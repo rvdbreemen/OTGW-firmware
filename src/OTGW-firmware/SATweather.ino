@@ -559,116 +559,78 @@ void weatherLoop()
 //=====================================================================
 void weatherSendStatusJSON()
 {
-  sendStartJsonMap(F(""));
-  sendJsonMapEntry(F("enabled"),      settings.sat.bWeatherEnable);
-  sendJsonMapEntry(F("valid"),        state.sat.weather.bValid);
+  // ADR-141: ArduinoJson v7. The old hand-rolled streaming map emitted every
+  // float through dtostrf as a QUOTED string ("21.5"); native assignment makes
+  // them real JSON numbers (the sanctioned "drop the printf formatting"
+  // behaviour — ArduinoJson renders native numeric precision). Bools/ints were
+  // already correct and stay so. Collapses the old entryBuf[300]/tmpBuf stack
+  // buffers (TASK-197) into one heap doc. The wrapper key was F("") => a flat
+  // ROOT object, so build directly on the document root (not a child object).
+  JsonDocument doc;
+  doc[F("enabled")] = settings.sat.bWeatherEnable;
+  doc[F("valid")]   = state.sat.weather.bValid;
 
-  {
-    char tmpBuf[10];
-    // Core SAT fields — both platforms
-    dtostrf(state.sat.weather.fTemperature,   1, 1, tmpBuf);
-    sendJsonMapEntry(F("temperature"),         tmpBuf);
-    dtostrf(state.sat.weather.fApparentTemp,  1, 1, tmpBuf);
-    sendJsonMapEntry(F("apparent_temp"),       tmpBuf);
-    dtostrf(state.sat.weather.fHumidity,      1, 0, tmpBuf);
-    sendJsonMapEntry(F("humidity"),            tmpBuf);
-    dtostrf(state.sat.weather.fWindSpeed,     1, 1, tmpBuf);
-    sendJsonMapEntry(F("wind_speed"),          tmpBuf);
-    dtostrf(state.sat.weather.fCloudCover,    1, 0, tmpBuf);
-    sendJsonMapEntry(F("cloud_cover"),         tmpBuf);
+  // Core SAT fields — both platforms
+  doc[F("temperature")]   = state.sat.weather.fTemperature;
+  doc[F("apparent_temp")] = state.sat.weather.fApparentTemp;
+  doc[F("humidity")]      = state.sat.weather.fHumidity;
+  doc[F("wind_speed")]    = state.sat.weather.fWindSpeed;
+  doc[F("cloud_cover")]   = state.sat.weather.fCloudCover;
 #if HAS_WEATHER_FORECAST
-    // Extended fields — ESP32 only
-    dtostrf(state.sat.weather.fWindDirection, 1, 0, tmpBuf);
-    sendJsonMapEntry(F("wind_direction"),      tmpBuf);
-    dtostrf(state.sat.weather.fWindGusts,     1, 1, tmpBuf);
-    sendJsonMapEntry(F("wind_gusts"),          tmpBuf);
-    dtostrf(state.sat.weather.fPressureMsl,   1, 1, tmpBuf);
-    sendJsonMapEntry(F("pressure_msl"),        tmpBuf);
-    dtostrf(state.sat.weather.fPrecipitation, 1, 1, tmpBuf);
-    sendJsonMapEntry(F("precipitation"),       tmpBuf);
-    dtostrf(state.sat.weather.fRain,          1, 1, tmpBuf);
-    sendJsonMapEntry(F("rain"),                tmpBuf);
-    dtostrf(state.sat.weather.fSnowfall,      1, 1, tmpBuf);
-    sendJsonMapEntry(F("snowfall"),            tmpBuf);
-    sendJsonMapEntry(F("weather_code"),        (int32_t)state.sat.weather.iWeatherCode);
-    sendJsonMapEntry(F("is_day"),              state.sat.weather.bIsDay);
+  // Extended fields — ESP32 only
+  doc[F("wind_direction")] = state.sat.weather.fWindDirection;
+  doc[F("wind_gusts")]     = state.sat.weather.fWindGusts;
+  doc[F("pressure_msl")]   = state.sat.weather.fPressureMsl;
+  doc[F("precipitation")]  = state.sat.weather.fPrecipitation;
+  doc[F("rain")]           = state.sat.weather.fRain;
+  doc[F("snowfall")]       = state.sat.weather.fSnowfall;
+  doc[F("weather_code")]   = (int32_t)state.sat.weather.iWeatherCode;
+  doc[F("is_day")]         = state.sat.weather.bIsDay;
 #endif  // HAS_WEATHER_FORECAST
-    dtostrf(settings.sat.fWeatherLat,         1, 4, tmpBuf);
-    sendJsonMapEntry(F("latitude"),            tmpBuf);
-    dtostrf(settings.sat.fWeatherLon,         1, 4, tmpBuf);
-    sendJsonMapEntry(F("longitude"),           tmpBuf);
-  }
+  doc[F("latitude")]  = settings.sat.fWeatherLat;
+  doc[F("longitude")] = settings.sat.fWeatherLon;
 
-  sendJsonMapEntry(F("fetch_errors"), (int32_t)state.sat.weather.iFetchErrors);
+  doc[F("fetch_errors")] = (int32_t)state.sat.weather.iFetchErrors;
 
   // Age in seconds
   if (state.sat.weather.bValid && state.sat.weather.iLastUpdateMs > 0) {
     uint32_t ageSec = (millis() - state.sat.weather.iLastUpdateMs) / 1000;
-    sendJsonMapEntry(F("age_seconds"), (int32_t)ageSec);
+    doc[F("age_seconds")] = (int32_t)ageSec;
   } else {
-    sendJsonMapEntry(F("age_seconds"), (int32_t)-1);
+    doc[F("age_seconds")] = (int32_t)-1;
   }
 
 #if HAS_WEATHER_FORECAST
-  // 24-hour forecast arrays — ESP32 only
+  // 24-hour forecast arrays — ESP32 only. Already unquoted numbers in the old
+  // code (dtostrf output went in raw, not via sendJsonMapEntry), so these stay
+  // numbers — no type change. Empty forecast (count==0) => [], as before.
   {
-    char entryBuf[300];
-    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast_temp\":["));
+    JsonArray a = doc[F("forecast_temp")].to<JsonArray>();
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
-      if (i > 0 && pos < sizeof(entryBuf) - 9) entryBuf[pos++] = ',';
-      char tmpBuf[8];
-      dtostrf(_weather_forecastTemp[i], 1, 1, tmpBuf);
-      size_t len = strlen(tmpBuf);
-      if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
+      a.add(_weather_forecastTemp[i]);
     }
-    entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
-    sendBeforenext(); restSendContent(entryBuf);
   }
-
   {
-    char entryBuf[300];
-    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast_dewpt\":["));
+    JsonArray a = doc[F("forecast_dewpt")].to<JsonArray>();
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
-      if (i > 0 && pos < sizeof(entryBuf) - 9) entryBuf[pos++] = ',';
-      char tmpBuf[8];
-      dtostrf(_weather_forecastDewPt[i], 1, 1, tmpBuf);
-      size_t len = strlen(tmpBuf);
-      if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
+      a.add(_weather_forecastDewPt[i]);
     }
-    entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
-    sendBeforenext(); restSendContent(entryBuf);
   }
-
   {
-    char entryBuf[200];
-    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast_cloud\":["));
+    JsonArray a = doc[F("forecast_cloud")].to<JsonArray>();
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
-      if (i > 0 && pos < sizeof(entryBuf) - 5) entryBuf[pos++] = ',';
-      char tmpBuf[5];
-      snprintf(tmpBuf, sizeof(tmpBuf), "%d", (int)_weather_forecastCloud[i]);
-      size_t len = strlen(tmpBuf);
-      if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
+      a.add(_weather_forecastCloud[i]);
     }
-    entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
-    sendBeforenext(); restSendContent(entryBuf);
   }
-
   {
-    char entryBuf[200];
-    size_t pos = snprintf_P(entryBuf, sizeof(entryBuf), PSTR("\"forecast_precip_prob\":["));
+    JsonArray a = doc[F("forecast_precip_prob")].to<JsonArray>();
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
-      if (i > 0 && pos < sizeof(entryBuf) - 5) entryBuf[pos++] = ',';
-      char tmpBuf[5];
-      snprintf(tmpBuf, sizeof(tmpBuf), "%d", (int)_weather_forecastPrecipProb[i]);
-      size_t len = strlen(tmpBuf);
-      if (pos + len < sizeof(entryBuf) - 2) { memcpy(entryBuf + pos, tmpBuf, len); pos += len; }
+      a.add(_weather_forecastPrecipProb[i]);
     }
-    entryBuf[pos++] = ']'; entryBuf[pos] = '\0';
-    sendBeforenext(); restSendContent(entryBuf);
   }
 #endif  // HAS_WEATHER_FORECAST
 
-  sendEndJsonMap(F(""));
+  restSendJson(doc);
 }
 
 //=====================================================================

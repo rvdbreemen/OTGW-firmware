@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-17T04:04:44.111Z
-> Files: 10 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-18T05:13:41.757Z
+> Files: 37 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/01-raw/sessies/
 
@@ -32,6 +32,8 @@
 
 ## ./
 
+- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~45481 tok)
+- `platformio.ini` — Declares used (~3485 tok)
 
 ## .claude/
 
@@ -368,7 +370,10 @@
 
 ## C:/Users/rvdbr/.claude/projects/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/memory/
 
+- `feedback_capture_transcript_naming.md` (~421 tok)
+- `feedback_test_secrets_outside_repo.md` (~535 tok)
 - `MEMORY.md` — OTGW-firmware Project Memory (~5202 tok)
+- `project_asynctcp_telnet_rxtimeout.md` (~920 tok)
 - `project_loop_adr_self_accept_bug.md` (~1771 tok)
 - `project_task879_twdt_core1_starvation.md` (~1466 tok)
 
@@ -383,10 +388,12 @@
 
 ## docs/adr/
 
+- `ADR-053-large-feature-buffer-static-allocation.md` — ADR-053: Large Feature Buffer Static Allocation (~3881 tok)
 - `ADR-143-async-telnet-ser2net-transport-asynctcp.md` — ADR-143: Telnet + ser2net transport on AsyncTCP (AsyncSimpleTelnet) to remove loop-task socket-write (~2217 tok)
 
 ## docs/api/
 
+- `openapi.yaml` — Declares metadata (~42557 tok)
 
 ## docs/audits/
 
@@ -420,15 +427,37 @@
 
 ## scripts/
 
+- `_secrets.py` — Shared secret/identity loader for the capture + test scripts. (~858 tok)
+- `add_op_security.py` — One-shot (TASK-881): add `security: [basicAuth]` to every /v2 POST/PUT (~494 tok)
+- `capture-mqtt-debug.bat` — Declares Show (~18948 tok)
+- `capture-serial.py` — Capture the ESP32-S3 USB-serial console (boot ROM + IDF logs + panic backtrace). (~1886 tok)
+- `capture-settings.example.json` (~232 tok)
+- `gen_sat_props.py` — One-shot helper (TASK-881): generate type-accurate OpenAPI properties for the (~2383 tok)
+- `json_golden.py` — TASK-867 regression oracle: snapshot every v2 GET JSON response, then after the (~1717 tok)
+- `otgw-test.py` — OTGW32 build -> flash -> capture -> test -> analyse workflow (autonomous loops). (~2338 tok)
+- `wf-arduinojson-fanout.js` — Exports meta (~1560 tok)
+
+## scripts/tests/
+
+- `provision_mqtt.py` — ACTIVE provisioning: point the OTGW-under-test at the MQTT broker, then reboot. (~1362 tok)
+- `test_telnet.py` — ACTIVE telnet/ser2net probe for the OTGW32 (separate from the passive monitors). (~1805 tok)
+- `test_webserver.py` — ACTIVE webserver test for the OTGW32 (separate from the passive capture scripts). (~1044 tok)
 
 ## src/OTGW-firmware/
 
+- `FSexplorer.ino` — Declares String (~7897 tok)
 - `handleDebug.ino` — Forward declaration — defined in SATweather.ino. (~7479 tok)
 - `networkStuff.ino` — Declares char (~10115 tok)
-- `OTGW-Core.h` — ifndef OTGWCore_h (~13753 tok)
+- `OTDirect.ino` — Declares instances (~41614 tok)
+- `OTGW-Core.h` — ifndef OTGWCore_h (~13863 tok)
 - `OTGW-Core.ino` — Declares char (~77291 tok)
-- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~11450 tok)
+- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~11498 tok)
 - `OTGW-firmware.ino` — Declares WifiPortalResetState (~11353 tok)
+- `restAPI.ino` — include <string.h> (~46253 tok)
+- `SATble.ino` — Declares uint32_t (~10406 tok)
+- `SATweather.ino` — Declares uint16_t (~8088 tok)
+- `webhook.ino` — ****** (~6011 tok)
+- `webServerCompat.h` — Declares uint8_t (~4827 tok)
 
 ## src/OTGW-firmware/data/
 
@@ -438,6 +467,10 @@
 
 ## src/libraries/Platform/src/
 
+
+## src/libraries/SimpleTelnet/src/
+
+- `AsyncSimpleTelnet.h` — Declares uint8_t (~5411 tok)
 
 ## tests/webui/
 

@@ -732,10 +732,11 @@ static int satBLERosterFindSlot(const char* mac)
   return -1;
 }
 
-// Stream the discovery roster as JSON (one map with top-level meta plus
-// a "sensors" array of per-slot objects). Uses sendStartJsonMap +
-// sendJsonMapEntry for the meta fields, then drops to raw sendContent
-// for the array (the helpers do not support nested arrays).
+// Stream the discovery roster as JSON (top-level meta fields plus a
+// "sensors" array of per-slot objects). ADR-141: built as a single
+// ArduinoJson v7 document and serialised in one shot via restSendJson().
+// ArduinoJson nests the array natively and escapes the user label, so the
+// old manual nesting + escapeJsonStringTo + dtostrf scaffolding is gone.
 void satBLERosterSendJSON()
 {
   const uint32_t now = millis();
@@ -745,21 +746,14 @@ void satBLERosterSendJSON()
     if (settings.sat.sBleMac[i][0] != '\0') cnt++;
   }
 
-  sendStartJsonMap("");
-  sendJsonMapEntry(F("max_slots"),          (int32_t)SAT_BLE_MAX_ROSTER);
-  sendJsonMapEntry(F("populated_slots"),    (int32_t)cnt);
-  sendJsonMapEntry(F("roster_full"),        (cnt >= SAT_BLE_MAX_ROSTER));
-  sendJsonMapEntry(F("dropped_since_full"), (int32_t)_bleRosterFullCount);
-  sendJsonMapEntry(F("selected_mac"),       settings.sat.sBleMAC);
+  JsonDocument doc;
+  doc[F("max_slots")]          = (int32_t)SAT_BLE_MAX_ROSTER;
+  doc[F("populated_slots")]    = (int32_t)cnt;
+  doc[F("roster_full")]        = (cnt >= SAT_BLE_MAX_ROSTER);
+  doc[F("dropped_since_full")] = (int32_t)_bleRosterFullCount;
+  doc[F("selected_mac")]       = settings.sat.sBleMAC;
 
-  // Sensors array — manual JSON since the helpers do not nest arrays.
-  // Route through restSendContent(P) so these bytes share the ESP32
-  // coalescing buffer (jsonStuff.ino sTxBuf): a raw httpServer.sendContent
-  // would flush ahead of the buffered wrapper and scramble the JSON.
-  sendBeforenext(); sendIdent();
-  restSendContentP(PSTR("\"sensors\": ["));
-
-  bool firstSensor = true;
+  JsonArray sensors = doc[F("sensors")].to<JsonArray>();
   for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
     if (settings.sat.sBleMac[i][0] == '\0') continue;
 
@@ -774,35 +768,20 @@ void satBLERosterSendJSON()
                        strcasecmp(settings.sat.sBleMac[i],
                                   settings.sat.sBleMAC) == 0);
 
-    char escapedLabel[64];
-    escapeJsonStringTo(settings.sat.sBleLabel[i], escapedLabel,
-                       sizeof(escapedLabel));
-
-    char tempBuf[12], humBuf[12];
-    dtostrf(snap.fTemperature, 1, 2, tempBuf);
-    dtostrf(snap.fHumidity,    1, 2, humBuf);
-
-    char buf[256];
-    snprintf_P(buf, sizeof(buf),
-               PSTR("%s{\"slot\":%d,\"mac\":\"%s\",\"label\":\"%s\","
-                    "\"temp\":%s,\"hum\":%s,\"battery\":%u,\"rssi\":%d,"
-                    "\"age_ms\":%u,\"valid\":%s,\"selected\":%s}"),
-               firstSensor ? "" : ",",
-               i,
-               settings.sat.sBleMac[i],
-               escapedLabel,
-               tempBuf, humBuf,
-               (unsigned)snap.iBattery,
-               (int)snap.iRssi,
-               (unsigned)(fresh ? (now - snap.iLastSeenMs) : 0),
-               fresh      ? "true" : "false",
-               isSelected ? "true" : "false");
-    restSendContent(buf);
-    firstSensor = false;
+    JsonObject e = sensors.add<JsonObject>();
+    e[F("slot")]     = i;
+    e[F("mac")]      = settings.sat.sBleMac[i];
+    e[F("label")]    = settings.sat.sBleLabel[i];
+    e[F("temp")]     = snap.fTemperature;
+    e[F("hum")]      = snap.fHumidity;
+    e[F("battery")]  = (uint32_t)snap.iBattery;
+    e[F("rssi")]     = (int32_t)snap.iRssi;
+    e[F("age_ms")]   = (uint32_t)(fresh ? (now - snap.iLastSeenMs) : 0);
+    e[F("valid")]    = fresh;
+    e[F("selected")] = isSelected;
   }
-  restSendContentP(PSTR("]"));
 
-  sendEndJsonMap("");
+  restSendJson(doc);
 }
 
 // Promote a roster MAC to the active SAT input. Returns false if mac

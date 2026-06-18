@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.206
+**  Version  : v2.0.0-alpha.207
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -266,87 +266,74 @@ void apifirmwarefilelist() {
   unsigned int entryCount = 0;
   if (state.debug.bRestAPI) DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
 
-  // 150 bytes covers longest entry: path (~30) + version (~32) + fwversion (~32) + JSON overhead
-  char entryBuffer[150];
   // ADR-004: stack char[] instead of String to avoid per-iteration heap churn.
   char version[32]   = {0};
   char fwversion[32] = {0};
   File f;
-  bool firstEntry = true;
 
   String dirpath = "/" + String(state.pic.sDeviceid);
   if (state.debug.bRestAPI) DebugTf(PSTR("dirpath=%s\r\n"), dirpath.c_str());
 
-  // Bounded JSON array (<= MAX_FILES_IN_LIST hex entries) into the per-request
-  // response stream; finalized once at the end (TASK-865.9).
-  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
-  AsyncResponseStream *s = restBeginStream("application/json");
-  if (!s) return;
-  s->print(F("["));
+  // ADR-141: ArduinoJson v7. Build the bounded array of hex entries into one
+  // JsonDocument, then stream it once via restSendJson(). Each entry holds the
+  // file name, its stored .ver version and size — assigned as objects (String /
+  // char[]) so ArduinoJson copies them; never .c_str() (that stores a dangling
+  // pointer, the doc is serialized after this function's locals are gone).
+  JsonDocument doc;
+  JsonArray arr = doc.to<JsonArray>();
 
   PlatformDir dir(dirpath.c_str());
-  if (!dir.valid()) {
-    s->print(F("]\r\n"));
-    restFinalize();
-    DebugTf(PSTR("api firmware/files: 0 entries (%lums)\r\n"),
-            (unsigned long)(millis() - startMs));
-    return;
-  }
-  while (dir.next()) {
-    String entryName = dir.fileName();
-    size_t entrySize = dir.fileSize();
-    if (entryName.endsWith(".hex")) {
-      version[0]   = '\0';
-      fwversion[0] = '\0';
-      String hexfile = dirpath + "/" + entryName;
-      String verfile = hexfile;
-      verfile.replace(".hex", ".ver");
-      f = LittleFS.open(verfile, "r");
-      if (f) {
-        // ADR-004: readBytesUntil into stack buffer (pattern: helperStuff.ino:690).
-        size_t n = f.readBytesUntil('\n', (uint8_t*)version, sizeof(version) - 1);
-        version[n] = '\0';
-        // Trim trailing CR (Windows-style lines) and whitespace.
-        while (n > 0 && (version[n-1] == '\r' || version[n-1] == ' ' || version[n-1] == '\t')) {
-          version[--n] = '\0';
-        }
-        f.close();
-      }
-
-      GetVersion(hexfile.c_str(), fwversion, sizeof(fwversion));
-
-      if (state.debug.bRestAPI) DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion);
-      if (fwversion[0] != '\0' && strcmp(fwversion, version) != 0) {
-        strlcpy(version, fwversion, sizeof(version));
-        if (f = LittleFS.open(verfile, "w")) {
-          if (state.debug.bRestAPI) DebugTf(PSTR("writing %s to %s\r\n"), version, verfile.c_str());
-          f.print(version);
-          f.print('\n');
+  if (dir.valid()) {
+    while (dir.next()) {
+      String entryName = dir.fileName();
+      size_t entrySize = dir.fileSize();
+      if (entryName.endsWith(".hex")) {
+        version[0]   = '\0';
+        fwversion[0] = '\0';
+        String hexfile = dirpath + "/" + entryName;
+        String verfile = hexfile;
+        verfile.replace(".hex", ".ver");
+        f = LittleFS.open(verfile, "r");
+        if (f) {
+          // ADR-004: readBytesUntil into stack buffer (pattern: helperStuff.ino:690).
+          size_t n = f.readBytesUntil('\n', (uint8_t*)version, sizeof(version) - 1);
+          version[n] = '\0';
+          // Trim trailing CR (Windows-style lines) and whitespace.
+          while (n > 0 && (version[n-1] == '\r' || version[n-1] == ' ' || version[n-1] == '\t')) {
+            version[--n] = '\0';
+          }
           f.close();
         }
+
+        GetVersion(hexfile.c_str(), fwversion, sizeof(fwversion));
+
+        if (state.debug.bRestAPI) DebugTf(PSTR("GetVersion(%s) returned [%s]\r\n"), hexfile.c_str(), fwversion);
+        if (fwversion[0] != '\0' && strcmp(fwversion, version) != 0) {
+          strlcpy(version, fwversion, sizeof(version));
+          if (f = LittleFS.open(verfile, "w")) {
+            if (state.debug.bRestAPI) DebugTf(PSTR("writing %s to %s\r\n"), version, verfile.c_str());
+            f.print(version);
+            f.print('\n');
+            f.close();
+          }
+        }
+
+        JsonObject e = arr.add<JsonObject>();
+        e[F("name")]    = entryName;        // String -> copied
+        e[F("version")] = version;          // char[] -> copied
+        e[F("size")]    = (int)entrySize;
+
+        feedWatchDog(); // Feed watchdog during potentially long operation
+        entryCount++;
       }
-
-      // Add comma separator after first entry
-      if (!firstEntry) {
-        s->print(F(","));
-      }
-      firstEntry = false;
-
-      // Stream this entry directly (fits in 256-byte buffer)
-      // CSTR() macro handles null safety globally - returns "" if null
-      snprintf_P(entryBuffer, sizeof(entryBuffer),
-                 PSTR("{\"name\":\"%s\",\"version\":\"%s\",\"size\":%d}"),
-                 CSTR(entryName), CSTR(version), (int)entrySize);
-      s->print(entryBuffer);
-
-      feedWatchDog(); // Feed watchdog during potentially long operation
-      entryCount++;
     }
   }
 
-  // Close JSON array
-  s->print(F("]\r\n"));
-  restFinalize();
+  // Bounded JSON array (<= the few hex entries present) into the per-request
+  // response stream; finalized once (TASK-865.9). CORS header pushed before
+  // restSendJson() so webApplyHeaders() picks it up (ADR-035 unversioned).
+  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
+  restSendJson(doc);
 
   DebugTf(PSTR("api firmware/files: %u entries (%lums)\r\n"),
           entryCount, (unsigned long)(millis() - startMs));
@@ -388,41 +375,35 @@ void apilistfiles()
     path = argCompat("path");
   }
 
-  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
-  AsyncResponseStream *s = restBeginStream("application/json");
-  if (!s) return;
-  s->print(F("["));
+  // ADR-141: ArduinoJson v7. Heterogeneous array — up to MAX_FILES_IN_LIST file
+  // objects {name,size,type} followed by ONE trailing storage-summary object.
+  // Order preserved: files first, summary last. Names are assigned as String
+  // (copied by ArduinoJson); "dir"/"file" are genuine string labels (not bools).
+  JsonDocument doc;
+  JsonArray arr = doc.to<JsonArray>();
 
-  char buf[100];
-  bool first = true;
   int fileCount = 0;
   bool truncated = false;
 
   PlatformDir dir(path.c_str());
-  if (!dir.valid()) {
-    s->print(F("]\r\n"));
-    restFinalize();
-    return;
-  }
-  while (dir.next()) {
-    String fname = dir.fileName();
-    long   fsize = (long)dir.fileSize();
-    bool   isDir = dir.isDirectory();
-    feedWatchDog();
-    // Skip hidden files/directories (names starting with '.')
-    if (fname.charAt(0) == '.') {
-      continue;
-    }
-    if (fileCount >= MAX_FILES_IN_LIST) { truncated = true; break; }
-    if (!first) s->print(F(","));
-    first = false;
+  if (dir.valid()) {
+    while (dir.next()) {
+      String fname = dir.fileName();
+      long   fsize = (long)dir.fileSize();
+      bool   isDir = dir.isDirectory();
+      feedWatchDog();
+      // Skip hidden files/directories (names starting with '.')
+      if (fname.charAt(0) == '.') {
+        continue;
+      }
+      if (fileCount >= MAX_FILES_IN_LIST) { truncated = true; break; }
 
-    snprintf_P(buf, sizeof(buf),
-      PSTR("{\"name\":\"%s\",\"size\":%ld,\"type\":\"%s\"}"),
-      fname.c_str(), fsize,
-      isDir ? "dir" : "file");
-    s->print(buf);
-    fileCount++;
+      JsonObject e = arr.add<JsonObject>();
+      e[F("name")] = fname;                  // String -> copied
+      e[F("size")] = fsize;                  // long
+      e[F("type")] = isDir ? "dir" : "file"; // genuine string label
+      fileCount++;
+    }
   }
 
   // Storage info as last entry (raw bytes — frontend formats for display)
@@ -430,17 +411,16 @@ void apilistfiles()
   platformFSInfo(fsInfo);
   unsigned long totalBytes = fsInfo.totalBytes;
   unsigned long usedBytesRaw = fsInfo.usedBytes;
-  if (!first) s->print(F(","));
   unsigned long usedBytes = (unsigned long)(usedBytesRaw * 1.05);
   unsigned long freeBytes = totalBytes - usedBytes;
-  snprintf_P(buf, sizeof(buf),
-    PSTR("{\"usedBytes\":%lu,\"totalBytes\":%lu,\"freeBytes\":%lu,\"truncated\":%s}"),
-    usedBytes, totalBytes, freeBytes,
-    truncated ? "true" : "false");
-  s->print(buf);
+  JsonObject summary = arr.add<JsonObject>();
+  summary[F("usedBytes")]  = usedBytes;      // unsigned long
+  summary[F("totalBytes")] = totalBytes;     // unsigned long
+  summary[F("freeBytes")]  = freeBytes;      // unsigned long
+  summary[F("truncated")]  = truncated;      // real JSON bool (was unquoted %s already)
 
-  s->print(F("]\r\n"));
-  restFinalize();
+  webPushHeader(F("Access-Control-Allow-Origin"), F("*"));
+  restSendJson(doc);
 
 } // apilistfiles()
 

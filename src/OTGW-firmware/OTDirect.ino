@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.206
+**  Version  : v2.0.0-alpha.207
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -991,56 +991,48 @@ void updateOTDirectStatus() {
 }
 
 // ---------------------------------------------------------------------------
-// sendOTDirectOverridesJSON — stream all active overrides as chunked JSON response.
-// Uses HTTP chunked transfer encoding: no large buffer needed, only a 48-byte
-// formatting scratch on the stack per entry.  Called from restAPI.ino.
+// sendOTDirectOverridesJSON — emit all active overrides as a JSON response.
+// ADR-141: built as one ArduinoJson v7 document and streamed via restSendJson()
+// (serializeJson chunks into the AsyncResponseStream). Called from restAPI.ino.
 // Caller must set CORS headers before calling this function.
 // ---------------------------------------------------------------------------
 void sendOTDirectOverridesJSON() {
-  char chunk[48];
-
   // Bounded JSON into the per-request response stream (TASK-865.9). The caller
   // (restAPI handleOTDirect) has already queued the CORS header via
   // sendCorsOriginHeader() before calling this.
-  AsyncResponseStream *s = restBeginStream("application/json");
-  if (!s) return;
-  s->print(F("{\"overrides\":{\"write\":["));
+  JsonDocument doc;
 
-  bool first = true;
+  JsonObject overrides = doc[F("overrides")].to<JsonObject>();
+
+  // All four arrays are created unconditionally so empty tables still serialize
+  // as [] — preserving the exact structure the old hand-rolled stream emitted.
+  JsonArray write = overrides[F("write")].to<JsonArray>();
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
     if (!otOverrides[i].active) continue;
-    snprintf_P(chunk, sizeof(chunk), PSTR("%s{\"msgid\":%u,\"value\":%u}"),
-               first ? "" : ",", otOverrides[i].msgId, otOverrides[i].overrideValue);
-    s->print(chunk);
-    first = false;
+    JsonObject e = write.add<JsonObject>();
+    e[F("msgid")] = (unsigned)otOverrides[i].msgId;
+    e[F("value")] = (unsigned)otOverrides[i].overrideValue;
   }
 
-  s->print(F("],\"response\":["));
-  first = true;
+  JsonArray response = overrides[F("response")].to<JsonArray>();
   for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
     if (!otResponseOverrides[i].active) continue;
-    snprintf_P(chunk, sizeof(chunk), PSTR("%s{\"msgid\":%u,\"value\":%u}"),
-               first ? "" : ",", otResponseOverrides[i].msgId, otResponseOverrides[i].value);
-    s->print(chunk);
-    first = false;
+    JsonObject e = response.add<JsonObject>();
+    e[F("msgid")] = (unsigned)otResponseOverrides[i].msgId;
+    e[F("value")] = (unsigned)otResponseOverrides[i].value;
   }
 
-  s->print(F("],\"modify\":["));
-  first = true;
+  JsonArray modify = overrides[F("modify")].to<JsonArray>();
   for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
     if (!otResponseModifiers[i].active) continue;
-    snprintf_P(chunk, sizeof(chunk), PSTR("%s{\"msgid\":%u,\"value\":%u}"),
-               first ? "" : ",", otResponseModifiers[i].msgId, otResponseModifiers[i].value);
-    s->print(chunk);
-    first = false;
+    JsonObject e = modify.add<JsonObject>();
+    e[F("msgid")] = (unsigned)otResponseModifiers[i].msgId;
+    e[F("value")] = (unsigned)otResponseModifiers[i].value;
   }
 
-  s->print(F("],\"unknown\":["));
-  first = true;
+  JsonArray unknown = overrides[F("unknown")].to<JsonArray>();
   for (uint8_t i = 0; i < otUnknownIdCount; i++) {
-    snprintf_P(chunk, sizeof(chunk), PSTR("%s%u"), first ? "" : ",", otUnknownIds[i]);
-    s->print(chunk);
-    first = false;
+    unknown.add((unsigned)otUnknownIds[i]);
   }
 
   // TASK-498 (4B-M2): expose queue depth + high-water-mark so non-telnet
@@ -1048,13 +1040,12 @@ void sendOTDirectOverridesJSON() {
   // queue load. "queue" is a sibling of "overrides", not nested under it.
   // Normal operation should keep highWater well below capacity; climbing
   // values indicate a producer-rate problem worth investigation.
-  snprintf_P(chunk, sizeof(chunk),
-             PSTR("]},\"queue\":{\"depth\":%u,\"highWater\":%u,\"capacity\":%u}}"),
-             (unsigned)otCmdQueueDepth(),
-             (unsigned)otCmdQueueHighWater,
-             (unsigned)OT_CMD_QUEUE_SIZE);
-  s->print(chunk);
-  restFinalize();
+  JsonObject queue = doc[F("queue")].to<JsonObject>();
+  queue[F("depth")]     = (unsigned)otCmdQueueDepth();
+  queue[F("highWater")] = (unsigned)otCmdQueueHighWater;
+  queue[F("capacity")]  = (unsigned)OT_CMD_QUEUE_SIZE;
+
+  restSendJson(doc);
 }
 
 // ---------------------------------------------------------------------------
