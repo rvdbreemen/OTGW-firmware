@@ -1,6 +1,6 @@
 /*********
 **  Program  : webhook.ino
-**  Version  : v2.0.0-alpha.203
+**  Version  : v2.0.0-alpha.204
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -349,7 +349,12 @@ void testWebhook(bool testOn) {
   WebhookJob job;
   bool built;
   {
-    OTStateLock stateLock;            // brief: only the payload expansion, no I/O held
+    // TASK-879: bounded acquire (never the default 0 == portMAX_DELAY). testWebhook
+    // runs on the async_tcp task (POST /api/v2/webhook/test); the loop-task writer
+    // (processOT) holds otStateMutex across slow I/O, so an unbounded wait here can
+    // wedge the WDT-subscribed service task. On timeout buildWebhookJob proceeds
+    // unlocked — at worst a slightly-stale test payload.
+    OTStateLock stateLock(OT_STATE_READ_LOCK_MS);
     built = buildWebhookJob(testOn, job);
   }
   if (built) {
