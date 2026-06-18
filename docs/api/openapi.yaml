@@ -952,7 +952,12 @@ paths:
       tags:
         - Filesystem
       summary: List filesystem files
-      description: Returns list of files on the LittleFS filesystem.
+      description: |
+        Returns the contents of the LittleFS filesystem as a heterogeneous JSON
+        array. Each leading element is a file or directory entry; the FINAL
+        element is a storage-summary object (`usedBytes`/`totalBytes`/`freeBytes`/
+        `truncated`) rather than a file entry. Consumers must treat the last
+        element specially (detect by absence of `name`/presence of `totalBytes`).
       operationId: getFilesystemFiles
       responses:
         '200':
@@ -962,12 +967,46 @@ paths:
               schema:
                 type: array
                 items:
-                  type: object
-                  properties:
-                    name:
-                      type: string
-                    size:
-                      type: integer
+                  oneOf:
+                    - type: object
+                      description: File or directory entry
+                      properties:
+                        name:
+                          type: string
+                          description: Entry name (no leading slash)
+                        size:
+                          type: integer
+                          description: File size in bytes (0 for directories)
+                        type:
+                          type: string
+                          enum: [file, dir]
+                          description: Entry type
+                    - type: object
+                      description: Trailing storage-summary object (last array element)
+                      properties:
+                        usedBytes:
+                          type: integer
+                          description: Bytes used on the filesystem
+                        totalBytes:
+                          type: integer
+                          description: Total filesystem capacity in bytes
+                        freeBytes:
+                          type: integer
+                          description: Free bytes remaining
+                        truncated:
+                          type: boolean
+                          description: True if the listing was truncated (too many entries)
+              example:
+                - name: index.html
+                  size: 39791
+                  type: file
+                - name: fonts
+                  size: 0
+                  type: dir
+                - usedBytes: 971980
+                  totalBytes: 2097152
+                  freeBytes: 1125172
+                  truncated: false
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -2204,12 +2243,15 @@ paths:
         - SAT
       summary: Get SAT runtime status
       description: |
-        Returns the full SAT runtime state as a JSON object with ~50 fields covering
-        control mode, setpoints, PID state, temperature sensors, cycle diagnostics,
-        pressure, power, and safety status.
+        Returns the full SAT runtime state as a flat JSON object with 132 fields
+        covering control mode, setpoints, PID state, temperature sensors, cycle
+        diagnostics, pressure, power, thermal model, comfort, and BLE inputs
+        (schema `SatStatus`).
 
-        Add `?detail=full` to get extended health diagnostics including cycle statistics,
-        auto-tune state, OPV calibration phase, and pressure health details.
+        Add `?detail=full` to get the compact health view instead: a SEPARATE
+        22-field object (schema `SatHealth`) focused on cycle/flame/device health,
+        sync flags, error statistics, pressure trend, and auto-tune progress. It is
+        not a superset of the standard status.
       operationId: getSatStatus
       parameters:
         - name: detail
@@ -2219,14 +2261,19 @@ paths:
             type: string
             enum: [full]
           description: |
-            Pass `full` to get extended health diagnostics instead of the standard status JSON.
+            Pass `full` to get the compact `SatHealth` object instead of the
+            standard `SatStatus` JSON.
       responses:
         '200':
-          description: SAT status retrieved successfully
+          description: |
+            SAT status retrieved successfully. Returns `SatStatus` by default, or
+            `SatHealth` when `?detail=full` is supplied.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SatStatus'
+                oneOf:
+                  - $ref: '#/components/schemas/SatStatus'
+                  - $ref: '#/components/schemas/SatHealth'
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -3291,115 +3338,641 @@ components:
     SatStatus:
       type: object
       description: |
-        SAT runtime status. Contains ~50 fields covering control mode, setpoints,
-        PID state, temperature sensors, cycle diagnostics, pressure, power, and safety.
-        Add `?detail=full` to the request URL for extended health diagnostics.
+        SAT runtime status as a flat JSON object (no wrapper). Returned by
+        `GET /v2/sat/status`. Contains 132 fields covering control mode,
+        setpoints, PID state, temperature sensors, cycle diagnostics, pressure,
+        power, thermal model, comfort, and BLE inputs. Field set may grow as the
+        SAT engine evolves; consumers must ignore unknown keys. Add
+        `?detail=full` for the compact health view (see `SatHealth`).
       properties:
-        sat_status:
-          type: object
-          properties:
-            mode:
-              type: string
-              enum: [off, continuous, pwm]
-              description: Current control mode
-            active:
-              type: boolean
-              description: Whether SAT is actively controlling
-            setpoint:
-              type: number
-              description: Final flow temperature setpoint sent to boiler (°C)
-            target:
-              type: number
-              description: Target room temperature (°C)
-            heating_curve:
-              type: number
-              description: Heating curve calculated value (°C)
-            pid_output:
-              type: number
-              description: PID output = curve + P + I + D (°C)
-            error:
-              type: number
-              description: PID error = target - room temp (°C)
-            pid_p:
-              type: number
-              description: Proportional PID term (°C)
-            pid_i:
-              type: number
-              description: Integral PID term (°C)
-            pid_d:
-              type: number
-              description: Derivative PID term (°C)
-            kp:
-              type: number
-              description: Current Kp gain
-            ki:
-              type: number
-              description: Current Ki gain
-            kd:
-              type: number
-              description: Current Kd gain
-            room_temp:
-              type: number
-              description: Room temperature used by PID (°C)
-            outside_temp:
-              type: number
-              description: Outside temperature used by heating curve (°C)
-            boiler_status:
-              type: integer
-              minimum: 0
-              maximum: 14
-              description: "Boiler status code: 0=Off, 1=Idle, 2=Preheating, 3=At Setpoint, 4=Modulating Up, 5=Modulating Down, 6=Ignition Surge, 7=Stalled Ignition, 8=Anti-Cycling, 9=Pump Starting, 10=Waiting Flame, 11=Overshoot Cooling, 12=Post-Cycle, 13=Heating, 14=Cooling"
-            cycle_class:
-              type: string
-              enum: [none, good, overshoot, underheat, short, uncertain]
-              description: Last cycle classification
-            pwm_duty:
-              type: number
-              minimum: 0.0
-              maximum: 1.0
-              description: PWM duty cycle (0.00-1.00)
-            safety_tripped:
-              type: boolean
-              description: Safety shutdown active
-            pressure:
-              type: number
-              description: Smoothed system pressure (bar)
-            pressure_alarm:
-              type: boolean
-              description: Pressure alarm active
-            power:
-              type: number
-              description: Current boiler power (kW)
-            energy_total:
-              type: number
-              description: Cumulative energy (kWh)
-            flame_status:
-              type: string
-              enum: [insufficient_data, healthy, idle_ok, stuck_on, stuck_off, pwm_short, short_cycling]
-              description: Flame health status
+        enabled:
+          type: boolean
+          description: "SAT control loop enabled"
+        active:
+          type: boolean
+          description: "SAT actively driving the boiler setpoint"
+        control_mode:
+          type: integer
+          description: "Control mode (0=off, 1=continuous, 2=PWM)"
+        boiler_status:
+          type: string
+          description: "Boiler status label (off/idle/preheating/at_setpoint/modulating/etc.)"
+        target_temp:
+          type: number
+          description: "Target room temperature (C)"
+        room_temp:
+          type: number
+          nullable: true
+          description: "Room temperature used by the PID (C); null when no sensor"
+        outside_temp:
+          type: number
+          description: "Outside temperature used by the heating curve (C)"
+        heating_curve:
+          type: number
+          description: "Heating-curve flow temperature (C)"
+        pid_output:
+          type: number
+          description: "PID output = curve + P + I + D (C)"
+        final_setpoint:
+          type: number
+          description: "Final flow setpoint sent to the boiler (C)"
+        error:
+          type: number
+          description: "PID error = target - room (C)"
+        pid_p:
+          type: number
+          description: "Proportional PID term (C)"
+        pid_i:
+          type: number
+          description: "Integral PID term (C)"
+        pid_d:
+          type: number
+          description: "Derivative PID term (C)"
+        kp:
+          type: number
+          description: "Active Kp gain"
+        ki:
+          type: number
+          description: "Active Ki gain"
+        kd:
+          type: number
+          description: "Active Kd gain"
+        raw_derivative:
+          type: number
+          description: "Raw (unfiltered) derivative of the error"
+        coefficient:
+          type: number
+          description: "Heating-curve coefficient (steepness)"
+        deadband:
+          type: number
+          description: "PID deadband (C) around the target"
+        overshoot_margin:
+          type: number
+          description: "Allowed overshoot above target before a cycle is classed as overshoot (C)"
+        cycle_count:
+          type: integer
+          description: "Total boiler cycles counted"
+        cycles_this_hour:
+          type: integer
+          description: "Boiler cycles in the trailing hour"
+        last_cycle_class:
+          type: integer
+          description: "Last cycle classification code (0=none,1=good,2=overshoot,3=underheat,4=short,5=uncertain)"
+        cycle_max_flow:
+          type: number
+          description: "Peak flow temperature in the current/last cycle (C)"
+        cycle_overshoot_sec:
+          type: integer
+          description: "Seconds spent above target in the current/last cycle"
+        duty_ratio:
+          type: number
+          description: "Flame-on duty ratio (0.0-1.0)"
+        overshoot_fraction:
+          type: number
+          description: "Fraction of cycle time spent in overshoot (0.0-1.0)"
+        underheat_fraction:
+          type: number
+          description: "Fraction of cycle time spent underheating (0.0-1.0)"
+        cycle_phase:
+          type: string
+          description: "Current cycle phase label (idle/heating/cooling/etc.)"
+        phase_duration_sec:
+          type: integer
+          description: "Seconds elapsed in the current cycle phase"
+        pwm_duty:
+          type: number
+          description: "PWM duty cycle (0.0-1.0)"
+        pwm_flame_req:
+          type: boolean
+          description: "PWM currently requesting flame on"
+        active_preset:
+          type: integer
+          description: "Active preset index"
+        mod_suppressed:
+          type: boolean
+          description: "Modulation suppression active"
+        dhw_active:
+          type: boolean
+          description: "Domestic hot water draw active"
+        dhw_setpoint:
+          type: number
+          description: "DHW setpoint (C)"
+        dhw_config_tank:
+          type: boolean
+          description: "DHW configured as a storage tank"
+        dhw_enable:
+          type: boolean
+          description: "DHW enabled"
+        control_interval_sec:
+          type: integer
+          description: "Control loop interval (s)"
+        fallback_active:
+          type: boolean
+          description: "Fallback control active (sensor/comms loss)"
+        fallback_reason:
+          type: integer
+          description: "Fallback reason code"
+        max_rel_modulation:
+          type: integer
+          description: "Maximum relative modulation allowed (%)"
+        current_modulation:
+          type: integer
+          description: "Current relative modulation (%)"
+        ovp_value:
+          type: number
+          description: "Overshoot-protection learned value (C)"
+        ovp_enabled:
+          type: boolean
+          description: "Overshoot protection enabled"
+        ovp_calib_phase:
+          type: integer
+          description: "OVP calibration phase"
+        ovp_calib_max_temp:
+          type: number
+          description: "Max temperature seen during OVP calibration (C)"
+        ovp_calib_samples:
+          type: integer
+          description: "OVP calibration sample count"
+        heating_system:
+          type: integer
+          description: "Configured heating-system type code (0=auto)"
+        heating_system_detected:
+          type: integer
+          description: "Detected heating-system type code"
+        manufacturer:
+          type: string
+          description: "Boiler manufacturer label"
+        manufacturer_setting:
+          type: integer
+          description: "Configured manufacturer code (0=auto)"
+        manufacturer_detected:
+          type: integer
+          description: "Detected manufacturer (slave member) ID"
+        slave_memberid:
+          type: integer
+          description: "OpenTherm slave member ID"
+        max_setpoint_system:
+          type: number
+          description: "System maximum flow setpoint (C)"
+        external_temp_valid:
+          type: boolean
+          description: "External room temperature input valid"
+        external_outdoor_valid:
+          type: boolean
+          description: "External outdoor temperature input valid"
+        pv_surplus_w:
+          type: integer
+          description: "Reported PV surplus (W)"
+        pv_surplus_valid:
+          type: boolean
+          description: "PV surplus reading valid"
+        pv_boost_active:
+          type: boolean
+          description: "PV boost currently applied"
+        pv_boost_applied_c:
+          type: number
+          description: "PV boost added to setpoint (C)"
+        pv_boost_enabled:
+          type: boolean
+          description: "PV boost feature enabled"
+        safety_tripped:
+          type: boolean
+          description: "Safety shutdown active"
+        valves_open:
+          type: boolean
+          description: "Zone valves reported open"
+        window_open:
+          type: boolean
+          description: "Open-window detected"
+        window_detection:
+          type: boolean
+          description: "Open-window detection enabled"
+        push_setpoint:
+          type: boolean
+          description: "Setpoint pushed to boiler this cycle"
+        flame_off_offset:
+          type: number
+          description: "Flame-off setpoint offset (C)"
+        force_pwm:
+          type: boolean
+          description: "Force PWM mode regardless of conditions"
+        flow_offset:
+          type: number
+          description: "Flow-temperature offset applied (C)"
+        pressure:
+          type: number
+          description: "System water pressure (bar)"
+        pressure_drop_rate:
+          type: number
+          description: "Pressure drop rate (bar/min)"
+        pressure_alarm:
+          type: boolean
+          description: "Low/high pressure alarm active"
+        modulation_reliable:
+          type: boolean
+          description: "Modulation feedback considered reliable"
+        setpoint_mismatch:
+          type: boolean
+          description: "Boiler flow setpoint differs from commanded"
+        curve_recommendation:
+          type: string
+          description: "Heating-curve tuning recommendation (insufficient/raise/lower/ok)"
+        heating_curve_recommendation:
+          type: string
+          description: "Heating-curve recommendation (duplicate of curve_recommendation)"
+        mean_error:
+          type: number
+          description: "Mean PID error over the sample window (C)"
+        error_stddev:
+          type: number
+          description: "PID error standard deviation (C)"
+        target_temp_step:
+          type: number
+          description: "Target temperature adjustment step (C)"
+        power_kw:
+          type: number
+          description: "Estimated boiler power output (kW)"
+        energy_kwh:
+          type: number
+          description: "Estimated cumulative energy (kWh)"
+        boiler_capacity:
+          type: number
+          description: "Configured boiler capacity (kW)"
+        boiler_rated_kw:
+          type: number
+          description: "Rated boiler power (kW)"
+        boiler_efficiency:
+          type: number
+          description: "Assumed boiler efficiency (0.0-1.0)"
+        energy_estimated_kwh:
+          type: number
+          description: "Model-estimated energy (kWh)"
+        preset_sync:
+          type: boolean
+          description: "Preset synchronised with thermostat"
+        thermal_coeff:
+          type: number
+          description: "Thermal model coefficient"
+        thermal_drop_rate:
+          type: number
+          description: "Modelled room temperature drop rate (C/min)"
+        thermal_model_valid:
+          type: boolean
+          description: "Thermal model has enough data to be valid"
+        estimated_room:
+          type: number
+          description: "Model-estimated room temperature (C)"
+        last_known_room:
+          type: number
+          description: "Last known room temperature (C)"
+        solar_gain_active:
+          type: boolean
+          description: "Solar-gain compensation active"
+        indoor_rise_rate:
+          type: number
+          description: "Observed indoor temperature rise rate (C/min)"
+        summer_simmer:
+          type: boolean
+          description: "Summer simmer mode active"
+        summer_active:
+          type: boolean
+          description: "Summer mode active"
+        summer_hours_above:
+          type: number
+          description: "Hours outdoor temp stayed above the summer threshold"
+        summer_threshold:
+          type: number
+          description: "Outdoor temperature threshold for summer mode (C)"
+        summer_min_hours:
+          type: integer
+          description: "Minimum hours above threshold to enter summer mode"
+        comfort_adjust:
+          type: boolean
+          description: "Humidity comfort adjustment active"
+        humidity:
+          type: integer
+          description: "Relative humidity (%)"
+        humidity_valid:
+          type: boolean
+          description: "Humidity reading valid"
+        comfort_offset:
+          type: number
+          description: "Applied comfort setpoint offset (C)"
+        comfort_ref_humidity:
+          type: integer
+          description: "Reference humidity for comfort adjustment (%)"
+        comfort_max_offset:
+          type: number
+          description: "Maximum comfort offset (C)"
+        simulation:
+          type: boolean
+          description: "Simulation mode active"
+        sim_available:
+          type: boolean
+          description: "Simulation mode available on this build"
+        auto_tune:
+          type: boolean
+          description: "Auto-tune enabled"
+        auto_tune_active:
+          type: boolean
+          description: "Auto-tune currently running"
+        auto_tune_cycles:
+          type: integer
+          description: "Auto-tune cycles completed"
+        auto_tune_score:
+          type: number
+          description: "Auto-tune fit score"
+        auto_tune_rate:
+          type: number
+          description: "Auto-tune learning rate"
+        sensor_max_age:
+          type: integer
+          description: "Maximum sensor age before stale (s)"
+        error_monitoring:
+          type: boolean
+          description: "Error monitoring enabled"
+        auto_gains_value:
+          type: number
+          description: "Auto-gains aggressiveness value"
+        auto_gains:
+          type: boolean
+          description: "Automatic PID gain scheduling enabled"
+        kp_manual:
+          type: number
+          description: "Manual Kp gain (used when auto_gains off)"
+        ki_manual:
+          type: number
+          description: "Manual Ki gain"
+        kd_manual:
+          type: number
+          description: "Manual Kd gain"
+        thermal_comfort:
+          type: boolean
+          description: "Thermal-comfort mode active"
+        heating_mode:
+          type: string
+          description: "Heating mode label (comfort/eco/etc.)"
+        cycles_per_hour:
+          type: integer
+          description: "Target maximum boiler cycles per hour"
+        valve_offset:
+          type: number
+          description: "Valve compensation offset (C)"
+        solar_freeze_integral:
+          type: boolean
+          description: "Freeze the PID integral during solar gain"
+        multi_area:
+          type: boolean
+          description: "Multi-area control enabled"
+        multi_area_count:
+          type: integer
+          description: "Number of configured areas"
+        ble_enable:
+          type: boolean
+          description: "BLE thermostat input enabled"
+        ble_failover:
+          type: boolean
+          description: "BLE failover enabled"
+        ble_failover_active:
+          type: boolean
+          description: "BLE failover currently active"
+        ble_temp_valid:
+          type: boolean
+          description: "BLE temperature reading valid"
+        ble_sensor_count:
+          type: integer
+          description: "Number of BLE sensors seen"
       example:
-        sat_status:
-          mode: continuous
-          active: true
-          setpoint: 43.1
-          target: 21.0
-          heating_curve: 42.3
-          pid_output: 43.1
-          error: 0.5
-          pid_p: 0.82
-          pid_i: 0.03
-          pid_d: -0.04
-          room_temp: 20.5
-          outside_temp: 8.0
-          boiler_status: 3
-          cycle_class: good
-          pwm_duty: 0.0
-          safety_tripped: false
-          pressure: 1.5
-          pressure_alarm: false
-          power: 12.5
-          energy_total: 234.5
-          flame_status: healthy
+        enabled: false
+        active: false
+        control_mode: 0
+        boiler_status: "off"
+        target_temp: 20.0
+        room_temp: null
+        outside_temp: 0.0
+        heating_curve: 0.0
+        pid_output: 0.0
+        final_setpoint: 0.0
+        error: 0.0
+        pid_p: 0.0
+        pid_i: 0.0
+        pid_d: 0.0
+        kp: 0.0
+        ki: 0.0
+        kd: 0.0
+        raw_derivative: 0.0
+        coefficient: 1.5
+        deadband: 0.1
+        overshoot_margin: 2.0
+        cycle_count: 0
+        cycles_this_hour: 0
+        last_cycle_class: 0
+        cycle_max_flow: 0.0
+        cycle_overshoot_sec: 0
+        duty_ratio: 0.0
+        overshoot_fraction: 0.0
+        underheat_fraction: 0.0
+        cycle_phase: "idle"
+        phase_duration_sec: 0
+        pwm_duty: 0.0
+        pwm_flame_req: false
+        active_preset: 0
+        mod_suppressed: false
+        dhw_active: false
+        dhw_setpoint: 0.0
+        dhw_config_tank: false
+        dhw_enable: true
+        control_interval_sec: 30
+        fallback_active: false
+        fallback_reason: 0
+        max_rel_modulation: 100
+        current_modulation: 100
+        ovp_value: 0.0
+        ovp_enabled: false
+        ovp_calib_phase: 0
+        ovp_calib_max_temp: 0.0
+        ovp_calib_samples: 0
+        heating_system: 0
+        heating_system_detected: 1
+        manufacturer: "Other"
+        manufacturer_setting: 0
+        manufacturer_detected: 18
+        slave_memberid: 0
+        max_setpoint_system: 62.0
+        external_temp_valid: false
+        external_outdoor_valid: false
+        pv_surplus_w: 0
+        pv_surplus_valid: false
+        pv_boost_active: false
+        pv_boost_applied_c: 0.0
+        pv_boost_enabled: false
+        safety_tripped: false
+        valves_open: true
+        window_open: false
+        window_detection: false
+        push_setpoint: false
+        flame_off_offset: 0.0
+        force_pwm: false
+        flow_offset: 2.0
+        pressure: 0.0
+        pressure_drop_rate: 0.0
+        pressure_alarm: false
+        modulation_reliable: true
+        setpoint_mismatch: false
+        curve_recommendation: "insufficient"
+        heating_curve_recommendation: "insufficient"
+        mean_error: 0.0
+        error_stddev: 0.0
+        target_temp_step: 0.5
+        power_kw: 0.0
+        energy_kwh: 0.0
+        boiler_capacity: 24.0
+        boiler_rated_kw: 0.0
+        boiler_efficiency: 0.92
+        energy_estimated_kwh: 0.0
+        preset_sync: false
+        thermal_coeff: 0.05
+        thermal_drop_rate: 0.0
+        thermal_model_valid: false
+        estimated_room: 0.0
+        last_known_room: 0.0
+        solar_gain_active: false
+        indoor_rise_rate: 0.0
+        summer_simmer: false
+        summer_active: false
+        summer_hours_above: 0.0
+        summer_threshold: 18.0
+        summer_min_hours: 6
+        comfort_adjust: false
+        humidity: 0
+        humidity_valid: false
+        comfort_offset: 0.0
+        comfort_ref_humidity: 50
+        comfort_max_offset: 1.0
+        simulation: false
+        sim_available: true
+        auto_tune: false
+        auto_tune_active: false
+        auto_tune_cycles: 0
+        auto_tune_score: 0.0
+        auto_tune_rate: 0.02
+        sensor_max_age: 21600
+        error_monitoring: false
+        auto_gains_value: 2.0
+        auto_gains: true
+        kp_manual: 5.0
+        ki_manual: 0.0005
+        kd_manual: 0.0
+        thermal_comfort: false
+        heating_mode: "comfort"
+        cycles_per_hour: 3
+        valve_offset: 0.0
+        solar_freeze_integral: true
+        multi_area: false
+        multi_area_count: 0
+        ble_enable: false
+        ble_failover: true
+        ble_failover_active: false
+        ble_temp_valid: false
+        ble_sensor_count: 0
+
+    SatHealth:
+      type: object
+      description: |
+        Compact SAT health view returned by `GET /v2/sat/status?detail=full`.
+        This is a SEPARATE 22-field object, not a superset of `SatStatus`:
+        it focuses on cycle/flame/device health, sync flags, error statistics,
+        pressure trend, and auto-tune progress. Consumers must ignore unknown keys.
+      properties:
+        sync_setpoint:
+          type: boolean
+          description: "Boiler flow setpoint in sync with the commanded value"
+        sync_modulation:
+          type: boolean
+          description: "Boiler modulation in sync with the commanded value"
+        sync_ch:
+          type: boolean
+          description: "CH-enable state in sync with the commanded value"
+        pressure_smoothed:
+          type: number
+          description: "Smoothed system water pressure (bar)"
+        pressure_drop_rate:
+          type: number
+          description: "Pressure drop rate (bar/min)"
+        pressure_alarm:
+          type: boolean
+          description: "Low/high pressure alarm active"
+        cycle_kind:
+          type: string
+          description: "Last cycle kind label (unknown/ch/dhw/mixed)"
+        cycle_duration:
+          type: integer
+          description: "Last cycle duration (s)"
+        cycle_count:
+          type: integer
+          description: "Total boiler cycles counted"
+        cycle_fraction_ch:
+          type: number
+          description: "Fraction of the last cycle spent on CH (0.0-1.0)"
+        cycle_fraction_dhw:
+          type: number
+          description: "Fraction of the last cycle spent on DHW (0.0-1.0)"
+        error_mean:
+          type: number
+          description: "Mean PID error over the sample window (C)"
+        error_stddev:
+          type: number
+          description: "PID error standard deviation (C)"
+        error_samples:
+          type: integer
+          description: "Number of PID error samples collected"
+        heating_curve_recommendation:
+          type: string
+          description: "Heating-curve tuning recommendation (insufficient/raise/lower/ok)"
+        flame_health:
+          type: boolean
+          description: "Flame behaviour considered healthy"
+        device_health:
+          type: boolean
+          description: "Overall device health OK"
+        cycle_health:
+          type: boolean
+          description: "Cycling behaviour considered healthy"
+        cycle_class:
+          type: string
+          description: "Last cycle classification (none/good/overshoot/underheat/short/uncertain)"
+        auto_tune_score:
+          type: number
+          description: "Auto-tune fit score"
+        auto_tune_cycles:
+          type: integer
+          description: "Auto-tune cycles completed"
+        ovp_phase:
+          type: integer
+          description: "Overshoot-protection calibration phase"
+      example:
+        sync_setpoint: false
+        sync_modulation: false
+        sync_ch: false
+        pressure_smoothed: 0.0
+        pressure_drop_rate: 0.0
+        pressure_alarm: false
+        cycle_kind: "unknown"
+        cycle_duration: 0
+        cycle_count: 0
+        cycle_fraction_ch: 0.0
+        cycle_fraction_dhw: 0.0
+        error_mean: 0.0
+        error_stddev: 0.0
+        error_samples: 0
+        heating_curve_recommendation: "insufficient"
+        flame_health: true
+        device_health: false
+        cycle_health: true
+        cycle_class: "none"
+        auto_tune_score: 0.0
+        auto_tune_cycles: 0
+        ovp_phase: 0
 
     ApiError:
       type: object

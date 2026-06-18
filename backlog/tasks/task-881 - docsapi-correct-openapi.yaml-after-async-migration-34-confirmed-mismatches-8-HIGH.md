@@ -7,6 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-18 00:03'
+updated_date: '2026-06-18 04:22'
 labels: []
 dependencies: []
 ordinal: 97000
@@ -20,6 +21,14 @@ Adversarial OpenAPI-vs-implementation audit (workflow wf_9f4d5d4d-af0, 43 agents
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 8 HIGH corrections applied to openapi.yaml
-- [ ] #2 openapi.yaml validates (yaml parse OK)
+- [x] #1 8 HIGH corrections applied to openapi.yaml
+- [x] #2 openapi.yaml validates (yaml parse OK)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Applied 7 corrections so far (commit pending): removed phantom health.picavailable; device/info.otcommandinterface boolean->string enum[PIC,OT-Direct,None]; /v2/otdirect/mode GW=-map corrected (monitor=GW=0, bypass=GW=P, master=GW=S) + removed the application/json requestBody (handler reads argCompat/form only) + removed the phantom bypass-400 clause and the 404; /v2/discovery/republish added the 429 cooldown response; added the missing securitySchemes.basicAuth definition (was referenced 9x, undefined -> invalid OpenAPI). YAML validates. REMAINING (deferred, generate against live device output): the 3 big schema rewrites (SatStatus flat-schema, filesystem/files heterogeneous array, sat/status?detail=full SatHealth) + the medium/low doc-completeness gaps (per-op basicAuth on SAT/otdirect mutations, PUT aliases, missing fields ipaddress/version/flame_duty_pct/hysteresis-vent, 503 on pic/* when no PIC, etc.).
+
+Applied the 3 big HIGH schema rewrites against live device output (alpha.204, 192.168.88.39): SatStatus -> flat 132-field object (was wrapped ~25-field, wrong types: boiler_status string/control_mode int/last_cycle_class int; room_temp nullable); added SatHealth (separate 22-field detail=full view, NOT a superset); /v2/sat/status 200 now oneOf[SatStatus,SatHealth] + field count 50->132; /v2/filesystem/files -> heterogeneous array (file/dir entries with type enum + trailing storage-summary object). YAML validates. All 8 HIGH now complete. gen_sat_props.py helper kept for field-drift regeneration.
+<!-- SECTION:NOTES:END -->
