@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.205
+**  Version  : v2.0.0-alpha.206
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -39,6 +39,7 @@
 #define WEBSERVERCOMPAT_H
 
 #include <Arduino.h>
+#include <ArduinoJson.h>   // restSendJson() takes JsonDocument& (ADR-141); include here so the helper compiles regardless of TU include order
 #include <ESPAsyncWebServer.h>
 
 //=====[ Async HTTP server (port 80) ]=========================================
@@ -352,6 +353,18 @@ inline void restFinalize() {
     g_restStream  = nullptr;
     g_responseSent = true;
   }
+}
+
+// ADR-141: canonical ArduinoJson v7 output path. serializeJson streams the doc
+// into the AsyncResponseStream in chunks (gentler on the S3 heap than
+// AsyncJsonResponse's single flat buffer; ADR-089 fragmentation tiers), reusing
+// the CORS/header/single-send plumbing above. Replaces the
+// sendStartJsonMap -> N x sendJsonMapEntry -> sendEndJsonMap layer. No-op if a
+// response was already sent (auth fail / early return), matching restFinalize.
+inline void restSendJson(JsonDocument& doc) {
+  AsyncResponseStream* s = restBeginStream("application/json");
+  if (s) serializeJson(doc, *s);
+  restFinalize();
 }
 
 #endif // WEBSERVERCOMPAT_H

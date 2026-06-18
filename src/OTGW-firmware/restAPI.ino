@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.205
+**  Version  : v2.0.0-alpha.206
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2609,9 +2609,7 @@ void sendHealth()
   h[F("otgwconnected")]  = state.otBus.bOnline;
   h[F("littlefsMounted")] = LittleFSmounted;
 
-  AsyncResponseStream *s = restBeginStream("application/json");
-  if (s) serializeJson(doc, *s);
-  restFinalize();
+  restSendJson(doc);
 
 } // sendHealth()
 
