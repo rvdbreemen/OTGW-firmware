@@ -4285,6 +4285,14 @@ x-api-design-notes: |
     emit proper JSON booleans (`true`/`false`). The former quoted-string booleans
     on `/v2/health` (`"true"`/`"false"`) are gone.
 
+  **HTTP Methods**:
+  - Every mutation endpoint documented with `post:` also accepts `PUT` as a
+    transparent alias (identical body, identical effect). The firmware dispatch
+    gates on `method == HTTP_POST || method == HTTP_PUT`, so a `put:` block is not
+    duplicated per path; treat POST and PUT as interchangeable on all mutations.
+  - The central auth gate (HTTP Basic) applies to both POST and PUT on every
+    `/v2/*` route; DELETE is not centrally gated.
+
   **Error Handling**:
   - All errors return structured JSON: {"error":{"status":N,"message":"..."}}
   - All 405 responses include an `Allow` header listing valid methods (RFC 7231 §6.5.5)
