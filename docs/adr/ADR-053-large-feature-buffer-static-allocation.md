@@ -1,6 +1,6 @@
 # ADR-053: Large Feature Buffer Static Allocation
 
-**Status:** Accepted  
+**Status:** Accepted — scope narrowed by [ADR-141](ADR-141-adopt-arduinojson-v7-esp32s3.md) (2026-06-15): on the 2.0.0 ESP32-S3-only line (ADR-128 dropped ESP8266), JSON I/O for REST responses and inbound parsing is no longer bound to the static-buffer rule and may use ArduinoJson v7 heap documents. The static-buffer requirement still governs the **settings-persistence** path (manual `wStrF`/`applySettingFromFile`, TASK-867 AC#6) and all non-JSON buffers. This status line is the sanctioned immutability exception (body below unedited).  
 **Date:** 2026-03-21  
 **Supersedes:** ADR-004 (Static Buffer Allocation Strategy)
 

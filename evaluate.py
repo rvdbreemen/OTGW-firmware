@@ -2245,9 +2245,15 @@ class WorkspaceEvaluator:
 
     # ===== ARDUINOJSON BAN CHECK =====
 
+    # ADR-141 (supersedes ADR-042): ArduinoJson v7 is PERMITTED on the ESP32-S3
+    # 2.0.0 line for REST output (serializeJson) and inbound parsing
+    # (deserializeJson). It MUST stay out of the settings-persistence path, which
+    # keeps the manual wStrF/applySettingFromFile contract (TASK-867 AC#6).
+    ARDUINOJSON_BANNED_FILES = {'settingStuff.ino'}
+
     def check_no_arduinojson(self):
-        """Ensure ArduinoJson library is never used (hard project rule)"""
-        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ArduinoJson Ban ==={Colors.ENDC}")
+        """ADR-141: keep ArduinoJson out of the settings-persistence path only."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ArduinoJson Settings-Path Ban ==={Colors.ENDC}")
 
         violations: List[str] = []
         src_dir = config.FIRMWARE_ROOT
@@ -2259,6 +2265,8 @@ class WorkspaceEvaluator:
         )
 
         for file in code_files:
+            if file.name not in self.ARDUINOJSON_BANNED_FILES:
+                continue  # ADR-141: permitted in REST/parse/discovery code
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
                 lines = f.read().split('\n')
 
@@ -2270,14 +2278,15 @@ class WorkspaceEvaluator:
 
         if violations:
             self.add_result(EvaluationResult(
-                "ArduinoJson", "Library ban", "FAIL",
-                f"Found {len(violations)} ArduinoJson usages (banned by project rules)",
+                "ArduinoJson", "Settings-path ban", "FAIL",
+                f"Found {len(violations)} ArduinoJson usages in the settings-persistence "
+                f"path (ADR-141/TASK-867 AC#6: settings stay manual)",
                 "; ".join(violations[:10])
             ))
         else:
             self.add_result(EvaluationResult(
-                "ArduinoJson", "Library ban", "PASS",
-                "No ArduinoJson usage found"
+                "ArduinoJson", "Settings-path ban", "PASS",
+                "ArduinoJson absent from the settings-persistence path (ADR-141 compliant)"
             ))
 
     # ===== STACK SAFETY CHECK =====

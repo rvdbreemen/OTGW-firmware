@@ -2,9 +2,10 @@
 id: TASK-867
 title: Adopt ArduinoJson v7 on ESP32-S3 for REST + inbound JSON (supersede ADR-042)
 status: In Progress
-assignee: []
+assignee:
+  - '@claude'
 created_date: '2026-06-14 22:58'
-updated_date: '2026-06-16 05:10'
+updated_date: '2026-06-18 04:42'
 labels: []
 dependencies: []
 ordinal: 83000
@@ -19,8 +20,8 @@ PLAN ONLY - do not execute yet (maintainer directive 2026-06-15). Revisit the AD
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 GO/NO-GO flash delta measured on esp32-combo (binding target) via a one-endpoint spike BEFORE any wholesale migration
-- [ ] #2 Superseding ADR Accepted: supersedes ADR-042; amends ADR-053 static-buffer scope to permit ArduinoJson v7 on ESP32-S3 for REST responses + inbound parsing; settings-persistence stays manual
-- [ ] #3 evaluate.py check_no_arduinojson updated (allow REST/parse use; keep ArduinoJson OUT of the settings-persistence path if that boundary is retained)
+- [x] #2 Superseding ADR Accepted: supersedes ADR-042; amends ADR-053 static-buffer scope to permit ArduinoJson v7 on ESP32-S3 for REST responses + inbound parsing; settings-persistence stays manual
+- [x] #3 evaluate.py check_no_arduinojson updated (allow REST/parse use; keep ArduinoJson OUT of the settings-persistence path if that boundary is retained)
 - [ ] #4 REST v2 endpoints serve byte-identical JSON contracts (docs/api) via AsyncJsonResponse; restBeginStream/sendJsonMapEntry layer + REST_STREAM_BUFFER_SIZE removed once migrated
 - [ ] #5 Inbound JSON parsing handles empty-string, escaping and nested cases (the ADR-042 known-bug list) via deserializeJson
 - [ ] #6 settingStuff.ino settings persistence unchanged (manual wStrF/applySettingFromFile) - explicitly out of scope
@@ -67,4 +68,6 @@ PLAN ONLY — not for execution yet. Phased so each phase is independently shipp
 
 <!-- SECTION:NOTES:BEGIN -->
 AC#1 GO/NO-GO flash spike (esp32-combo) = GO. Baseline 1981939 B -> spiked 1986291 B (one flat REST object via JsonDocument+serializeJson routed to live sink). Delta +4352 B; free_after 110861 B (>>40KB margin). ArduinoJson 7.4.3 compiled clean on combo. Caveat: header-only lib, +4.3KB is a lower bound (deserialization not exercised; cost scales with usage breadth) but headroom ample. AC#2 (superseding ADR) already satisfied by ADR-141 (Accepted, #660). Remaining: AC#3 evaluate.py gate, AC#4 REST v2 -> AsyncJson, AC#5 inbound deserializeJson, AC#7 build 3 targets, AC#8 hardware heap (field).
+
+AC#2 ADR wiring: ADR-042 already carries the sanctioned 'Superseded by ADR-141' status line; added the matching scope-narrowing status line to ADR-053 (JSON I/O exempt from static-buffer rule on S3 line; settings-persistence still bound). AC#3 evaluate.py::check_no_arduinojson relaxed to a settings-path-only ban (ARDUINOJSON_BANNED_FILES={settingStuff.ino}); ArduinoJson now permitted in REST/parse/discovery code. platformio.ini: pinned bblanchon/ArduinoJson @ 7.4.3 (matches EMS-ESP32 blueprint).
 <!-- SECTION:NOTES:END -->
