@@ -4,9 +4,10 @@ title: >-
   docs(api): SAT settings body fields + PUT-alias completeness audit (TASK-881
   tail)
 status: To Do
-assignee: []
+assignee:
+  - '@claude'
 created_date: '2026-06-18 04:31'
-updated_date: '2026-06-18 06:54'
+updated_date: '2026-06-18 07:48'
 labels: []
 dependencies: []
 ordinal: 98000
@@ -29,4 +30,6 @@ Source-dive remainder split off from TASK-881. Two openapi.yaml completeness ite
 
 <!-- SECTION:NOTES:BEGIN -->
 TASK-867 ArduinoJson migration changed REST types (string-bools -> real bools, dtostrf-quoted numbers -> native JSON numbers) across many endpoints. Done in 867: /v2/health schema (3 bools string->boolean) + the x-api-design-notes boolean section. REMAINING for this task: full OpenAPI re-sync against the post-migration golden (scripts/json-golden/, re-captured alpha.210+) - audit every endpoint's documented field types vs the now-corrected live output (device/info, settings, otmonitor/telegraf, sat/*, otdirect/*). Use scripts/json_golden.py captures as the source of truth.
+
+MIGRATION DOC-SYNC PORTION DONE (committed a55a87c6): the only explicit response-type bug from the ArduinoJson migration was /v2/health (3 bools documented as type:string enum[true,false]) - fixed to type:boolean + the x-api-design-notes 'booleans as strings' note corrected. Systematic re-scan found NO other 'enum:[true,false]' string-bool patterns and verified the other suspect fields (otdirectavailable, crashlog.available, simulate.active) are already correctly typed boolean. roomcomp/kp at openapi 1958 are POST /v2/otdirect/settings REQUEST-body fields (the API accepts string values), not response contracts, so not migration mismatches. REMAINING (original 882 scope, source-dive, NOT migration-driven): SAT settings request-body field completeness (flame_duty_pct, hysteresis/vent vs satParseSettings) + PUT-alias documentation. Set back To Do - this is separate doc-completeness work, no longer blocked on the migration.
 <!-- SECTION:NOTES:END -->
