@@ -683,26 +683,27 @@ void satBLEPublishMQTT()
 //=====================================================================
 // Send BLE status as part of SAT JSON status
 //=====================================================================
-// ADR-141: appends the ble_* fields into the caller's already-open SAT-status
-// JsonObject. Does NOT open/close a map or serialise — satSendStatusJSON()
-// owns the document and calls restSendJson() once after this returns.
-// ArduinoJson serialises the floats natively (no dtostrf / coalescing-buffer
-// gymnastics needed), so the old raw-restSendContent scramble gotcha is gone.
-void satBLESendStatusJSON(JsonObject& o)
+// TASK-885: appends the ble_* fields into the caller's already-open SAT-status
+// root object via the shared JsonEmit writer. Emits BARE fields only — does NOT
+// open/close a container or finalise; satSendStatusJSON() owns the root object
+// and the AsyncResponseStream, calling je.endObject() + restFinalize() once
+// after this returns. JsonEmit serialises NaN/Inf as null natively, so the old
+// raw-restSendContent scramble gotcha is gone.
+void satBLESendStatusJSON(JsonEmit& je)
 {
-  o[F("ble_enable")]          = settings.sat.bBleEnable;
-  o[F("ble_failover")]        = settings.sat.bBleFailover;
-  o[F("ble_failover_active")] = _bleFailoverActive;
-  o[F("ble_temp_valid")]      = state.sat.bBleTempValid;
+  je.field(F("ble_enable"),          settings.sat.bBleEnable);
+  je.field(F("ble_failover"),        settings.sat.bBleFailover);
+  je.field(F("ble_failover_active"), _bleFailoverActive);
+  je.field(F("ble_temp_valid"),      state.sat.bBleTempValid);
   if (state.sat.bBleTempValid) {
-    o[F("ble_temp")]     = state.sat.fBleTemp;
-    o[F("ble_humidity")] = state.sat.fBleHumidity;
-    o[F("ble_rssi")]     = (int32_t)state.sat.iBleRssi;
-    o[F("ble_battery")]  = (int32_t)state.sat.iBleBattery;
+    je.field(F("ble_temp"),     state.sat.fBleTemp);
+    je.field(F("ble_humidity"), state.sat.fBleHumidity);
+    je.field(F("ble_rssi"),     (int32_t)state.sat.iBleRssi);
+    je.field(F("ble_battery"),  (int32_t)state.sat.iBleBattery);
   }
-  o[F("ble_sensor_count")] = (int32_t)state.sat.iBleSensorCount;
+  je.field(F("ble_sensor_count"), (int32_t)state.sat.iBleSensorCount);
   if (settings.sat.sBleMAC[0] != '\0') {
-    o[F("ble_mac")] = settings.sat.sBleMAC;
+    je.field(F("ble_mac"), settings.sat.sBleMAC);
   }
 }
 

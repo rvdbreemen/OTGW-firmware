@@ -31,7 +31,9 @@ static int16_t restResponseStatus = 0;
 // JsonDocument alive for the whole async stream, so unbounded concurrency exhausts the
 // heap and the library aborts on bad_alloc in addHeader. restInFlight is async_tcp-task-
 // local (all handlers serialize on the one async_tcp task; no atomic needed).
-#define REST_MAX_INFLIGHT 4
+#ifndef REST_MAX_INFLIGHT
+#define REST_MAX_INFLIGHT 4   // override with -DREST_MAX_INFLIGHT=255 to disable the gate (A/B "raw" arm)
+#endif
 static uint8_t restInFlight = 0;
 
 // Zero-allocation HTTP method to string (returns PROGMEM pointer).
@@ -1708,253 +1710,259 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   snprintf_P(hwModeBuf, sizeof(hwModeBuf), PSTR("%S"), (PGM_P)hardwareModeName());
   snprintf_P(netModeBuf, sizeof(netModeBuf), PSTR("%S"), (PGM_P)networkModeName());
 
-  // ADR-141: ArduinoJson v7. Native types replace the hand-rolled streaming map.
-  JsonDocument doc;
-  JsonObject d = doc[F("debug")].to<JsonObject>();
+  // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path.
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.beginObject(F("debug"));       // "debug":{
 
-  d[F("build.version")] = _VERSION;
-  d[F("build.number")] = (int32_t)_VERSION_BUILD;
-  d[F("build.githash")] = _VERSION_GITHASH;
-  d[F("build.date")] = _VERSION_DATE;
+    je.field(F("build.version"), _VERSION);
+    je.field(F("build.number"), (int32_t)_VERSION_BUILD);
+    je.field(F("build.githash"), _VERSION_GITHASH);
+    je.field(F("build.date"), _VERSION_DATE);
 
-  d[F("runtime.heap_free")] = (uint32_t)platformFreeHeap();
-  d[F("runtime.heap_frag_pct")] = (uint32_t)platformHeapFragmentation();
-  d[F("runtime.heap_min_free")] = (uint32_t)platformMinFreeHeap();
-  d[F("runtime.heap_max_alloc")] = (uint32_t)platformMaxFreeBlock();
-  d[F("runtime.uptime_sec")] = (uint32_t)state.uptime.iSeconds;
-  d[F("runtime.reboots")] = (uint32_t)state.uptime.iRebootCount;
-  d[F("runtime.wifi_connected")] = (WiFi.status() == WL_CONNECTED);
-  d[F("runtime.wifi_rssi")] = (int32_t)WiFi.RSSI();
-  d[F("runtime.wifi_ip")] = ipBuf;
-  d[F("runtime.wifi_ssid")] = ssidBuf;
-  d[F("runtime.hw_mode")] = hwModeBuf;
-  d[F("runtime.net_mode")] = netModeBuf;
+    je.field(F("runtime.heap_free"), (uint32_t)platformFreeHeap());
+    je.field(F("runtime.heap_frag_pct"), (uint32_t)platformHeapFragmentation());
+    je.field(F("runtime.heap_min_free"), (uint32_t)platformMinFreeHeap());
+    je.field(F("runtime.heap_max_alloc"), (uint32_t)platformMaxFreeBlock());
+    je.field(F("runtime.uptime_sec"), (uint32_t)state.uptime.iSeconds);
+    je.field(F("runtime.reboots"), (uint32_t)state.uptime.iRebootCount);
+    je.field(F("runtime.wifi_connected"), (WiFi.status() == WL_CONNECTED));
+    je.field(F("runtime.wifi_rssi"), (int32_t)WiFi.RSSI());
+    je.field(F("runtime.wifi_ip"), ipBuf);
+    je.field(F("runtime.wifi_ssid"), ssidBuf);
+    je.field(F("runtime.hw_mode"), hwModeBuf);
+    je.field(F("runtime.net_mode"), netModeBuf);
 
-  d[F("settings.hostname")] = settings.sHostname;
-  d[F("settings.http_passwd")] = settings.sHTTPpasswd[0] ? "***" : "(not set)";
-  d[F("settings.led_blink")] = settings.bLEDblink;
-  d[F("settings.dark_theme")] = settings.bDarkTheme;
-  d[F("settings.mydebug")] = settings.bMyDEBUG;
-  d[F("settings.nightly_restart")] = settings.bNightlyRestart;
-  d[F("settings.restart_hour")] = (uint32_t)settings.iRestartHour;
+    je.field(F("settings.hostname"), settings.sHostname);
+    je.field(F("settings.http_passwd"), settings.sHTTPpasswd[0] ? "***" : "(not set)");
+    je.field(F("settings.led_blink"), settings.bLEDblink);
+    je.field(F("settings.dark_theme"), settings.bDarkTheme);
+    je.field(F("settings.mydebug"), settings.bMyDEBUG);
+    je.field(F("settings.nightly_restart"), settings.bNightlyRestart);
+    je.field(F("settings.restart_hour"), (uint32_t)settings.iRestartHour);
 
-  d[F("settings.mqtt.enabled")] = settings.mqtt.bEnable;
-  d[F("settings.mqtt.broker")] = settings.mqtt.sBroker;
-  d[F("settings.mqtt.port")] = (uint32_t)settings.mqtt.iBrokerPort;
-  d[F("settings.mqtt.user")] = settings.mqtt.sUser;
-  d[F("settings.mqtt.passwd")] = settings.mqtt.sPasswd[0] ? "***" : "(not set)";
-  d[F("settings.mqtt.ha_prefix")] = settings.mqtt.sHaprefix;
-  d[F("settings.mqtt.top_topic")] = settings.mqtt.sTopTopic;
-  d[F("settings.mqtt.unique_id")] = settings.mqtt.sUniqueid;
-  d[F("settings.mqtt.ot_message")] = settings.mqtt.bOTmessage;
-  d[F("settings.mqtt.on_change")] = settings.mqtt.bOnChangePublishing;
-  d[F("settings.mqtt.interval")] = (uint32_t)settings.mqtt.iInterval;
-  d[F("settings.mqtt.sep_sources")] = settings.mqtt.bSeparateSources;
-  d[F("settings.mqtt.disc_verify")] = settings.mqtt.bDiscoveryAutoVerify;
-  d[F("settings.mqtt.use_legacy_topics")] = settings.mqtt.bUseLegacyOtTopics;
-  d[F("settings.mqtt.ha_reboot")] = settings.mqtt.bHaRebootDetect;
-  d[F("settings.legacy.port25238")] = settings.mqtt.bLegacyPort25238Enabled;
+    je.field(F("settings.mqtt.enabled"), settings.mqtt.bEnable);
+    je.field(F("settings.mqtt.broker"), settings.mqtt.sBroker);
+    je.field(F("settings.mqtt.port"), (uint32_t)settings.mqtt.iBrokerPort);
+    je.field(F("settings.mqtt.user"), settings.mqtt.sUser);
+    je.field(F("settings.mqtt.passwd"), settings.mqtt.sPasswd[0] ? "***" : "(not set)");
+    je.field(F("settings.mqtt.ha_prefix"), settings.mqtt.sHaprefix);
+    je.field(F("settings.mqtt.top_topic"), settings.mqtt.sTopTopic);
+    je.field(F("settings.mqtt.unique_id"), settings.mqtt.sUniqueid);
+    je.field(F("settings.mqtt.ot_message"), settings.mqtt.bOTmessage);
+    je.field(F("settings.mqtt.on_change"), settings.mqtt.bOnChangePublishing);
+    je.field(F("settings.mqtt.interval"), (uint32_t)settings.mqtt.iInterval);
+    je.field(F("settings.mqtt.sep_sources"), settings.mqtt.bSeparateSources);
+    je.field(F("settings.mqtt.disc_verify"), settings.mqtt.bDiscoveryAutoVerify);
+    je.field(F("settings.mqtt.use_legacy_topics"), settings.mqtt.bUseLegacyOtTopics);
+    je.field(F("settings.mqtt.ha_reboot"), settings.mqtt.bHaRebootDetect);
+    je.field(F("settings.legacy.port25238"), settings.mqtt.bLegacyPort25238Enabled);
 
-  d[F("settings.ntp.enabled")] = settings.ntp.bEnable;
-  d[F("settings.ntp.timezone")] = settings.ntp.sTimezone;
-  d[F("settings.ntp.hostname")] = settings.ntp.sHostname;
-  d[F("settings.ntp.sendtime")] = settings.ntp.bSendtime;
+    je.field(F("settings.ntp.enabled"), settings.ntp.bEnable);
+    je.field(F("settings.ntp.timezone"), settings.ntp.sTimezone);
+    je.field(F("settings.ntp.hostname"), settings.ntp.sHostname);
+    je.field(F("settings.ntp.sendtime"), settings.ntp.bSendtime);
 
-  d[F("settings.sensors.enabled")] = settings.sensors.bEnabled;
-  d[F("settings.sensors.pin")] = (int32_t)settings.sensors.iPin;
-  d[F("settings.sensors.interval")] = (int32_t)settings.sensors.iInterval;
+    je.field(F("settings.sensors.enabled"), settings.sensors.bEnabled);
+    je.field(F("settings.sensors.pin"), (int32_t)settings.sensors.iPin);
+    je.field(F("settings.sensors.interval"), (int32_t)settings.sensors.iInterval);
 
-  d[F("settings.s0.enabled")] = settings.s0.bEnabled;
-  d[F("settings.s0.pin")] = (uint32_t)settings.s0.iPin;
-  d[F("settings.s0.debounce_ms")] = (uint32_t)settings.s0.iDebounceTime;
-  d[F("settings.s0.pulse_kw")] = (uint32_t)settings.s0.iPulsekw;
-  d[F("settings.s0.interval")] = (uint32_t)settings.s0.iInterval;
+    je.field(F("settings.s0.enabled"), settings.s0.bEnabled);
+    je.field(F("settings.s0.pin"), (uint32_t)settings.s0.iPin);
+    je.field(F("settings.s0.debounce_ms"), (uint32_t)settings.s0.iDebounceTime);
+    je.field(F("settings.s0.pulse_kw"), (uint32_t)settings.s0.iPulsekw);
+    je.field(F("settings.s0.interval"), (uint32_t)settings.s0.iInterval);
 
-  d[F("settings.outputs.enabled")] = settings.outputs.bEnabled;
-  d[F("settings.outputs.pin")] = (int32_t)settings.outputs.iPin;
-  d[F("settings.outputs.trigger_bit")] = (int32_t)settings.outputs.iTriggerBit;
+    je.field(F("settings.outputs.enabled"), settings.outputs.bEnabled);
+    je.field(F("settings.outputs.pin"), (int32_t)settings.outputs.iPin);
+    je.field(F("settings.outputs.trigger_bit"), (int32_t)settings.outputs.iTriggerBit);
 
-  d[F("settings.sat.enabled")] = settings.sat.bEnabled;
-  d[F("settings.sat.heating_system")] = (uint32_t)settings.sat.iHeatingSystem;
-  d[F("settings.sat.target_temp")] = settings.sat.fTargetTemp;
-  d[F("settings.sat.curve_coeff")] = settings.sat.fHeatingCurveCoeff;
-  d[F("settings.sat.deadband")] = settings.sat.fDeadband;
-  d[F("settings.sat.control_interval")] = (uint32_t)settings.sat.iControlInterval;
-  d[F("settings.sat.use_external_temp")] = settings.sat.bUseExternalTemp;
-  d[F("settings.sat.pwm_auto_switch")] = settings.sat.bPwmAutoSwitch;
-  d[F("settings.sat.max_rel_mod")] = (uint32_t)settings.sat.iMaxRelModulation;
-  d[F("settings.sat.ovp_value")] = settings.sat.fOvpValue;
-  d[F("settings.sat.ovp_enabled")] = settings.sat.bOvpEnabled;
-  d[F("settings.sat.overshoot_margin")] = settings.sat.fOvershootMargin;
-  d[F("settings.sat.dhw_setpoint")] = settings.sat.fDhwSetpoint;
-  d[F("settings.sat.dhw_enabled")] = settings.sat.bDhwEnabled;
-  d[F("settings.sat.dhw_enable")] = settings.sat.bDhwEnable;
-  d[F("settings.sat.window_detection")] = settings.sat.bWindowDetection;
-  d[F("settings.sat.weather_enable")] = settings.sat.bWeatherEnable;
-  d[F("settings.sat.weather_key")] = settings.sat.sWeatherApiKey[0] ? "***" : "(not set)";
-  d[F("settings.sat.boiler_capacity")] = settings.sat.fBoilerCapacity;
-  d[F("settings.sat.simulation")] = settings.sat.bSimulation;
-  d[F("settings.sat.solar_gain_enable")] = settings.sat.bSolarGainEnable;
-  d[F("settings.sat.summer_simmer")] = settings.sat.bSummerSimmer;
-  d[F("settings.sat.comfort_adjust")] = settings.sat.bComfortAdjust;
-  d[F("settings.sat.multi_area")] = settings.sat.bMultiArea;
-  d[F("settings.sat.auto_tune")] = settings.sat.bAutoTune;
-  d[F("settings.sat.max_setpoint")] = settings.sat.fMaxSetpoint;
-  d[F("settings.sat.sensor_max_age")] = (uint32_t)settings.sat.iSensorMaxAgeS;
-  d[F("settings.sat.error_monitoring")] = settings.sat.bErrorMonitoring;
-  d[F("settings.sat.auto_gains")] = settings.sat.bAutoGains;
-  d[F("settings.sat.thermal_comfort")] = settings.sat.bThermalComfort;
-  d[F("settings.sat.humidity_timeout")] = (uint32_t)settings.sat.iHumidityTimeoutS;
-  d[F("settings.sat.heating_mode")] = (uint32_t)settings.sat.iHeatingMode;
-  d[F("settings.sat.cycles_per_hour")] = (uint32_t)settings.sat.iCyclesPerHour;
-  d[F("settings.sat.valve_offset")] = settings.sat.fValveOffset;
-  d[F("settings.sat.solar_freeze_i")] = settings.sat.bSolarFreezeIntegral;
-  d[F("settings.sat.flush_threshold_h")] = (uint32_t)settings.sat.iSatFlushThresholdH;
-  d[F("settings.sat.zone_count")] = (uint32_t)settings.sat.iZoneCount;
-  d[F("settings.sat.zone_timeout_s")] = (uint32_t)settings.sat.iZoneTimeoutS;
+    je.field(F("settings.sat.enabled"), settings.sat.bEnabled);
+    je.field(F("settings.sat.heating_system"), (uint32_t)settings.sat.iHeatingSystem);
+    je.field(F("settings.sat.target_temp"), settings.sat.fTargetTemp);
+    je.field(F("settings.sat.curve_coeff"), settings.sat.fHeatingCurveCoeff);
+    je.field(F("settings.sat.deadband"), settings.sat.fDeadband);
+    je.field(F("settings.sat.control_interval"), (uint32_t)settings.sat.iControlInterval);
+    je.field(F("settings.sat.use_external_temp"), settings.sat.bUseExternalTemp);
+    je.field(F("settings.sat.pwm_auto_switch"), settings.sat.bPwmAutoSwitch);
+    je.field(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
+    je.field(F("settings.sat.ovp_value"), settings.sat.fOvpValue);
+    je.field(F("settings.sat.ovp_enabled"), settings.sat.bOvpEnabled);
+    je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
+    je.field(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
+    je.field(F("settings.sat.dhw_enabled"), settings.sat.bDhwEnabled);
+    je.field(F("settings.sat.dhw_enable"), settings.sat.bDhwEnable);
+    je.field(F("settings.sat.window_detection"), settings.sat.bWindowDetection);
+    je.field(F("settings.sat.weather_enable"), settings.sat.bWeatherEnable);
+    je.field(F("settings.sat.weather_key"), settings.sat.sWeatherApiKey[0] ? "***" : "(not set)");
+    je.field(F("settings.sat.boiler_capacity"), settings.sat.fBoilerCapacity);
+    je.field(F("settings.sat.simulation"), settings.sat.bSimulation);
+    je.field(F("settings.sat.solar_gain_enable"), settings.sat.bSolarGainEnable);
+    je.field(F("settings.sat.summer_simmer"), settings.sat.bSummerSimmer);
+    je.field(F("settings.sat.comfort_adjust"), settings.sat.bComfortAdjust);
+    je.field(F("settings.sat.multi_area"), settings.sat.bMultiArea);
+    je.field(F("settings.sat.auto_tune"), settings.sat.bAutoTune);
+    je.field(F("settings.sat.max_setpoint"), settings.sat.fMaxSetpoint);
+    je.field(F("settings.sat.sensor_max_age"), (uint32_t)settings.sat.iSensorMaxAgeS);
+    je.field(F("settings.sat.error_monitoring"), settings.sat.bErrorMonitoring);
+    je.field(F("settings.sat.auto_gains"), settings.sat.bAutoGains);
+    je.field(F("settings.sat.thermal_comfort"), settings.sat.bThermalComfort);
+    je.field(F("settings.sat.humidity_timeout"), (uint32_t)settings.sat.iHumidityTimeoutS);
+    je.field(F("settings.sat.heating_mode"), (uint32_t)settings.sat.iHeatingMode);
+    je.field(F("settings.sat.cycles_per_hour"), (uint32_t)settings.sat.iCyclesPerHour);
+    je.field(F("settings.sat.valve_offset"), settings.sat.fValveOffset);
+    je.field(F("settings.sat.solar_freeze_i"), settings.sat.bSolarFreezeIntegral);
+    je.field(F("settings.sat.flush_threshold_h"), (uint32_t)settings.sat.iSatFlushThresholdH);
+    je.field(F("settings.sat.zone_count"), (uint32_t)settings.sat.iZoneCount);
+    je.field(F("settings.sat.zone_timeout_s"), (uint32_t)settings.sat.iZoneTimeoutS);
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  d[F("settings.otd.mode")] = (uint32_t)settings.otd.iMode;
-  d[F("settings.otd.auto_detect")] = settings.otd.bAutoDetect;
-  d[F("settings.otd.setback_temp")] = settings.otd.fSetbackTemp;
-  d[F("settings.otd.setback_timeout")] = (uint32_t)settings.otd.iSetbackTimeout;
-  d[F("settings.otd.enable_slave")] = settings.otd.bEnableSlave;
-  d[F("settings.otd.summer_mode")] = settings.otd.bSummerMode;
-  d[F("settings.otd.fail_safe")] = settings.otd.bFailSafe;
-  d[F("settings.otd.msg_interval")] = (uint32_t)settings.otd.iMsgInterval;
-  d[F("settings.otd.has_bypass_relay")] = settings.otd.bHasBypassRelay;
-  d[F("settings.otd.ch_mode")] = (uint32_t)settings.otd.iCHMode;
-  d[F("settings.otd.flow_temp")] = settings.otd.fFlowTemp;
-  d[F("settings.otd.flow_max")] = settings.otd.fFlowMax;
-  d[F("settings.otd.room_setpoint")] = settings.otd.fRoomSetpoint;
-  d[F("settings.otd.gradient")] = settings.otd.fGradient;
-  d[F("settings.otd.exponent")] = settings.otd.fExponent;
-  d[F("settings.otd.offset")] = settings.otd.fOffset;
-  d[F("settings.otd.room_comp")] = settings.otd.bRoomCompEnabled;
-  d[F("settings.otd.kp")] = settings.otd.fKp;
-  d[F("settings.otd.ki")] = settings.otd.fKi;
-  d[F("settings.otd.kboost")] = settings.otd.fKboost;
+    je.field(F("settings.otd.mode"), (uint32_t)settings.otd.iMode);
+    je.field(F("settings.otd.auto_detect"), settings.otd.bAutoDetect);
+    je.field(F("settings.otd.setback_temp"), settings.otd.fSetbackTemp);
+    je.field(F("settings.otd.setback_timeout"), (uint32_t)settings.otd.iSetbackTimeout);
+    je.field(F("settings.otd.enable_slave"), settings.otd.bEnableSlave);
+    je.field(F("settings.otd.summer_mode"), settings.otd.bSummerMode);
+    je.field(F("settings.otd.fail_safe"), settings.otd.bFailSafe);
+    je.field(F("settings.otd.msg_interval"), (uint32_t)settings.otd.iMsgInterval);
+    je.field(F("settings.otd.has_bypass_relay"), settings.otd.bHasBypassRelay);
+    je.field(F("settings.otd.ch_mode"), (uint32_t)settings.otd.iCHMode);
+    je.field(F("settings.otd.flow_temp"), settings.otd.fFlowTemp);
+    je.field(F("settings.otd.flow_max"), settings.otd.fFlowMax);
+    je.field(F("settings.otd.room_setpoint"), settings.otd.fRoomSetpoint);
+    je.field(F("settings.otd.gradient"), settings.otd.fGradient);
+    je.field(F("settings.otd.exponent"), settings.otd.fExponent);
+    je.field(F("settings.otd.offset"), settings.otd.fOffset);
+    je.field(F("settings.otd.room_comp"), settings.otd.bRoomCompEnabled);
+    je.field(F("settings.otd.kp"), settings.otd.fKp);
+    je.field(F("settings.otd.ki"), settings.otd.fKi);
+    je.field(F("settings.otd.kboost"), settings.otd.fKboost);
 #endif
 
-  d[F("state.mqtt.connected")] = state.mqtt.bConnected;
-  d[F("state.pic.available")] = state.pic.bAvailable;
-  d[F("state.pic.device_id")] = state.pic.sDeviceid;
-  d[F("state.pic.type")] = state.pic.sType;
-  d[F("state.pic.fw_version")] = state.pic.sFwversion;
+    je.field(F("state.mqtt.connected"), state.mqtt.bConnected);
+    je.field(F("state.pic.available"), state.pic.bAvailable);
+    je.field(F("state.pic.device_id"), state.pic.sDeviceid);
+    je.field(F("state.pic.type"), state.pic.sType);
+    je.field(F("state.pic.fw_version"), state.pic.sFwversion);
 
-  d[F("state.otbus.online")] = state.otBus.bOnline;
-  d[F("state.otbus.gateway_mode")] = state.otBus.bGatewayMode;
-  d[F("state.otbus.gateway_known")] = state.otBus.bGatewayModeKnown;
-  d[F("state.otbus.boiler_state")] = state.otBus.bBoilerState;
-  d[F("state.otbus.thermostat_state")] = state.otBus.bThermostatState;
-  d[F("state.otbus.ps_mode")] = state.otBus.bPSmode;
+    je.field(F("state.otbus.online"), state.otBus.bOnline);
+    je.field(F("state.otbus.gateway_mode"), state.otBus.bGatewayMode);
+    je.field(F("state.otbus.gateway_known"), state.otBus.bGatewayModeKnown);
+    je.field(F("state.otbus.boiler_state"), state.otBus.bBoilerState);
+    je.field(F("state.otbus.thermostat_state"), state.otBus.bThermostatState);
+    je.field(F("state.otbus.ps_mode"), state.otBus.bPSmode);
 
-  d[F("state.debug.ot_msg")] = state.debug.bOTmsg;
-  d[F("state.debug.rest_api")] = state.debug.bRestAPI;
-  d[F("state.debug.mqtt")] = state.debug.bMQTT;
-  d[F("state.debug.mqtt_gate")] = state.debug.bMQTTGate;
-  d[F("state.debug.sensors")] = state.debug.bSensors;
-  d[F("state.debug.ntp")] = state.debug.bNTP;
-  d[F("state.debug.sensor_sim")] = state.debug.bSensorSim;
-  d[F("state.debug.otgw_sim")] = state.debug.bOTGWSimulation;
-  d[F("state.debug.sat")] = state.debug.bSAT;
-  d[F("state.debug.otdirect")] = state.debug.bOTDirect;
+    je.field(F("state.debug.ot_msg"), state.debug.bOTmsg);
+    je.field(F("state.debug.rest_api"), state.debug.bRestAPI);
+    je.field(F("state.debug.mqtt"), state.debug.bMQTT);
+    je.field(F("state.debug.mqtt_gate"), state.debug.bMQTTGate);
+    je.field(F("state.debug.sensors"), state.debug.bSensors);
+    je.field(F("state.debug.ntp"), state.debug.bNTP);
+    je.field(F("state.debug.sensor_sim"), state.debug.bSensorSim);
+    je.field(F("state.debug.otgw_sim"), state.debug.bOTGWSimulation);
+    je.field(F("state.debug.sat"), state.debug.bSAT);
+    je.field(F("state.debug.otdirect"), state.debug.bOTDirect);
 #if HAS_SAT_BLE
-  d[F("state.debug.sat_ble")] = state.debug.bSATBLE;
+    je.field(F("state.debug.sat_ble"), state.debug.bSATBLE);
 #endif
 
-  d[F("state.heap.ws_drops")] = (uint32_t)state.heapdiag.iWsDropsTotal;
-  d[F("state.heap.mqtt_drops")] = (uint32_t)state.heapdiag.iMqttDropsTotal;
-  d[F("state.heap.entered_low")] = (uint32_t)state.heapdiag.iEnteredLowCount;
-  d[F("state.heap.entered_warn")] = (uint32_t)state.heapdiag.iEnteredWarningCount;
-  d[F("state.heap.entered_crit")] = (uint32_t)state.heapdiag.iEnteredCriticalCount;
-  d[F("state.heap.drip_slow")] = (uint32_t)state.heapdiag.iDripSlowModeCount;
+    je.field(F("state.heap.ws_drops"), (uint32_t)state.heapdiag.iWsDropsTotal);
+    je.field(F("state.heap.mqtt_drops"), (uint32_t)state.heapdiag.iMqttDropsTotal);
+    je.field(F("state.heap.entered_low"), (uint32_t)state.heapdiag.iEnteredLowCount);
+    je.field(F("state.heap.entered_warn"), (uint32_t)state.heapdiag.iEnteredWarningCount);
+    je.field(F("state.heap.entered_crit"), (uint32_t)state.heapdiag.iEnteredCriticalCount);
+    je.field(F("state.heap.drip_slow"), (uint32_t)state.heapdiag.iDripSlowModeCount);
 
-  d[F("state.disco.published")] = (uint32_t)state.discovery.iPublishedTopicCount;
-  d[F("state.disco.verify_runs")] = (uint32_t)state.discovery.iVerifyRunCount;
-  d[F("state.disco.republishes")] = (uint32_t)state.discovery.iRepublishTriggeredCount;
-  d[F("state.disco.last_missing")] = (uint32_t)state.discovery.iLastMissingCount;
-  d[F("state.disco.last_orphan")] = (uint32_t)state.discovery.iLastOrphanCount;
-  d[F("state.disco.last_epoch")] = (uint32_t)state.discovery.iLastVerifyEpoch;
+    je.field(F("state.disco.published"), (uint32_t)state.discovery.iPublishedTopicCount);
+    je.field(F("state.disco.verify_runs"), (uint32_t)state.discovery.iVerifyRunCount);
+    je.field(F("state.disco.republishes"), (uint32_t)state.discovery.iRepublishTriggeredCount);
+    je.field(F("state.disco.last_missing"), (uint32_t)state.discovery.iLastMissingCount);
+    je.field(F("state.disco.last_orphan"), (uint32_t)state.discovery.iLastOrphanCount);
+    je.field(F("state.disco.last_epoch"), (uint32_t)state.discovery.iLastVerifyEpoch);
 
-  { char boilerStatus[20]; satGetBoilerStatusName(boilerStatus, sizeof(boilerStatus));
-    d[F("state.sat.boiler_status")] = boilerStatus; }
-  { char manufacturer[12]; satGetManufacturerName(manufacturer, sizeof(manufacturer));
-    d[F("state.sat.manufacturer")] = manufacturer; }
-  d[F("state.sat.active")] = state.sat.bActive;
-  d[F("state.sat.control_mode")] = (int32_t)state.sat.eControlMode;
-  d[F("state.sat.room_temp")] = satGetRoomTemp();
-  d[F("state.sat.outside_temp")] = satGetOutsideTemp();
-  d[F("state.sat.heating_curve")] = state.sat.fHeatingCurveValue;
-  d[F("state.sat.pid_output")] = state.sat.fPidOutput;
-  d[F("state.sat.final_setpoint")] = state.sat.fFinalSetpoint;
-  d[F("state.sat.error")] = state.sat.fError;
-  d[F("state.sat.pid_p")] = state.sat.fPidP;
-  d[F("state.sat.pid_i")] = state.sat.fPidI;
-  d[F("state.sat.pid_d")] = state.sat.fPidD;
-  d[F("state.sat.cycle_count")] = (uint32_t)state.sat.iCycleCount;
-  d[F("state.sat.last_cycle_class")] = (int32_t)state.sat.eLastCycleClass;
-  d[F("state.sat.duty_ratio")] = state.sat.fDutyRatio;
-  d[F("state.sat.pwm_duty")] = state.sat.fPwmDutyCycle;
-  d[F("state.sat.active_preset")] = (int32_t)state.sat.eActivePreset;
-  d[F("state.sat.mod_suppressed")] = state.sat.bModSuppressed;
-  d[F("state.sat.dhw_active")] = state.sat.bDhwActive;
-  d[F("state.sat.fallback_active")] = state.sat.bFallbackActive;
-  d[F("state.sat.fallback_reason")] = (int32_t)state.sat.eFallbackReason;
-  d[F("state.sat.current_mod")] = (int32_t)state.sat.iCurrentModulation;
-  d[F("state.sat.hsys_detected")] = (int32_t)state.sat.iDetectedHeatingSystem;
-  d[F("state.sat.weather_valid")] = state.sat.weather.bValid;
-  d[F("state.sat.weather_temp")] = state.sat.weather.fTemperature;
-  d[F("state.sat.weather_humidity")] = state.sat.weather.fHumidity;
-  d[F("state.sat.weather_wind")] = state.sat.weather.fWindSpeed;
-  d[F("state.sat.weather_cloud")] = state.sat.weather.fCloudCover;
+    { char boilerStatus[20]; satGetBoilerStatusName(boilerStatus, sizeof(boilerStatus));
+      je.field(F("state.sat.boiler_status"), boilerStatus); }
+    { char manufacturer[12]; satGetManufacturerName(manufacturer, sizeof(manufacturer));
+      je.field(F("state.sat.manufacturer"), manufacturer); }
+    je.field(F("state.sat.active"), state.sat.bActive);
+    je.field(F("state.sat.control_mode"), (int32_t)state.sat.eControlMode);
+    je.field(F("state.sat.room_temp"), satGetRoomTemp());
+    je.field(F("state.sat.outside_temp"), satGetOutsideTemp());
+    je.field(F("state.sat.heating_curve"), state.sat.fHeatingCurveValue);
+    je.field(F("state.sat.pid_output"), state.sat.fPidOutput);
+    je.field(F("state.sat.final_setpoint"), state.sat.fFinalSetpoint);
+    je.field(F("state.sat.error"), state.sat.fError);
+    je.field(F("state.sat.pid_p"), state.sat.fPidP);
+    je.field(F("state.sat.pid_i"), state.sat.fPidI);
+    je.field(F("state.sat.pid_d"), state.sat.fPidD);
+    je.field(F("state.sat.cycle_count"), (uint32_t)state.sat.iCycleCount);
+    je.field(F("state.sat.last_cycle_class"), (int32_t)state.sat.eLastCycleClass);
+    je.field(F("state.sat.duty_ratio"), state.sat.fDutyRatio);
+    je.field(F("state.sat.pwm_duty"), state.sat.fPwmDutyCycle);
+    je.field(F("state.sat.active_preset"), (int32_t)state.sat.eActivePreset);
+    je.field(F("state.sat.mod_suppressed"), state.sat.bModSuppressed);
+    je.field(F("state.sat.dhw_active"), state.sat.bDhwActive);
+    je.field(F("state.sat.fallback_active"), state.sat.bFallbackActive);
+    je.field(F("state.sat.fallback_reason"), (int32_t)state.sat.eFallbackReason);
+    je.field(F("state.sat.current_mod"), (int32_t)state.sat.iCurrentModulation);
+    je.field(F("state.sat.hsys_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
+    je.field(F("state.sat.weather_valid"), state.sat.weather.bValid);
+    je.field(F("state.sat.weather_temp"), state.sat.weather.fTemperature);
+    je.field(F("state.sat.weather_humidity"), state.sat.weather.fHumidity);
+    je.field(F("state.sat.weather_wind"), state.sat.weather.fWindSpeed);
+    je.field(F("state.sat.weather_cloud"), state.sat.weather.fCloudCover);
 #if HAS_WEATHER_FORECAST
-  d[F("state.sat.weather_pressure")] = state.sat.weather.fPressureMsl;
-  d[F("state.sat.weather_is_day")] = state.sat.weather.bIsDay;
+    je.field(F("state.sat.weather_pressure"), state.sat.weather.fPressureMsl);
+    je.field(F("state.sat.weather_is_day"), state.sat.weather.bIsDay);
 #endif
-  d[F("state.sat.current_power")] = state.sat.fCurrentPower;
-  d[F("state.sat.energy_total")] = state.sat.fEnergyTotal;
-  d[F("state.sat.energy_est")] = state.sat.fEnergyEstimatedKWh;
-  d[F("state.sat.thermal_valid")] = state.sat.bThermalModelValid;
-  d[F("state.sat.thermal_drop")] = state.sat.fThermalDropRate;
-  d[F("state.sat.solar_gain")] = state.sat.bSolarGainActive;
-  d[F("state.sat.summer_active")] = state.sat.bSummerActive;
-  d[F("state.sat.humidity")] = state.sat.fHumidity;
-  d[F("state.sat.humidity_valid")] = state.sat.bHumidityValid;
-  d[F("state.sat.comfort_offset")] = state.sat.fComfortOffset;
-  d[F("state.sat.area0_temp")] = state.sat.fAreaTemp[0];
-  d[F("state.sat.area1_temp")] = state.sat.fAreaTemp[1];
-  d[F("state.sat.area2_temp")] = state.sat.fAreaTemp[2];
-  d[F("state.sat.area3_temp")] = state.sat.fAreaTemp[3];
-  d[F("state.sat.auto_tune_active")] = state.sat.bAutoTuneActive;
-  d[F("state.sat.auto_tune_cycles")] = (uint32_t)state.sat.iAutoTuneCycles;
-  d[F("state.sat.auto_tune_score")] = state.sat.fAutoTuneScore;
+    je.field(F("state.sat.current_power"), state.sat.fCurrentPower);
+    je.field(F("state.sat.energy_total"), state.sat.fEnergyTotal);
+    je.field(F("state.sat.energy_est"), state.sat.fEnergyEstimatedKWh);
+    je.field(F("state.sat.thermal_valid"), state.sat.bThermalModelValid);
+    je.field(F("state.sat.thermal_drop"), state.sat.fThermalDropRate);
+    je.field(F("state.sat.solar_gain"), state.sat.bSolarGainActive);
+    je.field(F("state.sat.summer_active"), state.sat.bSummerActive);
+    je.field(F("state.sat.humidity"), state.sat.fHumidity);
+    je.field(F("state.sat.humidity_valid"), state.sat.bHumidityValid);
+    je.field(F("state.sat.comfort_offset"), state.sat.fComfortOffset);
+    je.field(F("state.sat.area0_temp"), state.sat.fAreaTemp[0]);
+    je.field(F("state.sat.area1_temp"), state.sat.fAreaTemp[1]);
+    je.field(F("state.sat.area2_temp"), state.sat.fAreaTemp[2]);
+    je.field(F("state.sat.area3_temp"), state.sat.fAreaTemp[3]);
+    je.field(F("state.sat.auto_tune_active"), state.sat.bAutoTuneActive);
+    je.field(F("state.sat.auto_tune_cycles"), (uint32_t)state.sat.iAutoTuneCycles);
+    je.field(F("state.sat.auto_tune_score"), state.sat.fAutoTuneScore);
 #if HAS_SAT_BLE
-  d[F("state.sat.ble_temp")] = state.sat.fBleTemp;
-  d[F("state.sat.ble_humidity")] = state.sat.fBleHumidity;
-  d[F("state.sat.ble_valid")] = state.sat.bBleTempValid;
-  d[F("state.sat.ble_count")] = (uint32_t)state.sat.iBleSensorCount;
-  d[F("state.sat.ble_battery")] = (uint32_t)state.sat.iBleBattery;
-  d[F("state.sat.ble_rssi")] = (int32_t)state.sat.iBleRssi;
+    je.field(F("state.sat.ble_temp"), state.sat.fBleTemp);
+    je.field(F("state.sat.ble_humidity"), state.sat.fBleHumidity);
+    je.field(F("state.sat.ble_valid"), state.sat.bBleTempValid);
+    je.field(F("state.sat.ble_count"), (uint32_t)state.sat.iBleSensorCount);
+    je.field(F("state.sat.ble_battery"), (uint32_t)state.sat.iBleBattery);
+    je.field(F("state.sat.ble_rssi"), (int32_t)state.sat.iBleRssi);
 #endif
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  d[F("state.otd.schedule_total")] = (uint32_t)state.otd.iScheduleTotal;
-  d[F("state.otd.schedule_active")] = (uint32_t)state.otd.iScheduleActive;
-  d[F("state.otd.schedule_disabled")] = (uint32_t)state.otd.iScheduleDisabled;
-  d[F("state.otd.override_count")] = (uint32_t)state.otd.iOverrideCount;
-  d[F("state.otd.bypass_active")] = state.otd.bBypassActive;
-  d[F("state.otd.stepup_enabled")] = state.otd.bStepUpEnabled;
-  d[F("state.otd.monitor_mode")] = state.otd.bMonitorMode;
-  d[F("state.otd.mode")] = (int32_t)state.otd.eMode;
-  d[F("state.otd.master_mode")] = state.otd.bMasterMode;
-  d[F("state.otd.thermostat_connected")] = state.otd.bThermostatConnected;
-  d[F("state.otd.setback_active")] = state.otd.bSetbackActive;
-  d[F("state.otd.override_mode")] = (int32_t)state.otd.eOverrideMode;
-  d[F("state.otd.override_f88")] = (uint32_t)state.otd.iOverrideF88;
+    je.field(F("state.otd.schedule_total"), (uint32_t)state.otd.iScheduleTotal);
+    je.field(F("state.otd.schedule_active"), (uint32_t)state.otd.iScheduleActive);
+    je.field(F("state.otd.schedule_disabled"), (uint32_t)state.otd.iScheduleDisabled);
+    je.field(F("state.otd.override_count"), (uint32_t)state.otd.iOverrideCount);
+    je.field(F("state.otd.bypass_active"), state.otd.bBypassActive);
+    je.field(F("state.otd.stepup_enabled"), state.otd.bStepUpEnabled);
+    je.field(F("state.otd.monitor_mode"), state.otd.bMonitorMode);
+    je.field(F("state.otd.mode"), (int32_t)state.otd.eMode);
+    je.field(F("state.otd.master_mode"), state.otd.bMasterMode);
+    je.field(F("state.otd.thermostat_connected"), state.otd.bThermostatConnected);
+    je.field(F("state.otd.setback_active"), state.otd.bSetbackActive);
+    je.field(F("state.otd.override_mode"), (int32_t)state.otd.eOverrideMode);
+    je.field(F("state.otd.override_f88"), (uint32_t)state.otd.iOverrideF88);
 #endif
 
-  restSendJson(doc);
+    je.endObject();                   // close "debug"
+    je.endObject();                   // close root
+  }
+  restFinalize();
 }
 
 // TASK-585: WiFi network scan
@@ -2274,21 +2282,26 @@ void sendOTmonitorV2()
   // lock the loop task can hold across writes.
   OTStateLock stateLock(OT_STATE_READ_LOCK_MS);
 
-  // ADR-141: ArduinoJson v7. Each entry is the OTmon compact object shape
-  // "name": {"value": V, "unit": "U", "epoch": E}. The generic lambda mirrors
-  // the old sendJsonOTmonMapEntry overloads: V is serialised by its native type
-  // (CONOFF()/CBOOLEAN strings stay strings, numerics stay numbers).
-  JsonDocument doc;
-  JsonObject mon = doc[F("otmonitor")].to<JsonObject>();
-  auto emit = [&](const __FlashStringHelper* name, auto value,
-                  const __FlashStringHelper* unit, uint32_t epoch) {
-    JsonObject e = mon[name].to<JsonObject>();
-    e[F("value")] = value;
-    e[F("unit")]  = unit;
-    e[F("epoch")] = epoch;
-  };
+  // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path. Each
+  // entry is the OTmon compact object shape "name": {"value": V, "unit": "U",
+  // "epoch": E}. The generic lambda mirrors the old sendJsonOTmonMapEntry
+  // overloads: V is serialised by its native type (CONOFF()/CBOOLEAN strings
+  // stay strings, numerics stay numbers).
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.beginObject(F("otmonitor"));   // "otmonitor":{
+    auto emit = [&](const __FlashStringHelper* name, auto value,
+                    const __FlashStringHelper* unit, uint32_t epoch) {
+      je.beginObject(name);
+      je.field(F("value"), value);
+      je.field(F("unit"),  unit);
+      je.field(F("epoch"), epoch);
+      je.endObject();
+    };
 
-  emit(F("flamestatus"), CONOFF(isFlameStatus()),F(""), getMsgLastUpdated(OT_Statusflags));
+    emit(F("flamestatus"), CONOFF(isFlameStatus()),F(""), getMsgLastUpdated(OT_Statusflags));
   emit(F("chmodus"), CONOFF(isCentralHeatingActive()),F(""), getMsgLastUpdated(OT_Statusflags));
   emit(F("chenable"), CONOFF(isCentralHeatingEnabled()),F(""), getMsgLastUpdated(OT_Statusflags));
   emit(F("ch2modus"), CONOFF(isCentralHeating2Active()),F(""), getMsgLastUpdated(OT_Statusflags));
@@ -2343,17 +2356,21 @@ void sendOTmonitorV2()
       if (!strDeviceAddress) continue;
       // Dallas variant adds "type":"dallas" between unit and epoch.
       // getDallasAddress() returns a shared static buffer overwritten each call;
-      // String() copies the key so multiple devices do not alias to the last addr.
-      JsonObject e = mon[String(strDeviceAddress)].to<JsonObject>();
-      e[F("value")] = DallasrealDevice[i].tempC;
-      e[F("unit")]  = F("°C");
-      e[F("type")]  = F("dallas");
-      e[F("epoch")] = (uint32_t)DallasrealDevice[i].lasttime;
+      // the streaming key emits immediately so no per-device copy is needed.
+      je.beginObject(strDeviceAddress);
+      je.field(F("value"), DallasrealDevice[i].tempC);
+      je.field(F("unit"),  F("°C"));
+      je.field(F("type"),  F("dallas"));
+      je.field(F("epoch"), (uint32_t)DallasrealDevice[i].lasttime);
+      je.endObject();
       // Labels now managed by Web UI via /dallas_labels.ini file (not sent in API)
     }
   }
 
-  restSendJson(doc);
+    je.endObject();                   // close "otmonitor"
+    je.endObject();                   // close root
+  }
+  restFinalize();
 }
 
 //=======================================================================
@@ -2382,181 +2399,186 @@ void sendDeviceInfoV2()
   const uint32_t startMs = millis();
   restPerfBegin(REST_PERF_DEVICE_INFO);
 
-  // ADR-141: ArduinoJson v7. Native types replace the hand-rolled streaming map.
-  // String-returning calls (getActiveIP/MAC, WiFi.*.toString, dBmtoQuality) are
-  // assigned DIRECTLY (not via CSTR): ArduinoJson copies a String by value, whereas
-  // CSTR(<temporary String>) would hand it a const char* into a dying temporary that
-  // dangles by serialise time. char[] fields are copied too (mutable char* path).
-  JsonDocument doc;
-  JsonObject o = doc[F("device")].to<JsonObject>();
+  // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path.
+  // String-returning calls (getActiveIP/MAC, WiFi.*.toString, dBmtoQuality) bind
+  // to the field(const String&) overload, which copies into the sink immediately
+  // (no dangling temporary). char[] fields bind to field(const char*).
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.beginObject(F("device"));      // "device":{
 
-  // --- Firmware & build identity ---
-  o[F("author")] = F("Robert van den Breemen");
-  o[F("fwversion")] = _SEMVER_FULL;
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
-  o[F("compiled")] = cMsg;
-  // ADR-113 stage 2 (TASK-754): picavailable removed; UI selects on hardware_type.
-  if (isPICEnabled()) {
-    o[F("picfwversion")] = state.pic.sFwversion;
-    o[F("picdeviceid")] = state.pic.sDeviceid;
-    o[F("picfwtype")] = state.pic.sType;
-  }
-  o[F("otdirectavailable")] = isOTDirectEnabled();
-#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  if (isOTDirectEnabled()) {
-    {
-      const char* modeStr = "gateway";
-      if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
-      else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
-      else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
-      else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
-      o[F("otdmode")] = modeStr;
+    // --- Firmware & build identity ---
+    je.field(F("author"), F("Robert van den Breemen"));
+    je.field(F("fwversion"), _SEMVER_FULL);
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
+    je.field(F("compiled"), cMsg);
+    // ADR-113 stage 2 (TASK-754): picavailable removed; UI selects on hardware_type.
+    if (isPICEnabled()) {
+      je.field(F("picfwversion"), state.pic.sFwversion);
+      je.field(F("picdeviceid"), state.pic.sDeviceid);
+      je.field(F("picfwtype"), state.pic.sType);
     }
-    o[F("otdbypass")] = state.otd.bBypassActive;
-    o[F("otdmonitor")] = state.otd.bMonitorMode;
-    o[F("otdmaster")] = state.otd.bMasterMode;
-    o[F("otdstepup")] = state.otd.bStepUpEnabled;
-    o[F("otdthermostat")] = state.otd.bThermostatConnected;
-    o[F("otdsetback")] = state.otd.bSetbackActive;
-    o[F("otdschedtotal")] = state.otd.iScheduleTotal;
-    o[F("otdschedactive")] = state.otd.iScheduleActive;
-    o[F("otdscheddisabled")] = state.otd.iScheduleDisabled;
-    o[F("otdoverrides")] = state.otd.iOverrideCount;
-  }
+    je.field(F("otdirectavailable"), isOTDirectEnabled());
+#if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
+    if (isOTDirectEnabled()) {
+      {
+        const char* modeStr = "gateway";
+        if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
+        else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+        else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
+        else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
+        je.field(F("otdmode"), modeStr);
+      }
+      je.field(F("otdbypass"), state.otd.bBypassActive);
+      je.field(F("otdmonitor"), state.otd.bMonitorMode);
+      je.field(F("otdmaster"), state.otd.bMasterMode);
+      je.field(F("otdstepup"), state.otd.bStepUpEnabled);
+      je.field(F("otdthermostat"), state.otd.bThermostatConnected);
+      je.field(F("otdsetback"), state.otd.bSetbackActive);
+      je.field(F("otdschedtotal"), state.otd.iScheduleTotal);
+      je.field(F("otdschedactive"), state.otd.iScheduleActive);
+      je.field(F("otdscheddisabled"), state.otd.iScheduleDisabled);
+      je.field(F("otdoverrides"), state.otd.iOverrideCount);
+    }
 #endif
 
-  // --- Platform & hardware identity ---
-  o[F("platform")] = F(PLATFORM_NAME);
-  o[F("board")] = boardName();
-  o[F("hardware_type")] = hardwareTypeName();  // ADR-113: static board class for codepath selection
-  o[F("hardwaremode")] = hardwareModeName();
-  o[F("networkmode")] = networkModeName();
-  o[F("oledpresent")] = state.hw.bOLEDPresent;
+    // --- Platform & hardware identity ---
+    je.field(F("platform"), F(PLATFORM_NAME));
+    je.field(F("board"), boardName());
+    je.field(F("hardware_type"), hardwareTypeName());  // ADR-113: static board class for codepath selection
+    je.field(F("hardwaremode"), hardwareModeName());
+    je.field(F("networkmode"), networkModeName());
+    je.field(F("oledpresent"), state.hw.bOLEDPresent);
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  o[F("ethernetpresent")] = state.hw.bEthernetPresent;
-  o[F("ethernetlink")] = state.net.bEthernetLink;
+    je.field(F("ethernetpresent"), state.hw.bEthernetPresent);
+    je.field(F("ethernetlink"), state.net.bEthernetLink);
 #endif
 
-  // --- Network identity ---
-  o[F("hostname")] = settings.sHostname;
-  o[F("ipaddress")] = getActiveIP();
-  o[F("macaddress")] = getActiveMAC();
-  // Current WiFi network parameters (for DHCP-prefill in the UI). Available
-  // on both ESP8266 and ESP32 via the standard WiFi API.
-  o[F("wifi_current_subnet")]  = WiFi.subnetMask().toString();
-  o[F("wifi_current_gateway")] = WiFi.gatewayIP().toString();
-  o[F("wifi_current_dns1")]    = WiFi.dnsIP(0).toString();
-  o[F("wifi_current_dns2")]    = WiFi.dnsIP(1).toString();
+    // --- Network identity ---
+    je.field(F("hostname"), settings.sHostname);
+    je.field(F("ipaddress"), getActiveIP());
+    je.field(F("macaddress"), getActiveMAC());
+    // Current WiFi network parameters (for DHCP-prefill in the UI). Available
+    // on both ESP8266 and ESP32 via the standard WiFi API.
+    je.field(F("wifi_current_subnet"),  WiFi.subnetMask().toString());
+    je.field(F("wifi_current_gateway"), WiFi.gatewayIP().toString());
+    je.field(F("wifi_current_dns1"),    WiFi.dnsIP(0).toString());
+    je.field(F("wifi_current_dns2"),    WiFi.dnsIP(1).toString());
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  // Current Ethernet network parameters (for DHCP-prefill in the UI). Reported
-  // via the EthernetESP32 library (Ethernet.* API).
-  o[F("eth_current_subnet")]  = Ethernet.subnetMask().toString();
-  o[F("eth_current_gateway")] = Ethernet.gatewayIP().toString();
-  o[F("eth_current_dns")]     = Ethernet.dnsServerIP().toString();
+    // Current Ethernet network parameters (for DHCP-prefill in the UI). Reported
+    // via the EthernetESP32 library (Ethernet.* API).
+    je.field(F("eth_current_subnet"),  Ethernet.subnetMask().toString());
+    je.field(F("eth_current_gateway"), Ethernet.gatewayIP().toString());
+    je.field(F("eth_current_dns"),     Ethernet.dnsServerIP().toString());
 #endif
 #if defined(_VERSION_PRERELEASE)
-  if (state.net.bAPFallback) {
-    o[F("ssid")] = state.net.sAPSSID;
-    o[F("wifirssi")] = 0;
-    o[F("wifiquality")] = 0;
-    o[F("wifiquality_text")] = F("AP Mode");
-    o[F("apfallback")] = true;
-  } else
+    if (state.net.bAPFallback) {
+      je.field(F("ssid"), state.net.sAPSSID);
+      je.field(F("wifirssi"), 0);
+      je.field(F("wifiquality"), 0);
+      je.field(F("wifiquality_text"), F("AP Mode"));
+      je.field(F("apfallback"), true);
+    } else
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  if (state.net.eMode == NET_ETHERNET) {
-    o[F("ssid")] = F("Wired");
-    o[F("wifirssi")] = 0;
-    o[F("wifiquality")] = 100;
-    o[F("wifiquality_text")] = F("Wired");
-  } else
+    if (state.net.eMode == NET_ETHERNET) {
+      je.field(F("ssid"), F("Wired"));
+      je.field(F("wifirssi"), 0);
+      je.field(F("wifiquality"), 100);
+      je.field(F("wifiquality_text"), F("Wired"));
+    } else
 #endif
-  {
-    o[F("ssid")] = WiFi.SSID();
-    o[F("wifirssi")] = WiFi.RSSI();
-    o[F("wifiquality")] = signal_quality_perc_quad(WiFi.RSSI());
-    o[F("wifiquality_text")] = dBmtoQuality(WiFi.RSSI());
+    {
+      je.field(F("ssid"), WiFi.SSID());
+      je.field(F("wifirssi"), WiFi.RSSI());
+      je.field(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
+      je.field(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
+    }
+
+    // --- Time, NTP & uptime ---
+    je.field(F("ntpenable"), settings.ntp.bEnable);
+    je.field(F("ntptimezone"), settings.ntp.sTimezone);
+    je.field(F("uptime"), upTime());
+    je.field(F("lastreset"), lastReset);
+    je.field(F("bootcount"), state.uptime.iRebootCount);
+
+    // --- Connection status (MQTT, OTGW, thermostat, boiler) ---
+    je.field(F("mqttconnected"), state.mqtt.bConnected);
+    // "otcommandinterface" names which OT interface is active, always one or the other, never both.
+    if (isPICEnabled())           je.field(F("otcommandinterface"), F("PIC"));
+    else if (isOTDirectEnabled()) je.field(F("otcommandinterface"), F("OT-Direct"));
+    else                          je.field(F("otcommandinterface"), F("None"));
+    if (hasOTCommandInterface()) {
+      je.field(F("thermostatconnected"), state.otBus.bThermostatState);
+      je.field(F("boilerconnected"), state.otBus.bBoilerState);
+      je.field(F("otgwconnected"), state.otBus.bOnline);
+    }
+    if (isPICEnabled()) {
+      je.field(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting");
+    }
+    je.field(F("otgwsimulation"), state.debug.bOTGWSimulation);
+
+    // --- Chip & CPU ---
+    snprintf_P(cMsg, sizeof(cMsg), PSTR("%06X"), (unsigned int)platformChipId());
+    je.field(F("chipid"), cMsg);
+    je.field(F("coreversion"), platformCoreVersion());
+    je.field(F("sdkversion"),  platformSdkVersion());
+    je.field(F("cpufreq"), platformCpuFreqMHz());
+
+    // --- RAM / heap (free heap, largest block, fragmentation, tier transitions) ---
+    je.field(F("freeheap"), platformFreeHeap());
+    je.field(F("maxfreeblock"), platformMaxFreeBlock());
+    je.field(F("hd_fragmentation_pct"), getHeapFragmentation());
+    je.field(F("hd_enter_low"),        state.heapdiag.iEnteredLowCount);
+    je.field(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
+    je.field(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
+
+    // --- Flash, sketch & filesystem storage (values cached at boot by cacheBootFlashInfo) ---
+    je.field(F("sketchsize"),       sBootFlash.sketchSize);
+    je.field(F("freesketchspace"),  sBootFlash.freeSketchSpace);
+    je.field(F("flashchipid"),      sBootFlash.flashChipId);
+    je.field(F("flashchipsize"),    sBootFlash.flashChipSizeMB);
+    je.field(F("flashchiprealsize"),sBootFlash.flashChipRealSizeMB);
+    je.field(F("flashchipspeed"),   sBootFlash.flashChipSpeedMHz);
+    je.field(F("flashchipmode"),    flashMode[sBootFlash.flashChipModeIdx < 4 ? sBootFlash.flashChipModeIdx : 4]);
+    je.field(F("LittleFSsize"),     sBootFlash.littleFSSizeMB);
+
+    // --- Reliability drops (heap-pressure side effects) ---
+    je.field(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
+    je.field(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
+
+    // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
+    je.field(F("disc_published_topics"),     state.discovery.iPublishedTopicCount);
+    je.field(F("disc_pending_ids"),          (uint32_t)countPendingDiscoveryIds());
+    je.field(F("disc_verify_runs"),          state.discovery.iVerifyRunCount);
+    je.field(F("disc_republish_triggered"),  state.discovery.iRepublishTriggeredCount);
+    je.field(F("disc_last_missing"),         (uint32_t)state.discovery.iLastMissingCount);
+    je.field(F("disc_last_orphan"),          (uint32_t)state.discovery.iLastOrphanCount);
+    je.field(F("disc_last_outcome"),         verifyOutcomeLabel(state.discovery.eLastOutcome));
+    je.field(F("hd_drip_burst_skip"),        state.heapdiag.iDripActiveBurstSkipCount);
+    je.field(F("hd_drip_cooldown_skip"),     state.heapdiag.iDripCooldownSkipCount);
+    je.field(F("hd_drip_slowmode"),          state.heapdiag.iDripSlowModeCount);
+    je.field(F("perf_sat_status_total_ms"),     state.restperf.satStatus.iLastTotalMs);
+    je.field(F("perf_sat_status_send_ms"),      state.restperf.satStatus.iLastSendMs);
+    je.field(F("perf_sat_status_render_ms"),    state.restperf.satStatus.iLastRenderMs);
+    je.field(F("perf_sat_status_chunks"),       state.restperf.satStatus.iLastChunkCount);
+    je.field(F("perf_device_info_total_ms"),    state.restperf.deviceInfo.iLastTotalMs);
+    je.field(F("perf_device_info_send_ms"),     state.restperf.deviceInfo.iLastSendMs);
+    je.field(F("perf_device_info_render_ms"),   state.restperf.deviceInfo.iLastRenderMs);
+    je.field(F("perf_device_info_chunks"),      state.restperf.deviceInfo.iLastChunkCount);
+    je.field(F("perf_device_info_max_ms"),      state.restperf.deviceInfo.iMaxTotalMs);
+    je.field(F("perf_device_info_samples"),     state.restperf.deviceInfo.iSampleCount);
+    je.field(F("perf_settings_total_ms"),       state.restperf.settings.iLastTotalMs);
+    je.field(F("perf_settings_send_ms"),        state.restperf.settings.iLastSendMs);
+    je.field(F("perf_settings_render_ms"),      state.restperf.settings.iLastRenderMs);
+    je.field(F("perf_settings_chunks"),         state.restperf.settings.iLastChunkCount);
+
+    je.endObject();                   // close "device"
+    je.endObject();                   // close root
   }
-
-  // --- Time, NTP & uptime ---
-  o[F("ntpenable")] = settings.ntp.bEnable;
-  o[F("ntptimezone")] = settings.ntp.sTimezone;
-  o[F("uptime")] = upTime();
-  o[F("lastreset")] = lastReset;
-  o[F("bootcount")] = state.uptime.iRebootCount;
-
-  // --- Connection status (MQTT, OTGW, thermostat, boiler) ---
-  o[F("mqttconnected")] = state.mqtt.bConnected;
-  // "otcommandinterface" names which OT interface is active, always one or the other, never both.
-  if (isPICEnabled())           o[F("otcommandinterface")] = F("PIC");
-  else if (isOTDirectEnabled()) o[F("otcommandinterface")] = F("OT-Direct");
-  else                          o[F("otcommandinterface")] = F("None");
-  if (hasOTCommandInterface()) {
-    o[F("thermostatconnected")] = state.otBus.bThermostatState;
-    o[F("boilerconnected")] = state.otBus.bBoilerState;
-    o[F("otgwconnected")] = state.otBus.bOnline;
-  }
-  if (isPICEnabled()) {
-    o[F("otgwmode")] = !isGatewayFirmware() ? "N/A" : state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting";
-  }
-  o[F("otgwsimulation")] = state.debug.bOTGWSimulation;
-
-  // --- Chip & CPU ---
-  snprintf_P(cMsg, sizeof(cMsg), PSTR("%06X"), (unsigned int)platformChipId());
-  o[F("chipid")] = cMsg;
-  o[F("coreversion")] = platformCoreVersion();
-  o[F("sdkversion")]  = platformSdkVersion();
-  o[F("cpufreq")] = platformCpuFreqMHz();
-
-  // --- RAM / heap (free heap, largest block, fragmentation, tier transitions) ---
-  o[F("freeheap")] = platformFreeHeap();
-  o[F("maxfreeblock")] = platformMaxFreeBlock();
-  o[F("hd_fragmentation_pct")] = getHeapFragmentation();
-  o[F("hd_enter_low")]        = state.heapdiag.iEnteredLowCount;
-  o[F("hd_enter_warning")]    = state.heapdiag.iEnteredWarningCount;
-  o[F("hd_enter_critical")]   = state.heapdiag.iEnteredCriticalCount;
-
-  // --- Flash, sketch & filesystem storage (values cached at boot by cacheBootFlashInfo) ---
-  o[F("sketchsize")]       = sBootFlash.sketchSize;
-  o[F("freesketchspace")]  = sBootFlash.freeSketchSpace;
-  o[F("flashchipid")]      = sBootFlash.flashChipId;
-  o[F("flashchipsize")]    = sBootFlash.flashChipSizeMB;
-  o[F("flashchiprealsize")]= sBootFlash.flashChipRealSizeMB;
-  o[F("flashchipspeed")]   = sBootFlash.flashChipSpeedMHz;
-  o[F("flashchipmode")]    = flashMode[sBootFlash.flashChipModeIdx < 4 ? sBootFlash.flashChipModeIdx : 4];
-  o[F("LittleFSsize")]     = sBootFlash.littleFSSizeMB;
-
-  // --- Reliability drops (heap-pressure side effects) ---
-  o[F("hd_ws_drops")]         = state.heapdiag.iWsDropsTotal;
-  o[F("hd_mqtt_drops")]       = state.heapdiag.iMqttDropsTotal;
-
-  // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
-  o[F("disc_published_topics")]     = state.discovery.iPublishedTopicCount;
-  o[F("disc_pending_ids")]          = (uint32_t)countPendingDiscoveryIds();
-  o[F("disc_verify_runs")]          = state.discovery.iVerifyRunCount;
-  o[F("disc_republish_triggered")]  = state.discovery.iRepublishTriggeredCount;
-  o[F("disc_last_missing")]         = (uint32_t)state.discovery.iLastMissingCount;
-  o[F("disc_last_orphan")]          = (uint32_t)state.discovery.iLastOrphanCount;
-  o[F("disc_last_outcome")]         = verifyOutcomeLabel(state.discovery.eLastOutcome);
-  o[F("hd_drip_burst_skip")]        = state.heapdiag.iDripActiveBurstSkipCount;
-  o[F("hd_drip_cooldown_skip")]     = state.heapdiag.iDripCooldownSkipCount;
-  o[F("hd_drip_slowmode")]          = state.heapdiag.iDripSlowModeCount;
-  o[F("perf_sat_status_total_ms")]     = state.restperf.satStatus.iLastTotalMs;
-  o[F("perf_sat_status_send_ms")]      = state.restperf.satStatus.iLastSendMs;
-  o[F("perf_sat_status_render_ms")]    = state.restperf.satStatus.iLastRenderMs;
-  o[F("perf_sat_status_chunks")]       = state.restperf.satStatus.iLastChunkCount;
-  o[F("perf_device_info_total_ms")]    = state.restperf.deviceInfo.iLastTotalMs;
-  o[F("perf_device_info_send_ms")]     = state.restperf.deviceInfo.iLastSendMs;
-  o[F("perf_device_info_render_ms")]   = state.restperf.deviceInfo.iLastRenderMs;
-  o[F("perf_device_info_chunks")]      = state.restperf.deviceInfo.iLastChunkCount;
-  o[F("perf_device_info_max_ms")]      = state.restperf.deviceInfo.iMaxTotalMs;
-  o[F("perf_device_info_samples")]     = state.restperf.deviceInfo.iSampleCount;
-  o[F("perf_settings_total_ms")]       = state.restperf.settings.iLastTotalMs;
-  o[F("perf_settings_send_ms")]        = state.restperf.settings.iLastSendMs;
-  o[F("perf_settings_render_ms")]      = state.restperf.settings.iLastRenderMs;
-  o[F("perf_settings_chunks")]         = state.restperf.settings.iLastChunkCount;
-
-  restSendJson(doc);
+  restFinalize();
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_DEVICE_INFO, totalMs);
   RESTDebugTf(PSTR("REST PERF device/info total=%lums send=%lums render=%lums chunks=%lu\r\n"),
@@ -2841,46 +2863,53 @@ void sendDeviceSettings()
   const uint32_t startMs = millis();
   restPerfBegin(REST_PERF_SETTINGS);
 
-  // ADR-141: ArduinoJson v7. Each setting becomes a typed sub-object, mirroring
-  // the four sendJsonSettingObj overloads:
+  // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path. Each
+  // setting becomes a typed sub-object, mirroring the four sendJsonSettingObj
+  // overloads:
   //   addStr  -> {"value":"<escaped>","type":"s","maxlen":N}
   //   addInt  -> {"value":<int>,"type":"i","min":N,"max":N}
   //   addNum  -> {"value":<number>,"type":"f","min":N,"max":N}  (float/string source)
   //   addBool -> {"value":<bool>,"type":"b"}
-  // addNum injects the dtostrf token verbatim via serialized(String(...)) so the
-  // exact digits (and the int-truncated min/max, matching the old overload) are
-  // preserved. char[]/String value sources are copied by ArduinoJson.
-  JsonDocument doc;
-  JsonObject s = doc[F("settings")].to<JsonObject>();
-  auto addStr = [&](const __FlashStringHelper* name, const char* value, const char* type, int maxlen) {
-    JsonObject e = s[name].to<JsonObject>();
-    // Copy the value: some sources are block-scoped locals (ssidBuf) that would
-    // dangle before restSendJson(); ArduinoJson stores const char* by pointer.
-    e[F("value")]  = String(value);
-    e[F("type")]   = type;
-    e[F("maxlen")] = maxlen;
-  };
-  auto addInt = [&](const __FlashStringHelper* name, int32_t value, const char* type, int minValue, int maxValue) {
-    JsonObject e = s[name].to<JsonObject>();
-    e[F("value")] = value;
-    e[F("type")]  = type;
-    e[F("min")]   = minValue;
-    e[F("max")]   = maxValue;
-  };
-  auto addNum = [&](const __FlashStringHelper* name, const char* numStr, const char* type, int minValue, int maxValue) {
-    JsonObject e = s[name].to<JsonObject>();
-    e[F("value")] = serialized(String(numStr));  // raw number token, exact digits
-    e[F("type")]  = type;
-    e[F("min")]   = minValue;
-    e[F("max")]   = maxValue;
-  };
-  auto addBool = [&](const __FlashStringHelper* name, bool value, const char* type) {
-    JsonObject e = s[name].to<JsonObject>();
-    e[F("value")] = value;
-    e[F("type")]  = type;
-  };
+  // addNum injects the dtostrf token verbatim via fieldRaw() so the exact digits
+  // (and the int-truncated min/max, matching the old overload) are preserved. The
+  // streaming key/value emit immediately, so block-scoped sources (ssidBuf, the
+  // tmpBuf blocks) are written before they go out of scope - no copy needed.
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.beginObject(F("settings"));    // "settings":{
+    auto addStr = [&](const __FlashStringHelper* name, const char* value, const char* type, int maxlen) {
+      je.beginObject(name);
+      je.field(F("value"),  value);
+      je.field(F("type"),   type);
+      je.field(F("maxlen"), (int32_t)maxlen);
+      je.endObject();
+    };
+    auto addInt = [&](const __FlashStringHelper* name, int32_t value, const char* type, int minValue, int maxValue) {
+      je.beginObject(name);
+      je.field(F("value"), value);
+      je.field(F("type"),  type);
+      je.field(F("min"),   (int32_t)minValue);
+      je.field(F("max"),   (int32_t)maxValue);
+      je.endObject();
+    };
+    auto addNum = [&](const __FlashStringHelper* name, const char* numStr, const char* type, int minValue, int maxValue) {
+      je.beginObject(name);
+      je.fieldRaw(F("value"), numStr);  // raw number token, exact digits
+      je.field(F("type"),  type);
+      je.field(F("min"),   (int32_t)minValue);
+      je.field(F("max"),   (int32_t)maxValue);
+      je.endObject();
+    };
+    auto addBool = [&](const __FlashStringHelper* name, bool value, const char* type) {
+      je.beginObject(name);
+      je.field(F("value"), value);
+      je.field(F("type"),  type);
+      je.endObject();
+    };
 
-  addStr(F("hostname"), CSTR(settings.sHostname), "s", 32);
+    addStr(F("hostname"), CSTR(settings.sHostname), "s", 32);
   { char ssidBuf[33]; strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf)); addStr(F("ssid"), ssidBuf, "r", 32); }
   addBool(F("mqttenable"), settings.mqtt.bEnable, "b");
   addStr(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
@@ -3154,7 +3183,10 @@ void sendDeviceSettings()
              static_cast<unsigned>(strnlen(settings.sHTTPpasswd, sizeof(settings.sHTTPpasswd))));
   addStr(F("httppasswd"), httpPasswordPlaceholder, "p", 40);
 
-  restSendJson(doc);
+    je.endObject();                   // close "settings"
+    je.endObject();                   // close root
+  }
+  restFinalize();
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_SETTINGS, totalMs);
   RESTDebugTf(PSTR("REST PERF settings total=%lums send=%lums render=%lums chunks=%lu\r\n"),

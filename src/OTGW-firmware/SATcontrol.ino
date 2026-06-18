@@ -2007,215 +2007,221 @@ void satSendStatusJSON()
 {
   const uint32_t startMs = millis();
   restPerfBegin(REST_PERF_SAT_STATUS);
-  // ADR-141: build the full SAT status as one ArduinoJson v7 document and
-  // serialise it in a single restSendJson() at the end (replaces the
-  // sendStartJsonMap -> N x sendJsonMapEntry/satSendJsonFloat -> sendEndJsonMap
-  // chunked layer). Empty-key wrapper = a flat ROOT object: doc.to<JsonObject>().
-  // ArduinoJson serialises NaN/Inf as null, matching the old satSendJsonFloat
-  // null handling, so the per-field decimal precision is intentionally dropped.
-  JsonDocument doc;
-  JsonObject o = doc.to<JsonObject>();
-  o[F("enabled")]              = settings.sat.bEnabled;
-  o[F("active")]               = state.sat.bActive;
-  o[F("control_mode")]         = (int32_t)state.sat.eControlMode;
-  { char bsName[20]; satGetBoilerStatusName(bsName, sizeof(bsName));
-    o[F("boiler_status")]        = bsName; }
-  o[F("target_temp")]          = settings.sat.fTargetTemp;
-  o[F("room_temp")]            = satGetRoomTemp();
-  o[F("outside_temp")]         = satGetOutsideTemp();
-  o[F("heating_curve")]        = state.sat.fHeatingCurveValue;
-  o[F("pid_output")]           = state.sat.fPidOutput;
-  o[F("final_setpoint")]       = state.sat.fFinalSetpoint;
-  o[F("error")]                = state.sat.fError;
-  o[F("pid_p")]                = state.sat.fPidP;
-  o[F("pid_i")]                = state.sat.fPidI;
-  o[F("pid_d")]                = state.sat.fPidD;
-  o[F("kp")]                   = state.sat.fKp;
-  o[F("ki")]                   = state.sat.fKi;
-  o[F("kd")]                   = state.sat.fKd;
-  o[F("raw_derivative")]       = state.sat.fRawDerivative;
-  o[F("coefficient")]          = settings.sat.fHeatingCurveCoeff;
-  o[F("deadband")]             = settings.sat.fDeadband;
-  o[F("overshoot_margin")]     = settings.sat.fOvershootMargin;
-  o[F("cycle_count")]          = state.sat.iCycleCount;
-  o[F("cycles_this_hour")]     = (int32_t)satCycleGetCyclesThisHour();
-  o[F("last_cycle_class")]     = (int32_t)state.sat.eLastCycleClass;
-  o[F("cycle_max_flow")]       = state.sat.fCycleMaxFlow;
-  o[F("cycle_overshoot_sec")]  = state.sat.fCycleOvershootSec;
-  o[F("duty_ratio")]           = state.sat.fDutyRatio;
-  o[F("overshoot_fraction")]   = state.sat.fOvershootFraction;
-  o[F("underheat_fraction")]   = state.sat.fUnderheatFraction;
-  o[F("cycle_phase")]          = satCycleGetPhaseName();
-  o[F("phase_duration_sec")]   = (int32_t)satCycleGetPhaseDurationSec();
-  o[F("pwm_duty")]             = state.sat.fPwmDutyCycle;
-  o[F("pwm_flame_req")]        = state.sat.bPwmFlameRequested;
-  o[F("active_preset")]        = (int32_t)state.sat.eActivePreset;
-  o[F("mod_suppressed")]       = state.sat.bModSuppressed;
-  o[F("dhw_active")]           = state.sat.bDhwActive;
-  o[F("dhw_setpoint")]         = settings.sat.fDhwSetpoint;
-  // TASK-516: boiler-gated master DHW enable. dhw_config_tank is derived live
-  // from MsgID 3 HB3 (bit 11 of the uint16 SlaveConfigMemberIDcode); the UI
-  // uses it to decide whether to render the toggle. dhw_enable mirrors the
-  // user setting; only acted on (HW=) when dhw_config_tank=true.
-  o[F("dhw_config_tank")]      = (bool)(OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800);
-  o[F("dhw_enable")]           = settings.sat.bDhwEnable;
-  o[F("control_interval_sec")] = (int32_t)settings.sat.iControlInterval;
-  o[F("fallback_active")]      = state.sat.bFallbackActive;
-  o[F("fallback_reason")]      = (int32_t)state.sat.eFallbackReason;
-  o[F("max_rel_modulation")]   = (int32_t)settings.sat.iMaxRelModulation;
-  o[F("current_modulation")]   = (int32_t)state.sat.iCurrentModulation;
-  o[F("ovp_value")]            = settings.sat.fOvpValue;
-  o[F("ovp_enabled")]          = settings.sat.bOvpEnabled;
-  o[F("ovp_calib_phase")]      = (int32_t)state.sat.eCalibPhase;
-  o[F("ovp_calib_max_temp")]   = state.sat.fCalibMaxTemp;
-  o[F("ovp_calib_samples")]    = (int32_t)state.sat.iCalibSamples;
-  o[F("heating_system")]       = (int32_t)settings.sat.iHeatingSystem;
-  o[F("heating_system_detected")] = (int32_t)state.sat.iDetectedHeatingSystem;
-  { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
-    o[F("manufacturer")] = mfrName; }
-  o[F("manufacturer_setting")] = (int32_t)settings.sat.iManufacturer;
-  o[F("manufacturer_detected")] = (int32_t)state.sat.iDetectedManufacturer;
-  o[F("slave_memberid")]       = (int32_t)state.sat.iSlaveMemberID;
-  o[F("max_setpoint_system")]  = satGetMaxSetpoint();
-  o[F("external_temp_valid")]  = state.sat.bExternalTempValid;
-  o[F("external_outdoor_valid")] = state.sat.bExternalOutdoorValid;
-  // PV-surplus boost (TASK-640)
-  o[F("pv_surplus_w")]         = state.sat.fExternalPvSurplusW;
-  o[F("pv_surplus_valid")]     = state.sat.bExternalPvSurplusValid;
-  o[F("pv_boost_active")]      = state.sat.bPvBoostActive;
-  o[F("pv_boost_applied_c")]   = state.sat.fPvBoostAppliedC;
-  o[F("pv_boost_enabled")]     = settings.sat.bPvBoostEnabled;
-  o[F("safety_tripped")]       = state.sat.bSafetyTripped;
-  o[F("valves_open")]          = state.sat.bValvesOpen;
-  o[F("window_open")]          = state.sat.bWindowOpen;
-  o[F("window_detection")]     = settings.sat.bWindowDetection;
-  o[F("push_setpoint")]        = settings.sat.bPushSetpoint;
-  o[F("flame_off_offset")]     = settings.sat.fFlameOffOffset;
-  o[F("force_pwm")]            = settings.sat.bForcePWM;
-  o[F("flow_offset")]          = settings.sat.fFlowOffset;
-  o[F("pressure")]             = state.sat.fSmoothedPressure;
-  o[F("pressure_drop_rate")]   = state.sat.fPressureDropRate;
-  o[F("pressure_alarm")]       = state.sat.bPressureAlarm;
-  o[F("modulation_reliable")]  = state.sat.bModulationReliable;
-  o[F("setpoint_mismatch")]    = state.sat.bSetpointMismatch;
-  { static const char* const crNames[] = { "insufficient", "increase", "decrease", "hold" };
-    int crIdx = (int)state.sat.eCurveRecommendation;
-    if (crIdx < 0 || crIdx > 3) crIdx = 0;
-    o[F("curve_recommendation")] = crNames[crIdx]; }
-  o[F("heating_curve_recommendation")] = state.sat.sHeatCurveRec;
-  o[F("mean_error")]           = state.sat.fMeanError;
-  o[F("error_stddev")]         = state.sat.fErrorStdDev;
-  o[F("target_temp_step")]     = settings.sat.fTargetTempStep;
-  o[F("power_kw")]             = state.sat.fCurrentPower;
-  o[F("energy_kwh")]           = state.sat.fEnergyTotal;
-  o[F("boiler_capacity")]      = settings.sat.fBoilerCapacity;
-  // Gas consumption estimation (Task #232)
-  o[F("boiler_rated_kw")]      = settings.sat.fBoilerRatedKW;
-  o[F("boiler_efficiency")]    = settings.sat.fBoilerEfficiency;
-  o[F("energy_estimated_kwh")] = state.sat.fEnergyEstimatedKWh;
-  // Preset sync (Task #46)
-  o[F("preset_sync")]          = settings.sat.bPresetSync;
-  // Thermal drop learning (Task #21)
-  o[F("thermal_coeff")]        = settings.sat.fThermalCoeff;
-  o[F("thermal_drop_rate")]    = state.sat.fThermalDropRate;
-  o[F("thermal_model_valid")]  = state.sat.bThermalModelValid;
-  o[F("estimated_room")]       = state.sat.fEstimatedRoom;
-  o[F("last_known_room")]      = state.sat.fLastKnownRoom;
-  // Solar gain (Task #23)
-  o[F("solar_gain_active")]    = state.sat.bSolarGainActive;
-  o[F("indoor_rise_rate")]     = state.sat.fIndoorRiseRate;
-  // Summer simmer (Task #24)
-  o[F("summer_simmer")]        = settings.sat.bSummerSimmer;
-  o[F("summer_active")]        = state.sat.bSummerActive;
-  o[F("summer_hours_above")]   = state.sat.fSummerHoursAbove;
-  o[F("summer_threshold")]     = settings.sat.fSummerThreshold;
-  o[F("summer_min_hours")]     = (int32_t)settings.sat.iSummerMinHours;
-  // Thermal comfort (Task #28/#47)
-  o[F("comfort_adjust")]       = settings.sat.bComfortAdjust;
-  o[F("humidity")]             = state.sat.fHumidity;
-  o[F("humidity_valid")]       = state.sat.bHumidityValid;
-  o[F("comfort_offset")]       = state.sat.fComfortOffset;
-  o[F("comfort_ref_humidity")] = settings.sat.fComfortHumidity;
-  o[F("comfort_max_offset")]   = settings.sat.fComfortMaxOffset;
-  // Simulation (Task #37 + TASK-795)
-  o[F("simulation")]           = settings.sat.bSimulation;
-  // §4.2: mirrors !satBoilerHardwarePresent() so the Web UI can hide the
-  // simulation card when a real boiler is attached.
-  o[F("sim_available")]        = !satBoilerHardwarePresent();
-  if (settings.sat.bSimulation) {
-    o[F("sim_room_temp")]       = state.sat.fSimRoomTemp;
-    o[F("sim_flow_temp")]       = state.sat.fSimFlowTemp;
-    o[F("sim_outdoor_temp")]    = state.sat.fSimOutdoorTemp;
-    o[F("sim_return_temp")]     = state.sat.fSimReturnTemp;
-    o[F("sim_flame_on")]        = state.sat.bSimFlameOn;
-    o[F("sim_modulation")]      = (int32_t)state.sat.iSimModulation;
-    // §4.3 command trace
-    o[F("last_blocked_cmd")]    = state.sat.sLastBlockedCmd;
-    o[F("last_blocked_cmd_age_ms")] =
-                     state.sat.iLastBlockedCmdMs == 0 ? (int32_t)0
-                       : (int32_t)(millis() - state.sat.iLastBlockedCmdMs);
-    // TASK-801 F6: last_blocked_cmds[] ring, newest-first. Each element
-    // {"cmd":"..","age_ms":N}. ArduinoJson v7 nested array (no manual buffer).
-    {
-      const uint8_t ring  = (uint8_t)(sizeof(state.sat.iSimTraceMs) / sizeof(state.sat.iSimTraceMs[0]));
-      const uint8_t count = state.sat.iSimTraceCount;
-      const uint32_t nowMs = millis();
-      JsonArray trace = o[F("last_blocked_cmds")].to<JsonArray>();
-      for (uint8_t k = 0; k < count; k++) {
-        // newest-first: head-1-k, wrapping
-        uint8_t idx = (uint8_t)((state.sat.iSimTraceHead + ring - 1 - k) % ring);
-        uint32_t age = (state.sat.iSimTraceMs[idx] == 0) ? 0 : (nowMs - state.sat.iSimTraceMs[idx]);
-        JsonObject e = trace.add<JsonObject>();
-        e[F("cmd")]    = state.sat.sSimTraceCmd[idx];
-        e[F("age_ms")] = age;
+  // TASK-885: emit the full SAT status field-by-field through the embedded-robust
+  // JsonEmit streaming writer (no JsonDocument, no whole-response buffer). The
+  // writer serialises NaN/Inf as null (matching the old satSendJsonFloat null
+  // handling) and uses the default 3-decimal float width; per-field decimal
+  // precision is intentionally not reintroduced. satBLESendStatusJSON() appends
+  // its ble_* fields into the same open root object before the final endObject().
+  AsyncResponseStream* s = restBeginStream("application/json");
+  if (s) {
+    JsonEmit je(*s);
+    je.beginObject();
+    je.field(F("enabled"),              settings.sat.bEnabled);
+    je.field(F("active"),               state.sat.bActive);
+    je.field(F("control_mode"),         (int32_t)state.sat.eControlMode);
+    { char bsName[20]; satGetBoilerStatusName(bsName, sizeof(bsName));
+      je.field(F("boiler_status"),        bsName); }
+    je.field(F("target_temp"),          settings.sat.fTargetTemp);
+    je.field(F("room_temp"),            satGetRoomTemp());
+    je.field(F("outside_temp"),         satGetOutsideTemp());
+    je.field(F("heating_curve"),        state.sat.fHeatingCurveValue);
+    je.field(F("pid_output"),           state.sat.fPidOutput);
+    je.field(F("final_setpoint"),       state.sat.fFinalSetpoint);
+    je.field(F("error"),                state.sat.fError);
+    je.field(F("pid_p"),                state.sat.fPidP);
+    je.field(F("pid_i"),                state.sat.fPidI);
+    je.field(F("pid_d"),                state.sat.fPidD);
+    je.field(F("kp"),                   state.sat.fKp, 6);
+    je.field(F("ki"),                   state.sat.fKi, 6);
+    je.field(F("kd"),                   state.sat.fKd, 6);
+    je.field(F("raw_derivative"),       state.sat.fRawDerivative);
+    je.field(F("coefficient"),          settings.sat.fHeatingCurveCoeff);
+    je.field(F("deadband"),             settings.sat.fDeadband);
+    je.field(F("overshoot_margin"),     settings.sat.fOvershootMargin);
+    je.field(F("cycle_count"),          state.sat.iCycleCount);
+    je.field(F("cycles_this_hour"),     (int32_t)satCycleGetCyclesThisHour());
+    je.field(F("last_cycle_class"),     (int32_t)state.sat.eLastCycleClass);
+    je.field(F("cycle_max_flow"),       state.sat.fCycleMaxFlow);
+    je.field(F("cycle_overshoot_sec"),  state.sat.fCycleOvershootSec);
+    je.field(F("duty_ratio"),           state.sat.fDutyRatio);
+    je.field(F("overshoot_fraction"),   state.sat.fOvershootFraction);
+    je.field(F("underheat_fraction"),   state.sat.fUnderheatFraction);
+    je.field(F("cycle_phase"),          satCycleGetPhaseName());
+    je.field(F("phase_duration_sec"),   (int32_t)satCycleGetPhaseDurationSec());
+    je.field(F("pwm_duty"),             state.sat.fPwmDutyCycle);
+    je.field(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
+    je.field(F("active_preset"),        (int32_t)state.sat.eActivePreset);
+    je.field(F("mod_suppressed"),       state.sat.bModSuppressed);
+    je.field(F("dhw_active"),           state.sat.bDhwActive);
+    je.field(F("dhw_setpoint"),         settings.sat.fDhwSetpoint);
+    // TASK-516: boiler-gated master DHW enable. dhw_config_tank is derived live
+    // from MsgID 3 HB3 (bit 11 of the uint16 SlaveConfigMemberIDcode); the UI
+    // uses it to decide whether to render the toggle. dhw_enable mirrors the
+    // user setting; only acted on (HW=) when dhw_config_tank=true.
+    je.field(F("dhw_config_tank"),      (bool)(OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800));
+    je.field(F("dhw_enable"),           settings.sat.bDhwEnable);
+    je.field(F("control_interval_sec"), (int32_t)settings.sat.iControlInterval);
+    je.field(F("fallback_active"),      state.sat.bFallbackActive);
+    je.field(F("fallback_reason"),      (int32_t)state.sat.eFallbackReason);
+    je.field(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
+    je.field(F("current_modulation"),   (int32_t)state.sat.iCurrentModulation);
+    je.field(F("ovp_value"),            settings.sat.fOvpValue);
+    je.field(F("ovp_enabled"),          settings.sat.bOvpEnabled);
+    je.field(F("ovp_calib_phase"),      (int32_t)state.sat.eCalibPhase);
+    je.field(F("ovp_calib_max_temp"),   state.sat.fCalibMaxTemp);
+    je.field(F("ovp_calib_samples"),    (int32_t)state.sat.iCalibSamples);
+    je.field(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
+    je.field(F("heating_system_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
+    { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
+      je.field(F("manufacturer"), mfrName); }
+    je.field(F("manufacturer_setting"), (int32_t)settings.sat.iManufacturer);
+    je.field(F("manufacturer_detected"), (int32_t)state.sat.iDetectedManufacturer);
+    je.field(F("slave_memberid"),       (int32_t)state.sat.iSlaveMemberID);
+    je.field(F("max_setpoint_system"),  satGetMaxSetpoint());
+    je.field(F("external_temp_valid"),  state.sat.bExternalTempValid);
+    je.field(F("external_outdoor_valid"), state.sat.bExternalOutdoorValid);
+    // PV-surplus boost (TASK-640)
+    je.field(F("pv_surplus_w"),         state.sat.fExternalPvSurplusW);
+    je.field(F("pv_surplus_valid"),     state.sat.bExternalPvSurplusValid);
+    je.field(F("pv_boost_active"),      state.sat.bPvBoostActive);
+    je.field(F("pv_boost_applied_c"),   state.sat.fPvBoostAppliedC);
+    je.field(F("pv_boost_enabled"),     settings.sat.bPvBoostEnabled);
+    je.field(F("safety_tripped"),       state.sat.bSafetyTripped);
+    je.field(F("valves_open"),          state.sat.bValvesOpen);
+    je.field(F("window_open"),          state.sat.bWindowOpen);
+    je.field(F("window_detection"),     settings.sat.bWindowDetection);
+    je.field(F("push_setpoint"),        settings.sat.bPushSetpoint);
+    je.field(F("flame_off_offset"),     settings.sat.fFlameOffOffset);
+    je.field(F("force_pwm"),            settings.sat.bForcePWM);
+    je.field(F("flow_offset"),          settings.sat.fFlowOffset);
+    je.field(F("pressure"),             state.sat.fSmoothedPressure);
+    je.field(F("pressure_drop_rate"),   state.sat.fPressureDropRate);
+    je.field(F("pressure_alarm"),       state.sat.bPressureAlarm);
+    je.field(F("modulation_reliable"),  state.sat.bModulationReliable);
+    je.field(F("setpoint_mismatch"),    state.sat.bSetpointMismatch);
+    { static const char* const crNames[] = { "insufficient", "increase", "decrease", "hold" };
+      int crIdx = (int)state.sat.eCurveRecommendation;
+      if (crIdx < 0 || crIdx > 3) crIdx = 0;
+      je.field(F("curve_recommendation"), crNames[crIdx]); }
+    je.field(F("heating_curve_recommendation"), state.sat.sHeatCurveRec);
+    je.field(F("mean_error"),           state.sat.fMeanError);
+    je.field(F("error_stddev"),         state.sat.fErrorStdDev);
+    je.field(F("target_temp_step"),     settings.sat.fTargetTempStep);
+    je.field(F("power_kw"),             state.sat.fCurrentPower);
+    je.field(F("energy_kwh"),           state.sat.fEnergyTotal);
+    je.field(F("boiler_capacity"),      settings.sat.fBoilerCapacity);
+    // Gas consumption estimation (Task #232)
+    je.field(F("boiler_rated_kw"),      settings.sat.fBoilerRatedKW);
+    je.field(F("boiler_efficiency"),    settings.sat.fBoilerEfficiency);
+    je.field(F("energy_estimated_kwh"), state.sat.fEnergyEstimatedKWh);
+    // Preset sync (Task #46)
+    je.field(F("preset_sync"),          settings.sat.bPresetSync);
+    // Thermal drop learning (Task #21)
+    je.field(F("thermal_coeff"),        settings.sat.fThermalCoeff);
+    je.field(F("thermal_drop_rate"),    state.sat.fThermalDropRate);
+    je.field(F("thermal_model_valid"),  state.sat.bThermalModelValid);
+    je.field(F("estimated_room"),       state.sat.fEstimatedRoom);
+    je.field(F("last_known_room"),      state.sat.fLastKnownRoom);
+    // Solar gain (Task #23)
+    je.field(F("solar_gain_active"),    state.sat.bSolarGainActive);
+    je.field(F("indoor_rise_rate"),     state.sat.fIndoorRiseRate);
+    // Summer simmer (Task #24)
+    je.field(F("summer_simmer"),        settings.sat.bSummerSimmer);
+    je.field(F("summer_active"),        state.sat.bSummerActive);
+    je.field(F("summer_hours_above"),   state.sat.fSummerHoursAbove);
+    je.field(F("summer_threshold"),     settings.sat.fSummerThreshold);
+    je.field(F("summer_min_hours"),     (int32_t)settings.sat.iSummerMinHours);
+    // Thermal comfort (Task #28/#47)
+    je.field(F("comfort_adjust"),       settings.sat.bComfortAdjust);
+    je.field(F("humidity"),             state.sat.fHumidity);
+    je.field(F("humidity_valid"),       state.sat.bHumidityValid);
+    je.field(F("comfort_offset"),       state.sat.fComfortOffset);
+    je.field(F("comfort_ref_humidity"), settings.sat.fComfortHumidity);
+    je.field(F("comfort_max_offset"),   settings.sat.fComfortMaxOffset);
+    // Simulation (Task #37 + TASK-795)
+    je.field(F("simulation"),           settings.sat.bSimulation);
+    // §4.2: mirrors !satBoilerHardwarePresent() so the Web UI can hide the
+    // simulation card when a real boiler is attached.
+    je.field(F("sim_available"),        !satBoilerHardwarePresent());
+    if (settings.sat.bSimulation) {
+      je.field(F("sim_room_temp"),       state.sat.fSimRoomTemp);
+      je.field(F("sim_flow_temp"),       state.sat.fSimFlowTemp);
+      je.field(F("sim_outdoor_temp"),    state.sat.fSimOutdoorTemp);
+      je.field(F("sim_return_temp"),     state.sat.fSimReturnTemp);
+      je.field(F("sim_flame_on"),        state.sat.bSimFlameOn);
+      je.field(F("sim_modulation"),      (int32_t)state.sat.iSimModulation);
+      // §4.3 command trace
+      je.field(F("last_blocked_cmd"),    state.sat.sLastBlockedCmd);
+      je.field(F("last_blocked_cmd_age_ms"),
+                       state.sat.iLastBlockedCmdMs == 0 ? (int32_t)0
+                         : (int32_t)(millis() - state.sat.iLastBlockedCmdMs));
+      // TASK-801 F6: last_blocked_cmds[] ring, newest-first. Each element
+      // {"cmd":"..","age_ms":N}. JsonEmit nested array-of-object (no manual buffer).
+      {
+        const uint8_t ring  = (uint8_t)(sizeof(state.sat.iSimTraceMs) / sizeof(state.sat.iSimTraceMs[0]));
+        const uint8_t count = state.sat.iSimTraceCount;
+        const uint32_t nowMs = millis();
+        je.beginArray(F("last_blocked_cmds"));
+        for (uint8_t k = 0; k < count; k++) {
+          // newest-first: head-1-k, wrapping
+          uint8_t idx = (uint8_t)((state.sat.iSimTraceHead + ring - 1 - k) % ring);
+          uint32_t age = (state.sat.iSimTraceMs[idx] == 0) ? 0 : (nowMs - state.sat.iSimTraceMs[idx]);
+          je.beginObject();
+          je.field(F("cmd"),    state.sat.sSimTraceCmd[idx]);
+          je.field(F("age_ms"), age);
+          je.endObject();
+        }
+        je.endArray();
       }
     }
-  }
-  // PID auto-tuning (Task #27)
-  o[F("auto_tune")]            = settings.sat.bAutoTune;
-  o[F("auto_tune_active")]     = state.sat.bAutoTuneActive;
-  o[F("auto_tune_cycles")]     = (int32_t)state.sat.iAutoTuneCycles;
-  o[F("auto_tune_score")]      = state.sat.fAutoTuneScore;
-  o[F("auto_tune_rate")]       = settings.sat.fAutoTuneRate;
-  // SAT Python parity settings (Task #82)
-  o[F("sensor_max_age")]       = (int32_t)settings.sat.iSensorMaxAgeS;
-  o[F("error_monitoring")]     = settings.sat.bErrorMonitoring;
-  o[F("auto_gains_value")]     = settings.sat.fAutoGainsValue;
-  // TASK-193: manual gains mode
-  o[F("auto_gains")]           = settings.sat.bAutoGains;
-  o[F("kp_manual")]            = settings.sat.fKpManual;
-  o[F("ki_manual")]            = settings.sat.fKiManual;
-  o[F("kd_manual")]            = settings.sat.fKdManual;
-  // TASK-204: thermal comfort mode (SSI as PID room temp)
-  o[F("thermal_comfort")]      = settings.sat.bThermalComfort;
-  o[F("heating_mode")]         = settings.sat.iHeatingMode == 1 ? "eco" : "comfort";
-  o[F("cycles_per_hour")]      = (int32_t)settings.sat.iCyclesPerHour;
-  o[F("valve_offset")]         = settings.sat.fValveOffset;
-  o[F("solar_freeze_integral")] = settings.sat.bSolarFreezeIntegral;
-  // Multi-area (Task #25)
-  o[F("multi_area")]           = settings.sat.bMultiArea;
-  o[F("multi_area_count")]     = (int32_t)settings.sat.iMultiAreaCount;
-  if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
-    uint8_t cnt = settings.sat.iMultiAreaCount;
-    if (cnt > SAT_MAX_AREAS) cnt = SAT_MAX_AREAS;
-    for (uint8_t i = 0; i < cnt; i++) {
-      // Dynamic per-area keys (area_0_temp ...): the key is formatted at
-      // runtime, so F() cannot be used. ArduinoJson copies the char[] key.
-      char nameBuf[20];
-      // area_N_temp
-      snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_temp"), i);
-      o[nameBuf] = state.sat.fAreaTemp[i];
-      // area_N_valid
-      snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_valid"), i);
-      o[nameBuf] = state.sat.bAreaValid[i];
-      // area_N_weight
-      snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_weight"), i);
-      o[nameBuf] = settings.sat.fAreaWeight[i];
+    // PID auto-tuning (Task #27)
+    je.field(F("auto_tune"),            settings.sat.bAutoTune);
+    je.field(F("auto_tune_active"),     state.sat.bAutoTuneActive);
+    je.field(F("auto_tune_cycles"),     (int32_t)state.sat.iAutoTuneCycles);
+    je.field(F("auto_tune_score"),      state.sat.fAutoTuneScore);
+    je.field(F("auto_tune_rate"),       settings.sat.fAutoTuneRate);
+    // SAT Python parity settings (Task #82)
+    je.field(F("sensor_max_age"),       (int32_t)settings.sat.iSensorMaxAgeS);
+    je.field(F("error_monitoring"),     settings.sat.bErrorMonitoring);
+    je.field(F("auto_gains_value"),     settings.sat.fAutoGainsValue);
+    // TASK-193: manual gains mode
+    je.field(F("auto_gains"),           settings.sat.bAutoGains);
+    je.field(F("kp_manual"),            settings.sat.fKpManual, 6);
+    je.field(F("ki_manual"),            settings.sat.fKiManual, 6);
+    je.field(F("kd_manual"),            settings.sat.fKdManual, 6);
+    // TASK-204: thermal comfort mode (SSI as PID room temp)
+    je.field(F("thermal_comfort"),      settings.sat.bThermalComfort);
+    je.field(F("heating_mode"),         settings.sat.iHeatingMode == 1 ? "eco" : "comfort");
+    je.field(F("cycles_per_hour"),      (int32_t)settings.sat.iCyclesPerHour);
+    je.field(F("valve_offset"),         settings.sat.fValveOffset);
+    je.field(F("solar_freeze_integral"), settings.sat.bSolarFreezeIntegral);
+    // Multi-area (Task #25)
+    je.field(F("multi_area"),           settings.sat.bMultiArea);
+    je.field(F("multi_area_count"),     (int32_t)settings.sat.iMultiAreaCount);
+    if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
+      uint8_t cnt = settings.sat.iMultiAreaCount;
+      if (cnt > SAT_MAX_AREAS) cnt = SAT_MAX_AREAS;
+      for (uint8_t i = 0; i < cnt; i++) {
+        // Dynamic per-area keys (area_0_temp ...): the key is formatted at
+        // runtime, so F() cannot be used. The key buffer is passed to je.field().
+        char nameBuf[20];
+        // area_N_temp
+        snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_temp"), i);
+        je.field(nameBuf, state.sat.fAreaTemp[i]);
+        // area_N_valid
+        snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_valid"), i);
+        je.field(nameBuf, state.sat.bAreaValid[i]);
+        // area_N_weight
+        snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_weight"), i);
+        je.field(nameBuf, settings.sat.fAreaWeight[i]);
+      }
     }
+    // BLE sensor status (Task #20). Appends ble_* fields into the shared object.
+    satBLESendStatusJSON(je);
+    je.endObject();
   }
-  // BLE sensor status (Task #20). Appends ble_* fields into the shared object.
-  satBLESendStatusJSON(o);
-  restSendJson(doc);
+  restFinalize();
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_SAT_STATUS, totalMs);
   if (state.debug.bRestAPI) {

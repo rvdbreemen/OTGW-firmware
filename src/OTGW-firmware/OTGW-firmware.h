@@ -15,6 +15,7 @@
 #include <Arduino.h>
 #include <AceTime.h>
 #include <ArduinoJson.h>        // ADR-141: JSON I/O on the ESP32-S3 line (REST serializeJson + inbound deserializeJson). Out of the settings-persistence path (TASK-867 AC#6).
+#include "jsonEmit.h"           // TASK-885: embedded-robust streaming JSON writer (no JsonDocument) for the heavy REST endpoints under load
 // #include <TimeLib.h>
 
 // DEBUGGING: Uncomment the next line to disable WebSocket functionality
@@ -328,7 +329,7 @@ void satBLEUpdateState();
 float satBLEGetTemperature();
 float satBLEGetHumidity();
 void satBLEPublishMQTT();
-void satBLESendStatusJSON(JsonObject& o);   // ADR-141: appends ble_* fields into the caller's open SAT-status object
+void satBLESendStatusJSON(JsonEmit& je);    // TASK-885: appends ble_* fields into the caller's open SAT-status object (streaming)
 
 // TASK-488 / TASK-492: BLE HA-discovery + per-MAC state-topic helpers
 // (defined in MQTTstuff.ino). Caller (satBLEPublishMQTT) wires these in once
