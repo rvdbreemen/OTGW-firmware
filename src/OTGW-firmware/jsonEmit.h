@@ -1,15 +1,15 @@
 /*
 ***************************************************************************
 **  Program  : jsonEmit.h
-**  Version  : v2.0.0-alpha.214
+**  Version  : v2.0.0-alpha.215
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
 **  Embedded-robust streaming JSON writer (TASK-885).
 **
 **  Emits type-correct JSON DIRECTLY into an Arduino Print sink (the
-**  AsyncResponseStream), with NO intermediate JsonDocument and NO whole-
-**  response buffer that the writer itself owns. Design principle: embedded
+**  AsyncResponseStream), with NO intermediate in-memory document tree and NO
+**  whole-response buffer that the writer itself owns. Design principle: embedded
 **  robustness over throughput.
 **
 **    - NON-THROWING. Every out.print()/out.write() return value is discarded;
@@ -135,11 +135,25 @@ public:
   void value(bool b)     { _sep(); _out.print(b ? F("true") : F("false")); }
   void value(int32_t v)  { _sep(); char b[12]; snprintf_P(b, sizeof(b), PSTR("%ld"), (long)v);          _out.print(b); }
   void value(uint32_t v) { _sep(); char b[12]; snprintf_P(b, sizeof(b), PSTR("%lu"), (unsigned long)v); _out.print(b); }
-  void value(float f, uint8_t decimals = 3) {
+  // Emits the float as a JSON number with up to `decimals` fractional digits, then
+  // trims trailing zeros (and a lone trailing '.') so the wire form matches
+  // ArduinoJson's natural representation: 0.000500 -> 0.0005, 21.500000 -> 21.5,
+  // 21.000000 -> 21. The default of 6 digits is wide enough to preserve sub-0.001
+  // control gains (e.g. an integral gain of 0.0005) that a fixed %.3f silently
+  // rounded to 0.001 (TASK-886 review: the OTD kp/ki/... contract). Pass a smaller
+  // `decimals` to cap precision deliberately. NaN/Inf -> null (no JSON form).
+  void value(float f, uint8_t decimals = 6) {
     _sep();
-    if (isnan(f) || isinf(f)) { _out.print(F("null")); return; }   // JSON has no NaN/Inf
+    if (isnan(f) || isinf(f)) { _out.print(F("null")); return; }
     char fmt[8]; snprintf_P(fmt, sizeof(fmt), PSTR("%%.%uf"), (unsigned)decimals);
     char b[24];  snprintf(b, sizeof(b), fmt, (double)f);
+    char* dot = strchr(b, '.');
+    if (dot) {
+      char* end = b + strlen(b) - 1;
+      while (end > dot && *end == '0') *end-- = '\0';                 // strip trailing zeros
+      if (end == dot) *end = '\0';                                    // strip lone trailing '.'
+      if (b[0] == '-' && b[1] == '0' && b[2] == '\0') { b[0] = '0'; b[1] = '\0'; }  // -0 -> 0
+    }
     _out.print(b);
   }
   void value(const char* s) {
@@ -185,7 +199,7 @@ public:
   template<typename K> void field(K k, const char* s)                  { key(k); value(s); }
   template<typename K> void field(K k, const String& s)               { key(k); value(s.c_str()); }
   template<typename K> void field(K k, const __FlashStringHelper* s)   { key(k); value(s); }
-  template<typename K> void field(K k, float f, uint8_t dec = 3)        { key(k); value(f, dec); }
+  template<typename K> void field(K k, float f, uint8_t dec = 6)        { key(k); value(f, dec); }
 #if PLATFORM_INT_DISTINCT_FROM_INT32
   template<typename K> void field(K k, int v)                          { key(k); value((int32_t)v); }
   template<typename K> void field(K k, unsigned int v)                 { key(k); value((uint32_t)v); }

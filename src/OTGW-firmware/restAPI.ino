@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.214
+**  Version  : v2.0.0-alpha.215
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -307,44 +307,52 @@ static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 }
 
 static void sendSensorStatus() {
-  // ADR-141: ArduinoJson v7. Native types replace the hand-rolled streaming map
-  // plus the raw restSendContent "devices"/"s0" sub-objects.
-  JsonDocument doc;
-  JsonObject sensors = doc[F("sensors")].to<JsonObject>();
+  // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path. The
+  // getDallasAddress() shared static buffer is emitted immediately as the key, so
+  // no per-device String() copy is needed (mirrors sendDeviceInfoV2/sendOTmonitorV2).
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.beginObject(F("sensors"));     // "sensors":{
 
-  // Dallas temperature sensors
-  sensors[F("dallas_enabled")]  = settings.sensors.bEnabled;
-  sensors[F("dallas_detected")] = bSensorsDetected;
-  sensors[F("dallas_count")]    = (int32_t)DallasrealDeviceCount;
-  sensors[F("dallas_gpio")]     = (int32_t)settings.sensors.iPin;
-  sensors[F("dallas_poll_sec")] = (int32_t)settings.sensors.iInterval;
-  sensors[F("simulated")]       = state.debug.bSensorSim;
+    // Dallas temperature sensors
+    je.field(F("dallas_enabled"),  settings.sensors.bEnabled);
+    je.field(F("dallas_detected"), bSensorsDetected);
+    je.field(F("dallas_count"),    (int32_t)DallasrealDeviceCount);
+    je.field(F("dallas_gpio"),     (int32_t)settings.sensors.iPin);
+    je.field(F("dallas_poll_sec"), (int32_t)settings.sensors.iInterval);
+    je.field(F("simulated"),       state.debug.bSensorSim);
 
-  // Individual sensor readings
-  if (bSensorsDetected || state.debug.bSensorSim) {
-    JsonObject devices = sensors[F("devices")].to<JsonObject>();
-    for (int i = 0; i < DallasrealDeviceCount; i++) {
-      const char *addr = getDallasAddress(DallasrealDevice[i].addr);
-      if (!addr) continue;
-      // getDallasAddress() returns a shared static buffer overwritten each call;
-      // String() copies the key so multiple devices do not alias to the last addr.
-      JsonObject dev = devices[String(addr)].to<JsonObject>();
-      dev[F("temp")]  = DallasrealDevice[i].tempC;
-      dev[F("epoch")] = (uint32_t)DallasrealDevice[i].lasttime;
+    // Individual sensor readings
+    if (bSensorsDetected || state.debug.bSensorSim) {
+      je.beginObject(F("devices"));   // "devices":{
+      for (int i = 0; i < DallasrealDeviceCount; i++) {
+        const char *addr = getDallasAddress(DallasrealDevice[i].addr);
+        if (!addr) continue;
+        je.beginObject(addr);         // dynamic per-address key
+        je.field(F("temp"),  DallasrealDevice[i].tempC);
+        je.field(F("epoch"), (uint32_t)DallasrealDevice[i].lasttime);
+        je.endObject();
+      }
+      je.endObject();                 // close "devices"
     }
+
+    // S0 pulse counter
+    je.beginObject(F("s0"));          // "s0":{
+    je.field(F("enabled"),  settings.s0.bEnabled);
+    je.field(F("gpio"),     settings.s0.iPin);
+    je.field(F("poll_sec"), settings.s0.iInterval);
+    je.field(F("pulses"),   (uint32_t)OTGWs0pulseCount);
+    je.field(F("total"),    (uint32_t)OTGWs0pulseCountTot);
+    je.field(F("power_kw"), OTGWs0powerkw);
+    je.field(F("epoch"),    (uint32_t)OTGWs0lasttime);
+    je.endObject();                   // close "s0"
+
+    je.endObject();                   // close "sensors"
+    je.endObject();                   // close root
   }
-
-  // S0 pulse counter
-  JsonObject s0 = sensors[F("s0")].to<JsonObject>();
-  s0[F("enabled")]  = settings.s0.bEnabled;
-  s0[F("gpio")]     = settings.s0.iPin;
-  s0[F("poll_sec")] = settings.s0.iInterval;
-  s0[F("pulses")]   = (uint32_t)OTGWs0pulseCount;
-  s0[F("total")]    = (uint32_t)OTGWs0pulseCountTot;
-  s0[F("power_kw")] = OTGWs0powerkw;
-  s0[F("epoch")]    = (uint32_t)OTGWs0lasttime;
-
-  restSendJson(doc);
+  restFinalize();
 }
 
 static void handleSensors(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
@@ -428,33 +436,39 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   // POST /api/v2/otdirect/settings?... — update
   else if (wc > 4 && strcmp_P(words[4], PSTR("settings")) == 0) {
     if (method == HTTP_GET) {
-      JsonDocument doc;
-      JsonObject o = doc[F("otdirect_settings")].to<JsonObject>();
-      o[F("mode")]            = (int32_t)settings.otd.iMode;
-      o[F("setback_temp")]    = settings.otd.fSetbackTemp;
-      o[F("setback_timeout")] = (int32_t)settings.otd.iSetbackTimeout;
-      // TASK-183: PI room compensation + heating curve
-      o[F("ch_mode")]         = (int32_t)settings.otd.iCHMode;
-      o[F("flow_temp")]       = settings.otd.fFlowTemp;
-      o[F("flow_max")]        = settings.otd.fFlowMax;
-      o[F("room_setpoint")]   = settings.otd.fRoomSetpoint;
-      o[F("gradient")]        = settings.otd.fGradient;
-      o[F("exponent")]        = settings.otd.fExponent;
-      o[F("offset")]          = settings.otd.fOffset;
-      o[F("room_comp")]       = settings.otd.bRoomCompEnabled;
-      o[F("kp")]              = settings.otd.fKp;
-      o[F("ki")]              = settings.otd.fKi;
-      o[F("kboost")]          = settings.otd.fKboost;
-      // TASK-582: CH hysteresis deadband
-      o[F("hysteresis_enable")] = settings.otd.bHysteresisEnable;
-      o[F("hysteresis")]        = settings.otd.fHysteresis;
-      // TASK-584: ventilation override persistence
-      o[F("vent_enable")]      = settings.otd.bVentEnable;
-      o[F("open_bypass")]      = settings.otd.bOpenBypass;
-      o[F("auto_bypass")]      = settings.otd.bAutoBypass;
-      o[F("free_vent_enable")] = settings.otd.bFreeVentEnable;
-      o[F("vent_setpoint")]    = (int32_t)settings.otd.iVentSetpoint;
-      restSendJson(doc);
+      AsyncResponseStream* strm = restBeginStream("application/json");
+      if (strm) {
+        JsonEmit je(*strm);
+        je.beginObject();                       // root {
+        je.beginObject(F("otdirect_settings")); // "otdirect_settings":{
+        je.field(F("mode"),            (int32_t)settings.otd.iMode);
+        je.field(F("setback_temp"),    settings.otd.fSetbackTemp);
+        je.field(F("setback_timeout"), (int32_t)settings.otd.iSetbackTimeout);
+        // TASK-183: PI room compensation + heating curve
+        je.field(F("ch_mode"),         (int32_t)settings.otd.iCHMode);
+        je.field(F("flow_temp"),       settings.otd.fFlowTemp);
+        je.field(F("flow_max"),        settings.otd.fFlowMax);
+        je.field(F("room_setpoint"),   settings.otd.fRoomSetpoint);
+        je.field(F("gradient"),        settings.otd.fGradient);
+        je.field(F("exponent"),        settings.otd.fExponent);
+        je.field(F("offset"),          settings.otd.fOffset);
+        je.field(F("room_comp"),       settings.otd.bRoomCompEnabled);
+        je.field(F("kp"),              settings.otd.fKp);
+        je.field(F("ki"),              settings.otd.fKi);
+        je.field(F("kboost"),          settings.otd.fKboost);
+        // TASK-582: CH hysteresis deadband
+        je.field(F("hysteresis_enable"), settings.otd.bHysteresisEnable);
+        je.field(F("hysteresis"),        settings.otd.fHysteresis);
+        // TASK-584: ventilation override persistence
+        je.field(F("vent_enable"),      settings.otd.bVentEnable);
+        je.field(F("open_bypass"),      settings.otd.bOpenBypass);
+        je.field(F("auto_bypass"),      settings.otd.bAutoBypass);
+        je.field(F("free_vent_enable"), settings.otd.bFreeVentEnable);
+        je.field(F("vent_setpoint"),    (int32_t)settings.otd.iVentSetpoint);
+        je.endObject();                         // close "otdirect_settings"
+        je.endObject();                         // close root
+      }
+      restFinalize();
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (hasArgCompat("setbacktemp"))    updateSetting("OTDsetbacktemp", argCompat("setbacktemp"));
       if (hasArgCompat("setbacktimeout")) updateSetting("OTDsetbacktimeout", argCompat("setbacktimeout"));
@@ -644,33 +658,43 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // char* literals — store-by-pointer is safe, they outlive the document.
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
-    JsonDocument doc;
-    JsonObject root = doc.to<JsonObject>();
-    JsonArray ur = root[F("unsupported_read")].to<JsonArray>();
-    for (int i = 0; i <= 255; i++) {
-      if (!isBoilerMsgIdUnsupportedRead((uint8_t)i)) continue;
-      OTlookup_t item;
-      const char* label = "Unknown";
-      const char* friendly = "";
-      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
-      JsonObject e = ur.add<JsonObject>();
-      e[F("id")]       = i;
-      e[F("label")]    = label;
-      e[F("friendly")] = friendly;
+    {
+      AsyncResponseStream* strm = restBeginStream("application/json");
+      if (strm) {
+        JsonEmit je(*strm);
+        je.beginObject();                          // root {
+        je.beginArray(F("unsupported_read"));      // "unsupported_read":[
+        for (int i = 0; i <= 255; i++) {
+          if (!isBoilerMsgIdUnsupportedRead((uint8_t)i)) continue;
+          OTlookup_t item;
+          const char* label = "Unknown";
+          const char* friendly = "";
+          if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
+          je.beginObject();
+          je.field(F("id"),       i);
+          je.field(F("label"),    label);
+          je.field(F("friendly"), friendly);
+          je.endObject();
+        }
+        je.endArray();                             // close "unsupported_read"
+        je.beginArray(F("unsupported_write"));     // "unsupported_write":[
+        for (int i = 0; i <= 255; i++) {
+          if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
+          OTlookup_t item;
+          const char* label = "Unknown";
+          const char* friendly = "";
+          if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
+          je.beginObject();
+          je.field(F("id"),       i);
+          je.field(F("label"),    label);
+          je.field(F("friendly"), friendly);
+          je.endObject();
+        }
+        je.endArray();                             // close "unsupported_write"
+        je.endObject();                            // close root
+      }
+      restFinalize();
     }
-    JsonArray uw = root[F("unsupported_write")].to<JsonArray>();
-    for (int i = 0; i <= 255; i++) {
-      if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
-      OTlookup_t item;
-      const char* label = "Unknown";
-      const char* friendly = "";
-      if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
-      JsonObject e = uw.add<JsonObject>();
-      e[F("id")]       = i;
-      e[F("label")]    = label;
-      e[F("friendly")] = friendly;
-    }
-    restSendJson(doc);
   } else if (strcmp_P(words[4], PSTR("ot-support")) == 0) {
     // TASK-694 port (dev TASK-689): GET /api/v2/otgw/ot-support -> bilateral
     // OT support map. Compact mode — only msgIDs where at least one of the
@@ -678,32 +702,40 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // ts*/bl* fields stay real JSON bools (assigned from the native bool vars).
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
-    JsonDocument doc;
-    JsonObject root = doc.to<JsonObject>();
-    JsonArray msgids = root[F("msgids")].to<JsonArray>();
-    for (int i = 0; i <= 255; i++) {
-      const uint8_t id = (uint8_t)i;
-      const bool tsR  = isThermostatMsgIdSentRead(id);
-      const bool tsW  = isThermostatMsgIdSentWrite(id);
-      const bool blAR = isBoilerMsgIdAckedRead(id);
-      const bool blAW = isBoilerMsgIdAckedWrite(id);
-      const bool blUR = isBoilerMsgIdUnsupportedRead(id);
-      const bool blUW = isBoilerMsgIdUnsupportedWrite(id);
-      if (!(tsR || tsW || blAR || blAW || blUR || blUW)) continue;
-      OTlookup_t item;
-      const char* label = "Unknown";
-      if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; }
-      JsonObject e = msgids.add<JsonObject>();
-      e[F("id")]    = id;
-      e[F("label")] = label;
-      e[F("tsR")]   = tsR;
-      e[F("tsW")]   = tsW;
-      e[F("blAR")]  = blAR;
-      e[F("blAW")]  = blAW;
-      e[F("blUR")]  = blUR;
-      e[F("blUW")]  = blUW;
+    {
+      AsyncResponseStream* strm = restBeginStream("application/json");
+      if (strm) {
+        JsonEmit je(*strm);
+        je.beginObject();                 // root {
+        je.beginArray(F("msgids"));       // "msgids":[
+        for (int i = 0; i <= 255; i++) {
+          const uint8_t id = (uint8_t)i;
+          const bool tsR  = isThermostatMsgIdSentRead(id);
+          const bool tsW  = isThermostatMsgIdSentWrite(id);
+          const bool blAR = isBoilerMsgIdAckedRead(id);
+          const bool blAW = isBoilerMsgIdAckedWrite(id);
+          const bool blUR = isBoilerMsgIdUnsupportedRead(id);
+          const bool blUW = isBoilerMsgIdUnsupportedWrite(id);
+          if (!(tsR || tsW || blAR || blAW || blUR || blUW)) continue;
+          OTlookup_t item;
+          const char* label = "Unknown";
+          if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; }
+          je.beginObject();
+          je.field(F("id"),    id);
+          je.field(F("label"), label);
+          je.field(F("tsR"),   tsR);
+          je.field(F("tsW"),   tsW);
+          je.field(F("blAR"),  blAR);
+          je.field(F("blAW"),  blAW);
+          je.field(F("blUR"),  blUR);
+          je.field(F("blUW"),  blUW);
+          je.endObject();
+        }
+        je.endArray();                    // close "msgids"
+        je.endObject();                   // close root
+      }
+      restFinalize();
     }
-    restSendJson(doc);
   } else if (strcmp_P(words[4], PSTR("overrides")) == 0) {
     // ADR-118: GET /api/v2/otgw/overrides -> active gateway-override values that the
     // boiler-side-worldview gate (ADR-096/103) drops from canonical. Additive surface;
@@ -712,27 +744,35 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // directly, no dtostrf) and age_s an unsigned long.
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
-    JsonDocument doc;
-    JsonObject root = doc.to<JsonObject>();
-    JsonArray overrides = root[F("overrides")].to<JsonArray>();
-    const uint32_t now = millis();
-    for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
-      if (otOverrideStore[i].lastSeen == 0) continue;
-      if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) continue;
-      const uint8_t id = otOverrideStore[i].id;
-      OTlookup_t item;
-      const char* label = "Unknown";
-      const char* friendly = "";
-      if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; friendly = item.friendlyname; }
-      JsonObject e = overrides.add<JsonObject>();
-      e[F("id")]       = id;
-      e[F("label")]    = label;
-      e[F("friendly")] = friendly;
-      e[F("kind")]     = (otOverrideStore[i].kind == OT_OVERRIDE_ANSWER) ? "answer" : "substituted";
-      e[F("value")]    = otOverrideStore[i].value;
-      e[F("age_s")]    = (unsigned long)((now - otOverrideStore[i].lastSeen) / 1000UL);
+    {
+      AsyncResponseStream* strm = restBeginStream("application/json");
+      if (strm) {
+        JsonEmit je(*strm);
+        je.beginObject();                 // root {
+        je.beginArray(F("overrides"));    // "overrides":[
+        const uint32_t now = millis();
+        for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
+          if (otOverrideStore[i].lastSeen == 0) continue;
+          if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) continue;
+          const uint8_t id = otOverrideStore[i].id;
+          OTlookup_t item;
+          const char* label = "Unknown";
+          const char* friendly = "";
+          if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; friendly = item.friendlyname; }
+          je.beginObject();
+          je.field(F("id"),       id);
+          je.field(F("label"),    label);
+          je.field(F("friendly"), friendly);
+          je.field(F("kind"),     (otOverrideStore[i].kind == OT_OVERRIDE_ANSWER) ? "answer" : "substituted");
+          je.field(F("value"),    otOverrideStore[i].value);
+          je.field(F("age_s"),    (uint32_t)((now - otOverrideStore[i].lastSeen) / 1000UL));
+          je.endObject();
+        }
+        je.endArray();                    // close "overrides"
+        je.endObject();                   // close root
+      }
+      restFinalize();
     }
-    restSendJson(doc);
   } else {
     sendApiNotFound(originalURI);
   }
@@ -817,48 +857,51 @@ static void satSendHealthJSON()
   int ckIdx = (int)state.sat.eLastCycleKind;
   if (ckIdx < 0 || ckIdx > 3) ckIdx = 0;
 
-  // --- Build JSON response (ADR-141: ArduinoJson v7) ---
-  // Empty-key wrapper = a flat ROOT object: doc.to<JsonObject>().
-  // ArduinoJson serialises NaN/Inf as null, matching the old satSendJsonFloat
-  // null handling, so the per-field decimal precision is intentionally dropped.
-  JsonDocument doc;
-  JsonObject o = doc.to<JsonObject>();
+  // --- Build JSON response (ADR-141 / TASK-885: streaming JsonEmit) ---
+  // Flat ROOT object. JsonEmit serialises NaN/Inf as null, matching the old
+  // satSendJsonFloat null handling, so per-field decimal precision is dropped.
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
 
-  // Synchronization problem indicators (AC#3)
-  o[F("sync_setpoint")]       = syncSetpoint;
-  o[F("sync_modulation")]     = syncModulation;
-  o[F("sync_ch")]             = syncCH;
+    // Synchronization problem indicators (AC#3)
+    je.field(F("sync_setpoint"),       syncSetpoint);
+    je.field(F("sync_modulation"),     syncModulation);
+    je.field(F("sync_ch"),             syncCH);
 
-  // Pressure diagnostics (AC#4)
-  o[F("pressure_smoothed")]   = state.sat.fSmoothedPressure;
-  o[F("pressure_drop_rate")]  = state.sat.fPressureDropRate;
-  o[F("pressure_alarm")]      = state.sat.bPressureAlarm;
+    // Pressure diagnostics (AC#4)
+    je.field(F("pressure_smoothed"),   state.sat.fSmoothedPressure);
+    je.field(F("pressure_drop_rate"),  state.sat.fPressureDropRate);
+    je.field(F("pressure_alarm"),      state.sat.bPressureAlarm);
 
-  // Cycle diagnostics (AC#5)
-  o[F("cycle_kind")]          = ckNames[ckIdx];
-  o[F("cycle_duration")]      = state.sat.fLastCycleDuration;
-  o[F("cycle_count")]         = state.sat.iCycleCount;
-  o[F("cycle_fraction_ch")]   = state.sat.fLastCycleFractionCH;
-  o[F("cycle_fraction_dhw")]  = state.sat.fLastCycleFractionDHW;
+    // Cycle diagnostics (AC#5)
+    je.field(F("cycle_kind"),          ckNames[ckIdx]);
+    je.field(F("cycle_duration"),      state.sat.fLastCycleDuration);
+    je.field(F("cycle_count"),         state.sat.iCycleCount);
+    je.field(F("cycle_fraction_ch"),   state.sat.fLastCycleFractionCH);
+    je.field(F("cycle_fraction_dhw"),  state.sat.fLastCycleFractionDHW);
 
-  // Error / curve statistics (AC#6)
-  o[F("error_mean")]          = state.sat.fMeanError;
-  o[F("error_stddev")]        = state.sat.fErrorStdDev;
-  o[F("error_samples")]       = (int32_t)state.sat.iErrorSampleCount;
-  o[F("heating_curve_recommendation")] = state.sat.sHeatCurveRec;
+    // Error / curve statistics (AC#6)
+    je.field(F("error_mean"),          state.sat.fMeanError);
+    je.field(F("error_stddev"),        state.sat.fErrorStdDev);
+    je.field(F("error_samples"),       (int32_t)state.sat.iErrorSampleCount);
+    je.field(F("heating_curve_recommendation"), state.sat.sHeatCurveRec);
 
-  // Health booleans (AC#7)
-  o[F("flame_health")]        = flameHealth;
-  o[F("device_health")]       = deviceHealth;
-  o[F("cycle_health")]        = cycleHealth;
-  o[F("cycle_class")]         = ccNames[ccIdx];
+    // Health booleans (AC#7)
+    je.field(F("flame_health"),        flameHealth);
+    je.field(F("device_health"),       deviceHealth);
+    je.field(F("cycle_health"),        cycleHealth);
+    je.field(F("cycle_class"),         ccNames[ccIdx]);
 
-  // Auto-tune and OVP calibration (AC#8)
-  o[F("auto_tune_score")]     = state.sat.fAutoTuneScore;
-  o[F("auto_tune_cycles")]    = (int32_t)state.sat.iAutoTuneCycles;
-  o[F("ovp_phase")]           = (int32_t)state.sat.eCalibPhase;
+    // Auto-tune and OVP calibration (AC#8)
+    je.field(F("auto_tune_score"),     state.sat.fAutoTuneScore);
+    je.field(F("auto_tune_cycles"),    (int32_t)state.sat.iAutoTuneCycles);
+    je.field(F("ovp_phase"),           (int32_t)state.sat.eCalibPhase);
 
-  restSendJson(doc);
+    je.endObject();                   // close root
+  }
+  restFinalize();
 }
 
 // Check whether the current request carries ?detail=full
@@ -1179,11 +1222,17 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
                       && (OTcurrentSystemState.Toutside == 0.0f)
                       && (!state.sat.weather.bValid);
       webPushHeader(F("Cache-Control"), F("no-cache"));
-      JsonDocument doc;
-      JsonObject o = doc.to<JsonObject>();
-      o[F("needs_setup")] = needs;
-      o[F("has_key")]     = (settings.sat.sWeatherApiKey[0] != '\0');
-      restSendJson(doc);
+      {
+        AsyncResponseStream* strm = restBeginStream("application/json");
+        if (strm) {
+          JsonEmit je(*strm);
+          je.beginObject();             // root {
+          je.field(F("needs_setup"), needs);
+          je.field(F("has_key"),     (settings.sat.sWeatherApiKey[0] != '\0'));
+          je.endObject();               // close root
+        }
+        restFinalize();
+      }
       return;
     }
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
@@ -2006,34 +2055,42 @@ static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
 
   // scanResult >= 0: scan complete, scanResult = number of networks
   _wifiScanStarted = false;
-  // ADR-141: ArduinoJson v7. Bounded array (visible AP count). The SSID is still
-  // sanitised in place ('"'/'\\' -> '_') before assignment to preserve the prior
-  // value semantics; String() copies each into the doc.
+  // ADR-141 / TASK-885: streaming JsonEmit. Bounded array (visible AP count). The
+  // SSID is still sanitised in place ('"'/'\\' -> '_') before emission to preserve
+  // the prior value semantics; jsonEscapeTo also escapes any remaining specials.
   char connectedSsid[33];
   strlcpy(connectedSsid, WiFi.SSID().c_str(), sizeof(connectedSsid));
 
   webPushHeader(F("Cache-Control"), F("no-cache"));
 
-  JsonDocument doc;
-  JsonObject root = doc.to<JsonObject>();
-  root[F("status")] = F("ready");
-  root[F("count")]  = (int32_t)scanResult;
-  JsonArray nets = root[F("networks")].to<JsonArray>();
-  for (int16_t i = 0; i < scanResult; i++) {
-    char ssidBuf[33];
-    strlcpy(ssidBuf, WiFi.SSID(i).c_str(), sizeof(ssidBuf));
-    // Sanitise quotes/backslash in SSID (kept from the hand-rolled version)
-    for (char* p = ssidBuf; *p; p++) { if (*p == '"' || *p == '\\') *p = '_'; }
-    bool isConn = (strcmp(ssidBuf, connectedSsid) == 0);
-    bool secured = platformWiFiIsEncrypted(i);
-    JsonObject net = nets.add<JsonObject>();
-    net[F("ssid")]      = String(ssidBuf);
-    net[F("rssi")]      = WiFi.RSSI(i);
-    net[F("channel")]   = WiFi.channel(i);
-    net[F("secured")]   = secured;
-    net[F("connected")] = isConn;
+  {
+    AsyncResponseStream* strm = restBeginStream("application/json");
+    if (strm) {
+      JsonEmit je(*strm);
+      je.beginObject();                 // root {
+      je.field(F("status"), F("ready"));
+      je.field(F("count"),  (int32_t)scanResult);
+      je.beginArray(F("networks"));     // "networks":[
+      for (int16_t i = 0; i < scanResult; i++) {
+        char ssidBuf[33];
+        strlcpy(ssidBuf, WiFi.SSID(i).c_str(), sizeof(ssidBuf));
+        // Sanitise quotes/backslash in SSID (kept from the hand-rolled version)
+        for (char* p = ssidBuf; *p; p++) { if (*p == '"' || *p == '\\') *p = '_'; }
+        bool isConn = (strcmp(ssidBuf, connectedSsid) == 0);
+        bool secured = platformWiFiIsEncrypted(i);
+        je.beginObject();
+        je.field(F("ssid"),      ssidBuf);
+        je.field(F("rssi"),      (int32_t)WiFi.RSSI(i));
+        je.field(F("channel"),   (int32_t)WiFi.channel(i));
+        je.field(F("secured"),   secured);
+        je.field(F("connected"), isConn);
+        je.endObject();
+      }
+      je.endArray();                    // close "networks"
+      je.endObject();                   // close root
+    }
+    restFinalize();
   }
-  restSendJson(doc);
 
   // Release scan memory
   WiFi.scanDelete();
@@ -2201,28 +2258,32 @@ void processAPI(AsyncWebServerRequest *request)
 //====[ implementing REST API ]====
 void sendOTValue(int msgid){
   if (msgid < 0 || msgid > OT_MSGID_MAX) {
-    JsonDocument doc;
-    doc.to<JsonObject>()[F("error")] = F("message id: out of range");
-    restSendJson(doc);
+    AsyncResponseStream* strm = restBeginStream("application/json");
+    if (strm) { JsonEmit je(*strm); je.beginObject(); je.field(F("error"), F("message id: out of range")); je.endObject(); }
+    restFinalize();
     return;
   }
   PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
   if (OTlookupitem.type == ot_undef) {
-    JsonDocument doc;
-    doc.to<JsonObject>()[F("error")] = F("message undefined: reserved for future use");
-    restSendJson(doc);
+    AsyncResponseStream* strm = restBeginStream("application/json");
+    if (strm) { JsonEmit je(*strm); je.beginObject(); je.field(F("error"), F("message undefined: reserved for future use")); je.endObject(); }
+    restFinalize();
     return;
   }
-  JsonDocument doc;
-  JsonObject o = doc.to<JsonObject>();
-  o[F("label")] = OTlookupitem.label;
-  if (OTlookupitem.type == ot_f88) {
-    o[F("value")] = (float)atof(getOTGWValue(msgid));
-  } else {
-    o[F("value")] = (int32_t)atoi(getOTGWValue(msgid));
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.field(F("label"), OTlookupitem.label);
+    if (OTlookupitem.type == ot_f88) {
+      je.field(F("value"), (float)atof(getOTGWValue(msgid)));
+    } else {
+      je.field(F("value"), (int32_t)atoi(getOTGWValue(msgid)));
+    }
+    je.field(F("unit"), OTlookupitem.unit);
+    je.endObject();                   // close root
   }
-  o[F("unit")] = OTlookupitem.unit;
-  restSendJson(doc);
+  restFinalize();
 }
 
 void sendOTLabel(const char *msglabel){
@@ -2232,27 +2293,31 @@ void sendOTLabel(const char *msglabel){
     if (strcasecmp(OTlookupitem.label, msglabel) == 0) break;
   }
   if (msgid > OT_MSGID_MAX){
-    JsonDocument doc;
-    doc.to<JsonObject>()[F("error")] = F("message id: reserved for future use");
-    restSendJson(doc);
+    AsyncResponseStream* strm = restBeginStream("application/json");
+    if (strm) { JsonEmit je(*strm); je.beginObject(); je.field(F("error"), F("message id: reserved for future use")); je.endObject(); }
+    restFinalize();
     return;
   }
   if (OTlookupitem.type == ot_undef) {
-    JsonDocument doc;
-    doc.to<JsonObject>()[F("error")] = F("message undefined: reserved for future use");
-    restSendJson(doc);
+    AsyncResponseStream* strm = restBeginStream("application/json");
+    if (strm) { JsonEmit je(*strm); je.beginObject(); je.field(F("error"), F("message undefined: reserved for future use")); je.endObject(); }
+    restFinalize();
     return;
   }
-  JsonDocument doc;
-  JsonObject o = doc.to<JsonObject>();
-  o[F("label")] = OTlookupitem.label;
-  if (OTlookupitem.type == ot_f88) {
-    o[F("value")] = (float)atof(getOTGWValue(msgid));
-  } else {
-    o[F("value")] = (int32_t)atoi(getOTGWValue(msgid));
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.field(F("label"), OTlookupitem.label);
+    if (OTlookupitem.type == ot_f88) {
+      je.field(F("value"), (float)atof(getOTGWValue(msgid)));
+    } else {
+      je.field(F("value"), (int32_t)atoi(getOTGWValue(msgid)));
+    }
+    je.field(F("unit"), OTlookupitem.unit);
+    je.endObject();                   // close root
   }
-  o[F("unit")] = OTlookupitem.unit;
-  restSendJson(doc);
+  restFinalize();
 }
 
 //=======================================================================
@@ -2596,25 +2661,30 @@ void sendHealth()
 {
   updateLittleFSStatus(F("/.health"));
 
-  // ADR-141: ArduinoJson v7. Native types replace the hand-rolled streaming map,
-  // which emitted booleans as quoted strings ("false") via CBOOLEAN — now real
-  // JSON booleans. uptime/networkmode are copied into the doc (String / flash).
-  JsonDocument doc;
-  JsonObject h = doc[F("health")].to<JsonObject>();
-  h[F("status")]         = LittleFSmounted ? "UP" : "DEGRADED";
-  h[F("uptime")]         = upTime();
-  h[F("heap")]           = platformFreeHeap();
-  h[F("networkmode")]    = networkModeName();
+  // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path.
+  // Booleans emit as real JSON booleans (the old hand-rolled map quoted them
+  // via CBOOLEAN). uptime/networkmode copy into the sink immediately.
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.beginObject(F("health"));      // "health":{
+    je.field(F("status"),         LittleFSmounted ? "UP" : "DEGRADED");
+    je.field(F("uptime"),         upTime());
+    je.field(F("heap"),           platformFreeHeap());
+    je.field(F("networkmode"),    networkModeName());
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  h[F("wifirssi")]       = (state.net.eMode == NET_ETHERNET) ? 0 : WiFi.RSSI();
+    je.field(F("wifirssi"),       (int32_t)((state.net.eMode == NET_ETHERNET) ? 0 : WiFi.RSSI()));
 #else
-  h[F("wifirssi")]       = WiFi.RSSI();
+    je.field(F("wifirssi"),       (int32_t)WiFi.RSSI());
 #endif
-  h[F("mqttconnected")]  = state.mqtt.bConnected;
-  h[F("otgwconnected")]  = state.otBus.bOnline;
-  h[F("littlefsMounted")] = LittleFSmounted;
-
-  restSendJson(doc);
+    je.field(F("mqttconnected"),  state.mqtt.bConnected);
+    je.field(F("otgwconnected"),  state.otBus.bOnline);
+    je.field(F("littlefsMounted"), LittleFSmounted);
+    je.endObject();                   // close "health"
+    je.endObject();                   // close root
+  }
+  restFinalize();
 
 } // sendHealth()
 
@@ -2627,12 +2697,18 @@ void sendDeviceCrashLog()
   char crashDetails[160] = {0};
   bool hasCrashLog = readLatestCrashLog(crashSummary, sizeof(crashSummary), crashDetails, sizeof(crashDetails));
 
-  JsonDocument doc;
-  JsonObject o = doc[F("crashlog")].to<JsonObject>();
-  o[F("available")] = hasCrashLog;
-  o[F("summary")] = hasCrashLog ? crashSummary : "";
-  o[F("details")] = hasCrashLog ? crashDetails : "";
-  restSendJson(doc);
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.beginObject(F("crashlog"));    // "crashlog":{
+    je.field(F("available"), hasCrashLog);
+    je.field(F("summary"),   hasCrashLog ? crashSummary : "");
+    je.field(F("details"),   hasCrashLog ? crashDetails : "");
+    je.endObject();                   // close "crashlog"
+    je.endObject();                   // close root
+  }
+  restFinalize();
 }
 
 
@@ -2645,27 +2721,33 @@ void sendDeviceCrashLog()
 void sendPICsettings()
 {
   triggerPICsettingsReadout();  // re-read all settings from PIC
-  JsonDocument doc;
-  JsonObject o = doc[F("pic_settings")].to<JsonObject>();
-  // Active settings
-  o[F("setpoint_override")]   = state.picSettings.sSetpointOverride;
-  o[F("setback")]             = state.picSettings.sSetback;
-  o[F("dhw_override")]        = state.picSettings.sDhwOverride;
-  // Hardware configuration
-  o[F("gpio")]                = state.picSettings.sGpio;
-  o[F("gpio_states")]         = state.picSettings.sGpioStates;
-  o[F("led")]                 = state.picSettings.sLed;
-  o[F("tweaks")]              = state.picSettings.sTweaks;
-  o[F("temp_sensor")]         = state.picSettings.sTempSensor;
-  o[F("smart_power")]         = state.picSettings.sSmartPower;
-  o[F("thermostat_detect")]   = state.picSettings.sThermostatDetect;
-  // Diagnostics
-  o[F("builddate")]           = state.picSettings.sBuilddate;
-  o[F("clock_mhz")]           = state.picSettings.sClockMHz;
-  o[F("reset_cause")]         = state.picSettings.sResetCause;
-  o[F("standalone_interval")] = state.picSettings.sStandaloneInterval;
-  o[F("voltage_ref")]         = state.picSettings.sVoltageRef;
-  restSendJson(doc);
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                   // root {
+    je.beginObject(F("pic_settings"));  // "pic_settings":{
+    // Active settings
+    je.field(F("setpoint_override"),   state.picSettings.sSetpointOverride);
+    je.field(F("setback"),             state.picSettings.sSetback);
+    je.field(F("dhw_override"),        state.picSettings.sDhwOverride);
+    // Hardware configuration
+    je.field(F("gpio"),                state.picSettings.sGpio);
+    je.field(F("gpio_states"),         state.picSettings.sGpioStates);
+    je.field(F("led"),                 state.picSettings.sLed);
+    je.field(F("tweaks"),              state.picSettings.sTweaks);
+    je.field(F("temp_sensor"),         state.picSettings.sTempSensor);
+    je.field(F("smart_power"),         state.picSettings.sSmartPower);
+    je.field(F("thermostat_detect"),   state.picSettings.sThermostatDetect);
+    // Diagnostics
+    je.field(F("builddate"),           state.picSettings.sBuilddate);
+    je.field(F("clock_mhz"),           state.picSettings.sClockMHz);
+    je.field(F("reset_cause"),         state.picSettings.sResetCause);
+    je.field(F("standalone_interval"), state.picSettings.sStandaloneInterval);
+    je.field(F("voltage_ref"),         state.picSettings.sVoltageRef);
+    je.endObject();                     // close "pic_settings"
+    je.endObject();                     // close root
+  }
+  restFinalize();
 } // sendPICsettings()
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
@@ -2675,45 +2757,51 @@ void sendPICsettings()
 // Returns: {"otdirect_status":{"bypass":false,"stepup":true,...}}
 void sendOTDirectStatus()
 {
-  JsonDocument doc;
-  JsonObject o = doc[F("otdirect_status")].to<JsonObject>();
-  // Operating mode
-  {
-    const char* modeStr = "gateway";
-    if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
-    else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
-    else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
-    else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
-    o[F("mode")]             = modeStr;
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                     // root {
+    je.beginObject(F("otdirect_status")); // "otdirect_status":{
+    // Operating mode
+    {
+      const char* modeStr = "gateway";
+      if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
+      else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+      else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
+      else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
+      je.field(F("mode"), modeStr);
+    }
+    // Hardware state
+    je.field(F("bypass"),       state.otd.bBypassActive);
+    je.field(F("stepup"),       state.otd.bStepUpEnabled);
+    je.field(F("monitor_mode"), state.otd.bMonitorMode);
+    je.field(F("master_mode"),  state.otd.bMasterMode);
+    // Thermostat connectivity
+    je.field(F("thermostat_connected"), state.otd.bThermostatConnected);
+    je.field(F("setback_active"), state.otd.bSetbackActive);
+    // Schedule statistics
+    je.field(F("schedule_total"),    state.otd.iScheduleTotal);
+    je.field(F("schedule_active"),   state.otd.iScheduleActive);
+    je.field(F("schedule_disabled"), state.otd.iScheduleDisabled);
+    // Override status
+    je.field(F("overrides_active"), state.otd.iOverrideCount);
+    // OT bus state
+    je.field(F("ot_online"),   state.otBus.bOnline);
+    je.field(F("thermostat"),  state.otBus.bThermostatState);
+    je.field(F("boiler"),      state.otBus.bBoilerState);
+    // TASK-184: flame ratio metrics
+    je.field(F("flame_duty_pct"), (int32_t)getFlameRatioDuty());
+    {
+      char freqBuf[8];
+      dtostrf(getFlameRatioFreq(), 1, 1, freqBuf);
+      je.field(F("flame_cycles_per_hour"), freqBuf);  // kept as a quoted string (dtostrf output)
+    }
+    // TASK-582: CH hysteresis suspension state
+    je.field(F("ch_suspended"), state.otd.bCHSuspended);
+    je.endObject();                       // close "otdirect_status"
+    je.endObject();                       // close root
   }
-  // Hardware state
-  o[F("bypass")]           = state.otd.bBypassActive;
-  o[F("stepup")]           = state.otd.bStepUpEnabled;
-  o[F("monitor_mode")]     = state.otd.bMonitorMode;
-  o[F("master_mode")]      = state.otd.bMasterMode;
-  // Thermostat connectivity
-  o[F("thermostat_connected")] = state.otd.bThermostatConnected;
-  o[F("setback_active")]   = state.otd.bSetbackActive;
-  // Schedule statistics
-  o[F("schedule_total")]   = state.otd.iScheduleTotal;
-  o[F("schedule_active")]  = state.otd.iScheduleActive;
-  o[F("schedule_disabled")] = state.otd.iScheduleDisabled;
-  // Override status
-  o[F("overrides_active")] = state.otd.iOverrideCount;
-  // OT bus state
-  o[F("ot_online")]        = state.otBus.bOnline;
-  o[F("thermostat")]       = state.otBus.bThermostatState;
-  o[F("boiler")]           = state.otBus.bBoilerState;
-  // TASK-184: flame ratio metrics
-  o[F("flame_duty_pct")]         = (int32_t)getFlameRatioDuty();
-  {
-    char freqBuf[8];
-    dtostrf(getFlameRatioFreq(), 1, 1, freqBuf);
-    o[F("flame_cycles_per_hour")] = freqBuf;  // kept as a quoted string (dtostrf output)
-  }
-  // TASK-582: CH hysteresis suspension state
-  o[F("ch_suspended")]          = state.otd.bCHSuspended;
-  restSendJson(doc);
+  restFinalize();
 } // sendOTDirectStatus()
 #endif
 
@@ -2722,13 +2810,19 @@ void sendPICFlashStatus()
 {
   // Minimal PIC flash status endpoint for polling during flash
   // Returns: {"flashstatus":{"flashing":true|false,"progress":0-100,"filename":"...","error":"..."}}
-  JsonDocument doc;
-  JsonObject o = doc[F("flashstatus")].to<JsonObject>();
-  o[F("flashing")] = state.flash.bPICactive;
-  o[F("progress")] = state.flash.iPICprogress;
-  o[F("filename")] = state.flash.sPICfile;
-  o[F("error")] = state.flash.sError;
-  restSendJson(doc);
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                  // root {
+    je.beginObject(F("flashstatus"));  // "flashstatus":{
+    je.field(F("flashing"), state.flash.bPICactive);
+    je.field(F("progress"), state.flash.iPICprogress);
+    je.field(F("filename"), state.flash.sPICfile);
+    je.field(F("error"),    state.flash.sError);
+    je.endObject();                    // close "flashstatus"
+    je.endObject();                    // close root
+  }
+  restFinalize();
 } // sendPICFlashStatus()
 
 //=======================================================================
@@ -2774,13 +2868,19 @@ void sendPICUpdateCheck()
   else if (state.pic.iUpdateCheck == PIC_UPDATE_ERROR)  status = "error";
   else                                                  status = "checking";
 
-  JsonDocument doc;
-  JsonObject o = doc[F("pic_update")].to<JsonObject>();
-  o[F("current")] = state.pic.sFwversion;
-  o[F("latest")] = latest;
-  o[F("update_available")] = updateAvailable;
-  o[F("status")] = status;
-  restSendJson(doc);
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.beginObject(F("pic_update"));  // "pic_update":{
+    je.field(F("current"),          state.pic.sFwversion);
+    je.field(F("latest"),           latest);
+    je.field(F("update_available"), updateAvailable);
+    je.field(F("status"),           status);
+    je.endObject();                   // close "pic_update"
+    je.endObject();                   // close root
+  }
+  restFinalize();
 } // sendPICUpdateCheck()
 
 //=======================================================================
@@ -2791,12 +2891,18 @@ void sendFilesystemHashCheck()
   const char* fsHash = getFilesystemHash();
   bool match = (fsHash[0] != '\0' &&
                 strcasecmp(fsHash, _VERSION_GITHASH) == 0);
-  JsonDocument doc;
-  JsonObject o = doc[F("filesystem_check")].to<JsonObject>();
-  o[F("match")] = match;
-  o[F("fw_hash")] = _VERSION_GITHASH;
-  o[F("fs_hash")] = fsHash;
-  restSendJson(doc);
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                       // root {
+    je.beginObject(F("filesystem_check"));  // "filesystem_check":{
+    je.field(F("match"),   match);
+    je.field(F("fw_hash"), _VERSION_GITHASH);
+    je.field(F("fs_hash"), fsHash);
+    je.endObject();                         // close "filesystem_check"
+    je.endObject();                         // close root
+  }
+  restFinalize();
 } // sendFilesystemHashCheck()
 
 //=======================================================================
@@ -2804,16 +2910,22 @@ void sendFlashStatus()
 {
   // Unified flash status endpoint - minimal response with only fields used by frontend
   // Returns: {"flashstatus":{"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}}
-  JsonDocument doc;
-  JsonObject o = doc[F("flashstatus")].to<JsonObject>();
-  o[F("flashing")] = isFlashing();
-  if (isPICEnabled()) {
-    o[F("pic_flashing")] = state.flash.bPICactive;
-    o[F("pic_progress")] = state.flash.iPICprogress;
-    o[F("pic_filename")] = state.flash.sPICfile;
-    o[F("pic_error")] = state.flash.sError;
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                  // root {
+    je.beginObject(F("flashstatus"));  // "flashstatus":{
+    je.field(F("flashing"), isFlashing());
+    if (isPICEnabled()) {
+      je.field(F("pic_flashing"), state.flash.bPICactive);
+      je.field(F("pic_progress"), state.flash.iPICprogress);
+      je.field(F("pic_filename"), state.flash.sPICfile);
+      je.field(F("pic_error"),    state.flash.sError);
+    }
+    je.endObject();                    // close "flashstatus"
+    je.endObject();                    // close root
   }
-  restSendJson(doc);
+  restFinalize();
 } // sendFlashStatus()
 
 
@@ -2822,38 +2934,44 @@ void sendDeviceTimeV2()
 {
   char buf[50];
 
-  JsonDocument doc;
-  JsonObject o = doc[F("devtime")].to<JsonObject>();
   time_t now = time(nullptr);
   //Timezone based devtime
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
   snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
-  o[F("dateTime")] = buf;
-  o[F("epoch")] = (int32_t)now;
-  o[F("message")] = getStatusMessageText();
-  o[F("psmode")] = state.otBus.bPSmode;
-  o[F("otgwsimulation")] = state.debug.bOTGWSimulation;
-  o[F("freeheap")] = platformFreeHeap();
-  o[F("maxfreeblock")] = platformMaxFreeBlock();
-  o[F("networkmode")] = networkModeName();
-  o[F("ipaddress")] = getActiveIP();  // TASK-759: live active-transport IP for the header indicator
+
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.beginObject(F("devtime"));     // "devtime":{
+    je.field(F("dateTime"),       buf);
+    je.field(F("epoch"),          (int32_t)now);
+    je.field(F("message"),        getStatusMessageText());
+    je.field(F("psmode"),         state.otBus.bPSmode);
+    je.field(F("otgwsimulation"), state.debug.bOTGWSimulation);
+    je.field(F("freeheap"),       platformFreeHeap());
+    je.field(F("maxfreeblock"),   platformMaxFreeBlock());
+    je.field(F("networkmode"),    networkModeName());
+    je.field(F("ipaddress"),      getActiveIP());  // TASK-759: live active-transport IP for the header indicator
 #if defined(_VERSION_PRERELEASE)
-  if (state.net.bAPFallback) {
-    o[F("apfallback")] = true;
-    o[F("wifiquality")] = 0;
-  } else
+    if (state.net.bAPFallback) {
+      je.field(F("apfallback"),  true);
+      je.field(F("wifiquality"), (int32_t)0);
+    } else
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  if (state.net.eMode == NET_ETHERNET) {
-    o[F("wifiquality")] = 100;
-  } else
+    if (state.net.eMode == NET_ETHERNET) {
+      je.field(F("wifiquality"), (int32_t)100);
+    } else
 #endif
-  {
-    o[F("wifiquality")] = signal_quality_perc_quad(WiFi.RSSI());
+    {
+      je.field(F("wifiquality"), (int32_t)signal_quality_perc_quad(WiFi.RSSI()));
+    }
+    je.endObject();                   // close "devtime"
+    je.endObject();                   // close root
   }
-
-  restSendJson(doc);
+  restFinalize();
 
 } // sendDeviceTimeV2()
 

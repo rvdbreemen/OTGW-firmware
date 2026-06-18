@@ -559,78 +559,81 @@ void weatherLoop()
 //=====================================================================
 void weatherSendStatusJSON()
 {
-  // ADR-141: ArduinoJson v7. The old hand-rolled streaming map emitted every
-  // float through dtostrf as a QUOTED string ("21.5"); native assignment makes
-  // them real JSON numbers (the sanctioned "drop the printf formatting"
-  // behaviour — ArduinoJson renders native numeric precision). Bools/ints were
-  // already correct and stay so. Collapses the old entryBuf[300]/tmpBuf stack
-  // buffers (TASK-197) into one heap doc. The wrapper key was F("") => a flat
-  // ROOT object, so build directly on the document root (not a child object).
-  JsonDocument doc;
-  doc[F("enabled")] = settings.sat.bWeatherEnable;
-  doc[F("valid")]   = state.sat.weather.bValid;
+  // ADR-141 revert / TASK-885: streaming JsonEmit replaces the JsonDocument
+  // path. Each float field emits as a real JSON number via je.field(k, float)
+  // (3-decimal default; json_golden tolerates decimal width). Bools emit as
+  // real true/false, ints as bare integers. The forecast arrays stay bare
+  // numbers. The original wrapper key was F("") => a flat ROOT object, so build
+  // directly on the root object (no nested wrapper).
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
 
-  // Core SAT fields — both platforms
-  doc[F("temperature")]   = state.sat.weather.fTemperature;
-  doc[F("apparent_temp")] = state.sat.weather.fApparentTemp;
-  doc[F("humidity")]      = state.sat.weather.fHumidity;
-  doc[F("wind_speed")]    = state.sat.weather.fWindSpeed;
-  doc[F("cloud_cover")]   = state.sat.weather.fCloudCover;
+    je.field(F("enabled"), settings.sat.bWeatherEnable);
+    je.field(F("valid"),   state.sat.weather.bValid);
+
+    // Core SAT fields — both platforms
+    je.field(F("temperature"),   state.sat.weather.fTemperature);
+    je.field(F("apparent_temp"), state.sat.weather.fApparentTemp);
+    je.field(F("humidity"),      state.sat.weather.fHumidity);
+    je.field(F("wind_speed"),    state.sat.weather.fWindSpeed);
+    je.field(F("cloud_cover"),   state.sat.weather.fCloudCover);
 #if HAS_WEATHER_FORECAST
-  // Extended fields — ESP32 only
-  doc[F("wind_direction")] = state.sat.weather.fWindDirection;
-  doc[F("wind_gusts")]     = state.sat.weather.fWindGusts;
-  doc[F("pressure_msl")]   = state.sat.weather.fPressureMsl;
-  doc[F("precipitation")]  = state.sat.weather.fPrecipitation;
-  doc[F("rain")]           = state.sat.weather.fRain;
-  doc[F("snowfall")]       = state.sat.weather.fSnowfall;
-  doc[F("weather_code")]   = (int32_t)state.sat.weather.iWeatherCode;
-  doc[F("is_day")]         = state.sat.weather.bIsDay;
+    // Extended fields — ESP32 only
+    je.field(F("wind_direction"), state.sat.weather.fWindDirection);
+    je.field(F("wind_gusts"),     state.sat.weather.fWindGusts);
+    je.field(F("pressure_msl"),   state.sat.weather.fPressureMsl);
+    je.field(F("precipitation"),  state.sat.weather.fPrecipitation);
+    je.field(F("rain"),           state.sat.weather.fRain);
+    je.field(F("snowfall"),       state.sat.weather.fSnowfall);
+    je.field(F("weather_code"),   (int32_t)state.sat.weather.iWeatherCode);
+    je.field(F("is_day"),         state.sat.weather.bIsDay);
 #endif  // HAS_WEATHER_FORECAST
-  doc[F("latitude")]  = settings.sat.fWeatherLat;
-  doc[F("longitude")] = settings.sat.fWeatherLon;
+    je.field(F("latitude"),  settings.sat.fWeatherLat);
+    je.field(F("longitude"), settings.sat.fWeatherLon);
 
-  doc[F("fetch_errors")] = (int32_t)state.sat.weather.iFetchErrors;
+    je.field(F("fetch_errors"), (int32_t)state.sat.weather.iFetchErrors);
 
-  // Age in seconds
-  if (state.sat.weather.bValid && state.sat.weather.iLastUpdateMs > 0) {
-    uint32_t ageSec = (millis() - state.sat.weather.iLastUpdateMs) / 1000;
-    doc[F("age_seconds")] = (int32_t)ageSec;
-  } else {
-    doc[F("age_seconds")] = (int32_t)-1;
-  }
+    // Age in seconds
+    if (state.sat.weather.bValid && state.sat.weather.iLastUpdateMs > 0) {
+      uint32_t ageSec = (millis() - state.sat.weather.iLastUpdateMs) / 1000;
+      je.field(F("age_seconds"), (int32_t)ageSec);
+    } else {
+      je.field(F("age_seconds"), (int32_t)-1);
+    }
 
 #if HAS_WEATHER_FORECAST
-  // 24-hour forecast arrays — ESP32 only. Already unquoted numbers in the old
-  // code (dtostrf output went in raw, not via sendJsonMapEntry), so these stay
-  // numbers — no type change. Empty forecast (count==0) => [], as before.
-  {
-    JsonArray a = doc[F("forecast_temp")].to<JsonArray>();
+    // 24-hour forecast arrays — ESP32 only. Bare numbers (cloud / precip_prob
+    // are uint8_t, emitted as integers). Empty forecast (count==0) => [].
+    je.beginArray(F("forecast_temp"));
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
-      a.add(_weather_forecastTemp[i]);
+      je.value(_weather_forecastTemp[i]);
     }
-  }
-  {
-    JsonArray a = doc[F("forecast_dewpt")].to<JsonArray>();
+    je.endArray();
+
+    je.beginArray(F("forecast_dewpt"));
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
-      a.add(_weather_forecastDewPt[i]);
+      je.value(_weather_forecastDewPt[i]);
     }
-  }
-  {
-    JsonArray a = doc[F("forecast_cloud")].to<JsonArray>();
+    je.endArray();
+
+    je.beginArray(F("forecast_cloud"));
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
-      a.add(_weather_forecastCloud[i]);
+      je.value(_weather_forecastCloud[i]);
     }
-  }
-  {
-    JsonArray a = doc[F("forecast_precip_prob")].to<JsonArray>();
+    je.endArray();
+
+    je.beginArray(F("forecast_precip_prob"));
     for (uint8_t i = 0; i < _weather_forecastCount && i < WEATHER_FORECAST_HOURS; i++) {
-      a.add(_weather_forecastPrecipProb[i]);
+      je.value(_weather_forecastPrecipProb[i]);
     }
-  }
+    je.endArray();
 #endif  // HAS_WEATHER_FORECAST
 
-  restSendJson(doc);
+    je.endObject();                   // close root
+  }
+  restFinalize();
 }
 
 //=====================================================================

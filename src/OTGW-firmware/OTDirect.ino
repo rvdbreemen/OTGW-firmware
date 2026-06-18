@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.214
+**  Version  : v2.0.0-alpha.215
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -992,60 +992,75 @@ void updateOTDirectStatus() {
 
 // ---------------------------------------------------------------------------
 // sendOTDirectOverridesJSON — emit all active overrides as a JSON response.
-// ADR-141: built as one ArduinoJson v7 document and streamed via restSendJson()
-// (serializeJson chunks into the AsyncResponseStream). Called from restAPI.ino.
-// Caller must set CORS headers before calling this function.
+// ADR-141 revert / TASK-885: streaming JsonEmit replaces the JsonDocument path
+// (emits field-by-field directly into the AsyncResponseStream). Called from
+// restAPI.ino. Caller must set CORS headers before calling this function.
 // ---------------------------------------------------------------------------
 void sendOTDirectOverridesJSON() {
   // Bounded JSON into the per-request response stream (TASK-865.9). The caller
   // (restAPI handleOTDirect) has already queued the CORS header via
   // sendCorsOriginHeader() before calling this.
-  JsonDocument doc;
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                  // root {
+    je.beginObject(F("overrides"));    // "overrides":{
 
-  JsonObject overrides = doc[F("overrides")].to<JsonObject>();
+    // All four arrays are emitted unconditionally so empty tables still
+    // serialize as [] — preserving the exact structure the JsonDocument path
+    // (and the original hand-rolled stream before it) emitted.
+    je.beginArray(F("write"));
+    for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
+      if (!otOverrides[i].active) continue;
+      je.beginObject();
+      je.field(F("msgid"), (uint32_t)otOverrides[i].msgId);
+      je.field(F("value"), (uint32_t)otOverrides[i].overrideValue);
+      je.endObject();
+    }
+    je.endArray();
 
-  // All four arrays are created unconditionally so empty tables still serialize
-  // as [] — preserving the exact structure the old hand-rolled stream emitted.
-  JsonArray write = overrides[F("write")].to<JsonArray>();
-  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
-    if (!otOverrides[i].active) continue;
-    JsonObject e = write.add<JsonObject>();
-    e[F("msgid")] = (unsigned)otOverrides[i].msgId;
-    e[F("value")] = (unsigned)otOverrides[i].overrideValue;
+    je.beginArray(F("response"));
+    for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
+      if (!otResponseOverrides[i].active) continue;
+      je.beginObject();
+      je.field(F("msgid"), (uint32_t)otResponseOverrides[i].msgId);
+      je.field(F("value"), (uint32_t)otResponseOverrides[i].value);
+      je.endObject();
+    }
+    je.endArray();
+
+    je.beginArray(F("modify"));
+    for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
+      if (!otResponseModifiers[i].active) continue;
+      je.beginObject();
+      je.field(F("msgid"), (uint32_t)otResponseModifiers[i].msgId);
+      je.field(F("value"), (uint32_t)otResponseModifiers[i].value);
+      je.endObject();
+    }
+    je.endArray();
+
+    je.beginArray(F("unknown"));
+    for (uint8_t i = 0; i < otUnknownIdCount; i++) {
+      je.value((uint32_t)otUnknownIds[i]);
+    }
+    je.endArray();
+
+    je.endObject();                    // close "overrides"
+
+    // TASK-498 (4B-M2): expose queue depth + high-water-mark so non-telnet
+    // clients (web UI, MQTT-driven dashboards) can monitor the OT command
+    // queue load. "queue" is a sibling of "overrides", not nested under it.
+    // Normal operation should keep highWater well below capacity; climbing
+    // values indicate a producer-rate problem worth investigation.
+    je.beginObject(F("queue"));        // "queue":{
+    je.field(F("depth"),     (uint32_t)otCmdQueueDepth());
+    je.field(F("highWater"), (uint32_t)otCmdQueueHighWater);
+    je.field(F("capacity"),  (uint32_t)OT_CMD_QUEUE_SIZE);
+    je.endObject();                    // close "queue"
+
+    je.endObject();                    // close root
   }
-
-  JsonArray response = overrides[F("response")].to<JsonArray>();
-  for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) {
-    if (!otResponseOverrides[i].active) continue;
-    JsonObject e = response.add<JsonObject>();
-    e[F("msgid")] = (unsigned)otResponseOverrides[i].msgId;
-    e[F("value")] = (unsigned)otResponseOverrides[i].value;
-  }
-
-  JsonArray modify = overrides[F("modify")].to<JsonArray>();
-  for (uint8_t i = 0; i < OT_RESPONSE_MODIFY_MAX; i++) {
-    if (!otResponseModifiers[i].active) continue;
-    JsonObject e = modify.add<JsonObject>();
-    e[F("msgid")] = (unsigned)otResponseModifiers[i].msgId;
-    e[F("value")] = (unsigned)otResponseModifiers[i].value;
-  }
-
-  JsonArray unknown = overrides[F("unknown")].to<JsonArray>();
-  for (uint8_t i = 0; i < otUnknownIdCount; i++) {
-    unknown.add((unsigned)otUnknownIds[i]);
-  }
-
-  // TASK-498 (4B-M2): expose queue depth + high-water-mark so non-telnet
-  // clients (web UI, MQTT-driven dashboards) can monitor the OT command
-  // queue load. "queue" is a sibling of "overrides", not nested under it.
-  // Normal operation should keep highWater well below capacity; climbing
-  // values indicate a producer-rate problem worth investigation.
-  JsonObject queue = doc[F("queue")].to<JsonObject>();
-  queue[F("depth")]     = (unsigned)otCmdQueueDepth();
-  queue[F("highWater")] = (unsigned)otCmdQueueHighWater;
-  queue[F("capacity")]  = (unsigned)OT_CMD_QUEUE_SIZE;
-
-  restSendJson(doc);
+  restFinalize();
 }
 
 // ---------------------------------------------------------------------------

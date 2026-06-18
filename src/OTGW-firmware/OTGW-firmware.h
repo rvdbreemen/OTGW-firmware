@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.214
+**  Version  : v2.0.0-alpha.215
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -14,8 +14,7 @@
 
 #include <Arduino.h>
 #include <AceTime.h>
-#include <ArduinoJson.h>        // ADR-141: JSON I/O on the ESP32-S3 line (REST serializeJson + inbound deserializeJson). Out of the settings-persistence path (TASK-867 AC#6).
-#include "jsonEmit.h"           // TASK-885: embedded-robust streaming JSON writer (no JsonDocument) for the heavy REST endpoints under load
+#include "jsonEmit.h"           // ADR-146/TASK-886: embedded-robust streaming JSON writer (no JsonDocument); ArduinoJson fully removed from the REST path
 // #include <TimeLib.h>
 
 // DEBUGGING: Uncomment the next line to disable WebSocket functionality

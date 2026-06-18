@@ -2245,48 +2245,59 @@ class WorkspaceEvaluator:
 
     # ===== ARDUINOJSON BAN CHECK =====
 
-    # ADR-141 (supersedes ADR-042): ArduinoJson v7 is PERMITTED on the ESP32-S3
-    # 2.0.0 line for REST output (serializeJson) and inbound parsing
-    # (deserializeJson). It MUST stay out of the settings-persistence path, which
-    # keeps the manual wStrF/applySettingFromFile contract (TASK-867 AC#6).
-    ARDUINOJSON_BANNED_FILES = {'settingStuff.ino'}
+    # ADR-146 (supersedes ADR-141, retires ADR-145; returns to the spirit of
+    # ADR-042): ArduinoJson is FORBIDDEN anywhere in firmware application code, on
+    # every branch. REST output is built with the streaming JsonEmit writer
+    # (jsonEmit.h); inbound JSON uses the hand-rolled extractJsonField scanner
+    # (jsonStuff.ino) / parseJsonKVLine. Vendored libraries under src/libraries/**
+    # are out of scope (independent upstreams). Maintainer standing directive
+    # (2026-06-19): never use ArduinoJson. collect_firmware_source_files() scans
+    # the sketch root (config.FIRMWARE_ROOT = src/OTGW-firmware), which excludes
+    # src/libraries, so the library-out-of-scope rule holds automatically.
 
     def check_no_arduinojson(self):
-        """ADR-141: keep ArduinoJson out of the settings-persistence path only."""
-        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ArduinoJson Settings-Path Ban ==={Colors.ENDC}")
+        """ADR-146: ArduinoJson is banned everywhere in firmware application code."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ArduinoJson Ban (ADR-146) ==={Colors.ENDC}")
 
         violations: List[str] = []
         src_dir = config.FIRMWARE_ROOT
         code_files = collect_firmware_source_files(src_dir)
 
         include_re = re.compile(r'#include\s*[<"]ArduinoJson')
+        # Word-boundary match on the ArduinoJson public symbols so manual helpers
+        # (writeJsonComma, kJsonAttrTopic, the JsonEmit class, parseJsonKVLine) are
+        # NOT false-flagged.
         types_re = re.compile(
-            r'StaticJsonDocument|DynamicJsonDocument|JsonDocument|deserializeJson|serializeJson'
+            r'\b(StaticJsonDocument|DynamicJsonDocument|JsonDocument|JsonObject|'
+            r'JsonArray|JsonVariant|serializeJson|deserializeJson|measureJson)\b'
         )
 
         for file in code_files:
-            if file.name not in self.ARDUINOJSON_BANNED_FILES:
-                continue  # ADR-141: permitted in REST/parse/discovery code
             with open(file, 'r', encoding='utf-8', errors='ignore') as f:
                 lines = f.read().split('\n')
 
             for i, line in enumerate(lines, 1):
-                if include_re.search(line):
+                # Strip any // line-comment: a comment mentioning JsonDocument (e.g.
+                # "streaming JsonEmit replaces the JsonDocument path") is provenance,
+                # not a usage. Block comments are not stripped (none in practice).
+                code = line.split('//', 1)[0]
+                if include_re.search(code):
                     violations.append(f"{file.name}:{i}: #include ArduinoJson")
-                if types_re.search(line):
-                    violations.append(f"{file.name}:{i}: ArduinoJson type usage")
+                if types_re.search(code):
+                    violations.append(f"{file.name}:{i}: ArduinoJson symbol")
 
         if violations:
             self.add_result(EvaluationResult(
-                "ArduinoJson", "Settings-path ban", "FAIL",
-                f"Found {len(violations)} ArduinoJson usages in the settings-persistence "
-                f"path (ADR-141/TASK-867 AC#6: settings stay manual)",
+                "ArduinoJson", "Library ban (ADR-146)", "FAIL",
+                f"Found {len(violations)} ArduinoJson usages. ArduinoJson is banned "
+                f"project-wide (ADR-146); use JsonEmit (jsonEmit.h) for output and "
+                f"extractJsonField/parseJsonKVLine for inbound JSON.",
                 "; ".join(violations[:10])
             ))
         else:
             self.add_result(EvaluationResult(
-                "ArduinoJson", "Settings-path ban", "PASS",
-                "ArduinoJson absent from the settings-persistence path (ADR-141 compliant)"
+                "ArduinoJson", "Library ban (ADR-146)", "PASS",
+                "No ArduinoJson symbols in firmware application code (ADR-146 compliant)"
             ))
 
     # ===== STACK SAFETY CHECK =====

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-alpha.214
+**  Version  : v2.0.0-alpha.215
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -726,46 +726,175 @@ void sendJsonSettingObj(const __FlashStringHelper* cName, bool bValue, const cha
 }
 
 //=======================================================================
-// Minimal streaming JSON field extractor for flat JSON object bodies.
-// Extracts the value of a named field from a flat JSON object string.
-// Handles:
-//   - String values:  {"key":"value"}  → result = "value"
-//   - Bool literals:  {"key":true}     → result = "true"
-//   - Numbers:        {"key":42}       → result = "42"
-// 'key' is a PROGMEM string (use F() macro at call site).
-// Returns true if the field was found and result was populated.
-// NOTE: Uses cMsg as scratch for building the search pattern.
-//       Safe: String::indexOf() does not yield, so cMsg cannot be clobbered mid-use.
-//       Not safe to call from ISR or concurrently.
+// Hand-rolled inbound JSON field extractor (TASK-886, full ADR-141 revert).
+// Replaces the ArduinoJson deserializeJson path with a bounded, NON-THROWING,
+// no-heap flat top-level scanner. Extracts the value of a named TOP-LEVEL field
+// from a flat JSON object string:
+//   - String values:  {"key":"value"}  -> result = "value" (escapes resolved,
+//                      \uXXXX decoded to UTF-8, strlcpy-style truncation)
+//   - Bool literals:   {"key":true}     -> result = "true" / "false"
+//   - Numbers:         {"key":42}       -> result = "42" (source token verbatim)
+//   - Explicit null / container value / absent / malformed -> returns false
+// CORRECTNESS: every value (string, nested object, nested array) is skipped
+// WHOLESALE, so a key-looking substring inside a value (e.g.
+// {"other":"value","value":5}) is never mis-matched as a key -- the exact bug
+// the original strstr scanner had, fixed here without re-introducing the
+// ArduinoJson dependency. 'key' is PROGMEM (use F() at the call site).
+// Algorithm validated host-side: scripts/tests/test_extract_json_field.py (32
+// cases incl. key-in-value, escapes, \u, truncation, adversarial no-throw).
+// Not safe from ISR (uses a caller buffer); fine under doBackgroundTasks.
 //=======================================================================
+static inline int xjfHex(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+  return -1;
+}
+// Append codepoint as UTF-8 (BMP, 1-3 bytes) into out[*oi], bounded by cap-1.
+// Drops the char whole rather than writing a partial multibyte sequence.
+static inline void xjfPutUtf8(char* out, size_t* oi, size_t cap, uint32_t cp) {
+  size_t need = (cp < 0x80) ? 1 : (cp < 0x800) ? 2 : 3;
+  if (*oi + need > cap - 1) return;
+  if (cp < 0x80) {
+    out[(*oi)++] = (char)cp;
+  } else if (cp < 0x800) {
+    out[(*oi)++] = (char)(0xC0 | (cp >> 6));
+    out[(*oi)++] = (char)(0x80 | (cp & 0x3F));
+  } else {
+    out[(*oi)++] = (char)(0xE0 | (cp >> 12));
+    out[(*oi)++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+    out[(*oi)++] = (char)(0x80 | (cp & 0x3F));
+  }
+}
+static inline const char* xjfSkipWs(const char* p) {
+  while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+  return p;
+}
+// Read a JSON string starting AT the opening '"'. If out!=NULL, write unescaped
+// bytes (NUL-terminated, TRUNCATED to cap-1 = strlcpy semantics, matching the
+// old strlcpy(result, v.as<const char*>(), resultSize)). Truncation never fails
+// the parse: scanning continues to the closing quote so the caller position
+// stays well-formed. Returns pointer PAST the closing '"', or NULL only if
+// unterminated/malformed.
+static const char* xjfReadString(const char* p, char* out, size_t cap) {
+  if (*p != '"') return NULL;
+  p++;
+  size_t oi = 0;
+  bool full = false;
+  while (*p && *p != '"') {
+    if (*p == '\\') {
+      char e = p[1];
+      if (!e) return NULL;
+      if (e == 'u') {
+        int h0 = xjfHex(p[2]), h1 = xjfHex(p[3]), h2 = xjfHex(p[4]), h3 = xjfHex(p[5]);
+        if (h0 < 0 || h1 < 0 || h2 < 0 || h3 < 0) return NULL;
+        uint32_t cp = (uint32_t)((h0 << 12) | (h1 << 8) | (h2 << 4) | h3);
+        if (out && !full) {
+          size_t before = oi;
+          xjfPutUtf8(out, &oi, cap, cp);
+          if (oi == before) full = true;          // didn't fit -> truncate here on
+        }
+        p += 6;
+        continue;
+      }
+      char c;
+      switch (e) {
+        case '"':  c = '"';  break;
+        case '\\': c = '\\'; break;
+        case '/':  c = '/';  break;
+        case 'b':  c = '\b'; break;
+        case 'f':  c = '\f'; break;
+        case 'n':  c = '\n'; break;
+        case 'r':  c = '\r'; break;
+        case 't':  c = '\t'; break;
+        default:   c = e;    break;                // unknown escape -> literal char
+      }
+      if (out && !full) {
+        if (oi + 1 <= cap - 1) out[oi++] = c;
+        else full = true;
+      }
+      p += 2;
+      continue;
+    }
+    if (out && !full) {
+      if (oi + 1 <= cap - 1) out[oi++] = *p;
+      else full = true;
+    }
+    p++;
+  }
+  if (*p != '"') return NULL;                       // unterminated
+  if (out) out[oi] = '\0';
+  return p + 1;
+}
+// Skip a value that begins at '{' or '['; balanced, respecting string contents
+// (so braces/brackets inside a string don't unbalance the count). Returns the
+// pointer past the matching closer, or NULL if unbalanced/unterminated.
+static const char* xjfSkipValue(const char* p) {
+  int depth = 0;
+  while (*p) {
+    char c = *p;
+    if (c == '"') { p = xjfReadString(p, NULL, 0); if (!p) return NULL; continue; }
+    if (c == '{' || c == '[') { depth++; p++; continue; }
+    if (c == '}' || c == ']') { depth--; p++; if (depth == 0) return p; continue; }
+    p++;
+  }
+  return NULL;
+}
+// Pure-char* core (host-tested). 'key' is already resolved out of PROGMEM.
+static bool extractJsonFieldImpl(const char* json, const char* key,
+                                 char* result, size_t resultSize) {
+  if (!json || !key || !result || resultSize == 0) return false;
+  result[0] = '\0';
+  const char* p = json;
+  while (*p && *p != '{') p++;                      // tolerate leading junk
+  if (*p != '{') return false;
+  p++;
+  for (;;) {
+    p = xjfSkipWs(p);
+    if (*p == '}' || *p == '\0') return false;      // end of object: not found
+    if (*p != '"') return false;                    // malformed at key position
+    char kbuf[48];
+    const char* after = xjfReadString(p, kbuf, sizeof(kbuf));
+    if (!after) return false;
+    p = xjfSkipWs(after);
+    if (*p != ':') return false;
+    p = xjfSkipWs(p + 1);
+    bool match = (strcmp(kbuf, key) == 0);
+    if (*p == '"') {                                // string value
+      if (match) return (xjfReadString(p, result, resultSize) != NULL);
+      const char* np = xjfReadString(p, NULL, 0);   // skip wholesale
+      if (!np) return false;
+      p = np;
+    } else if (*p == '{' || *p == '[') {            // container value
+      const char* np = xjfSkipValue(p);
+      if (!np) return false;
+      if (match) return false;                      // matched, but not a scalar
+      p = np;
+    } else {                                        // bare token: number/true/false/null
+      const char* start = p;
+      while (*p && *p != ',' && *p != '}' && *p != ' ' && *p != '\t'
+             && *p != '\n' && *p != '\r') p++;
+      size_t len = (size_t)(p - start);
+      if (match) {
+        if (len == 4 && strncmp_P(start, PSTR("null"), 4) == 0) return false;
+        if (len > resultSize - 1) len = resultSize - 1;   // strlcpy-style truncation
+        memcpy(result, start, len);
+        result[len] = '\0';
+        return true;
+      }
+    }
+    p = xjfSkipWs(p);
+    if (*p == ',') { p++; continue; }
+    return false;                                   // '}' / end / junk -> not found
+  }
+}
+
 bool extractJsonField(const char* json, const __FlashStringHelper* key,
                       char* result, size_t resultSize) {
-  if (!json || !result || resultSize == 0) return false;
-  result[0] = '\0';
-  // ADR-141 (TASK-867 AC#5): parse with ArduinoJson instead of the old
-  // strstr + hand-rolled scanner. The scanner false-matched a key that appeared
-  // inside a string VALUE (e.g. {"other":"value","value":5}), and only handled
-  // a flat object. deserializeJson handles quoting, backslash-escapes, nested
-  // objects, JSON null and whitespace correctly. Settings persistence keeps its
-  // own manual parseJsonKVLine (TASK-867 AC#6) and is unaffected.
-  JsonDocument doc;
-  if (deserializeJson(doc, json)) return false;   // parse error / not valid JSON
   char keyBuf[48];
   strncpy_P(keyBuf, (PGM_P)key, sizeof(keyBuf));
   keyBuf[sizeof(keyBuf) - 1] = '\0';
-  JsonVariant v = doc[keyBuf];
-  if (v.isNull()) return false;                    // field absent or explicit null
-  if (v.is<const char*>()) {                       // string value (already unescaped)
-    strlcpy(result, v.as<const char*>(), resultSize);
-    return true;
-  }
-  if (v.is<bool>()) {                              // bool literal -> "true"/"false"
-    strlcpy(result, v.as<bool>() ? "true" : "false", resultSize);
-    return true;
-  }
-  // numeric (or other scalar): serialize the token, e.g. 42 -> "42", 1.5 -> "1.5"
-  size_t n = serializeJson(v, result, resultSize);
-  return (n > 0 && n < resultSize);
+  return extractJsonFieldImpl(json, keyBuf, result, resultSize);
 }
 
 // Convenience wrapper accepting Arduino String (delegates to const char* version)

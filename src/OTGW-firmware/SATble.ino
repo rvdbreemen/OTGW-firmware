@@ -728,10 +728,11 @@ static int satBLERosterFindSlot(const char* mac)
 }
 
 // Stream the discovery roster as JSON (top-level meta fields plus a
-// "sensors" array of per-slot objects). ADR-141: built as a single
-// ArduinoJson v7 document and serialised in one shot via restSendJson().
-// ArduinoJson nests the array natively and escapes the user label, so the
-// old manual nesting + escapeJsonStringTo + dtostrf scaffolding is gone.
+// "sensors" array of per-slot objects). ADR-141 / TASK-885: streaming
+// JsonEmit writer replaces the JsonDocument path — emitted field-by-field
+// into the AsyncResponseStream with no materialised document. The label is
+// a char[] so it binds to field(const char*), which escapes via
+// jsonEscapeTo (replaces the old manual escapeJsonStringTo scaffolding).
 void satBLERosterSendJSON()
 {
   const uint32_t now = millis();
@@ -741,42 +742,48 @@ void satBLERosterSendJSON()
     if (settings.sat.sBleMac[i][0] != '\0') cnt++;
   }
 
-  JsonDocument doc;
-  doc[F("max_slots")]          = (int32_t)SAT_BLE_MAX_ROSTER;
-  doc[F("populated_slots")]    = (int32_t)cnt;
-  doc[F("roster_full")]        = (cnt >= SAT_BLE_MAX_ROSTER);
-  doc[F("dropped_since_full")] = (int32_t)_bleRosterFullCount;
-  doc[F("selected_mac")]       = settings.sat.sBleMAC;
+  AsyncResponseStream* strm = restBeginStream("application/json");
+  if (strm) {
+    JsonEmit je(*strm);
+    je.beginObject();                 // root {
+    je.field(F("max_slots"),          (int32_t)SAT_BLE_MAX_ROSTER);
+    je.field(F("populated_slots"),    (int32_t)cnt);
+    je.field(F("roster_full"),        (cnt >= SAT_BLE_MAX_ROSTER));
+    je.field(F("dropped_since_full"), (int32_t)_bleRosterFullCount);
+    je.field(F("selected_mac"),       settings.sat.sBleMAC);
 
-  JsonArray sensors = doc[F("sensors")].to<JsonArray>();
-  for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
-    if (settings.sat.sBleMac[i][0] == '\0') continue;
+    je.beginArray(F("sensors"));      // "sensors":[
+    for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+      if (settings.sat.sBleMac[i][0] == '\0') continue;
 
-    BLERuntime snap;
-    portENTER_CRITICAL(&_bleSensorsMux);
-    snap = _bleRuntime[i];
-    portEXIT_CRITICAL(&_bleSensorsMux);
+      BLERuntime snap;
+      portENTER_CRITICAL(&_bleSensorsMux);
+      snap = _bleRuntime[i];
+      portEXIT_CRITICAL(&_bleSensorsMux);
 
-    bool fresh      = (snap.iLastSeenMs > 0 &&
-                       (now - snap.iLastSeenMs) <= BLE_STALE_MS);
-    bool isSelected = (settings.sat.sBleMAC[0] != '\0' &&
-                       strcasecmp(settings.sat.sBleMac[i],
-                                  settings.sat.sBleMAC) == 0);
+      bool fresh      = (snap.iLastSeenMs > 0 &&
+                         (now - snap.iLastSeenMs) <= BLE_STALE_MS);
+      bool isSelected = (settings.sat.sBleMAC[0] != '\0' &&
+                         strcasecmp(settings.sat.sBleMac[i],
+                                    settings.sat.sBleMAC) == 0);
 
-    JsonObject e = sensors.add<JsonObject>();
-    e[F("slot")]     = i;
-    e[F("mac")]      = settings.sat.sBleMac[i];
-    e[F("label")]    = settings.sat.sBleLabel[i];
-    e[F("temp")]     = snap.fTemperature;
-    e[F("hum")]      = snap.fHumidity;
-    e[F("battery")]  = (uint32_t)snap.iBattery;
-    e[F("rssi")]     = (int32_t)snap.iRssi;
-    e[F("age_ms")]   = (uint32_t)(fresh ? (now - snap.iLastSeenMs) : 0);
-    e[F("valid")]    = fresh;
-    e[F("selected")] = isSelected;
+      je.beginObject();               // element {
+      je.field(F("slot"),     (int32_t)i);
+      je.field(F("mac"),      settings.sat.sBleMac[i]);
+      je.field(F("label"),    settings.sat.sBleLabel[i]);
+      je.field(F("temp"),     snap.fTemperature);
+      je.field(F("hum"),      snap.fHumidity);
+      je.field(F("battery"),  (uint32_t)snap.iBattery);
+      je.field(F("rssi"),     (int32_t)snap.iRssi);
+      je.field(F("age_ms"),   (uint32_t)(fresh ? (now - snap.iLastSeenMs) : 0));
+      je.field(F("valid"),    fresh);
+      je.field(F("selected"), isSelected);
+      je.endObject();                 // close element
+    }
+    je.endArray();                    // close "sensors"
+    je.endObject();                   // close root
   }
-
-  restSendJson(doc);
+  restFinalize();
 }
 
 // Promote a roster MAC to the active SAT input. Returns false if mac
