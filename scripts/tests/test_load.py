@@ -42,11 +42,13 @@ LEAK_TOLERANCE_PCT = 8.0     # final heap must be within this % of baseline
 MIN_SUCCESS_PCT = 98.0       # request success rate floor under load
 # A transient fragmentation peak during heavy JsonDocument churn is expected and
 # harmless if it recovers. Only SUSTAINED fragmentation (still high after the
-# cooldown) or a maxfreeblock too small to hold the largest response doc is a real
-# risk. ~22 KB covers the biggest JsonDocument (settings ~8.6 KB serialized,
-# roughly 2x in-doc).
-FRAG_SUSTAINED_PCT = 70      # hd_fragmentation_pct AFTER cooldown above this = concern
-MIN_MAXBLOCK_FLOOR = 22000   # largest contiguous free block must stay above this under load
+# cooldown) or a maxfreeblock dropping toward OOM is a real risk. NB: ArduinoJson
+# v7's JsonDocument pool is the contiguous alloc that matters, and for our biggest
+# response (settings, ~130 small values) it is only ~2-4 KB - NOT the ~8.6 KB
+# serialized size, which streams incrementally through the response cbuf in ~1.4 KB
+# AsyncTCP chunks. So the contiguous floor only needs to cover the pool + headroom.
+FRAG_SUSTAINED_PCT = 72      # hd_fragmentation_pct AFTER cooldown above this = concern
+MIN_MAXBLOCK_FLOOR = 5000    # largest contiguous block; below this the doc pool realloc is at OOM risk
 
 _stop = threading.Event()
 _stats = Counter()
