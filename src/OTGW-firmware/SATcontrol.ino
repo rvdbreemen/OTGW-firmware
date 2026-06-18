@@ -2027,217 +2027,215 @@ void satSendStatusJSON()
 {
   const uint32_t startMs = millis();
   restPerfBegin(REST_PERF_SAT_STATUS);
-  sendStartJsonMap("");
-  sendJsonMapEntry(F("enabled"),              settings.sat.bEnabled);
-  sendJsonMapEntry(F("active"),               state.sat.bActive);
-  sendJsonMapEntry(F("control_mode"),         (int32_t)state.sat.eControlMode);
+  // ADR-141: build the full SAT status as one ArduinoJson v7 document and
+  // serialise it in a single restSendJson() at the end (replaces the
+  // sendStartJsonMap -> N x sendJsonMapEntry/satSendJsonFloat -> sendEndJsonMap
+  // chunked layer). Empty-key wrapper = a flat ROOT object: doc.to<JsonObject>().
+  // ArduinoJson serialises NaN/Inf as null, matching the old satSendJsonFloat
+  // null handling, so the per-field decimal precision is intentionally dropped.
+  JsonDocument doc;
+  JsonObject o = doc.to<JsonObject>();
+  o[F("enabled")]              = settings.sat.bEnabled;
+  o[F("active")]               = state.sat.bActive;
+  o[F("control_mode")]         = (int32_t)state.sat.eControlMode;
   { char bsName[20]; satGetBoilerStatusName(bsName, sizeof(bsName));
-    sendJsonMapEntry(F("boiler_status"),        bsName); }
-  satSendJsonFloat(F("target_temp"),          settings.sat.fTargetTemp, 1);
-  satSendJsonFloat(F("room_temp"),            satGetRoomTemp(), 1);
-  satSendJsonFloat(F("outside_temp"),         satGetOutsideTemp(), 1);
-  satSendJsonFloat(F("heating_curve"),        state.sat.fHeatingCurveValue, 1);
-  satSendJsonFloat(F("pid_output"),           state.sat.fPidOutput, 1);
-  satSendJsonFloat(F("final_setpoint"),       state.sat.fFinalSetpoint, 1);
-  satSendJsonFloat(F("error"),                state.sat.fError, 2);
-  satSendJsonFloat(F("pid_p"),                state.sat.fPidP, 2);
-  satSendJsonFloat(F("pid_i"),                state.sat.fPidI, 2);
-  satSendJsonFloat(F("pid_d"),                state.sat.fPidD, 2);
-  satSendJsonFloat(F("kp"),                   state.sat.fKp, 4);
-  satSendJsonFloat(F("ki"),                   state.sat.fKi, 6);
-  satSendJsonFloat(F("kd"),                   state.sat.fKd, 2);
-  satSendJsonFloat(F("raw_derivative"),        state.sat.fRawDerivative, 4);
-  satSendJsonFloat(F("coefficient"),          settings.sat.fHeatingCurveCoeff, 1);
-  satSendJsonFloat(F("deadband"),             settings.sat.fDeadband, 2);
-  satSendJsonFloat(F("overshoot_margin"),     settings.sat.fOvershootMargin, 1);
-  sendJsonMapEntry(F("cycle_count"),          state.sat.iCycleCount);
-  sendJsonMapEntry(F("cycles_this_hour"),     (int32_t)satCycleGetCyclesThisHour());
-  sendJsonMapEntry(F("last_cycle_class"),     (int32_t)state.sat.eLastCycleClass);
-  satSendJsonFloat(F("cycle_max_flow"),       state.sat.fCycleMaxFlow, 1);
-  satSendJsonFloat(F("cycle_overshoot_sec"),  state.sat.fCycleOvershootSec, 0);
-  satSendJsonFloat(F("duty_ratio"),           state.sat.fDutyRatio, 3);
-  satSendJsonFloat(F("overshoot_fraction"),   state.sat.fOvershootFraction, 3);
-  satSendJsonFloat(F("underheat_fraction"),   state.sat.fUnderheatFraction, 3);
-  sendJsonMapEntry(F("cycle_phase"),          satCycleGetPhaseName());
-  sendJsonMapEntry(F("phase_duration_sec"),   (int32_t)satCycleGetPhaseDurationSec());
-  satSendJsonFloat(F("pwm_duty"),             state.sat.fPwmDutyCycle, 2);
-  sendJsonMapEntry(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
-  sendJsonMapEntry(F("active_preset"),         (int32_t)state.sat.eActivePreset);
-  sendJsonMapEntry(F("mod_suppressed"),        state.sat.bModSuppressed);
-  sendJsonMapEntry(F("dhw_active"),             state.sat.bDhwActive);
-  satSendJsonFloat(F("dhw_setpoint"),          settings.sat.fDhwSetpoint, 1);
+    o[F("boiler_status")]        = bsName; }
+  o[F("target_temp")]          = settings.sat.fTargetTemp;
+  o[F("room_temp")]            = satGetRoomTemp();
+  o[F("outside_temp")]         = satGetOutsideTemp();
+  o[F("heating_curve")]        = state.sat.fHeatingCurveValue;
+  o[F("pid_output")]           = state.sat.fPidOutput;
+  o[F("final_setpoint")]       = state.sat.fFinalSetpoint;
+  o[F("error")]                = state.sat.fError;
+  o[F("pid_p")]                = state.sat.fPidP;
+  o[F("pid_i")]                = state.sat.fPidI;
+  o[F("pid_d")]                = state.sat.fPidD;
+  o[F("kp")]                   = state.sat.fKp;
+  o[F("ki")]                   = state.sat.fKi;
+  o[F("kd")]                   = state.sat.fKd;
+  o[F("raw_derivative")]       = state.sat.fRawDerivative;
+  o[F("coefficient")]          = settings.sat.fHeatingCurveCoeff;
+  o[F("deadband")]             = settings.sat.fDeadband;
+  o[F("overshoot_margin")]     = settings.sat.fOvershootMargin;
+  o[F("cycle_count")]          = state.sat.iCycleCount;
+  o[F("cycles_this_hour")]     = (int32_t)satCycleGetCyclesThisHour();
+  o[F("last_cycle_class")]     = (int32_t)state.sat.eLastCycleClass;
+  o[F("cycle_max_flow")]       = state.sat.fCycleMaxFlow;
+  o[F("cycle_overshoot_sec")]  = state.sat.fCycleOvershootSec;
+  o[F("duty_ratio")]           = state.sat.fDutyRatio;
+  o[F("overshoot_fraction")]   = state.sat.fOvershootFraction;
+  o[F("underheat_fraction")]   = state.sat.fUnderheatFraction;
+  o[F("cycle_phase")]          = satCycleGetPhaseName();
+  o[F("phase_duration_sec")]   = (int32_t)satCycleGetPhaseDurationSec();
+  o[F("pwm_duty")]             = state.sat.fPwmDutyCycle;
+  o[F("pwm_flame_req")]        = state.sat.bPwmFlameRequested;
+  o[F("active_preset")]        = (int32_t)state.sat.eActivePreset;
+  o[F("mod_suppressed")]       = state.sat.bModSuppressed;
+  o[F("dhw_active")]           = state.sat.bDhwActive;
+  o[F("dhw_setpoint")]         = settings.sat.fDhwSetpoint;
   // TASK-516: boiler-gated master DHW enable. dhw_config_tank is derived live
   // from MsgID 3 HB3 (bit 11 of the uint16 SlaveConfigMemberIDcode); the UI
   // uses it to decide whether to render the toggle. dhw_enable mirrors the
   // user setting; only acted on (HW=) when dhw_config_tank=true.
-  sendJsonMapEntry(F("dhw_config_tank"),        (bool)(OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800));
-  sendJsonMapEntry(F("dhw_enable"),             settings.sat.bDhwEnable);
-  sendJsonMapEntry(F("control_interval_sec"),  (int32_t)settings.sat.iControlInterval);
-  sendJsonMapEntry(F("fallback_active"),       state.sat.bFallbackActive);
-  sendJsonMapEntry(F("fallback_reason"),       (int32_t)state.sat.eFallbackReason);
-  sendJsonMapEntry(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
-  sendJsonMapEntry(F("current_modulation"),   (int32_t)state.sat.iCurrentModulation);
-  satSendJsonFloat(F("ovp_value"),            settings.sat.fOvpValue, 1);
-  sendJsonMapEntry(F("ovp_enabled"),          settings.sat.bOvpEnabled);
-  sendJsonMapEntry(F("ovp_calib_phase"),      (int32_t)state.sat.eCalibPhase);
-  satSendJsonFloat(F("ovp_calib_max_temp"),   state.sat.fCalibMaxTemp, 1);
-  sendJsonMapEntry(F("ovp_calib_samples"),    (int32_t)state.sat.iCalibSamples);
-  sendJsonMapEntry(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
-  sendJsonMapEntry(F("heating_system_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
+  o[F("dhw_config_tank")]      = (bool)(OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800);
+  o[F("dhw_enable")]           = settings.sat.bDhwEnable;
+  o[F("control_interval_sec")] = (int32_t)settings.sat.iControlInterval;
+  o[F("fallback_active")]      = state.sat.bFallbackActive;
+  o[F("fallback_reason")]      = (int32_t)state.sat.eFallbackReason;
+  o[F("max_rel_modulation")]   = (int32_t)settings.sat.iMaxRelModulation;
+  o[F("current_modulation")]   = (int32_t)state.sat.iCurrentModulation;
+  o[F("ovp_value")]            = settings.sat.fOvpValue;
+  o[F("ovp_enabled")]          = settings.sat.bOvpEnabled;
+  o[F("ovp_calib_phase")]      = (int32_t)state.sat.eCalibPhase;
+  o[F("ovp_calib_max_temp")]   = state.sat.fCalibMaxTemp;
+  o[F("ovp_calib_samples")]    = (int32_t)state.sat.iCalibSamples;
+  o[F("heating_system")]       = (int32_t)settings.sat.iHeatingSystem;
+  o[F("heating_system_detected")] = (int32_t)state.sat.iDetectedHeatingSystem;
   { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
-    sendJsonMapEntry(F("manufacturer"), mfrName); }
-  sendJsonMapEntry(F("manufacturer_setting"), (int32_t)settings.sat.iManufacturer);
-  sendJsonMapEntry(F("manufacturer_detected"), (int32_t)state.sat.iDetectedManufacturer);
-  sendJsonMapEntry(F("slave_memberid"),        (int32_t)state.sat.iSlaveMemberID);
-  satSendJsonFloat(F("max_setpoint_system"), satGetMaxSetpoint(), 1);
-  sendJsonMapEntry(F("external_temp_valid"),  state.sat.bExternalTempValid);
-  sendJsonMapEntry(F("external_outdoor_valid"), state.sat.bExternalOutdoorValid);
+    o[F("manufacturer")] = mfrName; }
+  o[F("manufacturer_setting")] = (int32_t)settings.sat.iManufacturer;
+  o[F("manufacturer_detected")] = (int32_t)state.sat.iDetectedManufacturer;
+  o[F("slave_memberid")]       = (int32_t)state.sat.iSlaveMemberID;
+  o[F("max_setpoint_system")]  = satGetMaxSetpoint();
+  o[F("external_temp_valid")]  = state.sat.bExternalTempValid;
+  o[F("external_outdoor_valid")] = state.sat.bExternalOutdoorValid;
   // PV-surplus boost (TASK-640)
-  satSendJsonFloat(F("pv_surplus_w"),          state.sat.fExternalPvSurplusW, 0);
-  sendJsonMapEntry(F("pv_surplus_valid"),      state.sat.bExternalPvSurplusValid);
-  sendJsonMapEntry(F("pv_boost_active"),       state.sat.bPvBoostActive);
-  satSendJsonFloat(F("pv_boost_applied_c"),    state.sat.fPvBoostAppliedC, 1);
-  sendJsonMapEntry(F("pv_boost_enabled"),      settings.sat.bPvBoostEnabled);
-  sendJsonMapEntry(F("safety_tripped"),       state.sat.bSafetyTripped);
-  sendJsonMapEntry(F("valves_open"),            state.sat.bValvesOpen);
-  sendJsonMapEntry(F("window_open"),           state.sat.bWindowOpen);
-  sendJsonMapEntry(F("window_detection"),      settings.sat.bWindowDetection);
-  sendJsonMapEntry(F("push_setpoint"),         settings.sat.bPushSetpoint);
-  satSendJsonFloat(F("flame_off_offset"),      settings.sat.fFlameOffOffset, 1);
-  sendJsonMapEntry(F("force_pwm"),             settings.sat.bForcePWM);
-  satSendJsonFloat(F("flow_offset"),           settings.sat.fFlowOffset, 1);
-  satSendJsonFloat(F("pressure"),              state.sat.fSmoothedPressure, 2);
-  satSendJsonFloat(F("pressure_drop_rate"),    state.sat.fPressureDropRate, 3);
-  sendJsonMapEntry(F("pressure_alarm"),        state.sat.bPressureAlarm);
-  sendJsonMapEntry(F("modulation_reliable"),   state.sat.bModulationReliable);
-  sendJsonMapEntry(F("setpoint_mismatch"),     state.sat.bSetpointMismatch);
+  o[F("pv_surplus_w")]         = state.sat.fExternalPvSurplusW;
+  o[F("pv_surplus_valid")]     = state.sat.bExternalPvSurplusValid;
+  o[F("pv_boost_active")]      = state.sat.bPvBoostActive;
+  o[F("pv_boost_applied_c")]   = state.sat.fPvBoostAppliedC;
+  o[F("pv_boost_enabled")]     = settings.sat.bPvBoostEnabled;
+  o[F("safety_tripped")]       = state.sat.bSafetyTripped;
+  o[F("valves_open")]          = state.sat.bValvesOpen;
+  o[F("window_open")]          = state.sat.bWindowOpen;
+  o[F("window_detection")]     = settings.sat.bWindowDetection;
+  o[F("push_setpoint")]        = settings.sat.bPushSetpoint;
+  o[F("flame_off_offset")]     = settings.sat.fFlameOffOffset;
+  o[F("force_pwm")]            = settings.sat.bForcePWM;
+  o[F("flow_offset")]          = settings.sat.fFlowOffset;
+  o[F("pressure")]             = state.sat.fSmoothedPressure;
+  o[F("pressure_drop_rate")]   = state.sat.fPressureDropRate;
+  o[F("pressure_alarm")]       = state.sat.bPressureAlarm;
+  o[F("modulation_reliable")]  = state.sat.bModulationReliable;
+  o[F("setpoint_mismatch")]    = state.sat.bSetpointMismatch;
   { static const char* const crNames[] = { "insufficient", "increase", "decrease", "hold" };
     int crIdx = (int)state.sat.eCurveRecommendation;
     if (crIdx < 0 || crIdx > 3) crIdx = 0;
-    sendJsonMapEntry(F("curve_recommendation"), crNames[crIdx]); }
-  sendJsonMapEntry(F("heating_curve_recommendation"), state.sat.sHeatCurveRec);
-  satSendJsonFloat(F("mean_error"),            state.sat.fMeanError, 2);
-  satSendJsonFloat(F("error_stddev"),          state.sat.fErrorStdDev, 3);
-  satSendJsonFloat(F("target_temp_step"),      settings.sat.fTargetTempStep, 1);
-  satSendJsonFloat(F("power_kw"),              state.sat.fCurrentPower, 2);
-  satSendJsonFloat(F("energy_kwh"),            state.sat.fEnergyTotal, 3);
-  satSendJsonFloat(F("boiler_capacity"),       settings.sat.fBoilerCapacity, 1);
+    o[F("curve_recommendation")] = crNames[crIdx]; }
+  o[F("heating_curve_recommendation")] = state.sat.sHeatCurveRec;
+  o[F("mean_error")]           = state.sat.fMeanError;
+  o[F("error_stddev")]         = state.sat.fErrorStdDev;
+  o[F("target_temp_step")]     = settings.sat.fTargetTempStep;
+  o[F("power_kw")]             = state.sat.fCurrentPower;
+  o[F("energy_kwh")]           = state.sat.fEnergyTotal;
+  o[F("boiler_capacity")]      = settings.sat.fBoilerCapacity;
   // Gas consumption estimation (Task #232)
-  satSendJsonFloat(F("boiler_rated_kw"),       settings.sat.fBoilerRatedKW, 1);
-  satSendJsonFloat(F("boiler_efficiency"),     settings.sat.fBoilerEfficiency, 2);
-  satSendJsonFloat(F("energy_estimated_kwh"),  state.sat.fEnergyEstimatedKWh, 3);
+  o[F("boiler_rated_kw")]      = settings.sat.fBoilerRatedKW;
+  o[F("boiler_efficiency")]    = settings.sat.fBoilerEfficiency;
+  o[F("energy_estimated_kwh")] = state.sat.fEnergyEstimatedKWh;
   // Preset sync (Task #46)
-  sendJsonMapEntry(F("preset_sync"),           settings.sat.bPresetSync);
+  o[F("preset_sync")]          = settings.sat.bPresetSync;
   // Thermal drop learning (Task #21)
-  satSendJsonFloat(F("thermal_coeff"),         settings.sat.fThermalCoeff, 4);
-  satSendJsonFloat(F("thermal_drop_rate"),     state.sat.fThermalDropRate, 4);
-  sendJsonMapEntry(F("thermal_model_valid"),   state.sat.bThermalModelValid);
-  satSendJsonFloat(F("estimated_room"),        state.sat.fEstimatedRoom, 1);
-  satSendJsonFloat(F("last_known_room"),       state.sat.fLastKnownRoom, 1);
+  o[F("thermal_coeff")]        = settings.sat.fThermalCoeff;
+  o[F("thermal_drop_rate")]    = state.sat.fThermalDropRate;
+  o[F("thermal_model_valid")]  = state.sat.bThermalModelValid;
+  o[F("estimated_room")]       = state.sat.fEstimatedRoom;
+  o[F("last_known_room")]      = state.sat.fLastKnownRoom;
   // Solar gain (Task #23)
-  sendJsonMapEntry(F("solar_gain_active"),     state.sat.bSolarGainActive);
-  satSendJsonFloat(F("indoor_rise_rate"),      state.sat.fIndoorRiseRate, 2);
+  o[F("solar_gain_active")]    = state.sat.bSolarGainActive;
+  o[F("indoor_rise_rate")]     = state.sat.fIndoorRiseRate;
   // Summer simmer (Task #24)
-  sendJsonMapEntry(F("summer_simmer"),         settings.sat.bSummerSimmer);
-  sendJsonMapEntry(F("summer_active"),         state.sat.bSummerActive);
-  satSendJsonFloat(F("summer_hours_above"),    state.sat.fSummerHoursAbove, 1);
-  satSendJsonFloat(F("summer_threshold"),      settings.sat.fSummerThreshold, 1);
-  sendJsonMapEntry(F("summer_min_hours"),      (int32_t)settings.sat.iSummerMinHours);
+  o[F("summer_simmer")]        = settings.sat.bSummerSimmer;
+  o[F("summer_active")]        = state.sat.bSummerActive;
+  o[F("summer_hours_above")]   = state.sat.fSummerHoursAbove;
+  o[F("summer_threshold")]     = settings.sat.fSummerThreshold;
+  o[F("summer_min_hours")]     = (int32_t)settings.sat.iSummerMinHours;
   // Thermal comfort (Task #28/#47)
-  sendJsonMapEntry(F("comfort_adjust"),        settings.sat.bComfortAdjust);
-  satSendJsonFloat(F("humidity"),              state.sat.fHumidity, 0);
-  sendJsonMapEntry(F("humidity_valid"),         state.sat.bHumidityValid);
-  satSendJsonFloat(F("comfort_offset"),        state.sat.fComfortOffset, 2);
-  satSendJsonFloat(F("comfort_ref_humidity"),  settings.sat.fComfortHumidity, 0);
-  satSendJsonFloat(F("comfort_max_offset"),    settings.sat.fComfortMaxOffset, 1);
+  o[F("comfort_adjust")]       = settings.sat.bComfortAdjust;
+  o[F("humidity")]             = state.sat.fHumidity;
+  o[F("humidity_valid")]       = state.sat.bHumidityValid;
+  o[F("comfort_offset")]       = state.sat.fComfortOffset;
+  o[F("comfort_ref_humidity")] = settings.sat.fComfortHumidity;
+  o[F("comfort_max_offset")]   = settings.sat.fComfortMaxOffset;
   // Simulation (Task #37 + TASK-795)
-  sendJsonMapEntry(F("simulation"),            settings.sat.bSimulation);
+  o[F("simulation")]           = settings.sat.bSimulation;
   // §4.2: mirrors !satBoilerHardwarePresent() so the Web UI can hide the
   // simulation card when a real boiler is attached.
-  sendJsonMapEntry(F("sim_available"),         !satBoilerHardwarePresent());
+  o[F("sim_available")]        = !satBoilerHardwarePresent();
   if (settings.sat.bSimulation) {
-    satSendJsonFloat(F("sim_room_temp"),        state.sat.fSimRoomTemp, 1);
-    satSendJsonFloat(F("sim_flow_temp"),        state.sat.fSimFlowTemp, 1);
-    satSendJsonFloat(F("sim_outdoor_temp"),     state.sat.fSimOutdoorTemp, 1);
-    satSendJsonFloat(F("sim_return_temp"),      state.sat.fSimReturnTemp, 1);
-    sendJsonMapEntry(F("sim_flame_on"),         state.sat.bSimFlameOn);
-    sendJsonMapEntry(F("sim_modulation"),       (int32_t)state.sat.iSimModulation);
+    o[F("sim_room_temp")]       = state.sat.fSimRoomTemp;
+    o[F("sim_flow_temp")]       = state.sat.fSimFlowTemp;
+    o[F("sim_outdoor_temp")]    = state.sat.fSimOutdoorTemp;
+    o[F("sim_return_temp")]     = state.sat.fSimReturnTemp;
+    o[F("sim_flame_on")]        = state.sat.bSimFlameOn;
+    o[F("sim_modulation")]      = (int32_t)state.sat.iSimModulation;
     // §4.3 command trace
-    sendJsonMapEntry(F("last_blocked_cmd"),     state.sat.sLastBlockedCmd);
-    sendJsonMapEntry(F("last_blocked_cmd_age_ms"),
+    o[F("last_blocked_cmd")]    = state.sat.sLastBlockedCmd;
+    o[F("last_blocked_cmd_age_ms")] =
                      state.sat.iLastBlockedCmdMs == 0 ? (int32_t)0
-                       : (int32_t)(millis() - state.sat.iLastBlockedCmdMs));
+                       : (int32_t)(millis() - state.sat.iLastBlockedCmdMs);
     // TASK-801 F6: last_blocked_cmds[] ring, newest-first. Each element
-    // {"cmd":"..","age_ms":N}. Built in one buffer (<=16*~50B) then streamed.
+    // {"cmd":"..","age_ms":N}. ArduinoJson v7 nested array (no manual buffer).
     {
       const uint8_t ring  = (uint8_t)(sizeof(state.sat.iSimTraceMs) / sizeof(state.sat.iSimTraceMs[0]));
       const uint8_t count = state.sat.iSimTraceCount;
       const uint32_t nowMs = millis();
-      char arrBuf[820];
-      int n = snprintf_P(arrBuf, sizeof(arrBuf), PSTR("\"last_blocked_cmds\": ["));
+      JsonArray trace = o[F("last_blocked_cmds")].to<JsonArray>();
       for (uint8_t k = 0; k < count; k++) {
         // newest-first: head-1-k, wrapping
         uint8_t idx = (uint8_t)((state.sat.iSimTraceHead + ring - 1 - k) % ring);
         uint32_t age = (state.sat.iSimTraceMs[idx] == 0) ? 0 : (nowMs - state.sat.iSimTraceMs[idx]);
-        n += snprintf_P(arrBuf + n, sizeof(arrBuf) - n,
-                        PSTR("%s{\"cmd\":\"%s\",\"age_ms\":%lu}"),
-                        (k == 0 ? "" : ","), state.sat.sSimTraceCmd[idx], (unsigned long)age);
-        if (n >= (int)sizeof(arrBuf) - 40) break;  // guard (cannot happen at ring=16, defensive)
+        JsonObject e = trace.add<JsonObject>();
+        e[F("cmd")]    = state.sat.sSimTraceCmd[idx];
+        e[F("age_ms")] = age;
       }
-      snprintf_P(arrBuf + n, sizeof(arrBuf) - n, PSTR("]"));
-      sendBeforenext(); sendIdent(); restSendContent(arrBuf);
     }
   }
   // PID auto-tuning (Task #27)
-  sendJsonMapEntry(F("auto_tune"),             settings.sat.bAutoTune);
-  sendJsonMapEntry(F("auto_tune_active"),      state.sat.bAutoTuneActive);
-  sendJsonMapEntry(F("auto_tune_cycles"),      (int32_t)state.sat.iAutoTuneCycles);
-  satSendJsonFloat(F("auto_tune_score"),       state.sat.fAutoTuneScore, 2);
-  satSendJsonFloat(F("auto_tune_rate"),        settings.sat.fAutoTuneRate, 3);
+  o[F("auto_tune")]            = settings.sat.bAutoTune;
+  o[F("auto_tune_active")]     = state.sat.bAutoTuneActive;
+  o[F("auto_tune_cycles")]     = (int32_t)state.sat.iAutoTuneCycles;
+  o[F("auto_tune_score")]      = state.sat.fAutoTuneScore;
+  o[F("auto_tune_rate")]       = settings.sat.fAutoTuneRate;
   // SAT Python parity settings (Task #82)
-  sendJsonMapEntry(F("sensor_max_age"),        (int32_t)settings.sat.iSensorMaxAgeS);
-  sendJsonMapEntry(F("error_monitoring"),      settings.sat.bErrorMonitoring);
-  satSendJsonFloat(F("auto_gains_value"),      settings.sat.fAutoGainsValue, 2);
+  o[F("sensor_max_age")]       = (int32_t)settings.sat.iSensorMaxAgeS;
+  o[F("error_monitoring")]     = settings.sat.bErrorMonitoring;
+  o[F("auto_gains_value")]     = settings.sat.fAutoGainsValue;
   // TASK-193: manual gains mode
-  sendJsonMapEntry(F("auto_gains"),            settings.sat.bAutoGains);
-  satSendJsonFloat(F("kp_manual"),             settings.sat.fKpManual, 4);
-  satSendJsonFloat(F("ki_manual"),             settings.sat.fKiManual, 6);
-  satSendJsonFloat(F("kd_manual"),             settings.sat.fKdManual, 2);
+  o[F("auto_gains")]           = settings.sat.bAutoGains;
+  o[F("kp_manual")]            = settings.sat.fKpManual;
+  o[F("ki_manual")]            = settings.sat.fKiManual;
+  o[F("kd_manual")]            = settings.sat.fKdManual;
   // TASK-204: thermal comfort mode (SSI as PID room temp)
-  sendJsonMapEntry(F("thermal_comfort"),       settings.sat.bThermalComfort);
-  sendJsonMapEntry(F("heating_mode"),          settings.sat.iHeatingMode == 1 ? "eco" : "comfort");
-  sendJsonMapEntry(F("cycles_per_hour"),       (int32_t)settings.sat.iCyclesPerHour);
-  satSendJsonFloat(F("valve_offset"),          settings.sat.fValveOffset, 2);
-  sendJsonMapEntry(F("solar_freeze_integral"), settings.sat.bSolarFreezeIntegral);
+  o[F("thermal_comfort")]      = settings.sat.bThermalComfort;
+  o[F("heating_mode")]         = settings.sat.iHeatingMode == 1 ? "eco" : "comfort";
+  o[F("cycles_per_hour")]      = (int32_t)settings.sat.iCyclesPerHour;
+  o[F("valve_offset")]         = settings.sat.fValveOffset;
+  o[F("solar_freeze_integral")] = settings.sat.bSolarFreezeIntegral;
   // Multi-area (Task #25)
-  sendJsonMapEntry(F("multi_area"),            settings.sat.bMultiArea);
-  sendJsonMapEntry(F("multi_area_count"),      (int32_t)settings.sat.iMultiAreaCount);
+  o[F("multi_area")]           = settings.sat.bMultiArea;
+  o[F("multi_area_count")]     = (int32_t)settings.sat.iMultiAreaCount;
   if (settings.sat.bMultiArea && settings.sat.iMultiAreaCount > 0) {
     uint8_t cnt = settings.sat.iMultiAreaCount;
     if (cnt > SAT_MAX_AREAS) cnt = SAT_MAX_AREAS;
     for (uint8_t i = 0; i < cnt; i++) {
+      // Dynamic per-area keys (area_0_temp ...): the key is formatted at
+      // runtime, so F() cannot be used. ArduinoJson copies the char[] key.
       char nameBuf[20];
-      char numBuf[12];
-      char jsonBuff[60];
       // area_N_temp
       snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_temp"), i);
-      dtostrf(state.sat.fAreaTemp[i], 1, 1, numBuf);
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
-      sendBeforenext(); sendIdent(); restSendContent(jsonBuff);
+      o[nameBuf] = state.sat.fAreaTemp[i];
       // area_N_valid
       snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_valid"), i);
-      sendJsonMapEntry(nameBuf, state.sat.bAreaValid[i]);
+      o[nameBuf] = state.sat.bAreaValid[i];
       // area_N_weight
       snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_weight"), i);
-      dtostrf(settings.sat.fAreaWeight[i], 1, 2, numBuf);
-      snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
-      sendBeforenext(); sendIdent(); restSendContent(jsonBuff);
+      o[nameBuf] = settings.sat.fAreaWeight[i];
     }
   }
-  // BLE sensor status (Task #20). TASK-742: satBLESendStatusJSON() is a no-op
-  // stub on ESP8266 (no BLE radio).
-  satBLESendStatusJSON();
-  sendEndJsonMap("");
+  // BLE sensor status (Task #20). Appends ble_* fields into the shared object.
+  satBLESendStatusJSON(o);
+  restSendJson(doc);
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_SAT_STATUS, totalMs);
   if (state.debug.bRestAPI) {

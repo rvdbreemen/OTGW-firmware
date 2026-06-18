@@ -683,32 +683,26 @@ void satBLEPublishMQTT()
 //=====================================================================
 // Send BLE status as part of SAT JSON status
 //=====================================================================
-void satBLESendStatusJSON()
+// ADR-141: appends the ble_* fields into the caller's already-open SAT-status
+// JsonObject. Does NOT open/close a map or serialise — satSendStatusJSON()
+// owns the document and calls restSendJson() once after this returns.
+// ArduinoJson serialises the floats natively (no dtostrf / coalescing-buffer
+// gymnastics needed), so the old raw-restSendContent scramble gotcha is gone.
+void satBLESendStatusJSON(JsonObject& o)
 {
-  sendJsonMapEntry(F("ble_enable"),       settings.sat.bBleEnable);
-  sendJsonMapEntry(F("ble_failover"),     settings.sat.bBleFailover);
-  sendJsonMapEntry(F("ble_failover_active"), _bleFailoverActive);
-  sendJsonMapEntry(F("ble_temp_valid"),   state.sat.bBleTempValid);
+  o[F("ble_enable")]          = settings.sat.bBleEnable;
+  o[F("ble_failover")]        = settings.sat.bBleFailover;
+  o[F("ble_failover_active")] = _bleFailoverActive;
+  o[F("ble_temp_valid")]      = state.sat.bBleTempValid;
   if (state.sat.bBleTempValid) {
-    // Route through restSendContent so these bytes share the ESP32 coalescing
-    // buffer (jsonStuff.ino sTxBuf). A raw httpServer.sendContent would flush
-    // ahead of the buffered wrapper and scramble the JSON (same gotcha already
-    // fixed in satBLERosterSendJSON below) -- on ESP32 that truncated the
-    // >4KB sat/status response mid-number, blanking the SAT dashboard tiles.
-    { char buf[12]; dtostrf(state.sat.fBleTemp, 1, 2, buf);
-      sendBeforenext(); sendIdent();
-      char json[40]; snprintf_P(json, sizeof(json), PSTR("\"ble_temp\": %s"), buf);
-      restSendContent(json); }
-    { char buf[12]; dtostrf(state.sat.fBleHumidity, 1, 2, buf);
-      sendBeforenext(); sendIdent();
-      char json[40]; snprintf_P(json, sizeof(json), PSTR("\"ble_humidity\": %s"), buf);
-      restSendContent(json); }
-    sendJsonMapEntry(F("ble_rssi"),        (int32_t)state.sat.iBleRssi);
-    sendJsonMapEntry(F("ble_battery"),     (int32_t)state.sat.iBleBattery);
+    o[F("ble_temp")]     = state.sat.fBleTemp;
+    o[F("ble_humidity")] = state.sat.fBleHumidity;
+    o[F("ble_rssi")]     = (int32_t)state.sat.iBleRssi;
+    o[F("ble_battery")]  = (int32_t)state.sat.iBleBattery;
   }
-  sendJsonMapEntry(F("ble_sensor_count"), (int32_t)state.sat.iBleSensorCount);
+  o[F("ble_sensor_count")] = (int32_t)state.sat.iBleSensorCount;
   if (settings.sat.sBleMAC[0] != '\0') {
-    sendJsonMapEntry(F("ble_mac"),        settings.sat.sBleMAC);
+    o[F("ble_mac")] = settings.sat.sBleMAC;
   }
 }
 

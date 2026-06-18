@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.207
+**  Version  : v2.0.0-alpha.208
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -328,7 +328,7 @@ void satBLEUpdateState();
 float satBLEGetTemperature();
 float satBLEGetHumidity();
 void satBLEPublishMQTT();
-void satBLESendStatusJSON();
+void satBLESendStatusJSON(JsonObject& o);   // ADR-141: appends ble_* fields into the caller's open SAT-status object
 
 // TASK-488 / TASK-492: BLE HA-discovery + per-MAC state-topic helpers
 // (defined in MQTTstuff.ino). Caller (satBLEPublishMQTT) wires these in once
