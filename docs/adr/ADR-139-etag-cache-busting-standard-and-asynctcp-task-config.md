@@ -28,6 +28,16 @@ recorded as status lines on the affected ADRs (the sanctioned exception to
 immutability): ADR-132 gains "Amended by ADR-139" and ADR-026 gains "Superseded
 by ADR-139". Their decision bodies are not otherwise edited.
 
+**No amendment in force.** ADR-144 proposed amending this ADR's "SECONDARY
+(blueprint alignment, not the fix)" AsyncTCP core-affinity sub-decision (move
+`-DCONFIG_ASYNC_TCP_RUNNING_CORE` from `1` to `0`) to fix the TASK-883 under-load
+IDF Task-Watchdog reboot. ADR-144 was **Rejected** (2026-06-18): a hardware
+experiment refuted its loopTask-starvation premise (the decoded panic named
+`async_tcp` itself as the trip task, blocked in an O(n^2) `serializeJson` buffer
+realloc; core affinity was irrelevant and core 0 did not fix it). This ADR's
+core-1 pin therefore stands unchanged; the real fix is a bug fix in
+`restSendJson` (TASK-883), not a core move.
+
 ## Status History
 
 status_history:

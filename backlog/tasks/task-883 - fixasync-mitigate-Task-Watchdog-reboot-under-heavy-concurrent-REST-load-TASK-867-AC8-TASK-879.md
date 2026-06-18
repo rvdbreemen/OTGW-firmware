@@ -3,10 +3,11 @@ id: TASK-883
 title: >-
   fix(async): mitigate Task Watchdog reboot under heavy concurrent REST load
   (TASK-867 AC#8 / TASK-879)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-18 09:24'
-updated_date: '2026-06-18 12:16'
+updated_date: '2026-06-18 13:47'
 labels: []
 dependencies: []
 ordinal: 99000
@@ -26,8 +27,6 @@ scripts/tests/test_load.py (the AC#8 heap-under-load tool) surfaced a real edge:
 - [x] #4 A/B causation check: flash pre-migration build (b54c0890~1), run identical 8-worker test_load.py; record whether the TWDT threshold differs from the migrated build (proves/refutes migration involvement). Until done, the migration is NOT implicated.
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -35,4 +34,6 @@ A/B HARDWARE RESULT (same-session, same-conditions, 192.168.88.39). Arm A = 0a3e
 REALISTIC (4 workers @ --delay 1.0, 3 min): Arm A PASS (553 req 100%, 0 reboot); Arm B PASS (491 req 100%, 0 reboot). Real-world dashboard load is fine on BOTH builds.
 FLOOD (8 workers, --delay 0): Arm A survived 1 min AND 2 min, and even survived a 16-worker/2-min flood, with ZERO reboots (graceful degradation: timeouts/low success, but bootcount never moved, uptime monotonic). Arm B REBOOTED TWICE under the 8-worker/1-min flood (bootcount 1->3, uptime reset).
 VERDICT: the ArduinoJson v7 migration MEASURABLY LOWERED the flood/abuse TWDT threshold. This OVERTURNS the earlier 'causation unmeasured / pre-existing only' framing and the static CPU-delta prediction (which expected 'marginal, both arms behave the same'). The migration IS implicated for the flood case. Mechanism: two-pass build-then-serialize JsonDocument + heap-pool alloc/free churn holds core 1 (async_tcp pri 10) longer per request -> starves loopTask (pri 1, core 1) past the 30s TWDT under sustained 8-way concurrency. Heap axis itself stayed clean on both (no leak, 0 ADR-089 tier entries, frag recovers). TASK-879's web-dead TWDT (alpha.199) was a DISTINCT pre-migration manifestation; what the migration shifted is the flood threshold. AC#1 (8-worker survive) now has a concrete repro + a confirmed pre-migration baseline. Recommended fix #1 (async_tcp -> core 0, amend ADR-139) would address BOTH the pre-existing web-dead TWDT and this migration-worsened flood case. Note: test_load.py hardened to retry the cooldown snapshot and use bootcount (not a failed snapshot) as the only reboot signal (the 16w arm-A run initially false-positived 'rebooted' from a saturated snapshot).
+
+FIX ATTEMPTS (hardware-verified, both FAILED to stop the flood reboot): (1) async_tcp -> core 0 (ADR-144): device still rebooted (3x in a 1.5-min 8w flood); decoded panic named async_tcp itself as the trip task, loopTask healthy on CPU 1 -> loopTask-starvation hypothesis REFUTED, ADR-144 Rejected, RUNNING_CORE restored to ADR-139's 1. (2) Pre-size the AsyncResponseStream buffer to measureJson(doc) in restSendJson (webServerCompat.h): still rebooted (boot 11->13, 13->15). Second decoded panic: async_tcp stuck in serializeJson -> AsyncResponseStream::write -> async_ws_log_e('Failed to allocate') (WebResponses.cpp:937) via the esp_diagnostics log hook. ROOT CAUSE (architectural): AsyncResponseStream buffers the WHOLE response in one contiguous FreeRTOS RingBuffer; under 8-way concurrency the heap fragments below the response size (maxblock floor ~8.7KB < 8.6KB settings), the (pre-sized OR incremental) alloc fails, and write() then logs 'Failed to allocate' PER BYTE through the slow diagnostics hook -> thousands of log calls -> async_tcp >30s -> WDT. Core affinity and pre-sizing cannot fix this; AsyncJsonResponse cannot either (also contiguous). DECISION (maintainer, 2026-06-18): implement TRUE chunked/pull-based JSON streaming (serialize incrementally to the socket, bounded to the TCP window, never a large contiguous buffer) as the real fix - fixes the flood AND the plausible same-root TASK-879 field 'web dead' report. Pre-size kept as a separate common-case heap improvement (alpha.212): eliminates the O(n^2) ringbuffer rebuild for responses >1460B when the heap is healthy (single/light load), only fails to help under flood-fragmentation. Realistic throttled load (4 workers) passes clean on both builds throughout. Panic-capture tool added: scripts/tests/_serialcap.py.
 <!-- SECTION:NOTES:END -->

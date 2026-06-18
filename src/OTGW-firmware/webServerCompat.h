@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.211
+**  Version  : v2.0.0-alpha.212
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -338,10 +338,11 @@ inline void webRequestAuth() {
 // restBeginStream() lazily opens the AsyncResponseStream the restSend* helpers
 // write into; restFinalize() sends it exactly once. Both are no-ops if already
 // done, so an early-return handler that already sent (auth fail etc.) is safe.
-inline AsyncResponseStream* restBeginStream(const char* contentType) {
+inline AsyncResponseStream* restBeginStream(const char* contentType,
+                                           size_t bufferSize = RESPONSE_STREAM_BUFFER_SIZE) {
   if (!currentRequest || g_responseSent) return nullptr;
   if (!g_restStream) {
-    g_restStream = currentRequest->beginResponseStream(contentType);
+    g_restStream = currentRequest->beginResponseStream(contentType, bufferSize);
     webApplyHeaders(g_restStream);
   }
   return g_restStream;
@@ -355,14 +356,27 @@ inline void restFinalize() {
   }
 }
 
-// ADR-141: canonical ArduinoJson v7 output path. serializeJson streams the doc
-// into the AsyncResponseStream in chunks (gentler on the S3 heap than
-// AsyncJsonResponse's single flat buffer; ADR-089 fragmentation tiers), reusing
-// the CORS/header/single-send plumbing above. Replaces the
+// ADR-141: canonical ArduinoJson v7 output path. Replaces the
 // sendStartJsonMap -> N x sendJsonMapEntry -> sendEndJsonMap layer. No-op if a
 // response was already sent (auth fail / early return), matching restFinalize.
+//
+// TASK-883: PRE-SIZE the response buffer to the exact serialized length.
+// serializeJson() writes the document one byte at a time, and
+// AsyncResponseStream::write() grows its cbuf by only the deficit
+// (resizeAdd -> cbuf::resize), which REBUILDS the whole FreeRTOS RingBuffer
+// (xRingbufferCreate + malloc temp + full copy + delete old) on every growth.
+// Left at the 1460-byte default, an ~8.6 KB response (e.g. /v2/settings) triggers
+// thousands of full-buffer reallocs synchronously on the async_tcp task, which
+// pins it past the 30 s IDF Task-Watchdog under concurrent load and reboots the
+// device (a controlled A/B proved this is what the migration worsened vs the old
+// one-pass snprintf path). measureJson(doc) sizes the buffer once up front, so
+// every write finds room and resizeAdd is never called: O(2n) (measure + write)
+// instead of O(n^2). measureJson MUST pair with the non-pretty serializeJson.
 inline void restSendJson(JsonDocument& doc) {
-  AsyncResponseStream* s = restBeginStream("application/json");
+  const size_t len = measureJson(doc);
+  // +64 absorbs FreeRTOS RingBuffer overhead so cbuf::size() >= len (guarantees
+  // zero resizes even if xRingbufferCreate reserves a few bytes of structure).
+  AsyncResponseStream* s = restBeginStream("application/json", len + 64);
   if (s) serializeJson(doc, *s);
   restFinalize();
 }
