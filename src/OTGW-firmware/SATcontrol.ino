@@ -2003,26 +2003,6 @@ void satHandleControlMode(const char* value)
 //=====================================================================
 //=== Send SAT Status as JSON (for REST API) ===
 //=====================================================================
-// Precision-aware float entry — SAT fields need varying decimal places
-// (sendJsonMapEntry(float) defaults to %.3f which doesn't suit all fields)
-static void satSendJsonFloat(const __FlashStringHelper* cName, float fValue, uint8_t decimals)
-{
-  char nameBuf[25];
-  strncpy_P(nameBuf, (PGM_P)cName, sizeof(nameBuf));
-  nameBuf[sizeof(nameBuf) - 1] = 0;
-  char numBuf[16];
-  if (isnan(fValue) || isinf(fValue)) {
-    strcpy_P(numBuf, PSTR("null"));
-  } else {
-    dtostrf(fValue, 1, decimals, numBuf);
-  }
-  char jsonBuff[60];
-  snprintf_P(jsonBuff, sizeof(jsonBuff), PSTR("\"%s\": %s"), nameBuf, numBuf);
-  sendBeforenext();
-  sendIdent();
-  restSendContent(jsonBuff);
-}
-
 void satSendStatusJSON()
 {
   const uint32_t startMs = millis();

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.209
+**  Version  : v2.0.0-alpha.210
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -626,56 +626,49 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   } else if (strcmp_P(words[4], PSTR("boiler-support")) == 0) {
     // TASK-692 port (dev TASK-686): GET /api/v2/otgw/boiler-support ->
     // unsupported_read / unsupported_write arrays sourced from the in-RAM
-    // bitmaps populated by processOT. Streamed in chunks so even pathological
-    // boilers (hundreds of unsupported ids) do not need a large stack buffer.
-    // TASK-696: leading comma emitted via sendContent(F(",")) so we ship one
-    // PSTR format string per row instead of two — saves flash on ESP32.
+    // bitmaps populated by processOT. ADR-141: built as one ArduinoJson v7
+    // document so the OTmap label/friendly strings are escape-safe (the old
+    // snprintf path did not escape them). label/friendly are PROGMEM const
+    // char* literals — store-by-pointer is safe, they outlive the document.
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
-    AsyncResponseStream *s = restBeginStream("application/json");
-    if (!s) return;
-    s->print(F("{\"unsupported_read\":["));
-    bool first = true;
-    char ent[160];
+    JsonDocument doc;
+    JsonObject root = doc.to<JsonObject>();
+    JsonArray ur = root[F("unsupported_read")].to<JsonArray>();
     for (int i = 0; i <= 255; i++) {
       if (!isBoilerMsgIdUnsupportedRead((uint8_t)i)) continue;
       OTlookup_t item;
       const char* label = "Unknown";
       const char* friendly = "";
       if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
-      if (!first) s->print(F(","));
-      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\",\"friendly\":\"%s\"}"), i, label, friendly);
-      s->print(ent);
-      first = false;
+      JsonObject e = ur.add<JsonObject>();
+      e[F("id")]       = i;
+      e[F("label")]    = label;
+      e[F("friendly")] = friendly;
     }
-    s->print(F("],\"unsupported_write\":["));
-    first = true;
+    JsonArray uw = root[F("unsupported_write")].to<JsonArray>();
     for (int i = 0; i <= 255; i++) {
       if (!isBoilerMsgIdUnsupportedWrite((uint8_t)i)) continue;
       OTlookup_t item;
       const char* label = "Unknown";
       const char* friendly = "";
       if (i <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[i], item); label = item.label; friendly = item.friendlyname; }
-      if (!first) s->print(F(","));
-      snprintf_P(ent, sizeof(ent), PSTR("{\"id\":%d,\"label\":\"%s\",\"friendly\":\"%s\"}"), i, label, friendly);
-      s->print(ent);
-      first = false;
+      JsonObject e = uw.add<JsonObject>();
+      e[F("id")]       = i;
+      e[F("label")]    = label;
+      e[F("friendly")] = friendly;
     }
-    s->print(F("]}"));
-    restFinalize();
+    restSendJson(doc);
   } else if (strcmp_P(words[4], PSTR("ot-support")) == 0) {
     // TASK-694 port (dev TASK-689): GET /api/v2/otgw/ot-support -> bilateral
     // OT support map. Compact mode — only msgIDs where at least one of the
-    // six bitmaps has the bit set. One streamed JSON object per row, no
-    // full-payload allocation.
-    // TASK-696: single PSTR format per row (leading comma via sendContent).
+    // six bitmaps has the bit set. ADR-141: ArduinoJson v7 document; the six
+    // ts*/bl* fields stay real JSON bools (assigned from the native bool vars).
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
-    AsyncResponseStream *s = restBeginStream("application/json");
-    if (!s) return;
-    s->print(F("{\"msgids\":["));
-    bool first = true;
-    char row[160];
+    JsonDocument doc;
+    JsonObject root = doc.to<JsonObject>();
+    JsonArray msgids = root[F("msgids")].to<JsonArray>();
     for (int i = 0; i <= 255; i++) {
       const uint8_t id = (uint8_t)i;
       const bool tsR  = isThermostatMsgIdSentRead(id);
@@ -688,32 +681,29 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       OTlookup_t item;
       const char* label = "Unknown";
       if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; }
-      if (!first) s->print(F(","));
-      snprintf_P(row, sizeof(row),
-                 PSTR("{\"id\":%u,\"label\":\"%s\",\"tsR\":%s,\"tsW\":%s,\"blAR\":%s,\"blAW\":%s,\"blUR\":%s,\"blUW\":%s}"),
-                 id, label,
-                 tsR  ? "true" : "false", tsW  ? "true" : "false",
-                 blAR ? "true" : "false", blAW ? "true" : "false",
-                 blUR ? "true" : "false", blUW ? "true" : "false");
-      s->print(row);
-      first = false;
+      JsonObject e = msgids.add<JsonObject>();
+      e[F("id")]    = id;
+      e[F("label")] = label;
+      e[F("tsR")]   = tsR;
+      e[F("tsW")]   = tsW;
+      e[F("blAR")]  = blAR;
+      e[F("blAW")]  = blAW;
+      e[F("blUR")]  = blUR;
+      e[F("blUW")]  = blUW;
     }
-    s->print(F("]}"));
-    restFinalize();
+    restSendJson(doc);
   } else if (strcmp_P(words[4], PSTR("overrides")) == 0) {
     // ADR-118: GET /api/v2/otgw/overrides -> active gateway-override values that the
     // boiler-side-worldview gate (ADR-096/103) drops from canonical. Additive surface;
-    // distinct from the OT-Direct overrides under /api/v2/otdirect/overrides. Streamed
-    // one JSON object per active entry so no large stack buffer is needed.
+    // distinct from the OT-Direct overrides under /api/v2/otdirect/overrides.
+    // ADR-141: ArduinoJson v7 document; value is the native float (serialised
+    // directly, no dtostrf) and age_s an unsigned long.
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
-    AsyncResponseStream *s = restBeginStream("application/json");
-    if (!s) return;
-    s->print(F("{\"overrides\":["));
+    JsonDocument doc;
+    JsonObject root = doc.to<JsonObject>();
+    JsonArray overrides = root[F("overrides")].to<JsonArray>();
     const uint32_t now = millis();
-    bool first = true;
-    char row[200];
-    char valbuf[15];
     for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
       if (otOverrideStore[i].lastSeen == 0) continue;
       if ((now - otOverrideStore[i].lastSeen) >= OVERRIDE_ACTIVE_TIMEOUT) continue;
@@ -722,18 +712,15 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       const char* label = "Unknown";
       const char* friendly = "";
       if (id <= OT_MSGID_MAX) { PROGMEM_readAnything(&OTmap[id], item); label = item.label; friendly = item.friendlyname; }
-      dtostrf(otOverrideStore[i].value, 3, 2, valbuf);
-      if (!first) s->print(F(","));
-      snprintf_P(row, sizeof(row),
-                 PSTR("{\"id\":%u,\"label\":\"%s\",\"friendly\":\"%s\",\"kind\":\"%s\",\"value\":%s,\"age_s\":%lu}"),
-                 id, label, friendly,
-                 (otOverrideStore[i].kind == OT_OVERRIDE_ANSWER) ? "answer" : "substituted",
-                 valbuf, (unsigned long)((now - otOverrideStore[i].lastSeen) / 1000UL));
-      s->print(row);
-      first = false;
+      JsonObject e = overrides.add<JsonObject>();
+      e[F("id")]       = id;
+      e[F("label")]    = label;
+      e[F("friendly")] = friendly;
+      e[F("kind")]     = (otOverrideStore[i].kind == OT_OVERRIDE_ANSWER) ? "answer" : "substituted";
+      e[F("value")]    = otOverrideStore[i].value;
+      e[F("age_s")]    = (unsigned long)((now - otOverrideStore[i].lastSeen) / 1000UL);
     }
-    s->print(F("]}"));
-    restFinalize();
+    restSendJson(doc);
   } else {
     sendApiNotFound(originalURI);
   }
