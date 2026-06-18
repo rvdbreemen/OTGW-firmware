@@ -128,7 +128,10 @@ def main():
     user = _secrets.get("mqtt_user", "")
     monitors = []
     bat = os.path.join(HERE, "capture-mqtt-debug.bat")
-    net_cmd = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", bat,
+    # Launch the .bat via `cmd /c` — `powershell -File` hard-rejects any non-.ps1
+    # file and the process dies instantly, silently killing the network-capture
+    # pillar. cmd dispatches the batch wrapper correctly.
+    net_cmd = ["cmd", "/c", bat,
                "-DeviceHost", host, "-BrokerHost", broker, "-BrokerPort", bport,
                "-OutputRoot", run_dir, "-DurationSeconds", str(seconds)]
     if user:

@@ -1394,9 +1394,11 @@ function Save-CaptureSettings {
         if (-not (Test-Path -LiteralPath $dir)) {
             New-Item -ItemType Directory -Path $dir -Force | Out-Null
         }
-        # Carry over any previously stored secret unless we are explicitly writing one.
+        # Carry over any previously stored secret unless we are explicitly writing a
+        # NON-EMPTY one. -SaveSecrets with a blank resolved password (anonymous /
+        # blank-username case) must NOT clobber a previously stored secret.
         $pwToWrite = $null
-        if ($PersistPassword) {
+        if ($PersistPassword -and -not [string]::IsNullOrWhiteSpace($MqttPassword)) {
             $pwToWrite = $MqttPassword
         }
         elseif (Test-Path -LiteralPath $p) {
@@ -1486,6 +1488,11 @@ elseif (-not $passwordWasBound) {
         Write-Host "MQTT password: loaded from capture-settings.json (out-of-repo secret store)."
     }
     else {
+        # Unattended runs (otgw-test.py launches with redirected/EOF stdin) must NOT
+        # block on an interactive prompt that never returns. Fail fast instead.
+        if ([Console]::IsInputRedirected) {
+            throw "MQTT username '$Username' set but no stored password and stdin is non-interactive. Run 'capture-mqtt-debug.bat -SaveSecrets' once, or pass -Password."
+        }
         $securePassword = Read-Host "MQTT password for $Username" -AsSecureString
         $Password = ConvertFrom-SecureStringToPlainText -SecureString $securePassword
     }
