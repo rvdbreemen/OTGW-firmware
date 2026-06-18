@@ -1,0 +1,19 @@
+{"otdirect_status":{
+  "mode": "master",
+  "bypass": false,
+  "stepup": true,
+  "monitor_mode": false,
+  "master_mode": true,
+  "thermostat_connected": false,
+  "setback_active": false,
+  "schedule_total": 104,
+  "schedule_active": 104,
+  "schedule_disabled": 0,
+  "overrides_active": 1,
+  "ot_online": false,
+  "thermostat": false,
+  "boiler": false,
+  "flame_duty_pct": 0,
+  "flame_cycles_per_hour": "0.0",
+  "ch_suspended": false
+}}

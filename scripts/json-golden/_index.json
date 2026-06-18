@@ -1,0 +1,157 @@
+{
+  "/v2/health": {
+    "status": 200,
+    "bytes": 219,
+    "file": "v2_health.json"
+  },
+  "/v2/debug": {
+    "status": 200,
+    "bytes": 7616,
+    "file": "v2_debug.json"
+  },
+  "/v2/settings": {
+    "status": 200,
+    "bytes": 8640,
+    "file": "v2_settings.json"
+  },
+  "/v2/sensors": {
+    "status": 200,
+    "bytes": 295,
+    "file": "v2_sensors.json"
+  },
+  "/v2/sensors/status": {
+    "status": 200,
+    "bytes": 295,
+    "file": "v2_sensors_status.json"
+  },
+  "/v2/sensors/labels": {
+    "status": 200,
+    "bytes": 2,
+    "file": "v2_sensors_labels.json"
+  },
+  "/v2/device/info": {
+    "status": 200,
+    "bytes": 2775,
+    "file": "v2_device_info.json"
+  },
+  "/v2/device/time": {
+    "status": 200,
+    "bytes": 274,
+    "file": "v2_device_time.json"
+  },
+  "/v2/device/crashlog": {
+    "status": 200,
+    "bytes": 77,
+    "file": "v2_device_crashlog.json"
+  },
+  "/v2/flash/status": {
+    "status": 200,
+    "bytes": 43,
+    "file": "v2_flash_status.json"
+  },
+  "/v2/pic/flash-status": {
+    "status": 503,
+    "bytes": 77,
+    "file": "v2_pic_flash_status.json"
+  },
+  "/v2/pic/update-check": {
+    "status": 503,
+    "bytes": 77,
+    "file": "v2_pic_update_check.json"
+  },
+  "/v2/pic/settings": {
+    "status": 503,
+    "bytes": 77,
+    "file": "v2_pic_settings.json"
+  },
+  "/v2/firmware/files": {
+    "status": 200,
+    "bytes": 4,
+    "file": "v2_firmware_files.json"
+  },
+  "/v2/filesystem/files": {
+    "status": 200,
+    "bytes": 1439,
+    "file": "v2_filesystem_files.json"
+  },
+  "/v2/filesystem/hash-check": {
+    "status": 200,
+    "bytes": 94,
+    "file": "v2_filesystem_hash_check.json"
+  },
+  "/v2/simulate": {
+    "status": 200,
+    "bytes": 79,
+    "file": "v2_simulate.json"
+  },
+  "/v2/otgw/otmonitor": {
+    "status": 200,
+    "bytes": 925,
+    "file": "v2_otgw_otmonitor.json"
+  },
+  "/v2/otgw/telegraf": {
+    "status": 200,
+    "bytes": 925,
+    "file": "v2_otgw_telegraf.json"
+  },
+  "/v2/discovery": {
+    "status": 200,
+    "bytes": 228,
+    "file": "v2_discovery.json"
+  },
+  "/v2/otdirect/status": {
+    "status": 200,
+    "bytes": 455,
+    "file": "v2_otdirect_status.json"
+  },
+  "/v2/otdirect/settings": {
+    "status": 200,
+    "bytes": 508,
+    "file": "v2_otdirect_settings.json"
+  },
+  "/v2/otdirect/overrides": {
+    "status": 200,
+    "bytes": 134,
+    "file": "v2_otdirect_overrides.json"
+  },
+  "/v2/sat": {
+    "status": 200,
+    "bytes": 3532,
+    "file": "v2_sat.json"
+  },
+  "/v2/sat/status": {
+    "status": 200,
+    "bytes": 3532,
+    "file": "v2_sat_status.json"
+  },
+  "/v2/sat/status?detail=full": {
+    "status": 200,
+    "bytes": 607,
+    "file": "v2_sat_status_detail_full.json"
+  },
+  "/v2/sat/weather": {
+    "status": 200,
+    "bytes": 536,
+    "file": "v2_sat_weather.json"
+  },
+  "/v2/sat/weather/needs-setup": {
+    "status": 200,
+    "bytes": 536,
+    "file": "v2_sat_weather_needs_setup.json"
+  },
+  "/v2/sat/ble/discovery": {
+    "status": 200,
+    "bytes": 143,
+    "file": "v2_sat_ble_discovery.json"
+  },
+  "/v2/sat/markers": {
+    "status": 200,
+    "bytes": 2,
+    "file": "v2_sat_markers.json"
+  },
+  "/v2/sat/sensor-areas": {
+    "status": 200,
+    "bytes": 107,
+    "file": "v2_sat_sensor_areas.json"
+  }
+}

@@ -1,0 +1,23 @@
+{"otdirect_settings":{
+  "mode": 3,
+  "setback_temp": 16.000,
+  "setback_timeout": 30,
+  "ch_mode": 1,
+  "flow_temp": 45.000,
+  "flow_max": 75.000,
+  "room_setpoint": 20.000,
+  "gradient": 1.500,
+  "exponent": 1.000,
+  "offset": 0.000,
+  "room_comp": false,
+  "kp": 5.000,
+  "ki": 0.500,
+  "kboost": 2.000,
+  "hysteresis_enable": false,
+  "hysteresis": 0.500,
+  "vent_enable": false,
+  "open_bypass": false,
+  "auto_bypass": false,
+  "free_vent_enable": false,
+  "vent_setpoint": 0
+}}
