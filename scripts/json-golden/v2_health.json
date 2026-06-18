@@ -1,10 +1,1 @@
-{"health":{
-  "status": "UP",
-  "uptime": "0(d)-04:38(H:m)",
-  "heap": 96704,
-  "networkmode": "WiFi",
-  "wifirssi": -82,
-  "mqttconnected": "false",
-  "otgwconnected": "false",
-  "littlefsMounted": "true"
-}}
+{"health":{"status":"UP","uptime":"0(d)-00:04(H:m)","heap":97488,"networkmode":"WiFi","wifirssi":-81,"mqttconnected":false,"otgwconnected":false,"littlefsMounted":true}}

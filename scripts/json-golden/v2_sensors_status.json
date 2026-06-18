@@ -1,12 +1,1 @@
-{"sensors":{
-  "dallas_enabled": false,
-  "dallas_detected": false,
-  "dallas_count": 0,
-  "dallas_gpio": 10,
-  "dallas_poll_sec": 20,
-  "simulated": false,
-  "s0": {
-    "enabled": false, "gpio": 12, "poll_sec": 60,
-    "pulses": 0, "total": 0, "power_kw": 0.000, "epoch": 0
-  }
-}}
+{"sensors":{"dallas_enabled":false,"dallas_detected":false,"dallas_count":0,"dallas_gpio":10,"dallas_poll_sec":20,"simulated":false,"s0":{"enabled":false,"gpio":12,"poll_sec":60,"pulses":0,"total":0,"power_kw":0,"epoch":0}}}

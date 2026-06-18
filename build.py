@@ -122,9 +122,9 @@ TARGETS["esp32-combo"] = {
     # the shared 1.875 MB app slot. It uses its OWN partition table
     # (partitions_otgw_esp32_combo.csv): 2.0 MB app / 1.875 MB LittleFS. These
     # override the esp32 tcfg so the merge step + size check match (TASK-865.16).
-    "app_size": 2097152,       # 0x200000 = 2.0 MB — combo app0 slot
-    "fs_offset": "0x210000",   # LittleFS starts after the enlarged 2 MB app
-    "fs_size": 1966080,        # 0x1E0000 = 1.875 MB — combo "spiffs" partition
+    "app_size": 2490368,       # 0x260000 = 2.375 MB — combo app0 slot (TASK-867: +0.375 MB)
+    "fs_offset": "0x270000",   # LittleFS starts after the enlarged 2.375 MB app
+    "fs_size": 1572864,        # 0x180000 = 1.5 MB — combo "spiffs" partition (TASK-867)
 }
 
 def asset_slug(target):

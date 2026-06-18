@@ -1,5 +1,1 @@
-{"filesystem_check":{
-  "match": true,
-  "fw_hash": "e7a9070",
-  "fs_hash": "e7a9070"
-}}
+{"filesystem_check":{"match":true,"fw_hash":"f2252e5","fs_hash":"f2252e5"}}

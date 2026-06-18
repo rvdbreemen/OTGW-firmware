@@ -130,14 +130,14 @@ paths:
                         enum: [wifi, ethernet, ap]
                         description: Active network mode
                       mqttconnected:
-                        type: string
-                        enum: ["true", "false"]
+                        type: boolean
+                        description: MQTT broker connected (real JSON boolean since the ArduinoJson v7 migration, ADR-141)
                       otgwconnected:
-                        type: string
-                        enum: ["true", "false"]
+                        type: boolean
+                        description: OpenTherm gateway/bus online
                       littlefsMounted:
-                        type: string
-                        enum: ["true", "false"]
+                        type: boolean
+                        description: LittleFS mounted and writable
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -4277,12 +4277,13 @@ x-api-design-notes: |
   **API Version**: v2 only. v0 and v1 have been removed and return 410 Gone.
 
   **Memory Constraints**:
-  - ESP8266 has limited RAM (~40KB available after core libraries)
-  - API enforces minimum 4KB free heap before processing requests
+  - The ESP32-S3 2.0.0 line has ~300 KB heap (ADR-128 dropped ESP8266)
+  - API enforces a minimum free-heap floor before processing requests
 
   **Boolean Values**:
-  - `/v2/health` returns booleans as strings: "true" or "false"
-  - `/v2/device/info` and `/v2/device/time` return proper JSON booleans
+  - Since the ArduinoJson v7 migration (ADR-141, TASK-867) all REST endpoints
+    emit proper JSON booleans (`true`/`false`). The former quoted-string booleans
+    on `/v2/health` (`"true"`/`"false"`) are gone.
 
   **Error Handling**:
   - All errors return structured JSON: {"error":{"status":N,"message":"..."}}

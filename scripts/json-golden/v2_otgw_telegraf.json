@@ -1,16 +1,1 @@
-{"otmonitor":{
-  "flamestatus": {"value": "Off", "unit": "", "epoch": 15031},
-  "chmodus": {"value": "Off", "unit": "", "epoch": 15031},
-  "chenable": {"value": "On", "unit": "", "epoch": 15031},
-  "ch2modus": {"value": "Off", "unit": "", "epoch": 15031},
-  "ch2enable": {"value": "Off", "unit": "", "epoch": 15031},
-  "dhwmode": {"value": "Off", "unit": "", "epoch": 15031},
-  "dhwenable": {"value": "Off", "unit": "", "epoch": 15031},
-  "diagnosticindicator": {"value": "Off", "unit": "", "epoch": 15031},
-  "faultindicator": {"value": "Off", "unit": "", "epoch": 15031},
-  "coolingmodus": {"value": "Off", "unit": "", "epoch": 15031},
-  "coolingactive": {"value": "Off", "unit": "", "epoch": 15031},
-  "otcactive": {"value": "Off", "unit": "", "epoch": 15031},
-  "controlsetpoint": {"value": 45.000, "unit": "°C", "epoch": 15016},
-  "sensorsimulation": {"value": false, "unit": "", "epoch": 1781757546}
-}}
+{"otmonitor":{"flamestatus":{"value":"Off","unit":"","epoch":293},"chmodus":{"value":"Off","unit":"","epoch":293},"chenable":{"value":"On","unit":"","epoch":293},"ch2modus":{"value":"Off","unit":"","epoch":293},"ch2enable":{"value":"Off","unit":"","epoch":293},"dhwmode":{"value":"Off","unit":"","epoch":293},"dhwenable":{"value":"Off","unit":"","epoch":293},"diagnosticindicator":{"value":"Off","unit":"","epoch":293},"faultindicator":{"value":"Off","unit":"","epoch":293},"coolingmodus":{"value":"Off","unit":"","epoch":293},"coolingactive":{"value":"Off","unit":"","epoch":293},"otcactive":{"value":"Off","unit":"","epoch":293},"controlsetpoint":{"value":45,"unit":"°C","epoch":253},"sensorsimulation":{"value":false,"unit":"","epoch":1781765567}}}

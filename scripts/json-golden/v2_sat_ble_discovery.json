@@ -1,8 +1,1 @@
-{
-  "max_slots": 8,
-  "populated_slots": 0,
-  "roster_full": false,
-  "dropped_since_full": 0,
-  "selected_mac": "",
-  "sensors": []
-}
+{"max_slots":8,"populated_slots":0,"roster_full":false,"dropped_since_full":0,"selected_mac":"","sensors":[]}

@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-18 04:31'
+updated_date: '2026-06-18 06:54'
 labels: []
 dependencies: []
 ordinal: 98000
@@ -23,3 +24,9 @@ Source-dive remainder split off from TASK-881. Two openapi.yaml completeness ite
 - [ ] #2 Every POST handler that also accepts PUT documents the PUT alias
 - [ ] #3 openapi.yaml validates
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+TASK-867 ArduinoJson migration changed REST types (string-bools -> real bools, dtostrf-quoted numbers -> native JSON numbers) across many endpoints. Done in 867: /v2/health schema (3 bools string->boolean) + the x-api-design-notes boolean section. REMAINING for this task: full OpenAPI re-sync against the post-migration golden (scripts/json-golden/, re-captured alpha.210+) - audit every endpoint's documented field types vs the now-corrected live output (device/info, settings, otmonitor/telegraf, sat/*, otdirect/*). Use scripts/json_golden.py captures as the source of truth.
+<!-- SECTION:NOTES:END -->
