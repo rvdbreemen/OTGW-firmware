@@ -3,11 +3,11 @@ id: TASK-881
 title: >-
   docs(api): correct openapi.yaml after async migration (34 confirmed
   mismatches, 8 HIGH)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-18 00:03'
-updated_date: '2026-06-18 04:22'
+updated_date: '2026-06-18 04:32'
 labels: []
 dependencies: []
 ordinal: 97000
@@ -32,3 +32,9 @@ Applied 7 corrections so far (commit pending): removed phantom health.picavailab
 
 Applied the 3 big HIGH schema rewrites against live device output (alpha.204, 192.168.88.39): SatStatus -> flat 132-field object (was wrapped ~25-field, wrong types: boiler_status string/control_mode int/last_cycle_class int; room_temp nullable); added SatHealth (separate 22-field detail=full view, NOT a superset); /v2/sat/status 200 now oneOf[SatStatus,SatHealth] + field count 50->132; /v2/filesystem/files -> heterogeneous array (file/dir entries with type enum + trailing storage-summary object). YAML validates. All 8 HIGH now complete. gen_sat_props.py helper kept for field-drift regeneration.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Corrected openapi.yaml after the async + ArduinoJson migration. All 8 HIGH fixed (3 big schema rewrites generated against live device output: flat 132-field SatStatus, separate 22-field SatHealth for ?detail=full, heterogeneous filesystem listing; plus the 5 surgical HIGH from commit 99fb675f). High-value medium/low done + verified: basicAuth declared on all 40 v2 POST/PUT mutations (matches firmware H5 central auth gate), 503 PicUnavailable on all 4 pic routes (confirmed live), device/info capped with additionalProperties + board-conditional note + capability fields, anyOf for heterogeneous open-object arrays. YAML validates. Source-dive tail (SAT settings body fields, PUT-alias audit) split to TASK-882. Commits: 99fb675f, dbbf6fa4, bd6696d4.
+<!-- SECTION:FINAL_SUMMARY:END -->
