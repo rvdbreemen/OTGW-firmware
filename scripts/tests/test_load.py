@@ -95,7 +95,7 @@ def get_heap(host):
     return {k: d.get(k) for k in keys}
 
 
-def worker(host, idx):
+def worker(host, idx, delay=0.0):
     n = len(GET_ENDPOINTS)
     i = idx
     while not _stop.is_set():
@@ -107,6 +107,8 @@ def worker(host, idx):
             _stats["ok" if code == 200 else "fail"] += 1
             if code == 0:
                 _stats["timeout"] += 1
+        if delay > 0:
+            _stop.wait(delay)   # realistic-rate throttle (per-worker think-time)
 
 
 def inbound_worker(host):
@@ -137,13 +139,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--minutes", type=float, default=5.0, help="load window (max 15)")
     ap.add_argument("--workers", type=int, default=8, help="concurrent GET workers")
+    ap.add_argument("--delay", type=float, default=0.0,
+                    help="per-worker think-time between requests in seconds "
+                         "(0 = unthrottled flood; e.g. 1.0 with --workers 3 = realistic dashboard load)")
     ap.add_argument("--host", default=os.environ.get("OTGW_HOST", "192.168.88.39"))
     args = ap.parse_args()
     seconds = int(min(max(args.minutes, 0.5), 15) * 60)
     host = args.host
 
     print("== TASK-867 AC#8 heap-under-load ==")
-    print("host=%s window=%ds workers=%d" % (host, seconds, args.workers))
+    mode = "FLOOD (unthrottled)" if args.delay <= 0 else "THROTTLED %.2fs/req" % args.delay
+    print("host=%s window=%ds workers=%d mode=%s" % (host, seconds, args.workers, mode))
 
     base = get_heap(host)
     if not base:
@@ -155,7 +161,7 @@ def main():
 
     threads = [threading.Thread(target=sampler, args=(host,), daemon=True)]
     for k in range(args.workers):
-        threads.append(threading.Thread(target=worker, args=(host, k), daemon=True))
+        threads.append(threading.Thread(target=worker, args=(host, k, args.delay), daemon=True))
     threads.append(threading.Thread(target=inbound_worker, args=(host,), daemon=True))
     for t in threads:
         t.start()
@@ -175,10 +181,20 @@ def main():
         _stop.set()
     time.sleep(2)
 
-    # cool-down: let the heap settle, then take the recovery snapshot
-    print("cooling down 12s (recovery / leak check)...")
+    # cool-down: let the heap settle, then take the recovery snapshot. Under a heavy
+    # flood the device can still be saturated right after _stop, so a single read may
+    # time out even though the device never rebooted (the device just could not answer
+    # the snapshot in time). RETRY robustly: an unreachable snapshot must NOT be
+    # mistaken for a reboot - only an incremented bootcount (read below) proves a reboot.
+    print("cooling down (recovery / leak check, retrying the snapshot up to ~40s)...")
     time.sleep(12)
-    final = get_heap(host) or {}
+    final = {}
+    for _ in range(10):
+        final = get_heap(host) or {}
+        if final.get("bootcount") is not None:
+            break
+        time.sleep(3)
+    final_reachable = bool(final)
 
     # ---- analysis ----
     heaps = [s["freeheap"] for s in _samples if isinstance(s.get("freeheap"), int)]
@@ -223,8 +239,14 @@ def main():
 
     # ---- verdict ----
     fails = []
-    if boot_delta is None or boot_delta != 0:
-        fails.append("device rebooted/crashed during load (bootcount delta=%s)" % boot_delta)
+    if boot_delta is not None and boot_delta != 0:
+        fails.append("device REBOOTED during load (bootcount %s -> %s, delta=%s)"
+                     % (base.get("bootcount"), final.get("bootcount"), boot_delta))
+    elif not final_reachable:
+        # could not confirm post-load state - device stayed saturated past the retries.
+        # NOT counted as a reboot (no bootcount evidence); flagged for the operator.
+        fails.append("UNCONFIRMED: device unreachable after load (saturated snapshot, "
+                     "not proven a reboot - re-check bootcount/uptime manually)")
     if recover_pct is not None and recover_pct < -LEAK_TOLERANCE_PCT:
         fails.append("heap did not recover (%.1f%% < -%.1f%% leak tolerance)" % (recover_pct, LEAK_TOLERANCE_PCT))
     if succ_pct < MIN_SUCCESS_PCT:
