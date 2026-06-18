@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.208
+**  Version  : v2.0.0-alpha.209
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -295,52 +295,44 @@ static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 }
 
 static void sendSensorStatus() {
-  sendStartJsonMap(F("sensors"));
+  // ADR-141: ArduinoJson v7. Native types replace the hand-rolled streaming map
+  // plus the raw restSendContent "devices"/"s0" sub-objects.
+  JsonDocument doc;
+  JsonObject sensors = doc[F("sensors")].to<JsonObject>();
 
   // Dallas temperature sensors
-  sendJsonMapEntry(F("dallas_enabled"), settings.sensors.bEnabled);
-  sendJsonMapEntry(F("dallas_detected"), bSensorsDetected);
-  sendJsonMapEntry(F("dallas_count"), (int32_t)DallasrealDeviceCount);
-  sendJsonMapEntry(F("dallas_gpio"), (int32_t)settings.sensors.iPin);
-  sendJsonMapEntry(F("dallas_poll_sec"), (int32_t)settings.sensors.iInterval);
-  sendJsonMapEntry(F("simulated"), state.debug.bSensorSim);
+  sensors[F("dallas_enabled")]  = settings.sensors.bEnabled;
+  sensors[F("dallas_detected")] = bSensorsDetected;
+  sensors[F("dallas_count")]    = (int32_t)DallasrealDeviceCount;
+  sensors[F("dallas_gpio")]     = (int32_t)settings.sensors.iPin;
+  sensors[F("dallas_poll_sec")] = (int32_t)settings.sensors.iInterval;
+  sensors[F("simulated")]       = state.debug.bSensorSim;
 
   // Individual sensor readings
   if (bSensorsDetected || state.debug.bSensorSim) {
-    // Start "devices" sub-object — use chunked JSON.
-    // restSendContent(P) keeps these bytes in the ESP32 coalescing buffer
-    // (jsonStuff.ino g_restStream); a raw write outside the stream would flush ahead
-    // of the buffered sendJsonMapEntry wrapper and scramble the JSON.
-    restSendContentP(PSTR(",\r\n  \"devices\": {"));
+    JsonObject devices = sensors[F("devices")].to<JsonObject>();
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char *addr = getDallasAddress(DallasrealDevice[i].addr);
       if (!addr) continue;
-      char entry[100];
-      snprintf_P(entry, sizeof(entry),
-                 PSTR("%s\r\n    \"%s\": {\"temp\": %4.1f, \"epoch\": %u}"),
-                 (i > 0) ? "," : "",
-                 addr, DallasrealDevice[i].tempC, (uint32_t)DallasrealDevice[i].lasttime);
-      restSendContent(entry);
+      // getDallasAddress() returns a shared static buffer overwritten each call;
+      // String() copies the key so multiple devices do not alias to the last addr.
+      JsonObject dev = devices[String(addr)].to<JsonObject>();
+      dev[F("temp")]  = DallasrealDevice[i].tempC;
+      dev[F("epoch")] = (uint32_t)DallasrealDevice[i].lasttime;
     }
-    restSendContentP(PSTR("\r\n  }"));
   }
 
   // S0 pulse counter
-  restSendContentP(PSTR(",\r\n  \"s0\": {"));
-  {
-    char s0buf[120];
-    snprintf_P(s0buf, sizeof(s0buf),
-               PSTR("\r\n    \"enabled\": %s, \"gpio\": %d, \"poll_sec\": %d,"
-                    "\r\n    \"pulses\": %u, \"total\": %lu, \"power_kw\": %4.3f, \"epoch\": %u"
-                    "\r\n  }"),
-               settings.s0.bEnabled ? "true" : "false",
-               settings.s0.iPin, settings.s0.iInterval,
-               OTGWs0pulseCount, (unsigned long)OTGWs0pulseCountTot,
-               OTGWs0powerkw, (uint32_t)OTGWs0lasttime);
-    restSendContent(s0buf);
-  }
+  JsonObject s0 = sensors[F("s0")].to<JsonObject>();
+  s0[F("enabled")]  = settings.s0.bEnabled;
+  s0[F("gpio")]     = settings.s0.iPin;
+  s0[F("poll_sec")] = settings.s0.iInterval;
+  s0[F("pulses")]   = (uint32_t)OTGWs0pulseCount;
+  s0[F("total")]    = (uint32_t)OTGWs0pulseCountTot;
+  s0[F("power_kw")] = OTGWs0powerkw;
+  s0[F("epoch")]    = (uint32_t)OTGWs0lasttime;
 
-  sendEndJsonMap(F("sensors"));
+  restSendJson(doc);
 }
 
 static void handleSensors(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
@@ -424,32 +416,33 @@ static void handleOTDirect(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   // POST /api/v2/otdirect/settings?... — update
   else if (wc > 4 && strcmp_P(words[4], PSTR("settings")) == 0) {
     if (method == HTTP_GET) {
-      sendStartJsonMap(F("otdirect_settings"));
-      sendJsonMapEntry(F("mode"),            (int)settings.otd.iMode);
-      sendJsonMapEntry(F("setback_temp"),    settings.otd.fSetbackTemp);
-      sendJsonMapEntry(F("setback_timeout"), (int)settings.otd.iSetbackTimeout);
+      JsonDocument doc;
+      JsonObject o = doc[F("otdirect_settings")].to<JsonObject>();
+      o[F("mode")]            = (int32_t)settings.otd.iMode;
+      o[F("setback_temp")]    = settings.otd.fSetbackTemp;
+      o[F("setback_timeout")] = (int32_t)settings.otd.iSetbackTimeout;
       // TASK-183: PI room compensation + heating curve
-      sendJsonMapEntry(F("ch_mode"),         (int)settings.otd.iCHMode);
-      sendJsonMapEntry(F("flow_temp"),       settings.otd.fFlowTemp);
-      sendJsonMapEntry(F("flow_max"),        settings.otd.fFlowMax);
-      sendJsonMapEntry(F("room_setpoint"),   settings.otd.fRoomSetpoint);
-      sendJsonMapEntry(F("gradient"),        settings.otd.fGradient);
-      sendJsonMapEntry(F("exponent"),        settings.otd.fExponent);
-      sendJsonMapEntry(F("offset"),          settings.otd.fOffset);
-      sendJsonMapEntry(F("room_comp"),       settings.otd.bRoomCompEnabled);
-      sendJsonMapEntry(F("kp"),              settings.otd.fKp);
-      sendJsonMapEntry(F("ki"),              settings.otd.fKi);
-      sendJsonMapEntry(F("kboost"),          settings.otd.fKboost);
+      o[F("ch_mode")]         = (int32_t)settings.otd.iCHMode;
+      o[F("flow_temp")]       = settings.otd.fFlowTemp;
+      o[F("flow_max")]        = settings.otd.fFlowMax;
+      o[F("room_setpoint")]   = settings.otd.fRoomSetpoint;
+      o[F("gradient")]        = settings.otd.fGradient;
+      o[F("exponent")]        = settings.otd.fExponent;
+      o[F("offset")]          = settings.otd.fOffset;
+      o[F("room_comp")]       = settings.otd.bRoomCompEnabled;
+      o[F("kp")]              = settings.otd.fKp;
+      o[F("ki")]              = settings.otd.fKi;
+      o[F("kboost")]          = settings.otd.fKboost;
       // TASK-582: CH hysteresis deadband
-      sendJsonMapEntry(F("hysteresis_enable"), settings.otd.bHysteresisEnable);
-      sendJsonMapEntry(F("hysteresis"),        settings.otd.fHysteresis);
+      o[F("hysteresis_enable")] = settings.otd.bHysteresisEnable;
+      o[F("hysteresis")]        = settings.otd.fHysteresis;
       // TASK-584: ventilation override persistence
-      sendJsonMapEntry(F("vent_enable"),      settings.otd.bVentEnable);
-      sendJsonMapEntry(F("open_bypass"),      settings.otd.bOpenBypass);
-      sendJsonMapEntry(F("auto_bypass"),      settings.otd.bAutoBypass);
-      sendJsonMapEntry(F("free_vent_enable"), settings.otd.bFreeVentEnable);
-      sendJsonMapEntry(F("vent_setpoint"),    (int)settings.otd.iVentSetpoint);
-      sendEndJsonMap(F("otdirect_settings"));
+      o[F("vent_enable")]      = settings.otd.bVentEnable;
+      o[F("open_bypass")]      = settings.otd.bOpenBypass;
+      o[F("auto_bypass")]      = settings.otd.bAutoBypass;
+      o[F("free_vent_enable")] = settings.otd.bFreeVentEnable;
+      o[F("vent_setpoint")]    = (int32_t)settings.otd.iVentSetpoint;
+      restSendJson(doc);
     } else if (method == HTTP_POST || method == HTTP_PUT) {
       if (hasArgCompat("setbacktemp"))    updateSetting("OTDsetbacktemp", argCompat("setbacktemp"));
       if (hasArgCompat("setbacktimeout")) updateSetting("OTDsetbacktimeout", argCompat("setbacktimeout"));
@@ -795,8 +788,7 @@ static const char* satExtractPostValue(const char* body, char* buf, size_t bufSi
 
 //=== SAT extended health summary (detail=full) ===
 // Sends a comprehensive JSON with health booleans, pressure, cycle, error,
-// and auto-tune diagnostics.  Uses chunked transfer via sendStartJsonMap /
-// sendJsonMapEntry / satSendJsonFloat (defined in SATcontrol.ino).
+// and auto-tune diagnostics. Built as one ArduinoJson v7 document (ADR-141).
 // Called instead of satSendStatusJSON() when ?detail=full is present.
 static void satSendHealthJSON()
 {
@@ -826,44 +818,48 @@ static void satSendHealthJSON()
   int ckIdx = (int)state.sat.eLastCycleKind;
   if (ckIdx < 0 || ckIdx > 3) ckIdx = 0;
 
-  // --- Build chunked JSON response ---
-  sendStartJsonMap("");
+  // --- Build JSON response (ADR-141: ArduinoJson v7) ---
+  // Empty-key wrapper = a flat ROOT object: doc.to<JsonObject>().
+  // ArduinoJson serialises NaN/Inf as null, matching the old satSendJsonFloat
+  // null handling, so the per-field decimal precision is intentionally dropped.
+  JsonDocument doc;
+  JsonObject o = doc.to<JsonObject>();
 
   // Synchronization problem indicators (AC#3)
-  sendJsonMapEntry(F("sync_setpoint"),       syncSetpoint);
-  sendJsonMapEntry(F("sync_modulation"),     syncModulation);
-  sendJsonMapEntry(F("sync_ch"),             syncCH);
+  o[F("sync_setpoint")]       = syncSetpoint;
+  o[F("sync_modulation")]     = syncModulation;
+  o[F("sync_ch")]             = syncCH;
 
   // Pressure diagnostics (AC#4)
-  satSendJsonFloat(F("pressure_smoothed"),   state.sat.fSmoothedPressure, 2);
-  satSendJsonFloat(F("pressure_drop_rate"),  state.sat.fPressureDropRate, 3);
-  sendJsonMapEntry(F("pressure_alarm"),      state.sat.bPressureAlarm);
+  o[F("pressure_smoothed")]   = state.sat.fSmoothedPressure;
+  o[F("pressure_drop_rate")]  = state.sat.fPressureDropRate;
+  o[F("pressure_alarm")]      = state.sat.bPressureAlarm;
 
   // Cycle diagnostics (AC#5)
-  sendJsonMapEntry(F("cycle_kind"),          ckNames[ckIdx]);
-  satSendJsonFloat(F("cycle_duration"),      state.sat.fLastCycleDuration, 0);
-  sendJsonMapEntry(F("cycle_count"),         state.sat.iCycleCount);
-  satSendJsonFloat(F("cycle_fraction_ch"),   state.sat.fLastCycleFractionCH, 3);
-  satSendJsonFloat(F("cycle_fraction_dhw"),  state.sat.fLastCycleFractionDHW, 3);
+  o[F("cycle_kind")]          = ckNames[ckIdx];
+  o[F("cycle_duration")]      = state.sat.fLastCycleDuration;
+  o[F("cycle_count")]         = state.sat.iCycleCount;
+  o[F("cycle_fraction_ch")]   = state.sat.fLastCycleFractionCH;
+  o[F("cycle_fraction_dhw")]  = state.sat.fLastCycleFractionDHW;
 
   // Error / curve statistics (AC#6)
-  satSendJsonFloat(F("error_mean"),          state.sat.fMeanError, 2);
-  satSendJsonFloat(F("error_stddev"),        state.sat.fErrorStdDev, 3);
-  sendJsonMapEntry(F("error_samples"),       (int32_t)state.sat.iErrorSampleCount);
-  sendJsonMapEntry(F("heating_curve_recommendation"), state.sat.sHeatCurveRec);
+  o[F("error_mean")]          = state.sat.fMeanError;
+  o[F("error_stddev")]        = state.sat.fErrorStdDev;
+  o[F("error_samples")]       = (int32_t)state.sat.iErrorSampleCount;
+  o[F("heating_curve_recommendation")] = state.sat.sHeatCurveRec;
 
   // Health booleans (AC#7)
-  sendJsonMapEntry(F("flame_health"),        flameHealth);
-  sendJsonMapEntry(F("device_health"),       deviceHealth);
-  sendJsonMapEntry(F("cycle_health"),        cycleHealth);
-  sendJsonMapEntry(F("cycle_class"),         ccNames[ccIdx]);
+  o[F("flame_health")]        = flameHealth;
+  o[F("device_health")]       = deviceHealth;
+  o[F("cycle_health")]        = cycleHealth;
+  o[F("cycle_class")]         = ccNames[ccIdx];
 
   // Auto-tune and OVP calibration (AC#8)
-  satSendJsonFloat(F("auto_tune_score"),     state.sat.fAutoTuneScore, 2);
-  sendJsonMapEntry(F("auto_tune_cycles"),    (int32_t)state.sat.iAutoTuneCycles);
-  sendJsonMapEntry(F("ovp_phase"),           (int32_t)state.sat.eCalibPhase);
+  o[F("auto_tune_score")]     = state.sat.fAutoTuneScore;
+  o[F("auto_tune_cycles")]    = (int32_t)state.sat.iAutoTuneCycles;
+  o[F("ovp_phase")]           = (int32_t)state.sat.eCalibPhase;
 
-  sendEndJsonMap("");
+  restSendJson(doc);
 }
 
 // Check whether the current request carries ?detail=full
@@ -1184,10 +1180,11 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
                       && (OTcurrentSystemState.Toutside == 0.0f)
                       && (!state.sat.weather.bValid);
       webPushHeader(F("Cache-Control"), F("no-cache"));
-      sendStartJsonMap(F(""));
-      sendJsonMapEntry(F("needs_setup"), needs);
-      sendJsonMapEntry(F("has_key"), (settings.sat.sWeatherApiKey[0] != '\0'));
-      sendEndJsonMap(F(""));
+      JsonDocument doc;
+      JsonObject o = doc.to<JsonObject>();
+      o[F("needs_setup")] = needs;
+      o[F("has_key")]     = (settings.sat.sWeatherApiKey[0] != '\0');
+      restSendJson(doc);
       return;
     }
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
@@ -1714,251 +1711,253 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   snprintf_P(hwModeBuf, sizeof(hwModeBuf), PSTR("%S"), (PGM_P)hardwareModeName());
   snprintf_P(netModeBuf, sizeof(netModeBuf), PSTR("%S"), (PGM_P)networkModeName());
 
-  sendStartJsonMap(F("debug"));
+  // ADR-141: ArduinoJson v7. Native types replace the hand-rolled streaming map.
+  JsonDocument doc;
+  JsonObject d = doc[F("debug")].to<JsonObject>();
 
-  sendJsonMapEntry(F("build.version"), _VERSION);
-  sendJsonMapEntry(F("build.number"), (int32_t)_VERSION_BUILD);
-  sendJsonMapEntry(F("build.githash"), _VERSION_GITHASH);
-  sendJsonMapEntry(F("build.date"), _VERSION_DATE);
+  d[F("build.version")] = _VERSION;
+  d[F("build.number")] = (int32_t)_VERSION_BUILD;
+  d[F("build.githash")] = _VERSION_GITHASH;
+  d[F("build.date")] = _VERSION_DATE;
 
-  sendJsonMapEntry(F("runtime.heap_free"), (uint32_t)platformFreeHeap());
-  sendJsonMapEntry(F("runtime.heap_frag_pct"), (uint32_t)platformHeapFragmentation());
-  sendJsonMapEntry(F("runtime.heap_min_free"), (uint32_t)platformMinFreeHeap());
-  sendJsonMapEntry(F("runtime.heap_max_alloc"), (uint32_t)platformMaxFreeBlock());
-  sendJsonMapEntry(F("runtime.uptime_sec"), (uint32_t)state.uptime.iSeconds);
-  sendJsonMapEntry(F("runtime.reboots"), (uint32_t)state.uptime.iRebootCount);
-  sendJsonMapEntry(F("runtime.wifi_connected"), (WiFi.status() == WL_CONNECTED));
-  sendJsonMapEntry(F("runtime.wifi_rssi"), (int32_t)WiFi.RSSI());
-  sendJsonMapEntry(F("runtime.wifi_ip"), ipBuf);
-  sendJsonMapEntry(F("runtime.wifi_ssid"), ssidBuf);
-  sendJsonMapEntry(F("runtime.hw_mode"), hwModeBuf);
-  sendJsonMapEntry(F("runtime.net_mode"), netModeBuf);
+  d[F("runtime.heap_free")] = (uint32_t)platformFreeHeap();
+  d[F("runtime.heap_frag_pct")] = (uint32_t)platformHeapFragmentation();
+  d[F("runtime.heap_min_free")] = (uint32_t)platformMinFreeHeap();
+  d[F("runtime.heap_max_alloc")] = (uint32_t)platformMaxFreeBlock();
+  d[F("runtime.uptime_sec")] = (uint32_t)state.uptime.iSeconds;
+  d[F("runtime.reboots")] = (uint32_t)state.uptime.iRebootCount;
+  d[F("runtime.wifi_connected")] = (WiFi.status() == WL_CONNECTED);
+  d[F("runtime.wifi_rssi")] = (int32_t)WiFi.RSSI();
+  d[F("runtime.wifi_ip")] = ipBuf;
+  d[F("runtime.wifi_ssid")] = ssidBuf;
+  d[F("runtime.hw_mode")] = hwModeBuf;
+  d[F("runtime.net_mode")] = netModeBuf;
 
-  sendJsonMapEntry(F("settings.hostname"), settings.sHostname);
-  sendJsonMapEntry(F("settings.http_passwd"), settings.sHTTPpasswd[0] ? "***" : "(not set)");
-  sendJsonMapEntry(F("settings.led_blink"), settings.bLEDblink);
-  sendJsonMapEntry(F("settings.dark_theme"), settings.bDarkTheme);
-  sendJsonMapEntry(F("settings.mydebug"), settings.bMyDEBUG);
-  sendJsonMapEntry(F("settings.nightly_restart"), settings.bNightlyRestart);
-  sendJsonMapEntry(F("settings.restart_hour"), (uint32_t)settings.iRestartHour);
+  d[F("settings.hostname")] = settings.sHostname;
+  d[F("settings.http_passwd")] = settings.sHTTPpasswd[0] ? "***" : "(not set)";
+  d[F("settings.led_blink")] = settings.bLEDblink;
+  d[F("settings.dark_theme")] = settings.bDarkTheme;
+  d[F("settings.mydebug")] = settings.bMyDEBUG;
+  d[F("settings.nightly_restart")] = settings.bNightlyRestart;
+  d[F("settings.restart_hour")] = (uint32_t)settings.iRestartHour;
 
-  sendJsonMapEntry(F("settings.mqtt.enabled"), settings.mqtt.bEnable);
-  sendJsonMapEntry(F("settings.mqtt.broker"), settings.mqtt.sBroker);
-  sendJsonMapEntry(F("settings.mqtt.port"), (uint32_t)settings.mqtt.iBrokerPort);
-  sendJsonMapEntry(F("settings.mqtt.user"), settings.mqtt.sUser);
-  sendJsonMapEntry(F("settings.mqtt.passwd"), settings.mqtt.sPasswd[0] ? "***" : "(not set)");
-  sendJsonMapEntry(F("settings.mqtt.ha_prefix"), settings.mqtt.sHaprefix);
-  sendJsonMapEntry(F("settings.mqtt.top_topic"), settings.mqtt.sTopTopic);
-  sendJsonMapEntry(F("settings.mqtt.unique_id"), settings.mqtt.sUniqueid);
-  sendJsonMapEntry(F("settings.mqtt.ot_message"), settings.mqtt.bOTmessage);
-  sendJsonMapEntry(F("settings.mqtt.on_change"), settings.mqtt.bOnChangePublishing);
-  sendJsonMapEntry(F("settings.mqtt.interval"), (uint32_t)settings.mqtt.iInterval);
-  sendJsonMapEntry(F("settings.mqtt.sep_sources"), settings.mqtt.bSeparateSources);
-  sendJsonMapEntry(F("settings.mqtt.disc_verify"), settings.mqtt.bDiscoveryAutoVerify);
-  sendJsonMapEntry(F("settings.mqtt.use_legacy_topics"), settings.mqtt.bUseLegacyOtTopics);
-  sendJsonMapEntry(F("settings.mqtt.ha_reboot"), settings.mqtt.bHaRebootDetect);
-  sendJsonMapEntry(F("settings.legacy.port25238"), settings.mqtt.bLegacyPort25238Enabled);
+  d[F("settings.mqtt.enabled")] = settings.mqtt.bEnable;
+  d[F("settings.mqtt.broker")] = settings.mqtt.sBroker;
+  d[F("settings.mqtt.port")] = (uint32_t)settings.mqtt.iBrokerPort;
+  d[F("settings.mqtt.user")] = settings.mqtt.sUser;
+  d[F("settings.mqtt.passwd")] = settings.mqtt.sPasswd[0] ? "***" : "(not set)";
+  d[F("settings.mqtt.ha_prefix")] = settings.mqtt.sHaprefix;
+  d[F("settings.mqtt.top_topic")] = settings.mqtt.sTopTopic;
+  d[F("settings.mqtt.unique_id")] = settings.mqtt.sUniqueid;
+  d[F("settings.mqtt.ot_message")] = settings.mqtt.bOTmessage;
+  d[F("settings.mqtt.on_change")] = settings.mqtt.bOnChangePublishing;
+  d[F("settings.mqtt.interval")] = (uint32_t)settings.mqtt.iInterval;
+  d[F("settings.mqtt.sep_sources")] = settings.mqtt.bSeparateSources;
+  d[F("settings.mqtt.disc_verify")] = settings.mqtt.bDiscoveryAutoVerify;
+  d[F("settings.mqtt.use_legacy_topics")] = settings.mqtt.bUseLegacyOtTopics;
+  d[F("settings.mqtt.ha_reboot")] = settings.mqtt.bHaRebootDetect;
+  d[F("settings.legacy.port25238")] = settings.mqtt.bLegacyPort25238Enabled;
 
-  sendJsonMapEntry(F("settings.ntp.enabled"), settings.ntp.bEnable);
-  sendJsonMapEntry(F("settings.ntp.timezone"), settings.ntp.sTimezone);
-  sendJsonMapEntry(F("settings.ntp.hostname"), settings.ntp.sHostname);
-  sendJsonMapEntry(F("settings.ntp.sendtime"), settings.ntp.bSendtime);
+  d[F("settings.ntp.enabled")] = settings.ntp.bEnable;
+  d[F("settings.ntp.timezone")] = settings.ntp.sTimezone;
+  d[F("settings.ntp.hostname")] = settings.ntp.sHostname;
+  d[F("settings.ntp.sendtime")] = settings.ntp.bSendtime;
 
-  sendJsonMapEntry(F("settings.sensors.enabled"), settings.sensors.bEnabled);
-  sendJsonMapEntry(F("settings.sensors.pin"), (int32_t)settings.sensors.iPin);
-  sendJsonMapEntry(F("settings.sensors.interval"), (int32_t)settings.sensors.iInterval);
+  d[F("settings.sensors.enabled")] = settings.sensors.bEnabled;
+  d[F("settings.sensors.pin")] = (int32_t)settings.sensors.iPin;
+  d[F("settings.sensors.interval")] = (int32_t)settings.sensors.iInterval;
 
-  sendJsonMapEntry(F("settings.s0.enabled"), settings.s0.bEnabled);
-  sendJsonMapEntry(F("settings.s0.pin"), (uint32_t)settings.s0.iPin);
-  sendJsonMapEntry(F("settings.s0.debounce_ms"), (uint32_t)settings.s0.iDebounceTime);
-  sendJsonMapEntry(F("settings.s0.pulse_kw"), (uint32_t)settings.s0.iPulsekw);
-  sendJsonMapEntry(F("settings.s0.interval"), (uint32_t)settings.s0.iInterval);
+  d[F("settings.s0.enabled")] = settings.s0.bEnabled;
+  d[F("settings.s0.pin")] = (uint32_t)settings.s0.iPin;
+  d[F("settings.s0.debounce_ms")] = (uint32_t)settings.s0.iDebounceTime;
+  d[F("settings.s0.pulse_kw")] = (uint32_t)settings.s0.iPulsekw;
+  d[F("settings.s0.interval")] = (uint32_t)settings.s0.iInterval;
 
-  sendJsonMapEntry(F("settings.outputs.enabled"), settings.outputs.bEnabled);
-  sendJsonMapEntry(F("settings.outputs.pin"), (int32_t)settings.outputs.iPin);
-  sendJsonMapEntry(F("settings.outputs.trigger_bit"), (int32_t)settings.outputs.iTriggerBit);
+  d[F("settings.outputs.enabled")] = settings.outputs.bEnabled;
+  d[F("settings.outputs.pin")] = (int32_t)settings.outputs.iPin;
+  d[F("settings.outputs.trigger_bit")] = (int32_t)settings.outputs.iTriggerBit;
 
-  sendJsonMapEntry(F("settings.sat.enabled"), settings.sat.bEnabled);
-  sendJsonMapEntry(F("settings.sat.heating_system"), (uint32_t)settings.sat.iHeatingSystem);
-  sendJsonMapEntry(F("settings.sat.target_temp"), settings.sat.fTargetTemp);
-  sendJsonMapEntry(F("settings.sat.curve_coeff"), settings.sat.fHeatingCurveCoeff);
-  sendJsonMapEntry(F("settings.sat.deadband"), settings.sat.fDeadband);
-  sendJsonMapEntry(F("settings.sat.control_interval"), (uint32_t)settings.sat.iControlInterval);
-  sendJsonMapEntry(F("settings.sat.use_external_temp"), settings.sat.bUseExternalTemp);
-  sendJsonMapEntry(F("settings.sat.pwm_auto_switch"), settings.sat.bPwmAutoSwitch);
-  sendJsonMapEntry(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
-  sendJsonMapEntry(F("settings.sat.ovp_value"), settings.sat.fOvpValue);
-  sendJsonMapEntry(F("settings.sat.ovp_enabled"), settings.sat.bOvpEnabled);
-  sendJsonMapEntry(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
-  sendJsonMapEntry(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
-  sendJsonMapEntry(F("settings.sat.dhw_enabled"), settings.sat.bDhwEnabled);
-  sendJsonMapEntry(F("settings.sat.dhw_enable"), settings.sat.bDhwEnable);
-  sendJsonMapEntry(F("settings.sat.window_detection"), settings.sat.bWindowDetection);
-  sendJsonMapEntry(F("settings.sat.weather_enable"), settings.sat.bWeatherEnable);
-  sendJsonMapEntry(F("settings.sat.weather_key"), settings.sat.sWeatherApiKey[0] ? "***" : "(not set)");
-  sendJsonMapEntry(F("settings.sat.boiler_capacity"), settings.sat.fBoilerCapacity);
-  sendJsonMapEntry(F("settings.sat.simulation"), settings.sat.bSimulation);
-  sendJsonMapEntry(F("settings.sat.solar_gain_enable"), settings.sat.bSolarGainEnable);
-  sendJsonMapEntry(F("settings.sat.summer_simmer"), settings.sat.bSummerSimmer);
-  sendJsonMapEntry(F("settings.sat.comfort_adjust"), settings.sat.bComfortAdjust);
-  sendJsonMapEntry(F("settings.sat.multi_area"), settings.sat.bMultiArea);
-  sendJsonMapEntry(F("settings.sat.auto_tune"), settings.sat.bAutoTune);
-  sendJsonMapEntry(F("settings.sat.max_setpoint"), settings.sat.fMaxSetpoint);
-  sendJsonMapEntry(F("settings.sat.sensor_max_age"), (uint32_t)settings.sat.iSensorMaxAgeS);
-  sendJsonMapEntry(F("settings.sat.error_monitoring"), settings.sat.bErrorMonitoring);
-  sendJsonMapEntry(F("settings.sat.auto_gains"), settings.sat.bAutoGains);
-  sendJsonMapEntry(F("settings.sat.thermal_comfort"), settings.sat.bThermalComfort);
-  sendJsonMapEntry(F("settings.sat.humidity_timeout"), (uint32_t)settings.sat.iHumidityTimeoutS);
-  sendJsonMapEntry(F("settings.sat.heating_mode"), (uint32_t)settings.sat.iHeatingMode);
-  sendJsonMapEntry(F("settings.sat.cycles_per_hour"), (uint32_t)settings.sat.iCyclesPerHour);
-  sendJsonMapEntry(F("settings.sat.valve_offset"), settings.sat.fValveOffset);
-  sendJsonMapEntry(F("settings.sat.solar_freeze_i"), settings.sat.bSolarFreezeIntegral);
-  sendJsonMapEntry(F("settings.sat.flush_threshold_h"), (uint32_t)settings.sat.iSatFlushThresholdH);
-  sendJsonMapEntry(F("settings.sat.zone_count"), (uint32_t)settings.sat.iZoneCount);
-  sendJsonMapEntry(F("settings.sat.zone_timeout_s"), (uint32_t)settings.sat.iZoneTimeoutS);
+  d[F("settings.sat.enabled")] = settings.sat.bEnabled;
+  d[F("settings.sat.heating_system")] = (uint32_t)settings.sat.iHeatingSystem;
+  d[F("settings.sat.target_temp")] = settings.sat.fTargetTemp;
+  d[F("settings.sat.curve_coeff")] = settings.sat.fHeatingCurveCoeff;
+  d[F("settings.sat.deadband")] = settings.sat.fDeadband;
+  d[F("settings.sat.control_interval")] = (uint32_t)settings.sat.iControlInterval;
+  d[F("settings.sat.use_external_temp")] = settings.sat.bUseExternalTemp;
+  d[F("settings.sat.pwm_auto_switch")] = settings.sat.bPwmAutoSwitch;
+  d[F("settings.sat.max_rel_mod")] = (uint32_t)settings.sat.iMaxRelModulation;
+  d[F("settings.sat.ovp_value")] = settings.sat.fOvpValue;
+  d[F("settings.sat.ovp_enabled")] = settings.sat.bOvpEnabled;
+  d[F("settings.sat.overshoot_margin")] = settings.sat.fOvershootMargin;
+  d[F("settings.sat.dhw_setpoint")] = settings.sat.fDhwSetpoint;
+  d[F("settings.sat.dhw_enabled")] = settings.sat.bDhwEnabled;
+  d[F("settings.sat.dhw_enable")] = settings.sat.bDhwEnable;
+  d[F("settings.sat.window_detection")] = settings.sat.bWindowDetection;
+  d[F("settings.sat.weather_enable")] = settings.sat.bWeatherEnable;
+  d[F("settings.sat.weather_key")] = settings.sat.sWeatherApiKey[0] ? "***" : "(not set)";
+  d[F("settings.sat.boiler_capacity")] = settings.sat.fBoilerCapacity;
+  d[F("settings.sat.simulation")] = settings.sat.bSimulation;
+  d[F("settings.sat.solar_gain_enable")] = settings.sat.bSolarGainEnable;
+  d[F("settings.sat.summer_simmer")] = settings.sat.bSummerSimmer;
+  d[F("settings.sat.comfort_adjust")] = settings.sat.bComfortAdjust;
+  d[F("settings.sat.multi_area")] = settings.sat.bMultiArea;
+  d[F("settings.sat.auto_tune")] = settings.sat.bAutoTune;
+  d[F("settings.sat.max_setpoint")] = settings.sat.fMaxSetpoint;
+  d[F("settings.sat.sensor_max_age")] = (uint32_t)settings.sat.iSensorMaxAgeS;
+  d[F("settings.sat.error_monitoring")] = settings.sat.bErrorMonitoring;
+  d[F("settings.sat.auto_gains")] = settings.sat.bAutoGains;
+  d[F("settings.sat.thermal_comfort")] = settings.sat.bThermalComfort;
+  d[F("settings.sat.humidity_timeout")] = (uint32_t)settings.sat.iHumidityTimeoutS;
+  d[F("settings.sat.heating_mode")] = (uint32_t)settings.sat.iHeatingMode;
+  d[F("settings.sat.cycles_per_hour")] = (uint32_t)settings.sat.iCyclesPerHour;
+  d[F("settings.sat.valve_offset")] = settings.sat.fValveOffset;
+  d[F("settings.sat.solar_freeze_i")] = settings.sat.bSolarFreezeIntegral;
+  d[F("settings.sat.flush_threshold_h")] = (uint32_t)settings.sat.iSatFlushThresholdH;
+  d[F("settings.sat.zone_count")] = (uint32_t)settings.sat.iZoneCount;
+  d[F("settings.sat.zone_timeout_s")] = (uint32_t)settings.sat.iZoneTimeoutS;
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  sendJsonMapEntry(F("settings.otd.mode"), (uint32_t)settings.otd.iMode);
-  sendJsonMapEntry(F("settings.otd.auto_detect"), settings.otd.bAutoDetect);
-  sendJsonMapEntry(F("settings.otd.setback_temp"), settings.otd.fSetbackTemp);
-  sendJsonMapEntry(F("settings.otd.setback_timeout"), (uint32_t)settings.otd.iSetbackTimeout);
-  sendJsonMapEntry(F("settings.otd.enable_slave"), settings.otd.bEnableSlave);
-  sendJsonMapEntry(F("settings.otd.summer_mode"), settings.otd.bSummerMode);
-  sendJsonMapEntry(F("settings.otd.fail_safe"), settings.otd.bFailSafe);
-  sendJsonMapEntry(F("settings.otd.msg_interval"), (uint32_t)settings.otd.iMsgInterval);
-  sendJsonMapEntry(F("settings.otd.has_bypass_relay"), settings.otd.bHasBypassRelay);
-  sendJsonMapEntry(F("settings.otd.ch_mode"), (uint32_t)settings.otd.iCHMode);
-  sendJsonMapEntry(F("settings.otd.flow_temp"), settings.otd.fFlowTemp);
-  sendJsonMapEntry(F("settings.otd.flow_max"), settings.otd.fFlowMax);
-  sendJsonMapEntry(F("settings.otd.room_setpoint"), settings.otd.fRoomSetpoint);
-  sendJsonMapEntry(F("settings.otd.gradient"), settings.otd.fGradient);
-  sendJsonMapEntry(F("settings.otd.exponent"), settings.otd.fExponent);
-  sendJsonMapEntry(F("settings.otd.offset"), settings.otd.fOffset);
-  sendJsonMapEntry(F("settings.otd.room_comp"), settings.otd.bRoomCompEnabled);
-  sendJsonMapEntry(F("settings.otd.kp"), settings.otd.fKp);
-  sendJsonMapEntry(F("settings.otd.ki"), settings.otd.fKi);
-  sendJsonMapEntry(F("settings.otd.kboost"), settings.otd.fKboost);
+  d[F("settings.otd.mode")] = (uint32_t)settings.otd.iMode;
+  d[F("settings.otd.auto_detect")] = settings.otd.bAutoDetect;
+  d[F("settings.otd.setback_temp")] = settings.otd.fSetbackTemp;
+  d[F("settings.otd.setback_timeout")] = (uint32_t)settings.otd.iSetbackTimeout;
+  d[F("settings.otd.enable_slave")] = settings.otd.bEnableSlave;
+  d[F("settings.otd.summer_mode")] = settings.otd.bSummerMode;
+  d[F("settings.otd.fail_safe")] = settings.otd.bFailSafe;
+  d[F("settings.otd.msg_interval")] = (uint32_t)settings.otd.iMsgInterval;
+  d[F("settings.otd.has_bypass_relay")] = settings.otd.bHasBypassRelay;
+  d[F("settings.otd.ch_mode")] = (uint32_t)settings.otd.iCHMode;
+  d[F("settings.otd.flow_temp")] = settings.otd.fFlowTemp;
+  d[F("settings.otd.flow_max")] = settings.otd.fFlowMax;
+  d[F("settings.otd.room_setpoint")] = settings.otd.fRoomSetpoint;
+  d[F("settings.otd.gradient")] = settings.otd.fGradient;
+  d[F("settings.otd.exponent")] = settings.otd.fExponent;
+  d[F("settings.otd.offset")] = settings.otd.fOffset;
+  d[F("settings.otd.room_comp")] = settings.otd.bRoomCompEnabled;
+  d[F("settings.otd.kp")] = settings.otd.fKp;
+  d[F("settings.otd.ki")] = settings.otd.fKi;
+  d[F("settings.otd.kboost")] = settings.otd.fKboost;
 #endif
 
-  sendJsonMapEntry(F("state.mqtt.connected"), state.mqtt.bConnected);
-  sendJsonMapEntry(F("state.pic.available"), state.pic.bAvailable);
-  sendJsonMapEntry(F("state.pic.device_id"), state.pic.sDeviceid);
-  sendJsonMapEntry(F("state.pic.type"), state.pic.sType);
-  sendJsonMapEntry(F("state.pic.fw_version"), state.pic.sFwversion);
+  d[F("state.mqtt.connected")] = state.mqtt.bConnected;
+  d[F("state.pic.available")] = state.pic.bAvailable;
+  d[F("state.pic.device_id")] = state.pic.sDeviceid;
+  d[F("state.pic.type")] = state.pic.sType;
+  d[F("state.pic.fw_version")] = state.pic.sFwversion;
 
-  sendJsonMapEntry(F("state.otbus.online"), state.otBus.bOnline);
-  sendJsonMapEntry(F("state.otbus.gateway_mode"), state.otBus.bGatewayMode);
-  sendJsonMapEntry(F("state.otbus.gateway_known"), state.otBus.bGatewayModeKnown);
-  sendJsonMapEntry(F("state.otbus.boiler_state"), state.otBus.bBoilerState);
-  sendJsonMapEntry(F("state.otbus.thermostat_state"), state.otBus.bThermostatState);
-  sendJsonMapEntry(F("state.otbus.ps_mode"), state.otBus.bPSmode);
+  d[F("state.otbus.online")] = state.otBus.bOnline;
+  d[F("state.otbus.gateway_mode")] = state.otBus.bGatewayMode;
+  d[F("state.otbus.gateway_known")] = state.otBus.bGatewayModeKnown;
+  d[F("state.otbus.boiler_state")] = state.otBus.bBoilerState;
+  d[F("state.otbus.thermostat_state")] = state.otBus.bThermostatState;
+  d[F("state.otbus.ps_mode")] = state.otBus.bPSmode;
 
-  sendJsonMapEntry(F("state.debug.ot_msg"), state.debug.bOTmsg);
-  sendJsonMapEntry(F("state.debug.rest_api"), state.debug.bRestAPI);
-  sendJsonMapEntry(F("state.debug.mqtt"), state.debug.bMQTT);
-  sendJsonMapEntry(F("state.debug.mqtt_gate"), state.debug.bMQTTGate);
-  sendJsonMapEntry(F("state.debug.sensors"), state.debug.bSensors);
-  sendJsonMapEntry(F("state.debug.ntp"), state.debug.bNTP);
-  sendJsonMapEntry(F("state.debug.sensor_sim"), state.debug.bSensorSim);
-  sendJsonMapEntry(F("state.debug.otgw_sim"), state.debug.bOTGWSimulation);
-  sendJsonMapEntry(F("state.debug.sat"), state.debug.bSAT);
-  sendJsonMapEntry(F("state.debug.otdirect"), state.debug.bOTDirect);
+  d[F("state.debug.ot_msg")] = state.debug.bOTmsg;
+  d[F("state.debug.rest_api")] = state.debug.bRestAPI;
+  d[F("state.debug.mqtt")] = state.debug.bMQTT;
+  d[F("state.debug.mqtt_gate")] = state.debug.bMQTTGate;
+  d[F("state.debug.sensors")] = state.debug.bSensors;
+  d[F("state.debug.ntp")] = state.debug.bNTP;
+  d[F("state.debug.sensor_sim")] = state.debug.bSensorSim;
+  d[F("state.debug.otgw_sim")] = state.debug.bOTGWSimulation;
+  d[F("state.debug.sat")] = state.debug.bSAT;
+  d[F("state.debug.otdirect")] = state.debug.bOTDirect;
 #if HAS_SAT_BLE
-  sendJsonMapEntry(F("state.debug.sat_ble"), state.debug.bSATBLE);
+  d[F("state.debug.sat_ble")] = state.debug.bSATBLE;
 #endif
 
-  sendJsonMapEntry(F("state.heap.ws_drops"), (uint32_t)state.heapdiag.iWsDropsTotal);
-  sendJsonMapEntry(F("state.heap.mqtt_drops"), (uint32_t)state.heapdiag.iMqttDropsTotal);
-  sendJsonMapEntry(F("state.heap.entered_low"), (uint32_t)state.heapdiag.iEnteredLowCount);
-  sendJsonMapEntry(F("state.heap.entered_warn"), (uint32_t)state.heapdiag.iEnteredWarningCount);
-  sendJsonMapEntry(F("state.heap.entered_crit"), (uint32_t)state.heapdiag.iEnteredCriticalCount);
-  sendJsonMapEntry(F("state.heap.drip_slow"), (uint32_t)state.heapdiag.iDripSlowModeCount);
+  d[F("state.heap.ws_drops")] = (uint32_t)state.heapdiag.iWsDropsTotal;
+  d[F("state.heap.mqtt_drops")] = (uint32_t)state.heapdiag.iMqttDropsTotal;
+  d[F("state.heap.entered_low")] = (uint32_t)state.heapdiag.iEnteredLowCount;
+  d[F("state.heap.entered_warn")] = (uint32_t)state.heapdiag.iEnteredWarningCount;
+  d[F("state.heap.entered_crit")] = (uint32_t)state.heapdiag.iEnteredCriticalCount;
+  d[F("state.heap.drip_slow")] = (uint32_t)state.heapdiag.iDripSlowModeCount;
 
-  sendJsonMapEntry(F("state.disco.published"), (uint32_t)state.discovery.iPublishedTopicCount);
-  sendJsonMapEntry(F("state.disco.verify_runs"), (uint32_t)state.discovery.iVerifyRunCount);
-  sendJsonMapEntry(F("state.disco.republishes"), (uint32_t)state.discovery.iRepublishTriggeredCount);
-  sendJsonMapEntry(F("state.disco.last_missing"), (uint32_t)state.discovery.iLastMissingCount);
-  sendJsonMapEntry(F("state.disco.last_orphan"), (uint32_t)state.discovery.iLastOrphanCount);
-  sendJsonMapEntry(F("state.disco.last_epoch"), (uint32_t)state.discovery.iLastVerifyEpoch);
+  d[F("state.disco.published")] = (uint32_t)state.discovery.iPublishedTopicCount;
+  d[F("state.disco.verify_runs")] = (uint32_t)state.discovery.iVerifyRunCount;
+  d[F("state.disco.republishes")] = (uint32_t)state.discovery.iRepublishTriggeredCount;
+  d[F("state.disco.last_missing")] = (uint32_t)state.discovery.iLastMissingCount;
+  d[F("state.disco.last_orphan")] = (uint32_t)state.discovery.iLastOrphanCount;
+  d[F("state.disco.last_epoch")] = (uint32_t)state.discovery.iLastVerifyEpoch;
 
   { char boilerStatus[20]; satGetBoilerStatusName(boilerStatus, sizeof(boilerStatus));
-    sendJsonMapEntry(F("state.sat.boiler_status"), boilerStatus); }
+    d[F("state.sat.boiler_status")] = boilerStatus; }
   { char manufacturer[12]; satGetManufacturerName(manufacturer, sizeof(manufacturer));
-    sendJsonMapEntry(F("state.sat.manufacturer"), manufacturer); }
-  sendJsonMapEntry(F("state.sat.active"), state.sat.bActive);
-  sendJsonMapEntry(F("state.sat.control_mode"), (int32_t)state.sat.eControlMode);
-  sendJsonMapEntry(F("state.sat.room_temp"), satGetRoomTemp());
-  sendJsonMapEntry(F("state.sat.outside_temp"), satGetOutsideTemp());
-  sendJsonMapEntry(F("state.sat.heating_curve"), state.sat.fHeatingCurveValue);
-  sendJsonMapEntry(F("state.sat.pid_output"), state.sat.fPidOutput);
-  sendJsonMapEntry(F("state.sat.final_setpoint"), state.sat.fFinalSetpoint);
-  sendJsonMapEntry(F("state.sat.error"), state.sat.fError);
-  sendJsonMapEntry(F("state.sat.pid_p"), state.sat.fPidP);
-  sendJsonMapEntry(F("state.sat.pid_i"), state.sat.fPidI);
-  sendJsonMapEntry(F("state.sat.pid_d"), state.sat.fPidD);
-  sendJsonMapEntry(F("state.sat.cycle_count"), (uint32_t)state.sat.iCycleCount);
-  sendJsonMapEntry(F("state.sat.last_cycle_class"), (int32_t)state.sat.eLastCycleClass);
-  sendJsonMapEntry(F("state.sat.duty_ratio"), state.sat.fDutyRatio);
-  sendJsonMapEntry(F("state.sat.pwm_duty"), state.sat.fPwmDutyCycle);
-  sendJsonMapEntry(F("state.sat.active_preset"), (int32_t)state.sat.eActivePreset);
-  sendJsonMapEntry(F("state.sat.mod_suppressed"), state.sat.bModSuppressed);
-  sendJsonMapEntry(F("state.sat.dhw_active"), state.sat.bDhwActive);
-  sendJsonMapEntry(F("state.sat.fallback_active"), state.sat.bFallbackActive);
-  sendJsonMapEntry(F("state.sat.fallback_reason"), (int32_t)state.sat.eFallbackReason);
-  sendJsonMapEntry(F("state.sat.current_mod"), (int32_t)state.sat.iCurrentModulation);
-  sendJsonMapEntry(F("state.sat.hsys_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
-  sendJsonMapEntry(F("state.sat.weather_valid"), state.sat.weather.bValid);
-  sendJsonMapEntry(F("state.sat.weather_temp"), state.sat.weather.fTemperature);
-  sendJsonMapEntry(F("state.sat.weather_humidity"), state.sat.weather.fHumidity);
-  sendJsonMapEntry(F("state.sat.weather_wind"), state.sat.weather.fWindSpeed);
-  sendJsonMapEntry(F("state.sat.weather_cloud"), state.sat.weather.fCloudCover);
+    d[F("state.sat.manufacturer")] = manufacturer; }
+  d[F("state.sat.active")] = state.sat.bActive;
+  d[F("state.sat.control_mode")] = (int32_t)state.sat.eControlMode;
+  d[F("state.sat.room_temp")] = satGetRoomTemp();
+  d[F("state.sat.outside_temp")] = satGetOutsideTemp();
+  d[F("state.sat.heating_curve")] = state.sat.fHeatingCurveValue;
+  d[F("state.sat.pid_output")] = state.sat.fPidOutput;
+  d[F("state.sat.final_setpoint")] = state.sat.fFinalSetpoint;
+  d[F("state.sat.error")] = state.sat.fError;
+  d[F("state.sat.pid_p")] = state.sat.fPidP;
+  d[F("state.sat.pid_i")] = state.sat.fPidI;
+  d[F("state.sat.pid_d")] = state.sat.fPidD;
+  d[F("state.sat.cycle_count")] = (uint32_t)state.sat.iCycleCount;
+  d[F("state.sat.last_cycle_class")] = (int32_t)state.sat.eLastCycleClass;
+  d[F("state.sat.duty_ratio")] = state.sat.fDutyRatio;
+  d[F("state.sat.pwm_duty")] = state.sat.fPwmDutyCycle;
+  d[F("state.sat.active_preset")] = (int32_t)state.sat.eActivePreset;
+  d[F("state.sat.mod_suppressed")] = state.sat.bModSuppressed;
+  d[F("state.sat.dhw_active")] = state.sat.bDhwActive;
+  d[F("state.sat.fallback_active")] = state.sat.bFallbackActive;
+  d[F("state.sat.fallback_reason")] = (int32_t)state.sat.eFallbackReason;
+  d[F("state.sat.current_mod")] = (int32_t)state.sat.iCurrentModulation;
+  d[F("state.sat.hsys_detected")] = (int32_t)state.sat.iDetectedHeatingSystem;
+  d[F("state.sat.weather_valid")] = state.sat.weather.bValid;
+  d[F("state.sat.weather_temp")] = state.sat.weather.fTemperature;
+  d[F("state.sat.weather_humidity")] = state.sat.weather.fHumidity;
+  d[F("state.sat.weather_wind")] = state.sat.weather.fWindSpeed;
+  d[F("state.sat.weather_cloud")] = state.sat.weather.fCloudCover;
 #if HAS_WEATHER_FORECAST
-  sendJsonMapEntry(F("state.sat.weather_pressure"), state.sat.weather.fPressureMsl);
-  sendJsonMapEntry(F("state.sat.weather_is_day"), state.sat.weather.bIsDay);
+  d[F("state.sat.weather_pressure")] = state.sat.weather.fPressureMsl;
+  d[F("state.sat.weather_is_day")] = state.sat.weather.bIsDay;
 #endif
-  sendJsonMapEntry(F("state.sat.current_power"), state.sat.fCurrentPower);
-  sendJsonMapEntry(F("state.sat.energy_total"), state.sat.fEnergyTotal);
-  sendJsonMapEntry(F("state.sat.energy_est"), state.sat.fEnergyEstimatedKWh);
-  sendJsonMapEntry(F("state.sat.thermal_valid"), state.sat.bThermalModelValid);
-  sendJsonMapEntry(F("state.sat.thermal_drop"), state.sat.fThermalDropRate);
-  sendJsonMapEntry(F("state.sat.solar_gain"), state.sat.bSolarGainActive);
-  sendJsonMapEntry(F("state.sat.summer_active"), state.sat.bSummerActive);
-  sendJsonMapEntry(F("state.sat.humidity"), state.sat.fHumidity);
-  sendJsonMapEntry(F("state.sat.humidity_valid"), state.sat.bHumidityValid);
-  sendJsonMapEntry(F("state.sat.comfort_offset"), state.sat.fComfortOffset);
-  sendJsonMapEntry(F("state.sat.area0_temp"), state.sat.fAreaTemp[0]);
-  sendJsonMapEntry(F("state.sat.area1_temp"), state.sat.fAreaTemp[1]);
-  sendJsonMapEntry(F("state.sat.area2_temp"), state.sat.fAreaTemp[2]);
-  sendJsonMapEntry(F("state.sat.area3_temp"), state.sat.fAreaTemp[3]);
-  sendJsonMapEntry(F("state.sat.auto_tune_active"), state.sat.bAutoTuneActive);
-  sendJsonMapEntry(F("state.sat.auto_tune_cycles"), (uint32_t)state.sat.iAutoTuneCycles);
-  sendJsonMapEntry(F("state.sat.auto_tune_score"), state.sat.fAutoTuneScore);
+  d[F("state.sat.current_power")] = state.sat.fCurrentPower;
+  d[F("state.sat.energy_total")] = state.sat.fEnergyTotal;
+  d[F("state.sat.energy_est")] = state.sat.fEnergyEstimatedKWh;
+  d[F("state.sat.thermal_valid")] = state.sat.bThermalModelValid;
+  d[F("state.sat.thermal_drop")] = state.sat.fThermalDropRate;
+  d[F("state.sat.solar_gain")] = state.sat.bSolarGainActive;
+  d[F("state.sat.summer_active")] = state.sat.bSummerActive;
+  d[F("state.sat.humidity")] = state.sat.fHumidity;
+  d[F("state.sat.humidity_valid")] = state.sat.bHumidityValid;
+  d[F("state.sat.comfort_offset")] = state.sat.fComfortOffset;
+  d[F("state.sat.area0_temp")] = state.sat.fAreaTemp[0];
+  d[F("state.sat.area1_temp")] = state.sat.fAreaTemp[1];
+  d[F("state.sat.area2_temp")] = state.sat.fAreaTemp[2];
+  d[F("state.sat.area3_temp")] = state.sat.fAreaTemp[3];
+  d[F("state.sat.auto_tune_active")] = state.sat.bAutoTuneActive;
+  d[F("state.sat.auto_tune_cycles")] = (uint32_t)state.sat.iAutoTuneCycles;
+  d[F("state.sat.auto_tune_score")] = state.sat.fAutoTuneScore;
 #if HAS_SAT_BLE
-  sendJsonMapEntry(F("state.sat.ble_temp"), state.sat.fBleTemp);
-  sendJsonMapEntry(F("state.sat.ble_humidity"), state.sat.fBleHumidity);
-  sendJsonMapEntry(F("state.sat.ble_valid"), state.sat.bBleTempValid);
-  sendJsonMapEntry(F("state.sat.ble_count"), (uint32_t)state.sat.iBleSensorCount);
-  sendJsonMapEntry(F("state.sat.ble_battery"), (uint32_t)state.sat.iBleBattery);
-  sendJsonMapEntry(F("state.sat.ble_rssi"), (int32_t)state.sat.iBleRssi);
+  d[F("state.sat.ble_temp")] = state.sat.fBleTemp;
+  d[F("state.sat.ble_humidity")] = state.sat.fBleHumidity;
+  d[F("state.sat.ble_valid")] = state.sat.bBleTempValid;
+  d[F("state.sat.ble_count")] = (uint32_t)state.sat.iBleSensorCount;
+  d[F("state.sat.ble_battery")] = (uint32_t)state.sat.iBleBattery;
+  d[F("state.sat.ble_rssi")] = (int32_t)state.sat.iBleRssi;
 #endif
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-  sendJsonMapEntry(F("state.otd.schedule_total"), (uint32_t)state.otd.iScheduleTotal);
-  sendJsonMapEntry(F("state.otd.schedule_active"), (uint32_t)state.otd.iScheduleActive);
-  sendJsonMapEntry(F("state.otd.schedule_disabled"), (uint32_t)state.otd.iScheduleDisabled);
-  sendJsonMapEntry(F("state.otd.override_count"), (uint32_t)state.otd.iOverrideCount);
-  sendJsonMapEntry(F("state.otd.bypass_active"), state.otd.bBypassActive);
-  sendJsonMapEntry(F("state.otd.stepup_enabled"), state.otd.bStepUpEnabled);
-  sendJsonMapEntry(F("state.otd.monitor_mode"), state.otd.bMonitorMode);
-  sendJsonMapEntry(F("state.otd.mode"), (int32_t)state.otd.eMode);
-  sendJsonMapEntry(F("state.otd.master_mode"), state.otd.bMasterMode);
-  sendJsonMapEntry(F("state.otd.thermostat_connected"), state.otd.bThermostatConnected);
-  sendJsonMapEntry(F("state.otd.setback_active"), state.otd.bSetbackActive);
-  sendJsonMapEntry(F("state.otd.override_mode"), (int32_t)state.otd.eOverrideMode);
-  sendJsonMapEntry(F("state.otd.override_f88"), (uint32_t)state.otd.iOverrideF88);
+  d[F("state.otd.schedule_total")] = (uint32_t)state.otd.iScheduleTotal;
+  d[F("state.otd.schedule_active")] = (uint32_t)state.otd.iScheduleActive;
+  d[F("state.otd.schedule_disabled")] = (uint32_t)state.otd.iScheduleDisabled;
+  d[F("state.otd.override_count")] = (uint32_t)state.otd.iOverrideCount;
+  d[F("state.otd.bypass_active")] = state.otd.bBypassActive;
+  d[F("state.otd.stepup_enabled")] = state.otd.bStepUpEnabled;
+  d[F("state.otd.monitor_mode")] = state.otd.bMonitorMode;
+  d[F("state.otd.mode")] = (int32_t)state.otd.eMode;
+  d[F("state.otd.master_mode")] = state.otd.bMasterMode;
+  d[F("state.otd.thermostat_connected")] = state.otd.bThermostatConnected;
+  d[F("state.otd.setback_active")] = state.otd.bSetbackActive;
+  d[F("state.otd.override_mode")] = (int32_t)state.otd.eOverrideMode;
+  d[F("state.otd.override_f88")] = (uint32_t)state.otd.iOverrideF88;
 #endif
 
-  sendEndJsonMap(F("debug"));
+  restSendJson(doc);
 }
 
 // TASK-585: WiFi network scan
@@ -2002,35 +2001,34 @@ static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
 
   // scanResult >= 0: scan complete, scanResult = number of networks
   _wifiScanStarted = false;
-  // Build JSON response using chunked streaming (avoid large static buffer)
+  // ADR-141: ArduinoJson v7. Bounded array (visible AP count). The SSID is still
+  // sanitised in place ('"'/'\\' -> '_') before assignment to preserve the prior
+  // value semantics; String() copies each into the doc.
   char connectedSsid[33];
   strlcpy(connectedSsid, WiFi.SSID().c_str(), sizeof(connectedSsid));
 
   webPushHeader(F("Cache-Control"), F("no-cache"));
-  AsyncResponseStream *s = restBeginStream("application/json");
-  if (!s) return;
 
-  char chunk[256];
-  snprintf_P(chunk, sizeof(chunk), PSTR("{\"status\":\"ready\",\"count\":%d,\"networks\":["), scanResult);
-  s->print(chunk);
-
+  JsonDocument doc;
+  JsonObject root = doc.to<JsonObject>();
+  root[F("status")] = F("ready");
+  root[F("count")]  = (int32_t)scanResult;
+  JsonArray nets = root[F("networks")].to<JsonArray>();
   for (int16_t i = 0; i < scanResult; i++) {
     char ssidBuf[33];
     strlcpy(ssidBuf, WiFi.SSID(i).c_str(), sizeof(ssidBuf));
-    // Escape quotes in SSID
+    // Sanitise quotes/backslash in SSID (kept from the hand-rolled version)
     for (char* p = ssidBuf; *p; p++) { if (*p == '"' || *p == '\\') *p = '_'; }
     bool isConn = (strcmp(ssidBuf, connectedSsid) == 0);
     bool secured = platformWiFiIsEncrypted(i);
-    snprintf_P(chunk, sizeof(chunk),
-      PSTR("%s{\"ssid\":\"%s\",\"rssi\":%d,\"channel\":%d,\"secured\":%s,\"connected\":%s}"),
-      (i > 0 ? "," : ""),
-      ssidBuf, WiFi.RSSI(i), WiFi.channel(i),
-      secured ? "true" : "false",
-      isConn ? "true" : "false");
-    s->print(chunk);
+    JsonObject net = nets.add<JsonObject>();
+    net[F("ssid")]      = String(ssidBuf);
+    net[F("rssi")]      = WiFi.RSSI(i);
+    net[F("channel")]   = WiFi.channel(i);
+    net[F("secured")]   = secured;
+    net[F("connected")] = isConn;
   }
-  s->print(F("]}"));
-  restFinalize();
+  restSendJson(doc);
 
   // Release scan memory
   WiFi.scanDelete();
@@ -2182,27 +2180,28 @@ void processAPI(AsyncWebServerRequest *request)
 //====[ implementing REST API ]====
 void sendOTValue(int msgid){
   if (msgid < 0 || msgid > OT_MSGID_MAX) {
-    sendStartJsonMap("");
-    sendJsonMapEntry(F("error"), F("message id: out of range"));
-    sendEndJsonMap("");
+    JsonDocument doc;
+    doc.to<JsonObject>()[F("error")] = F("message id: out of range");
+    restSendJson(doc);
     return;
   }
   PROGMEM_readAnything (&OTmap[msgid], OTlookupitem);
   if (OTlookupitem.type == ot_undef) {
-    sendStartJsonMap("");
-    sendJsonMapEntry(F("error"), F("message undefined: reserved for future use"));
-    sendEndJsonMap("");
+    JsonDocument doc;
+    doc.to<JsonObject>()[F("error")] = F("message undefined: reserved for future use");
+    restSendJson(doc);
     return;
   }
-  sendStartJsonMap("");
-  sendJsonMapEntry(F("label"), OTlookupitem.label);
+  JsonDocument doc;
+  JsonObject o = doc.to<JsonObject>();
+  o[F("label")] = OTlookupitem.label;
   if (OTlookupitem.type == ot_f88) {
-    sendJsonMapEntry(F("value"), (float)atof(getOTGWValue(msgid)));
+    o[F("value")] = (float)atof(getOTGWValue(msgid));
   } else {
-    sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
+    o[F("value")] = (int32_t)atoi(getOTGWValue(msgid));
   }
-  sendJsonMapEntry(F("unit"), OTlookupitem.unit);
-  sendEndJsonMap("");
+  o[F("unit")] = OTlookupitem.unit;
+  restSendJson(doc);
 }
 
 void sendOTLabel(const char *msglabel){
@@ -2212,86 +2211,34 @@ void sendOTLabel(const char *msglabel){
     if (strcasecmp(OTlookupitem.label, msglabel) == 0) break;
   }
   if (msgid > OT_MSGID_MAX){
-    sendStartJsonMap("");
-    sendJsonMapEntry(F("error"), F("message id: reserved for future use"));
-    sendEndJsonMap("");
+    JsonDocument doc;
+    doc.to<JsonObject>()[F("error")] = F("message id: reserved for future use");
+    restSendJson(doc);
     return;
   }
   if (OTlookupitem.type == ot_undef) {
-    sendStartJsonMap("");
-    sendJsonMapEntry(F("error"), F("message undefined: reserved for future use"));
-    sendEndJsonMap("");
+    JsonDocument doc;
+    doc.to<JsonObject>()[F("error")] = F("message undefined: reserved for future use");
+    restSendJson(doc);
     return;
   }
-  sendStartJsonMap("");
-  sendJsonMapEntry(F("label"), OTlookupitem.label);
+  JsonDocument doc;
+  JsonObject o = doc.to<JsonObject>();
+  o[F("label")] = OTlookupitem.label;
   if (OTlookupitem.type == ot_f88) {
-    sendJsonMapEntry(F("value"), (float)atof(getOTGWValue(msgid)));
+    o[F("value")] = (float)atof(getOTGWValue(msgid));
   } else {
-    sendJsonMapEntry(F("value"), (int32_t)atoi(getOTGWValue(msgid))); // cast selects int32_t overload
+    o[F("value")] = (int32_t)atoi(getOTGWValue(msgid));
   }
-  sendJsonMapEntry(F("unit"), OTlookupitem.unit);
-  sendEndJsonMap("");
+  o[F("unit")] = OTlookupitem.unit;
+  restSendJson(doc);
 }
 
 //=======================================================================
-// Helpers for Map-based JSON functions (sendJsonOTmonMapEntry)
-// Concrete overloads instead of templates: ctags (Arduino builder) scans all
-// .ino files and generates forward declarations for template functions using
-// the template parameter name as a type (e.g. TVal), which GCC rejects because
-// TVal is unknown at the point the ctags block is compiled. Concrete overloads
-// with real types produce valid ctags forward declarations.
-// All call sites use F() for both label and unit, so only the F/value/F overloads
-// are needed. The F/value/char* and char*/value/F combinations are unused.
-//=======================================================================
-
-// Convert both flash-string label and unit to char buffers, then dispatch to
-// the concrete sendJsonOTmonMapEntry(char*, T, char*, time_t) in jsonStuff.ino.
-void sendJsonOTmonMapEntry(const __FlashStringHelper* label, const char* value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
-  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
-  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
-}
-void sendJsonOTmonMapEntry(const __FlashStringHelper* label, float value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
-  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
-  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
-}
-void sendJsonOTmonMapEntry(const __FlashStringHelper* label, uint16_t value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
-  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
-  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
-}
-void sendJsonOTmonMapEntry(const __FlashStringHelper* label, uint32_t value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
-  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
-  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
-}
-void sendJsonOTmonMapEntry(const __FlashStringHelper* label, int value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
-  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
-  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
-}
-void sendJsonOTmonMapEntry(const __FlashStringHelper* label, bool value, const __FlashStringHelper* unit, unsigned long lastupdated) {
-  char labelBuf[35]; strncpy_P(labelBuf, (PGM_P)label, sizeof(labelBuf)); labelBuf[sizeof(labelBuf)-1] = 0;
-  char unitBuf[10];  strncpy_P(unitBuf,  (PGM_P)unit,  sizeof(unitBuf));  unitBuf[sizeof(unitBuf)-1]  = 0;
-  sendJsonOTmonMapEntry(labelBuf, value, unitBuf, lastupdated);
-}
-
-// Helpers for start/end map (non-template)
-void sendStartJsonMap(const __FlashStringHelper* objName) {
-  char buf[33];
-  strncpy_P(buf, (PGM_P)objName, sizeof(buf));
-  buf[sizeof(buf)-1] = 0;
-  sendStartJsonMap(buf);
-}
-
-void sendEndJsonMap(const __FlashStringHelper* objName) {
-  char buf[33];
-  strncpy_P(buf, (PGM_P)objName, sizeof(buf));
-  buf[sizeof(buf)-1] = 0;
-  sendEndJsonMap(buf);
-}
+// (ADR-141) The F()-keyed sendJsonOTmonMapEntry / sendStartJsonMap /
+// sendEndJsonMap wrapper overloads that used to live here were removed when
+// sendOTmonitorV2() was migrated to ArduinoJson v7. Their only caller was
+// sendOTmonitorV2(); the base char* overloads in jsonStuff.ino are untouched.
 //=======================================================================
 
 void sendOTmonitorV2()
@@ -2314,70 +2261,86 @@ void sendOTmonitorV2()
   // lock the loop task can hold across writes.
   OTStateLock stateLock(OT_STATE_READ_LOCK_MS);
 
-  sendStartJsonMap(F("otmonitor"));
+  // ADR-141: ArduinoJson v7. Each entry is the OTmon compact object shape
+  // "name": {"value": V, "unit": "U", "epoch": E}. The generic lambda mirrors
+  // the old sendJsonOTmonMapEntry overloads: V is serialised by its native type
+  // (CONOFF()/CBOOLEAN strings stay strings, numerics stay numbers).
+  JsonDocument doc;
+  JsonObject mon = doc[F("otmonitor")].to<JsonObject>();
+  auto emit = [&](const __FlashStringHelper* name, auto value,
+                  const __FlashStringHelper* unit, uint32_t epoch) {
+    JsonObject e = mon[name].to<JsonObject>();
+    e[F("value")] = value;
+    e[F("unit")]  = unit;
+    e[F("epoch")] = epoch;
+  };
 
-  // sendJsonOTmonObj(F("status hb"), byte_to_binary((OTcurrentSystemState.Statusflags>>8) & 0xFF),F(""), msglastupdated[OT_Statusflags]);
-  // sendJsonOTmonObj(F("status lb"), byte_to_binary(OTcurrentSystemState.Statusflags & 0xFF),F(""), msglastupdated[OT_Statusflags]);
+  emit(F("flamestatus"), CONOFF(isFlameStatus()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("chmodus"), CONOFF(isCentralHeatingActive()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("chenable"), CONOFF(isCentralHeatingEnabled()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("ch2modus"), CONOFF(isCentralHeating2Active()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("ch2enable"), CONOFF(isCentralHeating2enabled()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("dhwmode"), CONOFF(isDomesticHotWaterActive()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("dhwenable"), CONOFF(isDomesticHotWaterEnabled()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("diagnosticindicator"), CONOFF(isDiagnosticIndicator()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("faultindicator"), CONOFF(isFaultIndicator()),F(""), getMsgLastUpdated(OT_Statusflags));
 
-  sendJsonOTmonMapEntry(F("flamestatus"), CONOFF(isFlameStatus()),F(""), getMsgLastUpdated(OT_Statusflags));
-  sendJsonOTmonMapEntry(F("chmodus"), CONOFF(isCentralHeatingActive()),F(""), getMsgLastUpdated(OT_Statusflags));
-  sendJsonOTmonMapEntry(F("chenable"), CONOFF(isCentralHeatingEnabled()),F(""), getMsgLastUpdated(OT_Statusflags));
-  sendJsonOTmonMapEntry(F("ch2modus"), CONOFF(isCentralHeating2Active()),F(""), getMsgLastUpdated(OT_Statusflags));
-  sendJsonOTmonMapEntry(F("ch2enable"), CONOFF(isCentralHeating2enabled()),F(""), getMsgLastUpdated(OT_Statusflags));
-  sendJsonOTmonMapEntry(F("dhwmode"), CONOFF(isDomesticHotWaterActive()),F(""), getMsgLastUpdated(OT_Statusflags));
-  sendJsonOTmonMapEntry(F("dhwenable"), CONOFF(isDomesticHotWaterEnabled()),F(""), getMsgLastUpdated(OT_Statusflags));
-  sendJsonOTmonMapEntry(F("diagnosticindicator"), CONOFF(isDiagnosticIndicator()),F(""), getMsgLastUpdated(OT_Statusflags));
-  sendJsonOTmonMapEntry(F("faultindicator"), CONOFF(isFaultIndicator()),F(""), getMsgLastUpdated(OT_Statusflags));
-  
-  sendJsonOTmonMapEntry(F("coolingmodus"), CONOFF(isCoolingEnabled()),F(""), getMsgLastUpdated(OT_Statusflags));
-  sendJsonOTmonMapEntry(F("coolingactive"), CONOFF(isCoolingActive()),F(""), getMsgLastUpdated(OT_Statusflags));  
-  sendJsonOTmonMapEntry(F("otcactive"), CONOFF(isOutsideTemperatureCompensationActive()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("coolingmodus"), CONOFF(isCoolingEnabled()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("coolingactive"), CONOFF(isCoolingActive()),F(""), getMsgLastUpdated(OT_Statusflags));
+  emit(F("otcactive"), CONOFF(isOutsideTemperatureCompensationActive()),F(""), getMsgLastUpdated(OT_Statusflags));
 
   if (getMsgLastUpdated(OT_ASFflags)) {
-    sendJsonOTmonMapEntry(F("servicerequest"), CONOFF(isServiceRequest()),F(""), getMsgLastUpdated(OT_ASFflags));
-    sendJsonOTmonMapEntry(F("lockoutreset"), CONOFF(isLockoutReset()),F(""), getMsgLastUpdated(OT_ASFflags));
-    sendJsonOTmonMapEntry(F("lowwaterpressure"), CONOFF(isLowWaterPressure()),F(""), getMsgLastUpdated(OT_ASFflags));
-    sendJsonOTmonMapEntry(F("gasflamefault"), CONOFF(isGasFlameFault()),F(""), getMsgLastUpdated(OT_ASFflags));
-    sendJsonOTmonMapEntry(F("airtemp"), CONOFF(isAirTemperature()),F(""), getMsgLastUpdated(OT_ASFflags));
-    sendJsonOTmonMapEntry(F("waterovertemperature"), CONOFF(isWaterOverTemperature()),F(""), getMsgLastUpdated(OT_ASFflags));
-    sendJsonOTmonMapEntry(F("oemfaultcode"), OTcurrentSystemState.ASFflags & 0xFF, F(""), getMsgLastUpdated(OT_ASFflags));
+    emit(F("servicerequest"), CONOFF(isServiceRequest()),F(""), getMsgLastUpdated(OT_ASFflags));
+    emit(F("lockoutreset"), CONOFF(isLockoutReset()),F(""), getMsgLastUpdated(OT_ASFflags));
+    emit(F("lowwaterpressure"), CONOFF(isLowWaterPressure()),F(""), getMsgLastUpdated(OT_ASFflags));
+    emit(F("gasflamefault"), CONOFF(isGasFlameFault()),F(""), getMsgLastUpdated(OT_ASFflags));
+    emit(F("airtemp"), CONOFF(isAirTemperature()),F(""), getMsgLastUpdated(OT_ASFflags));
+    emit(F("waterovertemperature"), CONOFF(isWaterOverTemperature()),F(""), getMsgLastUpdated(OT_ASFflags));
+    emit(F("oemfaultcode"), (int32_t)(OTcurrentSystemState.ASFflags & 0xFF), F(""), getMsgLastUpdated(OT_ASFflags));
   }
 
-  if (getMsgLastUpdated(OT_Toutside))            sendJsonOTmonMapEntry(F("outsidetemperature"), OTcurrentSystemState.Toutside, F("°C"), getMsgLastUpdated(OT_Toutside));
-  if (getMsgLastUpdated(OT_Tr))                   sendJsonOTmonMapEntry(F("roomtemperature"), OTcurrentSystemState.Tr, F("°C"), getMsgLastUpdated(OT_Tr));
-  if (getMsgLastUpdated(OT_TrSet))                sendJsonOTmonMapEntry(F("roomsetpoint"), OTcurrentSystemState.TrSet, F("°C"), getMsgLastUpdated(OT_TrSet));
-  if (getMsgLastUpdated(OT_TrOverride))           sendJsonOTmonMapEntry(F("remoteroomsetpoint"), OTcurrentSystemState.TrOverride, F("°C"), getMsgLastUpdated(OT_TrOverride));
-  if (getMsgLastUpdated(OT_TSet))                 sendJsonOTmonMapEntry(F("controlsetpoint"), OTcurrentSystemState.TSet,F("°C"), getMsgLastUpdated(OT_TSet));
-  if (getMsgLastUpdated(OT_RelModLevel))          sendJsonOTmonMapEntry(F("relmodlvl"), OTcurrentSystemState.RelModLevel,F("%"), getMsgLastUpdated(OT_RelModLevel));
-  if (getMsgLastUpdated(OT_MaxRelModLevelSetting))sendJsonOTmonMapEntry(F("maxrelmodlvl"), OTcurrentSystemState.MaxRelModLevelSetting, F("%"), getMsgLastUpdated(OT_MaxRelModLevelSetting));
+  if (getMsgLastUpdated(OT_Toutside))            emit(F("outsidetemperature"), OTcurrentSystemState.Toutside, F("°C"), getMsgLastUpdated(OT_Toutside));
+  if (getMsgLastUpdated(OT_Tr))                   emit(F("roomtemperature"), OTcurrentSystemState.Tr, F("°C"), getMsgLastUpdated(OT_Tr));
+  if (getMsgLastUpdated(OT_TrSet))                emit(F("roomsetpoint"), OTcurrentSystemState.TrSet, F("°C"), getMsgLastUpdated(OT_TrSet));
+  if (getMsgLastUpdated(OT_TrOverride))           emit(F("remoteroomsetpoint"), OTcurrentSystemState.TrOverride, F("°C"), getMsgLastUpdated(OT_TrOverride));
+  if (getMsgLastUpdated(OT_TSet))                 emit(F("controlsetpoint"), OTcurrentSystemState.TSet,F("°C"), getMsgLastUpdated(OT_TSet));
+  if (getMsgLastUpdated(OT_RelModLevel))          emit(F("relmodlvl"), OTcurrentSystemState.RelModLevel,F("%"), getMsgLastUpdated(OT_RelModLevel));
+  if (getMsgLastUpdated(OT_MaxRelModLevelSetting))emit(F("maxrelmodlvl"), OTcurrentSystemState.MaxRelModLevelSetting, F("%"), getMsgLastUpdated(OT_MaxRelModLevelSetting));
 
-  if (getMsgLastUpdated(OT_Tboiler))              sendJsonOTmonMapEntry(F("boilertemperature"), OTcurrentSystemState.Tboiler, F("°C"), getMsgLastUpdated(OT_Tboiler));
-  if (getMsgLastUpdated(OT_Tret))                 sendJsonOTmonMapEntry(F("returnwatertemperature"), OTcurrentSystemState.Tret,F("°C"), getMsgLastUpdated(OT_Tret));
-  if (getMsgLastUpdated(OT_Tdhw))                 sendJsonOTmonMapEntry(F("dhwtemperature"), OTcurrentSystemState.Tdhw,F("°C"), getMsgLastUpdated(OT_Tdhw));
-  if (getMsgLastUpdated(OT_TdhwSet))              sendJsonOTmonMapEntry(F("dhwsetpoint"), OTcurrentSystemState.TdhwSet,F("°C"), getMsgLastUpdated(OT_TdhwSet));
-  if (getMsgLastUpdated(OT_MaxTSet))              sendJsonOTmonMapEntry(F("maxchwatersetpoint"), OTcurrentSystemState.MaxTSet,F("°C"), getMsgLastUpdated(OT_MaxTSet));
-  if (getMsgLastUpdated(OT_CHPressure))           sendJsonOTmonMapEntry(F("chwaterpressure"), OTcurrentSystemState.CHPressure, F("bar"), getMsgLastUpdated(OT_CHPressure));
-  if (getMsgLastUpdated(OT_OEMDiagnosticCode))    sendJsonOTmonMapEntry(F("oemdiagnosticcode"), OTcurrentSystemState.OEMDiagnosticCode, F(""), getMsgLastUpdated(OT_OEMDiagnosticCode));
+  if (getMsgLastUpdated(OT_Tboiler))              emit(F("boilertemperature"), OTcurrentSystemState.Tboiler, F("°C"), getMsgLastUpdated(OT_Tboiler));
+  if (getMsgLastUpdated(OT_Tret))                 emit(F("returnwatertemperature"), OTcurrentSystemState.Tret,F("°C"), getMsgLastUpdated(OT_Tret));
+  if (getMsgLastUpdated(OT_Tdhw))                 emit(F("dhwtemperature"), OTcurrentSystemState.Tdhw,F("°C"), getMsgLastUpdated(OT_Tdhw));
+  if (getMsgLastUpdated(OT_TdhwSet))              emit(F("dhwsetpoint"), OTcurrentSystemState.TdhwSet,F("°C"), getMsgLastUpdated(OT_TdhwSet));
+  if (getMsgLastUpdated(OT_MaxTSet))              emit(F("maxchwatersetpoint"), OTcurrentSystemState.MaxTSet,F("°C"), getMsgLastUpdated(OT_MaxTSet));
+  if (getMsgLastUpdated(OT_CHPressure))           emit(F("chwaterpressure"), OTcurrentSystemState.CHPressure, F("bar"), getMsgLastUpdated(OT_CHPressure));
+  if (getMsgLastUpdated(OT_OEMDiagnosticCode))    emit(F("oemdiagnosticcode"), OTcurrentSystemState.OEMDiagnosticCode, F(""), getMsgLastUpdated(OT_OEMDiagnosticCode));
 
-  if (settings.s0.bEnabled) 
+  if (settings.s0.bEnabled)
   {
-    sendJsonOTmonMapEntry(F("s0powerkw"), OTGWs0powerkw , F("kW"), OTGWs0lasttime);
-    sendJsonOTmonMapEntry(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
-    sendJsonOTmonMapEntry(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
+    emit(F("s0powerkw"), OTGWs0powerkw , F("kW"), OTGWs0lasttime);
+    emit(F("s0intervalcount"), OTGWs0pulseCount , F(""), OTGWs0lasttime);
+    emit(F("s0totalcount"), OTGWs0pulseCountTot , F(""), OTGWs0lasttime);
   }
-  sendJsonOTmonMapEntry(F("sensorsimulation"), state.debug.bSensorSim, F(""), now);
-  if (settings.sensors.bEnabled || state.debug.bSensorSim) 
+  emit(F("sensorsimulation"), state.debug.bSensorSim, F(""), now);
+  if (settings.sensors.bEnabled || state.debug.bSensorSim)
   {
-    sendJsonOTmonMapEntry(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
+    emit(F("numberofsensors"), DallasrealDeviceCount , F(""), now );
     for (int i = 0; i < DallasrealDeviceCount; i++) {
       const char * strDeviceAddress = getDallasAddress(DallasrealDevice[i].addr);
       if (!strDeviceAddress) continue;
-      sendJsonOTmonMapEntryDallasTemp(strDeviceAddress, DallasrealDevice[i].tempC, F("°C"), DallasrealDevice[i].lasttime);
+      // Dallas variant adds "type":"dallas" between unit and epoch.
+      // getDallasAddress() returns a shared static buffer overwritten each call;
+      // String() copies the key so multiple devices do not alias to the last addr.
+      JsonObject e = mon[String(strDeviceAddress)].to<JsonObject>();
+      e[F("value")] = DallasrealDevice[i].tempC;
+      e[F("unit")]  = F("°C");
+      e[F("type")]  = F("dallas");
+      e[F("epoch")] = (uint32_t)DallasrealDevice[i].lasttime;
       // Labels now managed by Web UI via /dallas_labels.ini file (not sent in API)
     }
   }
 
-  sendEndJsonMap(F("otmonitor"));
+  restSendJson(doc);
 }
 
 //=======================================================================
@@ -2405,20 +2368,27 @@ void sendDeviceInfoV2()
   }
   const uint32_t startMs = millis();
   restPerfBegin(REST_PERF_DEVICE_INFO);
-  sendStartJsonMap(F("device"));
+
+  // ADR-141: ArduinoJson v7. Native types replace the hand-rolled streaming map.
+  // String-returning calls (getActiveIP/MAC, WiFi.*.toString, dBmtoQuality) are
+  // assigned DIRECTLY (not via CSTR): ArduinoJson copies a String by value, whereas
+  // CSTR(<temporary String>) would hand it a const char* into a dying temporary that
+  // dangles by serialise time. char[] fields are copied too (mutable char* path).
+  JsonDocument doc;
+  JsonObject o = doc[F("device")].to<JsonObject>();
 
   // --- Firmware & build identity ---
-  sendJsonMapEntry(F("author"), F("Robert van den Breemen"));
-  sendJsonMapEntry(F("fwversion"), _SEMVER_FULL);
+  o[F("author")] = F("Robert van den Breemen");
+  o[F("fwversion")] = _SEMVER_FULL;
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
-  sendJsonMapEntry(F("compiled"), cMsg);
+  o[F("compiled")] = cMsg;
   // ADR-113 stage 2 (TASK-754): picavailable removed; UI selects on hardware_type.
   if (isPICEnabled()) {
-    sendJsonMapEntry(F("picfwversion"), state.pic.sFwversion);
-    sendJsonMapEntry(F("picdeviceid"), state.pic.sDeviceid);
-    sendJsonMapEntry(F("picfwtype"), state.pic.sType);
+    o[F("picfwversion")] = state.pic.sFwversion;
+    o[F("picdeviceid")] = state.pic.sDeviceid;
+    o[F("picfwtype")] = state.pic.sType;
   }
-  sendJsonMapEntry(F("otdirectavailable"), isOTDirectEnabled());
+  o[F("otdirectavailable")] = isOTDirectEnabled();
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   if (isOTDirectEnabled()) {
     {
@@ -2427,153 +2397,153 @@ void sendDeviceInfoV2()
       else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
       else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
       else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
-      sendJsonMapEntry(F("otdmode"), modeStr);
+      o[F("otdmode")] = modeStr;
     }
-    sendJsonMapEntry(F("otdbypass"), state.otd.bBypassActive);
-    sendJsonMapEntry(F("otdmonitor"), state.otd.bMonitorMode);
-    sendJsonMapEntry(F("otdmaster"), state.otd.bMasterMode);
-    sendJsonMapEntry(F("otdstepup"), state.otd.bStepUpEnabled);
-    sendJsonMapEntry(F("otdthermostat"), state.otd.bThermostatConnected);
-    sendJsonMapEntry(F("otdsetback"), state.otd.bSetbackActive);
-    sendJsonMapEntry(F("otdschedtotal"), state.otd.iScheduleTotal);
-    sendJsonMapEntry(F("otdschedactive"), state.otd.iScheduleActive);
-    sendJsonMapEntry(F("otdscheddisabled"), state.otd.iScheduleDisabled);
-    sendJsonMapEntry(F("otdoverrides"), state.otd.iOverrideCount);
+    o[F("otdbypass")] = state.otd.bBypassActive;
+    o[F("otdmonitor")] = state.otd.bMonitorMode;
+    o[F("otdmaster")] = state.otd.bMasterMode;
+    o[F("otdstepup")] = state.otd.bStepUpEnabled;
+    o[F("otdthermostat")] = state.otd.bThermostatConnected;
+    o[F("otdsetback")] = state.otd.bSetbackActive;
+    o[F("otdschedtotal")] = state.otd.iScheduleTotal;
+    o[F("otdschedactive")] = state.otd.iScheduleActive;
+    o[F("otdscheddisabled")] = state.otd.iScheduleDisabled;
+    o[F("otdoverrides")] = state.otd.iOverrideCount;
   }
 #endif
 
   // --- Platform & hardware identity ---
-  sendJsonMapEntry(F("platform"), F(PLATFORM_NAME));
-  sendJsonMapEntry(F("board"), boardName());
-  sendJsonMapEntry(F("hardware_type"), hardwareTypeName());  // ADR-113: static board class for codepath selection
-  sendJsonMapEntry(F("hardwaremode"), hardwareModeName());
-  sendJsonMapEntry(F("networkmode"), networkModeName());
-  sendJsonMapEntry(F("oledpresent"), state.hw.bOLEDPresent);
+  o[F("platform")] = F(PLATFORM_NAME);
+  o[F("board")] = boardName();
+  o[F("hardware_type")] = hardwareTypeName();  // ADR-113: static board class for codepath selection
+  o[F("hardwaremode")] = hardwareModeName();
+  o[F("networkmode")] = networkModeName();
+  o[F("oledpresent")] = state.hw.bOLEDPresent;
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  sendJsonMapEntry(F("ethernetpresent"), state.hw.bEthernetPresent);
-  sendJsonMapEntry(F("ethernetlink"), state.net.bEthernetLink);
+  o[F("ethernetpresent")] = state.hw.bEthernetPresent;
+  o[F("ethernetlink")] = state.net.bEthernetLink;
 #endif
 
   // --- Network identity ---
-  sendJsonMapEntry(F("hostname"), CSTR(settings.sHostname));
-  sendJsonMapEntry(F("ipaddress"), CSTR(getActiveIP()));
-  sendJsonMapEntry(F("macaddress"), CSTR(getActiveMAC()));
+  o[F("hostname")] = settings.sHostname;
+  o[F("ipaddress")] = getActiveIP();
+  o[F("macaddress")] = getActiveMAC();
   // Current WiFi network parameters (for DHCP-prefill in the UI). Available
   // on both ESP8266 and ESP32 via the standard WiFi API.
-  sendJsonMapEntry(F("wifi_current_subnet"),  CSTR(WiFi.subnetMask().toString()));
-  sendJsonMapEntry(F("wifi_current_gateway"), CSTR(WiFi.gatewayIP().toString()));
-  sendJsonMapEntry(F("wifi_current_dns1"),    CSTR(WiFi.dnsIP(0).toString()));
-  sendJsonMapEntry(F("wifi_current_dns2"),    CSTR(WiFi.dnsIP(1).toString()));
+  o[F("wifi_current_subnet")]  = WiFi.subnetMask().toString();
+  o[F("wifi_current_gateway")] = WiFi.gatewayIP().toString();
+  o[F("wifi_current_dns1")]    = WiFi.dnsIP(0).toString();
+  o[F("wifi_current_dns2")]    = WiFi.dnsIP(1).toString();
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Current Ethernet network parameters (for DHCP-prefill in the UI). Reported
   // via the EthernetESP32 library (Ethernet.* API).
-  sendJsonMapEntry(F("eth_current_subnet"),  CSTR(Ethernet.subnetMask().toString()));
-  sendJsonMapEntry(F("eth_current_gateway"), CSTR(Ethernet.gatewayIP().toString()));
-  sendJsonMapEntry(F("eth_current_dns"),     CSTR(Ethernet.dnsServerIP().toString()));
+  o[F("eth_current_subnet")]  = Ethernet.subnetMask().toString();
+  o[F("eth_current_gateway")] = Ethernet.gatewayIP().toString();
+  o[F("eth_current_dns")]     = Ethernet.dnsServerIP().toString();
 #endif
 #if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
-    sendJsonMapEntry(F("ssid"), CSTR(state.net.sAPSSID));
-    sendJsonMapEntry(F("wifirssi"), 0);
-    sendJsonMapEntry(F("wifiquality"), 0);
-    sendJsonMapEntry(F("wifiquality_text"), F("AP Mode"));
-    sendJsonMapEntry(F("apfallback"), true);
+    o[F("ssid")] = state.net.sAPSSID;
+    o[F("wifirssi")] = 0;
+    o[F("wifiquality")] = 0;
+    o[F("wifiquality_text")] = F("AP Mode");
+    o[F("apfallback")] = true;
   } else
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (state.net.eMode == NET_ETHERNET) {
-    sendJsonMapEntry(F("ssid"), F("Wired"));
-    sendJsonMapEntry(F("wifirssi"), 0);
-    sendJsonMapEntry(F("wifiquality"), 100);
-    sendJsonMapEntry(F("wifiquality_text"), F("Wired"));
+    o[F("ssid")] = F("Wired");
+    o[F("wifirssi")] = 0;
+    o[F("wifiquality")] = 100;
+    o[F("wifiquality_text")] = F("Wired");
   } else
 #endif
   {
-    sendJsonMapEntry(F("ssid"), CSTR(WiFi.SSID()));
-    sendJsonMapEntry(F("wifirssi"), WiFi.RSSI());
-    sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
-    sendJsonMapEntry(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
+    o[F("ssid")] = WiFi.SSID();
+    o[F("wifirssi")] = WiFi.RSSI();
+    o[F("wifiquality")] = signal_quality_perc_quad(WiFi.RSSI());
+    o[F("wifiquality_text")] = dBmtoQuality(WiFi.RSSI());
   }
 
   // --- Time, NTP & uptime ---
-  sendJsonMapEntry(F("ntpenable"), settings.ntp.bEnable);
-  sendJsonMapEntry(F("ntptimezone"), CSTR(settings.ntp.sTimezone));
-  sendJsonMapEntry(F("uptime"), upTime());
-  sendJsonMapEntry(F("lastreset"), lastReset);
-  sendJsonMapEntry(F("bootcount"), state.uptime.iRebootCount);
+  o[F("ntpenable")] = settings.ntp.bEnable;
+  o[F("ntptimezone")] = settings.ntp.sTimezone;
+  o[F("uptime")] = upTime();
+  o[F("lastreset")] = lastReset;
+  o[F("bootcount")] = state.uptime.iRebootCount;
 
   // --- Connection status (MQTT, OTGW, thermostat, boiler) ---
-  sendJsonMapEntry(F("mqttconnected"), state.mqtt.bConnected);
+  o[F("mqttconnected")] = state.mqtt.bConnected;
   // "otcommandinterface" names which OT interface is active, always one or the other, never both.
-  if (isPICEnabled())           sendJsonMapEntry(F("otcommandinterface"), F("PIC"));
-  else if (isOTDirectEnabled()) sendJsonMapEntry(F("otcommandinterface"), F("OT-Direct"));
-  else                          sendJsonMapEntry(F("otcommandinterface"), F("None"));
+  if (isPICEnabled())           o[F("otcommandinterface")] = F("PIC");
+  else if (isOTDirectEnabled()) o[F("otcommandinterface")] = F("OT-Direct");
+  else                          o[F("otcommandinterface")] = F("None");
   if (hasOTCommandInterface()) {
-    sendJsonMapEntry(F("thermostatconnected"), state.otBus.bThermostatState);
-    sendJsonMapEntry(F("boilerconnected"), state.otBus.bBoilerState);
-    sendJsonMapEntry(F("otgwconnected"), state.otBus.bOnline);
+    o[F("thermostatconnected")] = state.otBus.bThermostatState;
+    o[F("boilerconnected")] = state.otBus.bBoilerState;
+    o[F("otgwconnected")] = state.otBus.bOnline;
   }
   if (isPICEnabled()) {
-    sendJsonMapEntry(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting");
+    o[F("otgwmode")] = !isGatewayFirmware() ? "N/A" : state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting";
   }
-  sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
+  o[F("otgwsimulation")] = state.debug.bOTGWSimulation;
 
   // --- Chip & CPU ---
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%06X"), (unsigned int)platformChipId());
-  sendJsonMapEntry(F("chipid"), cMsg);
-  sendJsonMapEntry(F("coreversion"), platformCoreVersion());
-  sendJsonMapEntry(F("sdkversion"),  platformSdkVersion());
-  sendJsonMapEntry(F("cpufreq"), platformCpuFreqMHz());
+  o[F("chipid")] = cMsg;
+  o[F("coreversion")] = platformCoreVersion();
+  o[F("sdkversion")]  = platformSdkVersion();
+  o[F("cpufreq")] = platformCpuFreqMHz();
 
   // --- RAM / heap (free heap, largest block, fragmentation, tier transitions) ---
-  sendJsonMapEntry(F("freeheap"), platformFreeHeap());
-  sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
-  sendJsonMapEntry(F("hd_fragmentation_pct"), getHeapFragmentation());
-  sendJsonMapEntry(F("hd_enter_low"),        state.heapdiag.iEnteredLowCount);
-  sendJsonMapEntry(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
-  sendJsonMapEntry(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
+  o[F("freeheap")] = platformFreeHeap();
+  o[F("maxfreeblock")] = platformMaxFreeBlock();
+  o[F("hd_fragmentation_pct")] = getHeapFragmentation();
+  o[F("hd_enter_low")]        = state.heapdiag.iEnteredLowCount;
+  o[F("hd_enter_warning")]    = state.heapdiag.iEnteredWarningCount;
+  o[F("hd_enter_critical")]   = state.heapdiag.iEnteredCriticalCount;
 
   // --- Flash, sketch & filesystem storage (values cached at boot by cacheBootFlashInfo) ---
-  sendJsonMapEntry(F("sketchsize"),       sBootFlash.sketchSize);
-  sendJsonMapEntry(F("freesketchspace"),  sBootFlash.freeSketchSpace);
-  sendJsonMapEntry(F("flashchipid"),      sBootFlash.flashChipId);
-  sendJsonMapEntry(F("flashchipsize"),    sBootFlash.flashChipSizeMB);
-  sendJsonMapEntry(F("flashchiprealsize"),sBootFlash.flashChipRealSizeMB);
-  sendJsonMapEntry(F("flashchipspeed"),   sBootFlash.flashChipSpeedMHz);
-  sendJsonMapEntry(F("flashchipmode"),    flashMode[sBootFlash.flashChipModeIdx < 4 ? sBootFlash.flashChipModeIdx : 4]);
-  sendJsonMapEntry(F("LittleFSsize"),     sBootFlash.littleFSSizeMB);
+  o[F("sketchsize")]       = sBootFlash.sketchSize;
+  o[F("freesketchspace")]  = sBootFlash.freeSketchSpace;
+  o[F("flashchipid")]      = sBootFlash.flashChipId;
+  o[F("flashchipsize")]    = sBootFlash.flashChipSizeMB;
+  o[F("flashchiprealsize")]= sBootFlash.flashChipRealSizeMB;
+  o[F("flashchipspeed")]   = sBootFlash.flashChipSpeedMHz;
+  o[F("flashchipmode")]    = flashMode[sBootFlash.flashChipModeIdx < 4 ? sBootFlash.flashChipModeIdx : 4];
+  o[F("LittleFSsize")]     = sBootFlash.littleFSSizeMB;
 
   // --- Reliability drops (heap-pressure side effects) ---
-  sendJsonMapEntry(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
-  sendJsonMapEntry(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
+  o[F("hd_ws_drops")]         = state.heapdiag.iWsDropsTotal;
+  o[F("hd_mqtt_drops")]       = state.heapdiag.iMqttDropsTotal;
 
   // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
-  sendJsonMapEntry(F("disc_published_topics"),     state.discovery.iPublishedTopicCount);
-  sendJsonMapEntry(F("disc_pending_ids"),          (uint32_t)countPendingDiscoveryIds());
-  sendJsonMapEntry(F("disc_verify_runs"),          state.discovery.iVerifyRunCount);
-  sendJsonMapEntry(F("disc_republish_triggered"),  state.discovery.iRepublishTriggeredCount);
-  sendJsonMapEntry(F("disc_last_missing"),         (uint32_t)state.discovery.iLastMissingCount);
-  sendJsonMapEntry(F("disc_last_orphan"),          (uint32_t)state.discovery.iLastOrphanCount);
-  sendJsonMapEntry(F("disc_last_outcome"),         verifyOutcomeLabel(state.discovery.eLastOutcome));
-  sendJsonMapEntry(F("hd_drip_burst_skip"),        state.heapdiag.iDripActiveBurstSkipCount);
-  sendJsonMapEntry(F("hd_drip_cooldown_skip"),     state.heapdiag.iDripCooldownSkipCount);
-  sendJsonMapEntry(F("hd_drip_slowmode"),          state.heapdiag.iDripSlowModeCount);
-  sendJsonMapEntry(F("perf_sat_status_total_ms"),     state.restperf.satStatus.iLastTotalMs);
-  sendJsonMapEntry(F("perf_sat_status_send_ms"),      state.restperf.satStatus.iLastSendMs);
-  sendJsonMapEntry(F("perf_sat_status_render_ms"),    state.restperf.satStatus.iLastRenderMs);
-  sendJsonMapEntry(F("perf_sat_status_chunks"),       state.restperf.satStatus.iLastChunkCount);
-  sendJsonMapEntry(F("perf_device_info_total_ms"),    state.restperf.deviceInfo.iLastTotalMs);
-  sendJsonMapEntry(F("perf_device_info_send_ms"),     state.restperf.deviceInfo.iLastSendMs);
-  sendJsonMapEntry(F("perf_device_info_render_ms"),   state.restperf.deviceInfo.iLastRenderMs);
-  sendJsonMapEntry(F("perf_device_info_chunks"),      state.restperf.deviceInfo.iLastChunkCount);
-  sendJsonMapEntry(F("perf_device_info_max_ms"),      state.restperf.deviceInfo.iMaxTotalMs);
-  sendJsonMapEntry(F("perf_device_info_samples"),     state.restperf.deviceInfo.iSampleCount);
-  sendJsonMapEntry(F("perf_settings_total_ms"),       state.restperf.settings.iLastTotalMs);
-  sendJsonMapEntry(F("perf_settings_send_ms"),        state.restperf.settings.iLastSendMs);
-  sendJsonMapEntry(F("perf_settings_render_ms"),      state.restperf.settings.iLastRenderMs);
-  sendJsonMapEntry(F("perf_settings_chunks"),         state.restperf.settings.iLastChunkCount);
+  o[F("disc_published_topics")]     = state.discovery.iPublishedTopicCount;
+  o[F("disc_pending_ids")]          = (uint32_t)countPendingDiscoveryIds();
+  o[F("disc_verify_runs")]          = state.discovery.iVerifyRunCount;
+  o[F("disc_republish_triggered")]  = state.discovery.iRepublishTriggeredCount;
+  o[F("disc_last_missing")]         = (uint32_t)state.discovery.iLastMissingCount;
+  o[F("disc_last_orphan")]          = (uint32_t)state.discovery.iLastOrphanCount;
+  o[F("disc_last_outcome")]         = verifyOutcomeLabel(state.discovery.eLastOutcome);
+  o[F("hd_drip_burst_skip")]        = state.heapdiag.iDripActiveBurstSkipCount;
+  o[F("hd_drip_cooldown_skip")]     = state.heapdiag.iDripCooldownSkipCount;
+  o[F("hd_drip_slowmode")]          = state.heapdiag.iDripSlowModeCount;
+  o[F("perf_sat_status_total_ms")]     = state.restperf.satStatus.iLastTotalMs;
+  o[F("perf_sat_status_send_ms")]      = state.restperf.satStatus.iLastSendMs;
+  o[F("perf_sat_status_render_ms")]    = state.restperf.satStatus.iLastRenderMs;
+  o[F("perf_sat_status_chunks")]       = state.restperf.satStatus.iLastChunkCount;
+  o[F("perf_device_info_total_ms")]    = state.restperf.deviceInfo.iLastTotalMs;
+  o[F("perf_device_info_send_ms")]     = state.restperf.deviceInfo.iLastSendMs;
+  o[F("perf_device_info_render_ms")]   = state.restperf.deviceInfo.iLastRenderMs;
+  o[F("perf_device_info_chunks")]      = state.restperf.deviceInfo.iLastChunkCount;
+  o[F("perf_device_info_max_ms")]      = state.restperf.deviceInfo.iMaxTotalMs;
+  o[F("perf_device_info_samples")]     = state.restperf.deviceInfo.iSampleCount;
+  o[F("perf_settings_total_ms")]       = state.restperf.settings.iLastTotalMs;
+  o[F("perf_settings_send_ms")]        = state.restperf.settings.iLastSendMs;
+  o[F("perf_settings_render_ms")]      = state.restperf.settings.iLastRenderMs;
+  o[F("perf_settings_chunks")]         = state.restperf.settings.iLastChunkCount;
 
-  sendEndJsonMap(F("device"));
+  restSendJson(doc);
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_DEVICE_INFO, totalMs);
   RESTDebugTf(PSTR("REST PERF device/info total=%lums send=%lums render=%lums chunks=%lu\r\n"),
@@ -2622,11 +2592,12 @@ void sendDeviceCrashLog()
   char crashDetails[160] = {0};
   bool hasCrashLog = readLatestCrashLog(crashSummary, sizeof(crashSummary), crashDetails, sizeof(crashDetails));
 
-  sendStartJsonMap(F("crashlog"));
-  sendJsonMapEntry(F("available"), hasCrashLog);
-  sendJsonMapEntry(F("summary"), hasCrashLog ? crashSummary : "");
-  sendJsonMapEntry(F("details"), hasCrashLog ? crashDetails : "");
-  sendEndJsonMap(F("crashlog"));
+  JsonDocument doc;
+  JsonObject o = doc[F("crashlog")].to<JsonObject>();
+  o[F("available")] = hasCrashLog;
+  o[F("summary")] = hasCrashLog ? crashSummary : "";
+  o[F("details")] = hasCrashLog ? crashDetails : "";
+  restSendJson(doc);
 }
 
 
@@ -2639,26 +2610,27 @@ void sendDeviceCrashLog()
 void sendPICsettings()
 {
   triggerPICsettingsReadout();  // re-read all settings from PIC
-  sendStartJsonMap(F("pic_settings"));
+  JsonDocument doc;
+  JsonObject o = doc[F("pic_settings")].to<JsonObject>();
   // Active settings
-  sendJsonMapEntry(F("setpoint_override"),   state.picSettings.sSetpointOverride);
-  sendJsonMapEntry(F("setback"),             state.picSettings.sSetback);
-  sendJsonMapEntry(F("dhw_override"),        state.picSettings.sDhwOverride);
+  o[F("setpoint_override")]   = state.picSettings.sSetpointOverride;
+  o[F("setback")]             = state.picSettings.sSetback;
+  o[F("dhw_override")]        = state.picSettings.sDhwOverride;
   // Hardware configuration
-  sendJsonMapEntry(F("gpio"),                state.picSettings.sGpio);
-  sendJsonMapEntry(F("gpio_states"),         state.picSettings.sGpioStates);
-  sendJsonMapEntry(F("led"),                 state.picSettings.sLed);
-  sendJsonMapEntry(F("tweaks"),              state.picSettings.sTweaks);
-  sendJsonMapEntry(F("temp_sensor"),         state.picSettings.sTempSensor);
-  sendJsonMapEntry(F("smart_power"),         state.picSettings.sSmartPower);
-  sendJsonMapEntry(F("thermostat_detect"),   state.picSettings.sThermostatDetect);
+  o[F("gpio")]                = state.picSettings.sGpio;
+  o[F("gpio_states")]         = state.picSettings.sGpioStates;
+  o[F("led")]                 = state.picSettings.sLed;
+  o[F("tweaks")]              = state.picSettings.sTweaks;
+  o[F("temp_sensor")]         = state.picSettings.sTempSensor;
+  o[F("smart_power")]         = state.picSettings.sSmartPower;
+  o[F("thermostat_detect")]   = state.picSettings.sThermostatDetect;
   // Diagnostics
-  sendJsonMapEntry(F("builddate"),           state.picSettings.sBuilddate);
-  sendJsonMapEntry(F("clock_mhz"),           state.picSettings.sClockMHz);
-  sendJsonMapEntry(F("reset_cause"),         state.picSettings.sResetCause);
-  sendJsonMapEntry(F("standalone_interval"), state.picSettings.sStandaloneInterval);
-  sendJsonMapEntry(F("voltage_ref"),         state.picSettings.sVoltageRef);
-  sendEndJsonMap(F("pic_settings"));
+  o[F("builddate")]           = state.picSettings.sBuilddate;
+  o[F("clock_mhz")]           = state.picSettings.sClockMHz;
+  o[F("reset_cause")]         = state.picSettings.sResetCause;
+  o[F("standalone_interval")] = state.picSettings.sStandaloneInterval;
+  o[F("voltage_ref")]         = state.picSettings.sVoltageRef;
+  restSendJson(doc);
 } // sendPICsettings()
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
@@ -2668,7 +2640,8 @@ void sendPICsettings()
 // Returns: {"otdirect_status":{"bypass":false,"stepup":true,...}}
 void sendOTDirectStatus()
 {
-  sendStartJsonMap(F("otdirect_status"));
+  JsonDocument doc;
+  JsonObject o = doc[F("otdirect_status")].to<JsonObject>();
   // Operating mode
   {
     const char* modeStr = "gateway";
@@ -2676,36 +2649,36 @@ void sendOTDirectStatus()
     else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
     else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
     else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
-    sendJsonMapEntry(F("mode"),             modeStr);
+    o[F("mode")]             = modeStr;
   }
   // Hardware state
-  sendJsonMapEntry(F("bypass"),           state.otd.bBypassActive);
-  sendJsonMapEntry(F("stepup"),           state.otd.bStepUpEnabled);
-  sendJsonMapEntry(F("monitor_mode"),     state.otd.bMonitorMode);
-  sendJsonMapEntry(F("master_mode"),      state.otd.bMasterMode);
+  o[F("bypass")]           = state.otd.bBypassActive;
+  o[F("stepup")]           = state.otd.bStepUpEnabled;
+  o[F("monitor_mode")]     = state.otd.bMonitorMode;
+  o[F("master_mode")]      = state.otd.bMasterMode;
   // Thermostat connectivity
-  sendJsonMapEntry(F("thermostat_connected"), state.otd.bThermostatConnected);
-  sendJsonMapEntry(F("setback_active"),   state.otd.bSetbackActive);
+  o[F("thermostat_connected")] = state.otd.bThermostatConnected;
+  o[F("setback_active")]   = state.otd.bSetbackActive;
   // Schedule statistics
-  sendJsonMapEntry(F("schedule_total"),   state.otd.iScheduleTotal);
-  sendJsonMapEntry(F("schedule_active"),  state.otd.iScheduleActive);
-  sendJsonMapEntry(F("schedule_disabled"), state.otd.iScheduleDisabled);
+  o[F("schedule_total")]   = state.otd.iScheduleTotal;
+  o[F("schedule_active")]  = state.otd.iScheduleActive;
+  o[F("schedule_disabled")] = state.otd.iScheduleDisabled;
   // Override status
-  sendJsonMapEntry(F("overrides_active"), state.otd.iOverrideCount);
+  o[F("overrides_active")] = state.otd.iOverrideCount;
   // OT bus state
-  sendJsonMapEntry(F("ot_online"),        state.otBus.bOnline);
-  sendJsonMapEntry(F("thermostat"),       state.otBus.bThermostatState);
-  sendJsonMapEntry(F("boiler"),           state.otBus.bBoilerState);
+  o[F("ot_online")]        = state.otBus.bOnline;
+  o[F("thermostat")]       = state.otBus.bThermostatState;
+  o[F("boiler")]           = state.otBus.bBoilerState;
   // TASK-184: flame ratio metrics
-  sendJsonMapEntry(F("flame_duty_pct"),         (int)getFlameRatioDuty());
+  o[F("flame_duty_pct")]         = (int32_t)getFlameRatioDuty();
   {
     char freqBuf[8];
     dtostrf(getFlameRatioFreq(), 1, 1, freqBuf);
-    sendJsonMapEntry(F("flame_cycles_per_hour"), freqBuf);
+    o[F("flame_cycles_per_hour")] = freqBuf;  // kept as a quoted string (dtostrf output)
   }
   // TASK-582: CH hysteresis suspension state
-  sendJsonMapEntry(F("ch_suspended"),          state.otd.bCHSuspended);
-  sendEndJsonMap(F("otdirect_status"));
+  o[F("ch_suspended")]          = state.otd.bCHSuspended;
+  restSendJson(doc);
 } // sendOTDirectStatus()
 #endif
 
@@ -2714,12 +2687,13 @@ void sendPICFlashStatus()
 {
   // Minimal PIC flash status endpoint for polling during flash
   // Returns: {"flashstatus":{"flashing":true|false,"progress":0-100,"filename":"...","error":"..."}}
-  sendStartJsonMap(F("flashstatus"));
-  sendJsonMapEntry(F("flashing"), state.flash.bPICactive);
-  sendJsonMapEntry(F("progress"), state.flash.iPICprogress);
-  sendJsonMapEntry(F("filename"), state.flash.sPICfile);
-  sendJsonMapEntry(F("error"), state.flash.sError);
-  sendEndJsonMap(F("flashstatus"));
+  JsonDocument doc;
+  JsonObject o = doc[F("flashstatus")].to<JsonObject>();
+  o[F("flashing")] = state.flash.bPICactive;
+  o[F("progress")] = state.flash.iPICprogress;
+  o[F("filename")] = state.flash.sPICfile;
+  o[F("error")] = state.flash.sError;
+  restSendJson(doc);
 } // sendPICFlashStatus()
 
 //=======================================================================
@@ -2765,12 +2739,13 @@ void sendPICUpdateCheck()
   else if (state.pic.iUpdateCheck == PIC_UPDATE_ERROR)  status = "error";
   else                                                  status = "checking";
 
-  sendStartJsonMap(F("pic_update"));
-  sendJsonMapEntry(F("current"), state.pic.sFwversion);
-  sendJsonMapEntry(F("latest"), latest);
-  sendJsonMapEntry(F("update_available"), updateAvailable);
-  sendJsonMapEntry(F("status"), status);
-  sendEndJsonMap(F("pic_update"));
+  JsonDocument doc;
+  JsonObject o = doc[F("pic_update")].to<JsonObject>();
+  o[F("current")] = state.pic.sFwversion;
+  o[F("latest")] = latest;
+  o[F("update_available")] = updateAvailable;
+  o[F("status")] = status;
+  restSendJson(doc);
 } // sendPICUpdateCheck()
 
 //=======================================================================
@@ -2781,11 +2756,12 @@ void sendFilesystemHashCheck()
   const char* fsHash = getFilesystemHash();
   bool match = (fsHash[0] != '\0' &&
                 strcasecmp(fsHash, _VERSION_GITHASH) == 0);
-  sendStartJsonMap(F("filesystem_check"));
-  sendJsonMapEntry(F("match"), match);
-  sendJsonMapEntry(F("fw_hash"), _VERSION_GITHASH);
-  sendJsonMapEntry(F("fs_hash"), fsHash);
-  sendEndJsonMap(F("filesystem_check"));
+  JsonDocument doc;
+  JsonObject o = doc[F("filesystem_check")].to<JsonObject>();
+  o[F("match")] = match;
+  o[F("fw_hash")] = _VERSION_GITHASH;
+  o[F("fs_hash")] = fsHash;
+  restSendJson(doc);
 } // sendFilesystemHashCheck()
 
 //=======================================================================
@@ -2793,15 +2769,16 @@ void sendFlashStatus()
 {
   // Unified flash status endpoint - minimal response with only fields used by frontend
   // Returns: {"flashstatus":{"flashing":bool,"pic_flashing":bool,"pic_progress":0-100,"pic_filename":"...","pic_error":"..."}}
-  sendStartJsonMap(F("flashstatus"));
-  sendJsonMapEntry(F("flashing"), isFlashing());
+  JsonDocument doc;
+  JsonObject o = doc[F("flashstatus")].to<JsonObject>();
+  o[F("flashing")] = isFlashing();
   if (isPICEnabled()) {
-    sendJsonMapEntry(F("pic_flashing"), state.flash.bPICactive);
-    sendJsonMapEntry(F("pic_progress"), state.flash.iPICprogress);
-    sendJsonMapEntry(F("pic_filename"), state.flash.sPICfile);
-    sendJsonMapEntry(F("pic_error"), state.flash.sError);
+    o[F("pic_flashing")] = state.flash.bPICactive;
+    o[F("pic_progress")] = state.flash.iPICprogress;
+    o[F("pic_filename")] = state.flash.sPICfile;
+    o[F("pic_error")] = state.flash.sError;
   }
-  sendEndJsonMap(F("flashstatus"));
+  restSendJson(doc);
 } // sendFlashStatus()
 
 
@@ -2809,38 +2786,39 @@ void sendFlashStatus()
 void sendDeviceTimeV2() 
 {
   char buf[50];
-  
-  sendStartJsonMap(F("devtime"));
+
+  JsonDocument doc;
+  JsonObject o = doc[F("devtime")].to<JsonObject>();
   time_t now = time(nullptr);
   //Timezone based devtime
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
   snprintf_P(buf, sizeof(buf), PSTR("%04d-%02d-%02d %02d:%02d:%02d"), myTime.year(), myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second());
-  sendJsonMapEntry(F("dateTime"), buf); 
-  sendJsonMapEntry(F("epoch"), (int)now);
-  sendJsonMapEntry(F("message"), getStatusMessageText());
-  sendJsonMapEntry(F("psmode"), state.otBus.bPSmode);
-  sendJsonMapEntry(F("otgwsimulation"), state.debug.bOTGWSimulation);
-  sendJsonMapEntry(F("freeheap"), platformFreeHeap());
-  sendJsonMapEntry(F("maxfreeblock"), platformMaxFreeBlock());
-  sendJsonMapEntry(F("networkmode"), networkModeName());
-  sendJsonMapEntry(F("ipaddress"), CSTR(getActiveIP()));  // TASK-759: live active-transport IP for the header indicator
+  o[F("dateTime")] = buf;
+  o[F("epoch")] = (int32_t)now;
+  o[F("message")] = getStatusMessageText();
+  o[F("psmode")] = state.otBus.bPSmode;
+  o[F("otgwsimulation")] = state.debug.bOTGWSimulation;
+  o[F("freeheap")] = platformFreeHeap();
+  o[F("maxfreeblock")] = platformMaxFreeBlock();
+  o[F("networkmode")] = networkModeName();
+  o[F("ipaddress")] = getActiveIP();  // TASK-759: live active-transport IP for the header indicator
 #if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
-    sendJsonMapEntry(F("apfallback"), true);
-    sendJsonMapEntry(F("wifiquality"), 0);
+    o[F("apfallback")] = true;
+    o[F("wifiquality")] = 0;
   } else
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   if (state.net.eMode == NET_ETHERNET) {
-    sendJsonMapEntry(F("wifiquality"), 100);
+    o[F("wifiquality")] = 100;
   } else
 #endif
   {
-    sendJsonMapEntry(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
+    o[F("wifiquality")] = signal_quality_perc_quad(WiFi.RSSI());
   }
 
-  sendEndJsonMap(F("devtime"));
+  restSendJson(doc);
 
 } // sendDeviceTimeV2()
 
@@ -2850,256 +2828,288 @@ void sendDeviceSettings()
   const uint32_t startMs = millis();
   restPerfBegin(REST_PERF_SETTINGS);
 
-  sendStartJsonMap(F("settings"));
+  // ADR-141: ArduinoJson v7. Each setting becomes a typed sub-object, mirroring
+  // the four sendJsonSettingObj overloads:
+  //   addStr  -> {"value":"<escaped>","type":"s","maxlen":N}
+  //   addInt  -> {"value":<int>,"type":"i","min":N,"max":N}
+  //   addNum  -> {"value":<number>,"type":"f","min":N,"max":N}  (float/string source)
+  //   addBool -> {"value":<bool>,"type":"b"}
+  // addNum injects the dtostrf token verbatim via serialized(String(...)) so the
+  // exact digits (and the int-truncated min/max, matching the old overload) are
+  // preserved. char[]/String value sources are copied by ArduinoJson.
+  JsonDocument doc;
+  JsonObject s = doc[F("settings")].to<JsonObject>();
+  auto addStr = [&](const __FlashStringHelper* name, const char* value, const char* type, int maxlen) {
+    JsonObject e = s[name].to<JsonObject>();
+    // Copy the value: some sources are block-scoped locals (ssidBuf) that would
+    // dangle before restSendJson(); ArduinoJson stores const char* by pointer.
+    e[F("value")]  = String(value);
+    e[F("type")]   = type;
+    e[F("maxlen")] = maxlen;
+  };
+  auto addInt = [&](const __FlashStringHelper* name, int32_t value, const char* type, int minValue, int maxValue) {
+    JsonObject e = s[name].to<JsonObject>();
+    e[F("value")] = value;
+    e[F("type")]  = type;
+    e[F("min")]   = minValue;
+    e[F("max")]   = maxValue;
+  };
+  auto addNum = [&](const __FlashStringHelper* name, const char* numStr, const char* type, int minValue, int maxValue) {
+    JsonObject e = s[name].to<JsonObject>();
+    e[F("value")] = serialized(String(numStr));  // raw number token, exact digits
+    e[F("type")]  = type;
+    e[F("min")]   = minValue;
+    e[F("max")]   = maxValue;
+  };
+  auto addBool = [&](const __FlashStringHelper* name, bool value, const char* type) {
+    JsonObject e = s[name].to<JsonObject>();
+    e[F("value")] = value;
+    e[F("type")]  = type;
+  };
 
-  //sendJsonSettingObj("string",   settingString,   "p", sizeof(settingString)-1);  
-  //sendJsonSettingObj("string",   settingString,   "s", sizeof(settingString)-1);
-  //sendJsonSettingObj("float",    settingFloat,    "f", 0, 10,  5);
-  //sendJsonSettingObj("intager",  settingInteger , "i", 2, 60);
-
-  sendJsonSettingObj(F("hostname"), CSTR(settings.sHostname), "s", 32);
-  { char ssidBuf[33]; strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf)); sendJsonSettingObj(F("ssid"), ssidBuf, "r", 32); }
-  sendJsonSettingObj(F("mqttenable"), settings.mqtt.bEnable, "b");
-  sendJsonSettingObj(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
-  sendJsonSettingObj(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
-  sendJsonSettingObj(F("mqttuser"), CSTR(settings.mqtt.sUser), "s", 32);
+  addStr(F("hostname"), CSTR(settings.sHostname), "s", 32);
+  { char ssidBuf[33]; strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf)); addStr(F("ssid"), ssidBuf, "r", 32); }
+  addBool(F("mqttenable"), settings.mqtt.bEnable, "b");
+  addStr(F("mqttbroker"), CSTR(settings.mqtt.sBroker), "s", 32);
+  addInt(F("mqttbrokerport"), settings.mqtt.iBrokerPort, "i", 0, 65535);
+  addStr(F("mqttuser"), CSTR(settings.mqtt.sUser), "s", 32);
   char mqttPasswordPlaceholder[sizeof("password=100")];
   snprintf_P(mqttPasswordPlaceholder,
              sizeof(mqttPasswordPlaceholder),
              PSTR("password=%u"),
              static_cast<unsigned>(strnlen(settings.mqtt.sPasswd, sizeof(settings.mqtt.sPasswd))));
-  sendJsonSettingObj(F("mqttpasswd"), mqttPasswordPlaceholder, "p", 100);
-  sendJsonSettingObj(F("mqtttoptopic"), CSTR(settings.mqtt.sTopTopic), "s", 15);
-  sendJsonSettingObj(F("mqtthaprefix"), CSTR(settings.mqtt.sHaprefix), "s", 20);
-  sendJsonSettingObj(F("mqttharebootdetection"), settings.mqtt.bHaRebootDetect, "b");
-  sendJsonSettingObj(F("mqttuniqueid"), CSTR(settings.mqtt.sUniqueid), "s", 20);
-  sendJsonSettingObj(F("mqttotmessage"), settings.mqtt.bOTmessage, "b");
-  sendJsonSettingObj(F("mqttonchangepublishing"), settings.mqtt.bOnChangePublishing, "b");
-  sendJsonSettingObj(F("mqttinterval"), settings.mqtt.iInterval, "i", 0, 3600);
-  sendJsonSettingObj(F("mqttseparatesources"), settings.mqtt.bSeparateSources, "b");
-  sendJsonSettingObj(F("mqttuselegacyottopics"), settings.mqtt.bUseLegacyOtTopics, "b");
-  sendJsonSettingObj(F("legacyport25238enabled"), settings.mqtt.bLegacyPort25238Enabled, "b");
-  sendJsonSettingObj(F("ntpenable"), settings.ntp.bEnable, "b");
-  sendJsonSettingObj(F("ntptimezone"), CSTR(settings.ntp.sTimezone), "s", 50);
-  sendJsonSettingObj(F("ntphostname"), CSTR(settings.ntp.sHostname), "s", 50);
-  sendJsonSettingObj(F("ntpsendtime"), settings.ntp.bSendtime, "b");
-  sendJsonSettingObj(F("ledblink"), settings.bLEDblink, "b");
-  sendJsonSettingObj(F("darktheme"), settings.bDarkTheme, "b");
-  sendJsonSettingObj(F("nightlyrestart"), settings.bNightlyRestart, "b");
-  sendJsonSettingObj(F("nightlyrestarthour"), (int)settings.iRestartHour, "i", 0, 23);
+  addStr(F("mqttpasswd"), mqttPasswordPlaceholder, "p", 100);
+  addStr(F("mqtttoptopic"), CSTR(settings.mqtt.sTopTopic), "s", 15);
+  addStr(F("mqtthaprefix"), CSTR(settings.mqtt.sHaprefix), "s", 20);
+  addBool(F("mqttharebootdetection"), settings.mqtt.bHaRebootDetect, "b");
+  addStr(F("mqttuniqueid"), CSTR(settings.mqtt.sUniqueid), "s", 20);
+  addBool(F("mqttotmessage"), settings.mqtt.bOTmessage, "b");
+  addBool(F("mqttonchangepublishing"), settings.mqtt.bOnChangePublishing, "b");
+  addInt(F("mqttinterval"), settings.mqtt.iInterval, "i", 0, 3600);
+  addBool(F("mqttseparatesources"), settings.mqtt.bSeparateSources, "b");
+  addBool(F("mqttuselegacyottopics"), settings.mqtt.bUseLegacyOtTopics, "b");
+  addBool(F("legacyport25238enabled"), settings.mqtt.bLegacyPort25238Enabled, "b");
+  addBool(F("ntpenable"), settings.ntp.bEnable, "b");
+  addStr(F("ntptimezone"), CSTR(settings.ntp.sTimezone), "s", 50);
+  addStr(F("ntphostname"), CSTR(settings.ntp.sHostname), "s", 50);
+  addBool(F("ntpsendtime"), settings.ntp.bSendtime, "b");
+  addBool(F("ledblink"), settings.bLEDblink, "b");
+  addBool(F("darktheme"), settings.bDarkTheme, "b");
+  addBool(F("nightlyrestart"), settings.bNightlyRestart, "b");
+  addInt(F("nightlyrestarthour"), (int)settings.iRestartHour, "i", 0, 23);
 #if HAS_RUNTIME_HW_DETECT
   // ADR-127 combo: persisted hardware-mode selector (0=auto, 1=pic, 2=otdirect).
-  sendJsonSettingObj(F("boardmode"), (int)settings.iBoardMode, "i", 0, 2);
+  addInt(F("boardmode"), (int)settings.iBoardMode, "i", 0, 2);
 #endif
-  sendJsonSettingObj(F("ui_autoscroll"), settings.ui.bAutoScroll, "b");
-  sendJsonSettingObj(F("ui_timestamps"), settings.ui.bShowTimestamp, "b");
-  sendJsonSettingObj(F("ui_capture"), settings.ui.bCaptureMode, "b");
-  sendJsonSettingObj(F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, "b");
-  sendJsonSettingObj(F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, "b");
-  sendJsonSettingObj(F("ui_autoexport"), settings.ui.bAutoExport, "b");
-  sendJsonSettingObj(F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, "i", 0, 1440);
-  sendJsonSettingObj(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
-  sendJsonSettingObj(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
-  sendJsonSettingObj(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, 16);
-  sendJsonSettingObj(F("gpiosensorsinterval"), settings.sensors.iInterval, "i", 5, 65535);
-  sendJsonSettingObj(F("s0counterenabled"), settings.s0.bEnabled, "b");
-  sendJsonSettingObj(F("s0counterpin"), settings.s0.iPin, "i", 1, 16);
-  sendJsonSettingObj(F("s0counterdebouncetime"), settings.s0.iDebounceTime, "i", 0, 1000);
-  sendJsonSettingObj(F("s0counterpulsekw"), settings.s0.iPulsekw, "i", 1, 5000);
-  sendJsonSettingObj(F("s0counterinterval"), settings.s0.iInterval, "i", 5, 65535);
-  sendJsonSettingObj(F("gpiooutputsenabled"), settings.outputs.bEnabled, "b");
-  sendJsonSettingObj(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, 16);
-  sendJsonSettingObj(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 16);
-  sendJsonSettingObj(F("otgwcommandenable"), settings.picBoot.bEnable, "b");
-  sendJsonSettingObj(F("otgwcommands"), CSTR(settings.picBoot.sCommands), "s", 128);
-  sendJsonSettingObj(F("webhookenable"), settings.webhook.bEnabled, "b");
-  sendJsonSettingObj(F("webhookurlon"), CSTR(settings.webhook.sURLon), "s", 100);
-  sendJsonSettingObj(F("webhookurloff"), CSTR(settings.webhook.sURLoff), "s", 100);
-  sendJsonSettingObj(F("webhooktriggerbit"), settings.webhook.iTriggerBit, "i", 0, 15);
-  sendJsonSettingObj(F("webhookpayload"), CSTR(settings.webhook.sPayload), "s", 200);
-  sendJsonSettingObj(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
+  addBool(F("ui_autoscroll"), settings.ui.bAutoScroll, "b");
+  addBool(F("ui_timestamps"), settings.ui.bShowTimestamp, "b");
+  addBool(F("ui_capture"), settings.ui.bCaptureMode, "b");
+  addBool(F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, "b");
+  addBool(F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, "b");
+  addBool(F("ui_autoexport"), settings.ui.bAutoExport, "b");
+  addInt(F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, "i", 0, 1440);
+  addBool(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
+  addBool(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
+  addInt(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, 16);
+  addInt(F("gpiosensorsinterval"), settings.sensors.iInterval, "i", 5, 65535);
+  addBool(F("s0counterenabled"), settings.s0.bEnabled, "b");
+  addInt(F("s0counterpin"), settings.s0.iPin, "i", 1, 16);
+  addInt(F("s0counterdebouncetime"), settings.s0.iDebounceTime, "i", 0, 1000);
+  addInt(F("s0counterpulsekw"), settings.s0.iPulsekw, "i", 1, 5000);
+  addInt(F("s0counterinterval"), settings.s0.iInterval, "i", 5, 65535);
+  addBool(F("gpiooutputsenabled"), settings.outputs.bEnabled, "b");
+  addInt(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, 16);
+  addInt(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 16);
+  addBool(F("otgwcommandenable"), settings.picBoot.bEnable, "b");
+  addStr(F("otgwcommands"), CSTR(settings.picBoot.sCommands), "s", 128);
+  addBool(F("webhookenable"), settings.webhook.bEnabled, "b");
+  addStr(F("webhookurlon"), CSTR(settings.webhook.sURLon), "s", 100);
+  addStr(F("webhookurloff"), CSTR(settings.webhook.sURLoff), "s", 100);
+  addInt(F("webhooktriggerbit"), settings.webhook.iTriggerBit, "i", 0, 15);
+  addStr(F("webhookpayload"), CSTR(settings.webhook.sPayload), "s", 200);
+  addStr(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
   // --- SAT settings ---
-  sendJsonSettingObj(F("satenabled"), settings.sat.bEnabled, "b");
-  sendJsonSettingObj(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 3);  // 0=auto,1=radiators,2=heat_pump,3=underfloor
-  sendJsonSettingObj(F("satmanufacturer"), settings.sat.iManufacturer, "i", 0, SAT_MFR_COUNT - 1);
+  addBool(F("satenabled"), settings.sat.bEnabled, "b");
+  addInt(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 3);  // 0=auto,1=radiators,2=heat_pump,3=underfloor
+  addInt(F("satmanufacturer"), settings.sat.iManufacturer, "i", 0, SAT_MFR_COUNT - 1);
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fTargetTemp, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("sattargettemp"), tmpBuf, "f", 5, 30);
+    addNum(F("sattargettemp"), tmpBuf, "f", 5, 30);
     dtostrf(settings.sat.fTargetTempStep, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("sattempstep"), tmpBuf, "f", 0.1, 1.0);
+    addNum(F("sattempstep"), tmpBuf, "f", 0.1, 1.0);
     dtostrf(settings.sat.fHeatingCurveCoeff, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satcoefficient"), tmpBuf, "f", 0, 5);
+    addNum(F("satcoefficient"), tmpBuf, "f", 0, 5);
     dtostrf(settings.sat.fDeadband, 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satdeadband"), tmpBuf, "f", 0, 2);
+    addNum(F("satdeadband"), tmpBuf, "f", 0, 2);
   }
-  sendJsonSettingObj(F("satinterval"), settings.sat.iControlInterval, "i", 10, 300);
-  sendJsonSettingObj(F("satexternaltemp"), settings.sat.bUseExternalTemp, "b");
+  addInt(F("satinterval"), settings.sat.iControlInterval, "i", 10, 300);
+  addBool(F("satexternaltemp"), settings.sat.bUseExternalTemp, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fPresetComfort, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satpresetcomfort"), tmpBuf, "f", 15, 28);
+    addNum(F("satpresetcomfort"), tmpBuf, "f", 15, 28);
     dtostrf(settings.sat.fPresetEco, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satpreseteco"), tmpBuf, "f", 10, 22);
+    addNum(F("satpreseteco"), tmpBuf, "f", 10, 22);
     dtostrf(settings.sat.fPresetAway, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satpresetaway"), tmpBuf, "f", 5, 18);
+    addNum(F("satpresetaway"), tmpBuf, "f", 5, 18);
   }
-  sendJsonSettingObj(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
+  addBool(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fPresetSleep, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satpresetsleep"), tmpBuf, "f", 5, 25);
+    addNum(F("satpresetsleep"), tmpBuf, "f", 5, 25);
     dtostrf(settings.sat.fPresetActivity, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satpresetactivity"), tmpBuf, "f", 5, 20);
+    addNum(F("satpresetactivity"), tmpBuf, "f", 5, 20);
     dtostrf(settings.sat.fPresetHome, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satpresethome"), tmpBuf, "f", 10, 25);
+    addNum(F("satpresethome"), tmpBuf, "f", 10, 25);
   }
-  sendJsonSettingObj(F("satmaxmodulation"), settings.sat.iMaxRelModulation, "i", 0, 100);
+  addInt(F("satmaxmodulation"), settings.sat.iMaxRelModulation, "i", 0, 100);
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fOvpValue, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satovpvalue"), tmpBuf, "f", 0, 90);
+    addNum(F("satovpvalue"), tmpBuf, "f", 0, 90);
   }
-  sendJsonSettingObj(F("satovpenabled"), settings.sat.bOvpEnabled, "b");
+  addBool(F("satovpenabled"), settings.sat.bOvpEnabled, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satovershootmargin"), tmpBuf, "f", 0, 5);
+    addNum(F("satovershootmargin"), tmpBuf, "f", 0, 5);
   }
   // --- SAT Weather settings (Task #50) ---
-  sendJsonSettingObj(F("satweatherenable"), settings.sat.bWeatherEnable, "b");
+  addBool(F("satweatherenable"), settings.sat.bWeatherEnable, "b");
   {
     char tmpBuf[12];
     dtostrf(settings.sat.fWeatherLat, 1, 4, tmpBuf);
-    sendJsonSettingObj(F("satweatherlat"), tmpBuf, "f", -90, 90);
+    addNum(F("satweatherlat"), tmpBuf, "f", -90, 90);
     dtostrf(settings.sat.fWeatherLon, 1, 4, tmpBuf);
-    sendJsonSettingObj(F("satweatherlon"), tmpBuf, "f", -180, 180);
+    addNum(F("satweatherlon"), tmpBuf, "f", -180, 180);
   }
-  sendJsonSettingObj(F("satweatherinterval"), settings.sat.iWeatherInterval, "i", 300, 3600);
+  addInt(F("satweatherinterval"), settings.sat.iWeatherInterval, "i", 300, 3600);
   // --- SAT Power/Energy settings (Task #45) ---
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fBoilerCapacity, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satboilercapacity"), tmpBuf, "f", 1, 100);
+    addNum(F("satboilercapacity"), tmpBuf, "f", 1, 100);
   }
   // --- SAT Preset Sync settings (Task #46) ---
-  sendJsonSettingObj(F("satpresetsync"), settings.sat.bPresetSync, "b");
-  sendJsonSettingObj(F("satpresetsynctopic"), CSTR(settings.sat.sPresetSyncTopic), "s", 64);
+  addBool(F("satpresetsync"), settings.sat.bPresetSync, "b");
+  addStr(F("satpresetsynctopic"), CSTR(settings.sat.sPresetSyncTopic), "s", 64);
   // --- SAT Simulation settings (Task #37) ---
-  sendJsonSettingObj(F("satsimulation"), settings.sat.bSimulation, "b");
+  addBool(F("satsimulation"), settings.sat.bSimulation, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fSimHeatRate, 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satsimheatrate"), tmpBuf, "f", 0, 5);
+    addNum(F("satsimheatrate"), tmpBuf, "f", 0, 5);
     dtostrf(settings.sat.fSimCoolRate, 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satsimcoolrate"), tmpBuf, "f", 0, 5);
+    addNum(F("satsimcoolrate"), tmpBuf, "f", 0, 5);
   }
   // --- SAT Thermal Drop Learning (Task #21) ---
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fThermalCoeff, 1, 4, tmpBuf);
-    sendJsonSettingObj(F("satthermalcoeff"), tmpBuf, "f", 0, 1);
+    addNum(F("satthermalcoeff"), tmpBuf, "f", 0, 1);
   }
   // --- SAT Solar Gain settings (Task #23) ---
-  sendJsonSettingObj(F("satsolargain"), settings.sat.bSolarGainEnable, "b");
+  addBool(F("satsolargain"), settings.sat.bSolarGainEnable, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fSolarMinRiseRate, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satsolarminrise"), tmpBuf, "f", 0, 5);
+    addNum(F("satsolarminrise"), tmpBuf, "f", 0, 5);
     dtostrf(settings.sat.fSolarSetpointOffset, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satsolaroffset"), tmpBuf, "f", 0, 10);
+    addNum(F("satsolaroffset"), tmpBuf, "f", 0, 10);
   }
   // --- SAT Summer Simmer settings (Task #24) ---
-  sendJsonSettingObj(F("satsummersimmer"), settings.sat.bSummerSimmer, "b");
+  addBool(F("satsummersimmer"), settings.sat.bSummerSimmer, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fSummerThreshold, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satsummerthreshold"), tmpBuf, "f", 5, 35);
+    addNum(F("satsummerthreshold"), tmpBuf, "f", 5, 35);
   }
-  sendJsonSettingObj(F("satsummerminhours"), settings.sat.iSummerMinHours, "i", 1, 48);
+  addInt(F("satsummerminhours"), settings.sat.iSummerMinHours, "i", 1, 48);
   // --- SAT Thermal Comfort settings (Task #28/#47) ---
-  sendJsonSettingObj(F("satcomfortadjust"), settings.sat.bComfortAdjust, "b");
+  addBool(F("satcomfortadjust"), settings.sat.bComfortAdjust, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fComfortHumidity, 1, 0, tmpBuf);
-    sendJsonSettingObj(F("satcomforthumidity"), tmpBuf, "f", 10, 90);
+    addNum(F("satcomforthumidity"), tmpBuf, "f", 10, 90);
     dtostrf(settings.sat.fComfortMaxOffset, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("satcomfortmaxoffset"), tmpBuf, "f", 0, 3);
+    addNum(F("satcomfortmaxoffset"), tmpBuf, "f", 0, 3);
   }
   // --- SAT Multi-area settings (Task #25) ---
-  sendJsonSettingObj(F("satmultiarea"), settings.sat.bMultiArea, "b");
-  sendJsonSettingObj(F("satmultiareacount"), settings.sat.iMultiAreaCount, "i", 0, 4);
+  addBool(F("satmultiarea"), settings.sat.bMultiArea, "b");
+  addInt(F("satmultiareacount"), settings.sat.iMultiAreaCount, "i", 0, 4);
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fAreaWeight[0], 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satareaweight0"), tmpBuf, "f", 0, 10);
+    addNum(F("satareaweight0"), tmpBuf, "f", 0, 10);
     dtostrf(settings.sat.fAreaWeight[1], 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satareaweight1"), tmpBuf, "f", 0, 10);
+    addNum(F("satareaweight1"), tmpBuf, "f", 0, 10);
     dtostrf(settings.sat.fAreaWeight[2], 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satareaweight2"), tmpBuf, "f", 0, 10);
+    addNum(F("satareaweight2"), tmpBuf, "f", 0, 10);
     dtostrf(settings.sat.fAreaWeight[3], 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satareaweight3"), tmpBuf, "f", 0, 10);
+    addNum(F("satareaweight3"), tmpBuf, "f", 0, 10);
   }
   // --- SAT PID Auto-Tuning settings (Task #27) ---
-  sendJsonSettingObj(F("satautotune"), settings.sat.bAutoTune, "b");
+  addBool(F("satautotune"), settings.sat.bAutoTune, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fAutoTuneRate, 1, 3, tmpBuf);
-    sendJsonSettingObj(F("satautotunerate"), tmpBuf, "f", 0, 1);
+    addNum(F("satautotunerate"), tmpBuf, "f", 0, 1);
   }
   // --- SAT Python parity settings (Task #82) ---
-  sendJsonSettingObj(F("satsensormaxage"), (int32_t)settings.sat.iSensorMaxAgeS, "i", 60, 86400);
-  sendJsonSettingObj(F("saterrormon"), settings.sat.bErrorMonitoring, "b");
+  addInt(F("satsensormaxage"), (int32_t)settings.sat.iSensorMaxAgeS, "i", 60, 86400);
+  addBool(F("saterrormon"), settings.sat.bErrorMonitoring, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fAutoGainsValue, 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satautogains"), tmpBuf, "f", 0, 10);
+    addNum(F("satautogains"), tmpBuf, "f", 0, 10);
   }
-  sendJsonSettingObj(F("satheatingmode"), settings.sat.iHeatingMode, "i", 0, 1);
-  sendJsonSettingObj(F("satcyclesperhour"), settings.sat.iCyclesPerHour, "i", 2, 6);
+  addInt(F("satheatingmode"), settings.sat.iHeatingMode, "i", 0, 1);
+  addInt(F("satcyclesperhour"), settings.sat.iCyclesPerHour, "i", 2, 6);
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fValveOffset, 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satvalveoffset"), tmpBuf, "f", -1, 1);
+    addNum(F("satvalveoffset"), tmpBuf, "f", -1, 1);
   }
-  sendJsonSettingObj(F("satsolarfreezeint"), settings.sat.bSolarFreezeIntegral, "b");
+  addBool(F("satsolarfreezeint"), settings.sat.bSolarFreezeIntegral, "b");
   // PV-surplus setpoint boost (TASK-640)
-  sendJsonSettingObj(F("satpvboostenabled"),        settings.sat.bPvBoostEnabled, "b");
-  sendJsonSettingObj(F("satpvboostthresholdw"),     (int32_t)settings.sat.iPvBoostThresholdW, "i", 100, 10000);
-  sendJsonSettingObj(F("satpvboostholds"),          (int32_t)settings.sat.iPvBoostHoldS, "i", 30, 600);
+  addBool(F("satpvboostenabled"),        settings.sat.bPvBoostEnabled, "b");
+  addInt(F("satpvboostthresholdw"),     (int32_t)settings.sat.iPvBoostThresholdW, "i", 100, 10000);
+  addInt(F("satpvboostholds"),          (int32_t)settings.sat.iPvBoostHoldS, "i", 30, 600);
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fPvBoostDeltaC, 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satpvboostdeltac"), tmpBuf, "f", 0, 5);
+    addNum(F("satpvboostdeltac"), tmpBuf, "f", 0, 5);
   }
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fPvBoostMaxIndoorC, 1, 2, tmpBuf);
-    sendJsonSettingObj(F("satpvboostmaxindoorc"), tmpBuf, "f", 18, 28);
+    addNum(F("satpvboostmaxindoorc"), tmpBuf, "f", 18, 28);
   }
-  sendJsonSettingObj(F("satpvboostmaxdurationmin"), (int32_t)settings.sat.iPvBoostMaxDurationMin, "i", 30, 1440);
+  addInt(F("satpvboostmaxdurationmin"), (int32_t)settings.sat.iPvBoostMaxDurationMin, "i", 30, 1440);
 #if HAS_SAT_BLE
   // --- SAT BLE Sensor settings (Task #20). TASK-742: gated on HAS_SAT_BLE. ---
-  sendJsonSettingObj(F("satbleenable"), settings.sat.bBleEnable, "b");
-  sendJsonSettingObj(F("satblefailover"), settings.sat.bBleFailover, "b");
-  sendJsonSettingObj(F("satblemac"), CSTR(settings.sat.sBleMAC), "s", 17);
-  sendJsonSettingObj(F("satbleinterval"), settings.sat.iBleInterval, "i", 10, 300);
+  addBool(F("satbleenable"), settings.sat.bBleEnable, "b");
+  addBool(F("satblefailover"), settings.sat.bBleFailover, "b");
+  addStr(F("satblemac"), CSTR(settings.sat.sBleMAC), "s", 17);
+  addInt(F("satbleinterval"), settings.sat.iBleInterval, "i", 10, 300);
 #endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-Direct settings (OTGW32 only) ---
-  sendJsonSettingObj(F("otdmode"), settings.otd.iMode, "i", 0, 4);
-  sendJsonSettingObj(F("otdautodetect"), settings.otd.bAutoDetect, "b");
+  addInt(F("otdmode"), settings.otd.iMode, "i", 0, 4);
+  addBool(F("otdautodetect"), settings.otd.bAutoDetect, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.otd.fSetbackTemp, 1, 1, tmpBuf);
-    sendJsonSettingObj(F("otdsetbacktemp"), tmpBuf, "f", 1, 30);
+    addNum(F("otdsetbacktemp"), tmpBuf, "f", 1, 30);
   }
-  sendJsonSettingObj(F("otdsetbacktimeout"), settings.otd.iSetbackTimeout, "i", 5, 255);
-  sendJsonSettingObj(F("otdenableslave"), settings.otd.bEnableSlave, "b");
-  sendJsonSettingObj(F("otdsummermode"), settings.otd.bSummerMode, "b");
-  sendJsonSettingObj(F("otdfailsafe"), settings.otd.bFailSafe, "b");
-  sendJsonSettingObj(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 1275);
-  sendJsonSettingObj(F("otdhasbypassrelay"), settings.otd.bHasBypassRelay, "b");
+  addInt(F("otdsetbacktimeout"), settings.otd.iSetbackTimeout, "i", 5, 255);
+  addBool(F("otdenableslave"), settings.otd.bEnableSlave, "b");
+  addBool(F("otdsummermode"), settings.otd.bSummerMode, "b");
+  addBool(F("otdfailsafe"), settings.otd.bFailSafe, "b");
+  addInt(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 1275);
+  addBool(F("otdhasbypassrelay"), settings.otd.bHasBypassRelay, "b");
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // --- Ethernet settings (only when a W5500 was actually probed) ---
@@ -3111,27 +3121,27 @@ void sendDeviceSettings()
   // Omitting "ethstaticip" here keeps the whole eth UI section out of the web
   // page — index.js only renders it when that trigger key is present.
   if (state.hw.bEthernetPresent) {
-    sendJsonSettingObj(F("ethstaticip"), settings.eth.bStaticIP, "b");
-    sendJsonSettingObj(F("ethipaddress"), CSTR(settings.eth.sIPaddress), "s", 15);
-    sendJsonSettingObj(F("ethgateway"), CSTR(settings.eth.sGateway), "s", 15);
-    sendJsonSettingObj(F("ethsubnet"), CSTR(settings.eth.sSubnet), "s", 15);
-    sendJsonSettingObj(F("ethdns"), CSTR(settings.eth.sDNS), "s", 15);
+    addBool(F("ethstaticip"), settings.eth.bStaticIP, "b");
+    addStr(F("ethipaddress"), CSTR(settings.eth.sIPaddress), "s", 15);
+    addStr(F("ethgateway"), CSTR(settings.eth.sGateway), "s", 15);
+    addStr(F("ethsubnet"), CSTR(settings.eth.sSubnet), "s", 15);
+    addStr(F("ethdns"), CSTR(settings.eth.sDNS), "s", 15);
   }
 #endif
   // --- WiFi static IP settings (empty = DHCP) ---
-  sendJsonSettingObj(F("wifistaticip"), CSTR(settings.wifi.sStaticIp), "s", 15);
-  sendJsonSettingObj(F("wifisubnet"),   CSTR(settings.wifi.sSubnet),   "s", 15);
-  sendJsonSettingObj(F("wifigateway"),  CSTR(settings.wifi.sGateway),  "s", 15);
-  sendJsonSettingObj(F("wifidns1"),     CSTR(settings.wifi.sDns1),     "s", 15);
-  sendJsonSettingObj(F("wifidns2"),     CSTR(settings.wifi.sDns2),     "s", 15);
+  addStr(F("wifistaticip"), CSTR(settings.wifi.sStaticIp), "s", 15);
+  addStr(F("wifisubnet"),   CSTR(settings.wifi.sSubnet),   "s", 15);
+  addStr(F("wifigateway"),  CSTR(settings.wifi.sGateway),  "s", 15);
+  addStr(F("wifidns1"),     CSTR(settings.wifi.sDns1),     "s", 15);
+  addStr(F("wifidns2"),     CSTR(settings.wifi.sDns2),     "s", 15);
   char httpPasswordPlaceholder[sizeof("password=40")];
   snprintf_P(httpPasswordPlaceholder,
              sizeof(httpPasswordPlaceholder),
              PSTR("password=%u"),
              static_cast<unsigned>(strnlen(settings.sHTTPpasswd, sizeof(settings.sHTTPpasswd))));
-  sendJsonSettingObj(F("httppasswd"), httpPasswordPlaceholder, "p", 40);
+  addStr(F("httppasswd"), httpPasswordPlaceholder, "p", 40);
 
-  sendEndJsonMap(F("settings"));
+  restSendJson(doc);
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_SETTINGS, totalMs);
   RESTDebugTf(PSTR("REST PERF settings total=%lums send=%lums render=%lums chunks=%lu\r\n"),
