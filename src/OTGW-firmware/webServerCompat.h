@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.213
+**  Version  : v2.0.0-alpha.214
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -409,22 +409,37 @@ struct RestJsonStream { JsonDocument doc; size_t total; };
 // (~6 re-serializes for an 8.6 KB response), still sub-ms and far under the watchdog.
 inline void restSendJson(JsonDocument& doc) {
   if (!currentRequest || g_responseSent) return;
-  auto st = std::make_shared<RestJsonStream>();
-  st->doc   = std::move(doc);
-  st->total = measureJson(st->doc);
-  AsyncWebServerResponse* resp = currentRequest->beginChunkedResponse(
-    "application/json",
-    [st](uint8_t* buffer, size_t maxLen, size_t index) -> size_t {
-      if (index >= st->total) return 0;                 // whole document sent -> done
-      if (maxLen == 0)        return RESPONSE_TRY_AGAIN; // no room this tick, retry
-      JsonChunkWindow w(index, buffer, maxLen);
-      serializeJson(st->doc, w);                        // re-emit only [index, index+maxLen)
-      return w.put;                                     // > 0 because index < total
-    });
-  if (!resp) return;        // response alloc failed; nothing sent (handler already returned headers? no)
-  webApplyHeaders(resp);
-  currentRequest->send(resp);
-  g_responseSent = true;
+  // TASK-884 backstop: exceptions are enabled, so a failed heap allocation under
+  // memory pressure throws std::bad_alloc; if it escapes, std::terminate aborts and
+  // REBOOTS the whole device. Catch it here and drop just this request with a cheap
+  // 503 instead. NOTE: this only covers the SYNCHRONOUS allocations in this function
+  // (make_shared / beginChunkedResponse); the library's own header allocation runs
+  // later in the async _respond path (request->send() is deferred) and is NOT
+  // reachable from here, so this reduces but cannot guarantee zero abusive-flood
+  // reboots. Realistic load never reaches this path. See TASK-884 / ADR-145.
+  try {
+    auto st = std::make_shared<RestJsonStream>();
+    st->doc   = std::move(doc);
+    st->total = measureJson(st->doc);
+    AsyncWebServerResponse* resp = currentRequest->beginChunkedResponse(
+      "application/json",
+      [st](uint8_t* buffer, size_t maxLen, size_t index) -> size_t {
+        if (index >= st->total) return 0;                 // whole document sent -> done
+        if (maxLen == 0)        return RESPONSE_TRY_AGAIN; // no room this tick, retry
+        JsonChunkWindow w(index, buffer, maxLen);
+        serializeJson(st->doc, w);                        // re-emit only [index, index+maxLen)
+        return w.put;                                     // > 0 because index < total
+      });
+    if (!resp) return;        // response alloc returned null instead of throwing
+    webApplyHeaders(resp);
+    currentRequest->send(resp);
+    g_responseSent = true;
+  } catch (const std::bad_alloc&) {
+    if (!g_responseSent && currentRequest) {
+      currentRequest->send(503, "application/json", "{\"error\":\"out of memory, retry\"}");
+      g_responseSent = true;
+    }
+  }
 }
 
 #endif // WEBSERVERCOMPAT_H

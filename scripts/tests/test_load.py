@@ -107,6 +107,8 @@ def worker(host, idx, delay=0.0):
             _stats["ok" if code == 200 else "fail"] += 1
             if code == 0:
                 _stats["timeout"] += 1
+            elif code == 503:
+                _stats["busy"] += 1   # backpressure (TASK-884): device responded, declined load
         if delay > 0:
             _stop.wait(delay)   # realistic-rate throttle (per-worker think-time)
 
@@ -217,15 +219,21 @@ def main():
 
     with _stats_lock:
         req, ok, fail = _stats["req"], _stats["ok"], _stats["fail"]
+        busy = _stats["busy"]
         post, post_ok = _stats["post"], _stats["post_ok"]
-    succ_pct = (100.0 * ok / req) if req else 0.0
+    # "handled" = the device responded with a real HTTP status (200 data OR a 503
+    # backpressure decline, TASK-884) -> it stayed alive and responsive. Only timeouts
+    # / connection errors (code 0) are true failures. Under the abusive flood a healthy
+    # backpressured device serves few 200s and many 503s; that is success, not failure.
+    handled = ok + busy
+    succ_pct = (100.0 * handled / req) if req else 0.0
 
     # restore the setting we cycled
     _post(host, "/v2/settings/sattargettemp", '{"name":"sattargettemp","value":"20.0"}')
 
     print("\n== RESULTS ==")
-    print("requests: %d (ok=%d fail=%d) success=%.2f%% | inbound POST: %d ok=%d"
-          % (req, ok, fail, succ_pct, post, post_ok))
+    print("requests: %d (ok=%d busy503=%d fail=%d) handled=%.2f%% | inbound POST: %d ok=%d"
+          % (req, ok, busy, fail, succ_pct, post, post_ok))
     print("heap floor under load: %s  (baseline %s)" % (heap_floor, base.get("freeheap")))
     print("heap after cooldown:   %s  (recovery %+.1f%% vs baseline)"
           % (final.get("freeheap"), recover_pct if recover_pct is not None else 0))
@@ -250,7 +258,8 @@ def main():
     if recover_pct is not None and recover_pct < -LEAK_TOLERANCE_PCT:
         fails.append("heap did not recover (%.1f%% < -%.1f%% leak tolerance)" % (recover_pct, LEAK_TOLERANCE_PCT))
     if succ_pct < MIN_SUCCESS_PCT:
-        fails.append("request success %.2f%% < %.1f%% floor" % (succ_pct, MIN_SUCCESS_PCT))
+        fails.append("handled rate %.2f%% < %.1f%% floor (200+503; the rest timed out/errored)"
+                     % (succ_pct, MIN_SUCCESS_PCT))
     if isinstance(frag_final, int) and frag_final >= FRAG_SUSTAINED_PCT:
         fails.append("fragmentation stayed high after cooldown (%s%% >= %s%%) - not just a transient peak"
                      % (frag_final, FRAG_SUSTAINED_PCT))

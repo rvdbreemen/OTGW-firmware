@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.213
+**  Version  : v2.0.0-alpha.214
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -23,6 +23,16 @@
 // REST API debug: tracks last response status for the access-log line.
 // Set by sendApiError/sendApiOptions; defaults to 200 before each handler.
 static int16_t restResponseStatus = 0;
+
+// TASK-884: max concurrent in-flight REST requests before returning 503 (backpressure).
+// 4 matches the verified-safe realistic load (the 4-worker load test passes clean);
+// excess is rejected cheaply so the ~95 KB heap is never asked to hold more concurrent
+// response contexts than it can serve. The chunked path (ADR-145) keeps each response's
+// JsonDocument alive for the whole async stream, so unbounded concurrency exhausts the
+// heap and the library aborts on bad_alloc in addHeader. restInFlight is async_tcp-task-
+// local (all handlers serialize on the one async_tcp task; no atomic needed).
+#define REST_MAX_INFLIGHT 4
+static uint8_t restInFlight = 0;
 
 // Zero-allocation HTTP method to string (returns PROGMEM pointer).
 // Replaces strHTTPmethod() which returned String (heap allocation per call).
@@ -2082,6 +2092,22 @@ void processAPI(AsyncWebServerRequest *request)
   // Bind the per-request context. processAPI is reached from the /api route AND
   // the onNotFound catch-all (which already bound it); rebinding is idempotent.
   webBeginRequest(request);
+
+  // TASK-884: backpressure. Reject excess concurrent requests with a cheap 503
+  // BEFORE building any JSON, so the device can never be driven out of memory by
+  // abusive concurrency (which otherwise aborts on bad_alloc in addHeader once the
+  // chunked responses pile up). The server sends "Connection: close" and closes
+  // after every response (no keep-alive), so request->onDisconnect() fires exactly
+  // once per request -> the counter is balanced and cannot leak. The diagnostic
+  // logs the heap at the cap so we can tell transient concurrency from a real leak.
+  if (restInFlight >= REST_MAX_INFLIGHT) {
+    RESTDebugTf(PSTR("REST BUSY: %u/%u in-flight => 503 (freeheap=%u maxblock=%u)\r\n"),
+                restInFlight, REST_MAX_INFLIGHT, platformFreeHeap(), platformMaxFreeBlock());
+    sendApiError(503, F("Server busy: too many concurrent requests, please retry"));
+    return;
+  }
+  restInFlight++;
+  request->onDisconnect([]() { if (restInFlight) restInFlight--; });
 
   // Static buffers save ~356 bytes of stack. Safe under ESPAsyncWebServer's
   // single-task (async_tcp) handler serialization — no concurrent re-entry.
