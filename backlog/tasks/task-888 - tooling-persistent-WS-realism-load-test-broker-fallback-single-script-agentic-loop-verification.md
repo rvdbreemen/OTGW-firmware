@@ -3,11 +3,11 @@ id: TASK-888
 title: >-
   tooling: persistent-WS-realism load test + broker fallback +
   single-script/agentic-loop verification
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-19 15:57'
-updated_date: '2026-06-19 16:18'
+updated_date: '2026-06-19 16:20'
 labels: []
 dependencies: []
 ordinal: 104000
