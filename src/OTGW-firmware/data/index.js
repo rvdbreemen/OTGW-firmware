@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.219
+**  Version  : v2.0.0-alpha.220
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4507,7 +4507,11 @@ function closeAdvDropdown(restoreFocus) {
   toggleHidden('adv_dropdown', true);
   syncAdvDropdownAria();
   if (restoreFocus) {
-    var trigger = document.getElementsByClassName('adminSettings')[0];
+    // The page-nav shell is cloned into every #display* section; getElementsByClassName
+    // [0] is always the main-page copy, which is display:none on every other page (so
+    // .focus() silently no-ops -> focus drops to <body>). Target the VISIBLE instance.
+    var trigger = document.querySelector('.page-section.active .adminSettings')
+               || document.getElementsByClassName('adminSettings')[0];
     if (trigger) trigger.focus();
   }
 }
@@ -5325,6 +5329,14 @@ function refreshPICsettings() {
 
 
 //============================================================================  
+// TASK-887: device/info fills the header version + name. It runs once on load
+// (window.onload -> initMainPage) and on tab switches. On a hard reload the asset
+// burst can lose the single initial fetch to a transient 503/timeout, leaving the
+// header stuck at "[version]" until the next tab click. Retry with backoff (reset
+// on success) so a transient failure self-heals; cap so a genuinely-down endpoint
+// does not loop forever.
+let devInfoRetries = 0;
+const DEV_INFO_MAX_RETRIES = 5;
 function refreshDevInfo() {
   const devNameEl = document.getElementById('devName');
   if (devNameEl) devNameEl.textContent = "";
@@ -5350,6 +5362,8 @@ function refreshDevInfo() {
       applyOTDirectAvailability(device.otdirectavailable);
       updateNetworkIndicator(device.networkmode, device.apfallback, device.wifiquality, device.ipaddress);
 
+      devInfoRetries = 0;   // success: clear the retry budget for the next transient
+
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
 
@@ -5359,12 +5373,17 @@ function refreshDevInfo() {
       }
     })
     .catch(function (error) {
-      var p = document.createElement('p');
-      p.appendChild(
-        document.createTextNode('Error: ' + error.message)
-      );
       if (!gatewayModeLastKnown) {
         updateGatewayModeIndicator('unavailable');
+      }
+      // Self-heal a transient device/info failure (e.g. the hard-reload request
+      // burst hitting the REST backpressure 503) so the header version still fills.
+      // Backoff 1.5s, 3s, ... capped, then give up rather than loop forever.
+      if (devInfoRetries < DEV_INFO_MAX_RETRIES) {
+        devInfoRetries++;
+        setTimeout(refreshDevInfo, 1500 * devInfoRetries);
+      } else if (DEBUG_WS) {
+        console.log('refreshDevInfo: giving up after ' + devInfoRetries + ' retries: ' + error.message);
       }
     });
 } // refreshDevInfo()
@@ -8276,6 +8295,8 @@ function updateStatisticsDisplay() {
     var countEl = document.getElementById('statsCount');
     if (countEl) countEl.textContent = rows.length;
     fitTableColumnsToContent('otStatsTable');
+    updateStatsSortAria();   // L1: reconcile aria-sort with the default/active sort on
+                             // EVERY render, incl. the initial one (was click-only before)
 }
 
 function sortStats(col) {
@@ -8285,8 +8306,7 @@ function sortStats(col) {
         statsSortCol = col;
         statsSortAsc = true;
     }
-    updateStatisticsDisplay();
-    updateStatsSortAria();
+    updateStatisticsDisplay();   // calls updateStatsSortAria() internally now
 }
 
 // L3: reflect the current sort on the header cells via aria-sort so screen
