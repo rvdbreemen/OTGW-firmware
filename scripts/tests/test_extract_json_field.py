@@ -299,11 +299,23 @@ def main():
     else:
         print(f"pass  truncation bound (strlcpy)       -> len {len(got)} == 15")
 
+    # 4-byte UTF-8 drop-at-cap (L1): a surrogate-pair emoji whose 4-byte expansion
+    # would straddle the cap-1 boundary must be dropped WHOLE (no partial 4-byte
+    # sequence on the wire), result NUL-terminated and <= cap-1. cap=6 -> "ab"
+    # occupies 2, leaving room 3 < 4, so the emoji is dropped and `full` stops "cd".
+    # Exercises the need==4 guard in xjf_putUtf8 + the oi==before truncation path.
+    got = extract_json_field('{"k":"ab\\uD83D\\uDE00cd"}', "k", cap=6)
+    if got != "ab":
+        print(f"FAIL  4-byte drop-at-cap              got={ascii(got)} (want 'ab')")
+        fails += 1
+    else:
+        print(f"pass  4-byte drop-at-cap               -> {ascii(got)} (emoji dropped whole)")
+
     print()
     if fails:
         print(f"RESULT: {fails} FAIL")
         sys.exit(1)
-    print(f"RESULT: all {len(CASES) + 1} pass")
+    print(f"RESULT: all {len(CASES) + 2} pass")
 
 
 if __name__ == "__main__":
