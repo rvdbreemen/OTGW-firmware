@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.220
+**  Version  : v2.0.0-alpha.221
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -15,6 +15,7 @@
 #include <Arduino.h>
 #include <AceTime.h>
 #include "jsonEmit.h"           // ADR-146/TASK-886: embedded-robust streaming JSON writer (no JsonDocument); ArduinoJson fully removed from the REST path
+#include "jsonChunked.h"        // TASK-883: true chunked/pull JSON streaming (no whole-response cbuf) — A/B vs the heap-tier gate mitigation
 // #include <TimeLib.h>
 
 // DEBUGGING: Uncomment the next line to disable WebSocket functionality

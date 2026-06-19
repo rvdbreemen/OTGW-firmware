@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.220
+**  Version  : v2.0.0-alpha.221
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3021,9 +3021,12 @@ void sendDeviceSettings()
   // (and the int-truncated min/max, matching the old overload) are preserved. The
   // streaming key/value emit immediately, so block-scoped sources (ssidBuf, the
   // tmpBuf blocks) are written before they go out of scope - no copy needed.
-  AsyncResponseStream* strm = restBeginStream("application/json");
-  if (strm) {
-    JsonEmit je(*strm);
+  // TASK-883: true chunked/pull streaming (no whole-response cbuf). The settings
+  // body reads only request-stable state (settings.*, state.hw.bEthernetPresent),
+  // so re-running this closure per TCP window is byte-deterministic -> no snapshot
+  // needed (see jsonChunked.h DETERMINISM CONTRACT). This is the biggest response
+  // (~8.6 KB) and the main driver of the under-flood cbuf resize storm.
+  restSendChunked("application/json", [](JsonEmit& je) {
     je.beginObject();                 // root {
     je.beginObject(F("settings"));    // "settings":{
     auto addStr = [&](const __FlashStringHelper* name, const char* value, const char* type, int maxlen) {
@@ -3332,8 +3335,7 @@ void sendDeviceSettings()
 
     je.endObject();                   // close "settings"
     je.endObject();                   // close root
-  }
-  restFinalize();
+  });
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_SETTINGS, totalMs);
   RESTDebugTf(PSTR("REST PERF settings total=%lums send=%lums render=%lums chunks=%lu\r\n"),
