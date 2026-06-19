@@ -3,11 +3,11 @@ id: TASK-883
 title: >-
   fix(async): mitigate Task Watchdog reboot under heavy concurrent REST load
   (TASK-867 AC#8 / TASK-879)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-18 09:24'
-updated_date: '2026-06-19 15:34'
+updated_date: '2026-06-19 15:39'
 labels: []
 dependencies: []
 ordinal: 99000
