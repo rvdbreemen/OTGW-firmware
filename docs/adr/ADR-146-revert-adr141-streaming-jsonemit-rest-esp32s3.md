@@ -1,7 +1,7 @@
 ---
 id: ADR-146
 title: "Revert ADR-141: remove ArduinoJson, return to a hand-rolled streaming JSON writer (JsonEmit) on the ESP32-S3 REST path"
-status: Proposed
+status: Accepted
 date: 2026-06-19
 tags: [json, arduinojson, rest, esp32s3, memory, streaming, jsonemit, heap, evaluate]
 supersedes: [ADR-141, ADR-145]
@@ -14,7 +14,8 @@ deciders: [Robert van den Breemen]
 
 ## Status
 
-Proposed, 2026-06-19.
+Accepted, 2026-06-19 (Proposed 2026-06-19; accepted by the maintainer 2026-06-19 after
+field validation on OTGW32 across alpha.216-220).
 
 **Binding-level** (per ADR-080): the enforcing gate is `evaluate.py::check_no_arduinojson`
 (restored/renamed under TASK-886). It FAILs on any ArduinoJson symbol
@@ -41,15 +42,13 @@ status_history:
   - date: 2026-06-19
     status: Proposed
     changed_by: Agent
-    reason: >
-      A/B experiment (TASK-885) produced hard numbers that satisfy the full-revert
-      criteria from PLAN-streaming-json-jsonEmit.md §5.8: JsonEmit 0 reboots across
-      8/12/16 workers; ArduinoJson craters to <12 KB maxblock floor and aborts on
-      bad_alloc; settings output byte-identical; binary ~8 KB smaller; json_golden
-      27 PASS (4 environmental). The maintainer chose full revert on those numbers
-      (2026-06-18). Proposing ADR superseding ADR-141/ADR-145 and restoring the
-      evaluate.py gate under TASK-886.
+    reason: A/B experiment (TASK-885) produced hard numbers that satisfy the full-revert criteria from PLAN-streaming-json-jsonEmit.md 5.8 (JsonEmit 0 reboots across 8/12/16 workers; ArduinoJson craters to <12 KB maxblock floor and aborts on bad_alloc; settings output byte-identical; binary ~8 KB smaller; json_golden 27 PASS, 4 environmental). The maintainer chose full revert on those numbers (2026-06-18). Proposing ADR superseding ADR-141/ADR-145 and restoring the evaluate.py gate under TASK-886.
     changed_via: adr-kit
+  - date: 2026-06-19
+    status: Accepted
+    changed_by: maintainer (Robert van den Breemen)
+    reason: Accepted after field validation on OTGW32 across alpha.216-220 (JsonEmit streaming + heap-tier backpressure gate; evaluate.py check_no_arduinojson restored; OpenAPI 18/18 live; json_golden semantic-equal). The residual flood-TWDT is mitigated by the gate, not eliminated; the real fix (true chunked JsonEmit streaming, no ArduinoJson) is tracked in TASK-883.
+    changed_via: manual
 ```
 
 ## Context

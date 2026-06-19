@@ -5,7 +5,7 @@ status: Accepted
 date: 2026-06-15
 tags: [json, arduinojson, mqtt, ha-discovery, rest, esp32s3, memory]
 supersedes: [ADR-042]
-superseded_by: []
+superseded_by: [ADR-146]
 related: [ADR-042, ADR-018, ADR-128, ADR-140, ADR-089, ADR-077, ADR-131]
 deciders: [Robert van den Breemen]
 ---
