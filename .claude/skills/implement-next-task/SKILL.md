@@ -69,15 +69,22 @@ into it (the `other-projects` submodule remote 404s, so copy from a populated
 worktree), then launch with the args above. **Integration is serial**: when a
 sub-branch lane finishes, merge it into `feature-2.0.0-esp32s3-async`, run
 `bin/bump-prerelease.sh` once for it (the deferred semver tag), resolve any
-version-banner conflicts, then announce. Caution: parallel lanes that touch
+version-banner conflicts, then announce. **Then DELETE the merged sub-branch
+immediately**: `git branch -d <sub-branch>`, `git push origin --delete <sub-branch>`,
+and `git worktree remove <dir>`. Never leave a merged sub-branch (or its worktree)
+lying around — that is the `-jsonemit` / `-chunked` proliferation cleaned up 2026-06-19
+(maintainer directive: one async branch). Caution: parallel lanes that touch
 overlapping files (loop edits in `OTGW-firmware.ino`, `platform_esp32.h`, version
 banners) conflict at merge — only fan out file-disjoint tasks.
 
 ## Notes
 - Field/hardware ACs are never self-certified -> those tasks end **In Review**; the
   maintainer accepts the Proposed ADRs and closes field-validation under the epic.
-- All work is on `feature-2.0.0-esp32s3-async` in `OTGW-firmware-esp32s3-async` (or a
-  parallel sub-branch/worktree). Never touch `dev` or the other 2.0.0 branch.
+- **Single lane (the default) commits and pushes DIRECTLY on `feature-2.0.0-esp32s3-async`
+  in `OTGW-firmware-esp32s3-async` — NO sub-branch.** The target is ONE async branch
+  (maintainer directive 2026-06-19). Sub-branches/worktrees exist ONLY for genuine
+  parallel lanes and are deleted right after merge (see Parallel lanes above). Never touch
+  `dev` or the other 2.0.0 branch.
 - Rate-limit storms: the engine ends a run on a transient agent death after cleaning
   up; just re-run (cron does this every 30 min). The abort-cleanup is itself an
   agent and can die under heavy limiting — the launching session then cleans up
