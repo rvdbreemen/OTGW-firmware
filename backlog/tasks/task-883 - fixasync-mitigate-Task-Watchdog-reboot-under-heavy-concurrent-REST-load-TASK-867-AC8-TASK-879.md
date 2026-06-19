@@ -3,11 +3,11 @@ id: TASK-883
 title: >-
   fix(async): mitigate Task Watchdog reboot under heavy concurrent REST load
   (TASK-867 AC#8 / TASK-879)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-18 09:24'
-updated_date: '2026-06-18 14:12'
+updated_date: '2026-06-19 06:52'
 labels: []
 dependencies: []
 ordinal: 99000
@@ -27,8 +27,6 @@ scripts/tests/test_load.py (the AC#8 heap-under-load tool) surfaced a real edge:
 - [x] #4 A/B causation check: flash pre-migration build (b54c0890~1), run identical 8-worker test_load.py; record whether the TWDT threshold differs from the migrated build (proves/refutes migration involvement). Until done, the migration is NOT implicated.
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -42,4 +40,6 @@ FIX ATTEMPTS (hardware-verified, both FAILED to stop the flood reboot): (1) asyn
 REAL FIX implemented (alpha.213, ADR-145 Proposed): restSendJson() now serves JSON via beginChunkedResponse with a pull filler that RE-SERIALIZES one TCP-window slice per chunk (JsonChunkWindow Print sink captures only [index,index+maxLen)). The JsonDocument is moved onto the heap behind a shared_ptr captured by the filler lambda (lives until the last chunk, then freed); total=measureJson cached so the filler returns 0 exactly at end vs RESPONSE_TRY_AGAIN when maxLen==0. Result: NO whole-response contiguous buffer -> the alloc-fail + per-byte 'Failed to allocate' log storm that tripped the watchdog cannot happen. O(1) RAM beyond the (smaller, fragmentation-tolerant) doc pool; CPU O(n*chunks) ~6 re-serializes per 8.6KB response (sub-ms). ZERO changes at the ~40 restSendJson call sites (signature preserved; doc moved internally). Verified lib semantics first: beginChunkedResponse filler gets index=_filledLength (cumulative offset), return 0 (!=RESPONSE_TRY_AGAIN) -> terminating chunk. Build + hardware-flood verification pending. AC#1 (8-worker survive) is the gate.
 
 RESOLUTION (alpha.213, ADR-145): the chunked-streaming fix ELIMINATES the IDF Task-Watchdog reboot that is the subject of this task. Hardware-verified: chunked build = 0 watchdog panics under the same 8-worker flood that gave all-watchdog panics on the buffered build; heap stays healthy (maxblock floor ~31KB vs ~8.7KB, frag peak 33% vs 81%); json_golden semantic-equal (heavy multi-chunk endpoints byte-identical); realistic 4-worker load PASS (bootcount delta 0, 535 req 100%, no ADR-089 tier breach). AC#2/#3/#4 met; AC#1's literal 'bootcount delta 0 under the 8-worker flood' is NOT met because, with the watchdog gone, the abusive flood now aborts via a DIFFERENT path -- unhandled std::bad_alloc in AsyncWebServerResponse::addHeader (cause NOT pinned: 46KB free / 31KB block at the time, so not simple exhaustion). That residual is split out to TASK-884 (connection/concurrency backpressure category, a fresh architectural call for the maintainer; per-path tweaks won't win the flood). Do NOT claim a 'capacity DoS' -- the free-heap numbers contradict it. Status -> In Review: the watchdog mechanism is fixed and shipped; field validation + the TASK-884 residual remain. Five fix iterations recorded above (core-0 rejected ADR-144, pre-size kept alpha.212, chunked shipped alpha.213).
+
+alpha.216 update (from TASK-886 ADR-141 revert): the ADR-145 chunked/pull path that fixed this watchdog reboot was ArduinoJson-based and was removed by the full ArduinoJson revert, so the flood reboot is REINTRODUCED in principle. Confirmed by hardware A/B on OTGW32 @192.168.1.143: under 8-16w unthrottled flood the whole-response AsyncResponseStream cbuf storms 'Failed to allocate' (~4186 lines/4min) when the internal-RAM heap fragments below the response size. MITIGATION shipped in alpha.216 (restAPI.ino restEffectiveInflightCap): the REST_MAX_INFLIGHT backpressure gate is now HEAP-TIER-AWARE, tightening the concurrency ceiling toward 1 as platformMaxFreeBlock() shrinks (>=24KB->4, >=16KB->2, below->serialize 1). Result: storm spread below the 30s TWDT threshold -> 0 reboots at 8w (99.3% handled) AND 16w (94.8% handled), heap recovers fully, 0 panic/0 task_wdt in serial. This is a MITIGATION, not the fix: the storm still occurs and 16w handled stays ~95% (< 98% floor) due to client timeouts under serialize-under-pressure. THE REAL FIX remains in scope here: true chunked/pull-based JSON streaming on JsonEmit (no ArduinoJson) that never materializes a whole-response buffer (bounded to the TCP window), so no contiguous alloc can fail under fragmentation. Design note: a no-document live-state producer cannot naively re-serialize per window (volatile fields shift byte widths -> window desync); needs either a per-response state snapshot or a resumable/stateful forward producer. ADR-146 documents this honestly.
 <!-- SECTION:NOTES:END -->
