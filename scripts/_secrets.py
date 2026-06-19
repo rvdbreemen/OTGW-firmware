@@ -14,6 +14,12 @@ Usage:
 """
 import json
 import os
+import socket
+
+# Test-rig fallback broker: laptop Docker Mosquitto (see project_mqtt_test_rig_broker
+# memory + D:\Users\Robert\ha-mqtt-validation). Private-LAN address, safe in-repo.
+TEST_RIG_BROKER = "192.168.1.234"
+TEST_RIG_PORT = 1883
 
 # logical key -> (settings.json aliases, env var)
 _KEYS = {
@@ -69,6 +75,37 @@ def mqtt_password():
 
 def all_secrets():
     return {k: get(k) for k in _KEYS}
+
+
+def _reachable(host, port, timeout=2.0):
+    try:
+        with socket.create_connection((host, int(port)), timeout=timeout):
+            return True
+    except Exception:
+        return False
+
+
+def resolve_broker(default_host="homeassistant.local", default_port=1883):
+    """Resolve the MQTT broker, PREFERRING the real/configured broker and FALLING
+    BACK to the laptop test-rig (192.168.1.234:1883) when the real one is unreachable.
+
+    Maintainer convention (2026-06-19, project_mqtt_test_rig_broker): test/capture
+    scripts must work whether the production broker is up or only the test rig is.
+
+    Returns (host, port, used_fallback: bool).
+    """
+    host = get("broker_host", default_host)
+    try:
+        port = int(get("broker_port", default_port) or default_port)
+    except (TypeError, ValueError):
+        port = default_port
+    if _reachable(host, port):
+        return host, port, False
+    # Real broker unreachable -> test-rig fallback.
+    if (host, port) != (TEST_RIG_BROKER, TEST_RIG_PORT) and _reachable(TEST_RIG_BROKER, TEST_RIG_PORT):
+        return TEST_RIG_BROKER, TEST_RIG_PORT, True
+    # Neither reachable -> hand back the configured one; the caller surfaces the failure.
+    return host, port, False
 
 
 if __name__ == "__main__":

@@ -64,8 +64,13 @@ def main():
     g = (lambda k, d=None: _secrets.get(k, d)) if _secrets else (lambda k, d=None: d)
     host = args.host or g("device_host", "OTGW.local")
     base = f"http://{host}"
-    broker = g("broker_host", "homeassistant.local")
-    port = int(g("broker_port", 1883) or 1883)
+    # Prefer the real broker; fall back to the laptop test-rig when it is unreachable.
+    if _secrets:
+        broker, port, used_fb = _secrets.resolve_broker()
+        if used_fb:
+            print(f"# real broker unreachable -> falling back to test-rig {broker}:{port}")
+    else:
+        broker, port = "homeassistant.local", 1883
     user = g("mqtt_user", "") or ""
     pw = _secrets.mqtt_password() if _secrets else ""
 
