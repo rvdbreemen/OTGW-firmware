@@ -561,7 +561,8 @@ void weatherSendStatusJSON()
 {
   // ADR-141 revert / TASK-885: streaming JsonEmit replaces the JsonDocument
   // path. Each float field emits as a real JSON number via je.field(k, float)
-  // (3-decimal default; json_golden tolerates decimal width). Bools emit as
+  // (6-decimal default, trailing zeros trimmed; json_golden tolerates decimal
+  // width). Bools emit as
   // real true/false, ints as bare integers. The forecast arrays stay bare
   // numbers. The original wrapper key was F("") => a flat ROOT object, so build
   // directly on the root object (no nested wrapper).

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-alpha.216
+**  Version  : v2.0.0-alpha.217
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -786,6 +786,13 @@ static const char* xjfReadString(const char* p, char* out, size_t cap) {
       char e = p[1];
       if (!e) return NULL;
       if (e == 'u') {
+        // Bound the 4-digit read FIRST. p is NUL-terminated; a body truncated
+        // mid-escape ("...\u", "...\u1") would otherwise let the comma-operator
+        // reads of p[3..5] run past the terminator (the old form evaluated all
+        // four xjfHex() before the <0 guard). The || short-circuits at the first
+        // NUL, so no byte past the terminator is ever dereferenced. Matches the
+        // host oracle's `i+5 >= len -> None` bound (test_extract_json_field.py).
+        if (!p[2] || !p[3] || !p[4] || !p[5]) return NULL;
         int h0 = xjfHex(p[2]), h1 = xjfHex(p[3]), h2 = xjfHex(p[4]), h3 = xjfHex(p[5]);
         if (h0 < 0 || h1 < 0 || h2 < 0 || h3 < 0) return NULL;
         uint32_t cp = (uint32_t)((h0 << 12) | (h1 << 8) | (h2 << 4) | h3);

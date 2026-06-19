@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.216
+**  Version  : v2.0.0-alpha.217
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -53,7 +53,10 @@ static uint8_t restInFlight = 0;
 // has the whole remaining contiguous block and is far likelier to succeed. Thresholds are
 // generous (settings ~8.6 KB): >=24 KB -> full cap, >=16 KB -> 2, below -> serialize (1).
 static inline uint8_t restEffectiveInflightCap() {
-  if (REST_MAX_INFLIGHT <= 1) return REST_MAX_INFLIGHT;   // gate explicitly disabled/minimal
+  // <=1 = minimal cap; ==255 = the "disable the gate" A/B raw-arm sentinel
+  // (line 35). Both bypass the heap-tier clamp so 255 measures truly unmitigated
+  // behaviour under load, not gated-vs-gated. Shipped default is 4 -> falls through.
+  if (REST_MAX_INFLIGHT <= 1 || REST_MAX_INFLIGHT >= 255) return REST_MAX_INFLIGHT;
   const uint32_t mb = platformMaxFreeBlock();
   if (mb < 16000) return 1;
   if (mb < 24000) return (REST_MAX_INFLIGHT < 2) ? REST_MAX_INFLIGHT : 2;

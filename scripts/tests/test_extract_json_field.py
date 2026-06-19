@@ -225,6 +225,13 @@ CASES = [
     ("colon inside string val", '{"label":"a:b","x":1}',                   "x",          "1"),
     ("empty object",            '{}',                                      "value",      None),
     ("unterminated string val", '{"command":"abc',                        "command",    None),
+    # body truncated mid-\u escape: must reject (None), never read past the
+    # terminator. Guards the OOB-read fix in xjfReadString's \u branch (the
+    # comma-operator hex reads used to dereference p[3..5] past the NUL).
+    ("truncated \\u no digits",  '{"command":"\\u',                        "command",    None),
+    ("truncated \\u 1 digit",    '{"command":"\\u1',                       "command",    None),
+    ("truncated \\u 3 digits",   '{"command":"\\u00e',                     "command",    None),
+    ("truncated \\u in key",     '{"comma\\u',                             "command",    None),
     ("leading junk before {",   'garbage {"command":"ok"}',                "command",    "ok"),
     # realistic captured bodies
     ("webhook event",           '{"event":"boiler_temp","value":45.5,"duration_s":300}', "event",      "boiler_temp"),
