@@ -1,7 +1,7 @@
-# Daily Issue Report — 2026-06-18
+# Daily Issue Report — 2026-06-19
 
-**Generated:** 2026-06-18T00:00:00Z
-**GitHub window:** since 2026-06-17T00:00:00Z (last 24 hours)
+**Generated:** 2026-06-19T07:05:21Z
+**GitHub window:** since 2026-06-18T00:00:00Z (last 24 hours)
 **Tweakers window:** N/A (feed blocked by egress policy)
 **Discord window:** N/A (MCP server not available in this environment)
 
@@ -9,7 +9,7 @@
 
 No new issues in the last 24 hours.
 
-- **GitHub**: 0 new or updated open issues since 2026-06-17T00:00:00Z.
+- **GitHub**: 0 new or updated open issues since 2026-06-18T00:00:00Z.
 - **Tweakers**: Feed unavailable — `gathering.tweakers.net` blocked by egress policy in this execution environment.
 - **Discord**: MCP server not configured in this execution environment.
 
@@ -38,12 +38,10 @@ No new issues in the last 24 hours.
 
 **Total open issues:** 4 — none updated in the last 24 hours.
 
-Note: Issue #561 ([Feature] Static IP address settings) appears to have been closed since the last report on 2026-06-04.
-
 ---
 
 ## Timestamps
 
-- GitHub last check: 2026-06-18T00:00:00Z
-- Tweakers last check: N/A (blocked)
+- GitHub last check: 2026-06-19T07:05:21Z
+- Tweakers last check: 2026-06-19T07:05:21Z (blocked — no data)
 - Discord last check: N/A (MCP unavailable)
