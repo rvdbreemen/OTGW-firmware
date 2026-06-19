@@ -68,12 +68,12 @@
         </div>
         <div class='nav-right'>
           <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
-          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
-          <div class="adv_dropdown hidden">
-            <span class="list_item tabPICflash pic-only">PIC firmware</span>
-            <span class="list_item tabWebhook">Webhook</span>
-            <span class="list_item tabDeviceInfo">Debug Information</span>
-            <span class="list_item FSexplorer">File system contents</span>
+          <button type="button" class='adminSettings nav-item tabButton' aria-haspopup="menu" aria-expanded="false">Advanced ▾</button>
+          <div class="adv_dropdown hidden" role="menu">
+            <span class="list_item tabPICflash pic-only" role="menuitem" tabindex="0">PIC firmware</span>
+            <span class="list_item tabWebhook" role="menuitem" tabindex="0">Webhook</span>
+            <span class="list_item tabDeviceInfo" role="menuitem" tabindex="0">Debug Information</span>
+            <span class="list_item FSexplorer" role="menuitem" tabindex="0">File system contents</span>
           </div>
         </div>
       </div>
@@ -156,11 +156,11 @@
         <div class="ot-log-header">
           <h3>OpenTherm Monitor</h3>
           <div class="ot-log-status">
-            <span id="wsStatus" class="ws-status ws-disconnected" title="Live WebSocket connection to the gateway for real-time OpenTherm message streaming">●</span>
+            <span id="wsStatus" class="ws-status ws-disconnected" role="img" aria-label="WebSocket link status" title="Live WebSocket connection to the gateway for real-time OpenTherm message streaming">●</span>
             <span id="wsStatusText" title="Live WebSocket connection to the gateway for real-time OpenTherm message streaming">Disconnected</span>
             <span id="simulationBadge" class="simulation-badge hidden" aria-live="polite">SIMULATION</span>
             <span class="status-separator pic-only">|</span>
-            <span id="gatewayModeStatus" class="mode-status mode-unknown pic-only" title="Gateway mode: actively modifies OpenTherm messages. Monitor mode: passively observes traffic without interfering.">●</span>
+            <span id="gatewayModeStatus" class="mode-status mode-unknown pic-only" role="img" aria-label="Gateway / OT-bus mode" title="Gateway mode: actively modifies OpenTherm messages. Monitor mode: passively observes traffic without interfering.">●</span>
             <span id="gatewayModeText" class="pic-only" title="Gateway mode: actively modifies OpenTherm messages. Monitor mode: passively observes traffic without interfering.">Detecting...</span>
           </div>
         </div>
@@ -230,12 +230,12 @@
                     </colgroup>
                     <thead>
                         <tr>
-                            <th onclick="sortStats(0)">Hex</th>
-                            <th onclick="sortStats(1)">Dec</th>
-                            <th onclick="sortStats(2)">Direction</th>
-                            <th onclick="sortStats(3)">Description</th>
-                            <th onclick="sortStats(4)">Interval (s)</th>
-                            <th onclick="sortStats(5)">Value</th>
+                            <th tabindex="0" aria-sort="none" onclick="sortStats(0)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();sortStats(0);}">Hex</th>
+                            <th tabindex="0" aria-sort="none" onclick="sortStats(1)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();sortStats(1);}">Dec</th>
+                            <th tabindex="0" aria-sort="none" onclick="sortStats(2)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();sortStats(2);}">Direction</th>
+                            <th tabindex="0" aria-sort="none" onclick="sortStats(3)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();sortStats(3);}">Description</th>
+                            <th tabindex="0" aria-sort="none" onclick="sortStats(4)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();sortStats(4);}">Interval (s)</th>
+                            <th tabindex="0" aria-sort="none" onclick="sortStats(5)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();sortStats(5);}">Value</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -359,7 +359,7 @@
           <span id="sat-sim-badge" class="sat-badge sat-badge-sim" style="display:none">SIMULATION</span>
           <span class="sat-enable-toggle-wrap" title="Enable / Disable SAT">
             <label class="ds-switch">
-              <input type="checkbox" id="sat-toggle-enable" onchange="SAT.toggleEnable()">
+              <input type="checkbox" id="sat-toggle-enable" onchange="SAT.toggleEnable()" aria-label="Enable SAT">
               <span class="slider"></span>
             </label>
             <span class="sat-toggle-label">SAT</span>
@@ -615,7 +615,7 @@
     <!-- KEEP THIS --->
 
     <!-- Pin to bottom right corner -->
-    <div class="bottom right-0"><span id="heap-info" style="display:inline-block; margin-right:0.75rem;"></span>2021-2026 &copy; Robert van den Breemen</div>
+    <div class="bottom right-0"><span id="heap-info" title="Free heap memory / largest contiguous free block, in bytes" style="display:inline-block; margin-right:0.75rem;"></span>2021-2026 &copy; Robert van den Breemen</div>
 
     <!-- Pin to bottom left corner -->
     <div id="message" class="bottom left-0"></div>

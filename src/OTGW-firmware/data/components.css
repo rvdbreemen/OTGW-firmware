@@ -40,7 +40,9 @@ body {
   color: var(--fg-1);
   background: var(--bg-app);
   -webkit-font-smoothing: antialiased;
-  padding-bottom: 1.5em;
+  /* Clear the position:fixed footer (.bottom) so page content never hides
+   * under it, including when the footer wraps to two lines on narrow phones. */
+  padding-bottom: 3.5em;
 }
 a { color: var(--accent-primary); text-decoration: none; }
 a:hover { color: var(--accent-hover); text-decoration: underline; }
@@ -102,7 +104,7 @@ body.dark .nav-container, [data-theme="dark"] .nav-container { background: #3838
 .nav-item {
   font: inherit;
   font-size: var(--fs-body); height: var(--btn-height); width: 110px;
-  background: var(--brand-lightblue); color: var(--fg-3);
+  background: var(--brand-lightblue); color: var(--fg-1);
   border: 0; border-radius: var(--radius-lg);
   cursor: pointer;
   box-shadow: var(--shadow-btn);
@@ -110,6 +112,16 @@ body.dark .nav-container, [data-theme="dark"] .nav-container { background: #3838
 }
 .nav-item:hover { color: var(--fg-1); }
 .nav-item:active { transform: translate(2px, 2px); box-shadow: none; }
+/* Keyboard focus must stay visible: outline is independent of the resting
+ * box-shadow (--shadow-btn) these controls set, so it is not overridden (M3). */
+.nav-item:focus-visible,
+.sat-btn:focus-visible,
+.sat-btn-temp:focus-visible,
+.sat-btn-preset:focus-visible,
+.sat-btn-mode:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+}
 
 .adv_dropdown {
   position: absolute; top: 52px; right: 0; min-width: 200px;
@@ -137,7 +149,9 @@ body.dark .adv_dropdown .list_item:hover,
 .footer { background: var(--bg-app); }
 .bottom {
   position: fixed; bottom: 0;
-  font-size: var(--fs-sm); color: var(--fg-5);
+  /* --fg-2 (#4a4d50) clears 4.5:1 on --bg-app #f1f7f8; --fg-5 failed at 2.1:1 (M5).
+   * Token resolves per-theme so dark stays readable without an override. */
+  font-size: var(--fs-sm); color: var(--fg-2);
 }
 .bottom.right-0 { right: 0; padding-right: var(--space-4); }
 .bottom.left-0  { left: 0;  padding-left:  var(--space-4); }
@@ -257,6 +271,9 @@ input[type="range"].ds-slider::-moz-range-thumb {
 }
 .ds-switch input:checked + .slider { background: var(--status-ok); }
 .ds-switch input:checked + .slider::before { transform: translateX(18px); }
+/* Visually-hidden input (opacity:0) can't show its own focus ring, so surface
+ * keyboard focus on the visible track instead (M3). */
+.ds-switch input:focus-visible + .slider { box-shadow: var(--shadow-focus); }
 
 /* =============================================================
  * 7. CARDS / PANELS
@@ -509,6 +526,10 @@ body.dark .otmonrow,
 
 .ot-stats-container {
   max-height: 340px; overflow: auto;
+  /* Wide table h-scrolls on mobile; keep the scrollbar visible so the
+   * affordance is discoverable on touch devices (L6). */
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
   background: var(--bg-surface); border: 1px solid var(--border-1);
 }
 .ot-stats-table {

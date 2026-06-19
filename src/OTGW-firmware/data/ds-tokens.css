@@ -71,7 +71,7 @@
   --fg-1:              #2a2d2f;   /* primary text — dark slate, not pure black */
   --fg-2:              #4a4d50;   /* body text */
   --fg-3:              #6b6f73;   /* button text / muted */
-  --fg-4:              #8a8e92;   /* captions, help text */
+  --fg-4:              #5e6266;   /* captions, help text — clears 4.5:1 on #fff (M6) */
   --fg-5:              #a8acb0;   /* disabled, footer bylines */
   --fg-inverse:        #ffffff;
 

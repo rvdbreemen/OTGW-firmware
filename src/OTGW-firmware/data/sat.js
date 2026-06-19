@@ -98,7 +98,17 @@ var SAT = (function() {
 
     var message = (typeof statusMessageText === 'string') ? statusMessageText : '';
     if (isLittleFSMismatchMessage(message)) {
-      banner.textContent = message;
+      // Render friendly, linked copy instead of the device's raw string.
+      while (banner.firstChild) banner.removeChild(banner.firstChild);
+      var msg = document.createTextNode(
+        'The web interface was built for a different firmware version. ' +
+        'Re-upload the matching filesystem image. '
+      );
+      banner.appendChild(msg);
+      var link = document.createElement('a');
+      link.href = '/update';
+      link.textContent = 'Flash the matching filesystem to fix this.';
+      banner.appendChild(link);
       banner.classList.remove('hidden');
       return;
     }

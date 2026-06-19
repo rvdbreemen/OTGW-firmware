@@ -2024,10 +2024,23 @@ void satSendStatusJSON()
       je.field(F("boiler_status"),        bsName); }
     je.field(F("target_temp"),          settings.sat.fTargetTemp);
     je.field(F("room_temp"),            satGetRoomTemp());
-    je.field(F("outside_temp"),         satGetOutsideTemp());
+    // TASK-886 review M1: distinguish "no reading" from a real 0 °C. room_temp
+    // already arrives as NaN->null when no thermostat exists; mirror that for the
+    // other two no-source-prone tiles so the UI shows "--" instead of a misleading
+    // "0.00°C". satGetOutsideTemp() is called FIRST (it resolves its own staleness
+    // side-effects), then if no live source remains AND it fell through to the bare
+    // OT-bus 0.0f (the firmware's own no-sensor convention, see line ~1113) it is
+    // emitted as null. final_setpoint is only meaningful while SAT is active.
+    {
+      float outsideDisp = satGetOutsideTemp();
+      bool outsideHasSource = settings.sat.bSimulation || state.sat.bExternalOutdoorValid ||
+                              (state.sat.weather.bValid && OTcurrentSystemState.Toutside == 0.0f);
+      if (!outsideHasSource && outsideDisp == 0.0f) outsideDisp = NAN;
+      je.field(F("outside_temp"),       outsideDisp);
+    }
     je.field(F("heating_curve"),        state.sat.fHeatingCurveValue);
     je.field(F("pid_output"),           state.sat.fPidOutput);
-    je.field(F("final_setpoint"),       state.sat.fFinalSetpoint);
+    je.field(F("final_setpoint"),       state.sat.bActive ? state.sat.fFinalSetpoint : NAN);
     je.field(F("error"),                state.sat.fError);
     je.field(F("pid_p"),                state.sat.fPidP);
     je.field(F("pid_i"),                state.sat.fPidI);

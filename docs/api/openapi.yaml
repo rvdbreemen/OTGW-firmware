@@ -3484,8 +3484,8 @@ components:
           type: [number, "null"]
           description: "Room temperature used by the PID (C); null when no sensor"
         outside_temp:
-          type: number
-          description: "Outside temperature used by the heating curve (C)"
+          type: [number, "null"]
+          description: "Outside temperature used by the heating curve (C); null when no OT-bus/external/weather source"
         heating_curve:
           type: number
           description: "Heating-curve flow temperature (C)"
@@ -3493,8 +3493,8 @@ components:
           type: number
           description: "PID output = curve + P + I + D (C)"
         final_setpoint:
-          type: number
-          description: "Final flow setpoint sent to the boiler (C)"
+          type: [number, "null"]
+          description: "Final flow setpoint sent to the boiler (C); null when SAT is not active"
         error:
           type: number
           description: "PID error = target - room (C)"
@@ -3868,10 +3868,10 @@ components:
         boiler_status: "off"
         target_temp: 20.0
         room_temp: null
-        outside_temp: 0.0
+        outside_temp: null
         heating_curve: 0.0
         pid_output: 0.0
-        final_setpoint: 0.0
+        final_setpoint: null
         error: 0.0
         pid_p: 0.0
         pid_i: 0.0

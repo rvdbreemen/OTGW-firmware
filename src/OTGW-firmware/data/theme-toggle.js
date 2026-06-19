@@ -21,6 +21,7 @@
     if (btn) {
       btn.textContent = dark ? '☀' : '☾';
       btn.setAttribute('aria-pressed', String(dark));
+      btn.title = dark ? 'Switch to light theme' : 'Switch to dark theme';
     }
     document.dispatchEvent(new CustomEvent('theme:changed', { detail: { mode: mode } }));
   }

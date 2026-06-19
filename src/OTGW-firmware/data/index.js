@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.218
+**  Version  : v2.0.0-alpha.219
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3259,8 +3259,8 @@ function initMainPage() {
         } else {
           saveSettings();
         }
-        toggleHidden('adv_dropdown', true);
-        toggleHidden('btnSaveSettings', true);
+        closeAdvDropdown(false);
+        setVisible('btnSaveSettings', false);
       });
     }
   );
@@ -3268,7 +3268,7 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         deviceinfoPage();
-        toggleHidden('adv_dropdown', true);
+        closeAdvDropdown(false);
         toggleHidden('btnSaveSettings', true);
       });
     }
@@ -3277,7 +3277,7 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         firmwarePage();
-        toggleHidden('adv_dropdown', true);
+        closeAdvDropdown(false);
         toggleHidden('btnSaveSettings', true);
       });
     }
@@ -3286,7 +3286,7 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         webhookPage();
-        toggleHidden('adv_dropdown', true);
+        closeAdvDropdown(false);
         toggleHidden('btnSaveSettings', true);
       });
     }
@@ -3295,7 +3295,7 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         satPage();
-        toggleHidden('adv_dropdown', true);
+        closeAdvDropdown(false);
         toggleHidden('btnSaveSettings', true);
       });
     }
@@ -3304,16 +3304,44 @@ function initMainPage() {
     function (el, idx, arr) {
       el.addEventListener('click', function () {
         settingsPage();
-        toggleHidden('adv_dropdown', true);
+        closeAdvDropdown(false);
         setVisible('btnSaveSettings', false);
       });
     }
   );
   Array.from(document.getElementsByClassName('adminSettings')).forEach(
     function (el, idx, arr) {
-      el.addEventListener('click', function () { toggleHidden('adv_dropdown', false); });
+      el.addEventListener('click', function () {
+        toggleHidden('adv_dropdown', false);
+        syncAdvDropdownAria();
+      });
     }
   );
+  // Close the Advanced menu on an outside click or Escape, and return focus to
+  // the trigger after Escape so keyboard users are not stranded. adv_dropdown is
+  // a class cloned per page-nav-shell, so test "open" via querySelector.
+  document.addEventListener('click', function (ev) {
+    if (!document.querySelector('.adv_dropdown:not(.hidden)')) return;
+    if (ev.target.closest && (ev.target.closest('.adv_dropdown') || ev.target.closest('.adminSettings'))) return;
+    closeAdvDropdown(false);
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Escape') return;
+    if (!document.querySelector('.adv_dropdown:not(.hidden)')) return;
+    closeAdvDropdown(true);
+  });
+  // M4: the Advanced menu items are role="menuitem" spans (not native buttons),
+  // so wire Enter/Space to fire their existing click handler for keyboard users.
+  // Delegated at document level because the menu is cloned into several shells.
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key !== 'Enter' && ev.key !== ' ' && ev.key !== 'Spacebar') return;
+    if (!ev.target.closest) return;
+    if (!ev.target.closest('.adv_dropdown')) return;
+    var item = ev.target.closest('.list_item');
+    if (!item) return;
+    ev.preventDefault();
+    item.click();
+  });
   Array.from(document.getElementsByClassName('home')).forEach(
     function (el, idx, arr) {
       el.addEventListener('click', function () {
@@ -4462,6 +4490,28 @@ function setVisible(className, visible) {
   );
 }
 
+// Reflect the Advanced menu's open/closed state on the trigger's aria-expanded.
+// Centralised so the ~6 close call-sites can't drift out of sync (M4/L1).
+function syncAdvDropdownAria() {
+  // adv_dropdown is a CLASS cloned into every page-nav-shell, not a unique id;
+  // the menu is "open" if any copy lacks the hidden class.
+  var expanded = !!document.querySelector('.adv_dropdown:not(.hidden)');
+  Array.from(document.getElementsByClassName('adminSettings')).forEach(function (el) {
+    el.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+  });
+}
+
+// Close the Advanced menu and keep aria-expanded in sync. When restoreFocus is
+// true (Escape), move focus back to the trigger so keyboard users aren't lost.
+function closeAdvDropdown(restoreFocus) {
+  toggleHidden('adv_dropdown', true);
+  syncAdvDropdownAria();
+  if (restoreFocus) {
+    var trigger = document.getElementsByClassName('adminSettings')[0];
+    if (trigger) trigger.focus();
+  }
+}
+
 function renderBottomMessage() {
   const msgEl = document.getElementById('message');
   if (!msgEl) return;
@@ -4496,7 +4546,9 @@ function renderBottomMessage() {
 function updateHeapDisplay() {
   const el = document.getElementById('heap-info');
   if (!el || currentFreeHeap === null) return;
-  el.textContent = `Heap: (${currentFreeHeap} / ${currentMaxFreeBlock})`;
+  // Compact readout: free heap / largest contiguous free block, both in bytes.
+  // The #heap-info title= (index.html) spells this out for screen readers.
+  el.textContent = `Heap: ${currentFreeHeap} / ${currentMaxFreeBlock} B`;
 }
 
 //============================================================================
@@ -5284,7 +5336,9 @@ function refreshDevInfo() {
       return response.json();
     })
     .then(json => {
-      console.log("parsed .., data is [" + JSON.stringify(json) + "]");
+      // Full device-info payload (mac/chipid/sdk/heap) is verbose; gate it behind
+      // the existing DEBUG_WS flag so production consoles aren't spammed each poll.
+      if (DEBUG_WS) console.log("parsed .., data is [" + JSON.stringify(json) + "]");
       const device = json.device || {};
       const hostname = device.hostname || "";
       const ipaddress = device.ipaddress || "";
@@ -6765,6 +6819,17 @@ function sendPostSetting(field, value) {
     mode: "cors"
   };
 
+  // On a failed save, re-mark the field as changed and re-show the Save button
+  // so the user can retry; the optimistic clear/hide done by saveSettings() is
+  // only correct when the POST actually lands.
+  const markSaveFailed = function (reason) {
+    const failEl = document.getElementById("settingMessage");
+    if (failEl) failEl.textContent = "Save failed: " + reason;
+    const fieldEl = document.getElementById(field);
+    if (fieldEl) fieldEl.className = "input-changed";
+    setVisible('btnSaveSettings', true);
+  };
+
   fetch(APIGW + "v2/settings", other_params)
     .then((response) => {
       //console.log(response.status );    //=> number 100–599
@@ -6781,10 +6846,11 @@ function sendPostSetting(field, value) {
           if (msgEl) msgEl.textContent = "";
         }, 2000); //and clear the message
       } else {
-        if (msgEl) msgEl.textContent = "Saving changes... FAILED";
+        markSaveFailed("HTTP " + response.status);
       }
     }, (error) => {
       console.log("Error[" + error.message + "]"); //=> String
+      markSaveFailed(error.message);
       return false;
     });
 } // sendPostSetting()
@@ -8220,6 +8286,20 @@ function sortStats(col) {
         statsSortAsc = true;
     }
     updateStatisticsDisplay();
+    updateStatsSortAria();
+}
+
+// L3: reflect the current sort on the header cells via aria-sort so screen
+// readers announce which column is sorted and in which direction.
+function updateStatsSortAria() {
+    var headers = document.querySelectorAll('#otStatsTable thead th');
+    headers.forEach(function (th, idx) {
+        if (idx === statsSortCol) {
+            th.setAttribute('aria-sort', statsSortAsc ? 'ascending' : 'descending');
+        } else {
+            th.setAttribute('aria-sort', 'none');
+        }
+    });
 }
 
 // TASK-694 port (dev TASK-689): render the bilateral OT-support map in the
