@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.221
+**  Version  : v2.0.0-alpha.222
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1770,6 +1770,29 @@ static void debugFormatLocalIp(char* buf, size_t bufSize)
   snprintf_P(buf, bufSize, PSTR("%u.%u.%u.%u"), ip[0], ip[1], ip[2], ip[3]);
 }
 
+// TASK-883: per-response snapshot for the chunked /v2/debug dump. Same
+// DETERMINISM CONTRACT as DeviceInfoSnap (jsonChunked.h): the closure re-runs per
+// TCP window, so every AUTONOMOUS value (heap, uptime, RSSI, all state.* the
+// OT/MQTT/SAT tasks mutate, and the float SAT telemetry whose text width varies
+// wildly) is frozen ONCE here. settings.* and build constants stay live.
+struct DebugDumpSnap {
+  OTGWState st;                       // frozen copy of every state.* the emit reads
+  uint32_t  heapFree;
+  uint32_t  heapFragPct;
+  uint32_t  heapMinFree;
+  uint32_t  heapMaxAlloc;
+  bool      wifiConnected;
+  int32_t   rssi;
+  float     roomTemp;
+  float     outsideTemp;
+  char      ip[16];
+  char      ssid[33];
+  char      hwMode[16];
+  char      netMode[16];
+  char      boilerStatus[20];
+  char      manufacturer[12];
+};
+
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
 {
   (void)words;
@@ -1777,20 +1800,35 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   (void)originalURI;
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (!checkHttpAuth()) return;
+  // The chunked path allocates only the small fixed snapshot (no whole-response
+  // cbuf), but guard the snapshot alloc itself against a fragmented heap (mirrors
+  // sendDeviceInfoV2's >=8 KB block guard).
+  if (platformMaxFreeBlock() < 8192) { sendApiError(503, F("low heap")); return; }
 
-  char ipBuf[16];
-  char ssidBuf[33];
-  char hwModeBuf[16];
-  char netModeBuf[16];
-  debugFormatLocalIp(ipBuf, sizeof(ipBuf));
-  strlcpy(ssidBuf, WiFi.SSID().c_str(), sizeof(ssidBuf));
-  snprintf_P(hwModeBuf, sizeof(hwModeBuf), PSTR("%S"), (PGM_P)hardwareModeName());
-  snprintf_P(netModeBuf, sizeof(netModeBuf), PSTR("%S"), (PGM_P)networkModeName());
+  // Freeze every volatile input ONCE (see DebugDumpSnap above); the closure owns
+  // it via shared_ptr so every window re-run reads identical bytes.
+  auto snap = std::make_shared<DebugDumpSnap>();
+  snap->st           = state;                          // en-bloc freeze of all state.*
+  snap->heapFree     = platformFreeHeap();
+  snap->heapFragPct  = platformHeapFragmentation();
+  snap->heapMinFree  = platformMinFreeHeap();
+  snap->heapMaxAlloc = platformMaxFreeBlock();
+  snap->wifiConnected = (WiFi.status() == WL_CONNECTED);
+  snap->rssi         = WiFi.RSSI();
+  snap->roomTemp     = satGetRoomTemp();
+  snap->outsideTemp  = satGetOutsideTemp();
+  debugFormatLocalIp(snap->ip, sizeof(snap->ip));
+  strlcpy(snap->ssid, WiFi.SSID().c_str(), sizeof(snap->ssid));
+  snprintf_P(snap->hwMode,  sizeof(snap->hwMode),  PSTR("%S"), (PGM_P)hardwareModeName());
+  snprintf_P(snap->netMode, sizeof(snap->netMode), PSTR("%S"), (PGM_P)networkModeName());
+  satGetBoilerStatusName(snap->boilerStatus, sizeof(snap->boilerStatus));
+  satGetManufacturerName(snap->manufacturer, sizeof(snap->manufacturer));
 
-  // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path.
-  AsyncResponseStream* strm = restBeginStream("application/json");
-  if (strm) {
-    JsonEmit je(*strm);
+  // DETERMINISM GATE (TASK-883): closure reads ONLY snap->*, settings.*, and build
+  // constants. The JSON KEYS are F("state.*"/"runtime.*") literals (not reads). No
+  // live state.* value read, heap/RSSI/WiFi/satGet*() — those would shift a field's
+  // text width between window passes and corrupt the wire JSON.
+  restSendChunked("application/json", [snap](JsonEmit& je) {
     je.beginObject();                 // root {
     je.beginObject(F("debug"));       // "debug":{
 
@@ -1799,18 +1837,18 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("build.githash"), _VERSION_GITHASH);
     je.field(F("build.date"), _VERSION_DATE);
 
-    je.field(F("runtime.heap_free"), (uint32_t)platformFreeHeap());
-    je.field(F("runtime.heap_frag_pct"), (uint32_t)platformHeapFragmentation());
-    je.field(F("runtime.heap_min_free"), (uint32_t)platformMinFreeHeap());
-    je.field(F("runtime.heap_max_alloc"), (uint32_t)platformMaxFreeBlock());
-    je.field(F("runtime.uptime_sec"), (uint32_t)state.uptime.iSeconds);
-    je.field(F("runtime.reboots"), (uint32_t)state.uptime.iRebootCount);
-    je.field(F("runtime.wifi_connected"), (WiFi.status() == WL_CONNECTED));
-    je.field(F("runtime.wifi_rssi"), (int32_t)WiFi.RSSI());
-    je.field(F("runtime.wifi_ip"), ipBuf);
-    je.field(F("runtime.wifi_ssid"), ssidBuf);
-    je.field(F("runtime.hw_mode"), hwModeBuf);
-    je.field(F("runtime.net_mode"), netModeBuf);
+    je.field(F("runtime.heap_free"), (uint32_t)snap->heapFree);
+    je.field(F("runtime.heap_frag_pct"), (uint32_t)snap->heapFragPct);
+    je.field(F("runtime.heap_min_free"), (uint32_t)snap->heapMinFree);
+    je.field(F("runtime.heap_max_alloc"), (uint32_t)snap->heapMaxAlloc);
+    je.field(F("runtime.uptime_sec"), (uint32_t)snap->st.uptime.iSeconds);
+    je.field(F("runtime.reboots"), (uint32_t)snap->st.uptime.iRebootCount);
+    je.field(F("runtime.wifi_connected"), snap->wifiConnected);
+    je.field(F("runtime.wifi_rssi"), (int32_t)snap->rssi);
+    je.field(F("runtime.wifi_ip"), snap->ip);
+    je.field(F("runtime.wifi_ssid"), snap->ssid);
+    je.field(F("runtime.hw_mode"), snap->hwMode);
+    je.field(F("runtime.net_mode"), snap->netMode);
 
     je.field(F("settings.hostname"), settings.sHostname);
     je.field(F("settings.http_passwd"), settings.sHTTPpasswd[0] ? "***" : "(not set)");
@@ -1918,128 +1956,125 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.otd.kboost"), settings.otd.fKboost);
 #endif
 
-    je.field(F("state.mqtt.connected"), state.mqtt.bConnected);
-    je.field(F("state.pic.available"), state.pic.bAvailable);
-    je.field(F("state.pic.device_id"), state.pic.sDeviceid);
-    je.field(F("state.pic.type"), state.pic.sType);
-    je.field(F("state.pic.fw_version"), state.pic.sFwversion);
+    je.field(F("state.mqtt.connected"), snap->st.mqtt.bConnected);
+    je.field(F("state.pic.available"), snap->st.pic.bAvailable);
+    je.field(F("state.pic.device_id"), snap->st.pic.sDeviceid);
+    je.field(F("state.pic.type"), snap->st.pic.sType);
+    je.field(F("state.pic.fw_version"), snap->st.pic.sFwversion);
 
-    je.field(F("state.otbus.online"), state.otBus.bOnline);
-    je.field(F("state.otbus.gateway_mode"), state.otBus.bGatewayMode);
-    je.field(F("state.otbus.gateway_known"), state.otBus.bGatewayModeKnown);
-    je.field(F("state.otbus.boiler_state"), state.otBus.bBoilerState);
-    je.field(F("state.otbus.thermostat_state"), state.otBus.bThermostatState);
-    je.field(F("state.otbus.ps_mode"), state.otBus.bPSmode);
+    je.field(F("state.otbus.online"), snap->st.otBus.bOnline);
+    je.field(F("state.otbus.gateway_mode"), snap->st.otBus.bGatewayMode);
+    je.field(F("state.otbus.gateway_known"), snap->st.otBus.bGatewayModeKnown);
+    je.field(F("state.otbus.boiler_state"), snap->st.otBus.bBoilerState);
+    je.field(F("state.otbus.thermostat_state"), snap->st.otBus.bThermostatState);
+    je.field(F("state.otbus.ps_mode"), snap->st.otBus.bPSmode);
 
-    je.field(F("state.debug.ot_msg"), state.debug.bOTmsg);
-    je.field(F("state.debug.rest_api"), state.debug.bRestAPI);
-    je.field(F("state.debug.mqtt"), state.debug.bMQTT);
-    je.field(F("state.debug.mqtt_gate"), state.debug.bMQTTGate);
-    je.field(F("state.debug.sensors"), state.debug.bSensors);
-    je.field(F("state.debug.ntp"), state.debug.bNTP);
-    je.field(F("state.debug.sensor_sim"), state.debug.bSensorSim);
-    je.field(F("state.debug.otgw_sim"), state.debug.bOTGWSimulation);
-    je.field(F("state.debug.sat"), state.debug.bSAT);
-    je.field(F("state.debug.otdirect"), state.debug.bOTDirect);
+    je.field(F("state.debug.ot_msg"), snap->st.debug.bOTmsg);
+    je.field(F("state.debug.rest_api"), snap->st.debug.bRestAPI);
+    je.field(F("state.debug.mqtt"), snap->st.debug.bMQTT);
+    je.field(F("state.debug.mqtt_gate"), snap->st.debug.bMQTTGate);
+    je.field(F("state.debug.sensors"), snap->st.debug.bSensors);
+    je.field(F("state.debug.ntp"), snap->st.debug.bNTP);
+    je.field(F("state.debug.sensor_sim"), snap->st.debug.bSensorSim);
+    je.field(F("state.debug.otgw_sim"), snap->st.debug.bOTGWSimulation);
+    je.field(F("state.debug.sat"), snap->st.debug.bSAT);
+    je.field(F("state.debug.otdirect"), snap->st.debug.bOTDirect);
 #if HAS_SAT_BLE
-    je.field(F("state.debug.sat_ble"), state.debug.bSATBLE);
+    je.field(F("state.debug.sat_ble"), snap->st.debug.bSATBLE);
 #endif
 
-    je.field(F("state.heap.ws_drops"), (uint32_t)state.heapdiag.iWsDropsTotal);
-    je.field(F("state.heap.mqtt_drops"), (uint32_t)state.heapdiag.iMqttDropsTotal);
-    je.field(F("state.heap.entered_low"), (uint32_t)state.heapdiag.iEnteredLowCount);
-    je.field(F("state.heap.entered_warn"), (uint32_t)state.heapdiag.iEnteredWarningCount);
-    je.field(F("state.heap.entered_crit"), (uint32_t)state.heapdiag.iEnteredCriticalCount);
-    je.field(F("state.heap.drip_slow"), (uint32_t)state.heapdiag.iDripSlowModeCount);
+    je.field(F("state.heap.ws_drops"), (uint32_t)snap->st.heapdiag.iWsDropsTotal);
+    je.field(F("state.heap.mqtt_drops"), (uint32_t)snap->st.heapdiag.iMqttDropsTotal);
+    je.field(F("state.heap.entered_low"), (uint32_t)snap->st.heapdiag.iEnteredLowCount);
+    je.field(F("state.heap.entered_warn"), (uint32_t)snap->st.heapdiag.iEnteredWarningCount);
+    je.field(F("state.heap.entered_crit"), (uint32_t)snap->st.heapdiag.iEnteredCriticalCount);
+    je.field(F("state.heap.drip_slow"), (uint32_t)snap->st.heapdiag.iDripSlowModeCount);
 
-    je.field(F("state.disco.published"), (uint32_t)state.discovery.iPublishedTopicCount);
-    je.field(F("state.disco.verify_runs"), (uint32_t)state.discovery.iVerifyRunCount);
-    je.field(F("state.disco.republishes"), (uint32_t)state.discovery.iRepublishTriggeredCount);
-    je.field(F("state.disco.last_missing"), (uint32_t)state.discovery.iLastMissingCount);
-    je.field(F("state.disco.last_orphan"), (uint32_t)state.discovery.iLastOrphanCount);
-    je.field(F("state.disco.last_epoch"), (uint32_t)state.discovery.iLastVerifyEpoch);
+    je.field(F("state.disco.published"), (uint32_t)snap->st.discovery.iPublishedTopicCount);
+    je.field(F("state.disco.verify_runs"), (uint32_t)snap->st.discovery.iVerifyRunCount);
+    je.field(F("state.disco.republishes"), (uint32_t)snap->st.discovery.iRepublishTriggeredCount);
+    je.field(F("state.disco.last_missing"), (uint32_t)snap->st.discovery.iLastMissingCount);
+    je.field(F("state.disco.last_orphan"), (uint32_t)snap->st.discovery.iLastOrphanCount);
+    je.field(F("state.disco.last_epoch"), (uint32_t)snap->st.discovery.iLastVerifyEpoch);
 
-    { char boilerStatus[20]; satGetBoilerStatusName(boilerStatus, sizeof(boilerStatus));
-      je.field(F("state.sat.boiler_status"), boilerStatus); }
-    { char manufacturer[12]; satGetManufacturerName(manufacturer, sizeof(manufacturer));
-      je.field(F("state.sat.manufacturer"), manufacturer); }
-    je.field(F("state.sat.active"), state.sat.bActive);
-    je.field(F("state.sat.control_mode"), (int32_t)state.sat.eControlMode);
-    je.field(F("state.sat.room_temp"), satGetRoomTemp());
-    je.field(F("state.sat.outside_temp"), satGetOutsideTemp());
-    je.field(F("state.sat.heating_curve"), state.sat.fHeatingCurveValue);
-    je.field(F("state.sat.pid_output"), state.sat.fPidOutput);
-    je.field(F("state.sat.final_setpoint"), state.sat.fFinalSetpoint);
-    je.field(F("state.sat.error"), state.sat.fError);
-    je.field(F("state.sat.pid_p"), state.sat.fPidP);
-    je.field(F("state.sat.pid_i"), state.sat.fPidI);
-    je.field(F("state.sat.pid_d"), state.sat.fPidD);
-    je.field(F("state.sat.cycle_count"), (uint32_t)state.sat.iCycleCount);
-    je.field(F("state.sat.last_cycle_class"), (int32_t)state.sat.eLastCycleClass);
-    je.field(F("state.sat.duty_ratio"), state.sat.fDutyRatio);
-    je.field(F("state.sat.pwm_duty"), state.sat.fPwmDutyCycle);
-    je.field(F("state.sat.active_preset"), (int32_t)state.sat.eActivePreset);
-    je.field(F("state.sat.mod_suppressed"), state.sat.bModSuppressed);
-    je.field(F("state.sat.dhw_active"), state.sat.bDhwActive);
-    je.field(F("state.sat.fallback_active"), state.sat.bFallbackActive);
-    je.field(F("state.sat.fallback_reason"), (int32_t)state.sat.eFallbackReason);
-    je.field(F("state.sat.current_mod"), (int32_t)state.sat.iCurrentModulation);
-    je.field(F("state.sat.hsys_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
-    je.field(F("state.sat.weather_valid"), state.sat.weather.bValid);
-    je.field(F("state.sat.weather_temp"), state.sat.weather.fTemperature);
-    je.field(F("state.sat.weather_humidity"), state.sat.weather.fHumidity);
-    je.field(F("state.sat.weather_wind"), state.sat.weather.fWindSpeed);
-    je.field(F("state.sat.weather_cloud"), state.sat.weather.fCloudCover);
+    je.field(F("state.sat.boiler_status"), snap->boilerStatus);
+    je.field(F("state.sat.manufacturer"), snap->manufacturer);
+    je.field(F("state.sat.active"), snap->st.sat.bActive);
+    je.field(F("state.sat.control_mode"), (int32_t)snap->st.sat.eControlMode);
+    je.field(F("state.sat.room_temp"), snap->roomTemp);
+    je.field(F("state.sat.outside_temp"), snap->outsideTemp);
+    je.field(F("state.sat.heating_curve"), snap->st.sat.fHeatingCurveValue);
+    je.field(F("state.sat.pid_output"), snap->st.sat.fPidOutput);
+    je.field(F("state.sat.final_setpoint"), snap->st.sat.fFinalSetpoint);
+    je.field(F("state.sat.error"), snap->st.sat.fError);
+    je.field(F("state.sat.pid_p"), snap->st.sat.fPidP);
+    je.field(F("state.sat.pid_i"), snap->st.sat.fPidI);
+    je.field(F("state.sat.pid_d"), snap->st.sat.fPidD);
+    je.field(F("state.sat.cycle_count"), (uint32_t)snap->st.sat.iCycleCount);
+    je.field(F("state.sat.last_cycle_class"), (int32_t)snap->st.sat.eLastCycleClass);
+    je.field(F("state.sat.duty_ratio"), snap->st.sat.fDutyRatio);
+    je.field(F("state.sat.pwm_duty"), snap->st.sat.fPwmDutyCycle);
+    je.field(F("state.sat.active_preset"), (int32_t)snap->st.sat.eActivePreset);
+    je.field(F("state.sat.mod_suppressed"), snap->st.sat.bModSuppressed);
+    je.field(F("state.sat.dhw_active"), snap->st.sat.bDhwActive);
+    je.field(F("state.sat.fallback_active"), snap->st.sat.bFallbackActive);
+    je.field(F("state.sat.fallback_reason"), (int32_t)snap->st.sat.eFallbackReason);
+    je.field(F("state.sat.current_mod"), (int32_t)snap->st.sat.iCurrentModulation);
+    je.field(F("state.sat.hsys_detected"), (int32_t)snap->st.sat.iDetectedHeatingSystem);
+    je.field(F("state.sat.weather_valid"), snap->st.sat.weather.bValid);
+    je.field(F("state.sat.weather_temp"), snap->st.sat.weather.fTemperature);
+    je.field(F("state.sat.weather_humidity"), snap->st.sat.weather.fHumidity);
+    je.field(F("state.sat.weather_wind"), snap->st.sat.weather.fWindSpeed);
+    je.field(F("state.sat.weather_cloud"), snap->st.sat.weather.fCloudCover);
 #if HAS_WEATHER_FORECAST
-    je.field(F("state.sat.weather_pressure"), state.sat.weather.fPressureMsl);
-    je.field(F("state.sat.weather_is_day"), state.sat.weather.bIsDay);
+    je.field(F("state.sat.weather_pressure"), snap->st.sat.weather.fPressureMsl);
+    je.field(F("state.sat.weather_is_day"), snap->st.sat.weather.bIsDay);
 #endif
-    je.field(F("state.sat.current_power"), state.sat.fCurrentPower);
-    je.field(F("state.sat.energy_total"), state.sat.fEnergyTotal);
-    je.field(F("state.sat.energy_est"), state.sat.fEnergyEstimatedKWh);
-    je.field(F("state.sat.thermal_valid"), state.sat.bThermalModelValid);
-    je.field(F("state.sat.thermal_drop"), state.sat.fThermalDropRate);
-    je.field(F("state.sat.solar_gain"), state.sat.bSolarGainActive);
-    je.field(F("state.sat.summer_active"), state.sat.bSummerActive);
-    je.field(F("state.sat.humidity"), state.sat.fHumidity);
-    je.field(F("state.sat.humidity_valid"), state.sat.bHumidityValid);
-    je.field(F("state.sat.comfort_offset"), state.sat.fComfortOffset);
-    je.field(F("state.sat.area0_temp"), state.sat.fAreaTemp[0]);
-    je.field(F("state.sat.area1_temp"), state.sat.fAreaTemp[1]);
-    je.field(F("state.sat.area2_temp"), state.sat.fAreaTemp[2]);
-    je.field(F("state.sat.area3_temp"), state.sat.fAreaTemp[3]);
-    je.field(F("state.sat.auto_tune_active"), state.sat.bAutoTuneActive);
-    je.field(F("state.sat.auto_tune_cycles"), (uint32_t)state.sat.iAutoTuneCycles);
-    je.field(F("state.sat.auto_tune_score"), state.sat.fAutoTuneScore);
+    je.field(F("state.sat.current_power"), snap->st.sat.fCurrentPower);
+    je.field(F("state.sat.energy_total"), snap->st.sat.fEnergyTotal);
+    je.field(F("state.sat.energy_est"), snap->st.sat.fEnergyEstimatedKWh);
+    je.field(F("state.sat.thermal_valid"), snap->st.sat.bThermalModelValid);
+    je.field(F("state.sat.thermal_drop"), snap->st.sat.fThermalDropRate);
+    je.field(F("state.sat.solar_gain"), snap->st.sat.bSolarGainActive);
+    je.field(F("state.sat.summer_active"), snap->st.sat.bSummerActive);
+    je.field(F("state.sat.humidity"), snap->st.sat.fHumidity);
+    je.field(F("state.sat.humidity_valid"), snap->st.sat.bHumidityValid);
+    je.field(F("state.sat.comfort_offset"), snap->st.sat.fComfortOffset);
+    je.field(F("state.sat.area0_temp"), snap->st.sat.fAreaTemp[0]);
+    je.field(F("state.sat.area1_temp"), snap->st.sat.fAreaTemp[1]);
+    je.field(F("state.sat.area2_temp"), snap->st.sat.fAreaTemp[2]);
+    je.field(F("state.sat.area3_temp"), snap->st.sat.fAreaTemp[3]);
+    je.field(F("state.sat.auto_tune_active"), snap->st.sat.bAutoTuneActive);
+    je.field(F("state.sat.auto_tune_cycles"), (uint32_t)snap->st.sat.iAutoTuneCycles);
+    je.field(F("state.sat.auto_tune_score"), snap->st.sat.fAutoTuneScore);
 #if HAS_SAT_BLE
-    je.field(F("state.sat.ble_temp"), state.sat.fBleTemp);
-    je.field(F("state.sat.ble_humidity"), state.sat.fBleHumidity);
-    je.field(F("state.sat.ble_valid"), state.sat.bBleTempValid);
-    je.field(F("state.sat.ble_count"), (uint32_t)state.sat.iBleSensorCount);
-    je.field(F("state.sat.ble_battery"), (uint32_t)state.sat.iBleBattery);
-    je.field(F("state.sat.ble_rssi"), (int32_t)state.sat.iBleRssi);
+    je.field(F("state.sat.ble_temp"), snap->st.sat.fBleTemp);
+    je.field(F("state.sat.ble_humidity"), snap->st.sat.fBleHumidity);
+    je.field(F("state.sat.ble_valid"), snap->st.sat.bBleTempValid);
+    je.field(F("state.sat.ble_count"), (uint32_t)snap->st.sat.iBleSensorCount);
+    je.field(F("state.sat.ble_battery"), (uint32_t)snap->st.sat.iBleBattery);
+    je.field(F("state.sat.ble_rssi"), (int32_t)snap->st.sat.iBleRssi);
 #endif
 
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-    je.field(F("state.otd.schedule_total"), (uint32_t)state.otd.iScheduleTotal);
-    je.field(F("state.otd.schedule_active"), (uint32_t)state.otd.iScheduleActive);
-    je.field(F("state.otd.schedule_disabled"), (uint32_t)state.otd.iScheduleDisabled);
-    je.field(F("state.otd.override_count"), (uint32_t)state.otd.iOverrideCount);
-    je.field(F("state.otd.bypass_active"), state.otd.bBypassActive);
-    je.field(F("state.otd.stepup_enabled"), state.otd.bStepUpEnabled);
-    je.field(F("state.otd.monitor_mode"), state.otd.bMonitorMode);
-    je.field(F("state.otd.mode"), (int32_t)state.otd.eMode);
-    je.field(F("state.otd.master_mode"), state.otd.bMasterMode);
-    je.field(F("state.otd.thermostat_connected"), state.otd.bThermostatConnected);
-    je.field(F("state.otd.setback_active"), state.otd.bSetbackActive);
-    je.field(F("state.otd.override_mode"), (int32_t)state.otd.eOverrideMode);
-    je.field(F("state.otd.override_f88"), (uint32_t)state.otd.iOverrideF88);
+    je.field(F("state.otd.schedule_total"), (uint32_t)snap->st.otd.iScheduleTotal);
+    je.field(F("state.otd.schedule_active"), (uint32_t)snap->st.otd.iScheduleActive);
+    je.field(F("state.otd.schedule_disabled"), (uint32_t)snap->st.otd.iScheduleDisabled);
+    je.field(F("state.otd.override_count"), (uint32_t)snap->st.otd.iOverrideCount);
+    je.field(F("state.otd.bypass_active"), snap->st.otd.bBypassActive);
+    je.field(F("state.otd.stepup_enabled"), snap->st.otd.bStepUpEnabled);
+    je.field(F("state.otd.monitor_mode"), snap->st.otd.bMonitorMode);
+    je.field(F("state.otd.mode"), (int32_t)snap->st.otd.eMode);
+    je.field(F("state.otd.master_mode"), snap->st.otd.bMasterMode);
+    je.field(F("state.otd.thermostat_connected"), snap->st.otd.bThermostatConnected);
+    je.field(F("state.otd.setback_active"), snap->st.otd.bSetbackActive);
+    je.field(F("state.otd.override_mode"), (int32_t)snap->st.otd.eOverrideMode);
+    je.field(F("state.otd.override_f88"), (uint32_t)snap->st.otd.iOverrideF88);
 #endif
 
     je.endObject();                   // close "debug"
     je.endObject();                   // close root
-  }
-  restFinalize();
+  });
 }
 
 // TASK-585: WiFi network scan
@@ -2484,6 +2519,49 @@ void sendOTmonitorV2()
 // If maxFreeBlock is below this, return 503 instead of compounding heap pressure.
 #define DEVICE_INFO_MIN_HEAP_BLOCK  8192
 
+// TASK-883: per-response snapshot for the chunked /v2/device/info emit.
+// jsonChunked.h re-runs the emit closure once per TCP window; those passes can
+// span many ms-to-seconds under a flood (filler callbacks interleave as windows
+// ACK). The DETERMINISM CONTRACT requires byte-identical output every pass, so
+// every AUTONOMOUS value (heap, uptime, RSSI, perf/drop/discovery counters, all
+// state.* that the OT/MQTT tasks mutate on their own) is FROZEN here once. The
+// full OTGWState copy freezes them en bloc so the closure can read snap->st.*
+// uniformly. Captured strings replace String-returning live APIs and the shared
+// cMsg scratch (a concurrency/determinism hazard if touched inside the closure).
+// Event-driven values (settings.*, board identity, set-once eMode/pic) stay live.
+struct DeviceInfoSnap {
+  OTGWState st;                       // frozen copy of every state.* the emit reads
+  bool      picEnabled;
+  bool      otDirectEnabled;
+  bool      hasOtCmd;
+  bool      gatewayFirmware;
+  uint32_t  freeHeap;
+  uint32_t  maxFreeBlock;
+  uint8_t   fragPct;
+  uint16_t  pendingDiscoveryIds;
+  int32_t   rssi;
+  uint32_t  cpuFreq;
+  const __FlashStringHelper* boardNm;
+  const __FlashStringHelper* hwTypeName;
+  const __FlashStringHelper* hwModeName;
+  const __FlashStringHelper* netModeName;
+  char      compiled[40];
+  char      chipid[12];
+  char      uptimeStr[32];
+  char      ip[40];
+  char      mac[20];
+  char      ssid[33];
+  char      subnet[16];
+  char      gateway[16];
+  char      dns1[16];
+  char      dns2[16];
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  char      ethSubnet[16];
+  char      ethGateway[16];
+  char      ethDns[16];
+#endif
+};
+
 void sendDeviceInfoV2()
 {
   if (platformMaxFreeBlock() < DEVICE_INFO_MIN_HEAP_BLOCK) {
@@ -2493,83 +2571,118 @@ void sendDeviceInfoV2()
   const uint32_t startMs = millis();
   restPerfBegin(REST_PERF_DEVICE_INFO);
 
-  // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path.
-  // String-returning calls (getActiveIP/MAC, WiFi.*.toString, dBmtoQuality) bind
-  // to the field(const String&) overload, which copies into the sink immediately
-  // (no dangling temporary). char[] fields bind to field(const char*).
-  AsyncResponseStream* strm = restBeginStream("application/json");
-  if (strm) {
-    JsonEmit je(*strm);
+  // Freeze every volatile input ONCE (see DeviceInfoSnap above). Allocation rides
+  // under the >=8 KB DEVICE_INFO_MIN_HEAP_BLOCK entry guard so it cannot fail the
+  // way the old contiguous cbuf could; the closure owns it via shared_ptr.
+  auto snap = std::make_shared<DeviceInfoSnap>();
+  snap->st              = state;                         // en-bloc freeze of all state.*
+  snap->picEnabled      = isPICEnabled();
+  snap->otDirectEnabled = isOTDirectEnabled();
+  snap->hasOtCmd        = hasOTCommandInterface();
+  snap->gatewayFirmware = isGatewayFirmware();
+  snap->freeHeap        = platformFreeHeap();
+  snap->maxFreeBlock    = platformMaxFreeBlock();
+  snap->fragPct         = getHeapFragmentation();
+  snap->pendingDiscoveryIds = countPendingDiscoveryIds();
+  snap->rssi            = WiFi.RSSI();
+  snap->cpuFreq         = platformCpuFreqMHz();
+  snap->boardNm         = boardName();
+  snap->hwTypeName      = hardwareTypeName();
+  snap->hwModeName      = hardwareModeName();
+  snap->netModeName     = networkModeName();
+  snprintf_P(snap->compiled, sizeof(snap->compiled), PSTR("%s %s"), __DATE__, __TIME__);
+  snprintf_P(snap->chipid,   sizeof(snap->chipid),   PSTR("%06X"), (unsigned int)platformChipId());
+  strlcpy(snap->uptimeStr, upTime().c_str(),                 sizeof(snap->uptimeStr));
+  strlcpy(snap->ip,        getActiveIP().c_str(),            sizeof(snap->ip));
+  strlcpy(snap->mac,       getActiveMAC().c_str(),           sizeof(snap->mac));
+  strlcpy(snap->ssid,      WiFi.SSID().c_str(),              sizeof(snap->ssid));
+  strlcpy(snap->subnet,    WiFi.subnetMask().toString().c_str(),  sizeof(snap->subnet));
+  strlcpy(snap->gateway,   WiFi.gatewayIP().toString().c_str(),   sizeof(snap->gateway));
+  strlcpy(snap->dns1,      WiFi.dnsIP(0).toString().c_str(),      sizeof(snap->dns1));
+  strlcpy(snap->dns2,      WiFi.dnsIP(1).toString().c_str(),      sizeof(snap->dns2));
+#if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+  strlcpy(snap->ethSubnet,  Ethernet.subnetMask().toString().c_str(),    sizeof(snap->ethSubnet));
+  strlcpy(snap->ethGateway, Ethernet.gatewayIP().toString().c_str(),     sizeof(snap->ethGateway));
+  strlcpy(snap->ethDns,     Ethernet.dnsServerIP().toString().c_str(),   sizeof(snap->ethDns));
+#endif
+
+  // DETERMINISM GATE (TASK-883): this closure MUST read ONLY snap->*, settings.*,
+  // F()/PSTR literals, the set-once boot globals (sBootFlash/lastReset/flashMode),
+  // chip-constant platform getters (platformCoreVersion/SdkVersion), and PURE
+  // helpers fed frozen inputs (signal_quality_perc_quad/dBmtoQuality/
+  // verifyOutcomeLabel/CCONOFF). NO live state.*, heap/uptime/RSSI/millis, WiFi.*/
+  // Ethernet.*, countPendingDiscoveryIds, isPICEnabled, or cMsg — those would
+  // shift a field's text width between window passes and corrupt the wire JSON.
+  restSendChunked("application/json", [snap](JsonEmit& je) {
     je.beginObject();                 // root {
     je.beginObject(F("device"));      // "device":{
 
     // --- Firmware & build identity ---
     je.field(F("author"), F("Robert van den Breemen"));
     je.field(F("fwversion"), _SEMVER_FULL);
-    snprintf_P(cMsg, sizeof(cMsg), PSTR("%s %s"), __DATE__, __TIME__);
-    je.field(F("compiled"), cMsg);
+    je.field(F("compiled"), snap->compiled);
     // ADR-113 stage 2 (TASK-754): picavailable removed; UI selects on hardware_type.
-    if (isPICEnabled()) {
-      je.field(F("picfwversion"), state.pic.sFwversion);
-      je.field(F("picdeviceid"), state.pic.sDeviceid);
-      je.field(F("picfwtype"), state.pic.sType);
+    if (snap->picEnabled) {
+      je.field(F("picfwversion"), snap->st.pic.sFwversion);
+      je.field(F("picdeviceid"), snap->st.pic.sDeviceid);
+      je.field(F("picfwtype"), snap->st.pic.sType);
     }
-    je.field(F("otdirectavailable"), isOTDirectEnabled());
+    je.field(F("otdirectavailable"), snap->otDirectEnabled);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
-    if (isOTDirectEnabled()) {
+    if (snap->otDirectEnabled) {
       {
         const char* modeStr = "gateway";
-        if (state.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
-        else if (state.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
-        else if (state.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
-        else if (state.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
+        if (snap->st.otd.eMode == OTD_MODE_MONITOR) modeStr = "monitor";
+        else if (snap->st.otd.eMode == OTD_MODE_BYPASS) modeStr = "bypass";
+        else if (snap->st.otd.eMode == OTD_MODE_MASTER) modeStr = "master";
+        else if (snap->st.otd.eMode == OTD_MODE_LOOPBACK) modeStr = "loopback";
         je.field(F("otdmode"), modeStr);
       }
-      je.field(F("otdbypass"), state.otd.bBypassActive);
-      je.field(F("otdmonitor"), state.otd.bMonitorMode);
-      je.field(F("otdmaster"), state.otd.bMasterMode);
-      je.field(F("otdstepup"), state.otd.bStepUpEnabled);
-      je.field(F("otdthermostat"), state.otd.bThermostatConnected);
-      je.field(F("otdsetback"), state.otd.bSetbackActive);
-      je.field(F("otdschedtotal"), state.otd.iScheduleTotal);
-      je.field(F("otdschedactive"), state.otd.iScheduleActive);
-      je.field(F("otdscheddisabled"), state.otd.iScheduleDisabled);
-      je.field(F("otdoverrides"), state.otd.iOverrideCount);
+      je.field(F("otdbypass"), snap->st.otd.bBypassActive);
+      je.field(F("otdmonitor"), snap->st.otd.bMonitorMode);
+      je.field(F("otdmaster"), snap->st.otd.bMasterMode);
+      je.field(F("otdstepup"), snap->st.otd.bStepUpEnabled);
+      je.field(F("otdthermostat"), snap->st.otd.bThermostatConnected);
+      je.field(F("otdsetback"), snap->st.otd.bSetbackActive);
+      je.field(F("otdschedtotal"), snap->st.otd.iScheduleTotal);
+      je.field(F("otdschedactive"), snap->st.otd.iScheduleActive);
+      je.field(F("otdscheddisabled"), snap->st.otd.iScheduleDisabled);
+      je.field(F("otdoverrides"), snap->st.otd.iOverrideCount);
     }
 #endif
 
     // --- Platform & hardware identity ---
     je.field(F("platform"), F(PLATFORM_NAME));
-    je.field(F("board"), boardName());
-    je.field(F("hardware_type"), hardwareTypeName());  // ADR-113: static board class for codepath selection
-    je.field(F("hardwaremode"), hardwareModeName());
-    je.field(F("networkmode"), networkModeName());
-    je.field(F("oledpresent"), state.hw.bOLEDPresent);
+    je.field(F("board"), snap->boardNm);
+    je.field(F("hardware_type"), snap->hwTypeName);  // ADR-113: static board class for codepath selection
+    je.field(F("hardwaremode"), snap->hwModeName);
+    je.field(F("networkmode"), snap->netModeName);
+    je.field(F("oledpresent"), snap->st.hw.bOLEDPresent);
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-    je.field(F("ethernetpresent"), state.hw.bEthernetPresent);
-    je.field(F("ethernetlink"), state.net.bEthernetLink);
+    je.field(F("ethernetpresent"), snap->st.hw.bEthernetPresent);
+    je.field(F("ethernetlink"), snap->st.net.bEthernetLink);
 #endif
 
     // --- Network identity ---
     je.field(F("hostname"), settings.sHostname);
-    je.field(F("ipaddress"), getActiveIP());
-    je.field(F("macaddress"), getActiveMAC());
+    je.field(F("ipaddress"), snap->ip);
+    je.field(F("macaddress"), snap->mac);
     // Current WiFi network parameters (for DHCP-prefill in the UI). Available
     // on both ESP8266 and ESP32 via the standard WiFi API.
-    je.field(F("wifi_current_subnet"),  WiFi.subnetMask().toString());
-    je.field(F("wifi_current_gateway"), WiFi.gatewayIP().toString());
-    je.field(F("wifi_current_dns1"),    WiFi.dnsIP(0).toString());
-    je.field(F("wifi_current_dns2"),    WiFi.dnsIP(1).toString());
+    je.field(F("wifi_current_subnet"),  snap->subnet);
+    je.field(F("wifi_current_gateway"), snap->gateway);
+    je.field(F("wifi_current_dns1"),    snap->dns1);
+    je.field(F("wifi_current_dns2"),    snap->dns2);
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
     // Current Ethernet network parameters (for DHCP-prefill in the UI). Reported
-    // via the EthernetESP32 library (Ethernet.* API).
-    je.field(F("eth_current_subnet"),  Ethernet.subnetMask().toString());
-    je.field(F("eth_current_gateway"), Ethernet.gatewayIP().toString());
-    je.field(F("eth_current_dns"),     Ethernet.dnsServerIP().toString());
+    // via the EthernetESP32 library (frozen into the snapshot above).
+    je.field(F("eth_current_subnet"),  snap->ethSubnet);
+    je.field(F("eth_current_gateway"), snap->ethGateway);
+    je.field(F("eth_current_dns"),     snap->ethDns);
 #endif
 #if defined(_VERSION_PRERELEASE)
-    if (state.net.bAPFallback) {
-      je.field(F("ssid"), state.net.sAPSSID);
+    if (snap->st.net.bAPFallback) {
+      je.field(F("ssid"), snap->st.net.sAPSSID);
       je.field(F("wifirssi"), 0);
       je.field(F("wifiquality"), 0);
       je.field(F("wifiquality_text"), F("AP Mode"));
@@ -2577,7 +2690,7 @@ void sendDeviceInfoV2()
     } else
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-    if (state.net.eMode == NET_ETHERNET) {
+    if (snap->st.net.eMode == NET_ETHERNET) {
       je.field(F("ssid"), F("Wired"));
       je.field(F("wifirssi"), 0);
       je.field(F("wifiquality"), 100);
@@ -2585,49 +2698,48 @@ void sendDeviceInfoV2()
     } else
 #endif
     {
-      je.field(F("ssid"), WiFi.SSID());
-      je.field(F("wifirssi"), WiFi.RSSI());
-      je.field(F("wifiquality"), signal_quality_perc_quad(WiFi.RSSI()));
-      je.field(F("wifiquality_text"), dBmtoQuality(WiFi.RSSI()));
+      je.field(F("ssid"), snap->ssid);
+      je.field(F("wifirssi"), snap->rssi);
+      je.field(F("wifiquality"), signal_quality_perc_quad(snap->rssi));
+      je.field(F("wifiquality_text"), dBmtoQuality(snap->rssi));
     }
 
     // --- Time, NTP & uptime ---
     je.field(F("ntpenable"), settings.ntp.bEnable);
     je.field(F("ntptimezone"), settings.ntp.sTimezone);
-    je.field(F("uptime"), upTime());
+    je.field(F("uptime"), snap->uptimeStr);
     je.field(F("lastreset"), lastReset);
-    je.field(F("bootcount"), state.uptime.iRebootCount);
+    je.field(F("bootcount"), snap->st.uptime.iRebootCount);
 
     // --- Connection status (MQTT, OTGW, thermostat, boiler) ---
-    je.field(F("mqttconnected"), state.mqtt.bConnected);
+    je.field(F("mqttconnected"), snap->st.mqtt.bConnected);
     // "otcommandinterface" names which OT interface is active, always one or the other, never both.
-    if (isPICEnabled())           je.field(F("otcommandinterface"), F("PIC"));
-    else if (isOTDirectEnabled()) je.field(F("otcommandinterface"), F("OT-Direct"));
-    else                          je.field(F("otcommandinterface"), F("None"));
-    if (hasOTCommandInterface()) {
-      je.field(F("thermostatconnected"), state.otBus.bThermostatState);
-      je.field(F("boilerconnected"), state.otBus.bBoilerState);
-      je.field(F("otgwconnected"), state.otBus.bOnline);
+    if (snap->picEnabled)           je.field(F("otcommandinterface"), F("PIC"));
+    else if (snap->otDirectEnabled) je.field(F("otcommandinterface"), F("OT-Direct"));
+    else                            je.field(F("otcommandinterface"), F("None"));
+    if (snap->hasOtCmd) {
+      je.field(F("thermostatconnected"), snap->st.otBus.bThermostatState);
+      je.field(F("boilerconnected"), snap->st.otBus.bBoilerState);
+      je.field(F("otgwconnected"), snap->st.otBus.bOnline);
     }
-    if (isPICEnabled()) {
-      je.field(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting");
+    if (snap->picEnabled) {
+      je.field(F("otgwmode"), !snap->gatewayFirmware ? "N/A" : snap->st.otBus.bGatewayModeKnown ? CCONOFF(snap->st.otBus.bGatewayMode) : "detecting");
     }
-    je.field(F("otgwsimulation"), state.debug.bOTGWSimulation);
+    je.field(F("otgwsimulation"), snap->st.debug.bOTGWSimulation);
 
     // --- Chip & CPU ---
-    snprintf_P(cMsg, sizeof(cMsg), PSTR("%06X"), (unsigned int)platformChipId());
-    je.field(F("chipid"), cMsg);
+    je.field(F("chipid"), snap->chipid);
     je.field(F("coreversion"), platformCoreVersion());
     je.field(F("sdkversion"),  platformSdkVersion());
-    je.field(F("cpufreq"), platformCpuFreqMHz());
+    je.field(F("cpufreq"), snap->cpuFreq);
 
     // --- RAM / heap (free heap, largest block, fragmentation, tier transitions) ---
-    je.field(F("freeheap"), platformFreeHeap());
-    je.field(F("maxfreeblock"), platformMaxFreeBlock());
-    je.field(F("hd_fragmentation_pct"), getHeapFragmentation());
-    je.field(F("hd_enter_low"),        state.heapdiag.iEnteredLowCount);
-    je.field(F("hd_enter_warning"),    state.heapdiag.iEnteredWarningCount);
-    je.field(F("hd_enter_critical"),   state.heapdiag.iEnteredCriticalCount);
+    je.field(F("freeheap"), snap->freeHeap);
+    je.field(F("maxfreeblock"), snap->maxFreeBlock);
+    je.field(F("hd_fragmentation_pct"), snap->fragPct);
+    je.field(F("hd_enter_low"),        snap->st.heapdiag.iEnteredLowCount);
+    je.field(F("hd_enter_warning"),    snap->st.heapdiag.iEnteredWarningCount);
+    je.field(F("hd_enter_critical"),   snap->st.heapdiag.iEnteredCriticalCount);
 
     // --- Flash, sketch & filesystem storage (values cached at boot by cacheBootFlashInfo) ---
     je.field(F("sketchsize"),       sBootFlash.sketchSize);
@@ -2640,39 +2752,38 @@ void sendDeviceInfoV2()
     je.field(F("LittleFSsize"),     sBootFlash.littleFSSizeMB);
 
     // --- Reliability drops (heap-pressure side effects) ---
-    je.field(F("hd_ws_drops"),         state.heapdiag.iWsDropsTotal);
-    je.field(F("hd_mqtt_drops"),       state.heapdiag.iMqttDropsTotal);
+    je.field(F("hd_ws_drops"),         snap->st.heapdiag.iWsDropsTotal);
+    je.field(F("hd_mqtt_drops"),       snap->st.heapdiag.iMqttDropsTotal);
 
     // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
-    je.field(F("disc_published_topics"),     state.discovery.iPublishedTopicCount);
-    je.field(F("disc_pending_ids"),          (uint32_t)countPendingDiscoveryIds());
-    je.field(F("disc_verify_runs"),          state.discovery.iVerifyRunCount);
-    je.field(F("disc_republish_triggered"),  state.discovery.iRepublishTriggeredCount);
-    je.field(F("disc_last_missing"),         (uint32_t)state.discovery.iLastMissingCount);
-    je.field(F("disc_last_orphan"),          (uint32_t)state.discovery.iLastOrphanCount);
-    je.field(F("disc_last_outcome"),         verifyOutcomeLabel(state.discovery.eLastOutcome));
-    je.field(F("hd_drip_burst_skip"),        state.heapdiag.iDripActiveBurstSkipCount);
-    je.field(F("hd_drip_cooldown_skip"),     state.heapdiag.iDripCooldownSkipCount);
-    je.field(F("hd_drip_slowmode"),          state.heapdiag.iDripSlowModeCount);
-    je.field(F("perf_sat_status_total_ms"),     state.restperf.satStatus.iLastTotalMs);
-    je.field(F("perf_sat_status_send_ms"),      state.restperf.satStatus.iLastSendMs);
-    je.field(F("perf_sat_status_render_ms"),    state.restperf.satStatus.iLastRenderMs);
-    je.field(F("perf_sat_status_chunks"),       state.restperf.satStatus.iLastChunkCount);
-    je.field(F("perf_device_info_total_ms"),    state.restperf.deviceInfo.iLastTotalMs);
-    je.field(F("perf_device_info_send_ms"),     state.restperf.deviceInfo.iLastSendMs);
-    je.field(F("perf_device_info_render_ms"),   state.restperf.deviceInfo.iLastRenderMs);
-    je.field(F("perf_device_info_chunks"),      state.restperf.deviceInfo.iLastChunkCount);
-    je.field(F("perf_device_info_max_ms"),      state.restperf.deviceInfo.iMaxTotalMs);
-    je.field(F("perf_device_info_samples"),     state.restperf.deviceInfo.iSampleCount);
-    je.field(F("perf_settings_total_ms"),       state.restperf.settings.iLastTotalMs);
-    je.field(F("perf_settings_send_ms"),        state.restperf.settings.iLastSendMs);
-    je.field(F("perf_settings_render_ms"),      state.restperf.settings.iLastRenderMs);
-    je.field(F("perf_settings_chunks"),         state.restperf.settings.iLastChunkCount);
+    je.field(F("disc_published_topics"),     snap->st.discovery.iPublishedTopicCount);
+    je.field(F("disc_pending_ids"),          (uint32_t)snap->pendingDiscoveryIds);
+    je.field(F("disc_verify_runs"),          snap->st.discovery.iVerifyRunCount);
+    je.field(F("disc_republish_triggered"),  snap->st.discovery.iRepublishTriggeredCount);
+    je.field(F("disc_last_missing"),         (uint32_t)snap->st.discovery.iLastMissingCount);
+    je.field(F("disc_last_orphan"),          (uint32_t)snap->st.discovery.iLastOrphanCount);
+    je.field(F("disc_last_outcome"),         verifyOutcomeLabel(snap->st.discovery.eLastOutcome));
+    je.field(F("hd_drip_burst_skip"),        snap->st.heapdiag.iDripActiveBurstSkipCount);
+    je.field(F("hd_drip_cooldown_skip"),     snap->st.heapdiag.iDripCooldownSkipCount);
+    je.field(F("hd_drip_slowmode"),          snap->st.heapdiag.iDripSlowModeCount);
+    je.field(F("perf_sat_status_total_ms"),     snap->st.restperf.satStatus.iLastTotalMs);
+    je.field(F("perf_sat_status_send_ms"),      snap->st.restperf.satStatus.iLastSendMs);
+    je.field(F("perf_sat_status_render_ms"),    snap->st.restperf.satStatus.iLastRenderMs);
+    je.field(F("perf_sat_status_chunks"),       snap->st.restperf.satStatus.iLastChunkCount);
+    je.field(F("perf_device_info_total_ms"),    snap->st.restperf.deviceInfo.iLastTotalMs);
+    je.field(F("perf_device_info_send_ms"),     snap->st.restperf.deviceInfo.iLastSendMs);
+    je.field(F("perf_device_info_render_ms"),   snap->st.restperf.deviceInfo.iLastRenderMs);
+    je.field(F("perf_device_info_chunks"),      snap->st.restperf.deviceInfo.iLastChunkCount);
+    je.field(F("perf_device_info_max_ms"),      snap->st.restperf.deviceInfo.iMaxTotalMs);
+    je.field(F("perf_device_info_samples"),     snap->st.restperf.deviceInfo.iSampleCount);
+    je.field(F("perf_settings_total_ms"),       snap->st.restperf.settings.iLastTotalMs);
+    je.field(F("perf_settings_send_ms"),        snap->st.restperf.settings.iLastSendMs);
+    je.field(F("perf_settings_render_ms"),      snap->st.restperf.settings.iLastRenderMs);
+    je.field(F("perf_settings_chunks"),         snap->st.restperf.settings.iLastChunkCount);
 
     je.endObject();                   // close "device"
     je.endObject();                   // close root
-  }
-  restFinalize();
+  });
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_DEVICE_INFO, totalMs);
   RESTDebugTf(PSTR("REST PERF device/info total=%lums send=%lums render=%lums chunks=%lu\r\n"),

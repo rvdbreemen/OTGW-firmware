@@ -3,11 +3,11 @@ id: TASK-883
 title: >-
   fix(async): mitigate Task Watchdog reboot under heavy concurrent REST load
   (TASK-867 AC#8 / TASK-879)
-status: In Review
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-18 09:24'
-updated_date: '2026-06-19 07:09'
+updated_date: '2026-06-19 11:59'
 labels: []
 dependencies: []
 ordinal: 99000
@@ -46,4 +46,8 @@ alpha.216 update (from TASK-886 ADR-141 revert): the ADR-145 chunked/pull path t
 Log-path finding (advisor side-effect check): the cbuf storm's 'Failed to allocate' lines are ESPAsyncWebServer async_ws_log_e -> ESP-IDF log_e -> UART/USB-JTAG console (AsyncWebServerLogging.h; the captured [E][file:line] func(): format confirms the log_e branch, not the Serial.printf or no-op branch). NOT esp_diagnostics-to-flash -> NO flash wear. The cost is core-1 CPU formatting+emitting ~4186 console lines/4min, which IS the async_tcp-starvation lever. Secondary TASK-883 lever: lowering CORE_DEBUG_LEVEL (currently emitting [E] from core/lib files) would suppress these error logs and remove the CPU cost outright, at the price of losing the diagnostic. Not changed in alpha.216 (keep the diagnostic; the gate already keeps the device up). The principled fix remains true chunked streaming (no whole-response buffer -> no resize -> no storm).
 
 Follow-up nit from the alpha.216 gate review: restEffectiveInflightCap() makes the -DREST_MAX_INFLIGHT=255 'disable the gate' A/B sentinel no longer fully disable (255>1 -> still falls through to the heap-tier maxblock clamp, returning 1/2 under fragmentation). Shipped cap=4 behaviour is unaffected. When TASK-883 revisits this code for the true chunked fix and wants a clean unmitigated A/B arm, restore the full-disable semantics: e.g. 'if (REST_MAX_INFLIGHT >= 255 || REST_MAX_INFLIGHT <= 1) return REST_MAX_INFLIGHT;'.
+
+PROOF delivered (TASK-883 true chunked streaming). Built jsonChunked.h: RestChunkWindow Print sink + restSendChunked() that re-runs a single-pass JsonEmit closure per TCP window into AsyncChunkedResponse (no whole-response cbuf). No PSRAM on OTGW32 (verified) + no-ArduinoJson -> this windowing-re-run-with-determinism-contract is the only correct approach. Converted /v2/settings (biggest, request-stable -> no snapshot) as PoC: output 7286 B / 132 keys valid JSON, byte-len identical to buffered. A/B on OTGW32 16w/2min unthrottled flood, MQTT off, identical conditions: 'Failed to allocate' storm 176 (chunked) vs 1719 (gate alpha.220) = ~10x fewer; real 200s served 779 vs 655 (+19%); maxblock floor 19444 vs 14324; ADR-089 tiers 0/0/0 vs low1/warn3; frag peak 71% vs 79%; 0 reboots both. Chunking ONE endpoint cut the storm ~10x. Full rollout (debug/sat-status/device-info need per-endpoint volatile snapshots per the determinism contract) extrapolates residual storm -> ~0 -> eliminates (not just mitigates) the WDT reboot. Committed df566e19 on experimental sub-branch feature-2.0.0-esp32s3-async-chunked (local, unbumped, NOT pushed/merged) pending maintainer go on full rollout + merge to alpha.
+
+Settings-only chunked win MERGED to alpha (maintainer chose option 1): commit 9874e050, alpha.221, pushed feature-2.0.0-esp32s3-async. /v2/settings now true-chunked (no whole-response cbuf). On-device validated alpha.221: settings 7286 B/132 keys valid, OpenAPI live-compliant. REMAINING in TASK-883: convert the volatile heavy endpoints (debug, sat/status, device/info) — each needs a per-endpoint snapshot of its volatile fields (heap/uptime/telemetry) per the jsonChunked.h determinism contract — to drive the residual storm toward 0 and eliminate (not just mitigate) the WDT reboot. jsonChunked.h infra is on alpha now; experimental branch feature-2.0.0-esp32s3-async-chunked (df566e19) retained.
 <!-- SECTION:NOTES:END -->

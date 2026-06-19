@@ -2003,6 +2003,32 @@ void satHandleControlMode(const char* value)
 //=====================================================================
 //=== Send SAT Status as JSON (for REST API) ===
 //=====================================================================
+// TASK-883: per-response snapshot for the chunked /v2/sat/status stream. Same
+// DETERMINISM CONTRACT as DeviceInfoSnap (jsonChunked.h): the closure re-runs per
+// TCP window, so every AUTONOMOUS input is frozen ONCE here — the full state copy
+// freezes all state.sat.* (incl. the volatile PID/cycle/sim floats and the
+// sim-trace ring), and the captured fields freeze the external OT-bus globals
+// (OTcurrentSystemState.*), the millis() clock used for sim-trace ages, the BLE
+// failover flag, and the results of the computed/side-effecting helpers
+// (satGetRoomTemp/OutsideTemp/MaxSetpoint, satCycleGet*, satBoilerHardwarePresent,
+// satGet*Name). settings.sat.* stays live (event-driven).
+struct SatStatusSnap {
+  OTGWState st;                       // frozen copy of every state.* the emit reads
+  float    otToutside;                // OTcurrentSystemState.Toutside
+  uint16_t otSlaveConfigMemberIDcode; // OTcurrentSystemState.SlaveConfigMemberIDcode
+  float    roomTemp;
+  float    outsideTemp;
+  float    maxSetpoint;
+  bool     boilerHwPresent;
+  uint8_t  cyclesThisHour;
+  uint32_t phaseDurationSec;
+  uint32_t nowMs;                     // millis() frozen for all sim-trace age maths
+  bool     bleFailoverActive;
+  char     boilerStatus[20];
+  char     manufacturer[12];
+  char     phaseName[24];
+};
+
 void satSendStatusJSON()
 {
   const uint32_t startMs = millis();
@@ -2013,175 +2039,198 @@ void satSendStatusJSON()
   // handling) and uses the default 3-decimal float width; per-field decimal
   // precision is intentionally not reintroduced. satBLESendStatusJSON() appends
   // its ble_* fields into the same open root object before the final endObject().
-  AsyncResponseStream* s = restBeginStream("application/json");
-  if (s) {
-    JsonEmit je(*s);
+  // The chunked path allocates only the small fixed snapshot (no whole-response
+  // cbuf); guard the snapshot alloc against a fragmented heap (mirrors device/info).
+  if (platformMaxFreeBlock() < 8192) { sendApiError(503, F("low heap")); return; }
+
+  // Freeze every volatile input ONCE (see SatStatusSnap above). Helpers are called
+  // in their original relative order so any side-effects (satGetOutsideTemp resolves
+  // its own staleness AFTER satGetRoomTemp) match the pre-chunked behaviour.
+  auto snap = std::make_shared<SatStatusSnap>();
+  snap->st            = state;                          // en-bloc freeze of all state.*
+  satGetBoilerStatusName(snap->boilerStatus, sizeof(snap->boilerStatus));
+  snap->roomTemp      = satGetRoomTemp();
+  snap->outsideTemp   = satGetOutsideTemp();
+  snap->cyclesThisHour   = satCycleGetCyclesThisHour();
+  strlcpy(snap->phaseName, satCycleGetPhaseName(), sizeof(snap->phaseName));
+  snap->phaseDurationSec = satCycleGetPhaseDurationSec();
+  satGetManufacturerName(snap->manufacturer, sizeof(snap->manufacturer));
+  snap->maxSetpoint   = satGetMaxSetpoint();
+  snap->boilerHwPresent = satBoilerHardwarePresent();
+  snap->otToutside    = OTcurrentSystemState.Toutside;
+  snap->otSlaveConfigMemberIDcode = OTcurrentSystemState.SlaveConfigMemberIDcode;
+  snap->nowMs         = millis();
+  snap->bleFailoverActive = satBLEFailoverActive();
+
+  // DETERMINISM GATE (TASK-883): this closure reads ONLY snap->*, settings.sat.*,
+  // and F()/PSTR literals. No live state.*, OTcurrentSystemState.*, millis(), or
+  // satGet*()/satCycleGet*() — those would shift a field's text width between
+  // window passes and corrupt the wire JSON.
+  restSendChunked("application/json", [snap](JsonEmit& je) {
     je.beginObject();
     je.field(F("enabled"),              settings.sat.bEnabled);
-    je.field(F("active"),               state.sat.bActive);
-    je.field(F("control_mode"),         (int32_t)state.sat.eControlMode);
-    { char bsName[20]; satGetBoilerStatusName(bsName, sizeof(bsName));
-      je.field(F("boiler_status"),        bsName); }
+    je.field(F("active"),               snap->st.sat.bActive);
+    je.field(F("control_mode"),         (int32_t)snap->st.sat.eControlMode);
+    je.field(F("boiler_status"),        snap->boilerStatus);
     je.field(F("target_temp"),          settings.sat.fTargetTemp);
-    je.field(F("room_temp"),            satGetRoomTemp());
+    je.field(F("room_temp"),            snap->roomTemp);
     // TASK-886 review M1: distinguish "no reading" from a real 0 °C. room_temp
     // already arrives as NaN->null when no thermostat exists; mirror that for the
     // other two no-source-prone tiles so the UI shows "--" instead of a misleading
-    // "0.00°C". satGetOutsideTemp() is called FIRST (it resolves its own staleness
-    // side-effects), then if no live source remains AND it fell through to the bare
-    // OT-bus 0.0f (the firmware's own no-sensor convention, see line ~1113) it is
-    // emitted as null. final_setpoint is only meaningful while SAT is active.
+    // "0.00°C". The outside-temp helper was called FIRST at snapshot time (it
+    // resolves its own staleness side-effects), then if no live source remains AND it fell
+    // through to the bare OT-bus 0.0f (the firmware's own no-sensor convention, see
+    // line ~1113) it is emitted as null. final_setpoint is only meaningful active.
     {
-      float outsideDisp = satGetOutsideTemp();
-      bool outsideHasSource = settings.sat.bSimulation || state.sat.bExternalOutdoorValid ||
-                              (state.sat.weather.bValid && OTcurrentSystemState.Toutside == 0.0f);
+      float outsideDisp = snap->outsideTemp;
+      bool outsideHasSource = settings.sat.bSimulation || snap->st.sat.bExternalOutdoorValid ||
+                              (snap->st.sat.weather.bValid && snap->otToutside == 0.0f);
       if (!outsideHasSource && outsideDisp == 0.0f) outsideDisp = NAN;
       je.field(F("outside_temp"),       outsideDisp);
     }
-    je.field(F("heating_curve"),        state.sat.fHeatingCurveValue);
-    je.field(F("pid_output"),           state.sat.fPidOutput);
-    je.field(F("final_setpoint"),       state.sat.bActive ? state.sat.fFinalSetpoint : NAN);
-    je.field(F("error"),                state.sat.fError);
-    je.field(F("pid_p"),                state.sat.fPidP);
-    je.field(F("pid_i"),                state.sat.fPidI);
-    je.field(F("pid_d"),                state.sat.fPidD);
-    je.field(F("kp"),                   state.sat.fKp, 6);
-    je.field(F("ki"),                   state.sat.fKi, 6);
-    je.field(F("kd"),                   state.sat.fKd, 6);
-    je.field(F("raw_derivative"),       state.sat.fRawDerivative);
+    je.field(F("heating_curve"),        snap->st.sat.fHeatingCurveValue);
+    je.field(F("pid_output"),           snap->st.sat.fPidOutput);
+    je.field(F("final_setpoint"),       snap->st.sat.bActive ? snap->st.sat.fFinalSetpoint : NAN);
+    je.field(F("error"),                snap->st.sat.fError);
+    je.field(F("pid_p"),                snap->st.sat.fPidP);
+    je.field(F("pid_i"),                snap->st.sat.fPidI);
+    je.field(F("pid_d"),                snap->st.sat.fPidD);
+    je.field(F("kp"),                   snap->st.sat.fKp, 6);
+    je.field(F("ki"),                   snap->st.sat.fKi, 6);
+    je.field(F("kd"),                   snap->st.sat.fKd, 6);
+    je.field(F("raw_derivative"),       snap->st.sat.fRawDerivative);
     je.field(F("coefficient"),          settings.sat.fHeatingCurveCoeff);
     je.field(F("deadband"),             settings.sat.fDeadband);
     je.field(F("overshoot_margin"),     settings.sat.fOvershootMargin);
-    je.field(F("cycle_count"),          state.sat.iCycleCount);
-    je.field(F("cycles_this_hour"),     (int32_t)satCycleGetCyclesThisHour());
-    je.field(F("last_cycle_class"),     (int32_t)state.sat.eLastCycleClass);
-    je.field(F("cycle_max_flow"),       state.sat.fCycleMaxFlow);
-    je.field(F("cycle_overshoot_sec"),  state.sat.fCycleOvershootSec);
-    je.field(F("duty_ratio"),           state.sat.fDutyRatio);
-    je.field(F("overshoot_fraction"),   state.sat.fOvershootFraction);
-    je.field(F("underheat_fraction"),   state.sat.fUnderheatFraction);
-    je.field(F("cycle_phase"),          satCycleGetPhaseName());
-    je.field(F("phase_duration_sec"),   (int32_t)satCycleGetPhaseDurationSec());
-    je.field(F("pwm_duty"),             state.sat.fPwmDutyCycle);
-    je.field(F("pwm_flame_req"),        state.sat.bPwmFlameRequested);
-    je.field(F("active_preset"),        (int32_t)state.sat.eActivePreset);
-    je.field(F("mod_suppressed"),       state.sat.bModSuppressed);
-    je.field(F("dhw_active"),           state.sat.bDhwActive);
+    je.field(F("cycle_count"),          snap->st.sat.iCycleCount);
+    je.field(F("cycles_this_hour"),     (int32_t)snap->cyclesThisHour);
+    je.field(F("last_cycle_class"),     (int32_t)snap->st.sat.eLastCycleClass);
+    je.field(F("cycle_max_flow"),       snap->st.sat.fCycleMaxFlow);
+    je.field(F("cycle_overshoot_sec"),  snap->st.sat.fCycleOvershootSec);
+    je.field(F("duty_ratio"),           snap->st.sat.fDutyRatio);
+    je.field(F("overshoot_fraction"),   snap->st.sat.fOvershootFraction);
+    je.field(F("underheat_fraction"),   snap->st.sat.fUnderheatFraction);
+    je.field(F("cycle_phase"),          snap->phaseName);
+    je.field(F("phase_duration_sec"),   (int32_t)snap->phaseDurationSec);
+    je.field(F("pwm_duty"),             snap->st.sat.fPwmDutyCycle);
+    je.field(F("pwm_flame_req"),        snap->st.sat.bPwmFlameRequested);
+    je.field(F("active_preset"),        (int32_t)snap->st.sat.eActivePreset);
+    je.field(F("mod_suppressed"),       snap->st.sat.bModSuppressed);
+    je.field(F("dhw_active"),           snap->st.sat.bDhwActive);
     je.field(F("dhw_setpoint"),         settings.sat.fDhwSetpoint);
-    // TASK-516: boiler-gated master DHW enable. dhw_config_tank is derived live
-    // from MsgID 3 HB3 (bit 11 of the uint16 SlaveConfigMemberIDcode); the UI
-    // uses it to decide whether to render the toggle. dhw_enable mirrors the
-    // user setting; only acted on (HW=) when dhw_config_tank=true.
-    je.field(F("dhw_config_tank"),      (bool)(OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800));
+    // TASK-516: boiler-gated master DHW enable. dhw_config_tank is derived from
+    // MsgID 3 HB3 (bit 11 of the uint16 SlaveConfigMemberIDcode); the UI uses it to
+    // decide whether to render the toggle. dhw_enable mirrors the user setting; only
+    // acted on (HW=) when dhw_config_tank=true.
+    je.field(F("dhw_config_tank"),      (bool)(snap->otSlaveConfigMemberIDcode & 0x0800));
     je.field(F("dhw_enable"),           settings.sat.bDhwEnable);
     je.field(F("control_interval_sec"), (int32_t)settings.sat.iControlInterval);
-    je.field(F("fallback_active"),      state.sat.bFallbackActive);
-    je.field(F("fallback_reason"),      (int32_t)state.sat.eFallbackReason);
+    je.field(F("fallback_active"),      snap->st.sat.bFallbackActive);
+    je.field(F("fallback_reason"),      (int32_t)snap->st.sat.eFallbackReason);
     je.field(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
-    je.field(F("current_modulation"),   (int32_t)state.sat.iCurrentModulation);
+    je.field(F("current_modulation"),   (int32_t)snap->st.sat.iCurrentModulation);
     je.field(F("ovp_value"),            settings.sat.fOvpValue);
     je.field(F("ovp_enabled"),          settings.sat.bOvpEnabled);
-    je.field(F("ovp_calib_phase"),      (int32_t)state.sat.eCalibPhase);
-    je.field(F("ovp_calib_max_temp"),   state.sat.fCalibMaxTemp);
-    je.field(F("ovp_calib_samples"),    (int32_t)state.sat.iCalibSamples);
+    je.field(F("ovp_calib_phase"),      (int32_t)snap->st.sat.eCalibPhase);
+    je.field(F("ovp_calib_max_temp"),   snap->st.sat.fCalibMaxTemp);
+    je.field(F("ovp_calib_samples"),    (int32_t)snap->st.sat.iCalibSamples);
     je.field(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
-    je.field(F("heating_system_detected"), (int32_t)state.sat.iDetectedHeatingSystem);
-    { char mfrName[12]; satGetManufacturerName(mfrName, sizeof(mfrName));
-      je.field(F("manufacturer"), mfrName); }
+    je.field(F("heating_system_detected"), (int32_t)snap->st.sat.iDetectedHeatingSystem);
+    je.field(F("manufacturer"),         snap->manufacturer);
     je.field(F("manufacturer_setting"), (int32_t)settings.sat.iManufacturer);
-    je.field(F("manufacturer_detected"), (int32_t)state.sat.iDetectedManufacturer);
-    je.field(F("slave_memberid"),       (int32_t)state.sat.iSlaveMemberID);
-    je.field(F("max_setpoint_system"),  satGetMaxSetpoint());
-    je.field(F("external_temp_valid"),  state.sat.bExternalTempValid);
-    je.field(F("external_outdoor_valid"), state.sat.bExternalOutdoorValid);
+    je.field(F("manufacturer_detected"), (int32_t)snap->st.sat.iDetectedManufacturer);
+    je.field(F("slave_memberid"),       (int32_t)snap->st.sat.iSlaveMemberID);
+    je.field(F("max_setpoint_system"),  snap->maxSetpoint);
+    je.field(F("external_temp_valid"),  snap->st.sat.bExternalTempValid);
+    je.field(F("external_outdoor_valid"), snap->st.sat.bExternalOutdoorValid);
     // PV-surplus boost (TASK-640)
-    je.field(F("pv_surplus_w"),         state.sat.fExternalPvSurplusW);
-    je.field(F("pv_surplus_valid"),     state.sat.bExternalPvSurplusValid);
-    je.field(F("pv_boost_active"),      state.sat.bPvBoostActive);
-    je.field(F("pv_boost_applied_c"),   state.sat.fPvBoostAppliedC);
+    je.field(F("pv_surplus_w"),         snap->st.sat.fExternalPvSurplusW);
+    je.field(F("pv_surplus_valid"),     snap->st.sat.bExternalPvSurplusValid);
+    je.field(F("pv_boost_active"),      snap->st.sat.bPvBoostActive);
+    je.field(F("pv_boost_applied_c"),   snap->st.sat.fPvBoostAppliedC);
     je.field(F("pv_boost_enabled"),     settings.sat.bPvBoostEnabled);
-    je.field(F("safety_tripped"),       state.sat.bSafetyTripped);
-    je.field(F("valves_open"),          state.sat.bValvesOpen);
-    je.field(F("window_open"),          state.sat.bWindowOpen);
+    je.field(F("safety_tripped"),       snap->st.sat.bSafetyTripped);
+    je.field(F("valves_open"),          snap->st.sat.bValvesOpen);
+    je.field(F("window_open"),          snap->st.sat.bWindowOpen);
     je.field(F("window_detection"),     settings.sat.bWindowDetection);
     je.field(F("push_setpoint"),        settings.sat.bPushSetpoint);
     je.field(F("flame_off_offset"),     settings.sat.fFlameOffOffset);
     je.field(F("force_pwm"),            settings.sat.bForcePWM);
     je.field(F("flow_offset"),          settings.sat.fFlowOffset);
-    je.field(F("pressure"),             state.sat.fSmoothedPressure);
-    je.field(F("pressure_drop_rate"),   state.sat.fPressureDropRate);
-    je.field(F("pressure_alarm"),       state.sat.bPressureAlarm);
-    je.field(F("modulation_reliable"),  state.sat.bModulationReliable);
-    je.field(F("setpoint_mismatch"),    state.sat.bSetpointMismatch);
+    je.field(F("pressure"),             snap->st.sat.fSmoothedPressure);
+    je.field(F("pressure_drop_rate"),   snap->st.sat.fPressureDropRate);
+    je.field(F("pressure_alarm"),       snap->st.sat.bPressureAlarm);
+    je.field(F("modulation_reliable"),  snap->st.sat.bModulationReliable);
+    je.field(F("setpoint_mismatch"),    snap->st.sat.bSetpointMismatch);
     { static const char* const crNames[] = { "insufficient", "increase", "decrease", "hold" };
-      int crIdx = (int)state.sat.eCurveRecommendation;
+      int crIdx = (int)snap->st.sat.eCurveRecommendation;
       if (crIdx < 0 || crIdx > 3) crIdx = 0;
       je.field(F("curve_recommendation"), crNames[crIdx]); }
-    je.field(F("heating_curve_recommendation"), state.sat.sHeatCurveRec);
-    je.field(F("mean_error"),           state.sat.fMeanError);
-    je.field(F("error_stddev"),         state.sat.fErrorStdDev);
+    je.field(F("heating_curve_recommendation"), snap->st.sat.sHeatCurveRec);
+    je.field(F("mean_error"),           snap->st.sat.fMeanError);
+    je.field(F("error_stddev"),         snap->st.sat.fErrorStdDev);
     je.field(F("target_temp_step"),     settings.sat.fTargetTempStep);
-    je.field(F("power_kw"),             state.sat.fCurrentPower);
-    je.field(F("energy_kwh"),           state.sat.fEnergyTotal);
+    je.field(F("power_kw"),             snap->st.sat.fCurrentPower);
+    je.field(F("energy_kwh"),           snap->st.sat.fEnergyTotal);
     je.field(F("boiler_capacity"),      settings.sat.fBoilerCapacity);
     // Gas consumption estimation (Task #232)
     je.field(F("boiler_rated_kw"),      settings.sat.fBoilerRatedKW);
     je.field(F("boiler_efficiency"),    settings.sat.fBoilerEfficiency);
-    je.field(F("energy_estimated_kwh"), state.sat.fEnergyEstimatedKWh);
+    je.field(F("energy_estimated_kwh"), snap->st.sat.fEnergyEstimatedKWh);
     // Preset sync (Task #46)
     je.field(F("preset_sync"),          settings.sat.bPresetSync);
     // Thermal drop learning (Task #21)
     je.field(F("thermal_coeff"),        settings.sat.fThermalCoeff);
-    je.field(F("thermal_drop_rate"),    state.sat.fThermalDropRate);
-    je.field(F("thermal_model_valid"),  state.sat.bThermalModelValid);
-    je.field(F("estimated_room"),       state.sat.fEstimatedRoom);
-    je.field(F("last_known_room"),      state.sat.fLastKnownRoom);
+    je.field(F("thermal_drop_rate"),    snap->st.sat.fThermalDropRate);
+    je.field(F("thermal_model_valid"),  snap->st.sat.bThermalModelValid);
+    je.field(F("estimated_room"),       snap->st.sat.fEstimatedRoom);
+    je.field(F("last_known_room"),      snap->st.sat.fLastKnownRoom);
     // Solar gain (Task #23)
-    je.field(F("solar_gain_active"),    state.sat.bSolarGainActive);
-    je.field(F("indoor_rise_rate"),     state.sat.fIndoorRiseRate);
+    je.field(F("solar_gain_active"),    snap->st.sat.bSolarGainActive);
+    je.field(F("indoor_rise_rate"),     snap->st.sat.fIndoorRiseRate);
     // Summer simmer (Task #24)
     je.field(F("summer_simmer"),        settings.sat.bSummerSimmer);
-    je.field(F("summer_active"),        state.sat.bSummerActive);
-    je.field(F("summer_hours_above"),   state.sat.fSummerHoursAbove);
+    je.field(F("summer_active"),        snap->st.sat.bSummerActive);
+    je.field(F("summer_hours_above"),   snap->st.sat.fSummerHoursAbove);
     je.field(F("summer_threshold"),     settings.sat.fSummerThreshold);
     je.field(F("summer_min_hours"),     (int32_t)settings.sat.iSummerMinHours);
     // Thermal comfort (Task #28/#47)
     je.field(F("comfort_adjust"),       settings.sat.bComfortAdjust);
-    je.field(F("humidity"),             state.sat.fHumidity);
-    je.field(F("humidity_valid"),       state.sat.bHumidityValid);
-    je.field(F("comfort_offset"),       state.sat.fComfortOffset);
+    je.field(F("humidity"),             snap->st.sat.fHumidity);
+    je.field(F("humidity_valid"),       snap->st.sat.bHumidityValid);
+    je.field(F("comfort_offset"),       snap->st.sat.fComfortOffset);
     je.field(F("comfort_ref_humidity"), settings.sat.fComfortHumidity);
     je.field(F("comfort_max_offset"),   settings.sat.fComfortMaxOffset);
     // Simulation (Task #37 + TASK-795)
     je.field(F("simulation"),           settings.sat.bSimulation);
-    // §4.2: mirrors !satBoilerHardwarePresent() so the Web UI can hide the
-    // simulation card when a real boiler is attached.
-    je.field(F("sim_available"),        !satBoilerHardwarePresent());
+    // §4.2: mirrors the inverse of the boiler-hardware-present check (frozen above)
+    // so the Web UI can hide the simulation card when a real boiler is attached.
+    je.field(F("sim_available"),        !snap->boilerHwPresent);
     if (settings.sat.bSimulation) {
-      je.field(F("sim_room_temp"),       state.sat.fSimRoomTemp);
-      je.field(F("sim_flow_temp"),       state.sat.fSimFlowTemp);
-      je.field(F("sim_outdoor_temp"),    state.sat.fSimOutdoorTemp);
-      je.field(F("sim_return_temp"),     state.sat.fSimReturnTemp);
-      je.field(F("sim_flame_on"),        state.sat.bSimFlameOn);
-      je.field(F("sim_modulation"),      (int32_t)state.sat.iSimModulation);
+      je.field(F("sim_room_temp"),       snap->st.sat.fSimRoomTemp);
+      je.field(F("sim_flow_temp"),       snap->st.sat.fSimFlowTemp);
+      je.field(F("sim_outdoor_temp"),    snap->st.sat.fSimOutdoorTemp);
+      je.field(F("sim_return_temp"),     snap->st.sat.fSimReturnTemp);
+      je.field(F("sim_flame_on"),        snap->st.sat.bSimFlameOn);
+      je.field(F("sim_modulation"),      (int32_t)snap->st.sat.iSimModulation);
       // §4.3 command trace
-      je.field(F("last_blocked_cmd"),    state.sat.sLastBlockedCmd);
+      je.field(F("last_blocked_cmd"),    snap->st.sat.sLastBlockedCmd);
       je.field(F("last_blocked_cmd_age_ms"),
-                       state.sat.iLastBlockedCmdMs == 0 ? (int32_t)0
-                         : (int32_t)(millis() - state.sat.iLastBlockedCmdMs));
+                       snap->st.sat.iLastBlockedCmdMs == 0 ? (int32_t)0
+                         : (int32_t)(snap->nowMs - snap->st.sat.iLastBlockedCmdMs));
       // TASK-801 F6: last_blocked_cmds[] ring, newest-first. Each element
       // {"cmd":"..","age_ms":N}. JsonEmit nested array-of-object (no manual buffer).
       {
-        const uint8_t ring  = (uint8_t)(sizeof(state.sat.iSimTraceMs) / sizeof(state.sat.iSimTraceMs[0]));
-        const uint8_t count = state.sat.iSimTraceCount;
-        const uint32_t nowMs = millis();
+        const uint8_t ring  = (uint8_t)(sizeof(snap->st.sat.iSimTraceMs) / sizeof(snap->st.sat.iSimTraceMs[0]));
+        const uint8_t count = snap->st.sat.iSimTraceCount;
+        const uint32_t nowMs = snap->nowMs;
         je.beginArray(F("last_blocked_cmds"));
         for (uint8_t k = 0; k < count; k++) {
           // newest-first: head-1-k, wrapping
-          uint8_t idx = (uint8_t)((state.sat.iSimTraceHead + ring - 1 - k) % ring);
-          uint32_t age = (state.sat.iSimTraceMs[idx] == 0) ? 0 : (nowMs - state.sat.iSimTraceMs[idx]);
+          uint8_t idx = (uint8_t)((snap->st.sat.iSimTraceHead + ring - 1 - k) % ring);
+          uint32_t age = (snap->st.sat.iSimTraceMs[idx] == 0) ? 0 : (nowMs - snap->st.sat.iSimTraceMs[idx]);
           je.beginObject();
-          je.field(F("cmd"),    state.sat.sSimTraceCmd[idx]);
+          je.field(F("cmd"),    snap->st.sat.sSimTraceCmd[idx]);
           je.field(F("age_ms"), age);
           je.endObject();
         }
@@ -2190,9 +2239,9 @@ void satSendStatusJSON()
     }
     // PID auto-tuning (Task #27)
     je.field(F("auto_tune"),            settings.sat.bAutoTune);
-    je.field(F("auto_tune_active"),     state.sat.bAutoTuneActive);
-    je.field(F("auto_tune_cycles"),     (int32_t)state.sat.iAutoTuneCycles);
-    je.field(F("auto_tune_score"),      state.sat.fAutoTuneScore);
+    je.field(F("auto_tune_active"),     snap->st.sat.bAutoTuneActive);
+    je.field(F("auto_tune_cycles"),     (int32_t)snap->st.sat.iAutoTuneCycles);
+    je.field(F("auto_tune_score"),      snap->st.sat.fAutoTuneScore);
     je.field(F("auto_tune_rate"),       settings.sat.fAutoTuneRate);
     // SAT Python parity settings (Task #82)
     je.field(F("sensor_max_age"),       (int32_t)settings.sat.iSensorMaxAgeS);
@@ -2221,20 +2270,19 @@ void satSendStatusJSON()
         char nameBuf[20];
         // area_N_temp
         snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_temp"), i);
-        je.field(nameBuf, state.sat.fAreaTemp[i]);
+        je.field(nameBuf, snap->st.sat.fAreaTemp[i]);
         // area_N_valid
         snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_valid"), i);
-        je.field(nameBuf, state.sat.bAreaValid[i]);
+        je.field(nameBuf, snap->st.sat.bAreaValid[i]);
         // area_N_weight
         snprintf_P(nameBuf, sizeof(nameBuf), PSTR("area_%u_weight"), i);
         je.field(nameBuf, settings.sat.fAreaWeight[i]);
       }
     }
-    // BLE sensor status (Task #20). Appends ble_* fields into the shared object.
-    satBLESendStatusJSON(je);
+    // BLE sensor status (Task #20). Appends ble_* fields from the frozen snapshot.
+    satBLESendStatusJSON(je, snap->st.sat, snap->bleFailoverActive);
     je.endObject();
-  }
-  restFinalize();
+  });
   const uint32_t totalMs = millis() - startMs;
   restPerfCommit(REST_PERF_SAT_STATUS, totalMs);
   if (state.debug.bRestAPI) {

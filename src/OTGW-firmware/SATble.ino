@@ -689,23 +689,33 @@ void satBLEPublishMQTT()
 // and the AsyncResponseStream, calling je.endObject() + restFinalize() once
 // after this returns. JsonEmit serialises NaN/Inf as null natively, so the old
 // raw-restSendContent scramble gotcha is gone.
-void satBLESendStatusJSON(JsonEmit& je)
+// TASK-883: sat/status is now a true chunked/pull stream whose emit closure
+// re-runs per TCP window and MUST be byte-deterministic (jsonChunked.h). The
+// volatile BLE telemetry (state.sat.bBle*/fBle*/iBle*) and the autonomous
+// _bleFailoverActive flag are frozen by the caller into its per-response snapshot
+// and passed in here, so this helper reads only the frozen `sat` snapshot + the
+// passed flag + request-stable settings.* — never live volatile state.
+void satBLESendStatusJSON(JsonEmit& je, const SATRuntimeSection& sat, bool bleFailoverActive)
 {
   je.field(F("ble_enable"),          settings.sat.bBleEnable);
   je.field(F("ble_failover"),        settings.sat.bBleFailover);
-  je.field(F("ble_failover_active"), _bleFailoverActive);
-  je.field(F("ble_temp_valid"),      state.sat.bBleTempValid);
-  if (state.sat.bBleTempValid) {
-    je.field(F("ble_temp"),     state.sat.fBleTemp);
-    je.field(F("ble_humidity"), state.sat.fBleHumidity);
-    je.field(F("ble_rssi"),     (int32_t)state.sat.iBleRssi);
-    je.field(F("ble_battery"),  (int32_t)state.sat.iBleBattery);
+  je.field(F("ble_failover_active"), bleFailoverActive);
+  je.field(F("ble_temp_valid"),      sat.bBleTempValid);
+  if (sat.bBleTempValid) {
+    je.field(F("ble_temp"),     sat.fBleTemp);
+    je.field(F("ble_humidity"), sat.fBleHumidity);
+    je.field(F("ble_rssi"),     (int32_t)sat.iBleRssi);
+    je.field(F("ble_battery"),  (int32_t)sat.iBleBattery);
   }
-  je.field(F("ble_sensor_count"), (int32_t)state.sat.iBleSensorCount);
+  je.field(F("ble_sensor_count"), (int32_t)sat.iBleSensorCount);
   if (settings.sat.sBleMAC[0] != '\0') {
     je.field(F("ble_mac"), settings.sat.sBleMAC);
   }
 }
+
+// Accessor so satSendStatusJSON() (another translation unit) can freeze the BLE
+// failover flag into its deterministic per-response snapshot (TASK-883).
+bool satBLEFailoverActive() { return _bleFailoverActive; }
 
 //=====================================================================
 // TASK-508: BLE roster REST helpers

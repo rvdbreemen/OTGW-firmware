@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.221
+**  Version  : v2.0.0-alpha.222
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -329,7 +329,8 @@ void satBLEUpdateState();
 float satBLEGetTemperature();
 float satBLEGetHumidity();
 void satBLEPublishMQTT();
-void satBLESendStatusJSON(JsonEmit& je);    // TASK-885: appends ble_* fields into the caller's open SAT-status object (streaming)
+void satBLESendStatusJSON(JsonEmit& je, const SATRuntimeSection& sat, bool bleFailoverActive);  // TASK-885/883: appends ble_* fields from a frozen SAT snapshot into the caller's open SAT-status object (deterministic streaming)
+bool satBLEFailoverActive();                // TASK-883: read the BLE failover flag for per-response snapshotting
 
 // TASK-488 / TASK-492: BLE HA-discovery + per-MAC state-topic helpers
 // (defined in MQTTstuff.ino). Caller (satBLEPublishMQTT) wires these in once
