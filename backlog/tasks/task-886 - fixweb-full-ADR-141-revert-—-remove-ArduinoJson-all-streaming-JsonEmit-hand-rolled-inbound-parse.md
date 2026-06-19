@@ -3,11 +3,11 @@ id: TASK-886
 title: >-
   fix(web): full ADR-141 revert — remove ArduinoJson, all-streaming JsonEmit,
   hand-rolled inbound parse
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-18 20:02'
-updated_date: '2026-06-19 06:52'
+updated_date: '2026-06-19 07:09'
 labels: []
 dependencies: []
 ordinal: 102000
@@ -26,8 +26,10 @@ Maintainer decision 2026-06-18 (TASK-885 A/B): full ADR-141 revert. Streaming Js
 - [x] #3 ArduinoJson fully removed: restSendJson(JsonDocument&)+RestJsonStream+JsonChunkWindow+measureJson deleted from webServerCompat.h; #include <ArduinoJson.h> removed (OTGW-firmware.h, webServerCompat.h); lib dep removed from platformio.ini; grep confirms zero ArduinoJson symbols outside src/libraries
 - [x] #4 Superseding ADR (Proposed) reverts ADR-141 and retires ADR-145; states the honest cbuf-vs-doc-pool tradeoff (whole-response cbuf, no doc pool; NOT zero-buffer)
 - [x] #5 build esp32 green + evaluate.py --quick green; json_golden semantic-equal (settings byte-identical) + explicit bool/float byte-checks pass
-- [ ] #6 [field] 8-16w load test GATE-ON (cap 4): no OOM-class reboot, heap pristine (maxblock floor, 0 ADR-089 tiers); any reboot decoded via _serialcap+addr2line and attributed — TASK-879/watchdog/core-1 is approach-independent, NOT a revert regression
+- [x] #6 [field] 8-16w load test GATE-ON (cap 4): no OOM-class reboot, heap pristine (maxblock floor, 0 ADR-089 tiers); any reboot decoded via _serialcap+addr2line and attributed — TASK-879/watchdog/core-1 is approach-independent, NOT a revert regression
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
