@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : jsonEmit.h
-**  Version  : v2.0.0-alpha.217
+**  Version  : v2.0.0-alpha.218
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -100,16 +100,16 @@ public:
   static constexpr uint8_t MAX_DEPTH = 8;
 
   explicit JsonEmit(Print& out)
-    : _out(out), _depth(0), _firstMask(0), _suppressSep(false), _bDepthError(false) {}
+    : _out(out), _depth(0), _firstMask(0), _suppressSep(false), _bDepthError(false), _dropped(0) {}
 
   // ---- structure ----
   void beginObject()                            { _openContainer('{'); }
-  void beginObject(const char* k)               { key(k); _openContainer('{'); }
-  void beginObject(const __FlashStringHelper* k){ key(k); _openContainer('{'); }
+  void beginObject(const char* k)               { if (_depth >= MAX_DEPTH) { _bDepthError = true; _dropped++; return; } key(k); _openContainer('{'); }
+  void beginObject(const __FlashStringHelper* k){ if (_depth >= MAX_DEPTH) { _bDepthError = true; _dropped++; return; } key(k); _openContainer('{'); }
   void endObject()                              { _closeContainer('}'); }
   void beginArray()                             { _openContainer('['); }
-  void beginArray(const char* k)                { key(k); _openContainer('['); }
-  void beginArray(const __FlashStringHelper* k) { key(k); _openContainer('['); }
+  void beginArray(const char* k)                { if (_depth >= MAX_DEPTH) { _bDepthError = true; _dropped++; return; } key(k); _openContainer('['); }
+  void beginArray(const __FlashStringHelper* k) { if (_depth >= MAX_DEPTH) { _bDepthError = true; _dropped++; return; } key(k); _openContainer('['); }
   void endArray()                               { _closeContainer(']'); }
 
   // ---- keys ----
@@ -219,14 +219,20 @@ private:
     }
   }
   void _openContainer(char brace) {
-    if (_depth >= MAX_DEPTH) { _bDepthError = true; return; }  // drop, keep balanced
+    if (_depth >= MAX_DEPTH) {                    // overflow: drop the container,
+      _bDepthError = true;                        // record it so its matching close
+      _suppressSep = false;                       // is skipped too (no dangling key
+      _dropped++;                                 // state, no parent over-close).
+      return;
+    }
     _sep();
     _out.print(brace);
     ++_depth;
     _firstMask |= (uint16_t)(1u << _depth);
   }
   void _closeContainer(char brace) {
-    if (_depth == 0) return;          // unbalanced close (dropped open): ignore
+    if (_dropped) { _dropped--; return; }  // matching close for an overflow-dropped open
+    if (_depth == 0) return;               // unbalanced close: ignore
     --_depth;
     _out.print(brace);
   }
@@ -236,6 +242,7 @@ private:
   uint16_t _firstMask;
   bool     _suppressSep;
   bool     _bDepthError;
+  uint8_t  _dropped;     // opens dropped at MAX_DEPTH, awaiting their matching close
 };
 
 #endif // JSONEMIT_H

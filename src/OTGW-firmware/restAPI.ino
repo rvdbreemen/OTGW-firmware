@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.217
+**  Version  : v2.0.0-alpha.218
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -657,7 +657,8 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     const char* body = bodyCompat();
     char cmdBuf[64] = "";
-    if (!extractJsonField(String(body), F("command"), cmdBuf, sizeof(cmdBuf))) {
+    // const char* overload: no String heap copy (ADR-004; TASK-886 review L2).
+    if (!extractJsonField(body, F("command"), cmdBuf, sizeof(cmdBuf))) {
       strlcpy(cmdBuf, body, sizeof(cmdBuf));
     }
     handleCommandSubmit(cmdBuf);

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-alpha.217
+**  Version  : v2.0.0-alpha.218
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -750,18 +750,23 @@ static inline int xjfHex(char c) {
   if (c >= 'A' && c <= 'F') return c - 'A' + 10;
   return -1;
 }
-// Append codepoint as UTF-8 (BMP, 1-3 bytes) into out[*oi], bounded by cap-1.
+// Append codepoint as UTF-8 (1-4 bytes) into out[*oi], bounded by cap-1.
 // Drops the char whole rather than writing a partial multibyte sequence.
 static inline void xjfPutUtf8(char* out, size_t* oi, size_t cap, uint32_t cp) {
-  size_t need = (cp < 0x80) ? 1 : (cp < 0x800) ? 2 : 3;
+  size_t need = (cp < 0x80) ? 1 : (cp < 0x800) ? 2 : (cp < 0x10000) ? 3 : 4;
   if (*oi + need > cap - 1) return;
   if (cp < 0x80) {
     out[(*oi)++] = (char)cp;
   } else if (cp < 0x800) {
     out[(*oi)++] = (char)(0xC0 | (cp >> 6));
     out[(*oi)++] = (char)(0x80 | (cp & 0x3F));
-  } else {
+  } else if (cp < 0x10000) {
     out[(*oi)++] = (char)(0xE0 | (cp >> 12));
+    out[(*oi)++] = (char)(0x80 | ((cp >> 6) & 0x3F));
+    out[(*oi)++] = (char)(0x80 | (cp & 0x3F));
+  } else {
+    out[(*oi)++] = (char)(0xF0 | (cp >> 18));
+    out[(*oi)++] = (char)(0x80 | ((cp >> 12) & 0x3F));
     out[(*oi)++] = (char)(0x80 | ((cp >> 6) & 0x3F));
     out[(*oi)++] = (char)(0x80 | (cp & 0x3F));
   }
@@ -796,12 +801,32 @@ static const char* xjfReadString(const char* p, char* out, size_t cap) {
         int h0 = xjfHex(p[2]), h1 = xjfHex(p[3]), h2 = xjfHex(p[4]), h3 = xjfHex(p[5]);
         if (h0 < 0 || h1 < 0 || h2 < 0 || h3 < 0) return NULL;
         uint32_t cp = (uint32_t)((h0 << 12) | (h1 << 8) | (h2 << 4) | h3);
+        p += 6;
+        // Surrogate-pair combining (RFC 8259): a non-BMP code point arrives as a
+        // UTF-16 pair \uD800-DBFF (high) + \uDC00-DFFF (low). Combine into the one
+        // supplementary code point (emitted as 4-byte UTF-8 by xjfPutUtf8). A high
+        // surrogate not followed by a valid low, or a lone low surrogate, is
+        // replaced with U+FFFD — matching the reverted ArduinoJson path and lenient
+        // decoders, so an unpaired surrogate never lands on the wire as invalid UTF-8.
+        if (cp >= 0xD800 && cp <= 0xDBFF) {
+          if (p[0] == '\\' && p[1] == 'u' && p[2] && p[3] && p[4] && p[5]) {
+            int g0 = xjfHex(p[2]), g1 = xjfHex(p[3]), g2 = xjfHex(p[4]), g3 = xjfHex(p[5]);
+            if (g0 >= 0 && g1 >= 0 && g2 >= 0 && g3 >= 0) {
+              uint32_t lo = (uint32_t)((g0 << 12) | (g1 << 8) | (g2 << 4) | g3);
+              if (lo >= 0xDC00 && lo <= 0xDFFF) {
+                cp = 0x10000u + ((cp - 0xD800u) << 10) + (lo - 0xDC00u);
+                p += 6;                            // consumed the low surrogate too
+              } else { cp = 0xFFFDu; }             // high not followed by a valid low
+            } else { cp = 0xFFFDu; }
+          } else { cp = 0xFFFDu; }                 // high not followed by \u
+        } else if (cp >= 0xDC00 && cp <= 0xDFFF) {
+          cp = 0xFFFDu;                            // lone low surrogate
+        }
         if (out && !full) {
           size_t before = oi;
           xjfPutUtf8(out, &oi, cap, cp);
           if (oi == before) full = true;          // didn't fit -> truncate here on
         }
-        p += 6;
         continue;
       }
       char c;

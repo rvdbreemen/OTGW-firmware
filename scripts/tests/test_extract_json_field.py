@@ -29,14 +29,19 @@ def _hex(c):
 
 
 def _put_utf8(out, cp):
-    # append codepoint as UTF-8 bytes; mirrors xjf_putUtf8 (BMP, 1-3 bytes)
+    # append codepoint as UTF-8 bytes; mirrors xjf_putUtf8 (1-4 bytes)
     if cp < 0x80:
         out.append(cp)
     elif cp < 0x800:
         out.append(0xC0 | (cp >> 6))
         out.append(0x80 | (cp & 0x3F))
-    else:
+    elif cp < 0x10000:
         out.append(0xE0 | (cp >> 12))
+        out.append(0x80 | ((cp >> 6) & 0x3F))
+        out.append(0x80 | (cp & 0x3F))
+    else:
+        out.append(0xF0 | (cp >> 18))
+        out.append(0x80 | ((cp >> 12) & 0x3F))
         out.append(0x80 | ((cp >> 6) & 0x3F))
         out.append(0x80 | (cp & 0x3F))
 
@@ -75,13 +80,31 @@ def _read_string(s, i, out, cap):
                 if min(h0, h1, h2, h3) < 0:
                     return None
                 cp = (h0 << 12) | (h1 << 8) | (h2 << 4) | h3
-                need = 1 if cp < 0x80 else (2 if cp < 0x800 else 3)
+                i += 6
+                # surrogate-pair combining (mirrors xjf_readString): high+low ->
+                # supplementary code point; unpaired/lone surrogate -> U+FFFD
+                if 0xD800 <= cp <= 0xDBFF:
+                    if (i + 5 < len(s) and s[i] == '\\' and s[i+1] == 'u'):
+                        g0, g1, g2, g3 = _hex(s[i+2]), _hex(s[i+3]), _hex(s[i+4]), _hex(s[i+5])
+                        if min(g0, g1, g2, g3) >= 0:
+                            lo = (g0 << 12) | (g1 << 8) | (g2 << 4) | g3
+                            if 0xDC00 <= lo <= 0xDFFF:
+                                cp = 0x10000 + ((cp - 0xD800) << 10) + (lo - 0xDC00)
+                                i += 6
+                            else:
+                                cp = 0xFFFD
+                        else:
+                            cp = 0xFFFD
+                    else:
+                        cp = 0xFFFD
+                elif 0xDC00 <= cp <= 0xDFFF:
+                    cp = 0xFFFD
+                need = 1 if cp < 0x80 else (2 if cp < 0x800 else (3 if cp < 0x10000 else 4))
                 if out is not None and not full:
                     if len(out) + need <= cap - 1:
                         _put_utf8(out, cp)
                     else:
                         full = True
-                i += 6
                 continue
             else:
                 c = ord(e); i += 2
@@ -220,6 +243,10 @@ CASES = [
     ("array value skipped",     '{"arr":[1,2,{"value":3}],"value":8}',     "value",      "8"),
     ("escapes in value",        '{"label":"a\\"b\\\\c\\nd"}',              "label",      'a"b\\c\nd'),
     ("unicode bmp diacritic",   '{"label":"caf\\u00e9"}',                  "label",      "café"),
+    ("surrogate pair emoji",     '{"label":"\\uD83D\\uDE00"}',              "label",      "\U0001F600"),
+    ("lone high surrogate",      '{"label":"\\uD83D"}',                     "label",      "�"),
+    ("lone low surrogate",       '{"label":"\\uDE00"}',                     "label",      "�"),
+    ("high then non-low char",   '{"label":"\\uD83Dx"}',                    "label",      "�x"),
     ("comma inside string val", '{"label":"a,b","x":1}',                   "x",          "1"),
     ("brace inside string val", '{"label":"a}b","x":1}',                   "x",          "1"),
     ("colon inside string val", '{"label":"a:b","x":1}',                   "x",          "1"),
@@ -254,11 +281,13 @@ def main():
             fails += 1
             continue
         ok = (got == expected)
+        # ascii() keeps non-ASCII results (é, emoji surrogate pairs) printable on
+        # any console encoding (Windows cp1252 raises UnicodeEncodeError on {!r}).
         if not ok:
-            print(f"FAIL  {desc:32}  key={key!r}  got={got!r}  expected={expected!r}")
+            print(f"FAIL  {desc:32}  key={key!r}  got={ascii(got)}  expected={ascii(expected)}")
             fails += 1
         else:
-            print(f"pass  {desc:32}  -> {got!r}")
+            print(f"pass  {desc:32}  -> {ascii(got)}")
 
     # truncation / overflow safety: value longer than the result buffer must be
     # truncated to cap-1 (strlcpy semantics), succeed, never overflow, never throw.

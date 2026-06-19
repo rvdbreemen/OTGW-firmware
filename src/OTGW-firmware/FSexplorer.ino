@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.217
+**  Version  : v2.0.0-alpha.218
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -266,6 +266,15 @@ void apifirmwarefilelist() {
   unsigned int entryCount = 0;
   if (state.debug.bRestAPI) DebugTf(PSTR("API: apifirmwarefilelist()\r\n"));
 
+  // Heap floor (mirrors processAPI's pre-check at restAPI.ino:2221). This
+  // deprecated route is registered directly on the async server, so it bypasses
+  // that guard; replicate it here so a low-heap entry into restBeginStream's
+  // throwing beginResponseStream() can never reach this path (TASK-886 review M1).
+  if (platformFreeHeap() < 4096) {
+    webSendP(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n"));
+    return;
+  }
+
   // ADR-004: stack char[] instead of String to avoid per-iteration heap churn.
   char version[32]   = {0};
   char fwversion[32] = {0};
@@ -348,6 +357,15 @@ void apifirmwarefilelist() {
 // Parameterless: reads the already-bound currentRequest (see apifirmwarefilelist).
 void apilistfiles()
 {
+  // Heap floor (mirrors processAPI's pre-check at restAPI.ino:2221). Deprecated
+  // route registered directly on the async server -> bypasses that guard; replicate
+  // it so the throwing beginResponseStream() on the listing path can never be
+  // reached under memory pressure (TASK-886 review M1).
+  if (platformFreeHeap() < 4096) {
+    webSendP(500, PSTR("text/plain"), PSTR("500: internal server error (low heap)\r\n"));
+    return;
+  }
+
   // --- Delete handler: local buffer instead of global cMsg ---
   if (hasArgCompat("delete")) {
     if (!checkHttpAuth()) return;  // 401 already sent
