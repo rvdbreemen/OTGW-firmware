@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.223
+**  Version  : v2.0.0-alpha.224
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -300,10 +300,26 @@ inline void webSendP(int code, PGM_P contentType, PGM_P body) {
   g_responseSent = true;
 }
 
+// ADR-147 D4.1: static-file backpressure gate. Defined in restAPI.ino (next to the
+// sibling REST gate, where the platform heap shims are in scope); forward-declared here
+// so webSendFile can admit/reject before touching LittleFS. async_tcp-task-local.
+bool webFileGateTryAdmit();   // true => admitted (counter incremented); false => caller 503s
+void webFileGateRelease();    // decrement; call from request->onDisconnect
+
 // Stream a file from LittleFS (or the .gz sibling — Content-Encoding handled by
 // the response). Drains pending headers, sends once.
 inline void webSendFile(const char* path, const char* contentType, bool gzip) {
   if (!currentRequest || g_responseSent) return;
+  // ADR-147 D4.1: refuse a new file serve under heap pressure / too much concurrency,
+  // BEFORE any LittleFS work, so an esp_littlefs FD-struct alloc cannot fail into a hung
+  // connection that drains the lwIP PCB pool (TASK-879). A normal single-browser asset
+  // burst (<=6 parallel) is never throttled while the heap is healthy; under a flood the
+  // heap-tier clamp tightens the cap toward 1 and the excess gets a cheap 503.
+  if (!webFileGateTryAdmit()) {
+    webSendStatus(503);
+    return;
+  }
+  currentRequest->onDisconnect([]() { webFileGateRelease(); });
   // Missing-file guard (ADR-139): beginResponse(LittleFS, <missing>) yields an
   // invalid-source response that send() turns into a 500 (or a hung connection on
   // some ESPAsyncWebServer forks), never a clean 404. Check first.

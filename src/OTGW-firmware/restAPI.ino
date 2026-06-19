@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.223
+**  Version  : v2.0.0-alpha.224
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -62,6 +62,38 @@ static inline uint8_t restEffectiveInflightCap() {
   if (mb < 24000) return (REST_MAX_INFLIGHT < 2) ? REST_MAX_INFLIGHT : 2;
   return REST_MAX_INFLIGHT;
 }
+
+// ADR-147 D4.1: backpressure gate for the LittleFS static-file path (webSendFile in
+// webServerCompat.h). Static serving allocates an esp_littlefs FD struct + a VFS read
+// buffer + the AsyncWebServer file-response buffer from the heap per concurrent stream;
+// under fragmentation a small FD-struct alloc fails ("esp_littlefs: Unable to allocate
+// FD"), the invalid-source response then hangs, the leaked accept slot drains the 16-slot
+// lwIP PCB pool, and the webserver dies (TASK-879 silent hang). Refuse a new file serve
+// when too many are already building OR the largest free block is too low, returning a
+// cheap 503 instead of pushing another FD alloc into the fragmentation wall. SEPARATE
+// counter from the REST gate (restInFlight) keeps the proven REST path untouched; same
+// heap-tier clamp. Base cap 6 = one browser's HTTP/1.1 per-origin parallel-connection
+// limit, so a normal single-browser asset burst is never throttled while the heap is
+// healthy. async_tcp-task-local (handlers serialize on the one task) -> no atomic. Defined
+// here, not in the header, because platformMaxFreeBlock() is in scope at this point.
+#ifndef WEB_FILE_MAX_INFLIGHT
+#define WEB_FILE_MAX_INFLIGHT 6
+#endif
+static uint8_t webFileInFlight = 0;
+bool webFileGateTryAdmit() {
+  uint8_t cap = WEB_FILE_MAX_INFLIGHT;
+  const uint32_t mb = platformMaxFreeBlock();
+  if (mb < 16000)      cap = 1;
+  else if (mb < 24000) cap = 2;
+  if (webFileInFlight >= cap) {
+    RESTDebugTf(PSTR("WEBFILE BUSY: %u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
+                webFileInFlight, cap, platformFreeHeap(), mb);
+    return false;
+  }
+  webFileInFlight++;
+  return true;
+}
+void webFileGateRelease() { if (webFileInFlight) webFileInFlight--; }
 
 // Zero-allocation HTTP method to string (returns PROGMEM pointer).
 // Replaces strHTTPmethod() which returned String (heap allocation per call).

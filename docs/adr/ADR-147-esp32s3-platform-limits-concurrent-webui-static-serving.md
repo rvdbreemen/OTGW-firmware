@@ -182,6 +182,53 @@ are the canonical-upstream guidance and the cost is build flags only.
 **D5 -- Debunked / closed.** Raising LittleFS `maxOpenFiles` is a no-op (D1) -- do not attempt
 it. Raising `CONFIG_LWIP_MAX_ACTIVE_TCP` is not possible on this prebuilt-lib build.
 
+## Alternatives Considered
+
+### Alternative A: Embed the web assets in flash (PROGMEM arrays)
+
+Embed the ~9 UI assets as PROGMEM byte arrays compiled into the firmware image (the
+WLED / Tasmota / EMS-ESP32 approach), structurally eliminating the esp_littlefs FD-struct +
+VFS-buffer heap consumers on the static-file path.
+
+**Rejected.** It is misdirected for OTGW: it does not fix the underlying disease (single
+`async_tcp`-task starvation, the 16-PCB lwIP ceiling, the REST-path `bad_alloc`), it would
+partially **reverse ADR-139** and the maintainer directive that assets ship plain,
+inspectable, and on-device-updatable via FSexplorer, and flash space is **not** the blocker
+(firmware.bin ~1.86 MB of the 2.375 MB app partition; the gzipped UI is ~142 KB and would
+fit). Peer projects embed for RAM/speed/atomic-OTA, not to fix this hang, and keep a
+filesystem mounted for mutable state anyway -- exactly OTGW's situation. The reason is
+mechanism + ADR cost, not space.
+
+### Alternative B: Raise LittleFS `maxOpenFiles`
+
+Raise the file-descriptor count via `LittleFS.begin(false, "/littlefs", N)` to grow the
+pool that the `esp_littlefs: Unable to allocate FD` failure appears to exhaust.
+
+**Rejected.** It is a **no-op** on this build. Arduino `LittleFSFS::begin(...)` literally
+discards the count (`(void)maxOpenFiles;` in `LittleFS.cpp`), `esp_vfs_littlefs_conf_t` has
+**no `max_files` field**, and esp_littlefs ships only as a prebuilt static lib
+(`libjoltwallet__littlefs.a`). There is no fixed FD-count cap to enlarge: the FD cache grows
+from the heap, so the allocation failure is heap pressure, not pool exhaustion.
+
+### Alternative C: Raise `CONFIG_LWIP_MAX_ACTIVE_TCP`
+
+Raise the 16-slot lwIP active-TCP PCB ceiling that the hung connections drain, so the
+accept-NULL storm cannot occur.
+
+**Rejected.** It is **un-raisable on this build**. The value is baked into the precompiled
+`liblwip.a`; `build_flags` cannot relink it, and an IDF/core source rebuild is out of scope.
+The sibling ceilings (`CONFIG_LWIP_MAX_LISTENING_TCP`, `CONFIG_LWIP_MAX_SOCKETS`,
+`CONFIG_LWIP_MAX_UDP_PCBS`) are likewise 16 and likewise locked.
+
+### Alternative D: Move the `async_tcp` task to core 0
+
+Pin the single `async_tcp` task to core 0 to relieve the contention on the app core (core 1).
+
+**Rejected.** Already evaluated and rejected as **ADR-144**. This ADR identifies the
+static-file path as the same heap-under-concurrency disease as the REST path covered there;
+re-litigating the core placement does not address the FD-struct alloc failure or the
+backpressure gap.
+
 ## Consequences
 
 - `platformio.ini` gains four AsyncTCP flags (RUNNING_CORE was already present). All three
@@ -196,7 +243,7 @@ it. Raising `CONFIG_LWIP_MAX_ACTIVE_TCP` is not possible on this prebuilt-lib bu
 - Field-test traceability: the AsyncTCP flag change alters runtime behaviour, so it ships under
   its own prerelease tag.
 
-## Related
+## Related Decisions
 
 - **ADR-139** (async web stack: AsyncTCP on core 1) -- this ADR adds the rest of the AsyncTCP
   config block alongside the existing `RUNNING_CORE=1`.
@@ -209,7 +256,9 @@ it. Raising `CONFIG_LWIP_MAX_ACTIVE_TCP` is not possible on this prebuilt-lib bu
 - **TASK-879** (the webui hang), **TASK-883/884** (the REST flood residual), **TASK-888** (the
   WS-realism tool that produced the A/B anchor).
 
-### References (official / canonical-upstream)
+## References
+
+Official / canonical-upstream sources:
 
 - espressif/esp-idf `components/lwip/Kconfig`: `LWIP_MAX_ACTIVE_TCP` default 16, range 1-1024.
 - ESP32Async/AsyncTCP README: the recommended `CONFIG_ASYNC_TCP_*` block (QUEUE_SIZE=64 default,
