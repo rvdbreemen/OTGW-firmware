@@ -127,7 +127,7 @@ paths:
                         description: WiFi signal strength in dBm (0 when in AP or Ethernet mode)
                       networkmode:
                         type: string
-                        enum: [wifi, ethernet, ap]
+                        enum: [WiFi, Ethernet]
                         description: Active network mode
                       mqttconnected:
                         type: boolean
@@ -628,7 +628,7 @@ paths:
                         description: Active hardware mode ("pic" or "otdirect")
                       networkmode:
                         type: string
-                        enum: [wifi, ethernet, ap]
+                        enum: [WiFi, Ethernet]
                         description: Active network mode
                       # OT Direct fields  - only present when otdirectavailable=true (OTGW32 builds)
                       otdirectavailable:
@@ -732,7 +732,8 @@ paths:
                         description: WiFi signal quality as a percentage (0-100). Returns 0 when in AP fallback mode, 100 when connected via Ethernet.
                       networkmode:
                         type: string
-                        description: Active network mode ("wifi", "ethernet", or "ap")
+                        enum: [WiFi, Ethernet]
+                        description: Active network mode
                       apfallback:
                         type: boolean
                         description: "True when the device has fallen back to AP mode (SSID: OTGW-<MAC>, IP: 192.168.4.1). Only present in pre-release builds and only when AP fallback is active."
@@ -3480,8 +3481,7 @@ components:
           type: number
           description: "Target room temperature (C)"
         room_temp:
-          type: number
-          nullable: true
+          type: [number, "null"]
           description: "Room temperature used by the PID (C); null when no sensor"
         outside_temp:
           type: number
