@@ -221,8 +221,10 @@ to mask a removable source is the wrong trade.
 ### Alternative D: Do nothing
 
 The residual `bad_alloc` in `addHeader` (documented in ADR-145) and the TWDT core-1
-reboots (TASK-879) are both present regardless of approach. If both are tolerable in
-field use, the alpha.214 baseline could be left in place. Rejected: the TASK-885 A/B
+reboots (TASK-879) are both present regardless of which *serializer* runs (ArduinoJson's
+default whole-response `serializeJson` OR JsonEmit) — only ADR-145's chunked path, removed
+here, avoided them. If both are tolerable in field use, the alpha.214 baseline could be
+left in place. Rejected: the TASK-885 A/B
 shows a materially better heap posture is achievable with a straightforward path rewrite
 and no new architectural complexity. There is no reason to carry the OOM failure class
 when the tested alternative removes it.
@@ -271,11 +273,23 @@ when the tested alternative removes it.
   acceptance. `scripts/tests/test_extract_json_field.py` 32-case coverage for the
   inbound scanner.
 - *Risk*: the revert does not fix the residual TWDT reboots under extreme unthrottled
-  flood. *Mitigation*: documented honestly. Those reboots are core-1 (`async_tcp` pinned
-  on core-1, ADR-139) starvation under abusive load, independent of the JSON approach.
-  "Survives 8-16 workers with 0 reboots" was already met by the alpha.214 backpressure
-  gate; this revert adds heap headroom (removes the `bad_alloc`/OOM class), not reboot
-  robustness. TASK-879 remains the tracker for the core-1 residual.
+  flood. *Mitigation*: documented honestly, and NOT mis-attributed. These reboots are
+  core-1 (`async_tcp` pinned on core-1, ADR-139) starvation, but they are NOT independent
+  of the JSON approach in the way an earlier draft claimed. The hardware A/B in the
+  45e26b8d / ADR-145 trail establishes they are *serializer*-independent but *whole-
+  response-buffering*-DEPENDENT: ArduinoJson's default `serializeJson(doc, stream)` and
+  JsonEmit both buffer the whole response in one contiguous `AsyncResponseStream` cbuf, and
+  both starve `async_tcp` once an 8-worker flood fragments the heap below the response size
+  and `cbuf::resizeAdd` fails per write through the slow `esp_diagnostics` log hook. Only
+  ADR-145's true chunked/pull-based streaming avoided the whole-response buffer and so was
+  the only verified fix. This revert removes that path (it depended on ArduinoJson's
+  immutable-document-snapshot property) and therefore reintroduces the flood reboot. Two
+  mitigations carry the gap: (1) the `REST_MAX_INFLIGHT` backpressure gate is now
+  HEAP-TIER-AWARE (alpha.216) — it tightens the concurrency ceiling toward 1 as `maxblock`
+  shrinks, so at most one large response buffers at a time under pressure (cheap 503s
+  instead of the resize storm); (2) the real architectural fix, true chunked/pull-based
+  JSON streaming on top of JsonEmit (no ArduinoJson), is scoped to **TASK-883**. TASK-879
+  remains the tracker for the core-1 field "web dead" report of the same class.
 - *Risk*: future endpoints or response shapes exceed `JsonEmit`'s current type surface.
   *Mitigation*: `jsonEmit.h` is header-only with full coverage of bool, int32/uint32,
   float-NaN-null, string-escaped, raw-numeric passthrough, nested object/array, and

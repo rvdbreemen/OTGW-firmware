@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.215
+**  Version  : v2.0.0-alpha.216
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -24,17 +24,41 @@
 // Set by sendApiError/sendApiOptions; defaults to 200 before each handler.
 static int16_t restResponseStatus = 0;
 
-// TASK-884: max concurrent in-flight REST requests before returning 503 (backpressure).
+// TASK-884/883: max concurrent in-flight REST requests before returning 503 (backpressure).
 // 4 matches the verified-safe realistic load (the 4-worker load test passes clean);
-// excess is rejected cheaply so the ~95 KB heap is never asked to hold more concurrent
-// response contexts than it can serve. The chunked path (ADR-145) keeps each response's
-// JsonDocument alive for the whole async stream, so unbounded concurrency exhausts the
-// heap and the library aborts on bad_alloc in addHeader. restInFlight is async_tcp-task-
-// local (all handlers serialize on the one async_tcp task; no atomic needed).
+// excess is rejected cheaply so the heap is never asked to hold more concurrent response
+// buffers than it can serve. AsyncResponseStream buffers each whole response in one
+// contiguous cbuf (RESPONSE_STREAM_BUFFER_SIZE then grown via resizeAdd); under flood the
+// internal-RAM heap fragments below the response size, every grow alloc fails, and
+// AsyncResponseStream::write() logs "Failed to allocate" per overflowing write through the
+// slow esp_diagnostics hook until async_tcp misses the 30 s watchdog (45e26b8d / ADR-145
+// trail). Pre-sizing alone did NOT stop this (hardware A/B, alpha.212); the driver is the
+// number of large contiguous buffers competing at once. So the cap is HEAP-TIER-AWARE
+// (restEffectiveInflightCap below): the static ceiling holds while maxblock is healthy and
+// tightens toward 1 as the largest contiguous block shrinks, serializing big responses
+// under pressure (more cheap 503s) instead of piling cbufs into the resize storm. This is a
+// mitigation for the architectural whole-response-buffer issue; the real fix is true
+// chunked/pull-based streaming, scoped to TASK-883. restInFlight is async_tcp-task-local
+// (all handlers serialize on the one async_tcp task; no atomic needed).
 #ifndef REST_MAX_INFLIGHT
 #define REST_MAX_INFLIGHT 4   // override with -DREST_MAX_INFLIGHT=255 to disable the gate (A/B "raw" arm)
 #endif
 static uint8_t restInFlight = 0;
+
+// Heap-tier-aware concurrency ceiling. The biggest REST response (~8.6 KB settings) needs a
+// contiguous block to buffer; admitting N of them needs ~N x that block. As maxblock falls
+// toward one response's worth, allowing 4 in flight is what fragments the heap below the
+// response size and triggers the resize storm. Tighten the ceiling as maxblock shrinks so
+// at most one large response builds at a time when memory is tight — its single alloc then
+// has the whole remaining contiguous block and is far likelier to succeed. Thresholds are
+// generous (settings ~8.6 KB): >=24 KB -> full cap, >=16 KB -> 2, below -> serialize (1).
+static inline uint8_t restEffectiveInflightCap() {
+  if (REST_MAX_INFLIGHT <= 1) return REST_MAX_INFLIGHT;   // gate explicitly disabled/minimal
+  const uint32_t mb = platformMaxFreeBlock();
+  if (mb < 16000) return 1;
+  if (mb < 24000) return (REST_MAX_INFLIGHT < 2) ? REST_MAX_INFLIGHT : 2;
+  return REST_MAX_INFLIGHT;
+}
 
 // Zero-allocation HTTP method to string (returns PROGMEM pointer).
 // Replaces strHTTPmethod() which returned String (heap allocation per call).
@@ -2165,9 +2189,10 @@ void processAPI(AsyncWebServerRequest *request)
   // after every response (no keep-alive), so request->onDisconnect() fires exactly
   // once per request -> the counter is balanced and cannot leak. The diagnostic
   // logs the heap at the cap so we can tell transient concurrency from a real leak.
-  if (restInFlight >= REST_MAX_INFLIGHT) {
-    RESTDebugTf(PSTR("REST BUSY: %u/%u in-flight => 503 (freeheap=%u maxblock=%u)\r\n"),
-                restInFlight, REST_MAX_INFLIGHT, platformFreeHeap(), platformMaxFreeBlock());
+  const uint8_t effectiveCap = restEffectiveInflightCap();
+  if (restInFlight >= effectiveCap) {
+    RESTDebugTf(PSTR("REST BUSY: %u/%u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
+                restInFlight, REST_MAX_INFLIGHT, effectiveCap, platformFreeHeap(), platformMaxFreeBlock());
     sendApiError(503, F("Server busy: too many concurrent requests, please retry"));
     return;
   }
