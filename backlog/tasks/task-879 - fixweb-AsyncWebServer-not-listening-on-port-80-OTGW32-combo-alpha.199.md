@@ -3,11 +3,11 @@ id: TASK-879
 title: >-
   fix(esp32): Task-Watchdog reboot loop + core-1 starvation (slow webserver),
   OTGW32 alpha.199
-status: In Review
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-16 05:38'
-updated_date: '2026-06-16 23:10'
+updated_date: '2026-06-19 14:29'
 labels: []
 dependencies: []
 ordinal: 95000
@@ -60,4 +60,19 @@ KILL-TEST (decisive, hand to field, no code): power-cycle the OTGW32, connect NO
 FIX (primary, needs decision - touches vendored SimpleTelnet which is READ-ONLY per policy): gate SimpleTelnet::write on availableForWrite() and DROP bytes that don't fit (lossy is fine for a debug stream) instead of the 10x1s select loop; OR move debug emission + the ser2net mirror onto a dedicated FreeRTOS task fed by a ring buffer the loop only enqueues into (mirrors the existing webhook offload pattern). Do NOT just add feedWatchDog() inside the write - masks the reboot, leaves the AsyncTCP latency floor. Full report: workflow wf_79e88a89-6f8 output.
 
 FIX SHIPPED (commit a125fbf7, 2.0.0-alpha.201, ADR-143 Accepted). Implemented option C: telnet (debugTelnet port 23) + ser2net (OTGWstream port 25238) migrated from synchronous SimpleTelnet to AsyncSimpleTelnet (AsyncTCP transport, SimpleTelnet submodule -> 55512dc). Non-blocking writes with TX backpressure (drained on onAck) => loop task never blocks on a socket write, removing both the 4-8s HTTP latency floor and the >=30s TWDT-reboot chain at the shared source. OTGWstream forced to NEG_OFF (raw OTmonitor bridge; lib default NEG_REFUSE would strip binary 0xFF as IAC). Build green all 3 targets (esp32 98.7% / classic 96.0% / combo 94.8% flash, async +~5KB); evaluate.py --quick clean. Toolchain note: build initially failed on a PlatformIO esptool console-script drift (esptool 5.1.0 dropped penv/Scripts/esptool.exe), fixed by pip --force-reinstall (bug-132), unrelated to the code. IN REVIEW pending the field KILL-TEST: power-cycle the OTGW32, connect nothing to port 23/25238, curl http://<ip>/ -> latency sub-second + maxLoopGap ~0 confirms; AsyncSimpleTelnet is an upstream prototype so hardware validation is required before Done.
+
+RESOLVED + HARDWARE-VERIFIED (alpha.202, commits 069513d3 + b664b293). The OTGW32 webserver/telnet symptom is fixed by TWO root causes, both found via multi-agent workflows + hardware-in-the-loop testing:
+1. AsyncSimpleTelnet drop@2s: keep-alive interval mapped onto AsyncTCP setRxTimeout(1) closed every quiet console; + a per-disconnect AsyncClient heap leak. Fixed in src/libraries/SimpleTelnet (upstream rvdbreemen/SimpleTelnet PR #4 -> a651add, submodule bumped). setRxTimeout(0) + delete-in-onDisconnect.
+2. Webserver priority-inversion: the async REST reader took OTStateLock with the default 0==portMAX_DELAY (forever) while the loop-task writer (processOT) holds it across per-frame I/O. Bounded to OT_STATE_READ_LOCK_MS=100 (restAPI.ino:2308).
+NOTE the original 'core-1 CPU starvation' theory (earlier notes) was MECHANISTICALLY WRONG: async_tcp runs at priority 10 > loopTask priority 1 on core 1, so it preempts the loop — a CPU-bound loop cannot starve it. The real coupling was lock-contention + the telnet RX-timeout, not CPU starvation.
+
+DEFINITIVE COMBINED-STRESS TEST (the original failing condition: webserver + telnet together):
+- Webserver under concurrent telnet hammering: 48 probes, 0 fails, 0 timeouts, worst 1.33s (was 4-8s/dead). VERDICT healthy.
+- Telnet under concurrent webserver load: held session 50s open (no drop), 15/15 reconnect cycles healthy.
+- No reboot (uptime climbed 0:15->0:16), heap stable.
+Tooling: scripts/otgw-test.py + scripts/tests/test_telnet.py/test_webserver.py; no-erase flash preserves WiFi creds (no captive portal). bug-133 logged.
+
+Local repro attempt (alpha.222, MQTT-on via laptop Mosquitto, 2026-06-19): observed ONE silent hang — device went fully unresponsive (HTTP 000 on API + root, serial EMPTY/no panic, crashlog available=false), recovered only via esptool hard-reset. Trigger correlated with a real browser (Playwright) loading the FULL webui root (index.html + ~10 parallel sub-resources index.js/*.css/graph.js/sat*.js/echarts + WS) under MQTT-on. NOT reproduced afterward by: direct root GET (serves 40875 B in 0.16-0.36s, 3x clean), WS-only /ws (clean), or 16w REST flood + WS-drain(2 conns,0 disconnects) + MQTT + HA-subscribed (PASS, 0 reboot/0 TWDT/0 storm). Consistent with the known OTGW32 sub-resource-starvation pattern (sat-slider stall): suspected trigger is the browser's parallel asset-burst saturating AsyncTCP slots/heap under MQTT, not any single path. Not a clean on-demand repro yet; needs a deliberate parallel-asset-burst test to confirm.
+
+ROOT CAUSE PINNED (reliable repro + code evidence, 2026-06-19): LittleFS file-descriptor exhaustion under parallel static-file serving. Repro: scripts/tests/webui_burst.py 192.168.1.143 --browsers 3 (each page-load = ~20 parallel asset+API requests + WS) hangs the device after ~12 loads. Serial smoking gun: 'esp_littlefs: Unable to allocate FD' -> 'fopen(/littlefs/index.html) failed' -> storm of 'tcp_accept _accept failed: pcb is NULL' -> webserver dead (HTTP+serial silent, crashlog empty, needs esptool reset). Chain: webSendFile (webServerCompat.h:317) calls currentRequest->beginResponse(LittleFS,path) which holds one LittleFS FD per concurrent stream; LittleFS.begin() (OTGW-firmware.ino:253) runs with default maxOpenFiles (~10, no arg). A parallel browser burst (>10 concurrent streams) exhausts the FD pool; beginResponse then returns an invalid-source response and the code only guards missing-file (line 310), NOT FD-exhaustion, so send() hangs the connection (the very ADR-139 hazard the line-307 comment warns about). Hung connections leak accept slots -> pcb-is-NULL storm -> hang. NOT MQTT-caused (MQTT uses no LittleFS FDs; chunked MQTT-on 16w flood = 0 reboot); MQTT only adds heap pressure. NOT chunked-3 (in-memory JSON, no FDs). FIX DIRECTIONS: (1) guard FD-exhaustion in webSendFile - pre-open the File, if !f send a clean 503 and close instead of letting an invalid-source response hang [the critical safety fix, caps the failure mode regardless of limit]; (2) raise LittleFS maxOpenFiles at the primary begin (e.g. begin(false,'/littlefs',N)); (3) optional: cap concurrent static-file streams (connection backpressure, ties to TASK-884). Repro tool committed: scripts/tests/webui_burst.py.
 <!-- SECTION:NOTES:END -->

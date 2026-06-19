@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-18 09:24'
-updated_date: '2026-06-19 11:59'
+updated_date: '2026-06-19 15:34'
 labels: []
 dependencies: []
 ordinal: 99000
@@ -21,7 +21,7 @@ scripts/tests/test_load.py (the AC#8 heap-under-load tool) surfaced a real edge:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Device survives the 8-worker test_load.py run (>=1 min) with bootcount delta 0 (no TWDT reboot)
+- [x] #1 Device survives the 8-worker test_load.py run (>=1 min) with bootcount delta 0 (no TWDT reboot)
 - [x] #2 Mitigation does not regress single-request latency or the <=4-worker heap-recovery behaviour
 - [x] #3 evaluate.py green; esp32 build + flash-fit
 - [x] #4 A/B causation check: flash pre-migration build (b54c0890~1), run identical 8-worker test_load.py; record whether the TWDT threshold differs from the migrated build (proves/refutes migration involvement). Until done, the migration is NOT implicated.
@@ -50,4 +50,10 @@ Follow-up nit from the alpha.216 gate review: restEffectiveInflightCap() makes t
 PROOF delivered (TASK-883 true chunked streaming). Built jsonChunked.h: RestChunkWindow Print sink + restSendChunked() that re-runs a single-pass JsonEmit closure per TCP window into AsyncChunkedResponse (no whole-response cbuf). No PSRAM on OTGW32 (verified) + no-ArduinoJson -> this windowing-re-run-with-determinism-contract is the only correct approach. Converted /v2/settings (biggest, request-stable -> no snapshot) as PoC: output 7286 B / 132 keys valid JSON, byte-len identical to buffered. A/B on OTGW32 16w/2min unthrottled flood, MQTT off, identical conditions: 'Failed to allocate' storm 176 (chunked) vs 1719 (gate alpha.220) = ~10x fewer; real 200s served 779 vs 655 (+19%); maxblock floor 19444 vs 14324; ADR-089 tiers 0/0/0 vs low1/warn3; frag peak 71% vs 79%; 0 reboots both. Chunking ONE endpoint cut the storm ~10x. Full rollout (debug/sat-status/device-info need per-endpoint volatile snapshots per the determinism contract) extrapolates residual storm -> ~0 -> eliminates (not just mitigates) the WDT reboot. Committed df566e19 on experimental sub-branch feature-2.0.0-esp32s3-async-chunked (local, unbumped, NOT pushed/merged) pending maintainer go on full rollout + merge to alpha.
 
 Settings-only chunked win MERGED to alpha (maintainer chose option 1): commit 9874e050, alpha.221, pushed feature-2.0.0-esp32s3-async. /v2/settings now true-chunked (no whole-response cbuf). On-device validated alpha.221: settings 7286 B/132 keys valid, OpenAPI live-compliant. REMAINING in TASK-883: convert the volatile heavy endpoints (debug, sat/status, device/info) — each needs a per-endpoint snapshot of its volatile fields (heap/uptime/telemetry) per the jsonChunked.h determinism contract — to drive the residual storm toward 0 and eliminate (not just mitigate) the WDT reboot. jsonChunked.h infra is on alpha now; experimental branch feature-2.0.0-esp32s3-async-chunked (df566e19) retained.
+
+alpha.222 (73ff9822 on feature-2.0.0-esp32s3-async-jsonemit): true chunked streaming extended to /v2/debug, /v2/sat/status, /v2/device/info (settings was banked on alpha.221). Per-response volatile snapshot + grep-gated determinism-by-construction. Validation OTGW32 MQTT-off: golden sat/status byte-identical, device-info+debug semantic-equal (only version/heap/uptime volatiles); json_desync_check.py 16w/150s = 4480 parsed, 0 desync, 100%; serial 16w/200s = 0 reboot/0 TWDT/0 cbuf-storm. build esp32 SUCCESS, evaluate 0-fail. Not yet pushed/merged (awaiting user).
+
+MQTT-ON validation (alpha.222 chunked-3, local Mosquitto on laptop 192.168.1.234, device MQTT enabled + connected + HA discovery burst confirmed). 16w/2.5min test_load: bootcount delta=0 (no reboot), handled 98.32%, heap floor 42436 -> full recovery 91564 (no leak), frag peak 63% bounded, maxblock floor 24564 (>8192 guard), ADR-089 warning+1/critical+0. 16w/120s json_desync with MQTT churning heap: 3152 parsed, 0 desync, 100%. Serial 185s: 0 reboot/0 TWDT/0 panic/0 cbuf-storm. Conclusion: chunked + heap-tier gate holds 0 reboots WITH MQTT competing for heap/async_tcp. Caveat: local broker, no active WebSocket live-log subscriber yet (George field crash also had WS heap churn, TASK-879) - that realism gap remains.
+
+alpha.222+73ff982 live full-matrix re-confirmation (OTGW32 @192.168.1.143, this session). evaluate --quick 0-fail (check_no_arduinojson green -> JsonEmit revert complete). OpenAPI live 18/18 pass (2 SKIP=PIC 503). json_golden compare 24 PASS, 7 FAIL all benign: device_info/time = network-move env diffs (ssid/ip/gw/dns), filesystem/files len 27->29 = device-state, and /v2/sat(+/status) final_setpoint/outside_temp 0->null = INTENDED JSON-correctness (deliberate NAN->null no-sensor convention, SATcontrol.ino:2080-2093). NO accidental drift. test_load gate-ON: 8w/1min MQTT-off bootcount delta 0 (handled 99.93%, heap 56996->92752, maxblock 26612, ADR-089 0/0/0); 16w/2min MQTT-off delta 0 (98.81%, maxblock 17396, warn+2); 16w/2min MQTT-ON+discovery-churning delta 0 (98.70%, heap 52628->89992, maxblock 19444, warn+1). MQTT-ON verified: connected to broker, 110 HA discovery + 21 state topics live. AC#1 met (8w survive, bootcount delta 0). HEAD 73ff9822 committed, push to origin/-jsonemit BLOCKED pending maintainer per-instance confirm; merge to feature-2.0.0-esp32s3-async pending maintainer go.
 <!-- SECTION:NOTES:END -->

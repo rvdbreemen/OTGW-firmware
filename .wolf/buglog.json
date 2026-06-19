@@ -2283,5 +2283,73 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-06-17"
+  },
+  {
+    "id": "bug-133",
+    "timestamp": "2026-06-18",
+    "error_message": "AsyncSimpleTelnet: telnet sessions connect + deliver banner + accept input, but the server drops the session at ~1.5-2.7s (the field \"telnet connects then disconnects\").",
+    "file": "src/libraries/SimpleTelnet/src/AsyncSimpleTelnet.h",
+    "root_cause": "Two async-only bugs. (1) RX-idle close: _attachClient mapped the protocol keep-alive interval (1000ms) onto AsyncTCP RX-inactivity timeout via setRxTimeout((keepAlive+999)/1000)=setRxTimeout(1). AsyncTCP _close()s a socket after N seconds of NO DATA FROM THE CLIENT (AsyncTCP.cpp:1106). A debug console is almost entirely outbound, so the silent client triggered a server FIN ~1-2s after the banner ACK. setRxTimeout (async, close-on-no-RX) is semantically OPPOSITE to setTimeout (sync read-timeout). (2) Heap leak: _onClientDisconnect nulled _clientPtr before _releaseSlot, so the app-owned AsyncClient (AsyncTCP does NOT delete server-accepted clients) was never freed (~200B/disconnect).",
+    "fix": "(1) c->setRxTimeout(0) (disable RX-idle close); dead peers still reaped by TCP/AsyncTCP poll. (2) delete the AsyncClient in the onDisconnect callback (canonical single-owner, no close() - pcb already torn down). Hardware-confirmed on OTGW32: held session >12s, 30 reconnects heap-stable. Upstream rvdbreemen/SimpleTelnet PR #4 merged -> a651add; firmware submodule bumped (commit 069513d3, alpha.202). The SYNCHRONOUS SimpleTelnet has NEITHER bug (setTimeout + status()==ESTABLISHED liveness; WiFiClient value-array, no new/delete).",
+    "tags": [
+      "asyncsimpletelnet",
+      "asynctcp",
+      "setRxTimeout",
+      "keepalive",
+      "heap-leak",
+      "telnet",
+      "esp32s3",
+      "TASK-879",
+      "upstream-pr"
+    ],
+    "related_bugs": [
+      "bug-130",
+      "bug-131",
+      "bug-132"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-06-18"
+  },
+  {
+    "id": "bug-134",
+    "timestamp": "2026-06-19",
+    "error_message": "REST /api/v2/otdirect/settings emitted OTD control gains (kp/ki/kboost/gradient/exponent/offset/hysteresis) with sub-0.001 values truncated: ki 0.0005 rendered as 0.001 on the wire (2x error on a control parameter)",
+    "file": "src/OTGW-firmware/jsonEmit.h",
+    "root_cause": "JsonEmit value(float) used a fixed %.3f format (default decimals=3); any magnitude below 0.001 rounded to 0.001 or 0. OTD integral gain ki is constrained 0-5 and realistically sub-0.001 (sibling fKiManual defaults 0.0005). Caught by the TASK-886 adversarial conversion review; json_golden missed it (value-parse tolerates decimal width).",
+    "fix": "value(float) now formats at 6 decimals then trims trailing zeros + lone dot (0.000500->0.0005, 21.500000->21.5, 21.000000->21), matching ArduinoJson's natural form and preserving sub-0.001 gains. Default field-float decimals 3->6. Host-validated 14 cases.",
+    "tags": [
+      "jsonemit",
+      "float-precision",
+      "TASK-886",
+      "adr-141-revert",
+      "control-gain",
+      "otdirect"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-19"
+  },
+  {
+    "id": "bug-135",
+    "timestamp": "2026-06-19",
+    "error_message": "OOB read in xjfReadString unicode-escape decoder on truncated untrusted POST body",
+    "file": "src/OTGW-firmware/jsonStuff.ino",
+    "root_cause": "The backslash-u-XXXX branch read four hex digits in one comma-operator initializer (h0=xjfHex(p[2]), h1=xjfHex(p[3]), h2=xjfHex(p[4]), h3=xjfHex(p[5])) so all four were dereferenced BEFORE the if(h<0) guard. On a body truncated mid-escape the reads ran up to 3 bytes past the NUL terminator of g_requestBody.data[2560]. Found by the TASK-886 multi-reviewer workflow (security + testing lanes), adversarially verified, confirmed against code. Bounded (no info leak, no fault on S3 DRAM) but client-reachable UB.",
+    "fix": "Short-circuited bounds check 'if (!p[2] || !p[3] || !p[4] || !p[5]) return NULL;' before the hex reads, so the || stops at the first NUL and no byte past the terminator is dereferenced. Mirrors the host oracle i+5>=len bound. +4 truncated-escape host cases (suite 32->36->40 with L1). Same short-circuit discipline applied to the L1 surrogate-pair second-escape lookahead.",
+    "tags": [
+      "oob-read",
+      "json-parser",
+      "untrusted-input",
+      "extractJsonField",
+      "esp32s3",
+      "TASK-886",
+      "memory-safety",
+      "alpha.217"
+    ],
+    "related_bugs": [
+      "bug-134"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-06-19"
   }
 ]

@@ -3,11 +3,11 @@ id: TASK-884
 title: >-
   fix(async): abusive-flood OOM abort in addHeader — needs
   connection/concurrency backpressure
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-18 14:11'
-updated_date: '2026-06-18 17:13'
+updated_date: '2026-06-18 17:14'
 labels: []
 dependencies: []
 ordinal: 100000
@@ -23,9 +23,11 @@ With the TASK-883 chunked-streaming fix (ADR-145) the under-load IDF Task-Watchd
 <!-- AC:BEGIN -->
 - [x] #1 Device survives the 8-worker test_load.py flood with bootcount delta 0 (no abort, no reboot)
 - [x] #2 Realistic 4-worker load and single-request latency NOT regressed by the concurrency cap
-- [ ] #3 Mechanism of the addHeader bad_alloc pinned OR made moot by backpressure; documented
+- [x] #3 Mechanism of the addHeader bad_alloc pinned OR made moot by backpressure; documented
 - [x] #4 evaluate.py green; esp32 build + flash-fit
 <!-- AC:END -->
+
+
 
 
 

@@ -3,11 +3,11 @@ id: TASK-880
 title: >-
   fix(web): POST /api body dropped on async server (onBody on catch-all, not
   /api handler)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-17 23:19'
-updated_date: '2026-06-17 23:31'
+updated_date: '2026-06-17 23:47'
 labels: []
 dependencies: []
 ordinal: 96000
@@ -22,8 +22,10 @@ Async-migration regression (TASK-865.9). server.on('/api',HTTP_ANY,processAPI) h
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 POST /api/v2/settings with a JSON body returns 200 and the setting is applied (verified on hardware)
-- [ ] #2 Build green 3 targets; evaluate.py --quick clean
+- [x] #2 Build green 3 targets; evaluate.py --quick clean
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
