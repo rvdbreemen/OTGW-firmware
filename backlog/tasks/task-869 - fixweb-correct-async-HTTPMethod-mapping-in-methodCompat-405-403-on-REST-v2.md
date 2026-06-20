@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-15 05:28'
-updated_date: '2026-06-15 06:18'
+updated_date: '2026-06-20 11:04'
 labels: []
 dependencies: []
 ordinal: 85000
@@ -31,6 +31,8 @@ After the ESPAsyncWebServer migration (TASK-865.9), every REST /api/v2 endpoint 
 
 <!-- SECTION:NOTES:BEGIN -->
 TEAM REVIEW (wot1wn2we) found a HIGH security regression that the method-mapping fix ACTIVATES: with methodCompat() now correctly returning HTTP_OPTIONS(6), the OPTIONS short-circuit in checkHttpAuth() (restAPI.ino:145, 'if (methodCompat()==HTTP_OPTIONS) return true;') began bypassing Basic Auth AND CSRF on the HTTP_ANY admin routes /ReBoot and /ResetWireless, whose handlers reach their side effect directly (a cross-origin CORS-preflight OPTIONS could wipe WiFi creds / reboot). /api/v2 is unaffected (OPTIONS intercepted upstream at restAPI.ino:2134). FIX: removed the OPTIONS short-circuit from checkHttpAuth() so OPTIONS falls through to the same auth+same-origin gate as every other method; /api/v2 CORS preflight still answered at 2134. Verified reBootESP/resetWirelessButton call checkHttpAuth before their side effect. Adjacent finding spun off as a separate task: /pic (upgradepic) is unauthenticated (TASK-870). Review also CONFIRMED the methodCompat switch itself compiles and fixes both 405 and 403.
+
+LIVE auth/CSRF validation on the connected esp32-classic (2026-06-20, temp password set then cleared, device restored to auth-off): unauth POST /api/v2/settings -> 401; authed Basic + cross-origin (Origin: evil) POST -> 403 (CSRF same-origin enforced, ADR-056); authed Basic same-origin POST -> 200. HTTP Basic Auth + CSRF same-origin enforcement on write routes confirmed working end-to-end. This closes the auth-enabled half of AC#3 (general write-path Basic Auth + CSRF). NOTE: I did NOT fire OPTIONS at /ReBoot or /ResetWireless (destructive); the OPTIONS-bypass-removal is covered indirectly by the same auth/CSRF machinery now proven on /api/v2/settings. AC#4 build receipt: 3-target build green at alpha.224+cdc4ec7 (esp32/esp32-classic/esp32-combo), evaluate.py --quick green (0 fail/1 warn/98.6%). Residual: AC#2 visual UI render (banner-gone + version/time header) not observed (browser MCP disconnected this session). Stays In Review pending that visual check.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

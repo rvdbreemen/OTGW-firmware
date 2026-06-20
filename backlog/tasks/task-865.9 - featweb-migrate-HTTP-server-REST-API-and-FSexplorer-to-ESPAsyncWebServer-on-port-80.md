@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:54'
-updated_date: '2026-06-14 03:42'
+updated_date: '2026-06-20 11:04'
 labels:
   - async-esp32s3
 dependencies:
@@ -99,4 +99,6 @@ POST-REVIEW FIXES + FULL 3-ENV BUILD:
 FINAL BUILDS (all per-env SUCCESS, grepped): esp32 97.4%, esp32-classic 93.9%, esp32-combo 99.0%. evaluate.py --quick: 0 FAIL / 1 pre-existing WARN, 98.6% health. Build/evaluator ACs MET. Field ACs (browser load, FSexplorer list/delete, /api JSON, auth+CSRF, parallel-load responsiveness, stack headroom) require hardware — out of scope, deferred to Land/field.
 
 LANDED (build+evaluator ACs met): HTTP server, REST API and FSexplorer migrated to ESPAsyncWebServer(80) over AsyncTCP; httpServer.handleClient() drain and OTGWWebServer alias removed; new webServerCompat.h bridges imperative-push JSON builders to async pull via file-static per-request context (safe under single AsyncTCP-task serialization) with send-exactly-once helpers and merged argCompat() semantics. ADR-132 (Proposed) supersedes ADR-109. Builds: esp32 97.4%, esp32-classic 93.9%, esp32-combo 99.0% (per-env SUCCESS grepped); evaluate.py --quick 0 FAIL. REMAINING field-validation ACs (require ESP32-S3 hardware, In Review): web UI + 8 versioned assets load; FSexplorer list/delete; all /api/v2 JSON correct; HTTP Basic Auth + CSRF same-origin on POST/PUT; sat-slider stall gone under parallel load; OT/MQTT throughput unaffected; AsyncTCP-task stack headroom for LittleFS handlers (no TWDT/stack overflow during full FSexplorer walk).
+
+LIVE auth/CSRF validation on the connected esp32-classic (2026-06-20, temp password set then cleared, device restored to auth-off): unauth POST /api/v2/settings -> 401; authed Basic + cross-origin (Origin: evil) POST -> 403 (CSRF same-origin enforced, ADR-056); authed Basic same-origin POST -> 200. HTTP Basic Auth + CSRF same-origin enforcement on write routes confirmed working end-to-end. AC4 auth/CSRF half now LIVE-VALIDATED. AC1 build receipt: 3-target build green at alpha.224+cdc4ec7 (esp32/esp32-classic/esp32-combo), evaluate.py --quick green (0 fail/1 warn/98.6%). Residual gates remain (NOT closing): FSexplorer DELETE round-trip, OT/MQTT throughput under web load, AsyncTCP-task stack headroom / no-TWDT during full FSexplorer walk on ESP32-S3. Stays In Review.
 <!-- SECTION:NOTES:END -->

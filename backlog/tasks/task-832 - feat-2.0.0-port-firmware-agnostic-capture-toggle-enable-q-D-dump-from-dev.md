@@ -1,11 +1,11 @@
 ---
 id: TASK-832
 title: 'feat-2.0.0: port firmware-agnostic capture toggle-enable + q/D dump from dev'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-06 08:49'
-updated_date: '2026-06-06 08:49'
+updated_date: '2026-06-20 11:10'
 labels:
   - tooling
   - diagnostics
@@ -23,5 +23,11 @@ Forward-port the capture-mqtt-debug.bat improvements from dev (TASK-828/829/830/
 <!-- AC:BEGIN -->
 - [x] #1 2.0.0 capture-mqtt-debug.bat has dynamic toggle-enable + Request-SettingsDump (q/D); browser-capture bytes unchanged
 - [x] #2 PowerShell payload parses clean; both browser fns and toggle/dump fns present
-- [ ] #3 Field-verify on a real 2.0.0 device that D produces settings/state output in telnet.log (drain window sufficient under load)
+- [x] #3 Field-verify on a real 2.0.0 device that D produces settings/state output in telnet.log (drain window sufficient under load)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Capture toggle + q/D dump ported and field-validated. AC#1/#2: committed a441ff6a. AC#3: LIVE telnet validation on the connected esp32-classic (2026-06-20, MQTT-connected = under load): 'D' produced '--- DUMP BEGIN ---' with [build]/[runtime]/[settings] sections (version/heap/settings state); 'q' triggered readSettings() with field-by-field updateSettings output. 46KB drained over 9s with the OT/MQTT log stream still flowing (no stall). All ACs met.
+<!-- SECTION:FINAL_SUMMARY:END -->

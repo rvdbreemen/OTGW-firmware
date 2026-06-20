@@ -6,7 +6,7 @@ title: >-
 status: In Review
 assignee: []
 created_date: '2026-06-15 14:21'
-updated_date: '2026-06-16 04:22'
+updated_date: '2026-06-20 11:03'
 labels: []
 dependencies: []
 ordinal: 87000
@@ -33,4 +33,6 @@ ADR-140 (supersedes ADR-124): revert the seven-device HA topology to ONE device 
 
 <!-- SECTION:NOTES:BEGIN -->
 DESIGN REVISION (ADR-140 refined 2026-06-15, maintainer): the 7 former devices become 7 CATEGORIES within ONE device, not flattened. So AC2 is corrected: the HaDevice enum, deviceForOTId map, and the bilateral Boiler/Thermostat handling are RETAINED and REPURPOSED to drive a category name-prefix (e.g. 'Boiler Control Setpoint', 'Thermostat Room Setpoint', 'ESP Free Heap'). ONLY the multi-DEVICE emission is removed: the 7 separate dev blocks, via_device, per-device suffix/metadata, and the deviceIntroduced[] per-device array. Mental model: 1 hardware = 1 IP = 1 MQTT device, with the 7 groupings as in-device categories. The actual category-prefix wiring is TASK-872; this task (871) is the single-device collapse + F1 (driver-set isFirstEntity) + F5 (escaping). HA constraint: only 3 native sections exist, so the 7 categories render as a name-prefix (entity_category stays a secondary axis for config/diagnostic).
+
+LIVE HA discovery validated on test-rig broker 192.168.1.234 (device provisioned + MQTT connected, 2026-06-20): our device otgw-AC276ECE45D8 published 105 entities (disc_published_topics=107, disc_pending=0, disc_republish_triggered=0), ALL bound to ONE HA device identifier, via_device=0 across every published entity; uniq_id source prefixes present (otd_/pic_/esp_/sat_). Captured via mosquitto_sub homeassistant/# retained. AC7 (single device, all entities bound, no leaked per-device identifiers) is now LIVE-VALIDATED. The BLE via_device carve-out (AC3 divergence) did NOT manifest in the dump because no BLE probes are present; maintainer decided 2026-06-20 to AMEND ADR-140 to sanction BLE child-devices (via_device), so the divergence becomes compliant once the amending ADR is Accepted (to be authored via adr-kit). Remaining: that ADR amendment, then AC3 reconciles. Build: 3-target green at alpha.224+cdc4ec7.
 <!-- SECTION:NOTES:END -->

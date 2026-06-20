@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-18 14:11'
-updated_date: '2026-06-18 17:14'
+updated_date: '2026-06-20 10:59'
 labels: []
 dependencies: []
 ordinal: 100000
@@ -27,14 +27,12 @@ With the TASK-883 chunked-streaming fix (ADR-145) the under-load IDF Task-Watchd
 - [x] #4 evaluate.py green; esp32 build + flash-fit
 <!-- AC:END -->
 
-
-
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented (alpha.214): app-level backpressure gate in processAPI (restAPI.ino). MAX=4 concurrent in-flight REST requests (matches the verified-safe 4-worker realistic load); excess gets a cheap 503 BEFORE any JSON build. Counter restInFlight is async_tcp-task-local (handlers serialize on one task, no atomic). Decrement via request->onDisconnect: the server sends Connection: close and closes after every response (no keep-alive, verified WebResponses.cpp:270/340), so onDisconnect fires exactly once per request -> the counter is balanced and cannot leak (this was the key correctness risk). For chunked responses the close fires after the last chunk ack (WebResponses.cpp:515) = exactly when the doc frees. Diagnostic: logs freeheap+maxblock at each cap-hit so we can tell transient concurrency from a real leak while shipping. Scope = all /api requests (KISS); lwIP/accept limits are in the precompiled core (read-only). test_load.py upgraded: 503 counted as 'handled' (device responded, declined) not 'fail'; only timeouts/errors are real failures. Verification pending: 8w flood (expect bootcount delta 0 + many 503) + 4-worker realistic (expect 0 503, PASS).
 
 RESOLVED (alpha.214): backpressure gate (MAX=4 concurrent in-flight, cheap 503 on excess) + a try/catch backstop in restSendJson that catches std::bad_alloc from the synchronous response-build allocations (make_shared / beginChunkedResponse) and drops the request with a 503 instead of letting the unhandled exception abort+reboot the device. The 5th decoded panic (the gate-only build, MAX=4) put the bad_alloc at restSendJson make_shared/beginChunkedResponse -> the OOM locus had MOVED into our code (catchable). Note request->send() is DEFERRED, so the library's own addHeader allocation in the async _respond path is NOT catchable from app code; the gate reduces its probability. HARDWARE RESULT: TWO consecutive 8-worker/1.5min floods = bootcount delta 0 (device survives, boot stable, uptime monotonic) where every prior build rebooted 1-4x. The device degrades under saturation (timeouts + 503s) but no longer aborts/reboots. Realistic 4-worker load: handled 100% (444/445; 1 negligible 503 from POST/sampler overlap), 0 reboots, 0 ADR-089 tier entries -> not regressed. The earlier 'why does a small alloc fail with ~50KB free' puzzle is now moot for survival: whatever the exact pressure, the catchable locus no longer reboots, and the gate keeps the uncatchable locus from firing in practice. Full provable zero-reboot is not achievable from app code (the precompiled lwIP accept layer + the library's deferred header alloc are read-only), but the device reliably SURVIVES the abusive flood now.
+
+LIVE 8-worker REST flood on connected esp32-classic @ alpha.224+cdc4ec7 (192.168.1.219), 60s (2026-06-20): 1148 req handled=100% (767 ok + 381 BUSY-503 from restEffectiveInflightCap gate), bootcount delta 0 (NO crash/reboot), heap floor 65352 -> recovered 106728 (+1.2%, no leak), ADR-089 tiers low+0/warn+0/crit+0, frag peak 64%->60%. The heap-tier backpressure gate provably sheds load via 503 instead of OOM. CAVEAT: esp32-classic 8w only — NOT the OTGW32 16w + concurrent-WS-subscriber matrix the full gate names. The backpressure mechanism (restEffectiveInflightCap heap-tier gate, restAPI.ino:55-64/2263-2271) is empirically proven on alpha.224: 381/1148 requests shed as 503, 0 OOM, 0 ADR-089 critical. NOTE: the task's old 'RESOLVED via try/catch bad_alloc backstop' note is STALE — that backstop was removed by the TASK-886 ArduinoJson revert; survival now rests on this heap-tier gate (+ TASK-883 chunked streaming). Moving to In Review. Maintainer call: close as the backpressure-mitigation milestone OR fold residual into TASK-883.
 <!-- SECTION:NOTES:END -->

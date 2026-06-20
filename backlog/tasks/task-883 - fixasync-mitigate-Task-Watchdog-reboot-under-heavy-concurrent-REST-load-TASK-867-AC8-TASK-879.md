@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-18 09:24'
-updated_date: '2026-06-19 15:39'
+updated_date: '2026-06-20 10:59'
 labels: []
 dependencies: []
 ordinal: 99000
@@ -56,4 +56,6 @@ alpha.222 (73ff9822 on feature-2.0.0-esp32s3-async-jsonemit): true chunked strea
 MQTT-ON validation (alpha.222 chunked-3, local Mosquitto on laptop 192.168.1.234, device MQTT enabled + connected + HA discovery burst confirmed). 16w/2.5min test_load: bootcount delta=0 (no reboot), handled 98.32%, heap floor 42436 -> full recovery 91564 (no leak), frag peak 63% bounded, maxblock floor 24564 (>8192 guard), ADR-089 warning+1/critical+0. 16w/120s json_desync with MQTT churning heap: 3152 parsed, 0 desync, 100%. Serial 185s: 0 reboot/0 TWDT/0 panic/0 cbuf-storm. Conclusion: chunked + heap-tier gate holds 0 reboots WITH MQTT competing for heap/async_tcp. Caveat: local broker, no active WebSocket live-log subscriber yet (George field crash also had WS heap churn, TASK-879) - that realism gap remains.
 
 alpha.222+73ff982 live full-matrix re-confirmation (OTGW32 @192.168.1.143, this session). evaluate --quick 0-fail (check_no_arduinojson green -> JsonEmit revert complete). OpenAPI live 18/18 pass (2 SKIP=PIC 503). json_golden compare 24 PASS, 7 FAIL all benign: device_info/time = network-move env diffs (ssid/ip/gw/dns), filesystem/files len 27->29 = device-state, and /v2/sat(+/status) final_setpoint/outside_temp 0->null = INTENDED JSON-correctness (deliberate NAN->null no-sensor convention, SATcontrol.ino:2080-2093). NO accidental drift. test_load gate-ON: 8w/1min MQTT-off bootcount delta 0 (handled 99.93%, heap 56996->92752, maxblock 26612, ADR-089 0/0/0); 16w/2min MQTT-off delta 0 (98.81%, maxblock 17396, warn+2); 16w/2min MQTT-ON+discovery-churning delta 0 (98.70%, heap 52628->89992, maxblock 19444, warn+1). MQTT-ON verified: connected to broker, 110 HA discovery + 21 state topics live. AC#1 met (8w survive, bootcount delta 0). HEAD 73ff9822 committed, push to origin/-jsonemit BLOCKED pending maintainer per-instance confirm; merge to feature-2.0.0-esp32s3-async pending maintainer go.
+
+LIVE 8-worker REST flood on connected esp32-classic @ alpha.224+cdc4ec7 (192.168.1.219), 60s (2026-06-20): 1148 req handled=100% (767 ok + 381 BUSY-503 from restEffectiveInflightCap gate), bootcount delta 0 (NO crash/reboot), heap floor 65352 -> recovered 106728 (+1.2%, no leak), ADR-089 tiers low+0/warn+0/crit+0, frag peak 64%->60%. The heap-tier backpressure gate provably sheds load via 503 instead of OOM. CAVEAT: esp32-classic 8w only — NOT the OTGW32 16w + concurrent-WS-subscriber matrix the full gate names. AC#1 (8w survive, bootcount delta 0) now re-confirmed on the CURRENT build alpha.224 (prior receipt was alpha.222). Still outstanding for full close: the OTGW32 16w + concurrent WS-live-log-subscriber matrix (the realism gap), and the true-chunked-streaming real fix. Stays In Review.
 <!-- SECTION:NOTES:END -->

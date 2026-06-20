@@ -6,7 +6,7 @@ title: >-
 status: In Review
 assignee: []
 created_date: '2026-06-15 14:26'
-updated_date: '2026-06-16 08:36'
+updated_date: '2026-06-20 11:03'
 labels: []
 dependencies:
   - TASK-871
@@ -32,4 +32,6 @@ ADR-140: after TASK-871 collapses discovery to one device, render the seven form
 
 <!-- SECTION:NOTES:BEGIN -->
 Classification audit (2026-06-16): ADVANCEABLE. Commit 7e3da75d shipped TASK-871+872 single-device + 5 source prefixes (esp_/pic_/otd_/sat_/sensors_) per accepted ADR-140 (the 7-category text in this task's ACs is stale vs the maintainer directive folded into ADR-140 while Proposed). Verified state of each AC: AC#2 entity_category present in the HA tables (HaEntityCat::diagnostic/none/config), satisfied. AC#1 partially divergent: the source-engine prefix is written into uniq_id only (MQTTHaDiscovery.cpp:2375), NOT into the visible friendlyName; the visible name carries only the bilateral _boiler/_thermostat token via ctx.sourceName (2386-2390, set 2843-2854). AC#5 (field validation) arbitrates whether uniq_id/entity_id grouping reads as 'visible'. AC#3 NOT met: composeBinSensorPayload writes raw label into uniq_id (MQTTHaDiscovery.cpp:2488) without sanitizeHaObjectId; the sensor path sanitizes via idLabel (2349-2353,2376). Build-verifiable slice: mirror the sensor path in composeBinSensorPayload (copy label->idLabel, sanitizeHaObjectId(idLabel), write idLabel at 2488), then build 3 targets + evaluate.py --quick for AC#4. AC#5 stays field-blocked.
+
+LIVE HA discovery validated on test-rig broker 192.168.1.234 (device provisioned + MQTT connected, 2026-06-20): our device otgw-AC276ECE45D8 published 105 entities (disc_published_topics=107, disc_pending=0, disc_republish_triggered=0), ALL bound to ONE HA device identifier, via_device=0 across every published entity; uniq_id source prefixes present (otd_/pic_/esp_/sat_). Captured via mosquitto_sub homeassistant/# retained. AC#5 (single-device, prefix-grouped entities) LIVE-VALIDATED: otd_/pic_/esp_/sat_ prefixes present in uniq_id, one device. AC#1 text ('7 categories') is stale vs Accepted ADR-140 (5 source prefixes in uniq_id) — wording fix needed. AC#3 (binsensor object_id sanitization parity in composeBinSensorPayload) is still a real latent code gap (sensor path sanitizes, binsensor writes raw label at ~:2488); not visibly broken for current clean labels but must be fixed. 3-target build green at alpha.224+cdc4ec7. Remaining work routed to the implement loop.
 <!-- SECTION:NOTES:END -->

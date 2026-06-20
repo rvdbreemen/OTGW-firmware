@@ -3,11 +3,11 @@ id: TASK-876
 title: >-
   fix(mqtt): SAT command pv_boost_max_duration_min unreachable — satSubCmd
   buffer too small (F6)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-15 14:30'
-updated_date: '2026-06-20 10:56'
+updated_date: '2026-06-20 11:03'
 labels: []
 dependencies: []
 ordinal: 92000
@@ -34,3 +34,9 @@ Implemented on branch claude/mqtt-reliability-phase3 (off feature-2.0.0-esp32s3-
 
 Audit wp0vjoo5s: SAT cmd buffer fix (satSubCmd[24]->[32] + static_assert) complete on all targets. AC#3 build receipt now satisfied (checked): 3-target build green at alpha.224+cdc4ec7 (after SimpleTelnet submodule fix -> 7013fdc3): esp32/esp32-classic/esp32-combo all SUCCESS, evaluate.py --quick green (0 fail/1 warn/98.6%). Audit wp0vjoo5s 2026-06-20. Remaining: AC#2 'applies' half = live MQTT round-trip publish set/<nodeId>/sat/pv_boost_max_duration_min -> setting changes; will attempt during broker HW-validation, else field-gated. Moving to In Review.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT cmd buffer fix complete and FULLY validated. AC#1: satSubCmd[24]->[32] + static_assert (MQTTstuff.ino:875-877). AC#2: LIVE round-trip on test-rig broker (2026-06-20) — published OTGW/set/otgw-AC276ECE45D8/sat/pv_boost_max_duration_min=360 -> setting SATpvboostmaxdurationmin changed 240->360 -> restored 240. The 25-char command (previously truncated by the [24] buffer) now dispatches end-to-end. AC#3: 3-target build green at alpha.224+cdc4ec7 (esp32/esp32-classic/esp32-combo). All ACs met.
+<!-- SECTION:FINAL_SUMMARY:END -->
