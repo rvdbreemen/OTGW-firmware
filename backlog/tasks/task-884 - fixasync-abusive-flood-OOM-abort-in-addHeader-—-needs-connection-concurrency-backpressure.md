@@ -3,11 +3,11 @@ id: TASK-884
 title: >-
   fix(async): abusive-flood OOM abort in addHeader — needs
   connection/concurrency backpressure
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-18 14:11'
-updated_date: '2026-06-20 19:05'
+updated_date: '2026-06-20 19:22'
 labels: []
 dependencies: []
 ordinal: 100000
@@ -58,3 +58,9 @@ VERDICT: B is empirically useless. A is the only mechanistically-correct fix (ra
 
 PATH A BUILD ATTEMPT (option 2, 2026-06-20): tried to make custom_sdkconfig build to get A's field data. Cleared two transient failures (1: lib-builder venv first-run race -> fixed by re-run after cmake installed; 2: WinError 32 file-lock on managed_components/.../mp3tabs.c -> fixed by wiping managed_components). 3rd attempt got 9min deep, correctly applied the override (CONFIG_LWIP_MAX_ACTIVE_TCP/MAX_SOCKETS 16->32), pulled the FULL IDF component set (esp-sr, esp_insights, https_server, cbor -- none used by the firmware), then FAILED on a build-system bug: "Source '.pio\build\esp32\.pio\build\esp32\https_server.crt.S' not found" (doubled .pio path + cert codegen). Structural pioarduino-custom_sdkconfig-on-Windows failure, not transient. CONCLUSION: Path A is NOT buildable in this environment without fixing the pioarduino custom_sdkconfig build path (separate, non-trivial). A's runtime effect remains UNVERIFIED (no binary produced). Empirical bottom line: C crashes, B crashes, A un-buildable here -> RECOMMEND PATH C (accept the 16-pcb ceiling + keep existing mitigations). Path A only if someone fixes the pioarduino IDF-component build first.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+RESOLVED via Path C (maintainer decision 2026-06-20, documented in Proposed ADR-149). Root cause empirically pinned on the real OTGW32: LWIP TCP-pcb pool exhaustion (MAX_ACTIVE_TCP=16, fixed in the pioarduino prebuilt libs) under concurrent connections -> AsyncTCP tcp_accept pcb-NULL -> TWDT. Empirical A/B/C: C(baseline) CRASH, B(WS cap 2) CRASH (marginal), A(LWIP 32) un-buildable here (pioarduino custom_sdkconfig full-IDF rebuild fails on Windows). DECISION: accept the 16-pcb ceiling; the existing app-level mitigations are the defense (MAX_WEBSOCKET_CLIENTS=3 + WS heap-reject, restEffectiveInflightCap request gate, ESPAsyncWebServer no-keep-alive) -- they cover the realistic load (<=3 live-log tabs + browsing). The ABUSIVE-FLOOD survival AC (8-worker+ adversarial connection flood, bootcount delta 0) is CLOSED AS A KNOWN LIMIT: a 16-pcb ESP32 cannot be fully defended against an adversarial connection flood at the app layer (vendored AsyncTCP has no connection cap + is read-only; raising LWIP needs Path A which is un-buildable here). Reopening path (future, only if flood resilience is required): fix pioarduino custom_sdkconfig, then build + field-validate LWIP=32. Evidence: bisect-testset/otgw32-wsrealism-crash-20260620/. ADR-149 Proposed (awaiting maintainer acceptance, does not block this resolution).
+<!-- SECTION:FINAL_SUMMARY:END -->

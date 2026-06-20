@@ -252,6 +252,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-061: Unified ESP8266/ESP32 Platform Abstraction](ADR-061-unified-esp8266-esp32-platform-abstraction.md)** 🆕  
   Single source codebase compiles for both ESP8266 (PIC-based OTGW) and ESP32 (OTGW32, OT-Direct, SAT) via `platform.h` / `platform_esp{8266,32}.h` shims; SDK differences encapsulated behind a thin abstraction.
 
+- **[ADR-149: Accept the LWIP TCP-pcb Connection Ceiling on the ESP32-S3](ADR-149-accept-lwip-tcp-pcb-connection-ceiling-esp32s3.md)** 🆕 *(Proposed)*  
+  Keep the application-level connection mitigations (WebSocket cap, heap reject, REST inflight gate) and accept that an adversarial concurrent-connection flood exhausts the 16-entry LWIP pcb pool and triggers a TWDT reset; do not raise `CONFIG_LWIP_MAX_ACTIVE_TCP`. Grounded in an alpha.227 on-device A/B/C experiment (TASK-884). Complements ADR-147.
+
 ### Development and Build
 
 - **[ADR-013: Arduino Framework Over ESP-IDF](ADR-013-arduino-framework-over-esp-idf.md)**  
