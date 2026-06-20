@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-18 14:11'
-updated_date: '2026-06-20 18:05'
+updated_date: '2026-06-20 19:05'
 labels: []
 dependencies: []
 ordinal: 100000
@@ -55,4 +55,6 @@ EMPIRICAL A/B/C FIELD COMPARISON (2026-06-20, real OTGW32 @192.168.1.143, alpha.
 - PATH A (LWIP MAX_ACTIVE_TCP=32 + MAX_SOCKETS=32 via custom_sdkconfig): DID NOT BUILD in this environment. After 23min the pioarduino arduino-libs rebuild failed: 'Error: Failed to create a proper virtual environment. Missing the Python executable!' (the IDF lib-builder venv could not bootstrap). Runtime effect therefore UNVERIFIED empirically (mechanism predicts it would survive -- more pcbs fit the connection count -- but not field-confirmed).
 
 VERDICT: B is empirically useless. A is the only mechanistically-correct fix (raises the pcb ceiling B/C cannot) BUT is currently un-buildable here (lib-builder venv broken) + carries RAM + full-rebuild build-time costs for all esp32 targets even once fixed. C (accept the 16-pcb ceiling) is the pragmatic near-term answer: the existing app-level mitigations (WS cap=3, heap-reject, request-inflight cap, REST no-keep-alive) cover the REALISTIC load (<=3 WS live-log tabs + normal browser asset loads); the crash needs an adversarial connection flood (14 workers) which is extreme. RECOMMENDATION: adopt C now (document the ceiling, close the abusive-flood AC as a known limit); spin a SEPARATE task for Path A only if connection-flood resilience is wanted (prereq: fix the pioarduino custom_sdkconfig lib-builder venv, then build+field-validate LWIP=32).
+
+PATH A BUILD ATTEMPT (option 2, 2026-06-20): tried to make custom_sdkconfig build to get A's field data. Cleared two transient failures (1: lib-builder venv first-run race -> fixed by re-run after cmake installed; 2: WinError 32 file-lock on managed_components/.../mp3tabs.c -> fixed by wiping managed_components). 3rd attempt got 9min deep, correctly applied the override (CONFIG_LWIP_MAX_ACTIVE_TCP/MAX_SOCKETS 16->32), pulled the FULL IDF component set (esp-sr, esp_insights, https_server, cbor -- none used by the firmware), then FAILED on a build-system bug: "Source '.pio\build\esp32\.pio\build\esp32\https_server.crt.S' not found" (doubled .pio path + cert codegen). Structural pioarduino-custom_sdkconfig-on-Windows failure, not transient. CONCLUSION: Path A is NOT buildable in this environment without fixing the pioarduino custom_sdkconfig build path (separate, non-trivial). A's runtime effect remains UNVERIFIED (no binary produced). Empirical bottom line: C crashes, B crashes, A un-buildable here -> RECOMMEND PATH C (accept the 16-pcb ceiling + keep existing mitigations). Path A only if someone fixes the pioarduino IDF-component build first.
 <!-- SECTION:NOTES:END -->
