@@ -3,11 +3,11 @@ id: TASK-879
 title: >-
   fix(esp32): Task-Watchdog reboot loop + core-1 starvation (slow webserver),
   OTGW32 alpha.199
-status: In Review
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-16 05:38'
-updated_date: '2026-06-20 06:24'
+updated_date: '2026-06-20 16:13'
 labels: []
 dependencies: []
 ordinal: 95000
@@ -81,4 +81,6 @@ ROOT-CAUSE ISOLATION (live A/B/control, OTGW32 alpha.222 @192.168.1.143, mqtt-ON
 ADR-147 ACCEPTED (maintainer Robert, 2026-06-19): documents the platform limits + the fix direction. Root cause (corrected, adversarially-verified framing): heap pressure/fragmentation under concurrent static-file serving on the single async_tcp task; 'esp_littlefs: Unable to allocate FD' is a heap-OOM on the FD-struct alloc (NOT a fixed pool - maxOpenFiles is a (void) no-op and the FD cache grows from heap), so static serving is just a heavier heap consumer than in-memory API JSON. Same disease as the ADR-145 REST-path bad_alloc. KEEP LittleFS (do NOT embed assets in flash: misdirected + ADR-139 reversal + flash budget is not the blocker). Adopted the AsyncTCP config block in platformio.ini (QUEUE_SIZE=64, MAX_ACK_TIME=5000, PRIORITY=10, RUNNING_CORE=1 already set, STACK_SIZE=4096). Load-bearing fix (next impl step): extend the heap/max-block backpressure gate (restEffectiveInflightCap, restAPI.ino:55, REST-only) to the static-file path; keep the existing existence-check guard (webServerCompat.h:310). Debunked: raise maxOpenFiles (no-op); raise CONFIG_LWIP_MAX_ACTIVE_TCP=16 (prebuilt-lib locked).
 
 FIX IMPLEMENTED + HARDWARE-VERIFIED (ADR-147 D4.1, alpha.223+gate flashed to OTGW32 @192.168.1.143). Added a heap/max-block-aware backpressure gate to the static-file path: webSendFile (webServerCompat.h) now calls webFileGateTryAdmit()/Release() (defined restAPI.ino next to the REST gate); base cap 6 (one browser's HTTP/1.1 parallel limit), clamps to 2 (<24KB maxblock) / 1 (<16KB) so under a flood the excess gets a cheap 503 BEFORE any LittleFS work, instead of an FD-struct alloc failing into a hung connection. Separate counter from restInFlight (proven REST path untouched). A/B: the 3-WS + 8w static+API flood that hung alpha.222 in <10s (permanent, esptool reset needed) now SURVIVES 90s with bootcount delta 0, heap recovers fully (floor 27988 -> 101528, no leak); intermittent saturation but always recovers. Regression check: a normal single-browser asset burst (9 assets, 6 parallel) = all 200, no spurious 503. Synergy with the ADR-147 D3 AsyncTCP flags (MAX_ACK_TIME=5000 bounds how long a stuck transfer lingers before abort -> onDisconnect -> gate release).
+
+LIVE OTGW32 CRASH REPRODUCED (2026-06-20, real OTGW32 @192.168.1.143, alpha.226+6b57115, OT-Direct, mqtt-off): the WS-realism load (scripts/tests/test_ws_liveload.py, 3 persistent ws://host/ws live-log subscribers + 8 HTTP flood workers, 60s) CRASHES the device. bootcount 2->4 (run1) ->6 (run2) = ~2 reboots per run; lastreset='Unknown' (TWDT/panic, not Power-on/Software). Device went UNREACHABLE+ping-down mid-load and self-recovered after ~40-60s. WS subscribers held (0 reconnects/errors) until the crash; HTTP ~50% fail under load. CONTRAST: flood-ONLY (no WS subscribers) on esp32-classic PASSED earlier (bootcount delta 0) -- the persistent WS live-log subscriber is the crash vector (George's exact scenario; the realism gap the audit flagged). Coredump captured: bisect-testset/otgw32-wsrealism-crash-20260620/coredump-alpha226-6b57115.bin. Exact backtrace decode PENDING: the matching 6b57115 .elf was overwritten by the alpha.227 build; need to rebuild 6b57115 OR OTA the device to alpha.227 (matching current elf) and re-repro. AC#4 (field-validate on a real OTGW32) FAILED: the alpha.226 fix (AsyncSimpleTelnet + bounded OTStateLock + ADR-147 static-file gate) does NOT survive WS-realism load on the actual OTGW32. Moving back to In Progress -- the webserver-collapse-under-load is NOT resolved for the WS-subscriber + flood case. Likely the same root as TASK-883's open real-fix (whole-response cbuf + WS heap churn).
 <!-- SECTION:NOTES:END -->
