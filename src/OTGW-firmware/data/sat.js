@@ -60,7 +60,8 @@ var SAT = (function() {
     'stalled_ignition': 'Stalled Ignition', 'anti_cycling': 'Anti-Cycling',
     'pump_starting': 'Pump Starting', 'waiting_flame': 'Waiting Flame',
     'overshoot_cooling': 'Overshoot Cooling', 'post_cycle': 'Post-Cycle',
-    'heating': 'Heating', 'cooling': 'Cooling'
+    'heating': 'Heating', 'cooling': 'Cooling',
+    'heating_hot_water': 'Heating Hot Water'
   };
 
   // --- DOM helpers ---

@@ -511,14 +511,13 @@ static float satCalcHeatingCurve(float targetTemp, float outsideTemp)
 //=====================================================================
 // SAT Python status.py timing constants
 static const uint32_t BS_ANTI_CYCLE_MIN_OFF_MS    = 180000UL;  // 180s min OFF between cycles
-static const uint32_t BS_STALLED_IGNITION_MIN_MS  = 600000UL;  // 600s fallback stalled threshold (no prior cycle)
-static const uint32_t BS_STALLED_IGNITION_FLOOR_MS = 120000UL; // 120s adaptive threshold floor
-static const uint32_t BS_STALLED_IGNITION_CAP_MS   = 900000UL; // 900s adaptive threshold cap
+static const uint32_t BS_STALLED_IGNITION_MIN_MS  = 600000UL;  // 600s floor (Python BOILER_STALL_IGNITION_MIN_OFF_SECONDS); threshold = max(600s, last_cycle * 3.0)
 static const uint32_t BS_POST_CYCLE_SETTLE_MS     = 60000UL;   // 60s post-cycle settling
 static const uint32_t BS_IGNITION_SURGE_WINDOW_MS = 30000UL;   // 30s window for ignition surge
 static const float    BS_DEMAND_HYSTERESIS        = 0.7f;      // demand = setpoint > flow + 0.7C
-static const float    BS_AT_SETPOINT_BAND         = 1.5f;      // +/- 1.5C at setpoint
+static const float    BS_AT_SETPOINT_BAND         = 1.5f;      // +/- 1.5C at setpoint (Python BOILER_SETPOINT_BAND)
 static const float    BS_PUMP_START_DELTA         = 6.0f;      // pump starting: temp drop > 6C
+static const float    BS_PREHEAT_DELTA            = 6.0f;      // preheating: flow > 6C below setpoint (Python BOILER_PREHEAT_DELTA)
 static const float    BS_IGNITION_SURGE_RATE      = 0.5f;      // 0.5C/s temp rise rate
 
 static void satUpdateBoilerStatus()
@@ -553,7 +552,11 @@ static void satUpdateBoilerStatus()
 
   SATBoilerStatus newStatus = SAT_BS_OFF;
 
-  if (!flame && !_bs_prevFlame) {
+  if (flame && state.sat.bDhwActive) {
+    // DHW takes priority while the flame is on (Python device/status.py: hot_water_active).
+    newStatus = SAT_BS_HEATING_HOT_WATER;
+  }
+  else if (!flame && !_bs_prevFlame) {
     // --- No flame, was already off ---
     uint32_t offDuration = (now - _bs_flameOffMs);
 
@@ -569,16 +572,13 @@ static void satUpdateBoilerStatus()
       newStatus = SAT_BS_ANTI_CYCLING;
     }
     else if (hasDemand && _bs_flameOffMs > 0) {
-      // Adaptive stall threshold: max(last_cycle_duration * 1.5, 120s), cap at 900s.
-      // Falls back to fixed 600s when no prior cycle duration is available (cold start).
-      uint32_t stalledThreshold;
+      // Stall threshold = max(600s, last_cycle_duration * 3.0) per Python
+      // (BOILER_STALL_IGNITION_MIN_OFF_SECONDS=600, BOILER_STALL_IGNITION_OFF_RATIO=3.0).
+      // Falls back to the 600s floor when no prior cycle duration is available (cold start).
+      uint32_t stalledThreshold = BS_STALLED_IGNITION_MIN_MS; // 600s floor
       if (state.sat.fLastCycleDuration > 0.0f) {
-        uint32_t adaptive = (uint32_t)(state.sat.fLastCycleDuration * 1500.0f); // * 1000 ms/s * 1.5
-        if (adaptive < BS_STALLED_IGNITION_FLOOR_MS) adaptive = BS_STALLED_IGNITION_FLOOR_MS;
-        if (adaptive > BS_STALLED_IGNITION_CAP_MS)   adaptive = BS_STALLED_IGNITION_CAP_MS;
-        stalledThreshold = adaptive;
-      } else {
-        stalledThreshold = BS_STALLED_IGNITION_MIN_MS; // 600s fallback
+        uint32_t adaptive = (uint32_t)(state.sat.fLastCycleDuration * 3000.0f); // * 1000 ms/s * 3.0
+        if (adaptive > stalledThreshold) stalledThreshold = adaptive;          // max(600s, dur * 3.0)
       }
       if (offDuration > stalledThreshold) {
         newStatus = SAT_BS_STALLED_IGNITION;
@@ -615,19 +615,26 @@ static void satUpdateBoilerStatus()
     else if (fabsf(boilerTemp - setpoint) <= BS_AT_SETPOINT_BAND) {
       newStatus = SAT_BS_AT_SETPOINT;
     }
-    else if (boilerTemp < setpoint) {
-      if (mod > _bs_prevModulation + 1.0f) {
-        newStatus = SAT_BS_MODULATING_UP;
-      } else {
-        newStatus = SAT_BS_PREHEATING;
-      }
-    }
     else {
-      // boilerTemp > setpoint + band
-      if (mod < _bs_prevModulation - 1.0f) {
+      // Not at-setpoint band: preheating (far below) or a modulation direction.
+      // Modulation direction uses the modulation delta when reliable, else the flow-temperature
+      // gradient (Python device modulation_direction with reliability fallback).
+      int modDir = 0;
+      if (state.sat.bModulationReliable) {
+        if (mod > _bs_prevModulation + 1.0f)       modDir = 1;
+        else if (mod < _bs_prevModulation - 1.0f)  modDir = -1;
+      } else {
+        if (tempRate > 0.1f)       modDir = 1;
+        else if (tempRate < -0.1f) modDir = -1;
+      }
+      if ((setpoint - boilerTemp) > BS_PREHEAT_DELTA) {
+        newStatus = SAT_BS_PREHEATING;        // flow > 6C below setpoint (Python BOILER_PREHEAT_DELTA)
+      } else if (modDir > 0) {
+        newStatus = SAT_BS_MODULATING_UP;
+      } else if (modDir < 0) {
         newStatus = SAT_BS_MODULATING_DOWN;
       } else {
-        newStatus = SAT_BS_OVERSHOOT_COOLING;
+        newStatus = SAT_BS_HEATING;           // generic central-heating fallback
       }
     }
   }
@@ -662,18 +669,19 @@ static const char _bsOvershoot[]  PROGMEM = "overshoot_cooling";
 static const char _bsPostCycle[]  PROGMEM = "post_cycle";
 static const char _bsHeating[]    PROGMEM = "heating";
 static const char _bsCooling[]    PROGMEM = "cooling";
+static const char _bsHotWater[]   PROGMEM = "heating_hot_water";
 
 static PGM_P const _bsNames[] PROGMEM = {
   _bsOff, _bsIdle, _bsPreheat, _bsAtSetpoint,
   _bsModUp, _bsModDown, _bsSurge, _bsStalled,
   _bsAntiCycle, _bsPumpStart, _bsWaiting, _bsOvershoot,
-  _bsPostCycle, _bsHeating, _bsCooling
+  _bsPostCycle, _bsHeating, _bsCooling, _bsHotWater
 };
 
 void satGetBoilerStatusName(char* buf, size_t bufLen)
 {
   int idx = (int)state.sat.eBoilerStatus;
-  if (idx < 0 || idx > (int)SAT_BS_COOLING) idx = 0;
+  if (idx < 0 || idx > (int)SAT_BS_HEATING_HOT_WATER) idx = 0;
   strncpy_P(buf, (PGM_P)pgm_read_ptr(&_bsNames[idx]), bufLen - 1);
   buf[bufLen - 1] = '\0';
 }
@@ -3228,34 +3236,41 @@ static void satUpdateCurveRecommendation()
 //=====================================================================
 //=== Modulation Reliability Tracker (Task #33) ===
 //=====================================================================
-static float    _mod_prevValue     = -1.0f;
-static uint32_t _mod_windowStartMs = 0;
-static const uint32_t MOD_WINDOW_MS = 600000UL;  // 10 min observation window
-static const uint8_t  MOD_MIN_CHANGES = 3;        // need at least 3 changes to be "reliable"
+// Python device/modulation.py parity: collect relative-modulation samples while the flame is
+// on, and mark modulation reliable only when at least MOD_REL_MIN_SAMPLES (8) samples have
+// accumulated AND >= max(2, 40% of the window) of the last 8 are >= the delta threshold (3%).
+// This separates boilers that report real, meaningful modulation from those stuck at a fixed
+// value (always 0/100). When unreliable, the device-status machine falls back to the flow
+// gradient for MODULATING_UP/DOWN (see satUpdateBoilerStatus).
+static const uint8_t MOD_REL_MIN_SAMPLES   = 8;      // Python BOILER_MODULATION_RELIABILITY_MIN_SAMPLES
+static const float   MOD_REL_DELTA_THRESH  = 3.0f;   // Python BOILER_MODULATION_DELTA_THRESHOLD
+static float   _mod_window[MOD_REL_MIN_SAMPLES] = {0};  // ring of the last 8 flame-on modulation values
+static uint8_t _mod_windowHead  = 0;
+static uint8_t _mod_windowCount = 0;
 
 static void satUpdateModulationReliability()
 {
+  // Only sample while the flame is on (Python gates on flame_active).
+  if (!satIsFlameOn()) return;
   float mod = OTcurrentSystemState.RelModLevel;
-  uint32_t now = millis();
+  if (isnan(mod) || mod < 0.0f) return;
 
-  if (_mod_windowStartMs == 0) {
-    _mod_windowStartMs = now;
-    _mod_prevValue = mod;
-    return;
+  _mod_window[_mod_windowHead] = mod;
+  _mod_windowHead = (uint8_t)((_mod_windowHead + 1) % MOD_REL_MIN_SAMPLES);
+  if (_mod_windowCount < MOD_REL_MIN_SAMPLES) {
+    _mod_windowCount++;
+    return;  // need a full window of 8 before judging (Python: < MIN_SAMPLES -> not reliable yet)
   }
 
-  // Count value changes (more than 1% difference)
-  if (fabsf(mod - _mod_prevValue) > 1.0f) {
-    if (state.sat.iModChangeCount < 255) state.sat.iModChangeCount++;
-    _mod_prevValue = mod;
+  // Reliable when >= max(2, int(8*0.4)=3) of the last 8 are at/above the delta threshold.
+  uint8_t aboveThresh = 0;
+  for (uint8_t i = 0; i < MOD_REL_MIN_SAMPLES; i++) {
+    if (_mod_window[i] >= MOD_REL_DELTA_THRESH) aboveThresh++;
   }
-
-  // Check at end of window
-  if ((now - _mod_windowStartMs) >= MOD_WINDOW_MS) {
-    state.sat.bModulationReliable = (state.sat.iModChangeCount >= MOD_MIN_CHANGES);
-    state.sat.iModChangeCount = 0;
-    _mod_windowStartMs = now;
-  }
+  uint8_t required = (uint8_t)(MOD_REL_MIN_SAMPLES * 0.4f);  // int(8*0.4) = 3
+  if (required < 2) required = 2;                            // max(2, ...)
+  state.sat.bModulationReliable = (aboveThresh >= required);
+  state.sat.iModChangeCount = aboveThresh;  // diagnostic: samples (of last 8) above the threshold
 }
 
 //=====================================================================

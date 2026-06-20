@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.229
+**  Version  : v2.0.0-alpha.230
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -92,7 +92,7 @@ enum SATBoilerStatus : uint8_t {
   SAT_BS_MODULATING_UP, SAT_BS_MODULATING_DOWN, SAT_BS_IGNITION_SURGE,
   SAT_BS_STALLED_IGNITION, SAT_BS_ANTI_CYCLING, SAT_BS_PUMP_STARTING,
   SAT_BS_WAITING_FLAME, SAT_BS_OVERSHOOT_COOLING, SAT_BS_POST_CYCLE,
-  SAT_BS_HEATING, SAT_BS_COOLING
+  SAT_BS_HEATING, SAT_BS_COOLING, SAT_BS_HEATING_HOT_WATER
 };
 
 // SAT rolling 4-hour window buffer size (Task #227/#236) is defined per board in
