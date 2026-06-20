@@ -3,11 +3,11 @@ id: TASK-687
 title: >-
   Suppress / mark-unavailable HA discovery for boiler-unsupported msgIDs (ADR +
   impl)
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-05-24 06:47'
-updated_date: '2026-06-04 21:46'
+updated_date: '2026-06-20 12:24'
 labels:
   - ha-discovery
   - opentherm
@@ -99,4 +99,6 @@ Rationale: (a) avoids the retained-topic-cleanup + re-discovery problem that A/D
 No ADR file or code written this session due to the channel failure (writing without re-Read verification would violate the edit-then-verify contract). Next session: re-read MQTTHaDiscovery.cpp doAutoConfigureMsgid/compose entry, draft docs/adr/ADR-NNN, gate compose on isBoilerMsgIdUnsupportedRead/Write, add clear-on-ack in OTGW-Core.ino:4204-4213.
 
 2026-06-01T18:25:49+02:00: MAINTAINER DECISION 7b — approach B (publish discovery + availability_topic offline; HA renders unavailable, auto-recovers when boiler answers). DEFER to milestone 2.1.0 (task is already milestone 2.1.0). Not pulled into 2.0.0. When picked up: implement B in MQTTHaDiscovery.cpp honouring the unknownLogged bitmaps, + the runtime force-publish override, per the ADR this task still owes (AC#1).
+
+Moved In Progress -> To Do (maintainer decision 2026-06-20): explicitly PARKED for milestone 2.1.0. Only ADR-142 (Proposed) exists; no implementation (availability-list gating, clear-on-ack recovery, runtime override, CI gate, docs all absent). Parking in To Do so the In Progress column reflects actual active work. Unpark when 2.1.0 starts: first drive ADR-142 to Accepted via adr-kit, then implement.
 <!-- SECTION:NOTES:END -->

@@ -34,7 +34,28 @@
       "ADR-077|docs/adr/ADR-148-ble-sensors-as-ha-child-devices-via-device.md": "2026-06-20T11:24:41.415818+00:00",
       "ADR-092|docs/adr/ADR-148-ble-sensors-as-ha-child-devices-via-device.md": "2026-06-20T11:24:41.415818+00:00",
       "ADR-140|docs/adr/ADR-148-ble-sensors-as-ha-child-devices-via-device.md": "2026-06-20T11:24:58.078499+00:00",
-      "ADR-098|docs/adr/README.md": "2026-06-20T11:25:48.794363+00:00"
+      "ADR-098|docs/adr/README.md": "2026-06-20T11:25:48.794363+00:00",
+      "ADR-101|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:28:09.115112+00:00",
+      "ADR-102|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:28:09.115112+00:00",
+      "ADR-106|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:28:09.115112+00:00",
+      "ADR-107|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:28:33.535236+00:00",
+      "ADR-111|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:28:33.535236+00:00",
+      "ADR-131|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:28:33.535236+00:00",
+      "ADR-132|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:28:48.157904+00:00",
+      "ADR-133|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:28:48.157904+00:00",
+      "ADR-002|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:28:48.157904+00:00",
+      "ADR-077|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:29:02.587235+00:00",
+      "ADR-090|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:29:02.587235+00:00",
+      "ADR-091|src/OTGW-firmware/helperStuff.ino": "2026-06-20T12:29:02.587235+00:00",
+      "ADR-101|src/OTGW-firmware/OTGW-firmware.h": "2026-06-20T12:29:39.910322+00:00",
+      "ADR-102|src/OTGW-firmware/OTGW-firmware.h": "2026-06-20T12:29:39.910322+00:00",
+      "ADR-106|src/OTGW-firmware/OTGW-firmware.h": "2026-06-20T12:29:39.910322+00:00",
+      "ADR-009|evaluate.py": "2026-06-20T12:30:27.873608+00:00",
+      "ADR-080|evaluate.py": "2026-06-20T12:30:27.873608+00:00",
+      "ADR-091|evaluate.py": "2026-06-20T12:30:27.873608+00:00",
+      "ADR-093|evaluate.py": "2026-06-20T12:31:08.217920+00:00",
+      "ADR-120|evaluate.py": "2026-06-20T12:31:08.217920+00:00",
+      "ADR-131|evaluate.py": "2026-06-20T12:31:08.217920+00:00"
     }
   }
 }

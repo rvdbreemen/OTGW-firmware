@@ -3,11 +3,11 @@ id: TASK-885
 title: >-
   fix(web): embedded-robust streaming JSON writer (JsonEmit, no JsonDocument) +
   A/B vs ArduinoJson under 8-16w load
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-18 18:22'
-updated_date: '2026-06-18 19:37'
+updated_date: '2026-06-20 12:24'
 labels: []
 dependencies: []
 ordinal: 101000
@@ -37,3 +37,9 @@ CONCLUSION (per plan decision criteria): streaming MATERIALLY more robust on the
 
 CORRECTIONS (advisor, before presenting): (1) The A-raw @8w 'reset Unknown' reboot: serial capture was EMPTY (no panic/wdt/backtrace text). Cause NOT established. Heap was pristine at the 3s-sampled points so a heap/bad_alloc cause is unlikely-but-not-excluded; do NOT assert 'non-heap/brownout/approach-independent' - that is unverified inference. (2) The A/B is NOT a faithful controlled experiment: B-raw = alpha.213 (a DIFFERENT commit + the chunked variant, not a same-HEAD ArduinoJson+gate-off+backstop-off build). The cross-commit comparison is SUGGESTIVE, not controlled. The heap-axis difference is structural (pooled JsonDocument vs no doc) and proven per-request, but the reboot comparison is not controlled. (3) AXES: streaming wins the HEAP axis (maxblock ~31KB vs <12KB cratered; 0 tier entries; settings byte-identical; ~8KB smaller binary). It does NOT win the REBOOT axis: on the gate-ON shippable, A-ship rebooted once @16w (watchdog) where B-ship (alpha.214) rebooted zero. 'Robust under 8-16w' was ALREADY met by alpha.214; streaming adds heap HEADROOM, not reboot robustness, and does not fix the watchdog. Possible small real cost: streaming's faster per-request path may raise sustained core-1 occupancy -> marginally more loopTask starvation (unconfirmed). HONEST VERDICT: streaming is a genuine improvement on heap pressure + simplicity + removing the bad_alloc/OOM failure class (plausibly helps long-uptime field devices + the TASK-879 web-dead under MQTT+WS heap pressure). It is NOT a forced revert. Maintainer picks: hybrid / full-revert / keep.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+JsonEmit streaming writer delivered and the chosen direction shipped. Reconciled against the landed decision (maintainer 2026-06-20): jsonEmit.h present + correct (non-throwing/no-alloc, unsigned-char escape fix, NaN/Inf->null, guarded narrow-int overloads), live on the device and validated via device + json_golden (the named host-side writer unit harness was NOT built; superseded by json_golden + device validation). ADR-146 Accepted (supersedes ADR-141/145); TASK-886 Done. AC#5: 8-16w survival + evaluate.py green ARE met; the throughput-improvement clause was deliberately TRADED for heap headroom in ADR-146 and the residual whole-response-cbuf throughput ceiling is routed to TASK-883 (In Review). Closing per maintainer decision; remaining throughput work tracked under TASK-883.
+<!-- SECTION:FINAL_SUMMARY:END -->
