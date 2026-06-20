@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:54'
-updated_date: '2026-06-20 11:04'
+updated_date: '2026-06-20 15:58'
 labels:
   - async-esp32s3
 dependencies:
@@ -101,4 +101,6 @@ FINAL BUILDS (all per-env SUCCESS, grepped): esp32 97.4%, esp32-classic 93.9%, e
 LANDED (build+evaluator ACs met): HTTP server, REST API and FSexplorer migrated to ESPAsyncWebServer(80) over AsyncTCP; httpServer.handleClient() drain and OTGWWebServer alias removed; new webServerCompat.h bridges imperative-push JSON builders to async pull via file-static per-request context (safe under single AsyncTCP-task serialization) with send-exactly-once helpers and merged argCompat() semantics. ADR-132 (Proposed) supersedes ADR-109. Builds: esp32 97.4%, esp32-classic 93.9%, esp32-combo 99.0% (per-env SUCCESS grepped); evaluate.py --quick 0 FAIL. REMAINING field-validation ACs (require ESP32-S3 hardware, In Review): web UI + 8 versioned assets load; FSexplorer list/delete; all /api/v2 JSON correct; HTTP Basic Auth + CSRF same-origin on POST/PUT; sat-slider stall gone under parallel load; OT/MQTT throughput unaffected; AsyncTCP-task stack headroom for LittleFS handlers (no TWDT/stack overflow during full FSexplorer walk).
 
 LIVE auth/CSRF validation on the connected esp32-classic (2026-06-20, temp password set then cleared, device restored to auth-off): unauth POST /api/v2/settings -> 401; authed Basic + cross-origin (Origin: evil) POST -> 403 (CSRF same-origin enforced, ADR-056); authed Basic same-origin POST -> 200. HTTP Basic Auth + CSRF same-origin enforcement on write routes confirmed working end-to-end. AC4 auth/CSRF half now LIVE-VALIDATED. AC1 build receipt: 3-target build green at alpha.224+cdc4ec7 (esp32/esp32-classic/esp32-combo), evaluate.py --quick green (0 fail/1 warn/98.6%). Residual gates remain (NOT closing): FSexplorer DELETE round-trip, OT/MQTT throughput under web load, AsyncTCP-task stack headroom / no-TWDT during full FSexplorer walk on ESP32-S3. Stays In Review.
+
+LIVE OTGW32 web-layer validation (2026-06-20, device 192.168.1.143, alpha.226+6b57115, hardware_type otgw32, OT-Direct mode): async HTTP/REST/FSexplorer/WebSocket migration confirmed on the actual OTGW32 hardware. GET / + /index.html -> 200 (web UI serves from LittleFS), /api/v2/health|device/info|otgw/overrides|sat/status|sensors|discovery|listfiles -> 200, /api/v1/* -> 410 Gone (ADR-035), /nonexistent -> 404, port 80 OPEN (AsyncWebSocket /ws shares it). Residual field gates unchanged (auth/CSRF, FSexplorer DELETE, OT/MQTT throughput under load, live OT bus).
 <!-- SECTION:NOTES:END -->

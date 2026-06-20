@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:41'
-updated_date: '2026-06-13 08:45'
+updated_date: '2026-06-20 15:58'
 labels:
   - async-esp32s3
 dependencies: []
@@ -45,4 +45,6 @@ seq1 owns the platformio.ini/build.py esp8266 deletions; do NOT re-touch those h
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented ESP8266 source-side drop (ADR-128). Deleted platform_esp8266.h + OTGW-ModUpdateServer-impl.h. Collapsed platform.h dispatcher/PlatformDir/PLATFORM_INT_DISTINCT_FROM_INT32(->1), boards.h (removed BOARD_NODOSHOP_ESP8266 block + esp8266 auto-detect arm + #error/comment tokens), OTGW-ModUpdateServer.h (->unconditional esp32 include), helperStuff.ino (dropped #ifdef ESP8266 watermark global). evaluate.py: removed platform_esp8266.h + OTGW-ModUpdateServer-impl.h from allowlist, baseline 1->0. VERIFIED: builds esp32/esp32-classic/esp32-combo all 2x[SUCCESS] per env, 0 FAILED. evaluate.py Failed:0; scan_esp_abstraction_violations()==[] BASELINE==0. grep: 0 BOARD_NODOSHOP_ESP8266, 0 ESP8266 directives outside SimpleTelnet/OTGWSerial, SimpleTelnet+OTGWSerial.cpp untouched (not in diff), jsonStuff int/int32 overloads retained. NOT committed/bumped (Land phase). Field-flash ACs out of scope (no hardware).
+
+OTGW32 boot + web UI LIVE-confirmed on the actual OTGW32 (192.168.1.143, alpha.226, OT-Direct): boots clean, LittleFS mounts, web UI + all v2 REST endpoints serve 200. AC5 'OTGW32 boot + web UI' met on hardware; only 'live OT traffic' remains (no boiler/thermostat wired: otgwmode=None, otgwconnected=false).
 <!-- SECTION:NOTES:END -->

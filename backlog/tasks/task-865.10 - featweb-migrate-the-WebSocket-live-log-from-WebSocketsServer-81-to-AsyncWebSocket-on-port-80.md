@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:55'
-updated_date: '2026-06-14 05:14'
+updated_date: '2026-06-20 15:58'
 labels:
   - async-esp32s3
 dependencies:
@@ -45,4 +45,6 @@ WEBSOCKET_PORT=81 (982) + wsURL `ws://host:81/` (1644) -> `ws://host/ws` (port 8
 
 <!-- SECTION:NOTES:BEGIN -->
 Landed: WebSocket live-log migrated from Links2004 WebSocketsServer:81 to AsyncWebSocket otLogWs("/ws") attached to the shared port-80 AsyncWebServer (ADR-133, supersedes ADR-005). startWebSocket() idempotent via wsInitialized; webSocketEvent ported to AwsEventHandler signature; connect-cap inverted to count() > MAX_WEBSOCKET_CLIENTS (lib inserts before dispatch); all TX via otLogWs.textAll()/closeAll(); wsClientCount removed (otLogWs.count() is sole source); webSocket.loop() removed, handleWebSocket() now 1s-timer cleanupClients()+keepalive; ADR-121 canSendWebSocket() heap gate and ADR-025 30s keepalive + flashModeActive guard preserved verbatim; index.js WEBSOCKET_PORT=81 -> WEBSOCKET_PATH='/ws' on window.location.host; WebSockets@2.3.6 dropped from platformio.ini. evaluate.py --quick green (0 fail). Remaining ACs are FIELD-VALIDATION on ESP32-S3 hardware: (1) OT live-log streams to ws://host/ws (80), reconnect across WiFi/Eth transition, 30s keepalive+cleanupClients keep idle alive; (2) ADR-025 Safari upload-progress on macOS+iOS, record whether close-before-flash mitigation still needed, heap stays HEAPHEALTHY over an extended live-log session.
+
+OTGW32 (192.168.1.143, alpha.226): port 80 OPEN, AsyncWebSocket /ws shares it (WebSocketsServer:81 retired). Web-layer live on OTGW32 hardware; Safari upload-progress + extended-session heap (AC5) still field-gated.
 <!-- SECTION:NOTES:END -->
