@@ -1,11 +1,11 @@
 ---
 id: TASK-866
 title: Diagnose async webserver no-response on esp32-combo (alpha.192)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-14 20:30'
-updated_date: '2026-06-16 08:41'
+updated_date: '2026-06-20 10:55'
 labels: []
 dependencies: []
 ordinal: 82000
@@ -36,4 +36,12 @@ MECHANISM PINNED (capture 20260616-074035, alpha.199 OTGW32; same bug class as T
 INSTRUMENTATION LANDED (commit bc84b9b7, 2.0.0-alpha.200). Loop-stall detector added to pin the >=30s blocking section without a USB cable: (1) HeapDiagSection.iMaxLoopGapMs = longest gap between loop() entries since boot; (2) loop() logs '[loop-stall] N ms gap' for any gap >200ms (the telnet timestamp brackets the blocking section against the preceding per-section debug line); (3) banner 'Drops:' line shows 'maxLoopGap N ms' and the 'D' state dump shows 'max_loop_gap_ms'. Diagnostic-only, zero behaviour change when healthy. Build green esp32/esp32-classic/esp32-combo; evaluate.py --quick 98.6%. FIELD STEP to close AC#1: flash alpha.200 to the OTGW32, let it run, then read the banner 'maxLoopGap' + grep the telnet log for '[loop-stall]' lines. The largest gap's timestamp, matched against the line just before it (processOT / loopOTDirect / an NTP/DNS/WiFi/LittleFS section), names the culprit. If the gap is ~30s+ that is the TWDT trigger; if it is 4-8s that is the AsyncTCP-starvation latency floor. Escalate to per-section checkpoint labels (Option B) only if the bracketing is ambiguous.
 
 ROOT-CAUSE HUNT (wf_79e88a89-6f8, full detail in TASK-879 notes). Top suspect for AC#1: synchronous SimpleTelnet/WiFiClient writes on the loop task (port 23 debug + port 25238 ser2net). NetworkClient::write blocks ~10s/write on a stalled/half-open client (1s select x 10 retries, no feedWatchDog); every Debug* macro + every OT-frame mirror funnels through it on the loop task; debug-all-on + alpha auto-enable makes the stream dense. OBSERVER-COUPLED: the stall exists only while a telnet/ser2net client is connected (SimpleTelnet::write early-returns at _connectedCount==0), and our capture is taken over telnet -> the AC#2 'dispatch alive but slow' is the AsyncTCP task being starved by the loop-task socket-write block, NOT a webserver-handler fault. a-priori suspects MQTT-broker-DNS + NTP-DNS ELIMINATED by code (MQTT disabled path returns before hostByName; NTP configTime is async). KILL-TEST to close AC#1/#2: power-cycle, connect NOTHING to 23/25238, curl http://<ip>/ -> floor vanishes confirms; persists -> reopen compute/LittleFS sweep. Fix touches vendored SimpleTelnet (read-only per policy) -> maintainer decision (availableForWrite gate + drop, or FreeRTOS ring-buffer offload).
+
+OBSOLETE (audit wp0vjoo5s): diagnostic stub. Its 'core-1 starvation' conclusion was MECHANISTICALLY OVERTURNED by TASK-879 (async_tcp prio10>loopTask prio1 preempts; real cause = lock-contention + telnet RX-timeout + LittleFS-FD/heap). The fix shipped under TASK-879 (AsyncSimpleTelnet a125fbf7, bounded OTStateLock, ADR-147 static-file gate 5a92b26e) and is live on HEAD. The combo browser re-capture field gate lives on TASK-879 (In Review).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as resolved-by-successor TASK-879/ADR-147. Root cause + fix landed under TASK-879; keeping one live task (879) for the OTGW32 field re-capture instead of two.
+<!-- SECTION:FINAL_SUMMARY:END -->

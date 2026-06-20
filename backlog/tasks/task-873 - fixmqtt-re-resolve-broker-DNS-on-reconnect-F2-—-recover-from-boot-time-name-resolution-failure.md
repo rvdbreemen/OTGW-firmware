@@ -3,11 +3,11 @@ id: TASK-873
 title: >-
   fix(mqtt): re-resolve broker DNS on reconnect (F2) — recover from boot-time
   name-resolution failure
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-15 14:28'
-updated_date: '2026-06-15 20:07'
+updated_date: '2026-06-20 10:56'
 labels: []
 dependencies: []
 ordinal: 89000
@@ -32,4 +32,6 @@ MQTT review F2 (HIGH). WiFi.hostByName()+setServer() run ONLY in MQTT_STATE_INIT
 <!-- SECTION:NOTES:BEGIN -->
 F2: MQTT_STATE_WAIT_FOR_RECONNECT now re-enters MQTT_STATE_INIT so WiFi.hostByName()+setServer() re-run each reconnect cycle.
 Implemented on branch claude/mqtt-reliability-phase3 (off feature-2.0.0-esp32s3-async). evaluate.py --quick green (0 failures). ESP32 build NOT verifiable in this container (network policy blocks PlatformIO framework-arduinoespressif32 download); build + field ACs left for maintainer verification.
+
+Audit wp0vjoo5s: F2 DNS re-resolve-on-reconnect code is complete and live on HEAD (alpha.224). AC#3 build receipt now satisfied: 3-target build green at alpha.224+cdc4ec7 (after SimpleTelnet submodule fix -> 7013fdc3): esp32/esp32-classic/esp32-combo all SUCCESS, evaluate.py --quick green (0 fail/1 warn/98.6%). Audit wp0vjoo5s 2026-06-20. (note: AC#3 wording 'esp8266/esp32/esp32-classic' is stale -> branch dropped esp8266; current 3 targets are esp32/esp32-classic/esp32-combo). Remaining: AC#4 field gate = live broker + induced boot-time DNS miss + HA observes available-after-resolver-up. Moving to In Review pending that field validation.
 <!-- SECTION:NOTES:END -->
