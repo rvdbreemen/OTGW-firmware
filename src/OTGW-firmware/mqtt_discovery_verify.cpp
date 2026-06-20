@@ -262,13 +262,17 @@ bool isDiscoveryVerificationActive() { return verifyActive; }
 //   <haprefix>/<component>/<nodeId>/... shape is counted as an orphan and
 //   consumed here.
 //
-// TASK-865.8 (chunked inbound): the match keys ENTIRELY on the topic name; the
-// `length` argument is deliberately ignored, so it does not matter whether the
-// retained config arrived whole or split across espMqttClient onMessage chunks.
-// The onMessage shim in MQTTstuff.ino dispatches only the first chunk
-// (index==0), which already carries the complete topic (the variable-header
-// topic is fully parsed before any payload chunk), so each retained config is
-// matched and counted exactly once regardless of payload size.
+// TASK-865.8 / TASK-889 (chunked inbound): the match keys ENTIRELY on the topic
+// name; the `length` argument is deliberately ignored, so it does not matter
+// whether the retained config arrived whole or split across espMqttClient
+// onMessage chunks. TASK-875's F4 whole-message gate (index==0 && len==total)
+// drops chunked payloads to stop partial COMMAND execution, but it would also
+// drop chunked retained discovery configs before they reached this function.
+// TASK-889 fixes that: the onMessage shim in MQTTstuff.ino calls this handler on
+// the first chunk (index==0) BEFORE the whole-message gate, since the variable-
+// header topic is delivered in full on every chunk. So each retained config is
+// matched and counted exactly once regardless of payload size, while commands
+// still require a whole single-chunk payload.
 bool handleDiscoveryVerifyMessage(const char *topic, unsigned int /*length*/) {
   if (!verifyActive || verifyPrefixLen == 0 || topic == nullptr) return false;
   const char* haPrefix = verifyAccessorHaPrefix();

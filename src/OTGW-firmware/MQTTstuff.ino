@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.226
+**  Version  : v2.0.0-alpha.227
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1030,12 +1030,22 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) 
 // (index==0 && len==total). espMqttClient splits a PUBLISH payload on TCP read
 // boundaries, so a payload can arrive as several onMessage calls even below
 // EMC_RX_BUFFER_SIZE; an index==0/len<total first chunk would otherwise be
-// dispatched truncated with the rest dropped. Anything chunked is dropped whole.
+// dispatched truncated with the rest dropped. COMMANDS chunked are dropped whole
+// (a partial command must never execute). TASK-889: the discovery-verify read
+// path is exempt -- it keys only on the topic name, so it is delivered on the
+// first chunk even when the payload is split (see below).
 static void onMqttMessage(const espMqttClientTypes::MessageProperties& properties,
                           const char* topic, const uint8_t* payload,
                           size_t len, size_t index, size_t total) {
   (void)properties;
-  if (index != 0 || len != total) return;  // only the first-and-only chunk of a whole payload
+  // TASK-889: deliver the topic to the discovery-verify handler on the first
+  // chunk even when the PAYLOAD is chunked. handleDiscoveryVerifyMessage ignores
+  // the payload and keys only on the topic name (which espMqttClient delivers in
+  // full on every chunk), so a chunked ~900B retained config is still counted --
+  // instead of being dropped by the whole-message gate below, scored MISSING, and
+  // triggering a spurious republish. Returns true (consumed) for verify topics.
+  if (index == 0 && handleDiscoveryVerifyMessage(topic, (unsigned int)total)) return;
+  if (index != 0 || len != total) return;  // F4 (TASK-875, ADR-131 item 8): commands only on a whole single-chunk payload
 
   // The legacy dispatcher takes a mutable char* topic (it never writes through
   // it — only strcmp/strcasecmp_P and a read-only cursor walk). Copy into a

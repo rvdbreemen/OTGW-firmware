@@ -3,9 +3,10 @@ id: TASK-889
 title: >-
   fix(mqtt): chunked inbound discovery-verify config dropped by len==total gate
   (republish storm risk)
-status: To Do
+status: In Review
 assignee: []
 created_date: '2026-06-20 10:30'
+updated_date: '2026-06-20 16:01'
 labels: []
 dependencies: []
 ordinal: 105000
@@ -26,8 +27,14 @@ Also stale: mqtt_discovery_verify.cpp:~266-271 still says 'the onMessage shim di
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduce on a real broker: a chunked retained discovery config during the verify window is dropped and triggers a spurious republish (or prove it cannot happen for our payload sizes)
-- [ ] #2 Fix without reopening ADR-131 item 8: either reassemble chunked inbound up to a bounded size, or exempt the discovery-verify read path from the whole-message drop, while still blocking partial inbound COMMANDS
-- [ ] #3 Correct the stale comment at mqtt_discovery_verify.cpp:~266-271 to match the len==total gate behaviour (fold into this commit so no separate prerelease bump for a comment)
-- [ ] #4 Build green esp32 / esp32-classic / esp32-combo; evaluate.py --quick no new failures
+- [x] #2 Fix without reopening ADR-131 item 8: either reassemble chunked inbound up to a bounded size, or exempt the discovery-verify read path from the whole-message drop, while still blocking partial inbound COMMANDS
+- [x] #3 Correct the stale comment at mqtt_discovery_verify.cpp:~266-271 to match the len==total gate behaviour (fold into this commit so no separate prerelease bump for a comment)
+- [x] #4 Build green esp32 / esp32-classic / esp32-combo; evaluate.py --quick no new failures
 - [ ] #5 Field: discovery-verify reports CLEAN on a real broker with chunked configs present; no spurious republish loop
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented alpha.227. AC#2: onMqttMessage (MQTTstuff.ino) now delivers the topic to handleDiscoveryVerifyMessage on the FIRST chunk (index==0) BEFORE the F4 whole-message gate -- the verify handler keys only on the topic name (payload ignored) and espMqttClient delivers the full topic on every chunk, so a chunked retained config is counted instead of dropped. Commands still require a whole single-chunk payload (F4/ADR-131 item 8 intact). AC#3: corrected the stale comment in mqtt_discovery_verify.cpp (now references TASK-889 + the F4-gate-applies-to-commands distinction). AC#4: 3-target build green at alpha.227 + evaluate.py --quick 67 pass/0 fail/98.7%. REMAINING (field, broker): AC#1 reproduce the chunked-drop->republish, AC#5 discovery-verify CLEAN with chunked configs on a real broker -- needs the device on alpha.227 (it is alpha.226) + broker + a config large enough to split. Moving to In Review.
+<!-- SECTION:NOTES:END -->
