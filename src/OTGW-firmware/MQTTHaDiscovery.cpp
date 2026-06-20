@@ -2465,8 +2465,11 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
                                     HaDiscoveryContext &ctx)
 {
   char label[48];
+  char idLabel[48];
   char friendlyName[80];
   strlcpy_P(label, cfg.label, sizeof(label));
+  strlcpy(idLabel, label, sizeof(idLabel));
+  sanitizeHaObjectId(idLabel);
   strlcpy_P(friendlyName, cfg.friendlyName, sizeof(friendlyName));
 
   if (!writeJsonOpen(w)) return false;
@@ -2479,13 +2482,16 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
 
   // "uniq_id":"<nodeId>-<sourcePrefix><label>"
   // ADR-140: source prefix replaces per-device suffix.
+  // TASK-872 AC#3: uniq_id uses idLabel (sanitized) for HA object_id restrictions,
+  // mirroring composeSensorPayload; stat_t below keeps the raw label to match the
+  // actual publish topic.
   if (!w.writeChar('"')) return false;
   if (!w.writeProgmem(kUniqId)) return false;
   if (!w.writeProgmem(PSTR("\":\""))) return false;
   if (!w.writeRam(ctx.nodeId)) return false;
   if (!w.writeChar('-')) return false;
   if (!w.writeProgmem(haSourcePrefix(ctx.device, ctx))) return false;
-  if (!w.writeRam(label)) return false;
+  if (!w.writeRam(idLabel)) return false;
   if (!w.writeChar('"')) return false;
   if (!writeJsonComma(w)) return false;
 

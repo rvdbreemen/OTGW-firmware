@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.224
+**  Version  : v2.0.0-alpha.225
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1357,9 +1357,9 @@ static void onMqttConnect(bool sessionPresent) {
 // restarts (timerMQTTwaitforconnect) live inside handleMQTT() where the
 // DECLARE_TIMER_SEC locals are in scope. The next handleMQTT() tick observes
 // !connected() and takes the matching branch:
-//   - from MQTT_STATE_IS_CONNECTED -> RESTART_TIMER + WAIT_FOR_RECONNECT (10 min)
+//   - from MQTT_STATE_IS_CONNECTED -> RESTART_TIMER + WAIT_FOR_RECONNECT (42s)
 //   - from MQTT_STATE_WAIT_CONNECTION_ATTEMPT -> retry after the per-attempt
-//     backoff, with the 5-attempts-then-10-minute fallback preserved.
+//     backoff, with the 5-attempts-then-42s fallback preserved.
 static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
   lastMqttDisconnectReason = reason;
   state.mqtt.bConnected = false;

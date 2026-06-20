@@ -13,8 +13,11 @@ export const meta = {
 }
 
 const A = (typeof args === 'object' && args) ? args : {}
-const REPO = A.repo || 'D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware-esp32s3-async'
-const BRANCH = A.branch || 'feature-2.0.0-esp32s3-async'
+// Branch model changed 2026-06-20: the 2.0.0 async line was promoted to `dev`
+// (the former feature-2.0.0-esp32s3-async). dev IS the default working line now;
+// the old async worktree is gone. otgw-1.x.x carries 1.x maintenance.
+const REPO = A.repo || 'D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware'
+const BRANCH = A.branch || 'dev'
 const SKIP_BUMP = !!A.skipBump              // parallel lanes defer the prerelease bump to serial integration
 const TARGET = (A.targetTask || '').trim()  // pin a specific task for a parallel lane; '' = auto-pick lowest
 const MAX_TASKS = A.maxTasks || 25          // safety cap on tasks drained per run

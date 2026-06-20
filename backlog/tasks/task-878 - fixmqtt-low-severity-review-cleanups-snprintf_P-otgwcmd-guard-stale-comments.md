@@ -3,11 +3,11 @@ id: TASK-878
 title: >-
   fix(mqtt): low-severity review cleanups (snprintf_P, otgwcmd guard, stale
   comments)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-15 14:32'
-updated_date: '2026-06-15 20:07'
+updated_date: '2026-06-20 11:31'
 labels: []
 dependencies: []
 ordinal: 94000
@@ -24,7 +24,7 @@ MQTT review LOW batch. (1) 4x bare snprintf (non-_P) with RAM format-string lite
 - [x] #1 Bare snprintf sites converted to snprintf_P+PSTR
 - [x] #2 otgwcmd truncation guarded against sizeof(otgwcmd)
 - [x] #3 Stale ESP8266 re-entrancy + 10-minute-timer comments corrected
-- [ ] #4 Build green 3 targets; evaluate.py --quick no new failures
+- [x] #4 Build green 3 targets; evaluate.py --quick no new failures
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -33,3 +33,9 @@ MQTT review LOW batch. (1) 4x bare snprintf (non-_P) with RAM format-string lite
 LOWs: 4 bare snprintf->snprintf_P+PSTR; otgwcmd[51] truncation guarded at both sinks; stale ESP8266 re-entrancy + 10-min timer comments corrected.
 Implemented on branch claude/mqtt-reliability-phase3 (off feature-2.0.0-esp32s3-async). evaluate.py --quick green (0 failures). ESP32 build NOT verifiable in this container (network policy blocks PlatformIO framework-arduinoespressif32 download); build + field ACs left for maintainer verification.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Low-severity review cleanups complete. AC#1/#2 (snprintf_P, otgwcmd guard) landed in 1d91bbce (alpha.198). AC#3 (stale comments): the two reconnect-wait comments at MQTTstuff.ino:1360/1362 said '10 min'/'10-minute fallback' but the timer is timerMQTTwaitforconnect=42s (verified: DECLARE_TIMER_SEC line 1054; the 5-attempts-then-42s fallback at lines 1164-1167) — corrected to 42s at alpha.225. AC#4 build/eval: esp32-classic build green + evaluate.py --quick green (0 fail/1 warn/98.6%) at alpha.225; the change is platform-common (comment-only) so esp32/esp32-combo compile identically (full 3-target was green at alpha.224 with the same files). All ACs met.
+<!-- SECTION:FINAL_SUMMARY:END -->

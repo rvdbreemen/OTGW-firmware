@@ -12,8 +12,14 @@ tasks as it can.
 
 ## Run (single lane, default worktree)
 
+> Branch model changed 2026-06-20: the 2.0.0 async line was promoted to **`dev`**
+> (the former `feature-2.0.0-esp32s3-async`). `dev` is the default working line and
+> the default worktree (`D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware`); the
+> old async worktree is gone. `otgw-1.x.x` is the 1.x maintenance line; `main` is
+> always the latest public release.
+
 ```
-Workflow({ scriptPath: "D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware-esp32s3-async/.claude/workflows/implement-next-task.js" })
+Workflow({ scriptPath: "D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware/.claude/workflows/implement-next-task.js" })
 ```
 
 The engine, in one run:
@@ -63,11 +69,11 @@ Workflow({ scriptPath: "<this script>", args: {
 }})
 ```
 
-Parallel-lane setup: `git worktree add <dir> -b <sub-branch> feature-2.0.0-esp32s3-async`,
+Parallel-lane setup: `git worktree add <dir> -b <sub-branch> dev`,
 copy `other-projects/` + `src/libraries/OpenTherm` + `src/libraries/SimpleTelnet`
 into it (the `other-projects` submodule remote 404s, so copy from a populated
 worktree), then launch with the args above. **Integration is serial**: when a
-sub-branch lane finishes, merge it into `feature-2.0.0-esp32s3-async`, run
+sub-branch lane finishes, merge it into `dev`, run
 `bin/bump-prerelease.sh` once for it (the deferred semver tag), resolve any
 version-banner conflicts, then announce. **Then DELETE the merged sub-branch
 immediately**: `git branch -d <sub-branch>`, `git push origin --delete <sub-branch>`,
@@ -80,11 +86,11 @@ banners) conflict at merge — only fan out file-disjoint tasks.
 ## Notes
 - Field/hardware ACs are never self-certified -> those tasks end **In Review**; the
   maintainer accepts the Proposed ADRs and closes field-validation under the epic.
-- **Single lane (the default) commits and pushes DIRECTLY on `feature-2.0.0-esp32s3-async`
-  in `OTGW-firmware-esp32s3-async` — NO sub-branch.** The target is ONE async branch
-  (maintainer directive 2026-06-19). Sub-branches/worktrees exist ONLY for genuine
-  parallel lanes and are deleted right after merge (see Parallel lanes above). Never touch
-  `dev` or the other 2.0.0 branch.
+- **Single lane (the default) commits and pushes DIRECTLY on `dev`
+  in `OTGW-firmware` — NO sub-branch.** `dev` IS the 2.0.0 async line now (one-branch
+  maintainer directive 2026-06-19, branch model change 2026-06-20). Sub-branches/worktrees
+  exist ONLY for genuine parallel lanes and are deleted right after merge (see Parallel
+  lanes above). Never touch `otgw-1.x.x` (1.x maintenance) or `main` (public release).
 - Rate-limit storms: the engine ends a run on a transient agent death after cleaning
   up; just re-run (cron does this every 30 min). The abort-cleanup is itself an
   agent and can die under heavy limiting — the launching session then cleans up
