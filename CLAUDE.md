@@ -97,7 +97,7 @@ ESP8266/ESP32 firmware for the NodoShop OpenTherm Gateway. Web UI, MQTT, REST AP
 - **Language**: Arduino C/C++ (.ino files), single translation unit
 - **Serial**: Reserved exclusively for PIC — never write to `Serial` after init
 - **Debug**: `DebugTln()`, `DebugTf()` → Telnet port 23, never `Serial.print()`
-- **Branches**: `dev` is the 1.5.x maintenance line; `feature-dev-2.0.0-otgw32-esp32-sat-support` is the 2.0.0 development branch (ESP32/OTGW32 + SAT). Default to the branch you are on; port fixes deliberately, not reflexively.
+- **Branches**: `dev` is the 1.5.x maintenance line; `feature-dev-2.0.0-otgw32-esp32-sat-support` is the older 2.0.0 ESP32/OTGW32 + SAT line; **`feature-2.0.0-esp32s3-async` is the active 2.0.0 ESP32-S3-only async + FreeRTOS line** (epic TASK-865, ADR-123/128; ESP8266 dropped). Default to the branch you are on; port fixes deliberately, not reflexively.
 
 ---
 
@@ -360,12 +360,13 @@ When investigating a user-reported bug, behavioural deviation, or "this should w
 
 ## Git push policy
 
-The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`** and **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
+The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`**, **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`**, and **`origin/feature-2.0.0-esp32s3-async`** when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
 
 Concrete rules that override the default "ask first":
 
 - **`origin/dev`** push: allowed once a feature task is committed locally AND the build verifies (`python build.py --firmware` returns exit 0) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
-- **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** push: allowed under the same conditions as `origin/dev` (feature task committed locally, build green for the relevant target, evaluator green; docs-only commits skip both gates). This is the active 2.0.0 development line; auto-push reduces the friction of cross-branch porting work that this branch carries from dev.
+- **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** push: allowed under the same conditions as `origin/dev` (feature task committed locally, build green for the relevant target, evaluator green; docs-only commits skip both gates). This is the older 2.0.0 development line.
+- **`origin/feature-2.0.0-esp32s3-async`** push: allowed under the same conditions as `origin/dev` (work committed locally, build green for the relevant ESP32-S3 target, evaluator green; docs-only commits skip both gates). This is the **active** 2.0.0 async development line. Sub-branches of it (`feature-2.0.0-esp32s3-async-*`) still need explicit per-instance confirmation to push (one-async-branch policy, see Worktree layout).
 - **`origin/main`** push: still requires explicit per-instance confirmation. Main is release-line; never auto-pushed.
 - **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.
 - **Other remote branches** (`feature-*` other than the 2.0.0 line, `fix-*`, etc.): require explicit per-instance confirmation unless the user has granted standing permission for that specific branch in this same section.
@@ -415,24 +416,21 @@ If you find yourself reaching for the bypass routinely, the rule is wrong, not t
 
 ## Worktree layout
 
-This project is intentionally checked out into **two parallel git worktrees** so the 1.5.x release line and the 2.0.0 feature line can be worked on side-by-side without branch-switch churn:
+This project is checked out into parallel git worktrees so the maintenance and 2.0.0 feature lines can be worked on side-by-side without branch-switch churn. **The paths below are the maintainer's Mac-canonical layout (`~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/...`); on the Windows machine the equivalent root is `D:/Users/Robert/Documents/GitHub/RvdB/` with the same directory names.**
 
-| Worktree path | Branch | Purpose |
+| Worktree dir (Mac path; Windows = `D:/.../GitHub/RvdB/<dir>`) | Branch | Purpose |
 |---|---|---|
-| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware` | `dev` | 1.5.x release line — the default working tree |
-| `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/OTGW-firmware-2.0.0` | `feature-dev-2.0.0-otgw32-esp32-sat-support` | 2.0.0 ESP32 + SAT feature line |
+| `.../GitHub/OTGW-firmware` | `dev` | 1.5.x maintenance line, default working tree |
+| `.../GitHub/OTGW-firmware-2.0.0` | `feature-2.0.0-esp32s3-only` | 2.0.0 ESP32-S3 clean-sync line (no ESP8266 code) |
+| `.../GitHub/OTGW-firmware-esp32s3-async` | `feature-2.0.0-esp32s3-async` | **active** 2.0.0 ESP32-S3-only async + FreeRTOS line (epic TASK-865) |
 
-**Rule: keep both worktrees present.** Work that targets one branch (e.g. SAT dashboard / ESP32 / 2.0.0 features) belongs in its own worktree; work targeting `dev` belongs in the dev worktree. Never use `git checkout <other-branch>` inside one worktree to do work that belongs in the other — it defeats the point of the split and risks losing in-flight changes on the original branch.
+(The older `feature-dev-2.0.0-otgw32-esp32-sat-support` line still exists but is not the active async work.)
 
-**If only one worktree exists, create the missing one before starting side-by-side work.** From inside the existing worktree:
+**One async branch (maintainer directive 2026-06-19).** The 2.0.0 async work lives on ONE branch, `feature-2.0.0-esp32s3-async`. Single-lane work commits and pushes DIRECTLY on it, NO sub-branch. Create a sub-branch/worktree ONLY for a genuine parallel lane, and DELETE it immediately after merging back: `git branch -d <sub>`, `git push origin --delete <sub>`, `git worktree remove <dir>`. Codified in `.claude/skills/implement-next-task/SKILL.md`.
 
-```bash
-# missing the 2.0.0 feature worktree:
-git worktree add ../OTGW-firmware-2.0.0 feature-dev-2.0.0-otgw32-esp32-sat-support
+**Rule: keep the worktrees present.** Work targeting a branch belongs in its own worktree. Never `git checkout <other-branch>` inside one worktree to do work that belongs in another: it defeats the split and risks losing in-flight changes.
 
-# missing the dev worktree:
-git worktree add ../OTGW-firmware dev
-```
+**Windows gotcha:** `git worktree remove` can fail with "Function not implemented" (ENOSYS) when a worktree holds internal symlinks (venv `lib64`, toolchain). Remove junction-safe with `cmd //c rmdir /s /q "<path>"` then `git worktree prune`, never a blind recursive delete that may follow a junction's target.
 
 Verify with `git worktree list`.
 
