@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.227
+**  Version  : v2.0.0-alpha.228
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -426,7 +426,7 @@ struct SATSection {
   bool     bDhwEnabled        = false;  // Enable DHW control in standalone/fallback mode
   bool     bDhwEnable         = true;   // TASK-516: master DHW enable (HW= command). Only acted on when boiler reports MsgID 3 HB3=1 (storage tank). Default true keeps boiler-default DHW enabled.
   bool     bPushSetpoint      = false;  // Push SAT target to thermostat display (TC= command)
-  float    fFlameOffOffset    = 0.0f;   // Setpoint offset when flame off (anti-cycling hysteresis)
+  float    fFlameOffOffset    = 18.0f;  // Flame-off hold offset above return temp during PWM (Python flame_off_setpoint_offset_celsius=18.0): primes the boiler for fast, clean re-ignition
   bool     bWindowDetection   = false;  // Enable window open detection via MQTT
   uint16_t iWindowMinOpenSec  = 60;     // Minimum seconds window must stay open before action
   bool     bForcePWM          = false;  // Force PWM mode regardless of boiler modulation
@@ -458,7 +458,7 @@ struct SATSection {
   float    fThermalCoeff      = 0.05f;  // Learned thermal drop coefficient (C/hr per C delta)
   // Solar gain compensation (Task #23)
   bool     bSolarGainEnable   = false;  // Enable solar gain compensation
-  float    fSolarMinRiseRate  = 0.5f;   // Minimum indoor rise rate (C/hr) to trigger
+  float    fSolarMinRiseRate  = 0.6f;   // Minimum indoor rise rate (C/hr) to trigger (Python CONF_SOLAR_GAIN_MIN_RISE_PER_HOUR=0.6)
   float    fSolarSetpointOffset = 2.0f; // Setpoint reduction during solar gain (C)
   float    fSolarMinElevation = 12.0f;  // Minimum sun elevation for solar gain activation (degrees, Task #68)
   // Summer simmer (Task #24) — auto-disable heating when outdoor temp stays warm

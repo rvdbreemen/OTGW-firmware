@@ -3927,14 +3927,17 @@ static void satUpdateSolarGain()
   }
   // else: no sun elevation data, rely on rise rate alone (AC#6)
 
-  // Detect solar gain condition: rising fast + low boiler modulation
+  // Detect solar gain condition: rising fast + low boiler modulation + at least one valve open.
+  // Python solar_gain.py ANDs valves_open into the detection; bValvesOpen defaults true when no
+  // TRV data is available, so this only suppresses detection when valves are known to be closed.
   float modulation = OTcurrentSystemState.RelModLevel;
   bool risingFast = (_solar_riseRateEma > settings.sat.fSolarMinRiseRate);
   bool lowModulation = (modulation < 20.0f);  // 20% threshold matches Python SAT reference
+  bool valvesOpen = state.sat.bValvesOpen;
 
   if (!_solar_wasActive) {
-    // Not yet active: require sustained rising + low modulation for 10 min
-    if (risingFast && lowModulation) {
+    // Not yet active: require sustained rising + low modulation + valves open for 10 min
+    if (risingFast && lowModulation && valvesOpen) {
       if (_solar_conditionMs == 0) _solar_conditionMs = now;
       if ((now - _solar_conditionMs) > 600000UL) { // 10 min sustained
         state.sat.bSolarGainActive = true;
