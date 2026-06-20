@@ -6,7 +6,7 @@ title: >-
 status: In Review
 assignee: []
 created_date: '2026-06-15 14:21'
-updated_date: '2026-06-20 11:31'
+updated_date: '2026-06-20 14:16'
 labels: []
 dependencies: []
 ordinal: 87000
@@ -37,4 +37,6 @@ DESIGN REVISION (ADR-140 refined 2026-06-15, maintainer): the 7 former devices b
 LIVE HA discovery validated on test-rig broker 192.168.1.234 (device provisioned + MQTT connected, 2026-06-20): our device otgw-AC276ECE45D8 published 105 entities (disc_published_topics=107, disc_pending=0, disc_republish_triggered=0), ALL bound to ONE HA device identifier, via_device=0 across every published entity; uniq_id source prefixes present (otd_/pic_/esp_/sat_). Captured via mosquitto_sub homeassistant/# retained. AC7 (single device, all entities bound, no leaked per-device identifiers) is now LIVE-VALIDATED. The BLE via_device carve-out (AC3 divergence) did NOT manifest in the dump because no BLE probes are present; maintainer decided 2026-06-20 to AMEND ADR-140 to sanction BLE child-devices (via_device), so the divergence becomes compliant once the amending ADR is Accepted (to be authored via adr-kit). Remaining: that ADR amendment, then AC3 reconciles. Build: 3-target green at alpha.224+cdc4ec7.
 
 AC#3 / BLE via_device divergence RESOLVED-BY-DECISION: maintainer chose (2026-06-20) to AMEND ADR-140 rather than remove the BLE child-device via_device. Drafted Proposed ADR-148 (docs/adr/ADR-148-ble-sensors-as-ha-child-devices-via-device.md, guideline-level) sanctioning BLE probe sensors as HA child-devices (via_device -> main OTGW device), all non-BLE entities stay in the single device per ADR-140. adr-generator verified via_device==uniqueId==nodeId chain. REMAINING before Done: (1) maintainer accepts ADR-148 via adr-kit gates; (2) reconcile AC#2/AC#3 checkbox text against the amended contract; (3) AC#6 esp32/esp32-combo build receipt (3-target green at alpha.224+cdc4ec7). AC7 single-device LIVE-validated 2026-06-20. Stays In Review.
+
+ADR-148 ACCEPTED 2026-06-20 (adr-kit gates: quality 0.90/A, lint PASS; maintainer-authorized). The BLE child-device via_device carve-out (AC#3 divergence from ADR-140) is now SANCTIONED by Accepted ADR-148. AC7 single-device topology already live-validated. Remaining before Done: validate the BLE-as-child-device discovery shape LIVE on the OTGW32 (the via_device path needs actual BLE probes to manifest), then reconcile the stale AC#2 text vs ADR-140. Deferred to the OTGW32 field-validation pass.
 <!-- SECTION:NOTES:END -->

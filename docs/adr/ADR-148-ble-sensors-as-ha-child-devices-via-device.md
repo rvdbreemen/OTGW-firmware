@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-06-20.
+Accepted, 2026-06-20. Decision Maker: Robert van den Breemen.
 Guideline-level (per ADR-080): like the parent ADR-140, the discovery payload
 shape is verified by field validation (a captured discovery dump on a real
 device with BLE probes present), not by a clean `evaluate.py` forbid/require
@@ -19,6 +19,11 @@ status_history:
     status: Proposed
     changed_by: Agent
     reason: After shipping the BLE-probe HA discovery (TASK-871/872, commit 7e3da75d), the implementation emits each BLE probe as its own HA child-device linked to the main OTGW device via via_device, which diverges from ADR-140 §1 ("no via_device") and §2 ("BLE sensors are sat_-prefixed entities inside the single device"). The maintainer has decided to KEEP the BLE-as-child-device behaviour because BLE probes are physically separate wireless sensors with their own battery/RSSI/identity. This ADR narrows ADR-140's single-device rule to sanction that carve-out for BLE probes only; all non-BLE entities stay inside the single device exactly as ADR-140 specifies.
+    changed_via: adr-kit
+  - date: 2026-06-20
+    status: Accepted
+    changed_by: maintainer (Robert van den Breemen)
+    reason: Accepted by the maintainer (authorized this session, 2026-06-20). The BLE-probe carve-out is adopted: each BLE probe is emitted as its own HA child-device linked to the main OTGW device by via_device, while all non-BLE entities remain inside the single OTGW device per ADR-140. Acceptance gates passed (adr-quality 0.90 grade A: Completeness 1.00, Evidence 0.70, Clarity 0.80, Consistency 1.00; adr-lint default gates PASS strictly). ADR-140 receives the reciprocal "Amended by ADR-148" back-link on acceptance. ADR-124 stays superseded; no automated CI gate (guideline-level per ADR-080, field-validated like ADR-140).
     changed_via: adr-kit
 
 ## Context

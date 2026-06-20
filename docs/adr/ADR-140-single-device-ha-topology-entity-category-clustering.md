@@ -2,6 +2,8 @@
 
 ## Status
 
+**Amended by [ADR-148](ADR-148-ble-sensors-as-ha-child-devices-via-device.md) (2026-06-20):** BLE probes only: each BLE probe becomes its own HA child-device linked by `via_device`; §1 "no via_device" and §2 "BLE sensors inside the single device" are narrowed for BLE probes. All non-BLE entities stay inside the single OTGW device. This status line is the sanctioned immutability exception (ADR body below is unedited).
+
 Accepted, 2026-06-15 (Proposed 2026-06-15; accepted by the maintainer 2026-06-15).
 Guideline-level (per ADR-080): the discovery payload shape is verified by field
 validation (a captured discovery dump on a real device), not by a clean

@@ -55,7 +55,10 @@
       "ADR-091|evaluate.py": "2026-06-20T12:30:27.873608+00:00",
       "ADR-093|evaluate.py": "2026-06-20T12:31:08.217920+00:00",
       "ADR-120|evaluate.py": "2026-06-20T12:31:08.217920+00:00",
-      "ADR-131|evaluate.py": "2026-06-20T12:31:08.217920+00:00"
+      "ADR-131|evaluate.py": "2026-06-20T12:31:08.217920+00:00",
+      "ADR-148|docs/adr/ADR-148-ble-sensors-as-ha-child-devices-via-device.md": "2026-06-20T14:11:56.853909+00:00",
+      "ADR-148|docs/adr/ADR-140-single-device-ha-topology-entity-category-clustering.md": "2026-06-20T14:12:19.835542+00:00",
+      "ADR-077|docs/adr/ADR-140-single-device-ha-topology-entity-category-clustering.md": "2026-06-20T14:12:19.835542+00:00"
     }
   }
 }
