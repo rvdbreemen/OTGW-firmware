@@ -14,18 +14,6 @@
   "last_nudged": "2026-06-19T06:17:05.336018+00:00",
   "watch": {
     "nudges": {
-      "ADR-101|src/OTGW-firmware/webServerCompat.h": "2026-06-19T14:30:42.507137+00:00",
-      "ADR-102|src/OTGW-firmware/webServerCompat.h": "2026-06-19T14:30:42.507137+00:00",
-      "ADR-106|src/OTGW-firmware/webServerCompat.h": "2026-06-19T14:30:42.507137+00:00",
-      "ADR-101|src/OTGW-firmware/OTGW-firmware.ino": "2026-06-19T14:31:09.721507+00:00",
-      "ADR-102|src/OTGW-firmware/OTGW-firmware.ino": "2026-06-19T14:31:09.721507+00:00",
-      "ADR-106|src/OTGW-firmware/OTGW-firmware.ino": "2026-06-19T14:31:09.721507+00:00",
-      "ADR-131|src/OTGW-firmware/webServerCompat.h": "2026-06-19T14:42:44.608481+00:00",
-      "ADR-132|src/OTGW-firmware/webServerCompat.h": "2026-06-19T14:42:44.608481+00:00",
-      "ADR-133|src/OTGW-firmware/webServerCompat.h": "2026-06-19T14:42:44.608481+00:00",
-      "ADR-111|src/OTGW-firmware/OTGW-firmware.ino": "2026-06-19T14:42:59.559765+00:00",
-      "ADR-131|src/OTGW-firmware/OTGW-firmware.ino": "2026-06-19T14:42:59.559765+00:00",
-      "ADR-132|src/OTGW-firmware/OTGW-firmware.ino": "2026-06-19T14:42:59.559765+00:00",
       "ADR-024|scripts/tests/test_ws_liveload.py": "2026-06-19T15:59:21.096639+00:00",
       "ADR-080|scripts/tests/test_ws_liveload.py": "2026-06-19T15:59:21.096639+00:00",
       "ADR-083|scripts/_secrets.py": "2026-06-19T16:15:29.317004+00:00",
@@ -39,7 +27,12 @@
       "ADR-106|src/OTGW-firmware/restAPI.ino": "2026-06-19T17:39:09.154768+00:00",
       "ADR-146|src/OTGW-firmware/webServerCompat.h": "2026-06-19T17:39:37.051689+00:00",
       "ADR-077|src/OTGW-firmware/webServerCompat.h": "2026-06-19T17:39:37.051689+00:00",
-      "ADR-090|src/OTGW-firmware/webServerCompat.h": "2026-06-19T17:39:37.051689+00:00"
+      "ADR-090|src/OTGW-firmware/webServerCompat.h": "2026-06-19T17:39:37.051689+00:00",
+      "ADR-007|.claude/skills/implement-next-task/SKILL.md": "2026-06-19T17:56:52.039397+00:00",
+      "ADR-094|.claude/skills/implement-next-task/SKILL.md": "2026-06-19T17:56:52.039397+00:00",
+      "ADR-101|src/libraries/SimpleTelnet/src/AsyncSimpleTelnet.h": "2026-06-19T19:38:47.671051+00:00",
+      "ADR-143|src/libraries/SimpleTelnet/src/AsyncSimpleTelnet.h": "2026-06-19T19:38:47.671051+00:00",
+      "ADR-120|src/libraries/SimpleTelnet/src/AsyncSimpleTelnet.h": "2026-06-19T19:38:47.671051+00:00"
     }
   }
 }

@@ -3,11 +3,11 @@ id: TASK-879
 title: >-
   fix(esp32): Task-Watchdog reboot loop + core-1 starvation (slow webserver),
   OTGW32 alpha.199
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-16 05:38'
-updated_date: '2026-06-19 17:49'
+updated_date: '2026-06-20 06:24'
 labels: []
 dependencies: []
 ordinal: 95000
