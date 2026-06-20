@@ -36,7 +36,7 @@ This repository contains ESP8266 and ESP32 firmware for the NodoShop OpenTherm G
 - Language: Arduino C/C++ in `.ino` files, built as a single translation unit.
 - Serial: reserved for the PIC after initialization. Never write to `Serial` after OTGW init.
 - Debug: use `DebugTln()`, `DebugTf()`, and related debug helpers. They go to Telnet port 23; do not use `Serial.print()`.
-- Branches: `dev` is the 1.4.x maintenance line. `feature-dev-2.0.0-otgw32-esp32-sat-support` is the 2.0.0 ESP32/OTGW32/SAT development line. Default to the current branch and port fixes deliberately.
+- Branches (model changed 2026-06-20): `dev` is the DEFAULT line and carries the 2.0.0 ESP32-S3-only async + FreeRTOS firmware (epic TASK-865; ESP8266 dropped; former `feature-2.0.0-esp32s3-async`). `otgw-1.x.x` is the 1.5.x/1.6.x maintenance/LTS line (the former `dev`). `main` is ALWAYS the latest public release. Default to the current branch and port fixes between `dev` and `otgw-1.x.x` deliberately.
 
 ---
 

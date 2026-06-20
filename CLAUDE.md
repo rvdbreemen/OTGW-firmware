@@ -13,7 +13,7 @@ This project uses OpenWolf for context management. Read and follow .wolf/OPENWOL
 
 **Every piece of work must have a backlog task before any code is written. No exceptions.**
 
-**Always use the `backlog` CLI for task operations on this project. Do NOT use the `mcp__backlog__*` MCP server.** The MCP server indexes only one worktree at a time and serves stale cached state across the dev/2.0.0 split (verified 2026-05-05: MCP returned a pre-edit "In Progress" snapshot of TASK-514 long after the CLI marked it Done on disk in the 2.0.0 tree). The "Backlog.md: always use the CLI" section near the bottom of this file is the canonical statement; this paragraph is a reminder so the rule is the first thing seen.
+**Always use the `backlog` CLI for task operations on this project. Do NOT use the `mcp__backlog__*` MCP server.** The MCP server indexes only one worktree at a time and serves stale cached state across worktrees (verified 2026-05-05: MCP returned a pre-edit "In Progress" snapshot of TASK-514 long after the CLI marked it Done on disk in another tree). The "Backlog.md: always use the CLI" section near the bottom of this file is the canonical statement; this paragraph is a reminder so the rule is the first thing seen.
 
 ```bash
 # Before writing any code:
@@ -97,7 +97,7 @@ ESP8266/ESP32 firmware for the NodoShop OpenTherm Gateway. Web UI, MQTT, REST AP
 - **Language**: Arduino C/C++ (.ino files), single translation unit
 - **Serial**: Reserved exclusively for PIC — never write to `Serial` after init
 - **Debug**: `DebugTln()`, `DebugTf()` → Telnet port 23, never `Serial.print()`
-- **Branches**: `dev` is the 1.5.x maintenance line; `feature-dev-2.0.0-otgw32-esp32-sat-support` is the older 2.0.0 ESP32/OTGW32 + SAT line; **`feature-2.0.0-esp32s3-async` is the active 2.0.0 ESP32-S3-only async + FreeRTOS line** (epic TASK-865, ADR-123/128; ESP8266 dropped). Default to the branch you are on; port fixes deliberately, not reflexively.
+- **Branches** (model changed 2026-06-20): **`dev` is now the DEFAULT working line and carries the 2.0.0 ESP32-S3-only async + FreeRTOS firmware** (epic TASK-865, ADR-123/128; ESP8266 dropped). It is the former `feature-2.0.0-esp32s3-async` line, promoted to `dev`. **`otgw-1.x.x` is the 1.5.x/1.6.x maintenance/LTS line** (the former `dev`, renamed). **`main` is ALWAYS the latest public release** (currently 1.6.1) and is never auto-pushed. The old `feature-2.0.0-esp32s3-async`, `feature-2.0.0-esp32s3-only` and `feature-dev-2.0.0-otgw32-esp32-sat-support` branches are historical/folded-in, not active. Default to the branch you are on; port fixes between `dev` (2.0.0) and `otgw-1.x.x` (1.x) deliberately, not reflexively.
 
 ---
 
@@ -360,16 +360,15 @@ When investigating a user-reported bug, behavioural deviation, or "this should w
 
 ## Git push policy
 
-The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`**, **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`**, and **`origin/feature-2.0.0-esp32s3-async`** when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
+The default Claude Code instruction is "do not push without explicit user permission". For this project, the maintainer (Robert) has granted standing permission to push to **`origin/dev`** (the 2.0.0 async default line) and **`origin/otgw-1.x.x`** (the 1.x maintenance line) when it is logical to do so. Logical means: a clean working state, recent commits that are self-contained, and no pending review checkpoints.
 
 Concrete rules that override the default "ask first":
 
-- **`origin/dev`** push: allowed once a feature task is committed locally AND the build verifies (`python build.py --firmware` returns exit 0) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
-- **`origin/feature-dev-2.0.0-otgw32-esp32-sat-support`** push: allowed under the same conditions as `origin/dev` (feature task committed locally, build green for the relevant target, evaluator green; docs-only commits skip both gates). This is the older 2.0.0 development line.
-- **`origin/feature-2.0.0-esp32s3-async`** push: allowed under the same conditions as `origin/dev` (work committed locally, build green for the relevant ESP32-S3 target, evaluator green; docs-only commits skip both gates). This is the **active** 2.0.0 async development line. Sub-branches of it (`feature-2.0.0-esp32s3-async-*`) still need explicit per-instance confirmation to push (one-async-branch policy, see Worktree layout).
-- **`origin/main`** push: still requires explicit per-instance confirmation. Main is release-line; never auto-pushed.
+- **`origin/dev`** push: allowed once a task is committed locally AND the build verifies (`python build.py` returns exit 0 for the relevant ESP32 target — `dev` is 2.0.0 ESP32-S3, no esp8266 target here) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
+- **`origin/otgw-1.x.x`** push: allowed under the same conditions as `origin/dev` (task committed locally, build green for the esp8266 target, evaluator green; docs-only commits skip both gates). This is the 1.5.x/1.6.x maintenance/LTS line (the former `dev`).
+- **`origin/main`** push: **`main` is ALWAYS the latest public release.** Never auto-pushed; every push requires explicit per-instance confirmation and is part of the release flow only.
 - **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.
-- **Other remote branches** (`feature-*` other than the 2.0.0 line, `fix-*`, etc.): require explicit per-instance confirmation unless the user has granted standing permission for that specific branch in this same section.
+- **Sub-branches / other remote branches** (`feature-*`, `fix-*`, ad-hoc lanes): require explicit per-instance confirmation. Create a parallel lane only for genuine parallel work and delete it immediately after merging back (one-line policy, see Worktree layout).
 
 When in doubt about whether a push is "logical", err toward asking. The cost of one extra prompt is small; the cost of an unwanted force-push is large.
 
@@ -416,19 +415,19 @@ If you find yourself reaching for the bypass routinely, the rule is wrong, not t
 
 ## Worktree layout
 
-This project is checked out into parallel git worktrees so the maintenance and 2.0.0 feature lines can be worked on side-by-side without branch-switch churn. **The paths below are the maintainer's Mac-canonical layout (`~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/...`); on the Windows machine the equivalent root is `D:/Users/Robert/Documents/GitHub/RvdB/` with the same directory names.**
+Branch model changed 2026-06-20. The 2.0.0 async line was promoted to `dev` (it is now the default working line), the old 1.x `dev` was renamed `otgw-1.x.x`, and `main` is always the latest public release. The everyday state is a **single working tree on `dev`**; a second worktree is only needed when actively maintaining the 1.x line. **The paths below assume the Windows root `D:/Users/Robert/Documents/GitHub/RvdB/` (Mac-canonical equivalent: `~/Library/CloudStorage/OneDrive-Belastingdienst/Documenten/GitHub/...`).**
 
-| Worktree dir (Mac path; Windows = `D:/.../GitHub/RvdB/<dir>`) | Branch | Purpose |
+| Worktree dir | Branch | Purpose |
 |---|---|---|
-| `.../GitHub/OTGW-firmware` | `dev` | 1.5.x maintenance line, default working tree |
-| `.../GitHub/OTGW-firmware-2.0.0` | `feature-2.0.0-esp32s3-only` | 2.0.0 ESP32-S3 clean-sync line (no ESP8266 code) |
-| `.../GitHub/OTGW-firmware-esp32s3-async` | `feature-2.0.0-esp32s3-async` | **active** 2.0.0 ESP32-S3-only async + FreeRTOS line (epic TASK-865) |
+| `.../GitHub/RvdB/OTGW-firmware` | `dev` | **DEFAULT working tree.** 2.0.0 ESP32-S3-only async + FreeRTOS line (epic TASK-865, ADR-123/128; ESP8266 dropped). |
+| (add on demand) | `otgw-1.x.x` | 1.5.x/1.6.x maintenance/LTS line (the former `dev`). Spin up a worktree only when patching 1.x. |
+| (release only) | `main` | ALWAYS the latest public release. Never a working tree; touched only during the release flow. |
 
-(The older `feature-dev-2.0.0-otgw32-esp32-sat-support` line still exists but is not the active async work.)
+The old `feature-2.0.0-esp32s3-async`, `feature-2.0.0-esp32s3-only` and `feature-dev-2.0.0-otgw32-esp32-sat-support` branches are historical (folded into `dev` / parked) and are not active work lines.
 
-**One async branch (maintainer directive 2026-06-19).** The 2.0.0 async work lives on ONE branch, `feature-2.0.0-esp32s3-async`. Single-lane work commits and pushes DIRECTLY on it, NO sub-branch. Create a sub-branch/worktree ONLY for a genuine parallel lane, and DELETE it immediately after merging back: `git branch -d <sub>`, `git push origin --delete <sub>`, `git worktree remove <dir>`. Codified in `.claude/skills/implement-next-task/SKILL.md`.
+**One line, no stray sub-branches (maintainer directive, 2026-06-19, still in force).** Single-lane work commits and pushes DIRECTLY on `dev`, NO sub-branch. Create a sub-branch/worktree ONLY for a genuine parallel lane, and DELETE it immediately after merging back: `git branch -d <sub>`, `git push origin --delete <sub>`, `git worktree remove <dir>`. Codified in `.claude/skills/implement-next-task/SKILL.md`.
 
-**Rule: keep the worktrees present.** Work targeting a branch belongs in its own worktree. Never `git checkout <other-branch>` inside one worktree to do work that belongs in another: it defeats the split and risks losing in-flight changes.
+**Rule: don't cross lines inside one tree.** Work targeting `otgw-1.x.x` belongs in its own worktree. Never `git checkout otgw-1.x.x` inside the `dev` tree to do 1.x work: it defeats the split and risks losing in-flight changes.
 
 **Windows gotcha:** `git worktree remove` can fail with "Function not implemented" (ENOSYS) when a worktree holds internal symlinks (venv `lib64`, toolchain). Remove junction-safe with `cmd //c rmdir /s /q "<path>"` then `git worktree prune`, never a blind recursive delete that may follow a junction's target.
 
@@ -436,7 +435,7 @@ Verify with `git worktree list`.
 
 **Backlog.md: always use the CLI, never the MCP server.** The `backlog` MCP server (`mcp__backlog__task_*` tools) inherits the launching session's working directory and indexes only that single worktree. Tasks living in a sibling worktree are invisible to `mcp__backlog__task_search`, and `mcp__backlog__task_view` returns cached/stale content for cross-tree tasks (verified 2026-05-05: MCP kept returning the pre-edit "In Progress" snapshot of TASK-514 long after a CLI edit had marked it Done on disk in the 2.0.0 tree). Mixing CLI and MCP on the same task is fragile because MCP caches and does not reflect CLI-side writes without a server restart. **Use `backlog task ...` CLI for every read, edit, create, complete, and archive in this project.**
 
-**CLI cross-tree behaviour.** `backlog task <id> --plain` resolves from either worktree, but `backlog task edit` only writes to the worktree where the task file actually lives. If an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file. SAT / ESP32 / 2.0.0 tasks generally live in the feature worktree's `backlog/tasks/`, not in dev's.
+**CLI cross-tree behaviour.** The backlog now lives in the `dev` tree's `backlog/tasks/` — all 2.0.0 (TASK-865.x and friends) and legacy task files are here. If you spin up a second worktree for `otgw-1.x.x`, remember `backlog task edit` only writes to the worktree where the task file actually lives: if an edit returns `Task not found`, `find` for `task-<id>*` across both worktrees and run the edit from the worktree that holds the file.
 
 ### One worktree per concurrent session — never share a working tree between two live sessions
 
@@ -450,13 +449,13 @@ Two Claude (or Codex / Gemini) sessions doing git operations in the **same** wor
 
 ### Cross-worktree work — ask first, then plan once, then parallelise
 
-Whenever you take on a bug fix, feature change, or architectural decision, **explicitly ask yourself**: *does this also need to land on the other worktree?* For 1.5.x↔2.0.0 the answer is almost always **yes** when the change touches:
+Whenever you take on a bug fix, feature change, or architectural decision, **explicitly ask yourself**: *does this also need to land on the other line?* For `dev` (2.0.0) ↔ `otgw-1.x.x` (1.x) the answer is **yes** when the change touches:
 
-- Any file under `src/OTGW-firmware/` whose name is the same in both trees (most `.ino`, `.h`, `.cpp` and the LittleFS data assets) — even when the line numbers or filenames differ between branches (e.g. dev's `mqtt_configuratie.cpp` is `MQTTHaDiscovery.cpp` on 2.0.0), the architectural fix usually applies to both.
-- ADRs that codify a cross-cutting decision (MQTT topic shape, heap policy, discovery semantics, settings schema). The dev ADR and the 2.0.0 ADR live in their own worktrees and have separate numbering, but the *decision* must be coherent across both.
-- Anything driven by a HA-side, broker-side or PIC-side contract (HA discovery regex, MQTT retained behaviour, OpenTherm message ID semantics) — those are platform-independent and the firmware-side fix must apply on both branches.
+- Any file under `src/OTGW-firmware/` whose name is the same on both lines (most `.ino`, `.h`, `.cpp` and the LittleFS data assets) — even when the line numbers or filenames differ between branches (e.g. 1.x's `mqtt_configuratie.cpp` is `MQTTHaDiscovery.cpp` on 2.0.0), the architectural fix usually applies to both.
+- ADRs that codify a cross-cutting decision (MQTT topic shape, heap policy, discovery semantics, settings schema). The `dev` ADR and the `otgw-1.x.x` ADR have separate numbering, but the *decision* must be coherent across both.
+- Anything driven by a HA-side, broker-side or PIC-side contract (HA discovery regex, MQTT retained behaviour, OpenTherm message ID semantics) — those are platform-independent and the firmware-side fix must apply on both lines.
 
-The answer is usually **no** when the change is genuinely scoped to a feature that only exists on one branch (SAT dashboard, ESP32-S3 board pinning, OTGW32 hardware bring-up → 2.0.0 only; LTS-1.4.x patch backports → only that branch).
+The answer is usually **no** when the change is genuinely scoped to a feature that only exists on one line (SAT dashboard, ESP32-S3 board pinning, OTGW32 hardware bring-up, async/FreeRTOS → `dev`/2.0.0 only; 1.x-specific patch backports → `otgw-1.x.x` only). Note: with 1.x now in maintenance/LTS, most active work is `dev`-only and cross-line porting is the exception, not the default.
 
 **If both: one master plan, two tasks, two agents.**
 
