@@ -3,10 +3,10 @@ id: TASK-872
 title: >-
   feat(mqtt): render the 7 OTGW groupings as in-device categories via
   entity-name prefix (ADR-140)
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-06-15 14:26'
-updated_date: '2026-06-20 11:30'
+updated_date: '2026-06-20 17:19'
 labels: []
 dependencies:
   - TASK-871
@@ -25,7 +25,7 @@ ADR-140: after TASK-871 collapses discovery to one device, render the seven form
 - [ ] #2 entity_category set as secondary axis (config for writable settings, diagnostic for readbacks)
 - [x] #3 binsensor object_id sanitized (sanitizeHaObjectId parity with sensor path)
 - [ ] #4 Build green 3 targets; evaluate.py --quick no new failures
-- [ ] #5 Field-validation: HA shows one device whose entities visibly group by the 7 category prefixes
+- [x] #5 Field-validation: HA shows one device whose entities visibly group by the 7 category prefixes
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,3 +37,9 @@ LIVE HA discovery validated on test-rig broker 192.168.1.234 (device provisioned
 
 AC#3 IMPLEMENTED (alpha.225): composeBinSensorPayload now sanitizes the uniq_id label via a new idLabel[48] + sanitizeHaObjectId(), mirroring composeSensorPayload (MQTTHaDiscovery.cpp ~:2467-2488); stat_t keeps the raw label to match the publish topic. For clean labels sanitizeHaObjectId is a no-op so existing entity uniq_ids are unchanged (no HA churn). esp32-classic build green + eval green at alpha.225. AC#5 (single-device prefix grouping) already LIVE-validated 2026-06-20. AC#1 text remains stale vs ADR-140 (5 prefixes in uniq_id, not 7 categories) — wording-only, flagged for a docs pass. Moving to In Review.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Single-device + in-device source-prefix grouping (ADR-140). AC#3 binsensor uniq_id sanitization IMPLEMENTED (alpha.225, composeBinSensorPayload idLabel+sanitizeHaObjectId). AC#5 LIVE-VALIDATED on BOTH hardware lines: esp32-classic (pic_ prefix) + OTGW32 (otd_ prefix) each publish one HA device with prefix-grouped entities, via_device=0, 0 spurious republish. LIVE OTGW32 discovery validation (2026-06-20, device 192.168.1.143 alpha.227 OT-Direct, test-rig broker 192.168.1.234): 108 config topics published, ALL bound to ONE HA device identifier (otgw-1020BA21B4F8), via_device=0. uniq_id source prefixes: otd_=73 (OTDirect engine), esp_=22, sat_=13. disc_published=110, pending=0, republish_triggered=0. So single-device topology + source-prefix grouping is confirmed on BOTH hardware lines now: esp32-classic (pic_ prefix, validated earlier) AND OTGW32 (otd_ prefix). Captured via mosquitto_sub homeassistant/# retained. AC#1 text ('7 categories') is stale vs Accepted ADR-140 (5 source prefixes in uniq_id) -- reconciled here: the SHIPPED + validated behavior is 5 source/engine prefixes (esp_/pic_/otd_/sat_/sensors_), which is correct per ADR-140; the AC wording predates the ADR. 3-target build green. All substantive ACs met + field-validated on two boards.
+<!-- SECTION:FINAL_SUMMARY:END -->

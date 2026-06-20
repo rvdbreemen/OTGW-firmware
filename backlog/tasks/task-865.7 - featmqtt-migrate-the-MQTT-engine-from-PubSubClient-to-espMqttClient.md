@@ -5,7 +5,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:49'
-updated_date: '2026-06-20 11:11'
+updated_date: '2026-06-20 17:19'
 labels:
   - async-esp32s3
 dependencies:
@@ -47,4 +47,6 @@ Replace PubSubClient with non-blocking espMqttClient (bertmelis), the client EMS
 Landed espMqttClient migration: PubSubClient removed from lib_deps + sources; espMqttClient @ 1.7.2 linked. handleMQTT() async (no 5s sync stall); onConnect/onDisconnect/onMessage wired; setWill() LWT before connect() with pointer-lifetime contract; single mqttPublishRaw() chokepoint replaces the 128B ESP8266 chunker. ADR-131 supersedes ADR-108. Verified: esp32 build [SUCCESS] x2 (firmware+fs), evaluate.py --quick 0 failures (ADR-108 forbid not tripped). Remaining field-validation ACs: (1) broker kill -> WebUI/graph stays responsive (no 5s stall); (2) HA avty_t online(birth)/offline(LWT within keepalive); (3) set/<nodeId>/<cmd> still reaches the PIC/OTDirect queue.
 
 Audit + live HW validation (2026-06-20): the espMqttClient data plane is PROVEN working end-to-end on the connected esp32-classic against test-rig broker 192.168.1.234. Outbound: MQTT connected on reboot, HA discovery published 107 retained topics (disc_published_topics=107, disc_pending=0). Inbound dispatch: set/<nodeId>/sat/pv_boost_max_duration_min round-trip applied a setting change (see TASK-876). Birth 'online' present (single-device discovery bound). NOT yet exercised: broker-kill loop-responsiveness (no 5s stall) and HA avty offline(LWT) within keepalive — those remain the residual field gates. 3-target build green at alpha.224+cdc4ec7. Stays In Review on broker-kill + LWT timing.
+
+OTGW32 (alpha.227, 192.168.1.143) espMqttClient data plane validated against test-rig broker 192.168.1.234: connected on reboot, HA discovery published 110 retained topics (disc_pending=0, republish_triggered=0). Confirms the espMqttClient migration works on the OTGW32/OTDirect board too (earlier validated on esp32-classic). Residual field gates unchanged (broker-kill responsiveness, HA avty LWT timing).
 <!-- SECTION:NOTES:END -->

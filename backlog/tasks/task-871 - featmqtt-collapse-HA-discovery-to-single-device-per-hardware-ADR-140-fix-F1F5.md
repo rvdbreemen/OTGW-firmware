@@ -6,7 +6,7 @@ title: >-
 status: In Review
 assignee: []
 created_date: '2026-06-15 14:21'
-updated_date: '2026-06-20 14:16'
+updated_date: '2026-06-20 17:19'
 labels: []
 dependencies: []
 ordinal: 87000
@@ -39,4 +39,6 @@ LIVE HA discovery validated on test-rig broker 192.168.1.234 (device provisioned
 AC#3 / BLE via_device divergence RESOLVED-BY-DECISION: maintainer chose (2026-06-20) to AMEND ADR-140 rather than remove the BLE child-device via_device. Drafted Proposed ADR-148 (docs/adr/ADR-148-ble-sensors-as-ha-child-devices-via-device.md, guideline-level) sanctioning BLE probe sensors as HA child-devices (via_device -> main OTGW device), all non-BLE entities stay in the single device per ADR-140. adr-generator verified via_device==uniqueId==nodeId chain. REMAINING before Done: (1) maintainer accepts ADR-148 via adr-kit gates; (2) reconcile AC#2/AC#3 checkbox text against the amended contract; (3) AC#6 esp32/esp32-combo build receipt (3-target green at alpha.224+cdc4ec7). AC7 single-device LIVE-validated 2026-06-20. Stays In Review.
 
 ADR-148 ACCEPTED 2026-06-20 (adr-kit gates: quality 0.90/A, lint PASS; maintainer-authorized). The BLE child-device via_device carve-out (AC#3 divergence from ADR-140) is now SANCTIONED by Accepted ADR-148. AC7 single-device topology already live-validated. Remaining before Done: validate the BLE-as-child-device discovery shape LIVE on the OTGW32 (the via_device path needs actual BLE probes to manifest), then reconcile the stale AC#2 text vs ADR-140. Deferred to the OTGW32 field-validation pass.
+
+LIVE OTGW32 discovery validation (2026-06-20, device 192.168.1.143 alpha.227 OT-Direct, test-rig broker 192.168.1.234): 108 config topics published, ALL bound to ONE HA device identifier (otgw-1020BA21B4F8), via_device=0. uniq_id source prefixes: otd_=73 (OTDirect engine), esp_=22, sat_=13. disc_published=110, pending=0, republish_triggered=0. So single-device topology + source-prefix grouping is confirmed on BOTH hardware lines now: esp32-classic (pic_ prefix, validated earlier) AND OTGW32 (otd_ prefix). Captured via mosquitto_sub homeassistant/# retained. AC7 single-device topology now validated on BOTH boards (classic pic_, OTGW32 otd_). ADR-148 (BLE child-devices) Accepted. Remaining gap: the BLE child-device via_device shape is LATENT on both units (no BLE probes paired -> via_device=0 in both dumps), so the ADR-148 carve-out can't be live-validated without a BLE probe. Everything else (single device, prefixes, no leaked per-device ids) is confirmed. Stays In Review pending a BLE-probe field check + AC#2 text reconciliation.
 <!-- SECTION:NOTES:END -->
