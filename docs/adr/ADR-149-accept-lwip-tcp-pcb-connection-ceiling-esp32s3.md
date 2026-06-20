@@ -1,7 +1,7 @@
 ---
 id: ADR-149
 title: "Accept the LWIP TCP-pcb connection ceiling on the ESP32-S3: keep the app-level connection mitigations, do not raise CONFIG_LWIP_MAX_ACTIVE_TCP (TASK-884)"
-status: Proposed
+status: Accepted
 date: 2026-06-20
 tags: [esp32s3, lwip, asynctcp, websocket, webserver, twdt, concurrency, connection-flood, platform-limits, task884, task879, task883]
 supersedes: []
@@ -14,7 +14,7 @@ deciders: [Robert van den Breemen]
 
 ## Status
 
-Proposed, 2026-06-20.
+Accepted, 2026-06-20. Decision Maker: Robert van den Breemen.
 
 This ADR resolves TASK-884 and the connection-backpressure aspect of TASK-879 and TASK-883.
 It records the maintainer's decision, grounded in an on-device A/B/C experiment on the real
@@ -35,6 +35,11 @@ status_history:
     status: Proposed
     changed_by: Agent
     reason: Initial decision record. Records the maintainer's decision (Robert, 2026-06-20) to accept the LWIP TCP-pcb ceiling on the ESP32-S3 after the alpha.227 A/B/C field experiment, rather than raise CONFIG_LWIP_MAX_ACTIVE_TCP.
+    changed_via: adr-kit
+  - date: 2026-06-20
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer-authorized acceptance. Robert explicitly authorized accepting ADR-149 on 2026-06-20 after the adr-kit gates passed (adr-quality grade A 0.96; adr-lint default gates completeness/audit/consistency pass strictly).
     changed_via: adr-kit
 
 ## Context
