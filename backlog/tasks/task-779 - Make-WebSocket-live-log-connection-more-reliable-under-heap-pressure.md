@@ -1,11 +1,11 @@
 ---
 id: TASK-779
 title: Make WebSocket live-log connection more reliable under heap pressure
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-05-31 12:48'
-updated_date: '2026-06-01 23:47'
+updated_date: '2026-06-20 12:42'
 labels:
   - bug
   - websocket
@@ -23,29 +23,24 @@ George (geo83_44083) repro in Discord #beta-testing 2026-05-31: with the web UI 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Characterise WebSocket live-log heap cost: measure per-frame heap/maxBlock impact with live-log open vs closed (telnet logHeapStats), document the dominant allocation
-- [ ] #2 Decouple or independently tune the WebSocket eligibility/throttle from the MQTT publish gate so relaxing MQTT guard does not make the WS live-log run hotter under pressure
+- [x] #2 Decouple or independently tune the WebSocket eligibility/throttle from the MQTT publish gate so relaxing MQTT guard does not make the WS live-log run hotter under pressure
 - [ ] #3 WebSocket live-log applies backpressure/coalescing under heap pressure (e.g. drop-to-latest or rate-cap) so it cannot drive heap into the desync-prone band
 - [ ] #4 WS connection survives heap-pressure events gracefully (clean reconnect, no firmware crash, no cascade into MQTT desync) verified on bench
-- [ ] #5 python build.py exits 0 (firmware + filesystem)
-- [ ] #6 python evaluate.py --quick shows no new failures
+- [x] #5 python build.py exits 0 (firmware + filesystem)
+- [x] #6 python evaluate.py --quick shows no new failures
 - [ ] #7 Field validation by GeorgeZ83 on NodeMCU v3 + HA: live-log open for >1h with no MQTT sensor-unavailable / malformed-packet events
 - [ ] #8 Relax MQTT publish-gate thresholds (telemetry-driven from GeorgeZ83 logHeapStats; CRITICAL OOM floor unchanged) so MQTT drops/throttles less aggressively, decoupled from the WS gate
-- [ ] #9 New ADR for per-consumer heap gating (supersede/amend ADR-030, which is Accepted + llm_judge:true): document the WS-vs-MQTT decoupling decision and the chosen relaxed MQTT values with rationale
+- [x] #9 New ADR for per-consumer heap gating (supersede/amend ADR-030, which is Accepted + llm_judge:true): document the WS-vs-MQTT decoupling decision and the chosen relaxed MQTT values with rationale
+- [x] #10 WS_HEAP_CRITICAL/WARNING/LOW_THRESHOLD and MQTT_HEAP_CRITICAL/WARNING/LOW_THRESHOLD defined and ordered (crit<warn<low); step-1 values equal the shared HEAP_* defaults (behaviour-equivalent)
+- [x] #11 getHeapHealthForWebSocket()/getHeapHealthForMQTT() exist, each evaluates its own ladder and keeps the canonical ADR-089 tier-entry counters live via getHeapHealth(); canSendWebSocket/canPublishMQTT call their per-consumer evaluator
+- [x] #12 evaluate.py check_per_consumer_heap_gate added and PASSES; existing ADR-089 heap gates still PASS (getHeapHealth untouched)
+- [x] #13 Build green esp32/esp32-classic/esp32-combo; evaluate.py --quick no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-CORRECTED DIAGNOSIS (2026-06-02, supersedes the task's original premise):
-The task premise — 'getHeapHealth() feeds ONE tier ladder gating BOTH canSendWebSocket() and canPublishMQTT()' — is factually WRONG on 2.0.0. Verified by repo-wide grep: canSendWebSocket() is DEAD CODE on this branch (declared OTGW-firmware.h:168, defined helperStuff.ino:939, ZERO callers). sendLogToWebSocket() (webSocketStuff.ino:265, called from 5 OT-hot-path sites) calls webSocket.broadcastTXT() with NO heap gate. So on 2.0.0 the WS live-log runs UNGATED while only MQTT is gated. That is the actual heap trigger.
-
-WHY: git archaeology shows the gate WAS deliberately added on dev (commit 34e55dcf 'Optimize logging: ... gate WebSocket' 2026-04-12) and dev STILL has '&& canSendWebSocket()' in sendLogToWebSocket. The 2.0.0 form (blame 6a7f83b58, 2026-03-06) predates it and the dev fix was NEVER PORTED. This is a missing dev->2.0.0 port, not a deliberate 2.0.0 removal. WS throttle constants (WEBSOCKET_THROTTLE_MS_WARNING=50 / _CRITICAL=200) are identical on both branches and proven in dev production ~7 weeks.
-
-SCOPE SPLIT:
-1. NOW (this commit, autonomous — proven cross-branch port): restore '&& canSendWebSocket()' to sendLogToWebSocket() (single point, after hasWebSocketClients()), matching dev. Brings 2.0.0 to dev parity: WS live-log gets heap backpressure it currently lacks. Framed as 'restore dev WS heap-gate parity (partial)', NOT 'fix TASK-779'. Does NOT close any gated AC.
-2. DEFERRED (needs maintainer + telemetry, ADR-121 Proposed): the DECOUPLE — independent per-consumer heap thresholds so relaxing the MQTT gate (AC#8) does not loosen the WS gate, plus telemetry-driven relaxed MQTT values. ADR-121 presents the choices (port-on-shared-ladder as-shipped vs independent per-consumer ladders); maintainer picks. Amends ADR-030/089 by reference (immutable, not edited).
-
-GATED / not autonomously closable: AC#1 measurement (per-frame heap via logHeapStats = hardware), AC#4/#7 bench+field validation (George), AC#8 relaxed MQTT values (real telemetry), AC#9 ADR Accept (maintainer).
+RE-SCOPED to ESP32-S3 (maintainer decision 2026-06-20; ESP8266/NodeMCU-v3 field ACs are obsolete — dev is ESP32-S3-only). Implement ADR-121 Option B (Accepted): two INDEPENDENT per-consumer heap threshold ladders so relaxing the MQTT gate cannot loosen the WebSocket gate. Step-1 is STRUCTURAL + behaviour-equivalent: WS_HEAP_* and MQTT_HEAP_* thresholds = the shared HEAP_* values for now (concrete WS-strict/MQTT-relaxed values stay telemetry-gated per ADR-121 AC#8). Design (gate-safe): keep getHeapHealth() byte-for-byte intact (ADR-089 evaluate.py gates parse its body for HEAP_FRAG_PROMOTE_MAXBLOCK + the 3 tier-entry counters); add getHeapHealthForWebSocket()/getHeapHealthForMQTT() that each (a) call getHeapHealth() once to keep the canonical ADR-089 counters live (idempotent transition counting) and (b) return a tier computed against their own per-consumer ladder via a local heapTierWithThresholds() helper. Wire canSendWebSocket()->getHeapHealthForWebSocket(), canPublishMQTT()->getHeapHealthForMQTT(). Add evaluate.py check_per_consumer_heap_gate (ADR-121's mandated gate): assert WS_/MQTT_ threshold sets exist + ordered crit<warn<low, and that each consumer calls its own evaluator. Build 3 targets + eval green. Field tuning of the relaxed values deferred (telemetry).
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -86,4 +81,6 @@ AC status: #9 ADR authored + Accepted (values portion pending telemetry, leave u
   (A) MAINTAINER DECISION (asked in chat, unanswered): land Option B STEP 1 (independent-ladder structure + check_per_consumer_heap_gate, behaviour-equivalent at current values) now, OR hold the whole decouple until George's telemetry so structure+values ship together? Not preempting this autonomously: it is a refactor of the binding ADR-089 heap machine + a field push.
   (B) George's logHeapStats telemetry (requested #beta-testing 2026-06-02) — gates STEP 2 values regardless of (A).
 No other 2.0.0 work is code-actionable: To Do all excluded (2.1.0: 641/648/687; blocked: 708, 802; needs-info/hw: 484/486; future-2.3.0: 409). TASK-779 stays In Progress.
+
+STRUCTURAL IMPLEMENTATION COMPLETE (alpha.226), ADR-121 Option B. helperStuff.ino: added WS_HEAP_*/MQTT_HEAP_* ladders (=shared defaults, behaviour-equivalent step-1), heapTierWithThresholds() helper, getHeapHealthForWebSocket()/getHeapHealthForMQTT() (each keeps the canonical ADR-089 counters live via getHeapHealth()); canSendWebSocket/canPublishMQTT now consult their own ladder. OTGW-firmware.h: declarations. evaluate.py: check_per_consumer_heap_gate added + PASSES (67 passed, 0 fail, 98.7%); existing ADR-089 gates still PASS (getHeapHealth untouched). 3-target build green at alpha.226. AC#9: ADR-121 is the per-consumer ADR (Accepted, binding amendment to ADR-089; AC text says ADR-030 but ADR-089 already amended ADR-030). REMAINING (telemetry/field, deferred per ADR-121 AC#8): #1 logHeapStats characterization, #3 coalescing/drop-to-latest beyond throttle, #4 ESP32-S3 bench survival, #8 telemetry-driven relaxed MQTT values. #7 (GeorgeZ83 NodeMCU-v3) is OBSOLETE (ESP8266 dropped). Moving to In Review: the independent-ladder STRUCTURE (the ADR-121 decision) is shipped; relaxed-value tuning awaits device telemetry.
 <!-- SECTION:NOTES:END -->

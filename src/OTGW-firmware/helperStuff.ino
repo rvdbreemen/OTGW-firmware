@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.225
+**  Version  : v2.0.0-alpha.226
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -846,6 +846,21 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 #define HEAP_WARNING_THRESHOLD    3072   // Warning: Start throttling messages
 #define HEAP_LOW_THRESHOLD        5120   // Low: Begin reducing message frequency
 
+// ADR-121 Option B: per-consumer heap threshold ladders. The WebSocket live-log
+// gate and the MQTT publish gate each get their OWN ladder so that relaxing one
+// (e.g. keeping HA sensors available longer at low heap) can never loosen the
+// other. Step-1 is STRUCTURAL and behaviour-equivalent: both ladders equal the
+// shared HEAP_* defaults. The WS-strict / MQTT-relaxed *values* are telemetry-
+// gated (ADR-121 AC#8) and tuned later from on-device logHeapStats; only the
+// independent-ladder structure is decided here. Enforced by
+// evaluate.py::check_per_consumer_heap_gate.
+#define WS_HEAP_CRITICAL_THRESHOLD    HEAP_CRITICAL_THRESHOLD
+#define WS_HEAP_WARNING_THRESHOLD     HEAP_WARNING_THRESHOLD
+#define WS_HEAP_LOW_THRESHOLD         HEAP_LOW_THRESHOLD
+#define MQTT_HEAP_CRITICAL_THRESHOLD  HEAP_CRITICAL_THRESHOLD
+#define MQTT_HEAP_WARNING_THRESHOLD   HEAP_WARNING_THRESHOLD
+#define MQTT_HEAP_LOW_THRESHOLD       HEAP_LOW_THRESHOLD
+
 // Throttling state
 static uint32_t lastWebSocketSendMs = 0;
 static uint32_t lastMQTTPublishMs = 0;
@@ -915,6 +930,50 @@ HeapHealthLevel getHeapHealth() {
 }
 
 //===========================================================================================
+// ADR-121 Option B: per-consumer tier evaluation against an independent ladder.
+//
+// This duplicates getHeapHealth()'s tier+fragmentation logic on purpose: the
+// ADR-089 evaluate.py gates parse getHeapHealth()'s body verbatim (it must keep
+// HEAP_FRAG_PROMOTE_MAXBLOCK and the three tier-entry counters inline), so the
+// shared logic cannot be factored out without breaking those binding gates.
+// heapTierWithThresholds() is pure (no counters); the canonical tier-entry
+// counting stays solely in getHeapHealth().
+//===========================================================================================
+static HeapHealthLevel heapTierWithThresholds(uint32_t critical, uint32_t warning, uint32_t low) {
+  uint32_t freeHeap = platformFreeHeap();
+  if (freeHeap < critical) return HEAP_CRITICAL;
+  if (freeHeap < warning)  return HEAP_WARNING;
+  if (freeHeap < low) {
+    // Same fragmentation promotion as getHeapHealth(): a small contiguous block
+    // promotes one tier so the gate backs off before the next alloc fails.
+    return (platformMaxFreeBlock() < HEAP_FRAG_PROMOTE_MAXBLOCK) ? HEAP_WARNING : HEAP_LOW;
+  }
+  return HEAP_HEALTHY;
+}
+
+//===========================================================================================
+// Per-consumer heap health (ADR-121 Option B). Each consumer evaluates its OWN
+// ladder. Both call getHeapHealth() once so the canonical ADR-089 tier-entry
+// counters stay live regardless of which consumer is active (the counter logic
+// is transition-based on a static lastLevel, so the extra call is idempotent
+// within a tier). At step-1 the per-consumer thresholds equal the shared HEAP_*
+// defaults, so these return exactly what getHeapHealth() would.
+//===========================================================================================
+HeapHealthLevel getHeapHealthForWebSocket() {
+  (void)getHeapHealth();   // keep canonical ADR-089 tier-entry counters live
+  return heapTierWithThresholds(WS_HEAP_CRITICAL_THRESHOLD,
+                                WS_HEAP_WARNING_THRESHOLD,
+                                WS_HEAP_LOW_THRESHOLD);
+}
+
+HeapHealthLevel getHeapHealthForMQTT() {
+  (void)getHeapHealth();   // keep canonical ADR-089 tier-entry counters live
+  return heapTierWithThresholds(MQTT_HEAP_CRITICAL_THRESHOLD,
+                                MQTT_HEAP_WARNING_THRESHOLD,
+                                MQTT_HEAP_LOW_THRESHOLD);
+}
+
+//===========================================================================================
 // Return heap fragmentation as a percentage (0 = no fragmentation, 100 = max).
 // Delegates to platformHeapFragmentation() which on ESP8266 uses the native
 // ESP.getHeapFragmentation() and on ESP32 computes 100 - (maxBlk*100/freeHeap).
@@ -928,7 +987,7 @@ uint8_t getHeapFragmentation() {
 // Check if we can send a WebSocket message (with backpressure)
 //===========================================================================================
 bool canSendWebSocket() {
-  HeapHealthLevel heapLevel = getHeapHealth();
+  HeapHealthLevel heapLevel = getHeapHealthForWebSocket();   // ADR-121 Option B: WS ladder
   uint32_t now = millis();
   
   // Critical: block WebSocket messages completely
@@ -982,7 +1041,7 @@ bool canSendWebSocket() {
 // Check if we can publish an MQTT message (with backpressure)
 //===========================================================================================
 bool canPublishMQTT() {
-  HeapHealthLevel heapLevel = getHeapHealth();
+  HeapHealthLevel heapLevel = getHeapHealthForMQTT();   // ADR-121 Option B: MQTT ladder
   uint32_t now = millis();
   
   // Critical: block MQTT messages completely

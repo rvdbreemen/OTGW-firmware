@@ -1841,6 +1841,90 @@ class WorkspaceEvaluator:
                 "See ADR-089 sub-rule 3: TASK-346 counters track tier transitions for field telemetry"
             ))
 
+    def check_per_consumer_heap_gate(self):
+        """ADR-121 Option B (binding amendment to ADR-089, TASK-779): the WebSocket
+        live-log gate and the MQTT publish gate must use INDEPENDENT per-consumer
+        heap threshold ladders, so relaxing one cannot loosen the other. Verifies:
+        (1) WS_HEAP_* and MQTT_HEAP_* {CRITICAL,WARNING,LOW}_THRESHOLD are #defined
+            and each ladder is ordered crit < warn < low (values may reference the
+            shared HEAP_* macros, which are resolved here);
+        (2) getHeapHealthForWebSocket()/getHeapHealthForMQTT() are defined;
+        (3) canSendWebSocket() consults its own evaluator (not getHeapHealth()/the
+            MQTT one) and canPublishMQTT() consults its own.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Per-Consumer Heap Gate (ADR-121) ==={Colors.ENDC}")
+
+        helper = config.FIRMWARE_ROOT / "helperStuff.ino"
+        if not helper.exists():
+            self.add_result(EvaluationResult(
+                "ADR-121", "Per-consumer heap gate", "WARN", "helperStuff.ino not found"))
+            return
+        try:
+            source = helper.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "ADR-121", "Per-consumer heap gate", "FAIL", f"Could not read helperStuff.ino: {e}"))
+            return
+
+        # Shared HEAP_* ints, used to resolve per-consumer macro references.
+        shared = {m.group(1): int(m.group(2)) for m in re.finditer(
+            r"#define\s+(HEAP_CRITICAL_THRESHOLD|HEAP_WARNING_THRESHOLD|HEAP_LOW_THRESHOLD)\s+(\d+)", source)}
+
+        def resolve(val):
+            val = val.strip()
+            if val.isdigit():
+                return int(val)
+            return shared.get(val)  # macro reference -> shared int, or None if unresolved
+
+        defs = {m.group(1): m.group(2).strip() for m in re.finditer(
+            r"#define\s+((?:WS|MQTT)_HEAP_(?:CRITICAL|WARNING|LOW)_THRESHOLD)\s+(\S+)", source)}
+
+        problems = []
+        for consumer in ("WS", "MQTT"):
+            keys = [f"{consumer}_HEAP_{t}_THRESHOLD" for t in ("CRITICAL", "WARNING", "LOW")]
+            missing = [k for k in keys if k not in defs]
+            if missing:
+                problems.append(f"missing #define(s): {', '.join(missing)}")
+                continue
+            vals = [resolve(defs[k]) for k in keys]
+            if any(v is None for v in vals):
+                problems.append(f"{consumer}_HEAP_* references an unresolvable value: "
+                                + ", ".join(f"{k}={defs[k]}" for k in keys))
+                continue
+            crit, warn, low = vals
+            if not (crit < warn < low):
+                problems.append(f"{consumer} ladder not ordered: CRITICAL={crit}, WARNING={warn}, LOW={low}")
+
+        # Per-consumer evaluators must exist.
+        for fn in ("getHeapHealthForWebSocket", "getHeapHealthForMQTT"):
+            if not re.search(r"HeapHealthLevel\s+" + fn + r"\s*\(", source):
+                problems.append(f"{fn}() not defined")
+
+        # Each consumer gate must consult its OWN evaluator.
+        def body_after(sig):
+            m = re.search(r"bool\s+" + sig + r"\s*\(\s*\)\s*\{", source)
+            if not m:
+                return None
+            nxt = re.search(r"\nbool\s+\w+\s*\(", source[m.end():])
+            return source[m.end(): m.end() + (nxt.start() if nxt else 2000)]
+
+        ws_body = body_after("canSendWebSocket")
+        mq_body = body_after("canPublishMQTT")
+        if ws_body is None or "getHeapHealthForWebSocket(" not in ws_body:
+            problems.append("canSendWebSocket() does not call getHeapHealthForWebSocket()")
+        if mq_body is None or "getHeapHealthForMQTT(" not in mq_body:
+            problems.append("canPublishMQTT() does not call getHeapHealthForMQTT()")
+
+        if problems:
+            self.add_result(EvaluationResult(
+                "ADR-121", "Per-consumer heap gate", "FAIL",
+                "; ".join(problems),
+                "ADR-121 Option B: WS and MQTT must gate on independent per-consumer heap ladders (TASK-779)"))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-121", "Per-consumer heap gate", "PASS",
+                "WS + MQTT use independent, ordered per-consumer heap ladders; each gate consults its own evaluator"))
+
     # ===== DESIGN SYSTEM CHECKS =====
 
     def check_design_system_drift(self):
@@ -3399,6 +3483,7 @@ class WorkspaceEvaluator:
         self.check_heap_tier_thresholds_ordered()     # TASK-428, ADR-089 sub-rule 1
         self.check_heap_fragmentation_promotion()     # TASK-428, ADR-089 sub-rule 2
         self.check_heap_tier_entry_counters()         # TASK-428, ADR-089 sub-rule 3
+        self.check_per_consumer_heap_gate()           # TASK-779, ADR-121 Option B
         self.check_design_system_drift()              # TASK-470, ADR-091 FAIL gate (TASK-480 grace complete)
         self.check_ps_summary_master_topic_gate()     # ADR-066 amendment / TASK-483
         self.check_adr_references_resolve()           # TASK-355/368

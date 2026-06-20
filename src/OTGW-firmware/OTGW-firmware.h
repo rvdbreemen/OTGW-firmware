@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.225
+**  Version  : v2.0.0-alpha.226
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -199,6 +199,8 @@ enum HeapHealthLevel {
 // to MQTTstuff. ESP32 path uses a different helper with platform-scaled values.
 #define HEAP_LOW_RESTORE_THRESHOLD 6144  // bytes (HEAP_LOW_THRESHOLD + 1024)
 HeapHealthLevel getHeapHealth();
+HeapHealthLevel getHeapHealthForWebSocket();   // ADR-121 Option B: WS-consumer heap ladder
+HeapHealthLevel getHeapHealthForMQTT();        // ADR-121 Option B: MQTT-consumer heap ladder
 uint8_t getHeapFragmentation();
 bool canSendWebSocket();
 bool canPublishMQTT();
