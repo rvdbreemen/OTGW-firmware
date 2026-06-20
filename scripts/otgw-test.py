@@ -123,8 +123,13 @@ def main():
 
     # --- start passive monitors in parallel (non-blocking) ---
     host = _secrets.get("device_host", "OTGW.local")
-    broker = _secrets.get("broker_host", "homeassistant.local")
-    bport = str(_secrets.get("broker_port", "1883"))
+    # Prefer the real broker; fall back to the laptop test-rig when unreachable,
+    # so the passive monitor watches the SAME broker the device-under-test was
+    # provisioned against (mirrors provision_mqtt.py). (TASK-888 AC#1)
+    broker, _bport_int, used_fb = _secrets.resolve_broker()
+    bport = str(_bport_int)
+    if used_fb:
+        log(f"MONITOR: real broker unreachable -> using test-rig {broker}:{bport}")
     user = _secrets.get("mqtt_user", "")
     monitors = []
     bat = os.path.join(HERE, "capture-mqtt-debug.bat")

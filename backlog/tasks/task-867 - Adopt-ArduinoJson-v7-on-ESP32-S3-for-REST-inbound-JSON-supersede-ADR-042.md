@@ -1,11 +1,11 @@
 ---
 id: TASK-867
 title: Adopt ArduinoJson v7 on ESP32-S3 for REST + inbound JSON (supersede ADR-042)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-14 22:58'
-updated_date: '2026-06-18 12:09'
+updated_date: '2026-06-20 10:29'
 labels: []
 dependencies: []
 ordinal: 83000
@@ -93,5 +93,5 @@ AC#8 UPDATE after a controlled hardware A/B (pre-migration alpha.204 vs migrated
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Migrated all JSON I/O on the ESP32-S3 2.0.0 line from hand-rolled code to ArduinoJson v7 (ADR-141). Output: every REST handler (health, SAT status 132 fields, device/info, settings, sensors, OTDirect, filesystem, weather, BLE, otmonitor/telegraf, the 3 otgw streamed arrays, +more) now builds a JsonDocument and streams via serializeJson; 0 callers of the old sendJsonMapEntry layer remain. Inbound: extractJsonField reimplemented with deserializeJson (one-point fix for ~15 call sites; kills the strstr false-match + escaping/nested bugs). Type-correctness improvements per maintainer: string-bools -> real bools, dtostrf-quoted numbers -> native numbers. Settings persistence stays manual (AC#6). Partition rebalanced (app 1.875->2.375 MB, LittleFS 2.0->1.5 MB) on both esp32 and combo tables to fit the ArduinoJson footprint; -DARDUINOJSON_USE_DOUBLE=0. All 3 targets build + flash-fit (esp32 78.9%, classic 76.6%, combo 80.7%), evaluate.py 0 failures. Hardware-verified end-to-end on 192.168.88.39 via a json_golden semantic-equality oracle (zero contract regressions) + full partition reflash (creds preserved, LittleFS remounts). Shipped alpha.205-211. AC#8 (heap-under-load on S3) is field validation -> In Review.
+OBSOLETE / SUPERSEDED — not completed. The ArduinoJson v7 migration was implemented and shipped (alpha.205-211, ADR-141) but then FULLY REVERTED by TASK-886 / ADR-146, which bans ArduinoJson project-wide. No implementing code survives in HEAD: REST AsyncJsonResponse/restSendJson(JsonDocument&) removed (commit f07634a6), inbound deserializeJson reverted to the manual extractJsonFieldImpl scanner (jsonStuff.ino), ArduinoJson dropped from platformio.ini lib_deps, and evaluate.py check_no_arduinojson now enforces the ban. ADR-141 is superseded_by ADR-146. Closing so the board reflects that the decision was reversed. Field AC#8 (heap-under-load) is moot post-revert. Audit: wf_d3d85c25-b22 / 2026-06-20.
 <!-- SECTION:FINAL_SUMMARY:END -->
