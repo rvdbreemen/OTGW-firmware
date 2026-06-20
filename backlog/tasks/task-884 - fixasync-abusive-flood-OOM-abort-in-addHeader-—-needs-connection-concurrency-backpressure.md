@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-18 14:11'
-updated_date: '2026-06-20 17:16'
+updated_date: '2026-06-20 18:05'
 labels: []
 dependencies: []
 ordinal: 100000
@@ -48,4 +48,11 @@ FIX PATHS:
 - PATH C (accept the limit): document that a 16-pcb ESP32 cannot fully withstand an adversarial connection flood; the realistic scenario (<=3 WS live-log tabs + normal browsing) is mostly covered by the existing mitigations. Add a note + close the abusive-flood AC as a known hardware/stack ceiling.
 
 RECOMMENDATION: Path A (raise LWIP headroom) is the only change that adds real capacity for the realistic WS+browse scenario; pair it with keeping the existing app-level mitigations. Needs maintainer go (build-time + RAM tradeoff). Awaiting path decision before implementing.
+
+EMPIRICAL A/B/C FIELD COMPARISON (2026-06-20, real OTGW32 @192.168.1.143, alpha.227, mqtt-off, controlled load = test_ws_liveload.py 6 WS subscribers + 14 HTTP flood workers, 75s, app-only flash @0x10000):
+- PATH C (baseline: LWIP MAX_ACTIVE_TCP=16, WS cap=3): CRASH. bootcount 13->14, AsyncTCP tcp_accept pcb-NULL flood. Builds fine.
+- PATH B (WS cap 3->2): CRASH. bootcount 15->16, 19x pcb-NULL. Builds fine (~3min). MARGINAL/no help -- freeing 1 WS pcb does not stop the 14-worker HTTP flood + TIME_WAIT from exhausting the 16-pcb pool.
+- PATH A (LWIP MAX_ACTIVE_TCP=32 + MAX_SOCKETS=32 via custom_sdkconfig): DID NOT BUILD in this environment. After 23min the pioarduino arduino-libs rebuild failed: 'Error: Failed to create a proper virtual environment. Missing the Python executable!' (the IDF lib-builder venv could not bootstrap). Runtime effect therefore UNVERIFIED empirically (mechanism predicts it would survive -- more pcbs fit the connection count -- but not field-confirmed).
+
+VERDICT: B is empirically useless. A is the only mechanistically-correct fix (raises the pcb ceiling B/C cannot) BUT is currently un-buildable here (lib-builder venv broken) + carries RAM + full-rebuild build-time costs for all esp32 targets even once fixed. C (accept the 16-pcb ceiling) is the pragmatic near-term answer: the existing app-level mitigations (WS cap=3, heap-reject, request-inflight cap, REST no-keep-alive) cover the REALISTIC load (<=3 WS live-log tabs + normal browser asset loads); the crash needs an adversarial connection flood (14 workers) which is extreme. RECOMMENDATION: adopt C now (document the ceiling, close the abusive-flood AC as a known limit); spin a SEPARATE task for Path A only if connection-flood resilience is wanted (prereq: fix the pioarduino custom_sdkconfig lib-builder venv, then build+field-validate LWIP=32).
 <!-- SECTION:NOTES:END -->
