@@ -25,9 +25,9 @@
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
 static const float    SAT_CYCLE_SHORT_DURATION_SEC  = 60.0f;   // Cycles shorter than this = SHORT_CYCLING
-// Overshoot margin now read from settings.sat.fOvershootMargin (default 2.0C)
+// Overshoot margin now read from settings.sat.fOvershootMargin (default 3.0C, Python OVERSHOOT_MARGIN_CELSIUS)
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot before PWM switch
-static const float    SAT_UNDERSHOOT_MARGIN_C       = 2.0f;    // Below setpoint margin for underheat
+static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0)
 static const float    SAT_UNDERHEAT_SUSTAIN_SEC     = 180.0f;  // Sustained underheat before continuous switch
 static const float    SAT_SATURATION_SUSTAIN_SEC    = 300.0f;  // Sustained saturation before continuous switch
 static const uint32_t SAT_DHW_OVERSHOOT_GUARD_MS    = 300000UL; // 300s guard: skip overshoot->PWM switch during/after DHW
@@ -739,15 +739,20 @@ bool satCycleCheckAutoSwitch()
       return true;
     }
 
-    // --- Saturation detection (PWM → continuous): off-time stays 0 too long ---
-    if (_cycle_flameOn) {
-      float flameDur = (float)(now - _cycle_flameOnStartMs) / 1000.0f;
-      if (flameDur > SAT_SATURATION_SUSTAIN_SEC) {
-        SATDebugTln(F("SAT: PWM saturation detected, switching to continuous mode"));
-        state.sat.eControlMode = SAT_MODE_CONTINUOUS;
-        _sustain_saturationSec = 0.0f;
-        return true;
-      }
+    // --- Saturation detection (PWM → continuous): PWM off_time stays 0 too long ---
+    // Matches Python pwm.state.off_time_seconds == 0 sustained for SATURATION_SUSTAIN_SECONDS:
+    // the duty calc wants the boiler running continuously, so PWM mode gives no benefit.
+    // satPwmLastOffTimeMs() is recorded by satApplyPWM() earlier in the same control cycle.
+    if (satPwmLastOffTimeMs() == 0) {
+      _sustain_saturationSec += dt;
+    } else {
+      _sustain_saturationSec = 0.0f;
+    }
+    if (_sustain_saturationSec >= SAT_SATURATION_SUSTAIN_SEC) {
+      SATDebugTln(F("SAT: PWM saturation (off_time=0 sustained), switching to continuous mode"));
+      state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+      _sustain_saturationSec = 0.0f;
+      return true;
     }
   }
 

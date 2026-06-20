@@ -687,6 +687,7 @@ static uint32_t _pwm_flameOnMs             = 0;
 static bool     _pwm_waitingForFlame       = false;
 static uint32_t _pwm_waitForFlameStartMs   = 0;    // Timestamp when flame wait began (for 180s timeout)
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
+static uint32_t _pwm_lastOffTimeMs         = 1;    // Last PWM off-phase duration (ms); 0 = saturation (duty wants continuous ON). Read by the off_time==0 saturation guard.
 // Python HEATER_STARTUP_TIMEFRAME: max wait for ignition before giving up
 static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeout
 
@@ -744,6 +745,7 @@ static float satApplyPWM(float pidOutput)
   if (duty >= dutyMax) {
     // Range 5: Over-max - continuous ON (no CS startup sequence needed)
     state.sat.bPwmFlameRequested = true;
+    _pwm_lastOffTimeMs = 0;   // off_time==0: duty wants continuous ON (saturation signal)
     return pidOutput;
   } else if (duty < dutyMin) {
     // Range 1: Ultra-low - keep off or let existing flame finish min-on
@@ -772,6 +774,7 @@ static float satApplyPWM(float pidOutput)
     offTimeMs = minOnMs;
     if (onTimeMs < minOnMs) onTimeMs = minOnMs;
   }
+  _pwm_lastOffTimeMs = offTimeMs;   // record for the off_time==0 saturation guard (Python pwm off_time)
 
   // --- PWM state machine with 4-step CS startup sequence ---
   uint32_t sinceFlameStart = millis() - satCycleGetFlameOnStartMs();
@@ -841,6 +844,10 @@ static float satApplyPWM(float pidOutput)
     return SAT_MIN_SETPOINT;
   }
 }
+
+// Last PWM off-phase duration in ms (0 = saturation: duty calc wants continuous ON).
+// Read by satCycleCheckAutoSwitch() for the off_time==0 saturation guard (Python pwm off_time).
+uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }
 
 //=====================================================================
 //=== Preset Handling ===

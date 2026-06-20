@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.228
+**  Version  : v2.0.0-alpha.229
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -419,7 +419,7 @@ struct SATSection {
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
   float    fOvpValue          = 0.0f;   // Overshoot Protection Value (0=not calibrated)
   bool     bOvpEnabled        = false;  // Use OPV for auto PWM switching
-  float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + auto-switch)
+  float    fOvershootMargin   = 3.0f;   // Overshoot margin °C (Python OVERSHOOT_MARGIN_CELSIUS=3.0; cycle classification + auto-switch)
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
   float    fDhwSetpoint       = 0.0f;   // DHW setpoint (0=inactive, 30-60°C)
