@@ -1,6 +1,6 @@
 # ADR-151 — BLE Name Capture Stays on the Passive-Continuous Scan (Active-Scan Burst Rejected)
 
-- **Status**: Proposed
+- **Status**: Accepted
 - **Date**: 2026-06-21
 - **Tags**: ble, esp32, sat, scan
 - **Supersedes**: (none)
@@ -9,8 +9,10 @@
 
 ## Status
 
-Proposed, 2026-06-21. Guideline-level per ADR-080 (no automated CI gate; the
-behaviour is a runtime radio characteristic only observable on hardware).
+Accepted, 2026-06-22 (maintainer). Guideline-level per ADR-080 (no automated CI
+gate; the behaviour is a runtime radio characteristic only observable on
+hardware). Field-validated 2026-06-22: passive-only is stable on a live OTGW32;
+the rejected active-burst crash-looped the device.
 
 ## Context
 
@@ -34,10 +36,15 @@ The reference implementation
 (`other-projects/OT-Thing-OTGW32/Firmware/src/sensors.cpp:358-364`) **never**
 flips scan mode — it runs passive-continuous only.
 
-A second consideration surfaced during recovery: the maintainer confirmed that
-the sensors in use (ATC/pvvx firmware) advertise their name as `ATC_<mac>` in
-the **primary advertisement**, so a passive scan already captures the name the
-filter needs.
+A second consideration surfaced during recovery: ATC/pvvx sensors were expected
+to advertise their name as `ATC_<mac>` in the **primary advertisement**, so a
+passive scan would capture it. A field test on 2026-06-22 (combo firmware, live
+OTGW32) **disproved this for the actual sensor**: its name is empty on passive
+scan (`getName()` returns `""`); the name lives in the **scan-response**, not
+the primary advertisement. So passive capture does NOT reliably yield the ATC
+name — the name filter only keys on sensors that put their name in the primary
+advertisement. The passive-friendly alternative for ATC sensors is a MAC-prefix
+filter on the shared Telink OUI `A4:C1:38` (the MAC is captured passively).
 
 ## Decision
 
@@ -58,9 +65,12 @@ Specifics (`src/OTGW-firmware/SATble.ino`):
 - The name-prefix filter (display + optional ingest gate + loop-task prune)
   works on whatever names passive capture yields.
 
-Consequence for the feature: ATC/pvvx sensors (name in the primary ad) filter
-cleanly; BTHome sensors that carry their name only in the scan response stay
-nameless and are admitted/shown under the "empty name = admit" rule.
+Consequence for the feature: any sensor that carries its name only in the
+scan-response (the field-tested ATC sensor, and many BTHome sensors) stays
+nameless on passive scan and is admitted/shown under the "empty name = admit"
+rule. The name filter is therefore only effective for sensors that put their
+name in the primary advertisement. For ATC sensors, a MAC-prefix filter on the
+OUI `A4:C1:38` achieves the same noise-reduction goal passively.
 
 ## Alternatives Considered
 
@@ -90,8 +100,8 @@ TASK-895; would need its own ADR and hardware validation. Not pursued now.
 
 - The device boots and runs on the proven-stable ADR-092 / OT-Thing passive
   path; no radio-mode flipping.
-- ATC/pvvx names (the maintainer's sensors) are captured on passive scan, so
-  the name-prefix filter is usable for the real use case.
+- For ATC sensors a passive MAC-prefix filter (OUI `A4:C1:38`) still meets the
+  original noise-reduction goal without any active scan or crash risk.
 
 **Negative / risks**:
 
@@ -108,8 +118,9 @@ TASK-895; would need its own ADR and hardware validation. Not pursued now.
 - **Evidence**: Field test — OTGW32 crash-loop after the hybrid OTA flash
   (0/30 HTTP probes, ICMP unreachable, USB-reflash recovery). Reference —
   `other-projects/OT-Thing-OTGW32/Firmware/src/sensors.cpp:358-364` is
-  passive-continuous only. Maintainer statement — ATC names are in the primary
-  advertisement.
+  passive-continuous only. Field test 2026-06-22 — the live ATC sensor's name is
+  empty on passive scan (`getName()` == `""`), confirming its name is in the
+  scan-response, not the primary advertisement.
 - **Clarity**: Decision uses no hedging verbs; the rejected alternative is
   named explicitly.
 - **Consistency**: Upholds ADR-092 (does not amend it). Honours the TASK-895
