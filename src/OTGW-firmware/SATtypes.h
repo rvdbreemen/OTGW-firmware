@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.233
+**  Version  : v2.0.0-alpha.234
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -51,10 +51,6 @@ enum SATHeatingSource : uint8_t {
   SAT_SRC_HYBRID     = 3   // Heat pump + separate gas boiler (manual; coordination = TASK-892)
 };
 enum SATControlMode : uint8_t { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS, SAT_MODE_PWM };
-enum SATCalibPhase  : uint8_t {
-  SAT_CALIB_IDLE = 0, SAT_CALIB_STARTING, SAT_CALIB_WARMING,
-  SAT_CALIB_MEASURING, SAT_CALIB_COOLDOWN, SAT_CALIB_DONE, SAT_CALIB_FAILED
-};
 enum SATPreset : uint8_t {
   SAT_PRESET_NONE = 0, SAT_PRESET_AWAY, SAT_PRESET_ECO,
   SAT_PRESET_COMFORT, SAT_PRESET_SLEEP, SAT_PRESET_ACTIVITY,
@@ -193,12 +189,6 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   // Modulation suppression
   bool     bModSuppressed           = false;
   uint32_t iModSuppressionSinceMs   = 0;
-  // OPV calibration state
-  SATCalibPhase eCalibPhase      = SAT_CALIB_IDLE;
-  float    fCalibMaxTemp         = 0.0f;  // Maximum boiler temp observed during calibration
-  float    fCalibStartTemp       = 0.0f;  // Boiler temp at calibration start
-  uint32_t iCalibStartMs         = 0;     // millis() when calibration started
-  uint16_t iCalibSamples         = 0;     // Number of temperature samples taken
   // External inputs (MQTT/REST overrides)
   float fExternalTemp            = 0.0f;
   float fExternalOutdoor         = 0.0f;
@@ -428,8 +418,6 @@ struct SATSection {
   float    fPresetHome        = 18.0f;  // Preset: Home (standard at-home temperature)
   bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
-  float    fOvpValue          = 0.0f;   // Overshoot Protection Value (0=not calibrated)
-  bool     bOvpEnabled        = false;  // Use OPV for auto PWM switching
   float    fOvershootMargin   = 3.0f;   // Overshoot margin °C (Python OVERSHOOT_MARGIN_CELSIUS=3.0; cycle classification + auto-switch)
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)

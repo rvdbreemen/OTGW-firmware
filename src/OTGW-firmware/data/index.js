@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.233
+**  Version  : v2.0.0-alpha.234
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3724,9 +3724,7 @@ var SAT_SETTINGS_GROUPS = [
     fields: [
       { key: 'satwindowdetect',  label: 'Window Detection',       type: 'b' },
       { key: 'satwindowminsec',  label: 'Window Min Open Time',   type: 'i', unit: 's', min: 10, max: 600, step: 10 },
-      { key: 'satpushsetpoint',  label: 'Push Setpoint',          type: 'b' },
-      { key: 'satovpenabled',    label: 'Overshoot Protection',            type: 'b' },
-      { key: 'satovpvalue',      label: 'Overshoot Protection Threshold', type: 'f', unit: '\u00B0C', min: 0.0, max: 90.0, step: 0.5 }
+      { key: 'satpushsetpoint',  label: 'Push Setpoint',          type: 'b' }
     ]
   },
   {
@@ -7152,8 +7150,6 @@ var translateFields = [
   , ["SATpresetactivity", "SAT Preset: Activity"]
   , ["SATpwmautoswitch", "SAT PWM Auto-Switch"]
   , ["SATmaxmodulation", "SAT Max Relative Modulation (0-100%)"]
-  , ["SATovpvalue", "SAT OPV Value (\u00B0C, 0=not calibrated)"]
-  , ["SATovpenabled", "SAT OPV Enabled"]
   , ["SATovershootmargin", "SAT Overshoot Margin (\u00B0C)"]
   , ["SATboilercapacity", "SAT Boiler Capacity (kW)"]
   , ["SATpresetsync", "SAT Preset Sync Enable"]
@@ -7290,8 +7286,6 @@ var translateTooltips = [
   , ["SATpresetactivity", "Activity preset target temperature. Used by window detection to lower heating when window is open."]
   , ["SATpwmautoswitch", "Automatically switch between PWM and continuous mode based on cycle analysis."]
   , ["SATmaxmodulation", "Maximum relative modulation (MM= command) sent to boiler. 0-100%. Heat pumps always use 100%. Default 100."]
-  , ["SATovpvalue", "Overshoot Protection Value: maximum boiler temp at minimum modulation. Determines when PWM is needed. 0 = not yet calibrated. Run calibration to auto-detect."]
-  , ["SATovpenabled", "Enable OPV-based automatic PWM switching. When boiler temp exceeds OPV and room temp is near setpoint, switch to PWM mode."]
   , ["SATovershootmargin", "Flow temperature margin above setpoint to classify as overshoot (0.5-5.0). Default 2.0."]
   , ["SATboilercapacity", "Boiler power capacity in kW (1-100). Used to calculate current power from modulation percentage. Typical values: 24 kW for combi boilers, 15-40 kW range."]
   , ["SATpresetsync", "When enabled, publish the active preset name to the configured MQTT topic on every preset change. Secondary climate entities or Home Assistant automations can subscribe to follow the same preset."]

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.233
+**  Version  : v2.0.0-alpha.234
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -954,10 +954,9 @@ static void satSendHealthJSON()
     je.field(F("cycle_health"),        cycleHealth);
     je.field(F("cycle_class"),         ccNames[ccIdx]);
 
-    // Auto-tune and OVP calibration (AC#8)
+    // Auto-tune (AC#8)
     je.field(F("auto_tune_score"),     state.sat.fAutoTuneScore);
     je.field(F("auto_tune_cycles"),    (int32_t)state.sat.iAutoTuneCycles);
-    je.field(F("ovp_phase"),           (int32_t)state.sat.eCalibPhase);
 
     je.endObject();                   // close root
   }
@@ -1336,12 +1335,6 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     if (strcasecmp_P(settingName, PSTR("reset_integral")) == 0) {
       satResetIntegral();
       handled = true; needsVal = false;
-    } else if (strcasecmp_P(settingName, PSTR("ovp_start")) == 0) {
-      satOvpStartCalibration();
-      handled = true; needsVal = false;
-    } else if (strcasecmp_P(settingName, PSTR("ovp_stop")) == 0) {
-      satOvpStopCalibration();
-      handled = true; needsVal = false;
     }
     if (handled && !needsVal) {
       webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
@@ -1379,10 +1372,6 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATdhwenable", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("interval")) == 0) {
       updateSetting("SATinterval", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("ovp_value")) == 0) {
-      updateSetting("SATovpvalue", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("ovp_enabled")) == 0) {
-      updateSetting("SATovpenabled", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("push_setpoint")) == 0) {
       updateSetting("SATpushsetpoint", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("flame_off_offset")) == 0) {
@@ -1937,8 +1926,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.use_external_temp"), settings.sat.bUseExternalTemp);
     je.field(F("settings.sat.pwm_auto_switch"), settings.sat.bPwmAutoSwitch);
     je.field(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
-    je.field(F("settings.sat.ovp_value"), settings.sat.fOvpValue);
-    je.field(F("settings.sat.ovp_enabled"), settings.sat.bOvpEnabled);
     je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
     je.field(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
     je.field(F("settings.sat.dhw_enabled"), settings.sat.bDhwEnabled);
@@ -3304,12 +3291,6 @@ void sendDeviceSettings()
     addNum(F("satpresethome"), tmpBuf, "f", 10, 25);
   }
   addInt(F("satmaxmodulation"), settings.sat.iMaxRelModulation, "i", 0, 100);
-  {
-    char tmpBuf[8];
-    dtostrf(settings.sat.fOvpValue, 1, 1, tmpBuf);
-    addNum(F("satovpvalue"), tmpBuf, "f", 0, 90);
-  }
-  addBool(F("satovpenabled"), settings.sat.bOvpEnabled, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fOvershootMargin, 1, 1, tmpBuf);

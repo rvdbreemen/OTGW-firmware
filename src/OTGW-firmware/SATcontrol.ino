@@ -387,113 +387,6 @@ static float    _thermal_coeffEma     = 0.05f;  // Running EMA of thermal coeffi
 static uint32_t _thermal_lastSaveMs   = 0;
 static uint32_t _thermal_totalLearnMs = 0;       // Accumulated learning time
 
-// --- OPV Calibration Constants ---
-static const uint32_t SAT_CALIB_TIMEOUT_MS    = 1800000UL; // 30 min total timeout
-static const uint32_t SAT_CALIB_FLAME_WAIT_MS = 180000UL;  // 3 min wait for flame
-static const uint32_t SAT_CALIB_MEASURE_MS    = 1200000UL; // 20 min measuring phase
-static const uint32_t SAT_CALIB_SAMPLE_MS     = 10000UL;   // Sample every 10s
-static const float    SAT_CALIB_WARM_DELTA    = 5.0f;      // Temp must rise 5C above start
-static const uint16_t SAT_CALIB_MIN_SAMPLES   = 40;        // Minimum samples before accepting result (Python parity)
-
-// OPV calibration state machine - called from control loop when calibration is active
-static void satOvpCalibrate()
-{
-  float boilerTemp = satGetFlowTemp();
-  bool  flameOn    = satIsFlameOn();
-  uint32_t elapsed = millis() - state.sat.iCalibStartMs;
-
-  switch (state.sat.eCalibPhase) {
-    case SAT_CALIB_STARTING: {
-      // Send high setpoint + MM=0 to find minimum boiler output
-      float calibSetpoint = satGetMaxSetpoint();
-      char cmdBuf[16];
-      snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("CS=%.1f"), calibSetpoint);
-      addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
-      addCommandToQueue("MM=0", 4, false, 0);
-      state.sat.fCalibStartTemp = boilerTemp;
-      state.sat.fCalibMaxTemp   = boilerTemp;
-      state.sat.iCalibSamples   = 0;
-      SATDebugTf(PSTR("OPV: calibration started, CS=%.1f MM=0, boiler=%.1f\r\n"), calibSetpoint, boilerTemp);
-      state.sat.eCalibPhase = SAT_CALIB_WARMING;
-      break;
-    }
-    case SAT_CALIB_WARMING: {
-      // Wait for flame and temp to rise
-      if (!flameOn && elapsed > SAT_CALIB_FLAME_WAIT_MS) {
-        DebugTln(F("OPV: FAILED - no flame after 3 min"));
-        state.sat.eCalibPhase = SAT_CALIB_FAILED;
-        break;
-      }
-      if (boilerTemp > state.sat.fCalibStartTemp + SAT_CALIB_WARM_DELTA) {
-        SATDebugTf(PSTR("OPV: warming done, boiler=%.1f, starting measurement\r\n"), boilerTemp);
-        state.sat.fCalibMaxTemp = boilerTemp;
-        state.sat.iCalibStartMs = millis(); // Reset timer for measuring phase
-        state.sat.eCalibPhase = SAT_CALIB_MEASURING;
-      }
-      if (elapsed > SAT_CALIB_TIMEOUT_MS) {
-        DebugTln(F("OPV: FAILED - timeout during warming"));
-        state.sat.eCalibPhase = SAT_CALIB_FAILED;
-      }
-      break;
-    }
-    case SAT_CALIB_MEASURING: {
-      // Sample boiler temp, track maximum
-      state.sat.iCalibSamples++;
-      if (boilerTemp > state.sat.fCalibMaxTemp) {
-        state.sat.fCalibMaxTemp = boilerTemp;
-      }
-      // Keep sending MM=0 to maintain minimum modulation
-      addCommandToQueue("MM=0", 4, false, 0);
-      elapsed = millis() - state.sat.iCalibStartMs;
-      if (elapsed >= SAT_CALIB_MEASURE_MS) {
-        // Enforce minimum sample count before accepting result (Python: OVERSHOOT_PROTECTION_REQUIRED_DATASET = 40)
-        if (state.sat.iCalibSamples < SAT_CALIB_MIN_SAMPLES) {
-          DebugTf(PSTR("OPV: FAILED - only %u/%u samples collected, result rejected\r\n"),
-                  (unsigned)state.sat.iCalibSamples, (unsigned)SAT_CALIB_MIN_SAMPLES);
-          state.sat.eCalibPhase = SAT_CALIB_FAILED;
-        } else {
-          // Measurement complete with sufficient samples
-          settings.sat.fOvpValue = state.sat.fCalibMaxTemp;
-          settings.sat.bOvpEnabled = true;
-          SATDebugTf(PSTR("OPV: calibration DONE! OPV=%.1f from %u/%u samples\r\n"),
-                  state.sat.fCalibMaxTemp, (unsigned)state.sat.iCalibSamples, (unsigned)SAT_CALIB_MIN_SAMPLES);
-          state.sat.eCalibPhase = SAT_CALIB_DONE;
-        }
-      }
-      break;
-    }
-    case SAT_CALIB_DONE:
-    case SAT_CALIB_FAILED: {
-      // Recovery: send CS=0 and MM=100 to return to normal
-      addCommandToQueue("CS=0", 4, false, 0);
-      char cmdBuf[8];
-      snprintf_P(cmdBuf, sizeof(cmdBuf), PSTR("MM=%u"), settings.sat.iMaxRelModulation);
-      addCommandToQueue(cmdBuf, strlen(cmdBuf), false, 0);
-      state.sat.eCalibPhase = SAT_CALIB_IDLE;
-      break;
-    }
-    default:
-      break;
-  }
-}
-
-// Start OPV calibration
-static void satOvpStartCalibration()
-{
-  if (state.sat.eCalibPhase != SAT_CALIB_IDLE) return; // Already running
-  state.sat.eCalibPhase  = SAT_CALIB_STARTING;
-  state.sat.iCalibStartMs = millis();
-  SATDebugTln(F("OPV: calibration requested"));
-}
-
-// Cancel OPV calibration
-static void satOvpStopCalibration()
-{
-  if (state.sat.eCalibPhase == SAT_CALIB_IDLE) return;
-  SATDebugTln(F("OPV: calibration cancelled"));
-  state.sat.eCalibPhase = SAT_CALIB_FAILED; // Will trigger recovery on next call
-}
-
 // --- Boiler Status Tracking ---
 static bool     _bs_prevFlame          = false;
 static float    _bs_prevModulation     = 0.0f;
@@ -2167,11 +2060,6 @@ void satSendStatusJSON()
     je.field(F("fallback_reason"),      (int32_t)snap->st.sat.eFallbackReason);
     je.field(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
     je.field(F("current_modulation"),   (int32_t)snap->st.sat.iCurrentModulation);
-    je.field(F("ovp_value"),            settings.sat.fOvpValue);
-    je.field(F("ovp_enabled"),          settings.sat.bOvpEnabled);
-    je.field(F("ovp_calib_phase"),      (int32_t)snap->st.sat.eCalibPhase);
-    je.field(F("ovp_calib_max_temp"),   snap->st.sat.fCalibMaxTemp);
-    je.field(F("ovp_calib_samples"),    (int32_t)snap->st.sat.iCalibSamples);
     je.field(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
     je.field(F("heating_source"),          (int32_t)settings.sat.iHeatingSource);
     je.field(F("heating_source_detected"), (int32_t)snap->st.sat.iDetectedHeatingSource);
@@ -2406,7 +2294,6 @@ void satPublishMQTT()
   static SATShadowF s_min_pressure, s_max_pressure, s_max_pressure_drop;
   static SATShadowF s_preset_comfort, s_preset_eco, s_preset_away;
   static SATShadowF s_preset_sleep, s_preset_activity, s_preset_home;
-  static SATShadowF s_ovp_value;
   static SATShadowI s_cycles_this_hour, s_4h_cycles, s_current_modulation;
   static SATShadowI s_pv_boost_threshold_w, s_pv_boost_hold_s, s_pv_boost_max_duration_min;
   static SATShadowI s_sensor_max_age, s_cycles_per_hour, s_humidity_timeout_s;
@@ -2428,7 +2315,7 @@ void satPublishMQTT()
   static SATShadowB s_solar_gain_enable, s_summer_simmer_enable, s_comfort_adjust_enable;
   static SATShadowB s_thermal_comfort, s_multi_area_enable, s_auto_tune_enable;
   static SATShadowB s_simulation_enable, s_window_detection_enable, s_force_pwm_enable;
-  static SATShadowB s_push_setpoint_enable, s_ovp_enabled, s_preset_sync_enable;
+  static SATShadowB s_push_setpoint_enable, s_preset_sync_enable;
   static SATShadowB s_dhw_enabled, s_dhw_enable, s_pwm_auto_switch_enable;
   // JSON-blob heartbeat counters (BSS zero-init == first-seen sentinel).
   static uint32_t s_pid_attrs_hb        = 0;
@@ -2871,7 +2758,6 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/preset_sleep"),        settings.sat.fPresetSleep,       s_preset_sleep,        SAT_EPS_TEMP,        1, true);
   publishIfChangedF(F("sat/preset_activity"),     settings.sat.fPresetActivity,    s_preset_activity,     SAT_EPS_TEMP,        1, true);
   publishIfChangedF(F("sat/preset_home"),         settings.sat.fPresetHome,        s_preset_home,         SAT_EPS_TEMP,        1, true);
-  publishIfChangedF(F("sat/ovp_value"),           settings.sat.fOvpValue,          s_ovp_value,           SAT_EPS_TEMP_COARSE, 1, true);
   publishIfChangedI(F("sat/heating_system"),      (int32_t)settings.sat.iHeatingSystem,  s_heating_system,    true);
   publishIfChangedI(F("sat/manufacturer_id"),     (int32_t)settings.sat.iManufacturer,   s_manufacturer_id,   true);
 
@@ -2886,7 +2772,6 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/window_detection_enable"), settings.sat.bWindowDetection,  s_window_detection_enable, true);
   publishIfChangedB(F("sat/force_pwm_enable"),        settings.sat.bForcePWM,         s_force_pwm_enable,        true);
   publishIfChangedB(F("sat/push_setpoint_enable"),    settings.sat.bPushSetpoint,     s_push_setpoint_enable,    true);
-  publishIfChangedB(F("sat/ovp_enabled"),             settings.sat.bOvpEnabled,       s_ovp_enabled,             true);
   publishIfChangedB(F("sat/preset_sync_enable"),      settings.sat.bPresetSync,       s_preset_sync_enable,      true);
   publishIfChangedB(F("sat/dhw_enabled"),             settings.sat.bDhwEnabled,       s_dhw_enabled,             true);
   publishIfChangedB(F("sat/dhw_enable"),              settings.sat.bDhwEnable,        s_dhw_enable,              true);
@@ -4278,9 +4163,6 @@ void satControlLoop()
   satUpdateSimulation();
   // --- Thermal drop learning (Task #21): learn building thermal decay rate ---
   satUpdateThermalLearning();
-
-  // --- OPV calibration state machine (ADR-076): poll while non-IDLE ---
-  if (state.sat.eCalibPhase != SAT_CALIB_IDLE) satOvpCalibrate();
 
   // If safety tripped, stay disabled until explicitly re-enabled
   if (state.sat.bSafetyTripped) return;

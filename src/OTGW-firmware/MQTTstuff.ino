@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.233
+**  Version  : v2.0.0-alpha.234
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -615,8 +615,6 @@ static void _satPvBoostEnabledCmd(const char* v) { satHandlePvBoostEnabled(v); }
 static void _satHumidityCmd(const char* v)       { satHandleHumidity(v); }
 static void _satSunElevationCmd(const char* v)   { satHandleSunElevation(v); }
 
-static void _satOvpStartCmd(const char* v)       { (void)v; satOvpStartCalibration(); }
-static void _satOvpStopCmd(const char* v)        { (void)v; satOvpStopCalibration(); }
 static void _satResetIntegralCmd(const char* v)  { (void)v; satResetIntegral(); }
 static void _satFlushCmd(const char* v) {
   (void)v;
@@ -669,8 +667,6 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "sun_elevation",          nullptr,                _satSunElevationCmd },
   { "window",                 nullptr,                _satWindowCmd },
   { "valves_open",            nullptr,                _satValvesOpenCmd },
-  { "ovp_start",              nullptr,                _satOvpStartCmd },
-  { "ovp_stop",               nullptr,                _satOvpStopCmd },
   { "reset_integral",         nullptr,                _satResetIntegralCmd },
   { "flush",                  nullptr,                _satFlushCmd },
 
@@ -683,8 +679,6 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "dhw_enabled",            "SATdhwenabled",        nullptr },
   { "dhw_enable",             "SATdhwenable",         nullptr }, // TASK-516: master DHW enable (HW= command, gated on MsgID 3 HB3)
   { "interval",               "SATinterval",          nullptr },
-  { "ovp_value",              "SATovpvalue",          nullptr },
-  { "ovp_enabled",            "SATovpenabled",        nullptr },
   { "push_setpoint",          "SATpushsetpoint",      nullptr },
   { "flame_off_offset",       "SATflameoffset",       nullptr },
   { "force_pwm",              "SATforcepwm",          nullptr },
@@ -2681,11 +2675,11 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     if (streamClimateDiscovery(0, ctx)) result = true;
     if (streamClimateDiscovery(1, ctx)) result = true;
     ctx.device = HaDevice::Sat;
-    // TASK-516: idx 13 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
+    // TASK-516: idx 12 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
     const bool dhwEnableSwitchAllowed =
         (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
-    for (uint8_t swIdx = 0; swIdx < 14; swIdx++) {
-      if (swIdx == 13 && !dhwEnableSwitchAllowed) continue;
+    for (uint8_t swIdx = 0; swIdx < 13; swIdx++) {
+      if (swIdx == 12 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
       if (streamSatSwitchDiscovery(swIdx, ctx)) result = true;
     }

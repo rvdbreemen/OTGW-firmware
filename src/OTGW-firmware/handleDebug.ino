@@ -96,8 +96,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("use_external_temp: %s\r\n"), settings.sat.bUseExternalTemp ? "true" : "false");
     Debugf(PSTR("pwm_auto_switch: %s\r\n"), settings.sat.bPwmAutoSwitch ? "true" : "false");
     Debugf(PSTR("max_rel_mod: %u\r\n"), (unsigned)settings.sat.iMaxRelModulation);
-    Debugf(PSTR("ovp_value: %.1f\r\n"), settings.sat.fOvpValue);
-    Debugf(PSTR("ovp_enabled: %s\r\n"), settings.sat.bOvpEnabled ? "true" : "false");
     Debugf(PSTR("overshoot_margin: %.1f\r\n"), settings.sat.fOvershootMargin);
     Debugf(PSTR("dhw_setpoint: %.1f\r\n"), settings.sat.fDhwSetpoint);
     Debugf(PSTR("dhw_enabled: %s\r\n"), settings.sat.bDhwEnabled ? "true" : "false");

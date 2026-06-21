@@ -3363,29 +3363,23 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
       break;
     case 9:
       published = streamSatBoolSwitch(ctx,
-        PSTR("-sat-ovp-enabled"),             PSTR("_SAT_OVP_Enabled"),
-        PSTR("/sat/ovp_enabled"),             PSTR("/sat/ovp_enabled"),
-        PSTR("mdi:shield-check"));
-      break;
-    case 10:
-      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-preset-sync-enable"),      PSTR("_SAT_Preset_Sync"),
         PSTR("/sat/preset_sync"),             PSTR("/sat/preset_sync_enable"),
         PSTR("mdi:sync"));
       break;
-    case 11:
+    case 10:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-dhw-enabled"),             PSTR("_SAT_DHW_Enabled"),
         PSTR("/sat/dhw_enabled"),             PSTR("/sat/dhw_enabled"),
         PSTR("mdi:water-boiler"));
       break;
-    case 12:
+    case 11:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-pwm-auto-switch-enable"),  PSTR("_SAT_PWM_Auto_Switch"),
         PSTR("/sat/pwm_auto_switch"),         PSTR("/sat/pwm_auto_switch_enable"),
         PSTR("mdi:swap-horizontal"));
       break;
-    case 13:
+    case 12:
       // TASK-516: master DHW enable (HW= command). Only emitted by the caller
       // when MsgID 3 HB3=1 (storage tank); combi boilers get no inert entity.
       published = streamSatBoolSwitch(ctx,

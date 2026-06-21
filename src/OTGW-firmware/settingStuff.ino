@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.233
+**  Version  : v2.0.0-alpha.234
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -308,8 +308,6 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATpresethome"), settings.sat.fPresetHome, true);
   writeJsonBoolKV(file, F("SATpwmautoswitch"), settings.sat.bPwmAutoSwitch, true);
   writeJsonIntKV(file, F("SATmaxmodulation"), settings.sat.iMaxRelModulation, true);
-  writeJsonFloatKV(file, F("SATovpvalue"), settings.sat.fOvpValue, true);
-  writeJsonBoolKV(file, F("SATovpenabled"), settings.sat.bOvpEnabled, true);
   writeJsonFloatKV(file, F("SATovershootmargin"), settings.sat.fOvershootMargin, true);
   writeJsonFloatKV(file, F("SATmodsupdelay"), settings.sat.fModSupDelay, true);
   writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset, true);
@@ -937,8 +935,6 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpresethome")) == 0)      settings.sat.fPresetHome = constrain(atof(newValue), 10.0f, 25.0f);
   else if (strcasecmp_P(field, PSTR("SATpwmautoswitch")) == 0)   settings.sat.bPwmAutoSwitch = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATmaxmodulation")) == 0)   settings.sat.iMaxRelModulation = constrain(atoi(newValue), 0, 100);
-  else if (strcasecmp_P(field, PSTR("SATovpvalue")) == 0)        settings.sat.fOvpValue = constrain(atof(newValue), 0.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("SATovpenabled")) == 0)      settings.sat.bOvpEnabled = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATovershootmargin")) == 0) settings.sat.fOvershootMargin = constrain(atof(newValue), 0.5f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = constrain(atof(newValue), 0.0f, 120.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = constrain(atof(newValue), 0.0f, 5.0f);
