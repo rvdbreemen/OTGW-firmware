@@ -5,7 +5,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-05-31 12:48'
-updated_date: '2026-06-20 12:42'
+updated_date: '2026-06-21 07:51'
 labels:
   - bug
   - websocket
@@ -83,4 +83,6 @@ AC status: #9 ADR authored + Accepted (values portion pending telemetry, leave u
 No other 2.0.0 work is code-actionable: To Do all excluded (2.1.0: 641/648/687; blocked: 708, 802; needs-info/hw: 484/486; future-2.3.0: 409). TASK-779 stays In Progress.
 
 STRUCTURAL IMPLEMENTATION COMPLETE (alpha.226), ADR-121 Option B. helperStuff.ino: added WS_HEAP_*/MQTT_HEAP_* ladders (=shared defaults, behaviour-equivalent step-1), heapTierWithThresholds() helper, getHeapHealthForWebSocket()/getHeapHealthForMQTT() (each keeps the canonical ADR-089 counters live via getHeapHealth()); canSendWebSocket/canPublishMQTT now consult their own ladder. OTGW-firmware.h: declarations. evaluate.py: check_per_consumer_heap_gate added + PASSES (67 passed, 0 fail, 98.7%); existing ADR-089 gates still PASS (getHeapHealth untouched). 3-target build green at alpha.226. AC#9: ADR-121 is the per-consumer ADR (Accepted, binding amendment to ADR-089; AC text says ADR-030 but ADR-089 already amended ADR-030). REMAINING (telemetry/field, deferred per ADR-121 AC#8): #1 logHeapStats characterization, #3 coalescing/drop-to-latest beyond throttle, #4 ESP32-S3 bench survival, #8 telemetry-driven relaxed MQTT values. #7 (GeorgeZ83 NodeMCU-v3) is OBSOLETE (ESP8266 dropped). Moving to In Review: the independent-ladder STRUCTURE (the ADR-121 decision) is shipped; relaxed-value tuning awaits device telemetry.
+
+3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert. (779 has no pure-build AC; build-half noted.)
 <!-- SECTION:NOTES:END -->

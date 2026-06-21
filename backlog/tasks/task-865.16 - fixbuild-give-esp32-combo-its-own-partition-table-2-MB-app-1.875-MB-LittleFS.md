@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-14 15:48'
-updated_date: '2026-06-14 16:19'
+updated_date: '2026-06-21 07:51'
 labels:
   - async-esp32s3
 dependencies: []
@@ -45,8 +45,8 @@ Wiring:
 - [ ] #1 New partitions_otgw_esp32_combo.csv exists: app0 0x10000/0x200000, spiffs 0x210000/0x1E0000, coredump 0x3F0000/0x10000; offsets sum to 0x400000
 - [ ] #2 Shared partitions_otgw_esp32.csv is UNCHANGED (esp32 + esp32-classic OTA partition compatibility preserved)
 - [ ] #3 platformio.ini [env:esp32-combo] overrides board_build.partitions to the combo CSV; build.py TARGETS['esp32-combo'] overrides app_size/fs_offset/fs_size
-- [ ] #4 python build.py: esp32, esp32-classic AND esp32-combo all show per-env SUCCESS (grep-verified); combo no longer overflows
-- [ ] #5 evaluate.py --quick: no new failures
+- [x] #4 python build.py: esp32, esp32-classic AND esp32-combo all show per-env SUCCESS (grep-verified); combo no longer overflows
+- [x] #5 evaluate.py --quick: no new failures
 - [ ] #6 FIELD (epic TASK-865): the combo merged bin flashes and boots on both OTGW32 and Classic-with-PIC hardware, LittleFS web UI intact
 <!-- AC:END -->
 
@@ -54,4 +54,6 @@ Wiring:
 
 <!-- SECTION:NOTES:BEGIN -->
 DONE (build): combo now uses partitions_otgw_esp32_combo.csv (2.0 MB app0 / 1.875 MB spiffs). Full build.py at alpha.192: esp32, esp32-classic AND esp32-combo all per-env SUCCESS; combo fits at 94.7% (1986395/2097152 B), was 101% overflow. Shared partitions_otgw_esp32.csv UNTOUCHED so esp32/esp32-classic OTA fs offset is unchanged. evaluate.py --quick 0 failures. Field AC (flash+boot on OTGW32 + Classic hardware, LittleFS UI intact) remains for hardware soak under epic TASK-865.
+
+3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert. esp32-combo SUCCESS confirms AC#4 (combo fits).
 <!-- SECTION:NOTES:END -->

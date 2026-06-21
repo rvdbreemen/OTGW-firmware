@@ -6,7 +6,7 @@ title: >-
 status: In Review
 assignee: []
 created_date: '2026-06-15 14:21'
-updated_date: '2026-06-20 17:19'
+updated_date: '2026-06-21 07:51'
 labels: []
 dependencies: []
 ordinal: 87000
@@ -25,7 +25,7 @@ ADR-140 (supersedes ADR-124): revert the seven-device HA topology to ONE device 
 - [ ] #3 Discovery emits exactly one HA device (shared identifiers=nodeId); full device block on first entity only, bare ids on the rest; no via_device
 - [ ] #4 F1 gone: first-entity gate is driver-set; MEASURE and WRITE passes produce identical length (no compose-time mutation)
 - [ ] #5 F5 gone: hostname/manufacturer/model are JSON-escaped in the device block
-- [ ] #6 Build green esp32/esp32-classic/esp32-combo; evaluate.py --quick no new failures
+- [x] #6 Build green esp32/esp32-classic/esp32-combo; evaluate.py --quick no new failures
 - [ ] #7 Field-validation: captured discovery dump on a real device shows one device with all entities bound, matching the 1.6.x layout
 <!-- AC:END -->
 
@@ -41,4 +41,8 @@ AC#3 / BLE via_device divergence RESOLVED-BY-DECISION: maintainer chose (2026-06
 ADR-148 ACCEPTED 2026-06-20 (adr-kit gates: quality 0.90/A, lint PASS; maintainer-authorized). The BLE child-device via_device carve-out (AC#3 divergence from ADR-140) is now SANCTIONED by Accepted ADR-148. AC7 single-device topology already live-validated. Remaining before Done: validate the BLE-as-child-device discovery shape LIVE on the OTGW32 (the via_device path needs actual BLE probes to manifest), then reconcile the stale AC#2 text vs ADR-140. Deferred to the OTGW32 field-validation pass.
 
 LIVE OTGW32 discovery validation (2026-06-20, device 192.168.1.143 alpha.227 OT-Direct, test-rig broker 192.168.1.234): 108 config topics published, ALL bound to ONE HA device identifier (otgw-1020BA21B4F8), via_device=0. uniq_id source prefixes: otd_=73 (OTDirect engine), esp_=22, sat_=13. disc_published=110, pending=0, republish_triggered=0. So single-device topology + source-prefix grouping is confirmed on BOTH hardware lines now: esp32-classic (pic_ prefix, validated earlier) AND OTGW32 (otd_ prefix). Captured via mosquitto_sub homeassistant/# retained. AC7 single-device topology now validated on BOTH boards (classic pic_, OTGW32 otd_). ADR-148 (BLE child-devices) Accepted. Remaining gap: the BLE child-device via_device shape is LATENT on both units (no BLE probes paired -> via_device=0 in both dumps), so the ADR-148 carve-out can't be live-validated without a BLE probe. Everything else (single device, prefixes, no leaked per-device ids) is confirmed. Stays In Review pending a BLE-probe field check + AC#2 text reconciliation.
+
+Triage 2026-06-21: code already implemented + committed (single-device collapse ~alpha.224; streaming writeDeviceBlock/buildDiscoveryDeviceBlock emit ONE device, full block only on isFirstEntity, F1 driver-set gate, F5 via writeRamEscaped/mqttJsonEscape). AC#2/#3 TEXT IS STALE: the HaDevice enum / deviceForOTId / bilateral two-pass are RETAINED + repurposed for source-prefix routing (only multi-DEVICE emission + deviceIntroduced[] were removed); the remaining via_device is the ADR-148-sanctioned BLE child-device path. Remaining to Done: fresh 3-target build receipt (AC#6) + AC#7 field (discovery dump shows one device; BLE child-device shape needs a paired BLE probe = hardware).
+
+3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert.
 <!-- SECTION:NOTES:END -->
