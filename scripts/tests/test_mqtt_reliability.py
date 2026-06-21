@@ -129,11 +129,14 @@ class Collector:
             pass
 
 
-def find_avty_topic(retained):
+def find_avty_topic(retained, node=None):
     """The avty topic is <topTopic>/value/<nodeId> with a retained online/offline.
-    Detect it by payload, so we never depend on the namespace shape."""
+    Detect it by payload, so we never depend on the namespace shape. When `node`
+    is given (the device's uniqueid, e.g. otgw-1020BA21B4F8), scope to that
+    device so a shared/production broker with many devices targets the right one."""
     hits = [t for t, p in retained.items()
-            if p in ("online", "offline") and "/value/" in t]
+            if p in ("online", "offline") and "/value/" in t
+            and (node is None or t.endswith("/" + node))]
     return hits[0] if hits else None
 
 
@@ -148,7 +151,7 @@ def _node_of(uniq_id):
     return m.group(1) if m else None
 
 
-def assert_topology(retained):
+def assert_topology(retained, node=None):
     """TASK-871 AC#7 / ADR-140: ONE HA device PER HARDWARE. Multiple physical
     OTGW units on the same broker legitimately produce multiple devices; the
     invariant is per-node: every entity of a given nodeId must bind to exactly
@@ -158,6 +161,20 @@ def assert_topology(retained):
     points back to their own node's root."""
     configs = {t: p for t, p in retained.items()
                if t.startswith("homeassistant/") and t.endswith("/config")}
+    if node:
+        # On a shared/production broker the discovery tree carries historical
+        # retained configs from many devices + old firmware. Scope to our node so
+        # the per-hardware assert reflects the device under test, not the cruft.
+        scoped = {}
+        for t, p in configs.items():
+            try:
+                doc = json.loads(p)
+            except Exception:
+                continue
+            uid = doc.get("uniq_id") or doc.get("unique_id") or ""
+            if uid.startswith(node):
+                scoped[t] = p
+        configs = scoped
     if not configs:
         return False, "no retained homeassistant/.../config topics found", {}
 
@@ -226,6 +243,9 @@ def assert_topology(retained):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--broker", help="force broker host (else auto-detect)")
+    ap.add_argument("--node", default=_secrets.get("uniqueid"),
+                    help="scope to one device's nodeId (e.g. otgw-1020BA21B4F8); "
+                         "required on a shared/production broker with many devices")
     ap.add_argument("--port", type=int, default=int(_secrets.get("broker_port") or 1883))
     ap.add_argument("--top-topic", default=None, help="base topic (default: auto)")
     ap.add_argument("--harvest", type=float, default=6.0, help="retained-harvest seconds")
@@ -267,7 +287,7 @@ def main():
         except Exception as e:
             print(f"[broker] {host}: connect/harvest failed: {e}")
             continue
-        avty = find_avty_topic(retained)
+        avty = find_avty_topic(retained, args.node)
         if avty:
             print(f"[broker] {host}: live device avty found -> {avty}")
             chosen = c
@@ -282,14 +302,14 @@ def main():
     results = {}
 
     # --- TASK-871 topology ---
-    ok, msg, info = assert_topology(retained)
+    ok, msg, info = assert_topology(retained, args.node)
     results["TASK-871 topology"] = ok
     print(f"\n[871] {'PASS' if ok else 'FAIL'}: {msg}")
     print(f"      config_topics={info.get('config_topics')} "
           f"prefixes={info.get('uniq_prefixes')} via={info.get('via_targets')}")
 
     # --- TASK-874 self-heal ---
-    avty = find_avty_topic(retained)
+    avty = find_avty_topic(retained, args.node)
     if args.no_self_heal:
         print("\n[874] self-heal SKIPPED (--no-self-heal)")
     else:
