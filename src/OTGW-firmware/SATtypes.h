@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.235
+**  Version  : v2.0.0-alpha.236
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -513,6 +513,15 @@ struct SATSection {
   bool     bBleFailover       = true;          // TASK-762: when the pinned sensor (sBleMAC) goes stale, fall back to another fresh roster sensor (roster order)
   char     sBleMAC[18]        = "";            // Bind to specific sensor MAC (empty = accept all)
   uint16_t iBleInterval       = 30;            // Publish/state-update cadence (sec, 10-300). NOT scan rate: TASK-494 made the BLE scan continuous to match OT-Thing.
+  // TASK-895: BLE name picker + name-prefix filter. sBleNamePrefix narrows the
+  // roster by advertised BLE name (empty = off, admit all = current behaviour).
+  // bBleNameFilterIngest promotes the prefix from a UI-display filter to a
+  // roster-ingestion gate. Only CONFIRMED mismatches (name known AND not a
+  // prefix match) are rejected/hidden; an empty/unknown name is always
+  // admitted/shown. The advertised names themselves are runtime-only
+  // (SATble.ino BLERuntime.sName) and never persisted.
+  char     sBleNamePrefix[24]   = "";          // Name-prefix filter (case-insensitive; empty = off)
+  bool     bBleNameFilterIngest = false;       // false = display filter only; true = also gate roster ingestion
   // TASK-508: BLE sensor self-discovery roster (max SAT_BLE_MAX_ROSTER known
   // sensors). sBleMac/sBleLabel are persistent here; runtime data (temp,
   // rssi, age, discovery flags) lives in SATble.ino's _bleRuntime[] array

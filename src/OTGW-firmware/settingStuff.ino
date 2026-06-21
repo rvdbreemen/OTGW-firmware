@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.235
+**  Version  : v2.0.0-alpha.236
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -391,6 +391,11 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATblefailover"), settings.sat.bBleFailover, true);
   writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC, true);
   writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval, true);
+  // TASK-895: name-prefix filter + ingestion toggle. Prefix is user text →
+  // escape before serialising; the bool is a plain key.
+  escapeJsonStringTo(settings.sat.sBleNamePrefix, cMsg, sizeof(cMsg));
+  writeJsonStringKV(file, F("SATblenameprefix"), cMsg, true);
+  writeJsonBoolKV(file, F("SATblenamefilteringest"), settings.sat.bBleNameFilterIngest, true);
   // TASK-508: BLE roster — 8 × {mac, label} + count. Indexed-key pattern
   // mirrors fAreaWeight precedent. Empty slots serialise as "" — readers
   // treat that as unused. cMsg is the writeSettings()-scoped escape buffer
@@ -1064,6 +1069,11 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATblefailover")) == 0) settings.sat.bBleFailover = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
   else if (strcasecmp_P(field, PSTR("SATbleinterval")) == 0) settings.sat.iBleInterval = constrain(atoi(newValue), 10, 300);
+  // TASK-895: name-prefix filter + ingestion toggle. Exact-match keys placed
+  // before the SATblemacN/SATblelabelN prefix branches below; "SATblename..."
+  // shares no 9/11-char prefix with "SATblemac"/"SATblelabel" so no collision.
+  else if (strcasecmp_P(field, PSTR("SATblenameprefix")) == 0)      strlcpy(settings.sat.sBleNamePrefix, newValue, sizeof(settings.sat.sBleNamePrefix));
+  else if (strcasecmp_P(field, PSTR("SATblenamefilteringest")) == 0) settings.sat.bBleNameFilterIngest = EVALBOOLEAN(newValue);
   // TASK-508: roster slot keys — SATblemacN / SATblelabelN with N=0..7.
   // Prefix-match + digit suffix to avoid 17 individual else-if branches.
   // The exact-match SATblemac above takes precedence (legacy selected MAC).

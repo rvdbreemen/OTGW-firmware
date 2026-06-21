@@ -86,6 +86,7 @@ struct BLERuntime {
   uint32_t iLastSeenMs;          // 0 = never seen since boot
   bool     bDiscoveryPublished;  // TASK-488: HA-discovery sent at least once for this MAC
   bool     bDiscoveryDirty;      // TASK-508: label changed → re-publish on next cycle
+  char     sName[32];            // TASK-895: advertised BLE local name (runtime-only, never persisted; "" = unknown)
 };
 
 static BLERuntime         _bleRuntime[SAT_BLE_MAX_ROSTER] = {};
@@ -114,6 +115,17 @@ static volatile uint32_t _bleUnknownCount   = 0;
 static volatile uint32_t _bleNoSlotCount    = 0;
 static uint32_t          _bleStatsLastMs    = 0;
 
+// TASK-895: scan stays PASSIVE-continuous, matching the proven OT-Thing
+// reference (sensors.cpp: setActiveScan(false) + start(0,false,true), no
+// active/passive flipping). Advertised names are read from passive
+// advertisements via getName() — ATC/pvvx firmware puts "ATC_<mac>" in the
+// primary advertisement, so passive capture is sufficient for the name
+// filter. An earlier hybrid active-scan burst was removed: flipping the
+// running NimBLE scan to active at runtime destabilised the radio on the
+// ESP32-S3 (single-radio WiFi/BT coexistence). BTHome sensors that only carry
+// their name in the scan-response stay nameless (admitted/shown per the
+// empty-name rule).
+
 // TASK-497 (cross-phase): NimBLE 2.x scan callback runs on a separate
 // FreeRTOS task on ESP32-S3 (the BLE host task on core 0) while the
 // Arduino loop task (core 1) reads _bleSensors[] in satBLEPublishMQTT()
@@ -131,6 +143,7 @@ static bool parseBLEAtcFormat(const uint8_t* data, size_t len, float* temp, floa
 static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);
 static int  bleFindOrAllocSlot(const char* mac);
 static bool bleMatchesConfiguredMAC(const char* mac);
+static bool bleNameConfirmedMismatch(const char* name);  // TASK-895
 
 //=====================================================================
 // Parse ATC/pvvx custom firmware format from service data UUID 0x181A
@@ -232,6 +245,22 @@ static bool bleMatchesConfiguredMAC(const char* mac)
 }
 
 //=====================================================================
+// TASK-895: name-prefix filter rule. Returns true ONLY for a CONFIRMED
+// mismatch — the prefix is non-empty AND the name is known (non-empty)
+// AND it does not start with the prefix (case-insensitive). An empty
+// prefix (filter off) or an empty/unknown name always returns false
+// (= admit/show), so a sensor is never lost to a not-yet-captured name.
+// Both operands live in RAM (settings + runtime), so plain strncasecmp.
+//=====================================================================
+static bool bleNameConfirmedMismatch(const char* name)
+{
+  const char* prefix = settings.sat.sBleNamePrefix;
+  if (prefix[0] == '\0') return false;                    // filter off
+  if (name == nullptr || name[0] == '\0') return false;   // name unknown → admit
+  return (strncasecmp(name, prefix, strlen(prefix)) != 0);
+}
+
+//=====================================================================
 // Find existing slot for MAC or allocate a new one in the roster
 // Returns slot index (0..SAT_BLE_MAX_ROSTER-1) or -1 if full
 // TASK-508: the roster is settings-backed — `settings.sat.sBleMac[i][0]`
@@ -299,6 +328,16 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     // Convert to uppercase AA:BB:CC:DD:EE:FF format
     for (int i = 0; macBuf[i]; i++) macBuf[i] = toupper((unsigned char)macBuf[i]);
 
+    // TASK-895: capture the advertised local name. getName() is called only
+    // here (after the temp-parse guard), so it runs for real sensors, not for
+    // every ad — no heap churn on the high-rate reject path. May be empty on a
+    // passive scan that carries no name; the boot/rescan active burst fills it.
+    char nameBuf[32];
+    {
+      std::string nm = dev->getName();
+      strlcpy(nameBuf, nm.c_str(), sizeof(nameBuf));
+    }
+
     // TASK-508: NO filter check here — every format-pass MAC enters the
     // roster so the UI can offer self-discovery. The MAC filter
     // (settings.sat.sBleMAC) is applied later in satBLEUpdateState() to
@@ -316,6 +355,17 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     // for everything except this single onResult write, and the BLE host
     // task is the only writer to it under the mutex below.
     bool isNewSlot = (settings.sat.sBleMac[slot][0] == '\0');
+
+    // TASK-895: ingestion gate applies to NEW admissions only. Block a brand-new
+    // sensor whose name is already known AND mismatches the prefix. An existing
+    // slot keeps updating (incl. its name below) so the loop-task prune
+    // (satBLEPruneByNameFilter) can evict it once a passive ad reveals a
+    // mismatching name. Empty/unknown name = admit — never lose a sensor before
+    // its name is captured (passive getName() supplies names; the prune cleans up).
+    if (isNewSlot && settings.sat.bBleNameFilterIngest && bleNameConfirmedMismatch(nameBuf)) {
+      _bleFilterRejCount += 1;
+      return;   // slot left empty; not admitted
+    }
 
     // TASK-497/508: serialise slot updates against loop-task readers.
     // For a brand-new slot we also write `settings.sat.sBleMac[slot]`
@@ -335,6 +385,12 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     _bleRuntime[slot].iBattery     = batt;
     _bleRuntime[slot].iRssi        = static_cast<int8_t>(dev->getRSSI());
     _bleRuntime[slot].iLastSeenMs  = millis();
+    // TASK-895: only overwrite the cached name when this ad actually carried
+    // one. A later passive ad with no name must not wipe the name captured
+    // during the active burst.
+    if (nameBuf[0] != '\0') {
+      strlcpy(_bleRuntime[slot].sName, nameBuf, sizeof(_bleRuntime[slot].sName));
+    }
     portEXIT_CRITICAL(&_bleSensorsMux);
 
     if (isNewSlot) {
@@ -384,6 +440,49 @@ void satBLEInit()
     DebugTf(PSTR("SAT BLE: bound to MAC %s\r\n"), settings.sat.sBleMAC);
   } else {
     DebugTln(F("SAT BLE: accepting all compatible sensors"));
+  }
+}
+
+//=====================================================================
+// TASK-895: POST /api/v2/sat/ble/rescan handler. The scan is passive and
+// continuous (OT-Thing parity), so there is no radio action to take here —
+// names are captured from passive advertisements as they arrive. Kept as a
+// safe no-op so the REST route + UI "Rescan" button stay wired; the UI
+// re-fetches /discovery after the 200, which is the user-visible refresh.
+//=====================================================================
+void satBLERescanRequest()
+{
+  // intentionally empty: passive-continuous scan needs no re-trigger
+}
+
+//=====================================================================
+// TASK-895: ingest-filter eviction. With "restrict roster" on, drop roster
+// slots whose captured advertised name is a CONFIRMED mismatch and which are
+// not the selected sensor. Runs on the loop task (settings writes are safe
+// here), so it prunes the neighbours that passive-first admission let in with
+// an empty name — passive getName() supplies the names this acts on as ads
+// arrive. NOTE: best-effort — a sensor whose name never appears in its
+// advertisement (e.g. some BTHome configs put the name only in the
+// scan-response) stays admitted under the empty-name rule.
+//=====================================================================
+static void satBLEPruneByNameFilter()
+{
+  if (!settings.sat.bBleNameFilterIngest) return;
+  if (settings.sat.sBleNamePrefix[0] == '\0') return;
+  for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+    if (settings.sat.sBleMac[i][0] == '\0') continue;
+    // Never evict the user's selected sensor, whatever its name.
+    if (settings.sat.sBleMAC[0] != '\0' &&
+        strcasecmp(settings.sat.sBleMac[i], settings.sat.sBleMAC) == 0) continue;
+    char nm[32];
+    portENTER_CRITICAL(&_bleSensorsMux);
+    strlcpy(nm, _bleRuntime[i].sName, sizeof(nm));
+    portEXIT_CRITICAL(&_bleSensorsMux);
+    if (bleNameConfirmedMismatch(nm)) {
+      SATBLEDebugTf(PSTR("SAT BLE: prune slot=%d mac=%s name=\"%s\" (name-filter mismatch)\r\n"),
+                    i, settings.sat.sBleMac[i], nm);
+      satBLERosterForget(settings.sat.sBleMac[i]);  // loop-task settings mutation
+    }
   }
 }
 
@@ -445,6 +544,10 @@ void satBLELoop()
     SATBLEDebugTf(PSTR("SAT BLE: roster updated, %u slot(s) in use\r\n"),
                   (unsigned)cnt);
   }
+
+  // TASK-895: prune roster slots that the name filter rejects (ingest mode).
+  // Runs before auto-select so a mismatched neighbour can never be auto-picked.
+  satBLEPruneByNameFilter();
 
   // TASK-508: auto-select-if-only-one. Trigger when no MAC is selected
   // (sBleMAC empty) AND exactly one roster slot has produced a sample
@@ -761,6 +864,8 @@ void satBLERosterSendJSON()
     je.field(F("roster_full"),        (cnt >= SAT_BLE_MAX_ROSTER));
     je.field(F("dropped_since_full"), (int32_t)_bleRosterFullCount);
     je.field(F("selected_mac"),       settings.sat.sBleMAC);
+    je.field(F("name_prefix"),        settings.sat.sBleNamePrefix);    // TASK-895
+    je.field(F("filter_ingest"),      settings.sat.bBleNameFilterIngest); // TASK-895
 
     je.beginArray(F("sensors"));      // "sensors":[
     for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
@@ -781,6 +886,7 @@ void satBLERosterSendJSON()
       je.field(F("slot"),     (int32_t)i);
       je.field(F("mac"),      settings.sat.sBleMac[i]);
       je.field(F("label"),    settings.sat.sBleLabel[i]);
+      je.field(F("name"),     snap.sName);          // TASK-895: advertised BLE name (runtime)
       je.field(F("temp"),     snap.fTemperature);
       je.field(F("hum"),      snap.fHumidity);
       je.field(F("battery"),  (uint32_t)snap.iBattery);

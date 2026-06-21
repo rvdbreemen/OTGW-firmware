@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.235
+**  Version  : v2.0.0-alpha.236
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -362,6 +362,7 @@ void satBLERosterSendJSON();
 bool satBLERosterSelect(const char* mac);
 bool satBLERosterSetLabel(const char* mac, const char* label);
 bool satBLERosterForget(const char* mac);
+void satBLERescanRequest();   // TASK-895: trigger an on-demand active-scan name burst
 
 // SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino
 void initSAT();

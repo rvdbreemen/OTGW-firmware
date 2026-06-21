@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.235
+**  Version  : v2.0.0-alpha.236
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3905,7 +3905,54 @@ function buildBleSensorsPanel(page) {
   warnRow.appendChild(warnLab);
   warnRow.appendChild(warnVal);
 
+  // TASK-895: name-prefix filter row — text input + Rescan button.
+  var filterRow = document.createElement('div');
+  filterRow.className = 'sat-row';
+  var filterLab = document.createElement('span');
+  filterLab.className = 'sat-label';
+  filterLab.textContent = 'Name filter';
+  var filterVal = document.createElement('span');
+  filterVal.className = 'sat-value';
+  var prefixInput = document.createElement('input');
+  prefixInput.type = 'text';
+  prefixInput.id = 'ble-name-prefix';
+  prefixInput.maxLength = 23;
+  prefixInput.placeholder = '(prefix, e.g. ATC)';
+  prefixInput.addEventListener('change', function() { bleSaveNamePrefix(); }, false);
+  var rescanBtn = document.createElement('button');
+  rescanBtn.type = 'button';
+  rescanBtn.className = 'sat-btn';
+  rescanBtn.textContent = 'Refresh names';
+  rescanBtn.addEventListener('click', function() { bleRescan(); }, false);
+  filterVal.appendChild(prefixInput);
+  filterVal.appendChild(document.createTextNode(' '));
+  filterVal.appendChild(rescanBtn);
+  filterRow.appendChild(filterLab);
+  filterRow.appendChild(filterVal);
+
+  // TASK-895: "also restrict roster" ingestion toggle.
+  var ingestRow = document.createElement('div');
+  ingestRow.className = 'sat-row';
+  var ingestLab = document.createElement('span');
+  ingestLab.className = 'sat-label';
+  ingestLab.textContent = 'Restrict roster';
+  var ingestVal = document.createElement('span');
+  ingestVal.className = 'sat-value';
+  var ingestChk = document.createElement('input');
+  ingestChk.type = 'checkbox';
+  ingestChk.id = 'ble-filter-ingest';
+  ingestChk.addEventListener('change', function() { bleToggleIngest(); }, false);
+  var ingestHint = document.createElement('label');
+  ingestHint.setAttribute('for', 'ble-filter-ingest');
+  ingestHint.textContent = ' Only admit sensors whose name matches the prefix';
+  ingestVal.appendChild(ingestChk);
+  ingestVal.appendChild(ingestHint);
+  ingestRow.appendChild(ingestLab);
+  ingestRow.appendChild(ingestVal);
+
   grid.appendChild(activeRow);
+  grid.appendChild(filterRow);
+  grid.appendChild(ingestRow);
   grid.appendChild(listDiv);
   grid.appendChild(warnRow);
   body.appendChild(grid);
@@ -4118,7 +4165,9 @@ function bleRowFor(s) {
   row1.className = 'sat-row';
   var lab1 = document.createElement('span');
   lab1.className = 'sat-label';
-  lab1.textContent = mac + (s.selected ? ' \u2014 active' : '');
+  // TASK-895: show the advertised BLE name (when captured) next to the MAC.
+  var advName = (typeof s.name === 'string') ? s.name.trim() : '';
+  lab1.textContent = mac + (advName ? ' (' + advName + ')' : '') + (s.selected ? ' \u2014 active' : '');
   var val1 = document.createElement('span');
   val1.className = 'sat-value';
   val1.textContent = temp + '\u00b0C / ' + ageStr + ' / ' + rssi + 'dBm';
@@ -4184,6 +4233,14 @@ function renderBleRoster(j) {
 
   var sensors = (j && j.sensors) || [];
 
+  // TASK-895: reflect persisted filter state into the controls. Skip the
+  // prefix input while the user is typing in it (poll runs every 5s).
+  var prefixVal = (j && typeof j.name_prefix === 'string') ? j.name_prefix : '';
+  var prefixEl = document.getElementById('ble-name-prefix');
+  if (prefixEl && document.activeElement !== prefixEl) prefixEl.value = prefixVal;
+  var ingestEl = document.getElementById('ble-filter-ingest');
+  if (ingestEl && document.activeElement !== ingestEl) ingestEl.checked = !!(j && j.filter_ingest);
+
   // Active-sensor display
   if (activeEl) {
     var sel = sensors.find(function(s) { return s.selected; });
@@ -4212,11 +4269,37 @@ function renderBleRoster(j) {
     emptyRow.appendChild(emptyVal);
     listEl.appendChild(emptyRow);
   } else {
+    // TASK-895: display filter — hide a row only on a CONFIRMED name mismatch
+    // (mirrors the firmware rule); the selected sensor is always shown so a
+    // too-narrow prefix can never hide the active pick.
+    var shown = 0;
     sensors.forEach(function(s) {
       if (!bleIsValidMac(s.mac)) return;       // skip malformed entries
+      if (!s.selected && bleNameConfirmedMismatchJs(s.name, prefixVal)) return;
       listEl.appendChild(bleRowFor(s));
+      shown++;
     });
+    if (shown === 0) {
+      var hiddenRow = document.createElement('div');
+      hiddenRow.className = 'sat-row';
+      var hiddenVal = document.createElement('span');
+      hiddenVal.className = 'sat-value';
+      hiddenVal.textContent = 'All ' + sensors.length + ' sensor(s) hidden by the name filter "' + prefixVal + '". Clear the filter to see them.';
+      hiddenRow.appendChild(hiddenVal);
+      listEl.appendChild(hiddenRow);
+    }
   }
+}
+
+// TASK-895: mirror of the firmware rule (SATble.ino bleNameConfirmedMismatch).
+// True ONLY for a confirmed mismatch: prefix set AND name known AND not a
+// case-insensitive prefix match. Empty prefix or empty/unknown name → false
+// (= show), so a sensor is never hidden before its name is captured.
+function bleNameConfirmedMismatchJs(name, prefix) {
+  if (!prefix) return false;
+  var n = (typeof name === 'string') ? name.trim() : '';
+  if (!n) return false;
+  return n.toLowerCase().indexOf(prefix.toLowerCase()) !== 0;
 }
 
 // Render a visible error state into the roster list when the discovery
@@ -4272,6 +4355,47 @@ function bleForget(mac) {
   blePost('forget', { mac: mac })
     .then(function() { refreshBleRoster(); })
     .catch(function(e) { alert('Removal failed: ' + e.message); });
+}
+
+// TASK-895: name-filter controls. Prefix + ingest toggle persist through the
+// generic settings POST (same path as SATweather*); rescan hits the dedicated
+// /sat/ble/rescan action route.
+function bleSaveNamePrefix() {
+  var inp = document.getElementById('ble-name-prefix');
+  var val = inp ? inp.value : '';
+  fetch(APIGW + 'v2/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'SATblenameprefix', value: val })
+  }).then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    refreshBleRoster();
+  }).catch(function(e) { alert('Failed to save name filter: ' + e.message); });
+}
+
+function bleToggleIngest() {
+  var chk = document.getElementById('ble-filter-ingest');
+  var val = (chk && chk.checked) ? '1' : '0';
+  fetch(APIGW + 'v2/settings', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: 'SATblenamefilteringest', value: val })
+  }).then(function(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    refreshBleRoster();
+  }).catch(function(e) { alert('Failed to toggle restriction: ' + e.message); });
+}
+
+function bleRescan() {
+  fetch(APIGW + 'v2/sat/ble/rescan', { method: 'POST' })
+    .then(function(r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      // Passive-continuous scan needs no re-trigger; just re-fetch the roster
+      // so any names that arrived since the last poll show immediately.
+      refreshBleRoster();
+      setTimeout(refreshBleRoster, 3000);
+    })
+    .catch(function(e) { alert('Rescan failed: ' + e.message); });
 }
 
 function buildSATSettingsGroups(page, data) {
@@ -7194,6 +7318,8 @@ var translateFields = [
   , ["SATblefailover", "SAT BLE Sensor Failover"]
   , ["SATblemac", "SAT BLE Sensor MAC Address"]
   , ["SATbleinterval", "SAT BLE Publish Cadence (sec)"]
+  , ["SATblenameprefix", "SAT BLE Name Filter (prefix)"]
+  , ["SATblenamefilteringest", "SAT BLE Restrict Roster by Name"]
   , ["SATweatherenable", "SAT Weather Enable"]
   , ["SATweatherlat", "SAT Weather Latitude"]
   , ["SATweatherlon", "SAT Weather Longitude"]
@@ -7312,6 +7438,8 @@ var translateTooltips = [
   , ["SATblefailover", "When the selected (pinned) BLE sensor stops reporting for more than 5 minutes, automatically fall back to another fresh sensor from the roster (first available in roster order) so SAT keeps a room temperature. Recovers to the pinned sensor when it returns. Enabled by default. Disable this to keep strict single-sensor behaviour (e.g. a dedicated room sensor that must not be substituted). No effect when no sensor is pinned."]
   , ["SATblemac", "(Managed via the BLE Sensors panel above) MAC address of the active BLE sensor. Leave empty for auto-select-if-only-one. Format AA:BB:CC:DD:EE:FF, uppercase."]
   , ["SATbleinterval", "How often the gateway publishes BLE-sensor state (MQTT + state.sat.*) in seconds (10-300). Default 30 seconds. Since 2.0.0 the BLE radio scans continuously on ESP32 (matches OT-Thing); this setting controls publish/state-update cadence, not scan rate."]
+  , ["SATblenameprefix", "(Managed via the BLE Sensors panel above) Show only BLE sensors whose advertised name starts with this text (case-insensitive). Empty = show all (default). Sensors with no captured name are always shown. Names are read from passive advertisements: ATC/pvvx sensors broadcast 'ATC_<mac>' so they filter cleanly; some BTHome sensors put the name only in the scan-response and stay nameless."]
+  , ["SATblenamefilteringest", "(Managed via the BLE Sensors panel above) When on, the name filter also keeps non-matching sensors OUT of the 8-slot roster, not just hidden in the UI — reserving slots for your sensors. Best-effort: names are read from passive advertisements as they arrive, so a non-matching neighbour is admitted until its name is seen, then pruned. Sensors with no captured name are still admitted. Off by default."]
   , ["SATweatherenable", "Enable weather data fetching from Open-Meteo API (free, no key needed). Provides outdoor temperature fallback when no OT outdoor sensor is available."]
   , ["SATweatherlat", "Latitude for weather data. Use the Detect Location button on the SAT dashboard, or enter manually (-90 to 90)."]
   , ["SATweatherlon", "Longitude for weather data. Use the Detect Location button on the SAT dashboard, or enter manually (-180 to 180)."]

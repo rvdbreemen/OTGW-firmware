@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.235
+**  Version  : v2.0.0-alpha.236
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1177,8 +1177,9 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   //   POST /api/v2/sat/ble/select   {mac}      — promote roster MAC to active sensor
   //   POST /api/v2/sat/ble/label    {mac,label}— set persistent label for a roster slot
   //   POST /api/v2/sat/ble/forget   {mac}      — drop slot + clean up HA discovery
+  //   POST /api/v2/sat/ble/rescan              — TASK-895: trigger an active-scan name burst
   else if (strcasecmp_P(sub, PSTR("ble")) == 0) {
-    if (wc < 6) { sendApiError(400, F("Missing BLE sub-action (discovery/select/label/forget)")); return; }
+    if (wc < 6) { sendApiError(400, F("Missing BLE sub-action (discovery/select/label/forget/rescan)")); return; }
     const char* act = words[5];
 
     if (strcasecmp_P(act, PSTR("discovery")) == 0) {
@@ -1236,8 +1237,15 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       }
       webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
     }
+    else if (strcasecmp_P(act, PSTR("rescan")) == 0) {
+      // TASK-895: trigger an on-demand active-scan burst to refresh advertised
+      // names. No body needed; loop-task-safe (sets a flag, satBLELoop flips).
+      if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+      satBLERescanRequest();
+      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    }
     else {
-      sendApiError(404, F("Unknown BLE sub-action (discovery/select/label/forget)"));
+      sendApiError(404, F("Unknown BLE sub-action (discovery/select/label/forget/rescan)"));
     }
   }
 #endif
