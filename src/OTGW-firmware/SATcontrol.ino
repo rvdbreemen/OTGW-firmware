@@ -1962,11 +1962,10 @@ void satDisable()
   satSaveEnergyState();      // Persist energy total before reset (Task #196)
   satSaveEstimatedEnergy();  // Persist estimated gas energy before reset (Task #232)
   satHCRReset();        // Reset daily-median recommendation (Task #228)
-  // Intentional: release boiler control to the thermostat (CS=0) rather than holding
-  // a warm-idle setpoint like Python SAT's COLD_SETPOINT=22C. OTGW is a gateway
-  // sitting between the thermostat and the boiler -- when SAT is disabled, the physical
-  // thermostat resumes authority. Python SAT uses a warm-idle setpoint because it *is*
-  // the thermostat (standalone HA replacement); OTGW firmware is not, so it defers.
+  // Intentional: when SAT is DISABLED, release boiler control to the thermostat (CS=0) so the
+  // physical thermostat resumes authority -- OTGW is a gateway between thermostat and boiler.
+  // (This is the disabled-handover only; while SAT is ENABLED it implements a per-heating-system
+  // COLD_SETPOINT cold-cutoff that commands the boiler off on low demand -- see ADR-150 / TASK-891.2.)
   addCommandToQueue("CS=0", 4, false, 0);
   // TASK-565: clear the write-on-change cache so the next satControlLoop
   // (re-enable, fallback, or recommissioning) re-emits all four SAT commands.

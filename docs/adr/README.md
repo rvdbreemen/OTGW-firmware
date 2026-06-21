@@ -22,7 +22,7 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (3 ADRs)
 - [OTGW32 & Dual Platform](#otgw32-and-dual-platform) (5 ADRs)
-- [SAT Subsystem](#sat-subsystem) (6 ADRs)
+- [SAT Subsystem](#sat-subsystem) (7 ADRs)
 - [ADR Governance](#adr-governance) (1 ADR)
 
 Counts above are advisory rather than hand-maintained; the canonical set is the per-section listing below.
@@ -400,6 +400,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-076: SAT OPV (Optimal Valve Position) Calibration](ADR-076-sat-opv-calibration.md)** 🆕  
   Calibration procedure that determines the optimal valve position by observing flow and temperature response; persisted to LittleFS for cross-boot retention.
+
+- **[ADR-150: SAT Per-Heating-System COLD_SETPOINT (Active Boiler-Off Cutoff on Low Demand)](ADR-150-sat-per-heating-system-cold-setpoint-boiler-off-cutoff.md)** 🆕  
+  *Proposed.* When SAT is the active controller and the requested setpoint falls below a per-heating-system cutoff (radiators 28.2C, underfloor 21C), SAT commands the boiler off (CS=10, CH=0, MM=100) and gates the PWM auto-switch and flame-off hold. Departs from the prior pure-pass-through stance while SAT is enabled; the SAT-disabled handover (CS=0 to thermostat) is unchanged. Supersedes the deliberate-omission code comment; ports thermo-nova `heating_control.py`.
 
 ### ADR Governance
 
