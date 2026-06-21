@@ -1,9 +1,11 @@
 ---
 id: TASK-901
 title: Fix 1.6.x heap-fragmentation instability (delay/yield mainloop regression)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-21 23:31'
+updated_date: '2026-06-21 23:33'
 labels: []
 dependencies: []
 ---
