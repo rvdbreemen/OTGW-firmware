@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.230
+**  Version  : v2.0.0-alpha.231
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -293,6 +293,8 @@ void writeSettings(bool show)
   // --- SAT settings ---
   writeJsonBoolKV(file, F("SATenabled"), settings.sat.bEnabled, true);
   writeJsonIntKV(file, F("SATsystem"), settings.sat.iHeatingSystem, true);
+  writeJsonIntKV(file, F("SATsource"), settings.sat.iHeatingSource, true);
+  writeJsonIntKV(file, F("SAThpcycle"), settings.sat.iHpCycleSeconds, true);
   writeJsonFloatKV(file, F("SATtargettemp"), settings.sat.fTargetTemp, true);
   writeJsonFloatKV(file, F("SATcoefficient"), settings.sat.fHeatingCurveCoeff, true);
   writeJsonFloatKV(file, F("SATdeadband"), settings.sat.fDeadband, true);
@@ -916,7 +918,9 @@ void updateSetting(const char *field, const char *newValue)
       satDisable();
     }
   }
-  else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 3);  // 0=auto,1=radiators,2=heat_pump,3=underfloor
+  else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 2);  // 0=auto,1=radiators,2=underfloor
+  else if (strcasecmp_P(field, PSTR("SATsource")) == 0)          settings.sat.iHeatingSource = constrain(atoi(newValue), 0, 3);  // 0=auto,1=gas_boiler,2=heat_pump,3=hybrid (TASK-891.8)
+  else if (strcasecmp_P(field, PSTR("SAThpcycle")) == 0)         settings.sat.iHpCycleSeconds = constrain(atoi(newValue), 1800, 2400);  // heat-pump cycle: 1800=2/hr, 2400=1.5/hr
   else if (strcasecmp_P(field, PSTR("SATtargettemp")) == 0)      settings.sat.fTargetTemp = constrain(atof(newValue), 5.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0)     settings.sat.fHeatingCurveCoeff = constrain(atof(newValue), 0.1f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATdeadband")) == 0)        settings.sat.fDeadband = constrain(atof(newValue), 0.05f, 2.0f);

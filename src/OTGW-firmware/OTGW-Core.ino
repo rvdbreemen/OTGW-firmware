@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.230
+**  Version  : v2.0.0-alpha.231
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2783,8 +2783,9 @@ void print_vh_configmemberid(uint16_t& value)
       sendMQTTData(useLegacy ? F("vh_configuration_bypass")        : F("supports_ventilation_bypass"),     (((OTdata.valueHB) & 0x02) ? "ON" : "OFF"));
       sendMQTTData(useLegacy ? F("vh_configuration_speed_control") : F("ventilation_speed_control_type"),  (((OTdata.valueHB) & 0x04) ? "ON" : "OFF"));
     }
-    // SAT auto-detect: bit 0 of HB = system type (0=boiler, 1=heat pump)
-    state.sat.iDetectedHeatingSystem = ((OTdata.valueHB) & 0x01) ? SAT_HSYS_HEAT_PUMP : SAT_HSYS_RADIATORS;  
+    // SAT auto-detect: bit 0 of HB = source type (0=gas boiler, 1=heat pump). TASK-891.8:
+    // detection feeds the heating-SOURCE axis (exact detect bit pending Elga validation).
+    state.sat.iDetectedHeatingSource = ((OTdata.valueHB) & 0x01) ? SAT_SRC_HEAT_PUMP : SAT_SRC_GAS_BOILER;
     
     utoa(OTdata.valueLB, _msg, 10);
     sendMQTTData(F("vh_memberid_code"), _msg);

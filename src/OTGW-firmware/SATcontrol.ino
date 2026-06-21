@@ -191,9 +191,19 @@ void satDetectManufacturer(uint8_t slaveMemberID)
 // Returns the effective heating system (resolves AUTO to detected or fallback)
 static uint8_t satGetEffectiveHeatingSystem()
 {
+  // System = distribution (radiators/underfloor). OT cannot detect this, so AUTO (and any
+  // legacy persisted HEAT_PUMP, migrated away on load) defaults to radiators.
   if (settings.sat.iHeatingSystem == SAT_HSYS_AUTO)
-    return state.sat.iDetectedHeatingSystem;
+    return SAT_HSYS_RADIATORS;
   return settings.sat.iHeatingSystem;
+}
+
+// Returns the effective heating source (resolves AUTO via the OT cooling-capable detect). TASK-891.8
+static uint8_t satGetEffectiveHeatingSource()
+{
+  if (settings.sat.iHeatingSource == SAT_SRC_AUTO)
+    return state.sat.iDetectedHeatingSource;
+  return settings.sat.iHeatingSource;
 }
 
 // Returns max boiler setpoint for the current heating system.
@@ -210,55 +220,48 @@ static uint8_t satGetEffectiveHeatingSystem()
 // Heat pump: C++ 40C matches Python's heat pump cap -- no discrepancy there.
 static float satGetMaxSetpoint()
 {
-  switch (satGetEffectiveHeatingSystem()) {
-    case SAT_HSYS_HEAT_PUMP:  return 40.0f;
-    case SAT_HSYS_UNDERFLOOR: return 45.0f;
-    case SAT_HSYS_RADIATORS:
-    default:                  return 62.0f;  // 62C: correct for high-temp radiator systems (see comment above)
-  }
+  // System cap (distribution): underfloor 45C, radiators 62C (see comment above).
+  float cap = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? 45.0f : 62.0f;
+  // Source cap: heat pumps are limited to ~40C flow -> take the tighter of the two.
+  if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP && cap > 40.0f) cap = 40.0f;
+  return cap;
 }
 
 // Returns heating curve base offset for the current heating system
 static float satGetBaseOffset()
 {
-  switch (satGetEffectiveHeatingSystem()) {
-    case SAT_HSYS_UNDERFLOOR: return SAT_HC_BASE_OFFSET_FLOOR;  // 20.0
-    case SAT_HSYS_HEAT_PUMP:
-    case SAT_HSYS_RADIATORS:
-    default:                  return SAT_HC_BASE_OFFSET_RAD;    // 27.2
-  }
+  // Base offset is heating-system-only (George 2026-06-20): underfloor vs radiators.
+  return (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_HC_BASE_OFFSET_FLOOR   // 20.0
+                                                                 : SAT_HC_BASE_OFFSET_RAD;    // 27.2
 }
 
 // Returns max PWM cycles per hour for the current heating system
 static uint8_t satGetMaxCyclesPerHour()
 {
-  // Use user-configured value if set (Task #82); otherwise fall back to system defaults
+  // Heat-pump source caps at 2 cycles/hr; the effective rate is governed by the heat-pump
+  // min-on setting (iHpCycleSeconds, see satGetMinOnTimeSec).
+  if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) return 2;
+  // Otherwise use the user-configured value if set (Task #82); else system defaults.
   if (settings.sat.iCyclesPerHour >= 2 && settings.sat.iCyclesPerHour <= 6) {
     return settings.sat.iCyclesPerHour;
   }
-  switch (satGetEffectiveHeatingSystem()) {
-    case SAT_HSYS_HEAT_PUMP:  return 2;   // Heat pumps: max 2 cycles/hr
-    case SAT_HSYS_UNDERFLOOR: return 3;
-    case SAT_HSYS_RADIATORS:
-    default:                  return 4;
-  }
+  return (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? 3 : 4;
 }
 
 // Returns minimum ON time in seconds for the current heating system
 static uint32_t satGetMinOnTimeSec()
 {
-  switch (satGetEffectiveHeatingSystem()) {
-    case SAT_HSYS_HEAT_PUMP:  return 1800; // 30 minutes for heat pumps
-    case SAT_HSYS_UNDERFLOOR:
-    case SAT_HSYS_RADIATORS:
-    default:                  return 180;  // 3 minutes for gas boilers
-  }
+  // Heat-pump source: user-selectable cycle rate (iHpCycleSeconds; 1800s=2/hr default,
+  // 2400s=1.5/hr). Gas boiler / hybrid: 3-minute minimum on-time.
+  if (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP) return settings.sat.iHpCycleSeconds;
+  return 180;
 }
 
 // Returns whether MM=100 should always be used (heat pumps)
 static bool satAlwaysMaxModulation()
 {
-  return (satGetEffectiveHeatingSystem() == SAT_HSYS_HEAT_PUMP);
+  // Heat pumps must always run at MM=100% (never 0%), even under PWM suppression. TASK-891.8
+  return (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP);
 }
 
 // Returns the name string for the current heating system.
@@ -267,10 +270,21 @@ __attribute__((unused))
 static const char* satGetHeatingSystemName()
 {
   switch (satGetEffectiveHeatingSystem()) {
-    case SAT_HSYS_HEAT_PUMP:  return "heat_pump";
     case SAT_HSYS_UNDERFLOOR: return "underfloor";
     case SAT_HSYS_RADIATORS:  return "radiators";
     default:                  return "auto";
+  }
+}
+
+// Returns the name string for the current heating source. (TASK-891.8)
+__attribute__((unused))
+static const char* satGetHeatingSourceName()
+{
+  switch (satGetEffectiveHeatingSource()) {
+    case SAT_SRC_HEAT_PUMP:  return "heat_pump";
+    case SAT_SRC_HYBRID:     return "hybrid";
+    case SAT_SRC_GAS_BOILER: return "gas_boiler";
+    default:                 return "auto";
   }
 }
 
@@ -2150,7 +2164,8 @@ void satSendStatusJSON()
     je.field(F("ovp_calib_max_temp"),   snap->st.sat.fCalibMaxTemp);
     je.field(F("ovp_calib_samples"),    (int32_t)snap->st.sat.iCalibSamples);
     je.field(F("heating_system"),       (int32_t)settings.sat.iHeatingSystem);
-    je.field(F("heating_system_detected"), (int32_t)snap->st.sat.iDetectedHeatingSystem);
+    je.field(F("heating_source"),          (int32_t)settings.sat.iHeatingSource);
+    je.field(F("heating_source_detected"), (int32_t)snap->st.sat.iDetectedHeatingSource);
     je.field(F("manufacturer"),         snap->manufacturer);
     je.field(F("manufacturer_setting"), (int32_t)settings.sat.iManufacturer);
     je.field(F("manufacturer_detected"), (int32_t)snap->st.sat.iDetectedManufacturer);

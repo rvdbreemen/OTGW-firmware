@@ -253,12 +253,15 @@ var SAT = (function() {
     var enToggle = el('sat-toggle-enable');
     if (enToggle) enToggle.checked = _lastSATEnabled;
 
-    var hsNames = ['Auto', 'Radiators', 'Heat Pump', 'Underfloor'];
+    var hsNames = ['Auto', 'Radiators', 'Underfloor'];
+    var srcNames = ['Auto', 'Gas Boiler', 'Heat Pump', 'Hybrid'];
     var hsIdx = d.heating_system !== undefined ? d.heating_system : 0;
-    var hsDetected = d.heating_system_detected !== undefined ? d.heating_system_detected : 1;
-    var hsLabel = hsNames[hsIdx] || 'Unknown';
-    if (hsIdx === 0) hsLabel = 'Auto (' + (hsNames[hsDetected] || 'Radiators') + ')';
-    setText('sat-heating-system', hsLabel);
+    var srcIdx = d.heating_source !== undefined ? d.heating_source : 0;
+    var srcDetected = d.heating_source_detected !== undefined ? d.heating_source_detected : 1;
+    var hsLabel = hsNames[hsIdx] || 'Radiators';
+    var srcLabel = srcNames[srcIdx] || 'Auto';
+    if (srcIdx === 0) srcLabel = 'Auto (' + (srcNames[srcDetected] || 'Gas Boiler') + ')';
+    setText('sat-heating-system', hsLabel + ' / ' + srcLabel);
 
     // Manufacturer
     var mfrName = d.manufacturer || '--';
@@ -486,7 +489,7 @@ var SAT = (function() {
   // --- Heating Curve ---
   // JS port of satCalcHeatingCurve() from SATcontrol.ino
   function calcHeatingCurve(outsideTemp, targetTemp, coefficient, heatingSystem) {
-    var baseOffset = (heatingSystem === 1) ? HC_BASE_OFFSET_FLOOR : HC_BASE_OFFSET_RAD;
+    var baseOffset = (heatingSystem === 2) ? HC_BASE_OFFSET_FLOOR : HC_BASE_OFFSET_RAD;  // 2=underfloor->floor offset (TASK-891.8)
     var diff = outsideTemp - HC_REF_TEMP;
     var curveValue = 4.0 * (targetTemp - HC_REF_TEMP)
                    + 0.03 * diff * diff

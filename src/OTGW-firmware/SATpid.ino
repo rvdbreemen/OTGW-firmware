@@ -102,7 +102,9 @@ static void _pidCalculateGains(float curveValue)
   }
 
   float coeff = settings.sat.fHeatingCurveCoeff;
-  float divisor = (settings.sat.iHeatingSystem == 1) ? SAT_PID_KP_DIVISOR_FLOOR : SAT_PID_KP_DIVISOR_RAD;
+  // Underfloor uses the floor divisor, radiators the radiator divisor. (TASK-891.8: was keyed
+  // on '==1'/radiators, which inverted the mapping; now via the heating-system axis.)
+  float divisor = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_PID_KP_DIVISOR_FLOOR : SAT_PID_KP_DIVISOR_RAD;
 
   float kp = (coeff * curveValue) / divisor;
   float ki = kp / SAT_PID_AGGRESSION_V3;

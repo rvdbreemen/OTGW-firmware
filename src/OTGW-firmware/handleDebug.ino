@@ -87,6 +87,8 @@ static void dumpDebugInfo() {
     Debugln(F("[settings.sat]"));
     Debugf(PSTR("enabled: %s\r\n"), settings.sat.bEnabled ? "true" : "false");
     Debugf(PSTR("heating_system: %u\r\n"), (unsigned)settings.sat.iHeatingSystem);
+    Debugf(PSTR("heating_source: %u\r\n"), (unsigned)settings.sat.iHeatingSource);
+    Debugf(PSTR("hp_cycle_seconds: %u\r\n"), (unsigned)settings.sat.iHpCycleSeconds);
     Debugf(PSTR("target_temp: %.1f\r\n"), settings.sat.fTargetTemp);
     Debugf(PSTR("curve_coeff: %.2f\r\n"), settings.sat.fHeatingCurveCoeff);
     Debugf(PSTR("deadband: %.2f\r\n"), settings.sat.fDeadband);
@@ -223,7 +225,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("fallback_active: %s\r\n"), state.sat.bFallbackActive ? "true" : "false");
     Debugf(PSTR("fallback_reason: %d\r\n"), (int)state.sat.eFallbackReason);
     Debugf(PSTR("current_modulation: %d\r\n"), (int)state.sat.iCurrentModulation);
-    Debugf(PSTR("detected_hsys: %d\r\n"), (int)state.sat.iDetectedHeatingSystem);
+    Debugf(PSTR("detected_source: %d\r\n"), (int)state.sat.iDetectedHeatingSource);
     Debugf(PSTR("weather_valid: %s\r\n"), state.sat.weather.bValid ? "true" : "false");
     Debugf(PSTR("weather_temp: %.1f\r\n"), state.sat.weather.fTemperature);
     Debugf(PSTR("weather_humidity: %.0f\r\n"), state.sat.weather.fHumidity);

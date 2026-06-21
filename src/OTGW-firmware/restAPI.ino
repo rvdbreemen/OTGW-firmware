@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.230
+**  Version  : v2.0.0-alpha.231
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1928,6 +1928,8 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
 
     je.field(F("settings.sat.enabled"), settings.sat.bEnabled);
     je.field(F("settings.sat.heating_system"), (uint32_t)settings.sat.iHeatingSystem);
+    je.field(F("settings.sat.heating_source"), (uint32_t)settings.sat.iHeatingSource);
+    je.field(F("settings.sat.hp_cycle_seconds"), (uint32_t)settings.sat.iHpCycleSeconds);
     je.field(F("settings.sat.target_temp"), settings.sat.fTargetTemp);
     je.field(F("settings.sat.curve_coeff"), settings.sat.fHeatingCurveCoeff);
     je.field(F("settings.sat.deadband"), settings.sat.fDeadband);
@@ -2052,7 +2054,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.sat.fallback_active"), snap->st.sat.bFallbackActive);
     je.field(F("state.sat.fallback_reason"), (int32_t)snap->st.sat.eFallbackReason);
     je.field(F("state.sat.current_mod"), (int32_t)snap->st.sat.iCurrentModulation);
-    je.field(F("state.sat.hsys_detected"), (int32_t)snap->st.sat.iDetectedHeatingSystem);
+    je.field(F("state.sat.source_detected"), (int32_t)snap->st.sat.iDetectedHeatingSource);
     je.field(F("state.sat.weather_valid"), snap->st.sat.weather.bValid);
     je.field(F("state.sat.weather_temp"), snap->st.sat.weather.fTemperature);
     je.field(F("state.sat.weather_humidity"), snap->st.sat.weather.fHumidity);
@@ -3265,7 +3267,9 @@ void sendDeviceSettings()
   addStr(F("webhookcontenttype"), CSTR(settings.webhook.sContentType), "s", 31);
   // --- SAT settings ---
   addBool(F("satenabled"), settings.sat.bEnabled, "b");
-  addInt(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 3);  // 0=auto,1=radiators,2=heat_pump,3=underfloor
+  addInt(F("satsystem"), settings.sat.iHeatingSystem, "i", 0, 2);  // 0=auto,1=radiators,2=underfloor
+  addInt(F("satsource"), settings.sat.iHeatingSource, "i", 0, 3);  // 0=auto,1=gas_boiler,2=heat_pump,3=hybrid (TASK-891.8)
+  addInt(F("sathpcycle"), settings.sat.iHpCycleSeconds, "i", 1800, 2400);  // heat-pump cycle: 1800=2/hr, 2400=1.5/hr
   addInt(F("satmanufacturer"), settings.sat.iManufacturer, "i", 0, SAT_MFR_COUNT - 1);
   {
     char tmpBuf[8];

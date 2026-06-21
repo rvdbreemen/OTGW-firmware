@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.230
+**  Version  : v2.0.0-alpha.231
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -35,11 +35,20 @@
 //=== SAT runtime enums ===
 //====================================================================
 
+// Heating SYSTEM = heat distribution (drives base offset + COLD_SETPOINT). Orthogonal to the
+// heating source. (TASK-891.8)
 enum SATHeatingSystem : uint8_t {
-  SAT_HSYS_AUTO       = 0,  // Auto-detect from OT MsgID 3 system_type bit
-  SAT_HSYS_RADIATORS  = 1,  // Gas boiler + radiators (default if auto-detect fails)
-  SAT_HSYS_HEAT_PUMP  = 2,  // Heat pump (hybrid or standalone)
-  SAT_HSYS_UNDERFLOOR = 3   // Underfloor heating
+  SAT_HSYS_AUTO       = 0,  // No OT detection for distribution; defaults to radiators
+  SAT_HSYS_RADIATORS  = 1,  // Radiators or mixed system
+  SAT_HSYS_UNDERFLOOR = 2   // Underfloor heating
+};
+// Heating SOURCE = energy device (drives min-on / cycles / max-setpoint timing + MM=100% for
+// heat pumps). Orthogonal to the heating system. (TASK-891.8, George+Robert 2026-06-20)
+enum SATHeatingSource : uint8_t {
+  SAT_SRC_AUTO       = 0,  // Auto-detect from OT MsgID 3 (cooling-enabled => heat pump)
+  SAT_SRC_GAS_BOILER = 1,  // Gas/oil boiler
+  SAT_SRC_HEAT_PUMP  = 2,  // Heat pump
+  SAT_SRC_HYBRID     = 3   // Heat pump + separate gas boiler (manual; coordination = TASK-892)
 };
 enum SATControlMode : uint8_t { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS, SAT_MODE_PWM };
 enum SATCalibPhase  : uint8_t {
@@ -212,7 +221,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bFallbackActive       = false;
   SATFallbackReason eFallbackReason = SAT_FB_NONE;
   // Heating system detection
-  uint8_t  iDetectedHeatingSystem = SAT_HSYS_RADIATORS; // auto-detected from OT MsgID 74
+  uint8_t  iDetectedHeatingSource  = SAT_SRC_GAS_BOILER; // auto-detected heating source from OT MsgID 3 (cooling-capable => heat pump)
   // Manufacturer detection
   uint8_t  iDetectedManufacturer  = SAT_MFR_OTHER;      // auto-detected from OT MsgID 3 valueLB
   uint8_t  iSlaveMemberID        = 0;                   // raw slave MemberID code from MsgID 3
@@ -403,7 +412,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
 
 struct SATSection {
   bool     bEnabled           = false;
-  uint8_t  iHeatingSystem     = SAT_HSYS_AUTO; // SATHeatingSystem enum: auto/radiators/heat_pump/underfloor
+  uint8_t  iHeatingSystem     = SAT_HSYS_AUTO; // SATHeatingSystem: auto/radiators/underfloor (heat_pump=legacy, migrated to iHeatingSource)
+  uint8_t  iHeatingSource     = SAT_SRC_AUTO;  // SATHeatingSource: auto/gas_boiler/heat_pump/hybrid (TASK-891.8)
+  uint16_t iHpCycleSeconds    = 1800;          // Heat-pump min-on / cycle rate: 1800s=2/hr (default) or 2400s=1.5/hr (TASK-891.8)
   float    fTargetTemp        = 20.0f;  // Default room target °C
   float    fHeatingCurveCoeff = 1.5f;   // Heating curve coefficient
   float    fDeadband          = 0.1f;   // PID deadband °C (matches Python DEADBAND=0.1)
