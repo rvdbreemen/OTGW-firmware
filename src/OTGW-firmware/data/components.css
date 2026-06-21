@@ -1865,30 +1865,20 @@ body.dark .sat-dashboard.sat-panel,
 #devName {
   cursor: help;
 }
-.net-signal-bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 2px;
-  height: 14px;
+/* TASK-899: the wifi glyph doubles as the signal-strength meter. Each arc
+   (dot -> mid -> outer) is dim grey until lit; lit arcs colour by quality
+   tier. Replaces the former separate .net-signal-bars element. */
+.net-icon-wifi .wifi-seg {
+  fill: var(--border-2);
+  opacity: 0.4;
+  transition: fill 0.2s ease, opacity 0.2s ease;
 }
-.sig-bar {
-  display: inline-block;
-  width: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--border-2);
-  opacity: 0.45;
-}
-.sig-bar-1 { height: 4px; }
-.sig-bar-2 { height: 7px; }
-.sig-bar-3 { height: 10px; }
-.sig-bar-4 { height: 13px; }
-.sig-bar.active {
-  background: var(--status-ok);
+.net-icon-wifi .wifi-seg.active {
   opacity: 1;
 }
-.net-signal-bars[data-quality="poor"] .sig-bar.active { background: var(--status-error); }
-.net-signal-bars[data-quality="medium"] .sig-bar.active { background: var(--status-warn); }
-.net-signal-bars[data-quality="good"] .sig-bar.active { background: var(--status-ok); }
+.net-icon-wifi[data-quality="poor"]   .wifi-seg.active { fill: var(--status-error); }
+.net-icon-wifi[data-quality="medium"] .wifi-seg.active { fill: var(--status-warn); }
+.net-icon-wifi[data-quality="good"]   .wifi-seg.active { fill: var(--status-ok); }
 
 /* Log command/status refinements */
 .log-control-inline {

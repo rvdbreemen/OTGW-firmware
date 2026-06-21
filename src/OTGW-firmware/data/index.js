@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.237
+**  Version  : v2.0.0-alpha.238
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -413,22 +413,21 @@ function updateNetworkIndicator(mode, apFallback, quality, ip) {
   ethIcon.classList.toggle('hidden', !isEth);
   if (textEl) textEl.textContent = isAP ? 'AP MODE' : '';
 
-  // Signal bars: shown for WiFi only; neutral for Ethernet/AP
-  var barsEl = document.getElementById('netSignalBars');
-  if (barsEl) {
-    var showBars = !isEth;  // hide for Ethernet (cable icon is enough)
-    barsEl.classList.toggle('hidden', !showBars);
-    if (showBars) {
-      var q = (quality !== undefined && quality !== null) ? quality : -1;
-      var tier = isAP ? 'none' : (q >= 70 ? 'good' : (q >= 40 ? 'medium' : 'poor'));
-      var activeBars = isAP ? 0 : (q >= 75 ? 4 : (q >= 50 ? 3 : (q >= 25 ? 2 : 1)));
-      barsEl.setAttribute('data-quality', tier);
-      barsEl.title = isAP ? 'AP mode' : ('Signal: ' + (q >= 0 ? q + '%' : 'unknown'));
-      var bars = barsEl.querySelectorAll('.sig-bar');
-      for (var i = 0; i < bars.length; i++) {
-        bars[i].classList.toggle('active', i < activeBars);
-      }
-    }
+  // TASK-899: the wifi glyph IS the strength meter — its arcs light from the
+  // inside out (dot -> mid -> outer) and colour by quality tier. No separate
+  // signal-bars element. Ethernet hides the wifi icon (cable says it all).
+  if (!isEth) {
+    var q = (quality !== undefined && quality !== null) ? quality : -1;
+    var tier  = isAP ? 'none' : (q >= 70 ? 'good' : (q >= 40 ? 'medium' : (q >= 0 ? 'poor' : 'none')));
+    var level = isAP ? 0      : (q >= 70 ? 3      : (q >= 40 ? 2        : (q >= 0 ? 1      : 0)));
+    wifiIcon.setAttribute('data-quality', tier);
+    wifiIcon.title = isAP ? 'AP mode' : ('Signal: ' + (q >= 0 ? q + '%' : 'unknown'));
+    var dot = wifiIcon.querySelector('.wifi-dot');
+    var mid = wifiIcon.querySelector('.wifi-mid');
+    var out = wifiIcon.querySelector('.wifi-out');
+    if (dot) dot.classList.toggle('active', level >= 1);
+    if (mid) mid.classList.toggle('active', level >= 2);
+    if (out) out.classList.toggle('active', level >= 3);
   }
 }
 
