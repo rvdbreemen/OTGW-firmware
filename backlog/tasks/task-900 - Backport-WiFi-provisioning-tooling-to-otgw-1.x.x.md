@@ -1,11 +1,11 @@
 ---
 id: TASK-900
 title: Backport WiFi provisioning tooling to otgw-1.x.x
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:16'
-updated_date: '2026-06-21 23:20'
+updated_date: '2026-06-21 23:22'
 labels: []
 dependencies: []
 ---
@@ -30,3 +30,9 @@ Port the host-side WiFi provisioning helpers from dev (2.0.0) to the otgw-1.x.x 
 <!-- SECTION:NOTES:BEGIN -->
 Ported provision-wifi-ap.py + wifi-profiles.py byte-identical from dev (both cross-platform, drive WiFiManager /wifisave at 192.168.4.1 which exists on ESP8266+ESP32; no logic adaptation needed). capture-settings.example.json template with Hardware=esp8266. Hardened .gitignore (capture-settings.json, wifi-profiles.json, *.secret(s).json, .env). Verified: py_compile OK, --help + list run, find shows NO real secret file in worktree, git check-ignore confirms creds files are ignored.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Backported headless WiFi provisioning (provision-wifi-ap.py, wifi-profiles.py) + capture-settings.example.json template to otgw-1.x.x, byte-identical (WiFiManager /wifisave portal is platform-agnostic). Hardened .gitignore so credential stores can never be committed; secrets stay in %LOCALAPPDATA%/OTGW-capture. Verified no secrets in worktree.
+<!-- SECTION:FINAL_SUMMARY:END -->
