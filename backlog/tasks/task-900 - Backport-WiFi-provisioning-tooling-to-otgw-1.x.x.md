@@ -1,9 +1,11 @@
 ---
 id: TASK-900
 title: Backport WiFi provisioning tooling to otgw-1.x.x
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-21 23:16'
+updated_date: '2026-06-21 23:17'
 labels: []
 dependencies: []
 ---
