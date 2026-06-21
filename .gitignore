@@ -82,3 +82,11 @@ logs/
 # Script-generated diagnostic captures
 scripts/logs/
 bisect-testset/
+
+# Secrets — the real store lives in %LOCALAPPDATA%\OTGW-capture\capture-settings.json
+# (outside the repo, never synced). Belt-and-suspenders if a copy ever lands here:
+capture-settings.json
+wifi-profiles.json
+*.secrets.json
+*.secret.json
+.env
