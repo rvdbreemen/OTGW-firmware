@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:16'
-updated_date: '2026-06-21 23:17'
+updated_date: '2026-06-21 23:20'
 labels: []
 dependencies: []
 ---
@@ -18,9 +18,15 @@ Port the host-side WiFi provisioning helpers from dev (2.0.0) to the otgw-1.x.x 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 bin/provision-wifi-ap.py present on otgw-1.x.x and runs --dry-run without error
-- [ ] #2 bin/wifi-profiles.py present and 'list' runs without error
-- [ ] #3 scripts/capture-settings.example.json present as a template with no real credentials (Hardware adapted to esp8266)
-- [ ] #4 .gitignore on otgw-1.x.x ignores capture-settings.json and *.secret(s).json so credentials cannot be committed
-- [ ] #5 No real secret file (capture-settings.json / wifi-profiles.json) exists anywhere in the worktree; secrets resolve only from %LOCALAPPDATA%/OTGW-capture or env vars
+- [x] #1 bin/provision-wifi-ap.py present on otgw-1.x.x and runs --dry-run without error
+- [x] #2 bin/wifi-profiles.py present and 'list' runs without error
+- [x] #3 scripts/capture-settings.example.json present as a template with no real credentials (Hardware adapted to esp8266)
+- [x] #4 .gitignore on otgw-1.x.x ignores capture-settings.json and *.secret(s).json so credentials cannot be committed
+- [x] #5 No real secret file (capture-settings.json / wifi-profiles.json) exists anywhere in the worktree; secrets resolve only from %LOCALAPPDATA%/OTGW-capture or env vars
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Ported provision-wifi-ap.py + wifi-profiles.py byte-identical from dev (both cross-platform, drive WiFiManager /wifisave at 192.168.4.1 which exists on ESP8266+ESP32; no logic adaptation needed). capture-settings.example.json template with Hardware=esp8266. Hardened .gitignore (capture-settings.json, wifi-profiles.json, *.secret(s).json, .env). Verified: py_compile OK, --help + list run, find shows NO real secret file in worktree, git check-ignore confirms creds files are ignored.
+<!-- SECTION:NOTES:END -->
