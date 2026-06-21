@@ -4256,6 +4256,35 @@ void satControlLoop()
   }
   _sat_consecutiveSkips = 0;  // Valid reading -- reset counter
 
+  // TASK-894 (George): EMA low-pass on the RAW room sensor before it drives control.
+  // Tames sensor jitter (e.g. BLE +-0.05 C) at the SOURCE so the controller sees a
+  // smooth signal and the PID D-term stops swinging on a stable temperature. The PID
+  // core is left untouched (George: "leave the pid untouched, add a filter to the raw
+  // sensor"); this keeps it byte-identical to pid.py, which is fed an already-smoothed
+  // HA sensor entity. Time-based EMA (tau ~45 s) so it is robust to variable control
+  // cadence and self-heals after a source gap (large dt -> alpha ~1 -> snaps to raw).
+  // sat/room_temp MQTT still publishes the raw satGetRoomTemp() reading.
+  {
+    static const float SAT_ROOM_FILTER_TAU_S = 45.0f;   // room temp is slow; ~45 s constant
+    static float    _roomFiltered     = 0.0f;
+    static uint32_t _roomFilterLastMs = 0;
+    static bool     _roomFilterSeeded = false;
+    uint32_t nowF = millis();
+    if (!_roomFilterSeeded) {
+      _roomFiltered = roomTemp;          // seed from first valid reading (no ramp-from-zero)
+      _roomFilterLastMs = nowF;
+      _roomFilterSeeded = true;
+    } else {
+      float dtF = (float)(nowF - _roomFilterLastMs) / 1000.0f;
+      _roomFilterLastMs = nowF;
+      if (dtF > 0.0f) {
+        float alphaF = dtF / (SAT_ROOM_FILTER_TAU_S + dtF);
+        _roomFiltered += alphaF * (roomTemp - _roomFiltered);
+        roomTemp = _roomFiltered;        // controller uses the smoothed value
+      }
+    }
+  }
+
   // Task #38: OT error flag monitoring -- check for critical boiler faults
   if (OTcurrentSystemState.SlaveStatus & 0x01) { // Bit 0 = fault indication
     SATDebugTln(F("SAT: boiler fault flag detected, skipping control cycle"));
