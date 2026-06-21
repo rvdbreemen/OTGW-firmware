@@ -4,7 +4,7 @@ title: 'SAT: implement per-system COLD_SETPOINT cold cutoff (+ADR)'
 status: To Do
 assignee: []
 created_date: '2026-06-20 19:20'
-updated_date: '2026-06-20 19:44'
+updated_date: '2026-06-20 20:16'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -31,10 +31,13 @@ George (SAT author) ruled COLD_SETPOINT a critical SAT function; Python value 22
 - [ ] #5 COLD_SETPOINT is a per-HEATING-SYSTEM constant (George 2026-06-20): radiators 28.2, underfloor 21. It is NOT a gas/heat-pump axis. Selected by the radiators/underfloor heating-system setting.
 - [ ] #6 Heat-pump device type (George 2026-06-20): max modulation must ALWAYS stay 100%, never 0% - gate off the suppression MM=0% drop when heat-pump is selected.
 - [ ] #7 Base offset (satGetBaseOffset) must depend ONLY on heating system (radiators/underfloor) per George ('small mistake since the beginning'); verify SAT_HC_BASE_OFFSET_RAD/_FLOOR selection and that the gas/heat-pump distinction does not alter it.
+- [ ] #8 Flame-off PWM hold lower clamp uses COLD_SETPOINT (not SAT_MIN_SETPOINT): clamp(return+offset, COLD_SETPOINT, maximum_setpoint) per Python heating_control.py:397-398; deferred from TASK-891.1 (SATcontrol.ino:799-801)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 George clarified (#dev-sat-mqtt 2026-06-20 19:15-19:31) two orthogonal axes that the SATHeatingSystem enum currently conflates: HEATING SYSTEM (radiators|underfloor -> drives base offset + COLD_SETPOINT) vs DEVICE TYPE (gas|heat pump -> drives max-modulation management only; heat pump MM always 100%). heat_pump should not be an enum peer of radiators/underfloor. The axis-separation refactor may warrant its own task - pending Robert.
+
+George design proposal (#dev-sat-mqtt 2026-06-20 19:48): Device Type axis = gas boiler | heat pump, auto-detected via ID3:LB2 (bit 1 = cooling enabled = heat pump; 0 = gas boiler) - pending Robert's validation on his Elga Ace. Heating System axis = radiators-or-mixed | underfloor. The full axis-split refactor (enum + ID3:LB2 auto-detect) is pending Robert's go and may become its own task; the heat-pump MM=100% gate is already captured in the ACs above.
 <!-- SECTION:NOTES:END -->
