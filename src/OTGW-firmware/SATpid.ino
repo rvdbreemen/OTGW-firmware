@@ -158,12 +158,14 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
 // alpha for low-pass filter that scales with sample rate.
 // Inside deadband: derivative FREEZES at last calculated value (persists as
 // heating curve offset). Outside deadband: derivative actively updates.
-static void _pidUpdateDerivative(float roomTemp)
+static void _pidUpdateDerivative(float roomTemp, float error)
 {
   float deadband = settings.sat.fDeadband;
 
-  // Inside deadband: FREEZE derivative (keep last value), update timestamp only
-  if (fabsf(_pid_lastError) <= deadband) {
+  // Inside deadband: FREEZE derivative (keep last value), update timestamp only.
+  // Uses the CURRENT error to exactly match Python pid.py:205 (abs(state.error) <= DEADBAND);
+  // previously checked _pid_lastError, a 1-cycle lag at the deadband boundary. (TASK-893)
+  if (fabsf(error) <= deadband) {
     // _pid_rawDerivative keeps its last value — intentional freeze
     _pid_lastDerivativeMs = millis();
     return;
@@ -244,8 +246,8 @@ float satPidUpdate(float roomTemp, float targetTemp, float heatingCurveValue, fl
   // Update integral (force update on each PID cycle)
   _pidUpdateIntegral(error, heatingCurveValue, true);
 
-  // Update derivative (temperature-based)
-  _pidUpdateDerivative(roomTemp);
+  // Update derivative (temperature-based); pass the current error for the deadband freeze
+  _pidUpdateDerivative(roomTemp, error);
 
   // Calculate P, I, D terms
   float P = state.sat.fKp * error;
