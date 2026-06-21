@@ -42,9 +42,11 @@
         <div class="headercolumnbig" id="sysName">OTGW firmware</div>
         <span class="headercolumn net-status" id="netStatus" title="Network: WiFi" aria-label="Network status: WiFi">
           <svg id="netIconWifi" class="net-icon net-icon-wifi" viewBox="0 0 24 24" width="18" height="18" role="img" aria-hidden="true">
-            <path class="wifi-seg wifi-out" d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9z"/>
-            <path class="wifi-seg wifi-mid" d="M5 13l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
-            <path class="wifi-seg wifi-dot" d="M9 17l3 3 3-3c-1.65-1.66-4.34-1.66-6 0z"/>
+            <!-- Arcs in document order: [0] outer, [1] mid, [2] dot. updateNetworkIndicator()
+                 lights them inside-out (dot first) by signal level; .wifi-seg styles them. -->
+            <path class="wifi-seg" d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9z"/>
+            <path class="wifi-seg" d="M5 13l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
+            <path class="wifi-seg" d="M9 17l3 3 3-3c-1.65-1.66-4.34-1.66-6 0z"/>
           </svg>
           <svg id="netIconEth" class="net-icon hidden" viewBox="0 0 24 24" width="18" height="18" fill="currentColor" role="img" aria-hidden="true">
             <path d="M7.77 6.76L6.23 5.48.82 12l5.41 6.52 1.54-1.28L3.42 12l4.35-5.24zM7 13h2v-2H7v2zm10-2h-2v2h2v-2zm-6 2h2v-2h-2v2zm6.77-7.52l-1.54 1.28L20.58 12l-4.35 5.24 1.54 1.28L23.18 12l-5.41-6.52z"/>
