@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-21 23:33'
+updated_date: '2026-06-21 23:48'
 labels: []
 dependencies: []
 ---
@@ -24,3 +24,9 @@ ROOT CAUSE (bisected from OTGW-logs/bisect-testset transcripts). Failure signatu
 - [ ] #4 python build.py firmware exit 0 + evaluate.py --quick no new failures
 - [ ] #5 No regression to webserver responsiveness that TASK-651 was trying to fix (or documented trade-off)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ROOT CAUSE pinned offline: commit 05e777bf (beta.15), delay(1)->yield() in doBackgroundTasks tail = primary (uncaps ~1kHz loop); delayms busy-wait = secondary (blinkLED cold, boot/manual only - grep-confirmed). Bisect refined via p05 maxBlock floor: beta.13(4040)=last GOOD -> beta.16(1296,12exc)=first BAD. LOAD-DEPENDENT: live zutphen units on 1.7.0-beta.4 survive 5d at low load; crash needs WS+HTTP load (matches README 'browser capture ON'). Hardware: bench ESP8266 MAC C8:C9:A3:5A:CB:08 on USB COM3 (CH340), NOT WiFi-joined -> needs flash+provision. Full plan/state/matrix in OTGW-logs/AB-campaign.md. 7-arm matrix locked (C0 yield, C1 delay1, C2 dus500, C3 dus500+yield, C4 dus250+yield, C5 dus250, CREV full-revert). Launched: harness scripts + 7-arm builds (background). 15-min autonomous loop armed.
+<!-- SECTION:NOTES:END -->
