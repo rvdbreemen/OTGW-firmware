@@ -52,6 +52,8 @@ static const float SAT_HC_REF_TEMP           = 20.0f;   // Reference temperature
 
 // --- Control Constants ---
 static const float SAT_MIN_SETPOINT          = 10.0f;   // Minimum boiler setpoint °C
+static const float SAT_COLD_SETPOINT_RAD     = 28.2f;   // Radiators: requested setpoint below this => no heating, boiler off (TASK-891.2)
+static const float SAT_COLD_SETPOINT_FLOOR   = 21.0f;   // Underfloor: requested setpoint below this => no heating, boiler off
 static const float SAT_MAX_SETPOINT_DEFAULT  = 75.0f;   // Default max boiler setpoint °C
 static const float SAT_FLOW_OFFSET_CONTINUOUS = 5.0f;   // Flow temp offset for continuous mode smoothing
 static const float SAT_PWM_MIN_ON_SEC        = 180.0f;  // Min flame-on time in PWM mode (matches Python HEATER_STARTUP_TIMEFRAME = 180s)
@@ -233,6 +235,14 @@ static float satGetBaseOffset()
   // Base offset is heating-system-only (George 2026-06-20): underfloor vs radiators.
   return (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_HC_BASE_OFFSET_FLOOR   // 20.0
                                                                  : SAT_HC_BASE_OFFSET_RAD;    // 27.2
+}
+
+// Per-heating-system cold setpoint (TASK-891.2; George: radiators 28.2, underfloor 21). Below
+// this requested setpoint the home needs no heating and the boiler is commanded off.
+static float satGetColdSetpoint()
+{
+  return (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_COLD_SETPOINT_FLOOR
+                                                                 : SAT_COLD_SETPOINT_RAD;
 }
 
 // Returns max PWM cycles per hour for the current heating system
@@ -822,7 +832,7 @@ static float satApplyPWM(float pidOutput)
         return SAT_MIN_SETPOINT;
       }
       float cs = satGetReturnTemp() + settings.sat.fFlameOffOffset;
-      if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
+      if (cs < satGetColdSetpoint()) cs = satGetColdSetpoint();  // flame-off hold clamped to COLD_SETPOINT (TASK-891.2, per Python heating_control.py)
       if (cs > maxSetpoint) cs = maxSetpoint;
       _pwm_flameOffHoldSetpoint = cs;
       return cs;
@@ -4610,7 +4620,7 @@ void satControlLoop()
   // --- Auto-switch between continuous and PWM modes (Tasks #42/#43) ---
   // Delegated to satCycleCheckAutoSwitch() in SATcycles.ino which uses correct
   // thresholds (3.0C overshoot margin, 60s sustain, 300s DHW post-overshoot guard).
-  if (!satAlwaysMaxModulation()) {
+  if (!satAlwaysMaxModulation() && pidOutput > satGetColdSetpoint()) {
     satCycleCheckAutoSwitch();
   }
 
@@ -4651,6 +4661,14 @@ void satControlLoop()
       if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;
       state.sat.fFinalSetpoint = finalSetpoint;
     }
+  }
+
+  // --- COLD_SETPOINT cutoff (TASK-891.2, George): requested setpoint below the per-heating-system
+  // cold setpoint => no heating needed; command the boiler OFF (CS=MINIMUM => CH=0, MM=100 restore).
+  if (pidOutput < satGetColdSetpoint()) {
+    finalSetpoint = SAT_MIN_SETPOINT;
+    state.sat.iCurrentModulation = 100;
+    state.sat.fFinalSetpoint = finalSetpoint;
   }
 
   // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
