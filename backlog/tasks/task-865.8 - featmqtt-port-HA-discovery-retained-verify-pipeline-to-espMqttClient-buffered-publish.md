@@ -3,11 +3,11 @@ id: TASK-865.8
 title: >-
   feat(mqtt): port HA discovery/retained/verify pipeline to espMqttClient
   buffered publish
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:50'
-updated_date: '2026-06-20 17:19'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies:
@@ -45,3 +45,9 @@ Landed seq8: removed verify-window RX-buffer accessors (verifyAccessorSetMqttBuf
 
 OTGW32 (alpha.227): buffered HA discovery published cleanly to the test-rig broker (110 topics, 0 pending, 0 spurious republish) on the OTDirect board. NOTE: alpha.227 includes the TASK-889 chunked-inbound verify fix, so the chunked-config-drop risk (889) is addressed on this build. Discovery-verify CLEAN with a captured chunked config still pending (broker + a config large enough to split).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ported the HA discovery / retained / verify pipeline to espMqttClient buffered publish (ADR-123 Phase 2). Live on dev. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->

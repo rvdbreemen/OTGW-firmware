@@ -1,11 +1,11 @@
 ---
 id: TASK-865.1
 title: 'feat(build): remove the esp8266 PlatformIO env and build-target plumbing'
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:41'
-updated_date: '2026-06-13 07:16'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies: []
@@ -48,3 +48,9 @@ Broad host-side sweep (.github, bin, scripts, top-level tooling) found two resid
 
 Landed in commit b9263957 (pushed to origin/feature-2.0.0-esp32s3-async). esp8266 PlatformIO env + build-target plumbing removed: platformio.ini parses to exactly 3 envs (esp32, esp32-classic, esp32-combo), default_envs=esp32; build.py, build.yml, dependency-scan.yml, flash_otgw.sh/.bat, patch_pio_libs.py de-esp8266'd. Build/evaluator-verifiable ACs PASS first-hand: all 3 esp32* envs compile (honest per-env exit 0, firmware.bin present), --target esp8266 rejected by argparse, forbidden esp8266 tokens absent, evaluate.py --quick 61 pass / 2 pre-existing-baseline warn / 0 fail. version.h/.hash build churn deliberately NOT committed (bump-owned as a unit, no prerelease bump warranted: srcTouched=false). Scope-guard: .claude/workflows+skills implement-next-task changes excluded (orchestrator-harness, not task content). REMAINING FIELD-VALIDATION AC (cannot self-certify, no hardware): flash esp32-classic + esp32-combo merged-full.bin on S3 hardware, confirm boot + AP + web UI (merged offsets changed). Reported as In Review (project backlog schema has no In Review state; on-disk status stays In Progress) pending that hardware sign-off.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Removed the esp8266 PlatformIO env + build-target plumbing (ADR-128); 2.0.0 dev builds ESP32 targets only. Live on dev, alpha-validated. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->

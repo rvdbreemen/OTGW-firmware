@@ -3,11 +3,11 @@ id: TASK-865.6
 title: >-
   feat(rtos): move the PIC UART onto a dedicated FreeRTOS task as sole
   OTGWSerial owner
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:48'
-updated_date: '2026-06-13 15:13'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies:
@@ -57,3 +57,9 @@ OPEN CORRECTNESS ITEMS deferred to field validation (status=In Review for this r
 
 REMAINING FIELD-VALIDATION ACs (require hardware): no Serial Buffer Overflow/Overrun under heavy HTTP+MQTT load; no TWDT resets; PIC OTA flash completes (task parked during isFlashing/bPICactive); ser2net 25238 both directions; OT/MQTT/WS/SAT byte-identical to pre-task build; OTDirect combo boot -> task created but immediately parks.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Moved the PIC UART onto a dedicated FreeRTOS task as the sole OTGWSerial owner (ADR-123 Phase 1). Live on dev. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->

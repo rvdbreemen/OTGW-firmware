@@ -3,11 +3,11 @@ id: TASK-865.11
 title: >-
   feat(web): rewrite the ESP32 OTA upload handler against AsyncWebServer
   onUpload
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:55'
-updated_date: '2026-06-14 06:38'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies:
@@ -48,3 +48,9 @@ Async upload callback runs on the AsyncTCP limited-stack task and must not block
 <!-- SECTION:NOTES:BEGIN -->
 Landed the AsyncWebServer onUpload OTA rewrite (ADR-134). OTGW-ModUpdateServer-esp32.h now uses srv.on(path,HTTP_POST,done,onUpload) with a _handleUpload(filename,index,data,len,final) dispatcher; zero _server->on/HTTPUpload/upload.status. /update route attach-once in setupFSexplorer() (guarded by _routesRegistered); startWiFi() keeps only updateCredentials() current. Merged-binary app-slot extraction, I2C 0x26/0xA5 watchdog feed per chunk, U_SPIFFS/U_FLASH split + LittleFS remount + writeSettings, deferred-reboot-from-loop(), and the four logBootSignature probes carried over. evaluate.py --quick green (0 failures). esp32-classic built clean (.ino.bin present post-edit); esp32 full build verified. REMAINING (field-validation on real ESP32-S3, blocks Done): plain .ino.bin + merged-binary firmware OTA boots and deferred reboot fires after HTTP 200 drains; filesystem-image (U_SPIFFS) OTA remounts + restores settings + assets serve; hardware watchdog fed through a multi-MB upload with no mid-flash reboot and the flash-progress WebSocket still flowing.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Rewrote the ESP32 OTA upload handler against AsyncWebServer onUpload (ADR-123 Phase 3 / ADR-134). Live on dev. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->

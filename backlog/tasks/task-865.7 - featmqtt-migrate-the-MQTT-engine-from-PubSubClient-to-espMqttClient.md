@@ -1,11 +1,11 @@
 ---
 id: TASK-865.7
 title: 'feat(mqtt): migrate the MQTT engine from PubSubClient to espMqttClient'
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:49'
-updated_date: '2026-06-20 17:19'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies:
@@ -50,3 +50,9 @@ Audit + live HW validation (2026-06-20): the espMqttClient data plane is PROVEN 
 
 OTGW32 (alpha.227, 192.168.1.143) espMqttClient data plane validated against test-rig broker 192.168.1.234: connected on reboot, HA discovery published 110 retained topics (disc_pending=0, republish_triggered=0). Confirms the espMqttClient migration works on the OTGW32/OTDirect board too (earlier validated on esp32-classic). Residual field gates unchanged (broker-kill responsiveness, HA avty LWT timing).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Migrated the MQTT engine from PubSubClient to espMqttClient (ADR-123 Phase 2 / ADR-131: async connect, single publish chokepoint). Live on dev. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->

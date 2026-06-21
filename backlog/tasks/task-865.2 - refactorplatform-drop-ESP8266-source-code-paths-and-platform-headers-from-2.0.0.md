@@ -3,11 +3,11 @@ id: TASK-865.2
 title: >-
   refactor(platform): drop ESP8266 source code paths and platform headers from
   2.0.0
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:41'
-updated_date: '2026-06-20 15:58'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies: []
@@ -48,3 +48,9 @@ Implemented ESP8266 source-side drop (ADR-128). Deleted platform_esp8266.h + OTG
 
 OTGW32 boot + web UI LIVE-confirmed on the actual OTGW32 (192.168.1.143, alpha.226, OT-Direct): boots clean, LittleFS mounts, web UI + all v2 REST endpoints serve 200. AC5 'OTGW32 boot + web UI' met on hardware; only 'live OT traffic' remains (no boiler/thermostat wired: otgwmode=None, otgwconnected=false).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Dropped ESP8266 source paths + platform headers from 2.0.0 (ADR-128); firmware is ESP32-S3-only. Live on dev. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->

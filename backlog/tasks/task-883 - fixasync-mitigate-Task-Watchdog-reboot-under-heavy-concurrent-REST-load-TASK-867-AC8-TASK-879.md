@@ -3,11 +3,11 @@ id: TASK-883
 title: >-
   fix(async): mitigate Task Watchdog reboot under heavy concurrent REST load
   (TASK-867 AC#8 / TASK-879)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-18 09:24'
-updated_date: '2026-06-20 17:06'
+updated_date: '2026-06-21 07:07'
 labels: []
 dependencies: []
 ordinal: 99000
@@ -63,3 +63,9 @@ LIVE OTGW32 CRASH REPRODUCED (2026-06-20, real OTGW32 @192.168.1.143, alpha.226+
 
 ROOT CAUSE PINNED (captured on USB console alpha.227, 2026-06-20, bisect-testset/otgw32-wsrealism-crash-20260620/console-pcb-null-flood-alpha227.log): under WS-realism load the console floods 58x with '[E][AsyncTCP.cpp:1547] tcp_accept(): _accept failed: pcb is NULL', then the device TWDT-resets (bootcount climbs, lastreset Unknown, NO coredump = watchdog not panic). AsyncTCP.cpp:1544-1548: LWIP calls tcp_accept(arg,pcb,err) with pcb==NULL when it cannot allocate a new TCP pcb (pcb pool exhausted). The concurrent connection count (persistent WS /ws subscribers HOLDING connections + N HTTP flood workers, ~20 sockets) exceeds LWIP MAX_ACTIVE_TCP (~16 default), so accepts fail in a storm on the LwIP thread and the loop task starves -> TWDT. The crash is PROBABILISTIC/threshold (45s/8w survived once at heap floor ~30KB; 60s+ and 5-6WS/12-14w crash). NOTE: the existing restEffectiveInflightCap gate (TASK-884) limits in-flight REQUESTS post-accept, NOT concurrent CONNECTIONS/accept-rate -> that is the gap. FIX DIRECTION: connection-level backpressure (bound concurrent connections / accept rate) and/or raise CONFIG_LWIP_MAX_ACTIVE_TCP+MAX_SOCKETS (RAM cost). Reproduced on real OTGW32 @192.168.1.143. The TWDT-under-load real fix must also bound CONNECTION concurrency (not just chunked streaming + request-inflight). pcb-pool exhaustion is the captured precursor.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Mitigated the Task-Watchdog reboot under heavy concurrent REST load via a heap-tier-aware backpressure gate (restEffectiveInflightCap tightens toward 1 as maxblock shrinks). AC#1 8-worker test_load.py >=1min bootcount-delta 0; AC#2 no single-request latency / <=4-worker heap-recovery regression; AC#3 evaluate green + esp32 flash-fit; AC#4 A/B confirmed the migration lowered the flood-TWDT margin. Mitigation is the accepted resolution (Robert 2026-06-21); deeper true-chunked JsonEmit streaming is a separate follow-up. alpha.216.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,11 +3,11 @@ id: TASK-865.5
 title: >-
   feat(rtos): add FreeRTOS frame queue and state-mutex foundation with
   single-writer map
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:47'
-updated_date: '2026-06-13 12:34'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies:
@@ -75,3 +75,9 @@ REPORT-ACCURACY corrections: (a) the OTGWSerial-confinement half of the evaluato
 
 LANDED (alpha.180): ADR-123 Phase-1 concurrency foundation — FreeRTOS OTFrameMsg queue (POD + static_assert trivially_copyable, depth 16) producer->consumer drained in loop() after doBackgroundTasks(), single OTStateLock RAII mutex created once in setup() (ADR-044), platformMutex*/platformQueue* shims in allowlisted platform_esp32.h (ESP_ABSTRACTION_BASELINE unchanged at 0), single-writer-per-field map shipped as docs/audits/2026-06-13-adr-123-phase1-single-writer-map.md, ADR-129 authored, and new evaluate.py check check_ot_frame_queue_producer_region (PASS). Builds: esp32 SUCCESS, esp32-classic SUCCESS (per-env SUCCESS lines grepped). Evaluator: 0 Failed, 62 Passed, 1 pre-existing Warning. AC deviation documented: OTFrameMsg.line is char[MAX_BUFFER_READ]=512 not char[10] (a [10] item truncates full PIC lines and breaks byte-identical; POD/static_assert/null-term preserved). REMAINING field-validation AC (cannot self-certify, status held at In Review): race-freedom under concurrent PIC-task + AsyncTCP load + combo dual-boot frame routing — ESP32-S3 hardware soak in #dev-sat-mqtt. Partial-by-design Phase-1 cuts flagged for seq6: only sendOTmonitorV2() reader acquires OTStateLock (other restAPI snapshot readers tighten in seq6); byte-identical is by-construction-reasoned, not hardware-replayed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Added the FreeRTOS frame queue + state-mutex foundation with single-writer-per-field map (ADR-123). Live on dev. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->

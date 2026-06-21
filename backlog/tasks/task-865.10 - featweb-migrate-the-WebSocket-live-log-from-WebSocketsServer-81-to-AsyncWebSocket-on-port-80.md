@@ -3,11 +3,11 @@ id: TASK-865.10
 title: >-
   feat(web): migrate the WebSocket live-log from WebSocketsServer:81 to
   AsyncWebSocket on port 80
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:55'
-updated_date: '2026-06-20 15:58'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies:
@@ -48,3 +48,9 @@ Landed: WebSocket live-log migrated from Links2004 WebSocketsServer:81 to AsyncW
 
 OTGW32 (192.168.1.143, alpha.226): port 80 OPEN, AsyncWebSocket /ws shares it (WebSocketsServer:81 retired). Web-layer live on OTGW32 hardware; Safari upload-progress + extended-session heap (AC5) still field-gated.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Migrated the WebSocket live-log from WebSocketsServer:81 to AsyncWebSocket /ws on port 80 (ADR-123 Phase 3 / ADR-133). Live on dev. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->

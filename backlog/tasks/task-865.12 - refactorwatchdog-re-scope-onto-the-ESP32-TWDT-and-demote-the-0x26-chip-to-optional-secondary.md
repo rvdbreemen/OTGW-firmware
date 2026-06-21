@@ -3,11 +3,11 @@ id: TASK-865.12
 title: >-
   refactor(watchdog): re-scope onto the ESP32 TWDT and demote the 0x26 chip to
   optional secondary
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:56'
-updated_date: '2026-06-14 15:29'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies:
@@ -45,3 +45,9 @@ Landed TWDT re-scope (ADR-135): three watchdog shapes collapsed to two. #if HAS_
 
 Follow-up fix (maintainer dispositie 2026-06-14): made the combo external-0x26 feed + boot-read UNCONDITIONAL, matching the already-unconditional arm. Removed secondaryWatchdogActive() and its isPICEnabled() gate. Rationale: 0x26 presence is not reliably detectable (later NodoShop Classic revisions dropped the chip; the only PIC probe is detectPIC() reset->ETX), feeding an absent 0x26 is a harmless NACK, while the previous arm-unconditional/feed-gated asymmetry could arm-but-not-feed a present chip on a combo+old-Classic-PCB with a dead/undetected PIC -> spurious reset loop. ADR-135 Decision/Risk updated. BUILD: esp32 + esp32-classic SUCCESS; esp32-combo links clean but fails the PRE-EXISTING partition-size check (101%, 1986399/1966080 B), unrelated to this change. EVAL: evaluate.py --quick 0 failures (98.6%).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Re-scoped the watchdog onto the ESP32 TWDT and demoted the external 0x26 chip to optional secondary (ADR-135). Live on dev. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->

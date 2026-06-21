@@ -3,11 +3,11 @@ id: TASK-865.9
 title: >-
   feat(web): migrate HTTP server, REST API and FSexplorer to ESPAsyncWebServer
   on port 80
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-13 05:54'
-updated_date: '2026-06-20 15:58'
+updated_date: '2026-06-21 07:07'
 labels:
   - async-esp32s3
 dependencies:
@@ -104,3 +104,9 @@ LIVE auth/CSRF validation on the connected esp32-classic (2026-06-20, temp passw
 
 LIVE OTGW32 web-layer validation (2026-06-20, device 192.168.1.143, alpha.226+6b57115, hardware_type otgw32, OT-Direct mode): async HTTP/REST/FSexplorer/WebSocket migration confirmed on the actual OTGW32 hardware. GET / + /index.html -> 200 (web UI serves from LittleFS), /api/v2/health|device/info|otgw/overrides|sat/status|sensors|discovery|listfiles -> 200, /api/v1/* -> 410 Gone (ADR-035), /nonexistent -> 404, port 80 OPEN (AsyncWebSocket /ws shares it). Residual field gates unchanged (auth/CSRF, FSexplorer DELETE, OT/MQTT throughput under load, live OT bus).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Migrated the HTTP server, REST API and FSexplorer to ESPAsyncWebServer on port 80 (ADR-123 Phase 3 / ADR-132 imperative-push to async-pull bridge). Live on dev. Closed per migration-accepted sign-off (Robert 2026-06-21).
+<!-- SECTION:FINAL_SUMMARY:END -->
