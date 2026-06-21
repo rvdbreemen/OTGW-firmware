@@ -50,7 +50,7 @@ BOARD_CONFIGS = {
         "chip": "esp32s3",
         "default_baud": 921600,
         "firmware_address": "0x10000",
-        "filesystem_address": "0x1F0000",  # from partitions_otgw_esp32.csv (4M2M layout)
+        "filesystem_address": "0x270000",  # spiffs offset from partitions_otgw_esp32.csv (TASK-867: 2.375M app @0x10000 + 1.5M LittleFS @0x270000). Stale 0x1F0000 caused a boot loop (TASK-890).
         "bootloader_address": "0x0",       # ESP32-S3 bootloader is at 0x0, not 0x1000
         "partitions_address": "0x8000",
         # ESP32-S3 built-in USB-Serial/JTAG (same VID/PID as OT-Thing)
@@ -527,18 +527,34 @@ def erase_flash(port, chip):
         return False
 
 
+def _read_fs_offset_from_csv(default="0x270000"):
+    """Read the LittleFS ('spiffs') offset from the ESP32 partition CSV so the flash
+    offset can never drift from the firmware build (TASK-890 AC#1: never hardcoded)."""
+    csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "partitions_otgw_esp32.csv")
+    try:
+        with open(csv, "r", encoding="utf-8") as f:
+            for line in f:
+                s = line.strip()
+                if not s or s.startswith("#"):
+                    continue
+                parts = [p.strip() for p in s.split(",")]  # Name,Type,SubType,Offset,Size,Flags
+                if len(parts) >= 4 and parts[0] == "spiffs":
+                    return parts[3]
+    except OSError:
+        pass
+    return default
+
+
 def flash_device(board, port, artifacts, baud=None, do_erase=False):
     """Flash the device. Handles both ESP8266 and ESP32."""
     cfg = BOARD_CONFIGS[board]
     if baud is None:
         baud = cfg["default_baud"]
 
-    # ESP32-S3 always erases before flashing: the otadata partition (0xE000)
-    # must be cleared so the bootloader starts fresh from the app0 slot.
-    # Without this, a corrupt otadata entry causes a TG0WDT boot loop even
-    # after reflashing the firmware.
-    if board == "esp32":
-        do_erase = True
+    # ESP32-S3: erase is OPT-IN (-e) so a normal flash PRESERVES NVS (saved WiFi
+    # credentials). The merged image carries a fresh partition table + otadata, so it
+    # boots cleanly without a full erase. If a corrupt-otadata boot loop occurs, re-flash
+    # with -e to clear it. (TASK-890 AC#2: a forced erase previously wiped WiFi creds.)
 
     print_header("Flash Summary")
     print(f"{Colors.BOLD}Board:{Colors.ENDC}     {cfg['name']}")
@@ -603,8 +619,9 @@ def flash_device(board, port, artifacts, baud=None, do_erase=False):
                 print_info(f"Firmware       @ {cfg['firmware_address']}")
 
             if "filesystem" in artifacts:
-                cmd.extend([cfg["filesystem_address"], str(artifacts["filesystem"])])
-                print_info(f"Filesystem     @ {cfg['filesystem_address']}")
+                fs_off = _read_fs_offset_from_csv(cfg["filesystem_address"])
+                cmd.extend([fs_off, str(artifacts["filesystem"])])
+                print_info(f"Filesystem     @ {fs_off} (from partition CSV)")
         else:
             # ESP8266
             if "firmware" in artifacts:
