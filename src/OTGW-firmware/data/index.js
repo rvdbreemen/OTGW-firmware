@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.235
+**  Version  : v2.0.0-alpha.236
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -402,15 +402,16 @@ function updateNetworkIndicator(mode, apFallback, quality, ip) {
   var isAP  = (mode === 'AP');
   var cssClass = isEth ? 'net-ethernet' : (isAP ? 'net-ap' : 'net-wifi');
   container.className = 'headercolumn net-status ' + cssClass;
-  // TASK-759: show the active IP alongside the transport so WiFi-vs-Ethernet
-  // and the address are both visible, live (the device/time poll carries it).
+  // TASK-896: the icon already conveys the transport (wifi vs cable) and the IP
+  // is shown once in #devName as 'hostname . IP'. So the cluster text only needs
+  // to flag AP fallback; the title/aria-label keep the full detail for a11y.
   var ipSuffix = (ip && !isAP) ? (' (' + ip + ')') : '';
   var netLabel = isAP ? 'AP Fallback mode (no WiFi)' : ('Network: ' + mode + ipSuffix);
   container.title = netLabel;
   container.setAttribute('aria-label', 'Network status: ' + (isAP ? 'AP Fallback' : (mode + ipSuffix)));
   wifiIcon.classList.toggle('hidden', isEth);
   ethIcon.classList.toggle('hidden', !isEth);
-  if (textEl) textEl.textContent = isAP ? 'AP MODE' : (mode + ipSuffix);
+  if (textEl) textEl.textContent = isAP ? 'AP MODE' : '';
 
   // Signal bars: shown for WiFi only; neutral for Ethernet/AP
   var barsEl = document.getElementById('netSignalBars');
@@ -5367,7 +5368,11 @@ function refreshDevInfo() {
 
       const devNameEl = document.getElementById('devName');
       if (devNameEl) {
-        devNameEl.textContent = hostname + (ipaddress ? " (" + ipaddress + ")" : "");
+        // TASK-896: single transport/host/IP cluster. The header icon conveys
+        // the transport, so here we show only 'hostname · IP' (once), with the
+        // mDNS name surfaced on hover instead of repeated inline.
+        devNameEl.textContent = hostname + (ipaddress ? " · " + ipaddress : "");
+        devNameEl.title = hostname ? ("Reachable at " + hostname + ".local") : "";
       }
     })
     .catch(function (error) {

@@ -1860,6 +1860,11 @@ body.dark .sat-dashboard.sat-panel,
   font-weight: 600;
   color: var(--fg-3);
 }
+/* TASK-896: #devName carries 'hostname · IP'; the mDNS name lives in its title
+   tooltip, so signal that it is hoverable. */
+#devName {
+  cursor: help;
+}
 .net-signal-bars {
   display: inline-flex;
   align-items: flex-end;
