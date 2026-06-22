@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 09:36'
+updated_date: '2026-06-22 10:29'
 labels: []
 dependencies: []
 ---
@@ -41,4 +41,6 @@ SYNTHETIC REPRO via built-in sim replay (no boiler needed): uploaded /otgw_simul
 REPRODUCED ON BENCH (full synthetic load). Enabled device MQTT (broker homeassistant.local, creds set - not stored here) -> mqttconnected true -> sim replay values now PUBLISH = the missing churn. C0(yield/BAD)+sim+MQTT+6http3ws 20min -> REBOOTED (bootcount 15->16, reboot_detected true, frag_max 61%, hd_mqtt_drops 22). The field crash reproduced synthetically (no boiler). MQTT publish churn was the final missing ingredient (decode alone = critical 3; decode+MQTT = reboot). Now validating beta.5(FIX dus500+yield)+same full load, 30min -> survive = fix proven on bench. delay1(C1) baseline next if needed.
 
 FULL-LOAD A/B (sim+MQTT+6http3ws, identical): C0(yield)=REBOOT@20min. beta.5(dus500+yield)=SURVIVED 30min, 0 reboot, BUT hd_enter_critical 5 + maxblock dipped 1352 (thin margin), served 15428 http (more load than C0, still no crash). => FIX VALIDATED on bench (prevents the crash) but thin headroom. Now running C1(delay1, 1kHz proven) same load -> if critical ~0 = bigger margin (max stability 1.3.5-class) vs beta.5 thinner-but-faster. Final fix decision after C1.
+
+FULL-LOAD A/B COMPLETE (sim+MQTT+6http3ws, identical): C0 yield=REBOOT@20m; beta.5 dus500+yield=survive 30m crit5 maxblk-floor 1352; C1 delay1=survive 30m crit3 maxblk-floor 3128. KEY: under realistic mixed load delay1 throughput == dus500 (15063 vs 15428) - the delay1 penalty was a pure-HTTP-flood artifact (work-bound vs loop-bound). delay1 = bigger margin (2.3x floor) + proven beta.13 + no real throughput cost => OPTIMUM. DECISION (user-approved): ship delay1 as the fix. Building beta.6 (tail = delay(1), reverting beta.5 dus500+yield). evaluate.py 100%. Next: flash beta.6 + full-load validation (must survive) -> commit -> push. beta.5 was a transient step, superseded by beta.6.
 <!-- SECTION:NOTES:END -->
