@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 00:23'
+updated_date: '2026-06-22 07:01'
 labels: []
 dependencies: []
 ---
@@ -31,4 +31,6 @@ ROOT CAUSE (bisected from OTGW-logs/bisect-testset transcripts). Failure signatu
 ROOT CAUSE pinned offline: commit 05e777bf (beta.15), delay(1)->yield() in doBackgroundTasks tail = primary (uncaps ~1kHz loop); delayms busy-wait = secondary (blinkLED cold, boot/manual only - grep-confirmed). Bisect refined via p05 maxBlock floor: beta.13(4040)=last GOOD -> beta.16(1296,12exc)=first BAD. LOAD-DEPENDENT: live zutphen units on 1.7.0-beta.4 survive 5d at low load; crash needs WS+HTTP load (matches README 'browser capture ON'). Hardware: bench ESP8266 MAC C8:C9:A3:5A:CB:08 on USB COM3 (CH340), NOT WiFi-joined -> needs flash+provision. Full plan/state/matrix in OTGW-logs/AB-campaign.md. 7-arm matrix locked (C0 yield, C1 delay1, C2 dus500, C3 dus500+yield, C4 dus250+yield, C5 dus250, CREV full-revert). Launched: harness scripts + 7-arm builds (background). 15-min autonomous loop armed.
 
 HARDWARE BLOCKER (2026-06-22): device on COM3 = MAC 84:F3:EB:22:B8:E1 = the live 88.68 unit (1.6.1-beta, PIC fw 6.6 = real boiler), NOT the C8:C9:A3 bench unit. Flash blocked: esptool reads MAC but stub/--no-stub fail with 'serial noise or corruption' = active PIC streams OT into ESP RX, corrupts bootloader. NO write happened; recovered to run mode (88.68 health=200). Will NOT autonomously flash/overload a production gateway. Need user: confirm safe bench target + quiet PIC, or point to real bench unit, or accept offline-confirmed fix. esptool works via 'python -m esptool' (pip 4.8.1); flash_esp.py cp1252 bug + flash_otgw.bat Get-FileHash bug noted. Root cause already pinned offline; hardware A/B is validation, not discovery.
+
+FIX IMPLEMENTED on 1.7.0-beta.5: doBackgroundTasks() tail yield() -> delayMicroseconds(500); yield() (C3). Caps loop ~2kHz (bounds heap fragmentation per offline bisect) + keeps yield (SDK servicing + web responsiveness TASK-651 wanted). Evaluator --quick 100% (34 pass/0 fail). Build running. BENCH NOTE: bench (no boiler) cannot validate the fragmentation fix (C0 yield == CREV delay1 == 53-55% frag, no crash, structural: no boiler->no value churn for loop to amplify). Bench validates no-regression + throughput only. REAL fragmentation validation = FIELD test on a boiler-connected unit (George). Conservative fallback if field shows insufficient = plain delay(1) (proven beta.13-stable).
 <!-- SECTION:NOTES:END -->
