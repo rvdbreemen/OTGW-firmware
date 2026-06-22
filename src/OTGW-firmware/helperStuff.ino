@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.7.0-beta.25
+**  Version  : v1.7.0-beta.26
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -657,9 +657,9 @@ void doRestart(const char* str) {
   delay(5000);  // Safety tail retained from v1.2.0; should not normally return.
 }
 
-String upTime() 
+const char* upTime()
 {
-  char    calcUptime[20];
+  static char calcUptime[20];   // static: returned pointer stays valid; no heap String (consumed immediately by callers)
 
   snprintf_P(calcUptime, sizeof(calcUptime), PSTR("%d(d)-%02d:%02d(H:m)")
                                           , int((state.uptime.iSeconds / (60 * 60 * 24)) % 365)

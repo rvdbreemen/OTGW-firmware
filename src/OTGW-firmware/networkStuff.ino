@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.7.0-beta.25
+**  Version  : v1.7.0-beta.26
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -312,7 +312,7 @@ static void sendTelnetBanner(const char* ip)
     checklittlefshash() ? "ok" : "mismatch");
   _debugPrintf_P(PSTR("  Host : %s   Up: %s   Reboots: %lu\r\n"),
     settings.sHostname,
-    upTime().c_str(),
+    upTime(),
     (unsigned long)state.uptime.iRebootCount);
   debugTelnet.println(F("============================================"));
   const int wifiRssi = WiFi.RSSI();
