@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.7.0-beta.14
+**  Version  : v1.7.0-beta.15
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2932,8 +2932,9 @@ void addOTWGcmdtoqueue(const char* buf, const int len, const bool forceQueue, co
   // GW→PR=M, SB→PR=S, VR→PR=V, TS→PR=D, IT/OH→PR=T, GA/GB→PR=G, LA-LF→PR=L
   if (len >= 2) {
     char cmd[3] = { buf[0], buf[1], '\0' };
-    static const char kSettingsCmds[] = "GW GA GB SB VR TS IT OH LA LB LC LD LE LF";
-    if (strstr(kSettingsCmds, cmd)) {
+    static const char kSettingsCmds[] PROGMEM = "GW GA GB SB VR TS IT OH LA LB LC LD LE LF";
+    char cmdList[sizeof(kSettingsCmds)]; strlcpy_P(cmdList, kSettingsCmds, sizeof(cmdList));  // list now in flash
+    if (strstr(cmdList, cmd)) {
       triggerPICsettingsReadout();
     }
   }
