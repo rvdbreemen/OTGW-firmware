@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 09:04'
+updated_date: '2026-06-22 09:36'
 labels: []
 dependencies: []
 ---
@@ -39,4 +39,6 @@ SHIPPED: commit e2382b55 pushed to origin/otgw-1.x.x as 1.7.0-beta.5. Fix = dela
 SYNTHETIC REPRO via built-in sim replay (no boiler needed): uploaded /otgw_simulation.log (2445 real OT frames from 1.5.0 transcript) -> POST /api/v2/simulate/start (750ms) feeds processOT() = boiler+thermostat decode workload. BREAKTHROUGH: C0(yield/BAD)+sim+8http3ws 20min hit hd_enter_CRITICAL=3 (low=17, ws_drops=11) - FIRST run to reach CRITICAL tier (all prior runs crit=0). The decode load IS the missing ingredient. No reboot yet (no MQTT publish churn). Now running beta.5(FIX)+sim+same load -> compare hd_enter_critical to C0's 3 = fix validation via tier counters. MQTT NOTE: device mqttenable=FALSE (broker correctly homeassistant.local:1883, reachable); enabling it would add publish churn (likely full crash on C0) but writes bench entities to real HA + device mqttuser empty (may need creds). Rig committed 5cde12d8 + pushed. New tools committed per user.
 
 REPRODUCED ON BENCH (full synthetic load). Enabled device MQTT (broker homeassistant.local, creds set - not stored here) -> mqttconnected true -> sim replay values now PUBLISH = the missing churn. C0(yield/BAD)+sim+MQTT+6http3ws 20min -> REBOOTED (bootcount 15->16, reboot_detected true, frag_max 61%, hd_mqtt_drops 22). The field crash reproduced synthetically (no boiler). MQTT publish churn was the final missing ingredient (decode alone = critical 3; decode+MQTT = reboot). Now validating beta.5(FIX dus500+yield)+same full load, 30min -> survive = fix proven on bench. delay1(C1) baseline next if needed.
+
+FULL-LOAD A/B (sim+MQTT+6http3ws, identical): C0(yield)=REBOOT@20min. beta.5(dus500+yield)=SURVIVED 30min, 0 reboot, BUT hd_enter_critical 5 + maxblock dipped 1352 (thin margin), served 15428 http (more load than C0, still no crash). => FIX VALIDATED on bench (prevents the crash) but thin headroom. Now running C1(delay1, 1kHz proven) same load -> if critical ~0 = bigger margin (max stability 1.3.5-class) vs beta.5 thinner-but-faster. Final fix decision after C1.
 <!-- SECTION:NOTES:END -->
