@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.19
+**  Version  : v1.7.0-beta.20
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -456,7 +456,7 @@ struct UISection {
   bool bAutoScreenshot  = false;
   bool bAutoDownloadLog = false;
   bool bAutoExport      = false;
-  int  iGraphTimeWindow = 60;      // Default to 1 Hour (60 minutes)
+  int16_t iGraphTimeWindow = 60;   // 1..1440 min; int16 ample (was int)
 };
 
 struct OTGWBootSection {            // PIC boot-time command injection
