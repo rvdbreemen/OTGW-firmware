@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.7.0-beta.26
+**  Version  : v1.7.0-beta.27
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -798,28 +798,8 @@ const char* getFilesystemHash(){
 }
 
 
-String strHTTPmethod(HTTPMethod method)
-{
-  switch (method)
-  {
-    case HTTPMethod::HTTP_GET:
-      return "GET";
-    case HTTPMethod::HTTP_POST:
-      return "POST";
-    case HTTPMethod::HTTP_PUT:
-      return "PUT";
-    case HTTPMethod::HTTP_PATCH:
-      return "PATCH";
-    case HTTPMethod::HTTP_DELETE:
-      return "DELETE";
-    case HTTPMethod::HTTP_OPTIONS:
-      return "OPTIONS";
-    case HTTPMethod::HTTP_HEAD:
-      return "HEAD";
-    default:
-      return "";
-  }
-}
+// strHTTPmethod() removed (TASK-903): dead code. restAPI.ino replaced it with a
+// char* HTTP-method mapper; this String-returning version had no callers left.
 
 /*
   RSSI signal quality to percentage quad function
