@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.17
+**  Version  : v1.7.0-beta.18
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -345,8 +345,8 @@ struct PicSettingsSection {    // state.picSettings — settings polled from PIC
   // All other PR= reports are polled on-demand by queryNextPICsetting(), one per 3s tick.
 
   // --- Active settings (most useful for HA integration) ---
-  char sSetpointOverride[16]  = "";  // PR=O: setpoint override ("T20.5" TT active, "C20.5" TC active, "N" none)
-  char sSetback[16]           = "";  // PR=S: setback temperature (SB command value, e.g. "15.0")
+  char sSetpointOverride[8]   = "";  // PR=O: setpoint override ("T20.5"/"C20.5"/"N", max ~6); strlcpy(sizeof) bounds (was 16)
+  char sSetback[8]            = "";  // PR=S: setback temp (e.g. "15.0", max ~5); strlcpy(sizeof) bounds (was 16)
   char sDhwOverride[8]        = "";  // PR=W: DHW/hot-water override ("0"=off, "1"=on, "A"=auto)
 
   // --- Hardware configuration ---
