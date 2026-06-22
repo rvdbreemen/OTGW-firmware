@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.16
+**  Version  : v1.7.0-beta.17
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -414,7 +414,7 @@ struct MQTTSettingsSection {
 
 struct NTPSection {
   bool bEnable        = true;
-  char sTimezone[65]  = NTP_DEFAULT_TIMEZONE;
+  char sTimezone[48]  = NTP_DEFAULT_TIMEZONE;   // longest IANA tz id ~32 chars; 48 ample, text-serialized (was 65)
   char sHostname[65]  = NTP_HOST_DEFAULT;
   bool bSendtime      = false;
 };
