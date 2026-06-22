@@ -8,9 +8,10 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-1.7.0 cycle (latest beta: 1.7.0-beta.4). Headlined by a heap-fragmentation crash fix for long-running devices; beta.4 fixes the root cause in the ESP8266 core itself.
+1.7.0 cycle (latest beta: 1.7.0-beta.6). Headlined by heap-fragmentation crash-proofing for long-running devices under load.
 
 ### Fixed
+- Random reboots on 1.6.x/1.7.x under sustained load: mainloop root cause (beta.6). A field bisect of the 1.6.0 cycle pinned a second fragmentation driver. TASK-651 had replaced the trailing `delay(1)` in `doBackgroundTasks()` with `yield()`, which uncapped the main loop. Under sustained decode + MQTT + WebSocket/HTTP load the unbounded loop fragments the heap (the largest contiguous block collapses while total free still looks fine) until an allocation fails and the device reboots. beta.6 restores `delay(1)` (the field-proven pre-TASK-651 behaviour, stable through 1.6.0-beta.13), which caps the loop at ~1 kHz and yields to the SDK. Reproduced and confirmed on a bench via a synthetic boiler-traffic replay plus MQTT load. (TASK-901)
 - HTTP static-file serving crash, fixed at the source (beta.4). The firmware-side heap gates in beta.2/beta.3 fired but could not stop the crash, because the faulting allocation is a per-TCP-segment `new uint8_t[~1460]` *inside* the ESP8266 core's `streamFile` loop: serving a large asset (e.g. the ~250 KB `index.js`) fragments the heap mid-transfer, a later chunk's unchecked `new[]` returns NULL, and the core writes to it (the `0x4000df64` ROM `memcpy` fault). A firmware entry-gate cannot see between the core's per-chunk allocations. beta.4 patches the core at build time (ADR-084): `BufferedStreamDataSource::get_buffer()` now returns NULL instead of copying into a failed allocation, and `ClientContext::_write_some()` treats that as "retry later", so a mid-transfer low-memory moment drops/retries the connection instead of crashing. The core is a board-manager install reapplied by `build.py` on every build. (TASK-844)
 
 ### Fixed
