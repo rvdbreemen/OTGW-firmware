@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v1.7.0-beta.21
+**  Version  : v1.7.0-beta.22
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -515,8 +515,8 @@ struct OTPublishGate {
 
 struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcode.com/firmware.html
 	char cmd[15];
-	int cmdlen;
-	int retrycnt;
+	uint8_t cmdlen;        // <= 14 (min(len, sizeof(cmd)-1)); was int
+	uint8_t retrycnt;      // caps at OTGW_CMD_RETRY=5 then dropped; was int
 	unsigned long due;
 };
 
