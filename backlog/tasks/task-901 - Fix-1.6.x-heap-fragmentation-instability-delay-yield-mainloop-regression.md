@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 07:18'
+updated_date: '2026-06-22 08:10'
 labels: []
 dependencies: []
 ---
@@ -35,4 +35,6 @@ HARDWARE BLOCKER (2026-06-22): device on COM3 = MAC 84:F3:EB:22:B8:E1 = the live
 FIX IMPLEMENTED on 1.7.0-beta.5: doBackgroundTasks() tail yield() -> delayMicroseconds(500); yield() (C3). Caps loop ~2kHz (bounds heap fragmentation per offline bisect) + keeps yield (SDK servicing + web responsiveness TASK-651 wanted). Evaluator --quick 100% (34 pass/0 fail). Build running. BENCH NOTE: bench (no boiler) cannot validate the fragmentation fix (C0 yield == CREV delay1 == 53-55% frag, no crash, structural: no boiler->no value churn for loop to amplify). Bench validates no-regression + throughput only. REAL fragmentation validation = FIELD test on a boiler-connected unit (George). Conservative fallback if field shows insufficient = plain delay(1) (proven beta.13-stable).
 
 SHIPPED: commit e2382b55 pushed to origin/otgw-1.x.x as 1.7.0-beta.5. Fix = delayMicroseconds(500)+yield in doBackgroundTasks tail. Bench-validated: build exit 0, evaluate.py 100%, 10-min 8http+3ws soak STABLE (0 exc, 0 reboot, hd_enter_critical 0), HTTP throughput 2657 (=2.3x delay1's 1164, ~67% of uncapped yield 3938 -> keeps responsiveness). Field-test build ready: build/OTGW-firmware-1.7.0-beta.5+d5883e1.{ino.bin,littlefs.bin}. REMAINING GATE (hardware/field, cannot self-verify on boiler-less bench): George flashes beta.5 on his boiler-connected unit + runs the README soak (browser capture ON ~20min); PASS = no maxBlock collapse / no reboot vs the beta.16 crash. Keeping In Progress until field-confirmed; fallback if 2kHz cap insufficient = plain delay(1).
+
+SYNTHETIC REPRO via built-in sim replay (no boiler needed): uploaded /otgw_simulation.log (2445 real OT frames from 1.5.0 transcript) -> POST /api/v2/simulate/start (750ms) feeds processOT() = boiler+thermostat decode workload. BREAKTHROUGH: C0(yield/BAD)+sim+8http3ws 20min hit hd_enter_CRITICAL=3 (low=17, ws_drops=11) - FIRST run to reach CRITICAL tier (all prior runs crit=0). The decode load IS the missing ingredient. No reboot yet (no MQTT publish churn). Now running beta.5(FIX)+sim+same load -> compare hd_enter_critical to C0's 3 = fix validation via tier counters. MQTT NOTE: device mqttenable=FALSE (broker correctly homeassistant.local:1883, reachable); enabling it would add publish churn (likely full crash on C0) but writes bench entities to real HA + device mqttuser empty (may need creds). Rig committed 5cde12d8 + pushed. New tools committed per user.
 <!-- SECTION:NOTES:END -->
