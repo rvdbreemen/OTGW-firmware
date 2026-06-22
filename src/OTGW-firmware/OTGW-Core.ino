@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.7.0-beta.7
+**  Version  : v1.7.0-beta.8
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -93,7 +93,7 @@ const char *hexheaders[] = {
 
 /* --- LOG marcro's ---*/
 
-#define OT_LOG_BUFFER_SIZE 512
+#define OT_LOG_BUFFER_SIZE 320  // one OT-frame log line; longest decoded line ~100 chars, 320 is ample (was 512)
 char ot_log_buffer[OT_LOG_BUFFER_SIZE];
 size_t ot_log_pos = 0;  // tracked write position — eliminates O(n²) strlen per AddLog call
 
