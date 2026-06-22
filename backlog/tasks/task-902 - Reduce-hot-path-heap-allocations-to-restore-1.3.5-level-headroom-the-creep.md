@@ -1,9 +1,11 @@
 ---
 id: TASK-902
 title: Reduce hot-path heap allocations to restore 1.3.5-level headroom (the 'creep')
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-22 13:37'
+updated_date: '2026-06-22 14:08'
 labels: []
 dependencies: []
 ---
