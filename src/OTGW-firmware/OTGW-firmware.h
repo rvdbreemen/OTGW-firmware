@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.11
+**  Version  : v1.7.0-beta.12
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -268,7 +268,7 @@ struct MQTTRuntimeSection {    // state.mqtt — MQTT broker connection state
 struct FlashSection {          // state.flash — Firmware upgrade operations
   bool bESPactive        = false;  // was isESPFlashing
   bool bPICactive        = false;  // was isPICFlashing
-  char sError[129]       = "";     // was errorupgrade
+  char sError[48]        = "";     // PIC-flash error msg; longest literal 40 chars, snprintf_P(sizeof) truncates safe (was 129)
   char sPICfile[65]      = "";     // was currentPICFlashFile
   int  iPICprogress      = 0;      // was currentPICFlashProgress — percent 0-100
 };
