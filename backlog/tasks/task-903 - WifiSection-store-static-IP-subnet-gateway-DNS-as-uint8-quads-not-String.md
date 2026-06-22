@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-22 18:03'
-updated_date: '2026-06-22 18:04'
+updated_date: '2026-06-22 18:13'
 labels: []
 dependencies: []
 ---
@@ -18,10 +18,16 @@ Change settings.wifi from 5x char[16] dotted-quad strings (80 B) to 5x uint8_t[4
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 WifiSection fields are uint8_t[4] quads (staticIp,subnet,gateway,dns1,dns2); 20 B total
-- [ ] #2 settings load/save/defaults updated; {0,0,0,0}=DHCP
-- [ ] #3 networkStuff applies static IP via IPAddress(octets) directly, no string parse
-- [ ] #4 REST settings GET renders quads as dotted string for UI; POST accepts and stores octets
-- [ ] #5 migration behaviour documented in CHANGELOG (static-IP users re-enter once)
+- [x] #1 WifiSection fields are uint8_t[4] quads (staticIp,subnet,gateway,dns1,dns2); 20 B total
+- [x] #2 settings load/save/defaults updated; {0,0,0,0}=DHCP
+- [x] #3 networkStuff applies static IP via IPAddress(octets) directly, no string parse
+- [x] #4 REST settings GET renders quads as dotted string for UI; POST accepts and stores octets
+- [x] #5 migration behaviour documented in CHANGELOG (static-IP users re-enter once)
 - [ ] #6 build firmware exit 0 + evaluate.py --quick green + prerelease bump
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented: WifiSection 5x char[16] (80B) -> 5x uint8_t[4] (20B), saves 60B. Added String-free helpers ipQuadToStr (snprintf_P) / ipQuadFromStr (IPAddress.fromString -> octets) / ipQuadIsSet in settingStuff.ino. updateSetting parses string->quad; writeSettings renders quad->string so the SETTINGS FILE FORMAT IS UNCHANGED = BACKWARD COMPATIBLE (existing static-IP users keep their setting on upgrade, NO migration needed - the earlier migration concern is moot). REST GET renders quad->string for UI; networkStuff builds IPAddress(octets) directly (requires staticIp+subnet+gateway all set, else DHCP). evaluate.py 100%. AC5 (migration): satisfied by preserving file format - documented as no-migration in CHANGELOG note. Build verifying.
+<!-- SECTION:NOTES:END -->
