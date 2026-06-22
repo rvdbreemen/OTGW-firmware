@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 10:29'
+updated_date: '2026-06-22 10:39'
 labels: []
 dependencies: []
 ---
@@ -43,4 +43,6 @@ REPRODUCED ON BENCH (full synthetic load). Enabled device MQTT (broker homeassis
 FULL-LOAD A/B (sim+MQTT+6http3ws, identical): C0(yield)=REBOOT@20min. beta.5(dus500+yield)=SURVIVED 30min, 0 reboot, BUT hd_enter_critical 5 + maxblock dipped 1352 (thin margin), served 15428 http (more load than C0, still no crash). => FIX VALIDATED on bench (prevents the crash) but thin headroom. Now running C1(delay1, 1kHz proven) same load -> if critical ~0 = bigger margin (max stability 1.3.5-class) vs beta.5 thinner-but-faster. Final fix decision after C1.
 
 FULL-LOAD A/B COMPLETE (sim+MQTT+6http3ws, identical): C0 yield=REBOOT@20m; beta.5 dus500+yield=survive 30m crit5 maxblk-floor 1352; C1 delay1=survive 30m crit3 maxblk-floor 3128. KEY: under realistic mixed load delay1 throughput == dus500 (15063 vs 15428) - the delay1 penalty was a pure-HTTP-flood artifact (work-bound vs loop-bound). delay1 = bigger margin (2.3x floor) + proven beta.13 + no real throughput cost => OPTIMUM. DECISION (user-approved): ship delay1 as the fix. Building beta.6 (tail = delay(1), reverting beta.5 dus500+yield). evaluate.py 100%. Next: flash beta.6 + full-load validation (must survive) -> commit -> push. beta.5 was a transient step, superseded by beta.6.
+
+beta.6 (delay(1)) built (evaluate 100%) + OTA-flashed to bench (bootcount 20). NOTE: OTA needs Windows D:/ path form for curl (MSYS /d/ form -> 0 bytes uploaded) AND a defragmented heap (reset device first if frag high - the bug bites the updater too). Full-load validation running (sim+MQTT+6http3ws, 30min, orphaned soak -> /tmp/b6full_samp.json). Expect survive (bootcount_delta 0) with delay1 margin. After PASS: commit beta.6 (supersedes beta.5) + push origin/otgw-1.x.x.
 <!-- SECTION:NOTES:END -->
