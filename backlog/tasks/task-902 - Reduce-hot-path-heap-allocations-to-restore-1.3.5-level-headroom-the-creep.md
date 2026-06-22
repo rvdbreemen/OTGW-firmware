@@ -1,11 +1,11 @@
 ---
 id: TASK-902
 title: Reduce hot-path heap allocations to restore 1.3.5-level headroom (the 'creep')
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-22 13:37'
-updated_date: '2026-06-22 14:24'
+updated_date: '2026-06-22 15:13'
 labels: []
 dependencies: []
 ---
@@ -31,3 +31,9 @@ ANALYSIS DONE (6-agent fan-out, 20 findings). KEY: NO single big reducible heap-
 
 FINAL (advisor-vetted): NO significant reducible code-level creep. The 'TOP' verify-buffer resize is GATED on maxFreeBlock>=1280 -> only fires when headroom EXISTS -> cannot cause a low floor -> demoted (option c, defer). Remaining items are tens-to-low-hundreds of bytes (bundle 22 heapdiag publishes->1 JSON; trim otOverrideStore[11]->9; pack bitmaps; char[]-ify 2 per-request String helpers) = NOT floor-movers. Bench head-to-head: 1.3.5 ~6624 vs 1.6/1.7 builds ~4700-5200 = ~1.3x (NOT the field 2.5x) -> code isn't 2.5x heavier; field gap = acute fragmentation ALREADY FIXED in 1.7.0 + inherent feature cost (HA discovery/entities/WS/REST). DO NOT run a bench experiment loop (reducers fire daily/hourly; 30-min soak measures noise). RECOMMENDATION: (a) STOP - beta.6 resolves the reported crash, creep = diminishing returns + regression risk on stability line [advisor: arguably best]; OR (b) one-shot low-risk tidy-up PR (heapdiag bundle + [11]->9), field-validate over days, no loop/bench; (c) defer verify-buffer. Awaiting user pick. Not closing pending decision.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Analyzed 1.3.5->1.7.0-beta.6 (281 commits, 6-agent fan-out). Conclusion (advisor-vetted): NO significant reducible code-level heap creep. Discovery is streamed; static RAM is net-leaner than 1.3.5 (sLine[1200] removed); OT-core hot path heap-alloc-free + leaner. The field 2.5x headroom gap = acute fragmentation ALREADY FIXED in 1.7.0 (beta.6 loop-cap + TASK-837/841/843 HTTP gates) + inherent cost of features 1.3.5 lacked (HA discovery, ~370 entities, WS live-log, REST). Bench head-to-head was ~1.3x not 2.5x. Reducible items are tens-to-low-hundreds of bytes (non-floor-movers) and the top candidate self-limits (gated on maxFreeBlock>=1280). User decision: (a) STOP - beta.6 resolves the reported crash; creep = diminishing returns + regression risk on a stability line. No code change. Tidy-up candidates (heapdiag-bundle, override[11]->9) recorded if ever wanted.
+<!-- SECTION:FINAL_SUMMARY:END -->
