@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.20
+**  Version  : v1.7.0-beta.21
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -306,9 +306,9 @@ enum class VerifyOutcome : uint8_t {
 
 struct DiscoverySection {                    // state.discovery — MQTT auto-discovery verify telemetry (ADR-062)
   uint32_t iLastVerifyEpoch         = 0;     // unix-epoch of last endVerify (0 = never)
-  uint32_t iVerifyRunCount          = 0;     // lifetime verify-start counter
-  uint32_t iRepublishTriggeredCount = 0;     // lifetime count where missing>0 → markAllMQTTConfigPending
-  uint32_t iPublishedTopicCount     = 0;     // running counter incremented by stream helpers after endPublish
+  uint16_t iVerifyRunCount          = 0;     // per-boot verify-start counter (display-only; u16 wrap cosmetic)
+  uint16_t iRepublishTriggeredCount = 0;     // per-boot republish-trigger counter (display-only; u16 wrap cosmetic)
+  uint16_t iPublishedTopicCount     = 0;     // topics published; verify already casts (uint16_t) so u16 is behavior-identical
   uint16_t iLastMissingCount        = 0;     // last run: expected - received
   uint16_t iLastOrphanCount         = 0;     // last run: foreign-nodeId retained configs observed
   VerifyOutcome eLastOutcome        = VerifyOutcome::UNKNOWN;  // TASK-361: honest outcome label for last verify pass
