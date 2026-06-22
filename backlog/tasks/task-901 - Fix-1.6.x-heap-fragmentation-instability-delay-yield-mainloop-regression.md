@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 08:10'
+updated_date: '2026-06-22 09:04'
 labels: []
 dependencies: []
 ---
@@ -37,4 +37,6 @@ FIX IMPLEMENTED on 1.7.0-beta.5: doBackgroundTasks() tail yield() -> delayMicros
 SHIPPED: commit e2382b55 pushed to origin/otgw-1.x.x as 1.7.0-beta.5. Fix = delayMicroseconds(500)+yield in doBackgroundTasks tail. Bench-validated: build exit 0, evaluate.py 100%, 10-min 8http+3ws soak STABLE (0 exc, 0 reboot, hd_enter_critical 0), HTTP throughput 2657 (=2.3x delay1's 1164, ~67% of uncapped yield 3938 -> keeps responsiveness). Field-test build ready: build/OTGW-firmware-1.7.0-beta.5+d5883e1.{ino.bin,littlefs.bin}. REMAINING GATE (hardware/field, cannot self-verify on boiler-less bench): George flashes beta.5 on his boiler-connected unit + runs the README soak (browser capture ON ~20min); PASS = no maxBlock collapse / no reboot vs the beta.16 crash. Keeping In Progress until field-confirmed; fallback if 2kHz cap insufficient = plain delay(1).
 
 SYNTHETIC REPRO via built-in sim replay (no boiler needed): uploaded /otgw_simulation.log (2445 real OT frames from 1.5.0 transcript) -> POST /api/v2/simulate/start (750ms) feeds processOT() = boiler+thermostat decode workload. BREAKTHROUGH: C0(yield/BAD)+sim+8http3ws 20min hit hd_enter_CRITICAL=3 (low=17, ws_drops=11) - FIRST run to reach CRITICAL tier (all prior runs crit=0). The decode load IS the missing ingredient. No reboot yet (no MQTT publish churn). Now running beta.5(FIX)+sim+same load -> compare hd_enter_critical to C0's 3 = fix validation via tier counters. MQTT NOTE: device mqttenable=FALSE (broker correctly homeassistant.local:1883, reachable); enabling it would add publish churn (likely full crash on C0) but writes bench entities to real HA + device mqttuser empty (may need creds). Rig committed 5cde12d8 + pushed. New tools committed per user.
+
+REPRODUCED ON BENCH (full synthetic load). Enabled device MQTT (broker homeassistant.local, creds set - not stored here) -> mqttconnected true -> sim replay values now PUBLISH = the missing churn. C0(yield/BAD)+sim+MQTT+6http3ws 20min -> REBOOTED (bootcount 15->16, reboot_detected true, frag_max 61%, hd_mqtt_drops 22). The field crash reproduced synthetically (no boiler). MQTT publish churn was the final missing ingredient (decode alone = critical 3; decode+MQTT = reboot). Now validating beta.5(FIX dus500+yield)+same full load, 30min -> survive = fix proven on bench. delay1(C1) baseline next if needed.
 <!-- SECTION:NOTES:END -->
