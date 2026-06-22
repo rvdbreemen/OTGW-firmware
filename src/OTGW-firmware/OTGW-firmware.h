@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.13
+**  Version  : v1.7.0-beta.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -533,7 +533,7 @@ static ExtendedZoneManager timezoneManager(
   zoneProcessorCache);
 
 const char *weekDayName[]  {  "Unknown", "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Unknown" };
-const char *flashMode[]    { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };
+static const char flashMode[][8] PROGMEM = { "QIO", "QOUT", "DIO", "DOUT", "Unknown" };  // flash, not RAM (was const char*[] in RODATA)
 
 //===================[ Module-local variables with extern declarations ]===================
 // Dallas sensor variables — definitions in sensors_ext.ino

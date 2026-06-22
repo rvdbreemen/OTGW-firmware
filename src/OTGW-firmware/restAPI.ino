@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.7.0-beta.13
+**  Version  : v1.7.0-beta.14
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -80,7 +80,7 @@ struct BootFlashCache {
   float       flashChipSizeMB;
   float       flashChipRealSizeMB;
   float       flashChipSpeedMHz;
-  const char* flashChipMode;      // pointer into flashMode[] (RODATA)
+  char        flashChipMode[8];   // copied from PROGMEM flashMode[] ("Unknown"=7+nul; was const char* into RODATA)
   float       littleFSSizeMB;
 };
 static BootFlashCache sBootFlash;
@@ -93,7 +93,8 @@ void cacheBootFlashInfo() {
   sBootFlash.flashChipSizeMB     = ESP.getFlashChipSize()     / 1024.0f / 1024.0f;
   sBootFlash.flashChipRealSizeMB = ESP.getFlashChipRealSize() / 1024.0f / 1024.0f;
   sBootFlash.flashChipSpeedMHz   = floorf(ESP.getFlashChipSpeed() / 1000.0f / 1000.0f);
-  sBootFlash.flashChipMode       = flashMode[ESP.getFlashChipMode()];
+  { uint8_t fm = ESP.getFlashChipMode(); if (fm > 4) fm = 4;  // bound to flashMode[] (idx 4 = "Unknown")
+    strlcpy_P(sBootFlash.flashChipMode, flashMode[fm], sizeof(sBootFlash.flashChipMode)); }
   FSInfo fsinfo;
   LittleFS.info(fsinfo);
   sBootFlash.littleFSSizeMB      = fsinfo.totalBytes / (1024.0f * 1024.0f);
