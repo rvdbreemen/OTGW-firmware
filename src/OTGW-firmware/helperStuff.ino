@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v1.7.0-beta.24
+**  Version  : v1.7.0-beta.25
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -848,16 +848,15 @@ int signal_quality_perc_quad(int rssi) {
   --> https://www.metageek.com/training/resources/wifi-signal-strength-basics/
   TL;DR strings on quality is based on this
 */
-String dBmtoQuality(int dBm)
+const __FlashStringHelper* dBmtoQuality(int dBm)
 {
-  String _ret="Amazing";
-  if (dBm<=-67) { _ret = "Very good";}
-  if (dBm<=-70) { _ret = "Okay";}
-  if (dBm<=-80) { _ret = "Not good enough";}
-  if (dBm<=-90) { _ret = "Unusable";}
-  //if (dBm<=-30) { _ret = "Amazing";}
-
-  return (_ret);
+  // Fixed labels -> flash (FSH), no per-call String alloc. Order = most-negative
+  // first so the first match wins (reproduces the old cascading-if override).
+  if (dBm<=-90) return F("Unusable");
+  if (dBm<=-80) return F("Not good enough");
+  if (dBm<=-70) return F("Okay");
+  if (dBm<=-67) return F("Very good");
+  return F("Amazing");
 }//dBmtoQuality
 
 // Replace all occurrences of token with replacement, guarding buffer size
