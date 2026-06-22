@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.7.0-beta.5
+**  Version  : v1.7.0-beta.6
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -429,14 +429,15 @@ void doBackgroundTasks()
     }
   } //otherwise, just wait until reconnected gracefully
   // Cap the cooperative loop rate. A bare yield() lets loop() spin unbounded,
-  // which under sustained WebSocket/HTTP load fragments the heap (the largest
-  // free block collapses while total free still looks fine -> allocation fails
-  // -> reboot). A short busy-wait bounds the loop to ~2 kHz, then yield()
-  // services the SDK (WiFi/LWIP). Restores pre-yield heap stability while
-  // keeping the web latency the bare yield() was after.
+  // which under sustained decode + MQTT + WS/HTTP load fragments the heap (the
+  // largest free block collapses while total free still looks fine -> allocation
+  // fails -> reboot). delay(1) caps the loop at ~1 kHz and yields to the SDK
+  // (WiFi/LWIP) internally. This is the field-proven pre-TASK-651 behaviour
+  // (stable through beta.13). A bench A/B under synthetic boiler load (sim replay
+  // + MQTT) confirmed delay(1) holds the largest-block margin where bare yield()
+  // reboots, at no real throughput cost under realistic mixed load.
   // See TASK-901 (1.6.x heap-fragmentation regression, bisected to TASK-651).
-  delayMicroseconds(500);
-  yield();
+  delay(1);
   return;
 }
 
