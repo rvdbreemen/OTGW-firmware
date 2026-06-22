@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.7.0-beta.12
+**  Version  : v1.7.0-beta.13
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -181,7 +181,7 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
 // requires: (1) add handler function, (2) add one entry to kV2Routes[].
 //=======================================================================
 
-constexpr uint8_t API_MAX_WORDS = 8;
+constexpr uint8_t API_MAX_WORDS = 6;   // deepest route = 6 segments (words[0..5]); no handler reads words[6+] (was 8)
 constexpr size_t  API_WORD_LEN  = 32;
 
 static void handleHealth(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
