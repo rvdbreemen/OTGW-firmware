@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.7.0-beta.4
+**  Version  : v1.7.0-beta.5
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -428,6 +428,14 @@ void doBackgroundTasks()
       loopNTP();
     }
   } //otherwise, just wait until reconnected gracefully
+  // Cap the cooperative loop rate. A bare yield() lets loop() spin unbounded,
+  // which under sustained WebSocket/HTTP load fragments the heap (the largest
+  // free block collapses while total free still looks fine -> allocation fails
+  // -> reboot). A short busy-wait bounds the loop to ~2 kHz, then yield()
+  // services the SDK (WiFi/LWIP). Restores pre-yield heap stability while
+  // keeping the web latency the bare yield() was after.
+  // See TASK-901 (1.6.x heap-fragmentation regression, bisected to TASK-651).
+  delayMicroseconds(500);
   yield();
   return;
 }
