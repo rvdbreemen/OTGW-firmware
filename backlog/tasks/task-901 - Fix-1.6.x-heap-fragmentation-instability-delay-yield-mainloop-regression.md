@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 10:39'
+updated_date: '2026-06-22 11:47'
 labels: []
 dependencies: []
 ---
@@ -45,4 +45,6 @@ FULL-LOAD A/B (sim+MQTT+6http3ws, identical): C0(yield)=REBOOT@20min. beta.5(dus
 FULL-LOAD A/B COMPLETE (sim+MQTT+6http3ws, identical): C0 yield=REBOOT@20m; beta.5 dus500+yield=survive 30m crit5 maxblk-floor 1352; C1 delay1=survive 30m crit3 maxblk-floor 3128. KEY: under realistic mixed load delay1 throughput == dus500 (15063 vs 15428) - the delay1 penalty was a pure-HTTP-flood artifact (work-bound vs loop-bound). delay1 = bigger margin (2.3x floor) + proven beta.13 + no real throughput cost => OPTIMUM. DECISION (user-approved): ship delay1 as the fix. Building beta.6 (tail = delay(1), reverting beta.5 dus500+yield). evaluate.py 100%. Next: flash beta.6 + full-load validation (must survive) -> commit -> push. beta.5 was a transient step, superseded by beta.6.
 
 beta.6 (delay(1)) built (evaluate 100%) + OTA-flashed to bench (bootcount 20). NOTE: OTA needs Windows D:/ path form for curl (MSYS /d/ form -> 0 bytes uploaded) AND a defragmented heap (reset device first if frag high - the bug bites the updater too). Full-load validation running (sim+MQTT+6http3ws, 30min, orphaned soak -> /tmp/b6full_samp.json). Expect survive (bootcount_delta 0) with delay1 margin. After PASS: commit beta.6 (supersedes beta.5) + push origin/otgw-1.x.x.
+
+SHIPPED beta.6 (delay(1)) commit 81d80b9b -> origin/otgw-1.x.x. Field-test build: build/OTGW-firmware-1.7.0-beta.6+0693e78.{ino.bin,littlefs.bin}. HONEST FINAL CONCLUSIONS: (1) Fixes the CLIFF (beta.13->beta.16 yield regression) = the acute crash making users downgrade; delay1 = field-proven beta.13 behaviour. (2) Bench reproduced the crash CLASS + proved mechanism (yield reboots; capping helps) but is HARSHER than field + too noisy to rank variants: delay1 rebooted 2/3 bench runs, yield 1/1, dus500 0/1 - it crashes even proven-good delay1, so variant selection rests on the field bisect, not the bench. (3) RESIDUAL: delay1 restores beta.13's maxBlock floor (~4040 p05), NOT 1.3.5-gold (~10456) - the gradual CREEP 1.3.5->beta.13 (heap-pressure reduction via fewer hot-path allocations) is a SEPARATE deeper follow-up if full 1.3.5-level wanted. (4) George field-test on a boiler-connected unit = the true validation. Status: implementation done+pushed; field-validation = remaining gate.
 <!-- SECTION:NOTES:END -->
