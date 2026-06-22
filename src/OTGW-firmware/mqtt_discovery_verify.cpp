@@ -54,7 +54,7 @@ static uint16_t        verifyOrphanCount     = 0;
 static bool            verifyBufferResized   = false;
 // sHaprefix[41] + "/+/" + sUniqueid[41] + "/#" + NUL = 88 bytes worst case.
 // Sized to 128 gives comfortable headroom for any future field-size bump.
-static char            verifyWildcard[128]   = "";
+static char            verifyWildcard[96]    = "";   // "<haPrefix<=40>/+/<nodeId<=40>/#" max 86; :117 refuses on truncation (was 128)
 // Cached once in startDiscoveryVerification() so the MQTT callback filter does
 // not recompute strlen() on every incoming retained-config message during the
 // 15s verify window (HIGH/Perf review finding).
