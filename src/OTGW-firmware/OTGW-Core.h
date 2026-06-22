@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h 
-**  Version  : v1.7.0-beta.6
+**  Version  : v1.7.0-beta.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -328,9 +328,18 @@ enum OpenThermMessageID {
         int id;
         OTmsgcmd_t msgcmd;
         OTtype_t type;
-        const char* label;
-        const char* friendlyname;
-        const char* unit;
+        // S1 RAM diet: inline fixed-size char arrays instead of const char* so the
+        // string bytes live INSIDE each OTmap[] entry. Because OTmap[] is PROGMEM,
+        // the strings now sit in flash and the existing PROGMEM_readAnything memcpy_P
+        // copies them byte-safe into the RAM scratch (OTlookupitem) along with the
+        // ints. label/friendlyname/unit therefore stay RAM pointers at every read
+        // site — no read site needs a flash-safe accessor. Sizes are generous; an
+        // over-long initializer is a hard compile error, so the compiler is the
+        // backstop. Longest seen: label 35B, friendlyname 77B, unit 5B (UTF-8 "°C"/"µA"
+        // are multi-byte but well within unit[8]).
+        char label[40];
+        char friendlyname[88];
+        char unit[8];
         bool bSlaveEchoesValue;  // ADR-066: false = slave Write-Ack data byte is per-spec undefined; suppress /boiler publication. Default true.
     };
 

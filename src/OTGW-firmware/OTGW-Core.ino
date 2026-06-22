@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.7.0-beta.6
+**  Version  : v1.7.0-beta.7
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1160,7 +1160,7 @@ const char *byte_to_binary(int x)
     write-acknowledged by the slave (OT_WRITE_ACK), then the value is valid.
   - if the OT message is a status message (from Heating, HAVC or Solar), then the message is always valid.
 */
-bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
+bool is_value_valid(OpenthermData_t OT, const OTlookup_t &OTlookup) {
   if (OT.skipthis) return false;
   if (isMsgIdReservedInActiveProfile(OT.id)) return false;
   bool _valid = false;
@@ -1193,7 +1193,7 @@ bool is_value_valid(OpenthermData_t OT, OTlookup_t OTlookup) {
 //
 // See ADR-066 + docs/api/MQTT-message-id-echo-audit.md for the per-MsgID
 // Write-Ack classification rationale (preserved by this ADR).
-bool is_value_valid_for_master_topic(OpenthermData_t OT, OTlookup_t OTlookup) {
+bool is_value_valid_for_master_topic(OpenthermData_t OT, const OTlookup_t &OTlookup) {
   if (OT.skipthis) return false;
   if (isMsgIdReservedInActiveProfile(OT.id)) return false;
   // ADR-069/ADR-075 canonical = boiler-side worldview gates:
@@ -1923,7 +1923,7 @@ void print_f88(float& value)
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    char topic[OT_TOPIC_LEN]; strlcpy(topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(topic));  // copy scratch ptr to local (OTmap now PROGMEM-backed; defends if feedWatchDog ever yields)
     if (validForMaster) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
     if (validForMaster) value = _value;
@@ -1949,7 +1949,7 @@ void print_s16(int16_t& value)
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    char topic[OT_TOPIC_LEN]; strlcpy(topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(topic));  // copy scratch ptr to local (OTmap now PROGMEM-backed; defends if feedWatchDog ever yields)
     if (validForMaster) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
     if (validForMaster) value = _value;
@@ -2007,7 +2007,7 @@ void print_u16(uint16_t& value)
 
   //SendMQTT
   if (is_value_valid(OTdata, OTlookupitem)){
-    const char* topic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    char topic[OT_TOPIC_LEN]; strlcpy(topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(topic));  // copy scratch ptr to local (OTmap now PROGMEM-backed; defends if feedWatchDog ever yields)
     if (validForMaster) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
     if (validForMaster) value = _value;
@@ -2549,7 +2549,7 @@ static void print_u8_single(uint16_t& value, bool useHB)
 
   if (is_value_valid(OTdata, OTlookupitem)){
     char _msg[10] {0};
-    const char* baseTopic = messageIDToString(static_cast<OpenThermMessageID>(OTdata.id));
+    char baseTopic[OT_TOPIC_LEN]; strlcpy(baseTopic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(baseTopic));  // copy scratch ptr to local (OTmap PROGMEM-backed defense-in-depth)
     utoa(activeByte, _msg, 10);
     if (is_value_valid_for_master_topic(OTdata, OTlookupitem)) sendMQTTData(baseTopic, _msg);
     publishToSourceTopic(baseTopic, _msg, OTdata.rsptype);
@@ -4180,9 +4180,10 @@ void processOT(const char *buf, int len){
         OTlookupitem.id = OTdata.id;
         OTlookupitem.msgcmd = OT_UNDEF;
         OTlookupitem.type = ot_undef;
-        OTlookupitem.label = "Unknown";
-        OTlookupitem.friendlyname = "Unknown";
-        OTlookupitem.unit = "";
+        // S1: label/friendlyname/unit are now char[] arrays, so copy instead of assign.
+        strlcpy(OTlookupitem.label, "Unknown", sizeof(OTlookupitem.label));
+        strlcpy(OTlookupitem.friendlyname, "Unknown", sizeof(OTlookupitem.friendlyname));
+        OTlookupitem.unit[0] = '\0';
       }
 
       // TASK-685 / TASK-686 / TASK-688: maintain the six per-msgID bitmaps that
