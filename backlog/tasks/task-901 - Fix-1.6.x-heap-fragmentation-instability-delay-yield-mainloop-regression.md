@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 13:02'
+updated_date: '2026-06-22 13:34'
 labels: []
 dependencies: []
 ---
@@ -51,4 +51,6 @@ SHIPPED beta.6 (delay(1)) commit 81d80b9b -> origin/otgw-1.x.x. Field-test build
 EXTENDED A/B (user req): full-load suite (sim+MQTT+6http3ws 30min) on (a) C3 dus500+yield [running c3full], (b) 1.3.5 gold-standard [building 4M2M variant via build-135 agent, since official 1.3.5=4M1M won't mount FS on 4M2M device]. Data so far under this load: yield reboot 1/1; delay1 reboot 2/3 (C1 survived, beta.6 x2 reboot); dus500 survived 0/1 (1 prior run, no reboot). Goal: dus500 vs delay1 cleaner read + does GOLD 1.3.5 survive (=> bench discriminates + creep real) or also crash (=> bench over-harsh). 15-min loop driving to completion + final continue-advice. Bench device 88.68, MQTT creds set (not stored).
 
 FULL-LOAD tally: yield reboot 1/1; delay1 reboot 2/3 (survived 1/3); dus500+yield SURVIVED 2/2 (C3 run#2: crit4, no reboot). SURPRISE: dus500+yield more robust than delay1 on bench (opposite of expected) - possibly noise (small n, threshold-straddling) OR real. 1.3.5 GOLD CONTROL now running: build-135 produced a genuine 4M2M recompile (1.3.5+145b102, FS mounts/sim file serves/MQTT connected = verified 4M2M, not a 4M1M copy). Full-load 30min on 1.3.5 (bwui3u311/bbqflcl1y). If 1.3.5 SURVIVES = bench discriminates + creep real + reconsider dus500-vs-delay1; if 1.3.5 REBOOTS = bench over-harsh, field bisect (delay1) is sole arbiter. Advice after, via advisor.
+
+1.3.5 GOLD full-load: SURVIVED (telnet_drops 0 / connects 1 over full 30min = definitive no-reboot; bootcount stable; heap never reset; http monotonic 43->12048). maxblock p05 6624 (HIGHEST of all). FINAL TALLY (full sim+MQTT+6http3ws load): yield reboot 1/1 (floor ~4992); delay1 reboot 2/3 (floor ~4720); dus500+yield 0/2 survive (floor ~5200); 1.3.5 0/1 survive (floor 6624). CONCLUSIONS: (1) bench DISCRIMINATES (gold survives where 1.6.x+ reboot) = valid reproducer. (2) CREEP REAL: 1.3.5 genuinely more robust; loop-cap (delay1/dus500) beats yield but does NOT restore 1.3.5 headroom -> need hot-path allocation reduction. (3) dus500>delay1 bench hint (0/2 vs 2/3): suggestive but small-n + counterintuitive + delay1 field-proven -> lean noise, keep beta.6/delay1. Synthesizing advice via advisor.
 <!-- SECTION:NOTES:END -->
