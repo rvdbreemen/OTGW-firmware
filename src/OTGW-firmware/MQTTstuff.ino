@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.7.0-beta.10
+**  Version  : v1.7.0-beta.11
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -41,7 +41,7 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst);  // ADR-082: used
 
 static IPAddress  MQTTbrokerIP;
 static char       MQTTbrokerIPchar[20];
-constexpr size_t  MQTT_ID_MAX_LEN = 96;
+constexpr size_t  MQTT_ID_MAX_LEN = 48;   // NodeId 'otgw-<chipid>' ~20, clientId/topicToken < 48 (was 96)
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 96;   // <topTopic(<=41)>/value|set/<NodeId(~20)> ~67 chars; 96 ample (was 192)
 constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
