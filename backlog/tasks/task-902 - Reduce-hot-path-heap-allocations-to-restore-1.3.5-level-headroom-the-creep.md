@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-22 13:37'
-updated_date: '2026-06-22 14:22'
+updated_date: '2026-06-22 14:24'
 labels: []
 dependencies: []
 ---
@@ -28,4 +28,6 @@ TASK-901 (beta.6/delay1) fixed the CLIFF (the delay1->yield regression that cras
 
 <!-- SECTION:NOTES:BEGIN -->
 ANALYSIS DONE (6-agent fan-out, 20 findings). KEY: NO single big reducible heap-hog. Discovery is STREAMED (128B chunks, not a big allocator); HEAD removed 1.3.5 sLine[1200] -> static RAM NET LEANER than 1.3.5; OT-core hot path heap-alloc-free + leaner. Reducible items are SMALL: (TOP,med) discovery-verify reallocs long-lived MQTT buffer 384<->1024 daily/hourly -> relocation holes; fix=keep 384 (verify reads topic only). (low) 22 heapdiag publishes/hr -> bundle to 1 JSON. (low) minor String churn per-HTTP-request helpers; over-provisioned statics (override[11]->9, 224B bitmaps). HONEST: field 2.5x gap (1.3.5 p05 10456 vs beta.13 4040) is mostly (a) ACUTE fragmentation ALREADY FIXED in 1.7.0 (beta.6 loop-cap + TASK-837/841/843 HTTP gates) + (b) inherent cost of FEATURES 1.3.5 lacked (HA discovery, more entities, WS, REST) = steady activity not wasteful code. Reducible code != 2.5x recovery. CAVEAT: top reducers fire daily/hourly -> 30-min bench soak CANNOT measure them; they are reasoned+field-validated, not bench-A/B-able. Vetting via advisor.
+
+FINAL (advisor-vetted): NO significant reducible code-level creep. The 'TOP' verify-buffer resize is GATED on maxFreeBlock>=1280 -> only fires when headroom EXISTS -> cannot cause a low floor -> demoted (option c, defer). Remaining items are tens-to-low-hundreds of bytes (bundle 22 heapdiag publishes->1 JSON; trim otOverrideStore[11]->9; pack bitmaps; char[]-ify 2 per-request String helpers) = NOT floor-movers. Bench head-to-head: 1.3.5 ~6624 vs 1.6/1.7 builds ~4700-5200 = ~1.3x (NOT the field 2.5x) -> code isn't 2.5x heavier; field gap = acute fragmentation ALREADY FIXED in 1.7.0 + inherent feature cost (HA discovery/entities/WS/REST). DO NOT run a bench experiment loop (reducers fire daily/hourly; 30-min soak measures noise). RECOMMENDATION: (a) STOP - beta.6 resolves the reported crash, creep = diminishing returns + regression risk on stability line [advisor: arguably best]; OR (b) one-shot low-risk tidy-up PR (heapdiag bundle + [11]->9), field-validate over days, no loop/bench; (c) defer verify-buffer. Awaiting user pick. Not closing pending decision.
 <!-- SECTION:NOTES:END -->
