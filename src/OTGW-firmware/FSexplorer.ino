@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v1.7.0-beta.9
+**  Version  : v1.7.0-beta.10
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -164,7 +164,7 @@ void startWebserver(){
       httpServer.send(200, F("text/html; charset=UTF-8"), F(""));
 
       // Use a fixed-size line buffer instead of String to avoid heap fragmentation.
-      static char lineBuf[512];
+      static char lineBuf[320];  // longest index.html line ~252 chars; 320 ample (was 512). readBytesUntil tracks sizeof-1
       while (f.available()) {
         int n = f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
         lineBuf[n] = '\0';
