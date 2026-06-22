@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.23
+**  Version  : v1.7.0-beta.24
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -270,7 +270,7 @@ struct FlashSection {          // state.flash — Firmware upgrade operations
   bool bPICactive        = false;  // was isPICFlashing
   char sError[48]        = "";     // PIC-flash error msg; longest literal 40 chars, snprintf_P(sizeof) truncates safe (was 129)
   char sPICfile[65]      = "";     // was currentPICFlashFile
-  int  iPICprogress      = 0;      // was currentPICFlashProgress — percent 0-100
+  int8_t iPICprogress    = 0;      // PIC flash percent (-1 error .. 100); int8 ample (was int)
 };
 
 struct DebugSection {          // state.debug — Runtime diagnostic output flags
