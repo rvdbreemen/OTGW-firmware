@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 11:47'
+updated_date: '2026-06-22 12:44'
 labels: []
 dependencies: []
 ---
@@ -47,4 +47,6 @@ FULL-LOAD A/B COMPLETE (sim+MQTT+6http3ws, identical): C0 yield=REBOOT@20m; beta
 beta.6 (delay(1)) built (evaluate 100%) + OTA-flashed to bench (bootcount 20). NOTE: OTA needs Windows D:/ path form for curl (MSYS /d/ form -> 0 bytes uploaded) AND a defragmented heap (reset device first if frag high - the bug bites the updater too). Full-load validation running (sim+MQTT+6http3ws, 30min, orphaned soak -> /tmp/b6full_samp.json). Expect survive (bootcount_delta 0) with delay1 margin. After PASS: commit beta.6 (supersedes beta.5) + push origin/otgw-1.x.x.
 
 SHIPPED beta.6 (delay(1)) commit 81d80b9b -> origin/otgw-1.x.x. Field-test build: build/OTGW-firmware-1.7.0-beta.6+0693e78.{ino.bin,littlefs.bin}. HONEST FINAL CONCLUSIONS: (1) Fixes the CLIFF (beta.13->beta.16 yield regression) = the acute crash making users downgrade; delay1 = field-proven beta.13 behaviour. (2) Bench reproduced the crash CLASS + proved mechanism (yield reboots; capping helps) but is HARSHER than field + too noisy to rank variants: delay1 rebooted 2/3 bench runs, yield 1/1, dus500 0/1 - it crashes even proven-good delay1, so variant selection rests on the field bisect, not the bench. (3) RESIDUAL: delay1 restores beta.13's maxBlock floor (~4040 p05), NOT 1.3.5-gold (~10456) - the gradual CREEP 1.3.5->beta.13 (heap-pressure reduction via fewer hot-path allocations) is a SEPARATE deeper follow-up if full 1.3.5-level wanted. (4) George field-test on a boiler-connected unit = the true validation. Status: implementation done+pushed; field-validation = remaining gate.
+
+EXTENDED A/B (user req): full-load suite (sim+MQTT+6http3ws 30min) on (a) C3 dus500+yield [running c3full], (b) 1.3.5 gold-standard [building 4M2M variant via build-135 agent, since official 1.3.5=4M1M won't mount FS on 4M2M device]. Data so far under this load: yield reboot 1/1; delay1 reboot 2/3 (C1 survived, beta.6 x2 reboot); dus500 survived 0/1 (1 prior run, no reboot). Goal: dus500 vs delay1 cleaner read + does GOLD 1.3.5 survive (=> bench discriminates + creep real) or also crash (=> bench over-harsh). 15-min loop driving to completion + final continue-advice. Bench device 88.68, MQTT creds set (not stored).
 <!-- SECTION:NOTES:END -->
