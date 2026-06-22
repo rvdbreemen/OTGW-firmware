@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 07:01'
+updated_date: '2026-06-22 07:18'
 labels: []
 dependencies: []
 ---
@@ -33,4 +33,6 @@ ROOT CAUSE pinned offline: commit 05e777bf (beta.15), delay(1)->yield() in doBac
 HARDWARE BLOCKER (2026-06-22): device on COM3 = MAC 84:F3:EB:22:B8:E1 = the live 88.68 unit (1.6.1-beta, PIC fw 6.6 = real boiler), NOT the C8:C9:A3 bench unit. Flash blocked: esptool reads MAC but stub/--no-stub fail with 'serial noise or corruption' = active PIC streams OT into ESP RX, corrupts bootloader. NO write happened; recovered to run mode (88.68 health=200). Will NOT autonomously flash/overload a production gateway. Need user: confirm safe bench target + quiet PIC, or point to real bench unit, or accept offline-confirmed fix. esptool works via 'python -m esptool' (pip 4.8.1); flash_esp.py cp1252 bug + flash_otgw.bat Get-FileHash bug noted. Root cause already pinned offline; hardware A/B is validation, not discovery.
 
 FIX IMPLEMENTED on 1.7.0-beta.5: doBackgroundTasks() tail yield() -> delayMicroseconds(500); yield() (C3). Caps loop ~2kHz (bounds heap fragmentation per offline bisect) + keeps yield (SDK servicing + web responsiveness TASK-651 wanted). Evaluator --quick 100% (34 pass/0 fail). Build running. BENCH NOTE: bench (no boiler) cannot validate the fragmentation fix (C0 yield == CREV delay1 == 53-55% frag, no crash, structural: no boiler->no value churn for loop to amplify). Bench validates no-regression + throughput only. REAL fragmentation validation = FIELD test on a boiler-connected unit (George). Conservative fallback if field shows insufficient = plain delay(1) (proven beta.13-stable).
+
+SHIPPED: commit e2382b55 pushed to origin/otgw-1.x.x as 1.7.0-beta.5. Fix = delayMicroseconds(500)+yield in doBackgroundTasks tail. Bench-validated: build exit 0, evaluate.py 100%, 10-min 8http+3ws soak STABLE (0 exc, 0 reboot, hd_enter_critical 0), HTTP throughput 2657 (=2.3x delay1's 1164, ~67% of uncapped yield 3938 -> keeps responsiveness). Field-test build ready: build/OTGW-firmware-1.7.0-beta.5+d5883e1.{ino.bin,littlefs.bin}. REMAINING GATE (hardware/field, cannot self-verify on boiler-less bench): George flashes beta.5 on his boiler-connected unit + runs the README soak (browser capture ON ~20min); PASS = no maxBlock collapse / no reboot vs the beta.16 crash. Keeping In Progress until field-confirmed; fallback if 2kHz cap insufficient = plain delay(1).
 <!-- SECTION:NOTES:END -->
