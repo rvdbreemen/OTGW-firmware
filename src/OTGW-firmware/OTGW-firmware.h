@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.18
+**  Version  : v1.7.0-beta.19
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -75,7 +75,7 @@ void setLed(int8_t, uint8_t);
 #define CMSG_SIZE  512   // General-purpose scratch buffer (webhook, REST API, JSON, MQTT topic render).
                          // All known users need ≤512 bytes.  MQTT autoconfig reads templates
                          // directly from PROGMEM pools (no RAM staging needed on ESP8266).
-#define OT_TOPIC_LEN 50  // Shared MQTT topic scratch for OT print_* functions.
+#define OT_TOPIC_LEN 40  // Shared MQTT topic scratch; only ever holds an OT label (messageIDToString -> OTlookupitem.label[40], <=39 chars) (was 50)
 #define JSON_BUFF_MAX   1024
 #define JSON_ENTRY_BUF   256  // max bytes for a single serialized JSON entry/object
 // Replace CSTR macro with overloads to handle both String and char*
