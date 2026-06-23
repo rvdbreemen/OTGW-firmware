@@ -8,7 +8,15 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-1.7.0 cycle (latest beta: 1.7.0-beta.6). Headlined by heap-fragmentation crash-proofing for long-running devices under load.
+1.7.0 cycle (latest beta: 1.7.0-beta.34). Headlined by heap-fragmentation crash-proofing (beta.1 to beta.6) and a RAM / heap-headroom optimization pass (beta.7 to beta.34) for long-running devices under load.
+
+### Changed
+- RAM and heap-headroom optimization pass (beta.7 to beta.33). The OpenTherm message-name table (`OTmap[]`) was moved into flash (PROGMEM) using inline table arrays, freeing about 4.96 KB of static RAM and lifting the idle free heap by about 6 KB. The largest-contiguous-block floor under sustained load rose from about 4.9 KB to about 11 KB, restoring the headroom the firmware had at 1.3.5. Roughly 25 smaller buffer and integer-width trims followed (OpenTherm log and topic buffers, MQTT namespace and client-id buffers, the JSON coalescing send buffer, the REST API URI tokenizer, the OT command queue, several diagnostic counters), plus two String-allocation removals (`dBmtoQuality()`, `upTime()`) that cut per-call heap churn. Net effect: about 6.6 KB of static RAM reclaimed with no functional change. Each step shipped under its own prerelease tag and was bench-verified (build, evaluator, on-device soak). (TASK-903)
+
+### Fixed
+- MQTT broker port above 32767 was stored as a negative value because the field was `int16_t`, so high non-standard ports could not be saved. The field is now `uint16_t` (full 1 to 65535 range). (beta.32, TASK-903)
+- S0 pulse-counter pulses-per-kWh values above 65535 wrapped: the input validator allowed 1 to 100000 into a `uint16_t` field. The validator now constrains to the field's 1 to 65535 range. (beta.33, TASK-903)
+- Debug Information tab showed raw key names for the runtime WiFi values (`wifi_current_subnet` / `_gateway` / `_dns1` / `_dns2`) and the simulation flag. These now render friendly labels, with a "(current)" qualifier distinguishing the runtime values from the configured static-IP fields. (beta.34, TASK-904)
 
 ### Fixed
 - Random reboots on 1.6.x/1.7.x under sustained load: mainloop root cause (beta.6). A field bisect of the 1.6.0 cycle pinned a second fragmentation driver. TASK-651 had replaced the trailing `delay(1)` in `doBackgroundTasks()` with `yield()`, which uncapped the main loop. Under sustained decode + MQTT + WebSocket/HTTP load the unbounded loop fragments the heap (the largest contiguous block collapses while total free still looks fine) until an allocation fails and the device reboots. beta.6 restores `delay(1)` (the field-proven pre-TASK-651 behaviour, stable through 1.6.0-beta.13), which caps the loop at ~1 kHz and yields to the SDK. Reproduced and confirmed on a bench via a synthetic boiler-traffic replay plus MQTT load. (TASK-901)
