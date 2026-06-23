@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v1.7.0-beta.27
+**  Version  : v1.7.0-beta.28
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -168,9 +168,11 @@ static int iIdentlevel = 0;
 bool bFirst = true;
 
 // B: Coalescing send buffer — routes all httpServer.sendContent calls
-// through a single 512-byte buffer to cut ~300 TCP writes down to ~7-8.
+// through a single 256-byte buffer to cut ~300 TCP writes down to ~15-16.
+// jsonBufAppend flushes-on-full and loops, so the size only tunes flush
+// frequency; it can never overflow (any chunk is copied in buffer-sized pieces).
 // Safe as module-static: HTTP handlers are not re-entered by doBackgroundTasks.
-static char    sJsonFlushBuf[512];
+static char    sJsonFlushBuf[256];
 static uint16_t sJsonFlushLen = 0;
 
 static void jsonBufFlush() {
