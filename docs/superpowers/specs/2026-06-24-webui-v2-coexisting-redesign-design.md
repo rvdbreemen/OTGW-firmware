@@ -49,6 +49,9 @@ The mockup is 100% simulated (random-walk JS). Visuals/CSS/SVG are done; the wor
   Headroom ~720 KB. New bundle estimate ~150–200 KB ⇒ projected ~1.05 MB, **~500 KB
   margin**. Coexistence fits without gzip. `webSendFile()` already supports gzip
   (`.gz` sibling + `Content-Encoding`) and is held in reserve if a future page balloons.
+  **Decided:** keep BOTH UIs full-size (no gzip, no legacy trim) for this epic; the
+  ~500 KB margin is sufficient. Gzip / legacy-trim revisited only if a later page
+  exceeds the budget.
 - **Design-system drift gate (ADR-091).** New tokens MUST fold into `ds-tokens.css`;
   bespoke `zone-*`/`tile-*` map onto the official status palette per the Patterns
   reconciliation doc. No parallel token set.
