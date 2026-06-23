@@ -3,9 +3,11 @@ id: TASK-904
 title: >-
   fix(webui): friendly labels for unmapped Debug tab keys (wifi_current_*,
   otgwsimulation)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-23 05:22'
+updated_date: '2026-06-23 05:24'
 labels: []
 dependencies: []
 ---
