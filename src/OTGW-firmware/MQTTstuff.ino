@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.7.0-beta.29
+**  Version  : v1.7.0-beta.30
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1673,8 +1673,6 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst = false) {
   ctx.mqttPubTopic = MQTTPubNamespace;
   ctx.mqttSubTopic = MQTTSubNamespace;
   ctx.haPrefix = CSTR(settings.mqtt.sHaprefix);
-  ctx.manufacturer = settings.device.sManufacturer;
-  ctx.model = settings.device.sModel;
   ctx.isFirstEntity = isFirst;
   ctx.sourceSuffix = "";
   ctx.sourceName = "";

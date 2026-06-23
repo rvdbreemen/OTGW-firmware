@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.7.0-beta.29
+**  Version  : v1.7.0-beta.30
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -229,8 +229,7 @@ bool writeSettings(bool show)
   bool ok = file.print(F("{\n")) > 0;
   ok = writeJsonStringKV(file, F("hostname"), settings.sHostname, true) && ok;
   ok = writeJsonStringKV(file, F("httppasswd"), settings.sHTTPpasswd, true) && ok;
-  ok = writeJsonStringKV(file, F("DeviceManufacturer"), settings.device.sManufacturer, true) && ok;
-  ok = writeJsonStringKV(file, F("DeviceModel"), settings.device.sModel, true) && ok;
+  // DeviceManufacturer/DeviceModel are fixed in flash now (TASK-903); not persisted.
   ok = writeJsonStringKV(file, F("WifiStaticIP"), settings.wifi.sStaticIp, true) && ok;
   ok = writeJsonStringKV(file, F("WifiSubnet"), settings.wifi.sSubnet, true) && ok;
   ok = writeJsonStringKV(file, F("WifiGateway"), settings.wifi.sGateway, true) && ok;
@@ -408,8 +407,7 @@ void readSettings(bool show)
     Debugln(F("\r\n==== read Settings ===================================================\r"));
     Debugf(PSTR("Hostname              : %s\r\n"), CSTR(settings.sHostname));
     Debugf(PSTR("HTTP password         : %s\r\n"), settings.sHTTPpasswd[0] ? "***" : "(not set)");
-    Debugf(PSTR("Device manufacturer   : %s\r\n"), CSTR(settings.device.sManufacturer));
-    Debugf(PSTR("Device model          : %s\r\n"), CSTR(settings.device.sModel));
+    Debugln(F("Device                : NodoShop OTGW (fixed)"));
     Debugf(PSTR("WiFi static IP        : %s\r\n"), settings.wifi.sStaticIp[0] ? settings.wifi.sStaticIp : "(DHCP)");
     Debugf(PSTR("WiFi subnet           : %s\r\n"), CSTR(settings.wifi.sSubnet));
     Debugf(PSTR("WiFi gateway          : %s\r\n"), CSTR(settings.wifi.sGateway));
@@ -488,12 +486,8 @@ void updateSetting(const char *field, const char *newValue)
     DebugTf(PSTR("Need reboot before new %s.local will be available!\r\n\n"), settings.sHostname);
   }
 
-  else if (strcasecmp_P(field, PSTR("DeviceManufacturer")) == 0) {
-    strlcpy(settings.device.sManufacturer, newValue, sizeof(settings.device.sManufacturer));
-  }
-  else if (strcasecmp_P(field, PSTR("DeviceModel")) == 0) {
-    strlcpy(settings.device.sModel, newValue, sizeof(settings.device.sModel));
-  }
+  // DeviceManufacturer/DeviceModel keys from older settings files are intentionally
+  // ignored now (board identity is fixed in flash, TASK-903) — they fall through harmlessly.
   else if (strcasecmp_P(field, PSTR("WifiStaticIP")) == 0) {
     strlcpy(settings.wifi.sStaticIp, newValue, sizeof(settings.wifi.sStaticIp));
   }

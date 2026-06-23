@@ -1919,6 +1919,10 @@ static const char kUrl[]      PROGMEM = "url";
 static const char kValTplVal[]  PROGMEM = "{{ value }}";
 static const char kOriginName[] PROGMEM = "OTGW-firmware";
 static const char kOriginUrl[]  PROGMEM = "https://github.com/rvdbreemen/OTGW-firmware";
+// Board identity is fixed for this ESP8266 firmware (NodoShop OTGW); kept in flash,
+// not an editable/persisted setting (TASK-903). Frees the 2x char[32] settings fields.
+static const char kMfrVal[]     PROGMEM = "NodoShop";
+static const char kModelVal[]   PROGMEM = "OTGW";
 
 // ---------------------------------------------------------------------------
 // Device block: full (first entity) or minimal (subsequent)
@@ -1931,9 +1935,9 @@ static bool writeDeviceBlock(MqttJsonWriter &w, const HaDiscoveryContext &ctx) {
 
   if (ctx.isFirstEntity) {
     if (!writeJsonComma(w)) return false;
-    if (!writeJsonKV(w, kMfr, ctx.manufacturer)) return false;
+    if (!writeJsonKV_P(w, kMfr, kMfrVal)) return false;
     if (!writeJsonComma(w)) return false;
-    if (!writeJsonKV(w, kModel, ctx.model)) return false;
+    if (!writeJsonKV_P(w, kModel, kModelVal)) return false;
     if (!writeJsonComma(w)) return false;
     if (!w.writeChar('"')) return false;
     if (!w.writeProgmem(kDevName)) return false;

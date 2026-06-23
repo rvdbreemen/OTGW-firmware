@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.29
+**  Version  : v1.7.0-beta.30
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -465,12 +465,9 @@ struct OTGWBootSection {            // PIC boot-time command injection
 };
 
 
-// Hardware identity for HA device registry discovery.
-// Defaults set per platform; user can override via settings.ini or web UI.
-struct DeviceSection {
-  char sManufacturer[32] = "NodoShop";
-  char sModel[32]        = "OTGW";
-};
+// Hardware identity for HA device registry discovery is FIXED for this ESP8266
+// firmware (NodoShop OTGW) and lives in flash as kMfrVal/kModelVal in
+// mqtt_configuratie.cpp — no editable/persisted DeviceSection (TASK-903).
 
 struct WifiSection {              // settings.wifi — static IP (all empty = DHCP)
   char sStaticIp[16] = "";       // e.g. "192.168.1.100"  (empty = DHCP)
@@ -491,7 +488,6 @@ struct OTGWSettings {
   uint8_t iRestartHour = 4;     // Hour (0-23, local time) for nightly restart (default 04:00)
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
-  DeviceSection       device;
   WifiSection         wifi;
   MQTTSettingsSection mqtt;
   NTPSection          ntp;

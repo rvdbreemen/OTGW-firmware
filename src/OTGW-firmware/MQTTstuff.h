@@ -271,8 +271,8 @@ struct HaDiscoveryContext {
     const char *mqttPubTopic;
     const char *mqttSubTopic;
     const char *haPrefix;
-    const char *manufacturer;      // Hardware manufacturer (from settings.device)
-    const char *model;             // Hardware model (from settings.device)
+    // manufacturer/model are fixed PROGMEM constants (kMfrVal/kModelVal in
+    // mqtt_configuratie.cpp), no longer ctx fields (TASK-903).
     bool        isFirstEntity;
     // Source template expansion (set per-source iteration)
     const char *sourceSuffix;
