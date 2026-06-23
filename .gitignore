@@ -12,7 +12,6 @@ Arduino 2/**
 libraries/**
 staging/**
 build/**
-build-archive/**
 arduino-cli.yaml
 
 # Local tooling artifacts (regenerated on demand; never committed)
