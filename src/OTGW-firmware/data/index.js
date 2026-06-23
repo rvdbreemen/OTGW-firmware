@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v1.7.0-beta.33
+**  Version  : v1.7.0-beta.34
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -5310,6 +5310,10 @@ var translateFields = [
   , ["wifigateway", "Default Gateway"]
   , ["wifidns1", "DNS Server 1"]
   , ["wifidns2", "DNS Server 2"]
+  , ["wifi_current_subnet", "Subnet Mask (current)"]
+  , ["wifi_current_gateway", "Default Gateway (current)"]
+  , ["wifi_current_dns1", "DNS Server 1 (current)"]
+  , ["wifi_current_dns2", "DNS Server 2 (current)"]
   , ["wifirssi", "Wi-Fi Signal Strength (dBm)"]
   , ["wifiquality", "Wi-Fi Quality (%)"]
   , ["wifiquality_text", "Wi-Fi Quality"]
@@ -5352,6 +5356,7 @@ var translateFields = [
   , ["boilerconnected", "Boiler Connected"]
   , ["otgwmode", "Gateway Mode"]
   , ["otgwconnected", "OpenTherm Active"]
+  , ["otgwsimulation", "OTGW Simulation"]
   , ["gpiooutputsenabled", "GPIO Output Trigger Enabled"]
   , ["gpiooutputspin", "GPIO Output Pin"]
   , ["gpiooutputstriggerbit", "GPIO Trigger Bit (0-15)"]
