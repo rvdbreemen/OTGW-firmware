@@ -341,11 +341,26 @@
   .set-cols{min-width:0}
   .set-cat-title{font-size:1.08rem;font-weight:700;display:flex;align-items:center;gap:8px;margin:2px 2px 4px}
   .cat-desc{font-size:.8rem;color:var(--muted);margin:0 2px 14px;max-width:70ch}
-  .set-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;align-items:start}
+  /* masonry flow: cards pack tightly per column (no grid row-alignment whitespace) */
+  .set-cards{columns:300px;column-gap:16px}
   .sfield{display:inline-flex;align-items:center;gap:6px}
   .sunit{font-size:.74rem;color:var(--muted);min-width:1.5em}
   .set-group{break-inside:avoid;background:var(--panel);border:1px solid var(--border);
-    border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin:0}
+    border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin:0 0 16px;display:inline-block;width:100%}
+  /* BLE sensor roster */
+  .ble-desc{font-size:.74rem;color:var(--muted);margin:2px 0 8px}
+  .ble-row{padding:9px 0;border-top:1px solid var(--border)}
+  .ble-row:first-of-type{border-top:0}
+  .ble-nm{font-weight:700;font-size:.86rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ble-mac{font-family:var(--font-mono);font-size:.66rem;color:var(--muted);font-weight:400}
+  .ble-tag{font-size:.62rem;font-weight:700;border-radius:7px;padding:2px 7px}
+  .ble-tag.temp{background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot)}
+  .ble-tag.hum{background:color-mix(in srgb,var(--cold) 18%,transparent);color:var(--cold)}
+  .ble-ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+  .ble-ctrls label{font-size:.68rem;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+  .ble-ctrls select{border:1px solid var(--border);background:var(--panel-2);color:var(--text);
+    border-radius:7px;padding:5px 7px;font-size:.78rem;font-family:var(--font-sans)}
+  .ble-val{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);margin-left:auto}
   .set-group h3{margin:0 0 4px;font-size:.95rem;display:flex;align-items:center;gap:8px}
   .set-group .gdesc{font-size:.76rem;color:var(--muted);margin:0 0 10px}
   .badge-reboot{font-size:.62rem;font-weight:700;color:var(--zone-warn);
@@ -1655,6 +1670,39 @@ var SAT_GROUPS = [
 
 /* Settings model — mirrors the real dev (2.0.0) settings. Category -> groups -> fields.
    field types: b=toggle, select(options [[v,label]]), f/i=number, s/t=text, p=password. */
+// Supplementary SAT groups — the remaining persisted SAT keys the dev UI
+// drives through dedicated panels (BLE discovery, multi-zone), surfaced here
+// so the audit reaches 100% coverage of writeSettings().
+var SAT_EXTRA=[
+ {id:'sat-grp-source', title:'Temperature Source', fields:[
+   {key:'satsource', label:'Room temp source', type:'select', value:0,
+     options:[[0,'OpenTherm thermostat'],[1,'External sensor'],[2,'BLE sensor'],[3,'MQTT topic']]},
+   {key:'satthermalcomfort', label:'Thermal comfort model', type:'b', value:false},
+   {key:'sathumiditytimeout', label:'Humidity sensor timeout', type:'i', unit:'s', value:600, min:60, max:86400, step:60}
+ ]},
+ {id:'sat-grp-ble', title:'BLE Sensors', desc:'Bluetooth temperature/humidity sensors. Per sensor: type and the room it maps to. (Scan enable/interval live under Temperature Sources.)', fields:[
+   {key:'satblenameprefix', label:'BLE name prefix', type:'s', value:'ATC'},
+   {key:'satblenamefilteringest', label:'Filter by name prefix', type:'b', value:true},
+   {key:'satblerostercount', label:'Discovered sensors', type:'i', value:4, readonly:true}
+ ], roster:[
+   {name:'Living room',  mac:'A4:C1:38:0B:11', type:'th', value:'21.4 °C · 47 %', area:0, on:true},
+   {name:'Bedroom',      mac:'A4:C1:38:0B:22', type:'t',  value:'19.2 °C',        area:1, on:true},
+   {name:'Bathroom',     mac:'A4:C1:38:0B:33', type:'h',  value:'58 %',           area:2, on:true},
+   {name:'Study',        mac:'A4:C1:38:0B:44', type:'th', value:'20.1 °C · 44 %', area:3, on:false}
+ ]},
+ {id:'sat-grp-zones', title:'Zones (multi-area)', fields:[
+   {key:'satzonecount', label:'Zone count', type:'i', value:0, min:0, max:4, step:1},
+   {key:'satzoneheadroom', label:'Zone headroom', type:'f', unit:'°C', value:0.5, min:0, max:5, step:0.1},
+   {key:'satzonetimeout', label:'Zone sensor timeout', type:'i', unit:'s', value:1800, min:60, max:86400, step:60}
+ ]},
+ {id:'sat-grp-boiler', title:'Boiler Model', fields:[
+   {key:'satboilerratedkw', label:'Rated output', type:'f', unit:'kW', value:24.0, min:1, max:100, step:0.5},
+   {key:'satboilerefficiency', label:'Efficiency', type:'f', unit:'%', value:92.0, min:50, max:110, step:0.5},
+   {key:'sathpcycle', label:'Heat-pump min cycle', type:'i', unit:'min', value:10, min:1, max:60, step:1},
+   {key:'satflushtreshold', label:'Flush threshold', type:'f', unit:'°C', value:5.0, min:0, max:20, step:0.5},
+   {key:'satdhwenable', label:'DHW enable (legacy alias)', type:'b', value:true}
+ ]}
+];
 var SET_CATS=[
  {id:'system',icon:'🖥',title:'System',desc:'Device identity and access.',groups:[{fields:[
    {key:'hostname',label:'Hostname',type:'t',value:'OTGW',hint:'mDNS name on your network'},
@@ -1698,7 +1746,8 @@ var SET_CATS=[
      {key:'MQTTinterval',label:'Publish interval',type:'i',unit:'s',value:30,min:1,max:600},
      {key:'MQTTOTmessage',label:'Publish raw OT messages',type:'b',value:false},
      {key:'MQTTseparatesources',label:'Separate thermostat/boiler topics',type:'b',value:false},
-     {key:'MQTTuseLegacyOtTopics',label:'Legacy OT topic layout',type:'b',value:false}
+     {key:'MQTTuseLegacyOtTopics',label:'Legacy OT topic layout',type:'b',value:false},
+     {key:'MQTTlastPublishedLegacy',label:'Last legacy publish (internal)',type:'t',value:'1970-01-01 00:00',readonly:true,hint:'Bookkeeping — persisted, not user-editable'}
    ]}
  ]},
  {id:'ntp',icon:'🕐',title:'Time / NTP',desc:'Clock sync and time-to-thermostat.',groups:[{fields:[
@@ -1792,7 +1841,7 @@ var SET_CATS=[
    {key:'ui_autoscreenshot',label:'Auto-save graph PNG',type:'b',value:false},
    {key:'ui_graphtimewindow',label:'Default graph window',type:'select',value:60,options:[[10,'10 min'],[30,'30 min'],[60,'1 hour'],[240,'4 hours'],[1440,'24 hours']]}
  ]}]},
- {id:'sat',icon:'🧠',title:'SAT — Smart Thermostat',desc:'Standalone Autonomous Thermostat: room-driven control, PID/PWM, presets, weather, solar & PV boost, safety. (ESP32 / OTGW32)',groups:SAT_GROUPS}
+ {id:'sat',icon:'🧠',title:'SAT — Smart Thermostat',desc:'Standalone Autonomous Thermostat: room-driven control, PID/PWM, presets, weather, solar & PV boost, safety. (ESP32 / OTGW32)',groups:SAT_GROUPS.concat(SAT_EXTRA)}
 ];
 var dirty={};
 function setDefault(f){
@@ -1815,7 +1864,23 @@ function fieldControl(f){
   return '<span class="sfield"><input type="'+t+'" data-key="'+f.key+'" data-orig="'+v+'" value="'+v+'"'+ex+ro+'>'+
     (f.unit?'<span class="sunit">'+f.unit+'</span>':'')+'</span>';
 }
-function catFieldCount(c){return c.groups.reduce(function(a,g){return a+g.fields.length;},0);}
+function catFieldCount(c){return c.groups.reduce(function(a,g){return a+g.fields.length+(g.roster?g.roster.length:0);},0);}
+function bleRoster(roster){
+  var rooms=[[0,'Area 0 · Living'],[1,'Area 1 · Bedroom'],[2,'Area 2 · Bathroom'],[3,'Area 3 · Study'],[9,'Unassigned']];
+  var typeOpt=[['t','🌡 Temperature'],['h','💧 Humidity'],['th','🌡💧 Temp + Humidity']];
+  return '<div class="ble-roster">'+roster.map(function(s,i){
+    var tags=(s.type.indexOf('t')>=0?'<span class="ble-tag temp">TEMP</span>':'')+
+             (s.type.indexOf('h')>=0?'<span class="ble-tag hum">HUM</span>':'');
+    return '<div class="ble-row" data-search="ble sensor '+s.name.toLowerCase()+' '+s.mac.toLowerCase()+'">'+
+      '<div class="ble-nm">'+s.name+' '+tags+'<span class="ble-mac">'+s.mac+'</span>'+
+        '<span class="ble-val">'+s.value+'</span></div>'+
+      '<div class="ble-ctrls">'+
+        '<label>Type<select>'+typeOpt.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===s.type?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></label>'+
+        '<label>Maps to room<select data-key="satsensorarea'+i+'" data-orig="'+s.area+'">'+rooms.map(function(r){return '<option value="'+r[0]+'"'+(r[0]===s.area?' selected':'')+'>'+r[1]+'</option>';}).join('')+'</select></label>'+
+        '<label>Active<input type="checkbox" class="sw"'+(s.on?' checked':'')+'></label>'+
+      '</div></div>';
+  }).join('')+'</div>';
+}
 function buildSettings(){
   var rail='',cols='';
   SET_CATS.forEach(function(c){
@@ -1825,11 +1890,13 @@ function buildSettings(){
       (c.desc?'<p class="cat-desc">'+c.desc+'</p>':'')+
       '<div class="set-cards">'+c.groups.map(function(g){
         return '<section class="set-group">'+(g.sub||g.title?'<h3>'+(g.sub||g.title)+'</h3>':'')+
+          (g.desc?'<div class="ble-desc">'+g.desc+'</div>':'')+
           g.fields.map(function(f){
             return '<div class="srow" data-search="'+(c.title+' '+(g.sub||g.title||'')+' '+f.label+' '+f.key).toLowerCase()+'">'+
               '<span class="slbl">'+f.label+(f.hint?'<span class="shint">'+f.hint+'</span>':'')+'</span>'+
               fieldControl(f)+'</div>';
-          }).join('')+'</section>';
+          }).join('')+
+          (g.roster?bleRoster(g.roster):'')+'</section>';
       }).join('')+'</div></div>';
   });
   document.getElementById('setRail').innerHTML=rail;
