@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.31
+**  Version  : v1.7.0-beta.32
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -397,7 +397,7 @@ struct MQTTSettingsSection {
   bool    bEnable          = true;
   bool    bSecure          = false;
   char    sBroker[65]      = "homeassistant.local";
-  int16_t iBrokerPort      = 1883;
+  uint16_t iBrokerPort     = 1883;   // TCP port 1..65535; was int16_t (overflowed >32767)
   char    sUser[41]        = "";
   char    sPasswd[41]      = "";
   char    sHaprefix[41]    = HOME_ASSISTANT_DISCOVERY_PREFIX;
