@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v1.7.0-beta.30
+**  Version  : v1.7.0-beta.31
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -185,20 +185,20 @@ static bool parseMsgId(const char *token, uint8_t &msgId) {
 constexpr uint8_t API_MAX_WORDS = 6;   // deepest route = 6 segments (words[0..5]); no handler reads words[6+] (was 8)
 constexpr size_t  API_WORD_LEN  = 32;
 
-static void handleHealth(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleSensors(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleDevice(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleFlash(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleFirmware(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
-static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleHealth(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleSettings(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleSensors(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleDevice(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleFlash(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handlePic(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleFirmware(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleFilesystem(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleSimulate(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleOtgw(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleWebhook(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleDiscovery(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleDebugDump(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleMqtt(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTGWvalue(int msgid);
 void sendOTGWlabel(const char *msglabel);
@@ -268,12 +268,12 @@ static void setOTGWSimulationEnabled(bool enabled) {
 
 //=== Resource handler functions ===
 
-static void handleHealth(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleHealth(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   sendHealth();
 }
 
-static void handleSettings(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleSettings(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   // Auth required for all methods (GET includes sensitive config)
   if (!checkHttpAuth()) return;
   if (method == HTTP_POST || method == HTTP_PUT) {
@@ -332,7 +332,7 @@ static void sendSensorStatus() {
   sendEndJsonMap(F("sensors"));
 }
 
-static void handleSensors(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleSensors(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (wc == 4 || (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0)) {
     // GET /api/v2/sensors or GET /api/v2/sensors/status
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
@@ -350,7 +350,7 @@ static void handleSensors(const char words[][API_WORD_LEN], uint8_t wc, HTTPMeth
   }
 }
 
-static void handleDevice(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleDevice(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (wc > 4 && strcmp_P(words[4], PSTR("info")) == 0) {
     sendDeviceInfoV2();
@@ -363,7 +363,7 @@ static void handleDevice(const char words[][API_WORD_LEN], uint8_t wc, HTTPMetho
   }
 }
 
-static void handleFlash(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleFlash(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (wc > 4 && strcmp_P(words[4], PSTR("status")) == 0) {
     sendFlashStatus();
@@ -372,7 +372,7 @@ static void handleFlash(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod
   }
 }
 
-static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handlePic(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (!isPICEnabled()) { sendApiError(503, F("No PIC detected - PIC functions disabled")); return; }
   if (wc > 4 && strcmp_P(words[4], PSTR("flash-status")) == 0) {
@@ -386,7 +386,7 @@ static void handlePic(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   }
 }
 
-static void handleFirmware(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleFirmware(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
     apifirmwarefilelist();
@@ -395,7 +395,7 @@ static void handleFirmware(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   }
 }
 
-static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleFilesystem(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (wc > 4 && strcmp_P(words[4], PSTR("files")) == 0) {
     apilistfiles();
@@ -406,7 +406,7 @@ static void handleFilesystem(const char words[][API_WORD_LEN], uint8_t wc, HTTPM
   }
 }
 
-static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleSimulate(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   const bool isGet = (method == HTTP_GET);
   const bool isPostOrPut = (method == HTTP_POST || method == HTTP_PUT);
 
@@ -433,7 +433,7 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   sendApiNotFound(originalURI);
 }
 
-static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleOtgw(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   const bool isGet = (method == HTTP_GET);
   const bool isPostOrPut = (method == HTTP_POST || method == HTTP_PUT);
 
@@ -584,7 +584,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   }
 }
 
-static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleWebhook(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (wc > 4 && strcmp_P(words[4], PSTR("test")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
     String stateParam = httpServer.arg(F("state"));
@@ -620,7 +620,7 @@ static const __FlashStringHelper* verifyOutcomeLabel(VerifyOutcome o) {
 }
 
 //===[ /api/v2/discovery — MQTT auto-discovery verification/republish (ADR-062 / TASK-349) ]===
-static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleDiscovery(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   // GET /api/v2/discovery — status dump
   if (wc == 4 || (wc == 5 && words[4][0] == '\0')) {
     if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
@@ -704,7 +704,7 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
 }
 
 //===[ /api/v2/mqtt — MQTT runtime actions ]===
-static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleMqtt(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   // POST /api/v2/mqtt/republish — force full OT value republish (e.g. after broker wipe)
   if (wc > 4 && strcmp_P(words[4], PSTR("republish")) == 0) {
     if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
@@ -719,7 +719,7 @@ static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 
 // GET /api/v2/debug — machine-readable dump of all settings and runtime state.
 // Auth-protected: contains SSID, broker address, and other config details.
-static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+static void handleDebugDump(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
   if (!checkHttpAuth()) return;
 
@@ -803,7 +803,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
 
 //=== Route dispatch table (ADR-050) ===
 // Adding a new v2 resource: (1) write handler function above, (2) add entry below.
-typedef void (*ApiResourceHandler)(const char[][API_WORD_LEN], uint8_t, HTTPMethod, const char*);
+typedef void (*ApiResourceHandler)(const char*[], uint8_t, HTTPMethod, const char*);
 
 struct ApiRoute {
   PGM_P              segment;
@@ -848,10 +848,10 @@ void processAPI()
 {
   // Static buffers save ~356 bytes of stack (not re-entrant in cooperative scheduler)
   static char URI[50];
-  static char words[API_MAX_WORDS][API_WORD_LEN];
+  static const char* words[API_MAX_WORDS];   // point into URI (tokenized in-place); URI is static + not overwritten mid-dispatch, so it outlives every words[] read (TASK-903)
   static char originalURI[sizeof(URI)];
   URI[0] = '\0';
-  memset(words, 0, sizeof(words));
+  for (uint8_t i = 0; i < API_MAX_WORDS; i++) words[i] = "";   // empty string, not nullptr (safe under any wc)
 
   const HTTPMethod method = httpServer.method();
   const unsigned long startMs = millis();
@@ -874,9 +874,9 @@ void processAPI()
   uint8_t wc = 0;
   {
     char *savePtr = nullptr;
-    if (URI[0] == '/' && wc < API_MAX_WORDS) { words[wc][0] = '\0'; wc++; }
+    if (URI[0] == '/' && wc < API_MAX_WORDS) { words[wc] = ""; wc++; }
     for (char *token = strtok_r(URI, "/", &savePtr); token && wc < API_MAX_WORDS; token = strtok_r(nullptr, "/", &savePtr)) {
-      strlcpy(words[wc], token, API_WORD_LEN);
+      words[wc] = token;   // point into URI (in-place tokenized), no per-token copy
       wc++;
     }
   }
