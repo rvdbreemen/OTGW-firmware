@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.0-beta.28
+**  Version  : v1.7.0-beta.29
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -325,18 +325,18 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 // last_verify_epoch). Adding a field here does NOT automatically surface on MQTT
 // — add a corresponding publishStatU32(F("otgw-firmware/stats/...")) call in
 // sendMQTTheapdiag().
-struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
-  uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
-  uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
-  uint32_t iMqttMaxBlockSkips       = 0; // MQTT publishes skipped by the maxBlock pre-flight gate (fragmentation guard)
-  uint32_t iWsMaxBlockSkips         = 0; // WebSocket sends skipped by the maxBlock pre-flight gate (fragmentation guard)
-  uint32_t iHttpFragSkips           = 0; // httpServer.handleClient() ticks skipped by the maxBlock gate (HTTP-load fragmentation guard)
-  uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
-  uint32_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier
-  uint32_t iEnteredCriticalCount    = 0; // transitions into HEAP_CRITICAL tier
-  uint32_t iDripActiveBurstSkipCount = 0; // drip ticks skipped DURING active Status-burst (TASK-342)
-  uint32_t iDripCooldownSkipCount   = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
-  uint32_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure
+struct HeapDiagSection {                 // state.heapdiag — per-boot heap-pressure diagnostics (reset on reboot; display-only, u16 wrap cosmetic)
+  uint16_t iWsDropsTotal            = 0; // per-boot WebSocket messages dropped due to heap pressure
+  uint16_t iMqttDropsTotal          = 0; // per-boot MQTT messages dropped due to heap pressure
+  uint16_t iMqttMaxBlockSkips       = 0; // MQTT publishes skipped by the maxBlock pre-flight gate (fragmentation guard)
+  uint16_t iWsMaxBlockSkips         = 0; // WebSocket sends skipped by the maxBlock pre-flight gate (fragmentation guard)
+  uint16_t iHttpFragSkips           = 0; // httpServer.handleClient() ticks skipped by the maxBlock gate (HTTP-load fragmentation guard)
+  uint16_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
+  uint16_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier
+  uint16_t iEnteredCriticalCount    = 0; // transitions into HEAP_CRITICAL tier
+  uint16_t iDripActiveBurstSkipCount = 0; // drip ticks skipped DURING active Status-burst (TASK-342)
+  uint16_t iDripCooldownSkipCount   = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
+  uint16_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure
 };
 
 struct PicSettingsSection {    // state.picSettings — settings polled from PIC via PR= commands
