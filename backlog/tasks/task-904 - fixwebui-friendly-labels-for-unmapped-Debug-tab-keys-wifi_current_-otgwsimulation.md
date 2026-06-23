@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-23 05:22'
-updated_date: '2026-06-23 05:24'
+updated_date: '2026-06-23 05:40'
 labels: []
 dependencies: []
 ---
@@ -20,7 +20,7 @@ Debug Information tab renders device/info keys via translateToHuman(); 5 of 59 k
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 All 5 unmapped device/info keys have translateFields entries
-- [ ] #2 Labels match existing style and distinguish current/runtime from configured/static WiFi values
-- [ ] #3 Debug tab on device shows the friendly labels after LittleFS flash
+- [x] #1 All 5 unmapped device/info keys have translateFields entries
+- [x] #2 Labels match existing style and distinguish current/runtime from configured/static WiFi values
+- [x] #3 Debug tab on device shows the friendly labels after LittleFS flash
 <!-- AC:END -->
