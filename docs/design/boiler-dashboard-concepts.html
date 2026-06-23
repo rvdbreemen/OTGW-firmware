@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>OTGW Web UI — Opening page concepts (TASK-854)</title>
+<!--
+  DESIGN MOCKUP — not firmware, not shipped to LittleFS.
+  Three switchable opening-page concepts for the OTGW Web UI:
+    A · System view   — animated boiler schematic: flame on/off, red flow
+                        arrow out + temperature, blue return arrow in +
+                        temperature (per user feedback), DHW branch, pump,
+                        radiator, pressure, room & outside temperature.
+    B · At a glance   — mobile-first hero dial + stat cards (Nest/Tado vibe).
+    C · Mission ctrl  — data-dense live strip chart + OT frame ticker.
+  100% self-contained: hand-rolled SVG/CSS/JS, no libraries, no network.
+  All data is SIMULATED (random walk) so everything visibly moves.
+-->
+<style>
+  :root{
+    --font-sans:'Inter',Roboto,Arial,Helvetica,sans-serif;
+    --font-mono:'JetBrains Mono',Consolas,'Courier New',monospace;
+  }
+  html[data-theme="light"]{
+    --bg:#e6ffff; --panel:#ffffff; --panel-2:#f2fbff; --nav:#00bffe;
+    --text:#10303a; --muted:#5b7c87; --border:#bfe9f7;
+    --shadow:0 1px 3px rgba(0,0,0,.12);
+    --zone-ok:#2ecc71; --zone-warn:#f39c12; --zone-alert:#e74c3c;
+    --accent:#0098cc; --needle:#10303a;
+    --hot:#ff5a3c; --cold:#2f8fe8;
+    --tile-on:#2ecc71; --tile-off:#9fb4bc; --tile-fault:#e74c3c;
+    --gauge-track:#d7eef6; --gauge-text:#10303a;
+  }
+  html[data-theme="dark"]{
+    --bg:#1a1a1a; --panel:#2c2c2e; --panel-2:#242426; --nav:#383838;
+    --text:#e8e8ea; --muted:#9a9a9e; --border:#3c3c3e;
+    --shadow:0 1px 3px rgba(0,0,0,.5);
+    --zone-ok:#27c469; --zone-warn:#e0a300; --zone-alert:#ff5a4d;
+    --accent:#00bffe; --needle:#e8e8ea;
+    --hot:#ff6a4d; --cold:#4da3ff;
+    --tile-on:#27c469; --tile-off:#54565a; --tile-fault:#ff5a4d;
+    --gauge-track:#3a3a3d; --gauge-text:#e8e8ea;
+  }
+  *{box-sizing:border-box}
+  html,body{font-feature-settings:"tnum" 1;font-variant-numeric:tabular-nums}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);
+       transition:background .2s,color .2s}
+
+  /* ---------- header + design switcher ---------- */
+  .headerrow{display:flex;align-items:center;gap:10px;background:var(--nav);
+    color:#fff;padding:10px 14px;font-weight:700;box-shadow:var(--shadow);flex-wrap:wrap}
+  html[data-theme="dark"] .headerrow{color:#e8e8ea}
+  .headerrow .big{font-size:1.05rem;margin-right:auto}
+  .headerrow .sub{font-weight:400;opacity:.9;font-size:.8rem}
+  .theme-toggle{cursor:pointer;user-select:none;border:1px solid rgba(255,255,255,.4);
+    border-radius:8px;padding:8px 12px;font-size:.85rem;min-height:40px}
+  .switcher{display:flex;gap:6px;background:var(--nav);padding:8px 12px 12px;flex-wrap:wrap}
+  .seg{flex:1;min-width:104px;min-height:48px;border:0;border-radius:12px;cursor:pointer;
+    background:rgba(255,255,255,.18);color:#fff;font-family:var(--font-sans);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+  html[data-theme="dark"] .seg{color:#e8e8ea}
+  .seg b{font-size:.92rem}
+  .seg small{font-size:.66rem;opacity:.85;letter-spacing:.04em;text-transform:uppercase}
+  .seg.active{background:var(--bg);color:var(--text)}
+
+  .wrap{max-width:1020px;margin:0 auto;padding:16px}
+  .design{display:none}
+  .design.active{display:block}
+  .concept-cap{font-size:.8rem;color:var(--muted);margin:2px 2px 12px}
+
+  /* ---------- shared bits ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px}
+  .tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);padding:12px;display:flex;align-items:center;gap:10px}
+  .led{width:12px;height:12px;border-radius:50%;background:var(--tile-off);flex:0 0 auto;
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--tile-off) 25%,transparent)}
+  .tile.on .led{background:var(--tile-on);box-shadow:0 0 0 3px color-mix(in srgb,var(--tile-on) 30%,transparent)}
+  .tile.fault .led{background:var(--tile-fault);box-shadow:0 0 0 3px color-mix(in srgb,var(--tile-fault) 30%,transparent);
+    animation:faultPulse 1s ease-in-out infinite}
+  @keyframes faultPulse{50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--tile-fault) 18%,transparent)}}
+  .tile .lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;font-weight:700}
+  .tile .val{font-size:.98rem;font-weight:700}
+  .foot{font-size:.75rem;color:var(--muted);text-align:center;margin:18px 0 6px}
+
+  /* ================= DESIGN A — system view ================= */
+  .schemcard{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+    box-shadow:var(--shadow);padding:8px 6px 2px}
+  .statusline{display:flex;gap:8px;align-items:center;font-size:.86rem;color:var(--muted);
+    padding:6px 10px 2px;flex-wrap:wrap}
+  .statusline .dot{width:9px;height:9px;border-radius:50%;background:var(--tile-off)}
+  .statusline.heating .dot{background:var(--hot);box-shadow:0 0 6px var(--hot)}
+  svg.schematic{width:100%;height:auto;display:block}
+  .boiler-body{fill:var(--panel-2);stroke:var(--border);stroke-width:2.5}
+  svg.fault .boiler-body{stroke:var(--zone-alert);animation:strokePulse 1s infinite}
+  @keyframes strokePulse{50%{stroke-width:5}}
+  .lcd{fill:#0d2026;stroke:var(--border)}
+  .lcd-txt{font-family:var(--font-mono);font-size:14px;fill:#79f2c0;text-anchor:middle}
+  .window{fill:#101418;stroke:var(--border);stroke-width:3}
+  svg.flame-on:not(.heatpump) .window{stroke:#ffb45e}
+  svg.heatpump.flame-on .window{stroke:#5bd6ff}
+  .flame-outer{fill:url(#gFlame)}
+  .flame-inner{fill:#ffe27a}
+  .bolt-outer{fill:url(#gBolt)}
+  .bolt-inner{fill:#eafdff}
+  #flameWrap{opacity:0;transition:opacity .35s}
+  svg.flame-on:not(.heatpump) #flameWrap{opacity:1}
+  #boltWrap{opacity:0;transition:opacity .35s}
+  svg.heatpump.flame-on #boltWrap{opacity:1}
+  .pilot{fill:#3a4754}
+  svg.flame-on .pilot{opacity:0}
+  /* burner height = modulation (scaleY drives the visible height) */
+  .burnscale{transform-box:fill-box;transform-origin:50% 100%;
+    transform:scaleX(var(--fx,1)) scaleY(var(--fy,1));transition:transform .5s ease}
+  .flick{transform-box:fill-box;transform-origin:50% 100%;
+    animation:flick .55s ease-in-out infinite}
+  .crackle{transform-box:fill-box;transform-origin:50% 100%;
+    animation:crackle .4s steps(2,end) infinite}
+  @keyframes crackle{0%,100%{opacity:.96}50%{opacity:.55}}
+  .glow-e{filter:drop-shadow(0 0 7px color-mix(in srgb,#2ad4ff 78%,transparent))}
+  .mod-big{fill:var(--gauge-text);font-size:25px;font-weight:700;text-anchor:middle;font-family:var(--font-sans)}
+  .mod-tag{fill:var(--muted);font-size:9px;letter-spacing:.14em;text-anchor:middle;font-weight:700}
+  .seg2btn{border:1px solid var(--border);background:var(--panel);color:var(--muted);
+    border-radius:8px;padding:6px 10px;font-size:.74rem;cursor:pointer;min-height:34px;font-family:var(--font-sans)}
+  .seg2btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .appl-toggle{display:inline-flex;gap:4px;margin-left:auto}
+  @keyframes flick{
+    0%,100%{transform:scale(var(--fs,1)) }
+    30%{transform:scale(calc(var(--fs,1)*1.07)) skewX(2deg)}
+    65%{transform:scale(calc(var(--fs,1)*.94)) skewX(-2deg)}
+  }
+  .pipe{fill:none;stroke-width:11;stroke-linecap:round;stroke-linejoin:round}
+  .pipeHot{stroke:url(#gHot)} .pipeCold{stroke:url(#gCold)} .pipeDhw{stroke:url(#gDhw)}
+  svg:not(.ch-on) .pipeHot, svg:not(.ch-on) .pipeCold{stroke:var(--gauge-track)}
+  svg:not(.dhw-on) .pipeDhw{stroke:var(--gauge-track)}
+  .dash{fill:none;stroke:rgba(255,255,255,.9);stroke-width:4;stroke-linecap:round;
+    stroke-dasharray:4 15;animation:dashMove 1s linear infinite;animation-play-state:paused;opacity:0}
+  svg.ch-on .dash.ch{animation-play-state:running;opacity:1}
+  svg.dhw-on .dash.dhw{animation-play-state:running;opacity:1}
+  @keyframes dashMove{to{stroke-dashoffset:-19}}
+  .arrow{opacity:.25;transition:opacity .3s}
+  svg.ch-on .arrow.ch{opacity:1}
+  svg.dhw-on .arrow.dhw{opacity:1}
+  .arrowHot{fill:var(--hot)} .arrowCold{fill:var(--cold)}
+  .chip-hot{fill:var(--hot)} .chip-cold{fill:var(--cold)} .chip-dhw{fill:#ff9b3c}
+  svg:not(.dhw-on) .chip-dhw{fill:var(--tile-off)}
+  .chip-txt{fill:#fff;font-weight:700;font-size:21px;text-anchor:middle;font-family:var(--font-sans)}
+  .chip-sub{fill:rgba(255,255,255,.85);font-size:9.5px;letter-spacing:.12em;text-anchor:middle}
+  .soft-chip{fill:var(--panel);stroke:var(--border)}
+  .soft-txt{fill:var(--muted);font-size:14px;text-anchor:middle;font-weight:700}
+  .label-big{fill:var(--gauge-text);font-size:20px;font-weight:700}
+  .label-sub{fill:var(--muted);font-size:11px}
+  .label-tag{fill:var(--muted);font-size:9.5px;letter-spacing:.12em;font-weight:700}
+  .rad-bar{stroke:var(--border);stroke-width:1.5;transition:fill .8s}
+  .rad-mani{fill:var(--gauge-track);stroke:var(--border)}
+  .pump-body{fill:var(--panel-2);stroke:var(--border);stroke-width:2.5}
+  #pumpBlades{transform-box:fill-box;transform-origin:center;
+    animation:spin 1.1s linear infinite;animation-play-state:paused;fill:var(--accent)}
+  svg.ch-on #pumpBlades{animation-play-state:running}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .drop{fill:var(--cold);opacity:0}
+  svg.dhw-on .drop{animation:dropFall 1.1s ease-in infinite}
+  .drop.d2{animation-delay:.35s} .drop.d3{animation-delay:.7s}
+  @keyframes dropFall{0%{opacity:0;transform:translateY(0)}15%{opacity:.95}
+    100%{opacity:0;transform:translateY(26px)}}
+  .glow{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--hot) 55%,transparent))}
+  .press-needle{stroke:var(--needle);stroke-width:3;stroke-linecap:round}
+  .press-txt{fill:var(--gauge-text);font-size:12.5px;font-weight:700;text-anchor:middle}
+  .cloud{fill:var(--gauge-track);stroke:var(--border)}
+  .house{fill:var(--panel-2);stroke:var(--muted);stroke-width:2}
+  .mobile-strip{display:none;gap:8px;overflow-x:auto;padding:8px 6px 10px}
+  .mobile-strip .mchip{flex:0 0 auto;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:10px;padding:6px 12px;font-size:.8rem;white-space:nowrap}
+  .mobile-strip b{font-size:.95rem}
+  @media(max-width:719px){.mobile-strip{display:flex}}
+
+  /* ================= DESIGN B — at a glance ================= */
+  .glance{max-width:430px;margin:0 auto}
+  .g-status{display:flex;align-items:center;gap:8px;font-size:.92rem;margin:4px 2px 10px;color:var(--muted)}
+  .g-status .dot{width:10px;height:10px;border-radius:50%;background:var(--tile-off)}
+  .g-status.heating .dot{background:var(--hot);box-shadow:0 0 8px var(--hot)}
+  .hero{background:linear-gradient(160deg,var(--panel),var(--panel-2));border:1px solid var(--border);
+    border-radius:22px;box-shadow:var(--shadow);padding:18px 14px 16px;text-align:center}
+  .hero svg{width:230px;height:230px}
+  .hero-track{fill:none;stroke:var(--gauge-track);stroke-width:15;stroke-linecap:round}
+  .hero-arc{fill:none;stroke:var(--accent);stroke-width:15;stroke-linecap:round}
+  .hero-tick{stroke:var(--zone-ok);stroke-width:5;stroke-linecap:round}
+  .hero-big{fill:var(--gauge-text);font-size:50px;font-weight:700;text-anchor:middle}
+  .hero-sub{fill:var(--muted);font-size:14px;text-anchor:middle}
+  .stepbtn{font-size:1.5rem;width:52px;height:52px;border-radius:50%;
+    border:1px solid var(--border);background:var(--panel-2);color:var(--text);cursor:pointer;margin:4px 10px 0}
+  .cmdline{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);margin-top:10px;min-height:1.1em}
+  .cmdline b{color:var(--accent)}
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+    box-shadow:var(--shadow);padding:14px;min-height:96px}
+  .stat .lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.04em}
+  .stat .big{font-size:1.45rem;font-weight:700;margin-top:4px}
+  .hotArrow{color:var(--hot);font-weight:700}
+  .coldArrow{color:var(--cold);font-weight:700}
+  .flamebadge{display:inline-block;margin-left:6px;font-size:1rem;filter:grayscale(1);opacity:.35}
+  .flamebadge.on{filter:none;opacity:1}
+  .zonebar{position:relative;height:10px;border-radius:5px;margin-top:12px;
+    background:linear-gradient(90deg,var(--zone-alert) 0 25%,var(--zone-warn) 25% 37.5%,
+      var(--zone-ok) 37.5% 62.5%,var(--zone-warn) 62.5% 75%,var(--zone-alert) 75% 100%)}
+  .zonedot{position:absolute;top:-4px;width:18px;height:18px;border-radius:50%;
+    background:var(--panel);border:3px solid var(--needle);transform:translateX(-50%);transition:left .6s}
+  .modwrap{display:flex;align-items:flex-end;gap:12px}
+  .modbar{position:relative;width:26px;height:64px;border-radius:8px;overflow:hidden;
+    background:var(--gauge-track)}
+  .modfill{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 8px 8px;
+    background:linear-gradient(0deg,var(--cold),var(--zone-warn) 55%,var(--zone-alert));
+    background-size:100% 64px;background-position:bottom;transition:height .6s}
+
+  /* ================= DESIGN C — mission control ================= */
+  .mc{--bg:#0d1117;--panel:#161b22;--panel-2:#1c2129;--border:#2d333b;--text:#e6edf3;
+      --muted:#8b949e;--gauge-track:#2d333b;
+      background:var(--bg);border-radius:16px;padding:14px;color:var(--text)}
+  .mc h2{font-family:var(--font-mono);font-size:.95rem;margin:2px 4px 12px;color:var(--muted);
+    letter-spacing:.08em}
+  .mc h2 b{color:#79f2c0}
+  .stripcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:8px}
+  .stripcard svg{width:100%;height:auto;display:block}
+  .axis-txt{fill:var(--muted);font-size:10px;font-family:var(--font-mono)}
+  .ser-flow{fill:none;stroke:var(--hot);stroke-width:2}
+  .ser-ret{fill:none;stroke:var(--cold);stroke-width:2}
+  .ser-sp{stroke:#8b949e;stroke-width:1.5;stroke-dasharray:5 5}
+  .ser-mod{fill:rgba(0,191,254,.18);stroke:rgba(0,191,254,.5);stroke-width:1}
+  .legend{display:flex;gap:14px;font-family:var(--font-mono);font-size:.7rem;color:var(--muted);
+    padding:6px 6px 2px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .mc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px}
+  .mc-cell{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .mc-cell .lbl{font-family:var(--font-mono);font-size:.64rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .mc-cell .val{font-family:var(--font-mono);font-size:1.3rem;font-weight:700;margin-top:2px}
+  .mc-cell .val.hot{color:var(--hot)} .mc-cell .val.cold{color:var(--cold)}
+  .mc-cell .val.ok{color:#79f2c0} .mc-cell .val.warn{color:var(--zone-warn)} .mc-cell .val.alert{color:var(--zone-alert)}
+  .ticker{background:#0a0e14;border:1px solid var(--border);border-radius:10px;margin-top:12px;
+    height:138px;overflow-y:auto;padding:8px 10px;font-family:var(--font-mono);font-size:.72rem;line-height:1.5}
+  .ticker .t{color:#00bffe} .ticker .b{color:#79f2c0} .ticker .ts{color:#566069}
+  @media(max-width:719px){
+    .hero svg{width:200px;height:200px}
+  }
+
+  /* ================= primary pages + concept chips ================= */
+  .page{display:none}
+  .page.active{display:block}
+  .cchips{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+  .cchip{border:1px solid var(--border);background:var(--panel);color:var(--text);
+    border-radius:20px;padding:9px 16px;font-size:.82rem;cursor:pointer;min-height:40px;
+    font-family:var(--font-sans)}
+  .cchip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+
+  /* ================= MONITOR page ================= */
+  .subtabs{display:flex;gap:6px;margin:2px 0 14px;flex-wrap:wrap}
+  .subtab{border:1px solid var(--border);background:var(--panel);color:var(--muted);
+    border-radius:10px;padding:10px 18px;font-size:.86rem;cursor:pointer;min-height:44px;
+    font-family:var(--font-sans);font-weight:700}
+  .subtab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .mpanel{display:none}
+  .mpanel.active{display:block}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .tbtn{border:1px solid var(--border);background:var(--panel);color:var(--text);
+    border-radius:9px;padding:8px 14px;font-size:.8rem;cursor:pointer;min-height:40px}
+  .tsearch{flex:1;min-width:140px;border:1px solid var(--border);background:var(--panel);
+    color:var(--text);border-radius:9px;padding:8px 12px;font-size:.85rem;min-height:40px}
+  .tchip{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);
+    border:1px solid var(--border);border-radius:20px;padding:7px 12px;cursor:pointer;user-select:none}
+  .tchip.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+  .console{background:#0a0e14;border:1px solid var(--border);border-radius:12px;
+    height:340px;overflow-y:auto;padding:10px 12px;font-family:var(--font-mono);
+    font-size:.74rem;line-height:1.55;color:#c7d1da}
+  .console .t{color:#00bffe}.console .b{color:#79f2c0}.console .ts{color:#566069}
+  .console .err{color:#ff5a4d}
+  .statfoot{display:flex;gap:16px;font-size:.76rem;color:var(--muted);padding:8px 4px 0;flex-wrap:wrap}
+  table.stats{width:100%;border-collapse:collapse;background:var(--panel);border-radius:12px;
+    overflow:hidden;box-shadow:var(--shadow);font-size:.84rem}
+  table.stats th{position:sticky;top:0;background:var(--panel-2);color:var(--muted);
+    font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;text-align:left;
+    padding:10px 12px;border-bottom:2px solid var(--border);cursor:pointer}
+  table.stats td{padding:9px 12px;border-bottom:1px solid var(--border)}
+  table.stats tr:hover td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  .idbadge{font-family:var(--font-mono);font-size:.74rem;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:6px;padding:2px 7px}
+  .dirbadge{font-size:.7rem;font-weight:700;border-radius:6px;padding:3px 8px;white-space:nowrap}
+  .dir-t{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+  .dir-b{background:color-mix(in srgb,var(--zone-ok) 18%,transparent);color:var(--zone-ok)}
+  .dir-tb{background:color-mix(in srgb,var(--zone-warn) 20%,transparent);color:var(--zone-warn)}
+  .statval{font-family:var(--font-mono);font-weight:700}
+  .matrix{display:grid;grid-template-columns:repeat(16,1fr);gap:5px;background:var(--panel);
+    border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
+  .mcellq{aspect-ratio:1;border-radius:5px;background:var(--gauge-track);position:relative;
+    font-size:.55rem;display:flex;align-items:center;justify-content:center;color:transparent}
+  .mcellq:hover{outline:2px solid var(--accent);color:var(--text);z-index:1}
+  .mcellq.both{background:var(--zone-ok)}
+  .mcellq.tonly{background:var(--accent)}
+  .mcellq.bonly{background:var(--zone-warn)}
+  .mcellq.sel{outline:3px solid var(--needle);outline-offset:1px;z-index:2;color:var(--text)}
+  .supwrap{display:grid;grid-template-columns:1fr 312px;gap:14px;align-items:start}
+  @media(max-width:899px){.supwrap{grid-template-columns:1fr}}
+  .supdetail{position:sticky;top:12px;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow);padding:16px;border-top:4px solid var(--s,var(--border))}
+  .supdetail .sd-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .supdetail .sd-num{font-family:var(--font-mono);font-size:1.8rem;font-weight:700;line-height:1}
+  .supdetail .sd-hex{font-family:var(--font-mono);font-size:.82rem;color:var(--muted)}
+  .supdetail .sd-spec{font-family:var(--font-mono);font-size:.82rem;color:var(--accent);
+    margin-left:auto;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:3px 8px}
+  .supdetail h5{margin:10px 0 2px;font-size:1.02rem}
+  .supdetail dl{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:12px 0;font-size:.82rem}
+  .supdetail dt{color:var(--muted)}
+  .supdetail dd{margin:0;font-family:var(--font-mono);text-align:right}
+  .supdetail .sd-badge{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:700;
+    color:#fff;background:var(--s);border-radius:8px;padding:4px 10px}
+  .supdetail .sd-concl{background:color-mix(in srgb,var(--s) 13%,transparent);
+    border:1px solid color-mix(in srgb,var(--s) 45%,transparent);border-radius:10px;
+    padding:9px 11px;font-size:.82rem;margin-top:6px}
+  .supdetail .sd-hint{font-size:.74rem;color:var(--muted);margin-top:10px}
+  .suptip{position:fixed;pointer-events:none;z-index:30;background:#0d2026;color:#fff;
+    font-size:.74rem;padding:6px 10px;border-radius:8px;opacity:0;transition:opacity .1s;
+    transform:translate(-50%,-135%);white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+  .suptip b{color:#79f2c0}
+  .mlegend{display:flex;gap:14px;font-size:.76rem;color:var(--muted);margin:10px 2px;flex-wrap:wrap}
+  .mlegend i{display:inline-block;width:13px;height:13px;border-radius:4px;margin-right:5px;vertical-align:-2px;background:var(--gauge-track)}
+  .mlegend .lb i{background:var(--zone-ok)} .mlegend .lt i{background:var(--accent)}
+  .mlegend .lo i{background:var(--zone-warn)}
+  .graphcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:10px;box-shadow:var(--shadow)}
+  .graphcard svg{width:100%;height:auto;display:block}
+
+  /* ================= SETTINGS page ================= */
+  .set-layout{display:grid;grid-template-columns:215px 1fr;gap:16px;align-items:start}
+  .set-rail{position:sticky;top:12px;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow);padding:8px;display:flex;flex-direction:column;gap:2px}
+  .rail-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
+    cursor:pointer;font-size:.86rem;color:var(--text)}
+  .rail-item:hover{background:var(--panel-2)}
+  .rail-item.active{background:color-mix(in srgb,var(--accent) 14%,transparent);
+    color:var(--accent);font-weight:700}
+  .rail-item .cnt{margin-left:auto;font-size:.68rem;color:var(--muted);background:var(--panel-2);
+    border-radius:9px;padding:2px 7px}
+  .set-cols{columns:2;column-gap:16px}
+  .set-group{break-inside:avoid;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin:0 0 16px}
+  .set-group h3{margin:0 0 4px;font-size:.95rem;display:flex;align-items:center;gap:8px}
+  .set-group .gdesc{font-size:.76rem;color:var(--muted);margin:0 0 10px}
+  .badge-reboot{font-size:.62rem;font-weight:700;color:var(--zone-warn);
+    border:1px solid var(--zone-warn);border-radius:8px;padding:2px 7px;letter-spacing:.04em}
+  .srow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border)}
+  .srow:first-of-type{border-top:0}
+  .srow .slbl{flex:1;font-size:.84rem}
+  .srow .shint{display:block;font-size:.7rem;color:var(--muted)}
+  .srow input[type=text],.srow input[type=number],.srow input[type=password],.srow select{
+    width:46%;max-width:220px;border:1px solid var(--border);background:var(--panel-2);
+    color:var(--text);border-radius:8px;padding:8px 10px;font-size:.84rem;font-family:var(--font-sans)}
+  .srow.dirty .slbl::before{content:'●';color:var(--zone-warn);margin-right:6px;font-size:.7rem}
+  .sw{appearance:none;width:44px;height:24px;background:var(--tile-off);border-radius:12px;
+    position:relative;cursor:pointer;transition:background .2s;flex:0 0 auto}
+  .sw:checked{background:var(--accent)}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;
+    background:#fff;border-radius:50%;transition:left .2s}
+  .sw:checked::after{left:22px}
+  .set-search{width:100%;border:1px solid var(--border);background:var(--panel);color:var(--text);
+    border-radius:11px;padding:11px 14px;font-size:.9rem;margin:0 0 14px;min-height:44px}
+  .savebar{position:sticky;bottom:10px;display:none;align-items:center;gap:12px;
+    background:var(--panel);border:1px solid var(--accent);border-radius:14px;
+    box-shadow:0 4px 18px rgba(0,0,0,.18);padding:10px 16px;margin-top:8px}
+  .savebar.show{display:flex}
+  .savebar .msg{font-size:.86rem;flex:1}
+  .savebar .save{background:var(--accent);color:#fff;border:0;border-radius:10px;
+    padding:10px 22px;font-weight:700;cursor:pointer;min-height:44px}
+  .savebar .discard{background:none;border:1px solid var(--border);color:var(--muted);
+    border-radius:10px;padding:10px 16px;cursor:pointer;min-height:44px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--zone-ok);
+    color:#fff;font-weight:700;border-radius:12px;padding:11px 22px;opacity:0;transition:opacity .3s;
+    pointer-events:none;z-index:9}
+  .toast.show{opacity:1}
+  @media(max-width:899px){
+    .set-cols{columns:1}
+    .set-layout{grid-template-columns:1fr}
+    .set-rail{position:static;flex-direction:row;overflow-x:auto;gap:6px}
+    .rail-item{white-space:nowrap;padding:9px 13px}
+    .rail-item .cnt{display:none}
+  }
+
+  /* ================= CONNECTIVITY ================= */
+  /* state vocabulary — one set of colours used everywhere */
+  .st-ok{--s:var(--zone-ok)} .st-warn{--s:var(--zone-warn)} .st-down{--s:var(--zone-alert)}
+  .st-off{--s:var(--tile-off)} .st-unknown{--s:var(--muted)} .st-mode{--s:var(--accent)}
+  .connstrip{display:flex;gap:8px;background:var(--nav);padding:0 12px 12px;overflow-x:auto}
+  .connpill{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.16);
+    border:0;border-radius:20px;padding:7px 12px;cursor:pointer;color:#fff;font-size:.78rem;
+    font-family:var(--font-sans);min-height:36px;white-space:nowrap}
+  html[data-theme="dark"] .connpill{color:#e8e8ea;background:rgba(255,255,255,.08)}
+  .connpill .d{width:9px;height:9px;border-radius:50%;background:var(--s,var(--tile-off));flex:0 0 auto}
+  .connpill.st-down .d,.connpill.st-warn .d{animation:cpPulse 1.1s ease-in-out infinite}
+  @keyframes cpPulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--s) 40%,transparent)}}
+  .connpill .pk{opacity:.8}
+  .connpill .pv{font-weight:700}
+
+  .connlegend{display:flex;flex-wrap:wrap;gap:14px;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);margin-bottom:14px;font-size:.8rem}
+  .connlegend .lg{display:flex;align-items:center;gap:8px;color:var(--muted)}
+  .connlegend .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:11px;color:#fff;background:var(--s)}
+  .connlegend b{color:var(--text)}
+
+  .connmap{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    box-shadow:var(--shadow);padding:8px 6px;margin-bottom:16px}
+  .connmap svg{width:100%;height:auto;display:block}
+  .cn-box{fill:var(--panel-2);stroke:var(--border);stroke-width:2}
+  .cn-title{fill:var(--gauge-text);font-size:15px;font-weight:700;font-family:var(--font-sans)}
+  .cn-sub{fill:var(--muted);font-size:11px;font-family:var(--font-sans)}
+  .cn-ic{font-size:21px}
+  .cn-link{fill:none;stroke-width:7;stroke-linecap:round}
+  .cn-flow{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-dasharray:2 11;
+    animation:dashMove 1s linear infinite;animation-play-state:paused;opacity:0}
+  .cn-link.lk-ok{stroke:var(--zone-ok)} .cn-link.lk-warn{stroke:var(--zone-warn)}
+  .cn-link.lk-down{stroke:var(--zone-alert)} .cn-link.lk-off{stroke:var(--gauge-track)}
+  .cn-link.lk-unknown{stroke:var(--gauge-track);stroke-dasharray:6 7}
+  .cn-flow.on{animation-play-state:running;opacity:.85}
+  .cn-statedot{stroke:var(--panel);stroke-width:2}
+  .cn-linklbl{fill:var(--muted);font-size:10px;font-family:var(--font-sans);text-anchor:middle}
+  .cn-modechip{font-size:11px;font-weight:700;font-family:var(--font-sans);text-anchor:middle}
+
+  .conngroup{margin-bottom:16px}
+  .conngroup h4{margin:0 0 8px 2px;font-size:.78rem;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.05em;font-weight:700}
+  .connrow{display:flex;align-items:flex-start;gap:12px;background:var(--panel);border:1px solid var(--border);
+    border-left:4px solid var(--s);border-radius:12px;box-shadow:var(--shadow);padding:11px 14px;margin-bottom:8px}
+  .connrow .badge{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;font-size:.72rem;
+    font-weight:700;color:#fff;background:var(--s);border-radius:8px;padding:4px 9px;min-width:104px;justify-content:center}
+  .connrow .body{flex:1;min-width:0}
+  .connrow .nm{font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .connrow .det{font-size:.8rem;color:var(--text);font-family:var(--font-mono);margin-top:2px}
+  .connrow .exp{font-size:.78rem;color:var(--muted);margin-top:4px}
+  .connrow .fix{font-size:.78rem;color:var(--zone-alert);margin-top:4px;font-weight:600}
+  .connrow .seen{font-size:.7rem;color:var(--muted);white-space:nowrap}
+</style>
+</head>
+<body>
+
+<div class="headerrow">
+  <span class="big">OTGW firmware <span class="sub">· opening-page concepts</span></span>
+  <span class="sub" id="clock">--:--:--</span>
+  <span class="theme-toggle" id="themeToggle">🌙 Dark</span>
+</div>
+<div class="switcher">
+  <button class="seg active" data-page="home"><b>Home</b><small>opening page</small></button>
+  <button class="seg" data-page="monitor"><b>Monitor</b><small>log · stats · support · graph · connection</small></button>
+  <button class="seg" data-page="settings"><b>Settings</b><small>grouped &amp; scannable</small></button>
+</div>
+<!-- always-visible connectivity strip — glance scale; click any pill for the detail map -->
+<div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
+
+<div class="wrap">
+
+<!-- ════════════════ PAGE: HOME ════════════════ -->
+<div id="page-home" class="page active">
+<div class="cchips">
+  <button class="cchip active" data-design="a">A · System view</button>
+  <button class="cchip" data-design="b">B · At a glance</button>
+  <button class="cchip" data-design="c">C · Mission control</button>
+</div>
+
+<!-- ============ DESIGN A — SYSTEM VIEW ============ -->
+<section id="design-a" class="design active">
+  <p class="concept-cap"><b>Concept A — your heating system, live.</b> The boiler burns, water flows:
+  red arrow out with the flow temperature, blue arrow back with the return temperature. DHW branch
+  wakes up when you tap hot water. Zero configuration — it knows everything from the OT bus.</p>
+
+  <div class="schemcard">
+    <div class="statusline" id="aStatus"><span class="dot"></span><span id="aStatusTxt">—</span>
+      <span class="appl-toggle" id="applToggle">
+        <button class="seg2btn active" data-appl="gas">🔥 Boiler</button>
+        <button class="seg2btn" data-appl="hp">⚡ Heat pump</button>
+      </span>
+    </div>
+
+    <svg class="schematic" id="schem" viewBox="0 0 800 470" role="img"
+         aria-label="Live diagram of the heating system">
+      <defs>
+        <linearGradient id="gHot" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#ff8a3c"/><stop offset="1" stop-color="#ff4d2e"/>
+        </linearGradient>
+        <linearGradient id="gCold" x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stop-color="#5ab1ff"/><stop offset="1" stop-color="#2f6fe8"/>
+        </linearGradient>
+        <linearGradient id="gDhw" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#ffb13c"/><stop offset="1" stop-color="#ff8a3c"/>
+        </linearGradient>
+        <linearGradient id="gFlame" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#ff7a1a"/><stop offset="1" stop-color="#ffb300"/>
+        </linearGradient>
+        <linearGradient id="gBolt" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#1aa3ff"/><stop offset="1" stop-color="#9af0ff"/>
+        </linearGradient>
+      </defs>
+
+      <!-- DHW branch: boiler top -> faucet -->
+      <path class="pipe pipeDhw" d="M145,120 V64 H318"/>
+      <path class="dash dhw" d="M145,120 V64 H318"/>
+      <g id="faucet">
+        <path d="M318,58 h26 a8,8 0 0 1 8,8 v10 h-13 v-7 h-21 z" fill="var(--gauge-track)"
+              stroke="var(--border)" stroke-width="2"/>
+        <circle class="drop d1" cx="345.5" cy="84" r="3.4"/>
+        <circle class="drop d2" cx="345.5" cy="84" r="3.4"/>
+        <circle class="drop d3" cx="345.5" cy="84" r="3.4"/>
+      </g>
+      <g transform="translate(232,38)">
+        <rect x="-46" y="-17" width="92" height="34" rx="11" class="chip-dhw"/>
+        <text class="chip-txt" y="3" font-size="17" id="aDhw">54°</text>
+        <text class="chip-sub" y="14.5">DHW</text>
+      </g>
+
+      <!-- Outside chip -->
+      <g transform="translate(660,34)">
+        <path class="cloud" d="M14,22 a10,10 0 0 1 2,-19.8 a13,13 0 0 1 25,2 a8.5,8.5 0 0 1 -1,17.8 z"/>
+        <text class="label-big" x="52" y="18" id="aOut">8.4°</text>
+        <text class="label-tag" x="52" y="32">OUTSIDE</text>
+      </g>
+
+      <!-- Boiler / heat pump body -->
+      <rect class="boiler-body" x="60" y="120" width="180" height="240" rx="16"/>
+      <rect x="84" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
+      <rect x="190" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
+      <rect class="lcd" x="88" y="136" width="124" height="28" rx="8"/>
+      <text class="lcd-txt" x="150" y="155" id="aLcd">CH 62%</text>
+
+      <!-- burner window: gas flame OR electric lightning bolt; height = modulation -->
+      <circle class="window" cx="150" cy="210" r="36"/>
+      <circle class="pilot" cx="150" cy="226" r="5"/>
+      <g id="flameWrap" class="glow">
+        <g transform="translate(150,238)">
+          <g class="burnscale"><g class="flick">
+            <path class="flame-outer" d="M0,4 C-15,-7 -11,-24 0,-40 C11,-24 15,-7 0,4 Z"/>
+            <path class="flame-inner" d="M0,2 C-7,-3 -5,-13 0,-22 C5,-13 7,-3 0,2 Z"/>
+          </g></g>
+        </g>
+      </g>
+      <g id="boltWrap" class="glow-e">
+        <g transform="translate(150,238)">
+          <g class="burnscale"><g class="crackle">
+            <path class="bolt-outer" d="M5,-44 L-9,-12 L-1,-12 L-6,6 L10,-22 L2,-22 Z"/>
+            <path class="bolt-inner" d="M3,-37 L-5,-12 L0,-12 L-3,2 L6,-20 L1,-20 Z"/>
+          </g></g>
+        </g>
+      </g>
+
+      <!-- prominent modulation readout -->
+      <text class="mod-big" x="150" y="286" id="aModBig">62%</text>
+      <text class="mod-tag" x="150" y="300" id="aModTag">MODULATION</text>
+
+      <!-- pressure mini-gauge on boiler face (lower) -->
+      <g transform="translate(0,10)">
+        <path d="M126,322 A24,24 0 0 1 133,305"   stroke="var(--zone-alert)" stroke-width="6" fill="none"/>
+        <path d="M133,305 A24,24 0 0 1 140.8,299.8" stroke="var(--zone-warn)" stroke-width="6" fill="none"/>
+        <path d="M140.8,299.8 A24,24 0 0 1 159.2,299.8" stroke="var(--zone-ok)" stroke-width="6" fill="none"/>
+        <path d="M159.2,299.8 A24,24 0 0 1 167,305" stroke="var(--zone-warn)" stroke-width="6" fill="none"/>
+        <path d="M167,305 A24,24 0 0 1 174,322"  stroke="var(--zone-alert)" stroke-width="6" fill="none"/>
+        <line id="aPressNeedle" class="press-needle" x1="150" y1="322" x2="132" y2="322"
+              transform="rotate(0,150,322)"/>
+        <circle cx="150" cy="322" r="3.5" fill="var(--needle)"/>
+        <text class="press-txt" x="150" y="344" id="aPress">1.75 bar</text>
+      </g>
+
+      <!-- FLOW pipe (red, out of the boiler) -->
+      <path class="pipe pipeHot" id="flowPipe" d="M240,170 H560 V206"/>
+      <path class="dash ch" d="M240,170 H560 V206"/>
+      <polygon class="arrow ch arrowHot" points="388,158 414,170 388,182"/>
+      <g transform="translate(310,128)">
+        <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-hot"/>
+        <text class="chip-txt" y="0" id="aFlow">62.3°</text>
+        <text class="chip-sub" y="15">FLOW →</text>
+      </g>
+
+      <!-- RETURN pipe (blue, back into the boiler) -->
+      <path class="pipe pipeCold" d="M560,306 V340 H240"/>
+      <path class="dash ch" d="M560,306 V340 H240"/>
+      <polygon class="arrow ch arrowCold" points="372,328 346,340 372,352"/>
+      <g transform="translate(310,392)">
+        <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-cold"/>
+        <text class="chip-txt" y="0" id="aRet">48.1°</text>
+        <text class="chip-sub" y="15">← RETURN</text>
+      </g>
+
+      <!-- ΔT chip -->
+      <g transform="translate(470,255)">
+        <rect x="-44" y="-15" width="88" height="30" rx="15" class="soft-chip"/>
+        <text class="soft-txt" y="5" id="aDt">ΔT 14.2°</text>
+      </g>
+
+      <!-- pump on the return -->
+      <g>
+        <circle class="pump-body" cx="452" cy="340" r="16"/>
+        <path id="pumpBlades" d="M452,340 L452,328 A12,12 0 0 1 462,346 Z M452,340 L442,346 A12,12 0 0 1 442,330 Z
+              M452,340 L462,334 A12,12 0 0 1 448,352 Z" opacity=".9"/>
+      </g>
+
+      <!-- radiator + room -->
+      <g id="radGroup">
+        <rect class="rad-mani" x="540" y="201" width="196" height="10" rx="5"/>
+        <rect class="rad-mani" x="540" y="301" width="196" height="10" rx="5"/>
+        <rect class="rad-bar" x="548" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="572" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="596" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="620" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="644" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="668" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="692" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="716" y="206" width="16" height="100" rx="8"/>
+      </g>
+      <g transform="translate(560,150)">
+        <path class="house" d="M0,10 L13,-3 L26,10 V28 H0 Z"/>
+        <text class="label-big" x="36" y="13" id="aRoom">20.4°</text>
+        <text class="label-sub" x="36" y="28" id="aRoomSet">set 21.0°</text>
+        <text class="label-tag" x="120" y="13">ROOM</text>
+      </g>
+
+      <!-- room return label under radiator -->
+      <text class="label-tag" x="560" y="334">RADIATORS</text>
+    </svg>
+
+    <div class="mobile-strip" id="aStrip"></div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile" id="aTFlame"><span class="led"></span><div><div class="lbl">Flame</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTCH"><span class="led"></span><div><div class="lbl">Heating</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTDHW"><span class="led"></span><div><div class="lbl">Hot water</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTFault"><span class="led"></span><div><div class="lbl">Fault</div><div class="val">—</div></div></div>
+  </div>
+</section>
+
+<!-- ============ DESIGN B — AT A GLANCE ============ -->
+<section id="design-b" class="design">
+  <div class="glance">
+    <p class="concept-cap"><b>Concept B — one thumb, one glance.</b> Phone-first: the room dial up top,
+    the four numbers that matter below it. Everything else lives one tap deeper.</p>
+
+    <div class="g-status" id="bStatus"><span class="dot"></span><span id="bStatusTxt">—</span></div>
+
+    <div class="hero">
+      <svg viewBox="0 0 240 240" aria-label="Room temperature dial">
+        <path class="hero-track" id="bTrack" d=""/>
+        <path class="hero-arc" id="bArc" d=""/>
+        <line class="hero-tick" id="bTick" x1="0" y1="0" x2="0" y2="0"/>
+        <text class="hero-big" x="120" y="128" id="bRoom">20.4°</text>
+        <text class="hero-sub" x="120" y="152" id="bSet">target 21.0°</text>
+      </svg>
+      <div>
+        <button class="stepbtn" id="bDown" aria-label="Lower target">−</button>
+        <button class="stepbtn" id="bUp" aria-label="Raise target">+</button>
+      </div>
+      <div class="cmdline" id="bCmd"></div>
+    </div>
+
+    <div class="statgrid">
+      <div class="stat">
+        <div class="lbl">Boiler</div>
+        <div class="big"><span class="hotArrow">↑ <span id="bFlow">62.3°</span></span>
+          <span class="flamebadge" id="bFlame">🔥</span></div>
+        <div class="big" style="font-size:1.05rem"><span class="coldArrow">↓ <span id="bRet">48.1°</span></span>
+          <span style="color:var(--muted);font-size:.8rem" id="bDt">ΔT 14.2°</span></div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Pressure</div>
+        <div class="big" id="bPress">1.75 bar</div>
+        <div class="zonebar"><div class="zonedot" id="bPressDot" style="left:44%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Modulation</div>
+        <div class="modwrap">
+          <div class="modbar"><div class="modfill" id="bModFill" style="height:45%"></div></div>
+          <div class="big" id="bMod">45%</div>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Hot water</div>
+        <div class="big" id="bDhw">54°</div>
+        <div style="font-size:.8rem;color:var(--muted)" id="bDhwState">standby</div>
+      </div>
+    </div>
+    <div class="foot" id="bOut">Outside 8.4° · OTGW firmware</div>
+  </div>
+</section>
+
+<!-- ============ DESIGN C — MISSION CONTROL ============ -->
+<section id="design-c" class="design">
+  <p class="concept-cap"><b>Concept C — for the people who read OT frames for fun.</b> Always-dark.
+  A live strip chart of flow/return/setpoint with modulation underneath, the numbers in mono,
+  and the raw bus scrolling by. OTmonitor, two decades later.</p>
+
+  <div class="mc">
+    <h2>OTGW <b>// MISSION CONTROL</b> · ws ● live</h2>
+
+    <div class="stripcard">
+      <div class="legend">
+        <span><i style="background:var(--hot)"></i>flow</span>
+        <span><i style="background:var(--cold)"></i>return</span>
+        <span><i style="background:#8b949e"></i>setpoint</span>
+        <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
+      </div>
+      <svg viewBox="0 0 780 210" id="strip">
+        <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
+        <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
+        <text class="axis-txt" x="8" y="16">90°</text>
+        <text class="axis-txt" x="8" y="92">50°</text>
+        <text class="axis-txt" x="8" y="172">10°</text>
+        <line class="ser-sp" id="cSpLine" x1="34" y1="0" x2="772" y2="0"/>
+        <polygon class="ser-mod" id="cMod" points=""/>
+        <polyline class="ser-flow" id="cFlow" points=""/>
+        <polyline class="ser-ret" id="cRet" points=""/>
+        <text class="axis-txt" id="cFlowLbl" x="745" y="20" fill="var(--hot)"></text>
+        <text class="axis-txt" id="cRetLbl" x="745" y="34" fill="var(--cold)"></text>
+      </svg>
+    </div>
+
+    <div class="mc-grid" id="cGrid"></div>
+
+    <div class="ticker" id="cTicker" aria-label="Live OpenTherm frames"></div>
+  </div>
+</section>
+</div><!-- /page-home -->
+
+<!-- ════════════════ PAGE: MONITOR ════════════════ -->
+<div id="page-monitor" class="page">
+  <p class="concept-cap"><b>Monitor — the four sub-tabs, redesigned.</b> Same data as today's
+  Log / Statistics / OT Support / Graph tabs, but visual: a calmer console, a scannable
+  statistics table with direction badges, the support map as a real map, and the graph
+  up front. Everything below runs on the simulated live bus.</p>
+
+  <div class="subtabs">
+    <button class="subtab active" data-tab="mlog">Log</button>
+    <button class="subtab" data-tab="mstats">Statistics</button>
+    <button class="subtab" data-tab="msupport">OT Support</button>
+    <button class="subtab" data-tab="mgraph">Graph</button>
+    <button class="subtab" data-tab="mconn">Connection</button>
+  </div>
+
+  <div id="mlog" class="mpanel active">
+    <div class="toolbar">
+      <button class="tbtn" id="logPause">⏸ Pause</button>
+      <button class="tbtn">Clear</button>
+      <button class="tbtn">⬇ Download</button>
+      <input class="tsearch" id="logSearch" placeholder="Filter frames… (e.g. 19, Boiler, DHW)">
+      <span class="tchip on" id="chipScroll">Auto-scroll</span>
+      <span class="tchip on" id="chipTs">Timestamps</span>
+    </div>
+    <div class="console" id="monLog" aria-label="Live OpenTherm log"></div>
+    <div class="statfoot">
+      <span>Lines: <b id="logCount">0</b></span>
+      <span>Rate: <b id="logRate">2.0</b>/s</span>
+      <span>Gateway mode · WS ● live (simulated)</span>
+    </div>
+  </div>
+
+  <div id="mstats" class="mpanel">
+    <div class="toolbar">
+      <input class="tsearch" id="statsSearch" placeholder="Filter by name or msg id…">
+      <span class="tchip" style="cursor:default">Unique msgIDs: <b id="statsCount" style="margin-left:4px">0</b></span>
+    </div>
+    <div style="overflow-x:auto;border-radius:12px">
+    <table class="stats" id="statsTable">
+      <thead><tr><th>MsgID</th><th>Description</th><th>Direction</th><th>Interval</th><th>Count</th><th style="text-align:right">Value</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+  </div>
+
+  <div id="msupport" class="mpanel">
+    <div class="mlegend">
+      <span class="lb"><i></i>Thermostat + boiler</span>
+      <span class="lt"><i></i>Thermostat only</span>
+      <span class="lo"><i></i>Boiler only</span>
+      <span><i></i>Never seen</span>
+      <span style="margin-left:auto">Observed: <b id="supCount">0</b> / 128 msgIDs</span>
+    </div>
+    <div class="supwrap">
+      <div class="matrix" id="supMatrix" aria-label="OpenTherm message ID support map"></div>
+      <aside class="supdetail" id="supDetail"></aside>
+    </div>
+    <p class="concept-cap" style="margin-top:10px">Hover a cell for a quick label · click (or tap)
+    to pin the full message details. Today this is a table you scroll; as a map you see your
+    system's OpenTherm dialect in one look — and every cell carries the spec.</p>
+  </div>
+  <div class="suptip" id="supTip"></div>
+
+  <div id="mgraph" class="mpanel">
+    <div class="toolbar">
+      <span class="tchip">10 min</span><span class="tchip on">1 hour</span>
+      <span class="tchip">4 h</span><span class="tchip">24 h</span>
+      <span style="flex:1"></span>
+      <button class="tbtn">📷 PNG</button><button class="tbtn">⬇ CSV</button>
+    </div>
+    <div class="graphcard">
+      <div class="legend">
+        <span><i style="background:var(--hot)"></i>flow</span>
+        <span><i style="background:var(--cold)"></i>return</span>
+        <span><i style="background:#8b949e"></i>setpoint</span>
+        <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
+      </div>
+      <svg viewBox="0 0 780 210" id="gstrip">
+        <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
+        <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
+        <text class="axis-txt" x="8" y="16">90°</text>
+        <text class="axis-txt" x="8" y="92">50°</text>
+        <text class="axis-txt" x="8" y="172">10°</text>
+        <line class="ser-sp" id="gSpLine" x1="34" y1="0" x2="772" y2="0"/>
+        <polygon class="ser-mod" id="gMod2" points=""/>
+        <polyline class="ser-flow" id="gFlow2" points=""/>
+        <polyline class="ser-ret" id="gRet2" points=""/>
+      </svg>
+    </div>
+  </div>
+
+  <div id="mconn" class="mpanel">
+    <div class="connlegend">
+      <span class="lg st-ok"><span class="ic">✓</span> <b>Connected</b> link up, data recent</span>
+      <span class="lg st-warn"><span class="ic">!</span> <b>Degraded</b> up but impaired / stale</span>
+      <span class="lg st-down"><span class="ic">✕</span> <b>Disconnected</b> link down</span>
+      <span class="lg st-off"><span class="ic">○</span> <b>Off</b> disabled in settings</span>
+      <span class="lg st-unknown"><span class="ic">?</span> <b>Unknown</b> not determined yet</span>
+      <span class="lg st-mode"><span class="ic">⇄</span> <b>Mode</b> a setting, not health</span>
+    </div>
+
+    <!-- signal-flow chain: see WHERE a break is, not just that something is down -->
+    <div class="connmap">
+      <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map">
+        <!-- links (drawn first, under the nodes) -->
+        <g id="cnLinks">
+          <path id="lk-therm"  class="cn-link" d="M150,86 H300"/>
+          <path id="fl-therm"  class="cn-flow" d="M150,86 H300"/>
+          <path id="lk-boiler" class="cn-link" d="M150,274 H300"/>
+          <path id="fl-boiler" class="cn-flow" d="M150,274 H300"/>
+          <path id="lk-wifi"   class="cn-link" d="M470,180 H560"/>
+          <path id="fl-wifi"   class="cn-flow" d="M470,180 H560"/>
+          <path id="lk-mqtt"   class="cn-link" d="M700,150 V104 H760"/>
+          <path id="fl-mqtt"   class="cn-flow" d="M700,150 V104 H760"/>
+          <path id="lk-ws"     class="cn-link" d="M700,210 V300 H760"/>
+          <path id="fl-ws"     class="cn-flow" d="M700,210 V300 H760"/>
+          <text class="cn-linklbl" x="225" y="74">OT bus</text>
+          <text class="cn-linklbl" x="225" y="262">OT bus</text>
+          <text class="cn-linklbl" x="515" y="170">Wi-Fi</text>
+          <text class="cn-linklbl" x="690" y="120">MQTT</text>
+          <text class="cn-linklbl" x="690" y="250">live</text>
+        </g>
+        <!-- nodes -->
+        <g id="n-therm">
+          <rect class="cn-box" x="20" y="56" width="130" height="60" rx="12"/>
+          <text class="cn-ic" x="36" y="96">🌡️</text>
+          <text class="cn-title" x="64" y="84">Thermostat</text>
+          <text class="cn-sub" x="64" y="102" id="cnThermSub">master</text>
+          <circle class="cn-statedot" id="dot-therm" cx="142" cy="64" r="7"/>
+        </g>
+        <g id="n-boiler">
+          <rect class="cn-box" x="20" y="244" width="130" height="60" rx="12"/>
+          <text class="cn-ic" x="36" y="284">🔥</text>
+          <text class="cn-title" x="64" y="272">Boiler</text>
+          <text class="cn-sub" x="64" y="290" id="cnBoilerSub">slave</text>
+          <circle class="cn-statedot" id="dot-boiler" cx="142" cy="252" r="7"/>
+        </g>
+        <!-- gateway: PIC + ESP, carries the mode chip -->
+        <g id="n-gw">
+          <rect class="cn-box" x="300" y="120" width="170" height="120" rx="14"/>
+          <text class="cn-ic" x="320" y="158">📟</text>
+          <text class="cn-title" x="352" y="150">OTGW</text>
+          <text class="cn-sub" x="352" y="167" id="cnPicSub">PIC gateway 6.5</text>
+          <rect x="318" y="186" width="134" height="34" rx="9" fill="var(--panel)" stroke="var(--border)"/>
+          <circle id="dot-mode" cx="334" cy="203" r="5" fill="var(--accent)"/>
+          <text class="cn-modechip" id="cnModeTxt" x="392" y="207" fill="var(--accent)">GATEWAY MODE</text>
+          <circle class="cn-statedot" id="dot-pic" cx="462" cy="128" r="7"/>
+        </g>
+        <g id="n-router">
+          <rect class="cn-box" x="560" y="150" width="140" height="60" rx="12"/>
+          <text class="cn-ic" x="578" y="190">📶</text>
+          <text class="cn-title" x="610" y="178">Router</text>
+          <text class="cn-sub" x="610" y="196" id="cnWifiSub">-58 dBm</text>
+          <circle class="cn-statedot" id="dot-wifi" cx="692" cy="158" r="7"/>
+        </g>
+        <g id="n-broker">
+          <rect class="cn-box" x="760" y="74" width="56" height="60" rx="12"/>
+          <text class="cn-ic" x="772" y="110">🗄️</text>
+          <circle class="cn-statedot" id="dot-mqtt" cx="808" cy="82" r="7"/>
+        </g>
+        <text class="cn-sub" x="760" y="148">Broker → HA</text>
+        <g id="n-browser">
+          <rect class="cn-box" x="760" y="270" width="56" height="60" rx="12"/>
+          <text class="cn-ic" x="772" y="306">📱</text>
+          <circle class="cn-statedot" id="dot-ws" cx="808" cy="278" r="7"/>
+        </g>
+        <text class="cn-sub" x="760" y="344">This browser</text>
+      </svg>
+    </div>
+
+    <div id="connDetail"></div>
+  </div>
+</div><!-- /page-monitor -->
+
+<!-- ════════════════ PAGE: SETTINGS ════════════════ -->
+<div id="page-settings" class="page">
+  <p class="concept-cap"><b>Settings — grouped, scannable, desktop-worthy.</b> The 2.0.0 branch
+  already groups settings into titled cards; this takes the next step: a sticky category rail,
+  cards flowing in two columns on desktop (one on mobile), live search across every field,
+  changed-field markers and a sticky save bar. Reboot-sensitive groups are badged.</p>
+
+  <input class="set-search" id="setSearch" placeholder="Search settings… (e.g. broker, ntp, pin)">
+
+  <div class="set-layout">
+    <nav class="set-rail" id="setRail"></nav>
+    <div>
+      <div class="set-cols" id="setCols"></div>
+      <div class="savebar" id="saveBar">
+        <span class="msg"><b id="dirtyCount">0</b> unsaved change(s)</span>
+        <button class="discard" id="btnDiscard">Discard</button>
+        <button class="save" id="btnSave">Save settings</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /page-settings -->
+
+<div class="foot">Design exploration TASK-854 / 855 / 856 · simulated data · self-contained mockup (no libraries, no network)</div>
+</div>
+<div class="toast" id="toast">Settings saved ✓ (simulated)</div>
+
+<script>
+/* ---------- theme + design switching ---------- */
+var root=document.documentElement;
+var themeBtn=document.getElementById('themeToggle');
+function applyTheme(t){
+  root.setAttribute('data-theme',t);
+  themeBtn.textContent = t==='dark' ? '☀ Light' : '🌙 Dark';
+  try{localStorage.setItem('mock-theme',t);}catch(e){}
+}
+themeBtn.onclick=function(){applyTheme(root.getAttribute('data-theme')==='dark'?'light':'dark');};
+try{
+  var st=localStorage.getItem('mock-theme');
+  if(st) applyTheme(st);
+  else if(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) applyTheme('dark');
+}catch(e){}
+
+var segs=document.querySelectorAll('.seg');
+function showPage(p){
+  segs.forEach(function(s){s.classList.toggle('active',s.dataset.page===p);});
+  ['home','monitor','settings'].forEach(function(k){
+    document.getElementById('page-'+k).classList.toggle('active',k===p);
+  });
+  try{localStorage.setItem('mock-page',p);}catch(e){}
+}
+segs.forEach(function(s){s.onclick=function(){showPage(s.dataset.page);};});
+
+var cchips=document.querySelectorAll('.cchip');
+function showDesign(d){
+  cchips.forEach(function(s){s.classList.toggle('active',s.dataset.design===d);});
+  ['a','b','c'].forEach(function(k){
+    document.getElementById('design-'+k).classList.toggle('active',k===d);
+  });
+  try{localStorage.setItem('mock-design',d);}catch(e){}
+}
+cchips.forEach(function(s){s.onclick=function(){showDesign(s.dataset.design);};});
+
+var subtabs=document.querySelectorAll('.subtab');
+function showTab(t){
+  subtabs.forEach(function(s){s.classList.toggle('active',s.dataset.tab===t);});
+  ['mlog','mstats','msupport','mgraph','mconn'].forEach(function(k){
+    document.getElementById(k).classList.toggle('active',k===t);
+  });
+  if(t==='mconn' && typeof renderConnDetail==='function') renderConnDetail();
+}
+subtabs.forEach(function(s){s.onclick=function(){showTab(s.dataset.tab);};});
+
+try{
+  var sd=localStorage.getItem('mock-design'); if(sd) showDesign(sd);
+  var sp=localStorage.getItem('mock-page'); if(sp) showPage(sp);
+}catch(e){}
+
+/* ---------- simulated live state ---------- */
+var sim={pressure:1.75,modulation:45,boiler:62,ret:48,dhw:54,outside:8.4,
+         flame:true,ch:true,dhw_on:false,fault:false,room:20.4,setpoint:21.0};
+var hist={boiler:[],ret:[],mod:[]};
+for(var i=0;i<60;i++){ // seed with a plausible burn cycle so the chart is alive at first paint
+  var b=58+11*Math.sin(i/8.5)+(Math.random()-0.5)*2.4;
+  hist.boiler.push(+b.toFixed(1));
+  hist.ret.push(+(b-13-3*Math.sin(i/6)).toFixed(1));
+  hist.mod.push(Math.max(0,Math.round(42+30*Math.sin(i/7+1)+(Math.random()-0.5)*8)));
+}
+function walk(v,step,lo,hi){v+=(Math.random()-0.5)*step;return Math.max(lo,Math.min(hi,v));}
+function tick(){
+  if(Math.random()<0.07) sim.flame=!sim.flame;
+  if(Math.random()<0.045) sim.dhw_on=!sim.dhw_on;
+  if(Math.random()<0.02) sim.fault=!sim.fault;
+  sim.ch=sim.flame||Math.random()<0.85;
+  // boiler temp follows the burner
+  var bias=sim.flame?+0.35:-0.45;
+  sim.boiler=+(walk(sim.boiler,1.6,30,85)+bias).toFixed(1);
+  sim.boiler=Math.max(30,Math.min(85,sim.boiler));
+  sim.ret=+(sim.boiler-(6+sim.modulation*0.12+Math.random()*2)).toFixed(1);
+  if(sim.ret<22) sim.ret=22;
+  sim.modulation=sim.flame?Math.round(walk(sim.modulation,9,8,100)):0;
+  sim.pressure=+walk(sim.pressure,0.05,0.7,3.4).toFixed(2);
+  sim.dhw=+walk(sim.dhw,0.8,35,68).toFixed(1);
+  sim.outside=+walk(sim.outside,0.12,-3,15).toFixed(1);
+  sim.room=+(sim.room+(sim.setpoint-sim.room)*0.02+(Math.random()-0.5)*0.06).toFixed(1);
+  hist.boiler.push(sim.boiler);hist.ret.push(sim.ret);hist.mod.push(sim.modulation);
+  if(hist.boiler.length>60){hist.boiler.shift();hist.ret.shift();hist.mod.shift();}
+  renderA();renderB();renderC();
+}
+
+function setTile(id,on,text,fault){
+  var el=document.getElementById(id);
+  el.classList.toggle('on',!!on&&!fault);
+  el.classList.toggle('fault',!!fault);
+  el.querySelector('.val').textContent=text;
+}
+var appliance='gas';   // 'gas' = boiler/flame, 'hp' = heat pump/electric
+function burnWord(){ return appliance==='hp' ? 'compressor' : 'flame'; }
+function statusSentence(){
+  if(sim.fault) return 'Fault reported — check the appliance display';
+  if(sim.dhw_on) return 'Hot water running · tap open';
+  if(sim.flame) return 'Heating · '+burnWord()+' on · '+sim.modulation+'% modulation';
+  if(sim.ch) return 'Heating idle · pump running, '+burnWord()+' off';
+  return 'Standby · everything quiet';
+}
+function pressClass(p){
+  if(p<1.0||p>3.0) return 'alert';
+  if(p<1.5||p>2.5) return 'warn';
+  return 'ok';
+}
+
+/* ---------- DESIGN A render ---------- */
+function renderA(){
+  var svg=document.getElementById('schem');
+  svg.classList.toggle('flame-on',sim.flame);
+  svg.classList.toggle('ch-on',sim.ch);
+  svg.classList.toggle('dhw-on',sim.dhw_on);
+  svg.classList.toggle('fault',sim.fault);
+  svg.classList.toggle('heatpump',appliance==='hp');
+  // burner HEIGHT expresses modulation: scaleY grows a lot, scaleX a little
+  var m=sim.flame?sim.modulation/100:0;
+  svg.style.setProperty('--fy',(0.32+m*0.95).toFixed(2));
+  svg.style.setProperty('--fx',(0.70+m*0.32).toFixed(2));
+  document.getElementById('aModBig').textContent=(sim.flame?sim.modulation:0)+'%';
+  var hpTag=appliance==='hp'?'COMPRESSOR':'MODULATION';
+  document.getElementById('aModTag').textContent=hpTag;
+  var lead=appliance==='hp'?'HP':'CH';
+  document.getElementById('aLcd').textContent=
+    sim.fault?'FAULT':(sim.dhw_on?'DHW '+sim.dhw.toFixed(0)+'°':(sim.flame?lead+' '+sim.modulation+'%':(sim.ch?lead+' idle':'STANDBY')));
+  // first tile reads Flame (gas) or Compressor (heat pump)
+  document.querySelector('#aTFlame .lbl').textContent=appliance==='hp'?'Compressor':'Flame';
+  document.getElementById('aFlow').textContent=sim.boiler.toFixed(1)+'°';
+  document.getElementById('aRet').textContent=sim.ret.toFixed(1)+'°';
+  document.getElementById('aDt').textContent='ΔT '+(sim.boiler-sim.ret).toFixed(1)+'°';
+  document.getElementById('aDhw').textContent=sim.dhw.toFixed(0)+'°';
+  document.getElementById('aRoom').textContent=sim.room.toFixed(1)+'°';
+  document.getElementById('aRoomSet').textContent='set '+sim.setpoint.toFixed(1)+'°';
+  document.getElementById('aOut').textContent=sim.outside.toFixed(1)+'°';
+  document.getElementById('aPress').textContent=sim.pressure.toFixed(2)+' bar';
+  var deg=Math.max(0,Math.min(4,sim.pressure))/4*180;
+  document.getElementById('aPressNeedle').setAttribute('transform','rotate('+deg.toFixed(1)+',150,322)');
+  // radiator bars tinted by flow temperature
+  var heat=Math.max(0,Math.min(1,(sim.boiler-30)/50));
+  var pct=sim.ch?Math.round(heat*80):0;
+  document.querySelectorAll('.rad-bar').forEach(function(b){
+    b.style.fill='color-mix(in srgb, var(--hot) '+pct+'%, var(--gauge-track))';
+  });
+  var sl=document.getElementById('aStatus');
+  sl.classList.toggle('heating',sim.flame);
+  document.getElementById('aStatusTxt').textContent=statusSentence();
+  setTile('aTFlame',sim.flame,sim.flame?'ON':'OFF');
+  setTile('aTCH',sim.ch,sim.ch?'ON':'OFF');
+  setTile('aTDHW',sim.dhw_on,sim.dhw_on?'ON':'OFF');
+  setTile('aTFault',false,sim.fault?'FAULT':'OK',sim.fault);
+  document.getElementById('aStrip').innerHTML=
+    '<span class="mchip">Flow <b style="color:var(--hot)">'+sim.boiler.toFixed(1)+'°</b></span>'+
+    '<span class="mchip">Return <b style="color:var(--cold)">'+sim.ret.toFixed(1)+'°</b></span>'+
+    '<span class="mchip">DHW <b>'+sim.dhw.toFixed(0)+'°</b></span>'+
+    '<span class="mchip">Pressure <b>'+sim.pressure.toFixed(2)+' bar</b></span>'+
+    '<span class="mchip">Room <b>'+sim.room.toFixed(1)+'°</b></span>'+
+    '<span class="mchip">Outside <b>'+sim.outside.toFixed(1)+'°</b></span>';
+}
+
+/* ---------- DESIGN B render ---------- */
+function polarB(cx,cy,r,aDeg){var a=(aDeg-90)*Math.PI/180;return{x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)};}
+function arcB(cx,cy,r,a0,a1){
+  var p0=polarB(cx,cy,r,a0),p1=polarB(cx,cy,r,a1);
+  var large=(a1-a0)%360>180?1:0;
+  return 'M '+p0.x.toFixed(1)+' '+p0.y.toFixed(1)+' A '+r+' '+r+' 0 '+large+' 1 '+p1.x.toFixed(1)+' '+p1.y.toFixed(1);
+}
+var BH={cx:120,cy:120,r:92,lo:5,hi:30,startA:225,sweep:270};
+function bAngle(v){return BH.startA+(v-BH.lo)/(BH.hi-BH.lo)*BH.sweep;}
+function renderB(){
+  document.getElementById('bTrack').setAttribute('d',arcB(BH.cx,BH.cy,BH.r,BH.startA,BH.startA+BH.sweep));
+  document.getElementById('bArc').setAttribute('d',arcB(BH.cx,BH.cy,BH.r,BH.startA,bAngle(sim.setpoint)));
+  var t0=polarB(BH.cx,BH.cy,BH.r-13,bAngle(sim.room)),t1=polarB(BH.cx,BH.cy,BH.r+13,bAngle(sim.room));
+  var tk=document.getElementById('bTick');
+  tk.setAttribute('x1',t0.x);tk.setAttribute('y1',t0.y);tk.setAttribute('x2',t1.x);tk.setAttribute('y2',t1.y);
+  document.getElementById('bRoom').textContent=sim.room.toFixed(1)+'°';
+  document.getElementById('bSet').textContent='target '+sim.setpoint.toFixed(1)+'°';
+  var bs=document.getElementById('bStatus');
+  bs.classList.toggle('heating',sim.flame);
+  document.getElementById('bStatusTxt').textContent=statusSentence();
+  document.getElementById('bFlow').textContent=sim.boiler.toFixed(1)+'°';
+  document.getElementById('bRet').textContent=sim.ret.toFixed(1)+'°';
+  document.getElementById('bDt').textContent='ΔT '+(sim.boiler-sim.ret).toFixed(1)+'°';
+  document.getElementById('bFlame').classList.toggle('on',sim.flame);
+  document.getElementById('bPress').textContent=sim.pressure.toFixed(2)+' bar';
+  document.getElementById('bPressDot').style.left=(Math.max(0,Math.min(4,sim.pressure))/4*100).toFixed(1)+'%';
+  document.getElementById('bMod').textContent=sim.modulation+'%';
+  document.getElementById('bModFill').style.height=sim.modulation+'%';
+  document.getElementById('bDhw').textContent=sim.dhw.toFixed(0)+'°';
+  document.getElementById('bDhwState').textContent=sim.dhw_on?'running':'standby';
+  document.getElementById('bOut').textContent='Outside '+sim.outside.toFixed(1)+'° · OTGW firmware';
+}
+function bStep(d){
+  sim.setpoint=Math.max(BH.lo,Math.min(BH.hi,+(sim.setpoint+d).toFixed(1)));
+  document.getElementById('bCmd').innerHTML='would queue <b>TT='+sim.setpoint.toFixed(1)+'</b>';
+  renderB();
+}
+document.getElementById('bUp').onclick=function(){bStep(0.5);};
+document.getElementById('bDown').onclick=function(){bStep(-0.5);};
+
+/* ---------- DESIGN C render ---------- */
+var SP=65; // control setpoint shown in the chart
+function yTemp(v){return 10+(90-Math.max(10,Math.min(90,v)))/80*160;}
+function renderC(){
+  var n=hist.boiler.length, x0=34, x1=772, dx=(x1-x0)/(n-1);
+  var pf='',pr='';
+  for(var i=0;i<n;i++){
+    var x=(x0+i*dx).toFixed(1);
+    pf+=x+','+yTemp(hist.boiler[i]).toFixed(1)+' ';
+    pr+=x+','+yTemp(hist.ret[i]).toFixed(1)+' ';
+  }
+  document.getElementById('cFlow').setAttribute('points',pf);
+  document.getElementById('cRet').setAttribute('points',pr);
+  var sp=document.getElementById('cSpLine'), ySp=yTemp(SP).toFixed(1);
+  sp.setAttribute('y1',ySp);sp.setAttribute('y2',ySp);
+  var pm=x0+',170 ';
+  for(var j=0;j<n;j++){pm+=(x0+j*dx).toFixed(1)+','+(170-hist.mod[j]/100*42).toFixed(1)+' ';}
+  pm+=x1+',170';
+  document.getElementById('cMod').setAttribute('points',pm);
+  document.getElementById('cFlowLbl').textContent=sim.boiler.toFixed(1);
+  document.getElementById('cRetLbl').textContent=sim.ret.toFixed(1);
+  var pc=pressClass(sim.pressure);
+  document.getElementById('cGrid').innerHTML=
+    cell('T flow',sim.boiler.toFixed(1)+'°C','hot')+
+    cell('T return',sim.ret.toFixed(1)+'°C','cold')+
+    cell('ΔT',(sim.boiler-sim.ret).toFixed(1)+'°C','')+
+    cell('Modulation',sim.modulation+' %',sim.flame?'ok':'')+
+    cell('Pressure',sim.pressure.toFixed(2)+' bar',pc)+
+    cell('T DHW',sim.dhw.toFixed(1)+'°C','')+
+    cell('T room',sim.room.toFixed(1)+'°C','')+
+    cell('Setpoint',sim.setpoint.toFixed(1)+'°C','')+
+    cell('T outside',sim.outside.toFixed(1)+'°C','')+
+    cell('Flame',sim.flame?'ON':'OFF',sim.flame?'ok':'')+
+    cell('Status',sim.fault?'FAULT':'OK',sim.fault?'alert':'ok');
+  pushFrames();
+}
+function cell(lbl,val,cls){
+  return '<div class="mc-cell"><div class="lbl">'+lbl+'</div><div class="val '+cls+'">'+val+'</div></div>';
+}
+var frames=[];
+function hex16(v){var x=Math.max(0,Math.round(v*256))&0xFFFF;return x.toString(16).toUpperCase().padStart(4,'0');}
+function pushFrames(){
+  var pool=[
+    ['19','Boiler water temp',sim.boiler],
+    ['1C','Return water temp',sim.ret],
+    ['11','Rel modulation',sim.modulation],
+    ['12','CH water pressure',sim.pressure],
+    ['18','Room temperature',sim.room],
+    ['1A','DHW temperature',sim.dhw]
+  ];
+  var m=pool[Math.floor(Math.random()*pool.length)];
+  var ts=new Date().toTimeString().slice(0,8);
+  frames.push({ts:ts,body:'<span class="t">T00'+m[0]+'0000</span>  read  '+m[1],
+               search:('t00'+m[0]+'0000 read '+m[1]).toLowerCase()});
+  frames.push({ts:ts,body:'<span class="b">B40'+m[0]+hex16(m[2])+'</span>  '+m[1]+' = <b>'+(+m[2]).toFixed(2)+'</b>',
+               search:('b40'+m[0]+' '+m[1]+' '+(+m[2]).toFixed(2)).toLowerCase()});
+  if(frames.length>200) frames.splice(0,frames.length-200);
+  var tEl=document.getElementById('cTicker');
+  tEl.innerHTML=frames.slice(-40).map(function(f){
+    return '<span class="ts">'+f.ts+'</span> '+f.body;
+  }).join('<br>');
+  tEl.scrollTop=tEl.scrollHeight;
+}
+
+/* ---------- MONITOR page ---------- */
+var logPaused=false, logScroll=true, logTs=true;
+document.getElementById('logPause').onclick=function(){
+  logPaused=!logPaused; this.textContent=logPaused?'▶ Resume':'⏸ Pause';
+};
+function chipToggle(id,fn){
+  var el=document.getElementById(id);
+  el.onclick=function(){el.classList.toggle('on');fn(el.classList.contains('on'));renderMonLog();};
+}
+chipToggle('chipScroll',function(v){logScroll=v;});
+chipToggle('chipTs',function(v){logTs=v;});
+document.getElementById('logSearch').oninput=renderMonLog;
+function renderMonLog(){
+  if(logPaused) return;
+  var q=document.getElementById('logSearch').value.trim().toLowerCase();
+  var list=q?frames.filter(function(f){return f.search.indexOf(q)>=0;}):frames;
+  var el=document.getElementById('monLog');
+  el.innerHTML=list.slice(-120).map(function(f){
+    return (logTs?'<span class="ts">'+f.ts+'</span> ':'')+f.body;
+  }).join('<br>');
+  if(logScroll) el.scrollTop=el.scrollHeight;
+  document.getElementById('logCount').textContent=list.length;
+}
+
+var STATS=[
+  {id:0, name:'Status (master/slave)',        dir:'tb', iv:1,  get:function(){return sim.flame?'flame on':'flame off';}},
+  {id:1, name:'Control setpoint',             dir:'tb', iv:1,  get:function(){return '65.0 °C';}},
+  {id:5, name:'Fault flags & OEM code',       dir:'tb', iv:60, get:function(){return sim.fault?'0x01':'0x00';}},
+  {id:14,name:'Max relative modulation',      dir:'tb', iv:60, get:function(){return '100 %';}},
+  {id:16,name:'Room setpoint',                dir:'t',  iv:10, get:function(){return sim.setpoint.toFixed(1)+' °C';}},
+  {id:17,name:'Relative modulation level',    dir:'b',  iv:1,  get:function(){return sim.modulation+' %';}},
+  {id:18,name:'CH water pressure',            dir:'b',  iv:30, get:function(){return sim.pressure.toFixed(2)+' bar';}},
+  {id:24,name:'Room temperature',             dir:'t',  iv:10, get:function(){return sim.room.toFixed(1)+' °C';}},
+  {id:25,name:'Boiler water temperature',     dir:'b',  iv:1,  get:function(){return sim.boiler.toFixed(1)+' °C';}},
+  {id:26,name:'DHW temperature',              dir:'b',  iv:10, get:function(){return sim.dhw.toFixed(1)+' °C';}},
+  {id:27,name:'Outside temperature',          dir:'b',  iv:60, get:function(){return sim.outside.toFixed(1)+' °C';}},
+  {id:28,name:'Return water temperature',     dir:'b',  iv:1,  get:function(){return sim.ret.toFixed(1)+' °C';}},
+  {id:56,name:'DHW setpoint',                 dir:'tb', iv:60, get:function(){return '55.0 °C';}},
+  {id:57,name:'Max CH water setpoint',        dir:'tb', iv:60, get:function(){return '75.0 °C';}}
+];
+STATS.forEach(function(s){s.count=Math.floor(800/s.iv)+Math.floor(Math.random()*50);});
+document.getElementById('statsSearch').oninput=renderStats;
+function dirBadge(d){
+  if(d==='t') return '<span class="dirbadge dir-t">T →</span>';
+  if(d==='b') return '<span class="dirbadge dir-b">← B</span>';
+  return '<span class="dirbadge dir-tb">T ⇄ B</span>';
+}
+function renderStats(){
+  var q=(document.getElementById('statsSearch').value||'').trim().toLowerCase();
+  var rows=STATS.filter(function(s){
+    return !q || s.name.toLowerCase().indexOf(q)>=0 || String(s.id).indexOf(q)>=0;
+  });
+  document.querySelector('#statsTable tbody').innerHTML=rows.map(function(s){
+    return '<tr><td><span class="idbadge">'+s.id+'</span></td><td>'+s.name+'</td>'+
+      '<td>'+dirBadge(s.dir)+'</td><td>'+s.iv+' s</td><td>'+s.count+'</td>'+
+      '<td class="statval" style="text-align:right">'+s.get()+'</td></tr>';
+  }).join('');
+  document.getElementById('statsCount').textContent=STATS.length;
+}
+
+var OTMSG=[[0,"R","flag8/flag8","Status","Master and Slave status",""],
+[1,"W","f8.8","TSet","Control setpoint","°C"],
+[2,"W","flag8/u8","MasterConfigMemberIDcode","Master Config / Member ID",""],
+[3,"R","flag8/u8","SlaveConfigMemberIDcode","Slave Config / Member ID",""],
+[4,"W","u8/u8","Command","Command-Code",""],
+[5,"R","flag8/u8","ASFflags","Application-specific fault",""],
+[6,"R","flag8/flag8","RBPflags","Remote-parameter flags",""],
+[7,"W","f8.8","CoolingControl","Cooling control signal","%"],
+[8,"W","f8.8","TsetCH2","Control setpoint for 2e CH circuit","°C"],
+[9,"R","f8.8","TrOverride","Remote override room setpoint","°C"],
+[10,"R","u8/u8","TSP","Number of TSPs",""],
+[11,"RW","u8/u8","TSPindexTSPvalue","Index number / Value of referred-to transparent slave parameter",""],
+[12,"R","u8/u8","FHBsize","Size of Fault-History-Buffer supported by slave",""],
+[13,"R","u8/u8","FHBindexFHBvalue","Index number / Value of referred-to fault-history buffer entry",""],
+[14,"W","f8.8","MaxRelModLevelSetting","Maximum relative modulation level setting","%"],
+[15,"R","u8/u8","MaxCapacityMinModLevel","Maximum boiler capacity (kW) / Minimum boiler modulation level(%)","kW/%"],
+[16,"W","f8.8","TrSet","Room Setpoint","°C"],
+[17,"R","f8.8","RelModLevel","Relative Modulation Level","%"],
+[18,"R","f8.8","CHPressure","CH water pressure","bar"],
+[19,"R","f8.8","DHWFlowRate","DHW flow rate","l/min"],
+[20,"RW","special","DayTime","Day of Week and Time of Day",""],
+[21,"RW","u8/u8","Date","Calendar date ",""],
+[22,"RW","u16","Year","Calendar year",""],
+[23,"W","f8.8","TrSetCH2","Room Setpoint CH2","°C"],
+[24,"W","f8.8","Tr","Room Temperature","°C"],
+[25,"R","f8.8","Tboiler","Boiler water temperature","°C"],
+[26,"R","f8.8","Tdhw","DHW temperature","°C"],
+[27,"RW","f8.8","Toutside","Outside temperature","°C"],
+[28,"R","f8.8","Tret","Return water temperature","°C"],
+[29,"R","f8.8","Tsolarstorage","Solar storage temperature","°C"],
+[30,"R","s16","Tsolarcollector","Solar collector temperature","°C"],
+[31,"R","f8.8","TflowCH2","Flow water temperature CH2","°C"],
+[32,"R","f8.8","Tdhw2","DHW2 temperature","°C"],
+[33,"R","s16","Texhaust","Exhaust temperature","°C"],
+[34,"R","f8.8","Theatexchanger","Boiler heat exchanger temperature","°C"],
+[35,"R","u8/u8","FanSpeed","Boiler fan speed and setpoint","Hz"],
+[36,"R","f8.8","ElectricalCurrentBurnerFlame","Electrical current through burner flame","µA"],
+[37,"W","f8.8","TRoomCH2","Room temperature for 2nd CH circuit","°C"],
+[38,"RW","f8.8","RelativeHumidity","Relative Humidity","%"],
+[39,"R","f8.8","TrOverride2","Remote override room setpoint 2","°C"],
+[40,"U","—","","",""],
+[41,"U","—","","",""],
+[42,"U","—","","",""],
+[43,"U","—","","",""],
+[44,"U","—","","",""],
+[45,"U","—","","",""],
+[46,"U","—","","",""],
+[47,"U","—","","",""],
+[48,"R","s8/s8","TdhwSetUBTdhwSetLB","DHW setpoint upper & lower bounds for adjustment","°C"],
+[49,"R","s8/s8","MaxTSetUBMaxTSetLB","Max CH water setpoint upper & lower bounds for adjustment","°C"],
+[50,"R","s8/s8","HcratioUBHcratioLB","OTC heat curve ratio upper & lower bounds for adjustment","°C"],
+[51,"R","s8/s8","Remoteparameter4boundaries","Remote parameter 4 boundaries",""],
+[52,"R","s8/s8","Remoteparameter5boundaries","Remote parameter 5 boundaries",""],
+[53,"R","s8/s8","Remoteparameter6boundaries","Remote parameter 6 boundaries",""],
+[54,"R","s8/s8","Remoteparameter7boundaries","Remote parameter 7 boundaries",""],
+[55,"R","s8/s8","Remoteparameter8boundaries","Remote parameter 8 boundaries",""],
+[56,"RW","f8.8","TdhwSet","DHW setpoint","°C"],
+[57,"RW","f8.8","MaxTSet","Max CH water setpoint","°C"],
+[58,"RW","f8.8","Hcratio","OTC heat curve ratio","°C"],
+[59,"RW","f8.8","Remoteparameter4","Remote parameter 4",""],
+[60,"RW","f8.8","Remoteparameter5","Remote parameter 5",""],
+[61,"RW","f8.8","Remoteparameter6","Remote parameter 6",""],
+[62,"RW","f8.8","Remoteparameter7","Remote parameter 7",""],
+[63,"RW","f8.8","Remoteparameter8","Remote parameter 8",""],
+[64,"U","—","","",""],
+[65,"U","—","","",""],
+[66,"U","—","","",""],
+[67,"U","—","","",""],
+[68,"U","—","","",""],
+[69,"U","—","","",""],
+[70,"R","flag8/flag8","StatusVH","Status Ventilation/Heat recovery",""],
+[71,"W","u8","ControlSetpointVH","Control setpoint V/H","%"],
+[72,"R","flag8/u8","ASFFaultCodeVH","Application-specific Fault Flags/Code V/H",""],
+[73,"R","u16","DiagnosticCodeVH","Diagnostic code V/H",""],
+[74,"R","flag8/u8","ConfigMemberIDVH","Config/Member ID V/H",""],
+[75,"R","f8.8","OpenthermVersionVH","OpenTherm version V/H",""],
+[76,"R","u8/u8","VersionTypeVH","Product version & type V/H",""],
+[77,"R","u8","RelativeVentilation","Relative ventilation","%"],
+[78,"RW","u8","RelativeHumidityExhaustAir","Relative humidity exhaust air","%"],
+[79,"RW","u16","CO2LevelExhaustAir","CO2 level exhaust air","ppm"],
+[80,"R","f8.8","SupplyInletTemperature","Supply inlet temperature","°C"],
+[81,"R","f8.8","SupplyOutletTemperature","Supply outlet temperature","°C"],
+[82,"R","f8.8","ExhaustInletTemperature","Exhaust inlet temperature","°C"],
+[83,"R","f8.8","ExhaustOutletTemperature","Exhaust outlet temperature","°C"],
+[84,"R","u16","ActualExhaustFanSpeed","Actual exhaust fan speed","rpm"],
+[85,"R","u16","ActualSupplyFanSpeed","Actual supply fan speed","rpm"],
+[86,"R","flag8/flag8","RemoteParameterSettingVH","Remote Parameter Setting V/H",""],
+[87,"RW","u8","NominalVentilationValue","Nominal Ventilation Value","%"],
+[88,"R","u8/u8","TSPNumberVH","TSP Number V/H",""],
+[89,"RW","u8/u8","TSPEntryVH","TSP setting V/H",""],
+[90,"R","u8/u8","FaultBufferSizeVH","Fault Buffer Size V/H",""],
+[91,"R","u8/u8","FaultBufferEntryVH","Fault Buffer Entry V/H",""],
+[92,"U","—","","",""],
+[93,"R","u8/u8","Brand","Boiler brand name (index/char)",""],
+[94,"R","u8/u8","BrandVersion","Boiler brand version (index/char)",""],
+[95,"R","u8/u8","BrandSerialNumber","Boiler brand serial number (index/char)",""],
+[96,"RW","u16","CoolingOperationHours","Cooling operation hours","hrs"],
+[97,"RW","u16","PowerCycles","Power cycles",""],
+[98,"W","special","RFstrengthbatterylevel","RF sensor status information",""],
+[99,"RW","special","OperatingMode_HC1_HC2_DHW","Remote Override Operating Mode (Heating/DHW)",""],
+[100,"R","ot_flag8","RoomRemoteOverrideFunction","Function of manual and program changes in master and remote room setpoint.",""],
+[101,"R","flag8/flag8","SolarStorageMaster","Solar Storage Master mode",""],
+[102,"R","flag8/u8","SolarStorageASFflags","Solar Storage Application-specific flags and OEM fault",""],
+[103,"R","flag8/u8","SolarStorageSlaveConfigMemberIDcode","Solar Storage Slave Config / Member ID",""],
+[104,"R","u8/u8","SolarStorageVersionType","Solar Storage product version number and type",""],
+[105,"R","u8/u8","SolarStorageTSP","Solar Storage Number of Transparent-Slave-Parameters supported",""],
+[106,"RW","u8/u8","SolarStorageTSPindexTSPvalue","Solar Storage Index number / Value of referred-to transparent slave parameter",""],
+[107,"R","u8/u8","SolarStorageFHBsize","Solar Storage Size of Fault-History-Buffer supported by slave",""],
+[108,"R","u8/u8","SolarStorageFHBindexFHBvalue","Solar Storage Index number / Value of referred-to fault-history buffer entry",""],
+[109,"RW","u16","ElectricityProducerStarts","Electricity producer starts",""],
+[110,"RW","u16","ElectricityProducerHours","Electricity producer hours",""],
+[111,"R","u16","ElectricityProduction","Electricity production",""],
+[112,"RW","u16","CumulativeElectricityProduction","Cumulative Electricity production",""],
+[113,"RW","u16","BurnerUnsuccessfulStarts","Unsuccessful burner starts",""],
+[114,"RW","u16","FlameSignalTooLow","Flame signal too low count",""],
+[115,"R","u16","OEMDiagnosticCode","OEM-specific diagnostic/service code",""],
+[116,"RW","u16","BurnerStarts","Burner starts",""],
+[117,"RW","u16","CHPumpStarts","CH pump starts",""],
+[118,"RW","u16","DHWPumpValveStarts","DHW pump/valve starts",""],
+[119,"RW","u16","DHWBurnerStarts","DHW burner starts",""],
+[120,"RW","u16","BurnerOperationHours","Burner operation hours","hrs"],
+[121,"RW","u16","CHPumpOperationHours","CH pump operation hours","hrs"],
+[122,"RW","u16","DHWPumpValveOperationHours","DHW pump/valve operation hours","hrs"],
+[123,"RW","u16","DHWBurnerOperationHours","DHW burner operation hours","hrs"],
+[124,"W","f8.8","OpenThermVersionMaster","Master Version OpenTherm Protocol Specification",""],
+[125,"R","f8.8","OpenThermVersionSlave","Slave Version OpenTherm Protocol Specification",""],
+[126,"W","u8/u8","MasterVersion","Master product version number and type",""],
+[127,"R","u8/u8","SlaveVersion","Slave product version number and type",""]];
+
+// simulated support: which msgIDs the thermostat asks, the boiler answers, or both
+var SUP_BOTH=[0,1,3,5,6,14,16,17,18,24,25,26,27,28,48,49,56,57];
+var SUP_T=[2,4,8,9,10,100];
+var SUP_B=[15,19,33,34,35,116,117,118,119,120,121,123];
+function supState(id){
+  if(SUP_BOTH.indexOf(id)>=0) return 'both';
+  if(SUP_T.indexOf(id)>=0) return 'tonly';
+  if(SUP_B.indexOf(id)>=0) return 'bonly';
+  return 'none';
+}
+function supColor(st){return {both:'var(--zone-ok)',tonly:'var(--accent)',bonly:'var(--zone-warn)',none:'var(--tile-off)'}[st];}
+function supLabel(st){return {both:'✓ Both sides',tonly:'↑ Thermostat only',bonly:'↓ Boiler only',none:'○ Not seen'}[st];}
+function rwText(rw){return {R:'Read · boiler → thermostat',W:'Write · thermostat → boiler',RW:'Read / Write',U:'Undefined'}[rw]||rw;}
+function supConcl(st,undef){
+  if(st==='both') return 'Your thermostat requests this and the boiler answers it — fully supported on your system.';
+  if(st==='tonly') return 'Your thermostat asks for this, but the boiler never answers it — your boiler does not implement this message.';
+  if(st==='bonly') return 'The boiler reports this, but your thermostat never requests it.';
+  if(undef) return 'Reserved / unused in the OpenTherm specification.';
+  return 'Not seen on your bus yet — it is defined in the spec but neither side has used it this session.';
+}
+function supShowDetail(id){
+  var m=OTMSG[id], st=supState(id), undef=(m[2]==='—');
+  var hex='0x'+id.toString(16).toUpperCase().padStart(2,'0');
+  var el=document.getElementById('supDetail');
+  el.style.setProperty('--s',supColor(st));
+  el.innerHTML=
+    '<div class="sd-top"><span class="sd-num">'+id+'</span><span class="sd-hex">'+hex+'</span>'+
+      (m[3]?'<span class="sd-spec">'+m[3]+'</span>':'')+'</div>'+
+    '<h5>'+(m[4]||'(undefined / reserved)')+'</h5>'+
+    '<span class="sd-badge">'+supLabel(st)+'</span>'+
+    '<dl>'+
+      '<dt>Decimal</dt><dd>'+id+'</dd>'+
+      '<dt>Hex</dt><dd>'+hex+'</dd>'+
+      '<dt>Spec name</dt><dd>'+(m[3]||'—')+'</dd>'+
+      '<dt>Data type</dt><dd>'+m[2]+'</dd>'+
+      '<dt>Direction</dt><dd style="text-align:right">'+rwText(m[1])+'</dd>'+
+      (m[5]?'<dt>Unit</dt><dd>'+m[5]+'</dd>':'')+
+    '</dl>'+
+    '<div class="sd-concl">'+supConcl(st,undef)+'</div>'+
+    '<div class="sd-hint">From the OpenTherm spec table + your bus traffic this session.</div>';
+}
+function supDetailPlaceholder(){
+  var el=document.getElementById('supDetail');
+  el.style.setProperty('--s','var(--border)');
+  el.innerHTML='<div class="sd-hint" style="margin:0">Click any square to see its OpenTherm message — decimal &amp; hex id, spec name, human-readable name, data type, direction, and what it means for your system.</div>';
+}
+function wireSupport(){
+  var mx=document.getElementById('supMatrix'), tip=document.getElementById('supTip');
+  mx.addEventListener('mousemove',function(e){
+    var cell=e.target.closest('.mcellq'); if(!cell){tip.style.opacity=0;return;}
+    var id=+cell.dataset.id, m=OTMSG[id];
+    tip.innerHTML='<b>'+id+'</b> · '+(m[4]||'undefined / reserved');
+    tip.style.left=e.clientX+'px'; tip.style.top=e.clientY+'px'; tip.style.opacity=1;
+  });
+  mx.addEventListener('mouseleave',function(){tip.style.opacity=0;});
+  mx.addEventListener('click',function(e){
+    var cell=e.target.closest('.mcellq'); if(!cell) return;
+    mx.querySelectorAll('.mcellq.sel').forEach(function(x){x.classList.remove('sel');});
+    cell.classList.add('sel'); supShowDetail(+cell.dataset.id);
+  });
+}
+function buildSupportMatrix(){
+  var html='';
+  for(var i=0;i<128;i++){
+    var st=supState(i);
+    var cls=st==='none'?'':st;
+    html+='<div class="mcellq '+cls+'" data-id="'+i+'">'+i+'</div>';
+  }
+  var mx=document.getElementById('supMatrix');
+  mx.innerHTML=html;
+  document.getElementById('supCount').textContent=SUP_BOTH.length+SUP_T.length+SUP_B.length;
+  wireSupport();
+  var def=mx.querySelector('[data-id="25"]'); if(def) def.classList.add('sel');
+  supShowDetail(25);
+}
+
+function drawStrip(fFlow,fRet,fMod,fSp){
+  var n=hist.boiler.length, x0=34, x1=772, dx=(x1-x0)/(n-1);
+  var pf='',pr='';
+  for(var i=0;i<n;i++){
+    var x=(x0+i*dx).toFixed(1);
+    pf+=x+','+yTemp(hist.boiler[i]).toFixed(1)+' ';
+    pr+=x+','+yTemp(hist.ret[i]).toFixed(1)+' ';
+  }
+  document.getElementById(fFlow).setAttribute('points',pf);
+  document.getElementById(fRet).setAttribute('points',pr);
+  var sp=document.getElementById(fSp), ySp=yTemp(SP).toFixed(1);
+  sp.setAttribute('y1',ySp);sp.setAttribute('y2',ySp);
+  var pm=x0+',170 ';
+  for(var j=0;j<n;j++){pm+=(x0+j*dx).toFixed(1)+','+(170-hist.mod[j]/100*42).toFixed(1)+' ';}
+  pm+=x1+',170';
+  document.getElementById(fMod).setAttribute('points',pm);
+}
+
+function renderMonitor(){
+  renderMonLog();
+  // a couple of counters tick up each second, like the real stats table
+  STATS.forEach(function(s){ if(s.iv===1) s.count++; else if(Math.random()<1/s.iv) s.count++; });
+  renderStats();
+  drawStrip('gFlow2','gRet2','gMod2','gSpLine');
+}
+
+/* ---------- SETTINGS page ---------- */
+var SET_GROUPS=[
+  {id:'system', icon:'🖥', title:'System', desc:'Identity and device behaviour.',
+   fields:[
+     {key:'hostname',label:'Hostname',hint:'mDNS name on your network',type:'t',value:'OTGW'},
+     {key:'LEDblink',label:'Blink LED on OT traffic',type:'b',value:true},
+     {key:'LegacyPort25238Enabled',label:'Legacy TCP port 25238',hint:'For old OTmonitor clients',type:'b',value:false},
+     {key:'nightlyreboot',label:'Nightly reboot',hint:'Restart every night at 04:00',type:'b',value:false}
+   ]},
+  {id:'network', icon:'📶', title:'Network / Wi-Fi', reboot:true, desc:'Address configuration. Changes apply after reboot.',
+   fields:[
+     {key:'usedhcp',label:'Use DHCP (automatic IP)',type:'b',value:true},
+     {key:'wifistaticip',label:'Static IP',type:'t',value:'192.168.1.50'},
+     {key:'wifisubnet',label:'Subnet mask',type:'t',value:'255.255.255.0'},
+     {key:'wifigateway',label:'Gateway',type:'t',value:'192.168.1.1'},
+     {key:'wifidns1',label:'DNS 1',type:'t',value:'192.168.1.1'},
+     {key:'wifidns2',label:'DNS 2 (optional)',type:'t',value:''}
+   ]},
+  {id:'mqtt', icon:'📡', title:'MQTT', desc:'Broker connection and Home Assistant discovery.',
+   fields:[
+     {key:'MQTTenable',label:'Enable MQTT',type:'b',value:true},
+     {key:'MQTTbroker',label:'Broker',type:'t',value:'192.168.1.10'},
+     {key:'MQTTbrokerPort',label:'Port',type:'n',value:1883},
+     {key:'MQTTuser',label:'Username',type:'t',value:'otgw'},
+     {key:'MQTTpasswd',label:'Password',type:'p',value:'••••••••'},
+     {key:'MQTTtoptopic',label:'Top topic',type:'t',value:'OTGW'},
+     {key:'MQTThaprefix',label:'HA discovery prefix',type:'t',value:'homeassistant'},
+     {key:'MQTTdiscoveryAutoVerify',label:'Hourly discovery verify',hint:'Re-publish missed entities',type:'b',value:true},
+     {key:'MQTTonChangePublishing',label:'Publish on change',type:'b',value:true}
+   ]},
+  {id:'ntp', icon:'🕐', title:'Time / NTP', desc:'Clock sync and thermostat time.',
+   fields:[
+     {key:'NTPenable',label:'Enable NTP',type:'b',value:true},
+     {key:'NTPtimezone',label:'Timezone',type:'sel',value:'Europe/Amsterdam',
+      options:['Europe/Amsterdam','Europe/London','Europe/Berlin','UTC']},
+     {key:'NTPhostname',label:'NTP server',type:'t',value:'pool.ntp.org'},
+     {key:'NTPsendtime',label:'Send time to thermostat',hint:'OT msg 21/22 time sync',type:'b',value:true}
+   ]},
+  {id:'otgw', icon:'🔥', title:'OpenTherm Gateway', desc:'PIC behaviour at boot.',
+   fields:[
+     {key:'OTGWcommandenable',label:'Run commands at boot',type:'b',value:true},
+     {key:'OTGWcommands',label:'Boot commands',hint:'Semicolon separated, e.g. PS=0;GW=1',type:'t',value:'GW=1'}
+   ]},
+  {id:'sensors', icon:'🌡', title:'GPIO Sensors', desc:'Dallas 1-Wire temperature sensors.',
+   fields:[
+     {key:'GPIOSENSORSenabled',label:'Enable sensors',type:'b',value:true},
+     {key:'GPIOSENSORSpin',label:'GPIO pin',type:'n',value:13},
+     {key:'GPIOSENSORSinterval',label:'Poll interval (s)',type:'n',value:30},
+     {key:'GPIOSENSORSlegacyformat',label:'Legacy topic format',type:'b',value:false}
+   ]},
+  {id:'outputs', icon:'⚡', title:'GPIO Outputs', desc:'Drive a relay from an OT status bit.',
+   fields:[
+     {key:'GPIOOUTPUTSenabled',label:'Enable output',type:'b',value:false},
+     {key:'GPIOOUTPUTSpin',label:'GPIO pin',type:'n',value:16},
+     {key:'GPIOOUTPUTStriggerBit',label:'Trigger',type:'sel',value:'Flame',
+      options:['Flame','CH active','DHW active','Fault']}
+   ]},
+  {id:'s0', icon:'🔌', title:'S0 Pulse Counter', desc:'Energy meter pulse input.',
+   fields:[
+     {key:'S0COUNTERenabled',label:'Enable S0 counter',type:'b',value:false},
+     {key:'S0COUNTERpin',label:'GPIO pin',type:'n',value:12},
+     {key:'S0COUNTERpulsekw',label:'Pulses per kWh',type:'n',value:2000},
+     {key:'S0COUNTERinterval',label:'Report interval (s)',type:'n',value:60}
+   ]},
+  {id:'webhook', icon:'🔗', title:'Webhook', desc:'Push events to an external service.',
+   fields:[
+     {key:'WebhookEnabled',label:'Enable webhook',type:'b',value:false},
+     {key:'WebhookUrl',label:'URL',type:'t',value:'https://example.local/hook'},
+     {key:'WebhookContentType',label:'Content type',type:'sel',value:'application/json',
+      options:['application/json','text/plain','application/x-www-form-urlencoded']}
+   ]}
+];
+var dirty={};
+function fieldControl(f){
+  var orig=(f.type==='b')?(f.value?'1':'0'):String(f.value);
+  if(f.type==='b')
+    return '<input type="checkbox" class="sw" data-key="'+f.key+'" data-orig="'+orig+'" '+(f.value?'checked':'')+'>';
+  if(f.type==='sel')
+    return '<select data-key="'+f.key+'" data-orig="'+orig+'">'+f.options.map(function(o){
+      return '<option'+(o===f.value?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
+  var t=f.type==='p'?'password':(f.type==='n'?'number':'text');
+  return '<input type="'+t+'" data-key="'+f.key+'" data-orig="'+orig+'" value="'+f.value+'">';
+}
+function buildSettings(){
+  document.getElementById('setRail').innerHTML=SET_GROUPS.map(function(g){
+    return '<div class="rail-item" data-target="sg-'+g.id+'">'+g.icon+' '+g.title+
+           '<span class="cnt">'+g.fields.length+'</span></div>';
+  }).join('');
+  document.getElementById('setCols').innerHTML=SET_GROUPS.map(function(g){
+    return '<section class="set-group" id="sg-'+g.id+'"><h3>'+g.icon+' '+g.title+
+      (g.reboot?' <span class="badge-reboot">REBOOT</span>':'')+'</h3>'+
+      '<p class="gdesc">'+g.desc+'</p>'+
+      g.fields.map(function(f){
+        return '<div class="srow" data-search="'+(g.title+' '+f.label+' '+f.key).toLowerCase()+'">'+
+          '<span class="slbl">'+f.label+(f.hint?'<span class="shint">'+f.hint+'</span>':'')+'</span>'+
+          fieldControl(f)+'</div>';
+      }).join('')+'</section>';
+  }).join('');
+  document.querySelectorAll('.rail-item').forEach(function(r){
+    r.onclick=function(){
+      document.querySelectorAll('.rail-item').forEach(function(x){x.classList.remove('active');});
+      r.classList.add('active');
+      var t=document.getElementById(r.dataset.target);
+      if(t) t.scrollIntoView({behavior:'smooth',block:'start'});
+    };
+  });
+  document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
+    inp.addEventListener('change',onSetChange);
+    inp.addEventListener('input',onSetChange);
+  });
+  document.getElementById('btnSave').onclick=function(){
+    document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
+      inp.dataset.orig=(inp.type==='checkbox')?(inp.checked?'1':'0'):inp.value;
+    });
+    dirty={};updateSaveBar();
+    var t=document.getElementById('toast');
+    t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1800);
+  };
+  document.getElementById('btnDiscard').onclick=function(){
+    document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
+      if(inp.type==='checkbox') inp.checked=inp.dataset.orig==='1';
+      else inp.value=inp.dataset.orig;
+      inp.closest('.srow').classList.remove('dirty');
+    });
+    dirty={};updateSaveBar();
+  };
+  document.getElementById('setSearch').oninput=function(){
+    var q=this.value.trim().toLowerCase();
+    document.querySelectorAll('#setCols .srow').forEach(function(row){
+      row.style.display=(!q||row.dataset.search.indexOf(q)>=0)?'':'none';
+    });
+    document.querySelectorAll('#setCols .set-group').forEach(function(g){
+      var any=Array.prototype.some.call(g.querySelectorAll('.srow'),function(r){return r.style.display!=='none';});
+      g.style.display=any?'':'none';
+    });
+  };
+}
+function onSetChange(e){
+  var inp=e.target,k=inp.dataset.key;
+  var now=(inp.type==='checkbox')?(inp.checked?'1':'0'):inp.value;
+  if(now!==inp.dataset.orig) dirty[k]=true; else delete dirty[k];
+  inp.closest('.srow').classList.toggle('dirty',now!==inp.dataset.orig);
+  updateSaveBar();
+}
+function updateSaveBar(){
+  var n=Object.keys(dirty).length;
+  document.getElementById('dirtyCount').textContent=n;
+  document.getElementById('saveBar').classList.toggle('show',n>0);
+}
+
+/* ---------- CONNECTIVITY ----------
+   Design notes:
+   - One state vocabulary everywhere: ok / warn / down / off / unknown, plus
+     'mode' which is a *setting* (Gateway vs Monitor), shown blue — never a
+     green/red health light. Disabled integrations read 'off' (grey), not error.
+   - The map shows the signal CHAIN so a user can locate a break: thermostat &
+     boiler -> gateway -> wifi/router -> {broker->HA} and {this browser}.
+   - Each signal carries a plain-language meaning and, when broken, a fix hint. */
+var STV={ok:'#2ecc71',warn:'#f39c12',down:'#e74c3c',off:'#9fb4bc',unknown:'#9aa0a6'};
+var STICON={ok:'✓',warn:'!',down:'✕',off:'○',unknown:'?'};
+var STLABEL={ok:'Connected',warn:'Degraded',down:'Disconnected',off:'Off',unknown:'Unknown'};
+var rssi=-58;
+var conn={
+  therm: {grp:'bus', s:'ok', icon:'🌡️', name:'Thermostat',  seen:1,
+          exp:'The room thermostat (OT master) is talking to the gateway.',
+          fix:'No frames from the thermostat — check the wiring to the gateway.'},
+  boiler:{grp:'bus', s:'ok', icon:'🔥', name:'Boiler',       seen:1,
+          exp:'The boiler (OT slave) is answering the gateway.',
+          fix:'Boiler not answering — check the OT wiring / boiler power.'},
+  pic:   {grp:'bus', s:'ok', icon:'📟', name:'PIC link',     fw:'gateway 6.5',
+          exp:'The ESP can talk to the OTGW PIC over the serial link.',
+          fix:'PIC not detected — reseat the gateway / reflash the PIC firmware.'},
+  mode:  {grp:'bus', s:'mode', icon:'⇄', name:'Gateway mode', value:'gateway',
+          exp:'Gateway = actively rewrites OT messages (lets the UI set temperatures). Monitor = passively observes only.'},
+  wifi:  {grp:'net', s:'ok', icon:'📶', name:'Wi-Fi',
+          exp:'The gateway is on your network.',
+          fix:'Weak or no signal — move the device or add a repeater.'},
+  ip:    {grp:'net', s:'ok', icon:'🌐', name:'IP address', detail:'192.168.1.50 · DHCP',
+          exp:'The device has a network address.'},
+  mqtt:  {grp:'int', s:'ok', icon:'📡', name:'MQTT broker', seen:1,
+          exp:'Connected to the broker; the online (birth) message is published.',
+          fix:'Cannot reach the broker — check address, port and credentials.'},
+  ha:    {grp:'int', s:'ok', icon:'🏠', name:'Home Assistant', detail:'42 entities discovered',
+          exp:'Discovery configs are published; entities appear in HA.'},
+  ntp:   {grp:'int', s:'ok', icon:'🕐', name:'Time (NTP)', detail:'synced · pool.ntp.org',
+          exp:'The clock is synced; timestamps and time-to-thermostat are correct.',
+          fix:'No time sync — check the NTP server and internet access.'},
+  ws:    {grp:'ses', s:'ok', icon:'📱', name:'Live link', detail:'WebSocket · streaming',
+          exp:'This page has a live link to the gateway — the log updates in real time.',
+          fix:'Live link dropped — the page is reconnecting; data may be paused.'},
+  api:   {grp:'ses', s:'ok', icon:'🔁', name:'REST API', detail:'polling · 1s',
+          exp:'Values on this page are fetched from the device API.',
+          fix:'API unreachable — the device may be rebooting or off the network.'}
+};
+function setLink(id,state,active){
+  var lk=document.getElementById('lk-'+id); if(lk) lk.setAttribute('class','cn-link lk-'+state);
+  var fl=document.getElementById('fl-'+id); if(fl) fl.classList.toggle('on',!!active && (state==='ok'||state==='warn'));
+}
+function setDot(id,state){
+  var d=document.getElementById('dot-'+id); if(d) d.setAttribute('fill',STV[state]||STV.unknown);
+}
+var CONN_GROUPS=[
+  {id:'bus', title:'Heating bus (OpenTherm)'},
+  {id:'net', title:'Network'},
+  {id:'int', title:'Integrations'},
+  {id:'ses', title:'This browser session'}
+];
+function connRecency(c){
+  if(c.s==='off') return 'disabled';
+  if(c.s==='down') return 'no link';
+  if(c.seen!=null) return 'seen '+c.seen+'s ago';
+  return '';
+}
+function renderConnStrip(){
+  // glance scale: the six that matter most, worst-first feel via state colour
+  var order=['ws','mode','mqtt','wifi','boiler','therm'];
+  document.getElementById('connStrip').innerHTML=order.map(function(k){
+    var c=conn[k];
+    if(c.s==='mode'){
+      return '<button class="connpill st-mode" data-goconn="1"><span class="d"></span>'+
+        '<span class="pk">'+c.name+'</span><span class="pv">'+c.value.toUpperCase()+'</span></button>';
+    }
+    var short={ws:'Live',mqtt:'MQTT',wifi:'Wi-Fi',boiler:'Boiler',therm:'Thermostat'}[k]||c.name;
+    return '<button class="connpill st-'+c.s+'" data-goconn="1"><span class="d"></span>'+
+      '<span class="pk">'+short+'</span><span class="pv">'+STLABEL[c.s]+'</span></button>';
+  }).join('');
+  document.querySelectorAll('[data-goconn]').forEach(function(b){
+    b.onclick=function(){showPage('monitor');showTab('mconn');};
+  });
+}
+function renderConnMap(){
+  setDot('therm',conn.therm.s); setDot('boiler',conn.boiler.s);
+  setDot('pic',conn.pic.s); setDot('wifi',conn.wifi.s);
+  setDot('mqtt',conn.mqtt.s); setDot('ws',conn.ws.s);
+  setLink('therm',conn.therm.s,true); setLink('boiler',conn.boiler.s,true);
+  setLink('wifi',conn.wifi.s,true);
+  setLink('mqtt',conn.mqtt.s,true); setLink('ws',conn.ws.s,true);
+  document.getElementById('cnThermSub').textContent='master · '+connRecency(conn.therm);
+  document.getElementById('cnBoilerSub').textContent='slave · '+connRecency(conn.boiler);
+  document.getElementById('cnPicSub').textContent='PIC '+conn.pic.fw;
+  document.getElementById('cnWifiSub').textContent=rssi+' dBm';
+  var modeTxt=conn.mode.value==='gateway'?'GATEWAY MODE':(conn.mode.value==='monitor'?'MONITOR MODE':'MODE: DETECTING');
+  document.getElementById('cnModeTxt').textContent=modeTxt;
+  document.getElementById('dot-mode').setAttribute('fill',conn.mode.value==='unknown'?STV.unknown:STV.ok);
+}
+function connDetail(c){
+  var det=c.detail||'';
+  if(c.s==='mode'){
+    return '<div class="connrow st-mode"><span class="badge">⇄ '+c.value.toUpperCase()+'</span>'+
+      '<div class="body"><div class="nm">'+c.name+'</div>'+
+      '<div class="exp">'+c.exp+'</div></div></div>';
+  }
+  if(c===conn.therm||c===conn.boiler||c===conn.mqtt) det=connRecency(c);
+  if(c===conn.pic) det=c.fw+(c.s==='ok'?' · serial OK':'');
+  if(c===conn.wifi) det=rssi+' dBm'+(c.s==='warn'?' · weak':'');
+  return '<div class="connrow st-'+c.s+'">'+
+    '<span class="badge">'+STICON[c.s]+' '+STLABEL[c.s]+'</span>'+
+    '<div class="body"><div class="nm">'+c.icon+' '+c.name+
+      (c.seen!=null&&c.s!=='down'?'<span class="seen">· '+connRecency(c)+'</span>':'')+'</div>'+
+      (det?'<div class="det">'+det+'</div>':'')+
+      '<div class="exp">'+c.exp+'</div>'+
+      (c.s==='down'||c.s==='warn'?'<div class="fix">▸ '+(c.fix||'')+'</div>':'')+
+    '</div></div>';
+}
+function renderConnDetail(){
+  document.getElementById('connDetail').innerHTML=CONN_GROUPS.map(function(g){
+    var rows=Object.keys(conn).filter(function(k){return conn[k].grp===g.id;})
+      .map(function(k){return connDetail(conn[k]);}).join('');
+    return '<div class="conngroup"><h4>'+g.title+'</h4>'+rows+'</div>';
+  }).join('');
+}
+function connTick(){
+  // wander RSSI; degrade wifi when weak
+  rssi=Math.max(-86,Math.min(-42,Math.round(rssi+(Math.random()-0.5)*5)));
+  conn.wifi.s = rssi<-80?'down':(rssi<-72?'warn':'ok');
+  // OT sides track the sim: a side is 'warn' (quiet) if it hasn't been "seen"
+  conn.boiler.seen = sim.flame||Math.random()<0.7 ? 1 : (conn.boiler.seen||1)+1;
+  conn.therm.seen  = Math.random()<0.85 ? 1 : (conn.therm.seen||1)+1;
+  conn.boiler.s = conn.boiler.seen>6?'warn':'ok';
+  conn.therm.s  = conn.therm.seen>6?'warn':'ok';
+  // MQTT: occasional reconnect cycle
+  if(conn.mqtt.s==='ok'){ if(Math.random()<0.03){conn.mqtt.s='warn';conn.mqtt.seen=1;} else conn.mqtt.seen=1; }
+  else if(conn.mqtt.s==='warn'){ conn.mqtt.seen=(conn.mqtt.seen||1)+1;
+    if(conn.mqtt.seen>3) conn.mqtt.s=Math.random()<0.5?'down':'ok'; }
+  else { if(Math.random()<0.4){conn.mqtt.s='ok';conn.mqtt.seen=1;} }
+  conn.ha.s = conn.mqtt.s==='down'?'down':(conn.mqtt.s==='warn'?'warn':'ok');
+  // live link (WS): rare drop -> reconnect
+  if(conn.ws.s==='ok'){ if(Math.random()<0.025){conn.ws.s='warn';conn.ws.detail='WebSocket · reconnecting…';} }
+  else if(conn.ws.s==='warn'){ if(Math.random()<0.4){conn.ws.s='ok';conn.ws.detail='WebSocket · streaming';} }
+  // mode mirrors the Gateway-mode demo elsewhere; flip rarely
+  if(Math.random()<0.012) conn.mode.value=conn.mode.value==='gateway'?'monitor':'gateway';
+  conn.pic.s='ok'; conn.ip.s='ok'; conn.ntp.s='ok'; conn.api.s='ok';
+  renderConnStrip(); renderConnMap();
+  if(document.getElementById('mconn').classList.contains('active')) renderConnDetail();
+}
+
+/* ---------- appliance toggle (boiler flame ↔ heat-pump bolt) ---------- */
+document.querySelectorAll('#applToggle .seg2btn').forEach(function(b){
+  b.onclick=function(){
+    appliance=b.dataset.appl;
+    document.querySelectorAll('#applToggle .seg2btn').forEach(function(x){x.classList.toggle('active',x===b);});
+    renderA();
+  };
+});
+
+/* ---------- boot ---------- */
+function clock(){document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);}
+buildSupportMatrix();
+buildSettings();
+renderA();renderB();renderC();renderMonitor();
+renderConnStrip();renderConnMap();renderConnDetail();
+clock();
+setInterval(clock,1000);
+setInterval(function(){tick();renderMonitor();connTick();},1000);
+</script>
+</body>
+</html>
