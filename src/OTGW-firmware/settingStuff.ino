@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v1.7.0-beta.32
+**  Version  : v1.7.0-beta.33
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -649,7 +649,7 @@ void updateSetting(const char *field, const char *newValue)
     }
   }
   else if (strcasecmp_P(field, PSTR("S0COUNTERdebouncetime")) == 0) { int val = atoi(newValue); settings.s0.iDebounceTime = constrain(val, 0, 1000); }
-  else if (strcasecmp_P(field, PSTR("S0COUNTERpulsekw")) == 0)      { int val = atoi(newValue); settings.s0.iPulsekw = constrain(val, 1, 100000); }
+  else if (strcasecmp_P(field, PSTR("S0COUNTERpulsekw")) == 0)      { int val = atoi(newValue); settings.s0.iPulsekw = constrain(val, 1, 65535); }  // uint16_t range; was 100000 which wrapped >65535
 
   else if (strcasecmp_P(field, PSTR("S0COUNTERinterval")) == 0) {
     int val = atoi(newValue);
