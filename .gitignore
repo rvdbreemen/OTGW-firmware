@@ -12,7 +12,6 @@ Arduino 2/**
 libraries/**
 staging/**
 build/**
-build-archive/**
 arduino-cli.yaml
 _codeql_detected_source_root
 __pycache__/

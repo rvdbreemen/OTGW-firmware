@@ -689,13 +689,14 @@ def rename_build_artifacts(project_dir, semver):
 
 
 def archive_build_artifacts(project_dir, semver):
-    """Copy every build artifact into a per-build archive keyed by semver+githash.
+    """Compress every build artifact into a single per-build zip outside the repo.
 
-    _SEMVER_FULL already embeds the git short hash (e.g. 1.7.0-beta.4+84918da),
-    so each build lands in its own immutable folder under build-archive/. This
-    keeps the exact .elf for any shipped or bisect build so an ESP8266 panic
-    stack (epc1 / >>>stack>>>) can be decoded with addr2line long after the
-    working build/ dir has been overwritten by a later build.
+    _SEMVER_FULL already embeds the git short hash (e.g. 1.7.0-beta.4+84918da), so
+    each build becomes one immutable <semver>.zip under config.ARCHIVE_DIR
+    (../OTGW-build-archive by default, outside the working tree). Keeps the exact
+    .elf for any shipped or bisect build so an ESP8266 panic stack (epc1 /
+    >>>stack>>>) can be decoded with addr2line long after the working build/ dir
+    has been overwritten by a later build.
     """
     print_step("Archiving build")
 
@@ -704,31 +705,31 @@ def archive_build_artifacts(project_dir, semver):
         print_warning("Build directory not found, skipping archive")
         return None
 
-    # Sanitize semver for use as a directory name (defensive; _SEMVER_FULL is
-    # normally filesystem-safe). Empty/unknown still gets a stable folder.
+    # Sanitize semver for use as a file name (defensive; _SEMVER_FULL is normally
+    # filesystem-safe). Empty/unknown still gets a stable name.
     safe = re.sub(r'[\\/:*?"<>|]', '_', semver).strip() or "unknown"
-    archive_dir = config.ARCHIVE_DIR / safe
-    archive_dir.mkdir(parents=True, exist_ok=True)
+    archive_root = config.ARCHIVE_DIR
+    archive_root.mkdir(parents=True, exist_ok=True)
 
-    artifacts = list(build_dir.glob("*.bin")) + list(build_dir.glob("*.elf"))
+    artifacts = (list(build_dir.glob("*.bin"))
+                 + list(build_dir.glob("*.elf"))
+                 + list(build_dir.glob("*.zip")))
     if not artifacts:
         print_warning("No artifacts to archive")
         return None
 
-    count = 0
-    for art in artifacts:
-        try:
-            shutil.copy2(str(art), str(archive_dir / art.name))
-            count += 1
-        except OSError as e:
-            print_warning(f"Could not archive {art.name}: {e}")
-
+    zip_path = archive_root / f"{safe}.zip"
     try:
-        rel = archive_dir.relative_to(project_dir)
-    except ValueError:
-        rel = archive_dir
-    print_success(f"Archived {count} artifact(s) -> {rel}")
-    return archive_dir
+        with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for art in artifacts:
+                zf.write(str(art), art.name)
+    except OSError as e:
+        print_warning(f"Could not write archive {zip_path.name}: {e}")
+        return None
+
+    size_mb = zip_path.stat().st_size / (1024 * 1024)
+    print_success(f"Archived {len(artifacts)} artifact(s) -> {zip_path} ({size_mb:.1f} MB)")
+    return zip_path
 
 
 def list_build_artifacts(project_dir):
