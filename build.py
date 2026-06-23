@@ -1007,7 +1007,12 @@ Examples:
         action="store_true",
         help="Disable colored output"
     )
-    
+    parser.add_argument(
+        "--no-archive",
+        action="store_true",
+        help="Skip copying this build's artifacts to build-archive/<semver>/ (archiving is on by default)"
+    )
+
     args = parser.parse_args()
     
     # Disable colors if requested or on Windows (unless ANSICON is present)
@@ -1107,7 +1112,8 @@ Examples:
         print_info("Flash command: esptool.py --port <PORT> -b 460800 write_flash 0x0 " + str(merged_file))
     
     # Archive this build (unique per semver+githash) before listing
-    archive_build_artifacts(project_dir, semver)
+    if not args.no_archive:
+        archive_build_artifacts(project_dir, semver)
 
     # List build artifacts
     list_build_artifacts(project_dir)
