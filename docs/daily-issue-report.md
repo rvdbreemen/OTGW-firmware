@@ -1,7 +1,7 @@
-# Daily Issue Report — 2026-06-22
+# Daily Issue Report — 2026-06-23
 
-**Generated:** 2026-06-22T07:10:00Z
-**GitHub window:** since 2026-06-21T00:00:00Z
+**Generated:** 2026-06-23T00:00:00Z
+**GitHub window:** since 2026-06-22T00:00:00Z
 **Tweakers window:** N/A (feed blocked by egress policy)
 **Discord window:** N/A (MCP server not available in this environment)
 
@@ -9,7 +9,7 @@
 
 No new issues in the last 24 hours.
 
-- **GitHub**: 0 new or updated open issues since 2026-06-21T00:00:00Z. (Most recently updated open issue was #656 on 2026-06-05.)
+- **GitHub**: 0 new or updated open issues since 2026-06-22T00:00:00Z. (Most recently updated open issue was #656 on 2026-06-05.)
 - **Tweakers**: Feed unavailable — `gathering.tweakers.net` blocked by egress policy in this execution environment.
 - **Discord**: MCP server not configured in this execution environment.
 
@@ -29,16 +29,33 @@ No new issues in the last 24 hours.
 
 ## Open Issues Reference (all 4 open, for context)
 
-| # | Title | Author | Labels | Last updated | Classification |
-|---|-------|--------|--------|-------------|----------------|
-| [#656](https://github.com/rvdbreemen/OTGW-firmware/issues/656) | Proper way to update | sanderlv | — | 2026-06-05 | Question |
-| [#557](https://github.com/rvdbreemen/OTGW-firmware/issues/557) | Settings / Run Boot Command and PIC missing | dwd1 | bug, question | 2026-05-06 | Bug / Question |
-| [#154](https://github.com/rvdbreemen/OTGW-firmware/issues/154) | [Request] Suggestions to improve security | 0crap | enhancement | 2026-05-09 | Feature request |
-| [#10](https://github.com/rvdbreemen/OTGW-firmware/issues/10) | Human readable ASF, RBP-flags, TSP, FHB-values… | STemplar | enhancement | 2022-10-09 | Feature request |
+| # | Title | Reporter | Labels | Last Updated |
+|---|-------|----------|--------|--------------|
+| [#656](https://github.com/rvdbreemen/OTGW-firmware/issues/656) | Proper way to update | sanderlv | — | 2026-06-05 |
+| [#557](https://github.com/rvdbreemen/OTGW-firmware/issues/557) | Settings / Run Boot Command and PIC missing | dwd1 | bug, question | 2026-05-06 |
+| [#154](https://github.com/rvdbreemen/OTGW-firmware/issues/154) | [Request] Suggestions to improve security | 0crap | enhancement | 2026-05-09 |
+| [#10](https://github.com/rvdbreemen/OTGW-firmware/issues/10) | Human readable ASF, RBP-flags, TSP, FHB-values … | STemplar | enhancement, good first issue | 2022-10-09 |
 
----
+### Issue #656 — "Proper way to update" (question)
+- **Reporter:** sanderlv
+- **Classification:** Question
+- **Summary:** User asks how to update from an older version to 1.6.1 and finds no clear guidance in the web interface.
+- **Status:** Open, no response yet.
 
-## Timestamps Updated
+### Issue #557 — "Settings / Run Boot Command and PIC missing" (bug/question)
+- **Reporter:** dwd1
+- **Classification:** Bug report / question
+- **Summary:** User flashed 1.4.1 firmware on a new Wemos D1 Mini Pro but the "Run Boot Command" checkbox and Boot Command field are absent, and `picavailable: false`. Another identical board shows these settings. Possible hardware or flash issue.
+- **Status:** Open, 2 comments.
 
-- GitHub last check: 2026-06-22T07:10:00Z
-- Tweakers last check: 2026-06-22T07:10:00Z (timestamp advanced; feed still blocked)
+### Issue #154 — "[Request] Suggestions to improve security" (feature request)
+- **Reporter:** 0crap
+- **Classification:** Feature request
+- **Summary:** Requests security improvements: AP-mode reset, GUI auth (username/password), HTTPS option, ability to disable Telnet/OTmonitor. MQTT config shown as reference UX.
+- **Status:** Open, 7 comments.
+
+### Issue #10 — "Human readable ASF, RBP-flags, TSP, FHB-values …" (feature request)
+- **Reporter:** STemplar
+- **Classification:** Feature request
+- **Summary:** Request for JSON-based lookup table to map OpenTherm TSP/fault/OEM-diagnostic values to human-readable descriptions (Remeha fault codes, Pxx parameter codes, etc.).
+- **Status:** Open, 8 comments.
