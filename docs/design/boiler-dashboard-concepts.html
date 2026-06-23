@@ -338,9 +338,14 @@
     color:var(--accent);font-weight:700}
   .rail-item .cnt{margin-left:auto;font-size:.68rem;color:var(--muted);background:var(--panel-2);
     border-radius:9px;padding:2px 7px}
-  .set-cols{columns:2;column-gap:16px}
+  .set-cols{min-width:0}
+  .set-cat-title{font-size:1.08rem;font-weight:700;display:flex;align-items:center;gap:8px;margin:2px 2px 4px}
+  .cat-desc{font-size:.8rem;color:var(--muted);margin:0 2px 14px;max-width:70ch}
+  .set-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:16px;align-items:start}
+  .sfield{display:inline-flex;align-items:center;gap:6px}
+  .sunit{font-size:.74rem;color:var(--muted);min-width:1.5em}
   .set-group{break-inside:avoid;background:var(--panel);border:1px solid var(--border);
-    border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin:0 0 16px}
+    border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin:0}
   .set-group h3{margin:0 0 4px;font-size:.95rem;display:flex;align-items:center;gap:8px}
   .set-group .gdesc{font-size:.76rem;color:var(--muted);margin:0 0 10px}
   .badge-reboot{font-size:.62rem;font-weight:700;color:var(--zone-warn);
@@ -375,7 +380,7 @@
     pointer-events:none;z-index:9}
   .toast.show{opacity:1}
   @media(max-width:899px){
-    .set-cols{columns:1}
+    .set-cards{grid-template-columns:1fr}
     .set-layout{grid-template-columns:1fr}
     .set-rail{position:static;flex-direction:row;overflow-x:auto;gap:6px}
     .rail-item{white-space:nowrap;padding:9px 13px}
@@ -1474,142 +1479,404 @@ function renderMonitor(){
 }
 
 /* ---------- SETTINGS page ---------- */
-var SET_GROUPS=[
-  {id:'system', icon:'🖥', title:'System', desc:'Identity and device behaviour.',
-   fields:[
-     {key:'hostname',label:'Hostname',hint:'mDNS name on your network',type:'t',value:'OTGW'},
-     {key:'LEDblink',label:'Blink LED on OT traffic',type:'b',value:true},
-     {key:'LegacyPort25238Enabled',label:'Legacy TCP port 25238',hint:'For old OTmonitor clients',type:'b',value:false},
-     {key:'nightlyreboot',label:'Nightly reboot',hint:'Restart every night at 04:00',type:'b',value:false}
-   ]},
-  {id:'network', icon:'📶', title:'Network / Wi-Fi', reboot:true, desc:'Address configuration. Changes apply after reboot.',
-   fields:[
+var SAT_GROUPS = [
+  {
+    id: 'sat-grp-core',
+    title: 'Core Control',
+    fields: [
+      { key: 'satenabled',     label: 'SAT Enabled',           type: 'b' },
+      { key: 'satsystem',      label: 'Heating System',        type: 'select',
+        options: [[0,'Gas / Radiators'],[1,'Heat Pump'],[2,'Hybrid'],[3,'Underfloor']] },
+      { key: 'satmanufacturer',label: 'Manufacturer',          type: 'select',
+        options: [[0,'Auto-detect'],[1,'Atag'],[2,'Baxi'],[3,'Brotge'],[4,'De Dietrich'],[5,'Ferroli'],[6,'Geminox'],[7,'Ideal'],[8,'Immergas'],[9,'Intergas'],[10,'Itho'],[11,'Nefit'],[12,'Radiant'],[13,'Remeha'],[14,'Sime'],[15,'Vaillant'],[16,'Viessmann'],[17,'Worcester Bosch'],[18,'Other']] },
+      { key: 'satcoefficient', label: 'Heating Curve Slope',    type: 'f', min: 0.1, max: 5.0, step: 0.1 },
+      { key: 'satdeadband',    label: 'Deadband',              type: 'f', unit: '\u00B0C', min: 0.05, max: 2.0, step: 0.05 },
+      { key: 'satinterval',    label: 'Control Interval',      type: 'i', unit: 's', min: 30, max: 600, step: 10 },
+      { key: 'satheatingmode', label: 'Heating Mode',          type: 'select',
+        options: [[0,'Comfort'],[1,'Eco']] },
+      { key: 'sattargettemp',  label: 'Target Temperature',    type: 'f', unit: '\u00B0C', min: 5.0, max: 30.0, step: 0.5 },
+      { key: 'sattempstep',    label: 'Temp Adjust Step',      type: 'f', unit: '\u00B0C', min: 0.1, max: 1.0, step: 0.1 }
+    ]
+  },
+  {
+    id: 'sat-grp-pid',
+    title: 'PID Tuning',
+    fields: [
+      { key: 'satpwmautoswitch',  label: 'Auto-Switch PWM/Continuous', type: 'b' },
+      { key: 'satautogains',      label: 'Auto-Gains Multiplier',      type: 'f', min: 0.1, max: 10.0, step: 0.1 },
+      { key: 'satovershootmargin',label: 'Overshoot Margin',   type: 'f', unit: '\u00B0C', min: 0.5, max: 5.0, step: 0.1 }
+    ]
+  },
+  {
+    id: 'sat-grp-pwm',
+    title: 'PWM',
+    fields: [
+      { key: 'satforcepwm',       label: 'Force PWM',          type: 'b' },
+      { key: 'satcyclesperhour',  label: 'Cycles per Hour',    type: 'i', min: 2, max: 6, step: 1 },
+      { key: 'satmaxmodulation',  label: 'Max Rel. Modulation',type: 'i', unit: '%', min: 0, max: 100, step: 1 }
+    ]
+  },
+  {
+    id: 'sat-grp-tempsrc',
+    title: 'Temperature Sources',
+    fields: [
+      { key: 'satexternaltemp',   label: 'Use External Temp',  type: 'b' },
+      { key: 'satsensormaxage',   label: 'Sensor Max Age',     type: 'i', unit: 's', min: 60, max: 86400, step: 60 },
+      { key: 'satbleenable',      label: 'BLE Enable',         type: 'b' },
+      { key: 'satblefailover',    label: 'BLE Failover',       type: 'b' },
+      // TASK-508: legacy field. Managed via the BLE Sensors panel
+      // above (auto-discovery + selection). Readonly to avoid
+      // duplicate editing.
+      { key: 'satblemac',         label: 'BLE MAC Address',    type: 's', maxlen: 18, size: 20, readonly: true },
+      { key: 'satbleinterval',    label: 'BLE Interval',       type: 'i', unit: 's', min: 10, max: 300, step: 5 }
+    ]
+  },
+  {
+    id: 'sat-grp-presets',
+    title: 'Presets',
+    fields: [
+      { key: 'satpresetcomfort',  label: 'Comfort',            type: 'f', unit: '\u00B0C', min: 15.0, max: 28.0, step: 0.5 },
+      { key: 'satpreseteco',      label: 'Eco',                type: 'f', unit: '\u00B0C', min: 10.0, max: 22.0, step: 0.5 },
+      { key: 'satpresetaway',     label: 'Away',               type: 'f', unit: '\u00B0C', min: 5.0,  max: 18.0, step: 0.5 },
+      { key: 'satpresetsleep',    label: 'Sleep',              type: 'f', unit: '\u00B0C', min: 5.0,  max: 25.0, step: 0.5 },
+      { key: 'satpresetactivity', label: 'Activity',           type: 'f', unit: '\u00B0C', min: 5.0,  max: 20.0, step: 0.5 },
+      { key: 'satpresethome',     label: 'Home',               type: 'f', unit: '\u00B0C', min: 10.0, max: 25.0, step: 0.5 }
+    ]
+  },
+  {
+    id: 'sat-grp-dhw',
+    title: 'DHW (Domestic Hot Water)',
+    fields: [
+      { key: 'satdhwenabled',     label: 'DHW Enabled',        type: 'b' },
+      { key: 'satdhwsetpoint',    label: 'DHW Setpoint',       type: 'f', unit: '\u00B0C', min: 0.0, max: 60.0, step: 0.5 }
+    ]
+  },
+  {
+    id: 'sat-grp-pressure',
+    title: 'Pressure',
+    fields: [
+      { key: 'satminpressure',    label: 'Min Pressure',       type: 'f', unit: 'bar', min: 0.0, max: 3.0, step: 0.1 },
+      { key: 'satmaxpressure',    label: 'Max Pressure',       type: 'f', unit: 'bar', min: 1.0, max: 4.0, step: 0.1 },
+      { key: 'satmaxpressdrop',   label: 'Max Pressure Drop',  type: 'f', unit: 'bar', min: 0.05, max: 2.0, step: 0.05 }
+    ]
+  },
+  {
+    id: 'sat-grp-smart',
+    title: 'Smart Features',
+    fields: [
+      { key: 'satsolargain',       label: 'Solar Gain Enable',      type: 'b' },
+      { key: 'satsolarminrise',    label: 'Solar Min Rise Rate',    type: 'f', unit: '\u00B0C/hr', min: 0.1, max: 5.0, step: 0.1 },
+      { key: 'satsolaroffset',     label: 'Solar Setpoint Offset',  type: 'f', unit: '\u00B0C', min: 0.5, max: 10.0, step: 0.5 },
+      { key: 'satsolarminelev',    label: 'Solar Min Elevation',    type: 'f', unit: '\u00B0', min: -10.0, max: 45.0, step: 1.0 },
+      { key: 'satsolarfreezeint',  label: 'Solar Freeze Integral',  type: 'b' },
+      { key: 'satsummersimmer',    label: 'Summer Simmer Enable',   type: 'b' },
+      { key: 'satsummerthreshold', label: 'Summer Threshold',       type: 'f', unit: '\u00B0C', min: 5.0, max: 35.0, step: 0.5 },
+      { key: 'satsummerminhours',  label: 'Summer Min Hours',       type: 'i', unit: 'h', min: 1, max: 48, step: 1 },
+      { key: 'satcomfortadjust',   label: 'Thermal Comfort Enable', type: 'b' },
+      { key: 'satcomforthumidity', label: 'Comfort Humidity',       type: 'f', unit: '%', min: 10.0, max: 90.0, step: 1.0 },
+      { key: 'satcomfortmaxoffset',label: 'Comfort Max Offset',     type: 'f', unit: '\u00B0C', min: 0.0, max: 3.0, step: 0.1 },
+      { key: 'satmultiarea',       label: 'Multi-Area Enable',      type: 'b' },
+      { key: 'satmultiareacount',  label: 'Multi-Area Count',       type: 'i', min: 0, max: 4, step: 1 },
+      { key: 'satareaweight0',     label: 'Area 0 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satareaweight1',     label: 'Area 1 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satareaweight2',     label: 'Area 2 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satareaweight3',     label: 'Area 3 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satthermalcoeff',    label: 'Thermal Coefficient',    type: 'f', min: 0.005, max: 0.3, step: 0.005 }
+    ]
+  },
+  {
+    id: 'sat-grp-safety',
+    title: 'Safety',
+    fields: [
+      { key: 'satwindowdetect',  label: 'Window Detection',       type: 'b' },
+      { key: 'satwindowminsec',  label: 'Window Min Open Time',   type: 'i', unit: 's', min: 10, max: 600, step: 10 },
+      { key: 'satpushsetpoint',  label: 'Push Setpoint',          type: 'b' }
+    ]
+  },
+  {
+    id: 'sat-grp-energy',
+    title: 'Energy',
+    fields: [
+      { key: 'satboilercapacity', label: 'Boiler Capacity', type: 'f', unit: 'kW', min: 1.0, max: 100.0, step: 0.5 }
+    ]
+  },
+  {
+    // TASK-640: PV-surplus opportunistic setpoint boost.
+    // Disabled by default; HA-side automation publishes pv_surplus_w.
+    id: 'sat-grp-pvboost',
+    title: 'PV Surplus Boost',
+    fields: [
+      { key: 'satpvboostenabled',        label: 'PV Boost Enable',     type: 'b' },
+      { key: 'satpvboostthresholdw',     label: 'Surplus Threshold',   type: 'i', unit: 'W',   min: 100,  max: 10000, step: 100 },
+      { key: 'satpvboostholds',          label: 'Hold Time',           type: 'i', unit: 's',   min: 30,   max: 600,   step: 10  },
+      { key: 'satpvboostdeltac',         label: 'Boost Delta',         type: 'f', unit: '°C', min: 0.5, max: 5.0, step: 0.1 },
+      { key: 'satpvboostmaxindoorc',     label: 'Max Indoor Ceiling',  type: 'f', unit: '°C', min: 18.0, max: 28.0, step: 0.5 },
+      { key: 'satpvboostmaxdurationmin', label: 'Max Boost Duration',  type: 'i', unit: 'min', min: 30,   max: 1440,  step: 10  }
+    ]
+  },
+  {
+    id: 'sat-grp-weather',
+    title: 'Weather',
+    fields: [
+      { key: 'satweatherenable',   label: 'Weather Enable',         type: 'b' },
+      { key: 'satweatherlat',      label: 'Latitude',               type: 'f', min: -90.0, max: 90.0, step: 0.0001 },
+      { key: 'satweatherlon',      label: 'Longitude',              type: 'f', min: -180.0, max: 180.0, step: 0.0001 },
+      // TASK-511: hard floor at 900 s (15 min) per OWM free-tier rate-limit (1000 calls/day).
+      { key: 'satweatherinterval', label: 'Fetch Interval',         type: 'i', unit: 's', min: 900, max: 3600, step: 60 },
+      { key: 'satweatherapikey',   label: 'OWM API Key',            type: 's', maxlen: 64, size: 40, hidden: true }
+    ]
+  },
+  {
+    id: 'sat-grp-sync',
+    title: 'Sync',
+    fields: [
+      { key: 'satpresetsync',       label: 'Preset Sync Enable', type: 'b' },
+      { key: 'satpresetsynctopic',  label: 'Preset Sync Topic',  type: 's', maxlen: 64, size: 40 }
+    ]
+  },
+  {
+    id: 'sat-grp-advanced',
+    title: 'Advanced',
+    fields: [
+      { key: 'satsimulation',    label: 'Simulation Mode',       type: 'b' },
+      { key: 'satsimheatrate',   label: 'Sim Heat Rate',         type: 'f', unit: '\u00B0C/min', min: 0.01, max: 5.0, step: 0.01 },
+      { key: 'satsimcoolrate',   label: 'Sim Cool Rate',         type: 'f', unit: '\u00B0C/min', min: 0.01, max: 5.0, step: 0.01 },
+      { key: 'satautotune',      label: 'Auto-Tune',             type: 'b' },
+      { key: 'satautotunerate',  label: 'Auto-Tune Rate',        type: 'f', min: 0.005, max: 0.1, step: 0.005 },
+      { key: 'saterrormon',      label: 'Error Monitoring',      type: 'b' },
+      { key: 'satflameoffset',   label: 'Flame Off Offset',      type: 'f', unit: '\u00B0C', min: 0.0, max: 5.0, step: 0.1 },
+      { key: 'satflowoffset',    label: 'Flow Offset',           type: 'f', unit: '\u00B0C', min: 0.5, max: 10.0, step: 0.1 },
+      { key: 'satmodsupoffset',  label: 'Modulation Suppression Offset', type: 'f', unit: '%', min: 0.0, max: 5.0, step: 0.1 },
+      { key: 'satmodsupdelay',   label: 'Modulation Suppression Delay',  type: 'f', unit: 's', min: 0.0, max: 120.0, step: 1.0 },
+      { key: 'satvalveoffset',   label: 'Valve Position Offset',         type: 'f', min: -1.0, max: 1.0, step: 0.1 }
+    ]
+  }
+];
+
+/* Settings model — mirrors the real dev (2.0.0) settings. Category -> groups -> fields.
+   field types: b=toggle, select(options [[v,label]]), f/i=number, s/t=text, p=password. */
+var SET_CATS=[
+ {id:'system',icon:'🖥',title:'System',desc:'Device identity and access.',groups:[{fields:[
+   {key:'hostname',label:'Hostname',type:'t',value:'OTGW',hint:'mDNS name on your network'},
+   {key:'httppasswd',label:'Admin password',type:'p',value:'••••••••',hint:'Protects Settings/Advanced'},
+   {key:'boardmode',label:'Board mode',type:'select',value:0,options:[[0,'Auto-detect'],[1,'NodoShop ESP8266'],[2,'OTGW32 (ESP32)'],[3,'LOLIN S3 + Classic']]},
+   {key:'DeviceManufacturer',label:'Device manufacturer',type:'t',value:'NodoShop'},
+   {key:'DeviceModel',label:'Device model',type:'t',value:'OTGW'}
+ ]}]},
+ {id:'network',icon:'📶',title:'Network',reboot:true,desc:'IP configuration. Applies after reboot.',groups:[
+   {sub:'Wi-Fi',fields:[
      {key:'usedhcp',label:'Use DHCP (automatic IP)',type:'b',value:true},
-     {key:'wifistaticip',label:'Static IP',type:'t',value:'192.168.1.50'},
-     {key:'wifisubnet',label:'Subnet mask',type:'t',value:'255.255.255.0'},
-     {key:'wifigateway',label:'Gateway',type:'t',value:'192.168.1.1'},
-     {key:'wifidns1',label:'DNS 1',type:'t',value:'192.168.1.1'},
-     {key:'wifidns2',label:'DNS 2 (optional)',type:'t',value:''}
+     {key:'WifiStaticIP',label:'Static IP',type:'t',value:'192.168.1.50'},
+     {key:'WifiSubnet',label:'Subnet mask',type:'t',value:'255.255.255.0'},
+     {key:'WifiGateway',label:'Gateway',type:'t',value:'192.168.1.1'},
+     {key:'WifiDns1',label:'DNS 1',type:'t',value:'192.168.1.1'},
+     {key:'WifiDns2',label:'DNS 2 (optional)',type:'t',value:''}
    ]},
-  {id:'mqtt', icon:'📡', title:'MQTT', desc:'Broker connection and Home Assistant discovery.',
-   fields:[
+   {sub:'Ethernet (ESP32 / OTGW32)',fields:[
+     {key:'ETHstaticip',label:'Use static IP',type:'b',value:false},
+     {key:'ETHipaddress',label:'IP address',type:'t',value:''},
+     {key:'ETHsubnet',label:'Subnet mask',type:'t',value:''},
+     {key:'ETHgateway',label:'Gateway',type:'t',value:''},
+     {key:'ETHdns',label:'DNS',type:'t',value:''}
+   ]}
+ ]},
+ {id:'mqtt',icon:'📡',title:'MQTT',desc:'Broker connection and Home Assistant discovery.',groups:[
+   {sub:'Connection',fields:[
      {key:'MQTTenable',label:'Enable MQTT',type:'b',value:true},
      {key:'MQTTbroker',label:'Broker',type:'t',value:'192.168.1.10'},
-     {key:'MQTTbrokerPort',label:'Port',type:'n',value:1883},
+     {key:'MQTTbrokerPort',label:'Port',type:'i',value:1883,min:1,max:65535},
      {key:'MQTTuser',label:'Username',type:'t',value:'otgw'},
      {key:'MQTTpasswd',label:'Password',type:'p',value:'••••••••'},
      {key:'MQTTtoptopic',label:'Top topic',type:'t',value:'OTGW'},
+     {key:'MQTTuniqueid',label:'Unique id',type:'t',value:'otgw-a1b2c3'}
+   ]},
+   {sub:'Home Assistant & publishing',fields:[
      {key:'MQTThaprefix',label:'HA discovery prefix',type:'t',value:'homeassistant'},
-     {key:'MQTTdiscoveryAutoVerify',label:'Hourly discovery verify',hint:'Re-publish missed entities',type:'b',value:true},
-     {key:'MQTTonChangePublishing',label:'Publish on change',type:'b',value:true}
-   ]},
-  {id:'ntp', icon:'🕐', title:'Time / NTP', desc:'Clock sync and thermostat time.',
-   fields:[
-     {key:'NTPenable',label:'Enable NTP',type:'b',value:true},
-     {key:'NTPtimezone',label:'Timezone',type:'sel',value:'Europe/Amsterdam',
-      options:['Europe/Amsterdam','Europe/London','Europe/Berlin','UTC']},
-     {key:'NTPhostname',label:'NTP server',type:'t',value:'pool.ntp.org'},
-     {key:'NTPsendtime',label:'Send time to thermostat',hint:'OT msg 21/22 time sync',type:'b',value:true}
-   ]},
-  {id:'otgw', icon:'🔥', title:'OpenTherm Gateway', desc:'PIC behaviour at boot.',
-   fields:[
-     {key:'OTGWcommandenable',label:'Run commands at boot',type:'b',value:true},
-     {key:'OTGWcommands',label:'Boot commands',hint:'Semicolon separated, e.g. PS=0;GW=1',type:'t',value:'GW=1'}
-   ]},
-  {id:'sensors', icon:'🌡', title:'GPIO Sensors', desc:'Dallas 1-Wire temperature sensors.',
-   fields:[
-     {key:'GPIOSENSORSenabled',label:'Enable sensors',type:'b',value:true},
-     {key:'GPIOSENSORSpin',label:'GPIO pin',type:'n',value:13},
-     {key:'GPIOSENSORSinterval',label:'Poll interval (s)',type:'n',value:30},
-     {key:'GPIOSENSORSlegacyformat',label:'Legacy topic format',type:'b',value:false}
-   ]},
-  {id:'outputs', icon:'⚡', title:'GPIO Outputs', desc:'Drive a relay from an OT status bit.',
-   fields:[
-     {key:'GPIOOUTPUTSenabled',label:'Enable output',type:'b',value:false},
-     {key:'GPIOOUTPUTSpin',label:'GPIO pin',type:'n',value:16},
-     {key:'GPIOOUTPUTStriggerBit',label:'Trigger',type:'sel',value:'Flame',
-      options:['Flame','CH active','DHW active','Fault']}
-   ]},
-  {id:'s0', icon:'🔌', title:'S0 Pulse Counter', desc:'Energy meter pulse input.',
-   fields:[
-     {key:'S0COUNTERenabled',label:'Enable S0 counter',type:'b',value:false},
-     {key:'S0COUNTERpin',label:'GPIO pin',type:'n',value:12},
-     {key:'S0COUNTERpulsekw',label:'Pulses per kWh',type:'n',value:2000},
-     {key:'S0COUNTERinterval',label:'Report interval (s)',type:'n',value:60}
-   ]},
-  {id:'webhook', icon:'🔗', title:'Webhook', desc:'Push events to an external service.',
-   fields:[
-     {key:'WebhookEnabled',label:'Enable webhook',type:'b',value:false},
-     {key:'WebhookUrl',label:'URL',type:'t',value:'https://example.local/hook'},
-     {key:'WebhookContentType',label:'Content type',type:'sel',value:'application/json',
-      options:['application/json','text/plain','application/x-www-form-urlencoded']}
+     {key:'MQTTdiscoveryAutoVerify',label:'Hourly discovery verify',type:'b',value:true},
+     {key:'MQTTharebootdetection',label:'HA reboot detection',type:'b',value:true},
+     {key:'MQTTonChangePublishing',label:'Publish on change',type:'b',value:true},
+     {key:'MQTTinterval',label:'Publish interval',type:'i',unit:'s',value:30,min:1,max:600},
+     {key:'MQTTOTmessage',label:'Publish raw OT messages',type:'b',value:false},
+     {key:'MQTTseparatesources',label:'Separate thermostat/boiler topics',type:'b',value:false},
+     {key:'MQTTuseLegacyOtTopics',label:'Legacy OT topic layout',type:'b',value:false}
    ]}
+ ]},
+ {id:'ntp',icon:'🕐',title:'Time / NTP',desc:'Clock sync and time-to-thermostat.',groups:[{fields:[
+   {key:'NTPenable',label:'Enable NTP',type:'b',value:true},
+   {key:'NTPtimezone',label:'Timezone',type:'select',value:'Europe/Amsterdam',options:['Europe/Amsterdam','Europe/London','Europe/Berlin','UTC','America/New_York']},
+   {key:'NTPhostname',label:'NTP server',type:'t',value:'pool.ntp.org'},
+   {key:'NTPsendtime',label:'Send time to thermostat',type:'b',value:true}
+ ]}]},
+ {id:'otgw',icon:'🔥',title:'OpenTherm Gateway',desc:'PIC behaviour and legacy access.',groups:[{fields:[
+   {key:'OTGWcommandenable',label:'Run commands at boot',type:'b',value:true},
+   {key:'OTGWcommands',label:'Boot commands',type:'t',value:'GW=1',hint:'Semicolon separated, e.g. PS=0;GW=1'},
+   {key:'LegacyPort25238Enabled',label:'Legacy TCP port 25238',type:'b',value:false}
+ ]}]},
+ {id:'otdirect',icon:'🔌',title:'OT-Direct',desc:'Direct OpenTherm control without a thermostat (ESP32 / OTGW32).',groups:[
+   {sub:'Mode & control',fields:[
+     {key:'OTDmode',label:'OT-Direct mode',type:'select',value:0,options:[[0,'Off'],[1,'On/Off'],[2,'PID'],[3,'Weather-comp']]},
+     {key:'OTDautodetect',label:'Auto-detect',type:'b',value:true},
+     {key:'OTDenableslave',label:'Enable slave (boiler)',type:'b',value:true},
+     {key:'OTDchmode',label:'CH enabled',type:'b',value:true},
+     {key:'OTDsummermode',label:'Summer mode',type:'b',value:false},
+     {key:'OTDroomsetpoint',label:'Room setpoint',type:'f',unit:'°C',value:20.0,min:5,max:30,step:0.5},
+     {key:'OTDroomcomp',label:'Room compensation',type:'b',value:false},
+     {key:'OTDflowtemp',label:'Flow setpoint',type:'f',unit:'°C',value:60.0,min:10,max:90,step:1},
+     {key:'OTDflowmax',label:'Max flow temperature',type:'f',unit:'°C',value:75.0,min:20,max:90,step:1}
+   ]},
+   {sub:'PID & curve',fields:[
+     {key:'OTDkp',label:'Kp (proportional)',type:'f',value:2.0,min:0,max:50,step:0.1},
+     {key:'OTDki',label:'Ki (integral)',type:'f',value:0.1,min:0,max:10,step:0.01},
+     {key:'OTDkboost',label:'K boost',type:'f',value:1.0,min:0,max:10,step:0.1},
+     {key:'OTDgradient',label:'Heat-curve gradient',type:'f',value:1.2,min:0.1,max:5,step:0.1},
+     {key:'OTDexponent',label:'Curve exponent',type:'f',value:1.0,min:0.5,max:2,step:0.05},
+     {key:'OTDoffset',label:'Curve offset',type:'f',unit:'°C',value:0.0,min:-10,max:10,step:0.5},
+     {key:'OTDhysteresisenable',label:'Hysteresis enabled',type:'b',value:true},
+     {key:'OTDhysteresis',label:'Hysteresis',type:'f',unit:'°C',value:2.0,min:0.1,max:10,step:0.1},
+     {key:'OTDmsginterval',label:'Message interval',type:'i',unit:'s',value:1,min:1,max:30}
+   ]},
+   {sub:'Bypass relay',fields:[
+     {key:'OTDhasbypassrelay',label:'Bypass relay fitted',type:'b',value:false},
+     {key:'OTDautobypass',label:'Auto bypass',type:'b',value:false},
+     {key:'OTDopenbypass',label:'Open bypass now',type:'b',value:false},
+     {key:'OTDfailsafe',label:'Fail-safe on error',type:'b',value:true}
+   ]},
+   {sub:'Ventilation (HRV)',fields:[
+     {key:'OTDventenable',label:'Ventilation enabled',type:'b',value:false},
+     {key:'OTDventsetpoint',label:'Ventilation setpoint',type:'f',unit:'%',value:30,min:0,max:100,step:5},
+     {key:'OTDfreeventenable',label:'Free ventilation',type:'b',value:false}
+   ]},
+   {sub:'Setback',fields:[
+     {key:'OTDsetbacktemp',label:'Setback temperature',type:'f',unit:'°C',value:16.0,min:5,max:25,step:0.5},
+     {key:'OTDsetbacktimeout',label:'Setback timeout',type:'i',unit:'min',value:60,min:0,max:1440,step:10}
+   ]}
+ ]},
+ {id:'sensors',icon:'🌡',title:'GPIO Sensors',desc:'Dallas 1-Wire temperature sensors.',groups:[{fields:[
+   {key:'GPIOSENSORSenabled',label:'Enable sensors',type:'b',value:true},
+   {key:'GPIOSENSORSpin',label:'GPIO pin',type:'i',value:13,min:0,max:39},
+   {key:'GPIOSENSORSinterval',label:'Poll interval',type:'i',unit:'s',value:30,min:5,max:600},
+   {key:'GPIOSENSORSlegacyformat',label:'Legacy topic format',type:'b',value:false}
+ ]}]},
+ {id:'outputs',icon:'⚡',title:'GPIO Outputs',desc:'Drive a relay from an OT status bit.',groups:[{fields:[
+   {key:'GPIOOUTPUTSenabled',label:'Enable output',type:'b',value:false},
+   {key:'GPIOOUTPUTSpin',label:'GPIO pin',type:'i',value:16,min:0,max:39},
+   {key:'GPIOOUTPUTStriggerBit',label:'Trigger on',type:'select',value:0,options:[[0,'Flame'],[1,'CH active'],[2,'DHW active'],[3,'Fault']]}
+ ]}]},
+ {id:'s0',icon:'🔢',title:'S0 Pulse Counter',desc:'Energy meter pulse input.',groups:[{fields:[
+   {key:'S0COUNTERenabled',label:'Enable S0 counter',type:'b',value:false},
+   {key:'S0COUNTERpin',label:'GPIO pin',type:'i',value:12,min:0,max:39},
+   {key:'S0COUNTERpulsekw',label:'Pulses per kWh',type:'i',value:2000,min:1,max:10000},
+   {key:'S0COUNTERinterval',label:'Report interval',type:'i',unit:'s',value:60,min:5,max:3600},
+   {key:'S0COUNTERdebouncetime',label:'Debounce time',type:'i',unit:'ms',value:30,min:0,max:1000}
+ ]}]},
+ {id:'webhook',icon:'🔗',title:'Webhook',desc:'Fire an HTTP call when a status bit flips.',groups:[{fields:[
+   {key:'WebhookEnabled',label:'Enable webhook',type:'b',value:false},
+   {key:'WebhookTriggerBit',label:'Trigger on',type:'select',value:0,options:[[0,'Flame'],[1,'CH active'],[2,'DHW active'],[3,'Fault']]},
+   {key:'WebhookURLon',label:'URL when ON',type:'t',value:'https://example.local/on'},
+   {key:'WebhookURLoff',label:'URL when OFF',type:'t',value:'https://example.local/off'},
+   {key:'WebhookContentType',label:'Content type',type:'select',value:'application/json',options:['application/json','text/plain','application/x-www-form-urlencoded']},
+   {key:'WebhookPayload',label:'Payload template',type:'t',value:'{"state":"%s"}'}
+ ]}]},
+ {id:'behavior',icon:'🎛',title:'Behavior',desc:'Indicators and maintenance.',groups:[{fields:[
+   {key:'LEDblink',label:'Blink LED on OT traffic',type:'b',value:true},
+   {key:'darktheme',label:'Dark theme by default',type:'b',value:false},
+   {key:'nightlyrestart',label:'Nightly restart',type:'b',value:false},
+   {key:'nightlyrestarthour',label:'Restart hour',type:'i',unit:'h',value:4,min:0,max:23}
+ ]}]},
+ {id:'ui',icon:'🖱',title:'User Interface',desc:'Remembered preferences for the log & graph views.',groups:[{fields:[
+   {key:'ui_autoscroll',label:'Log auto-scroll',type:'b',value:true},
+   {key:'ui_timestamps',label:'Show timestamps',type:'b',value:true},
+   {key:'ui_capture',label:'Large capture mode',type:'b',value:false},
+   {key:'ui_autodownloadlog',label:'Auto-download log',type:'b',value:false},
+   {key:'ui_autoexport',label:'Auto-export CSV',type:'b',value:false},
+   {key:'ui_autoscreenshot',label:'Auto-save graph PNG',type:'b',value:false},
+   {key:'ui_graphtimewindow',label:'Default graph window',type:'select',value:60,options:[[10,'10 min'],[30,'30 min'],[60,'1 hour'],[240,'4 hours'],[1440,'24 hours']]}
+ ]}]},
+ {id:'sat',icon:'🧠',title:'SAT — Smart Thermostat',desc:'Standalone Autonomous Thermostat: room-driven control, PID/PWM, presets, weather, solar & PV boost, safety. (ESP32 / OTGW32)',groups:SAT_GROUPS}
 ];
 var dirty={};
-function fieldControl(f){
-  var orig=(f.type==='b')?(f.value?'1':'0'):String(f.value);
-  if(f.type==='b')
-    return '<input type="checkbox" class="sw" data-key="'+f.key+'" data-orig="'+orig+'" '+(f.value?'checked':'')+'>';
-  if(f.type==='sel')
-    return '<select data-key="'+f.key+'" data-orig="'+orig+'">'+f.options.map(function(o){
-      return '<option'+(o===f.value?' selected':'')+'>'+o+'</option>';}).join('')+'</select>';
-  var t=f.type==='p'?'password':(f.type==='n'?'number':'text');
-  return '<input type="'+t+'" data-key="'+f.key+'" data-orig="'+orig+'" value="'+f.value+'">';
+function setDefault(f){
+  if(f.value!==undefined) return f.value;
+  if(f.type==='b') return false;
+  if(f.type==='select'){var o=f.options[0];return Array.isArray(o)?o[0]:o;}
+  if(f.type==='f'||f.type==='i'||f.type==='n') return (f.min!==undefined?f.min:0);
+  return '';
 }
+function optPairs(opts){return opts.map(function(o){return Array.isArray(o)?o:[o,o];});}
+function fieldControl(f){
+  var v=setDefault(f), ro=f.readonly?' disabled':'';
+  if(f.type==='b')
+    return '<input type="checkbox" class="sw" data-key="'+f.key+'" data-orig="'+(v?'1':'0')+'"'+(v?' checked':'')+ro+'>';
+  if(f.type==='select')
+    return '<select data-key="'+f.key+'" data-orig="'+v+'"'+ro+'>'+optPairs(f.options).map(function(o){
+      return '<option value="'+o[0]+'"'+(String(o[0])===String(v)?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>';
+  var t=(f.type==='p'||f.hidden)?'password':((f.type==='f'||f.type==='i'||f.type==='n')?'number':'text');
+  var ex=(f.min!==undefined?' min="'+f.min+'"':'')+(f.max!==undefined?' max="'+f.max+'"':'')+(f.step!==undefined?' step="'+f.step+'"':'');
+  return '<span class="sfield"><input type="'+t+'" data-key="'+f.key+'" data-orig="'+v+'" value="'+v+'"'+ex+ro+'>'+
+    (f.unit?'<span class="sunit">'+f.unit+'</span>':'')+'</span>';
+}
+function catFieldCount(c){return c.groups.reduce(function(a,g){return a+g.fields.length;},0);}
 function buildSettings(){
-  document.getElementById('setRail').innerHTML=SET_GROUPS.map(function(g){
-    return '<div class="rail-item" data-target="sg-'+g.id+'">'+g.icon+' '+g.title+
-           '<span class="cnt">'+g.fields.length+'</span></div>';
-  }).join('');
-  document.getElementById('setCols').innerHTML=SET_GROUPS.map(function(g){
-    return '<section class="set-group" id="sg-'+g.id+'"><h3>'+g.icon+' '+g.title+
-      (g.reboot?' <span class="badge-reboot">REBOOT</span>':'')+'</h3>'+
-      '<p class="gdesc">'+g.desc+'</p>'+
-      g.fields.map(function(f){
-        return '<div class="srow" data-search="'+(g.title+' '+f.label+' '+f.key).toLowerCase()+'">'+
-          '<span class="slbl">'+f.label+(f.hint?'<span class="shint">'+f.hint+'</span>':'')+'</span>'+
-          fieldControl(f)+'</div>';
-      }).join('')+'</section>';
-  }).join('');
+  var rail='',cols='';
+  SET_CATS.forEach(function(c){
+    rail+='<div class="rail-item" data-cat="'+c.id+'">'+c.icon+' '+c.title+'<span class="cnt">'+catFieldCount(c)+'</span></div>';
+    cols+='<div class="set-cat" id="cat-'+c.id+'"><div class="set-cat-title">'+c.icon+' '+c.title+
+      (c.reboot?' <span class="badge-reboot">REBOOT</span>':'')+'</div>'+
+      (c.desc?'<p class="cat-desc">'+c.desc+'</p>':'')+
+      '<div class="set-cards">'+c.groups.map(function(g){
+        return '<section class="set-group">'+(g.sub||g.title?'<h3>'+(g.sub||g.title)+'</h3>':'')+
+          g.fields.map(function(f){
+            return '<div class="srow" data-search="'+(c.title+' '+(g.sub||g.title||'')+' '+f.label+' '+f.key).toLowerCase()+'">'+
+              '<span class="slbl">'+f.label+(f.hint?'<span class="shint">'+f.hint+'</span>':'')+'</span>'+
+              fieldControl(f)+'</div>';
+          }).join('')+'</section>';
+      }).join('')+'</div></div>';
+  });
+  document.getElementById('setRail').innerHTML=rail;
+  document.getElementById('setCols').innerHTML=cols;
   document.querySelectorAll('.rail-item').forEach(function(r){
-    r.onclick=function(){
-      document.querySelectorAll('.rail-item').forEach(function(x){x.classList.remove('active');});
-      r.classList.add('active');
-      var t=document.getElementById(r.dataset.target);
-      if(t) t.scrollIntoView({behavior:'smooth',block:'start'});
-    };
+    r.onclick=function(){ document.getElementById('setSearch').value=''; showCat(r.dataset.cat); };
   });
   document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
-    inp.addEventListener('change',onSetChange);
-    inp.addEventListener('input',onSetChange);
+    inp.addEventListener('change',onSetChange); inp.addEventListener('input',onSetChange);
   });
   document.getElementById('btnSave').onclick=function(){
     document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
       inp.dataset.orig=(inp.type==='checkbox')?(inp.checked?'1':'0'):inp.value;
     });
     dirty={};updateSaveBar();
-    var t=document.getElementById('toast');
-    t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1800);
+    var t=document.getElementById('toast');t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1800);
   };
   document.getElementById('btnDiscard').onclick=function(){
     document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
-      if(inp.type==='checkbox') inp.checked=inp.dataset.orig==='1';
-      else inp.value=inp.dataset.orig;
+      if(inp.type==='checkbox') inp.checked=inp.dataset.orig==='1'; else inp.value=inp.dataset.orig;
       inp.closest('.srow').classList.remove('dirty');
     });
     dirty={};updateSaveBar();
   };
-  document.getElementById('setSearch').oninput=function(){
-    var q=this.value.trim().toLowerCase();
-    document.querySelectorAll('#setCols .srow').forEach(function(row){
-      row.style.display=(!q||row.dataset.search.indexOf(q)>=0)?'':'none';
-    });
-    document.querySelectorAll('#setCols .set-group').forEach(function(g){
+  document.getElementById('setSearch').oninput=function(){ applySettingsSearch(this.value); };
+  showCat(SET_CATS[0].id);
+}
+function showCat(id){
+  document.querySelectorAll('.rail-item').forEach(function(x){x.classList.toggle('active',x.dataset.cat===id);});
+  document.querySelectorAll('.set-cat').forEach(function(s){s.style.display=(s.id==='cat-'+id)?'':'none';});
+  document.querySelectorAll('#setCols .srow').forEach(function(r){r.style.display='';});
+  document.querySelectorAll('#setCols .set-group').forEach(function(g){g.style.display='';});
+}
+function applySettingsSearch(q){
+  q=(q||'').trim().toLowerCase();
+  if(!q){ var act=document.querySelector('.rail-item.active'); showCat(act?act.dataset.cat:SET_CATS[0].id); return; }
+  document.querySelectorAll('.set-cat').forEach(function(c){
+    var anyCat=false;
+    c.querySelectorAll('.srow').forEach(function(r){var m=r.dataset.search.indexOf(q)>=0;r.style.display=m?'':'none';if(m)anyCat=true;});
+    c.querySelectorAll('.set-group').forEach(function(g){
       var any=Array.prototype.some.call(g.querySelectorAll('.srow'),function(r){return r.style.display!=='none';});
       g.style.display=any?'':'none';
     });
-  };
+    c.style.display=anyCat?'':'none';
+  });
 }
+
 function onSetChange(e){
   var inp=e.target,k=inp.dataset.key;
   var now=(inp.type==='checkbox')?(inp.checked?'1':'0'):inp.value;
