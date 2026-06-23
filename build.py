@@ -30,6 +30,7 @@ import json
 import multiprocessing
 import os
 import platform
+import re
 import shutil
 import ssl
 import stat
@@ -998,6 +999,52 @@ def create_distribution_zip(project_dir, semver, target):
     except Exception as e:
         print_error(f"Failed to create distribution zip for {tcfg['name']}: {e}")
         return None
+
+
+def archive_build_artifacts(project_dir, semver):
+    """Copy every build artifact into a per-build archive keyed by semver+githash.
+
+    The semver already embeds the git short hash (e.g. 1.7.0-beta.4+84918da), so
+    each build lands in its own immutable folder under build-archive/. This keeps
+    the exact .elf for any shipped or bisect build so an ESP32 panic backtrace can
+    be decoded with addr2line long after build/ has been overwritten by a later
+    build. .bin (firmware/filesystem/merged) and .zip (flash bundles) are archived
+    alongside so a build is fully reproducible from its folder. Ported from the
+    otgw-1.x.x archive feature.
+    """
+    print_step("Archiving build")
+
+    build_dir = config.BUILD_DIR
+    if not build_dir.exists():
+        print_warning("Build directory not found, skipping archive")
+        return None
+
+    # Sanitize semver for use as a directory name (defensive; normally safe).
+    safe = re.sub(r'[\\/:*?"<>|]', '_', semver).strip() or "unknown"
+    archive_dir = config.ARCHIVE_DIR / safe
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    artifacts = (list(build_dir.glob("*.bin"))
+                 + list(build_dir.glob("*.elf"))
+                 + list(build_dir.glob("*.zip")))
+    if not artifacts:
+        print_warning("No artifacts to archive")
+        return None
+
+    count = 0
+    for art in artifacts:
+        try:
+            shutil.copy2(str(art), str(archive_dir / art.name))
+            count += 1
+        except OSError as e:
+            print_warning(f"Could not archive {art.name}: {e}")
+
+    try:
+        rel = archive_dir.relative_to(project_dir)
+    except ValueError:
+        rel = archive_dir
+    print_success(f"Archived {count} artifact(s) -> {rel}")
+    return archive_dir
 
 
 def _build_distribution_readme(target, tcfg, merged_full_name, upgrade_bin_name, semver):
@@ -2379,6 +2426,11 @@ Examples:
         metavar="PORT",
         help="After build, run esptool verify-flash against the given serial port"
     )
+    parser.add_argument(
+        "--no-archive",
+        action="store_true",
+        help="Skip copying this build's artifacts to build-archive/<semver>/ (archiving is on by default)"
+    )
 
     args = parser.parse_args()
     
@@ -2548,6 +2600,10 @@ Examples:
 
     # Stage flash helper scripts so they ship with release artifacts.
     copy_flash_scripts(project_dir)
+
+    # Archive this build (unique per semver+githash) before listing
+    if not args.no_archive:
+        archive_build_artifacts(project_dir, semver)
 
     # List build artifacts
     list_build_artifacts(project_dir)
