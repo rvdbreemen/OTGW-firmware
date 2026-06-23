@@ -1,9 +1,11 @@
 ---
 id: TASK-905
 title: 'fix(build): build.bat parse-time BASE_PYTHON expansion broke venv bootstrap'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-23 16:06'
+updated_date: '2026-06-23 16:09'
 labels: []
 dependencies: []
 ---
