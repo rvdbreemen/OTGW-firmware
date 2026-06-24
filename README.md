@@ -4,9 +4,24 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** Active development for the next 1.x release (v1.7.0-beta.34) happens here. The 1.7.0 beta cycle adds heap-fragmentation crash-proofing and a RAM / heap-headroom optimization pass (about 6.6 KB of static RAM reclaimed, the largest-contiguous-block floor under load restored to roughly the 1.3.5 level). For the latest stable release, see [v1.6.1](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.6.1).
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.0](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.0), which adds heap-fragmentation crash-proofing and a RAM / heap-headroom optimization pass (about 6.6 KB of static RAM reclaimed, the largest-contiguous-block floor under load restored to roughly the 1.3.5 level).
 
-## What's New in v1.6.1
+## What's New in v1.7.0
+
+v1.7.0 is a stability and headroom release for the 1.x (ESP8266) line.
+
+- **Heap-fragmentation crash-proofing**: random reboots under sustained load are fixed at the source. MQTT, WebSocket, and HTTP serving gate on the largest contiguous heap block and back off gracefully, the ESP8266 core's `streamFile` NULL-write fault is patched at build time (ADR-084), and the main loop is back on its field-proven `delay(1)` pacing.
+- **RAM / heap-headroom optimization pass**: the OpenTherm message-name table moved into flash plus about 25 verified buffer and integer-width trims. About 6.6 KB of static RAM reclaimed; largest-contiguous-block floor under load up from about 4.9 KB to about 11 KB. No feature behaviour changed.
+- **Active gateway overrides over MQTT and Web UI** (ADR-082): override state set on the PIC is now visible to Home Assistant and the dashboard.
+- **WiFi signal quality** (percentage and label) in the telnet welcome banner.
+- New diagnostic counters `mqtt_fragskips`, `ws_fragskips`, `http_fragskips` on telnet and in MQTT stats.
+- Fixes: MQTT broker ports above 32767 can be saved, S0 pulses-per-kWh above 65535 no longer wrap, friendly labels for the runtime WiFi rows on the Debug Information tab.
+
+Full release notes: [RELEASE_NOTES_1.7.0.md](RELEASE_NOTES_1.7.0.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
+
+## What was new in v1.6.1
 
 v1.6.1 is a focused follow-up to v1.6.0. It makes MQTT on-change publishing the default, redesigns the boiler-unsupported diagnostics panel, and lands a set of MQTT and Web UI reliability fixes.
 

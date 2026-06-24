@@ -347,7 +347,7 @@ When `settings.mqtt.bSeparateSources` is enabled, OpenTherm data is published to
 
 All three are sibling leaves. Each is a normal MQTT topic — the canonical has no children, which makes topic-browser UX (mosquitto_sub, MQTT Explorer) straightforward and removes the structural ambiguity that an earlier nested shape would create.
 
-There is no `_gateway` topic. Gateway override is observable by comparing `_thermostat` and `_boiler` — divergence means the gateway is intervening.
+There is no `_gateway` topic. Gateway override is observable by comparing `_thermostat` and `_boiler` — divergence means the gateway is intervening. The active override value is also surfaced directly on a dedicated `<label>/override` state topic (see "Active gateway override topics" below).
 
 #### Worldview semantics (ADR-069)
 
@@ -366,6 +366,18 @@ Each per-source topic shows what *that device* sees on the OpenTherm bus, regard
 | `…/value/<id>/TSet` (canonical) | `27.37` | Boiler-side worldview (= what reached the boiler) |
 
 Without override, all three publish the same value. `_thermostat` and `_boiler` always update independently regardless of override state.
+
+#### Active gateway override topics (ADR-082)
+
+The canonical/`_boiler` worldview deliberately drops the user-injected override value (the boiler-side reality is what the boiler actually did, which is `0` / Data-Invalid when it ignores the override). To keep the injected value observable, the firmware records each active override and publishes it on a dedicated retained topic:
+
+`{TopTopic}/value/{UniqueId}/{label}/override`
+
+- Payload is the override value as a plain ASCII decimal (f8.8, 2 decimals, e.g. `8.50`).
+- Published from the periodic (5-minute) path for every active override entry. An entry goes stale ~10 minutes after it was last seen and stops being republished.
+- Each active override also emits a Just-In-Time HA discovery sensor named `<label> Override` (`uniq_id` = `<nodeId>-<label>_override`), **except message ID 27** (`Toutside`): the existing "Outside temperature override" Number entity already surfaces that value (see Discovery, below), so a duplicate sensor is suppressed.
+
+A matching REST surface is available at `GET /api/v2/otgw/overrides`.
 
 #### Frame-to-topic routing reference
 
@@ -518,6 +530,7 @@ change as those tables grow, so only the stable pseudo-ID mapping is listed here
 | `binary_sensor` | OT IDs 0–253 | OpenTherm flag bits |
 | `climate` | ID 0 | Thermostat (CH) and DHW control |
 | `number` | ID 27 | Outside temperature override |
+| `sensor` (override) | active override IDs | `<label> Override`, one per active gateway override (ADR-082); ID 27 excluded (covered by the Number entity above) |
 | `sensor` (Dallas) | pseudo-ID 246 | Dallas temperature sensors (one per detected address) |
 | `sensor` (stats) | pseudo-ID 247 | Heap and discovery diagnostics |
 | `sensor` (fw info) | pseudo-ID 248 | Firmware version, hostname, reboot info |
@@ -525,6 +538,8 @@ change as those tables grow, so only the stable pseudo-ID mapping is listed here
 | `sensor` (PIC settings) | pseudo-ID 250 | PIC PR=-polled settings |
 | `button` | pseudo-ID 251 | Reset Gateway |
 | `select` | pseudo-ID 251 | GPIO A/B and LED A–F function selects |
+
+The `number` entity for ID 27 ("Outside temperature override") has its state topic (`stat_t`) pointed at `{base}/Toutside/override` (ADR-082), not the canonical `{base}/Toutside`. This is so the entity reflects the injected override value: the canonical `Toutside` shows boiler-side reality, which is `0` / Data-Invalid when the boiler ignores the override.
 
 All discovery configs — including the PIC pseudo-IDs 249/250/251 — are published
 **unconditionally** via the drip pipeline regardless of `isPICEnabled()`. The PIC
@@ -587,7 +602,7 @@ The base `{entity}` is also advertised in discovery alongside both source varian
 
 For non-source-templated MsgIDs the base entity continues to publish in both modes.
 
-There is no `{entity}_gateway` variant; gateway override is observable via divergence between the two source-variant topics.
+There is no `{entity}_gateway` variant; gateway override is observable via divergence between the two source-variant topics, or directly via the dedicated `<label> Override` sensors and `<label>/override` state topics (ADR-082, see "Active gateway override topics" above).
 
 #### Discovery topic shape (ADR-071)
 
@@ -675,7 +690,7 @@ Template placeholders:
 
 ## Heap diagnostic telemetry
 
-The firmware publishes heap-pressure and discovery counters as 17 individual retained topics under `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/*`. Each metric lives on its own topic (no JSON bundling) so consumers can subscribe to a single counter, expose it as a Home Assistant sensor without JSON path templating, or graph it directly in Grafana. These topics are announced via HA discovery so they appear automatically as diagnostic entities under the OTGW device card.
+The firmware publishes heap-pressure and discovery counters as 20 individual retained topics under `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/*`. Each metric lives on its own topic (no JSON bundling) so consumers can subscribe to a single counter, expose it as a Home Assistant sensor without JSON path templating, or graph it directly in Grafana. These topics are announced via HA discovery so they appear automatically as diagnostic entities under the OTGW device card.
 
 **Topic prefix**: `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/<metric>` (all retained)
 
@@ -689,6 +704,9 @@ The firmware publishes heap-pressure and discovery counters as 17 individual ret
 | ------------------- | ---- | ---- | ------- |
 | `ws_drops` | uint32 | session counter | WebSocket messages dropped due to heap pressure since boot. |
 | `mqtt_drops` | uint32 | session counter | MQTT messages dropped due to heap pressure since boot. |
+| `ws_fragskips` | uint32 | session counter | WebSocket sends skipped by the largest-contiguous-block (`maxBlock`) pre-flight gate (fragmentation guard) since boot. |
+| `mqtt_fragskips` | uint32 | session counter | MQTT publishes skipped by the `maxBlock` pre-flight gate since boot. |
+| `http_fragskips` | uint32 | session counter | HTTP `handleClient()` ticks skipped by the `maxBlock` gate (HTTP-load fragmentation guard) since boot. |
 | `enter_low` | uint32 | session counter | Transitions into the `HEAP_LOW` tier (from `HEALTHY`). |
 | `enter_warning` | uint32 | session counter | Transitions into the `HEAP_WARNING` tier. |
 | `enter_critical` | uint32 | session counter | Transitions into the `HEAP_CRITICAL` tier. |
@@ -711,7 +729,7 @@ The firmware publishes heap-pressure and discovery counters as 17 individual ret
 - `live sample` topics reflect the state at the moment of publish; do not use them to infer trends without sampling.
 - `last known` topics hold the result of the *previous* verify run. During an active verify window they are not updated until `endVerify` runs.
 
-Subscribing to `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/+` gives you all 17 counters as individual messages. A matching REST surface is available at `GET /api/v2/discovery` for the discovery-specific subset of these fields (see `docs/api/README.md`).
+Subscribing to `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/+` gives you all 20 counters as individual messages. A matching REST surface is available at `GET /api/v2/discovery` for the discovery-specific subset of these fields (see `docs/api/README.md`).
 
 ---
 

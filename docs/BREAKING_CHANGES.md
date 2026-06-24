@@ -4,6 +4,14 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.7.0
+
+**No breaking changes versus v1.6.1.**
+
+Several internal buffer-size constants were tightened during the RAM optimization pass (for example `OT_TOPIC_LEN` 50 to 40, `MQTT_ID_MAX_LEN` 96 to 48, `sTimezone` 65 to 48, the MQTT namespace and OpenTherm log buffers). Each was sized with verified headroom above the longest real value it holds, and persisted settings are read with bounded `strlcpy`, so no stored configuration is truncated on upgrade. No MQTT topic, REST API, or settings-format change.
+
+---
+
 ## v1.6.1
 
 ### Behaviour change: MQTT on-change publishing is the default (ADR-081)

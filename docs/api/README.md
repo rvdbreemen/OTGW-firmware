@@ -346,6 +346,22 @@ Retrieve the current value for an OpenTherm message by its human-readable label 
 
 **Response** `200 OK`: Same format as `/api/v2/otgw/messages/{msgid}`
 
+#### `GET /api/v2/otgw/overrides`
+
+Returns the gateway override values currently active (ADR-082). These are the user-injected values that the boiler-side-worldview gate (ADR-069/075) drops from the canonical topics/endpoints, surfaced here additively. Each row is one active override store entry (maximum 11); an entry goes stale roughly 10 minutes after it was last seen.
+
+**Authentication**: Not required
+
+**Response** `200 OK`:
+```json
+{"overrides": [{"id": 27, "label": "Toutside", "value": 8.50, "kind": "answer", "age": 42}]}
+```
+
+- `kind` = `"answer"` (gateway-forced answer = injected value) or `"substituted"` (thermostat value replaced before forwarding to the boiler).
+- `age` = seconds since the entry was last seen.
+
+The same overrides are mirrored on MQTT as retained `<base>/value/<id>/<label>/override` topics and JIT `<label> Override` HA sensors. See [docs/api/MQTT.md](MQTT.md).
+
 ---
 
 ### Commands

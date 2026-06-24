@@ -212,6 +212,45 @@ paths:
         '403':
           description: CSRF protection - invalid origin
 
+  /v2/sensors:
+    get:
+      tags:
+        - Sensors
+      summary: Get sensor status (alias for /v2/sensors/status)
+      description: |
+        Returns the current Dallas temperature sensor readings and S0 pulse
+        counter status. Identical response to `/v2/sensors/status`.
+      operationId: getSensorsRoot
+      responses:
+        '200':
+          description: Sensor status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensorStatus'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sensors/status:
+    get:
+      tags:
+        - Sensors
+      summary: Get sensor status
+      description: |
+        Returns the current Dallas temperature sensor readings (per 1-Wire
+        address, when sensors are detected or simulation is active) and the
+        S0 pulse counter status.
+      operationId: getSensorStatus
+      responses:
+        '200':
+          description: Sensor status retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SensorStatus'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
   /v2/sensors/labels:
     get:
       tags:
@@ -893,6 +932,146 @@ paths:
                 unit: "\u00b0C"
         '400':
           $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otgw/overrides:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get active gateway override values (ADR-082)
+      description: |
+        Returns the gateway override values that are currently active. These are
+        the user-injected values that the boiler-side-worldview gate
+        (ADR-069/075) deliberately drops from the canonical topics/endpoints, so
+        they would otherwise be invisible. This endpoint surfaces them
+        additively without changing canonical behavior.
+
+        Each row is one active override store entry (maximum 11). An entry
+        becomes stale and is omitted roughly 10 minutes after it was last seen.
+
+        - `kind = "answer"`: an answer-override (`A` frame), i.e. a
+          gateway-forced answer equal to the user-injected value.
+        - `kind = "substituted"`: a thermostat value that the gateway replaced
+          before forwarding to the boiler (`T` frame substituted to `R`).
+
+        See also the matching MQTT surface: the retained
+        `<base>/value/<id>/<label>/override` state topics and the JIT
+        `<label> Override` HA sensors (ADR-082).
+      operationId: getGatewayOverrides
+      responses:
+        '200':
+          description: Active gateway overrides retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  overrides:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                          description: OpenTherm message ID
+                        label:
+                          type: string
+                          description: OpenTherm message label
+                        value:
+                          type: number
+                          description: The active override value (f8.8, 2 decimals)
+                        kind:
+                          type: string
+                          enum: [answer, substituted]
+                        age:
+                          type: integer
+                          description: Seconds since this entry was last seen
+              example:
+                overrides:
+                  - id: 27
+                    label: "Toutside"
+                    value: 8.50
+                    kind: "answer"
+                    age: 42
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otgw/boiler-support:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get unsupported boiler message IDs
+      description: |
+        Returns the message IDs the boiler has reported as unsupported for read
+        and write, sourced from the in-RAM support bitmaps populated by the OT
+        decoder. Response is streamed in chunks.
+      operationId: getBoilerSupport
+      responses:
+        '200':
+          description: Boiler support map retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  unsupported_read:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MsgIdLabelEntry'
+                  unsupported_write:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MsgIdLabelEntry'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otgw/ot-support:
+    get:
+      tags:
+        - OpenTherm Data
+      summary: Get bilateral OpenTherm support map
+      description: |
+        Returns the bilateral OpenTherm support map: for every message ID where
+        at least one support bit is set, reports whether the thermostat has sent
+        a read/write and whether the boiler has acked or reported unsupported for
+        read/write. Compact mode (only non-empty rows). Response is streamed.
+      operationId: getOtSupport
+      responses:
+        '200':
+          description: OpenTherm support map retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  msgids:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: integer
+                        label:
+                          type: string
+                        tsR:
+                          type: boolean
+                          description: Thermostat has sent a read for this ID
+                        tsW:
+                          type: boolean
+                          description: Thermostat has sent a write for this ID
+                        blAR:
+                          type: boolean
+                          description: Boiler has acked a read for this ID
+                        blAW:
+                          type: boolean
+                          description: Boiler has acked a write for this ID
+                        blUR:
+                          type: boolean
+                          description: Boiler reported read unsupported for this ID
+                        blUW:
+                          type: boolean
+                          description: Boiler reported write unsupported for this ID
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -1739,6 +1918,69 @@ components:
           active: false
           file: "/otgw_simulation.log"
           interval_ms: 1000
+
+    MsgIdLabelEntry:
+      type: object
+      description: An OpenTherm message ID with its label and friendly name
+      properties:
+        id:
+          type: integer
+        label:
+          type: string
+        friendly:
+          type: string
+      example:
+        id: 3
+        label: "Sconfig_Smemberid"
+        friendly: "Slave configuration"
+
+    SensorStatus:
+      type: object
+      properties:
+        sensors:
+          type: object
+          properties:
+            devices:
+              type: object
+              description: |
+                Per-address Dallas readings (present only when sensors are
+                detected or sensor simulation is active).
+              additionalProperties:
+                type: object
+                properties:
+                  temp:
+                    type: number
+                  epoch:
+                    type: integer
+            s0:
+              type: object
+              properties:
+                enabled:
+                  type: boolean
+                gpio:
+                  type: integer
+                poll_sec:
+                  type: integer
+                pulses:
+                  type: integer
+                total:
+                  type: integer
+                power_kw:
+                  type: number
+                epoch:
+                  type: integer
+      example:
+        sensors:
+          devices:
+            "28FF64D1841703F1": { temp: 21.4, epoch: 86400 }
+          s0:
+            enabled: false
+            gpio: 14
+            poll_sec: 60
+            pulses: 0
+            total: 0
+            power_kw: 0.000
+            epoch: 0
 
   responses:
     BadRequestJson:

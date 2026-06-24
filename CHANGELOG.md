@@ -8,7 +8,9 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-1.7.0 cycle (latest beta: 1.7.0-beta.34). Headlined by heap-fragmentation crash-proofing (beta.1 to beta.6) and a RAM / heap-headroom optimization pass (beta.7 to beta.34) for long-running devices under load.
+## [1.7.0] - 2026-06-25
+
+Stability and headroom release for the 1.x (ESP8266) line. Headlined by heap-fragmentation crash-proofing (beta.1 to beta.6) and a RAM / heap-headroom optimization pass (beta.7 to beta.34) for long-running devices under load. Full notes: [RELEASE_NOTES_1.7.0.md](RELEASE_NOTES_1.7.0.md).
 
 ### Changed
 - RAM and heap-headroom optimization pass (beta.7 to beta.33). The OpenTherm message-name table (`OTmap[]`) was moved into flash (PROGMEM) using inline table arrays, freeing about 4.96 KB of static RAM and lifting the idle free heap by about 6 KB. The largest-contiguous-block floor under sustained load rose from about 4.9 KB to about 11 KB, restoring the headroom the firmware had at 1.3.5. Roughly 25 smaller buffer and integer-width trims followed (OpenTherm log and topic buffers, MQTT namespace and client-id buffers, the JSON coalescing send buffer, the REST API URI tokenizer, the OT command queue, several diagnostic counters), plus two String-allocation removals (`dBmtoQuality()`, `upTime()`) that cut per-call heap churn. Net effect: about 6.6 KB of static RAM reclaimed with no functional change. Each step shipped under its own prerelease tag and was bench-verified (build, evaluator, on-device soak). (TASK-903)
