@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 21:21'
-updated_date: '2026-06-24 21:31'
+updated_date: '2026-06-24 22:02'
 labels: []
 dependencies: []
 ordinal: 143000
@@ -29,6 +29,12 @@ The autonomous implement-next-task loop currently drafts a Proposed ADR per task
 - [x] #6 meta.phases + meta.description + SKILL.md description/steps updated to reflect end-of-loop ADR evaluation; rewritten JS parses and all break paths verified
 - [x] #7 Doc refs that state per-task ADR TIMING (update-docs/SKILL.md, adr-kit-guide.md, CLAUDE.md, anatomy.md, cerebrum.md) reconciled to the new flow
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Extension (2026-06-25, maintainer ask): added process-death recovery. Land stamps task note ADR-PENDING; end-of-loop pass stamps ADR-EVALUATED only on confirmed completion; next run's Audit returns leftover ADR-PENDING tasks as adrOrphans and the pass re-sweeps them; enumerate greps docs/adr for task ids and skips already-documented decisions so retry never double-drafts. Validated the eval brain with 2 report-only Workflow dry-runs: maxAdrNumber 152->assign 153; dedup skip-existing (ADR-056/102/152) + no over-skip on ADR-150 passing mention; positive-detection drafted ADR-153 for the SAT dual-axis split (a9047177). JS syntax-checked.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

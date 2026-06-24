@@ -51,10 +51,20 @@ The engine, in one run:
    only place the loop authors ADRs** — moved out of the per-task path 2026-06-24
    (TASK-928) so one evaluation sees cross-task decisions and the maintainer reviews a
    coherent batch instead of a per-task drip.
+   - **Process-death recovery.** Every **Land** stamps the task note `ADR-PENDING`;
+     the ADR-Evaluation pass stamps `ADR-EVALUATED: <ADR-ids|none>` ONLY on confirmed
+     completion (ADRs drafted + committed, or nothing architectural to draft). If the
+     pass dies (rate-limit) before stamping, the `ADR-PENDING` marker survives in git,
+     so the NEXT run's Audit returns the task in `adrOrphans` and this pass sweeps it
+     up alongside its own tasks. Enumerate greps `docs/adr/` for the task ids first and
+     skips any decision already documented, so a retry after a partial death never
+     double-drafts. (The same marker drives the parallel-lane handoff: a `skipAdrEval`
+     lane leaves its tasks `ADR-PENDING` for the integrating run to draw in.)
 4. **Stop** when nothing is actionable, on a transient agent death (rate limit — it
    cleans up the task back to To Do and ends so a later run retries), or when a task
    fails review twice (flags it for attention). The ADR-Evaluation pass still runs for
-   whatever did land before the stop.
+   whatever did land before the stop, plus any `ADR-PENDING` orphans from a prior dead
+   run.
 
 Returns `{ done, completed: [...], count, endReason, adrsDrafted: [...] }`. `endReason`
 tells you whether it drained the backlog, hit a transient rate-limit, or needs

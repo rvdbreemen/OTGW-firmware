@@ -65,11 +65,12 @@ else log(`WARNING: could not capture start HEAD; the ADR-Evaluation pass will fa
 
 const AUDIT = {
   type: 'object',
-  required: ['summary', 'movedToDone', 'resetToToDo'],
+  required: ['summary', 'movedToDone', 'resetToToDo', 'adrOrphans'],
   properties: {
     summary: { type: 'string' },
     movedToDone: { type: 'array', items: { type: 'string' }, description: 'task ids advanced to Done this audit' },
     resetToToDo: { type: 'array', items: { type: 'string' }, description: 'stuck/abandoned task ids reset to To Do this audit' },
+    adrOrphans: { type: 'array', items: { type: 'string' }, description: 'task ids whose notes carry ADR-PENDING but NOT ADR-EVALUATED -> a prior run landed them but its end-of-loop ADR pass died before drafting their ADR; the end-of-loop pass this run must sweep them up' },
   },
 }
 const audit = await agent(
@@ -78,7 +79,8 @@ const audit = await agent(
   `- STUCK (CLEAN worktree ONLY): status In Progress AND \`git -C ${REPO} status\` shows NO uncommitted src/ edits -> a lane that was working it died leaving no partial work (or never started). Reset it: \`backlog task edit <id> -s "To Do" -a @claude\`. CRITICAL: if there ARE uncommitted src/ edits for an In Progress task, a lane is ACTIVELY working it right now (or a died lane's edits await the launching session's manual cleanup) -> LEAVE IT UNTOUCHED. NEVER \`git checkout\`/discard or reset a task whose worktree is dirty; you would clobber a running lane.\n` +
   `- FINISHABLE: status In Progress/In Review where EVERY remaining acceptance criterion is build-verifiable or evaluator-verifiable (NO hardware/field-validation AC left) AND the work is committed + green. Move it to Done: \`backlog task edit <id> -s "Done"\`. Get this right by reading the ACs — do NOT move a task to Done while a field-validation / hardware-soak AC is open (those stay In Review).\n` +
   `- CORRECT: In Review purely because a field-validation / hardware AC remains -> leave it (cannot self-certify hardware).\n` +
-  `Return a one-line summary plus the ids you moved to Done and reset to To Do. Make the changes; do not ask permission.`,
+  `ALSO — ADR-ORPHAN SWEEP (do not change anything, just detect): for every task-865.* read its notes; collect the ids whose notes contain the token "ADR-PENDING" but NOT "ADR-EVALUATED". At THIS point (run start) such a task can only come from a PRIOR run whose end-of-loop ADR pass died before drafting its ADR. Return them as adrOrphans. (Empty list if none.)\n` +
+  `Return a one-line summary, the ids you moved to Done, the ids you reset to To Do, and adrOrphans. Make the status changes; do not ask permission.`,
   { label: 'audit', phase: 'Audit', schema: AUDIT }
 )
 if (audit) log(`Audit: ${audit.summary}${audit.movedToDone && audit.movedToDone.length ? ' | Done: ' + audit.movedToDone.join(',') : ''}${audit.resetToToDo && audit.resetToToDo.length ? ' | reset: ' + audit.resetToToDo.join(',') : ''}`)
@@ -137,7 +139,7 @@ const landPrompt = (sel) =>
   `Land the reviewed work for TASK ${sel.taskId} in ${REPO} (branch ${BRANCH}).\n${RULES}\n\nsrcTouched=${sel.srcTouched}; fieldValidationRemains=${sel.fieldValidationRemains}; skipBump=${SKIP_BUMP}.\n` +
   `NOTE: ADRs are NOT authored or committed here. The end-of-loop ADR-Evaluation pass drafts all Proposed ADRs for the run. Do NOT create, stage, or commit any docs/adr/*.md file in this step.\n` +
   `Steps (ORDER MATTERS — status must be INSIDE the commit so a checkout cannot revert it):\n` +
-  `1. Set final status FIRST: if fieldValidationRemains "In Review", else "Done". \`backlog task edit ${sel.taskId} -s "<status>" --append-notes "<what landed + remaining field-validation ACs>"\`.\n` +
+  `1. Set final status FIRST: if fieldValidationRemains "In Review", else "Done". \`backlog task edit ${sel.taskId} -s "<status>" --append-notes "<what landed + remaining field-validation ACs>. ADR-PENDING (end-of-loop ADR-Evaluation drafts any ADR and stamps ADR-EVALUATED)."\`. The ADR-PENDING token is mandatory — it is the persistent marker the end-of-loop pass (and the NEXT run's Audit, if this run dies) uses to know this task still needs ADR evaluation.\n` +
   (SKIP_BUMP
     ? `2. Do NOT bump the prerelease (parallel lane; the bump+tag happens at serial integration when this sub-branch merges). prereleaseTag="".\n`
     : `2. If srcTouched, run \`bin/bump-prerelease.sh\` (stages version.h + banners); record the new tag (e.g. alpha.182) as prereleaseTag. Else prereleaseTag="".\n`) +
@@ -227,41 +229,59 @@ const ADRGUARD = {
 const ADRLAND = { type: 'object', required: ['committed', 'commitHash', 'pushed', 'note'], properties: { committed: { type: 'boolean' }, commitHash: { type: 'string' }, pushed: { type: 'boolean' }, note: { type: 'string' } } }
 
 let adrsDrafted = []
-if (completed.length && SKIP_ADR_EVAL) {
-  log(`ADR Evaluation SKIPPED (parallel lane; defer to serial integration). ${completed.length} task(s) landed without ADRs this run.`)
-} else if (completed.length) {
+// Process-death recovery (TASK-928): every Land stamps the task note "ADR-PENDING";
+// the end-of-loop pass stamps "ADR-EVALUATED" once it has confirmed-drafted (or
+// confirmed there was nothing to draft). If this run's eval dies before stamping,
+// the marker survives in git and the NEXT run's Audit returns the task in adrOrphans
+// — so this pass sweeps up orphans from prior dead runs alongside its own tasks.
+const orphans = (audit && audit.adrOrphans && audit.adrOrphans.length) ? audit.adrOrphans : []
+const haveAdrWork = completed.length > 0 || orphans.length > 0
+if (haveAdrWork && SKIP_ADR_EVAL) {
+  log(`ADR Evaluation SKIPPED (parallel lane; defer to serial integration). ${completed.length} landed + ${orphans.length} orphan(s) stay ADR-PENDING for the integrating run to draft.`)
+} else if (haveAdrWork) {
   phase('ADR Evaluation')
-  const landedList = completed.map(c => `${c.task} (${c.title}) -> commit ${c.commit}`).join('\n')
-  const range = startHead ? `${startHead}..HEAD` : `(no start HEAD captured; inspect each landed task's commit individually: ${completed.map(c => c.commit).join(', ')})`
+  const coveredTaskIds = Array.from(new Set([...completed.map(c => c.task), ...orphans]))
+  const thisRunList = completed.length ? completed.map(c => `${c.task} (${c.title}) -> commit ${c.commit}`).join('\n') : '(none landed this run)'
+  const orphanList = orphans.length ? orphans.join(', ') : '(none)'
+  const range = startHead ? `${startHead}..HEAD` : `(no start HEAD captured; inspect each task's landing commit individually via git log --grep)`
+  let evalSucceeded = false
 
   // 1. ENUMERATE — one agent reads the whole-run diff + task bodies, returns a
-  //    dedup'd decision list mapped to task ids. Writes NO files. Also returns the
-  //    current max ADR number so the JS (not an LLM) assigns the next free numbers.
+  //    dedup'd decision list mapped to task ids. Writes NO files. Returns the current
+  //    max ADR number so the JS (not an LLM) assigns the next free numbers.
   const ev = await agent(
     `End-of-loop ADR evaluation for the async ESP32-S3 drain run in ${REPO}.\n${RULES}\n\n` +
-    `Tasks LANDED this run:\n${landedList}\n\n` +
-    `Review the CUMULATIVE diff of the run: \`git -C ${REPO} diff ${range}\` (focus on src/** and any API/topic contract docs; ignore version bumps, banners, and task-status noise). For full intent, read each landed task body via \`backlog task <id> --plain\`.\n` +
-    `Identify EVERY distinct ARCHITECTURAL decision the run embodies — a new pattern/dependency, an API/MQTT/topic contract change, a concurrency/threading model change, or a supersession of an existing ADR. DEDUP across tasks: one decision that several tasks contributed to is ONE entry (list all contributing task ids). A task that is a routine bug fix / refactor within an existing pattern is NOT a decision — omit it. If the run made no architectural decision, return decisions=[].\n` +
-    `Do NOT write any file in this step. Also return maxAdrNumber = the highest existing ADR number (glob docs/adr/ADR-*.md). For each decision return: title, a kebab-case filename slug (no number/no .md), a one-line rationale, the contributing taskIds, and supersedes (ADR-NNN or empty).`,
+    `Tasks LANDED THIS run (diff them as a batch via \`git -C ${REPO} diff ${range}\`):\n${thisRunList}\n\n` +
+    `ORPHAN tasks from a PRIOR run whose ADR pass died (still marked ADR-PENDING) — evaluate these TOO; find each one's landing commit with \`git -C ${REPO} log --oneline --grep "(<taskId>)"\` and inspect it via \`git show <hash>\`: ${orphanList}\n\n` +
+    `For full intent read each task body via \`backlog task <id> --plain\`. Identify EVERY distinct ARCHITECTURAL decision across ALL these tasks — a new pattern/dependency, an API/MQTT/topic contract change, a concurrency/threading model change, or a supersession of an existing ADR. DEDUP: one decision several tasks made is ONE entry (list all contributing task ids). Routine bug fixes / refactors within an existing pattern are NOT decisions — omit them.\n` +
+    `IDEMPOTENCY (a prior run may have drafted some ADRs before dying): for EACH candidate decision, FIRST grep docs/adr/*.md for an ADR that already documents it — search the contributing task ids in ADR References sections, or the decision topic. If an ADR already covers it, SKIP it (do NOT duplicate). Only return decisions that have NO existing ADR.\n` +
+    `If nothing remains, return decisions=[]. Do NOT write any file. Also return maxAdrNumber = the highest existing ADR number (glob docs/adr/ADR-*.md). For each decision return: title, a kebab-case filename slug (no number/no .md), a one-line rationale, the contributing taskIds, and supersedes (ADR-NNN or empty).`,
     { label: 'adr-enumerate', phase: 'ADR Evaluation', schema: ENUM }
   )
 
-  if (!ev || !ev.decisions || !ev.decisions.length) {
-    log(`ADR Evaluation: ${ev ? ev.summary : 'enumerate agent unavailable'} — no Proposed ADRs drafted this run.`)
+  if (!ev) {
+    // Enumerate agent died: do NOT stamp ADR-EVALUATED. Markers stay ADR-PENDING so
+    // the next run's Audit re-flags these as orphans and retries the whole pass.
+    log(`ADR Evaluation: enumerate agent unavailable (transient) — tasks stay ADR-PENDING; next run will retry. Covered ids: ${coveredTaskIds.join(', ')}`)
+  } else if (!ev.decisions || !ev.decisions.length) {
+    // Nothing architectural (or all already ADR'd): evaluation IS complete.
+    log(`ADR Evaluation: ${ev.summary || 'no new architectural decision'} — no Proposed ADRs needed this run.`)
+    evalSucceeded = true
   } else {
-    // 2. JS assigns the numbers deterministically (kills the parallel/sequential
-    //    "next free number" collision at the root — advisor KISS steer).
+    // 2. JS assigns the numbers deterministically (kills the "next free number"
+    //    collision at the root — advisor KISS steer).
     let next = (typeof ev.maxAdrNumber === 'number' && ev.maxAdrNumber > 0 ? ev.maxAdrNumber : 0) + 1
     const assigned = ev.decisions.map(d => ({ ...d, num: next++ }))
     log(`ADR Evaluation: ${assigned.length} decision(s) -> drafting ADR-${assigned.map(a => a.num).join(', ADR-')} (Proposed).`)
 
-    // 3. AUTHOR each ADR at its pre-assigned number (sequential: tiny N, and it
-    //    keeps the shared docs/adr/README.md index race-free). Authors write ONLY
-    //    their own ADR file; the README index + commit happen once, in Land.
+    // 3. AUTHOR each ADR at its pre-assigned number (sequential: tiny N, keeps the
+    //    shared docs/adr/README.md index race-free). Authors write ONLY their own ADR
+    //    file; the README index + commit happen once, in Land.
     const created = []
     for (const d of assigned) {
       const taskRefs = d.taskIds.join(', ')
-      const commits = completed.filter(c => d.taskIds.includes(c.task)).map(c => `${c.task}=${c.commit}`).join(', ')
+      const thisRunCommits = completed.filter(c => d.taskIds.includes(c.task)).map(c => `${c.task}=${c.commit}`).join(', ')
+      const commits = thisRunCommits || `(orphan task(s); find each landing commit via \`git -C ${REPO} log --oneline --grep "(<taskId>)"\`)`
       const a = await agent(
         `Author ONE Architecture Decision Record per adr-kit for a decision made by the async drain run in ${REPO}.\n${RULES}\n\n` +
         `Write the file docs/adr/ADR-${d.num}-${d.kebab}.md. Use EXACTLY ADR number ${d.num} (already assigned — do NOT pick your own number, do NOT glob for the next free one).\n` +
@@ -276,7 +296,9 @@ if (completed.length && SKIP_ADR_EVAL) {
       if (a && a.files && a.files.length) created.push(...a.files)
     }
 
-    if (created.length) {
+    if (!created.length) {
+      log(`ADR Evaluation: ${assigned.length} decision(s) enumerated but NO ADR file was authored (author agents unavailable). Tasks stay ADR-PENDING; next run retries.`)
+    } else {
       // 4. GOVERNANCE GUARD (loop self-accept fix, 2026-06-15 / relocated 2026-06-24).
       //    The adr-kit:adr-generator DEFAULTS to "Accepted" and pre-fills
       //    `status: Accepted` (agents/adr-generator.md:52,174). A prompt does not
@@ -306,6 +328,7 @@ if (completed.length && SKIP_ADR_EVAL) {
       )
       adrsDrafted = assigned.map(a => ({ adr: `ADR-${a.num}`, title: a.title, file: created.find(f => f.includes(`ADR-${a.num}-`)) || '', taskIds: a.taskIds }))
       if (adrLand && adrLand.committed) {
+        evalSucceeded = true
         log(`ADR Evaluation landed ${created.length} Proposed ADR(s): ${adrsDrafted.map(a => a.adr).join(', ')} — commit ${adrLand.commitHash}. Awaiting maintainer acceptance.`)
         // 6. ANNOUNCE the drafted ADRs to #dev-sat-mqtt for the maintainer to review/accept.
         await agent(
@@ -314,10 +337,25 @@ if (completed.length && SKIP_ADR_EVAL) {
           { label: 'adr-announce', phase: 'ADR Evaluation' }
         )
       } else {
-        log(`ADR Evaluation: drafted ${created.length} ADR(s) but the docs commit did NOT land: ${adrLand ? adrLand.note : 'land agent unavailable'}. ADR files are on disk uncommitted — next run's Audit / a manual commit must land them.`)
+        // ADRs authored but the commit did not land: leave tasks ADR-PENDING so the
+        // next run retries. The idempotency grep in enumerate skips any ADR that DID
+        // land, so a partial failure does not double-draft.
+        log(`ADR Evaluation: drafted ${created.length} ADR(s) but the docs commit did NOT land: ${adrLand ? adrLand.note : 'land agent unavailable'}. Tasks stay ADR-PENDING; next run retries (idempotent dedup prevents duplicates).`)
       }
     }
   }
+
+  // 7. STAMP ADR-EVALUATED on every covered task — but ONLY on confirmed completion
+  //    (evalSucceeded). On any transient failure above we deliberately skip this so
+  //    the ADR-PENDING marker survives and the next run's Audit re-sweeps the task.
+  if (evalSucceeded && coveredTaskIds.length) {
+    const coverMap = JSON.stringify(adrsDrafted.map(a => ({ adr: a.adr, taskIds: a.taskIds })))
+    await agent(
+      `MECHANICAL marker step in ${REPO}. For EACH task id [${coveredTaskIds.join(', ')}], append a backlog note so the next run's Audit does not re-flag it as an ADR orphan: \`backlog task edit <id> --append-notes "ADR-EVALUATED: <comma-list of ADR-NNN that cover this task, or 'none'>"\`. ADR coverage map (task -> ADRs): ${coverMap}. A task NOT in that map gets 'none'. Do not change status or anything else. Report how many tasks you marked.`,
+      { label: 'adr-mark-evaluated', phase: 'ADR Evaluation' }
+    )
+    log(`ADR Evaluation: stamped ADR-EVALUATED on ${coveredTaskIds.length} task(s) — they will not be re-swept.`)
+  }
 }
 
-return { done: true, completed, count: completed.length, endReason, adrsDrafted }
+return { done: true, completed, count: completed.length, endReason, adrsDrafted, adrOrphansSwept: orphans }
