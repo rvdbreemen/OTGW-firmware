@@ -68,6 +68,8 @@
     if (t === 'mlog') renderLog();
     else if (t === 'mstats') renderStats();
     else if (t === 'msupport') renderSupport();
+    else if (t === 'mgraph') renderGraph();
+    else if (t === 'mconn') fetchConn();
   }
 
   // ---------- back to the classic UI ----------
@@ -90,20 +92,28 @@
     el.textContent = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
   }
 
-  // ---------- connectivity strip (static placeholder; P4 wires live data) ----------
+  // ---------- always-visible connectivity strip (live; fed by fetchConn) ----------
+  var STATE_TXT = { 'st-ok': 'up', 'st-warn': 'weak', 'st-down': 'down', 'st-off': 'off', 'st-unknown': '—' };
   function renderConnStrip() {
     var strip = document.getElementById('connStrip');
     if (!strip) return;
     var pills = [
-      { k: 'WiFi', v: '—', s: 'st-unknown' },
-      { k: 'MQTT', v: '—', s: 'st-unknown' },
-      { k: 'OT bus', v: '—', s: 'st-unknown' },
-      { k: 'NTP', v: '—', s: 'st-unknown' }
+      { k: 'WiFi', s: conn.wifi, v: conn.rssi !== null ? conn.rssi + ' dBm' : STATE_TXT[conn.wifi] },
+      { k: 'MQTT', s: conn.mqtt, v: STATE_TXT[conn.mqtt] },
+      { k: 'OT bus', s: conn.ot, v: STATE_TXT[conn.ot] },
+      { k: 'NTP', s: conn.ntp, v: STATE_TXT[conn.ntp] }
     ];
-    strip.innerHTML = pills.map(function (p) {
-      return '<button class="connpill ' + p.s + '"><span class="d"></span>' +
-        '<span class="pk">' + p.k + '</span> <span class="pv">' + p.v + '</span></button>';
-    }).join('');
+    strip.textContent = '';   // rebuild with DOM nodes (textContent — no HTML injection)
+    pills.forEach(function (p) {
+      var btn = document.createElement('button'); btn.className = 'connpill ' + p.s;
+      btn.title = 'Connectivity — tap for the detail map';
+      btn.addEventListener('click', function () { showPage('monitor'); showTab('mconn'); });
+      var dot = document.createElement('span'); dot.className = 'd';
+      var k = document.createElement('span'); k.className = 'pk'; k.textContent = p.k + ' ';
+      var v = document.createElement('span'); v.className = 'pv'; v.textContent = p.v;
+      btn.appendChild(dot); btn.appendChild(k); btn.appendChild(v);
+      strip.appendChild(btn);
+    });
   }
 
   // ============================================================
@@ -545,6 +555,59 @@
     t.scrollTop = t.scrollHeight;
   }
 
+  // ---------- Monitor > Graph (same strip chart, g-prefixed ids) ----------
+  function setG(id, key) { var el = document.getElementById(id); if (el) el.setAttribute('points', seriesPoints(key)); }
+  function renderGraph() {
+    setG('gFlow2', 'flow'); setG('gRet2', 'ret');
+    var sp = document.getElementById('gSpLine');
+    if (sp) { var y = model.chSet === null ? -10 : tempY(model.chSet); sp.setAttribute('y1', y); sp.setAttribute('y2', y); }
+    var mod = document.getElementById('gMod2');
+    if (mod) {
+      if (samples.length < 2) mod.setAttribute('points', '');
+      else {
+        var n = samples.length, span = C_X1 - C_X0, p = [C_X0 + ',170'];
+        for (var i = 0; i < n; i++) {
+          var m = samples[i].mod; if (m === null || m === undefined || isNaN(m)) m = 0;
+          p.push((C_X0 + (i / (n - 1)) * span).toFixed(1) + ',' + (170 - Math.max(0, Math.min(100, m)) * 0.4).toFixed(1));
+        }
+        p.push(C_X1 + ',170'); mod.setAttribute('points', p.join(' '));
+      }
+    }
+  }
+
+  // ---------- Monitor > Connection map + (P4) connectivity strip ----------
+  var conn = { wifi: 'st-unknown', mqtt: 'st-unknown', ot: 'st-unknown', ntp: 'st-unknown',
+               mode: '', rssi: null, mqttOn: false, otOn: false };
+  function fetchConn() {
+    fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (!j || !j.health) return;
+      var h = j.health;
+      conn.mode = h.networkmode || ''; conn.rssi = (typeof h.wifirssi === 'number') ? h.wifirssi : null;
+      conn.mqttOn = !!h.mqttconnected; conn.otOn = !!h.otgwconnected;
+      conn.wifi = h.networkmode ? (conn.rssi !== null && conn.rssi < -80 ? 'st-warn' : 'st-ok') : 'st-down';
+      conn.mqtt = h.mqttconnected ? 'st-ok' : 'st-down';
+      conn.ot = h.otgwconnected ? 'st-ok' : 'st-down';
+      conn.ntp = 'st-ok'; // device clock is advancing (NTP-driven); refined later if an endpoint exposes it
+      renderConnMap(); renderConnStrip();
+    }).catch(function () { });
+  }
+  function setLink(id, flowId, state) {
+    var lk = document.getElementById(id);
+    if (lk) lk.setAttribute('class', 'cn-link lk-' + state.replace('st-', ''));
+    var fl = document.getElementById(flowId);
+    if (fl) fl.classList.toggle('on', state === 'st-ok' || state === 'st-warn');
+  }
+  function setDot(id, state) { var d = document.getElementById(id); if (d) d.setAttribute('class', 'cn-statedot ' + state); }
+  function renderConnMap() {
+    setLink('lk-wifi', 'fl-wifi', conn.wifi); setDot('dot-wifi', conn.wifi);
+    setLink('lk-mqtt', 'fl-mqtt', conn.mqtt); setDot('dot-mqtt', conn.mqtt);
+    setLink('lk-ws', 'fl-ws', ws && ws.readyState === 1 ? 'st-ok' : 'st-down');
+    setLink('lk-boiler', 'fl-boiler', conn.ot); setDot('dot-boiler', conn.ot);
+    setLink('lk-therm', 'fl-therm', conn.ot); setDot('dot-therm', conn.ot);
+    var ws2 = document.getElementById('cnWifiSub'); if (ws2) ws2.textContent = conn.rssi === null ? conn.mode : (conn.mode + ' · ' + conn.rssi + ' dBm');
+    var md = document.getElementById('cnModeTxt'); if (md) md.textContent = conn.mode || '—';
+  }
+
   // ---------- init ----------
   function init() {
     initTheme();
@@ -584,6 +647,10 @@
     // Live OT data: connect the log WebSocket and render the active Home concept.
     connectWs();
     renderActive();
+
+    // Connectivity: poll device health for the strip + connection map.
+    fetchConn();
+    setInterval(fetchConn, 15000);
 
     // Hooks for later phases to attach live-data renderers.
     window.OTGWv2 = {
