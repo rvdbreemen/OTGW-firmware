@@ -41,6 +41,7 @@
       if (el) el.classList.toggle('active', k === p);
     });
     try { localStorage.setItem('otgw-v2-page', p); } catch (e) { }
+    if (p === 'monitor' && isMonitorLogVisible()) renderLog();
   }
 
   // ---------- Home concept chips (A/B/C) ----------
@@ -64,6 +65,7 @@
     document.querySelectorAll('.mpanel').forEach(function (el) {
       el.classList.toggle('active', el.id === t);
     });
+    if (t === 'mlog') renderLog();
   }
 
   // ---------- back to the classic UI ----------
@@ -181,6 +183,7 @@
     if (raw) {
       applyFrame(raw);
       pushTicker(d);                // mission-control raw-frame ticker (concept C)
+      pushLog(d);                   // Monitor > Log console
       if (activeDesign() === 'c') scheduleRender();
     }
   }
@@ -200,6 +203,35 @@
   function pushTicker(line) {
     ticker.push(line);
     if (ticker.length > TICKER_MAX) ticker.shift();
+  }
+
+  // ---------- Monitor > Log ----------
+  var LOG_MAX = 600, logBuf = [], logRecvTimes = [];
+  var logPaused = false, logSearch = '', logShowTs = true, logAutoScroll = true;
+  function pushLog(line) {
+    var now = Date.now();
+    logRecvTimes.push(now);
+    while (logRecvTimes.length && now - logRecvTimes[0] > 10000) logRecvTimes.shift();
+    if (logPaused) return;
+    logBuf.push(line);
+    if (logBuf.length > LOG_MAX) logBuf.shift();
+    if (isMonitorLogVisible()) renderLog();
+  }
+  function isMonitorLogVisible() {
+    var p = document.getElementById('page-monitor');
+    var l = document.getElementById('mlog');
+    return p && l && p.classList.contains('active') && l.classList.contains('active');
+  }
+  function renderLog() {
+    var el = document.getElementById('monLog'); if (!el) return;
+    var q = logSearch.trim().toLowerCase();
+    var lines = logBuf;
+    if (q) lines = lines.filter(function (l) { return l.toLowerCase().indexOf(q) !== -1; });
+    if (!logShowTs) lines = lines.map(function (l) { return l.replace(/^\d{2}:\d{2}:\d{2}\.\d{3,6}\s+/, ''); });
+    el.textContent = lines.join('\n');     // textContent: device data, not HTML
+    if (logAutoScroll) el.scrollTop = el.scrollHeight;
+    var cnt = document.getElementById('logCount'); if (cnt) cnt.textContent = logBuf.length;
+    var rate = document.getElementById('logRate'); if (rate) rate.textContent = (logRecvTimes.length / 10).toFixed(1);
   }
 
   function connectWs() {
@@ -424,6 +456,19 @@
     });
     var ut = document.getElementById('uiToggle');
     if (ut) ut.addEventListener('click', gotoClassic);
+
+    // Monitor > Log controls
+    var lp = document.getElementById('logPause');
+    if (lp) lp.addEventListener('click', function () { logPaused = !logPaused; lp.textContent = logPaused ? '▶ Resume' : '⏸ Pause'; });
+    var ls = document.getElementById('logSearch');
+    if (ls) ls.addEventListener('input', function () { logSearch = ls.value; if (isMonitorLogVisible()) renderLog(); });
+    var cs = document.getElementById('chipScroll');
+    if (cs) cs.addEventListener('click', function () { logAutoScroll = !logAutoScroll; cs.classList.toggle('on', logAutoScroll); });
+    var ct = document.getElementById('chipTs');
+    if (ct) ct.addEventListener('click', function () { logShowTs = !logShowTs; ct.classList.toggle('on', logShowTs); if (isMonitorLogVisible()) renderLog(); });
+    document.querySelectorAll('#mlog .tbtn').forEach(function (b) {
+      if (/clear/i.test(b.textContent)) b.addEventListener('click', function () { logBuf = []; renderLog(); });
+    });
 
     var sp = localStorage.getItem('otgw-v2-page'); showPage(sp || 'home');
     var sd = localStorage.getItem('otgw-v2-design'); showDesign(sd || 'a');
