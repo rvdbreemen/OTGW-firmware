@@ -27,5 +27,5 @@ Release 1.7.0 docs pass. PREV=v1.6.1. Themes: heap/crash hardening (TASK-837/841
 - [x] #4 RELEASE_GITHUB_1.7.0.md generated
 - [x] #5 docs/BREAKING_CHANGES.md updated (none)
 - [x] #6 README What's New + CHANGELOG.md updated
-- [ ] #7 Docs folder cleanup (archive old releases, move misplaced)
+- [x] #7 Docs folder cleanup (archive old releases, move misplaced)
 <!-- AC:END -->
