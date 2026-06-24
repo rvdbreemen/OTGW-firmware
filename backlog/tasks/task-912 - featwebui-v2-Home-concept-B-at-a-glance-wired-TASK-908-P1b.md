@@ -1,0 +1,24 @@
+---
+id: TASK-912
+title: 'feat(webui): v2 Home concept B at-a-glance wired (TASK-908 P1b)'
+status: In Progress
+assignee:
+  - '@claude'
+created_date: '2026-06-24 04:33'
+updated_date: '2026-06-24 05:32'
+labels: []
+milestone: 2.0.0
+dependencies: []
+ordinal: 128000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Extract #design-b; renderB hero dial + stat cards + zone bar + mod bar from model.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Dial+cards reflect live data; both builds green
+<!-- AC:END -->

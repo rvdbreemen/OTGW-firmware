@@ -206,7 +206,20 @@
     var d = document.querySelector('.cchip.active');
     var which = d ? d.dataset.design : 'a';
     if (which === 'a') renderA();
-    // B and C renderers are added in later phases.
+    else if (which === 'b') renderB();
+    else if (which === 'c') renderC();
+  }
+
+  // SVG arc helper: point on a circle (deg, 0 = 12 o'clock, clockwise).
+  function polar(cx, cy, r, deg) {
+    var a = (deg - 90) * Math.PI / 180;
+    return [cx + r * Math.cos(a), cy + r * Math.sin(a)];
+  }
+  function arcPath(cx, cy, r, startDeg, endDeg) {
+    var s = polar(cx, cy, r, endDeg), e = polar(cx, cy, r, startDeg);
+    var large = (endDeg - startDeg) <= 180 ? 0 : 1;
+    return 'M' + s[0].toFixed(1) + ' ' + s[1].toFixed(1) +
+      ' A' + r + ' ' + r + ' 0 ' + large + ' 0 ' + e[0].toFixed(1) + ' ' + e[1].toFixed(1);
   }
 
   function txt(id, s) { var el = document.getElementById(id); if (el) el.textContent = s; }
@@ -256,6 +269,55 @@
     setTile('aTDHW', model.dhw_on, false, model.dhw_on ? 'Active' : 'Off');
     setTile('aTFault', false, model.fault, model.fault ? 'Fault' : 'OK');
   }
+
+  // Concept B — at a glance (hero dial + stat cards).
+  var B_LO = 135, B_HI = 405, B_MIN = 5, B_MAX = 30;  // 270° sweep, 5..30 °C
+  function renderB() {
+    var track = document.getElementById('bTrack');
+    if (track && !track.getAttribute('data-init')) {
+      track.setAttribute('d', arcPath(120, 120, 100, B_LO, B_HI));
+      track.setAttribute('data-init', '1');
+    }
+    var arc = document.getElementById('bArc');
+    if (arc) {
+      if (model.room === null) arc.setAttribute('d', '');
+      else {
+        var f = Math.max(0, Math.min(1, (model.room - B_MIN) / (B_MAX - B_MIN)));
+        arc.setAttribute('d', arcPath(120, 120, 100, B_LO, B_LO + (B_HI - B_LO) * f));
+      }
+    }
+    var tick = document.getElementById('bTick');
+    if (tick) {
+      if (model.roomSet === null) { tick.setAttribute('x1', 0); tick.setAttribute('y1', 0); tick.setAttribute('x2', 0); tick.setAttribute('y2', 0); }
+      else {
+        var sf = Math.max(0, Math.min(1, (model.roomSet - B_MIN) / (B_MAX - B_MIN)));
+        var deg = B_LO + (B_HI - B_LO) * sf, p1 = polar(120, 120, 88, deg), p2 = polar(120, 120, 108, deg);
+        tick.setAttribute('x1', p1[0].toFixed(1)); tick.setAttribute('y1', p1[1].toFixed(1));
+        tick.setAttribute('x2', p2[0].toFixed(1)); tick.setAttribute('y2', p2[1].toFixed(1));
+      }
+    }
+    txt('bRoom', fmt(model.room, 1, '°'));
+    txt('bSet', 'target ' + (model.roomSet === null ? '—' : fmt(model.roomSet, 1, '°')));
+    txt('bFlow', fmt(model.flow, 1, '°'));
+    txt('bRet', fmt(model.ret, 1, '°'));
+    txt('bDt', 'ΔT ' + (model.flow !== null && model.ret !== null ? fmt(model.flow - model.ret, 1, '°') : '—'));
+    txt('bPress', fmt(model.pressure, 2, ' bar'));
+    txt('bMod', model.mod === null ? '—' : Math.round(model.mod) + '%');
+    txt('bDhw', model.dhw === null ? '—' : Math.round(model.dhw) + '°');
+    txt('bDhwState', model.dhw_on ? 'running' : 'standby');
+    txt('bOut', fmt(model.outside, 1, '°'));
+    var fill = document.getElementById('bModFill');
+    if (fill) fill.style.height = (model.mod === null ? 0 : Math.max(0, Math.min(100, model.mod))) + '%';
+    var dot = document.getElementById('bPressDot');
+    if (dot && model.pressure !== null) dot.style.left = Math.max(0, Math.min(100, model.pressure / 4 * 100)) + '%';
+    var flame = document.getElementById('bFlame'); if (flame) flame.classList.toggle('on', model.flame);
+    var st = document.getElementById('bStatus'); if (st) st.classList.toggle('heating', model.flame);
+    txt('bStatusTxt', model.flame ? (model.dhw_on ? 'Heating water' : 'Heating') : (model.dhw_on ? 'Hot water' : 'Idle'));
+  }
+
+  // Concept C — mission control. Fully wired in P1c; placeholder keeps the
+  // static mockup until then.
+  function renderC() { }
 
   // ---------- init ----------
   function init() {
