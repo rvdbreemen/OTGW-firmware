@@ -9,12 +9,6 @@
          The actual active scheme is still driven by the html color-scheme
          declaration in the loaded stylesheet below. -->
     <meta name="color-scheme" content="light dark">
-    <script>
-      // TASK-922: per-user UI choice. If this browser opted into v2, redirect to
-      // it before loading any classic assets. Runs first; explicit-file target
-      // avoids a redirect loop with the device-wide default (settings.ui.bUseV2).
-      try { if (localStorage.getItem('otgw-ui') === 'v2') location.replace('/v2.html'); } catch (e) { }
-    </script>
     <link rel="stylesheet" href="ds-tokens.css">
     <link rel="stylesheet" href="components.css">
 
@@ -66,14 +60,17 @@
         <button class="theme-toggle-btn" id="tryV2" aria-label="Switch to the new v2 UI" title="Try the new v2 dashboard">✨ New UI</button>
     </div>
     <script>
-      // TASK-922: opt this browser into the v2 redesign. Per-user choice stored
-      // in localStorage (not the device-wide default), then navigate to v2.
+      // TASK-923: opt into the v2 redesign. The choice is persisted device-side
+      // in settings.ini (settings.ui.bUseV2) via the settings API, then reload —
+      // the firmware serves /v2.html as the root when the flag is set.
       (function () {
         var b = document.getElementById('tryV2');
         if (!b) return;
         b.addEventListener('click', function () {
-          try { localStorage.setItem('otgw-ui', 'v2'); } catch (e) { }
-          location.href = '/v2.html';
+          fetch(location.protocol + '//' + location.host + '/api/v2/settings', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'ui_usev2', value: 'true' })
+          }).catch(function () { }).finally(function () { location.href = '/'; });
         });
       })();
     </script>

@@ -75,10 +75,13 @@
 
   // ---------- back to the classic UI ----------
   function gotoClassic() {
-    // TASK-922: per-user choice — remember "classic" for this browser, then go to
-    // the classic shell explicitly (avoids a loop with the device-wide default).
-    try { localStorage.setItem('otgw-ui', 'classic'); } catch (e) { }
-    location.href = '/index.html';
+    // TASK-923: persist the choice device-side in settings.ini (ui_usev2=false)
+    // via the settings API, then reload — the firmware serves the classic UI.
+    fetch(APIGW + 'v2/settings', {
+      method: 'POST', mode: 'cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'ui_usev2', value: 'false' })
+    }).catch(function () { }).finally(function () { location.href = '/'; });
   }
 
   // ---------- clock ----------

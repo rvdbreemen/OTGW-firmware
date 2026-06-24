@@ -90,3 +90,20 @@ Net precedence: per-user `localStorage` > device `bUseV2` > classic. Because the
 redirects are pure client-side, the per-user switch works even before the firmware
 carrying `bUseV2` is flashed. Verified on 192.168.88.39: v2-choice bounces
 `/index.html`->`/v2.html`, classic-choice bounces `/v2.html`->`/index.html`, default unset stays classic.
+
+
+## Amendment 2026-06-24 (TASK-923): preference persisted in settings.ini (supersedes TASK-922 per-user)
+
+Maintainer decision: the UI preference must persist **device-side in `settings.ini`**,
+not per-browser. This supersedes the TASK-922 localStorage approach:
+
+- The toggle buttons POST `ui_usev2` to `/api/v2/settings`, which serializes to
+  `settings.ui.bUseV2` in `/settings.ini` (the existing TASK-910 plumbing), then reload.
+- The per-user `localStorage['otgw-ui']` redirects in `index.html`/`v2.html` are removed.
+- Serving is driven solely by `sendIndex()` reading `settings.ui.bUseV2` (default false =
+  classic). The choice is therefore **device-wide** (shared across all browsers/clients)
+  and survives reboot/reflash because it lives in `settings.ini` on LittleFS.
+
+Consequence: unlike the localStorage layer, this requires the firmware carrying the
+`bUseV2`/`sendIndex` switch (TASK-910) to be flashed before the toggle takes effect; on
+older firmware the `ui_usev2` POST is ignored and the UI stays classic.
