@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.255
+**  Version  : v2.0.0-alpha.256
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -712,7 +712,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   } else if (strcmp_P(words[4], PSTR("boiler-support")) == 0) {
     // TASK-692 port (dev TASK-686): GET /api/v2/otgw/boiler-support ->
     // unsupported_read / unsupported_write arrays sourced from the in-RAM
-    // bitmaps populated by processOT. ADR-141: built as one ArduinoJson v7
+    // bitmaps populated by processOT. ADR-146: built with streaming JsonEmit (not ArduinoJson);
     // document so the OTmap label/friendly strings are escape-safe (the old
     // snprintf path did not escape them). label/friendly are PROGMEM const
     // char* literals — store-by-pointer is safe, they outlive the document.
@@ -758,7 +758,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   } else if (strcmp_P(words[4], PSTR("ot-support")) == 0) {
     // TASK-694 port (dev TASK-689): GET /api/v2/otgw/ot-support -> bilateral
     // OT support map. Compact mode — only msgIDs where at least one of the
-    // six bitmaps has the bit set. ADR-141: ArduinoJson v7 document; the six
+    // six bitmaps has the bit set. ADR-146: streaming JsonEmit (not ArduinoJson); the six
     // ts*/bl* fields stay real JSON bools (assigned from the native bool vars).
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
@@ -800,7 +800,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     // ADR-118: GET /api/v2/otgw/overrides -> active gateway-override values that the
     // boiler-side-worldview gate (ADR-096/103) drops from canonical. Additive surface;
     // distinct from the OT-Direct overrides under /api/v2/otdirect/overrides.
-    // ADR-141: ArduinoJson v7 document; value is the native float (serialised
+    // ADR-146: streaming JsonEmit (not ArduinoJson); value is the native float (serialised
     // directly, no dtostrf) and age_s an unsigned long.
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     sendCorsOriginHeader();
@@ -887,7 +887,7 @@ static const char* satExtractPostValue(const char* body, char* buf, size_t bufSi
 
 //=== SAT extended health summary (detail=full) ===
 // Sends a comprehensive JSON with health booleans, pressure, cycle, error,
-// and auto-tune diagnostics. Built as one ArduinoJson v7 document (ADR-141).
+// and auto-tune diagnostics. Built with streaming JsonEmit (ADR-146; not ArduinoJson).
 // Called instead of satSendStatusJSON() when ?detail=full is present.
 static void satSendHealthJSON()
 {
@@ -2313,8 +2313,10 @@ void processAPI(AsyncWebServerRequest *request)
         return;
       }
 
-      // H5: Centralized auth check — all POST/PUT mutations require auth
-      if (method == HTTP_POST || method == HTTP_PUT) {
+      // H5: Centralized auth check — all mutating methods require auth.
+      // (TASK-925: widened from POST/PUT to also cover PATCH/DELETE; previously
+      // those were guarded only incidentally inside handleSAT.)
+      if (method == HTTP_POST || method == HTTP_PUT || method == HTTP_PATCH || method == HTTP_DELETE) {
         if (!checkHttpAuth()) return;
       }
 
@@ -3517,7 +3519,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satpvboostdeltac", "satpvboostenabled", "satpvboostholds",
   "satpvboostmaxdurationmin", "satpvboostmaxindoorc", "satpvboostthresholdw",
   "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation",
-  "satsolargain", "satsolarminrise", "satsolaroffset",
+  "satsolargain", "satsolarminrise", "satsolaroffset", "satsource",
   "satsummerminhours", "satsummersimmer", "satsummerthreshold",
   "satsystem", "sattargettemp", "sattempstep", "satthermalcoeff",
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",

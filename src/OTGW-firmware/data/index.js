@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.255
+**  Version  : v2.0.0-alpha.256
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3626,7 +3626,9 @@ var SAT_SETTINGS_GROUPS = [
     fields: [
       { key: 'satenabled',     label: 'SAT Enabled',           type: 'b' },
       { key: 'satsystem',      label: 'Heating System',        type: 'select',
-        options: [[0,'Gas / Radiators'],[1,'Heat Pump'],[2,'Hybrid'],[3,'Underfloor']] },
+        options: [[0,'Auto'],[1,'Radiators'],[2,'Underfloor']] },
+      { key: 'satsource',      label: 'Heat Source',           type: 'select',
+        options: [[0,'Auto'],[1,'Gas Boiler'],[2,'Heat Pump'],[3,'Hybrid']] },
       { key: 'satmanufacturer',label: 'Manufacturer',          type: 'select',
         options: [[0,'Auto-detect'],[1,'Atag'],[2,'Baxi'],[3,'Brotge'],[4,'De Dietrich'],[5,'Ferroli'],[6,'Geminox'],[7,'Ideal'],[8,'Immergas'],[9,'Intergas'],[10,'Itho'],[11,'Nefit'],[12,'Radiant'],[13,'Remeha'],[14,'Sime'],[15,'Vaillant'],[16,'Viessmann'],[17,'Worcester Bosch'],[18,'Other']] },
       { key: 'satcoefficient', label: 'Heating Curve Slope',    type: 'f', min: 0.1, max: 5.0, step: 0.1 },
@@ -7270,7 +7272,8 @@ var translateFields = [
   , ["webhookpayload", "Webhook Payload Template"]
   , ["webhookcontenttype", "Webhook Content-Type (POST)"]
   , ["SATenabled", "SAT Enabled"]
-  , ["SATsystem", "SAT Heating System (0=Auto, 1=Radiators, 2=Heat Pump, 3=Underfloor)"]
+  , ["SATsystem", "SAT Heating System / distribution (0=Auto, 1=Radiators, 2=Underfloor)"]
+  , ["SATsource", "SAT Heat Source / energy device (0=Auto, 1=Gas Boiler, 2=Heat Pump, 3=Hybrid)"]
   , ["SATmanufacturer", "SAT Manufacturer (0=Auto, 1=Atag, 2=Baxi, 3=Brotge, 4=DeDietrich, 5=Ferroli, 6=Geminox, 7=Ideal, 8=Immergas, 9=Intergas, 10=Itho, 11=Nefit, 12=Radiant, 13=Remeha, 14=Sime, 15=Vaillant, 16=Viessmann, 17=Worcester, 18=Other)"]
   , ["SATtargettemp", "SAT Target Temperature"]
   , ["SATcoefficient", "SAT Heating Curve Coefficient"]

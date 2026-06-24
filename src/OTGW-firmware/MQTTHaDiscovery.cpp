@@ -3665,7 +3665,7 @@ static bool publishEmptyRetained(const char *topic) {
 // but without legacyMode context — always returns the concrete device segment).
 // OtCore uses the compile-time HA_OTCORE_NAME intentionally: topology-clear runs at
 // topology-version boundaries, not at mode-switch time. A mode switch always reboots;
-// topics from the prior mode are accepted as manual-cleanup (ADR-124 §alpha).
+// topics from the prior mode are accepted as manual-cleanup (ADR-140, was ADR-124 §alpha).
 static const char *topoDeviceName(HaDevice d) {
   switch (d) {
     case HaDevice::Boiler:     return "boiler";
@@ -3684,13 +3684,13 @@ static const char *topoDeviceName(HaDevice d) {
 // there; this local copy exists solely to avoid cross-TU access to a static).
 static HaDevice topoDeviceForPseudoId(uint8_t otId) {
   switch (otId) {
-    case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-124)
+    case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-140, was ADR-124)
     case 244: return HaDevice::Gateway;
-    case 245: return HaDevice::Sensors;  // s0 pulse counter (ADR-124)
-    case 246: return HaDevice::Sensors;  // dallas (ADR-124, was Esp)
+    case 245: return HaDevice::Sensors;  // s0 pulse counter (ADR-140, was ADR-124)
+    case 246: return HaDevice::Sensors;  // dallas (ADR-140, was ADR-124/Esp)
     case 247: return HaDevice::Esp;
     case 248: return HaDevice::Esp;
-    case 249: return HaDevice::OtCore;      // picinfo (ADR-124, was Gateway)
+    case 249: return HaDevice::OtCore;      // picinfo (ADR-140, was ADR-124/Gateway)
     case 250: return HaDevice::Gateway;
     case 251: return HaDevice::Sat;
     case 252: return HaDevice::Sat;

@@ -208,10 +208,10 @@
   }
 
   // Concept C buffers: strip-chart samples + raw-frame ticker.
-  var SAMPLES_MAX = 140, samples = [];
+  var SAMPLES_MAX = 1800, samples = [];
   var TICKER_MAX = 60, ticker = [];
   function pushSample() {
-    samples.push({ flow: model.flow, ret: model.ret, sp: model.chSet, mod: model.mod });
+    samples.push({ t: Date.now(), flow: model.flow, ret: model.ret, sp: model.chSet, mod: model.mod });
     if (samples.length > SAMPLES_MAX) samples.shift();
   }
   function pushTicker(line) {
@@ -259,7 +259,7 @@
   }
   function renderStats() {
     var tb = document.querySelector('#statsTable tbody'); if (!tb) return;
-    var ids = Object.keys(stats).map(Number).sort(function (a, b) { return a - b; });
+    var ids = Object.keys(stats).map(Number).sort(sortStatsCmp);
     var q = statsSearch.trim().toLowerCase();
     tb.innerHTML = '';
     var shown = 0;
@@ -289,6 +289,9 @@
       for (var i = 0; i < 128; i++) {
         var c = document.createElement('div'); c.className = 'mcellq'; c.dataset.id = i; c.textContent = i;
         c.addEventListener('click', (function (id) { return function () { showSupportDetail(id); }; })(i));
+        c.addEventListener('mouseenter', (function (id) { return function (e) { showSupTip(id, e); }; })(i));
+        c.addEventListener('mousemove', (function (id) { return function (e) { showSupTip(id, e); }; })(i));
+        c.addEventListener('mouseleave', hideSupTip);
         grid.appendChild(c);
       }
     }
@@ -353,7 +356,7 @@
     try {
       ws = new WebSocket(url);
       ws.onmessage = onWsMessage;
-      ws.onclose = function () { ws = null; scheduleReconnect(); };
+      ws.onclose = function () { ws = null; scheduleReconnect(); fetchSeed(); };
       ws.onerror = function () { try { if (ws) ws.close(); } catch (e) { } };
     } catch (e) { scheduleReconnect(); }
   }
@@ -558,18 +561,34 @@
 
   // ---------- Monitor > Graph (same strip chart, g-prefixed ids) ----------
   function setG(id, key) { var el = document.getElementById(id); if (el) el.setAttribute('points', seriesPoints(key)); }
+  function windowedSamples() {
+    if (!graphWindowMs) return samples;
+    var cutoff = Date.now() - graphWindowMs;
+    return samples.filter(function (s) { return !s.t || s.t >= cutoff; });
+  }
+  function winSeries(arr, key) {
+    if (arr.length < 2) return '';
+    var span = C_X1 - C_X0, pts = [];
+    for (var i = 0; i < arr.length; i++) {
+      var v = arr[i][key]; if (v === null || v === undefined || isNaN(v)) continue;
+      pts.push((C_X0 + (i / (arr.length - 1)) * span).toFixed(1) + ',' + tempY(v).toFixed(1));
+    }
+    return pts.join(' ');
+  }
   function renderGraph() {
-    setG('gFlow2', 'flow'); setG('gRet2', 'ret');
+    var arr = windowedSamples();
+    var ef = document.getElementById('gFlow2'); if (ef) ef.setAttribute('points', winSeries(arr, 'flow'));
+    var er = document.getElementById('gRet2'); if (er) er.setAttribute('points', winSeries(arr, 'ret'));
     var sp = document.getElementById('gSpLine');
     if (sp) { var y = model.chSet === null ? -10 : tempY(model.chSet); sp.setAttribute('y1', y); sp.setAttribute('y2', y); }
     var mod = document.getElementById('gMod2');
     if (mod) {
-      if (samples.length < 2) mod.setAttribute('points', '');
+      if (arr.length < 2) mod.setAttribute('points', '');
       else {
-        var n = samples.length, span = C_X1 - C_X0, p = [C_X0 + ',170'];
-        for (var i = 0; i < n; i++) {
-          var m = samples[i].mod; if (m === null || m === undefined || isNaN(m)) m = 0;
-          p.push((C_X0 + (i / (n - 1)) * span).toFixed(1) + ',' + (170 - Math.max(0, Math.min(100, m)) * 0.4).toFixed(1));
+        var span = C_X1 - C_X0, p = [C_X0 + ',170'];
+        for (var i = 0; i < arr.length; i++) {
+          var m = arr[i].mod; if (m === null || m === undefined || isNaN(m)) m = 0;
+          p.push((C_X0 + (i / (arr.length - 1)) * span).toFixed(1) + ',' + (170 - Math.max(0, Math.min(100, m)) * 0.4).toFixed(1));
         }
         p.push(C_X1 + ',170'); mod.setAttribute('points', p.join(' '));
       }
@@ -607,6 +626,7 @@
     setLink('lk-therm', 'fl-therm', conn.ot); setDot('dot-therm', conn.ot);
     var ws2 = document.getElementById('cnWifiSub'); if (ws2) ws2.textContent = conn.rssi === null ? conn.mode : (conn.mode + ' · ' + conn.rssi + ' dBm');
     var md = document.getElementById('cnModeTxt'); if (md) md.textContent = conn.mode || '—';
+    renderConnDetail();
   }
 
   // ---------- Settings (built from GET /api/v2/settings) ----------
@@ -686,6 +706,13 @@
       input.addEventListener('change', function () { markDirty(k, input.checked ? 'true' : 'false', row); });
     } else if (type === 'r') {
       input = document.createElement('input'); input.type = 'text'; input.value = curVal(k); input.disabled = true;
+    } else if (ENUM_OPTS[k]) {
+      input = document.createElement('select');
+      ENUM_OPTS[k].forEach(function (o) {
+        var opt = document.createElement('option'); opt.value = '' + o[0]; opt.textContent = o[1]; input.appendChild(opt);
+      });
+      input.value = '' + (parseInt(curVal(k), 10) || 0);
+      input.addEventListener('change', function () { markDirty(k, input.value, row); });
     } else {
       input = document.createElement('input');
       input.type = (type === 'p') ? 'password' : (type === 'i') ? 'number' : 'text';
@@ -792,6 +819,133 @@
     cols.appendChild(card);
   }
 
+  // ============================================================
+  // P9: heat-source control, REST seed, target steppers, conn detail,
+  // support hover, graph window/export, settings enum options.
+  // ============================================================
+  var sat = { source: 0, detected: 1, target: null };  // source: 0=auto,1=gas,2=hp,3=hybrid
+  function effectiveSource() { return sat.source === 0 ? sat.detected : sat.source; }
+  var statsSort = { col: 'id', asc: true };
+  function sortStatsCmp(a, b) {
+    var sa = stats[a], sb = stats[b], dir = statsSort.asc ? 1 : -1;
+    switch (statsSort.col) {
+      case 'label': return (sa.label || '').localeCompare(sb.label || '') * dir;
+      case 'dir': return (dirBadge(sa)[0]).localeCompare(dirBadge(sb)[0]) * dir;
+      case 'interval': return ((sa.interval || 0) - (sb.interval || 0)) * dir;
+      case 'count': return (sa.count - sb.count) * dir;
+      case 'value': return ('' + (sa.value || '')).localeCompare('' + (sb.value || '')) * dir;
+      default: return (a - b) * dir;
+    }
+  }
+  var graphWindowMs = 3600000;
+  var ENUM_OPTS = {
+    satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid']],
+    satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']]
+  };
+
+  function fetchSeed() {
+    fetch(APIGW + 'v2/otgw/otmonitor').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var o = j && j.otmonitor; if (!o) return;
+      function num(k) { var e = o[k]; if (!e || e.value === undefined) return null; var v = parseFloat(e.value); return isNaN(v) ? null : v; }
+      function on(k) { var e = o[k]; if (!e || e.value === undefined) return null; return /on|true|1/i.test('' + e.value); }
+      var map = { flow: 'boilertemperature', ret: 'returnwatertemperature', dhw: 'dhwtemperature', outside: 'outsidetemperature', room: 'roomtemperature', roomSet: 'roomsetpoint', chSet: 'controlsetpoint', mod: 'relmodlvl', pressure: 'chwaterpressure' };
+      var changed = false;
+      Object.keys(map).forEach(function (f) { var v = num(map[f]); if (v !== null) { model[f] = v; changed = true; } });
+      var fl = on('flamestatus'); if (fl !== null) { model.flame = fl; changed = true; }
+      var ch = on('chmodus'); if (ch !== null) { model.ch = ch; changed = true; }
+      var dh = on('dhwmode'); if (dh !== null) { model.dhw_on = dh; changed = true; }
+      if (changed) { pushSample(); scheduleRender(); }
+    }).catch(function () { });
+  }
+
+  function fetchSatStatus() {
+    fetch(APIGW + 'v2/sat/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var st = j && (j.sat || j); if (!st) return;
+      if (st.heating_source !== undefined) sat.source = st.heating_source | 0;
+      if (st.heating_source_detected !== undefined) sat.detected = st.heating_source_detected | 0;
+      if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
+      applyApplianceToggle();
+      if (activeDesign() === 'a') renderA();
+    }).catch(function () { });
+  }
+  function applyApplianceToggle() {
+    var hp = effectiveSource() === 2;
+    var svg = document.getElementById('schem'); if (svg) svg.classList.toggle('heatpump', hp);
+    document.querySelectorAll('#applToggle .seg2btn').forEach(function (b) {
+      var isHp = (b.dataset.appl === 'hp');
+      b.classList.toggle('active', isHp === hp);
+    });
+  }
+  function setSource(v) {
+    fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'satsource', value: '' + v }) })
+      .then(function (r) { if (r.ok) { sat.source = v; applyApplianceToggle(); setTimeout(fetchSatStatus, 400); } }).catch(function () { });
+  }
+
+  function stepTarget(delta) {
+    var base = (sat.target !== null && !isNaN(sat.target)) ? sat.target : (model.roomSet !== null ? model.roomSet : 20);
+    var t = Math.max(5, Math.min(30, Math.round((base + delta) * 2) / 2));
+    txt('bCmd', 'set target ' + t.toFixed(1) + '°…');
+    fetch(APIGW + 'v2/sat/target', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ value: '' + t }) })
+      .then(function (r) {
+        if (r.ok) { sat.target = t; txt('bSet', 'target ' + t.toFixed(1) + '°'); txt('bCmd', 'target set ' + t.toFixed(1) + '°'); }
+        else txt('bCmd', 'set failed (HTTP ' + r.status + ')');
+      }).catch(function () { txt('bCmd', 'set failed'); });
+  }
+
+  function renderConnDetail() {
+    var box = document.getElementById('connDetail'); if (!box) return;
+    var wsUp = ws && ws.readyState === 1;
+    var rows = [
+      { k: 'WiFi / network', s: conn.wifi, d: (conn.mode || '?') + (conn.rssi !== null ? ' · ' + conn.rssi + ' dBm' : '') },
+      { k: 'WebSocket (live log)', s: wsUp ? 'st-ok' : 'st-down', d: wsUp ? 'connected' : 'disconnected — values seeded from REST' },
+      { k: 'MQTT broker', s: conn.mqtt, d: conn.mqttOn ? 'connected' : 'not connected' },
+      { k: 'OpenTherm bus', s: conn.ot, d: conn.otOn ? 'online' : 'no data' },
+      { k: 'NTP / clock', s: conn.ntp, d: 'time syncing' }
+    ];
+    box.textContent = '';
+    rows.forEach(function (r) {
+      var row = document.createElement('div'); row.className = 'connrow ' + r.s;
+      var b = document.createElement('span'); b.className = 'badge'; b.textContent = STATE_TXT[r.s] || '—';
+      var body = document.createElement('div'); body.className = 'body';
+      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = r.k;
+      var det = document.createElement('div'); det.className = 'det'; det.textContent = r.d;
+      body.appendChild(nm); body.appendChild(det); row.appendChild(b); row.appendChild(body); box.appendChild(row);
+    });
+  }
+
+  function showSupTip(id, e) {
+    var tip = document.getElementById('supTip'); if (!tip) return;
+    var sx = stats[id];
+    tip.textContent = '';
+    var b = document.createElement('b'); b.textContent = id; tip.appendChild(b);
+    tip.appendChild(document.createTextNode(' ' + (sx ? (sx.label || 'seen') : 'not seen')));
+    tip.style.left = e.clientX + 'px'; tip.style.top = e.clientY + 'px'; tip.style.opacity = '1';
+  }
+  function hideSupTip() { var tip = document.getElementById('supTip'); if (tip) tip.style.opacity = '0'; }
+
+  function downloadBlob(blob, name) {
+    var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+  }
+  function ts() { var d = new Date(); function p(n) { return (n < 10 ? '0' : '') + n; } return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); }
+  function exportCsv() {
+    var arr = windowedSamples();
+    var lines = ['epoch_ms,flow,return,setpoint,modulation'];
+    arr.forEach(function (s) { lines.push([s.t || '', s.flow, s.ret, s.sp, s.mod].map(function (x) { return x === null || x === undefined ? '' : x; }).join(',')); });
+    downloadBlob(new Blob([lines.join('\n')], { type: 'text/csv' }), 'otgw-graph-' + ts() + '.csv');
+  }
+  function exportPng() {
+    var svg = document.getElementById('gstrip'); if (!svg) return;
+    var xml = new XMLSerializer().serializeToString(svg);
+    var img = new Image();
+    img.onload = function () {
+      var c = document.createElement('canvas'); c.width = 780; c.height = 210;
+      var ctx = c.getContext('2d'); ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, 780, 210); ctx.drawImage(img, 0, 0);
+      c.toBlob(function (blob) { if (blob) downloadBlob(blob, 'otgw-graph-' + ts() + '.png'); });
+    };
+    img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+  }
+
   // ---------- init ----------
   function init() {
     initTheme();
@@ -841,6 +995,42 @@
     // Connectivity: poll device health for the strip + connection map.
     fetchConn();
     setInterval(fetchConn, 15000);
+
+    // P9 wiring -----------------------------------------------------------
+    document.querySelectorAll('#applToggle .seg2btn').forEach(function (b) {
+      b.addEventListener('click', function () { setSource(b.dataset.appl === 'hp' ? 2 : 1); });
+    });
+    var bU = document.getElementById('bUp'); if (bU) bU.addEventListener('click', function () { stepTarget(0.5); });
+    var bD = document.getElementById('bDown'); if (bD) bD.addEventListener('click', function () { stepTarget(-0.5); });
+    document.querySelectorAll('#statsTable thead th').forEach(function (th, idx) {
+      var cols = ['id', 'label', 'dir', 'interval', 'count', 'value'];
+      th.style.cursor = 'pointer';
+      th.addEventListener('click', function () {
+        var col = cols[idx] || 'id';
+        if (statsSort.col === col) statsSort.asc = !statsSort.asc; else { statsSort.col = col; statsSort.asc = true; }
+        if (isMonitorVisible('mstats')) renderStats();
+      });
+    });
+    document.querySelectorAll('#mlog .tbtn').forEach(function (b) {
+      if (/download/i.test(b.textContent)) b.addEventListener('click', function () {
+        downloadBlob(new Blob([logBuf.join('\n')], { type: 'text/plain' }), 'otgw-log-' + ts() + '.txt');
+      });
+    });
+    document.querySelectorAll('#mgraph .tchip').forEach(function (ch) {
+      ch.addEventListener('click', function () {
+        var t = ch.textContent.toLowerCase();
+        graphWindowMs = t.indexOf('10') >= 0 ? 600000 : t.indexOf('4') >= 0 ? 14400000 : t.indexOf('24') >= 0 ? 86400000 : 3600000;
+        document.querySelectorAll('#mgraph .tchip').forEach(function (x) { x.classList.toggle('on', x === ch); });
+        if (isMonitorVisible('mgraph')) renderGraph();
+      });
+    });
+    document.querySelectorAll('#mgraph .tbtn').forEach(function (b) {
+      if (/png/i.test(b.textContent)) b.addEventListener('click', exportPng);
+      else if (/csv/i.test(b.textContent)) b.addEventListener('click', exportCsv);
+    });
+    fetchSeed(); fetchSatStatus();
+    setInterval(function () { if (!ws || ws.readyState !== 1) fetchSeed(); }, 20000);
+    setInterval(fetchSatStatus, 30000);
 
     // Hooks for later phases to attach live-data renderers.
     window.OTGWv2 = {
