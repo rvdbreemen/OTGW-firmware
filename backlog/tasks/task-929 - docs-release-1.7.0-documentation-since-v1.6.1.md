@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-24 22:19'
-updated_date: '2026-06-24 22:25'
+updated_date: '2026-06-24 22:29'
 labels:
   - docs
   - update-docs
@@ -21,7 +21,7 @@ Release 1.7.0 docs pass. PREV=v1.6.1. Themes: heap/crash hardening (TASK-837/841
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 API docs updated for gateway-override REST/MQTT surface (openapi.yaml, README.md, MQTT.md)
+- [x] #1 API docs updated for gateway-override REST/MQTT surface (openapi.yaml, README.md, MQTT.md)
 - [x] #2 Contributors gathered (gh PRs + Discord #beta-testing + #devs-esp-firmware)
 - [x] #3 RELEASE_NOTES_1.7.0.md generated
 - [x] #4 RELEASE_GITHUB_1.7.0.md generated
