@@ -1617,11 +1617,33 @@ $script:CrashlogWorkerScript = {
                 }
                 catch { }
             }
-            return @{ Status = $status; Body = $null; Error = $we.Message }
+            # Classify the transport failure (Timeout vs ConnectFailure vs ...) so a poll that
+            # loses the ESP8266 single-loop accept race reads differently from a dead device.
+            $reason = if ($we.Status) { "$($we.Status) - $($we.Message)" } else { $we.Message }
+            return @{ Status = $status; Body = $null; Error = $reason }
         }
         catch {
             return @{ Status = $null; Body = $null; Error = $_.Exception.Message }
         }
+    }
+
+    # The device runs one cooperative loop and serves a single HTTP client at a time. A heavy
+    # synchronous handler (firmware/files hex-version scan ~2.4s, settings flash write ~0.25s)
+    # can briefly block the accept path, so a lone 5s poll occasionally times out on a perfectly
+    # healthy device. Give each poll a longer ceiling and one retry before it counts as a failure;
+    # this is bounded extra work only when a poll actually fails, so it adds no sustained load.
+    function Invoke-HttpGetResilient {
+        param([string]$Url, [int]$TimeoutMs = 10000, [int]$Attempts = 2, [int]$BackoffMs = 1500)
+        $result = $null
+        for ($i = 1; $i -le $Attempts; $i++) {
+            $result = Invoke-HttpGet -Url $Url -TimeoutMs $TimeoutMs
+            # Done on any real HTTP answer (200, or a status like 404); only retry transport failures.
+            if ($null -ne $result.Status) { return $result }
+            if ($i -lt $Attempts -and -not [OtgMqttCapture.CancelFlag]::StopRequested) {
+                Start-Sleep -Milliseconds $BackoffMs
+            }
+        }
+        return $result
     }
 
     $summary = "Crash-log capture: completed normally."
@@ -1640,7 +1662,7 @@ $script:CrashlogWorkerScript = {
         while ($true) {
             $polls++
 
-            $crash = Invoke-HttpGet -Url $CrashlogUrl
+            $crash = Invoke-HttpGetResilient -Url $CrashlogUrl
             if ($crash.Status -eq 200 -and $crash.Body) {
                 $trimmed = $crash.Body.Trim()
                 if ($trimmed -ne $lastCrashBody) {
@@ -1656,10 +1678,10 @@ $script:CrashlogWorkerScript = {
                 }
             }
             else {
-                Write-CrashLine "[crashlog #$polls] request failed: $($crash.Error)"
+                Write-CrashLine "[crashlog #$polls] request failed after retry: $($crash.Error)"
             }
 
-            $reboot = Invoke-HttpGet -Url $RebootLogUrl
+            $reboot = Invoke-HttpGetResilient -Url $RebootLogUrl
             if ($reboot.Status -eq 200 -and $reboot.Body) {
                 $trimmed = $reboot.Body.Trim()
                 if ($trimmed -and $trimmed -ne $lastRebootBody) {
