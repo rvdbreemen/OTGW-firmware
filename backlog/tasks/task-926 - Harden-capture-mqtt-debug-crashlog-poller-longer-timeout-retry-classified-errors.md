@@ -3,7 +3,7 @@ id: TASK-926
 title: >-
   Harden capture-mqtt-debug crashlog poller: longer timeout, retry, classified
   errors
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 20:31'
@@ -31,3 +31,9 @@ Field capture (1.7.0-beta.34) showed ~15% of crashlog polls logged as 'request f
 <!-- SECTION:NOTES:BEGIN -->
 Patched scripts/capture-mqtt-debug.bat crashlog worker: new Invoke-HttpGetResilient (10s timeout, 2 attempts, 1.5s backoff, retries transport failures only); WebException classified by .Status (Timeout/ConnectFailure/...); failure line now 'failed after retry'. PS payload parses clean (0 errors). Host-side only, no firmware bump.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Crashlog poller in capture-mqtt-debug.bat no longer logs false failures. Added Invoke-HttpGetResilient (10s timeout, 1 retry, 1.5s backoff) wrapping the crashlog+reboot_log polls; only transport failures retry, real HTTP answers (200/404) return immediately. WebException now classified by .Status. Worst-case 21.5s/failed-poll stays under the 30s interval; no sustained load added.
+<!-- SECTION:FINAL_SUMMARY:END -->
