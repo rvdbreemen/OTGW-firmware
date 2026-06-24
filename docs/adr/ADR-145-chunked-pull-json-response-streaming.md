@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-06-18. Guideline-level (per ADR-080): a response-serving idiom
+Superseded by ADR-146, 2026-06-18 (chunked approach retired when ArduinoJson was reverted). Guideline-level (per ADR-080): a response-serving idiom
 enforced at PR review, not by an automated `evaluate.py` gate. **Field-validation
 gated** on the criteria this fix actually targets: the under-load IDF Task-Watchdog
 reboot is eliminated (0 watchdog panics on the chunked build, where the buffered

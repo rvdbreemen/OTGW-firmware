@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Date: 2026-06-21.
+Accepted. Date: 2026-06-24 (maintainer approval; landed: satGetColdSetpoint()). Originally Proposed 2026-06-21.
 
 ## Status History
 

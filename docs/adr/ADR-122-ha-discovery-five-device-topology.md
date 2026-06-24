@@ -1,7 +1,7 @@
 ---
 id: ADR-122
 title: HA Discovery Five-Device Topology
-status: Proposed
+status: Superseded by ADR-140
 date: 2026-06-03
 tags: [mqtt, ha-discovery, topology, legacy-mode, sat, esp, gateway, boiler, thermostat]
 supersedes: []

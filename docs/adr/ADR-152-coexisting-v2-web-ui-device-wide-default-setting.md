@@ -1,6 +1,7 @@
 # ADR-152: Coexisting v2 Web UI selected by a device-wide setting
 
-- **Status:** Proposed
+- **Status:** Accepted
+- **Accepted:** 2026-06-24 (maintainer approval)
 - **Date:** 2026-06-24
 - **Deciders:** Robert van den Breemen (maintainer), Claude
 - **Type:** Structural (no automated CI gate; reviewed at PR per ADR-080)
