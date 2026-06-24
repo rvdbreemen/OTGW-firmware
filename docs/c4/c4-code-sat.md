@@ -145,6 +145,9 @@ Auto-discovery: every format-passing MAC enters the roster on first sight. The f
 - `parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt): bool` (static)
   - Parses BTHome v2 format (service data UUID 0xFCD2)
 
+- `parseBLEMiBeaconFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt): bool` (static)
+  - Parses plaintext Xiaomi MiBeacon format (service data UUID 0xFE95) for stock Mijia sensors (TASK-930 Phase 1; object TLV 0x1004/0x1006/0x100A/0x100D). Encrypted MiBeacon (frame-control bit 3) is skipped — deferred to a gated Phase 2 (AES-CCM + per-slot bindkey), see ADR-153.
+
 - `SATBLEScanCallbacks::onResult(const NimBLEAdvertisedDevice*)`
   - NimBLE 2.x scan callback. Runs on the BLE host task; defers `flushSettings()` to the loop task so writes never happen from BLE context.
 

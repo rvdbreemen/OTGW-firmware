@@ -8,7 +8,8 @@
 **  SAT concept and algorithm design by George Dellas
 **
 **  Scans for BLE advertisements from common temperature/humidity sensors
-**  (Xiaomi LYWSD03MMC with ATC/pvvx custom firmware, BTHome v2 protocol).
+**  (Xiaomi LYWSD03MMC with ATC/pvvx custom firmware, BTHome v2 protocol, and
+**  plaintext Xiaomi MiBeacon 0xFE95 for stock Mijia sensors — TASK-930 Phase 1).
 **  Provides room temperature input for SAT control loop.
 **
 **  TASK-487 / ADR-092: built on NimBLE-Arduino 2.x rather than the classic
@@ -47,6 +48,9 @@ static_assert(BLE_STALE_MS > 60000UL, "BLE_STALE_MS must be > 60 s; see SATble.i
 static const uint16_t ATC_SERVICE_UUID_16    = 0x181A;
 // BTHome v2 service data UUID: 0xFCD2
 static const uint16_t BTHOME_SERVICE_UUID_16 = 0xFCD2;
+// Xiaomi MiBeacon service data UUID: 0xFE95 (stock Mijia sensors, e.g. MJ_HT_V1,
+// unencrypted LYWSD03MMC). TASK-930 Phase 1 decodes plaintext frames only.
+static const uint16_t MIBEACON_SERVICE_UUID_16 = 0xFE95;
 
 // BTHome v2 device-info / flag byte
 //   bit6 = version 2 (must be 1)
@@ -141,6 +145,7 @@ static portMUX_TYPE _bleSensorsMux = portMUX_INITIALIZER_UNLOCKED;
 // --- Forward declarations ---
 static bool parseBLEAtcFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);
 static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);
+static bool parseBLEMiBeaconFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);  // TASK-930
 static int  bleFindOrAllocSlot(const char* mac);
 static bool bleMatchesConfiguredMAC(const char* mac);
 static bool bleNameConfirmedMismatch(const char* name);  // TASK-895
@@ -235,6 +240,91 @@ static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, f
 }
 
 //=====================================================================
+// Parse Xiaomi MiBeacon PLAINTEXT format from service data UUID 0xFE95
+// (stock Mijia sensors: MJ_HT_V1, unencrypted LYWSD03MMC, MHO-C401, ...).
+// Frame (service-data payload, offset 0 = after the UUID):
+//   [0..1] frame control u16 LITTLE-ENDIAN
+//          bit3=encrypted, bit4=mac-included, bit5=capability-included,
+//          bit6=object-included, bits[15:12]=version.
+//   [2..3] product id (u16 LE)   [4] frame counter (u8)
+//   [opt]  MAC(6, byte-reversed) iff bit4; capability(1, +1 if cap&0x20) iff bit5
+//   [end]  object TLV list iff bit6 — each: id(u16 LE) | len(u8) | value[len]
+// Objects: 0x1004 temp s16/10, 0x1006 hum u16/10, 0x100A batt u8 %,
+//          0x100D combined (s16 temp/10 + u16 hum/10).
+// Encrypted frames (bit3) are SKIPPED here; TASK-930 Phase 2 (AES-CCM +
+// per-slot bindkey) handles those. PHASE-1 CAVEAT: each advert is decoded in
+// isolation, so a sensor that splits temp and humidity across separate adverts
+// updates one field per advert (the other reflects the most recent frame).
+// Refs: ESPHome xiaomi_ble.cpp, Bluetooth-Devices/xiaomi-ble parser.py (cross-verified).
+//=====================================================================
+static bool parseBLEMiBeaconFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt)
+{
+  if (len < 5) return false;
+
+  uint16_t frctrl = (uint16_t)(data[0] | (data[1] << 8));
+  if (frctrl & 0x0008) return false;          // encrypted, no key here -> Phase 2
+  if ((frctrl & 0x0040) == 0) return false;   // no object payload
+
+  // Payload offset: frctrl(2)+productid(2)+counter(1)=5, then optional fields.
+  size_t pos = 5;
+  if (frctrl & 0x0010) pos += 6;              // mac-included (6 bytes, reversed)
+  if (frctrl & 0x0020) {                      // capability-included
+    if (pos >= len) return false;
+    uint8_t cap = data[pos];
+    pos += 1;
+    if (cap & 0x20) {                         // I/O capability sub-field
+      if (pos >= len) return false;
+      pos += 1;
+    }
+  }
+
+  bool gotTemp = false, gotHum = false;
+  // TLV walk: id(u16 LE) | len(u8) | value[len]. One advert may carry several.
+  while (pos + 3 <= len) {
+    uint16_t objId  = (uint16_t)(data[pos] | (data[pos + 1] << 8));
+    uint8_t  objLen = data[pos + 2];
+    size_t   val    = pos + 3;
+    if (val + objLen > len) break;            // truncated value -> stop
+
+    switch (objId) {
+      case 0x1004:                            // temperature s16 / 10
+        if (objLen >= 2) {
+          int16_t rawT = (int16_t)(data[val] | (data[val + 1] << 8));
+          *temp = rawT / 10.0f;
+          if (*temp >= -40.0f && *temp <= 60.0f) gotTemp = true;
+        }
+        break;
+      case 0x1006:                            // humidity u16 / 10
+        if (objLen >= 2) {
+          uint16_t rawH = (uint16_t)(data[val] | (data[val + 1] << 8));
+          *hum = rawH / 10.0f;
+          if (*hum >= 0.0f && *hum <= 100.0f) gotHum = true;
+        }
+        break;
+      case 0x100A:                            // battery percent u8
+        if (objLen >= 1) *batt = data[val];
+        break;
+      case 0x100D:                            // combined: s16 temp/10 + u16 hum/10
+        if (objLen >= 4) {
+          int16_t  rawT = (int16_t)(data[val] | (data[val + 1] << 8));
+          uint16_t rawH = (uint16_t)(data[val + 2] | (data[val + 3] << 8));
+          *temp = rawT / 10.0f;
+          *hum  = rawH / 10.0f;
+          if (*temp >= -40.0f && *temp <= 60.0f) gotTemp = true;
+          if (*hum  >= 0.0f  && *hum  <= 100.0f) gotHum = true;
+        }
+        break;
+      default:
+        break;                                // unknown object: length-prefixed, skip
+    }
+    pos = val + objLen;
+  }
+
+  (void)gotHum;  // humidity optional; require a valid temperature to register
+  return gotTemp;
+}
+
+//=====================================================================
 // Check if a MAC address matches the configured BLE MAC filter
 // Empty/unset MAC means accept all sensors
 //=====================================================================
@@ -313,6 +403,15 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
       if (bthomeData.length() >= 3) {
         parsed = parseBLEBTHomeFormat(reinterpret_cast<const uint8_t*>(bthomeData.data()),
                                        bthomeData.length(), &temp, &hum, &batt);
+      }
+    }
+
+    // TASK-930: fall through to Xiaomi MiBeacon (UUID 0xFE95) if BTHome didn't match.
+    if (!parsed) {
+      std::string mibData = dev->getServiceData(NimBLEUUID((uint16_t)MIBEACON_SERVICE_UUID_16));
+      if (mibData.length() >= 5) {
+        parsed = parseBLEMiBeaconFormat(reinterpret_cast<const uint8_t*>(mibData.data()),
+                                        mibData.length(), &temp, &hum, &batt);
       }
     }
 
