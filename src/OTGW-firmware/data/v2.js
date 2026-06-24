@@ -66,6 +66,8 @@
       el.classList.toggle('active', el.id === t);
     });
     if (t === 'mlog') renderLog();
+    else if (t === 'mstats') renderStats();
+    else if (t === 'msupport') renderSupport();
   }
 
   // ---------- back to the classic UI ----------
@@ -184,6 +186,7 @@
       applyFrame(raw);
       pushTicker(d);                // mission-control raw-frame ticker (concept C)
       pushLog(d);                   // Monitor > Log console
+      updateStats(d, raw);          // Monitor > Stats + OT Support
       if (activeDesign() === 'c') scheduleRender();
     }
   }
@@ -203,6 +206,106 @@
   function pushTicker(line) {
     ticker.push(line);
     if (ticker.length > TICKER_MAX) ticker.shift();
+  }
+
+  // ---------- Monitor > Stats + OT Support ----------
+  // Per-msgID telemetry built from the decoded log lines. We reuse the
+  // firmware's own "> label = value" decoding rather than a static table.
+  var stats = {};            // id -> {label, value, dirT, dirB, count, lastMs, interval}
+  var statsSearch = '';
+  function updateStats(line, raw) {
+    var id = parseInt(raw.substr(3, 2), 16);
+    if (isNaN(id)) return;
+    var s = stats[id] || (stats[id] = { label: '', value: '', dirT: false, dirB: false, count: 0, lastMs: 0, interval: 0 });
+    // direction from the raw frame's leading letter (T/R = request, B/A = answer)
+    var dl = raw.charAt(0).toUpperCase();
+    if (dl === 'T' || dl === 'R') s.dirT = true;
+    if (dl === 'B' || dl === 'A') s.dirB = true;
+    // label = value from the part after '>'
+    var gt = line.indexOf('>');
+    if (gt !== -1) {
+      var rest = line.substring(gt + 1).trim();
+      var eq = rest.indexOf('=');
+      if (eq !== -1) { s.label = rest.substring(0, eq).trim(); s.value = rest.substring(eq + 1).trim(); }
+      else if (rest) { s.label = rest; }
+    }
+    var now = Date.now();
+    if (s.lastMs) s.interval = now - s.lastMs;
+    s.lastMs = now; s.count++;
+    if (isMonitorVisible('mstats')) renderStats();
+    if (isMonitorVisible('msupport')) renderSupport();
+  }
+  function isMonitorVisible(panelId) {
+    var p = document.getElementById('page-monitor');
+    var el = document.getElementById(panelId);
+    return p && el && p.classList.contains('active') && el.classList.contains('active');
+  }
+  function dirBadge(s) {
+    if (s.dirT && s.dirB) return ['T+B', 'dir-tb'];
+    if (s.dirT) return ['T', 'dir-t'];
+    if (s.dirB) return ['B', 'dir-b'];
+    return ['—', ''];
+  }
+  function renderStats() {
+    var tb = document.querySelector('#statsTable tbody'); if (!tb) return;
+    var ids = Object.keys(stats).map(Number).sort(function (a, b) { return a - b; });
+    var q = statsSearch.trim().toLowerCase();
+    tb.innerHTML = '';
+    var shown = 0;
+    ids.forEach(function (id) {
+      var s = stats[id];
+      if (q && ('' + id).indexOf(q) === -1 && s.label.toLowerCase().indexOf(q) === -1) return;
+      shown++;
+      var db = dirBadge(s);
+      var tr = document.createElement('tr');
+      function td(txt, cls) { var e = document.createElement('td'); if (cls) e.className = cls; e.textContent = txt; return e; }
+      var idTd = document.createElement('td'); var b = document.createElement('span'); b.className = 'idbadge'; b.textContent = id; idTd.appendChild(b);
+      tr.appendChild(idTd);
+      tr.appendChild(td(s.label || ('ID ' + id)));
+      var dTd = document.createElement('td'); var badge = document.createElement('span'); badge.className = 'dirbadge ' + db[1]; badge.textContent = db[0]; dTd.appendChild(badge); tr.appendChild(dTd);
+      tr.appendChild(td(s.interval ? (s.interval / 1000).toFixed(1) + 's' : '—'));
+      tr.appendChild(td('' + s.count));
+      tr.appendChild(td(s.value || '—', 'statval'));
+      tr.lastChild.style.textAlign = 'right';
+      tb.appendChild(tr);
+    });
+    var cnt = document.getElementById('statsCount'); if (cnt) cnt.textContent = shown;
+  }
+  function renderSupport() {
+    var grid = document.getElementById('supMatrix'); if (!grid) return;
+    if (grid.childElementCount !== 128) {
+      grid.innerHTML = '';
+      for (var i = 0; i < 128; i++) {
+        var c = document.createElement('div'); c.className = 'mcellq'; c.dataset.id = i; c.textContent = i;
+        c.addEventListener('click', (function (id) { return function () { showSupportDetail(id); }; })(i));
+        grid.appendChild(c);
+      }
+    }
+    var seen = 0;
+    for (var id = 0; id < 128; id++) {
+      var cell = grid.children[id], s = stats[id];
+      cell.className = 'mcellq' + (s ? (s.dirT && s.dirB ? ' both' : (s.dirT ? ' tonly' : ' bonly')) : '');
+      if (s) seen++;
+    }
+    var sc = document.getElementById('supCount'); if (sc) sc.textContent = seen;
+  }
+  function showSupportDetail(id) {
+    var el = document.getElementById('supDetail'); if (!el) return;
+    var s = stats[id];
+    el.innerHTML = '';
+    var top = document.createElement('div'); top.className = 'sd-top';
+    var num = document.createElement('span'); num.className = 'sd-num'; num.textContent = id; top.appendChild(num);
+    var hex = document.createElement('span'); hex.className = 'sd-hex'; hex.textContent = '0x' + ('0' + id.toString(16).toUpperCase()).slice(-2); top.appendChild(hex);
+    el.appendChild(top);
+    var h5 = document.createElement('h5'); h5.textContent = s ? (s.label || ('ID ' + id)) : ('ID ' + id + ' — not observed'); el.appendChild(h5);
+    if (s) {
+      var dl = document.createElement('dl');
+      [['Value', s.value || '—'], ['Direction', dirBadge(s)[0]], ['Count', '' + s.count], ['Interval', s.interval ? (s.interval / 1000).toFixed(1) + 's' : '—']]
+        .forEach(function (kv) { var dt = document.createElement('dt'); dt.textContent = kv[0]; var dd = document.createElement('dd'); dd.textContent = kv[1]; dl.appendChild(dt); dl.appendChild(dd); });
+      el.appendChild(dl);
+    } else {
+      var hint = document.createElement('div'); hint.className = 'sd-hint'; hint.textContent = 'This message ID has not been seen on the bus yet.'; el.appendChild(hint);
+    }
   }
 
   // ---------- Monitor > Log ----------
@@ -469,6 +572,8 @@
     document.querySelectorAll('#mlog .tbtn').forEach(function (b) {
       if (/clear/i.test(b.textContent)) b.addEventListener('click', function () { logBuf = []; renderLog(); });
     });
+    var ss = document.getElementById('statsSearch');
+    if (ss) ss.addEventListener('input', function () { statsSearch = ss.value; if (isMonitorVisible('mstats')) renderStats(); });
 
     var sp = localStorage.getItem('otgw-v2-page'); showPage(sp || 'home');
     var sd = localStorage.getItem('otgw-v2-design'); showDesign(sd || 'a');
