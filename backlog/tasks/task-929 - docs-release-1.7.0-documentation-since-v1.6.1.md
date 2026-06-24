@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-24 22:19'
-updated_date: '2026-06-24 22:29'
+updated_date: '2026-06-24 22:31'
 labels:
   - docs
   - update-docs
@@ -29,3 +29,9 @@ Release 1.7.0 docs pass. PREV=v1.6.1. Themes: heap/crash hardening (TASK-837/841
 - [x] #6 README What's New + CHANGELOG.md updated
 - [x] #7 Docs folder cleanup (archive old releases, move misplaced)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Release 1.7.0 docs: full RELEASE_NOTES + RELEASE_GITHUB, CHANGELOG [1.7.0], BREAKING_CHANGES (none), README What's New. API docs updated for gateway-override endpoint/topics (ADR-082), ID-27 stat_t retarget, 3 fragskip stat topics, plus sensors/boiler-support/ot-support gap closure. Contributors: GeorgeZ83, Richard_HA, crashevans, Ties, Remco, Mattie, Andre Brait. Old release notes archived to docs/releases/.
+<!-- SECTION:FINAL_SUMMARY:END -->
