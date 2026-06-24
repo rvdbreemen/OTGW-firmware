@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-23T07:05:59.903Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-24T07:06:24.871Z
 > Files: 9 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../../ha-mqtt-validation/
@@ -399,7 +399,7 @@
 
 ## docs/
 
-- `daily-issue-report.md` — Daily Issue Report — 2026-06-23 (~823 tok)
+- `daily-issue-report.md` — Daily Issue Report — 2026-06-24 (~646 tok)
 
 ## docs/adr/
 
