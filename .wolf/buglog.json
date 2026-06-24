@@ -1,5 +1,24 @@
 [
   {
+    "id": "bug-036",
+    "timestamp": "2026-06-24T00:00:00Z",
+    "error_message": "ADR status-flip script corrupted 21 already-Accepted ADRs by rewriting their Status-History prose ('Proposed 2026-05-26; accepted by maintainer' -> 'Accepted 2026-05-26'). Separately, the initial grep reported 31 Proposed ADRs when only 5 were truly Proposed.",
+    "file": "docs/adr/ADR-*.md (driver: scratchpad flip_adrs.py)",
+    "root_cause": "Two-part false-positive sharing one root: a grep `^\\s*(status|Status):\\s*proposed` and a later `\\bProposed\\b in first 25 lines` both matched the historical 'Proposed <date>' line that every Accepted ADR keeps in its `## Status History` / status_history block. ADR current status has NO single canonical location: it lives in frontmatter `status:` on some files, `## Status` prose first word on others, or inline `- **Status:**` on others. Matching the word 'Proposed' anywhere therefore hits history, not current status.",
+    "fix": "Revert all ADR edits (git checkout -- docs/adr/), then detect TRUE current status per file in priority order: frontmatter `status:` if present, else first word under the `## Status` heading, else inline `**Status:**`. Only 5 ADRs were truly Proposed (122,142,145,150,152). Flip ONLY the canonical current-status line with an anchored regex (e.g. `^status: Proposed$`), never a bare substring that also matches the status_history block. Always `git diff` the result before committing.",
+    "tags": [
+      "adr",
+      "adr-kit",
+      "status",
+      "grep-false-positive",
+      "docs",
+      "2.0.0"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-24T00:00:00Z"
+  },
+  {
     "id": "bug-035",
     "timestamp": "2026-06-10T00:00:00Z",
     "error_message": "OTGW-firmware.ino:147:9: error: 'sscanf_P' was not declared in this scope; did you mean 'sscanf'? (env:esp32-combo only)",

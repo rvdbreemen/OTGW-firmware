@@ -1,14 +1,14 @@
 export const meta = {
   name: 'implement-next-task',
-  description: 'Continuously drain the actionable async-esp32s3 backlog (epic TASK-865): audit stuck/finishable In Progress + In Review tasks, then per task implement -> build/eval -> adversarial review -> Proposed ADR -> commit/push -> Discord, advancing to the next immediately until none remain or a transient failure ends the run. Parameterizable per worktree/branch for parallel lanes.',
+  description: 'Continuously drain the actionable async-esp32s3 backlog (epic TASK-865): audit stuck/finishable In Progress + In Review tasks, then per task implement -> build/eval -> adversarial review -> commit/push -> Discord, advancing to the next immediately until none remain or a transient failure ends the run. ADRs are NOT authored per task; one end-of-loop ADR-Evaluation pass reviews every task landed this run, dedups the architectural decisions, and drafts the Proposed ADRs (maintainer accepts them later). Parameterizable per worktree/branch for parallel lanes.',
   phases: [
-    { title: 'Audit', detail: 'reconcile stuck/finishable In Progress + In Review tasks' },
+    { title: 'Audit', detail: 'reconcile stuck/finishable In Progress + In Review tasks; capture run start HEAD' },
     { title: 'Select', detail: 'next actionable task (deps Done/In Review)' },
     { title: 'Implement', detail: 'coding agent, build + evaluator gated' },
     { title: 'Review', detail: 'adversarial check vs ACs + binding ADRs' },
-    { title: 'ADR', detail: 'Proposed ADR for architectural decisions' },
-    { title: 'Land', detail: 'status + (bump) + commit + push' },
+    { title: 'Land', detail: 'status + (bump) + commit + push (no ADR in the per-task commit)' },
     { title: 'Announce', detail: 'alpha-channel Discord report' },
+    { title: 'ADR Evaluation', detail: 'end-of-run: enumerate architectural decisions across ALL landed tasks, JS-number them, draft Proposed ADRs, guard, one docs commit, announce' },
   ],
 }
 
@@ -19,6 +19,10 @@ const A = (typeof args === 'object' && args) ? args : {}
 const REPO = A.repo || 'D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware'
 const BRANCH = A.branch || 'dev'
 const SKIP_BUMP = !!A.skipBump              // parallel lanes defer the prerelease bump to serial integration
+// ADR-Evaluation defers to serial integration on parallel lanes so two lanes never
+// race on ADR numbers. Defaults to skipBump (lanes set skipBump:true and inherit it);
+// pass skipAdrEval explicitly to override either way.
+const SKIP_ADR_EVAL = (typeof A.skipAdrEval === 'boolean') ? A.skipAdrEval : SKIP_BUMP
 const TARGET = (A.targetTask || '').trim()  // pin a specific task for a parallel lane; '' = auto-pick lowest
 const MAX_TASKS = A.maxTasks || 25          // safety cap on tasks drained per run
 
@@ -45,6 +49,20 @@ const cleanup = async (taskId, why) => {
 
 // ============================ AUDIT (once per run) ==========================
 phase('Audit')
+
+// Capture the run's start commit BEFORE the audit runs. The audit + every Land
+// status edit auto-commit in the dev tree (backlog CLI auto-commits there), so a
+// `completed[i].commit^` range would be fragile. `startHead..HEAD` is the only
+// stable range for the end-of-loop ADR-Evaluation pass. (TASK-928, advisor trap 2.)
+const HEAD = { type: 'object', required: ['head'], properties: { head: { type: 'string', description: 'output of git rev-parse HEAD' } } }
+const startCap = await agent(
+  `In ${REPO}: run \`git -C ${REPO} rev-parse HEAD\` and return ONLY the resulting 40-char commit hash as {head}. Do not change anything.`,
+  { label: 'capture-start-head', phase: 'Audit', schema: HEAD }
+)
+const startHead = (startCap && startCap.head ? startCap.head : '').trim()
+if (startHead) log(`Run start HEAD: ${startHead}`)
+else log(`WARNING: could not capture start HEAD; the ADR-Evaluation pass will fall back to reviewing each landed task's commit individually.`)
+
 const AUDIT = {
   type: 'object',
   required: ['summary', 'movedToDone', 'resetToToDo'],
@@ -90,14 +108,6 @@ const IMPL = {
   },
 }
 const REV = { type: 'object', required: ['pass', 'issues'], properties: { pass: { type: 'boolean' }, issues: { type: 'string' } } }
-const ADR = {
-  type: 'object', required: ['adrAction', 'adrFiles', 'summary'],
-  properties: { adrAction: { type: 'string', enum: ['none', 'created', 'amended', 'superseding'] }, adrFiles: { type: 'array', items: { type: 'string' } }, summary: { type: 'string' } },
-}
-const ADRGUARD = {
-  type: 'object', required: ['changed', 'note'],
-  properties: { changed: { type: 'array', items: { type: 'string' }, description: 'files where Accepted->Proposed or a premature back-reference revert was applied; empty if all already Proposed' }, note: { type: 'string' } },
-}
 const LAND = {
   type: 'object', required: ['committed', 'commitHash', 'pushed', 'newStatus', 'prereleaseTag', 'featureSummary', 'note'],
   properties: {
@@ -118,22 +128,20 @@ const selPrompt =
 const implPrompt = (sel, extra) =>
   `Implement this backlog task end-to-end in ${REPO} (branch ${BRANCH}).\n${RULES}\n\n` +
   `TASK ${sel.taskId}: ${sel.title}\n\n${sel.body}\n\n` +
-  `Steps: (1) \`backlog task edit ${sel.taskId} -s "In Progress" -a @claude\`. (2) Implement per the ## Acceptance Criteria, re-grepping the cited anchors first (they may have drifted). (3) Build \`python build.py --target <each of ${JSON.stringify(sel.buildTargets)}>\` and GREP the log for the per-env SUCCESS line. (4) \`python evaluate.py --quick\` (no NEW failures). (5) Do NOT commit/bump/change status (Land owns that). Satisfy only build/evaluator ACs; field-validation ACs are out of scope (no hardware).\n` +
+  `Steps: (1) \`backlog task edit ${sel.taskId} -s "In Progress" -a @claude\`. (2) Implement per the ## Acceptance Criteria, re-grepping the cited anchors first (they may have drifted). (3) Build \`python build.py --target <each of ${JSON.stringify(sel.buildTargets)}>\` and GREP the log for the per-env SUCCESS line. (4) \`python evaluate.py --quick\` (no NEW failures). (5) Do NOT commit/bump/change status (Land owns that), and do NOT author any ADR (the end-of-loop ADR-Evaluation pass owns that). Satisfy only build/evaluator ACs; field-validation ACs are out of scope (no hardware).\n` +
   (extra || '') + `Return what changed, build+eval pass, ACs met with evidence, blockers.`
 const revPrompt = (sel) =>
   `Adversarially review the working-tree diff in ${REPO} for TASK ${sel.taskId}.\n${RULES}\n\nTASK body (contract):\n${sel.body}\n\n` +
   `\`git -C ${REPO} diff\`/\`status\`. Check: (a) every build/evaluator AC actually met (re-run build/evaluate if unsure; grep the SUCCESS line); (b) no binding ADR/CLAUDE rule violated; (c) scope discipline (only this task's files; no stray edits). Default pass=false if any build/evaluator AC is unproven. Be specific.`
-const adrPrompt = (sel) =>
-  `Document architectural decisions in the diff for TASK ${sel.taskId} in ${REPO}, per adr-kit.\n${RULES}\n\nTASK body (may REQUIRE ADR work, e.g. supersede ADR-108/011/047/048/058):\n${sel.body}\n\n` +
-  `\`git -C ${REPO} diff\`. If the change makes/alters an architectural decision (new pattern/dependency, API/MQTT/topic contract, concurrency model, supersession): author a NEW (or amend a still-Proposed) ADR at docs/adr/ADR-NNN-kebab.md, Status MUST be "Proposed" (NEVER Accepted; maintainer's checkpoint). CRITICAL: the adr-kit:adr-generator definition DEFAULTS to "Accepted" for already-implemented decisions and its template pre-fills "status: Accepted" (agents/adr-generator.md:52,174) — you MUST OVERRIDE that. Emit Status "Proposed" and a SINGLE status_history entry (status: Proposed, changed_by: Agent, changed_via: adr-kit). NEVER write "status: Accepted" and NEVER fabricate a maintainer/manual acceptance entry. Include Context/Decision/Alternatives(>=2)/Consequences/Related/References; to supersede an Accepted ADR write a NEW one and do NOT touch the old body/Status (no "Superseded by"/"Amended by" back-reference on the old ADR while the new one is still Proposed). Else adrAction="none". Use the next free ADR number. Return action + file paths for Land to stage + one-line summary.`
-const landPrompt = (sel, adr) =>
+const landPrompt = (sel) =>
   `Land the reviewed work for TASK ${sel.taskId} in ${REPO} (branch ${BRANCH}).\n${RULES}\n\nsrcTouched=${sel.srcTouched}; fieldValidationRemains=${sel.fieldValidationRemains}; skipBump=${SKIP_BUMP}.\n` +
+  `NOTE: ADRs are NOT authored or committed here. The end-of-loop ADR-Evaluation pass drafts all Proposed ADRs for the run. Do NOT create, stage, or commit any docs/adr/*.md file in this step.\n` +
   `Steps (ORDER MATTERS — status must be INSIDE the commit so a checkout cannot revert it):\n` +
   `1. Set final status FIRST: if fieldValidationRemains "In Review", else "Done". \`backlog task edit ${sel.taskId} -s "<status>" --append-notes "<what landed + remaining field-validation ACs>"\`.\n` +
   (SKIP_BUMP
     ? `2. Do NOT bump the prerelease (parallel lane; the bump+tag happens at serial integration when this sub-branch merges). prereleaseTag="".\n`
     : `2. If srcTouched, run \`bin/bump-prerelease.sh\` (stages version.h + banners); record the new tag (e.g. alpha.182) as prereleaseTag. Else prereleaseTag="".\n`) +
-  `3. ADR GOVERNANCE GATE (fail-closed) FIRST: for each ADR file in ${JSON.stringify(adr.adrFiles)}, grep its \`## Status\`; if ANY reads "Accepted", STOP — do NOT commit, return committed=false with note "ADR self-accept slipped past the guard: <file> (acceptance is the maintainer's manual checkpoint)". Then stage ONLY this task's changed paths via \`git add <explicit paths>\` (NEVER \`git add -A\`): its source/doc files, the bump files (if any), ADR files (${JSON.stringify(adr.adrFiles)}), AND the task's own backlog/tasks/*.md (now carrying the new status). Do NOT stage sibling task notes or other in-flight work.\n` +
+  `3. Stage ONLY this task's changed paths via \`git add <explicit paths>\` (NEVER \`git add -A\`): its source/doc files, the bump files (if any), AND the task's own backlog/tasks/*.md (now carrying the new status). Do NOT stage any docs/adr/*.md, sibling task notes, or other in-flight work.\n` +
   `4. Commit subject \`<type>(<scope>): <imperative> (${sel.taskId})\`. No em dashes. Co-author trailer. \`git push origin ${BRANCH}\` with retry.\n` +
   `5. featureSummary: 1-2 plain sentences on the user-facing feature/improvement (for #alpha-testing). Empty if nothing committed.\n` +
   `Return committed/commitHash/pushed/newStatus/prereleaseTag/featureSummary/note.`
@@ -170,35 +178,8 @@ for (let n = 0; n < MAX_TASKS; n++) {
     if (!rev.pass) { await cleanup(sel.taskId, `review failed twice: ${rev.issues}`); endReason = `${sel.taskId} failed review twice (needs attention): ${rev.issues}`; break }
   }
 
-  phase('ADR')
-  let adr = await agent(adrPrompt(sel), { label: `adr:${sel.taskId}`, phase: 'ADR', schema: ADR, agentType: 'adr-kit:adr-generator' })
-  if (!adr) adr = { adrAction: 'none', adrFiles: [], summary: 'ADR agent unavailable (transient); skipped' }
-  if (adr.adrAction !== 'none') log(`ADR ${adr.adrAction}: ${adr.adrFiles.join(', ')}`)
-
-  // GOVERNANCE GUARD (loop self-accept fix, 2026-06-15). The adr-kit:adr-generator
-  // agent DEFAULTS to "Accepted" for already-implemented decisions and its template
-  // pre-fills `status: Accepted` (agents/adr-generator.md:52,174). The loop runs the
-  // ADR phase AFTER implementing, so every ADR is "already-implemented"; the agent's
-  // default overrode the "Proposed only" prompt and self-accepted ADRs, fabricating a
-  // maintainer status_history entry (observed on ADR-139: `changed_via: manual`,
-  // `changed_by: <git user>`). Acceptance is a HUMAN checkpoint. A prompt does not
-  // reliably beat the agent's hardcoded default, so this DETERMINISTIC post-step forces
-  // every loop-authored/amended ADR back to Proposed regardless of what the generator did.
-  if (adr.adrAction !== 'none' && adr.adrFiles && adr.adrFiles.length) {
-    const guard = await agent(
-      `MECHANICAL GOVERNANCE GUARD in ${REPO}. NO judgment, NO content authoring, ONLY enforce ADR status. For EACH ADR file in ${JSON.stringify(adr.adrFiles)}:\n` +
-      `1. In its \`## Status\` section: if the status is "Accepted" (or anything other than Proposed / "Superseded by ADR-*" / "Amended by ADR-*"), REWRITE it to "Proposed, <the date already in the file>." Leave a genuine Superseded-by/Amended-by status of a DIFFERENT, older ADR alone.\n` +
-      `2. In \`## Status History\`: DELETE every entry whose \`status:\` is \`Accepted\`, and any fabricated maintainer entry (e.g. \`changed_via: manual\` with a human \`changed_by\`). Keep exactly the Proposed entry (status: Proposed, changed_by: Agent, changed_via: adr-kit); if none exists, write one with today's date.\n` +
-      `3. If this new/amended ADR supersedes or amends an EXISTING Accepted ADR and the generator already wrote a "Superseded by ADR-NNN"/"Amended by ADR-NNN" back-reference onto that OLD ADR (or flipped its Status), REVERT the old ADR: \`git -C ${REPO} diff <oldAdrFile>\` then restore it. Back-references are applied ONLY on real human acceptance, never while the new ADR is Proposed.\n` +
-      `4. Fix docs/adr/README.md: if the new ADR's row says "Accepted", set it to "Proposed".\n` +
-      `Do not reword or improve any other content. Report each file changed and what you changed (empty list if all were already correctly Proposed). The loop NEVER accepts an ADR; acceptance is the maintainer's manual checkpoint.`,
-      { label: `adr-guard:${sel.taskId}`, phase: 'ADR', schema: ADRGUARD }
-    )
-    if (guard && guard.changed && guard.changed.length) log(`ADR self-accept guard forced Proposed: ${guard.changed.join('; ')}`)
-  }
-
   phase('Land')
-  const land = await agent(landPrompt(sel, adr), { label: `land:${sel.taskId}`, phase: 'Land', schema: LAND })
+  const land = await agent(landPrompt(sel), { label: `land:${sel.taskId}`, phase: 'Land', schema: LAND })
   if (!land) { await cleanup(sel.taskId, 'land agent died (transient)'); endReason = `transient abort on ${sel.taskId}`; break }
   if (!land.committed) { endReason = `land did not commit ${sel.taskId}: ${land.note}`; break }
 
@@ -206,8 +187,137 @@ for (let n = 0; n < MAX_TASKS; n++) {
   const ann = await agent(announcePrompt(sel, land), { label: `announce:${sel.taskId}`, phase: 'Announce' })
   log(`Announced ${sel.taskId}: ${ann || 'posted'}`)
 
-  completed.push({ task: sel.taskId, title: sel.title, status: land.newStatus, commit: land.commitHash, tag: land.prereleaseTag, adr: adr.adrAction, srcTouched: sel.srcTouched })
+  completed.push({ task: sel.taskId, title: sel.title, body: sel.body, status: land.newStatus, commit: land.commitHash, tag: land.prereleaseTag, srcTouched: sel.srcTouched })
   log(`Landed ${sel.taskId} -> ${land.newStatus}${land.tag ? ' (' + land.tag + ')' : ''}. Advancing immediately to the next task.`)
 }
 
-return { done: true, completed, count: completed.length, endReason }
+// ===================== END-OF-LOOP ADR EVALUATION ===========================
+// ADRs are deferred out of the per-task path (maintainer directive 2026-06-24,
+// TASK-928): one pass at the END of the drain reviews EVERY task landed this run,
+// dedups the architectural decisions across tasks, and drafts the Proposed ADRs.
+// This fires on every loop exit (normal drain or `break`) because it sits after
+// the for-loop guarded by completed.length — it always ADRs the tasks that DID
+// land this run. Acceptance stays the maintainer's manual checkpoint; the
+// self-accept governance guard (the loop's original-sin fix, bug-036's cousin)
+// travels here intact and runs over every newly drafted ADR.
+const ENUM = {
+  type: 'object', required: ['decisions', 'maxAdrNumber', 'summary'],
+  properties: {
+    decisions: {
+      type: 'array',
+      items: {
+        type: 'object', required: ['title', 'kebab', 'rationale', 'taskIds', 'supersedes'],
+        properties: {
+          title: { type: 'string' }, kebab: { type: 'string', description: 'kebab-case slug for the filename (no ADR number, no .md)' },
+          rationale: { type: 'string', description: 'why this is a genuine architectural decision needing an ADR' },
+          taskIds: { type: 'array', items: { type: 'string' }, description: 'every task this run whose diff contributed to this decision' },
+          supersedes: { type: 'string', description: 'ADR-NNN it supersedes/amends, or empty' },
+        },
+      },
+    },
+    maxAdrNumber: { type: 'integer', description: 'highest existing ADR number under docs/adr/ (so the JS can assign the next free numbers)' },
+    summary: { type: 'string' },
+  },
+}
+const ADRFILE = { type: 'object', required: ['files'], properties: { files: { type: 'array', items: { type: 'string' } }, note: { type: 'string' } } }
+const ADRGUARD = {
+  type: 'object', required: ['changed', 'note'],
+  properties: { changed: { type: 'array', items: { type: 'string' }, description: 'files where Accepted->Proposed or a premature back-reference revert was applied; empty if all already Proposed' }, note: { type: 'string' } },
+}
+const ADRLAND = { type: 'object', required: ['committed', 'commitHash', 'pushed', 'note'], properties: { committed: { type: 'boolean' }, commitHash: { type: 'string' }, pushed: { type: 'boolean' }, note: { type: 'string' } } }
+
+let adrsDrafted = []
+if (completed.length && SKIP_ADR_EVAL) {
+  log(`ADR Evaluation SKIPPED (parallel lane; defer to serial integration). ${completed.length} task(s) landed without ADRs this run.`)
+} else if (completed.length) {
+  phase('ADR Evaluation')
+  const landedList = completed.map(c => `${c.task} (${c.title}) -> commit ${c.commit}`).join('\n')
+  const range = startHead ? `${startHead}..HEAD` : `(no start HEAD captured; inspect each landed task's commit individually: ${completed.map(c => c.commit).join(', ')})`
+
+  // 1. ENUMERATE — one agent reads the whole-run diff + task bodies, returns a
+  //    dedup'd decision list mapped to task ids. Writes NO files. Also returns the
+  //    current max ADR number so the JS (not an LLM) assigns the next free numbers.
+  const ev = await agent(
+    `End-of-loop ADR evaluation for the async ESP32-S3 drain run in ${REPO}.\n${RULES}\n\n` +
+    `Tasks LANDED this run:\n${landedList}\n\n` +
+    `Review the CUMULATIVE diff of the run: \`git -C ${REPO} diff ${range}\` (focus on src/** and any API/topic contract docs; ignore version bumps, banners, and task-status noise). For full intent, read each landed task body via \`backlog task <id> --plain\`.\n` +
+    `Identify EVERY distinct ARCHITECTURAL decision the run embodies — a new pattern/dependency, an API/MQTT/topic contract change, a concurrency/threading model change, or a supersession of an existing ADR. DEDUP across tasks: one decision that several tasks contributed to is ONE entry (list all contributing task ids). A task that is a routine bug fix / refactor within an existing pattern is NOT a decision — omit it. If the run made no architectural decision, return decisions=[].\n` +
+    `Do NOT write any file in this step. Also return maxAdrNumber = the highest existing ADR number (glob docs/adr/ADR-*.md). For each decision return: title, a kebab-case filename slug (no number/no .md), a one-line rationale, the contributing taskIds, and supersedes (ADR-NNN or empty).`,
+    { label: 'adr-enumerate', phase: 'ADR Evaluation', schema: ENUM }
+  )
+
+  if (!ev || !ev.decisions || !ev.decisions.length) {
+    log(`ADR Evaluation: ${ev ? ev.summary : 'enumerate agent unavailable'} — no Proposed ADRs drafted this run.`)
+  } else {
+    // 2. JS assigns the numbers deterministically (kills the parallel/sequential
+    //    "next free number" collision at the root — advisor KISS steer).
+    let next = (typeof ev.maxAdrNumber === 'number' && ev.maxAdrNumber > 0 ? ev.maxAdrNumber : 0) + 1
+    const assigned = ev.decisions.map(d => ({ ...d, num: next++ }))
+    log(`ADR Evaluation: ${assigned.length} decision(s) -> drafting ADR-${assigned.map(a => a.num).join(', ADR-')} (Proposed).`)
+
+    // 3. AUTHOR each ADR at its pre-assigned number (sequential: tiny N, and it
+    //    keeps the shared docs/adr/README.md index race-free). Authors write ONLY
+    //    their own ADR file; the README index + commit happen once, in Land.
+    const created = []
+    for (const d of assigned) {
+      const taskRefs = d.taskIds.join(', ')
+      const commits = completed.filter(c => d.taskIds.includes(c.task)).map(c => `${c.task}=${c.commit}`).join(', ')
+      const a = await agent(
+        `Author ONE Architecture Decision Record per adr-kit for a decision made by the async drain run in ${REPO}.\n${RULES}\n\n` +
+        `Write the file docs/adr/ADR-${d.num}-${d.kebab}.md. Use EXACTLY ADR number ${d.num} (already assigned — do NOT pick your own number, do NOT glob for the next free one).\n` +
+        `Decision: ${d.title}\nRationale: ${d.rationale}\nContributing tasks: ${taskRefs}\n${d.supersedes ? `Supersedes/amends: ${d.supersedes}\n` : ''}` +
+        `Read the relevant diff for context: \`git -C ${REPO} diff ${range}\` and the task bodies (\`backlog task <id> --plain\`).\n` +
+        `CRITICAL — Status MUST be "Proposed" (NEVER "Accepted"; acceptance is the maintainer's manual checkpoint). The adr-kit:adr-generator template DEFAULTS to "Accepted" for already-implemented decisions (agents/adr-generator.md:52,174) — you MUST OVERRIDE that: emit Status "Proposed" and a SINGLE status_history entry (status: Proposed, changed_by: Agent, changed_via: adr-kit). NEVER fabricate a maintainer/manual acceptance entry.\n` +
+        `If this supersedes/amends an EXISTING Accepted ADR, write it as a NEW ADR and do NOT touch the old ADR's body/Status (no "Superseded by"/"Amended by" back-reference while this one is still Proposed).\n` +
+        `Include Context / Decision / Alternatives(>=2) / Consequences / Related. The References section MUST list the contributing tasks with their landed commit hashes: ${commits}. (This replaces the per-task atomicity lost by deferring the ADR out of the code commit.)\n` +
+        `Do NOT edit docs/adr/README.md and do NOT git add/commit — Land stages the index + commits all ADRs together. Return the file path(s) you wrote.`,
+        { label: `adr-author:ADR-${d.num}`, phase: 'ADR Evaluation', schema: ADRFILE, agentType: 'adr-kit:adr-generator' }
+      )
+      if (a && a.files && a.files.length) created.push(...a.files)
+    }
+
+    if (created.length) {
+      // 4. GOVERNANCE GUARD (loop self-accept fix, 2026-06-15 / relocated 2026-06-24).
+      //    The adr-kit:adr-generator DEFAULTS to "Accepted" and pre-fills
+      //    `status: Accepted` (agents/adr-generator.md:52,174). A prompt does not
+      //    reliably beat that default, so this DETERMINISTIC post-step forces every
+      //    drafted/amended ADR back to Proposed regardless of what the generator did.
+      const guard = await agent(
+        `MECHANICAL GOVERNANCE GUARD in ${REPO}. NO judgment, NO content authoring, ONLY enforce ADR status. For EACH ADR file in ${JSON.stringify(created)}:\n` +
+        `1. In its \`## Status\` section: if the status is "Accepted" (or anything other than Proposed / "Superseded by ADR-*" / "Amended by ADR-*"), REWRITE it to "Proposed, <the date already in the file>." Leave a genuine Superseded-by/Amended-by status of a DIFFERENT, older ADR alone.\n` +
+        `2. In \`## Status History\`: DELETE every entry whose \`status:\` is \`Accepted\`, and any fabricated maintainer entry (e.g. \`changed_via: manual\` with a human \`changed_by\`). Keep exactly the Proposed entry (status: Proposed, changed_by: Agent, changed_via: adr-kit); if none exists, write one with today's date.\n` +
+        `3. If a new ADR supersedes or amends an EXISTING Accepted ADR and the generator already wrote a "Superseded by ADR-NNN"/"Amended by ADR-NNN" back-reference onto that OLD ADR (or flipped its Status), REVERT the old ADR: \`git -C ${REPO} diff <oldAdrFile>\` then restore it. Back-references are applied ONLY on real human acceptance, never while the new ADR is Proposed.\n` +
+        `4. Fix docs/adr/README.md: for each new ADR row, if it says "Accepted", set it to "Proposed".\n` +
+        `Do not reword or improve any other content. Report each file changed and what you changed (empty list if all were already correctly Proposed). The loop NEVER accepts an ADR; acceptance is the maintainer's manual checkpoint.`,
+        { label: 'adr-guard', phase: 'ADR Evaluation', schema: ADRGUARD }
+      )
+      if (guard && guard.changed && guard.changed.length) log(`ADR self-accept guard forced Proposed: ${guard.changed.join('; ')}`)
+
+      // 5. LAND the ADRs — one docs commit, citing TASK-865 (the epic file is
+      //    tracked, so commit-msg pass 1 + pass 2 are satisfied; docs-only = no bump).
+      const adrLand = await agent(
+        `Land the end-of-loop Proposed ADRs in ${REPO} (branch ${BRANCH}). These document architectural decisions from this drain run: ${assigned.map(a => `ADR-${a.num} (${a.title})`).join('; ')}.\n${RULES}\n\n` +
+        `1. Ensure docs/adr/README.md has a Proposed row for each new ADR (${created.join(', ')}); add any missing rows.\n` +
+        `2. Stage ONLY: the new ADR files ${JSON.stringify(created)} and docs/adr/README.md. NEVER \`git add -A\`. Do NOT stage src/ or any task file.\n` +
+        `3. Commit (docs-only, NO prerelease bump) with subject \`docs(adr): draft Proposed ADRs for drain run (TASK-865)\`. The TASK-865 reference satisfies the commit-msg hook (epic file is tracked); no [no-task] needed. No em dashes. Co-author trailer.\n` +
+        `4. \`git push origin ${BRANCH}\` with retry.\n` +
+        `Return committed/commitHash/pushed/note.`,
+        { label: 'adr-land', phase: 'ADR Evaluation', schema: ADRLAND }
+      )
+      adrsDrafted = assigned.map(a => ({ adr: `ADR-${a.num}`, title: a.title, file: created.find(f => f.includes(`ADR-${a.num}-`)) || '', taskIds: a.taskIds }))
+      if (adrLand && adrLand.committed) {
+        log(`ADR Evaluation landed ${created.length} Proposed ADR(s): ${adrsDrafted.map(a => a.adr).join(', ')} — commit ${adrLand.commitHash}. Awaiting maintainer acceptance.`)
+        // 6. ANNOUNCE the drafted ADRs to #dev-sat-mqtt for the maintainer to review/accept.
+        await agent(
+          `Post ONE maintainer-facing note to Discord #dev-sat-mqtt (channel_id 1105556725714649128) via mcp__discord-mcp__discord_post_message. English, facts only. NEVER #beta-testing.\n` +
+          `Message: "📋 ${created.length} Proposed ADR(s) drafted this drain run for review: ${adrsDrafted.map(a => a.adr + ' (' + a.title + ')').join(', ')}. Commit ${adrLand.commitHash} on ${BRANCH}. Acceptance is the maintainer's call." Return a one-line confirmation.`,
+          { label: 'adr-announce', phase: 'ADR Evaluation' }
+        )
+      } else {
+        log(`ADR Evaluation: drafted ${created.length} ADR(s) but the docs commit did NOT land: ${adrLand ? adrLand.note : 'land agent unavailable'}. ADR files are on disk uncommitted — next run's Audit / a manual commit must land them.`)
+      }
+    }
+  }
+}
+
+return { done: true, completed, count: completed.length, endReason, adrsDrafted }

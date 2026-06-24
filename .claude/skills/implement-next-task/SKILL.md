@@ -1,6 +1,6 @@
 ---
 name: implement-next-task
-description: Drive the autonomous 2.0.0 ESP32-S3-only async + FreeRTOS migration (epic TASK-865). Runs a continuous workflow that audits stuck/finishable backlog tasks, then drains every actionable async-esp32s3 task back-to-back (implement -> build/eval -> adversarial review -> Proposed ADR -> commit/push -> Discord) without waiting between tasks, and can fan out to parallel worktree lanes. Use for one drain run of the migration loop (cron or manual).
+description: Drive the autonomous 2.0.0 ESP32-S3-only async + FreeRTOS migration (epic TASK-865). Runs a continuous workflow that audits stuck/finishable backlog tasks, then drains every actionable async-esp32s3 task back-to-back (implement -> build/eval -> adversarial review -> commit/push -> Discord) without waiting between tasks, then runs ONE end-of-loop ADR-evaluation pass that drafts Proposed ADRs for the run's architectural decisions, and can fan out to parallel worktree lanes. Use for one drain run of the migration loop (cron or manual).
 ---
 
 # implement-next-task
@@ -23,25 +23,47 @@ Workflow({ scriptPath: "D:/Users/Robert/Documents/GitHub/RvdB/OTGW-firmware/.cla
 ```
 
 The engine, in one run:
-1. **Audit** — reads every In Progress / In Review async-esp32s3 task. Resets STUCK
-   ones (abandoned partial edits from a transient abort) to To Do; moves FINISHABLE
-   ones (all remaining ACs build/evaluator-verifiable, committed + green, no hardware
-   AC) to **Done**; leaves correctly-In-Review (field-validation pending) ones alone.
-   It decides this itself — no permission prompt.
+1. **Audit** — captures the run's start commit (`git rev-parse HEAD`, the stable
+   `startHead..HEAD` range the ADR-Evaluation pass diffs later), then reads every In
+   Progress / In Review async-esp32s3 task. Resets STUCK ones (abandoned partial edits
+   from a transient abort) to To Do; moves FINISHABLE ones (all remaining ACs
+   build/evaluator-verifiable, committed + green, no hardware AC) to **Done**; leaves
+   correctly-In-Review (field-validation pending) ones alone. It decides this itself —
+   no permission prompt.
 2. **Drain loop** — repeatedly: **Select** the lowest actionable task (deps Done/In
    Review; single-flight-guarded per worktree) -> **Implement** (coding agent, ACs +
    CLAUDE rules) -> build (`python build.py`) + `evaluate.py --quick` -> **adversarial
-   Review** (one fix pass) -> **ADR** (`adr-kit:adr-generator` drafts a *Proposed* ADR
-   for any architectural decision; never Accepted) -> **Land** (set status In Review /
-   Done, bump prerelease if `src/**` touched, commit incl. the ADR, push) ->
-   **Announce** (Discord, below). Then it advances to the **next task immediately** —
-   it does NOT wait for the next tick.
-3. **Stop** when nothing is actionable, on a transient agent death (rate limit — it
+   Review** (one fix pass) -> **Land** (set status In Review / Done, bump prerelease if
+   `src/**` touched, commit, push — **no ADR in the per-task commit**) -> **Announce**
+   (Discord, below). Then it advances to the **next task immediately** — it does NOT
+   wait for the next tick.
+3. **ADR Evaluation (end of run)** — after the drain loop exits (whether it drained
+   the backlog or `break`s on a transient failure), if any task landed this run a
+   single pass reviews the **whole-run diff** (`startHead..HEAD`) plus the landed task
+   bodies, dedups the **architectural decisions across all tasks** into one entry each,
+   has the JS assign the next free ADR numbers (no LLM number-picking → no collision),
+   drafts one **Proposed** ADR per decision (`adr-kit:adr-generator`, never Accepted),
+   runs the self-accept governance guard over them, commits them in **one
+   `docs(adr): ... (TASK-865)`** commit (docs-only, no bump), pushes, and posts a
+   maintainer-facing "N Proposed ADRs drafted for review" note to #dev-sat-mqtt. Each
+   ADR's References section cites the contributing task ids + their commit hashes (the
+   traceability that replaces riding the ADR inside the code commit). **This is the
+   only place the loop authors ADRs** — moved out of the per-task path 2026-06-24
+   (TASK-928) so one evaluation sees cross-task decisions and the maintainer reviews a
+   coherent batch instead of a per-task drip.
+4. **Stop** when nothing is actionable, on a transient agent death (rate limit — it
    cleans up the task back to To Do and ends so a later run retries), or when a task
-   fails review twice (flags it for attention).
+   fails review twice (flags it for attention). The ADR-Evaluation pass still runs for
+   whatever did land before the stop.
 
-Returns `{ done, completed: [...], count, endReason }`. `endReason` tells you whether
-it drained the backlog, hit a transient rate-limit, or needs attention on a task.
+Returns `{ done, completed: [...], count, endReason, adrsDrafted: [...] }`. `endReason`
+tells you whether it drained the backlog, hit a transient rate-limit, or needs
+attention on a task; `adrsDrafted` lists the Proposed ADRs the end-of-run pass drafted
+(awaiting maintainer acceptance).
+
+Parallel lanes (`args.skipAdrEval`, set automatically alongside `skipBump`) defer the
+ADR-Evaluation pass to serial integration so two lanes never race on ADR numbers; the
+integrating run drafts the ADRs once after the merge.
 
 ## Discord (alpha-channel policy, done INSIDE the loop)
 
