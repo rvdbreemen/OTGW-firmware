@@ -1,11 +1,11 @@
 ---
 id: TASK-910
 title: 'feat(webui): v2 bundle skeleton + device-wide toggle setting (TASK-908 P0b)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 04:32'
-updated_date: '2026-06-24 04:40'
+updated_date: '2026-06-24 08:09'
 labels: []
 milestone: 2.0.0
 dependencies: []

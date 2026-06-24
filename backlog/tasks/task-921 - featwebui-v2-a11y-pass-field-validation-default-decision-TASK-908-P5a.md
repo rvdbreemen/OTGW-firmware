@@ -1,11 +1,11 @@
 ---
 id: TASK-921
 title: 'feat(webui): v2 a11y pass + field validation + default decision (TASK-908 P5a)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 04:37'
-updated_date: '2026-06-24 05:57'
+updated_date: '2026-06-24 08:09'
 labels: []
 milestone: 2.0.0
 dependencies: []

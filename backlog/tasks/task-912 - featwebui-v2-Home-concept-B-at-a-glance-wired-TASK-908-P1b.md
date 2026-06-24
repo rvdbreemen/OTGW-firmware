@@ -1,11 +1,11 @@
 ---
 id: TASK-912
 title: 'feat(webui): v2 Home concept B at-a-glance wired (TASK-908 P1b)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 04:33'
-updated_date: '2026-06-24 05:32'
+updated_date: '2026-06-24 08:09'
 labels: []
 milestone: 2.0.0
 dependencies: []

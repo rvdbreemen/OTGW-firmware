@@ -1,11 +1,11 @@
 ---
 id: TASK-918
 title: 'feat(webui): v2 Settings rail + grouped cards + save/discard (TASK-908 P3a)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 04:36'
-updated_date: '2026-06-24 05:50'
+updated_date: '2026-06-24 08:09'
 labels: []
 milestone: 2.0.0
 dependencies: []

@@ -3,11 +3,11 @@ id: TASK-911
 title: >-
   feat(webui): v2 Home concept A system schematic wired to live data (TASK-908
   P1a)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 04:32'
-updated_date: '2026-06-24 04:58'
+updated_date: '2026-06-24 08:09'
 labels: []
 milestone: 2.0.0
 dependencies: []

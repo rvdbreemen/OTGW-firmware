@@ -1,11 +1,11 @@
 ---
 id: TASK-919
 title: 'feat(webui): v2 Settings BLE sensor roster (TASK-908 P3b)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 04:36'
-updated_date: '2026-06-24 05:53'
+updated_date: '2026-06-24 08:09'
 labels: []
 milestone: 2.0.0
 dependencies: []

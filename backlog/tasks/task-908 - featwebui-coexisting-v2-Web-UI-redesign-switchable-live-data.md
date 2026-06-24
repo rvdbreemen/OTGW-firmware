@@ -1,11 +1,11 @@
 ---
 id: TASK-908
 title: 'feat(webui): coexisting v2 Web UI redesign (switchable, live data)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-23 22:31'
-updated_date: '2026-06-23 22:32'
+updated_date: '2026-06-24 08:10'
 labels: []
 milestone: 2.0.0
 dependencies: []

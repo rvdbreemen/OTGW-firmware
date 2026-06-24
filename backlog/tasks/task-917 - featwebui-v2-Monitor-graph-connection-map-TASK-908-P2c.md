@@ -1,11 +1,11 @@
 ---
 id: TASK-917
 title: 'feat(webui): v2 Monitor graph + connection map (TASK-908 P2c)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 04:35'
-updated_date: '2026-06-24 05:46'
+updated_date: '2026-06-24 08:09'
 labels: []
 milestone: 2.0.0
 dependencies: []

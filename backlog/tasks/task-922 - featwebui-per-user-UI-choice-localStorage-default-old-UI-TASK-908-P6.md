@@ -1,9 +1,10 @@
 ---
 id: TASK-922
 title: 'feat(webui): per-user UI choice (localStorage), default old UI (TASK-908 P6)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-24 07:55'
+updated_date: '2026-06-24 08:09'
 labels: []
 milestone: 2.0.0
 dependencies: []

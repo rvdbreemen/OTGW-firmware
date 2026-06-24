@@ -1,9 +1,10 @@
 ---
 id: TASK-920
 title: 'feat(webui): v2 connectivity strip + detail map (TASK-908 P4a)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-24 04:37'
+updated_date: '2026-06-24 08:09'
 labels: []
 milestone: 2.0.0
 dependencies: []
