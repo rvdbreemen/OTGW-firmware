@@ -116,7 +116,7 @@
   svg.ch-on .arrow.ch{opacity:1}
   svg.dhw-on .arrow.dhw{opacity:1}
   .arrowHot{fill:var(--hot)} .arrowCold{fill:var(--cold)}
-  .chip-hot{fill:var(--hot)} .chip-cold{fill:var(--cold)} .chip-dhw{fill:#ff9b3c}
+  .chip-hot{fill:var(--hot)} .chip-cold{fill:var(--cold)} .chip-dhw{fill:var(--dhw)}
   svg:not(.dhw-on) .chip-dhw{fill:var(--tile-off)}
   .chip-txt{fill:#fff;font-weight:700;font-size:21px;text-anchor:middle;font-family:var(--font-sans)}
   .chip-sub{fill:rgba(255,255,255,.85);font-size:9.5px;letter-spacing:.12em;text-anchor:middle}

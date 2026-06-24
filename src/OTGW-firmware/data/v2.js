@@ -715,7 +715,12 @@
         return fetch(APIGW + 'v2/settings', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name: k, value: setDirty[k] })
-        }).then(function () { if (setData[k]) setData[k].value = setDirty[k]; });
+        }).then(function (r) {
+          // audit fix: only treat as saved when the HTTP status is OK; a 401/403
+          // (auth/CSRF) or 4xx/5xx must NOT report success or clear the dirty mark.
+          if (!r.ok) throw new Error('save ' + k + ' -> HTTP ' + r.status);
+          if (setData[k]) setData[k].value = setDirty[k];
+        });
       });
     });
     chain.then(function () {
@@ -765,9 +770,14 @@
         var mac = document.createElement('span'); mac.className = 'ble-mac'; mac.textContent = s.mac || ''; nm.appendChild(mac);
         if (s.mac && s.mac === bleData.selected_mac) { var tag = document.createElement('span'); tag.className = 'ble-tag temp'; tag.textContent = 'selected'; nm.appendChild(tag); }
         row.appendChild(nm);
-        if (s.temperature !== undefined || s.humidity !== undefined) {
+        // Firmware emits per-sensor "temp"/"hum" (SATble roster); accept the
+        // longer aliases too for forward-compat. (audit fix: was reading
+        // s.temperature/s.humidity which the firmware never sends.)
+        var bt = (s.temp !== undefined) ? s.temp : s.temperature;
+        var bh = (s.hum !== undefined) ? s.hum : s.humidity;
+        if (bt !== undefined || bh !== undefined) {
           var val = document.createElement('div'); val.className = 'ble-val';
-          val.textContent = (s.temperature !== undefined ? s.temperature + '°' : '') + (s.humidity !== undefined ? '  ' + s.humidity + '%' : '');
+          val.textContent = (bt !== undefined ? bt + '°' : '') + (bh !== undefined ? '  ' + bh + '%' : '');
           row.appendChild(val);
         }
         var ctr = document.createElement('div'); ctr.className = 'ble-ctrls';

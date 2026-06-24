@@ -285,7 +285,7 @@
         <span><i style="background:#8b949e"></i>setpoint</span>
         <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
       </div>
-      <svg viewBox="0 0 780 210" id="strip">
+      <svg viewBox="0 0 780 210" id="strip" role="img" aria-label="Live flow/return/setpoint/modulation strip chart">
         <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
         <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
         <text class="axis-txt" x="8" y="16">90°</text>
@@ -302,7 +302,7 @@
 
     <div class="mc-grid" id="cGrid"></div>
 
-    <div class="ticker" id="cTicker" aria-label="Live OpenTherm frames"></div>
+    <div class="ticker" id="cTicker" role="log" aria-live="polite" aria-label="Live OpenTherm frames"></div>
   </div>
 </section>
 </div><!-- /page-home -->
@@ -364,9 +364,9 @@
       <div class="matrix" id="supMatrix" aria-label="OpenTherm message ID support map"></div>
       <aside class="supdetail" id="supDetail"></aside>
     </div>
-    <p class="concept-cap" style="margin-top:10px">Hover a cell for a quick label · click (or tap)
-    to pin the full message details. Today this is a table you scroll; as a map you see your
-    system's OpenTherm dialect in one look — and every cell carries the spec.</p>
+    <p class="concept-cap" style="margin-top:10px">Click (or tap) a cell to pin its decoded
+    message details. As a map you see your system's OpenTherm dialect in one look — which message
+    IDs the thermostat and boiler actually use.</p>
   </div>
   <div class="suptip" id="supTip"></div>
 
@@ -384,7 +384,7 @@
         <span><i style="background:#8b949e"></i>setpoint</span>
         <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
       </div>
-      <svg viewBox="0 0 780 210" id="gstrip">
+      <svg viewBox="0 0 780 210" id="gstrip" role="img" aria-label="Flow/return/setpoint/modulation graph">
         <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
         <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
         <text class="axis-txt" x="8" y="16">90°</text>
