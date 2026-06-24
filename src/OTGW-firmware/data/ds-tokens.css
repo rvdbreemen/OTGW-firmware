@@ -115,6 +115,22 @@
   --status-ok-bg:      #c8e6c9;
   --status-warn-bg:    #ffe0b2;
 
+  /* v2 dashboard (TASK-908) — heating-system color vocabulary.
+     Genuinely new physical tokens: --hot/--cold/--dhw/--gauge-track.
+     zone-*/tile-* are RECONCILED ALIASES onto the official status palette
+     (ADR-091): one source of truth for ok/warn/alert across both UIs. */
+  --hot:               #ff5a3c;   /* flow / heat — warm red-orange */
+  --cold:              #2f8fe8;   /* return / cold — blue */
+  --dhw:               #ff9b3c;   /* domestic hot water — amber-orange */
+  --gauge-track:       #d7eef6;   /* unfilled gauge/pipe track */
+  --gauge-text:        var(--fg-1);
+  --zone-ok:           var(--status-ok);
+  --zone-warn:         var(--status-warn);
+  --zone-alert:        var(--status-error);
+  --tile-on:           var(--status-ok);
+  --tile-off:          var(--status-neutral);
+  --tile-fault:        var(--status-error);
+
   --sim-badge-bg:      #0a84ff;
   --sim-badge-text:    #ffffff;
 
@@ -209,6 +225,19 @@ html.dark {
   --status-neutral-bg: #424242;
   --status-ok-bg:      #2e4a2f;
   --status-warn-bg:    #4a3a20;
+
+  /* v2 dashboard (TASK-908) — dark variants of the heating vocabulary. */
+  --hot:               #ff6a4d;
+  --cold:              #4da3ff;
+  --dhw:               #ffb05a;
+  --gauge-track:       #3a3a3d;
+  --gauge-text:        var(--fg-1);
+  --zone-ok:           var(--status-ok);
+  --zone-warn:         var(--status-warn);
+  --zone-alert:        var(--status-error);
+  --tile-on:           var(--status-ok);
+  --tile-off:          var(--status-neutral);
+  --tile-fault:        var(--status-error);
 
   --sim-badge-bg:      #3b9dff;
   --sim-badge-text:    #04111f;
