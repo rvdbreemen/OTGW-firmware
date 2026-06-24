@@ -156,7 +156,7 @@
       case 27: if (isAck) { model.outside = f88(u16); changed = true; } break;    // Toutside
       case 28: if (isAck) { model.ret = f88(u16); changed = true; } break;        // Tret (return)
     }
-    if (changed) { model.fresh = true; scheduleRender(); }
+    if (changed) { model.fresh = true; pushSample(); scheduleRender(); }
   }
 
   // Column offsets mirror parseLogLine() in the classic UI: the raw frame
@@ -178,7 +178,28 @@
     if (d.indexOf('"type":"keepalive"') !== -1) return;
     if (d.charAt(0) === '{' || d.charAt(0) === '[') return; // JSON status, not a frame
     var raw = rawFromLine(d);
-    if (raw) applyFrame(raw);
+    if (raw) {
+      applyFrame(raw);
+      pushTicker(d);                // mission-control raw-frame ticker (concept C)
+      if (activeDesign() === 'c') scheduleRender();
+    }
+  }
+
+  function activeDesign() {
+    var d = document.querySelector('.cchip.active');
+    return d ? d.dataset.design : 'a';
+  }
+
+  // Concept C buffers: strip-chart samples + raw-frame ticker.
+  var SAMPLES_MAX = 140, samples = [];
+  var TICKER_MAX = 60, ticker = [];
+  function pushSample() {
+    samples.push({ flow: model.flow, ret: model.ret, sp: model.chSet, mod: model.mod });
+    if (samples.length > SAMPLES_MAX) samples.shift();
+  }
+  function pushTicker(line) {
+    ticker.push(line);
+    if (ticker.length > TICKER_MAX) ticker.shift();
   }
 
   function connectWs() {
@@ -315,9 +336,79 @@
     txt('bStatusTxt', model.flame ? (model.dhw_on ? 'Heating water' : 'Heating') : (model.dhw_on ? 'Hot water' : 'Idle'));
   }
 
-  // Concept C — mission control. Fully wired in P1c; placeholder keeps the
-  // static mockup until then.
-  function renderC() { }
+  // Concept C — mission control: live strip chart + metric cells + frame ticker.
+  // strip svg: viewBox 0 0 780 210, plot x 34..772, temp axis y = 170-(T-10)*2
+  // (T=10->170, 50->90, 90->10).
+  var C_X0 = 34, C_X1 = 772;
+  function tempY(t) { return 170 - (t - 10) * 2; }
+  function seriesPoints(key) {
+    if (samples.length < 2) return '';
+    var n = samples.length, span = C_X1 - C_X0, pts = [];
+    for (var i = 0; i < n; i++) {
+      var v = samples[i][key];
+      if (v === null || v === undefined || isNaN(v)) continue;
+      var x = C_X0 + (n === 1 ? 0 : (i / (n - 1)) * span);
+      pts.push(x.toFixed(1) + ',' + tempY(v).toFixed(1));
+    }
+    return pts.join(' ');
+  }
+  function setPoints(id, key) { var el = document.getElementById(id); if (el) el.setAttribute('points', seriesPoints(key)); }
+  function renderC() {
+    setPoints('cFlow', 'flow');
+    setPoints('cRet', 'ret');
+    // setpoint: horizontal line at the latest chSet
+    var sp = document.getElementById('cSpLine');
+    if (sp) {
+      if (model.chSet === null) { sp.setAttribute('y1', -10); sp.setAttribute('y2', -10); }
+      else { var y = tempY(model.chSet).toFixed(1); sp.setAttribute('y1', y); sp.setAttribute('y2', y); }
+    }
+    // modulation: filled area along the bottom (0% at y=170, 100% at y=130)
+    var mod = document.getElementById('cMod');
+    if (mod) {
+      if (samples.length < 2) mod.setAttribute('points', '');
+      else {
+        var n = samples.length, span = C_X1 - C_X0, p = [C_X0 + ',170'];
+        for (var i = 0; i < n; i++) {
+          var m = samples[i].mod; if (m === null || m === undefined || isNaN(m)) m = 0;
+          var x = C_X0 + (i / (n - 1)) * span;
+          p.push(x.toFixed(1) + ',' + (170 - Math.max(0, Math.min(100, m)) * 0.4).toFixed(1));
+        }
+        p.push(C_X1 + ',170');
+        mod.setAttribute('points', p.join(' '));
+      }
+    }
+    txt('cFlowLbl', model.flow === null ? '' : 'flow ' + fmt(model.flow, 1, '°'));
+    txt('cRetLbl', model.ret === null ? '' : 'ret ' + fmt(model.ret, 1, '°'));
+    renderCGrid();
+    renderTicker();
+  }
+  function renderCGrid() {
+    var grid = document.getElementById('cGrid'); if (!grid) return;
+    var cells = [
+      ['FLOW', fmt(model.flow, 1, '°'), 'hot'],
+      ['RETURN', fmt(model.ret, 1, '°'), 'cold'],
+      ['ΔT', (model.flow !== null && model.ret !== null) ? fmt(model.flow - model.ret, 1, '°') : '—', ''],
+      ['MODULATION', model.mod === null ? '—' : Math.round(model.mod) + '%', model.flame ? 'ok' : ''],
+      ['CH SETPOINT', fmt(model.chSet, 1, '°'), ''],
+      ['DHW', model.dhw === null ? '—' : fmt(model.dhw, 1, '°'), ''],
+      ['PRESSURE', fmt(model.pressure, 2, ''), ''],
+      ['FLAME', model.flame ? 'ON' : 'off', model.flame ? 'ok' : '']
+    ];
+    // Build with textContent to avoid HTML injection from values.
+    grid.innerHTML = '';
+    cells.forEach(function (c) {
+      var d = document.createElement('div'); d.className = 'mc-cell';
+      var l = document.createElement('div'); l.className = 'lbl'; l.textContent = c[0];
+      var v = document.createElement('div'); v.className = 'val ' + (c[2] || ''); v.textContent = c[1];
+      d.appendChild(l); d.appendChild(v); grid.appendChild(d);
+    });
+  }
+  function renderTicker() {
+    var t = document.getElementById('cTicker'); if (!t) return;
+    // textContent (not innerHTML) — raw frames are device data, treat as text.
+    t.textContent = ticker.join('\n');
+    t.scrollTop = t.scrollHeight;
+  }
 
   // ---------- init ----------
   function init() {
