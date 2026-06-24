@@ -77,7 +77,7 @@ Published at startup, on MQTT (re)connect, and whenever the values change. These
 | `thermostat_connected` | `"ON"` / `"OFF"` | A thermostat is visible on the OpenTherm bus (frames received from the master side). |
 | `otgw_connected` | `"ON"` / `"OFF"` | The OpenTherm bus is active (the firmware is exchanging frames). This topic replaces the former `otgw-otdirect/ot_online` and mirrors the former `otgw-pic/otgw_connected`. |
 
-Payloads are retained. Published as `OTGW/value/<uniqueId>/<topic>` using the configured `TopTopic` and `UniqueId` (see [Namespace Convention](#namespace-convention)).
+Payloads are **not** retained: these three values reflect live OpenTherm-bus state, and broker-side liveness is carried separately by the retained birth/LWT availability at the publish-namespace root (ADR-102). Published as `OTGW/value/<uniqueId>/<topic>` using the configured `TopTopic` and `UniqueId` (see [Namespace Convention](#namespace-convention)).
 
 ### PIC Gateway Information
 
