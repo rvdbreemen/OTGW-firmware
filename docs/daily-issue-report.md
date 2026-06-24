@@ -1,29 +1,36 @@
-# Daily Issue Report — 2026-06-23
+# Daily Issue Report — 2026-06-24
 
-**Generated:** 2026-06-23T00:00:00Z
-**GitHub window:** since 2026-06-22T00:00:00Z
-**Tweakers window:** N/A (feed blocked by egress policy)
-**Discord window:** N/A (MCP server not available in this environment)
+## GitHub Issues (updated in last 24h)
 
-## Summary
-
-No new issues in the last 24 hours.
-
-- **GitHub**: 0 new or updated open issues since 2026-06-22T00:00:00Z. (Most recently updated open issue was #656 on 2026-06-05.)
-- **Tweakers**: Feed unavailable — `gathering.tweakers.net` blocked by egress policy in this execution environment.
-- **Discord**: MCP server not configured in this execution environment.
+**No open GitHub issues updated in the last 24 hours.**
 
 ---
 
-## Sources Not Available
+## Tweakers Forum (last 24h, excluding number3/rvdbreemen)
 
-| Source | Status | Reason |
-|--------|--------|--------|
-| Tweakers RSS | Blocked | `gathering.tweakers.net` not in network allowlist |
-| Discord #beta-testing | Not available | Discord MCP not configured in this session |
-| Discord #english-support | Not available | Discord MCP not configured in this session |
-| Discord #nederlandse-ondersteuning | Not available | Discord MCP not configured in this session |
-| Discord #devs-esp-firmware | Not available | Discord MCP not configured in this session |
+Thread: [OTGW] OpenTherm gateway — Duurzame energie en installaties  
+URL: https://gathering.tweakers.net/forum/list_messages/1653967
+
+### Post 1
+- **Reporter:** Ittie
+- **Date:** Tue, 23 Jun 2026 20:29 UTC
+- **URL:** https://gathering.tweakers.net/forum/list_message/85552232#85552232
+- **Classification:** Bug report (confirmation)
+- **Summary:** User confirms experiencing the same WiFi disconnect issue others reported. Notes that sometimes a reboot of the access point temporarily resolves it. Asks for access to the beta firmware to help validate the fix.
+
+**Background context (from thread, outside 24h window):**
+Multiple users (jaronbor, tjanssen, Ittie) report WiFi instability and connectivity drops starting with firmware 1.6.0/1.6.1, not present in 1.3.5 or 1.5.0. Symptoms include: device repeatedly dropping WiFi, high packet loss during pings, HA entities (e.g. `otgw_boiler_connected`) flipping to unavailable every few minutes, and "Access to invalid address (29)" crashes. Root cause identified by number3 as the removal of `delay(1)` from the main loop. A fix is in beta 1.7.0-beta.34 (released on GitHub) and testers are being sought via the Discord beta channel. number3 responded to Ittie pointing to the GitHub release.
+
+---
+
+## Summary
+
+| Source | Count | Classification |
+|--------|-------|----------------|
+| GitHub Issues | 0 | — |
+| Tweakers Forum | 1 | Bug report (confirmation of known WiFi regression in 1.6.x) |
+
+**Known active bug:** WiFi disconnection regression introduced in 1.6.0, root cause identified (removal of `delay(1)` in mainloop), fix candidate in beta 1.7.0-beta.34. Field validation in progress.
 
 ---
 
@@ -35,27 +42,3 @@ No new issues in the last 24 hours.
 | [#557](https://github.com/rvdbreemen/OTGW-firmware/issues/557) | Settings / Run Boot Command and PIC missing | dwd1 | bug, question | 2026-05-06 |
 | [#154](https://github.com/rvdbreemen/OTGW-firmware/issues/154) | [Request] Suggestions to improve security | 0crap | enhancement | 2026-05-09 |
 | [#10](https://github.com/rvdbreemen/OTGW-firmware/issues/10) | Human readable ASF, RBP-flags, TSP, FHB-values … | STemplar | enhancement, good first issue | 2022-10-09 |
-
-### Issue #656 — "Proper way to update" (question)
-- **Reporter:** sanderlv
-- **Classification:** Question
-- **Summary:** User asks how to update from an older version to 1.6.1 and finds no clear guidance in the web interface.
-- **Status:** Open, no response yet.
-
-### Issue #557 — "Settings / Run Boot Command and PIC missing" (bug/question)
-- **Reporter:** dwd1
-- **Classification:** Bug report / question
-- **Summary:** User flashed 1.4.1 firmware on a new Wemos D1 Mini Pro but the "Run Boot Command" checkbox and Boot Command field are absent, and `picavailable: false`. Another identical board shows these settings. Possible hardware or flash issue.
-- **Status:** Open, 2 comments.
-
-### Issue #154 — "[Request] Suggestions to improve security" (feature request)
-- **Reporter:** 0crap
-- **Classification:** Feature request
-- **Summary:** Requests security improvements: AP-mode reset, GUI auth (username/password), HTTPS option, ability to disable Telnet/OTmonitor. MQTT config shown as reference UX.
-- **Status:** Open, 7 comments.
-
-### Issue #10 — "Human readable ASF, RBP-flags, TSP, FHB-values …" (feature request)
-- **Reporter:** STemplar
-- **Classification:** Feature request
-- **Summary:** Request for JSON-based lookup table to map OpenTherm TSP/fault/OEM-diagnostic values to human-readable descriptions (Remeha fault codes, Pxx parameter codes, etc.).
-- **Status:** Open, 8 comments.
