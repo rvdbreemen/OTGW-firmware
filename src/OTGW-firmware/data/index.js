@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.253
+**  Version  : v2.0.0-alpha.254
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -3191,7 +3191,10 @@ function updateThemeToggle() {
   var isDark = (localStorage.getItem('otgw-theme') || localStorage.getItem('theme')) === 'dark';
   var icon  = isDark ? '\u2600\uFE0E' : '\u263D\uFE0E';   // ☀︎ sun  or  ☽︎ moon (text presentation, not emoji)
   var title = isDark ? 'Switch to light theme' : 'Switch to dark theme';
-  document.querySelectorAll('.theme-toggle-btn').forEach(function(btn) {
+  // TASK-923: exclude the "New UI" switch (#tryV2) — it shares the
+  // theme-toggle-btn styling but is not a theme toggle, so it must keep its
+  // own label/title and not be relabelled to the sun/moon glyph.
+  document.querySelectorAll('.theme-toggle-btn:not(#tryV2)').forEach(function(btn) {
     btn.textContent = icon;
     btn.title       = title;
   });
