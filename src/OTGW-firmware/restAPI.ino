@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.240
+**  Version  : v2.0.0-alpha.241
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3239,6 +3239,7 @@ void sendDeviceSettings()
   addBool(F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, "b");
   addBool(F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, "b");
   addBool(F("ui_autoexport"), settings.ui.bAutoExport, "b");
+  addBool(F("ui_usev2"), settings.ui.bUseV2, "b");
   addInt(F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, "i", 0, 1440);
   addBool(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
   addBool(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
@@ -3521,7 +3522,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satsystem", "sattargettemp", "sattempstep", "satthermalcoeff",
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
-  "ui_capture", "ui_graphtimewindow", "ui_timestamps",
+  "ui_capture", "ui_graphtimewindow", "ui_timestamps", "ui_usev2",
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
   "wifidns1", "wifidns2", "wifigateway", "wifistaticip", "wifisubnet",

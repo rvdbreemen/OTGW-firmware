@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.240
+**  Version  : v2.0.0-alpha.241
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -116,7 +116,15 @@ static void sendIndex(AsyncWebServerRequest *request) {
   // caches credentials before any API call is made (ADR-056), avoiding a
   // mid-session popup. checkHttpAuth() sends the 401 challenge on failure.
   if (!checkHttpAuth()) return;
-  serveVersionedAsset("/index.html", F("text/html; charset=UTF-8"));
+  // TASK-908: device-wide default UI selector. When settings.ui.bUseV2 is set,
+  // the root path serves the redesigned v2 shell; otherwise the classic UI.
+  // Both shells stay individually reachable at /index.html and /v2.html so the
+  // in-page toggle can always navigate explicitly regardless of the flag.
+  if (settings.ui.bUseV2 && LittleFS.exists("/v2.html")) {
+    serveVersionedAsset("/v2.html", F("text/html; charset=UTF-8"));
+  } else {
+    serveVersionedAsset("/index.html", F("text/html; charset=UTF-8"));
+  }
 }
 
 //=====================================================================================
@@ -149,6 +157,10 @@ void startWebserver(){
   server.on("/theme-toggle.js",  HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/theme-toggle.js",  F("application/javascript")); });
   server.on("/components.css",   HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/components.css",   F("text/css")); });
   server.on("/ds-tokens.css",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/ds-tokens.css",    F("text/css")); });
+  // TASK-908: coexisting v2 Web UI bundle (served next to the classic assets).
+  server.on("/v2.html",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); if (!checkHttpAuth()) return; serveVersionedAsset("/v2.html", F("text/html; charset=UTF-8")); });
+  server.on("/v2.js",            HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2.js",            F("application/javascript")); });
+  server.on("/v2.css",           HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2.css",           F("text/css")); });
 #if HAS_PIC
   //otgw pic functions
   server.on("/pic", HTTP_ANY, upgradepic);

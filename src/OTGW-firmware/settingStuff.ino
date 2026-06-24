@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.240
+**  Version  : v2.0.0-alpha.241
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -269,6 +269,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, true);
   writeJsonBoolKV(file, F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, true);
   writeJsonBoolKV(file, F("ui_autoexport"), settings.ui.bAutoExport, true);
+  writeJsonBoolKV(file, F("ui_usev2"), settings.ui.bUseV2, true);
   writeJsonIntKV(file, F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, true);
   writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settings.sensors.bEnabled, true);
   writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settings.sensors.bLegacyFormat, true);
@@ -798,6 +799,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("ui_autoscreenshot"))==0)  settings.ui.bAutoScreenshot = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("ui_autodownloadlog"))==0) settings.ui.bAutoDownloadLog = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("ui_autoexport"))==0)      settings.ui.bAutoExport = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("ui_usev2"))==0)          settings.ui.bUseV2 = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("ui_graphtimewindow"))==0) {
     int val = atoi(newValue);
     settings.ui.iGraphTimeWindow = constrain(val, 1, 1440);

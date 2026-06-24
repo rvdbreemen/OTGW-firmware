@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>OTGW firmware</title>
+<link rel="stylesheet" href="ds-tokens.css">
+<link rel="stylesheet" href="v2.css">
+<script>
+  // Pre-paint theme (shared key with the classic UI) to avoid flash-of-wrong-theme.
+  (function(){
+    try{
+      var stored = localStorage.getItem('otgw-theme') || localStorage.getItem('theme');
+      var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      var isDark = (stored === 'dark') || (!stored && prefersDark);
+      document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+    }catch(e){}
+  })();
+</script>
+<script src="./v2.js" defer></script>
+</head>
+<body>
+
+
+<div class="headerrow">
+  <span class="big">OTGW firmware <span class="sub">· v2</span></span>
+  <span class="sub" id="clock">--:--:--</span>
+  <span class="theme-toggle" id="uiToggle" title="Switch back to the classic UI">↩ Classic UI</span>
+  <span class="theme-toggle" id="themeToggle">🌙 Dark</span>
+</div>
+<div class="switcher">
+  <button class="seg active" data-page="home"><b>Home</b><small>opening page</small></button>
+  <button class="seg" data-page="monitor"><b>Monitor</b><small>log · stats · support · graph · connection</small></button>
+  <button class="seg" data-page="settings"><b>Settings</b><small>grouped &amp; scannable</small></button>
+</div>
+<!-- always-visible connectivity strip — glance scale; click any pill for the detail map -->
+<div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
+
+<div class="wrap">
+
+<!-- ════════════════ PAGE: HOME ════════════════ -->
+<div id="page-home" class="page active">
+<div class="cchips">
+  <button class="cchip active" data-design="a">A · System view</button>
+  <button class="cchip" data-design="b">B · At a glance</button>
+  <button class="cchip" data-design="c">C · Mission control</button>
+</div>
+
+<!-- ============ DESIGN A — SYSTEM VIEW ============ -->
+<section id="design-a" class="design active">
+  <p class="concept-cap"><b>Concept A — your heating system, live.</b> The boiler burns, water flows:
+  red arrow out with the flow temperature, blue arrow back with the return temperature. DHW branch
+  wakes up when you tap hot water. Zero configuration — it knows everything from the OT bus.</p>
+
+  <div class="schemcard">
+    <div class="statusline" id="aStatus"><span class="dot"></span><span id="aStatusTxt">—</span>
+      <span class="appl-toggle" id="applToggle">
+        <button class="seg2btn active" data-appl="gas">🔥 Boiler</button>
+        <button class="seg2btn" data-appl="hp">⚡ Heat pump</button>
+      </span>
+    </div>
+
+    <svg class="schematic" id="schem" viewBox="0 0 800 470" role="img"
+         aria-label="Live diagram of the heating system">
+      <defs>
+        <linearGradient id="gHot" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#ff8a3c"/><stop offset="1" stop-color="#ff4d2e"/>
+        </linearGradient>
+        <linearGradient id="gCold" x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stop-color="#5ab1ff"/><stop offset="1" stop-color="#2f6fe8"/>
+        </linearGradient>
+        <linearGradient id="gDhw" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#ffb13c"/><stop offset="1" stop-color="#ff8a3c"/>
+        </linearGradient>
+        <linearGradient id="gFlame" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#ff7a1a"/><stop offset="1" stop-color="#ffb300"/>
+        </linearGradient>
+        <linearGradient id="gBolt" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#1aa3ff"/><stop offset="1" stop-color="#9af0ff"/>
+        </linearGradient>
+      </defs>
+
+      <!-- DHW branch: boiler top -> faucet -->
+      <path class="pipe pipeDhw" d="M145,120 V64 H318"/>
+      <path class="dash dhw" d="M145,120 V64 H318"/>
+      <g id="faucet">
+        <path d="M318,58 h26 a8,8 0 0 1 8,8 v10 h-13 v-7 h-21 z" fill="var(--gauge-track)"
+              stroke="var(--border)" stroke-width="2"/>
+        <circle class="drop d1" cx="345.5" cy="84" r="3.4"/>
+        <circle class="drop d2" cx="345.5" cy="84" r="3.4"/>
+        <circle class="drop d3" cx="345.5" cy="84" r="3.4"/>
+      </g>
+      <g transform="translate(232,38)">
+        <rect x="-46" y="-17" width="92" height="34" rx="11" class="chip-dhw"/>
+        <text class="chip-txt" y="3" font-size="17" id="aDhw">54°</text>
+        <text class="chip-sub" y="14.5">DHW</text>
+      </g>
+
+      <!-- Outside chip -->
+      <g transform="translate(660,34)">
+        <path class="cloud" d="M14,22 a10,10 0 0 1 2,-19.8 a13,13 0 0 1 25,2 a8.5,8.5 0 0 1 -1,17.8 z"/>
+        <text class="label-big" x="52" y="18" id="aOut">8.4°</text>
+        <text class="label-tag" x="52" y="32">OUTSIDE</text>
+      </g>
+
+      <!-- Boiler / heat pump body -->
+      <rect class="boiler-body" x="60" y="120" width="180" height="240" rx="16"/>
+      <rect x="84" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
+      <rect x="190" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
+      <rect class="lcd" x="88" y="136" width="124" height="28" rx="8"/>
+      <text class="lcd-txt" x="150" y="155" id="aLcd">CH 62%</text>
+
+      <!-- burner window: gas flame OR electric lightning bolt; height = modulation -->
+      <circle class="window" cx="150" cy="210" r="36"/>
+      <circle class="pilot" cx="150" cy="226" r="5"/>
+      <g id="flameWrap" class="glow">
+        <g transform="translate(150,238)">
+          <g class="burnscale"><g class="flick">
+            <path class="flame-outer" d="M0,4 C-15,-7 -11,-24 0,-40 C11,-24 15,-7 0,4 Z"/>
+            <path class="flame-inner" d="M0,2 C-7,-3 -5,-13 0,-22 C5,-13 7,-3 0,2 Z"/>
+          </g></g>
+        </g>
+      </g>
+      <g id="boltWrap" class="glow-e">
+        <g transform="translate(150,238)">
+          <g class="burnscale"><g class="crackle">
+            <path class="bolt-outer" d="M5,-44 L-9,-12 L-1,-12 L-6,6 L10,-22 L2,-22 Z"/>
+            <path class="bolt-inner" d="M3,-37 L-5,-12 L0,-12 L-3,2 L6,-20 L1,-20 Z"/>
+          </g></g>
+        </g>
+      </g>
+
+      <!-- prominent modulation readout -->
+      <text class="mod-big" x="150" y="286" id="aModBig">62%</text>
+      <text class="mod-tag" x="150" y="300" id="aModTag">MODULATION</text>
+
+      <!-- pressure mini-gauge on boiler face (lower) -->
+      <g transform="translate(0,10)">
+        <path d="M126,322 A24,24 0 0 1 133,305"   stroke="var(--zone-alert)" stroke-width="6" fill="none"/>
+        <path d="M133,305 A24,24 0 0 1 140.8,299.8" stroke="var(--zone-warn)" stroke-width="6" fill="none"/>
+        <path d="M140.8,299.8 A24,24 0 0 1 159.2,299.8" stroke="var(--zone-ok)" stroke-width="6" fill="none"/>
+        <path d="M159.2,299.8 A24,24 0 0 1 167,305" stroke="var(--zone-warn)" stroke-width="6" fill="none"/>
+        <path d="M167,305 A24,24 0 0 1 174,322"  stroke="var(--zone-alert)" stroke-width="6" fill="none"/>
+        <line id="aPressNeedle" class="press-needle" x1="150" y1="322" x2="132" y2="322"
+              transform="rotate(0,150,322)"/>
+        <circle cx="150" cy="322" r="3.5" fill="var(--needle)"/>
+        <text class="press-txt" x="150" y="344" id="aPress">1.75 bar</text>
+      </g>
+
+      <!-- FLOW pipe (red, out of the boiler) -->
+      <path class="pipe pipeHot" id="flowPipe" d="M240,170 H560 V206"/>
+      <path class="dash ch" d="M240,170 H560 V206"/>
+      <polygon class="arrow ch arrowHot" points="388,158 414,170 388,182"/>
+      <g transform="translate(310,128)">
+        <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-hot"/>
+        <text class="chip-txt" y="0" id="aFlow">62.3°</text>
+        <text class="chip-sub" y="15">FLOW →</text>
+      </g>
+
+      <!-- RETURN pipe (blue, back into the boiler) -->
+      <path class="pipe pipeCold" d="M560,306 V340 H240"/>
+      <path class="dash ch" d="M560,306 V340 H240"/>
+      <polygon class="arrow ch arrowCold" points="372,328 346,340 372,352"/>
+      <g transform="translate(310,392)">
+        <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-cold"/>
+        <text class="chip-txt" y="0" id="aRet">48.1°</text>
+        <text class="chip-sub" y="15">← RETURN</text>
+      </g>
+
+      <!-- ΔT chip -->
+      <g transform="translate(470,255)">
+        <rect x="-44" y="-15" width="88" height="30" rx="15" class="soft-chip"/>
+        <text class="soft-txt" y="5" id="aDt">ΔT 14.2°</text>
+      </g>
+
+      <!-- pump on the return -->
+      <g>
+        <circle class="pump-body" cx="452" cy="340" r="16"/>
+        <path id="pumpBlades" d="M452,340 L452,328 A12,12 0 0 1 462,346 Z M452,340 L442,346 A12,12 0 0 1 442,330 Z
+              M452,340 L462,334 A12,12 0 0 1 448,352 Z" opacity=".9"/>
+      </g>
+
+      <!-- radiator + room -->
+      <g id="radGroup">
+        <rect class="rad-mani" x="540" y="201" width="196" height="10" rx="5"/>
+        <rect class="rad-mani" x="540" y="301" width="196" height="10" rx="5"/>
+        <rect class="rad-bar" x="548" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="572" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="596" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="620" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="644" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="668" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="692" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="716" y="206" width="16" height="100" rx="8"/>
+      </g>
+      <g transform="translate(560,150)">
+        <path class="house" d="M0,10 L13,-3 L26,10 V28 H0 Z"/>
+        <text class="label-big" x="36" y="13" id="aRoom">20.4°</text>
+        <text class="label-sub" x="36" y="28" id="aRoomSet">set 21.0°</text>
+        <text class="label-tag" x="120" y="13">ROOM</text>
+      </g>
+
+      <!-- room return label under radiator -->
+      <text class="label-tag" x="560" y="334">RADIATORS</text>
+    </svg>
+
+    <div class="mobile-strip" id="aStrip"></div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile" id="aTFlame"><span class="led"></span><div><div class="lbl">Flame</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTCH"><span class="led"></span><div><div class="lbl">Heating</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTDHW"><span class="led"></span><div><div class="lbl">Hot water</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTFault"><span class="led"></span><div><div class="lbl">Fault</div><div class="val">—</div></div></div>
+  </div>
+</section>
+
+<!-- ============ DESIGN B — AT A GLANCE ============ -->
+<section id="design-b" class="design">
+  <div class="glance">
+    <p class="concept-cap"><b>Concept B — one thumb, one glance.</b> Phone-first: the room dial up top,
+    the four numbers that matter below it. Everything else lives one tap deeper.</p>
+
+    <div class="g-status" id="bStatus"><span class="dot"></span><span id="bStatusTxt">—</span></div>
+
+    <div class="hero">
+      <svg viewBox="0 0 240 240" aria-label="Room temperature dial">
+        <path class="hero-track" id="bTrack" d=""/>
+        <path class="hero-arc" id="bArc" d=""/>
+        <line class="hero-tick" id="bTick" x1="0" y1="0" x2="0" y2="0"/>
+        <text class="hero-big" x="120" y="128" id="bRoom">20.4°</text>
+        <text class="hero-sub" x="120" y="152" id="bSet">target 21.0°</text>
+      </svg>
+      <div>
+        <button class="stepbtn" id="bDown" aria-label="Lower target">−</button>
+        <button class="stepbtn" id="bUp" aria-label="Raise target">+</button>
+      </div>
+      <div class="cmdline" id="bCmd"></div>
+    </div>
+
+    <div class="statgrid">
+      <div class="stat">
+        <div class="lbl">Boiler</div>
+        <div class="big"><span class="hotArrow">↑ <span id="bFlow">62.3°</span></span>
+          <span class="flamebadge" id="bFlame">🔥</span></div>
+        <div class="big" style="font-size:1.05rem"><span class="coldArrow">↓ <span id="bRet">48.1°</span></span>
+          <span style="color:var(--muted);font-size:.8rem" id="bDt">ΔT 14.2°</span></div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Pressure</div>
+        <div class="big" id="bPress">1.75 bar</div>
+        <div class="zonebar"><div class="zonedot" id="bPressDot" style="left:44%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Modulation</div>
+        <div class="modwrap">
+          <div class="modbar"><div class="modfill" id="bModFill" style="height:45%"></div></div>
+          <div class="big" id="bMod">45%</div>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Hot water</div>
+        <div class="big" id="bDhw">54°</div>
+        <div style="font-size:.8rem;color:var(--muted)" id="bDhwState">standby</div>
+      </div>
+    </div>
+    <div class="foot" id="bOut">Outside 8.4° · OTGW firmware</div>
+  </div>
+</section>
+
+<!-- ============ DESIGN C — MISSION CONTROL ============ -->
+<section id="design-c" class="design">
+  <p class="concept-cap"><b>Concept C — for the people who read OT frames for fun.</b> Always-dark.
+  A live strip chart of flow/return/setpoint with modulation underneath, the numbers in mono,
+  and the raw bus scrolling by. OTmonitor, two decades later.</p>
+
+  <div class="mc">
+    <h2>OTGW <b>// MISSION CONTROL</b> · ws ● live</h2>
+
+    <div class="stripcard">
+      <div class="legend">
+        <span><i style="background:var(--hot)"></i>flow</span>
+        <span><i style="background:var(--cold)"></i>return</span>
+        <span><i style="background:#8b949e"></i>setpoint</span>
+        <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
+      </div>
+      <svg viewBox="0 0 780 210" id="strip">
+        <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
+        <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
+        <text class="axis-txt" x="8" y="16">90°</text>
+        <text class="axis-txt" x="8" y="92">50°</text>
+        <text class="axis-txt" x="8" y="172">10°</text>
+        <line class="ser-sp" id="cSpLine" x1="34" y1="0" x2="772" y2="0"/>
+        <polygon class="ser-mod" id="cMod" points=""/>
+        <polyline class="ser-flow" id="cFlow" points=""/>
+        <polyline class="ser-ret" id="cRet" points=""/>
+        <text class="axis-txt" id="cFlowLbl" x="745" y="20" fill="var(--hot)"></text>
+        <text class="axis-txt" id="cRetLbl" x="745" y="34" fill="var(--cold)"></text>
+      </svg>
+    </div>
+
+    <div class="mc-grid" id="cGrid"></div>
+
+    <div class="ticker" id="cTicker" aria-label="Live OpenTherm frames"></div>
+  </div>
+</section>
+</div><!-- /page-home -->
+
+<!-- ════════════════ PAGE: MONITOR ════════════════ -->
+<div id="page-monitor" class="page">
+  <p class="concept-cap"><b>Monitor — the four sub-tabs, redesigned.</b> Same data as today's
+  Log / Statistics / OT Support / Graph tabs, but visual: a calmer console, a scannable
+  statistics table with direction badges, the support map as a real map, and the graph
+  up front. Everything below runs on the simulated live bus.</p>
+
+  <div class="subtabs">
+    <button class="subtab active" data-tab="mlog">Log</button>
+    <button class="subtab" data-tab="mstats">Statistics</button>
+    <button class="subtab" data-tab="msupport">OT Support</button>
+    <button class="subtab" data-tab="mgraph">Graph</button>
+    <button class="subtab" data-tab="mconn">Connection</button>
+  </div>
+
+  <div id="mlog" class="mpanel active">
+    <div class="toolbar">
+      <button class="tbtn" id="logPause">⏸ Pause</button>
+      <button class="tbtn">Clear</button>
+      <button class="tbtn">⬇ Download</button>
+      <input class="tsearch" id="logSearch" placeholder="Filter frames… (e.g. 19, Boiler, DHW)">
+      <span class="tchip on" id="chipScroll">Auto-scroll</span>
+      <span class="tchip on" id="chipTs">Timestamps</span>
+    </div>
+    <div class="console" id="monLog" aria-label="Live OpenTherm log"></div>
+    <div class="statfoot">
+      <span>Lines: <b id="logCount">0</b></span>
+      <span>Rate: <b id="logRate">2.0</b>/s</span>
+      <span>Gateway mode · WS ● live (simulated)</span>
+    </div>
+  </div>
+
+  <div id="mstats" class="mpanel">
+    <div class="toolbar">
+      <input class="tsearch" id="statsSearch" placeholder="Filter by name or msg id…">
+      <span class="tchip" style="cursor:default">Unique msgIDs: <b id="statsCount" style="margin-left:4px">0</b></span>
+    </div>
+    <div style="overflow-x:auto;border-radius:12px">
+    <table class="stats" id="statsTable">
+      <thead><tr><th>MsgID</th><th>Description</th><th>Direction</th><th>Interval</th><th>Count</th><th style="text-align:right">Value</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+  </div>
+
+  <div id="msupport" class="mpanel">
+    <div class="mlegend">
+      <span class="lb"><i></i>Thermostat + boiler</span>
+      <span class="lt"><i></i>Thermostat only</span>
+      <span class="lo"><i></i>Boiler only</span>
+      <span><i></i>Never seen</span>
+      <span style="margin-left:auto">Observed: <b id="supCount">0</b> / 128 msgIDs</span>
+    </div>
+    <div class="supwrap">
+      <div class="matrix" id="supMatrix" aria-label="OpenTherm message ID support map"></div>
+      <aside class="supdetail" id="supDetail"></aside>
+    </div>
+    <p class="concept-cap" style="margin-top:10px">Hover a cell for a quick label · click (or tap)
+    to pin the full message details. Today this is a table you scroll; as a map you see your
+    system's OpenTherm dialect in one look — and every cell carries the spec.</p>
+  </div>
+  <div class="suptip" id="supTip"></div>
+
+  <div id="mgraph" class="mpanel">
+    <div class="toolbar">
+      <span class="tchip">10 min</span><span class="tchip on">1 hour</span>
+      <span class="tchip">4 h</span><span class="tchip">24 h</span>
+      <span style="flex:1"></span>
+      <button class="tbtn">📷 PNG</button><button class="tbtn">⬇ CSV</button>
+    </div>
+    <div class="graphcard">
+      <div class="legend">
+        <span><i style="background:var(--hot)"></i>flow</span>
+        <span><i style="background:var(--cold)"></i>return</span>
+        <span><i style="background:#8b949e"></i>setpoint</span>
+        <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
+      </div>
+      <svg viewBox="0 0 780 210" id="gstrip">
+        <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
+        <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
+        <text class="axis-txt" x="8" y="16">90°</text>
+        <text class="axis-txt" x="8" y="92">50°</text>
+        <text class="axis-txt" x="8" y="172">10°</text>
+        <line class="ser-sp" id="gSpLine" x1="34" y1="0" x2="772" y2="0"/>
+        <polygon class="ser-mod" id="gMod2" points=""/>
+        <polyline class="ser-flow" id="gFlow2" points=""/>
+        <polyline class="ser-ret" id="gRet2" points=""/>
+      </svg>
+    </div>
+  </div>
+
+  <div id="mconn" class="mpanel">
+    <div class="connlegend">
+      <span class="lg st-ok"><span class="ic">✓</span> <b>Connected</b> link up, data recent</span>
+      <span class="lg st-warn"><span class="ic">!</span> <b>Degraded</b> up but impaired / stale</span>
+      <span class="lg st-down"><span class="ic">✕</span> <b>Disconnected</b> link down</span>
+      <span class="lg st-off"><span class="ic">○</span> <b>Off</b> disabled in settings</span>
+      <span class="lg st-unknown"><span class="ic">?</span> <b>Unknown</b> not determined yet</span>
+      <span class="lg st-mode"><span class="ic">⇄</span> <b>Mode</b> a setting, not health</span>
+    </div>
+
+    <!-- signal-flow chain: see WHERE a break is, not just that something is down -->
+    <div class="connmap">
+      <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map">
+        <!-- links (drawn first, under the nodes) -->
+        <g id="cnLinks">
+          <path id="lk-therm"  class="cn-link" d="M150,86 H300"/>
+          <path id="fl-therm"  class="cn-flow" d="M150,86 H300"/>
+          <path id="lk-boiler" class="cn-link" d="M150,274 H300"/>
+          <path id="fl-boiler" class="cn-flow" d="M150,274 H300"/>
+          <path id="lk-wifi"   class="cn-link" d="M470,180 H560"/>
+          <path id="fl-wifi"   class="cn-flow" d="M470,180 H560"/>
+          <path id="lk-mqtt"   class="cn-link" d="M700,150 V104 H760"/>
+          <path id="fl-mqtt"   class="cn-flow" d="M700,150 V104 H760"/>
+          <path id="lk-ws"     class="cn-link" d="M700,210 V300 H760"/>
+          <path id="fl-ws"     class="cn-flow" d="M700,210 V300 H760"/>
+          <text class="cn-linklbl" x="225" y="74">OT bus</text>
+          <text class="cn-linklbl" x="225" y="262">OT bus</text>
+          <text class="cn-linklbl" x="515" y="170">Wi-Fi</text>
+          <text class="cn-linklbl" x="690" y="120">MQTT</text>
+          <text class="cn-linklbl" x="690" y="250">live</text>
+        </g>
+        <!-- nodes -->
+        <g id="n-therm">
+          <rect class="cn-box" x="20" y="56" width="130" height="60" rx="12"/>
+          <text class="cn-ic" x="36" y="96">🌡️</text>
+          <text class="cn-title" x="64" y="84">Thermostat</text>
+          <text class="cn-sub" x="64" y="102" id="cnThermSub">master</text>
+          <circle class="cn-statedot" id="dot-therm" cx="142" cy="64" r="7"/>
+        </g>
+        <g id="n-boiler">
+          <rect class="cn-box" x="20" y="244" width="130" height="60" rx="12"/>
+          <text class="cn-ic" x="36" y="284">🔥</text>
+          <text class="cn-title" x="64" y="272">Boiler</text>
+          <text class="cn-sub" x="64" y="290" id="cnBoilerSub">slave</text>
+          <circle class="cn-statedot" id="dot-boiler" cx="142" cy="252" r="7"/>
+        </g>
+        <!-- gateway: PIC + ESP, carries the mode chip -->
+        <g id="n-gw">
+          <rect class="cn-box" x="300" y="120" width="170" height="120" rx="14"/>
+          <text class="cn-ic" x="320" y="158">📟</text>
+          <text class="cn-title" x="352" y="150">OTGW</text>
+          <text class="cn-sub" x="352" y="167" id="cnPicSub">PIC gateway 6.5</text>
+          <rect x="318" y="186" width="134" height="34" rx="9" fill="var(--panel)" stroke="var(--border)"/>
+          <circle id="dot-mode" cx="334" cy="203" r="5" fill="var(--accent)"/>
+          <text class="cn-modechip" id="cnModeTxt" x="392" y="207" fill="var(--accent)">GATEWAY MODE</text>
+          <circle class="cn-statedot" id="dot-pic" cx="462" cy="128" r="7"/>
+        </g>
+        <g id="n-router">
+          <rect class="cn-box" x="560" y="150" width="140" height="60" rx="12"/>
+          <text class="cn-ic" x="578" y="190">📶</text>
+          <text class="cn-title" x="610" y="178">Router</text>
+          <text class="cn-sub" x="610" y="196" id="cnWifiSub">-58 dBm</text>
+          <circle class="cn-statedot" id="dot-wifi" cx="692" cy="158" r="7"/>
+        </g>
+        <g id="n-broker">
+          <rect class="cn-box" x="760" y="74" width="56" height="60" rx="12"/>
+          <text class="cn-ic" x="772" y="110">🗄️</text>
+          <circle class="cn-statedot" id="dot-mqtt" cx="808" cy="82" r="7"/>
+        </g>
+        <text class="cn-sub" x="760" y="148">Broker → HA</text>
+        <g id="n-browser">
+          <rect class="cn-box" x="760" y="270" width="56" height="60" rx="12"/>
+          <text class="cn-ic" x="772" y="306">📱</text>
+          <circle class="cn-statedot" id="dot-ws" cx="808" cy="278" r="7"/>
+        </g>
+        <text class="cn-sub" x="760" y="344">This browser</text>
+      </svg>
+    </div>
+
+    <div id="connDetail"></div>
+  </div>
+</div><!-- /page-monitor -->
+
+<!-- ════════════════ PAGE: SETTINGS ════════════════ -->
+<div id="page-settings" class="page">
+  <p class="concept-cap"><b>Settings — grouped, scannable, desktop-worthy.</b> The 2.0.0 branch
+  already groups settings into titled cards; this takes the next step: a sticky category rail,
+  cards flowing in two columns on desktop (one on mobile), live search across every field,
+  changed-field markers and a sticky save bar. Reboot-sensitive groups are badged.</p>
+
+  <input class="set-search" id="setSearch" placeholder="Search settings… (e.g. broker, ntp, pin)">
+
+  <div class="set-layout">
+    <nav class="set-rail" id="setRail"></nav>
+    <div>
+      <div class="set-cols" id="setCols"></div>
+      <div class="savebar" id="saveBar">
+        <span class="msg"><b id="dirtyCount">0</b> unsaved change(s)</span>
+        <button class="discard" id="btnDiscard">Discard</button>
+        <button class="save" id="btnSave">Save settings</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /page-settings -->
+
+<div class="foot">Design exploration TASK-854 / 855 / 856 · simulated data · self-contained mockup (no libraries, no network)</div>
+</div>
+<div class="toast" id="toast">Settings saved ✓ (simulated)</div>
+
+
+</body>
+</html>

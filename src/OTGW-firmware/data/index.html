@@ -57,7 +57,22 @@
         <div class="headercolumn" id="devVersion">[version]</div>
         <div class="headercolumn" id='theTime'>[00:00:00]</div>
         <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle theme" aria-pressed="false">☾</button>
+        <button class="theme-toggle-btn" id="tryV2" aria-label="Switch to the new v2 UI" title="Try the new v2 dashboard">✨ New UI</button>
     </div>
+    <script>
+      // TASK-908: opt in to the v2 redesign (device-wide). Flips ui_usev2 then
+      // reloads the root path, which the firmware now serves as /v2.html.
+      (function () {
+        var b = document.getElementById('tryV2');
+        if (!b) return;
+        b.addEventListener('click', function () {
+          fetch(location.protocol + '//' + location.host + '/api/v2/settings', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: 'ui_usev2', value: 'true' })
+          }).catch(function () { }).finally(function () { location.href = '/'; });
+        });
+      })();
+    </script>
     <template id="pageNavTemplate">
       <div class="nav-container">
         <div class='nav-left'>

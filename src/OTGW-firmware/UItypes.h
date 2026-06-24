@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : UItypes.h
-**  Version  : v2.0.0-alpha.240
+**  Version  : v2.0.0-alpha.241
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -24,5 +24,6 @@ struct UISection {
   bool bAutoScreenshot  = false;
   bool bAutoDownloadLog = false;
   bool bAutoExport      = false;
+  bool bUseV2           = false;   // TASK-908: device-wide default UI (false=classic, true=v2 redesign)
   int  iGraphTimeWindow = 60;      // Default to 1 Hour (60 minutes)
 };
