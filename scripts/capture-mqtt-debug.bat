@@ -78,7 +78,11 @@ param(
     [string]$BrowserPath,
     [switch]$SkipHttpProbes,
     [ValidateRange(1, 60)]
-    [int]$HttpProbeTimeoutSeconds = 10
+    [int]$HttpProbeTimeoutSeconds = 10,
+    [switch]$SkipCrashlogCapture,
+    [string]$CrashlogUrl,
+    [ValidateRange(5, 3600)]
+    [int]$CrashlogPollSeconds = 30
 )
 
 Set-StrictMode -Version Latest
@@ -123,11 +127,22 @@ function Show-Help {
     Write-Host ""
     Write-Host "Browser devtools capture (console + exceptions + resource 404s + network timings):"
     Write-Host "  Enabled by default. A headless Microsoft Edge (or Chrome) instance loads the OTGW web UI over the"
-    Write-Host "  Chrome DevTools Protocol and its console/network output is written to browser.log, merged into transcript.txt."
+    Write-Host "  Chrome DevTools Protocol and its console/network output is written to browser.log."
+    Write-Host "  Browser/tool stderr is captured in error.txt, which is also merged into the final transcript."
     Write-Host "  -SkipBrowserCapture            Disable the browser capture entirely (telnet + MQTT only)."
     Write-Host "  -BrowserUrl <url>             Page to load (default http://<DeviceHost>/)."
     Write-Host "  -BrowserDebugPort <port>     CDP remote-debugging port (default 9222; auto-bumped if busy)."
     Write-Host "  -BrowserPath <path>          Explicit msedge.exe/chrome.exe path (default: auto-detect)."
+    Write-Host ""
+    Write-Host "Crash-log capture (decoded ESP exception: exccause + epc1/excvaddr registers):"
+    Write-Host "  Enabled by default. Polls the firmware REST endpoint http://<DeviceHost>/api/v2/device/crashlog"
+    Write-Host "  plus the raw /reboot_log.txt ring buffer, writing both to crashlog.log (merged into the final transcript)."
+    Write-Host "  This is the reliable way to capture the decoded crash reason without a USB serial console: the"
+    Write-Host "  firmware reads rst_info at boot and persists it to flash, so a single poll between reboots catches it."
+    Write-Host "  Devices without the endpoint (e.g. firmware 1.2.0) simply log a 404 and the capture continues."
+    Write-Host "  -SkipCrashlogCapture          Disable the crash-log poll entirely."
+    Write-Host "  -CrashlogUrl <url>           Crash-log endpoint (default http://<DeviceHost>/api/v2/device/crashlog)."
+    Write-Host "  -CrashlogPollSeconds <n>     Poll interval in seconds (default 30, range 5-3600)."
     Write-Host ""
     Write-Host "HTTP probes (curl):"
     Write-Host "  After the live capture stops (connection broken), the script runs a short series of curl.exe"
@@ -138,7 +153,8 @@ function Show-Help {
     Write-Host "  -HttpProbeTimeoutSeconds <n> Per-request timeout in seconds (default 10, range 1-60)."
     Write-Host ""
     Write-Host "Stopping capture:"
-    Write-Host "  Press Q in the console to stop cleanly. The script closes the logs and leaves transcript.txt."
+    Write-Host "  Press Q in the console to stop cleanly. The script closes the logs and leaves"
+    Write-Host "  transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt plus error.txt."
     Write-Host "  Ctrl+C and Ctrl+Break remain fallback interrupts, but cmd.exe may show its batch-job prompt after Ctrl+C."
     Write-Host "  Or pass -DurationSeconds <seconds> to stop automatically after a fixed interval."
     Write-Host ""
@@ -544,6 +560,305 @@ function New-Utf8Writer {
     return New-Object System.IO.StreamWriter -ArgumentList $Path, $true, $utf8NoBom
 }
 
+function ConvertTo-SafeFileNamePart {
+    param(
+        [string]$Value,
+        [Parameter(Mandatory = $true)][string]$Fallback,
+        [int]$MaxLength = 80
+    )
+
+    $part = $Value
+    if ([string]::IsNullOrWhiteSpace($part)) {
+        $part = $Fallback
+    }
+
+    $invalidChars = [System.IO.Path]::GetInvalidFileNameChars()
+    foreach ($ch in $invalidChars) {
+        $part = $part.Replace([string]$ch, "-")
+    }
+
+    $part = ($part.Trim() -replace '\s+', '-' -replace '-+', '-').Trim('.-')
+    if ([string]::IsNullOrWhiteSpace($part)) {
+        $part = $Fallback
+    }
+
+    if ($part.Length -gt $MaxLength) {
+        $part = $part.Substring(0, $MaxLength).Trim('.-')
+    }
+
+    return $part
+}
+
+function Get-JsonPropertyValue {
+    param(
+        [AllowNull()]$Object,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    if ($null -eq $Object) {
+        return $null
+    }
+
+    $property = $Object.PSObject.Properties[$Name]
+    if ($property) {
+        return $property.Value
+    }
+
+    return $null
+}
+
+function Get-ApiSettingValue {
+    param(
+        [AllowNull()]$Settings,
+        [Parameter(Mandatory = $true)][string]$Name
+    )
+
+    $entry = Get-JsonPropertyValue -Object $Settings -Name $Name
+    if ($null -eq $entry) {
+        return $null
+    }
+
+    $value = Get-JsonPropertyValue -Object $entry -Name "value"
+    if ($null -ne $value) {
+        return $value
+    }
+
+    return $entry
+}
+
+function Test-UsableCaptureValue {
+    param([AllowNull()]$Value)
+
+    if ($null -eq $Value) {
+        return $false
+    }
+
+    $text = ([string]$Value).Trim()
+    return -not ([string]::IsNullOrWhiteSpace($text) -or
+        [string]::Equals($text, "null", [System.StringComparison]::OrdinalIgnoreCase) -or
+        [string]::Equals($text, "unknown", [System.StringComparison]::OrdinalIgnoreCase) -or
+        [string]::Equals($text, "(not set)", [System.StringComparison]::OrdinalIgnoreCase))
+}
+
+function Add-CaptureMetadataValue {
+    param(
+        [Parameter(Mandatory = $true)]$Metadata,
+        [Parameter(Mandatory = $true)][string]$Name,
+        [AllowNull()]$Value,
+        [Parameter(Mandatory = $true)][string]$Source,
+        [switch]$PreferExisting
+    )
+
+    if (-not (Test-UsableCaptureValue -Value $Value)) {
+        return
+    }
+
+    if ($PreferExisting -and (Test-UsableCaptureValue -Value $Metadata[$Name])) {
+        return
+    }
+
+    $Metadata[$Name] = [string]$Value
+    $Metadata["Sources"].Add("$Name=$Source") | Out-Null
+}
+
+function Add-ToolErrorLine {
+    param(
+        [AllowNull()][string]$Path,
+        [Parameter(Mandatory = $true)][string]$Line
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Path)) {
+        return
+    }
+
+    try {
+        Add-Content -LiteralPath $Path -Value "$((Get-Date).ToString('o'))  $Line" -Encoding UTF8
+    }
+    catch { }
+}
+
+function Update-CaptureMetadataFromTelnetLog {
+    param(
+        [Parameter(Mandatory = $true)]$Metadata,
+        [AllowNull()][string]$TelnetLog
+    )
+
+    if ([string]::IsNullOrWhiteSpace($TelnetLog) -or -not (Test-Path -LiteralPath $TelnetLog -PathType Leaf)) {
+        return
+    }
+
+    try {
+        foreach ($line in [System.IO.File]::ReadLines($TelnetLog)) {
+            if ($line -match '^\s*hostname:\s*(.+?)\s*$') {
+                Add-CaptureMetadataValue -Metadata $Metadata -Name "Hostname" -Value $matches[1] -Source "telnet.log" -PreferExisting
+                continue
+            }
+
+            if ($line -match '^\s*version:\s*(.+?)\s*$') {
+                Add-CaptureMetadataValue -Metadata $Metadata -Name "FirmwareVersion" -Value $matches[1] -Source "telnet.log" -PreferExisting
+                continue
+            }
+
+            if ($line -match '^\s*unique_id:\s*(.+?)\s*$') {
+                Add-CaptureMetadataValue -Metadata $Metadata -Name "UniqueId" -Value $matches[1] -Source "telnet.log"
+                continue
+            }
+
+            if ($line -match '^\s*device_id:\s*(.+?)\s*$') {
+                Add-CaptureMetadataValue -Metadata $Metadata -Name "PicDeviceId" -Value $matches[1] -Source "telnet.log"
+            }
+        }
+    }
+    catch {
+        $Metadata["Errors"].Add("metadata telnet parse failed: $($_.Exception.Message)") | Out-Null
+    }
+}
+
+function Get-CaptureDeviceMetadata {
+    param(
+        [Parameter(Mandatory = $true)][string]$DeviceHost,
+        [AllowNull()][string]$TelnetLog
+    )
+
+    $metadata = [ordered]@{
+        Hostname    = $null
+        FirmwareVersion = $null
+        UniqueId    = $null
+        PicDeviceId = $null
+        Sources     = New-Object System.Collections.Generic.List[string]
+        Errors      = New-Object System.Collections.Generic.List[string]
+    }
+
+    Update-CaptureMetadataFromTelnetLog -Metadata $metadata -TelnetLog $TelnetLog
+
+    if ((Test-UsableCaptureValue -Value $metadata["Hostname"]) -and
+        (Test-UsableCaptureValue -Value $metadata["FirmwareVersion"]) -and
+        (Test-UsableCaptureValue -Value $metadata["UniqueId"])) {
+        return [PSCustomObject]$metadata
+    }
+
+    $baseUri = "http://$DeviceHost"
+
+    try {
+        $debugResponse = Invoke-RestMethod -Uri "$baseUri/api/v2/debug" -TimeoutSec 2 -ErrorAction Stop
+        $debug = Get-JsonPropertyValue -Object $debugResponse -Name "debug"
+        Add-CaptureMetadataValue -Metadata $metadata -Name "Hostname" -Value (Get-JsonPropertyValue -Object $debug -Name "settings.hostname") -Source "/api/v2/debug" -PreferExisting
+        Add-CaptureMetadataValue -Metadata $metadata -Name "FirmwareVersion" -Value (Get-JsonPropertyValue -Object $debug -Name "build.version") -Source "/api/v2/debug" -PreferExisting
+        Add-CaptureMetadataValue -Metadata $metadata -Name "UniqueId" -Value (Get-JsonPropertyValue -Object $debug -Name "settings.mqtt.unique_id") -Source "/api/v2/debug"
+    }
+    catch {
+        $metadata["Errors"].Add("metadata /api/v2/debug unavailable: $($_.Exception.Message)") | Out-Null
+    }
+
+    if (-not (Test-UsableCaptureValue -Value $metadata["UniqueId"])) {
+        try {
+            $settingsResponse = Invoke-RestMethod -Uri "$baseUri/api/v2/settings" -TimeoutSec 2 -ErrorAction Stop
+            $settings = Get-JsonPropertyValue -Object $settingsResponse -Name "settings"
+            Add-CaptureMetadataValue -Metadata $metadata -Name "Hostname" -Value (Get-ApiSettingValue -Settings $settings -Name "hostname") -Source "/api/v2/settings" -PreferExisting
+            Add-CaptureMetadataValue -Metadata $metadata -Name "UniqueId" -Value (Get-ApiSettingValue -Settings $settings -Name "mqttuniqueid") -Source "/api/v2/settings"
+        }
+        catch {
+            $metadata["Errors"].Add("metadata /api/v2/settings unavailable: $($_.Exception.Message)") | Out-Null
+        }
+    }
+
+    try {
+        $deviceResponse = Invoke-RestMethod -Uri "$baseUri/api/v2/device/info" -TimeoutSec 2 -ErrorAction Stop
+        $device = Get-JsonPropertyValue -Object $deviceResponse -Name "device"
+        Add-CaptureMetadataValue -Metadata $metadata -Name "Hostname" -Value (Get-JsonPropertyValue -Object $device -Name "hostname") -Source "/api/v2/device/info" -PreferExisting
+        Add-CaptureMetadataValue -Metadata $metadata -Name "FirmwareVersion" -Value (Get-JsonPropertyValue -Object $device -Name "fwversion") -Source "/api/v2/device/info" -PreferExisting
+
+        if (-not (Test-UsableCaptureValue -Value $metadata["UniqueId"])) {
+            $macAddress = Get-JsonPropertyValue -Object $device -Name "macaddress"
+            if (Test-UsableCaptureValue -Value $macAddress) {
+                $mac = ([string]$macAddress) -replace '[^0-9A-Fa-f]', ''
+                if (-not [string]::IsNullOrWhiteSpace($mac)) {
+                    Add-CaptureMetadataValue -Metadata $metadata -Name "UniqueId" -Value ("otgw-" + $mac.ToUpperInvariant()) -Source "/api/v2/device/info macaddress"
+                }
+            }
+        }
+    }
+    catch {
+        $metadata["Errors"].Add("metadata /api/v2/device/info unavailable: $($_.Exception.Message)") | Out-Null
+    }
+
+    return [PSCustomObject]$metadata
+}
+
+function Get-CaptureTranscriptPath {
+    param(
+        [Parameter(Mandatory = $true)][string]$RunPath,
+        [Parameter(Mandatory = $true)][string]$RunName,
+        [Parameter(Mandatory = $true)][string]$DeviceHost,
+        [Parameter(Mandatory = $true)]$Metadata
+    )
+
+    $hostPart = ConvertTo-SafeFileNamePart -Value $Metadata.Hostname -Fallback $DeviceHost
+    $versionPart = ConvertTo-SafeFileNamePart -Value $Metadata.FirmwareVersion -Fallback "unknown-version"
+    $idValue = $Metadata.UniqueId
+    if (-not (Test-UsableCaptureValue -Value $idValue)) {
+        $idValue = $Metadata.PicDeviceId
+    }
+    $idPart = ConvertTo-SafeFileNamePart -Value $idValue -Fallback "unknown-id"
+    return (Join-Path -Path $RunPath -ChildPath "transcript-$RunName-$versionPart-$hostPart-$idPart.txt")
+}
+
+function New-ToolErrorLog {
+    param(
+        [Parameter(Mandatory = $true)][string]$RunPath,
+        [Parameter(Mandatory = $true)][string]$ErrorPath
+    )
+
+    $parts = @(
+        @{ Title = "SCRIPT / CAPTURE ERRORS (script.error.log)"; File = "script.error.log" },
+        @{ Title = "MQTT STDERR (mqtt.stderr.log)";             File = "mqtt.stderr.log" },
+        @{ Title = "BROWSER STDERR (browser.stderr.log)";       File = "browser.stderr.log" }
+    )
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+    $writer = New-Object System.IO.StreamWriter -ArgumentList $ErrorPath, $false, $utf8NoBom
+    try {
+        $writer.WriteLine("OTGW capture - tool stderr and script errors")
+        $writer.WriteLine("Generated: $((Get-Date).ToString('o'))")
+        $writer.WriteLine("Run folder: $RunPath")
+        $writer.WriteLine("")
+
+        foreach ($part in $parts) {
+            $path = Join-Path -Path $RunPath -ChildPath $part.File
+            $writer.WriteLine("============================================================")
+            $writer.WriteLine("=== $($part.Title)")
+            $writer.WriteLine("============================================================")
+            if (Test-Path -LiteralPath $path -PathType Leaf) {
+                try {
+                    $content = [System.IO.File]::ReadAllText($path)
+                    if ([string]::IsNullOrWhiteSpace($content)) {
+                        $writer.WriteLine("(empty)")
+                    }
+                    else {
+                        $writer.Write($content)
+                        if (-not $content.EndsWith("`n")) {
+                            $writer.WriteLine("")
+                        }
+                    }
+                }
+                catch {
+                    $writer.WriteLine("(could not read: $($_.Exception.Message))")
+                }
+            }
+            else {
+                $writer.WriteLine("(not present)")
+            }
+            $writer.WriteLine("")
+        }
+    }
+    finally {
+        $writer.Flush()
+        $writer.Dispose()
+    }
+
+    return $ErrorPath
+}
+
 function Invoke-HttpProbes {
     # Post-capture sanity sweep: hit the root page and a handful of REST endpoints
     # with real curl.exe (NOT PowerShell's Invoke-WebRequest alias, which throws on
@@ -633,39 +948,27 @@ function Invoke-HttpProbes {
 }
 
 function New-MergedTranscript {
-    param([Parameter(Mandatory = $true)][string]$RunPath)
+    param(
+        [Parameter(Mandatory = $true)][string]$RunPath,
+        [string]$TranscriptPath
+    )
 
     # Combine every capture file into ONE transcript so the tester uploads a
     # single file. Order: summary first (metadata + event timeline), then the
     # raw streams. Each file is read defensively so a missing/locked file cannot
     # abort the whole merge.
-    #
-    # Naming convention (shared with capture-serial.py):
-    #   transcript-<hostname>-<uniqueid>-<hardware>-<datetime>.txt
-    # Identity is parsed from the captured telnet banner / 'D' state dump; each
-    # field falls back to a safe default when the device did not report it.
-    $idHost = "OTGW"; $idUid = "unknown"; $idHw = "esp32"
-    $telnetPath = Join-Path -Path $RunPath -ChildPath "telnet.log"
-    if (Test-Path -LiteralPath $telnetPath -PathType Leaf) {
-        $bannerLines = Get-Content -LiteralPath $telnetPath -TotalCount 600 -ErrorAction SilentlyContinue
-        foreach ($line in $bannerLines) {
-            if     ($line -match 'Host\s*:\s*(\S+)')          { $idHost = $Matches[1] }
-            elseif ($line -match 'unique_id:\s*(\S+)')        { $idUid  = $Matches[1] }
-            elseif ($line -match 'MQTT uniqueid\s*:\s*(\S+)') { $idUid  = $Matches[1] }
-            elseif ($line -match 'hardware\.mode:\s*(\S+)')   { $idHw   = $Matches[1] }
-        }
+    if ([string]::IsNullOrWhiteSpace($TranscriptPath)) {
+        $TranscriptPath = Join-Path -Path $RunPath -ChildPath "transcript.txt"
     }
-    $sanitize = { param($s) (($s -replace '[^A-Za-z0-9._-]', '_')) }
-    $idHost = & $sanitize $idHost; $idUid = & $sanitize $idUid; $idHw = & $sanitize $idHw
-    $stamp = (Get-Date).ToString('yyyyMMdd-HHmmss')
-    $mergedName = "transcript-$idHost-$idUid-$idHw-$stamp.txt"
-    $mergedPath = Join-Path -Path $RunPath -ChildPath $mergedName
+
+    $mergedPath = $TranscriptPath
     $parts = @(
         @{ Title = "SUMMARY (summary.txt)";          File = "summary.txt" },
+        @{ Title = "TOOL ERRORS (error.txt)";        File = "error.txt" },
         @{ Title = "OTGW TELNET DEBUG (telnet.log)";  File = "telnet.log" },
         @{ Title = "MQTT BROKER STREAM (mqtt.log)";   File = "mqtt.log" },
-        @{ Title = "MQTT STDERR (mqtt.stderr.log)";   File = "mqtt.stderr.log" },
         @{ Title = "BROWSER DEVTOOLS (browser.log)";  File = "browser.log" },
+        @{ Title = "DEVICE CRASH LOG (crashlog.log)"; File = "crashlog.log" },
         @{ Title = "HTTP PROBES (curl-probes.log)";   File = "curl-probes.log" }
     )
 
@@ -718,7 +1021,7 @@ function Remove-IntermediateCaptureFiles {
     $transcriptFullPath = [System.IO.Path]::GetFullPath($TranscriptPath)
     $removed = New-Object System.Collections.Generic.List[string]
 
-    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log", "curl-probes.log")) {
+    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log", "browser.stderr.log", "crashlog.log", "script.error.log", "curl-probes.log")) {
         $path = Join-Path -Path $RunPath -ChildPath $file
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             continue
@@ -1073,7 +1376,8 @@ $script:BrowserWorkerScript = {
         [string]$DeviceUrl,
         [int]$DebugPort,
         [string]$TempProfile,
-        [string]$BrowserLog
+        [string]$BrowserLog,
+        [string]$BrowserErrorLog
     )
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
@@ -1124,7 +1428,7 @@ $script:BrowserWorkerScript = {
             "--user-data-dir=$TempProfile",
             "about:blank"
         )
-        $edge = Start-Process -FilePath $BrowserPath -ArgumentList $browserArgs -PassThru -WindowStyle Hidden
+        $edge = Start-Process -FilePath $BrowserPath -ArgumentList $browserArgs -PassThru -WindowStyle Hidden -RedirectStandardError $BrowserErrorLog
 
         # Attach to the about:blank page target FIRST, then navigate, so page-load console
         # logs and resource requests are captured from the very start.
@@ -1303,7 +1607,8 @@ function Start-BrowserCapture {
         [Parameter(Mandatory = $true)][string]$DeviceUrl,
         [Parameter(Mandatory = $true)][int]$DebugPort,
         [Parameter(Mandatory = $true)][string]$TempProfile,
-        [Parameter(Mandatory = $true)][string]$BrowserLog
+        [Parameter(Mandatory = $true)][string]$BrowserLog,
+        [Parameter(Mandatory = $true)][string]$BrowserErrorLog
     )
 
     $worker = [powershell]::Create()
@@ -1313,6 +1618,7 @@ function Start-BrowserCapture {
     [void]$worker.AddParameter("DebugPort", $DebugPort)
     [void]$worker.AddParameter("TempProfile", $TempProfile)
     [void]$worker.AddParameter("BrowserLog", $BrowserLog)
+    [void]$worker.AddParameter("BrowserErrorLog", $BrowserErrorLog)
     $async = $worker.BeginInvoke()
 
     return [PSCustomObject]@{
@@ -1345,6 +1651,218 @@ function Stop-BrowserCapture {
     }
     catch {
         $summary = "Browser capture: stop error - $($_.Exception.Message)"
+    }
+    finally {
+        try { $Handle.Worker.Dispose() } catch { }
+    }
+
+    return $summary
+}
+
+# The crash-log worker runs in its own runspace (same model as the browser worker) so it
+# can poll the device REST endpoint concurrently with the telnet/MQTT capture loop without
+# blocking it. It shares the in-process [OtgMqttCapture.CancelFlag] static for the stop
+# signal, writes its own crashlog.log (no contention with the main thread), and returns a
+# one-line status string that the main thread folds into summary.txt.
+#
+# Why poll instead of relying on the MQTT reboot_reason topic: that topic only carries the
+# coarse string ("Exception"). The decoded crash (exccause + epc1/epc2/epc3/excvaddr/depc)
+# lives in the firmware's /reboot_log.txt ring buffer, exposed JSON-wrapped at
+# /api/v2/device/crashlog. The firmware reads rst_info once at boot and persists it to flash,
+# so a single successful poll between two reboots captures the decode for a crash-looping unit.
+$script:CrashlogWorkerScript = {
+    param(
+        [string]$CrashlogUrl,
+        [string]$RebootLogUrl,
+        [int]$PollSeconds,
+        [string]$CrashlogLog
+    )
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+    $log = New-Object System.IO.StreamWriter -ArgumentList $CrashlogLog, $false, $utf8NoBom
+    $log.AutoFlush = $true
+
+    function Write-CrashLine {
+        param([string]$Line)
+        $log.WriteLine("$((Get-Date).ToString('HH:mm:ss.fff'))  $Line")
+    }
+
+    # HttpWebRequest (not WebClient/Invoke-RestMethod) because it exposes an explicit Timeout,
+    # which is essential against a crash-looping device that may accept the socket then stall.
+    function Invoke-HttpGet {
+        param([string]$Url, [int]$TimeoutMs = 5000)
+        try {
+            $req = [System.Net.HttpWebRequest]::Create($Url)
+            $req.Method = "GET"
+            $req.Timeout = $TimeoutMs
+            $req.ReadWriteTimeout = $TimeoutMs
+            $req.KeepAlive = $false
+            $resp = $req.GetResponse()
+            try {
+                $status = [int]$resp.StatusCode
+                $reader = New-Object System.IO.StreamReader($resp.GetResponseStream())
+                try { $body = $reader.ReadToEnd() } finally { $reader.Dispose() }
+                return @{ Status = $status; Body = $body; Error = $null }
+            }
+            finally { $resp.Dispose() }
+        }
+        catch [System.Net.WebException] {
+            $we = $_.Exception
+            $status = $null
+            if ($we.Response) {
+                try {
+                    $status = [int]([System.Net.HttpWebResponse]$we.Response).StatusCode
+                    $reader = New-Object System.IO.StreamReader($we.Response.GetResponseStream())
+                    try { $body = $reader.ReadToEnd() } finally { $reader.Dispose() }
+                    return @{ Status = $status; Body = $body; Error = $we.Message }
+                }
+                catch { }
+            }
+            # Classify the transport failure (Timeout vs ConnectFailure vs ...) so a poll that
+            # loses the ESP8266 single-loop accept race reads differently from a dead device.
+            $reason = if ($we.Status) { "$($we.Status) - $($we.Message)" } else { $we.Message }
+            return @{ Status = $status; Body = $null; Error = $reason }
+        }
+        catch {
+            return @{ Status = $null; Body = $null; Error = $_.Exception.Message }
+        }
+    }
+
+    # The device runs one cooperative loop and serves a single HTTP client at a time. A heavy
+    # synchronous handler (firmware/files hex-version scan ~2.4s, settings flash write ~0.25s)
+    # can briefly block the accept path, so a lone 5s poll occasionally times out on a perfectly
+    # healthy device. Give each poll a longer ceiling and one retry before it counts as a failure;
+    # this is bounded extra work only when a poll actually fails, so it adds no sustained load.
+    function Invoke-HttpGetResilient {
+        param([string]$Url, [int]$TimeoutMs = 10000, [int]$Attempts = 2, [int]$BackoffMs = 1500)
+        $result = $null
+        for ($i = 1; $i -le $Attempts; $i++) {
+            $result = Invoke-HttpGet -Url $Url -TimeoutMs $TimeoutMs
+            # Done on any real HTTP answer (200, or a status like 404); only retry transport failures.
+            if ($null -ne $result.Status) { return $result }
+            if ($i -lt $Attempts -and -not [OtgMqttCapture.CancelFlag]::StopRequested) {
+                Start-Sleep -Milliseconds $BackoffMs
+            }
+        }
+        return $result
+    }
+
+    $summary = "Crash-log capture: completed normally."
+    $polls = 0
+    $lastCrashBody = $null
+    $lastRebootBody = $null
+
+    try {
+        Write-CrashLine "crashlog endpoint: $CrashlogUrl"
+        Write-CrashLine "reboot-log file:   $RebootLogUrl"
+        Write-CrashLine "poll interval:     ${PollSeconds}s"
+
+        # Poll once up front, then on the interval. Each poll grabs the decoded REST endpoint
+        # plus the raw ring-buffer file; both are logged only when their content changes, so a
+        # stable device does not flood the log while a crash-looping one records every new entry.
+        while ($true) {
+            $polls++
+
+            $crash = Invoke-HttpGetResilient -Url $CrashlogUrl
+            if ($crash.Status -eq 200 -and $crash.Body) {
+                $trimmed = $crash.Body.Trim()
+                if ($trimmed -ne $lastCrashBody) {
+                    Write-CrashLine "[crashlog #$polls CHANGED] $trimmed"
+                    $lastCrashBody = $trimmed
+                }
+            }
+            elseif ($null -ne $crash.Status) {
+                # 404 on 1.2.0 (endpoint absent) - record once-ish, do not abort.
+                if ("status-$($crash.Status)" -ne $lastCrashBody) {
+                    Write-CrashLine "[crashlog #$polls] HTTP $($crash.Status) (endpoint unavailable on this firmware?)"
+                    $lastCrashBody = "status-$($crash.Status)"
+                }
+            }
+            else {
+                Write-CrashLine "[crashlog #$polls] request failed after retry: $($crash.Error)"
+            }
+
+            $reboot = Invoke-HttpGetResilient -Url $RebootLogUrl
+            if ($reboot.Status -eq 200 -and $reboot.Body) {
+                $trimmed = $reboot.Body.Trim()
+                if ($trimmed -and $trimmed -ne $lastRebootBody) {
+                    Write-CrashLine "[reboot_log.txt #$polls CHANGED]"
+                    foreach ($line in ($trimmed -split "`r?`n")) {
+                        if ($line.Trim()) { Write-CrashLine "  | $line" }
+                    }
+                    $lastRebootBody = $trimmed
+                }
+            }
+
+            # Sleep the interval in small slices so a stop request is honoured promptly.
+            $elapsed = 0
+            while ($elapsed -lt ($PollSeconds * 1000)) {
+                if ([OtgMqttCapture.CancelFlag]::StopRequested) { break }
+                Start-Sleep -Milliseconds 200
+                $elapsed += 200
+            }
+            if ([OtgMqttCapture.CancelFlag]::StopRequested) { break }
+        }
+
+        Write-CrashLine "stop requested; closing crash-log capture ($polls polls)"
+    }
+    catch {
+        $summary = "Crash-log capture: error - $($_.Exception.Message)"
+        try { Write-CrashLine "[worker-error] $($_.Exception.Message)" } catch { }
+    }
+    finally {
+        try { $log.Flush(); $log.Dispose() } catch { }
+    }
+
+    return $summary
+}
+
+function Start-CrashlogCapture {
+    param(
+        [Parameter(Mandatory = $true)][string]$CrashlogUrl,
+        [Parameter(Mandatory = $true)][string]$RebootLogUrl,
+        [Parameter(Mandatory = $true)][int]$PollSeconds,
+        [Parameter(Mandatory = $true)][string]$CrashlogLog
+    )
+
+    $worker = [powershell]::Create()
+    [void]$worker.AddScript($script:CrashlogWorkerScript)
+    [void]$worker.AddParameter("CrashlogUrl", $CrashlogUrl)
+    [void]$worker.AddParameter("RebootLogUrl", $RebootLogUrl)
+    [void]$worker.AddParameter("PollSeconds", $PollSeconds)
+    [void]$worker.AddParameter("CrashlogLog", $CrashlogLog)
+    $async = $worker.BeginInvoke()
+
+    return [PSCustomObject]@{
+        Worker = $worker
+        Async  = $async
+    }
+}
+
+function Stop-CrashlogCapture {
+    param(
+        [AllowNull()]$Handle,
+        [int]$TimeoutSeconds = 8
+    )
+
+    if (-not $Handle) {
+        return $null
+    }
+
+    $summary = $null
+    try {
+        if (-not $Handle.Async.AsyncWaitHandle.WaitOne([TimeSpan]::FromSeconds($TimeoutSeconds))) {
+            [void]$Handle.Worker.Stop()
+        }
+        else {
+            $output = $Handle.Worker.EndInvoke($Handle.Async)
+            if ($output -and $output.Count -gt 0) {
+                $summary = [string]$output[$output.Count - 1]
+            }
+        }
+    }
+    catch {
+        $summary = "Crash-log capture: stop error - $($_.Exception.Message)"
     }
     finally {
         try { $Handle.Worker.Dispose() } catch { }
@@ -1512,7 +2030,11 @@ $telnetLog = Join-Path -Path $runPath -ChildPath "telnet.log"
 $mqttLog = Join-Path -Path $runPath -ChildPath "mqtt.log"
 $mqttErrorLog = Join-Path -Path $runPath -ChildPath "mqtt.stderr.log"
 $browserLog = Join-Path -Path $runPath -ChildPath "browser.log"
+$browserErrorLog = Join-Path -Path $runPath -ChildPath "browser.stderr.log"
+$crashlogLog = Join-Path -Path $runPath -ChildPath "crashlog.log"
 $httpProbeLog = Join-Path -Path $runPath -ChildPath "curl-probes.log"
+$toolErrorLog = Join-Path -Path $runPath -ChildPath "error.txt"
+$scriptErrorLog = Join-Path -Path $runPath -ChildPath "script.error.log"
 $script:SummaryPath = Join-Path -Path $runPath -ChildPath "summary.txt"
 
 Add-SummaryLine "OTGW MQTT diagnostic capture"
@@ -1529,6 +2051,7 @@ Add-SummaryLine "Topic: $Topic"
 Add-SummaryLine "Username supplied: $([bool](-not [string]::IsNullOrWhiteSpace($Username)))"
 Add-SummaryLine "DurationSeconds: $(if ($DurationSeconds -gt 0) { $DurationSeconds } else { 'until manual stop' })"
 Add-SummaryLine "SkipToolInstall: $([bool]$SkipToolInstall)"
+Add-SummaryLine "Tool stderr log: $toolErrorLog"
 if ($savedSettingsPath) { Add-SummaryLine "Settings prefill saved: $savedSettingsPath" }
 Add-SummaryLine "Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)"
 
@@ -1543,6 +2066,7 @@ $telnetReconnectReason = $null
 $nextTelnetConnectUtc = [DateTime]::MinValue
 $telnetRebootScanBuffer = ""
 $browserHandle = $null
+$crashlogHandle = $null
 
 try {
     Initialize-CancelFlag
@@ -1575,13 +2099,41 @@ try {
                     -DeviceUrl $BrowserUrl `
                     -DebugPort $chosenPort `
                     -TempProfile $browserProfile `
-                    -BrowserLog $browserLog
-                Add-SummaryLine "Browser capture started (headless, writing browser.log)."
+                    -BrowserLog $browserLog `
+                    -BrowserErrorLog $browserErrorLog
+                Add-SummaryLine "Browser capture started (headless, writing browser.log; tool stderr captured for error.txt)."
             }
         }
         catch {
             Add-SummaryLine "Browser capture: failed to start - $($_.Exception.Message)"
             $browserHandle = $null
+        }
+    }
+
+    if ($SkipCrashlogCapture) {
+        Add-SummaryLine "Crash-log capture: disabled (-SkipCrashlogCapture)."
+    }
+    else {
+        try {
+            if ([string]::IsNullOrWhiteSpace($CrashlogUrl)) {
+                $CrashlogUrl = "http://$DeviceHost/api/v2/device/crashlog"
+            }
+            $rebootLogUrl = "http://$DeviceHost/reboot_log.txt"
+
+            Add-SummaryLine "Crash-log endpoint: $CrashlogUrl"
+            Add-SummaryLine "Crash-log reboot-log file: $rebootLogUrl"
+            Add-SummaryLine "Crash-log poll interval: ${CrashlogPollSeconds}s"
+
+            $crashlogHandle = Start-CrashlogCapture `
+                -CrashlogUrl $CrashlogUrl `
+                -RebootLogUrl $rebootLogUrl `
+                -PollSeconds $CrashlogPollSeconds `
+                -CrashlogLog $crashlogLog
+            Add-SummaryLine "Crash-log capture started (polling, writing crashlog.log)."
+        }
+        catch {
+            Add-SummaryLine "Crash-log capture: failed to start - $($_.Exception.Message)"
+            $crashlogHandle = $null
         }
     }
 
@@ -1613,7 +2165,7 @@ try {
 
     Add-SummaryLine "Capture started: $((Get-Date).ToString('o'))"
     Write-Host "Capturing telnet and MQTT output in $runPath"
-    Write-Host "Press Q to stop cleanly and leave transcript.txt. Run with -Help for options."
+    Write-Host "Press Q to stop cleanly and leave a transcript timestamp-version-host-uniqueid file. Run with -Help for options."
     Write-Host "Ctrl+C and Ctrl+Break also stop capture; Ctrl+C may still trigger a cmd.exe batch-job prompt."
 
     while (-not (Test-CaptureStopRequested) -and (Get-Date) -lt $deadline) {
@@ -1717,6 +2269,7 @@ try {
 }
 catch {
     Add-SummaryLine "Error: $($_.Exception.Message)"
+    Add-ToolErrorLine -Path $scriptErrorLog -Line "Script error: $($_.Exception.Message)"
     throw
 }
 finally {
@@ -1753,8 +2306,15 @@ finally {
         }
     }
 
-    # Post-capture HTTP probes: now that telnet/browser/MQTT are torn down, sweep the
-    # device's web endpoints with curl so we can see which respond and which hang.
+    if ($crashlogHandle) {
+        # Ensure the worker sees the stop signal even on an error-driven exit, then drain it.
+        Request-CaptureStop -Reason "capture shutdown"
+        $crashlogSummary = Stop-CrashlogCapture -Handle $crashlogHandle -TimeoutSeconds 10
+        if ($crashlogSummary) {
+            Add-SummaryLine $crashlogSummary
+        }
+    }
+
     if (-not $SkipHttpProbes) {
         try {
             $httpProbePaths = @(
@@ -1781,12 +2341,36 @@ finally {
     if ($cancelHandler) {
         [System.Console]::remove_CancelKeyPress($cancelHandler)
     }
+
+    $captureMetadata = Get-CaptureDeviceMetadata -DeviceHost $DeviceHost -TelnetLog $telnetLog
+    $resolvedHostname = if (Test-UsableCaptureValue -Value $captureMetadata.Hostname) { $captureMetadata.Hostname } else { $DeviceHost }
+    $resolvedFirmwareVersion = if (Test-UsableCaptureValue -Value $captureMetadata.FirmwareVersion) { $captureMetadata.FirmwareVersion } else { "unknown-version" }
+    $resolvedDeviceId = if (Test-UsableCaptureValue -Value $captureMetadata.UniqueId) { $captureMetadata.UniqueId } elseif (Test-UsableCaptureValue -Value $captureMetadata.PicDeviceId) { $captureMetadata.PicDeviceId } else { "unknown-id" }
+    Add-SummaryLine "ResolvedHostname: $resolvedHostname"
+    Add-SummaryLine "ResolvedFirmwareVersion: $resolvedFirmwareVersion"
+    Add-SummaryLine "ResolvedUniqueId: $(if (Test-UsableCaptureValue -Value $captureMetadata.UniqueId) { $captureMetadata.UniqueId } else { '(unknown)' })"
+    Add-SummaryLine "ResolvedPicDeviceId: $(if (Test-UsableCaptureValue -Value $captureMetadata.PicDeviceId) { $captureMetadata.PicDeviceId } else { '(unknown)' })"
+    Add-SummaryLine "ResolvedDeviceIdForFilename: $resolvedDeviceId"
+    if ($captureMetadata.Sources.Count -gt 0) {
+        Add-SummaryLine "Metadata sources: $($captureMetadata.Sources -join ', ')"
+    }
+    if ($captureMetadata.Errors.Count -gt 0) {
+        foreach ($metadataError in $captureMetadata.Errors) {
+            Add-ToolErrorLine -Path $scriptErrorLog -Line $metadataError
+        }
+        Add-SummaryLine "Metadata lookup warnings: $($captureMetadata.Errors.Count) (see error.txt)"
+    }
+
     Add-SummaryLine "Finished: $((Get-Date).ToString('o'))"
 
     try {
-        $mergedTranscript = New-MergedTranscript -RunPath $runPath
+        [void](New-ToolErrorLog -RunPath $runPath -ErrorPath $toolErrorLog)
+        $transcriptPath = Get-CaptureTranscriptPath -RunPath $runPath -RunName $runName -DeviceHost $DeviceHost -Metadata $captureMetadata
+        Add-SummaryLine "Transcript filename: $(Split-Path -Path $transcriptPath -Leaf)"
+        $mergedTranscript = New-MergedTranscript -RunPath $runPath -TranscriptPath $transcriptPath
         $removedFiles = Remove-IntermediateCaptureFiles -RunPath $runPath -TranscriptPath $mergedTranscript
         Write-Host "Merged transcript (single upload): $mergedTranscript"
+        Write-Host "Tool errors captured in: $toolErrorLog"
         if ($removedFiles.Count -gt 0) {
             Write-Host "Removed intermediate capture files: $($removedFiles -join ', ')"
         }
