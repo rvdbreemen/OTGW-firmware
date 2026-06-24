@@ -639,6 +639,7 @@
         if (v && typeof v === 'object' && 'value' in v) setData[k] = v;
       });
       renderSettings();
+      fetchBle();
     }).catch(function () { });
   }
   function fieldDirty(k) { return Object.prototype.hasOwnProperty.call(setDirty, k); }
@@ -670,6 +671,7 @@
       keys.sort().forEach(function (k) { card.appendChild(settingRow(k)); });
       cols.appendChild(card);
     });
+    if (bleData) renderBleCard();
     updateSaveBar();
   }
   function settingRow(k) {
@@ -725,6 +727,60 @@
     });
   }
   function discardSettings() { setDirty = {}; renderSettings(); }
+
+  // ---------- Settings > BLE sensor roster (GET/POST /api/v2/sat/ble/*) ----------
+  var bleData = null;
+  function fetchBle() {
+    fetch(APIGW + 'v2/sat/ble/discovery').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j) { bleData = j; renderBleCard(); } }).catch(function () { });
+  }
+  function bleAction(path, body) {
+    return fetch(APIGW + 'v2/sat/ble/' + path, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function () { setTimeout(fetchBle, 500); }).catch(function () { });
+  }
+  function renderBleCard() {
+    var cols = document.getElementById('setCols'); if (!cols || !bleData) return;
+    var old = document.getElementById('setcard-ble'); if (old) old.remove();
+    var card = document.createElement('div'); card.className = 'set-group'; card.id = 'setcard-ble';
+    var h = document.createElement('h3'); h.textContent = 'BLE sensors'; card.appendChild(h);
+    var desc = document.createElement('div'); desc.className = 'ble-desc';
+    desc.textContent = (bleData.populated_slots || 0) + ' / ' + (bleData.max_slots || 0) + ' slots used' +
+      (bleData.name_prefix ? ' · prefix "' + bleData.name_prefix + '"' : '');
+    card.appendChild(desc);
+    var rescan = document.createElement('button'); rescan.className = 'tbtn'; rescan.textContent = '🔄 Rescan';
+    rescan.addEventListener('click', function () { bleAction('rescan'); });
+    card.appendChild(rescan);
+    var sensors = bleData.sensors || [];
+    if (!sensors.length) {
+      var empty = document.createElement('div'); empty.className = 'ble-row'; empty.style.color = 'var(--muted)';
+      empty.textContent = 'No BLE sensors discovered yet. Press Rescan and put a sensor in range.';
+      card.appendChild(empty);
+    } else {
+      sensors.forEach(function (s) {
+        var row = document.createElement('div'); row.className = 'ble-row';
+        var nm = document.createElement('div'); nm.className = 'ble-nm';
+        nm.textContent = s.name || s.label || '(unnamed)';
+        var mac = document.createElement('span'); mac.className = 'ble-mac'; mac.textContent = s.mac || ''; nm.appendChild(mac);
+        if (s.mac && s.mac === bleData.selected_mac) { var tag = document.createElement('span'); tag.className = 'ble-tag temp'; tag.textContent = 'selected'; nm.appendChild(tag); }
+        row.appendChild(nm);
+        if (s.temperature !== undefined || s.humidity !== undefined) {
+          var val = document.createElement('div'); val.className = 'ble-val';
+          val.textContent = (s.temperature !== undefined ? s.temperature + '°' : '') + (s.humidity !== undefined ? '  ' + s.humidity + '%' : '');
+          row.appendChild(val);
+        }
+        var ctr = document.createElement('div'); ctr.className = 'ble-ctrls';
+        var sel = document.createElement('button'); sel.className = 'tbtn'; sel.textContent = 'Select';
+        sel.addEventListener('click', function () { bleAction('select', { mac: s.mac }); });
+        var forget = document.createElement('button'); forget.className = 'tbtn'; forget.textContent = 'Forget';
+        forget.addEventListener('click', function () { bleAction('forget', { mac: s.mac }); });
+        ctr.appendChild(sel); ctr.appendChild(forget); row.appendChild(ctr);
+        card.appendChild(row);
+      });
+    }
+    cols.appendChild(card);
+  }
 
   // ---------- init ----------
   function init() {
