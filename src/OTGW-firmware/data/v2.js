@@ -42,6 +42,7 @@
     });
     try { localStorage.setItem('otgw-v2-page', p); } catch (e) { }
     if (p === 'monitor' && isMonitorLogVisible()) renderLog();
+    if (p === 'settings') fetchSettings();
   }
 
   // ---------- Home concept chips (A/B/C) ----------
@@ -608,6 +609,123 @@
     var md = document.getElementById('cnModeTxt'); if (md) md.textContent = conn.mode || '—';
   }
 
+  // ---------- Settings (built from GET /api/v2/settings) ----------
+  // Categorize flat setting keys by prefix into titled groups.
+  var SET_GROUPS = [
+    { id: 'device', label: 'Device', icon: '🖥', test: function (k) { return /^(hostname|ssid|ledblink|darktheme|mydebug|nightlyrestart|restarthour|boardmode|httppasswd)/.test(k); } },
+    { id: 'network', label: 'Network', icon: '📶', test: function (k) { return /^wifi|^eth/.test(k); } },
+    { id: 'mqtt', label: 'MQTT', icon: '📨', test: function (k) { return /^mqtt|^legacyport/.test(k); } },
+    { id: 'ntp', label: 'Time / NTP', icon: '🕐', test: function (k) { return /^ntp/.test(k); } },
+    { id: 'sat', label: 'SAT thermostat', icon: '🌡', test: function (k) { return /^sat/.test(k); } },
+    { id: 'sensors', label: 'Sensors', icon: '🌡', test: function (k) { return /^gpiosensors|^s0|^dallas|^sensor/.test(k); } },
+    { id: 'outputs', label: 'Outputs', icon: '🔌', test: function (k) { return /^gpiooutputs|^output/.test(k); } },
+    { id: 'webhook', label: 'Webhook', icon: '🪝', test: function (k) { return /^webhook/.test(k); } },
+    { id: 'otd', label: 'OT-Direct', icon: '⚙', test: function (k) { return /^otd/.test(k); } },
+    { id: 'ui', label: 'Web UI', icon: '🎛', test: function (k) { return /^ui_/.test(k); } },
+    { id: 'other', label: 'Other', icon: '•', test: function () { return true; } }
+  ];
+  var setData = {};   // key -> {value,type,...} as fetched
+  var setDirty = {};  // key -> new value (string)
+  var setSearch = '';
+  function groupFor(k) { for (var i = 0; i < SET_GROUPS.length; i++) if (SET_GROUPS[i].test(k)) return SET_GROUPS[i].id; return 'other'; }
+  function fetchSettings() {
+    fetch(APIGW + 'v2/settings').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      if (!j) return;
+      // settings come as { key: {value, type, ...}, ... } possibly nested under a root
+      var src = j.settings || j;
+      setData = {}; setDirty = {};
+      Object.keys(src).forEach(function (k) {
+        var v = src[k];
+        if (v && typeof v === 'object' && 'value' in v) setData[k] = v;
+      });
+      renderSettings();
+    }).catch(function () { });
+  }
+  function fieldDirty(k) { return Object.prototype.hasOwnProperty.call(setDirty, k); }
+  function curVal(k) { return fieldDirty(k) ? setDirty[k] : ('' + setData[k].value); }
+  function renderSettings() {
+    var rail = document.getElementById('setRail'), cols = document.getElementById('setCols');
+    if (!rail || !cols) return;
+    // bucket keys
+    var buckets = {};
+    Object.keys(setData).forEach(function (k) { (buckets[groupFor(k)] = buckets[groupFor(k)] || []).push(k); });
+    var q = setSearch.trim().toLowerCase();
+    rail.textContent = ''; cols.textContent = '';
+    SET_GROUPS.forEach(function (g) {
+      var keys = (buckets[g.id] || []).filter(function (k) { return !q || k.toLowerCase().indexOf(q) !== -1; });
+      if (!keys.length) return;
+      // rail item
+      var ri = document.createElement('div'); ri.className = 'rail-item'; ri.textContent = g.icon + ' ' + g.label;
+      var cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = keys.length; ri.appendChild(cnt);
+      ri.addEventListener('click', function () {
+        var card = document.getElementById('setcard-' + g.id);
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        document.querySelectorAll('.rail-item').forEach(function (x) { x.classList.remove('active'); });
+        ri.classList.add('active');
+      });
+      rail.appendChild(ri);
+      // card
+      var card = document.createElement('div'); card.className = 'set-group'; card.id = 'setcard-' + g.id;
+      var h = document.createElement('h3'); h.textContent = g.label; card.appendChild(h);
+      keys.sort().forEach(function (k) { card.appendChild(settingRow(k)); });
+      cols.appendChild(card);
+    });
+    updateSaveBar();
+  }
+  function settingRow(k) {
+    var meta = setData[k], type = meta.type || 's';
+    var row = document.createElement('div'); row.className = 'srow' + (fieldDirty(k) ? ' dirty' : '');
+    row.dataset.key = k;
+    var lbl = document.createElement('div'); lbl.className = 'slbl'; lbl.textContent = k; row.appendChild(lbl);
+    var input;
+    if (type === 'b') {
+      input = document.createElement('input'); input.type = 'checkbox'; input.className = 'sw';
+      input.checked = curVal(k) === 'true' || curVal(k) === '1';
+      input.addEventListener('change', function () { markDirty(k, input.checked ? 'true' : 'false', row); });
+    } else if (type === 'r') {
+      input = document.createElement('input'); input.type = 'text'; input.value = curVal(k); input.disabled = true;
+    } else {
+      input = document.createElement('input');
+      input.type = (type === 'p') ? 'password' : (type === 'i') ? 'number' : 'text';
+      input.value = curVal(k);
+      input.addEventListener('input', function () { markDirty(k, input.value, row); });
+    }
+    row.appendChild(input);
+    return row;
+  }
+  function markDirty(k, val, row) {
+    if (('' + setData[k].value) === val) delete setDirty[k]; else setDirty[k] = val;
+    if (row) row.classList.toggle('dirty', fieldDirty(k));
+    updateSaveBar();
+  }
+  function updateSaveBar() {
+    var bar = document.getElementById('saveBar'), cnt = document.getElementById('dirtyCount');
+    var n = Object.keys(setDirty).length;
+    if (cnt) cnt.textContent = n;
+    if (bar) bar.classList.toggle('show', n > 0);
+  }
+  function saveSettings() {
+    var keys = Object.keys(setDirty);
+    if (!keys.length) return;
+    var chain = Promise.resolve();
+    keys.forEach(function (k) {
+      chain = chain.then(function () {
+        return fetch(APIGW + 'v2/settings', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: k, value: setDirty[k] })
+        }).then(function () { if (setData[k]) setData[k].value = setDirty[k]; });
+      });
+    });
+    chain.then(function () {
+      setDirty = {};
+      var t = document.getElementById('toast'); if (t) { t.textContent = 'Settings saved'; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2000); }
+      renderSettings();
+    }).catch(function () {
+      var t = document.getElementById('toast'); if (t) { t.textContent = 'Save failed'; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2500); }
+    });
+  }
+  function discardSettings() { setDirty = {}; renderSettings(); }
+
   // ---------- init ----------
   function init() {
     initTheme();
@@ -637,6 +755,12 @@
     });
     var ss = document.getElementById('statsSearch');
     if (ss) ss.addEventListener('input', function () { statsSearch = ss.value; if (isMonitorVisible('mstats')) renderStats(); });
+
+    // Settings controls
+    var setS = document.getElementById('setSearch');
+    if (setS) setS.addEventListener('input', function () { setSearch = setS.value; renderSettings(); });
+    var bSave = document.getElementById('btnSave'); if (bSave) bSave.addEventListener('click', saveSettings);
+    var bDisc = document.getElementById('btnDiscard'); if (bDisc) bDisc.addEventListener('click', discardSettings);
 
     var sp = localStorage.getItem('otgw-v2-page'); showPage(sp || 'home');
     var sd = localStorage.getItem('otgw-v2-design'); showDesign(sd || 'a');
