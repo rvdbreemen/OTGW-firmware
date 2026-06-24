@@ -69,3 +69,24 @@ Verified on the live OTGW32 (192.168.88.39, 2.0.0-alpha.241) by uploading the v2
 and loading `/v2.html`: the shell renders, navigation/sub-tabs/theme work, and there are no page
 console errors. Firmware (`esp32` target) builds green; the settings field round-trips through the
 existing serializer.
+
+
+## Amendment 2026-06-24 (TASK-922): per-user choice overrides the device default
+
+Field feedback: the UI choice should be remembered **per browser/user**, with the
+device default staying classic. So a per-user override is layered on top of the
+device-wide `bUseV2`:
+
+- `localStorage['otgw-ui']` = `'v2'` | `'classic'` (unset = follow device default).
+- `index.html` redirects to `/v2.html` when `otgw-ui==='v2'`; `v2.html` redirects to
+  `/index.html` when `otgw-ui==='classic'`. Redirects target **explicit files**
+  (`/v2.html`, `/index.html`), never `/`, so they never loop with the `sendIndex`
+  device default regardless of `bUseV2`.
+- The in-page toggle buttons set `localStorage` only (they no longer POST the
+  device-wide `ui_usev2`). The device-wide `bUseV2` remains as the admin default
+  (Settings), default false (classic).
+
+Net precedence: per-user `localStorage` > device `bUseV2` > classic. Because the
+redirects are pure client-side, the per-user switch works even before the firmware
+carrying `bUseV2` is flashed. Verified on 192.168.88.39: v2-choice bounces
+`/index.html`->`/v2.html`, classic-choice bounces `/v2.html`->`/index.html`, default unset stays classic.

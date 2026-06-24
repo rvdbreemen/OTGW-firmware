@@ -75,13 +75,10 @@
 
   // ---------- back to the classic UI ----------
   function gotoClassic() {
-    // Flip the device-wide default to classic, then land on the root path.
-    fetch(APIGW + 'v2/settings', {
-      method: 'POST', mode: 'cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'ui_usev2', value: 'false' })
-    }).catch(function () { /* navigate regardless */ })
-      .finally(function () { location.href = '/'; });
+    // TASK-922: per-user choice — remember "classic" for this browser, then go to
+    // the classic shell explicitly (avoids a loop with the device-wide default).
+    try { localStorage.setItem('otgw-ui', 'classic'); } catch (e) { }
+    location.href = '/index.html';
   }
 
   // ---------- clock ----------

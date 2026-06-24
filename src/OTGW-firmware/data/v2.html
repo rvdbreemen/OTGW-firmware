@@ -5,6 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>OTGW firmware</title>
+<script>
+  // TASK-922: per-user UI choice. If this browser opted back to classic, redirect
+  // before loading v2 assets. Explicit-file target avoids a loop with bUseV2.
+  try { if (localStorage.getItem('otgw-ui') === 'classic') location.replace('/index.html'); } catch (e) { }
+</script>
 <link rel="stylesheet" href="ds-tokens.css">
 <link rel="stylesheet" href="v2.css">
 <script>
