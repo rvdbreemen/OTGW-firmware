@@ -1,7 +1,7 @@
 ---
 id: TASK-929
 title: 'docs: release 1.7.0 documentation (since v1.6.1)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 22:19'
