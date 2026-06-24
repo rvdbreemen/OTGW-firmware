@@ -25,3 +25,9 @@ Field capture (1.7.0-beta.34) showed ~15% of crashlog polls logged as 'request f
 - [x] #3 Failure line classifies the WebException status (timeout vs connection refused vs other)
 - [x] #4 No new sustained HTTP load added to the device
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Patched scripts/capture-mqtt-debug.bat crashlog worker: new Invoke-HttpGetResilient (10s timeout, 2 attempts, 1.5s backoff, retries transport failures only); WebException classified by .Status (Timeout/ConnectFailure/...); failure line now 'failed after retry'. PS payload parses clean (0 errors). Host-side only, no firmware bump.
+<!-- SECTION:NOTES:END -->
