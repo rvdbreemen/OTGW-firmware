@@ -312,7 +312,7 @@
   <p class="concept-cap"><b>Monitor — the four sub-tabs, redesigned.</b> Same data as today's
   Log / Statistics / OT Support / Graph tabs, but visual: a calmer console, a scannable
   statistics table with direction badges, the support map as a real map, and the graph
-  up front. Everything below runs on the simulated live bus.</p>
+  up front. Everything below is live from the OpenTherm bus.</p>
 
   <div class="subtabs">
     <button class="subtab active" data-tab="mlog">Log</button>
@@ -331,11 +331,11 @@
       <span class="tchip on" id="chipScroll">Auto-scroll</span>
       <span class="tchip on" id="chipTs">Timestamps</span>
     </div>
-    <div class="console" id="monLog" aria-label="Live OpenTherm log"></div>
+    <div class="console" id="monLog" role="log" aria-live="polite" aria-label="Live OpenTherm log"></div>
     <div class="statfoot">
       <span>Lines: <b id="logCount">0</b></span>
       <span>Rate: <b id="logRate">2.0</b>/s</span>
-      <span>Gateway mode · WS ● live (simulated)</span>
+      <span>WS ● live</span>
     </div>
   </div>
 
@@ -449,7 +449,7 @@
           <rect class="cn-box" x="300" y="120" width="170" height="120" rx="14"/>
           <text class="cn-ic" x="320" y="158">📟</text>
           <text class="cn-title" x="352" y="150">OTGW</text>
-          <text class="cn-sub" x="352" y="167" id="cnPicSub">PIC gateway 6.5</text>
+          <text class="cn-sub" x="352" y="167" id="cnPicSub">gateway</text>
           <rect x="318" y="186" width="134" height="34" rx="9" fill="var(--panel)" stroke="var(--border)"/>
           <circle id="dot-mode" cx="334" cy="203" r="5" fill="var(--accent)"/>
           <text class="cn-modechip" id="cnModeTxt" x="392" y="207" fill="var(--accent)">GATEWAY MODE</text>
@@ -503,9 +503,9 @@
   </div>
 </div><!-- /page-settings -->
 
-<div class="foot">Design exploration TASK-854 / 855 / 856 · simulated data · self-contained mockup (no libraries, no network)</div>
+<div class="foot">OTGW firmware · v2 Web UI · live from the OpenTherm bus</div>
 </div>
-<div class="toast" id="toast">Settings saved ✓ (simulated)</div>
+<div class="toast" id="toast" role="status" aria-live="polite">Settings saved</div>
 
 
 </body>
