@@ -7,6 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-24 20:31'
+updated_date: '2026-06-24 20:35'
 labels: []
 dependencies: []
 ---
@@ -19,8 +20,8 @@ Field capture (1.7.0-beta.34) showed ~15% of crashlog polls logged as 'request f
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Crashlog/reboot poll timeout raised to 10s
-- [ ] #2 Each poll retried once with short backoff before logging a failure
-- [ ] #3 Failure line classifies the WebException status (timeout vs connection refused vs other)
-- [ ] #4 No new sustained HTTP load added to the device
+- [x] #1 Crashlog/reboot poll timeout raised to 10s
+- [x] #2 Each poll retried once with short backoff before logging a failure
+- [x] #3 Failure line classifies the WebException status (timeout vs connection refused vs other)
+- [x] #4 No new sustained HTTP load added to the device
 <!-- AC:END -->
