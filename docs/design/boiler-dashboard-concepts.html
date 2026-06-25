@@ -286,6 +286,9 @@
   .dir-t{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
   .dir-b{background:color-mix(in srgb,var(--zone-ok) 18%,transparent);color:var(--zone-ok)}
   .dir-tb{background:color-mix(in srgb,var(--zone-warn) 20%,transparent);color:var(--zone-warn)}
+  .dir-dallas{background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot)}
+  .dir-ble{background:color-mix(in srgb,var(--cold) 18%,transparent);color:var(--cold)}
+  .dir-ovr{background:color-mix(in srgb,var(--zone-warn) 22%,transparent);color:var(--zone-warn)}
   .statval{font-family:var(--font-mono);font-weight:700}
   .matrix{display:grid;grid-template-columns:repeat(16,1fr);gap:5px;background:var(--panel);
     border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
@@ -784,10 +787,31 @@
 
   <div class="subtabs">
     <button class="subtab active" data-tab="mlog">Log</button>
+    <button class="subtab" data-tab="malldata">All data</button>
     <button class="subtab" data-tab="mstats">Statistics</button>
     <button class="subtab" data-tab="msupport">OT Support</button>
     <button class="subtab" data-tab="mgraph">Graph</button>
     <button class="subtab" data-tab="mconn">Connection</button>
+  </div>
+
+  <div id="malldata" class="mpanel">
+    <div class="toolbar">
+      <input class="tsearch" id="allSearch" placeholder="Filter by name, msgID or source…">
+      <span class="seg2" style="display:inline-flex;gap:4px">
+        <button class="seg2btn active" id="allSimple">Simple</button>
+        <button class="seg2btn" id="allTech">Technical</button>
+      </span>
+      <span class="tchip" style="cursor:default">Shown: <b id="allCount" style="margin-left:4px">0</b></span>
+    </div>
+    <p class="concept-cap" style="margin:0 0 10px">Every value the gateway knows — OT bus, Dallas &amp; BLE
+    sensors, gateway overrides. <b>Simple</b> shows the decoded essentials a homeowner can read;
+    <b>Technical</b> reveals everything (counters, diagnostics, raw IDs) — nothing is hidden, only deferred.</p>
+    <div style="overflow-x:auto;border-radius:12px">
+    <table class="stats" id="allTable">
+      <thead><tr><th>MsgID</th><th>Name</th><th>Source</th><th style="text-align:right">Value</th><th>Unit</th><th>Age</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
   </div>
 
   <div id="mlog" class="mpanel active">
@@ -1016,7 +1040,8 @@ cchips.forEach(function(s){s.onclick=function(){showDesign(s.dataset.design);};}
 var subtabs=document.querySelectorAll('.subtab');
 function showTab(t){
   subtabs.forEach(function(s){s.classList.toggle('active',s.dataset.tab===t);});
-  ['mlog','mstats','msupport','mgraph','mconn'].forEach(function(k){
+  if(t==='malldata' && typeof renderAllData==='function') renderAllData();
+  ['mlog','malldata','mstats','msupport','mgraph','mconn'].forEach(function(k){
     document.getElementById(k).classList.toggle('active',k===t);
   });
   if(t==='mconn' && typeof renderConnDetail==='function') renderConnDetail();
@@ -1533,7 +1558,77 @@ function renderMonitor(){
   STATS.forEach(function(s){ if(s.iv===1) s.count++; else if(Math.random()<1/s.iv) s.count++; });
   renderStats();
   drawStrip('gFlow2','gRet2','gMod2','gSpLine');
+  if(document.getElementById('malldata').classList.contains('active')) renderAllData();
 }
+
+/* ---------- All data (the complete technical surface) ----------
+   The original UI's strength was showing EVERYTHING. This keeps that: every
+   value across OT bus + Dallas + BLE + overrides. 'Simple' filters to the
+   decoded essentials a homeowner reads; 'Technical' shows all of it. */
+var onoff=function(b){return b?'On':'Off';};
+var ALLDATA=[
+  {id:25,name:'Boiler water temperature', src:'b', u:'°C', c:1, get:function(){return sim.boiler.toFixed(1);}},
+  {id:28,name:'Return water temperature', src:'b', u:'°C', c:1, get:function(){return sim.ret.toFixed(1);}},
+  {id:1, name:'Control setpoint',         src:'tb',u:'°C', c:1, get:function(){return '65.0';}},
+  {id:17,name:'Relative modulation level',src:'b', u:'%',  c:1, get:function(){return String(sim.modulation);}},
+  {id:18,name:'CH water pressure',        src:'b', u:'bar',c:1, get:function(){return sim.pressure.toFixed(2);}},
+  {id:24,name:'Room temperature',         src:'t', u:'°C', c:1, get:function(){return sim.room.toFixed(1);}},
+  {id:16,name:'Room setpoint',            src:'t', u:'°C', c:1, ovr:1, get:function(){return sim.setpoint.toFixed(1);}},
+  {id:27,name:'Outside temperature',      src:'tb',u:'°C', c:1, ovr:1, get:function(){return sim.outside.toFixed(1);}},
+  {id:26,name:'DHW temperature',          src:'b', u:'°C', c:1, get:function(){return sim.dhw.toFixed(1);}},
+  {id:56,name:'DHW setpoint',             src:'tb',u:'°C', c:1, get:function(){return '55.0';}},
+  {id:0, name:'Flame status',             src:'tb',u:'',   c:1, get:function(){return onoff(sim.flame);}},
+  {id:0, name:'CH active',                src:'tb',u:'',   c:1, get:function(){return onoff(sim.ch);}},
+  {id:0, name:'DHW active',               src:'tb',u:'',   c:1, get:function(){return onoff(sim.dhw_on);}},
+  {id:5, name:'Fault indication',         src:'b', u:'',   c:1, get:function(){return sim.fault?'FAULT':'OK';}},
+  {id:'1-Wire',name:'Living room (DS18B20 28-AA-BB)', src:'dallas', u:'°C', c:1, get:function(){return (sim.room+0.3).toFixed(1);}},
+  {id:'BLE',name:'Living room (ATC_0B11)', src:'ble', u:'°C', c:1, get:function(){return (sim.room).toFixed(1);}},
+  {id:'BLE',name:'Bathroom humidity (ATC_0B33)', src:'ble', u:'%', c:1, get:function(){return '58';}},
+  // technical-only below
+  {id:14,name:'Max relative modulation',  src:'tb',u:'%',  c:0, get:function(){return '100';}},
+  {id:57,name:'Max CH water setpoint',    src:'tb',u:'°C', c:0, get:function(){return '75.0';}},
+  {id:48,name:'DHW setpoint bounds',      src:'b', u:'°C', c:0, get:function(){return '40–60';}},
+  {id:49,name:'Max CH setpoint bounds',   src:'b', u:'°C', c:0, get:function(){return '20–80';}},
+  {id:19,name:'DHW flow rate',            src:'b', u:'l/min',c:0,get:function(){return sim.dhw_on?'8.4':'0.0';}},
+  {id:33,name:'Exhaust temperature',      src:'b', u:'°C', c:0, get:function(){return '64';}},
+  {id:34,name:'Heat exchanger temp',      src:'b', u:'°C', c:0, get:function(){return (sim.boiler+2).toFixed(1);}},
+  {id:35,name:'Boiler fan speed',         src:'b', u:'Hz', c:0, get:function(){return sim.flame?'42':'0';}},
+  {id:116,name:'Burner starts',           src:'b', u:'',   c:0, get:function(){return '18423';}},
+  {id:120,name:'Burner operation hours',  src:'b', u:'hrs',c:0, get:function(){return '4127';}},
+  {id:117,name:'CH pump starts',          src:'b', u:'',   c:0, get:function(){return '20991';}},
+  {id:119,name:'DHW burner starts',       src:'b', u:'',   c:0, get:function(){return '9044';}},
+  {id:115,name:'OEM diagnostic code',     src:'b', u:'',   c:0, get:function(){return '0';}},
+  {id:3, name:'Slave configuration',      src:'b', u:'',   c:0, get:function(){return '0x05 / 3';}},
+  {id:125,name:'OT version (slave)',      src:'b', u:'',   c:0, get:function(){return '4.20';}},
+  {id:127,name:'Slave product version',   src:'b', u:'',   c:0, get:function(){return 'v3 / type 12';}}
+];
+var allTechMode=false;
+function srcBadge(src){
+  var m={t:['dir-t','T →'],b:['dir-b','← B'],tb:['dir-tb','T ⇄ B'],dallas:['dir-dallas','1-Wire'],ble:['dir-ble','BLE']};
+  var x=m[src]||['dir-tb',src]; return '<span class="dirbadge '+x[0]+'">'+x[1]+'</span>';
+}
+function renderAllData(){
+  var q=(document.getElementById('allSearch').value||'').trim().toLowerCase();
+  var rows=ALLDATA.filter(function(r){
+    if(!allTechMode && !r.c) return false;
+    if(!q) return true;
+    return (r.name+' '+r.id+' '+r.src).toLowerCase().indexOf(q)>=0;
+  });
+  document.querySelector('#allTable tbody').innerHTML=rows.map(function(r){
+    return '<tr><td><span class="idbadge">'+r.id+'</span></td>'+
+      '<td>'+r.name+(r.ovr?' <span class="dirbadge dir-ovr">⛓ override</span>':'')+'</td>'+
+      '<td>'+srcBadge(r.src)+'</td>'+
+      '<td class="statval" style="text-align:right">'+r.get()+'</td>'+
+      '<td style="color:var(--muted)">'+r.u+'</td>'+
+      '<td style="color:var(--muted)">'+(r.src==='b'||r.src==='tb'?'1s':(r.src==='ble'?'12s':'30s'))+'</td></tr>';
+  }).join('');
+  document.getElementById('allCount').textContent=rows.length+(allTechMode?' / all':' / essentials');
+}
+document.getElementById('allSearch').oninput=renderAllData;
+document.getElementById('allSimple').onclick=function(){allTechMode=false;
+  this.classList.add('active');document.getElementById('allTech').classList.remove('active');renderAllData();};
+document.getElementById('allTech').onclick=function(){allTechMode=true;
+  this.classList.add('active');document.getElementById('allSimple').classList.remove('active');renderAllData();};
 
 /* ---------- SETTINGS page ---------- */
 var SAT_GROUPS = [

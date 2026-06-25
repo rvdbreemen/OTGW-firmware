@@ -227,7 +227,7 @@ Depth ladder (every level is one tap deeper, nothing is hidden, only deferred):
 |---|---|---|---|
 | L0 glance | Home B — hero dial | anyone | is it warm? room temp + target |
 | L1 system | Home A — schematic | homeowner | flow/return/modulation/pressure/DHW, flame, the whole loop |
-| L2 detail | All-values table | curious | every OT value as label:value:unit |
+| L2 detail | Monitor → **All data** | curious → technical | every value (OT bus + Dallas + BLE + overrides) with source provenance; a **Simple⇄Technical** toggle shows the decoded essentials or *everything* (counters, diagnostics, raw IDs) |
 | L3 technical | Monitor: Statistics / OT-Support map / Graph | tinkerer | per-msgID intervals, support map, trends |
 | L4 raw | Monitor: Log / Mission control | developer | raw `T…/B…` frames |
 
@@ -241,6 +241,15 @@ visible at *every* level, not buried. In the mockup:
   (`TT=21.0`), the value now in effect, and what it replaced.
 - This elevates what the current UI hides in a Statistics-tab table
   ("Active gateway overrides (injected values…)").
+
+**Keeping the power-user "everything" view** — progressive disclosure must *defer*
+detail, never *delete* it. The original UI's strength was that it showed all
+information; the **All data** view preserves that completely: a dense, searchable
+table of every value with its source (`T → / ← B / T ⇄ B`, `1-Wire`, `BLE`) and
+override marks. The **Simple** filter shows ~17 decoded essentials a homeowner can
+read; **Technical** reveals all 33+ (counters, diagnostics, bounds, versions). A
+starting user understands the data available; a technical user reaches everything
+in one tap.
 
 **Sensor-availability signals** (new capability coming online): when a BLE or
 DS18B20 (1-Wire) sensor is discovered, a dismissible **discovery card** announces
