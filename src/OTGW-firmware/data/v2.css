@@ -15,6 +15,10 @@
   --needle:var(--fg-1);
   --shadow:var(--shadow-panel);
 }
+/* Dark theme: the accent follows the cyan brand (matching the header strip + the
+   mockup) instead of the generic blue --accent-primary, so dark v2 is single-brand
+   cyan, not a blue/cyan split. Light theme keeps --accent-primary. */
+html[data-theme="dark"]{--accent:var(--brand-cyan)}
 
 *{box-sizing:border-box}
   html,body{font-feature-settings:"tnum" 1;font-variant-numeric:tabular-nums}
@@ -28,7 +32,9 @@
   .headerrow .big{font-size:1.05rem;margin-right:auto}
   .headerrow .sub{font-weight:400;opacity:.9;font-size:.8rem}
   .theme-toggle{cursor:pointer;user-select:none;border:1px solid rgba(255,255,255,.4);
-    border-radius:8px;padding:8px 12px;font-size:.85rem;min-height:40px}
+    border-radius:8px;padding:8px 12px;font-size:.85rem;min-height:40px;
+    /* button reset so <button> matches the old <span> look + stays keyboard-operable */
+    background:transparent;color:inherit;font-family:inherit;line-height:1.2}
   .switcher{display:flex;gap:6px;background:var(--nav);padding:8px 12px 12px;flex-wrap:wrap}
   .seg{flex:1;min-width:104px;min-height:48px;border:0;border-radius:12px;cursor:pointer;
     background:rgba(255,255,255,.18);color:#fff;font-family:var(--font-sans);

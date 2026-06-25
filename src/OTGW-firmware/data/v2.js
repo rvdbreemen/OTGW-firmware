@@ -93,26 +93,61 @@
     el.textContent = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
   }
 
-  // ---------- always-visible connectivity strip (live; fed by fetchConn) ----------
-  var STATE_TXT = { 'st-ok': 'up', 'st-warn': 'weak', 'st-down': 'down', 'st-off': 'off', 'st-unknown': '—' };
+  // ---------- connectivity model + always-visible strip (live; fed by fetchConn) ----------
+  // One five-state vocabulary used everywhere (colour + icon + text), ported from
+  // the mockup. MODE (gateway/monitor) is a separate kind, never a green/red light.
+  var STICON = { 'st-ok': '✓', 'st-warn': '!', 'st-down': '✕', 'st-off': '○', 'st-unknown': '?', 'st-mode': '⇄' };
+  var STLABEL = { 'st-ok': 'Connected', 'st-warn': 'Degraded', 'st-down': 'Disconnected', 'st-off': 'Off', 'st-unknown': 'Unknown', 'st-mode': 'Mode' };
+  var STV = { 'st-ok': 'var(--zone-ok)', 'st-warn': 'var(--zone-warn)', 'st-down': 'var(--zone-alert)', 'st-off': 'var(--tile-off)', 'st-unknown': 'var(--muted)', 'st-mode': 'var(--accent)' };
+  // CONN: static metadata (group / icon / name / explanation / fix hint) + live
+  // state (s / value / detail), bound to the real /api/v2/health + settings. The OT
+  // bus is two independent links (thermostat vs boiler) so "boiler not answering"
+  // is distinguishable from "thermostat not asking".
+  var CONN = {
+    ws:    { grp: 'ses', s: 'st-unknown', icon: '📱', name: 'Live link', detail: '',
+             exp: 'This page has a live link to the gateway — the log updates in real time.',
+             fix: 'Live link dropped — the page is reconnecting; data may be paused.' },
+    mode:  { grp: 'bus', s: 'st-mode', icon: '⇄', name: 'Gateway mode', value: '',
+             exp: 'Gateway actively rewrites OT messages (lets the UI set temperatures); Monitor passively observes only.' },
+    mqtt:  { grp: 'int', s: 'st-unknown', icon: '📡', name: 'MQTT broker', detail: '',
+             exp: 'Connected to the broker; the online (birth) message is published.',
+             fix: 'Cannot reach the broker — check address, port and credentials.' },
+    wifi:  { grp: 'net', s: 'st-unknown', icon: '📶', name: 'Wi-Fi', detail: '',
+             exp: 'The gateway is on your network.',
+             fix: 'Weak or no signal — move the device or add a repeater.' },
+    boiler:{ grp: 'bus', s: 'st-unknown', icon: '🔥', name: 'Boiler', detail: '',
+             exp: 'The boiler (OT slave) is answering.',
+             fix: 'Boiler not answering — check the OT wiring / boiler power.' },
+    therm: { grp: 'bus', s: 'st-unknown', icon: '🌡️', name: 'Thermostat', detail: '',
+             exp: 'The room thermostat (OT master) is talking to the gateway.',
+             fix: 'No frames from the thermostat — check the OT wiring.' },
+    ot:    { grp: 'bus', s: 'st-unknown', icon: '🔌', name: 'OpenTherm interface', detail: '',
+             exp: 'The active OpenTherm command interface (PIC gateway or OT-Direct).',
+             fix: 'No OT interface available — check the hardware / board mode.' },
+    ntp:   { grp: 'int', s: 'st-unknown', icon: '🕐', name: 'Time (NTP)', detail: '',
+             exp: 'The clock is synced; timestamps and time-to-thermostat are correct.',
+             fix: 'No time sync — check the NTP server and internet access.' },
+    api:   { grp: 'ses', s: 'st-ok', icon: '🔁', name: 'REST API', detail: 'polling',
+             exp: 'Values on this page are fetched from the device API.' }
+  };
+  var connRssi = null;
   function renderConnStrip() {
-    var strip = document.getElementById('connStrip');
-    if (!strip) return;
-    var pills = [
-      { k: 'WiFi', s: conn.wifi, v: conn.rssi !== null ? conn.rssi + ' dBm' : STATE_TXT[conn.wifi] },
-      { k: 'MQTT', s: conn.mqtt, v: STATE_TXT[conn.mqtt] },
-      { k: 'OT bus', s: conn.ot, v: STATE_TXT[conn.ot] },
-      { k: 'NTP', s: conn.ntp, v: STATE_TXT[conn.ntp] }
-    ];
+    var strip = document.getElementById('connStrip'); if (!strip) return;
+    var order = ['ws', 'mode', 'mqtt', 'wifi', 'boiler', 'therm'];
+    var short = { ws: 'Live', mode: 'Mode', mqtt: 'MQTT', wifi: 'Wi-Fi', boiler: 'Boiler', therm: 'Thermostat' };
     strip.textContent = '';   // rebuild with DOM nodes (textContent — no HTML injection)
-    pills.forEach(function (p) {
-      var btn = document.createElement('button'); btn.className = 'connpill ' + p.s;
+    order.forEach(function (key) {
+      var c = CONN[key]; if (!c) return;
+      var btn = document.createElement('button'); btn.className = 'connpill ' + c.s;
       btn.title = 'Connectivity — tap for the detail map';
       btn.addEventListener('click', function () { showPage('monitor'); showTab('mconn'); });
       var dot = document.createElement('span'); dot.className = 'd';
-      var k = document.createElement('span'); k.className = 'pk'; k.textContent = p.k + ' ';
-      var v = document.createElement('span'); v.className = 'pv'; v.textContent = p.v;
-      btn.appendChild(dot); btn.appendChild(k); btn.appendChild(v);
+      var pk = document.createElement('span'); pk.className = 'pk'; pk.textContent = short[key] + ' ';
+      var pv = document.createElement('span'); pv.className = 'pv';
+      if (c.s === 'st-mode') pv.textContent = (c.value || 'unknown').toUpperCase();
+      else if (key === 'wifi' && connRssi !== null) pv.textContent = connRssi + ' dBm';
+      else pv.textContent = STLABEL[c.s] || '—';
+      btn.appendChild(dot); btn.appendChild(pk); btn.appendChild(pv);
       strip.appendChild(btn);
     });
   }
@@ -282,44 +317,213 @@
     });
     var cnt = document.getElementById('statsCount'); if (cnt) cnt.textContent = shown;
   }
+  // OpenTherm message-ID metadata (msgID 0..127), extracted verbatim from the
+  // firmware OTmap[] in OTGW-Core.h. Drives the OT Support map detail panel + tooltip
+  // so spec name / data type / direction / conclusion are authentic even for IDs the
+  // bus has never shown (TASK-933 iter 3).
+  var OTMSG = [
+  /*   0 */ { name: "Master and Slave status", spec: "Status", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Master/slave status flags: CH and DHW demand plus the boiler's flame, fault and mode bits." },
+  /*   1 */ { name: "Control setpoint", spec: "TSet", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's commanded boiler flow (CH water) setpoint." },
+  /*   2 */ { name: "Master Config / Member ID", spec: "MasterConfigMemberIDcode", type: "flag8/u8", dir: "Write · thermostat → boiler", unit: "", concl: "Thermostat announces its configuration flags and OpenTherm member ID." },
+  /*   3 */ { name: "Slave Config / Member ID", spec: "SlaveConfigMemberIDcode", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler announces its configuration flags and OpenTherm member ID." },
+  /*   4 */ { name: "Command-Code", spec: "Command", type: "u8/u8", dir: "Write · thermostat → boiler", unit: "", concl: "Thermostat sends a remote command to the boiler (e.g. boiler reset)." },
+  /*   5 */ { name: "Application-specific fault", spec: "ASFflags", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler's application-specific fault flags plus an OEM fault code." },
+  /*   6 */ { name: "Remote-parameter flags", spec: "RBPflags", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler advertises which remote boiler parameters are transfer-enabled and read/write." },
+  /*   7 */ { name: "Cooling control signal", spec: "CoolingControl", type: "f8.8", dir: "Write · thermostat → boiler", unit: "%", concl: "Thermostat's cooling demand signal to the boiler." },
+  /*   8 */ { name: "Control setpoint for 2e CH circuit", spec: "TsetCH2", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's flow setpoint for the second CH circuit." },
+  /*   9 */ { name: "Remote override room setpoint", spec: "TrOverride", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Remote-supplied room-setpoint override; a value of 0 means no override is active." },
+  /*  10 */ { name: "Number of TSPs", spec: "TSP", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Number of transparent slave parameters the boiler exposes." },
+  /*  11 */ { name: "Index number / Value of referred-to transparent slave parameter", spec: "TSPindexTSPvalue", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Reads or writes one transparent slave parameter by index." },
+  /*  12 */ { name: "Size of Fault-History-Buffer supported by slave", spec: "FHBsize", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Size of the boiler's fault-history buffer." },
+  /*  13 */ { name: "Index number / Value of referred-to fault-history buffer entry", spec: "FHBindexFHBvalue", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Reads one fault-history buffer entry by index." },
+  /*  14 */ { name: "Maximum relative modulation level setting", spec: "MaxRelModLevelSetting", type: "f8.8", dir: "Write · thermostat → boiler", unit: "%", concl: "Thermostat caps the boiler's maximum relative modulation." },
+  /*  15 */ { name: "Maximum boiler capacity (kW) / Minimum boiler modulation level(%)", spec: "MaxCapacityMinModLevel", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "kW/%", concl: "Boiler reports its maximum capacity (kW) and minimum modulation level (%)." },
+  /*  16 */ { name: "Room Setpoint", spec: "TrSet", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's current room setpoint." },
+  /*  17 */ { name: "Relative Modulation Level", spec: "RelModLevel", type: "f8.8", dir: "Read · boiler → thermostat", unit: "%", concl: "Boiler's actual relative modulation level (burner output, %)." },
+  /*  18 */ { name: "CH water pressure", spec: "CHPressure", type: "f8.8", dir: "Read · boiler → thermostat", unit: "bar", concl: "Boiler's central-heating water pressure." },
+  /*  19 */ { name: "DHW flow rate", spec: "DHWFlowRate", type: "f8.8", dir: "Read · boiler → thermostat", unit: "l/min", concl: "Domestic-hot-water flow rate through the boiler." },
+  /*  20 */ { name: "Day of Week and Time of Day", spec: "DayTime", type: "special", dir: "Read / Write", unit: "", concl: "Day-of-week and time-of-day clock exchanged between thermostat and boiler." },
+  /*  21 */ { name: "Calendar date", spec: "Date", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Calendar month and day." },
+  /*  22 */ { name: "Calendar year", spec: "Year", type: "u16", dir: "Read / Write", unit: "", concl: "Calendar year." },
+  /*  23 */ { name: "Room Setpoint CH2", spec: "TrSetCH2", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's room setpoint for the second CH circuit." },
+  /*  24 */ { name: "Room Temperature", spec: "Tr", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's measured room temperature." },
+  /*  25 */ { name: "Boiler water temperature", spec: "Tboiler", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Boiler's actual flow (CH water) temperature." },
+  /*  26 */ { name: "DHW temperature", spec: "Tdhw", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Domestic-hot-water temperature." },
+  /*  27 */ { name: "Outside temperature", spec: "Toutside", type: "f8.8", dir: "Read / Write", unit: "°C", concl: "Outside air temperature used for weather-compensated control." },
+  /*  28 */ { name: "Return water temperature", spec: "Tret", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Central-heating return water temperature." },
+  /*  29 */ { name: "Solar storage temperature", spec: "Tsolarstorage", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Solar storage tank temperature." },
+  /*  30 */ { name: "Solar collector temperature", spec: "Tsolarcollector", type: "s16", dir: "Read · boiler → thermostat", unit: "°C", concl: "Solar collector temperature." },
+  /*  31 */ { name: "Flow water temperature CH2", spec: "TflowCH2", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Flow water temperature of the second CH circuit." },
+  /*  32 */ { name: "DHW2 temperature", spec: "Tdhw2", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Second domestic-hot-water circuit temperature." },
+  /*  33 */ { name: "Exhaust temperature", spec: "Texhaust", type: "s16", dir: "Read · boiler → thermostat", unit: "°C", concl: "Boiler exhaust-gas temperature." },
+  /*  34 */ { name: "Boiler heat exchanger temperature", spec: "Theatexchanger", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Boiler heat-exchanger temperature." },
+  /*  35 */ { name: "Boiler fan speed and setpoint", spec: "FanSpeed", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "Hz", concl: "Boiler fan speed and its setpoint." },
+  /*  36 */ { name: "Electrical current through burner flame", spec: "ElectricalCurrentBurnerFlame", type: "f8.8", dir: "Read · boiler → thermostat", unit: "µA", concl: "Flame-ionisation current measured at the burner." },
+  /*  37 */ { name: "Room temperature for 2nd CH circuit", spec: "TRoomCH2", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Room temperature reported for the second CH circuit." },
+  /*  38 */ { name: "Relative Humidity", spec: "RelativeHumidity", type: "f8.8", dir: "Read / Write", unit: "%", concl: "Relative humidity measurement." },
+  /*  39 */ { name: "Remote override room setpoint 2", spec: "TrOverride2", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Remote room-setpoint override for a second zone; 0 means no override is active." },
+  /*  40 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  41 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  42 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  43 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  44 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  45 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  46 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  47 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  48 */ { name: "DHW setpoint upper & lower bounds for adjustment", spec: "TdhwSetUBTdhwSetLB", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Allowed upper/lower bounds for the DHW setpoint." },
+  /*  49 */ { name: "Max CH water setpoint upper & lower bounds for adjustment", spec: "MaxTSetUBMaxTSetLB", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Allowed upper/lower bounds for the maximum CH setpoint." },
+  /*  50 */ { name: "OTC heat curve ratio upper & lower bounds for adjustment", spec: "HcratioUBHcratioLB", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Allowed upper/lower bounds for the OTC heat-curve ratio." },
+  /*  51 */ { name: "Remote parameter 4 boundaries", spec: "Remoteparameter4boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 4." },
+  /*  52 */ { name: "Remote parameter 5 boundaries", spec: "Remoteparameter5boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 5." },
+  /*  53 */ { name: "Remote parameter 6 boundaries", spec: "Remoteparameter6boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 6." },
+  /*  54 */ { name: "Remote parameter 7 boundaries", spec: "Remoteparameter7boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 7." },
+  /*  55 */ { name: "Remote parameter 8 boundaries", spec: "Remoteparameter8boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 8." },
+  /*  56 */ { name: "DHW setpoint", spec: "TdhwSet", type: "f8.8", dir: "Read / Write", unit: "°C", concl: "Domestic-hot-water setpoint." },
+  /*  57 */ { name: "Max CH water setpoint", spec: "MaxTSet", type: "f8.8", dir: "Read / Write", unit: "°C", concl: "Maximum central-heating water setpoint." },
+  /*  58 */ { name: "OTC heat curve ratio", spec: "Hcratio", type: "f8.8", dir: "Read / Write", unit: "°C", concl: "Outside-temperature-compensation (weather) heat-curve ratio." },
+  /*  59 */ { name: "Remote parameter 4", spec: "Remoteparameter4", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 4." },
+  /*  60 */ { name: "Remote parameter 5", spec: "Remoteparameter5", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 5." },
+  /*  61 */ { name: "Remote parameter 6", spec: "Remoteparameter6", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 6." },
+  /*  62 */ { name: "Remote parameter 7", spec: "Remoteparameter7", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 7." },
+  /*  63 */ { name: "Remote parameter 8", spec: "Remoteparameter8", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 8." },
+  /*  64 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  65 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  66 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  67 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  68 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  69 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  70 */ { name: "Status Ventilation/Heat recovery", spec: "StatusVH", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Master/slave status flags for the ventilation/heat-recovery unit." },
+  /*  71 */ { name: "Control setpoint V/H", spec: "ControlSetpointVH", type: "u8", dir: "Write · thermostat → boiler", unit: "%", concl: "Commanded ventilation/heat-recovery setpoint." },
+  /*  72 */ { name: "Application-specific Fault Flags/Code V/H", spec: "ASFFaultCodeVH", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Ventilation/heat-recovery fault flags and OEM fault code." },
+  /*  73 */ { name: "Diagnostic code V/H", spec: "DiagnosticCodeVH", type: "u16", dir: "Read · boiler → thermostat", unit: "", concl: "Ventilation/heat-recovery diagnostic code." },
+  /*  74 */ { name: "Config/Member ID V/H", spec: "ConfigMemberIDVH", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Ventilation/heat-recovery configuration flags and member ID." },
+  /*  75 */ { name: "OpenTherm version V/H", spec: "OpenthermVersionVH", type: "f8.8", dir: "Read · boiler → thermostat", unit: "", concl: "OpenTherm protocol version of the ventilation/heat-recovery unit." },
+  /*  76 */ { name: "Product version & type V/H", spec: "VersionTypeVH", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Product version and type of the ventilation/heat-recovery unit." },
+  /*  77 */ { name: "Relative ventilation", spec: "RelativeVentilation", type: "u8", dir: "Read · boiler → thermostat", unit: "%", concl: "Actual relative ventilation level." },
+  /*  78 */ { name: "Relative humidity exhaust air", spec: "RelativeHumidityExhaustAir", type: "u8", dir: "Read / Write", unit: "%", concl: "Relative humidity of the exhaust air." },
+  /*  79 */ { name: "CO2 level exhaust air", spec: "CO2LevelExhaustAir", type: "u16", dir: "Read / Write", unit: "ppm", concl: "CO2 concentration of the exhaust air." },
+  /*  80 */ { name: "Supply inlet temperature", spec: "SupplyInletTemperature", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Ventilation supply-air inlet temperature." },
+  /*  81 */ { name: "Supply outlet temperature", spec: "SupplyOutletTemperature", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Ventilation supply-air outlet temperature." },
+  /*  82 */ { name: "Exhaust inlet temperature", spec: "ExhaustInletTemperature", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Ventilation exhaust-air inlet temperature." },
+  /*  83 */ { name: "Exhaust outlet temperature", spec: "ExhaustOutletTemperature", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Ventilation exhaust-air outlet temperature." },
+  /*  84 */ { name: "Actual exhaust fan speed", spec: "ActualExhaustFanSpeed", type: "u16", dir: "Read · boiler → thermostat", unit: "rpm", concl: "Measured exhaust fan speed." },
+  /*  85 */ { name: "Actual supply fan speed", spec: "ActualSupplyFanSpeed", type: "u16", dir: "Read · boiler → thermostat", unit: "rpm", concl: "Measured supply fan speed." },
+  /*  86 */ { name: "Remote Parameter Setting V/H", spec: "RemoteParameterSettingVH", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Transfer-enable & read/write flags for the V/H remote parameters." },
+  /*  87 */ { name: "Nominal Ventilation Value", spec: "NominalVentilationValue", type: "u8", dir: "Read / Write", unit: "%", concl: "Nominal ventilation level setting." },
+  /*  88 */ { name: "TSP Number V/H", spec: "TSPNumberVH", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Number of transparent slave parameters for the V/H unit." },
+  /*  89 */ { name: "TSP setting V/H", spec: "TSPEntryVH", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Reads or writes one V/H transparent slave parameter." },
+  /*  90 */ { name: "Fault Buffer Size V/H", spec: "FaultBufferSizeVH", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Size of the V/H fault-history buffer." },
+  /*  91 */ { name: "Fault Buffer Entry V/H", spec: "FaultBufferEntryVH", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Reads one V/H fault-history buffer entry." },
+  /*  92 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  93 */ { name: "Boiler brand name (index/char)", spec: "Brand", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler brand name, transferred one character at a time by index." },
+  /*  94 */ { name: "Boiler brand version (index/char)", spec: "BrandVersion", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler brand/version string, transferred one character at a time." },
+  /*  95 */ { name: "Boiler brand serial number (index/char)", spec: "BrandSerialNumber", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler serial number, transferred one character at a time." },
+  /*  96 */ { name: "Cooling operation hours", spec: "CoolingOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Cumulative hours spent in cooling mode." },
+  /*  97 */ { name: "Power cycles", spec: "PowerCycles", type: "u16", dir: "Read / Write", unit: "", concl: "Number of boiler power cycles." },
+  /*  98 */ { name: "RF sensor status information", spec: "RFstrengthbatterylevel", type: "special", dir: "Write · thermostat → boiler", unit: "", concl: "RF sensor signal strength and battery level." },
+  /*  99 */ { name: "Remote Override Operating Mode (Heating/DHW)", spec: "OperatingMode_HC1_HC2_DHW", type: "special", dir: "Read / Write", unit: "", concl: "Remote override of the heating/DHW operating mode; 0 means no override is active." },
+  /* 100 */ { name: "Function of manual and program changes in master and remote room setpoint.", spec: "RoomRemoteOverrideFunction", type: "flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Defines whether manual and program room-setpoint changes may overrule an active remote override." },
+  /* 101 */ { name: "Solar Storage Master mode", spec: "SolarStorageMaster", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Master/slave status flags for the solar-storage unit." },
+  /* 102 */ { name: "Solar Storage Application-specific flags and OEM fault", spec: "SolarStorageASFflags", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Solar-storage application-specific fault flags and OEM fault code." },
+  /* 103 */ { name: "Solar Storage Slave Config / Member ID", spec: "SolarStorageSlaveConfigMemberIDcode", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Solar-storage configuration flags and member ID." },
+  /* 104 */ { name: "Solar Storage product version number and type", spec: "SolarStorageVersionType", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Solar-storage product version and type." },
+  /* 105 */ { name: "Solar Storage Number of Transparent-Slave-Parameters supported", spec: "SolarStorageTSP", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Number of solar-storage transparent slave parameters." },
+  /* 106 */ { name: "Solar Storage Index number / Value of referred-to transparent slave parameter", spec: "SolarStorageTSPindexTSPvalue", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Reads or writes one solar-storage transparent slave parameter by index." },
+  /* 107 */ { name: "Solar Storage Size of Fault-History-Buffer supported by slave", spec: "SolarStorageFHBsize", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Size of the solar-storage fault-history buffer." },
+  /* 108 */ { name: "Solar Storage Index number / Value of referred-to fault-history buffer entry", spec: "SolarStorageFHBindexFHBvalue", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Reads one solar-storage fault-history buffer entry by index." },
+  /* 109 */ { name: "Electricity producer starts", spec: "ElectricityProducerStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Number of micro-CHP electricity-producer starts." },
+  /* 110 */ { name: "Electricity producer hours", spec: "ElectricityProducerHours", type: "u16", dir: "Read / Write", unit: "", concl: "Operating hours of the electricity producer." },
+  /* 111 */ { name: "Electricity production", spec: "ElectricityProduction", type: "u16", dir: "Read · boiler → thermostat", unit: "", concl: "Instantaneous electricity production." },
+  /* 112 */ { name: "Cumulative Electricity production", spec: "CumulativeElectricityProduction", type: "u16", dir: "Read / Write", unit: "", concl: "Cumulative electricity produced." },
+  /* 113 */ { name: "Unsuccessful burner starts", spec: "BurnerUnsuccessfulStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Count of failed burner ignition attempts." },
+  /* 114 */ { name: "Flame signal too low count", spec: "FlameSignalTooLow", type: "u16", dir: "Read / Write", unit: "", concl: "Count of low-flame-signal events." },
+  /* 115 */ { name: "OEM-specific diagnostic/service code", spec: "OEMDiagnosticCode", type: "u16", dir: "Read · boiler → thermostat", unit: "", concl: "Manufacturer-specific diagnostic/service code." },
+  /* 116 */ { name: "Burner starts", spec: "BurnerStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Total number of burner ignitions." },
+  /* 117 */ { name: "CH pump starts", spec: "CHPumpStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Total number of CH pump starts." },
+  /* 118 */ { name: "DHW pump/valve starts", spec: "DHWPumpValveStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Total number of DHW pump/valve starts." },
+  /* 119 */ { name: "DHW burner starts", spec: "DHWBurnerStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Number of burner starts while in DHW mode." },
+  /* 120 */ { name: "Burner operation hours", spec: "BurnerOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Total hours the burner has run (flame on)." },
+  /* 121 */ { name: "CH pump operation hours", spec: "CHPumpOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Total hours the CH pump has run." },
+  /* 122 */ { name: "DHW pump/valve operation hours", spec: "DHWPumpValveOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Total hours the DHW pump has run or the DHW valve has been open." },
+  /* 123 */ { name: "DHW burner operation hours", spec: "DHWBurnerOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Total burner hours while in DHW mode." },
+  /* 124 */ { name: "Master Version OpenTherm Protocol Specification", spec: "OpenThermVersionMaster", type: "f8.8", dir: "Write · thermostat → boiler", unit: "", concl: "OpenTherm protocol version implemented by the thermostat (master)." },
+  /* 125 */ { name: "Slave Version OpenTherm Protocol Specification", spec: "OpenThermVersionSlave", type: "f8.8", dir: "Read · boiler → thermostat", unit: "", concl: "OpenTherm protocol version implemented by the boiler (slave)." },
+  /* 126 */ { name: "Master product version number and type", spec: "MasterVersion", type: "u8/u8", dir: "Write · thermostat → boiler", unit: "", concl: "Thermostat (master) product version number and type." },
+  /* 127 */ { name: "Slave product version number and type", spec: "SlaveVersion", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler (slave) product version number and type." }
+  ];
+  var supPinned = null;   // msgID currently shown in the detail panel
   function renderSupport() {
     var grid = document.getElementById('supMatrix'); if (!grid) return;
     if (grid.childElementCount !== 128) {
       grid.innerHTML = '';
       for (var i = 0; i < 128; i++) {
         var c = document.createElement('div'); c.className = 'mcellq'; c.dataset.id = i; c.textContent = i;
-        c.addEventListener('click', (function (id) { return function () { showSupportDetail(id); }; })(i));
+        c.addEventListener('click', (function (id) { return function () { showSupportDetail(id); renderSupport(); }; })(i));
         c.addEventListener('mouseenter', (function (id) { return function (e) { showSupTip(id, e); }; })(i));
         c.addEventListener('mousemove', (function (id) { return function (e) { showSupTip(id, e); }; })(i));
         c.addEventListener('mouseleave', hideSupTip);
         grid.appendChild(c);
       }
+      // Pin a default cell so the detail panel is never blank (mockup pins one on load).
+      showSupportDetail(supPinned == null ? 0 : supPinned);
     }
     var seen = 0;
     for (var id = 0; id < 128; id++) {
       var cell = grid.children[id], s = stats[id];
-      cell.className = 'mcellq' + (s ? (s.dirT && s.dirB ? ' both' : (s.dirT ? ' tonly' : ' bonly')) : '');
+      cell.className = 'mcellq' + (s ? (s.dirT && s.dirB ? ' both' : (s.dirT ? ' tonly' : ' bonly')) : '') + (id === supPinned ? ' sel' : '');
       if (s) seen++;
     }
     var sc = document.getElementById('supCount'); if (sc) sc.textContent = seen;
+    // refresh the pinned panel so observed value/count track the live bus
+    if (supPinned != null) showSupportDetail(supPinned);
+  }
+  // Support state of a msgID: who uses it on THIS bus (colours the badge + panel).
+  function supState(id) {
+    var s = stats[id];
+    if (!s) return { cls: 'off', label: 'Not seen', sv: 'var(--tile-off)' };
+    if (s.dirT && s.dirB) return { cls: 'both', label: 'Both sides', sv: 'var(--zone-ok)' };
+    if (s.dirT) return { cls: 'tonly', label: 'Thermostat only', sv: 'var(--accent)' };
+    return { cls: 'bonly', label: 'Boiler only', sv: 'var(--zone-warn)' };
+  }
+  var SUP_BADGE = { both: '✓', tonly: '↑', bonly: '↓', off: '○' };
+  function supConcl(id, st) {
+    var m = (typeof OTMSG !== 'undefined' && OTMSG[id]) ? OTMSG[id] : null;
+    if (st.cls === 'both') return 'Both the thermostat and the boiler use this message.';
+    if (st.cls === 'tonly') return 'The thermostat asks for this, but the boiler never answers — your boiler may not implement it.';
+    if (st.cls === 'bonly') return 'The boiler reports this, but the thermostat never asks for it.';
+    if (m && m.spec === '') return 'Reserved / undefined in the OpenTherm spec — not used.';
+    return (m && m.concl) ? (m.concl + ' (Not seen on your bus yet.)') : 'Not seen on your bus yet.';
   }
   function showSupportDetail(id) {
     var el = document.getElementById('supDetail'); if (!el) return;
+    supPinned = id;
     var s = stats[id];
+    var m = (typeof OTMSG !== 'undefined' && OTMSG[id]) ? OTMSG[id] : { name: 'Reserved', spec: '', type: '—', dir: 'Undefined', unit: '', concl: '' };
+    var st = supState(id);
+    el.style.setProperty('--s', st.sv);
     el.innerHTML = '';
+    // top: decimal + hex + spec mnemonic chip
     var top = document.createElement('div'); top.className = 'sd-top';
     var num = document.createElement('span'); num.className = 'sd-num'; num.textContent = id; top.appendChild(num);
     var hex = document.createElement('span'); hex.className = 'sd-hex'; hex.textContent = '0x' + ('0' + id.toString(16).toUpperCase()).slice(-2); top.appendChild(hex);
+    if (m.spec) { var sp = document.createElement('span'); sp.className = 'sd-spec'; sp.textContent = m.spec; top.appendChild(sp); }
     el.appendChild(top);
-    var h5 = document.createElement('h5'); h5.textContent = s ? (s.label || ('ID ' + id)) : ('ID ' + id + ' — not observed'); el.appendChild(h5);
+    // coloured support badge
+    var badge = document.createElement('div'); badge.className = 'sd-badge'; badge.textContent = (SUP_BADGE[st.cls] || '') + ' ' + st.label; el.appendChild(badge);
+    // human name
+    var h5 = document.createElement('h5'); h5.textContent = m.name || ('ID ' + id); el.appendChild(h5);
+    // spec + observed fields
+    var dl = document.createElement('dl');
+    var rows = [['Data type', m.type || '—'], ['Direction', m.dir || '—']];
+    if (m.unit) rows.push(['Unit', m.unit]);
     if (s) {
-      var dl = document.createElement('dl');
-      [['Value', s.value || '—'], ['Direction', dirBadge(s)[0]], ['Count', '' + s.count], ['Interval', s.interval ? (s.interval / 1000).toFixed(1) + 's' : '—']]
-        .forEach(function (kv) { var dt = document.createElement('dt'); dt.textContent = kv[0]; var dd = document.createElement('dd'); dd.textContent = kv[1]; dl.appendChild(dt); dl.appendChild(dd); });
-      el.appendChild(dl);
-    } else {
-      var hint = document.createElement('div'); hint.className = 'sd-hint'; hint.textContent = 'This message ID has not been seen on the bus yet.'; el.appendChild(hint);
+      rows.push(['Value', s.value || '—']);
+      rows.push(['Seen', s.count + '×' + (s.interval ? ' · ~' + (s.interval / 1000).toFixed(1) + 's' : '')]);
     }
+    rows.forEach(function (kv) { var dt = document.createElement('dt'); dt.textContent = kv[0]; var dd = document.createElement('dd'); dd.textContent = kv[1]; dl.appendChild(dt); dl.appendChild(dd); });
+    el.appendChild(dl);
+    // plain-language conclusion
+    var concl = document.createElement('div'); concl.className = 'sd-concl'; concl.textContent = supConcl(id, st); el.appendChild(concl);
   }
 
   // ---------- Monitor > Log ----------
@@ -404,15 +608,28 @@
     var v = el.querySelector('.val'); if (v) v.textContent = text;
   }
 
+  // Plain-language status line (mockup hero headline): load + action, appliance-aware.
+  function statusSentence(isHP) {
+    var burn = isHP ? 'compressor' : 'flame';
+    if (model.fault) return 'Fault reported — check the appliance display.';
+    if (model.dhw_on) return 'Hot water running · tap open';
+    if (model.flame) return 'Heating · ' + burn + ' on' + (model.mod !== null ? ' · ' + Math.round(model.mod) + '% modulation' : '');
+    if (model.ch) return 'Heating idle · pump running, ' + burn + ' off';
+    return 'Standby · everything quiet';
+  }
   function renderA() {
+    var isHP = effectiveSource() === 2;  // 2 = Heat Pump (electric → bolt + HP labels)
     var svg = document.getElementById('schem');
     if (svg) {
       svg.classList.toggle('flame-on', model.flame);
       svg.classList.toggle('ch-on', model.ch);
       svg.classList.toggle('dhw-on', model.dhw_on);
       svg.classList.toggle('fault', model.fault);
-      // burner height = modulation (0..1 on --fy, consumed by .burnscale)
-      if (model.mod !== null) svg.style.setProperty('--fy', Math.max(0.12, Math.min(1, model.mod / 100)).toFixed(2));
+      // burner size tracks modulation: dramatic height (--fy 0.32..1.27) + a touch
+      // of width (--fx) so a short bolt at 34% reads differently from a tall flame.
+      var m = (model.mod === null) ? 0 : Math.max(0, Math.min(1, model.mod / 100));
+      svg.style.setProperty('--fy', (0.32 + m * 0.95).toFixed(2));
+      svg.style.setProperty('--fx', (0.70 + m * 0.32).toFixed(2));
     }
     txt('aFlow', fmt(model.flow, 1, '°'));
     txt('aRet', fmt(model.ret, 1, '°'));
@@ -421,23 +638,56 @@
     txt('aRoom', fmt(model.room, 1, '°'));
     txt('aRoomSet', model.roomSet === null ? '' : 'set ' + fmt(model.roomSet, 1, '°'));
     txt('aModBig', model.mod === null ? '—' : Math.round(model.flame ? model.mod : 0) + '%');
-    txt('aLcd', 'CH ' + (model.mod === null ? '--' : Math.round(model.mod)) + '%');
+    txt('aModTag', isHP ? 'COMPRESSOR' : 'MODULATION');
+    // LCD context line: FAULT / DHW xx° / HP|CH xx% / HP|CH idle
+    var lead = isHP ? 'HP' : 'CH';
+    var lcd = model.fault ? 'FAULT'
+            : model.dhw_on ? ('DHW ' + (model.dhw === null ? '--' : Math.round(model.dhw)) + '°')
+            : model.flame ? (lead + ' ' + (model.mod === null ? '--' : Math.round(model.mod)) + '%')
+            : (model.ch ? lead + ' idle' : 'STANDBY');
+    txt('aLcd', lcd);
     txt('aPress', fmt(model.pressure, 2, ' bar'));
     if (model.flow !== null && model.ret !== null) txt('aDt', 'ΔT ' + fmt(model.flow - model.ret, 1, '°'));
-    // pressure needle: 0..4 bar over a ~150° sweep centred on the gauge.
+    // radiator bars tint from the flow temperature (cool track → hot), but only
+    // while CH is actually heating — residual boiler heat must not paint them red.
+    var rads = document.querySelectorAll('#schem .rad-bar');
+    if (rads.length) {
+      var radFill = 'var(--gauge-track)';
+      if (model.flow !== null && model.ch) {
+        var radPct = Math.max(0, Math.min(100, (model.flow - 20) / 60 * 100));
+        radFill = 'color-mix(in srgb, var(--hot) ' + radPct.toFixed(0) + '%, var(--gauge-track))';
+      }
+      for (var ri = 0; ri < rads.length; ri++) rads[ri].setAttribute('fill', radFill);
+    }
+    // pressure needle: 0..4 bar over the 180° top semicircle. The needle points
+    // west at rotate(0); the arc runs west(low) → north(2 bar OK) → east(high), so
+    // the angle is pressure/4*180 (matching the gauge geometry + the mockup).
     var needle = document.getElementById('aPressNeedle');
     if (needle && model.pressure !== null) {
-      var deg = -75 + Math.max(0, Math.min(4, model.pressure)) / 4 * 150;
+      var deg = Math.max(0, Math.min(4, model.pressure)) / 4 * 180;
       needle.setAttribute('transform', 'rotate(' + deg.toFixed(1) + ',150,322)');
     }
-    var statusTxt = model.flame ? (model.dhw_on ? 'Heating water' : 'Heating') : (model.dhw_on ? 'Hot water' : 'Idle');
-    txt('aStatusTxt', statusTxt);
+    txt('aStatusTxt', statusSentence(isHP));
     var aStatus = document.getElementById('aStatus');
     if (aStatus) aStatus.classList.toggle('heating', model.flame);
-    setTile('aTFlame', model.flame, false, model.flame ? 'On' : 'Off');
-    setTile('aTCH', model.ch, false, model.ch ? 'Active' : 'Off');
-    setTile('aTDHW', model.dhw_on, false, model.dhw_on ? 'Active' : 'Off');
-    setTile('aTFault', false, model.fault, model.fault ? 'Fault' : 'OK');
+    // first tile relabels to Compressor in heat-pump mode; tile values uppercase.
+    var t0lbl = document.querySelector('#aTFlame .lbl'); if (t0lbl) t0lbl.textContent = isHP ? 'Compressor' : 'Flame';
+    setTile('aTFlame', model.flame, false, model.flame ? 'ON' : 'OFF');
+    setTile('aTCH', model.ch, false, model.ch ? 'ON' : 'OFF');
+    setTile('aTDHW', model.dhw_on, false, model.dhw_on ? 'ON' : 'OFF');
+    setTile('aTFault', false, model.fault, model.fault ? 'FAULT' : 'OK');
+    // mobile chip strip (≤719px) — same six values as the schematic
+    var strip = document.getElementById('aStrip');
+    if (strip) {
+      var chips = [['Flow', fmt(model.flow, 1, '°'), 'var(--hot)'], ['Return', fmt(model.ret, 1, '°'), 'var(--cold)'], ['DHW', model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], ['Pressure', fmt(model.pressure, 2, ' bar'), ''], ['Room', fmt(model.room, 1, '°'), ''], ['Outside', fmt(model.outside, 1, '°'), '']];
+      strip.textContent = '';
+      chips.forEach(function (c) {
+        var ch = document.createElement('span'); ch.className = 'mchip';
+        var bb = document.createElement('b'); bb.textContent = c[1]; if (c[2]) bb.style.color = c[2];
+        ch.appendChild(document.createTextNode(c[0] + ' ')); ch.appendChild(bb);
+        strip.appendChild(ch);
+      });
+    }
   }
 
   // Concept B — at a glance (hero dial + stat cards).
@@ -448,19 +698,21 @@
       track.setAttribute('d', arcPath(120, 120, 100, B_LO, B_HI));
       track.setAttribute('data-init', '1');
     }
+    // Mockup semantics: the coloured arc fills to the SETPOINT (the target), the
+    // tick marks the measured ROOM temperature.
     var arc = document.getElementById('bArc');
     if (arc) {
-      if (model.room === null) arc.setAttribute('d', '');
+      if (model.roomSet === null) arc.setAttribute('d', '');
       else {
-        var f = Math.max(0, Math.min(1, (model.room - B_MIN) / (B_MAX - B_MIN)));
+        var f = Math.max(0, Math.min(1, (model.roomSet - B_MIN) / (B_MAX - B_MIN)));
         arc.setAttribute('d', arcPath(120, 120, 100, B_LO, B_LO + (B_HI - B_LO) * f));
       }
     }
     var tick = document.getElementById('bTick');
     if (tick) {
-      if (model.roomSet === null) { tick.setAttribute('x1', 0); tick.setAttribute('y1', 0); tick.setAttribute('x2', 0); tick.setAttribute('y2', 0); }
+      if (model.room === null) { tick.setAttribute('x1', 0); tick.setAttribute('y1', 0); tick.setAttribute('x2', 0); tick.setAttribute('y2', 0); }
       else {
-        var sf = Math.max(0, Math.min(1, (model.roomSet - B_MIN) / (B_MAX - B_MIN)));
+        var sf = Math.max(0, Math.min(1, (model.room - B_MIN) / (B_MAX - B_MIN)));
         var deg = B_LO + (B_HI - B_LO) * sf, p1 = polar(120, 120, 88, deg), p2 = polar(120, 120, 108, deg);
         tick.setAttribute('x1', p1[0].toFixed(1)); tick.setAttribute('y1', p1[1].toFixed(1));
         tick.setAttribute('x2', p2[0].toFixed(1)); tick.setAttribute('y2', p2[1].toFixed(1));
@@ -531,17 +783,27 @@
     renderCGrid();
     renderTicker();
   }
+  // Pressure severity (5-band, HA-style): green around the 2.0 optimum.
+  function pressClass(p) {
+    if (p === null || p === undefined || isNaN(p)) return '';
+    if (p < 1.0 || p >= 3.0) return 'alert';
+    if (p < 1.2 || p >= 2.5) return 'warn';
+    return 'ok';
+  }
   function renderCGrid() {
     var grid = document.getElementById('cGrid'); if (!grid) return;
     var cells = [
       ['FLOW', fmt(model.flow, 1, '°'), 'hot'],
       ['RETURN', fmt(model.ret, 1, '°'), 'cold'],
       ['ΔT', (model.flow !== null && model.ret !== null) ? fmt(model.flow - model.ret, 1, '°') : '—', ''],
+      ['T ROOM', fmt(model.room, 1, '°'), ''],
+      ['ROOM SET', fmt(model.roomSet, 1, '°'), ''],
+      ['T OUTSIDE', fmt(model.outside, 1, '°'), ''],
       ['MODULATION', model.mod === null ? '—' : Math.round(model.mod) + '%', model.flame ? 'ok' : ''],
       ['CH SETPOINT', fmt(model.chSet, 1, '°'), ''],
       ['DHW', model.dhw === null ? '—' : fmt(model.dhw, 1, '°'), ''],
-      ['PRESSURE', fmt(model.pressure, 2, ''), ''],
-      ['FLAME', model.flame ? 'ON' : 'off', model.flame ? 'ok' : '']
+      ['PRESSURE', fmt(model.pressure, 2, ' bar'), pressClass(model.pressure)],
+      ['STATUS', model.fault ? 'FAULT' : 'OK', model.fault ? 'alert' : 'ok']
     ];
     // Build with textContent to avoid HTML injection from values.
     grid.innerHTML = '';
@@ -595,21 +857,57 @@
     }
   }
 
-  // ---------- Monitor > Connection map + (P4) connectivity strip ----------
-  var conn = { wifi: 'st-unknown', mqtt: 'st-unknown', ot: 'st-unknown', ntp: 'st-unknown',
-               mode: '', rssi: null, mqttOn: false, otOn: false };
+  // ---------- Monitor > Connection map + detail (live; from /health + settings) ----------
+  function st5ok(b) { return b ? 'st-ok' : 'st-down'; }
   function fetchConn() {
     fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j || !j.health) return;
       var h = j.health;
-      conn.mode = h.networkmode || ''; conn.rssi = (typeof h.wifirssi === 'number') ? h.wifirssi : null;
-      conn.mqttOn = !!h.mqttconnected; conn.otOn = !!h.otgwconnected;
-      conn.wifi = h.networkmode ? (conn.rssi !== null && conn.rssi < -80 ? 'st-warn' : 'st-ok') : 'st-down';
-      conn.mqtt = h.mqttconnected ? 'st-ok' : 'st-down';
-      conn.ot = h.otgwconnected ? 'st-ok' : 'st-down';
-      conn.ntp = 'st-ok'; // device clock is advancing (NTP-driven); refined later if an endpoint exposes it
-      renderConnMap(); renderConnStrip();
+      connRssi = (typeof h.wifirssi === 'number' && h.wifirssi !== 0) ? h.wifirssi : null;
+      var iface = h.otcommandinterface || '';
+      var isPic = iface === 'PIC';
+      // Two-link OT bus: on PIC use the independent thermostat/boiler flags; on
+      // OT-Direct the firmware does not populate the sub-states, so both follow
+      // bOnline (otgwconnected) — honest single-bus health on OT-Direct hardware.
+      var thermOk = isPic ? !!h.thermostatconnected : !!h.otgwconnected;
+      var boilerOk = isPic ? !!h.boilerconnected : !!h.otgwconnected;
+      CONN.therm.s = st5ok(thermOk);
+      CONN.boiler.s = st5ok(boilerOk);
+      // OpenTherm command interface row (PIC link vs OT-Direct)
+      CONN.ot.name = isPic ? 'PIC link' : (iface === 'OT-Direct' ? 'OT-Direct' : 'OpenTherm interface');
+      CONN.ot.detail = iface || 'none';
+      CONN.ot.s = (iface && iface !== 'None') ? 'st-ok' : 'st-down';
+      // Gateway MODE (PIC only). otgwmode is absent on OT-Direct -> N/A.
+      if (h.otgwmode === undefined) { CONN.mode.value = isPic ? 'detecting' : 'n/a'; }
+      else { var m = ('' + h.otgwmode).toLowerCase(); CONN.mode.value = (m === 'on') ? 'gateway' : (m === 'off') ? 'monitor' : m; }
+      // Wi-Fi health from RSSI
+      CONN.wifi.detail = (h.networkmode || '') + (connRssi !== null ? ' · ' + connRssi + ' dBm' : '');
+      CONN.wifi.s = h.networkmode ? (connRssi !== null && connRssi < -72 ? 'st-warn' : 'st-ok') : 'st-down';
+      // MQTT five-state: connected -> ok; otherwise off when disabled in settings,
+      // down when enabled-but-unreachable, unknown when the enabled-state has not
+      // loaded yet (setData is empty until Settings is opened — never show a red
+      // fault for a not-yet-known integration on the first Home render).
+      var mqttKnown = Object.prototype.hasOwnProperty.call(setData, 'mqttenable');
+      var mqttEnabled = !mqttKnown || ('' + setData.mqttenable.value) === 'true';
+      CONN.mqtt.s = h.mqttconnected ? 'st-ok' : (!mqttKnown ? 'st-unknown' : (mqttEnabled ? 'st-down' : 'st-off'));
+      CONN.mqtt.detail = h.mqttconnected ? 'connected' : (!mqttKnown ? 'checking…' : (mqttEnabled ? 'not connected' : 'disabled in settings'));
+      // NTP from ntpenable
+      var ntpEnabled = (h.ntpenable === undefined) ? true : !!h.ntpenable;
+      CONN.ntp.s = !ntpEnabled ? 'st-off' : 'st-ok';
+      CONN.ntp.detail = ntpEnabled ? 'time syncing' : 'disabled';
+      // Live link (WS) + REST API — this browser session
+      var wsUp = ws && ws.readyState === 1;
+      CONN.ws.s = wsUp ? 'st-ok' : 'st-down';
+      CONN.ws.detail = wsUp ? 'WebSocket · streaming' : 'WebSocket · reconnecting…';
+      CONN.api.s = 'st-ok';
+      renderConnMap(); renderConnStrip(); renderConnDetail();
     }).catch(function () { });
+  }
+  function connRecency(c) {
+    if (c.s === 'st-off') return 'disabled';
+    if (c.s === 'st-down') return 'no link';
+    if (c.seen != null) return 'seen ' + c.seen + 's ago';
+    return '';
   }
   function setLink(id, flowId, state) {
     var lk = document.getElementById(id);
@@ -617,15 +915,24 @@
     var fl = document.getElementById(flowId);
     if (fl) fl.classList.toggle('on', state === 'st-ok' || state === 'st-warn');
   }
-  function setDot(id, state) { var d = document.getElementById(id); if (d) d.setAttribute('class', 'cn-statedot ' + state); }
+  // Colour the SVG state dots directly (the .cn-statedot CSS has no fill rule, so
+  // a class alone would leave them uncoloured — set fill from the state palette).
+  function setDot(id, state) { var d = document.getElementById(id); if (d) d.setAttribute('fill', STV[state] || STV['st-unknown']); }
   function renderConnMap() {
-    setLink('lk-wifi', 'fl-wifi', conn.wifi); setDot('dot-wifi', conn.wifi);
-    setLink('lk-mqtt', 'fl-mqtt', conn.mqtt); setDot('dot-mqtt', conn.mqtt);
-    setLink('lk-ws', 'fl-ws', ws && ws.readyState === 1 ? 'st-ok' : 'st-down');
-    setLink('lk-boiler', 'fl-boiler', conn.ot); setDot('dot-boiler', conn.ot);
-    setLink('lk-therm', 'fl-therm', conn.ot); setDot('dot-therm', conn.ot);
-    var ws2 = document.getElementById('cnWifiSub'); if (ws2) ws2.textContent = conn.rssi === null ? conn.mode : (conn.mode + ' · ' + conn.rssi + ' dBm');
-    var md = document.getElementById('cnModeTxt'); if (md) md.textContent = conn.mode || '—';
+    setLink('lk-therm', 'fl-therm', CONN.therm.s); setDot('dot-therm', CONN.therm.s);
+    setLink('lk-boiler', 'fl-boiler', CONN.boiler.s); setDot('dot-boiler', CONN.boiler.s);
+    setLink('lk-wifi', 'fl-wifi', CONN.wifi.s); setDot('dot-wifi', CONN.wifi.s);
+    setLink('lk-mqtt', 'fl-mqtt', CONN.mqtt.s); setDot('dot-mqtt', CONN.mqtt.s);
+    setLink('lk-ws', 'fl-ws', CONN.ws.s); setDot('dot-ws', CONN.ws.s);
+    setDot('dot-pic', CONN.ot.s);
+    function roleSub(role, c) { var r = connRecency(c); return r ? (role + ' · ' + r) : role; }
+    var ts2 = document.getElementById('cnThermSub'); if (ts2) ts2.textContent = roleSub('master', CONN.therm);
+    var bs = document.getElementById('cnBoilerSub'); if (bs) bs.textContent = roleSub('slave', CONN.boiler);
+    var ps = document.getElementById('cnPicSub'); if (ps) ps.textContent = CONN.ot.name;
+    var wf = document.getElementById('cnWifiSub'); if (wf) wf.textContent = connRssi !== null ? connRssi + ' dBm' : (CONN.wifi.detail || '—');
+    var md = document.getElementById('cnModeTxt');
+    if (md) md.textContent = CONN.mode.value === 'gateway' ? 'GATEWAY MODE' : CONN.mode.value === 'monitor' ? 'MONITOR MODE' : CONN.mode.value === 'n/a' ? 'NO PIC' : ('MODE: ' + (CONN.mode.value || '?').toUpperCase());
+    var dm = document.getElementById('dot-mode'); if (dm) dm.setAttribute('fill', (CONN.mode.value === 'gateway' || CONN.mode.value === 'monitor') ? STV['st-mode'] : STV['st-unknown']);
     renderConnDetail();
   }
 
@@ -728,7 +1035,9 @@
     satdeadband:     { cat: 'sat', label: 'Deadband', hint: '°C' },
     satheatingmode:  { cat: 'sat', label: 'Heating mode' },
     satmanufacturer: { cat: 'sat', label: 'Manufacturer' },
-    satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' }
+    satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
+    sathpcycle:      { cat: 'sat', label: 'Heat-pump min cycle', hint: 'Seconds (1800 = 2/hr, 2400 = 1.5/hr)' },
+    otdmode:         { cat: 'otd', label: 'OT-Direct mode' }
   };
   // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
   // normal toggle — never list it as an editable setting.
@@ -1046,7 +1355,12 @@
     boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (OTGW32)']],
     gpiooutputstriggerbit: [[0, 'Flame'], [1, 'CH active'], [2, 'DHW active'], [3, 'Fault']],
     webhooktriggerbit: [[0, 'Flame'], [1, 'CH active'], [2, 'DHW active'], [3, 'Fault']],
-    satheatingmode: [[0, 'Comfort'], [1, 'Eco']]
+    satheatingmode: [[0, 'Comfort'], [1, 'Eco']],
+    // OT-Direct gateway mode — labels from OTDirecttypes.h (NOT the mockup's
+    // Off/On-Off/PID list, which was a different, wrong concept).
+    otdmode: [[0, 'Bypass'], [1, 'Gateway'], [2, 'Monitor'], [3, 'Master'], [4, 'Loopback']],
+    // SAT manufacturer presets — labels from the firmware satManufacturerTable[].
+    satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']]
   };
 
   function fetchSeed() {
@@ -1098,24 +1412,40 @@
       }).catch(function () { txt('bCmd', 'set failed'); });
   }
 
+  // Grouped chain map: Heating bus / Network / Integrations / This browser, each
+  // row with state badge (icon + word), explanation, per-link fix hint when down,
+  // and recency — the mockup's "locate the break and tell the user how to fix it".
+  var CONN_GROUPS = [
+    { id: 'bus', title: 'Heating bus (OpenTherm)' },
+    { id: 'net', title: 'Network' },
+    { id: 'int', title: 'Integrations' },
+    { id: 'ses', title: 'This browser session' }
+  ];
+  function connDetailRow(key) {
+    var c = CONN[key];
+    var row = document.createElement('div'); row.className = 'connrow ' + c.s;
+    var badge = document.createElement('span'); badge.className = 'badge';
+    badge.textContent = (c.s === 'st-mode') ? ('⇄ ' + (c.value || '?').toUpperCase()) : ((STICON[c.s] || '?') + ' ' + (STLABEL[c.s] || '—'));
+    var body = document.createElement('div'); body.className = 'body';
+    var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = c.icon + ' ' + c.name;
+    body.appendChild(nm);
+    var det = c.detail || (c.seen != null ? connRecency(c) : '');
+    if (det) { var dd = document.createElement('div'); dd.className = 'det'; dd.textContent = det; body.appendChild(dd); }
+    if (c.exp) { var ex = document.createElement('div'); ex.className = 'exp'; ex.textContent = c.exp; body.appendChild(ex); }
+    if ((c.s === 'st-down' || c.s === 'st-warn') && c.fix) { var fx = document.createElement('div'); fx.className = 'fix'; fx.textContent = '▸ ' + c.fix; body.appendChild(fx); }
+    row.appendChild(badge); row.appendChild(body);
+    return row;
+  }
   function renderConnDetail() {
     var box = document.getElementById('connDetail'); if (!box) return;
-    var wsUp = ws && ws.readyState === 1;
-    var rows = [
-      { k: 'WiFi / network', s: conn.wifi, d: (conn.mode || '?') + (conn.rssi !== null ? ' · ' + conn.rssi + ' dBm' : '') },
-      { k: 'WebSocket (live log)', s: wsUp ? 'st-ok' : 'st-down', d: wsUp ? 'connected' : 'disconnected — values seeded from REST' },
-      { k: 'MQTT broker', s: conn.mqtt, d: conn.mqttOn ? 'connected' : 'not connected' },
-      { k: 'OpenTherm bus', s: conn.ot, d: conn.otOn ? 'online' : 'no data' },
-      { k: 'NTP / clock', s: conn.ntp, d: 'time syncing' }
-    ];
     box.textContent = '';
-    rows.forEach(function (r) {
-      var row = document.createElement('div'); row.className = 'connrow ' + r.s;
-      var b = document.createElement('span'); b.className = 'badge'; b.textContent = STATE_TXT[r.s] || '—';
-      var body = document.createElement('div'); body.className = 'body';
-      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = r.k;
-      var det = document.createElement('div'); det.className = 'det'; det.textContent = r.d;
-      body.appendChild(nm); body.appendChild(det); row.appendChild(b); row.appendChild(body); box.appendChild(row);
+    CONN_GROUPS.forEach(function (g) {
+      var keys = Object.keys(CONN).filter(function (k) { return CONN[k].grp === g.id; });
+      if (!keys.length) return;
+      var grp = document.createElement('div'); grp.className = 'conngroup';
+      var h4 = document.createElement('h4'); h4.textContent = g.title; grp.appendChild(h4);
+      keys.forEach(function (k) { grp.appendChild(connDetailRow(k)); });
+      box.appendChild(grp);
     });
   }
 
@@ -1124,7 +1454,10 @@
     var sx = stats[id];
     tip.textContent = '';
     var b = document.createElement('b'); b.textContent = id; tip.appendChild(b);
-    tip.appendChild(document.createTextNode(' ' + (sx ? (sx.label || 'seen') : 'not seen')));
+    // Spec name from the firmware OTmap for ALL cells (even never-seen ones).
+    var m = (typeof OTMSG !== 'undefined' && OTMSG[id]) ? OTMSG[id] : null;
+    var nm = (m && m.name) ? m.name : (sx ? (sx.label || 'seen') : 'not seen');
+    tip.appendChild(document.createTextNode(' ' + nm));
     tip.style.left = e.clientX + 'px'; tip.style.top = e.clientY + 'px'; tip.style.opacity = '1';
   }
   function hideSupTip() { var tip = document.getElementById('supTip'); if (tip) tip.style.opacity = '0'; }
@@ -1198,7 +1531,11 @@
     connectWs();
     renderActive();
 
-    // Connectivity: poll device health for the strip + connection map.
+    // Connectivity: poll device health for the strip + connection map. Prefetch
+    // settings once so the connectivity model knows which integrations are disabled
+    // (MQTT off must read grey "Off", not a red "Disconnected", on the first Home
+    // render — setData is otherwise empty until the Settings page is opened).
+    fetchSettings();
     fetchConn();
     setInterval(fetchConn, 15000);
 
@@ -1224,8 +1561,11 @@
     });
     document.querySelectorAll('#mgraph .tchip').forEach(function (ch) {
       ch.addEventListener('click', function () {
+        // Parse the leading number + unit. indexOf('4') used to match the '4' in
+        // '24 h' and silently apply a 4 h window to the 24 h chip.
         var t = ch.textContent.toLowerCase();
-        graphWindowMs = t.indexOf('10') >= 0 ? 600000 : t.indexOf('4') >= 0 ? 14400000 : t.indexOf('24') >= 0 ? 86400000 : 3600000;
+        var n = parseInt(t, 10) || 1;
+        graphWindowMs = /min/.test(t) ? n * 60000 : n * 3600000;
         document.querySelectorAll('#mgraph .tchip').forEach(function (x) { x.classList.toggle('on', x === ch); });
         if (isMonitorVisible('mgraph')) renderGraph();
       });
