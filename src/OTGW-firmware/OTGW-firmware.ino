@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.265
+**  Version  : v2.0.0-alpha.266
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -573,6 +573,7 @@ void doTaskEvery1s(){
   //== do tasks ==
   handleCommandQueue(); //just check if there are commands to retry
   state.uptime.iSeconds++;
+  sampleHeapWatermark();   // TASK-934: 1 Hz maxBlock min-watermark + histogram
 
   // LED status indicators (evaluated every 1s):
   //   No WiFi          → LED2 blinks 1x/s, LED1 off

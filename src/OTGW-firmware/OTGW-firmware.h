@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.265
+**  Version  : v2.0.0-alpha.266
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -454,6 +454,9 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iDripCooldownSkipCount   = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
   uint32_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure
   uint32_t iMaxLoopGapMs            = 0; // TASK-866/879: longest gap between loop() entries since boot (loop-stall / core-1 starvation watermark; see loop() detector)
+  // TASK-934 soak instrumentation (pure observation; reset by telnet 'z'):
+  uint32_t iMinMaxBlock            = 0xFFFFFFFF; // smallest contiguous free block (maxBlock) seen since boot/reset
+  uint32_t aMaxBlockBucket[5]      = {0, 0, 0, 0, 0}; // 1 Hz maxBlock histogram: [0]<2k [1]<4k [2]<8k [3]<16k [4]>=16k
 };
 
 enum RestPerfTarget : uint8_t {
@@ -850,6 +853,8 @@ void performDeferredReboot();                      // called by loop() when g_re
 bool isRebootPending();                            // true when a deferred reboot is queued
 void rebootHeapWatermarkTick();                    // update min-free-heap watermark; called from loop()
 uint32_t getMinFreeHeap();                         // read current heap watermark (wraps platformMinFreeHeap)
+void     sampleHeapWatermark();                    // TASK-934: 1 Hz maxBlock min-watermark + histogram sampler
+void     resetHeapWatermark();                     // TASK-934: zero soak watermark/histogram/pressure counters
 void maybeWarnFlashMismatch();                     // one-shot flash-config sanity check at boot
 
 //Now load Debug & network library

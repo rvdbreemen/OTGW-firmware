@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.265
+**  Version  : v2.0.0-alpha.266
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -411,6 +411,41 @@ void rebootHeapWatermarkTick() {
 // watermark on ESP8266.
 uint32_t getMinFreeHeap() {
   return platformMinFreeHeap();
+}
+
+// TASK-934 soak instrumentation. Sampled once per second from doTaskEvery1s().
+// platformMaxFreeBlock() is ESP.getMaxAllocHeap() on ESP32 (cheap, no umm free-list
+// walk), so 1 Hz sampling is negligible. Pure observation: does NOT gate or alter
+// behaviour. Captures the worst-case (smallest) contiguous block the hourly MQTT
+// snapshot of max_block cannot see, plus a coarse histogram straddling the gating
+// thresholds (1536 promote / 8192 emergency).
+void sampleHeapWatermark() {
+  uint32_t mb = platformMaxFreeBlock();
+  if (mb < state.heapdiag.iMinMaxBlock) state.heapdiag.iMinMaxBlock = mb;
+  uint8_t b;
+  if      (mb <  2048) b = 0;
+  else if (mb <  4096) b = 1;
+  else if (mb <  8192) b = 2;
+  else if (mb < 16384) b = 3;
+  else                 b = 4;
+  state.heapdiag.aMaxBlockBucket[b]++;
+}
+
+// Zero the soak window: watermark, histogram, and the cumulative pressure counters.
+// Note: min_free_heap is the native ESP32 allocator watermark (ESP.getMinFreeHeap)
+// and CANNOT be reset from user space — it stays since-boot.
+void resetHeapWatermark() {
+  state.heapdiag.iMinMaxBlock = 0xFFFFFFFF;
+  for (uint8_t i = 0; i < 5; i++) state.heapdiag.aMaxBlockBucket[i] = 0;
+  state.heapdiag.iWsDropsTotal             = 0;
+  state.heapdiag.iMqttDropsTotal           = 0;
+  state.heapdiag.iEnteredLowCount          = 0;
+  state.heapdiag.iEnteredWarningCount      = 0;
+  state.heapdiag.iEnteredCriticalCount     = 0;
+  state.heapdiag.iDripActiveBurstSkipCount = 0;
+  state.heapdiag.iDripCooldownSkipCount    = 0;
+  state.heapdiag.iDripSlowModeCount        = 0;
+  state.heapdiag.iMaxLoopGapMs             = 0;
 }
 
 bool isRebootPending() {
