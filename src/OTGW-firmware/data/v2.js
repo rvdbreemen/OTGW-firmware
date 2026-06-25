@@ -317,44 +317,213 @@
     });
     var cnt = document.getElementById('statsCount'); if (cnt) cnt.textContent = shown;
   }
+  // OpenTherm message-ID metadata (msgID 0..127), extracted verbatim from the
+  // firmware OTmap[] in OTGW-Core.h. Drives the OT Support map detail panel + tooltip
+  // so spec name / data type / direction / conclusion are authentic even for IDs the
+  // bus has never shown (TASK-933 iter 3).
+  var OTMSG = [
+  /*   0 */ { name: "Master and Slave status", spec: "Status", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Master/slave status flags: CH and DHW demand plus the boiler's flame, fault and mode bits." },
+  /*   1 */ { name: "Control setpoint", spec: "TSet", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's commanded boiler flow (CH water) setpoint." },
+  /*   2 */ { name: "Master Config / Member ID", spec: "MasterConfigMemberIDcode", type: "flag8/u8", dir: "Write · thermostat → boiler", unit: "", concl: "Thermostat announces its configuration flags and OpenTherm member ID." },
+  /*   3 */ { name: "Slave Config / Member ID", spec: "SlaveConfigMemberIDcode", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler announces its configuration flags and OpenTherm member ID." },
+  /*   4 */ { name: "Command-Code", spec: "Command", type: "u8/u8", dir: "Write · thermostat → boiler", unit: "", concl: "Thermostat sends a remote command to the boiler (e.g. boiler reset)." },
+  /*   5 */ { name: "Application-specific fault", spec: "ASFflags", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler's application-specific fault flags plus an OEM fault code." },
+  /*   6 */ { name: "Remote-parameter flags", spec: "RBPflags", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler advertises which remote boiler parameters are transfer-enabled and read/write." },
+  /*   7 */ { name: "Cooling control signal", spec: "CoolingControl", type: "f8.8", dir: "Write · thermostat → boiler", unit: "%", concl: "Thermostat's cooling demand signal to the boiler." },
+  /*   8 */ { name: "Control setpoint for 2e CH circuit", spec: "TsetCH2", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's flow setpoint for the second CH circuit." },
+  /*   9 */ { name: "Remote override room setpoint", spec: "TrOverride", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Remote-supplied room-setpoint override; a value of 0 means no override is active." },
+  /*  10 */ { name: "Number of TSPs", spec: "TSP", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Number of transparent slave parameters the boiler exposes." },
+  /*  11 */ { name: "Index number / Value of referred-to transparent slave parameter", spec: "TSPindexTSPvalue", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Reads or writes one transparent slave parameter by index." },
+  /*  12 */ { name: "Size of Fault-History-Buffer supported by slave", spec: "FHBsize", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Size of the boiler's fault-history buffer." },
+  /*  13 */ { name: "Index number / Value of referred-to fault-history buffer entry", spec: "FHBindexFHBvalue", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Reads one fault-history buffer entry by index." },
+  /*  14 */ { name: "Maximum relative modulation level setting", spec: "MaxRelModLevelSetting", type: "f8.8", dir: "Write · thermostat → boiler", unit: "%", concl: "Thermostat caps the boiler's maximum relative modulation." },
+  /*  15 */ { name: "Maximum boiler capacity (kW) / Minimum boiler modulation level(%)", spec: "MaxCapacityMinModLevel", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "kW/%", concl: "Boiler reports its maximum capacity (kW) and minimum modulation level (%)." },
+  /*  16 */ { name: "Room Setpoint", spec: "TrSet", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's current room setpoint." },
+  /*  17 */ { name: "Relative Modulation Level", spec: "RelModLevel", type: "f8.8", dir: "Read · boiler → thermostat", unit: "%", concl: "Boiler's actual relative modulation level (burner output, %)." },
+  /*  18 */ { name: "CH water pressure", spec: "CHPressure", type: "f8.8", dir: "Read · boiler → thermostat", unit: "bar", concl: "Boiler's central-heating water pressure." },
+  /*  19 */ { name: "DHW flow rate", spec: "DHWFlowRate", type: "f8.8", dir: "Read · boiler → thermostat", unit: "l/min", concl: "Domestic-hot-water flow rate through the boiler." },
+  /*  20 */ { name: "Day of Week and Time of Day", spec: "DayTime", type: "special", dir: "Read / Write", unit: "", concl: "Day-of-week and time-of-day clock exchanged between thermostat and boiler." },
+  /*  21 */ { name: "Calendar date", spec: "Date", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Calendar month and day." },
+  /*  22 */ { name: "Calendar year", spec: "Year", type: "u16", dir: "Read / Write", unit: "", concl: "Calendar year." },
+  /*  23 */ { name: "Room Setpoint CH2", spec: "TrSetCH2", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's room setpoint for the second CH circuit." },
+  /*  24 */ { name: "Room Temperature", spec: "Tr", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Thermostat's measured room temperature." },
+  /*  25 */ { name: "Boiler water temperature", spec: "Tboiler", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Boiler's actual flow (CH water) temperature." },
+  /*  26 */ { name: "DHW temperature", spec: "Tdhw", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Domestic-hot-water temperature." },
+  /*  27 */ { name: "Outside temperature", spec: "Toutside", type: "f8.8", dir: "Read / Write", unit: "°C", concl: "Outside air temperature used for weather-compensated control." },
+  /*  28 */ { name: "Return water temperature", spec: "Tret", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Central-heating return water temperature." },
+  /*  29 */ { name: "Solar storage temperature", spec: "Tsolarstorage", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Solar storage tank temperature." },
+  /*  30 */ { name: "Solar collector temperature", spec: "Tsolarcollector", type: "s16", dir: "Read · boiler → thermostat", unit: "°C", concl: "Solar collector temperature." },
+  /*  31 */ { name: "Flow water temperature CH2", spec: "TflowCH2", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Flow water temperature of the second CH circuit." },
+  /*  32 */ { name: "DHW2 temperature", spec: "Tdhw2", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Second domestic-hot-water circuit temperature." },
+  /*  33 */ { name: "Exhaust temperature", spec: "Texhaust", type: "s16", dir: "Read · boiler → thermostat", unit: "°C", concl: "Boiler exhaust-gas temperature." },
+  /*  34 */ { name: "Boiler heat exchanger temperature", spec: "Theatexchanger", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Boiler heat-exchanger temperature." },
+  /*  35 */ { name: "Boiler fan speed and setpoint", spec: "FanSpeed", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "Hz", concl: "Boiler fan speed and its setpoint." },
+  /*  36 */ { name: "Electrical current through burner flame", spec: "ElectricalCurrentBurnerFlame", type: "f8.8", dir: "Read · boiler → thermostat", unit: "µA", concl: "Flame-ionisation current measured at the burner." },
+  /*  37 */ { name: "Room temperature for 2nd CH circuit", spec: "TRoomCH2", type: "f8.8", dir: "Write · thermostat → boiler", unit: "°C", concl: "Room temperature reported for the second CH circuit." },
+  /*  38 */ { name: "Relative Humidity", spec: "RelativeHumidity", type: "f8.8", dir: "Read / Write", unit: "%", concl: "Relative humidity measurement." },
+  /*  39 */ { name: "Remote override room setpoint 2", spec: "TrOverride2", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Remote room-setpoint override for a second zone; 0 means no override is active." },
+  /*  40 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  41 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  42 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  43 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  44 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  45 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  46 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  47 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  48 */ { name: "DHW setpoint upper & lower bounds for adjustment", spec: "TdhwSetUBTdhwSetLB", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Allowed upper/lower bounds for the DHW setpoint." },
+  /*  49 */ { name: "Max CH water setpoint upper & lower bounds for adjustment", spec: "MaxTSetUBMaxTSetLB", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Allowed upper/lower bounds for the maximum CH setpoint." },
+  /*  50 */ { name: "OTC heat curve ratio upper & lower bounds for adjustment", spec: "HcratioUBHcratioLB", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Allowed upper/lower bounds for the OTC heat-curve ratio." },
+  /*  51 */ { name: "Remote parameter 4 boundaries", spec: "Remoteparameter4boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 4." },
+  /*  52 */ { name: "Remote parameter 5 boundaries", spec: "Remoteparameter5boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 5." },
+  /*  53 */ { name: "Remote parameter 6 boundaries", spec: "Remoteparameter6boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 6." },
+  /*  54 */ { name: "Remote parameter 7 boundaries", spec: "Remoteparameter7boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 7." },
+  /*  55 */ { name: "Remote parameter 8 boundaries", spec: "Remoteparameter8boundaries", type: "s8/s8", dir: "Read · boiler → thermostat", unit: "", concl: "Upper/lower bounds for remote parameter 8." },
+  /*  56 */ { name: "DHW setpoint", spec: "TdhwSet", type: "f8.8", dir: "Read / Write", unit: "°C", concl: "Domestic-hot-water setpoint." },
+  /*  57 */ { name: "Max CH water setpoint", spec: "MaxTSet", type: "f8.8", dir: "Read / Write", unit: "°C", concl: "Maximum central-heating water setpoint." },
+  /*  58 */ { name: "OTC heat curve ratio", spec: "Hcratio", type: "f8.8", dir: "Read / Write", unit: "°C", concl: "Outside-temperature-compensation (weather) heat-curve ratio." },
+  /*  59 */ { name: "Remote parameter 4", spec: "Remoteparameter4", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 4." },
+  /*  60 */ { name: "Remote parameter 5", spec: "Remoteparameter5", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 5." },
+  /*  61 */ { name: "Remote parameter 6", spec: "Remoteparameter6", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 6." },
+  /*  62 */ { name: "Remote parameter 7", spec: "Remoteparameter7", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 7." },
+  /*  63 */ { name: "Remote parameter 8", spec: "Remoteparameter8", type: "f8.8", dir: "Read / Write", unit: "", concl: "Value of remote parameter 8." },
+  /*  64 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  65 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  66 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  67 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  68 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  69 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  70 */ { name: "Status Ventilation/Heat recovery", spec: "StatusVH", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Master/slave status flags for the ventilation/heat-recovery unit." },
+  /*  71 */ { name: "Control setpoint V/H", spec: "ControlSetpointVH", type: "u8", dir: "Write · thermostat → boiler", unit: "%", concl: "Commanded ventilation/heat-recovery setpoint." },
+  /*  72 */ { name: "Application-specific Fault Flags/Code V/H", spec: "ASFFaultCodeVH", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Ventilation/heat-recovery fault flags and OEM fault code." },
+  /*  73 */ { name: "Diagnostic code V/H", spec: "DiagnosticCodeVH", type: "u16", dir: "Read · boiler → thermostat", unit: "", concl: "Ventilation/heat-recovery diagnostic code." },
+  /*  74 */ { name: "Config/Member ID V/H", spec: "ConfigMemberIDVH", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Ventilation/heat-recovery configuration flags and member ID." },
+  /*  75 */ { name: "OpenTherm version V/H", spec: "OpenthermVersionVH", type: "f8.8", dir: "Read · boiler → thermostat", unit: "", concl: "OpenTherm protocol version of the ventilation/heat-recovery unit." },
+  /*  76 */ { name: "Product version & type V/H", spec: "VersionTypeVH", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Product version and type of the ventilation/heat-recovery unit." },
+  /*  77 */ { name: "Relative ventilation", spec: "RelativeVentilation", type: "u8", dir: "Read · boiler → thermostat", unit: "%", concl: "Actual relative ventilation level." },
+  /*  78 */ { name: "Relative humidity exhaust air", spec: "RelativeHumidityExhaustAir", type: "u8", dir: "Read / Write", unit: "%", concl: "Relative humidity of the exhaust air." },
+  /*  79 */ { name: "CO2 level exhaust air", spec: "CO2LevelExhaustAir", type: "u16", dir: "Read / Write", unit: "ppm", concl: "CO2 concentration of the exhaust air." },
+  /*  80 */ { name: "Supply inlet temperature", spec: "SupplyInletTemperature", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Ventilation supply-air inlet temperature." },
+  /*  81 */ { name: "Supply outlet temperature", spec: "SupplyOutletTemperature", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Ventilation supply-air outlet temperature." },
+  /*  82 */ { name: "Exhaust inlet temperature", spec: "ExhaustInletTemperature", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Ventilation exhaust-air inlet temperature." },
+  /*  83 */ { name: "Exhaust outlet temperature", spec: "ExhaustOutletTemperature", type: "f8.8", dir: "Read · boiler → thermostat", unit: "°C", concl: "Ventilation exhaust-air outlet temperature." },
+  /*  84 */ { name: "Actual exhaust fan speed", spec: "ActualExhaustFanSpeed", type: "u16", dir: "Read · boiler → thermostat", unit: "rpm", concl: "Measured exhaust fan speed." },
+  /*  85 */ { name: "Actual supply fan speed", spec: "ActualSupplyFanSpeed", type: "u16", dir: "Read · boiler → thermostat", unit: "rpm", concl: "Measured supply fan speed." },
+  /*  86 */ { name: "Remote Parameter Setting V/H", spec: "RemoteParameterSettingVH", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Transfer-enable & read/write flags for the V/H remote parameters." },
+  /*  87 */ { name: "Nominal Ventilation Value", spec: "NominalVentilationValue", type: "u8", dir: "Read / Write", unit: "%", concl: "Nominal ventilation level setting." },
+  /*  88 */ { name: "TSP Number V/H", spec: "TSPNumberVH", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Number of transparent slave parameters for the V/H unit." },
+  /*  89 */ { name: "TSP setting V/H", spec: "TSPEntryVH", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Reads or writes one V/H transparent slave parameter." },
+  /*  90 */ { name: "Fault Buffer Size V/H", spec: "FaultBufferSizeVH", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Size of the V/H fault-history buffer." },
+  /*  91 */ { name: "Fault Buffer Entry V/H", spec: "FaultBufferEntryVH", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Reads one V/H fault-history buffer entry." },
+  /*  92 */ { name: "Reserved", spec: "", type: "—", dir: "Undefined", unit: "", concl: "" },
+  /*  93 */ { name: "Boiler brand name (index/char)", spec: "Brand", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler brand name, transferred one character at a time by index." },
+  /*  94 */ { name: "Boiler brand version (index/char)", spec: "BrandVersion", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler brand/version string, transferred one character at a time." },
+  /*  95 */ { name: "Boiler brand serial number (index/char)", spec: "BrandSerialNumber", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler serial number, transferred one character at a time." },
+  /*  96 */ { name: "Cooling operation hours", spec: "CoolingOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Cumulative hours spent in cooling mode." },
+  /*  97 */ { name: "Power cycles", spec: "PowerCycles", type: "u16", dir: "Read / Write", unit: "", concl: "Number of boiler power cycles." },
+  /*  98 */ { name: "RF sensor status information", spec: "RFstrengthbatterylevel", type: "special", dir: "Write · thermostat → boiler", unit: "", concl: "RF sensor signal strength and battery level." },
+  /*  99 */ { name: "Remote Override Operating Mode (Heating/DHW)", spec: "OperatingMode_HC1_HC2_DHW", type: "special", dir: "Read / Write", unit: "", concl: "Remote override of the heating/DHW operating mode; 0 means no override is active." },
+  /* 100 */ { name: "Function of manual and program changes in master and remote room setpoint.", spec: "RoomRemoteOverrideFunction", type: "flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Defines whether manual and program room-setpoint changes may overrule an active remote override." },
+  /* 101 */ { name: "Solar Storage Master mode", spec: "SolarStorageMaster", type: "flag8/flag8", dir: "Read · boiler → thermostat", unit: "", concl: "Master/slave status flags for the solar-storage unit." },
+  /* 102 */ { name: "Solar Storage Application-specific flags and OEM fault", spec: "SolarStorageASFflags", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Solar-storage application-specific fault flags and OEM fault code." },
+  /* 103 */ { name: "Solar Storage Slave Config / Member ID", spec: "SolarStorageSlaveConfigMemberIDcode", type: "flag8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Solar-storage configuration flags and member ID." },
+  /* 104 */ { name: "Solar Storage product version number and type", spec: "SolarStorageVersionType", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Solar-storage product version and type." },
+  /* 105 */ { name: "Solar Storage Number of Transparent-Slave-Parameters supported", spec: "SolarStorageTSP", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Number of solar-storage transparent slave parameters." },
+  /* 106 */ { name: "Solar Storage Index number / Value of referred-to transparent slave parameter", spec: "SolarStorageTSPindexTSPvalue", type: "u8/u8", dir: "Read / Write", unit: "", concl: "Reads or writes one solar-storage transparent slave parameter by index." },
+  /* 107 */ { name: "Solar Storage Size of Fault-History-Buffer supported by slave", spec: "SolarStorageFHBsize", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Size of the solar-storage fault-history buffer." },
+  /* 108 */ { name: "Solar Storage Index number / Value of referred-to fault-history buffer entry", spec: "SolarStorageFHBindexFHBvalue", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Reads one solar-storage fault-history buffer entry by index." },
+  /* 109 */ { name: "Electricity producer starts", spec: "ElectricityProducerStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Number of micro-CHP electricity-producer starts." },
+  /* 110 */ { name: "Electricity producer hours", spec: "ElectricityProducerHours", type: "u16", dir: "Read / Write", unit: "", concl: "Operating hours of the electricity producer." },
+  /* 111 */ { name: "Electricity production", spec: "ElectricityProduction", type: "u16", dir: "Read · boiler → thermostat", unit: "", concl: "Instantaneous electricity production." },
+  /* 112 */ { name: "Cumulative Electricity production", spec: "CumulativeElectricityProduction", type: "u16", dir: "Read / Write", unit: "", concl: "Cumulative electricity produced." },
+  /* 113 */ { name: "Unsuccessful burner starts", spec: "BurnerUnsuccessfulStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Count of failed burner ignition attempts." },
+  /* 114 */ { name: "Flame signal too low count", spec: "FlameSignalTooLow", type: "u16", dir: "Read / Write", unit: "", concl: "Count of low-flame-signal events." },
+  /* 115 */ { name: "OEM-specific diagnostic/service code", spec: "OEMDiagnosticCode", type: "u16", dir: "Read · boiler → thermostat", unit: "", concl: "Manufacturer-specific diagnostic/service code." },
+  /* 116 */ { name: "Burner starts", spec: "BurnerStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Total number of burner ignitions." },
+  /* 117 */ { name: "CH pump starts", spec: "CHPumpStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Total number of CH pump starts." },
+  /* 118 */ { name: "DHW pump/valve starts", spec: "DHWPumpValveStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Total number of DHW pump/valve starts." },
+  /* 119 */ { name: "DHW burner starts", spec: "DHWBurnerStarts", type: "u16", dir: "Read / Write", unit: "", concl: "Number of burner starts while in DHW mode." },
+  /* 120 */ { name: "Burner operation hours", spec: "BurnerOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Total hours the burner has run (flame on)." },
+  /* 121 */ { name: "CH pump operation hours", spec: "CHPumpOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Total hours the CH pump has run." },
+  /* 122 */ { name: "DHW pump/valve operation hours", spec: "DHWPumpValveOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Total hours the DHW pump has run or the DHW valve has been open." },
+  /* 123 */ { name: "DHW burner operation hours", spec: "DHWBurnerOperationHours", type: "u16", dir: "Read / Write", unit: "hrs", concl: "Total burner hours while in DHW mode." },
+  /* 124 */ { name: "Master Version OpenTherm Protocol Specification", spec: "OpenThermVersionMaster", type: "f8.8", dir: "Write · thermostat → boiler", unit: "", concl: "OpenTherm protocol version implemented by the thermostat (master)." },
+  /* 125 */ { name: "Slave Version OpenTherm Protocol Specification", spec: "OpenThermVersionSlave", type: "f8.8", dir: "Read · boiler → thermostat", unit: "", concl: "OpenTherm protocol version implemented by the boiler (slave)." },
+  /* 126 */ { name: "Master product version number and type", spec: "MasterVersion", type: "u8/u8", dir: "Write · thermostat → boiler", unit: "", concl: "Thermostat (master) product version number and type." },
+  /* 127 */ { name: "Slave product version number and type", spec: "SlaveVersion", type: "u8/u8", dir: "Read · boiler → thermostat", unit: "", concl: "Boiler (slave) product version number and type." }
+  ];
+  var supPinned = null;   // msgID currently shown in the detail panel
   function renderSupport() {
     var grid = document.getElementById('supMatrix'); if (!grid) return;
     if (grid.childElementCount !== 128) {
       grid.innerHTML = '';
       for (var i = 0; i < 128; i++) {
         var c = document.createElement('div'); c.className = 'mcellq'; c.dataset.id = i; c.textContent = i;
-        c.addEventListener('click', (function (id) { return function () { showSupportDetail(id); }; })(i));
+        c.addEventListener('click', (function (id) { return function () { showSupportDetail(id); renderSupport(); }; })(i));
         c.addEventListener('mouseenter', (function (id) { return function (e) { showSupTip(id, e); }; })(i));
         c.addEventListener('mousemove', (function (id) { return function (e) { showSupTip(id, e); }; })(i));
         c.addEventListener('mouseleave', hideSupTip);
         grid.appendChild(c);
       }
+      // Pin a default cell so the detail panel is never blank (mockup pins one on load).
+      showSupportDetail(supPinned == null ? 0 : supPinned);
     }
     var seen = 0;
     for (var id = 0; id < 128; id++) {
       var cell = grid.children[id], s = stats[id];
-      cell.className = 'mcellq' + (s ? (s.dirT && s.dirB ? ' both' : (s.dirT ? ' tonly' : ' bonly')) : '');
+      cell.className = 'mcellq' + (s ? (s.dirT && s.dirB ? ' both' : (s.dirT ? ' tonly' : ' bonly')) : '') + (id === supPinned ? ' sel' : '');
       if (s) seen++;
     }
     var sc = document.getElementById('supCount'); if (sc) sc.textContent = seen;
+    // refresh the pinned panel so observed value/count track the live bus
+    if (supPinned != null) showSupportDetail(supPinned);
+  }
+  // Support state of a msgID: who uses it on THIS bus (colours the badge + panel).
+  function supState(id) {
+    var s = stats[id];
+    if (!s) return { cls: 'off', label: 'Not seen', sv: 'var(--tile-off)' };
+    if (s.dirT && s.dirB) return { cls: 'both', label: 'Both sides', sv: 'var(--zone-ok)' };
+    if (s.dirT) return { cls: 'tonly', label: 'Thermostat only', sv: 'var(--accent)' };
+    return { cls: 'bonly', label: 'Boiler only', sv: 'var(--zone-warn)' };
+  }
+  var SUP_BADGE = { both: '✓', tonly: '↑', bonly: '↓', off: '○' };
+  function supConcl(id, st) {
+    var m = (typeof OTMSG !== 'undefined' && OTMSG[id]) ? OTMSG[id] : null;
+    if (st.cls === 'both') return 'Both the thermostat and the boiler use this message.';
+    if (st.cls === 'tonly') return 'The thermostat asks for this, but the boiler never answers — your boiler may not implement it.';
+    if (st.cls === 'bonly') return 'The boiler reports this, but the thermostat never asks for it.';
+    if (m && m.spec === '') return 'Reserved / undefined in the OpenTherm spec — not used.';
+    return (m && m.concl) ? (m.concl + ' (Not seen on your bus yet.)') : 'Not seen on your bus yet.';
   }
   function showSupportDetail(id) {
     var el = document.getElementById('supDetail'); if (!el) return;
+    supPinned = id;
     var s = stats[id];
+    var m = (typeof OTMSG !== 'undefined' && OTMSG[id]) ? OTMSG[id] : { name: 'Reserved', spec: '', type: '—', dir: 'Undefined', unit: '', concl: '' };
+    var st = supState(id);
+    el.style.setProperty('--s', st.sv);
     el.innerHTML = '';
+    // top: decimal + hex + spec mnemonic chip
     var top = document.createElement('div'); top.className = 'sd-top';
     var num = document.createElement('span'); num.className = 'sd-num'; num.textContent = id; top.appendChild(num);
     var hex = document.createElement('span'); hex.className = 'sd-hex'; hex.textContent = '0x' + ('0' + id.toString(16).toUpperCase()).slice(-2); top.appendChild(hex);
+    if (m.spec) { var sp = document.createElement('span'); sp.className = 'sd-spec'; sp.textContent = m.spec; top.appendChild(sp); }
     el.appendChild(top);
-    var h5 = document.createElement('h5'); h5.textContent = s ? (s.label || ('ID ' + id)) : ('ID ' + id + ' — not observed'); el.appendChild(h5);
+    // coloured support badge
+    var badge = document.createElement('div'); badge.className = 'sd-badge'; badge.textContent = (SUP_BADGE[st.cls] || '') + ' ' + st.label; el.appendChild(badge);
+    // human name
+    var h5 = document.createElement('h5'); h5.textContent = m.name || ('ID ' + id); el.appendChild(h5);
+    // spec + observed fields
+    var dl = document.createElement('dl');
+    var rows = [['Data type', m.type || '—'], ['Direction', m.dir || '—']];
+    if (m.unit) rows.push(['Unit', m.unit]);
     if (s) {
-      var dl = document.createElement('dl');
-      [['Value', s.value || '—'], ['Direction', dirBadge(s)[0]], ['Count', '' + s.count], ['Interval', s.interval ? (s.interval / 1000).toFixed(1) + 's' : '—']]
-        .forEach(function (kv) { var dt = document.createElement('dt'); dt.textContent = kv[0]; var dd = document.createElement('dd'); dd.textContent = kv[1]; dl.appendChild(dt); dl.appendChild(dd); });
-      el.appendChild(dl);
-    } else {
-      var hint = document.createElement('div'); hint.className = 'sd-hint'; hint.textContent = 'This message ID has not been seen on the bus yet.'; el.appendChild(hint);
+      rows.push(['Value', s.value || '—']);
+      rows.push(['Seen', s.count + '×' + (s.interval ? ' · ~' + (s.interval / 1000).toFixed(1) + 's' : '')]);
     }
+    rows.forEach(function (kv) { var dt = document.createElement('dt'); dt.textContent = kv[0]; var dd = document.createElement('dd'); dd.textContent = kv[1]; dl.appendChild(dt); dl.appendChild(dd); });
+    el.appendChild(dl);
+    // plain-language conclusion
+    var concl = document.createElement('div'); concl.className = 'sd-concl'; concl.textContent = supConcl(id, st); el.appendChild(concl);
   }
 
   // ---------- Monitor > Log ----------
@@ -1215,7 +1384,10 @@
     var sx = stats[id];
     tip.textContent = '';
     var b = document.createElement('b'); b.textContent = id; tip.appendChild(b);
-    tip.appendChild(document.createTextNode(' ' + (sx ? (sx.label || 'seen') : 'not seen')));
+    // Spec name from the firmware OTmap for ALL cells (even never-seen ones).
+    var m = (typeof OTMSG !== 'undefined' && OTMSG[id]) ? OTMSG[id] : null;
+    var nm = (m && m.name) ? m.name : (sx ? (sx.label || 'seen') : 'not seen');
+    tip.appendChild(document.createTextNode(' ' + nm));
     tip.style.left = e.clientX + 'px'; tip.style.top = e.clientY + 'px'; tip.style.opacity = '1';
   }
   function hideSupTip() { var tip = document.getElementById('supTip'); if (tip) tip.style.opacity = '0'; }
