@@ -1,4 +1,4 @@
-# Daily Issue Report — 2026-06-24
+# Daily Issue Report — 2026-06-25
 
 ## GitHub Issues (updated in last 24h)
 
@@ -11,26 +11,24 @@
 Thread: [OTGW] OpenTherm gateway — Duurzame energie en installaties  
 URL: https://gathering.tweakers.net/forum/list_messages/1653967
 
-### Post 1
-- **Reporter:** Ittie
-- **Date:** Tue, 23 Jun 2026 20:29 UTC
-- **URL:** https://gathering.tweakers.net/forum/list_message/85552232#85552232
-- **Classification:** Bug report (confirmation)
-- **Summary:** User confirms experiencing the same WiFi disconnect issue others reported. Notes that sometimes a reboot of the access point temporarily resolves it. Asks for access to the beta firmware to help validate the fix.
+**No new posts from community members in the last 24 hours.**
 
-**Background context (from thread, outside 24h window):**
-Multiple users (jaronbor, tjanssen, Ittie) report WiFi instability and connectivity drops starting with firmware 1.6.0/1.6.1, not present in 1.3.5 or 1.5.0. Symptoms include: device repeatedly dropping WiFi, high packet loss during pings, HA entities (e.g. `otgw_boiler_connected`) flipping to unavailable every few minutes, and "Access to invalid address (29)" crashes. Root cause identified by number3 as the removal of `delay(1)` from the main loop. A fix is in beta 1.7.0-beta.34 (released on GitHub) and testers are being sought via the Discord beta channel. number3 responded to Ittie pointing to the GitHub release.
+> **Notable context (excluded per rules — post by number3):**  
+> At 06:02 UTC on 2026-06-25, Robert (number3/rvdbreemen) announced the **official v1.7.0 release**.  
+> This closes the WiFi disconnect regression tracked in the previous daily report.  
+> Key fixes in v1.7.0: heap fragmentation crashproofing, more free heap via refactoring, active gateway overrides visible in UI & MQTT, WiFi quality in Telnet banner, improved capture script for debug, various bug fixes (int16 → uint16 for port numbers above 32767).  
+> Release URL: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.0
 
 ---
 
 ## Summary
 
+**No new issues in the last 24 hours.**
+
 | Source | Count | Classification |
 |--------|-------|----------------|
 | GitHub Issues | 0 | — |
-| Tweakers Forum | 1 | Bug report (confirmation of known WiFi regression in 1.6.x) |
-
-**Known active bug:** WiFi disconnection regression introduced in 1.6.0, root cause identified (removal of `delay(1)` in mainloop), fix candidate in beta 1.7.0-beta.34. Field validation in progress.
+| Tweakers Forum | 0 | — |
 
 ---
 
