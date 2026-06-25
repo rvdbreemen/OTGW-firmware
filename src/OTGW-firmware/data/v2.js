@@ -608,15 +608,27 @@
     var v = el.querySelector('.val'); if (v) v.textContent = text;
   }
 
+  // Plain-language status line (mockup hero headline): load + action, appliance-aware.
+  function statusSentence(isHP) {
+    var burn = isHP ? 'compressor' : 'flame';
+    if (model.fault) return 'Fault reported — check the appliance display.';
+    if (model.dhw_on) return 'Hot water running · tap open';
+    if (model.flame) return 'Heating · ' + burn + ' on' + (model.mod !== null ? ' · ' + Math.round(model.mod) + '% modulation' : '');
+    return 'Standby · everything quiet';
+  }
   function renderA() {
+    var isHP = effectiveSource() === 2;  // 2 = Heat Pump (electric → bolt + HP labels)
     var svg = document.getElementById('schem');
     if (svg) {
       svg.classList.toggle('flame-on', model.flame);
       svg.classList.toggle('ch-on', model.ch);
       svg.classList.toggle('dhw-on', model.dhw_on);
       svg.classList.toggle('fault', model.fault);
-      // burner height = modulation (0..1 on --fy, consumed by .burnscale)
-      if (model.mod !== null) svg.style.setProperty('--fy', Math.max(0.12, Math.min(1, model.mod / 100)).toFixed(2));
+      // burner size tracks modulation: dramatic height (--fy 0.32..1.27) + a touch
+      // of width (--fx) so a short bolt at 34% reads differently from a tall flame.
+      var m = (model.mod === null) ? 0 : Math.max(0, Math.min(1, model.mod / 100));
+      svg.style.setProperty('--fy', (0.32 + m * 0.95).toFixed(2));
+      svg.style.setProperty('--fx', (0.70 + m * 0.32).toFixed(2));
     }
     txt('aFlow', fmt(model.flow, 1, '°'));
     txt('aRet', fmt(model.ret, 1, '°'));
@@ -625,23 +637,53 @@
     txt('aRoom', fmt(model.room, 1, '°'));
     txt('aRoomSet', model.roomSet === null ? '' : 'set ' + fmt(model.roomSet, 1, '°'));
     txt('aModBig', model.mod === null ? '—' : Math.round(model.flame ? model.mod : 0) + '%');
-    txt('aLcd', 'CH ' + (model.mod === null ? '--' : Math.round(model.mod)) + '%');
+    txt('aModTag', isHP ? 'COMPRESSOR' : 'MODULATION');
+    // LCD context line: FAULT / DHW xx° / HP|CH xx% / HP|CH idle
+    var lead = isHP ? 'HP' : 'CH';
+    var lcd = model.fault ? 'FAULT'
+            : model.dhw_on ? ('DHW ' + (model.dhw === null ? '--' : Math.round(model.dhw)) + '°')
+            : model.flame ? (lead + ' ' + (model.mod === null ? '--' : Math.round(model.mod)) + '%')
+            : (lead + ' idle');
+    txt('aLcd', lcd);
     txt('aPress', fmt(model.pressure, 2, ' bar'));
     if (model.flow !== null && model.ret !== null) txt('aDt', 'ΔT ' + fmt(model.flow - model.ret, 1, '°'));
+    // radiator bars tint from the flow temperature (cool track → hot)
+    var rads = document.querySelectorAll('#schem .rad-bar');
+    if (rads.length) {
+      var radFill = 'var(--gauge-track)';
+      if (model.flow !== null) {
+        var radPct = Math.max(0, Math.min(100, (model.flow - 20) / 60 * 100));
+        radFill = 'color-mix(in srgb, var(--hot) ' + radPct.toFixed(0) + '%, var(--gauge-track))';
+      }
+      for (var ri = 0; ri < rads.length; ri++) rads[ri].setAttribute('fill', radFill);
+    }
     // pressure needle: 0..4 bar over a ~150° sweep centred on the gauge.
     var needle = document.getElementById('aPressNeedle');
     if (needle && model.pressure !== null) {
       var deg = -75 + Math.max(0, Math.min(4, model.pressure)) / 4 * 150;
       needle.setAttribute('transform', 'rotate(' + deg.toFixed(1) + ',150,322)');
     }
-    var statusTxt = model.flame ? (model.dhw_on ? 'Heating water' : 'Heating') : (model.dhw_on ? 'Hot water' : 'Idle');
-    txt('aStatusTxt', statusTxt);
+    txt('aStatusTxt', statusSentence(isHP));
     var aStatus = document.getElementById('aStatus');
     if (aStatus) aStatus.classList.toggle('heating', model.flame);
-    setTile('aTFlame', model.flame, false, model.flame ? 'On' : 'Off');
-    setTile('aTCH', model.ch, false, model.ch ? 'Active' : 'Off');
-    setTile('aTDHW', model.dhw_on, false, model.dhw_on ? 'Active' : 'Off');
-    setTile('aTFault', false, model.fault, model.fault ? 'Fault' : 'OK');
+    // first tile relabels to Compressor in heat-pump mode; tile values uppercase.
+    var t0lbl = document.querySelector('#aTFlame .lbl'); if (t0lbl) t0lbl.textContent = isHP ? 'Compressor' : 'Flame';
+    setTile('aTFlame', model.flame, false, model.flame ? 'ON' : 'OFF');
+    setTile('aTCH', model.ch, false, model.ch ? 'ON' : 'OFF');
+    setTile('aTDHW', model.dhw_on, false, model.dhw_on ? 'ON' : 'OFF');
+    setTile('aTFault', false, model.fault, model.fault ? 'FAULT' : 'OK');
+    // mobile chip strip (≤719px) — same six values as the schematic
+    var strip = document.getElementById('aStrip');
+    if (strip) {
+      var chips = [['Flow', fmt(model.flow, 1, '°')], ['Return', fmt(model.ret, 1, '°')], ['DHW', model.dhw === null ? '—' : Math.round(model.dhw) + '°'], ['Pressure', fmt(model.pressure, 2, '')], ['Room', fmt(model.room, 1, '°')], ['Outside', fmt(model.outside, 1, '°')]];
+      strip.textContent = '';
+      chips.forEach(function (c) {
+        var ch = document.createElement('span'); ch.className = 'mchip';
+        var bb = document.createElement('b'); bb.textContent = c[1];
+        ch.appendChild(document.createTextNode(c[0] + ' ')); ch.appendChild(bb);
+        strip.appendChild(ch);
+      });
+    }
   }
 
   // Concept B — at a glance (hero dial + stat cards).
@@ -735,17 +777,27 @@
     renderCGrid();
     renderTicker();
   }
+  // Pressure severity (5-band, HA-style): green around the 2.0 optimum.
+  function pressClass(p) {
+    if (p === null || p === undefined || isNaN(p)) return '';
+    if (p < 1.0 || p >= 3.0) return 'alert';
+    if (p < 1.2 || p >= 2.5) return 'warn';
+    return 'ok';
+  }
   function renderCGrid() {
     var grid = document.getElementById('cGrid'); if (!grid) return;
     var cells = [
       ['FLOW', fmt(model.flow, 1, '°'), 'hot'],
       ['RETURN', fmt(model.ret, 1, '°'), 'cold'],
       ['ΔT', (model.flow !== null && model.ret !== null) ? fmt(model.flow - model.ret, 1, '°') : '—', ''],
+      ['T ROOM', fmt(model.room, 1, '°'), ''],
+      ['ROOM SET', fmt(model.roomSet, 1, '°'), ''],
+      ['T OUTSIDE', fmt(model.outside, 1, '°'), ''],
       ['MODULATION', model.mod === null ? '—' : Math.round(model.mod) + '%', model.flame ? 'ok' : ''],
       ['CH SETPOINT', fmt(model.chSet, 1, '°'), ''],
       ['DHW', model.dhw === null ? '—' : fmt(model.dhw, 1, '°'), ''],
-      ['PRESSURE', fmt(model.pressure, 2, ''), ''],
-      ['FLAME', model.flame ? 'ON' : 'off', model.flame ? 'ok' : '']
+      ['PRESSURE', fmt(model.pressure, 2, ' bar'), pressClass(model.pressure)],
+      ['STATUS', model.fault ? 'FAULT' : 'OK', model.fault ? 'alert' : 'ok']
     ];
     // Build with textContent to avoid HTML injection from values.
     grid.innerHTML = '';
