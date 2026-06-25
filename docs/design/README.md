@@ -215,6 +215,54 @@ Recommended path, in order:
 
 ---
 
+## Progressive disclosure & live signals
+
+The guiding principle is **simple → deeply technical, with all data reachable** —
+the *opposite* of the current UI, which presents everything at one flat technical
+level (tables and panels) regardless of who is looking.
+
+Depth ladder (every level is one tap deeper, nothing is hidden, only deferred):
+
+| Level | View | Audience | Shows |
+|---|---|---|---|
+| L0 glance | Home B — hero dial | anyone | is it warm? room temp + target |
+| L1 system | Home A — schematic | homeowner | flow/return/modulation/pressure/DHW, flame, the whole loop |
+| L2 detail | All-values table | curious | every OT value as label:value:unit |
+| L3 technical | Monitor: Statistics / OT-Support map / Graph | tinkerer | per-msgID intervals, support map, trends |
+| L4 raw | Monitor: Log / Mission control | developer | raw `T…/B…` frames |
+
+**Override signals** (gateway is injecting a value — `TT=`/`TC=`/`OT=`/`SW=`/`MM=`…):
+the boiler/thermostat see the injected value, not the original, so it must be
+visible at *every* level, not buried. In the mockup:
+- L0/L1: a `⛓` marker sits on each overridden value (room setpoint, outside
+  temp) on the schematic, and an amber **"⛓ Overrides N"** pill rides in the
+  persistent header strip.
+- click → an **Active gateway overrides** panel: per override the command
+  (`TT=21.0`), the value now in effect, and what it replaced.
+- This elevates what the current UI hides in a Statistics-tab table
+  ("Active gateway overrides (injected values…)").
+
+**Sensor-availability signals** (new capability coming online): when a BLE or
+DS18B20 (1-Wire) sensor is discovered, a dismissible **discovery card** announces
+it with the address/reading and a one-tap **Assign to room / Name & use** action.
+This turns the current silent behaviour (Dallas sensors just appear as new rows
+in the otmonitor table; BLE lives only inside SAT) into an explicit, actionable
+signal — the moment deeper sensor capability becomes available.
+
+## Old interface vs new — the difference
+
+| Dimension | Current `dev` UI | New design |
+|---|---|---|
+| Information model | flat: one technical level for all | layered L0→L4 progressive disclosure |
+| First impression | otmonitor table of ~30 rows | a glanceable hero / living schematic |
+| Boiler state | numbers in a table | animated schematic (flame/bolt height = modulation, flow/return arrows) |
+| Overrides | a table buried in the Statistics tab + an OT-Direct panel | `⛓` on the value + header pill + drill-down panel, at every level |
+| New sensors | Dallas appear as silent new rows; BLE only in SAT | explicit discovery cards with assign/label actions |
+| OT support | scrollable table | colour-coded 128-cell map, click for spec |
+| Connectivity | one WS dot + gateway-mode dot | five-state vocabulary + signal-flow chain map |
+| Settings | flat list / partial grouping | category rail + masonry cards + search, 100% coverage |
+| Consistency | real `ds-tokens`/`components`/`design.html` | mockup uses parallel tokens (to be reconciled) |
+
 ## Open follow-ups / decisions pending
 
 - Pick a winning Home direction (recommendation: **A as hero + B-style controls

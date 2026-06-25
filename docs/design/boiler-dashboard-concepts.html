@@ -394,6 +394,39 @@
     color:#fff;font-weight:700;border-radius:12px;padding:11px 22px;opacity:0;transition:opacity .3s;
     pointer-events:none;z-index:9}
   .toast.show{opacity:1}
+  /* override signal */
+  .connpill.ovr{background:color-mix(in srgb,var(--zone-warn) 34%,var(--nav))}
+  .connpill.ovr .d{background:var(--zone-warn)}
+  .ovr-panel{position:fixed;top:128px;right:14px;width:300px;background:var(--panel);
+    border:1px solid var(--zone-warn);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.22);
+    padding:13px 15px;z-index:40;display:none}
+  .ovr-panel.show{display:block}
+  .ovr-panel h4{margin:0 0 4px;font-size:.86rem;display:flex;align-items:center;gap:7px}
+  .ovr-panel .sub{font-size:.72rem;color:var(--muted);margin:0 0 8px}
+  .ovr-item{font-size:.82rem;padding:8px 0;border-top:1px solid var(--border)}
+  .ovr-item:first-of-type{border-top:0}
+  .ovr-item .r1{display:flex;align-items:center;gap:8px}
+  .ovr-item .cmd{font-family:var(--font-mono);color:var(--zone-warn);font-weight:700}
+  .ovr-item .clr{margin-left:auto;font-size:.72rem;border:1px solid var(--border);background:var(--panel-2);
+    color:var(--muted);border-radius:7px;padding:3px 8px;cursor:pointer}
+  .ovr-item .r2{font-size:.72rem;color:var(--muted);margin-top:2px}
+  /* sensor-discovery notifications */
+  .discover-stack{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:10px;z-index:45;max-width:330px}
+  .discover-card{background:var(--panel);border:1px solid var(--accent);border-left:4px solid var(--accent);
+    border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:11px 12px;display:flex;gap:11px;
+    align-items:flex-start;animation:discIn .3s ease}
+  .discover-card.ble{border-color:var(--cold);border-left-color:var(--cold)}
+  .discover-card.dallas{border-color:var(--hot);border-left-color:var(--hot)}
+  @keyframes discIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+  .discover-ic{font-size:1.35rem;line-height:1}
+  .discover-bd{flex:1;min-width:0}
+  .discover-bd .t{font-weight:700;font-size:.84rem}
+  .discover-bd .s{font-size:.72rem;color:var(--muted);font-family:var(--font-mono);margin-top:1px}
+  .discover-act{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .discover-act button{font-size:.74rem;border-radius:7px;padding:6px 11px;cursor:pointer;
+    border:1px solid var(--border);background:var(--panel-2);color:var(--text);min-height:34px}
+  .discover-act .primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .discover-x{cursor:pointer;color:var(--muted);font-size:1.05rem;line-height:1;padding:0 2px}
   @media(max-width:899px){
     .set-cards{grid-template-columns:1fr}
     .set-layout{grid-template-columns:1fr}
@@ -941,6 +974,8 @@
 <div class="foot">Design exploration TASK-854 / 855 / 856 · simulated data · self-contained mockup (no libraries, no network)</div>
 </div>
 <div class="toast" id="toast">Settings saved ✓ (simulated)</div>
+<div class="ovr-panel" id="ovrPanel"></div>
+<div class="discover-stack" id="discoverStack"></div>
 
 <script>
 /* ---------- theme + design switching ---------- */
@@ -995,7 +1030,12 @@ try{
 
 /* ---------- simulated live state ---------- */
 var sim={pressure:1.75,modulation:45,boiler:62,ret:48,dhw:54,outside:8.4,
-         flame:true,ch:true,dhw_on:false,fault:false,room:20.4,setpoint:21.0};
+         flame:true,ch:true,dhw_on:false,fault:false,room:20.4,setpoint:21.0,
+         // gateway is injecting these values onto the OT bus (override signal demo)
+         overrides:[
+           {label:'Room setpoint', cmd:'TT=21.0', canon:'21.0 °C', orig:'thermostat 20.0 °C', mark:'aRoomSet'},
+           {label:'Outside temp',   cmd:'OT=7.5',  canon:'7.5 °C',  orig:'(no outside sensor)', mark:'aOut'}
+         ]};
 var hist={boiler:[],ret:[],mod:[]};
 for(var i=0;i<60;i++){ // seed with a plausible burn cycle so the chart is alive at first paint
   var b=58+11*Math.sin(i/8.5)+(Math.random()-0.5)*2.4;
@@ -1071,8 +1111,10 @@ function renderA(){
   document.getElementById('aDt').textContent='ΔT '+(sim.boiler-sim.ret).toFixed(1)+'°';
   document.getElementById('aDhw').textContent=sim.dhw.toFixed(0)+'°';
   document.getElementById('aRoom').textContent=sim.room.toFixed(1)+'°';
-  document.getElementById('aRoomSet').textContent='set '+sim.setpoint.toFixed(1)+'°';
-  document.getElementById('aOut').textContent=sim.outside.toFixed(1)+'°';
+  var ovrSet=sim.overrides.some(function(o){return o.mark==='aRoomSet';});
+  var ovrOut=sim.overrides.some(function(o){return o.mark==='aOut';});
+  document.getElementById('aRoomSet').textContent='set '+sim.setpoint.toFixed(1)+'°'+(ovrSet?' ⛓':'');
+  document.getElementById('aOut').textContent=sim.outside.toFixed(1)+'°'+(ovrOut?' ⛓':'');
   document.getElementById('aPress').textContent=sim.pressure.toFixed(2)+' bar';
   var deg=Math.max(0,Math.min(4,sim.pressure))/4*180;
   document.getElementById('aPressNeedle').setAttribute('transform','rotate('+deg.toFixed(1)+',150,322)');
@@ -2033,9 +2075,31 @@ function renderConnStrip(){
     return '<button class="connpill st-'+c.s+'" data-goconn="1"><span class="d"></span>'+
       '<span class="pk">'+short+'</span><span class="pv">'+STLABEL[c.s]+'</span></button>';
   }).join('');
+  // override signal: gateway is injecting values onto the bus
+  if(sim.overrides && sim.overrides.length){
+    document.getElementById('connStrip').insertAdjacentHTML('afterbegin',
+      '<button class="connpill ovr" id="ovrPill"><span class="d"></span>'+
+      '<span class="pk">⛓ Overrides</span><span class="pv">'+sim.overrides.length+'</span></button>');
+    document.getElementById('ovrPill').onclick=function(e){ e.stopPropagation(); toggleOvrPanel(); };
+  }
   document.querySelectorAll('[data-goconn]').forEach(function(b){
     b.onclick=function(){showPage('monitor');showTab('mconn');};
   });
+}
+function renderOvrPanel(){
+  document.getElementById('ovrPanel').innerHTML=
+    '<h4>⛓ Active gateway overrides</h4>'+
+    '<p class="sub">Values the gateway is injecting onto the OT bus — the boiler/thermostat see these, not the original.</p>'+
+    sim.overrides.map(function(o){
+      return '<div class="ovr-item"><div class="r1"><span>'+o.label+'</span>'+
+        '<span class="cmd">'+o.cmd+'</span><button class="clr">Clear</button></div>'+
+        '<div class="r2">now: <b>'+o.canon+'</b> · was: '+o.orig+'</div></div>';
+    }).join('');
+}
+function toggleOvrPanel(){
+  var p=document.getElementById('ovrPanel');
+  if(!p.classList.contains('show')) renderOvrPanel();
+  p.classList.toggle('show');
 }
 function renderConnMap(){
   setDot('therm',conn.therm.s); setDot('boiler',conn.boiler.s);
@@ -2112,6 +2176,32 @@ document.querySelectorAll('#applToggle .seg2btn').forEach(function(b){
   };
 });
 
+/* ---------- sensor discovery signals ----------
+   New sensors becoming available (BLE / DS18B20 1-Wire) announce themselves
+   with a dismissible card and a one-tap "assign/label" action — the simple-level
+   signal that deeper sensor capability just came online. */
+var DISCOVERIES=[
+  {cls:'ble', ic:'🔵', t:'New BLE sensor discovered', s:'ATC_0B33 · A4:C1:38:0B:33 · 21.1 °C / 58 %', act:'Assign to room'},
+  {cls:'dallas', ic:'🌡', t:'New 1-Wire sensor detected', s:'DS18B20 · 28-AA-BB-12-34 · GPIO 13 · 44.6 °C', act:'Name & use'}
+];
+function showDiscovery(d){
+  var card=document.createElement('div');
+  card.className='discover-card '+d.cls;
+  card.innerHTML='<span class="discover-ic">'+d.ic+'</span>'+
+    '<div class="discover-bd"><div class="t">'+d.t+'</div><div class="s">'+d.s+'</div>'+
+    '<div class="discover-act"><button class="primary">'+d.act+'</button>'+
+    '<button class="later">Ignore</button></div></div>'+
+    '<span class="discover-x" title="Dismiss">×</span>';
+  function close(){ card.remove(); }
+  card.querySelector('.discover-x').onclick=close;
+  card.querySelector('.later').onclick=close;
+  card.querySelector('.primary').onclick=function(){
+    card.querySelector('.discover-bd').innerHTML='<div class="t">✓ '+(d.cls==='ble'?'Assigned':'Added')+' (simulated)</div>';
+    setTimeout(close,1100);
+  };
+  document.getElementById('discoverStack').appendChild(card);
+}
+
 /* ---------- boot ---------- */
 function clock(){document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);}
 buildSupportMatrix();
@@ -2121,6 +2211,9 @@ renderConnStrip();renderConnMap();renderConnDetail();
 clock();
 setInterval(clock,1000);
 setInterval(function(){tick();renderMonitor();connTick();},1000);
+// announce newly-available sensors shortly after load (demo of the signal)
+setTimeout(function(){showDiscovery(DISCOVERIES[0]);},2200);
+setTimeout(function(){showDiscovery(DISCOVERIES[1]);},3600);
 </script>
 </body>
 </html>
