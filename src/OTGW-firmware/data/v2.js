@@ -93,26 +93,61 @@
     el.textContent = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
   }
 
-  // ---------- always-visible connectivity strip (live; fed by fetchConn) ----------
-  var STATE_TXT = { 'st-ok': 'up', 'st-warn': 'weak', 'st-down': 'down', 'st-off': 'off', 'st-unknown': '—' };
+  // ---------- connectivity model + always-visible strip (live; fed by fetchConn) ----------
+  // One five-state vocabulary used everywhere (colour + icon + text), ported from
+  // the mockup. MODE (gateway/monitor) is a separate kind, never a green/red light.
+  var STICON = { 'st-ok': '✓', 'st-warn': '!', 'st-down': '✕', 'st-off': '○', 'st-unknown': '?', 'st-mode': '⇄' };
+  var STLABEL = { 'st-ok': 'Connected', 'st-warn': 'Degraded', 'st-down': 'Disconnected', 'st-off': 'Off', 'st-unknown': 'Unknown', 'st-mode': 'Mode' };
+  var STV = { 'st-ok': 'var(--zone-ok)', 'st-warn': 'var(--zone-warn)', 'st-down': 'var(--zone-alert)', 'st-off': 'var(--tile-off)', 'st-unknown': 'var(--muted)', 'st-mode': 'var(--accent)' };
+  // CONN: static metadata (group / icon / name / explanation / fix hint) + live
+  // state (s / value / detail), bound to the real /api/v2/health + settings. The OT
+  // bus is two independent links (thermostat vs boiler) so "boiler not answering"
+  // is distinguishable from "thermostat not asking".
+  var CONN = {
+    ws:    { grp: 'ses', s: 'st-unknown', icon: '📱', name: 'Live link', detail: '',
+             exp: 'This page has a live link to the gateway — the log updates in real time.',
+             fix: 'Live link dropped — the page is reconnecting; data may be paused.' },
+    mode:  { grp: 'bus', s: 'st-mode', icon: '⇄', name: 'Gateway mode', value: '',
+             exp: 'Gateway actively rewrites OT messages (lets the UI set temperatures); Monitor passively observes only.' },
+    mqtt:  { grp: 'int', s: 'st-unknown', icon: '📡', name: 'MQTT broker', detail: '',
+             exp: 'Connected to the broker; the online (birth) message is published.',
+             fix: 'Cannot reach the broker — check address, port and credentials.' },
+    wifi:  { grp: 'net', s: 'st-unknown', icon: '📶', name: 'Wi-Fi', detail: '',
+             exp: 'The gateway is on your network.',
+             fix: 'Weak or no signal — move the device or add a repeater.' },
+    boiler:{ grp: 'bus', s: 'st-unknown', icon: '🔥', name: 'Boiler', detail: '',
+             exp: 'The boiler (OT slave) is answering.',
+             fix: 'Boiler not answering — check the OT wiring / boiler power.' },
+    therm: { grp: 'bus', s: 'st-unknown', icon: '🌡️', name: 'Thermostat', detail: '',
+             exp: 'The room thermostat (OT master) is talking to the gateway.',
+             fix: 'No frames from the thermostat — check the OT wiring.' },
+    ot:    { grp: 'bus', s: 'st-unknown', icon: '🔌', name: 'OpenTherm interface', detail: '',
+             exp: 'The active OpenTherm command interface (PIC gateway or OT-Direct).',
+             fix: 'No OT interface available — check the hardware / board mode.' },
+    ntp:   { grp: 'int', s: 'st-unknown', icon: '🕐', name: 'Time (NTP)', detail: '',
+             exp: 'The clock is synced; timestamps and time-to-thermostat are correct.',
+             fix: 'No time sync — check the NTP server and internet access.' },
+    api:   { grp: 'ses', s: 'st-ok', icon: '🔁', name: 'REST API', detail: 'polling',
+             exp: 'Values on this page are fetched from the device API.' }
+  };
+  var connRssi = null;
   function renderConnStrip() {
-    var strip = document.getElementById('connStrip');
-    if (!strip) return;
-    var pills = [
-      { k: 'WiFi', s: conn.wifi, v: conn.rssi !== null ? conn.rssi + ' dBm' : STATE_TXT[conn.wifi] },
-      { k: 'MQTT', s: conn.mqtt, v: STATE_TXT[conn.mqtt] },
-      { k: 'OT bus', s: conn.ot, v: STATE_TXT[conn.ot] },
-      { k: 'NTP', s: conn.ntp, v: STATE_TXT[conn.ntp] }
-    ];
+    var strip = document.getElementById('connStrip'); if (!strip) return;
+    var order = ['ws', 'mode', 'mqtt', 'wifi', 'boiler', 'therm'];
+    var short = { ws: 'Live', mode: 'Mode', mqtt: 'MQTT', wifi: 'Wi-Fi', boiler: 'Boiler', therm: 'Thermostat' };
     strip.textContent = '';   // rebuild with DOM nodes (textContent — no HTML injection)
-    pills.forEach(function (p) {
-      var btn = document.createElement('button'); btn.className = 'connpill ' + p.s;
+    order.forEach(function (key) {
+      var c = CONN[key]; if (!c) return;
+      var btn = document.createElement('button'); btn.className = 'connpill ' + c.s;
       btn.title = 'Connectivity — tap for the detail map';
       btn.addEventListener('click', function () { showPage('monitor'); showTab('mconn'); });
       var dot = document.createElement('span'); dot.className = 'd';
-      var k = document.createElement('span'); k.className = 'pk'; k.textContent = p.k + ' ';
-      var v = document.createElement('span'); v.className = 'pv'; v.textContent = p.v;
-      btn.appendChild(dot); btn.appendChild(k); btn.appendChild(v);
+      var pk = document.createElement('span'); pk.className = 'pk'; pk.textContent = short[key] + ' ';
+      var pv = document.createElement('span'); pv.className = 'pv';
+      if (c.s === 'st-mode') pv.textContent = (c.value || 'unknown').toUpperCase();
+      else if (key === 'wifi' && connRssi !== null) pv.textContent = connRssi + ' dBm';
+      else pv.textContent = STLABEL[c.s] || '—';
+      btn.appendChild(dot); btn.appendChild(pk); btn.appendChild(pv);
       strip.appendChild(btn);
     });
   }
@@ -595,21 +630,53 @@
     }
   }
 
-  // ---------- Monitor > Connection map + (P4) connectivity strip ----------
-  var conn = { wifi: 'st-unknown', mqtt: 'st-unknown', ot: 'st-unknown', ntp: 'st-unknown',
-               mode: '', rssi: null, mqttOn: false, otOn: false };
+  // ---------- Monitor > Connection map + detail (live; from /health + settings) ----------
+  function st5ok(b) { return b ? 'st-ok' : 'st-down'; }
   function fetchConn() {
     fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j || !j.health) return;
       var h = j.health;
-      conn.mode = h.networkmode || ''; conn.rssi = (typeof h.wifirssi === 'number') ? h.wifirssi : null;
-      conn.mqttOn = !!h.mqttconnected; conn.otOn = !!h.otgwconnected;
-      conn.wifi = h.networkmode ? (conn.rssi !== null && conn.rssi < -80 ? 'st-warn' : 'st-ok') : 'st-down';
-      conn.mqtt = h.mqttconnected ? 'st-ok' : 'st-down';
-      conn.ot = h.otgwconnected ? 'st-ok' : 'st-down';
-      conn.ntp = 'st-ok'; // device clock is advancing (NTP-driven); refined later if an endpoint exposes it
-      renderConnMap(); renderConnStrip();
+      connRssi = (typeof h.wifirssi === 'number' && h.wifirssi !== 0) ? h.wifirssi : null;
+      var iface = h.otcommandinterface || '';
+      var isPic = iface === 'PIC';
+      // Two-link OT bus: on PIC use the independent thermostat/boiler flags; on
+      // OT-Direct the firmware does not populate the sub-states, so both follow
+      // bOnline (otgwconnected) — honest single-bus health on OT-Direct hardware.
+      var thermOk = isPic ? !!h.thermostatconnected : !!h.otgwconnected;
+      var boilerOk = isPic ? !!h.boilerconnected : !!h.otgwconnected;
+      CONN.therm.s = st5ok(thermOk);
+      CONN.boiler.s = st5ok(boilerOk);
+      // OpenTherm command interface row (PIC link vs OT-Direct)
+      CONN.ot.name = isPic ? 'PIC link' : (iface === 'OT-Direct' ? 'OT-Direct' : 'OpenTherm interface');
+      CONN.ot.detail = iface || 'none';
+      CONN.ot.s = (iface && iface !== 'None') ? 'st-ok' : 'st-down';
+      // Gateway MODE (PIC only). otgwmode is absent on OT-Direct -> N/A.
+      if (h.otgwmode === undefined) { CONN.mode.value = isPic ? 'detecting' : 'n/a'; }
+      else { var m = ('' + h.otgwmode).toLowerCase(); CONN.mode.value = (m === 'on') ? 'gateway' : (m === 'off') ? 'monitor' : m; }
+      // Wi-Fi health from RSSI
+      CONN.wifi.detail = (h.networkmode || '') + (connRssi !== null ? ' · ' + connRssi + ' dBm' : '');
+      CONN.wifi.s = h.networkmode ? (connRssi !== null && connRssi < -72 ? 'st-warn' : 'st-ok') : 'st-down';
+      // MQTT: off when disabled in settings; down when enabled but unreachable
+      var mqttEnabled = !setData.mqttenable || ('' + setData.mqttenable.value) === 'true';
+      CONN.mqtt.s = !mqttEnabled ? 'st-off' : (h.mqttconnected ? 'st-ok' : 'st-down');
+      CONN.mqtt.detail = mqttEnabled ? (h.mqttconnected ? 'connected' : 'not connected') : 'disabled in settings';
+      // NTP from ntpenable
+      var ntpEnabled = (h.ntpenable === undefined) ? true : !!h.ntpenable;
+      CONN.ntp.s = !ntpEnabled ? 'st-off' : 'st-ok';
+      CONN.ntp.detail = ntpEnabled ? 'time syncing' : 'disabled';
+      // Live link (WS) + REST API — this browser session
+      var wsUp = ws && ws.readyState === 1;
+      CONN.ws.s = wsUp ? 'st-ok' : 'st-down';
+      CONN.ws.detail = wsUp ? 'WebSocket · streaming' : 'WebSocket · reconnecting…';
+      CONN.api.s = 'st-ok';
+      renderConnMap(); renderConnStrip(); renderConnDetail();
     }).catch(function () { });
+  }
+  function connRecency(c) {
+    if (c.s === 'st-off') return 'disabled';
+    if (c.s === 'st-down') return 'no link';
+    if (c.seen != null) return 'seen ' + c.seen + 's ago';
+    return '';
   }
   function setLink(id, flowId, state) {
     var lk = document.getElementById(id);
@@ -617,15 +684,23 @@
     var fl = document.getElementById(flowId);
     if (fl) fl.classList.toggle('on', state === 'st-ok' || state === 'st-warn');
   }
-  function setDot(id, state) { var d = document.getElementById(id); if (d) d.setAttribute('class', 'cn-statedot ' + state); }
+  // Colour the SVG state dots directly (the .cn-statedot CSS has no fill rule, so
+  // a class alone would leave them uncoloured — set fill from the state palette).
+  function setDot(id, state) { var d = document.getElementById(id); if (d) d.setAttribute('fill', STV[state] || STV['st-unknown']); }
   function renderConnMap() {
-    setLink('lk-wifi', 'fl-wifi', conn.wifi); setDot('dot-wifi', conn.wifi);
-    setLink('lk-mqtt', 'fl-mqtt', conn.mqtt); setDot('dot-mqtt', conn.mqtt);
-    setLink('lk-ws', 'fl-ws', ws && ws.readyState === 1 ? 'st-ok' : 'st-down');
-    setLink('lk-boiler', 'fl-boiler', conn.ot); setDot('dot-boiler', conn.ot);
-    setLink('lk-therm', 'fl-therm', conn.ot); setDot('dot-therm', conn.ot);
-    var ws2 = document.getElementById('cnWifiSub'); if (ws2) ws2.textContent = conn.rssi === null ? conn.mode : (conn.mode + ' · ' + conn.rssi + ' dBm');
-    var md = document.getElementById('cnModeTxt'); if (md) md.textContent = conn.mode || '—';
+    setLink('lk-therm', 'fl-therm', CONN.therm.s); setDot('dot-therm', CONN.therm.s);
+    setLink('lk-boiler', 'fl-boiler', CONN.boiler.s); setDot('dot-boiler', CONN.boiler.s);
+    setLink('lk-wifi', 'fl-wifi', CONN.wifi.s); setDot('dot-wifi', CONN.wifi.s);
+    setLink('lk-mqtt', 'fl-mqtt', CONN.mqtt.s); setDot('dot-mqtt', CONN.mqtt.s);
+    setLink('lk-ws', 'fl-ws', CONN.ws.s);
+    setDot('dot-pic', CONN.ot.s);
+    var ts2 = document.getElementById('cnThermSub'); if (ts2) ts2.textContent = 'master · ' + connRecency(CONN.therm);
+    var bs = document.getElementById('cnBoilerSub'); if (bs) bs.textContent = 'slave · ' + connRecency(CONN.boiler);
+    var ps = document.getElementById('cnPicSub'); if (ps) ps.textContent = CONN.ot.name;
+    var wf = document.getElementById('cnWifiSub'); if (wf) wf.textContent = connRssi !== null ? connRssi + ' dBm' : (CONN.wifi.detail || '—');
+    var md = document.getElementById('cnModeTxt');
+    if (md) md.textContent = CONN.mode.value === 'gateway' ? 'GATEWAY MODE' : CONN.mode.value === 'monitor' ? 'MONITOR MODE' : CONN.mode.value === 'n/a' ? 'NO PIC' : ('MODE: ' + (CONN.mode.value || '?').toUpperCase());
+    var dm = document.getElementById('dot-mode'); if (dm) dm.setAttribute('fill', (CONN.mode.value === 'gateway' || CONN.mode.value === 'monitor') ? STV['st-mode'] : STV['st-unknown']);
     renderConnDetail();
   }
 
@@ -1098,24 +1173,40 @@
       }).catch(function () { txt('bCmd', 'set failed'); });
   }
 
+  // Grouped chain map: Heating bus / Network / Integrations / This browser, each
+  // row with state badge (icon + word), explanation, per-link fix hint when down,
+  // and recency — the mockup's "locate the break and tell the user how to fix it".
+  var CONN_GROUPS = [
+    { id: 'bus', title: 'Heating bus (OpenTherm)' },
+    { id: 'net', title: 'Network' },
+    { id: 'int', title: 'Integrations' },
+    { id: 'ses', title: 'This browser session' }
+  ];
+  function connDetailRow(key) {
+    var c = CONN[key];
+    var row = document.createElement('div'); row.className = 'connrow ' + c.s;
+    var badge = document.createElement('span'); badge.className = 'badge';
+    badge.textContent = (c.s === 'st-mode') ? ('⇄ ' + (c.value || '?').toUpperCase()) : ((STICON[c.s] || '?') + ' ' + (STLABEL[c.s] || '—'));
+    var body = document.createElement('div'); body.className = 'body';
+    var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = c.icon + ' ' + c.name;
+    body.appendChild(nm);
+    var det = c.detail || (c.seen != null ? connRecency(c) : '');
+    if (det) { var dd = document.createElement('div'); dd.className = 'det'; dd.textContent = det; body.appendChild(dd); }
+    if (c.exp) { var ex = document.createElement('div'); ex.className = 'exp'; ex.textContent = c.exp; body.appendChild(ex); }
+    if ((c.s === 'st-down' || c.s === 'st-warn') && c.fix) { var fx = document.createElement('div'); fx.className = 'fix'; fx.textContent = '▸ ' + c.fix; body.appendChild(fx); }
+    row.appendChild(badge); row.appendChild(body);
+    return row;
+  }
   function renderConnDetail() {
     var box = document.getElementById('connDetail'); if (!box) return;
-    var wsUp = ws && ws.readyState === 1;
-    var rows = [
-      { k: 'WiFi / network', s: conn.wifi, d: (conn.mode || '?') + (conn.rssi !== null ? ' · ' + conn.rssi + ' dBm' : '') },
-      { k: 'WebSocket (live log)', s: wsUp ? 'st-ok' : 'st-down', d: wsUp ? 'connected' : 'disconnected — values seeded from REST' },
-      { k: 'MQTT broker', s: conn.mqtt, d: conn.mqttOn ? 'connected' : 'not connected' },
-      { k: 'OpenTherm bus', s: conn.ot, d: conn.otOn ? 'online' : 'no data' },
-      { k: 'NTP / clock', s: conn.ntp, d: 'time syncing' }
-    ];
     box.textContent = '';
-    rows.forEach(function (r) {
-      var row = document.createElement('div'); row.className = 'connrow ' + r.s;
-      var b = document.createElement('span'); b.className = 'badge'; b.textContent = STATE_TXT[r.s] || '—';
-      var body = document.createElement('div'); body.className = 'body';
-      var nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = r.k;
-      var det = document.createElement('div'); det.className = 'det'; det.textContent = r.d;
-      body.appendChild(nm); body.appendChild(det); row.appendChild(b); row.appendChild(body); box.appendChild(row);
+    CONN_GROUPS.forEach(function (g) {
+      var keys = Object.keys(CONN).filter(function (k) { return CONN[k].grp === g.id; });
+      if (!keys.length) return;
+      var grp = document.createElement('div'); grp.className = 'conngroup';
+      var h4 = document.createElement('h4'); h4.textContent = g.title; grp.appendChild(h4);
+      keys.forEach(function (k) { grp.appendChild(connDetailRow(k)); });
+      box.appendChild(grp);
     });
   }
 

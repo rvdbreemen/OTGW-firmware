@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : jsonEmit.h
-**  Version  : v2.0.0-alpha.266
+**  Version  : v2.0.0-alpha.268
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
