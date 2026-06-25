@@ -630,24 +630,139 @@
   }
 
   // ---------- Settings (built from GET /api/v2/settings) ----------
-  // Categorize flat setting keys by prefix into titled groups.
-  var SET_GROUPS = [
-    { id: 'device', label: 'Device', icon: '🖥', test: function (k) { return /^(hostname|ssid|ledblink|darktheme|mydebug|nightlyrestart|restarthour|boardmode|httppasswd)/.test(k); } },
-    { id: 'network', label: 'Network', icon: '📶', test: function (k) { return /^wifi|^eth/.test(k); } },
-    { id: 'mqtt', label: 'MQTT', icon: '📨', test: function (k) { return /^mqtt|^legacyport/.test(k); } },
-    { id: 'ntp', label: 'Time / NTP', icon: '🕐', test: function (k) { return /^ntp/.test(k); } },
-    { id: 'sat', label: 'SAT thermostat', icon: '🌡', test: function (k) { return /^sat/.test(k); } },
-    { id: 'sensors', label: 'Sensors', icon: '🌡', test: function (k) { return /^gpiosensors|^s0|^dallas|^sensor/.test(k); } },
-    { id: 'outputs', label: 'Outputs', icon: '🔌', test: function (k) { return /^gpiooutputs|^output/.test(k); } },
-    { id: 'webhook', label: 'Webhook', icon: '🪝', test: function (k) { return /^webhook/.test(k); } },
-    { id: 'otd', label: 'OT-Direct', icon: '⚙', test: function (k) { return /^otd/.test(k); } },
-    { id: 'ui', label: 'Web UI', icon: '🎛', test: function (k) { return /^ui_/.test(k); } },
-    { id: 'other', label: 'Other', icon: '•', test: function () { return true; } }
+  // Curated catalog (the mockup's SET_CATS, re-keyed to the LOWERCASE REST names
+  // that GET /api/v2/settings actually emits — the mockup used the mixed-case
+  // persisted spellings, which never bind by === against the GET keys). Rows show
+  // human-readable labels + hints grouped into categories. Any exposed key NOT in
+  // the catalog is still shown (categorised by prefix, label humanised) so nothing
+  // the firmware exposes ever disappears from the page.
+  var SET_CATS = [
+    { id: 'system',   title: 'System',                 icon: '🖥', reboot: false, desc: 'Device identity and access.' },
+    { id: 'network',  title: 'Network',                icon: '📶', reboot: true,  desc: 'Wi-Fi / Ethernet addressing. Changes apply after a reboot.' },
+    { id: 'mqtt',     title: 'MQTT',                   icon: '📨', reboot: false, desc: 'Broker connection and Home Assistant publishing.' },
+    { id: 'ntp',      title: 'Time / NTP',             icon: '🕐', reboot: false, desc: 'Clock synchronisation.' },
+    { id: 'otgw',     title: 'OpenTherm Gateway',      icon: '🔥', reboot: false, desc: 'Commands sent to the PIC at boot.' },
+    { id: 'otd',      title: 'OT-Direct',              icon: '🎚', reboot: false, desc: 'Direct OpenTherm control (OTGW32).' },
+    { id: 'sensors',  title: 'GPIO Sensors',           icon: '🌡', reboot: false, desc: 'Dallas / GPIO temperature sensors.' },
+    { id: 'outputs',  title: 'GPIO Outputs',           icon: '🔌', reboot: false, desc: 'Drive a GPIO from OT state.' },
+    { id: 's0',       title: 'S0 Pulse Counter',       icon: '⚡', reboot: false, desc: 'Energy pulse counting.' },
+    { id: 'webhook',  title: 'Webhook',                icon: '🪝', reboot: false, desc: 'HTTP callbacks on OT state.' },
+    { id: 'behavior', title: 'Behavior',               icon: '🔧', reboot: false, desc: 'LED, theme and restart behaviour.' },
+    { id: 'ui',       title: 'User Interface',         icon: '🎛', reboot: false, desc: 'Web UI preferences.' },
+    { id: 'sat',      title: 'SAT — Smart Thermostat', icon: '🧠', reboot: false, desc: 'Standalone Adaptive Thermostat.' }
   ];
+  // lowercase REST key -> { cat, sub?, label, hint? }. Reboot is per-category.
+  var SET_META = {
+    hostname:        { cat: 'system', label: 'Hostname', hint: 'mDNS name on your network' },
+    ssid:            { cat: 'system', label: 'Wi-Fi network', hint: 'Connected SSID (read-only)' },
+    httppasswd:      { cat: 'system', label: 'Admin password', hint: 'Protects Settings / Advanced' },
+    boardmode:       { cat: 'system', label: 'Board mode', hint: 'Hardware interface override' },
+    wifistaticip:    { cat: 'network', sub: 'Wi-Fi', label: 'Static IP', hint: 'Leave empty for DHCP' },
+    wifisubnet:      { cat: 'network', sub: 'Wi-Fi', label: 'Subnet mask' },
+    wifigateway:     { cat: 'network', sub: 'Wi-Fi', label: 'Gateway' },
+    wifidns1:        { cat: 'network', sub: 'Wi-Fi', label: 'DNS 1' },
+    wifidns2:        { cat: 'network', sub: 'Wi-Fi', label: 'DNS 2', hint: 'Optional' },
+    ethstaticip:     { cat: 'network', sub: 'Ethernet', label: 'Use static IP' },
+    ethipaddress:    { cat: 'network', sub: 'Ethernet', label: 'IP address' },
+    ethsubnet:       { cat: 'network', sub: 'Ethernet', label: 'Subnet mask' },
+    ethgateway:      { cat: 'network', sub: 'Ethernet', label: 'Gateway' },
+    ethdns:          { cat: 'network', sub: 'Ethernet', label: 'DNS' },
+    mqttenable:      { cat: 'mqtt', sub: 'Connection', label: 'Enable MQTT' },
+    mqttbroker:      { cat: 'mqtt', sub: 'Connection', label: 'Broker' },
+    mqttbrokerport:  { cat: 'mqtt', sub: 'Connection', label: 'Port' },
+    mqttuser:        { cat: 'mqtt', sub: 'Connection', label: 'Username' },
+    mqttpasswd:      { cat: 'mqtt', sub: 'Connection', label: 'Password' },
+    mqtttoptopic:    { cat: 'mqtt', sub: 'Connection', label: 'Top topic' },
+    mqttuniqueid:    { cat: 'mqtt', sub: 'Connection', label: 'Unique id' },
+    mqtthaprefix:    { cat: 'mqtt', sub: 'HA & publishing', label: 'HA discovery prefix' },
+    mqttharebootdetection:  { cat: 'mqtt', sub: 'HA & publishing', label: 'HA reboot detection' },
+    mqttonchangepublishing: { cat: 'mqtt', sub: 'HA & publishing', label: 'Publish on change' },
+    mqttinterval:    { cat: 'mqtt', sub: 'HA & publishing', label: 'Publish interval', hint: 'Seconds' },
+    mqttotmessage:   { cat: 'mqtt', sub: 'HA & publishing', label: 'Publish raw OT messages' },
+    mqttseparatesources:   { cat: 'mqtt', sub: 'HA & publishing', label: 'Separate thermostat/boiler topics' },
+    mqttuselegacyottopics: { cat: 'mqtt', sub: 'HA & publishing', label: 'Legacy OT topic layout' },
+    legacyport25238enabled:{ cat: 'otgw', label: 'Legacy TCP port 25238' },
+    ntpenable:       { cat: 'ntp', label: 'Enable NTP' },
+    ntptimezone:     { cat: 'ntp', label: 'Timezone' },
+    ntphostname:     { cat: 'ntp', label: 'NTP server' },
+    ntpsendtime:     { cat: 'ntp', label: 'Send time to thermostat' },
+    otgwcommandenable: { cat: 'otgw', label: 'Run commands at boot' },
+    otgwcommands:    { cat: 'otgw', label: 'Boot commands', hint: 'Semicolon separated, e.g. PS=0;GW=1' },
+    gpiosensorsenabled:   { cat: 'sensors', label: 'Enable sensors' },
+    gpiosensorspin:       { cat: 'sensors', label: 'GPIO pin' },
+    gpiosensorsinterval:  { cat: 'sensors', label: 'Poll interval', hint: 'Seconds' },
+    gpiosensorslegacyformat: { cat: 'sensors', label: 'Legacy topic format' },
+    gpiooutputsenabled:   { cat: 'outputs', label: 'Enable output' },
+    gpiooutputspin:       { cat: 'outputs', label: 'GPIO pin' },
+    gpiooutputstriggerbit:{ cat: 'outputs', label: 'Trigger on' },
+    s0counterenabled:     { cat: 's0', label: 'Enable S0 counter' },
+    s0counterpin:         { cat: 's0', label: 'GPIO pin' },
+    s0counterpulsekw:     { cat: 's0', label: 'Pulses per kWh' },
+    s0counterinterval:    { cat: 's0', label: 'Report interval', hint: 'Seconds' },
+    s0counterdebouncetime:{ cat: 's0', label: 'Debounce time', hint: 'Milliseconds' },
+    webhookenable:   { cat: 'webhook', label: 'Enable webhook' },
+    webhooktriggerbit: { cat: 'webhook', label: 'Trigger on' },
+    webhookurlon:    { cat: 'webhook', label: 'URL when ON' },
+    webhookurloff:   { cat: 'webhook', label: 'URL when OFF' },
+    webhookcontenttype: { cat: 'webhook', label: 'Content type' },
+    webhookpayload:  { cat: 'webhook', label: 'Payload template' },
+    ledblink:        { cat: 'behavior', label: 'Blink LED on OT traffic' },
+    darktheme:       { cat: 'behavior', label: 'Dark theme by default' },
+    nightlyrestart:  { cat: 'behavior', label: 'Nightly restart' },
+    nightlyrestarthour: { cat: 'behavior', label: 'Restart hour', hint: '0–23' },
+    ui_autoscroll:   { cat: 'ui', label: 'Log auto-scroll' },
+    ui_timestamps:   { cat: 'ui', label: 'Show timestamps' },
+    ui_capture:      { cat: 'ui', label: 'Large capture mode' },
+    ui_autodownloadlog: { cat: 'ui', label: 'Auto-download log' },
+    ui_autoexport:   { cat: 'ui', label: 'Auto-export CSV' },
+    ui_autoscreenshot:  { cat: 'ui', label: 'Auto-save graph PNG' },
+    ui_graphtimewindow: { cat: 'ui', label: 'Default graph window' },
+    // Most-used SAT fields get curated labels; the long tail falls back to the
+    // humanised key under the SAT category (Phase 2: port full SAT metadata).
+    satenabled:      { cat: 'sat', label: 'SAT enabled' },
+    satsystem:       { cat: 'sat', label: 'Heating system' },
+    satsource:       { cat: 'sat', label: 'Appliance type' },
+    sattargettemp:   { cat: 'sat', label: 'Target temperature', hint: '°C' },
+    sattempstep:     { cat: 'sat', label: 'Setpoint step', hint: '°C' },
+    satcoefficient:  { cat: 'sat', label: 'Heating curve slope' },
+    satdeadband:     { cat: 'sat', label: 'Deadband', hint: '°C' },
+    satheatingmode:  { cat: 'sat', label: 'Heating mode' },
+    satmanufacturer: { cat: 'sat', label: 'Manufacturer' },
+    satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' }
+  };
+  // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
+  // normal toggle — never list it as an editable setting.
+  var SET_HIDE = { ui_usev2: 1 };
+  function humanizeKey(k) {
+    var s = k.replace(/^(sat|otd|gpiosensors|gpiooutputs|s0counter|mqtt|wifi|eth|ntp|webhook|ui_|dallas)/, '');
+    if (!s) s = k;
+    s = s.replace(/_/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim();
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : k;
+  }
+  function catFor(k) {
+    if (SET_META[k]) return SET_META[k].cat;
+    if (/^wifi|^eth/.test(k)) return 'network';
+    if (/^mqtt|^legacyport/.test(k)) return 'mqtt';
+    if (/^ntp/.test(k)) return 'ntp';
+    if (/^otgw/.test(k)) return 'otgw';
+    if (/^otd/.test(k)) return 'otd';
+    if (/^gpiosensors|^dallas|^sensor/.test(k)) return 'sensors';
+    if (/^gpiooutputs/.test(k)) return 'outputs';
+    if (/^s0/.test(k)) return 's0';
+    if (/^webhook/.test(k)) return 'webhook';
+    if (/^sat/.test(k)) return 'sat';
+    if (/^ui_/.test(k)) return 'ui';
+    return 'system';
+  }
+  function labelFor(k) { return (SET_META[k] && SET_META[k].label) || humanizeKey(k); }
+  function hintFor(k) { return SET_META[k] && SET_META[k].hint; }
+  function subFor(k) { return (SET_META[k] && SET_META[k].sub) || ''; }
+  function catById(id) { for (var i = 0; i < SET_CATS.length; i++) if (SET_CATS[i].id === id) return SET_CATS[i]; return null; }
+
   var setData = {};   // key -> {value,type,...} as fetched
   var setDirty = {};  // key -> new value (string)
   var setSearch = '';
-  function groupFor(k) { for (var i = 0; i < SET_GROUPS.length; i++) if (SET_GROUPS[i].test(k)) return SET_GROUPS[i].id; return 'other'; }
+  var setActiveCat = '';  // id of the currently-shown category (empty => first non-empty)
   function fetchSettings() {
     fetch(APIGW + 'v2/settings').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j) return;
@@ -656,40 +771,81 @@
       setData = {}; setDirty = {};
       Object.keys(src).forEach(function (k) {
         var v = src[k];
-        if (v && typeof v === 'object' && 'value' in v) setData[k] = v;
+        if (v && typeof v === 'object' && 'value' in v && !SET_HIDE[k]) setData[k] = v;
       });
       renderSettings();
       fetchBle();
     }).catch(function () { });
   }
   function fieldDirty(k) { return Object.prototype.hasOwnProperty.call(setDirty, k); }
-  function curVal(k) { return fieldDirty(k) ? setDirty[k] : ('' + setData[k].value); }
+  // Password fields: GET returns a masked sentinel ("password=N"), never the real
+  // secret. Show an empty field; only POST when the user actually typed something.
+  function isPwd(k) { return setData[k] && setData[k].type === 'p'; }
+  function curVal(k) {
+    if (fieldDirty(k)) return setDirty[k];
+    if (isPwd(k)) return '';
+    return '' + setData[k].value;
+  }
+  // keys per category, honoring the search filter
+  function keysForCat(id, q) {
+    return Object.keys(setData).filter(function (k) {
+      if (catFor(k) !== id) return false;
+      if (!q) return true;
+      return labelFor(k).toLowerCase().indexOf(q) !== -1 || k.toLowerCase().indexOf(q) !== -1;
+    });
+  }
   function renderSettings() {
     var rail = document.getElementById('setRail'), cols = document.getElementById('setCols');
     if (!rail || !cols) return;
-    // bucket keys
-    var buckets = {};
-    Object.keys(setData).forEach(function (k) { (buckets[groupFor(k)] = buckets[groupFor(k)] || []).push(k); });
     var q = setSearch.trim().toLowerCase();
     rail.textContent = ''; cols.textContent = '';
-    SET_GROUPS.forEach(function (g) {
-      var keys = (buckets[g.id] || []).filter(function (k) { return !q || k.toLowerCase().indexOf(q) !== -1; });
-      if (!keys.length) return;
-      // rail item
-      var ri = document.createElement('div'); ri.className = 'rail-item'; ri.textContent = g.icon + ' ' + g.label;
-      var cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = keys.length; ri.appendChild(cnt);
-      ri.addEventListener('click', function () {
-        var card = document.getElementById('setcard-' + g.id);
-        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        document.querySelectorAll('.rail-item').forEach(function (x) { x.classList.remove('active'); });
-        ri.classList.add('active');
-      });
+    // Build the rail (one item per category that has at least one field), with
+    // per-category counts and a REBOOT badge on reboot-sensitive categories.
+    var firstNonEmpty = '';
+    SET_CATS.forEach(function (c) {
+      var n = keysForCat(c.id, q).length;
+      if (!n) return;
+      if (!firstNonEmpty) firstNonEmpty = c.id;
+      var ri = document.createElement('div'); ri.className = 'rail-item';
+      ri.appendChild(document.createTextNode(c.icon + ' ' + c.title + ' '));
+      if (c.reboot) { var rb = document.createElement('span'); rb.className = 'badge-reboot'; rb.textContent = 'REBOOT'; ri.appendChild(rb); }
+      var cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = n; ri.appendChild(cnt);
+      ri.addEventListener('click', function () { setActiveCat = c.id; renderSettings(); });
+      ri.dataset.cat = c.id;
       rail.appendChild(ri);
-      // card
-      var card = document.createElement('div'); card.className = 'set-group'; card.id = 'setcard-' + g.id;
-      var h = document.createElement('h3'); h.textContent = g.label; card.appendChild(h);
-      keys.sort().forEach(function (k) { card.appendChild(settingRow(k)); });
-      cols.appendChild(card);
+    });
+    // When searching, show every matching category at once; otherwise show the one
+    // active category (mockup's show-one-at-a-time behaviour).
+    var showCats;
+    if (q) { showCats = SET_CATS.filter(function (c) { return keysForCat(c.id, q).length; }).map(function (c) { return c.id; }); }
+    else {
+      var active = setActiveCat && keysForCat(setActiveCat, '').length ? setActiveCat : firstNonEmpty;
+      setActiveCat = active;
+      showCats = active ? [active] : [];
+      var act = rail.querySelector('.rail-item[data-cat="' + active + '"]'); if (act) act.classList.add('active');
+    }
+    showCats.forEach(function (id) {
+      var c = catById(id); if (!c) return;
+      // category header (title + REBOOT + description)
+      var head = document.createElement('div');
+      var title = document.createElement('div'); title.className = 'set-cat-title';
+      title.appendChild(document.createTextNode(c.icon + ' ' + c.title + ' '));
+      if (c.reboot) { var rb2 = document.createElement('span'); rb2.className = 'badge-reboot'; rb2.textContent = 'REBOOT'; title.appendChild(rb2); }
+      head.appendChild(title);
+      if (c.desc) { var d = document.createElement('div'); d.className = 'cat-desc'; d.textContent = c.desc; head.appendChild(d); }
+      cols.appendChild(head);
+      // masonry container; cards grouped by sub-group
+      var wrap = document.createElement('div'); wrap.className = 'set-cards';
+      var keys = keysForCat(id, q);
+      var bySub = {}; var subOrder = [];
+      keys.forEach(function (k) { var s = subFor(k); if (!(s in bySub)) { bySub[s] = []; subOrder.push(s); } bySub[s].push(k); });
+      subOrder.forEach(function (s) {
+        var card = document.createElement('section'); card.className = 'set-group';
+        if (s) { var h = document.createElement('h3'); h.textContent = s; card.appendChild(h); }
+        bySub[s].forEach(function (k) { card.appendChild(settingRow(k)); });
+        wrap.appendChild(card);
+      });
+      cols.appendChild(wrap);
     });
     if (bleData) renderBleCard();
     updateSaveBar();
@@ -698,7 +854,11 @@
     var meta = setData[k], type = meta.type || 's';
     var row = document.createElement('div'); row.className = 'srow' + (fieldDirty(k) ? ' dirty' : '');
     row.dataset.key = k;
-    var lbl = document.createElement('div'); lbl.className = 'slbl'; lbl.textContent = k; row.appendChild(lbl);
+    var lbl = document.createElement('div'); lbl.className = 'slbl';
+    lbl.appendChild(document.createTextNode(labelFor(k)));
+    var hint = hintFor(k);
+    if (hint) { var hs = document.createElement('span'); hs.className = 'shint'; hs.textContent = hint; lbl.appendChild(hs); }
+    row.appendChild(lbl);
     var input;
     if (type === 'b') {
       input = document.createElement('input'); input.type = 'checkbox'; input.className = 'sw';
@@ -717,13 +877,17 @@
       input = document.createElement('input');
       input.type = (type === 'p') ? 'password' : (type === 'i') ? 'number' : 'text';
       input.value = curVal(k);
+      if (type === 'p') input.placeholder = '••••••••';
       input.addEventListener('input', function () { markDirty(k, input.value, row); });
     }
     row.appendChild(input);
     return row;
   }
   function markDirty(k, val, row) {
-    if (('' + setData[k].value) === val) delete setDirty[k]; else setDirty[k] = val;
+    // Password fields show empty; an empty value means "leave unchanged", so it is
+    // never dirty and never POSTed (the GET-side value is a mask, not the secret).
+    if ((isPwd(k) && val === '') || ('' + setData[k].value) === val) delete setDirty[k];
+    else setDirty[k] = val;
     if (row) row.classList.toggle('dirty', fieldDirty(k));
     updateSaveBar();
   }
@@ -876,7 +1040,13 @@
   var graphWindowMs = 3600000;
   var ENUM_OPTS = {
     satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid']],
-    satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']]
+    satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],
+    // boardmode is the real 3-value hardware override (ADR-127); the mockup's
+    // 4-option ESP8266/OTGW32/LOLIN list was semantically wrong.
+    boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (OTGW32)']],
+    gpiooutputstriggerbit: [[0, 'Flame'], [1, 'CH active'], [2, 'DHW active'], [3, 'Fault']],
+    webhooktriggerbit: [[0, 'Flame'], [1, 'CH active'], [2, 'DHW active'], [3, 'Fault']],
+    satheatingmode: [[0, 'Comfort'], [1, 'Eco']]
   };
 
   function fetchSeed() {

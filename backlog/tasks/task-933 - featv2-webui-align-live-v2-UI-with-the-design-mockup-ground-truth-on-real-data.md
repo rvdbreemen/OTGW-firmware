@@ -1,0 +1,66 @@
+---
+id: TASK-933
+title: >-
+  feat(v2-webui): align live v2 UI with the design mockup (ground truth) on real
+  data
+status: In Progress
+assignee:
+  - '@claude'
+created_date: '2026-06-25 17:20'
+updated_date: '2026-06-25 17:36'
+labels: []
+dependencies: []
+ordinal: 147000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+The shipped v2 Web UI (v2.html/v2.js/v2.css) diverges from the approved design mockup (docs/design/boiler-dashboard-concepts.html on branch claude/webui-gauge-widget-design-s5t9s, PR #649). Bring the live implementation to match the mockup's structure, labels, and interactions, but bound to REAL device data/REST keys (not the mockup's simulated data). Confirmed gaps: settings show raw REST keys instead of human-readable labels/hints/categories; connectivity collapses the OT bus into a single down state instead of the mockup's two-link (thermostat vs boiler) MODE-vs-HEALTH model. Full audit across Home (A/B/C), Monitor (Log/Stats/OT Support/Graph/Connection), Settings, Connectivity to follow as the issue list. Ground truth = the mockup; data source = the real OTGW32 at 192.168.88.39.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Comprehensive issue list produced: mockup vs impl, every page/dashboard/setting, with file:line and fix direction
+- [ ] #2 Settings render human-readable labels + hints + categories + REBOOT badges (mockup SET_CATS model) bound to real REST keys
+- [ ] #3 Connectivity models OT bus as two links (thermostat/boiler) with MODE-vs-HEALTH vocabulary per the mockup
+- [ ] #4 Home A/B/C dashboards match the mockup layout/labels on real OT data
+- [ ] #5 Monitor sub-tabs (Log/Stats/OT Support/Graph/Connection) match the mockup
+- [ ] #6 Final: live v2 UI visually matches the mockup at desktop+mobile, driven by real device data
+<!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+MASTER ISSUE LIST (4 parallel audits, mockup=ground-truth). Root pattern: v2.html+v2.css are faithful 1:1 mockup ports (all CSS classes exist); gaps are in v2.js wiring + ~20 lines firmware REST.
+
+FIRMWARE (done): /health (sendHealth, restAPI.ino) now emits thermostatconnected, boilerconnected, otcommandinterface, otgwmode, ntpenable (mirror of device/info).
+
+SETTINGS (P0/P1) — biggest, user's explicit complaint:
+- Raw REST key shown as label (v2.js:701 lbl.textContent=k). Build lowercase-keyed catalog: label+hint+category+sub-group+reboot+enum. Mockup SET_CATS uses mixed-case keys -> won't bind; re-key to lowercase (GET is lowercase, restAPI.ino:3233).
+- Missing: hints, REBOOT badges, sub-groups, masonry, enum selects.
+- Enum fixes: boardmode i 0-2 Auto/PIC/OTDirect (mockup 4-opt WRONG), satsystem 0-2 (mockup 0-3), satsource 0-3, sathpcycle 1800-2400 SEC (mockup minutes), otdmode 0-4, gpiooutputstriggerbit/webhooktriggerbit 0=Flame/1=CH/2=DHW/3=Fault, satmanufacturer, satheatingmode 0/1.
+- Password: GET returns sentinel 'password=N'; empty input = leave unchanged; skip POST unless typed.
+- Drop mockup 'usedhcp' (no such key; DHCP=empty wifistaticip). ssid readonly. Omit ui_usev2.
+- Phase 2 (firmware): ~50 OTD-PID/curve/bypass/vent + SAT DHW/pressure/zones/sensorarea/boilermodel keys persisted but NOT REST-exposed -> expose in sendDeviceSettings + knownSettings[] before wiring, else drop. Do NOT ship dead 200-echo inputs.
+
+CONNECTIVITY (P0) — second complaint:
+- Split OT bus -> thermostat+boiler (data now on /health; UI fallback to bOnline when otcommandinterface=OT-Direct).
+- Mode chip: use otgwmode (NOT networkmode, current bug v2.js:605/628 shows WiFi in GATEWAY chip); blue st-mode in strip+map.
+- Five-state: st-off (disabled-in-settings), st-unknown (pre-fetch); MQTT off -> grey not red.
+- renderConnDetail: grouped 11-row chain (Heating bus/Network/Integrations/Browser) + fix hints + recency + PIC/HA/REST/Live rows (currently flat 5 rows v2.js:931-950).
+- Strip: 6 pills (Live/Mode/MQTT/WiFi/Boiler/Thermostat); NTP pill hardcoded green -> wire or drop.
+
+OT SUPPORT (P0):
+- No OTmap spec table in v2.js -> port from firmware OTGW-Core.h / classic index.js. Detail panel: Decimal/Hex/Spec name/human name/Data type/Direction/Unit/support badge/conclusion (CSS sd-spec/sd-badge/sd-concl already exist, dead). Default-pin + placeholder; hover spec name for all 128.
+
+HOME Concept A (P1):
+- Heat-pump source-aware renderA: LCD HP not CH, tag COMPRESSOR, tile Compressor.
+- statusSentence() restore (modulation %, 'tap open', fault sentence, standby).
+- rad-bar tint writer (flow-temp). flame --fx width curve. multi-state LCD. populate #aStrip mobile. tile casing ON/OFF/FAULT/OK.
+Concept B: TT= preview vs real write (keep real); dial arc=setpoint/tick=room (currently inverted). Concept C: grid 11 cells (+T room/outside/Status), pressure unit+severity; ticker color via DOM spans.
+
+HEADER (P2): UI-switch as <button> distinct class (not span cloning theme-toggle), keyboard-operable; dark accent follow brand-cyan not accent-primary (blue/cyan split-brand).
+
+DO NOT REGRESS: sortable stats, wired Clear/Download/Graph PNG/CSV, real settings API, textContent XSS-safe, live dBm, mobile tap-targets (TASK-932).
+<!-- SECTION:NOTES:END -->

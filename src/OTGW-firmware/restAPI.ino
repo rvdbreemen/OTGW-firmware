@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.264
+**  Version  : v2.0.0-alpha.265
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2877,6 +2877,23 @@ void sendHealth()
 #endif
     je.field(F("mqttconnected"),  state.mqtt.bConnected);
     je.field(F("otgwconnected"),  state.otBus.bOnline);
+    // Two-link OT model + gateway MODE for the v2 connectivity map. Mirror of the
+    // already-proven /api/v2/device/info emitter (sendDeviceInfoV2): the UI needs
+    // thermostat and boiler as INDEPENDENT links (bOnline alone can't tell "boiler
+    // not answering" from "thermostat not asking"), the active OT interface so it
+    // can pick the two-link (PIC) vs single-bus (OT-Direct) presentation, and the
+    // gateway/monitor MODE which is a setting, not a health state.
+    if (hasOTCommandInterface()) {
+      je.field(F("thermostatconnected"), state.otBus.bThermostatState);
+      je.field(F("boilerconnected"),     state.otBus.bBoilerState);
+    }
+    if (isPICEnabled())           je.field(F("otcommandinterface"), F("PIC"));
+    else if (isOTDirectEnabled()) je.field(F("otcommandinterface"), F("OT-Direct"));
+    else                          je.field(F("otcommandinterface"), F("None"));
+    if (isPICEnabled()) {
+      je.field(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting");
+    }
+    je.field(F("ntpenable"),      settings.ntp.bEnable);
     je.field(F("littlefsMounted"), LittleFSmounted);
     je.endObject();                   // close "health"
     je.endObject();                   // close root
