@@ -614,6 +614,7 @@
     if (model.fault) return 'Fault reported — check the appliance display.';
     if (model.dhw_on) return 'Hot water running · tap open';
     if (model.flame) return 'Heating · ' + burn + ' on' + (model.mod !== null ? ' · ' + Math.round(model.mod) + '% modulation' : '');
+    if (model.ch) return 'Heating idle · pump running, ' + burn + ' off';
     return 'Standby · everything quiet';
   }
   function renderA() {
@@ -643,24 +644,27 @@
     var lcd = model.fault ? 'FAULT'
             : model.dhw_on ? ('DHW ' + (model.dhw === null ? '--' : Math.round(model.dhw)) + '°')
             : model.flame ? (lead + ' ' + (model.mod === null ? '--' : Math.round(model.mod)) + '%')
-            : (lead + ' idle');
+            : (model.ch ? lead + ' idle' : 'STANDBY');
     txt('aLcd', lcd);
     txt('aPress', fmt(model.pressure, 2, ' bar'));
     if (model.flow !== null && model.ret !== null) txt('aDt', 'ΔT ' + fmt(model.flow - model.ret, 1, '°'));
-    // radiator bars tint from the flow temperature (cool track → hot)
+    // radiator bars tint from the flow temperature (cool track → hot), but only
+    // while CH is actually heating — residual boiler heat must not paint them red.
     var rads = document.querySelectorAll('#schem .rad-bar');
     if (rads.length) {
       var radFill = 'var(--gauge-track)';
-      if (model.flow !== null) {
+      if (model.flow !== null && model.ch) {
         var radPct = Math.max(0, Math.min(100, (model.flow - 20) / 60 * 100));
         radFill = 'color-mix(in srgb, var(--hot) ' + radPct.toFixed(0) + '%, var(--gauge-track))';
       }
       for (var ri = 0; ri < rads.length; ri++) rads[ri].setAttribute('fill', radFill);
     }
-    // pressure needle: 0..4 bar over a ~150° sweep centred on the gauge.
+    // pressure needle: 0..4 bar over the 180° top semicircle. The needle points
+    // west at rotate(0); the arc runs west(low) → north(2 bar OK) → east(high), so
+    // the angle is pressure/4*180 (matching the gauge geometry + the mockup).
     var needle = document.getElementById('aPressNeedle');
     if (needle && model.pressure !== null) {
-      var deg = -75 + Math.max(0, Math.min(4, model.pressure)) / 4 * 150;
+      var deg = Math.max(0, Math.min(4, model.pressure)) / 4 * 180;
       needle.setAttribute('transform', 'rotate(' + deg.toFixed(1) + ',150,322)');
     }
     txt('aStatusTxt', statusSentence(isHP));
@@ -675,11 +679,11 @@
     // mobile chip strip (≤719px) — same six values as the schematic
     var strip = document.getElementById('aStrip');
     if (strip) {
-      var chips = [['Flow', fmt(model.flow, 1, '°')], ['Return', fmt(model.ret, 1, '°')], ['DHW', model.dhw === null ? '—' : Math.round(model.dhw) + '°'], ['Pressure', fmt(model.pressure, 2, '')], ['Room', fmt(model.room, 1, '°')], ['Outside', fmt(model.outside, 1, '°')]];
+      var chips = [['Flow', fmt(model.flow, 1, '°'), 'var(--hot)'], ['Return', fmt(model.ret, 1, '°'), 'var(--cold)'], ['DHW', model.dhw === null ? '—' : Math.round(model.dhw) + '°', ''], ['Pressure', fmt(model.pressure, 2, ' bar'), ''], ['Room', fmt(model.room, 1, '°'), ''], ['Outside', fmt(model.outside, 1, '°'), '']];
       strip.textContent = '';
       chips.forEach(function (c) {
         var ch = document.createElement('span'); ch.className = 'mchip';
-        var bb = document.createElement('b'); bb.textContent = c[1];
+        var bb = document.createElement('b'); bb.textContent = c[1]; if (c[2]) bb.style.color = c[2];
         ch.appendChild(document.createTextNode(c[0] + ' ')); ch.appendChild(bb);
         strip.appendChild(ch);
       });
@@ -694,19 +698,21 @@
       track.setAttribute('d', arcPath(120, 120, 100, B_LO, B_HI));
       track.setAttribute('data-init', '1');
     }
+    // Mockup semantics: the coloured arc fills to the SETPOINT (the target), the
+    // tick marks the measured ROOM temperature.
     var arc = document.getElementById('bArc');
     if (arc) {
-      if (model.room === null) arc.setAttribute('d', '');
+      if (model.roomSet === null) arc.setAttribute('d', '');
       else {
-        var f = Math.max(0, Math.min(1, (model.room - B_MIN) / (B_MAX - B_MIN)));
+        var f = Math.max(0, Math.min(1, (model.roomSet - B_MIN) / (B_MAX - B_MIN)));
         arc.setAttribute('d', arcPath(120, 120, 100, B_LO, B_LO + (B_HI - B_LO) * f));
       }
     }
     var tick = document.getElementById('bTick');
     if (tick) {
-      if (model.roomSet === null) { tick.setAttribute('x1', 0); tick.setAttribute('y1', 0); tick.setAttribute('x2', 0); tick.setAttribute('y2', 0); }
+      if (model.room === null) { tick.setAttribute('x1', 0); tick.setAttribute('y1', 0); tick.setAttribute('x2', 0); tick.setAttribute('y2', 0); }
       else {
-        var sf = Math.max(0, Math.min(1, (model.roomSet - B_MIN) / (B_MAX - B_MIN)));
+        var sf = Math.max(0, Math.min(1, (model.room - B_MIN) / (B_MAX - B_MIN)));
         var deg = B_LO + (B_HI - B_LO) * sf, p1 = polar(120, 120, 88, deg), p2 = polar(120, 120, 108, deg);
         tick.setAttribute('x1', p1[0].toFixed(1)); tick.setAttribute('y1', p1[1].toFixed(1));
         tick.setAttribute('x2', p2[0].toFixed(1)); tick.setAttribute('y2', p2[1].toFixed(1));
@@ -877,10 +883,14 @@
       // Wi-Fi health from RSSI
       CONN.wifi.detail = (h.networkmode || '') + (connRssi !== null ? ' · ' + connRssi + ' dBm' : '');
       CONN.wifi.s = h.networkmode ? (connRssi !== null && connRssi < -72 ? 'st-warn' : 'st-ok') : 'st-down';
-      // MQTT: off when disabled in settings; down when enabled but unreachable
-      var mqttEnabled = !setData.mqttenable || ('' + setData.mqttenable.value) === 'true';
-      CONN.mqtt.s = !mqttEnabled ? 'st-off' : (h.mqttconnected ? 'st-ok' : 'st-down');
-      CONN.mqtt.detail = mqttEnabled ? (h.mqttconnected ? 'connected' : 'not connected') : 'disabled in settings';
+      // MQTT five-state: connected -> ok; otherwise off when disabled in settings,
+      // down when enabled-but-unreachable, unknown when the enabled-state has not
+      // loaded yet (setData is empty until Settings is opened — never show a red
+      // fault for a not-yet-known integration on the first Home render).
+      var mqttKnown = Object.prototype.hasOwnProperty.call(setData, 'mqttenable');
+      var mqttEnabled = !mqttKnown || ('' + setData.mqttenable.value) === 'true';
+      CONN.mqtt.s = h.mqttconnected ? 'st-ok' : (!mqttKnown ? 'st-unknown' : (mqttEnabled ? 'st-down' : 'st-off'));
+      CONN.mqtt.detail = h.mqttconnected ? 'connected' : (!mqttKnown ? 'checking…' : (mqttEnabled ? 'not connected' : 'disabled in settings'));
       // NTP from ntpenable
       var ntpEnabled = (h.ntpenable === undefined) ? true : !!h.ntpenable;
       CONN.ntp.s = !ntpEnabled ? 'st-off' : 'st-ok';
@@ -913,10 +923,11 @@
     setLink('lk-boiler', 'fl-boiler', CONN.boiler.s); setDot('dot-boiler', CONN.boiler.s);
     setLink('lk-wifi', 'fl-wifi', CONN.wifi.s); setDot('dot-wifi', CONN.wifi.s);
     setLink('lk-mqtt', 'fl-mqtt', CONN.mqtt.s); setDot('dot-mqtt', CONN.mqtt.s);
-    setLink('lk-ws', 'fl-ws', CONN.ws.s);
+    setLink('lk-ws', 'fl-ws', CONN.ws.s); setDot('dot-ws', CONN.ws.s);
     setDot('dot-pic', CONN.ot.s);
-    var ts2 = document.getElementById('cnThermSub'); if (ts2) ts2.textContent = 'master · ' + connRecency(CONN.therm);
-    var bs = document.getElementById('cnBoilerSub'); if (bs) bs.textContent = 'slave · ' + connRecency(CONN.boiler);
+    function roleSub(role, c) { var r = connRecency(c); return r ? (role + ' · ' + r) : role; }
+    var ts2 = document.getElementById('cnThermSub'); if (ts2) ts2.textContent = roleSub('master', CONN.therm);
+    var bs = document.getElementById('cnBoilerSub'); if (bs) bs.textContent = roleSub('slave', CONN.boiler);
     var ps = document.getElementById('cnPicSub'); if (ps) ps.textContent = CONN.ot.name;
     var wf = document.getElementById('cnWifiSub'); if (wf) wf.textContent = connRssi !== null ? connRssi + ' dBm' : (CONN.wifi.detail || '—');
     var md = document.getElementById('cnModeTxt');
@@ -1024,7 +1035,9 @@
     satdeadband:     { cat: 'sat', label: 'Deadband', hint: '°C' },
     satheatingmode:  { cat: 'sat', label: 'Heating mode' },
     satmanufacturer: { cat: 'sat', label: 'Manufacturer' },
-    satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' }
+    satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
+    sathpcycle:      { cat: 'sat', label: 'Heat-pump min cycle', hint: 'Seconds (1800 = 2/hr, 2400 = 1.5/hr)' },
+    otdmode:         { cat: 'otd', label: 'OT-Direct mode' }
   };
   // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
   // normal toggle — never list it as an editable setting.
@@ -1342,7 +1355,12 @@
     boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (OTGW32)']],
     gpiooutputstriggerbit: [[0, 'Flame'], [1, 'CH active'], [2, 'DHW active'], [3, 'Fault']],
     webhooktriggerbit: [[0, 'Flame'], [1, 'CH active'], [2, 'DHW active'], [3, 'Fault']],
-    satheatingmode: [[0, 'Comfort'], [1, 'Eco']]
+    satheatingmode: [[0, 'Comfort'], [1, 'Eco']],
+    // OT-Direct gateway mode — labels from OTDirecttypes.h (NOT the mockup's
+    // Off/On-Off/PID list, which was a different, wrong concept).
+    otdmode: [[0, 'Bypass'], [1, 'Gateway'], [2, 'Monitor'], [3, 'Master'], [4, 'Loopback']],
+    // SAT manufacturer presets — labels from the firmware satManufacturerTable[].
+    satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']]
   };
 
   function fetchSeed() {
@@ -1513,7 +1531,11 @@
     connectWs();
     renderActive();
 
-    // Connectivity: poll device health for the strip + connection map.
+    // Connectivity: poll device health for the strip + connection map. Prefetch
+    // settings once so the connectivity model knows which integrations are disabled
+    // (MQTT off must read grey "Off", not a red "Disconnected", on the first Home
+    // render — setData is otherwise empty until the Settings page is opened).
+    fetchSettings();
     fetchConn();
     setInterval(fetchConn, 15000);
 
@@ -1539,8 +1561,11 @@
     });
     document.querySelectorAll('#mgraph .tchip').forEach(function (ch) {
       ch.addEventListener('click', function () {
+        // Parse the leading number + unit. indexOf('4') used to match the '4' in
+        // '24 h' and silently apply a 4 h window to the 24 h chip.
         var t = ch.textContent.toLowerCase();
-        graphWindowMs = t.indexOf('10') >= 0 ? 600000 : t.indexOf('4') >= 0 ? 14400000 : t.indexOf('24') >= 0 ? 86400000 : 3600000;
+        var n = parseInt(t, 10) || 1;
+        graphWindowMs = /min/.test(t) ? n * 60000 : n * 3600000;
         document.querySelectorAll('#mgraph .tchip').forEach(function (x) { x.classList.toggle('on', x === ch); });
         if (isMonitorVisible('mgraph')) renderGraph();
       });
