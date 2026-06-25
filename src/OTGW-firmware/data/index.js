@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.263
+**  Version  : v2.0.0-alpha.264
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -7218,6 +7218,10 @@ var translateFields = [
   , ["ethernetpresent", "Ethernet Hardware"]
   , ["ethernetlink", "Ethernet Link"]
   , ["ssid", "Wi-Fi Network (SSID)"]
+  , ["wifi_current_subnet", "Subnet Mask (current)"]
+  , ["wifi_current_gateway", "Default Gateway (current)"]
+  , ["wifi_current_dns1", "DNS Server 1 (current)"]
+  , ["wifi_current_dns2", "DNS Server 2 (current)"]
   , ["wifirssi", "Wi-Fi Signal Strength (dBm)"]
   , ["wifiquality", "Wi-Fi Quality (%)"]
   , ["wifiquality_text", "Wi-Fi Quality"]
