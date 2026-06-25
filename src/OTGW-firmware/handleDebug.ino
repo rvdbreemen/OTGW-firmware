@@ -315,7 +315,7 @@ void handleDebugChar(char c){
                 Debugln(F("  a) Send PR=A to identify PIC firmware version & type"));
                 Debugln(F("  s/S) Toggle OTGW serial-simulation replay"));
                 Debugln(F("  w) Trigger Open-Meteo weather fetch and dump state"));
-                Debugln(F("  z) Reset heap soak watermark + maxBlock histogram"));
+                Debugln(F("  z) Reset heap soak diagnostics (watermark, histogram, counters)"));
                 Debugln(F("--- GPIO / Misc ---"));
                 Debugln(F("  b) Blink LED 1 (5x)"));
                 Debugln(F("  i) Initialize relay outputs"));
@@ -478,7 +478,7 @@ void handleDebugChar(char c){
                 break;
             case 'z':
                 resetHeapWatermark();
-                DebugTln(F("Heap soak watermark + maxBlock histogram + pressure counters reset (min_free_heap is native, not reset)"));
+                DebugTln(F("Heap soak diagnostics reset (watermark + histogram + pressure counters; min_free_heap is native, not reset). Use from a healthy heap for accurate tier counts."));
                 break;
             default:
                 break;

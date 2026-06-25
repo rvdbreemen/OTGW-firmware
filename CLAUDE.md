@@ -319,7 +319,10 @@ heap-frag soak, TASK-934):
   `/maxblock_lt2k…ge16k`, `/max_loop_gap_ms` and the gating counters
   (`/drip_slowmode`, `/mqtt_drops`, `/ws_drops`, `/enter_*`). Telnet `z` zeroes the
   watermark/histogram/counters for a fresh window (`min_free_heap` is the native
-  ESP32 allocator watermark and is not resettable).
+  ESP32 allocator watermark and is not resettable). Press `z` from a healthy heap:
+  if reset mid-pressure, the tier-entry counters (`enter_*`) only resume counting
+  after the heap recovers to HEALTHY and re-enters the tier (they share
+  `getHeapHealth()`'s internal state, which the reset deliberately does not touch).
 
 ---
 
