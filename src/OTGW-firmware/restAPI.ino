@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.257
+**  Version  : v2.0.0-alpha.258
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1179,7 +1179,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
   //   POST /api/v2/sat/ble/forget   {mac}      — drop slot + clean up HA discovery
   //   POST /api/v2/sat/ble/rescan              — TASK-895: trigger an active-scan name burst
   else if (strcasecmp_P(sub, PSTR("ble")) == 0) {
-    if (wc < 6) { sendApiError(400, F("Missing BLE sub-action (discovery/select/label/forget/rescan)")); return; }
+    if (wc < 6) { sendApiError(400, F("Missing BLE sub-action (discovery/select/label/bindkey/forget/rescan)")); return; }
     const char* act = words[5];
 
     if (strcasecmp_P(act, PSTR("discovery")) == 0) {
@@ -1233,6 +1233,32 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       }
       if (!satBLERosterForget(macBuf)) {
         sendApiError(404, F("MAC not in roster"));
+        return;
+      }
+      webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
+    }
+    else if (strcasecmp_P(act, PSTR("bindkey")) == 0) {
+      // TASK-930 Phase 2: provision a roster slot's encrypted-MiBeacon bindkey.
+      // Body {"mac":"AA:..","key":"<32 hex>"} (empty key clears). Allocates a slot
+      // if the MAC is new (encrypted sensors cannot self-announce). The key is a
+      // SECRET: validated here, never logged, never echoed back.
+      if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+      if (!hasArgCompat(F("plain"))) { sendApiError(400, F("Missing JSON body")); return; }
+      char macBuf[18];
+      char keyBuf[40];
+      if (!satExtractTwoFields(argCompat(F("plain")),
+                                F("mac"), macBuf, sizeof(macBuf),
+                                F("key"), keyBuf, sizeof(keyBuf))) {
+        sendApiError(400, F("Missing 'mac' or 'key' field"));
+        return;
+      }
+      size_t kl = strlen(keyBuf);
+      if (kl != 0 && kl != 32) { sendApiError(400, F("bindkey must be empty or 32 hex chars")); return; }
+      for (size_t p = 0; p < kl; p++) {
+        if (!isxdigit((unsigned char)keyBuf[p])) { sendApiError(400, F("bindkey must be hex")); return; }
+      }
+      if (!satBLERosterSetBindkey(macBuf, keyBuf)) {
+        sendApiError(507, F("Roster full"));
         return;
       }
       webSend(200, F("application/json"), F("{\"status\":\"ok\"}"));
@@ -3570,9 +3596,10 @@ void postSettings()
     return;
   }
 
-  // Mask password fields in REST debug log
+  // Mask password fields in REST debug log (TASK-930: + per-slot MiBeacon bindkey secret)
   if (strcasecmp_P(field, PSTR("httppasswd")) == 0 ||
-      strcasecmp_P(field, PSTR("mqttpasswd")) == 0) {
+      strcasecmp_P(field, PSTR("mqttpasswd")) == 0 ||
+      strncasecmp_P(field, PSTR("satblebindkey"), 13) == 0) {
     RESTDebugTf(PSTR("--> field[%s] => newValue[***]\r\n"), field);
   } else {
     RESTDebugTf(PSTR("--> field[%s] => newValue[%s]\r\n"), field, newValue);

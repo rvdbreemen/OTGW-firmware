@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.257
+**  Version  : v2.0.0-alpha.258
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -529,6 +529,8 @@ struct SATSection {
   // (one of these 8 entries when set; kept for backward compatibility).
   char     sBleMac[SAT_BLE_MAX_ROSTER][18]   = {{0}};   // Known sensor MACs (uppercase AA:BB:..)
   char     sBleLabel[SAT_BLE_MAX_ROSTER][24] = {{0}};   // User-friendly names ("Woonkamer")
+  char     sBleBindkey[SAT_BLE_MAX_ROSTER][33] = {{0}}; // TASK-930 Phase 2: per-slot Xiaomi MiBeacon v4/v5 bindkey (32 lowercase hex + NUL; empty = none). SECRET — masked in REST GET + logs, like httppasswd.
   uint8_t  iBleRosterCount                   = 0;       // Count of populated slots
   static_assert(sizeof(sBleLabel[0]) <= 100, "label too long for settingStuff line buffer");
+  static_assert(sizeof(sBleBindkey[0]) == 33, "bindkey buffer must be 32 hex + NUL");
 };

@@ -146,7 +146,13 @@ Auto-discovery: every format-passing MAC enters the roster on first sight. The f
   - Parses BTHome v2 format (service data UUID 0xFCD2)
 
 - `parseBLEMiBeaconFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt): bool` (static)
-  - Parses plaintext Xiaomi MiBeacon format (service data UUID 0xFE95) for stock Mijia sensors (TASK-930 Phase 1; object TLV 0x1004/0x1006/0x100A/0x100D). Encrypted MiBeacon (frame-control bit 3) is skipped — deferred to a gated Phase 2 (AES-CCM + per-slot bindkey), see ADR-153.
+  - Parses plaintext Xiaomi MiBeacon format (service data UUID 0xFE95) for stock Mijia sensors (TASK-930 Phase 1; object TLV 0x1004/0x1006/0x100A/0x100D). See ADR-153.
+
+- `mibeaconDecryptInPlace(uint8_t* raw, size_t len, const char* bindkeyHex, const uint8_t addr6[6], size_t* plaintextLen): bool` (static)
+  - TASK-930 Phase 2: decrypts an encrypted MiBeacon v4/v5 frame (frame-control bit 3) via mbedtls AES-128-CCM using the slot's per-device bindkey, then hands the plaintext to `parseBLEMiBeaconFormat`. Recipe pinned by `scripts/test_mibeacon_decrypt.py`. See ADR-154.
+
+- `satBLERosterSetBindkey(const char* mac, const char* key): bool`
+  - Provisions a roster slot's MiBeacon bindkey (allocates the slot if the MAC is new). Backs `POST /api/v2/sat/ble/bindkey`. The key is a secret: validated, never logged/echoed; discovery exposes only `has_key`.
 
 - `SATBLEScanCallbacks::onResult(const NimBLEAdvertisedDevice*)`
   - NimBLE 2.x scan callback. Runs on the BLE host task; defers `flushSettings()` to the loop task so writes never happen from BLE context.

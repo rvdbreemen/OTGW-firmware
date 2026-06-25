@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.257
+**  Version  : v2.0.0-alpha.258
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -407,6 +407,11 @@ void writeSettings(bool show)
     escapeJsonStringTo(settings.sat.sBleLabel[i], cMsg, sizeof(cMsg));
     file.printf_P(PSTR("  \"SATblelabel%u\": \"%s\",\n"),
                   (unsigned)i, cMsg);
+    // TASK-930 Phase 2: per-slot MiBeacon bindkey (32 hex, no escaping needed).
+    // Persisted plaintext to settings.ini under the trusted-LAN model, like the
+    // MQTT/HTTP passwords; it is masked on the REST read path and in logs.
+    file.printf_P(PSTR("  \"SATblebindkey%u\": \"%s\",\n"),
+                  (unsigned)i, settings.sat.sBleBindkey[i]);
   }
   writeJsonIntKV(file, F("SATblerostercount"), settings.sat.iBleRosterCount, true);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
@@ -652,8 +657,10 @@ void readSettings(bool show)
 void updateSetting(const char *field, const char *newValue)
 { //do not just trust the caller to do the right thing, server side validation is here!
   // Mask password fields in debug log to avoid leaking credentials
+  // (TASK-930: + per-slot MiBeacon bindkey secret, SATblebindkeyN)
   if (strcasecmp_P(field, PSTR("httppasswd")) == 0 ||
-      strcasecmp_P(field, PSTR("MQTTpasswd")) == 0) {
+      strcasecmp_P(field, PSTR("MQTTpasswd")) == 0 ||
+      strncasecmp_P(field, PSTR("SATblebindkey"), 13) == 0) {
     DebugTf(PSTR("-> field[%s], newValue[***]\r\n"), field);
   } else {
     DebugTf(PSTR("-> field[%s], newValue[%s]\r\n"), field, newValue);
@@ -1108,6 +1115,26 @@ void updateSetting(const char *field, const char *newValue)
     int idx = atoi(field + 11);
     if (idx >= 0 && idx < SAT_BLE_MAX_ROSTER) {
       strlcpy(settings.sat.sBleLabel[idx], newValue, sizeof(settings.sat.sBleLabel[idx]));
+    }
+  }
+  // TASK-930 Phase 2: per-slot MiBeacon bindkey. Accept empty (clear) or EXACTLY
+  // 32 hex chars; store lowercase. Malformed input is ignored (slot unchanged).
+  // No 9/11-char prefix collision with SATblemac/SATblelabel (differ at index 6).
+  else if (strncasecmp_P(field, PSTR("SATblebindkey"), 13) == 0 && isdigit((unsigned char)field[13])) {
+    int idx = atoi(field + 13);
+    if (idx >= 0 && idx < SAT_BLE_MAX_ROSTER) {
+      size_t n = strlen(newValue);
+      bool ok = (n == 0);
+      if (n == 32) {
+        ok = true;
+        for (size_t p = 0; p < 32; p++) { if (!isxdigit((unsigned char)newValue[p])) { ok = false; break; } }
+      }
+      if (ok) {
+        strlcpy(settings.sat.sBleBindkey[idx], newValue, sizeof(settings.sat.sBleBindkey[idx]));
+        for (int p = 0; settings.sat.sBleBindkey[idx][p]; p++) {
+          settings.sat.sBleBindkey[idx][p] = tolower((unsigned char)settings.sat.sBleBindkey[idx][p]);
+        }
+      }
     }
   }
   else if (strcasecmp_P(field, PSTR("SATblerostercount")) == 0) {

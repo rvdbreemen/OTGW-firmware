@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-24 22:54'
-updated_date: '2026-06-24 23:01'
+updated_date: '2026-06-25 04:24'
 labels: []
 dependencies: []
 ordinal: 144000
@@ -21,11 +21,11 @@ Path A from the 2026-06-25 BLE validation: the SATble passive-scan parser curren
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Phase 1: a new parse branch for Xiaomi MiBeacon service-data UUID (0xFE95) is added in the BLE scan onResult callback AFTER the ATC(0x181A) and BTHome(0xFCD2) branches, feeding the same bleFindOrAllocSlot roster path (temp/hum/battery/rssi), so a stock unencrypted Mijia sensor auto-populates a roster slot exactly like ATC/BTHome
-- [ ] #2 Phase 1: MiBeacon object-id TLV decoder handles the temp/hum/battery objects (0x1004,0x1006,0x100A,0x100D) for UNENCRYPTED frames; frames flagged encrypted are skipped without crashing when no key is present (mirror the existing BTHome encrypted-skip behaviour), using memcmp_P for binary compares (never strncmp_P/strstr_P on binary)
-- [ ] #3 Coding discipline: PROGMEM for all literals (F()/PSTR()/snprintf_P), no String in the hot scan path (ADR-004), feedWatchDog() in any added loop; builds green for esp32 and esp32-classic targets; python evaluate.py --quick shows no new failures
+- [x] #1 Phase 1: a new parse branch for Xiaomi MiBeacon service-data UUID (0xFE95) is added in the BLE scan onResult callback AFTER the ATC(0x181A) and BTHome(0xFCD2) branches, feeding the same bleFindOrAllocSlot roster path (temp/hum/battery/rssi), so a stock unencrypted Mijia sensor auto-populates a roster slot exactly like ATC/BTHome
+- [x] #2 Phase 1: MiBeacon object-id TLV decoder handles the temp/hum/battery objects (0x1004,0x1006,0x100A,0x100D) for UNENCRYPTED frames; frames flagged encrypted are skipped without crashing when no key is present (mirror the existing BTHome encrypted-skip behaviour), using memcmp_P for binary compares (never strncmp_P/strstr_P on binary)
+- [x] #3 Coding discipline: PROGMEM for all literals (F()/PSTR()/snprintf_P), no String in the hot scan path (ADR-004), feedWatchDog() in any added loop; builds green for esp32 and esp32-classic targets; python evaluate.py --quick shows no new failures
 - [ ] #4 Phase 2 (only if the plan approves it): encrypted v4/v5 MiBeacon via mbedtls AES-CCM; a per-roster-slot bindkey setting (e.g. settings.sat.sBleBindkey[slot], 32-hex/16-byte) with serializer round-trip, REST surface, and a UI field; nonce + AAD constructed per the MiBeacon spec; packet-size validation mirrors ESPHome xiaomi_ble.cpp
-- [ ] #5 An ADR is drafted (Proposed) covering the architectural additions: a new advertised-format supported (MiBeacon/0xFE95) and, if Phase 2 is in scope, the new mbedtls AES-CCM crypto dependency + per-sensor secret (bindkey) storage in settings. SATble.ino header comment + the BLE-related doc updated to list 0xFE95 support
+- [x] #5 An ADR is drafted (Proposed) covering the architectural additions: a new advertised-format supported (MiBeacon/0xFE95) and, if Phase 2 is in scope, the new mbedtls AES-CCM crypto dependency + per-sensor secret (bindkey) storage in settings. SATble.ino header comment + the BLE-related doc updated to list 0xFE95 support
 - [ ] #6 Field validation (hardware, user-gated): a real stock Xiaomi sensor (e.g. LYWSD03MMC stock or MJ_HT_V1) appears in /api/v2/sat/ble/discovery with correct temp/hum, on the live OTGW32
 <!-- AC:END -->
 
@@ -76,3 +76,9 @@ Draft a Proposed ADR at implementation: new advertised BLE format supported (MiB
 - mbedtls first use in this firmware - verify link on both esp32 targets.
 - ble_monitor truncates 0x1006 hum to int for the LYWSD03MMC variant; general rule /10.0.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Phase 1 landed: e19aea63 (alpha.257). parseBLEMiBeaconFormat (plaintext 0xFE95, TLV 0x1004/0x1006/0x100A/0x100D, encrypted-bit3 skip, bounds-checked) + onResult fallthrough after BTHome. Builds green esp32 + esp32-classic; evaluate --quick 0 failed (98.7%). Adversarially reviewed; added the capability sub-field bound. ADR-153 (Proposed) + c4-code-sat + SATble header updated. AC4 (Phase 2 encrypted AES-CCM + per-slot bindkey) deferred per the approved plan, gated on maintainer go. AC6 (real stock Mijia in roster) is hardware/field-gated -> In Review. Note: device 192.168.88.39 currently has only ATC sensors (3) in range; needs a stock Mijia advertising plaintext MiBeacon to field-verify.
+<!-- SECTION:NOTES:END -->

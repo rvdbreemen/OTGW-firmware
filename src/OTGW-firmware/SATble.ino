@@ -9,7 +9,8 @@
 **
 **  Scans for BLE advertisements from common temperature/humidity sensors
 **  (Xiaomi LYWSD03MMC with ATC/pvvx custom firmware, BTHome v2 protocol, and
-**  plaintext Xiaomi MiBeacon 0xFE95 for stock Mijia sensors — TASK-930 Phase 1).
+**  Xiaomi MiBeacon 0xFE95 for stock Mijia sensors — plaintext (TASK-930 Phase 1)
+**  and encrypted v4/v5 via a per-slot AES-CCM bindkey (TASK-930 Phase 2, ADR-154)).
 **  Provides room temperature input for SAT control loop.
 **
 **  TASK-487 / ADR-092: built on NimBLE-Arduino 2.x rather than the classic
@@ -25,6 +26,7 @@
 #if HAS_SAT_BLE
 
 #include <NimBLEDevice.h>
+#include <mbedtls/ccm.h>   // TASK-930 Phase 2: AES-CCM for encrypted Xiaomi MiBeacon v4/v5
 
 // --- Switchable debug-trace macros (telnet key '7' toggles state.debug.bSATBLE) ---
 // Init meldingen blijven ongewrapt zodat boot-time visibility behouden blijft.
@@ -146,6 +148,11 @@ static portMUX_TYPE _bleSensorsMux = portMUX_INITIALIZER_UNLOCKED;
 static bool parseBLEAtcFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);
 static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);
 static bool parseBLEMiBeaconFormat(const uint8_t* data, size_t len, float* temp, float* hum, uint8_t* batt);  // TASK-930
+// TASK-930 Phase 2 (encrypted MiBeacon):
+static int  satBleHexNib(char c);
+static bool satBleParseMacToOnAir(const char* macStr, uint8_t out6[6]);
+static bool mibeaconDecryptInPlace(uint8_t* raw, size_t len, const char* bindkeyHex, const uint8_t addr6[6], size_t* plaintextLen);
+bool        satBLERosterSetBindkey(const char* mac, const char* key);  // called from restAPI.ino
 static int  bleFindOrAllocSlot(const char* mac);
 static bool bleMatchesConfiguredMAC(const char* mac);
 static bool bleNameConfirmedMismatch(const char* name);  // TASK-895
@@ -237,6 +244,85 @@ static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, f
   }
   (void)gotHum;  // humidity is optional
   return gotTemp;
+}
+
+//=====================================================================
+// TASK-930 Phase 2: MiBeacon AES-CCM helpers (encrypted v4/v5).
+// Recipe verified against the xiaomi-ble known-answer vector
+// (test_Xiaomi_LYWSD03MMC_encrypted): nonce(12) = on-air MAC(6) +
+// raw[2..5] (product-id 2 + counter 1) + ext-counter(3 @ len-7);
+// AAD = {0x11}; AES-128-CCM with a 4-byte tag; ciphertext geometry by
+// total size (19 -> @5 len 7; 22-24 -> @11 len size-18). The on-air MAC
+// is the BLE source address in LSB-first order. See ADR-154.
+//=====================================================================
+static int satBleHexNib(char c) {
+  if (c >= '0' && c <= '9') return c - '0';
+  c = (char)(c | 0x20);
+  if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+  return -1;
+}
+
+// Parse "AA:BB:CC:DD:EE:FF" (display, MSB-first) into out6 in BLE on-air
+// LSB-first order (FF EE DD CC BB AA) — the byte order the CCM nonce wants.
+static bool satBleParseMacToOnAir(const char* macStr, uint8_t out6[6]) {
+  if (!macStr) return false;
+  uint8_t msb[6];
+  for (int i = 0; i < 6; i++) {
+    int hi = satBleHexNib(macStr[i * 3]);
+    int lo = satBleHexNib(macStr[i * 3 + 1]);
+    if (hi < 0 || lo < 0) return false;
+    if (i < 5 && macStr[i * 3 + 2] != ':') return false;
+    msb[i] = (uint8_t)((hi << 4) | lo);
+  }
+  for (int i = 0; i < 6; i++) out6[i] = msb[5 - i];
+  return true;
+}
+
+// Decrypt an encrypted MiBeacon frame in place: overwrites the ciphertext
+// region with the plaintext object-TLV bytes and clears the encryption bit,
+// so the plaintext walker (parseBLEMiBeaconFormat) can read it. *plaintextLen
+// is set to the index just past the plaintext objects so the walker does not
+// run into the trailing counter+tag. Returns false on bad size, bad key, or
+// CCM auth failure (wrong bindkey — a wrong key cannot forge a valid tag).
+static bool mibeaconDecryptInPlace(uint8_t* raw, size_t len, const char* bindkeyHex,
+                                   const uint8_t addr6[6], size_t* plaintextLen) {
+  if (!(len == 19 || (len >= 22 && len <= 24))) return false;
+  if (!bindkeyHex || strlen(bindkeyHex) != 32) return false;
+  uint8_t key[16];
+  for (int i = 0; i < 16; i++) {
+    int hi = satBleHexNib(bindkeyHex[i * 2]);
+    int lo = satBleHexNib(bindkeyHex[i * 2 + 1]);
+    if (hi < 0 || lo < 0) return false;
+    key[i] = (uint8_t)((hi << 4) | lo);
+  }
+  size_t cipherPos = (len == 19) ? 5 : 11;
+  size_t dataSize  = (len == 19) ? 7 : (len - 18);
+  uint8_t nonce[12];
+  memcpy(nonce,     addr6,           6);    // on-air MAC
+  memcpy(nonce + 6, raw + 2,         3);    // product id (2) + frame counter (1)
+  memcpy(nonce + 9, raw + (len - 7), 3);    // 3-byte extended counter (precedes the tag)
+  const uint8_t aad  = 0x11;
+  const uint8_t* tag = raw + (len - 4);
+  uint8_t pt[16];
+  if (dataSize > sizeof(pt)) return false;
+
+  mbedtls_ccm_context ctx;
+  mbedtls_ccm_init(&ctx);
+  bool ok = false;
+  if (mbedtls_ccm_setkey(&ctx, MBEDTLS_CIPHER_ID_AES, key, 128) == 0) {
+    ok = (mbedtls_ccm_auth_decrypt(&ctx, dataSize,
+                                   nonce, sizeof(nonce),
+                                   &aad, 1,
+                                   raw + cipherPos, pt,
+                                   tag, 4) == 0);
+  }
+  mbedtls_ccm_free(&ctx);
+  if (!ok) return false;
+
+  memcpy(raw + cipherPos, pt, dataSize);    // ciphertext -> plaintext objects
+  raw[0] &= (uint8_t)~0x08;                 // clear the encryption bit
+  *plaintextLen = cipherPos + dataSize;     // bound the TLV walk to the plaintext
+  return true;
 }
 
 //=====================================================================
@@ -407,11 +493,32 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
     }
 
     // TASK-930: fall through to Xiaomi MiBeacon (UUID 0xFE95) if BTHome didn't match.
+    // Plaintext frames parse directly; encrypted frames (frame-control bit 3) are
+    // decrypted first with the per-slot bindkey (provisioned via /sat/ble/bindkey).
     if (!parsed) {
       std::string mibData = dev->getServiceData(NimBLEUUID((uint16_t)MIBEACON_SERVICE_UUID_16));
-      if (mibData.length() >= 5) {
-        parsed = parseBLEMiBeaconFormat(reinterpret_cast<const uint8_t*>(mibData.data()),
-                                        mibData.length(), &temp, &hum, &batt);
+      size_t mlen = mibData.length();
+      if (mlen >= 5) {
+        const uint8_t* md = reinterpret_cast<const uint8_t*>(mibData.data());
+        uint16_t mfc = (uint16_t)(md[0] | (md[1] << 8));
+        if (mfc & 0x0008) {                       // encrypted (Phase 2)
+          char encMac[18];
+          strlcpy(encMac, dev->getAddress().toString().c_str(), sizeof(encMac));
+          for (int i = 0; encMac[i]; i++) encMac[i] = toupper((unsigned char)encMac[i]);
+          int kslot = satBLERosterFindSlot(encMac);
+          if (kslot >= 0 && settings.sat.sBleBindkey[kslot][0] != '\0' && mlen <= 24) {
+            uint8_t buf[24];
+            memcpy(buf, md, mlen);
+            uint8_t addr6[6];
+            size_t ptLen = 0;
+            if (satBleParseMacToOnAir(encMac, addr6) &&
+                mibeaconDecryptInPlace(buf, mlen, settings.sat.sBleBindkey[kslot], addr6, &ptLen)) {
+              parsed = parseBLEMiBeaconFormat(buf, ptLen, &temp, &hum, &batt);
+            }
+          }
+        } else {                                  // plaintext (Phase 1)
+          parsed = parseBLEMiBeaconFormat(md, mlen, &temp, &hum, &batt);
+        }
       }
     }
 
@@ -985,6 +1092,7 @@ void satBLERosterSendJSON()
       je.field(F("slot"),     (int32_t)i);
       je.field(F("mac"),      settings.sat.sBleMac[i]);
       je.field(F("label"),    settings.sat.sBleLabel[i]);
+      je.field(F("has_key"),  settings.sat.sBleBindkey[i][0] != '\0');  // TASK-930: bindkey present? (never expose the key itself)
       je.field(F("name"),     snap.sName);          // TASK-895: advertised BLE name (runtime)
       je.field(F("temp"),     snap.fTemperature);
       je.field(F("hum"),      snap.fHumidity);
@@ -1052,6 +1160,33 @@ bool satBLERosterSetLabel(const char* mac, const char* label)
   return true;
 }
 
+// TASK-930 Phase 2: set (or clear) a roster slot's MiBeacon bindkey.
+// Unlike label/select, this ALLOCATES a slot for a not-yet-seen MAC, because an
+// encrypted sensor cannot self-announce into the roster until it has a key — the
+// user provisions MAC + bindkey together (both come from the pvvx/Xiaomi-cloud
+// tooling). Pass an empty key to clear. settingStuff validates empty|32-hex and
+// lowercases. Returns false only if the roster is full (and the MAC is new).
+bool satBLERosterSetBindkey(const char* mac, const char* key)
+{
+  if (!mac || !mac[0] || !key) return false;
+  char macUp[18];
+  strlcpy(macUp, mac, sizeof(macUp));
+  for (int i = 0; macUp[i]; i++) macUp[i] = toupper((unsigned char)macUp[i]);
+
+  int slot = satBLERosterFindSlot(macUp);
+  if (slot < 0) {
+    slot = bleFindOrAllocSlot(macUp);     // provision a new slot
+    if (slot < 0) return false;           // roster full
+    char k[20];
+    snprintf_P(k, sizeof(k), PSTR("SATblemac%d"), slot);
+    updateSetting(k, macUp);
+  }
+  char k[24];
+  snprintf_P(k, sizeof(k), PSTR("SATblebindkey%d"), slot);
+  updateSetting(k, key);                  // validated + lowercased in updateSetting
+  return true;
+}
+
 // Drop a roster slot — clears persistent fields and runtime data.
 // If the forgotten MAC was the active selection, also clears sBleMAC
 // AND wipes its retained HA-discovery configs (Block C extension).
@@ -1088,10 +1223,12 @@ bool satBLERosterForget(const char* mac)
   }
 
   // Clear persistent slot fields via updateSetting (settings.ini flush).
-  char keyBuf[20];
+  char keyBuf[24];
   snprintf_P(keyBuf, sizeof(keyBuf), PSTR("SATblemac%d"), slot);
   updateSetting(keyBuf, "");
   snprintf_P(keyBuf, sizeof(keyBuf), PSTR("SATblelabel%d"), slot);
+  updateSetting(keyBuf, "");
+  snprintf_P(keyBuf, sizeof(keyBuf), PSTR("SATblebindkey%d"), slot);  // TASK-930 Phase 2
   updateSetting(keyBuf, "");
 
   if (isSelected) {
