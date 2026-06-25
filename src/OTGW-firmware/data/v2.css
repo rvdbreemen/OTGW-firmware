@@ -272,6 +272,9 @@
   .mcellq.sel{outline:3px solid var(--needle);outline-offset:1px;z-index:2;color:var(--text)}
   .supwrap{display:grid;grid-template-columns:1fr 312px;gap:14px;align-items:start}
   @media(max-width:899px){.supwrap{grid-template-columns:1fr}}
+  /* 16 columns × ~17px cells are below the 24px AA tap target on a phone.
+     Halve to 8 columns ≤719px → ~37px cells, still a glanceable heatmap (TASK-932). */
+  @media(max-width:719px){.matrix{grid-template-columns:repeat(8,1fr)}}
   .supdetail{position:sticky;top:12px;background:var(--panel);border:1px solid var(--border);
     border-radius:14px;box-shadow:var(--shadow);padding:16px;border-top:4px solid var(--s,var(--border))}
   .supdetail .sd-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
@@ -369,11 +372,22 @@
     pointer-events:none;z-index:9}
   .toast.show{opacity:1}
   @media(max-width:899px){
-    .set-cards{grid-template-columns:1fr}
+    /* .set-cards is CSS multi-column (columns:300px); a grid-template-columns
+       rule here is a no-op — removed (TASK-932). The 300px column already
+       collapses to one column on a phone. */
     .set-layout{grid-template-columns:1fr}
     .set-rail{position:static;flex-direction:row;overflow-x:auto;gap:6px}
     .rail-item{white-space:nowrap;padding:9px 13px}
     .rail-item .cnt{display:none}
+    /* iOS Safari auto-zooms the page when a focused input renders <16px.
+       Pin form fields to 16px on narrow screens (TASK-932 mobile review). */
+    .srow input[type=text],.srow input[type=number],.srow input[type=password],
+    .srow select,.set-search{font-size:16px}
+    /* Long values (webhook URL, timezone) clipped at 46%/220px on a phone.
+       Wrap the row so the input drops full-width under its label. */
+    .srow{flex-wrap:wrap}
+    .srow input[type=text],.srow input[type=number],.srow input[type=password],
+    .srow select{width:100%;max-width:none}
   }
 
   /* ================= CONNECTIVITY ================= */
@@ -429,3 +443,12 @@
   .connrow .exp{font-size:.78rem;color:var(--muted);margin-top:4px}
   .connrow .fix{font-size:.78rem;color:var(--zone-alert);margin-top:4px;font-weight:600}
   .connrow .seen{font-size:.7rem;color:var(--muted);white-space:nowrap}
+
+  /* ================= TASK-932 mobile review: tap targets + readability ≤719px ================= */
+  @media(max-width:719px){
+    /* lift sub-44px controls to the 44px comfortable touch target */
+    .connpill,.seg2btn,.cchip,.tbtn,.theme-toggle{min-height:44px}
+    /* bump the smallest labels for phone readability */
+    .ble-tag{font-size:.66rem}
+    .mc-cell .lbl{font-size:.68rem}
+  }
