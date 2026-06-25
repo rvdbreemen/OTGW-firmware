@@ -54,7 +54,7 @@ struct MQTTSettingsSection {
   bool    bEnable          = true;
   bool    bSecure          = false;
   char    sBroker[65]      = "homeassistant.local";
-  int16_t iBrokerPort      = 1883;
+  uint16_t iBrokerPort     = 1883;
   char    sUser[41]        = "";
   char    sPasswd[41]      = "";
   char    sHaprefix[41]    = HOME_ASSISTANT_DISCOVERY_PREFIX;

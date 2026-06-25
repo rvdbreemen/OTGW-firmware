@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Flashtypes.h
-**  Version  : v2.0.0-alpha.260
+**  Version  : v2.0.0-alpha.262
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
