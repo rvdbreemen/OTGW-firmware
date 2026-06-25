@@ -286,6 +286,43 @@ wipe the affected `.pio/build/<env>` dir and rebuild solo to recover.
 
 ---
 
+## Test automation (on-device / soak)
+
+End-to-end loop for firmware changes that need on-device validation (e.g. the
+heap-frag soak, TASK-934):
+
+- **Build (canonical):** `python build.py --target esp32` (or `./build.sh` /
+  `build.bat`) — builds firmware + filesystem and bootstraps its own venv, so it
+  is immune to the host Python version.
+- **Build (direct pio) gotcha:** `python -m platformio run -e esp32` fails if the
+  host Python is 3.14+ (the espressif32 platform requires 3.10–3.13: *"Python
+  version must be between 3.10 and 3.13"*). Invoke pio via its own penv instead:
+  `~/.platformio/penv/Scripts/python.exe -m platformio run -e esp32`
+  (firmware) and `... -e esp32 -t buildfs` (LittleFS).
+- **Fresh worktree:** run `git submodule update --init --recursive` before the
+  first build — git worktrees do NOT populate submodule working trees, so
+  `SimpleTelnet` (AsyncSimpleTelnet.h) and `OpenTherm` are missing otherwise and
+  the sketch fails with *"No such file or directory"*.
+- **Static gates:** `python evaluate.py` (full) / `--quick`. Exit 0 = pass, 1 =
+  FAIL, 2 = WARN>5. NOT run by build.py — run it separately. Gate unit tests:
+  `python tests/test_evaluate.py` (stdlib unittest, no pytest).
+- **Flash:** `flash_otgw.bat --board esp32` (auto-detects the S3 over USB
+  VID/PID 303A:1001; `--port COMx` to force). esptool-only — works on any Python.
+- **Load (fragmenting):** `python scripts/sat_boiler_emulator.py --host <ip>` for
+  synthetic OT traffic; combine with concurrent Web UI polling + MQTT discovery
+  republish to exercise heap pressure.
+- **Capture / soak:** `scripts/capture-mqtt-debug.bat -DeviceHost <ip> -BrokerHost
+  <ip> -DurationSeconds <N> -Topic "otgw-firmware/stats/#"` → one merged
+  transcript (telnet debug + MQTT stream + browser devtools + crashlog + HTTP
+  probes).
+- **Heap soak (TASK-934):** watch `otgw-firmware/stats/min_max_block`,
+  `/maxblock_lt2k…ge16k`, `/max_loop_gap_ms` and the gating counters
+  (`/drip_slowmode`, `/mqtt_drops`, `/ws_drops`, `/enter_*`). Telnet `z` zeroes the
+  watermark/histogram/counters for a fresh window (`min_free_heap` is the native
+  ESP32 allocator watermark and is not resettable).
+
+---
+
 ## Important Constraints
 
 - Never write to `Serial` after OTGW init (it's the PIC serial link)
