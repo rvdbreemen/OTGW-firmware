@@ -188,6 +188,14 @@ static void dumpDebugInfo() {
     Debugf(PSTR("entered_critical: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredCriticalCount);
     Debugf(PSTR("drip_slow_mode: %lu\r\n"), (unsigned long)state.heapdiag.iDripSlowModeCount);
     Debugf(PSTR("max_loop_gap_ms: %lu\r\n"), (unsigned long)state.heapdiag.iMaxLoopGapMs);
+    Debugf(PSTR("min_max_block: %lu\r\n"), (unsigned long)state.heapdiag.iMinMaxBlock);
+    Debugf(PSTR("min_free_heap: %lu\r\n"), (unsigned long)getMinFreeHeap());
+    Debugf(PSTR("maxblock_hist <2k/<4k/<8k/<16k/>=16k: %lu/%lu/%lu/%lu/%lu\r\n"),
+      (unsigned long)state.heapdiag.aMaxBlockBucket[0],
+      (unsigned long)state.heapdiag.aMaxBlockBucket[1],
+      (unsigned long)state.heapdiag.aMaxBlockBucket[2],
+      (unsigned long)state.heapdiag.aMaxBlockBucket[3],
+      (unsigned long)state.heapdiag.aMaxBlockBucket[4]);
 
     Debugln(F("[state.discovery]"));
     Debugf(PSTR("published_topics: %lu\r\n"), (unsigned long)state.discovery.iPublishedTopicCount);
@@ -307,6 +315,7 @@ void handleDebugChar(char c){
                 Debugln(F("  a) Send PR=A to identify PIC firmware version & type"));
                 Debugln(F("  s/S) Toggle OTGW serial-simulation replay"));
                 Debugln(F("  w) Trigger Open-Meteo weather fetch and dump state"));
+                Debugln(F("  z) Reset heap soak watermark + maxBlock histogram"));
                 Debugln(F("--- GPIO / Misc ---"));
                 Debugln(F("  b) Blink LED 1 (5x)"));
                 Debugln(F("  i) Initialize relay outputs"));
@@ -466,6 +475,10 @@ void handleDebugChar(char c){
                 break;
             case 'w':
                 weatherFetchOpenMeteoNow();
+                break;
+            case 'z':
+                resetHeapWatermark();
+                DebugTln(F("Heap soak watermark + maxBlock histogram + pressure counters reset (min_free_heap is native, not reset)"));
                 break;
             default:
                 break;

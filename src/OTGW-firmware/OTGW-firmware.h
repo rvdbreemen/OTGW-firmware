@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.266
+**  Version  : v2.0.0-alpha.268
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -437,13 +437,14 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 };
 
 // NOTE: this struct is NOT authoritative for the retained otgw-firmware/stats/*
-// MQTT topics. sendMQTTheapdiag() publishes 17 individual retained topics: 8
-// sourced from this struct, 3 live values (ESP.getFreeHeap / getMaxFreeBlockSize
-// / getHeapFragmentation), and 6 from state.discovery (verify_runs /
-// republish_triggered / last_missing / last_orphan / published_topics /
-// last_verify_epoch). Adding a field here does NOT automatically surface on MQTT
-// — add a corresponding publishStatU32(F("otgw-firmware/stats/...")) call in
-// sendMQTTheapdiag().
+// MQTT topics. sendMQTTheapdiag() publishes 25 individual retained topics: 8
+// cumulative counters + 3 soak watermarks (min_max_block, min_free_heap,
+// max_loop_gap_ms) + 5 maxBlock histogram buckets sourced from this struct (16
+// total), 3 live values (free_heap / max_block / frag_pct), and 6 from
+// state.discovery (verify_runs / republish_triggered / last_missing /
+// last_orphan / published_topics / last_verify_epoch). Adding a field here does
+// NOT automatically surface on MQTT — add a corresponding
+// publishStatU32(F("otgw-firmware/stats/...")) call in sendMQTTheapdiag().
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
   uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
