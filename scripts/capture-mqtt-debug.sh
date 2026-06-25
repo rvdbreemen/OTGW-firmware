@@ -27,6 +27,11 @@ SKIP_BROWSER_CAPTURE=0
 BROWSER_URL=""
 BROWSER_DEBUG_PORT=9222
 BROWSER_PATH=""
+SKIP_HTTP_PROBES=0
+HTTP_PROBE_TIMEOUT_SECONDS=10
+SKIP_CRASHLOG_CAPTURE=0
+CRASHLOG_URL=""
+CRASHLOG_POLL_SECONDS=30
 NO_PROMPT=0
 
 RUN_PATH=""
@@ -35,11 +40,17 @@ TELNET_LOG=""
 MQTT_LOG=""
 MQTT_ERR_LOG=""
 BROWSER_LOG=""
+BROWSER_ERR_LOG=""
+CRASHLOG_LOG=""
+HTTP_PROBE_LOG=""
+TOOL_ERROR_LOG=""
+SCRIPT_ERROR_LOG=""
 TRANSCRIPT=""
 STOP_FILE=""
 MQTT_PID=""
 TELNET_PID=""
 BROWSER_PID=""
+CRASHLOG_PID=""
 BROWSER_PROFILE=""
 CLEANED_UP=0
 CAPTURE_STOP_REASON=""
@@ -72,11 +83,26 @@ Telnet options:
 
 Browser DevTools capture:
   Enabled by default when Chrome or Edge can be found. It records console output,
-  exceptions, resource failures, and network timings to browser.log.
+  exceptions, resource failures, and network timings to browser.log. Browser
+  stderr is captured in browser.stderr.log and merged into the transcript.
   --skip-browser-capture                  Disable browser capture
   --browser-url <url>                     Page to load, default http://<device>/
   --browser-debug-port <port>             CDP port, default 9222; auto-bumped if busy
   --browser-path <path>                   Explicit Chrome/Edge executable path
+
+Crash-log capture:
+  Enabled by default. Polls http://<device>/api/v2/device/crashlog and
+  /reboot_log.txt into crashlog.log so decoded ESP exceptions survive reboot
+  loops. Devices without the endpoint log HTTP status/failure and continue.
+  --skip-crashlog-capture                 Disable crash-log polling
+  --crashlog-url <url>                    Override crash-log endpoint
+  --crashlog-poll-seconds <n>             Poll interval, default 30, range 5-3600
+
+HTTP probes:
+  After capture stops, the script probes the root page and key REST endpoints
+  with per-request timeouts and writes status/timing/size to curl-probes.log.
+  --skip-http-probes                      Disable post-capture HTTP probes
+  --http-probe-timeout-seconds <n>        Per-request timeout, default 10, range 1-60
 
 Stop:
   Press Q to stop cleanly and create:
@@ -90,7 +116,15 @@ Telnet debug logging:
 
 Aliases:
   Windows-style aliases are accepted, for example -DeviceHost, -BrokerHost,
-  -DurationSeconds, -MosquittoSubPath, and -SkipBrowserCapture.
+  -DurationSeconds, -MosquittoSubPath, -SkipBrowserCapture, and
+  -SkipCrashlogCapture.
+
+Examples:
+  ./capture-mqtt-debug.sh
+  ./capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --duration 120
+  ./capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --user mqttuser
+  ./capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --skip-browser-capture
+  ./capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --topic '#'
 
 Security:
   Supplying --password can expose the password in the process list while the
@@ -266,6 +300,61 @@ find_browser() {
   return 1
 }
 
+cat_redacted() {
+  local file="$1"
+
+  "$PYTHON" - "$file" <<'PY'
+import re
+import sys
+
+path = sys.argv[1]
+patterns = [
+    re.compile(r"(?i)((?:password|passwd|mqttpasswd|mqtt_password|mqtpassword|token|secret|api[_-]?key)\s*[:=]\s*)('([^']*)'|\"([^\"]*)\"|[^,\s}]+)"),
+    re.compile(r"(?i)((?:-P|--password)\s+)(\S+)"),
+]
+
+try:
+    with open(path, "r", encoding="utf-8", errors="replace") as handle:
+        for line in handle:
+            redacted = line
+            for pattern in patterns:
+                redacted = pattern.sub(r"\1[REDACTED]", redacted)
+            sys.stdout.write(redacted)
+except OSError as exc:
+    print(f"(could not read: {exc})")
+PY
+}
+
+create_tool_error_log() {
+  {
+    echo "OTGW capture - tool stderr and script errors"
+    echo "Generated: $(timestamp)"
+    echo "Run folder: $RUN_PATH"
+    echo
+
+    for item in \
+      "SCRIPT / CAPTURE ERRORS (script.error.log)|$SCRIPT_ERROR_LOG" \
+      "MQTT STDERR (mqtt.stderr.log)|$MQTT_ERR_LOG" \
+      "BROWSER STDERR (browser.stderr.log)|$BROWSER_ERR_LOG"; do
+      local title="${item%%|*}"
+      local file="${item#*|}"
+      echo "============================================================"
+      echo "=== $title"
+      echo "============================================================"
+      if [[ -f "$file" ]]; then
+        if [[ -s "$file" ]]; then
+          cat_redacted "$file"
+        else
+          echo "(empty)"
+        fi
+      else
+        echo "(not present)"
+      fi
+      echo
+    done
+  } > "$TOOL_ERROR_LOG"
+}
+
 merge_transcript() {
   local temp_transcript="$TRANSCRIPT.tmp"
 
@@ -278,17 +367,21 @@ merge_transcript() {
 
     for item in \
       "SUMMARY (summary.txt)|$SUMMARY_LOG" \
+      "TOOL ERRORS (error.txt)|$TOOL_ERROR_LOG" \
       "OTGW TELNET DEBUG (telnet.log)|$TELNET_LOG" \
       "MQTT BROKER STREAM (mqtt.log)|$MQTT_LOG" \
       "MQTT STDERR (mqtt.stderr.log)|$MQTT_ERR_LOG" \
-      "BROWSER DEVTOOLS (browser.log)|$BROWSER_LOG"; do
+      "BROWSER DEVTOOLS (browser.log)|$BROWSER_LOG" \
+      "BROWSER STDERR (browser.stderr.log)|$BROWSER_ERR_LOG" \
+      "DEVICE CRASH LOG (crashlog.log)|$CRASHLOG_LOG" \
+      "HTTP PROBES (curl-probes.log)|$HTTP_PROBE_LOG"; do
       local title="${item%%|*}"
       local file="${item#*|}"
       echo "============================================================"
       echo "=== $title"
       echo "============================================================"
       if [[ -f "$file" ]]; then
-        cat "$file" 2>/dev/null || echo "(could not read)"
+        cat_redacted "$file"
       else
         echo "(not present)"
       fi
@@ -424,6 +517,68 @@ print(", ".join(sources) if sources else "(none)")
 PY
 }
 
+run_http_probes() {
+  "$PYTHON" - "$DEVICE_HOST" "$HTTP_PROBE_LOG" "$HTTP_PROBE_TIMEOUT_SECONDS" <<'PY'
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime
+
+host, probe_log, timeout_text = sys.argv[1:4]
+timeout = int(timeout_text)
+paths = [
+    "/",
+    "/index.html",
+    "/index.js",
+    "/api/v2/health",
+    "/api/v2/device/info",
+    "/api/v2/device/time",
+    "/api/v2/flash/status",
+    "/api/v2/sat/status",
+]
+
+def stamp():
+    return datetime.now().strftime("%H:%M:%S.%f")[:-3]
+
+def collapse(text):
+    return " ".join(text.split())
+
+with open(probe_log, "w", encoding="utf-8") as log:
+    log.write("HTTP probes via Python urllib\n")
+    log.write(f"Target host : {host}\n")
+    log.write(f"Per-request timeout: {timeout}s\n")
+    log.write(f"Started: {datetime.now().astimezone().isoformat()}\n")
+    log.write("Columns: <time>  <result>  <http_code> <time_total> <size> <content_type>  <url>\n\n")
+
+    for path in paths:
+        url = f"http://{host}{path}"
+        started = time.monotonic()
+        try:
+            request = urllib.request.Request(url, headers={"User-Agent": "OTGW-capture/1"})
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                body = response.read()
+                elapsed = time.monotonic() - started
+                content_type = response.headers.get("content-type", "-")
+                log.write(f"{stamp()}  OK       {response.status} {elapsed:.3f}s {len(body)}B {content_type}  {url}\n")
+                snippet = collapse(body[:300].decode("utf-8", "replace"))
+                if snippet:
+                    log.write(f"              body: {snippet[:200]}{'...' if len(snippet) > 200 else ''}\n")
+        except urllib.error.HTTPError as exc:
+            body = exc.read()
+            elapsed = time.monotonic() - started
+            content_type = exc.headers.get("content-type", "-") if exc.headers else "-"
+            log.write(f"{stamp()}  HTTP     {exc.code} {elapsed:.3f}s {len(body)}B {content_type}  {url}\n")
+        except TimeoutError:
+            log.write(f"{stamp()}  TIMEOUT  no response within {timeout}s  {url}\n")
+        except Exception as exc:
+            elapsed = time.monotonic() - started
+            log.write(f"{stamp()}  ERROR    {type(exc).__name__}: {exc} after {elapsed:.3f}s  {url}\n")
+
+    log.write(f"\nFinished: {datetime.now().astimezone().isoformat()}\n")
+PY
+}
+
 stop_child() {
   local name="$1"
   local pid="$2"
@@ -492,6 +647,19 @@ cleanup() {
   stop_child "mosquitto_sub" "${MQTT_PID:-}"
   stop_child "Telnet capture worker" "${TELNET_PID:-}" 20
   stop_child "Browser capture worker" "${BROWSER_PID:-}" 20
+  stop_child "Crash-log capture worker" "${CRASHLOG_PID:-}" 20
+
+  if [[ "$SKIP_HTTP_PROBES" -eq 1 ]]; then
+    write_summary "HTTP probes: disabled (--skip-http-probes)."
+  else
+    echo "Running post-capture HTTP probes -> curl-probes.log"
+    if run_http_probes; then
+      write_summary "HTTP probes: ran 8 request(s) -> curl-probes.log"
+    else
+      write_summary "HTTP probes: failed (see script.error.log)"
+      printf '%s  HTTP probes failed\n' "$(timestamp)" >> "$SCRIPT_ERROR_LOG"
+    fi
+  fi
 
   if ! metadata_output="$(resolve_capture_metadata)"; then
     metadata_output="$(printf '%s\n' \
@@ -529,7 +697,23 @@ cleanup() {
   write_summary "Finished: $(timestamp)"
 
   if merge_transcript; then
-    for file in "$SUMMARY_LOG" "$TELNET_LOG" "$MQTT_LOG" "$MQTT_ERR_LOG" "$BROWSER_LOG"; do
+    create_tool_error_log
+    if ! merge_transcript; then
+      echo "Could not rebuild merged transcript with tool errors; intermediate capture files were preserved." >&2
+      echo "Diagnostic capture folder: $RUN_PATH"
+      return
+    fi
+    for file in \
+      "$SUMMARY_LOG" \
+      "$TELNET_LOG" \
+      "$MQTT_LOG" \
+      "$MQTT_ERR_LOG" \
+      "$BROWSER_LOG" \
+      "$BROWSER_ERR_LOG" \
+      "$CRASHLOG_LOG" \
+      "$HTTP_PROBE_LOG" \
+      "$TOOL_ERROR_LOG" \
+      "$SCRIPT_ERROR_LOG"; do
       if [[ -f "$file" ]]; then
         rm -f "$file"
       fi
@@ -786,7 +970,7 @@ start_browser_capture() {
   local resolved_browser="$2"
   local chosen_port="$3"
 
-  "$python" - "$resolved_browser" "$BROWSER_URL" "$chosen_port" "$BROWSER_PROFILE" "$BROWSER_LOG" "$SUMMARY_LOG" "$STOP_FILE" <<'PY' &
+  "$python" - "$resolved_browser" "$BROWSER_URL" "$chosen_port" "$BROWSER_PROFILE" "$BROWSER_LOG" "$BROWSER_ERR_LOG" "$SUMMARY_LOG" "$STOP_FILE" <<'PY' &
 import base64
 import json
 import os
@@ -798,7 +982,7 @@ import time
 import urllib.request
 from datetime import datetime
 
-browser_path, device_url, debug_port, temp_profile, browser_log, summary_log, stop_file = sys.argv[1:8]
+browser_path, device_url, debug_port, temp_profile, browser_log, browser_error_log, summary_log, stop_file = sys.argv[1:9]
 debug_port = int(debug_port)
 
 def stopped():
@@ -895,6 +1079,7 @@ class WebSocket:
 
 proc = None
 ws = None
+stderr_handle = None
 requests = {}
 cdp_id = 0
 capture_summary = "Browser capture: completed normally."
@@ -924,7 +1109,8 @@ try:
         f"--user-data-dir={temp_profile}",
         "about:blank",
     ]
-    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT)
+    stderr_handle = open(browser_error_log, "ab")
+    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=stderr_handle)
 
     ws_url = None
     deadline = time.monotonic() + 15
@@ -1037,9 +1223,119 @@ finally:
                 proc.kill()
             except Exception:
                 pass
+    if stderr_handle:
+        try:
+            stderr_handle.close()
+        except Exception:
+            pass
     summary(capture_summary)
 PY
   BROWSER_PID=$!
+}
+
+start_crashlog_capture() {
+  local python="$1"
+
+  "$python" - "$CRASHLOG_URL" "http://$DEVICE_HOST/reboot_log.txt" "$CRASHLOG_POLL_SECONDS" "$CRASHLOG_LOG" "$SUMMARY_LOG" "$STOP_FILE" <<'PY' &
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+from datetime import datetime
+
+crashlog_url, reboot_log_url, poll_seconds, crashlog_log, summary_log, stop_file = sys.argv[1:7]
+poll_seconds = int(poll_seconds)
+
+def stopped():
+    return os.path.exists(stop_file)
+
+def log(line):
+    with open(crashlog_log, "a", encoding="utf-8") as handle:
+        handle.write(datetime.now().strftime("%H:%M:%S.%f")[:-3] + "  " + line + "\n")
+
+def summary(line):
+    with open(summary_log, "a", encoding="utf-8") as handle:
+        handle.write(line + "\n")
+
+def http_get(url, timeout=10):
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "OTGW-capture/1"})
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return response.status, response.read().decode("utf-8", "replace"), None
+    except urllib.error.HTTPError as exc:
+        try:
+            body = exc.read().decode("utf-8", "replace")
+        except Exception:
+            body = ""
+        return exc.code, body, str(exc)
+    except Exception as exc:
+        return None, "", f"{type(exc).__name__}: {exc}"
+
+def resilient_get(url):
+    result = None
+    for attempt in range(2):
+        result = http_get(url)
+        if result[0] is not None:
+            return result
+        if attempt == 0 and not stopped():
+            time.sleep(1.5)
+    return result
+
+capture_summary = "Crash-log capture: completed normally."
+last_crash_body = None
+last_reboot_body = None
+polls = 0
+
+try:
+    log(f"crashlog endpoint: {crashlog_url}")
+    log(f"reboot-log file:   {reboot_log_url}")
+    log(f"poll interval:     {poll_seconds}s")
+
+    while not stopped():
+        polls += 1
+
+        status, body, error = resilient_get(crashlog_url)
+        if status == 200 and body:
+            trimmed = body.strip()
+            if trimmed != last_crash_body:
+                log(f"[crashlog #{polls} CHANGED] {trimmed}")
+                last_crash_body = trimmed
+        elif status is not None:
+            marker = f"status-{status}"
+            if marker != last_crash_body:
+                log(f"[crashlog #{polls}] HTTP {status} (endpoint unavailable on this firmware?)")
+                last_crash_body = marker
+        else:
+            log(f"[crashlog #{polls}] request failed after retry: {error}")
+
+        status, body, error = resilient_get(reboot_log_url)
+        if status == 200 and body:
+            trimmed = body.strip()
+            if trimmed and trimmed != last_reboot_body:
+                log(f"[reboot_log.txt #{polls} CHANGED]")
+                for line in trimmed.splitlines():
+                    if line.strip():
+                        log(f"  | {line}")
+                last_reboot_body = trimmed
+        elif status is None:
+            log(f"[reboot_log.txt #{polls}] request failed after retry: {error}")
+
+        end = time.monotonic() + poll_seconds
+        while not stopped() and time.monotonic() < end:
+            time.sleep(min(0.2, max(0.0, end - time.monotonic())))
+
+    log(f"stop requested; closing crash-log capture ({polls} polls)")
+except Exception as exc:
+    capture_summary = f"Crash-log capture: error - {exc}"
+    try:
+        log(f"[worker-error] {exc}")
+    except Exception:
+        pass
+finally:
+    summary(capture_summary)
+PY
+  CRASHLOG_PID=$!
 }
 
 while [[ $# -gt 0 ]]; do
@@ -1078,6 +1374,16 @@ while [[ $# -gt 0 ]]; do
       require_option_value "$1" "${2-}"; BROWSER_DEBUG_PORT="$2"; shift 2 ;;
     --browser-path|-BrowserPath)
       require_option_value "$1" "${2-}"; BROWSER_PATH="$2"; shift 2 ;;
+    --skip-http-probes|-SkipHttpProbes)
+      SKIP_HTTP_PROBES=1; shift ;;
+    --http-probe-timeout-seconds|-HttpProbeTimeoutSeconds)
+      require_option_value "$1" "${2-}"; HTTP_PROBE_TIMEOUT_SECONDS="$2"; shift 2 ;;
+    --skip-crashlog-capture|-SkipCrashlogCapture)
+      SKIP_CRASHLOG_CAPTURE=1; shift ;;
+    --crashlog-url|-CrashlogUrl)
+      require_option_value "$1" "${2-}"; CRASHLOG_URL="$2"; shift 2 ;;
+    --crashlog-poll-seconds|-CrashlogPollSeconds)
+      require_option_value "$1" "${2-}"; CRASHLOG_POLL_SECONDS="$2"; shift 2 ;;
     --no-prompt)
       NO_PROMPT=1; shift ;;
     --help|-h|-Help|-\?)
@@ -1097,6 +1403,8 @@ validate_range "--telnet-connect-timeout-seconds" "$TELNET_CONNECT_TIMEOUT_SECON
 validate_range "--telnet-reconnect-delay-ms" "$TELNET_RECONNECT_DELAY_MILLISECONDS" 250 60000
 validate_range "--telnet-post-disconnect-delay-ms" "$TELNET_POST_DISCONNECT_DELAY_MILLISECONDS" 250 60000
 validate_range "--browser-debug-port" "$BROWSER_DEBUG_PORT" 1 65535
+validate_range "--http-probe-timeout-seconds" "$HTTP_PROBE_TIMEOUT_SECONDS" 1 60
+validate_range "--crashlog-poll-seconds" "$CRASHLOG_POLL_SECONDS" 5 3600
 
 if [[ "$NO_PROMPT" -eq 0 ]]; then
   if [[ -z "$DEVICE_HOST" ]]; then
@@ -1129,6 +1437,9 @@ fi
 if [[ -z "$BROWSER_URL" ]]; then
   BROWSER_URL="http://$DEVICE_HOST/"
 fi
+if [[ -z "$CRASHLOG_URL" ]]; then
+  CRASHLOG_URL="http://$DEVICE_HOST/api/v2/device/crashlog"
+fi
 PYTHON="$(find_python3)"
 RUN_NAME="$(date +"%Y%m%d-%H%M%S")"
 RUN_PATH="$OUTPUT_ROOT/$RUN_NAME"
@@ -1139,6 +1450,11 @@ TELNET_LOG="$RUN_PATH/telnet.log"
 MQTT_LOG="$RUN_PATH/mqtt.log"
 MQTT_ERR_LOG="$RUN_PATH/mqtt.stderr.log"
 BROWSER_LOG="$RUN_PATH/browser.log"
+BROWSER_ERR_LOG="$RUN_PATH/browser.stderr.log"
+CRASHLOG_LOG="$RUN_PATH/crashlog.log"
+HTTP_PROBE_LOG="$RUN_PATH/curl-probes.log"
+TOOL_ERROR_LOG="$RUN_PATH/error.txt"
+SCRIPT_ERROR_LOG="$RUN_PATH/script.error.log"
 STOP_FILE="$RUN_PATH/.stop"
 
 : > "$SUMMARY_LOG"
@@ -1146,6 +1462,10 @@ STOP_FILE="$RUN_PATH/.stop"
 : > "$MQTT_LOG"
 : > "$MQTT_ERR_LOG"
 : > "$BROWSER_LOG"
+: > "$BROWSER_ERR_LOG"
+: > "$CRASHLOG_LOG"
+: > "$HTTP_PROBE_LOG"
+: > "$SCRIPT_ERROR_LOG"
 
 trap cleanup EXIT
 trap on_signal INT TERM
@@ -1164,6 +1484,12 @@ write_summary "Topic: $TOPIC"
 write_summary "Username supplied: $([[ -n "$USERNAME" ]] && echo true || echo false)"
 write_summary "DurationSeconds: ${DURATION_SECONDS:-until manual stop}"
 write_summary "SkipToolInstall: $([[ "$SKIP_TOOL_INSTALL" -eq 1 ]] && echo true || echo false)"
+write_summary "SkipBrowserCapture: $([[ "$SKIP_BROWSER_CAPTURE" -eq 1 ]] && echo true || echo false)"
+write_summary "SkipCrashlogCapture: $([[ "$SKIP_CRASHLOG_CAPTURE" -eq 1 ]] && echo true || echo false)"
+write_summary "SkipHttpProbes: $([[ "$SKIP_HTTP_PROBES" -eq 1 ]] && echo true || echo false)"
+write_summary "HttpProbeTimeoutSeconds: $HTTP_PROBE_TIMEOUT_SECONDS"
+write_summary "CrashlogPollSeconds: $CRASHLOG_POLL_SECONDS"
+write_summary "Tool stderr log: $TOOL_ERROR_LOG"
 write_summary "Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)"
 write_summary "python3: $PYTHON"
 write_summary "bash: ${BASH_VERSION:-unknown}"
@@ -1182,10 +1508,19 @@ else
     write_summary "Browser url: $BROWSER_URL"
     write_summary "Browser CDP port: $chosen_port"
     start_browser_capture "$PYTHON" "$resolved_browser" "$chosen_port"
-    write_summary "Browser capture started (headless, writing browser.log)."
+    write_summary "Browser capture started (headless, writing browser.log; stderr in browser.stderr.log)."
   else
     write_summary "Browser capture: skipped - no Edge/Chrome found (pass --browser-path or --skip-browser-capture)."
   fi
+fi
+
+if [[ "$SKIP_CRASHLOG_CAPTURE" -eq 1 ]]; then
+  write_summary "Crash-log capture: disabled (--skip-crashlog-capture)."
+else
+  write_summary "Crash-log endpoint: $CRASHLOG_URL"
+  write_summary "Crash-log poll interval: ${CRASHLOG_POLL_SECONDS}s"
+  start_crashlog_capture "$PYTHON"
+  write_summary "Crash-log capture started (polling, writing crashlog.log)."
 fi
 
 MOSQUITTO_SUB="$(ensure_mosquitto_sub)"

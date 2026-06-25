@@ -80,7 +80,8 @@ pwsh -File scripts/branch-hygiene-queue.ps1 -Remote origin -BaseBranch dev -Inac
 macOS/Linux equivalent of `capture-mqtt-debug.bat` for collecting OTGW telnet
 debug output, MQTT broker traffic, and browser DevTools output into one
 uploadable transcript. Both launchers use the shared `capture-mqtt-debug`
-basename; only the platform-specific `.bat` / `.sh` extension differs.
+basename; only the platform-specific `.bat` / `.sh` extension differs. The old
+`capture-mqtt-debug-macos.sh` path remains as a compatibility wrapper.
 
 ### MQTT Debug Capture Usage
 
@@ -88,6 +89,8 @@ basename; only the platform-specific `.bat` / `.sh` extension differs.
 scripts/capture-mqtt-debug.sh
 scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10
 scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --duration 120
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --skip-browser-capture
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --topic '#'
 ```
 
 The script prompts for the OTGW device host, MQTT broker host, and optional MQTT
@@ -109,6 +112,11 @@ credentials when they are not supplied. Use `--no-prompt` for unattended runs.
 - `--browser-url` / `-BrowserUrl` - Page to load (default: `http://<device>/`)
 - `--browser-debug-port` / `-BrowserDebugPort` - CDP port (default: `9222`)
 - `--browser-path` / `-BrowserPath` - Explicit Chrome/Edge executable path
+- `--skip-crashlog-capture` / `-SkipCrashlogCapture` - Disable crash-log polling
+- `--crashlog-url` / `-CrashlogUrl` - Crash-log endpoint (default: `http://<device>/api/v2/device/crashlog`)
+- `--crashlog-poll-seconds` / `-CrashlogPollSeconds` - Crash-log poll interval (default: `30`)
+- `--skip-http-probes` / `-SkipHttpProbes` - Disable post-capture HTTP probes
+- `--http-probe-timeout-seconds` / `-HttpProbeTimeoutSeconds` - Per-request HTTP probe timeout (default: `10`)
 
 ### MQTT Debug Capture Notes
 
@@ -127,19 +135,30 @@ Browser DevTools capture is enabled by default when Microsoft Edge, Google Chrom
 or Chromium can be found. On macOS, the script checks the standard `.app`
 locations under `/Applications` and `~/Applications`; use `--browser-path` if the
 browser is installed elsewhere. Browser output is written to `browser.log` and
-merged into
+browser stderr is written to `browser.stderr.log`.
+
+Crash-log capture is enabled by default and polls `/api/v2/device/crashlog` plus
+`/reboot_log.txt` into `crashlog.log`. This is useful for decoded ESP exception
+state during reboot loops; devices without the endpoint log the HTTP/failure
+status and the capture continues. After capture stops, HTTP probes hit `/`,
+`/index.html`, `/index.js`, and key REST endpoints with bounded timeouts and
+write status/timing/size details to `curl-probes.log`.
+
+All logs are merged into
 `transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt`. The
 working files use the same names as the Windows capture:
-`summary.txt`, `telnet.log`, `mqtt.log`, `mqtt.stderr.log`, and `browser.log`,
-under `logs/mqtt-diagnostics/<yyyyMMdd-HHmmss>/`. After a successful merge,
-those intermediate files are removed; upload only the named transcript.
+`summary.txt`, `telnet.log`, `mqtt.log`, `mqtt.stderr.log`, `browser.log`,
+`browser.stderr.log`, `crashlog.log`, `curl-probes.log`, `error.txt`, and
+`script.error.log`, under `logs/mqtt-diagnostics/<yyyyMMdd-HHmmss>/`. After a
+successful merge, those intermediate files are removed; upload only the named
+transcript.
 
 The deliberate platform differences are the launcher extension (`.sh` instead
 of `.bat`), command-line option style, Homebrew-based Mosquitto installation,
-and macOS/Linux browser executable paths. The newer Windows capture also has
-separate `error.txt` and crash-log capture features; the shell port continues
-to merge its existing `mqtt.stderr.log` directly into the transcript because
-adding those capture sources is outside this naming-alignment change.
+macOS/Linux browser executable paths, and portable Python HTTP probes rather
+than Windows `curl.exe`. Windows unattended `-SaveSecrets` storage is not ported:
+the shell script does not store MQTT passwords in generated files or local
+settings; prefer the interactive password prompt.
 
 ## sat_boiler_emulator.py
 
