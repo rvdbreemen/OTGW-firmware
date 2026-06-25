@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-24T21:28:13.138Z
-> Files: 535 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-25T07:06:11.649Z
+> Files: 536 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/01-raw/sessies/
 
@@ -891,3 +891,7 @@
 - `flip_adrs.py` — flip (~388 tok)
 - `flip_adrs2.py` — edit (~414 tok)
 - `p9_v2js.py` — renderGraph: windowedSamples, winSeries, effectiveSource + 16 more (~4484 tok)
+
+## docs/
+
+- `daily-issue-report.md` — Daily Issue Report — 2026-06-25 (~480 tok)
