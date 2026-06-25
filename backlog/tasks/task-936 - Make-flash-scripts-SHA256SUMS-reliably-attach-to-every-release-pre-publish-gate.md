@@ -3,9 +3,11 @@ id: TASK-936
 title: >-
   Make flash scripts + SHA256SUMS reliably attach to every release (pre-publish
   gate)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-25 19:55'
+updated_date: '2026-06-25 19:58'
 labels:
   - release
   - tooling
@@ -28,3 +30,9 @@ Releases since v1.0.0 are GitHub immutable. The post-publish workflow .github/wo
 - [ ] #4 Dead workflow .github/workflows/release-assets.yml is removed (incompatible with immutable releases; its SHA256SUMS logic now lives in the manual process)
 - [ ] #5 flash-bundle zip is intentionally dropped; confirmed no docs reference it
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. /release SKILL.md Phase 5: split step 6 into (a) generate SHA256SUMS from build/*.bin, (b) upload bins+scripts+SHA256SUMS to draft, (c) hard pre-publish gate asserting all 5 assets present before --draft=false.\n2. RELEASE_PROCESS.md: same upload+gate update at step 7-9.\n3. Delete .github/workflows/release-assets.yml (dead, immutable-incompatible).\n4. Verify no doc references flash-bundle zip (done).\n5. Docs-only + CI removal: commit, push otgw-1.x.x.
+<!-- SECTION:PLAN:END -->
