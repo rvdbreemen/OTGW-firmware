@@ -210,18 +210,18 @@ static bool parseBLEBTHomeFormat(const uint8_t* data, size_t len, float* temp, f
     switch (objId) {
       case BTHOME_OBJ_TEMPERATURE_S16:
         if (pos + 2 > len) return gotTemp;
-        { int16_t rawT = (int16_t)(data[pos] | (data[pos + 1] << 8));
-          *temp = rawT / 100.0f;
-          if (*temp >= -40.0f && *temp <= 60.0f) gotTemp = true;
+        // TASK-931: write only a VALID reading, so the per-field merge never
+        // stores an out-of-range value (the caller leaves *temp at its sentinel).
+        { float t = (int16_t)(data[pos] | (data[pos + 1] << 8)) / 100.0f;
+          if (t >= -40.0f && t <= 60.0f) { *temp = t; gotTemp = true; }
         }
         pos += 2;
         break;
 
       case BTHOME_OBJ_HUMIDITY_U16:
         if (pos + 2 > len) return gotTemp;
-        { uint16_t rawH = (uint16_t)(data[pos] | (data[pos + 1] << 8));
-          *hum = rawH / 100.0f;
-          if (*hum >= 0.0f && *hum <= 100.0f) gotHum = true;
+        { float h = (uint16_t)(data[pos] | (data[pos + 1] << 8)) / 100.0f;
+          if (h >= 0.0f && h <= 100.0f) { *hum = h; gotHum = true; }
         }
         pos += 2;
         break;
@@ -364,7 +364,11 @@ static bool parseBLEMiBeaconFormat(const uint8_t* data, size_t len, float* temp,
     }
   }
 
-  bool gotTemp = false, gotHum = false;
+  // TASK-931: write ONLY validated fields (caller leaves the rest at its sentinel,
+  // so a single-object advert does not clobber the slot's other readings) and
+  // register on ANY decoded field, not temperature-only — stock Mijia emit temp /
+  // humidity / battery in SEPARATE adverts.
+  bool gotTemp = false, gotHum = false, gotBatt = false;
   // TLV walk: id(u16 LE) | len(u8) | value[len]. One advert may carry several.
   while (pos + 3 <= len) {
     uint16_t objId  = (uint16_t)(data[pos] | (data[pos + 1] << 8));
@@ -375,29 +379,25 @@ static bool parseBLEMiBeaconFormat(const uint8_t* data, size_t len, float* temp,
     switch (objId) {
       case 0x1004:                            // temperature s16 / 10
         if (objLen >= 2) {
-          int16_t rawT = (int16_t)(data[val] | (data[val + 1] << 8));
-          *temp = rawT / 10.0f;
-          if (*temp >= -40.0f && *temp <= 60.0f) gotTemp = true;
+          float t = (int16_t)(data[val] | (data[val + 1] << 8)) / 10.0f;
+          if (t >= -40.0f && t <= 60.0f) { *temp = t; gotTemp = true; }
         }
         break;
       case 0x1006:                            // humidity u16 / 10
         if (objLen >= 2) {
-          uint16_t rawH = (uint16_t)(data[val] | (data[val + 1] << 8));
-          *hum = rawH / 10.0f;
-          if (*hum >= 0.0f && *hum <= 100.0f) gotHum = true;
+          float h = (uint16_t)(data[val] | (data[val + 1] << 8)) / 10.0f;
+          if (h >= 0.0f && h <= 100.0f) { *hum = h; gotHum = true; }
         }
         break;
       case 0x100A:                            // battery percent u8
-        if (objLen >= 1) *batt = data[val];
+        if (objLen >= 1) { *batt = data[val]; gotBatt = true; }
         break;
       case 0x100D:                            // combined: s16 temp/10 + u16 hum/10
         if (objLen >= 4) {
-          int16_t  rawT = (int16_t)(data[val] | (data[val + 1] << 8));
-          uint16_t rawH = (uint16_t)(data[val + 2] | (data[val + 3] << 8));
-          *temp = rawT / 10.0f;
-          *hum  = rawH / 10.0f;
-          if (*temp >= -40.0f && *temp <= 60.0f) gotTemp = true;
-          if (*hum  >= 0.0f  && *hum  <= 100.0f) gotHum = true;
+          float t = (int16_t)(data[val] | (data[val + 1] << 8)) / 10.0f;
+          float h = (uint16_t)(data[val + 2] | (data[val + 3] << 8)) / 10.0f;
+          if (t >= -40.0f && t <= 60.0f) { *temp = t; gotTemp = true; }
+          if (h >= 0.0f  && h <= 100.0f) { *hum  = h; gotHum = true; }
         }
         break;
       default:
@@ -406,8 +406,7 @@ static bool parseBLEMiBeaconFormat(const uint8_t* data, size_t len, float* temp,
     pos = val + objLen;
   }
 
-  (void)gotHum;  // humidity optional; require a valid temperature to register
-  return gotTemp;
+  return gotTemp || gotHum || gotBatt;        // any decoded field registers the advert
 }
 
 //=====================================================================
@@ -465,8 +464,12 @@ static int bleFindOrAllocSlot(const char* mac)
 class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
   void onResult(const NimBLEAdvertisedDevice* dev) override
   {
-    float temp = 0.0f, hum = 0.0f;
-    uint8_t batt = 0;
+    // TASK-931: sentinels mean "this advert did not carry the field". A parser
+    // writes only the fields it actually decoded; the runtime merge below then
+    // updates ONLY non-sentinel fields, so a single-object advert (e.g. a stock
+    // Mijia humidity-only frame) never clobbers temperature to 0.
+    float temp = NAN, hum = NAN;
+    uint8_t batt = 0xFF;
     bool parsed = false;
 
     // TASK-506: count every ad; per-ad logging removed to cut spam.
@@ -586,9 +589,11 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
       // HA discovery once before its first state update is meaningful.
       _bleRuntime[slot] = {};
     }
-    _bleRuntime[slot].fTemperature = temp;
-    _bleRuntime[slot].fHumidity    = hum;
-    _bleRuntime[slot].iBattery     = batt;
+    // TASK-931: merge only the fields this advert decoded (sentinel = absent),
+    // so a single-object frame keeps the slot's last value for the others.
+    if (!isnan(temp))  _bleRuntime[slot].fTemperature = temp;
+    if (!isnan(hum))   _bleRuntime[slot].fHumidity    = hum;
+    if (batt != 0xFF)  _bleRuntime[slot].iBattery     = batt;
     _bleRuntime[slot].iRssi        = static_cast<int8_t>(dev->getRSSI());
     _bleRuntime[slot].iLastSeenMs  = millis();
     // TASK-895: only overwrite the cached name when this ad actually carried

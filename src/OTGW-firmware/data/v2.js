@@ -807,15 +807,51 @@
           val.textContent = (bt !== undefined ? bt + '°' : '') + (bh !== undefined ? '  ' + bh + '%' : '');
           row.appendChild(val);
         }
+        // TASK-931: bindkey state — encrypted Xiaomi MiBeacon sensors show a lock
+        // when a key is set. The key itself is write-only (never sent back).
+        if (s.has_key) { var kt = document.createElement('span'); kt.className = 'ble-tag'; kt.textContent = '🔒 key'; nm.appendChild(kt); }
         var ctr = document.createElement('div'); ctr.className = 'ble-ctrls';
         var sel = document.createElement('button'); sel.className = 'tbtn'; sel.textContent = 'Select';
         sel.addEventListener('click', function () { bleAction('select', { mac: s.mac }); });
         var forget = document.createElement('button'); forget.className = 'tbtn'; forget.textContent = 'Forget';
         forget.addEventListener('click', function () { bleAction('forget', { mac: s.mac }); });
         ctr.appendChild(sel); ctr.appendChild(forget); row.appendChild(ctr);
+        // TASK-931: per-row bindkey input (encrypted MiBeacon). Paste the 32-hex
+        // beaconkey from the pvvx/Xiaomi-cloud tooling; empty clears it.
+        var keyRow = document.createElement('div'); keyRow.className = 'ble-ctrls';
+        var keyIn = document.createElement('input'); keyIn.type = 'password'; keyIn.placeholder = '32-hex bindkey';
+        keyIn.maxLength = 32; keyIn.autocomplete = 'off'; keyIn.style.flex = '1'; keyIn.style.minWidth = '12ch';
+        var keyBtn = document.createElement('button'); keyBtn.className = 'tbtn'; keyBtn.textContent = '🔑 Set';
+        keyBtn.addEventListener('click', function () {
+          var k = (keyIn.value || '').trim().toLowerCase();
+          if (k && !/^[0-9a-f]{32}$/.test(k)) { keyIn.style.borderColor = 'var(--hot,#c33)'; return; }
+          bleAction('bindkey', { mac: s.mac, key: k }); keyIn.value = '';
+        });
+        keyRow.appendChild(keyIn); keyRow.appendChild(keyBtn); row.appendChild(keyRow);
         card.appendChild(row);
       });
     }
+    // TASK-931: provision an ENCRYPTED sensor that is not in the roster yet — an
+    // encrypted Mijia cannot self-announce until it has a key, so paste its MAC +
+    // 32-hex bindkey together (both from the pvvx/Xiaomi-cloud tooling).
+    var add = document.createElement('div'); add.className = 'ble-row';
+    var addLbl = document.createElement('div'); addLbl.className = 'ble-nm'; addLbl.textContent = 'Add encrypted sensor';
+    add.appendChild(addLbl);
+    var addCtr = document.createElement('div'); addCtr.className = 'ble-ctrls';
+    var macIn = document.createElement('input'); macIn.type = 'text'; macIn.placeholder = 'AA:BB:CC:DD:EE:FF';
+    macIn.autocomplete = 'off'; macIn.style.minWidth = '15ch';
+    var bkIn = document.createElement('input'); bkIn.type = 'password'; bkIn.placeholder = '32-hex bindkey';
+    bkIn.maxLength = 32; bkIn.autocomplete = 'off'; bkIn.style.minWidth = '12ch';
+    var addBtn = document.createElement('button'); addBtn.className = 'tbtn'; addBtn.textContent = '➕ Add';
+    addBtn.addEventListener('click', function () {
+      var m = (macIn.value || '').trim().toUpperCase();
+      var k = (bkIn.value || '').trim().toLowerCase();
+      if (!/^[0-9A-F]{2}(:[0-9A-F]{2}){5}$/.test(m)) { macIn.style.borderColor = 'var(--hot,#c33)'; return; }
+      if (!/^[0-9a-f]{32}$/.test(k)) { bkIn.style.borderColor = 'var(--hot,#c33)'; return; }
+      bleAction('bindkey', { mac: m, key: k }); macIn.value = ''; bkIn.value = '';
+    });
+    addCtr.appendChild(macIn); addCtr.appendChild(bkIn); addCtr.appendChild(addBtn);
+    add.appendChild(addCtr); card.appendChild(add);
     cols.appendChild(card);
   }
 

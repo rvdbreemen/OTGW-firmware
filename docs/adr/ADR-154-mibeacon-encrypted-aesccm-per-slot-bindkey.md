@@ -90,11 +90,11 @@ and somewhere to store the per-sensor secret. Both are architectural, hence this
   (the ATC/BTHome contract, which keeps SAT's room-temperature input from ever
   flickering to 0). The decrypt + walker locate a humidity-only frame's value
   correctly (proven by `test_mibeacon_decrypt.py`: walker offset 11, humidity 46.7),
-  but such a frame is not registered, so **temperature populates and drives SAT while
-  standalone humidity may lag or not appear** for separate-advert sensors. Combined
-  `0x100D` frames carry both. A per-BLE-format per-field merge (update only the fields
-  present, preserving the others) would close this but touches the proven ATC/BTHome
-  update path, so it is left as a tracked follow-up rather than folded into this phase.
+  but such a frame was initially not registered. **Resolved in TASK-931**: a per-field
+  merge now registers a frame on ANY decoded field and updates only the fields present
+  (sentinel = absent), so temperature never flickers to 0 and humidity/battery populate
+  from their own adverts. The v2 BLE card also gained a per-slot bindkey input + an
+  "add encrypted sensor" form (the key is write-only; discovery exposes only `has_key`).
 - **Neutral.** mbedtls was already present in the toolchain; this is its first use in
   the firmware.
 
