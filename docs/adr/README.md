@@ -341,6 +341,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-034: Non-Blocking Modal Dialogs for User Input](ADR-034-non-blocking-modal-dialogs.md)** 🆕  
   Custom HTML/CSS modal dialogs instead of blocking prompt() to maintain real-time data flow.
 
+- **[ADR-155: v2 Web UI Connectivity Model — Two-Link OT Bus, MODE Separated from HEALTH, Five-State Vocabulary](ADR-155-v2-webui-connectivity-two-link-ot-bus.md)** 🆕 *(Accepted)*  
+  Accepted (2026-06-26), structural (ADR-080: no automated gate). The v2 Web UI models the OT bus as two independent links (thermostat vs boiler) instead of a single `bOnline` flag, renders gateway MODE (gateway/monitor) as a separate blue chip never a green/red health light, and uses one five-state-plus-mode vocabulary (connected/degraded/disconnected/off/unknown) everywhere as colour+icon+text. Firmware `/api/v2/health` gains `thermostatconnected`/`boilerconnected`/`otcommandinterface`/`otgwmode` additively (mirroring `/device/info`); on OT-Direct hardware the UI falls back to `bOnline` for both links since OTDirect does not populate the sub-states. Implemented alpha.268/alpha.274 (TASK-933). Complements ADR-152 (v2 Web UI); REST/UI counterpart to ADR-084 (OT-bus state MQTT topics); depends on ADR-031 (two-MCU).
+
 ### OTA and Firmware Updates
 
 - **[ADR-029: Simple XHR-Based OTA Flash (KISS Principle)](ADR-029-simple-xhr-ota-flash.md)** 🆕  
