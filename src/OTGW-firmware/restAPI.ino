@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.277
+**  Version  : v2.0.0-alpha.278
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2890,7 +2890,7 @@ void sendHealth()
       // seconds since the last frame from each side, -1 when never seen since boot.
       // Only the PIC/OT-frame parser stamps these; on OT-Direct they stay -1 and the
       // UI keeps its bOnline two-link fallback (additive fields per ADR-019).
-      time_t otNow = now();
+      time_t otNow = time(nullptr);   // epoch source used across the firmware (NTP-set system clock); now() is TimeLib, not in scope here
       je.field(F("thermostat_age_s"), state.otBus.tThermostatLastSeen ? (int32_t)(otNow - state.otBus.tThermostatLastSeen) : (int32_t)-1);
       je.field(F("boiler_age_s"),     state.otBus.tBoilerLastSeen     ? (int32_t)(otNow - state.otBus.tBoilerLastSeen)     : (int32_t)-1);
     }
