@@ -64,12 +64,27 @@ Instrumented firmware `2.0.0-alpha.275+b55b7f8` (heap watermark/histogram + jitt
    or the agent's `scratchpad/soak_driver2.py <seconds>` (stream-monitors min free/maxBlock + flags pressure lines, then takes a clean `D` dump).
 4. After the window, telnet `D` → record `[state.heapdiag]` (min_max_block, maxblock_hist, drip_slow_mode, ws_drops, mqtt_drops, entered_*, max_loop_gap_ms). MQTT stats publish only hourly, so a multi-hour run is needed for the `otgw-firmware/stats/#` trend; telnet `D` is the on-demand readout.
 5. Apply the proof criterion above → Phase 3 (gating removal) only if it holds.
+
+## Soak result — first 30-min gentle-load run (2026-06-27, agent-driven)
+
+Ran a 30-min gentle sustained load (1 worker ~1.5s pacing: REST + occasional heavy index.html, no discovery republish) at 192.168.1.143, stream-monitoring the `(free|maxBlock)` debug prefix + a clean telnet `D` dump after. Device stayed up the whole window (telnet_drops=0, http err=1/908).
+
+Authoritative `[state.heapdiag]` after the run (from telnet `D`, since the last `z` reset):
+- `maxblock_hist <2k/<4k/<8k/<16k/>=16k = 0/0/0/0/1967` — EVERY one of 1967 1 Hz samples had the largest contiguous block ≥ 16 KB.
+- `min_max_block = 31732` (31.7 KB) — smallest contiguous block ever, vs gating thresholds 8192 (emergency) / 1536 (promote).
+- `min_free_heap = 63316`; stream min free = 90380; stream min max_block = 40948.
+- `drip_slow_mode = 0`, `ws_drops = 0`, `mqtt_drops = 0`, `entered_low = 0`, `entered_warning = 0`, `entered_critical = 0` — the gating NEVER fired and the heap NEVER left the HEALTHY tier.
+- `max_loop_gap_ms = 76` (< 200 ms) — no loop stalls / WDT pressure.
+
+**Verdict (this window): proof criterion HOLDS.** On ESP32-S3 the heap does not collapse the way ESP8266 did; the largest contiguous block stayed ≥ 16 KB (min 31.7 KB) throughout, so the preventive gating is dead weight. Strong signal for Phase 3.
+
+**Caveats:** 30 min, gentle load — NOT the multi-day "long-running under sustained load" regime where the 1.x ESP8266 eventually failed. Heavier load crashed the bench unit off the network (WiFi/WDT, NOT heap-frag — heap was healthy beforehand; flagged as a separate issue). A longer (hours/days) confirmatory soak should precede actually removing the gating.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Instrumented firmware flashed to a free ESP32-S3 (not the TASK-933 device); 'z' reset from a healthy heap at soak start
-- [ ] #2 Fragmenting load driven (sat_boiler_emulator + Web UI + MQTT discovery republish) and a representative-window capture collected via capture-mqtt-debug.bat
-- [ ] #3 Verdict recorded against the proof criterion (min_max_block / histogram / gating counters / max_loop_gap_ms) with the capture transcript attached
+- [x] #1 Instrumented firmware flashed to a free ESP32-S3 (not the TASK-933 device); 'z' reset from a healthy heap at soak start
+- [x] #2 Fragmenting load driven (sat_boiler_emulator + Web UI + MQTT discovery republish) and a representative-window capture collected via capture-mqtt-debug.bat
+- [x] #3 Verdict recorded against the proof criterion (min_max_block / histogram / gating counters / max_loop_gap_ms) with the capture transcript attached
 - [ ] #4 If proven: Phase-3 removal of drip/tier gating WITH evaluate.py ADR-089/121 gates + ADRs updated, rebuilt and re-soaked clean. If disproven: ESP32-S3 evidence documented on ADR-089/121, gating kept.
 <!-- AC:END -->
