@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.274
+**  Version  : v2.0.0-alpha.275
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3462,6 +3462,54 @@ void sendDeviceSettings()
     addNum(F("satpvboostmaxindoorc"), tmpBuf, "f", 18, 28);
   }
   addInt(F("satpvboostmaxdurationmin"), (int32_t)settings.sat.iPvBoostMaxDurationMin, "i", 30, 1440);
+  // --- SAT settings newly exposed over REST (TASK-933 Phase 2) ---
+  // updateSetting() dispatch + writeSettings persistence already exist for all of
+  // these; these GET lines + the knownSettings[] tokens complete the round-trip.
+  addBool(F("satforcepwm"),       settings.sat.bForcePWM, "b");
+  addBool(F("satpushsetpoint"),   settings.sat.bPushSetpoint, "b");
+  addBool(F("satwindowdetect"),   settings.sat.bWindowDetection, "b");
+  addInt (F("satwindowminsec"),   settings.sat.iWindowMinOpenSec, "i", 10, 600);
+  addBool(F("satthermalcomfort"), settings.sat.bThermalComfort, "b");
+  addInt (F("sathumiditytimeout"),settings.sat.iHumidityTimeoutS, "i", 60, 65535);
+  addInt (F("satflushtreshold"),  settings.sat.iSatFlushThresholdH, "i", 1, 720);
+  // DHW: two distinct flags. bDhwEnabled (standalone control) vs bDhwEnable
+  // (HW= master; updateSetting 957-970 queues a PIC HW= command on write).
+  addBool(F("satdhwenabled"),     settings.sat.bDhwEnabled, "b");
+  addBool(F("satdhwenable"),      settings.sat.bDhwEnable, "b");
+  // Multi-zone PID (Task #233)
+  addInt (F("satzonecount"),      settings.sat.iZoneCount, "i", 1, 4);
+  addInt (F("satzonetimeout"),    settings.sat.iZoneTimeoutS, "i", 30, 3600);
+  // DS18B20 sensor-to-area mapping (TASK-587): 16-hex Dallas addresses
+  addStr (F("satsensorarea0"),    CSTR(settings.sat.sSensorArea[0]), "s", 16);
+  addStr (F("satsensorarea1"),    CSTR(settings.sat.sSensorArea[1]), "s", 16);
+  addStr (F("satsensorarea2"),    CSTR(settings.sat.sSensorArea[2]), "s", 16);
+  addStr (F("satsensorarea3"),    CSTR(settings.sat.sSensorArea[3]), "s", 16);
+  {
+    char tmpBuf[8];
+    dtostrf(settings.sat.fDhwSetpoint,             1, 1, tmpBuf); addNum(F("satdhwsetpoint"),      tmpBuf, "f", 0, 60);
+    dtostrf(settings.sat.fFlameOffOffset,          1, 1, tmpBuf); addNum(F("satflameoffset"),      tmpBuf, "f", 0, 30);
+    dtostrf(settings.sat.fFlowOffset,              1, 1, tmpBuf); addNum(F("satflowoffset"),       tmpBuf, "f", 0, 10);
+    dtostrf(settings.sat.fModSupDelay,             1, 1, tmpBuf); addNum(F("satmodsupdelay"),      tmpBuf, "f", 0, 120);
+    dtostrf(settings.sat.fModSupOffset,            1, 1, tmpBuf); addNum(F("satmodsupoffset"),     tmpBuf, "f", 0, 5);
+    dtostrf(settings.sat.fMinPressure,             1, 2, tmpBuf); addNum(F("satminpressure"),      tmpBuf, "f", 0, 3);
+    dtostrf(settings.sat.fMaxPressure,             1, 2, tmpBuf); addNum(F("satmaxpressure"),      tmpBuf, "f", 1, 4);
+    dtostrf(settings.sat.fMaxPressureDrop,         1, 2, tmpBuf); addNum(F("satmaxpressdrop"),     tmpBuf, "f", 0, 2);
+    dtostrf(settings.sat.fZoneAggregationHeadroom, 1, 1, tmpBuf); addNum(F("satzoneheadroom"),     tmpBuf, "f", 0, 15);
+    dtostrf(settings.sat.fSolarMinElevation,       1, 1, tmpBuf); addNum(F("satsolarminelev"),     tmpBuf, "f", -10, 45);
+    dtostrf(settings.sat.fBoilerRatedKW,           1, 1, tmpBuf); addNum(F("satboilerratedkw"),    tmpBuf, "f", 0, 200);
+    dtostrf(settings.sat.fBoilerEfficiency,        1, 2, tmpBuf); addNum(F("satboilerefficiency"), tmpBuf, "f", 0, 1);
+  }
+  // satweatherapikey is a credential: emit a masked "apikey=<len>" placeholder
+  // (mirrors httppasswd/mqttpasswd). The dispatch guard ignores the echo so a
+  // form re-save without retyping keeps the real key (TASK-933 P2).
+  {
+    char weatherApiKeyPlaceholder[sizeof("apikey=64")];
+    snprintf_P(weatherApiKeyPlaceholder, sizeof(weatherApiKeyPlaceholder),
+               PSTR("apikey=%u"),
+               static_cast<unsigned>(strnlen(settings.sat.sWeatherApiKey,
+                                              sizeof(settings.sat.sWeatherApiKey))));
+    addStr(F("satweatherapikey"), weatherApiKeyPlaceholder, "p", 64);
+  }
 #if HAS_SAT_BLE
   // --- SAT BLE Sensor settings (Task #20). TASK-742: gated on HAS_SAT_BLE. ---
   addBool(F("satbleenable"), settings.sat.bBleEnable, "b");
@@ -3484,6 +3532,30 @@ void sendDeviceSettings()
   addBool(F("otdfailsafe"), settings.otd.bFailSafe, "b");
   addInt(F("otdmsginterval"), settings.otd.iMsgInterval, "i", 100, 1275);
   addBool(F("otdhasbypassrelay"), settings.otd.bHasBypassRelay, "b");
+  // --- OT-Direct PI room-comp + heating curve (TASK-183), newly exposed (TASK-933 P2) ---
+  addInt(F("otdchmode"), settings.otd.iCHMode, "i", 0, 2);   // 0=off,1=fixed,2=curve; ENUM_OPTS in v2.js
+  {
+    char tmpBuf[8];
+    dtostrf(settings.otd.fFlowTemp,     1, 1, tmpBuf); addNum(F("otdflowtemp"),     tmpBuf, "f", 5, 90);
+    dtostrf(settings.otd.fFlowMax,      1, 1, tmpBuf); addNum(F("otdflowmax"),      tmpBuf, "f", 20, 90);
+    dtostrf(settings.otd.fRoomSetpoint, 1, 1, tmpBuf); addNum(F("otdroomsetpoint"), tmpBuf, "f", 5, 30);
+    dtostrf(settings.otd.fGradient,     1, 2, tmpBuf); addNum(F("otdgradient"),     tmpBuf, "f", 0, 5);
+    dtostrf(settings.otd.fExponent,     1, 2, tmpBuf); addNum(F("otdexponent"),     tmpBuf, "f", 0, 2);
+    dtostrf(settings.otd.fOffset,       1, 1, tmpBuf); addNum(F("otdoffset"),       tmpBuf, "f", -10, 10);
+    dtostrf(settings.otd.fKp,           1, 2, tmpBuf); addNum(F("otdkp"),           tmpBuf, "f", 0, 20);
+    dtostrf(settings.otd.fKi,           1, 2, tmpBuf); addNum(F("otdki"),           tmpBuf, "f", 0, 5);
+    dtostrf(settings.otd.fKboost,       1, 2, tmpBuf); addNum(F("otdkboost"),       tmpBuf, "f", 0, 10);
+    dtostrf(settings.otd.fHysteresis,   1, 2, tmpBuf); addNum(F("otdhysteresis"),   tmpBuf, "f", 0, 2);
+  }
+  addBool(F("otdroomcomp"),         settings.otd.bRoomCompEnabled, "b");
+  // --- OT-Direct CH hysteresis (TASK-582) ---
+  addBool(F("otdhysteresisenable"), settings.otd.bHysteresisEnable, "b");
+  // --- OT-Direct ventilation override (TASK-584) ---
+  addBool(F("otdventenable"),       settings.otd.bVentEnable, "b");
+  addBool(F("otdopenbypass"),       settings.otd.bOpenBypass, "b");
+  addBool(F("otdautobypass"),       settings.otd.bAutoBypass, "b");
+  addBool(F("otdfreeventenable"),   settings.otd.bFreeVentEnable, "b");
+  addInt(F("otdventsetpoint"),      settings.otd.iVentSetpoint, "i", 0, 100);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // --- Ethernet settings (only when a W5500 was actually probed) ---
@@ -3546,26 +3618,39 @@ static const char* const PROGMEM knownSettings[] = {
   "mqttinterval", "mqttonchangepublishing", "mqttotmessage", "mqttpasswd", "mqttseparatesources", "legacyport25238enabled",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
-  "otdautodetect", "otdenableslave", "otdfailsafe", "otdmode", "otdmsginterval",
-  "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
+  "otdautobypass", "otdautodetect", "otdchmode", "otdenableslave", "otdexponent",
+  "otdfailsafe", "otdflowmax", "otdflowtemp", "otdfreeventenable", "otdgradient",
+  "otdhasbypassrelay", "otdhysteresis", "otdhysteresisenable", "otdkboost", "otdki",
+  "otdkp", "otdmode", "otdmsginterval", "otdoffset", "otdopenbypass", "otdroomcomp",
+  "otdroomsetpoint", "otdsetbacktemp", "otdsetbacktimeout", "otdsummermode",
+  "otdventenable", "otdventsetpoint",
   "otgwcommandenable", "otgwcommands",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
   "satautotune", "satautotunerate",
   "satbleenable", "satblefailover", "satbleinterval", "satblemac",
-  "satboilercapacity", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
-  "satdeadband", "satenabled", "satexternaltemp",
-  "satinterval", "satmanufacturer", "satmultiarea", "satmultiareacount",
+  "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
+  "satdeadband", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
+  "satflameoffset", "satflowoffset", "satflushtreshold", "satforcepwm", "sathumiditytimeout",
+  "satinterval", "satmanufacturer", "satmaxpressdrop", "satmaxpressure", "satminpressure",
+  "satmodsupdelay", "satmodsupoffset", "satmultiarea", "satmultiareacount",
   "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
-  "satpresetsync", "satpresetsynctopic",
+  "satpresetsync", "satpresetsynctopic", "satpushsetpoint",
   // TASK-640: PV-surplus setpoint boost settings
   "satpvboostdeltac", "satpvboostenabled", "satpvboostholds",
   "satpvboostmaxdurationmin", "satpvboostmaxindoorc", "satpvboostthresholdw",
-  "satpwmautoswitch", "satsimcoolrate", "satsimheatrate", "satsimulation",
-  "satsolargain", "satsolarminrise", "satsolaroffset", "satsource",
+  "satpwmautoswitch", "satsensorarea0", "satsensorarea1", "satsensorarea2", "satsensorarea3",
+  "satsimcoolrate", "satsimheatrate", "satsimulation",
+  "satsolargain", "satsolarminelev", "satsolarminrise", "satsolaroffset", "satsource",
   "satsummerminhours", "satsummersimmer", "satsummerthreshold",
-  "satsystem", "sattargettemp", "sattempstep", "satthermalcoeff",
+  "satsystem", "sattargettemp", "sattempstep", "satthermalcoeff", "satthermalcomfort",
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",
+  "satwindowdetect", "satwindowminsec", "satzonecount", "satzoneheadroom", "satzonetimeout",
+  // TASK-933 P2: SAT keys that already had GET + dispatch but were missing from the
+  // whitelist (POST-blocked), plus the masked weather API key. isKnownSetting is a
+  // linear scan so position is cosmetic; grouped here for traceability.
+  "satautogains", "satcyclesperhour", "saterrormon", "satheatingmode", "sathpcycle",
+  "satmaxmodulation", "satsensormaxage", "satsolarfreezeint", "satvalveoffset", "satweatherapikey",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps", "ui_usev2",
   "webhookcontenttype", "webhookenable", "webhookenabled",

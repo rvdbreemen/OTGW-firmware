@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.274
+**  Version  : v2.0.0-alpha.275
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -44,6 +44,23 @@ static bool isHttpPasswordPlaceholder(const char* value)
     lengthPart++;
   }
 
+  return true;
+}
+
+// TASK-933 P2: the OpenWeatherMap API key is a credential and is masked in GET as
+// "apikey=<len>" (mirrors the httppasswd/mqttpasswd "password=<len>" pattern). A
+// POST echoing that mask must be ignored so the real key is not overwritten.
+static bool isWeatherApiKeyPlaceholder(const char* value)
+{
+  if (!value) return false;
+  const size_t prefixLen = sizeof("apikey=") - 1;
+  if (strncasecmp_P(value, PSTR("apikey="), prefixLen) != 0) return false;
+  const char* lengthPart = value + prefixLen;
+  if (*lengthPart == '\0') return false;
+  while (*lengthPart) {
+    if (!isdigit(static_cast<unsigned char>(*lengthPart))) return false;
+    lengthPart++;
+  }
   return true;
 }
 
@@ -424,6 +441,10 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("OTDsummermode"), settings.otd.bSummerMode, true);
   writeJsonBoolKV(file, F("OTDfailsafe"), settings.otd.bFailSafe, true);
   writeJsonIntKV(file, F("OTDmsginterval"), settings.otd.iMsgInterval, true);
+  // TASK-933 P2: persist the user-declared bypass-relay-fitted flag so it survives
+  // a reboot (the POST dispatch + GET emit already existed; without this line the
+  // flag reset to false every boot and the bypass-mode logic could never stay on).
+  writeJsonBoolKV(file, F("OTDhasbypassrelay"), settings.otd.bHasBypassRelay, true);
   // --- TASK-183: PI room compensation + heating curve ---
   writeJsonIntKV(file, F("OTDchmode"), settings.otd.iCHMode, true);
   writeJsonFloatKV(file, F("OTDflowtemp"), settings.otd.fFlowTemp, true);
@@ -660,6 +681,7 @@ void updateSetting(const char *field, const char *newValue)
   // (TASK-930: + per-slot MiBeacon bindkey secret, SATblebindkeyN)
   if (strcasecmp_P(field, PSTR("httppasswd")) == 0 ||
       strcasecmp_P(field, PSTR("MQTTpasswd")) == 0 ||
+      strcasecmp_P(field, PSTR("SATweatherapikey")) == 0 ||
       strncasecmp_P(field, PSTR("SATblebindkey"), 13) == 0) {
     DebugTf(PSTR("-> field[%s], newValue[***]\r\n"), field);
   } else {
@@ -990,7 +1012,11 @@ void updateSetting(const char *field, const char *newValue)
     CHANGE_INTERVAL_SEC(timerWeatherPoll, settings.sat.iWeatherInterval);
   }
   else if (strcasecmp_P(field, PSTR("SATweatherapikey")) == 0) {
-    strlcpy(settings.sat.sWeatherApiKey, newValue, sizeof(settings.sat.sWeatherApiKey));
+    // TASK-933 P2: ignore the masked "apikey=<len>" echo so re-saving the form
+    // without retyping the key does not overwrite it with the placeholder.
+    if (newValue && !isWeatherApiKeyPlaceholder(newValue)) {
+      strlcpy(settings.sat.sWeatherApiKey, newValue, sizeof(settings.sat.sWeatherApiKey));
+    }
   }
   else if (strcasecmp_P(field, PSTR("SATboilercapacity")) == 0) settings.sat.fBoilerCapacity = constrain(atof(newValue), 1.0f, 100.0f);
   else if (strcasecmp_P(field, PSTR("SATboilerratedkw")) == 0)   settings.sat.fBoilerRatedKW = constrain(atof(newValue), 0.0f, 200.0f);
