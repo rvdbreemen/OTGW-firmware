@@ -3480,10 +3480,13 @@ class WorkspaceEvaluator:
         self.check_status_burst_cooldown_bound()      # TASK-353/368
         self.check_status_publishers_wrap_burst()     # TASK-347/354/368, ADR-088 sub-rule 1
         self.check_drip_consults_deferred()           # TASK-426, ADR-088 sub-rule 3
-        self.check_heap_tier_thresholds_ordered()     # TASK-428, ADR-089 sub-rule 1
-        self.check_heap_fragmentation_promotion()     # TASK-428, ADR-089 sub-rule 2
-        self.check_heap_tier_entry_counters()         # TASK-428, ADR-089 sub-rule 3
-        self.check_per_consumer_heap_gate()           # TASK-779, ADR-121 Option B
+        self.check_heap_tier_thresholds_ordered()     # TASK-428, ADR-089 sub-rule 1 (tier still diagnostic)
+        # TASK-937: maxBlock fragmentation-promotion removed (ADR-089 sub-rule 2 superseded) —
+        # the TASK-935 ESP32-S3 soak proved it never fires. Gate retired.
+        # self.check_heap_fragmentation_promotion()
+        self.check_heap_tier_entry_counters()         # TASK-428, ADR-089 sub-rule 3 (enter_* still counted)
+        # TASK-937: per-consumer heap ladders removed (ADR-121 superseded) — gating proven dead.
+        # self.check_per_consumer_heap_gate()
         self.check_design_system_drift()              # TASK-470, ADR-091 FAIL gate (TASK-480 grace complete)
         self.check_ps_summary_master_topic_gate()     # ADR-066 amendment / TASK-483
         self.check_adr_references_resolve()           # TASK-355/368

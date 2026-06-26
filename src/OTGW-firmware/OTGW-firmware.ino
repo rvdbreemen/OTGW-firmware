@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.275
+**  Version  : v2.0.0-alpha.276
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -816,10 +816,10 @@ void doBackgroundTasks()
   if (!isFlashing()) loopEthernet();   // W5500 link-poll + WiFi↔Ethernet failover (every 5s)
 #endif
 
-  // Check for critically low heap and attempt recovery if needed
-  if (getHeapHealth() == HEAP_CRITICAL) {
-    emergencyHeapRecovery();
-  }
+  // TASK-937: the HEAP_CRITICAL emergency-recovery gate was removed (it never fired
+  // on ESP32-S3 per the TASK-935 soak). Still call getHeapHealth() once per loop so
+  // the diagnostic tier-entry counters (enter_low/warning/critical) stay live.
+  (void)getHeapHealth();
 
   if (isNetworkUp()) {
     if (state.flash.bESPactive) {

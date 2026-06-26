@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.275
+**  Version  : v2.0.0-alpha.276
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -198,14 +198,11 @@ enum HeapHealthLevel {
 // in the Arduino sketch build, so a #define in helperStuff would not be visible
 // to MQTTstuff. ESP32 path uses a different helper with platform-scaled values.
 #define HEAP_LOW_RESTORE_THRESHOLD 6144  // bytes (HEAP_LOW_THRESHOLD + 1024)
-HeapHealthLevel getHeapHealth();
-HeapHealthLevel getHeapHealthForWebSocket();   // ADR-121 Option B: WS-consumer heap ladder
-HeapHealthLevel getHeapHealthForMQTT();        // ADR-121 Option B: MQTT-consumer heap ladder
+HeapHealthLevel getHeapHealth();               // TASK-937: diagnostic tier classifier (no longer gates)
 uint8_t getHeapFragmentation();
-bool canSendWebSocket();
-bool canPublishMQTT();
+bool canSendWebSocket();                        // TASK-937: neutered to always-true
+bool canPublishMQTT();                          // TASK-937: neutered to always-true
 void logHeapStats();
-void emergencyHeapRecovery();
 // Status-frame burst quiesce (TASK-342): suppress MQTT discovery drip during
 // Status sub-topic fanout so allocation peaks do not stack.
 // Post-burst cooldown (TASK-347): hold drip for STATUS_BURST_COOLDOWN_MS after
