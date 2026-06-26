@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-25T07:06:11.649Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-26T07:06:30.361Z
 > Files: 536 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/01-raw/sessies/
@@ -894,4 +894,4 @@
 
 ## docs/
 
-- `daily-issue-report.md` — Daily Issue Report — 2026-06-25 (~480 tok)
+- `daily-issue-report.md` — Daily Issue Report — 2026-06-26 (~926 tok)
