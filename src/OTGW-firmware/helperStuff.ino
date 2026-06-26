@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.277
+**  Version  : v2.0.0-alpha.278
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -443,14 +443,11 @@ void sampleHeapWatermark() {
 void resetHeapWatermark() {
   state.heapdiag.iMinMaxBlock = 0xFFFFFFFF;
   for (uint8_t i = 0; i < 5; i++) state.heapdiag.aMaxBlockBucket[i] = 0;
-  state.heapdiag.iWsDropsTotal             = 0;
-  state.heapdiag.iMqttDropsTotal           = 0;
   state.heapdiag.iEnteredLowCount          = 0;
   state.heapdiag.iEnteredWarningCount      = 0;
   state.heapdiag.iEnteredCriticalCount     = 0;
   state.heapdiag.iDripActiveBurstSkipCount = 0;
   state.heapdiag.iDripCooldownSkipCount    = 0;
-  state.heapdiag.iDripSlowModeCount        = 0;
   state.heapdiag.iMaxLoopGapMs             = 0;
   sampleHeapWatermark();   // re-seed iMinMaxBlock + first histogram tick (no 0xFFFFFFFF window)
 }

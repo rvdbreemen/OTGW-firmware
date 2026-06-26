@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.277
+**  Version  : v2.0.0-alpha.278
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2038,12 +2038,9 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.debug.sat_ble"), snap->st.debug.bSATBLE);
 #endif
 
-    je.field(F("state.heap.ws_drops"), (uint32_t)snap->st.heapdiag.iWsDropsTotal);
-    je.field(F("state.heap.mqtt_drops"), (uint32_t)snap->st.heapdiag.iMqttDropsTotal);
     je.field(F("state.heap.entered_low"), (uint32_t)snap->st.heapdiag.iEnteredLowCount);
     je.field(F("state.heap.entered_warn"), (uint32_t)snap->st.heapdiag.iEnteredWarningCount);
     je.field(F("state.heap.entered_crit"), (uint32_t)snap->st.heapdiag.iEnteredCriticalCount);
-    je.field(F("state.heap.drip_slow"), (uint32_t)snap->st.heapdiag.iDripSlowModeCount);
 
     je.field(F("state.disco.published"), (uint32_t)snap->st.discovery.iPublishedTopicCount);
     je.field(F("state.disco.verify_runs"), (uint32_t)snap->st.discovery.iVerifyRunCount);
@@ -2808,10 +2805,6 @@ void sendDeviceInfoV2()
     je.field(F("flashchipmode"),    flashMode[sBootFlash.flashChipModeIdx < 4 ? sBootFlash.flashChipModeIdx : 4]);
     je.field(F("LittleFSsize"),     sBootFlash.littleFSSizeMB);
 
-    // --- Reliability drops (heap-pressure side effects) ---
-    je.field(F("hd_ws_drops"),         snap->st.heapdiag.iWsDropsTotal);
-    je.field(F("hd_mqtt_drops"),       snap->st.heapdiag.iMqttDropsTotal);
-
     // --- MQTT Discovery telemetry (ADR-062 / TASK-349 / TASK-361) ---
     je.field(F("disc_published_topics"),     snap->st.discovery.iPublishedTopicCount);
     je.field(F("disc_pending_ids"),          (uint32_t)snap->pendingDiscoveryIds);
@@ -2822,7 +2815,6 @@ void sendDeviceInfoV2()
     je.field(F("disc_last_outcome"),         verifyOutcomeLabel(snap->st.discovery.eLastOutcome));
     je.field(F("hd_drip_burst_skip"),        snap->st.heapdiag.iDripActiveBurstSkipCount);
     je.field(F("hd_drip_cooldown_skip"),     snap->st.heapdiag.iDripCooldownSkipCount);
-    je.field(F("hd_drip_slowmode"),          snap->st.heapdiag.iDripSlowModeCount);
     je.field(F("perf_sat_status_total_ms"),     snap->st.restperf.satStatus.iLastTotalMs);
     je.field(F("perf_sat_status_send_ms"),      snap->st.restperf.satStatus.iLastSendMs);
     je.field(F("perf_sat_status_render_ms"),    snap->st.restperf.satStatus.iLastRenderMs);

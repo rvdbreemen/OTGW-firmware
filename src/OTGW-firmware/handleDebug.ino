@@ -181,12 +181,9 @@ static void dumpDebugInfo() {
 #endif
 
     Debugln(F("[state.heapdiag]"));
-    Debugf(PSTR("ws_drops: %lu\r\n"), (unsigned long)state.heapdiag.iWsDropsTotal);
-    Debugf(PSTR("mqtt_drops: %lu\r\n"), (unsigned long)state.heapdiag.iMqttDropsTotal);
     Debugf(PSTR("entered_low: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredLowCount);
     Debugf(PSTR("entered_warning: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredWarningCount);
     Debugf(PSTR("entered_critical: %lu\r\n"), (unsigned long)state.heapdiag.iEnteredCriticalCount);
-    Debugf(PSTR("drip_slow_mode: %lu\r\n"), (unsigned long)state.heapdiag.iDripSlowModeCount);
     Debugf(PSTR("max_loop_gap_ms: %lu\r\n"), (unsigned long)state.heapdiag.iMaxLoopGapMs);
     Debugf(PSTR("min_max_block: %lu\r\n"), (unsigned long)state.heapdiag.iMinMaxBlock);
     Debugf(PSTR("min_free_heap: %lu\r\n"), (unsigned long)getMinFreeHeap());

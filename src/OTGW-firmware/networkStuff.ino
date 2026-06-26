@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.277
+**  Version  : v2.0.0-alpha.278
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -521,13 +521,10 @@ static void sendTelnetBanner(const char* ip)
     (unsigned)platformMinFreeHeap(),
     (unsigned)platformMaxFreeBlock(),
     (unsigned)platformFreeSketchSpace());
-  _debugPrintf_P(PSTR("  Drops: ws %lu  mqtt %lu   low/warn/crit %lu/%lu/%lu   slow %lu   maxLoopGap %lu ms\r\n"),
-    (unsigned long)state.heapdiag.iWsDropsTotal,
-    (unsigned long)state.heapdiag.iMqttDropsTotal,
+  _debugPrintf_P(PSTR("  Tiers: enter low/warn/crit %lu/%lu/%lu   maxLoopGap %lu ms\r\n"),
     (unsigned long)state.heapdiag.iEnteredLowCount,
     (unsigned long)state.heapdiag.iEnteredWarningCount,
     (unsigned long)state.heapdiag.iEnteredCriticalCount,
-    (unsigned long)state.heapdiag.iDripSlowModeCount,
     (unsigned long)state.heapdiag.iMaxLoopGapMs);
   debugTelnet.println(F("--------------------------------------------"));
   _debugPrintf_P(PSTR("  PIC  : %s  v%s   id %s\r\n"),

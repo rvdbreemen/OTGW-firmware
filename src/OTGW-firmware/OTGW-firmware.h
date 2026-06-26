@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.277
+**  Version  : v2.0.0-alpha.278
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -434,23 +434,23 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 };
 
 // NOTE: this struct is NOT authoritative for the retained otgw-firmware/stats/*
-// MQTT topics. sendMQTTheapdiag() publishes 25 individual retained topics: 15
-// from this struct (8 cumulative counters + min_max_block + max_loop_gap_ms + 5
-// maxBlock histogram buckets), 4 live values (free_heap / max_block / frag_pct /
-// min_free_heap — the last via getMinFreeHeap(), not stored here), and 6 from
-// state.discovery (verify_runs / republish_triggered / last_missing /
-// last_orphan / published_topics / last_verify_epoch). Adding a field here does
-// NOT automatically surface on MQTT — add a corresponding
-// publishStatU32(F("otgw-firmware/stats/...")) call in sendMQTTheapdiag().
+// MQTT topics. sendMQTTheapdiag() publishes 22 individual retained topics: 12
+// from this struct (5 cumulative counters — enter_low/warning/critical +
+// drip_burst_skip/cooldown_skip — plus min_max_block + max_loop_gap_ms + 5 maxBlock
+// histogram buckets), 4 live values (free_heap / max_block / frag_pct / min_free_heap
+// — the last via getMinFreeHeap(), not stored here), and 6 from state.discovery
+// (verify_runs / republish_triggered / last_missing / last_orphan / published_topics /
+// last_verify_epoch). TASK-937 removed ws_drops/mqtt_drops/drip_slowmode with the gating
+// (their HA discovery sensors at pseudo-ID 247 remain but go unavailable). Adding a field
+// here does NOT auto-surface on MQTT — add a publishStatU32(...) call in sendMQTTheapdiag().
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
-  uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
-  uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
-  uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
+  // TASK-937: iWsDropsTotal / iMqttDropsTotal / iDripSlowModeCount removed with the
+  // preventive gating (no more drops; discovery drip no longer slow-modes).
+  uint32_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (diagnostic, getHeapHealth)
   uint32_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier
   uint32_t iEnteredCriticalCount    = 0; // transitions into HEAP_CRITICAL tier
   uint32_t iDripActiveBurstSkipCount = 0; // drip ticks skipped DURING active Status-burst (TASK-342)
   uint32_t iDripCooldownSkipCount   = 0; // drip ticks skipped in post-burst cooldown window (TASK-347)
-  uint32_t iDripSlowModeCount       = 0; // transitions to 10s slow-mode due to heap pressure
   uint32_t iMaxLoopGapMs            = 0; // TASK-866/879: longest gap between loop() entries since boot (loop-stall / core-1 starvation watermark; see loop() detector)
   // TASK-934 soak instrumentation (pure observation; reset by telnet 'z'):
   uint32_t iMinMaxBlock            = 0xFFFFFFFF; // smallest contiguous free block (maxBlock) seen since boot/reset
