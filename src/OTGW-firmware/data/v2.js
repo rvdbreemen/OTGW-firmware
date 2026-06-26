@@ -19,7 +19,7 @@
   function applyTheme(dark) {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     var b = document.getElementById('themeToggle');
-    if (b) b.textContent = dark ? '☀ Light' : '🌙 Dark';
+    if (b) { b.textContent = dark ? '☀ Light' : '🌙 Dark'; b.setAttribute('aria-pressed', dark ? 'true' : 'false'); }
   }
   function initTheme() {
     applyTheme(document.documentElement.getAttribute('data-theme') === 'dark');
@@ -250,7 +250,12 @@
     if (samples.length > SAMPLES_MAX) samples.shift();
   }
   function pushTicker(line) {
-    ticker.push(line);
+    // store parsed {ts,dir,body} so renderTicker can colour timestamp/request/answer
+    // (T/R = request, B/A = answer) without ever feeding device data to innerHTML.
+    var ts = '', body = line, tm = line.match(/^(\d{2}:\d{2}:\d{2}\.\d{3,6})\s+/);
+    if (tm) { ts = tm[1]; body = line.substring(tm[0].length); }
+    var raw = rawFromLine(line);
+    ticker.push({ ts: ts, dir: raw ? raw.charAt(0).toUpperCase() : '', body: body });
     if (ticker.length > TICKER_MAX) ticker.shift();
   }
 
@@ -316,6 +321,21 @@
       tb.appendChild(tr);
     });
     var cnt = document.getElementById('statsCount'); if (cnt) cnt.textContent = shown;
+    updateSortIndicators();
+  }
+  // Reflect the active sort column/direction on the header (aria-sort + ▲/▼ glyph)
+  // so the user can see which column is sorted and which way.
+  function updateSortIndicators() {
+    var ths = document.querySelectorAll('#statsTable thead th');
+    var cols = ['id', 'label', 'dir', 'interval', 'count', 'value'];
+    ths.forEach(function (th, i) {
+      var on = cols[i] === statsSort.col;
+      th.classList.toggle('sorted', on);
+      th.classList.toggle('asc', on && statsSort.asc);
+      th.classList.toggle('desc', on && !statsSort.asc);
+      if (on) th.setAttribute('aria-sort', statsSort.asc ? 'ascending' : 'descending');
+      else th.removeAttribute('aria-sort');
+    });
   }
   // OpenTherm message-ID metadata (msgID 0..127), extracted verbatim from the
   // firmware OTmap[] in OTGW-Core.h. Drives the OT Support map detail panel + tooltip
@@ -508,10 +528,10 @@
     var hex = document.createElement('span'); hex.className = 'sd-hex'; hex.textContent = '0x' + ('0' + id.toString(16).toUpperCase()).slice(-2); top.appendChild(hex);
     if (m.spec) { var sp = document.createElement('span'); sp.className = 'sd-spec'; sp.textContent = m.spec; top.appendChild(sp); }
     el.appendChild(top);
-    // coloured support badge
-    var badge = document.createElement('div'); badge.className = 'sd-badge'; badge.textContent = (SUP_BADGE[st.cls] || '') + ' ' + st.label; el.appendChild(badge);
     // human name
     var h5 = document.createElement('h5'); h5.textContent = m.name || ('ID ' + id); el.appendChild(h5);
+    // coloured support badge — after the name, matching the mockup detail order
+    var badge = document.createElement('div'); badge.className = 'sd-badge'; badge.textContent = (SUP_BADGE[st.cls] || '') + ' ' + st.label; el.appendChild(badge);
     // spec + observed fields
     var dl = document.createElement('dl');
     var rows = [['Data type', m.type || '—'], ['Direction', m.dir || '—']];
@@ -524,6 +544,8 @@
     el.appendChild(dl);
     // plain-language conclusion
     var concl = document.createElement('div'); concl.className = 'sd-concl'; concl.textContent = supConcl(id, st); el.appendChild(concl);
+    // provenance footnote — mockup closes every detail render with this
+    var hint = document.createElement('div'); hint.className = 'sd-hint'; hint.textContent = 'From the OpenTherm spec table + your bus traffic this session.'; el.appendChild(hint);
   }
 
   // ---------- Monitor > Log ----------
@@ -727,14 +749,16 @@
     txt('bMod', model.mod === null ? '—' : Math.round(model.mod) + '%');
     txt('bDhw', model.dhw === null ? '—' : Math.round(model.dhw) + '°');
     txt('bDhwState', model.dhw_on ? 'running' : 'standby');
-    txt('bOut', fmt(model.outside, 1, '°'));
+    txt('bOut', 'Outside ' + fmt(model.outside, 1, '°') + ' · OTGW firmware');
     var fill = document.getElementById('bModFill');
     if (fill) fill.style.height = (model.mod === null ? 0 : Math.max(0, Math.min(100, model.mod))) + '%';
     var dot = document.getElementById('bPressDot');
     if (dot && model.pressure !== null) dot.style.left = Math.max(0, Math.min(100, model.pressure / 4 * 100)) + '%';
     var flame = document.getElementById('bFlame'); if (flame) flame.classList.toggle('on', model.flame);
     var st = document.getElementById('bStatus'); if (st) st.classList.toggle('heating', model.flame);
-    txt('bStatusTxt', model.flame ? (model.dhw_on ? 'Heating water' : 'Heating') : (model.dhw_on ? 'Hot water' : 'Idle'));
+    // mockup reuses the rich status sentence here (surfaces fault + modulation),
+    // not a reduced 4-state string that hides a boiler fault in Concept B.
+    txt('bStatusTxt', statusSentence(effectiveSource() === 2));
   }
 
   // Concept C — mission control: live strip chart + metric cells + frame ticker.
@@ -816,8 +840,20 @@
   }
   function renderTicker() {
     var t = document.getElementById('cTicker'); if (!t) return;
-    // textContent (not innerHTML) — raw frames are device data, treat as text.
-    t.textContent = ticker.join('\n');
+    // One block line per frame, coloured via DOM spans (textContent on each node —
+    // raw frames are device data, never innerHTML). Grey timestamp (.ts), request
+    // T/R in blue (.t), answer B/A in green (.b) — the mockup's ticker palette.
+    t.textContent = '';
+    ticker.forEach(function (e) {
+      var ln = document.createElement('div');
+      if (typeof e === 'string') { ln.textContent = e; t.appendChild(ln); return; }
+      if (e.ts) { var sp = document.createElement('span'); sp.className = 'ts'; sp.textContent = e.ts + ' '; ln.appendChild(sp); }
+      var bd = document.createElement('span');
+      bd.className = (e.dir === 'B' || e.dir === 'A') ? 'b' : (e.dir === 'T' || e.dir === 'R') ? 't' : '';
+      bd.textContent = e.body;
+      ln.appendChild(bd);
+      t.appendChild(ln);
+    });
     t.scrollTop = t.scrollHeight;
   }
 
@@ -859,6 +895,15 @@
 
   // ---------- Monitor > Connection map + detail (live; from /health + settings) ----------
   function st5ok(b) { return b ? 'st-ok' : 'st-down'; }
+  // OT-link state with recency (ADR-155 degraded/stale): connected + fresh -> ok;
+  // connected but ageing past OT_STALE_S (approaching the firmware's 30 s window) ->
+  // degraded (st-warn); not connected -> down. ageS null = no recency data.
+  var OT_STALE_S = 20;
+  function otLinkState(connected, ageS) {
+    if (!connected) return 'st-down';
+    if (ageS != null && ageS >= OT_STALE_S) return 'st-warn';
+    return 'st-ok';
+  }
   function fetchConn() {
     fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j || !j.health) return;
@@ -871,8 +916,14 @@
       // bOnline (otgwconnected) — honest single-bus health on OT-Direct hardware.
       var thermOk = isPic ? !!h.thermostatconnected : !!h.otgwconnected;
       var boilerOk = isPic ? !!h.boilerconnected : !!h.otgwconnected;
-      CONN.therm.s = st5ok(thermOk);
-      CONN.boiler.s = st5ok(boilerOk);
+      // Per-link recency (age in s from /health; -1 -> null = no data, e.g. OT-Direct).
+      // On PIC a connected-but-ageing link degrades to st-warn; on OT-Direct we keep
+      // the binary bOnline fallback (ADR-155 — split is presentational there).
+      var thermAge = (typeof h.thermostat_age_s === 'number' && h.thermostat_age_s >= 0) ? h.thermostat_age_s : null;
+      var boilerAge = (typeof h.boiler_age_s === 'number' && h.boiler_age_s >= 0) ? h.boiler_age_s : null;
+      CONN.therm.s = isPic ? otLinkState(thermOk, thermAge) : st5ok(thermOk);
+      CONN.boiler.s = isPic ? otLinkState(boilerOk, boilerAge) : st5ok(boilerOk);
+      CONN.therm.seen = thermAge; CONN.boiler.seen = boilerAge;
       // OpenTherm command interface row (PIC link vs OT-Direct)
       CONN.ot.name = isPic ? 'PIC link' : (iface === 'OT-Direct' ? 'OT-Direct' : 'OpenTherm interface');
       CONN.ot.detail = iface || 'none';
@@ -1095,7 +1146,58 @@
     satautogains:        { cat: 'sat', label: 'Auto-gain factor' },
     satsolarfreezeint:   { cat: 'sat', label: 'Solar freeze integral' },
     satmaxmodulation:    { cat: 'sat', label: 'Max modulation', hint: '%' },
-    satweatherapikey:    { cat: 'sat', label: 'OWM API key' }
+    satweatherapikey:    { cat: 'sat', label: 'OWM API key' },
+    // --- SAT long-tail: curated labels + hints + sub-groups for the older SAT keys
+    // the firmware GET exposes (presets / weather / solar / summer / comfort /
+    // multi-area / PV-boost / auto-tune / simulation / BLE). These previously fell
+    // back to humanizeKey under a flat SAT card (TASK-933 mockup-alignment). ---
+    satexternaltemp:     { cat: 'sat', label: 'Use external temp source' },
+    satovershootmargin:  { cat: 'sat', label: 'Overshoot margin', hint: '°C' },
+    satpwmautoswitch:    { cat: 'sat', label: 'Auto PWM switch' },
+    satboilercapacity:   { cat: 'sat', label: 'Boiler capacity', hint: 'kW' },
+    satthermalcoeff:     { cat: 'sat', label: 'Thermal-drop coefficient' },
+    satpresetcomfort:    { cat: 'sat', sub: 'Presets', label: 'Comfort preset', hint: '°C' },
+    satpreseteco:        { cat: 'sat', sub: 'Presets', label: 'Eco preset', hint: '°C' },
+    satpresetaway:       { cat: 'sat', sub: 'Presets', label: 'Away preset', hint: '°C' },
+    satpresetsleep:      { cat: 'sat', sub: 'Presets', label: 'Sleep preset', hint: '°C' },
+    satpresetactivity:   { cat: 'sat', sub: 'Presets', label: 'Activity preset', hint: '°C' },
+    satpresethome:       { cat: 'sat', sub: 'Presets', label: 'Home preset', hint: '°C' },
+    satpresetsync:       { cat: 'sat', sub: 'Presets', label: 'Sync presets via MQTT' },
+    satpresetsynctopic:  { cat: 'sat', sub: 'Presets', label: 'Preset sync topic' },
+    satweatherenable:    { cat: 'sat', sub: 'Weather', label: 'Enable weather compensation' },
+    satweatherlat:       { cat: 'sat', sub: 'Weather', label: 'Latitude', hint: '°' },
+    satweatherlon:       { cat: 'sat', sub: 'Weather', label: 'Longitude', hint: '°' },
+    satweatherinterval:  { cat: 'sat', sub: 'Weather', label: 'Update interval', hint: 'Seconds' },
+    satsolargain:        { cat: 'sat', sub: 'Solar gain', label: 'Enable solar gain' },
+    satsolarminrise:     { cat: 'sat', sub: 'Solar gain', label: 'Min rise rate', hint: '°C' },
+    satsolaroffset:      { cat: 'sat', sub: 'Solar gain', label: 'Setpoint offset', hint: '°C' },
+    satsummersimmer:     { cat: 'sat', sub: 'Summer simmer', label: 'Enable summer simmer' },
+    satsummerthreshold:  { cat: 'sat', sub: 'Summer simmer', label: 'Summer threshold', hint: '°C' },
+    satsummerminhours:   { cat: 'sat', sub: 'Summer simmer', label: 'Min summer hours', hint: 'Hours' },
+    satcomfortadjust:    { cat: 'sat', sub: 'Thermal comfort', label: 'Comfort humidity adjust' },
+    satcomforthumidity:  { cat: 'sat', sub: 'Thermal comfort', label: 'Target humidity', hint: '%' },
+    satcomfortmaxoffset: { cat: 'sat', sub: 'Thermal comfort', label: 'Max comfort offset', hint: '°C' },
+    satmultiarea:        { cat: 'sat', sub: 'Multi-area', label: 'Enable multi-area' },
+    satmultiareacount:   { cat: 'sat', sub: 'Multi-area', label: 'Area count' },
+    satareaweight0:      { cat: 'sat', sub: 'Multi-area', label: 'Area 0 weight' },
+    satareaweight1:      { cat: 'sat', sub: 'Multi-area', label: 'Area 1 weight' },
+    satareaweight2:      { cat: 'sat', sub: 'Multi-area', label: 'Area 2 weight' },
+    satareaweight3:      { cat: 'sat', sub: 'Multi-area', label: 'Area 3 weight' },
+    satpvboostenabled:   { cat: 'sat', sub: 'PV boost', label: 'Enable PV boost' },
+    satpvboostthresholdw:{ cat: 'sat', sub: 'PV boost', label: 'Surplus threshold', hint: 'W' },
+    satpvboostholds:     { cat: 'sat', sub: 'PV boost', label: 'Hold time', hint: 'Seconds' },
+    satpvboostdeltac:    { cat: 'sat', sub: 'PV boost', label: 'Setpoint boost', hint: '°C' },
+    satpvboostmaxindoorc:{ cat: 'sat', sub: 'PV boost', label: 'Max indoor temp', hint: '°C' },
+    satpvboostmaxdurationmin: { cat: 'sat', sub: 'PV boost', label: 'Max duration', hint: 'Minutes' },
+    satautotune:         { cat: 'sat', sub: 'PID auto-tune', label: 'Enable auto-tune' },
+    satautotunerate:     { cat: 'sat', sub: 'PID auto-tune', label: 'Auto-tune rate' },
+    satsimulation:       { cat: 'sat', sub: 'Simulation', label: 'Enable simulation' },
+    satsimheatrate:      { cat: 'sat', sub: 'Simulation', label: 'Heat rate', hint: '°C/min' },
+    satsimcoolrate:      { cat: 'sat', sub: 'Simulation', label: 'Cool rate', hint: '°C/min' },
+    satbleenable:        { cat: 'sat', sub: 'BLE sensor', label: 'Enable BLE sensor' },
+    satblefailover:      { cat: 'sat', sub: 'BLE sensor', label: 'BLE failover to OT' },
+    satblemac:           { cat: 'sat', sub: 'BLE sensor', label: 'BLE sensor MAC' },
+    satbleinterval:      { cat: 'sat', sub: 'BLE sensor', label: 'BLE poll interval', hint: 'Seconds' }
   };
   // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
   // normal toggle — never list it as an editable setting.
@@ -1235,10 +1337,22 @@
       input = document.createElement('input'); input.type = 'text'; input.value = curVal(k); input.disabled = true;
     } else if (ENUM_OPTS[k]) {
       input = document.createElement('select');
+      var cv = '' + curVal(k);
+      // Match the current value against the option set. Numeric enums store "2";
+      // string enums store the literal value. Try raw first, then int-normalised —
+      // the old parseInt-only path coerced every string enum to the 0th option.
+      var hasRaw = ENUM_OPTS[k].some(function (o) { return ('' + o[0]) === cv; });
+      var cvInt = '' + parseInt(cv, 10);
+      var hasInt = !hasRaw && cv !== '' && ENUM_OPTS[k].some(function (o) { return ('' + o[0]) === cvInt; });
       ENUM_OPTS[k].forEach(function (o) {
         var opt = document.createElement('option'); opt.value = '' + o[0]; opt.textContent = o[1]; input.appendChild(opt);
       });
-      input.value = '' + (parseInt(curVal(k), 10) || 0);
+      // Preserve an out-of-list current value as its own option so a custom setting
+      // (e.g. a timezone not in the list) is never silently dropped to the 0th entry.
+      if (!hasRaw && !hasInt && cv !== '') {
+        var cur = document.createElement('option'); cur.value = cv; cur.textContent = cv + ' (current)'; input.appendChild(cur);
+      }
+      input.value = hasRaw ? cv : hasInt ? cvInt : cv;
       input.addEventListener('change', function () { markDirty(k, input.value, row); });
     } else {
       input = document.createElement('input');
@@ -1420,7 +1534,12 @@
     // OT-Direct CH mode (TASK-933 P2): 0=off, 1=fixed flow, 2=heating curve (auto)
     otdchmode: [[0, 'Off'], [1, 'Fixed flow'], [2, 'Heating curve (auto)']],
     // SAT manufacturer presets — labels from the firmware satManufacturerTable[].
-    satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']]
+    satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']],
+    // Friendly select for the default graph window (firmware stores minutes, 0-1440).
+    ui_graphtimewindow: [[10, '10 min'], [30, '30 min'], [60, '1 hour'], [240, '4 hours'], [1440, '24 hours']],
+    // Webhook POST content type — standard closed set (string-valued enum; the
+    // string-safe select path preserves any custom value not in this list).
+    webhookcontenttype: [['application/json', 'application/json'], ['application/x-www-form-urlencoded', 'form-urlencoded'], ['text/plain', 'text/plain']]
   };
 
   function fetchSeed() {

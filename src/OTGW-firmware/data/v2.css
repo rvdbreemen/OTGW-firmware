@@ -260,6 +260,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan)}
     padding:10px 12px;border-bottom:2px solid var(--border);cursor:pointer}
   table.stats td{padding:9px 12px;border-bottom:1px solid var(--border)}
   table.stats tr:hover td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  table.stats th.sorted{color:var(--accent)}
+  table.stats th.sorted.asc::after{content:' \25B2';font-size:.7em;opacity:.85}
+  table.stats th.sorted.desc::after{content:' \25BC';font-size:.7em;opacity:.85}
   .idbadge{font-family:var(--font-mono);font-size:.74rem;background:var(--panel-2);
     border:1px solid var(--border);border-radius:6px;padding:2px 7px}
   .dirbadge{font-size:.7rem;font-weight:700;border-radius:6px;padding:3px 8px;white-space:nowrap}

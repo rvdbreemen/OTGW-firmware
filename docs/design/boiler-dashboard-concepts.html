@@ -1,0 +1,2711 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>OTGW Web UI — Opening page concepts (TASK-854)</title>
+<!--
+  DESIGN MOCKUP — not firmware, not shipped to LittleFS.
+  Three switchable opening-page concepts for the OTGW Web UI:
+    A · System view   — animated boiler schematic: flame on/off, red flow
+                        arrow out + temperature, blue return arrow in +
+                        temperature (per user feedback), DHW branch, pump,
+                        radiator, pressure, room & outside temperature.
+    B · At a glance   — mobile-first hero dial + stat cards (Nest/Tado vibe).
+    C · Mission ctrl  — data-dense live strip chart + OT frame ticker.
+  100% self-contained: hand-rolled SVG/CSS/JS, no libraries, no network.
+  All data is SIMULATED (random walk) so everything visibly moves.
+-->
+<style>
+  :root{
+    --font-sans:'Inter',Roboto,Arial,Helvetica,sans-serif;
+    --font-mono:'JetBrains Mono',Consolas,'Courier New',monospace;
+  }
+  html[data-theme="light"]{
+    --bg:#e6ffff; --panel:#ffffff; --panel-2:#f2fbff; --nav:#00bffe;
+    --text:#10303a; --muted:#5b7c87; --border:#bfe9f7;
+    --shadow:0 1px 3px rgba(0,0,0,.12);
+    --zone-ok:#2ecc71; --zone-warn:#f39c12; --zone-alert:#e74c3c;
+    --accent:#0098cc; --needle:#10303a;
+    --hot:#ff5a3c; --cold:#2f8fe8;
+    --tile-on:#2ecc71; --tile-off:#9fb4bc; --tile-fault:#e74c3c;
+    --gauge-track:#d7eef6; --gauge-text:#10303a;
+  }
+  html[data-theme="dark"]{
+    --bg:#1a1a1a; --panel:#2c2c2e; --panel-2:#242426; --nav:#383838;
+    --text:#e8e8ea; --muted:#9a9a9e; --border:#3c3c3e;
+    --shadow:0 1px 3px rgba(0,0,0,.5);
+    --zone-ok:#27c469; --zone-warn:#e0a300; --zone-alert:#ff5a4d;
+    --accent:#00bffe; --needle:#e8e8ea;
+    --hot:#ff6a4d; --cold:#4da3ff;
+    --tile-on:#27c469; --tile-off:#54565a; --tile-fault:#ff5a4d;
+    --gauge-track:#3a3a3d; --gauge-text:#e8e8ea;
+  }
+  *{box-sizing:border-box}
+  html,body{font-feature-settings:"tnum" 1;font-variant-numeric:tabular-nums}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-sans);
+       transition:background .2s,color .2s}
+
+  /* ---------- header + design switcher ---------- */
+  .headerrow{display:flex;align-items:center;gap:10px;background:var(--nav);
+    color:#fff;padding:10px 14px;font-weight:700;box-shadow:var(--shadow);flex-wrap:wrap}
+  html[data-theme="dark"] .headerrow{color:#e8e8ea}
+  .headerrow .big{font-size:1.05rem;margin-right:auto}
+  .headerrow .sub{font-weight:400;opacity:.9;font-size:.8rem}
+  .theme-toggle{cursor:pointer;user-select:none;border:1px solid rgba(255,255,255,.4);
+    border-radius:8px;padding:8px 12px;font-size:.85rem;min-height:40px}
+  .switcher{display:flex;gap:6px;background:var(--nav);padding:8px 12px 12px;flex-wrap:wrap}
+  .seg{flex:1;min-width:104px;min-height:48px;border:0;border-radius:12px;cursor:pointer;
+    background:rgba(255,255,255,.18);color:#fff;font-family:var(--font-sans);
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+  html[data-theme="dark"] .seg{color:#e8e8ea}
+  .seg b{font-size:.92rem}
+  .seg small{font-size:.66rem;opacity:.85;letter-spacing:.04em;text-transform:uppercase}
+  .seg.active{background:var(--bg);color:var(--text)}
+
+  .wrap{max-width:1020px;margin:0 auto;padding:16px}
+  .design{display:none}
+  .design.active{display:block}
+  .concept-cap{font-size:.8rem;color:var(--muted);margin:2px 2px 12px}
+
+  /* ---------- shared bits ---------- */
+  .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px}
+  .tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);padding:12px;display:flex;align-items:center;gap:10px}
+  .led{width:12px;height:12px;border-radius:50%;background:var(--tile-off);flex:0 0 auto;
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--tile-off) 25%,transparent)}
+  .tile.on .led{background:var(--tile-on);box-shadow:0 0 0 3px color-mix(in srgb,var(--tile-on) 30%,transparent)}
+  .tile.fault .led{background:var(--tile-fault);box-shadow:0 0 0 3px color-mix(in srgb,var(--tile-fault) 30%,transparent);
+    animation:faultPulse 1s ease-in-out infinite}
+  @keyframes faultPulse{50%{box-shadow:0 0 0 7px color-mix(in srgb,var(--tile-fault) 18%,transparent)}}
+  .tile .lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;font-weight:700}
+  .tile .val{font-size:.98rem;font-weight:700}
+  .foot{font-size:.75rem;color:var(--muted);text-align:center;margin:18px 0 6px}
+
+  /* ================= DESIGN A — system view ================= */
+  .schemcard{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+    box-shadow:var(--shadow);padding:8px 6px 2px}
+  .statusline{display:flex;gap:8px;align-items:center;font-size:.86rem;color:var(--muted);
+    padding:6px 10px 2px;flex-wrap:wrap}
+  .statusline .dot{width:9px;height:9px;border-radius:50%;background:var(--tile-off)}
+  .statusline.heating .dot{background:var(--hot);box-shadow:0 0 6px var(--hot)}
+  svg.schematic{width:100%;height:auto;display:block}
+  .boiler-body{fill:var(--panel-2);stroke:var(--border);stroke-width:2.5}
+  svg.fault .boiler-body{stroke:var(--zone-alert);animation:strokePulse 1s infinite}
+  @keyframes strokePulse{50%{stroke-width:5}}
+  .lcd{fill:#0d2026;stroke:var(--border)}
+  .lcd-txt{font-family:var(--font-mono);font-size:14px;fill:#79f2c0;text-anchor:middle}
+  .window{fill:#101418;stroke:var(--border);stroke-width:3}
+  svg.flame-on:not(.heatpump) .window{stroke:#ffb45e}
+  svg.heatpump.flame-on .window{stroke:#5bd6ff}
+  .flame-outer{fill:url(#gFlame)}
+  .flame-inner{fill:#ffe27a}
+  .bolt-outer{fill:url(#gBolt)}
+  .bolt-inner{fill:#eafdff}
+  #flameWrap{opacity:0;transition:opacity .35s}
+  svg.flame-on:not(.heatpump) #flameWrap{opacity:1}
+  #boltWrap{opacity:0;transition:opacity .35s}
+  svg.heatpump.flame-on #boltWrap{opacity:1}
+  .pilot{fill:#3a4754}
+  svg.flame-on .pilot{opacity:0}
+  /* burner height = modulation (scaleY drives the visible height) */
+  .burnscale{transform-box:fill-box;transform-origin:50% 100%;
+    transform:scaleX(var(--fx,1)) scaleY(var(--fy,1));transition:transform .5s ease}
+  .flick{transform-box:fill-box;transform-origin:50% 100%;
+    animation:flick .55s ease-in-out infinite}
+  .crackle{transform-box:fill-box;transform-origin:50% 100%;
+    animation:crackle .4s steps(2,end) infinite}
+  @keyframes crackle{0%,100%{opacity:.96}50%{opacity:.55}}
+  .glow-e{filter:drop-shadow(0 0 7px color-mix(in srgb,#2ad4ff 78%,transparent))}
+  .mod-big{fill:var(--gauge-text);font-size:25px;font-weight:700;text-anchor:middle;font-family:var(--font-sans)}
+  .mod-tag{fill:var(--muted);font-size:9px;letter-spacing:.14em;text-anchor:middle;font-weight:700}
+  .seg2btn{border:1px solid var(--border);background:var(--panel);color:var(--muted);
+    border-radius:8px;padding:6px 10px;font-size:.74rem;cursor:pointer;min-height:34px;font-family:var(--font-sans)}
+  .seg2btn.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .appl-toggle{display:inline-flex;gap:4px;margin-left:auto}
+  @keyframes flick{
+    0%,100%{transform:scale(var(--fs,1)) }
+    30%{transform:scale(calc(var(--fs,1)*1.07)) skewX(2deg)}
+    65%{transform:scale(calc(var(--fs,1)*.94)) skewX(-2deg)}
+  }
+  .pipe{fill:none;stroke-width:11;stroke-linecap:round;stroke-linejoin:round}
+  .pipeHot{stroke:url(#gHot)} .pipeCold{stroke:url(#gCold)} .pipeDhw{stroke:url(#gDhw)}
+  svg:not(.ch-on) .pipeHot, svg:not(.ch-on) .pipeCold{stroke:var(--gauge-track)}
+  svg:not(.dhw-on) .pipeDhw{stroke:var(--gauge-track)}
+  .dash{fill:none;stroke:rgba(255,255,255,.9);stroke-width:4;stroke-linecap:round;
+    stroke-dasharray:4 15;animation:dashMove 1s linear infinite;animation-play-state:paused;opacity:0}
+  svg.ch-on .dash.ch{animation-play-state:running;opacity:1}
+  svg.dhw-on .dash.dhw{animation-play-state:running;opacity:1}
+  @keyframes dashMove{to{stroke-dashoffset:-19}}
+  .arrow{opacity:.25;transition:opacity .3s}
+  svg.ch-on .arrow.ch{opacity:1}
+  svg.dhw-on .arrow.dhw{opacity:1}
+  .arrowHot{fill:var(--hot)} .arrowCold{fill:var(--cold)}
+  .chip-hot{fill:var(--hot)} .chip-cold{fill:var(--cold)} .chip-dhw{fill:#ff9b3c}
+  svg:not(.dhw-on) .chip-dhw{fill:var(--tile-off)}
+  .chip-txt{fill:#fff;font-weight:700;font-size:21px;text-anchor:middle;font-family:var(--font-sans)}
+  .chip-sub{fill:rgba(255,255,255,.85);font-size:9.5px;letter-spacing:.12em;text-anchor:middle}
+  .soft-chip{fill:var(--panel);stroke:var(--border)}
+  .soft-txt{fill:var(--muted);font-size:14px;text-anchor:middle;font-weight:700}
+  .label-big{fill:var(--gauge-text);font-size:20px;font-weight:700}
+  .label-sub{fill:var(--muted);font-size:11px}
+  .label-tag{fill:var(--muted);font-size:9.5px;letter-spacing:.12em;font-weight:700}
+  .rad-bar{stroke:var(--border);stroke-width:1.5;transition:fill .8s}
+  .rad-mani{fill:var(--gauge-track);stroke:var(--border)}
+  .pump-body{fill:var(--panel-2);stroke:var(--border);stroke-width:2.5}
+  #pumpBlades{transform-box:fill-box;transform-origin:center;
+    animation:spin 1.1s linear infinite;animation-play-state:paused;fill:var(--accent)}
+  svg.ch-on #pumpBlades{animation-play-state:running}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .drop{fill:var(--cold);opacity:0}
+  svg.dhw-on .drop{animation:dropFall 1.1s ease-in infinite}
+  .drop.d2{animation-delay:.35s} .drop.d3{animation-delay:.7s}
+  @keyframes dropFall{0%{opacity:0;transform:translateY(0)}15%{opacity:.95}
+    100%{opacity:0;transform:translateY(26px)}}
+  .glow{filter:drop-shadow(0 0 6px color-mix(in srgb,var(--hot) 55%,transparent))}
+  .press-needle{stroke:var(--needle);stroke-width:3;stroke-linecap:round}
+  .press-txt{fill:var(--gauge-text);font-size:12.5px;font-weight:700;text-anchor:middle}
+  .cloud{fill:var(--gauge-track);stroke:var(--border)}
+  .house{fill:var(--panel-2);stroke:var(--muted);stroke-width:2}
+  .mobile-strip{display:none;gap:8px;overflow-x:auto;padding:8px 6px 10px}
+  .mobile-strip .mchip{flex:0 0 auto;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:10px;padding:6px 12px;font-size:.8rem;white-space:nowrap}
+  .mobile-strip b{font-size:.95rem}
+  @media(max-width:719px){.mobile-strip{display:flex}}
+
+  /* ================= DESIGN B — at a glance ================= */
+  .glance{max-width:430px;margin:0 auto}
+  .g-status{display:flex;align-items:center;gap:8px;font-size:.92rem;margin:4px 2px 10px;color:var(--muted)}
+  .g-status .dot{width:10px;height:10px;border-radius:50%;background:var(--tile-off)}
+  .g-status.heating .dot{background:var(--hot);box-shadow:0 0 8px var(--hot)}
+  .hero{background:linear-gradient(160deg,var(--panel),var(--panel-2));border:1px solid var(--border);
+    border-radius:22px;box-shadow:var(--shadow);padding:18px 14px 16px;text-align:center}
+  .hero svg{width:230px;height:230px}
+  .hero-track{fill:none;stroke:var(--gauge-track);stroke-width:15;stroke-linecap:round}
+  .hero-arc{fill:none;stroke:var(--accent);stroke-width:15;stroke-linecap:round}
+  .hero-tick{stroke:var(--zone-ok);stroke-width:5;stroke-linecap:round}
+  .hero-big{fill:var(--gauge-text);font-size:50px;font-weight:700;text-anchor:middle}
+  .hero-sub{fill:var(--muted);font-size:14px;text-anchor:middle}
+  .stepbtn{font-size:1.5rem;width:52px;height:52px;border-radius:50%;
+    border:1px solid var(--border);background:var(--panel-2);color:var(--text);cursor:pointer;margin:4px 10px 0}
+  .cmdline{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);margin-top:10px;min-height:1.1em}
+  .cmdline b{color:var(--accent)}
+  .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+    box-shadow:var(--shadow);padding:14px;min-height:96px}
+  .stat .lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.04em}
+  .stat .big{font-size:1.45rem;font-weight:700;margin-top:4px}
+  .hotArrow{color:var(--hot);font-weight:700}
+  .coldArrow{color:var(--cold);font-weight:700}
+  .flamebadge{display:inline-block;margin-left:6px;font-size:1rem;filter:grayscale(1);opacity:.35}
+  .flamebadge.on{filter:none;opacity:1}
+  .zonebar{position:relative;height:10px;border-radius:5px;margin-top:12px;
+    background:linear-gradient(90deg,var(--zone-alert) 0 25%,var(--zone-warn) 25% 37.5%,
+      var(--zone-ok) 37.5% 62.5%,var(--zone-warn) 62.5% 75%,var(--zone-alert) 75% 100%)}
+  .zonedot{position:absolute;top:-4px;width:18px;height:18px;border-radius:50%;
+    background:var(--panel);border:3px solid var(--needle);transform:translateX(-50%);transition:left .6s}
+  .modwrap{display:flex;align-items:flex-end;gap:12px}
+  .modbar{position:relative;width:26px;height:64px;border-radius:8px;overflow:hidden;
+    background:var(--gauge-track)}
+  .modfill{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 8px 8px;
+    background:linear-gradient(0deg,var(--cold),var(--zone-warn) 55%,var(--zone-alert));
+    background-size:100% 64px;background-position:bottom;transition:height .6s}
+
+  /* ================= DESIGN C — mission control ================= */
+  .mc{--bg:#0d1117;--panel:#161b22;--panel-2:#1c2129;--border:#2d333b;--text:#e6edf3;
+      --muted:#8b949e;--gauge-track:#2d333b;
+      background:var(--bg);border-radius:16px;padding:14px;color:var(--text)}
+  .mc h2{font-family:var(--font-mono);font-size:.95rem;margin:2px 4px 12px;color:var(--muted);
+    letter-spacing:.08em}
+  .mc h2 b{color:#79f2c0}
+  .stripcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:8px}
+  .stripcard svg{width:100%;height:auto;display:block}
+  .axis-txt{fill:var(--muted);font-size:10px;font-family:var(--font-mono)}
+  .ser-flow{fill:none;stroke:var(--hot);stroke-width:2}
+  .ser-ret{fill:none;stroke:var(--cold);stroke-width:2}
+  .ser-sp{stroke:#8b949e;stroke-width:1.5;stroke-dasharray:5 5}
+  .ser-mod{fill:rgba(0,191,254,.18);stroke:rgba(0,191,254,.5);stroke-width:1}
+  .legend{display:flex;gap:14px;font-family:var(--font-mono);font-size:.7rem;color:var(--muted);
+    padding:6px 6px 2px;flex-wrap:wrap}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
+  .mc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px}
+  .mc-cell{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .mc-cell .lbl{font-family:var(--font-mono);font-size:.64rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+  .mc-cell .val{font-family:var(--font-mono);font-size:1.3rem;font-weight:700;margin-top:2px}
+  .mc-cell .val.hot{color:var(--hot)} .mc-cell .val.cold{color:var(--cold)}
+  .mc-cell .val.ok{color:#79f2c0} .mc-cell .val.warn{color:var(--zone-warn)} .mc-cell .val.alert{color:var(--zone-alert)}
+  .ticker{background:#0a0e14;border:1px solid var(--border);border-radius:10px;margin-top:12px;
+    height:138px;overflow-y:auto;padding:8px 10px;font-family:var(--font-mono);font-size:.72rem;line-height:1.5}
+  .ticker .t{color:#00bffe} .ticker .b{color:#79f2c0} .ticker .ts{color:#566069}
+  @media(max-width:719px){
+    .hero svg{width:200px;height:200px}
+  }
+
+  /* ================= primary pages + concept chips ================= */
+  .page{display:none}
+  .page.active{display:block}
+  .cchips{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
+  .cchip{border:1px solid var(--border);background:var(--panel);color:var(--text);
+    border-radius:20px;padding:9px 16px;font-size:.82rem;cursor:pointer;min-height:40px;
+    font-family:var(--font-sans)}
+  .cchip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+
+  /* ================= MONITOR page ================= */
+  .subtabs{display:flex;gap:6px;margin:2px 0 14px;flex-wrap:wrap}
+  .subtab{border:1px solid var(--border);background:var(--panel);color:var(--muted);
+    border-radius:10px;padding:10px 18px;font-size:.86rem;cursor:pointer;min-height:44px;
+    font-family:var(--font-sans);font-weight:700}
+  .subtab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .mpanel{display:none}
+  .mpanel.active{display:block}
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+  .tbtn{border:1px solid var(--border);background:var(--panel);color:var(--text);
+    border-radius:9px;padding:8px 14px;font-size:.8rem;cursor:pointer;min-height:40px}
+  .tsearch{flex:1;min-width:140px;border:1px solid var(--border);background:var(--panel);
+    color:var(--text);border-radius:9px;padding:8px 12px;font-size:.85rem;min-height:40px}
+  .tchip{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);
+    border:1px solid var(--border);border-radius:20px;padding:7px 12px;cursor:pointer;user-select:none}
+  .tchip.on{border-color:var(--accent);color:var(--accent);font-weight:700}
+  .console{background:#0a0e14;border:1px solid var(--border);border-radius:12px;
+    height:340px;overflow-y:auto;padding:10px 12px;font-family:var(--font-mono);
+    font-size:.74rem;line-height:1.55;color:#c7d1da}
+  .console .t{color:#00bffe}.console .b{color:#79f2c0}.console .ts{color:#566069}
+  .console .err{color:#ff5a4d}
+  .statfoot{display:flex;gap:16px;font-size:.76rem;color:var(--muted);padding:8px 4px 0;flex-wrap:wrap}
+  table.stats{width:100%;border-collapse:collapse;background:var(--panel);border-radius:12px;
+    overflow:hidden;box-shadow:var(--shadow);font-size:.84rem}
+  table.stats th{position:sticky;top:0;background:var(--panel-2);color:var(--muted);
+    font-size:.7rem;text-transform:uppercase;letter-spacing:.05em;text-align:left;
+    padding:10px 12px;border-bottom:2px solid var(--border);cursor:pointer}
+  table.stats td{padding:9px 12px;border-bottom:1px solid var(--border)}
+  table.stats tr:hover td{background:color-mix(in srgb,var(--accent) 7%,transparent)}
+  .idbadge{font-family:var(--font-mono);font-size:.74rem;background:var(--panel-2);
+    border:1px solid var(--border);border-radius:6px;padding:2px 7px}
+  .dirbadge{font-size:.7rem;font-weight:700;border-radius:6px;padding:3px 8px;white-space:nowrap}
+  .dir-t{background:color-mix(in srgb,var(--accent) 18%,transparent);color:var(--accent)}
+  .dir-b{background:color-mix(in srgb,var(--zone-ok) 18%,transparent);color:var(--zone-ok)}
+  .dir-tb{background:color-mix(in srgb,var(--zone-warn) 20%,transparent);color:var(--zone-warn)}
+  .dir-dallas{background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot)}
+  .dir-ble{background:color-mix(in srgb,var(--cold) 18%,transparent);color:var(--cold)}
+  .dir-ovr{background:color-mix(in srgb,var(--zone-warn) 22%,transparent);color:var(--zone-warn)}
+  .statval{font-family:var(--font-mono);font-weight:700}
+  .matrix{display:grid;grid-template-columns:repeat(16,1fr);gap:5px;background:var(--panel);
+    border:1px solid var(--border);border-radius:12px;padding:14px;box-shadow:var(--shadow)}
+  .mcellq{aspect-ratio:1;border-radius:5px;background:var(--gauge-track);position:relative;
+    font-size:.55rem;display:flex;align-items:center;justify-content:center;color:transparent}
+  .mcellq:hover{outline:2px solid var(--accent);color:var(--text);z-index:1}
+  .mcellq.both{background:var(--zone-ok)}
+  .mcellq.tonly{background:var(--accent)}
+  .mcellq.bonly{background:var(--zone-warn)}
+  .mcellq.sel{outline:3px solid var(--needle);outline-offset:1px;z-index:2;color:var(--text)}
+  .supwrap{display:grid;grid-template-columns:1fr 312px;gap:14px;align-items:start}
+  @media(max-width:899px){.supwrap{grid-template-columns:1fr}}
+  .supdetail{position:sticky;top:12px;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow);padding:16px;border-top:4px solid var(--s,var(--border))}
+  .supdetail .sd-top{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .supdetail .sd-num{font-family:var(--font-mono);font-size:1.8rem;font-weight:700;line-height:1}
+  .supdetail .sd-hex{font-family:var(--font-mono);font-size:.82rem;color:var(--muted)}
+  .supdetail .sd-spec{font-family:var(--font-mono);font-size:.82rem;color:var(--accent);
+    margin-left:auto;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:3px 8px}
+  .supdetail h5{margin:10px 0 2px;font-size:1.02rem}
+  .supdetail dl{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;margin:12px 0;font-size:.82rem}
+  .supdetail dt{color:var(--muted)}
+  .supdetail dd{margin:0;font-family:var(--font-mono);text-align:right}
+  .supdetail .sd-badge{display:inline-flex;align-items:center;gap:6px;font-size:.74rem;font-weight:700;
+    color:#fff;background:var(--s);border-radius:8px;padding:4px 10px}
+  .supdetail .sd-concl{background:color-mix(in srgb,var(--s) 13%,transparent);
+    border:1px solid color-mix(in srgb,var(--s) 45%,transparent);border-radius:10px;
+    padding:9px 11px;font-size:.82rem;margin-top:6px}
+  .supdetail .sd-hint{font-size:.74rem;color:var(--muted);margin-top:10px}
+  .suptip{position:fixed;pointer-events:none;z-index:30;background:#0d2026;color:#fff;
+    font-size:.74rem;padding:6px 10px;border-radius:8px;opacity:0;transition:opacity .1s;
+    transform:translate(-50%,-135%);white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.3)}
+  .suptip b{color:#79f2c0}
+  .mlegend{display:flex;gap:14px;font-size:.76rem;color:var(--muted);margin:10px 2px;flex-wrap:wrap}
+  .mlegend i{display:inline-block;width:13px;height:13px;border-radius:4px;margin-right:5px;vertical-align:-2px;background:var(--gauge-track)}
+  .mlegend .lb i{background:var(--zone-ok)} .mlegend .lt i{background:var(--accent)}
+  .mlegend .lo i{background:var(--zone-warn)}
+  .graphcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:10px;box-shadow:var(--shadow)}
+  .graphcard svg{width:100%;height:auto;display:block}
+
+  /* ================= SETTINGS page ================= */
+  .set-layout{display:grid;grid-template-columns:215px 1fr;gap:16px;align-items:start}
+  .set-rail{position:sticky;top:12px;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow);padding:8px;display:flex;flex-direction:column;gap:2px}
+  .rail-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
+    cursor:pointer;font-size:.86rem;color:var(--text)}
+  .rail-item:hover{background:var(--panel-2)}
+  .rail-item.active{background:color-mix(in srgb,var(--accent) 14%,transparent);
+    color:var(--accent);font-weight:700}
+  .rail-item .cnt{margin-left:auto;font-size:.68rem;color:var(--muted);background:var(--panel-2);
+    border-radius:9px;padding:2px 7px}
+  .set-cols{min-width:0}
+  .set-cat-title{font-size:1.08rem;font-weight:700;display:flex;align-items:center;gap:8px;margin:2px 2px 4px}
+  .cat-desc{font-size:.8rem;color:var(--muted);margin:0 2px 14px;max-width:70ch}
+  /* masonry flow: cards pack tightly per column (no grid row-alignment whitespace) */
+  .set-cards{columns:300px;column-gap:16px}
+  .sfield{display:inline-flex;align-items:center;gap:6px}
+  .sunit{font-size:.74rem;color:var(--muted);min-width:1.5em}
+  .set-group{break-inside:avoid;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin:0 0 16px;display:inline-block;width:100%}
+  /* BLE sensor roster */
+  .ble-desc{font-size:.74rem;color:var(--muted);margin:2px 0 8px}
+  .ble-row{padding:9px 0;border-top:1px solid var(--border)}
+  .ble-row:first-of-type{border-top:0}
+  .ble-nm{font-weight:700;font-size:.86rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ble-mac{font-family:var(--font-mono);font-size:.66rem;color:var(--muted);font-weight:400}
+  .ble-tag{font-size:.62rem;font-weight:700;border-radius:7px;padding:2px 7px}
+  .ble-tag.temp{background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot)}
+  .ble-tag.hum{background:color-mix(in srgb,var(--cold) 18%,transparent);color:var(--cold)}
+  .ble-ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:6px}
+  .ble-ctrls label{font-size:.68rem;color:var(--muted);display:flex;flex-direction:column;gap:2px}
+  .ble-ctrls select{border:1px solid var(--border);background:var(--panel-2);color:var(--text);
+    border-radius:7px;padding:5px 7px;font-size:.78rem;font-family:var(--font-sans)}
+  .ble-val{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);margin-left:auto}
+  .set-group h3{margin:0 0 4px;font-size:.95rem;display:flex;align-items:center;gap:8px}
+  .set-group .gdesc{font-size:.76rem;color:var(--muted);margin:0 0 10px}
+  .badge-reboot{font-size:.62rem;font-weight:700;color:var(--zone-warn);
+    border:1px solid var(--zone-warn);border-radius:8px;padding:2px 7px;letter-spacing:.04em}
+  .srow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border)}
+  .srow:first-of-type{border-top:0}
+  .srow .slbl{flex:1;font-size:.84rem}
+  .srow .shint{display:block;font-size:.7rem;color:var(--muted)}
+  .srow input[type=text],.srow input[type=number],.srow input[type=password],.srow select{
+    width:46%;max-width:220px;border:1px solid var(--border);background:var(--panel-2);
+    color:var(--text);border-radius:8px;padding:8px 10px;font-size:.84rem;font-family:var(--font-sans)}
+  .srow.dirty .slbl::before{content:'●';color:var(--zone-warn);margin-right:6px;font-size:.7rem}
+  .sw{appearance:none;width:44px;height:24px;background:var(--tile-off);border-radius:12px;
+    position:relative;cursor:pointer;transition:background .2s;flex:0 0 auto}
+  .sw:checked{background:var(--accent)}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;
+    background:#fff;border-radius:50%;transition:left .2s}
+  .sw:checked::after{left:22px}
+  .set-search{width:100%;border:1px solid var(--border);background:var(--panel);color:var(--text);
+    border-radius:11px;padding:11px 14px;font-size:.9rem;margin:0 0 14px;min-height:44px}
+  .savebar{position:sticky;bottom:10px;display:none;align-items:center;gap:12px;
+    background:var(--panel);border:1px solid var(--accent);border-radius:14px;
+    box-shadow:0 4px 18px rgba(0,0,0,.18);padding:10px 16px;margin-top:8px}
+  .savebar.show{display:flex}
+  .savebar .msg{font-size:.86rem;flex:1}
+  .savebar .save{background:var(--accent);color:#fff;border:0;border-radius:10px;
+    padding:10px 22px;font-weight:700;cursor:pointer;min-height:44px}
+  .savebar .discard{background:none;border:1px solid var(--border);color:var(--muted);
+    border-radius:10px;padding:10px 16px;cursor:pointer;min-height:44px}
+  .toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--zone-ok);
+    color:#fff;font-weight:700;border-radius:12px;padding:11px 22px;opacity:0;transition:opacity .3s;
+    pointer-events:none;z-index:9}
+  .toast.show{opacity:1}
+  /* override signal */
+  .connpill.ovr{background:color-mix(in srgb,var(--zone-warn) 34%,var(--nav))}
+  .connpill.ovr .d{background:var(--zone-warn)}
+  .ovr-panel{position:fixed;top:128px;right:14px;width:300px;background:var(--panel);
+    border:1px solid var(--zone-warn);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.22);
+    padding:13px 15px;z-index:40;display:none}
+  .ovr-panel.show{display:block}
+  .ovr-panel h4{margin:0 0 4px;font-size:.86rem;display:flex;align-items:center;gap:7px}
+  .ovr-panel .sub{font-size:.72rem;color:var(--muted);margin:0 0 8px}
+  .ovr-item{font-size:.82rem;padding:8px 0;border-top:1px solid var(--border)}
+  .ovr-item:first-of-type{border-top:0}
+  .ovr-item .r1{display:flex;align-items:center;gap:8px}
+  .ovr-item .cmd{font-family:var(--font-mono);color:var(--zone-warn);font-weight:700}
+  .ovr-item .clr{margin-left:auto;font-size:.72rem;border:1px solid var(--border);background:var(--panel-2);
+    color:var(--muted);border-radius:7px;padding:3px 8px;cursor:pointer}
+  .ovr-item .r2{font-size:.72rem;color:var(--muted);margin-top:2px}
+  /* sensor-discovery notifications */
+  .discover-stack{position:fixed;right:14px;bottom:14px;display:flex;flex-direction:column;gap:10px;z-index:45;max-width:330px}
+  .discover-card{background:var(--panel);border:1px solid var(--accent);border-left:4px solid var(--accent);
+    border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.22);padding:11px 12px;display:flex;gap:11px;
+    align-items:flex-start;animation:discIn .3s ease}
+  .discover-card.ble{border-color:var(--cold);border-left-color:var(--cold)}
+  .discover-card.dallas{border-color:var(--hot);border-left-color:var(--hot)}
+  @keyframes discIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+  .discover-ic{font-size:1.35rem;line-height:1}
+  .discover-bd{flex:1;min-width:0}
+  .discover-bd .t{font-weight:700;font-size:.84rem}
+  .discover-bd .s{font-size:.72rem;color:var(--muted);font-family:var(--font-mono);margin-top:1px}
+  .discover-act{margin-top:8px;display:flex;gap:6px;flex-wrap:wrap}
+  .discover-act button{font-size:.74rem;border-radius:7px;padding:6px 11px;cursor:pointer;
+    border:1px solid var(--border);background:var(--panel-2);color:var(--text);min-height:34px}
+  .discover-act .primary{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .discover-x{cursor:pointer;color:var(--muted);font-size:1.05rem;line-height:1;padding:0 2px}
+  @media(max-width:899px){
+    .set-cards{grid-template-columns:1fr}
+    .set-layout{grid-template-columns:1fr}
+    .set-rail{position:static;flex-direction:row;overflow-x:auto;gap:6px}
+    .rail-item{white-space:nowrap;padding:9px 13px}
+    .rail-item .cnt{display:none}
+  }
+
+  /* ================= CONNECTIVITY ================= */
+  /* state vocabulary — one set of colours used everywhere */
+  .st-ok{--s:var(--zone-ok)} .st-warn{--s:var(--zone-warn)} .st-down{--s:var(--zone-alert)}
+  .st-off{--s:var(--tile-off)} .st-unknown{--s:var(--muted)} .st-mode{--s:var(--accent)}
+  .connstrip{display:flex;gap:8px;background:var(--nav);padding:0 12px 12px;overflow-x:auto}
+  .connpill{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.16);
+    border:0;border-radius:20px;padding:7px 12px;cursor:pointer;color:#fff;font-size:.78rem;
+    font-family:var(--font-sans);min-height:36px;white-space:nowrap}
+  html[data-theme="dark"] .connpill{color:#e8e8ea;background:rgba(255,255,255,.08)}
+  .connpill .d{width:9px;height:9px;border-radius:50%;background:var(--s,var(--tile-off));flex:0 0 auto}
+  .connpill.st-down .d,.connpill.st-warn .d{animation:cpPulse 1.1s ease-in-out infinite}
+  @keyframes cpPulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--s) 40%,transparent)}}
+  .connpill .pk{opacity:.8}
+  .connpill .pv{font-weight:700}
+
+  .connlegend{display:flex;flex-wrap:wrap;gap:14px;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);margin-bottom:14px;font-size:.8rem}
+  .connlegend .lg{display:flex;align-items:center;gap:8px;color:var(--muted)}
+  .connlegend .ic{width:18px;height:18px;border-radius:50%;display:flex;align-items:center;
+    justify-content:center;font-size:11px;color:#fff;background:var(--s)}
+  .connlegend b{color:var(--text)}
+
+  .connmap{background:var(--panel);border:1px solid var(--border);border-radius:14px;
+    box-shadow:var(--shadow);padding:8px 6px;margin-bottom:16px}
+  .connmap svg{width:100%;height:auto;display:block}
+  .cn-box{fill:var(--panel-2);stroke:var(--border);stroke-width:2}
+  .cn-title{fill:var(--gauge-text);font-size:15px;font-weight:700;font-family:var(--font-sans)}
+  .cn-sub{fill:var(--muted);font-size:11px;font-family:var(--font-sans)}
+  .cn-ic{font-size:21px}
+  .cn-link{fill:none;stroke-width:7;stroke-linecap:round}
+  .cn-flow{fill:none;stroke:#fff;stroke-width:3;stroke-linecap:round;stroke-dasharray:2 11;
+    animation:dashMove 1s linear infinite;animation-play-state:paused;opacity:0}
+  .cn-link.lk-ok{stroke:var(--zone-ok)} .cn-link.lk-warn{stroke:var(--zone-warn)}
+  .cn-link.lk-down{stroke:var(--zone-alert)} .cn-link.lk-off{stroke:var(--gauge-track)}
+  .cn-link.lk-unknown{stroke:var(--gauge-track);stroke-dasharray:6 7}
+  .cn-flow.on{animation-play-state:running;opacity:.85}
+  .cn-statedot{stroke:var(--panel);stroke-width:2}
+  .cn-linklbl{fill:var(--muted);font-size:10px;font-family:var(--font-sans);text-anchor:middle}
+  .cn-modechip{font-size:11px;font-weight:700;font-family:var(--font-sans);text-anchor:middle}
+
+  .conngroup{margin-bottom:16px}
+  .conngroup h4{margin:0 0 8px 2px;font-size:.78rem;color:var(--muted);text-transform:uppercase;
+    letter-spacing:.05em;font-weight:700}
+  .connrow{display:flex;align-items:flex-start;gap:12px;background:var(--panel);border:1px solid var(--border);
+    border-left:4px solid var(--s);border-radius:12px;box-shadow:var(--shadow);padding:11px 14px;margin-bottom:8px}
+  .connrow .badge{flex:0 0 auto;display:inline-flex;align-items:center;gap:6px;font-size:.72rem;
+    font-weight:700;color:#fff;background:var(--s);border-radius:8px;padding:4px 9px;min-width:104px;justify-content:center}
+  .connrow .body{flex:1;min-width:0}
+  .connrow .nm{font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .connrow .det{font-size:.8rem;color:var(--text);font-family:var(--font-mono);margin-top:2px}
+  .connrow .exp{font-size:.78rem;color:var(--muted);margin-top:4px}
+  .connrow .fix{font-size:.78rem;color:var(--zone-alert);margin-top:4px;font-weight:600}
+  .connrow .seen{font-size:.7rem;color:var(--muted);white-space:nowrap}
+  /* ================= SAT dashboard (multi-layer) ================= */
+  .sat-head{display:flex;align-items:center;gap:12px;margin:2px 2px 12px}
+  .sat-title{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:10px}
+  .sat-pill{font-size:.7rem;font-weight:700;color:#fff;background:var(--hot);border-radius:10px;padding:3px 10px}
+  .sat-pill.idle{background:var(--tile-off)} .sat-pill.off{background:var(--tile-off)}
+  .sat-views{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .satview-btn{flex:1;min-width:150px;min-height:54px;border:1px solid var(--border);background:var(--panel);
+    color:var(--text);border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:1px;font-family:var(--font-sans)}
+  .satview-btn small{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .satview-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .satview-btn.active small{color:rgba(255,255,255,.85)}
+  /* cumulative reveal */
+  .sat-l2,.sat-l3{display:none}
+  #satBody.sv-control .sat-l2{display:block}
+  #satBody.sv-technical .sat-l2,#satBody.sv-technical .sat-l3{display:block}
+  .sat-thermo-wrap{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:center;
+    background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:18px;margin-bottom:16px}
+  @media(max-width:719px){.sat-thermo-wrap{grid-template-columns:1fr}}
+  .sat-dial-card{text-align:center}
+  .sat-dial-card svg{width:240px;height:240px;max-width:100%}
+  .sat-steps{margin-top:4px}
+  .sat-side-lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin:10px 0 6px}
+  .sat-status-big{font-size:1.2rem;font-weight:700}
+  .sat-presets{display:flex;flex-wrap:wrap;gap:7px}
+  .sat-preset{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:20px;
+    padding:8px 14px;font-size:.8rem;cursor:pointer;min-height:38px;font-family:var(--font-sans)}
+  .sat-preset.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .ds-seg-row{display:inline-flex;gap:4px;flex-wrap:wrap}
+  .ds-seg{border:1px solid var(--border);background:var(--panel-2);color:var(--muted);border-radius:8px;
+    padding:7px 13px;font-size:.8rem;cursor:pointer;min-height:36px;font-family:var(--font-sans)}
+  .ds-seg.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .sat-hint{font-size:.78rem;color:var(--muted);margin-top:12px}
+  .sat-tiles4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  @media(max-width:719px){.sat-tiles4{grid-template-columns:1fr 1fr}}
+  .sat-tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:13px 14px}
+  .sat-tile.is-target{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .sat-tile .l{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .sat-tile .v{font-size:1.7rem;font-weight:700;margin-top:4px}
+  .sat-tile .v.hot{color:var(--hot)}
+  .sat-tile .tag{font-size:.56rem;background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot);border-radius:6px;padding:1px 6px;letter-spacing:0}
+  .sat-row2{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .sat-row2.sat-row-2up{grid-template-columns:1fr 1fr}
+  @media(max-width:899px){.sat-row2{grid-template-columns:1fr 1fr}.sat-row2.sat-row-2up{grid-template-columns:1fr}}
+  @media(max-width:520px){.sat-row2{grid-template-columns:1fr}}
+  .sat-mini h4,.card h4{margin:0 0 8px;font-size:.82rem;display:flex;align-items:center;gap:8px}
+  .sat-mini .sub,.card .sub{font-size:.7rem;color:var(--muted);font-weight:400}
+  .sat-mini .big{font-size:1.3rem;font-weight:700}
+  .page .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px}
+  .sat-mini .modwrap{display:flex;align-items:flex-end;gap:12px}
+  .sat-mini .modbar{position:relative;width:26px;height:56px;border-radius:8px;overflow:hidden;background:var(--gauge-track)}
+  .sat-mini .modfill{position:absolute;left:0;right:0;bottom:0;border-radius:0 0 8px 8px;
+    background:linear-gradient(0deg,var(--cold),var(--zone-warn) 55%,var(--zone-alert))}
+  #satCurve,#satTrend{width:100%;height:auto;display:block}
+  .pid-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .pid-cell{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
+  .pid-cell .k{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
+  .pid-cell .val{font-family:var(--font-mono);font-size:1.05rem;font-weight:700;margin-top:2px}
+  .sim-tag{font-size:.62rem;font-weight:700;letter-spacing:.06em;color:#fff;
+    background:color-mix(in srgb,var(--zone-warn) 78%,#000);border-radius:6px;padding:3px 8px}
+  /* SAT comprehensive dashboard: kv cards, curve hero, health, raw json */
+  .sat-l1>.card,.sat-l2>.card{margin-bottom:14px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.74rem;color:var(--muted);padding:6px 2px 0}
+  .legend i,.curve-legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}
+  .kv-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.82rem}
+  .kv-k{color:var(--muted)} .kv-v{font-family:var(--font-mono);font-weight:700;text-align:right}
+  @media(max-width:560px){.kv{grid-template-columns:1fr}}
+  .sat-curve-hero .curve-wrap{display:grid;grid-template-columns:1fr 210px;gap:14px;align-items:start}
+  @media(max-width:719px){.sat-curve-hero .curve-wrap{grid-template-columns:1fr}}
+  #satCurveBig{width:100%;height:auto;display:block}
+  #satHistChart{width:100%;display:block}
+  .curve-legend{display:flex;flex-direction:column;gap:6px;font-size:.76rem;color:var(--muted);margin-bottom:10px}
+  .curve-legend i{width:16px;height:10px;border-radius:3px}
+  .marker-head{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;margin-bottom:6px}
+  .marker-list{list-style:none;margin:0;padding:0;font-size:.8rem}
+  .marker-list li{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)}
+  .marker-list li span{color:var(--muted)} .marker-list li b{font-family:var(--font-mono);color:var(--zone-ok)}
+  .health-strip{display:flex;flex-wrap:wrap;gap:16px}
+  .health-item{display:flex;align-items:center;gap:7px;font-size:.84rem;font-weight:600}
+  .hdot{width:11px;height:11px;border-radius:50%;background:var(--tile-off)}
+  .hdot.ok{background:var(--zone-ok)} .hdot.warn{background:var(--zone-warn)} .hdot.alert{background:var(--zone-alert)}
+  .hdot.idle{background:var(--tile-off)}
+  .raw-toggle{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;font-size:.86rem;font-family:var(--font-sans);padding:0}
+  .raw-json{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+    font-family:var(--font-mono);font-size:.72rem;color:var(--text);overflow:auto;max-height:240px;margin:6px 0 0}
+  /* SAT settings tier control */
+  .tierbar{display:inline-flex;gap:4px;margin:0 0 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:3px}
+  .tierbar button{border:0;background:none;color:var(--muted);border-radius:8px;padding:7px 14px;font-size:.8rem;cursor:pointer;min-height:36px;font-family:var(--font-sans)}
+  .tierbar button.active{background:var(--accent);color:#fff;font-weight:700}
+  .tier-note{font-size:.74rem;color:var(--muted);margin:-8px 2px 12px}
+</style>
+</head>
+<body>
+
+<div class="headerrow">
+  <span class="big">OTGW firmware <span class="sub">· opening-page concepts</span></span>
+  <span class="sim-tag" title="Design mockup — all values are simulated, not from a real gateway">SIMULATED · MOCKUP</span>
+  <span class="sub" id="clock">--:--:--</span>
+  <span class="theme-toggle" id="themeToggle">🌙 Dark</span>
+</div>
+<div class="switcher">
+  <button class="seg active" data-page="home"><b>Home</b><small>opening page</small></button>
+  <button class="seg" data-page="sat"><b>SAT</b><small>thermostat · control · technical</small></button>
+  <button class="seg" data-page="monitor"><b>Monitor</b><small>log · stats · support · graph · connection</small></button>
+  <button class="seg" data-page="settings"><b>Settings</b><small>grouped &amp; scannable</small></button>
+</div>
+<!-- always-visible connectivity strip — glance scale; click any pill for the detail map -->
+<div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
+
+<div class="wrap">
+
+<!-- ════════════════ PAGE: HOME ════════════════ -->
+<div id="page-home" class="page active">
+<div class="cchips">
+  <button class="cchip active" data-design="a">A · System view</button>
+  <button class="cchip" data-design="b">B · At a glance</button>
+  <button class="cchip" data-design="c">C · Mission control</button>
+</div>
+
+<!-- ============ DESIGN A — SYSTEM VIEW ============ -->
+<section id="design-a" class="design active">
+  <p class="concept-cap"><b>Concept A — your heating system, live.</b> The boiler burns, water flows:
+  red arrow out with the flow temperature, blue arrow back with the return temperature. DHW branch
+  wakes up when you tap hot water. Zero configuration — it knows everything from the OT bus.</p>
+
+  <div class="schemcard">
+    <div class="statusline" id="aStatus"><span class="dot"></span><span id="aStatusTxt">—</span>
+      <span class="appl-toggle" id="applToggle">
+        <button class="seg2btn active" data-appl="gas">🔥 Boiler</button>
+        <button class="seg2btn" data-appl="hp">⚡ Heat pump</button>
+      </span>
+    </div>
+
+    <svg class="schematic" id="schem" viewBox="0 0 800 470" role="img"
+         aria-label="Live diagram of the heating system">
+      <defs>
+        <linearGradient id="gHot" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#ff8a3c"/><stop offset="1" stop-color="#ff4d2e"/>
+        </linearGradient>
+        <linearGradient id="gCold" x1="1" y1="0" x2="0" y2="0">
+          <stop offset="0" stop-color="#5ab1ff"/><stop offset="1" stop-color="#2f6fe8"/>
+        </linearGradient>
+        <linearGradient id="gDhw" x1="0" y1="1" x2="1" y2="0">
+          <stop offset="0" stop-color="#ffb13c"/><stop offset="1" stop-color="#ff8a3c"/>
+        </linearGradient>
+        <linearGradient id="gFlame" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#ff7a1a"/><stop offset="1" stop-color="#ffb300"/>
+        </linearGradient>
+        <linearGradient id="gBolt" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0" stop-color="#1aa3ff"/><stop offset="1" stop-color="#9af0ff"/>
+        </linearGradient>
+      </defs>
+
+      <!-- DHW branch: boiler top -> faucet -->
+      <path class="pipe pipeDhw" d="M145,120 V64 H318"/>
+      <path class="dash dhw" d="M145,120 V64 H318"/>
+      <g id="faucet">
+        <path d="M318,58 h26 a8,8 0 0 1 8,8 v10 h-13 v-7 h-21 z" fill="var(--gauge-track)"
+              stroke="var(--border)" stroke-width="2"/>
+        <circle class="drop d1" cx="345.5" cy="84" r="3.4"/>
+        <circle class="drop d2" cx="345.5" cy="84" r="3.4"/>
+        <circle class="drop d3" cx="345.5" cy="84" r="3.4"/>
+      </g>
+      <g transform="translate(232,38)">
+        <rect x="-46" y="-17" width="92" height="34" rx="11" class="chip-dhw"/>
+        <text class="chip-txt" y="3" font-size="17" id="aDhw">54°</text>
+        <text class="chip-sub" y="14.5">DHW</text>
+      </g>
+
+      <!-- Outside chip -->
+      <g transform="translate(660,34)">
+        <path class="cloud" d="M14,22 a10,10 0 0 1 2,-19.8 a13,13 0 0 1 25,2 a8.5,8.5 0 0 1 -1,17.8 z"/>
+        <text class="label-big" x="52" y="18" id="aOut">8.4°</text>
+        <text class="label-tag" x="52" y="32">OUTSIDE</text>
+      </g>
+
+      <!-- Boiler / heat pump body -->
+      <rect class="boiler-body" x="60" y="120" width="180" height="240" rx="16"/>
+      <rect x="84" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
+      <rect x="190" y="352" width="26" height="12" rx="3" fill="var(--gauge-track)"/>
+      <rect class="lcd" x="88" y="136" width="124" height="28" rx="8"/>
+      <text class="lcd-txt" x="150" y="155" id="aLcd">CH 62%</text>
+
+      <!-- burner window: gas flame OR electric lightning bolt; height = modulation -->
+      <circle class="window" cx="150" cy="210" r="36"/>
+      <circle class="pilot" cx="150" cy="226" r="5"/>
+      <g id="flameWrap" class="glow">
+        <g transform="translate(150,238)">
+          <g class="burnscale"><g class="flick">
+            <path class="flame-outer" d="M0,4 C-15,-7 -11,-24 0,-40 C11,-24 15,-7 0,4 Z"/>
+            <path class="flame-inner" d="M0,2 C-7,-3 -5,-13 0,-22 C5,-13 7,-3 0,2 Z"/>
+          </g></g>
+        </g>
+      </g>
+      <g id="boltWrap" class="glow-e">
+        <g transform="translate(150,238)">
+          <g class="burnscale"><g class="crackle">
+            <path class="bolt-outer" d="M5,-44 L-9,-12 L-1,-12 L-6,6 L10,-22 L2,-22 Z"/>
+            <path class="bolt-inner" d="M3,-37 L-5,-12 L0,-12 L-3,2 L6,-20 L1,-20 Z"/>
+          </g></g>
+        </g>
+      </g>
+
+      <!-- prominent modulation readout -->
+      <text class="mod-big" x="150" y="286" id="aModBig">62%</text>
+      <text class="mod-tag" x="150" y="300" id="aModTag">MODULATION</text>
+
+      <!-- pressure mini-gauge on boiler face (lower) -->
+      <g transform="translate(0,10)">
+        <path d="M126,322 A24,24 0 0 1 133,305"   stroke="var(--zone-alert)" stroke-width="6" fill="none"/>
+        <path d="M133,305 A24,24 0 0 1 140.8,299.8" stroke="var(--zone-warn)" stroke-width="6" fill="none"/>
+        <path d="M140.8,299.8 A24,24 0 0 1 159.2,299.8" stroke="var(--zone-ok)" stroke-width="6" fill="none"/>
+        <path d="M159.2,299.8 A24,24 0 0 1 167,305" stroke="var(--zone-warn)" stroke-width="6" fill="none"/>
+        <path d="M167,305 A24,24 0 0 1 174,322"  stroke="var(--zone-alert)" stroke-width="6" fill="none"/>
+        <line id="aPressNeedle" class="press-needle" x1="150" y1="322" x2="132" y2="322"
+              transform="rotate(0,150,322)"/>
+        <circle cx="150" cy="322" r="3.5" fill="var(--needle)"/>
+        <text class="press-txt" x="150" y="344" id="aPress">1.75 bar</text>
+      </g>
+
+      <!-- FLOW pipe (red, out of the boiler) -->
+      <path class="pipe pipeHot" id="flowPipe" d="M240,170 H560 V206"/>
+      <path class="dash ch" d="M240,170 H560 V206"/>
+      <polygon class="arrow ch arrowHot" points="388,158 414,170 388,182"/>
+      <g transform="translate(310,128)">
+        <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-hot"/>
+        <text class="chip-txt" y="0" id="aFlow">62.3°</text>
+        <text class="chip-sub" y="15">FLOW →</text>
+      </g>
+
+      <!-- RETURN pipe (blue, back into the boiler) -->
+      <path class="pipe pipeCold" d="M560,306 V340 H240"/>
+      <path class="dash ch" d="M560,306 V340 H240"/>
+      <polygon class="arrow ch arrowCold" points="372,328 346,340 372,352"/>
+      <g transform="translate(310,392)">
+        <rect x="-52" y="-22" width="104" height="44" rx="12" class="chip-cold"/>
+        <text class="chip-txt" y="0" id="aRet">48.1°</text>
+        <text class="chip-sub" y="15">← RETURN</text>
+      </g>
+
+      <!-- ΔT chip -->
+      <g transform="translate(470,255)">
+        <rect x="-44" y="-15" width="88" height="30" rx="15" class="soft-chip"/>
+        <text class="soft-txt" y="5" id="aDt">ΔT 14.2°</text>
+      </g>
+
+      <!-- pump on the return -->
+      <g>
+        <circle class="pump-body" cx="452" cy="340" r="16"/>
+        <path id="pumpBlades" d="M452,340 L452,328 A12,12 0 0 1 462,346 Z M452,340 L442,346 A12,12 0 0 1 442,330 Z
+              M452,340 L462,334 A12,12 0 0 1 448,352 Z" opacity=".9"/>
+      </g>
+
+      <!-- radiator + room -->
+      <g id="radGroup">
+        <rect class="rad-mani" x="540" y="201" width="196" height="10" rx="5"/>
+        <rect class="rad-mani" x="540" y="301" width="196" height="10" rx="5"/>
+        <rect class="rad-bar" x="548" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="572" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="596" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="620" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="644" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="668" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="692" y="206" width="16" height="100" rx="8"/>
+        <rect class="rad-bar" x="716" y="206" width="16" height="100" rx="8"/>
+      </g>
+      <g transform="translate(560,150)">
+        <path class="house" d="M0,10 L13,-3 L26,10 V28 H0 Z"/>
+        <text class="label-big" x="36" y="13" id="aRoom">20.4°</text>
+        <text class="label-sub" x="36" y="28" id="aRoomSet">set 21.0°</text>
+        <text class="label-tag" x="120" y="13">ROOM</text>
+      </g>
+
+      <!-- room return label under radiator -->
+      <text class="label-tag" x="560" y="334">RADIATORS</text>
+    </svg>
+
+    <div class="mobile-strip" id="aStrip"></div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile" id="aTFlame"><span class="led"></span><div><div class="lbl">Flame</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTCH"><span class="led"></span><div><div class="lbl">Heating</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTDHW"><span class="led"></span><div><div class="lbl">Hot water</div><div class="val">—</div></div></div>
+    <div class="tile" id="aTFault"><span class="led"></span><div><div class="lbl">Fault</div><div class="val">—</div></div></div>
+  </div>
+</section>
+
+<!-- ============ DESIGN B — AT A GLANCE ============ -->
+<section id="design-b" class="design">
+  <div class="glance">
+    <p class="concept-cap"><b>Concept B — one thumb, one glance.</b> Phone-first: the room dial up top,
+    the four numbers that matter below it. Everything else lives one tap deeper.</p>
+
+    <div class="g-status" id="bStatus"><span class="dot"></span><span id="bStatusTxt">—</span></div>
+
+    <div class="hero">
+      <svg viewBox="0 0 240 240" aria-label="Room temperature dial">
+        <path class="hero-track" id="bTrack" d=""/>
+        <path class="hero-arc" id="bArc" d=""/>
+        <line class="hero-tick" id="bTick" x1="0" y1="0" x2="0" y2="0"/>
+        <text class="hero-big" x="120" y="128" id="bRoom">20.4°</text>
+        <text class="hero-sub" x="120" y="152" id="bSet">target 21.0°</text>
+      </svg>
+      <div>
+        <button class="stepbtn" id="bDown" aria-label="Lower target">−</button>
+        <button class="stepbtn" id="bUp" aria-label="Raise target">+</button>
+      </div>
+      <div class="cmdline" id="bCmd"></div>
+    </div>
+
+    <div class="statgrid">
+      <div class="stat">
+        <div class="lbl">Boiler</div>
+        <div class="big"><span class="hotArrow">↑ <span id="bFlow">62.3°</span></span>
+          <span class="flamebadge" id="bFlame">🔥</span></div>
+        <div class="big" style="font-size:1.05rem"><span class="coldArrow">↓ <span id="bRet">48.1°</span></span>
+          <span style="color:var(--muted);font-size:.8rem" id="bDt">ΔT 14.2°</span></div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Pressure</div>
+        <div class="big" id="bPress">1.75 bar</div>
+        <div class="zonebar"><div class="zonedot" id="bPressDot" style="left:44%"></div></div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Modulation</div>
+        <div class="modwrap">
+          <div class="modbar"><div class="modfill" id="bModFill" style="height:45%"></div></div>
+          <div class="big" id="bMod">45%</div>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="lbl">Hot water</div>
+        <div class="big" id="bDhw">54°</div>
+        <div style="font-size:.8rem;color:var(--muted)" id="bDhwState">standby</div>
+      </div>
+    </div>
+    <div class="foot" id="bOut">Outside 8.4° · OTGW firmware</div>
+  </div>
+</section>
+
+<!-- ============ DESIGN C — MISSION CONTROL ============ -->
+<section id="design-c" class="design">
+  <p class="concept-cap"><b>Concept C — for the people who read OT frames for fun.</b> Always-dark.
+  A live strip chart of flow/return/setpoint with modulation underneath, the numbers in mono,
+  and the raw bus scrolling by. OTmonitor, two decades later.</p>
+
+  <div class="mc">
+    <h2>OTGW <b>// MISSION CONTROL</b> · ws ● live</h2>
+
+    <div class="stripcard">
+      <div class="legend">
+        <span><i style="background:var(--hot)"></i>flow</span>
+        <span><i style="background:var(--cold)"></i>return</span>
+        <span><i style="background:#8b949e"></i>setpoint</span>
+        <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
+      </div>
+      <svg viewBox="0 0 780 210" id="strip">
+        <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
+        <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
+        <text class="axis-txt" x="8" y="16">90°</text>
+        <text class="axis-txt" x="8" y="92">50°</text>
+        <text class="axis-txt" x="8" y="172">10°</text>
+        <line class="ser-sp" id="cSpLine" x1="34" y1="0" x2="772" y2="0"/>
+        <polygon class="ser-mod" id="cMod" points=""/>
+        <polyline class="ser-flow" id="cFlow" points=""/>
+        <polyline class="ser-ret" id="cRet" points=""/>
+        <text class="axis-txt" id="cFlowLbl" x="745" y="20" fill="var(--hot)"></text>
+        <text class="axis-txt" id="cRetLbl" x="745" y="34" fill="var(--cold)"></text>
+      </svg>
+    </div>
+
+    <div class="mc-grid" id="cGrid"></div>
+
+    <div class="ticker" id="cTicker" aria-label="Live OpenTherm frames"></div>
+  </div>
+</section>
+</div><!-- /page-home -->
+
+<!-- ════════════════ PAGE: SAT (multi-layer thermostat) ════════════════ -->
+<div id="page-sat" class="page">
+  <p class="concept-cap"><b>SAT — one screen, three depths.</b> A homeowner sets a temperature
+  and walks away (<b>Thermostat</b>); a tinkerer watches what it's doing (<b>Control</b>);
+  an expert tunes the loop (<b>Technical</b>). Each layer adds, never replaces.
+  This page is the <b>live control surface</b>; the underlying defaults &amp; tuning live in
+  <b>Settings → SAT</b> — same values, one source of truth in the real firmware.</p>
+
+  <div class="sat-head">
+    <div class="sat-title">SAT · Smart Autotune Thermostat <span class="sat-pill" id="satPill">Heating</span></div>
+    <label class="switch" style="margin-left:auto"><input type="checkbox" id="satEnable" checked><span id="satEnableLbl">Enabled</span></label>
+  </div>
+
+  <div class="sat-views">
+    <button class="satview-btn active" data-sv="simple"><b>🏠 Thermostat</b><small>simple</small></button>
+    <button class="satview-btn" data-sv="control"><b>🎛 Control</b><small>operational</small></button>
+    <button class="satview-btn" data-sv="technical"><b>🔬 Technical</b><small>the control loop</small></button>
+  </div>
+
+  <div id="satBody" class="sv-simple">
+    <!-- L1 Thermostat -->
+    <div class="sat-l1">
+      <div class="sat-thermo-wrap">
+        <div class="sat-dial-card">
+          <svg viewBox="0 0 240 240" id="satDial" aria-label="Room thermostat"></svg>
+          <div class="sat-steps"><button class="stepbtn" id="satDown" aria-label="lower">−</button><button class="stepbtn" id="satUp" aria-label="raise">+</button></div>
+        </div>
+        <div class="sat-side">
+          <div class="sat-status-big" id="satStatusBig">Heating to 21.0°</div>
+          <div class="sat-side-lbl">Presets</div>
+          <div class="sat-presets" id="satPresets"></div>
+          <div class="sat-side-lbl">Mode</div>
+          <div class="ds-seg-row" id="satModeRow"><button class="ds-seg active" data-mode="auto">Auto</button><button class="ds-seg" data-mode="off">Off</button></div>
+          <div class="sat-hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
+        </div>
+      </div>
+      <div class="card"><h4>Temperature history <span class="sub">last hour</span></h4>
+        <svg viewBox="0 0 600 200" id="satHistChart" preserveAspectRatio="none" style="height:200px"></svg>
+        <div class="legend" id="satHistLegend"></div></div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card sat-mini"><h4>Hot water</h4>
+          <div class="kv">
+            <div class="kv-row"><span class="kv-k">DHW setpoint</span><span class="kv-v"><input type="range" min="40" max="60" value="50" id="satDhwSlider" class="ds-slider" style="width:96px;vertical-align:middle"> <b id="satDhwR">50°C</b></span></div>
+            <div class="kv-row"><span class="kv-k">DHW enable (HW=)</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnable" checked></span></div>
+          </div></div>
+        <div class="card sat-mini"><h4>Burner cycle mode</h4><div class="ds-seg-row" id="satCycleRow"><button class="ds-seg active">Continuous</button><button class="ds-seg">PWM</button></div><div class="sub">PID drives the burner continuously</div></div>
+      </div>
+    </div>
+
+    <!-- L2 Control -->
+    <div class="sat-l2">
+      <div class="sat-tiles4">
+        <div class="sat-tile"><div class="l">Outside</div><div class="v" id="satOut">8.4°</div></div>
+        <div class="sat-tile"><div class="l">Boiler setpoint <span class="tag">SAT → boiler</span></div><div class="v hot" id="satFlowSet">52.0°</div></div>
+        <div class="sat-tile"><div class="l">Room</div><div class="v" id="satRoom">20.4°</div></div>
+        <div class="sat-tile is-target"><div class="l">Target</div><div class="v" id="satTargetT">21.0°</div></div>
+      </div>
+      <!-- Heating curve — hero -->
+      <div class="card sat-curve-hero"><h4>Heating curve <span class="sub" id="satCurveLbl"></span></h4>
+        <div class="curve-wrap">
+          <svg viewBox="0 0 600 300" id="satCurveBig"></svg>
+          <div class="curve-side">
+            <div class="curve-legend" id="satCurveLegend"></div>
+            <div class="marker-head">Calibration markers <span class="sub">learned points</span></div>
+            <ul class="marker-list" id="satMarkerList"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Control status</h4><div class="kv" id="satControlStatus"></div></div>
+        <div class="card"><h4>Weather <span class="sub">Open-Meteo</span></h4><div class="kv" id="satWeatherKv"></div>
+          <button class="tbtn" id="satDetectLoc" style="margin-top:8px">Detect location</button>
+          <span class="sub" id="satCoords" style="margin-left:8px"></span></div>
+      </div>
+    </div>
+
+    <!-- L3 Technical -->
+    <div class="sat-l3">
+      <div class="card"><h4>Health</h4><div class="health-strip" id="satHealth"></div></div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>PID controller</h4><div class="kv" id="satPidKv"></div></div>
+        <div class="card"><h4>PWM &amp; cycle tracking</h4><div class="kv" id="satPwmKv"></div></div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Smart features</h4><div class="kv" id="satSmartKv"></div></div>
+        <div class="card"><h4>External sensors</h4><div class="kv" id="satExtKv"></div></div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Simulation &amp; diagnostics</h4><div class="kv" id="satSimKv"></div>
+          <label class="switch" style="margin-top:10px"><input type="checkbox" id="satSim"><span>Bench simulation</span></label></div>
+        <div class="card"><h4><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ Raw data (JSON)</button></h4>
+          <pre class="raw-json" id="satRawJson" style="display:none"></pre></div>
+      </div>
+      <p class="concept-cap" style="margin-top:2px">Every knob behind these readouts lives in
+      <b>Settings → SAT</b> (Basic / Advanced / Expert tiers).</p>
+    </div>
+  </div>
+</div><!-- /page-sat -->
+
+<!-- ════════════════ PAGE: MONITOR ════════════════ -->
+<div id="page-monitor" class="page">
+  <p class="concept-cap"><b>Monitor — the four sub-tabs, redesigned.</b> Same data as today's
+  Log / Statistics / OT Support / Graph tabs, but visual: a calmer console, a scannable
+  statistics table with direction badges, the support map as a real map, and the graph
+  up front. Everything below runs on the simulated live bus.</p>
+
+  <div class="subtabs">
+    <button class="subtab active" data-tab="mlog">Log</button>
+    <button class="subtab" data-tab="malldata">All data</button>
+    <button class="subtab" data-tab="mstats">Statistics</button>
+    <button class="subtab" data-tab="msupport">OT Support</button>
+    <button class="subtab" data-tab="mgraph">Graph</button>
+    <button class="subtab" data-tab="mconn">Connection</button>
+  </div>
+
+  <div id="malldata" class="mpanel">
+    <div class="toolbar">
+      <input class="tsearch" id="allSearch" placeholder="Filter by name, msgID or source…">
+      <span class="seg2" style="display:inline-flex;gap:4px">
+        <button class="seg2btn active" id="allSimple">Simple</button>
+        <button class="seg2btn" id="allTech">Technical</button>
+      </span>
+      <span class="tchip" style="cursor:default">Shown: <b id="allCount" style="margin-left:4px">0</b></span>
+    </div>
+    <p class="concept-cap" style="margin:0 0 10px">Every value the gateway knows — OT bus, Dallas &amp; BLE
+    sensors, gateway overrides. <b>Simple</b> shows the decoded essentials a homeowner can read;
+    <b>Technical</b> reveals everything (counters, diagnostics, raw IDs) — nothing is hidden, only deferred.</p>
+    <div style="overflow-x:auto;border-radius:12px">
+    <table class="stats" id="allTable">
+      <thead><tr><th>MsgID</th><th>Name</th><th>Source</th><th style="text-align:right">Value</th><th>Unit</th><th>Age</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+  </div>
+
+  <div id="mlog" class="mpanel active">
+    <div class="toolbar">
+      <button class="tbtn" id="logPause">⏸ Pause</button>
+      <button class="tbtn">Clear</button>
+      <button class="tbtn">⬇ Download</button>
+      <input class="tsearch" id="logSearch" placeholder="Filter frames… (e.g. 19, Boiler, DHW)">
+      <span class="tchip on" id="chipScroll">Auto-scroll</span>
+      <span class="tchip on" id="chipTs">Timestamps</span>
+    </div>
+    <div class="console" id="monLog" aria-label="Live OpenTherm log"></div>
+    <div class="statfoot">
+      <span>Lines: <b id="logCount">0</b></span>
+      <span>Rate: <b id="logRate">2.0</b>/s</span>
+      <span>Gateway mode · WS ● live (simulated)</span>
+    </div>
+  </div>
+
+  <div id="mstats" class="mpanel">
+    <div class="toolbar">
+      <input class="tsearch" id="statsSearch" placeholder="Filter by name or msg id…">
+      <span class="tchip" style="cursor:default">Unique msgIDs: <b id="statsCount" style="margin-left:4px">0</b></span>
+    </div>
+    <div style="overflow-x:auto;border-radius:12px">
+    <table class="stats" id="statsTable">
+      <thead><tr><th>MsgID</th><th>Description</th><th>Direction</th><th>Interval</th><th>Count</th><th style="text-align:right">Value</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+  </div>
+
+  <div id="msupport" class="mpanel">
+    <div class="mlegend">
+      <span class="lb"><i></i>Thermostat + boiler</span>
+      <span class="lt"><i></i>Thermostat only</span>
+      <span class="lo"><i></i>Boiler only</span>
+      <span><i></i>Never seen</span>
+      <span style="margin-left:auto">Observed: <b id="supCount">0</b> / 128 msgIDs</span>
+    </div>
+    <div class="supwrap">
+      <div class="matrix" id="supMatrix" aria-label="OpenTherm message ID support map"></div>
+      <aside class="supdetail" id="supDetail"></aside>
+    </div>
+    <p class="concept-cap" style="margin-top:10px">Hover a cell for a quick label · click (or tap)
+    to pin the full message details. Today this is a table you scroll; as a map you see your
+    system's OpenTherm dialect in one look — and every cell carries the spec.</p>
+  </div>
+  <div class="suptip" id="supTip"></div>
+
+  <div id="mgraph" class="mpanel">
+    <div class="toolbar">
+      <span class="tchip">10 min</span><span class="tchip on">1 hour</span>
+      <span class="tchip">4 h</span><span class="tchip">24 h</span>
+      <span style="flex:1"></span>
+      <button class="tbtn">📷 PNG</button><button class="tbtn">⬇ CSV</button>
+    </div>
+    <div class="graphcard">
+      <div class="legend">
+        <span><i style="background:var(--hot)"></i>flow</span>
+        <span><i style="background:var(--cold)"></i>return</span>
+        <span><i style="background:#8b949e"></i>setpoint</span>
+        <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
+      </div>
+      <svg viewBox="0 0 780 210" id="gstrip">
+        <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
+        <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
+        <text class="axis-txt" x="8" y="16">90°</text>
+        <text class="axis-txt" x="8" y="92">50°</text>
+        <text class="axis-txt" x="8" y="172">10°</text>
+        <line class="ser-sp" id="gSpLine" x1="34" y1="0" x2="772" y2="0"/>
+        <polygon class="ser-mod" id="gMod2" points=""/>
+        <polyline class="ser-flow" id="gFlow2" points=""/>
+        <polyline class="ser-ret" id="gRet2" points=""/>
+      </svg>
+    </div>
+  </div>
+
+  <div id="mconn" class="mpanel">
+    <div class="connlegend">
+      <span class="lg st-ok"><span class="ic">✓</span> <b>Connected</b> link up, data recent</span>
+      <span class="lg st-warn"><span class="ic">!</span> <b>Degraded</b> up but impaired / stale</span>
+      <span class="lg st-down"><span class="ic">✕</span> <b>Disconnected</b> link down</span>
+      <span class="lg st-off"><span class="ic">○</span> <b>Off</b> disabled in settings</span>
+      <span class="lg st-unknown"><span class="ic">?</span> <b>Unknown</b> not determined yet</span>
+      <span class="lg st-mode"><span class="ic">⇄</span> <b>Mode</b> a setting, not health</span>
+    </div>
+
+    <!-- signal-flow chain: see WHERE a break is, not just that something is down -->
+    <div class="connmap">
+      <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map">
+        <!-- links (drawn first, under the nodes) -->
+        <g id="cnLinks">
+          <path id="lk-therm"  class="cn-link" d="M150,86 H300"/>
+          <path id="fl-therm"  class="cn-flow" d="M150,86 H300"/>
+          <path id="lk-boiler" class="cn-link" d="M150,274 H300"/>
+          <path id="fl-boiler" class="cn-flow" d="M150,274 H300"/>
+          <path id="lk-wifi"   class="cn-link" d="M470,180 H560"/>
+          <path id="fl-wifi"   class="cn-flow" d="M470,180 H560"/>
+          <path id="lk-mqtt"   class="cn-link" d="M700,150 V104 H760"/>
+          <path id="fl-mqtt"   class="cn-flow" d="M700,150 V104 H760"/>
+          <path id="lk-ws"     class="cn-link" d="M700,210 V300 H760"/>
+          <path id="fl-ws"     class="cn-flow" d="M700,210 V300 H760"/>
+          <text class="cn-linklbl" x="225" y="74">OT bus</text>
+          <text class="cn-linklbl" x="225" y="262">OT bus</text>
+          <text class="cn-linklbl" x="515" y="170">Wi-Fi</text>
+          <text class="cn-linklbl" x="690" y="120">MQTT</text>
+          <text class="cn-linklbl" x="690" y="250">live</text>
+        </g>
+        <!-- nodes -->
+        <g id="n-therm">
+          <rect class="cn-box" x="20" y="56" width="130" height="60" rx="12"/>
+          <text class="cn-ic" x="36" y="96">🌡️</text>
+          <text class="cn-title" x="64" y="84">Thermostat</text>
+          <text class="cn-sub" x="64" y="102" id="cnThermSub">master</text>
+          <circle class="cn-statedot" id="dot-therm" cx="142" cy="64" r="7"/>
+        </g>
+        <g id="n-boiler">
+          <rect class="cn-box" x="20" y="244" width="130" height="60" rx="12"/>
+          <text class="cn-ic" x="36" y="284">🔥</text>
+          <text class="cn-title" x="64" y="272">Boiler</text>
+          <text class="cn-sub" x="64" y="290" id="cnBoilerSub">slave</text>
+          <circle class="cn-statedot" id="dot-boiler" cx="142" cy="252" r="7"/>
+        </g>
+        <!-- gateway: PIC + ESP, carries the mode chip -->
+        <g id="n-gw">
+          <rect class="cn-box" x="300" y="120" width="170" height="120" rx="14"/>
+          <text class="cn-ic" x="320" y="158">📟</text>
+          <text class="cn-title" x="352" y="150">OTGW</text>
+          <text class="cn-sub" x="352" y="167" id="cnPicSub">PIC gateway 6.5</text>
+          <rect x="318" y="186" width="134" height="34" rx="9" fill="var(--panel)" stroke="var(--border)"/>
+          <circle id="dot-mode" cx="334" cy="203" r="5" fill="var(--accent)"/>
+          <text class="cn-modechip" id="cnModeTxt" x="392" y="207" fill="var(--accent)">GATEWAY MODE</text>
+          <circle class="cn-statedot" id="dot-pic" cx="462" cy="128" r="7"/>
+        </g>
+        <g id="n-router">
+          <rect class="cn-box" x="560" y="150" width="140" height="60" rx="12"/>
+          <text class="cn-ic" x="578" y="190">📶</text>
+          <text class="cn-title" x="610" y="178">Router</text>
+          <text class="cn-sub" x="610" y="196" id="cnWifiSub">-58 dBm</text>
+          <circle class="cn-statedot" id="dot-wifi" cx="692" cy="158" r="7"/>
+        </g>
+        <g id="n-broker">
+          <rect class="cn-box" x="760" y="74" width="56" height="60" rx="12"/>
+          <text class="cn-ic" x="772" y="110">🗄️</text>
+          <circle class="cn-statedot" id="dot-mqtt" cx="808" cy="82" r="7"/>
+        </g>
+        <text class="cn-sub" x="760" y="148">Broker → HA</text>
+        <g id="n-browser">
+          <rect class="cn-box" x="760" y="270" width="56" height="60" rx="12"/>
+          <text class="cn-ic" x="772" y="306">📱</text>
+          <circle class="cn-statedot" id="dot-ws" cx="808" cy="278" r="7"/>
+        </g>
+        <text class="cn-sub" x="760" y="344">This browser</text>
+      </svg>
+    </div>
+
+    <div id="connDetail"></div>
+  </div>
+</div><!-- /page-monitor -->
+
+<!-- ════════════════ PAGE: SETTINGS ════════════════ -->
+<div id="page-settings" class="page">
+  <p class="concept-cap"><b>Settings — grouped, scannable, desktop-worthy.</b> The 2.0.0 branch
+  already groups settings into titled cards; this takes the next step: a sticky category rail,
+  cards flowing in two columns on desktop (one on mobile), live search across every field,
+  changed-field markers and a sticky save bar. Reboot-sensitive groups are badged.</p>
+
+  <input class="set-search" id="setSearch" placeholder="Search settings… (e.g. broker, ntp, pin)">
+
+  <div class="set-layout">
+    <nav class="set-rail" id="setRail"></nav>
+    <div>
+      <div class="set-cols" id="setCols"></div>
+      <div class="savebar" id="saveBar">
+        <span class="msg"><b id="dirtyCount">0</b> unsaved change(s)</span>
+        <button class="discard" id="btnDiscard">Discard</button>
+        <button class="save" id="btnSave">Save settings</button>
+      </div>
+    </div>
+  </div>
+</div><!-- /page-settings -->
+
+<div class="foot">Design exploration TASK-854 / 855 / 856 · simulated data · self-contained mockup (no libraries, no network)</div>
+</div>
+<div class="toast" id="toast">Settings saved ✓ (simulated)</div>
+<div class="ovr-panel" id="ovrPanel"></div>
+<div class="discover-stack" id="discoverStack"></div>
+
+<script>
+/* ---------- theme + design switching ---------- */
+// null-safe element accessor: a missing id no longer throws and kills the rest of the script
+function gel(id){return document.getElementById(id)||{};}
+var root=document.documentElement;
+var themeBtn=document.getElementById('themeToggle');
+function applyTheme(t){
+  root.setAttribute('data-theme',t);
+  themeBtn.textContent = t==='dark' ? '☀ Light' : '🌙 Dark';
+  try{localStorage.setItem('mock-theme',t);}catch(e){}
+}
+themeBtn.onclick=function(){applyTheme(root.getAttribute('data-theme')==='dark'?'light':'dark');};
+try{
+  var st=localStorage.getItem('mock-theme');
+  if(st) applyTheme(st);
+  else if(window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) applyTheme('dark');
+}catch(e){}
+
+var segs=document.querySelectorAll('.seg');
+function showPage(p){
+  segs.forEach(function(s){s.classList.toggle('active',s.dataset.page===p);});
+  ['home','sat','monitor','settings'].forEach(function(k){
+    document.getElementById('page-'+k).classList.toggle('active',k===p);
+  });
+  // render the page we just switched to immediately (interval only renders the visible page)
+  if(p==='sat' && typeof renderSAT==='function') renderSAT();
+  if(p==='home'){ renderA(); renderB(); renderC(); }
+  if(p==='monitor') renderMonitor();
+  try{localStorage.setItem('mock-page',p);}catch(e){}
+}
+segs.forEach(function(s){s.onclick=function(){showPage(s.dataset.page);};});
+
+var cchips=document.querySelectorAll('.cchip');
+function showDesign(d){
+  cchips.forEach(function(s){s.classList.toggle('active',s.dataset.design===d);});
+  ['a','b','c'].forEach(function(k){
+    document.getElementById('design-'+k).classList.toggle('active',k===d);
+  });
+  try{localStorage.setItem('mock-design',d);}catch(e){}
+}
+cchips.forEach(function(s){s.onclick=function(){showDesign(s.dataset.design);};});
+
+var subtabs=document.querySelectorAll('.subtab');
+function showTab(t){
+  subtabs.forEach(function(s){s.classList.toggle('active',s.dataset.tab===t);});
+  if(t==='malldata' && typeof renderAllData==='function') renderAllData();
+  ['mlog','malldata','mstats','msupport','mgraph','mconn'].forEach(function(k){
+    document.getElementById(k).classList.toggle('active',k===t);
+  });
+  if(t==='mconn' && typeof renderConnDetail==='function') renderConnDetail();
+}
+subtabs.forEach(function(s){s.onclick=function(){showTab(s.dataset.tab);};});
+
+try{
+  var sd=localStorage.getItem('mock-design'); if(sd) showDesign(sd);
+  var sp=localStorage.getItem('mock-page'); if(sp) showPage(sp);
+}catch(e){}
+
+/* ---------- simulated live state ---------- */
+var sim={pressure:1.75,modulation:45,boiler:62,ret:48,dhw:54,outside:8.4,
+         flame:true,ch:true,dhw_on:false,fault:false,room:20.4,setpoint:21.0,
+         // gateway is injecting these values onto the OT bus (override signal demo)
+         overrides:[
+           {label:'Room setpoint', cmd:'TT=21.0', canon:'21.0 °C', orig:'thermostat 20.0 °C', mark:'aRoomSet'},
+           {label:'Outside temp',   cmd:'OT=7.5',  canon:'7.5 °C',  orig:'(no outside sensor)', mark:'aOut'}
+         ]};
+var hist={boiler:[],ret:[],mod:[]};
+for(var i=0;i<60;i++){ // seed with a plausible burn cycle so the chart is alive at first paint
+  var b=58+11*Math.sin(i/8.5)+(Math.random()-0.5)*2.4;
+  hist.boiler.push(+b.toFixed(1));
+  hist.ret.push(+(b-13-3*Math.sin(i/6)).toFixed(1));
+  hist.mod.push(Math.max(0,Math.round(42+30*Math.sin(i/7+1)+(Math.random()-0.5)*8)));
+}
+function walk(v,step,lo,hi){v+=(Math.random()-0.5)*step;return Math.max(lo,Math.min(hi,v));}
+function tick(){
+  if(Math.random()<0.07) sim.flame=!sim.flame;
+  if(Math.random()<0.045) sim.dhw_on=!sim.dhw_on;
+  if(Math.random()<0.02) sim.fault=!sim.fault;
+  sim.ch=sim.flame||Math.random()<0.85;
+  // boiler temp follows the burner
+  var bias=sim.flame?+0.35:-0.45;
+  sim.boiler=+(walk(sim.boiler,1.6,30,85)+bias).toFixed(1);
+  sim.boiler=Math.max(30,Math.min(85,sim.boiler));
+  sim.ret=+(sim.boiler-(6+sim.modulation*0.12+Math.random()*2)).toFixed(1);
+  if(sim.ret<22) sim.ret=22;
+  sim.modulation=sim.flame?Math.round(walk(sim.modulation,9,8,100)):0;
+  sim.pressure=+walk(sim.pressure,0.05,0.7,3.4).toFixed(2);
+  sim.dhw=+walk(sim.dhw,0.8,35,68).toFixed(1);
+  sim.outside=+walk(sim.outside,0.12,-3,15).toFixed(1);
+  sim.room=+(sim.room+(sim.setpoint-sim.room)*0.02+(Math.random()-0.5)*0.06).toFixed(1);
+  hist.boiler.push(sim.boiler);hist.ret.push(sim.ret);hist.mod.push(sim.modulation);
+  if(hist.boiler.length>60){hist.boiler.shift();hist.ret.shift();hist.mod.shift();}
+  // rendering is gated to the visible page in the main interval (perf)
+}
+function pageActive(id){var e=document.getElementById('page-'+id);return e&&e.classList.contains('active');}
+
+function setTile(id,on,text,fault){
+  var el=document.getElementById(id);
+  el.classList.toggle('on',!!on&&!fault);
+  el.classList.toggle('fault',!!fault);
+  el.querySelector('.val').textContent=text;
+}
+var appliance='gas';   // 'gas' = boiler/flame, 'hp' = heat pump/electric
+function burnWord(){ return appliance==='hp' ? 'compressor' : 'flame'; }
+function statusSentence(){
+  if(sim.fault) return 'Fault reported — check the appliance display';
+  if(sim.dhw_on) return 'Hot water running · tap open';
+  if(sim.flame) return 'Heating · '+burnWord()+' on · '+sim.modulation+'% modulation';
+  if(sim.ch) return 'Heating idle · pump running, '+burnWord()+' off';
+  return 'Standby · everything quiet';
+}
+function pressClass(p){
+  if(p<1.0||p>3.0) return 'alert';
+  if(p<1.5||p>2.5) return 'warn';
+  return 'ok';
+}
+
+/* ---------- DESIGN A render ---------- */
+function renderA(){
+  var svg=document.getElementById('schem');
+  svg.classList.toggle('flame-on',sim.flame);
+  svg.classList.toggle('ch-on',sim.ch);
+  svg.classList.toggle('dhw-on',sim.dhw_on);
+  svg.classList.toggle('fault',sim.fault);
+  svg.classList.toggle('heatpump',appliance==='hp');
+  // burner HEIGHT expresses modulation: scaleY grows a lot, scaleX a little
+  var m=sim.flame?sim.modulation/100:0;
+  svg.style.setProperty('--fy',(0.32+m*0.95).toFixed(2));
+  svg.style.setProperty('--fx',(0.70+m*0.32).toFixed(2));
+  document.getElementById('aModBig').textContent=(sim.flame?sim.modulation:0)+'%';
+  var hpTag=appliance==='hp'?'COMPRESSOR':'MODULATION';
+  document.getElementById('aModTag').textContent=hpTag;
+  var lead=appliance==='hp'?'HP':'CH';
+  document.getElementById('aLcd').textContent=
+    sim.fault?'FAULT':(sim.dhw_on?'DHW '+sim.dhw.toFixed(0)+'°':(sim.flame?lead+' '+sim.modulation+'%':(sim.ch?lead+' idle':'STANDBY')));
+  // first tile reads Flame (gas) or Compressor (heat pump)
+  document.querySelector('#aTFlame .lbl').textContent=appliance==='hp'?'Compressor':'Flame';
+  document.getElementById('aFlow').textContent=sim.boiler.toFixed(1)+'°';
+  document.getElementById('aRet').textContent=sim.ret.toFixed(1)+'°';
+  document.getElementById('aDt').textContent='ΔT '+(sim.boiler-sim.ret).toFixed(1)+'°';
+  document.getElementById('aDhw').textContent=sim.dhw.toFixed(0)+'°';
+  document.getElementById('aRoom').textContent=sim.room.toFixed(1)+'°';
+  var ovrSet=sim.overrides.some(function(o){return o.mark==='aRoomSet';});
+  var ovrOut=sim.overrides.some(function(o){return o.mark==='aOut';});
+  document.getElementById('aRoomSet').textContent='set '+sim.setpoint.toFixed(1)+'°'+(ovrSet?' ⛓':'');
+  document.getElementById('aOut').textContent=sim.outside.toFixed(1)+'°'+(ovrOut?' ⛓':'');
+  document.getElementById('aPress').textContent=sim.pressure.toFixed(2)+' bar';
+  var deg=Math.max(0,Math.min(4,sim.pressure))/4*180;
+  document.getElementById('aPressNeedle').setAttribute('transform','rotate('+deg.toFixed(1)+',150,322)');
+  // radiator bars tinted by flow temperature
+  var heat=Math.max(0,Math.min(1,(sim.boiler-30)/50));
+  var pct=sim.ch?Math.round(heat*80):0;
+  document.querySelectorAll('.rad-bar').forEach(function(b){
+    b.style.fill='color-mix(in srgb, var(--hot) '+pct+'%, var(--gauge-track))';
+  });
+  var sl=document.getElementById('aStatus');
+  sl.classList.toggle('heating',sim.flame);
+  document.getElementById('aStatusTxt').textContent=statusSentence();
+  setTile('aTFlame',sim.flame,sim.flame?'ON':'OFF');
+  setTile('aTCH',sim.ch,sim.ch?'ON':'OFF');
+  setTile('aTDHW',sim.dhw_on,sim.dhw_on?'ON':'OFF');
+  setTile('aTFault',false,sim.fault?'FAULT':'OK',sim.fault);
+  document.getElementById('aStrip').innerHTML=
+    '<span class="mchip">Flow <b style="color:var(--hot)">'+sim.boiler.toFixed(1)+'°</b></span>'+
+    '<span class="mchip">Return <b style="color:var(--cold)">'+sim.ret.toFixed(1)+'°</b></span>'+
+    '<span class="mchip">DHW <b>'+sim.dhw.toFixed(0)+'°</b></span>'+
+    '<span class="mchip">Pressure <b>'+sim.pressure.toFixed(2)+' bar</b></span>'+
+    '<span class="mchip">Room <b>'+sim.room.toFixed(1)+'°</b></span>'+
+    '<span class="mchip">Outside <b>'+sim.outside.toFixed(1)+'°</b></span>';
+}
+
+/* ---------- DESIGN B render ---------- */
+function polarB(cx,cy,r,aDeg){var a=(aDeg-90)*Math.PI/180;return{x:cx+r*Math.cos(a),y:cy+r*Math.sin(a)};}
+function arcB(cx,cy,r,a0,a1){
+  var p0=polarB(cx,cy,r,a0),p1=polarB(cx,cy,r,a1);
+  var large=(a1-a0)%360>180?1:0;
+  return 'M '+p0.x.toFixed(1)+' '+p0.y.toFixed(1)+' A '+r+' '+r+' 0 '+large+' 1 '+p1.x.toFixed(1)+' '+p1.y.toFixed(1);
+}
+var BH={cx:120,cy:120,r:92,lo:5,hi:30,startA:225,sweep:270};
+function bAngle(v){return BH.startA+(v-BH.lo)/(BH.hi-BH.lo)*BH.sweep;}
+function renderB(){
+  document.getElementById('bTrack').setAttribute('d',arcB(BH.cx,BH.cy,BH.r,BH.startA,BH.startA+BH.sweep));
+  document.getElementById('bArc').setAttribute('d',arcB(BH.cx,BH.cy,BH.r,BH.startA,bAngle(sim.setpoint)));
+  var t0=polarB(BH.cx,BH.cy,BH.r-13,bAngle(sim.room)),t1=polarB(BH.cx,BH.cy,BH.r+13,bAngle(sim.room));
+  var tk=document.getElementById('bTick');
+  tk.setAttribute('x1',t0.x);tk.setAttribute('y1',t0.y);tk.setAttribute('x2',t1.x);tk.setAttribute('y2',t1.y);
+  document.getElementById('bRoom').textContent=sim.room.toFixed(1)+'°';
+  document.getElementById('bSet').textContent='target '+sim.setpoint.toFixed(1)+'°';
+  var bs=document.getElementById('bStatus');
+  bs.classList.toggle('heating',sim.flame);
+  document.getElementById('bStatusTxt').textContent=statusSentence();
+  document.getElementById('bFlow').textContent=sim.boiler.toFixed(1)+'°';
+  document.getElementById('bRet').textContent=sim.ret.toFixed(1)+'°';
+  document.getElementById('bDt').textContent='ΔT '+(sim.boiler-sim.ret).toFixed(1)+'°';
+  document.getElementById('bFlame').classList.toggle('on',sim.flame);
+  document.getElementById('bPress').textContent=sim.pressure.toFixed(2)+' bar';
+  document.getElementById('bPressDot').style.left=(Math.max(0,Math.min(4,sim.pressure))/4*100).toFixed(1)+'%';
+  document.getElementById('bMod').textContent=sim.modulation+'%';
+  document.getElementById('bModFill').style.height=sim.modulation+'%';
+  document.getElementById('bDhw').textContent=sim.dhw.toFixed(0)+'°';
+  document.getElementById('bDhwState').textContent=sim.dhw_on?'running':'standby';
+  document.getElementById('bOut').textContent='Outside '+sim.outside.toFixed(1)+'° · OTGW firmware';
+}
+function bStep(d){
+  sim.setpoint=Math.max(BH.lo,Math.min(BH.hi,+(sim.setpoint+d).toFixed(1)));
+  document.getElementById('bCmd').innerHTML='would queue <b>TT='+sim.setpoint.toFixed(1)+'</b>';
+  renderB();
+}
+gel('bUp').onclick=function(){bStep(0.5);};
+gel('bDown').onclick=function(){bStep(-0.5);};
+
+/* ---------- DESIGN C render ---------- */
+var SP=65; // control setpoint shown in the chart
+function yTemp(v){return 10+(90-Math.max(10,Math.min(90,v)))/80*160;}
+function renderC(){
+  var n=hist.boiler.length, x0=34, x1=772, dx=(x1-x0)/(n-1);
+  var pf='',pr='';
+  for(var i=0;i<n;i++){
+    var x=(x0+i*dx).toFixed(1);
+    pf+=x+','+yTemp(hist.boiler[i]).toFixed(1)+' ';
+    pr+=x+','+yTemp(hist.ret[i]).toFixed(1)+' ';
+  }
+  document.getElementById('cFlow').setAttribute('points',pf);
+  document.getElementById('cRet').setAttribute('points',pr);
+  var sp=document.getElementById('cSpLine'), ySp=yTemp(SP).toFixed(1);
+  sp.setAttribute('y1',ySp);sp.setAttribute('y2',ySp);
+  var pm=x0+',170 ';
+  for(var j=0;j<n;j++){pm+=(x0+j*dx).toFixed(1)+','+(170-hist.mod[j]/100*42).toFixed(1)+' ';}
+  pm+=x1+',170';
+  document.getElementById('cMod').setAttribute('points',pm);
+  document.getElementById('cFlowLbl').textContent=sim.boiler.toFixed(1);
+  document.getElementById('cRetLbl').textContent=sim.ret.toFixed(1);
+  var pc=pressClass(sim.pressure);
+  document.getElementById('cGrid').innerHTML=
+    cell('T flow',sim.boiler.toFixed(1)+'°C','hot')+
+    cell('T return',sim.ret.toFixed(1)+'°C','cold')+
+    cell('ΔT',(sim.boiler-sim.ret).toFixed(1)+'°C','')+
+    cell('Modulation',sim.modulation+' %',sim.flame?'ok':'')+
+    cell('Pressure',sim.pressure.toFixed(2)+' bar',pc)+
+    cell('T DHW',sim.dhw.toFixed(1)+'°C','')+
+    cell('T room',sim.room.toFixed(1)+'°C','')+
+    cell('Setpoint',sim.setpoint.toFixed(1)+'°C','')+
+    cell('T outside',sim.outside.toFixed(1)+'°C','')+
+    cell('Flame',sim.flame?'ON':'OFF',sim.flame?'ok':'')+
+    cell('Status',sim.fault?'FAULT':'OK',sim.fault?'alert':'ok');
+}
+function cell(lbl,val,cls){
+  return '<div class="mc-cell"><div class="lbl">'+lbl+'</div><div class="val '+cls+'">'+val+'</div></div>';
+}
+var frames=[];
+function hex16(v){var x=Math.max(0,Math.round(v*256))&0xFFFF;return x.toString(16).toUpperCase().padStart(4,'0');}
+function pushFrames(){
+  var pool=[
+    ['19','Boiler water temp',sim.boiler],
+    ['1C','Return water temp',sim.ret],
+    ['11','Rel modulation',sim.modulation],
+    ['12','CH water pressure',sim.pressure],
+    ['18','Room temperature',sim.room],
+    ['1A','DHW temperature',sim.dhw]
+  ];
+  var m=pool[Math.floor(Math.random()*pool.length)];
+  var ts=new Date().toTimeString().slice(0,8);
+  frames.push({ts:ts,body:'<span class="t">T00'+m[0]+'0000</span>  read  '+m[1],
+               search:('t00'+m[0]+'0000 read '+m[1]).toLowerCase()});
+  frames.push({ts:ts,body:'<span class="b">B40'+m[0]+hex16(m[2])+'</span>  '+m[1]+' = <b>'+(+m[2]).toFixed(2)+'</b>',
+               search:('b40'+m[0]+' '+m[1]+' '+(+m[2]).toFixed(2)).toLowerCase()});
+  if(frames.length>200) frames.splice(0,frames.length-200);
+  var tEl=document.getElementById('cTicker');
+  tEl.innerHTML=frames.slice(-40).map(function(f){
+    return '<span class="ts">'+f.ts+'</span> '+f.body;
+  }).join('<br>');
+  tEl.scrollTop=tEl.scrollHeight;
+}
+
+/* ---------- MONITOR page ---------- */
+var logPaused=false, logScroll=true, logTs=true;
+gel('logPause').onclick=function(){
+  logPaused=!logPaused; this.textContent=logPaused?'▶ Resume':'⏸ Pause';
+};
+function chipToggle(id,fn){
+  var el=document.getElementById(id);
+  el.onclick=function(){el.classList.toggle('on');fn(el.classList.contains('on'));renderMonLog();};
+}
+chipToggle('chipScroll',function(v){logScroll=v;});
+chipToggle('chipTs',function(v){logTs=v;});
+gel('logSearch').oninput=renderMonLog;
+function renderMonLog(){
+  if(logPaused) return;
+  var q=document.getElementById('logSearch').value.trim().toLowerCase();
+  var list=q?frames.filter(function(f){return f.search.indexOf(q)>=0;}):frames;
+  var el=document.getElementById('monLog');
+  el.innerHTML=list.slice(-120).map(function(f){
+    return (logTs?'<span class="ts">'+f.ts+'</span> ':'')+f.body;
+  }).join('<br>');
+  if(logScroll) el.scrollTop=el.scrollHeight;
+  document.getElementById('logCount').textContent=list.length;
+}
+
+var STATS=[
+  {id:0, name:'Status (master/slave)',        dir:'tb', iv:1,  get:function(){return sim.flame?'flame on':'flame off';}},
+  {id:1, name:'Control setpoint',             dir:'tb', iv:1,  get:function(){return '65.0 °C';}},
+  {id:5, name:'Fault flags & OEM code',       dir:'tb', iv:60, get:function(){return sim.fault?'0x01':'0x00';}},
+  {id:14,name:'Max relative modulation',      dir:'tb', iv:60, get:function(){return '100 %';}},
+  {id:16,name:'Room setpoint',                dir:'t',  iv:10, get:function(){return sim.setpoint.toFixed(1)+' °C';}},
+  {id:17,name:'Relative modulation level',    dir:'b',  iv:1,  get:function(){return sim.modulation+' %';}},
+  {id:18,name:'CH water pressure',            dir:'b',  iv:30, get:function(){return sim.pressure.toFixed(2)+' bar';}},
+  {id:24,name:'Room temperature',             dir:'t',  iv:10, get:function(){return sim.room.toFixed(1)+' °C';}},
+  {id:25,name:'Boiler water temperature',     dir:'b',  iv:1,  get:function(){return sim.boiler.toFixed(1)+' °C';}},
+  {id:26,name:'DHW temperature',              dir:'b',  iv:10, get:function(){return sim.dhw.toFixed(1)+' °C';}},
+  {id:27,name:'Outside temperature',          dir:'b',  iv:60, get:function(){return sim.outside.toFixed(1)+' °C';}},
+  {id:28,name:'Return water temperature',     dir:'b',  iv:1,  get:function(){return sim.ret.toFixed(1)+' °C';}},
+  {id:56,name:'DHW setpoint',                 dir:'tb', iv:60, get:function(){return '55.0 °C';}},
+  {id:57,name:'Max CH water setpoint',        dir:'tb', iv:60, get:function(){return '75.0 °C';}}
+];
+STATS.forEach(function(s){s.count=Math.floor(800/s.iv)+Math.floor(Math.random()*50);});
+gel('statsSearch').oninput=renderStats;
+function dirBadge(d){
+  if(d==='t') return '<span class="dirbadge dir-t">T →</span>';
+  if(d==='b') return '<span class="dirbadge dir-b">← B</span>';
+  return '<span class="dirbadge dir-tb">T ⇄ B</span>';
+}
+function renderStats(){
+  var q=(document.getElementById('statsSearch').value||'').trim().toLowerCase();
+  var rows=STATS.filter(function(s){
+    return !q || s.name.toLowerCase().indexOf(q)>=0 || String(s.id).indexOf(q)>=0;
+  });
+  document.querySelector('#statsTable tbody').innerHTML=rows.map(function(s){
+    return '<tr><td><span class="idbadge">'+s.id+'</span></td><td>'+s.name+'</td>'+
+      '<td>'+dirBadge(s.dir)+'</td><td>'+s.iv+' s</td><td>'+s.count+'</td>'+
+      '<td class="statval" style="text-align:right">'+s.get()+'</td></tr>';
+  }).join('');
+  document.getElementById('statsCount').textContent=STATS.length;
+}
+
+var OTMSG=[[0,"R","flag8/flag8","Status","Master and Slave status",""],
+[1,"W","f8.8","TSet","Control setpoint","°C"],
+[2,"W","flag8/u8","MasterConfigMemberIDcode","Master Config / Member ID",""],
+[3,"R","flag8/u8","SlaveConfigMemberIDcode","Slave Config / Member ID",""],
+[4,"W","u8/u8","Command","Command-Code",""],
+[5,"R","flag8/u8","ASFflags","Application-specific fault",""],
+[6,"R","flag8/flag8","RBPflags","Remote-parameter flags",""],
+[7,"W","f8.8","CoolingControl","Cooling control signal","%"],
+[8,"W","f8.8","TsetCH2","Control setpoint for 2e CH circuit","°C"],
+[9,"R","f8.8","TrOverride","Remote override room setpoint","°C"],
+[10,"R","u8/u8","TSP","Number of TSPs",""],
+[11,"RW","u8/u8","TSPindexTSPvalue","Index number / Value of referred-to transparent slave parameter",""],
+[12,"R","u8/u8","FHBsize","Size of Fault-History-Buffer supported by slave",""],
+[13,"R","u8/u8","FHBindexFHBvalue","Index number / Value of referred-to fault-history buffer entry",""],
+[14,"W","f8.8","MaxRelModLevelSetting","Maximum relative modulation level setting","%"],
+[15,"R","u8/u8","MaxCapacityMinModLevel","Maximum boiler capacity (kW) / Minimum boiler modulation level(%)","kW/%"],
+[16,"W","f8.8","TrSet","Room Setpoint","°C"],
+[17,"R","f8.8","RelModLevel","Relative Modulation Level","%"],
+[18,"R","f8.8","CHPressure","CH water pressure","bar"],
+[19,"R","f8.8","DHWFlowRate","DHW flow rate","l/min"],
+[20,"RW","special","DayTime","Day of Week and Time of Day",""],
+[21,"RW","u8/u8","Date","Calendar date ",""],
+[22,"RW","u16","Year","Calendar year",""],
+[23,"W","f8.8","TrSetCH2","Room Setpoint CH2","°C"],
+[24,"W","f8.8","Tr","Room Temperature","°C"],
+[25,"R","f8.8","Tboiler","Boiler water temperature","°C"],
+[26,"R","f8.8","Tdhw","DHW temperature","°C"],
+[27,"RW","f8.8","Toutside","Outside temperature","°C"],
+[28,"R","f8.8","Tret","Return water temperature","°C"],
+[29,"R","f8.8","Tsolarstorage","Solar storage temperature","°C"],
+[30,"R","s16","Tsolarcollector","Solar collector temperature","°C"],
+[31,"R","f8.8","TflowCH2","Flow water temperature CH2","°C"],
+[32,"R","f8.8","Tdhw2","DHW2 temperature","°C"],
+[33,"R","s16","Texhaust","Exhaust temperature","°C"],
+[34,"R","f8.8","Theatexchanger","Boiler heat exchanger temperature","°C"],
+[35,"R","u8/u8","FanSpeed","Boiler fan speed and setpoint","Hz"],
+[36,"R","f8.8","ElectricalCurrentBurnerFlame","Electrical current through burner flame","µA"],
+[37,"W","f8.8","TRoomCH2","Room temperature for 2nd CH circuit","°C"],
+[38,"RW","f8.8","RelativeHumidity","Relative Humidity","%"],
+[39,"R","f8.8","TrOverride2","Remote override room setpoint 2","°C"],
+[40,"U","—","","",""],
+[41,"U","—","","",""],
+[42,"U","—","","",""],
+[43,"U","—","","",""],
+[44,"U","—","","",""],
+[45,"U","—","","",""],
+[46,"U","—","","",""],
+[47,"U","—","","",""],
+[48,"R","s8/s8","TdhwSetUBTdhwSetLB","DHW setpoint upper & lower bounds for adjustment","°C"],
+[49,"R","s8/s8","MaxTSetUBMaxTSetLB","Max CH water setpoint upper & lower bounds for adjustment","°C"],
+[50,"R","s8/s8","HcratioUBHcratioLB","OTC heat curve ratio upper & lower bounds for adjustment","°C"],
+[51,"R","s8/s8","Remoteparameter4boundaries","Remote parameter 4 boundaries",""],
+[52,"R","s8/s8","Remoteparameter5boundaries","Remote parameter 5 boundaries",""],
+[53,"R","s8/s8","Remoteparameter6boundaries","Remote parameter 6 boundaries",""],
+[54,"R","s8/s8","Remoteparameter7boundaries","Remote parameter 7 boundaries",""],
+[55,"R","s8/s8","Remoteparameter8boundaries","Remote parameter 8 boundaries",""],
+[56,"RW","f8.8","TdhwSet","DHW setpoint","°C"],
+[57,"RW","f8.8","MaxTSet","Max CH water setpoint","°C"],
+[58,"RW","f8.8","Hcratio","OTC heat curve ratio","°C"],
+[59,"RW","f8.8","Remoteparameter4","Remote parameter 4",""],
+[60,"RW","f8.8","Remoteparameter5","Remote parameter 5",""],
+[61,"RW","f8.8","Remoteparameter6","Remote parameter 6",""],
+[62,"RW","f8.8","Remoteparameter7","Remote parameter 7",""],
+[63,"RW","f8.8","Remoteparameter8","Remote parameter 8",""],
+[64,"U","—","","",""],
+[65,"U","—","","",""],
+[66,"U","—","","",""],
+[67,"U","—","","",""],
+[68,"U","—","","",""],
+[69,"U","—","","",""],
+[70,"R","flag8/flag8","StatusVH","Status Ventilation/Heat recovery",""],
+[71,"W","u8","ControlSetpointVH","Control setpoint V/H","%"],
+[72,"R","flag8/u8","ASFFaultCodeVH","Application-specific Fault Flags/Code V/H",""],
+[73,"R","u16","DiagnosticCodeVH","Diagnostic code V/H",""],
+[74,"R","flag8/u8","ConfigMemberIDVH","Config/Member ID V/H",""],
+[75,"R","f8.8","OpenthermVersionVH","OpenTherm version V/H",""],
+[76,"R","u8/u8","VersionTypeVH","Product version & type V/H",""],
+[77,"R","u8","RelativeVentilation","Relative ventilation","%"],
+[78,"RW","u8","RelativeHumidityExhaustAir","Relative humidity exhaust air","%"],
+[79,"RW","u16","CO2LevelExhaustAir","CO2 level exhaust air","ppm"],
+[80,"R","f8.8","SupplyInletTemperature","Supply inlet temperature","°C"],
+[81,"R","f8.8","SupplyOutletTemperature","Supply outlet temperature","°C"],
+[82,"R","f8.8","ExhaustInletTemperature","Exhaust inlet temperature","°C"],
+[83,"R","f8.8","ExhaustOutletTemperature","Exhaust outlet temperature","°C"],
+[84,"R","u16","ActualExhaustFanSpeed","Actual exhaust fan speed","rpm"],
+[85,"R","u16","ActualSupplyFanSpeed","Actual supply fan speed","rpm"],
+[86,"R","flag8/flag8","RemoteParameterSettingVH","Remote Parameter Setting V/H",""],
+[87,"RW","u8","NominalVentilationValue","Nominal Ventilation Value","%"],
+[88,"R","u8/u8","TSPNumberVH","TSP Number V/H",""],
+[89,"RW","u8/u8","TSPEntryVH","TSP setting V/H",""],
+[90,"R","u8/u8","FaultBufferSizeVH","Fault Buffer Size V/H",""],
+[91,"R","u8/u8","FaultBufferEntryVH","Fault Buffer Entry V/H",""],
+[92,"U","—","","",""],
+[93,"R","u8/u8","Brand","Boiler brand name (index/char)",""],
+[94,"R","u8/u8","BrandVersion","Boiler brand version (index/char)",""],
+[95,"R","u8/u8","BrandSerialNumber","Boiler brand serial number (index/char)",""],
+[96,"RW","u16","CoolingOperationHours","Cooling operation hours","hrs"],
+[97,"RW","u16","PowerCycles","Power cycles",""],
+[98,"W","special","RFstrengthbatterylevel","RF sensor status information",""],
+[99,"RW","special","OperatingMode_HC1_HC2_DHW","Remote Override Operating Mode (Heating/DHW)",""],
+[100,"R","ot_flag8","RoomRemoteOverrideFunction","Function of manual and program changes in master and remote room setpoint.",""],
+[101,"R","flag8/flag8","SolarStorageMaster","Solar Storage Master mode",""],
+[102,"R","flag8/u8","SolarStorageASFflags","Solar Storage Application-specific flags and OEM fault",""],
+[103,"R","flag8/u8","SolarStorageSlaveConfigMemberIDcode","Solar Storage Slave Config / Member ID",""],
+[104,"R","u8/u8","SolarStorageVersionType","Solar Storage product version number and type",""],
+[105,"R","u8/u8","SolarStorageTSP","Solar Storage Number of Transparent-Slave-Parameters supported",""],
+[106,"RW","u8/u8","SolarStorageTSPindexTSPvalue","Solar Storage Index number / Value of referred-to transparent slave parameter",""],
+[107,"R","u8/u8","SolarStorageFHBsize","Solar Storage Size of Fault-History-Buffer supported by slave",""],
+[108,"R","u8/u8","SolarStorageFHBindexFHBvalue","Solar Storage Index number / Value of referred-to fault-history buffer entry",""],
+[109,"RW","u16","ElectricityProducerStarts","Electricity producer starts",""],
+[110,"RW","u16","ElectricityProducerHours","Electricity producer hours",""],
+[111,"R","u16","ElectricityProduction","Electricity production",""],
+[112,"RW","u16","CumulativeElectricityProduction","Cumulative Electricity production",""],
+[113,"RW","u16","BurnerUnsuccessfulStarts","Unsuccessful burner starts",""],
+[114,"RW","u16","FlameSignalTooLow","Flame signal too low count",""],
+[115,"R","u16","OEMDiagnosticCode","OEM-specific diagnostic/service code",""],
+[116,"RW","u16","BurnerStarts","Burner starts",""],
+[117,"RW","u16","CHPumpStarts","CH pump starts",""],
+[118,"RW","u16","DHWPumpValveStarts","DHW pump/valve starts",""],
+[119,"RW","u16","DHWBurnerStarts","DHW burner starts",""],
+[120,"RW","u16","BurnerOperationHours","Burner operation hours","hrs"],
+[121,"RW","u16","CHPumpOperationHours","CH pump operation hours","hrs"],
+[122,"RW","u16","DHWPumpValveOperationHours","DHW pump/valve operation hours","hrs"],
+[123,"RW","u16","DHWBurnerOperationHours","DHW burner operation hours","hrs"],
+[124,"W","f8.8","OpenThermVersionMaster","Master Version OpenTherm Protocol Specification",""],
+[125,"R","f8.8","OpenThermVersionSlave","Slave Version OpenTherm Protocol Specification",""],
+[126,"W","u8/u8","MasterVersion","Master product version number and type",""],
+[127,"R","u8/u8","SlaveVersion","Slave product version number and type",""]];
+
+// simulated support: which msgIDs the thermostat asks, the boiler answers, or both
+var SUP_BOTH=[0,1,3,5,6,14,16,17,18,24,25,26,27,28,48,49,56,57];
+var SUP_T=[2,4,8,9,10,100];
+var SUP_B=[15,19,33,34,35,116,117,118,119,120,121,123];
+function supState(id){
+  if(SUP_BOTH.indexOf(id)>=0) return 'both';
+  if(SUP_T.indexOf(id)>=0) return 'tonly';
+  if(SUP_B.indexOf(id)>=0) return 'bonly';
+  return 'none';
+}
+function supColor(st){return {both:'var(--zone-ok)',tonly:'var(--accent)',bonly:'var(--zone-warn)',none:'var(--tile-off)'}[st];}
+function supLabel(st){return {both:'✓ Both sides',tonly:'↑ Thermostat only',bonly:'↓ Boiler only',none:'○ Not seen'}[st];}
+function rwText(rw){return {R:'Read · boiler → thermostat',W:'Write · thermostat → boiler',RW:'Read / Write',U:'Undefined'}[rw]||rw;}
+function supConcl(st,undef){
+  if(st==='both') return 'Your thermostat requests this and the boiler answers it — fully supported on your system.';
+  if(st==='tonly') return 'Your thermostat asks for this, but the boiler never answers it — your boiler does not implement this message.';
+  if(st==='bonly') return 'The boiler reports this, but your thermostat never requests it.';
+  if(undef) return 'Reserved / unused in the OpenTherm specification.';
+  return 'Not seen on your bus yet — it is defined in the spec but neither side has used it this session.';
+}
+function supShowDetail(id){
+  var m=OTMSG[id], st=supState(id), undef=(m[2]==='—');
+  var hex='0x'+id.toString(16).toUpperCase().padStart(2,'0');
+  var el=document.getElementById('supDetail');
+  el.style.setProperty('--s',supColor(st));
+  el.innerHTML=
+    '<div class="sd-top"><span class="sd-num">'+id+'</span><span class="sd-hex">'+hex+'</span>'+
+      (m[3]?'<span class="sd-spec">'+m[3]+'</span>':'')+'</div>'+
+    '<h5>'+(m[4]||'(undefined / reserved)')+'</h5>'+
+    '<span class="sd-badge">'+supLabel(st)+'</span>'+
+    '<dl>'+
+      '<dt>Decimal</dt><dd>'+id+'</dd>'+
+      '<dt>Hex</dt><dd>'+hex+'</dd>'+
+      '<dt>Spec name</dt><dd>'+(m[3]||'—')+'</dd>'+
+      '<dt>Data type</dt><dd>'+m[2]+'</dd>'+
+      '<dt>Direction</dt><dd style="text-align:right">'+rwText(m[1])+'</dd>'+
+      (m[5]?'<dt>Unit</dt><dd>'+m[5]+'</dd>':'')+
+    '</dl>'+
+    '<div class="sd-concl">'+supConcl(st,undef)+'</div>'+
+    '<div class="sd-hint">From the OpenTherm spec table + your bus traffic this session.</div>';
+}
+function supDetailPlaceholder(){
+  var el=document.getElementById('supDetail');
+  el.style.setProperty('--s','var(--border)');
+  el.innerHTML='<div class="sd-hint" style="margin:0">Click any square to see its OpenTherm message — decimal &amp; hex id, spec name, human-readable name, data type, direction, and what it means for your system.</div>';
+}
+function wireSupport(){
+  var mx=document.getElementById('supMatrix'), tip=document.getElementById('supTip');
+  mx.addEventListener('mousemove',function(e){
+    var cell=e.target.closest('.mcellq'); if(!cell){tip.style.opacity=0;return;}
+    var id=+cell.dataset.id, m=OTMSG[id];
+    tip.innerHTML='<b>'+id+'</b> · '+(m[4]||'undefined / reserved');
+    tip.style.left=e.clientX+'px'; tip.style.top=e.clientY+'px'; tip.style.opacity=1;
+  });
+  mx.addEventListener('mouseleave',function(){tip.style.opacity=0;});
+  function pick(cell){ mx.querySelectorAll('.mcellq.sel').forEach(function(x){x.classList.remove('sel');});
+    cell.classList.add('sel'); supShowDetail(+cell.dataset.id); }
+  mx.addEventListener('click',function(e){ var cell=e.target.closest('.mcellq'); if(cell) pick(cell); });
+  mx.addEventListener('keydown',function(e){ var cell=e.target.closest('.mcellq');
+    if(cell && (e.key==='Enter'||e.key===' ')){ e.preventDefault(); pick(cell); } });
+}
+function buildSupportMatrix(){
+  var html='';
+  for(var i=0;i<128;i++){
+    var st=supState(i);
+    var cls=st==='none'?'':st;
+    html+='<div class="mcellq '+cls+'" data-id="'+i+'" role="button" tabindex="0" aria-label="msgID '+i+'">'+i+'</div>';
+  }
+  var mx=document.getElementById('supMatrix');
+  mx.innerHTML=html;
+  document.getElementById('supCount').textContent=SUP_BOTH.length+SUP_T.length+SUP_B.length;
+  wireSupport();
+  var def=mx.querySelector('[data-id="25"]'); if(def) def.classList.add('sel');
+  supShowDetail(25);
+}
+
+function drawStrip(fFlow,fRet,fMod,fSp){
+  var n=hist.boiler.length, x0=34, x1=772, dx=(x1-x0)/(n-1);
+  var pf='',pr='';
+  for(var i=0;i<n;i++){
+    var x=(x0+i*dx).toFixed(1);
+    pf+=x+','+yTemp(hist.boiler[i]).toFixed(1)+' ';
+    pr+=x+','+yTemp(hist.ret[i]).toFixed(1)+' ';
+  }
+  document.getElementById(fFlow).setAttribute('points',pf);
+  document.getElementById(fRet).setAttribute('points',pr);
+  var sp=document.getElementById(fSp), ySp=yTemp(SP).toFixed(1);
+  sp.setAttribute('y1',ySp);sp.setAttribute('y2',ySp);
+  var pm=x0+',170 ';
+  for(var j=0;j<n;j++){pm+=(x0+j*dx).toFixed(1)+','+(170-hist.mod[j]/100*42).toFixed(1)+' ';}
+  pm+=x1+',170';
+  document.getElementById(fMod).setAttribute('points',pm);
+}
+
+function renderMonitor(){
+  renderMonLog();
+  // a couple of counters tick up each second, like the real stats table
+  STATS.forEach(function(s){ if(s.iv===1) s.count++; else if(Math.random()<1/s.iv) s.count++; });
+  renderStats();
+  drawStrip('gFlow2','gRet2','gMod2','gSpLine');
+  if(document.getElementById('malldata').classList.contains('active')) renderAllData();
+}
+
+/* ---------- All data (the complete technical surface) ----------
+   The original UI's strength was showing EVERYTHING. This keeps that: every
+   value across OT bus + Dallas + BLE + overrides. 'Simple' filters to the
+   decoded essentials a homeowner reads; 'Technical' shows all of it. */
+var onoff=function(b){return b?'On':'Off';};
+var ALLDATA=[
+  {id:25,name:'Boiler water temperature', src:'b', u:'°C', c:1, get:function(){return sim.boiler.toFixed(1);}},
+  {id:28,name:'Return water temperature', src:'b', u:'°C', c:1, get:function(){return sim.ret.toFixed(1);}},
+  {id:1, name:'Control setpoint',         src:'tb',u:'°C', c:1, get:function(){return '65.0';}},
+  {id:17,name:'Relative modulation level',src:'b', u:'%',  c:1, get:function(){return String(sim.modulation);}},
+  {id:18,name:'CH water pressure',        src:'b', u:'bar',c:1, get:function(){return sim.pressure.toFixed(2);}},
+  {id:24,name:'Room temperature',         src:'t', u:'°C', c:1, get:function(){return sim.room.toFixed(1);}},
+  {id:16,name:'Room setpoint',            src:'t', u:'°C', c:1, ovr:1, get:function(){return sim.setpoint.toFixed(1);}},
+  {id:27,name:'Outside temperature',      src:'tb',u:'°C', c:1, ovr:1, get:function(){return sim.outside.toFixed(1);}},
+  {id:26,name:'DHW temperature',          src:'b', u:'°C', c:1, get:function(){return sim.dhw.toFixed(1);}},
+  {id:56,name:'DHW setpoint',             src:'tb',u:'°C', c:1, get:function(){return '55.0';}},
+  {id:0, name:'Flame status',             src:'tb',u:'',   c:1, get:function(){return onoff(sim.flame);}},
+  {id:0, name:'CH active',                src:'tb',u:'',   c:1, get:function(){return onoff(sim.ch);}},
+  {id:0, name:'DHW active',               src:'tb',u:'',   c:1, get:function(){return onoff(sim.dhw_on);}},
+  {id:5, name:'Fault indication',         src:'b', u:'',   c:1, get:function(){return sim.fault?'FAULT':'OK';}},
+  {id:'1-Wire',name:'Living room (DS18B20 28-AA-BB)', src:'dallas', u:'°C', c:1, get:function(){return (sim.room+0.3).toFixed(1);}},
+  {id:'BLE',name:'Living room (ATC_0B11)', src:'ble', u:'°C', c:1, get:function(){return (sim.room).toFixed(1);}},
+  {id:'BLE',name:'Bathroom humidity (ATC_0B33)', src:'ble', u:'%', c:1, get:function(){return '58';}},
+  // technical-only below
+  {id:14,name:'Max relative modulation',  src:'tb',u:'%',  c:0, get:function(){return '100';}},
+  {id:57,name:'Max CH water setpoint',    src:'tb',u:'°C', c:0, get:function(){return '75.0';}},
+  {id:48,name:'DHW setpoint bounds',      src:'b', u:'°C', c:0, get:function(){return '40–60';}},
+  {id:49,name:'Max CH setpoint bounds',   src:'b', u:'°C', c:0, get:function(){return '20–80';}},
+  {id:19,name:'DHW flow rate',            src:'b', u:'l/min',c:0,get:function(){return sim.dhw_on?'8.4':'0.0';}},
+  {id:33,name:'Exhaust temperature',      src:'b', u:'°C', c:0, get:function(){return '64';}},
+  {id:34,name:'Heat exchanger temp',      src:'b', u:'°C', c:0, get:function(){return (sim.boiler+2).toFixed(1);}},
+  {id:35,name:'Boiler fan speed',         src:'b', u:'Hz', c:0, get:function(){return sim.flame?'42':'0';}},
+  {id:116,name:'Burner starts',           src:'b', u:'',   c:0, get:function(){return '18423';}},
+  {id:120,name:'Burner operation hours',  src:'b', u:'hrs',c:0, get:function(){return '4127';}},
+  {id:117,name:'CH pump starts',          src:'b', u:'',   c:0, get:function(){return '20991';}},
+  {id:119,name:'DHW burner starts',       src:'b', u:'',   c:0, get:function(){return '9044';}},
+  {id:115,name:'OEM diagnostic code',     src:'b', u:'',   c:0, get:function(){return '0';}},
+  {id:3, name:'Slave configuration',      src:'b', u:'',   c:0, get:function(){return '0x05 / 3';}},
+  {id:125,name:'OT version (slave)',      src:'b', u:'',   c:0, get:function(){return '4.20';}},
+  {id:127,name:'Slave product version',   src:'b', u:'',   c:0, get:function(){return 'v3 / type 12';}}
+];
+var allTechMode=false;
+function srcBadge(src){
+  var m={t:['dir-t','T →'],b:['dir-b','← B'],tb:['dir-tb','T ⇄ B'],dallas:['dir-dallas','1-Wire'],ble:['dir-ble','BLE']};
+  var x=m[src]||['dir-tb',src]; return '<span class="dirbadge '+x[0]+'">'+x[1]+'</span>';
+}
+function renderAllData(){
+  var q=(document.getElementById('allSearch').value||'').trim().toLowerCase();
+  var rows=ALLDATA.filter(function(r){
+    if(!allTechMode && !r.c) return false;
+    if(!q) return true;
+    return (r.name+' '+r.id+' '+r.src).toLowerCase().indexOf(q)>=0;
+  });
+  document.querySelector('#allTable tbody').innerHTML=rows.map(function(r){
+    return '<tr><td><span class="idbadge">'+r.id+'</span></td>'+
+      '<td>'+r.name+(r.ovr?' <span class="dirbadge dir-ovr">⛓ override</span>':'')+'</td>'+
+      '<td>'+srcBadge(r.src)+'</td>'+
+      '<td class="statval" style="text-align:right">'+r.get()+'</td>'+
+      '<td style="color:var(--muted)">'+r.u+'</td>'+
+      '<td style="color:var(--muted)">'+(r.src==='b'||r.src==='tb'?'1s':(r.src==='ble'?'12s':'30s'))+'</td></tr>';
+  }).join('');
+  document.getElementById('allCount').textContent=rows.length+(allTechMode?' / all':' / essentials');
+}
+gel('allSearch').oninput=renderAllData;
+gel('allSimple').onclick=function(){allTechMode=false;
+  this.classList.add('active');document.getElementById('allTech').classList.remove('active');renderAllData();};
+gel('allTech').onclick=function(){allTechMode=true;
+  this.classList.add('active');document.getElementById('allSimple').classList.remove('active');renderAllData();};
+
+/* ---------- SETTINGS page ---------- */
+var SAT_GROUPS = [
+  {
+    id: 'sat-grp-core',
+    title: 'Core Control',
+    fields: [
+      { key: 'satenabled',     label: 'SAT Enabled',           type: 'b' },
+      { key: 'satsystem',      label: 'Heating System',        type: 'select',
+        options: [[0,'Gas / Radiators'],[1,'Heat Pump'],[2,'Hybrid'],[3,'Underfloor']] },
+      { key: 'satmanufacturer',label: 'Manufacturer',          type: 'select',
+        options: [[0,'Auto-detect'],[1,'Atag'],[2,'Baxi'],[3,'Brotge'],[4,'De Dietrich'],[5,'Ferroli'],[6,'Geminox'],[7,'Ideal'],[8,'Immergas'],[9,'Intergas'],[10,'Itho'],[11,'Nefit'],[12,'Radiant'],[13,'Remeha'],[14,'Sime'],[15,'Vaillant'],[16,'Viessmann'],[17,'Worcester Bosch'],[18,'Other']] },
+      { key: 'satcoefficient', label: 'Heating Curve Slope',    type: 'f', min: 0.1, max: 5.0, step: 0.1 },
+      { key: 'satdeadband',    label: 'Deadband',              type: 'f', unit: '\u00B0C', min: 0.05, max: 2.0, step: 0.05 },
+      { key: 'satinterval',    label: 'Control Interval',      type: 'i', unit: 's', min: 30, max: 600, step: 10 },
+      { key: 'satheatingmode', label: 'Heating Mode',          type: 'select',
+        options: [[0,'Comfort'],[1,'Eco']] },
+      { key: 'sattargettemp',  label: 'Target Temperature',    type: 'f', unit: '\u00B0C', min: 5.0, max: 30.0, step: 0.5 },
+      { key: 'sattempstep',    label: 'Temp Adjust Step',      type: 'f', unit: '\u00B0C', min: 0.1, max: 1.0, step: 0.1 }
+    ]
+  },
+  {
+    id: 'sat-grp-pid',
+    title: 'PID Tuning',
+    fields: [
+      { key: 'satpwmautoswitch',  label: 'Auto-Switch PWM/Continuous', type: 'b' },
+      { key: 'satautogains',      label: 'Auto-Gains Multiplier',      type: 'f', min: 0.1, max: 10.0, step: 0.1 },
+      { key: 'satovershootmargin',label: 'Overshoot Margin',   type: 'f', unit: '\u00B0C', min: 0.5, max: 5.0, step: 0.1 }
+    ]
+  },
+  {
+    id: 'sat-grp-pwm',
+    title: 'PWM',
+    fields: [
+      { key: 'satforcepwm',       label: 'Force PWM',          type: 'b' },
+      { key: 'satcyclesperhour',  label: 'Cycles per Hour',    type: 'i', min: 2, max: 6, step: 1 },
+      { key: 'satmaxmodulation',  label: 'Max Rel. Modulation',type: 'i', unit: '%', min: 0, max: 100, step: 1 }
+    ]
+  },
+  {
+    id: 'sat-grp-tempsrc',
+    title: 'Temperature Sources',
+    fields: [
+      { key: 'satexternaltemp',   label: 'Use external temp source', type: 'b' },
+      { key: 'satsensormaxage',   label: 'Sensor max age',     type: 'i', unit: 's', min: 60, max: 86400, step: 60 },
+      { key: 'satblefailover',    label: 'Fail over to OT thermostat', type: 'b' }
+      // BLE scan + roster config live under Settings → Sensors → Bluetooth
+    ]
+  },
+  {
+    id: 'sat-grp-presets',
+    title: 'Presets',
+    fields: [
+      { key: 'satpresetcomfort',  label: 'Comfort',            type: 'f', unit: '\u00B0C', min: 15.0, max: 28.0, step: 0.5 },
+      { key: 'satpreseteco',      label: 'Eco',                type: 'f', unit: '\u00B0C', min: 10.0, max: 22.0, step: 0.5 },
+      { key: 'satpresetaway',     label: 'Away',               type: 'f', unit: '\u00B0C', min: 5.0,  max: 18.0, step: 0.5 },
+      { key: 'satpresetsleep',    label: 'Sleep',              type: 'f', unit: '\u00B0C', min: 5.0,  max: 25.0, step: 0.5 },
+      { key: 'satpresetactivity', label: 'Activity',           type: 'f', unit: '\u00B0C', min: 5.0,  max: 20.0, step: 0.5 },
+      { key: 'satpresethome',     label: 'Home',               type: 'f', unit: '\u00B0C', min: 10.0, max: 25.0, step: 0.5 }
+    ]
+  },
+  {
+    id: 'sat-grp-dhw',
+    title: 'DHW (Domestic Hot Water)',
+    fields: [
+      { key: 'satdhwenabled',     label: 'DHW Enabled',        type: 'b' },
+      { key: 'satdhwsetpoint',    label: 'DHW Setpoint',       type: 'f', unit: '\u00B0C', min: 0.0, max: 60.0, step: 0.5 }
+    ]
+  },
+  {
+    id: 'sat-grp-pressure',
+    title: 'Pressure',
+    fields: [
+      { key: 'satminpressure',    label: 'Min Pressure',       type: 'f', unit: 'bar', min: 0.0, max: 3.0, step: 0.1 },
+      { key: 'satmaxpressure',    label: 'Max Pressure',       type: 'f', unit: 'bar', min: 1.0, max: 4.0, step: 0.1 },
+      { key: 'satmaxpressdrop',   label: 'Max Pressure Drop',  type: 'f', unit: 'bar', min: 0.05, max: 2.0, step: 0.05 }
+    ]
+  },
+  {
+    id: 'sat-grp-smart',
+    title: 'Smart Features',
+    fields: [
+      { key: 'satsolargain',       label: 'Solar Gain Enable',      type: 'b' },
+      { key: 'satsolarminrise',    label: 'Solar Min Rise Rate',    type: 'f', unit: '\u00B0C/hr', min: 0.1, max: 5.0, step: 0.1 },
+      { key: 'satsolaroffset',     label: 'Solar Setpoint Offset',  type: 'f', unit: '\u00B0C', min: 0.5, max: 10.0, step: 0.5 },
+      { key: 'satsolarminelev',    label: 'Solar Min Elevation',    type: 'f', unit: '\u00B0', min: -10.0, max: 45.0, step: 1.0 },
+      { key: 'satsolarfreezeint',  label: 'Solar Freeze Integral',  type: 'b' },
+      { key: 'satsummersimmer',    label: 'Summer Simmer Enable',   type: 'b' },
+      { key: 'satsummerthreshold', label: 'Summer Threshold',       type: 'f', unit: '\u00B0C', min: 5.0, max: 35.0, step: 0.5 },
+      { key: 'satsummerminhours',  label: 'Summer Min Hours',       type: 'i', unit: 'h', min: 1, max: 48, step: 1 },
+      { key: 'satcomfortadjust',   label: 'Thermal Comfort Enable', type: 'b' },
+      { key: 'satcomforthumidity', label: 'Comfort Humidity',       type: 'f', unit: '%', min: 10.0, max: 90.0, step: 1.0 },
+      { key: 'satcomfortmaxoffset',label: 'Comfort Max Offset',     type: 'f', unit: '\u00B0C', min: 0.0, max: 3.0, step: 0.1 },
+      { key: 'satmultiarea',       label: 'Multi-Area Enable',      type: 'b' },
+      { key: 'satmultiareacount',  label: 'Multi-Area Count',       type: 'i', min: 0, max: 4, step: 1 },
+      { key: 'satareaweight0',     label: 'Area 0 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satareaweight1',     label: 'Area 1 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satareaweight2',     label: 'Area 2 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satareaweight3',     label: 'Area 3 Weight',          type: 'f', min: 0.0, max: 10.0, step: 0.1 },
+      { key: 'satthermalcoeff',    label: 'Thermal Coefficient',    type: 'f', min: 0.005, max: 0.3, step: 0.005 }
+    ]
+  },
+  {
+    id: 'sat-grp-safety',
+    title: 'Safety',
+    fields: [
+      { key: 'satwindowdetect',  label: 'Window Detection',       type: 'b' },
+      { key: 'satwindowminsec',  label: 'Window Min Open Time',   type: 'i', unit: 's', min: 10, max: 600, step: 10 },
+      { key: 'satpushsetpoint',  label: 'Push Setpoint',          type: 'b' }
+    ]
+  },
+  {
+    id: 'sat-grp-energy',
+    title: 'Energy',
+    fields: [
+      { key: 'satboilercapacity', label: 'Boiler Capacity', type: 'f', unit: 'kW', min: 1.0, max: 100.0, step: 0.5 }
+    ]
+  },
+  {
+    // TASK-640: PV-surplus opportunistic setpoint boost.
+    // Disabled by default; HA-side automation publishes pv_surplus_w.
+    id: 'sat-grp-pvboost',
+    title: 'PV Surplus Boost',
+    fields: [
+      { key: 'satpvboostenabled',        label: 'PV Boost Enable',     type: 'b' },
+      { key: 'satpvboostthresholdw',     label: 'Surplus Threshold',   type: 'i', unit: 'W',   min: 100,  max: 10000, step: 100 },
+      { key: 'satpvboostholds',          label: 'Hold Time',           type: 'i', unit: 's',   min: 30,   max: 600,   step: 10  },
+      { key: 'satpvboostdeltac',         label: 'Boost Delta',         type: 'f', unit: '°C', min: 0.5, max: 5.0, step: 0.1 },
+      { key: 'satpvboostmaxindoorc',     label: 'Max Indoor Ceiling',  type: 'f', unit: '°C', min: 18.0, max: 28.0, step: 0.5 },
+      { key: 'satpvboostmaxdurationmin', label: 'Max Boost Duration',  type: 'i', unit: 'min', min: 30,   max: 1440,  step: 10  }
+    ]
+  },
+  {
+    id: 'sat-grp-weather',
+    title: 'Weather',
+    fields: [
+      { key: 'satweatherenable',   label: 'Weather Enable',         type: 'b' },
+      { key: 'satweatherlat',      label: 'Latitude',               type: 'f', min: -90.0, max: 90.0, step: 0.0001 },
+      { key: 'satweatherlon',      label: 'Longitude',              type: 'f', min: -180.0, max: 180.0, step: 0.0001 },
+      // TASK-511: hard floor at 900 s (15 min) per OWM free-tier rate-limit (1000 calls/day).
+      { key: 'satweatherinterval', label: 'Fetch Interval',         type: 'i', unit: 's', min: 900, max: 3600, step: 60 },
+      { key: 'satweatherapikey',   label: 'OWM API Key',            type: 's', maxlen: 64, size: 40, hidden: true }
+    ]
+  },
+  {
+    id: 'sat-grp-sync',
+    title: 'Sync',
+    fields: [
+      { key: 'satpresetsync',       label: 'Preset Sync Enable', type: 'b' },
+      { key: 'satpresetsynctopic',  label: 'Preset Sync Topic',  type: 's', maxlen: 64, size: 40 }
+    ]
+  },
+  {
+    id: 'sat-grp-advanced',
+    title: 'Advanced',
+    fields: [
+      { key: 'satsimulation',    label: 'Simulation Mode',       type: 'b' },
+      { key: 'satsimheatrate',   label: 'Sim Heat Rate',         type: 'f', unit: '\u00B0C/min', min: 0.01, max: 5.0, step: 0.01 },
+      { key: 'satsimcoolrate',   label: 'Sim Cool Rate',         type: 'f', unit: '\u00B0C/min', min: 0.01, max: 5.0, step: 0.01 },
+      { key: 'satautotune',      label: 'Auto-Tune',             type: 'b' },
+      { key: 'satautotunerate',  label: 'Auto-Tune Rate',        type: 'f', min: 0.005, max: 0.1, step: 0.005 },
+      { key: 'saterrormon',      label: 'Error Monitoring',      type: 'b' },
+      { key: 'satflameoffset',   label: 'Flame Off Offset',      type: 'f', unit: '\u00B0C', min: 0.0, max: 5.0, step: 0.1 },
+      { key: 'satflowoffset',    label: 'Flow Offset',           type: 'f', unit: '\u00B0C', min: 0.5, max: 10.0, step: 0.1 },
+      { key: 'satmodsupoffset',  label: 'Modulation Suppression Offset', type: 'f', unit: '%', min: 0.0, max: 5.0, step: 0.1 },
+      { key: 'satmodsupdelay',   label: 'Modulation Suppression Delay',  type: 'f', unit: 's', min: 0.0, max: 120.0, step: 1.0 },
+      { key: 'satvalveoffset',   label: 'Valve Position Offset',         type: 'f', min: -1.0, max: 1.0, step: 0.1 }
+    ]
+  }
+];
+
+/* Settings model — mirrors the real dev (2.0.0) settings. Category -> groups -> fields.
+   field types: b=toggle, select(options [[v,label]]), f/i=number, s/t=text, p=password. */
+// Supplementary SAT groups — the remaining persisted SAT keys the dev UI
+// drives through dedicated panels (BLE discovery, multi-zone), surfaced here
+// so the audit reaches 100% coverage of writeSettings().
+var SAT_EXTRA=[
+ {id:'sat-grp-source', title:'Temperature Source', fields:[
+   {key:'satsource', label:'Room temp source', type:'select', value:0,
+     options:[[0,'OpenTherm thermostat'],[1,'External sensor'],[2,'BLE sensor'],[3,'MQTT topic']]},
+   {key:'satthermalcomfort', label:'Thermal comfort model', type:'b', value:false},
+   {key:'sathumiditytimeout', label:'Humidity sensor timeout', type:'i', unit:'s', value:600, min:60, max:86400, step:60}
+ ]},
+ {id:'sat-grp-zones', title:'Zones (multi-area)', fields:[
+   {key:'satzonecount', label:'Zone count', type:'i', value:0, min:0, max:4, step:1},
+   {key:'satzoneheadroom', label:'Zone headroom', type:'f', unit:'°C', value:0.5, min:0, max:5, step:0.1},
+   {key:'satzonetimeout', label:'Zone sensor timeout', type:'i', unit:'s', value:1800, min:60, max:86400, step:60}
+ ]},
+ {id:'sat-grp-boiler', title:'Boiler Model', fields:[
+   {key:'satboilerratedkw', label:'Rated output', type:'f', unit:'kW', value:24.0, min:1, max:100, step:0.5},
+   {key:'satboilerefficiency', label:'Efficiency', type:'f', unit:'%', value:92.0, min:50, max:110, step:0.5},
+   {key:'sathpcycle', label:'Heat-pump min cycle', type:'i', unit:'min', value:10, min:1, max:60, step:1},
+   {key:'satflushtreshold', label:'Flush threshold', type:'f', unit:'°C', value:5.0, min:0, max:20, step:0.5},
+   {key:'satdhwenable', label:'DHW enable (legacy alias)', type:'b', value:true}
+ ]}
+];
+var SET_CATS=[
+ {id:'system',icon:'🖥',title:'System',desc:'Device identity and access.',groups:[{fields:[
+   {key:'hostname',label:'Hostname',type:'t',value:'OTGW',hint:'mDNS name on your network'},
+   {key:'httppasswd',label:'Admin password',type:'p',value:'••••••••',hint:'Protects Settings/Advanced'},
+   {key:'boardmode',label:'Board mode',type:'select',value:0,options:[[0,'Auto-detect'],[1,'NodoShop ESP8266'],[2,'OTGW32 (ESP32)'],[3,'LOLIN S3 + Classic']]},
+   {key:'DeviceManufacturer',label:'Device manufacturer',type:'t',value:'NodoShop'},
+   {key:'DeviceModel',label:'Device model',type:'t',value:'OTGW'}
+ ]}]},
+ {id:'network',icon:'📶',title:'Network',reboot:true,desc:'IP configuration. Applies after reboot.',groups:[
+   {sub:'Wi-Fi',fields:[
+     {key:'usedhcp',label:'Use DHCP (automatic IP)',type:'b',value:true},
+     {key:'WifiStaticIP',label:'Static IP',type:'t',value:'192.168.1.50'},
+     {key:'WifiSubnet',label:'Subnet mask',type:'t',value:'255.255.255.0'},
+     {key:'WifiGateway',label:'Gateway',type:'t',value:'192.168.1.1'},
+     {key:'WifiDns1',label:'DNS 1',type:'t',value:'192.168.1.1'},
+     {key:'WifiDns2',label:'DNS 2 (optional)',type:'t',value:''}
+   ]},
+   {sub:'Ethernet (ESP32 / OTGW32)',fields:[
+     {key:'ETHstaticip',label:'Use static IP',type:'b',value:false},
+     {key:'ETHipaddress',label:'IP address',type:'t',value:''},
+     {key:'ETHsubnet',label:'Subnet mask',type:'t',value:''},
+     {key:'ETHgateway',label:'Gateway',type:'t',value:''},
+     {key:'ETHdns',label:'DNS',type:'t',value:''}
+   ]}
+ ]},
+ {id:'mqtt',icon:'📡',title:'MQTT',desc:'Broker connection and Home Assistant discovery.',groups:[
+   {sub:'Connection',fields:[
+     {key:'MQTTenable',label:'Enable MQTT',type:'b',value:true},
+     {key:'MQTTbroker',label:'Broker',type:'t',value:'192.168.1.10'},
+     {key:'MQTTbrokerPort',label:'Port',type:'i',value:1883,min:1,max:65535},
+     {key:'MQTTuser',label:'Username',type:'t',value:'otgw'},
+     {key:'MQTTpasswd',label:'Password',type:'p',value:'••••••••'},
+     {key:'MQTTtoptopic',label:'Top topic',type:'t',value:'OTGW'},
+     {key:'MQTTuniqueid',label:'Unique id',type:'t',value:'otgw-a1b2c3'}
+   ]},
+   {sub:'Home Assistant & publishing',fields:[
+     {key:'MQTThaprefix',label:'HA discovery prefix',type:'t',value:'homeassistant'},
+     {key:'MQTTdiscoveryAutoVerify',label:'Hourly discovery verify',type:'b',value:true},
+     {key:'MQTTharebootdetection',label:'HA reboot detection',type:'b',value:true},
+     {key:'MQTTonChangePublishing',label:'Publish on change',type:'b',value:true},
+     {key:'MQTTinterval',label:'Publish interval',type:'i',unit:'s',value:30,min:1,max:600},
+     {key:'MQTTOTmessage',label:'Publish raw OT messages',type:'b',value:false},
+     {key:'MQTTseparatesources',label:'Separate thermostat/boiler topics',type:'b',value:false},
+     {key:'MQTTuseLegacyOtTopics',label:'Legacy OT topic layout',type:'b',value:false},
+     {key:'MQTTlastPublishedLegacy',label:'Last legacy publish (internal)',type:'t',value:'1970-01-01 00:00',readonly:true,hint:'Bookkeeping — persisted, not user-editable'}
+   ]}
+ ]},
+ {id:'ntp',icon:'🕐',title:'Time / NTP',desc:'Clock sync and time-to-thermostat.',groups:[{fields:[
+   {key:'NTPenable',label:'Enable NTP',type:'b',value:true},
+   {key:'NTPtimezone',label:'Timezone',type:'select',value:'Europe/Amsterdam',options:['Europe/Amsterdam','Europe/London','Europe/Berlin','UTC','America/New_York']},
+   {key:'NTPhostname',label:'NTP server',type:'t',value:'pool.ntp.org'},
+   {key:'NTPsendtime',label:'Send time to thermostat',type:'b',value:true}
+ ]}]},
+ {id:'otgw',icon:'🔥',title:'OpenTherm Gateway',desc:'PIC behaviour and legacy access.',groups:[{fields:[
+   {key:'OTGWcommandenable',label:'Run commands at boot',type:'b',value:true},
+   {key:'OTGWcommands',label:'Boot commands',type:'t',value:'GW=1',hint:'Semicolon separated, e.g. PS=0;GW=1'},
+   {key:'LegacyPort25238Enabled',label:'Legacy TCP port 25238',type:'b',value:false}
+ ]}]},
+ {id:'otdirect',icon:'🔌',title:'OT-Direct',desc:'Direct OpenTherm control without a thermostat (ESP32 / OTGW32).',groups:[
+   {sub:'Mode & control',fields:[
+     {key:'OTDmode',label:'OT-Direct mode',type:'select',value:0,options:[[0,'Off'],[1,'On/Off'],[2,'PID'],[3,'Weather-comp']]},
+     {key:'OTDautodetect',label:'Auto-detect',type:'b',value:true},
+     {key:'OTDenableslave',label:'Enable slave (boiler)',type:'b',value:true},
+     {key:'OTDchmode',label:'CH enabled',type:'b',value:true},
+     {key:'OTDsummermode',label:'Summer mode',type:'b',value:false},
+     {key:'OTDroomsetpoint',label:'Room setpoint',type:'f',unit:'°C',value:20.0,min:5,max:30,step:0.5},
+     {key:'OTDroomcomp',label:'Room compensation',type:'b',value:false},
+     {key:'OTDflowtemp',label:'Flow setpoint',type:'f',unit:'°C',value:60.0,min:10,max:90,step:1},
+     {key:'OTDflowmax',label:'Max flow temperature',type:'f',unit:'°C',value:75.0,min:20,max:90,step:1}
+   ]},
+   {sub:'PID & curve',fields:[
+     {key:'OTDkp',label:'Kp (proportional)',type:'f',value:2.0,min:0,max:50,step:0.1},
+     {key:'OTDki',label:'Ki (integral)',type:'f',value:0.1,min:0,max:10,step:0.01},
+     {key:'OTDkboost',label:'K boost',type:'f',value:1.0,min:0,max:10,step:0.1},
+     {key:'OTDgradient',label:'Heat-curve gradient',type:'f',value:1.2,min:0.1,max:5,step:0.1},
+     {key:'OTDexponent',label:'Curve exponent',type:'f',value:1.0,min:0.5,max:2,step:0.05},
+     {key:'OTDoffset',label:'Curve offset',type:'f',unit:'°C',value:0.0,min:-10,max:10,step:0.5},
+     {key:'OTDhysteresisenable',label:'Hysteresis enabled',type:'b',value:true},
+     {key:'OTDhysteresis',label:'Hysteresis',type:'f',unit:'°C',value:2.0,min:0.1,max:10,step:0.1},
+     {key:'OTDmsginterval',label:'Message interval',type:'i',unit:'s',value:1,min:1,max:30}
+   ]},
+   {sub:'Bypass relay',fields:[
+     {key:'OTDhasbypassrelay',label:'Bypass relay fitted',type:'b',value:false},
+     {key:'OTDautobypass',label:'Auto bypass',type:'b',value:false},
+     {key:'OTDopenbypass',label:'Open bypass now',type:'b',value:false},
+     {key:'OTDfailsafe',label:'Fail-safe on error',type:'b',value:true}
+   ]},
+   {sub:'Ventilation (HRV)',fields:[
+     {key:'OTDventenable',label:'Ventilation enabled',type:'b',value:false},
+     {key:'OTDventsetpoint',label:'Ventilation setpoint',type:'f',unit:'%',value:30,min:0,max:100,step:5},
+     {key:'OTDfreeventenable',label:'Free ventilation',type:'b',value:false}
+   ]},
+   {sub:'Setback',fields:[
+     {key:'OTDsetbacktemp',label:'Setback temperature',type:'f',unit:'°C',value:16.0,min:5,max:25,step:0.5},
+     {key:'OTDsetbacktimeout',label:'Setback timeout',type:'i',unit:'min',value:60,min:0,max:1440,step:10}
+   ]}
+ ]},
+ {id:'sensors',icon:'🌡',title:'Sensors',desc:'All temperature/humidity sensors — wired (1-Wire) and wireless (Bluetooth). SAT picks which of these feeds its control under Settings → SAT → Temperature Sources.',groups:[
+   {sub:'1-Wire (Dallas / DS18B20)',fields:[
+     {key:'GPIOSENSORSenabled',label:'Enable 1-Wire sensors',type:'b',value:true},
+     {key:'GPIOSENSORSpin',label:'GPIO pin',type:'i',value:13,min:0,max:39},
+     {key:'GPIOSENSORSinterval',label:'Poll interval',type:'i',unit:'s',value:30,min:5,max:600},
+     {key:'GPIOSENSORSlegacyformat',label:'Legacy topic format',type:'b',value:false}
+   ]},
+   {sub:'Bluetooth (BLE)',desc:'Scanning &amp; discovery. Per sensor below: type and the room it maps to.',fields:[
+     {key:'satbleenable',label:'Enable BLE scanning',type:'b',value:true},
+     {key:'satbleinterval',label:'Scan interval',type:'i',unit:'s',value:30,min:10,max:300,step:5},
+     {key:'satblenameprefix',label:'BLE name prefix',type:'s',value:'ATC'},
+     {key:'satblenamefilteringest',label:'Filter by name prefix',type:'b',value:true},
+     {key:'satblemac',label:'Legacy single MAC',type:'s',value:'',readonly:true,hint:'Superseded by the roster'},
+     {key:'satblerostercount',label:'Discovered sensors',type:'i',value:4,readonly:true}
+   ], roster:[
+     {name:'Living room',  mac:'A4:C1:38:0B:11', type:'th', value:'21.4 °C · 47 %', area:0, on:true},
+     {name:'Bedroom',      mac:'A4:C1:38:0B:22', type:'t',  value:'19.2 °C',        area:1, on:true},
+     {name:'Bathroom',     mac:'A4:C1:38:0B:33', type:'h',  value:'58 %',           area:2, on:true},
+     {name:'Study',        mac:'A4:C1:38:0B:44', type:'th', value:'20.1 °C · 44 %', area:3, on:false}
+   ]}
+ ]},
+ {id:'outputs',icon:'⚡',title:'GPIO Outputs',desc:'Drive a relay from an OT status bit.',groups:[{fields:[
+   {key:'GPIOOUTPUTSenabled',label:'Enable output',type:'b',value:false},
+   {key:'GPIOOUTPUTSpin',label:'GPIO pin',type:'i',value:16,min:0,max:39},
+   {key:'GPIOOUTPUTStriggerBit',label:'Trigger on',type:'select',value:0,options:[[0,'Flame'],[1,'CH active'],[2,'DHW active'],[3,'Fault']]}
+ ]}]},
+ {id:'s0',icon:'🔢',title:'S0 Pulse Counter',desc:'Energy meter pulse input.',groups:[{fields:[
+   {key:'S0COUNTERenabled',label:'Enable S0 counter',type:'b',value:false},
+   {key:'S0COUNTERpin',label:'GPIO pin',type:'i',value:12,min:0,max:39},
+   {key:'S0COUNTERpulsekw',label:'Pulses per kWh',type:'i',value:2000,min:1,max:10000},
+   {key:'S0COUNTERinterval',label:'Report interval',type:'i',unit:'s',value:60,min:5,max:3600},
+   {key:'S0COUNTERdebouncetime',label:'Debounce time',type:'i',unit:'ms',value:30,min:0,max:1000}
+ ]}]},
+ {id:'webhook',icon:'🔗',title:'Webhook',desc:'Fire an HTTP call when a status bit flips.',groups:[{fields:[
+   {key:'WebhookEnabled',label:'Enable webhook',type:'b',value:false},
+   {key:'WebhookTriggerBit',label:'Trigger on',type:'select',value:0,options:[[0,'Flame'],[1,'CH active'],[2,'DHW active'],[3,'Fault']]},
+   {key:'WebhookURLon',label:'URL when ON',type:'t',value:'https://example.local/on'},
+   {key:'WebhookURLoff',label:'URL when OFF',type:'t',value:'https://example.local/off'},
+   {key:'WebhookContentType',label:'Content type',type:'select',value:'application/json',options:['application/json','text/plain','application/x-www-form-urlencoded']},
+   {key:'WebhookPayload',label:'Payload template',type:'t',value:'{"state":"%s"}'}
+ ]}]},
+ {id:'behavior',icon:'🎛',title:'Behavior',desc:'Indicators and maintenance.',groups:[{fields:[
+   {key:'LEDblink',label:'Blink LED on OT traffic',type:'b',value:true},
+   {key:'darktheme',label:'Dark theme by default',type:'b',value:false},
+   {key:'nightlyrestart',label:'Nightly restart',type:'b',value:false},
+   {key:'nightlyrestarthour',label:'Restart hour',type:'i',unit:'h',value:4,min:0,max:23}
+ ]}]},
+ {id:'ui',icon:'🖱',title:'User Interface',desc:'Remembered preferences for the log & graph views.',groups:[{fields:[
+   {key:'ui_autoscroll',label:'Log auto-scroll',type:'b',value:true},
+   {key:'ui_timestamps',label:'Show timestamps',type:'b',value:true},
+   {key:'ui_capture',label:'Large capture mode',type:'b',value:false},
+   {key:'ui_autodownloadlog',label:'Auto-download log',type:'b',value:false},
+   {key:'ui_autoexport',label:'Auto-export CSV',type:'b',value:false},
+   {key:'ui_autoscreenshot',label:'Auto-save graph PNG',type:'b',value:false},
+   {key:'ui_graphtimewindow',label:'Default graph window',type:'select',value:60,options:[[10,'10 min'],[30,'30 min'],[60,'1 hour'],[240,'4 hours'],[1440,'24 hours']]}
+ ]}]},
+ {id:'sat',icon:'🧠',title:'SAT — Smart Thermostat',desc:'Standalone Autonomous Thermostat: room-driven control, PID/PWM, presets, weather, solar & PV boost, safety. (ESP32 / OTGW32)',groups:SAT_GROUPS.concat(SAT_EXTRA)}
+];
+var dirty={};
+function setDefault(f){
+  if(f.value!==undefined) return f.value;
+  if(f.type==='b') return false;
+  if(f.type==='select'){var o=f.options[0];return Array.isArray(o)?o[0]:o;}
+  if(f.type==='f'||f.type==='i'||f.type==='n') return (f.min!==undefined?f.min:0);
+  return '';
+}
+function optPairs(opts){return opts.map(function(o){return Array.isArray(o)?o:[o,o];});}
+function fieldControl(f){
+  var v=setDefault(f), ro=f.readonly?' disabled':'';
+  if(f.type==='b')
+    return '<input type="checkbox" class="sw" data-key="'+f.key+'" data-orig="'+(v?'1':'0')+'"'+(v?' checked':'')+ro+'>';
+  if(f.type==='select')
+    return '<select data-key="'+f.key+'" data-orig="'+v+'"'+ro+'>'+optPairs(f.options).map(function(o){
+      return '<option value="'+o[0]+'"'+(String(o[0])===String(v)?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>';
+  var t=(f.type==='p'||f.hidden)?'password':((f.type==='f'||f.type==='i'||f.type==='n')?'number':'text');
+  var ex=(f.min!==undefined?' min="'+f.min+'"':'')+(f.max!==undefined?' max="'+f.max+'"':'')+(f.step!==undefined?' step="'+f.step+'"':'');
+  return '<span class="sfield"><input type="'+t+'" data-key="'+f.key+'" data-orig="'+v+'" value="'+v+'"'+ex+ro+'>'+
+    (f.unit?'<span class="sunit">'+f.unit+'</span>':'')+'</span>';
+}
+function catFieldCount(c){return c.groups.reduce(function(a,g){return a+g.fields.length+(g.roster?g.roster.length:0);},0);}
+function bleRoster(roster){
+  var rooms=[[0,'Area 0 · Living'],[1,'Area 1 · Bedroom'],[2,'Area 2 · Bathroom'],[3,'Area 3 · Study'],[9,'Unassigned']];
+  var typeOpt=[['t','🌡 Temperature'],['h','💧 Humidity'],['th','🌡💧 Temp + Humidity']];
+  return '<div class="ble-roster">'+roster.map(function(s,i){
+    var tags=(s.type.indexOf('t')>=0?'<span class="ble-tag temp">TEMP</span>':'')+
+             (s.type.indexOf('h')>=0?'<span class="ble-tag hum">HUM</span>':'');
+    return '<div class="ble-row" data-search="ble sensor '+s.name.toLowerCase()+' '+s.mac.toLowerCase()+'">'+
+      '<div class="ble-nm">'+s.name+' '+tags+'<span class="ble-mac">'+s.mac+'</span>'+
+        '<span class="ble-val">'+s.value+'</span></div>'+
+      '<div class="ble-ctrls">'+
+        '<label>Type<select>'+typeOpt.map(function(o){return '<option value="'+o[0]+'"'+(o[0]===s.type?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></label>'+
+        '<label>Maps to room<select data-key="satsensorarea'+i+'" data-orig="'+s.area+'">'+rooms.map(function(r){return '<option value="'+r[0]+'"'+(r[0]===s.area?' selected':'')+'>'+r[1]+'</option>';}).join('')+'</select></label>'+
+        '<label>Active<input type="checkbox" class="sw"'+(s.on?' checked':'')+'></label>'+
+      '</div></div>';
+  }).join('')+'</div>';
+}
+function buildSettings(){
+  var rail='',cols='';
+  SET_CATS.forEach(function(c){
+    rail+='<div class="rail-item" data-cat="'+c.id+'" role="button" tabindex="0">'+c.icon+' '+c.title+'<span class="cnt">'+catFieldCount(c)+'</span></div>';
+    cols+='<div class="set-cat" id="cat-'+c.id+'"><div class="set-cat-title">'+c.icon+' '+c.title+
+      (c.reboot?' <span class="badge-reboot">REBOOT</span>':'')+'</div>'+
+      (c.desc?'<p class="cat-desc">'+c.desc+'</p>':'')+
+      (c.id==='sat'?'<div class="tierbar" id="satTierBar"><button data-tier="basic" class="active">Basic</button>'+
+        '<button data-tier="advanced">Advanced</button><button data-tier="expert">Expert</button></div>'+
+        '<div class="tier-note" id="satTierNote"></div>':'')+
+      '<div class="set-cards">'+c.groups.map(function(g){
+        return '<section class="set-group" data-tier="'+tierOf(g.sub||g.title)+'">'+(g.sub||g.title?'<h3>'+(g.sub||g.title)+'</h3>':'')+
+          (g.desc?'<div class="ble-desc">'+g.desc+'</div>':'')+
+          g.fields.map(function(f){
+            return '<div class="srow" data-search="'+(c.title+' '+(g.sub||g.title||'')+' '+f.label+' '+f.key).toLowerCase()+'">'+
+              '<span class="slbl">'+f.label+(f.hint?'<span class="shint">'+f.hint+'</span>':'')+'</span>'+
+              fieldControl(f)+'</div>';
+          }).join('')+
+          (g.roster?bleRoster(g.roster):'')+'</section>';
+      }).join('')+'</div></div>';
+  });
+  document.getElementById('setRail').innerHTML=rail;
+  document.getElementById('setCols').innerHTML=cols;
+  document.querySelectorAll('.rail-item').forEach(function(r){
+    var go=function(){ document.getElementById('setSearch').value=''; showCat(r.dataset.cat); };
+    r.onclick=go;
+    r.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
+  });
+  document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
+    inp.addEventListener('change',onSetChange); inp.addEventListener('input',onSetChange);
+  });
+  document.getElementById('btnSave').onclick=function(){
+    document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
+      inp.dataset.orig=(inp.type==='checkbox')?(inp.checked?'1':'0'):inp.value;
+    });
+    dirty={};updateSaveBar();
+    var t=document.getElementById('toast');t.classList.add('show');setTimeout(function(){t.classList.remove('show');},1800);
+  };
+  document.getElementById('btnDiscard').onclick=function(){
+    document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
+      if(inp.type==='checkbox') inp.checked=inp.dataset.orig==='1'; else inp.value=inp.dataset.orig;
+      inp.closest('.srow').classList.remove('dirty');
+    });
+    dirty={};updateSaveBar();
+  };
+  document.getElementById('setSearch').oninput=function(){ applySettingsSearch(this.value); };
+  var bar=document.getElementById('satTierBar');
+  if(bar) bar.querySelectorAll('button').forEach(function(b){
+    b.onclick=function(){satSetTier=b.dataset.tier;
+      bar.querySelectorAll('button').forEach(function(x){x.classList.toggle('active',x===b);});
+      applySatTier();};
+  });
+  showCat(SET_CATS[0].id);
+}
+// SAT settings progressive disclosure: basic -> advanced -> expert (cumulative)
+var SAT_TIER={'Core Control':'basic','Presets':'basic','DHW (Domestic Hot Water)':'basic',
+  'PID Tuning':'advanced','PWM':'advanced','Temperature Sources':'advanced','Temperature Source':'advanced','Pressure':'advanced','Weather':'advanced',
+  'Smart Features':'expert','Safety':'expert','Energy':'expert','PV Surplus Boost':'expert','Sync':'expert','Zones (multi-area)':'expert','Boiler Model':'expert','Advanced':'expert'};
+var TIER_RANK={basic:0,advanced:1,expert:2};
+var satSetTier='basic';
+function tierOf(title){return SAT_TIER[title]||'advanced';}
+function applySatTier(){
+  if(!document.getElementById('satTierBar')) return;
+  var rank=TIER_RANK[satSetTier];
+  document.querySelectorAll('#cat-sat .set-group').forEach(function(s){
+    s.style.display=(TIER_RANK[s.dataset.tier]<=rank)?'':'none';
+  });
+  var note=document.getElementById('satTierNote');
+  if(note) note.textContent={
+    basic:'Just the essentials — enable, what kind of system, target & presets, hot water. Tuning is one tap away.',
+    advanced:'Essentials + tuning: PID, PWM, temperature source, pressure, weather compensation.',
+    expert:'Everything — smart features, safety, energy, multi-zone, PV boost, simulation, offsets.'
+  }[satSetTier];
+}
+function showCat(id){
+  document.querySelectorAll('.rail-item').forEach(function(x){x.classList.toggle('active',x.dataset.cat===id);});
+  document.querySelectorAll('.set-cat').forEach(function(s){s.style.display=(s.id==='cat-'+id)?'':'none';});
+  document.querySelectorAll('#setCols .srow').forEach(function(r){r.style.display='';});
+  document.querySelectorAll('#setCols .set-group').forEach(function(g){g.style.display='';});
+  if(id==='sat') applySatTier();
+}
+function applySettingsSearch(q){
+  q=(q||'').trim().toLowerCase();
+  if(!q){ var act=document.querySelector('.rail-item.active'); showCat(act?act.dataset.cat:SET_CATS[0].id); return; }
+  document.querySelectorAll('.set-cat').forEach(function(c){
+    var anyCat=false;
+    c.querySelectorAll('.srow').forEach(function(r){var m=r.dataset.search.indexOf(q)>=0;r.style.display=m?'':'none';if(m)anyCat=true;});
+    c.querySelectorAll('.set-group').forEach(function(g){
+      var any=Array.prototype.some.call(g.querySelectorAll('.srow'),function(r){return r.style.display!=='none';});
+      g.style.display=any?'':'none';
+    });
+    c.style.display=anyCat?'':'none';
+  });
+}
+
+function onSetChange(e){
+  var inp=e.target,k=inp.dataset.key;
+  var now=(inp.type==='checkbox')?(inp.checked?'1':'0'):inp.value;
+  if(now!==inp.dataset.orig) dirty[k]=true; else delete dirty[k];
+  inp.closest('.srow').classList.toggle('dirty',now!==inp.dataset.orig);
+  updateSaveBar();
+}
+function updateSaveBar(){
+  var n=Object.keys(dirty).length;
+  document.getElementById('dirtyCount').textContent=n;
+  document.getElementById('saveBar').classList.toggle('show',n>0);
+}
+
+/* ---------- CONNECTIVITY ----------
+   Design notes:
+   - One state vocabulary everywhere: ok / warn / down / off / unknown, plus
+     'mode' which is a *setting* (Gateway vs Monitor), shown blue — never a
+     green/red health light. Disabled integrations read 'off' (grey), not error.
+   - The map shows the signal CHAIN so a user can locate a break: thermostat &
+     boiler -> gateway -> wifi/router -> {broker->HA} and {this browser}.
+   - Each signal carries a plain-language meaning and, when broken, a fix hint. */
+var STV={ok:'#2ecc71',warn:'#f39c12',down:'#e74c3c',off:'#9fb4bc',unknown:'#9aa0a6'};
+var STICON={ok:'✓',warn:'!',down:'✕',off:'○',unknown:'?'};
+var STLABEL={ok:'Connected',warn:'Degraded',down:'Disconnected',off:'Off',unknown:'Unknown'};
+var rssi=-58;
+var conn={
+  therm: {grp:'bus', s:'ok', icon:'🌡️', name:'Thermostat',  seen:1,
+          exp:'The room thermostat (OT master) is talking to the gateway.',
+          fix:'No frames from the thermostat — check the wiring to the gateway.'},
+  boiler:{grp:'bus', s:'ok', icon:'🔥', name:'Boiler',       seen:1,
+          exp:'The boiler (OT slave) is answering the gateway.',
+          fix:'Boiler not answering — check the OT wiring / boiler power.'},
+  pic:   {grp:'bus', s:'ok', icon:'📟', name:'PIC link',     fw:'gateway 6.5',
+          exp:'The ESP can talk to the OTGW PIC over the serial link.',
+          fix:'PIC not detected — reseat the gateway / reflash the PIC firmware.'},
+  mode:  {grp:'bus', s:'mode', icon:'⇄', name:'Gateway mode', value:'gateway',
+          exp:'Gateway = actively rewrites OT messages (lets the UI set temperatures). Monitor = passively observes only.'},
+  wifi:  {grp:'net', s:'ok', icon:'📶', name:'Wi-Fi',
+          exp:'The gateway is on your network.',
+          fix:'Weak or no signal — move the device or add a repeater.'},
+  ip:    {grp:'net', s:'ok', icon:'🌐', name:'IP address', detail:'192.168.1.50 · DHCP',
+          exp:'The device has a network address.'},
+  mqtt:  {grp:'int', s:'ok', icon:'📡', name:'MQTT broker', seen:1,
+          exp:'Connected to the broker; the online (birth) message is published.',
+          fix:'Cannot reach the broker — check address, port and credentials.'},
+  ha:    {grp:'int', s:'ok', icon:'🏠', name:'Home Assistant', detail:'42 entities discovered',
+          exp:'Discovery configs are published; entities appear in HA.'},
+  ntp:   {grp:'int', s:'ok', icon:'🕐', name:'Time (NTP)', detail:'synced · pool.ntp.org',
+          exp:'The clock is synced; timestamps and time-to-thermostat are correct.',
+          fix:'No time sync — check the NTP server and internet access.'},
+  ws:    {grp:'ses', s:'ok', icon:'📱', name:'Live link', detail:'WebSocket · streaming',
+          exp:'This page has a live link to the gateway — the log updates in real time.',
+          fix:'Live link dropped — the page is reconnecting; data may be paused.'},
+  api:   {grp:'ses', s:'ok', icon:'🔁', name:'REST API', detail:'polling · 1s',
+          exp:'Values on this page are fetched from the device API.',
+          fix:'API unreachable — the device may be rebooting or off the network.'}
+};
+function setLink(id,state,active){
+  var lk=document.getElementById('lk-'+id); if(lk) lk.setAttribute('class','cn-link lk-'+state);
+  var fl=document.getElementById('fl-'+id); if(fl) fl.classList.toggle('on',!!active && (state==='ok'||state==='warn'));
+}
+function setDot(id,state){
+  var d=document.getElementById('dot-'+id); if(d) d.setAttribute('fill',STV[state]||STV.unknown);
+}
+var CONN_GROUPS=[
+  {id:'bus', title:'Heating bus (OpenTherm)'},
+  {id:'net', title:'Network'},
+  {id:'int', title:'Integrations'},
+  {id:'ses', title:'This browser session'}
+];
+function connRecency(c){
+  if(c.s==='off') return 'disabled';
+  if(c.s==='down') return 'no link';
+  if(c.seen!=null) return 'seen '+c.seen+'s ago';
+  return '';
+}
+function renderConnStrip(){
+  // glance scale: the six that matter most, worst-first feel via state colour
+  var order=['ws','mode','mqtt','wifi','boiler','therm'];
+  document.getElementById('connStrip').innerHTML=order.map(function(k){
+    var c=conn[k];
+    if(c.s==='mode'){
+      return '<button class="connpill st-mode" data-goconn="1"><span class="d"></span>'+
+        '<span class="pk">'+c.name+'</span><span class="pv">'+c.value.toUpperCase()+'</span></button>';
+    }
+    var short={ws:'Live',mqtt:'MQTT',wifi:'Wi-Fi',boiler:'Boiler',therm:'Thermostat'}[k]||c.name;
+    return '<button class="connpill st-'+c.s+'" data-goconn="1"><span class="d"></span>'+
+      '<span class="pk">'+short+'</span><span class="pv">'+STLABEL[c.s]+'</span></button>';
+  }).join('');
+  // override signal: gateway is injecting values onto the bus
+  if(sim.overrides && sim.overrides.length){
+    document.getElementById('connStrip').insertAdjacentHTML('afterbegin',
+      '<button class="connpill ovr" id="ovrPill"><span class="d"></span>'+
+      '<span class="pk">⛓ Overrides</span><span class="pv">'+sim.overrides.length+'</span></button>');
+    document.getElementById('ovrPill').onclick=function(e){ e.stopPropagation(); toggleOvrPanel(); };
+  }
+  document.querySelectorAll('[data-goconn]').forEach(function(b){
+    b.onclick=function(){showPage('monitor');showTab('mconn');};
+  });
+}
+function renderOvrPanel(){
+  document.getElementById('ovrPanel').innerHTML=
+    '<h4>⛓ Active gateway overrides</h4>'+
+    '<p class="sub">Values the gateway is injecting onto the OT bus — the boiler/thermostat see these, not the original.</p>'+
+    sim.overrides.map(function(o){
+      return '<div class="ovr-item"><div class="r1"><span>'+o.label+'</span>'+
+        '<span class="cmd">'+o.cmd+'</span><button class="clr">Clear</button></div>'+
+        '<div class="r2">now: <b>'+o.canon+'</b> · was: '+o.orig+'</div></div>';
+    }).join('');
+}
+function toggleOvrPanel(){
+  var p=document.getElementById('ovrPanel');
+  if(!p.classList.contains('show')) renderOvrPanel();
+  p.classList.toggle('show');
+}
+// close the override panel when clicking outside it (or its trigger pill)
+document.addEventListener('click',function(e){
+  var p=document.getElementById('ovrPanel'); if(!p||!p.classList.contains('show')) return;
+  if(!p.contains(e.target) && !(e.target.closest && e.target.closest('#ovrPill'))) p.classList.remove('show');
+});
+function renderConnMap(){
+  setDot('therm',conn.therm.s); setDot('boiler',conn.boiler.s);
+  setDot('pic',conn.pic.s); setDot('wifi',conn.wifi.s);
+  setDot('mqtt',conn.mqtt.s); setDot('ws',conn.ws.s);
+  setLink('therm',conn.therm.s,true); setLink('boiler',conn.boiler.s,true);
+  setLink('wifi',conn.wifi.s,true);
+  setLink('mqtt',conn.mqtt.s,true); setLink('ws',conn.ws.s,true);
+  document.getElementById('cnThermSub').textContent='master · '+connRecency(conn.therm);
+  document.getElementById('cnBoilerSub').textContent='slave · '+connRecency(conn.boiler);
+  document.getElementById('cnPicSub').textContent='PIC '+conn.pic.fw;
+  document.getElementById('cnWifiSub').textContent=rssi+' dBm';
+  var modeTxt=conn.mode.value==='gateway'?'GATEWAY MODE':(conn.mode.value==='monitor'?'MONITOR MODE':'MODE: DETECTING');
+  document.getElementById('cnModeTxt').textContent=modeTxt;
+  document.getElementById('dot-mode').setAttribute('fill',conn.mode.value==='unknown'?STV.unknown:STV.ok);
+}
+function connDetail(c){
+  var det=c.detail||'';
+  if(c.s==='mode'){
+    return '<div class="connrow st-mode"><span class="badge">⇄ '+c.value.toUpperCase()+'</span>'+
+      '<div class="body"><div class="nm">'+c.name+'</div>'+
+      '<div class="exp">'+c.exp+'</div></div></div>';
+  }
+  if(c===conn.therm||c===conn.boiler||c===conn.mqtt) det=connRecency(c);
+  if(c===conn.pic) det=c.fw+(c.s==='ok'?' · serial OK':'');
+  if(c===conn.wifi) det=rssi+' dBm'+(c.s==='warn'?' · weak':'');
+  return '<div class="connrow st-'+c.s+'">'+
+    '<span class="badge">'+STICON[c.s]+' '+STLABEL[c.s]+'</span>'+
+    '<div class="body"><div class="nm">'+c.icon+' '+c.name+
+      (c.seen!=null&&c.s!=='down'?'<span class="seen">· '+connRecency(c)+'</span>':'')+'</div>'+
+      (det?'<div class="det">'+det+'</div>':'')+
+      '<div class="exp">'+c.exp+'</div>'+
+      (c.s==='down'||c.s==='warn'?'<div class="fix">▸ '+(c.fix||'')+'</div>':'')+
+    '</div></div>';
+}
+function renderConnDetail(){
+  document.getElementById('connDetail').innerHTML=CONN_GROUPS.map(function(g){
+    var rows=Object.keys(conn).filter(function(k){return conn[k].grp===g.id;})
+      .map(function(k){return connDetail(conn[k]);}).join('');
+    return '<div class="conngroup"><h4>'+g.title+'</h4>'+rows+'</div>';
+  }).join('');
+}
+function connTick(){
+  // wander RSSI; degrade wifi when weak
+  rssi=Math.max(-86,Math.min(-42,Math.round(rssi+(Math.random()-0.5)*5)));
+  conn.wifi.s = rssi<-80?'down':(rssi<-72?'warn':'ok');
+  // OT sides track the sim: a side is 'warn' (quiet) if it hasn't been "seen"
+  conn.boiler.seen = sim.flame||Math.random()<0.7 ? 1 : (conn.boiler.seen||1)+1;
+  conn.therm.seen  = Math.random()<0.85 ? 1 : (conn.therm.seen||1)+1;
+  conn.boiler.s = conn.boiler.seen>6?'warn':'ok';
+  conn.therm.s  = conn.therm.seen>6?'warn':'ok';
+  // MQTT: occasional reconnect cycle
+  if(conn.mqtt.s==='ok'){ if(Math.random()<0.03){conn.mqtt.s='warn';conn.mqtt.seen=1;} else conn.mqtt.seen=1; }
+  else if(conn.mqtt.s==='warn'){ conn.mqtt.seen=(conn.mqtt.seen||1)+1;
+    if(conn.mqtt.seen>3) conn.mqtt.s=Math.random()<0.5?'down':'ok'; }
+  else { if(Math.random()<0.4){conn.mqtt.s='ok';conn.mqtt.seen=1;} }
+  conn.ha.s = conn.mqtt.s==='down'?'down':(conn.mqtt.s==='warn'?'warn':'ok');
+  // live link (WS): rare drop -> reconnect
+  if(conn.ws.s==='ok'){ if(Math.random()<0.025){conn.ws.s='warn';conn.ws.detail='WebSocket · reconnecting…';} }
+  else if(conn.ws.s==='warn'){ if(Math.random()<0.4){conn.ws.s='ok';conn.ws.detail='WebSocket · streaming';} }
+  // mode mirrors the Gateway-mode demo elsewhere; flip rarely
+  if(Math.random()<0.012) conn.mode.value=conn.mode.value==='gateway'?'monitor':'gateway';
+  conn.pic.s='ok'; conn.ip.s='ok'; conn.ntp.s='ok'; conn.api.s='ok';
+  renderConnStrip(); renderConnMap();
+  if(document.getElementById('mconn').classList.contains('active')) renderConnDetail();
+}
+
+/* ---------- appliance toggle (boiler flame ↔ heat-pump bolt) ---------- */
+document.querySelectorAll('#applToggle .seg2btn').forEach(function(b){
+  b.onclick=function(){
+    appliance=b.dataset.appl;
+    document.querySelectorAll('#applToggle .seg2btn').forEach(function(x){x.classList.toggle('active',x===b);});
+    renderA();
+  };
+});
+
+/* ---------- SAT multi-layer dashboard ----------
+   Faithful reproduction of the dev SAT UI in hand-rolled SVG: three cumulative
+   depths (Thermostat / Control / Technical) with the two real graphs
+   (Temperature History 5-series, Heating Curve hero with calibration markers)
+   and every diagnostic section as a compact card. */
+function cssvar(n){return 'var('+n+')';}   // SVG fill/stroke resolve CSS vars live (themes for free)
+function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'manual';}
+function kv(pairs){return pairs.map(function(p){return '<div class="kv-row"><span class="kv-k">'+p[0]+'</span><span class="kv-v">'+p[1]+'</span></div>';}).join('');}
+function sdot(t,s){return '<span class="hdot '+s+'" style="margin-right:6px;vertical-align:-1px"></span>'+t;}
+var sat={target:21.0, preset:'comfort', mode:'auto', enabled:true};
+var SAT_PRESETS=[['comfort','Comfort',21.0],['eco','Eco',18.0],['away','Away',15.0],
+                 ['home','Home',20.0],['sleep','Sleep',17.0],['activity','Activity',19.0]];
+var SAT_DIAL={cx:120,cy:120,r:92,lo:5,hi:30,startA:225,sweep:270};
+// learned calibration points (outside°C, flow°C) for the heating curve
+// learned points as [outside°C, residual°C] — flow is derived from the active curve so
+// markers actually sit on/near it and track the target (illustrative, not SAT's real solver)
+var SAT_CALIB=[[-9,1.6],[-4,-1.1],[1,0.8],[6,-1.3],[11,0.6],[15,-0.5]];
+function calibFlow(m){return curveF(m[0],1.2)+m[1];}
+// 5-series history for the temperature-history chart
+var satHist={set:[],flow:[],room:[],out:[],pid:[]};
+(function(){for(var i=0;i<60;i++){var b=52+9*Math.sin(i/9)+(Math.random()-0.5)*2;
+  satHist.set.push(53); satHist.flow.push(+b.toFixed(1)); satHist.room.push(+(20.6+Math.sin(i/8)*0.3).toFixed(1));
+  satHist.out.push(+(8+Math.sin(i/15)*2).toFixed(1)); satHist.pid.push(Math.round(45+12*Math.sin(i/7)));}})();
+function satHistPush(){
+  var flow=satFlowSet();
+  satHist.set.push(flow); satHist.flow.push(sim.boiler); satHist.room.push(sim.room);
+  satHist.out.push(sim.outside); satHist.pid.push(Math.max(0,Math.min(100,Math.round((sat.target-sim.room)*22+45))));
+  ['set','flow','room','out','pid'].forEach(function(k){if(satHist[k].length>60)satHist[k].shift();});
+}
+function satAngle(v){return SAT_DIAL.startA+(v-SAT_DIAL.lo)/(SAT_DIAL.hi-SAT_DIAL.lo)*SAT_DIAL.sweep;}
+function satFlowSet(){return Math.max(20,Math.min(80,Math.round((28+(18-sim.outside)*1.25+(sat.target-20)*2.2)*10)/10));}
+function satDialDraw(){
+  var D=SAT_DIAL,svg=document.getElementById('satDial');
+  var track=cssvar('--gauge-track'),accent=cssvar('--accent'),ok=cssvar('--zone-ok'),txt=cssvar('--gauge-text'),muted=cssvar('--muted');
+  var aT=satAngle(sat.target),aR=satAngle(sim.room);
+  var t0=polarB(D.cx,D.cy,D.r-13,aR),t1=polarB(D.cx,D.cy,D.r+13,aR);
+  svg.innerHTML='<path d="'+arcB(D.cx,D.cy,D.r,D.startA,D.startA+D.sweep)+'" fill="none" stroke="'+track+'" stroke-width="14" stroke-linecap="round"/>'+
+    '<path d="'+arcB(D.cx,D.cy,D.r,D.startA,aT)+'" fill="none" stroke="'+accent+'" stroke-width="14" stroke-linecap="round"/>'+
+    '<line x1="'+t0.x+'" y1="'+t0.y+'" x2="'+t1.x+'" y2="'+t1.y+'" stroke="'+ok+'" stroke-width="4" stroke-linecap="round"/>'+
+    '<text x="120" y="116" text-anchor="middle" font-size="44" font-weight="700" fill="'+txt+'" font-family="var(--font-sans)">'+sat.target.toFixed(1)+'°</text>'+
+    '<text x="120" y="140" text-anchor="middle" font-size="13" fill="'+muted+'" font-family="var(--font-sans)">target · room '+sim.room.toFixed(1)+'°</text>';
+}
+// Temperature history — 5 named series (Setpoint, Flow, Room, Outside, PID)
+function drawTempHistory(){
+  var svg=document.getElementById('satHistChart');
+  function Y(t){return 186-(Math.max(-5,Math.min(80,t))+5)/85*168;}
+  var n=satHist.flow.length,x0=8,x1=592,dx=(x1-x0)/(n-1);
+  function L(arr,sc){var p='';for(var i=0;i<n;i++){var v=sc?sc(arr[i]):arr[i];p+=(x0+i*dx).toFixed(1)+','+Y(v).toFixed(1)+' ';}return p;}
+  var accent=cssvar('--accent'),hot=cssvar('--hot'),ok=cssvar('--zone-ok'),cold=cssvar('--cold'),muted=cssvar('--muted'),border=cssvar('--border');
+  var g='';[0,20,40,60,80].forEach(function(t){var y=Y(t).toFixed(1);g+='<line x1="8" y1="'+y+'" x2="592" y2="'+y+'" stroke="'+border+'" stroke-width="1"/>';});
+  g+='<polyline points="'+L(satHist.out)+'" fill="none" stroke="'+cold+'" stroke-width="1.5" stroke-dasharray="6 4"/>';
+  g+='<polyline points="'+L(satHist.pid,function(v){return v/100*78;})+'" fill="none" stroke="'+muted+'" stroke-width="1.5" stroke-dasharray="1 4"/>';
+  g+='<polyline points="'+L(satHist.flow)+'" fill="none" stroke="'+hot+'" stroke-width="2"/>';
+  g+='<polyline points="'+L(satHist.set)+'" fill="none" stroke="'+accent+'" stroke-width="2"/>';
+  g+='<polyline points="'+L(satHist.room)+'" fill="none" stroke="'+ok+'" stroke-width="2"/>';
+  svg.innerHTML=g;
+  document.getElementById('satHistLegend').innerHTML=
+    '<span><i style="background:'+accent+'"></i>Setpoint</span><span><i style="background:'+hot+'"></i>Flow</span>'+
+    '<span><i style="background:'+ok+'"></i>Room</span><span><i style="background:'+cold+'"></i>Outside</span>'+
+    '<span><i style="background:'+muted+'"></i>PID</span>';
+}
+// Heating curve — family of curves + active + calibration markers + current point
+function curveF(o,c){return Math.max(20,Math.min(85, 20 + c*(18-o)*1.5 + (sat.target-20)*2));}
+function drawHeatingCurve(){
+  var svg=document.getElementById('satCurveBig');
+  function X(o){return 50+(o+15)/35*530;} function Y(f){return 270-(Math.max(20,Math.min(85,f))-20)/65*240;}
+  var muted=cssvar('--muted'),border=cssvar('--border'),accent=cssvar('--accent'),ok=cssvar('--zone-ok'),hot=cssvar('--hot');
+  var coeffs=[0.8,1.2,1.6,2.0,2.5],active=1.2,g='';
+  [20,40,60,80].forEach(function(f){var y=Y(f).toFixed(1);g+='<line x1="50" y1="'+y+'" x2="580" y2="'+y+'" stroke="'+border+'" stroke-width="1"/><text x="44" y="'+(+y+4)+'" text-anchor="end" font-size="11" fill="'+muted+'">'+f+'°</text>';});
+  [-10,0,10,20].forEach(function(o){var x=X(o).toFixed(1);g+='<line x1="'+x+'" y1="30" x2="'+x+'" y2="270" stroke="'+border+'" stroke-width="1" stroke-dasharray="2 5"/><text x="'+x+'" y="288" text-anchor="middle" font-size="11" fill="'+muted+'">'+o+'°</text>';});
+  coeffs.forEach(function(c){var pts=[];for(var o=-15;o<=20;o++){pts.push(X(o).toFixed(1)+','+Y(curveF(o,c)).toFixed(1));}
+    var a=(c===active);g+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+(a?accent:border)+'" stroke-width="'+(a?3:1.5)+'" opacity="'+(a?1:0.7)+'"/>';
+    if(!a)g+='<text x="'+(X(-15)+3).toFixed(1)+'" y="'+(Y(curveF(-15,c))-3).toFixed(1)+'" font-size="10" fill="'+muted+'">c='+c.toFixed(1)+'</text>';});
+  SAT_CALIB.forEach(function(m){g+='<circle cx="'+X(m[0]).toFixed(1)+'" cy="'+Y(calibFlow(m)).toFixed(1)+'" r="4.5" fill="'+ok+'" stroke="var(--panel)" stroke-width="1.5"/>';});
+  g+='<circle cx="'+X(sim.outside).toFixed(1)+'" cy="'+Y(curveF(sim.outside,active)).toFixed(1)+'" r="6.5" fill="none" stroke="'+accent+'" stroke-width="2.5"/>';
+  g+='<circle cx="'+X(sim.outside).toFixed(1)+'" cy="'+Y(sim.boiler).toFixed(1)+'" r="6.5" fill="'+hot+'" stroke="var(--panel)" stroke-width="2"/>';
+  svg.innerHTML=g;
+  document.getElementById('satCurveLbl').textContent='slope '+active.toFixed(1)+' · target '+sat.target.toFixed(1)+'° · '+curveF(sim.outside,active).toFixed(0)+'°@'+sim.outside.toFixed(0)+'°';
+  document.getElementById('satCurveLegend').innerHTML=
+    '<span><i style="background:'+accent+'"></i>active curve (c=1.2)</span>'+
+    '<span><i style="background:'+ok+'"></i>calibration markers</span>'+
+    '<span><i style="background:'+hot+'"></i>current point</span>'+
+    '<span><i style="border:2px solid '+accent+';background:transparent"></i>curve position</span>';
+  document.getElementById('satMarkerList').innerHTML=SAT_CALIB.map(function(m){return '<li><span>'+m[0]+'° out</span><b>'+calibFlow(m).toFixed(0)+'° flow</b></li>';}).join('');
+}
+function renderSAT(){
+  var on=sat.enabled,heating=on&&sim.flame,flow=satFlowSet(),err=sat.target-sim.room;
+  var pill=document.getElementById('satPill');
+  pill.textContent=!on?'Off':(heating?'Heating':'Idle');
+  pill.className='sat-pill'+(!on?' off':(heating?'':' idle'));
+  document.getElementById('satEnableLbl').textContent=on?'Enabled':'Disabled';
+  satDialDraw(); drawTempHistory(); drawHeatingCurve();
+  document.getElementById('satStatusBig').textContent=!on?'SAT is off':(heating?('Heating to '+sat.target.toFixed(1)+'°'):'At target · idle');
+  document.getElementById('satPresets').innerHTML=SAT_PRESETS.map(function(p){
+    return '<button class="sat-preset'+(p[0]===sat.preset?' active':'')+'" data-preset="'+p[0]+'" data-temp="'+p[2]+'">'+p[1]+'</button>';}).join('');
+  document.querySelectorAll('#satPresets .sat-preset').forEach(function(b){
+    b.onclick=function(){sat.preset=b.dataset.preset;sat.target=parseFloat(b.dataset.temp);renderSAT();};});
+  document.getElementById('satOut').textContent=sim.outside.toFixed(1)+'°';
+  document.getElementById('satFlowSet').textContent=flow.toFixed(1)+'°';
+  document.getElementById('satRoom').textContent=sim.room.toFixed(1)+'°';
+  document.getElementById('satTargetT').textContent=sat.target.toFixed(1)+'°';
+  document.getElementById('satControlStatus').innerHTML=kv([
+    ['Control mode', sat.mode==='off'?'Off':'PID · continuous'],['Boiler status', heating?'Heating':'Idle'],
+    ['Active preset', cap(sat.preset)],['Heating system','Gas / radiators'],['Manufacturer','Auto (Intergas)'],
+    ['Heating curve','slope 1.2'],['PID output', flow.toFixed(1)+' °C'],['Error', err.toFixed(2)+' °C'],
+    ['Coefficient','1.20'],['Deadband','0.10 °C'],['Overshoot margin','0.5 °C'],
+    ['Modulation (MM=)', sim.modulation+' %'],['Max modulation','100 %']]);
+  document.getElementById('satWeatherKv').innerHTML=kv([
+    ['Outdoor temp', sim.outside.toFixed(1)+' °C'],['Humidity','82 %'],['Wind','3.4 m/s'],
+    ['Last update','2 min ago'],['Fetch errors','0']]);
+  document.getElementById('satCoords').textContent='52.09, 5.12';
+  var P=err*2.0,I=err*0.4+1.2,Dt=-(sim.room-sat.target)*0.1;
+  document.getElementById('satPidKv').innerHTML=kv([
+    ['P term',P.toFixed(2)],['I term',I.toFixed(2)],['D term',Dt.toFixed(2)],
+    ['Kp','2.00'],['Ki','0.10'],['Kd','0.50'],['Raw derivative',(Dt*1.3).toFixed(3)]]);
+  document.getElementById('satPwmKv').innerHTML=kv([
+    ['Duty cycle','64 %'],['PWM flame', heating?'On':'Off'],['Cycle count','3 /h'],
+    ['Last cycle','4m 12s ago'],['Cycle max flow',(sim.boiler+3).toFixed(1)+' °C'],['Cycle overshoot','0.4 °C']]);
+  document.getElementById('satSmartKv').innerHTML=kv([
+    ['Solar gain','Off'],['Summer mode','Off'],['Thermal learning','Active'],
+    ['Comfort offset','+0.0 °C'],['Simmer index','0.12'],['Auto-tune','idle']]);
+  document.getElementById('satExtKv').innerHTML=kv([
+    ['Indoor sensor', sdot('BLE · Living room','ok')],['Outdoor sensor', sdot('OT bus','off')]]);
+  var simOn=document.getElementById('satSim').checked;
+  document.getElementById('satSimKv').innerHTML=kv([
+    ['Simulation mode', simOn?'On (bench)':'Off'],['Sim room temp', simOn?sim.room.toFixed(1)+' °C':'—'],
+    ['Sim flow temp', simOn?sim.boiler.toFixed(1)+' °C':'—'],['Sim return temp', simOn?sim.ret.toFixed(1)+' °C':'—'],
+    ['Sim flame', simOn?(sim.flame?'On':'Off'):'—'],['Sim modulation', simOn?sim.modulation+' %':'—'],
+    ['Last blocked cmd', simOn?'CS=52.0':'—'],['Fallback active','No'],['Fallback reason','—']]);
+  document.getElementById('satHealth').innerHTML=[
+    ['Device','ok'],['Cycle','ok'],['Flame', heating?'ok':'idle'],
+    ['Pressure', sim.pressure<1.0?'warn':'ok'],['Setpoint sync','ok'],['Mod sync','ok']
+  ].map(function(h){return '<span class="health-item"><span class="hdot '+h[1]+'"></span>'+h[0]+'</span>';}).join('');
+  document.getElementById('satRawJson').textContent=JSON.stringify({
+    enabled:on,target:sat.target,room:sim.room,flow_setpoint:flow,actual_flow:sim.boiler,
+    modulation:sim.modulation,outside:sim.outside,preset:sat.preset,mode:sat.mode,
+    coefficient:1.2,deadband:0.1,pid:{p:+P.toFixed(2),i:+I.toFixed(2),d:+Dt.toFixed(2)}},null,2);
+}
+document.querySelectorAll('.satview-btn').forEach(function(b){
+  b.onclick=function(){document.querySelectorAll('.satview-btn').forEach(function(x){x.classList.toggle('active',x===b);});
+    document.getElementById('satBody').className='sv-'+b.dataset.sv; renderSAT();};});
+gel('satUp').onclick=function(){sat.target=Math.min(30,+(sat.target+0.5).toFixed(1));sat.preset='';renderSAT();};
+gel('satDown').onclick=function(){sat.target=Math.max(5,+(sat.target-0.5).toFixed(1));sat.preset='';renderSAT();};
+gel('satEnable').onchange=function(){sat.enabled=this.checked;renderSAT();};
+document.querySelectorAll('#satModeRow .ds-seg').forEach(function(b){b.onclick=function(){
+  document.querySelectorAll('#satModeRow .ds-seg').forEach(function(x){x.classList.toggle('active',x===b);});sat.mode=b.dataset.mode;renderSAT();};});
+document.querySelectorAll('#satCycleRow .ds-seg').forEach(function(b){b.onclick=function(){
+  document.querySelectorAll('#satCycleRow .ds-seg').forEach(function(x){x.classList.toggle('active',x===b);});};});
+gel('satDhwSlider').oninput=function(){document.getElementById('satDhwR').textContent=this.value+'°C';};
+gel('satSim').onchange=renderSAT;
+gel('satDetectLoc').onclick=function(){document.getElementById('satCoords').textContent='locating… 52.09, 5.12 ✓';};
+gel('satRawToggle').onclick=function(){
+  var pre=document.getElementById('satRawJson'),open=pre.style.display==='none';
+  pre.style.display=open?'block':'none'; this.textContent=(open?'▾':'▸')+' Raw data (JSON)'; this.setAttribute('aria-expanded',open);};
+
+/* ---------- sensor discovery signals ----------
+   New sensors becoming available (BLE / DS18B20 1-Wire) announce themselves
+   with a dismissible card and a one-tap "assign/label" action — the simple-level
+   signal that deeper sensor capability just came online. */
+var DISCOVERIES=[
+  {cls:'ble', ic:'🔵', t:'New BLE sensor discovered', s:'ATC_0B33 · A4:C1:38:0B:33 · 21.1 °C / 58 %', act:'Assign to room'},
+  {cls:'dallas', ic:'🌡', t:'New 1-Wire sensor detected', s:'DS18B20 · 28-AA-BB-12-34 · GPIO 13 · 44.6 °C', act:'Name & use'}
+];
+function showDiscovery(d){
+  var card=document.createElement('div');
+  card.className='discover-card '+d.cls;
+  card.innerHTML='<span class="discover-ic">'+d.ic+'</span>'+
+    '<div class="discover-bd"><div class="t">'+d.t+'</div><div class="s">'+d.s+'</div>'+
+    '<div class="discover-act"><button class="primary">'+d.act+'</button>'+
+    '<button class="later">Ignore</button></div></div>'+
+    '<span class="discover-x" title="Dismiss">×</span>';
+  function close(){ card.remove(); }
+  card.querySelector('.discover-x').onclick=close;
+  card.querySelector('.later').onclick=close;
+  card.querySelector('.primary').onclick=function(){
+    card.querySelector('.discover-bd').innerHTML='<div class="t">✓ '+(d.cls==='ble'?'Assigned':'Added')+' (simulated)</div>';
+    setTimeout(close,1100);
+  };
+  document.getElementById('discoverStack').appendChild(card);
+  setTimeout(close,12000);   // auto-dismiss so it doesn't sit over content forever
+}
+
+/* ---------- boot ---------- */
+function clock(){document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);}
+buildSupportMatrix();
+buildSettings();
+renderA();renderB();renderC();renderMonitor();
+renderConnStrip();renderConnMap();renderConnDetail();
+clock();
+setInterval(clock,1000);
+setInterval(function(){
+  tick(); pushFrames(); satHistPush();   // data accumulation — always (cheap, keeps log/history live)
+  connTick();                            // header strip is always visible
+  if(pageActive('home')){ renderA(); renderB(); renderC(); }
+  if(pageActive('monitor')) renderMonitor();
+  if(pageActive('sat')) renderSAT();
+},1000);
+// announce newly-available sensors shortly after load (demo of the signal)
+setTimeout(function(){showDiscovery(DISCOVERIES[0]);},2200);
+setTimeout(function(){showDiscovery(DISCOVERIES[1]);},3600);
+</script>
+</body>
+</html>

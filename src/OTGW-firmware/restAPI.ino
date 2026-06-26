@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.275
+**  Version  : v2.0.0-alpha.276
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2886,6 +2886,13 @@ void sendHealth()
     if (hasOTCommandInterface()) {
       je.field(F("thermostatconnected"), state.otBus.bThermostatState);
       je.field(F("boilerconnected"),     state.otBus.bBoilerState);
+      // Per-link recency for the v2 connectivity degraded/stale state (ADR-155):
+      // seconds since the last frame from each side, -1 when never seen since boot.
+      // Only the PIC/OT-frame parser stamps these; on OT-Direct they stay -1 and the
+      // UI keeps its bOnline two-link fallback (additive fields per ADR-019).
+      time_t otNow = now();
+      je.field(F("thermostat_age_s"), state.otBus.tThermostatLastSeen ? (int32_t)(otNow - state.otBus.tThermostatLastSeen) : (int32_t)-1);
+      je.field(F("boiler_age_s"),     state.otBus.tBoilerLastSeen     ? (int32_t)(otNow - state.otBus.tBoilerLastSeen)     : (int32_t)-1);
     }
     if (isPICEnabled())           je.field(F("otcommandinterface"), F("PIC"));
     else if (isOTDirectEnabled()) je.field(F("otcommandinterface"), F("OT-Direct"));

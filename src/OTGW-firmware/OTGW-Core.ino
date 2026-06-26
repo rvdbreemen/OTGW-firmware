@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.275
+**  Version  : v2.0.0-alpha.276
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4548,8 +4548,9 @@ void processOT(const char *buf, int len, bool suppressOutput){
   // and OT state flag writes still run so MQTT/SAT/WebUI values stay fresh.
   // Set by bridgeFrameToParser() on ESP32 OT-direct when PS=1 is active; the
   // PIC does the equivalent internally on ESP8266.
-  static time_t epochBoilerlastseen = 0;
-  static time_t epochThermostatlastseen = 0;
+  // Per-link last-seen now lives in state.otBus (tBoilerLastSeen/tThermostatLastSeen)
+  // so /api/v2/health can emit per-link recency for the v2 connectivity degraded/stale
+  // state (ADR-155). Same single source of truth feeds the 30 s connected window below.
   static bool bOTGWboilerpreviousstate = false;
   static bool bOTGWthermostatpreviousstate = false;
   static bool bOTGWpreviousstate = false;
@@ -4579,13 +4580,13 @@ void processOT(const char *buf, int len, bool suppressOutput){
 
     // source of otmsg
     if (buf[0]=='B'){
-      epochBoilerlastseen = now;
+      state.otBus.tBoilerLastSeen = now;
       OTdata.rsptype = OTGW_BOILER;
       // TASK-795 §4.2: a real boiler frame arrived on the PIC bus. If SAT
       // simulation is active, trip the edge hook (deferred auto-disable).
       satNotifyBoilerFrameSeen();
     } else if (buf[0]=='T'){
-      epochThermostatlastseen = now;
+      state.otBus.tThermostatLastSeen = now;
       OTdata.rsptype = OTGW_THERMOSTAT;
     } else if (buf[0]=='R')    {
       OTdata.rsptype = OTGW_REQUEST_BOILER;
@@ -4596,14 +4597,14 @@ void processOT(const char *buf, int len, bool suppressOutput){
     } 
 
     //If the Boiler messages have not been seen for 30 seconds, then set the state to false.
-    state.otBus.bBoilerState = (now < (epochBoilerlastseen+30));
+    state.otBus.bBoilerState = (now < (state.otBus.tBoilerLastSeen+30));
     if ((state.otBus.bBoilerState != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
       publishBoilerConnectedState();
       bOTGWboilerpreviousstate = state.otBus.bBoilerState;
     }
 
     //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
-    state.otBus.bThermostatState = (now < (epochThermostatlastseen+30));
+    state.otBus.bThermostatState = (now < (state.otBus.tThermostatLastSeen+30));
     if ((state.otBus.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){
       publishThermostatConnectedState();
       bOTGWthermostatpreviousstate = state.otBus.bThermostatState;

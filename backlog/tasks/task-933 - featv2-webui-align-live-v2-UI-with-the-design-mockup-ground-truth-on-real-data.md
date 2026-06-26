@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-25 17:20'
-updated_date: '2026-06-25 17:36'
+updated_date: '2026-06-26 21:59'
 labels: []
 dependencies: []
 ordinal: 147000
@@ -21,7 +21,7 @@ The shipped v2 Web UI (v2.html/v2.js/v2.css) diverges from the approved design m
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Comprehensive issue list produced: mockup vs impl, every page/dashboard/setting, with file:line and fix direction
+- [x] #1 Comprehensive issue list produced: mockup vs impl, every page/dashboard/setting, with file:line and fix direction
 - [ ] #2 Settings render human-readable labels + hints + categories + REBOOT badges (mockup SET_CATS model) bound to real REST keys
 - [ ] #3 Connectivity models OT bus as two links (thermostat/boiler) with MODE-vs-HEALTH vocabulary per the mockup
 - [ ] #4 Home A/B/C dashboards match the mockup layout/labels on real OT data
@@ -63,4 +63,10 @@ Concept B: TT= preview vs real write (keep real); dial arc=setpoint/tick=room (c
 HEADER (P2): UI-switch as <button> distinct class (not span cloning theme-toggle), keyboard-operable; dark accent follow brand-cyan not accent-primary (blue/cyan split-brand).
 
 DO NOT REGRESS: sortable stats, wired Clear/Download/Graph PNG/CSV, real settings API, textContent XSS-safe, live dBm, mobile tap-targets (TASK-932).
+
+Picking up via fresh import of the claude.ai 'Mockups into design system' project (PR #649 source): OTGW Patterns and Tokens.dc.html + OTGW Mockup Screens.dc.html. Plan = (A) import design assets into docs/design/ [absent on dev], (B) re-diff imported design vs current v2.{html,js,css}+firmware REST -> updated file:line issue list (AC#1), (C) implement still-open self-verifiable slices; device AC#6 (.88.39) left for maintainer sign-off. Coordinating to avoid collision with open 924/925/932.
+
+AC#1 done: consolidated file:line issue list at docs/audits/2026-06-26-v2-mockup-alignment-audit.md. Ground truth = interactive mockup docs/design/boiler-dashboard-concepts.html (maintainer directive 2026-06-26). Result: live v2 is a faithful, largely-complete port; original-audit OPENs (settings labels/cats, OT-Support spec table, two-link conn, sortable stats, graph CSV/PNG) now DONE. Residual: 7 trivial fidelity fixes, 3 medium (ticker colour, string-enum selects, SAT long-tail SET_META), 1 firmware (/health per-link age for conn recency/st-warn), 5 maintainer design calls (dark nav cyan vs #383838, dark off-LED brightness, tile radii, Concept-C Flame cell, pressure bands). Overlaps: 932 owns mobile tap-targets; 924 owns dhw token + a11y; 925's source-toggle/stats-sort/graph-export already landed.
+
+Implemented all 11 self-verifiable alignment items (maintainer chose full incl. firmware). v2.js/html/css: (1) OT-Support sd-hint footnote + (7) sd-badge moved after name; (2) Concept-B footer 'Outside X · OTGW firmware'; (3) Concept-B headline reuses statusSentence (surfaces fault+modulation); (4) stats sort glyph ▲/▼ + aria-sort (updateSortIndicators + CSS); (5) theme-toggle aria-pressed/aria-label; (6) ui_graphtimewindow select; (8) Concept-C ticker coloured via DOM block-line spans (ts/t/b), no innerHTML; (9) enum-select path made string-safe + preserves out-of-list current value, webhookcontenttype select added (ntptimezone KEPT free-text: AceTime IANA zone-name, a fixed list risks offering a zone absent from the device registry -> silent UTC fallback); (10) SAT long-tail SET_META ~46 curated labels/hints + sub-groups (Presets/Weather/Solar/Summer/Comfort/Multi-area/PV-boost/Auto-tune/Simulation/BLE). Firmware (11) connectivity recency/ADR-155 degraded: promoted epoch*lastseen statics into state.otBus.t{Boiler,Thermostat}LastSeen (OTBustypes.h+OTGW-Core.ino), /health emits additive thermostat_age_s/boiler_age_s (-1 when never seen / OT-Direct), v2.js otLinkState() -> st-warn past 20s on PIC + CONN.*.seen populates the recency line. evaluate.py 0 FAIL; node --check v2.js OK; esp32 build running. AC#6 (on-device at .88.39) remains maintainer sign-off.
 <!-- SECTION:NOTES:END -->
