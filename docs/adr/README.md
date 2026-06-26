@@ -19,10 +19,10 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Development & Build](#development-and-build) (6 ADRs)
 - [Core Services](#core-services) (6 ADRs)
 - [Features & Extensions](#features-and-extensions) (10 ADRs)
-- [Browser & Client](#browser-and-client-compatibility) (4 ADRs)
+- [Browser & Client](#browser-and-client-compatibility) (6 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (3 ADRs)
 - [OTGW32 & Dual Platform](#otgw32-and-dual-platform) (5 ADRs)
-- [SAT Subsystem](#sat-subsystem) (7 ADRs)
+- [SAT Subsystem](#sat-subsystem) (9 ADRs)
 - [ADR Governance](#adr-governance) (1 ADR)
 
 Counts above are advisory rather than hand-maintained; the canonical set is the per-section listing below.
@@ -341,6 +341,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-034: Non-Blocking Modal Dialogs for User Input](ADR-034-non-blocking-modal-dialogs.md)** 🆕  
   Custom HTML/CSS modal dialogs instead of blocking prompt() to maintain real-time data flow.
 
+- **[ADR-152: Coexisting v2 Web UI selected by a device-wide setting](ADR-152-coexisting-v2-web-ui-device-wide-default-setting.md)** 🆕  
+  The full multi-page v2 Web UI redesign (Home with three concepts, Monitor, Settings, connectivity strip) ships **alongside** the classic `index.html` rather than replacing it; a device-wide setting (`settings.ui.bUseV2`) selects which UI is served, so the new design can be field-tested without forcing it on every user. The two asset sets (`v2.html`/`v2.css`/`v2.js` next to `index.html`/`index.js`/`components.css`) coexist on LittleFS. ADR-155 builds the connectivity model inside this v2 UI.
+
 - **[ADR-155: v2 Web UI Connectivity Model — Two-Link OT Bus, MODE Separated from HEALTH, Five-State Vocabulary](ADR-155-v2-webui-connectivity-two-link-ot-bus.md)** 🆕 *(Accepted)*  
   Accepted (2026-06-26), structural (ADR-080: no automated gate). The v2 Web UI models the OT bus as two independent links (thermostat vs boiler) instead of a single `bOnline` flag, renders gateway MODE (gateway/monitor) as a separate blue chip never a green/red health light, and uses one five-state-plus-mode vocabulary (connected/degraded/disconnected/off/unknown) everywhere as colour+icon+text. Firmware `/api/v2/health` gains `thermostatconnected`/`boilerconnected`/`otcommandinterface`/`otgwmode` additively (mirroring `/device/info`); on OT-Direct hardware the UI falls back to `bOnline` for both links since OTDirect does not populate the sub-states. Implemented alpha.268/alpha.274 (TASK-933). Complements ADR-152 (v2 Web UI); REST/UI counterpart to ADR-084 (OT-bus state MQTT topics); depends on ADR-031 (two-MCU).
 
@@ -406,6 +409,12 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-150: SAT Per-Heating-System COLD_SETPOINT (Active Boiler-Off Cutoff on Low Demand)](ADR-150-sat-per-heating-system-cold-setpoint-boiler-off-cutoff.md)** 🆕  
   *Proposed.* When SAT is the active controller and the requested setpoint falls below a per-heating-system cutoff (radiators 28.2C, underfloor 21C), SAT commands the boiler off (CS=10, CH=0, MM=100) and gates the PWM auto-switch and flame-off hold. Departs from the prior pure-pass-through stance while SAT is enabled; the SAT-disabled handover (CS=0 to thermostat) is unchanged. Supersedes the deliberate-omission code comment; ports thermo-nova `heating_control.py`.
+
+- **[ADR-153: SAT BLE Adds Plaintext Xiaomi MiBeacon (0xFE95); Encrypted Deferred to a Gated Phase 2](ADR-153-sat-ble-mibeacon-plaintext-defer-encrypted.md)** 🆕  
+  Accepted (TASK-930). The SAT BLE roster (`SATble.ino`) gains a third advertisement decoder for plaintext Xiaomi MiBeacon (`0xFE95`) alongside the existing ATC `0x181A` and BTHome `0xFCD2` paths, so stock Mijia/LYWSD03MMC sensors are ingested without a custom firmware flash. Encrypted MiBeacon (which needs a new mbedtls dependency plus per-sensor secret storage) is explicitly deferred to a gated Phase 2 (ADR-154).
+
+- **[ADR-154: Encrypted Xiaomi MiBeacon (v4/v5) via mbedtls AES-CCM with Per-Roster-Slot Bindkey Secret Storage](ADR-154-mibeacon-encrypted-aesccm-per-slot-bindkey.md)** 🆕 *(Phase 2 of ADR-153)*  
+  Accepted (TASK-930 Phase 2). Decrypts encrypted MiBeacon v4/v5 frames using mbedtls AES-CCM with a per-roster-slot bindkey stored as a device secret, so stock LYWSD03MMC sensors at default (encrypted) settings are decoded. Adds the mbedtls dependency and the per-slot secret storage that ADR-153 deferred; the plaintext path stays the fallback.
 
 ### ADR Governance
 
