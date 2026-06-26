@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.273
+**  Version  : v2.0.0-alpha.274
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -887,7 +887,7 @@ void loop()
   DECLARE_TIMER_SEC(timer3s,   3,   SKIP_MISSED_TICKS);
   DECLARE_TIMER_MS(timer500ms, 500, SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
-  DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS);
+  DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS, 30000, 60000);  // 30-60s jitter desyncs from timer60s so the 5-min + 60s publishes don't fire together (heap spike); port of 1.x 7199e158
   DECLARE_TIMER_MIN(timer15min, 15, CATCH_UP_MISSED_TICKS);  // TASK-693 port
 
   if (!isFlashing()) {
