@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-alpha.271
+**  Version  : v2.0.0-alpha.272
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -112,7 +112,7 @@ struct OTDirectSettingsSection {
   bool     bSummerMode        = false; // SM= summer mode (bit5 of master status)
   bool     bFailSafe          = true;  // FS= fail-safe setback on thermostat disconnect
   uint16_t iMsgInterval       = 100;   // MI= minimum inter-message gap (ms, 100-1275)
-  bool     bHasBypassRelay    = false; // Runtime: bypass relay present on this board
+  bool     bHasBypassRelay    = false; // Persisted: bypass relay fitted on this board (user-declared, TASK-933 P2)
   // --- TASK-183: PI room compensation + weather-compensated heating curve ---
   uint8_t  iCHMode            = 1;     // 0=off, 1=fixed flow, 2=heating curve (AUTO)
   float    fFlowTemp          = 45.0f; // Fixed flow temp for CH mode=fixed (°C)

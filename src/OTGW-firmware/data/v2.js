@@ -1037,7 +1037,65 @@
     satmanufacturer: { cat: 'sat', label: 'Manufacturer' },
     satinterval:     { cat: 'sat', label: 'Update interval', hint: 'Seconds' },
     sathpcycle:      { cat: 'sat', label: 'Heat-pump min cycle', hint: 'Seconds (1800 = 2/hr, 2400 = 1.5/hr)' },
-    otdmode:         { cat: 'otd', label: 'OT-Direct mode' }
+    otdmode:         { cat: 'otd', label: 'OT-Direct mode' },
+    // OT-Direct heating-curve / PI room-comp + ventilation (TASK-933 Phase 2)
+    otdchmode:           { cat: 'otd', label: 'CH mode' },
+    otdflowtemp:         { cat: 'otd', label: 'Flow setpoint', hint: '°C' },
+    otdflowmax:          { cat: 'otd', label: 'Max flow temperature', hint: '°C' },
+    otdroomsetpoint:     { cat: 'otd', label: 'Room setpoint', hint: '°C' },
+    otdgradient:         { cat: 'otd', label: 'Heat-curve gradient' },
+    otdexponent:         { cat: 'otd', label: 'Curve exponent' },
+    otdoffset:           { cat: 'otd', label: 'Curve offset', hint: '°C' },
+    otdroomcomp:         { cat: 'otd', label: 'Room compensation' },
+    otdkp:               { cat: 'otd', label: 'Kp (proportional)' },
+    otdki:               { cat: 'otd', label: 'Ki (integral)' },
+    otdkboost:           { cat: 'otd', label: 'K boost' },
+    otdhysteresisenable: { cat: 'otd', label: 'Hysteresis enabled' },
+    otdhysteresis:       { cat: 'otd', label: 'Hysteresis', hint: '°C' },
+    otdventenable:       { cat: 'otd', label: 'Ventilation enabled' },
+    otdopenbypass:       { cat: 'otd', label: 'Open bypass now' },
+    otdautobypass:       { cat: 'otd', label: 'Auto bypass' },
+    otdfreeventenable:   { cat: 'otd', label: 'Free ventilation' },
+    otdventsetpoint:     { cat: 'otd', label: 'Ventilation setpoint', hint: '%' },
+    otdhasbypassrelay:   { cat: 'otd', label: 'Bypass relay fitted' },
+    // SAT: full metadata (TASK-933 Phase 2)
+    satforcepwm:         { cat: 'sat', label: 'Force PWM' },
+    satpushsetpoint:     { cat: 'sat', label: 'Push setpoint to thermostat' },
+    satwindowdetect:     { cat: 'sat', label: 'Window detection' },
+    satwindowminsec:     { cat: 'sat', label: 'Window min open time', hint: 'Seconds' },
+    satthermalcomfort:   { cat: 'sat', label: 'Thermal comfort model' },
+    sathumiditytimeout:  { cat: 'sat', label: 'Humidity sensor timeout', hint: 'Seconds' },
+    satflushtreshold:    { cat: 'sat', label: 'Flush threshold', hint: 'Hours' },
+    satdhwenabled:       { cat: 'sat', label: 'DHW enabled (standalone)' },
+    satdhwenable:        { cat: 'sat', label: 'DHW enable (HW= master)' },
+    satzonecount:        { cat: 'sat', label: 'Zone count' },
+    satzonetimeout:      { cat: 'sat', label: 'Zone sensor timeout', hint: 'Seconds' },
+    satzoneheadroom:     { cat: 'sat', label: 'Zone headroom', hint: '°C' },
+    satsensorarea0:      { cat: 'sat', label: 'Area 0 sensor' },
+    satsensorarea1:      { cat: 'sat', label: 'Area 1 sensor' },
+    satsensorarea2:      { cat: 'sat', label: 'Area 2 sensor' },
+    satsensorarea3:      { cat: 'sat', label: 'Area 3 sensor' },
+    satdhwsetpoint:      { cat: 'sat', label: 'DHW setpoint', hint: '°C (0 = inactive)' },
+    satflameoffset:      { cat: 'sat', label: 'Flame-off offset', hint: '°C' },
+    satflowoffset:       { cat: 'sat', label: 'Flow offset', hint: '°C' },
+    satmodsupdelay:      { cat: 'sat', label: 'Modulation suppression delay', hint: 'Seconds' },
+    satmodsupoffset:     { cat: 'sat', label: 'Modulation suppression offset', hint: '°C' },
+    satminpressure:      { cat: 'sat', label: 'Min pressure', hint: 'bar' },
+    satmaxpressure:      { cat: 'sat', label: 'Max pressure', hint: 'bar' },
+    satmaxpressdrop:     { cat: 'sat', label: 'Max pressure drop', hint: 'bar/hr' },
+    satsolarminelev:     { cat: 'sat', label: 'Solar min elevation', hint: '°' },
+    satboilerratedkw:    { cat: 'sat', label: 'Boiler rated output', hint: 'kW (0 = off)' },
+    satboilerefficiency: { cat: 'sat', label: 'Boiler efficiency', hint: 'fraction 0.5–1.0' },
+    // TASK-933 P2: keys that already had GET + dispatch but lacked a whitelist token
+    // (now POST-able) plus the masked weather API key.
+    satcyclesperhour:    { cat: 'sat', label: 'Cycles per hour' },
+    satvalveoffset:      { cat: 'sat', label: 'Valve offset', hint: '°C' },
+    satsensormaxage:     { cat: 'sat', label: 'Sensor max age', hint: 'Seconds' },
+    saterrormon:         { cat: 'sat', label: 'Error monitoring' },
+    satautogains:        { cat: 'sat', label: 'Auto-gain factor' },
+    satsolarfreezeint:   { cat: 'sat', label: 'Solar freeze integral' },
+    satmaxmodulation:    { cat: 'sat', label: 'Max modulation', hint: '%' },
+    satweatherapikey:    { cat: 'sat', label: 'OWM API key' }
   };
   // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
   // normal toggle — never list it as an editable setting.
@@ -1359,6 +1417,8 @@
     // OT-Direct gateway mode — labels from OTDirecttypes.h (NOT the mockup's
     // Off/On-Off/PID list, which was a different, wrong concept).
     otdmode: [[0, 'Bypass'], [1, 'Gateway'], [2, 'Monitor'], [3, 'Master'], [4, 'Loopback']],
+    // OT-Direct CH mode (TASK-933 P2): 0=off, 1=fixed flow, 2=heating curve (auto)
+    otdchmode: [[0, 'Off'], [1, 'Fixed flow'], [2, 'Heating curve (auto)']],
     // SAT manufacturer presets — labels from the firmware satManufacturerTable[].
     satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']]
   };
