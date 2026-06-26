@@ -74,7 +74,7 @@ is therefore aimed at sensors kept on stock firmware and at non-reflashable mode
    The legacy v2/v3 unauthenticated-AES cipher is out of scope entirely (ESPHome does
    not implement it; modern encrypted Mijia are all v4/v5).
 
-## Alternatives considered
+## Alternatives Considered
 
 - **Reflash stock → pvvx (already supported).** Zero firmware change; recommended for
   Telink models. Rejected as the *only* answer because it does not help sensors kept on
@@ -100,6 +100,11 @@ is therefore aimed at sensors kept on stock firmware and at non-reflashable mode
   has the same single-advert model).
 - **Neutral.** The encrypted path is cleanly stubbed by the bit-3 skip, so Phase 2 slots
   in as a decrypt-then-reuse-the-same-TLV-walker addition without reworking Phase 1.
+
+## Related Decisions
+
+- **ADR-154 (Encrypted Xiaomi MiBeacon via mbedtls AES-CCM with per-roster-slot bindkey)**: the gated Phase 2 this ADR defers; ADR-154 adds the crypto dependency and per-slot bindkey storage and reuses this ADR's TLV walker.
+- **ADR-085 (SAT Integration)**: the SAT subsystem whose BLE roster (`SATble.ino`) this third advertisement decoder feeds.
 
 ## References
 

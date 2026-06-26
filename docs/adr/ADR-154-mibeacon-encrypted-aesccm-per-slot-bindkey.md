@@ -59,7 +59,7 @@ and somewhere to store the per-sensor secret. Both are architectural, hence this
    pastes the MAC and the 32-hex key (both from the pvvx/cloud tooling) in one step; an
    empty key clears it; `forget` clears it.
 
-## Alternatives considered
+## Alternatives Considered
 
 - **Require reflashing to pvvx (ADR-153's recommended path).** Still recommended for
   Telink models, but it does not cover stock-kept or non-reflashable sensors — which is
@@ -97,6 +97,12 @@ and somewhere to store the per-sensor secret. Both are architectural, hence this
   "add encrypted sensor" form (the key is write-only; discovery exposes only `has_key`).
 - **Neutral.** mbedtls was already present in the toolchain; this is its first use in
   the firmware.
+
+## Related Decisions
+
+- **ADR-153 (Plaintext MiBeacon; encrypted deferred to a gated Phase 2)**: the Phase 1 this ADR completes; ADR-153 explicitly deferred encrypted frames to this phase, and the decrypt path reuses ADR-153's Phase-1 TLV walker.
+- **ADR-085 (SAT Integration)**: the SAT subsystem whose BLE roster this decoder feeds.
+- **ADR-056 (Protected admin endpoint security and secret-handling contract)**: the plaintext-secret-in-flash risk class the stored bindkey inherits, identical to the existing password handling.
 
 ## References
 

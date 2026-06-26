@@ -1,12 +1,19 @@
 # ADR-152: Coexisting v2 Web UI selected by a device-wide setting
 
-- **Status:** Accepted
-- **Accepted:** 2026-06-24 (maintainer approval)
-- **Date:** 2026-06-24
-- **Deciders:** Robert van den Breemen (maintainer), Claude
-- **Type:** Structural (no automated CI gate; reviewed at PR per ADR-080)
-- **Related:** ADR-051 (settings architecture), ADR-079/081 (per-component type headers),
-  ADR-091 (design-system drift gate), ADR-139 (static-file shell serving), ADR-132 (async HTTP stack)
+## Status
+
+Accepted. Date: 2026-06-24 (maintainer approval).
+
+**Decision Maker:** User: Robert van den Breemen (maintainer). Type: Structural (no automated CI gate; reviewed at PR per ADR-080).
+
+## Status History
+
+status_history:
+  - date: 2026-06-24
+    status: Accepted
+    changed_by: User
+    reason: Initial decision record; v2 Web UI ships alongside classic, selected by settings.ui.bUseV2
+    changed_via: adr-kit
 
 ## Context
 
@@ -56,7 +63,7 @@ field validation. Per-browser preferences (`localStorage`) remain for the in-pag
 - **Neutral.** `bUseV2` is a normal `ui_*` setting; it serializes, round-trips, and is exposed in the
   settings API like its siblings.
 
-## Alternatives considered
+## Alternatives Considered
 
 - **Hard replace.** Rejected: removes the fallback during validation; higher field risk.
 - **Per-browser localStorage default.** Rejected by the maintainer: the default should be device-wide
@@ -108,3 +115,18 @@ not per-browser. This supersedes the TASK-922 localStorage approach:
 Consequence: unlike the localStorage layer, this requires the firmware carrying the
 `bUseV2`/`sendIndex` switch (TASK-910) to be flashed before the toggle takes effect; on
 older firmware the `ui_usev2` POST is ignored and the UI stays classic.
+
+## Related Decisions
+
+- **ADR-051 (Settings/State architecture)**: `bUseV2` is added as a bool in the existing `UISection` (key `ui_usev2`) per this architecture.
+- **ADR-079 / ADR-081 (Per-component type headers)**: the settings-field plumbing for the new flag follows these.
+- **ADR-091 (Design-system drift gate)**: the v2 tokens fold into `ds-tokens.css` instead of forking the design system.
+- **ADR-139 (ETag static-file shell serving)** and **ADR-132 (Async HTTP stack)**: `sendIndex()` serves the selected shell (`/v2.html` or `/index.html`) over these.
+- **ADR-155 (v2 Web UI Connectivity Model)**: builds the two-link OT-bus connectivity model inside this v2 UI.
+
+## References
+
+- TASK-910 (`bUseV2` / `sendIndex` plumbing); TASK-922 and TASK-923 (the two amendments above).
+- Firmware: `sendIndex()` in `restAPI.ino` serves `/v2.html` when `settings.ui.bUseV2` is set; the `UISection` bool field in the settings struct (ADR-051).
+- Assets: `data/v2.html`, `data/v2.css`, `data/v2.js` coexisting with `data/index.html`, `data/index.js`, `data/components.css` on LittleFS.
+- Verified live on OTGW32 192.168.88.39 (2.0.0-alpha.241); see the Verification section above.
