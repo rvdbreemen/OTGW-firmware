@@ -3,11 +3,11 @@ id: TASK-924
 title: >-
   fix(webui): v2 audit fixes — BLE temp/hum, dhw token, save r.ok, a11y
   (TASK-908 P8)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 11:40'
-updated_date: '2026-06-24 11:41'
+updated_date: '2026-06-26 22:30'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -22,6 +22,12 @@ Deep audit (stress+MQTT+REST+UI) findings. FIXED: (1) BLE roster temp/hum never 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 BLE temp/hum, dhw token, save r.ok, ticker aria-live, SVG labels fixed
-- [ ] #2 Deferred items documented for follow-up
+- [x] #1 BLE temp/hum, dhw token, save r.ok, ticker aria-live, SVG labels fixed
+- [x] #2 Deferred items documented for follow-up
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All AC#1 fixes verified present in shipped v2 assets: BLE roster reads s.temp/s.hum with s.temperature/s.humidity fallback (v2.js:1448); saveSettings throws on !r.ok (v2.js:1315); .chip-dhw uses var(--dhw) (v2.css); #cTicker + #monLog role=log aria-live=polite (v2.html:305/334); strip/gstrip/connMap/schem/dial SVGs carry aria-label. AC#2 deferred items documented in description (most since landed via TASK-925/933). Self-verifiable, no hardware AC — Done.
+<!-- SECTION:FINAL_SUMMARY:END -->

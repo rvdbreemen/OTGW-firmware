@@ -3,11 +3,11 @@ id: TASK-933
 title: >-
   feat(v2-webui): align live v2 UI with the design mockup (ground truth) on real
   data
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-25 17:20'
-updated_date: '2026-06-26 21:59'
+updated_date: '2026-06-26 22:27'
 labels: []
 dependencies: []
 ordinal: 147000
@@ -22,10 +22,10 @@ The shipped v2 Web UI (v2.html/v2.js/v2.css) diverges from the approved design m
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Comprehensive issue list produced: mockup vs impl, every page/dashboard/setting, with file:line and fix direction
-- [ ] #2 Settings render human-readable labels + hints + categories + REBOOT badges (mockup SET_CATS model) bound to real REST keys
-- [ ] #3 Connectivity models OT bus as two links (thermostat/boiler) with MODE-vs-HEALTH vocabulary per the mockup
+- [x] #2 Settings render human-readable labels + hints + categories + REBOOT badges (mockup SET_CATS model) bound to real REST keys
+- [x] #3 Connectivity models OT bus as two links (thermostat/boiler) with MODE-vs-HEALTH vocabulary per the mockup
 - [ ] #4 Home A/B/C dashboards match the mockup layout/labels on real OT data
-- [ ] #5 Monitor sub-tabs (Log/Stats/OT Support/Graph/Connection) match the mockup
+- [x] #5 Monitor sub-tabs (Log/Stats/OT Support/Graph/Connection) match the mockup
 - [ ] #6 Final: live v2 UI visually matches the mockup at desktop+mobile, driven by real device data
 <!-- AC:END -->
 
@@ -69,4 +69,8 @@ Picking up via fresh import of the claude.ai 'Mockups into design system' projec
 AC#1 done: consolidated file:line issue list at docs/audits/2026-06-26-v2-mockup-alignment-audit.md. Ground truth = interactive mockup docs/design/boiler-dashboard-concepts.html (maintainer directive 2026-06-26). Result: live v2 is a faithful, largely-complete port; original-audit OPENs (settings labels/cats, OT-Support spec table, two-link conn, sortable stats, graph CSV/PNG) now DONE. Residual: 7 trivial fidelity fixes, 3 medium (ticker colour, string-enum selects, SAT long-tail SET_META), 1 firmware (/health per-link age for conn recency/st-warn), 5 maintainer design calls (dark nav cyan vs #383838, dark off-LED brightness, tile radii, Concept-C Flame cell, pressure bands). Overlaps: 932 owns mobile tap-targets; 924 owns dhw token + a11y; 925's source-toggle/stats-sort/graph-export already landed.
 
 Implemented all 11 self-verifiable alignment items (maintainer chose full incl. firmware). v2.js/html/css: (1) OT-Support sd-hint footnote + (7) sd-badge moved after name; (2) Concept-B footer 'Outside X · OTGW firmware'; (3) Concept-B headline reuses statusSentence (surfaces fault+modulation); (4) stats sort glyph ▲/▼ + aria-sort (updateSortIndicators + CSS); (5) theme-toggle aria-pressed/aria-label; (6) ui_graphtimewindow select; (8) Concept-C ticker coloured via DOM block-line spans (ts/t/b), no innerHTML; (9) enum-select path made string-safe + preserves out-of-list current value, webhookcontenttype select added (ntptimezone KEPT free-text: AceTime IANA zone-name, a fixed list risks offering a zone absent from the device registry -> silent UTC fallback); (10) SAT long-tail SET_META ~46 curated labels/hints + sub-groups (Presets/Weather/Solar/Summer/Comfort/Multi-area/PV-boost/Auto-tune/Simulation/BLE). Firmware (11) connectivity recency/ADR-155 degraded: promoted epoch*lastseen statics into state.otBus.t{Boiler,Thermostat}LastSeen (OTBustypes.h+OTGW-Core.ino), /health emits additive thermostat_age_s/boiler_age_s (-1 when never seen / OT-Direct), v2.js otLinkState() -> st-warn past 20s on PIC + CONN.*.seen populates the recency line. evaluate.py 0 FAIL; node --check v2.js OK; esp32 build running. AC#6 (on-device at .88.39) remains maintainer sign-off.
+
+Self-verifiable ACs done (alpha.276, committed 62bf7252, pushed origin/dev; esp32 build green, evaluate.py 0 FAIL, node --check v2.js OK). AC#2 settings labels/hints/categories/REBOOT + SAT long-tail + enum selects: done. AC#3 connectivity two-link MODE-vs-HEALTH + recency/st-warn: done. AC#5 Monitor sub-tabs (ticker colour, stats sort glyph, OT-Support sd-hint): done. REMAINING (maintainer hardware sign-off, OTGW32 @192.168.88.39): AC#4 'on real OT data' value-binding and AC#6 final desktop+mobile visual match — code is correct + self-verified but live-data rendering and the st-warn stale band need the device. Moved to In Review pending that verification.
+
+Playwright validation pass (mock OTGW device, REST-driven, light+dark): item1 sd-hint footnote ✓ visual; item3 Concept-B headline reuses statusSentence ✓ (HP-aware 'Heating · compressor on · 62%'); item4 stats sort glyph ✓ DOM (class 'sorted asc' + aria-sort ascending + ::after ' ▲'); item5 theme aria-pressed flips ✓; items6/9 enum selects render w/ correct values ✓; item7 sd-badge after name ✓; item8 ticker parse+colour mapping 5/5 Node (T/R→t, B/A→b); item10 ~46 SAT keys curated + sub-grouped (Presets/Weather/Solar/Summer/Comfort/Multi-area/PV-boost/Auto-tune/Simulation/BLE) ✓ visual; item11 connectivity 'Thermostat Degraded' amber from thermostat_age_s=25 while Boiler Connected from age=5 ✓ end-to-end + Mode GATEWAY from otgwmode ✓. Zero runtime exceptions on load. Self-verifiable ACs now browser-confirmed; AC#6 (live data/WS on real OTGW32) still maintainer sign-off.
 <!-- SECTION:NOTES:END -->

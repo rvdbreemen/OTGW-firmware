@@ -3,11 +3,11 @@ id: TASK-932
 title: >-
   fix(v2-webui): mobile review fixes — iOS input-zoom, tap-targets, matrix
   cells, value-clip, dead CSS
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-25 05:18'
-updated_date: '2026-06-25 05:20'
+updated_date: '2026-06-26 22:30'
 labels: []
 dependencies: []
 ordinal: 146000
@@ -21,13 +21,13 @@ Six findings from a 360px live-data mobile review of the v2 Web UI (rendered aga
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Settings inputs + search render >=16px on mobile so iOS Safari does not auto-zoom on focus
-- [ ] #2 OT Support matrix cells reach >=24px tap target on mobile (WCAG 2.5.8 AA)
-- [ ] #3 Interactive controls connpill/seg2btn/cchip/tbtn/theme-toggle reach >=44px min-height
-- [ ] #4 Long settings values no longer clip on narrow phones
-- [ ] #5 Dead .set-cards grid-template-columns rule removed from the multicol block
-- [ ] #6 Tiny labels (ble-tag/mc-cell) bumped for phone readability
-- [ ] #7 No horizontal overflow regression at 360px; desktop layout unchanged in spirit
+- [x] #1 Settings inputs + search render >=16px on mobile so iOS Safari does not auto-zoom on focus
+- [x] #2 OT Support matrix cells reach >=24px tap target on mobile (WCAG 2.5.8 AA)
+- [x] #3 Interactive controls connpill/seg2btn/cchip/tbtn/theme-toggle reach >=44px min-height
+- [x] #4 Long settings values no longer clip on narrow phones
+- [x] #5 Dead .set-cards grid-template-columns rule removed from the multicol block
+- [x] #6 Tiny labels (ble-tag/mc-cell) bumped for phone readability
+- [x] #7 No horizontal overflow regression at 360px; desktop layout unchanged in spirit
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,3 +44,9 @@ CSS-only, all in v2.css, mobile-scoped via existing @media blocks (no desktop re
 
 Verify: re-render @360px live, confirm >=16px inputs, 8-col matrix, no overflow. Bump prerelease (data asset). Build fs+fw, evaluator quick.
 <!-- SECTION:PLAN:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+All 7 ACs in v2.css, Playwright-validated at 360px: #1 .srow text/number/password+select+.set-search font-size:16px (setSearch measured 16px, no iOS zoom); #2 .matrix repeat(8,1fr) <=719px; #3 connpill/seg2btn/cchip/tbtn/theme-toggle min-height:44px (themeToggle measured 44px); #4 .srow flex-wrap:wrap + inputs width:100% (no clip); #5 dead .set-cards grid rule removed; #6 .ble-tag .66rem/.mc-cell .lbl .68rem; #7 horizontal overflow measured 0px at 360px. CSS-only. Done.
+<!-- SECTION:FINAL_SUMMARY:END -->

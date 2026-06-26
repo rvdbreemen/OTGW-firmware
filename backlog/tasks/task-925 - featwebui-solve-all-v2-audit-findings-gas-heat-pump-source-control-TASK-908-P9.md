@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-24 18:50'
-updated_date: '2026-06-24 18:51'
+updated_date: '2026-06-26 22:32'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -27,3 +27,9 @@ Implement approved plan cozy-juggling-fern: Phase1 firmware (satsource whitelist
 - [ ] #3 Classic satsystem label bug fixed + heating_source select
 - [ ] #4 Docs/oracle updated; build+eval green; verified on device
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Loop assessment 2026-06-26: Phase2 (v2 UI: REST seed, source toggle, steppers, stats sort, log download, conn detail, support hover, graph chips+CSV+PNG, enum selects) = DONE per TASK-933 audit + Playwright validation. Phase3 (classic satsource 'Heat Source' select) present at index.js:3630. REMAINING/unverified: Phase1 firmware (satsource whitelist in dispatch, PATCH/DELETE auth, comment scrubs), Phase4 (docs MQTT-retained line + MEMORY ADR-124->140 + SAT json-golden regen), and AC#4 on-device verification. Recommend as next focused iteration — left In Progress.
+<!-- SECTION:NOTES:END -->
