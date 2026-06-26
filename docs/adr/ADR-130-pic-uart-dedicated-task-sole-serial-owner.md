@@ -18,6 +18,11 @@ status_history:
     changed_by: Agent
     reason: Document the ADR-123 Phase-1 PIC-UART task lift delivered by TASK-865.6 on top of the ADR-129 primitives
     changed_via: adr-kit
+  - date: 2026-06-13
+    status: Accepted
+    changed_by: User
+    reason: Accepted by the maintainer (Robert) on the same day
+    changed_via: adr-kit
 
 ## Context
 

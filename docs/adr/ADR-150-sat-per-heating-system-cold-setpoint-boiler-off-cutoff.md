@@ -12,6 +12,11 @@ status_history:
     changed_by: Agent
     reason: Initial decision record
     changed_via: adr-kit
+  - date: 2026-06-24
+    status: Accepted
+    changed_by: User
+    reason: Accepted by the maintainer; landed satGetColdSetpoint()
+    changed_via: adr-kit
 
 ## Context
 

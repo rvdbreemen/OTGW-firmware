@@ -70,6 +70,12 @@ The maintainer decided on 2026-06-10 to drop runtime detection entirely.
    is kept for all boards: WiFi configuration runs before PIC/OTDirect
    bring-up in `setup()`. It is a good ordering independent of detection.
 
+## Alternatives Considered
+
+- **Keep the ADR-125 combo runtime boot-detection.** Rejected: field testing on real hardware (alpha.166 through alpha.172) showed it does not converge. The boot-time PIC probe starved the captive portal on a fresh flash, the LOLIN S3-in-Classic pin map took several field iterations (PIN_PIC_RST 5 to 12) with a wrong probe silently misclassifying the board, the dual pin map forced runtime indirection through otherwise compile-time code, and the combo could not feed the Classic PCB's external 0x26 watchdog (`HAS_PIC_WATCHDOG` forced to 0).
+- **Auto-correct a mis-flashed board at runtime.** Rejected: auto-correction *is* the runtime detection being removed. A fixed per-board image with per-target asset naming is deterministic and removes the misclassification failure mode entirely, at the cost of the user picking the right image.
+- **Do nothing and ship the combo as-is.** Rejected: the four convergence failures above are field-reproduced defects, not theoretical risks; shipping them would leave the Classic hardware watchdog unfed in PIC mode.
+
 ## Consequences
 
 - Users must pick the correct firmware image for their hardware; flashing the
@@ -87,11 +93,14 @@ The maintainer decided on 2026-06-10 to drop runtime detection entirely.
 - The `esp32-combo` PlatformIO env, build target and asset set are replaced
   by `esp32-classic` equivalents.
 
-## Related
+## Related Decisions
 
-- ADR-125 (superseded): combo board, runtime boot detection.
-- ADR-113 (board-class slug semantics; the `hardwareTypeName()` contract
-  reverts to its original compile-time form).
-- ADR-080 (gate policy; this ADR is guideline-level).
-- TASK-854 (implementation), TASK-845/848/853 (combo field-debugging history).
-- `docs/hardware/PINOUT.md` (verified D1-mini footprint → S3 Mini GPIO map).
+- **ADR-127 (Combo ESP32-S3 single binary revived)**: supersedes this ADR; revives the ADR-125 combo design with the objections here root-caused and fixed, while retaining the `esp32-classic` board class, its verified pin map, and the portal-first boot order defined here.
+- **ADR-125 (Combo board, runtime boot detection)**: superseded by this ADR.
+- **ADR-113 (Board-class slug semantics)**: the `hardwareTypeName()` contract reverts to its original compile-time form here.
+- **ADR-080 (Gate policy)**: this ADR is guideline-level (no new dedicated gate introduced).
+
+## References
+
+- TASK-854 (implementation); TASK-845 / TASK-848 / TASK-853 (combo field-debugging history).
+- `docs/hardware/PINOUT.md` (verified D1-mini footprint to S3 Mini GPIO map).

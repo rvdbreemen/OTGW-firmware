@@ -36,6 +36,11 @@ status_history:
     changed_by: Agent
     reason: Replace the whole-response AsyncResponseStream buffer in restSendJson() with a chunked pull response that re-serializes a TCP-window slice per chunk, so no large contiguous buffer is ever allocated. Fixes the TASK-883 under-load IDF Task-Watchdog reboot (and the plausibly same-root TASK-879 field "web dead" report). Proposed pending hardware confirmation (8-worker flood, bootcount delta 0).
     changed_via: adr-kit
+  - date: 2026-06-18
+    status: Superseded
+    changed_by: Agent
+    reason: Superseded by ADR-146; the chunked-pull approach was retired when ArduinoJson was reverted on the ESP32-S3, so the re-serialize-per-chunk idiom no longer applies
+    changed_via: adr-kit
 
 ## Context
 
