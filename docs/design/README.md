@@ -278,6 +278,21 @@ both.
   the expert who tunes.
 Each layer *adds*, never replaces — same screen, deeper on demand.
 
+The dashboard is a **faithful reproduction** of the real dev SAT UI (all 13
+sections), rebuilt in **hand-rolled SVG** (no library, self-contained):
+- **Temperature History** — the real 5-series chart (Setpoint / Flow / Room /
+  Outside dashed / PID dotted) with legend.
+- **Heating Curve (hero)** — the family of curves (c=0.8…2.5), the active curve
+  highlighted, the **calibration markers** (learned points) + marker list, the
+  current operating point, and the curve-position ring. This is SAT's most
+  distinctive graph, given pride of place.
+- Every diagnostic section (Control Status, PID, PWM & Cycle, Smart Features,
+  External Sensors, Weather, Health dots, Simulation, **Raw JSON**) reproduced
+  faithfully but as **compact grouped cards** instead of dev's long flat
+  label:value lists — same data, far less overwhelming.
+- Controls copied: presets, mode, **DHW slider + DHW-enable (HW=)**, cycle mode,
+  Detect Location, bench simulation.
+
 **Settings (Settings → SAT)** — the ~90 SAT fields were overwhelming as a flat
 list, so a **Basic / Advanced / Expert** tier filter sits at the top:
 - **Basic** → Core Control, Presets, DHW (3 cards).

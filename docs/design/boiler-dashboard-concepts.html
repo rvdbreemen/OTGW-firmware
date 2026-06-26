@@ -549,6 +549,31 @@
   .pid-cell{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
   .pid-cell .k{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
   .pid-cell .val{font-family:var(--font-mono);font-size:1.05rem;font-weight:700;margin-top:2px}
+  /* SAT comprehensive dashboard: kv cards, curve hero, health, raw json */
+  .sat-l1>.card,.sat-l2>.card{margin-bottom:14px}
+  .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.74rem;color:var(--muted);padding:6px 2px 0}
+  .legend i,.curve-legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:6px;vertical-align:middle}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}
+  .kv-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.82rem}
+  .kv-k{color:var(--muted)} .kv-v{font-family:var(--font-mono);font-weight:700;text-align:right}
+  @media(max-width:560px){.kv{grid-template-columns:1fr}}
+  .sat-curve-hero .curve-wrap{display:grid;grid-template-columns:1fr 210px;gap:14px;align-items:start}
+  @media(max-width:719px){.sat-curve-hero .curve-wrap{grid-template-columns:1fr}}
+  #satCurveBig{width:100%;height:auto;display:block}
+  .curve-legend{display:flex;flex-direction:column;gap:6px;font-size:.76rem;color:var(--muted);margin-bottom:10px}
+  .curve-legend i{width:16px;height:10px;border-radius:3px}
+  .marker-head{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;margin-bottom:6px}
+  .marker-list{list-style:none;margin:0;padding:0;font-size:.8rem}
+  .marker-list li{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)}
+  .marker-list li span{color:var(--muted)} .marker-list li b{font-family:var(--font-mono);color:var(--zone-ok)}
+  .health-strip{display:flex;flex-wrap:wrap;gap:16px}
+  .health-item{display:flex;align-items:center;gap:7px;font-size:.84rem;font-weight:600}
+  .hdot{width:11px;height:11px;border-radius:50%;background:var(--tile-off)}
+  .hdot.ok{background:var(--zone-ok)} .hdot.warn{background:var(--zone-warn)} .hdot.alert{background:var(--zone-alert)}
+  .hdot.idle{background:var(--tile-off)}
+  .raw-toggle{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;font-size:.86rem;font-family:var(--font-sans);padding:0}
+  .raw-json{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+    font-family:var(--font-mono);font-size:.72rem;color:var(--text);overflow:auto;max-height:240px;margin:6px 0 0}
   /* SAT settings tier control */
   .tierbar{display:inline-flex;gap:4px;margin:0 0 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:3px}
   .tierbar button{border:0;background:none;color:var(--muted);border-radius:8px;padding:7px 14px;font-size:.8rem;cursor:pointer;min-height:36px;font-family:var(--font-sans)}
@@ -861,18 +886,31 @@
 
   <div id="satBody" class="sv-simple">
     <!-- L1 Thermostat -->
-    <div class="sat-l1 sat-thermo-wrap">
-      <div class="sat-dial-card">
-        <svg viewBox="0 0 240 240" id="satDial" aria-label="Room thermostat"></svg>
-        <div class="sat-steps"><button class="stepbtn" id="satDown" aria-label="lower">−</button><button class="stepbtn" id="satUp" aria-label="raise">+</button></div>
+    <div class="sat-l1">
+      <div class="sat-thermo-wrap">
+        <div class="sat-dial-card">
+          <svg viewBox="0 0 240 240" id="satDial" aria-label="Room thermostat"></svg>
+          <div class="sat-steps"><button class="stepbtn" id="satDown" aria-label="lower">−</button><button class="stepbtn" id="satUp" aria-label="raise">+</button></div>
+        </div>
+        <div class="sat-side">
+          <div class="sat-status-big" id="satStatusBig">Heating to 21.0°</div>
+          <div class="sat-side-lbl">Presets</div>
+          <div class="sat-presets" id="satPresets"></div>
+          <div class="sat-side-lbl">Mode</div>
+          <div class="ds-seg-row" id="satModeRow"><button class="ds-seg active" data-mode="auto">Auto</button><button class="ds-seg" data-mode="off">Off</button></div>
+          <div class="sat-hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
+        </div>
       </div>
-      <div class="sat-side">
-        <div class="sat-status-big" id="satStatusBig">Heating to 21.0°</div>
-        <div class="sat-side-lbl">Presets</div>
-        <div class="sat-presets" id="satPresets"></div>
-        <div class="sat-side-lbl">Mode</div>
-        <div class="ds-seg-row" id="satModeRow"><button class="ds-seg active" data-mode="auto">Auto</button><button class="ds-seg" data-mode="off">Off</button></div>
-        <div class="sat-hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
+      <div class="card"><h4>Temperature history <span class="sub">last hour</span></h4>
+        <svg viewBox="0 0 600 200" id="satHistChart" preserveAspectRatio="none" style="height:200px"></svg>
+        <div class="legend" id="satHistLegend"></div></div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card sat-mini"><h4>Hot water</h4>
+          <div class="kv">
+            <div class="kv-row"><span class="kv-k">DHW setpoint</span><span class="kv-v"><input type="range" min="40" max="60" value="50" id="satDhwSlider" class="ds-slider" style="width:96px;vertical-align:middle"> <b id="satDhwR">50°C</b></span></div>
+            <div class="kv-row"><span class="kv-k">DHW enable (HW=)</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnable" checked></span></div>
+          </div></div>
+        <div class="card sat-mini"><h4>Burner cycle mode</h4><div class="ds-seg-row" id="satCycleRow"><button class="ds-seg active">Continuous</button><button class="ds-seg">PWM</button></div><div class="sub">PID drives the burner continuously</div></div>
       </div>
     </div>
 
@@ -884,33 +922,44 @@
         <div class="sat-tile"><div class="l">Room</div><div class="v" id="satRoom">20.4°</div></div>
         <div class="sat-tile is-target"><div class="l">Target</div><div class="v" id="satTargetT">21.0°</div></div>
       </div>
-      <div class="sat-row2">
-        <div class="card sat-mini"><h4>Modulation</h4><div class="modwrap"><div class="modbar"><div class="modfill" id="satModFill" style="height:68%"></div></div><div class="big" id="satMod">68%</div></div></div>
-        <div class="card sat-mini"><h4>DHW setpoint</h4><input type="range" min="40" max="60" value="50" id="satDhwSlider" class="ds-slider" style="width:100%"><div class="big" id="satDhwR">50 °C</div></div>
-        <div class="card sat-mini"><h4>Cycle mode</h4><div class="ds-seg-row"><button class="ds-seg active">Continuous</button><button class="ds-seg">PWM</button></div><div class="sub">PID drives the burner continuously</div></div>
-        <div class="card sat-mini"><h4>Heating curve <span class="sub" id="satCurveLbl">slope 1.2</span></h4><svg viewBox="0 0 170 96" id="satCurve"></svg></div>
+      <!-- Heating curve — hero -->
+      <div class="card sat-curve-hero"><h4>Heating curve <span class="sub" id="satCurveLbl"></span></h4>
+        <div class="curve-wrap">
+          <svg viewBox="0 0 600 300" id="satCurveBig"></svg>
+          <div class="curve-side">
+            <div class="curve-legend" id="satCurveLegend"></div>
+            <div class="marker-head">Calibration markers <span class="sub">learned points</span></div>
+            <ul class="marker-list" id="satMarkerList"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Control status</h4><div class="kv" id="satControlStatus"></div></div>
+        <div class="card"><h4>Weather <span class="sub">Open-Meteo</span></h4><div class="kv" id="satWeatherKv"></div>
+          <button class="tbtn" id="satDetectLoc" style="margin-top:8px">Detect location</button>
+          <span class="sub" id="satCoords" style="margin-left:8px"></span></div>
       </div>
     </div>
 
     <!-- L3 Technical -->
     <div class="sat-l3">
+      <div class="card"><h4>Health</h4><div class="health-strip" id="satHealth"></div></div>
       <div class="sat-row2 sat-row-2up">
-        <div class="card"><h4>PID control loop</h4><div class="pid-grid" id="satPid"></div>
-          <div class="sub">output = boiler setpoint the gateway injects</div></div>
-        <div class="card"><h4>Target · room · boiler setpoint (10 min)</h4>
-          <svg viewBox="0 0 360 130" id="satTrend"></svg>
-          <div class="legend"><span><i style="background:var(--accent)"></i>target</span>
-            <span><i style="background:var(--zone-ok)"></i>room</span>
-            <span><i style="background:var(--hot)"></i>boiler setpoint</span></div></div>
+        <div class="card"><h4>PID controller</h4><div class="kv" id="satPidKv"></div></div>
+        <div class="card"><h4>PWM &amp; cycle tracking</h4><div class="kv" id="satPwmKv"></div></div>
       </div>
-      <div class="sat-row2">
-        <div class="card sat-mini"><h4>PWM cycle</h4><div class="big" id="satPwm">3 /h · duty 64%</div></div>
-        <div class="card sat-mini"><h4>Autotune</h4><label class="switch"><input type="checkbox" id="satAuto"><span>Learning gains</span></label><div class="sub" id="satAutoSub">idle</div></div>
-        <div class="card sat-mini"><h4>Simulation</h4><label class="switch"><input type="checkbox" id="satSim"><span>Bench sim</span></label><div class="sub">no boiler attached</div></div>
-        <div class="card sat-mini"><h4>Overshoot margin</h4><div class="big">0.5 °C</div><div class="sub">deadband 0.10 °C</div></div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Smart features</h4><div class="kv" id="satSmartKv"></div></div>
+        <div class="card"><h4>External sensors</h4><div class="kv" id="satExtKv"></div></div>
       </div>
-      <p class="concept-cap" style="margin-top:4px">Every knob behind these readouts lives in
-      <b>Settings → SAT</b>, where the same Basic / Advanced / Expert tiers keep it from overwhelming.</p>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Simulation &amp; diagnostics</h4><div class="kv" id="satSimKv"></div>
+          <label class="switch" style="margin-top:10px"><input type="checkbox" id="satSim"><span>Bench simulation</span></label></div>
+        <div class="card"><h4><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ Raw data (JSON)</button></h4>
+          <pre class="raw-json" id="satRawJson" style="display:none"></pre></div>
+      </div>
+      <p class="concept-cap" style="margin-top:2px">Every knob behind these readouts lives in
+      <b>Settings → SAT</b> (Basic / Advanced / Expert tiers).</p>
     </div>
   </div>
 </div><!-- /page-sat -->
@@ -2440,13 +2489,31 @@ document.querySelectorAll('#applToggle .seg2btn').forEach(function(b){
 });
 
 /* ---------- SAT multi-layer dashboard ----------
-   Same screen, three depths (cumulative): Thermostat (set & forget) ->
-   Control (what it's doing) -> Technical (the PID loop, for tuning). */
+   Faithful reproduction of the dev SAT UI in hand-rolled SVG: three cumulative
+   depths (Thermostat / Control / Technical) with the two real graphs
+   (Temperature History 5-series, Heating Curve hero with calibration markers)
+   and every diagnostic section as a compact card. */
 function cssvar(n){return 'var('+n+')';}   // SVG fill/stroke resolve CSS vars live (themes for free)
+function cap(s){return s?s.charAt(0).toUpperCase()+s.slice(1):'manual';}
+function kv(pairs){return pairs.map(function(p){return '<div class="kv-row"><span class="kv-k">'+p[0]+'</span><span class="kv-v">'+p[1]+'</span></div>';}).join('');}
+function sdot(t,s){return '<span class="hdot '+s+'" style="margin-right:6px;vertical-align:-1px"></span>'+t;}
 var sat={target:21.0, preset:'comfort', mode:'auto', enabled:true};
 var SAT_PRESETS=[['comfort','Comfort',21.0],['eco','Eco',18.0],['away','Away',15.0],
                  ['home','Home',20.0],['sleep','Sleep',17.0],['activity','Activity',19.0]];
 var SAT_DIAL={cx:120,cy:120,r:92,lo:5,hi:30,startA:225,sweep:270};
+// learned calibration points (outside°C, flow°C) for the heating curve
+var SAT_CALIB=[[-9,71],[-4,62],[1,54],[6,46],[11,39],[15,33]];
+// 5-series history for the temperature-history chart
+var satHist={set:[],flow:[],room:[],out:[],pid:[]};
+(function(){for(var i=0;i<60;i++){var b=52+9*Math.sin(i/9)+(Math.random()-0.5)*2;
+  satHist.set.push(53); satHist.flow.push(+b.toFixed(1)); satHist.room.push(+(20.6+Math.sin(i/8)*0.3).toFixed(1));
+  satHist.out.push(+(8+Math.sin(i/15)*2).toFixed(1)); satHist.pid.push(Math.round(45+12*Math.sin(i/7)));}})();
+function satHistPush(){
+  var flow=satFlowSet();
+  satHist.set.push(flow); satHist.flow.push(sim.boiler); satHist.room.push(sim.room);
+  satHist.out.push(sim.outside); satHist.pid.push(Math.max(0,Math.min(100,Math.round((sat.target-sim.room)*22+45))));
+  ['set','flow','room','out','pid'].forEach(function(k){if(satHist[k].length>60)satHist[k].shift();});
+}
 function satAngle(v){return SAT_DIAL.startA+(v-SAT_DIAL.lo)/(SAT_DIAL.hi-SAT_DIAL.lo)*SAT_DIAL.sweep;}
 function satFlowSet(){return Math.max(20,Math.min(80,Math.round((28+(18-sim.outside)*1.25+(sat.target-20)*2.2)*10)/10));}
 function satDialDraw(){
@@ -2460,55 +2527,101 @@ function satDialDraw(){
     '<text x="120" y="116" text-anchor="middle" font-size="44" font-weight="700" fill="'+txt+'" font-family="var(--font-sans)">'+sat.target.toFixed(1)+'°</text>'+
     '<text x="120" y="140" text-anchor="middle" font-size="13" fill="'+muted+'" font-family="var(--font-sans)">target · room '+sim.room.toFixed(1)+'°</text>';
 }
-function satCurveDraw(flow){
-  var svg=document.getElementById('satCurve'),accent=cssvar('--accent'),muted=cssvar('--muted'),hot=cssvar('--hot');
-  function X(o){return 12+(o+10)/30*150;} function Y(f){return 86-(Math.max(20,Math.min(80,f))-20)/60*76;}
-  var p=[];for(var o=-10;o<=20;o+=2){var f=28+(18-o)*1.25+(sat.target-20)*2.2;p.push(X(o).toFixed(1)+','+Y(f).toFixed(1));}
-  svg.innerHTML='<polyline points="'+p.join(' ')+'" fill="none" stroke="'+accent+'" stroke-width="2"/>'+
-    '<circle cx="'+X(sim.outside).toFixed(1)+'" cy="'+Y(flow).toFixed(1)+'" r="4" fill="'+hot+'"/>'+
-    '<text x="6" y="93" font-size="8" fill="'+muted+'">−10°</text><text x="150" y="93" font-size="8" fill="'+muted+'">+20°</text>';
-  document.getElementById('satCurveLbl').textContent='slope 1.2 · '+flow.toFixed(0)+'°@'+sim.outside.toFixed(0)+'°';
+// Temperature history — 5 named series (Setpoint, Flow, Room, Outside, PID)
+function drawTempHistory(){
+  var svg=document.getElementById('satHistChart');
+  function Y(t){return 186-(Math.max(-5,Math.min(80,t))+5)/85*168;}
+  var n=satHist.flow.length,x0=8,x1=592,dx=(x1-x0)/(n-1);
+  function L(arr,sc){var p='';for(var i=0;i<n;i++){var v=sc?sc(arr[i]):arr[i];p+=(x0+i*dx).toFixed(1)+','+Y(v).toFixed(1)+' ';}return p;}
+  var accent=cssvar('--accent'),hot=cssvar('--hot'),ok=cssvar('--zone-ok'),cold=cssvar('--cold'),muted=cssvar('--muted'),border=cssvar('--border');
+  var g='';[0,20,40,60,80].forEach(function(t){var y=Y(t).toFixed(1);g+='<line x1="8" y1="'+y+'" x2="592" y2="'+y+'" stroke="'+border+'" stroke-width="1"/>';});
+  g+='<polyline points="'+L(satHist.out)+'" fill="none" stroke="'+cold+'" stroke-width="1.5" stroke-dasharray="6 4"/>';
+  g+='<polyline points="'+L(satHist.pid,function(v){return v/100*78;})+'" fill="none" stroke="'+muted+'" stroke-width="1.5" stroke-dasharray="1 4"/>';
+  g+='<polyline points="'+L(satHist.flow)+'" fill="none" stroke="'+hot+'" stroke-width="2"/>';
+  g+='<polyline points="'+L(satHist.set)+'" fill="none" stroke="'+accent+'" stroke-width="2"/>';
+  g+='<polyline points="'+L(satHist.room)+'" fill="none" stroke="'+ok+'" stroke-width="2"/>';
+  svg.innerHTML=g;
+  document.getElementById('satHistLegend').innerHTML=
+    '<span><i style="background:'+accent+'"></i>Setpoint</span><span><i style="background:'+hot+'"></i>Flow</span>'+
+    '<span><i style="background:'+ok+'"></i>Room</span><span><i style="background:'+cold+'"></i>Outside</span>'+
+    '<span><i style="background:'+muted+'"></i>PID</span>';
 }
-function satPidDraw(flow){
-  var err=sat.target-sim.room,P=err*2.0,I=err*0.4+1.2,Dt=-(sim.room-sat.target)*0.1;
-  var cells=[['Error',err.toFixed(2)+'°'],['P term',P.toFixed(2)],['I term',I.toFixed(2)],
-             ['D term',Dt.toFixed(2)],['Integral',(I*3).toFixed(1)],['Output',flow.toFixed(1)+'°']];
-  document.getElementById('satPid').innerHTML=cells.map(function(c){return '<div class="pid-cell"><div class="k">'+c[0]+'</div><div class="val">'+c[1]+'</div></div>';}).join('');
-}
-function satTrendDraw(){
-  var svg=document.getElementById('satTrend'),accent=cssvar('--accent'),ok=cssvar('--zone-ok'),hot=cssvar('--hot');
-  var n=hist.boiler.length,x0=6,x1=354,dx=(x1-x0)/(n-1);
-  function Y(t){return 122-(Math.max(10,Math.min(70,t))-10)/60*114;}
-  var tgt='',room='',fl='';
-  for(var i=0;i<n;i++){var x=(x0+i*dx).toFixed(1);
-    tgt+=x+','+Y(sat.target).toFixed(1)+' ';
-    room+=x+','+Y(sat.target-0.8+Math.sin(i/7)*0.5).toFixed(1)+' ';
-    fl+=x+','+Y(hist.boiler[i]).toFixed(1)+' ';}
-  svg.innerHTML='<polyline points="'+fl+'" fill="none" stroke="'+hot+'" stroke-width="2"/>'+
-    '<polyline points="'+room+'" fill="none" stroke="'+ok+'" stroke-width="2"/>'+
-    '<polyline points="'+tgt+'" fill="none" stroke="'+accent+'" stroke-width="1.5" stroke-dasharray="5 4"/>';
+// Heating curve — family of curves + active + calibration markers + current point
+function curveF(o,c){return Math.max(20,Math.min(85, 20 + c*(18-o)*1.5 + (sat.target-20)*2));}
+function drawHeatingCurve(){
+  var svg=document.getElementById('satCurveBig');
+  function X(o){return 50+(o+15)/35*530;} function Y(f){return 270-(Math.max(20,Math.min(85,f))-20)/65*240;}
+  var muted=cssvar('--muted'),border=cssvar('--border'),accent=cssvar('--accent'),ok=cssvar('--zone-ok'),hot=cssvar('--hot');
+  var coeffs=[0.8,1.2,1.6,2.0,2.5],active=1.2,g='';
+  [20,40,60,80].forEach(function(f){var y=Y(f).toFixed(1);g+='<line x1="50" y1="'+y+'" x2="580" y2="'+y+'" stroke="'+border+'" stroke-width="1"/><text x="44" y="'+(+y+4)+'" text-anchor="end" font-size="11" fill="'+muted+'">'+f+'°</text>';});
+  [-10,0,10,20].forEach(function(o){var x=X(o).toFixed(1);g+='<line x1="'+x+'" y1="30" x2="'+x+'" y2="270" stroke="'+border+'" stroke-width="1" stroke-dasharray="2 5"/><text x="'+x+'" y="288" text-anchor="middle" font-size="11" fill="'+muted+'">'+o+'°</text>';});
+  coeffs.forEach(function(c){var pts=[];for(var o=-15;o<=20;o++){pts.push(X(o).toFixed(1)+','+Y(curveF(o,c)).toFixed(1));}
+    var a=(c===active);g+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+(a?accent:border)+'" stroke-width="'+(a?3:1.5)+'" opacity="'+(a?1:0.7)+'"/>';
+    if(!a)g+='<text x="'+(X(-15)+3).toFixed(1)+'" y="'+(Y(curveF(-15,c))-3).toFixed(1)+'" font-size="10" fill="'+muted+'">c='+c.toFixed(1)+'</text>';});
+  SAT_CALIB.forEach(function(m){g+='<circle cx="'+X(m[0]).toFixed(1)+'" cy="'+Y(m[1]).toFixed(1)+'" r="4.5" fill="'+ok+'" stroke="var(--panel)" stroke-width="1.5"/>';});
+  g+='<circle cx="'+X(sim.outside).toFixed(1)+'" cy="'+Y(curveF(sim.outside,active)).toFixed(1)+'" r="6.5" fill="none" stroke="'+accent+'" stroke-width="2.5"/>';
+  g+='<circle cx="'+X(sim.outside).toFixed(1)+'" cy="'+Y(sim.boiler).toFixed(1)+'" r="6.5" fill="'+hot+'" stroke="var(--panel)" stroke-width="2"/>';
+  svg.innerHTML=g;
+  document.getElementById('satCurveLbl').textContent='slope '+active.toFixed(1)+' · target '+sat.target.toFixed(1)+'° · '+curveF(sim.outside,active).toFixed(0)+'°@'+sim.outside.toFixed(0)+'°';
+  document.getElementById('satCurveLegend').innerHTML=
+    '<span><i style="background:'+accent+'"></i>active curve (c=1.2)</span>'+
+    '<span><i style="background:'+ok+'"></i>calibration markers</span>'+
+    '<span><i style="background:'+hot+'"></i>current point</span>'+
+    '<span><i style="border:2px solid '+accent+';background:transparent"></i>curve position</span>';
+  document.getElementById('satMarkerList').innerHTML=SAT_CALIB.map(function(m){return '<li><span>'+m[0]+'° out</span><b>'+m[1]+'° flow</b></li>';}).join('');
 }
 function renderSAT(){
-  var on=sat.enabled,heating=on&&sim.flame;
+  var on=sat.enabled,heating=on&&sim.flame,flow=satFlowSet(),err=sat.target-sim.room;
   var pill=document.getElementById('satPill');
   pill.textContent=!on?'Off':(heating?'Heating':'Idle');
   pill.className='sat-pill'+(!on?' off':(heating?'':' idle'));
   document.getElementById('satEnableLbl').textContent=on?'Enabled':'Disabled';
-  satDialDraw();
+  satDialDraw(); drawTempHistory(); drawHeatingCurve();
   document.getElementById('satStatusBig').textContent=!on?'SAT is off':(heating?('Heating to '+sat.target.toFixed(1)+'°'):'At target · idle');
   document.getElementById('satPresets').innerHTML=SAT_PRESETS.map(function(p){
     return '<button class="sat-preset'+(p[0]===sat.preset?' active':'')+'" data-preset="'+p[0]+'" data-temp="'+p[2]+'">'+p[1]+'</button>';}).join('');
   document.querySelectorAll('#satPresets .sat-preset').forEach(function(b){
     b.onclick=function(){sat.preset=b.dataset.preset;sat.target=parseFloat(b.dataset.temp);renderSAT();};});
-  var flow=satFlowSet();
   document.getElementById('satOut').textContent=sim.outside.toFixed(1)+'°';
   document.getElementById('satFlowSet').textContent=flow.toFixed(1)+'°';
   document.getElementById('satRoom').textContent=sim.room.toFixed(1)+'°';
   document.getElementById('satTargetT').textContent=sat.target.toFixed(1)+'°';
-  document.getElementById('satMod').textContent=sim.modulation+'%';
-  document.getElementById('satModFill').style.height=sim.modulation+'%';
-  satCurveDraw(flow); satPidDraw(flow); satTrendDraw();
-  document.getElementById('satAutoSub').textContent=document.getElementById('satAuto').checked?'learning gains…':'idle';
+  document.getElementById('satControlStatus').innerHTML=kv([
+    ['Control mode', sat.mode==='off'?'Off':'PID · continuous'],['Boiler status', heating?'Heating':'Idle'],
+    ['Active preset', cap(sat.preset)],['Heating system','Gas / radiators'],['Manufacturer','Auto (Intergas)'],
+    ['Heating curve','slope 1.2'],['PID output', flow.toFixed(1)+' °C'],['Error', err.toFixed(2)+' °C'],
+    ['Coefficient','1.20'],['Deadband','0.10 °C'],['Overshoot margin','0.5 °C'],
+    ['Modulation (MM=)', sim.modulation+' %'],['Max modulation','100 %']]);
+  document.getElementById('satWeatherKv').innerHTML=kv([
+    ['Outdoor temp', sim.outside.toFixed(1)+' °C'],['Humidity','82 %'],['Wind','3.4 m/s'],
+    ['Last update','2 min ago'],['Fetch errors','0']]);
+  document.getElementById('satCoords').textContent='52.09, 5.12';
+  var P=err*2.0,I=err*0.4+1.2,Dt=-(sim.room-sat.target)*0.1;
+  document.getElementById('satPidKv').innerHTML=kv([
+    ['P term',P.toFixed(2)],['I term',I.toFixed(2)],['D term',Dt.toFixed(2)],
+    ['Kp','2.00'],['Ki','0.10'],['Kd','0.50'],['Raw derivative',(Dt*1.3).toFixed(3)]]);
+  document.getElementById('satPwmKv').innerHTML=kv([
+    ['Duty cycle','64 %'],['PWM flame', heating?'On':'Off'],['Cycle count','3 /h'],
+    ['Last cycle','4m 12s ago'],['Cycle max flow',(sim.boiler+3).toFixed(1)+' °C'],['Cycle overshoot','0.4 °C']]);
+  document.getElementById('satSmartKv').innerHTML=kv([
+    ['Solar gain','Off'],['Summer mode','Off'],['Thermal learning','Active'],
+    ['Comfort offset','+0.0 °C'],['Simmer index','0.12'],['Auto-tune','idle']]);
+  document.getElementById('satExtKv').innerHTML=kv([
+    ['Indoor sensor', sdot('BLE · Living room','ok')],['Outdoor sensor', sdot('OT bus','off')]]);
+  var simOn=document.getElementById('satSim').checked;
+  document.getElementById('satSimKv').innerHTML=kv([
+    ['Simulation mode', simOn?'On (bench)':'Off'],['Sim room temp', simOn?sim.room.toFixed(1)+' °C':'—'],
+    ['Sim flow temp', simOn?sim.boiler.toFixed(1)+' °C':'—'],['Sim return temp', simOn?sim.ret.toFixed(1)+' °C':'—'],
+    ['Sim flame', simOn?(sim.flame?'On':'Off'):'—'],['Sim modulation', simOn?sim.modulation+' %':'—'],
+    ['Last blocked cmd', simOn?'CS=52.0':'—'],['Fallback active','No'],['Fallback reason','—']]);
+  document.getElementById('satHealth').innerHTML=[
+    ['Device','ok'],['Cycle','ok'],['Flame', heating?'ok':'idle'],
+    ['Pressure', sim.pressure<1.0?'warn':'ok'],['Setpoint sync','ok'],['Mod sync','ok']
+  ].map(function(h){return '<span class="health-item"><span class="hdot '+h[1]+'"></span>'+h[0]+'</span>';}).join('');
+  document.getElementById('satRawJson').textContent=JSON.stringify({
+    enabled:on,target:sat.target,room:sim.room,flow_setpoint:flow,actual_flow:sim.boiler,
+    modulation:sim.modulation,outside:sim.outside,preset:sat.preset,mode:sat.mode,
+    coefficient:1.2,deadband:0.1,pid:{p:+P.toFixed(2),i:+I.toFixed(2),d:+Dt.toFixed(2)}},null,2);
 }
 document.querySelectorAll('.satview-btn').forEach(function(b){
   b.onclick=function(){document.querySelectorAll('.satview-btn').forEach(function(x){x.classList.toggle('active',x===b);});
@@ -2518,8 +2631,14 @@ document.getElementById('satDown').onclick=function(){sat.target=Math.max(5,+(sa
 document.getElementById('satEnable').onchange=function(){sat.enabled=this.checked;renderSAT();};
 document.querySelectorAll('#satModeRow .ds-seg').forEach(function(b){b.onclick=function(){
   document.querySelectorAll('#satModeRow .ds-seg').forEach(function(x){x.classList.toggle('active',x===b);});sat.mode=b.dataset.mode;renderSAT();};});
-document.getElementById('satDhwSlider').oninput=function(){document.getElementById('satDhwR').textContent=this.value+' °C';};
-document.getElementById('satAuto').onchange=renderSAT;
+document.querySelectorAll('#satCycleRow .ds-seg').forEach(function(b){b.onclick=function(){
+  document.querySelectorAll('#satCycleRow .ds-seg').forEach(function(x){x.classList.toggle('active',x===b);});};});
+document.getElementById('satDhwSlider').oninput=function(){document.getElementById('satDhwR').textContent=this.value+'°C';};
+document.getElementById('satSim').onchange=renderSAT;
+document.getElementById('satDetectLoc').onclick=function(){document.getElementById('satCoords').textContent='locating… 52.09, 5.12 ✓';};
+document.getElementById('satRawToggle').onclick=function(){
+  var pre=document.getElementById('satRawJson'),open=pre.style.display==='none';
+  pre.style.display=open?'block':'none'; this.textContent=(open?'▾':'▸')+' Raw data (JSON)'; this.setAttribute('aria-expanded',open);};
 
 /* ---------- sensor discovery signals ----------
    New sensors becoming available (BLE / DS18B20 1-Wire) announce themselves
@@ -2555,7 +2674,7 @@ renderA();renderB();renderC();renderMonitor();
 renderConnStrip();renderConnMap();renderConnDetail();
 clock();
 setInterval(clock,1000);
-setInterval(function(){tick();renderMonitor();connTick();
+setInterval(function(){tick();renderMonitor();connTick();satHistPush();
   if(document.getElementById('page-sat').classList.contains('active')) renderSAT();},1000);
 // announce newly-available sensors shortly after load (demo of the signal)
 setTimeout(function(){showDiscovery(DISCOVERIES[0]);},2200);
