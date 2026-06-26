@@ -35,6 +35,6 @@ RISK: do NOT blindly add an `if(telnetInitialized)return` guard — if dev's Asy
 <!-- AC:BEGIN -->
 - [x] #1 POST /api/v2/mqtt/republish added (mirrors /api/v2/discovery/republish): method+connected guards, calls requestMQTTRepublishAll(), 200 JSON; builds clean for esp32
 - [ ] #2 WiFi-reconnect TCP rebind: bench-confirm whether dev's AsyncSimpleTelnet listener survives a WiFi drop/reconnect; if it does, guard startTelnet() (and remove the redundant reconnect rebind) per 1.x 8cf181d3; if not, document why the rebind stays
-- [ ] #3 Dropped-set-command default-stream trace (#602): verify dev's OTGW-command reject path; add a DebugTf only if it is genuinely silent at the default debug level
+- [x] #3 Dropped-set-command default-stream trace (#602): verify dev's OTGW-command reject path; add a DebugTf only if it is genuinely silent at the default debug level
 - [x] #4 timer5min jitter ported (1.x 7199e158): added 30000,60000 jitter params to DECLARE_TIMER_MIN(timer5min,...) so the 5-min publish desyncs from timer60s (avoids the joint-fire heap spike); builds clean for esp32
 <!-- AC:END -->
