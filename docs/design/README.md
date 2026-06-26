@@ -259,6 +259,33 @@ This turns the current silent behaviour (Dallas sensors just appear as new rows
 in the otmonitor table; BLE lives only inside SAT) into an explicit, actionable
 signal — the moment deeper sensor capability becomes available.
 
+## SAT — multi-layer dashboard + tiered settings
+
+SAT is two products in one: a set-and-forget thermostat *and* a tunable control
+loop. The current dev SAT page already has a 3-view selector
+(Thermostat / Expert / Diagnostics) but its settings are a separate flat ~90-field
+page. The mockup splits the two concerns and applies progressive disclosure to
+both.
+
+**Dashboard (SAT page)** — one screen, three *cumulative* depths via a selector:
+- **Thermostat** *(simple)* — a dial, presets (Comfort/Eco/Away/…), Auto/Off, a
+  plain status line. What a homeowner needs; nothing else.
+- **Control** *(operational)* — adds the 2×2 tiles (outside / boiler setpoint SAT
+  injects / room / target), modulation, DHW, cycle mode, the heating curve with
+  the live operating point.
+- **Technical** *(the loop)* — adds the PID terms (error, P/I/D, integral,
+  output), a target·room·setpoint trend, PWM cycle, autotune and simulation. For
+  the expert who tunes.
+Each layer *adds*, never replaces — same screen, deeper on demand.
+
+**Settings (Settings → SAT)** — the ~90 SAT fields were overwhelming as a flat
+list, so a **Basic / Advanced / Expert** tier filter sits at the top:
+- **Basic** → Core Control, Presets, DHW (3 cards).
+- **Advanced** → + PID, PWM, Temperature Source, Pressure, Weather.
+- **Expert** → everything (Smart Features, Safety, Energy, PV boost, Zones,
+  Boiler Model, Sync, Advanced).
+Same data, same 100 % coverage — just revealed in tiers.
+
 ## Old interface vs new — the difference
 
 | Dimension | Current `dev` UI | New design |
