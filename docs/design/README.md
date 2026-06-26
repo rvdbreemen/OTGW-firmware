@@ -132,7 +132,8 @@ guesswork.
   categories / 172 base fields + the BLE roster**.
 - **Cluster proposal (top-level categories):** System · Network (Wi-Fi +
   Ethernet) · MQTT · Time/NTP · OpenTherm Gateway · **OT-Direct** (Mode, PID &
-  curve, Bypass, Ventilation, Setback) · GPIO Sensors · GPIO Outputs · S0 Pulse
+  curve, Bypass, Ventilation, Setback) · **Sensors** (unified: 1-Wire/Dallas +
+  Bluetooth/BLE roster with per-sensor type & room mapping) · GPIO Outputs · S0 Pulse
   Counter · Webhook · Behavior · User Interface · **SAT** (the real 14 groups:
   Core Control, PID, PWM, Temperature Sources, Presets, DHW, Pressure, Smart
   Features, Safety, Energy, PV Surplus Boost, Weather, Sync, Advanced — plus

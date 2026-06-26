@@ -1672,15 +1672,10 @@ var SAT_GROUPS = [
     id: 'sat-grp-tempsrc',
     title: 'Temperature Sources',
     fields: [
-      { key: 'satexternaltemp',   label: 'Use External Temp',  type: 'b' },
-      { key: 'satsensormaxage',   label: 'Sensor Max Age',     type: 'i', unit: 's', min: 60, max: 86400, step: 60 },
-      { key: 'satbleenable',      label: 'BLE Enable',         type: 'b' },
-      { key: 'satblefailover',    label: 'BLE Failover',       type: 'b' },
-      // TASK-508: legacy field. Managed via the BLE Sensors panel
-      // above (auto-discovery + selection). Readonly to avoid
-      // duplicate editing.
-      { key: 'satblemac',         label: 'BLE MAC Address',    type: 's', maxlen: 18, size: 20, readonly: true },
-      { key: 'satbleinterval',    label: 'BLE Interval',       type: 'i', unit: 's', min: 10, max: 300, step: 5 }
+      { key: 'satexternaltemp',   label: 'Use external temp source', type: 'b' },
+      { key: 'satsensormaxage',   label: 'Sensor max age',     type: 'i', unit: 's', min: 60, max: 86400, step: 60 },
+      { key: 'satblefailover',    label: 'Fail over to OT thermostat', type: 'b' }
+      // BLE scan + roster config live under Settings → Sensors → Bluetooth
     ]
   },
   {
@@ -1817,16 +1812,6 @@ var SAT_EXTRA=[
    {key:'satthermalcomfort', label:'Thermal comfort model', type:'b', value:false},
    {key:'sathumiditytimeout', label:'Humidity sensor timeout', type:'i', unit:'s', value:600, min:60, max:86400, step:60}
  ]},
- {id:'sat-grp-ble', title:'BLE Sensors', desc:'Bluetooth temperature/humidity sensors. Per sensor: type and the room it maps to. (Scan enable/interval live under Temperature Sources.)', fields:[
-   {key:'satblenameprefix', label:'BLE name prefix', type:'s', value:'ATC'},
-   {key:'satblenamefilteringest', label:'Filter by name prefix', type:'b', value:true},
-   {key:'satblerostercount', label:'Discovered sensors', type:'i', value:4, readonly:true}
- ], roster:[
-   {name:'Living room',  mac:'A4:C1:38:0B:11', type:'th', value:'21.4 °C · 47 %', area:0, on:true},
-   {name:'Bedroom',      mac:'A4:C1:38:0B:22', type:'t',  value:'19.2 °C',        area:1, on:true},
-   {name:'Bathroom',     mac:'A4:C1:38:0B:33', type:'h',  value:'58 %',           area:2, on:true},
-   {name:'Study',        mac:'A4:C1:38:0B:44', type:'th', value:'20.1 °C · 44 %', area:3, on:false}
- ]},
  {id:'sat-grp-zones', title:'Zones (multi-area)', fields:[
    {key:'satzonecount', label:'Zone count', type:'i', value:0, min:0, max:4, step:1},
    {key:'satzoneheadroom', label:'Zone headroom', type:'f', unit:'°C', value:0.5, min:0, max:5, step:0.1},
@@ -1937,12 +1922,27 @@ var SET_CATS=[
      {key:'OTDsetbacktimeout',label:'Setback timeout',type:'i',unit:'min',value:60,min:0,max:1440,step:10}
    ]}
  ]},
- {id:'sensors',icon:'🌡',title:'GPIO Sensors',desc:'Dallas 1-Wire temperature sensors.',groups:[{fields:[
-   {key:'GPIOSENSORSenabled',label:'Enable sensors',type:'b',value:true},
-   {key:'GPIOSENSORSpin',label:'GPIO pin',type:'i',value:13,min:0,max:39},
-   {key:'GPIOSENSORSinterval',label:'Poll interval',type:'i',unit:'s',value:30,min:5,max:600},
-   {key:'GPIOSENSORSlegacyformat',label:'Legacy topic format',type:'b',value:false}
- ]}]},
+ {id:'sensors',icon:'🌡',title:'Sensors',desc:'All temperature/humidity sensors — wired (1-Wire) and wireless (Bluetooth). SAT picks which of these feeds its control under Settings → SAT → Temperature Sources.',groups:[
+   {sub:'1-Wire (Dallas / DS18B20)',fields:[
+     {key:'GPIOSENSORSenabled',label:'Enable 1-Wire sensors',type:'b',value:true},
+     {key:'GPIOSENSORSpin',label:'GPIO pin',type:'i',value:13,min:0,max:39},
+     {key:'GPIOSENSORSinterval',label:'Poll interval',type:'i',unit:'s',value:30,min:5,max:600},
+     {key:'GPIOSENSORSlegacyformat',label:'Legacy topic format',type:'b',value:false}
+   ]},
+   {sub:'Bluetooth (BLE)',desc:'Scanning &amp; discovery. Per sensor below: type and the room it maps to.',fields:[
+     {key:'satbleenable',label:'Enable BLE scanning',type:'b',value:true},
+     {key:'satbleinterval',label:'Scan interval',type:'i',unit:'s',value:30,min:10,max:300,step:5},
+     {key:'satblenameprefix',label:'BLE name prefix',type:'s',value:'ATC'},
+     {key:'satblenamefilteringest',label:'Filter by name prefix',type:'b',value:true},
+     {key:'satblemac',label:'Legacy single MAC',type:'s',value:'',readonly:true,hint:'Superseded by the roster'},
+     {key:'satblerostercount',label:'Discovered sensors',type:'i',value:4,readonly:true}
+   ], roster:[
+     {name:'Living room',  mac:'A4:C1:38:0B:11', type:'th', value:'21.4 °C · 47 %', area:0, on:true},
+     {name:'Bedroom',      mac:'A4:C1:38:0B:22', type:'t',  value:'19.2 °C',        area:1, on:true},
+     {name:'Bathroom',     mac:'A4:C1:38:0B:33', type:'h',  value:'58 %',           area:2, on:true},
+     {name:'Study',        mac:'A4:C1:38:0B:44', type:'th', value:'20.1 °C · 44 %', area:3, on:false}
+   ]}
+ ]},
  {id:'outputs',icon:'⚡',title:'GPIO Outputs',desc:'Drive a relay from an OT status bit.',groups:[{fields:[
    {key:'GPIOOUTPUTSenabled',label:'Enable output',type:'b',value:false},
    {key:'GPIOOUTPUTSpin',label:'GPIO pin',type:'i',value:16,min:0,max:39},
