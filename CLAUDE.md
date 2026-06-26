@@ -527,6 +527,7 @@ The benefit of writing the plan once is symmetry: agents see the same intent, th
 This project uses [adr-kit](https://github.com/rvdbreemen/adr-kit) for Architecture Decision Records. The skill, the `adr-generator` subagent, and the path-specific instructions are loaded via the plugin.
 
 - Use `/adr-kit:adr` (or invoke the `adr-generator` subagent) when authoring a new ADR.
+- Before implementing a feature or change, run `bin/adr-context "<task description>"` (or the `/adr-kit:context` skill) to surface the most relevant ADRs out of the 150+ in `docs/adr/` — it ranks by weighted signals so you read the handful that apply instead of grepping all of them (TASK-708).
 - During coding work, follow the rules in the plugin's `instructions/adr.coding.md`.
 - During code review, apply the six named ADR checks in the plugin's `instructions/adr.review.md`.
 - An ADR cannot flip from `Proposed` to `Accepted` until it passes all four verification gates: Completeness, Evidence, Clarity, Consistency.
