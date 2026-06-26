@@ -549,6 +549,8 @@
   .pid-cell{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:8px 10px}
   .pid-cell .k{font-size:.62rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700}
   .pid-cell .val{font-family:var(--font-mono);font-size:1.05rem;font-weight:700;margin-top:2px}
+  .sim-tag{font-size:.62rem;font-weight:700;letter-spacing:.06em;color:#fff;
+    background:color-mix(in srgb,var(--zone-warn) 78%,#000);border-radius:6px;padding:3px 8px}
   /* SAT comprehensive dashboard: kv cards, curve hero, health, raw json */
   .sat-l1>.card,.sat-l2>.card{margin-bottom:14px}
   .legend{display:flex;flex-wrap:wrap;gap:14px;font-size:.74rem;color:var(--muted);padding:6px 2px 0}
@@ -586,6 +588,7 @@
 
 <div class="headerrow">
   <span class="big">OTGW firmware <span class="sub">· opening-page concepts</span></span>
+  <span class="sim-tag" title="Design mockup — all values are simulated, not from a real gateway">SIMULATED · MOCKUP</span>
   <span class="sub" id="clock">--:--:--</span>
   <span class="theme-toggle" id="themeToggle">🌙 Dark</span>
 </div>
@@ -872,7 +875,9 @@
 <div id="page-sat" class="page">
   <p class="concept-cap"><b>SAT — one screen, three depths.</b> A homeowner sets a temperature
   and walks away (<b>Thermostat</b>); a tinkerer watches what it's doing (<b>Control</b>);
-  an expert tunes the loop (<b>Technical</b>). Each layer adds, never replaces.</p>
+  an expert tunes the loop (<b>Technical</b>). Each layer adds, never replaces.
+  This page is the <b>live control surface</b>; the underlying defaults &amp; tuning live in
+  <b>Settings → SAT</b> — same values, one source of truth in the real firmware.</p>
 
   <div class="sat-head">
     <div class="sat-title">SAT · Smart Autotune Thermostat <span class="sat-pill" id="satPill">Heating</span></div>
@@ -1190,6 +1195,8 @@
 
 <script>
 /* ---------- theme + design switching ---------- */
+// null-safe element accessor: a missing id no longer throws and kills the rest of the script
+function gel(id){return document.getElementById(id)||{};}
 var root=document.documentElement;
 var themeBtn=document.getElementById('themeToggle');
 function applyTheme(t){
@@ -1210,7 +1217,10 @@ function showPage(p){
   ['home','sat','monitor','settings'].forEach(function(k){
     document.getElementById('page-'+k).classList.toggle('active',k===p);
   });
+  // render the page we just switched to immediately (interval only renders the visible page)
   if(p==='sat' && typeof renderSAT==='function') renderSAT();
+  if(p==='home'){ renderA(); renderB(); renderC(); }
+  if(p==='monitor') renderMonitor();
   try{localStorage.setItem('mock-page',p);}catch(e){}
 }
 segs.forEach(function(s){s.onclick=function(){showPage(s.dataset.page);};});
@@ -1275,8 +1285,9 @@ function tick(){
   sim.room=+(sim.room+(sim.setpoint-sim.room)*0.02+(Math.random()-0.5)*0.06).toFixed(1);
   hist.boiler.push(sim.boiler);hist.ret.push(sim.ret);hist.mod.push(sim.modulation);
   if(hist.boiler.length>60){hist.boiler.shift();hist.ret.shift();hist.mod.shift();}
-  renderA();renderB();renderC();
+  // rendering is gated to the visible page in the main interval (perf)
 }
+function pageActive(id){var e=document.getElementById('page-'+id);return e&&e.classList.contains('active');}
 
 function setTile(id,on,text,fault){
   var el=document.getElementById(id);
@@ -1390,8 +1401,8 @@ function bStep(d){
   document.getElementById('bCmd').innerHTML='would queue <b>TT='+sim.setpoint.toFixed(1)+'</b>';
   renderB();
 }
-document.getElementById('bUp').onclick=function(){bStep(0.5);};
-document.getElementById('bDown').onclick=function(){bStep(-0.5);};
+gel('bUp').onclick=function(){bStep(0.5);};
+gel('bDown').onclick=function(){bStep(-0.5);};
 
 /* ---------- DESIGN C render ---------- */
 var SP=65; // control setpoint shown in the chart
@@ -1427,7 +1438,6 @@ function renderC(){
     cell('T outside',sim.outside.toFixed(1)+'°C','')+
     cell('Flame',sim.flame?'ON':'OFF',sim.flame?'ok':'')+
     cell('Status',sim.fault?'FAULT':'OK',sim.fault?'alert':'ok');
-  pushFrames();
 }
 function cell(lbl,val,cls){
   return '<div class="mc-cell"><div class="lbl">'+lbl+'</div><div class="val '+cls+'">'+val+'</div></div>';
@@ -1459,7 +1469,7 @@ function pushFrames(){
 
 /* ---------- MONITOR page ---------- */
 var logPaused=false, logScroll=true, logTs=true;
-document.getElementById('logPause').onclick=function(){
+gel('logPause').onclick=function(){
   logPaused=!logPaused; this.textContent=logPaused?'▶ Resume':'⏸ Pause';
 };
 function chipToggle(id,fn){
@@ -1468,7 +1478,7 @@ function chipToggle(id,fn){
 }
 chipToggle('chipScroll',function(v){logScroll=v;});
 chipToggle('chipTs',function(v){logTs=v;});
-document.getElementById('logSearch').oninput=renderMonLog;
+gel('logSearch').oninput=renderMonLog;
 function renderMonLog(){
   if(logPaused) return;
   var q=document.getElementById('logSearch').value.trim().toLowerCase();
@@ -1498,7 +1508,7 @@ var STATS=[
   {id:57,name:'Max CH water setpoint',        dir:'tb', iv:60, get:function(){return '75.0 °C';}}
 ];
 STATS.forEach(function(s){s.count=Math.floor(800/s.iv)+Math.floor(Math.random()*50);});
-document.getElementById('statsSearch').oninput=renderStats;
+gel('statsSearch').oninput=renderStats;
 function dirBadge(d){
   if(d==='t') return '<span class="dirbadge dir-t">T →</span>';
   if(d==='b') return '<span class="dirbadge dir-b">← B</span>';
@@ -1701,18 +1711,18 @@ function wireSupport(){
     tip.style.left=e.clientX+'px'; tip.style.top=e.clientY+'px'; tip.style.opacity=1;
   });
   mx.addEventListener('mouseleave',function(){tip.style.opacity=0;});
-  mx.addEventListener('click',function(e){
-    var cell=e.target.closest('.mcellq'); if(!cell) return;
-    mx.querySelectorAll('.mcellq.sel').forEach(function(x){x.classList.remove('sel');});
-    cell.classList.add('sel'); supShowDetail(+cell.dataset.id);
-  });
+  function pick(cell){ mx.querySelectorAll('.mcellq.sel').forEach(function(x){x.classList.remove('sel');});
+    cell.classList.add('sel'); supShowDetail(+cell.dataset.id); }
+  mx.addEventListener('click',function(e){ var cell=e.target.closest('.mcellq'); if(cell) pick(cell); });
+  mx.addEventListener('keydown',function(e){ var cell=e.target.closest('.mcellq');
+    if(cell && (e.key==='Enter'||e.key===' ')){ e.preventDefault(); pick(cell); } });
 }
 function buildSupportMatrix(){
   var html='';
   for(var i=0;i<128;i++){
     var st=supState(i);
     var cls=st==='none'?'':st;
-    html+='<div class="mcellq '+cls+'" data-id="'+i+'">'+i+'</div>';
+    html+='<div class="mcellq '+cls+'" data-id="'+i+'" role="button" tabindex="0" aria-label="msgID '+i+'">'+i+'</div>';
   }
   var mx=document.getElementById('supMatrix');
   mx.innerHTML=html;
@@ -1812,10 +1822,10 @@ function renderAllData(){
   }).join('');
   document.getElementById('allCount').textContent=rows.length+(allTechMode?' / all':' / essentials');
 }
-document.getElementById('allSearch').oninput=renderAllData;
-document.getElementById('allSimple').onclick=function(){allTechMode=false;
+gel('allSearch').oninput=renderAllData;
+gel('allSimple').onclick=function(){allTechMode=false;
   this.classList.add('active');document.getElementById('allTech').classList.remove('active');renderAllData();};
-document.getElementById('allTech').onclick=function(){allTechMode=true;
+gel('allTech').onclick=function(){allTechMode=true;
   this.classList.add('active');document.getElementById('allSimple').classList.remove('active');renderAllData();};
 
 /* ---------- SETTINGS page ---------- */
@@ -2209,7 +2219,7 @@ function bleRoster(roster){
 function buildSettings(){
   var rail='',cols='';
   SET_CATS.forEach(function(c){
-    rail+='<div class="rail-item" data-cat="'+c.id+'">'+c.icon+' '+c.title+'<span class="cnt">'+catFieldCount(c)+'</span></div>';
+    rail+='<div class="rail-item" data-cat="'+c.id+'" role="button" tabindex="0">'+c.icon+' '+c.title+'<span class="cnt">'+catFieldCount(c)+'</span></div>';
     cols+='<div class="set-cat" id="cat-'+c.id+'"><div class="set-cat-title">'+c.icon+' '+c.title+
       (c.reboot?' <span class="badge-reboot">REBOOT</span>':'')+'</div>'+
       (c.desc?'<p class="cat-desc">'+c.desc+'</p>':'')+
@@ -2230,7 +2240,9 @@ function buildSettings(){
   document.getElementById('setRail').innerHTML=rail;
   document.getElementById('setCols').innerHTML=cols;
   document.querySelectorAll('.rail-item').forEach(function(r){
-    r.onclick=function(){ document.getElementById('setSearch').value=''; showCat(r.dataset.cat); };
+    var go=function(){ document.getElementById('setSearch').value=''; showCat(r.dataset.cat); };
+    r.onclick=go;
+    r.onkeydown=function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } };
   });
   document.querySelectorAll('#setCols [data-key]').forEach(function(inp){
     inp.addEventListener('change',onSetChange); inp.addEventListener('input',onSetChange);
@@ -2414,6 +2426,11 @@ function toggleOvrPanel(){
   if(!p.classList.contains('show')) renderOvrPanel();
   p.classList.toggle('show');
 }
+// close the override panel when clicking outside it (or its trigger pill)
+document.addEventListener('click',function(e){
+  var p=document.getElementById('ovrPanel'); if(!p||!p.classList.contains('show')) return;
+  if(!p.contains(e.target) && !(e.target.closest && e.target.closest('#ovrPill'))) p.classList.remove('show');
+});
 function renderConnMap(){
   setDot('therm',conn.therm.s); setDot('boiler',conn.boiler.s);
   setDot('pic',conn.pic.s); setDot('wifi',conn.wifi.s);
@@ -2503,7 +2520,10 @@ var SAT_PRESETS=[['comfort','Comfort',21.0],['eco','Eco',18.0],['away','Away',15
                  ['home','Home',20.0],['sleep','Sleep',17.0],['activity','Activity',19.0]];
 var SAT_DIAL={cx:120,cy:120,r:92,lo:5,hi:30,startA:225,sweep:270};
 // learned calibration points (outside°C, flow°C) for the heating curve
-var SAT_CALIB=[[-9,71],[-4,62],[1,54],[6,46],[11,39],[15,33]];
+// learned points as [outside°C, residual°C] — flow is derived from the active curve so
+// markers actually sit on/near it and track the target (illustrative, not SAT's real solver)
+var SAT_CALIB=[[-9,1.6],[-4,-1.1],[1,0.8],[6,-1.3],[11,0.6],[15,-0.5]];
+function calibFlow(m){return curveF(m[0],1.2)+m[1];}
 // 5-series history for the temperature-history chart
 var satHist={set:[],flow:[],room:[],out:[],pid:[]};
 (function(){for(var i=0;i<60;i++){var b=52+9*Math.sin(i/9)+(Math.random()-0.5)*2;
@@ -2559,7 +2579,7 @@ function drawHeatingCurve(){
   coeffs.forEach(function(c){var pts=[];for(var o=-15;o<=20;o++){pts.push(X(o).toFixed(1)+','+Y(curveF(o,c)).toFixed(1));}
     var a=(c===active);g+='<polyline points="'+pts.join(' ')+'" fill="none" stroke="'+(a?accent:border)+'" stroke-width="'+(a?3:1.5)+'" opacity="'+(a?1:0.7)+'"/>';
     if(!a)g+='<text x="'+(X(-15)+3).toFixed(1)+'" y="'+(Y(curveF(-15,c))-3).toFixed(1)+'" font-size="10" fill="'+muted+'">c='+c.toFixed(1)+'</text>';});
-  SAT_CALIB.forEach(function(m){g+='<circle cx="'+X(m[0]).toFixed(1)+'" cy="'+Y(m[1]).toFixed(1)+'" r="4.5" fill="'+ok+'" stroke="var(--panel)" stroke-width="1.5"/>';});
+  SAT_CALIB.forEach(function(m){g+='<circle cx="'+X(m[0]).toFixed(1)+'" cy="'+Y(calibFlow(m)).toFixed(1)+'" r="4.5" fill="'+ok+'" stroke="var(--panel)" stroke-width="1.5"/>';});
   g+='<circle cx="'+X(sim.outside).toFixed(1)+'" cy="'+Y(curveF(sim.outside,active)).toFixed(1)+'" r="6.5" fill="none" stroke="'+accent+'" stroke-width="2.5"/>';
   g+='<circle cx="'+X(sim.outside).toFixed(1)+'" cy="'+Y(sim.boiler).toFixed(1)+'" r="6.5" fill="'+hot+'" stroke="var(--panel)" stroke-width="2"/>';
   svg.innerHTML=g;
@@ -2569,7 +2589,7 @@ function drawHeatingCurve(){
     '<span><i style="background:'+ok+'"></i>calibration markers</span>'+
     '<span><i style="background:'+hot+'"></i>current point</span>'+
     '<span><i style="border:2px solid '+accent+';background:transparent"></i>curve position</span>';
-  document.getElementById('satMarkerList').innerHTML=SAT_CALIB.map(function(m){return '<li><span>'+m[0]+'° out</span><b>'+m[1]+'° flow</b></li>';}).join('');
+  document.getElementById('satMarkerList').innerHTML=SAT_CALIB.map(function(m){return '<li><span>'+m[0]+'° out</span><b>'+calibFlow(m).toFixed(0)+'° flow</b></li>';}).join('');
 }
 function renderSAT(){
   var on=sat.enabled,heating=on&&sim.flame,flow=satFlowSet(),err=sat.target-sim.room;
@@ -2627,17 +2647,17 @@ function renderSAT(){
 document.querySelectorAll('.satview-btn').forEach(function(b){
   b.onclick=function(){document.querySelectorAll('.satview-btn').forEach(function(x){x.classList.toggle('active',x===b);});
     document.getElementById('satBody').className='sv-'+b.dataset.sv; renderSAT();};});
-document.getElementById('satUp').onclick=function(){sat.target=Math.min(30,+(sat.target+0.5).toFixed(1));sat.preset='';renderSAT();};
-document.getElementById('satDown').onclick=function(){sat.target=Math.max(5,+(sat.target-0.5).toFixed(1));sat.preset='';renderSAT();};
-document.getElementById('satEnable').onchange=function(){sat.enabled=this.checked;renderSAT();};
+gel('satUp').onclick=function(){sat.target=Math.min(30,+(sat.target+0.5).toFixed(1));sat.preset='';renderSAT();};
+gel('satDown').onclick=function(){sat.target=Math.max(5,+(sat.target-0.5).toFixed(1));sat.preset='';renderSAT();};
+gel('satEnable').onchange=function(){sat.enabled=this.checked;renderSAT();};
 document.querySelectorAll('#satModeRow .ds-seg').forEach(function(b){b.onclick=function(){
   document.querySelectorAll('#satModeRow .ds-seg').forEach(function(x){x.classList.toggle('active',x===b);});sat.mode=b.dataset.mode;renderSAT();};});
 document.querySelectorAll('#satCycleRow .ds-seg').forEach(function(b){b.onclick=function(){
   document.querySelectorAll('#satCycleRow .ds-seg').forEach(function(x){x.classList.toggle('active',x===b);});};});
-document.getElementById('satDhwSlider').oninput=function(){document.getElementById('satDhwR').textContent=this.value+'°C';};
-document.getElementById('satSim').onchange=renderSAT;
-document.getElementById('satDetectLoc').onclick=function(){document.getElementById('satCoords').textContent='locating… 52.09, 5.12 ✓';};
-document.getElementById('satRawToggle').onclick=function(){
+gel('satDhwSlider').oninput=function(){document.getElementById('satDhwR').textContent=this.value+'°C';};
+gel('satSim').onchange=renderSAT;
+gel('satDetectLoc').onclick=function(){document.getElementById('satCoords').textContent='locating… 52.09, 5.12 ✓';};
+gel('satRawToggle').onclick=function(){
   var pre=document.getElementById('satRawJson'),open=pre.style.display==='none';
   pre.style.display=open?'block':'none'; this.textContent=(open?'▾':'▸')+' Raw data (JSON)'; this.setAttribute('aria-expanded',open);};
 
@@ -2665,6 +2685,7 @@ function showDiscovery(d){
     setTimeout(close,1100);
   };
   document.getElementById('discoverStack').appendChild(card);
+  setTimeout(close,12000);   // auto-dismiss so it doesn't sit over content forever
 }
 
 /* ---------- boot ---------- */
@@ -2675,8 +2696,13 @@ renderA();renderB();renderC();renderMonitor();
 renderConnStrip();renderConnMap();renderConnDetail();
 clock();
 setInterval(clock,1000);
-setInterval(function(){tick();renderMonitor();connTick();satHistPush();
-  if(document.getElementById('page-sat').classList.contains('active')) renderSAT();},1000);
+setInterval(function(){
+  tick(); pushFrames(); satHistPush();   // data accumulation — always (cheap, keeps log/history live)
+  connTick();                            // header strip is always visible
+  if(pageActive('home')){ renderA(); renderB(); renderC(); }
+  if(pageActive('monitor')) renderMonitor();
+  if(pageActive('sat')) renderSAT();
+},1000);
 // announce newly-available sensors shortly after load (demo of the signal)
 setTimeout(function(){showDiscovery(DISCOVERIES[0]);},2200);
 setTimeout(function(){showDiscovery(DISCOVERIES[1]);},3600);

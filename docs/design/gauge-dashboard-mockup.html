@@ -393,10 +393,9 @@ function pressureZones(){
   return [[0.8/3,alert],[1.8/3,ok],[2.5/3,warn],[1,alert]];
 }
 // Temperature zones: 0–90 °C, blue->green->amber->red-ish
-function tempZones(){
-  const ok=cssvar('--zone-ok'), warn=cssvar('--zone-warn'), alert=cssvar('--zone-alert');
-  return [[40/90,cssvar('--accent')],[70/90,ok],[80/90,warn],[1,alert]];
-}
+// Temperature is not a good/bad quantity (a boiler at 78 °C is normal), so the
+// temperature gauges use a neutral progress arc — no misleading green/amber/red
+// severity. Pressure keeps severity zones because there low/high genuinely is bad.
 
 function tempColor(v){
   if(v<40) return cssvar('--accent');
@@ -453,7 +452,7 @@ function modulationOption(value){
 }
 
 // ---- the same temperature value, five ECharts-core representations ----
-function tcGaugeOption(v){ return gaugeOption({value:v,unit:'°',min:0,max:90,zones:tempZones()}); }
+function tcGaugeOption(v){ return gaugeOption({value:v,unit:'°',min:0,max:90,progressColor:cssvar('--accent')}); }
 
 function tcRingOption(v){
   const txt=cssvar('--gauge-text');
@@ -549,9 +548,9 @@ function render(initial){
   if (charts.gPressure){
     charts.gPressure.setOption(pressureOption(sim.pressure));
     charts.gMod.setOption(modulationOption(sim.modulation));
-    charts.gBoiler.setOption(gaugeOption({value:sim.boiler,unit:'°',min:0,max:90,zones:tempZones()}));
-    charts.gReturn.setOption(gaugeOption({value:sim.ret,unit:'°',min:0,max:90,zones:tempZones()}));
-    charts.gDhw.setOption(gaugeOption({value:sim.dhw,unit:'°',min:0,max:90,zones:tempZones()}));
+    charts.gBoiler.setOption(gaugeOption({value:sim.boiler,unit:'°',min:0,max:90,progressColor:cssvar('--accent')}));
+    charts.gReturn.setOption(gaugeOption({value:sim.ret,unit:'°',min:0,max:90,progressColor:cssvar('--cold')}));
+    charts.gDhw.setOption(gaugeOption({value:sim.dhw,unit:'°',min:0,max:90,progressColor:cssvar('--hot')}));
     // same boiler temperature rendered five ways, side by side:
     charts.tcGauge.setOption(tcGaugeOption(sim.boiler));
     charts.tcRing.setOption(tcRingOption(sim.boiler));

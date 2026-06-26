@@ -315,6 +315,47 @@ Same data, same 100 % coverage — just revealed in tiers.
 | Settings | flat list / partial grouping | category rail + masonry cards + search, 100% coverage |
 | Consistency | real `ds-tokens`/`components`/`design.html` | mockup uses parallel tokens (to be reconciled) |
 
+## What is simulated vs faithful (honesty note)
+
+These are **design mockups fed by simulated data** — every value is generated, not
+read from a real gateway. A persistent **SIMULATED · MOCKUP** badge sits in the
+header so screenshots are self-labelling.
+
+- **Faithful** (matches dev structure/data): the settings field set (audited
+  against `writeSettings()`), the OT-Support msgID metadata (from `OTmap`), the
+  SAT section layout, the temperature-history series, the control inventory.
+- **Illustrative, not the real algorithm** (looks right, math is invented): the
+  **heating-curve formula** and **PID terms** are plausible stand-ins, *not*
+  SAT's real solver. Calibration markers are derived from the displayed curve so
+  they stay self-consistent, but they are not learned from real data. Diagnostic
+  values (manufacturer, burner counts, humidity, …) are fabricated.
+- **"100 % settings coverage"** means every persisted key *appears once* as a
+  control — not that each is wired/validated. A few are read-only stubs, and a
+  couple of UI-only affordances (`usedhcp`) are not firmware keys.
+
+## Adversarial-review fixes (applied)
+
+A self-review found real issues; these were fixed:
+- **Robustness:** a missing element id used to throw at load and kill the rest of
+  the script; all top-level wiring now goes through a null-safe `gel()` accessor.
+- **Performance:** the per-second loop now only re-renders the **visible** page
+  (data still accumulates always), instead of rebuilding every page each tick.
+- **Accessibility:** interactive `<div>`s (OT-Support cells, settings rail) now
+  have `role="button"` + `tabindex` + Enter/Space keyboard handlers.
+- **Honesty:** the SIMULATED badge + this note (per-view labelling).
+- **Temperature gauges** dropped the misleading green/amber/red severity (a
+  boiler at 78 °C is normal) for a neutral progress arc; pressure keeps severity
+  because low/high genuinely is bad.
+- **Overlays:** discovery cards auto-dismiss after 12 s; the override panel closes
+  on outside-click.
+- **Heating-curve markers** now lie on the active curve and track the target.
+
+**Still open (deliberately not faked): design-system convergence.** The two
+mockups still use their own tokens, not dev's real `ds-tokens.css` /
+`components.css`. That is a genuine refactor (best done via the
+`firmware-design-handoff` skill), not a quick patch — see the recommendation
+above.
+
 ## Open follow-ups / decisions pending
 
 - Pick a winning Home direction (recommendation: **A as hero + B-style controls
