@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.272
+**  Version  : v2.0.0-alpha.274
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1711,6 +1711,16 @@ void sendMQTTheapdiag(){
   publishStatU32(F("otgw-firmware/stats/disc_last_orphan"),         (unsigned long)state.discovery.iLastOrphanCount);
   publishStatU32(F("otgw-firmware/stats/disc_published_topics"),    (unsigned long)state.discovery.iPublishedTopicCount);
   publishStatU32(F("otgw-firmware/stats/disc_last_verify_epoch"),   (unsigned long)state.discovery.iLastVerifyEpoch);
+
+  // TASK-934 soak instrumentation: worst-case watermarks + maxBlock histogram
+  publishStatU32(F("otgw-firmware/stats/min_max_block"),   (unsigned long)state.heapdiag.iMinMaxBlock);
+  publishStatU32(F("otgw-firmware/stats/min_free_heap"),   (unsigned long)getMinFreeHeap());
+  publishStatU32(F("otgw-firmware/stats/max_loop_gap_ms"), (unsigned long)state.heapdiag.iMaxLoopGapMs);
+  publishStatU32(F("otgw-firmware/stats/maxblock_lt2k"),   (unsigned long)state.heapdiag.aMaxBlockBucket[0]);
+  publishStatU32(F("otgw-firmware/stats/maxblock_lt4k"),   (unsigned long)state.heapdiag.aMaxBlockBucket[1]);
+  publishStatU32(F("otgw-firmware/stats/maxblock_lt8k"),   (unsigned long)state.heapdiag.aMaxBlockBucket[2]);
+  publishStatU32(F("otgw-firmware/stats/maxblock_lt16k"),  (unsigned long)state.heapdiag.aMaxBlockBucket[3]);
+  publishStatU32(F("otgw-firmware/stats/maxblock_ge16k"),  (unsigned long)state.heapdiag.aMaxBlockBucket[4]);
 }
 
 // ADR-084: OT-bus presence values (boiler_connected, thermostat_connected,

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.272
+**  Version  : v2.0.0-alpha.274
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -437,13 +437,14 @@ struct DiscoverySection {                    // state.discovery — MQTT auto-di
 };
 
 // NOTE: this struct is NOT authoritative for the retained otgw-firmware/stats/*
-// MQTT topics. sendMQTTheapdiag() publishes 17 individual retained topics: 8
-// sourced from this struct, 3 live values (ESP.getFreeHeap / getMaxFreeBlockSize
-// / getHeapFragmentation), and 6 from state.discovery (verify_runs /
-// republish_triggered / last_missing / last_orphan / published_topics /
-// last_verify_epoch). Adding a field here does NOT automatically surface on MQTT
-// — add a corresponding publishStatU32(F("otgw-firmware/stats/...")) call in
-// sendMQTTheapdiag().
+// MQTT topics. sendMQTTheapdiag() publishes 25 individual retained topics: 15
+// from this struct (8 cumulative counters + min_max_block + max_loop_gap_ms + 5
+// maxBlock histogram buckets), 4 live values (free_heap / max_block / frag_pct /
+// min_free_heap — the last via getMinFreeHeap(), not stored here), and 6 from
+// state.discovery (verify_runs / republish_triggered / last_missing /
+// last_orphan / published_topics / last_verify_epoch). Adding a field here does
+// NOT automatically surface on MQTT — add a corresponding
+// publishStatU32(F("otgw-firmware/stats/...")) call in sendMQTTheapdiag().
 struct HeapDiagSection {                 // state.heapdiag — cumulative heap-pressure diagnostics (reset on reboot)
   uint32_t iWsDropsTotal            = 0; // lifetime WebSocket messages dropped due to heap pressure
   uint32_t iMqttDropsTotal          = 0; // lifetime MQTT messages dropped due to heap pressure
@@ -456,7 +457,7 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iMaxLoopGapMs            = 0; // TASK-866/879: longest gap between loop() entries since boot (loop-stall / core-1 starvation watermark; see loop() detector)
   // TASK-934 soak instrumentation (pure observation; reset by telnet 'z'):
   uint32_t iMinMaxBlock            = 0xFFFFFFFF; // smallest contiguous free block (maxBlock) seen since boot/reset
-  uint32_t aMaxBlockBucket[5]      = {0, 0, 0, 0, 0}; // 1 Hz maxBlock histogram: [0]<2k [1]<4k [2]<8k [3]<16k [4]>=16k
+  uint32_t aMaxBlockBucket[5]      = {0, 0, 0, 0, 0}; // 1 Hz maxBlock histogram, mutually-exclusive ranges: [0]<2k [1]2k-4k [2]4k-8k [3]8k-16k [4]>=16k
 };
 
 enum RestPerfTarget : uint8_t {

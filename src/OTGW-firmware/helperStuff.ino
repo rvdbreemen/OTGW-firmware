@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.272
+**  Version  : v2.0.0-alpha.274
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -431,7 +431,13 @@ void sampleHeapWatermark() {
   state.heapdiag.aMaxBlockBucket[b]++;
 }
 
-// Zero the soak window: watermark, histogram, and the cumulative pressure counters.
+// Zero the soak window: watermark, histogram, and the cumulative pressure counters,
+// then re-seed the watermark so a publish/dump immediately after reset never shows
+// the 0xFFFFFFFF sentinel. Intended to be used from a HEALTHY heap at the start of a
+// soak: the tier-entry counters (iEntered*) are gated by getHeapHealth()'s internal
+// lastLevel, which this deliberately does not touch (ADR-089 forbids changing
+// getHeapHealth's parsed body), so if reset while already in a stricter tier they
+// only resume counting once the heap returns to HEALTHY and re-enters that tier.
 // Note: min_free_heap is the native ESP32 allocator watermark (ESP.getMinFreeHeap)
 // and CANNOT be reset from user space — it stays since-boot.
 void resetHeapWatermark() {
@@ -446,6 +452,7 @@ void resetHeapWatermark() {
   state.heapdiag.iDripCooldownSkipCount    = 0;
   state.heapdiag.iDripSlowModeCount        = 0;
   state.heapdiag.iMaxLoopGapMs             = 0;
+  sampleHeapWatermark();   // re-seed iMinMaxBlock + first histogram tick (no 0xFFFFFFFF window)
 }
 
 bool isRebootPending() {

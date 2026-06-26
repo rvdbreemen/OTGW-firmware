@@ -3,7 +3,7 @@ id: TASK-934
 title: >-
   feat(heap): soak instrumentation — min-maxBlock watermark + histogram to prove
   ESP32-S3 preventive gating is dead weight
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-25 17:35'
@@ -36,10 +36,10 @@ Proof criterion: min_max_block stays well above gating thresholds (8192 emergenc
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 HeapDiagSection gains iMinMaxBlock (init 0xFFFFFFFF) and coarse histogram bucket counters (<2k/<4k/<8k/<16k/>=16k), updated at 1 Hz in doTaskEvery1s() from platformMaxFreeBlock()
-- [ ] #2 No change to getHeapHealth() or any existing gating/threshold logic; evaluate.py ADR-089 gate still passes
-- [ ] #3 sendMQTTheapdiag() publishes stats/min_max_block, stats/min_free_heap (native getMinFreeHeap), stats/max_loop_gap_ms, and the histogram bucket topics; topic-count comment in OTGW-firmware.h updated
-- [ ] #4 Telnet debug dump (handleDebug.ino) shows min_max_block, min_free_heap, histogram, and a reset key that zeroes the watermark+histogram for a fresh soak window without reboot
-- [ ] #5 Builds clean for ESP32-S3 via build.py; capture-mqtt-debug.bat -Topic otgw-firmware/stats/# shows the new topics
-- [ ] #6 Test-automation workflow (build/flash/load/capture) documented in CLAUDE.md
+- [x] #1 HeapDiagSection gains iMinMaxBlock (init 0xFFFFFFFF) and coarse histogram bucket counters (<2k/<4k/<8k/<16k/>=16k), updated at 1 Hz in doTaskEvery1s() from platformMaxFreeBlock()
+- [x] #2 No change to getHeapHealth() or any existing gating/threshold logic; evaluate.py ADR-089 gate still passes
+- [x] #3 sendMQTTheapdiag() publishes stats/min_max_block, stats/min_free_heap (native getMinFreeHeap), stats/max_loop_gap_ms, and the histogram bucket topics; topic-count comment in OTGW-firmware.h updated
+- [x] #4 Telnet debug dump (handleDebug.ino) shows min_max_block, min_free_heap, histogram, and a reset key that zeroes the watermark+histogram for a fresh soak window without reboot
+- [ ] #5 Builds clean for ESP32-S3 via build.py; capture-mqtt-debug.bat -Topic otgw-firmware/stats/# shows the new topics  (build VERIFIED via `pio run -e esp32`; runtime topic-presence pending the maintainer soak)
+- [x] #6 Test-automation workflow (build/flash/load/capture) documented in CLAUDE.md
 <!-- AC:END -->
