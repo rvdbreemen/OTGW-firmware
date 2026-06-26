@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-alpha.276
+**  Version  : v2.0.0-alpha.277
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -46,13 +46,9 @@ void doWebSocketClose() {
   otLogWs.closeAll();
 }
 
-// Disconnect-all wrapper for emergencyHeapRecovery() in helperStuff.ino (ADR-107
-// action #1). Same scoping rationale as doWebSocketClose() above. closeAll()
-// closes all connected WS clients, releasing their lwIP buffers (~2-4 KB each).
-// Browsers reconnect via the graph.js auto-reconnect.
-void doWebSocketDisconnectAll() {
-  otLogWs.closeAll();
-}
+// TASK-937: doWebSocketDisconnectAll() removed — its only caller was the deleted
+// emergencyHeapRecovery() (ADR-107). doWebSocketClose() above remains for the
+// settings-driven WS shutdown path.
 
 // Maximum number of simultaneous WebSocket clients
 // Rationale: Each client uses ~700 bytes (256 byte buffer + overhead)
@@ -266,9 +262,9 @@ void handleWebSocket() {
 // Send log message directly to all connected WebSocket clients
 // This is called from OTGW-Core.ino when a new log line is ready
 // Simplified: no queue, no JSON, just direct text broadcasting.
-// Heap backpressure: gated by canSendWebSocket() so the live-log throttles/blocks
-// under heap pressure instead of broadcasting every OT frame unconditionally.
-// (Restores parity with dev, where this gate is wired; it had never been ported to 2.0.0.)
+// TASK-937: canSendWebSocket() is neutered to always-true (the TASK-935 soak proved
+// the heap-pressure throttle never engaged on ESP32-S3). The call is left as a
+// harmless no-op pending a cosmetic cleanup pass.
 //===========================================================================================
 void sendLogToWebSocket(const char* logMessage) {
   if (hasWebSocketClients() && logMessage != nullptr && canSendWebSocket()) {

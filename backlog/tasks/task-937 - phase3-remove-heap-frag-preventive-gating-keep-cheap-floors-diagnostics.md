@@ -65,14 +65,28 @@ DROP the now-sourceless gating counters: iWsDropsTotal, iMqttDropsTotal, iDripAc
 - Future load profiles / new features could fragment differently; mitigated by the kept floors + the retained observability (min_max_block/histogram still measured, so a regression is visible).
 - HA discovery: dropped stats sensors must be wiped (zero-byte retained) or they linger "unavailable".
 - Re-tune note: SATcontrol/restAPI floors use literal 8192 — keep the literal when the promotion constant is deleted.
+
+## Execution status (2026-06-27, agent on maintainer go-ahead)
+
+LANDED (commits 5c6db138 + cosmetic follow-up on feat/heap-soak-instr; builds clean for esp32, evaluate.py 0-fail/98.6%, adversarial review found ZERO real bugs):
+- Removed: per-consumer ladders (WS_HEAP_*/MQTT_HEAP_*, getHeapHealthForWebSocket/MQTT, heapTierWithThresholds), throttle state/intervals, maxBlock tier-promotion (HEAP_FRAG_PROMOTE_MAXBLOCK), emergencyHeapRecovery() + its loop gate + the orphaned doWebSocketDisconnectAll().
+- canSendWebSocket()/canPublishMQTT() neutered to always-true.
+- Kept: simplified diagnostic getHeapHealth() (tier + enter_* counters, called once/loop), all TASK-934 observability, the cheap maxBlock<8192 / MQTT_DISCOVERY_HEAP_MIN floors, TASK-342/347 burst/cooldown.
+- evaluate.py: retired check_heap_fragmentation_promotion + check_per_consumer_heap_gate; ADR-156 written (supersedes ADR-121/107, amends ADR-030/089). Misleading comments fixed.
+
+DEFERRED (harmless dead code per the review — compiles + runs, never fires / publishes 0):
+- The discovery-drip slow-mode throttle (discoveryDripHasHeapPressure/IsHeapHealthyForRestore + the slow/normal state machine in MQTTstuff.ino loopMQTTDiscovery).
+- The sourceless gating-counter FIELDS (iWsDropsTotal/iMqttDropsTotal/iDrip*) + their sendMQTTheapdiag topics + handleDebug/REST/banner lines + the HA discovery sensors (a multi-file symbol removal — do it atomically, see [[atomic-multi-file-symbol-removal]]).
+- AC#1 longer confirmatory soak: SKIPPED for the landing per go-ahead; still recommended before this ships to the field. The ADR-156 "Status" notes this.
+- ADR-121/107 "Superseded by ADR-156" back-references (adr-kit guardian backfill / lint hygiene).
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 GATE: a longer confirmatory soak (hours/days, ideally under heavier-but-stable load) reproduces the TASK-935 result (min_max_block well above floors, gating counters 0) BEFORE any removal lands
 - [ ] #2 Preventive machinery removed per the surface above: per-consumer ladders, canPublishMQTT/canSendWebSocket gates (all call sites converted), maxBlock-promotion, drip slow-mode throttle, emergencyHeapRecovery
-- [ ] #3 Kept: all TASK-934 observability, a simplified diagnostic getHeapHealth() (tier+enter_* counters, no promotion/gating), the cheap maxBlock<8192 / MQTT_DISCOVERY_HEAP_MIN floors, and the TASK-342/347 burst/cooldown framework
-- [ ] #4 evaluate.py green: frag-promotion + per-consumer gates removed, tier-entry + buffer-arithmetic gates still pass; CI `evaluate.yml` passes
+- [x] #3 Kept: all TASK-934 observability, a simplified diagnostic getHeapHealth() (tier+enter_* counters, no promotion/gating), the cheap maxBlock<8192 / MQTT_DISCOVERY_HEAP_MIN floors, and the TASK-342/347 burst/cooldown framework
+- [x] #4 evaluate.py green: frag-promotion + per-consumer gates removed, tier-entry + buffer-arithmetic gates still pass; CI `evaluate.yml` passes
 - [ ] #5 A new ADR documents the removal + soak evidence and supersedes/amends ADR-030/089/107/121; HA discovery sensors for dropped stats topics cleaned up
 - [ ] #6 Builds clean for esp32; re-soak confirms no regression (heap still healthy, no new drops/stalls)
 <!-- AC:END -->

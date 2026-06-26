@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.276
+**  Version  : v2.0.0-alpha.277
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1388,9 +1388,9 @@ bool sendMQTTData(const char* topic, const char *json, const bool retain)
   if (!MQTTclient.connected()) { return false; }  // handleMQTT() logs disconnect and manages reconnect
   if (!isValidIP(MQTTbrokerIP)) {DebugTln(F("Error: MQTT broker IP not valid.")); return false;}
 
-  // Check heap health before publishing
+  // TASK-937: canPublishMQTT() is neutered to always-true (heap-pressure gate removed);
+  // this no-op is left pending a cosmetic cleanup pass.
   if (!canPublishMQTT()) {
-    // Message dropped due to low heap - canPublishMQTT() handles logging
     return false;
   }
 
