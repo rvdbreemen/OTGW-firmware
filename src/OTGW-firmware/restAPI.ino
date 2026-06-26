@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.278
+**  Version  : v2.0.0-alpha.279
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -279,6 +279,7 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 // TASK-585: WiFi network scan
 static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
 void sendOTValue(int msgid);
 void sendOTLabel(const char *msglabel);
@@ -1819,6 +1820,44 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendApiNotFound(originalURI);
 }
 
+// POST /api/v2/mqtt/republish — reset MQTT publish eligibility so every observed OT
+// value re-publishes as first-seen (e.g. after a broker wipe). Port of the 1.x v1.6.0
+// handleMqtt() (TASK-936). requestMQTTRepublishAll() already runs on reconnect; this
+// exposes it on demand. Auth is enforced by the v2 dispatcher (mutating method).
+static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  if (wc > 4 && strcmp_P(words[4], PSTR("republish")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+
+    // 60 s cooldown: a republish re-arms every OT value as first-seen, so rapid-fire
+    // POSTs would flood the broker on the next status burst. Mirrors the
+    // /discovery/republish cooldown (TASK-356, CWE-770). Function-local static.
+    static unsigned long lastMqttRepublishMs = 0;
+    constexpr unsigned long MQTT_REPUBLISH_COOLDOWN_MS = 60000UL;
+    if (lastMqttRepublishMs != 0) {
+      const unsigned long elapsed = millis() - lastMqttRepublishMs;
+      if (elapsed < MQTT_REPUBLISH_COOLDOWN_MS) {
+        const unsigned long remaining = (MQTT_REPUBLISH_COOLDOWN_MS - elapsed + 999UL) / 1000UL;
+        restResponseStatus = 429;
+        char jsonBuff[120];
+        snprintf_P(jsonBuff, sizeof(jsonBuff),
+          PSTR("{\"error\":{\"status\":429,\"message\":\"Republish cooldown active, retry in %lus\"}}"),
+          remaining);
+        sendCorsOriginHeader();
+        webSend(429, F("application/json"), jsonBuff);
+        return;
+      }
+    }
+
+    requestMQTTRepublishAll();
+    lastMqttRepublishMs = millis();  // stamp only after work commits
+    sendCorsOriginHeader();
+    webSend(200, F("application/json"), F("{\"status\":\"ok\",\"message\":\"OT value republish requested\"}"));
+    return;
+  }
+  sendApiNotFound(originalURI);
+}
+
 static void debugFormatLocalIp(char* buf, size_t bufSize)
 {
   IPAddress ip = WiFi.localIP();
@@ -2238,6 +2277,7 @@ static const char kRouteSat[]        PROGMEM = "sat";
 static const char kRouteDiscovery[]  PROGMEM = "discovery";
 static const char kRouteDebugDump[]  PROGMEM = "debug";
 static const char kRouteNetwork[]    PROGMEM = "network";  // TASK-585
+static const char kRouteMqtt[]       PROGMEM = "mqtt";     // TASK-936: POST /mqtt/republish
 
 // Dispatch table placed in PROGMEM so the ~136 B of {segment, handler}
 // rows live in flash, not DRAM. Same pattern as kSatMqttCmds in
@@ -2263,6 +2303,7 @@ static const ApiRoute kV2Routes[] PROGMEM = {
   { kRouteDiscovery,  handleDiscovery },
   { kRouteDebugDump,  handleDebugDump },
   { kRouteNetwork,    handleNetwork },  // TASK-585: WiFi scan
+  { kRouteMqtt,       handleMqtt },     // TASK-936: POST /mqtt/republish
   { nullptr,          nullptr }  // sentinel
 };
 
