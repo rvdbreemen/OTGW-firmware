@@ -2532,7 +2532,8 @@ void doAutoConfigure(){
 // twice (BOILER_DEVICE_DESCRIPTION + THERMOSTAT_DEVICE_DESCRIPTION). Legacy mode
 // emits once with no device suffix (byte-identical to pre-Task-4 behaviour).
 //
-// Non-OT pseudo-IDs route to a single fixed device (ADR-124 seven-device topology):
+// Non-OT pseudo-IDs map to a source-prefix cluster within the single HA device
+// (ADR-140 single-device topology, was ADR-124 seven-device):
 //   243 (otdirect)    : OtCore    — OTDirect flame metrics (split out of 251; Ot-Core device)
 //   244 (piccontrols) : Gateway   — resetgateway button, GPIO/LED selects
 //   245 (s0)          : Sensors   — S0 pulse counter (physical hardware sensor)
@@ -2562,13 +2563,13 @@ static HaDevice deviceForOTId(byte OTid) {
   // logic in doAutoConfigureMsgid() runs a second pass with Thermostat.
   if (OTid <= 127) return HaDevice::Boiler;  // bilateral, see doAutoConfigureMsgid
   switch (OTid) {
-    case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-124)
+    case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-140, was ADR-124)
     case 244: return HaDevice::Gateway;  // piccontrols
-    case 245: return HaDevice::Sensors;  // s0 pulse counter (ADR-124)
-    case 246: return HaDevice::Sensors;  // dallas 1-wire temps (ADR-124, was Esp)
+    case 245: return HaDevice::Sensors;  // s0 pulse counter (ADR-140, was ADR-124)
+    case 246: return HaDevice::Sensors;  // dallas 1-wire temps (ADR-140, was ADR-124/Esp)
     case 247: return HaDevice::Esp;      // heapstats
     case 248: return HaDevice::Esp;      // fwinfo
-    case 249: return HaDevice::OtCore;      // picinfo (ADR-124, was Gateway)
+    case 249: return HaDevice::OtCore;      // picinfo (ADR-140, was ADR-124/Gateway)
     case 250: return HaDevice::Gateway;  // picsettings
     case 251: return HaDevice::Sat;      // diag200 (SAT BLE health)
     case 252: return HaDevice::Sat;      // satcore
