@@ -827,6 +827,7 @@
       ['CH SETPOINT', fmt(model.chSet, 1, '°'), ''],
       ['DHW', model.dhw === null ? '—' : fmt(model.dhw, 1, '°'), ''],
       ['PRESSURE', fmt(model.pressure, 2, ' bar'), pressClass(model.pressure)],
+      ['FLAME', model.flame ? 'ON' : 'OFF', model.flame ? 'ok' : ''],
       ['STATUS', model.fault ? 'FAULT' : 'OK', model.fault ? 'alert' : 'ok']
     ];
     // Build with textContent to avoid HTML injection from values.

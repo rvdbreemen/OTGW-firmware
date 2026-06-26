@@ -15,10 +15,12 @@
   --needle:var(--fg-1);
   --shadow:var(--shadow-panel);
 }
-/* Dark theme: the accent follows the cyan brand (matching the header strip + the
-   mockup) instead of the generic blue --accent-primary, so dark v2 is single-brand
-   cyan, not a blue/cyan split. Light theme keeps --accent-primary. */
-html[data-theme="dark"]{--accent:var(--brand-cyan)}
+/* Dark theme overrides toward the PR#649 mockup: --accent stays cyan (follows
+   --brand-cyan, not the generic blue --accent-primary), but the nav strip darkens
+   to #383838 (mockup dark header — header/seg text is already #e8e8ea, readable on
+   grey) and the "off"-state LED dims to #54565a (mockup off-grey) instead of the
+   bright --status-neutral. Light theme unchanged. */
+html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#54565a}
 
 *{box-sizing:border-box}
   html,body{font-feature-settings:"tnum" 1;font-variant-numeric:tabular-nums}
@@ -51,7 +53,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan)}
 
   /* ---------- shared bits ---------- */
   .tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-top:14px}
-  .tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+  .tile{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-2xl);
     box-shadow:var(--shadow);padding:12px;display:flex;align-items:center;gap:10px}
   .led{width:12px;height:12px;border-radius:50%;background:var(--tile-off);flex:0 0 auto;
     box-shadow:0 0 0 3px color-mix(in srgb,var(--tile-off) 25%,transparent)}
@@ -64,7 +66,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan)}
   .foot{font-size:.75rem;color:var(--muted);text-align:center;margin:18px 0 6px}
 
   /* ================= DESIGN A — system view ================= */
-  .schemcard{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+  .schemcard{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-2xl);
     box-shadow:var(--shadow);padding:8px 6px 2px}
   .statusline{display:flex;gap:8px;align-items:center;font-size:.86rem;color:var(--muted);
     padding:6px 10px 2px;flex-wrap:wrap}
@@ -160,7 +162,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan)}
   .g-status .dot{width:10px;height:10px;border-radius:50%;background:var(--tile-off)}
   .g-status.heating .dot{background:var(--hot);box-shadow:0 0 8px var(--hot)}
   .hero{background:linear-gradient(160deg,var(--panel),var(--panel-2));border:1px solid var(--border);
-    border-radius:22px;box-shadow:var(--shadow);padding:18px 14px 16px;text-align:center}
+    border-radius:var(--radius-2xl);box-shadow:var(--shadow);padding:18px 14px 16px;text-align:center}
   .hero svg{width:230px;height:230px}
   .hero-track{fill:none;stroke:var(--gauge-track);stroke-width:15;stroke-linecap:round}
   .hero-arc{fill:none;stroke:var(--accent);stroke-width:15;stroke-linecap:round}
@@ -172,7 +174,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan)}
   .cmdline{font-family:var(--font-mono);font-size:.8rem;color:var(--muted);margin-top:10px;min-height:1.1em}
   .cmdline b{color:var(--accent)}
   .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}
-  .stat{background:var(--panel);border:1px solid var(--border);border-radius:16px;
+  .stat{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-2xl);
     box-shadow:var(--shadow);padding:14px;min-height:96px}
   .stat .lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.04em}
   .stat .big{font-size:1.45rem;font-weight:700;margin-top:4px}
@@ -195,11 +197,11 @@ html[data-theme="dark"]{--accent:var(--brand-cyan)}
   /* ================= DESIGN C — mission control ================= */
   .mc{--bg:#0d1117;--panel:#161b22;--panel-2:#1c2129;--border:#2d333b;--text:#e6edf3;
       --muted:#8b949e;--gauge-track:#2d333b;
-      background:var(--bg);border-radius:16px;padding:14px;color:var(--text)}
+      background:var(--bg);border-radius:var(--radius-2xl);padding:14px;color:var(--text)}
   .mc h2{font-family:var(--font-mono);font-size:.95rem;margin:2px 4px 12px;color:var(--muted);
     letter-spacing:.08em}
   .mc h2 b{color:#79f2c0}
-  .stripcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:8px}
+  .stripcard{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-2xl);padding:8px}
   .stripcard svg{width:100%;height:auto;display:block}
   .axis-txt{fill:var(--muted);font-size:10px;font-family:var(--font-mono)}
   .ser-flow{fill:none;stroke:var(--hot);stroke-width:2}
@@ -210,7 +212,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan)}
     padding:6px 6px 2px;flex-wrap:wrap}
   .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle}
   .mc-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px}
-  .mc-cell{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+  .mc-cell{background:var(--panel);border:1px solid var(--border);border-radius:var(--radius-2xl);padding:10px 12px}
   .mc-cell .lbl{font-family:var(--font-mono);font-size:.64rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
   .mc-cell .val{font-family:var(--font-mono);font-size:1.3rem;font-weight:700;margin-top:2px}
   .mc-cell .val.hot{color:var(--hot)} .mc-cell .val.cold{color:var(--cold)}
