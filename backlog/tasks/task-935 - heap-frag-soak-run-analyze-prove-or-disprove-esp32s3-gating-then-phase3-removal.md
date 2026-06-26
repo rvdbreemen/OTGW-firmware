@@ -43,6 +43,27 @@ If the criterion holds, remove dev's preventive drip/tier gating. This is ADR-go
 - evaluate.py `check_per_consumer_heap_gate` (ADR-121) REQUIRES getHeapHealthForWebSocket()/getHeapHealthForMQTT() + independent WS/MQTT ladders.
 - evaluate.py `check_heap_tier_entry_counters` (ADR-089 sub-rule 3) + `check_heap_tier_thresholds_ordered`.
 Supersede/amend ADR-089 and ADR-121, update the gates, and rebuild + re-soak to confirm no regression. If the criterion does NOT hold, keep the gating and document the ESP32-S3 evidence on the ADRs instead.
+
+## Deployment + first-probe findings (2026-06-26, maintainer to run the full soak)
+
+Instrumented firmware `2.0.0-alpha.275+b55b7f8` (heap watermark/histogram + jitter) was flashed to the bench OTGW32 and the instrumentation verified live, but a stable headless soak could not be driven from the agent; handed to the maintainer.
+
+- **Flash (app-only, settings-preserving):** the device is USB on COM4 (VID 303A/PID 1001), MAC 10:20:ba:21:b4:f8, DHCP IP 192.168.1.143 (broker laptop 192.168.1.234). `flash_otgw.bat` does a merged `-e 0x0` erase that wipes settings — DO NOT use it on a provisioned device. App-only flash that preserves NVS(WiFi)+littlefs(settings):
+  `PYTHONIOENCODING=utf-8 ~/.platformio/penv/Scripts/python.exe -m esptool --chip esp32s3 --port COM4 --before default_reset --after hard_reset write_flash 0x10000 .pio/build/esp32/firmware.bin`
+  (app0 = ota_0 @ 0x10000 per partitions_otgw_esp32.csv; nvs @ 0x9000, spiffs/littlefs @ 0x270000 untouched.) Build with the penv python, NOT `python -m platformio` (host Python 3.14 fails the espressif32 platform; `-t upload` also failed on a penv dep-install — esptool app-only is the reliable path).
+- **Do NOT read serial with DtrEnable/RtsEnable set** — it drops the ESP32-S3 USB-JTAG into bootloader. A clean `esptool ... --after hard_reset read-mac` reboots it into the app.
+- **Instrumentation confirmed working:** telnet `z` returned the exact reset message; the debug-line prefix `(free|maxBlock)` gives a live heap read on every line.
+- **First-probe observation (NOT a verdict):** under brief heavy load (5 concurrent HTTP workers + discovery republish) free went 112k→70k and maxBlock 63k→~13.8k — i.e. maxBlock stayed WELL above the gating thresholds (8192 emergency / 1536 promote). No fragmentation in the window observed.
+- **Blocking instability (separate issue, flag for its own investigation):** the device repeatedly fell OFF the network (no ARP) within ~90s under the heavy concurrent load (and once right after flash), recovered each time only by a USB hard-reset. The heap was healthy right before each drop, so this is NOT heap-fragmentation — it looks like WiFi instability or a WDT/crash under sustained concurrent async load on this bench unit. A real soak needs a stable device (good WiFi, gentler load) and physical monitoring.
+
+## Runbook (maintainer)
+1. App-only flash (above) — keeps the device at 192.168.1.143 on instrumented firmware.
+2. Telnet `192.168.1.143:23`, press `z` from a healthy heap to zero the window.
+3. Drive load + run the soak (gentler than the agent's probe if the WiFi/WDT drop recurs):
+   `scripts/capture-mqtt-debug.bat -DeviceHost 192.168.1.143 -BrokerHost 192.168.1.234 -DurationSeconds <hours*3600> -Topic "otgw-firmware/stats/#"`
+   or the agent's `scratchpad/soak_driver2.py <seconds>` (stream-monitors min free/maxBlock + flags pressure lines, then takes a clean `D` dump).
+4. After the window, telnet `D` → record `[state.heapdiag]` (min_max_block, maxblock_hist, drip_slow_mode, ws_drops, mqtt_drops, entered_*, max_loop_gap_ms). MQTT stats publish only hourly, so a multi-hour run is needed for the `otgw-firmware/stats/#` trend; telnet `D` is the on-demand readout.
+5. Apply the proof criterion above → Phase 3 (gating removal) only if it holds.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
