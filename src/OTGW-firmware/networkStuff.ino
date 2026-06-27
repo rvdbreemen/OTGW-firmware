@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.279
+**  Version  : v2.0.0-alpha.280
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -282,9 +282,12 @@ static void startAPFallback() {
   state.net.bAPFallback = true;
 
   WiFi.mode(WIFI_AP_STA);  // AP + STA so WiFi.begin() can retry without dropping AP
-  WiFi.softAP(apSSID, "otgw123");
+  // Passphrase MUST be >= 8 chars: esp_wifi rejects a shorter WPA2 key with
+  // "passphrase too short!" and the fallback AP never starts, stranding a device
+  // that has lost STA (no STA, no AP). "otgw123" was 7 chars -> too short (TASK-940).
+  WiFi.softAP(apSSID, "otgw1234");
 
-  DebugTf(PSTR("BETA AP: fallback started SSID=[%s] IP=192.168.4.1 pass=otgw123\r\n"), apSSID);
+  DebugTf(PSTR("BETA AP: fallback started SSID=[%s] IP=192.168.4.1 pass=otgw1234\r\n"), apSSID);
 }
 
 static void stopAPFallback() {

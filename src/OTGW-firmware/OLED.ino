@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.279
+**  Version  : v2.0.0-alpha.280
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -207,11 +207,11 @@ static void drawConfigBody(const char* ssid, const char* pw, const char* url) {
 // Shown as the forced first page while state.net.bAPFallback is active so a
 // freshly-booted, WiFi-less device tells the user how to reach the web UI.
 // SSID comes from state.net.sAPSSID; password and IP mirror startAPFallback()
-// in networkStuff.ino ("otgw123" / 192.168.4.1) — kept in sync by hand.
+// in networkStuff.ino ("otgw1234" / 192.168.4.1) — kept in sync by hand.
 // ---------------------------------------------------------------------------
 static void drawPageConfig() {
   drawConfigHeader();
-  drawConfigBody(state.net.sAPSSID, "otgw123", "http://192.168.4.1/");
+  drawConfigBody(state.net.sAPSSID, "otgw1234", "http://192.168.4.1/");
 }
 #endif
 

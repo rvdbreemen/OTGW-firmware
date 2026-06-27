@@ -27,14 +27,14 @@ At boot, if credentials are stored but WiFi is unreachable, beta builds also ski
 
 - **SSID**: `OTGW-<last 3 bytes of MAC address in uppercase hex>`, for example `OTGW-AABBCC`
 - **IP address**: `192.168.4.1`
-- **Password**: `otgw123`
+- **Password**: `otgw1234`
 - **MQTT**: disabled in fallback mode
 - **OTA update**: available from fallback mode so you can flash a corrected firmware without serial access
 
 In AP fallback mode the device keeps attempting to reconnect to the configured WiFi network every 5 minutes. When WiFi comes back, services (MQTT, Telnet, WebSocket) restart automatically and the AP is torn down.
 
 **How to recover from fallback:**
-1. Connect to the `OTGW-XXXXXX` SSID using password `otgw123`.
+1. Connect to the `OTGW-XXXXXX` SSID using password `otgw1234`.
 2. Open `http://192.168.4.1` in your browser.
 3. Correct your WiFi credentials in Settings or use Reset WiFi.
 4. Reboot the device.

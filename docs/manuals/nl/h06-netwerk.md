@@ -40,14 +40,14 @@ Bij opstart, als er credentials opgeslagen zijn maar WiFi niet bereikbaar is, sl
 
 - **SSID**: `OTGW-<laatste 3 bytes van het MAC-adres in hoofdletters hex>`, bijvoorbeeld `OTGW-AABBCC`
 - **IP-adres**: `192.168.4.1`
-- **Wachtwoord**: `otgw123`
+- **Wachtwoord**: `otgw1234`
 - **MQTT**: uitgeschakeld in fallbackmodus
 - **OTA-update**: beschikbaar vanuit fallbackmodus, zodat u een gecorrigeerde firmware kunt flashen zonder serieel toegang
 
 In AP-fallbackmodus probeert de firmware elke 5 minuten opnieuw verbinding te maken met het geconfigureerde WiFi-netwerk. Zodra WiFi beschikbaar is, worden alle services automatisch hersteld en wordt de AP afgesloten.
 
 **Herstelstappen:**
-1. Verbind met de SSID `OTGW-XXXXXX` met wachtwoord `otgw123`.
+1. Verbind met de SSID `OTGW-XXXXXX` met wachtwoord `otgw1234`.
 2. Open `http://192.168.4.1` in uw browser.
 3. Pas de WiFi-instellingen aan via de Settings-pagina of gebruik Reset WiFi.
 4. Herstart het apparaat.

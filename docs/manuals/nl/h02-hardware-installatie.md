@@ -340,7 +340,7 @@ De standaard hostname is `otgw`, dus het AP heet doorgaans iets als `otgw-A1B2C3
 
 > **ESP32-S3 met Ethernet**: Als u een W5500 Ethernet-module en een netwerkkabel hebt aangesloten, verkrijgt het apparaat bij het opstarten automatisch een IP-adres via DHCP op de bekabelde interface en opent het geen AP. Wi-Fi-configuratie is niet nodig.
 
-> **AP-fallbackmodus (beta, alleen ESP32-S3)**: Als het geconfigureerde Wi-Fi-netwerk na de initialisatie onbereikbaar wordt, opent het apparaat een fallback-AP genaamd `OTGW-<MAC>` met wachtwoord `otgw123` en IP `192.168.4.1`, zodat de webinterface bereikbaar blijft.
+> **AP-fallbackmodus (beta, alleen ESP32-S3)**: Als het geconfigureerde Wi-Fi-netwerk na de initialisatie onbereikbaar wordt, opent het apparaat een fallback-AP genaamd `OTGW-<MAC>` met wachtwoord `otgw1234` en IP `192.168.4.1`, zodat de webinterface bereikbaar blijft.
 
 ---
 

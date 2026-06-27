@@ -309,7 +309,7 @@ The default hostname is `otgw`, so the AP will typically be named something like
 
 > **ESP32-S3 with Ethernet**: If you have a W5500 Ethernet module and a network cable connected, the device obtains an IP address via DHCP on the wired interface at boot and does not open an AP. No Wi-Fi setup is needed.
 
-> **AP Fallback Mode (beta, ESP32-S3 only)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw123` and IP `192.168.4.1`, keeping the web UI accessible.
+> **AP Fallback Mode (beta, ESP32-S3 only)**: If the configured Wi-Fi network becomes unavailable after initial setup, the device opens a fallback AP named `OTGW-<MAC>` with password `otgw1234` and IP `192.168.4.1`, keeping the web UI accessible.
 
 ### Filesystem Upload (LittleFS)
 
