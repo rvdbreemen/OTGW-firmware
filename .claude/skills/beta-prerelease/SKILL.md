@@ -1,6 +1,6 @@
 ---
 name: beta-prerelease
-description: Publish an OTGW-firmware beta prerelease — bump _VERSION_PRERELEASE, push to dev, tag, and let CI build + publish the GitHub prerelease
+description: Publish an OTGW-firmware beta prerelease — bump _VERSION_PRERELEASE, push to otgw-1.x.x, tag, and let CI build + publish the GitHub prerelease
 disable-model-invocation: true
 ---
 
@@ -32,7 +32,7 @@ Run when a firmware change under `src/OTGW-firmware/**` or `src/libraries/**` is
 
 | Aspect | `/release` | `/beta-prerelease` |
 |---|---|---|
-| Target branch | `dev` then merge to `main` | `dev` only |
+| Target branch | `dev` then merge to `main` | `otgw-1.x.x` only |
 | Bumps `_SEMVER_CORE` | yes | no |
 | GitHub release | stable, not prerelease | prerelease: true |
 | Discord channels | `#nederlandse-ondersteuning`, `#english-support` | `#beta-testing` |
@@ -46,10 +46,14 @@ Run when a firmware change under `src/OTGW-firmware/**` or `src/libraries/**` is
 
 ## Process
 
-### Phase 0: Prepare — clean state on dev
+### Phase 0: Prepare — clean state on otgw-1.x.x
 
-1. Ensure you are on `dev`: `git checkout dev`
-2. Verify clean state: `git status` must be clean (or only the firmware change about to be bumped). Then `git pull origin dev`.
+The 1.x maintenance/LTS line lives in its own worktree. Run this skill FROM the
+`wt-otgw-1.x.x` worktree. Do NOT `git checkout otgw-1.x.x` inside the dev tree:
+the branch is already checked out in the worktree and the checkout will fail.
+
+1. Confirm the branch: `git rev-parse --abbrev-ref HEAD` must print `otgw-1.x.x`.
+2. Verify clean state: `git status` must be clean (or only the firmware change about to be bumped). Then `git pull origin otgw-1.x.x`.
 3. Detect the latest prerelease tag:
    ```bash
    git fetch --tags
@@ -86,23 +90,23 @@ The GitHub Action reads these files at the tagged commit. Stale narrative at the
 # 1. Commits since last public release (the change set to account for)
 git log --pretty=format:'%h %s' "${LATEST_PUBLIC}..HEAD" -- src/OTGW-firmware/ src/libraries/ docs/
 
-# 2. Existing narrative — extract only the relevant sections
-grep -A 50 "What's new on dev" README.md | head -55
+# 2. Existing narrative — CHANGELOG [Unreleased] is the rolling beta log on the
+#    1.x line. (The README "What's New in v<stable>" sections are refreshed at
+#    STABLE release, not per beta, and there is no RELEASE_NOTES_*-beta file.)
 grep -A 35 "## \[Unreleased\]" CHANGELOG.md | head -40
-sed -n '1,/<!-- digest:end -->/p' RELEASE_NOTES_*-beta.md 2>/dev/null
 ```
 
 **Decision:**
-- All commit subjects appear in at least one narrative AND dev-banner version label matches `NEW_PRERELEASE` → pass silently, continue to Phase 4.
-- Any commit missing from the narrative OR dev-banner label stale → refresh now. Stop and ask only if the gap is ambiguous; otherwise edit in-session.
+- Every commit subject since `LATEST_PUBLIC` appears under CHANGELOG `## [Unreleased]` → pass silently, continue to Phase 4.
+- Any commit missing → refresh the CHANGELOG now. Stop and ask only if the gap is ambiguous; otherwise edit in-session.
 
 **Authoring rules (P3 — write immediately, keep only filename in context):**
 
-1. `CHANGELOG.md` — append under `## [Unreleased]` using Keep-a-Changelog headings (`### Added/Changed/Fixed/Removed/Documentation`). One bullet per change, with ADR/TASK/PR reference. → note "Updated."
-2. `README.md` — update dev-banner version label to `NEW_PRERELEASE` and "What's new on dev" section. Do NOT touch the "What's New in v<stable>" section. → note "Updated."
-3. `RELEASE_NOTES_<base>-beta.md` — update the digest region above `<!-- digest:end -->`. → note "Updated."
+1. `CHANGELOG.md` — append under `## [Unreleased]` using Keep-a-Changelog headings (`### Added/Changed/Fixed/Removed/Documentation`). One bullet per change, with ADR/TASK/PR/GH-issue reference. → note "Updated." This is the only mandatory narrative for a 1.x beta.
+2. `README.md` — leave untouched. The 1.x README's "What's New in v<stable>" sections are refreshed at STABLE release (via `/release`), not per beta.
+3. `RELEASE_NOTES_<next-stable>.md` (e.g. `RELEASE_NOTES_1.7.1.md`) — optional during a beta cycle (authored in full at stable release). Update it now only if you keep a running draft. → note "Updated."
 
-Skip all three only when this is a re-cut at the same change surface (previous tag hit Trap 2). Note the reason in the commit message.
+Skip the CHANGELOG edit only when this is a re-cut at the same change surface (previous tag hit Trap 2). Note the reason in the commit message.
 
 ### Phase 4: Build verification (P1)
 
@@ -122,22 +126,25 @@ python evaluate.py --quick
 
 Must show no new failures. Pre-existing baseline failures unrelated to this change: document in the commit message.
 
-### Phase 6: Commit and push to dev
+### Phase 6: Commit and push to otgw-1.x.x
 
 ```bash
-git add src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash \
-        <firmware-files> \
-        CHANGELOG.md README.md \
-        RELEASE_NOTES_*-beta.md
+# The 1.x bin/bump-prerelease.sh updates version banners across ~24 files and
+# does NOT auto-stage. Stage the real change set (on Windows, --ignore-cr-at-eol
+# filters out EOL-only churn). On a clean Phase-0 tree this is exactly the bump
+# banners + version.h + data/version.hash + your firmware change + CHANGELOG.md:
+git add $(git diff --ignore-cr-at-eol --name-only)
 
 git commit -m "chore(release): ${NEW_PRERELEASE}
 
 <one-line summary of what is in this beta>"
 
-git push origin dev
+git push origin otgw-1.x.x
 ```
 
 If the pre-commit hook blocks: re-stage `version.h` + `data/version.hash` and retry. Do NOT bypass with `OTGW_BUMP_HOOK_DISABLE=1`.
+
+Note: the `.githooks/commit-msg` task-hook requires a TASK-NNN whose `backlog/tasks/task-NNN-*.md` is tracked in THIS worktree. The backlog lives in the dev tree, so a 1.x firmware commit usually cannot satisfy it. Use a `chore(release): ...` subject (exempt from the task-hook) for the bump commit, or `OTGW_TASK_HOOK_DISABLE=1` if you reference a cross-tree TASK-NNN.
 
 ### Phase 7: Create and push the prerelease tag
 
@@ -193,7 +200,7 @@ git tag -a v0.0.0-beta.dryrun -m "dryrun" && git push origin v0.0.0-beta.dryrun
 # watch the Action, then clean up:
 gh release delete v0.0.0-beta.dryrun --yes
 git push --delete origin v0.0.0-beta.dryrun && git tag -d v0.0.0-beta.dryrun
-git checkout dev && git branch -d test/beta-prerelease-dryrun
+git checkout otgw-1.x.x && git branch -d test/beta-prerelease-dryrun
 ```
 
 ## Known traps (P4 — full detail in `beta-prerelease.yml`)
@@ -208,7 +215,7 @@ git checkout dev && git branch -d test/beta-prerelease-dryrun
 
 - **Never use em dashes** in any generated text.
 - **Always push to remote after every commit**.
-- **Never force-push to dev**.
+- **Never force-push to otgw-1.x.x**.
 - **Build and evaluator gates are mandatory** — do not push a tag if either is red.
 - **One checkpoint**: the Discord announcement in Phase 9.
 - **Do NOT bypass the bump-check hook** with `OTGW_BUMP_HOOK_DISABLE=1` — if the hook blocks, you forgot to stage `version.h` / `data/version.hash`.
