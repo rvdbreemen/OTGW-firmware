@@ -8,6 +8,9 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+### Added
+- Unified heat/cool/off Home Assistant climate entity. The MQTT climate ("Thermostat") entity now represents cooling: `modes` are `off`/`heat`/`cool`, driven by new `hvac_mode` and `hvac_action` topics computed from the OpenTherm status bits. Cooling-capable systems (for example a Honeywell Round Modulation Heat/Cool on a heatpump) previously showed as heating-only, carrying the cooling setpoint with no way to reflect cooling. Mode is reflective (the thermostat owns heat/cool switching), and `hvac_action` reads the central-heating bit rather than flame, so DHW hot-water draws do not show as heating. Validated against real gas-boiler (idle, DHW, active heating) and heatpump (cooling) captures. (GH #665)
+
 ## [1.7.0] - 2026-06-25
 
 Stability and headroom release for the 1.x (ESP8266) line. Headlined by heap-fragmentation crash-proofing (beta.1 to beta.6) and a RAM / heap-headroom optimization pass (beta.7 to beta.34) for long-running devices under load. Full notes: [RELEASE_NOTES_1.7.0.md](RELEASE_NOTES_1.7.0.md).
