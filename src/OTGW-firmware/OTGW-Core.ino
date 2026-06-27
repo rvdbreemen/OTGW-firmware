@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.278
+**  Version  : v2.0.0-alpha.279
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2045,6 +2045,45 @@ static void buildStatusSlaveText(uint8_t valueLB, char *statusText, size_t statu
   statusText[8] = '\0';
 }
 
+// GH #665 / TASK-939 (port of 1.x 7b2d3cdd): HA-climate hvac_mode + hvac_action
+// for a unified heat/cool/off thermostat entity. hvac_mode follows the MASTER
+// enable bits (the thermostat's intent), hvac_action the SLAVE actual bits (what
+// the appliance is doing). Mode is reflective: the thermostat owns heat/cool
+// switching, the OTGW only mirrors it. Both report "off" when the thermostat is
+// disconnected. Published on change, and on force (reconnect/interval).
+static int8_t mqttLastHvacMode   = -1;  // -1 unset, 0 off, 1 heat, 2 cool
+static int8_t mqttLastHvacAction = -1;  // -1 unset, 0 off, 1 idle, 2 heating, 3 cooling
+
+static void publishHvacMode(bool forcePublish)
+{
+  // mode is the thermostat's standing intent, not its momentary demand: a
+  // connected heating thermostat stays "heat" even while satisfied/idle (gas
+  // boilers clear ch_enable between calls). Only the master's cooling_enable bit
+  // flips it to "cool"; "off" is reserved for a disconnected thermostat. (GH #665)
+  const uint8_t hb = OTcurrentSystemState.MasterStatus;
+  const int8_t mode = !state.otBus.bThermostatState ? 0   // off when no thermostat
+                    : (hb & 0x04)                   ? 2   // cooling_enable -> cool
+                    :                                 1;  // connected, not cooling -> heat
+  if (forcePublish || mode != mqttLastHvacMode) {
+    sendMQTTData("hvac_mode", mode == 2 ? "cool" : mode == 1 ? "heat" : "off");
+    mqttLastHvacMode = mode;
+  }
+}
+
+static void publishHvacAction(bool forcePublish)
+{
+  const uint8_t lb = OTcurrentSystemState.SlaveStatus;
+  const int8_t action = !state.otBus.bThermostatState ? 0   // off when no thermostat
+                      : (lb & 0x10)                   ? 3   // cooling        -> cooling
+                      : (lb & 0x02)                   ? 2   // centralheating -> heating
+                      :                                 1;  // else           -> idle
+  if (forcePublish || action != mqttLastHvacAction) {
+    sendMQTTData("hvac_action",
+                 action == 3 ? "cooling" : action == 2 ? "heating" : action == 1 ? "idle" : "off");
+    mqttLastHvacAction = action;
+  }
+}
+
 static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
 {
   const uint8_t previousStatus = OTcurrentSystemState.MasterStatus;
@@ -2085,6 +2124,7 @@ static void publishMasterStatusState(uint8_t valueHB, const char *statusText)
   publishStatusBitMQTT(4, "ch2_enable",       (valueHB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueHB);
   publishStatusBitMQTT(5, "summerwintertime", (valueHB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueHB);
   publishStatusBitMQTT(6, "dhw_blocking",     (valueHB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueHB);
+  publishHvacMode(forcePublish);   // GH #665: HA-climate hvac_mode from the master enable bits
   endStatusBurst();
 }
 
@@ -2129,6 +2169,7 @@ static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)
   publishStatusBitMQTT(13, "centralheating2",      (valueLB & 0x20), (previousStatus & 0x20), forcePublish, previousStatus, valueLB, "central_heating_2");
   publishStatusBitMQTT(14, "diagnostic_indicator", (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB, "diagnostic_indication");
   publishStatusBitMQTT(15, "electric_production",  (valueLB & 0x80), (previousStatus & 0x80), forcePublish, previousStatus, valueLB);
+  publishHvacAction(forcePublish);   // GH #665: HA-climate hvac_action from the slave actual bits
   endStatusBurst();
 }
 
@@ -4607,6 +4648,8 @@ void processOT(const char *buf, int len, bool suppressOutput){
     state.otBus.bThermostatState = (now < (state.otBus.tThermostatLastSeen+30));
     if ((state.otBus.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){
       publishThermostatConnectedState();
+      publishHvacMode(false);    // GH #665: re-evaluate hvac_mode/action on thermostat connect/disconnect (off when gone)
+      publishHvacAction(false);
       bOTGWthermostatpreviousstate = state.otBus.bThermostatState;
     }
 
