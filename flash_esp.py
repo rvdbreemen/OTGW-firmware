@@ -160,6 +160,41 @@ def check_esptool():
     return False
 
 
+_ESPTOOL_SEP = None
+
+
+def esptool_subcmd(name):
+    """Return an esptool subcommand in the syntax the installed esptool accepts.
+
+    esptool v5+ renamed subcommands to hyphenated form (write-flash, erase-flash)
+    and REJECTS the legacy underscore form; esptool v4 and earlier accept ONLY the
+    underscore form (write_flash) and reject the hyphen. The two forms do not
+    overlap, so the right one must be chosen by the detected major version.
+    flash_esp.py runs under whatever `python -m esptool` resolves to (the system
+    Python may carry v4 while a PlatformIO penv carries v5), so it cannot assume
+    either. (TASK-890: a hardcoded hyphenated subcommand failed on esptool v4.8.1
+    with "invalid choice: 'write-flash'".)
+    """
+    global _ESPTOOL_SEP
+    if _ESPTOOL_SEP is None:
+        _ESPTOOL_SEP = "_"  # legacy underscore: the wider-deployed, safer default
+        try:
+            r = subprocess.run(
+                [sys.executable, "-m", "esptool", "version"],
+                capture_output=True, text=True, check=False
+            )
+            blob = (r.stdout or "") + (r.stderr or "")
+            for tok in blob.replace("v", " ").split():
+                head = tok.split(".")[0]
+                if head.isdigit():
+                    if int(head) >= 5:
+                        _ESPTOOL_SEP = "-"
+                    break
+        except Exception:
+            pass
+    return name.replace("_", _ESPTOOL_SEP)
+
+
 # ---- Board selection -------------------------------------------------------
 
 def select_board(args_board=None):
@@ -516,7 +551,7 @@ def build_firmware():
 def erase_flash(port, chip):
     """Erase the entire flash of the connected device."""
     print_header("Erasing Flash")
-    cmd = [sys.executable, "-m", "esptool", "--port", port, "--chip", chip, "erase-flash"]
+    cmd = [sys.executable, "-m", "esptool", "--port", port, "--chip", chip, esptool_subcmd("erase_flash")]
     print_info(f"Command: {' '.join(cmd)}")
     try:
         subprocess.run(cmd, check=True)
@@ -589,7 +624,7 @@ def flash_device(board, port, artifacts, baud=None, do_erase=False):
         "--port", port,
         "--chip", cfg["chip"],
         "-b", str(baud),
-        "write-flash",
+        esptool_subcmd("write_flash"),
     ]
 
     if use_merged_file:
