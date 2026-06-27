@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-25 17:20'
-updated_date: '2026-06-26 22:27'
+updated_date: '2026-06-27 08:21'
 labels: []
 dependencies: []
 ordinal: 147000
@@ -73,4 +73,6 @@ Implemented all 11 self-verifiable alignment items (maintainer chose full incl. 
 Self-verifiable ACs done (alpha.276, committed 62bf7252, pushed origin/dev; esp32 build green, evaluate.py 0 FAIL, node --check v2.js OK). AC#2 settings labels/hints/categories/REBOOT + SAT long-tail + enum selects: done. AC#3 connectivity two-link MODE-vs-HEALTH + recency/st-warn: done. AC#5 Monitor sub-tabs (ticker colour, stats sort glyph, OT-Support sd-hint): done. REMAINING (maintainer hardware sign-off, OTGW32 @192.168.88.39): AC#4 'on real OT data' value-binding and AC#6 final desktop+mobile visual match — code is correct + self-verified but live-data rendering and the st-warn stale band need the device. Moved to In Review pending that verification.
 
 Playwright validation pass (mock OTGW device, REST-driven, light+dark): item1 sd-hint footnote ✓ visual; item3 Concept-B headline reuses statusSentence ✓ (HP-aware 'Heating · compressor on · 62%'); item4 stats sort glyph ✓ DOM (class 'sorted asc' + aria-sort ascending + ::after ' ▲'); item5 theme aria-pressed flips ✓; items6/9 enum selects render w/ correct values ✓; item7 sd-badge after name ✓; item8 ticker parse+colour mapping 5/5 Node (T/R→t, B/A→b); item10 ~46 SAT keys curated + sub-grouped (Presets/Weather/Solar/Summer/Comfort/Multi-area/PV-boost/Auto-tune/Simulation/BLE) ✓ visual; item11 connectivity 'Thermostat Degraded' amber from thermostat_age_s=25 while Boiler Connected from age=5 ✓ end-to-end + Mode GATEWAY from otgwmode ✓. Zero runtime exceptions on load. Self-verifiable ACs now browser-confirmed; AC#6 (live data/WS on real OTGW32) still maintainer sign-off.
+
+HARDWARE SIGNOFF (2026-06-27, real OTGW32): flashed alpha.278 via USB COM4 (offset-based esptool, preserved nvs+spiffs -> WiFi+settings kept; device reconnected to 192.168.1.143). VERIFIED ON HARDWARE: device/info.fwversion=2.0.0-alpha.278+3d3f093 (incl. fix commit); /api/v2/health emits thermostat_age_s=-1 + boiler_age_s=-1 (fields wired + correct never-seen sentinel for OT-Direct w/o OT bus). CRITICAL FIND during signoff: alpha.276/277 firmware did NOT compile (restAPI.ino now() -> AceTime, fixed to time(nullptr), commit 3d3f0936) — build.py exit-0 masking + stale firmware.bin hid it; dev firmware was broken 62bf7252..5a7eda6d, now restored. AC#6 firmware-side: DONE on hardware. Degraded st-warn transition NOT reproducible on this bench unit (no OT bus, age stays -1) — mock-validated. UI flips: Playwright-validated (browser rendering independent of device).
 <!-- SECTION:NOTES:END -->

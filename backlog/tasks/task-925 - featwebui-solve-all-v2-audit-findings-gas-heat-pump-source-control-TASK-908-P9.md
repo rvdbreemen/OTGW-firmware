@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-24 18:50'
-updated_date: '2026-06-26 22:32'
+updated_date: '2026-06-27 08:24'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -32,4 +32,8 @@ Implement approved plan cozy-juggling-fern: Phase1 firmware (satsource whitelist
 
 <!-- SECTION:NOTES:BEGIN -->
 Loop assessment 2026-06-26: Phase2 (v2 UI: REST seed, source toggle, steppers, stats sort, log download, conn detail, support hover, graph chips+CSV+PNG, enum selects) = DONE per TASK-933 audit + Playwright validation. Phase3 (classic satsource 'Heat Source' select) present at index.js:3630. REMAINING/unverified: Phase1 firmware (satsource whitelist in dispatch, PATCH/DELETE auth, comment scrubs), Phase4 (docs MQTT-retained line + MEMORY ADR-124->140 + SAT json-golden regen), and AC#4 on-device verification. Recommend as next focused iteration — left In Progress.
+
+Phase4 partial (2026-06-27): ADR-124->140 comment scrub done for MQTTstuff.ino deviceForOTId block (header + cases 243/245/246/249 now cite ADR-140, matching MQTTHaDiscovery.cpp). MQTT-retained doc line already correct (MQTT.md:80 states not-retained). BLOCKED ON OFFLINE DEVICE: (a) SAT json-golden regen — scripts/json-golden/v2_sat_status.json + v2_health.json (now stale: alpha.276 added thermostat_age_s/boiler_age_s) need a live capture; (b) AC#4 on-device verify. OTGW32 .88.39 is OFFLINE (ping 100% loss, curl HTTP 000). .88.16 runs 1.7.0-beta (1.x line, not 2.0.0). Scattered historical-origin ADR-124 refs (MQTTstuff.ino:2051/2756, OTGW-firmware.h:835, MQTTstuff.h:380/394, MQTTHaDiscovery.cpp:1271/1721/1729) left as-is (accurate about the split's origin).
+
+Phase4 golden-regen finding (2026-06-27, live OTGW32 @1.143/alpha.278): the json-golden set is alpha.210-stale (captured 2026-06-18, githash f2252e5) — 68 alpha versions behind. 'json_golden.py compare' FAILs broadly, mostly NOT from this work: build version/githash, network (88.39/KeepOut2 -> 1.143/Koekie), accumulated otd* settings + ADR-155 health fields. MY contribution = +thermostat_age_s/+boiler_age_s in /health (idle -1). A blind full 'capture' now would bake in this idle + fw(278)/fs(275)-mismatched + device-specific network state (huge diff, beyond 925 scope). The 925 'ovp_*/heating_source' SAT-golden item is subsumed by this broader staleness. RECOMMEND: a dedicated golden-refresh task captured against a CLEAN alpha.278 device with matching fs+config, not a tail-end partial. Phase4 status: MQTT-retained doc line=already correct; ADR-124->140 deviceForOTId scrub=DONE (b8523a07); golden-regen=deferred to golden-refresh task. AC#4 firmware behaviour now hardware-verified (alpha.278, /health age fields emit).
 <!-- SECTION:NOTES:END -->
