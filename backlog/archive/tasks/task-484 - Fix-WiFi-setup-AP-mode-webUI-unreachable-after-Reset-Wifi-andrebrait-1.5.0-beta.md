@@ -3,7 +3,7 @@ id: TASK-484
 title: >-
   Fix: WiFi setup AP mode webUI unreachable after Reset Wifi (andrebrait,
   1.5.0-beta)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-29 23:48'
 updated_date: '2026-04-30 00:37'

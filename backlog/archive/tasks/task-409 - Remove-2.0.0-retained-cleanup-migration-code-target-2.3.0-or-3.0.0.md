@@ -1,7 +1,7 @@
 ---
 id: TASK-409
 title: 'Remove 2.0.0 retained-cleanup migration code (target: 2.3.0 or 3.0.0)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-24 19:57'
 updated_date: '2026-04-30 00:37'

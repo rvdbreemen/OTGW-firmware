@@ -1,7 +1,7 @@
 ---
 id: TASK-486
 title: 'Fix: PIC not detected on Wemos D1 Mini Pro (GitHub #557, dwd1)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-29 23:49'
 updated_date: '2026-04-30 00:37'
