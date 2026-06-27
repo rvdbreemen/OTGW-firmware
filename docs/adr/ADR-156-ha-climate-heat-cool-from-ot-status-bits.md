@@ -2,9 +2,9 @@
 
 ## Status
 
-Proposed. Date: 2026-06-27.
+Accepted. Date: 2026-06-27.
 
-**Decision Maker:** User: Robert van den Breemen (maintainer). The design shipped first on the 1.x maintenance line as `1.7.1-beta.2` (commit `7b2d3cdd`, GitHub issue #665) and is being ported to the 2.0.0 `dev` line under TASK-939. This ADR records the 2.0.0 decision; it stays Proposed until the port lands and the four verification gates pass.
+**Decision Maker:** User: Robert van den Breemen (maintainer). The design shipped first on the 1.x maintenance line as `1.7.1-beta.2` (commit `7b2d3cdd`, GitHub issue #665) and was ported to the 2.0.0 `dev` line under TASK-939. The Proposed condition is now met: the port landed on `origin/dev` (commit `94890099`, alpha.279), the ESP32 build is SUCCESS with a fresh firmware.bin, `evaluate.py` reports Failed 0 (ESP abstraction clean), and implementation parity with the 1.x build (commit `7b2d3cdd`) is verified (both helpers evaluate disconnect-first, so the reviewer's asymmetry note does not apply). All four verification gates pass (adr-lint PASS strictly, adr-quality 0.96 grade A), so this ADR is now Accepted.
 
 ## Status History
 
@@ -13,6 +13,11 @@ status_history:
     status: Proposed
     changed_by: Agent
     reason: Initial decision record for the 2.0.0 port of the heat/cool HA climate representation (TASK-939); design validated on the 1.x line against real captures
+    changed_via: adr-kit
+  - date: 2026-06-27
+    status: Accepted
+    changed_by: User
+    reason: 2.0.0 port landed on origin/dev (commit 94890099, alpha.279); ESP32 build SUCCESS with fresh firmware.bin, evaluate.py Failed 0 (ESP abstraction clean); implementation parity with 1.x build 7b2d3cdd verified (both helpers evaluate disconnect-first); four verification gates pass (adr-lint PASS strictly, adr-quality 0.96 grade A)
     changed_via: adr-kit
 
 ## Context
