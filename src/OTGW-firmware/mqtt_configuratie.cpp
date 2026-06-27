@@ -2598,14 +2598,14 @@ bool streamClimateDiscovery(PubSubClient &client,
     if (!writeJsonOpen(w)) return false;
 
     if (climateIdx == 0) {
-      // === Thermostat ===
-      if (!writeJsonKV_P(w, PSTR("action_template"), PSTR("{% if value == 'ON' %}heating{% else %}idle{% endif %}"))) return false;
+      // === Thermostat === (GH #665: action reflects the unified hvac_action topic)
+      if (!writeJsonKV_P(w, PSTR("action_template"), PSTR("{{ value }}"))) return false;
       if (!writeJsonComma(w)) return false;
 
-      // "action_topic":"<pub>/ch_enable"
+      // "action_topic":"<pub>/hvac_action"
       if (!w.writeProgmem(PSTR("\"action_topic\":\""))) return false;
       if (!w.writeRam(ctx.mqttPubTopic)) return false;
-      if (!w.writeProgmem(PSTR("/ch_enable\""))) return false;
+      if (!w.writeProgmem(PSTR("/hvac_action\""))) return false;
       if (!writeJsonComma(w)) return false;
     } else {
       // === DHW Control ===
@@ -2649,7 +2649,7 @@ bool streamClimateDiscovery(PubSubClient &client,
 
     // modes
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("\"modes\":[\"off\",\"heat\"]"))) return false;
+      if (!w.writeProgmem(PSTR("\"modes\":[\"off\",\"heat\",\"cool\"]"))) return false;  // GH #665: unified heat/cool/off
     } else {
       if (!w.writeProgmem(PSTR("\"modes\":[\"off\",\"auto\"]"))) return false;
     }
@@ -2659,12 +2659,12 @@ bool streamClimateDiscovery(PubSubClient &client,
     if (!w.writeProgmem(PSTR("\"mode_stat_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttPubTopic)) return false;
     if (climateIdx == 0) {
-      // Uses kPicSubtreePrefix for consistency with composeBinSensorPayload (ADR-065).
+      // GH #665 / TASK-938: mode reflects the unified <pub>/hvac_mode topic
+      // (off/heat/cool), computed in OTGW-Core.ino from the OT status bits.
       if (!w.writeChar('/')) return false;
-      if (!w.writeProgmem(kPicSubtreePrefix)) return false;
-      if (!w.writeProgmem(PSTR("thermostat_connected\""))) return false;
+      if (!w.writeProgmem(PSTR("hvac_mode\""))) return false;
       if (!writeJsonComma(w)) return false;
-      if (!writeJsonKV_P(w, PSTR("mode_stat_tpl"), PSTR("{% if value == 'ON' %}heat{% else %}off{% endif %}"))) return false;
+      if (!writeJsonKV_P(w, PSTR("mode_stat_tpl"), PSTR("{{ value }}"))) return false;
     } else {
       if (!w.writeProgmem(PSTR("/dhw_enable\""))) return false;
       if (!writeJsonComma(w)) return false;
@@ -2706,7 +2706,7 @@ bool streamClimateDiscovery(PubSubClient &client,
 
     // temp bounds + settings
     if (climateIdx == 0) {
-      if (!w.writeProgmem(PSTR("\"initial\":\"20\",\"min_temp\":\"12\",\"max_temp\":\"28\",\"temp_step\":\"0.5\",\"precision\":0.1"))) return false;
+      if (!w.writeProgmem(PSTR("\"initial\":\"20\",\"min_temp\":\"12\",\"max_temp\":\"30\",\"temp_step\":\"0.5\",\"precision\":0.1"))) return false;  // GH #665: cooling headroom
     } else {
       if (!w.writeProgmem(PSTR("\"min_temp\":\"40\",\"max_temp\":\"60\",\"temp_step\":\"1\",\"precision\":1"))) return false;
     }
