@@ -148,6 +148,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-078: Defer HA-Core Capability-Flag Aliases — Ship on 2.0.0 Only](ADR-078-defer-ha-core-aliases-to-2-0-0-revert-from-dev.md)** *(Accepted)*
   Reverts ADR-077 from the dev branch and reserves HA-core capability-flag aliases for the 2.0.0 line. Includes a forbid-pattern Enforcement block that prevents re-introduction on dev (the `bPublishHaCoreAliases` symbol must not reappear under `src/OTGW-firmware/`).
 
+- **[ADR-085: Unified Off/Heat/Cool HA Climate Entity Derived from OpenTherm Status Bits](ADR-085-ha-climate-heat-cool-from-ot-status-bits.md)** *(Accepted)*
+  Replaces the heating-only HA Thermostat entity with a unified off/heat/cool climate entity driven by two firmware-computed topics (`<pub>/hvac_mode`, `<pub>/hvac_action`) derived from the MsgID 0 status bits. Mode is reflective (no `mode_command_topic`; the thermostat owns heat/cool switching); heating reads the central-heating slave bit, not flame, so DHW does not show as heating. Fixes GH #665 (cooling invisible on a heatpump). Mirror of 2.0.0 ADR-156.
+
 ### System Architecture
 
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
