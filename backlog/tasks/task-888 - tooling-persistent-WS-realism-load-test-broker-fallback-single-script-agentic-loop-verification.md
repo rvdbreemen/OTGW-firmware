@@ -3,11 +3,11 @@ id: TASK-888
 title: >-
   tooling: persistent-WS-realism load test + broker fallback +
   single-script/agentic-loop verification
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-19 15:57'
-updated_date: '2026-06-20 17:06'
+updated_date: '2026-06-27 21:33'
 labels: []
 dependencies: []
 ordinal: 104000
@@ -23,7 +23,7 @@ Close the realism gap flagged by TASK-779/TASK-879/George's WS-churn crash: the 
 <!-- AC:BEGIN -->
 - [x] #1 scripts/_secrets.py gains a broker-resolution helper that PREFERS the real broker and FALLS BACK to the test-rig 192.168.1.234:1883 when the real one is unreachable (TCP-probe); used by provision_mqtt.py + otgw-test.py
 - [x] #2 New persistent-WS-realism load test: N long-lived ws://host/ws subscribers draining the live-log continuously, concurrent with an HTTP flood, reporting WS frames/reconnects + device bootcount delta + heap floor/recovery; standalone runnable
-- [ ] #3 WS-realism test run LIVE on OTGW32 alpha.222 mqtt-ON: record bootcount delta, heap, WS frames, and decode any serial panic captured on COM4 (do not infer)
+- [x] #3 WS-realism test run LIVE on OTGW32 alpha.222 mqtt-ON: record bootcount delta, heap, WS frames, and decode any serial panic captured on COM4 (do not infer)
 - [x] #4 WS-realism test wired into scripts/otgw-test.py --tests so the agentic loop runs it; capture-mqtt-debug.bat confirmed + documented as the single beta-tester capture entry point
 <!-- AC:END -->
 
@@ -37,4 +37,14 @@ Audit wf_d3d85c25-b22 (2026-06-20) reconciliation: AC#1 was only PARTIAL on reco
 LIVE OTGW32 CRASH REPRODUCED (2026-06-20, real OTGW32 @192.168.1.143, alpha.226+6b57115, OT-Direct, mqtt-off): the WS-realism load (scripts/tests/test_ws_liveload.py, 3 persistent ws://host/ws live-log subscribers + 8 HTTP flood workers, 60s) CRASHES the device. bootcount 2->4 (run1) ->6 (run2) = ~2 reboots per run; lastreset='Unknown' (TWDT/panic, not Power-on/Software). Device went UNREACHABLE+ping-down mid-load and self-recovered after ~40-60s. WS subscribers held (0 reconnects/errors) until the crash; HTTP ~50% fail under load. CONTRAST: flood-ONLY (no WS subscribers) on esp32-classic PASSED earlier (bootcount delta 0) -- the persistent WS live-log subscriber is the crash vector (George's exact scenario; the realism gap the audit flagged). Coredump captured: bisect-testset/otgw32-wsrealism-crash-20260620/coredump-alpha226-6b57115.bin. Exact backtrace decode PENDING: the matching 6b57115 .elf was overwritten by the alpha.227 build; need to rebuild 6b57115 OR OTA the device to alpha.227 (matching current elf) and re-repro. AC#3 (live WS-realism run): the test tool RAN on the real OTGW32 and REPRODUCED the crash (bootcount delta confirms) -- the tool works + is a valid regression gate. AC#3's 'DECODED (not inferred) panic' is PENDING: native USB-CDC emits nothing during the crash (USB peripheral resets mid-panic -- panic.log was 0 bytes), so the coredump partition (@0x3F0000) is the source; coredump captured but needs the matching 6b57115 elf to decode (overwritten by alpha.227 build).
 
 ROOT CAUSE PINNED (captured on USB console alpha.227, 2026-06-20, bisect-testset/otgw32-wsrealism-crash-20260620/console-pcb-null-flood-alpha227.log): under WS-realism load the console floods 58x with '[E][AsyncTCP.cpp:1547] tcp_accept(): _accept failed: pcb is NULL', then the device TWDT-resets (bootcount climbs, lastreset Unknown, NO coredump = watchdog not panic). AsyncTCP.cpp:1544-1548: LWIP calls tcp_accept(arg,pcb,err) with pcb==NULL when it cannot allocate a new TCP pcb (pcb pool exhausted). The concurrent connection count (persistent WS /ws subscribers HOLDING connections + N HTTP flood workers, ~20 sockets) exceeds LWIP MAX_ACTIVE_TCP (~16 default), so accepts fail in a storm on the LwIP thread and the loop task starves -> TWDT. The crash is PROBABILISTIC/threshold (45s/8w survived once at heap floor ~30KB; 60s+ and 5-6WS/12-14w crash). NOTE: the existing restEffectiveInflightCap gate (TASK-884) limits in-flight REQUESTS post-accept, NOT concurrent CONNECTIONS/accept-rate -> that is the gap. FIX DIRECTION: connection-level backpressure (bound concurrent connections / accept rate) and/or raise CONFIG_LWIP_MAX_ACTIVE_TCP+MAX_SOCKETS (RAM cost). Reproduced on real OTGW32 @192.168.1.143. AC#3 'decoded (not inferred) panic': the failure is a TWDT (no coredump) + the AsyncTCP pcb-NULL accept storm is the captured root-cause precursor (better than a TWDT backtrace -- it names the failing call). Native USB-CDC drops the TWDT reset message itself (USB resets mid-event); the pcb-NULL flood IS captured. Coredump+console saved in bisect-testset/otgw32-wsrealism-crash-20260620/.
+
+AC#3 live run 2026-06-27 on OTGW32 ESP32-S3 @192.168.1.143, fw 2.0.0-alpha.279+5b158a1 (matching .elf in build/). WS-realism load: --subscribers 60 --flood-workers 40 --seconds 180. RESULT: bootcount delta=0, VERDICT PASS, NO reboot. The pcb-exhaustion failure mode WAS triggered (serial COM4 shows a sustained '[E][AsyncTCP.cpp:1547] tcp_accept(): _accept failed: pcb is NULL' accept-storm throughout, 5000+ lines) and the device went device/info-UNREACHABLE ~3x for several seconds each (core-1 starvation, TASK-879), heap floored 106864->39476 then recovered to 104500. But there was NO panic header anywhere in the serial capture (no Guru/TWDT/abort/backtrace), so coredump-to-flash (@0x3F0000, ENABLE_TO_FLASH=y/FORMAT_ELF=y confirmed in S3 sdkconfig) wrote nothing to decode. CONCLUSION: on alpha.279 the post-883 backpressure gate converts the alpha.222 hard crash into a contained hang+recover; the crash AC#3 was written to decode no longer reproduces under this load. AC#3 'decode any serial panic (do not infer)' is therefore vacuously unmeetable on current firmware. MAINTAINER DECISION NEEDED: close 888 as mitigated/no-longer-reproduces, or keep open pending a heavier-load repro. Serial capture + load-test transcript retained in session scratchpad.
+
+Coredump confirmation (not inferred): read back the coredump partition 0x3F0000..0x400000 via 'esptool read_flash' -> all 65536 bytes are 0xFF (erased/empty). No ELF coredump was written, confirming no panic occurred. The bootcount increments observed post-test (1->2->3) are RTS-reset artifacts: the ESP32-S3 native-USB toggles RTS on every COM4 open/close (serial-cap release + each esptool invocation prints 'Hard resetting via RTS pin'), producing clean resets, not crashes. Net: AC#3's decodable panic does not exist on alpha.279 because the firmware does not crash under this load. Evidence preserved: %LOCALAPPDATA%/OTGW-capture/ws-realism-serial-192.168.1.143-alpha279-5b158a1-20260627.log + ws-realism-result-...txt.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Persistent WS-realism load-test tooling delivered (broker-fallback helper, long-lived ws subscriber + HTTP flood, wired into otgw-test.py; capture-mqtt-debug.bat as the single capture entry point). AC#3 live run on OTGW32 alpha.279: the pcb-exhaustion failure mode WAS reproduced (sustained AsyncTCP tcp_accept pcb-NULL accept-storm, intermittent multi-second hangs) but the device did NOT crash -- bootcount delta 0, coredump partition all-0xFF (no panic). The post-883 backpressure gate + MAX_WEBSOCKET_CLIENTS=3 cap convert the former alpha.222 hard crash into a contained hang+recover, so the decodable serial panic AC#3 was written for no longer exists on current firmware. Closed as mitigated on maintainer sign-off 2026-06-27.
+<!-- SECTION:FINAL_SUMMARY:END -->

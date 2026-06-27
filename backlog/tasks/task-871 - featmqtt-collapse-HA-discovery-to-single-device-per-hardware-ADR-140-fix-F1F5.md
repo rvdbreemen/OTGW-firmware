@@ -6,7 +6,7 @@ title: >-
 status: In Review
 assignee: []
 created_date: '2026-06-15 14:21'
-updated_date: '2026-06-21 07:51'
+updated_date: '2026-06-27 18:57'
 labels: []
 dependencies: []
 ordinal: 87000
@@ -45,4 +45,6 @@ LIVE OTGW32 discovery validation (2026-06-20, device 192.168.1.143 alpha.227 OT-
 Triage 2026-06-21: code already implemented + committed (single-device collapse ~alpha.224; streaming writeDeviceBlock/buildDiscoveryDeviceBlock emit ONE device, full block only on isFirstEntity, F1 driver-set gate, F5 via writeRamEscaped/mqttJsonEscape). AC#2/#3 TEXT IS STALE: the HaDevice enum / deviceForOTId / bilateral two-pass are RETAINED + repurposed for source-prefix routing (only multi-DEVICE emission + deviceIntroduced[] were removed); the remaining via_device is the ADR-148-sanctioned BLE child-device path. Remaining to Done: fresh 3-target build receipt (AC#6) + AC#7 field (discovery dump shows one device; BLE child-device shape needs a paired BLE probe = hardware).
 
 3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert.
+
+Live HA-discovery validation 2026-06-27: OTGW32 ESP32-S3 (uniqueid otgw-1020BA21B4F8) on alpha.279+5b158a1, publishing to the real home HA broker (192.168.88.25). Captured 110 retained discovery configs (homeassistant/+/otgw-1020BA21B4F8/+/config). CONFIRMED: (AC#3 part) exactly ONE HA device -- all 108 parseable configs share a single identifier set ('otgw-1020BA21B4F8'), 0 via_device anywhere (AC#2/#3); (AC#5) device-block fields JSON-escaped and valid (manufacturer 'NodoShop', model 'OTGW', name 'OpenTherm Gateway (OTGW)'); (AC#7) all entities bound to the one device. OPEN ISSUE on AC#3 'full device block on FIRST entity only': observed 52 full device blocks (binary_sensor 34, switch 13, climate 2, sensor 4) vs 55 bare (sensor 46, select 8, number 1). The isFirstEntity gate (MQTTstuff.ino:2273/2339, dripDeviceInfoPending) exists, but the full block rides many entities because dripDeviceInfoPending is re-marked per drip cycle, so 'first-entity-only' does not hold across cycles. This is a payload inefficiency, not a topology break (HA still renders one device). MAINTAINER DECISION: is the per-drip-cycle full-block emission intended, or should F1 tightening reduce it to one full block per discovery pass? Evidence: %LOCALAPPDATA%/OTGW-capture/ha-discovery-alpha279-otgw32-1020BA21B4F8-20260627.txt. NOTE: also found ~110 stale retained configs from older firmware (alpha.202/alpha.236) orphaned on the home broker from prior sessions.
 <!-- SECTION:NOTES:END -->
