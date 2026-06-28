@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.282
+**  Version  : v2.0.0-alpha.283
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -276,6 +276,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 // TASK-585: WiFi network scan
 static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
@@ -1819,6 +1820,48 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendApiNotFound(originalURI);
 }
 
+//===[ /api/v2/mqtt — force OT-value republish (TASK-936, ported from 1.x v1.6.0 handleMqtt) ]===
+// Distinct from /api/v2/discovery/republish: that re-announces HA *discovery configs*;
+// this resets OT publish eligibility so the next observed OT values publish as first-seen
+// again (requestMQTTRepublishAll, OTGW-Core.ino). Use case: force a full OT-value
+// republish after a broker wipe, without re-announcing discovery.
+static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  // POST /api/v2/mqtt/republish — reset publish eligibility, re-emit observed OT values
+  if (wc > 4 && strcmp_P(words[4], PSTR("republish")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+
+    // CWE-770 rate-limit, mirroring the discovery/republish cooldown: a rapid-fire
+    // POST loop would keep forcing status-frame republishes on every OT cycle. 60 s
+    // is ample for a legitimate post-broker-wipe refresh. Function-local static, no
+    // new global leaks out.
+    static unsigned long lastMqttRepublishMs = 0;
+    constexpr unsigned long MQTT_REPUBLISH_COOLDOWN_MS = 60000UL;
+    if (lastMqttRepublishMs != 0) {
+      const unsigned long elapsed = millis() - lastMqttRepublishMs;
+      if (elapsed < MQTT_REPUBLISH_COOLDOWN_MS) {
+        const unsigned long remaining = (MQTT_REPUBLISH_COOLDOWN_MS - elapsed + 999UL) / 1000UL;
+        restResponseStatus = 429;
+        char jsonBuff[160];
+        snprintf_P(jsonBuff, sizeof(jsonBuff),
+          PSTR("{\"error\":{\"status\":429,\"message\":\"Republish cooldown active, retry in %lus\"}}"),
+          remaining);
+        sendCorsOriginHeader();
+        webSend(429, F("application/json"), jsonBuff);
+        return;
+      }
+    }
+
+    requestMQTTRepublishAll();
+    lastMqttRepublishMs = millis();  // stamp only after work commits
+    sendCorsOriginHeader();
+    webSend(200, F("application/json"), F("{\"status\":\"republish_requested\"}"));
+    return;
+  }
+
+  sendApiNotFound(originalURI);
+}
+
 static void debugFormatLocalIp(char* buf, size_t bufSize)
 {
   IPAddress ip = WiFi.localIP();
@@ -2241,6 +2284,7 @@ static const char kRouteSat[]        PROGMEM = "sat";
 static const char kRouteDiscovery[]  PROGMEM = "discovery";
 static const char kRouteDebugDump[]  PROGMEM = "debug";
 static const char kRouteNetwork[]    PROGMEM = "network";  // TASK-585
+static const char kRouteMqtt[]       PROGMEM = "mqtt";     // TASK-936: OT-value republish
 
 // Dispatch table placed in PROGMEM so the ~136 B of {segment, handler}
 // rows live in flash, not DRAM. Same pattern as kSatMqttCmds in
@@ -2266,6 +2310,7 @@ static const ApiRoute kV2Routes[] PROGMEM = {
   { kRouteDiscovery,  handleDiscovery },
   { kRouteDebugDump,  handleDebugDump },
   { kRouteNetwork,    handleNetwork },  // TASK-585: WiFi scan
+  { kRouteMqtt,       handleMqtt },     // TASK-936: POST /api/v2/mqtt/republish
   { nullptr,          nullptr }  // sentinel
 };
 

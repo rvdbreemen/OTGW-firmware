@@ -1,11 +1,14 @@
 ---
 id: TASK-936
 title: >-
-  feat(parity): port the remaining 1.5/1.6 divergence gaps to dev (mqtt/republish
-  endpoint, WiFi-reconnect TCP rebind, dropped-set-command trace)
-status: To Do
+  feat(parity): port the remaining 1.5/1.6 divergence gaps to dev
+  (mqtt/republish endpoint, WiFi-reconnect TCP rebind, dropped-set-command
+  trace)
+status: In Progress
 assignee:
   - '@claude'
+created_date: ''
+updated_date: '2026-06-28 21:28'
 labels:
   - parity
   - mqtt
@@ -35,6 +38,14 @@ RISK: do NOT blindly add an `if(telnetInitialized)return` guard — if dev's Asy
 <!-- AC:BEGIN -->
 - [ ] #1 POST /api/v2/mqtt/republish added (mirrors /api/v2/discovery/republish): method+connected guards, calls requestMQTTRepublishAll(), 200 JSON; builds clean for esp32
 - [ ] #2 WiFi-reconnect TCP rebind: bench-confirm whether dev's AsyncSimpleTelnet listener survives a WiFi drop/reconnect; if it does, guard startTelnet() (and remove the redundant reconnect rebind) per 1.x 8cf181d3; if not, document why the rebind stays
-- [ ] #3 Dropped-set-command default-stream trace (#602): verify dev's OTGW-command reject path; add a DebugTf only if it is genuinely silent at the default debug level
+- [x] #3 Dropped-set-command default-stream trace (#602): verify dev's OTGW-command reject path; add a DebugTf only if it is genuinely silent at the default debug level
 - [x] #4 timer5min jitter ported (1.x 7199e158): added 30000,60000 jitter params to DECLARE_TIMER_MIN(timer5min,...) so the 5-min publish desyncs from timer60s (avoids the joint-fire heap spike); builds clean for esp32
 <!-- AC:END -->
+
+
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC#3 VERIFIED (no code needed): dev's OTGW-command reject path already emits the two #602-equivalent traces at DEFAULT (ungated DebugTf) level — MQTTstuff.ino:944 'dropped: no OT command interface available' (generalises 1.x 'no PIC detected' for PIC+OTDirect) and :1007 'dropped: no matching OTGW command (check topic spelling)'. Only SAT-specific unknown sub-commands use the gated MQTTDebugTf. Nothing silent; AC#3 satisfied by existing code.
+<!-- SECTION:NOTES:END -->
