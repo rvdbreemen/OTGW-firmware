@@ -2412,5 +2412,26 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-06-27"
+  },
+  {
+    "id": "bug-138",
+    "timestamp": "2026-06-28T00:00:00Z",
+    "error_message": "src/OTGW-firmware/MQTTHaDiscovery.cpp:1344: error: 'thermostat' is not a member of 'HaIcon'; :1345: 'heating' is not a member of 'HaIcon'. build.py exited 0 anyway (per-env FAILED masked).",
+    "file": "src/OTGW-firmware/MQTTHaDiscovery.cpp",
+    "root_cause": "TASK-942 added two sensor-table rows using HaIcon::thermostat and HaIcon::heating, guessed from a grep that matched those words as comments/mdi-strings, not enum members. The real enum (MQTTstuff.h:186) names them thermostat_icon and (no 'heating'; radiator/fire/thermometer_lines instead).",
+    "fix": "Use valid HaIcon members: hvac_mode -> HaIcon::thermostat_icon, hvac_action -> HaIcon::radiator. Always verify enum membership in MQTTstuff.h before using an HaIcon value. Also: build.py exit 0 is NOT proof of success -- grep the per-env [SUCCESS]/[FAILED] line and check firmware.bin mtime.",
+    "tags": [
+      "build",
+      "esp32",
+      "haicon",
+      "enum",
+      "mqtt-discovery",
+      "build.py-masks-failure",
+      "task-942",
+      "2.0.0"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-28"
   }
 ]

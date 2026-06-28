@@ -3,11 +3,11 @@ id: TASK-943
 title: >-
   fix(sat): demote heating-source auto-detect to non-control telemetry hint;
   read correct OT MsgID 3 cooling bit
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-28 12:47'
-updated_date: '2026-06-28 12:51'
+updated_date: '2026-06-28 13:27'
 labels: []
 dependencies: []
 ordinal: 156000
@@ -24,6 +24,12 @@ Beta-readiness review found the SAT heating-source auto-detect (state.sat.iDetec
 - [x] #1 satGetEffectiveHeatingSource() AUTO branch returns SAT_SRC_GAS_BOILER (manual selection remains authoritative; iDetectedHeatingSource no longer drives control)
 - [x] #2 Detection read removed from print_vh_configmemberid (MsgID 74) and added to the MsgID 3 slave-config handler, reading HB bit2 (& 0x0400 = cooling supported)
 - [x] #3 iDetectedHeatingSource documented as a non-control telemetry hint; comments at SATtypes.h:214 and the moved code corrected to match
-- [ ] #4 Build green for esp32 target (per-env SUCCESS line verified, not just exit 0); evaluate.py --quick clean
+- [x] #4 Build green for esp32 target (per-env SUCCESS line verified, not just exit 0); evaluate.py --quick clean
 - [ ] #5 Field note: detected hint vs manual selection behaves sensibly on a real device (hardware-gated, deferred to field)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Build green: esp32 SUCCESS (clean solo rebuild, firmware 6:40 + filesystem; build/OTGW-firmware-esp32-otgw32-2.0.0-alpha.282 artifacts). evaluate.py --quick: 0 failures, health 98.7%. Field AC#5 deferred (hardware).
+<!-- SECTION:NOTES:END -->

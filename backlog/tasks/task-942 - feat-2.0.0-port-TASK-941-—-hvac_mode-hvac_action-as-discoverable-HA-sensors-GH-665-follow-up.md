@@ -3,11 +3,11 @@ id: TASK-942
 title: >-
   feat-2.0.0: port TASK-941 — hvac_mode + hvac_action as discoverable HA sensors
   (GH #665 follow-up)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-28 05:57'
-updated_date: '2026-06-28 13:01'
+updated_date: '2026-06-28 13:27'
 labels:
   - feature
   - mqtt
@@ -29,6 +29,12 @@ ordinal: 155000
 - [x] #2 A discoverable HA sensor entity for hvac_action is published (state from the existing hvac_action topic)
 - [x] #3 Both sensors follow ADR-140 single-device topology (shared nodeId identifiers, no via_device, full device block only on the first entity of the cycle)
 - [x] #4 No new publish logic; climate entity unchanged and still works
-- [ ] #5 Build green esp32/esp32-classic/esp32-combo; evaluate.py --quick no new failures; prerelease bumped
+- [x] #5 Build green esp32/esp32-classic/esp32-combo; evaluate.py --quick no new failures; prerelease bumped
 - [ ] #6 Field: both sensors appear in HA discovery on a real OTGW32 and show correct values across off/heat/cool
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Build green: esp32 SUCCESS after fixing invalid HaIcon members (thermostat->thermostat_icon, heating->radiator; bug-138). evaluate.py --quick clean. prerelease alpha.282. Field AC#6 deferred (hardware: confirm both sensors in HA discovery + values across off/heat/cool).
+<!-- SECTION:NOTES:END -->
