@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.281
+**  Version  : v2.0.0-alpha.282
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -838,6 +838,10 @@ byte      OTGWsatcoreid      = 252;
 byte      OTGWsatweatherid   = 253;
 byte      OTGWsatbinaryid    = 254;
 byte      OTGWsatzoneid      = 255;
+// TASK-942 (GH #665): faux dataid anchoring the standalone hvac_mode/hvac_action HA
+// sensors that mirror the unified climate entity's published topics. 242 is the first
+// free slot below the 243-255 faux block; routed to the OT-Core device (deviceForOTId).
+byte      OTGWhvacid         = 242;
 uint8_t   satGetMaxZones();
 bool      satShouldDiscoverZone(uint8_t zoneIndex);
 
