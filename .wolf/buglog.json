@@ -2370,5 +2370,47 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-06-19"
+  },
+  {
+    "id": "bug-136",
+    "timestamp": "2026-06-27",
+    "error_message": "esptool: error: argument operation: invalid choice: 'write-flash'",
+    "file": "flash_esp.py",
+    "root_cause": "flash_esp.py hardcoded esptool v5 hyphenated subcommands (write-flash/erase-flash); host esptool v4.8.1 (system Python default) only accepts underscore form and aborts before flashing. v5 lives only in the PlatformIO penv.",
+    "fix": "Added esptool_subcmd() helper: detect esptool major version via -m esptool version, emit underscore (v4) or hyphen (v5). Applied at erase_flash and write_flash call sites.",
+    "tags": [
+      "flash_esp",
+      "esptool",
+      "v4",
+      "v5",
+      "tooling",
+      "TASK-890",
+      "portability"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-27"
+  },
+  {
+    "id": "bug-137",
+    "timestamp": "2026-06-27",
+    "error_message": "[E][AP.cpp:218] create(): passphrase too short!  +  wifi:sta is connecting, cannot set config / [E][STA.cpp:336] connect(): STA config failed",
+    "file": "src/OTGW-firmware/networkStuff.ino:285",
+    "root_cause": "On OTGW32 ESP32-S3 (alpha.279) after sustained WS-realism load + repeated RTS resets, the WiFi STA stopped rejoining KeepOut2 (STA config failed). The SoftAP provisioning fallback then refused to start with \"passphrase too short!\" (AP.cpp:218), leaving the device stranded: no STA, no usable provisioning AP. Bench went fully off-network (HTTP 000, no ARP). Not yet root-caused in firmware; possibly a latent SoftAP-fallback config bug (AP passphrase below the 8-char WPA minimum) exposed only when STA fails, compounded by load/reset-induced WiFi driver wedge. EXACT LINE: networkStuff.ino:285 WiFi.softAP(apSSID, \"otgw123\") -- \"otgw123\" is 7 chars, below the WPA2 8-char minimum, so the WIFI_AP_FALLBACK SoftAP refuses to start. NOTE: the first-boot WiFiManager provisioning portal (startConfigPortal, networkStuff.ino:215) is OPEN (no password, line 66) and works fine; only the post-provisioning AP_FALLBACK path is broken.",
+    "fix": "UNRESOLVED in firmware. Fix: pad the fallback passphrase to >=8 chars (e.g. \"otgw1234\") or make the fallback AP open. Recovery now: full-erase + merged-full reflash -> boots to the OPEN provisioning portal -> user re-provisions.",
+    "tags": [
+      "wifi",
+      "softap",
+      "provisioning",
+      "esp32s3",
+      "otgw32",
+      "stranded",
+      "AP.cpp",
+      "STA.cpp",
+      "TASK-871-blocked"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-27"
   }
 ]
