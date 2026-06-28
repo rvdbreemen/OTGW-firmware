@@ -1,11 +1,11 @@
 ---
 id: TASK-802
 title: 'feat-2.0.0: SAT sim F7 — host-side boiler-emulator script'
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-31 22:56'
-updated_date: '2026-06-03 17:41'
+updated_date: '2026-06-28 21:37'
 labels:
   - sat
   - simulation
@@ -56,4 +56,6 @@ CONCLUSION: F7 as specified (host TCP->OT bridge trips the §4.2 gate) is not ac
 2026-06-03: script written (scripts/sat_boiler_emulator.py, stdlib-only) + scripts/README. AC#1 (single-file frame emitter) and AC#4 (host-only, PowerShell-launchable, documented, no fw change) met; dry-run builds a correct MsgID 3 READ-ACK (B40030004 for member-id 4) and MsgID 0 status frame, syntax-clean. FINDING (verified in OTDirect.ino:651-703): port 25238 INPUT is relayed straight to the PIC via sendPICSerial(); it is NOT injected into otBoilerCacheValid[3]. That cache (-> satBoilerHardwarePresent -> satOnBoilerDetected edge) is set only from real OT-bus boiler responses in handleMasterResponse. So the OTDirect-TCP-bridge approach CANNOT trip the TASK-795 availability gate -> AC#2/#3 are NOT achievable via TCP. The plan's deferred 'open question' is answered: a serial-level PIC emulator OR a dedicated firmware test-injection hook is required. Script kept as a correct frame-builder/dry-run reference + documents the dead-end. Task stays In Progress pending a design decision on the emulation path.
 
 2026-06-03: PARKED (maintainer decision, Option C). Options for resuming F7 captured in docs/plan/SAT_SIM_F7_BOILER_EMULATOR_OPTIONS.md: (A) serial-level PIC emulator [faithful, needs hardware], (B) firmware test-injection hook [pure host-side, recommended], (C) park [current]. Frame-builder script scripts/sat_boiler_emulator.py stays as a reference. Resume by picking A or B.
+
+MAINTAINER DECISION 2026-06-28 (B-3): Path A chosen. Add a debug force-boiler-present hook (REST/MQTT debug command) so the SAT availability/F7 gate becomes self-testable without hardware. Implement the small firmware backdoor; AC#2/#3 then validated against it.
 <!-- SECTION:NOTES:END -->

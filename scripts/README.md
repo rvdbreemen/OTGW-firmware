@@ -230,11 +230,24 @@ The OTGW32 port 25238 bridge is bidirectional but asymmetric:
 A raw `B40030004` line sent as INPUT does not match the `XX=value` parser, so it will
 NOT populate `otBoilerCacheValid[3]` via the TCP path.
 
-**AC#2 and AC#3 of TASK-795** (actual §4.2 edge-trip on a real OTGW32: simulation
-auto-disables within 1 second of first boiler slave frame) require bench validation by
-the maintainer with actual OT bus hardware. The script is intended to provide:
+Because the TCP bridge cannot inject a boiler response, **AC#2/#3 of TASK-795 are
+exercised through the firmware test hook** instead (TASK-802 path A):
+
+```powershell
+# assert a synthetic boiler is present -> trips the §4.2 availability gate
+python scripts\sat_boiler_emulator.py --host 192.168.1.x --rest-force-boiler on
+# expect: simulation auto-disables within ~1s; POST /api/v2/sat/mode (enable) -> 409;
+#         MQTT sat enable command rejected
+python scripts\sat_boiler_emulator.py --host 192.168.1.x --rest-force-boiler off
+```
+
+`POST /api/v2/sat/force-boiler` (body `0|1`) is a test-only, transient override
+(cleared on reboot) that `satBoilerHardwarePresent()` honours; turning it on also
+trips the deferred boiler-detected edge so the "boiler appeared -> simulation off"
+teardown runs exactly as a real boiler frame would. Trusted-LAN only.
+
+The frame-builder / `--dry-run` / TCP modes remain useful as:
 
 1. A reference for what a correctly-formed slave-response frame looks like.
 2. A TCP connection harness so bench state can be observed over the monitor stream.
-3. A starting point for adapting to an OT-bus hardware slave device (e.g. via a
-   USB-to-OT adapter or a microcontroller wired to the OTGW32 OT master pins).
+3. A starting point for adapting to an OT-bus hardware slave device.

@@ -1147,8 +1147,19 @@ bool satSimulationBlocksBusTx(const char* cmd,
 // abstraction rules — no raw platform ifdefs.
 // Non-static + prototyped in OTGW-firmware.h: the REST 409 guard and the MQTT
 // enable-reject (both concatenated ahead of this file) call it cross-file.
+// TASK-802 F7 path A: test-only override so the §4.2 availability gate is
+// self-verifiable on the bench WITHOUT a physical boiler. There is no software
+// path from the network into otBoilerCacheValid[]/bBoilerState (the TCP bridge
+// relays to the PIC, it does not inject boiler responses), so a host emulator
+// cannot trip the gate over the wire. This flag lets a REST call assert
+// "a real boiler is present" so TASK-795 AC#8/#9/#10 (edge auto-disable, REST
+// 409, MQTT enable-reject) can be exercised. Transient (never persisted); a
+// reboot clears it. Trusted-LAN only, like the rest of the admin surface.
+static bool satDebugForceBoilerPresent = false;
+
 bool satBoilerHardwarePresent()
 {
+  if (satDebugForceBoilerPresent) return true;  // TASK-802 F7-A test override
 #if HAS_PIC
   if (state.otBus.bBoilerState) return true;
 #endif
@@ -1156,6 +1167,16 @@ bool satBoilerHardwarePresent()
   if (otDirectBoilerPresent()) return true;
 #endif
   return false;
+}
+
+// TASK-802 F7 path A setter. When asserting presence, also trip the §4.2 edge
+// (satNotifyBoilerFrameSeen raises the deferred flag iff sim is active), so the
+// "boiler appeared -> simulation off" teardown runs within ~1s exactly as a
+// real boiler frame would. Clearing the flag just removes the override.
+void satSetDebugForceBoilerPresent(bool on)
+{
+  satDebugForceBoilerPresent = on;
+  if (on) satNotifyBoilerFrameSeen();
 }
 
 // Complete teardown when a real boiler appears while sim is active. One-way:

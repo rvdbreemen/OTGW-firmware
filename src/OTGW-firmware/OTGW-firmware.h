@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.283
+**  Version  : v2.0.0-alpha.284
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -386,6 +386,7 @@ void satNarratef_P(PGM_P fmt_P, ...);
 bool satSimulationBlocksBusTx(const char* cmd, const __FlashStringHelper* source);  // TASK-795 plan §4.1: bus-tx isolation gate
 void satNotifyBoilerFrameSeen();  // TASK-795 plan §4.2: slave-frame edge hook → deferred auto-disable
 bool satBoilerHardwarePresent();  // TASK-795 plan §4.2: real boiler on bus (REST 409 / MQTT reject guard)
+void satSetDebugForceBoilerPresent(bool on);  // TASK-802 F7-A: test-only boiler-present override (trips §4.2 edge, transient)
 bool satSimInjectEvent(const char* event, float value, int32_t durationS);  // TASK-797 plan §12 F2: scenario injection
 void satSendStatusJSON();
 uint32_t satCycleGetFlameOnStartMs();

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.283
+**  Version  : v2.0.0-alpha.284
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1021,6 +1021,27 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     webPushHeader(F("Cache-Control"), F("no-cache"));
     if (satRequestHasDetailFull()) { satSendHealthJSON(); }
     else                           { satSendStatusJSON(); }
+  }
+  else if (strcasecmp_P(sub, PSTR("force-boiler")) == 0) {
+    // TASK-802 F7-A: test-only boiler-present override so the §4.2 availability
+    // gate (edge auto-disable, REST 409, MQTT enable-reject) is verifiable on
+    // the bench without a physical boiler. POST/PUT body 0|1|true|false.
+    // Transient (cleared on reboot); trusted-LAN only like the admin surface.
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
+    } else if (wc > 5) {
+      val = words[5];
+    }
+    if (!val) { sendApiError(400, F("Missing value (0|1)")); return; }
+    const bool on = EVALBOOLEAN(val);
+    satSetDebugForceBoilerPresent(on);
+    char msg[64];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"status\":\"ok\",\"force_boiler_present\":%s}"), on ? "true" : "false");
+    webSend(200, F("application/json"), msg);
   }
   else if (strcasecmp_P(sub, PSTR("target")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }

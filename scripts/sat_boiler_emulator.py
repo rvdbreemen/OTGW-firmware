@@ -88,16 +88,31 @@ The OTGW32 port 25238 bridge is BIDIRECTIONAL but ASYMMETRIC:
     (c) drive the TCP INPUT path to test the firmware's command parsing and response
         logic without a physical boiler in loop (e.g. SR= response-override injection).
 
+TASK-802 F7 PATH A - REST TEST HOOK (the working AC#2/#3 path)
+-------------------------------------------------------------
+Because the TCP bridge cannot inject a boiler response (see the asymmetry note
+above), the firmware exposes a test-only REST hook POST /api/v2/sat/force-boiler
+that asserts boiler-present. This DOES trip the §4.2 availability gate, so it is
+the path that satisfies TASK-795 AC#8/#9/#10 without hardware:
+
+  python scripts/sat_boiler_emulator.py --host 192.168.1.x --rest-force-boiler on
+  # verify: sim auto-disables ~1s; POST sat/mode enable -> 409; MQTT enable rejected
+  python scripts/sat_boiler_emulator.py --host 192.168.1.x --rest-force-boiler off
+
+The frame-builder/--dry-run/TCP modes remain as a reference for what a real
+boiler's monitor-stream output looks like.
+
 USAGE
 -----
   python scripts/sat_boiler_emulator.py --dry-run [--member-id 4] [--slave-config 0x01]
   python scripts/sat_boiler_emulator.py --host 192.168.1.x [--port 25238]
+  python scripts/sat_boiler_emulator.py --host 192.168.1.x --rest-force-boiler on|off
 
 PowerShell launch:
   python scripts\\sat_boiler_emulator.py --dry-run
-  python scripts\\sat_boiler_emulator.py --host 192.168.1.42 --interval 2.0
+  python scripts\\sat_boiler_emulator.py --host 192.168.1.42 --rest-force-boiler on
 
-Dependencies: Python 3 standard library only (socket, argparse, time, sys).
+Dependencies: Python 3 standard library only (socket, urllib, argparse, time, sys).
 """
 
 import argparse
@@ -380,6 +395,45 @@ def run_connected(args: argparse.Namespace) -> None:
         print(f"Socket closed. Sent {iteration} frame burst(s).")
 
 
+def run_rest_force_boiler(args: argparse.Namespace) -> None:
+    """
+    TASK-802 F7 path A: drive the firmware test hook POST /api/v2/sat/force-boiler.
+
+    The OTDirect TCP bridge (port 25238) cannot inject a boiler response into
+    otBoilerCacheValid[] (it relays to the PIC), so the §4.2 availability gate is
+    not trippable over the wire. The firmware therefore exposes a test-only REST
+    hook that asserts boiler-present; posting it auto-disables simulation within
+    ~1s exactly as a real boiler frame would, making TASK-795 AC#8/#9/#10
+    (edge auto-disable, REST 409 on re-enable, MQTT enable-reject) self-verifiable
+    without hardware. Stdlib only (urllib).
+    """
+    import urllib.request
+    import urllib.error
+
+    on = args.rest_force_boiler in ('1', 'on', 'true', 'yes')
+    url = f"http://{args.host}:{args.http_port}/api/v2/sat/force-boiler"
+    body = ('1' if on else '0').encode('ascii')
+    req = urllib.request.Request(url, data=body, method='POST',
+                                 headers={'Content-Type': 'text/plain'})
+    print(f"POST {url}  body={body.decode()}  (force boiler-present {'ON' if on else 'OFF'})")
+    try:
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            print(f"HTTP {resp.status}: {resp.read().decode('utf-8', 'replace').rstrip()}")
+    except urllib.error.HTTPError as exc:
+        print(f"HTTP {exc.code}: {exc.read().decode('utf-8', 'replace').rstrip()}", file=sys.stderr)
+        sys.exit(1)
+    except (urllib.error.URLError, OSError) as exc:
+        print(f"ERROR: cannot reach {url}: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    print()
+    print("Next: verify TASK-795 availability-gate ACs while the override is ON:")
+    print("  - simulation auto-disables within ~1s (telnet log 'boiler appeared, simulation off')")
+    print("  - POST /api/v2/sat/mode (enable sim) returns 409")
+    print("  - MQTT sat enable command is rejected")
+    print("Then POST again with --rest-force-boiler off (or reboot) to clear the override.")
+
+
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -438,6 +492,26 @@ def main() -> None:
         action='store_true',
         help="Print computed frames and exit without opening a socket.",
     )
+    parser.add_argument(
+        '--rest-force-boiler',
+        default=None,
+        dest='rest_force_boiler',
+        metavar='ON|OFF',
+        help=(
+            "TASK-802 F7 path A: POST the firmware test hook "
+            "/api/v2/sat/force-boiler to assert (on) or clear (off) a synthetic "
+            "boiler-present, tripping the §4.2 availability gate without hardware. "
+            "Requires --host; uses --http-port (default 80)."
+        ),
+    )
+    parser.add_argument(
+        '--http-port',
+        type=int,
+        default=80,
+        dest='http_port',
+        metavar='PORT',
+        help="HTTP port for --rest-force-boiler (the web UI port).",
+    )
 
     args = parser.parse_args()
 
@@ -447,6 +521,15 @@ def main() -> None:
 
     if args.dry_run:
         run_dry_run(args)
+        return
+
+    if args.rest_force_boiler is not None:
+        if args.host is None:
+            parser.error("--host is required for --rest-force-boiler")
+        if args.rest_force_boiler.lower() not in ('1', '0', 'on', 'off', 'true', 'false', 'yes', 'no'):
+            parser.error("--rest-force-boiler must be on|off (or 1|0)")
+        args.rest_force_boiler = args.rest_force_boiler.lower()
+        run_rest_force_boiler(args)
         return
 
     if args.host is None:
