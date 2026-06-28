@@ -200,11 +200,16 @@ static uint8_t satGetEffectiveHeatingSystem()
   return settings.sat.iHeatingSystem;
 }
 
-// Returns the effective heating source (resolves AUTO via the OT cooling-capable detect). TASK-891.8
+// Returns the effective heating source for CONTROL. The manual satsource setting is
+// authoritative; AUTO resolves to a safe gas-boiler default. (TASK-943, supersedes the
+// TASK-891.8 auto-detect-drives-control behaviour.) OpenTherm has no reliable source-class
+// signal — the cooling-capable bit is a lossy proxy (heating-only heat pumps don't set it,
+// hybrid is invisible on one bus) — so source selection is configuration, not detection.
+// state.sat.iDetectedHeatingSource is kept as a non-control telemetry hint only.
 static uint8_t satGetEffectiveHeatingSource()
 {
   if (settings.sat.iHeatingSource == SAT_SRC_AUTO)
-    return state.sat.iDetectedHeatingSource;
+    return SAT_SRC_GAS_BOILER;
   return settings.sat.iHeatingSource;
 }
 

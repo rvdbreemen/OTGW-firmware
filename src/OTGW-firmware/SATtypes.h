@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.280
+**  Version  : v2.0.0-alpha.281
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -45,7 +45,7 @@ enum SATHeatingSystem : uint8_t {
 // Heating SOURCE = energy device (drives min-on / cycles / max-setpoint timing + MM=100% for
 // heat pumps). Orthogonal to the heating system. (TASK-891.8, George+Robert 2026-06-20)
 enum SATHeatingSource : uint8_t {
-  SAT_SRC_AUTO       = 0,  // Auto-detect from OT MsgID 3 (cooling-enabled => heat pump)
+  SAT_SRC_AUTO       = 0,  // Default: control uses gas-boiler timing; detection is a non-control hint only (TASK-943)
   SAT_SRC_GAS_BOILER = 1,  // Gas/oil boiler
   SAT_SRC_HEAT_PUMP  = 2,  // Heat pump
   SAT_SRC_HYBRID     = 3   // Heat pump + separate gas boiler (manual; coordination = TASK-892)
@@ -211,7 +211,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bFallbackActive       = false;
   SATFallbackReason eFallbackReason = SAT_FB_NONE;
   // Heating system detection
-  uint8_t  iDetectedHeatingSource  = SAT_SRC_GAS_BOILER; // auto-detected heating source from OT MsgID 3 (cooling-capable => heat pump)
+  uint8_t  iDetectedHeatingSource  = SAT_SRC_GAS_BOILER; // NON-CONTROL hint from OT MsgID 3 HB bit2 (cooling-capable => heat pump). Telemetry only; control uses manual satsource (TASK-943).
   // Manufacturer detection
   uint8_t  iDetectedManufacturer  = SAT_MFR_OTHER;      // auto-detected from OT MsgID 3 valueLB
   uint8_t  iSlaveMemberID        = 0;                   // raw slave MemberID code from MsgID 3

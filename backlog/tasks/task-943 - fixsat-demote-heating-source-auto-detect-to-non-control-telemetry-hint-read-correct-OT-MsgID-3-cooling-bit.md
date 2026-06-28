@@ -1,0 +1,29 @@
+---
+id: TASK-943
+title: >-
+  fix(sat): demote heating-source auto-detect to non-control telemetry hint;
+  read correct OT MsgID 3 cooling bit
+status: In Progress
+assignee:
+  - '@claude'
+created_date: '2026-06-28 12:47'
+updated_date: '2026-06-28 12:51'
+labels: []
+dependencies: []
+ordinal: 156000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Beta-readiness review found the SAT heating-source auto-detect (state.sat.iDetectedHeatingSource) is (a) mis-wired — set inside print_vh_configmemberid (OTGW-Core.ino:2829), which decodes OT MsgID 74 ventilation config, keyed on ventilation bit0, NOT the intended MsgID 3 cooling bit; and (b) CONTROL-AFFECTING — satGetEffectiveHeatingSource() (SATcontrol.ino:204) resolves AUTO (the default) to iDetectedHeatingSource, which feeds boiler-command limits (maxSetpoint 40C cap, HP cycle, base offset). OpenTherm spec v4.2 has no device-class field; the only proxy is MsgID 3 HB bit2 'cooling supported', which is lossy (heating-only heat pumps do not set it; hybrid is invisible on one OT bus). Maintainer steer: source selection should be manual configuration, not unreliable auto-detection. Fix: make manual satsource authoritative for control (AUTO resolves to a safe GAS_BOILER default), move the detect read to the correct MsgID 3 HB bit2 (0x0400) but surface it only as a non-control telemetry hint (heating_source_detected). Spec evidence: OpenTherm-Protocol-Specification-v4.2.md:1606.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 satGetEffectiveHeatingSource() AUTO branch returns SAT_SRC_GAS_BOILER (manual selection remains authoritative; iDetectedHeatingSource no longer drives control)
+- [x] #2 Detection read removed from print_vh_configmemberid (MsgID 74) and added to the MsgID 3 slave-config handler, reading HB bit2 (& 0x0400 = cooling supported)
+- [x] #3 iDetectedHeatingSource documented as a non-control telemetry hint; comments at SATtypes.h:214 and the moved code corrected to match
+- [ ] #4 Build green for esp32 target (per-env SUCCESS line verified, not just exit 0); evaluate.py --quick clean
+- [ ] #5 Field note: detected hint vs manual selection behaves sensibly on a real device (hardware-gated, deferred to field)
+<!-- AC:END -->
