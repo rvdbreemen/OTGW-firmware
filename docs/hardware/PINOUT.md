@@ -168,5 +168,40 @@ Capabilities: `HAS_PIC=1`, `HAS_DIRECT_OT=1`, `HAS_PIC_WATCHDOG=1` (0x26 feed
 runtime-gated on PIC mode; ESP32 TWDT always on), `HAS_RUNTIME_HW_DETECT=1`,
 OTGW32 peripheral set (Ethernet/OLED/SAT/BLE/weather).
 
+### 4a. Third combo variant — S3 Mini Pro in the Classic socket (ADR-157)
+
+The combo also boot-detects a **LOLIN S3 Mini Pro** dropped into the Classic
+socket and selects a third pin map (`PIN_CLASSIC_PRO_*`). The Pro reroutes its
+headers to free GPIO 33–36 for its on-board TFT, so the GPIO behind each
+D1-mini hole differs from the plain S3 Mini; only the PIC UART (43/44) is the
+same. Detection is the Pro's on-board **QMI8658C IMU** (I2C 0x6A/0x6B,
+WHO_AM_I=0x05) on the Pro I2C bus (11/12), probed before the 0x26 watchdog
+disarm. An IMU hit ⇒ Classic + PIC + Pro pin map; cached/forced via
+`settings.iBoardMode=3`.
+
+| Macro | S3 GPIO | From hole | Classic signal |
+|---|---|---|---|
+| `PIN_CLASSIC_PRO_PIC_RST` | **40** | D5 | PIC reset (= TFT SCK, cosmetic) |
+| `PIN_CLASSIC_PRO_I2C_SCL` | **11** | D1 | I2C SCL (0x26 watchdog + OLED + IMU) |
+| `PIN_CLASSIC_PRO_I2C_SDA` | **12** | D2 | I2C SDA |
+| `PIN_CLASSIC_PRO_BUTTON` | **13** | D3 | Config/reset button |
+| `PIN_CLASSIC_PRO_LED1` | **14** | D4 | LED1 (active LOW) |
+| `PIN_CLASSIC_PRO_LED2` | **41** | D0 | LED2 (active LOW) |
+
+Conflicting GPIO positions vs the OTGW32 base (resolved by the runtime
+accessors, one owner per boot — Ethernet inits only in OTDirect mode):
+
+| GPIO | Classic-Pro | OTGW32 |
+|---|---|---|
+| 11 | I2C SCL | W5500 SPI MOSI |
+| 12 | I2C SDA | W5500 SPI SCK |
+| 13 | button | W5500 SPI MISO |
+| 14 | LED1 | W5500 CS |
+
+Verified against the WEMOS `S3_MINI_PRO` schematic (P2/P3 "Pins" sheet) and the
+Arduino variant `lolin_s3_mini_pro/pins_arduino.h`. The Pro stays the
+`otgw-classic` hardware-type slug (ADR-113); the module distinction is
+diagnostic only.
+
 Historical combo rationale: `docs/hardware/combo-esp32-s3-pinout.md`,
-ADR-125 → ADR-126 → revived as ADR-127.
+ADR-125 → ADR-126 → revived as ADR-127 → S3 Mini Pro added by ADR-157.

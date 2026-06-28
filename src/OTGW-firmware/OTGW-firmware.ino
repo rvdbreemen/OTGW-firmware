@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.280
+**  Version  : v2.0.0-alpha.281
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -166,10 +166,10 @@ static void appendBootDetectLog()
   // Build the new detection line (mirrors the log_e console format).
   char newline[BOOTDETECT_LINE_LEN] = {0};
   snprintf_P(newline, sizeof(newline),
-    PSTR("boot#%u t=%lums eMode=%d pic=%d mode=%d RST=%d RX=%d TX=%d I2C(classic)=%d/%d\n"),
+    PSTR("boot#%u t=%lums eMode=%d pic=%d mode=%d pro=%d RST=%d RX=%d TX=%d I2C=%d/%d\n"),
     bootNum, (unsigned long)millis(),
     (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode,
-    PIN_PIC_RST, PIN_PIC_RX, PIN_PIC_TX, PIN_CLASSIC_I2C_SDA, PIN_CLASSIC_I2C_SCL);
+    (int)state.hw.bClassicPro, activePicRst(), PIN_PIC_RX, PIN_PIC_TX, activeI2cSda(), activeI2cScl());
 
   // Write newest-first into a temp file, then append up to LINES-1 prior lines.
   File outfh = LittleFS.open(BOOTDETECT_TMP, "w");
@@ -201,6 +201,31 @@ static void appendBootDetectLog()
   LittleFS.rename(BOOTDETECT_TMP, BOOTDETECT_FILE);
 }
 
+// ADR-157: detect a LOLIN S3 Mini Pro in the Classic socket via its on-board
+// QMI8658C 6-axis IMU. The Pro reroutes its headers (Classic I2C on 11/12, not
+// the S3 Mini's 35/36), so this MUST run before the 0x26 watchdog disarm to pick
+// the right Classic bus. The probe is a passive I2C read of WHO_AM_I at both
+// possible addresses (SA0 strap) with a chip-id check, so a stray device on a
+// non-Pro bus cannot trigger a false positive. On a plain S3 Mini those GPIOs
+// carry MOSI/PIC-reset and on an OTGW32 they carry W5500 SPI — a brief probe
+// there is benign (it precedes both the PIC and W5500 init).
+static bool probeProImu()
+{
+  Wire.end();                                       // core 3.x: no silent re-pin
+  Wire.begin(PIN_CLASSIC_PRO_I2C_SDA, PIN_CLASSIC_PRO_I2C_SCL);
+  bool found = false;
+  const uint8_t addrs[2] = { PRO_IMU_I2C_ADDR_LO, PRO_IMU_I2C_ADDR_HI };
+  for (uint8_t i = 0; i < 2 && !found; i++) {
+    Wire.beginTransmission(addrs[i]);
+    Wire.write((uint8_t)PRO_IMU_WHOAMI_REG);
+    if (Wire.endTransmission(false) != 0) continue; // no ACK at this address
+    if (Wire.requestFrom((int)addrs[i], 1) != 1) continue;
+    if (Wire.read() == PRO_IMU_WHOAMI_VALUE) found = true;
+  }
+  Wire.end();
+  return found;
+}
+
 // ADR-127: after hardware-mode resolution the live pin map may differ from the
 // pre-detection Classic default (or from the previous persisted mode). Move
 // I2C, the ledc LED channels and the OLED (incl. its button pinMode) onto the
@@ -223,14 +248,25 @@ void setup() {
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
 
+#if HAS_RUNTIME_HW_DETECT
+  // ADR-157: decide S3 Mini vs S3 Mini Pro BEFORE the 0x26 watchdog disarm,
+  // because the Pro's watchdog (and its IMU) live on a different Classic I2C bus
+  // (11/12 vs 35/36). Settings are not read yet, but the IMU is a hardware fact
+  // so the live probe is self-sufficient; a cached/forced iBoardMode override is
+  // applied after readSettings() via the re-pin below. activeI2c*() then resolves
+  // to the Pro bus when a Pro is found.
+  state.hw.bClassicPro = probeProImu();
+#endif
+
   // I2C must be on the board's pins BEFORE the watchdog-disarm below. On the
   // ESP8266 the Wire defaults happen to equal PIN_I2C_SDA/SCL (4/5), but on the
-  // ESP32-S3 Classic they do not (35/36 vs core defaults) — without this the
-  // 0x26 disarm goes out on the wrong pins and an armed watchdog from the
-  // previous session can reset the board mid-WiFi-portal. On the combo board
-  // (ADR-127) settings are not read yet, so activeI2c*() resolves to the
-  // CLASSIC pins — exactly where a real 0x26 lives; on an OTGW32 those pins
-  // float and the disarm is a NACKed no-op. Fixed boards: PIN_I2C_SDA/SCL.
+  // ESP32-S3 Classic they do not (35/36, or 11/12 on a Pro, vs core defaults) —
+  // without this the 0x26 disarm goes out on the wrong pins and an armed
+  // watchdog from the previous session can reset the board mid-WiFi-portal. On
+  // the combo board (ADR-127/157) settings are not read yet, so activeI2c*()
+  // resolves to the CLASSIC (or Pro, per the probe above) pins — exactly where a
+  // real 0x26 lives; on an OTGW32 those pins float and the disarm is a NACKed
+  // no-op. Fixed boards: PIN_I2C_SDA/SCL.
   Wire.begin(activeI2cSda(), activeI2cScl());
   WatchDogEnabled(0); // turn off watchdog
 
@@ -310,14 +346,20 @@ void setup() {
   } else {
     // UART1 was closed before the WiFi portal; re-open it for the PIC probe.
     OTGWSerial.begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX);
-    if (settings.iBoardMode == 1) {
+    // ADR-157: bind the PIC reset / firmware-progress-LED to the live Classic
+    // pin map (S3 Mini vs S3 Mini Pro) BEFORE detectPIC() drives them. The PIC
+    // UART (RX/TX) is identical on both modules, so only reset+LED move.
+    OTGWSerial.setResetPin(activePicRst());
+    OTGWSerial.setProgressLed(activeLed2());
+    if (settings.iBoardMode == 1 || settings.iBoardMode == 3) {
       SetupDebugln(F("Board mode: forced PIC"));
       detectPIC();               // sets HW_MODE_PIC, or HW_MODE_DEGRADED if dead
     } else {
       SetupDebugln(F("Board mode: auto — PIC-probe-first"));
       detectPIC();               // drives only the PIC pins; benign on OTGW32
       if (isPICEnabled()) {
-        settings.iBoardMode = 1; // cache: this is a PIC (Classic) board
+        // cache: PIC board — Pro (3) when the IMU probe flagged it, else S3 Mini (1)
+        settings.iBoardMode = state.hw.bClassicPro ? 3 : 1;
       } else {
         // No PIC: tear down UART1 again BEFORE OT-direct, so a floating PIC-RX
         // pin can't drive an RX interrupt storm (ADR-125 field finding).
@@ -335,9 +377,9 @@ void setup() {
   // Boot-time detection result to the ESP-IDF/USB console (ERROR level = always
   // printed, regardless of CORE_DEBUG_LEVEL; appears next to any task_wdt lines).
   // This is the ground-truth probe: did detection find the PIC, on which pins?
-  log_e("[combo] detect: eMode=%d picEnabled=%d boardMode=%d (RST=%d RX=%d TX=%d I2C(classic)=%d/%d)",
-        (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode,
-        PIN_PIC_RST, PIN_PIC_RX, PIN_PIC_TX, PIN_CLASSIC_I2C_SDA, PIN_CLASSIC_I2C_SCL);
+  log_e("[combo] detect: eMode=%d picEnabled=%d boardMode=%d pro=%d (RST=%d RX=%d TX=%d I2C=%d/%d)",
+        (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode, (int)state.hw.bClassicPro,
+        activePicRst(), PIN_PIC_RX, PIN_PIC_TX, activeI2cSda(), activeI2cScl());
   // Durable copy of the detection result to LittleFS (/bootdetect.log),
   // readable via FSexplorer after a power cycle when no console is attached.
   appendBootDetectLog();

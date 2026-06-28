@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.280
+**  Version  : v2.0.0-alpha.281
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3282,8 +3282,9 @@ void sendDeviceSettings()
   addBool(F("nightlyrestart"), settings.bNightlyRestart, "b");
   addInt(F("nightlyrestarthour"), (int)settings.iRestartHour, "i", 0, 23);
 #if HAS_RUNTIME_HW_DETECT
-  // ADR-127 combo: persisted hardware-mode selector (0=auto, 1=pic, 2=otdirect).
-  addInt(F("boardmode"), (int)settings.iBoardMode, "i", 0, 2);
+  // ADR-127/157 combo: persisted hardware-mode selector
+  // (0=auto, 1=pic/S3 Mini, 2=otdirect, 3=pic/S3 Mini Pro).
+  addInt(F("boardmode"), (int)settings.iBoardMode, "i", 0, 3);
 #endif
   addBool(F("ui_autoscroll"), settings.ui.bAutoScroll, "b");
   addBool(F("ui_timestamps"), settings.ui.bShowTimestamp, "b");
