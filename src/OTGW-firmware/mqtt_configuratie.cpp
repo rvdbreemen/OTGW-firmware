@@ -22,6 +22,7 @@
 //   Sensors        : 306 entries (119 unique OT IDs + stats pseudo-ID 247)
 //   Binary sensors : 53 entries (10 unique OT IDs)
 //   Climate        : 2 entries
+//   HVAC sensors   : 2 entries (custom-streamed, TASK-941: hvac_mode + hvac_action)
 //   Number         : 1 entries
 //   Button         : 1 entry  (pseudo-ID 251: resetgateway)
 //   Selects        : 8 entries (pseudo-ID 251: gpioa/gpiob/leda-f)
@@ -2372,6 +2373,114 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
     if (!w.writeProgmem(kIcon)) return false;
     if (!w.writeProgmem(PSTR("\":\"mdi:"))) return false;
     if (!w.writeProgmem(haIconStr(HaIcon::thermometer))) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "value_template":"{{ value }}"
+    if (!writeJsonKV_P(w, kValTpl, kValTplVal)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // origin block
+    if (!writeOriginBlock(w, ctx)) return false;
+
+    return writeJsonClose(w);
+  };
+
+  // Measure pass
+  MqttJsonWriter measure(MqttJsonWriter::MEASURE);
+  if (!compose(measure)) return false;
+
+  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+
+  // Write pass
+  MqttJsonWriter writer(MqttJsonWriter::WRITE);
+  if (!compose(writer) || !writer.ok) {
+    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    return false;
+  }
+
+  if (!client.endPublish()) return false;
+
+  incPublishedTopicCount();   // ADR-062 / TASK-349
+  feedWatchDog();
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// Public API: streamHvacSensorDiscovery (TASK-941 / GH #665 follow-up)
+// Standalone discoverable HA SENSOR entities mirroring the climate entity's
+// backing topics: hvacIdx 0 -> hvac_mode (off/heat/cool, from the master enable
+// bits), hvacIdx 1 -> hvac_action (from the slave actual bits). The state topics
+// already exist (publishHvacMode/publishHvacAction in OTGW-Core.ino); this only
+// adds the discovery so the values are visible as plain sensors, not only inside
+// the climate card. HA allows the climate entity and these sensors to share the
+// same state topics.
+// ---------------------------------------------------------------------------
+bool streamHvacSensorDiscovery(PubSubClient &client,
+                               uint8_t hvacIdx,
+                               HaDiscoveryContext &ctx)
+{
+  if (!client.connected()) return false;
+  if (!canPublishMQTT()) return false;
+  if (ESP.getFreeHeap() < STREAM_HEAP_MIN) return false;
+  if (hvacIdx > 1) return false;
+
+  // suffix doubles as the topic segment AND the value sub-topic (publishHvacMode/
+  // publishHvacAction send to <mqttPubTopic>/hvac_mode and /hvac_action).
+  const char *suffix    = (hvacIdx == 0) ? PSTR("hvac_mode")  : PSTR("hvac_action");
+  const char *prettyName = (hvacIdx == 0) ? PSTR("HVAC Mode") : PSTR("HVAC Action");
+  const char *iconName   = (hvacIdx == 0) ? PSTR("mdi:thermostat-auto") : PSTR("mdi:hvac");
+
+  // topic: <haPrefix>/sensor/<nodeId>/hvac_mode|hvac_action/config
+  char topic[STREAM_TOPIC_MAX];
+  int n = snprintf_P(topic, sizeof(topic), PSTR("%s/sensor/%s/%S/config"),
+                     ctx.haPrefix, ctx.nodeId, (PGM_P)suffix);
+  if (n <= 0 || static_cast<size_t>(n) >= sizeof(topic)) return false;
+
+  auto compose = [&](MqttJsonWriter &w) -> bool {
+    if (!writeJsonOpen(w)) return false;
+
+    // "avty_t"
+    if (!writeJsonKV(w, kAvtyT, ctx.mqttPubTopic)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // device block
+    if (!writeDeviceBlock(w, ctx)) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "uniq_id":"<nodeId>-hvac_mode|-hvac_action"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kUniqId)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeRam(ctx.nodeId)) return false;
+    if (!w.writeChar('-')) return false;
+    if (!w.writeProgmem(suffix)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "name":"HVAC Mode|HVAC Action"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kName)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeProgmem(prettyName)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "stat_t":"<mqttPubTopic>/hvac_mode|hvac_action"
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kStatT)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeRam(ctx.mqttPubTopic)) return false;
+    if (!w.writeChar('/')) return false;
+    if (!w.writeProgmem(suffix)) return false;
+    if (!w.writeChar('"')) return false;
+    if (!writeJsonComma(w)) return false;
+
+    // "icon":"mdi:..."
+    if (!w.writeChar('"')) return false;
+    if (!w.writeProgmem(kIcon)) return false;
+    if (!w.writeProgmem(PSTR("\":\""))) return false;
+    if (!w.writeProgmem(iconName)) return false;
     if (!w.writeChar('"')) return false;
     if (!writeJsonComma(w)) return false;
 

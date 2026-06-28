@@ -367,6 +367,12 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
                                  const char *sensorAddress,
                                  HaDiscoveryContext &ctx);
 
+// TASK-941 / GH #665 follow-up: standalone discoverable HA sensors for the
+// climate entity's backing topics. hvacIdx 0 -> hvac_mode, 1 -> hvac_action.
+bool streamHvacSensorDiscovery(PubSubClient &client,
+                               uint8_t hvacIdx,
+                               HaDiscoveryContext &ctx);
+
 // ADR-082 / TASK-805: JIT HA sensor discovery for an active gateway override.
 bool streamOverrideSensorDiscovery(PubSubClient &client,
                                    uint8_t id,

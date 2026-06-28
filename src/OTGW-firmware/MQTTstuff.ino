@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.7.1-beta.2
+**  Version  : v1.7.1-beta.3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1745,6 +1745,10 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   if (OTid == 0) {
     if (streamClimateDiscovery(MQTTclient, 0, ctx)) result = true;
     if (streamClimateDiscovery(MQTTclient, 1, ctx)) result = true;
+    // TASK-941 / GH #665 follow-up: standalone hvac_mode + hvac_action sensors,
+    // grouped with the status-derived (OT ID 0) entities they reflect.
+    if (streamHvacSensorDiscovery(MQTTclient, 0, ctx)) result = true;
+    if (streamHvacSensorDiscovery(MQTTclient, 1, ctx)) result = true;
   }
   // Number (OT ID 27)
   if (OTid == 27) {
