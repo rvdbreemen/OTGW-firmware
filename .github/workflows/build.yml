@@ -28,7 +28,14 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          submodules: recursive
+          # Do NOT fetch submodules recursively here: the read-only `other-projects`
+          # reference submodule points at a repo CI cannot access, which aborts the
+          # whole checkout. The firmware build only needs the two vendored libraries
+          # that aren't already in-tree; init just those below.
+          submodules: false
+
+      - name: Init build submodules (skip read-only other-projects reference)
+        run: git submodule update --init --recursive src/libraries/OpenTherm src/libraries/SimpleTelnet
 
       - name: Setup Python
         uses: actions/setup-python@v5
