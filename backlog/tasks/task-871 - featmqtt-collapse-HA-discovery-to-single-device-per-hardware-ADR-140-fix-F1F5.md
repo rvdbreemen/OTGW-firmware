@@ -6,7 +6,7 @@ title: >-
 status: In Review
 assignee: []
 created_date: '2026-06-15 14:21'
-updated_date: '2026-06-27 18:57'
+updated_date: '2026-06-28 21:32'
 labels: []
 dependencies: []
 ordinal: 87000
@@ -47,4 +47,8 @@ Triage 2026-06-21: code already implemented + committed (single-device collapse 
 3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert.
 
 Live HA-discovery validation 2026-06-27: OTGW32 ESP32-S3 (uniqueid otgw-1020BA21B4F8) on alpha.279+5b158a1, publishing to the real home HA broker (192.168.88.25). Captured 110 retained discovery configs (homeassistant/+/otgw-1020BA21B4F8/+/config). CONFIRMED: (AC#3 part) exactly ONE HA device -- all 108 parseable configs share a single identifier set ('otgw-1020BA21B4F8'), 0 via_device anywhere (AC#2/#3); (AC#5) device-block fields JSON-escaped and valid (manufacturer 'NodoShop', model 'OTGW', name 'OpenTherm Gateway (OTGW)'); (AC#7) all entities bound to the one device. OPEN ISSUE on AC#3 'full device block on FIRST entity only': observed 52 full device blocks (binary_sensor 34, switch 13, climate 2, sensor 4) vs 55 bare (sensor 46, select 8, number 1). The isFirstEntity gate (MQTTstuff.ino:2273/2339, dripDeviceInfoPending) exists, but the full block rides many entities because dripDeviceInfoPending is re-marked per drip cycle, so 'first-entity-only' does not hold across cycles. This is a payload inefficiency, not a topology break (HA still renders one device). MAINTAINER DECISION: is the per-drip-cycle full-block emission intended, or should F1 tightening reduce it to one full block per discovery pass? Evidence: %LOCALAPPDATA%/OTGW-capture/ha-discovery-alpha279-otgw32-1020BA21B4F8-20260627.txt. NOTE: also found ~110 stale retained configs from older firmware (alpha.202/alpha.236) orphaned on the home broker from prior sessions.
+
+MAINTAINER DECISION 2026-06-28 (B-2): Tighten F1 to ONE full device-block per discovery pass, abbreviated thereafter. Topology already validated single-device (AC#7). Resolves AC#4 ambiguity: per-drip-cycle full-block is NOT intended.
+
+AC#4 F1 VERIFIED ALREADY-CORRECT (no code needed), 2026-06-28: traced the full drip path. writeDeviceBlock (MQTTHaDiscovery.cpp:2298) emits the FULL device block (mfr/model/name/sw) only under ctx.isFirstEntity; every other entity gets the minimal ids-only block, which ADR-140 REQUIRES so HA binds all ~52 entities to the one device. dripDeviceInfoPending (MQTTstuff.ino:2002/2058) is set once per discovery pass and cleared after the first successful drip publish (MQTTstuff.ino:2207); within a single msgId's multi-entity publish, isFirstEntity is reset to false after the first entity. Net = exactly ONE full block per discovery pass + N required minimal id-blocks. The earlier '52 full blocks' observation conflated the minimal id-blocks (correct, required) with the full block (already 1). The B-2 'tighten to 1/pass' decision is therefore satisfied by existing code; no change made.
 <!-- SECTION:NOTES:END -->
