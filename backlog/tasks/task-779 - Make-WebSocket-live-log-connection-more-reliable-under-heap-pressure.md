@@ -1,11 +1,11 @@
 ---
 id: TASK-779
 title: Make WebSocket live-log connection more reliable under heap pressure
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 12:48'
-updated_date: '2026-06-21 07:51'
+updated_date: '2026-06-29 21:48'
 labels:
   - bug
   - websocket
@@ -85,4 +85,12 @@ No other 2.0.0 work is code-actionable: To Do all excluded (2.1.0: 641/648/687; 
 STRUCTURAL IMPLEMENTATION COMPLETE (alpha.226), ADR-121 Option B. helperStuff.ino: added WS_HEAP_*/MQTT_HEAP_* ladders (=shared defaults, behaviour-equivalent step-1), heapTierWithThresholds() helper, getHeapHealthForWebSocket()/getHeapHealthForMQTT() (each keeps the canonical ADR-089 counters live via getHeapHealth()); canSendWebSocket/canPublishMQTT now consult their own ladder. OTGW-firmware.h: declarations. evaluate.py: check_per_consumer_heap_gate added + PASSES (67 passed, 0 fail, 98.7%); existing ADR-089 gates still PASS (getHeapHealth untouched). 3-target build green at alpha.226. AC#9: ADR-121 is the per-consumer ADR (Accepted, binding amendment to ADR-089; AC text says ADR-030 but ADR-089 already amended ADR-030). REMAINING (telemetry/field, deferred per ADR-121 AC#8): #1 logHeapStats characterization, #3 coalescing/drop-to-latest beyond throttle, #4 ESP32-S3 bench survival, #8 telemetry-driven relaxed MQTT values. #7 (GeorgeZ83 NodeMCU-v3) is OBSOLETE (ESP8266 dropped). Moving to In Review: the independent-ladder STRUCTURE (the ADR-121 decision) is shipped; relaxed-value tuning awaits device telemetry.
 
 3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert. (779 has no pure-build AC; build-half noted.)
+
+CLOSED 2026-06-29 per maintainer: the underlying WebSocket live-log heap-reliability issue is FIXED by the 1.7.0 release (1.x line). The dev/2.0.0 work tracked here is superseded by that fix; the open ACs (heap characterisation, WS backpressure/coalescing, MQTT gate relaxation, GeorgeZ83 field soak) are no longer needed as separate 2.0.0 deliverables. Maintainer decision (Robert).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+WebSocket live-log heap reliability resolved by the 1.7.0 release. Closed as fixed-by-release; remaining 2.0.0 ACs superseded.
+<!-- SECTION:FINAL_SUMMARY:END -->
