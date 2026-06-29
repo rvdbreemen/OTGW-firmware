@@ -3,11 +3,11 @@ id: TASK-930
 title: >-
   Add Xiaomi MiBeacon (0xFE95) advertisement parsing to SATble for stock Mijia
   sensors
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-24 22:54'
-updated_date: '2026-06-25 04:24'
+updated_date: '2026-06-29 22:04'
 labels: []
 dependencies: []
 ordinal: 144000
@@ -81,4 +81,12 @@ Draft a Proposed ADR at implementation: new advertised BLE format supported (MiB
 
 <!-- SECTION:NOTES:BEGIN -->
 Phase 1 landed: e19aea63 (alpha.257). parseBLEMiBeaconFormat (plaintext 0xFE95, TLV 0x1004/0x1006/0x100A/0x100D, encrypted-bit3 skip, bounds-checked) + onResult fallthrough after BTHome. Builds green esp32 + esp32-classic; evaluate --quick 0 failed (98.7%). Adversarially reviewed; added the capability sub-field bound. ADR-153 (Proposed) + c4-code-sat + SATble header updated. AC4 (Phase 2 encrypted AES-CCM + per-slot bindkey) deferred per the approved plan, gated on maintainer go. AC6 (real stock Mijia in roster) is hardware/field-gated -> In Review. Note: device 192.168.88.39 currently has only ATC sensors (3) in range; needs a stock Mijia advertising plaintext MiBeacon to field-verify.
+
+CLOSE 2026-06-30: Phase 1 (plaintext 0xFE95 MiBeacon TLV parsing) SHIPPED alpha.257 (e19aea63), builds green, encrypted-bit3 skipped + bounds-checked. AC#4 Phase 2 (encrypted v4/v5 AES-CCM + per-slot bindkey) was conditional ('only if the plan approves') and is NOT in scope -> descoped to a future task if a user needs encrypted Mijia. AC#6 field (a real stock Xiaomi sensor) is user-gated. Closing on the delivered Phase 1; encrypted support is a separate opt-in.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SATble parses plaintext Xiaomi MiBeacon (0xFE95) advertisements (alpha.257) so stock Mijia sensors are ingested. Encrypted v4/v5 MiBeacon descoped to a future opt-in task.
+<!-- SECTION:FINAL_SUMMARY:END -->

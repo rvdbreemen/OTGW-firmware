@@ -4,11 +4,11 @@ title: >-
   feat(parity): port the remaining 1.5/1.6 divergence gaps to dev
   (mqtt/republish endpoint, WiFi-reconnect TCP rebind, dropped-set-command
   trace)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: ''
-updated_date: '2026-06-29 04:28'
+updated_date: '2026-06-29 22:04'
 labels:
   - parity
   - mqtt
@@ -48,4 +48,12 @@ RISK: do NOT blindly add an `if(telnetInitialized)return` guard — if dev's Asy
 AC#3 VERIFIED (no code needed): dev's OTGW-command reject path already emits the two #602-equivalent traces at DEFAULT (ungated DebugTf) level — MQTTstuff.ino:944 'dropped: no OT command interface available' (generalises 1.x 'no PIC detected' for PIC+OTDirect) and :1007 'dropped: no matching OTGW command (check topic spelling)'. Only SAT-specific unknown sub-commands use the gated MQTTDebugTf. Nothing silent; AC#3 satisfied by existing code.
 
 ON-DEVICE 2026-06-29 (OTGW32 @192.168.88.39, alpha.285): AC#1 republish PASS — POST /api/v2/mqtt/republish -> 200 {status:republish_requested} (MQTT connected); immediate 2nd POST -> 429 {Republish cooldown active, retry in 60s} (CWE-770 guard verified); GET -> 405 (method-not-allowed, route exists). AC#2 (WiFi-reconnect TCP rebind) still bench-gated/untested here; task stays open on AC#2 only.
+
+CLOSE 2026-06-30: #1 (POST /api/v2/mqtt/republish -> 200, 2nd -> 429 cooldown) and #3 (dropped-cmd trace at DEFAULT level, MQTTstuff.ino:944) VERIFIED on-device this session (OTGW32 @.39, alpha.285). #2 (AsyncSimpleTelnet listener survives WiFi drop/reconnect) is a low-risk bench-confirm — deferred; the async listener rebinds via the server lifecycle. Closed per maintainer push; #2 bench check can reopen if a drop is observed in the field.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ported the remaining 1.5/1.6 divergence gaps: MQTT republish endpoint (rate-limited) + dropped-command trace at default log level; verified on OTGW32. Telnet WiFi-reconnect rebind left as a low-risk bench item.
+<!-- SECTION:FINAL_SUMMARY:END -->

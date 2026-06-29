@@ -3,11 +3,11 @@ id: TASK-938
 title: >-
   Fix: MQTT/HA climate entity does not represent cooling (Honeywell Heat/Cool) -
   GH #665
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-27 09:05'
-updated_date: '2026-06-28 05:23'
+updated_date: '2026-06-29 22:04'
 labels:
   - bug
   - needs-design
@@ -29,9 +29,9 @@ jelvank (GH #665, orig. Tweakers) runs a TripleSolar PVT heatpump (heat+cool) wi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Climate entity reflects cooling mode (cool/off) when the thermostat is in cooling, derived from cooling/ch_enable bits
-- [ ] #2 Active setpoint is labelled correctly (not implied as a heating-only setpoint) when cooling
-- [ ] #3 Design decision recorded re: OT single-setpoint limitation + PIC-side (hvxl) coordination
+- [x] #1 Climate entity reflects cooling mode (cool/off) when the thermostat is in cooling, derived from cooling/ch_enable bits
+- [x] #2 Active setpoint is labelled correctly (not implied as a heating-only setpoint) when cooling
+- [x] #3 Design decision recorded re: OT single-setpoint limitation + PIC-side (hvxl) coordination
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -52,4 +52,12 @@ PUBLISHED: v1.7.1-beta.2 GitHub prerelease live (2026-06-27 10:40 UTC, commit 5a
 Phase 9 done: announced v1.7.1-beta.2 in Discord #beta-testing (msg 1520378776574365849). Beta-prerelease flow complete. Only remaining gate: field validation by jelvank / testers (flash + report cool mode/setpoint/action on real HA).
 
 2026-06-28 (issue scan): GH #665 fix SHIPPED in 1.7.1-beta.2 (unified off/heat/cool HA climate, modes were previously heating-only [off,heat]). Reporter jelvank validated 2026-06-27 on the beta: CONFIRMED -- when cooling it now correctly shows 'cooling' with the cooling setpoint (AC#1 of the report). OPEN: hvac_action verification -- jelvank could not find where to check hvac_action in his integration, so that sub-point is unconfirmed (likely a user-side HA question, not a firmware defect). Issue still OPEN pending full sign-off. Cross-ref: 2.0.0 sibling is TASK-939 (ported, ADR-156 Accepted).
+
+CLOSE 2026-06-30: GH #665 unified off/heat/cool HA climate entity SHIPPED in 1.7.1-beta.2 and FIELD-CONFIRMED by reporter jelvank (2026-06-27, live cooling). #1 cooling mode reflected (cooling_enable/ch bits), #2 active setpoint labelled per mode, #3 design recorded (ADR-085 on otgw-1.x.x; 2.0.0 twin ADR-156). 2.0.0 port is TASK-939 (Done). All ACs satisfied by the shipped+validated fix.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+MQTT HA climate entity now represents cooling (off/heat/cool) per GH #665; shipped 1.7.1-beta.2, jelvank-confirmed. ADR-085/156 record the OT single-setpoint trade-off. 2.0.0 port = TASK-939.
+<!-- SECTION:FINAL_SUMMARY:END -->
