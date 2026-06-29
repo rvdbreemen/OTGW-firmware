@@ -153,7 +153,9 @@ recovery only.
   were a user decision.
 - No resolver change and no new state: `comboActivePinMap()` already derives the
   AUTO map from transient `state.hw.bClassicPro` and `state.hw.eMode`, so the
-  fix is a deletion (the cache-back at `OTGW-firmware.ino:314, 320`), which
+  fix is a deletion (the cache-back writes were removed from the AUTO branch of
+  the hardware-mode resolution block in `setup()`, `OTGW-firmware.ino` ~L346-L385,
+  post-TASK-947 tree), which
   lowers complexity rather than adding it. It is a net code reduction, so it does
   not grow the combo image, which ADR-127 measured at 98.4% of the 1.875 MB app
   slot (roughly 30 KB headroom).
