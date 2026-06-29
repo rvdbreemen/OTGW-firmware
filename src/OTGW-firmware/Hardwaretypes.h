@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Hardwaretypes.h
-**  Version  : v2.0.0-alpha.281
+**  Version  : v2.0.0-alpha.288
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -37,6 +37,6 @@ struct HardwareSection {       // state.hw — detected hardware capabilities
   bool bEthernetPresent        = false;
 #endif
 #if HAS_RUNTIME_HW_DETECT
-  bool bClassicPro             = false;   // ADR-157: LOLIN S3 Mini Pro in the Classic socket (IMU-detected; different Classic pin map)
+  bool bClassicPro             = false;   // ADR-158: LOLIN S3 Mini Pro in the Classic socket (IMU-detected; different Classic pin map)
 #endif
 };

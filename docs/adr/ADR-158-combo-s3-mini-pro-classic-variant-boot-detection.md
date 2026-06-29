@@ -1,4 +1,4 @@
-# ADR-157 Combo board: add the LOLIN S3 Mini Pro as a third boot-detected Classic variant
+# ADR-158 Combo board: add the LOLIN S3 Mini Pro as a third boot-detected Classic variant
 
 ## Status
 

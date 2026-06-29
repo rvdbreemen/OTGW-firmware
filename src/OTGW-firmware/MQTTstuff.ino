@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.281
+**  Version  : v2.0.0-alpha.288
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1992,6 +1992,7 @@ void publishNonOTDiscoveryConfigs()
     return;
   }
   setMQTTConfigPending(0);                  // climate: thermostat + DHW control
+  setMQTTConfigPending(OTGWhvacid);         // TASK-942: hvac_mode/hvac_action companion sensors (faux id 242; not bus-seen, so it must be marked explicitly here or the sensors never publish on boot/reconnect)
   setMQTTConfigPending(27);                 // number: outside temperature override
   setMQTTConfigPending(OTGWdallasdataid);   // Dallas temperature sensors
   setMQTTConfigPending(OTGWheapstatsid);    // heap / discovery statistics
@@ -2563,6 +2564,7 @@ static HaDevice deviceForOTId(byte OTid) {
   // logic in doAutoConfigureMsgid() runs a second pass with Thermostat.
   if (OTid <= 127) return HaDevice::Boiler;  // bilateral, see doAutoConfigureMsgid
   switch (OTid) {
+    case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors
     case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-140, was ADR-124)
     case 244: return HaDevice::Gateway;  // piccontrols
     case 245: return HaDevice::Sensors;  // s0 pulse counter (ADR-140, was ADR-124)

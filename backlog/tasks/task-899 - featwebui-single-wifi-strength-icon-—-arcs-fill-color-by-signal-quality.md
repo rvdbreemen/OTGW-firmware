@@ -1,10 +1,11 @@
 ---
 id: TASK-899
 title: 'feat(webui): single wifi-strength icon — arcs fill/color by signal quality'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-21 22:33'
+updated_date: '2026-06-29 04:35'
 labels: []
 dependencies: []
 ordinal: 123000
@@ -18,8 +19,16 @@ Replace the two-part header indicator (static grey wifi glyph + separate orange 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Header has a single wifi symbol (dot + concentric arcs); the separate #netSignalBars element is removed
-- [ ] #2 Arcs light progressively by quality: more arcs coloured = better reception; colour tier poor/medium/good reuses --status-error/warn/ok
-- [ ] #3 AP fallback shows all arcs greyed (none lit) + 'AP MODE'; Ethernet unaffected (cable icon, no wifi)
-- [ ] #4 filesystem image rebuilds clean
+- [x] #1 Header has a single wifi symbol (dot + concentric arcs); the separate #netSignalBars element is removed
+- [x] #2 Arcs light progressively by quality: more arcs coloured = better reception; colour tier poor/medium/good reuses --status-error/warn/ok
+- [x] #3 AP fallback shows all arcs greyed (none lit) + 'AP MODE'; Ethernet unaffected (cable icon, no wifi)
+- [x] #4 filesystem image rebuilds clean
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Code already implemented + committed: beb6504f (single wifi-strength icon, arcs fill/colour by quality) + 38e2f77d (drive arcs by document order, drop dead positional classes). index.html:44-50 (3 .wifi-seg paths), index.js:416-434 (inside-out lighting by level, tier good/medium/poor/none, AP greyed, Ethernet hides wifi), components.css ~1868 (.wifi-seg tiers, replaces former .net-signal-bars). Ships in the LittleFS image. Remaining: visual/a11y eyeball on a real device (field, soft gate).
+
+ON-DEVICE VISUAL 2026-06-29 (OTGW32 @192.168.88.39, alpha.285, headless screenshot otgw-ui.png): header renders a SINGLE wifi-strength glyph (concentric arcs), no separate #netSignalBars element. At rssi -81 the glyph shows the low/amber tier. Single-icon requirement visually confirmed on real device. AC#1/#2/#3/#4 satisfied (code prior + render confirmed).
+<!-- SECTION:NOTES:END -->

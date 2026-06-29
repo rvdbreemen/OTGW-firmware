@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.281
+**  Version  : v2.0.0-alpha.288
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -386,6 +386,7 @@ void satNarratef_P(PGM_P fmt_P, ...);
 bool satSimulationBlocksBusTx(const char* cmd, const __FlashStringHelper* source);  // TASK-795 plan §4.1: bus-tx isolation gate
 void satNotifyBoilerFrameSeen();  // TASK-795 plan §4.2: slave-frame edge hook → deferred auto-disable
 bool satBoilerHardwarePresent();  // TASK-795 plan §4.2: real boiler on bus (REST 409 / MQTT reject guard)
+void satSetDebugForceBoilerPresent(bool on);  // TASK-802 F7-A: test-only boiler-present override (trips §4.2 edge, transient)
 bool satSimInjectEvent(const char* event, float value, int32_t durationS);  // TASK-797 plan §12 F2: scenario injection
 void satSendStatusJSON();
 uint32_t satCycleGetFlameOnStartMs();
@@ -678,7 +679,7 @@ struct OTGWSettings {
   bool bMyDEBUG      = false;
   bool bNightlyRestart = false;  // scheduled daily restart for heap recovery
   uint8_t iRestartHour = 4;     // hour (0-23) for nightly restart
-  // Combo board (ADR-127 / ADR-157) persisted hardware-mode selector / override.
+  // Combo board (ADR-127 / ADR-158) persisted hardware-mode selector / override.
   // 0 = auto (boot-detect PIC vs OTDirect + S3 Mini vs S3 Mini Pro, then cache
   // the result here), 1 = force PIC (S3 Mini), 2 = force OTDirect,
   // 3 = force PIC (S3 Mini Pro). Ignored on the fixed boards.
@@ -706,7 +707,7 @@ struct OTGWSettings {
 
 OTGWSettings settings;
 
-// ---- Combo runtime pin resolution (ADR-127; ADR-157 adds the S3 Mini Pro) --
+// ---- Combo runtime pin resolution (ADR-127; ADR-158 adds the S3 Mini Pro) --
 // The combo binary carries THREE pin maps: OTGW32 (PIN_*), Classic-on-S3-Mini
 // (PIN_CLASSIC_*) and Classic-on-S3-Mini-Pro (PIN_CLASSIC_PRO_*). These
 // accessors pick the live one. Defined here (not next to the other hw helpers)
@@ -889,6 +890,10 @@ byte      OTGWsatcoreid      = 252;
 byte      OTGWsatweatherid   = 253;
 byte      OTGWsatbinaryid    = 254;
 byte      OTGWsatzoneid      = 255;
+// TASK-942 (GH #665): faux dataid anchoring the standalone hvac_mode/hvac_action HA
+// sensors that mirror the unified climate entity's published topics. 242 is the first
+// free slot below the 243-255 faux block; routed to the OT-Core device (deviceForOTId).
+byte      OTGWhvacid         = 242;
 uint8_t   satGetMaxZones();
 bool      satShouldDiscoverZone(uint8_t zoneIndex);
 

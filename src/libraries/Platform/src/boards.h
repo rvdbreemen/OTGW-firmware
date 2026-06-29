@@ -267,7 +267,7 @@ typedef uint16_t SAT_RING_IDX_T;
   #define PIN_CLASSIC_LED1     16   // D4 hole (active LOW)
   #define PIN_CLASSIC_LED2     4    // D0 hole (active LOW)
 
-  // ---- Classic-on-S3-Mini-Pro pins (ADR-157) ------------------------------
+  // ---- Classic-on-S3-Mini-Pro pins (ADR-158) ------------------------------
   // A LOLIN S3 Mini PRO dropped into the same OTGW Classic socket. The Pro
   // reroutes its 2x8 headers to free GPIO 33-36 for its on-board TFT, so the
   // GPIO behind each D1-mini hole differs from the plain S3 Mini. Verified
@@ -289,7 +289,7 @@ typedef uint16_t SAT_RING_IDX_T;
   #define PIN_CLASSIC_PRO_LED1     14   // D4 hole (active LOW)
   #define PIN_CLASSIC_PRO_LED2     41   // D0 hole (active LOW)
 
-  // Boot discriminator (ADR-157): the Pro carries an on-board QMI8658C 6-axis
+  // Boot discriminator (ADR-158): the Pro carries an on-board QMI8658C 6-axis
   // IMU on its I2C bus (11/12); the plain S3 Mini does not. Probe WHO_AM_I at
   // both possible 7-bit addresses (SA0 strap) and verify the chip-id byte so a
   // stray device on a non-Pro bus cannot trigger a false positive.

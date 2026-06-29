@@ -2370,5 +2370,68 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-06-19"
+  },
+  {
+    "id": "bug-136",
+    "timestamp": "2026-06-27",
+    "error_message": "esptool: error: argument operation: invalid choice: 'write-flash'",
+    "file": "flash_esp.py",
+    "root_cause": "flash_esp.py hardcoded esptool v5 hyphenated subcommands (write-flash/erase-flash); host esptool v4.8.1 (system Python default) only accepts underscore form and aborts before flashing. v5 lives only in the PlatformIO penv.",
+    "fix": "Added esptool_subcmd() helper: detect esptool major version via -m esptool version, emit underscore (v4) or hyphen (v5). Applied at erase_flash and write_flash call sites.",
+    "tags": [
+      "flash_esp",
+      "esptool",
+      "v4",
+      "v5",
+      "tooling",
+      "TASK-890",
+      "portability"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-27"
+  },
+  {
+    "id": "bug-137",
+    "timestamp": "2026-06-27",
+    "error_message": "[E][AP.cpp:218] create(): passphrase too short!  +  wifi:sta is connecting, cannot set config / [E][STA.cpp:336] connect(): STA config failed",
+    "file": "src/OTGW-firmware/networkStuff.ino:285",
+    "root_cause": "On OTGW32 ESP32-S3 (alpha.279) after sustained WS-realism load + repeated RTS resets, the WiFi STA stopped rejoining KeepOut2 (STA config failed). The SoftAP provisioning fallback then refused to start with \"passphrase too short!\" (AP.cpp:218), leaving the device stranded: no STA, no usable provisioning AP. Bench went fully off-network (HTTP 000, no ARP). Not yet root-caused in firmware; possibly a latent SoftAP-fallback config bug (AP passphrase below the 8-char WPA minimum) exposed only when STA fails, compounded by load/reset-induced WiFi driver wedge. EXACT LINE: networkStuff.ino:285 WiFi.softAP(apSSID, \"otgw123\") -- \"otgw123\" is 7 chars, below the WPA2 8-char minimum, so the WIFI_AP_FALLBACK SoftAP refuses to start. NOTE: the first-boot WiFiManager provisioning portal (startConfigPortal, networkStuff.ino:215) is OPEN (no password, line 66) and works fine; only the post-provisioning AP_FALLBACK path is broken.",
+    "fix": "UNRESOLVED in firmware. Fix: pad the fallback passphrase to >=8 chars (e.g. \"otgw1234\") or make the fallback AP open. Recovery now: full-erase + merged-full reflash -> boots to the OPEN provisioning portal -> user re-provisions.",
+    "tags": [
+      "wifi",
+      "softap",
+      "provisioning",
+      "esp32s3",
+      "otgw32",
+      "stranded",
+      "AP.cpp",
+      "STA.cpp",
+      "TASK-871-blocked"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-27"
+  },
+  {
+    "id": "bug-138",
+    "timestamp": "2026-06-28T00:00:00Z",
+    "error_message": "src/OTGW-firmware/MQTTHaDiscovery.cpp:1344: error: 'thermostat' is not a member of 'HaIcon'; :1345: 'heating' is not a member of 'HaIcon'. build.py exited 0 anyway (per-env FAILED masked).",
+    "file": "src/OTGW-firmware/MQTTHaDiscovery.cpp",
+    "root_cause": "TASK-942 added two sensor-table rows using HaIcon::thermostat and HaIcon::heating, guessed from a grep that matched those words as comments/mdi-strings, not enum members. The real enum (MQTTstuff.h:186) names them thermostat_icon and (no 'heating'; radiator/fire/thermometer_lines instead).",
+    "fix": "Use valid HaIcon members: hvac_mode -> HaIcon::thermostat_icon, hvac_action -> HaIcon::radiator. Always verify enum membership in MQTTstuff.h before using an HaIcon value. Also: build.py exit 0 is NOT proof of success -- grep the per-env [SUCCESS]/[FAILED] line and check firmware.bin mtime.",
+    "tags": [
+      "build",
+      "esp32",
+      "haicon",
+      "enum",
+      "mqtt-discovery",
+      "build.py-masks-failure",
+      "task-942",
+      "2.0.0"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-28"
   }
 ]

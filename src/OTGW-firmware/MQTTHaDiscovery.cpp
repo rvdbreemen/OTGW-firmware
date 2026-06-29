@@ -342,6 +342,11 @@ DECLARE_SAT_DISCOVERY_STRINGS(sat_safety_tripped,        "sat/safety_tripped",  
 DECLARE_SAT_DISCOVERY_STRINGS(sat_flame_health,          "sat/flame_health",                 "SAT_Flame_Health")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_valves_open,           "sat/valves_open",                  "SAT_Valves_Open")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_is_day,        "sat/weather/is_day",               "SAT_Weather_Is_Day")
+// TASK-942 (GH #665): standalone HA sensors mirroring the unified climate entity's
+// hvac_mode/hvac_action topics (published by OTGW-Core.ino). Plain string topics, so the
+// default "{{ value }}" template applies. Faux dataid OTGWhvacid (242) -> OT-Core device.
+DECLARE_SAT_DISCOVERY_STRINGS(hvac_mode,                 "hvac_mode",                        "HVAC_Mode")
+DECLARE_SAT_DISCOVERY_STRINGS(hvac_action,               "hvac_action",                      "HVAC_Action")
 static const char ha_tpl_sat_pwm_percent[]        PROGMEM = "{{ (value | float * 100) | round(0) }}";
 static const char ha_tpl_sat_ratio_percent[]      PROGMEM = "{{ (value | float * 100) | round(1) }}";
 static const char ha_tpl_sat_kmh_to_ms[]          PROGMEM = "{{ (value | float / 3.6) | round(1) }}";
@@ -803,7 +808,7 @@ const char ha_name_alias_ventilation_system_type[]                           PRO
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
 // ========== Sensor array (289 entries, sorted by id) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 385;
+const uint16_t MQTT_HA_SENSOR_COUNT = 387;  // TASK-942: +2 hvac_mode/hvac_action (faux id 242)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1335,6 +1340,9 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {253, 0x00, ha_lbl_sat_weather_weather_code,   ha_name_sat_weather_weather_code,   HaDeviceClass::none,        HaUnit::none,    HaStateClass::measurement, HaIcon::information,   HaEntityCat::none, true, nullptr,              nullptr},
     // --- Pseudo-ID 254: TASK-543 SAT flame status string ---
     {254, 0x00, ha_lbl_sat_flame_status,           ha_name_sat_flame_status,           HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::fire,          HaEntityCat::none, true, nullptr,              nullptr},
+    // --- Faux ID 242 (OTGWhvacid): unified-climate companion sensors, TASK-942 / GH #665 ---
+    {242, 0x00, ha_lbl_hvac_mode,                  ha_name_hvac_mode,                  HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::thermostat_icon, HaEntityCat::none, true, nullptr,            nullptr},
+    {242, 0x00, ha_lbl_hvac_action,                ha_name_hvac_action,                HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::radiator,      HaEntityCat::none, true, nullptr,              nullptr},
 };
 
 // ========== Binary sensor array (58 entries, sorted by id) ==========
@@ -1717,7 +1725,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 239
     0xFFFF, // id 240
     0xFFFF, // id 241
-    0xFFFF, // id 242
+    385, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
     330, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
@@ -3682,6 +3690,7 @@ static const char *topoDeviceName(HaDevice d) {
 // there; this local copy exists solely to avoid cross-TU access to a static).
 static HaDevice topoDeviceForPseudoId(uint8_t otId) {
   switch (otId) {
+    case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors
     case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-140, was ADR-124)
     case 244: return HaDevice::Gateway;
     case 245: return HaDevice::Sensors;  // s0 pulse counter (ADR-140, was ADR-124)

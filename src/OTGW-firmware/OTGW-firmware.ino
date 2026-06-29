@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.281
+**  Version  : v2.0.0-alpha.288
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -201,7 +201,7 @@ static void appendBootDetectLog()
   LittleFS.rename(BOOTDETECT_TMP, BOOTDETECT_FILE);
 }
 
-// ADR-157: detect a LOLIN S3 Mini Pro in the Classic socket via its on-board
+// ADR-158: detect a LOLIN S3 Mini Pro in the Classic socket via its on-board
 // QMI8658C 6-axis IMU. The Pro reroutes its headers (Classic I2C on 11/12, not
 // the S3 Mini's 35/36), so this MUST run before the 0x26 watchdog disarm to pick
 // the right Classic bus. The probe is a passive I2C read of WHO_AM_I at both
@@ -249,7 +249,7 @@ void setup() {
   // while (!Serial) {} //Wait for OK
 
 #if HAS_RUNTIME_HW_DETECT
-  // ADR-157: decide S3 Mini vs S3 Mini Pro BEFORE the 0x26 watchdog disarm,
+  // ADR-158: decide S3 Mini vs S3 Mini Pro BEFORE the 0x26 watchdog disarm,
   // because the Pro's watchdog (and its IMU) live on a different Classic I2C bus
   // (11/12 vs 35/36). Settings are not read yet, but the IMU is a hardware fact
   // so the live probe is self-sufficient; a cached/forced iBoardMode override is
@@ -346,7 +346,7 @@ void setup() {
   } else {
     // UART1 was closed before the WiFi portal; re-open it for the PIC probe.
     OTGWSerial.begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX);
-    // ADR-157: bind the PIC reset / firmware-progress-LED to the live Classic
+    // ADR-158: bind the PIC reset / firmware-progress-LED to the live Classic
     // pin map (S3 Mini vs S3 Mini Pro) BEFORE detectPIC() drives them. The PIC
     // UART (RX/TX) is identical on both modules, so only reset+LED move.
     OTGWSerial.setResetPin(activePicRst());

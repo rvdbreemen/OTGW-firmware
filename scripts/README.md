@@ -75,6 +75,91 @@ pwsh -File scripts/branch-hygiene-queue.ps1 -Remote origin -BaseBranch dev -Inac
 4. Adds owner/decision/notes columns for manual review
 5. Exports a sorted review queue CSV for branch governance
 
+## capture-mqtt-debug.sh
+
+macOS/Linux equivalent of `capture-mqtt-debug.bat` for collecting OTGW telnet
+debug output, MQTT broker traffic, and browser DevTools output into one
+uploadable transcript. Both launchers use the shared `capture-mqtt-debug`
+basename; only the platform-specific `.bat` / `.sh` extension differs. The old
+`capture-mqtt-debug-macos.sh` path remains as a compatibility wrapper.
+
+### MQTT Debug Capture Usage
+
+```bash
+scripts/capture-mqtt-debug.sh
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --duration 120
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --skip-browser-capture
+scripts/capture-mqtt-debug.sh --device 192.168.1.50 --broker 192.168.1.10 --topic '#'
+```
+
+The script prompts for the OTGW device host, MQTT broker host, and optional MQTT
+credentials when they are not supplied. Use `--no-prompt` for unattended runs.
+
+### MQTT Debug Capture Options
+
+- `--device` / `-DeviceHost` - OTGW device IP address or hostname
+- `--broker` / `-BrokerHost` - MQTT broker IP address or hostname
+- `--broker-port` / `-BrokerPort` - MQTT broker port (default: `1883`)
+- `--topic` / `-Topic` - MQTT topic filter (default: `#`)
+- `--user` / `-Username` - MQTT username
+- `--password` / `-Password` - MQTT password
+- `--duration` / `-DurationSeconds` - Stop automatically after fixed seconds
+- `--output-root` / `-OutputRoot` - Output folder root (default: `logs/mqtt-diagnostics`)
+- `--mosquitto-sub-path` / `-MosquittoSubPath` - Explicit `mosquitto_sub` path
+- `--skip-tool-install` / `-SkipToolInstall` - Do not attempt Homebrew install
+- `--skip-browser-capture` / `-SkipBrowserCapture` - Disable browser capture
+- `--browser-url` / `-BrowserUrl` - Page to load (default: `http://<device>/`)
+- `--browser-debug-port` / `-BrowserDebugPort` - CDP port (default: `9222`)
+- `--browser-path` / `-BrowserPath` - Explicit Chrome/Edge executable path
+- `--skip-crashlog-capture` / `-SkipCrashlogCapture` - Disable crash-log polling
+- `--crashlog-url` / `-CrashlogUrl` - Crash-log endpoint (default: `http://<device>/api/v2/device/crashlog`)
+- `--crashlog-poll-seconds` / `-CrashlogPollSeconds` - Crash-log poll interval (default: `30`)
+- `--skip-http-probes` / `-SkipHttpProbes` - Disable post-capture HTTP probes
+- `--http-probe-timeout-seconds` / `-HttpProbeTimeoutSeconds` - Per-request HTTP probe timeout (default: `10`)
+
+### MQTT Debug Capture Notes
+
+The script requires `python3` and `mosquitto_sub`. On macOS, it can install the
+Mosquitto client with Homebrew unless `--skip-tool-install` is passed. Press `Q`
+or use Ctrl+C to stop manually; timed captures also stop the MQTT, telnet, and
+browser workers cleanly before writing the final transcript.
+
+On each Telnet connection, including reconnects after a disconnect or reboot,
+the script parses the firmware's debug-toggle banner and enables every logging
+toggle that is currently off. It supports the different 1.x and 2.0.0/OTGW32
+toggle keys and leaves simulator options such as `SensorSim` and `OTGW-Sim`
+unchanged. It then sends `q` and `D` to capture the current settings and state.
+
+Browser DevTools capture is enabled by default when Microsoft Edge, Google Chrome,
+or Chromium can be found. On macOS, the script checks the standard `.app`
+locations under `/Applications` and `~/Applications`; use `--browser-path` if the
+browser is installed elsewhere. Browser output is written to `browser.log` and
+browser stderr is written to `browser.stderr.log`.
+
+Crash-log capture is enabled by default and polls `/api/v2/device/crashlog` plus
+`/reboot_log.txt` into `crashlog.log`. This is useful for decoded ESP exception
+state during reboot loops; devices without the endpoint log the HTTP/failure
+status and the capture continues. After capture stops, HTTP probes hit `/`,
+`/index.html`, `/index.js`, and key REST endpoints with bounded timeouts and
+write status/timing/size details to `curl-probes.log`.
+
+All logs are merged into
+`transcript-<date-time>-<firmware-version>-<hostname>-<uniqueid>.txt`. The
+working files use the same names as the Windows capture:
+`summary.txt`, `telnet.log`, `mqtt.log`, `mqtt.stderr.log`, `browser.log`,
+`browser.stderr.log`, `crashlog.log`, `curl-probes.log`, `error.txt`, and
+`script.error.log`, under `logs/mqtt-diagnostics/<yyyyMMdd-HHmmss>/`. After a
+successful merge, those intermediate files are removed; upload only the named
+transcript.
+
+The deliberate platform differences are the launcher extension (`.sh` instead
+of `.bat`), command-line option style, Homebrew-based Mosquitto installation,
+macOS/Linux browser executable paths, and portable Python HTTP probes rather
+than Windows `curl.exe`. Windows unattended `-SaveSecrets` storage is not ported:
+the shell script does not store MQTT passwords in generated files or local
+settings; prefer the interactive password prompt.
+
 ## sat_boiler_emulator.py
 
 Host-side synthetic boiler emulator for OTGW32 bench testing (TASK-802). Connects to
@@ -145,11 +230,24 @@ The OTGW32 port 25238 bridge is bidirectional but asymmetric:
 A raw `B40030004` line sent as INPUT does not match the `XX=value` parser, so it will
 NOT populate `otBoilerCacheValid[3]` via the TCP path.
 
-**AC#2 and AC#3 of TASK-795** (actual §4.2 edge-trip on a real OTGW32: simulation
-auto-disables within 1 second of first boiler slave frame) require bench validation by
-the maintainer with actual OT bus hardware. The script is intended to provide:
+Because the TCP bridge cannot inject a boiler response, **AC#2/#3 of TASK-795 are
+exercised through the firmware test hook** instead (TASK-802 path A):
+
+```powershell
+# assert a synthetic boiler is present -> trips the §4.2 availability gate
+python scripts\sat_boiler_emulator.py --host 192.168.1.x --rest-force-boiler on
+# expect: simulation auto-disables within ~1s; POST /api/v2/sat/mode (enable) -> 409;
+#         MQTT sat enable command rejected
+python scripts\sat_boiler_emulator.py --host 192.168.1.x --rest-force-boiler off
+```
+
+`POST /api/v2/sat/force-boiler` (body `0|1`) is a test-only, transient override
+(cleared on reboot) that `satBoilerHardwarePresent()` honours; turning it on also
+trips the deferred boiler-detected edge so the "boiler appeared -> simulation off"
+teardown runs exactly as a real boiler frame would. Trusted-LAN only.
+
+The frame-builder / `--dry-run` / TCP modes remain useful as:
 
 1. A reference for what a correctly-formed slave-response frame looks like.
 2. A TCP connection harness so bench state can be observed over the monitor stream.
-3. A starting point for adapting to an OT-bus hardware slave device (e.g. via a
-   USB-to-OT adapter or a microcontroller wired to the OTGW32 OT master pins).
+3. A starting point for adapting to an OT-bus hardware slave device.

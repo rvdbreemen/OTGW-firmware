@@ -898,7 +898,7 @@
 
 ## docs/adr/
 
-- `ADR-157-combo-s3-mini-pro-classic-variant-boot-detection.md` — ADR-157 Combo board: add the LOLIN S3 Mini Pro as a third boot-detected Classic variant (~1907 tok)
+- `ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md` — ADR-158 Combo board: add the LOLIN S3 Mini Pro as a third boot-detected Classic variant (~1907 tok)
 
 ## docs/hardware/
 

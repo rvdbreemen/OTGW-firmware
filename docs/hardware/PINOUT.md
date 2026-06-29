@@ -168,7 +168,7 @@ Capabilities: `HAS_PIC=1`, `HAS_DIRECT_OT=1`, `HAS_PIC_WATCHDOG=1` (0x26 feed
 runtime-gated on PIC mode; ESP32 TWDT always on), `HAS_RUNTIME_HW_DETECT=1`,
 OTGW32 peripheral set (Ethernet/OLED/SAT/BLE/weather).
 
-### 4a. Third combo variant — S3 Mini Pro in the Classic socket (ADR-157)
+### 4a. Third combo variant — S3 Mini Pro in the Classic socket (ADR-158)
 
 The combo also boot-detects a **LOLIN S3 Mini Pro** dropped into the Classic
 socket and selects a third pin map (`PIN_CLASSIC_PRO_*`). The Pro reroutes its
@@ -204,4 +204,4 @@ Arduino variant `lolin_s3_mini_pro/pins_arduino.h`. The Pro stays the
 diagnostic only.
 
 Historical combo rationale: `docs/hardware/combo-esp32-s3-pinout.md`,
-ADR-125 → ADR-126 → revived as ADR-127 → S3 Mini Pro added by ADR-157.
+ADR-125 → ADR-126 → revived as ADR-127 → S3 Mini Pro added by ADR-158.

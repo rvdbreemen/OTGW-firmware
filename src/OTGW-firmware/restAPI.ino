@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.281
+**  Version  : v2.0.0-alpha.288
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -276,6 +276,7 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 static void handleWebhook(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 // TASK-585: WiFi network scan
 static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
@@ -1020,6 +1021,98 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     webPushHeader(F("Cache-Control"), F("no-cache"));
     if (satRequestHasDetailFull()) { satSendHealthJSON(); }
     else                           { satSendStatusJSON(); }
+  }
+  else if (strcasecmp_P(sub, PSTR("force-boiler")) == 0) {
+    // TASK-802 F7-A: test-only boiler-present override so the §4.2 availability
+    // gate (edge auto-disable, REST 409, MQTT enable-reject) is verifiable on
+    // the bench without a physical boiler. POST/PUT body 0|1|true|false.
+    // Transient (cleared on reboot); trusted-LAN only like the admin surface.
+    if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    char valBuf[16];
+    const char* val = nullptr;
+    if (hasArgCompat(F("plain"))) {
+      val = satExtractPostValue(argCompat(F("plain")), valBuf, sizeof(valBuf));
+    } else if (wc > 5) {
+      val = words[5];
+    }
+    if (!val) { sendApiError(400, F("Missing value (0|1)")); return; }
+    const bool on = EVALBOOLEAN(val);
+    satSetDebugForceBoilerPresent(on);
+    char msg[64];
+    snprintf_P(msg, sizeof(msg),
+      PSTR("{\"status\":\"ok\",\"force_boiler_present\":%s}"), on ? "true" : "false");
+    webSend(200, F("application/json"), msg);
+  }
+  else if (strcasecmp_P(sub, PSTR("ble")) == 0 && wc > 5 && strcasecmp_P(words[5], PSTR("roster")) == 0) {
+    // TASK-935: dedicated SAT BLE roster endpoint (8 slots). GET returns the
+    // structured roster; bindkeys are WRITE-ONLY (only has_bindkey is emitted,
+    // never the secret). PUT writes a single slot (idx required; mac/label/
+    // bindkey optional) by reusing updateSetting() so all validation lives in one
+    // place. DELETE clears a slot. Writes are parser-free (flat params, no JSON
+    // array parsing — ADR-146). Auth already enforced at the top of handleSAT and
+    // centrally for mutating methods in processAPI.
+#if HAS_SAT_BLE
+    if (method == HTTP_GET) {
+      AsyncResponseStream* strm = restBeginStream("application/json");
+      if (strm) {
+        JsonEmit je(*strm);
+        je.beginObject();
+        je.field(F("count"), (int32_t)settings.sat.iBleRosterCount);
+        je.field(F("name_prefix"), settings.sat.sBleNamePrefix);
+        je.field(F("name_filter_ingest"), settings.sat.bBleNameFilterIngest);
+        je.beginArray(F("slots"));
+        for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+          je.beginObject();
+          je.field(F("idx"), (int32_t)i);
+          je.field(F("mac"), settings.sat.sBleMac[i]);
+          je.field(F("label"), settings.sat.sBleLabel[i]);
+          je.field(F("has_bindkey"), settings.sat.sBleBindkey[i][0] != '\0');
+          je.endObject();
+        }
+        je.endArray();
+        je.endObject();
+      }
+      restFinalize();
+    }
+    else if (method == HTTP_PUT || method == HTTP_POST) {
+      const char* idxStr = hasArgCompat(F("idx")) ? argCompat(F("idx")) : (wc > 6 ? words[6] : nullptr);
+      if (!idxStr) { sendApiError(400, F("Missing idx (0-7)")); return; }
+      const int idx = atoi(idxStr);
+      if (idx < 0 || idx >= SAT_BLE_MAX_ROSTER) { sendApiError(400, F("idx out of range (0-7)")); return; }
+      char fld[24];
+      bool wrote = false;
+      if (hasArgCompat(F("mac")))     { snprintf_P(fld, sizeof(fld), PSTR("SATblemac%d"), idx);     updateSetting(fld, argCompat(F("mac")));     wrote = true; }
+      if (hasArgCompat(F("label")))   { snprintf_P(fld, sizeof(fld), PSTR("SATblelabel%d"), idx);   updateSetting(fld, argCompat(F("label")));   wrote = true; }
+      if (hasArgCompat(F("bindkey"))) { snprintf_P(fld, sizeof(fld), PSTR("SATblebindkey%d"), idx); updateSetting(fld, argCompat(F("bindkey"))); wrote = true; }
+      if (!wrote) { sendApiError(400, F("Provide at least one of mac, label, bindkey")); return; }
+      writeSettings(false);
+      // No user-supplied text echoed (avoids JSON-escaping the label); client GETs to read back.
+      char msg[80];
+      snprintf_P(msg, sizeof(msg),
+        PSTR("{\"status\":\"ok\",\"idx\":%d,\"has_bindkey\":%s}"),
+        idx, settings.sat.sBleBindkey[idx][0] ? "true" : "false");
+      sendCorsOriginHeader();
+      webSend(200, F("application/json"), msg);
+    }
+    else if (method == HTTP_DELETE) {
+      const char* idxStr = hasArgCompat(F("idx")) ? argCompat(F("idx")) : (wc > 6 ? words[6] : nullptr);
+      if (!idxStr) { sendApiError(400, F("Missing idx (0-7)")); return; }
+      const int idx = atoi(idxStr);
+      if (idx < 0 || idx >= SAT_BLE_MAX_ROSTER) { sendApiError(400, F("idx out of range (0-7)")); return; }
+      char fld[24];
+      snprintf_P(fld, sizeof(fld), PSTR("SATblemac%d"), idx);     updateSetting(fld, "");
+      snprintf_P(fld, sizeof(fld), PSTR("SATblelabel%d"), idx);   updateSetting(fld, "");
+      snprintf_P(fld, sizeof(fld), PSTR("SATblebindkey%d"), idx); updateSetting(fld, "");
+      writeSettings(false);
+      sendCorsOriginHeader();
+      webSend(200, F("application/json"), F("{\"status\":\"cleared\"}"));
+    }
+    else {
+      sendApiMethodNotAllowed(F("GET, PUT, DELETE"));
+    }
+#else
+    sendApiError(404, F("BLE not supported on this build"));
+#endif
   }
   else if (strcasecmp_P(sub, PSTR("target")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
@@ -1819,6 +1912,48 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   sendApiNotFound(originalURI);
 }
 
+//===[ /api/v2/mqtt — force OT-value republish (TASK-936, ported from 1.x v1.6.0 handleMqtt) ]===
+// Distinct from /api/v2/discovery/republish: that re-announces HA *discovery configs*;
+// this resets OT publish eligibility so the next observed OT values publish as first-seen
+// again (requestMQTTRepublishAll, OTGW-Core.ino). Use case: force a full OT-value
+// republish after a broker wipe, without re-announcing discovery.
+static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
+  // POST /api/v2/mqtt/republish — reset publish eligibility, re-emit observed OT values
+  if (wc > 4 && strcmp_P(words[4], PSTR("republish")) == 0) {
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
+
+    // CWE-770 rate-limit, mirroring the discovery/republish cooldown: a rapid-fire
+    // POST loop would keep forcing status-frame republishes on every OT cycle. 60 s
+    // is ample for a legitimate post-broker-wipe refresh. Function-local static, no
+    // new global leaks out.
+    static unsigned long lastMqttRepublishMs = 0;
+    constexpr unsigned long MQTT_REPUBLISH_COOLDOWN_MS = 60000UL;
+    if (lastMqttRepublishMs != 0) {
+      const unsigned long elapsed = millis() - lastMqttRepublishMs;
+      if (elapsed < MQTT_REPUBLISH_COOLDOWN_MS) {
+        const unsigned long remaining = (MQTT_REPUBLISH_COOLDOWN_MS - elapsed + 999UL) / 1000UL;
+        restResponseStatus = 429;
+        char jsonBuff[160];
+        snprintf_P(jsonBuff, sizeof(jsonBuff),
+          PSTR("{\"error\":{\"status\":429,\"message\":\"Republish cooldown active, retry in %lus\"}}"),
+          remaining);
+        sendCorsOriginHeader();
+        webSend(429, F("application/json"), jsonBuff);
+        return;
+      }
+    }
+
+    requestMQTTRepublishAll();
+    lastMqttRepublishMs = millis();  // stamp only after work commits
+    sendCorsOriginHeader();
+    webSend(200, F("application/json"), F("{\"status\":\"republish_requested\"}"));
+    return;
+  }
+
+  sendApiNotFound(originalURI);
+}
+
 static void debugFormatLocalIp(char* buf, size_t bufSize)
 {
   IPAddress ip = WiFi.localIP();
@@ -2241,6 +2376,7 @@ static const char kRouteSat[]        PROGMEM = "sat";
 static const char kRouteDiscovery[]  PROGMEM = "discovery";
 static const char kRouteDebugDump[]  PROGMEM = "debug";
 static const char kRouteNetwork[]    PROGMEM = "network";  // TASK-585
+static const char kRouteMqtt[]       PROGMEM = "mqtt";     // TASK-936: OT-value republish
 
 // Dispatch table placed in PROGMEM so the ~136 B of {segment, handler}
 // rows live in flash, not DRAM. Same pattern as kSatMqttCmds in
@@ -2266,6 +2402,7 @@ static const ApiRoute kV2Routes[] PROGMEM = {
   { kRouteDiscovery,  handleDiscovery },
   { kRouteDebugDump,  handleDebugDump },
   { kRouteNetwork,    handleNetwork },  // TASK-585: WiFi scan
+  { kRouteMqtt,       handleMqtt },     // TASK-936: POST /api/v2/mqtt/republish
   { nullptr,          nullptr }  // sentinel
 };
 
