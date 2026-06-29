@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.288
+**  Version  : v2.0.0-alpha.289
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1204,18 +1204,21 @@ void sendPICBootCommands(){
 //   1. HAS_PIC_WATCHDOG (esp32-classic + combo): the ESP32 Task Watchdog Timer
 //      (TWDT) is the ALWAYS-ON primary safety net; the external 0x26 I2C
 //      watchdog on the OTGW Classic PCB is an OPTIONAL SECONDARY layer.
-//      The 0x26 arm, feed AND boot-read all run UNCONDITIONALLY on every
-//      HAS_PIC_WATCHDOG build (esp32-classic AND combo) — never gated on
-//      isPICEnabled(). This is deliberate (maintainer directive 2026-06-14):
-//      0x26 presence is NOT reliably detectable (later NodoShop Classic
-//      revisions dropped the chip; an I2C ACK is not proof of board type), and
-//      arming/feeding an absent 0x26 is a harmless NACKed no-op on floating
-//      pins — whereas NOT feeding a chip that IS present causes a spurious ESP
-//      reset. So we always feed, exactly as the original NodoShop firmware did.
-//      Gating the feed on isPICEnabled() (while the arm stayed unconditional)
-//      would let a combo on an old Classic PCB with a dead/undetected PIC arm
-//      the chip but never feed it -> reset loop. Symmetric & unconditional
-//      avoids that. The only PIC-presence probe is reset->ETX in detectPIC().
+//      Original directive (2026-06-14) was "arm + feed UNCONDITIONALLY", on the
+//      premise that writing to an absent 0x26 is a harmless NACKed no-op. That
+//      premise broke on the ESP32-S3 esp32-hal-i2c-ng driver: a non-responding
+//      0x26 logs an [E] i2c_master_transmit error on EVERY write, so the 100ms
+//      feed became a continuous log storm (TASK-945, observed on a classic-S3
+//      with no 0x26). TASK-946 resolves this by SYMMETRIC presence-gating instead
+//      of dropping back to unconditional: initWatchDog probes 0x26 once (retried,
+//      below) into s_extWdPresent, and BOTH the arm (WatchDogEnabled) and the
+//      feed (feedWatchDog) are gated on it. The asymmetry the directive warned
+//      against (feed gated, arm unconditional -> armed-but-unfed -> reset loop)
+//      is therefore avoided: a chip we did not detect is never armed, so it can
+//      never bite, and the TWDT remains the always-on primary safety net (so a
+//      false-negative only loses the optional secondary for that boot, per
+//      ADR-135). The DISARM is still sent unconditionally (safe; boot disarm runs
+//      before detection). The only PIC-presence probe is reset->ETX in detectPIC().
 //   2. !HAS_PIC_WATCHDOG (OTGW32): ESP32 TWDT only — no external chip.
 // The TWDT subscribes the loop task only (esp_task_wdt_add(NULL) from the loop
 // context); see ADR-135 §"PIC task subscription" for the explicit decision not
@@ -1268,10 +1271,20 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
   // driver an absent 0x26 does NOT NACK silently; it logs an [E] error. So we
   // detect presence ONCE here and gate the periodic feed (feedWatchDog) on it.
   delay(100);
-  Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   // OTGW WD address
-  Wire.write(0x83);             // command to set pointer
-  Wire.write(17);               // pointer value to status byte
-  s_extWdPresent = (Wire.endTransmission() == 0);
+  // TASK-946: retry the probe a few times. A single-shot probe can false-negative
+  // if the I2C bus is briefly busy at init, and a false-negative on a PRESENT
+  // chip is the one dangerous case — WatchDogEnabled gates the ARM and feedWatchDog
+  // gates the FEED on this flag (symmetric), so a wrong "absent" verdict leaves a
+  // real 0x26 disarmed (safe, cannot bite) but loses the secondary WD for that
+  // boot. Retries keep that rare.
+  s_extWdPresent = false;
+  for (uint8_t attempt = 0; attempt < 3 && !s_extWdPresent; attempt++) {
+    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   // OTGW WD address
+    Wire.write(0x83);             // command to set pointer
+    Wire.write(17);               // pointer value to status byte
+    s_extWdPresent = (Wire.endTransmission() == 0);
+    if (!s_extWdPresent) delay(5);
+  }
   if (s_extWdPresent) {
     Wire.requestFrom((uint8_t)EXT_WD_I2C_ADDRESS, (uint8_t)1);
     if (Wire.available()) {
@@ -1288,10 +1301,16 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
 }
 
 void WatchDogEnabled(byte stateWatchdog) {
-  // SECONDARY only. The TWDT is always running and has no enable/disable; this
-  // arms/disarms the external 0x26 chip (OTA flash disarm, boot-time disarm).
-  // On the combo the boot-time disarm runs BEFORE detection and a stray write on
-  // an OTGW32 is a NACKed no-op, so the arm/disarm goes out regardless of mode.
+  // SECONDARY only (TWDT is primary, ADR-135). Arms/disarms the external 0x26 chip.
+  // TASK-946: the ARM is gated on s_extWdPresent. feedWatchDog() likewise only
+  // feeds a detected 0x26, so arming a chip we did NOT detect would leave it
+  // armed-but-unfed -> it bites -> spurious ESP reset (the exact asymmetry the
+  // 2026-06-14 directive warned against). Gating arm AND feed together keeps it
+  // safe: an undetected (or false-negative) 0x26 is simply never armed.
+  // The DISARM (stateWatchdog==0) is ALWAYS sent — turning a present chip off is
+  // safe, an absent chip NACKs harmlessly, and the boot-time disarm must run
+  // before detection. (One boot-time NACK is not the 100ms feed spam.)
+  if (stateWatchdog && !s_extWdPresent) return;   // never arm an undetected 0x26
   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
   Wire.write(7);                                //Write to register 7, the action register
   Wire.write(stateWatchdog);                    //1 = armed to reset, 0 = turned off

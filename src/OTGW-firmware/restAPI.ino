@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.288
+**  Version  : v2.0.0-alpha.289
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -999,6 +999,35 @@ static bool satExtractTwoFields(const char* body,
 // POST /api/v2/sat/sim/event            — inject sim scenario (window_open/solar_gain/sensor_noise/sensor_dropout/dhw_demand); 409 if sim off
 // POST /api/v2/sat/flush                — flush short-lived data (PID integral + cycle window)
 // POST /api/v2/sat/settings/<name>      — update any SAT setting (mirrors all MQTT sat/* commands)
+#if HAS_SAT_BLE
+// TASK-946: BLE roster input validators (the /api/v2/sat/ble/roster endpoint).
+// strtol-based idx parse rejects non-numeric (atoi("foo")==0 would silently target
+// slot 0); mac/bindkey validators mirror updateSetting() so the endpoint can 400 on
+// malformed input instead of reporting 200 on a silent no-op store.
+static bool satBleParseRosterIdx(const char* s, int& out) {
+  if (!s || !*s) return false;
+  char* endp = nullptr;
+  long v = strtol(s, &endp, 10);
+  if (*endp != '\0' || v < 0 || v >= SAT_BLE_MAX_ROSTER) return false;
+  out = (int)v;
+  return true;
+}
+static bool satBleMacValid(const char* m) {           // empty (clear) or 17-char colon-hex
+  if (!m || m[0] == '\0') return true;
+  if (strlen(m) != 17) return false;
+  for (int p = 0; p < 17; p++) {
+    if (p == 2 || p == 5 || p == 8 || p == 11 || p == 14) { if (m[p] != ':') return false; }
+    else if (!isxdigit((unsigned char)m[p])) return false;
+  }
+  return true;
+}
+static bool satBleBindkeyValid(const char* k) {       // empty (clear) or exactly 32 hex
+  if (!k || k[0] == '\0') return true;
+  if (strlen(k) != 32) return false;
+  for (int p = 0; p < 32; p++) if (!isxdigit((unsigned char)k[p])) return false;
+  return true;
+}
+#endif
 static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
 {
   if (!checkHttpAuth()) return;
@@ -1076,14 +1105,23 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     }
     else if (method == HTTP_PUT || method == HTTP_POST) {
       const char* idxStr = hasArgCompat(F("idx")) ? argCompat(F("idx")) : (wc > 6 ? words[6] : nullptr);
-      if (!idxStr) { sendApiError(400, F("Missing idx (0-7)")); return; }
-      const int idx = atoi(idxStr);
-      if (idx < 0 || idx >= SAT_BLE_MAX_ROSTER) { sendApiError(400, F("idx out of range (0-7)")); return; }
+      int idx;
+      if (!satBleParseRosterIdx(idxStr, idx)) { sendApiError(400, F("idx must be an integer 0-7")); return; }
       char fld[24];
       bool wrote = false;
-      if (hasArgCompat(F("mac")))     { snprintf_P(fld, sizeof(fld), PSTR("SATblemac%d"), idx);     updateSetting(fld, argCompat(F("mac")));     wrote = true; }
-      if (hasArgCompat(F("label")))   { snprintf_P(fld, sizeof(fld), PSTR("SATblelabel%d"), idx);   updateSetting(fld, argCompat(F("label")));   wrote = true; }
-      if (hasArgCompat(F("bindkey"))) { snprintf_P(fld, sizeof(fld), PSTR("SATblebindkey%d"), idx); updateSetting(fld, argCompat(F("bindkey"))); wrote = true; }
+      // TASK-946: validate mac/bindkey HERE and 400 on malformed input. updateSetting
+      // silently no-ops a bad value, so without this the PUT would falsely report 200.
+      if (hasArgCompat(F("mac"))) {
+        const char* mac = argCompat(F("mac"));
+        if (!satBleMacValid(mac)) { sendApiError(400, F("mac must be empty or AA:BB:CC:DD:EE:FF")); return; }
+        snprintf_P(fld, sizeof(fld), PSTR("SATblemac%d"), idx);     updateSetting(fld, mac);   wrote = true;
+      }
+      if (hasArgCompat(F("label")))   { snprintf_P(fld, sizeof(fld), PSTR("SATblelabel%d"), idx);   updateSetting(fld, argCompat(F("label"))); wrote = true; }
+      if (hasArgCompat(F("bindkey"))) {
+        const char* bk = argCompat(F("bindkey"));
+        if (!satBleBindkeyValid(bk)) { sendApiError(400, F("bindkey must be empty or 32 hex chars")); return; }
+        snprintf_P(fld, sizeof(fld), PSTR("SATblebindkey%d"), idx); updateSetting(fld, bk);    wrote = true;
+      }
       if (!wrote) { sendApiError(400, F("Provide at least one of mac, label, bindkey")); return; }
       writeSettings(false);
       // No user-supplied text echoed (avoids JSON-escaping the label); client GETs to read back.
@@ -1096,9 +1134,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     }
     else if (method == HTTP_DELETE) {
       const char* idxStr = hasArgCompat(F("idx")) ? argCompat(F("idx")) : (wc > 6 ? words[6] : nullptr);
-      if (!idxStr) { sendApiError(400, F("Missing idx (0-7)")); return; }
-      const int idx = atoi(idxStr);
-      if (idx < 0 || idx >= SAT_BLE_MAX_ROSTER) { sendApiError(400, F("idx out of range (0-7)")); return; }
+      int idx;
+      if (!satBleParseRosterIdx(idxStr, idx)) { sendApiError(400, F("idx must be an integer 0-7")); return; }
       char fld[24];
       snprintf_P(fld, sizeof(fld), PSTR("SATblemac%d"), idx);     updateSetting(fld, "");
       snprintf_P(fld, sizeof(fld), PSTR("SATblelabel%d"), idx);   updateSetting(fld, "");
