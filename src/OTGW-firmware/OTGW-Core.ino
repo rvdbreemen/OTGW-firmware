@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.286
+**  Version  : v2.0.0-alpha.287
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1231,6 +1231,13 @@ void sendPICBootCommands(){
 // this flag: no spam, and the TWDT simply isn't armed until it's set up.
 static bool s_twdtReady = false;
 
+// TASK-945: runtime presence of the external 0x26 I2C watchdog. The secondary
+// feed is gated on this — on the ESP32-S3 esp32-hal-i2c-ng driver a non-responding
+// 0x26 logs an [E] i2c_master_transmit error per write instead of NACKing
+// silently, so feeding an absent chip every 100ms is a continuous log storm. An
+// absent chip cannot bite and the TWDT is primary (ADR-135), so skipping it is safe.
+static bool s_extWdPresent = false;
+
 void initWatchDog(char* reasonBuf, size_t reasonSize) {
   if (reasonSize > 0) reasonBuf[0] = '\0';
   OTDebugTln(F("Setup ESP32 Task Watchdog (primary) + external 0x26 (secondary)"));
@@ -1253,22 +1260,30 @@ void initWatchDog(char* reasonBuf, size_t reasonSize) {
   }
   s_twdtReady = true;  // from here feedWatchDog() may safely reset the TWDT
 
-  // ---- SECONDARY: read the external 0x26 boot-status (reset-by-WD flag) -----
+  // ---- SECONDARY: probe + read the external 0x26 boot-status (reset-by-WD flag) -
   // Hardware WatchDog is based on:
   // https://github.com/rvdbreemen/ESPEasySlaves/tree/master/TinyI2CWatchdog
-  // Unconditional: an absent 0x26 simply NACKs and Wire.available() stays false.
+  // TASK-945: this same transaction doubles as the presence probe —
+  // endTransmission()==0 means the 0x26 ACKed (present). On the ESP32-S3 i2c-ng
+  // driver an absent 0x26 does NOT NACK silently; it logs an [E] error. So we
+  // detect presence ONCE here and gate the periodic feed (feedWatchDog) on it.
   delay(100);
   Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   // OTGW WD address
   Wire.write(0x83);             // command to set pointer
   Wire.write(17);               // pointer value to status byte
-  Wire.endTransmission();
-  Wire.requestFrom((uint8_t)EXT_WD_I2C_ADDRESS, (uint8_t)1);
-  if (Wire.available()) {
-    byte status = Wire.read();
-    if (status & 0x1) {
-      OTDebugTln(F("INIT : Reset by external WD!"));
-      strlcpy(reasonBuf, "Reset by External WD\r\n", reasonSize);
+  s_extWdPresent = (Wire.endTransmission() == 0);
+  if (s_extWdPresent) {
+    Wire.requestFrom((uint8_t)EXT_WD_I2C_ADDRESS, (uint8_t)1);
+    if (Wire.available()) {
+      byte status = Wire.read();
+      if (status & 0x1) {
+        OTDebugTln(F("INIT : Reset by external WD!"));
+        strlcpy(reasonBuf, "Reset by External WD\r\n", reasonSize);
+      }
     }
+    OTDebugTln(F("INIT : external 0x26 watchdog present (secondary feed enabled)"));
+  } else {
+    OTDebugTln(F("INIT : no external 0x26 watchdog responding (secondary feed disabled; TWDT is primary)"));
   }
 }
 
@@ -1291,10 +1306,14 @@ void feedWatchDog() {
   if (DUE(timerWD)) {
     // PRIMARY: reset the ESP32 TWDT (loop task).
     if (s_twdtReady) esp_task_wdt_reset();
-    // SECONDARY: feed the external 0x26 chip unconditionally (absent = NACK no-op).
-    Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
-    Wire.write(0xA5);                             //Feed the dog, before it bites.
-    Wire.endTransmission();                       //That's all there is...
+    // SECONDARY: feed the external 0x26 chip — ONLY if it was detected at init
+    // (TASK-945). Feeding an absent/non-responding 0x26 every 100ms spams the
+    // ESP32-S3 i2c-ng [E] log; an absent chip cannot bite anyway.
+    if (s_extWdPresent) {
+      Wire.beginTransmission(EXT_WD_I2C_ADDRESS);   //Nodoshop design uses the hardware WD on I2C, address 0x26
+      Wire.write(0xA5);                             //Feed the dog, before it bites.
+      Wire.endTransmission();                       //That's all there is...
+    }
   }
   //==== blink LED1 once a second to show we are alive ====
   DECLARE_TIMER_MS(timerWDBlink, 1000, SKIP_MISSED_TICKS);
