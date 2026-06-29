@@ -1,3 +1,46 @@
+# Daily Issue Report — 2026-06-29
+
+## GitHub Issues (updated in last 24h)
+
+No new issues in the last 24 hours.
+
+---
+
+## Tweakers Forum Posts (last 24h, excluding number3/rvdbreemen)
+
+No new posts in the last 24 hours.
+
+Most recent non-excluded activity was from **jelvank** on 2026-06-27 21:24 GMT (covered in the 2026-06-28 report):
+ongoing validation of the 1.7.1 beta fix for heat/cool mode switching (GitHub #665).
+
+---
+
+## Open Items Carried Over
+
+The following issues from previous reports remain open and unresolved:
+
+1. **#665 — Switching heating and cooling with Honeywell Round Modulation Heat/Cool**
+   - **Reporter:** jelvank
+   - **URL:** https://github.com/rvdbreemen/OTGW-firmware/issues/665
+   - **Status:** Open — 1.7.1 beta validation in progress by jelvank as of 2026-06-27.
+   - **Classification:** Bug report (firmware / MQTT / HA integration)
+   - **Summary:** Heat/Cool Auto mode (dual setpoints) not correctly represented in HA; mode switching broken. Beta 1.7.1 fix released; awaiting field validation sign-off.
+
+2. **#666 — winget failed to install EclipseMosquitto.Mosquitto**
+   - **Reporter:** Pistoletjes
+   - **URL:** https://github.com/rvdbreemen/OTGW-firmware/issues/666
+   - **Status:** Open — no comments or fix yet.
+   - **Classification:** Bug report (scripts)
+   - **Summary:** scripts/capture-mqtt-debug.bat uses stale winget package ID EclipseMosquitto.Mosquitto; correct ID is EclipseFoundation.Mosquitto. One-line fix needed.
+
+---
+
+## Summary
+
+No new issues in the last 24 hours.
+
+---
+
 # Daily Issue Report — 2026-06-28
 
 ## GitHub Issues (updated in last 24h)
