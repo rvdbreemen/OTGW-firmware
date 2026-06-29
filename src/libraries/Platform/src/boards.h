@@ -266,6 +266,37 @@ typedef uint16_t SAT_RING_IDX_T;
   #define PIN_CLASSIC_BUTTON   18   // D3 hole (active LOW)
   #define PIN_CLASSIC_LED1     16   // D4 hole (active LOW)
   #define PIN_CLASSIC_LED2     4    // D0 hole (active LOW)
+
+  // ---- Classic-on-S3-Mini-Pro pins (ADR-158) ------------------------------
+  // A LOLIN S3 Mini PRO dropped into the same OTGW Classic socket. The Pro
+  // reroutes its 2x8 headers to free GPIO 33-36 for its on-board TFT, so the
+  // GPIO behind each D1-mini hole differs from the plain S3 Mini. Verified
+  // against the WEMOS S3_MINI_PRO schematic (P2/P3 "Pins" sheet) + the Arduino
+  // variant `lolin_s3_mini_pro/pins_arduino.h`:
+  //   hole  D1-mini  S3MiniPro GPIO  signal
+  //   TX    1        43             PIC UART (ESP TX -> PIC RX)   [same as Mini]
+  //   RX    3        44             PIC UART (ESP RX <- PIC TX)   [same as Mini]
+  //   D1    5        11             I2C SCL (0x26 watchdog + OLED + on-board IMU)
+  //   D2    4        12             I2C SDA
+  //   D3    0        13             Config/reset button
+  //   D4    2        14             LED1
+  //   D5    14       40             PIC reset (= TFT SCK; toggling shows TFT noise only)
+  //   D0    16       41             LED2
+  #define PIN_CLASSIC_PRO_PIC_RST  40   // D5 hole
+  #define PIN_CLASSIC_PRO_I2C_SCL  11   // D1 hole
+  #define PIN_CLASSIC_PRO_I2C_SDA  12   // D2 hole
+  #define PIN_CLASSIC_PRO_BUTTON   13   // D3 hole (active LOW)
+  #define PIN_CLASSIC_PRO_LED1     14   // D4 hole (active LOW)
+  #define PIN_CLASSIC_PRO_LED2     41   // D0 hole (active LOW)
+
+  // Boot discriminator (ADR-158): the Pro carries an on-board QMI8658C 6-axis
+  // IMU on its I2C bus (11/12); the plain S3 Mini does not. Probe WHO_AM_I at
+  // both possible 7-bit addresses (SA0 strap) and verify the chip-id byte so a
+  // stray device on a non-Pro bus cannot trigger a false positive.
+  #define PRO_IMU_I2C_ADDR_LO      0x6A  // QMI8658C, SA0 low
+  #define PRO_IMU_I2C_ADDR_HI      0x6B  // QMI8658C, SA0 high
+  #define PRO_IMU_WHOAMI_REG       0x00  // WHO_AM_I register
+  #define PRO_IMU_WHOAMI_VALUE     0x05  // QMI8658 chip id
 #endif
 
 // HAS_RUNTIME_HW_DETECT: 1 only on the combo board class (ADR-127); every

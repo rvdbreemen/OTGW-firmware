@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-06-26T07:06:30.361Z
-> Files: 536 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-06-28T06:52:26.517Z
+> Files: 546 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/01-raw/sessies/
 
@@ -895,3 +895,31 @@
 ## docs/
 
 - `daily-issue-report.md` — Daily Issue Report — 2026-06-26 (~926 tok)
+
+## docs/adr/
+
+- `ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md` — ADR-158 Combo board: add the LOLIN S3 Mini Pro as a third boot-detected Classic variant (~1907 tok)
+
+## docs/hardware/
+
+- `PINOUT.md` — OTGW Pinout Reference (~2217 tok)
+
+## src/OTGW-firmware/
+
+- `Hardwaretypes.h` — Declares OTGWHardwareMode (~468 tok)
+- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~12222 tok)
+- `OTGW-firmware.ino` — Declares WifiPortalResetState (~11762 tok)
+- `restAPI.ino` — include <string.h> (~51685 tok)
+- `settingStuff.ino` — include <ctype.h> (~21409 tok)
+
+## src/OTGW-firmware/data/
+
+- `index.js` — Safely parse JSON with validation and error handling (~101162 tok)
+
+## src/libraries/OTGWSerial/
+
+- `OTGWSerial.h` — Declares char (~1968 tok)
+
+## src/libraries/Platform/src/
+
+- `boards.h` — Declares slug (~4660 tok)

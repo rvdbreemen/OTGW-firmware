@@ -173,6 +173,11 @@ public:
    String processorToString();
    bool busy();
    void resetPic();
+   // Re-bind the PIC reset / firmware-progress-LED GPIOs after construction.
+   // Needed by the combo board (ADR-158): the ctor runs at global-init with the
+   // S3 Mini pins, but a boot-detected S3 Mini Pro uses different reset/LED pins.
+   void setResetPin(int pin)    { _reset = pin; }
+   void setProgressLed(int pin) { _led = pin; }
    OTGWError startUpgrade(const char *hexfile);
    void registerFinishedCallback(OTGWUpgradeFinished *func);
    void registerProgressCallback(OTGWUpgradeProgress *func);

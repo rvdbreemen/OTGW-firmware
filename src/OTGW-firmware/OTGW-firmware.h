@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.287
+**  Version  : v2.0.0-alpha.288
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -679,9 +679,10 @@ struct OTGWSettings {
   bool bMyDEBUG      = false;
   bool bNightlyRestart = false;  // scheduled daily restart for heap recovery
   uint8_t iRestartHour = 4;     // hour (0-23) for nightly restart
-  // Combo board (ADR-127) persisted hardware-mode selector / override.
-  // 0 = auto (boot-detect PIC vs OTDirect, then cache the result here),
-  // 1 = force PIC, 2 = force OTDirect. Ignored on the fixed boards.
+  // Combo board (ADR-127 / ADR-158) persisted hardware-mode selector / override.
+  // 0 = auto (boot-detect PIC vs OTDirect + S3 Mini vs S3 Mini Pro, then cache
+  // the result here), 1 = force PIC (S3 Mini), 2 = force OTDirect,
+  // 3 = force PIC (S3 Mini Pro). Ignored on the fixed boards.
   uint8_t iBoardMode = 0;
 
   // Named sub-sections — access as settings.mqtt.sBroker, settings.ntp.sTimezone, etc.
@@ -706,46 +707,96 @@ struct OTGWSettings {
 
 OTGWSettings settings;
 
-// ---- Combo runtime pin resolution (ADR-127) --------------------------------
-// The combo board carries two pin maps (Classic-on-S3 and OTGW32); these
+// ---- Combo runtime pin resolution (ADR-127; ADR-158 adds the S3 Mini Pro) --
+// The combo binary carries THREE pin maps: OTGW32 (PIN_*), Classic-on-S3-Mini
+// (PIN_CLASSIC_*) and Classic-on-S3-Mini-Pro (PIN_CLASSIC_PRO_*). These
 // accessors pick the live one. Defined here (not next to the other hw helpers)
 // because they need the `settings` instantiation: peripherals come up BEFORE
 // hardware detection (WiFi-portal-first boot, TASK-853), so resolution falls
 // back to the persisted settings.iBoardMode — every boot after the first
 // detection has the cached mode and picks the right pins immediately.
-// Unresolved auto (very first boot) defaults to the CLASSIC pins: the 0x26
-// watchdog disarm at the top of setup() is the safety-critical consumer, and a
-// stray I2C/LED write on the OTGW32 (where those GPIOs are re-initialized
-// after detection) is benign. On the fixed boards everything folds to the
-// single compile-time pin map.
-inline bool comboClassicPinsActive() {
+// Unresolved auto (very first boot) defaults to the CLASSIC pins, EXCEPT when
+// the early IMU probe flagged a Pro (state.hw.bClassicPro): the 0x26 watchdog
+// disarm at the top of setup() is the safety-critical consumer and a Pro's
+// watchdog lives on the Pro I2C bus. A stray I2C/LED write on the OTGW32 (where
+// those GPIOs are re-initialized after detection) is benign. On the fixed
+// boards everything folds to the single compile-time pin map.
+enum ComboPinMap : uint8_t {
+  COMBO_MAP_OTGW32      = 0,   // OTDirect (no PIC)
+  COMBO_MAP_CLASSIC     = 1,   // PIC — LOLIN S3 Mini in the Classic socket
+  COMBO_MAP_CLASSIC_PRO = 2,   // PIC — LOLIN S3 Mini Pro in the Classic socket
+};
+inline ComboPinMap comboActivePinMap() {
 #if HAS_RUNTIME_HW_DETECT
-  if (settings.iBoardMode == 1) return true;
-  if (settings.iBoardMode == 2) return false;
-  // auto: follow the live mode once detected; default Classic until then
-  return (state.hw.eMode != HW_MODE_OT_DIRECT);
+  // Explicit override / cached decision (persisted in settings.iBoardMode).
+  switch (settings.iBoardMode) {
+    case 1: return COMBO_MAP_CLASSIC;      // forced PIC (S3 Mini)
+    case 2: return COMBO_MAP_OTGW32;       // forced OTDirect
+    case 3: return COMBO_MAP_CLASSIC_PRO;  // forced PIC (S3 Mini Pro)
+    default: break;                        // 0 = auto
+  }
+  // auto: the early IMU probe flags a Pro; otherwise fall back to the
+  // PIC/OTDirect axis (default Classic until the PIC probe settles eMode).
+  if (state.hw.bClassicPro) return COMBO_MAP_CLASSIC_PRO;
+  return (state.hw.eMode == HW_MODE_OT_DIRECT) ? COMBO_MAP_OTGW32 : COMBO_MAP_CLASSIC;
 #else
-  return false;  // fixed boards: single pin map, value unused
+  return COMBO_MAP_OTGW32;  // fixed boards: single pin map, value unused
 #endif
+}
+// Retained convenience: is a Classic (PIC) pin map live, either module?
+inline bool comboClassicPinsActive() {
+  return comboActivePinMap() != COMBO_MAP_OTGW32;
 }
 inline int activeI2cSda() {
 #if HAS_RUNTIME_HW_DETECT
-  return comboClassicPinsActive() ? PIN_CLASSIC_I2C_SDA : PIN_I2C_SDA;
+  switch (comboActivePinMap()) {
+    case COMBO_MAP_CLASSIC_PRO: return PIN_CLASSIC_PRO_I2C_SDA;
+    case COMBO_MAP_CLASSIC:     return PIN_CLASSIC_I2C_SDA;
+    default:                    return PIN_I2C_SDA;
+  }
 #else
   return PIN_I2C_SDA;
 #endif
 }
 inline int activeI2cScl() {
 #if HAS_RUNTIME_HW_DETECT
-  return comboClassicPinsActive() ? PIN_CLASSIC_I2C_SCL : PIN_I2C_SCL;
+  switch (comboActivePinMap()) {
+    case COMBO_MAP_CLASSIC_PRO: return PIN_CLASSIC_PRO_I2C_SCL;
+    case COMBO_MAP_CLASSIC:     return PIN_CLASSIC_I2C_SCL;
+    default:                    return PIN_I2C_SCL;
+  }
 #else
   return PIN_I2C_SCL;
 #endif
 }
 #if HAS_RUNTIME_HW_DETECT
-inline int activeButton() { return comboClassicPinsActive() ? PIN_CLASSIC_BUTTON : PIN_BUTTON; }
-inline int activeLed1()   { return comboClassicPinsActive() ? PIN_CLASSIC_LED1   : PIN_LED1; }
-inline int activeLed2()   { return comboClassicPinsActive() ? PIN_CLASSIC_LED2   : PIN_LED2; }
+inline int activeButton() {
+  switch (comboActivePinMap()) {
+    case COMBO_MAP_CLASSIC_PRO: return PIN_CLASSIC_PRO_BUTTON;
+    case COMBO_MAP_CLASSIC:     return PIN_CLASSIC_BUTTON;
+    default:                    return PIN_BUTTON;
+  }
+}
+inline int activeLed1() {
+  switch (comboActivePinMap()) {
+    case COMBO_MAP_CLASSIC_PRO: return PIN_CLASSIC_PRO_LED1;
+    case COMBO_MAP_CLASSIC:     return PIN_CLASSIC_LED1;
+    default:                    return PIN_LED1;
+  }
+}
+inline int activeLed2() {
+  switch (comboActivePinMap()) {
+    case COMBO_MAP_CLASSIC_PRO: return PIN_CLASSIC_PRO_LED2;
+    case COMBO_MAP_CLASSIC:     return PIN_CLASSIC_LED2;
+    default:                    return PIN_LED2;
+  }
+}
+// PIC reset differs between the two Classic modules (S3 Mini 12, Pro 40). The
+// OTGWSerial ctor binds the S3 Mini pin at global-init; it is re-pinned after
+// detection via OTGWSerial.setResetPin(activePicRst()). OTGW32 has no PIC.
+inline int activePicRst() {
+  return (comboActivePinMap() == COMBO_MAP_CLASSIC_PRO) ? PIN_CLASSIC_PRO_PIC_RST : PIN_PIC_RST;
+}
 #endif
 
 //===================[ Global variables — not part of settings or state ]===================

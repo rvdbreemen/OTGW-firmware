@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.287
+**  Version  : v2.0.0-alpha.288
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -6487,9 +6487,10 @@ function refreshSettings() {
             // only exposes this key on the combo build, so the row never
             // renders on fixed boards.
             "boardmode": [
-              [0, "Auto-detect (probe PIC at boot)"],
-              [1, "PIC (OTGW Classic PCB)"],
-              [2, "OT-Direct (OTGW32 PCB)"]
+              [0, "Auto-detect (probe PIC + module at boot)"],
+              [1, "PIC (OTGW Classic, S3 Mini)"],
+              [2, "OT-Direct (OTGW32 PCB)"],
+              [3, "PIC (OTGW Classic, S3 Mini Pro)"]
             ]
           };
 
@@ -7388,7 +7389,7 @@ var translateTooltips = [
   , ["darktheme", "Use the dark color theme in the web interface."]
   , ["nightlyrestart", "Restart the device once a day at the configured hour to recover heap memory. Causes a brief (~30 second) service interruption."]
   , ["nightlyrestarthour", "Local hour (0-23) when the nightly restart runs. Default is 4 (04:00). Only active when NTP is enabled and synced."]
-  , ["boardmode", "Combo build only: which OpenTherm hardware this board drives. Auto-detect probes for a PIC at boot and caches the result; PIC forces the OTGW Classic path, OT-Direct forces the OTGW32 path. Takes effect after a reboot."]
+  , ["boardmode", "Combo build only: which OpenTherm hardware this board drives. Auto-detect probes for a PIC and (on the Classic socket) an S3 Mini Pro IMU at boot, then caches the result; PIC forces the OTGW Classic path (S3 Mini), OT-Direct forces the OTGW32 path, and PIC (S3 Mini Pro) forces the Classic path with the Pro pin map. Takes effect after a reboot."]
   , ["gpiosensorsenabled", "Enable 1-Wire temperature sensors connected to the selected GPIO pin."]
   , ["gpiosensorslegacyformat", "Use the older MQTT payload format only if an existing setup depends on it."]
   , ["gpiosensorsinterval", "Seconds between GPIO sensor updates. Use a higher value to reduce MQTT traffic."]
