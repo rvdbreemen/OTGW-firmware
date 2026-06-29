@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-27 10:47'
-updated_date: '2026-06-28 12:46'
+updated_date: '2026-06-29 04:42'
 labels:
   - feature
 dependencies: []
@@ -35,4 +35,6 @@ IMPLEMENTED + pushed to origin/dev: 94890099 (2.0.0 alpha.279). Port of 1.x 7b2d
 ADR-156 (2.0.0) flipped Proposed->Accepted via adr-kit + pushed (5b158a12). Cross-line mirror authored on otgw-1.x.x as ADR-085 (Accepted, quality 0.90 A, lint PASS), pushed df4a3b5d. Both ADRs cross-reference each other; cross-worktree ADR coherence complete. Field validation (on-device + jelvank) deferred per maintainer.
 
 Code landed on dev (publishHvacMode/publishHvacAction OTGW-Core.ino:2057-2085; discovery climate modes [off,heat,cool] + action_topic/hvac_action + mode_stat_t/hvac_mode MQTTHaDiscovery.cpp:2895-2965). Board status was stale at To Do; flipped to In Review. Remaining gate: on-device + field sign-off (jelvank, 1.x twin TASK-938 already cooling-confirmed). No code work outstanding.
+
+ON-DEVICE EVIDENCE 2026-06-29 (OTGW32 @192.168.88.39, alpha.285, broker homeassistant.local): the unified climate entity IS published and correct — homeassistant/climate/otgw-1020BA21B4F8/climate/config carries "modes":["off","heat","cool"] (AC#1 modes verified live). Build esp32 + evaluate green (AC#2). Code is a faithful parity port of 1.x TASK-938 (ADR-156), and the 1.x twin is field-confirmed by jelvank for live cooling. NOT fully closing: demonstrating the off<->heat<->cool VALUE transitions requires a real cooling-capable master/thermostat (the force-boiler hook flips boiler PRESENCE, not the MsgID 0 cooling-enable/cooling-status bits), which a bus-less bench cannot produce. Remains In Review pending a live-cooling demo (already proven on the 1.x twin).
 <!-- SECTION:NOTES:END -->

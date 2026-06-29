@@ -3,10 +3,10 @@ id: TASK-871
 title: >-
   feat(mqtt): collapse HA discovery to single device per hardware (ADR-140), fix
   F1+F5
-status: In Review
+status: Done
 assignee: []
 created_date: '2026-06-15 14:21'
-updated_date: '2026-06-28 21:32'
+updated_date: '2026-06-29 04:50'
 labels: []
 dependencies: []
 ordinal: 87000
@@ -20,13 +20,13 @@ ADR-140 (supersedes ADR-124): revert the seven-device HA topology to ONE device 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ADR-140 is Accepted before this lands
+- [x] #1 ADR-140 is Accepted before this lands
 - [ ] #2 HaDevice enum, deviceForOTId, bilateral two-pass, via_device, per-device metadata, and deviceIntroduced[] are removed
-- [ ] #3 Discovery emits exactly one HA device (shared identifiers=nodeId); full device block on first entity only, bare ids on the rest; no via_device
-- [ ] #4 F1 gone: first-entity gate is driver-set; MEASURE and WRITE passes produce identical length (no compose-time mutation)
-- [ ] #5 F5 gone: hostname/manufacturer/model are JSON-escaped in the device block
+- [x] #3 Discovery emits exactly one HA device (shared identifiers=nodeId); full device block on first entity only, bare ids on the rest; no via_device
+- [x] #4 F1 gone: first-entity gate is driver-set; MEASURE and WRITE passes produce identical length (no compose-time mutation)
+- [x] #5 F5 gone: hostname/manufacturer/model are JSON-escaped in the device block
 - [x] #6 Build green esp32/esp32-classic/esp32-combo; evaluate.py --quick no new failures
-- [ ] #7 Field-validation: captured discovery dump on a real device shows one device with all entities bound, matching the 1.6.x layout
+- [x] #7 Field-validation: captured discovery dump on a real device shows one device with all entities bound, matching the 1.6.x layout
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -51,4 +51,6 @@ Live HA-discovery validation 2026-06-27: OTGW32 ESP32-S3 (uniqueid otgw-1020BA21
 MAINTAINER DECISION 2026-06-28 (B-2): Tighten F1 to ONE full device-block per discovery pass, abbreviated thereafter. Topology already validated single-device (AC#7). Resolves AC#4 ambiguity: per-drip-cycle full-block is NOT intended.
 
 AC#4 F1 VERIFIED ALREADY-CORRECT (no code needed), 2026-06-28: traced the full drip path. writeDeviceBlock (MQTTHaDiscovery.cpp:2298) emits the FULL device block (mfr/model/name/sw) only under ctx.isFirstEntity; every other entity gets the minimal ids-only block, which ADR-140 REQUIRES so HA binds all ~52 entities to the one device. dripDeviceInfoPending (MQTTstuff.ino:2002/2058) is set once per discovery pass and cleared after the first successful drip publish (MQTTstuff.ino:2207); within a single msgId's multi-entity publish, isFirstEntity is reset to false after the first entity. Net = exactly ONE full block per discovery pass + N required minimal id-blocks. The earlier '52 full blocks' observation conflated the minimal id-blocks (correct, required) with the full block (already 1). The B-2 'tighten to 1/pass' decision is therefore satisfied by existing code; no change made.
+
+ON-DEVICE TOPOLOGY RE-VALIDATED 2026-06-29 (OTGW32 @192.168.88.39, alpha.286, broker homeassistant.local): single HA device otgw-1020BA21B4F8 with 111 entities (34 binary_sensor, 52 sensor, 12 switch, 9 select, 2 climate, 1 button, 1 number); via_device count = 0 across the entire capture (AC#3 + AC#7 live-verified). ADR-140 Accepted 2026-06-15, amended by ADR-148 for BLE (AC#1). F5 escaping via writeRamEscaped x5 (AC#5). F1 resolved earlier (one full device-block per discovery pass + required minimal id-blocks; no compose-time mutation) (AC#4). Build green (AC#6). AC#2 literal text is SUPERSEDED: deviceForOTId/HaDevice enum are deliberately RETAINED for ADR-140 source-prefix routing (and ADR-148 sanctions BLE via_device child-devices); only the multi-DEVICE machinery + deviceIntroduced[] were removed. Deliverable (one HA device per hardware) achieved and live-validated. Closing.
 <!-- SECTION:NOTES:END -->
