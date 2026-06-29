@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.285
+**  Version  : v2.0.0-alpha.286
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1992,6 +1992,7 @@ void publishNonOTDiscoveryConfigs()
     return;
   }
   setMQTTConfigPending(0);                  // climate: thermostat + DHW control
+  setMQTTConfigPending(OTGWhvacid);         // TASK-942: hvac_mode/hvac_action companion sensors (faux id 242; not bus-seen, so it must be marked explicitly here or the sensors never publish on boot/reconnect)
   setMQTTConfigPending(27);                 // number: outside temperature override
   setMQTTConfigPending(OTGWdallasdataid);   // Dallas temperature sensors
   setMQTTConfigPending(OTGWheapstatsid);    // heap / discovery statistics

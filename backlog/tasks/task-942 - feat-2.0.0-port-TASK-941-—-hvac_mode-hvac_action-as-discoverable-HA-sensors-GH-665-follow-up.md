@@ -3,11 +3,11 @@ id: TASK-942
 title: >-
   feat-2.0.0: port TASK-941 — hvac_mode + hvac_action as discoverable HA sensors
   (GH #665 follow-up)
-status: In Review
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-28 05:57'
-updated_date: '2026-06-28 13:27'
+updated_date: '2026-06-29 04:40'
 labels:
   - feature
   - mqtt
@@ -37,4 +37,6 @@ ordinal: 155000
 
 <!-- SECTION:NOTES:BEGIN -->
 Build green: esp32 SUCCESS after fixing invalid HaIcon members (thermostat->thermostat_icon, heating->radiator; bug-138). evaluate.py --quick clean. prerelease alpha.282. Field AC#6 deferred (hardware: confirm both sensors in HA discovery + values across off/heat/cool).
+
+ON-DEVICE BUG FOUND 2026-06-29 (OTGW32 @192.168.88.39, alpha.285, broker homeassistant.local): the hvac_mode/hvac_action companion sensors do NOT publish on a normal boot/reconnect. Broker has the climate config (modes [off,heat,cool], TASK-939) but NONE of the 109 retained configs for this device include sensor/.../hvac_mode|hvac_action/config. Root cause: id 242 (OTGWhvacid) is a FAUX sensor id (never seen on the OT bus), and publishNonOTDiscoveryConfigs() — the boot/reconnect discovery list — marks 0/27/dallas/heap/fw/pic* but NOT 242. So the companion sensors only appear after a manual full markAllMQTTConfigPending (F-key/discovery republish), not out of the box. readSensorIndex[242]=385 is valid, so the full-scan path works; only the boot list omits it. Fix: add setMQTTConfigPending(OTGWhvacid) to publishNonOTDiscoveryConfigs.
 <!-- SECTION:NOTES:END -->
