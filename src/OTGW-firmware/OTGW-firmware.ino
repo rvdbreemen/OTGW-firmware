@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.291
+**  Version  : v2.0.0-alpha.292
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -248,29 +248,14 @@ void setup() {
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
 
-  // TASK-949: load LittleFS + settings FIRST, so the combo IMU probe and the PIC
-  // detection can be SKIPPED on a boot where iBoardMode is already persisted. The
-  // IMU probe drives the Pro I2C pins (11/12); on a regular S3 Mini GPIO 12 is
-  // PIC_RST, so probing it on EVERY boot disturbs the PIC reset line (field
-  // regression: regular S3 Mini no longer detected as Classic). Reading the cached
-  // mode here lets us probe ONLY on the first / auto boot.
-  LittleFSmounted = LittleFS.begin();
-  if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
-  cacheBootFlashInfo();   // cache static flash/FS values once; used by /api/v2/device/info
-  readSettings(true);
-
 #if HAS_RUNTIME_HW_DETECT
-  // ADR-158 + TASK-949: decide S3 Mini vs S3 Mini Pro BEFORE the 0x26 watchdog
-  // disarm (the Pro's watchdog + IMU live on the 11/12 bus). Probe the IMU ONLY in
-  // AUTO mode (iBoardMode==0). On a cached/forced boot, derive the module from the
-  // persisted mode (3 = Pro) and SKIP the probe — so the every-boot pin-12 PIC-RST
-  // disturbance is gone once detection has persisted. activeI2c*() then resolves to
-  // the Pro bus when a Pro is (or was) found.
-  if (settings.iBoardMode == 0) {
-    state.hw.bClassicPro = probeProImu();
-  } else {
-    state.hw.bClassicPro = (settings.iBoardMode == 3);
-  }
+  // ADR-158: decide S3 Mini vs S3 Mini Pro BEFORE the 0x26 watchdog disarm,
+  // because the Pro's watchdog (and its IMU) live on a different Classic I2C bus
+  // (11/12 vs 35/36). Settings are not read yet, but the IMU is a hardware fact
+  // so the live probe is self-sufficient; a cached/forced iBoardMode override is
+  // applied after readSettings() via the re-pin below. activeI2c*() then resolves
+  // to the Pro bus when a Pro is found.
+  state.hw.bClassicPro = probeProImu();
 #endif
 
   // I2C must be on the board's pins BEFORE the watchdog-disarm below. On the
@@ -301,7 +286,10 @@ void setup() {
   setLed(LED1, ON);
   setLed(LED2, ON);
 
-  // LittleFS + settings already loaded at the top of setup() (TASK-949).
+  LittleFSmounted = LittleFS.begin();
+  if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
+  cacheBootFlashInfo();   // A: cache static flash/FS values once; used by /api/v2/device/info
+  readSettings(true);
   checklittlefshash();
   loadOtSupportFiles();  // TASK-693 port: warm the in-RAM support bitmaps from prior-boot knowledge
 
@@ -348,11 +336,12 @@ void setup() {
   // Runs AFTER WiFi configuration (TASK-853): the captive portal on a fresh
   // flash must never be blocked by the PIC probe or a starved UART.
   // Fixed boards: detect PIC, then init OTDirect if compiled in (unchanged).
-  // Combo board: honour the persisted/forced settings.iBoardMode (1/2/3), else
-  // (0=auto) detect ONCE on the first boot and PERSIST the verdict, so later boots
-  // skip both this PIC probe and the early IMU probe (TASK-949). The PIC is the
-  // only reliable discriminator (OLED/W5500 are optional on OTGW32). iBoardMode is
-  // a soft setting: the user can override it in the settings menu if ever wrong.
+  // Combo board: honour the MANUAL settings.iBoardMode override (1/2/3), else
+  // (0=auto) PIC-probe-first EVERY boot — the PIC is the only reliable
+  // discriminator; OLED/W5500 are optional on OTGW32. TASK-947: auto NEVER
+  // persists its verdict into iBoardMode (that conflated auto with a user force
+  // and stuck OTDirect); it re-detects each boot and defaults to OTGW32 when no
+  // live PIC + no live OT bus (bench / non-production).
 #if HAS_RUNTIME_HW_DETECT
   if (settings.iBoardMode == 2) {
     // MANUAL force OT-Direct (user-set; auto never writes 2). Skip the PIC probe
@@ -372,14 +361,14 @@ void setup() {
       detectPIC();               // sets HW_MODE_PIC, or HW_MODE_DEGRADED if dead
     } else {
       // AUTO (iBoardMode==0): FIRST-BOOT detection, then PERSIST once (TASK-949,
-      // restores the persist-once that TASK-947 wrongly removed). Do the utmost to
-      // get the verdict right: retry detectPIC a few times so a transient miss —
-      // including the one-time IMU-probe disturbance of GPIO 12 (PIC_RST on a
-      // regular S3 Mini) done above — does not mis-detect. PIC present => Classic
-      // (Pro vs regular from the IMU probe); no PIC after retries => OTGW32/OT-Direct
-      // (bench default). The result is written to LittleFS, so EVERY later boot
-      // skips both the IMU probe and this detection. iBoardMode is the soft setting:
-      // the user can change it in the settings menu if detection is ever wrong.
+      // conservative redesign — replaces TASK-947's never-persist). Retry detectPIC
+      // a few times so a transient miss does not mis-detect; PIC present => Classic
+      // (Pro vs regular from the IMU probe), no PIC after retries => OTGW32/OT-Direct
+      // (bench default). The verdict is written to LittleFS, so later boots take the
+      // forced path above (line 359) and skip the auto branch — and that path's
+      // detectPIC() does its own clean PIC reset, recovering from the early IMU
+      // probe's transient on GPIO 12. iBoardMode is the soft setting: the user can
+      // change it in the settings menu if detection is ever wrong.
       SetupDebugln(F("Board mode: auto — first-boot PIC detection (retried)"));
       bool picFound = false;
       for (uint8_t attempt = 0; attempt < 3 && !picFound; attempt++) {
@@ -393,14 +382,14 @@ void setup() {
                     state.hw.bClassicPro ? "S3 Mini Pro" : "S3 Mini", (int)settings.iBoardMode);
       } else {
         // No live PIC after retries: tear down UART1 BEFORE OT-direct so a floating
-        // PIC-RX pin can't drive an RX interrupt storm (ADR-125). No live PIC + no
-        // live OT bus = bench (non-production): OTGW32/OT-Direct is the safe default.
+        // PIC-RX pin can't drive an RX interrupt storm (ADR-125). No PIC + no OT bus
+        // = bench (non-production): OTGW32/OT-Direct is the safe default.
         OTGWSerial.end();
         initOTDirect();            // sets HW_MODE_OT_DIRECT
         if (state.hw.eMode == HW_MODE_OT_DIRECT) settings.iBoardMode = 2;
         SetupDebugln(F("Board mode: auto -> no PIC -> OTGW32/OT-Direct (persisting iBoardMode=2)"));
       }
-      if (settings.iBoardMode != 0) writeSettings(false);  // persist once; later boots skip detection
+      if (settings.iBoardMode != 0) writeSettings(false);   // persist once; later boots use the forced path
     }
   }
   // The resolved mode may select the other pin map than the pre-detection
