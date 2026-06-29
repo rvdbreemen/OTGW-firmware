@@ -3,11 +3,11 @@ id: TASK-935
 title: >-
   feat(2.0.0): expose advanced OT-Direct + SAT settings over REST (v2 Settings
   Phase 2)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-06-25 19:15'
-updated_date: '2026-06-29 03:53'
+updated_date: '2026-06-29 03:58'
 labels: []
 dependencies: []
 ordinal: 149000
@@ -21,12 +21,14 @@ Phase 2 of TASK-933. ~50 persisted OT-Direct PID/curve/bypass/vent + SAT DHW/pre
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Each targeted advanced OTD/SAT key is emitted by GET /api/v2/settings with the correct type and min/max
-- [ ] #2 Each targeted key is in the POST whitelist and writes through to the settings struct + persists
+- [x] #1 Each targeted advanced OTD/SAT key is emitted by GET /api/v2/settings with the correct type and min/max
+- [x] #2 Each targeted key is in the POST whitelist and writes through to the settings struct + persists
 - [ ] #3 v2.js SET_META gives each newly-exposed key a friendly label/hint/category; enums added where the value is an ordinal code
-- [ ] #4 Firmware builds green (esp32 target) and evaluator stays green
+- [x] #4 Firmware builds green (esp32 target) and evaluator stays green
 - [ ] #5 Round-trip verified live: read a value, POST a change, confirm it persists across a reboot on the real device
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
