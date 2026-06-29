@@ -3,11 +3,11 @@ id: TASK-933
 title: >-
   feat(v2-webui): align live v2 UI with the design mockup (ground truth) on real
   data
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-25 17:20'
-updated_date: '2026-06-27 08:21'
+updated_date: '2026-06-29 21:52'
 labels: []
 dependencies: []
 ordinal: 147000
@@ -24,9 +24,9 @@ The shipped v2 Web UI (v2.html/v2.js/v2.css) diverges from the approved design m
 - [x] #1 Comprehensive issue list produced: mockup vs impl, every page/dashboard/setting, with file:line and fix direction
 - [x] #2 Settings render human-readable labels + hints + categories + REBOOT badges (mockup SET_CATS model) bound to real REST keys
 - [x] #3 Connectivity models OT bus as two links (thermostat/boiler) with MODE-vs-HEALTH vocabulary per the mockup
-- [ ] #4 Home A/B/C dashboards match the mockup layout/labels on real OT data
+- [x] #4 Home A/B/C dashboards match the mockup layout/labels on real OT data
 - [x] #5 Monitor sub-tabs (Log/Stats/OT Support/Graph/Connection) match the mockup
-- [ ] #6 Final: live v2 UI visually matches the mockup at desktop+mobile, driven by real device data
+- [x] #6 Final: live v2 UI visually matches the mockup at desktop+mobile, driven by real device data
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -75,4 +75,14 @@ Self-verifiable ACs done (alpha.276, committed 62bf7252, pushed origin/dev; esp3
 Playwright validation pass (mock OTGW device, REST-driven, light+dark): item1 sd-hint footnote ✓ visual; item3 Concept-B headline reuses statusSentence ✓ (HP-aware 'Heating · compressor on · 62%'); item4 stats sort glyph ✓ DOM (class 'sorted asc' + aria-sort ascending + ::after ' ▲'); item5 theme aria-pressed flips ✓; items6/9 enum selects render w/ correct values ✓; item7 sd-badge after name ✓; item8 ticker parse+colour mapping 5/5 Node (T/R→t, B/A→b); item10 ~46 SAT keys curated + sub-grouped (Presets/Weather/Solar/Summer/Comfort/Multi-area/PV-boost/Auto-tune/Simulation/BLE) ✓ visual; item11 connectivity 'Thermostat Degraded' amber from thermostat_age_s=25 while Boiler Connected from age=5 ✓ end-to-end + Mode GATEWAY from otgwmode ✓. Zero runtime exceptions on load. Self-verifiable ACs now browser-confirmed; AC#6 (live data/WS on real OTGW32) still maintainer sign-off.
 
 HARDWARE SIGNOFF (2026-06-27, real OTGW32): flashed alpha.278 via USB COM4 (offset-based esptool, preserved nvs+spiffs -> WiFi+settings kept; device reconnected to 192.168.1.143). VERIFIED ON HARDWARE: device/info.fwversion=2.0.0-alpha.278+3d3f093 (incl. fix commit); /api/v2/health emits thermostat_age_s=-1 + boiler_age_s=-1 (fields wired + correct never-seen sentinel for OT-Direct w/o OT bus). CRITICAL FIND during signoff: alpha.276/277 firmware did NOT compile (restAPI.ino now() -> AceTime, fixed to time(nullptr), commit 3d3f0936) — build.py exit-0 masking + stale firmware.bin hid it; dev firmware was broken 62bf7252..5a7eda6d, now restored. AC#6 firmware-side: DONE on hardware. Degraded st-warn transition NOT reproducible on this bench unit (no OT bus, age stays -1) — mock-validated. UI flips: Playwright-validated (browser rendering independent of device).
+
+On-device FS completion (2026-06-27, OTGW32 @192.168.1.143): uploaded the changed alpha.278 v2 assets (v2.css/v2.js/v2.html/version.hash) per-file via POST /upload — preserves settings.ini (no partition wipe). Verified on hardware: device serves the dark-nav #383838 flip + Concept-C FLAME cell; device version.hash=3d3f093 matches firmware (mismatch warning cleared); settings intact (hostname=OTGW, mqttbroker=homeassistant.local, otdmode=3, sat=False = pre-flash backup); /health still emits thermostat_age_s/boiler_age_s=-1. Device now fully alpha.278 (fw+assets+version.hash). AC#6 desktop+mobile visual: UI + flips confirmed serving on real hardware; full live-DATA visual still needs a connected OT bus (this bench unit has none).
+
+CLOSE 2026-06-29: maintainer verified v2 UI visually matches the mockup on real OT data, desktop + mobile (#4, #6). Closed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Live v2 UI aligned to the design mockup on real device data, verified desktop + mobile.
+<!-- SECTION:FINAL_SUMMARY:END -->

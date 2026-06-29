@@ -1,11 +1,11 @@
 ---
 id: TASK-865.15
 title: 'harden(pic-uart): close residual FreeRTOS PIC-UART task coupling gaps'
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-14 09:52'
-updated_date: '2026-06-21 07:51'
+updated_date: '2026-06-29 21:53'
 labels:
   - async-esp32s3
 dependencies:
@@ -53,4 +53,12 @@ Amend ADR-130 (control-method UART access + TX ordering invariant). Add a note t
 Landed (alpha bump pending): (A) control-method park handshake — g_picResetInProgress flag OR-ed into picSerialTaskShouldPark(); resetOTGW() and detectPIC() now raise it + waitForPICTaskParked() around the direct OTGWSerial.resetPic()/find(ETX) span so the loop is never a second concurrent UART owner. (B) TX short-write requeue moved from platformQueueSend (back) to new platformQueueSendToFront() shim (front) restoring strict FIFO under ser2net relay backpressure. (C) handlePICSerialSimulation() parks the PIC task before the loop-side picSerialFlushRx(). (D) fwupgradestep() dedupes WebSocket progress on integer-pct change (<=101 frames/flash), consciously left outside the ADR-121 heap gate. ADR-138 (Proposed) amends ADR-130 (park + TX ordering) and ADR-133 (progress-path heap-gate note); README.md index updated. evaluate.py --quick: 0 failures, sole-owner gate + ESP-abstraction boundary green. AC#1-#6 met; AC#7 remains: FIELD validation on ESP32-S3 (ser2net load soak shows no command corruption; PIC flash with live progress shows no heap-churn regression).
 
 3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert.
+
+CLOSE 2026-06-29 per maintainer: the underlying issue is FIXED BY A RELEASE (the shipped firmware resolves it; same disposition as TASK-779 which 1.7.0 fixed). The open ACs here were NOT individually completed in this 2.0.0 task — they are superseded by the released fix. Maintainer decision (Robert).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as fixed-by-release: the underlying issue is resolved in the shipped firmware; remaining 2.0.0 ACs superseded.
+<!-- SECTION:FINAL_SUMMARY:END -->

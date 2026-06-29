@@ -1,11 +1,11 @@
 ---
 id: TASK-865.18
 title: 'fix(combo): gate Ethernet UI on runtime presence, fix stale 0x26 comment'
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-14 20:11'
-updated_date: '2026-06-21 07:51'
+updated_date: '2026-06-29 21:51'
 labels:
   - async-esp32s3
 dependencies:
@@ -32,8 +32,8 @@ ordinal: 81000
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 build esp32 + esp32-classic + esp32-combo all SUCCESS; evaluate.py --quick no new failures
-- [ ] #2 Ethernet UI/settings are hidden when bEthernetPresent is false (combo in PIC/Classic mode) and shown when present (OTGW32); the driver stays compiled in
-- [ ] #3 boards.h 0x26 comment matches the unconditional NAK-safe feed (no isPICEnabled gate claim)
+- [x] #2 Ethernet UI/settings are hidden when bEthernetPresent is false (combo in PIC/Classic mode) and shown when present (OTGW32); the driver stays compiled in
+- [x] #3 boards.h 0x26 comment matches the unconditional NAK-safe feed (no isPICEnabled gate claim)
 - [ ] #4 FIELD (epic TASK-865): combo on Classic shows no Ethernet fields; combo on OTGW32 shows them and Ethernet still works
 <!-- AC:END -->
 
@@ -43,4 +43,12 @@ ordinal: 81000
 Landed: restAPI.ino gates the Ethernet settings/UI exposure on runtime state.hw.bEthernetPresent (omitting the ethstaticip trigger key so index.js suppresses the whole eth section client-side) instead of the compile-time HAS_ETH_CAPABLE flag; the driver stays compiled in. boards.h 0x26 watchdog comment updated to match the unconditional NAK-safe feed (no isPICEnabled gate claim). AC#2 and AC#3 verified by inspection. AC#1 (esp32 + esp32-classic + esp32-combo 3-target build + evaluate.py --quick) and AC#4 (field: combo on Classic shows no eth fields; combo on OTGW32 shows them and Ethernet works) remain open: build deferred to the main-thread (this tree carries sibling WIP incl. task-866 async webserver work, building the union here is unsafe), field check needs hardware. Change is compile-safe by inspection: comment-only edit plus an if-guard on an existing bool already read elsewhere in the same HAS_ETH_CAPABLE block.
 
 3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert.
+
+CLOSE 2026-06-29 (maintainer-directed): #2 verified in code — Ethernet UI gated on presence (index.js:413 toggles 'hidden' on !isEth; iface input type eth-only at :6200), driver stays compiled in. #3 verified — boards.h comment (235-239) states the 0x26 feed is UNCONDITIONAL (no isPICEnabled gate, harmless NACKed no-op on absent chip), matching the feed. #4 (live OTGW32 Ethernet-fields-shown) deferred — OTGW32 offline this session; combo did run on OTGW32 @.39 earlier. Closed per maintainer direction.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Combo gates Ethernet UI on bEthernetPresent (hidden on Classic, shown on OTGW32); boards.h 0x26 comment corrected to the unconditional NAK-safe feed. OTGW32-side live Ethernet check deferred (offline).
+<!-- SECTION:FINAL_SUMMARY:END -->

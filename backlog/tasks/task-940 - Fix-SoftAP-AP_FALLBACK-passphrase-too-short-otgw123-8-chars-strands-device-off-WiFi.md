@@ -3,11 +3,11 @@ id: TASK-940
 title: >-
   Fix SoftAP AP_FALLBACK passphrase too short (otgw123 < 8 chars strands device
   off-WiFi)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-27 18:27'
-updated_date: '2026-06-27 18:29'
+updated_date: '2026-06-29 21:52'
 labels: []
 dependencies: []
 ordinal: 153000
@@ -21,7 +21,19 @@ On OTGW32 ESP32-S3 (2.0.0 alpha.279), when WiFi STA loses a previously-provision
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Fallback SoftAP passphrase is >=8 chars (e.g. otgw1234) OR the fallback AP is opened with no passphrase; AP_FALLBACK starts successfully (no 'passphrase too short')
-- [ ] #2 A device that loses STA after provisioning is reachable on the fallback AP at 192.168.4.1 within the retry window
-- [ ] #3 Build green esp32/esp32-classic/esp32-combo; evaluate.py --quick no new failures
+- [x] #1 Fallback SoftAP passphrase is >=8 chars (e.g. otgw1234) OR the fallback AP is opened with no passphrase; AP_FALLBACK starts successfully (no 'passphrase too short')
+- [x] #2 A device that loses STA after provisioning is reachable on the fallback AP at 192.168.4.1 within the retry window
+- [x] #3 Build green esp32/esp32-classic/esp32-combo; evaluate.py --quick no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+CLOSE 2026-06-29: maintainer verified the device falls back to SoftAP at 192.168.4.1 after losing STA (#2). Passphrase otgw1234 (>=8 chars) confirmed. Closed.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SoftAP AP_FALLBACK reachable at 192.168.4.1 after STA loss; passphrase length fixed (otgw1234).
+<!-- SECTION:FINAL_SUMMARY:END -->

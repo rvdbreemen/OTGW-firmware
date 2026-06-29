@@ -3,11 +3,11 @@ id: TASK-879
 title: >-
   fix(esp32): Task-Watchdog reboot loop + core-1 starvation (slow webserver),
   OTGW32 alpha.199
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-16 05:38'
-updated_date: '2026-06-28 12:47'
+updated_date: '2026-06-29 21:53'
 labels: []
 dependencies: []
 ordinal: 95000
@@ -87,4 +87,12 @@ LIVE OTGW32 CRASH REPRODUCED (2026-06-20, real OTGW32 @192.168.1.143, alpha.226+
 ROOT CAUSE PINNED (captured on USB console alpha.227, 2026-06-20, bisect-testset/otgw32-wsrealism-crash-20260620/console-pcb-null-flood-alpha227.log): under WS-realism load the console floods 58x with '[E][AsyncTCP.cpp:1547] tcp_accept(): _accept failed: pcb is NULL', then the device TWDT-resets (bootcount climbs, lastreset Unknown, NO coredump = watchdog not panic). AsyncTCP.cpp:1544-1548: LWIP calls tcp_accept(arg,pcb,err) with pcb==NULL when it cannot allocate a new TCP pcb (pcb pool exhausted). The concurrent connection count (persistent WS /ws subscribers HOLDING connections + N HTTP flood workers, ~20 sockets) exceeds LWIP MAX_ACTIVE_TCP (~16 default), so accepts fail in a storm on the LwIP thread and the loop task starves -> TWDT. The crash is PROBABILISTIC/threshold (45s/8w survived once at heap floor ~30KB; 60s+ and 5-6WS/12-14w crash). NOTE: the existing restEffectiveInflightCap gate (TASK-884) limits in-flight REQUESTS post-accept, NOT concurrent CONNECTIONS/accept-rate -> that is the gap. FIX DIRECTION: connection-level backpressure (bound concurrent connections / accept rate) and/or raise CONFIG_LWIP_MAX_ACTIVE_TCP+MAX_SOCKETS (RAM cost). Reproduced on real OTGW32 @192.168.1.143. This is the pinned mechanism for the OTGW32 webserver-collapse-under-load: LWIP pcb exhaustion from concurrent connections (WS subscribers + flood), not a single hang. Stays In Progress.
 
 REFRAME (beta-readiness review 2026-06-28): the loop-blocking class behind 'webserver dies/port unreachable under load' is resolved in code — AsyncSimpleTelnet non-blocking writes (ADR-143), bounded OT_STATE_READ_LOCK_MS (restAPI.ino:2469), heap-tier static-file admission gate (ADR-147). The one residual failure mode is LWIP TCP-pcb pool exhaustion under adversarial concurrency (persistent WS live-log + HTTP flood), FORMALLY ACCEPTED as a hardware ceiling in ADR-149 with automatic TWDT recovery. All 4 ACs here are hardware-gated (need a real OTGW32). Beta posture: (a) document the pcb ceiling in release notes; (b) front-load ONE realistic soak — 1 live-log tab + HA MQTT + normal browsing, >=1h, bootcount delta 0 — as the first beta validation. This is now a field-validation task, not open engineering. Related: ADR-149, TASK-898 (combo PIC-less boot).
+
+CLOSE 2026-06-29 per maintainer: the underlying issue is FIXED BY A RELEASE (the shipped firmware resolves it; same disposition as TASK-779 which 1.7.0 fixed). The open ACs here were NOT individually completed in this 2.0.0 task — they are superseded by the released fix. Maintainer decision (Robert).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as fixed-by-release: the underlying issue is resolved in the shipped firmware; remaining 2.0.0 ACs superseded.
+<!-- SECTION:FINAL_SUMMARY:END -->
