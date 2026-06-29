@@ -169,7 +169,8 @@
   var model = {
     flow: null, ret: null, dhw: null, outside: null, room: null,
     roomSet: null, chSet: null, mod: null, pressure: null,
-    flame: false, ch: false, dhw_on: false, fault: false, fresh: false
+    flame: false, ch: false, dhw_on: false, fault: false, fresh: false,
+    wxValid: false   // TASK-954: weather API drives OUTSIDE when its last fetch is valid
   };
 
   function f88(u16) { var v = (u16 > 32767) ? u16 - 65536 : u16; return v / 256; }
@@ -203,7 +204,7 @@
       case 24: if (isAck || isWrite) { model.room = f88(u16); changed = true; } break; // Troom
       case 25: if (isAck) { model.flow = f88(u16); changed = true; } break;       // Tboiler (flow)
       case 26: if (isAck) { model.dhw = f88(u16); changed = true; } break;        // Tdhw
-      case 27: if (isAck) { model.outside = f88(u16); changed = true; } break;    // Toutside
+      case 27: if (isAck && !model.wxValid) { model.outside = f88(u16); changed = true; } break;    // Toutside (yields to weather API when valid, TASK-954)
       case 28: if (isAck) { model.ret = f88(u16); changed = true; } break;        // Tret (return)
     }
     if (changed) { model.fresh = true; pushSample(); scheduleRender(); }
@@ -1550,7 +1551,7 @@
       function on(k) { var e = o[k]; if (!e || e.value === undefined) return null; return /on|true|1/i.test('' + e.value); }
       var map = { flow: 'boilertemperature', ret: 'returnwatertemperature', dhw: 'dhwtemperature', outside: 'outsidetemperature', room: 'roomtemperature', roomSet: 'roomsetpoint', chSet: 'controlsetpoint', mod: 'relmodlvl', pressure: 'chwaterpressure' };
       var changed = false;
-      Object.keys(map).forEach(function (f) { var v = num(map[f]); if (v !== null) { model[f] = v; changed = true; } });
+      Object.keys(map).forEach(function (f) { if (f === 'outside' && model.wxValid) return; var v = num(map[f]); if (v !== null) { model[f] = v; changed = true; } });
       var fl = on('flamestatus'); if (fl !== null) { model.flame = fl; changed = true; }
       var ch = on('chmodus'); if (ch !== null) { model.ch = ch; changed = true; }
       var dh = on('dhwmode'); if (dh !== null) { model.dhw_on = dh; changed = true; }
@@ -1566,6 +1567,22 @@
       if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
       applyApplianceToggle();
       if (activeDesign() === 'a') renderA();
+    }).catch(function () { });
+  }
+
+  // TASK-954: wire the OUTSIDE reading to the actual weather-data API. When
+  // weather compensation is enabled and the last OpenWeatherMap fetch is valid,
+  // its temperature drives OUTSIDE; otherwise OUTSIDE falls back to the OT-bus
+  // Toutside (MsgID 27) / otmonitor value (the OT case 27 + fetchSeed both yield
+  // to model.wxValid). Polled slowly — weather changes on the minute scale.
+  function fetchWeather() {
+    fetch(APIGW + 'v2/sat/weather').then(function (r) { return r.ok ? r.json() : null; }).then(function (w) {
+      if (!w) return;
+      if (w.enabled && w.valid) {
+        var t = parseFloat(w.temperature);
+        if (!isNaN(t)) { model.outside = t; model.wxValid = true; scheduleRender(); return; }
+      }
+      model.wxValid = false;
     }).catch(function () { });
   }
   function applyApplianceToggle() {
@@ -1754,9 +1771,10 @@
       if (/png/i.test(b.textContent)) b.addEventListener('click', exportPng);
       else if (/csv/i.test(b.textContent)) b.addEventListener('click', exportCsv);
     });
-    fetchSeed(); fetchSatStatus();
+    fetchSeed(); fetchSatStatus(); fetchWeather();
     setInterval(function () { if (!ws || ws.readyState !== 1) fetchSeed(); }, 20000);
     setInterval(fetchSatStatus, 30000);
+    setInterval(fetchWeather, 60000);   // TASK-954: refresh weather-API OUTSIDE
 
     // Hooks for later phases to attach live-data renderers.
     window.OTGWv2 = {
