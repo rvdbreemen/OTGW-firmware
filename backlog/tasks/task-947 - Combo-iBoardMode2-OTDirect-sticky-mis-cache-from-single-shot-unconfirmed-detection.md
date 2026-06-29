@@ -3,9 +3,11 @@ id: TASK-947
 title: >-
   Combo: iBoardMode=2 (OTDirect) sticky mis-cache from single-shot unconfirmed
   detection
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-29 09:11'
+updated_date: '2026-06-29 10:04'
 labels:
   - async-esp32s3
 dependencies: []
@@ -25,3 +27,9 @@ Aggressive review 2026-06-29 (combo PR#667 / ADR-127 path, NOT introduced this s
 - [ ] #3 Manual boardmode override still works; no regression to the PIC (1/3) or OTGW32 detection paths
 - [ ] #4 Build esp32-combo + esp32-classic green; evaluate.py --quick 0 new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+IMPLEMENTED 2026-06-29 (maintainer decision B + OTGW32-default rule): AUTO (iBoardMode==0) now re-probes the PIC EVERY boot and NEVER persists its verdict into iBoardMode (OTGW-firmware.ino). iBoardMode is the MANUAL override only (1/2/3); the ==2 'forced OT-Direct, no PIC probe' path is now reachable only by explicit user force. No live PIC -> OTGWSerial.end() (ADR-125 RX-storm guard kept) -> initOTDirect() = OTGW32/OT-Direct assumption = bench (non-production) default; re-detected next boot so a PIC appearing later wins. comboActivePinMap() auto branch already resolves the pin map from transient state.hw.bClassicPro/eMode, so dropping the cache needs no resolver change. Removes the sticky-cache stranding (a single transient detectPIC miss no longer locks OTDirect). Combo-only (HAS_RUNTIME_HW_DETECT); on-device combo verification deferred (combo flash erases WiFi).
+<!-- SECTION:NOTES:END -->

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.289
+**  Version  : v2.0.0-alpha.290
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -336,12 +336,17 @@ void setup() {
   // Runs AFTER WiFi configuration (TASK-853): the captive portal on a fresh
   // flash must never be blocked by the PIC probe or a starved UART.
   // Fixed boards: detect PIC, then init OTDirect if compiled in (unchanged).
-  // Combo board: honour the persisted settings.iBoardMode override, else
-  // PIC-probe-first (the PIC is the only reliable discriminator; OLED/W5500 are
-  // optional on OTGW32) and cache the resolved mode so later boots skip probing.
+  // Combo board: honour the MANUAL settings.iBoardMode override (1/2/3), else
+  // (0=auto) PIC-probe-first EVERY boot — the PIC is the only reliable
+  // discriminator; OLED/W5500 are optional on OTGW32. TASK-947: auto NEVER
+  // persists its verdict into iBoardMode (that conflated auto with a user force
+  // and stuck OTDirect); it re-detects each boot and defaults to OTGW32 when no
+  // live PIC + no live OT bus (bench / non-production).
 #if HAS_RUNTIME_HW_DETECT
   if (settings.iBoardMode == 2) {
-    SetupDebugln(F("Board mode: forced OT-Direct (no PIC probe)"));
+    // MANUAL force OT-Direct (user-set; auto never writes 2). Skip the PIC probe
+    // by explicit user request.
+    SetupDebugln(F("Board mode: forced OT-Direct (manual override, no PIC probe)"));
     initOTDirect();              // UART1 already torn down before startWiFi()
   } else {
     // UART1 was closed before the WiFi portal; re-open it for the PIC probe.
@@ -355,19 +360,29 @@ void setup() {
       SetupDebugln(F("Board mode: forced PIC"));
       detectPIC();               // sets HW_MODE_PIC, or HW_MODE_DEGRADED if dead
     } else {
-      SetupDebugln(F("Board mode: auto — PIC-probe-first"));
+      // AUTO (iBoardMode==0): re-detect EVERY boot and NEVER persist the verdict
+      // (TASK-947). iBoardMode is the MANUAL override field ONLY; the old code
+      // cached the auto verdict into it, which (a) conflated an auto guess with a
+      // user force and (b) for OTDirect stuck the board permanently because the
+      // ==2 path above skips the PIC probe. A single transient detectPIC miss
+      // then stranded a real Classic board in OTDirect forever. comboActivePinMap()
+      // resolves the pin map from the per-boot detection state (bClassicPro/eMode)
+      // when iBoardMode==0, so no cache is needed and detection self-corrects.
+      SetupDebugln(F("Board mode: auto — re-probing PIC this boot"));
       detectPIC();               // drives only the PIC pins; benign on OTGW32
       if (isPICEnabled()) {
-        // cache: PIC board — Pro (3) when the IMU probe flagged it, else S3 Mini (1)
-        settings.iBoardMode = state.hw.bClassicPro ? 3 : 1;
+        SetupDebugln(F("Board mode: auto — live PIC -> Classic"));
       } else {
-        // No PIC: tear down UART1 again BEFORE OT-direct, so a floating PIC-RX
-        // pin can't drive an RX interrupt storm (ADR-125 field finding).
+        // No live PIC: tear down UART1 again BEFORE OT-direct, so a floating
+        // PIC-RX pin can't drive an RX interrupt storm (ADR-125 field finding).
         OTGWSerial.end();
-        initOTDirect();          // no PIC → OTDirect; sets HW_MODE_OT_DIRECT
-        if (state.hw.eMode == HW_MODE_OT_DIRECT) settings.iBoardMode = 2;  // cache
+        initOTDirect();          // sets HW_MODE_OT_DIRECT
+        // No live PIC AND no live OT bus = bench (non-production): assume OTGW32.
+        // OTGW32/OT-Direct is the safe default; re-detected next boot, so a PIC
+        // that appears later wins automatically.
+        SetupDebugln(F("Board mode: auto — no live PIC -> OTGW32/OT-Direct (bench default)"));
       }
-      if (settings.iBoardMode != 0) writeSettings(false);  // persist the decision
+      // Deliberately NOT persisted: iBoardMode stays 0 (auto) and re-detects next boot.
     }
   }
   // The resolved mode may select the other pin map than the pre-detection
