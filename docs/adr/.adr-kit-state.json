@@ -14,35 +14,9 @@
   "last_nudged": "2026-06-26T20:31:31.127662+00:00",
   "watch": {
     "nudges": {
-      "ADR-098|D:/Users/Robert/Documents/GitHub/RvdB/wt-otgw-1.x.x/src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T09:44:33.956377+00:00",
-      "ADR-098|D:/Users/Robert/Documents/GitHub/RvdB/wt-otgw-1.x.x/src/OTGW-firmware/mqtt_configuratie.cpp": "2026-06-27T09:46:06.678260+00:00",
-      "ADR-101|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:52:12.842536+00:00",
-      "ADR-102|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:52:12.842536+00:00",
-      "ADR-106|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:52:12.842536+00:00",
-      "ADR-111|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:52:19.696841+00:00",
-      "ADR-131|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:52:19.696841+00:00",
-      "ADR-132|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:52:19.696841+00:00",
-      "ADR-133|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:52:25.516279+00:00",
-      "ADR-135|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:52:25.516279+00:00",
-      "ADR-090|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:52:25.516279+00:00",
-      "ADR-098|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:53:45.443138+00:00",
-      "ADR-002|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:53:45.443138+00:00",
-      "ADR-077|src/OTGW-firmware/OTGW-Core.ino": "2026-06-27T10:53:45.443138+00:00",
-      "ADR-098|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:54:22.933089+00:00",
-      "ADR-101|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:54:22.933089+00:00",
-      "ADR-102|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:54:22.933089+00:00",
-      "ADR-106|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:54:29.257067+00:00",
-      "ADR-111|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:54:29.257067+00:00",
-      "ADR-131|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:54:29.257067+00:00",
-      "ADR-077|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:54:35.671503+00:00",
-      "ADR-094|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:54:35.671503+00:00",
-      "ADR-084|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:54:35.671503+00:00",
-      "ADR-090|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:55:02.137014+00:00",
-      "ADR-091|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:55:02.137014+00:00",
-      "ADR-093|src/OTGW-firmware/MQTTHaDiscovery.cpp": "2026-06-27T10:55:02.137014+00:00",
-      "ADR-077|docs/adr/ADR-156-ha-climate-heat-cool-from-ot-status-bits.md": "2026-06-27T10:58:17.018966+00:00",
-      "ADR-098|docs/adr/README.md": "2026-06-27T10:59:11.507883+00:00",
-      "ADR-156|docs/adr/ADR-156-ha-climate-heat-cool-from-ot-status-bits.md": "2026-06-27T11:36:38.504910+00:00"
+      "ADR-135|docs/adr/ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md": "2026-06-29T06:23:00.375876+00:00",
+      "ADR-139|docs/adr/ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md": "2026-06-29T06:23:00.375876+00:00",
+      "ADR-158|docs/adr/ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md": "2026-06-29T06:23:43.586785+00:00"
     }
   }
 }

@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-06-28
+Accepted, 2026-06-29 (Proposed 2026-06-28; accepted by the maintainer 2026-06-29 after passing the four ADR quality gates — Completeness 1.00, Evidence 0.90, Clarity 0.80, Consistency 1.00; score 0.94/A). Combo S3-Mini-Pro field verification on real hardware still pending (see Consequences).
 
 Amends ADR-127 (combo ESP32-S3 single binary, runtime PIC/OTDirect boot
 detection). ADR-127 stays in force; this ADR extends its runtime-detection
@@ -115,6 +115,13 @@ on both modules and needs no re-pinning (TASK-862 precedent for the ctor args).
 **resolved** PIC-reset and I2C pins (`activePicRst()`, `activeI2cSda/Scl()`)
 instead of the fixed Classic-S3-Mini constants.
 
+## Alternatives Considered
+
+- **A. Discriminate the two Classic modules via an existing I2C peripheral (0x26 watchdog or 0x3C OLED) instead of the IMU.** Rejected: both modules are the same ESP32-S3 silicon with identical PIC wiring, and the 0x26 WD / OLED are *optional* (absent on bare boards, and on the Pro they sit on a different I2C bus). Their presence is therefore not a reliable discriminator — it would false-negative on a populated plain S3 Mini and false-positive risk is unbounded. The Pro's on-board QMI8658C IMU (WHO_AM_I 0x05) is the only deterministic hardware difference.
+- **B. Add a dedicated fourth build target / asset for the S3 Mini Pro.** Rejected: contradicts the combo single-binary decision (ADR-127) and the fixed-target set (ADR-126); a fourth asset multiplies the release and flash surface for a single module variant. Runtime detection keeps one `esp32-combo` binary serving all three physical configs.
+- **C. Manual selection only (no auto-detect).** Rejected as the default: it forces every Pro user to know and set `iBoardMode=3` before the device functions at all. The IMU probe makes auto-detection deterministic; the manual override (`iBoardMode=3`) is still provided as a recovery/forcing path.
+- **D. Do nothing (no Pro support).** Rejected: a Pro placed in the Classic socket would silently run the S3 Mini pin map (PIC reset on GPIO 12 not 40, I2C on 35/36 not 11/12) — the PIC never resets and I2C is dead, i.e. a non-functional gateway with no diagnostic hint.
+
 ## Consequences
 
 - One `esp32-combo` asset now serves OTGW32, OTGW Classic + S3 Mini, and OTGW
@@ -136,11 +143,20 @@ instead of the fixed Classic-S3-Mini constants.
   false-positive on a plain S3 Mini / OTGW32), the PIC must come up on 43/44 with
   reset on 40, and the 0x26 watchdog + OLED must work on 11/12.
 
-## Related
+## Related Decisions
 
 - ADR-127 — combo single binary, runtime PIC/OTDirect boot detection (amended here)
 - ADR-126 — fixed `esp32-classic` build (the S3 Mini Classic map this reuses)
 - ADR-135 — TWDT primary, external 0x26 optional secondary watchdog
 - ADR-113 — hardware-type codepath selection (Pro stays the `otgw-classic` slug)
 - ADR-080 — binding-ADR / CI-gate meta-rule (guideline-level declaration above)
-- `docs/hardware/PINOUT.md` §4 — combo pin maps
+
+## References
+
+- GitHub PR #667 — implementation: https://github.com/rvdbreemen/OTGW-firmware/pull/667
+- `docs/hardware/PINOUT.md` §4 / §4a — combo pin maps incl. the S3 Mini Pro column
+- `src/libraries/Platform/src/boards.h` — `PIN_CLASSIC_PRO_*` pin set + `PRO_IMU_*` discriminator constants
+- `src/OTGW-firmware/OTGW-firmware.ino` — `probeProImu()` early IMU probe (before the 0x26 disarm)
+- `src/OTGW-firmware/OTGW-firmware.h` — `comboActivePinMap()` 3-way resolver + `activePicRst()`
+- QMI8658C 6-axis IMU (WHO_AM_I value 0x05 at I2C 0x6A/0x6B): https://www.qstcorp.com/en/product-detail/QMI8658C
+- Combo app slot fit: firmware.bin ~1.92 MB within the 2.0 MB app0 partition (≈96% headroom margin)
