@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.284
+**  Version  : v2.0.0-alpha.285
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1042,6 +1042,77 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
     snprintf_P(msg, sizeof(msg),
       PSTR("{\"status\":\"ok\",\"force_boiler_present\":%s}"), on ? "true" : "false");
     webSend(200, F("application/json"), msg);
+  }
+  else if (strcasecmp_P(sub, PSTR("ble")) == 0 && wc > 5 && strcasecmp_P(words[5], PSTR("roster")) == 0) {
+    // TASK-935: dedicated SAT BLE roster endpoint (8 slots). GET returns the
+    // structured roster; bindkeys are WRITE-ONLY (only has_bindkey is emitted,
+    // never the secret). PUT writes a single slot (idx required; mac/label/
+    // bindkey optional) by reusing updateSetting() so all validation lives in one
+    // place. DELETE clears a slot. Writes are parser-free (flat params, no JSON
+    // array parsing — ADR-146). Auth already enforced at the top of handleSAT and
+    // centrally for mutating methods in processAPI.
+#if HAS_SAT_BLE
+    if (method == HTTP_GET) {
+      AsyncResponseStream* strm = restBeginStream("application/json");
+      if (strm) {
+        JsonEmit je(*strm);
+        je.beginObject();
+        je.field(F("count"), (int32_t)settings.sat.iBleRosterCount);
+        je.field(F("name_prefix"), settings.sat.sBleNamePrefix);
+        je.field(F("name_filter_ingest"), settings.sat.bBleNameFilterIngest);
+        je.beginArray(F("slots"));
+        for (int i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
+          je.beginObject();
+          je.field(F("idx"), (int32_t)i);
+          je.field(F("mac"), settings.sat.sBleMac[i]);
+          je.field(F("label"), settings.sat.sBleLabel[i]);
+          je.field(F("has_bindkey"), settings.sat.sBleBindkey[i][0] != '\0');
+          je.endObject();
+        }
+        je.endArray();
+        je.endObject();
+      }
+      restFinalize();
+    }
+    else if (method == HTTP_PUT || method == HTTP_POST) {
+      const char* idxStr = hasArgCompat(F("idx")) ? argCompat(F("idx")) : (wc > 6 ? words[6] : nullptr);
+      if (!idxStr) { sendApiError(400, F("Missing idx (0-7)")); return; }
+      const int idx = atoi(idxStr);
+      if (idx < 0 || idx >= SAT_BLE_MAX_ROSTER) { sendApiError(400, F("idx out of range (0-7)")); return; }
+      char fld[24];
+      bool wrote = false;
+      if (hasArgCompat(F("mac")))     { snprintf_P(fld, sizeof(fld), PSTR("SATblemac%d"), idx);     updateSetting(fld, argCompat(F("mac")));     wrote = true; }
+      if (hasArgCompat(F("label")))   { snprintf_P(fld, sizeof(fld), PSTR("SATblelabel%d"), idx);   updateSetting(fld, argCompat(F("label")));   wrote = true; }
+      if (hasArgCompat(F("bindkey"))) { snprintf_P(fld, sizeof(fld), PSTR("SATblebindkey%d"), idx); updateSetting(fld, argCompat(F("bindkey"))); wrote = true; }
+      if (!wrote) { sendApiError(400, F("Provide at least one of mac, label, bindkey")); return; }
+      writeSettings(false);
+      // No user-supplied text echoed (avoids JSON-escaping the label); client GETs to read back.
+      char msg[80];
+      snprintf_P(msg, sizeof(msg),
+        PSTR("{\"status\":\"ok\",\"idx\":%d,\"has_bindkey\":%s}"),
+        idx, settings.sat.sBleBindkey[idx][0] ? "true" : "false");
+      sendCorsOriginHeader();
+      webSend(200, F("application/json"), msg);
+    }
+    else if (method == HTTP_DELETE) {
+      const char* idxStr = hasArgCompat(F("idx")) ? argCompat(F("idx")) : (wc > 6 ? words[6] : nullptr);
+      if (!idxStr) { sendApiError(400, F("Missing idx (0-7)")); return; }
+      const int idx = atoi(idxStr);
+      if (idx < 0 || idx >= SAT_BLE_MAX_ROSTER) { sendApiError(400, F("idx out of range (0-7)")); return; }
+      char fld[24];
+      snprintf_P(fld, sizeof(fld), PSTR("SATblemac%d"), idx);     updateSetting(fld, "");
+      snprintf_P(fld, sizeof(fld), PSTR("SATblelabel%d"), idx);   updateSetting(fld, "");
+      snprintf_P(fld, sizeof(fld), PSTR("SATblebindkey%d"), idx); updateSetting(fld, "");
+      writeSettings(false);
+      sendCorsOriginHeader();
+      webSend(200, F("application/json"), F("{\"status\":\"cleared\"}"));
+    }
+    else {
+      sendApiMethodNotAllowed(F("GET, PUT, DELETE"));
+    }
+#else
+    sendApiError(404, F("BLE not supported on this build"));
+#endif
   }
   else if (strcasecmp_P(sub, PSTR("target")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
