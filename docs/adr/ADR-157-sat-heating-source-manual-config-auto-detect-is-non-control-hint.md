@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Date: 2026-06-28.
+Accepted. Date: 2026-06-29. (Proposed 2026-06-28; accepted by the maintainer 2026-06-29 after passing the four ADR quality gates and on-device validation of the manual-authoritative invariant — see References.)
 
 **Decision Maker:** User: Robert (maintainer), prompted by George (SAT author) asking on #dev-sat-mqtt for a reliable way to detect gas boiler vs heat pump vs hybrid.
 
@@ -13,6 +13,11 @@ status_history:
     status: Proposed
     changed_by: Agent
     reason: Capture the spec-grounded decision that heating-source is manual config, not auto-detection (TASK-943).
+    changed_via: adr-kit
+  - date: 2026-06-29
+    status: Accepted
+    changed_by: Agent
+    reason: Maintainer accepted; passed the four quality gates and on-device validation of the manual-authoritative / detect-is-a-hint invariant (TASK-943, alpha.285).
     changed_via: adr-kit
 
 ## Context
@@ -84,6 +89,8 @@ Detect source via a side channel — Modbus heat-pump registers (TASK-641) or a 
 - Code: `SATcontrol.ino:204-209` (`satGetEffectiveHeatingSource`), `:228/253/266/274/293` (control consumers); `OTGW-Core.ino` `print_slavememberid` (MsgID 3 HB bit2 hint read), `print_vh_configmemberid` (MsgID 74 detect removed); `SATtypes.h:47-52` (enum), `:214` (hint field).
 - Spec: OpenTherm Protocol Specification v4.2 — line 458 (no device-class distinction), lines 1603-1620 (MsgID 3 Slave Configuration flag8 bit definitions, cooling-config = bit2).
 - Field evidence: George, #dev-sat-mqtt 2026-06-20, on hybrid invisibility ("You can't see it burn thru the OTGW from the Elga"), captured in TASK-892.
+- On-device validation (OTGW32 @192.168.88.39, alpha.285, 2026-06-29, TASK-943): `POST {name:satsource,value:2}` set `heating_source` 0->2 (manual authoritative) while `heating_source_detected` stayed 1 (the auto-detect hint never overrode the control value); restoring `satsource=0` returned control to 0 with the hint still independent — empirically confirming the manual-authoritative / detect-is-a-hint invariant.
+- OpenTherm Protocol Specification v4.2 (MsgID 3 Slave Configuration, cooling-config bit2): https://www.opentherm.eu/request-details/?post_ids=2944
 
 ## Enforcement
 

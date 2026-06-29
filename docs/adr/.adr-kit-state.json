@@ -16,7 +16,10 @@
     "nudges": {
       "ADR-135|docs/adr/ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md": "2026-06-29T06:23:00.375876+00:00",
       "ADR-139|docs/adr/ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md": "2026-06-29T06:23:00.375876+00:00",
-      "ADR-158|docs/adr/ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md": "2026-06-29T06:23:43.586785+00:00"
+      "ADR-158|docs/adr/ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md": "2026-06-29T06:23:43.586785+00:00",
+      "ADR-090|docs/adr/ADR-157-sat-heating-source-manual-config-auto-detect-is-non-control-hint.md": "2026-06-29T07:06:11.576328+00:00",
+      "ADR-098|docs/adr/ADR-157-sat-heating-source-manual-config-auto-detect-is-non-control-hint.md": "2026-06-29T07:06:11.576328+00:00",
+      "ADR-157|docs/adr/ADR-157-sat-heating-source-manual-config-auto-detect-is-non-control-hint.md": "2026-06-29T07:06:20.848055+00:00"
     }
   }
 }
