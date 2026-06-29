@@ -58,3 +58,9 @@ ADVICE DELIVERED (advisor-vetted). Bench reproduces the crash CLASS but does NOT
 
 CLOSE 2026-06-30 per maintainer: 1.6.x heap-fragmentation FIXED BY THE 1.7.0 RELEASE. The shipped firmware resolves the fragmentation; remaining ACs superseded by the release. Maintainer decision (Robert).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+1.6.x heap-fragmentation resolved in the 1.7.0 release. Closed as fixed-by-release.
+<!-- SECTION:FINAL_SUMMARY:END -->
