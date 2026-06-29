@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-21 23:31'
-updated_date: '2026-06-22 13:39'
+updated_date: '2026-06-29 22:06'
 labels: []
 dependencies: []
 ---
@@ -55,4 +55,6 @@ FULL-LOAD tally: yield reboot 1/1; delay1 reboot 2/3 (survived 1/3); dus500+yiel
 1.3.5 GOLD full-load: SURVIVED (telnet_drops 0 / connects 1 over full 30min = definitive no-reboot; bootcount stable; heap never reset; http monotonic 43->12048). maxblock p05 6624 (HIGHEST of all). FINAL TALLY (full sim+MQTT+6http3ws load): yield reboot 1/1 (floor ~4992); delay1 reboot 2/3 (floor ~4720); dus500+yield 0/2 survive (floor ~5200); 1.3.5 0/1 survive (floor 6624). CONCLUSIONS: (1) bench DISCRIMINATES (gold survives where 1.6.x+ reboot) = valid reproducer. (2) CREEP REAL: 1.3.5 genuinely more robust; loop-cap (delay1/dus500) beats yield but does NOT restore 1.3.5 headroom -> need hot-path allocation reduction. (3) dus500>delay1 bench hint (0/2 vs 2/3): suggestive but small-n + counterintuitive + delay1 field-proven -> lean noise, keep beta.6/delay1. Synthesizing advice via advisor.
 
 ADVICE DELIVERED (advisor-vetted). Bench reproduces the crash CLASS but does NOT cleanly rank variants (n=1-3, all straddle one threshold; 1.3.5 survived at lowest min 568 while delay1 rebooted at 648 = stochastic, not a ranking). dus500 0/2 vs delay1 2/3 = NOT credible (small-n, mechanism backwards, delay1 field-proven) -> KEEP beta.6/delay1, no switch. CREEP is real per FIELD transcripts (1.3.5 p05 10456 vs beta.13 4040 = 2.5x), not the bench (compressed). beta.6 = necessary-not-sufficient for 'as stable as 1.3.5': fixes cliff, not creep. Opened TASK-902 (hot-path allocation reduction) as the real remaining work. NEXT: George field-tests beta.6 (arbiter); do TASK-902; STOP bench A/B (noise). Loop stopped. Cleanup pending user: disable bench MQTT? reflash device 1.3.5->beta.6?
+
+CLOSE 2026-06-30 per maintainer: 1.6.x heap-fragmentation FIXED BY THE 1.7.0 RELEASE. The shipped firmware resolves the fragmentation; remaining ACs superseded by the release. Maintainer decision (Robert).
 <!-- SECTION:NOTES:END -->
