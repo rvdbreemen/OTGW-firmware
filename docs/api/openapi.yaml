@@ -84,6 +84,8 @@ tags:
       `503 Service Unavailable` with `{"error":{"status":503,"message":"No OT-direct hardware - OTGW32 functions disabled"}}`.
   - name: Discovery
     description: Retained MQTT auto-discovery verification and republish (ADR-062)
+  - name: MQTT
+    description: Force a full OT-value republish to MQTT (distinct from discovery)
 
 paths:
   /v2/health:
@@ -1616,6 +1618,61 @@ paths:
                   status: 503
                   message: "MQTT not connected"
 
+  /v2/mqtt/republish:
+    post:
+      security:
+        - basicAuth: []
+      tags:
+        - MQTT
+      summary: Force a full OT-value republish
+      description: |
+        Resets MQTT publish eligibility so every observed OpenTherm value is
+        re-published as if seen for the first time (TASK-936). Use this to
+        repopulate a broker after a wipe without re-announcing Home Assistant
+        discovery configs.
+
+        This is distinct from `POST /v2/discovery/republish`, which re-announces
+        the HA discovery *configs* rather than the OT *values*.
+
+        A 60-second cooldown rate-limits repeated calls (CWE-770); a call inside
+        the window returns 429 with the remaining seconds.
+      operationId: republishMqttValues
+      responses:
+        '200':
+          description: Republish requested
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [republish_requested]
+              example:
+                status: "republish_requested"
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '429':
+          description: Republish cooldown active (a 60s rate-limit between republishes).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error:
+                  status: 429
+                  message: "Republish cooldown active, retry in 60s"
+        '503':
+          description: MQTT is not connected; nothing was republished.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+              example:
+                error:
+                  status: 503
+                  message: "MQTT not connected"
+
   /v2/webhook/test:
     post:
       security:
@@ -2351,6 +2408,68 @@ paths:
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
+  /v2/sat/force-boiler:
+    post:
+      security:
+        - basicAuth: []
+      tags:
+        - SAT
+      summary: Force boiler-present override (TEST/DEBUG hook)
+      description: |
+        **Test/debug hook — not for production use.** Asserts that a boiler is
+        present so the SAT availability gate (edge auto-disable, REST 409, MQTT
+        enable-reject) can be verified on the bench without real hardware
+        (TASK-802). The override is transient: it lives in RAM only and is
+        cleared on reboot.
+
+        The value may be supplied in the body (`0`, `1`, `true`, `false`) or in
+        the path as `/v2/sat/force-boiler/1`.
+      operationId: setSatForceBoiler
+      requestBody:
+        required: false
+        content:
+          text/plain:
+            schema:
+              type: string
+              enum: ["0", "1", "true", "false"]
+              example: "1"
+      responses:
+        '200':
+          description: Override applied
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  force_boiler_present:
+                    type: boolean
+              example:
+                status: ok
+                force_boiler_present: true
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      security:
+        - basicAuth: []
+      tags:
+        - SAT
+      summary: Force boiler-present override (PUT alias)
+      operationId: setSatForceBoilerPut
+      requestBody:
+        $ref: '#/paths/~1v2~1sat~1force-boiler/post/requestBody'
+      responses:
+        '200':
+          description: Override applied
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
   /v2/sat/target:
     post:
       security:
@@ -3068,6 +3187,197 @@ paths:
           $ref: '#/components/responses/BadRequestJson'
         '404':
           description: MAC not present in roster
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/ble/roster:
+    get:
+      tags:
+        - SAT
+      summary: Get the SAT BLE roster (ESP32 only)
+      description: |
+        Returns the structured SAT BLE sensor roster (TASK-935/946): the 8 fixed
+        slots plus the global name-prefix filter settings. Gated on `HAS_SAT_BLE`;
+        returns 404 (`BLE not supported on this build`) on builds without BLE.
+
+        **Bindkeys are write-only.** Each slot reports only `has_bindkey`
+        (boolean) — the per-slot bindkey secret is NEVER emitted in the response.
+      operationId: getSatBleRoster
+      security:
+        - basicAuth: []
+      responses:
+        '200':
+          description: Roster retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  count:
+                    type: integer
+                    description: Number of populated roster slots
+                  name_prefix:
+                    type: string
+                    description: BLE advertised-name prefix filter
+                  name_filter_ingest:
+                    type: boolean
+                    description: Whether the name-prefix filter is applied on ingest
+                  slots:
+                    type: array
+                    description: Always 8 entries (slot indices 0-7)
+                    items:
+                      type: object
+                      properties:
+                        idx:
+                          type: integer
+                          minimum: 0
+                          maximum: 7
+                        mac:
+                          type: string
+                          description: Slot MAC (empty string when unset)
+                        label:
+                          type: string
+                          description: User-visible slot label
+                        has_bindkey:
+                          type: boolean
+                          description: True when a bindkey is stored for this slot (the secret itself is never returned)
+        '404':
+          description: BLE not supported on this build
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    put:
+      security:
+        - basicAuth: []
+      tags:
+        - SAT
+      summary: Write a single BLE roster slot (ESP32 only)
+      description: |
+        Writes one roster slot (TASK-935/946). `idx` is required; at least one of
+        `mac`, `label`, or `bindkey` must be provided. Parameters may be sent as
+        query string or form body. The response never echoes user-supplied text;
+        GET the roster to read values back. Gated on `HAS_SAT_BLE`; returns 404 on
+        builds without BLE.
+
+        Validation:
+        - `idx` — required integer 0-7 (non-numeric → 400)
+        - `mac` — empty (clears) or a 17-char colon-hex address `AA:BB:CC:DD:EE:FF` (else 400)
+        - `label` — optional free text
+        - `bindkey` — empty (clears) or exactly 32 hex characters (else 400); write-only
+      operationId: setSatBleRosterSlot
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              required:
+                - idx
+              properties:
+                idx:
+                  type: integer
+                  minimum: 0
+                  maximum: 7
+                mac:
+                  type: string
+                  pattern: '^(([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2})?$'
+                  description: 17-char colon-hex MAC, or empty string to clear
+                label:
+                  type: string
+                bindkey:
+                  type: string
+                  pattern: '^([0-9A-Fa-f]{32})?$'
+                  description: Exactly 32 hex characters, or empty string to clear (write-only)
+      responses:
+        '200':
+          description: Slot written
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  idx:
+                    type: integer
+                  has_bindkey:
+                    type: boolean
+              example:
+                status: ok
+                idx: 0
+                has_bindkey: true
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: BLE not supported on this build
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    post:
+      security:
+        - basicAuth: []
+      tags:
+        - SAT
+      summary: Write a single BLE roster slot (POST alias)
+      operationId: setSatBleRosterSlotPost
+      requestBody:
+        $ref: '#/paths/~1v2~1sat~1ble~1roster/put/requestBody'
+      responses:
+        '200':
+          description: Slot written
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: BLE not supported on this build
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+    delete:
+      security:
+        - basicAuth: []
+      tags:
+        - SAT
+      summary: Clear a single BLE roster slot (ESP32 only)
+      description: |
+        Clears the roster slot identified by `idx` (required integer 0-7;
+        non-numeric → 400). Gated on `HAS_SAT_BLE`; returns 404 on builds
+        without BLE.
+      operationId: clearSatBleRosterSlot
+      parameters:
+        - name: idx
+          in: query
+          required: true
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 7
+      responses:
+        '200':
+          description: Slot cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [cleared]
+              example:
+                status: "cleared"
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: BLE not supported on this build
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 

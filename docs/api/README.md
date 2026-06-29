@@ -54,6 +54,7 @@ Optional HTTP Basic Auth. When a password is configured in device settings, muta
 - OTGW commands: `POST /api/v2/otgw/commands`, `POST /api/v2/otgw/command/{cmd}`
 - MQTT discovery: `POST /api/v2/otgw/discovery`, `POST /api/v2/otgw/autoconfigure`
 - Discovery verify/republish: `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`
+- MQTT value republish: `POST /api/v2/mqtt/republish`
 - Simulation: `POST /api/v2/simulate/start`, `POST /api/v2/simulate/stop`
 - Webhook test: `POST /api/v2/webhook/test`
 - Debug dump: `GET /api/v2/debug`
@@ -483,6 +484,25 @@ Version 1.4.1 adds three endpoints under `/api/v2/discovery/` that complement th
 - `POST /api/v2/discovery/republish` — unconditionally marks every discovery ID pending in the drip pipeline. Use this only when you already know the broker's retained state is bad, for example after a broker reinstall without persistence. Returns `200 OK` with `{status, count}` or `503` when MQTT is down.
 
 For normal troubleshooting prefer the verify endpoint: it only re-announces when something is actually missing and avoids a full flood of ~80 retained messages.
+
+---
+
+### MQTT
+
+#### `POST /api/v2/mqtt/republish`
+
+Forces a full OT-VALUE republish: resets MQTT publish eligibility so every observed OpenTherm value re-publishes as first-seen (TASK-936). This is distinct from `POST /api/v2/discovery/republish`, which re-announces the Home Assistant discovery **configs** rather than the OT **values**. A 60-second cooldown rate-limits repeated calls.
+
+**Authentication**: Required (when password is configured)
+
+**Response** `200 OK`:
+```json
+{"status": "republish_requested"}
+```
+
+**Error responses**:
+- `429` - Republish cooldown active: `{"error":{"status":429,"message":"Republish cooldown active, retry in <N>s"}}`
+- `503` - MQTT not connected
 
 ---
 
@@ -1073,6 +1093,21 @@ Updates one of the four slots (TASK-587). Addresses are validated as 16 hex char
 {"status": "ok"}
 ```
 
+#### `POST /api/v2/sat/force-boiler` | `PUT /api/v2/sat/force-boiler`
+
+**Test/debug hook — not for production use.** Asserts that a boiler is present so the SAT availability gate (edge auto-disable, REST 409, MQTT enable-reject) can be verified on the bench without real hardware (TASK-802). The override is transient: it lives in RAM only and is cleared on reboot.
+
+**Authentication**: Required (when password is configured)
+
+**Request**: value in the body (`0`, `1`, `true`, `false`) or in the path (`/api/v2/sat/force-boiler/1`).
+
+**Response** `200 OK`:
+```json
+{"status": "ok", "force_boiler_present": true}
+```
+
+**Error responses**: `400` when the value is missing.
+
 #### BLE roster (ESP32 only)
 
 The `/v2/sat/ble/*` family is only mounted on ESP32 builds (TASK-508). On ESP8266 builds these paths return 404.
@@ -1083,6 +1118,16 @@ The `/v2/sat/ble/*` family is only mounted on ESP32 builds (TASK-508). On ESP826
 - `POST | PUT | DELETE /api/v2/sat/ble/forget` — body `{"mac":"..."}`; drop the slot and unpublish its HA discovery config.
 
 All four return `{"status":"ok"}` on success. `404` is returned when the MAC is not present in the roster.
+
+#### `GET | PUT | POST | DELETE /api/v2/sat/ble/roster` (ESP32 only)
+
+Structured 8-slot BLE roster CRUD (TASK-935/946), gated on `HAS_SAT_BLE`. On builds without BLE support every method returns `404` (`BLE not supported on this build`).
+
+**Authentication**: Required (when password is configured)
+
+- **GET** returns `{"count":int, "name_prefix":string, "name_filter_ingest":bool, "slots":[{"idx":0-7, "mac":string, "label":string, "has_bindkey":bool}, ... 8 entries]}`. The per-slot **bindkey is write-only** — GET emits only `has_bindkey` (bool), never the secret value.
+- **PUT** / **POST** write a single slot. Params (query or body): `idx` (required, integer 0-7; non-numeric → `400`), `mac` (optional, empty or 17-char colon-hex `AA:BB:CC:DD:EE:FF` → else `400`), `label` (optional free text), `bindkey` (optional, empty or exactly 32 hex chars → else `400`). At least one of `mac`/`label`/`bindkey` is required (else `400`). Response `200 {"status":"ok","idx":N,"has_bindkey":bool}` (no user text echoed).
+- **DELETE** clears a slot. Param `idx` (required 0-7). Response `200 {"status":"cleared"}`.
 
 ---
 
