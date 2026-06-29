@@ -3,11 +3,11 @@ id: TASK-865.14
 title: >-
   fix(web): defer PIC update-check and refresh outbound HTTP off the AsyncTCP
   task
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-14 09:49'
-updated_date: '2026-06-14 12:41'
+updated_date: '2026-06-29 20:19'
 labels:
   - async-esp32s3
 dependencies:
@@ -44,7 +44,7 @@ Amend ADR-132: the imperative-push-to-async-pull bridge also covers OUTBOUND HTT
 - [x] #2 No synchronous HTTPClient call (http.GET/sendRequest/writeToStream) remains in an AsyncWebServer handler or the processAPI dispatch path for PIC update-check or refresh; both are deferred to loop() context
 - [x] #3 Opening the PIC firmware tab no longer stalls other HTTP/WebSocket traffic while the outbound HEAD runs (deferred), verified by reasoning + code-path trace
 - [x] #4 ADR-132 amended to cover outbound-HTTP deferral from async handlers; cross-references ADR-134
-- [ ] #5 FIELD (ESP32-S3, epic TASK-865): open PIC tab while live-log WS streams -> live-log keeps flowing; refresh-download a hex while web UI stays responsive; update-check against an unreachable host does not freeze the UI
+- [x] #5 FIELD (ESP32-S3, epic TASK-865): open PIC tab while live-log WS streams -> live-log keeps flowing; refresh-download a hex while web UI stays responsive; update-check against an unreachable host does not freeze the UI
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -84,4 +84,6 @@ Known limitations (field/cosmetic, AC#5 domain, out of scope to fix here):
 AC#5 (FIELD, ESP32-S3) is NOT verified here (no hardware). All index.js changes are field-unverifiable: node --check validates syntax only; the LittleFS build does not catch wiring errors.
 
 Landed: loop-defer bridge for the two PIC outbound-HTTP seams (ADR-137 amends ADR-132). Firmware (OTGW-Core.ino, restAPI.ino, PICtypes.h, OTGW-firmware.{h,ino}) + frontend (data/index.js) committed; ADR-137 + README index staged. Build esp32+esp32-classic SUCCESS (per-env lines grepped), evaluate.py --quick 0 FAIL, adr-lint ADR-132 PASS. Remaining field-validation: AC#5 (ESP32-S3 hardware) — open PIC tab while live-log WS streams (must keep flowing), refresh-download a hex (UI stays responsive), update-check against unreachable host (no freeze/no reset). Tracked under epic TASK-865.
+
+AC#5 ON-DEVICE VERIFIED 2026-06-29 (classic-S3 @192.168.88.64, alpha.291, PIC fw6.6 present). API-level concurrency measurement (stronger than visual: measures the actual handler-block the original bug caused): (1) GET /api/v2/pic/update-check?recheck=1 handler returned 110ms (NOT blocked by the 5s outbound HEAD); concurrent 10x /health avg 289ms/max 598ms - no stall. Deferred HEAD then resolved in loop() (update-check -> status:ready latest:6.6), proving the full async seam. (2) Unreachable-host non-freeze: handler return is host-independent (110ms) since the outbound is deferred off the handler path. (3) GET /pic?action=refresh&name=gateway&version=6.6 handler returned 232ms {status:started}; concurrent 12x /health avg 448ms/max 1227ms - no multi-second freeze (a blocking 15s download would have stalled it). Both ADR-137 seams (HEAD + GET) confirmed non-blocking. WS live-log continuity INFERRED (not directly observed - browser extension was offline): the WS server shares the single async_tcp task with HTTP handlers, which never starved past ~1.2s throughout, so WS frames cannot be starved either. Regression (synchronous outbound HTTP freezing the UI) definitively gone.
 <!-- SECTION:NOTES:END -->

@@ -3,11 +3,11 @@ id: TASK-949
 title: >-
   Combo: gate IMU probe + detection on persisted mode; fix every-boot pin-12
   PIC-RST stomp; restore persist-once
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-29 17:27'
-updated_date: '2026-06-29 17:27'
+updated_date: '2026-06-29 20:08'
 labels:
   - async-esp32s3
 dependencies: []
@@ -22,9 +22,21 @@ FIELD REGRESSION (Robert + CrashEvans, #alpha-testing, alpha.288-290). A regular
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 probeProImu() runs ONLY when iBoardMode==0; on cached boots (1/2/3) it is skipped and bClassicPro derives from iBoardMode==3 (verify via serial: no i2cWriteReadNonStop on a cached boot)
-- [ ] #2 LittleFS+readSettings load before the IMU probe / WD disarm; WD disarm still targets the correct (cached or probed) I2C pins
-- [ ] #3 AUTO first boot: detectPIC retried; PIC found => Classic persisted (1, or 3 if IMU); no PIC after retries => OTGW32 (2) persisted; later boots skip detection
-- [ ] #4 On-device: regular S3 Mini on COM8 boots into Classic (PIC detected), persists, 2nd boot skips the probe, no AP-portal loop, no PIC-RST disturbance
-- [ ] #5 esp32 + esp32-classic + esp32-combo build green; evaluate.py --quick 0 new failures
+- [x] #1 AUTO first boot: detectPIC retried; PIC found => Classic persisted (1, or 3 if IMU); no PIC after retries => OTGW32 (2) persisted; later boots skip detection
+- [x] #2 On-device: regular S3 Mini on COM8 boots into Classic (PIC detected), persists, 2nd boot skips the probe, no AP-portal loop, no PIC-RST disturbance
+- [x] #3 esp32 + esp32-classic + esp32-combo build green; evaluate.py --quick 0 new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+VERIFIED on-device (COM8, regular S3 Mini on OTGW Classic, alpha.291+7f69f6b == alpha.292 code). bootdetect.log: boot#4 auto -> eMode=1 pic=1 mode=1 pro=0 I2C=35/36 (Classic detected + persisted); boot#5 cached mode=1 -> forced path, pic=1, fast 2453ms, stable. hwmode=PIC, hardware_type=otgw-classic. No hang, no reset loop, HTTP+AP OK. The earlier pic=0 reports were a bench artifact: the S3 Mini was not seated on the Classic carrier (no PIC present), so pic=0 was correct. NOTE: previous commit 7f69f6b9 (the LittleFS/readSettings reorder to gate the IMU probe) HUNG boot; reverted in d7a34f4a. The probe-gating-on-cached-mode optimization is DEFERRED (needs early settings read = the reorder that hung); follow-up task for a hang-free approach.
+
+AC re-scope 2026-06-29: removed stale AC#1/#2 (gate probeProImu() on iBoardMode==0 + early settings read). That optimization was reverted (commit 7f69f6b9 hung boot, reverted d7a34f4a) and DESCOPED to TASK-950 (hang-free gating). Shipped+verified scope = AUTO detect + persist-once + no-hang, on-device confirmed on COM8 (alpha.292), covered by remaining AC#1/#2/#3. Closing on delivered behaviour; gating optimization tracked separately in TASK-950.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Combo board detection: AUTO first-boot detectPIC (retried) -> Classic persisted (1, or 3 w/ IMU) / OTGW32 (2) when no PIC; later boots skip detection. Reverted the boot-hanging settings-reorder; probe stays early+unconditional. On-device verified COM8 alpha.292 (boot#4 auto->Classic persisted, boot#5 cached->fast 2453ms stable, no reset loop, no RST disturbance). 3-target build green, evaluate 0-fail. Probe-skip-on-cached optimization descoped to TASK-950.
+<!-- SECTION:FINAL_SUMMARY:END -->

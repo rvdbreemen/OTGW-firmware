@@ -3,11 +3,11 @@ id: TASK-939
 title: >-
   feat-2.0.0: port TASK-938 — unified heat/cool/off HA climate entity (cooling,
   GH #665)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-27 10:47'
-updated_date: '2026-06-29 04:42'
+updated_date: '2026-06-29 20:04'
 labels:
   - feature
 dependencies: []
