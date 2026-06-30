@@ -1,12 +1,13 @@
 ---
-id: TASK-935
+id: TASK-956
 title: >-
   test(heap): run the heap-frag soak + analyze — prove/disprove ESP32-S3 gating,
   then Phase-3 removal if proven
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-25 21:30'
+updated_date: '2026-06-30 04:32'
 labels:
   - heap
   - soak
@@ -52,3 +53,15 @@ Supersede/amend ADR-089 and ADR-121, update the gates, and rebuild + re-soak to 
 - [ ] #3 Verdict recorded against the proof criterion (min_max_block / histogram / gating counters / max_loop_gap_ms) with the capture transcript attached
 - [ ] #4 If proven: Phase-3 removal of drip/tier gating WITH evaluate.py ADR-089/121 gates + ADRs updated, rebuilt and re-soaked clean. If disproven: ESP32-S3 evidence documented on ADR-089/121, gating kept.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+RENUMBERED from a duplicate TASK-935 (collided with the v2-settings Phase-2 task) to TASK-956 on 2026-06-30.
+
+DATA POINT 2026-06-30 (OTGW32 @192.168.88.39, alpha.286, /v2/debug state.heap counters, cumulative since boot, uptime 6.7h spanning two soaks incl. a 30-min 8-worker REST flood + 960-connection WS churn): entered_low=0, entered_warn=1, entered_crit=0, drip_slow=0, ws_drops=0, mqtt_drops=0; heap_min_free=1188 B; heap_max_alloc(maxblock)=31732; no reset, no crash, no MQTT desync.
+
+READING: the tier-machine engaged exactly ONCE at WARN, never CRIT, and never had to drop/throttle a consumer (the TASK-884 503 backpressure fronts it and absorbed the overload). BUT heap_min_free reached 1188 B, so the heap DOES get genuinely tight on ESP32-S3 under load — which argues AGAINST a blind Phase-3 removal.
+
+CAVEAT (why this is not yet the verdict): (1) my load was EXTREME-SYNTHETIC (8 parallel REST workers + aggressive WS open/close churn), not the representative fragmenting profile (sat_boiler_emulator + real Web UI + MQTT republish) the proof criterion specifies — the 1188 B floor likely reflects pathological concurrency, not real-world use; (2) counters are cumulative since boot, not a clean telnet-'z'-isolated window from a healthy heap; (3) device is the TASK-933 unit, not a free dedicated ESP32-S3 (AC#1). A clean 'z'-isolated soak under REPRESENTATIVE load on a dedicated S3 is still needed for the formal prove/disprove. Directionally: do NOT remove the gating on this data.
+<!-- SECTION:NOTES:END -->
