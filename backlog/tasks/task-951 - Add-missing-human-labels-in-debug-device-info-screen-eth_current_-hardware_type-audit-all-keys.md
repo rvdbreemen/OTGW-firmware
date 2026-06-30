@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-29 20:36'
-updated_date: '2026-06-29 21:58'
+updated_date: '2026-06-30 13:35'
 labels: []
 dependencies: []
 ordinal: 164000
@@ -39,4 +39,6 @@ Both debug + settings screens use translateToHuman()/translateTooltip() over tra
 DONE (code): 79 translateFields[] labels + 79 translateTooltips[] entries added (data/index.js), covering device-info debug keys (platform, hardware_type, eth_current_*, otgwsimulation, perf_*) + settings (ui_*, sat*, otd*, wifi static-IP). One dict serves both screens (translateToHuman at :467 debug, :6467 settings). Labels/tooltips sourced from restAPI.ino settings emit (units/enums). node --check OK, littlefs esp32-combo buildfs SUCCESS, prerelease alpha.292->293, committed 1ad2385a + pushed origin/dev. AC#3 (live render on device) pending a flash of alpha.293 to a reachable board — bench board mid-rebuild, defer.
 
 AC#3 VERIFIED 2026-06-29 via Playwright (chromium headless, real index.js loaded with addScriptTag): all 79 keys -> translateToHuman() returns a human label (rawLabels=0) and translateTooltip() returns non-empty (noTips=0). Both debug and settings screens share these functions, so both render human-readable. Screenshot of the full key->label->tooltip table captured (all green). Verified against the alpha.293 asset directly, device-data-independent (the dict is static).
+
+AC#3 ON-DEVICE VERIFIED 2026-06-30: flashed the alpha.296 littlefs to the OTGW32 @192.168.88.39 (COM4, MAC 10:20:ba:21:b4:f8) and confirmed the device SERVES the fixed assets: index.js carries the 10 TASK-951 label groups + the 'hardware_type'->'Hardware Type' entry resolves. (Same flash also confirmed the sibling fixes live: 953 'Try New UI ->' btn-primary in index.html, 954 fetchWeather/wxValid in v2.js, 957 white-space:pre-wrap in v2.css.) All ACs complete.
 <!-- SECTION:NOTES:END -->
