@@ -174,7 +174,9 @@ static const char UpdateServerIndex[] PROGMEM =
 
          function redirectToHome(delayMs) {
            setTimeout(function() {
-             window.location.href = '/';
+             // TASK-958: cache-bust the post-OTA reload so the browser fetches the
+             // fresh document (sub-resources revalidate via no-cache + ETag).
+             window.location.href = '/?_ota=' + Date.now();
            }, delayMs || 1000);
          }
 
@@ -313,7 +315,7 @@ static const char UpdateServerIndex[] PROGMEM =
              onTimeout: function() {
                console.log('[OTA] State: Timeout reached, redirecting anyway');
                progressText.textContent = 'Redirecting...';
-               window.location.href = '/';
+               window.location.href = '/?_ota=' + Date.now();
              }
            });
          }

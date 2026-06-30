@@ -2,7 +2,11 @@
 
 ## Status
 
-Accepted, 2026-06-15. Proposed 2026-06-14; accepted by the maintainer
+Accepted, 2026-06-15. **Amended by ADR-163 (2026-06-30)** — the `Cache-Control`
+value only is changed from `public, max-age=60` to `no-cache` (always-revalidate
+via the same ETag); everything else in this ADR (ETag standard, stable URLs, no
+`?v=` versioning, AsyncFileResponse streaming, AsyncTCP task config) remains in
+force. Proposed 2026-06-14; accepted by the maintainer
 (Robert van den Breemen) 2026-06-15. Guideline-level (per ADR-080): this is a
 pattern/idiom decision with no automated CI gate planned, so it is enforced at
 PR review, not by `evaluate.py` or `bin/adr-judge`.

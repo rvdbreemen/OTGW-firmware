@@ -2433,5 +2433,28 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-06-28"
+  },
+  {
+    "id": "bug-139",
+    "timestamp": "2026-06-30",
+    "error_message": "OTA filesystem update succeeds but the web UI keeps serving the OLD assets (USB esptool flash of the same littlefs.bin works)",
+    "file": "src/OTGW-firmware/FSexplorer.ino",
+    "root_cause": "NOT a partition/size/partial-write bug (disproven on bench: a complete OTA fs upload correctly replaces the filesystem, served version.hash flipped a46e95a->03591d5). The OTA write is correct. The stale UI is browser caching: serveVersionedAsset served assets with Cache-Control: public, max-age=60 (ADR-139) + ETag=fsHash, and the post-reboot reload window.location.href='/' (updateServerHtml.h) did not cache-bust, so the browser served its cached copy for up to 60s WITHOUT revalidating against the new ETag.",
+    "fix": "FSexplorer.ino serveVersionedAsset Cache-Control public,max-age=60 -> no-cache (always-revalidate via the existing ETag; the 304 path is ungated by the ADR-147 file-serve gate, verified 24/24 304 on an 8-asset concurrent burst). Plus: updateServerHtml.h post-OTA reload cache-bust (?_ota=Date.now()); OTGW-ModUpdateServer-esp32.h _handleUploadEnd verifies /version.hash exists after remount so a truncated write (Update.end(true) finalizes partials) errors loudly instead of silent success. ADR-163 amends ADR-139. Verified live on .39 alpha.297: stale-ETag GET->200 fresh, matching->304.",
+    "tags": [
+      "ota",
+      "cache",
+      "littlefs",
+      "esp32",
+      "etag",
+      "no-cache",
+      "adr-139",
+      "adr-163",
+      "task-958",
+      "2.0.0"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-06-30"
   }
 ]

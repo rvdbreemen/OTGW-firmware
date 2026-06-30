@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.296
+**  Version  : v2.0.0-alpha.297
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -58,14 +58,17 @@ const char Helper[] PROGMEM =
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
 
 
-// Serve a static webui asset with ETag-based cache validation (ADR-139). Stable
-// URLs, no ?v= query versioning: the ETag is the filesystem hash, paired with a
-// bounded Cache-Control: max-age. Inside the window the browser serves from cache
-// with no request; once it expires a conditional GET returns 304 when the FS is
-// unchanged (headers only, no body). A reflash changes the hash, so the next
-// revalidation picks up the new build. max-age is the one tunable knob: kept short
-// (60s) so a reflash is visible quickly, traded against a periodic revalidation
-// burst on the single-connection ESP32 server (see ADR-139 / bug-113). Assets are
+// Serve a static webui asset with ETag-based cache validation (ADR-139, amended
+// TASK-958). Stable URLs, no ?v= query versioning: the ETag is the filesystem
+// hash. Cache-Control: no-cache means the browser MAY store the asset but MUST
+// revalidate (conditional GET) before every use — it never serves from cache
+// blind. Unchanged FS -> 304 (headers only, no body); a reflash/OTA changes the
+// hash -> 200 with the new asset on the very next load. This replaces the earlier
+// max-age=60 window: that window let the browser serve stale assets without asking
+// for up to 60s, so a filesystem OTA (which DOES replace the assets) still showed
+// the old UI on the immediate post-reboot reload (window.location.href='/' does
+// not bypass a fresh cache entry). no-cache costs one tiny 304 revalidation per
+// asset per load, negligible on the trusted LAN. Assets are
 // stored as plain readable files on LittleFS (no build-time gzip, maintainer
 // directive); streamed straight from flash via AsyncFileResponse, never buffered
 // whole on the fragmented S3 heap.
@@ -88,14 +91,14 @@ static void serveVersionedAsset(const char* path, const __FlashStringHelper* mim
     snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
     if (hasHeaderCompat(F("If-None-Match")) &&
         strcmp(headerCompat(F("If-None-Match")), etag) == 0) {
-      webPushHeader(F("Cache-Control"), F("public, max-age=60"));
+      webPushHeader(F("Cache-Control"), F("no-cache"));
       webPushHeader(F("ETag"), etag);
       webSendStatus(304);
       return;
     }
     webPushHeader(F("ETag"), etag);
   }
-  webPushHeader(F("Cache-Control"), F("public, max-age=60"));
+  webPushHeader(F("Cache-Control"), F("no-cache"));
   webSendFile(path, mime, /*gzip=*/false);
 }
 
@@ -136,10 +139,10 @@ void startWebserver(){
     server.on("/index",      HTTP_GET, sendFSexplorerFallback);
     server.on("/index.html", HTTP_GET, sendFSexplorerFallback);
   } else {
-    // Serve index.html with ETag-based caching (ADR-139):
-    //  - Browser caches within Cache-Control max-age, then revalidates via If-None-Match (ETag = fsHash).
+    // Serve index.html with ETag-based caching (ADR-139, amended TASK-958):
+    //  - Cache-Control: no-cache — browser may store but MUST revalidate via If-None-Match (ETag = fsHash) every load.
     //  - Unchanged FS → server replies 304 Not Modified (headers only, no body re-download).
-    //  - FS upgraded → ETag changes → server replies 200 with fresh content.
+    //  - FS upgraded/OTA → ETag changes → server replies 200 with fresh content on the very next load (no stale window).
     //  - JS/CSS assets share the same stable-path + ETag policy (no ?v= query versioning).
     server.on("/",           HTTP_GET, sendIndex);
     server.on("/index",      HTTP_GET, sendIndex);

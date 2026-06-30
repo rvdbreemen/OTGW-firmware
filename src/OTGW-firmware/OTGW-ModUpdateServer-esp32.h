@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.296
+**  Version  : v2.0.0-alpha.297
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -361,7 +361,14 @@ private:
       logBootSignature("[OTA] post-end");    // second probe: after Update.end(true) commits the image
       if (_uploadTarget == UploadTarget::Filesystem) {
         LittleFSmounted = LittleFS.begin();
-        if (LittleFSmounted) {
+        // TASK-958: Update.end(true) finalizes even a truncated write, so a short
+        // upload could report "success" with a broken/old filesystem. A complete
+        // image always carries /version.hash; its absence after remount means the
+        // write did NOT take. Surface it as an error instead of a silent success.
+        if (LittleFSmounted && !LittleFS.exists(F("/version.hash"))) {
+          strlcpy(_updaterError, "incomplete filesystem image (version.hash missing)", sizeof(_updaterError));
+          if (_serial_output) DebugTln(F("[OTA] Error: filesystem image incomplete (no version.hash)"));
+        } else if (LittleFSmounted) {
           updateLittleFSStatus(F("/.ota_post"));
           logBootSignature("[OTA] post-remount");    // third probe (FS-OTA only): after LittleFS.begin() remount
           if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
