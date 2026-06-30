@@ -1016,7 +1016,7 @@
     { id: 'ntp',      title: 'Time / NTP',             icon: '🕐', reboot: false, desc: 'Clock synchronisation.' },
     { id: 'otgw',     title: 'OpenTherm Gateway',      icon: '🔥', reboot: false, desc: 'Commands sent to the PIC at boot.' },
     { id: 'otd',      title: 'OT-Direct',              icon: '🎚', reboot: false, desc: 'Direct OpenTherm control (OTGW32).' },
-    { id: 'sensors',  title: 'GPIO Sensors',           icon: '🌡', reboot: false, desc: 'Dallas / GPIO temperature sensors.' },
+    { id: 'sensors',  title: 'Sensors',                icon: '🌡', reboot: false, desc: '1-Wire / GPIO temperature sensors and the BLE roster.' },
     { id: 'outputs',  title: 'GPIO Outputs',           icon: '🔌', reboot: false, desc: 'Drive a GPIO from OT state.' },
     { id: 's0',       title: 'S0 Pulse Counter',       icon: '⚡', reboot: false, desc: 'Energy pulse counting.' },
     { id: 'webhook',  title: 'Webhook',                icon: '🪝', reboot: false, desc: 'HTTP callbacks on OT state.' },
@@ -1429,11 +1429,38 @@
   function discardSettings() { setDirty = {}; renderSettings(); }
 
   // ---------- Settings > BLE sensor roster (GET/POST /api/v2/sat/ble/*) ----------
-  var bleData = null;
+  var bleData = null, blePollTimer = null;
+  function bleToast(msg) {
+    var t = document.getElementById('toast');
+    if (t) { t.textContent = msg; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2000); }
+  }
   function fetchBle() {
     fetch(APIGW + 'v2/sat/ble/discovery').then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (j) { if (j) { bleData = j; renderBleCard(); } }).catch(function () { });
+      .then(function (j) {
+        if (!j) return;
+        // TASK-963: re-render only when the roster actually changed, and never
+        // while an input inside the card is focused (a 4s poll would otherwise
+        // clobber a half-typed bindkey / steal focus).
+        var changed = !bleData || bleData.populated_slots !== j.populated_slots ||
+          JSON.stringify(bleData.sensors || []) !== JSON.stringify(j.sensors || []);
+        bleData = j;
+        var card = document.getElementById('setcard-ble');
+        var typing = card && card.contains(document.activeElement) &&
+          /^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
+        if (changed && !typing) renderBleCard();
+      }).catch(function () { });
   }
+  // TASK-963: continuous detection. The firmware scans passive-continuous (ADR-151),
+  // so sensors appear over time; poll the roster while the Sensors category is open
+  // so they surface on their own. Self-stops when the user leaves Sensors.
+  function startBlePoll() {
+    if (blePollTimer) return;
+    blePollTimer = setInterval(function () {
+      if (setActiveCat !== 'sensors' || !document.getElementById('setcard-ble')) { stopBlePoll(); return; }
+      fetchBle();
+    }, 4000);
+  }
+  function stopBlePoll() { if (blePollTimer) { clearInterval(blePollTimer); blePollTimer = null; } }
   function bleAction(path, body) {
     return fetch(APIGW + 'v2/sat/ble/' + path, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1443,6 +1470,10 @@
   function renderBleCard() {
     var cols = document.getElementById('setCols'); if (!cols || !bleData) return;
     var old = document.getElementById('setcard-ble'); if (old) old.remove();
+    // TASK-963: the BLE roster belongs to the Sensors category ONLY. The old code
+    // appended unconditionally (called here AND from the async fetchBle()), so the
+    // card leaked onto every category. Bail (and stop the poll) when not on Sensors.
+    if (setActiveCat !== 'sensors') { stopBlePoll(); return; }
     var card = document.createElement('div'); card.className = 'set-group'; card.id = 'setcard-ble';
     var h = document.createElement('h3'); h.textContent = 'BLE sensors'; card.appendChild(h);
     var desc = document.createElement('div'); desc.className = 'ble-desc';
@@ -1450,7 +1481,15 @@
       (bleData.name_prefix ? ' · prefix "' + bleData.name_prefix + '"' : '');
     card.appendChild(desc);
     var rescan = document.createElement('button'); rescan.className = 'tbtn'; rescan.textContent = '🔄 Rescan';
-    rescan.addEventListener('click', function () { bleAction('rescan'); });
+    rescan.addEventListener('click', function () {
+      // TASK-963: the POST already fires (200) but gave NO visible feedback, so the
+      // button read as dead. Show a scanning state + toast; the continuous poll
+      // surfaces any newly-found sensors. Re-enable after a short window.
+      rescan.disabled = true; rescan.textContent = '⏳ Scanning…';
+      bleToast('Scanning for BLE sensors…');
+      bleAction('rescan');
+      setTimeout(function () { if (rescan.isConnected) { rescan.disabled = false; rescan.textContent = '🔄 Rescan'; } }, 3000);
+    });
     card.appendChild(rescan);
     var sensors = bleData.sensors || [];
     if (!sensors.length) {
@@ -1521,6 +1560,7 @@
     addCtr.appendChild(macIn); addCtr.appendChild(bkIn); addCtr.appendChild(addBtn);
     add.appendChild(addCtr); card.appendChild(add);
     cols.appendChild(card);
+    startBlePoll();   // TASK-963: continuous roster polling while the Sensors category is open
   }
 
   // ============================================================

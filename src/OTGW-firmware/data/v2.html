@@ -42,17 +42,13 @@
 <!-- ════════════════ PAGE: HOME ════════════════ -->
 <div id="page-home" class="page active">
 <div class="cchips">
-  <button class="cchip active" data-design="a">A · System view</button>
-  <button class="cchip" data-design="b">B · At a glance</button>
-  <button class="cchip" data-design="c">C · Mission control</button>
+  <button class="cchip active" data-design="a">System view</button>
+  <button class="cchip" data-design="b">At a glance</button>
+  <button class="cchip" data-design="c">Mission control</button>
 </div>
 
 <!-- ============ DESIGN A — SYSTEM VIEW ============ -->
 <section id="design-a" class="design active">
-  <p class="concept-cap"><b>Concept A — your heating system, live.</b> The boiler burns, water flows:
-  red arrow out with the flow temperature, blue arrow back with the return temperature. DHW branch
-  wakes up when you tap hot water. Zero configuration — it knows everything from the OT bus.</p>
-
   <div class="schemcard">
     <div class="statusline" id="aStatus"><span class="dot"></span><span id="aStatusTxt">—</span>
       <span class="appl-toggle" id="applToggle">
@@ -219,8 +215,6 @@
 <!-- ============ DESIGN B — AT A GLANCE ============ -->
 <section id="design-b" class="design">
   <div class="glance">
-    <p class="concept-cap"><b>Concept B — one thumb, one glance.</b> Phone-first: the room dial up top,
-    the four numbers that matter below it. Everything else lives one tap deeper.</p>
 
     <div class="g-status" id="bStatus"><span class="dot"></span><span id="bStatusTxt">—</span></div>
 
@@ -271,9 +265,6 @@
 
 <!-- ============ DESIGN C — MISSION CONTROL ============ -->
 <section id="design-c" class="design">
-  <p class="concept-cap"><b>Concept C — for the people who read OT frames for fun.</b> Always-dark.
-  A live strip chart of flow/return/setpoint with modulation underneath, the numbers in mono,
-  and the raw bus scrolling by. OTmonitor, two decades later.</p>
 
   <div class="mc">
     <h2>OTGW <b>// MISSION CONTROL</b> · ws ● live</h2>
@@ -309,10 +300,6 @@
 
 <!-- ════════════════ PAGE: MONITOR ════════════════ -->
 <div id="page-monitor" class="page">
-  <p class="concept-cap"><b>Monitor — the four sub-tabs, redesigned.</b> Same data as today's
-  Log / Statistics / OT Support / Graph tabs, but visual: a calmer console, a scannable
-  statistics table with direction badges, the support map as a real map, and the graph
-  up front. Everything below is live from the OpenTherm bus.</p>
 
   <div class="subtabs">
     <button class="subtab active" data-tab="mlog">Log</button>
@@ -364,9 +351,7 @@
       <div class="matrix" id="supMatrix" aria-label="OpenTherm message ID support map"></div>
       <aside class="supdetail" id="supDetail"></aside>
     </div>
-    <p class="concept-cap" style="margin-top:10px">Click (or tap) a cell to pin its decoded
-    message details. As a map you see your system's OpenTherm dialect in one look — which message
-    IDs the thermostat and boiler actually use.</p>
+    <p class="ot-support-hint" style="margin-top:10px">Click (or tap) a cell to pin its decoded message details.</p>
   </div>
   <div class="suptip" id="supTip"></div>
 
@@ -483,10 +468,6 @@
 
 <!-- ════════════════ PAGE: SETTINGS ════════════════ -->
 <div id="page-settings" class="page">
-  <p class="concept-cap"><b>Settings — grouped, scannable, desktop-worthy.</b> The 2.0.0 branch
-  already groups settings into titled cards; this takes the next step: a sticky category rail,
-  cards flowing in two columns on desktop (one on mobile), live search across every field,
-  changed-field markers and a sticky save bar. Reboot-sensitive groups are badged.</p>
 
   <input class="set-search" id="setSearch" placeholder="Search settings… (e.g. broker, ntp, pin)">
 
