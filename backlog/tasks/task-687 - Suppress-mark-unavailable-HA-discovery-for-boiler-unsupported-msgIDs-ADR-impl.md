@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-05-24 06:47'
-updated_date: '2026-06-20 12:24'
+updated_date: '2026-06-30 04:45'
 labels:
   - ha-discovery
   - opentherm
@@ -15,7 +15,8 @@ labels:
   - user-experience
   - adr-required
   - milestone-2.1.0
-milestone: 2.1.0
+  - deferred
+milestone: 3.0.0
 dependencies: []
 priority: medium
 ordinal: 59000
@@ -101,4 +102,6 @@ No ADR file or code written this session due to the channel failure (writing wit
 2026-06-01T18:25:49+02:00: MAINTAINER DECISION 7b — approach B (publish discovery + availability_topic offline; HA renders unavailable, auto-recovers when boiler answers). DEFER to milestone 2.1.0 (task is already milestone 2.1.0). Not pulled into 2.0.0. When picked up: implement B in MQTTHaDiscovery.cpp honouring the unknownLogged bitmaps, + the runtime force-publish override, per the ADR this task still owes (AC#1).
 
 Moved In Progress -> To Do (maintainer decision 2026-06-20): explicitly PARKED for milestone 2.1.0. Only ADR-142 (Proposed) exists; no implementation (availability-list gating, clear-on-ack recovery, runtime override, CI gate, docs all absent). Parking in To Do so the In Progress column reflects actual active work. Unpark when 2.1.0 starts: first drive ADR-142 to Accepted via adr-kit, then implement.
+
+PARKED for release 3.0.0 (maintainer decision 2026-06-30): suppress/mark-unavailable HA discovery for boiler-unsupported msgIDs is a substantial ADR-gated feature (ADR draft+accept, discovery-publisher change, runtime force-publish override, recovery path, 3-tester field validation across distinct boilers, docs). Not in scope for the 2.0.0 line; deferred to the 3.0.0 milestone.
 <!-- SECTION:NOTES:END -->
