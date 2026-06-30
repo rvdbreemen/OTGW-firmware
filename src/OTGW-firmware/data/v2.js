@@ -76,12 +76,25 @@
   // ---------- back to the classic UI ----------
   function gotoClassic() {
     // TASK-923: persist the choice device-side in settings.ini (ui_usev2=false)
-    // via the settings API, then reload — the firmware serves the classic UI.
-    fetch(APIGW + 'v2/settings', {
-      method: 'POST', mode: 'cors',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: 'ui_usev2', value: 'false' })
-    }).catch(function () { }).finally(function () { location.href = '/'; });
+    // via the settings API, then reload so the firmware serves the classic UI.
+    // TASK-960: retry on 503/network and reload ONLY after a confirmed 200. The
+    // old handler reloaded unconditionally (.finally) without checking
+    // response.ok, so a 503 from the REST backpressure gate silently dropped the
+    // switch and reloaded back to v2.
+    var attempt = 0;
+    function trySet() {
+      fetch(APIGW + 'v2/settings', {
+        method: 'POST', mode: 'cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: 'ui_usev2', value: 'false' })
+      }).then(function (r) {
+        if (r.ok) { location.href = '/'; }
+        else if (++attempt <= 8) { setTimeout(trySet, 250 * attempt); }
+      }).catch(function () {
+        if (++attempt <= 8) { setTimeout(trySet, 250 * attempt); }
+      });
+    }
+    trySet();
   }
 
   // ---------- clock ----------

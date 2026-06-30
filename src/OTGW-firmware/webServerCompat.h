@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.297
+**  Version  : v2.0.0-alpha.298
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -316,6 +316,14 @@ inline void webSendFile(const char* path, const char* contentType, bool gzip) {
   // burst (<=6 parallel) is never throttled while the heap is healthy; under a flood the
   // heap-tier clamp tightens the cap toward 1 and the excess gets a cheap 503.
   if (!webFileGateTryAdmit()) {
+    // TASK-960: tell the client this is transient backpressure, not a hard error,
+    // so a cooperative loader retries promptly (the gate frees a slot within ~1s
+    // as in-flight serves finish). The cap itself stays allocation-bound (cap 1
+    // when maxBlock<16000): two concurrent LittleFS serves cannot be guaranteed to
+    // allocate at that point (the TASK-879 hung-PCB hazard), so the floor is held
+    // and the client-side retry — not a higher cap — is what makes a multi-asset
+    // page load reliably under heap pressure.
+    webPushHeader(F("Retry-After"), F("1"));
     webSendStatus(503);
     return;
   }

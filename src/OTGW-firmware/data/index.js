@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.297
+**  Version  : v2.0.0-alpha.298
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -137,7 +137,21 @@ function fetchDallasLabels() {
 }
 
 console.log(`Hash=${window.location.hash}`);
-window.onload = initMainPage;
+// TASK-960: index.js can be loaded by the resilient sequential loader in
+// index.html (retry-on-503), which may finish AFTER the window 'load' event has
+// already fired. A bare `window.onload =` assignment would then be dropped
+// silently and the page would never initialise. Run now if the document already
+// finished loading; otherwise wait for 'load' as before.
+if (document.readyState === 'complete') {
+  // Defer to the next tick so the REST of this script finishes executing first
+  // (module-level state initMainPage relies on, e.g. the `let`s declared just
+  // below, does not exist yet at this point). This matches the original
+  // `window.onload` timing, which only fired after the whole script had run;
+  // calling initMainPage() inline here runs it mid-script, too early.
+  setTimeout(function () { initMainPage(); }, 0);
+} else {
+  window.addEventListener('load', initMainPage);
+}
 
 let mainPageCompatWarningShown = false;
 let otLogCompatWarningShown = false;

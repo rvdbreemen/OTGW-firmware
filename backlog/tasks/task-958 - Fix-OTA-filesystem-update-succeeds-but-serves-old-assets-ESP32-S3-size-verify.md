@@ -3,11 +3,11 @@ id: TASK-958
 title: >-
   Fix OTA filesystem update: succeeds but serves old assets (ESP32-S3
   size/verify)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 17:05'
-updated_date: '2026-06-30 18:13'
+updated_date: '2026-06-30 18:15'
 labels: []
 dependencies: []
 ordinal: 170000

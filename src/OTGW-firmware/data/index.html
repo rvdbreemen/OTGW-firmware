@@ -29,12 +29,43 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"
             integrity="sha384-BQKzmHvQLMCAnL3UtDBA1Al5tFjsCz1wrMlIUA1wkzo14DYkRWjywW+p9pCj0cwd"
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="./echarts-theme.js" defer></script>
-    <script src="./theme-toggle.js" defer></script>
-    <script src="./sat-slider.js" defer></script>
-    <script src="./index.js"></script>
-    <script src="./graph.js"></script>
-    <script src="./sat.js"></script>
+    <!-- TASK-960: load app scripts SEQUENTIALLY with retry. The old parallel
+         <script> burst (6 files at once) fragmented the ESP32 heap and tripped
+         the file-serve gate (ADR-147), which 503s the excess under pressure —
+         and a 503'd index.js silently kills the whole UI ([hostname]/[version]
+         placeholders, empty log). Serializing removes the burst (one file at a
+         time never trips the gate); the retry recovers any transient 503 so the
+         UI never dies on a dropped asset. Order preserved: index.js defines the
+         APIGW global that graph.js/sat.js use, so it must load first. -->
+    <script>
+      (function () {
+        var SCRIPTS = ['./index.js', './graph.js', './sat.js',
+                       './echarts-theme.js', './theme-toggle.js', './sat-slider.js'];
+        var MAX_RETRY = 8;
+        function load(i) {
+          if (i >= SCRIPTS.length) return;
+          var attempt = 0;
+          (function attemptLoad() {
+            var s = document.createElement('script');
+            s.src = SCRIPTS[i];
+            s.async = false; // execute in insertion order
+            s.onload = function () { load(i + 1); };
+            s.onerror = function () {
+              if (s.parentNode) s.parentNode.removeChild(s);
+              if (++attempt <= MAX_RETRY) {
+                // Linear backoff: the gate frees a slot as in-flight serves finish.
+                setTimeout(attemptLoad, 200 * attempt);
+              } else {
+                console.error('[loader] gave up on ' + SCRIPTS[i] + ' after ' + MAX_RETRY + ' tries');
+                load(i + 1); // continue so one wedged asset can't block the rest
+              }
+            };
+            document.head.appendChild(s);
+          })();
+        }
+        load(0);
+      })();
+    </script>
     <title>OTGW firmware</title>
   </head>
   <body>
@@ -67,10 +98,30 @@
         var b = document.getElementById('tryV2');
         if (!b) return;
         b.addEventListener('click', function () {
-          fetch(location.protocol + '//' + location.host + '/api/v2/settings', {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: 'ui_usev2', value: 'true' })
-          }).catch(function () { }).finally(function () { location.href = '/'; });
+          // TASK-960: the old handler reloaded UNCONDITIONALLY (.finally) without
+          // checking response.ok, so a 503 from the REST backpressure gate (the
+          // POST competing with the page's polling under heap pressure) silently
+          // dropped the switch and reloaded back to the classic UI. Retry on
+          // 503/network and reload ONLY after a confirmed 200, so the toggle is
+          // reliable.
+          var url = location.protocol + '//' + location.host + '/api/v2/settings';
+          var orig = b.textContent;
+          b.textContent = 'Switching...';
+          var attempt = 0;
+          function trySet() {
+            fetch(url, {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: 'ui_usev2', value: 'true' })
+            }).then(function (r) {
+              if (r.ok) { location.href = '/'; }
+              else if (++attempt <= 8) { setTimeout(trySet, 250 * attempt); }
+              else { b.textContent = orig; b.title = 'Device busy, tap to retry'; }
+            }).catch(function () {
+              if (++attempt <= 8) { setTimeout(trySet, 250 * attempt); }
+              else { b.textContent = orig; b.title = 'Device busy, tap to retry'; }
+            });
+          }
+          trySet();
         });
       })();
     </script>
@@ -629,10 +680,13 @@
 
     <!-- Pin to bottom left corner -->
     <div id="message" class="bottom left-0"></div>
-  
-    <script>
-       window.onload=initMainPage;
-    </script>
+
+    <!-- TASK-960: the init wiring (window.onload -> initMainPage) lives in
+         index.js itself, which now self-initialises in a load-safe way regardless
+         of when the resilient sequential loader finishes loading it. The old
+         inline `window.onload=initMainPage;` here ran during body parse, BEFORE
+         the async-loaded index.js had defined initMainPage, throwing a
+         ReferenceError ("initMainPage is not defined"). Removed as redundant. -->
 
   </body>
 

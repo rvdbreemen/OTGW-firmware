@@ -2456,5 +2456,29 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-06-30"
+  },
+  {
+    "id": "bug-140",
+    "timestamp": "2026-06-30",
+    "error_message": "Classic v1 Web UI dead: header stuck on [hostname]/[version]/[00:00:00] placeholders, 'Wait for it...', empty log",
+    "file": "src/OTGW-firmware/data/index.html",
+    "root_cause": "NOT the REST API (device/info returns 200). index.js (the main script) was 503'd by the file-serve gate webFileGateTryAdmit (ADR-147, restAPI.ino:83) during the classic UI's 8-asset concurrent <script> burst. The burst fragments the heap (maxBlk 40948 idle -> 7668 under load, frag 55%); the gate clamps cap to 1 (maxBlock<16000) and 503s the excess (telnet: 'WEBFILE BUSY: 4 in-flight (cap 1) => 503 maxblock=7668'). A 503'd <script> kills the whole UI, and a 503'd asset never caches so it keeps 503ing (feedback death-spiral).",
+    "fix": "index.html: load the 6 app scripts SEQUENTIALLY via an inline loader with retry-on-error (removes the concurrent burst that trips the gate + self-heals a transient 503). index.js: init made load-safe (readyState check + setTimeout deferral) since the loader can finish after window 'load'. Removed a redundant inline 'window.onload=initMainPage' at end of index.html body that, with the now-async index.js, ran before initMainPage was defined (ReferenceError 'initMainPage is not defined'). webServerCompat.h: Retry-After:1 on the file 503 (cap kept; allocation-bound per TASK-879). Verified on .39 alpha.298, 0 console errors, UI fully populated.",
+    "tags": ["webui", "v1", "classic", "503", "file-gate", "adr-147", "heap-fragmentation", "script-loader", "task-960", "2.0.0"],
+    "related_bugs": ["bug-139"],
+    "occurrences": 1,
+    "last_seen": "2026-06-30"
+  },
+  {
+    "id": "bug-141",
+    "timestamp": "2026-06-30",
+    "error_message": "UI switch buttons (Try New UI / Classic UI) silently do nothing under load - reload to the same UI",
+    "file": "src/OTGW-firmware/data/index.html",
+    "root_cause": "Both switch handlers (index.html #tryV2 click, v2.js gotoClassic) did fetch('/api/v2/settings' ui_usev2).catch(function(){}).finally(function(){location.href='/'}). They never checked response.ok and reloaded UNCONDITIONALLY. A 503 from the REST backpressure gate on the ui_usev2 POST (the POST competing with the page polling under heap pressure) resolves the fetch (not reject), so .catch does not fire, .finally reloads anyway, and the setting was never written -> reloads to the same UI = silent no-switch.",
+    "fix": "Both handlers now POST with retry on 503/network (8 tries, linear backoff) and reload ONLY after a confirmed response.ok (200). index.html #tryV2 also shows 'Switching...' feedback and a 'tap to retry' title on persistent failure. Verified: real button clicks classic<->v2<->classic work reliably on .39.",
+    "tags": ["webui", "ui-switch", "ui_usev2", "503", "response.ok", "backpressure", "task-960", "2.0.0"],
+    "related_bugs": ["bug-140", "bug-139"],
+    "occurrences": 1,
+    "last_seen": "2026-06-30"
   }
 ]

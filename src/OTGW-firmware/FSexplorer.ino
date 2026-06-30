@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.297
+**  Version  : v2.0.0-alpha.298
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -87,8 +87,15 @@ static void serveVersionedAsset(const char* path, const __FlashStringHelper* mim
   }
   const char* fsHash = getFilesystemHash();
   if (fsHash && fsHash[0] != '\0') {
-    char etag[24];
-    snprintf_P(etag, sizeof(etag), PSTR("\"%s\""), fsHash);
+    // The ETag must identify the RESOURCE REPRESENTATION, not merely the
+    // filesystem build. The root route ("/", "/index", "/index.html") serves
+    // index.html OR v2.html depending on settings.ui.bUseV2 (sendIndex), so a
+    // bare fsHash ETag is identical for both shells. The browser then gets a
+    // false 304 when the UI toggle flips and keeps showing the stale shell until
+    // a hard reload (TASK-960: "need CTRL-R between UI switches"). Include the
+    // served path so each shell, and each asset, has a distinct validator.
+    char etag[64];
+    snprintf_P(etag, sizeof(etag), PSTR("\"%s-%s\""), fsHash, path);
     if (hasHeaderCompat(F("If-None-Match")) &&
         strcmp(headerCompat(F("If-None-Match")), etag) == 0) {
       webPushHeader(F("Cache-Control"), F("no-cache"));
