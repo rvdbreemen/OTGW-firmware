@@ -1,3 +1,59 @@
+# Daily Issue Report — 2026-06-30
+
+## GitHub Issues (updated in last 24h)
+
+No GitHub issues were updated in the last 24 hours.
+
+---
+
+## Tweakers Forum Posts (last 24h, excluding number3/rvdbreemen)
+
+### Post by tjanssen — 2026-06-29 09:10 GMT
+- **URL:** https://gathering.tweakers.net/forum/list_message/85594732#85594732
+- **Classification:** Bug indication + Feature request
+- **Summary:** tjanssen reports experiencing another disconnect over the weekend (recurring issue, previously mentioned in earlier posts). Requests an uptime sensor be added to the firmware so that reboots/resets become visible without having to watch logs. Directed at number3.
+
+### Post by hvxl — 2026-06-29 08:10 GMT
+- **URL:** https://gathering.tweakers.net/forum/list_message/85594186#85594186
+- **Classification:** Discussion / Not relevant (no code action needed)
+- **Summary:** hvxl responds to jelvank's heat/cool discussion (#665 thread). States no PIC firmware changes are needed for the described use case. Suggests running heating via the thermostat as normal and controlling cooling directly via OTGW using the CE/CL commands. Notes that cooling control is less precision-sensitive than heating so a simpler algorithm suffices.
+
+---
+
+## Open Items Carried Over
+
+1. **#665 — Switching heating and cooling with Honeywell Round Modulation Heat/Cool**
+   - **Reporter:** jelvank
+   - **URL:** https://github.com/rvdbreemen/OTGW-firmware/issues/665
+   - **Status:** Open — 1.7.1 beta validation in progress by jelvank as of 2026-06-27.
+   - **Classification:** Bug report (firmware / MQTT / HA integration)
+   - **Summary:** Heat/Cool Auto mode (dual setpoints) not correctly represented in HA; mode switching broken. Beta 1.7.1 fix released; awaiting field validation sign-off.
+
+2. **#666 — winget failed to install EclipseMosquitto.Mosquitto**
+   - **Reporter:** Pistoletjes
+   - **URL:** https://github.com/rvdbreemen/OTGW-firmware/issues/666
+   - **Status:** Open — no comments or fix yet.
+   - **Classification:** Bug report (scripts)
+   - **Summary:** scripts/capture-mqtt-debug.bat uses stale winget package ID EclipseMosquitto.Mosquitto; correct ID is EclipseFoundation.Mosquitto. One-line fix needed.
+
+3. **Recurring disconnect (Tweakers, tjanssen)** — NEW this report
+   - **Reporter:** tjanssen (Tweakers)
+   - **Source:** https://gathering.tweakers.net/forum/list_message/85594732#85594732
+   - **Status:** Informal report; no GitHub issue filed yet.
+   - **Classification:** Bug indication (connection stability)
+   - **Summary:** User is experiencing recurring OTGW disconnects. Feature request for an uptime sensor to make resets visible at a glance. No GitHub issue open yet; may warrant one if the root cause is firmware-side.
+
+---
+
+## Summary
+
+No new GitHub issues in the last 24 hours. Two Tweakers posts from non-excluded users:
+
+- **tjanssen** reported a recurring disconnect and requested an uptime sensor — potentially a firmware stability signal worth tracking.
+- **hvxl** provided guidance on cooling-mode control (CE/CL commands, no PIC changes needed) — discussion only, no action required.
+
+---
+
 # Daily Issue Report — 2026-06-29
 
 ## GitHub Issues (updated in last 24h)
