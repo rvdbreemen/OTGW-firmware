@@ -251,7 +251,8 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .tchip.on{border-color:var(--accent);color:var(--accent);font-weight:700}
   .console{background:#0a0e14;border:1px solid var(--border);border-radius:12px;
     height:340px;overflow-y:auto;padding:10px 12px;font-family:var(--font-mono);
-    font-size:.74rem;line-height:1.55;color:#c7d1da}
+    font-size:.74rem;line-height:1.55;color:#c7d1da;
+    white-space:pre-wrap;overflow-wrap:anywhere}  /* TASK-957: one frame per line, wrap long frames */
   .console .t{color:#00bffe}.console .b{color:#79f2c0}.console .ts{color:#566069}
   .console .err{color:#ff5a4d}
   .statfoot{display:flex;gap:16px;font-size:.76rem;color:var(--muted);padding:8px 4px 0;flex-wrap:wrap}
