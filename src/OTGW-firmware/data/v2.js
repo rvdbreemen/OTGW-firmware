@@ -1111,6 +1111,14 @@
     otdfreeventenable:   { cat: 'otd', label: 'Free ventilation' },
     otdventsetpoint:     { cat: 'otd', label: 'Ventilation setpoint', hint: '%' },
     otdhasbypassrelay:   { cat: 'otd', label: 'Bypass relay fitted' },
+    // TASK-935: remaining OT-Direct config keys (were falling back to humanizeKey)
+    otdautodetect:       { cat: 'otd', label: 'Auto-detect OTGW32 mode' },
+    otdsetbacktemp:      { cat: 'otd', label: 'Setback temperature', hint: '°C' },
+    otdsetbacktimeout:   { cat: 'otd', label: 'Setback timeout', hint: 'Minutes' },
+    otdenableslave:      { cat: 'otd', label: 'Enable slave (thermostat) passthrough' },
+    otdsummermode:       { cat: 'otd', label: 'Summer mode (CH off)' },
+    otdfailsafe:         { cat: 'otd', label: 'Fail-safe on OT bus loss' },
+    otdmsginterval:      { cat: 'otd', label: 'Message interval', hint: 'ms' },
     // SAT: full metadata (TASK-933 Phase 2)
     satforcepwm:         { cat: 'sat', label: 'Force PWM' },
     satpushsetpoint:     { cat: 'sat', label: 'Push setpoint to thermostat' },

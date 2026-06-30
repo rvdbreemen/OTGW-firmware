@@ -3,11 +3,11 @@ id: TASK-935
 title: >-
   feat(2.0.0): expose advanced OT-Direct + SAT settings over REST (v2 Settings
   Phase 2)
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-25 19:15'
-updated_date: '2026-06-29 04:28'
+updated_date: '2026-06-30 04:25'
 labels: []
 dependencies: []
 ordinal: 149000
