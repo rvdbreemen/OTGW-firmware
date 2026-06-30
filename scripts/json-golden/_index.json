@@ -1,17 +1,17 @@
 {
   "/v2/health": {
     "status": 200,
-    "bytes": 169,
+    "bytes": 311,
     "file": "v2_health.json"
   },
   "/v2/debug": {
     "status": 200,
-    "bytes": 6366,
+    "bytes": 6379,
     "file": "v2_debug.json"
   },
   "/v2/settings": {
     "status": 200,
-    "bytes": 7282,
+    "bytes": 9838,
     "file": "v2_settings.json"
   },
   "/v2/sensors": {
@@ -31,12 +31,12 @@
   },
   "/v2/device/info": {
     "status": 200,
-    "bytes": 2295,
+    "bytes": 2282,
     "file": "v2_device_info.json"
   },
   "/v2/device/time": {
     "status": 200,
-    "bytes": 220,
+    "bytes": 263,
     "file": "v2_device_time.json"
   },
   "/v2/device/crashlog": {
@@ -71,12 +71,12 @@
   },
   "/v2/filesystem/files": {
     "status": 200,
-    "bytes": 1386,
+    "bytes": 1797,
     "file": "v2_filesystem_files.json"
   },
   "/v2/filesystem/hash-check": {
     "status": 200,
-    "bytes": 75,
+    "bytes": 76,
     "file": "v2_filesystem_hash_check.json"
   },
   "/v2/simulate": {
@@ -86,17 +86,17 @@
   },
   "/v2/otgw/otmonitor": {
     "status": 200,
-    "bytes": 751,
+    "bytes": 777,
     "file": "v2_otgw_otmonitor.json"
   },
   "/v2/otgw/telegraf": {
     "status": 200,
-    "bytes": 751,
+    "bytes": 777,
     "file": "v2_otgw_telegraf.json"
   },
   "/v2/discovery": {
     "status": 200,
-    "bytes": 228,
+    "bytes": 230,
     "file": "v2_discovery.json"
   },
   "/v2/otdirect/status": {
@@ -116,17 +116,17 @@
   },
   "/v2/sat": {
     "status": 200,
-    "bytes": 2720,
+    "bytes": 2647,
     "file": "v2_sat.json"
   },
   "/v2/sat/status": {
     "status": 200,
-    "bytes": 2720,
+    "bytes": 2647,
     "file": "v2_sat_status.json"
   },
   "/v2/sat/status?detail=full": {
     "status": 200,
-    "bytes": 468,
+    "bytes": 454,
     "file": "v2_sat_status_detail_full.json"
   },
   "/v2/sat/weather": {
@@ -141,7 +141,7 @@
   },
   "/v2/sat/ble/discovery": {
     "status": 200,
-    "bytes": 109,
+    "bytes": 148,
     "file": "v2_sat_ble_discovery.json"
   },
   "/v2/sat/markers": {

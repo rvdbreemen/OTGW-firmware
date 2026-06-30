@@ -32,8 +32,12 @@ VOLATILE_EXACT = {
  "fw_hash","fs_hash","match","message",
  # filesystem totals + reboot/discovery counters shift on every reboot:
  "usedBytes","freeBytes","pending_ids",
+ # /v2/debug uses FLAT dotted-string keys (e.g. "runtime.heap_free"), not nested
+ # dicts — these runtime-telemetry keys change every fetch, can never be golden'd
+ # (TASK-955). The "runtime.heap" prefix covers heap_free/frag_pct/min_free/max_alloc.
+ "runtime.uptime_sec","runtime.wifi_rssi",
 }
-VOLATILE_PREFIX = ("perf_","hd_","disc_")
+VOLATILE_PREFIX = ("perf_","hd_","disc_","runtime.heap")
 
 # Strings the manual JSON emitted for booleans; ArduinoJson now emits real bools.
 # Normalising both sides means the intended string->bool improvement is transparent
