@@ -1,10 +1,10 @@
 ---
 id: TASK-865
 title: 'EPIC: 2.0.0 ESP32-S3-only async + FreeRTOS migration (ADR-123/127/128)'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-13 05:37'
-updated_date: '2026-06-28 21:20'
+updated_date: '2026-06-30 10:50'
 labels:
   - async-esp32s3
   - epic
@@ -75,3 +75,15 @@ WS-D DESCOPE FROM 2.0.0 (decide explicitly):
 EXEC SEQUENCE: (1) answer WS-B -> drain WS-A via loop, each build+eval+bump+push origin/dev. (2) interactive device: C-4+C-3+C-1. (3) unattended: C-2 heap soak -> Phase3 call. (4) flip B-6 -> EPIC closes -> cut 2.0.0 beta.
 BOTTOM LINE: ~1 large code task (935-sat) + handful small. Rest is press-button-on-hardware + 6 decisions.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+CLOSE 2026-06-30 (maintainer decision): the 2.0.0 ESP32-S3-only async + FreeRTOS migration is complete. All 18 sub-tasks (865.1 through 865.18) are Done — drop-esp8266, foundation, phase1-pic, phase2-mqtt, phase3-web/ws, phase4-cleanup. ADR-123 (hybrid FreeRTOS PIC-UART task + async networking), ADR-128 (ESP8266 dropped), ADR-127 (combo single binary, runtime boot-detect) all landed. Epic-level field-validation gate (full-stack ESP32-S3 hardware soak across OTGW32 + esp32-classic + esp32-combo) covered this session: OTGW32 @192.168.88.39 passed a 30-min soak (41k REST @ 0% error, 960 WS connections, no reset/crash/leak); esp32-classic @192.168.88.64 verified (board-mode force/recover, roster-400, label render); esp32-combo dual-boot verified (force OT-Direct <-> PIC re-detect, 865.17). HONEST CAVEAT: the gate was met piecewise per-target this session, not as one coordinated tri-target full-stack soak run simultaneously; coverage is strong but a single unified full-stack soak was not run. Closed per maintainer.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+2.0.0 ESP32-S3-only async + FreeRTOS migration complete (ADR-123/127/128). All 18 sub-tasks Done; field-validated across OTGW32 (30-min soak PASS), esp32-classic, and esp32-combo dual-boot this session.
+<!-- SECTION:FINAL_SUMMARY:END -->
