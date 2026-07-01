@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T05:48:13.680Z
-> Files: 547 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T16:57:05.943Z
+> Files: 548 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/01-raw/sessies/
 
@@ -14,6 +14,10 @@
 ## ../../../Claude/Projects/Kluis/graphify-out/
 
 - `.graphify_chunk_01.json` (~6926 tok)
+
+## ../otgw-1x/src/OTGW-firmware/
+
+- `mqtt_configuratie.cpp` — ======================================================================= (~53791 tok)
 
 ## ../wt-otgw-1.x.x/scripts/
 
@@ -34,7 +38,7 @@
 - `CHANGELOG.md` — Change log (~8375 tok)
 - `CLAUDE.md` — OpenWolf (~9409 tok)
 - `config.py` — Base Paths (~268 tok)
-- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 more (~47028 tok)
+- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~47768 tok)
 - `flash_esp.py` — Colors: disable, print_header, print_success, print_error + 11 more (~10532 tok)
 - `flash_otgw.bat` (~2804 tok)
 - `flash_otgw.sh` — flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware (Linux/macOS) (~3385 tok)
@@ -907,7 +911,7 @@
 ## src/OTGW-firmware/
 
 - `Hardwaretypes.h` — Declares OTGWHardwareMode (~468 tok)
-- `MQTTHaDiscovery.cpp` — ======================================================================= (~70190 tok)
+- `MQTTHaDiscovery.cpp` — ======================================================================= (~70440 tok)
 - `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~12222 tok)
 - `OTGW-firmware.ino` — Declares WifiPortalResetState (~11762 tok)
 - `restAPI.ino` — include <string.h> (~51685 tok)

@@ -372,6 +372,10 @@ const char ha_lbl_otc_active[] PROGMEM = "otc_active";
 const char ha_lbl_summerwintertime[] PROGMEM = "summerwintertime";
 const char ha_lbl_boiler_connected[] PROGMEM = "boiler_connected";
 const char ha_lbl_thermostat_connected[] PROGMEM = "thermostat_connected";
+// Gateway/OTGW connection status (faux dataid 244). gateway_mode uses IS_PIC (0x08)
+// -> "otgw-pic/gateway_mode"; otgw_connected is bare (ADR-102, base namespace).
+const char ha_lbl_gateway_mode[] PROGMEM = "gateway_mode";
+const char ha_lbl_otgw_connected[] PROGMEM = "otgw_connected";
 const char ha_lbl_master_configuration_smart_power[] PROGMEM = "master_configuration_smart_power";
 const char ha_lbl_ch2_present[] PROGMEM = "ch2_present";
 const char ha_lbl_control_type_modulation[] PROGMEM = "control_type_modulation";
@@ -732,6 +736,8 @@ const char ha_name_otc_enable[] PROGMEM = "OTC_enable";
 const char ha_name_summerwintertime[] PROGMEM = "Summer_Winter_Time";
 const char ha_name_boiler_connected[] PROGMEM = "Boiler_Connected";
 const char ha_name_thermostat_connected[] PROGMEM = "Thermostat_Connected";
+const char ha_name_gateway_mode[] PROGMEM = "Gateway_Mode";
+const char ha_name_otgw_connected[] PROGMEM = "OTGW_Connected";
 const char ha_name_master_configuration_smart_power[] PROGMEM = "master_configuration_smart_power";
 const char ha_name_ch2_present[] PROGMEM = "CH2_present";
 const char ha_name_control_type_modulation[] PROGMEM = "control_type_modulation";
@@ -1351,13 +1357,13 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {242, 0x00, ha_lbl_hvac_action,                ha_name_hvac_action,                HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::radiator,      HaEntityCat::none, true, nullptr,              nullptr},
 };
 
-// ========== Binary sensor array (58 entries, sorted by id) ==========
-// ADR-105: first 58 rows are sorted by OT id and indexed via mqttHaBinSensorIndex[].
-// Rows 58..94 are HA-core aliases, NOT contiguous by OT id and NOT covered by
+// ========== Binary sensor array (60 indexed entries) ==========
+// ADR-105: first 60 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
+// Rows 60..96 are HA-core aliases, NOT contiguous by OT id and NOT covered by
 // the index. The discovery dispatcher walks the alias tail separately when
 // settings.mqtt.bPublishHaCoreAliases is on (see MQTTstuff.ino).
-const uint16_t MQTT_HA_BINSENSOR_COUNT         = 95;
-const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 58;
+const uint16_t MQTT_HA_BINSENSOR_COUNT         = 97;
+const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 60;
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1437,6 +1443,12 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     SAT_BIN(254, sat_safety_tripped, HaIcon::alert_circle,    HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::true_false),
     SAT_BIN(254, sat_flame_health,   HaIcon::fire,            HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::on_off),
     SAT_BIN(254, sat_valves_open,    HaIcon::radiator,        HaEntityCat::none, true, nullptr,           HaBinaryPayload::true_false),
+
+    // --- Pseudo-ID 244: gateway/OTGW connection status (HaDevice::Gateway) ---
+    // Last rows of the INDEXED region (index covers rows 0..INDEXED_COUNT-1).
+    // Values publish "on"/"off" via CCONOFF -> default payload (on_off).
+    {244, 0x08, ha_lbl_gateway_mode,   ha_name_gateway_mode,   HaIcon::lan_connect, HaEntityCat::diagnostic, true},
+    {244, 0x00, ha_lbl_otgw_connected, ha_name_otgw_connected, HaIcon::lan_connect, HaEntityCat::diagnostic, true},
 
     // ---------------------------------------------------------------------------
     // ADR-105: HA-core aliases (37 rows) — gated by settings.mqtt.bPublishHaCoreAliases
@@ -1992,7 +2004,7 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 241
     0xFFFF, // id 242
     0xFFFF, // id 243
-    0xFFFF, // id 244
+    58,     // id 244, 2 entries (gateway_mode, otgw_connected; last of indexed region)
     0xFFFF, // id 245
     0xFFFF, // id 246
     0xFFFF, // id 247
