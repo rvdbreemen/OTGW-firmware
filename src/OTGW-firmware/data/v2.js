@@ -1537,6 +1537,18 @@
       body: body ? JSON.stringify(body) : undefined
     }).then(function () { setTimeout(fetchBle, 500); }).catch(function () { });
   }
+  // TASK-975: clear the whole roster by forgetting every slot (forget also cleans
+  // HA discovery). Fire SEQUENTIALLY — concurrent POSTs trip the REST in-flight cap
+  // (REST_MAX_INFLIGHT=4) and some forgets 503, leaving slots behind. Re-fetch once.
+  function clearBleRoster(macs) {
+    if (typeof bleToast === 'function') bleToast('Clearing roster…');
+    var list = (macs || []).filter(Boolean);
+    (function next(i) {
+      if (i >= list.length) { setTimeout(fetchBle, 500); return; }
+      fetch(APIGW + 'v2/sat/ble/forget', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mac: list[i] }) })
+        .then(function () { next(i + 1); }).catch(function () { next(i + 1); });
+    })(0);
+  }
   function renderBleCard() {
     var cols = document.getElementById('setCols'); if (!cols || !bleData) return;
     var old = document.getElementById('setcard-ble'); if (old) old.remove();
@@ -1561,6 +1573,19 @@
       setTimeout(function () { if (rescan.isConnected) { rescan.disabled = false; rescan.textContent = '🔄 Rescan'; } }, 3000);
     });
     card.appendChild(rescan);
+    // TASK-975: clear the whole roster (forget every slot; forget also cleans up HA
+    // discovery). Two-click confirm avoids a blocking modal dialog.
+    var sensorsNow = (bleData.sensors || []).filter(function (s) { return s.mac; });
+    if (sensorsNow.length) {
+      var clr = document.createElement('button'); clr.className = 'tbtn'; clr.textContent = '🗑 Clear roster';
+      clr.style.marginLeft = '6px';
+      clr.addEventListener('click', function () {
+        if (clr._armed) { clr._armed = false; clearBleRoster(sensorsNow.map(function (s) { return s.mac; })); return; }
+        clr._armed = true; clr.textContent = '⚠ Click again to clear all';
+        clr._t = setTimeout(function () { if (clr.isConnected) { clr._armed = false; clr.textContent = '🗑 Clear roster'; } }, 3000);
+      });
+      card.appendChild(clr);
+    }
     var sensors = bleData.sensors || [];
     if (!sensors.length) {
       var empty = document.createElement('div'); empty.className = 'ble-row'; empty.style.color = 'var(--muted)';
