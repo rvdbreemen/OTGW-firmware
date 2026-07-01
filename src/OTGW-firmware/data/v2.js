@@ -71,6 +71,7 @@
     else if (t === 'msupport') renderSupport();
     else if (t === 'mgraph') renderGraph();
     else if (t === 'mconn') { fetchConn(); fetchOtdOvr(); }
+    else if (t === 'mdebug') fetchDebug();
   }
 
   // ---------- back to the classic UI ----------
@@ -1796,6 +1797,22 @@
       c.toBlob(function (blob) { if (blob) downloadBlob(blob, 'otgw-graph-' + ts() + '.png'); });
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+  }
+
+  // ---------- Monitor > Debug page (TASK-967) ----------
+  function fetchDebug() {
+    fetch(APIGW + 'v2/debug').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var el = document.getElementById('dbgInfo'); if (!el) return;
+      var d = (j && j.debug) || j || {};
+      var keys = Object.keys(d);
+      el.textContent = keys.length ? keys.map(function (k) { return k + '  =  ' + d[k]; }).join('\n') : 'No debug data';
+    }).catch(function () { var el = document.getElementById('dbgInfo'); if (el) el.textContent = 'Failed to load debug info'; });
+    fetch(APIGW + 'v2/device/crashlog').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var el = document.getElementById('dbgCrash'); if (!el) return;
+      var c = (j && j.crashlog) || {};
+      if (!c.available) { el.textContent = 'No crash recorded.'; return; }
+      el.textContent = ((c.summary || '') + '\n\n' + (c.details || '')).trim() || 'Crash recorded (no detail).';
+    }).catch(function () { var el = document.getElementById('dbgCrash'); if (el) el.textContent = '—'; });
   }
 
   // ---------- Monitor > Log > send raw OTGW command (TASK-965) ----------

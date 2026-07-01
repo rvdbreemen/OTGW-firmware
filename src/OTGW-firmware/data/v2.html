@@ -307,6 +307,7 @@
     <button class="subtab" data-tab="msupport">OT Support</button>
     <button class="subtab" data-tab="mgraph">Graph</button>
     <button class="subtab" data-tab="mconn">Connection</button>
+    <button class="subtab" data-tab="mdebug">Debug</button>
   </div>
 
   <div id="mlog" class="mpanel active">
@@ -491,6 +492,18 @@
         <input id="otdOvrValue" type="text" maxlength="4" placeholder="Hex" aria-label="Override value (hex)" style="width:82px">
         <button id="otdOvrApply" class="tbtn">Apply</button>
       </div>
+    </div>
+  </div>
+
+  <!-- TASK-967: Debug / crash-log page (parity with Classic "Debug Information"). -->
+  <div id="mdebug" class="mpanel">
+    <div class="set-group">
+      <h3>System / debug info</h3>
+      <pre id="dbgInfo" class="console" style="max-height:340px;white-space:pre-wrap">Loading…</pre>
+    </div>
+    <div class="set-group" style="margin-top:14px">
+      <h3>Crash log</h3>
+      <pre id="dbgCrash" class="console" style="max-height:320px;white-space:pre-wrap">—</pre>
     </div>
   </div>
 </div><!-- /page-monitor -->
