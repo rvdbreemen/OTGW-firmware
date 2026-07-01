@@ -1804,6 +1804,16 @@
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
   }
+  // ---------- Monitor > Graph auto-save (TASK-971) ----------
+  var gAutoPngTimer = null, gAutoCsvTimer = null;
+  function toggleAutoPng(chip) {
+    if (gAutoPngTimer) { clearInterval(gAutoPngTimer); gAutoPngTimer = null; chip.classList.remove('on'); }
+    else { gAutoPngTimer = setInterval(exportPng, 300000); chip.classList.add('on'); }   // every 5 min
+  }
+  function toggleAutoCsv(chip) {
+    if (gAutoCsvTimer) { clearInterval(gAutoCsvTimer); gAutoCsvTimer = null; chip.classList.remove('on'); }
+    else { gAutoCsvTimer = setInterval(exportCsv, 300000); chip.classList.add('on'); }   // every 5 min
+  }
 
   // ---------- Monitor > Log power-features (TASK-970) ----------
   function downloadLog() {
@@ -1976,14 +1986,14 @@
         downloadBlob(new Blob([logBuf.join('\n')], { type: 'text/plain' }), 'otgw-log-' + ts() + '.txt');
       });
     });
-    document.querySelectorAll('#mgraph .tchip').forEach(function (ch) {
+    document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (ch) {
       ch.addEventListener('click', function () {
         // Parse the leading number + unit. indexOf('4') used to match the '4' in
         // '24 h' and silently apply a 4 h window to the 24 h chip.
         var t = ch.textContent.toLowerCase();
         var n = parseInt(t, 10) || 1;
         graphWindowMs = /min/.test(t) ? n * 60000 : n * 3600000;
-        document.querySelectorAll('#mgraph .tchip').forEach(function (x) { x.classList.toggle('on', x === ch); });
+        document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (x) { x.classList.toggle('on', x === ch); });
         if (isMonitorVisible('mgraph')) renderGraph();
       });
     });
@@ -1991,6 +2001,10 @@
       if (/png/i.test(b.textContent)) b.addEventListener('click', exportPng);
       else if (/csv/i.test(b.textContent)) b.addEventListener('click', exportCsv);
     });
+    var apng = document.getElementById('chipAutoPng');   // TASK-971
+    if (apng) apng.addEventListener('click', function () { toggleAutoPng(apng); });
+    var acsv = document.getElementById('chipAutoCsv');
+    if (acsv) acsv.addEventListener('click', function () { toggleAutoCsv(acsv); });
     fetchSeed(); fetchSatStatus(); fetchWeather();
     setInterval(function () { if (!ws || ws.readyState !== 1) fetchSeed(); }, 20000);
     setInterval(fetchSatStatus, 30000);
