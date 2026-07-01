@@ -51,7 +51,7 @@
   .headerrow{display:flex;align-items:center;gap:10px;background:var(--nav);
     color:#fff;padding:10px 14px;font-weight:700;box-shadow:var(--shadow);flex-wrap:wrap}
   html[data-theme="dark"] .headerrow{color:#e8e8ea}
-  .headerrow .big{font-size:1.05rem;margin-right:auto}
+  .headerrow .big{font-size:1.05rem}
   .headerrow .sub{font-weight:400;opacity:.9;font-size:.8rem}
   .theme-toggle{cursor:pointer;user-select:none;border:1px solid rgba(255,255,255,.4);
     border-radius:8px;padding:8px 12px;font-size:.85rem;min-height:40px}
@@ -63,6 +63,120 @@
   .seg b{font-size:.92rem}
   .seg small{font-size:.66rem;opacity:.85;letter-spacing:.04em;text-transform:uppercase}
   .seg.active{background:var(--bg);color:var(--text)}
+
+  /* ---- firmware-authentic header identity + status badges ---- */
+  .headerrow .hdr-id{font-family:var(--font-mono);font-size:.72rem;font-weight:600;
+    display:inline-flex;align-items:center;
+    opacity:.95;background:rgba(255,255,255,.16);border-radius:6px;padding:3px 8px}
+  .hdr-net{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .hdr-id small{font-weight:600;opacity:.6;font-size:.62rem;margin-left:2px}
+  .hdr-id .cdot{width:7px;height:7px;border-radius:50%;background:var(--zone-ok);box-shadow:0 0 6px var(--zone-ok);margin-right:5px}
+  .hdr-id .wbars{display:inline-flex;align-items:flex-end;gap:2px;height:13px;margin-right:5px}
+  .hdr-id .wbars i{width:3px;background:var(--zone-ok);border-radius:1px}
+  .hdr-status{font-size:.66rem;font-weight:700;border-radius:20px;padding:4px 10px;
+    display:inline-flex;align-items:center;gap:6px;white-space:nowrap;line-height:1;
+    background:color-mix(in srgb,var(--zone-ok) 28%,transparent);color:#fff}
+  .hdr-status.down{background:color-mix(in srgb,var(--zone-alert) 30%,transparent)}
+  .hdr-status .hdr-dot{width:7px;height:7px;border-radius:50%;background:var(--zone-ok);box-shadow:0 0 6px var(--zone-ok)}
+  .hdr-status.down .hdr-dot{background:var(--zone-alert);box-shadow:0 0 6px var(--zone-alert)}
+  .hdr-sim{font-size:.66rem;font-weight:700;border-radius:20px;padding:4px 10px;white-space:nowrap;
+    line-height:1;display:inline-flex;align-items:center;letter-spacing:.03em;
+    background:color-mix(in srgb,var(--zone-warn) 82%,#000);color:#fff}
+  .hdr-sim.hidden{display:none}
+  html[data-theme="dark"] .headerrow .hdr-id{background:rgba(255,255,255,.09)}
+  .hdr-spacer{margin-left:auto}
+  .fw-badge{font-size:.66rem;font-weight:700;letter-spacing:.02em;border-radius:20px;
+    padding:4px 10px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;line-height:1}
+  .fw-conn{background:color-mix(in srgb,var(--zone-ok) 34%,transparent);color:#fff}
+  .fw-conn.down{background:color-mix(in srgb,var(--zone-alert) 42%,transparent)}
+  .fw-mode{background:rgba(255,255,255,.2);color:#fff}
+  .fw-sim{background:color-mix(in srgb,var(--zone-warn) 82%,#000);color:#fff}
+  .fw-badge.hidden{display:none}
+
+  /* ---- home device-identity strip ---- */
+  .devid{display:grid;grid-template-columns:repeat(auto-fit,minmax(158px,1fr));gap:10px;margin:0 0 14px}
+  .devid-item{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    box-shadow:var(--shadow);padding:10px 13px;display:flex;flex-direction:column;gap:4px}
+  .devid-item .k{font-size:.61rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .devid-item .v{font-family:var(--font-mono);font-size:.9rem;font-weight:700;display:flex;
+    align-items:center;gap:6px;flex-wrap:wrap;color:var(--text)}
+  .devid-item .v small{font-family:var(--font-sans);font-size:.64rem;font-weight:600;color:var(--muted)}
+  .wbars{display:inline-flex;align-items:flex-end;gap:2px;height:14px}
+  .wbars i{width:3px;background:var(--zone-ok);border-radius:1px}
+  .wbars i.off{background:var(--gauge-track)}
+  .devid-item .cdot{width:8px;height:8px;border-radius:50%;background:var(--zone-ok);box-shadow:0 0 6px var(--zone-ok)}
+
+  /* ---- Advanced pages (PIC / Debug / FSexplorer) ---- */
+  .adv-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;margin:0 0 14px}
+  .adv-card h4{margin:0 0 12px;font-size:.95rem}
+  .pic-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+  .pic-head>div{display:flex;flex-direction:column;gap:3px}
+  .pic-head .k{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .pic-head b{font-family:var(--font-mono);font-size:1.05rem}
+  .pic-banner{border-radius:10px;padding:10px 14px;font-size:.84rem;font-weight:700;margin-bottom:12px}
+  .pic-banner.warn{background:color-mix(in srgb,var(--zone-warn) 16%,transparent);
+    border:1px solid color-mix(in srgb,var(--zone-warn) 50%,transparent);color:var(--zone-warn)}
+  .pic-banner.ok{background:color-mix(in srgb,var(--zone-ok) 14%,transparent);
+    border:1px solid color-mix(in srgb,var(--zone-ok) 45%,transparent);color:var(--zone-ok)}
+  .pictable{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  .picrow{display:grid;grid-template-columns:1fr 70px 80px 44px 44px;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.84rem}
+  .picrow:last-child{border-bottom:0}
+  .picrow.head{background:var(--panel-2);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+  .picrow .fname{font-family:var(--font-mono);font-weight:700}
+  .picrow .fver,.picrow .fsize{font-family:var(--font-mono);color:var(--muted)}
+  .picrow.newer .fver{color:var(--zone-ok)}
+  .picbtn{width:34px;height:34px;border:1px solid var(--border);background:var(--panel-2);border-radius:8px;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:var(--text)}
+  .picbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .pic-progress{margin:14px 0 0}
+  .pic-progress .track{height:12px;background:var(--gauge-track);border-radius:6px;overflow:hidden}
+  .pic-progress .fill{height:100%;width:0;background:var(--accent);border-radius:6px;transition:width .25s}
+  .pic-progress .lbl{font-size:.76rem;color:var(--muted);margin-top:6px}
+  .prtable{display:grid;grid-template-columns:1fr auto;gap:7px 14px;font-size:.82rem}
+  .prtable .prk{color:var(--muted)}
+  .prtable .prv{font-family:var(--font-mono);text-align:right;font-weight:700}
+  .devinfo-group{margin:0 0 14px}
+  .devinfo-group h4{margin:0 0 8px 2px;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+  .devinfo-rows{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  .devinforow{display:grid;grid-template-columns:1fr auto;gap:12px;padding:9px 14px;border-bottom:1px solid var(--border);font-size:.83rem}
+  .devinforow:last-child{border-bottom:0}
+  .devinforow:nth-child(even){background:color-mix(in srgb,var(--panel-2) 55%,transparent)}
+  .devinfocolumn1{color:var(--muted)}
+  .devinfocolumn2{font-family:var(--font-mono);font-weight:700;text-align:right;color:var(--text)}
+  .crashlog-ok{display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--zone-ok) 12%,transparent);
+    border:1px solid color-mix(in srgb,var(--zone-ok) 40%,transparent);color:var(--zone-ok);
+    border-radius:10px;padding:10px 14px;font-size:.84rem;font-weight:700;margin-bottom:14px}
+  .fs-title{margin:0 0 10px;font-size:1.05rem}
+  .fs-crumb{font-family:var(--font-mono);font-size:.82rem;font-weight:700;margin:0 0 8px;color:var(--text)}
+  .fstable{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;overflow:hidden;box-shadow:var(--shadow);font-size:.83rem}
+  .fstable td{padding:8px 12px;border-bottom:1px solid var(--border)}
+  .fstable tr:last-child td{border-bottom:0}
+  .fstable tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+  .fstable .fn{font-family:var(--font-mono);font-weight:700}
+  .fstable .fn.dir{color:var(--accent);cursor:pointer}
+  .fstable .fsz{font-family:var(--font-mono);color:var(--muted);white-space:nowrap}
+  .fstable a.fsact{color:var(--accent);text-decoration:none;font-weight:600;font-size:.78rem;cursor:pointer}
+  .fstable a.del{color:var(--zone-alert)}
+  .fs-usage{margin:12px 0 4px;font-size:.82rem;color:var(--muted)}
+  .fs-usage b{color:var(--text)}
+  .fs-bar{height:10px;background:var(--gauge-track);border-radius:5px;overflow:hidden;margin-bottom:16px}
+  .fs-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
+  .fs-upload{background:var(--panel-2);border:1px dashed var(--border);border-radius:12px;padding:14px 16px;margin:0 0 16px}
+  .fs-upload legend{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .fs-upload .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .fs-actions{border-top:2px solid var(--border);padding-top:14px}
+  .fs-actions h4{margin:0 0 10px;font-size:.95rem}
+  .fs-btnrow{display:flex;gap:10px;flex-wrap:wrap}
+  .fs-btn{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;
+    padding:11px 16px;font-size:.85rem;font-weight:700;cursor:pointer;min-height:44px;
+    font-family:var(--font-sans);transition:transform .15s,box-shadow .15s}
+  .fs-btn:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.15)}
+  .fs-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+  .fs-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .fs-btn.danger{border-color:color-mix(in srgb,var(--zone-alert) 55%,var(--border));color:var(--zone-alert)}
+  .fs-btn.danger:hover{background:color-mix(in srgb,var(--zone-alert) 12%,transparent)}
 
   .wrap{max-width:1020px;margin:0 auto;padding:16px}
   .design{display:none}
@@ -250,6 +364,36 @@
     border-radius:20px;padding:9px 16px;font-size:.82rem;cursor:pointer;min-height:40px;
     font-family:var(--font-sans)}
   .cchip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  /* home concept picker — one unobtrusive control (mockup-only; in production this is a Settings pref or a single shipped view) */
+  .viewpick{position:relative;display:flex;justify-content:flex-end;margin:0 0 12px}
+  .viewpick-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--panel);
+    color:var(--text);border-radius:10px;padding:8px 12px;font-size:.82rem;font-weight:600;cursor:pointer;
+    font-family:var(--font-sans);min-height:40px}
+  .viewpick-btn .vp-car{opacity:.55;font-size:.7rem;margin-left:1px}
+  .viewpick-btn .vp-lead{color:var(--muted);font-weight:600}
+  .viewpick-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;background:var(--panel);
+    border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 16px rgba(0,0,0,.2);padding:6px;
+    display:none;min-width:210px}
+  .viewpick-menu.show{display:block}
+  .vp-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:none;
+    color:var(--text);border-radius:8px;padding:9px 11px;font-size:.85rem;cursor:pointer;font-family:var(--font-sans);min-height:40px}
+  .vp-item:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+  .vp-item .vp-chk{width:1em;font-size:.8rem;color:var(--accent);opacity:0}
+  .vp-item.active{font-weight:700}
+  .vp-item.active .vp-chk{opacity:1}
+  .vp-item small{display:block;color:var(--muted);font-size:.7rem;font-weight:400;margin-top:1px}
+  .ovr-badge{border:1.5px solid var(--zone-warn);background:color-mix(in srgb,var(--zone-warn) 16%,var(--panel));
+    color:var(--zone-warn);border-radius:20px;padding:5px 12px;font-size:.76rem;font-weight:700;cursor:pointer;
+    font-family:var(--font-sans);min-height:32px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .ovr-badge.hidden{display:none}
+  .wh-form{display:grid;grid-template-columns:1fr;gap:10px;max-width:620px}
+  .wh-row{display:grid;grid-template-columns:170px 1fr;align-items:center;gap:12px;font-size:.85rem;font-weight:600}
+  .wh-row>span{color:var(--muted)}
+  .wh-in{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:8px;
+    padding:9px 11px;font-size:.85rem;font-family:var(--font-mono);min-height:40px;width:100%}
+  .wh-actions{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+  .wh-status{font-size:.8rem;color:var(--muted);font-family:var(--font-mono)}
+  .wh-status.ok{color:var(--zone-ok)}
 
   /* ================= MONITOR page ================= */
   .subtabs{display:flex;gap:6px;margin:2px 0 14px;flex-wrap:wrap}
@@ -259,8 +403,7 @@
   .subtab.active{background:var(--accent);border-color:var(--accent);color:#fff}
   .mpanel{display:none}
   .mpanel.active{display:block}
-  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
-  .tbtn{border:1px solid var(--border);background:var(--panel);color:var(--text);
+  .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}  .tbtn{border:1px solid var(--border);background:var(--panel);color:var(--text);
     border-radius:9px;padding:8px 14px;font-size:.8rem;cursor:pointer;min-height:40px}
   .tsearch{flex:1;min-width:140px;border:1px solid var(--border);background:var(--panel);
     color:var(--text);border-radius:9px;padding:8px 12px;font-size:.85rem;min-height:40px}
@@ -272,6 +415,13 @@
     font-size:.74rem;line-height:1.55;color:#c7d1da}
   .console .t{color:#00bffe}.console .b{color:#79f2c0}.console .ts{color:#566069}
   .console .err{color:#ff5a4d}
+  .console .cmd{color:#ffd479}.console .rsp{color:#9a9a9e}
+  .cmdbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;background:#0a0e14;border:1px solid var(--border);border-radius:10px;padding:6px 8px 6px 12px}
+  .cmdbar-prompt{font-family:var(--font-mono);font-size:.8rem;color:#79f2c0;font-weight:700;flex:0 0 auto}
+  .cmdbar-in{flex:1;min-width:0;background:none;border:0;outline:none;color:#e8e8ea;font-family:var(--font-mono);font-size:.8rem;padding:6px 2px}
+  .cmdbar-in::placeholder{color:#566069}
+  .cmdbar-send{flex:0 0 auto;border:0;background:var(--accent);color:#fff;border-radius:8px;padding:8px 16px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:var(--font-sans);min-height:36px}
+  .cmdbar-send:hover{filter:brightness(1.08)}
   .statfoot{display:flex;gap:16px;font-size:.76rem;color:var(--muted);padding:8px 4px 0;flex-wrap:wrap}
   table.stats{width:100%;border-collapse:collapse;background:var(--panel);border-radius:12px;
     overflow:hidden;box-shadow:var(--shadow);font-size:.84rem}
@@ -382,6 +532,7 @@
   .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;
     background:#fff;border-radius:50%;transition:left .2s}
   .sw:checked::after{left:22px}
+  .sat-switch{display:inline-flex;align-items:center;gap:9px;font-size:.85rem;font-weight:700;color:var(--text);cursor:pointer;user-select:none}
   .set-search{width:100%;border:1px solid var(--border);background:var(--panel);color:var(--text);
     border-radius:11px;padding:11px 14px;font-size:.9rem;margin:0 0 14px;min-height:44px}
   .savebar{position:sticky;bottom:10px;display:none;align-items:center;gap:12px;
@@ -443,6 +594,15 @@
   .st-ok{--s:var(--zone-ok)} .st-warn{--s:var(--zone-warn)} .st-down{--s:var(--zone-alert)}
   .st-off{--s:var(--tile-off)} .st-unknown{--s:var(--muted)} .st-mode{--s:var(--accent)}
   .connstrip{display:flex;gap:8px;background:var(--nav);padding:0 12px 12px;overflow-x:auto}
+  .connsum{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;border:0;border-radius:20px;
+    padding:7px 14px;cursor:pointer;color:#fff;font-size:.78rem;font-weight:700;font-family:var(--font-sans);
+    min-height:36px;white-space:nowrap;background:color-mix(in srgb,var(--zone-ok) 30%,var(--nav))}
+  html[data-theme="dark"] .connsum{color:#e8e8ea}
+  .connsum.warn{background:color-mix(in srgb,var(--zone-warn) 32%,var(--nav))}
+  .connsum.down{background:color-mix(in srgb,var(--zone-alert) 34%,var(--nav))}
+  .connsum .d{width:9px;height:9px;border-radius:50%;background:var(--zone-ok)}
+  .connsum.warn .d{background:var(--zone-warn)} .connsum.down .d{background:var(--zone-alert)}
+  .connsum .go{opacity:.7;font-weight:600}
   .connpill{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.16);
     border:0;border-radius:20px;padding:7px 12px;cursor:pointer;color:#fff;font-size:.78rem;
     font-family:var(--font-sans);min-height:36px;white-space:nowrap}
@@ -587,9 +747,18 @@
 <body>
 
 <div class="headerrow">
-  <span class="big">OTGW firmware <span class="sub">· opening-page concepts</span></span>
-  <span class="sim-tag" title="Design mockup — all values are simulated, not from a real gateway">SIMULATED · MOCKUP</span>
+  <span class="big">OTGW firmware</span>
+  <span class="hdr-net">
+    <span class="hdr-id" id="hdrHost" title="Hostname · firmware version">otgw-a3f1<small>.local</small> · v1.4.2-beta</span>
+    <span class="hdr-id" id="hdrNet" title="IP 192.168.1.50 (DHCP) · Wi-Fi HomeNet-2G · −58 dBm · 84%"><span class="cdot"></span>192.168.1.50<span class="wbars" style="margin-left:8px"><i style="height:4px"></i><i style="height:7px"></i><i style="height:10px"></i><i style="height:13px"></i></span></span>
+  </span>
+  <span class="hdr-spacer"></span>
+  <span class="hdr-status" id="hdrStatus" title="Connected · Monitor mode">
+    <span class="hdr-dot"></span><span id="hdrStatMode">Monitor</span>
+  </span>
+  <span class="hdr-sim" id="hdrSim">SIMULATION</span>
   <span class="sub" id="clock">--:--:--</span>
+  <span class="sim-tag" title="Design mockup — all values are simulated, not from a real gateway">MOCKUP</span>
   <span class="theme-toggle" id="themeToggle">🌙 Dark</span>
 </div>
 <div class="switcher">
@@ -597,6 +766,7 @@
   <button class="seg" data-page="sat"><b>SAT</b><small>thermostat · control · technical</small></button>
   <button class="seg" data-page="monitor"><b>Monitor</b><small>log · stats · support · graph · connection</small></button>
   <button class="seg" data-page="settings"><b>Settings</b><small>grouped &amp; scannable</small></button>
+  <button class="seg" data-page="advanced"><b>Advanced</b><small>pic · debug · files</small></button>
 </div>
 <!-- always-visible connectivity strip — glance scale; click any pill for the detail map -->
 <div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
@@ -605,10 +775,17 @@
 
 <!-- ════════════════ PAGE: HOME ════════════════ -->
 <div id="page-home" class="page active">
-<div class="cchips">
-  <button class="cchip active" data-design="a">A · System view</button>
-  <button class="cchip" data-design="b">B · At a glance</button>
-  <button class="cchip" data-design="c">C · Mission control</button>
+<!-- device identity now lives in the header top line -->
+<div class="viewpick" id="viewPick">
+  <button class="viewpick-btn" id="viewPickBtn" aria-haspopup="true" aria-expanded="false" title="Choose home view">
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1" y="1" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1"/></svg>
+    <span class="vp-lead">View:</span><span id="viewPickLabel">System view</span><span class="vp-car">▾</span>
+  </button>
+  <div class="viewpick-menu" id="viewPickMenu" role="menu">
+    <button class="vp-item active" data-design="a" role="menuitem"><span class="vp-chk">✓</span><span>System view<small>the heating system, live</small></span></button>
+    <button class="vp-item" data-design="b" role="menuitem"><span class="vp-chk">✓</span><span>At a glance<small>phone-first, one dial</small></span></button>
+    <button class="vp-item" data-design="c" role="menuitem"><span class="vp-chk">✓</span><span>Mission control<small>live strip chart + raw bus</small></span></button>
+  </div>
 </div>
 
 <!-- ============ DESIGN A — SYSTEM VIEW ============ -->
@@ -623,6 +800,7 @@
         <button class="seg2btn active" data-appl="gas">🔥 Boiler</button>
         <button class="seg2btn" data-appl="hp">⚡ Heat pump</button>
       </span>
+      <button class="ovr-badge hidden" id="aOvrBadge" style="margin-left:auto" title="The gateway is injecting values onto the OT bus — click for detail">⛓ <span id="aOvrCount">0</span> injected</button>
     </div>
 
     <svg class="schematic" id="schem" viewBox="0 0 800 470" role="img"
@@ -881,7 +1059,7 @@
 
   <div class="sat-head">
     <div class="sat-title">SAT · Smart Autotune Thermostat <span class="sat-pill" id="satPill">Heating</span></div>
-    <label class="switch" style="margin-left:auto"><input type="checkbox" id="satEnable" checked><span id="satEnableLbl">Enabled</span></label>
+    <label class="sat-switch" style="margin-left:auto"><span id="satEnableLbl">Enabled</span><input type="checkbox" class="sw" id="satEnable" checked></label>
   </div>
 
   <div class="sat-views">
@@ -907,6 +1085,10 @@
           <div class="sat-hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
         </div>
       </div>
+    </div>
+
+    <!-- L2 Control -->
+    <div class="sat-l2">
       <div class="card"><h4>Temperature history <span class="sub">last hour</span></h4>
         <svg viewBox="0 0 600 200" id="satHistChart" preserveAspectRatio="none" style="height:200px"></svg>
         <div class="legend" id="satHistLegend"></div></div>
@@ -918,10 +1100,6 @@
           </div></div>
         <div class="card sat-mini"><h4>Burner cycle mode</h4><div class="ds-seg-row" id="satCycleRow"><button class="ds-seg active">Continuous</button><button class="ds-seg">PWM</button></div><div class="sub">PID drives the burner continuously</div></div>
       </div>
-    </div>
-
-    <!-- L2 Control -->
-    <div class="sat-l2">
       <div class="sat-tiles4">
         <div class="sat-tile"><div class="l">Outside</div><div class="v" id="satOut">8.4°</div></div>
         <div class="sat-tile"><div class="l">Boiler setpoint <span class="tag">SAT → boiler</span></div><div class="v hot" id="satFlowSet">52.0°</div></div>
@@ -960,7 +1138,7 @@
       </div>
       <div class="sat-row2 sat-row-2up">
         <div class="card"><h4>Simulation &amp; diagnostics</h4><div class="kv" id="satSimKv"></div>
-          <label class="switch" style="margin-top:10px"><input type="checkbox" id="satSim"><span>Bench simulation</span></label></div>
+          <label class="sat-switch" style="margin-top:10px"><span>Bench simulation</span><input type="checkbox" class="sw" id="satSim"></label></div>
         <div class="card"><h4><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ Raw data (JSON)</button></h4>
           <pre class="raw-json" id="satRawJson" style="display:none"></pre></div>
       </div>
@@ -1014,6 +1192,11 @@
       <input class="tsearch" id="logSearch" placeholder="Filter frames… (e.g. 19, Boiler, DHW)">
       <span class="tchip on" id="chipScroll">Auto-scroll</span>
       <span class="tchip on" id="chipTs">Timestamps</span>
+    </div>
+    <div class="cmdbar" id="otCmdBar">
+      <span class="cmdbar-prompt">PIC &rsaquo;</span>
+      <input class="cmdbar-in" id="otCmdInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Command — e.g. PS=1, TT=20.5, GW=1" aria-label="OTGW command">
+      <button class="cmdbar-send" id="otCmdSend">Send</button>
     </div>
     <div class="console" id="monLog" aria-label="Live OpenTherm log"></div>
     <div class="statfoot">
@@ -1097,10 +1280,10 @@
       <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map">
         <!-- links (drawn first, under the nodes) -->
         <g id="cnLinks">
-          <path id="lk-therm"  class="cn-link" d="M150,86 H300"/>
-          <path id="fl-therm"  class="cn-flow" d="M150,86 H300"/>
-          <path id="lk-boiler" class="cn-link" d="M150,274 H300"/>
-          <path id="fl-boiler" class="cn-flow" d="M150,274 H300"/>
+          <path id="lk-therm"  class="cn-link" d="M150,86 H264 V180 H300"/>
+          <path id="fl-therm"  class="cn-flow" d="M150,86 H264 V180 H300"/>
+          <path id="lk-boiler" class="cn-link" d="M150,274 H264 V180 H300"/>
+          <path id="fl-boiler" class="cn-flow" d="M150,274 H264 V180 H300"/>
           <path id="lk-wifi"   class="cn-link" d="M470,180 H560"/>
           <path id="fl-wifi"   class="cn-flow" d="M470,180 H560"/>
           <path id="lk-mqtt"   class="cn-link" d="M700,150 V104 H760"/>
@@ -1158,6 +1341,11 @@
           <circle class="cn-statedot" id="dot-ws" cx="808" cy="278" r="7"/>
         </g>
         <text class="cn-sub" x="760" y="344">This browser</text>
+        <!-- override signal: the gateway injecting values onto the OT bus (click for detail) -->
+        <g id="cnOvr" style="cursor:pointer" role="button" aria-label="Active gateway overrides — click for detail">
+          <rect x="200" y="167" width="96" height="26" rx="13" fill="color-mix(in srgb,var(--zone-warn) 16%,var(--panel))" stroke="var(--zone-warn)" stroke-width="1.5"/>
+          <text id="cnOvrTxt" x="248" y="184" text-anchor="middle" font-size="12" font-weight="700" fill="var(--zone-warn)" font-family="var(--font-sans)">⛓ 2 injected</text>
+        </g>
       </svg>
     </div>
 
@@ -1187,6 +1375,160 @@
   </div>
 </div><!-- /page-settings -->
 
+<!-- ════════════════ PAGE: ADVANCED (PIC · Debug · File system) ════════════════ -->
+<div id="page-advanced" class="page">
+  <p class="concept-cap"><b>Advanced — the firmware's <span style="font-family:var(--font-mono)">Advanced ▾</span> dropdown, made scannable.</b>
+  The three power-user screens behind the Advanced menu: flash the OTGW <b>PIC firmware</b>, read the full
+  <b>Debug Information</b> dump, and browse the <b>File System</b> (LittleFS) with its system-action buttons.</p>
+
+  <div class="subtabs" id="advTabs">
+    <button class="subtab active" data-adv="pic">PIC firmware</button>
+    <button class="subtab" data-adv="debug">Debug Information</button>
+    <button class="subtab" data-adv="files">File System</button>
+    <button class="subtab" data-adv="system">System</button>
+  </div>
+
+  <!-- ---- PIC firmware ---- -->
+  <div id="adv-pic" class="mpanel active">
+    <div class="pic-head">
+      <div><span class="k">PIC Device</span><b>16F1847</b></div>
+      <div><span class="k">PIC Type</span><b>gateway</b></div>
+      <div><span class="k">PIC Firmware Version</span><b>6.3</b></div>
+    </div>
+    <div class="pic-banner warn">PIC firmware update available: 6.3 → 6.4</div>
+    <div class="pictable">
+      <div class="picrow head"><span>Firmware name</span><span>Version</span><span>Size</span><span></span><span></span></div>
+      <div class="picrow newer">
+        <span class="fname">gateway.hex</span><span class="fver">6.4</span><span class="fsize">39.2 KB</span>
+        <span class="picbtn" title="Refresh version from web" data-refresh="gateway.hex">⟳</span>
+        <span class="picbtn" title="Flash onto PIC" data-flash="gateway.hex">⇩</span>
+      </div>
+      <div class="picrow">
+        <span class="fname">interface.hex</span><span class="fver">4.4</span><span class="fsize">32.8 KB</span>
+        <span class="picbtn" title="Refresh version from web" data-refresh="interface.hex">⟳</span>
+        <span class="picbtn" title="Flash onto PIC" data-flash="interface.hex">⇩</span>
+      </div>
+      <div class="picrow">
+        <span class="fname">diagnose.hex</span><span class="fver">2.1</span><span class="fsize">12.4 KB</span>
+        <span class="picbtn" title="Refresh version from web" data-refresh="diagnose.hex">⟳</span>
+        <span class="picbtn" title="Flash onto PIC" data-flash="diagnose.hex">⇩</span>
+      </div>
+    </div>
+    <div class="pic-progress">
+      <div class="track"><div class="fill" id="picFill"></div></div>
+      <div class="lbl" id="picLbl">Idle — pick a firmware above and tap ⇩ to flash the PIC (simulated).</div>
+    </div>
+    <div class="adv-card" style="margin-top:14px">
+      <h4>Gateway settings <span style="font-weight:400;color:var(--muted);font-size:.8rem">· cached PR= values</span></h4>
+      <div class="prtable">
+        <span class="prk">PIC firmware version</span><span class="prv">6.3</span>
+        <span class="prk">Build date</span><span class="prv">2023-11-02</span>
+        <span class="prk">Clock speed</span><span class="prv">4 MHz</span>
+        <span class="prk">Reset cause</span><span class="prv">By command (GW=R)</span>
+        <span class="prk">Thermostat detected</span><span class="prv">Yes</span>
+        <span class="prk">Voltage reference</span><span class="prv">Internal</span>
+        <span class="prk">Standalone interval</span><span class="prv">10 s</span>
+        <span class="prk">Gateway/Monitor mode</span><span class="prv">Gateway</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- Debug Information ---- -->
+  <div id="adv-debug" class="mpanel">
+    <div class="crashlog-ok">✓ No crash logs recorded since last boot.</div>
+    <div class="devinfo-group"><h4>Firmware</h4><div class="devinfo-rows">
+      <div class="devinforow"><div class="devinfocolumn1">Firmware Version</div><div class="devinfocolumn2">v1.4.2-beta</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Compiled On</div><div class="devinfocolumn2">Jun 12 2026 14:03:11</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">PIC Firmware Version</div><div class="devinfocolumn2">6.3</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">PIC Firmware Type</div><div class="devinfocolumn2">gateway</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">PIC Device ID</div><div class="devinfocolumn2">16F1847</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Board Type</div><div class="devinfocolumn2">NodoShop ESP8266</div></div>
+    </div></div>
+    <div class="devinfo-group"><h4>Network</h4><div class="devinfo-rows">
+      <div class="devinforow"><div class="devinfocolumn1">Hostname (.local)</div><div class="devinfocolumn2">otgw-a3f1</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">IP Address</div><div class="devinfocolumn2">192.168.1.50</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">MAC Address</div><div class="devinfocolumn2">A3:F1:2C:9E:44:1B</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Wi-Fi Network (SSID)</div><div class="devinfocolumn2">HomeNet-2G</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Wi-Fi Signal Strength (dBm)</div><div class="devinfocolumn2">−58</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Wi-Fi Quality</div><div class="devinfocolumn2">Good (84%)</div></div>
+    </div></div>
+    <div class="devinfo-group"><h4>Hardware</h4><div class="devinfo-rows">
+      <div class="devinforow"><div class="devinfocolumn1">Unique Chip ID</div><div class="devinfocolumn2">0x009E441B</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Arduino Core Version</div><div class="devinfocolumn2">3.1.2</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Espressif SDK Version</div><div class="devinfocolumn2">2.2.2-dev</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">CPU Speed (MHz)</div><div class="devinfocolumn2">160</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Flash Chip Size (MB)</div><div class="devinfocolumn2">4.0</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">LittleFS Size (MB)</div><div class="devinfocolumn2">2.0</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Flash Mode</div><div class="devinfocolumn2">DIO</div></div>
+    </div></div>
+    <div class="devinfo-group"><h4>Memory &amp; uptime</h4><div class="devinfo-rows">
+      <div class="devinforow"><div class="devinfocolumn1">Free Heap Memory (bytes)</div><div class="devinfocolumn2">24,880</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Max. Free Block (bytes)</div><div class="devinfocolumn2">16,104</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Heap Fragmentation (%)</div><div class="devinfocolumn2">12</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Uptime Since Boot</div><div class="devinfocolumn2">3d 07:42:19</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Number of Reboots</div><div class="devinfocolumn2">14</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">Last Reset Reason</div><div class="devinfocolumn2">External System</div></div>
+    </div></div>
+    <div class="devinfo-group"><h4>Integrations</h4><div class="devinfo-rows">
+      <div class="devinforow"><div class="devinfocolumn1">MQTT Connected</div><div class="devinfocolumn2">Yes</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">MQTT Enabled</div><div class="devinfocolumn2">Yes</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">NTP Enabled</div><div class="devinfocolumn2">Yes</div></div>
+      <div class="devinforow"><div class="devinfocolumn1">NTP Timezone</div><div class="devinfocolumn2">Europe/Amsterdam</div></div>
+    </div></div>
+  </div>
+
+  <!-- ---- File System (FSexplorer) ---- -->
+  <div id="adv-files" class="mpanel">
+    <h3 class="fs-title">FSexplorer — file system contents</h3>
+    <div class="fs-crumb">Current directory: /</div>
+    <table class="fstable"><tbody>
+      <tr><td class="fn dir" data-dir="fonts/">fonts/</td><td class="fsz">&lt;DIR&gt;</td><td></td><td></td></tr>
+      <tr><td class="fn">index.html</td><td class="fsz">14.0 KB</td><td><a class="fsact">Download</a></td><td></td></tr>
+      <tr><td class="fn">index.js</td><td class="fsz">214 KB</td><td><a class="fsact">Download</a></td><td></td></tr>
+      <tr><td class="fn">index.css</td><td class="fsz">11.2 KB</td><td><a class="fsact">Download</a></td><td></td></tr>
+      <tr><td class="fn">FSexplorer.html</td><td class="fsz">6.9 KB</td><td><a class="fsact">Download</a></td><td></td></tr>
+      <tr><td class="fn">graph.js</td><td class="fsz">44.1 KB</td><td><a class="fsact">Download</a></td><td><a class="fsact del" data-del="graph.js">Delete</a></td></tr>
+      <tr><td class="fn">favicon.ico</td><td class="fsz">3.6 KB</td><td><a class="fsact">Download</a></td><td><a class="fsact del" data-del="favicon.ico">Delete</a></td></tr>
+      <tr><td class="fn">settings.ini</td><td class="fsz">2.4 KB</td><td><a class="fsact">Download</a></td><td><a class="fsact del" data-del="settings.ini">Delete</a></td></tr>
+      <tr><td class="fn">mqttha.cfg</td><td class="fsz">1.1 KB</td><td><a class="fsact">Download</a></td><td><a class="fsact del" data-del="mqttha.cfg">Delete</a></td></tr>
+      <tr><td class="fn">otgw-firmware.log</td><td class="fsz">128 KB</td><td><a class="fsact">Download</a></td><td><a class="fsact del" data-del="otgw-firmware.log">Delete</a></td></tr>
+    </tbody></table>
+    <div class="fs-usage"><b>LittleFS</b> used <b>1.3 MB</b> of <b>2.0 MB</b> — 0.7 MB free</div>
+    <div class="fs-bar"><i style="width:65%"></i></div>
+    <fieldset class="fs-upload">
+      <legend>Upload file</legend>
+      <div class="row">
+        <input type="file">
+        <button class="fs-btn" disabled style="min-height:38px;padding:8px 16px">Upload</button>
+        <span style="font-size:.76rem;color:var(--muted)">0.7 MB free · files land in the current directory</span>
+      </div>
+    </fieldset>
+  </div>
+
+  <!-- ---- System actions ---- -->
+  <div id="adv-system" class="mpanel">
+    <div class="adv-card" style="margin-bottom:14px">
+      <h4>Device status</h4>
+      <div class="fs-btnrow" style="gap:8px">
+        <span class="fw-badge fw-conn" id="sysConn" title="Live WebSocket link to the gateway">● Connected</span>
+        <span class="fw-badge fw-mode" id="sysMode" title="Gateway mode: actively rewrites OpenTherm messages">⇄ Gateway</span>
+        <span class="fw-badge fw-sim" id="sysSim" title="Simulation active: OT replay + Dallas sensors">SIMULATION</span>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0">Live gateway link, current OT-rewrite mode, and simulation state.</p>
+    </div>
+    <div class="fs-actions" style="border-top:0;padding-top:0">
+      <h4>System Actions <span style="font-weight:400;color:var(--muted);font-size:.8rem">· device-wide</span></h4>
+      <div class="fs-btnrow">
+        <button class="fs-btn primary" data-act="update">Update Firmware</button>
+        <button class="fs-btn" data-act="reboot">ReBoot</button>
+        <button class="fs-btn danger" data-act="resetwifi">Reset Wireless</button>
+        <button class="fs-btn" data-act="home">Home</button>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0"><b>Update Firmware</b> → OTA sketch upload · <b>ReBoot</b> → restart the ESP · <b>Reset Wireless</b> → clear Wi-Fi &amp; reboot into AP mode · <b>Home</b> → back to the main UI.</p>
+    </div>
+  </div>
+</div><!-- /page-advanced -->
+
 <div class="foot">Design exploration TASK-854 / 855 / 856 · simulated data · self-contained mockup (no libraries, no network)</div>
 </div>
 <div class="toast" id="toast">Settings saved ✓ (simulated)</div>
@@ -1214,7 +1556,7 @@ try{
 var segs=document.querySelectorAll('.seg');
 function showPage(p){
   segs.forEach(function(s){s.classList.toggle('active',s.dataset.page===p);});
-  ['home','sat','monitor','settings'].forEach(function(k){
+  ['home','sat','monitor','settings','advanced'].forEach(function(k){
     document.getElementById('page-'+k).classList.toggle('active',k===p);
   });
   // render the page we just switched to immediately (interval only renders the visible page)
@@ -1225,15 +1567,32 @@ function showPage(p){
 }
 segs.forEach(function(s){s.onclick=function(){showPage(s.dataset.page);};});
 
-var cchips=document.querySelectorAll('.cchip');
+var cchips=document.querySelectorAll('.vp-item');
+var VIEW_LABELS={a:'System view',b:'At a glance',c:'Mission control'};
 function showDesign(d){
   cchips.forEach(function(s){s.classList.toggle('active',s.dataset.design===d);});
   ['a','b','c'].forEach(function(k){
     document.getElementById('design-'+k).classList.toggle('active',k===d);
   });
+  var lbl=document.getElementById('viewPickLabel'); if(lbl) lbl.textContent=VIEW_LABELS[d]||VIEW_LABELS.a;
   try{localStorage.setItem('mock-design',d);}catch(e){}
 }
-cchips.forEach(function(s){s.onclick=function(){showDesign(s.dataset.design);};});
+function closeViewMenu(){
+  var m=document.getElementById('viewPickMenu'); if(m) m.classList.remove('show');
+  var b=document.getElementById('viewPickBtn'); if(b) b.setAttribute('aria-expanded','false');
+}
+cchips.forEach(function(s){s.onclick=function(){showDesign(s.dataset.design);closeViewMenu();};});
+(function(){
+  var btn=document.getElementById('viewPickBtn'), menu=document.getElementById('viewPickMenu');
+  if(btn&&menu){
+    btn.onclick=function(e){ e.stopPropagation();
+      var open=menu.classList.toggle('show');
+      btn.setAttribute('aria-expanded',open?'true':'false'); };
+    document.addEventListener('click',function(e){
+      if(!e.target.closest || !e.target.closest('#viewPick')) closeViewMenu();
+    });
+  }
+})();
 
 var subtabs=document.querySelectorAll('.subtab');
 function showTab(t){
@@ -1339,6 +1698,11 @@ function renderA(){
   var ovrOut=sim.overrides.some(function(o){return o.mark==='aOut';});
   document.getElementById('aRoomSet').textContent='set '+sim.setpoint.toFixed(1)+'°'+(ovrSet?' ⛓':'');
   document.getElementById('aOut').textContent=sim.outside.toFixed(1)+'°'+(ovrOut?' ⛓':'');
+  var aob=document.getElementById('aOvrBadge');
+  if(aob){ var no=(sim.overrides&&sim.overrides.length)||0;
+    aob.classList.toggle('hidden',!no);
+    document.getElementById('aOvrCount').textContent=no;
+    aob.onclick=function(e){ e.stopPropagation(); toggleOvrPanel(); }; }
   document.getElementById('aPress').textContent=sim.pressure.toFixed(2)+' bar';
   var deg=Math.max(0,Math.min(4,sim.pressure))/4*180;
   document.getElementById('aPressNeedle').setAttribute('transform','rotate('+deg.toFixed(1)+',150,322)');
@@ -1479,6 +1843,33 @@ function chipToggle(id,fn){
 chipToggle('chipScroll',function(v){logScroll=v;});
 chipToggle('chipTs',function(v){logTs=v;});
 gel('logSearch').oninput=renderMonLog;
+/* OTGW raw-command bar — echo the command and a simulated PIC acknowledgement into the log */
+(function(){
+  var input=document.getElementById('otCmdInput'), send=document.getElementById('otCmdSend');
+  if(!input||!send) return;
+  function ack(cmd){
+    var c=cmd.toUpperCase();
+    var m=c.match(/^([A-Z]{2})=(.*)$/);
+    if(!m) return 'NG';                       // OTGW replies NG for a bad command
+    return m[1]+': '+m[2];                    // valid commands echo back "CODE: value"
+  }
+  function submit(){
+    var cmd=input.value.trim();
+    if(!cmd) return;
+    var ts=new Date().toTimeString().slice(0,8);
+    frames.push({ts:ts,body:'<span class="cmd">&rsaquo; '+cmd.toUpperCase()+'</span>  sent to PIC',
+                 search:('cmd '+cmd).toLowerCase()});
+    var r=ack(cmd);
+    frames.push({ts:ts,body:'<span class="rsp">&lsaquo; '+r+'</span>'+(r==='NG'?'  <span class="err">unknown command</span>':'  acknowledged'),
+                 search:('rsp '+r).toLowerCase()});
+    if(frames.length>200) frames.splice(0,frames.length-200);
+    input.value='';
+    logPaused=false;                          // make sure the echo is visible
+    renderMonLog();
+  }
+  send.onclick=submit;
+  input.addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); submit(); }});
+})();
 function renderMonLog(){
   if(logPaused) return;
   var q=document.getElementById('logSearch').value.trim().toLowerCase();
@@ -2189,14 +2580,15 @@ function setDefault(f){
 function optPairs(opts){return opts.map(function(o){return Array.isArray(o)?o:[o,o];});}
 function fieldControl(f){
   var v=setDefault(f), ro=f.readonly?' disabled':'';
+  var esc=function(s){return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');};
   if(f.type==='b')
     return '<input type="checkbox" class="sw" data-key="'+f.key+'" data-orig="'+(v?'1':'0')+'"'+(v?' checked':'')+ro+'>';
   if(f.type==='select')
-    return '<select data-key="'+f.key+'" data-orig="'+v+'"'+ro+'>'+optPairs(f.options).map(function(o){
-      return '<option value="'+o[0]+'"'+(String(o[0])===String(v)?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>';
+    return '<select data-key="'+f.key+'" data-orig="'+esc(v)+'"'+ro+'>'+optPairs(f.options).map(function(o){
+      return '<option value="'+esc(o[0])+'"'+(String(o[0])===String(v)?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select>';
   var t=(f.type==='p'||f.hidden)?'password':((f.type==='f'||f.type==='i'||f.type==='n')?'number':'text');
   var ex=(f.min!==undefined?' min="'+f.min+'"':'')+(f.max!==undefined?' max="'+f.max+'"':'')+(f.step!==undefined?' step="'+f.step+'"':'');
-  return '<span class="sfield"><input type="'+t+'" data-key="'+f.key+'" data-orig="'+v+'" value="'+v+'"'+ex+ro+'>'+
+  return '<span class="sfield"><input type="'+t+'" data-key="'+f.key+'" data-orig="'+esc(v)+'" value="'+esc(v)+'"'+ex+ro+'>'+
     (f.unit?'<span class="sunit">'+f.unit+'</span>':'')+'</span>';
 }
 function catFieldCount(c){return c.groups.reduce(function(a,g){return a+g.fields.length+(g.roster?g.roster.length:0);},0);}
@@ -2388,28 +2780,36 @@ function connRecency(c){
   return '';
 }
 function renderConnStrip(){
-  // glance scale: the six that matter most, worst-first feel via state colour
-  var order=['ws','mode','mqtt','wifi','boiler','therm'];
-  document.getElementById('connStrip').innerHTML=order.map(function(k){
-    var c=conn[k];
-    if(c.s==='mode'){
-      return '<button class="connpill st-mode" data-goconn="1"><span class="d"></span>'+
-        '<span class="pk">'+c.name+'</span><span class="pv">'+c.value.toUpperCase()+'</span></button>';
-    }
-    var short={ws:'Live',mqtt:'MQTT',wifi:'Wi-Fi',boiler:'Boiler',therm:'Thermostat'}[k]||c.name;
-    return '<button class="connpill st-'+c.s+'" data-goconn="1"><span class="d"></span>'+
-      '<span class="pk">'+short+'</span><span class="pv">'+STLABEL[c.s]+'</span></button>';
-  }).join('');
-  // override signal: gateway is injecting values onto the bus
-  if(sim.overrides && sim.overrides.length){
-    document.getElementById('connStrip').insertAdjacentHTML('afterbegin',
-      '<button class="connpill ovr" id="ovrPill"><span class="d"></span>'+
-      '<span class="pk">⛓ Overrides</span><span class="pv">'+sim.overrides.length+'</span></button>');
-    document.getElementById('ovrPill').onclick=function(e){ e.stopPropagation(); toggleOvrPanel(); };
-  }
+  // single health-summary pill — the per-node detail lives on Monitor › Connection
+  var nodes=['ws','mqtt','wifi','boiler','therm'];
+  var worst='ok', issues=0;
+  nodes.forEach(function(k){
+    var s=conn[k].s;
+    if(s==='down'){ worst='down'; issues++; }
+    else if(s==='warn'){ if(worst!=='down') worst='warn'; issues++; }
+  });
+  var cls=worst==='down'?'down':(worst==='warn'?'warn':'');
+  var label=worst==='down'?(issues+' connection issue'+(issues>1?'s':'')):
+            (worst==='warn'?(issues+' degraded'):'All systems connected');
+  document.getElementById('connStrip').innerHTML=
+    '<button class="connsum '+cls+'" data-goconn="1" title="Connectivity health — open the Connection map">'+
+    '<span class="d"></span><span>'+label+'</span><span class="go">· Connection ›</span></button>';
   document.querySelectorAll('[data-goconn]').forEach(function(b){
     b.onclick=function(){showPage('monitor');showTab('mconn');};
   });
+  // keep the firmware-style header status badges in sync with the live model
+  var hc=document.getElementById('sysConn');
+  if(hc){ var wsDown=(conn.ws.s!=='ok'&&conn.ws.s!=='warn');
+    hc.className='fw-badge fw-conn'+(wsDown?' down':'');
+    hc.textContent=(wsDown?'● Disconnected':'● Connected'); }
+  var hm=document.getElementById('sysMode');
+  if(hm){ hm.textContent=(conn.mode.value==='gateway'?'⇄ Gateway':'⇄ Monitor'); }
+  var hs=document.getElementById('hdrStatus');
+  if(hs){ var wd=(conn.ws.s!=='ok'&&conn.ws.s!=='warn');
+    hs.classList.toggle('down',wd);
+    var mode=(conn.mode.value==='gateway'?'Gateway':'Monitor');
+    hs.title=(wd?'Disconnected':'Connected')+' · '+mode+' mode';
+    var md=document.getElementById('hdrStatMode'); if(md) md.textContent=(wd?'Disconnected':mode); }
 }
 function renderOvrPanel(){
   document.getElementById('ovrPanel').innerHTML=
@@ -2429,7 +2829,7 @@ function toggleOvrPanel(){
 // close the override panel when clicking outside it (or its trigger pill)
 document.addEventListener('click',function(e){
   var p=document.getElementById('ovrPanel'); if(!p||!p.classList.contains('show')) return;
-  if(!p.contains(e.target) && !(e.target.closest && e.target.closest('#ovrPill'))) p.classList.remove('show');
+  if(!p.contains(e.target) && !(e.target.closest && (e.target.closest('#cnOvr')||e.target.closest('#aOvrBadge')))) p.classList.remove('show');
 });
 function renderConnMap(){
   setDot('therm',conn.therm.s); setDot('boiler',conn.boiler.s);
@@ -2445,6 +2845,14 @@ function renderConnMap(){
   var modeTxt=conn.mode.value==='gateway'?'GATEWAY MODE':(conn.mode.value==='monitor'?'MONITOR MODE':'MODE: DETECTING');
   document.getElementById('cnModeTxt').textContent=modeTxt;
   document.getElementById('dot-mode').setAttribute('fill',conn.mode.value==='unknown'?STV.unknown:STV.ok);
+  // override signal — the gateway injecting values onto the OT bus, shown on the bus itself
+  var ovrG=document.getElementById('cnOvr');
+  if(ovrG){
+    var n=(sim.overrides&&sim.overrides.length)||0;
+    ovrG.style.display=n?'':'none';
+    var ot=document.getElementById('cnOvrTxt'); if(ot) ot.textContent='⛓ '+n+' injected';
+    ovrG.onclick=function(e){ e.stopPropagation(); toggleOvrPanel(); };
+  }
 }
 function connDetail(c){
   var det=c.detail||'';
@@ -2692,8 +3100,85 @@ function showDiscovery(d){
 function clock(){document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8);}
 buildSupportMatrix();
 buildSettings();
+/* Webhook lives in Settings → Integrations — give its group an inline Send-test-call action */
+(function(){
+  var cat=document.getElementById('cat-webhook'); if(!cat) return;
+  var grp=cat.querySelector('.set-group'); if(!grp) return;
+  var wrap=document.createElement('div');
+  wrap.className='wh-actions';
+  wrap.innerHTML='<button class="fs-btn primary" id="whTest" style="min-height:38px;padding:9px 16px">Send test call</button>'+
+    '<span class="wh-status" id="whStatus">Not fired yet</span>';
+  grp.appendChild(wrap);
+  document.getElementById('whTest').onclick=function(){
+    var st=document.getElementById('whStatus');
+    var en=cat.querySelector('[data-key="WebhookEnabled"]');
+    if(en && en.type==='checkbox' && !en.checked){ st.className='wh-status'; st.textContent='Webhook disabled — enable it above first'; return; }
+    var urlEl=cat.querySelector('[data-key="WebhookURLon"]');
+    var payEl=cat.querySelector('[data-key="WebhookPayload"]');
+    var url=urlEl?urlEl.value:'', payload=(payEl?payEl.value:'').replace('%s','on');
+    st.className='wh-status'; st.textContent='Sending…';
+    setTimeout(function(){
+      var ts=new Date().toTimeString().slice(0,8);
+      st.className='wh-status ok';
+      st.textContent='✓ 200 OK · POST '+url+' · '+payload+' · '+ts+' (simulated)';
+    },600);
+  };
+})();
 renderA();renderB();renderC();renderMonitor();
 renderConnStrip();renderConnMap();renderConnDetail();
+
+/* ---------- ADVANCED pages: PIC · Debug · File system ---------- */
+function showToast(msg,color){
+  var t=document.getElementById('toast'); if(!t) return;
+  t.textContent=msg; t.style.background=color||'var(--zone-ok)';
+  t.classList.add('show'); clearTimeout(window.__toastT);
+  window.__toastT=setTimeout(function(){t.classList.remove('show');},2600);
+}
+document.querySelectorAll('#advTabs .subtab').forEach(function(b){
+  b.onclick=function(){
+    document.querySelectorAll('#advTabs .subtab').forEach(function(x){x.classList.toggle('active',x===b);});
+    ['pic','debug','files','system'].forEach(function(k){
+      var el=document.getElementById('adv-'+k); if(el) el.classList.toggle('active',k===b.dataset.adv);
+    });
+  };
+});
+document.querySelectorAll('#adv-files [data-act], #adv-system [data-act]').forEach(function(b){
+  b.onclick=function(){
+    switch(b.dataset.act){
+      case 'home': showPage('home'); break;
+      case 'update': showToast('Opening OTA firmware update… (simulated)','var(--accent)'); break;
+      case 'reboot': showToast('Device is rebooting… (simulated)','color-mix(in srgb,var(--zone-warn) 82%,#000)'); break;
+      case 'resetwifi': showToast('Wi-Fi cleared — rebooting into AP “OTGW-A3F12C” (simulated)','var(--zone-alert)'); break;
+    }
+  };
+});
+document.querySelectorAll('#adv-files [data-del]').forEach(function(b){
+  b.onclick=function(e){ e.preventDefault();
+    var tr=b.closest('tr');
+    if(tr){ tr.style.transition='opacity .25s'; tr.style.opacity='0'; setTimeout(function(){tr.remove();},250); }
+    showToast('Deleted '+b.dataset.del+' (simulated)','var(--zone-alert)');
+  };
+});
+document.querySelectorAll('#adv-files [data-dir]').forEach(function(b){
+  b.onclick=function(){ showToast('Opening '+b.dataset.dir+' — empty (simulated)','var(--accent)'); };
+});
+document.querySelectorAll('#adv-pic [data-flash]').forEach(function(b){
+  b.onclick=function(){
+    var name=b.dataset.flash, fill=document.getElementById('picFill'), lbl=document.getElementById('picLbl');
+    if(!fill||!lbl) return;
+    clearInterval(window.__picT); var p=0; b.style.pointerEvents='none';
+    window.__picT=setInterval(function(){
+      p+=Math.random()*11+5;
+      if(p>=100){ p=100; clearInterval(window.__picT); lbl.textContent='✓ '+name+' installed — PIC rebooting'; b.style.pointerEvents=''; }
+      else { lbl.textContent='Flashing '+name+'… '+p.toFixed(0)+'%'; }
+      fill.style.width=p.toFixed(0)+'%';
+    },240);
+  };
+});
+document.querySelectorAll('#adv-pic [data-refresh]').forEach(function(b){
+  b.onclick=function(){ showToast('Checked '+b.dataset.refresh+' — latest version fetched (simulated)','var(--accent)'); };
+});
+
 clock();
 setInterval(clock,1000);
 setInterval(function(){
