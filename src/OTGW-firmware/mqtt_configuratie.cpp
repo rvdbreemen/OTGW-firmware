@@ -246,11 +246,16 @@ const char ha_lbl_stats_disc_last_missing[] PROGMEM       = "otgw-firmware/stats
 const char ha_lbl_stats_disc_last_orphan[] PROGMEM        = "otgw-firmware/stats/disc_last_orphan";
 const char ha_lbl_stats_disc_published_topics[] PROGMEM   = "otgw-firmware/stats/disc_published_topics";
 const char ha_lbl_stats_disc_last_verify_epoch[] PROGMEM  = "otgw-firmware/stats/disc_last_verify_epoch";
+const char ha_lbl_stats_ws_fragskips[] PROGMEM            = "otgw-firmware/stats/ws_fragskips";
+const char ha_lbl_stats_mqtt_fragskips[] PROGMEM          = "otgw-firmware/stats/mqtt_fragskips";
+const char ha_lbl_stats_http_fragskips[] PROGMEM          = "otgw-firmware/stats/http_fragskips";
 // Firmware diagnostic labels (TASK-540, faux dataid 248). Plain topic paths.
 const char ha_lbl_fw_reboot_count[]  PROGMEM = "otgw-firmware/reboot_count";
 const char ha_lbl_fw_reboot_reason[] PROGMEM = "otgw-firmware/reboot_reason";
 const char ha_lbl_fw_version[]       PROGMEM = "otgw-firmware/version";
 const char ha_lbl_fw_hostname[]      PROGMEM = "otgw-firmware/hostname";
+const char ha_lbl_fw_uptime[]           PROGMEM = "otgw-firmware/uptime";
+const char ha_lbl_fw_unsupported_msgids[] PROGMEM = "otgw-firmware/boiler/unsupported_msgids";
 // PIC info labels (TASK-540, faux dataid 249). MQTT_HA_FLAG_IS_PIC_ENTRY auto-prepends "otgw-pic/".
 const char ha_lbl_pic_version[]       PROGMEM = "version";
 const char ha_lbl_pic_deviceid[]      PROGMEM = "deviceid";
@@ -551,11 +556,16 @@ const char ha_name_stats_disc_last_missing[] PROGMEM       = "Stats_Discovery_La
 const char ha_name_stats_disc_last_orphan[] PROGMEM        = "Stats_Discovery_Last_Orphan";
 const char ha_name_stats_disc_published_topics[] PROGMEM   = "Stats_Discovery_Published_Topics";
 const char ha_name_stats_disc_last_verify_epoch[] PROGMEM  = "Stats_Discovery_Last_Verify_Epoch";
+const char ha_name_stats_ws_fragskips[] PROGMEM           = "Stats_WS_Frag_Skips";
+const char ha_name_stats_mqtt_fragskips[] PROGMEM         = "Stats_MQTT_Frag_Skips";
+const char ha_name_stats_http_fragskips[] PROGMEM         = "Stats_HTTP_Frag_Skips";
 // Firmware diagnostic friendly names (TASK-540, faux dataid 248)
 const char ha_name_fw_reboot_count[]  PROGMEM = "Reboot_Count";
 const char ha_name_fw_reboot_reason[] PROGMEM = "Reboot_Reason";
 const char ha_name_fw_version[]       PROGMEM = "Firmware_Version";
 const char ha_name_fw_hostname[]      PROGMEM = "Hostname";
+const char ha_name_fw_uptime[]           PROGMEM = "Uptime";
+const char ha_name_fw_unsupported_msgids[] PROGMEM = "Boiler_Unsupported_MsgIDs";
 // PIC info friendly names (TASK-540, faux dataid 249)
 const char ha_name_pic_version[]       PROGMEM = "PIC_Version";
 const char ha_name_pic_deviceid[]      PROGMEM = "PIC_DeviceID";
@@ -632,7 +642,7 @@ const char ha_name_remote_override_program_change_priority[] PROGMEM = "remote_o
 const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storage_slave_fault_indicator";
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
 // ========== Sensor array (289 entries, sorted by id) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 330;
+const uint16_t MQTT_HA_SENSOR_COUNT = 335;  // +5 (uptime, unsupported_msgids, ws/mqtt/http_fragskips)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1064,12 +1074,17 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {247, 0x00, ha_lbl_stats_disc_last_orphan,        ha_name_stats_disc_last_orphan,        HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {247, 0x00, ha_lbl_stats_disc_published_topics,   ha_name_stats_disc_published_topics,   HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
     {247, 0x00, ha_lbl_stats_disc_last_verify_epoch,  ha_name_stats_disc_last_verify_epoch,  HaDeviceClass::none, HaUnit::none,    HaStateClass::measurement,      HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_ws_fragskips,            ha_name_stats_ws_fragskips,            HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_mqtt_fragskips,          ha_name_stats_mqtt_fragskips,          HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
+    {247, 0x00, ha_lbl_stats_http_fragskips,          ha_name_stats_http_fragskips,          HaDeviceClass::none, HaUnit::none,    HaStateClass::total_increasing, HaIcon::counter, HaEntityCat::diagnostic, true},
     // --- Pseudo-ID 248: firmware diagnostics (TASK-540) ---
     // Plain otgw-firmware/* topics; entity_category=diagnostic.
     {248, 0x00, ha_lbl_fw_reboot_count,  ha_name_fw_reboot_count,  HaDeviceClass::none, HaUnit::none, HaStateClass::total_increasing, HaIcon::counter,             HaEntityCat::diagnostic, true},
     {248, 0x00, ha_lbl_fw_reboot_reason, ha_name_fw_reboot_reason, HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {248, 0x00, ha_lbl_fw_version,       ha_name_fw_version,       HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {248, 0x00, ha_lbl_fw_hostname,      ha_name_fw_hostname,      HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    {248, 0x00, ha_lbl_fw_uptime,           ha_name_fw_uptime,           HaDeviceClass::none, HaUnit::s,    HaStateClass::measurement,      HaIcon::timer_outline,       HaEntityCat::diagnostic, true},
+    {248, 0x00, ha_lbl_fw_unsupported_msgids, ha_name_fw_unsupported_msgids, HaDeviceClass::none, HaUnit::none, HaStateClass::none,          HaIcon::information_outline, HaEntityCat::diagnostic, true},
     // --- Pseudo-ID 249: PIC info (TASK-540) ---
     // 0x08 = MQTT_HA_FLAG_IS_PIC_ENTRY → "otgw-pic/" prefix added by streamSensorDiscovery
     // and entries are skipped at publish time when isPICEnabled() is false.
@@ -1418,9 +1433,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     284, // id 245, 4 entries
     288, // id 246, 1 entry
     289, // id 247, 17 entries
-    306, // id 248, 4 entries (TASK-540 firmware diagnostics)
-    310, // id 249, 5 entries (TASK-540 PIC info)
-    315, // id 250, 15 entries (TASK-540 PIC settings)
+    309, // id 248, 6 entries (TASK-540 firmware diagnostics + uptime/unsupported_msgids)
+    315, // id 249, 5 entries (TASK-540 PIC info)
+    320, // id 250, 15 entries (TASK-540 PIC settings)
     0xFFFF, // id 251
     0xFFFF, // id 252
     0xFFFF, // id 253
