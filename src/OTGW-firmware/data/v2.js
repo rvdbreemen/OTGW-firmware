@@ -67,7 +67,7 @@
       el.classList.toggle('active', el.id === t);
     });
     if (t === 'mlog') renderLog();
-    else if (t === 'mstats') renderStats();
+    else if (t === 'mstats') { renderStats(); fetchStatsPanels(); }
     else if (t === 'msupport') renderSupport();
     else if (t === 'mgraph') renderGraph();
     else if (t === 'mconn') { fetchConn(); fetchOtdOvr(); }
@@ -1797,6 +1797,36 @@
       c.toBlob(function (blob) { if (blob) downloadBlob(blob, 'otgw-graph-' + ts() + '.png'); });
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
+  }
+
+  // ---------- Monitor > Statistics > gateway overrides + boiler-unsupported (TASK-969) ----------
+  function statMuted(t) { var d = document.createElement('div'); d.className = 'ble-row'; d.style.color = 'var(--muted)'; d.textContent = t; return d; }
+  function statRow(title, meta) {
+    var row = document.createElement('div'); row.className = 'ble-row';
+    var nm = document.createElement('div'); nm.className = 'ble-nm'; nm.textContent = title;
+    if (meta) { var m = document.createElement('span'); m.className = 'ble-mac'; m.textContent = meta; nm.appendChild(m); }
+    row.appendChild(nm); return row;
+  }
+  function fetchStatsPanels() {
+    fetch(APIGW + 'v2/otgw/overrides').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var el = document.getElementById('ovStatList'); if (!el) return; el.textContent = '';
+      var rows = (j && Array.isArray(j.overrides)) ? j.overrides : [];
+      if (!rows.length) { el.appendChild(statMuted('No active gateway overrides')); return; }
+      rows.forEach(function (r) {
+        var name = (r.friendly && r.friendly.length) ? r.friendly : (r.label || 'Unknown');
+        var kind = (r.kind === 'answer') ? 'answer' : 'substituted';
+        var val = (typeof r.value === 'number') ? r.value.toFixed(2) : r.value;
+        el.appendChild(statRow('MsgID ' + r.id + ' · ' + name, kind + ' = ' + val + ' · ' + r.age_s + 's'));
+      });
+    }).catch(function () { });
+    fetch(APIGW + 'v2/otgw/boiler-support').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var el = document.getElementById('boilerUnsupList'); if (!el) return; el.textContent = '';
+      var rd = (j && Array.isArray(j.unsupported_read)) ? j.unsupported_read : [];
+      var wr = (j && Array.isArray(j.unsupported_write)) ? j.unsupported_write : [];
+      if (!rd.length && !wr.length) { el.appendChild(statMuted('None — boiler supports all observed messages (or no boiler seen).')); return; }
+      function add(arr, mode) { arr.forEach(function (e) { var name = (e.friendly && e.friendly.length) ? e.friendly : (e.label || 'Unknown'); el.appendChild(statRow('MsgID ' + e.id + ' · ' + name, mode)); }); }
+      add(rd, 'read'); add(wr, 'write');
+    }).catch(function () { });
   }
 
   // ---------- Monitor > Debug page (TASK-967) ----------
