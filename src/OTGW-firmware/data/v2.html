@@ -497,7 +497,15 @@
 
   <!-- TASK-967: Debug / crash-log page (parity with Classic "Debug Information"). -->
   <div id="mdebug" class="mpanel">
+    <!-- TASK-968: admin tools/links parity with the Classic Advanced menu. -->
     <div class="set-group">
+      <h3>Tools</h3>
+      <div class="ble-ctrls">
+        <a class="tbtn" href="/FSexplorer">📁 File system</a>
+        <a class="tbtn" href="/update">⬆ Flash firmware / filesystem</a>
+      </div>
+    </div>
+    <div class="set-group" style="margin-top:14px">
       <h3>System / debug info</h3>
       <pre id="dbgInfo" class="console" style="max-height:340px;white-space:pre-wrap">Loading…</pre>
     </div>
