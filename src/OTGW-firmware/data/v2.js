@@ -263,6 +263,22 @@
     return /^[A-Za-z][0-9A-Fa-f]{8}$/.test(raw) ? raw : null;
   }
 
+  // TASK-981: classify a timestamped event/narration line — the lines rawFromLine
+  // drops. The firmware emits these over the same WS log stream with a one-char
+  // prefix after the timestamp: '>' sent command, '<' PIC response, '!' error/NG,
+  // '*' system event, 'S' SAT narration. Returns the colour class for the coloured
+  // kinds, 'evt' for the pushed-but-uncoloured kinds ('*'/'S'), or '' when the line
+  // is not an event line (so arbitrary non-frame text is never mistaken for one).
+  function eventLineClass(line) {
+    if (typeof line !== 'string') return '';
+    var off = 0;
+    var ts = line.match(/^\d{2}:\d{2}:\d{2}\.\d{3,6}\s/);
+    if (ts) off = ts[0].length;
+    var m = line.substring(off).match(/^([><!*S])\s/);
+    if (!m) return '';
+    return m[1] === '>' ? 'cmd' : m[1] === '<' ? 'rsp' : m[1] === '!' ? 'err' : 'evt';
+  }
+
   function onWsMessage(ev) {
     var d = ev.data;
     if (typeof d !== 'string') return;
@@ -275,6 +291,8 @@
       pushLog(d);                   // Monitor > Log console
       updateStats(d, raw);          // Monitor > Stats + OT Support
       if (activeDesign() === 'c') scheduleRender();
+    } else if (eventLineClass(d)) {
+      pushLog(d);                   // TASK-981: sent-command echo / PIC ack / NG into the log
     }
   }
 
@@ -622,7 +640,23 @@
     if (q) lines = lines.filter(function (l) { return l.toLowerCase().indexOf(q) !== -1; });
     if (logSatOnly) lines = lines.filter(function (l) { return SAT_LINE_RE.test(l); });   // TASK-970
     if (!logShowTs) lines = lines.map(function (l) { return l.replace(/^\d{2}:\d{2}:\d{2}\.\d{3,6}\s+/, ''); });
-    el.textContent = lines.join('\n');     // textContent: device data, not HTML
+    // TASK-981: per-line DOM so command-echo lines can be coloured (.cmd/.rsp/.err)
+    // without ever feeding device text to innerHTML. .console is white-space:pre-wrap,
+    // so the '\n' text nodes are the line separators (matches the old join('\n')).
+    // OT frames stay bare text nodes; only the coloured event kinds get a span.
+    el.textContent = '';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < lines.length; i++) {
+      if (i > 0) frag.appendChild(document.createTextNode('\n'));
+      var cls = eventLineClass(lines[i]);
+      if (cls === 'cmd' || cls === 'rsp' || cls === 'err') {
+        var span = document.createElement('span'); span.className = cls; span.textContent = lines[i];
+        frag.appendChild(span);
+      } else {
+        frag.appendChild(document.createTextNode(lines[i]));
+      }
+    }
+    el.appendChild(frag);
     if (logAutoScroll) el.scrollTop = el.scrollHeight;
     var cnt = document.getElementById('logCount'); if (cnt) cnt.textContent = logBuf.length;
     var rate = document.getElementById('logRate'); if (rate) rate.textContent = (logRecvTimes.length / 10).toFixed(1);
@@ -980,6 +1014,10 @@
       CONN.ot.name = isPic ? 'PIC link' : (iface === 'OT-Direct' ? 'OT-Direct' : 'OpenTherm interface');
       CONN.ot.detail = iface || 'none';
       CONN.ot.s = (iface && iface !== 'None') ? 'st-ok' : 'st-down';
+      // TASK-981: command-bar prompt reflects the live interface — 'OT ›' on OT-Direct,
+      // 'PIC ›' otherwise (PIC gateway, or unknown/none as a sane default; never hardcoded).
+      var cmdPrompt = document.getElementById('otCmdPrompt');
+      if (cmdPrompt) cmdPrompt.textContent = (iface === 'OT-Direct') ? 'OT ›' : 'PIC ›';
       // TASK-964: the OT-Direct override panel is meaningful only on OT-Direct
       // hardware (there is no direct bus to override behind a PIC gateway).
       var otdOvrEl = document.getElementById('otdOvr');
@@ -2038,12 +2076,28 @@
     var inp = document.getElementById('otCmdInput');
     var cmd = ((inp && inp.value) || '').trim();
     if (!cmd) { showCmdStatus('Enter a command', false); return; }
+    // OTGW convention: the two-letter command code is upper-case (tt=20.5 -> TT=20.5).
+    // Only the leading code is forced; the value is sent verbatim.
+    cmd = cmd.replace(/^([a-zA-Z]{2})/, function (m) { return m.toUpperCase(); });
+    // TASK-981: unpause the log so the firmware's '>' echo and the PIC ack are visible.
+    // Do it before the POST so a paused pushLog can't swallow an echo that races the
+    // response. Restore the Pause button label exactly like its own click handler.
+    if (logPaused) {
+      logPaused = false;
+      var lp = document.getElementById('logPause'); if (lp) lp.textContent = '⏸ Pause';
+      if (isMonitorLogVisible()) renderLog();
+    }
     fetch(APIGW + 'v2/otgw/commands', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command: cmd })
     }).then(function (r) {
-      if (r.status === 202 || r.ok) { showCmdStatus('Sent: ' + cmd, true); if (inp) inp.value = ''; }
-      else { showCmdStatus('Error ' + r.status, false); }
+      if (r.status === 202 || r.ok) { showCmdStatus('Sent: ' + cmd, true); if (inp) inp.value = ''; return; }
+      // TASK-981: surface the firmware's error text ({"error":{"message":...}}) rather
+      // than a bare status code (e.g. 413 "Command too long", 503 "No OT interface").
+      r.json().then(function (j) {
+        var msg = (j && j.error && j.error.message) ? j.error.message : ('Error ' + r.status);
+        showCmdStatus(msg, false);
+      }).catch(function () { showCmdStatus('Error ' + r.status, false); });
     }).catch(function () { showCmdStatus('Send failed', false); });
   }
 

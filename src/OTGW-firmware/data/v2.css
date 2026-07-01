@@ -263,6 +263,15 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     white-space:pre-wrap;overflow-wrap:anywhere}  /* TASK-957: one frame per line, wrap long frames */
   .console .t{color:#00bffe}.console .b{color:#79f2c0}.console .ts{color:#566069}
   .console .err{color:#ff5a4d}
+  /* TASK-981: command-bar echo colours — sent command (>), PIC ack (<), error/NG (!). */
+  .console .cmd{color:#ffd479}.console .rsp{color:#9a9a9e}
+  /* TASK-981: dedicated OTGW command bar (prompt + borderless mono input + Send). */
+  .cmdbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;background:#0a0e14;border:1px solid var(--border);border-radius:10px;padding:6px 8px 6px 12px}
+  .cmdbar-prompt{font-family:var(--font-mono);font-size:.8rem;color:#79f2c0;font-weight:700;flex:0 0 auto}
+  .cmdbar-in{flex:1;min-width:0;background:none;border:0;outline:none;color:#e8e8ea;font-family:var(--font-mono);font-size:.8rem;padding:6px 2px}
+  .cmdbar-in::placeholder{color:#566069}
+  .cmdbar-send{flex:0 0 auto;border:0;background:var(--accent);color:#fff;border-radius:8px;padding:8px 16px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:var(--font-sans);min-height:36px}
+  .cmdbar-send:hover{filter:brightness(1.08)}
   .statfoot{display:flex;gap:16px;font-size:.76rem;color:var(--muted);padding:8px 4px 0;flex-wrap:wrap}
   table.stats{width:100%;border-collapse:collapse;background:var(--panel);border-radius:12px;
     overflow:hidden;box-shadow:var(--shadow);font-size:.84rem}

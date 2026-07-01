@@ -1,10 +1,11 @@
 ---
 id: TASK-981
 title: 'feat(v2-webui): command bar echo-into-log + PIC/OT prompt styling'
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-01 22:17'
+updated_date: '2026-07-01 22:56'
 labels: []
 dependencies: []
 ordinal: 193000
@@ -18,8 +19,14 @@ Audit area monitor-cmdbar (findings 1-5). Echo sent command + PIC acknowledgemen
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Sent command and PIC/OT acknowledgement (incl. NG) appear in the log console with distinct colouring
-- [ ] #2 Log unpauses on command send
-- [ ] #3 Prompt label follows otcommandinterface
+- [x] #1 Sent command and PIC/OT acknowledgement (incl. NG) appear in the log console with distinct colouring
+- [x] #2 Log unpauses on command send
+- [x] #3 Prompt label follows otcommandinterface
 - [ ] #4 python evaluate.py --quick green; build green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented by subagent impl-981: eventLineClass() classifier + onWsMessage else-branch pushes real firmware WS event lines (> < ! * S) into logBuf; renderLog rebuilt as per-line DOM (DocumentFragment, textContent-only) with .cmd/.rsp/.err colouring; no client-side ack simulation (real PIC replies, avoids double echo). Prompt bound to otcommandinterface in fetchConn (PIC vs OT). Unpause-before-POST with Pause-label restore. Error body message surfaced from sendApiError JSON. Uppercase leading 2-letter code only. Placeholder em dash replaced per house style. evaluate.py --quick 0 FAIL, drift gate clean, JS parse OK. On-device echo verification pending.
+<!-- SECTION:NOTES:END -->
