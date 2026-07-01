@@ -147,23 +147,49 @@
   var connRssi = null;
   function renderConnStrip() {
     var strip = document.getElementById('connStrip'); if (!strip) return;
-    var order = ['ws', 'mode', 'mqtt', 'wifi', 'boiler', 'therm'];
-    var short = { ws: 'Live', mode: 'Mode', mqtt: 'MQTT', wifi: 'Wi-Fi', boiler: 'Boiler', therm: 'Thermostat' };
-    strip.textContent = '';   // rebuild with DOM nodes (textContent — no HTML injection)
-    order.forEach(function (key) {
-      var c = CONN[key]; if (!c) return;
-      var btn = document.createElement('button'); btn.className = 'connpill ' + c.s;
-      btn.title = 'Connectivity — tap for the detail map';
-      btn.addEventListener('click', function () { showPage('monitor'); showTab('mconn'); });
-      var dot = document.createElement('span'); dot.className = 'd';
-      var pk = document.createElement('span'); pk.className = 'pk'; pk.textContent = short[key] + ' ';
-      var pv = document.createElement('span'); pv.className = 'pv';
-      if (c.s === 'st-mode') pv.textContent = (c.value || 'unknown').toUpperCase();
-      else if (key === 'wifi' && connRssi !== null) pv.textContent = connRssi + ' dBm';
-      else pv.textContent = STLABEL[c.s] || '—';
-      btn.appendChild(dot); btn.appendChild(pk); btn.appendChild(pv);
-      strip.appendChild(btn);
+    // Single worst-of health-summary pill; the per-node detail lives on Monitor › Connection.
+    // Mode is excluded from the roll-up — it moved to the header status pill below.
+    var nodes = ['ws', 'mqtt', 'wifi', 'boiler', 'therm'];
+    var worst = 'ok', issues = 0;
+    nodes.forEach(function (k) {
+      var c = CONN[k]; if (!c) return;
+      if (c.s === 'st-down') { worst = 'down'; issues++; }
+      else if (c.s === 'st-warn') { if (worst !== 'down') worst = 'warn'; issues++; }
     });
+    var cls = worst === 'down' ? 'down' : (worst === 'warn' ? 'warn' : '');
+    var label = worst === 'down' ? (issues + ' connection issue' + (issues > 1 ? 's' : '')) :
+                (worst === 'warn' ? (issues + ' degraded') : 'All systems connected');
+    strip.textContent = '';   // rebuild with DOM nodes (textContent — no HTML injection)
+    var btn = document.createElement('button');
+    btn.className = 'connsum' + (cls ? ' ' + cls : '');
+    btn.title = 'Connectivity health — open the Connection map';
+    btn.addEventListener('click', function () { showPage('monitor'); showTab('mconn'); });
+    var dot = document.createElement('span'); dot.className = 'd';
+    var lbl = document.createElement('span'); lbl.textContent = label;
+    var go = document.createElement('span'); go.className = 'go'; go.textContent = '· Connection ›';
+    btn.appendChild(dot); btn.appendChild(lbl); btn.appendChild(go);
+    strip.appendChild(btn);
+
+    // Keep the firmware-style header status pill in sync with the live CONN model.
+    // v2's mode vocabulary is wider than the mockup's gateway|monitor: 'detecting'
+    // (PIC, mode not yet known) and 'n/a' also occur. 'n/a' is overloaded — it is set
+    // both for OT-Direct hardware and for a PIC running non-gateway firmware — so we
+    // disambiguate via CONN.ot.detail rather than asserting a hardware type blindly.
+    var hs = document.getElementById('hdrStatus');
+    if (hs) {
+      var wd = (CONN.ws.s !== 'st-ok' && CONN.ws.s !== 'st-warn');
+      hs.classList.toggle('down', wd);
+      var mv = CONN.mode.value;
+      var mode;
+      if (mv === 'gateway') mode = 'Gateway';
+      else if (mv === 'monitor') mode = 'Monitor';
+      else if (mv === 'detecting') mode = 'Detecting…';
+      else if (mv === 'n/a') mode = (CONN.ot.detail === 'OT-Direct') ? 'OT-Direct' : 'N/A';
+      else mode = mv ? (mv.charAt(0).toUpperCase() + mv.slice(1)) : 'Unknown';
+      hs.title = (wd ? 'Disconnected' : 'Connected') + ' · ' + mode + ' mode';
+      var md = document.getElementById('hdrStatMode');
+      if (md) md.textContent = (wd ? 'Disconnected' : mode);
+    }
   }
 
   // ============================================================

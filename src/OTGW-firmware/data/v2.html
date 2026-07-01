@@ -25,6 +25,10 @@
 
 <div class="headerrow">
   <span class="big">OTGW firmware <span class="sub">· v2</span></span>
+  <span class="hdr-spacer"></span>
+  <span class="hdr-status" id="hdrStatus" title="Connectivity status">
+    <span class="hdr-dot"></span><span id="hdrStatMode">…</span>
+  </span>
   <span class="sub" id="clock">--:--:--</span>
   <button type="button" class="theme-toggle" id="uiToggle" title="Switch back to the classic UI">↩ Classic UI</button>
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">🌙 Dark</button>
@@ -422,10 +426,10 @@
       <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map">
         <!-- links (drawn first, under the nodes) -->
         <g id="cnLinks">
-          <path id="lk-therm"  class="cn-link" d="M150,86 H300"/>
-          <path id="fl-therm"  class="cn-flow" d="M150,86 H300"/>
-          <path id="lk-boiler" class="cn-link" d="M150,274 H300"/>
-          <path id="fl-boiler" class="cn-flow" d="M150,274 H300"/>
+          <path id="lk-therm"  class="cn-link" d="M150,86 H264 V180 H300"/>
+          <path id="fl-therm"  class="cn-flow" d="M150,86 H264 V180 H300"/>
+          <path id="lk-boiler" class="cn-link" d="M150,274 H264 V180 H300"/>
+          <path id="fl-boiler" class="cn-flow" d="M150,274 H264 V180 H300"/>
           <path id="lk-wifi"   class="cn-link" d="M470,180 H560"/>
           <path id="fl-wifi"   class="cn-flow" d="M470,180 H560"/>
           <path id="lk-mqtt"   class="cn-link" d="M700,150 V104 H760"/>

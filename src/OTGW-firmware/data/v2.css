@@ -31,12 +31,20 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .headerrow{display:flex;align-items:center;gap:10px;background:var(--nav);
     color:#fff;padding:10px 14px;font-weight:700;box-shadow:var(--shadow);flex-wrap:wrap}
   html[data-theme="dark"] .headerrow{color:#e8e8ea}
-  .headerrow .big{font-size:1.05rem;margin-right:auto}
+  .headerrow .big{font-size:1.05rem}
   .headerrow .sub{font-weight:400;opacity:.9;font-size:.8rem}
   .theme-toggle{cursor:pointer;user-select:none;border:1px solid rgba(255,255,255,.4);
     border-radius:8px;padding:8px 12px;font-size:.85rem;min-height:40px;
     /* button reset so <button> matches the old <span> look + stays keyboard-operable */
     background:transparent;color:inherit;font-family:inherit;line-height:1.2}
+  /* firmware-authentic header status pill — synced from the live CONN model in renderConnStrip */
+  .hdr-spacer{margin-left:auto}
+  .hdr-status{font-size:.66rem;font-weight:700;border-radius:20px;padding:4px 10px;
+    display:inline-flex;align-items:center;gap:6px;white-space:nowrap;line-height:1;
+    background:color-mix(in srgb,var(--zone-ok) 28%,transparent);color:#fff}
+  .hdr-status.down{background:color-mix(in srgb,var(--zone-alert) 30%,transparent)}
+  .hdr-status .hdr-dot{width:7px;height:7px;border-radius:50%;background:var(--zone-ok);box-shadow:0 0 6px var(--zone-ok)}
+  .hdr-status.down .hdr-dot{background:var(--zone-alert);box-shadow:0 0 6px var(--zone-alert)}
   .switcher{display:flex;gap:6px;background:var(--nav);padding:8px 12px 12px;flex-wrap:wrap}
   .seg{flex:1;min-width:104px;min-height:48px;border:0;border-radius:12px;cursor:pointer;
     background:rgba(255,255,255,.18);color:#fff;font-family:var(--font-sans);
@@ -407,6 +415,16 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .st-ok{--s:var(--zone-ok)} .st-warn{--s:var(--zone-warn)} .st-down{--s:var(--zone-alert)}
   .st-off{--s:var(--tile-off)} .st-unknown{--s:var(--muted)} .st-mode{--s:var(--accent)}
   .connstrip{display:flex;gap:8px;background:var(--nav);padding:0 12px 12px;overflow-x:auto}
+  /* single worst-of health-summary pill (the per-node detail lives on Monitor › Connection) */
+  .connsum{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;border:0;border-radius:20px;
+    padding:7px 14px;cursor:pointer;color:#fff;font-size:.78rem;font-weight:700;font-family:var(--font-sans);
+    min-height:36px;white-space:nowrap;background:color-mix(in srgb,var(--zone-ok) 30%,var(--nav))}
+  html[data-theme="dark"] .connsum{color:#e8e8ea}
+  .connsum.warn{background:color-mix(in srgb,var(--zone-warn) 32%,var(--nav))}
+  .connsum.down{background:color-mix(in srgb,var(--zone-alert) 34%,var(--nav))}
+  .connsum .d{width:9px;height:9px;border-radius:50%;background:var(--zone-ok)}
+  .connsum.warn .d{background:var(--zone-warn)} .connsum.down .d{background:var(--zone-alert)}
+  .connsum .go{opacity:.7;font-weight:600}
   .connpill{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.16);
     border:0;border-radius:20px;padding:7px 12px;cursor:pointer;color:#fff;font-size:.78rem;
     font-family:var(--font-sans);min-height:36px;white-space:nowrap}
@@ -459,7 +477,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* ================= TASK-932 mobile review: tap targets + readability ≤719px ================= */
   @media(max-width:719px){
     /* lift sub-44px controls to the 44px comfortable touch target */
-    .connpill,.seg2btn,.cchip,.tbtn,.theme-toggle{min-height:44px}
+    .connsum,.connpill,.seg2btn,.cchip,.tbtn,.theme-toggle{min-height:44px}
     /* bump the smallest labels for phone readability */
     .ble-tag{font-size:.66rem}
     .mc-cell .lbl{font-size:.68rem}
