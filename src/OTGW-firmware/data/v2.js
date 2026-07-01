@@ -71,7 +71,7 @@
     else if (t === 'msupport') renderSupport();
     else if (t === 'mgraph') renderGraph();
     else if (t === 'mconn') { fetchConn(); fetchOtdOvr(); }
-    else if (t === 'mdebug') fetchDebug();
+    else if (t === 'mdebug') { fetchDebug(); fetchPic(); }
   }
 
   // ---------- back to the classic UI ----------
@@ -1911,6 +1911,97 @@
     }).catch(function () { var el = document.getElementById('dbgCrash'); if (el) el.textContent = '—'; });
   }
 
+  // ---------- Monitor > Debug > PIC firmware flash (TASK-972) ----------
+  var PICBASE = location.protocol + '//' + location.host + '/';   // /pic is a top-level route, not under /api/v2
+  var picPollTimer = null, picBusy = false;
+  function picMuted(t) { var d = document.createElement('div'); d.className = 'ble-row'; d.style.color = 'var(--muted)'; d.textContent = t; return d; }
+  function fetchPic() {
+    var card = document.getElementById('picFlash'); if (!card) return;
+    fetch(APIGW + 'v2/device/info').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var d = (j && j.device) || {};
+      if ((d.otcommandinterface || '') !== 'PIC') { card.style.display = 'none'; return; }   // hidden on OTGW32 / OT-Direct
+      card.style.display = '';
+      var info = document.getElementById('picInfo');
+      if (info) info.textContent = 'Device ' + (d.picdeviceid || '?') + ' · type ' + (d.picfwtype || '?') + ' · firmware ' + (d.picfwversion || '?');
+      fetchPicFiles();
+    }).catch(function () { });
+  }
+  function fetchPicFiles() {
+    fetch(APIGW + 'v2/firmware/files').then(function (r) { return r.ok ? r.json() : null; }).then(function (files) {
+      renderPicFiles(Array.isArray(files) ? files : ((files && files.files) || []));   // firmware/files is a bare array
+    }).catch(function () { });
+  }
+  function renderPicFiles(files) {
+    var el = document.getElementById('picFiles'); if (!el) return; el.textContent = '';
+    if (!files.length) { el.appendChild(picMuted('No firmware files on device. Use Check for updates, or upload a .hex via the File system.')); return; }
+    files.forEach(function (f) {
+      var row = document.createElement('div'); row.className = 'ble-row';
+      var nm = document.createElement('div'); nm.className = 'ble-nm'; nm.textContent = (f.name || '?') + '  ';
+      var v = document.createElement('span'); v.className = 'ble-mac'; v.textContent = 'v' + (f.version || '?') + ' · ' + (f.size || 0) + ' B'; nm.appendChild(v);
+      row.appendChild(nm);
+      var ctr = document.createElement('div'); ctr.className = 'ble-ctrls';
+      var flash = document.createElement('button'); flash.className = 'tbtn'; flash.textContent = '⚡ Flash';
+      flash.addEventListener('click', function () {
+        if (picBusy) return;
+        if (flash._armed) { flash._armed = false; startPicFlash(f.name); return; }
+        flash._armed = true; flash.textContent = '⚠ Confirm flash';   // two-click confirm (a bad flash bricks the PIC)
+        setTimeout(function () { if (flash.isConnected) { flash._armed = false; flash.textContent = '⚡ Flash'; } }, 3000);
+      });
+      var refr = document.createElement('button'); refr.className = 'tbtn'; refr.textContent = '⭳ Re-download';
+      refr.addEventListener('click', function () { if (!picBusy) picRefresh(f.name, f.version); });
+      var del = document.createElement('button'); del.className = 'tbtn'; del.textContent = 'Delete';
+      del.addEventListener('click', function () { if (!picBusy) picDelete(f.name); });
+      ctr.appendChild(flash); ctr.appendChild(refr); ctr.appendChild(del); row.appendChild(ctr);
+      el.appendChild(row);
+    });
+  }
+  function checkPicUpdate() {
+    var b = document.getElementById('picBanner'); if (b) b.textContent = 'Checking for updates…';
+    fetch(APIGW + 'v2/pic/update-check?recheck=1').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var u = (j && j.pic_update) || {}; if (!b) return;
+      if (u.status === 'checking') { b.textContent = 'Checking…'; setTimeout(checkPicUpdate, 2500); return; }
+      if (u.update_available) b.textContent = '⬆ Update available: ' + u.latest + ' (current ' + u.current + ')';
+      else if (u.status === 'ready') b.textContent = 'Up to date (' + (u.current || '?') + ')';
+      else b.textContent = 'Update check: ' + (u.status || 'unavailable');
+    }).catch(function () { if (b) b.textContent = 'Update check failed'; });
+  }
+  function startPicFlash(name) {
+    picBusy = true;
+    var prog = document.getElementById('picProg'), txt = document.getElementById('picProgTxt'), bar = document.getElementById('picProgBar');
+    if (prog) prog.style.display = '';
+    if (bar) { bar.style.width = '0%'; bar.style.background = 'var(--accent)'; }
+    if (txt) txt.textContent = 'Starting flash of ' + name + '…';
+    fetch(PICBASE + 'pic?action=upgrade&name=' + encodeURIComponent(name)).then(function (r) {
+      if (!r.ok) throw 0;
+      pollPicFlash();
+    }).catch(function () { if (txt) txt.textContent = 'Flash failed to start'; picBusy = false; });
+  }
+  function pollPicFlash() {
+    if (picPollTimer) clearTimeout(picPollTimer);
+    fetch(APIGW + 'v2/pic/flash-status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var s = (j && j.flashstatus) || {};
+      var bar = document.getElementById('picProgBar'), txt = document.getElementById('picProgTxt');
+      var p = (typeof s.progress === 'number') ? s.progress : 0;
+      if (bar) bar.style.width = Math.max(0, Math.min(100, p)) + '%';
+      if (s.flashing) {
+        if (txt) txt.textContent = 'Flashing ' + (s.filename || '') + ' — ' + p + '%';
+        picPollTimer = setTimeout(pollPicFlash, 1000);
+      } else {
+        picBusy = false;
+        if (s.error && ('' + s.error).length) { if (txt) txt.textContent = 'Error: ' + s.error; if (bar) bar.style.background = 'var(--hot,#c33)'; }
+        else { if (bar) bar.style.width = '100%'; if (txt) txt.textContent = 'Flash complete'; }
+        setTimeout(fetchPic, 2500);
+      }
+    }).catch(function () { picBusy = false; var txt = document.getElementById('picProgTxt'); if (txt) txt.textContent = 'Lost contact during flash (device may be rebooting)'; });
+  }
+  function picRefresh(name, version) {
+    var b = document.getElementById('picBanner'); if (b) b.textContent = 'Downloading ' + name + '…';
+    fetch(PICBASE + 'pic?action=refresh&name=' + encodeURIComponent(name) + '&version=' + encodeURIComponent(version || '')).then(function () { setTimeout(fetchPicFiles, 2000); }).catch(function () { });
+  }
+  function picDelete(name) {
+    fetch(PICBASE + 'pic?action=delete&name=' + encodeURIComponent(name)).then(function () { setTimeout(fetchPicFiles, 600); }).catch(function () { });
+  }
+
   // ---------- Monitor > Log > send raw OTGW command (TASK-965) ----------
   function showCmdStatus(msg, ok) {
     var st = document.getElementById('otCmdStatus'); if (!st) return;
@@ -1979,6 +2070,7 @@
     var setS = document.getElementById('setSearch');
     if (setS) setS.addEventListener('input', function () { setSearch = setS.value; renderSettings(); });
     var bSave = document.getElementById('btnSave'); if (bSave) bSave.addEventListener('click', saveSettings);
+    var pcu = document.getElementById('picCheckUpd'); if (pcu) pcu.addEventListener('click', checkPicUpdate);   // TASK-972
     var bDisc = document.getElementById('btnDiscard'); if (bDisc) bDisc.addEventListener('click', discardSettings);
 
     var sp = localStorage.getItem('otgw-v2-page'); showPage(sp || 'home');

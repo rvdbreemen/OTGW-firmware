@@ -529,6 +529,23 @@
       <h3>Crash log</h3>
       <pre id="dbgCrash" class="console" style="max-height:320px;white-space:pre-wrap">—</pre>
     </div>
+    <!-- TASK-972: PIC firmware flash (parity with the Classic PIC firmware tab).
+         Shown ONLY on PIC hardware (otcommandinterface === 'PIC'); hidden on OTGW32. -->
+    <div id="picFlash" class="set-group" style="display:none;margin-top:14px">
+      <h3>PIC firmware</h3>
+      <div id="picInfo" class="ot-support-hint">Reading PIC…</div>
+      <div id="picBanner" class="ot-support-hint"></div>
+      <div class="ble-ctrls" style="margin-bottom:8px">
+        <button id="picCheckUpd" class="tbtn">🔄 Check for updates</button>
+      </div>
+      <div id="picFiles"></div>
+      <div id="picProg" style="display:none;margin-top:10px">
+        <div style="height:10px;background:var(--border);border-radius:6px;overflow:hidden">
+          <div id="picProgBar" style="height:100%;width:0%;background:var(--accent);transition:width .3s"></div>
+        </div>
+        <div id="picProgTxt" class="ot-support-hint" style="margin-top:4px">Ready to flash</div>
+      </div>
+    </div>
   </div>
 </div><!-- /page-monitor -->
 
