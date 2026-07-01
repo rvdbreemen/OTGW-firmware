@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T16:57:05.943Z
-> Files: 548 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-01T17:00:21.196Z
+> Files: 549 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/01-raw/sessies/
 
@@ -15,9 +15,13 @@
 
 - `.graphify_chunk_01.json` (~6926 tok)
 
+## ../otgw-1x/
+
+- `evaluate.py` — Colors: disable, add_result, run_command, check_code_structure + 2 more (~22250 tok)
+
 ## ../otgw-1x/src/OTGW-firmware/
 
-- `mqtt_configuratie.cpp` — ======================================================================= (~53791 tok)
+- `mqtt_configuratie.cpp` — ======================================================================= (~54044 tok)
 
 ## ../wt-otgw-1.x.x/scripts/
 
