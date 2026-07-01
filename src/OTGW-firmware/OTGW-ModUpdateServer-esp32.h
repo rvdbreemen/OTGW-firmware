@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.310
+**  Version  : v2.0.0-alpha.311
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -40,6 +40,8 @@
 
 #include <ESPAsyncWebServer.h>
 #include <Update.h>
+#include <esp_ota_ops.h>       // esp_ota_get_running/next_update_partition — single-app-slot OTA guard
+#include <esp_partition.h>     // esp_partition_find_first — full LittleFS partition size
 #include <StreamString.h>
 #include <LittleFS.h>
 #include "Wire.h"
@@ -69,8 +71,7 @@ public:
       _routesRegistered(false), _updateFinalized(false),
       _serverIndex(nullptr), _serverSuccess(nullptr),
       _uploadTarget(UploadTarget::None),
-      _uploadExpectedBytes(0), _uploadWrittenBytes(0), _uploadBlockIndex(0),
-      _mergedSkipBytes(0), _mergedWriteLimit(0) {
+      _uploadExpectedBytes(0), _uploadWrittenBytes(0), _uploadBlockIndex(0) {
     _updaterError[0] = '\0';
   }
 
@@ -163,21 +164,11 @@ public:
   void setSuccessPage(const char *successPage) { _serverSuccess = successPage; }
 
 private:
-  // Merged binary layout (from partitions_otgw_esp32.csv)
-  // app0 slot size MUST match the active partition table value
-  // (`app, ota_0, 0x10000, 0x1E0000` in partitions_otgw_esp32.csv).
-  // Earlier value (0x2E0000) would trip Update.begin() range-check on
-  // merged-binary OTA uploads since the writeable region is smaller.
-  static constexpr size_t MERGED_APP_OFFSET = 0x10000;   // bootloader + partition table
-  static constexpr size_t MERGED_APP_SIZE   = 0x1E0000;  // app0 partition size (1.875 MB)
-
   void _resetUploadTracking() {
     _uploadTarget = UploadTarget::None;
     _uploadExpectedBytes = 0;
     _uploadWrittenBytes = 0;
     _uploadBlockIndex = 0;
-    _mergedSkipBytes = 0;
-    _mergedWriteLimit = 0;
   }
 
   // Auth helper. Empty credentials == open (no auth configured).
@@ -186,17 +177,20 @@ private:
             request->authenticate(_username.c_str(), _password.c_str()));
   }
 
-  // Total upload size. The form posts `size=<file.size>` on the query string
-  // (see updateServerHtml.h); fall back to the multipart content length when the
-  // param is absent so merged-binary detection still has a figure to compare.
+  // Total upload size, taken ONLY from the `size=<file.size>` query param the
+  // form posts (see updateServerHtml.h). Do NOT fall back to
+  // request->contentLength(): that is the whole multipart body length (file +
+  // boundary/header bytes), which for a full-partition filesystem image exceeds
+  // the partition and would trip a spurious "filesystem image too large". When
+  // the param is absent, return 0 and let the target begin() size the region
+  // from the partition itself — matching the 1.x ESP8266 path.
   size_t _parseUploadTotalSize(AsyncWebServerRequest *request) const {
     const AsyncWebParameter *p = request->getParam("size", false);  // query string
     if (p) {
       long parsedSize = p->value().toInt();
       if (parsedSize > 0) return static_cast<size_t>(parsedSize);
     }
-    size_t cl = request->contentLength();
-    return cl;
+    return 0;
   }
 
   // Target detection. The form action carries cmd=0 (firmware) / cmd=100
@@ -256,7 +250,17 @@ private:
 
     if (_isFilesystemTarget(request, filename)) {
       _uploadTarget = UploadTarget::Filesystem;
-      size_t fsSize = LittleFS.totalBytes();
+      // Use the FULL LittleFS partition size, not LittleFS.totalBytes(): the
+      // latter reports USABLE bytes (< partition — LittleFS reserves metadata
+      // blocks), while a mklittlefs image always spans the WHOLE partition.
+      // Comparing an image against totalBytes() spuriously rejects it, and
+      // Update.begin() needs the full partition as its size budget so a
+      // partition-spanning image is accepted (no UPDATE_ERROR_SPACE); the
+      // Updater erases lazily per-sector as bytes are written. Mirrors the
+      // 1.x ESP8266 path (`_FS_end - _FS_start`).
+      const esp_partition_t *fsPart = esp_partition_find_first(
+          ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_SPIFFS, nullptr);
+      size_t fsSize = fsPart ? fsPart->size : LittleFS.totalBytes();
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
       }
@@ -268,30 +272,36 @@ private:
       }
     } else {
       _uploadTarget = UploadTarget::Firmware;
+      // App/firmware OTA needs a SECOND app partition to receive the image:
+      // esp_ota writes to the inactive OTA slot, then otadata flips the boot
+      // pointer. On a single-app-slot table (the 4MB combo — app0/ota_0 only;
+      // the web-asset LittleFS leaves no room for a second ~1.9MB slot, and the
+      // only 4MB dual-slot scheme ships a 190KB FS too small for the web UI),
+      // esp_ota_get_next_update_partition() returns the RUNNING partition, so
+      // the write would overwrite the executing app and brick the device
+      // (empirically confirmed — TASK-959). Reject before any Update.begin();
+      // app flashing is USB-only here (flash_otgw.bat / merged-full over USB).
+      // The check is dynamic: an 8MB dual-slot (ota_0+ota_1) table would make
+      // nextSlot != running and re-enable OTA app updates automatically.
+      // The 4MB merged image is deliberately NOT accepted over OTA (USB-only);
+      // a plain firmware.bin app image is the only firmware upload we handle.
+      const esp_partition_t *running  = esp_ota_get_running_partition();
+      const esp_partition_t *nextSlot = esp_ota_get_next_update_partition(nullptr);
+      if (nextSlot == nullptr || nextSlot == running) {
+        strlcpy(_updaterError,
+                "app update is USB-only on this board (single app slot); use flash_otgw.bat over USB",
+                sizeof(_updaterError));
+        if (_serial_output) {
+          DebugTln(F("[OTA] Firmware OTA rejected: single app slot (no ota_1) — app flash is USB-only"));
+        }
+        return;
+      }
       uint32_t maxSketchSpace = (platformFreeSketchSpace() - 0x1000) & 0xFFFFF000;
-
-      if (uploadTotal > maxSketchSpace) {
-        // Merged binary (bootloader + partitions + app + filesystem).
-        // Extract only the app portion: skip MERGED_APP_OFFSET bytes, write up to MERGED_APP_SIZE.
-        _mergedSkipBytes  = MERGED_APP_OFFSET;
-        _mergedWriteLimit = MERGED_APP_SIZE;
-        _uploadExpectedBytes = MERGED_APP_SIZE;  // progress bar vs. app portion only
-        if (_serial_output) {
-          DebugTf(PSTR("[OTA] Merged binary detected (%u bytes) — extracting app at 0x%x (%u bytes)\r\n"),
-                  static_cast<unsigned>(uploadTotal),
-                  static_cast<unsigned>(MERGED_APP_OFFSET),
-                  static_cast<unsigned>(MERGED_APP_SIZE));
-        }
-        if (!Update.begin(MERGED_APP_SIZE, U_FLASH)) {
-          _setUpdaterError();
-        }
-      } else {
-        if (_serial_output) {
-          DebugTf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
-        }
-        if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)) {
-          _setUpdaterError();
-        }
+      if (_serial_output) {
+        DebugTf(PSTR("[OTA] Target: firmware (%u bytes)\r\n"), static_cast<unsigned>(maxSketchSpace));
+      }
+      if (!Update.begin(uploadTotal > 0 ? uploadTotal : maxSketchSpace, U_FLASH)) {
+        _setUpdaterError();
       }
     }
   }
@@ -310,30 +320,7 @@ private:
     Wire.write(0xA5);
     Wire.endTransmission();
 
-    uint8_t *buf = data;
-
-    // Merged binary: skip the bootloader + partition table header
-    if (_mergedSkipBytes > 0) {
-      if (len <= _mergedSkipBytes) {
-        _mergedSkipBytes -= len;
-        return;  // entire chunk is header — discard
-      }
-      buf += _mergedSkipBytes;
-      len -= _mergedSkipBytes;
-      _mergedSkipBytes = 0;
-    }
-
-    // Merged binary: stop writing once we've covered the full app partition;
-    // the remainder of the upload is the filesystem image which must not
-    // be written into the app OTA slot.
-    if (_mergedWriteLimit > 0) {
-      if (len > _mergedWriteLimit) len = _mergedWriteLimit;
-      _mergedWriteLimit -= len;
-    }
-
-    if (len == 0) return;
-
-    size_t written = Update.write(buf, len);
+    size_t written = Update.write(data, len);
     if (written != len) {
       _setUpdaterError();
       return;
@@ -442,8 +429,6 @@ private:
   size_t _uploadExpectedBytes;
   size_t _uploadWrittenBytes;
   uint32_t _uploadBlockIndex;
-  size_t _mergedSkipBytes;   // bytes remaining to skip (merged binary header)
-  size_t _mergedWriteLimit;  // bytes remaining to write (0 = no limit); stops at app/fs boundary
   const char *_serverIndex;
   const char *_serverSuccess;
 };

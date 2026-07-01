@@ -3,9 +3,11 @@ id: TASK-959
 title: >-
   Guard firmware OTA on single-app-slot OTGW32 — it corrupts the running
   partition (app OTA is USB-only on 4MB)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-30 18:37'
+updated_date: '2026-07-01 21:08'
 labels: []
 dependencies: []
 ordinal: 171000
@@ -19,8 +21,14 @@ Empirically proven on bench OTGW32 @.39 (alpha.297/298): FILESYSTEM OTA (POST /u
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 _handleUploadStart rejects cmd=0 (firmware target) with a clear error BEFORE any Update.begin/write when the partition table has no spare app slot (single ota_X == running), so nothing is ever written to the running partition
+- [x] #1 _handleUploadStart rejects cmd=0 (firmware target) with a clear error BEFORE any Update.begin/write when the partition table has no spare app slot (single ota_X == running), so nothing is ever written to the running partition
 - [ ] #2 The Flash Utility UI hides/disables the firmware-flash option (or shows 'app update is USB-only on this board') when single-slot; filesystem flash stays available
 - [ ] #3 Doc note: app updates = USB (flash_otgw.bat), filesystem updates = OTA; dual-slot firmware OTA needs an 8MB module
 - [ ] #4 ADR drafted: single-slot app-OTA policy + the 8MB-module path to dual-slot OTA with rollback
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC#1 implemented (alpha.311, OTGW-ModUpdateServer-esp32.h): firmware/app OTA now rejected BEFORE any Update.begin when single-app-slot (esp_ota_get_next_update_partition(nullptr)==esp_ota_get_running_partition() or null). Sets _updaterError, returns early; the POST completion handler returns 'Flash error: app update is USB-only on this board (single app slot); use flash_otgw.bat over USB' and clears bESPactive — board stays alive, no write reaches flash. Empirically the prior code bricked (720KB written to running ota_0). Also removed the merged-4MB OTA branch entirely (merged=USB-only). Dynamic: a future 8MB dual-slot table auto-re-enables app OTA. Adversarial review (5 agents): 0 confirmed defects on the reject/detect/merged-removal logic. Remaining: AC#2 (UI hide firmware-flash on single-slot), AC#3 (doc note), AC#4 (ADR).
+<!-- SECTION:NOTES:END -->
