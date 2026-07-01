@@ -252,6 +252,8 @@ const char ha_lbl_fw_reboot_reason[] PROGMEM = "otgw-firmware/reboot_reason";
 const char ha_lbl_fw_version[]       PROGMEM = "otgw-firmware/version";
 const char ha_lbl_fw_hostname[]      PROGMEM = "otgw-firmware/hostname";
 const char ha_lbl_fw_hardware_type[] PROGMEM = "otgw-firmware/hardware_type";  // ADR-113
+const char ha_lbl_fw_uptime[]           PROGMEM = "otgw-firmware/uptime";
+const char ha_lbl_fw_unsupported_msgids[] PROGMEM = "otgw-firmware/boiler/unsupported_msgids";
 // PIC info labels (TASK-540 / TASK-541, faux dataid 249). MQTT_HA_FLAG_IS_PIC_ENTRY auto-prepends "otgw-pic/".
 const char ha_lbl_pic_version[]       PROGMEM = "version";
 const char ha_lbl_pic_deviceid[]      PROGMEM = "deviceid";
@@ -680,6 +682,8 @@ const char ha_name_fw_reboot_reason[] PROGMEM = "Reboot_Reason";
 const char ha_name_fw_version[]       PROGMEM = "Firmware_Version";
 const char ha_name_fw_hostname[]      PROGMEM = "Hostname";
 const char ha_name_fw_hardware_type[] PROGMEM = "Hardware_Type";  // ADR-113
+const char ha_name_fw_uptime[]           PROGMEM = "Uptime";
+const char ha_name_fw_unsupported_msgids[] PROGMEM = "Boiler_Unsupported_MsgIDs";
 // PIC info friendly names (TASK-540 / TASK-541, faux dataid 249)
 const char ha_name_pic_version[]       PROGMEM = "PIC_Version";
 const char ha_name_pic_deviceid[]      PROGMEM = "PIC_DeviceID";
@@ -808,7 +812,7 @@ const char ha_name_alias_ventilation_system_type[]                           PRO
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
 // ========== Sensor array (289 entries, sorted by id) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 387;  // TASK-942: +2 hvac_mode/hvac_action (faux id 242)
+const uint16_t MQTT_HA_SENSOR_COUNT = 389;  // +2 fw uptime/unsupported_msgids (faux id 248)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1247,6 +1251,8 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {248, 0x00, ha_lbl_fw_version,       ha_name_fw_version,       HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {248, 0x00, ha_lbl_fw_hostname,      ha_name_fw_hostname,      HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {248, 0x00, ha_lbl_fw_hardware_type, ha_name_fw_hardware_type, HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},  // ADR-113
+    {248, 0x00, ha_lbl_fw_uptime,           ha_name_fw_uptime,           HaDeviceClass::none, HaUnit::s,    HaStateClass::measurement,      HaIcon::timer_outline,       HaEntityCat::diagnostic, true},
+    {248, 0x00, ha_lbl_fw_unsupported_msgids, ha_name_fw_unsupported_msgids, HaDeviceClass::none, HaUnit::none, HaStateClass::none,          HaIcon::information_outline, HaEntityCat::diagnostic, true},
     // --- Pseudo-ID 249: PIC info (TASK-540 / TASK-541) ---
     // 0x08 = MQTT_HA_FLAG_IS_PIC_ENTRY → "otgw-pic/" prefix added by streamSensorDiscovery
     // and entries are skipped at publish time when isPICEnabled() is false.
@@ -1725,19 +1731,19 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 239
     0xFFFF, // id 240
     0xFFFF, // id 241
-    385, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
-    330, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
+    387, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
+    332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
     288, // id 246, 1 entry
     289, // id 247, 17 entries
-    306, // id 248, 5 entries (TASK-541 firmware diagnostics + ADR-113 hardware_type)
-    311, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
-    315, // id 250, 15 entries (TASK-541 PIC settings)
-    332, // id 251, 5 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
-    337, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
-    369, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    384, // id 254, 1 entry  (TASK-543 SAT flame status)
+    306, // id 248, 7 entries (TASK-541 firmware diagnostics + ADR-113 hardware_type + uptime/unsupported_msgids)
+    313, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
+    317, // id 250, 15 entries (TASK-541 PIC settings)
+    334, // id 251, 5 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
+    339, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
+    371, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    386, // id 254, 1 entry  (TASK-543 SAT flame status)
     0xFFFF // id 255
 };
 
