@@ -566,10 +566,15 @@
   // ---------- Monitor > Log ----------
   var LOG_MAX = 600, logBuf = [], logRecvTimes = [];
   var logPaused = false, logSearch = '', logShowTs = true, logAutoScroll = true;
+  // TASK-970: SAT-only filter, auto-download timer, stream-to-file writer
+  var logSatOnly = false, logAutoDlTimer = null, logStreamWriter = null;
+  var SAT_LINE_RE = /^\d{2}:\d{2}:\d{2}\s+S\s/;   // "HH:MM:SS S ..." SAT narration prefix
   function pushLog(line) {
     var now = Date.now();
     logRecvTimes.push(now);
     while (logRecvTimes.length && now - logRecvTimes[0] > 10000) logRecvTimes.shift();
+    // Stream to file captures every frame regardless of the display Pause.
+    if (logStreamWriter) { try { logStreamWriter.write(line + '\n'); } catch (e) { } }
     if (logPaused) return;
     logBuf.push(line);
     if (logBuf.length > LOG_MAX) logBuf.shift();
@@ -585,6 +590,7 @@
     var q = logSearch.trim().toLowerCase();
     var lines = logBuf;
     if (q) lines = lines.filter(function (l) { return l.toLowerCase().indexOf(q) !== -1; });
+    if (logSatOnly) lines = lines.filter(function (l) { return SAT_LINE_RE.test(l); });   // TASK-970
     if (!logShowTs) lines = lines.map(function (l) { return l.replace(/^\d{2}:\d{2}:\d{2}\.\d{3,6}\s+/, ''); });
     el.textContent = lines.join('\n');     // textContent: device data, not HTML
     if (logAutoScroll) el.scrollTop = el.scrollHeight;
@@ -1799,6 +1805,23 @@
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
   }
 
+  // ---------- Monitor > Log power-features (TASK-970) ----------
+  function downloadLog() {
+    downloadBlob(new Blob([logBuf.join('\n')], { type: 'text/plain' }), 'otgw-log-' + ts() + '.txt');
+  }
+  function toggleAutoDl(chip) {
+    if (logAutoDlTimer) { clearInterval(logAutoDlTimer); logAutoDlTimer = null; chip.classList.remove('on'); }
+    else { logAutoDlTimer = setInterval(downloadLog, 900000); chip.classList.add('on'); }   // every 15 min
+  }
+  function toggleStream(chip) {
+    if (logStreamWriter) { try { logStreamWriter.close(); } catch (e) { } logStreamWriter = null; chip.classList.remove('on'); return; }
+    if (!window.showSaveFilePicker) return;   // Chrome/Edge only (feature-detected in init)
+    window.showSaveFilePicker({ suggestedName: 'otgw-log-' + ts() + '.txt', types: [{ description: 'Text log', accept: { 'text/plain': ['.txt'] } }] })
+      .then(function (h) { return h.createWritable(); })
+      .then(function (w) { logStreamWriter = w; chip.classList.add('on'); })
+      .catch(function () { });
+  }
+
   // ---------- Monitor > Statistics > gateway overrides + boiler-unsupported (TASK-969) ----------
   function statMuted(t) { var d = document.createElement('div'); d.className = 'ble-row'; d.style.color = 'var(--muted)'; d.textContent = t; return d; }
   function statRow(title, meta) {
@@ -1888,6 +1911,17 @@
     var ocs = document.getElementById('otCmdSend'), oci = document.getElementById('otCmdInput');
     if (ocs) ocs.addEventListener('click', sendOtgwCmd);
     if (oci) oci.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); sendOtgwCmd(); } });
+    // TASK-970: Clear + Download (were rendered but unwired) + SAT-only / auto-download / stream chips
+    var lcl = document.getElementById('logClear');
+    if (lcl) lcl.addEventListener('click', function () { logBuf = []; logRecvTimes = []; renderLog(); });
+    var ldl = document.getElementById('logDownload');
+    if (ldl) ldl.addEventListener('click', downloadLog);
+    var cso = document.getElementById('chipSatOnly');
+    if (cso) cso.addEventListener('click', function () { logSatOnly = !logSatOnly; cso.classList.toggle('on', logSatOnly); if (isMonitorLogVisible()) renderLog(); });
+    var cad = document.getElementById('chipAutoDl');
+    if (cad) cad.addEventListener('click', function () { toggleAutoDl(cad); });
+    var cst = document.getElementById('chipStream');
+    if (cst) { if (!window.showSaveFilePicker) { cst.style.opacity = '.5'; cst.title = 'Stream to file needs Chrome / Edge'; } cst.addEventListener('click', function () { toggleStream(cst); }); }
     var cs = document.getElementById('chipScroll');
     if (cs) cs.addEventListener('click', function () { logAutoScroll = !logAutoScroll; cs.classList.toggle('on', logAutoScroll); });
     var ct = document.getElementById('chipTs');

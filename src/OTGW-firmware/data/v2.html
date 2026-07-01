@@ -313,11 +313,15 @@
   <div id="mlog" class="mpanel active">
     <div class="toolbar">
       <button class="tbtn" id="logPause">⏸ Pause</button>
-      <button class="tbtn">Clear</button>
-      <button class="tbtn">⬇ Download</button>
+      <button class="tbtn" id="logClear">Clear</button>
+      <button class="tbtn" id="logDownload">⬇ Download</button>
       <input class="tsearch" id="logSearch" placeholder="Filter frames… (e.g. 19, Boiler, DHW)">
       <span class="tchip on" id="chipScroll">Auto-scroll</span>
       <span class="tchip on" id="chipTs">Timestamps</span>
+      <!-- TASK-970: Log power-features (SAT-only filter, auto-download, stream-to-file). -->
+      <span class="tchip" id="chipSatOnly" title="Show only SAT narration lines">SAT only</span>
+      <span class="tchip" id="chipAutoDl" title="Download the log automatically every 15 minutes">Auto-download</span>
+      <span class="tchip" id="chipStream" title="Stream frames straight to a local file (Chrome/Edge)">Stream to file</span>
     </div>
     <!-- TASK-965: send a raw OTGW command (PS=1, TT=20.5, GW=1, ...). Works on PIC
          and OT-Direct (OTGW32 translates PIC commands to OT frames natively). -->
