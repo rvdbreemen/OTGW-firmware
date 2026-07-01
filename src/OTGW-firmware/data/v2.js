@@ -1283,10 +1283,14 @@
     satsimulation:       { cat: 'sat', sub: 'Simulation', label: 'Enable simulation' },
     satsimheatrate:      { cat: 'sat', sub: 'Simulation', label: 'Heat rate', hint: '°C/min' },
     satsimcoolrate:      { cat: 'sat', sub: 'Simulation', label: 'Cool rate', hint: '°C/min' },
-    satbleenable:        { cat: 'sat', sub: 'BLE sensor', label: 'Enable BLE sensor' },
-    satblefailover:      { cat: 'sat', sub: 'BLE sensor', label: 'BLE failover to OT' },
-    satblemac:           { cat: 'sat', sub: 'BLE sensor', label: 'BLE sensor MAC' },
-    satbleinterval:      { cat: 'sat', sub: 'BLE sensor', label: 'BLE poll interval', hint: 'Seconds' }
+    // TASK-974: BLE sensors are sensors, independent of SAT — grouped under the
+    // Sensors category (not SAT) so users find the enable toggle next to the roster.
+    // The firmware already scans on satbleenable alone (no satenabled needed) and
+    // lazy-inits the scan at runtime, so enabling here starts it without a reboot.
+    satbleenable:        { cat: 'sensors', sub: 'BLE sensors', label: 'Enable BLE sensors' },
+    satblefailover:      { cat: 'sensors', sub: 'BLE sensors', label: 'BLE failover to OT' },
+    satblemac:           { cat: 'sensors', sub: 'BLE sensors', label: 'BLE sensor MAC' },
+    satbleinterval:      { cat: 'sensors', sub: 'BLE sensors', label: 'BLE poll interval', hint: 'Seconds' }
   };
   // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
   // normal toggle — never list it as an editable setting.
