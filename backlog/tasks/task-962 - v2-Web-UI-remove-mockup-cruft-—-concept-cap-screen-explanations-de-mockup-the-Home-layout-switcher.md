@@ -3,11 +3,11 @@ id: TASK-962
 title: >-
   v2 Web UI: remove mockup cruft — concept-cap screen explanations + de-mockup
   the Home layout switcher
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 22:53'
-updated_date: '2026-06-30 23:12'
+updated_date: '2026-07-01 19:34'
 labels: []
 dependencies: []
 ordinal: 174000

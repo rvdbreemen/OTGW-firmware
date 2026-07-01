@@ -1,11 +1,11 @@
 ---
 id: TASK-969
 title: 'v2 parity: Statistics boiler-unsupported + active-overrides panels'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 23:09'
-updated_date: '2026-07-01 04:57'
+updated_date: '2026-07-01 19:34'
 labels: []
 dependencies: []
 ordinal: 181000

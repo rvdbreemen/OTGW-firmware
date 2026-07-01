@@ -1,11 +1,11 @@
 ---
 id: TASK-967
 title: 'v2 parity: Debug-info / crashlog page'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 23:08'
-updated_date: '2026-07-01 04:48'
+updated_date: '2026-07-01 19:34'
 labels: []
 dependencies: []
 ordinal: 179000

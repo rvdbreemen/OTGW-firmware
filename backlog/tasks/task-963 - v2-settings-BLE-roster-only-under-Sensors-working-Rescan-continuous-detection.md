@@ -3,11 +3,11 @@ id: TASK-963
 title: >-
   v2 settings: BLE roster only under Sensors + working Rescan + continuous
   detection
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 22:53'
-updated_date: '2026-06-30 23:12'
+updated_date: '2026-07-01 19:34'
 labels: []
 dependencies: []
 ordinal: 175000

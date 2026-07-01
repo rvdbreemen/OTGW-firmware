@@ -1,11 +1,11 @@
 ---
 id: TASK-970
 title: 'v2 parity: Log stream-to-file + SAT-only filter + auto-download'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 23:10'
-updated_date: '2026-07-01 05:05'
+updated_date: '2026-07-01 19:34'
 labels: []
 dependencies: []
 ordinal: 182000

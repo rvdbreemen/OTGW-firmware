@@ -1,11 +1,11 @@
 ---
 id: TASK-971
 title: 'v2 parity: Graph auto-save PNG/CSV toggles'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 23:11'
-updated_date: '2026-07-01 05:11'
+updated_date: '2026-07-01 19:34'
 labels: []
 dependencies: []
 ordinal: 183000

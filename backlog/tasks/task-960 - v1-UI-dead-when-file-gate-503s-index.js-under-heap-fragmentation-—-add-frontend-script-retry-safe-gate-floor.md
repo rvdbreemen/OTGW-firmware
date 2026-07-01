@@ -3,11 +3,11 @@ id: TASK-960
 title: >-
   v1 UI dead when file gate 503s index.js under heap fragmentation — add
   frontend script-retry + safe gate floor
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 20:22'
-updated_date: '2026-06-30 21:06'
+updated_date: '2026-07-01 19:34'
 labels: []
 dependencies: []
 ordinal: 172000
