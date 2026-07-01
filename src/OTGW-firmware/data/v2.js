@@ -570,6 +570,10 @@
   var logSatOnly = false, logAutoDlTimer = null, logStreamWriter = null;
   var SAT_LINE_RE = /^\d{2}:\d{2}:\d{2}\s+S\s/;   // "HH:MM:SS S ..." SAT narration prefix
   function pushLog(line) {
+    // WS frames arrive with a trailing "\r\n"; strip it so renderLog's join('\n')
+    // produces ONE newline per frame (dense) instead of frame-newline + join-newline
+    // = a blank line between every frame. Also keeps the stream-to-file output clean.
+    line = ('' + line).replace(/[\r\n]+$/, '');
     var now = Date.now();
     logRecvTimes.push(now);
     while (logRecvTimes.length && now - logRecvTimes[0] > 10000) logRecvTimes.shift();
