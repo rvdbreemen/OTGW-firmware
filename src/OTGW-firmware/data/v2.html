@@ -318,6 +318,13 @@
       <span class="tchip on" id="chipScroll">Auto-scroll</span>
       <span class="tchip on" id="chipTs">Timestamps</span>
     </div>
+    <!-- TASK-965: send a raw OTGW command (PS=1, TT=20.5, GW=1, ...). Works on PIC
+         and OT-Direct (OTGW32 translates PIC commands to OT frames natively). -->
+    <div class="toolbar">
+      <input class="tsearch" id="otCmdInput" placeholder="Send OTGW command… (e.g. PS=1, TT=20.5)" aria-label="OTGW command" style="flex:1">
+      <button class="tbtn" id="otCmdSend">Send</button>
+      <span class="tchip" id="otCmdStatus" style="display:none" aria-live="polite"></span>
+    </div>
     <div class="console" id="monLog" role="log" aria-live="polite" aria-label="Live OpenTherm log"></div>
     <div class="statfoot">
       <span>Lines: <b id="logCount">0</b></span>

@@ -1798,6 +1798,25 @@
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
   }
 
+  // ---------- Monitor > Log > send raw OTGW command (TASK-965) ----------
+  function showCmdStatus(msg, ok) {
+    var st = document.getElementById('otCmdStatus'); if (!st) return;
+    st.textContent = msg; st.style.display = ''; st.classList.toggle('on', !!ok);
+    clearTimeout(st._t); st._t = setTimeout(function () { st.style.display = 'none'; }, 2600);
+  }
+  function sendOtgwCmd() {
+    var inp = document.getElementById('otCmdInput');
+    var cmd = ((inp && inp.value) || '').trim();
+    if (!cmd) { showCmdStatus('Enter a command', false); return; }
+    fetch(APIGW + 'v2/otgw/commands', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ command: cmd })
+    }).then(function (r) {
+      if (r.status === 202 || r.ok) { showCmdStatus('Sent: ' + cmd, true); if (inp) inp.value = ''; }
+      else { showCmdStatus('Error ' + r.status, false); }
+    }).catch(function () { showCmdStatus('Send failed', false); });
+  }
+
   // ---------- init ----------
   function init() {
     initTheme();
@@ -1818,6 +1837,10 @@
     if (lp) lp.addEventListener('click', function () { logPaused = !logPaused; lp.textContent = logPaused ? '▶ Resume' : '⏸ Pause'; });
     var ls = document.getElementById('logSearch');
     if (ls) ls.addEventListener('input', function () { logSearch = ls.value; if (isMonitorLogVisible()) renderLog(); });
+    // TASK-965: send raw OTGW command (button + Enter key)
+    var ocs = document.getElementById('otCmdSend'), oci = document.getElementById('otCmdInput');
+    if (ocs) ocs.addEventListener('click', sendOtgwCmd);
+    if (oci) oci.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); sendOtgwCmd(); } });
     var cs = document.getElementById('chipScroll');
     if (cs) cs.addEventListener('click', function () { logAutoScroll = !logAutoScroll; cs.classList.toggle('on', logAutoScroll); });
     var ct = document.getElementById('chipTs');

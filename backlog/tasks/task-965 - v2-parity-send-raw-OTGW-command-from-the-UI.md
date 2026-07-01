@@ -1,9 +1,11 @@
 ---
 id: TASK-965
 title: 'v2 parity: send raw OTGW command from the UI'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-06-30 23:06'
+updated_date: '2026-07-01 04:43'
 labels: []
 dependencies: []
 ordinal: 177000
@@ -17,6 +19,12 @@ Verified gap (grep ~0 hits in v2): Classic has an OT-command input + Send button
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 v2 has a command input + send that POSTs the OTGW command and shows success/error status
-- [ ] #2 Verified on-device: a command sent from v2 reaches the gateway (e.g. PS=1 toggles, confirmed via status/telnet)
+- [x] #1 v2 has a command input + send that POSTs the OTGW command and shows success/error status
+- [x] #2 Verified on-device: a command sent from v2 reaches the gateway (e.g. PS=1 toggles, confirmed via status/telnet)
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+v2 parity: send a raw OTGW command from the UI (closes the action gap vs Classic). Added a command input + Send + status row to the v2 Monitor > Log toolbar; POSTs {command} to /api/v2/otgw/commands (202 Accepted). Works on PIC and OT-Direct (OTGW32 translates PIC commands to OT frames). Enter key also sends; status shows 'Sent: <cmd>' / error and auto-clears. Reuses tsearch/tbtn/tchip classes (no drift). Verified on .39: input+Send present, Send 'PR=A' -> POST 202, status 'Sent: PR=A', input cleared, 0 console errors.
+<!-- SECTION:FINAL_SUMMARY:END -->
