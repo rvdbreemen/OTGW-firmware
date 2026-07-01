@@ -70,7 +70,7 @@
     else if (t === 'mstats') renderStats();
     else if (t === 'msupport') renderSupport();
     else if (t === 'mgraph') renderGraph();
-    else if (t === 'mconn') fetchConn();
+    else if (t === 'mconn') { fetchConn(); fetchOtdOvr(); }
   }
 
   // ---------- back to the classic UI ----------
@@ -943,6 +943,13 @@
       CONN.ot.name = isPic ? 'PIC link' : (iface === 'OT-Direct' ? 'OT-Direct' : 'OpenTherm interface');
       CONN.ot.detail = iface || 'none';
       CONN.ot.s = (iface && iface !== 'None') ? 'st-ok' : 'st-down';
+      // TASK-964: the OT-Direct override panel is meaningful only on OT-Direct
+      // hardware (there is no direct bus to override behind a PIC gateway).
+      var otdOvrEl = document.getElementById('otdOvr');
+      if (otdOvrEl) {
+        if (iface === 'OT-Direct') { otdOvrEl.style.display = ''; wireOtdOvrApply(); }
+        else otdOvrEl.style.display = 'none';
+      }
       // Gateway MODE (PIC only). otgwmode is absent on OT-Direct -> N/A.
       if (h.otgwmode === undefined) { CONN.mode.value = isPic ? 'detecting' : 'n/a'; }
       else { var m = ('' + h.otgwmode).toLowerCase(); CONN.mode.value = (m === 'on') ? 'gateway' : (m === 'off') ? 'monitor' : m; }
@@ -968,6 +975,54 @@
       CONN.api.s = 'st-ok';
       renderConnMap(); renderConnStrip(); renderConnDetail();
     }).catch(function () { });
+  }
+  // ---------- Monitor > Connection > OT-Direct manual overrides (TASK-964) ----------
+  function otdHex(v) { return '0x' + ('0000' + ((v >>> 0)).toString(16)).slice(-4).toUpperCase(); }
+  function fetchOtdOvr() {
+    fetch(APIGW + 'v2/otdirect/overrides').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j && j.overrides) renderOtdOvr(j.overrides); }).catch(function () { });
+  }
+  function otdOvrRow(label, msgid, valueTxt, clearAction) {
+    var row = document.createElement('div'); row.className = 'ble-row';
+    var nm = document.createElement('div'); nm.className = 'ble-nm';
+    nm.appendChild(document.createTextNode(label + ' · MsgID ' + msgid));
+    if (valueTxt) { var v = document.createElement('span'); v.className = 'ble-mac'; v.textContent = valueTxt; nm.appendChild(v); }
+    row.appendChild(nm);
+    if (clearAction) {
+      var ctr = document.createElement('div'); ctr.className = 'ble-ctrls';
+      var btn = document.createElement('button'); btn.className = 'tbtn'; btn.textContent = 'Clear';
+      btn.addEventListener('click', function () { otdOvrPost(clearAction, msgid); });
+      ctr.appendChild(btn); row.appendChild(ctr);
+    }
+    return row;
+  }
+  function renderOtdOvr(ov) {
+    var el = document.getElementById('otdOvrList'); if (!el) return;
+    el.textContent = ''; var any = false;
+    (ov.write || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('Write', e.msgid, otdHex(e.value), null)); });
+    (ov.response || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('SR', e.msgid, otdHex(e.value), 'cr')); });
+    (ov.modify || []).forEach(function (e) { any = true; el.appendChild(otdOvrRow('RM', e.msgid, otdHex(e.value), 'cm')); });
+    (ov.unknown || []).forEach(function (id) { any = true; el.appendChild(otdOvrRow('UI', (id && id.msgid !== undefined) ? id.msgid : id, '', 'ki')); });
+    if (!any) { var e = document.createElement('div'); e.className = 'ble-row'; e.style.color = 'var(--muted)'; e.textContent = 'No active overrides'; el.appendChild(e); }
+  }
+  function otdOvrPost(action, msgid, value) {
+    var url = APIGW + 'v2/otdirect/overrides?action=' + action + '&msgid=' + encodeURIComponent(msgid);
+    if ((action === 'sr' || action === 'rm') && value) url += '&value=' + encodeURIComponent(value);
+    fetch(url, { method: 'POST', mode: 'cors' }).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { if (j && j.overrides) renderOtdOvr(j.overrides); else fetchOtdOvr(); }).catch(function () { });
+  }
+  function wireOtdOvrApply() {
+    var btn = document.getElementById('otdOvrApply'); if (!btn || btn._wired) return; btn._wired = true;
+    var sel = document.getElementById('otdOvrAction'), vi = document.getElementById('otdOvrValue');
+    // Hex value only applies to the "set" actions (SR/RM); hide it for the rest.
+    if (sel && vi) { var upd = function () { vi.style.display = (sel.value === 'sr' || sel.value === 'rm') ? '' : 'none'; }; sel.addEventListener('change', upd); upd(); }
+    btn.addEventListener('click', function () {
+      var a = sel ? sel.value : '', mi = document.getElementById('otdOvrMsgid');
+      var m = mi ? mi.value : '';
+      if (!a || m === '' || m == null) return;
+      otdOvrPost(a, m, vi ? vi.value : '');
+      if (mi) mi.value = ''; if (vi) vi.value = '';
+    });
   }
   function connRecency(c) {
     if (c.s === 'st-off') return 'disabled';

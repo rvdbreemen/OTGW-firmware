@@ -463,6 +463,28 @@
     </div>
 
     <div id="connDetail"></div>
+
+    <!-- TASK-964: OT-Direct manual overrides. Shown only on OT-Direct hardware
+         (fetchConn toggles it when the OpenTherm interface is OT-Direct). Mirrors
+         the classic Home override panel: set/clear stored responses + modifiers. -->
+    <div id="otdOvr" class="set-group" style="display:none;margin-top:14px">
+      <h3>OT-Direct overrides</h3>
+      <p class="ot-support-hint">Set or clear stored responses / response modifiers on the direct OpenTherm bus.</p>
+      <div id="otdOvrList"></div>
+      <div class="ble-ctrls" style="margin-top:8px">
+        <select id="otdOvrAction" class="tbtn" aria-label="Override action" style="flex:0 0 auto">
+          <option value="sr">SR · Set stored response</option>
+          <option value="cr">CR · Clear stored response</option>
+          <option value="rm">RM · Set response modifier</option>
+          <option value="cm">CM · Clear modifier</option>
+          <option value="ui">UI · Mark unknown ID</option>
+          <option value="ki">KI · Mark known ID</option>
+        </select>
+        <input id="otdOvrMsgid" type="number" min="0" max="127" placeholder="MsgID" aria-label="OpenTherm message ID" style="width:82px">
+        <input id="otdOvrValue" type="text" maxlength="4" placeholder="Hex" aria-label="Override value (hex)" style="width:82px">
+        <button id="otdOvrApply" class="tbtn">Apply</button>
+      </div>
+    </div>
   </div>
 </div><!-- /page-monitor -->
 
