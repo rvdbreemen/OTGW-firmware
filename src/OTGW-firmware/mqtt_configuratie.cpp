@@ -331,6 +331,10 @@ const char ha_lbl_remote_override_manual_change_priority[] PROGMEM = "remote_ove
 const char ha_lbl_remote_override_program_change_priority[] PROGMEM = "remote_override_program_change_priority";
 const char ha_lbl_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storage_slave_fault_indicator";
 const char ha_lbl_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
+// Gateway/OTGW connection status (faux dataid 244). Both use IS_PIC (0x08) ->
+// "otgw-pic/gateway_mode" and "otgw-pic/otgw_connected" (1.x publishes both via sendMQTTDataPic).
+const char ha_lbl_gateway_mode[] PROGMEM = "gateway_mode";
+const char ha_lbl_otgw_connected[] PROGMEM = "otgw_connected";
 
 // ========== Named PROGMEM strings: Friendly names ==========
 const char ha_name_status_master[] PROGMEM = "Status_Master";
@@ -641,6 +645,8 @@ const char ha_name_remote_override_manual_change_priority[] PROGMEM = "remote_ov
 const char ha_name_remote_override_program_change_priority[] PROGMEM = "remote_override_program_change_priority";
 const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storage_slave_fault_indicator";
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
+const char ha_name_gateway_mode[] PROGMEM = "Gateway_Mode";
+const char ha_name_otgw_connected[] PROGMEM = "OTGW_Connected";
 // ========== Sensor array (289 entries, sorted by id) ==========
 const uint16_t MQTT_HA_SENSOR_COUNT = 335;  // +5 (uptime, unsupported_msgids, ws/mqtt/http_fragskips)
 
@@ -1114,7 +1120,7 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 };
 
 // ========== Binary sensor array (53 entries, sorted by id) ==========
-const uint16_t MQTT_HA_BINSENSOR_COUNT = 53;
+const uint16_t MQTT_HA_BINSENSOR_COUNT = 55;  // +2 (gateway_mode, otgw_connected; faux id 244)
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1181,6 +1187,11 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     {101, 0x00, ha_lbl_solar_storage_slave_fault_indicator, ha_name_solar_storage_slave_fault_indicator, HaIcon::alert_circle, HaEntityCat::none, false},
     // --- OT ID 113 ---
     {113, 0x00, ha_lbl_solar_storage_system_type, ha_name_solar_storage_system_type, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
+    // --- Pseudo-ID 244: gateway/OTGW connection status ---
+    // Both use IS_PIC (0x08) -> otgw-pic/{gateway_mode,otgw_connected}. Values
+    // publish "on"/"off" via CCONOFF (default on_off payload).
+    {244, 0x08, ha_lbl_gateway_mode,   ha_name_gateway_mode,   HaIcon::lan_connect, HaEntityCat::diagnostic, true},
+    {244, 0x08, ha_lbl_otgw_connected, ha_name_otgw_connected, HaIcon::lan_connect, HaEntityCat::diagnostic, true},
 };
 
 // ========== Index arrays (OT ID -> first entry) ==========
@@ -1688,7 +1699,7 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 241
     0xFFFF, // id 242
     0xFFFF, // id 243
-    0xFFFF, // id 244
+    53,     // id 244, 2 entries (gateway_mode, otgw_connected)
     0xFFFF, // id 245
     0xFFFF, // id 246
     0xFFFF, // id 247
