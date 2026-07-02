@@ -254,11 +254,24 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* ================= primary pages + concept chips ================= */
   .page{display:none}
   .page.active{display:block}
-  .cchips{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
-  .cchip{border:1px solid var(--border);background:var(--panel);color:var(--text);
-    border-radius:20px;padding:9px 16px;font-size:.82rem;cursor:pointer;min-height:40px;
-    font-family:var(--font-sans)}
-  .cchip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  /* Home view picker — one unobtrusive dropdown (design update 2026-07-01). */
+  .viewpick{position:relative;display:flex;justify-content:flex-end;margin:0 0 12px}
+  .viewpick-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--panel);
+    color:var(--text);border-radius:10px;padding:8px 12px;font-size:.82rem;font-weight:600;cursor:pointer;
+    font-family:var(--font-sans);min-height:40px}
+  .viewpick-btn .vp-car{opacity:.55;font-size:.7rem;margin-left:1px}
+  .viewpick-btn .vp-lead{color:var(--muted);font-weight:600}
+  .viewpick-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;background:var(--panel);
+    border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 16px rgba(0,0,0,.2);padding:6px;
+    display:none;min-width:210px}
+  .viewpick-menu.show{display:block}
+  .vp-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:none;
+    color:var(--text);border-radius:8px;padding:9px 11px;font-size:.85rem;cursor:pointer;font-family:var(--font-sans);min-height:40px}
+  .vp-item:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+  .vp-item .vp-chk{width:1em;font-size:.8rem;color:var(--accent);opacity:0}
+  .vp-item.active{font-weight:700}
+  .vp-item.active .vp-chk{opacity:1}
+  .vp-item small{display:block;color:var(--muted);font-size:.7rem;font-weight:400;margin-top:1px}
 
   /* ================= MONITOR page ================= */
   .subtabs{display:flex;gap:6px;margin:2px 0 14px;flex-wrap:wrap}
@@ -526,7 +539,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* ================= TASK-932 mobile review: tap targets + readability ≤719px ================= */
   @media(max-width:719px){
     /* lift sub-44px controls to the 44px comfortable touch target */
-    .connsum,.connpill,.seg2btn,.cchip,.tbtn,.theme-toggle,.ovr-badge{min-height:44px}
+    .connsum,.connpill,.seg2btn,.viewpick-btn,.vp-item,.tbtn,.theme-toggle,.ovr-badge{min-height:44px}
     /* bump the smallest labels for phone readability */
     .ble-tag{font-size:.66rem}
     .mc-cell .lbl{font-size:.68rem}

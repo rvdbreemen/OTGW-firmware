@@ -56,16 +56,23 @@
   }
 
   // ---------- Home concept chips (A/B/C) ----------
+  var VIEW_LABELS = { a: 'System view', b: 'At a glance', c: 'Mission control' };
   function showDesign(d) {
-    document.querySelectorAll('.cchip').forEach(function (s) {
+    document.querySelectorAll('.vp-item').forEach(function (s) {
       s.classList.toggle('active', s.dataset.design === d);
     });
     ['a', 'b', 'c'].forEach(function (k) {
       var el = document.getElementById('design-' + k);
       if (el) el.classList.toggle('active', k === d);
     });
+    var lbl = document.getElementById('viewPickLabel');
+    if (lbl) lbl.textContent = VIEW_LABELS[d] || VIEW_LABELS.a;
     try { localStorage.setItem('otgw-v2-design', d); } catch (e) { }
     if (typeof renderActive === 'function') renderActive();
+  }
+  function closeViewMenu() {
+    var m = document.getElementById('viewPickMenu'); if (m) m.classList.remove('show');
+    var b = document.getElementById('viewPickBtn'); if (b) b.setAttribute('aria-expanded', 'false');
   }
 
   // ---------- Monitor sub-tabs ----------
@@ -406,7 +413,7 @@
   }
 
   function activeDesign() {
-    var d = document.querySelector('.cchip.active');
+    var d = document.querySelector('.vp-item.active');
     return d ? d.dataset.design : 'a';
   }
 
@@ -793,7 +800,7 @@
     requestAnimationFrame(function () { renderPending = false; renderActive(); });
   }
   function renderActive() {
-    var d = document.querySelector('.cchip.active');
+    var d = document.querySelector('.vp-item.active');
     var which = d ? d.dataset.design : 'a';
     if (which === 'a') renderA();
     else if (which === 'b') renderB();
@@ -3198,9 +3205,21 @@
     document.querySelectorAll('.seg').forEach(function (s) {
       s.addEventListener('click', function () { showPage(s.dataset.page); });
     });
-    document.querySelectorAll('.cchip').forEach(function (s) {
-      s.addEventListener('click', function () { showDesign(s.dataset.design); });
+    document.querySelectorAll('.vp-item').forEach(function (s) {
+      s.addEventListener('click', function () { showDesign(s.dataset.design); closeViewMenu(); });
     });
+    (function () {
+      var btn = document.getElementById('viewPickBtn'), menu = document.getElementById('viewPickMenu');
+      if (!btn || !menu) return;
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = menu.classList.toggle('show');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest || !e.target.closest('#viewPick')) closeViewMenu();
+      });
+    })();
     // Monitor sub-tabs only (scoped so Advanced's own .subtab elements are wired separately).
     document.querySelectorAll('#page-monitor .subtab').forEach(function (s) {
       s.addEventListener('click', function () { showTab(s.dataset.tab); });

@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>OTGW firmware</title>
-<link rel="stylesheet" href="ds-tokens.css">
-<link rel="stylesheet" href="v2.css">
 <script>
   // Pre-paint theme (shared key with the classic UI) to avoid flash-of-wrong-theme.
   (function(){
@@ -18,7 +16,44 @@
     }catch(e){}
   })();
 </script>
-<script src="./v2.js" defer></script>
+<script>
+  // TASK-978: load the stylesheets + v2.js with retry-on-503. A browser fires
+  // every page asset in parallel; the ADR-147 file-serve gate caps concurrent
+  // serves (WEB_FILE_MAX_INFLIGHT=4, lower under heap pressure) and 503s the
+  // excess. A 503'd <link>/<script> has no native retry, so the UI would render
+  // unstyled (CSS dropped) or dead (v2.js dropped) with nothing surfaced. This
+  // mirrors the classic index.html loader (TASK-960): retry with linear backoff
+  // so every asset arrives as gate slots free.
+  (function(){
+    var MAX = 8;
+    function loadCss(href){
+      var attempt = 0;
+      (function go(){
+        var l = document.createElement('link');
+        l.rel = 'stylesheet'; l.href = href;
+        l.onerror = function(){
+          if (l.parentNode) l.parentNode.removeChild(l);
+          if (++attempt <= MAX) setTimeout(go, 200 * attempt);
+          else console.error('[loader] gave up on ' + href);
+        };
+        document.head.appendChild(l);
+      })();
+    }
+    loadCss('ds-tokens.css');
+    loadCss('v2.css');
+    var jsAttempt = 0;
+    (function loadJs(){
+      var s = document.createElement('script');
+      s.src = './v2.js'; s.defer = true;
+      s.onerror = function(){
+        if (s.parentNode) s.parentNode.removeChild(s);
+        if (++jsAttempt <= MAX) setTimeout(loadJs, 200 * jsAttempt);
+        else console.error('[loader] gave up on v2.js');
+      };
+      document.head.appendChild(s);
+    })();
+  })();
+</script>
 </head>
 <body>
 
@@ -56,10 +91,16 @@
 
 <!-- ════════════════ PAGE: HOME ════════════════ -->
 <div id="page-home" class="page active">
-<div class="cchips">
-  <button class="cchip active" data-design="a">System view</button>
-  <button class="cchip" data-design="b">At a glance</button>
-  <button class="cchip" data-design="c">Mission control</button>
+<div class="viewpick" id="viewPick">
+  <button type="button" class="viewpick-btn" id="viewPickBtn" aria-haspopup="true" aria-expanded="false" title="Choose home view">
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="1" y="1" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1"/></svg>
+    <span class="vp-lead">View:</span><span id="viewPickLabel">System view</span><span class="vp-car">▾</span>
+  </button>
+  <div class="viewpick-menu" id="viewPickMenu" role="menu">
+    <button type="button" class="vp-item active" data-design="a" role="menuitem"><span class="vp-chk">✓</span><span>System view<small>the heating system, live</small></span></button>
+    <button type="button" class="vp-item" data-design="b" role="menuitem"><span class="vp-chk">✓</span><span>At a glance<small>phone-first, one dial</small></span></button>
+    <button type="button" class="vp-item" data-design="c" role="menuitem"><span class="vp-chk">✓</span><span>Mission control<small>live strip chart + raw bus</small></span></button>
+  </div>
 </div>
 
 <!-- ============ DESIGN A — SYSTEM VIEW ============ -->
