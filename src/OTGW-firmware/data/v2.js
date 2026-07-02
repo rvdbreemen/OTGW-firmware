@@ -1681,6 +1681,13 @@
         bySub[s].forEach(function (k) { card.appendChild(settingRow(k)); });
         wrap.appendChild(card);
       });
+      // TASK-985: give the Webhook group an inline Send-test-call action. renderSettings
+      // rebuilds #setCols on every render, so the row is re-appended here (not once) —
+      // the webhook category has a single set-group (no sub-groups).
+      if (id === 'webhook') {
+        var whCard = wrap.querySelector('.set-group');
+        if (whCard) whCard.appendChild(webhookTestRow());
+      }
       cols.appendChild(wrap);
     });
     if (bleData) renderBleCard();
@@ -1730,6 +1737,63 @@
     }
     row.appendChild(input);
     return row;
+  }
+  // TASK-985: Webhook "Send test call" action, appended to the Webhook settings group
+  // by renderSettings(). Fires the REAL POST /api/v2/webhook/test?state=on. The endpoint
+  // is fire-and-forget: it returns {"status":"ok"} immediately and sends the SAVED ON
+  // URL/payload from its own FreeRTOS task. The target server's HTTP result is not
+  // exposed by the firmware, so the success line reports the endpoint's own ack + a
+  // local timestamp, not the remote status.
+  function webhookTestRow() {
+    var wrap = document.createElement('div'); wrap.className = 'wh-actions';
+    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'tbtn';
+    btn.textContent = 'Send test call';
+    btn.title = 'Fires the saved ON webhook (POST /api/v2/webhook/test)';
+    var status = document.createElement('span'); status.className = 'wh-status';
+    status.textContent = 'Not fired yet';
+    wrap.appendChild(btn); wrap.appendChild(status);
+    btn.addEventListener('click', function () {
+      // Disabled-guard: mirror the mockup — block only when the enable checkbox is
+      // present and unchecked. (The firmware itself fires regardless of bEnabled; this
+      // is a UX gate, so an absent checkbox — e.g. filtered out by search — proceeds.)
+      var en = document.querySelector('#setCols .srow[data-key="webhookenable"] input.sw');
+      if (en && !en.checked) {
+        status.className = 'wh-status';
+        status.textContent = 'Webhook disabled — enable it above first';
+        return;
+      }
+      status.className = 'wh-status'; status.textContent = 'Sending…';
+      btn.disabled = true;
+      // credentials:'same-origin' so HTTP Basic-Auth + CSRF same-origin (ADR-056) hold.
+      fetch(APIGW + 'v2/webhook/test?state=on', { method: 'POST', credentials: 'same-origin' })
+        .then(function (r) {
+          btn.disabled = false;
+          if (r.status === 401 || r.status === 403) {
+            status.className = 'wh-status';
+            status.textContent = 'Auth required — sign in first (HTTP ' + r.status + ')';
+            return;
+          }
+          if (!r.ok) {
+            status.className = 'wh-status';
+            status.textContent = 'Error: HTTP ' + r.status;
+            return;
+          }
+          return r.text().then(function (body) {
+            var st = 'ok';
+            try { var j = JSON.parse(body); if (j && j.status) st = j.status; }
+            catch (e) { /* non-JSON ack still counts as sent */ }
+            var ts = new Date().toTimeString().slice(0, 8);
+            status.className = 'wh-status ok';
+            status.textContent = '✓ ' + st + ' · ' + ts;
+          });
+        })
+        .catch(function (e) {
+          btn.disabled = false;
+          status.className = 'wh-status';
+          status.textContent = 'Error: ' + ((e && e.message) ? e.message : 'network');
+        });
+    });
+    return wrap;
   }
   function markDirty(k, val, row) {
     // Password fields show empty; an empty value means "leave unchanged", so it is

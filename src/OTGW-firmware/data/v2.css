@@ -398,6 +398,10 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     width:46%;max-width:220px;border:1px solid var(--border);background:var(--panel-2);
     color:var(--text);border-radius:8px;padding:8px 10px;font-size:.84rem;font-family:var(--font-sans)}
   .srow.dirty .slbl::before{content:'●';color:var(--zone-warn);margin-right:6px;font-size:.7rem}
+  /* TASK-985: webhook Send-test-call action row appended to the Webhook settings group. */
+  .wh-actions{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+  .wh-status{font-size:.8rem;color:var(--muted);font-family:var(--font-mono)}
+  .wh-status.ok{color:var(--zone-ok)}
   .sw{appearance:none;width:44px;height:24px;background:var(--tile-off);border-radius:12px;
     position:relative;cursor:pointer;transition:background .2s;flex:0 0 auto}
   .sw:checked{background:var(--accent)}
