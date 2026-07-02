@@ -463,6 +463,23 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .connpill .pk{opacity:.8}
   .connpill .pv{font-weight:700}
 
+  /* TASK-984: override-injection visibility — Home A badge + on-bus map badge + floating panel.
+     Panel is read-only: the ADR-118 store carries {id,kind,value,age} only (no orig value / Clear). */
+  .ovr-badge{border:1.5px solid var(--zone-warn);background:color-mix(in srgb,var(--zone-warn) 16%,var(--panel));
+    color:var(--zone-warn);border-radius:20px;padding:5px 12px;font-size:.76rem;font-weight:700;cursor:pointer;
+    font-family:var(--font-sans);min-height:32px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .ovr-badge.hidden{display:none}
+  .ovr-panel{position:fixed;top:128px;right:14px;width:300px;background:var(--panel);
+    border:1px solid var(--zone-warn);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.22);
+    padding:13px 15px;z-index:40;display:none}
+  .ovr-panel.show{display:block}
+  .ovr-panel h4{margin:0 0 4px;font-size:.86rem;display:flex;align-items:center;gap:7px}
+  .ovr-panel .sub{font-size:.72rem;color:var(--muted);margin:0 0 8px}
+  .ovr-item{font-size:.82rem;padding:8px 0;border-top:1px solid var(--border)}
+  .ovr-item:first-of-type{border-top:0}
+  .ovr-item .r1{display:flex;align-items:center;gap:8px}
+  .ovr-item .r2{font-size:.72rem;color:var(--muted);margin-top:2px}
+
   .connlegend{display:flex;flex-wrap:wrap;gap:14px;background:var(--panel);border:1px solid var(--border);
     border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);margin-bottom:14px;font-size:.8rem}
   .connlegend .lg{display:flex;align-items:center;gap:8px;color:var(--muted)}
@@ -505,7 +522,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* ================= TASK-932 mobile review: tap targets + readability ≤719px ================= */
   @media(max-width:719px){
     /* lift sub-44px controls to the 44px comfortable touch target */
-    .connsum,.connpill,.seg2btn,.cchip,.tbtn,.theme-toggle{min-height:44px}
+    .connsum,.connpill,.seg2btn,.cchip,.tbtn,.theme-toggle,.ovr-badge{min-height:44px}
     /* bump the smallest labels for phone readability */
     .ble-tag{font-size:.66rem}
     .mc-cell .lbl{font-size:.68rem}

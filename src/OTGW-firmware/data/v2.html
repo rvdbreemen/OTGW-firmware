@@ -69,6 +69,8 @@
         <button class="seg2btn active" data-appl="gas">🔥 Boiler</button>
         <button class="seg2btn" data-appl="hp">⚡ Heat pump</button>
       </span>
+      <!-- TASK-984: injected-value badge. Hidden when zero; opens the override panel. -->
+      <button class="ovr-badge hidden" id="aOvrBadge" style="margin-left:auto" title="The gateway is injecting values onto the OT bus — click for detail">⛓ <span id="aOvrCount">0</span> injected</button>
     </div>
 
     <svg class="schematic" id="schem" viewBox="0 0 800 470" role="img"
@@ -498,6 +500,11 @@
           <circle class="cn-statedot" id="dot-ws" cx="808" cy="278" r="7"/>
         </g>
         <text class="cn-sub" x="760" y="344">This browser</text>
+        <!-- TASK-984: override signal on the OT bus (elbows converge at y=180). Hidden when zero. -->
+        <g id="cnOvr" style="cursor:pointer;display:none" role="button" aria-label="Active gateway overrides — click for detail">
+          <rect x="200" y="167" width="96" height="26" rx="13" fill="color-mix(in srgb,var(--zone-warn) 16%,var(--panel))" stroke="var(--zone-warn)" stroke-width="1.5"/>
+          <text id="cnOvrTxt" x="248" y="184" text-anchor="middle" font-size="12" font-weight="700" fill="var(--zone-warn)" font-family="var(--font-sans)">⛓ 0 injected</text>
+        </g>
       </svg>
     </div>
 
@@ -642,6 +649,8 @@
 <div class="foot">OTGW firmware · v2 Web UI · live from the OpenTherm bus</div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite">Settings saved</div>
+<!-- TASK-984: floating override-detail panel (fixed position). Opened by #aOvrBadge (Home) and #cnOvr (Monitor map). -->
+<div class="ovr-panel" id="ovrPanel"></div>
 
 
 </body>

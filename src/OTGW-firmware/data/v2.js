@@ -809,6 +809,14 @@
   }
 
   function txt(id, s) { var el = document.getElementById(id); if (el) el.textContent = s; }
+  // TASK-984: append the ⛓ injected-override mark (+ tooltip) to a readout without
+  // clobbering its formatted value; clears the mark/title when the datapoint is plain.
+  function setMark(id, base, on) {
+    var el = document.getElementById(id); if (!el) return;
+    el.textContent = on ? base + ' ⛓' : base;
+    if (on) el.title = 'This value is being injected onto the OT bus by the gateway';
+    else el.removeAttribute('title');
+  }
   function fmt(v, dp, suffix) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return v.toFixed(dp === undefined ? 1 : dp) + (suffix || '');
@@ -846,9 +854,22 @@
     txt('aFlow', fmt(model.flow, 1, '°'));
     txt('aRet', fmt(model.ret, 1, '°'));
     txt('aDhw', model.dhw === null ? '—' : Math.round(model.dhw) + '°');
-    txt('aOut', fmt(model.outside, 1, '°'));
+    // TASK-984: decorate the outside-temp and room-setpoint readouts with ⛓ when
+    // those specific values are being gateway-injected (MsgID 27, resp. 9/16).
+    var ovrOut = ovrRows.some(function (o) { return ovrMark(o.id) === 'aOut'; });
+    var ovrSet = ovrRows.some(function (o) { return ovrMark(o.id) === 'aRoomSet'; });
+    setMark('aOut', fmt(model.outside, 1, '°'), model.outside !== null && ovrOut);
     txt('aRoom', fmt(model.room, 1, '°'));
-    txt('aRoomSet', model.roomSet === null ? '' : 'set ' + fmt(model.roomSet, 1, '°'));
+    var setBase = model.roomSet === null ? '' : 'set ' + fmt(model.roomSet, 1, '°');
+    setMark('aRoomSet', setBase, !!setBase && ovrSet);
+    // injected-override badge — count from the same polled overrides model.
+    var aob = document.getElementById('aOvrBadge');
+    if (aob) {
+      var no = ovrRows.length;
+      aob.classList.toggle('hidden', !no);
+      txt('aOvrCount', no);
+      if (!aob._wired) { aob._wired = true; aob.addEventListener('click', function (e) { e.stopPropagation(); toggleOvrPanel(); }); }
+    }
     txt('aModBig', model.mod === null ? '—' : Math.round(model.flame ? model.mod : 0) + '%');
     txt('aModTag', isHP ? 'COMPRESSOR' : 'MODULATION');
     // LCD context line: FAULT / DHW xx° / HP|CH xx% / HP|CH idle
@@ -1156,6 +1177,7 @@
       renderConnMap(); renderConnStrip(); renderConnDetail();
       renderHdrNet();   // TASK-983: refresh Wi-Fi bars + dBm tooltip from the live RSSI
       fetchSim();       // TASK-983: piggyback the SIMULATION-badge poll on this cadence
+      fetchOverrides(iface);   // TASK-984: refresh the injected-override count/list (source by interface)
     }).catch(function () { });
   }
   // ---------- Monitor > Connection > OT-Direct manual overrides (TASK-964) ----------
@@ -1236,7 +1258,88 @@
     var md = document.getElementById('cnModeTxt');
     if (md) md.textContent = CONN.mode.value === 'gateway' ? 'GATEWAY MODE' : CONN.mode.value === 'monitor' ? 'MONITOR MODE' : CONN.mode.value === 'n/a' ? 'NO PIC' : ('MODE: ' + (CONN.mode.value || '?').toUpperCase());
     var dm = document.getElementById('dot-mode'); if (dm) dm.setAttribute('fill', (CONN.mode.value === 'gateway' || CONN.mode.value === 'monitor') ? STV['st-mode'] : STV['st-unknown']);
+    updateCnOvr();   // TASK-984: refresh the on-bus override badge from the cached rows
     renderConnDetail();
+  }
+
+  // ---------- Override-injection visibility (TASK-984) ----------
+  // The gateway can inject values onto the OT bus (ADR-118: PIC recordOTOverride) or,
+  // on OT-Direct hardware, the user's manual stored-response / modifier overrides. We
+  // surface the live count on Home (design A) and the connection map, and list the rows
+  // in a floating read-only panel. Polled on the fetchConn cadence — no new timer.
+  var ovrRows = [];   // normalized [{ id: <OT MsgID>, name, meta }]
+  // MsgID -> which Design-A readout the injection decorates. 9 = remote-override room
+  // setpoint (TrOverride), 16 = room setpoint (TrSet); 27 = outside temperature (Toutside).
+  function ovrMark(id) { return (id === 9 || id === 16) ? 'aRoomSet' : (id === 27 ? 'aOut' : null); }
+  function normPicOvr(j) {
+    var rows = (j && Array.isArray(j.overrides)) ? j.overrides : [];
+    return rows.map(function (r) {
+      var name = (r.friendly && r.friendly.length) ? r.friendly : (r.label || ('MsgID ' + r.id));
+      var kind = (r.kind === 'answer') ? 'answer' : 'substituted';
+      var val = (typeof r.value === 'number') ? r.value.toFixed(2) : r.value;
+      return { id: r.id, name: name, meta: kind + ' = ' + val + ' · ' + r.age_s + 's' };
+    });
+  }
+  function normOtdOvr(j) {
+    var ov = (j && j.overrides) ? j.overrides : {};
+    var out = [];
+    function push(arr, label) {
+      (arr || []).forEach(function (e) {
+        var mid = (e && e.msgid !== undefined) ? e.msgid : e;
+        var idn = (typeof mid === 'number') ? mid : parseInt(mid, 10);
+        var v = (e && e.value !== undefined) ? otdHex(e.value) : '';
+        out.push({ id: idn, name: label, meta: 'MsgID ' + mid + (v ? ' · ' + v : '') });
+      });
+    }
+    push(ov.write, 'Write'); push(ov.response, 'Stored response');
+    push(ov.modify, 'Response modifier'); push(ov.unknown, 'Unknown ID');
+    return out;
+  }
+  function fetchOverrides(iface) {
+    // On OT-Direct the gateway overrides endpoint is meaningless (no PIC); read the
+    // OT-Direct store instead. Both normalize into ovrRows; errors -> empty, silently.
+    var otd = (iface === 'OT-Direct');
+    var url = APIGW + (otd ? 'v2/otdirect/overrides' : 'v2/otgw/overrides');
+    function apply() { updateCnOvr(); scheduleRender(); }   // map badge + Home A badge/marks
+    fetch(url).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { ovrRows = otd ? normOtdOvr(j) : normPicOvr(j); apply(); })
+      .catch(function () { ovrRows = []; apply(); });
+  }
+  // On-bus badge in the connection-map SVG (#cnOvr sits on the y=180 shared bus segment).
+  function updateCnOvr() {
+    var g = document.getElementById('cnOvr'); if (!g) return;
+    var n = ovrRows.length;
+    g.style.display = n ? '' : 'none';
+    var tx = document.getElementById('cnOvrTxt'); if (tx) tx.textContent = '⛓ ' + n + ' injected';
+    g.onclick = function (e) { e.stopPropagation(); toggleOvrPanel(); };
+  }
+  // Floating read-only detail panel. The ADR-118 store carries {id,kind,value,age} only,
+  // so no originating-command / pre-override value / Clear affordance is available yet.
+  function renderOvrPanel() {
+    var p = document.getElementById('ovrPanel'); if (!p) return;
+    p.textContent = '';
+    var h = document.createElement('h4'); h.textContent = '⛓ Active gateway overrides'; p.appendChild(h);
+    var sub = document.createElement('p'); sub.className = 'sub';
+    sub.textContent = 'Values the gateway is injecting onto the OT bus — the boiler/thermostat see these, not the original.';
+    p.appendChild(sub);
+    if (!ovrRows.length) {
+      var m = document.createElement('div'); m.className = 'ovr-item'; m.style.color = 'var(--muted)';
+      m.textContent = 'No active overrides'; p.appendChild(m); return;
+    }
+    ovrRows.forEach(function (o) {
+      var it = document.createElement('div'); it.className = 'ovr-item';
+      var r1 = document.createElement('div'); r1.className = 'r1';
+      var nm = document.createElement('span'); nm.textContent = o.name; r1.appendChild(nm);
+      it.appendChild(r1);
+      var r2 = document.createElement('div'); r2.className = 'r2'; r2.textContent = o.meta;
+      it.appendChild(r2);
+      p.appendChild(it);
+    });
+  }
+  function toggleOvrPanel() {
+    var p = document.getElementById('ovrPanel'); if (!p) return;
+    if (!p.classList.contains('show')) renderOvrPanel();
+    p.classList.toggle('show');
   }
 
   // ---------- Settings (built from GET /api/v2/settings) ----------
@@ -2619,6 +2722,14 @@
     // TASK-983: fill the header identity chips (hostname·version + IP·Wi-Fi) once from
     // the heavy device/info snapshot. Never polled — the Wi-Fi bars refresh via fetchConn.
     withDeviceInfo(fillHeaderIdentity);
+
+    // TASK-984: close the floating override panel on an outside click. The two triggers
+    // (#aOvrBadge on Home, #cnOvr on the connection map) stopPropagation on their own
+    // clicks, but whitelist them here too so a bubbled click never self-closes the panel.
+    document.addEventListener('click', function (e) {
+      var p = document.getElementById('ovrPanel'); if (!p || !p.classList.contains('show')) return;
+      if (!p.contains(e.target) && !(e.target.closest && (e.target.closest('#cnOvr') || e.target.closest('#aOvrBadge')))) p.classList.remove('show');
+    });
 
     // P9 wiring -----------------------------------------------------------
     document.querySelectorAll('#applToggle .seg2btn').forEach(function (b) {
