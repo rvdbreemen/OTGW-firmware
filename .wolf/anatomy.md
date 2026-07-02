@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-02T05:19:53.083Z
-> Files: 542 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-02T07:12:49.950Z
+> Files: 543 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/06-claude/
 
@@ -796,6 +796,10 @@
 - `_decode.py` — get_decode_cache, decode, repl_func_with_cache (~859 tok)
 - `_encode.py` — get_encode_cache, encode (~744 tok)
 - `_format.py` — format (~179 tok)
+
+## docs/
+
+- `daily-issue-report.md` — Daily Issue Report — 2026-07-02 (~834 tok)
 
 ## src/OTGW-firmware/data/
 
