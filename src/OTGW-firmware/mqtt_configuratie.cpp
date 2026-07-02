@@ -1746,6 +1746,7 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::rpm: { static const char s[] PROGMEM = "rpm"; return s; }
         case HaUnit::ppm: { static const char s[] PROGMEM = "ppm"; return s; }
         case HaUnit::mS: { static const char s[] PROGMEM = "mS"; return s; }
+        case HaUnit::s: { static const char s[] PROGMEM = "s"; return s; }
         case HaUnit::h: { static const char s[] PROGMEM = "h"; return s; }
         case HaUnit::bytes: { static const char s[] PROGMEM = "B"; return s; }
         default: return nullptr;

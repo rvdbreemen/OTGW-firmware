@@ -9,7 +9,12 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 ## [Unreleased]
 
 ### Added
-- Unified heat/cool/off Home Assistant climate entity. The MQTT climate ("Thermostat") entity now represents cooling: `modes` are `off`/`heat`/`cool`, driven by new `hvac_mode` and `hvac_action` topics computed from the OpenTherm status bits. Cooling-capable systems (for example a Honeywell Round Modulation Heat/Cool on a heatpump) previously showed as heating-only, carrying the cooling setpoint with no way to reflect cooling. Mode is reflective (the thermostat owns heat/cool switching), and `hvac_action` reads the central-heating bit rather than flame, so DHW hot-water draws do not show as heating. Validated against real gas-boiler (idle, DHW, active heating) and heatpump (cooling) captures. (GH #665)
+- Gateway mode and OTGW-connected state as Home Assistant binary-sensor auto-discovery entities, gated by the discovery index so they publish once and self-heal. Home Assistant can now see whether the gateway is in gateway or monitor mode and whether the OTGW link is up, without scraping the debug page. (beta.6)
+- Uptime, unsupported-message-id count and per-path fragskip counters (`http_fragskips` / `mqtt_fragskips` / `ws_fragskips`) as Home Assistant auto-discovery sensors, so long-running-device health and the heap-fragmentation back-off activity are visible in Home Assistant. (beta.6)
+
+### Fixed
+- Build break on the uptime sensor: the discovery table referenced `HaUnit::s` (seconds) but that unit was never added to the `HaUnit` enum or its string mapper, so the firmware did not compile. Added the `s` unit (the uptime value is published in seconds). The gateway-mode, OTGW-connected and uptime/fragskip sensors above therefore reach devices for the first time in this build. (beta.6)
+- Unified heat/cool/off Home Assistant climate entity. The MQTT climate ("Thermostat") entity now represents cooling: `modes` are `off`/`heat`/`cool`, driven by new `hvac_mode` and `hvac_action` topics computed from the OpenTherm status bits. Cooling-capable systems (for example a Honeywell Round Modulation Heat/Cool on a heatpump) previously showed as heating-only, carrying the cooling setpoint with no way to reflect cooling. Mode is reflective (the thermostat owns heat/cool switching), and `hvac_action` reads the central-heating bit rather than flame, so DHW hot-water draws do not show as heating. `hvac_mode` and `hvac_action` are also exposed as standalone discoverable sensors. Validated against real gas-boiler (idle, DHW, active heating) and heatpump (cooling) captures. (GH #665, TASK-941)
 
 ## [1.7.0] - 2026-06-25
 

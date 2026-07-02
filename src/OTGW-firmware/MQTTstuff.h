@@ -75,6 +75,7 @@ enum class HaUnit : uint8_t {
     rpm,                // "rpm"
     ppm,                // "ppm"
     mS,                 // "mS" (milliseconds, S0 pulse time)
+    s,                  // "s" (seconds, uptime sensor)
     h,                  // "h" (hours)
     kW_percent,         // "kW/%" (MaxCapacity composite)
     bytes,              // "B" (bytes, used by heap-diag sensors)
