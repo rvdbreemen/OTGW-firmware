@@ -36,13 +36,17 @@
     document.querySelectorAll('.seg').forEach(function (s) {
       s.classList.toggle('active', s.dataset.page === p);
     });
-    ['home', 'monitor', 'settings', 'advanced'].forEach(function (k) {
+    ['home', 'sat', 'monitor', 'settings', 'advanced'].forEach(function (k) {
       var el = document.getElementById('page-' + k);
       if (el) el.classList.toggle('active', k === p);
     });
     try { localStorage.setItem('otgw-v2-page', p); } catch (e) { }
+    // TASK-986: the SAT page polls /api/v2/sat/status only while it is visible.
+    // Stop the poll on every navigation, then (re)arm it when entering the page.
+    satPageStop();
     if (p === 'monitor' && isMonitorLogVisible()) renderLog();
     if (p === 'settings') fetchSettings();
+    if (p === 'sat') satPageStart();
     // TASK-982: entering Advanced re-asserts its active sub-tab (restore-on-refresh,
     // TASK-808) and loads that tab's data on demand.
     if (p === 'advanced') {
@@ -2698,6 +2702,496 @@
     }).catch(function () { showCmdStatus('Send failed', false); });
   }
 
+  // ======================= SAT page (TASK-986) =======================
+  // Owns #page-sat. Polls GET /api/v2/sat/status every 5 s ONLY while the page
+  // is visible (satPageStart/Stop, driven by showPage). Renders three cumulative
+  // depth layers (Thermostat / Control / Technical) and writes back via the SAT
+  // POST routes verified in restAPI.ino: /sat/enable, /sat/target, /sat/preset,
+  // /sat/mode, /sat/settings/<name>. Temperature history accumulates client-side
+  // across polls (no firmware history endpoint, by design — mirrors classic sat.js).
+  var satPollTimer = null;
+  var satLastData = null;
+  var satMarkers = [];
+  var satMarkersLoaded = false;
+  var satHist = { set: [], flow: [], room: [], out: [], pid: [] };
+  var SAT_HIST_MAX = 720;               // ~1 h at the 5 s poll cadence
+  var satDhwDirty = false;              // user dragging the DHW slider — defer status echo
+  var satEnPending = false, satDhwEnPending = false, satSimPending = false;  // in-flight POST guards
+  var SAT_MODE_LABELS = ['Off', 'Continuous', 'PWM'];      // control_mode enum
+  var SAT_CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain'];  // last_cycle_class
+  var SAT_PRESET_NAMES = ['None', 'Away', 'Eco', 'Comfort', 'Sleep', 'Activity', 'Home'];   // active_preset enum
+  var SAT_PRESETS = [['home', '🏠 Home'], ['away', '🚪 Away'], ['eco', '🌱 Eco'], ['comfort', '🛋 Comfort'], ['sleep', '🌙 Sleep'], ['activity', '🏃 Activity']];
+  var SAT_BOILER_LABELS = {
+    off: 'Off', idle: 'Idle', preheating: 'Preheating', at_setpoint: 'At setpoint',
+    modulating_up: 'Modulating up', modulating_down: 'Modulating down', ignition_surge: 'Ignition surge',
+    stalled_ignition: 'Stalled ignition', anti_cycling: 'Anti-cycling', pump_starting: 'Pump starting',
+    waiting_flame: 'Waiting flame', overshoot_cooling: 'Overshoot cooling', post_cycle: 'Post-cycle',
+    heating: 'Heating', cooling: 'Cooling', heating_hot_water: 'Heating hot water'
+  };
+  // Heating-curve constants — JS port of satCalcHeatingCurve() in SATcontrol.ino.
+  var SAT_HC_FLOOR = 20.0, SAT_HC_RAD = 27.2, SAT_HC_REF = 20.0;
+
+  function satCssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888'; }
+  function satNum(v) { return (v !== null && v !== undefined && !isNaN(v)) ? +v : null; }
+  function satFmt(v, dp, suf) { var n = satNum(v); return n === null ? '—' : n.toFixed(dp === undefined ? 1 : dp) + (suf || ''); }
+
+  function satPageStart() {
+    fetchSatPage();
+    if (!satMarkersLoaded) { satMarkersLoaded = true; fetchSatMarkers(); }
+    if (satPollTimer) clearInterval(satPollTimer);
+    satPollTimer = setInterval(fetchSatPage, 5000);
+  }
+  function satPageStop() { if (satPollTimer) { clearInterval(satPollTimer); satPollTimer = null; } }
+
+  // POST helper for the /api/v2/sat/* write routes. Default content-type text/plain
+  // (matches how the routes parse the body via satExtractPostValue).
+  function satPost(sub, value, ctype) {
+    return fetch(APIGW + 'v2/sat/' + sub, {
+      method: 'POST', headers: { 'Content-Type': ctype || 'text/plain' }, body: String(value)
+    }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; });
+  }
+
+  function fetchSatPage() {
+    fetch(APIGW + 'v2/sat/status')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var nd = document.getElementById('satNoData'), body = document.getElementById('satBody');
+        if (!d || typeof d !== 'object') { if (nd) nd.style.display = ''; if (body) body.style.display = 'none'; return; }
+        if (nd) nd.style.display = 'none'; if (body) body.style.display = '';
+        satLastData = d;
+        try { renderSatPage(d); } catch (e) { }
+      })
+      .catch(function () {
+        // Hard failure (device unreachable) at first paint: show the no-data banner
+        // instead of a wall of dashes. Self-heals on the next poll once reachable.
+        if (!satLastData) {
+          var nd = document.getElementById('satNoData'), body = document.getElementById('satBody');
+          if (nd) nd.style.display = ''; if (body) body.style.display = 'none';
+        }
+      });
+    fetchSatPageWeather();
+  }
+
+  function fetchSatPageWeather() {
+    fetch(APIGW + 'v2/sat/weather')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (w) { if (w) renderSatWeather(w); })
+      .catch(function () { });
+  }
+
+  function fetchSatMarkers() {
+    fetch(APIGW + 'v2/sat/markers')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        satMarkers = Array.isArray(data) ? data : (data && Array.isArray(data.markers) ? data.markers : []);
+        satRenderMarkerList();
+        if (satLastData) satDrawCurve(satLastData);
+      })
+      .catch(function () { satMarkers = []; });
+  }
+
+  // Build a .kv card via DOM (textContent — safe for device-provided strings like manufacturer).
+  function satKv(id, rows) {
+    var box = document.getElementById(id); if (!box) return;
+    box.textContent = '';
+    rows.forEach(function (r) {
+      if (!r) return;
+      var row = document.createElement('div'); row.className = 'kv-row';
+      var k = document.createElement('span'); k.className = 'kv-k'; k.textContent = r[0];
+      var v = document.createElement('span'); v.className = 'kv-v'; v.textContent = r[1];
+      row.appendChild(k); row.appendChild(v); box.appendChild(row);
+    });
+  }
+
+  function renderSatPage(d) {
+    var enabled = !!d.enabled, active = !!d.active, heating = enabled && active;
+
+    var pill = document.getElementById('satPill');
+    if (pill) {
+      pill.textContent = !enabled ? 'Off' : (heating ? 'Heating' : 'Idle');
+      pill.className = 'sat-pill' + (!enabled ? ' off' : (heating ? '' : ' idle'));
+    }
+    txt('satEnableLbl', enabled ? 'Enabled' : 'Disabled');
+    var enCb = document.getElementById('satEnable'); if (enCb && !satEnPending) enCb.checked = enabled;
+
+    // L1 — dial + status + presets
+    satDialDraw(d);
+    var big;
+    if (!enabled) big = 'SAT is off';
+    else if (d.safety_tripped) big = 'Safety tripped!';
+    else if (d.window_open) big = 'Window open';
+    else if (d.summer_active) big = 'Summer mode';
+    else if (active) big = 'Heating to ' + satFmt(d.target_temp, 1, '°');
+    else big = 'At target · idle';
+    txt('satStatusBig', big);
+    satRenderPresets(d);
+
+    // L2 — history + tiles + dhw + burner cycle + curve + control status
+    satHistPush(d); satDrawHistory();
+    txt('satOut', satFmt(d.outside_temp, 1, '°'));
+    txt('satFlowSet', satFmt(d.final_setpoint, 1, '°'));
+    txt('satRoom', satFmt(d.room_temp, 1, '°'));
+    txt('satTargetT', satFmt(d.target_temp, 1, '°'));
+    satRenderDhw(d);
+    satRenderCycle(d);
+    satDrawCurve(d);
+    satKv('satControlStatus', [
+      ['Control mode', SAT_MODE_LABELS[d.control_mode | 0] || '—'],
+      ['Boiler status', SAT_BOILER_LABELS[d.boiler_status] || '—'],
+      ['Active preset', SAT_PRESET_NAMES[d.active_preset | 0] || '—'],
+      ['Manufacturer', d.manufacturer || '—'],
+      ['Coefficient', satFmt(d.coefficient, 2)],
+      ['Deadband', satFmt(d.deadband, 2, ' °C')],
+      ['PID output', satFmt(d.pid_output, 1, ' °C')],
+      ['Error', satFmt(d.error, 2, ' °C')],
+      ['Modulation', d.current_modulation != null ? d.current_modulation + ' %' : '—'],
+      ['Max modulation', d.max_rel_modulation != null ? d.max_rel_modulation + ' %' : '—']
+    ]);
+
+    // L3 — health + PID + PWM/cycle + smart + external + simulation + raw JSON
+    satRenderHealth(d);
+    satKv('satPidKv', [
+      ['P term', satFmt(d.pid_p, 2)], ['I term', satFmt(d.pid_i, 2)], ['D term', satFmt(d.pid_d, 2)],
+      ['Kp', satFmt(d.kp, 4)], ['Ki', satFmt(d.ki, 4)], ['Kd', satFmt(d.kd, 4)],
+      ['Raw derivative', satFmt(d.raw_derivative, 4)]
+    ]);
+    satKv('satPwmKv', [
+      ['Duty cycle', d.pwm_duty != null ? Math.round(d.pwm_duty * 100) + ' %' : '—'],
+      ['PWM flame', d.pwm_flame_req ? 'Requesting' : 'Off'],
+      ['Cycle count', d.cycle_count != null ? String(d.cycle_count) : '—'],
+      ['Cycles this hour', d.cycles_this_hour != null ? String(d.cycles_this_hour) : '—'],
+      ['Last cycle', SAT_CYCLE_LABELS[d.last_cycle_class | 0] || '—'],
+      ['Cycle max flow', satFmt(d.cycle_max_flow, 1, ' °C')],
+      ['Cycle overshoot', d.cycle_overshoot_sec != null ? Math.round(d.cycle_overshoot_sec) + ' s' : '—']
+    ]);
+    var summer = d.summer_active ? ('Active' + (d.summer_hours_above != null ? ' (' + Math.round(d.summer_hours_above) + ' h)' : '')) : 'Inactive';
+    var thermal = (d.thermal_model_valid && d.thermal_coeff != null) ? satFmt(d.thermal_coeff, 3) : 'Learning…';
+    satKv('satSmartKv', [
+      ['Solar gain', d.solar_gain_active ? 'Active' : 'Inactive'],
+      ['Summer mode', summer],
+      ['Thermal learning', thermal],
+      ['Comfort offset', (d.comfort_offset != null && d.comfort_offset !== 0) ? satFmt(d.comfort_offset, 2, ' °C') : 'Off'],
+      ['PV boost', d.pv_boost_active ? ('Active ' + satFmt(d.pv_boost_applied_c, 1, ' °C')) : 'Off'],
+      ['Window detection', d.window_detection ? 'On' : 'Off']
+    ]);
+    satKv('satExtKv', [
+      ['Indoor sensor', d.external_temp_valid ? 'External' : 'OT bus'],
+      ['Outdoor sensor', d.external_outdoor_valid ? 'External' : 'OT bus / weather']
+    ]);
+    satRenderSim(d);
+    var raw = document.getElementById('satRawJson');
+    if (raw && raw.style.display !== 'none') raw.textContent = JSON.stringify(d, null, 2);
+  }
+
+  function satDialDraw(d) {
+    var svg = document.getElementById('satDial'); if (!svg) return;
+    var lo = 5, hi = 30, startDeg = -135, sweepDeg = 270;
+    function ang(v) { return startDeg + (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * sweepDeg; }
+    var track = satCssVar('--gauge-track'), accent = satCssVar('--accent'), ok = satCssVar('--zone-ok'),
+      txtc = satCssVar('--gauge-text'), muted = satCssVar('--muted');
+    var tgt = satNum(d.target_temp), room = satNum(d.room_temp);
+    var g = '<path d="' + arcPath(120, 120, 92, startDeg, startDeg + sweepDeg) + '" fill="none" stroke="' + track + '" stroke-width="14" stroke-linecap="round"/>';
+    if (tgt !== null) g += '<path d="' + arcPath(120, 120, 92, startDeg, ang(tgt)) + '" fill="none" stroke="' + accent + '" stroke-width="14" stroke-linecap="round"/>';
+    if (room !== null) {
+      var a = polar(120, 120, 79, ang(room)), b = polar(120, 120, 105, ang(room));
+      g += '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" stroke="' + ok + '" stroke-width="4" stroke-linecap="round"/>';
+    }
+    g += '<text x="120" y="116" text-anchor="middle" font-size="44" font-weight="700" fill="' + txtc + '" font-family="var(--font-sans)">' + (tgt !== null ? tgt.toFixed(1) + '°' : '—') + '</text>';
+    g += '<text x="120" y="140" text-anchor="middle" font-size="13" fill="' + muted + '" font-family="var(--font-sans)">target · room ' + (room !== null ? room.toFixed(1) + '°' : '—') + '</text>';
+    svg.innerHTML = g;
+  }
+
+  function satRenderPresets(d) {
+    var box = document.getElementById('satPresets'); if (!box) return;
+    var an = SAT_PRESET_NAMES[d.active_preset | 0];
+    var activeName = an ? an.toLowerCase() : '';
+    box.textContent = '';
+    SAT_PRESETS.forEach(function (p) {
+      var b = document.createElement('button');
+      b.className = 'sat-preset' + (p[0] === activeName ? ' active' : '');
+      b.textContent = p[1];
+      b.dataset.preset = p[0];
+      b.addEventListener('click', function () {
+        satPost('preset', p[0]).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
+        document.querySelectorAll('#satPresets .sat-preset').forEach(function (x) { x.classList.toggle('active', x === b); });
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function satHistPush(d) {
+    satHist.set.push(satNum(d.final_setpoint));
+    satHist.flow.push(satNum(d.heating_curve));
+    satHist.room.push(satNum(d.room_temp));
+    satHist.out.push(satNum(d.outside_temp));
+    satHist.pid.push(satNum(d.pid_output));
+    ['set', 'flow', 'room', 'out', 'pid'].forEach(function (k) { if (satHist[k].length > SAT_HIST_MAX) satHist[k].shift(); });
+  }
+
+  function satDrawHistory() {
+    var svg = document.getElementById('satHistChart'); if (!svg) return;
+    var n = satHist.flow.length;
+    var accent = satCssVar('--accent'), hot = satCssVar('--hot'), ok = satCssVar('--zone-ok'),
+      cold = satCssVar('--cold'), muted = satCssVar('--muted'), border = satCssVar('--border');
+    function Y(t) { return 186 - (Math.max(-5, Math.min(80, t)) + 5) / 85 * 168; }
+    var x0 = 8, x1 = 592, dx = n > 1 ? (x1 - x0) / (n - 1) : 0;
+    function L(arr) {
+      var p = '';
+      for (var i = 0; i < n; i++) { var v = arr[i]; if (v === null || v === undefined || isNaN(v)) continue; p += (x0 + i * dx).toFixed(1) + ',' + Y(v).toFixed(1) + ' '; }
+      return p.trim();
+    }
+    function poly(pts, stroke, w, dash) { return pts ? '<polyline points="' + pts + '" fill="none" stroke="' + stroke + '" stroke-width="' + w + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>' : ''; }
+    var g = '';
+    [0, 20, 40, 60, 80].forEach(function (t) { var y = Y(t).toFixed(1); g += '<line x1="8" y1="' + y + '" x2="592" y2="' + y + '" stroke="' + border + '" stroke-width="1"/>'; });
+    g += poly(L(satHist.out), cold, 1.5, '6 4');
+    g += poly(L(satHist.pid), muted, 1.5, '1 4');
+    g += poly(L(satHist.flow), hot, 2);
+    g += poly(L(satHist.set), accent, 2);
+    g += poly(L(satHist.room), ok, 2);
+    svg.innerHTML = g;
+    var lg = document.getElementById('satHistLegend');
+    if (lg) lg.innerHTML =
+      '<span><i style="background:' + accent + '"></i>Setpoint</span><span><i style="background:' + hot + '"></i>Flow</span>' +
+      '<span><i style="background:' + ok + '"></i>Room</span><span><i style="background:' + cold + '"></i>Outside</span>' +
+      '<span><i style="background:' + muted + '"></i>PID</span>';
+  }
+
+  function satRenderDhw(d) {
+    var slider = document.getElementById('satDhwSlider');
+    var sp = satNum(d.dhw_setpoint);
+    if (slider && !satDhwDirty) {
+      if (sp !== null) { slider.value = Math.round(sp); txt('satDhwR', Math.round(sp) + '°C'); }
+      else txt('satDhwR', '—');
+    }
+    var row = document.getElementById('satDhwEnableRow');
+    if (row) row.style.display = d.dhw_config_tank ? '' : 'none';
+    var cb = document.getElementById('satDhwEnable');
+    if (cb && !satDhwEnPending && d.dhw_enable !== undefined) cb.checked = !!d.dhw_enable;
+  }
+
+  function satRenderCycle(d) {
+    var cm = d.control_mode | 0;
+    document.querySelectorAll('#satCycleRow .ds-seg').forEach(function (b) {
+      var on = (b.dataset.mode === 'continuous' && cm === 1) || (b.dataset.mode === 'pwm' && cm === 2);
+      b.classList.toggle('active', on);
+    });
+    txt('satCycleSub', cm === 2 ? 'PID modulates the burner in PWM bursts' : (cm === 1 ? 'PID drives the burner continuously' : 'SAT is not actively controlling'));
+  }
+
+  function satRenderHealth(d) {
+    var box = document.getElementById('satHealth'); if (!box) return;
+    var lc = d.last_cycle_class | 0, badCycle = (lc === 2 || lc === 3 || lc === 4);
+    var items = [
+      ['Device', (d.boiler_status && d.boiler_status !== 'off') ? 'ok' : 'idle'],
+      ['Cycle', badCycle ? 'warn' : 'ok'],
+      ['Flame', d.safety_tripped ? 'alert' : 'ok'],
+      ['Pressure', d.pressure_alarm ? 'alert' : 'ok'],
+      ['Setpoint', d.setpoint_mismatch ? 'warn' : 'ok'],
+      ['Modulation', d.modulation_reliable ? 'ok' : 'warn']
+    ];
+    box.textContent = '';
+    items.forEach(function (it) {
+      var span = document.createElement('span'); span.className = 'health-item';
+      var dot = document.createElement('span'); dot.className = 'hdot ' + it[1];
+      span.appendChild(dot); span.appendChild(document.createTextNode(it[0]));
+      box.appendChild(span);
+    });
+  }
+
+  function satRenderSim(d) {
+    var on = !!d.simulation, avail = (d.sim_available !== false);
+    var cb = document.getElementById('satSim');
+    if (cb && !satSimPending) cb.checked = on;
+    if (cb) cb.disabled = (!avail && !on);
+    txt('satSimHint', avail ? '' : 'A real boiler is connected — bench simulation is unavailable.');
+    satKv('satSimKv', [
+      ['Simulation', on ? 'On (bench)' : 'Off'],
+      ['Sim room', on ? satFmt(d.sim_room_temp, 1, ' °C') : '—'],
+      ['Sim flow', on ? satFmt(d.sim_flow_temp, 1, ' °C') : '—'],
+      ['Sim return', on ? satFmt(d.sim_return_temp, 1, ' °C') : '—'],
+      ['Sim flame', on ? (d.sim_flame_on ? 'On' : 'Off') : '—'],
+      ['Sim modulation', on && d.sim_modulation != null ? d.sim_modulation + ' %' : '—'],
+      ['Last blocked cmd', (on && d.last_blocked_cmd) ? (d.last_blocked_cmd + (d.last_blocked_cmd_age_ms != null ? ' (' + Math.round(d.last_blocked_cmd_age_ms / 1000) + 's ago)' : '')) : '—'],
+      ['Fallback active', d.fallback_active ? 'Yes' : 'No'],
+      ['Fallback reason', d.fallback_reason != null ? String(d.fallback_reason) : '—']
+    ]);
+  }
+
+  function renderSatWeather(w) {
+    if (!w || !w.enabled) { satKv('satWeatherKv', [['Weather', 'Disabled']]); txt('satCoords', ''); return; }
+    var valid = !!w.valid;
+    var mins = (valid && w.age_seconds >= 0) ? Math.floor(w.age_seconds / 60) : null;
+    satKv('satWeatherKv', [
+      ['Outdoor temp', valid ? satFmt(w.temperature, 1, ' °C') : '—'],
+      ['Humidity', valid && w.humidity != null ? Math.round(w.humidity) + ' %' : '—'],
+      ['Wind', valid && w.wind_speed != null ? satFmt(w.wind_speed, 1, ' km/h') : '—'],
+      ['Last update', mins === null ? 'Never' : (mins < 1 ? 'Just now' : mins + ' min ago')],
+      ['Fetch errors', String(w.fetch_errors || 0)]
+    ]);
+    var lat = parseFloat(w.latitude), lon = parseFloat(w.longitude);
+    txt('satCoords', (!isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0)) ? lat.toFixed(3) + ', ' + lon.toFixed(3) : 'No location set');
+  }
+
+  // JS port of satCalcHeatingCurve() (SATcontrol.ino): base offset + (coeff/4)·curve.
+  function satCalcCurve(outside, target, coeff, system) {
+    var base = (system === 2) ? SAT_HC_FLOOR : SAT_HC_RAD;   // 2 = underfloor
+    var diff = outside - SAT_HC_REF;
+    return base + (coeff / 4.0) * (4.0 * (target - SAT_HC_REF) + 0.03 * diff * diff - 0.4 * diff);
+  }
+
+  function satDrawCurve(d) {
+    var svg = document.getElementById('satCurveBig'); if (!svg) return;
+    var coeff = satNum(d.coefficient), target = satNum(d.target_temp), system = d.heating_system | 0,
+      outside = satNum(d.outside_temp), setp = satNum(d.final_setpoint);
+    if (coeff === null || target === null) { svg.innerHTML = ''; return; }
+    var xmin = -15, xmax = 25, ymin = 20, ymax = 85;
+    function X(o) { return 50 + (o - xmin) / (xmax - xmin) * 530; }
+    function Y(f) { return 270 - (Math.max(ymin, Math.min(ymax, f)) - ymin) / (ymax - ymin) * 240; }
+    var muted = satCssVar('--muted'), border = satCssVar('--border'), accent = satCssVar('--accent'),
+      ok = satCssVar('--zone-ok'), hot = satCssVar('--hot'), panel = satCssVar('--panel');
+    var g = '';
+    [20, 40, 60, 80].forEach(function (f) { var y = Y(f).toFixed(1); g += '<line x1="50" y1="' + y + '" x2="580" y2="' + y + '" stroke="' + border + '" stroke-width="1"/><text x="44" y="' + (+y + 4) + '" text-anchor="end" font-size="11" fill="' + muted + '">' + f + '°</text>'; });
+    [-10, 0, 10, 20].forEach(function (o) { var x = X(o).toFixed(1); g += '<line x1="' + x + '" y1="30" x2="' + x + '" y2="270" stroke="' + border + '" stroke-width="1" stroke-dasharray="2 5"/><text x="' + x + '" y="288" text-anchor="middle" font-size="11" fill="' + muted + '">' + o + '°</text>'; });
+    var refs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0], matched = false;
+    refs.forEach(function (c) {
+      var pts = [], activeC = Math.abs(c - coeff) < 0.05; if (activeC) matched = true;
+      for (var o = xmin; o <= xmax; o++) pts.push(X(o).toFixed(1) + ',' + Y(satCalcCurve(o, target, c, system)).toFixed(1));
+      g += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + (activeC ? accent : border) + '" stroke-width="' + (activeC ? 3 : 1.2) + '" opacity="' + (activeC ? 1 : 0.65) + '"/>';
+    });
+    if (!matched) {
+      var apts = [];
+      for (var o2 = xmin; o2 <= xmax; o2++) apts.push(X(o2).toFixed(1) + ',' + Y(satCalcCurve(o2, target, coeff, system)).toFixed(1));
+      g += '<polyline points="' + apts.join(' ') + '" fill="none" stroke="' + accent + '" stroke-width="3"/>';
+    }
+    satMarkers.forEach(function (m) {
+      var mo = satNum(m.outside_temp), mf = satNum(m.flow_temp);
+      if (mo !== null && mf !== null) g += '<circle cx="' + X(mo).toFixed(1) + '" cy="' + Y(mf).toFixed(1) + '" r="4.5" fill="' + ok + '" stroke="' + panel + '" stroke-width="1.5"/>';
+    });
+    if (outside !== null && setp !== null) g += '<circle cx="' + X(outside).toFixed(1) + '" cy="' + Y(setp).toFixed(1) + '" r="6.5" fill="' + hot + '" stroke="' + panel + '" stroke-width="2"/>';
+    svg.innerHTML = g;
+    txt('satCurveLbl', (system === 2 ? 'underfloor' : 'radiator') + ' · coeff ' + coeff.toFixed(1) + ' · target ' + target.toFixed(1) + '°');
+    var lg = document.getElementById('satCurveLegend');
+    if (lg) lg.innerHTML =
+      '<span><i style="background:' + accent + '"></i>active curve (c=' + coeff.toFixed(1) + ')</span>' +
+      '<span><i style="background:' + ok + '"></i>calibration markers</span>' +
+      '<span><i style="background:' + hot + '"></i>current point</span>';
+  }
+
+  function satRenderMarkerList() {
+    var list = document.getElementById('satMarkerList'); if (!list) return;
+    list.textContent = '';
+    if (!satMarkers.length) {
+      var li0 = document.createElement('li'); li0.textContent = 'No calibration markers yet.'; li0.style.color = 'var(--muted)';
+      list.appendChild(li0); return;
+    }
+    satMarkers.forEach(function (m) {
+      var li = document.createElement('li');
+      var s = document.createElement('span'); s.textContent = satFmt(m.outside_temp, 0, '° out');
+      var b = document.createElement('b'); b.textContent = satFmt(m.flow_temp, 0, '° flow');
+      li.appendChild(s); li.appendChild(b); list.appendChild(li);
+    });
+  }
+
+  function satShowView(v) {
+    if (['simple', 'control', 'technical'].indexOf(v) === -1) v = 'simple';
+    document.querySelectorAll('.satview-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.sv === v); });
+    var body = document.getElementById('satBody'); var cls = 'sv-' + v; if (body) body.className = cls;
+    try { localStorage.setItem('otgw-v2-satview', v); } catch (e) { }
+    // Redraw charts: a layer that was display:none has no layout, so its SVG must
+    // be regenerated once it becomes visible.
+    if (satLastData) { satDrawHistory(); satDrawCurve(satLastData); }
+  }
+
+  function satStep(delta) {
+    var base = (satLastData && satNum(satLastData.target_temp) !== null) ? satNum(satLastData.target_temp) : 20;
+    var t = Math.max(5, Math.min(30, Math.round((base + delta) * 2) / 2));
+    satPost('target', t.toFixed(1)).then(function () {
+      if (satLastData) { satLastData.target_temp = t; satDialDraw(satLastData); }
+      setTimeout(fetchSatPage, 300);
+    }).catch(function () { });
+  }
+
+  // Detect location for the weather card. Sets SATweatherlat/lon (string settings —
+  // not the boolean SATweatherenable, which the /api/v2/settings typed-bool path
+  // would silently no-op on a "1" string; enabling weather stays a Settings action).
+  function satDetectLocation() {
+    if (!navigator.geolocation) { txt('satCoords', 'Geolocation not supported'); return; }
+    txt('satCoords', 'Detecting…');
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      var lat = pos.coords.latitude.toFixed(4), lon = pos.coords.longitude.toFixed(4);
+      var posts = [['SATweatherlat', lat], ['SATweatherlon', lon]].map(function (kv) {
+        return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: kv[0], value: kv[1] }) })
+          .then(function (r) { if (!r.ok) throw new Error(r.status); return r; });
+      });
+      Promise.all(posts).then(function () { txt('satCoords', lat + ', ' + lon); setTimeout(fetchSatPageWeather, 1500); }).catch(function () { txt('satCoords', 'Save failed'); });
+    }, function () { txt('satCoords', 'Location error'); }, { timeout: 10000 });
+  }
+
+  // Wire the SAT page controls once (elements exist at load; the page is just hidden).
+  function wireSat() {
+    document.querySelectorAll('.satview-btn').forEach(function (b) {
+      b.addEventListener('click', function () { satShowView(b.dataset.sv); });
+    });
+    var sv = 'simple'; try { sv = localStorage.getItem('otgw-v2-satview') || 'simple'; } catch (e) { }
+    satShowView(sv);
+
+    var en = document.getElementById('satEnable');
+    if (en) en.addEventListener('change', function () {
+      satEnPending = true;
+      satPost('enable', en.checked ? '1' : '0')
+        .then(function () { satEnPending = false; setTimeout(fetchSatPage, 300); })
+        .catch(function () { satEnPending = false; if (satLastData) en.checked = !!satLastData.enabled; });
+    });
+
+    var up = document.getElementById('satUp'), dn = document.getElementById('satDown');
+    if (up) up.addEventListener('click', function () { satStep(0.5); });
+    if (dn) dn.addEventListener('click', function () { satStep(-0.5); });
+
+    document.querySelectorAll('#satCycleRow .ds-seg').forEach(function (b) {
+      b.addEventListener('click', function () {
+        satPost('mode', b.dataset.mode).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
+      });
+    });
+
+    var ds = document.getElementById('satDhwSlider');
+    if (ds) {
+      ds.addEventListener('input', function () { satDhwDirty = true; txt('satDhwR', ds.value + '°C'); });
+      ds.addEventListener('change', function () {
+        satDhwDirty = false;
+        satPost('settings/dhw_setpoint', ds.value).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
+      });
+    }
+
+    var de = document.getElementById('satDhwEnable');
+    if (de) de.addEventListener('change', function () {
+      satDhwEnPending = true;
+      satPost('settings/dhw_enable', de.checked ? 'true' : 'false')
+        .then(function () { satDhwEnPending = false; setTimeout(fetchSatPage, 300); })
+        .catch(function () { satDhwEnPending = false; if (satLastData) de.checked = !!satLastData.dhw_enable; });
+    });
+
+    var sim = document.getElementById('satSim');
+    if (sim) sim.addEventListener('change', function () {
+      satSimPending = true;
+      satPost('settings/simulation', sim.checked ? '1' : '0')
+        .then(function () { satSimPending = false; setTimeout(fetchSatPage, 300); })
+        .catch(function () { satSimPending = false; if (satLastData) sim.checked = !!satLastData.simulation; txt('satSimHint', 'Could not change simulation (a real boiler may be connected).'); });
+    });
+
+    var rt = document.getElementById('satRawToggle');
+    if (rt) rt.addEventListener('click', function () {
+      var pre = document.getElementById('satRawJson'); if (!pre) return;
+      var open = pre.style.display === 'none';
+      pre.style.display = open ? 'block' : 'none';
+      rt.textContent = (open ? '▾' : '▸') + ' Raw data (JSON)';
+      rt.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open && satLastData) pre.textContent = JSON.stringify(satLastData, null, 2);
+    });
+
+    var dl = document.getElementById('satDetectLoc');
+    if (dl) dl.addEventListener('click', satDetectLocation);
+  }
+
   // ---------- init ----------
   function init() {
     initTheme();
@@ -2766,6 +3260,7 @@
     var pcu = document.getElementById('picCheckUpd'); if (pcu) pcu.addEventListener('click', checkPicUpdate);   // TASK-972
     var bDisc = document.getElementById('btnDiscard'); if (bDisc) bDisc.addEventListener('click', discardSettings);
 
+    wireSat();   // TASK-986: bind SAT-page controls before the page is restored below
     var sp = localStorage.getItem('otgw-v2-page'); showPage(sp || 'home');
     var sd = localStorage.getItem('otgw-v2-design'); showDesign(sd || 'a');
     renderConnStrip();

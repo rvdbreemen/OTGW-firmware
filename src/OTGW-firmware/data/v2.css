@@ -618,3 +618,84 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .fs-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
   .fs-btn.danger{border-color:color-mix(in srgb,var(--zone-alert) 55%,var(--border));color:var(--zone-alert)}
   .fs-btn.danger:hover{background:color-mix(in srgb,var(--zone-alert) 12%,transparent)}
+
+  /* ================= SAT page (TASK-986): thermostat · control · technical ================= */
+  /* Ported from the design mockup (docs/design/boiler-dashboard-concepts.html) onto the
+     v2 token aliases. Cumulative reveal: Thermostat shows L1, Control adds L2, Technical
+     adds L3. Bound to real /api/v2/sat/status data (renderSatPage in v2.js). */
+  .sat-switch{display:inline-flex;align-items:center;gap:9px;font-size:.85rem;font-weight:700;color:var(--text);cursor:pointer;user-select:none}
+  .sat-head{display:flex;align-items:center;gap:12px;margin:2px 2px 12px;flex-wrap:wrap}
+  .sat-title{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:10px}
+  .sat-pill{font-size:.7rem;font-weight:700;color:#fff;background:var(--hot);border-radius:10px;padding:3px 10px}
+  .sat-pill.idle{background:var(--tile-off)} .sat-pill.off{background:var(--tile-off)}
+  .sat-views{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+  .satview-btn{flex:1;min-width:150px;min-height:54px;border:1px solid var(--border);background:var(--panel);
+    color:var(--text);border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:1px;font-family:var(--font-sans)}
+  .satview-btn small{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+  .satview-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  .satview-btn.active small{color:rgba(255,255,255,.85)}
+  /* cumulative reveal: Thermostat shows L1 only; Control adds L2; Technical adds L3 */
+  .sat-l1{display:block}
+  .sat-l2,.sat-l3{display:none}
+  #satBody.sv-simple .sat-l2,#satBody.sv-simple .sat-l3{display:none}
+  #satBody.sv-control .sat-l2{display:block}
+  #satBody.sv-technical .sat-l2,#satBody.sv-technical .sat-l3{display:block}
+  .sat-thermo-wrap{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:center;
+    background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:18px;margin-bottom:16px}
+  @media(max-width:719px){.sat-thermo-wrap{grid-template-columns:1fr}}
+  .sat-dial-card{text-align:center}
+  .sat-dial-card svg{width:240px;height:240px;max-width:100%}
+  .sat-side{min-width:0}
+  .sat-steps{margin-top:4px;display:flex;gap:10px;justify-content:center}
+  .sat-side-lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin:10px 0 6px}
+  .sat-status-big{font-size:1.2rem;font-weight:700}
+  .sat-presets{display:flex;flex-wrap:wrap;gap:7px}
+  .sat-preset{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:20px;
+    padding:8px 14px;font-size:.8rem;cursor:pointer;min-height:38px;font-family:var(--font-sans)}
+  .sat-preset.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .ds-seg-row{display:inline-flex;gap:4px;flex-wrap:wrap}
+  .ds-seg{border:1px solid var(--border);background:var(--panel-2);color:var(--muted);border-radius:8px;
+    padding:7px 13px;font-size:.8rem;cursor:pointer;min-height:36px;font-family:var(--font-sans)}
+  .ds-seg.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .sat-hint{font-size:.78rem;color:var(--muted);margin-top:12px}
+  .sat-slider{width:110px;max-width:100%;vertical-align:middle;accent-color:var(--accent);cursor:pointer}
+  .sat-tiles4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  @media(max-width:719px){.sat-tiles4{grid-template-columns:1fr 1fr}}
+  .sat-tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:13px 14px}
+  .sat-tile.is-target{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .sat-tile .l{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .sat-tile .v{font-size:1.7rem;font-weight:700;margin-top:4px}
+  .sat-tile .v.hot{color:var(--hot)}
+  .sat-tile .tag{font-size:.56rem;background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot);border-radius:6px;padding:1px 6px;letter-spacing:0}
+  .sat-row2{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .sat-row2.sat-row-2up{grid-template-columns:1fr 1fr}
+  @media(max-width:899px){.sat-row2{grid-template-columns:1fr 1fr}.sat-row2.sat-row-2up{grid-template-columns:1fr}}
+  @media(max-width:520px){.sat-row2{grid-template-columns:1fr}}
+  .page .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:14px}
+  .sat-mini h4,.card h4{margin:0 0 8px;font-size:.82rem;display:flex;align-items:center;gap:8px}
+  .sat-mini .sub,.card .sub{font-size:.7rem;color:var(--muted);font-weight:400}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}
+  .kv-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.82rem}
+  .kv-k{color:var(--muted)} .kv-v{font-family:var(--font-mono);font-weight:700;text-align:right}
+  @media(max-width:560px){.kv{grid-template-columns:1fr}}
+  #satHistChart{width:100%;display:block}
+  .sat-curve-hero .curve-wrap{display:grid;grid-template-columns:1fr 210px;gap:14px;align-items:start}
+  @media(max-width:719px){.sat-curve-hero .curve-wrap{grid-template-columns:1fr}}
+  .curve-side{min-width:0}
+  #satCurveBig{width:100%;height:auto;display:block}
+  .curve-legend{display:flex;flex-direction:column;gap:6px;font-size:.76rem;color:var(--muted);margin-bottom:10px}
+  .curve-legend i{display:inline-block;width:16px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  .marker-head{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;margin-bottom:6px}
+  .marker-list{list-style:none;margin:0;padding:0;font-size:.8rem}
+  .marker-list li{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)}
+  .marker-list li span{color:var(--muted)} .marker-list li b{font-family:var(--font-mono);color:var(--zone-ok)}
+  .health-strip{display:flex;flex-wrap:wrap;gap:16px}
+  .health-item{display:flex;align-items:center;gap:7px;font-size:.84rem;font-weight:600}
+  .hdot{width:11px;height:11px;border-radius:50%;background:var(--tile-off)}
+  .hdot.ok{background:var(--zone-ok)} .hdot.warn{background:var(--zone-warn)} .hdot.alert{background:var(--zone-alert)}
+  .hdot.idle{background:var(--tile-off)}
+  .raw-toggle{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;font-size:.86rem;font-family:var(--font-sans);padding:0}
+  .raw-json{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+    font-family:var(--font-mono);font-size:.72rem;color:var(--text);overflow:auto;max-height:240px;margin:6px 0 0;white-space:pre-wrap}
+  @media(max-width:719px){.satview-btn,.sat-preset,.ds-seg{min-height:44px}}

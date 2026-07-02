@@ -44,6 +44,7 @@
 </div>
 <div class="switcher">
   <button class="seg active" data-page="home"><b>Home</b><small>opening page</small></button>
+  <button class="seg" data-page="sat"><b>SAT</b><small>thermostat · control · technical</small></button>
   <button class="seg" data-page="monitor"><b>Monitor</b><small>log · stats · support · graph · connection</small></button>
   <button class="seg" data-page="settings"><b>Settings</b><small>grouped &amp; scannable</small></button>
   <button class="seg" data-page="advanced"><b>Advanced</b><small>pic · debug · files · system</small></button>
@@ -313,6 +314,105 @@
   </div>
 </section>
 </div><!-- /page-home -->
+
+<!-- ════════════════ PAGE: SAT (TASK-986) ════════════════ -->
+<!-- Smart Autotune Thermostat control surface. Three cumulative depth layers
+     (Thermostat / Control / Technical) toggled by .satview-btn, persisted in
+     localStorage 'otgw-v2-satview'. Bound to GET /api/v2/sat/status (polled 5s
+     while this page is visible only) + POST /api/v2/sat/{enable,target,preset,
+     mode,settings/<name>}. History accumulates client-side (no history endpoint,
+     by design — matches the classic sat.js). -->
+<div id="page-sat" class="page">
+  <div class="sat-head">
+    <div class="sat-title">SAT · Smart Autotune Thermostat <span class="sat-pill off" id="satPill">…</span></div>
+    <label class="sat-switch" style="margin-left:auto"><span id="satEnableLbl">Enabled</span><input type="checkbox" class="sw" id="satEnable"></label>
+  </div>
+
+  <div class="sat-views">
+    <button class="satview-btn active" data-sv="simple"><b>🏠 Thermostat</b><small>simple</small></button>
+    <button class="satview-btn" data-sv="control"><b>🎛 Control</b><small>operational</small></button>
+    <button class="satview-btn" data-sv="technical"><b>🔬 Technical</b><small>the control loop</small></button>
+  </div>
+
+  <!-- no-data banner: shown when /api/v2/sat/status is unreachable (older firmware / build without SAT) -->
+  <div class="card" id="satNoData" style="display:none;text-align:center;color:var(--muted)">SAT status is unavailable on this device.</div>
+
+  <div id="satBody" class="sv-simple">
+    <!-- L1 Thermostat — dial + presets + hint (the header toggle already carries enable/disable) -->
+    <div class="sat-l1">
+      <div class="sat-thermo-wrap">
+        <div class="sat-dial-card">
+          <svg viewBox="0 0 240 240" id="satDial" aria-label="Room thermostat"></svg>
+          <div class="sat-steps"><button class="stepbtn" id="satDown" aria-label="lower target">−</button><button class="stepbtn" id="satUp" aria-label="raise target">+</button></div>
+        </div>
+        <div class="sat-side">
+          <div class="sat-status-big" id="satStatusBig">—</div>
+          <div class="sat-side-lbl">Presets</div>
+          <div class="sat-presets" id="satPresets"></div>
+          <div class="sat-hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- L2 Control — history, hot water, burner cycle, live tiles, heating curve, control status, weather -->
+    <div class="sat-l2">
+      <div class="card"><h4>Temperature history <span class="sub">live</span></h4>
+        <svg viewBox="0 0 600 200" id="satHistChart" preserveAspectRatio="none" style="height:200px"></svg>
+        <div class="legend" id="satHistLegend"></div></div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card sat-mini"><h4>Hot water</h4>
+          <div class="kv">
+            <div class="kv-row"><span class="kv-k">DHW setpoint</span><span class="kv-v"><input type="range" min="40" max="65" value="50" id="satDhwSlider" class="sat-slider" aria-label="DHW setpoint"> <b id="satDhwR">—</b></span></div>
+            <div class="kv-row" id="satDhwEnableRow" style="display:none"><span class="kv-k">DHW enable (HW=)</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnable" aria-label="DHW enable"></span></div>
+          </div></div>
+        <div class="card sat-mini"><h4>Burner cycle mode</h4><div class="ds-seg-row" id="satCycleRow"><button class="ds-seg" data-mode="continuous">Continuous</button><button class="ds-seg" data-mode="pwm">PWM</button></div><div class="sub" id="satCycleSub">—</div></div>
+      </div>
+      <div class="sat-tiles4">
+        <div class="sat-tile"><div class="l">Outside</div><div class="v" id="satOut">—</div></div>
+        <div class="sat-tile"><div class="l">Boiler setpoint <span class="tag">SAT → boiler</span></div><div class="v hot" id="satFlowSet">—</div></div>
+        <div class="sat-tile"><div class="l">Room</div><div class="v" id="satRoom">—</div></div>
+        <div class="sat-tile is-target"><div class="l">Target</div><div class="v" id="satTargetT">—</div></div>
+      </div>
+      <div class="card sat-curve-hero"><h4>Heating curve <span class="sub" id="satCurveLbl"></span></h4>
+        <div class="curve-wrap">
+          <svg viewBox="0 0 600 300" id="satCurveBig"></svg>
+          <div class="curve-side">
+            <div class="curve-legend" id="satCurveLegend"></div>
+            <div class="marker-head">Calibration markers <span class="sub">learned points</span></div>
+            <ul class="marker-list" id="satMarkerList"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Control status</h4><div class="kv" id="satControlStatus"></div></div>
+        <div class="card"><h4>Weather <span class="sub">Open-Meteo</span></h4><div class="kv" id="satWeatherKv"></div>
+          <button class="tbtn" id="satDetectLoc" style="margin-top:8px">Detect location</button>
+          <span class="sub" id="satCoords" style="margin-left:8px"></span></div>
+      </div>
+    </div>
+
+    <!-- L3 Technical — health, PID, PWM/cycle, smart features, external sensors, simulation, raw JSON -->
+    <div class="sat-l3">
+      <div class="card"><h4>Health</h4><div class="health-strip" id="satHealth"></div></div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>PID controller</h4><div class="kv" id="satPidKv"></div></div>
+        <div class="card"><h4>PWM &amp; cycle tracking</h4><div class="kv" id="satPwmKv"></div></div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Smart features</h4><div class="kv" id="satSmartKv"></div></div>
+        <div class="card"><h4>External sensors</h4><div class="kv" id="satExtKv"></div></div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Simulation &amp; diagnostics</h4><div class="kv" id="satSimKv"></div>
+          <label class="sat-switch" style="margin-top:10px"><span>Bench simulation</span><input type="checkbox" class="sw" id="satSim"></label>
+          <div class="sub" id="satSimHint" style="margin-top:6px"></div></div>
+        <div class="card"><h4><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ Raw data (JSON)</button></h4>
+          <pre class="raw-json" id="satRawJson" style="display:none"></pre></div>
+      </div>
+      <p class="sat-hint" style="margin-top:2px">Every knob behind these readouts lives in <b>Settings → SAT</b>.</p>
+    </div>
+  </div>
+</div><!-- /page-sat -->
 
 <!-- ════════════════ PAGE: MONITOR ════════════════ -->
 <div id="page-monitor" class="page">
