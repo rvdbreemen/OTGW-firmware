@@ -1,3 +1,42 @@
+# Daily Issue Report — 2026-07-02
+
+**Generated:** 2026-07-02 07:09 UTC  
+**Window:** Last 24 hours (since 2026-07-01 07:09 UTC)
+
+---
+
+## GitHub Issues
+
+**Repository:** rvdbreemen/OTGW-firmware  
+**Result:** No open issues updated in the last 24 hours.
+
+---
+
+## Tweakers Forum (GoT thread #1653967)
+
+**Feed fetched:** 2026-07-02 07:09 UTC  
+**Exclusions:** Posts by `number3` (maintainer) and `rvdbreemen` are excluded.
+
+**Result:** No new user posts in the last 24 hours.
+
+### Recent context (for reference — outside 24h window)
+
+| Date (UTC) | Author | Summary |
+|---|---|---|
+| 2026-07-01 05:04 | number3 *(excluded)* | Confirms uptime is already published on MQTT; says HA auto-discovery sensor will be added in the next beta. |
+| 2026-06-29 09:10 | tjanssen | **Feature request** — Asks for an uptime sensor so a reset/disconnect is easy to spot. Reports another weekend disconnect. |
+| 2026-06-29 08:10 | hvxl | Replies on cooling/heating control: no PIC firmware changes needed; suggests using CE/CL commands via OTGW for cooling. |
+
+---
+
+## Summary
+
+**No new bug reports, feature requests, or questions in the last 24 hours.**
+
+The most recent user activity (tjanssen, Jun 29) requesting an uptime HA auto-discovery sensor has already been acknowledged by `number3` on Jul 1 — it will be added in the next beta.
+
+---
+
 # Daily Issue Report — 2026-07-01
 
 ## GitHub Issues (updated in last 24h)
