@@ -37,6 +37,7 @@
   <button class="seg active" data-page="home"><b>Home</b><small>opening page</small></button>
   <button class="seg" data-page="monitor"><b>Monitor</b><small>log · stats · support · graph · connection</small></button>
   <button class="seg" data-page="settings"><b>Settings</b><small>grouped &amp; scannable</small></button>
+  <button class="seg" data-page="advanced"><b>Advanced</b><small>pic · debug · files · system</small></button>
 </div>
 <!-- always-visible connectivity strip — glance scale; click any pill for the detail map -->
 <div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
@@ -311,7 +312,6 @@
     <button class="subtab" data-tab="msupport">OT Support</button>
     <button class="subtab" data-tab="mgraph">Graph</button>
     <button class="subtab" data-tab="mconn">Connection</button>
-    <button class="subtab" data-tab="mdebug">Debug</button>
   </div>
 
   <div id="mlog" class="mpanel active">
@@ -517,42 +517,6 @@
     </div>
   </div>
 
-  <!-- TASK-967: Debug / crash-log page (parity with Classic "Debug Information"). -->
-  <div id="mdebug" class="mpanel">
-    <!-- TASK-968: admin tools/links parity with the Classic Advanced menu. -->
-    <div class="set-group">
-      <h3>Tools</h3>
-      <div class="ble-ctrls">
-        <a class="tbtn" href="/FSexplorer">📁 File system</a>
-        <a class="tbtn" href="/update">⬆ Flash firmware / filesystem</a>
-      </div>
-    </div>
-    <div class="set-group" style="margin-top:14px">
-      <h3>System / debug info</h3>
-      <pre id="dbgInfo" class="console" style="max-height:340px;white-space:pre-wrap">Loading…</pre>
-    </div>
-    <div class="set-group" style="margin-top:14px">
-      <h3>Crash log</h3>
-      <pre id="dbgCrash" class="console" style="max-height:320px;white-space:pre-wrap">—</pre>
-    </div>
-    <!-- TASK-972: PIC firmware flash (parity with the Classic PIC firmware tab).
-         Shown ONLY on PIC hardware (otcommandinterface === 'PIC'); hidden on OTGW32. -->
-    <div id="picFlash" class="set-group" style="display:none;margin-top:14px">
-      <h3>PIC firmware</h3>
-      <div id="picInfo" class="ot-support-hint">Reading PIC…</div>
-      <div id="picBanner" class="ot-support-hint"></div>
-      <div class="ble-ctrls" style="margin-bottom:8px">
-        <button id="picCheckUpd" class="tbtn">🔄 Check for updates</button>
-      </div>
-      <div id="picFiles"></div>
-      <div id="picProg" style="display:none;margin-top:10px">
-        <div style="height:10px;background:var(--border);border-radius:6px;overflow:hidden">
-          <div id="picProgBar" style="height:100%;width:0%;background:var(--accent);transition:width .3s"></div>
-        </div>
-        <div id="picProgTxt" class="ot-support-hint" style="margin-top:4px">Ready to flash</div>
-      </div>
-    </div>
-  </div>
 </div><!-- /page-monitor -->
 
 <!-- ════════════════ PAGE: SETTINGS ════════════════ -->
@@ -572,6 +536,99 @@
     </div>
   </div>
 </div><!-- /page-settings -->
+
+<!-- ════════════════ PAGE: ADVANCED (TASK-982) ════════════════ -->
+<!-- Top-level Advanced page: the power-user screens that used to live under
+     Monitor > Debug. Four sub-tabs; data is fetched on tab-open (not page init). -->
+<div id="page-advanced" class="page">
+
+  <div class="subtabs" id="advTabs">
+    <button class="subtab active" data-adv="pic">PIC firmware</button>
+    <button class="subtab" data-adv="debug">Debug Information</button>
+    <button class="subtab" data-adv="files">File System</button>
+    <button class="subtab" data-adv="system">System</button>
+  </div>
+
+  <!-- ---- PIC firmware (relocated + restyled from Monitor > Debug, TASK-972) ---- -->
+  <div id="adv-pic" class="mpanel active">
+    <div id="picNone" class="crashlog-ok" style="display:none;background:none;border-color:var(--border);color:var(--muted)">
+      No PIC detected — PIC firmware flashing is unavailable on this board (OT-Direct / OTGW32).</div>
+    <div id="picFlash">
+      <div class="pic-head">
+        <div><span class="k">PIC Device</span><b id="picHeadDev">…</b></div>
+        <div><span class="k">PIC Type</span><b id="picHeadType">…</b></div>
+        <div><span class="k">PIC Firmware Version</span><b id="picHeadVer">…</b></div>
+      </div>
+      <div id="picBanner" class="pic-banner" style="display:none"></div>
+      <div class="ble-ctrls" style="margin-bottom:12px">
+        <button id="picCheckUpd" class="tbtn">🔄 Check for updates</button>
+      </div>
+      <!-- filled by renderPicFiles(): header row + one .picrow per firmware file -->
+      <div class="pictable" id="picFiles"></div>
+      <div id="picProg" class="pic-progress" style="display:none">
+        <div class="track"><div class="fill" id="picProgBar"></div></div>
+        <div class="lbl" id="picProgTxt">Ready to flash</div>
+      </div>
+      <div class="adv-card" style="margin-top:14px">
+        <h4>Gateway settings <span style="font-weight:400;color:var(--muted);font-size:.8rem">· cached PR= values</span></h4>
+        <div class="prtable" id="picPrTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- Debug Information (relocated from Monitor > Debug, TASK-967) ---- -->
+  <div id="adv-debug" class="mpanel">
+    <div id="dbgCrashOk" class="crashlog-ok" style="display:none">✓ No crash logs recorded since last boot.</div>
+    <pre id="dbgCrash" class="console" style="display:none;max-height:320px;white-space:pre-wrap">—</pre>
+    <div id="dbgGroups"></div>
+    <details style="margin-top:6px">
+      <summary style="cursor:pointer;color:var(--muted);font-size:.8rem">Raw debug dump (/api/v2/debug)</summary>
+      <pre id="dbgInfo" class="console" style="max-height:340px;white-space:pre-wrap;margin-top:8px">Loading…</pre>
+    </details>
+  </div>
+
+  <!-- ---- File System — in-page FSexplorer (TASK-982) ---- -->
+  <div id="adv-files" class="mpanel">
+    <h3 class="fs-title">File system (LittleFS)</h3>
+    <div class="fs-crumb" id="fsCrumb">Current directory: /</div>
+    <table class="fstable"><tbody id="fsTableBody"></tbody></table>
+    <div class="fs-usage" id="fsUsage"></div>
+    <div class="fs-bar"><i id="fsBar" style="width:0%"></i></div>
+    <fieldset class="fs-upload">
+      <legend>Upload file</legend>
+      <div class="row">
+        <input type="file" id="fsFile">
+        <button class="fs-btn" id="fsUpload" disabled style="min-height:38px;padding:8px 16px">Upload</button>
+        <span id="fsUploadHint" style="font-size:.76rem;color:var(--muted)">Files land in the current directory.</span>
+      </div>
+    </fieldset>
+    <p style="font-size:.78rem;color:var(--muted);margin:0">
+      <a class="fsact" href="/FSexplorer" style="color:var(--accent);font-weight:600">Open classic /FSexplorer ›</a></p>
+  </div>
+
+  <!-- ---- System (relocated Tools + new device status + actions, TASK-968/982) ---- -->
+  <div id="adv-system" class="mpanel">
+    <div class="adv-card" style="margin-bottom:14px">
+      <h4>Device status</h4>
+      <div class="fs-btnrow" style="gap:8px">
+        <span class="fw-badge fw-conn" id="sysConn" title="Live WebSocket link to the gateway">● …</span>
+        <span class="fw-badge fw-mode" id="sysMode" title="Current OpenTherm rewrite mode">⇄ …</span>
+        <span class="fw-badge fw-sim hidden" id="sysSim" title="Simulation active: OT replay / sensor simulation">SIMULATION</span>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0">Live gateway link, current OT-rewrite mode, and simulation state.</p>
+    </div>
+    <div class="fs-actions" style="border-top:0;padding-top:0">
+      <h4>System Actions <span style="font-weight:400;color:var(--muted);font-size:.8rem">· device-wide</span></h4>
+      <div class="fs-btnrow">
+        <button class="fs-btn primary" data-act="update">Update Firmware</button>
+        <button class="fs-btn" data-act="reboot">ReBoot</button>
+        <button class="fs-btn danger" data-act="resetwifi">Reset Wireless</button>
+        <button class="fs-btn" data-act="home">Home</button>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0"><b>Update Firmware</b> → OTA sketch / filesystem upload · <b>ReBoot</b> → restart the device · <b>Reset Wireless</b> → clear Wi-Fi &amp; reboot into AP-mode setup · <b>Home</b> → back to the dashboard.</p>
+    </div>
+  </div>
+</div><!-- /page-advanced -->
 
 <div class="foot">OTGW firmware · v2 Web UI · live from the OpenTherm bus</div>
 </div>

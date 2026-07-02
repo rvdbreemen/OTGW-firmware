@@ -36,13 +36,19 @@
     document.querySelectorAll('.seg').forEach(function (s) {
       s.classList.toggle('active', s.dataset.page === p);
     });
-    ['home', 'monitor', 'settings'].forEach(function (k) {
+    ['home', 'monitor', 'settings', 'advanced'].forEach(function (k) {
       var el = document.getElementById('page-' + k);
       if (el) el.classList.toggle('active', k === p);
     });
     try { localStorage.setItem('otgw-v2-page', p); } catch (e) { }
     if (p === 'monitor' && isMonitorLogVisible()) renderLog();
     if (p === 'settings') fetchSettings();
+    // TASK-982: entering Advanced re-asserts its active sub-tab (restore-on-refresh,
+    // TASK-808) and loads that tab's data on demand.
+    if (p === 'advanced') {
+      var at = null; try { at = localStorage.getItem('otgw-v2-advtab'); } catch (e) { }
+      showAdvTab(at || 'pic');
+    }
   }
 
   // ---------- Home concept chips (A/B/C) ----------
@@ -59,11 +65,13 @@
   }
 
   // ---------- Monitor sub-tabs ----------
+  // Scoped to #page-monitor so the Advanced page's own .subtab/.mpanel elements
+  // (TASK-982) are never toggled by this switcher, and vice-versa.
   function showTab(t) {
-    document.querySelectorAll('.subtab').forEach(function (s) {
+    document.querySelectorAll('#page-monitor .subtab').forEach(function (s) {
       s.classList.toggle('active', s.dataset.tab === t);
     });
-    document.querySelectorAll('.mpanel').forEach(function (el) {
+    document.querySelectorAll('#page-monitor .mpanel').forEach(function (el) {
       el.classList.toggle('active', el.id === t);
     });
     if (t === 'mlog') renderLog();
@@ -71,7 +79,23 @@
     else if (t === 'msupport') renderSupport();
     else if (t === 'mgraph') renderGraph();
     else if (t === 'mconn') { fetchConn(); fetchOtdOvr(); }
-    else if (t === 'mdebug') { fetchDebug(); fetchPic(); }
+  }
+
+  // ---------- Advanced sub-tabs (TASK-982): PIC / Debug / File System / System ----------
+  function showAdvTab(k) {
+    document.querySelectorAll('#advTabs .subtab').forEach(function (s) {
+      s.classList.toggle('active', s.dataset.adv === k);
+    });
+    ['pic', 'debug', 'files', 'system'].forEach(function (x) {
+      var el = document.getElementById('adv-' + x);
+      if (el) el.classList.toggle('active', x === k);
+    });
+    try { localStorage.setItem('otgw-v2-advtab', k); } catch (e) { }
+    // Fetch-on-demand: each sub-tab loads its own data when opened, not on page init.
+    if (k === 'pic') { fetchPic(); fetchPicSettings(); picUpdatePoll(); }
+    else if (k === 'debug') fetchDebug();
+    else if (k === 'files') fetchFsList(fsCurrentPath);
+    else if (k === 'system') fetchSystemStatus();
   }
 
   // ---------- back to the classic UI ----------
@@ -145,6 +169,7 @@
              exp: 'Values on this page are fetched from the device API.' }
   };
   var connRssi = null;
+  var simActive = false;   // TASK-982: device/info otgwsimulation, cached via withDeviceInfo
   function renderConnStrip() {
     var strip = document.getElementById('connStrip'); if (!strip) return;
     // Single worst-of health-summary pill; the per-node detail lives on Monitor › Connection.
@@ -189,6 +214,14 @@
       hs.title = (wd ? 'Disconnected' : 'Connected') + ' · ' + mode + ' mode';
       var md = document.getElementById('hdrStatMode');
       if (md) md.textContent = (wd ? 'Disconnected' : mode);
+      // TASK-982: keep the Advanced › System 'Device status' badges in sync from the
+      // SAME wd/mode mapping (no drift). sysSim reflects the cached device/info flag.
+      var sc = document.getElementById('sysConn');
+      if (sc) { sc.classList.toggle('down', wd); sc.textContent = '● ' + (wd ? 'Disconnected' : 'Connected'); }
+      var sm = document.getElementById('sysMode');
+      if (sm) sm.textContent = '⇄ ' + mode;
+      var ssim = document.getElementById('sysSim');
+      if (ssim) ssim.classList.toggle('hidden', !simActive);
     }
   }
 
@@ -1959,75 +1992,217 @@
     }).catch(function () { });
   }
 
-  // ---------- Monitor > Debug page (TASK-967) ----------
+  // ---------- Advanced: shared device/info snapshot ----------
+  // device/info is the heavy chunked endpoint (heap-gated). Fetch it once and
+  // cache for a few seconds so opening PIC → Debug → System in quick succession
+  // does not hammer it. Never polled — only fetched on Advanced sub-tab open.
+  var devInfoCache = null, devInfoTs = 0, devInfoInflight = null;
+  function withDeviceInfo(cb) {
+    var now = Date.now();
+    if (devInfoCache && (now - devInfoTs) < 8000) { cb(devInfoCache); return; }
+    if (devInfoInflight) { devInfoInflight.push(cb); return; }
+    devInfoInflight = [cb];
+    fetch(APIGW + 'v2/device/info').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var d = (j && j.device) || {};
+      devInfoCache = d; devInfoTs = Date.now();
+      simActive = (d.otgwsimulation === true || d.otgwsimulation === 'true');
+      var cbs = devInfoInflight; devInfoInflight = null;
+      cbs.forEach(function (fn) { try { fn(d); } catch (e) { } });
+    }).catch(function () {
+      var cbs = devInfoInflight || []; devInfoInflight = null;
+      cbs.forEach(function (fn) { try { fn(devInfoCache || {}); } catch (e) { } });
+    });
+  }
+  function yesno(b) { return (b === undefined || b === null) ? undefined : (b === false || b === 'false' || b === 0) ? 'No' : 'Yes'; }
+
+  // ---------- Advanced > Debug Information (TASK-967/982) ----------
   function fetchDebug() {
+    // Grouped device info (mockup devinfo-groups), from the cached device/info snapshot.
+    withDeviceInfo(function (d) { renderDebugGroups(d); });
+    // Crashlog: green ok-banner when clean; the detail <pre> only when a crash exists.
+    fetch(APIGW + 'v2/device/crashlog').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var c = (j && j.crashlog) || {};
+      var ok = document.getElementById('dbgCrashOk'), pre = document.getElementById('dbgCrash');
+      if (!c.available) { if (ok) ok.style.display = ''; if (pre) pre.style.display = 'none'; }
+      else { if (ok) ok.style.display = 'none'; if (pre) { pre.style.display = ''; pre.textContent = ((c.summary || '') + '\n\n' + (c.details || '')).trim() || 'Crash recorded (no detail).'; } }
+    }).catch(function () {
+      var ok = document.getElementById('dbgCrashOk'), pre = document.getElementById('dbgCrash');
+      if (ok) ok.style.display = 'none'; if (pre) { pre.style.display = ''; pre.textContent = '—'; }
+    });
+    // Raw /api/v2/debug dump preserved behind the collapsible (nothing lost from the old tab).
     fetch(APIGW + 'v2/debug').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var el = document.getElementById('dbgInfo'); if (!el) return;
       var d = (j && j.debug) || j || {};
       var keys = Object.keys(d);
       el.textContent = keys.length ? keys.map(function (k) { return k + '  =  ' + d[k]; }).join('\n') : 'No debug data';
     }).catch(function () { var el = document.getElementById('dbgInfo'); if (el) el.textContent = 'Failed to load debug info'; });
-    fetch(APIGW + 'v2/device/crashlog').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      var el = document.getElementById('dbgCrash'); if (!el) return;
-      var c = (j && j.crashlog) || {};
-      if (!c.available) { el.textContent = 'No crash recorded.'; return; }
-      el.textContent = ((c.summary || '') + '\n\n' + (c.details || '')).trim() || 'Crash recorded (no detail).';
-    }).catch(function () { var el = document.getElementById('dbgCrash'); if (el) el.textContent = '—'; });
+  }
+  function renderDebugGroups(d) {
+    var host = document.getElementById('dbgGroups'); if (!host) return;
+    host.textContent = '';
+    var mqttEn;
+    if (Object.prototype.hasOwnProperty.call(setData, 'mqttenable')) mqttEn = (('' + setData.mqttenable.value) === 'true') ? 'Yes' : 'No';
+    var wifiQ;
+    if (d.wifiquality_text !== undefined) wifiQ = d.wifiquality_text + (d.wifiquality !== undefined ? ' (' + d.wifiquality + '%)' : '');
+    var groups = [
+      ['Firmware', [
+        ['Firmware Version', d.fwversion], ['Compiled On', d.compiled],
+        ['PIC Firmware Version', d.picfwversion], ['PIC Firmware Type', d.picfwtype],
+        ['PIC Device ID', d.picdeviceid], ['Board Type', d.board]
+      ]],
+      ['Network', [
+        ['Hostname (.local)', d.hostname], ['IP Address', d.ipaddress], ['MAC Address', d.macaddress],
+        ['Wi-Fi Network (SSID)', d.ssid], ['Wi-Fi Signal Strength (dBm)', d.wifirssi], ['Wi-Fi Quality', wifiQ]
+      ]],
+      ['Hardware', [
+        ['Unique Chip ID', d.chipid], ['Arduino Core Version', d.coreversion], ['Espressif SDK Version', d.sdkversion],
+        ['CPU Speed (MHz)', d.cpufreq], ['Flash Chip Size (MB)', d.flashchipsize], ['LittleFS Size (MB)', d.LittleFSsize], ['Flash Mode', d.flashchipmode]
+      ]],
+      ['Memory & uptime', [
+        ['Free Heap Memory (bytes)', d.freeheap], ['Max. Free Block (bytes)', d.maxfreeblock], ['Heap Fragmentation (%)', d.hd_fragmentation_pct],
+        ['Uptime Since Boot', d.uptime], ['Number of Reboots', d.bootcount], ['Last Reset Reason', d.lastreset]
+      ]],
+      ['Integrations', [
+        ['MQTT Connected', yesno(d.mqttconnected)], ['MQTT Enabled', mqttEn], ['NTP Enabled', yesno(d.ntpenable)], ['NTP Timezone', d.ntptimezone]
+      ]]
+    ];
+    groups.forEach(function (g) {
+      var rows = g[1].filter(function (r) { return r[1] !== undefined && r[1] !== null && r[1] !== ''; });
+      if (!rows.length) return;
+      var wrap = document.createElement('div'); wrap.className = 'devinfo-group';
+      var h = document.createElement('h4'); h.textContent = g[0]; wrap.appendChild(h);
+      var bodyEl = document.createElement('div'); bodyEl.className = 'devinfo-rows';
+      rows.forEach(function (r) {
+        var row = document.createElement('div'); row.className = 'devinforow';
+        var c1 = document.createElement('div'); c1.className = 'devinfocolumn1'; c1.textContent = r[0];
+        var c2 = document.createElement('div'); c2.className = 'devinfocolumn2'; c2.textContent = '' + r[1];
+        row.appendChild(c1); row.appendChild(c2); bodyEl.appendChild(row);
+      });
+      wrap.appendChild(bodyEl); host.appendChild(wrap);
+    });
   }
 
-  // ---------- Monitor > Debug > PIC firmware flash (TASK-972) ----------
+  // ---------- Advanced > PIC firmware flash (TASK-972/982) ----------
   var PICBASE = location.protocol + '//' + location.host + '/';   // /pic is a top-level route, not under /api/v2
-  var picPollTimer = null, picBusy = false;
-  function picMuted(t) { var d = document.createElement('div'); d.className = 'ble-row'; d.style.color = 'var(--muted)'; d.textContent = t; return d; }
+  var picPollTimer = null, picBusy = false, picDevVer = '';
   function fetchPic() {
-    var card = document.getElementById('picFlash'); if (!card) return;
-    fetch(APIGW + 'v2/device/info').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      var d = (j && j.device) || {};
-      if ((d.otcommandinterface || '') !== 'PIC') { card.style.display = 'none'; return; }   // hidden on OTGW32 / OT-Direct
-      card.style.display = '';
-      var info = document.getElementById('picInfo');
-      if (info) info.textContent = 'Device ' + (d.picdeviceid || '?') + ' · type ' + (d.picfwtype || '?') + ' · firmware ' + (d.picfwversion || '?');
+    var wrap = document.getElementById('picFlash'), none = document.getElementById('picNone');
+    withDeviceInfo(function (d) {
+      var isPic = (d.otcommandinterface || '') === 'PIC';
+      if (wrap) wrap.style.display = isPic ? '' : 'none';      // hidden on OTGW32 / OT-Direct
+      if (none) none.style.display = isPic ? 'none' : '';
+      var ssim = document.getElementById('sysSim'); if (ssim) ssim.classList.toggle('hidden', !simActive);
+      if (!isPic) return;
+      picDevVer = ('' + (d.picfwversion || '')).trim();        // for the .newer highlight
+      txt('picHeadDev', d.picdeviceid || '?');
+      txt('picHeadType', d.picfwtype || '?');
+      txt('picHeadVer', d.picfwversion || '?');
       fetchPicFiles();
-    }).catch(function () { });
+    });
   }
   function fetchPicFiles() {
     fetch(APIGW + 'v2/firmware/files').then(function (r) { return r.ok ? r.json() : null; }).then(function (files) {
       renderPicFiles(Array.isArray(files) ? files : ((files && files.files) || []));   // firmware/files is a bare array
     }).catch(function () { });
   }
+  function picIcon(sym, title, cls) {
+    var b = document.createElement('span'); b.className = 'picbtn' + (cls ? ' ' + cls : '');
+    b.textContent = sym; b.title = title; b.setAttribute('role', 'button'); b.tabIndex = 0;
+    return b;
+  }
+  function newerThanDevice(fver) {
+    var a = parseFloat(fver), b = parseFloat(picDevVer);
+    return (!isNaN(a) && !isNaN(b) && a > b);
+  }
   function renderPicFiles(files) {
     var el = document.getElementById('picFiles'); if (!el) return; el.textContent = '';
-    if (!files.length) { el.appendChild(picMuted('No firmware files on device. Use Check for updates, or upload a .hex via the File system.')); return; }
+    if (!files.length) {
+      var em = document.createElement('div'); em.className = 'picempty';
+      em.textContent = 'No firmware files on device. Use Check for updates, or upload a .hex via the File System tab.';
+      el.appendChild(em); return;
+    }
+    var head = document.createElement('div'); head.className = 'picrow head';
+    ['Firmware name', 'Version', 'Size', '', '', ''].forEach(function (t) { var s = document.createElement('span'); s.textContent = t; head.appendChild(s); });
+    el.appendChild(head);
     files.forEach(function (f) {
-      var row = document.createElement('div'); row.className = 'ble-row';
-      var nm = document.createElement('div'); nm.className = 'ble-nm'; nm.textContent = (f.name || '?') + '  ';
-      var v = document.createElement('span'); v.className = 'ble-mac'; v.textContent = 'v' + (f.version || '?') + ' · ' + (f.size || 0) + ' B'; nm.appendChild(v);
-      row.appendChild(nm);
-      var ctr = document.createElement('div'); ctr.className = 'ble-ctrls';
-      var flash = document.createElement('button'); flash.className = 'tbtn'; flash.textContent = '⚡ Flash';
+      var row = document.createElement('div'); row.className = 'picrow' + (newerThanDevice(f.version) ? ' newer' : '');
+      var nm = document.createElement('span'); nm.className = 'fname'; nm.textContent = f.name || '?';
+      var ver = document.createElement('span'); ver.className = 'fver'; ver.textContent = 'v' + (f.version || '?');
+      var sz = document.createElement('span'); sz.className = 'fsize'; sz.textContent = ((f.size || 0) >= 1024 ? (f.size / 1024).toFixed(1) + ' KB' : (f.size || 0) + ' B');
+      row.appendChild(nm); row.appendChild(ver); row.appendChild(sz);
+      var refr = picIcon('⟳', 'Re-download latest ' + (f.name || ''), '');
+      refr.addEventListener('click', function () { if (!picBusy) picRefresh(f.name, f.version); });
+      var flash = picIcon('⇩', 'Flash ' + (f.name || '') + ' onto the PIC', '');
       flash.addEventListener('click', function () {
         if (picBusy) return;
-        if (flash._armed) { flash._armed = false; startPicFlash(f.name); return; }
-        flash._armed = true; flash.textContent = '⚠ Confirm flash';   // two-click confirm (a bad flash bricks the PIC)
-        setTimeout(function () { if (flash.isConnected) { flash._armed = false; flash.textContent = '⚡ Flash'; } }, 3000);
+        if (flash._armed) { flash._armed = false; flash.classList.remove('armed'); flash.textContent = '⇩'; flash.title = 'Flash ' + (f.name || '') + ' onto the PIC'; startPicFlash(f.name); return; }
+        flash._armed = true; flash.classList.add('armed'); flash.textContent = '⚠'; flash.title = 'Tap again to confirm flashing ' + (f.name || '') + ' — a bad flash can brick the PIC';
+        setTimeout(function () { if (flash.isConnected && flash._armed) { flash._armed = false; flash.classList.remove('armed'); flash.textContent = '⇩'; flash.title = 'Flash ' + (f.name || '') + ' onto the PIC'; } }, 3000);
       });
-      var refr = document.createElement('button'); refr.className = 'tbtn'; refr.textContent = '⭳ Re-download';
-      refr.addEventListener('click', function () { if (!picBusy) picRefresh(f.name, f.version); });
-      var del = document.createElement('button'); del.className = 'tbtn'; del.textContent = 'Delete';
-      del.addEventListener('click', function () { if (!picBusy) picDelete(f.name); });
-      ctr.appendChild(flash); ctr.appendChild(refr); ctr.appendChild(del); row.appendChild(ctr);
+      var del = picIcon('🗑', 'Delete ' + (f.name || ''), 'del');
+      del.addEventListener('click', function () { if (!picBusy && window.confirm('Delete firmware file ' + (f.name || '') + '?')) picDelete(f.name); });
+      row.appendChild(refr); row.appendChild(flash); row.appendChild(del);
       el.appendChild(row);
     });
   }
+  // Update banner. Manual button forces a fresh check (recheck=1); the auto path on
+  // PIC-tab open (picUpdatePoll) reads the cached result without re-triggering.
+  function renderPicBanner(u) {
+    var b = document.getElementById('picBanner'); if (!b) return;
+    b.className = 'pic-banner';
+    if (u.status === 'checking') { b.style.display = ''; b.textContent = 'Checking for updates…'; return; }
+    if (u.update_available) { b.style.display = ''; b.classList.add('warn'); b.textContent = 'PIC firmware update available: ' + (u.current || '?') + ' → ' + (u.latest || '?'); }
+    else if (u.status === 'ready' || u.current) { b.style.display = ''; b.classList.add('ok'); b.textContent = '✓ PIC firmware up to date (' + (u.current || '?') + ')'; }
+    else { b.style.display = 'none'; b.textContent = ''; }
+  }
+  function picUpdatePoll() {
+    fetch(APIGW + 'v2/pic/update-check').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var u = (j && j.pic_update) || {};
+      if (u.status === 'checking') { setTimeout(picUpdatePoll, 2500); renderPicBanner(u); return; }
+      renderPicBanner(u);
+    }).catch(function () { });
+  }
   function checkPicUpdate() {
-    var b = document.getElementById('picBanner'); if (b) b.textContent = 'Checking for updates…';
+    var b = document.getElementById('picBanner'); if (b) { b.className = 'pic-banner'; b.style.display = ''; b.textContent = 'Checking for updates…'; }
     fetch(APIGW + 'v2/pic/update-check?recheck=1').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      var u = (j && j.pic_update) || {}; if (!b) return;
-      if (u.status === 'checking') { b.textContent = 'Checking…'; setTimeout(checkPicUpdate, 2500); return; }
-      if (u.update_available) b.textContent = '⬆ Update available: ' + u.latest + ' (current ' + u.current + ')';
-      else if (u.status === 'ready') b.textContent = 'Up to date (' + (u.current || '?') + ')';
-      else b.textContent = 'Update check: ' + (u.status || 'unavailable');
-    }).catch(function () { if (b) b.textContent = 'Update check failed'; });
+      var u = (j && j.pic_update) || {};
+      if (u.status === 'checking') { setTimeout(picUpdatePoll, 2500); return; }
+      renderPicBanner(u);
+    }).catch(function () { if (b) { b.className = 'pic-banner'; b.textContent = 'Update check failed'; } });
+  }
+  // Gateway settings · cached PR= values. The GET returns the cache immediately AND
+  // triggers a fresh ~45s PR readout on the device — call once per tab open, no loop.
+  function prv(x) { var s = (x === undefined || x === null) ? '' : ('' + x).trim(); return s === '' ? '—' : s; }
+  function picModeText(m) {
+    if (m === undefined || m === null || m === '') return '—';
+    var s = ('' + m).toLowerCase();
+    return s === 'on' ? 'Gateway' : s === 'off' ? 'Monitor' : s === 'detecting' ? 'Detecting…' : ('' + m);
+  }
+  function fetchPicSettings() {
+    var el = document.getElementById('picPrTable'); if (!el) return;
+    el.textContent = '';
+    var ld = document.createElement('span'); ld.className = 'prk'; ld.textContent = 'Reading PR= values…'; el.appendChild(ld);
+    fetch(APIGW + 'v2/pic/settings').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var s = (j && j.pic_settings) || {};
+      withDeviceInfo(function (d) {
+        el.textContent = '';
+        var rows = [
+          ['PIC firmware version', prv(d.picfwversion)],
+          ['Build date', prv(s.builddate)],
+          ['Clock speed', prv(s.clock_mhz)],
+          ['Reset cause', prv(s.reset_cause)],
+          ['Thermostat detected', prv(s.thermostat_detect)],
+          ['Voltage reference', prv(s.voltage_ref)],
+          ['Standalone interval', prv(s.standalone_interval)],
+          ['Gateway/Monitor mode', picModeText(d.otgwmode)]
+        ];
+        rows.forEach(function (r) {
+          var k = document.createElement('span'); k.className = 'prk'; k.textContent = r[0];
+          var v = document.createElement('span'); v.className = 'prv'; v.textContent = r[1];
+          el.appendChild(k); el.appendChild(v);
+        });
+      });
+    }).catch(function () { el.textContent = ''; var e = document.createElement('span'); e.className = 'prk'; e.textContent = 'Failed to read PIC settings'; el.appendChild(e); });
   }
   function startPicFlash(name) {
     picBusy = true;
@@ -2064,6 +2239,187 @@
   }
   function picDelete(name) {
     fetch(PICBASE + 'pic?action=delete&name=' + encodeURIComponent(name)).then(function () { setTimeout(fetchPicFiles, 600); }).catch(function () { });
+  }
+
+  // ---------- Advanced > File System — in-page FSexplorer (TASK-982) ----------
+  // Mirrors the classic FSexplorer.html against /api/v2/filesystem/files. The listing
+  // is a heterogeneous JSON array: file/dir entries {name,size,type} followed by ONE
+  // trailing storage-summary {usedBytes,totalBytes,freeBytes,truncated}. All names are
+  // device-sourced -> DOM-built with textContent only, never innerHTML.
+  var fsCurrentPath = '/';
+  // Core UI assets: deleting any of these bricks the very page you are looking at, so
+  // the Delete affordance is withheld (parity with the classic protectedFiles guard).
+  var FS_PROTECTED = [
+    'v2.html', 'v2.js', 'v2.css', 'sat.js', 'sat-slider.js', 'theme-toggle.js', 'echarts-theme.js',
+    'index.html', 'index.js', 'index_common.css', 'components.css', 'ds-tokens.css', 'graph.js',
+    'FSexplorer.html', 'FSexplorer.png', 'design.html', 'favicon.ico', 'settings.png',
+    'inter-400.woff2', 'inter-700.woff2', 'jetbrains-mono-400.woff2'
+  ];
+  function fsFmtBytes(n) {
+    n = +n || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(2) + ' MB';
+  }
+  function fsFullPath(name) {
+    var p = (fsCurrentPath === '/') ? name : (fsCurrentPath + '/' + name);
+    return (p.charAt(0) === '/') ? p : ('/' + p);   // root-absolute so it serves regardless of the page path
+  }
+  function fetchFsList(path) {
+    if (typeof path === 'string') fsCurrentPath = path;
+    fetch(APIGW + 'v2/filesystem/files?path=' + encodeURIComponent(fsCurrentPath))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (json) {
+        if (!Array.isArray(json)) { renderFsError('Failed to read the file system.'); return; }
+        var summary = json.length ? json[json.length - 1] : null;
+        var files = json.slice(0, -1);
+        // LittleFS drops empty directories; if this one vanished, fall back to root.
+        if (files.length === 0 && fsCurrentPath !== '/') { fetchFsList('/'); return; }
+        files.sort(function (a, b) {
+          if (a.type === 'dir' && b.type !== 'dir') return -1;
+          if (a.type !== 'dir' && b.type === 'dir') return 1;
+          return ('' + a.name).localeCompare('' + b.name, undefined, { sensitivity: 'base' });
+        });
+        renderFsList(files, summary);
+      })
+      .catch(function () { renderFsError('Failed to read the file system.'); });
+  }
+  function renderFsError(msg) {
+    var body = document.getElementById('fsTableBody'); if (!body) return;
+    body.textContent = '';
+    var tr = document.createElement('tr'); var td = document.createElement('td');
+    td.colSpan = 4; td.style.color = 'var(--muted)'; td.style.padding = '12px'; td.textContent = msg;
+    tr.appendChild(td); body.appendChild(tr);
+  }
+  function renderFsList(files, summary) {
+    var body = document.getElementById('fsTableBody'); if (!body) return;
+    body.textContent = '';
+    var crumb = document.getElementById('fsCrumb');
+    if (crumb) crumb.textContent = 'Current directory: ' + fsCurrentPath + (summary && summary.truncated ? '  · list truncated' : '');
+
+    // Parent row (navigates up one level) whenever we are below root.
+    if (fsCurrentPath !== '/') {
+      var pr = document.createElement('tr');
+      var pc = document.createElement('td'); pc.className = 'fn dir'; pc.textContent = '.. (parent)';
+      pc.addEventListener('click', function () { fsNavigate('..'); });
+      pr.appendChild(pc);
+      var ps = document.createElement('td'); ps.className = 'fsz'; ps.textContent = '<DIR>'; pr.appendChild(ps);
+      pr.appendChild(document.createElement('td')); pr.appendChild(document.createElement('td'));
+      body.appendChild(pr);
+    }
+
+    files.forEach(function (f) {
+      var name = '' + (f.name || '');
+      var tr = document.createElement('tr');
+      if (f.type === 'dir') {
+        var dn = document.createElement('td'); dn.className = 'fn dir'; dn.textContent = name + '/';
+        dn.addEventListener('click', function () { fsNavigate(name); });
+        tr.appendChild(dn);
+        var dz = document.createElement('td'); dz.className = 'fsz'; dz.textContent = '<DIR>'; tr.appendChild(dz);
+        tr.appendChild(document.createElement('td')); tr.appendChild(document.createElement('td'));
+      } else {
+        var nn = document.createElement('td'); nn.className = 'fn'; nn.textContent = name; tr.appendChild(nn);
+        var sz = document.createElement('td'); sz.className = 'fsz'; sz.textContent = fsFmtBytes(f.size); tr.appendChild(sz);
+        var dl = document.createElement('td');
+        var a = document.createElement('a'); a.className = 'fsact'; a.textContent = 'Download';
+        a.href = fsFullPath(name); a.setAttribute('download', name); a.target = '_blank'; a.rel = 'noopener';
+        dl.appendChild(a); tr.appendChild(dl);
+        var dc = document.createElement('td');
+        if (FS_PROTECTED.indexOf(name) === -1) {
+          var del = document.createElement('a'); del.className = 'fsact del'; del.href = '#'; del.textContent = 'Delete';
+          del.addEventListener('click', function (e) { e.preventDefault(); fsDelete(fsFullPath(name), name); });
+          dc.appendChild(del);
+        }
+        tr.appendChild(dc);
+      }
+      body.appendChild(tr);
+    });
+
+    if (summary && summary.usedBytes !== undefined) {
+      var usage = document.getElementById('fsUsage');
+      if (usage) {
+        usage.textContent = '';
+        var b = document.createElement('b'); b.textContent = 'LittleFS'; usage.appendChild(b);
+        usage.appendChild(document.createTextNode(
+          ' used ' + fsFmtBytes(summary.usedBytes) + ' of ' + fsFmtBytes(summary.totalBytes) +
+          ' — ' + fsFmtBytes(summary.freeBytes) + ' free'));
+      }
+      var bar = document.getElementById('fsBar');
+      if (bar) {
+        var pct = summary.totalBytes ? (summary.usedBytes / summary.totalBytes) * 100 : 0;
+        bar.style.width = Math.max(0, Math.min(100, pct)).toFixed(0) + '%';
+      }
+      var hint = document.getElementById('fsUploadHint');
+      if (hint) hint.textContent = fsFmtBytes(summary.freeBytes) + ' free · files land in the current directory.';
+    }
+  }
+  function fsNavigate(name) {
+    if (name === '..') {
+      var parts = fsCurrentPath.split('/'); parts.pop();
+      fsCurrentPath = (parts.length <= 1) ? '/' : parts.join('/');
+      if (fsCurrentPath === '') fsCurrentPath = '/';
+    } else {
+      fsCurrentPath = (fsCurrentPath === '/') ? ('/' + name) : (fsCurrentPath + '/' + name);
+    }
+    fetchFsList();
+  }
+  function fsDelete(fullPath, name) {
+    if (!window.confirm('Delete ' + name + ' from the file system? This cannot be undone.')) return;
+    fetch(APIGW + 'v2/filesystem/files?delete=' + encodeURIComponent(fullPath), { credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.ok) { bleToast('Deleted ' + name); fetchFsList(); return; }
+        if (r.status === 401 || r.status === 403) bleToast('Not authorized — open classic /FSexplorer to sign in first');
+        else bleToast('Delete failed: ' + r.status);
+      })
+      .catch(function () { bleToast('Delete failed'); });
+  }
+  function fsDoUpload() {
+    var inp = document.getElementById('fsFile'), btn = document.getElementById('fsUpload');
+    if (!inp || !inp.files || !inp.files.length) { bleToast('Choose a file to upload first'); return; }
+    var fd = new FormData(); fd.append('file', inp.files[0], inp.files[0].name);
+    if (btn) btn.disabled = true;
+    // /upload replies 303 -> FSexplorer.html; redirect:'manual' keeps us here and we
+    // refresh the listing ourselves instead of following the redirect.
+    fetch('/upload?path=' + encodeURIComponent(fsCurrentPath), {
+      method: 'POST', body: fd, credentials: 'same-origin', redirect: 'manual'
+    }).then(function (r) {
+      // An opaqueredirect (type 'opaqueredirect', status 0) is the success path here.
+      if (r.type === 'opaqueredirect' || r.ok || r.status === 0) { bleToast('Uploaded ' + inp.files[0].name); }
+      else if (r.status === 401 || r.status === 403) { bleToast('Not authorized — open classic /FSexplorer to sign in first'); }
+      else { bleToast('Upload failed: ' + r.status); }
+      inp.value = ''; if (btn) btn.disabled = true;
+      setTimeout(fetchFsList, 400);
+    }).catch(function () {
+      bleToast('Upload failed'); if (btn) btn.disabled = false;
+    });
+  }
+
+  // ---------- Advanced > System — device status + system actions (TASK-982) ----------
+  // The three status badges are driven from renderConnStrip() (the SAME wd/mode mapping
+  // as the TASK-980 header pill), so there is no vocabulary drift. Opening the tab just
+  // re-asserts them and refreshes the cached simulation flag.
+  function fetchSystemStatus() {
+    renderConnStrip();
+    withDeviceInfo(function () { renderConnStrip(); });
+  }
+  function advAction(act) {
+    if (act === 'home') { showPage('home'); return; }
+    if (act === 'update') { window.location.href = '/update'; return; }   // OTA sketch / filesystem upload page
+    if (act === 'reboot') {
+      if (!window.confirm('Reboot the OTGW device now? The Web UI will be unavailable for a few seconds.')) return;
+      bleToast('Device is rebooting…');
+      fetch('/ReBoot', { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) bleToast('Reboot failed: ' + r.status); })
+        .catch(function () { });   // socket drops as the device restarts — expected
+      return;
+    }
+    if (act === 'resetwifi') {
+      if (!window.confirm('Reset Wireless settings?\n\nThis CLEARS the stored Wi-Fi network and reboots the device into AP-mode setup. You will have to reconnect it to your network afterwards.')) return;
+      bleToast('Wi-Fi cleared — rebooting into AP-mode setup…');
+      fetch('/ResetWireless', { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) bleToast('Reset failed: ' + r.status); })
+        .catch(function () { });   // socket drops as the device restarts — expected
+    }
   }
 
   // ---------- Monitor > Log > send raw OTGW command (TASK-965) ----------
@@ -2110,9 +2466,25 @@
     document.querySelectorAll('.cchip').forEach(function (s) {
       s.addEventListener('click', function () { showDesign(s.dataset.design); });
     });
-    document.querySelectorAll('.subtab').forEach(function (s) {
+    // Monitor sub-tabs only (scoped so Advanced's own .subtab elements are wired separately).
+    document.querySelectorAll('#page-monitor .subtab').forEach(function (s) {
       s.addEventListener('click', function () { showTab(s.dataset.tab); });
     });
+    // TASK-982: Advanced sub-tabs (PIC / Debug / File System / System).
+    document.querySelectorAll('#advTabs .subtab').forEach(function (s) {
+      s.addEventListener('click', function () { showAdvTab(s.dataset.adv); });
+    });
+    // TASK-982: Advanced > System action buttons.
+    document.querySelectorAll('#adv-system [data-act]').forEach(function (b) {
+      b.addEventListener('click', function () { advAction(b.dataset.act); });
+    });
+    // TASK-982: Advanced > File System upload (button enables once a file is chosen).
+    var fsFileInp = document.getElementById('fsFile');
+    if (fsFileInp) fsFileInp.addEventListener('change', function () {
+      var u = document.getElementById('fsUpload'); if (u) u.disabled = !(fsFileInp.files && fsFileInp.files.length);
+    });
+    var fsUpBtn = document.getElementById('fsUpload');
+    if (fsUpBtn) fsUpBtn.addEventListener('click', fsDoUpload);
     var ut = document.getElementById('uiToggle');
     if (ut) ut.addEventListener('click', gotoClassic);
 

@@ -491,3 +491,90 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     .ble-tag{font-size:.66rem}
     .mc-cell .lbl{font-size:.68rem}
   }
+
+  /* ================= ADVANCED page (TASK-982): PIC · Debug · File System · System ================= */
+  /* Device-status badges (System tab) — firmware-authentic pills synced from the CONN model. */
+  .fw-badge{font-size:.66rem;font-weight:700;letter-spacing:.02em;border-radius:20px;
+    padding:4px 10px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;line-height:1}
+  .fw-conn{background:color-mix(in srgb,var(--zone-ok) 34%,transparent);color:#fff}
+  .fw-conn.down{background:color-mix(in srgb,var(--zone-alert) 42%,transparent)}
+  /* Deviation from mockup: mockup fw-mode is white-on-rgba-white (built for the dark
+     header). In v2 these badges sit on a light --panel card, so use a neutral, theme
+     readable chip instead of the near-invisible translucent-white original. */
+  .fw-mode{background:var(--panel-2);color:var(--text);border:1px solid var(--border)}
+  .fw-sim{background:color-mix(in srgb,var(--zone-warn) 82%,#000);color:#fff}
+  .fw-badge.hidden{display:none}
+  .adv-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;margin:0 0 14px}
+  .adv-card h4{margin:0 0 12px;font-size:.95rem}
+  .pic-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+  .pic-head>div{display:flex;flex-direction:column;gap:3px}
+  .pic-head .k{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .pic-head b{font-family:var(--font-mono);font-size:1.05rem}
+  .pic-banner{border-radius:10px;padding:10px 14px;font-size:.84rem;font-weight:700;margin-bottom:12px}
+  .pic-banner.warn{background:color-mix(in srgb,var(--zone-warn) 16%,transparent);
+    border:1px solid color-mix(in srgb,var(--zone-warn) 50%,transparent);color:var(--zone-warn)}
+  .pic-banner.ok{background:color-mix(in srgb,var(--zone-ok) 14%,transparent);
+    border:1px solid color-mix(in srgb,var(--zone-ok) 45%,transparent);color:var(--zone-ok)}
+  .pictable{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  /* six columns: name · version · size · refresh · flash · delete (v2 keeps Delete + two-click flash the mockup omits) */
+  .picrow{display:grid;grid-template-columns:1fr 62px 76px 40px 40px 40px;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.84rem}
+  .picrow:last-child{border-bottom:0}
+  .picrow.head{background:var(--panel-2);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+  .picrow .fname{font-family:var(--font-mono);font-weight:700;overflow:hidden;text-overflow:ellipsis}
+  .picrow .fver,.picrow .fsize{font-family:var(--font-mono);color:var(--muted)}
+  .picrow.newer .fver{color:var(--zone-ok)}
+  .picempty{padding:14px;color:var(--muted);font-size:.83rem}
+  .picbtn{width:34px;height:34px;border:1px solid var(--border);background:var(--panel-2);border-radius:8px;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:var(--text)}
+  .picbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .picbtn.armed{border-color:var(--zone-alert);color:var(--zone-alert)}
+  .picbtn.del:hover{border-color:var(--zone-alert);color:var(--zone-alert)}
+  .pic-progress{margin:14px 0 0}
+  .pic-progress .track{height:12px;background:var(--gauge-track);border-radius:6px;overflow:hidden}
+  .pic-progress .fill{height:100%;width:0;background:var(--accent);border-radius:6px;transition:width .25s}
+  .pic-progress .lbl{font-size:.76rem;color:var(--muted);margin-top:6px}
+  .prtable{display:grid;grid-template-columns:1fr auto;gap:7px 14px;font-size:.82rem}
+  .prtable .prk{color:var(--muted)}
+  .prtable .prv{font-family:var(--font-mono);text-align:right;font-weight:700}
+  .devinfo-group{margin:0 0 14px}
+  .devinfo-group h4{margin:0 0 8px 2px;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+  .devinfo-rows{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  .devinforow{display:grid;grid-template-columns:1fr auto;gap:12px;padding:9px 14px;border-bottom:1px solid var(--border);font-size:.83rem}
+  .devinforow:last-child{border-bottom:0}
+  .devinforow:nth-child(even){background:color-mix(in srgb,var(--panel-2) 55%,transparent)}
+  .devinfocolumn1{color:var(--muted)}
+  .devinfocolumn2{font-family:var(--font-mono);font-weight:700;text-align:right;color:var(--text)}
+  .crashlog-ok{display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--zone-ok) 12%,transparent);
+    border:1px solid color-mix(in srgb,var(--zone-ok) 40%,transparent);color:var(--zone-ok);
+    border-radius:10px;padding:10px 14px;font-size:.84rem;font-weight:700;margin-bottom:14px}
+  .fs-title{margin:0 0 10px;font-size:1.05rem}
+  .fs-crumb{font-family:var(--font-mono);font-size:.82rem;font-weight:700;margin:0 0 8px;color:var(--text)}
+  .fstable{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;overflow:hidden;box-shadow:var(--shadow);font-size:.83rem}
+  .fstable td{padding:8px 12px;border-bottom:1px solid var(--border)}
+  .fstable tr:last-child td{border-bottom:0}
+  .fstable tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+  .fstable .fn{font-family:var(--font-mono);font-weight:700}
+  .fstable .fn.dir{color:var(--accent);cursor:pointer}
+  .fstable .fsz{font-family:var(--font-mono);color:var(--muted);white-space:nowrap}
+  .fstable a.fsact{color:var(--accent);text-decoration:none;font-weight:600;font-size:.78rem;cursor:pointer}
+  .fstable a.del{color:var(--zone-alert)}
+  .fs-usage{margin:12px 0 4px;font-size:.82rem;color:var(--muted)}
+  .fs-usage b{color:var(--text)}
+  .fs-bar{height:10px;background:var(--gauge-track);border-radius:5px;overflow:hidden;margin-bottom:16px}
+  .fs-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
+  .fs-upload{background:var(--panel-2);border:1px dashed var(--border);border-radius:12px;padding:14px 16px;margin:0 0 16px}
+  .fs-upload legend{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .fs-upload .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .fs-actions{border-top:2px solid var(--border);padding-top:14px}
+  .fs-actions h4{margin:0 0 10px;font-size:.95rem}
+  .fs-btnrow{display:flex;gap:10px;flex-wrap:wrap}
+  .fs-btn{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;
+    padding:11px 16px;font-size:.85rem;font-weight:700;cursor:pointer;min-height:44px;
+    font-family:var(--font-sans);transition:transform .15s,box-shadow .15s}
+  .fs-btn:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.15)}
+  .fs-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+  .fs-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .fs-btn.danger{border-color:color-mix(in srgb,var(--zone-alert) 55%,var(--border));color:var(--zone-alert)}
+  .fs-btn.danger:hover{background:color-mix(in srgb,var(--zone-alert) 12%,transparent)}
