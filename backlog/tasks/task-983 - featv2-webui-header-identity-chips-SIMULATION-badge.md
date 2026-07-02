@@ -1,10 +1,11 @@
 ---
 id: TASK-983
 title: 'feat(v2-webui): header identity chips + SIMULATION badge'
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-01 22:21'
+updated_date: '2026-07-02 04:12'
 labels: []
 dependencies: []
 ordinal: 195000
@@ -18,8 +19,14 @@ Audit area header (findings 1,2,4,6). Add .hdr-net with hdrHost chip (hostname.l
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Header shows hostname+version chip and IP+WiFi-bars chip with correct tooltip, one-shot fetch
-- [ ] #2 WiFi bars + dBm refresh from existing health poll; Ethernet/AP variants render correctly
-- [ ] #3 SIMULATION badge appears only when simulation active
+- [x] #1 Header shows hostname+version chip and IP+WiFi-bars chip with correct tooltip, one-shot fetch
+- [x] #2 WiFi bars + dBm refresh from existing health poll; Ethernet/AP variants render correctly
+- [x] #3 SIMULATION badge appears only when simulation active
 - [ ] #4 python evaluate.py --quick green; build green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented by impl-983: hdrHost/hdrNet identity chips (one-shot withDeviceInfo reuse from TASK-982, never polls device/info), live bars+dBm via existing fetchConn health poll, wifiQualFromRssi 1:1 replica of firmware signal_quality_perc_quad (-50 perfect/-85 worst), Ethernet=Wired 4 bars, AP-fallback amber dot, DHCP/static from cached settings wifistaticip. hdrSim via /api/v2/simulate on fetchConn cadence, errors silently = not simulating (OT-Direct 404-safe); sysSim intentionally stays on device/info otgwsimulation (same firmware flag, verified restAPI.ino:333 vs :2959). Mobile <480px hides hdr-net (3-row header prevention). evaluate.py 0 FAIL, drift gate clean, parse OK. On-device verify pending.
+<!-- SECTION:NOTES:END -->

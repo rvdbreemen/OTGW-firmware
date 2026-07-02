@@ -25,10 +25,19 @@
 
 <div class="headerrow">
   <span class="big">OTGW firmware <span class="sub">· v2</span></span>
+  <!-- TASK-983: firmware-authentic identity chips (hostname·version + IP·Wi-Fi bars).
+       Filled once from /api/v2/device/info at startup; the Wi-Fi bars + dBm refresh
+       live from the /api/v2/health poll (fetchConn). -->
+  <span class="hdr-net">
+    <span class="hdr-id" id="hdrHost" title="Hostname · firmware version">…</span>
+    <span class="hdr-id" id="hdrNet" title="Network connection">…</span>
+  </span>
   <span class="hdr-spacer"></span>
   <span class="hdr-status" id="hdrStatus" title="Connectivity status">
     <span class="hdr-dot"></span><span id="hdrStatMode">…</span>
   </span>
+  <!-- TASK-983: shown only while OT-replay simulation is active (polled via /api/v2/simulate). -->
+  <span class="hdr-sim hidden" id="hdrSim" title="Simulation active — values may be replayed, not live from the boiler">SIMULATION</span>
   <span class="sub" id="clock">--:--:--</span>
   <button type="button" class="theme-toggle" id="uiToggle" title="Switch back to the classic UI">↩ Classic UI</button>
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">🌙 Dark</button>

@@ -45,6 +45,25 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .hdr-status.down{background:color-mix(in srgb,var(--zone-alert) 30%,transparent)}
   .hdr-status .hdr-dot{width:7px;height:7px;border-radius:50%;background:var(--zone-ok);box-shadow:0 0 6px var(--zone-ok)}
   .hdr-status.down .hdr-dot{background:var(--zone-alert);box-shadow:0 0 6px var(--zone-alert)}
+  /* TASK-983: firmware-authentic identity chips (hostname·version + IP·Wi-Fi bars) + SIMULATION badge */
+  .headerrow .hdr-id{font-family:var(--font-mono);font-size:.72rem;font-weight:600;
+    display:inline-flex;align-items:center;
+    opacity:.95;background:rgba(255,255,255,.16);border-radius:6px;padding:3px 8px}
+  .hdr-net{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .hdr-id small{font-weight:600;opacity:.6;font-size:.62rem;margin-left:2px}
+  .hdr-id .cdot{width:7px;height:7px;border-radius:50%;background:var(--zone-ok);box-shadow:0 0 6px var(--zone-ok);margin-right:5px}
+  .hdr-id.ap .cdot{background:var(--zone-warn);box-shadow:0 0 6px var(--zone-warn)}
+  .hdr-id .wbars{display:inline-flex;align-items:flex-end;gap:2px;height:13px;margin-right:5px}
+  .hdr-id .wbars i{width:3px;background:var(--zone-ok);border-radius:1px}
+  .hdr-id .wbars i.off{background:var(--gauge-track)}
+  html[data-theme="dark"] .headerrow .hdr-id{background:rgba(255,255,255,.09)}
+  .hdr-sim{font-size:.66rem;font-weight:700;border-radius:20px;padding:4px 10px;white-space:nowrap;
+    line-height:1;display:inline-flex;align-items:center;letter-spacing:.03em;
+    background:color-mix(in srgb,var(--zone-warn) 82%,#000);color:#fff}
+  .hdr-sim.hidden{display:none}
+  /* Narrow phones: the mono hostname·version chip is wide and would push the header
+     to a third row — drop the identity chips, keep the status pill + clock + toggles. */
+  @media(max-width:480px){.hdr-net{display:none}}
   .switcher{display:flex;gap:6px;background:var(--nav);padding:8px 12px 12px;flex-wrap:wrap}
   .seg{flex:1;min-width:104px;min-height:48px;border:0;border-radius:12px;cursor:pointer;
     background:rgba(255,255,255,.18);color:#fff;font-family:var(--font-sans);

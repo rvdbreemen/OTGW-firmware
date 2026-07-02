@@ -170,6 +170,9 @@
   };
   var connRssi = null;
   var simActive = false;   // TASK-982: device/info otgwsimulation, cached via withDeviceInfo
+  // TASK-983: header network chip — static identity from the one-shot device/info
+  // snapshot; the Wi-Fi bars + dBm refresh live from connRssi (the /health poll).
+  var hdrNet = { ip: '', ssid: '', quality: 0, kind: 'wifi' };   // kind: wifi | eth | ap
   function renderConnStrip() {
     var strip = document.getElementById('connStrip'); if (!strip) return;
     // Single worst-of health-summary pill; the per-node detail lives on Monitor › Connection.
@@ -223,6 +226,75 @@
       var ssim = document.getElementById('sysSim');
       if (ssim) ssim.classList.toggle('hidden', !simActive);
     }
+  }
+
+  // ---------- TASK-983: header identity chips (hostname·version + IP·Wi-Fi) ----------
+  function wifiQualFromRssi(rssi) {
+    // Mirror of the firmware's signal_quality_perc_quad() so the live bar count
+    // matches the quality% device/info reports (which /health does not carry).
+    var perfect = -50, worst = -85, n = perfect - worst;   // 35
+    var q = Math.trunc((100 * n * n - (perfect - rssi) * (15 * n + 62 * (perfect - rssi))) / (n * n));
+    return q > 100 ? 100 : (q < 1 ? 0 : q);
+  }
+  function fillHeaderIdentity(d) {
+    // One-shot from the device/info snapshot at startup (never polled). hostname and
+    // ssid are device-sourced strings — build with textContent, never innerHTML.
+    var host = document.getElementById('hdrHost');
+    if (host) {
+      var hn = ('' + (d.hostname || '')).trim();
+      var ver = ('' + (d.fwversion || '')).split('+')[0];   // drop +buildmetadata for a compact chip
+      host.textContent = '';
+      host.appendChild(document.createTextNode(hn || 'device'));
+      var sm = document.createElement('small'); sm.textContent = '.local';
+      host.appendChild(sm);
+      host.appendChild(document.createTextNode(' · ' + (ver ? 'v' + ver : '—')));
+    }
+    // device/info distinguishes Wi-Fi, Ethernet ("Wired") and AP-fallback — render each honestly.
+    hdrNet.ip = ('' + (d.ipaddress || '')).trim();
+    hdrNet.ssid = ('' + (d.ssid || '')).trim();
+    hdrNet.quality = (typeof d.wifiquality === 'number') ? d.wifiquality : 0;
+    hdrNet.kind = (d.apfallback === true) ? 'ap'
+      : ((d.wifiquality_text === 'Wired' || d.ssid === 'Wired') ? 'eth' : 'wifi');
+    renderHdrNet();
+  }
+  function renderHdrNet() {
+    var el = document.getElementById('hdrNet'); if (!el) return;
+    el.textContent = ''; el.classList.remove('ap');
+    var dot = document.createElement('span'); dot.className = 'cdot'; el.appendChild(dot);
+    el.appendChild(document.createTextNode(hdrNet.ip || '—'));
+    // Lit-bar count: Ethernet = all 4, AP = 0; Wi-Fi from quality quartiles, with the
+    // quality re-derived from the live connRssi once /health has refreshed it.
+    var q = hdrNet.quality, lit;
+    if (hdrNet.kind === 'eth') { lit = 4; }
+    else if (hdrNet.kind === 'ap') { lit = 0; el.classList.add('ap'); }
+    else { if (connRssi !== null) q = wifiQualFromRssi(connRssi); lit = q >= 75 ? 4 : q >= 50 ? 3 : q >= 25 ? 2 : q > 0 ? 1 : 0; }
+    var bars = document.createElement('span'); bars.className = 'wbars'; bars.style.marginLeft = '8px';
+    var hpx = [4, 7, 10, 13];
+    for (var i = 0; i < 4; i++) { var b = document.createElement('i'); b.style.height = hpx[i] + 'px'; if (i >= lit) b.className = 'off'; bars.appendChild(b); }
+    el.appendChild(bars);
+    // Tooltip — honest per network type. DHCP-vs-static read lazily from the settings
+    // cache (empty wifistaticip == DHCP); it fills in once fetchSettings() lands.
+    var staticip = (setData.wifistaticip && setData.wifistaticip.value != null) ? ('' + setData.wifistaticip.value).trim() : '';
+    var mode = staticip === '' ? 'DHCP' : 'static';
+    var tip;
+    if (hdrNet.kind === 'eth') tip = 'IP ' + (hdrNet.ip || '—') + ' (' + mode + ') · Wired';
+    else if (hdrNet.kind === 'ap') tip = 'IP ' + (hdrNet.ip || '—') + ' · AP mode';
+    else {
+      tip = 'IP ' + (hdrNet.ip || '—') + ' (' + mode + ') · Wi-Fi ' + (hdrNet.ssid || '—');
+      if (connRssi !== null) tip += ' · ' + connRssi + ' dBm';
+      if (q > 0) tip += ' · ' + q + '%';
+    }
+    el.title = tip;
+  }
+  // SIMULATION badge — /api/v2/simulate is PIC-path only; any error (404/503 on
+  // OT-Direct, transport failure) is treated as "not simulating" and hides the badge.
+  function fetchSim() {
+    fetch(APIGW + 'v2/simulate').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var active = !!(j && j.simulation && j.simulation.active);
+      var el = document.getElementById('hdrSim'); if (el) el.classList.toggle('hidden', !active);
+    }).catch(function () {
+      var el = document.getElementById('hdrSim'); if (el) el.classList.add('hidden');
+    });
   }
 
   // ============================================================
@@ -1082,6 +1154,8 @@
       CONN.ws.detail = wsUp ? 'WebSocket · streaming' : 'WebSocket · reconnecting…';
       CONN.api.s = 'st-ok';
       renderConnMap(); renderConnStrip(); renderConnDetail();
+      renderHdrNet();   // TASK-983: refresh Wi-Fi bars + dBm tooltip from the live RSSI
+      fetchSim();       // TASK-983: piggyback the SIMULATION-badge poll on this cadence
     }).catch(function () { });
   }
   // ---------- Monitor > Connection > OT-Direct manual overrides (TASK-964) ----------
@@ -2542,6 +2616,9 @@
     fetchSettings();
     fetchConn();
     setInterval(fetchConn, 15000);
+    // TASK-983: fill the header identity chips (hostname·version + IP·Wi-Fi) once from
+    // the heavy device/info snapshot. Never polled — the Wi-Fi bars refresh via fetchConn.
+    withDeviceInfo(fillHeaderIdentity);
 
     // P9 wiring -----------------------------------------------------------
     document.querySelectorAll('#applToggle .seg2btn').forEach(function (b) {
