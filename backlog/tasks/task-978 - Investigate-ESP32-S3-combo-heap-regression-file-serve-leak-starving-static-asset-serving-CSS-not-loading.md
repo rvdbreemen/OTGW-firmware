@@ -1,0 +1,40 @@
+---
+id: TASK-978
+title: >-
+  Investigate ESP32-S3 combo heap regression + file-serve leak starving
+  static-asset serving (CSS not loading)
+status: In Progress
+assignee:
+  - '@claude'
+created_date: '2026-07-01 21:51'
+updated_date: '2026-07-02 03:35'
+labels: []
+dependencies: []
+ordinal: 190000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+On alpha.311 combo (bench .64), static-file serving returns HTTP 200 with a 0-byte body: v2.css/ds-tokens.css/components.css all fail to load in the browser (unstyled v2 UI). API endpoints (device/info, generated in RAM) still respond. Root cause is heap: maxfreeblock ~18KB->14KB, freeheap DECLINING at idle 33KB->25KB over 70s, fragmentation 45%. Two intertwined problems: (1) a boot-heap REGRESSION — alpha.291 measured 100KB free / 57KB maxfreeblock at session start vs alpha.311 33KB/18KB (~67KB lost across the 2.0.0 line, bulk pre-alpha.310, NOT the OTA commit 9d29eea which is heap-neutral); (2) a suspected LEAK — freeheap declines while idle, possibly on the async file-serve failure path (each 200|0 leaking its partial stream buffer -> death spiral). The async static-file stream needs a contiguous block; at ~18KB maxfreeblock it sends 200 headers then cannot allocate the body -> empty response. Relates to ADR-089 (heap tiers), ADR-147 (file-serve gate), TASK-879/883/934/956/960.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 Leak source identified: is freeheap decline from the file-serve failure path, device/info path, or idle background (MQTT/WS/BLE/discovery)?
+- [ ] #2 Boot-heap regression bisected/attributed alpha.291->alpha.311 (which change consumed the ~67KB)
+- [ ] #3 Concrete fix or mitigation proposed (free-on-failure, gate floor, buffer strategy, or leaner build for PIC boards)
+- [ ] #4 Verified on-device: static CSS serves reliably (8/8 full) after the fix
+<!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+EMPIRICAL (bench .64 alpha.311): Controlled experiment isolates the mechanism. Phase 1 API-only (device/info x6): heap STABLE freeheap~33200 / maxfreeblock~21492. Phase 2: 12x v2.css serves. Phase 3 API-only x6: maxfreeblock dropped 21492->11252 and STAYED; freeheap ~unchanged (~32860). => FRAGMENTATION of internal DRAM by the file-serve path, NOT a byte-leak; maxfreeblock does not coalesce back. Once maxfreeblock < stream-buffer size, serves return 200|0 (headers, empty body). ROOT ENABLER: S3 has 2MB PSRAM (esptool 'Embedded PSRAM 2MB AP_3v3') but platformio.ini has NO psram config (no arduino_memory_type/BOARD_HAS_PSRAM) and firmware has NO heap_caps/ps_malloc — freeheap=33KB proves only internal DRAM is in the malloc pool; 2MB PSRAM entirely unused. Likely fix: enable PSRAM so large async file/JSON buffers spill there, relieving internal-DRAM fragmentation. Risks to vet: do all S3 targets have PSRAM (boot break if not), DMA buffers must stay internal. 4-agent root-cause workflow running (serve-path / psram / boot-regression / async-alloc + synthesis).
+
+ROOT CAUSE (4-agent workflow, file:line evidence). NOT a leak and NOT primarily PSRAM-off. Chain: (1) CHRONIC serve-path fragmentation always present — ESPAsyncWebServer allocates a 2872B send buffer (ASYNC_RESPONCE_BUFF_SIZE=LWIP_TCP_MSS*2=1436*2) per static-file serve from plain internal DRAM (WebResponses.cpp:440, no heap_caps), + COPY into pbufs + AsyncTCP per-event heap-node churn; long-lived WS client buffers get stranded; TLSF coalesces only adjacent blocks -> maxfreeblock permanently bisected (matches 21492->11252 stays, freeheap ~flat). (2) MASKED at alpha.291 (~100KB/57KB headroom). (3) TRIGGER: BLE flipped ON by default bBleEnable false->true (SATtypes.h:512, commit cf2b9634d, TASK-975); NimBLE+S3 BT controller init at boot eat ~36-67KB INTERNAL DRAM (controller DMA-bound, must be internal) -> boot heap 33KB/21KB. (4) Chronic frag now drops maxblock <2872B -> send-buffer new() fails AFTER headers flushed -> HTTP 200 + 0-byte body -> unstyled UI. (5) BLIND: getHeapHealth() helperStuff.ino:887/940 uses ESP8266-era thresholds (1536/3072/5120) keyed on freeHeap, only reads maxBlock in LOW band -> at 33KB reports HEALTHY. PSRAM CORRECTION: qio_qspi is the pioarduino default (CONFIG_SPIRAM=1); PSRAM likely ALREADY active on S3-Mini boards, firmware just never measures it (getFreeHeap=internal-only). 2872B < 4096B MALLOC_ALWAYSINTERNAL so PSRAM does NOT directly de-frag the serve path; it only reclaims internal DRAM indirectly. ALL-VARIANTS PSRAM VERDICT (esptool): S3-Mini combo/classic HAS 2MB, S3-Mini-Pro HAS 2MB, OTGW32 has NONE. qio_qspi fail-soft on no-PSRAM (no BOOT_INIT) so combo binary safe on OTGW32 (verified in framework source). FIX PLAN: STEP0 BLE A/B (blocked: combo board off USB); serve-gate absolute maxBlock floor -> 503 not 200|0 (restAPI.ino webFileGateTryAdmit); recalibrate ADR-089 getHeapHealth read maxBlock unconditionally + S3 thresholds. MAINTAINER DECISIONS: (a) BLE-on-by-default vs DRAM budget (keep+PSRAM/serve-fix, gate on PSRAM-present, or revert default false for combo/S3); (b) PSRAM scope. Do NOT port BLE default to otgw-1.x.x (ESP8266).
+
+CORRECTED ROOT CAUSE (earlier 0-body readings were a curl -o /dev/null + MSYS_NO_PATHCONV=1 write-error artifact, NOT a board failure — SEQUENTIAL serving is 9/9 perfect, verified via curl|wc -c). REAL bug = CONCURRENT-load 503s: a browser fetches ~9 v2 assets in parallel; during the burst maxfreeblock drops to ~18KB; the ADR-147 file gate (webFileGateTryAdmit) clamps cap to 2 (cap=1 <16000, cap=2 <24000) and returns 503+Retry-After for the rest. Measured: parallel load -> 2/9 served (v2.css+v2.js), 7/9 got HTTP 503. The v2 UI loads CSS/JS via <link>/<script> which do NOT retry 503 -> those assets never load -> UNSTYLED UI = the user's report. So heap headroom DOES matter but only under concurrency (sequential is fine). The BLE-on-by-default regression (TASK-975, ~36-67KB internal DRAM) lowers headroom -> gate clamps harder -> more 503s. FIX DIRECTION (confirmed correct): aggressive internal-DRAM reduction (BLE footprint + static buffers) raises maxfreeblock under the burst -> higher gate cap -> assets serve. Secondary robustness: frontend retry-on-503 for v2 <link>/<script> assets, and/or gzip the FS assets to cut per-serve size/time. NOTE bench board muddied by ~15 reflash/reset cycles this session; app=alpha.311+9d29eea, FS=fresh alpha.312.
+
+FIX IMPLEMENTED + ON-DEVICE VALIDATED (alpha.313, bench .64). Gate confirmed at restAPI.ino:83 webFileGateTryAdmit(): cap=WEB_FILE_MAX_INFLIGHT(=4), ->2 when maxBlock<24000, ->1 when <16000. Browser fires ~9 parallel assets -> gate 503s the excess -> <link>/<script> don't retry -> unstyled. TWO FIXES: (1) PRIMARY frontend retry-on-503 loader in data/v2.html: ds-tokens.css + v2.css + v2.js now loaded via createElement + onerror->retry with linear backoff (200ms*attempt, 8 tries), ported from the classic index.html TASK-960 loader. Confirmed served on device (6 loader markers in GET /v2.html). This makes every asset arrive as gate slots free. (2) HEADROOM HELPER NimBLE trim in platformio.ini [env] build_flags: passive-scan-only (observer) -> -DCONFIG_BT_NIMBLE_ROLE_PERIPHERAL_DISABLED, ROLE_BROADCASTER_DISABLED, MAX_CONNECTIONS=1, MAX_BONDS=0, MAX_CCCDS=0, ATT_PREFERRED_MTU=23. MEASURED concurrent-serve (parallel curl, no browser retry): BASELINE stock NimBLE 4/9->2/9->1/9 (cap COLLAPSES as fragmentation drops maxblock <16KB); AFTER NimBLE trim 6/9->5/9->8/9 (cap STAYS 4, maxblock 73KB holds). The trim stops the cap collapse; the loader mops up the residual 503s in the browser -> 9/9. BUILDS green (esp32-combo). UNCOMMITTED: platformio.ini + data/v2.html changes are flashed to .64 but NOT committed — active parallel work in this worktree (branch advanced to alpha.313 TASK-979/980/981, v2.html modified under me, playwright in use). Commit held pending coordination + a real-browser styled-render check. Helps ALL boards incl no-PSRAM OTGW32.
+<!-- SECTION:NOTES:END -->
