@@ -1622,6 +1622,7 @@
       });
       renderSettings();
       fetchBle();
+      maybeShowOnboarding();   // TASK-997: first-time wizard, once settings (ui_onboarded) are known
     }).catch(function () { });
   }
   function fieldDirty(k) { return Object.prototype.hasOwnProperty.call(setDirty, k); }
@@ -2710,6 +2711,7 @@
   }
   function advAction(act) {
     if (act === 'home') { showPage('home'); return; }
+    if (act === 'onboarding') { startOnboarding(); return; }   // TASK-997: re-run the first-time setup wizard on demand
     if (act === 'update') { window.location.href = '/update'; return; }   // OTA sketch / filesystem upload page
     if (act === 'reboot') {
       if (!window.confirm('Reboot the OTGW device now? The Web UI will be unavailable for a few seconds.')) return;
@@ -3371,6 +3373,156 @@
   // (where /api/v2/simulate exists) offer once to enable simulation mode. The
   // firmware itself refuses simulation when a real boiler is present
   // (satBoilerHardwarePresent), so this can never clobber a live rig.
+  // ── TASK-997: first-time-setup onboarding wizard (design OTGW Onboarding.dc.html) ──
+  // Shown ONCE on a genuinely fresh device (firmware ui_onboarded=false; existing
+  // installs are migrated to onboarded so it never appears again). Welcome ->
+  // Appliance -> Home Assistant -> Done; writes SATsource + mqtt*, then persists
+  // ui_onboarded=true. Re-runnable from Settings > System (see renderSettings).
+  var _onbShown = false;
+  function maybeShowOnboarding() {
+    if (_onbShown || document.getElementById('onbBack')) return;
+    var ob = setData.ui_onboarded;
+    if (!ob || ('' + ob.value) === 'true') return;   // already onboarded / old firmware
+    _onbShown = true; startOnboarding();
+  }
+  function startOnboarding() {
+    var st = {
+      screen: 'welcome',
+      appliance: (setData.satsource && ('' + setData.satsource.value) === '2') ? 'hp' : 'gas',
+      mqtt: !!(setData.mqttenable && ('' + setData.mqttenable.value) === 'true'),
+      discovery: true, test: 'idle',
+      broker: (setData.mqttbroker && setData.mqttbroker.value) || 'homeassistant.local',
+      port: (setData.mqttbrokerport && setData.mqttbrokerport.value) || '1883',
+      user: (setData.mqttuser && setData.mqttuser.value) || '', pass: '',
+      topic: (setData.mqtttoptopic && setData.mqtttoptopic.value) || 'otgw'
+    };
+    var back = document.createElement('div'); back.id = 'onbBack';
+    back.setAttribute('style', 'position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;overflow:auto');
+    document.body.appendChild(back);
+    var CARD = 'background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 26px rgba(0,0,0,.32);padding:28px 26px';
+    var PRIM = 'background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:14px;border-radius:11px;padding:12px 26px;cursor:pointer;min-height:46px';
+    var GHOST = 'background:none;border:1px solid var(--border);color:var(--text);font-weight:600;font-size:13.5px;border-radius:10px;padding:11px 18px;cursor:pointer;min-height:44px';
+    var IN = 'width:100%;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;padding:10px 12px;font:400 13.5px inherit';
+    var LBL = 'font-weight:600;font-size:11.5px;color:var(--muted);display:block;margin-bottom:5px';
+    function esc(s) { return ('' + (s == null ? '' : s)).replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+    function post(name, value) { return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) }); }
+    function close() { if (back.parentNode) back.parentNode.removeChild(back); }
+    function syncInputs() {
+      var b = back.querySelector('#onbBroker'); if (b) st.broker = b.value;
+      var p = back.querySelector('#onbPort'); if (p) st.port = p.value;
+      var u = back.querySelector('#onbUser'); if (u) st.user = u.value;
+      var pw = back.querySelector('#onbPass'); if (pw) st.pass = pw.value;
+      var t = back.querySelector('#onbTopic'); if (t) st.topic = t.value;
+    }
+    function commit(then) {
+      var w = [post('satsource', st.appliance === 'hp' ? 2 : 1), post('mqttenable', st.mqtt)];
+      if (st.mqtt) {
+        w.push(post('mqttbroker', st.broker), post('mqttbrokerport', parseInt(st.port, 10) || 1883), post('mqttuser', st.user), post('mqtttoptopic', st.topic));
+        if (st.pass) w.push(post('mqttpasswd', st.pass));
+      }
+      Promise.all(w).then(function () { return post('ui_onboarded', true); }).then(then, then);
+    }
+    function testConn() {
+      if (st.test === 'testing') return; syncInputs(); st.test = 'testing'; render();
+      Promise.all([post('mqttenable', true), post('mqttbroker', st.broker), post('mqttbrokerport', parseInt(st.port, 10) || 1883), post('mqttuser', st.user)].concat(st.pass ? [post('mqttpasswd', st.pass)] : [])).then(function () {
+        var tries = 0;
+        (function poll() {
+          fetch(APIGW + 'v2/device/info').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+            var c = j && j.device && j.device.mqttconnected;
+            if (c === true || c === 'true') { st.test = 'ok'; render(); }
+            else if (++tries < 6) setTimeout(poll, 1300); else { st.test = 'fail'; render(); }
+          }).catch(function () { if (++tries < 6) setTimeout(poll, 1300); else { st.test = 'fail'; render(); } });
+        })();
+      });
+    }
+    function choiceCard(kind, title, desc) {
+      var sel = st.appliance === kind;
+      return '<button data-act="pick-' + kind + '" style="flex:1;min-width:210px;text-align:left;border-radius:12px;padding:16px;cursor:pointer;font-family:inherit;' +
+        (sel ? 'background:color-mix(in srgb,var(--accent) 12%,var(--panel));border:2px solid var(--accent)' : 'background:var(--bg);border:1.5px solid var(--border)') + '">' +
+        '<div style="display:flex;align-items:center;gap:9px"><span style="width:16px;height:16px;border-radius:50%;box-sizing:border-box;flex:0 0 auto;' +
+        (sel ? 'border:5px solid var(--accent)' : 'border:1.5px solid var(--muted)') + '"></span><span style="font-weight:700;font-size:15px;color:var(--text)">' + title + '</span></div>' +
+        '<p style="font:400 11.5px/1.5 inherit;color:var(--muted);margin:9px 0 0">' + desc + '</p></button>';
+    }
+    function toggle(on, act) {
+      return '<button data-act="' + act + '" aria-label="toggle" style="width:44px;height:24px;border-radius:12px;position:relative;flex:0 0 auto;cursor:pointer;border:0;padding:0;background:' + (on ? 'var(--accent)' : 'var(--border)') + '">' +
+        '<span style="position:absolute;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;left:' + (on ? '22px' : '2px') + '"></span></button>';
+    }
+    function render() {
+      var h = '';
+      h += '<div style="display:flex;align-items:center;gap:11px;padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--border)">' +
+        '<span style="font-weight:700;font-size:15px;color:var(--text)">OTGW firmware</span>' +
+        '<span style="font-weight:600;font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">First-time setup</span></div>';
+      h += '<div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:44px 18px 60px"><div style="width:100%;max-width:560px">';
+      if (st.screen === 'appliance' || st.screen === 'mqtt') {
+        var isM = st.screen === 'mqtt';
+        h += '<div style="margin:0 0 20px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">' +
+          '<span style="font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Step ' + (isM ? 2 : 1) + ' of 2</span>' +
+          '<span style="font-weight:600;font-size:12px;color:var(--text)">' + (isM ? 'Home Assistant' : 'Appliance') + '</span></div>' +
+          '<div style="height:5px;border-radius:3px;background:var(--border);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:var(--accent);width:' + (isM ? 100 : 50) + '%"></span></div></div>';
+      }
+      if (st.screen === 'welcome') {
+        h += '<div style="' + CARD + ';text-align:center">' +
+          '<div style="width:54px;height:54px;border-radius:50%;background:color-mix(in srgb,var(--ok,#27c469) 18%,transparent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px"><span style="width:16px;height:16px;border-radius:50%;background:var(--ok,#27c469);box-shadow:0 0 10px var(--ok,#27c469)"></span></div>' +
+          '<h1 style="font-weight:700;font-size:25px;color:var(--text);margin:0 0 8px">Your gateway is online</h1>' +
+          '<p style="font:400 13px/1.65 inherit;color:var(--muted);margin:0 auto 24px;max-width:400px">Two quick things and you\'re done — everything else is read straight from the OpenTherm bus.</p>' +
+          '<button data-act="begin" style="' + PRIM + ';font-size:15px;padding:13px 30px">Get started</button></div>';
+      } else if (st.screen === 'appliance') {
+        h += '<div style="' + CARD + '"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">What are you heating with?</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">Sets how OpenTherm data is read and labelled. Change it anytime in Settings.</p>' +
+          '<div style="display:flex;gap:12px;flex-wrap:wrap">' + choiceCard('gas', 'Gas boiler', 'Modulating OpenTherm boiler — flow &amp; return temperature, modulation %, flame &amp; DHW.') + choiceCard('hp', 'Heat pump', 'Air/water heat pump or electric heater — compressor, COP, water temperatures &amp; defrost.') + '</div>' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:24px"><button data-act="back-welcome" style="' + GHOST + '">Back</button>' +
+          '<button data-act="to-mqtt" style="margin-left:auto;' + PRIM + '">Continue</button></div></div>';
+      } else if (st.screen === 'mqtt') {
+        h += '<div style="' + CARD + '"><div style="display:flex;align-items:flex-start;gap:12px"><div style="flex:1">' +
+          '<h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">Connect to Home Assistant</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0">The gateway publishes every value over MQTT; Home Assistant auto-discovers them. Optional — leave off to run standalone.</p></div>' +
+          toggle(st.mqtt, 'toggle-mqtt') + '</div>';
+        if (st.mqtt) {
+          h += '<div style="margin-top:18px;display:flex;flex-direction:column;gap:12px">' +
+            '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + LBL + '">MQTT broker</label><input id="onbBroker" value="' + esc(st.broker) + '" style="' + IN + '"></div>' +
+            '<div style="width:116px"><label style="' + LBL + '">Port</label><input id="onbPort" value="' + esc(st.port) + '" style="' + IN + '"></div></div>' +
+            '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + LBL + '">Username</label><input id="onbUser" value="' + esc(st.user) + '" style="' + IN + '"></div>' +
+            '<div style="flex:1"><label style="' + LBL + '">Password</label><input id="onbPass" type="password" placeholder="unchanged" style="' + IN + '"></div></div>' +
+            '<div style="flex:1"><label style="' + LBL + '">Top topic</label><input id="onbTopic" value="' + esc(st.topic) + '" style="' + IN + '"></div>' +
+            '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:40px">' +
+            '<button data-act="test" style="background:none;color:var(--accent);font-weight:600;font-size:12.5px;border-radius:9px;padding:9px 15px;min-height:40px;border:1px solid var(--accent);cursor:pointer">' + (st.test === 'testing' ? 'Testing…' : (st.test === 'ok' || st.test === 'fail') ? 'Test again' : 'Test connection') + '</button>' +
+            (st.test === 'testing' ? '<span style="font:500 12px inherit;color:var(--muted)">Testing connection…</span>' : '') +
+            (st.test === 'ok' ? '<span style="font-weight:600;font-size:12px;color:var(--ok,#27c469)">✓ Connected</span>' : '') +
+            (st.test === 'fail' ? '<span style="font-weight:600;font-size:12px;color:var(--warn,#e0a300)">No response — check broker &amp; port</span>' : '') +
+            '</div></div>';
+        }
+        h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-act="back-appliance" style="' + GHOST + '">Back</button>' +
+          '<button data-act="finish" style="margin-left:auto;' + PRIM + '">' + (st.mqtt ? 'Finish' : 'Skip &amp; finish') + '</button></div></div>';
+      } else if (st.screen === 'done') {
+        h += '<div style="' + CARD + ';text-align:center">' +
+          '<div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:#04222c">✓</div>' +
+          '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">You\'re all set</h1>' +
+          '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:400px">The gateway is live and reading the bus.</p>' +
+          '<div style="text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:6px 16px;margin:0 0 20px">' +
+          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font:500 12.5px inherit;color:var(--muted)">Appliance</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + (st.appliance === 'hp' ? 'Heat pump' : 'Gas boiler') + '</span></div>' +
+          '<div style="display:flex;align-items:center;padding:11px 0"><span style="font:500 12.5px inherit;color:var(--muted)">Integration</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + (st.mqtt ? 'Home Assistant · ' + esc(st.broker) : 'Standalone (no MQTT)') + '</span></div></div>' +
+          '<button data-act="go" style="' + PRIM + ';font-size:15px;padding:13px 30px">Go to dashboard</button></div>';
+      }
+      h += '</div></div>';
+      back.innerHTML = h;
+    }
+    back.addEventListener('click', function (ev) {
+      var t = ev.target.closest && ev.target.closest('[data-act]'); if (!t) return;
+      var a = t.getAttribute('data-act');
+      if (a === 'begin') { st.screen = 'appliance'; render(); }
+      else if (a === 'pick-gas') { st.appliance = 'gas'; render(); }
+      else if (a === 'pick-hp') { st.appliance = 'hp'; render(); }
+      else if (a === 'back-welcome') { st.screen = 'welcome'; render(); }
+      else if (a === 'to-mqtt') { st.screen = 'mqtt'; render(); }
+      else if (a === 'back-appliance') { syncInputs(); st.screen = 'appliance'; render(); }
+      else if (a === 'toggle-mqtt') { syncInputs(); st.mqtt = !st.mqtt; st.test = 'idle'; render(); }
+      else if (a === 'test') { testConn(); }
+      else if (a === 'finish') { syncInputs(); commit(function () { st.screen = 'done'; render(); }); }
+      else if (a === 'go') { close(); fetchSettings(); showPage('home'); }
+    });
+    render();
+  }
+
   function showSimModal() {
     if (document.getElementById('simBackdrop')) return;
     var bd = document.createElement('div'); bd.id = 'simBackdrop'; bd.className = 'sim-backdrop';
