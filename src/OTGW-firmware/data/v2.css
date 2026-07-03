@@ -65,13 +65,28 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
      to a third row — drop the identity chips, keep the status pill + clock + toggles. */
   @media(max-width:480px){.hdr-net{display:none}}
   .switcher{display:flex;gap:6px;background:var(--nav);padding:8px 12px 12px;flex-wrap:wrap}
-  .seg{flex:1;min-width:104px;min-height:48px;border:0;border-radius:12px;cursor:pointer;
-    background:rgba(255,255,255,.18);color:#fff;font-family:var(--font-sans);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+  /* TASK-998 — nav design "1d refined pill bar": the descriptive subtitle no longer
+     crowds every pill (it wrapped on Monitor). It appears ONLY under the active
+     section, as a small mono caption, and the active pill goes solid brand-cyan. */
+  .seg{flex:1;min-width:104px;min-height:44px;border:0;border-radius:12px;cursor:pointer;
+    background:rgba(255,255,255,.14);color:#fff;font-family:var(--font-sans);padding:9px 14px;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
+    transition:background .15s,color .15s}
   html[data-theme="dark"] .seg{color:#e8e8ea}
   .seg b{font-size:.92rem}
-  .seg small{font-size:.66rem;opacity:.85;letter-spacing:.04em;text-transform:uppercase}
-  .seg.active{background:var(--bg);color:var(--text)}
+  .seg small{display:none;font-family:var(--font-mono);font-size:.6rem;font-weight:600;
+    opacity:.74;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
+  /* Active pill contrasts against the (cyan in light / grey in dark) nav — 1d's
+     brand-cyan active was for a dark nav; our nav is already cyan, so the pop
+     comes from the light --bg fill instead. Its subtitle then reads in --text. */
+  .seg.active{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.16)}
+  .seg.active small{display:block;color:var(--accent)}
+  /* Mobile: a horizontal scroll strip of pills instead of a wrapping grid. */
+  @media(max-width:640px){
+    .switcher{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
+    .seg{flex:0 0 auto;min-width:auto}
+    .seg small{display:none!important}
+  }
 
   .wrap{max-width:1020px;margin:0 auto;padding:16px}
   .design{display:none}
