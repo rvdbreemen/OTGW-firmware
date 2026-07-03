@@ -1,3 +1,49 @@
+# Daily Issue Report — 2026-07-03
+
+**Generated:** 2026-07-03 07:09 UTC  
+**Window:** Last 24 hours (since 2026-07-02 07:09 UTC)
+
+---
+
+## GitHub Issues
+
+**Repository:** rvdbreemen/OTGW-firmware  
+**Result:** No open issues updated in the last 24 hours.
+
+---
+
+## Tweakers Forum (GoT thread #1653967)
+
+**Feed fetched:** 2026-07-03 07:09 UTC  
+**Exclusions:** Posts by `number3` (maintainer) and `rvdbreemen` are excluded.
+
+**Result:** No new user posts in the last 24 hours.
+
+---
+
+## Summary
+
+**No new issues in the last 24 hours.**
+
+---
+
+## Open Items Carried Over
+
+### GitHub — Issue #666 (OPEN, no response yet)
+- **Title:** winget failed to install EclipseMosquitto.Mosquitto
+- **Reporter:** Pistoletjes
+- **URL:** https://github.com/rvdbreemen/OTGW-firmware/issues/666
+- **Created:** 2026-06-27
+- **Classification:** Bug report (tooling — `scripts/capture-mqtt-debug.bat`)
+- **Summary:** The winget package ID for Mosquitto changed from `EclipseMosquitto.Mosquitto` to `EclipseFoundation.Mosquitto`, causing the capture script to fail with exit code -1978335212. Still open, no comments or fix yet. Day 6 without response.
+
+### Tweakers — Feature request (tjanssen, 2026-06-29)
+- **URL:** https://gathering.tweakers.net/forum/list_message/85594732#85594732
+- **Classification:** Feature request
+- **Summary:** tjanssen requested an HA auto-discovery uptime/reset sensor after recurring disconnects. `number3` acknowledged on 2026-07-01: uptime is published on MQTT but not yet in HA auto-discovery — planned for next beta.
+
+---
+
 # Daily Issue Report — 2026-07-02
 
 **Generated:** 2026-07-02 07:09 UTC  
