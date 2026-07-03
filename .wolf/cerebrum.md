@@ -66,3 +66,5 @@
 ## Key Learnings (2026-07-02)
 - When two sessions edit v2.html concurrently (this batch's UI work + a foreign TASK-978 head loader), git coalesces adjacent hunks (<2x context lines apart). To stage ONLY your body hunks and leave the foreign <head> change unstaged: `git diff -U1` to force minimal context so hunks split, filter out hunks containing the foreign markers (TASK-978/ds-tokens.css/loadCss), then `git apply --cached --unidiff-zero`. Verified across TASK-980..987.
 - SAT REST write routes: enable=/sat/enable (NOT /sat/settings/satenabled), target=/sat/target, preset=/sat/preset, mode=/sat/mode, dhw=/sat/settings/dhw_setpoint|dhw_enable, sim=/sat/settings/simulation (key literally 'simulation', not 'satsimulation'). Bodies are bare text/plain (captured via webCaptureBody). Classic sat.js is the ground truth for these.
+
+- **Git Bash `ps` ziet geen native Windows-processen** (2026-07-02): een via PowerShell Start-Process gestart proces is onzichtbaar voor MSYS `ps -p <pid>`; een monitor die daarop test krijgt vals "proces weg". Gebruik `tasklist //FI "PID eq <pid>"` vanuit Git Bash, of check via PowerShell Get-Process.

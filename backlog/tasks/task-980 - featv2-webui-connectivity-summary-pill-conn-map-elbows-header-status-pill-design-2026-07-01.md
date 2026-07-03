@@ -3,11 +3,11 @@ id: TASK-980
 title: >-
   feat(v2-webui): connectivity summary pill + conn-map elbows + header status
   pill (design 2026-07-01)
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-01 22:13'
-updated_date: '2026-07-01 22:39'
+updated_date: '2026-07-02 05:26'
 labels: []
 dependencies: []
 ordinal: 192000

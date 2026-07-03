@@ -1,11 +1,11 @@
 ---
 id: TASK-975
 title: 'v2: BLE scans by default + Clear-roster control in Sensors settings'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-01 08:42'
-updated_date: '2026-07-01 09:05'
+updated_date: '2026-07-01 09:07'
 labels: []
 dependencies: []
 ordinal: 187000

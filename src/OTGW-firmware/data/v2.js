@@ -1996,6 +1996,26 @@
         var forget = document.createElement('button'); forget.className = 'tbtn'; forget.textContent = 'Forget';
         forget.addEventListener('click', function () { bleAction('forget', { mac: s.mac }); });
         ctr.appendChild(sel); ctr.appendChild(forget); row.appendChild(ctr);
+        // TASK-996: per-row friendly-name input. The firmware persists a label per
+        // roster slot (POST /sat/ble/label {mac,label} -> sBleLabel[24]); this exposes
+        // it so a discovered sensor can be named and renamed. Pre-filled with the
+        // current label; Enter or Save applies; clearing + Save clears the label.
+        var nameRow = document.createElement('div'); nameRow.className = 'ble-ctrls';
+        var nameIn = document.createElement('input'); nameIn.type = 'text';
+        nameIn.placeholder = 'Name (e.g. Living room)'; nameIn.maxLength = 23;
+        nameIn.value = s.label || ''; nameIn.autocomplete = 'off';
+        nameIn.style.flex = '1'; nameIn.style.minWidth = '12ch';
+        var nameBtn = document.createElement('button'); nameBtn.className = 'tbtn'; nameBtn.textContent = '💾 Save name';
+        (function (mac, input) {
+          function saveName() {
+            var v = (input.value || '').trim();
+            bleAction('label', { mac: mac, label: v });
+            if (typeof bleToast === 'function') bleToast(v ? 'Name saved' : 'Name cleared');
+          }
+          nameBtn.addEventListener('click', saveName);
+          input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveName(); } });
+        })(s.mac, nameIn);
+        nameRow.appendChild(nameIn); nameRow.appendChild(nameBtn); row.appendChild(nameRow);
         // TASK-931: per-row bindkey input (encrypted MiBeacon). Paste the 32-hex
         // beaconkey from the pvvx/Xiaomi-cloud tooling; empty clears it.
         var keyRow = document.createElement('div'); keyRow.className = 'ble-ctrls';

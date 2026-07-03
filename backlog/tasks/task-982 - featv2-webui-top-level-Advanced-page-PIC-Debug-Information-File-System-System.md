@@ -3,10 +3,11 @@ id: TASK-982
 title: >-
   feat(v2-webui): top-level Advanced page (PIC / Debug Information / File System
   / System)
-status: To Do
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-01 22:19'
+updated_date: '2026-07-02 05:26'
 labels: []
 dependencies: []
 ordinal: 194000
@@ -20,10 +21,16 @@ Audit area advanced-page (11 findings). Add 5th nav seg data-page=advanced + pag
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Advanced nav entry + four sub-tabs work; Monitor Debug removed without losing any existing function
-- [ ] #2 PIC tab shows identity grid, auto banner, restyled table with kept safety extras, PR= values table
-- [ ] #3 Debug tab shows grouped rows + crashlog-ok banner logic
-- [ ] #4 Files tab lists/navigates/downloads/deletes/uploads against real LittleFS endpoints
-- [ ] #5 System tab actions wired with confirm dialogs
+- [x] #1 Advanced nav entry + four sub-tabs work; Monitor Debug removed without losing any existing function
+- [x] #2 PIC tab shows identity grid, auto banner, restyled table with kept safety extras, PR= values table
+- [x] #3 Debug tab shows grouped rows + crashlog-ok banner logic
+- [x] #4 Files tab lists/navigates/downloads/deletes/uploads against real LittleFS endpoints
+- [x] #5 System tab actions wired with confirm dialogs
 - [ ] #6 python evaluate.py --quick green; build green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented across impl-982 (died on session limit: html+css+half js) and impl-982b (completed: full Files-tab JS, System actions, all event wiring, FS_PROTECTED list incl. v2 assets). Adversarial review rev-982: PASS, zero blockers (runtime, XSS, path handling, fetch hygiene, confirm guards, relocation inventory all verified). evaluate.py --quick 0 FAIL, JS parse OK. Monitor>Debug fully relocated, ids stable, 0 orphan refs. On-device verify pending: FS ops vs real LittleFS, PIC PR= 45s readout cycle, ReBoot/ResetWireless deferred-reboot, tab restore.
+<!-- SECTION:NOTES:END -->

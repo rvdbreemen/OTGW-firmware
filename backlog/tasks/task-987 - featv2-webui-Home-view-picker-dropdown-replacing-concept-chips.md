@@ -1,11 +1,11 @@
 ---
 id: TASK-987
 title: 'feat(v2-webui): Home view-picker dropdown replacing concept chips'
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-07-01 22:26'
-updated_date: '2026-07-02 05:20'
+updated_date: '2026-07-02 05:26'
 labels: []
 dependencies: []
 ordinal: 199000
