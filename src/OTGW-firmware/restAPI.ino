@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.319
+**  Version  : v2.0.0-alpha.320
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1566,6 +1566,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATsimulation", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("ble_enable")) == 0) {
       updateSetting("SATbleenable", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("bleriskack")) == 0) {
+      updateSetting("SATbleriskack", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("ble_failover")) == 0) {
       updateSetting("SATblefailover", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("ble_mac")) == 0) {
@@ -2967,6 +2969,24 @@ void sendDeviceInfoV2()
     // --- RAM / heap (free heap, largest block, fragmentation, tier transitions) ---
     je.field(F("freeheap"), snap->freeHeap);
     je.field(F("maxfreeblock"), snap->maxFreeBlock);
+    // TASK-995: chip capabilities for the Debug screen — PSRAM presence + amount,
+    // flash amount, internal-vs-PSRAM heap split, and a best-effort ESP32-S3 package
+    // part number extrapolated from flash+PSRAM (FH<flash>R<psram> when PSRAM is
+    // present = in-package flash + quad PSRAM; FN<flash> when absent). Labeled "est".
+    je.field(F("psram_found"),    (int32_t)(psramFound() ? 1 : 0));
+    je.field(F("psram_size"),     (int32_t)ESP.getPsramSize());
+    je.field(F("psram_free"),     (int32_t)ESP.getFreePsram());
+    je.field(F("flash_size"),     (int32_t)ESP.getFlashChipSize());
+    je.field(F("internal_free"),  (int32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    je.field(F("internal_maxblk"),(int32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
+    {
+      const uint32_t flashMB = ESP.getFlashChipSize() / (1024UL * 1024UL);
+      const uint32_t psramMB = ESP.getPsramSize()    / (1024UL * 1024UL);
+      char chipEst[32];
+      if (psramMB > 0) snprintf_P(chipEst, sizeof(chipEst), PSTR("ESP32-S3FH%luR%lu"), (unsigned long)flashMB, (unsigned long)psramMB);
+      else             snprintf_P(chipEst, sizeof(chipEst), PSTR("ESP32-S3FN%lu"),     (unsigned long)flashMB);
+      je.field(F("chip_model_est"), chipEst);
+    }
     je.field(F("hd_fragmentation_pct"), snap->fragPct);
     je.field(F("hd_enter_low"),        snap->st.heapdiag.iEnteredLowCount);
     je.field(F("hd_enter_warning"),    snap->st.heapdiag.iEnteredWarningCount);
@@ -3347,6 +3367,13 @@ void sendDeviceTimeV2()
     je.field(F("otgwsimulation"), state.debug.bOTGWSimulation);
     je.field(F("freeheap"),       platformFreeHeap());
     je.field(F("maxfreeblock"),   platformMaxFreeBlock());
+    // TASK-995: PSRAM presence/amount + internal-vs-PSRAM heap split (Debug screen + the
+    // PSRAM-aware BLE default). Mirrors the device/info snapshot branch.
+    je.field(F("psram_found"),    (int32_t)(psramFound() ? 1 : 0));
+    je.field(F("psram_size"),     (int32_t)ESP.getPsramSize());
+    je.field(F("psram_free"),     (int32_t)ESP.getFreePsram());
+    je.field(F("internal_free"),  (int32_t)heap_caps_get_free_size(MALLOC_CAP_INTERNAL));
+    je.field(F("internal_maxblk"),(int32_t)heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL));
     je.field(F("networkmode"),    networkModeName());
     je.field(F("ipaddress"),      getActiveIP());  // TASK-759: live active-transport IP for the header indicator
 #if defined(_VERSION_PRERELEASE)
@@ -3695,6 +3722,7 @@ void sendDeviceSettings()
 #if HAS_SAT_BLE
   // --- SAT BLE Sensor settings (Task #20). TASK-742: gated on HAS_SAT_BLE. ---
   addBool(F("satbleenable"), settings.sat.bBleEnable, "b");
+  addBool(F("satbleriskack"), settings.sat.bBleRiskAck, "b");
   addBool(F("satblefailover"), settings.sat.bBleFailover, "b");
   addStr(F("satblemac"), CSTR(settings.sat.sBleMAC), "s", 17);
   addInt(F("satbleinterval"), settings.sat.iBleInterval, "i", 10, 300);
@@ -3810,7 +3838,7 @@ static const char* const PROGMEM knownSettings[] = {
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
   "satautotune", "satautotunerate",
-  "satbleenable", "satblefailover", "satbleinterval", "satblemac",
+  "satbleenable", "satbleriskack", "satblefailover", "satbleinterval", "satblemac",
   "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
   "satdeadband", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
   "satflameoffset", "satflowoffset", "satflushtreshold", "satforcepwm", "sathumiditytimeout",

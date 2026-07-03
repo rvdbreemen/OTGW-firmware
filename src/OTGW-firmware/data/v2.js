@@ -1863,11 +1863,40 @@
         var changed = !bleData || bleData.populated_slots !== j.populated_slots ||
           JSON.stringify(bleData.sensors || []) !== JSON.stringify(j.sensors || []);
         bleData = j;
+        // TASK-995: no-PSRAM instability consent gate. When the board has no PSRAM,
+        // BLE is enabled, but the user hasn't accepted the risk yet, BLE stays dormant
+        // (firmware bleActive()==false) — surface the consent dialog once.
+        if (j.psram === 0 && j.ble_enable && !j.risk_ack) maybeShowBleConsent();
         var card = document.getElementById('setcard-ble');
         var typing = card && card.contains(document.activeElement) &&
           /^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
         if (changed && !typing) renderBleCard();
       }).catch(function () { });
+  }
+  // TASK-995: BLE-without-PSRAM instability consent. On a no-PSRAM board, enabling BLE
+  // steals ~64 KB of internal DRAM that the async web server needs, so the Web UI can
+  // wedge under concurrent load. Require an explicit risk acknowledgement: accept ->
+  // persist SATbleriskack=true (firmware starts scanning); decline -> turn BLE off again.
+  function maybeShowBleConsent() {
+    if (document.getElementById('bleRiskBackdrop')) return;   // already open
+    var bd = document.createElement('div'); bd.id = 'bleRiskBackdrop'; bd.className = 'sim-backdrop';
+    var m = document.createElement('div'); m.className = 'sim-modal';
+    var h = document.createElement('h3'); h.textContent = '⚠ BLE without PSRAM — instability risk';
+    var p = document.createElement('p');
+    p.textContent = 'This board has no PSRAM. Enabling BLE takes ~64 KB of internal memory that the web server needs, so the Web UI can become unstable or unreachable under load (you may need to reboot). Enable BLE anyway?';
+    var acts = document.createElement('div'); acts.className = 'acts';
+    var no = document.createElement('button'); no.textContent = 'Keep BLE off';
+    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Enable anyway (accept risk)';
+    function post(name, value, then) {
+      fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) })
+        .then(function (r) { if (r.ok && then) then(); }).catch(function () { });
+    }
+    function close() { if (bd.parentNode) bd.parentNode.removeChild(bd); }
+    no.addEventListener('click', function () { post('satbleenable', false, function () { if (typeof bleToast === 'function') bleToast('BLE kept off'); setTimeout(fetchBle, 500); }); close(); });
+    yes.addEventListener('click', function () { post('satbleriskack', true, function () { if (typeof bleToast === 'function') bleToast('BLE enabled — risk accepted'); setTimeout(fetchBle, 800); }); close(); });
+    acts.appendChild(no); acts.appendChild(yes);
+    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
+    document.body.appendChild(bd);
   }
   // TASK-963: continuous detection. The firmware scans passive-continuous (ADR-151),
   // so sensors appear over time; poll the roster while the Sensors category is open
@@ -2296,6 +2325,9 @@
     if (Object.prototype.hasOwnProperty.call(setData, 'mqttenable')) mqttEn = (('' + setData.mqttenable.value) === 'true') ? 'Yes' : 'No';
     var wifiQ;
     if (d.wifiquality_text !== undefined) wifiQ = d.wifiquality_text + (d.wifiquality !== undefined ? ' (' + d.wifiquality + '%)' : '');
+    // TASK-995: format a byte count as MB (whole when exact) for the Hardware group.
+    function fmtMB(b) { if (b === undefined || b === null) return undefined; var m = b / 1048576; return (m % 1 ? m.toFixed(1) : m) + ' MB'; }
+    var psramStr = d.psram_found ? (fmtMB(d.psram_size) + ' (' + fmtMB(d.psram_free) + ' free)') : 'None';
     var groups = [
       ['Firmware', [
         ['Firmware Version', d.fwversion], ['Compiled On', d.compiled],
@@ -2307,8 +2339,10 @@
         ['Wi-Fi Network (SSID)', d.ssid], ['Wi-Fi Signal Strength (dBm)', d.wifirssi], ['Wi-Fi Quality', wifiQ]
       ]],
       ['Hardware', [
-        ['Unique Chip ID', d.chipid], ['Arduino Core Version', d.coreversion], ['Espressif SDK Version', d.sdkversion],
-        ['CPU Speed (MHz)', d.cpufreq], ['Flash Chip Size (MB)', d.flashchipsize], ['LittleFS Size (MB)', d.LittleFSsize], ['Flash Mode', d.flashchipmode]
+        ['Chip Model (est.)', d.chip_model_est], ['Unique Chip ID', d.chipid],
+        ['Arduino Core Version', d.coreversion], ['Espressif SDK Version', d.sdkversion],
+        ['CPU Speed (MHz)', d.cpufreq], ['Flash Size', d.flash_size ? fmtMB(d.flash_size) : (d.flashchipsize ? d.flashchipsize + ' MB' : undefined)],
+        ['PSRAM', psramStr], ['LittleFS Size (MB)', d.LittleFSsize], ['Flash Mode', d.flashchipmode]
       ]],
       ['Memory & uptime', [
         ['Free Heap Memory (bytes)', d.freeheap], ['Max. Free Block (bytes)', d.maxfreeblock], ['Heap Fragmentation (%)', d.hd_fragmentation_pct],
@@ -3199,6 +3233,173 @@
     if (dl) dl.addEventListener('click', satDetectLocation);
   }
 
+  // ---------- TASK-990: sensor-discovery toast (PR-649 "OTGW Patterns and Tokens") ----------
+  // A newly discovered, still-unassigned BLE sensor surfaces as a floating card
+  // (bottom-right, .discover-stack) with one-tap Assign (jump to the Sensors roster)
+  // or Ignore, then dismiss/auto-expire. Runs GLOBALLY off the same
+  // GET /api/v2/sat/ble/discovery poll the roster uses, so a background discovery is
+  // never silent. Each MAC surfaces once (persisted in localStorage otgw-ble-seen).
+  var discoverSeen = null;
+  function discoverSeenSet() {
+    if (discoverSeen) return discoverSeen;
+    discoverSeen = {};
+    try { (JSON.parse(localStorage.getItem('otgw-ble-seen') || '[]') || []).forEach(function (m) { discoverSeen[m] = 1; }); } catch (e) {}
+    return discoverSeen;
+  }
+  function markDiscoverSeen(mac) {
+    discoverSeenSet()[mac] = 1;
+    try { localStorage.setItem('otgw-ble-seen', JSON.stringify(Object.keys(discoverSeen))); } catch (e) {}
+  }
+  function getDiscoverStack() {
+    var s = document.getElementById('discoverStack');
+    if (!s) { s = document.createElement('div'); s.id = 'discoverStack'; s.className = 'discover-stack'; document.body.appendChild(s); }
+    return s;
+  }
+  function dropDiscoverCard(card, mac) {
+    markDiscoverSeen(mac);
+    if (card && card.parentNode) card.parentNode.removeChild(card);
+  }
+  // o = { id, bus:'ble'|'dallas', title, sub }. Bus-agnostic so BLE and 1-Wire
+  // (Dallas) both surface through the same card, colour-coded by CSS (.ble/.dallas).
+  function showDiscoverCard(o) {
+    var id = o.id; if (!id) return;
+    var stack = getDiscoverStack();
+    if (stack.querySelector('[data-mac="' + id + '"]')) return;   // already shown
+    if (stack.children.length >= 4) return;                       // cap the visible stack
+    var card = document.createElement('div');
+    card.className = 'discover-card ' + (o.bus || 'ble');
+    card.setAttribute('data-mac', id);
+    var ic = document.createElement('span'); ic.className = 'discover-ic';
+    var bd = document.createElement('div'); bd.className = 'discover-bd';
+    var t = document.createElement('div'); t.className = 't'; t.textContent = o.title;
+    var ss = document.createElement('div'); ss.className = 's'; ss.textContent = o.sub;
+    var act = document.createElement('div'); act.className = 'discover-act';
+    var assign = document.createElement('button'); assign.className = 'primary'; assign.textContent = 'Assign';
+    assign.addEventListener('click', function () {
+      dropDiscoverCard(card, id);
+      setActiveCat = 'sensors'; showPage('settings'); renderSettings();
+      setTimeout(function () { var el = document.querySelector('[class*="ble-row"]'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 350);
+    });
+    var ign = document.createElement('button'); ign.textContent = 'Ignore';
+    ign.addEventListener('click', function () { dropDiscoverCard(card, id); });
+    act.appendChild(assign); act.appendChild(ign);
+    bd.appendChild(t); bd.appendChild(ss); bd.appendChild(act);
+    var x = document.createElement('button'); x.className = 'discover-x'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '×';
+    x.addEventListener('click', function () { dropDiscoverCard(card, id); });
+    card.appendChild(ic); card.appendChild(bd); card.appendChild(x);
+    stack.appendChild(card);
+    // No auto-expire: the card stays until the user acts on it (Assign / Ignore / ×).
+  }
+  // BLE discovery: /api/v2/sat/ble/discovery (mac + temp/hum).
+  function pollDiscovery(retriesLeft) {
+    fetch(APIGW + 'v2/sat/ble/discovery', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) {
+        if (!j || !Array.isArray(j.sensors)) return;
+        var seen = discoverSeenSet();
+        j.sensors.forEach(function (s) {
+          if (!s || !s.valid || !s.mac || seen[s.mac]) return;
+          if (s.label && s.label.trim()) { markDiscoverSeen(s.mac); return; }   // already named -> not "new"
+          var nm = (s.name && s.name.trim()) || '';
+          var sub = (nm ? nm + ' · ' : '') + s.mac;
+          if (typeof s.temp === 'number') sub += ' · ' + s.temp.toFixed(1) + '°C';
+          if (typeof s.hum === 'number') sub += ' / ' + Math.round(s.hum) + '%';
+          showDiscoverCard({ id: s.mac, bus: 'ble', title: 'New BLE sensor discovered', sub: sub });
+        });
+      })
+      .catch(function () {
+        // Board momentarily saturated under the page's concurrent load (the
+        // discovery fetch colliding with the health/SAT polls + WS starved it).
+        // Retry once shortly; the board recovers between bursts.
+        if ((retriesLeft | 0) > 0) setTimeout(function () { pollDiscovery(retriesLeft - 1); }, 4000);
+      });
+  }
+  // 1-Wire/Dallas discovery: /api/v2/sensors (sensors.dallas[] with addr + temp).
+  // Each detected address surfaces once (seen-tracked, shared with BLE).
+  function pollDallasDiscovery(retriesLeft) {
+    fetch(APIGW + 'v2/sensors', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) {
+        var d = j && j.sensors; if (!d || !Array.isArray(d.dallas)) return;
+        var seen = discoverSeenSet();
+        d.dallas.forEach(function (s) {
+          var addr = s && s.addr; if (!addr || seen[addr]) return;
+          var sub = 'DS18B20 · ' + addr;
+          if (typeof s.temp === 'number') sub += ' · ' + s.temp.toFixed(1) + '°C';
+          showDiscoverCard({ id: addr, bus: 'dallas', title: 'New 1-Wire sensor detected', sub: sub });
+        });
+      })
+      .catch(function () { if ((retriesLeft | 0) > 0) setTimeout(function () { pollDallasDiscovery(retriesLeft - 1); }, 4000); });
+  }
+  // Gentle scheduler: skip the boot asset-burst (10s), then poll on a 25s cycle
+  // OFFSET from the 15s health poll so the two rarely fire together — that
+  // collision is what starved the discovery fetch. Dallas polls a beat later so
+  // the two discovery fetches don't collide with each other. Each tick retries once.
+  function startDiscoveryPolling() {
+    setTimeout(function () {
+      pollDiscovery(1);
+      setInterval(function () { pollDiscovery(1); }, 25000);
+    }, 10000);
+    setTimeout(function () {
+      pollDallasDiscovery(1);
+      setInterval(function () { pollDallasDiscovery(1); }, 25000);
+    }, 14000);
+  }
+
+  // ---------- TASK-991: bench-mode -> simulation prompt ----------
+  // No boiler AND no thermostat on the OT bus == a bench setup. On PIC boards
+  // (where /api/v2/simulate exists) offer once to enable simulation mode. The
+  // firmware itself refuses simulation when a real boiler is present
+  // (satBoilerHardwarePresent), so this can never clobber a live rig.
+  function showSimModal() {
+    if (document.getElementById('simBackdrop')) return;
+    var bd = document.createElement('div'); bd.id = 'simBackdrop'; bd.className = 'sim-backdrop';
+    var m = document.createElement('div'); m.className = 'sim-modal';
+    var h = document.createElement('h3'); h.textContent = '⚙ No boiler detected';
+    var p = document.createElement('p'); p.textContent = 'This gateway sees no boiler or thermostat on the OpenTherm bus — looks like a bench setup. Run in simulation mode to preview live-like data?';
+    var acts = document.createElement('div'); acts.className = 'acts';
+    var no = document.createElement('button'); no.textContent = 'Not now';
+    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Enable simulation';
+    function closeSim() { try { localStorage.setItem('otgw-sim-prompted', '1'); } catch (e) { } if (bd.parentNode) bd.parentNode.removeChild(bd); }
+    no.addEventListener('click', closeSim);
+    yes.addEventListener('click', function () {
+      fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'simulation', value: true }) })
+        .then(function (r) { if (r.ok && typeof bleToast === 'function') bleToast('Simulation enabled'); })
+        .catch(function () { });
+      closeSim();
+    });
+    bd.addEventListener('click', function (e) { if (e.target === bd) closeSim(); });
+    acts.appendChild(no); acts.appendChild(yes);
+    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
+    document.body.appendChild(bd);
+  }
+  function maybePromptSimulation() {
+    try { if (localStorage.getItem('otgw-sim-prompted') === '1') return; } catch (e) { }
+    withDeviceInfo(function (d) {
+      if (!d) return;
+      if (d.otcommandinterface !== 'PIC') return;                                  // /simulate is PIC-path only
+      if (d.otgwsimulation) return;                                                // already simulating
+      if (d.boilerconnected || d.thermostatconnected || d.otgwconnected) return;   // something on the bus -> not a bench
+      showSimModal();
+    });
+  }
+
+  // ---------- TASK-992: hide the Advanced > PIC sub-tab when no PIC is present ----------
+  // OT-Direct boards (OTGW32) have no PIC firmware, so the PIC tab is dead there.
+  function applyPicTabVisibility() {
+    withDeviceInfo(function (d) {
+      var isPic = !!(d && d.otcommandinterface === 'PIC');
+      var btn = document.querySelector('#advTabs [data-adv="pic"]');
+      var panel = document.getElementById('adv-pic');
+      if (btn) btn.classList.toggle('hidden', !isPic);
+      if (!isPic) {
+        var wasActive = (btn && btn.classList.contains('active')) || (panel && panel.classList.contains('active'));
+        if (panel) panel.classList.remove('active');
+        if (wasActive && typeof showAdvTab === 'function') showAdvTab('debug');
+      }
+    });
+  }
+
   // ---------- init ----------
   function init() {
     initTheme();
@@ -3294,12 +3495,23 @@
     // settings once so the connectivity model knows which integrations are disabled
     // (MQTT off must read grey "Off", not a red "Disconnected", on the first Home
     // render — setData is otherwise empty until the Settings page is opened).
+    // TASK-989: STAGGER the startup API calls. Firing them all at once (plus the
+    // three big assets) is the parallel burst that collapses the S3 heap under
+    // concurrent serving. Settings first (the connectivity model needs it), then
+    // conn shortly after for the first strip render; the heavier device/info and
+    // the seed/SAT/weather cluster trickle in behind (see below).
     fetchSettings();
-    fetchConn();
+    setTimeout(fetchConn, 400);
     setInterval(fetchConn, 15000);
-    // TASK-983: fill the header identity chips (hostname·version + IP·Wi-Fi) once from
-    // the heavy device/info snapshot. Never polled — the Wi-Fi bars refresh via fetchConn.
-    withDeviceInfo(fillHeaderIdentity);
+    // TASK-990: surface newly discovered BLE + 1-Wire sensors as discovery toasts
+    // (any page), via a gentle retrying scheduler that stays out of the boot burst.
+    startDiscoveryPolling();
+    // TASK-983/992: one delayed device/info fetch feeds BOTH the header identity
+    // chips and the PIC-tab visibility (withDeviceInfo dedups + caches 8s).
+    setTimeout(function () { applyPicTabVisibility(); withDeviceInfo(fillHeaderIdentity); }, 1200);
+    // TASK-991: on a bench setup (no boiler/thermostat on the bus, PIC board), offer
+    // simulation mode once. Delayed past the boot burst so the bus state has settled.
+    setTimeout(maybePromptSimulation, 12000);
 
     // TASK-984: close the floating override panel on an outside click. The two triggers
     // (#aOvrBadge on Home, #cnOvr on the connection map) stopPropagation on their own
@@ -3348,7 +3560,9 @@
     if (apng) apng.addEventListener('click', function () { toggleAutoPng(apng); });
     var acsv = document.getElementById('chipAutoCsv');
     if (acsv) acsv.addEventListener('click', function () { toggleAutoCsv(acsv); });
-    fetchSeed(); fetchSatStatus(); fetchWeather();
+    // TASK-989: staggered (see the startup-burst note above) — seed/SAT/weather
+    // trail the first-paint fetches one at a time instead of bursting together.
+    setTimeout(fetchSeed, 2000); setTimeout(fetchSatStatus, 2800); setTimeout(fetchWeather, 3600);
     setInterval(function () { if (!ws || ws.readyState !== 1) fetchSeed(); }, 20000);
     setInterval(fetchSatStatus, 30000);
     setInterval(fetchWeather, 60000);   // TASK-954: refresh weather-API OUTSIDE

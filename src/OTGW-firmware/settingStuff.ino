@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.319
+**  Version  : v2.0.0-alpha.320
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -406,6 +406,7 @@ void writeSettings(bool show)
   // serialised unconditionally (fields exist on both platforms) so settings.json
   // round-trips between ESP8266 and ESP32; on ESP8266 these write zero/empty.
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
+  writeJsonBoolKV(file, F("SATbleriskack"), settings.sat.bBleRiskAck, true);
   writeJsonBoolKV(file, F("SATblefailover"), settings.sat.bBleFailover, true);
   writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC, true);
   writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval, true);
@@ -1101,6 +1102,7 @@ void updateSetting(const char *field, const char *newValue)
   // ESP-abstraction Tier 2 (TASK-742): parsed unconditionally so a settings.json
   // written on either platform round-trips; harmless no-op fields on ESP8266.
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATbleriskack")) == 0) settings.sat.bBleRiskAck = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblefailover")) == 0) settings.sat.bBleFailover = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
   else if (strcasecmp_P(field, PSTR("SATbleinterval")) == 0) settings.sat.iBleInterval = constrain(atoi(newValue), 10, 300);

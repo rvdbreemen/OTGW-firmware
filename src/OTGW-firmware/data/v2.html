@@ -17,41 +17,45 @@
   })();
 </script>
 <script>
-  // TASK-978: load the stylesheets + v2.js with retry-on-503. A browser fires
-  // every page asset in parallel; the ADR-147 file-serve gate caps concurrent
-  // serves (WEB_FILE_MAX_INFLIGHT=4, lower under heap pressure) and 503s the
-  // excess. A 503'd <link>/<script> has no native retry, so the UI would render
-  // unstyled (CSS dropped) or dead (v2.js dropped) with nothing surfaced. This
-  // mirrors the classic index.html loader (TASK-960): retry with linear backoff
-  // so every asset arrives as gate slots free.
+  // TASK-978: load the stylesheets + v2.js with retry-on-503. A 503'd/reset
+  // <link>/<script> has no native retry, so the UI would render unstyled (CSS
+  // dropped) or dead (v2.js dropped) with nothing surfaced. Retry with linear
+  // backoff, mirroring the classic index.html loader (TASK-960).
+  // TASK-989: load SEQUENTIALLY (ds-tokens -> v2.css -> v2.js), one connection
+  // at a time. A parallel burst of asset connections is what collapses the S3
+  // heap under concurrent serving (AsyncTCP accepts unconditionally; measured
+  // freeheap 22K->3.8K); serializing the three big assets removes the burst at
+  // the source instead of relying on the serve gates to shed it.
   (function(){
     var MAX = 8;
-    function loadCss(href){
+    function loadCss(href, then){
       var attempt = 0;
       (function go(){
         var l = document.createElement('link');
         l.rel = 'stylesheet'; l.href = href;
+        l.onload = function(){ if (then) then(); };
         l.onerror = function(){
           if (l.parentNode) l.parentNode.removeChild(l);
           if (++attempt <= MAX) setTimeout(go, 200 * attempt);
-          else console.error('[loader] gave up on ' + href);
+          else { console.error('[loader] gave up on ' + href); if (then) then(); }
         };
         document.head.appendChild(l);
       })();
     }
-    loadCss('ds-tokens.css');
-    loadCss('v2.css');
-    var jsAttempt = 0;
-    (function loadJs(){
-      var s = document.createElement('script');
-      s.src = './v2.js'; s.defer = true;
-      s.onerror = function(){
-        if (s.parentNode) s.parentNode.removeChild(s);
-        if (++jsAttempt <= MAX) setTimeout(loadJs, 200 * jsAttempt);
-        else console.error('[loader] gave up on v2.js');
-      };
-      document.head.appendChild(s);
-    })();
+    function loadJs(){
+      var jsAttempt = 0;
+      (function go(){
+        var s = document.createElement('script');
+        s.src = './v2.js'; s.defer = true;
+        s.onerror = function(){
+          if (s.parentNode) s.parentNode.removeChild(s);
+          if (++jsAttempt <= MAX) setTimeout(go, 200 * jsAttempt);
+          else console.error('[loader] gave up on v2.js');
+        };
+        document.head.appendChild(s);
+      })();
+    }
+    loadCss('ds-tokens.css', function(){ loadCss('v2.css', loadJs); });
   })();
 </script>
 </head>
