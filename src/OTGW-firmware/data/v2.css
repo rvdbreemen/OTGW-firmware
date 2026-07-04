@@ -64,29 +64,20 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* Narrow phones: the mono hostname·version chip is wide and would push the header
      to a third row — drop the identity chips, keep the status pill + clock + toggles. */
   @media(max-width:480px){.hdr-net{display:none}}
-  .switcher{display:flex;gap:6px;background:var(--nav);padding:8px 12px 12px;flex-wrap:wrap}
-  /* TASK-998 — nav design "1d refined pill bar": the descriptive subtitle no longer
-     crowds every pill (it wrapped on Monitor). It appears ONLY under the active
-     section, as a small mono caption, and the active pill goes solid brand-cyan. */
-  .seg{flex:1;min-width:104px;min-height:44px;border:0;border-radius:12px;cursor:pointer;
-    background:rgba(255,255,255,.14);color:#fff;font-family:var(--font-sans);padding:9px 14px;
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;
-    transition:background .15s,color .15s}
-  html[data-theme="dark"] .seg{color:#e8e8ea}
-  .seg b{font-size:.92rem}
-  .seg small{display:none;font-family:var(--font-mono);font-size:.6rem;font-weight:600;
-    opacity:.74;letter-spacing:.04em;text-transform:uppercase;margin-top:2px}
-  /* Active pill contrasts against the (cyan in light / grey in dark) nav — 1d's
-     brand-cyan active was for a dark nav; our nav is already cyan, so the pop
-     comes from the light --bg fill instead. Its subtitle then reads in --text. */
-  .seg.active{background:var(--bg);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.16)}
-  .seg.active small{display:block;color:var(--accent)}
-  /* Mobile: a horizontal scroll strip of pills instead of a wrapping grid. */
-  @media(max-width:640px){
-    .switcher{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch}
-    .seg{flex:0 0 auto;min-width:auto}
-    .seg small{display:none!important}
-  }
+  /* TASK-999 — nav design "1a underlined text tabs" (Material/GitHub). The
+     subtitle-heavy pills are gone: the top level is one clean text row where the
+     active section carries a 3px accent underline. Sub-views live in the page's
+     own sub-tab row (.subtabs), which uses the same underline pattern at 2px. */
+  .switcher{display:flex;gap:2px;background:var(--nav);padding:0 10px;align-items:stretch;
+    overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .seg{flex:0 0 auto;border:0;border-bottom:3px solid transparent;background:none;cursor:pointer;
+    color:rgba(255,255,255,.82);font-family:var(--font-sans);padding:13px 16px 10px;white-space:nowrap;
+    display:flex;align-items:center;gap:6px;transition:color .15s,border-color .15s}
+  .seg b{font-size:.9rem;font-weight:600}
+  .seg small{display:none}   /* 1a: no subtitle — sub-views are the .subtabs row */
+  .seg:hover{color:#fff}
+  .seg.active{border-bottom-color:var(--accent);color:var(--accent)}
+  .seg.active b{font-weight:700}
 
   .wrap{max-width:1020px;margin:0 auto;padding:16px}
   .design{display:none}
@@ -289,11 +280,16 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .vp-item small{display:block;color:var(--muted);font-size:.7rem;font-weight:400;margin-top:1px}
 
   /* ================= MONITOR page ================= */
-  .subtabs{display:flex;gap:6px;margin:2px 0 14px;flex-wrap:wrap}
-  .subtab{border:1px solid var(--border);background:var(--panel);color:var(--muted);
-    border-radius:10px;padding:10px 18px;font-size:.86rem;cursor:pointer;min-height:44px;
-    font-family:var(--font-sans);font-weight:700}
-  .subtab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* TASK-999 — sub-header bars as 1a underlined text tabs (the second tier). Sits
+     on the content surface (not the nav), so muted text + an accent underline reads
+     in both themes. The 1px baseline is the tab-row rule the active 2px sits on. */
+  .subtabs{display:flex;gap:2px;margin:2px 0 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    border-bottom:1px solid var(--border)}
+  .subtab{flex:0 0 auto;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);
+    padding:9px 14px 8px;margin-bottom:-1px;font-size:.84rem;cursor:pointer;white-space:nowrap;
+    font-family:var(--font-sans);font-weight:500;transition:color .15s,border-color .15s}
+  .subtab:hover{color:var(--text)}
+  .subtab.active{border-bottom-color:var(--accent);color:var(--accent);font-weight:600}
   .mpanel{display:none}
   .mpanel.active{display:block}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
@@ -474,7 +470,13 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* state vocabulary — one set of colours used everywhere */
   .st-ok{--s:var(--zone-ok)} .st-warn{--s:var(--zone-warn)} .st-down{--s:var(--zone-alert)}
   .st-off{--s:var(--tile-off)} .st-unknown{--s:var(--muted)} .st-mode{--s:var(--accent)}
-  .connstrip{display:flex;gap:8px;background:var(--nav);padding:0 12px 12px;overflow-x:auto}
+  /* TASK-999 — the connectivity pill now lives inline in the header line (moved up
+     from a full-width strip below the nav), so it drops the --nav band + padding. */
+  .connstrip{display:inline-flex;gap:8px;align-items:center}
+  .connstrip:empty{display:none}
+  /* TASK-999: the moved connStrip is now the single header connectivity pill, so the
+     older coarse status chip is redundant — hide it to match the mockup's one pill. */
+  .hdr-status{display:none}
   /* single worst-of health-summary pill (the per-node detail lives on Monitor › Connection) */
   .connsum{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;border:0;border-radius:20px;
     padding:7px 14px;cursor:pointer;color:#fff;font-size:.78rem;font-weight:700;font-family:var(--font-sans);
@@ -656,13 +658,18 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sat-title{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:10px}
   .sat-pill{font-size:.7rem;font-weight:700;color:#fff;background:var(--hot);border-radius:10px;padding:3px 10px}
   .sat-pill.idle{background:var(--tile-off)} .sat-pill.off{background:var(--tile-off)}
-  .sat-views{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
-  .satview-btn{flex:1;min-width:150px;min-height:54px;border:1px solid var(--border);background:var(--panel);
-    color:var(--text);border-radius:12px;cursor:pointer;display:flex;flex-direction:column;align-items:center;
-    justify-content:center;gap:1px;font-family:var(--font-sans)}
-  .satview-btn small{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
-  .satview-btn.active{background:var(--accent);border-color:var(--accent);color:#fff}
-  .satview-btn.active small{color:rgba(255,255,255,.85)}
+  /* TASK-999: SAT depth-level nav (Thermostat/Control/Technical) as 1a underlined
+     text tabs — the same second-tier pattern as .subtabs, keeping the small hint. */
+  .sat-views{display:flex;gap:2px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    border-bottom:1px solid var(--border)}
+  .satview-btn{flex:0 0 auto;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:9px 16px 8px;
+    margin-bottom:-1px;white-space:nowrap;font-family:var(--font-sans);transition:color .15s,border-color .15s}
+  .satview-btn b{font-size:.86rem;font-weight:600}
+  .satview-btn small{font-size:.62rem;color:inherit;opacity:.7;text-transform:uppercase;letter-spacing:.04em}
+  .satview-btn:hover{color:var(--text)}
+  .satview-btn.active{border-bottom-color:var(--accent);color:var(--accent)}
+  .satview-btn.active small{color:var(--accent);opacity:.85}
   /* cumulative reveal: Thermostat shows L1 only; Control adds L2; Technical adds L3 */
   .sat-l1{display:block}
   .sat-l2,.sat-l3{display:none}

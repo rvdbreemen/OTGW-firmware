@@ -75,6 +75,8 @@
   <span class="hdr-status" id="hdrStatus" title="Connectivity status">
     <span class="hdr-dot"></span><span id="hdrStatMode">…</span>
   </span>
+  <!-- TASK-999: connectivity pill moved up onto the header line (was a strip below the nav). -->
+  <div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
   <!-- TASK-983: shown only while OT-replay simulation is active (polled via /api/v2/simulate). -->
   <span class="hdr-sim hidden" id="hdrSim" title="Simulation active — values may be replayed, not live from the boiler">SIMULATION</span>
   <span class="sub" id="clock">--:--:--</span>
@@ -88,9 +90,6 @@
   <button class="seg" data-page="settings"><b>Settings</b><small>grouped &amp; scannable</small></button>
   <button class="seg" data-page="advanced"><b>Advanced</b><small>pic · debug · files · system</small></button>
 </div>
-<!-- always-visible connectivity strip — glance scale; click any pill for the detail map -->
-<div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
-
 <div class="wrap">
 
 <!-- ════════════════ PAGE: HOME ════════════════ -->
