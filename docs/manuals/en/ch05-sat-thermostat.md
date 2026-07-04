@@ -75,7 +75,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | Setting | Default | Range | Description |
 |---|---|---|---|
 | `satenabled` | false | bool | Master on/off switch |
-| `satheatsystem` | 0 | 0-2 | Heating SYSTEM (heat distribution): 0 = auto (defaults to radiators), 1 = radiators, 2 = underfloor |
+| `satsystem` | 0 | 0-2 | Heating SYSTEM (heat distribution): 0 = auto (defaults to radiators), 1 = radiators, 2 = underfloor |
 | `satsource` | 0 | 0-3 | Heating SOURCE (energy device): 0 = auto, 1 = gas boiler, 2 = heat pump, 3 = hybrid |
 | `sattargettemp` | 20.0 | 5-30 C | Desired room temperature |
 | `satcoefficient` | 1.5 | 0.1-5.0 | Heating curve steepness |
@@ -91,7 +91,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 
 SAT keeps two orthogonal choices apart:
 
-- The heating **system** (`satheatsystem`) is how heat is distributed: radiators or underfloor. It drives the base offset of the heating curve, the hard temperature ceiling (underfloor is capped lower), and the per-system cold cutoff.
+- The heating **system** (`satsystem`) is how heat is distributed: radiators or underfloor. It drives the base offset of the heating curve, the hard temperature ceiling (underfloor is capped lower), and the per-system cold cutoff.
 - The heating **source** (`satsource`) is the energy device: gas boiler, heat pump, or hybrid. It drives timing (minimum on-time, cycles) and, for heat pumps, forcing maximum relative modulation.
 
 Source selection is manual and authoritative: whatever you set is what SAT controls against. SAT can also derive a source hint from the OpenTherm bus (a cooling-capable boiler is likely a heat pump), but that auto-detect is only a hint for display and never overrides your manual choice.

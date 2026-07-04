@@ -81,7 +81,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
 | `satenabled` | `false` | bool | SAT in-/uitschakelen |
-| `satheatsystem` | `0` | 0-2 | Verwarmings-SYSTEEM (warmteafgifte): 0=auto (valt terug op radiatoren), 1=radiatoren, 2=vloerverwarming |
+| `satsystem` | `0` | 0-2 | Verwarmings-SYSTEEM (warmteafgifte): 0=auto (valt terug op radiatoren), 1=radiatoren, 2=vloerverwarming |
 | `satsource` | `0` | 0-3 | WarmteBRON (energie-apparaat): 0=auto, 1=gasketel, 2=warmtepomp, 3=hybride |
 | `sattargettemp` | `20.0` | 5-30 C | Gewenste ruimtetemperatuur |
 | `satcoefficient` | `1.5` | 0.1-5.0 | Steilheid van de verwarmingscurve |
@@ -97,7 +97,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 
 SAT houdt twee losstaande keuzes uit elkaar:
 
-- Het verwarmings**systeem** (`satheatsystem`) bepaalt hoe warmte wordt afgegeven: radiatoren of vloerverwarming. Het stuurt de basis-offset van de verwarmingscurve, de harde temperatuurgrens (vloerverwarming is lager begrensd) en de cold cutoff per systeem.
+- Het verwarmings**systeem** (`satsystem`) bepaalt hoe warmte wordt afgegeven: radiatoren of vloerverwarming. Het stuurt de basis-offset van de verwarmingscurve, de harde temperatuurgrens (vloerverwarming is lager begrensd) en de cold cutoff per systeem.
 - De warmte**bron** (`satsource`) is het energie-apparaat: gasketel, warmtepomp of hybride. Deze stuurt de timing (minimale aan-tijd, cycli) en, voor warmtepompen, het forceren van maximale relatieve modulatie.
 
 De bronkeuze is handmatig en leidend: wat u instelt, is waar SAT tegen regelt. SAT kan ook een bron-hint afleiden uit de OpenTherm-bus (een koelcapabele ketel is waarschijnlijk een warmtepomp), maar die auto-detectie is slechts een hint voor weergave en overschrijft uw handmatige keuze nooit.

@@ -42,6 +42,12 @@ class LintTests(unittest.TestCase):
         _, warns = gov.cmd_lint(adrs, gates=set())
         self.assertTrue(any("expected Superseded" in w for w in warns))
 
+    def test_supersedes_missing_backlink_warns(self):
+        # A supersedes B, but B has an EMPTY superseded_by (no backlink at all)
+        adrs = {1: adr(1, supersedes=[2]), 2: adr(2, superseded_by=[])}
+        _, warns = gov.cmd_lint(adrs, gates=set())
+        self.assertTrue(any("does not list 1" in w for w in warns))
+
     def test_binding_adr_missing_gate_fails(self):
         adrs = {1: adr(1, "Accepted", named_gates=["check_missing"], is_binding=True)}
         fails, _ = gov.cmd_lint(adrs, gates={"check_present"})

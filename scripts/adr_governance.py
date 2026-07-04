@@ -140,7 +140,7 @@ def cmd_lint(adrs, gates):
             warns.append(f"ADR-{n}: has superseded_by but status is '{a['status']}' (expected Superseded)")
         # reciprocity: if A supersedes B (frontmatter), B should point back
         for tgt in a["supersedes"]:
-            if tgt in adrs and adrs[tgt]["superseded_by"] and n not in adrs[tgt]["superseded_by"]:
+            if tgt in adrs and n not in adrs[tgt]["superseded_by"]:
                 warns.append(f"ADR-{n}: supersedes ADR-{tgt} but ADR-{tgt}.superseded_by does not list {n}")
         # ADR-080: a Binding ADR that names a gate must have that gate present
         if a["is_binding"] and a["status"] == "Accepted":
