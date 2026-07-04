@@ -45,10 +45,12 @@ SAT heeft een ruimtetemperatuurmeting nodig. Mogelijke bronnen (in prioriteitsvo
 
 #### Via de webinterface
 
+De v2-webinterface toont SAT als een enkele pagina met drie diepteniveaus, zodat u alleen ziet wat u nodig heeft: een eenvoudige thermostaatweergave (draaiknop, presets, actuele status), een control-weergave (bedrijfsmodus, ketelstatus, coefficient, deadband, PID-uitvoer) en een technische weergave (health, ruwe PID-termen, PWM-/cyclusdetail, simulatie, ruwe JSON). Alle drie delen de UI-schil die in hoofdstuk 3 wordt beschreven.
+
 1. Open de webinterface (`http://otgw.local/`).
 2. Ga naar het tabblad **SAT** of **Instellingen > SAT**.
 3. Zet de schakelaar **SAT inschakelen** op aan.
-4. Stel het verwarmingssysteem in (auto-detect, radiatoren, warmtepomp of vloerverwarming).
+4. Stel het verwarmingssysteem in (auto, radiatoren of vloerverwarming) en de warmtebron (auto, gasketel, warmtepomp of hybride). Systeem en bron zijn aparte instellingen (zie hieronder).
 5. Voer de gewenste doeltemperatuur in.
 6. Klik op **Opslaan**.
 
@@ -79,7 +81,8 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
 | `satenabled` | `false` | bool | SAT in-/uitschakelen |
-| `satheatsystem` | `0` | 0-3 | 0=auto-detect, 1=radiatoren, 2=warmtepomp, 3=vloerverwarming |
+| `satheatsystem` | `0` | 0-2 | Verwarmings-SYSTEEM (warmteafgifte): 0=auto (valt terug op radiatoren), 1=radiatoren, 2=vloerverwarming |
+| `satsource` | `0` | 0-3 | WarmteBRON (energie-apparaat): 0=auto, 1=gasketel, 2=warmtepomp, 3=hybride |
 | `sattargettemp` | `20.0` | 5-30 C | Gewenste ruimtetemperatuur |
 | `satcoefficient` | `1.5` | 0.1-5.0 | Steilheid van de verwarmingscurve |
 | `satdeadband` | `0.1` | 0.05-2.0 C | PID-deadband breedte |
@@ -89,6 +92,17 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satforcepwm` | `false` | bool | PWM-modus forceren ongeacht ketelmodulatie |
 | `satmaxrelmod` | `100` | 0-100 % | Maximale relatieve modulatie naar ketel (MM= commando) |
 | `satmanufacturer` | `0` | 0-18 | Ketelmerkt (0 = auto-detect) |
+
+#### Warmtebron versus verwarmingssysteem
+
+SAT houdt twee losstaande keuzes uit elkaar:
+
+- Het verwarmings**systeem** (`satheatsystem`) bepaalt hoe warmte wordt afgegeven: radiatoren of vloerverwarming. Het stuurt de basis-offset van de verwarmingscurve, de harde temperatuurgrens (vloerverwarming is lager begrensd) en de cold cutoff per systeem.
+- De warmte**bron** (`satsource`) is het energie-apparaat: gasketel, warmtepomp of hybride. Deze stuurt de timing (minimale aan-tijd, cycli) en, voor warmtepompen, het forceren van maximale relatieve modulatie.
+
+De bronkeuze is handmatig en leidend: wat u instelt, is waar SAT tegen regelt. SAT kan ook een bron-hint afleiden uit de OpenTherm-bus (een koelcapabele ketel is waarschijnlijk een warmtepomp), maar die auto-detectie is slechts een hint voor weergave en overschrijft uw handmatige keuze nooit.
+
+Een **cold cutoff** per systeem (COLD_SETPOINT: 28,2 C voor radiatoren, 21,0 C voor vloerverwarming) betekent dat wanneer werkelijk lage vraag het gevraagde aanvoer-setpoint onder die drempel drukt, SAT de ketel volledig uit commandeert in plaats van te branden voor een sprankje warmte. Dit voorkomt onnodige korte cycli op milde dagen.
 
 #### Preset-temperaturen
 
@@ -462,29 +476,50 @@ Wanneer `satzonecount` 1 is (standaard), werkt SAT in single-zone modus en heeft
 
 ### 5.15 BLE-temperatuursensor (alleen ESP32)
 
-Op ESP32-builds (OTGW32 / Thermo-Nova) scant SAT BLE-temperatuursensoren en gebruikt er een als ruimtetemperatuurinvoer. De BLE-stack is **NimBLE-Arduino** (ADR-092), die in 2.0.0 Bluedroid heeft vervangen en zo'n 400 KB flash bespaart. Ondersteunde advertising-formaten:
+Op ESP32-builds (OTGW32 / Thermo-Nova / LOLIN S3 Mini) scant SAT BLE-temperatuursensoren en kan er een als ruimtetemperatuurinvoer gebruiken. BLE-sensoren staan in de webinterface onder hun eigen categorie **Sensors** (niet meer verstopt onder SAT), naast de 1-Wire- en GPIO-sensoren. Scannen is een passieve, continue achtergrondactiviteit die **standaard aan** staat (onder voorbehoud van de PSRAM-poort hieronder), zodat sensoren vanzelf verschijnen. De BLE-stack is **NimBLE-Arduino** (ADR-092), die in 2.0.0 Bluedroid heeft vervangen en zo'n 400 KB flash bespaart. Ondersteunde advertising-formaten:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC met custom firmware): service data UUID 0x181A. Rapporteert temperatuur, luchtvochtigheid en batterijniveau.
 - **BTHome v2**: service data UUID 0xFCD2. Standaard BTHome-protocol voor temperatuur- en luchtvochtigheidssensoren. Versleutelde advertisements worden geweigerd.
+- **Xiaomi MiBeacon** (standaard Mijia-sensoren zoals MJ_HT_V1 en de onversleutelde LYWSD03MMC): service data UUID 0xFE95. Plaintext-frames worden direct gedecodeerd. **Versleutelde MiBeacon v4/v5**-frames worden ook ondersteund: geef een bindkey per sensor op en SAT ontsleutelt ze ter plaatse met AES-128-CCM. Bindkeys worden per sensor in het roster ingevoerd (een trusted-LAN-functie). Ze zijn write-only: de UI toont alleen of er een sleutel is ingesteld, nooit de sleutel zelf.
 
 De radio voert sinds 2.0.0 een **continue scan** uit vanaf boot (TASK-494). Elk geldig advertisement wordt opgenomen in een persistent 8-slot roster, ongeacht of het geselecteerd is. De parameter `satbleinterval` regelt nu de publish/state-update-cadans en niet langer de radio-scan zelf.
 
+#### PSRAM-bewuste standaard
+
+Er wordt een enkele gecombineerde firmware-image geleverd voor alle ESP32-boards; `psramFound()` bepaalt bij runtime of BLE daadwerkelijk scant:
+
+- **Boards MET PSRAM** (bijvoorbeeld de LOLIN S3 Mini): BLE draait standaard. Het extra RAM vangt de NimBLE-stack op zonder de rest van de firmware te destabiliseren.
+- **Boards ZONDER PSRAM** (bijvoorbeeld de OTGW32): BLE blijft slapend, ook als het is ingeschakeld. De webinterface toont een toestemmingsdialoog die waarschuwt voor het instabiliteitsrisico van BLE zonder PSRAM. Pas nadat u accepteert (instelling `satbleriskack`) start de radio met scannen.
+
+Kort gezegd: BLE is actief wanneer het is ingeschakeld EN (het board PSRAM heeft OF u het risico heeft geaccepteerd).
+
 #### Zelfontdekkende sensor-roster (TASK-508)
 
-Open het SAT-instellingenpaneel in de webinterface om het ontdekte roster te zien. Elke regel toont de laatste temperatuur, RSSI en leeftijd. Geef sensoren herkenbare labels ("Woonkamer", "Slaapkamer"); de actieve sensor wordt vanuit het roster geselecteerd. Auto-select promoveert de enige verse sensor wanneer er maar een in bereik is. Labels worden via de retained discovery-configs doorgegeven aan Home Assistant (per-MAC entiteiten worden automatisch aangemaakt). "Forget" leegt een slot en wist de bijbehorende HA-discovery-topics met zero-byte retained payloads.
+Open de categorie **Sensors** in de webinterface om het ontdekte roster te zien, een lijst van 8 slots. Elke regel toont de laatste temperatuur, RSSI en leeftijd. Geef sensoren herkenbare namen ("Woonkamer", "Slaapkamer") en hernoem ze op elk moment; de actieve sensor wordt vanuit het roster geselecteerd. Auto-select promoveert de enige verse sensor wanneer er maar een in bereik is. Labels worden via de retained discovery-configs doorgegeven aan Home Assistant (per-MAC entiteiten worden automatisch aangemaakt). "Forget" leegt een slot en wist de bijbehorende HA-discovery-topics met zero-byte retained payloads.
+
+De Sensors-kaart biedt drie bedieningselementen:
+
+- **Rescan**: forceert een active-scan naam-burst zodat net ingeschakelde sensoren zich direct aankondigen in plaats van te wachten op het volgende passieve advertisement.
+- **Clear roster**: wist alle acht slots (een twee-druk-bevestiging voorkomt ongelukken).
+- **Naam-prefix filter**: typ een hoofdletterongevoelige prefix om het roster te beperken op de geadverteerde BLE-naam van de sensor. Standaard filtert dit alleen de weergave. Zet de toggle **restrict roster** aan om het te promoveren tot een ingest-poort: sensoren waarvan de bekende naam niet met de prefix overeenkomt, worden dan volledig uit het roster gehouden. Sensoren met een lege of onbekende naam worden altijd toegelaten.
 
 REST-endpoints voor het roster:
 
 - `GET /api/v2/sat/ble/discovery` -  JSON-dump van alle roster-slots
 - `POST /api/v2/sat/ble/select` `{"mac":"AA:BB:.."}` -  MAC promoveren tot actieve sensor
 - `POST /api/v2/sat/ble/label`  `{"mac":"AA:BB:..","label":"Woonkamer"}` -  slot hernoemen
+- `POST /api/v2/sat/ble/bindkey` `{"mac":"AA:BB:..","key":"<32 hex>"}` -  bindkey voor versleutelde MiBeacon van een slot instellen (of wissen met een lege sleutel). Write-only.
+- `POST /api/v2/sat/ble/rescan` -  active-scan naam-burst forceren
 - `POST /api/v2/sat/ble/forget` `{"mac":"AA:BB:.."}` -  slot wissen en HA opruimen
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
-| `satbleenable` | `false` | bool | BLE-temperatuursensor scanning inschakelen |
+| `satbleenable` | `true` | bool | BLE-sensor scanning inschakelen (passief, continu). No-op op boards zonder BLE-radio |
+| `satbleriskack` | `false` | bool | Op een board ZONDER PSRAM: het instabiliteitsrisico accepteren zodat BLE mag scannen. Genegeerd op PSRAM-boards (`psramFound()` beslist dan) |
 | `satblemac` | `""` | MAC-adres | Actieve sensor-MAC (via roster select gezet; leeg = eerste verse slot wordt automatisch gekozen) |
 | `satbleinterval` | `30` | 10-300 s | Publish/state-update-cadans (NIET scaninterval; de scan is continu) |
+| `satblenameprefix` | `""` | tot 23 tekens | Naam-prefix filter (hoofdletterongevoelig; leeg = uit) |
+| `satblenamefilteringest` | `false` | bool | false = alleen de weergave filteren; true = ook roster-ingest beperken (restrict roster) |
 
 #### MQTT-topicstructuur
 

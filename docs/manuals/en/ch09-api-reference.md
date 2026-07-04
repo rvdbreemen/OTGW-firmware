@@ -222,6 +222,13 @@ Returns hardware and platform information. No authentication required.
     "cpufreq": 80,
     "freeheap": 25600,
     "maxfreeblock": 20480,
+    "psram_found": 1,
+    "psram_size": 2097152,
+    "psram_free": 2000000,
+    "flash_size": 8388608,
+    "internal_free": 180000,
+    "internal_maxblk": 110000,
+    "chip_model_est": "ESP32-S3FH4R2",
     "chipid": "AABBCC",
     "picavailable": true,
     "picfwversion": "5.4",
@@ -234,6 +241,8 @@ Returns hardware and platform information. No authentication required.
   }
 }
 ```
+
+The ESP32-S3 chip and memory fields feed the Debug screen (all integers, bytes unless noted): `psram_found` (`1` when PSRAM is present, `0` when absent), `psram_size` (total PSRAM, 0 when absent), `psram_free` (free PSRAM), `flash_size` (flash chip size), `internal_free` (free internal, non-PSRAM heap), `internal_maxblk` (largest free internal heap block), and `chip_model_est` (string; best-effort ESP32-S3 package part number extrapolated from flash + PSRAM, for example `"ESP32-S3FH4R2"`, or `"ESP32-S3FN8"` when no PSRAM).
 
 On OTGW32 hardware: the `otdirectavailable` field is `true`, and additional `otd*` fields are included (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`). On standard ESP8266+PIC builds, only `otdirectavailable: false` is present.
 
@@ -605,8 +614,10 @@ The BLE roster surfaces nearby BLE temperature sensors discovered by the ESP32-S
 | POST | `/api/v2/sat/ble/select` | Body `{"mac": "AA:BB:CC:DD:EE:FF"}` — promote the roster entry to the active SAT BLE sensor. |
 | POST | `/api/v2/sat/ble/label` | Body `{"mac": "AA:BB:CC:DD:EE:FF", "label": "Living room"}` — set the persistent label for a roster slot. |
 | POST or DELETE | `/api/v2/sat/ble/forget` | Body `{"mac": "AA:BB:CC:DD:EE:FF"}` — drop the slot and clean up its HA discovery entries. |
+| POST or PUT | `/api/v2/sat/ble/bindkey` | Body `{"mac": "AA:BB:CC:DD:EE:FF", "key": "<32 hex>"}`: set the per-sensor encrypted-MiBeacon bindkey. If the MAC is new a roster slot is allocated for it; an empty `key` clears the stored bindkey. Returns HTTP 507 when the roster is full. |
+| POST or PUT | `/api/v2/sat/ble/rescan` | No body: trigger an on-demand active-scan burst to refresh advertised names. |
 
-All four endpoints return HTTP 404 when the supplied MAC is not in the roster. These endpoints are not present on ESP8266 builds (route returns 404).
+`select`, `label`, and `forget` return HTTP 404 when the supplied MAC is not in the roster. The `bindkey` value is a **write-only secret** (validated as empty or exactly 32 hex chars, else 400; never logged, never echoed back; the roster/discovery responses expose only a `has_bindkey` / `has_key` boolean). These endpoints are not present on builds without BLE support (route returns 404).
 
 ---
 

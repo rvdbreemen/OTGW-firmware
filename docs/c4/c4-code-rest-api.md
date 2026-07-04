@@ -112,6 +112,7 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
   - `GET /api/v2/device/time` → `sendDeviceTimeV2()`
   - `GET /api/v2/device/crashlog` → `sendDeviceCrashLog()`
 - **Auth**: Not required
+- **Notes**: `device/info` is extended (TASK-995) with chip-capability fields for the v2 Debug screen: `psram_found`, `psram_size`, `psram_free`, `flash_size`, `internal_free`, `internal_maxblk`, and a best-effort ESP32-S3 package part number `chip_model_est` (extrapolated from flash + PSRAM).
 
 #### `void handleFlash()`
 - **Location**: `restAPI.ino:261–268`
@@ -212,6 +213,13 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 - **Auth**: Not required.
 - **Notes**: Single-shot active scan; cooperative-scheduler-friendly (results buffered, no blocking wait).
 
+#### `void handleMqtt()` (TASK-936)
+- **Purpose**: Force a full OT-value republish.
+- **HTTP Method**: POST only.
+- **Route**: `POST /api/v2/mqtt/republish` → resets OT publish eligibility (`requestMQTTRepublishAll()`) so the next observed OT values publish as first-seen again.
+- **Auth**: Required (POST mutation).
+- **Notes**: Requires an active MQTT connection (503 otherwise) and is rate-limited by a 60 s cooldown (CWE-770). **Distinct from `POST /api/v2/discovery/republish`** (handled by `handleDiscovery`), which re-announces the HA *discovery configs* rather than the OT values.
+
 #### `void handleSAT()`
 - **Location**: `restAPI.ino:644–821`
 - **Purpose**: Smart Ambient Temperature (SAT) control and diagnostics
@@ -234,7 +242,11 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
   - `GET /api/v2/sat/ble/discovery` — stream the BLE roster as JSON (TASK-508)
   - `POST /api/v2/sat/ble/select` — `{mac}`: promote roster MAC to active sensor
   - `POST /api/v2/sat/ble/label` — `{mac,label}`: set persistent label for a roster slot
-  - `POST /api/v2/sat/ble/forget` — `{mac}`: drop slot and clean up its HA discovery
+  - `POST /api/v2/sat/ble/bindkey` — `{mac,key}`: provision the encrypted-MiBeacon bindkey for a slot (32 hex chars, empty clears). The key is a write-only secret: validated but never logged or echoed back
+  - `POST/DELETE /api/v2/sat/ble/forget` — `{mac}`: drop slot and clean up its HA discovery
+  - `GET/PUT/POST/DELETE /api/v2/sat/ble/roster` — dedicated 8-slot roster (TASK-935). GET streams the structured roster; PUT/POST write a single slot (flat `idx` plus optional `mac`/`label`/`bindkey`, parser-free per ADR-146); DELETE clears a slot. Bindkeys are **write-only** — GET emits only `has_bindkey`, never the secret
+  - All BLE sub-routes gated on `HAS_SAT_BLE` (ESP32-S3 only); ESP8266 returns 404
+- **Test-only override**: `POST/PUT /api/v2/sat/force-boiler` — `0|1|true|false` boiler-present override so the availability gate is verifiable on the bench without a physical boiler. Transient (cleared on reboot), auth-gated, trusted-LAN only
 - **Auth**: Required (`checkHttpAuth()` at start)
 - **Extended diagnostics** (`?detail=full`):
   - Sync diagnostics (setpoint, modulation, CH mismatch)
@@ -603,10 +615,15 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 | GET | `/api/v2/sat/sensor-areas` | handleSAT | Yes | Multi-area DS18B20 mapping |
 | PATCH | `/api/v2/sat/sensor-areas` | handleSAT | Yes | Update one area→sensor mapping |
 | GET | `/api/v2/sat/weather/needs-setup` | handleSAT | Yes | Weather onboarding gate |
-| GET | `/api/v2/sat/ble/discovery` | handleSAT | Yes | BLE sensor roster (ESP32 only) |
+| GET | `/api/v2/sat/ble/discovery` | handleSAT | Yes | BLE sensor roster (ESP32-S3 only) |
 | POST | `/api/v2/sat/ble/select` | handleSAT | Yes | Promote roster slot to active BLE sensor |
 | POST | `/api/v2/sat/ble/label` | handleSAT | Yes | Set persistent label for roster slot |
-| POST | `/api/v2/sat/ble/forget` | handleSAT | Yes | Drop roster slot + HA discovery cleanup |
+| POST/PUT | `/api/v2/sat/ble/bindkey` | handleSAT | Yes | Provision encrypted-MiBeacon bindkey (write-only secret) |
+| POST/DELETE | `/api/v2/sat/ble/forget` | handleSAT | Yes | Drop roster slot + HA discovery cleanup |
+| GET/PUT/POST/DELETE | `/api/v2/sat/ble/roster` | handleSAT | Yes | 8-slot BLE roster; write-only bindkeys (TASK-935) |
+| POST/PUT | `/api/v2/sat/force-boiler` | handleSAT | Yes | Test-only transient boiler-present override |
+| POST | `/api/v2/discovery/republish` | handleDiscovery | Yes | Force full HA discovery-config re-announce |
+| POST | `/api/v2/mqtt/republish` | handleMqtt | Yes | Force full OT-value republish (TASK-936) |
 | GET | `/api/v2/debug` | handleDebugDump | No | Snapshot of all debug flags + local IP |
 | GET | `/api/v2/network/scan` | handleNetwork | No | WiFi scan for Settings page (TASK-585) |
 | OPTIONS | `/api/v2/*` | sendApiOptions | N/A | CORS preflight |
@@ -757,7 +774,7 @@ Each request generates a one-line telnet debug log when `state.debug.bRestAPI` f
 
 ## Notes
 
-- **No ArduinoJson library** (ADR-001): JSON is built manually with `snprintf_P` and streamed via `httpServer.sendContent()`
+- **No ArduinoJson library** (ADR-146, reverting ADR-141): JSON output is a hand-rolled streaming writer, `JsonEmit` (`jsonEmit.h`), used field-by-field over an `AsyncResponseStream` via `restBeginStream()` / `restFinalize()` (and `restSendChunked()`). It serialises NaN/Inf as `null` natively and never buffers a whole response. Legacy helpers still build small responses with `snprintf_P`.
 - **Backward compatibility**: v0/v1 endpoints return 410 Gone; unversioned legacy endpoints (`/api/firmwarefilelist`, `/api/listfiles`) remain in v1.4.0 for backward compatibility (scheduled removal per ADR-035)
 - **OTGW32 hardware detection**: OTDirect endpoints guarded by `#if HAS_DIRECT_OT` (OTGW32 exclusive)
 - **Cooperative scheduling**: Static buffers in `processAPI()` avoid re-entrancy issues with `feedWatchDog()` yields
@@ -772,6 +789,8 @@ Each request generates a one-line telnet debug log when `state.debug.bRestAPI` f
 - **ADR-035**: API versioning policy; v0/v1 removal roadmap
 - **ADR-050**: v2 API route dispatch table design
 - **ADR-054**: CSRF protection and auth integration
+- **ADR-146**: Streaming `JsonEmit` REST writer (no ArduinoJson) on ESP32-S3
+- **ADR-147**: ESP32-S3 platform limits and concurrent Web UI static serving (503 backpressure)
 - **Related code**: 
   - `/src/OTGW-firmware/OTGW-firmware.h` (settings, state structures)
   - `/src/OTGW-firmware/OTGW-Core.ino` (command execution)

@@ -4,7 +4,14 @@
 
 OTGW-firmware turns the NodoShop OpenTherm Gateway into a fully networked smart heating controller. It runs on the ESP8266 or ESP32 Wi-Fi microcontroller built into the OTGW device, monitors the OpenTherm communication bus between your room thermostat and your boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API.
 
-The firmware ships as a single unified codebase that targets both the ESP8266-based OTGW (NodeMCU or Wemos D1 mini variants) and the newer ESP32-based OTGW32 board. Both platforms are fully supported and build from the same source tree via PlatformIO.
+The firmware has two active lines. The 2.0.0 line (the `dev` branch documented here) is ESP32-S3 only: it is built on an async web stack plus FreeRTOS and targets the OTGW32 / OT-Thing PCB and the OTGW Classic driven by a LOLIN S3 Mini. ESP8266 is dropped on this line. The ESP8266-based OTGW (NodeMCU or Wemos D1 mini) is still supported on the 1.x maintenance / LTS line. Both lines build from the same source tree via PlatformIO.
+
+Highlights new in the 2.0.0 line:
+
+- A redesigned v2 Web UI that coexists with the classic UI, is selectable, and is mobile-friendly.
+- BLE sensor support: Xiaomi MiBeacon (including encrypted v4/v5 via a per-sensor bindkey), ATC/pvvx custom firmware, and BTHome v2.
+- A first-time-setup onboarding wizard that runs once on a fresh device and is re-runnable from Settings.
+- A unified Home Assistant heat/cool/off climate entity driven by the OpenTherm status bits.
 
 ### The OpenTherm Gateway Hardware
 
@@ -42,12 +49,12 @@ On the OTGW32 board (ESP32), the hardware includes onboard OpenTherm circuitry t
 
 - OTDirect: direct GPIO OpenTherm bus communication with five operating modes (no PIC required).
 - W5500 Ethernet with dynamic, runtime cable-detect failover between wired Ethernet and Wi-Fi (no reboot required).
-- BLE room temperature and humidity sensors: up to four Xiaomi LYWSD03MMC sensors read passively via BTHome v2 protocol.
+- BLE room temperature and humidity sensors read passively: Xiaomi MiBeacon (plaintext and encrypted v4/v5 via a per-sensor bindkey), ATC/pvvx custom firmware, and BTHome v2.
 - AP fallback mode (beta): the web UI stays reachable even when the home network is unavailable.
 
 ### What Is New in v2.0.0
 
-Version 2.0.0 is a major platform release. It ships full ESP32 and OTGW32 support alongside the established ESP8266 path, all in a single unified codebase. Settings files from v1.3.x load without modification.
+Version 2.0.0 is a major platform release. It is the ESP32-S3-only async + FreeRTOS line; ESP8266 has moved to the 1.x maintenance / LTS line. Settings files from v1.3.x load without modification.
 
 Version 2.0.0 is still in alpha at the time of writing. It is feature complete on the established functionality but receives ongoing refinement on SAT, OTDirect, and the new MQTT topic shape (see below). Track the GitHub Releases page for the current alpha tag.
 
@@ -58,7 +65,7 @@ Version 2.0.0 is still in alpha at the time of writing. It is feature complete o
 - **OTGW32 / ESP32 platform**: Native ESP32 support. The OTGW32 board combines an ESP32 with onboard OpenTherm circuitry. The PIC gateway chip is optional. Build with `pio run -e esp32`.
 - **OTDirect**: ESP32-only direct GPIO OpenTherm master/slave with five operating modes: thermostat, boiler, gateway, monitor, and a combined master+slave pair, all without a PIC co-processor.
 - **Ethernet (W5500) with runtime failover**: Wired Ethernet via W5500 SPI on the OTGW32 board. The firmware detects cable presence dynamically and switches transparently between Ethernet and Wi-Fi in both directions while running, without a reboot.
-- **BLE temperature sensors**: On ESP32, up to four Xiaomi LYWSD03MMC sensors are read passively over Bluetooth LE. Room temperature and humidity feed directly into SAT and Home Assistant.
+- **BLE temperature sensors**: On ESP32-S3, sensors are read passively over Bluetooth LE. Xiaomi MiBeacon (plaintext and encrypted v4/v5 via a per-sensor bindkey), ATC/pvvx custom firmware, and BTHome v2 are supported. Room temperature and humidity feed directly into SAT and Home Assistant.
 - **SAT (Smart Autotune Thermostat)**: A full embedded heating controller with weather-compensated PID control, multi-zone support, Summer Simmer Index, solar gain compensation, pressure monitoring, OPV calibration, and six configurable presets.
 - **Weather integration (Open-Meteo)**: Free weather API provides outdoor temperature and solar data for SAT when no local sensor is available.
 - **OLED display**: 128x64 SSD1306 I2C display on both platforms. Four information pages cover status, temperatures, network, and boiler. A button cycles pages; the display turns off automatically after a configurable timeout.
@@ -66,6 +73,8 @@ Version 2.0.0 is still in alpha at the time of writing. It is feature complete o
 - **Streaming MQTT HA discovery**: Auto-discovery payloads are now compiled into flash (PROGMEM) and published via an asynchronous, bitmap-driven drip publisher that streams each entity directly to the broker. This replaces the previous LittleFS- and RAM-staged approach, eliminating large staging buffers and improving heap stability on ESP8266. The streaming pipeline also covers SAT switches and select entities (TASK-284), runtime-discovered Dallas sensors, the climate and number entities, and HA button and select entities for PIC commands.
 - **Just-in-time MQTT discovery (ADR-100)**: Discovery configs for OpenTherm MsgIDs are now published only when the boiler or thermostat first emits that MsgID, instead of bulk-publishing all 256 IDs at every boot. This keeps the broker registry focused on the IDs your hardware actually uses and reduces start-up MQTT traffic. The handler for the `homeassistant/status` online event also no longer republishes everything; the broker retains discovery configs across HA restarts.
 - **Flat per-value MQTT topics (ADR-101)**: Each sensor or control value publishes as a plain scalar on its own topic. No aggregated JSON state topics. This is a deliberate design choice that keeps auto-discovery transparent and avoids the need for a custom HA component.
+- **Redesigned v2 Web UI**: A new, mobile-friendly web interface (`v2.html`) coexists with the classic UI and is selectable. It includes a first-time-setup onboarding wizard that runs once on a fresh device and can be re-run from Settings.
+- **Unified climate entity**: The Home Assistant climate entity now supports off / heat / cool. Its mode and action are derived from the OpenTherm status bits and published on their own topics (see Chapter 4).
 - **English-only web UI**: Leftover Dutch UI strings inherited from the OTTHING platform port have been removed. The web UI is now consistently English (TASK-569).
 - **Nightly restart scheduling**: Configurable automatic reboot at a chosen time and day to recover from heap fragmentation on long-running ESP8266 devices.
 - **Platform abstraction (boards.h)**: A new `boards.h` header defines pin maps, feature flags (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`), and hardware capabilities per board variant. This cleanly separates platform-specific configuration from application logic.
@@ -75,6 +84,8 @@ Version 2.0.0 is still in alpha at the time of writing. It is feature complete o
 - **PlatformIO build**: Unified `platformio.ini` with `esp8266` and `esp32` environments. Arduino IDE still works for ESP8266.
 
 ### Platform Comparison
+
+The 2.0.0 line runs on ESP32-S3 only. The ESP8266 column below applies to the 1.x maintenance / LTS line.
 
 | Feature | ESP8266 (NodeMCU / Wemos D1 mini) | ESP32 / OTGW32 |
 |---|---|---|

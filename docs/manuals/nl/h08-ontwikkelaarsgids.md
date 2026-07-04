@@ -227,6 +227,76 @@ Er is geen gebruikersconfiguratie vereist. `loopEthernet()` bewaakt zichzelf met
 
 ---
 
+### Build targets en boards (2.0.0)
+
+De `dev`-lijn (firmware 2.0.0) is uitsluitend ESP32-S3, gebouwd op een async + FreeRTOS-stack. ESP8266 is op deze lijn geschrapt en blijft alleen bestaan op de `otgw-1.x.x` maintenance-lijn. De hierboven beschreven dual arduino-cli/PlatformIO-aanpak en de `esp8266`-omgeving gelden voor de 1.x-lijn; op 2.0.0 verloopt de build uitsluitend via PlatformIO en is elk target een ESP32-S3.
+
+#### Vaste build targets (ADR-126)
+
+Het board wordt gekozen tijdens de compilatie. Er is geen runtime hardwaredetectie op de twee vaste single-engine targets; elk linkt precies één OpenTherm-engine. Drie omgevingen zijn gedefinieerd in `platformio.ini`:
+
+| Target (`--target`) | Hardware | OpenTherm-engine |
+|---|---|---|
+| `esp32` | OTGW32 / OT-Thing PCB | OTDirect (directe GPIO-bus) |
+| `esp32-classic` | OTGW Classic + LOLIN S3 Mini | PIC (OTGWSerial via UART) |
+| `esp32-combo` | Een van beide, boot-gedetecteerd | Beide engines ingelinkt |
+
+Bouw met de wrapper of `build.py`:
+
+```bash
+./build.sh                             # firmware + filesystem, alle drie de targets
+python build.py --target esp32         # alleen OTGW32 (OTDirect)
+python build.py --target esp32-classic # alleen S3-in-Classic-socket (PIC)
+python build.py --target esp32-combo   # alleen combo (boot-gedetecteerd)
+```
+
+`esp32` is de standaard PlatformIO-omgeving. `esp32-classic` en `esp32-combo` breiden die uit (`extends = env:esp32`) en erven het platform, board, `lib_deps` en `build_unflags`; ze overschrijven alleen `build_flags`, `lib_ignore` en (voor combo) de partitietabel.
+
+#### Combo boot-detectie (ADR-127 / ADR-158 / ADR-160)
+
+De `esp32-combo`-binary linkt beide OT-engines en kiest er één bij het opstarten. De `iBoardMode`-instelling bepaalt de modus:
+
+| `iBoardMode` | Modus | Hardware |
+|---|---|---|
+| `0` | AUTO | herprobeer PIC vs OTDirect (en S3 Mini vs S3 Mini Pro) bij boot |
+| `1` | Force PIC | LOLIN S3 Mini in de Classic-socket |
+| `2` | OTDirect | OTGW32 directe GPIO-bus |
+| `3` | Force PIC | LOLIN S3 Mini Pro in de Classic-socket |
+
+De S3 Mini Pro onderscheidt zich van de gewone S3 Mini door zijn onboard QMI8658C IMU. De Pro herbedraadt zijn Classic I2C-headers en heeft een andere Classic pin map nodig; `state.hw.bClassicPro` legt het resultaat vast. AUTO herprobeer de PIC bij elke boot: de detectie is persist-once, maar een verkeerd oordeel wordt bij de volgende boot opnieuw geëvalueerd in plaats van vastgezet.
+
+#### PSRAM
+
+Elke S3-build definieert `BOARD_HAS_PSRAM` en selecteert het `qio_qspi` memory type (`board_build.arduino.memory_type`). PSRAM wordt daarom tijdens runtime gedetecteerd, niet per board: `psramFound()` is de enige discriminator en stuurt de PSRAM-bewuste BLE-standaard aan (`bleActive()` in `SATble.ino`). Een board zonder PSRAM start netjes op (BOOT_INIT staat uit, dus `psramInit()` geeft false terug zonder abort). Een toekomstige OTGW32-revisie met PSRAM schakelt BLE automatisch in met dezelfde firmware, zonder herbouw.
+
+#### Async webstack-afstemming
+
+De async-stack vervangt het synchrone `WebServer` + `PubSubClient`-pad (ADR-123). `platformio.ini` stemt hem af in de globale `[env]`, zodat alle drie de targets de instellingen erven:
+
+- `CONFIG_ASYNC_TCP_STACK_SIZE=16384`: een gecontroleerde load-ramp A/B toonde aan dat de oude stack van 4096 bytes overliep in AsyncTCP's low-heap-opschoonpad tijdens een gelijktijdige burst, waardoor poort 80 permanent vastliep. Met 16384 overleeft de task dat pad, zodat de server herstelt zodra de belasting afneemt.
+- NimBLE is teruggebracht tot een passive-scan observer-only footprint (`ROLE_PERIPHERAL`/`BROADCASTER`/`CENTRAL_DISABLED`, één connection slot, geen bonds of CCCDs, 23-byte MTU) om intern DRAM terug te winnen. SATble scant alleen (`setActiveScan(false)`); het maakt nooit verbinding en adverteert nooit.
+
+#### Partitie-layout
+
+De ESP32-S3-partitietabel `partitions_otgw_esp32.csv` (gedeeld door `esp32` en `esp32-classic`) is een single-app (geen OTA) 4 MB-layout: een 2.375 MB app slot op `0x10000` en een 1.5 MB LittleFS (label `spiffs`) op offset `0x270000`, plus een 64 KB coredump. Het `esp32-combo`-target heeft een eigen partitietabel (`partitions_otgw_esp32_combo.csv`) omdat de binary met beide engines groter is; een eigen tabel voorkomt dat de filesystem-offset van de gedeelde tabel verschuift.
+
+#### Flashen (flash_esp.py)
+
+`flash_esp.py` leest de LittleFS-offset uit de partitie-CSV (`_read_fs_offset_from_csv()`) in plaats van die hard te coderen, zodat de flash-offset nooit kan afwijken van de firmware-build. Het detecteert de geïnstalleerde esptool-hoofdversie en kiest de bijpassende subcommandovorm: esptool v5 gebruikt het gekoppelde `write-flash`/`erase-flash`, terwijl v4 en eerder alleen de underscore-vorm accepteren. Een volledige erase van de ESP32-S3 is opt-in (`-e`), zodat een normale flash de NVS (opgeslagen WiFi-gegevens) behoudt; de merged image bevat een verse partitietabel en otadata, zodat hij toch schoon opstart. Elke build wordt gearchiveerd (bin/elf/zip) zodat een latere crash-backtrace met addr2line kan worden gedecodeerd.
+
+#### Relevante ADRs
+
+| ADR | Onderwerp |
+|-----|-----------|
+| ADR-126 | Vaste build targets (geen runtime hardwaredetectie) |
+| ADR-158 | LOLIN S3 Mini Pro Classic-variant (IMU-gedetecteerd) |
+| ADR-160 | Combo AUTO herprobeer (persist-once, opnieuw evalueren bij boot) |
+| ADR-130 | PIC-UART FreeRTOS-task |
+| ADR-146 | Streaming JsonEmit-writer (ArduinoJson verwijderd) |
+| ADR-147 / ADR-149 | Async static-serve config en LWIP TCP-pcb-limieten |
+
+---
+
 ### 8.4 C4-architectuuroverzicht
 
 De firmware gebruikt een vierniveau C4-model, gedocumenteerd in `docs/c4/`. Lees het relevante niveau voordat je code aanraakt.

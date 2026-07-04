@@ -339,6 +339,13 @@ Apparaatinformatie opvragen (firmware, hardware, netwerk). Geen authenticatie ve
     "ipaddress": "192.168.1.100",
     "macaddress": "AA:BB:CC:DD:EE:FF",
     "ssid": "MijnWifiNetwerk",
+    "psram_found": 1,
+    "psram_size": 2097152,
+    "psram_free": 2000000,
+    "flash_size": 8388608,
+    "internal_free": 180000,
+    "internal_maxblk": 110000,
+    "chip_model_est": "ESP32-S3FH4R2",
     "picavailable": true,
     "otgwconnected": true,
     "otcommandinterface": true,
@@ -346,6 +353,8 @@ Apparaatinformatie opvragen (firmware, hardware, netwerk). Geen authenticatie ve
   }
 }
 ```
+
+De ESP32-S3 chip- en geheugenvelden voeden het Debug-scherm (alle integers, bytes tenzij anders vermeld): `psram_found` (`1` als PSRAM aanwezig is, `0` als afwezig), `psram_size` (totale PSRAM, 0 indien afwezig), `psram_free` (vrije PSRAM), `flash_size` (grootte flash-chip), `internal_free` (vrij intern, niet-PSRAM heap), `internal_maxblk` (grootste vrije interne heap-blok) en `chip_model_est` (string; best-effort ESP32-S3 package-onderdeelnummer afgeleid uit flash + PSRAM, bijvoorbeeld `"ESP32-S3FH4R2"`, of `"ESP32-S3FN8"` zonder PSRAM).
 
 Op OTGW32-hardware: het veld `otdirectavailable` is `true` en aanvullende `otd*`-velden zijn aanwezig (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`).
 
@@ -471,6 +480,8 @@ Buitentemperatuur aanleveren vanuit een externe bron. Overschrijft de OT MsgID 2
 | POST | `/api/v2/sat/ble/select` | BLE-sensor selecteren via `{"mac": "..."}` (alleen ESP32) |
 | POST | `/api/v2/sat/ble/label` | BLE-sensorlabel zetten via `{"mac": "...", "label": "..."}` (alleen ESP32) |
 | POST / DELETE | `/api/v2/sat/ble/forget` | BLE-roster-slot wissen via `{"mac": "..."}` (alleen ESP32) |
+| POST / PUT | `/api/v2/sat/ble/bindkey` | Encrypted-MiBeacon bindkey per sensor zetten via `{"mac": "...", "key": "<32 hex>"}` (alleen ESP32). Als het MAC-adres nieuw is wordt er een roster-slot voor toegewezen; een lege `key` wist de opgeslagen bindkey. De bindkey is een **alleen-schrijven geheim**: gevalideerd (leeg of exact 32 hex-tekens, anders 400), nooit gelogd, nooit teruggegeven (roster/discovery tonen alleen een `has_bindkey`/`has_key`-boolean). HTTP 507 wanneer de roster vol is. |
+| POST / PUT | `/api/v2/sat/ble/rescan` | Zonder body: een actieve-scan-burst starten om geadverteerde namen te verversen (alleen ESP32). |
 
 ##### POST /api/v2/sat/settings/{naam}
 
