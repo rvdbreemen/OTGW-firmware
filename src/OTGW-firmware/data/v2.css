@@ -7,7 +7,9 @@
   --bg:var(--bg-app);
   --panel:var(--bg-surface);
   --panel-2:var(--brand-faint);
-  --nav:var(--brand-cyan);
+  --nav:#383838;   /* TASK-999: dark header/nav strip in BOTH themes (matches the design's
+                      #383838 header) so the 1a accent underline reads in light mode too;
+                      header text is already #fff on --nav, so no other change is needed. */
   --text:var(--fg-2);
   --muted:var(--fg-4);
   --border:var(--border-1);
