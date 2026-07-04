@@ -23,6 +23,10 @@ on:
       - "tests/test_adr_governance.py"
       - ".github/workflows/adr-governance.yml"
 
+# Least-privilege token: this workflow only reads the checkout and runs Python.
+permissions:
+  contents: read
+
 jobs:
   adr-governance:
     name: ADR lint + index-check
