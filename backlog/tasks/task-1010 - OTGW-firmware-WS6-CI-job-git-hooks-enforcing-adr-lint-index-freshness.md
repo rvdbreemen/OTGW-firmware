@@ -1,10 +1,10 @@
 ---
 id: TASK-1010
 title: 'OTGW-firmware WS6: CI job + git hooks enforcing adr lint + index freshness'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-04 16:31'
-updated_date: '2026-07-04 16:46'
+updated_date: '2026-07-04 16:48'
 labels:
   - adr-kit
   - governance
@@ -34,3 +34,9 @@ Reconcile with TASK-422 (adr-lint CLI for CI): WS6 is the OTGW-firmware side of 
 
 Repo-local realization landed (proof of WS6): scripts/adr_governance.py (lint/index-check/doctor), tests/test_adr_governance.py (10 tests, fire-on-drift + live-tree guards), .github/workflows/adr-governance.yml (PR gate on docs/adr/**). Live tree is green: lint 0/0, index-check 0 fail, index completed (added 24 previously-missing ADRs 91-120). Pre-commit already runs adr-kit; swap the repo-local CLI for the adr-kit adr-lint CLI when TASK-422 ships.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Delivered repo-local (WS6): scripts/adr_governance.py + tests/test_adr_governance.py + .github/workflows/adr-governance.yml. CI job 'ADR lint + index-check' is GREEN on PR #670 (lint --strict + index-check + 10 unit tests). Live docs/adr tree is lint-clean and fully indexed (164 ADRs). Follow-up: swap the repo-local CLI for the adr-kit adr-lint CLI (TASK-422) and add index-check to the pre-commit hook (adr-kit ADR check already runs there).
+<!-- SECTION:FINAL_SUMMARY:END -->
