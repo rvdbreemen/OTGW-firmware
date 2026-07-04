@@ -12,17 +12,17 @@ Architecture Decision Records capture important architectural decisions along wi
 
 - [Platform & Build System](#platform-and-build-system) (5 ADRs)
 - [Network & Security](#network-and-security) (7 ADRs)
-- [Memory Management](#memory-management) (12 ADRs)
-- [Integration & Communication](#integration-and-communication) (9 ADRs, plus MQTT subsection of 18)
-- [System Architecture](#system-architecture) (26 ADRs)
+- [Memory Management](#memory-management) (13 ADRs)
+- [Integration & Communication](#integration-and-communication) (9 ADRs, plus MQTT subsection of 32)
+- [System Architecture](#system-architecture) (27 ADRs)
 - [Hardware & Reliability](#hardware-and-reliability) (8 ADRs)
 - [Development & Build](#development-and-build) (6 ADRs)
 - [Core Services](#core-services) (6 ADRs)
 - [Features & Extensions](#features-and-extensions) (10 ADRs)
-- [Browser & Client](#browser-and-client-compatibility) (6 ADRs)
+- [Browser & Client](#browser-and-client-compatibility) (7 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
-- [OTGW32 & Dual Platform](#otgw32-and-dual-platform) (12 ADRs)
-- [SAT Subsystem](#sat-subsystem) (12 ADRs)
+- [OTGW32 & Dual Platform](#otgw32-and-dual-platform) (15 ADRs)
+- [SAT Subsystem](#sat-subsystem) (16 ADRs)
 - [ADR Governance](#adr-governance) (1 ADR)
 
 Counts above are advisory rather than hand-maintained; the canonical set is the per-section listing below.
@@ -115,6 +115,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-146: Revert ADR-141 — remove ArduinoJson, return to a hand-rolled streaming JSON writer (JsonEmit) on the ESP32-S3 REST path](ADR-146-revert-adr141-streaming-jsonemit-rest-esp32s3.md)** 🆕 *(Supersedes ADR-141, ADR-145)*  
   Accepted. Reverts ADR-141 and ADR-145: removes ArduinoJson and returns to a hand-rolled streaming JSON writer (JsonEmit) on the ESP32-S3 REST path.
 
+- **[ADR-107: Emergency Heap Recovery Actions (2.0.0 platform variant)](ADR-107-emergency-heap-recovery-actions.md)** 🆕  
+  Defines what `emergencyHeapRecovery()` does at HEAP_CRITICAL on the 2.0.0 platform: a rate-limited scheduler `yield()` for SDK free-pool housekeeping.
+
 ### Integration and Communication
 
 - **[ADR-005: WebSocket for Real-Time Streaming](ADR-005-websocket-real-time-streaming.md)**  
@@ -200,6 +203,48 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-142: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List](ADR-142-ha-discovery-mark-unavailable-unsupported-msgids.md)** 🆕 *(Proposed)*  
   Marks HA discovery entities for MsgIDs the boiler does not support as unavailable via an availability list, instead of advertising dead entities.
 
+- **[ADR-094: Home Assistant Discovery State Reconciliation on OTA Upgrade (feature-2.0.0 port of ADR-067)](ADR-094-ha-discovery-state-reconciliation-on-ota-upgrade.md)** 🆕  
+  Guideline-level per ADR-080. Per-device, firmware-driven removal of stale retained HA discovery configs across an OTA firmware transition; complements ADR-093's per-entity user-driven removal.
+
+- **[ADR-095: bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive (feature-2.0.0 port of ADR-068)](ADR-095-bseparatesources-mutually-exclusive-base-and-source-variants.md)** *(Superseded by ADR-097)*  
+  Flipped `bSeparateSources` from additive to mutually-exclusive base-vs-source entities to end duplicate HA entities; superseded by ADR-097.
+
+- **[ADR-096: MQTT Source-Subtopic Worldview Semantics](ADR-096-mqtt-source-topic-worldview-semantics.md)** *(Superseded by ADR-103)*  
+  Adopts the worldview model (each source subtopic shows what that device sees); superseded by ADR-103, which adds the proxy-answer (no-B) routing case.
+
+- **[ADR-098: MQTT Discovery Topic Sibling-Suffix Shape (Supersedes ADR-097)](ADR-098-mqtt-discovery-topic-sibling-suffix-shape.md)** 🆕  
+  Discovery topic identifiers adopt the sibling-suffix shape to satisfy HA's `discovery.py` TOPIC_MATCHER; supersedes ADR-097's nested-discovery carve-out.
+
+- **[ADR-099: HA Discovery Friendly-Name Format](ADR-099-ha-discovery-friendly-name-format.md)** 🆕  
+  Drops the hostname prefix and renders human-readable entity names (spaces, consistent acronym casing) instead of raw internal identifiers.
+
+- **[ADR-100: JIT HA Discovery with Smart Reconnect (Port of dev ADR-073)](ADR-100-jit-ha-discovery-smart-reconnect.md)** 🆕  
+  Stops the bulk republish of all 256 configs at every boot/reconnect; republishes only after an offline-threshold reconnect (broker-restart heuristic).
+
+- **[ADR-103: MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement](ADR-103-mqtt-source-topic-proxy-answer-routing.md)** 🆕 *(Supersedes ADR-096)*  
+  Distinguishes a proxy-answer `A` (no preceding `B`) from an answer-override `A`; a proxy `A` publishes to canonical, `_boiler`, and `_thermostat`. Supersedes ADR-096.
+
+- **[ADR-104: MQTT Status Fan-Out — Drop Global Rate-Gate, Keep Per-Slot Heartbeat (2.0.0)](ADR-104-mqtt-status-fanout-drop-global-rate-gate.md)** 🆕  
+  Removes the 250 ms global publish rate-gate that starved status slots; keeps the per-slot 60 s heartbeat with immediate change-detect publishing.
+
+- **[ADR-105: MQTT — Publish HA-Core-Style Self-Describing Aliases for Capability, State, Type, and Fault Bits under `settings.mqtt.bPublishHaCoreAliases`](ADR-105-mqtt-ha-core-capability-flag-aliases.md)** *(Superseded by ADR-106)*  
+  Default-off dual-publish of HA-core-style alias topics alongside OT-spec labels; superseded by ADR-106's mutually-exclusive naming toggle.
+
+- **[ADR-106: MQTT Topic Naming Mode — New Self-Describing Names by Default, Legacy OT-Spec Names via `settings.mqtt.bUseLegacyOtTopics` (Mutually Exclusive)](ADR-106-mqtt-topic-naming-mode-new-default-legacy-toggle.md)** 🆕  
+  Self-describing topic labels become the 2.0.0 default; `settings.mqtt.bUseLegacyOtTopics` flips back to legacy OT-spec names (mutually exclusive, breaking change).
+
+- **[ADR-108: MQTT connect() Socket Timeout Accepted as Known Main-Loop Sync-Blocker (2.0.0)](ADR-108-mqtt-connect-socket-timeout-as-accepted-sync-blocker.md)** *(Superseded by ADR-131)*  
+  Accepted PubSubClient's synchronous `connect()` bounded by `setSocketTimeout(5)`; superseded by ADR-131 after espMqttClient made connect async.
+
+- **[ADR-112: Pure JIT MQTT Discovery (2.0.0 sibling of dev ADR-073)](ADR-112-pure-jit-mqtt-discovery.md)** 🆕  
+  Removes the remaining `markAllMQTTConfigPending()` boot/reconnect paths so discovery is emitted strictly just-in-time per observed MsgID.
+
+- **[ADR-116: MQTT On-Change Publishing as the Default with One-Time Interval Migration](ADR-116-mqtt-on-change-publishing-default.md)** 🆕  
+  Makes on-change publishing the default with a one-time migration of the legacy fixed-interval setting.
+
+- **[ADR-118: Surface Gateway Overrides as Distinct Override State](ADR-118-surface-gateway-overrides-as-distinct-override-state.md)** 🆕  
+  Publishes user-injected gateway overrides (`OT=`/`TT=`/`SW=`/`MM=`) to a distinct override topic so they stay visible even though the worldview gate keeps them out of canonical.
+
 ### System Architecture
 
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
@@ -279,6 +324,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-144: Move the AsyncTCP service task to core 0 (amend ADR-139's core-1 pin)](ADR-144-asynctcp-task-core-affinity-move-to-core-0.md)** *(Rejected)*  
   Rejected (2026-06-18). Proposed moving the AsyncTCP service task from core 1 to core 0 (amend ADR-139) to fix an under-load TWDT reboot; rejected after on-device testing. Kept for the decision trail.
+
+- **[ADR-109: ESP32 REST Response Coalescing Buffer](ADR-109-esp32-rest-response-coalescing-buffer.md)** *(Superseded by ADR-132)*  
+  Coalescing buffer on the synchronous ESP32 WebServer to cut REST chunk latency; obsolete once ESP8266 was dropped and the web stack moved to ESPAsyncWebServer. Superseded by ADR-132.
 
 ### Hardware and Reliability
 
@@ -398,6 +446,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-155: v2 Web UI Connectivity Model — Two-Link OT Bus, MODE Separated from HEALTH, Five-State Vocabulary](ADR-155-v2-webui-connectivity-two-link-ot-bus.md)** 🆕 *(Accepted)*  
   Accepted (2026-06-26), structural (ADR-080: no automated gate). The v2 Web UI models the OT bus as two independent links (thermostat vs boiler) instead of a single `bOnline` flag, renders gateway MODE (gateway/monitor) as a separate blue chip never a green/red health light, and uses one five-state-plus-mode vocabulary (connected/degraded/disconnected/off/unknown) everywhere as colour+icon+text. Firmware `/api/v2/health` gains `thermostatconnected`/`boilerconnected`/`otcommandinterface`/`otgwmode` additively (mirroring `/device/info`); on OT-Direct hardware the UI falls back to `bOnline` for both links since OTDirect does not populate the sub-states. Implemented alpha.268/alpha.274 (TASK-933). Complements ADR-152 (v2 Web UI); REST/UI counterpart to ADR-084 (OT-bus state MQTT topics); depends on ADR-031 (two-MCU).
 
+- **[ADR-091: Design-System Class Drift Gated by evaluate.py](ADR-091-design-system-class-drift-gated-by-evaluate-py.md)** 🆕  
+  Promotes the design-system class-drift detector into `evaluate.py` so HTML/JS class names emitted without a matching `components.css`/`ds-tokens.css` selector fail the gate (WARN→FAIL, TASK-480).
+
 ### OTA and Firmware Updates
 
 - **[ADR-029: Simple XHR-Based OTA Flash (KISS Principle)](ADR-029-simple-xhr-ota-flash.md)** 🆕  
@@ -444,6 +495,15 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-164: Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)](ADR-164-combo-auto-board-detect-persist-once-supersedes-adr160.md)** 🆕 *(Accepted)*  
   Accepted (2026-07-04). Combo AUTO detection persists its PIC verdict once (with a 3x `detectPIC` retry) instead of re-probing every boot; supersedes ADR-160's never-persist rule after it hung boot on-device and was reverted to persist-once. Related to ADR-126, ADR-127, ADR-158.
 
+- **[ADR-113: Hardware-Type as Codepath-Selection Contract](ADR-113-hardware-type-codepath-selection-contract.md)** 🆕  
+  Guideline-level (ADR-080). `hardware_type` selects code paths (deprecating `picavailable`); amended by ADR-125 so the combo board resolves it at boot detection (runtime).
+
+- **[ADR-114: OLED Runtime Detection Decoupled from the Board Flag](ADR-114-oled-runtime-detection-decoupled-from-board-flag.md)** 🆕  
+  Guideline-level (ADR-080). Removes the `HAS_OLED_CAPABLE` compile gate around the OLED path in favour of a runtime I2C probe, so one binary drives boards with or without an OLED.
+
+- **[ADR-120: Platform Abstraction Headers Promoted to the src/libraries/Platform Library](ADR-120-platform-abstraction-promoted-to-library.md)** 🆕  
+  Moves the `platform*.h` abstraction headers into a dedicated `src/libraries/Platform` library; extends ADR-061/ADR-115's abstraction-file organization.
+
 ### SAT Subsystem
 
 - **[ADR-085: SAT (Smart Autotune Thermostat) Integration](ADR-085-sat-smart-autotune-thermostat-integration.md)** 🆕  
@@ -481,6 +541,18 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-162: Sanctioned SAT Force-Boiler Test Hook in Production Firmware](ADR-162-sat-force-boiler-test-hook.md)** 🆕 *(Accepted)*  
   Proposed. A sanctioned SAT force-boiler test hook shipped in production firmware for bench/emulator validation (option A from the SAT sim options analysis).
+
+- **[ADR-092: Adopt NimBLE-Arduino over Bluedroid for SAT BLE Scanner](ADR-092-adopt-nimble-arduino-over-bluedroid-for-sat-ble-scanner.md)** 🆕  
+  Switches the SAT BLE temperature-sensor scanner from the Bluedroid-based Arduino BLE library to NimBLE-Arduino, saving roughly 400 KB of flash on the ESP32-S3.
+
+- **[ADR-110: SAT PV-Surplus Setpoint Boost](ADR-110-sat-pv-surplus-setpoint-boost.md)** 🆕  
+  Adds a solar-PV-surplus setpoint boost to the SAT controller (TASK-640).
+
+- **[ADR-111: SAT MQTT Publish — On-Change + Jittered Heartbeat](ADR-111-sat-mqtt-publish-on-change-and-jittered-heartbeat.md)** 🆕  
+  Replaces unconditional per-cycle publishing of the ~74 `sat/*` topics with change-detection plus a jittered heartbeat to cut MQTT chatter.
+
+- **[ADR-117: SAT Simulation Contract — Bus Isolation, Boiler-Absence Availability, Command Trace](ADR-117-sat-simulation-contract.md)** 🆕  
+  Defines the SAT simulation-mode contract: OT-bus isolation, boiler-absence availability handling, and a command trace for bench/emulator validation.
 
 ### ADR Governance
 
