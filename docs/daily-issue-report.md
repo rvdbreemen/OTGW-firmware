@@ -1,3 +1,28 @@
+# Daily Issue Report — 2026-07-04
+
+**Generated:** 2026-07-04 07:09 UTC
+**Window:** Last 24 hours (since 2026-07-03 07:09 UTC)
+
+## GitHub Issues
+
+**Repository:** rvdbreemen/OTGW-firmware
+**Result:** No open issues updated in the last 24 hours.
+
+## Tweakers Forum (GoT thread #1653967)
+
+**Feed fetched:** 2026-07-04 07:09 UTC
+**Exclusions:** Posts by `number3` (maintainer) and `rvdbreemen` are excluded.
+
+**Result:** No new user posts in the last 24 hours.
+
+Most recent non-excluded activity: tjanssen on 2026-07-01 requested an HA auto-discovery uptime sensor (after recurring disconnects); `number3` acknowledged on 2026-07-01 — uptime is already on MQTT, HA auto-discovery sensor planned for next beta.
+
+## Summary
+
+**No new issues in the last 24 hours.**
+
+---
+
 # Daily Issue Report — 2026-07-03
 
 **Generated:** 2026-07-03 07:09 UTC  
