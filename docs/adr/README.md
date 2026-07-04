@@ -21,7 +21,7 @@ Architecture Decision Records capture important architectural decisions along wi
 - [Features & Extensions](#features-and-extensions) (10 ADRs)
 - [Browser & Client](#browser-and-client-compatibility) (6 ADRs)
 - [OTA & Updates](#ota-and-firmware-updates) (2 ADRs)
-- [OTGW32 & Dual Platform](#otgw32-and-dual-platform) (11 ADRs)
+- [OTGW32 & Dual Platform](#otgw32-and-dual-platform) (12 ADRs)
 - [SAT Subsystem](#sat-subsystem) (12 ADRs)
 - [ADR Governance](#adr-governance) (1 ADR)
 
@@ -438,8 +438,11 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-158: Combo board: add the LOLIN S3 Mini Pro as a third boot-detected Classic variant](ADR-158-combo-s3-mini-pro-classic-variant-boot-detection.md)** 🆕 *(Accepted)*  
   Accepted (2026-06-29). Adds the LOLIN S3 Mini Pro as a third boot-detected Classic variant on the combo board. Amends ADR-127; field verification on real hardware pending.
 
-- **[ADR-160: Combo board: AUTO hardware detection re-probes every boot and never persists its verdict](ADR-160-combo-auto-board-detect-per-boot-no-persist.md)** 🆕 *(Proposed)*  
-  Proposed. Combo-board AUTO hardware detection re-probes every boot and never persists its verdict. Amends ADR-127.
+- **[ADR-160: Combo board: AUTO hardware detection re-probes every boot and never persists its verdict](ADR-160-combo-auto-board-detect-per-boot-no-persist.md)** *(Superseded by ADR-164)*  
+  Superseded by ADR-164. Combo-board AUTO detection was specified to re-probe every boot and never persist its verdict; that never-persist rule was reverted to persist-once in shipped code (see ADR-164). Amends ADR-127.
+
+- **[ADR-164: Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)](ADR-164-combo-auto-board-detect-persist-once-supersedes-adr160.md)** 🆕 *(Accepted)*  
+  Accepted (2026-07-04). Combo AUTO detection persists its PIC verdict once (with a 3x `detectPIC` retry) instead of re-probing every boot; supersedes ADR-160's never-persist rule after it hung boot on-device and was reverted to persist-once. Related to ADR-126, ADR-127, ADR-158.
 
 ### SAT Subsystem
 

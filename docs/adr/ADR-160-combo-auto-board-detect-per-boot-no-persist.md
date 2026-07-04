@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-06-29.
+Superseded by [ADR-164](ADR-164-combo-auto-board-detect-persist-once-supersedes-adr160.md), 2026-07-04. (Originally Proposed 2026-06-29.) The never-persist rule below was implemented (TASK-947) and did not survive the hardware boot order: the follow-up fix hung boot on-device and was reverted (`d7a34f4ad`) to persist-once with a 3x `detectPIC()` retry. ADR-164 records the persist-once decision that shipped. This status line is the sanctioned immutability exception (body below unedited).
 
 Amends ADR-127 (combo ESP32-S3 single binary, runtime PIC/OTDirect boot
 detection). ADR-127 stays in force; this ADR corrects one specific behaviour of
