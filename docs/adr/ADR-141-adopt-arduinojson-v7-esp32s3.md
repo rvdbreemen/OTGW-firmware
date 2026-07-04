@@ -1,7 +1,7 @@
 ---
 id: ADR-141
 title: Adopt ArduinoJson v7 for JSON on the ESP32-S3 2.0.0 line
-status: Accepted
+status: Superseded by ADR-146
 date: 2026-06-15
 tags: [json, arduinojson, mqtt, ha-discovery, rest, esp32s3, memory]
 supersedes: [ADR-042]
@@ -13,6 +13,8 @@ deciders: [Robert van den Breemen]
 # ADR-141: Adopt ArduinoJson v7 for JSON on the ESP32-S3 2.0.0 line
 
 ## Status
+
+**Superseded by [ADR-146](ADR-146-revert-adr141-streaming-jsonemit-rest-esp32s3.md) (Accepted 2026-06-19):** the ArduinoJson v7 adoption recorded below was reverted after field validation (alpha.216-220). ArduinoJson was removed from the firmware entirely and the REST JSON path returned to the hand-rolled streaming writer `jsonEmit.h`. ADR-042's no-ArduinoJson stance is back in force, enforced by `evaluate.py::check_no_arduinojson`. Only the REST path ever migrated; the MQTT HA-discovery writer never adopted ArduinoJson. The text below is retained immutable as the original decision of record (sanctioned immutability exception).
 
 Accepted, 2026-06-15 (Proposed 2026-06-15; accepted by the maintainer 2026-06-15).
 **Supersedes ADR-042** (Streaming JSON I/O — No ArduinoJson). ADR-042 stays immutable;

@@ -137,6 +137,13 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "macaddress": "AA:BB:CC:DD:EE:FF",
     "freeheap": 25600,
     "maxfreeblock": 20480,
+    "psram_found": 1,
+    "psram_size": 2097152,
+    "psram_free": 2000000,
+    "flash_size": 8388608,
+    "internal_free": 180000,
+    "internal_maxblk": 110000,
+    "chip_model_est": "ESP32-S3FH4R2",
     "chipid": "1A2B3C",
     "coreversion": "3.1.2",
     "sdkversion": "2.2.2",
@@ -192,6 +199,15 @@ The `board`, `hardwaremode`, and `networkmode` fields indicate the hardware plat
 - `networkmode`: `"wifi"`, `"ethernet"`, or `"ap"` (AP fallback mode)
 
 The `otd*` fields are only present when `otdirectavailable` is `true` (OTGW32 builds). On standard ESP8266+PIC builds, only `otdirectavailable: false` is included.
+
+The ESP32-S3 chip/memory fields feed the Debug screen (all integers, bytes unless noted):
+- `psram_found`: `1` when PSRAM is present, `0` when absent
+- `psram_size`: total PSRAM size (0 when absent)
+- `psram_free`: free PSRAM
+- `flash_size`: flash chip size
+- `internal_free`: free internal (non-PSRAM) heap
+- `internal_maxblk`: largest free internal (non-PSRAM) heap block
+- `chip_model_est`: best-effort ESP32-S3 package part number extrapolated from flash + PSRAM (string, e.g. `"ESP32-S3FH4R2"`, or `"ESP32-S3FN8"` when no PSRAM)
 
 #### `GET /api/v2/device/time`
 
@@ -289,7 +305,7 @@ Update a single device setting.
 - `401` - Authentication required
 - `403` - CSRF protection: invalid origin
 
-**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttonchangepublishing`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satpwmautoswitch`
+**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttonchangepublishing`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`, `ui_onboarded`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satpwmautoswitch`, `satbleriskack`
 
 **Nightly restart settings**:
 
@@ -1116,8 +1132,10 @@ The `/v2/sat/ble/*` family is only mounted on ESP32 builds (TASK-508). On ESP826
 - `POST /api/v2/sat/ble/select` — body `{"mac":"AA:BB:CC:DD:EE:FF"}`; promote a roster MAC to the active sensor slot.
 - `POST /api/v2/sat/ble/label` — body `{"mac":"...","label":"Living room"}`; set the persistent label.
 - `POST | PUT | DELETE /api/v2/sat/ble/forget` — body `{"mac":"..."}`; drop the slot and unpublish its HA discovery config.
+- `POST | PUT /api/v2/sat/ble/bindkey`: body `{"mac":"...","key":"<32 hex>"}`; set the per-sensor encrypted-MiBeacon bindkey. If the MAC is new a roster slot is allocated for it; an empty `key` clears the stored bindkey. The **bindkey is a write-only secret**: validated (empty or exactly 32 hex chars, else `400`), never logged, never echoed back. `507` when the roster is full and no slot can be allocated.
+- `POST | PUT /api/v2/sat/ble/rescan`: no body; trigger an on-demand active-scan burst to refresh advertised names.
 
-All four return `{"status":"ok"}` on success. `404` is returned when the MAC is not present in the roster.
+`select`, `label`, and `forget` return `{"status":"ok"}` on success and `404` when the MAC is not present in the roster. `bindkey` and `rescan` return `{"status":"ok"}` on success.
 
 #### `GET | PUT | POST | DELETE /api/v2/sat/ble/roster` (ESP32 only)
 
@@ -1126,7 +1144,7 @@ Structured 8-slot BLE roster CRUD (TASK-935/946), gated on `HAS_SAT_BLE`. On bui
 **Authentication**: Required (when password is configured)
 
 - **GET** returns `{"count":int, "name_prefix":string, "name_filter_ingest":bool, "slots":[{"idx":0-7, "mac":string, "label":string, "has_bindkey":bool}, ... 8 entries]}`. The per-slot **bindkey is write-only** — GET emits only `has_bindkey` (bool), never the secret value.
-- **PUT** / **POST** write a single slot. Params (query or body): `idx` (required, integer 0-7; non-numeric → `400`), `mac` (optional, empty or 17-char colon-hex `AA:BB:CC:DD:EE:FF` → else `400`), `label` (optional free text), `bindkey` (optional, empty or exactly 32 hex chars → else `400`). At least one of `mac`/`label`/`bindkey` is required (else `400`). Response `200 {"status":"ok","idx":N,"has_bindkey":bool}` (no user text echoed).
+- **PUT** / **POST** write a single slot. Params (query or body): `idx` (required, integer 0-7; non-numeric → `400`), `mac` (optional, empty or 17-char colon-hex `AA:BB:CC:DD:EE:FF` → else `400`), `label` (optional free text), `bindkey` (optional, empty or exactly 32 hex chars, else `400`). At least one of `mac`/`label`/`bindkey` is required (else `400`). Response `200 {"status":"ok","idx":N,"has_bindkey":bool}` (no user text echoed).
 - **DELETE** clears a slot. Param `idx` (required 0-7). Response `200 {"status":"cleared"}`.
 
 ---

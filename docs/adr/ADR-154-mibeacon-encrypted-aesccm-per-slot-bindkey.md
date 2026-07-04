@@ -9,7 +9,7 @@
 
 ## Status
 
-Proposed, 2026-06-25. Authored from TASK-930 Phase 2 (the gated half ADR-153 deferred,
+Accepted, 2026-07-04 (Proposed 2026-06-25; accepted by the maintainer Robert van den Breemen 2026-07-04 after verifying the encrypted MiBeacon AES-CCM decrypt and per-slot bindkey are implemented in `SATble.ino`, and the host known-answer test `scripts/test_mibeacon_decrypt.py` is present). Authored from TASK-930 Phase 2 (the gated half ADR-153 deferred,
 unblocked by maintainer approval 2026-06-25). Guideline-level per ADR-080: no automated
 CI gate on the runtime path (decoding a real encrypted sensor is hardware-observable),
 BUT the decrypt recipe is pinned by a host known-answer test (`scripts/test_mibeacon_decrypt.py`)

@@ -304,6 +304,22 @@ Er worden twee climate-entiteiten gepubliceerd:
 
 Als SAT is ingeschakeld, is de thermostaat-climate de SAT-gestuurde variant, met ondersteuning voor modus- en preset-keuze.
 
+##### HVAC mode en action (off / heat / cool)
+
+De thermostaat-climate-entiteit ondersteunt de HVAC-modi `off`, `heat` en `cool`. De firmware berekent twee waarden uit de OpenTherm-statusbits en publiceert ze op eigen topics:
+
+```
+<pub>/hvac_mode     →  off | heat | cool
+<pub>/hvac_action   →  off | idle | heating | cooling
+```
+
+- `hvac_mode` volgt de master (thermostaat) enable-bits: het weerspiegelt de staande intentie van de thermostaat. Het is `off` als er geen thermostaat verbonden is, `cool` als de cooling-enable-bit van de master gezet is, en anders `heat`. Een verwarmingsthermostaat blijft `heat`, ook als hij tussen warmtevragen door idle is.
+- `hvac_action` volgt de slave (ketel) actual-bits: `cooling` als de cooling-bit gezet is, `heating` als de centrale-verwarming-bit gezet is, anders `idle`, en `off` als er geen thermostaat verbonden is.
+
+De modus is reflectief: de firmware weerspiegelt de status, hij stuurt de thermostaat niet aan. De thermostaat bepaalt zelf het schakelen tussen heat en cool. Let op: `hvac_action` wordt afgeleid uit de centrale-verwarming- en cooling-statusbits, niet uit de vlam, zodat een warmwater-tapping niet als heating wordt gelezen.
+
+Beide waarden worden ook als twee zelfstandige, discoverable Home Assistant-sensoren blootgesteld (`hvac_mode` en `hvac_action`). Ze worden bij de eerste boot automatisch aangemeld, naast de andere niet-OT-entiteiten, zodat ze ook verschijnen als u de climate-entiteit zelf niet gebruikt.
+
 #### Number-entiteit
 
 Voor het overschrijven van de buitentemperatuur wordt een number-entiteit gepubliceerd; hiermee kan Home Assistant een waarde pushen alsof die van een bekabelde buitensensor komt.
@@ -321,6 +337,8 @@ OTGW/value/<uniqueId>/sat/ble/<mac>/{temp,rh,bat,rssi}
 ```
 
 Het MAC-adres staat als 12 kleine hex-tekens zonder scheidingstekens (bijv. `a4c138123456`). Discovery gebeurt eenmaal per MAC per sessie. De vier entiteiten worden gegroepeerd onder één HA-apparaat met `model: "BLE Sensor"` en `via_device: <uniqueId>`.
+
+Elke BLE-probe verschijnt als een apart Home Assistant child-device, gekoppeld aan het hoofd-OTGW-apparaat via `via_device` (ADR-148). Dit is de enige uitzondering op de single-device-topologie (ADR-140): elke niet-BLE-entiteit blijft binnen het ene OTGW-apparaat, en alleen BLE-probes worden afgesplitst naar hun eigen child-device zodat elke fysieke sensor als eigen apparaat in Home Assistant zichtbaar is.
 
 #### SAT-switches en -select (nieuw in 2.0.0)
 

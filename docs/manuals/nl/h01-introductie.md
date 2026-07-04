@@ -4,7 +4,14 @@
 
 OTGW-firmware is de open-source firmware voor de NodoShop OpenTherm Gateway (OTGW). De firmware draait op een ESP8266 of ESP32 Wi-Fi-microcontroller op het OTGW-printje en verbindt de OpenTherm verwarmingsbus in uw woning met uw thuisnetwerk, een domotica-platform en een webbrowser.
 
-De firmware wordt geleverd als een enkele, uniforme codebase die zowel de ESP8266-gebaseerde OTGW (NodeMCU of Wemos D1 mini) als het nieuwere ESP32-gebaseerde OTGW32-printje ondersteunt. Beide platformen worden volledig ondersteund en gebouwd vanuit dezelfde broncode via PlatformIO.
+De firmware kent twee actieve lijnen. De 2.0.0-lijn (de `dev`-branch die hier beschreven wordt) is uitsluitend voor de ESP32-S3: hij is gebouwd op een async web stack plus FreeRTOS en richt zich op het OTGW32 / OT-Thing-printje en de OTGW Classic aangestuurd door een LOLIN S3 Mini. ESP8266 is op deze lijn vervallen. De ESP8266-gebaseerde OTGW (NodeMCU of Wemos D1 mini) wordt nog ondersteund op de 1.x maintenance / LTS-lijn. Beide lijnen worden gebouwd vanuit dezelfde broncode via PlatformIO.
+
+Nieuw in de 2.0.0-lijn:
+
+- Een herontworpen v2 Web UI die naast de klassieke UI bestaat, selecteerbaar is en mobielvriendelijk.
+- BLE-sensorondersteuning: Xiaomi MiBeacon (inclusief encrypted v4/v5 via een per-sensor bindkey), ATC/pvvx custom firmware, en BTHome v2.
+- Een first-time-setup onboarding wizard die eenmalig draait op een vers apparaat en opnieuw te starten is vanuit Instellingen.
+- Een unified Home Assistant heat/cool/off climate entity, aangestuurd door de OpenTherm-statusbits.
 
 Zonder firmware is de OpenTherm Gateway een slimme maar moeilijk toegankelijke hardware. Met OTGW-firmware wordt het een volledig netwerk-connected verwarmingscontroller die:
 
@@ -56,7 +63,7 @@ Sinds v2.0.0 bevat de firmware een `boards.h`-header die pin-mappings, feature f
 
 ### Nieuwe functies in v2.0.0
 
-v2.0.0 is een grote platformrelease. Het levert volledige ondersteuning voor het ESP32-platform en de OTGW32-hardware, naast het bestaande ESP8266-pad, in een enkele uniforme codebase. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
+v2.0.0 is een grote platformrelease. Het is de ESP32-S3-only async + FreeRTOS-lijn; ESP8266 is verplaatst naar de 1.x maintenance / LTS-lijn. Instellingenbestanden van v1.3.x worden automatisch geladen zonder conversie.
 
 v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functionaliteit is feature-compleet, maar SAT, OTDirect en de nieuwe MQTT-topicnamen (zie hieronder) worden nog verder verfijnd. Volg de GitHub Releases-pagina voor de actuele alpha-tag.
 
@@ -66,7 +73,7 @@ v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functiona
 - Volledige compilatie en werking op ESP32 naast de bestaande ESP8266
 - OTDirect: directe GPIO-implementatie van OpenTherm, zonder PIC co-processor, met vijf werkingsmodi (thermostaat, ketel, gateway, monitor en gecombineerd master+slave)
 - W5500 SPI Ethernet: bekabeld netwerk met dynamische runtime-failover van en naar Wi-Fi (zonder reboot)
-- BLE temperatuursensoren: passieve Bluetooth LE-scan van Xiaomi LYWSD03MMC via BTHome v2 (maximaal 4 sensoren)
+- BLE temperatuursensoren: passieve Bluetooth LE-scan van Xiaomi MiBeacon (plaintext en encrypted v4/v5 via een per-sensor bindkey), ATC/pvvx custom firmware, en BTHome v2
 - Aangepaste partitietabel met twee OTA-sloten van 1,5 MB en 768 KB LittleFS
 
 **SAT (Smart Autotune Thermostat)**
@@ -81,6 +88,7 @@ v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functiona
 
 **MQTT en Home Assistant**
 - 250+ auto-discovery entiteiten: climate entity, SAT-sensoren, BLE-sensoren, drukbewaking, OLED-status
+- Unified climate entity met off/heat/cool: modus en actie worden afgeleid uit de OpenTherm-statusbits en op eigen topics gepubliceerd (zie Hoofdstuk 4)
 - Streaming MQTT discovery: discovery payloads worden gecompileerd in flash (PROGMEM) en asynchroon gepubliceerd via een bitmap-gestuurd drip-mechanisme dat elke entiteit rechtstreeks naar de broker streamt. Dit vervangt de eerdere LittleFS- en RAM-gebaseerde aanpak en elimineert grote staging-buffers.
 - SAT switches en select entities zijn toegevoegd aan de HA discovery via dezelfde streaming-pipeline (TASK-284), samen met runtime-gedetecteerde Dallas-sensoren, de climate- en number-entiteiten, en HA button- en select-entiteiten voor PIC-commando's.
 - Just-in-time MQTT discovery (ADR-100): discovery-configs voor OpenTherm MsgIDs worden nu pas gepubliceerd wanneer de ketel of thermostaat die MsgID voor het eerst zendt, in plaats van bij elke boot alle 256 IDs in bulk te publiceren. Dit houdt het broker-register beperkt tot de IDs die uw hardware daadwerkelijk gebruikt en vermindert MQTT-verkeer bij het opstarten.
@@ -93,6 +101,7 @@ v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functiona
 - Nachtelijke herstart: configureerbare automatische reboot (tijdstip en dagkeuze) om heap-fragmentatie op te lossen bij langlopende ESP8266-apparaten
 
 **Webinterface**
+- Herontworpen v2 Web UI (`v2.html`): mobielvriendelijk, selecteerbaar en bestaat naast de klassieke UI. Bevat een first-time-setup onboarding wizard die eenmalig draait op een vers apparaat en opnieuw te starten is vanuit Instellingen.
 - De webinterface is uitsluitend Engelstalig. Resterende Nederlandse strings uit de OTTHING-platformport zijn verwijderd (TASK-569). Dit handboek blijft Nederlandstalig.
 
 **Build en tooling**
@@ -105,6 +114,8 @@ v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functiona
 ---
 
 ### Platformvergelijking: ESP8266 vs ESP32
+
+De 2.0.0-lijn draait uitsluitend op ESP32-S3. De ESP8266-kolom hieronder geldt voor de 1.x maintenance / LTS-lijn.
 
 | Eigenschap | ESP8266 (OTGW v1.x) | ESP32 (OTGW32) |
 |---|---|---|

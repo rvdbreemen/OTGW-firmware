@@ -23,6 +23,8 @@ It has no automated CI gate planned; it is enforced at PR review, not by `evalua
 The one new build-time change it mandates (the AsyncTCP config block in `platformio.ini`)
 is self-checking: the firmware does not compile if a flag is malformed.
 
+**Post-acceptance note (2026-07-04):** two details in the Decision below have since changed in shipped code and are recorded here without editing the immutable body. (1) `CONFIG_ASYNC_TCP_STACK_SIZE` was later raised 4096 to 16384 to stop a non-recovering port-80 wedge (the AsyncTCP task died in its low-heap cleanup path under a concurrent burst); the rationale is inlined in `platformio.ini`. (2) The D4.1 static-file heap-backpressure serve gate described below as future work has since landed (`webFileGateTryAdmit()` in `webServerCompat.h`, returning 503 when the largest free block is too low).
+
 ## Status History
 
 ```yaml

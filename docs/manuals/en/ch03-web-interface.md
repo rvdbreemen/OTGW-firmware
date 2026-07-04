@@ -18,9 +18,64 @@ The interface provides:
 
 The interface adapts to desktop and mobile screens and supports both light and dark themes. A persistent firmware/filesystem mismatch banner appears at the top of every page when the running firmware build hash does not match the LittleFS image hash, with a direct link to the flash utility.
 
+> **Two coexisting UIs**: The 2.0.0 firmware ships two web UIs on the same device: the original **Classic UI** (documented in the sections that follow) and a newer **v2 UI** (the "New UI"). Both are served from LittleFS and can be used interchangeably. A switch button in the header (**New UI** on the classic side, **Classic UI** on the v2 side) toggles between them. The choice is stored device-wide in `settings.ini` (the `ui_usev2` flag), not per-browser, so every browser that opens the device sees the selected UI. See "The v2 Web UI" below.
+
+### The v2 Web UI
+
+The v2 UI is a second, fully functional web interface that coexists with the Classic UI. It targets the same firmware and the same REST/WebSocket endpoints, so both UIs stay in sync; you can move between them at any time without losing configuration.
+
+**Selecting the UI.** The switch is device-wide, not per-browser. Clicking **Classic UI** in the v2 header (or **New UI** in the classic header) writes the `ui_usev2` flag to `settings.ini` via the REST API, then reloads the page so the firmware serves the chosen UI. No hard reload (CTRL-R / cache clear) is needed, and the other UI keeps working unchanged. The switch retries automatically if the device is briefly busy, and only reloads after the change is confirmed.
+
+**Header and navigation.** The v2 header is a dark strip in both light and dark themes. It shows identity chips (hostname and firmware version, plus IP address and Wi-Fi signal bars), a connectivity status pill, a live connectivity summary strip, a clock, the UI-switch and theme buttons, and a **SIMULATION** badge that appears only while OT-replay simulation is active. Main navigation is a row of underlined text tabs: **Home**, **SAT**, **Monitor**, **Settings**, and **Advanced**. Sub-navigation within a page uses the same underlined text-tab style.
+
+#### Home page
+
+The Home page offers several layouts through a **View** picker dropdown at the top:
+
+- **System view**: a live schematic of the heating system (boiler or heat pump, flow and return pipes, radiators, room, DHW, pressure and modulation readouts).
+- **At a glance**: a phone-first layout built around a single large room-temperature dial with step buttons.
+- **Mission control**: a live strip chart (flow / return / setpoint / modulation) plus a raw OpenTherm frame ticker.
+
+When the gateway is injecting values onto the OT bus (active gateway overrides), an "injected" badge appears on the Home schematic and on the Connection map; clicking it opens a floating detail panel listing the active overrides.
+
+#### Monitor page
+
+The Monitor page has five sub-tabs:
+
+- **Log**: a live console fed by the WebSocket stream, one OpenTherm frame per line (dense rendering). A toolbar carries Pause, **Clear**, **Download**, a frame filter, and toggle chips for Auto-scroll, Timestamps, **SAT only** (show only SAT narration lines), **Auto-download** (save the log every 15 minutes), and **Stream to file** (append frames straight to a local file in Chrome/Edge). Below the toolbar a command bar sends a raw OTGW command (for example `PS=1`, `TT=20.5`, `GW=1`); the command echoes into the log and the prompt label reflects the live command interface (a `PIC ›` prompt on PIC hardware, `OT ›` on OT-Direct).
+- **Statistics**: a per-message-ID table (msgID, description, direction, interval, count, value) with a search box, followed by an **Active gateway overrides** panel and a **Boiler unsupported messages** panel.
+- **OT Support**: a matrix of all 128 OpenTherm message IDs colour-coded by where each ID was seen (thermostat + boiler, thermostat only, boiler only, or never seen). Click a cell to pin a detail panel with the decoded message.
+- **Graph**: a live flow / return / setpoint / modulation chart with window chips (10 min, 1 hour, 4 h, 24 h), one-off **PNG** and **CSV** export buttons, and **Auto-PNG** / **Auto-CSV** chips for periodic auto-save.
+- **Connection**: an OT-bus and connectivity map. The OT bus is modelled as two separate links (thermostat and boiler), and the map separates **MODE** (a setting, such as gateway or monitor) from **HEALTH** using a five-state vocabulary: Connected, Degraded, Disconnected, Off, and Unknown (ADR-155). Nodes cover thermostat, boiler, OTGW, router (with a Wi-Fi signal-strength icon and dBm), MQTT broker, and this browser. On OT-Direct hardware an **OT-Direct overrides** panel lets you apply or clear stored responses and response modifiers (SR/CR/RM/CM/UI/KI) directly.
+
+#### SAT page
+
+A dedicated Smart Autotune Thermostat page provides the thermostat control surface in three cumulative depth layers: **Thermostat** (simple), **Control** (operational), and **Technical** (the control loop). It is bound to the SAT REST endpoints. For full details of SAT, presets, the heating curve, and diagnostics, see Chapter 5.
+
+#### Settings page
+
+The Settings page is driven by the REST API and presents settings with human-readable labels, categories, and hints, plus a search box and a rail of category links. A save bar tracks unsaved changes with **Discard** and **Save settings** actions. Additional panels include a **BLE sensor** roster (discovered Bluetooth Low Energy sensors) and, in the Webhook group, a **Send test call** action that fires the real saved ON webhook. Advanced OT-Direct and SAT settings are exposed here as well.
+
+#### Advanced page
+
+The Advanced page collects the power-user screens in four sub-tabs:
+
+- **PIC firmware**: shows PIC device, type, and firmware version, a "Check for updates" action, a list of available firmware files with a flash progress bar, and a cached gateway-settings (`PR=`) table. Hidden on boards without a PIC (OT-Direct / OTGW32).
+- **Debug Information**: device info groups, the crash log (or a "no crash logs" note), friendly Wi-Fi labels, and a raw debug dump.
+- **File System**: an in-page FSexplorer (browse, upload, usage bar) with a link to the classic `/FSexplorer`.
+- **System**: live device status (link, OT-rewrite mode, simulation), and **System Actions** buttons: Update Firmware (OTA sketch / filesystem), ReBoot, **Run setup wizard**, Reset Wireless, and Home.
+
+#### First-time setup wizard
+
+On a genuinely fresh device the v2 UI shows a first-time-setup onboarding wizard once (existing installs are migrated so it never appears again). It can be re-run at any time from **Advanced > System > Run setup wizard**.
+
+#### Mobile use and asset caching
+
+The v2 UI is designed to be usable on a smartphone. Its assets are served with a `no-cache` policy (ADR-163), so after a filesystem OTA update the browser picks up the new assets immediately without a manual cache clear.
+
 ### Navigation
 
-The interface is organized into five main tabs, accessible from the navigation bar at the top of the page:
+The remaining sections of this chapter describe the **Classic UI**. The Classic UI is organized into main tabs, accessible from the navigation bar at the top of the page:
 
 | Tab | Purpose |
 |---|---|

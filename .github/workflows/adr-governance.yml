@@ -1,0 +1,51 @@
+name: ADR governance
+
+# Repo-local realization of the adr-kit governance plan
+# (docs/plan/adr-kit-governance-plan.md), pending the adr-kit CLI (TASK-422/424).
+# Fails a PR that leaves the ADR set inconsistent or the index stale:
+#   - lint: superseded_by resolves; ADR-080 binding ADRs name an existing gate;
+#           status <-> superseded_by reciprocity.
+#   - index-check: every ADR is listed exactly once in docs/adr/README.md.
+#   - unit tests: prove the checks fire (fixtures) and the live tree is clean.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - dev
+      - "1.4.*"
+      - "1.5.*"
+      - "feature-dev-*"
+      - "release/**"
+    paths:
+      - "docs/adr/**"
+      - "scripts/adr_governance.py"
+      - "tests/test_adr_governance.py"
+      - ".github/workflows/adr-governance.yml"
+
+# Least-privilege token: this workflow only reads the checkout and runs Python.
+permissions:
+  contents: read
+
+jobs:
+  adr-governance:
+    name: ADR lint + index-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: ADR lint (strict)
+        run: python scripts/adr_governance.py lint --strict
+
+      - name: ADR index-check
+        run: python scripts/adr_governance.py index-check
+
+      - name: ADR governance unit tests
+        run: python tests/test_adr_governance.py

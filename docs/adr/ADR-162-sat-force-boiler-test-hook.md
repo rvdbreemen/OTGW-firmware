@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed. Date: 2026-06-29.
+Accepted. Date: 2026-07-04 (Proposed 2026-06-29; accepted by the maintainer Robert van den Breemen 2026-07-04 after verifying the `satSetDebugForceBoilerPresent` hook and the `/api/v2/sat/force-boiler` route are implemented).
 
 **Decision Maker:** User: Robert (maintainer), who chose option A (a firmware test hook) over the alternatives after the options analysis in `docs/plan/SAT_SIM_F7_BOILER_EMULATOR_OPTIONS.md`.
 
@@ -14,6 +14,11 @@ status_history:
     changed_by: Agent
     reason: Sanction a narrow, constrained test-hook pattern so the SAT section 4.2 boiler-availability gate (TASK-795) is bench-verifiable without a physical boiler (TASK-802).
     changed_via: adr-kit
+  - date: 2026-07-04
+    status: Accepted
+    changed_by: maintainer (Robert van den Breemen)
+    reason: Accepted after code-implementation verification (force-boiler test hook live in SATcontrol.ino + restAPI.ino) on maintainer instruction in-session.
+    changed_via: manual
 
 ## Context
 

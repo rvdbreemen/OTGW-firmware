@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-06-29.
+Accepted, 2026-07-04 (Proposed 2026-06-29; accepted by the maintainer Robert van den Breemen 2026-07-04 after verifying the symmetric arm+feed presence-gating on `s_extWdPresent`, with a 3x boot probe, is implemented in `OTGW-Core.ino`).
 
 This ADR is **guideline-level** per ADR-080: it does not introduce a new
 `evaluate.py` gate. The invariant it protects (arm and feed gated by the same
@@ -27,6 +27,11 @@ status_history:
     changed_by: Agent
     reason: Replace ADR-135's unconditional 0x26 arm+feed with symmetric presence-gating (both arm and feed gated on a single retried boot probe into s_extWdPresent; disarm stays unconditional). Fixes the ESP32-S3 esp32-hal-i2c-ng log storm from feeding an absent chip (TASK-945) without re-introducing the armed-but-unfed spurious-reset hazard ADR-135 warned against (the asymmetry left by TASK-945, closed by TASK-946). Guideline-level per ADR-080; amends ADR-135.
     changed_via: adr-kit
+  - date: 2026-07-04
+    status: Accepted
+    changed_by: maintainer (Robert van den Breemen)
+    reason: Accepted after code-implementation verification (symmetric 0x26 arm+feed gating live in OTGW-Core.ino) on maintainer instruction in-session.
+    changed_via: manual
 
 ## Context
 
