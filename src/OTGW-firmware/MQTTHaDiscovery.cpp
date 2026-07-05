@@ -817,7 +817,7 @@ const char ha_name_alias_ventilation_diagnostic[]                            PRO
 const char ha_name_alias_ventilation_system_type[]                           PROGMEM = "Ventilation_system_type";
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
-// ========== Sensor array (289 entries, sorted by id) ==========
+// ========== Sensor array (389 entries) ==========
 const uint16_t MQTT_HA_SENSOR_COUNT = 389;  // +2 fw uptime/unsupported_msgids (faux id 248)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
@@ -1446,7 +1446,8 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 
     // --- Pseudo-ID 244: gateway/OTGW connection status (HaDevice::Gateway) ---
     // Last rows of the INDEXED region (index covers rows 0..INDEXED_COUNT-1).
-    // Values publish "on"/"off" via CCONOFF -> default payload (on_off).
+    // Values publish "ON"/"OFF" via CCONOFF; the on_off payload writes no
+    // pl_on/pl_off, so HA's default ON/OFF payloads apply and match.
     {244, 0x08, ha_lbl_gateway_mode,   ha_name_gateway_mode,   HaIcon::lan_connect, HaEntityCat::diagnostic, true},
     {244, 0x00, ha_lbl_otgw_connected, ha_name_otgw_connected, HaIcon::lan_connect, HaEntityCat::diagnostic, true},
 
