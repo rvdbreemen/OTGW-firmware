@@ -252,6 +252,8 @@ const char ha_lbl_fw_reboot_reason[] PROGMEM = "otgw-firmware/reboot_reason";
 const char ha_lbl_fw_version[]       PROGMEM = "otgw-firmware/version";
 const char ha_lbl_fw_hostname[]      PROGMEM = "otgw-firmware/hostname";
 const char ha_lbl_fw_hardware_type[] PROGMEM = "otgw-firmware/hardware_type";  // ADR-113
+const char ha_lbl_fw_uptime[]           PROGMEM = "otgw-firmware/uptime";
+const char ha_lbl_fw_unsupported_msgids[] PROGMEM = "otgw-firmware/boiler/unsupported_msgids";
 // PIC info labels (TASK-540 / TASK-541, faux dataid 249). MQTT_HA_FLAG_IS_PIC_ENTRY auto-prepends "otgw-pic/".
 const char ha_lbl_pic_version[]       PROGMEM = "version";
 const char ha_lbl_pic_deviceid[]      PROGMEM = "deviceid";
@@ -370,6 +372,10 @@ const char ha_lbl_otc_active[] PROGMEM = "otc_active";
 const char ha_lbl_summerwintertime[] PROGMEM = "summerwintertime";
 const char ha_lbl_boiler_connected[] PROGMEM = "boiler_connected";
 const char ha_lbl_thermostat_connected[] PROGMEM = "thermostat_connected";
+// Gateway/OTGW connection status (faux dataid 244). gateway_mode uses IS_PIC (0x08)
+// -> "otgw-pic/gateway_mode"; otgw_connected is bare (ADR-102, base namespace).
+const char ha_lbl_gateway_mode[] PROGMEM = "gateway_mode";
+const char ha_lbl_otgw_connected[] PROGMEM = "otgw_connected";
 const char ha_lbl_master_configuration_smart_power[] PROGMEM = "master_configuration_smart_power";
 const char ha_lbl_ch2_present[] PROGMEM = "ch2_present";
 const char ha_lbl_control_type_modulation[] PROGMEM = "control_type_modulation";
@@ -680,6 +686,8 @@ const char ha_name_fw_reboot_reason[] PROGMEM = "Reboot_Reason";
 const char ha_name_fw_version[]       PROGMEM = "Firmware_Version";
 const char ha_name_fw_hostname[]      PROGMEM = "Hostname";
 const char ha_name_fw_hardware_type[] PROGMEM = "Hardware_Type";  // ADR-113
+const char ha_name_fw_uptime[]           PROGMEM = "Uptime";
+const char ha_name_fw_unsupported_msgids[] PROGMEM = "Boiler_Unsupported_MsgIDs";
 // PIC info friendly names (TASK-540 / TASK-541, faux dataid 249)
 const char ha_name_pic_version[]       PROGMEM = "PIC_Version";
 const char ha_name_pic_deviceid[]      PROGMEM = "PIC_DeviceID";
@@ -728,6 +736,8 @@ const char ha_name_otc_enable[] PROGMEM = "OTC_enable";
 const char ha_name_summerwintertime[] PROGMEM = "Summer_Winter_Time";
 const char ha_name_boiler_connected[] PROGMEM = "Boiler_Connected";
 const char ha_name_thermostat_connected[] PROGMEM = "Thermostat_Connected";
+const char ha_name_gateway_mode[] PROGMEM = "Gateway_Mode";
+const char ha_name_otgw_connected[] PROGMEM = "OTGW_Connected";
 const char ha_name_master_configuration_smart_power[] PROGMEM = "master_configuration_smart_power";
 const char ha_name_ch2_present[] PROGMEM = "CH2_present";
 const char ha_name_control_type_modulation[] PROGMEM = "control_type_modulation";
@@ -807,8 +817,8 @@ const char ha_name_alias_ventilation_diagnostic[]                            PRO
 const char ha_name_alias_ventilation_system_type[]                           PROGMEM = "Ventilation_system_type";
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
-// ========== Sensor array (289 entries, sorted by id) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 387;  // TASK-942: +2 hvac_mode/hvac_action (faux id 242)
+// ========== Sensor array (389 entries) ==========
+const uint16_t MQTT_HA_SENSOR_COUNT = 389;  // +2 fw uptime/unsupported_msgids (faux id 248)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1247,6 +1257,8 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {248, 0x00, ha_lbl_fw_version,       ha_name_fw_version,       HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {248, 0x00, ha_lbl_fw_hostname,      ha_name_fw_hostname,      HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {248, 0x00, ha_lbl_fw_hardware_type, ha_name_fw_hardware_type, HaDeviceClass::none, HaUnit::none, HaStateClass::none,             HaIcon::information_outline, HaEntityCat::diagnostic, true},  // ADR-113
+    {248, 0x00, ha_lbl_fw_uptime,           ha_name_fw_uptime,           HaDeviceClass::none, HaUnit::s,    HaStateClass::measurement,      HaIcon::timer_outline,       HaEntityCat::diagnostic, true},
+    {248, 0x00, ha_lbl_fw_unsupported_msgids, ha_name_fw_unsupported_msgids, HaDeviceClass::none, HaUnit::none, HaStateClass::none,          HaIcon::information_outline, HaEntityCat::diagnostic, true},
     // --- Pseudo-ID 249: PIC info (TASK-540 / TASK-541) ---
     // 0x08 = MQTT_HA_FLAG_IS_PIC_ENTRY → "otgw-pic/" prefix added by streamSensorDiscovery
     // and entries are skipped at publish time when isPICEnabled() is false.
@@ -1345,13 +1357,13 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {242, 0x00, ha_lbl_hvac_action,                ha_name_hvac_action,                HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::radiator,      HaEntityCat::none, true, nullptr,              nullptr},
 };
 
-// ========== Binary sensor array (58 entries, sorted by id) ==========
-// ADR-105: first 58 rows are sorted by OT id and indexed via mqttHaBinSensorIndex[].
-// Rows 58..94 are HA-core aliases, NOT contiguous by OT id and NOT covered by
+// ========== Binary sensor array (60 indexed entries) ==========
+// ADR-105: first 60 rows are indexed via mqttHaBinSensorIndex[] (per-id contiguous).
+// Rows 60..96 are HA-core aliases, NOT contiguous by OT id and NOT covered by
 // the index. The discovery dispatcher walks the alias tail separately when
 // settings.mqtt.bPublishHaCoreAliases is on (see MQTTstuff.ino).
-const uint16_t MQTT_HA_BINSENSOR_COUNT         = 95;
-const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 58;
+const uint16_t MQTT_HA_BINSENSOR_COUNT         = 97;
+const uint16_t MQTT_HA_BINSENSOR_INDEXED_COUNT = 60;
 
 const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
 //  {id, flags, label, friendlyName, icon, entityCat, enabledByDefault}
@@ -1431,6 +1443,13 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     SAT_BIN(254, sat_safety_tripped, HaIcon::alert_circle,    HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::true_false),
     SAT_BIN(254, sat_flame_health,   HaIcon::fire,            HaEntityCat::none, true, ha_bincls_problem, HaBinaryPayload::on_off),
     SAT_BIN(254, sat_valves_open,    HaIcon::radiator,        HaEntityCat::none, true, nullptr,           HaBinaryPayload::true_false),
+
+    // --- Pseudo-ID 244: gateway/OTGW connection status (HaDevice::Gateway) ---
+    // Last rows of the INDEXED region (index covers rows 0..INDEXED_COUNT-1).
+    // Values publish "ON"/"OFF" via CCONOFF; the on_off payload writes no
+    // pl_on/pl_off, so HA's default ON/OFF payloads apply and match.
+    {244, 0x08, ha_lbl_gateway_mode,   ha_name_gateway_mode,   HaIcon::lan_connect, HaEntityCat::diagnostic, true},
+    {244, 0x00, ha_lbl_otgw_connected, ha_name_otgw_connected, HaIcon::lan_connect, HaEntityCat::diagnostic, true},
 
     // ---------------------------------------------------------------------------
     // ADR-105: HA-core aliases (37 rows) — gated by settings.mqtt.bPublishHaCoreAliases
@@ -1725,19 +1744,19 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 239
     0xFFFF, // id 240
     0xFFFF, // id 241
-    385, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
-    330, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
+    387, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
+    332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
     288, // id 246, 1 entry
     289, // id 247, 17 entries
-    306, // id 248, 5 entries (TASK-541 firmware diagnostics + ADR-113 hardware_type)
-    311, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
-    315, // id 250, 15 entries (TASK-541 PIC settings)
-    332, // id 251, 5 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
-    337, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
-    369, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    384, // id 254, 1 entry  (TASK-543 SAT flame status)
+    306, // id 248, 7 entries (TASK-541 firmware diagnostics + ADR-113 hardware_type + uptime/unsupported_msgids)
+    313, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
+    317, // id 250, 15 entries (TASK-541 PIC settings)
+    334, // id 251, 5 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
+    339, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
+    371, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    386, // id 254, 1 entry  (TASK-543 SAT flame status)
     0xFFFF // id 255
 };
 
@@ -1986,7 +2005,7 @@ const uint16_t PROGMEM mqttHaBinSensorIndex[256] = {
     0xFFFF, // id 241
     0xFFFF, // id 242
     0xFFFF, // id 243
-    0xFFFF, // id 244
+    58,     // id 244, 2 entries (gateway_mode, otgw_connected; last of indexed region)
     0xFFFF, // id 245
     0xFFFF, // id 246
     0xFFFF, // id 247

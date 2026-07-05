@@ -1129,6 +1129,142 @@ class WorkspaceEvaluator:
                 f"All {total_ids_with_entries} IDs indexed correctly ({total_entries} sensor entries total)"
             ))
 
+    def check_ha_binsensor_index_consistency(self):
+        """Verify that mqttHaBinSensorIndex[] points to the correct first-entry
+        row for every OT/pseudo ID that has entries in the INDEXED region of
+        mqttHaBinSensors[], and 0xFFFF for IDs with none. Mirrors the sensor
+        gate (check_ha_sensor_index_consistency) for the binary-sensor table.
+
+        Two binary-specific wrinkles vs the sensor table:
+          - Rows may be written either as ``{id, ...}`` or via the ``SAT_BIN(id,
+            ...)`` macro (2.0.0 SAT aliases); both forms are counted.
+          - ADR-105/106: only the first MQTT_HA_BINSENSOR_INDEXED_COUNT rows are
+            covered by the index. Rows in the alias tail (>= INDEXED_COUNT) are
+            NOT indexed, so they are excluded from first-entry computation. When
+            no INDEXED_COUNT constant exists (1.x line), the whole array is
+            indexed.
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== HA Binary Sensor Index Consistency ==={Colors.ENDC}")
+
+        cpp = config.FIRMWARE_ROOT / "mqtt_configuratie.cpp"
+        if not cpp.exists():
+            cpp = config.FIRMWARE_ROOT / "MQTTHaDiscovery.cpp"
+        if not cpp.exists():
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Binary sensor index consistency", "WARN",
+                "Neither mqtt_configuratie.cpp nor MQTTHaDiscovery.cpp found — cannot verify"
+            ))
+            return
+
+        try:
+            source = cpp.read_text(encoding='utf-8', errors='ignore')
+        except OSError as e:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Binary sensor index consistency", "FAIL",
+                f"Could not read {cpp.name}: {e}"
+            ))
+            return
+
+        # --- Parse mqttHaBinSensors[] body ---
+        bin_block_re = re.compile(
+            r"const\s+MqttHaBinSensorCfg\s+PROGMEM\s+mqttHaBinSensors\s*\[\s*\]\s*=\s*\{(.*?)\n\}\s*;",
+            re.DOTALL,
+        )
+        m = bin_block_re.search(source)
+        if not m:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Binary sensor index consistency", "FAIL",
+                "Could not locate mqttHaBinSensors[] array — file restructured?"
+            ))
+            return
+
+        bin_body = m.group(1)
+        # A row starts with either `{ <id>,` or `SAT_BIN( <id>,`. The SAT_BIN
+        # macro *definition* line (`#define SAT_BIN(id, ...`) has a non-numeric
+        # first arg so it never matches; skip preprocessor lines anyway.
+        row_re = re.compile(r"(?:\{|SAT_BIN\()\s*(\d+)\s*,")
+        ids_in_order: List[int] = []
+        for line in bin_body.split('\n'):
+            code = line.split('//', 1)[0]
+            if code.lstrip().startswith('#'):
+                continue
+            m_row = row_re.search(code)
+            if m_row:
+                ids_in_order.append(int(m_row.group(1)))
+
+        if not ids_in_order:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Binary sensor index consistency", "WARN",
+                "mqttHaBinSensors[] body parsed but no rows matched"
+            ))
+            return
+
+        # --- Indexed region size (ADR-105). Absent on 1.x => whole array. ---
+        idx_count_re = re.compile(r"MQTT_HA_BINSENSOR_INDEXED_COUNT\s*=\s*(\d+)")
+        icm = idx_count_re.search(source)
+        indexed_count = int(icm.group(1)) if icm else len(ids_in_order)
+
+        # Build id -> first_row_index over the INDEXED region only.
+        first_index: dict = {}
+        for row_idx, id_val in enumerate(ids_in_order[:indexed_count]):
+            if id_val not in first_index:
+                first_index[id_val] = row_idx
+
+        # --- Parse mqttHaBinSensorIndex[256] body ---
+        index_block_re = re.compile(
+            r"const\s+uint16_t\s+PROGMEM\s+mqttHaBinSensorIndex\s*\[\s*256\s*\]\s*=\s*\{(.*?)\n\}\s*;",
+            re.DOTALL,
+        )
+        m2 = index_block_re.search(source)
+        if not m2:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Binary sensor index consistency", "FAIL",
+                "Could not locate mqttHaBinSensorIndex[256] array — file restructured?"
+            ))
+            return
+
+        val_re = re.compile(r"^\s*(?:(0x[0-9A-Fa-f]+)|(\d+))\b")
+        index_vals: List[int] = []
+        for line in m2.group(1).split('\n'):
+            code = line.split('//', 1)[0]
+            vm = val_re.match(code)
+            if not vm:
+                continue
+            index_vals.append(int(vm.group(1), 16) if vm.group(1) else int(vm.group(2)))
+
+        if len(index_vals) != 256:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Binary sensor index consistency", "FAIL",
+                f"mqttHaBinSensorIndex[256] parsed {len(index_vals)} values; expected 256"
+            ))
+            return
+
+        # --- Validate consistency over the indexed region ---
+        MQTT_HA_INDEX_NONE = 0xFFFF
+        mismatches: List[str] = []
+        for otid in range(256):
+            idx_val = index_vals[otid]
+            expected = first_index.get(otid, MQTT_HA_INDEX_NONE)
+            if idx_val != expected:
+                mismatches.append(
+                    f"id {otid}: index={hex(idx_val) if idx_val == MQTT_HA_INDEX_NONE else idx_val} "
+                    f"expected={hex(expected) if expected == MQTT_HA_INDEX_NONE else expected}"
+                )
+
+        if mismatches:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Binary sensor index consistency", "FAIL",
+                f"{len(mismatches)} mismatch(es) across {len(first_index)} indexed IDs "
+                f"(indexed region = {indexed_count} of {len(ids_in_order)} rows)",
+                "; ".join(mismatches[:10]) + (" ..." if len(mismatches) > 10 else "")
+            ))
+        else:
+            self.add_result(EvaluationResult(
+                "HA-DISC", "Binary sensor index consistency", "PASS",
+                f"All {len(first_index)} indexed IDs correct "
+                f"(indexed region = {indexed_count} of {len(ids_in_order)} rows)"
+            ))
+
     # ===== JSON BUFFER ARITHMETIC (TASK-368) =====
 
     def check_json_buffer_arithmetic(self):
@@ -3474,6 +3610,7 @@ class WorkspaceEvaluator:
         self.check_discovery_counter_instrumented()   # ADR-062 CI gate (TASK-364)
         self.check_publishedtopic_counter_reset()     # ADR-062 CI gate (TASK-364)
         self.check_ha_sensor_index_consistency()      # HA discovery gate (TASK-392)
+        self.check_ha_binsensor_index_consistency()   # HA discovery gate (binary sensors)
         self.check_json_buffer_arithmetic()           # TASK-352/368
         self.check_no_settings_state_snapshots()      # ESP8266 memory audit PR #644 Trim 1 gate
         self.check_dispatch_tables_progmem()          # ESP8266 memory audit PR #644 Trim 2 gate
