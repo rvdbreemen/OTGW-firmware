@@ -290,6 +290,22 @@ Two climate entities are published:
 
 If SAT is enabled, the thermostat climate is the SAT-driven one and supports mode and preset selection.
 
+##### HVAC mode and action (off / heat / cool)
+
+The thermostat climate entity supports the HVAC modes `off`, `heat`, and `cool`. The firmware computes two values from the OpenTherm status bits and publishes them on their own topics:
+
+```
+<pub>/hvac_mode     →  off | heat | cool
+<pub>/hvac_action   →  off | idle | heating | cooling
+```
+
+- `hvac_mode` follows the master (thermostat) enable bits: it reflects the thermostat's standing intent. It is `off` when no thermostat is connected, `cool` when the master cooling-enable bit is set, and `heat` otherwise. A heating thermostat stays `heat` even while idle between calls.
+- `hvac_action` follows the slave (boiler) actual bits: `cooling` when the cooling bit is set, `heating` when the central-heating bit is set, `idle` otherwise, and `off` when no thermostat is connected.
+
+The mode is reflective: the firmware mirrors state, it does not command the thermostat. The thermostat owns heat/cool switching. Note that `hvac_action` derives from the central-heating and cooling status bits, not the flame, so a domestic-hot-water draw does not read as heating.
+
+Both values are also exposed as two standalone, discoverable Home Assistant sensors (`hvac_mode` and `hvac_action`). They auto-discover on first boot alongside the other non-OT entities, so they appear even if you do not use the climate entity itself.
+
 #### Number Entity
 
 A number entity is published for the outside-temperature override, letting HA push a value as if it came from a wired outdoor sensor.
@@ -307,6 +323,8 @@ OTGW/value/<uniqueId>/sat/ble/<mac>/{temp,rh,bat,rssi}
 ```
 
 The MAC is rendered as 12 lowercase hex characters with no separators (e.g. `a4c138123456`). Discovery is one-shot per MAC per session. The four entities are grouped under a single HA device with `model: "BLE Sensor"` and `via_device: <uniqueId>`.
+
+Each BLE probe appears as a separate Home Assistant child-device, linked back to the main OTGW device through `via_device` (ADR-148). This is the one exception to the single-device topology (ADR-140): every non-BLE entity stays inside the single OTGW device, and only BLE probes are broken out into their own child-devices so each physical sensor shows as its own device in Home Assistant.
 
 #### SAT Switches and Select (new in 2.0.0)
 

@@ -12,11 +12,68 @@ De SPA bestaat uit de bestanden `index.html`, `index.js`, `sat.js`, `graph.js`, 
 
 Een persistent banner bovenaan elke pagina waarschuwt zodra de firmware-buildhash niet overeenkomt met de hash van het geflashte LittleFS-image, met een directe link naar de flash utility.
 
+> **Twee naast elkaar bestaande UI's**: De 2.0.0-firmware levert twee web-UI's op hetzelfde apparaat: de oorspronkelijke **Classic UI** (beschreven in de secties hierna) en een nieuwere **v2 UI** (de "New UI"). Beide worden vanaf LittleFS geserveerd en zijn door elkaar te gebruiken. Een schakelknop in de header (**New UI** aan de klassieke kant, **Classic UI** aan de v2-kant) wisselt tussen beide. De keuze wordt apparaat-breed opgeslagen in `settings.ini` (de `ui_usev2`-vlag), niet per browser, zodat elke browser die het apparaat opent de gekozen UI ziet. Zie "De v2-webinterface" hieronder.
+
+---
+
+### De v2-webinterface
+
+De v2 UI is een tweede, volledig functionele webinterface die naast de Classic UI bestaat. Ze richt zich op dezelfde firmware en dezelfde REST/WebSocket-endpoints, zodat beide UI's synchroon blijven; u kunt op elk moment wisselen zonder configuratie te verliezen.
+
+**De UI kiezen.** De schakelaar werkt apparaat-breed, niet per browser. Op **Classic UI** klikken in de v2-header (of **New UI** in de klassieke header) schrijft de `ui_usev2`-vlag via de REST API naar `settings.ini` en herlaadt daarna de pagina, zodat de firmware de gekozen UI serveert. Een harde herlaadactie (CTRL-R / cache wissen) is niet nodig, en de andere UI blijft ongewijzigd werken. De schakelaar probeert het automatisch opnieuw als het apparaat kort bezig is, en herlaadt pas nadat de wijziging is bevestigd.
+
+**Header en navigatie.** De v2-header is een donkere strip in zowel het lichte als het donkere thema. Hij toont identiteits-chips (hostnaam en firmwareversie, plus IP-adres en Wi-Fi-signaalbalkjes), een connectiviteits-status pill, een live connectiviteitssamenvatting, een klok, de UI-schakel- en themaknoppen, en een **SIMULATION**-badge die alleen verschijnt zolang OT-replay-simulatie actief is. De hoofdnavigatie is een rij onderstreepte tekst-tabbladen: **Home**, **SAT**, **Monitor**, **Settings** en **Advanced**. De subnavigatie binnen een pagina gebruikt dezelfde onderstreepte tekst-tab-stijl.
+
+#### Home-pagina
+
+De Home-pagina biedt meerdere weergaven via een **View**-keuzemenu bovenaan:
+
+- **System view**: een live schema van het verwarmingssysteem (ketel of warmtepomp, aanvoer- en retourleidingen, radiatoren, kamer, DHW, druk- en modulatiewaarden).
+- **At a glance**: een telefoon-eerst weergave rond een enkele grote kamertemperatuur-dial met stapknoppen.
+- **Mission control**: een live strip-grafiek (flow / return / setpoint / modulatie) plus een ruwe OpenTherm-frame-ticker.
+
+Wanneer de gateway waarden op de OT-bus injecteert (actieve gateway-overrides), verschijnt een "injected"-badge op het Home-schema en op de Connection-kaart; klikken opent een zwevend detailpaneel met de actieve overrides.
+
+#### Monitor-pagina
+
+De Monitor-pagina heeft vijf sub-tabbladen:
+
+- **Log**: een live console gevoed door de WebSocket-stream, één OpenTherm-frame per regel (dichte weergave). Een werkbalk bevat Pause, **Clear**, **Download**, een frame-filter en toggle-chips voor Auto-scroll, Timestamps, **SAT only** (alleen SAT-narratieregels tonen), **Auto-download** (log elke 15 minuten opslaan) en **Stream to file** (frames rechtstreeks naar een lokaal bestand schrijven in Chrome/Edge). Onder de werkbalk verstuurt een commandobalk een ruw OTGW-commando (bijvoorbeeld `PS=1`, `TT=20.5`, `GW=1`); het commando echoot naar de log en het promptlabel volgt de live command interface (een `PIC ›`-prompt op PIC-hardware, `OT ›` op OT-Direct).
+- **Statistics**: een tabel per bericht-ID (msgID, omschrijving, richting, interval, aantal, waarde) met een zoekveld, gevolgd door een paneel **Active gateway overrides** en een paneel **Boiler unsupported messages**.
+- **OT Support**: een matrix van alle 128 OpenTherm-bericht-ID's, kleurgecodeerd naar waar elk ID is gezien (thermostaat + ketel, alleen thermostaat, alleen ketel, of nooit gezien). Klik een cel om een detailpaneel met het gedecodeerde bericht vast te zetten.
+- **Graph**: een live flow / return / setpoint / modulatie-grafiek met venster-chips (10 min, 1 uur, 4 u, 24 u), losse **PNG**- en **CSV**-exportknoppen, en **Auto-PNG** / **Auto-CSV**-chips voor periodieke auto-save.
+- **Connection**: een OT-bus- en connectiviteitskaart. De OT-bus wordt gemodelleerd als twee aparte links (thermostaat en ketel), en de kaart scheidt **MODE** (een instelling, zoals gateway of monitor) van **HEALTH** met een vijf-toestanden-vocabulaire: Connected, Degraded, Disconnected, Off en Unknown (ADR-155). Knooppunten omvatten thermostaat, ketel, OTGW, router (met een Wi-Fi-signaalsterkte-icoon en dBm), MQTT-broker en deze browser. Op OT-Direct-hardware laat een paneel **OT-Direct overrides** u stored responses en response modifiers (SR/CR/RM/CM/UI/KI) rechtstreeks instellen of wissen.
+
+#### SAT-pagina
+
+Een aparte Smart Autotune Thermostat-pagina biedt de thermostaatbediening in drie cumulatieve detaillagen: **Thermostat** (eenvoudig), **Control** (operationeel) en **Technical** (de regellus). Ze is gekoppeld aan de SAT REST-endpoints. Zie Hoofdstuk 5 voor de volledige beschrijving van SAT, presets, de stooklijn en diagnostiek.
+
+#### Settings-pagina
+
+De Settings-pagina wordt aangestuurd door de REST API en presenteert instellingen met leesbare labels, categorieën en hints, plus een zoekveld en een rail met categorielinks. Een opslaanbalk houdt niet-opgeslagen wijzigingen bij met **Discard**- en **Save settings**-acties. Extra panelen zijn onder meer een **BLE-sensor**roster (gedetecteerde Bluetooth Low Energy-sensoren) en, in de Webhook-groep, een **Send test call**-actie die de echte opgeslagen ON-webhook afvuurt. Geavanceerde OT-Direct- en SAT-instellingen zijn hier ook beschikbaar.
+
+#### Advanced-pagina
+
+De Advanced-pagina bundelt de power-user-schermen in vier sub-tabbladen:
+
+- **PIC firmware**: toont PIC-device, -type en -firmwareversie, een "Check for updates"-actie, een lijst van beschikbare firmwarebestanden met een flash-voortgangsbalk, en een gecachete gateway-instellingen (`PR=`)-tabel. Verborgen op boards zonder PIC (OT-Direct / OTGW32).
+- **Debug Information**: apparaatinfo-groepen, de crash log (of een "geen crash logs"-melding), leesbare Wi-Fi-labels en een ruwe debug-dump.
+- **File System**: een in-pagina FSexplorer (bladeren, uploaden, gebruiksbalk) met een link naar de klassieke `/FSexplorer`.
+- **System**: live apparaatstatus (link, OT-rewrite-modus, simulatie) en **System Actions**-knoppen: Update Firmware (OTA sketch / filesystem), ReBoot, **Run setup wizard**, Reset Wireless en Home.
+
+#### Eerste-keer setup-wizard
+
+Op een echt vers apparaat toont de v2 UI eenmalig een onboarding-wizard voor de eerste installatie (bestaande installaties worden gemigreerd zodat hij niet opnieuw verschijnt). Hij is op elk moment opnieuw te starten via **Advanced > System > Run setup wizard**.
+
+#### Mobiel gebruik en asset-caching
+
+De v2 UI is ontworpen om bruikbaar te zijn op een smartphone. De assets worden geserveerd met een `no-cache`-beleid (ADR-163), zodat de browser na een filesystem-OTA-update de nieuwe assets direct oppikt zonder handmatig de cache te wissen.
+
 ---
 
 ### Navigatiebalk en tabbladen
 
-De navigatiebalk bovenaan de pagina bevat de volgende tabbladen:
+De overige secties van dit hoofdstuk beschrijven de **Classic UI**. De navigatiebalk bovenaan de pagina bevat de volgende tabbladen:
 
 | Tabblad | Functie |
 |---|---|

@@ -1,11 +1,11 @@
 ---
 id: TASK-965
 title: 'v2 parity: send raw OTGW command from the UI'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 23:06'
-updated_date: '2026-07-01 04:43'
+updated_date: '2026-07-01 19:34'
 labels: []
 dependencies: []
 ordinal: 177000

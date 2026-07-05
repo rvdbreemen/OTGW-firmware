@@ -1,6 +1,6 @@
 # ADR-042: Streaming JSON I/O — No ArduinoJson
 
-**Status:** Superseded by [ADR-141](ADR-141-adopt-arduinojson-v7-esp32s3.md) (2026-06-15) — the 2.0.0 ESP32-S3-only line (ADR-128 dropped ESP8266) re-adopts ArduinoJson v7; the no-ArduinoJson ban no longer applies there. This status line is the sanctioned immutability exception (body below unedited). Originally **Accepted** 2026-02-28.
+**Status:** Superseded by [ADR-141](ADR-141-adopt-arduinojson-v7-esp32s3.md) (2026-06-15), which re-adopted ArduinoJson v7 on the 2.0.0 ESP32-S3-only line (ADR-128 dropped ESP8266). That reversal was itself reverted by [ADR-146](ADR-146-revert-adr141-streaming-jsonemit-rest-esp32s3.md) (2026-06-19): ArduinoJson was removed from the firmware and the REST JSON path returned to a hand-rolled streaming writer (`jsonEmit.h`), so the no-ArduinoJson ban is back in force on the ESP32-S3 line, now enforced by `evaluate.py::check_no_arduinojson`. ADR-146 re-adopts this ADR's stance without formally superseding it, so ADR-042 remains superseded-by-ADR-141 of record. This status line is the sanctioned immutability exception (body below unedited). Originally **Accepted** 2026-02-28.
 **Date:** 2026-02-28
 **Decision Maker:** User: Rob van den Breemen (rvdbreemen)
 **Supersedes:** ADR-018 (ArduinoJson for Data Interchange)

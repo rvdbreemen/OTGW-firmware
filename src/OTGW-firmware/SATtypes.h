@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.303
+**  Version  : v2.0.0-alpha.326
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -509,7 +509,8 @@ struct SATSection {
   // persisted unconditionally so settings.json round-trips across platforms
   // (zero/empty on ESP8266, which has no BLE radio). ~360 B of settings/RAM on
   // ESP8266 — matches the already-unconditional remainder of SATSection.
-  bool     bBleEnable         = false;         // Enable BLE temperature sensor scanning
+  bool     bBleEnable         = true;          // TASK-975: BLE sensors scan by default (they are sensors). Passive-continuous, no-op on non-BLE boards. Existing installs keep their persisted value.
+  bool     bBleRiskAck        = false;         // TASK-995: on a NO-PSRAM board, BLE only actually scans once the user has accepted the instability risk (PSRAM boards ignore this — psramFound() gates instead). See bleActive() in SATble.ino.
   bool     bBleFailover       = true;          // TASK-762: when the pinned sensor (sBleMAC) goes stale, fall back to another fresh roster sensor (roster order)
   char     sBleMAC[18]        = "";            // Bind to specific sensor MAC (empty = accept all)
   uint16_t iBleInterval       = 30;            // Publish/state-update cadence (sec, 10-300). NOT scan rate: TASK-494 made the BLE scan continuous to match OT-Thing.

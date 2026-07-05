@@ -36,41 +36,77 @@
     document.querySelectorAll('.seg').forEach(function (s) {
       s.classList.toggle('active', s.dataset.page === p);
     });
-    ['home', 'monitor', 'settings'].forEach(function (k) {
+    ['home', 'sat', 'monitor', 'settings', 'advanced'].forEach(function (k) {
       var el = document.getElementById('page-' + k);
       if (el) el.classList.toggle('active', k === p);
     });
     try { localStorage.setItem('otgw-v2-page', p); } catch (e) { }
+    // TASK-986: the SAT page polls /api/v2/sat/status only while it is visible.
+    // Stop the poll on every navigation, then (re)arm it when entering the page.
+    satPageStop();
     if (p === 'monitor' && isMonitorLogVisible()) renderLog();
     if (p === 'settings') fetchSettings();
+    if (p === 'sat') satPageStart();
+    // TASK-982: entering Advanced re-asserts its active sub-tab (restore-on-refresh,
+    // TASK-808) and loads that tab's data on demand.
+    if (p === 'advanced') {
+      var at = null; try { at = localStorage.getItem('otgw-v2-advtab'); } catch (e) { }
+      showAdvTab(at || 'pic');
+    }
   }
 
   // ---------- Home concept chips (A/B/C) ----------
+  var VIEW_LABELS = { a: 'System view', b: 'At a glance', c: 'Mission control' };
   function showDesign(d) {
-    document.querySelectorAll('.cchip').forEach(function (s) {
+    document.querySelectorAll('.vp-item').forEach(function (s) {
       s.classList.toggle('active', s.dataset.design === d);
     });
     ['a', 'b', 'c'].forEach(function (k) {
       var el = document.getElementById('design-' + k);
       if (el) el.classList.toggle('active', k === d);
     });
+    var lbl = document.getElementById('viewPickLabel');
+    if (lbl) lbl.textContent = VIEW_LABELS[d] || VIEW_LABELS.a;
     try { localStorage.setItem('otgw-v2-design', d); } catch (e) { }
     if (typeof renderActive === 'function') renderActive();
   }
+  function closeViewMenu() {
+    var m = document.getElementById('viewPickMenu'); if (m) m.classList.remove('show');
+    var b = document.getElementById('viewPickBtn'); if (b) b.setAttribute('aria-expanded', 'false');
+  }
 
   // ---------- Monitor sub-tabs ----------
+  // Scoped to #page-monitor so the Advanced page's own .subtab/.mpanel elements
+  // (TASK-982) are never toggled by this switcher, and vice-versa.
   function showTab(t) {
-    document.querySelectorAll('.subtab').forEach(function (s) {
+    document.querySelectorAll('#page-monitor .subtab').forEach(function (s) {
       s.classList.toggle('active', s.dataset.tab === t);
     });
-    document.querySelectorAll('.mpanel').forEach(function (el) {
+    document.querySelectorAll('#page-monitor .mpanel').forEach(function (el) {
       el.classList.toggle('active', el.id === t);
     });
     if (t === 'mlog') renderLog();
-    else if (t === 'mstats') renderStats();
+    else if (t === 'mstats') { renderStats(); fetchStatsPanels(); }
     else if (t === 'msupport') renderSupport();
     else if (t === 'mgraph') renderGraph();
     else if (t === 'mconn') { fetchConn(); fetchOtdOvr(); }
+  }
+
+  // ---------- Advanced sub-tabs (TASK-982): PIC / Debug / File System / System ----------
+  function showAdvTab(k) {
+    document.querySelectorAll('#advTabs .subtab').forEach(function (s) {
+      s.classList.toggle('active', s.dataset.adv === k);
+    });
+    ['pic', 'debug', 'files', 'system'].forEach(function (x) {
+      var el = document.getElementById('adv-' + x);
+      if (el) el.classList.toggle('active', x === k);
+    });
+    try { localStorage.setItem('otgw-v2-advtab', k); } catch (e) { }
+    // Fetch-on-demand: each sub-tab loads its own data when opened, not on page init.
+    if (k === 'pic') { fetchPic(); fetchPicSettings(); picUpdatePoll(); }
+    else if (k === 'debug') fetchDebug();
+    else if (k === 'files') fetchFsList(fsCurrentPath);
+    else if (k === 'system') fetchSystemStatus();
   }
 
   // ---------- back to the classic UI ----------
@@ -144,24 +180,131 @@
              exp: 'Values on this page are fetched from the device API.' }
   };
   var connRssi = null;
+  var simActive = false;   // TASK-982: device/info otgwsimulation, cached via withDeviceInfo
+  // TASK-983: header network chip — static identity from the one-shot device/info
+  // snapshot; the Wi-Fi bars + dBm refresh live from connRssi (the /health poll).
+  var hdrNet = { ip: '', ssid: '', quality: 0, kind: 'wifi' };   // kind: wifi | eth | ap
   function renderConnStrip() {
     var strip = document.getElementById('connStrip'); if (!strip) return;
-    var order = ['ws', 'mode', 'mqtt', 'wifi', 'boiler', 'therm'];
-    var short = { ws: 'Live', mode: 'Mode', mqtt: 'MQTT', wifi: 'Wi-Fi', boiler: 'Boiler', therm: 'Thermostat' };
+    // Single worst-of health-summary pill; the per-node detail lives on Monitor › Connection.
+    // Mode is excluded from the roll-up — it moved to the header status pill below.
+    var nodes = ['ws', 'mqtt', 'wifi', 'boiler', 'therm'];
+    var worst = 'ok', issues = 0;
+    nodes.forEach(function (k) {
+      var c = CONN[k]; if (!c) return;
+      if (c.s === 'st-down') { worst = 'down'; issues++; }
+      else if (c.s === 'st-warn') { if (worst !== 'down') worst = 'warn'; issues++; }
+    });
+    var cls = worst === 'down' ? 'down' : (worst === 'warn' ? 'warn' : '');
+    var label = worst === 'down' ? (issues + ' connection issue' + (issues > 1 ? 's' : '')) :
+                (worst === 'warn' ? (issues + ' degraded') : 'All systems connected');
     strip.textContent = '';   // rebuild with DOM nodes (textContent — no HTML injection)
-    order.forEach(function (key) {
-      var c = CONN[key]; if (!c) return;
-      var btn = document.createElement('button'); btn.className = 'connpill ' + c.s;
-      btn.title = 'Connectivity — tap for the detail map';
-      btn.addEventListener('click', function () { showPage('monitor'); showTab('mconn'); });
-      var dot = document.createElement('span'); dot.className = 'd';
-      var pk = document.createElement('span'); pk.className = 'pk'; pk.textContent = short[key] + ' ';
-      var pv = document.createElement('span'); pv.className = 'pv';
-      if (c.s === 'st-mode') pv.textContent = (c.value || 'unknown').toUpperCase();
-      else if (key === 'wifi' && connRssi !== null) pv.textContent = connRssi + ' dBm';
-      else pv.textContent = STLABEL[c.s] || '—';
-      btn.appendChild(dot); btn.appendChild(pk); btn.appendChild(pv);
-      strip.appendChild(btn);
+    var btn = document.createElement('button');
+    btn.className = 'connsum' + (cls ? ' ' + cls : '');
+    btn.title = 'Connectivity health — open the Connection map';
+    btn.addEventListener('click', function () { showPage('monitor'); showTab('mconn'); });
+    var dot = document.createElement('span'); dot.className = 'd';
+    var lbl = document.createElement('span'); lbl.textContent = label;
+    var go = document.createElement('span'); go.className = 'go'; go.textContent = '· Connection ›';
+    btn.appendChild(dot); btn.appendChild(lbl); btn.appendChild(go);
+    strip.appendChild(btn);
+
+    // Keep the firmware-style header status pill in sync with the live CONN model.
+    // v2's mode vocabulary is wider than the mockup's gateway|monitor: 'detecting'
+    // (PIC, mode not yet known) and 'n/a' also occur. 'n/a' is overloaded — it is set
+    // both for OT-Direct hardware and for a PIC running non-gateway firmware — so we
+    // disambiguate via CONN.ot.detail rather than asserting a hardware type blindly.
+    var hs = document.getElementById('hdrStatus');
+    if (hs) {
+      var wd = (CONN.ws.s !== 'st-ok' && CONN.ws.s !== 'st-warn');
+      hs.classList.toggle('down', wd);
+      var mv = CONN.mode.value;
+      var mode;
+      if (mv === 'gateway') mode = 'Gateway';
+      else if (mv === 'monitor') mode = 'Monitor';
+      else if (mv === 'detecting') mode = 'Detecting…';
+      else if (mv === 'n/a') mode = (CONN.ot.detail === 'OT-Direct') ? 'OT-Direct' : 'N/A';
+      else mode = mv ? (mv.charAt(0).toUpperCase() + mv.slice(1)) : 'Unknown';
+      hs.title = (wd ? 'Disconnected' : 'Connected') + ' · ' + mode + ' mode';
+      var md = document.getElementById('hdrStatMode');
+      if (md) md.textContent = (wd ? 'Disconnected' : mode);
+      // TASK-982: keep the Advanced › System 'Device status' badges in sync from the
+      // SAME wd/mode mapping (no drift). sysSim reflects the cached device/info flag.
+      var sc = document.getElementById('sysConn');
+      if (sc) { sc.classList.toggle('down', wd); sc.textContent = '● ' + (wd ? 'Disconnected' : 'Connected'); }
+      var sm = document.getElementById('sysMode');
+      if (sm) sm.textContent = '⇄ ' + mode;
+      var ssim = document.getElementById('sysSim');
+      if (ssim) ssim.classList.toggle('hidden', !simActive);
+    }
+  }
+
+  // ---------- TASK-983: header identity chips (hostname·version + IP·Wi-Fi) ----------
+  function wifiQualFromRssi(rssi) {
+    // Mirror of the firmware's signal_quality_perc_quad() so the live bar count
+    // matches the quality% device/info reports (which /health does not carry).
+    var perfect = -50, worst = -85, n = perfect - worst;   // 35
+    var q = Math.trunc((100 * n * n - (perfect - rssi) * (15 * n + 62 * (perfect - rssi))) / (n * n));
+    return q > 100 ? 100 : (q < 1 ? 0 : q);
+  }
+  function fillHeaderIdentity(d) {
+    // One-shot from the device/info snapshot at startup (never polled). hostname and
+    // ssid are device-sourced strings — build with textContent, never innerHTML.
+    var host = document.getElementById('hdrHost');
+    if (host) {
+      var hn = ('' + (d.hostname || '')).trim();
+      var ver = ('' + (d.fwversion || '')).split('+')[0];   // drop +buildmetadata for a compact chip
+      host.textContent = '';
+      host.appendChild(document.createTextNode(hn || 'device'));
+      var sm = document.createElement('small'); sm.textContent = '.local';
+      host.appendChild(sm);
+      host.appendChild(document.createTextNode(' · ' + (ver ? 'v' + ver : '—')));
+    }
+    // device/info distinguishes Wi-Fi, Ethernet ("Wired") and AP-fallback — render each honestly.
+    hdrNet.ip = ('' + (d.ipaddress || '')).trim();
+    hdrNet.ssid = ('' + (d.ssid || '')).trim();
+    hdrNet.quality = (typeof d.wifiquality === 'number') ? d.wifiquality : 0;
+    hdrNet.kind = (d.apfallback === true) ? 'ap'
+      : ((d.wifiquality_text === 'Wired' || d.ssid === 'Wired') ? 'eth' : 'wifi');
+    renderHdrNet();
+  }
+  function renderHdrNet() {
+    var el = document.getElementById('hdrNet'); if (!el) return;
+    el.textContent = ''; el.classList.remove('ap');
+    var dot = document.createElement('span'); dot.className = 'cdot'; el.appendChild(dot);
+    el.appendChild(document.createTextNode(hdrNet.ip || '—'));
+    // Lit-bar count: Ethernet = all 4, AP = 0; Wi-Fi from quality quartiles, with the
+    // quality re-derived from the live connRssi once /health has refreshed it.
+    var q = hdrNet.quality, lit;
+    if (hdrNet.kind === 'eth') { lit = 4; }
+    else if (hdrNet.kind === 'ap') { lit = 0; el.classList.add('ap'); }
+    else { if (connRssi !== null) q = wifiQualFromRssi(connRssi); lit = q >= 75 ? 4 : q >= 50 ? 3 : q >= 25 ? 2 : q > 0 ? 1 : 0; }
+    var bars = document.createElement('span'); bars.className = 'wbars'; bars.style.marginLeft = '8px';
+    var hpx = [4, 7, 10, 13];
+    for (var i = 0; i < 4; i++) { var b = document.createElement('i'); b.style.height = hpx[i] + 'px'; if (i >= lit) b.className = 'off'; bars.appendChild(b); }
+    el.appendChild(bars);
+    // Tooltip — honest per network type. DHCP-vs-static read lazily from the settings
+    // cache (empty wifistaticip == DHCP); it fills in once fetchSettings() lands.
+    var staticip = (setData.wifistaticip && setData.wifistaticip.value != null) ? ('' + setData.wifistaticip.value).trim() : '';
+    var mode = staticip === '' ? 'DHCP' : 'static';
+    var tip;
+    if (hdrNet.kind === 'eth') tip = 'IP ' + (hdrNet.ip || '—') + ' (' + mode + ') · Wired';
+    else if (hdrNet.kind === 'ap') tip = 'IP ' + (hdrNet.ip || '—') + ' · AP mode';
+    else {
+      tip = 'IP ' + (hdrNet.ip || '—') + ' (' + mode + ') · Wi-Fi ' + (hdrNet.ssid || '—');
+      if (connRssi !== null) tip += ' · ' + connRssi + ' dBm';
+      if (q > 0) tip += ' · ' + q + '%';
+    }
+    el.title = tip;
+  }
+  // SIMULATION badge — /api/v2/simulate is PIC-path only; any error (404/503 on
+  // OT-Direct, transport failure) is treated as "not simulating" and hides the badge.
+  function fetchSim() {
+    fetch(APIGW + 'v2/simulate').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var active = !!(j && j.simulation && j.simulation.active);
+      var el = document.getElementById('hdrSim'); if (el) el.classList.toggle('hidden', !active);
+    }).catch(function () {
+      var el = document.getElementById('hdrSim'); if (el) el.classList.add('hidden');
     });
   }
 
@@ -236,6 +379,22 @@
     return /^[A-Za-z][0-9A-Fa-f]{8}$/.test(raw) ? raw : null;
   }
 
+  // TASK-981: classify a timestamped event/narration line — the lines rawFromLine
+  // drops. The firmware emits these over the same WS log stream with a one-char
+  // prefix after the timestamp: '>' sent command, '<' PIC response, '!' error/NG,
+  // '*' system event, 'S' SAT narration. Returns the colour class for the coloured
+  // kinds, 'evt' for the pushed-but-uncoloured kinds ('*'/'S'), or '' when the line
+  // is not an event line (so arbitrary non-frame text is never mistaken for one).
+  function eventLineClass(line) {
+    if (typeof line !== 'string') return '';
+    var off = 0;
+    var ts = line.match(/^\d{2}:\d{2}:\d{2}\.\d{3,6}\s/);
+    if (ts) off = ts[0].length;
+    var m = line.substring(off).match(/^([><!*S])\s/);
+    if (!m) return '';
+    return m[1] === '>' ? 'cmd' : m[1] === '<' ? 'rsp' : m[1] === '!' ? 'err' : 'evt';
+  }
+
   function onWsMessage(ev) {
     var d = ev.data;
     if (typeof d !== 'string') return;
@@ -248,11 +407,13 @@
       pushLog(d);                   // Monitor > Log console
       updateStats(d, raw);          // Monitor > Stats + OT Support
       if (activeDesign() === 'c') scheduleRender();
+    } else if (eventLineClass(d)) {
+      pushLog(d);                   // TASK-981: sent-command echo / PIC ack / NG into the log
     }
   }
 
   function activeDesign() {
-    var d = document.querySelector('.cchip.active');
+    var d = document.querySelector('.vp-item.active');
     return d ? d.dataset.design : 'a';
   }
 
@@ -565,10 +726,19 @@
   // ---------- Monitor > Log ----------
   var LOG_MAX = 600, logBuf = [], logRecvTimes = [];
   var logPaused = false, logSearch = '', logShowTs = true, logAutoScroll = true;
+  // TASK-970: SAT-only filter, auto-download timer, stream-to-file writer
+  var logSatOnly = false, logAutoDlTimer = null, logStreamWriter = null;
+  var SAT_LINE_RE = /^\d{2}:\d{2}:\d{2}\s+S\s/;   // "HH:MM:SS S ..." SAT narration prefix
   function pushLog(line) {
+    // WS frames arrive with a trailing "\r\n"; strip it so renderLog's join('\n')
+    // produces ONE newline per frame (dense) instead of frame-newline + join-newline
+    // = a blank line between every frame. Also keeps the stream-to-file output clean.
+    line = ('' + line).replace(/[\r\n]+$/, '');
     var now = Date.now();
     logRecvTimes.push(now);
     while (logRecvTimes.length && now - logRecvTimes[0] > 10000) logRecvTimes.shift();
+    // Stream to file captures every frame regardless of the display Pause.
+    if (logStreamWriter) { try { logStreamWriter.write(line + '\n'); } catch (e) { } }
     if (logPaused) return;
     logBuf.push(line);
     if (logBuf.length > LOG_MAX) logBuf.shift();
@@ -584,8 +754,25 @@
     var q = logSearch.trim().toLowerCase();
     var lines = logBuf;
     if (q) lines = lines.filter(function (l) { return l.toLowerCase().indexOf(q) !== -1; });
+    if (logSatOnly) lines = lines.filter(function (l) { return SAT_LINE_RE.test(l); });   // TASK-970
     if (!logShowTs) lines = lines.map(function (l) { return l.replace(/^\d{2}:\d{2}:\d{2}\.\d{3,6}\s+/, ''); });
-    el.textContent = lines.join('\n');     // textContent: device data, not HTML
+    // TASK-981: per-line DOM so command-echo lines can be coloured (.cmd/.rsp/.err)
+    // without ever feeding device text to innerHTML. .console is white-space:pre-wrap,
+    // so the '\n' text nodes are the line separators (matches the old join('\n')).
+    // OT frames stay bare text nodes; only the coloured event kinds get a span.
+    el.textContent = '';
+    var frag = document.createDocumentFragment();
+    for (var i = 0; i < lines.length; i++) {
+      if (i > 0) frag.appendChild(document.createTextNode('\n'));
+      var cls = eventLineClass(lines[i]);
+      if (cls === 'cmd' || cls === 'rsp' || cls === 'err') {
+        var span = document.createElement('span'); span.className = cls; span.textContent = lines[i];
+        frag.appendChild(span);
+      } else {
+        frag.appendChild(document.createTextNode(lines[i]));
+      }
+    }
+    el.appendChild(frag);
     if (logAutoScroll) el.scrollTop = el.scrollHeight;
     var cnt = document.getElementById('logCount'); if (cnt) cnt.textContent = logBuf.length;
     var rate = document.getElementById('logRate'); if (rate) rate.textContent = (logRecvTimes.length / 10).toFixed(1);
@@ -613,7 +800,7 @@
     requestAnimationFrame(function () { renderPending = false; renderActive(); });
   }
   function renderActive() {
-    var d = document.querySelector('.cchip.active');
+    var d = document.querySelector('.vp-item.active');
     var which = d ? d.dataset.design : 'a';
     if (which === 'a') renderA();
     else if (which === 'b') renderB();
@@ -633,6 +820,14 @@
   }
 
   function txt(id, s) { var el = document.getElementById(id); if (el) el.textContent = s; }
+  // TASK-984: append the ⛓ injected-override mark (+ tooltip) to a readout without
+  // clobbering its formatted value; clears the mark/title when the datapoint is plain.
+  function setMark(id, base, on) {
+    var el = document.getElementById(id); if (!el) return;
+    el.textContent = on ? base + ' ⛓' : base;
+    if (on) el.title = 'This value is being injected onto the OT bus by the gateway';
+    else el.removeAttribute('title');
+  }
   function fmt(v, dp, suffix) {
     if (v === null || v === undefined || isNaN(v)) return '—';
     return v.toFixed(dp === undefined ? 1 : dp) + (suffix || '');
@@ -670,9 +865,22 @@
     txt('aFlow', fmt(model.flow, 1, '°'));
     txt('aRet', fmt(model.ret, 1, '°'));
     txt('aDhw', model.dhw === null ? '—' : Math.round(model.dhw) + '°');
-    txt('aOut', fmt(model.outside, 1, '°'));
+    // TASK-984: decorate the outside-temp and room-setpoint readouts with ⛓ when
+    // those specific values are being gateway-injected (MsgID 27, resp. 9/16).
+    var ovrOut = ovrRows.some(function (o) { return ovrMark(o.id) === 'aOut'; });
+    var ovrSet = ovrRows.some(function (o) { return ovrMark(o.id) === 'aRoomSet'; });
+    setMark('aOut', fmt(model.outside, 1, '°'), model.outside !== null && ovrOut);
     txt('aRoom', fmt(model.room, 1, '°'));
-    txt('aRoomSet', model.roomSet === null ? '' : 'set ' + fmt(model.roomSet, 1, '°'));
+    var setBase = model.roomSet === null ? '' : 'set ' + fmt(model.roomSet, 1, '°');
+    setMark('aRoomSet', setBase, !!setBase && ovrSet);
+    // injected-override badge — count from the same polled overrides model.
+    var aob = document.getElementById('aOvrBadge');
+    if (aob) {
+      var no = ovrRows.length;
+      aob.classList.toggle('hidden', !no);
+      txt('aOvrCount', no);
+      if (!aob._wired) { aob._wired = true; aob.addEventListener('click', function (e) { e.stopPropagation(); toggleOvrPanel(); }); }
+    }
     txt('aModBig', model.mod === null ? '—' : Math.round(model.flame ? model.mod : 0) + '%');
     txt('aModTag', isHP ? 'COMPRESSOR' : 'MODULATION');
     // LCD context line: FAULT / DHW xx° / HP|CH xx% / HP|CH idle
@@ -943,6 +1151,10 @@
       CONN.ot.name = isPic ? 'PIC link' : (iface === 'OT-Direct' ? 'OT-Direct' : 'OpenTherm interface');
       CONN.ot.detail = iface || 'none';
       CONN.ot.s = (iface && iface !== 'None') ? 'st-ok' : 'st-down';
+      // TASK-981: command-bar prompt reflects the live interface — 'OT ›' on OT-Direct,
+      // 'PIC ›' otherwise (PIC gateway, or unknown/none as a sane default; never hardcoded).
+      var cmdPrompt = document.getElementById('otCmdPrompt');
+      if (cmdPrompt) cmdPrompt.textContent = (iface === 'OT-Direct') ? 'OT ›' : 'PIC ›';
       // TASK-964: the OT-Direct override panel is meaningful only on OT-Direct
       // hardware (there is no direct bus to override behind a PIC gateway).
       var otdOvrEl = document.getElementById('otdOvr');
@@ -974,6 +1186,9 @@
       CONN.ws.detail = wsUp ? 'WebSocket · streaming' : 'WebSocket · reconnecting…';
       CONN.api.s = 'st-ok';
       renderConnMap(); renderConnStrip(); renderConnDetail();
+      renderHdrNet();   // TASK-983: refresh Wi-Fi bars + dBm tooltip from the live RSSI
+      fetchSim();       // TASK-983: piggyback the SIMULATION-badge poll on this cadence
+      fetchOverrides(iface);   // TASK-984: refresh the injected-override count/list (source by interface)
     }).catch(function () { });
   }
   // ---------- Monitor > Connection > OT-Direct manual overrides (TASK-964) ----------
@@ -1054,7 +1269,88 @@
     var md = document.getElementById('cnModeTxt');
     if (md) md.textContent = CONN.mode.value === 'gateway' ? 'GATEWAY MODE' : CONN.mode.value === 'monitor' ? 'MONITOR MODE' : CONN.mode.value === 'n/a' ? 'NO PIC' : ('MODE: ' + (CONN.mode.value || '?').toUpperCase());
     var dm = document.getElementById('dot-mode'); if (dm) dm.setAttribute('fill', (CONN.mode.value === 'gateway' || CONN.mode.value === 'monitor') ? STV['st-mode'] : STV['st-unknown']);
+    updateCnOvr();   // TASK-984: refresh the on-bus override badge from the cached rows
     renderConnDetail();
+  }
+
+  // ---------- Override-injection visibility (TASK-984) ----------
+  // The gateway can inject values onto the OT bus (ADR-118: PIC recordOTOverride) or,
+  // on OT-Direct hardware, the user's manual stored-response / modifier overrides. We
+  // surface the live count on Home (design A) and the connection map, and list the rows
+  // in a floating read-only panel. Polled on the fetchConn cadence — no new timer.
+  var ovrRows = [];   // normalized [{ id: <OT MsgID>, name, meta }]
+  // MsgID -> which Design-A readout the injection decorates. 9 = remote-override room
+  // setpoint (TrOverride), 16 = room setpoint (TrSet); 27 = outside temperature (Toutside).
+  function ovrMark(id) { return (id === 9 || id === 16) ? 'aRoomSet' : (id === 27 ? 'aOut' : null); }
+  function normPicOvr(j) {
+    var rows = (j && Array.isArray(j.overrides)) ? j.overrides : [];
+    return rows.map(function (r) {
+      var name = (r.friendly && r.friendly.length) ? r.friendly : (r.label || ('MsgID ' + r.id));
+      var kind = (r.kind === 'answer') ? 'answer' : 'substituted';
+      var val = (typeof r.value === 'number') ? r.value.toFixed(2) : r.value;
+      return { id: r.id, name: name, meta: kind + ' = ' + val + ' · ' + r.age_s + 's' };
+    });
+  }
+  function normOtdOvr(j) {
+    var ov = (j && j.overrides) ? j.overrides : {};
+    var out = [];
+    function push(arr, label) {
+      (arr || []).forEach(function (e) {
+        var mid = (e && e.msgid !== undefined) ? e.msgid : e;
+        var idn = (typeof mid === 'number') ? mid : parseInt(mid, 10);
+        var v = (e && e.value !== undefined) ? otdHex(e.value) : '';
+        out.push({ id: idn, name: label, meta: 'MsgID ' + mid + (v ? ' · ' + v : '') });
+      });
+    }
+    push(ov.write, 'Write'); push(ov.response, 'Stored response');
+    push(ov.modify, 'Response modifier'); push(ov.unknown, 'Unknown ID');
+    return out;
+  }
+  function fetchOverrides(iface) {
+    // On OT-Direct the gateway overrides endpoint is meaningless (no PIC); read the
+    // OT-Direct store instead. Both normalize into ovrRows; errors -> empty, silently.
+    var otd = (iface === 'OT-Direct');
+    var url = APIGW + (otd ? 'v2/otdirect/overrides' : 'v2/otgw/overrides');
+    function apply() { updateCnOvr(); scheduleRender(); }   // map badge + Home A badge/marks
+    fetch(url).then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { ovrRows = otd ? normOtdOvr(j) : normPicOvr(j); apply(); })
+      .catch(function () { ovrRows = []; apply(); });
+  }
+  // On-bus badge in the connection-map SVG (#cnOvr sits on the y=180 shared bus segment).
+  function updateCnOvr() {
+    var g = document.getElementById('cnOvr'); if (!g) return;
+    var n = ovrRows.length;
+    g.style.display = n ? '' : 'none';
+    var tx = document.getElementById('cnOvrTxt'); if (tx) tx.textContent = '⛓ ' + n + ' injected';
+    g.onclick = function (e) { e.stopPropagation(); toggleOvrPanel(); };
+  }
+  // Floating read-only detail panel. The ADR-118 store carries {id,kind,value,age} only,
+  // so no originating-command / pre-override value / Clear affordance is available yet.
+  function renderOvrPanel() {
+    var p = document.getElementById('ovrPanel'); if (!p) return;
+    p.textContent = '';
+    var h = document.createElement('h4'); h.textContent = '⛓ Active gateway overrides'; p.appendChild(h);
+    var sub = document.createElement('p'); sub.className = 'sub';
+    sub.textContent = 'Values the gateway is injecting onto the OT bus — the boiler/thermostat see these, not the original.';
+    p.appendChild(sub);
+    if (!ovrRows.length) {
+      var m = document.createElement('div'); m.className = 'ovr-item'; m.style.color = 'var(--muted)';
+      m.textContent = 'No active overrides'; p.appendChild(m); return;
+    }
+    ovrRows.forEach(function (o) {
+      var it = document.createElement('div'); it.className = 'ovr-item';
+      var r1 = document.createElement('div'); r1.className = 'r1';
+      var nm = document.createElement('span'); nm.textContent = o.name; r1.appendChild(nm);
+      it.appendChild(r1);
+      var r2 = document.createElement('div'); r2.className = 'r2'; r2.textContent = o.meta;
+      it.appendChild(r2);
+      p.appendChild(it);
+    });
+  }
+  function toggleOvrPanel() {
+    var p = document.getElementById('ovrPanel'); if (!p) return;
+    if (!p.classList.contains('show')) renderOvrPanel();
+    p.classList.toggle('show');
   }
 
   // ---------- Settings (built from GET /api/v2/settings) ----------
@@ -1272,10 +1568,14 @@
     satsimulation:       { cat: 'sat', sub: 'Simulation', label: 'Enable simulation' },
     satsimheatrate:      { cat: 'sat', sub: 'Simulation', label: 'Heat rate', hint: '°C/min' },
     satsimcoolrate:      { cat: 'sat', sub: 'Simulation', label: 'Cool rate', hint: '°C/min' },
-    satbleenable:        { cat: 'sat', sub: 'BLE sensor', label: 'Enable BLE sensor' },
-    satblefailover:      { cat: 'sat', sub: 'BLE sensor', label: 'BLE failover to OT' },
-    satblemac:           { cat: 'sat', sub: 'BLE sensor', label: 'BLE sensor MAC' },
-    satbleinterval:      { cat: 'sat', sub: 'BLE sensor', label: 'BLE poll interval', hint: 'Seconds' }
+    // TASK-974: BLE sensors are sensors, independent of SAT — grouped under the
+    // Sensors category (not SAT) so users find the enable toggle next to the roster.
+    // The firmware already scans on satbleenable alone (no satenabled needed) and
+    // lazy-inits the scan at runtime, so enabling here starts it without a reboot.
+    satbleenable:        { cat: 'sensors', sub: 'BLE sensors', label: 'Enable BLE sensors' },
+    satblefailover:      { cat: 'sensors', sub: 'BLE sensors', label: 'BLE failover to OT' },
+    satblemac:           { cat: 'sensors', sub: 'BLE sensors', label: 'BLE sensor MAC' },
+    satbleinterval:      { cat: 'sensors', sub: 'BLE sensors', label: 'BLE poll interval', hint: 'Seconds' }
   };
   // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
   // normal toggle — never list it as an editable setting.
@@ -1322,6 +1622,7 @@
       });
       renderSettings();
       fetchBle();
+      maybeShowOnboarding();   // TASK-997: first-time wizard, once settings (ui_onboarded) are known
     }).catch(function () { });
   }
   function fieldDirty(k) { return Object.prototype.hasOwnProperty.call(setDirty, k); }
@@ -1392,6 +1693,13 @@
         bySub[s].forEach(function (k) { card.appendChild(settingRow(k)); });
         wrap.appendChild(card);
       });
+      // TASK-985: give the Webhook group an inline Send-test-call action. renderSettings
+      // rebuilds #setCols on every render, so the row is re-appended here (not once) —
+      // the webhook category has a single set-group (no sub-groups).
+      if (id === 'webhook') {
+        var whCard = wrap.querySelector('.set-group');
+        if (whCard) whCard.appendChild(webhookTestRow());
+      }
       cols.appendChild(wrap);
     });
     if (bleData) renderBleCard();
@@ -1441,6 +1749,63 @@
     }
     row.appendChild(input);
     return row;
+  }
+  // TASK-985: Webhook "Send test call" action, appended to the Webhook settings group
+  // by renderSettings(). Fires the REAL POST /api/v2/webhook/test?state=on. The endpoint
+  // is fire-and-forget: it returns {"status":"ok"} immediately and sends the SAVED ON
+  // URL/payload from its own FreeRTOS task. The target server's HTTP result is not
+  // exposed by the firmware, so the success line reports the endpoint's own ack + a
+  // local timestamp, not the remote status.
+  function webhookTestRow() {
+    var wrap = document.createElement('div'); wrap.className = 'wh-actions';
+    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'tbtn';
+    btn.textContent = 'Send test call';
+    btn.title = 'Fires the saved ON webhook (POST /api/v2/webhook/test)';
+    var status = document.createElement('span'); status.className = 'wh-status';
+    status.textContent = 'Not fired yet';
+    wrap.appendChild(btn); wrap.appendChild(status);
+    btn.addEventListener('click', function () {
+      // Disabled-guard: mirror the mockup — block only when the enable checkbox is
+      // present and unchecked. (The firmware itself fires regardless of bEnabled; this
+      // is a UX gate, so an absent checkbox — e.g. filtered out by search — proceeds.)
+      var en = document.querySelector('#setCols .srow[data-key="webhookenable"] input.sw');
+      if (en && !en.checked) {
+        status.className = 'wh-status';
+        status.textContent = 'Webhook disabled — enable it above first';
+        return;
+      }
+      status.className = 'wh-status'; status.textContent = 'Sending…';
+      btn.disabled = true;
+      // credentials:'same-origin' so HTTP Basic-Auth + CSRF same-origin (ADR-056) hold.
+      fetch(APIGW + 'v2/webhook/test?state=on', { method: 'POST', credentials: 'same-origin' })
+        .then(function (r) {
+          btn.disabled = false;
+          if (r.status === 401 || r.status === 403) {
+            status.className = 'wh-status';
+            status.textContent = 'Auth required — sign in first (HTTP ' + r.status + ')';
+            return;
+          }
+          if (!r.ok) {
+            status.className = 'wh-status';
+            status.textContent = 'Error: HTTP ' + r.status;
+            return;
+          }
+          return r.text().then(function (body) {
+            var st = 'ok';
+            try { var j = JSON.parse(body); if (j && j.status) st = j.status; }
+            catch (e) { /* non-JSON ack still counts as sent */ }
+            var ts = new Date().toTimeString().slice(0, 8);
+            status.className = 'wh-status ok';
+            status.textContent = '✓ ' + st + ' · ' + ts;
+          });
+        })
+        .catch(function (e) {
+          btn.disabled = false;
+          status.className = 'wh-status';
+          status.textContent = 'Error: ' + ((e && e.message) ? e.message : 'network');
+        });
+    });
+    return wrap;
   }
   function markDirty(k, val, row) {
     // Password fields show empty; an empty value means "leave unchanged", so it is
@@ -1499,11 +1864,40 @@
         var changed = !bleData || bleData.populated_slots !== j.populated_slots ||
           JSON.stringify(bleData.sensors || []) !== JSON.stringify(j.sensors || []);
         bleData = j;
+        // TASK-995: no-PSRAM instability consent gate. When the board has no PSRAM,
+        // BLE is enabled, but the user hasn't accepted the risk yet, BLE stays dormant
+        // (firmware bleActive()==false) — surface the consent dialog once.
+        if (j.psram === 0 && j.ble_enable && !j.risk_ack) maybeShowBleConsent();
         var card = document.getElementById('setcard-ble');
         var typing = card && card.contains(document.activeElement) &&
           /^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '');
         if (changed && !typing) renderBleCard();
       }).catch(function () { });
+  }
+  // TASK-995: BLE-without-PSRAM instability consent. On a no-PSRAM board, enabling BLE
+  // steals ~64 KB of internal DRAM that the async web server needs, so the Web UI can
+  // wedge under concurrent load. Require an explicit risk acknowledgement: accept ->
+  // persist SATbleriskack=true (firmware starts scanning); decline -> turn BLE off again.
+  function maybeShowBleConsent() {
+    if (document.getElementById('bleRiskBackdrop')) return;   // already open
+    var bd = document.createElement('div'); bd.id = 'bleRiskBackdrop'; bd.className = 'sim-backdrop';
+    var m = document.createElement('div'); m.className = 'sim-modal';
+    var h = document.createElement('h3'); h.textContent = '⚠ BLE without PSRAM — instability risk';
+    var p = document.createElement('p');
+    p.textContent = 'This board has no PSRAM. Enabling BLE takes ~64 KB of internal memory that the web server needs, so the Web UI can become unstable or unreachable under load (you may need to reboot). Enable BLE anyway?';
+    var acts = document.createElement('div'); acts.className = 'acts';
+    var no = document.createElement('button'); no.textContent = 'Keep BLE off';
+    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Enable anyway (accept risk)';
+    function post(name, value, then) {
+      fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) })
+        .then(function (r) { if (r.ok && then) then(); }).catch(function () { });
+    }
+    function close() { if (bd.parentNode) bd.parentNode.removeChild(bd); }
+    no.addEventListener('click', function () { post('satbleenable', false, function () { if (typeof bleToast === 'function') bleToast('BLE kept off'); setTimeout(fetchBle, 500); }); close(); });
+    yes.addEventListener('click', function () { post('satbleriskack', true, function () { if (typeof bleToast === 'function') bleToast('BLE enabled — risk accepted'); setTimeout(fetchBle, 800); }); close(); });
+    acts.appendChild(no); acts.appendChild(yes);
+    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
+    document.body.appendChild(bd);
   }
   // TASK-963: continuous detection. The firmware scans passive-continuous (ADR-151),
   // so sensors appear over time; poll the roster while the Sensors category is open
@@ -1521,6 +1915,18 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: body ? JSON.stringify(body) : undefined
     }).then(function () { setTimeout(fetchBle, 500); }).catch(function () { });
+  }
+  // TASK-975: clear the whole roster by forgetting every slot (forget also cleans
+  // HA discovery). Fire SEQUENTIALLY — concurrent POSTs trip the REST in-flight cap
+  // (REST_MAX_INFLIGHT=4) and some forgets 503, leaving slots behind. Re-fetch once.
+  function clearBleRoster(macs) {
+    if (typeof bleToast === 'function') bleToast('Clearing roster…');
+    var list = (macs || []).filter(Boolean);
+    (function next(i) {
+      if (i >= list.length) { setTimeout(fetchBle, 500); return; }
+      fetch(APIGW + 'v2/sat/ble/forget', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mac: list[i] }) })
+        .then(function () { next(i + 1); }).catch(function () { next(i + 1); });
+    })(0);
   }
   function renderBleCard() {
     var cols = document.getElementById('setCols'); if (!cols || !bleData) return;
@@ -1546,6 +1952,19 @@
       setTimeout(function () { if (rescan.isConnected) { rescan.disabled = false; rescan.textContent = '🔄 Rescan'; } }, 3000);
     });
     card.appendChild(rescan);
+    // TASK-975: clear the whole roster (forget every slot; forget also cleans up HA
+    // discovery). Two-click confirm avoids a blocking modal dialog.
+    var sensorsNow = (bleData.sensors || []).filter(function (s) { return s.mac; });
+    if (sensorsNow.length) {
+      var clr = document.createElement('button'); clr.className = 'tbtn'; clr.textContent = '🗑 Clear roster';
+      clr.style.marginLeft = '6px';
+      clr.addEventListener('click', function () {
+        if (clr._armed) { clr._armed = false; clearBleRoster(sensorsNow.map(function (s) { return s.mac; })); return; }
+        clr._armed = true; clr.textContent = '⚠ Click again to clear all';
+        clr._t = setTimeout(function () { if (clr.isConnected) { clr._armed = false; clr.textContent = '🗑 Clear roster'; } }, 3000);
+      });
+      card.appendChild(clr);
+    }
     var sensors = bleData.sensors || [];
     if (!sensors.length) {
       var empty = document.createElement('div'); empty.className = 'ble-row'; empty.style.color = 'var(--muted)';
@@ -1578,6 +1997,26 @@
         var forget = document.createElement('button'); forget.className = 'tbtn'; forget.textContent = 'Forget';
         forget.addEventListener('click', function () { bleAction('forget', { mac: s.mac }); });
         ctr.appendChild(sel); ctr.appendChild(forget); row.appendChild(ctr);
+        // TASK-996: per-row friendly-name input. The firmware persists a label per
+        // roster slot (POST /sat/ble/label {mac,label} -> sBleLabel[24]); this exposes
+        // it so a discovered sensor can be named and renamed. Pre-filled with the
+        // current label; Enter or Save applies; clearing + Save clears the label.
+        var nameRow = document.createElement('div'); nameRow.className = 'ble-ctrls';
+        var nameIn = document.createElement('input'); nameIn.type = 'text';
+        nameIn.placeholder = 'Name (e.g. Living room)'; nameIn.maxLength = 23;
+        nameIn.value = s.label || ''; nameIn.autocomplete = 'off';
+        nameIn.style.flex = '1'; nameIn.style.minWidth = '12ch';
+        var nameBtn = document.createElement('button'); nameBtn.className = 'tbtn'; nameBtn.textContent = '💾 Save name';
+        (function (mac, input) {
+          function saveName() {
+            var v = (input.value || '').trim();
+            bleAction('label', { mac: mac, label: v });
+            if (typeof bleToast === 'function') bleToast(v ? 'Name saved' : 'Name cleared');
+          }
+          nameBtn.addEventListener('click', saveName);
+          input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); saveName(); } });
+        })(s.mac, nameIn);
+        nameRow.appendChild(nameIn); nameRow.appendChild(nameBtn); row.appendChild(nameRow);
         // TASK-931: per-row bindkey input (encrypted MiBeacon). Paste the 32-hex
         // beaconkey from the pvvx/Xiaomi-cloud tooling; empty clears it.
         var keyRow = document.createElement('div'); keyRow.className = 'ble-ctrls';
@@ -1797,6 +2236,499 @@
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
   }
+  // ---------- Monitor > Graph auto-save (TASK-971) ----------
+  var gAutoPngTimer = null, gAutoCsvTimer = null;
+  function toggleAutoPng(chip) {
+    if (gAutoPngTimer) { clearInterval(gAutoPngTimer); gAutoPngTimer = null; chip.classList.remove('on'); }
+    else { gAutoPngTimer = setInterval(exportPng, 300000); chip.classList.add('on'); }   // every 5 min
+  }
+  function toggleAutoCsv(chip) {
+    if (gAutoCsvTimer) { clearInterval(gAutoCsvTimer); gAutoCsvTimer = null; chip.classList.remove('on'); }
+    else { gAutoCsvTimer = setInterval(exportCsv, 300000); chip.classList.add('on'); }   // every 5 min
+  }
+
+  // ---------- Monitor > Log power-features (TASK-970) ----------
+  function downloadLog() {
+    downloadBlob(new Blob([logBuf.join('\n')], { type: 'text/plain' }), 'otgw-log-' + ts() + '.txt');
+  }
+  function toggleAutoDl(chip) {
+    if (logAutoDlTimer) { clearInterval(logAutoDlTimer); logAutoDlTimer = null; chip.classList.remove('on'); }
+    else { logAutoDlTimer = setInterval(downloadLog, 900000); chip.classList.add('on'); }   // every 15 min
+  }
+  function toggleStream(chip) {
+    if (logStreamWriter) { try { logStreamWriter.close(); } catch (e) { } logStreamWriter = null; chip.classList.remove('on'); return; }
+    if (!window.showSaveFilePicker) return;   // Chrome/Edge only (feature-detected in init)
+    window.showSaveFilePicker({ suggestedName: 'otgw-log-' + ts() + '.txt', types: [{ description: 'Text log', accept: { 'text/plain': ['.txt'] } }] })
+      .then(function (h) { return h.createWritable(); })
+      .then(function (w) { logStreamWriter = w; chip.classList.add('on'); })
+      .catch(function () { });
+  }
+
+  // ---------- Monitor > Statistics > gateway overrides + boiler-unsupported (TASK-969) ----------
+  function statMuted(t) { var d = document.createElement('div'); d.className = 'ble-row'; d.style.color = 'var(--muted)'; d.textContent = t; return d; }
+  function statRow(title, meta) {
+    var row = document.createElement('div'); row.className = 'ble-row';
+    var nm = document.createElement('div'); nm.className = 'ble-nm'; nm.textContent = title;
+    if (meta) { var m = document.createElement('span'); m.className = 'ble-mac'; m.textContent = meta; nm.appendChild(m); }
+    row.appendChild(nm); return row;
+  }
+  function fetchStatsPanels() {
+    fetch(APIGW + 'v2/otgw/overrides').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var el = document.getElementById('ovStatList'); if (!el) return; el.textContent = '';
+      var rows = (j && Array.isArray(j.overrides)) ? j.overrides : [];
+      if (!rows.length) { el.appendChild(statMuted('No active gateway overrides')); return; }
+      rows.forEach(function (r) {
+        var name = (r.friendly && r.friendly.length) ? r.friendly : (r.label || 'Unknown');
+        var kind = (r.kind === 'answer') ? 'answer' : 'substituted';
+        var val = (typeof r.value === 'number') ? r.value.toFixed(2) : r.value;
+        el.appendChild(statRow('MsgID ' + r.id + ' · ' + name, kind + ' = ' + val + ' · ' + r.age_s + 's'));
+      });
+    }).catch(function () { });
+    fetch(APIGW + 'v2/otgw/boiler-support').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var el = document.getElementById('boilerUnsupList'); if (!el) return; el.textContent = '';
+      var rd = (j && Array.isArray(j.unsupported_read)) ? j.unsupported_read : [];
+      var wr = (j && Array.isArray(j.unsupported_write)) ? j.unsupported_write : [];
+      if (!rd.length && !wr.length) { el.appendChild(statMuted('None — boiler supports all observed messages (or no boiler seen).')); return; }
+      function add(arr, mode) { arr.forEach(function (e) { var name = (e.friendly && e.friendly.length) ? e.friendly : (e.label || 'Unknown'); el.appendChild(statRow('MsgID ' + e.id + ' · ' + name, mode)); }); }
+      add(rd, 'read'); add(wr, 'write');
+    }).catch(function () { });
+  }
+
+  // ---------- Advanced: shared device/info snapshot ----------
+  // device/info is the heavy chunked endpoint (heap-gated). Fetch it once and
+  // cache for a few seconds so opening PIC → Debug → System in quick succession
+  // does not hammer it. Never polled — only fetched on Advanced sub-tab open.
+  var devInfoCache = null, devInfoTs = 0, devInfoInflight = null;
+  function withDeviceInfo(cb) {
+    var now = Date.now();
+    if (devInfoCache && (now - devInfoTs) < 8000) { cb(devInfoCache); return; }
+    if (devInfoInflight) { devInfoInflight.push(cb); return; }
+    devInfoInflight = [cb];
+    fetch(APIGW + 'v2/device/info').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var d = (j && j.device) || {};
+      devInfoCache = d; devInfoTs = Date.now();
+      simActive = (d.otgwsimulation === true || d.otgwsimulation === 'true');
+      var cbs = devInfoInflight; devInfoInflight = null;
+      cbs.forEach(function (fn) { try { fn(d); } catch (e) { } });
+    }).catch(function () {
+      var cbs = devInfoInflight || []; devInfoInflight = null;
+      cbs.forEach(function (fn) { try { fn(devInfoCache || {}); } catch (e) { } });
+    });
+  }
+  function yesno(b) { return (b === undefined || b === null) ? undefined : (b === false || b === 'false' || b === 0) ? 'No' : 'Yes'; }
+
+  // ---------- Advanced > Debug Information (TASK-967/982) ----------
+  function fetchDebug() {
+    // Grouped device info (mockup devinfo-groups), from the cached device/info snapshot.
+    withDeviceInfo(function (d) { renderDebugGroups(d); });
+    // Crashlog: green ok-banner when clean; the detail <pre> only when a crash exists.
+    fetch(APIGW + 'v2/device/crashlog').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var c = (j && j.crashlog) || {};
+      var ok = document.getElementById('dbgCrashOk'), pre = document.getElementById('dbgCrash');
+      if (!c.available) { if (ok) ok.style.display = ''; if (pre) pre.style.display = 'none'; }
+      else { if (ok) ok.style.display = 'none'; if (pre) { pre.style.display = ''; pre.textContent = ((c.summary || '') + '\n\n' + (c.details || '')).trim() || 'Crash recorded (no detail).'; } }
+    }).catch(function () {
+      var ok = document.getElementById('dbgCrashOk'), pre = document.getElementById('dbgCrash');
+      if (ok) ok.style.display = 'none'; if (pre) { pre.style.display = ''; pre.textContent = '—'; }
+    });
+    // Raw /api/v2/debug dump preserved behind the collapsible (nothing lost from the old tab).
+    fetch(APIGW + 'v2/debug').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var el = document.getElementById('dbgInfo'); if (!el) return;
+      var d = (j && j.debug) || j || {};
+      var keys = Object.keys(d);
+      el.textContent = keys.length ? keys.map(function (k) { return k + '  =  ' + d[k]; }).join('\n') : 'No debug data';
+    }).catch(function () { var el = document.getElementById('dbgInfo'); if (el) el.textContent = 'Failed to load debug info'; });
+  }
+  function renderDebugGroups(d) {
+    var host = document.getElementById('dbgGroups'); if (!host) return;
+    host.textContent = '';
+    var mqttEn;
+    if (Object.prototype.hasOwnProperty.call(setData, 'mqttenable')) mqttEn = (('' + setData.mqttenable.value) === 'true') ? 'Yes' : 'No';
+    var wifiQ;
+    if (d.wifiquality_text !== undefined) wifiQ = d.wifiquality_text + (d.wifiquality !== undefined ? ' (' + d.wifiquality + '%)' : '');
+    // TASK-995: format a byte count as MB (whole when exact) for the Hardware group.
+    function fmtMB(b) { if (b === undefined || b === null) return undefined; var m = b / 1048576; return (m % 1 ? m.toFixed(1) : m) + ' MB'; }
+    var psramStr = d.psram_found ? (fmtMB(d.psram_size) + ' (' + fmtMB(d.psram_free) + ' free)') : 'None';
+    var groups = [
+      ['Firmware', [
+        ['Firmware Version', d.fwversion], ['Compiled On', d.compiled],
+        ['PIC Firmware Version', d.picfwversion], ['PIC Firmware Type', d.picfwtype],
+        ['PIC Device ID', d.picdeviceid], ['Board Type', d.board]
+      ]],
+      ['Network', [
+        ['Hostname (.local)', d.hostname], ['IP Address', d.ipaddress], ['MAC Address', d.macaddress],
+        ['Wi-Fi Network (SSID)', d.ssid], ['Wi-Fi Signal Strength (dBm)', d.wifirssi], ['Wi-Fi Quality', wifiQ]
+      ]],
+      ['Hardware', [
+        ['Chip Model (est.)', d.chip_model_est], ['Unique Chip ID', d.chipid],
+        ['Arduino Core Version', d.coreversion], ['Espressif SDK Version', d.sdkversion],
+        ['CPU Speed (MHz)', d.cpufreq], ['Flash Size', d.flash_size ? fmtMB(d.flash_size) : (d.flashchipsize ? d.flashchipsize + ' MB' : undefined)],
+        ['PSRAM', psramStr], ['LittleFS Size (MB)', d.LittleFSsize], ['Flash Mode', d.flashchipmode]
+      ]],
+      ['Memory & uptime', [
+        ['Free Heap Memory (bytes)', d.freeheap], ['Max. Free Block (bytes)', d.maxfreeblock], ['Heap Fragmentation (%)', d.hd_fragmentation_pct],
+        ['Uptime Since Boot', d.uptime], ['Number of Reboots', d.bootcount], ['Last Reset Reason', d.lastreset]
+      ]],
+      ['Integrations', [
+        ['MQTT Connected', yesno(d.mqttconnected)], ['MQTT Enabled', mqttEn], ['NTP Enabled', yesno(d.ntpenable)], ['NTP Timezone', d.ntptimezone]
+      ]]
+    ];
+    groups.forEach(function (g) {
+      var rows = g[1].filter(function (r) { return r[1] !== undefined && r[1] !== null && r[1] !== ''; });
+      if (!rows.length) return;
+      var wrap = document.createElement('div'); wrap.className = 'devinfo-group';
+      var h = document.createElement('h4'); h.textContent = g[0]; wrap.appendChild(h);
+      var bodyEl = document.createElement('div'); bodyEl.className = 'devinfo-rows';
+      rows.forEach(function (r) {
+        var row = document.createElement('div'); row.className = 'devinforow';
+        var c1 = document.createElement('div'); c1.className = 'devinfocolumn1'; c1.textContent = r[0];
+        var c2 = document.createElement('div'); c2.className = 'devinfocolumn2'; c2.textContent = '' + r[1];
+        row.appendChild(c1); row.appendChild(c2); bodyEl.appendChild(row);
+      });
+      wrap.appendChild(bodyEl); host.appendChild(wrap);
+    });
+  }
+
+  // ---------- Advanced > PIC firmware flash (TASK-972/982) ----------
+  var PICBASE = location.protocol + '//' + location.host + '/';   // /pic is a top-level route, not under /api/v2
+  var picPollTimer = null, picBusy = false, picDevVer = '';
+  function fetchPic() {
+    var wrap = document.getElementById('picFlash'), none = document.getElementById('picNone');
+    withDeviceInfo(function (d) {
+      var isPic = (d.otcommandinterface || '') === 'PIC';
+      if (wrap) wrap.style.display = isPic ? '' : 'none';      // hidden on OTGW32 / OT-Direct
+      if (none) none.style.display = isPic ? 'none' : '';
+      var ssim = document.getElementById('sysSim'); if (ssim) ssim.classList.toggle('hidden', !simActive);
+      if (!isPic) return;
+      picDevVer = ('' + (d.picfwversion || '')).trim();        // for the .newer highlight
+      txt('picHeadDev', d.picdeviceid || '?');
+      txt('picHeadType', d.picfwtype || '?');
+      txt('picHeadVer', d.picfwversion || '?');
+      fetchPicFiles();
+    });
+  }
+  function fetchPicFiles() {
+    fetch(APIGW + 'v2/firmware/files').then(function (r) { return r.ok ? r.json() : null; }).then(function (files) {
+      renderPicFiles(Array.isArray(files) ? files : ((files && files.files) || []));   // firmware/files is a bare array
+    }).catch(function () { });
+  }
+  function picIcon(sym, title, cls) {
+    var b = document.createElement('span'); b.className = 'picbtn' + (cls ? ' ' + cls : '');
+    b.textContent = sym; b.title = title; b.setAttribute('role', 'button'); b.tabIndex = 0;
+    return b;
+  }
+  function newerThanDevice(fver) {
+    var a = parseFloat(fver), b = parseFloat(picDevVer);
+    return (!isNaN(a) && !isNaN(b) && a > b);
+  }
+  function renderPicFiles(files) {
+    var el = document.getElementById('picFiles'); if (!el) return; el.textContent = '';
+    if (!files.length) {
+      var em = document.createElement('div'); em.className = 'picempty';
+      em.textContent = 'No firmware files on device. Use Check for updates, or upload a .hex via the File System tab.';
+      el.appendChild(em); return;
+    }
+    var head = document.createElement('div'); head.className = 'picrow head';
+    ['Firmware name', 'Version', 'Size', '', '', ''].forEach(function (t) { var s = document.createElement('span'); s.textContent = t; head.appendChild(s); });
+    el.appendChild(head);
+    files.forEach(function (f) {
+      var row = document.createElement('div'); row.className = 'picrow' + (newerThanDevice(f.version) ? ' newer' : '');
+      var nm = document.createElement('span'); nm.className = 'fname'; nm.textContent = f.name || '?';
+      var ver = document.createElement('span'); ver.className = 'fver'; ver.textContent = 'v' + (f.version || '?');
+      var sz = document.createElement('span'); sz.className = 'fsize'; sz.textContent = ((f.size || 0) >= 1024 ? (f.size / 1024).toFixed(1) + ' KB' : (f.size || 0) + ' B');
+      row.appendChild(nm); row.appendChild(ver); row.appendChild(sz);
+      var refr = picIcon('⟳', 'Re-download latest ' + (f.name || ''), '');
+      refr.addEventListener('click', function () { if (!picBusy) picRefresh(f.name, f.version); });
+      var flash = picIcon('⇩', 'Flash ' + (f.name || '') + ' onto the PIC', '');
+      flash.addEventListener('click', function () {
+        if (picBusy) return;
+        if (flash._armed) { flash._armed = false; flash.classList.remove('armed'); flash.textContent = '⇩'; flash.title = 'Flash ' + (f.name || '') + ' onto the PIC'; startPicFlash(f.name); return; }
+        flash._armed = true; flash.classList.add('armed'); flash.textContent = '⚠'; flash.title = 'Tap again to confirm flashing ' + (f.name || '') + ' — a bad flash can brick the PIC';
+        setTimeout(function () { if (flash.isConnected && flash._armed) { flash._armed = false; flash.classList.remove('armed'); flash.textContent = '⇩'; flash.title = 'Flash ' + (f.name || '') + ' onto the PIC'; } }, 3000);
+      });
+      var del = picIcon('🗑', 'Delete ' + (f.name || ''), 'del');
+      del.addEventListener('click', function () { if (!picBusy && window.confirm('Delete firmware file ' + (f.name || '') + '?')) picDelete(f.name); });
+      row.appendChild(refr); row.appendChild(flash); row.appendChild(del);
+      el.appendChild(row);
+    });
+  }
+  // Update banner. Manual button forces a fresh check (recheck=1); the auto path on
+  // PIC-tab open (picUpdatePoll) reads the cached result without re-triggering.
+  function renderPicBanner(u) {
+    var b = document.getElementById('picBanner'); if (!b) return;
+    b.className = 'pic-banner';
+    if (u.status === 'checking') { b.style.display = ''; b.textContent = 'Checking for updates…'; return; }
+    if (u.update_available) { b.style.display = ''; b.classList.add('warn'); b.textContent = 'PIC firmware update available: ' + (u.current || '?') + ' → ' + (u.latest || '?'); }
+    else if (u.status === 'ready' || u.current) { b.style.display = ''; b.classList.add('ok'); b.textContent = '✓ PIC firmware up to date (' + (u.current || '?') + ')'; }
+    else { b.style.display = 'none'; b.textContent = ''; }
+  }
+  function picUpdatePoll() {
+    fetch(APIGW + 'v2/pic/update-check').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var u = (j && j.pic_update) || {};
+      if (u.status === 'checking') { setTimeout(picUpdatePoll, 2500); renderPicBanner(u); return; }
+      renderPicBanner(u);
+    }).catch(function () { });
+  }
+  function checkPicUpdate() {
+    var b = document.getElementById('picBanner'); if (b) { b.className = 'pic-banner'; b.style.display = ''; b.textContent = 'Checking for updates…'; }
+    fetch(APIGW + 'v2/pic/update-check?recheck=1').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var u = (j && j.pic_update) || {};
+      if (u.status === 'checking') { setTimeout(picUpdatePoll, 2500); return; }
+      renderPicBanner(u);
+    }).catch(function () { if (b) { b.className = 'pic-banner'; b.textContent = 'Update check failed'; } });
+  }
+  // Gateway settings · cached PR= values. The GET returns the cache immediately AND
+  // triggers a fresh ~45s PR readout on the device — call once per tab open, no loop.
+  function prv(x) { var s = (x === undefined || x === null) ? '' : ('' + x).trim(); return s === '' ? '—' : s; }
+  function picModeText(m) {
+    if (m === undefined || m === null || m === '') return '—';
+    var s = ('' + m).toLowerCase();
+    return s === 'on' ? 'Gateway' : s === 'off' ? 'Monitor' : s === 'detecting' ? 'Detecting…' : ('' + m);
+  }
+  function fetchPicSettings() {
+    var el = document.getElementById('picPrTable'); if (!el) return;
+    el.textContent = '';
+    var ld = document.createElement('span'); ld.className = 'prk'; ld.textContent = 'Reading PR= values…'; el.appendChild(ld);
+    fetch(APIGW + 'v2/pic/settings').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var s = (j && j.pic_settings) || {};
+      withDeviceInfo(function (d) {
+        el.textContent = '';
+        var rows = [
+          ['PIC firmware version', prv(d.picfwversion)],
+          ['Build date', prv(s.builddate)],
+          ['Clock speed', prv(s.clock_mhz)],
+          ['Reset cause', prv(s.reset_cause)],
+          ['Thermostat detected', prv(s.thermostat_detect)],
+          ['Voltage reference', prv(s.voltage_ref)],
+          ['Standalone interval', prv(s.standalone_interval)],
+          ['Gateway/Monitor mode', picModeText(d.otgwmode)]
+        ];
+        rows.forEach(function (r) {
+          var k = document.createElement('span'); k.className = 'prk'; k.textContent = r[0];
+          var v = document.createElement('span'); v.className = 'prv'; v.textContent = r[1];
+          el.appendChild(k); el.appendChild(v);
+        });
+      });
+    }).catch(function () { el.textContent = ''; var e = document.createElement('span'); e.className = 'prk'; e.textContent = 'Failed to read PIC settings'; el.appendChild(e); });
+  }
+  function startPicFlash(name) {
+    picBusy = true;
+    var prog = document.getElementById('picProg'), txt = document.getElementById('picProgTxt'), bar = document.getElementById('picProgBar');
+    if (prog) prog.style.display = '';
+    if (bar) { bar.style.width = '0%'; bar.style.background = 'var(--accent)'; }
+    if (txt) txt.textContent = 'Starting flash of ' + name + '…';
+    fetch(PICBASE + 'pic?action=upgrade&name=' + encodeURIComponent(name)).then(function (r) {
+      if (!r.ok) throw 0;
+      pollPicFlash();
+    }).catch(function () { if (txt) txt.textContent = 'Flash failed to start'; picBusy = false; });
+  }
+  function pollPicFlash() {
+    if (picPollTimer) clearTimeout(picPollTimer);
+    fetch(APIGW + 'v2/pic/flash-status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var s = (j && j.flashstatus) || {};
+      var bar = document.getElementById('picProgBar'), txt = document.getElementById('picProgTxt');
+      var p = (typeof s.progress === 'number') ? s.progress : 0;
+      if (bar) bar.style.width = Math.max(0, Math.min(100, p)) + '%';
+      if (s.flashing) {
+        if (txt) txt.textContent = 'Flashing ' + (s.filename || '') + ' — ' + p + '%';
+        picPollTimer = setTimeout(pollPicFlash, 1000);
+      } else {
+        picBusy = false;
+        if (s.error && ('' + s.error).length) { if (txt) txt.textContent = 'Error: ' + s.error; if (bar) bar.style.background = 'var(--hot,#c33)'; }
+        else { if (bar) bar.style.width = '100%'; if (txt) txt.textContent = 'Flash complete'; }
+        setTimeout(fetchPic, 2500);
+      }
+    }).catch(function () { picBusy = false; var txt = document.getElementById('picProgTxt'); if (txt) txt.textContent = 'Lost contact during flash (device may be rebooting)'; });
+  }
+  function picRefresh(name, version) {
+    var b = document.getElementById('picBanner'); if (b) b.textContent = 'Downloading ' + name + '…';
+    fetch(PICBASE + 'pic?action=refresh&name=' + encodeURIComponent(name) + '&version=' + encodeURIComponent(version || '')).then(function () { setTimeout(fetchPicFiles, 2000); }).catch(function () { });
+  }
+  function picDelete(name) {
+    fetch(PICBASE + 'pic?action=delete&name=' + encodeURIComponent(name)).then(function () { setTimeout(fetchPicFiles, 600); }).catch(function () { });
+  }
+
+  // ---------- Advanced > File System — in-page FSexplorer (TASK-982) ----------
+  // Mirrors the classic FSexplorer.html against /api/v2/filesystem/files. The listing
+  // is a heterogeneous JSON array: file/dir entries {name,size,type} followed by ONE
+  // trailing storage-summary {usedBytes,totalBytes,freeBytes,truncated}. All names are
+  // device-sourced -> DOM-built with textContent only, never innerHTML.
+  var fsCurrentPath = '/';
+  // Core UI assets: deleting any of these bricks the very page you are looking at, so
+  // the Delete affordance is withheld (parity with the classic protectedFiles guard).
+  var FS_PROTECTED = [
+    'v2.html', 'v2.js', 'v2.css', 'sat.js', 'sat-slider.js', 'theme-toggle.js', 'echarts-theme.js',
+    'index.html', 'index.js', 'index_common.css', 'components.css', 'ds-tokens.css', 'graph.js',
+    'FSexplorer.html', 'FSexplorer.png', 'design.html', 'favicon.ico', 'settings.png',
+    'inter-400.woff2', 'inter-700.woff2', 'jetbrains-mono-400.woff2'
+  ];
+  function fsFmtBytes(n) {
+    n = +n || 0;
+    if (n < 1024) return n + ' B';
+    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
+    return (n / 1048576).toFixed(2) + ' MB';
+  }
+  function fsFullPath(name) {
+    var p = (fsCurrentPath === '/') ? name : (fsCurrentPath + '/' + name);
+    return (p.charAt(0) === '/') ? p : ('/' + p);   // root-absolute so it serves regardless of the page path
+  }
+  function fetchFsList(path) {
+    if (typeof path === 'string') fsCurrentPath = path;
+    fetch(APIGW + 'v2/filesystem/files?path=' + encodeURIComponent(fsCurrentPath))
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (json) {
+        if (!Array.isArray(json)) { renderFsError('Failed to read the file system.'); return; }
+        var summary = json.length ? json[json.length - 1] : null;
+        var files = json.slice(0, -1);
+        // LittleFS drops empty directories; if this one vanished, fall back to root.
+        if (files.length === 0 && fsCurrentPath !== '/') { fetchFsList('/'); return; }
+        files.sort(function (a, b) {
+          if (a.type === 'dir' && b.type !== 'dir') return -1;
+          if (a.type !== 'dir' && b.type === 'dir') return 1;
+          return ('' + a.name).localeCompare('' + b.name, undefined, { sensitivity: 'base' });
+        });
+        renderFsList(files, summary);
+      })
+      .catch(function () { renderFsError('Failed to read the file system.'); });
+  }
+  function renderFsError(msg) {
+    var body = document.getElementById('fsTableBody'); if (!body) return;
+    body.textContent = '';
+    var tr = document.createElement('tr'); var td = document.createElement('td');
+    td.colSpan = 4; td.style.color = 'var(--muted)'; td.style.padding = '12px'; td.textContent = msg;
+    tr.appendChild(td); body.appendChild(tr);
+  }
+  function renderFsList(files, summary) {
+    var body = document.getElementById('fsTableBody'); if (!body) return;
+    body.textContent = '';
+    var crumb = document.getElementById('fsCrumb');
+    if (crumb) crumb.textContent = 'Current directory: ' + fsCurrentPath + (summary && summary.truncated ? '  · list truncated' : '');
+
+    // Parent row (navigates up one level) whenever we are below root.
+    if (fsCurrentPath !== '/') {
+      var pr = document.createElement('tr');
+      var pc = document.createElement('td'); pc.className = 'fn dir'; pc.textContent = '.. (parent)';
+      pc.addEventListener('click', function () { fsNavigate('..'); });
+      pr.appendChild(pc);
+      var ps = document.createElement('td'); ps.className = 'fsz'; ps.textContent = '<DIR>'; pr.appendChild(ps);
+      pr.appendChild(document.createElement('td')); pr.appendChild(document.createElement('td'));
+      body.appendChild(pr);
+    }
+
+    files.forEach(function (f) {
+      var name = '' + (f.name || '');
+      var tr = document.createElement('tr');
+      if (f.type === 'dir') {
+        var dn = document.createElement('td'); dn.className = 'fn dir'; dn.textContent = name + '/';
+        dn.addEventListener('click', function () { fsNavigate(name); });
+        tr.appendChild(dn);
+        var dz = document.createElement('td'); dz.className = 'fsz'; dz.textContent = '<DIR>'; tr.appendChild(dz);
+        tr.appendChild(document.createElement('td')); tr.appendChild(document.createElement('td'));
+      } else {
+        var nn = document.createElement('td'); nn.className = 'fn'; nn.textContent = name; tr.appendChild(nn);
+        var sz = document.createElement('td'); sz.className = 'fsz'; sz.textContent = fsFmtBytes(f.size); tr.appendChild(sz);
+        var dl = document.createElement('td');
+        var a = document.createElement('a'); a.className = 'fsact'; a.textContent = 'Download';
+        a.href = fsFullPath(name); a.setAttribute('download', name); a.target = '_blank'; a.rel = 'noopener';
+        dl.appendChild(a); tr.appendChild(dl);
+        var dc = document.createElement('td');
+        if (FS_PROTECTED.indexOf(name) === -1) {
+          var del = document.createElement('a'); del.className = 'fsact del'; del.href = '#'; del.textContent = 'Delete';
+          del.addEventListener('click', function (e) { e.preventDefault(); fsDelete(fsFullPath(name), name); });
+          dc.appendChild(del);
+        }
+        tr.appendChild(dc);
+      }
+      body.appendChild(tr);
+    });
+
+    if (summary && summary.usedBytes !== undefined) {
+      var usage = document.getElementById('fsUsage');
+      if (usage) {
+        usage.textContent = '';
+        var b = document.createElement('b'); b.textContent = 'LittleFS'; usage.appendChild(b);
+        usage.appendChild(document.createTextNode(
+          ' used ' + fsFmtBytes(summary.usedBytes) + ' of ' + fsFmtBytes(summary.totalBytes) +
+          ' — ' + fsFmtBytes(summary.freeBytes) + ' free'));
+      }
+      var bar = document.getElementById('fsBar');
+      if (bar) {
+        var pct = summary.totalBytes ? (summary.usedBytes / summary.totalBytes) * 100 : 0;
+        bar.style.width = Math.max(0, Math.min(100, pct)).toFixed(0) + '%';
+      }
+      var hint = document.getElementById('fsUploadHint');
+      if (hint) hint.textContent = fsFmtBytes(summary.freeBytes) + ' free · files land in the current directory.';
+    }
+  }
+  function fsNavigate(name) {
+    if (name === '..') {
+      var parts = fsCurrentPath.split('/'); parts.pop();
+      fsCurrentPath = (parts.length <= 1) ? '/' : parts.join('/');
+      if (fsCurrentPath === '') fsCurrentPath = '/';
+    } else {
+      fsCurrentPath = (fsCurrentPath === '/') ? ('/' + name) : (fsCurrentPath + '/' + name);
+    }
+    fetchFsList();
+  }
+  function fsDelete(fullPath, name) {
+    if (!window.confirm('Delete ' + name + ' from the file system? This cannot be undone.')) return;
+    fetch(APIGW + 'v2/filesystem/files?delete=' + encodeURIComponent(fullPath), { credentials: 'same-origin' })
+      .then(function (r) {
+        if (r.ok) { bleToast('Deleted ' + name); fetchFsList(); return; }
+        if (r.status === 401 || r.status === 403) bleToast('Not authorized — open classic /FSexplorer to sign in first');
+        else bleToast('Delete failed: ' + r.status);
+      })
+      .catch(function () { bleToast('Delete failed'); });
+  }
+  function fsDoUpload() {
+    var inp = document.getElementById('fsFile'), btn = document.getElementById('fsUpload');
+    if (!inp || !inp.files || !inp.files.length) { bleToast('Choose a file to upload first'); return; }
+    var fd = new FormData(); fd.append('file', inp.files[0], inp.files[0].name);
+    if (btn) btn.disabled = true;
+    // /upload replies 303 -> FSexplorer.html; redirect:'manual' keeps us here and we
+    // refresh the listing ourselves instead of following the redirect.
+    fetch('/upload?path=' + encodeURIComponent(fsCurrentPath), {
+      method: 'POST', body: fd, credentials: 'same-origin', redirect: 'manual'
+    }).then(function (r) {
+      // An opaqueredirect (type 'opaqueredirect', status 0) is the success path here.
+      if (r.type === 'opaqueredirect' || r.ok || r.status === 0) { bleToast('Uploaded ' + inp.files[0].name); }
+      else if (r.status === 401 || r.status === 403) { bleToast('Not authorized — open classic /FSexplorer to sign in first'); }
+      else { bleToast('Upload failed: ' + r.status); }
+      inp.value = ''; if (btn) btn.disabled = true;
+      setTimeout(fetchFsList, 400);
+    }).catch(function () {
+      bleToast('Upload failed'); if (btn) btn.disabled = false;
+    });
+  }
+
+  // ---------- Advanced > System — device status + system actions (TASK-982) ----------
+  // The three status badges are driven from renderConnStrip() (the SAME wd/mode mapping
+  // as the TASK-980 header pill), so there is no vocabulary drift. Opening the tab just
+  // re-asserts them and refreshes the cached simulation flag.
+  function fetchSystemStatus() {
+    renderConnStrip();
+    withDeviceInfo(function () { renderConnStrip(); });
+  }
+  function advAction(act) {
+    if (act === 'home') { showPage('home'); return; }
+    if (act === 'onboarding') { startOnboarding(); return; }   // TASK-997: re-run the first-time setup wizard on demand
+    if (act === 'update') { window.location.href = '/update'; return; }   // OTA sketch / filesystem upload page
+    if (act === 'reboot') {
+      if (!window.confirm('Reboot the OTGW device now? The Web UI will be unavailable for a few seconds.')) return;
+      bleToast('Device is rebooting…');
+      fetch('/ReBoot', { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) bleToast('Reboot failed: ' + r.status); })
+        .catch(function () { });   // socket drops as the device restarts — expected
+      return;
+    }
+    if (act === 'resetwifi') {
+      if (!window.confirm('Reset Wireless settings?\n\nThis CLEARS the stored Wi-Fi network and reboots the device into AP-mode setup. You will have to reconnect it to your network afterwards.')) return;
+      bleToast('Wi-Fi cleared — rebooting into AP-mode setup…');
+      fetch('/ResetWireless', { credentials: 'same-origin' })
+        .then(function (r) { if (!r.ok) bleToast('Reset failed: ' + r.status); })
+        .catch(function () { });   // socket drops as the device restarts — expected
+    }
+  }
 
   // ---------- Monitor > Log > send raw OTGW command (TASK-965) ----------
   function showCmdStatus(msg, ok) {
@@ -1808,13 +2740,836 @@
     var inp = document.getElementById('otCmdInput');
     var cmd = ((inp && inp.value) || '').trim();
     if (!cmd) { showCmdStatus('Enter a command', false); return; }
+    // OTGW convention: the two-letter command code is upper-case (tt=20.5 -> TT=20.5).
+    // Only the leading code is forced; the value is sent verbatim.
+    cmd = cmd.replace(/^([a-zA-Z]{2})/, function (m) { return m.toUpperCase(); });
+    // TASK-981: unpause the log so the firmware's '>' echo and the PIC ack are visible.
+    // Do it before the POST so a paused pushLog can't swallow an echo that races the
+    // response. Restore the Pause button label exactly like its own click handler.
+    if (logPaused) {
+      logPaused = false;
+      var lp = document.getElementById('logPause'); if (lp) lp.textContent = '⏸ Pause';
+      if (isMonitorLogVisible()) renderLog();
+    }
     fetch(APIGW + 'v2/otgw/commands', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ command: cmd })
     }).then(function (r) {
-      if (r.status === 202 || r.ok) { showCmdStatus('Sent: ' + cmd, true); if (inp) inp.value = ''; }
-      else { showCmdStatus('Error ' + r.status, false); }
+      if (r.status === 202 || r.ok) { showCmdStatus('Sent: ' + cmd, true); if (inp) inp.value = ''; return; }
+      // TASK-981: surface the firmware's error text ({"error":{"message":...}}) rather
+      // than a bare status code (e.g. 413 "Command too long", 503 "No OT interface").
+      r.json().then(function (j) {
+        var msg = (j && j.error && j.error.message) ? j.error.message : ('Error ' + r.status);
+        showCmdStatus(msg, false);
+      }).catch(function () { showCmdStatus('Error ' + r.status, false); });
     }).catch(function () { showCmdStatus('Send failed', false); });
+  }
+
+  // ======================= SAT page (TASK-986) =======================
+  // Owns #page-sat. Polls GET /api/v2/sat/status every 5 s ONLY while the page
+  // is visible (satPageStart/Stop, driven by showPage). Renders three cumulative
+  // depth layers (Thermostat / Control / Technical) and writes back via the SAT
+  // POST routes verified in restAPI.ino: /sat/enable, /sat/target, /sat/preset,
+  // /sat/mode, /sat/settings/<name>. Temperature history accumulates client-side
+  // across polls (no firmware history endpoint, by design — mirrors classic sat.js).
+  var satPollTimer = null;
+  var satLastData = null;
+  var satMarkers = [];
+  var satMarkersLoaded = false;
+  var satHist = { set: [], flow: [], room: [], out: [], pid: [] };
+  var SAT_HIST_MAX = 720;               // ~1 h at the 5 s poll cadence
+  var satDhwDirty = false;              // user dragging the DHW slider — defer status echo
+  var satEnPending = false, satDhwEnPending = false, satSimPending = false;  // in-flight POST guards
+  var SAT_MODE_LABELS = ['Off', 'Continuous', 'PWM'];      // control_mode enum
+  var SAT_CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain'];  // last_cycle_class
+  var SAT_PRESET_NAMES = ['None', 'Away', 'Eco', 'Comfort', 'Sleep', 'Activity', 'Home'];   // active_preset enum
+  var SAT_PRESETS = [['home', '🏠 Home'], ['away', '🚪 Away'], ['eco', '🌱 Eco'], ['comfort', '🛋 Comfort'], ['sleep', '🌙 Sleep'], ['activity', '🏃 Activity']];
+  var SAT_BOILER_LABELS = {
+    off: 'Off', idle: 'Idle', preheating: 'Preheating', at_setpoint: 'At setpoint',
+    modulating_up: 'Modulating up', modulating_down: 'Modulating down', ignition_surge: 'Ignition surge',
+    stalled_ignition: 'Stalled ignition', anti_cycling: 'Anti-cycling', pump_starting: 'Pump starting',
+    waiting_flame: 'Waiting flame', overshoot_cooling: 'Overshoot cooling', post_cycle: 'Post-cycle',
+    heating: 'Heating', cooling: 'Cooling', heating_hot_water: 'Heating hot water'
+  };
+  // Heating-curve constants — JS port of satCalcHeatingCurve() in SATcontrol.ino.
+  var SAT_HC_FLOOR = 20.0, SAT_HC_RAD = 27.2, SAT_HC_REF = 20.0;
+
+  function satCssVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim() || '#888'; }
+  function satNum(v) { return (v !== null && v !== undefined && !isNaN(v)) ? +v : null; }
+  function satFmt(v, dp, suf) { var n = satNum(v); return n === null ? '—' : n.toFixed(dp === undefined ? 1 : dp) + (suf || ''); }
+
+  function satPageStart() {
+    fetchSatPage();
+    if (!satMarkersLoaded) { satMarkersLoaded = true; fetchSatMarkers(); }
+    if (satPollTimer) clearInterval(satPollTimer);
+    satPollTimer = setInterval(fetchSatPage, 5000);
+  }
+  function satPageStop() { if (satPollTimer) { clearInterval(satPollTimer); satPollTimer = null; } }
+
+  // POST helper for the /api/v2/sat/* write routes. Default content-type text/plain
+  // (matches how the routes parse the body via satExtractPostValue).
+  function satPost(sub, value, ctype) {
+    return fetch(APIGW + 'v2/sat/' + sub, {
+      method: 'POST', headers: { 'Content-Type': ctype || 'text/plain' }, body: String(value)
+    }).then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r; });
+  }
+
+  function fetchSatPage() {
+    fetch(APIGW + 'v2/sat/status')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (d) {
+        var nd = document.getElementById('satNoData'), body = document.getElementById('satBody');
+        if (!d || typeof d !== 'object') { if (nd) nd.style.display = ''; if (body) body.style.display = 'none'; return; }
+        if (nd) nd.style.display = 'none'; if (body) body.style.display = '';
+        satLastData = d;
+        try { renderSatPage(d); } catch (e) { }
+      })
+      .catch(function () {
+        // Hard failure (device unreachable) at first paint: show the no-data banner
+        // instead of a wall of dashes. Self-heals on the next poll once reachable.
+        if (!satLastData) {
+          var nd = document.getElementById('satNoData'), body = document.getElementById('satBody');
+          if (nd) nd.style.display = ''; if (body) body.style.display = 'none';
+        }
+      });
+    fetchSatPageWeather();
+  }
+
+  function fetchSatPageWeather() {
+    fetch(APIGW + 'v2/sat/weather')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (w) { if (w) renderSatWeather(w); })
+      .catch(function () { });
+  }
+
+  function fetchSatMarkers() {
+    fetch(APIGW + 'v2/sat/markers')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        satMarkers = Array.isArray(data) ? data : (data && Array.isArray(data.markers) ? data.markers : []);
+        satRenderMarkerList();
+        if (satLastData) satDrawCurve(satLastData);
+      })
+      .catch(function () { satMarkers = []; });
+  }
+
+  // Build a .kv card via DOM (textContent — safe for device-provided strings like manufacturer).
+  function satKv(id, rows) {
+    var box = document.getElementById(id); if (!box) return;
+    box.textContent = '';
+    rows.forEach(function (r) {
+      if (!r) return;
+      var row = document.createElement('div'); row.className = 'kv-row';
+      var k = document.createElement('span'); k.className = 'kv-k'; k.textContent = r[0];
+      var v = document.createElement('span'); v.className = 'kv-v'; v.textContent = r[1];
+      row.appendChild(k); row.appendChild(v); box.appendChild(row);
+    });
+  }
+
+  function renderSatPage(d) {
+    var enabled = !!d.enabled, active = !!d.active, heating = enabled && active;
+
+    var pill = document.getElementById('satPill');
+    if (pill) {
+      pill.textContent = !enabled ? 'Off' : (heating ? 'Heating' : 'Idle');
+      pill.className = 'sat-pill' + (!enabled ? ' off' : (heating ? '' : ' idle'));
+    }
+    txt('satEnableLbl', enabled ? 'Enabled' : 'Disabled');
+    var enCb = document.getElementById('satEnable'); if (enCb && !satEnPending) enCb.checked = enabled;
+
+    // L1 — dial + status + presets
+    satDialDraw(d);
+    var big;
+    if (!enabled) big = 'SAT is off';
+    else if (d.safety_tripped) big = 'Safety tripped!';
+    else if (d.window_open) big = 'Window open';
+    else if (d.summer_active) big = 'Summer mode';
+    else if (active) big = 'Heating to ' + satFmt(d.target_temp, 1, '°');
+    else big = 'At target · idle';
+    txt('satStatusBig', big);
+    satRenderPresets(d);
+
+    // L2 — history + tiles + dhw + burner cycle + curve + control status
+    satHistPush(d); satDrawHistory();
+    txt('satOut', satFmt(d.outside_temp, 1, '°'));
+    txt('satFlowSet', satFmt(d.final_setpoint, 1, '°'));
+    txt('satRoom', satFmt(d.room_temp, 1, '°'));
+    txt('satTargetT', satFmt(d.target_temp, 1, '°'));
+    satRenderDhw(d);
+    satRenderCycle(d);
+    satDrawCurve(d);
+    satKv('satControlStatus', [
+      ['Control mode', SAT_MODE_LABELS[d.control_mode | 0] || '—'],
+      ['Boiler status', SAT_BOILER_LABELS[d.boiler_status] || '—'],
+      ['Active preset', SAT_PRESET_NAMES[d.active_preset | 0] || '—'],
+      ['Manufacturer', d.manufacturer || '—'],
+      ['Coefficient', satFmt(d.coefficient, 2)],
+      ['Deadband', satFmt(d.deadband, 2, ' °C')],
+      ['PID output', satFmt(d.pid_output, 1, ' °C')],
+      ['Error', satFmt(d.error, 2, ' °C')],
+      ['Modulation', d.current_modulation != null ? d.current_modulation + ' %' : '—'],
+      ['Max modulation', d.max_rel_modulation != null ? d.max_rel_modulation + ' %' : '—']
+    ]);
+
+    // L3 — health + PID + PWM/cycle + smart + external + simulation + raw JSON
+    satRenderHealth(d);
+    satKv('satPidKv', [
+      ['P term', satFmt(d.pid_p, 2)], ['I term', satFmt(d.pid_i, 2)], ['D term', satFmt(d.pid_d, 2)],
+      ['Kp', satFmt(d.kp, 4)], ['Ki', satFmt(d.ki, 4)], ['Kd', satFmt(d.kd, 4)],
+      ['Raw derivative', satFmt(d.raw_derivative, 4)]
+    ]);
+    satKv('satPwmKv', [
+      ['Duty cycle', d.pwm_duty != null ? Math.round(d.pwm_duty * 100) + ' %' : '—'],
+      ['PWM flame', d.pwm_flame_req ? 'Requesting' : 'Off'],
+      ['Cycle count', d.cycle_count != null ? String(d.cycle_count) : '—'],
+      ['Cycles this hour', d.cycles_this_hour != null ? String(d.cycles_this_hour) : '—'],
+      ['Last cycle', SAT_CYCLE_LABELS[d.last_cycle_class | 0] || '—'],
+      ['Cycle max flow', satFmt(d.cycle_max_flow, 1, ' °C')],
+      ['Cycle overshoot', d.cycle_overshoot_sec != null ? Math.round(d.cycle_overshoot_sec) + ' s' : '—']
+    ]);
+    var summer = d.summer_active ? ('Active' + (d.summer_hours_above != null ? ' (' + Math.round(d.summer_hours_above) + ' h)' : '')) : 'Inactive';
+    var thermal = (d.thermal_model_valid && d.thermal_coeff != null) ? satFmt(d.thermal_coeff, 3) : 'Learning…';
+    satKv('satSmartKv', [
+      ['Solar gain', d.solar_gain_active ? 'Active' : 'Inactive'],
+      ['Summer mode', summer],
+      ['Thermal learning', thermal],
+      ['Comfort offset', (d.comfort_offset != null && d.comfort_offset !== 0) ? satFmt(d.comfort_offset, 2, ' °C') : 'Off'],
+      ['PV boost', d.pv_boost_active ? ('Active ' + satFmt(d.pv_boost_applied_c, 1, ' °C')) : 'Off'],
+      ['Window detection', d.window_detection ? 'On' : 'Off']
+    ]);
+    satKv('satExtKv', [
+      ['Indoor sensor', d.external_temp_valid ? 'External' : 'OT bus'],
+      ['Outdoor sensor', d.external_outdoor_valid ? 'External' : 'OT bus / weather']
+    ]);
+    satRenderSim(d);
+    var raw = document.getElementById('satRawJson');
+    if (raw && raw.style.display !== 'none') raw.textContent = JSON.stringify(d, null, 2);
+  }
+
+  function satDialDraw(d) {
+    var svg = document.getElementById('satDial'); if (!svg) return;
+    var lo = 5, hi = 30, startDeg = -135, sweepDeg = 270;
+    function ang(v) { return startDeg + (Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo) * sweepDeg; }
+    var track = satCssVar('--gauge-track'), accent = satCssVar('--accent'), ok = satCssVar('--zone-ok'),
+      txtc = satCssVar('--gauge-text'), muted = satCssVar('--muted');
+    var tgt = satNum(d.target_temp), room = satNum(d.room_temp);
+    var g = '<path d="' + arcPath(120, 120, 92, startDeg, startDeg + sweepDeg) + '" fill="none" stroke="' + track + '" stroke-width="14" stroke-linecap="round"/>';
+    if (tgt !== null) g += '<path d="' + arcPath(120, 120, 92, startDeg, ang(tgt)) + '" fill="none" stroke="' + accent + '" stroke-width="14" stroke-linecap="round"/>';
+    if (room !== null) {
+      var a = polar(120, 120, 79, ang(room)), b = polar(120, 120, 105, ang(room));
+      g += '<line x1="' + a[0].toFixed(1) + '" y1="' + a[1].toFixed(1) + '" x2="' + b[0].toFixed(1) + '" y2="' + b[1].toFixed(1) + '" stroke="' + ok + '" stroke-width="4" stroke-linecap="round"/>';
+    }
+    g += '<text x="120" y="116" text-anchor="middle" font-size="44" font-weight="700" fill="' + txtc + '" font-family="var(--font-sans)">' + (tgt !== null ? tgt.toFixed(1) + '°' : '—') + '</text>';
+    g += '<text x="120" y="140" text-anchor="middle" font-size="13" fill="' + muted + '" font-family="var(--font-sans)">target · room ' + (room !== null ? room.toFixed(1) + '°' : '—') + '</text>';
+    svg.innerHTML = g;
+  }
+
+  function satRenderPresets(d) {
+    var box = document.getElementById('satPresets'); if (!box) return;
+    var an = SAT_PRESET_NAMES[d.active_preset | 0];
+    var activeName = an ? an.toLowerCase() : '';
+    box.textContent = '';
+    SAT_PRESETS.forEach(function (p) {
+      var b = document.createElement('button');
+      b.className = 'sat-preset' + (p[0] === activeName ? ' active' : '');
+      b.textContent = p[1];
+      b.dataset.preset = p[0];
+      b.addEventListener('click', function () {
+        satPost('preset', p[0]).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
+        document.querySelectorAll('#satPresets .sat-preset').forEach(function (x) { x.classList.toggle('active', x === b); });
+      });
+      box.appendChild(b);
+    });
+  }
+
+  function satHistPush(d) {
+    satHist.set.push(satNum(d.final_setpoint));
+    satHist.flow.push(satNum(d.heating_curve));
+    satHist.room.push(satNum(d.room_temp));
+    satHist.out.push(satNum(d.outside_temp));
+    satHist.pid.push(satNum(d.pid_output));
+    ['set', 'flow', 'room', 'out', 'pid'].forEach(function (k) { if (satHist[k].length > SAT_HIST_MAX) satHist[k].shift(); });
+  }
+
+  function satDrawHistory() {
+    var svg = document.getElementById('satHistChart'); if (!svg) return;
+    var n = satHist.flow.length;
+    var accent = satCssVar('--accent'), hot = satCssVar('--hot'), ok = satCssVar('--zone-ok'),
+      cold = satCssVar('--cold'), muted = satCssVar('--muted'), border = satCssVar('--border');
+    function Y(t) { return 186 - (Math.max(-5, Math.min(80, t)) + 5) / 85 * 168; }
+    var x0 = 8, x1 = 592, dx = n > 1 ? (x1 - x0) / (n - 1) : 0;
+    function L(arr) {
+      var p = '';
+      for (var i = 0; i < n; i++) { var v = arr[i]; if (v === null || v === undefined || isNaN(v)) continue; p += (x0 + i * dx).toFixed(1) + ',' + Y(v).toFixed(1) + ' '; }
+      return p.trim();
+    }
+    function poly(pts, stroke, w, dash) { return pts ? '<polyline points="' + pts + '" fill="none" stroke="' + stroke + '" stroke-width="' + w + '"' + (dash ? ' stroke-dasharray="' + dash + '"' : '') + '/>' : ''; }
+    var g = '';
+    [0, 20, 40, 60, 80].forEach(function (t) { var y = Y(t).toFixed(1); g += '<line x1="8" y1="' + y + '" x2="592" y2="' + y + '" stroke="' + border + '" stroke-width="1"/>'; });
+    g += poly(L(satHist.out), cold, 1.5, '6 4');
+    g += poly(L(satHist.pid), muted, 1.5, '1 4');
+    g += poly(L(satHist.flow), hot, 2);
+    g += poly(L(satHist.set), accent, 2);
+    g += poly(L(satHist.room), ok, 2);
+    svg.innerHTML = g;
+    var lg = document.getElementById('satHistLegend');
+    if (lg) lg.innerHTML =
+      '<span><i style="background:' + accent + '"></i>Setpoint</span><span><i style="background:' + hot + '"></i>Flow</span>' +
+      '<span><i style="background:' + ok + '"></i>Room</span><span><i style="background:' + cold + '"></i>Outside</span>' +
+      '<span><i style="background:' + muted + '"></i>PID</span>';
+  }
+
+  function satRenderDhw(d) {
+    var slider = document.getElementById('satDhwSlider');
+    var sp = satNum(d.dhw_setpoint);
+    if (slider && !satDhwDirty) {
+      if (sp !== null) { slider.value = Math.round(sp); txt('satDhwR', Math.round(sp) + '°C'); }
+      else txt('satDhwR', '—');
+    }
+    var row = document.getElementById('satDhwEnableRow');
+    if (row) row.style.display = d.dhw_config_tank ? '' : 'none';
+    var cb = document.getElementById('satDhwEnable');
+    if (cb && !satDhwEnPending && d.dhw_enable !== undefined) cb.checked = !!d.dhw_enable;
+  }
+
+  function satRenderCycle(d) {
+    var cm = d.control_mode | 0;
+    document.querySelectorAll('#satCycleRow .ds-seg').forEach(function (b) {
+      var on = (b.dataset.mode === 'continuous' && cm === 1) || (b.dataset.mode === 'pwm' && cm === 2);
+      b.classList.toggle('active', on);
+    });
+    txt('satCycleSub', cm === 2 ? 'PID modulates the burner in PWM bursts' : (cm === 1 ? 'PID drives the burner continuously' : 'SAT is not actively controlling'));
+  }
+
+  function satRenderHealth(d) {
+    var box = document.getElementById('satHealth'); if (!box) return;
+    var lc = d.last_cycle_class | 0, badCycle = (lc === 2 || lc === 3 || lc === 4);
+    var items = [
+      ['Device', (d.boiler_status && d.boiler_status !== 'off') ? 'ok' : 'idle'],
+      ['Cycle', badCycle ? 'warn' : 'ok'],
+      ['Flame', d.safety_tripped ? 'alert' : 'ok'],
+      ['Pressure', d.pressure_alarm ? 'alert' : 'ok'],
+      ['Setpoint', d.setpoint_mismatch ? 'warn' : 'ok'],
+      ['Modulation', d.modulation_reliable ? 'ok' : 'warn']
+    ];
+    box.textContent = '';
+    items.forEach(function (it) {
+      var span = document.createElement('span'); span.className = 'health-item';
+      var dot = document.createElement('span'); dot.className = 'hdot ' + it[1];
+      span.appendChild(dot); span.appendChild(document.createTextNode(it[0]));
+      box.appendChild(span);
+    });
+  }
+
+  function satRenderSim(d) {
+    var on = !!d.simulation, avail = (d.sim_available !== false);
+    var cb = document.getElementById('satSim');
+    if (cb && !satSimPending) cb.checked = on;
+    if (cb) cb.disabled = (!avail && !on);
+    txt('satSimHint', avail ? '' : 'A real boiler is connected — bench simulation is unavailable.');
+    satKv('satSimKv', [
+      ['Simulation', on ? 'On (bench)' : 'Off'],
+      ['Sim room', on ? satFmt(d.sim_room_temp, 1, ' °C') : '—'],
+      ['Sim flow', on ? satFmt(d.sim_flow_temp, 1, ' °C') : '—'],
+      ['Sim return', on ? satFmt(d.sim_return_temp, 1, ' °C') : '—'],
+      ['Sim flame', on ? (d.sim_flame_on ? 'On' : 'Off') : '—'],
+      ['Sim modulation', on && d.sim_modulation != null ? d.sim_modulation + ' %' : '—'],
+      ['Last blocked cmd', (on && d.last_blocked_cmd) ? (d.last_blocked_cmd + (d.last_blocked_cmd_age_ms != null ? ' (' + Math.round(d.last_blocked_cmd_age_ms / 1000) + 's ago)' : '')) : '—'],
+      ['Fallback active', d.fallback_active ? 'Yes' : 'No'],
+      ['Fallback reason', d.fallback_reason != null ? String(d.fallback_reason) : '—']
+    ]);
+  }
+
+  function renderSatWeather(w) {
+    if (!w || !w.enabled) { satKv('satWeatherKv', [['Weather', 'Disabled']]); txt('satCoords', ''); return; }
+    var valid = !!w.valid;
+    var mins = (valid && w.age_seconds >= 0) ? Math.floor(w.age_seconds / 60) : null;
+    satKv('satWeatherKv', [
+      ['Outdoor temp', valid ? satFmt(w.temperature, 1, ' °C') : '—'],
+      ['Humidity', valid && w.humidity != null ? Math.round(w.humidity) + ' %' : '—'],
+      ['Wind', valid && w.wind_speed != null ? satFmt(w.wind_speed, 1, ' km/h') : '—'],
+      ['Last update', mins === null ? 'Never' : (mins < 1 ? 'Just now' : mins + ' min ago')],
+      ['Fetch errors', String(w.fetch_errors || 0)]
+    ]);
+    var lat = parseFloat(w.latitude), lon = parseFloat(w.longitude);
+    txt('satCoords', (!isNaN(lat) && !isNaN(lon) && (lat !== 0 || lon !== 0)) ? lat.toFixed(3) + ', ' + lon.toFixed(3) : 'No location set');
+  }
+
+  // JS port of satCalcHeatingCurve() (SATcontrol.ino): base offset + (coeff/4)·curve.
+  function satCalcCurve(outside, target, coeff, system) {
+    var base = (system === 2) ? SAT_HC_FLOOR : SAT_HC_RAD;   // 2 = underfloor
+    var diff = outside - SAT_HC_REF;
+    return base + (coeff / 4.0) * (4.0 * (target - SAT_HC_REF) + 0.03 * diff * diff - 0.4 * diff);
+  }
+
+  function satDrawCurve(d) {
+    var svg = document.getElementById('satCurveBig'); if (!svg) return;
+    var coeff = satNum(d.coefficient), target = satNum(d.target_temp), system = d.heating_system | 0,
+      outside = satNum(d.outside_temp), setp = satNum(d.final_setpoint);
+    if (coeff === null || target === null) { svg.innerHTML = ''; return; }
+    var xmin = -15, xmax = 25, ymin = 20, ymax = 85;
+    function X(o) { return 50 + (o - xmin) / (xmax - xmin) * 530; }
+    function Y(f) { return 270 - (Math.max(ymin, Math.min(ymax, f)) - ymin) / (ymax - ymin) * 240; }
+    var muted = satCssVar('--muted'), border = satCssVar('--border'), accent = satCssVar('--accent'),
+      ok = satCssVar('--zone-ok'), hot = satCssVar('--hot'), panel = satCssVar('--panel');
+    var g = '';
+    [20, 40, 60, 80].forEach(function (f) { var y = Y(f).toFixed(1); g += '<line x1="50" y1="' + y + '" x2="580" y2="' + y + '" stroke="' + border + '" stroke-width="1"/><text x="44" y="' + (+y + 4) + '" text-anchor="end" font-size="11" fill="' + muted + '">' + f + '°</text>'; });
+    [-10, 0, 10, 20].forEach(function (o) { var x = X(o).toFixed(1); g += '<line x1="' + x + '" y1="30" x2="' + x + '" y2="270" stroke="' + border + '" stroke-width="1" stroke-dasharray="2 5"/><text x="' + x + '" y="288" text-anchor="middle" font-size="11" fill="' + muted + '">' + o + '°</text>'; });
+    var refs = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5, 5.0], matched = false;
+    refs.forEach(function (c) {
+      var pts = [], activeC = Math.abs(c - coeff) < 0.05; if (activeC) matched = true;
+      for (var o = xmin; o <= xmax; o++) pts.push(X(o).toFixed(1) + ',' + Y(satCalcCurve(o, target, c, system)).toFixed(1));
+      g += '<polyline points="' + pts.join(' ') + '" fill="none" stroke="' + (activeC ? accent : border) + '" stroke-width="' + (activeC ? 3 : 1.2) + '" opacity="' + (activeC ? 1 : 0.65) + '"/>';
+    });
+    if (!matched) {
+      var apts = [];
+      for (var o2 = xmin; o2 <= xmax; o2++) apts.push(X(o2).toFixed(1) + ',' + Y(satCalcCurve(o2, target, coeff, system)).toFixed(1));
+      g += '<polyline points="' + apts.join(' ') + '" fill="none" stroke="' + accent + '" stroke-width="3"/>';
+    }
+    satMarkers.forEach(function (m) {
+      var mo = satNum(m.outside_temp), mf = satNum(m.flow_temp);
+      if (mo !== null && mf !== null) g += '<circle cx="' + X(mo).toFixed(1) + '" cy="' + Y(mf).toFixed(1) + '" r="4.5" fill="' + ok + '" stroke="' + panel + '" stroke-width="1.5"/>';
+    });
+    if (outside !== null && setp !== null) g += '<circle cx="' + X(outside).toFixed(1) + '" cy="' + Y(setp).toFixed(1) + '" r="6.5" fill="' + hot + '" stroke="' + panel + '" stroke-width="2"/>';
+    svg.innerHTML = g;
+    txt('satCurveLbl', (system === 2 ? 'underfloor' : 'radiator') + ' · coeff ' + coeff.toFixed(1) + ' · target ' + target.toFixed(1) + '°');
+    var lg = document.getElementById('satCurveLegend');
+    if (lg) lg.innerHTML =
+      '<span><i style="background:' + accent + '"></i>active curve (c=' + coeff.toFixed(1) + ')</span>' +
+      '<span><i style="background:' + ok + '"></i>calibration markers</span>' +
+      '<span><i style="background:' + hot + '"></i>current point</span>';
+  }
+
+  function satRenderMarkerList() {
+    var list = document.getElementById('satMarkerList'); if (!list) return;
+    list.textContent = '';
+    if (!satMarkers.length) {
+      var li0 = document.createElement('li'); li0.textContent = 'No calibration markers yet.'; li0.style.color = 'var(--muted)';
+      list.appendChild(li0); return;
+    }
+    satMarkers.forEach(function (m) {
+      var li = document.createElement('li');
+      var s = document.createElement('span'); s.textContent = satFmt(m.outside_temp, 0, '° out');
+      var b = document.createElement('b'); b.textContent = satFmt(m.flow_temp, 0, '° flow');
+      li.appendChild(s); li.appendChild(b); list.appendChild(li);
+    });
+  }
+
+  function satShowView(v) {
+    if (['simple', 'control', 'technical'].indexOf(v) === -1) v = 'simple';
+    document.querySelectorAll('.satview-btn').forEach(function (b) { b.classList.toggle('active', b.dataset.sv === v); });
+    var body = document.getElementById('satBody'); var cls = 'sv-' + v; if (body) body.className = cls;
+    try { localStorage.setItem('otgw-v2-satview', v); } catch (e) { }
+    // Redraw charts: a layer that was display:none has no layout, so its SVG must
+    // be regenerated once it becomes visible.
+    if (satLastData) { satDrawHistory(); satDrawCurve(satLastData); }
+  }
+
+  function satStep(delta) {
+    var base = (satLastData && satNum(satLastData.target_temp) !== null) ? satNum(satLastData.target_temp) : 20;
+    var t = Math.max(5, Math.min(30, Math.round((base + delta) * 2) / 2));
+    satPost('target', t.toFixed(1)).then(function () {
+      if (satLastData) { satLastData.target_temp = t; satDialDraw(satLastData); }
+      setTimeout(fetchSatPage, 300);
+    }).catch(function () { });
+  }
+
+  // Detect location for the weather card. Sets SATweatherlat/lon (string settings —
+  // not the boolean SATweatherenable, which the /api/v2/settings typed-bool path
+  // would silently no-op on a "1" string; enabling weather stays a Settings action).
+  function satDetectLocation() {
+    if (!navigator.geolocation) { txt('satCoords', 'Geolocation not supported'); return; }
+    txt('satCoords', 'Detecting…');
+    navigator.geolocation.getCurrentPosition(function (pos) {
+      var lat = pos.coords.latitude.toFixed(4), lon = pos.coords.longitude.toFixed(4);
+      var posts = [['SATweatherlat', lat], ['SATweatherlon', lon]].map(function (kv) {
+        return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: kv[0], value: kv[1] }) })
+          .then(function (r) { if (!r.ok) throw new Error(r.status); return r; });
+      });
+      Promise.all(posts).then(function () { txt('satCoords', lat + ', ' + lon); setTimeout(fetchSatPageWeather, 1500); }).catch(function () { txt('satCoords', 'Save failed'); });
+    }, function () { txt('satCoords', 'Location error'); }, { timeout: 10000 });
+  }
+
+  // Wire the SAT page controls once (elements exist at load; the page is just hidden).
+  function wireSat() {
+    document.querySelectorAll('.satview-btn').forEach(function (b) {
+      b.addEventListener('click', function () { satShowView(b.dataset.sv); });
+    });
+    var sv = 'simple'; try { sv = localStorage.getItem('otgw-v2-satview') || 'simple'; } catch (e) { }
+    satShowView(sv);
+
+    var en = document.getElementById('satEnable');
+    if (en) en.addEventListener('change', function () {
+      satEnPending = true;
+      satPost('enable', en.checked ? '1' : '0')
+        .then(function () { satEnPending = false; setTimeout(fetchSatPage, 300); })
+        .catch(function () { satEnPending = false; if (satLastData) en.checked = !!satLastData.enabled; });
+    });
+
+    var up = document.getElementById('satUp'), dn = document.getElementById('satDown');
+    if (up) up.addEventListener('click', function () { satStep(0.5); });
+    if (dn) dn.addEventListener('click', function () { satStep(-0.5); });
+
+    document.querySelectorAll('#satCycleRow .ds-seg').forEach(function (b) {
+      b.addEventListener('click', function () {
+        satPost('mode', b.dataset.mode).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
+      });
+    });
+
+    var ds = document.getElementById('satDhwSlider');
+    if (ds) {
+      ds.addEventListener('input', function () { satDhwDirty = true; txt('satDhwR', ds.value + '°C'); });
+      ds.addEventListener('change', function () {
+        satDhwDirty = false;
+        satPost('settings/dhw_setpoint', ds.value).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
+      });
+    }
+
+    var de = document.getElementById('satDhwEnable');
+    if (de) de.addEventListener('change', function () {
+      satDhwEnPending = true;
+      satPost('settings/dhw_enable', de.checked ? 'true' : 'false')
+        .then(function () { satDhwEnPending = false; setTimeout(fetchSatPage, 300); })
+        .catch(function () { satDhwEnPending = false; if (satLastData) de.checked = !!satLastData.dhw_enable; });
+    });
+
+    var sim = document.getElementById('satSim');
+    if (sim) sim.addEventListener('change', function () {
+      satSimPending = true;
+      satPost('settings/simulation', sim.checked ? '1' : '0')
+        .then(function () { satSimPending = false; setTimeout(fetchSatPage, 300); })
+        .catch(function () { satSimPending = false; if (satLastData) sim.checked = !!satLastData.simulation; txt('satSimHint', 'Could not change simulation (a real boiler may be connected).'); });
+    });
+
+    var rt = document.getElementById('satRawToggle');
+    if (rt) rt.addEventListener('click', function () {
+      var pre = document.getElementById('satRawJson'); if (!pre) return;
+      var open = pre.style.display === 'none';
+      pre.style.display = open ? 'block' : 'none';
+      rt.textContent = (open ? '▾' : '▸') + ' Raw data (JSON)';
+      rt.setAttribute('aria-expanded', open ? 'true' : 'false');
+      if (open && satLastData) pre.textContent = JSON.stringify(satLastData, null, 2);
+    });
+
+    var dl = document.getElementById('satDetectLoc');
+    if (dl) dl.addEventListener('click', satDetectLocation);
+  }
+
+  // ---------- TASK-990: sensor-discovery toast (PR-649 "OTGW Patterns and Tokens") ----------
+  // A newly discovered, still-unassigned BLE sensor surfaces as a floating card
+  // (bottom-right, .discover-stack) with one-tap Assign (jump to the Sensors roster)
+  // or Ignore, then dismiss/auto-expire. Runs GLOBALLY off the same
+  // GET /api/v2/sat/ble/discovery poll the roster uses, so a background discovery is
+  // never silent. Each MAC surfaces once (persisted in localStorage otgw-ble-seen).
+  var discoverSeen = null;
+  function discoverSeenSet() {
+    if (discoverSeen) return discoverSeen;
+    discoverSeen = {};
+    try { (JSON.parse(localStorage.getItem('otgw-ble-seen') || '[]') || []).forEach(function (m) { discoverSeen[m] = 1; }); } catch (e) {}
+    return discoverSeen;
+  }
+  function markDiscoverSeen(mac) {
+    discoverSeenSet()[mac] = 1;
+    try { localStorage.setItem('otgw-ble-seen', JSON.stringify(Object.keys(discoverSeen))); } catch (e) {}
+  }
+  function getDiscoverStack() {
+    var s = document.getElementById('discoverStack');
+    if (!s) { s = document.createElement('div'); s.id = 'discoverStack'; s.className = 'discover-stack'; document.body.appendChild(s); }
+    return s;
+  }
+  function dropDiscoverCard(card, mac) {
+    markDiscoverSeen(mac);
+    if (card && card.parentNode) card.parentNode.removeChild(card);
+  }
+  // o = { id, bus:'ble'|'dallas', title, sub }. Bus-agnostic so BLE and 1-Wire
+  // (Dallas) both surface through the same card, colour-coded by CSS (.ble/.dallas).
+  function showDiscoverCard(o) {
+    var id = o.id; if (!id) return;
+    var stack = getDiscoverStack();
+    if (stack.querySelector('[data-mac="' + id + '"]')) return;   // already shown
+    if (stack.children.length >= 4) return;                       // cap the visible stack
+    var card = document.createElement('div');
+    card.className = 'discover-card ' + (o.bus || 'ble');
+    card.setAttribute('data-mac', id);
+    var ic = document.createElement('span'); ic.className = 'discover-ic';
+    var bd = document.createElement('div'); bd.className = 'discover-bd';
+    var t = document.createElement('div'); t.className = 't'; t.textContent = o.title;
+    var ss = document.createElement('div'); ss.className = 's'; ss.textContent = o.sub;
+    var act = document.createElement('div'); act.className = 'discover-act';
+    var assign = document.createElement('button'); assign.className = 'primary'; assign.textContent = 'Assign';
+    assign.addEventListener('click', function () {
+      dropDiscoverCard(card, id);
+      setActiveCat = 'sensors'; showPage('settings'); renderSettings();
+      setTimeout(function () { var el = document.querySelector('[class*="ble-row"]'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 350);
+    });
+    var ign = document.createElement('button'); ign.textContent = 'Ignore';
+    ign.addEventListener('click', function () { dropDiscoverCard(card, id); });
+    act.appendChild(assign); act.appendChild(ign);
+    bd.appendChild(t); bd.appendChild(ss); bd.appendChild(act);
+    var x = document.createElement('button'); x.className = 'discover-x'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '×';
+    x.addEventListener('click', function () { dropDiscoverCard(card, id); });
+    card.appendChild(ic); card.appendChild(bd); card.appendChild(x);
+    stack.appendChild(card);
+    // No auto-expire: the card stays until the user acts on it (Assign / Ignore / ×).
+  }
+  // BLE discovery: /api/v2/sat/ble/discovery (mac + temp/hum).
+  function pollDiscovery(retriesLeft) {
+    fetch(APIGW + 'v2/sat/ble/discovery', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) {
+        if (!j || !Array.isArray(j.sensors)) return;
+        var seen = discoverSeenSet();
+        j.sensors.forEach(function (s) {
+          if (!s || !s.valid || !s.mac || seen[s.mac]) return;
+          if (s.label && s.label.trim()) { markDiscoverSeen(s.mac); return; }   // already named -> not "new"
+          var nm = (s.name && s.name.trim()) || '';
+          var sub = (nm ? nm + ' · ' : '') + s.mac;
+          if (typeof s.temp === 'number') sub += ' · ' + s.temp.toFixed(1) + '°C';
+          if (typeof s.hum === 'number') sub += ' / ' + Math.round(s.hum) + '%';
+          showDiscoverCard({ id: s.mac, bus: 'ble', title: 'New BLE sensor discovered', sub: sub });
+        });
+      })
+      .catch(function () {
+        // Board momentarily saturated under the page's concurrent load (the
+        // discovery fetch colliding with the health/SAT polls + WS starved it).
+        // Retry once shortly; the board recovers between bursts.
+        if ((retriesLeft | 0) > 0) setTimeout(function () { pollDiscovery(retriesLeft - 1); }, 4000);
+      });
+  }
+  // 1-Wire/Dallas discovery: /api/v2/sensors (sensors.dallas[] with addr + temp).
+  // Each detected address surfaces once (seen-tracked, shared with BLE).
+  function pollDallasDiscovery(retriesLeft) {
+    fetch(APIGW + 'v2/sensors', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (j) {
+        var d = j && j.sensors; if (!d || !Array.isArray(d.dallas)) return;
+        var seen = discoverSeenSet();
+        d.dallas.forEach(function (s) {
+          var addr = s && s.addr; if (!addr || seen[addr]) return;
+          var sub = 'DS18B20 · ' + addr;
+          if (typeof s.temp === 'number') sub += ' · ' + s.temp.toFixed(1) + '°C';
+          showDiscoverCard({ id: addr, bus: 'dallas', title: 'New 1-Wire sensor detected', sub: sub });
+        });
+      })
+      .catch(function () { if ((retriesLeft | 0) > 0) setTimeout(function () { pollDallasDiscovery(retriesLeft - 1); }, 4000); });
+  }
+  // Gentle scheduler: skip the boot asset-burst (10s), then poll on a 25s cycle
+  // OFFSET from the 15s health poll so the two rarely fire together — that
+  // collision is what starved the discovery fetch. Dallas polls a beat later so
+  // the two discovery fetches don't collide with each other. Each tick retries once.
+  function startDiscoveryPolling() {
+    setTimeout(function () {
+      pollDiscovery(1);
+      setInterval(function () { pollDiscovery(1); }, 25000);
+    }, 10000);
+    setTimeout(function () {
+      pollDallasDiscovery(1);
+      setInterval(function () { pollDallasDiscovery(1); }, 25000);
+    }, 14000);
+  }
+
+  // ---------- TASK-991: bench-mode -> simulation prompt ----------
+  // No boiler AND no thermostat on the OT bus == a bench setup. On PIC boards
+  // (where /api/v2/simulate exists) offer once to enable simulation mode. The
+  // firmware itself refuses simulation when a real boiler is present
+  // (satBoilerHardwarePresent), so this can never clobber a live rig.
+  // ── TASK-997: first-time-setup onboarding wizard (design OTGW Onboarding.dc.html) ──
+  // Shown ONCE on a genuinely fresh device (firmware ui_onboarded=false; existing
+  // installs are migrated to onboarded so it never appears again). Welcome ->
+  // Appliance -> Home Assistant -> Done; writes SATsource + mqtt*, then persists
+  // ui_onboarded=true. Re-runnable from Settings > System (see renderSettings).
+  var _onbShown = false;
+  function maybeShowOnboarding() {
+    if (_onbShown || document.getElementById('onbBack')) return;
+    var ob = setData.ui_onboarded;
+    if (!ob || ('' + ob.value) === 'true') return;   // already onboarded / old firmware
+    _onbShown = true; startOnboarding();
+  }
+  function startOnboarding() {
+    var st = {
+      screen: 'welcome',
+      appliance: (setData.satsource && ('' + setData.satsource.value) === '2') ? 'hp' : 'gas',
+      mqtt: !!(setData.mqttenable && ('' + setData.mqttenable.value) === 'true'),
+      discovery: true, test: 'idle',
+      broker: (setData.mqttbroker && setData.mqttbroker.value) || 'homeassistant.local',
+      port: (setData.mqttbrokerport && setData.mqttbrokerport.value) || '1883',
+      user: (setData.mqttuser && setData.mqttuser.value) || '', pass: '',
+      topic: (setData.mqtttoptopic && setData.mqtttoptopic.value) || 'otgw'
+    };
+    var back = document.createElement('div'); back.id = 'onbBack';
+    back.setAttribute('style', 'position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;overflow:auto');
+    document.body.appendChild(back);
+    var CARD = 'background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 26px rgba(0,0,0,.32);padding:28px 26px';
+    var PRIM = 'background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:14px;border-radius:11px;padding:12px 26px;cursor:pointer;min-height:46px';
+    var GHOST = 'background:none;border:1px solid var(--border);color:var(--text);font-weight:600;font-size:13.5px;border-radius:10px;padding:11px 18px;cursor:pointer;min-height:44px';
+    var IN = 'width:100%;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;padding:10px 12px;font:400 13.5px inherit';
+    var LBL = 'font-weight:600;font-size:11.5px;color:var(--muted);display:block;margin-bottom:5px';
+    function esc(s) { return ('' + (s == null ? '' : s)).replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+    function post(name, value) { return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) }); }
+    function close() { if (back.parentNode) back.parentNode.removeChild(back); }
+    function syncInputs() {
+      var b = back.querySelector('#onbBroker'); if (b) st.broker = b.value;
+      var p = back.querySelector('#onbPort'); if (p) st.port = p.value;
+      var u = back.querySelector('#onbUser'); if (u) st.user = u.value;
+      var pw = back.querySelector('#onbPass'); if (pw) st.pass = pw.value;
+      var t = back.querySelector('#onbTopic'); if (t) st.topic = t.value;
+    }
+    function commit(then) {
+      var w = [post('satsource', st.appliance === 'hp' ? 2 : 1), post('mqttenable', st.mqtt)];
+      if (st.mqtt) {
+        w.push(post('mqttbroker', st.broker), post('mqttbrokerport', parseInt(st.port, 10) || 1883), post('mqttuser', st.user), post('mqtttoptopic', st.topic));
+        if (st.pass) w.push(post('mqttpasswd', st.pass));
+      }
+      Promise.all(w).then(function () { return post('ui_onboarded', true); }).then(then, then);
+    }
+    function testConn() {
+      if (st.test === 'testing') return; syncInputs(); st.test = 'testing'; render();
+      Promise.all([post('mqttenable', true), post('mqttbroker', st.broker), post('mqttbrokerport', parseInt(st.port, 10) || 1883), post('mqttuser', st.user)].concat(st.pass ? [post('mqttpasswd', st.pass)] : [])).then(function () {
+        var tries = 0;
+        (function poll() {
+          fetch(APIGW + 'v2/device/info').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+            var c = j && j.device && j.device.mqttconnected;
+            if (c === true || c === 'true') { st.test = 'ok'; render(); }
+            else if (++tries < 6) setTimeout(poll, 1300); else { st.test = 'fail'; render(); }
+          }).catch(function () { if (++tries < 6) setTimeout(poll, 1300); else { st.test = 'fail'; render(); } });
+        })();
+      });
+    }
+    function choiceCard(kind, title, desc) {
+      var sel = st.appliance === kind;
+      return '<button data-act="pick-' + kind + '" style="flex:1;min-width:210px;text-align:left;border-radius:12px;padding:16px;cursor:pointer;font-family:inherit;' +
+        (sel ? 'background:color-mix(in srgb,var(--accent) 12%,var(--panel));border:2px solid var(--accent)' : 'background:var(--bg);border:1.5px solid var(--border)') + '">' +
+        '<div style="display:flex;align-items:center;gap:9px"><span style="width:16px;height:16px;border-radius:50%;box-sizing:border-box;flex:0 0 auto;' +
+        (sel ? 'border:5px solid var(--accent)' : 'border:1.5px solid var(--muted)') + '"></span><span style="font-weight:700;font-size:15px;color:var(--text)">' + title + '</span></div>' +
+        '<p style="font:400 11.5px/1.5 inherit;color:var(--muted);margin:9px 0 0">' + desc + '</p></button>';
+    }
+    function toggle(on, act) {
+      return '<button data-act="' + act + '" aria-label="toggle" style="width:44px;height:24px;border-radius:12px;position:relative;flex:0 0 auto;cursor:pointer;border:0;padding:0;background:' + (on ? 'var(--accent)' : 'var(--border)') + '">' +
+        '<span style="position:absolute;top:2px;width:20px;height:20px;background:#fff;border-radius:50%;left:' + (on ? '22px' : '2px') + '"></span></button>';
+    }
+    function render() {
+      var h = '';
+      h += '<div style="display:flex;align-items:center;gap:11px;padding:12px 18px;background:var(--panel);border-bottom:1px solid var(--border)">' +
+        '<span style="font-weight:700;font-size:15px;color:var(--text)">OTGW firmware</span>' +
+        '<span style="font-weight:600;font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">First-time setup</span></div>';
+      h += '<div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:44px 18px 60px"><div style="width:100%;max-width:560px">';
+      if (st.screen === 'appliance' || st.screen === 'mqtt') {
+        var isM = st.screen === 'mqtt';
+        h += '<div style="margin:0 0 20px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">' +
+          '<span style="font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Step ' + (isM ? 2 : 1) + ' of 2</span>' +
+          '<span style="font-weight:600;font-size:12px;color:var(--text)">' + (isM ? 'Home Assistant' : 'Appliance') + '</span></div>' +
+          '<div style="height:5px;border-radius:3px;background:var(--border);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:var(--accent);width:' + (isM ? 100 : 50) + '%"></span></div></div>';
+      }
+      if (st.screen === 'welcome') {
+        h += '<div style="' + CARD + ';text-align:center">' +
+          '<div style="width:54px;height:54px;border-radius:50%;background:color-mix(in srgb,var(--ok,#27c469) 18%,transparent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px"><span style="width:16px;height:16px;border-radius:50%;background:var(--ok,#27c469);box-shadow:0 0 10px var(--ok,#27c469)"></span></div>' +
+          '<h1 style="font-weight:700;font-size:25px;color:var(--text);margin:0 0 8px">Your gateway is online</h1>' +
+          '<p style="font:400 13px/1.65 inherit;color:var(--muted);margin:0 auto 24px;max-width:400px">Two quick things and you\'re done — everything else is read straight from the OpenTherm bus.</p>' +
+          '<button data-act="begin" style="' + PRIM + ';font-size:15px;padding:13px 30px">Get started</button></div>';
+      } else if (st.screen === 'appliance') {
+        h += '<div style="' + CARD + '"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">What are you heating with?</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">Sets how OpenTherm data is read and labelled. Change it anytime in Settings.</p>' +
+          '<div style="display:flex;gap:12px;flex-wrap:wrap">' + choiceCard('gas', 'Gas boiler', 'Modulating OpenTherm boiler — flow &amp; return temperature, modulation %, flame &amp; DHW.') + choiceCard('hp', 'Heat pump', 'Air/water heat pump or electric heater — compressor, COP, water temperatures &amp; defrost.') + '</div>' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:24px"><button data-act="back-welcome" style="' + GHOST + '">Back</button>' +
+          '<button data-act="to-mqtt" style="margin-left:auto;' + PRIM + '">Continue</button></div></div>';
+      } else if (st.screen === 'mqtt') {
+        h += '<div style="' + CARD + '"><div style="display:flex;align-items:flex-start;gap:12px"><div style="flex:1">' +
+          '<h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">Connect to Home Assistant</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0">The gateway publishes every value over MQTT; Home Assistant auto-discovers them. Optional — leave off to run standalone.</p></div>' +
+          toggle(st.mqtt, 'toggle-mqtt') + '</div>';
+        if (st.mqtt) {
+          h += '<div style="margin-top:18px;display:flex;flex-direction:column;gap:12px">' +
+            '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + LBL + '">MQTT broker</label><input id="onbBroker" value="' + esc(st.broker) + '" style="' + IN + '"></div>' +
+            '<div style="width:116px"><label style="' + LBL + '">Port</label><input id="onbPort" value="' + esc(st.port) + '" style="' + IN + '"></div></div>' +
+            '<div style="display:flex;gap:12px"><div style="flex:1"><label style="' + LBL + '">Username</label><input id="onbUser" value="' + esc(st.user) + '" style="' + IN + '"></div>' +
+            '<div style="flex:1"><label style="' + LBL + '">Password</label><input id="onbPass" type="password" placeholder="unchanged" style="' + IN + '"></div></div>' +
+            '<div style="flex:1"><label style="' + LBL + '">Top topic</label><input id="onbTopic" value="' + esc(st.topic) + '" style="' + IN + '"></div>' +
+            '<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;min-height:40px">' +
+            '<button data-act="test" style="background:none;color:var(--accent);font-weight:600;font-size:12.5px;border-radius:9px;padding:9px 15px;min-height:40px;border:1px solid var(--accent);cursor:pointer">' + (st.test === 'testing' ? 'Testing…' : (st.test === 'ok' || st.test === 'fail') ? 'Test again' : 'Test connection') + '</button>' +
+            (st.test === 'testing' ? '<span style="font:500 12px inherit;color:var(--muted)">Testing connection…</span>' : '') +
+            (st.test === 'ok' ? '<span style="font-weight:600;font-size:12px;color:var(--ok,#27c469)">✓ Connected</span>' : '') +
+            (st.test === 'fail' ? '<span style="font-weight:600;font-size:12px;color:var(--warn,#e0a300)">No response — check broker &amp; port</span>' : '') +
+            '</div></div>';
+        }
+        h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-act="back-appliance" style="' + GHOST + '">Back</button>' +
+          '<button data-act="finish" style="margin-left:auto;' + PRIM + '">' + (st.mqtt ? 'Finish' : 'Skip &amp; finish') + '</button></div></div>';
+      } else if (st.screen === 'done') {
+        h += '<div style="' + CARD + ';text-align:center">' +
+          '<div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:#04222c">✓</div>' +
+          '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">You\'re all set</h1>' +
+          '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:400px">The gateway is live and reading the bus.</p>' +
+          '<div style="text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:6px 16px;margin:0 0 20px">' +
+          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font:500 12.5px inherit;color:var(--muted)">Appliance</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + (st.appliance === 'hp' ? 'Heat pump' : 'Gas boiler') + '</span></div>' +
+          '<div style="display:flex;align-items:center;padding:11px 0"><span style="font:500 12.5px inherit;color:var(--muted)">Integration</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + (st.mqtt ? 'Home Assistant · ' + esc(st.broker) : 'Standalone (no MQTT)') + '</span></div></div>' +
+          '<button data-act="go" style="' + PRIM + ';font-size:15px;padding:13px 30px">Go to dashboard</button></div>';
+      }
+      h += '</div></div>';
+      back.innerHTML = h;
+    }
+    back.addEventListener('click', function (ev) {
+      var t = ev.target.closest && ev.target.closest('[data-act]'); if (!t) return;
+      var a = t.getAttribute('data-act');
+      if (a === 'begin') { st.screen = 'appliance'; render(); }
+      else if (a === 'pick-gas') { st.appliance = 'gas'; render(); }
+      else if (a === 'pick-hp') { st.appliance = 'hp'; render(); }
+      else if (a === 'back-welcome') { st.screen = 'welcome'; render(); }
+      else if (a === 'to-mqtt') { st.screen = 'mqtt'; render(); }
+      else if (a === 'back-appliance') { syncInputs(); st.screen = 'appliance'; render(); }
+      else if (a === 'toggle-mqtt') { syncInputs(); st.mqtt = !st.mqtt; st.test = 'idle'; render(); }
+      else if (a === 'test') { testConn(); }
+      else if (a === 'finish') { syncInputs(); commit(function () { st.screen = 'done'; render(); }); }
+      else if (a === 'go') { close(); fetchSettings(); showPage('home'); }
+    });
+    render();
+  }
+
+  function showSimModal() {
+    if (document.getElementById('simBackdrop')) return;
+    var bd = document.createElement('div'); bd.id = 'simBackdrop'; bd.className = 'sim-backdrop';
+    var m = document.createElement('div'); m.className = 'sim-modal';
+    var h = document.createElement('h3'); h.textContent = '⚙ No boiler detected';
+    var p = document.createElement('p'); p.textContent = 'This gateway sees no boiler or thermostat on the OpenTherm bus — looks like a bench setup. Run in simulation mode to preview live-like data?';
+    var acts = document.createElement('div'); acts.className = 'acts';
+    var no = document.createElement('button'); no.textContent = 'Not now';
+    var yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Enable simulation';
+    function closeSim() { try { localStorage.setItem('otgw-sim-prompted', '1'); } catch (e) { } if (bd.parentNode) bd.parentNode.removeChild(bd); }
+    no.addEventListener('click', closeSim);
+    yes.addEventListener('click', function () {
+      fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'simulation', value: true }) })
+        .then(function (r) { if (r.ok && typeof bleToast === 'function') bleToast('Simulation enabled'); })
+        .catch(function () { });
+      closeSim();
+    });
+    bd.addEventListener('click', function (e) { if (e.target === bd) closeSim(); });
+    acts.appendChild(no); acts.appendChild(yes);
+    m.appendChild(h); m.appendChild(p); m.appendChild(acts); bd.appendChild(m);
+    document.body.appendChild(bd);
+  }
+  function maybePromptSimulation() {
+    try { if (localStorage.getItem('otgw-sim-prompted') === '1') return; } catch (e) { }
+    withDeviceInfo(function (d) {
+      if (!d) return;
+      if (d.otcommandinterface !== 'PIC') return;                                  // /simulate is PIC-path only
+      if (d.otgwsimulation) return;                                                // already simulating
+      if (d.boilerconnected || d.thermostatconnected || d.otgwconnected) return;   // something on the bus -> not a bench
+      showSimModal();
+    });
+  }
+
+  // ---------- TASK-992: hide the Advanced > PIC sub-tab when no PIC is present ----------
+  // OT-Direct boards (OTGW32) have no PIC firmware, so the PIC tab is dead there.
+  function applyPicTabVisibility() {
+    withDeviceInfo(function (d) {
+      var isPic = !!(d && d.otcommandinterface === 'PIC');
+      var btn = document.querySelector('#advTabs [data-adv="pic"]');
+      var panel = document.getElementById('adv-pic');
+      if (btn) btn.classList.toggle('hidden', !isPic);
+      if (!isPic) {
+        var wasActive = (btn && btn.classList.contains('active')) || (panel && panel.classList.contains('active'));
+        if (panel) panel.classList.remove('active');
+        if (wasActive && typeof showAdvTab === 'function') showAdvTab('debug');
+      }
+    });
   }
 
   // ---------- init ----------
@@ -1823,12 +3578,40 @@
     document.querySelectorAll('.seg').forEach(function (s) {
       s.addEventListener('click', function () { showPage(s.dataset.page); });
     });
-    document.querySelectorAll('.cchip').forEach(function (s) {
-      s.addEventListener('click', function () { showDesign(s.dataset.design); });
+    document.querySelectorAll('.vp-item').forEach(function (s) {
+      s.addEventListener('click', function () { showDesign(s.dataset.design); closeViewMenu(); });
     });
-    document.querySelectorAll('.subtab').forEach(function (s) {
+    (function () {
+      var btn = document.getElementById('viewPickBtn'), menu = document.getElementById('viewPickMenu');
+      if (!btn || !menu) return;
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = menu.classList.toggle('show');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      });
+      document.addEventListener('click', function (e) {
+        if (!e.target.closest || !e.target.closest('#viewPick')) closeViewMenu();
+      });
+    })();
+    // Monitor sub-tabs only (scoped so Advanced's own .subtab elements are wired separately).
+    document.querySelectorAll('#page-monitor .subtab').forEach(function (s) {
       s.addEventListener('click', function () { showTab(s.dataset.tab); });
     });
+    // TASK-982: Advanced sub-tabs (PIC / Debug / File System / System).
+    document.querySelectorAll('#advTabs .subtab').forEach(function (s) {
+      s.addEventListener('click', function () { showAdvTab(s.dataset.adv); });
+    });
+    // TASK-982: Advanced > System action buttons.
+    document.querySelectorAll('#adv-system [data-act]').forEach(function (b) {
+      b.addEventListener('click', function () { advAction(b.dataset.act); });
+    });
+    // TASK-982: Advanced > File System upload (button enables once a file is chosen).
+    var fsFileInp = document.getElementById('fsFile');
+    if (fsFileInp) fsFileInp.addEventListener('change', function () {
+      var u = document.getElementById('fsUpload'); if (u) u.disabled = !(fsFileInp.files && fsFileInp.files.length);
+    });
+    var fsUpBtn = document.getElementById('fsUpload');
+    if (fsUpBtn) fsUpBtn.addEventListener('click', fsDoUpload);
     var ut = document.getElementById('uiToggle');
     if (ut) ut.addEventListener('click', gotoClassic);
 
@@ -1841,6 +3624,17 @@
     var ocs = document.getElementById('otCmdSend'), oci = document.getElementById('otCmdInput');
     if (ocs) ocs.addEventListener('click', sendOtgwCmd);
     if (oci) oci.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); sendOtgwCmd(); } });
+    // TASK-970: Clear + Download (were rendered but unwired) + SAT-only / auto-download / stream chips
+    var lcl = document.getElementById('logClear');
+    if (lcl) lcl.addEventListener('click', function () { logBuf = []; logRecvTimes = []; renderLog(); });
+    var ldl = document.getElementById('logDownload');
+    if (ldl) ldl.addEventListener('click', downloadLog);
+    var cso = document.getElementById('chipSatOnly');
+    if (cso) cso.addEventListener('click', function () { logSatOnly = !logSatOnly; cso.classList.toggle('on', logSatOnly); if (isMonitorLogVisible()) renderLog(); });
+    var cad = document.getElementById('chipAutoDl');
+    if (cad) cad.addEventListener('click', function () { toggleAutoDl(cad); });
+    var cst = document.getElementById('chipStream');
+    if (cst) { if (!window.showSaveFilePicker) { cst.style.opacity = '.5'; cst.title = 'Stream to file needs Chrome / Edge'; } cst.addEventListener('click', function () { toggleStream(cst); }); }
     var cs = document.getElementById('chipScroll');
     if (cs) cs.addEventListener('click', function () { logAutoScroll = !logAutoScroll; cs.classList.toggle('on', logAutoScroll); });
     var ct = document.getElementById('chipTs');
@@ -1855,8 +3649,10 @@
     var setS = document.getElementById('setSearch');
     if (setS) setS.addEventListener('input', function () { setSearch = setS.value; renderSettings(); });
     var bSave = document.getElementById('btnSave'); if (bSave) bSave.addEventListener('click', saveSettings);
+    var pcu = document.getElementById('picCheckUpd'); if (pcu) pcu.addEventListener('click', checkPicUpdate);   // TASK-972
     var bDisc = document.getElementById('btnDiscard'); if (bDisc) bDisc.addEventListener('click', discardSettings);
 
+    wireSat();   // TASK-986: bind SAT-page controls before the page is restored below
     var sp = localStorage.getItem('otgw-v2-page'); showPage(sp || 'home');
     var sd = localStorage.getItem('otgw-v2-design'); showDesign(sd || 'a');
     renderConnStrip();
@@ -1871,9 +3667,31 @@
     // settings once so the connectivity model knows which integrations are disabled
     // (MQTT off must read grey "Off", not a red "Disconnected", on the first Home
     // render — setData is otherwise empty until the Settings page is opened).
+    // TASK-989: STAGGER the startup API calls. Firing them all at once (plus the
+    // three big assets) is the parallel burst that collapses the S3 heap under
+    // concurrent serving. Settings first (the connectivity model needs it), then
+    // conn shortly after for the first strip render; the heavier device/info and
+    // the seed/SAT/weather cluster trickle in behind (see below).
     fetchSettings();
-    fetchConn();
+    setTimeout(fetchConn, 400);
     setInterval(fetchConn, 15000);
+    // TASK-990: surface newly discovered BLE + 1-Wire sensors as discovery toasts
+    // (any page), via a gentle retrying scheduler that stays out of the boot burst.
+    startDiscoveryPolling();
+    // TASK-983/992: one delayed device/info fetch feeds BOTH the header identity
+    // chips and the PIC-tab visibility (withDeviceInfo dedups + caches 8s).
+    setTimeout(function () { applyPicTabVisibility(); withDeviceInfo(fillHeaderIdentity); }, 1200);
+    // TASK-991: on a bench setup (no boiler/thermostat on the bus, PIC board), offer
+    // simulation mode once. Delayed past the boot burst so the bus state has settled.
+    setTimeout(maybePromptSimulation, 12000);
+
+    // TASK-984: close the floating override panel on an outside click. The two triggers
+    // (#aOvrBadge on Home, #cnOvr on the connection map) stopPropagation on their own
+    // clicks, but whitelist them here too so a bubbled click never self-closes the panel.
+    document.addEventListener('click', function (e) {
+      var p = document.getElementById('ovrPanel'); if (!p || !p.classList.contains('show')) return;
+      if (!p.contains(e.target) && !(e.target.closest && (e.target.closest('#cnOvr') || e.target.closest('#aOvrBadge')))) p.classList.remove('show');
+    });
 
     // P9 wiring -----------------------------------------------------------
     document.querySelectorAll('#applToggle .seg2btn').forEach(function (b) {
@@ -1895,14 +3713,14 @@
         downloadBlob(new Blob([logBuf.join('\n')], { type: 'text/plain' }), 'otgw-log-' + ts() + '.txt');
       });
     });
-    document.querySelectorAll('#mgraph .tchip').forEach(function (ch) {
+    document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (ch) {
       ch.addEventListener('click', function () {
         // Parse the leading number + unit. indexOf('4') used to match the '4' in
         // '24 h' and silently apply a 4 h window to the 24 h chip.
         var t = ch.textContent.toLowerCase();
         var n = parseInt(t, 10) || 1;
         graphWindowMs = /min/.test(t) ? n * 60000 : n * 3600000;
-        document.querySelectorAll('#mgraph .tchip').forEach(function (x) { x.classList.toggle('on', x === ch); });
+        document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (x) { x.classList.toggle('on', x === ch); });
         if (isMonitorVisible('mgraph')) renderGraph();
       });
     });
@@ -1910,7 +3728,13 @@
       if (/png/i.test(b.textContent)) b.addEventListener('click', exportPng);
       else if (/csv/i.test(b.textContent)) b.addEventListener('click', exportCsv);
     });
-    fetchSeed(); fetchSatStatus(); fetchWeather();
+    var apng = document.getElementById('chipAutoPng');   // TASK-971
+    if (apng) apng.addEventListener('click', function () { toggleAutoPng(apng); });
+    var acsv = document.getElementById('chipAutoCsv');
+    if (acsv) acsv.addEventListener('click', function () { toggleAutoCsv(acsv); });
+    // TASK-989: staggered (see the startup-burst note above) — seed/SAT/weather
+    // trail the first-paint fetches one at a time instead of bursting together.
+    setTimeout(fetchSeed, 2000); setTimeout(fetchSatStatus, 2800); setTimeout(fetchWeather, 3600);
     setInterval(function () { if (!ws || ws.readyState !== 1) fetchSeed(); }, 20000);
     setInterval(fetchSatStatus, 30000);
     setInterval(fetchWeather, 60000);   // TASK-954: refresh weather-API OUTSIDE

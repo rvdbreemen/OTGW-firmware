@@ -1,10 +1,11 @@
 ---
 id: TASK-957
 title: 'Fix v2 Monitor log: frames run together (missing white-space on .console)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 05:04'
+updated_date: '2026-07-01 19:34'
 labels: []
 dependencies: []
 ordinal: 169000
@@ -18,7 +19,13 @@ The v2 Monitor -> Log console renders all OT frames concatenated on a continuous
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 v2 Monitor Log shows one OT frame per line (newlines honoured)
-- [ ] #2 .console has white-space: pre-wrap; long frames wrap instead of horizontal-scroll
-- [ ] #3 littlefs build green; prerelease bumped
+- [x] #1 v2 Monitor Log shows one OT frame per line (newlines honoured)
+- [x] #2 .console has white-space: pre-wrap; long frames wrap instead of horizontal-scroll
+- [x] #3 littlefs build green; prerelease bumped
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed in alpha.296 (commit 852d3ce05): added white-space:pre-wrap;overflow-wrap:anywhere to .console (v2.css:255) so the v2 Monitor Log renders one OT frame per line and wraps long frames, matching the classic .ot-log-content contract. renderLog() already emitted lines.join('\n'), so no JS change was needed. littlefs rebuilt + prerelease bumped. ACs reconciled against shipped code.
+<!-- SECTION:FINAL_SUMMARY:END -->

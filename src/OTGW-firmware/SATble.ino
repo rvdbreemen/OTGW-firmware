@@ -620,10 +620,20 @@ class SATBLEScanCallbacks final : public NimBLEScanCallbacks {
 
 static SATBLEScanCallbacks _bleScanCallbacks;
 
+// TASK-995: PSRAM-aware activation gate. BLE actually runs only when the user
+// enabled it AND the board can carry the ~64 KB internal-DRAM footprint safely:
+// either it has PSRAM (which frees the internal room the web stack needs), or the
+// user has explicitly accepted the no-PSRAM instability risk in the Web UI. On a
+// no-PSRAM board with bBleEnable=true but no risk-ack, BLE stays dormant — the UI
+// surfaces a consent dialog. This replaces the bare bBleEnable check at every gate.
+static inline bool bleActive() {
+  return settings.sat.bBleEnable && (psramFound() || settings.sat.bBleRiskAck);
+}
+
 //=====================================================================
 void satBLEInit()
 {
-  if (!settings.sat.bBleEnable) return;
+  if (!bleActive()) return;
 
   NimBLEDevice::init("");
   _pBLEScan = NimBLEDevice::getScan();
@@ -700,7 +710,7 @@ static void satBLEPruneByNameFilter()
 //=====================================================================
 void satBLELoop()
 {
-  if (!settings.sat.bBleEnable) return;
+  if (!bleActive()) return;
 
   // Lazy init: if BLE was enabled at runtime via settings change
   if (!_bleInitialized) {
@@ -918,7 +928,7 @@ float satBLEGetHumidity()
 void satBLEPublishMQTT()
 {
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
-  if (!settings.sat.bBleEnable) return;
+  if (!bleActive()) return;
 
   // ADR-111: on-change + jittered heartbeat. Shadows are BSS zero-init.
   static SATShadowF s_ble_temp, s_ble_humidity;
@@ -1073,6 +1083,13 @@ void satBLERosterSendJSON()
     je.field(F("max_slots"),          (int32_t)SAT_BLE_MAX_ROSTER);
     je.field(F("populated_slots"),    (int32_t)cnt);
     je.field(F("roster_full"),        (cnt >= SAT_BLE_MAX_ROSTER));
+    // TASK-995: PSRAM-aware BLE policy signals for the UI consent gate.
+    // psram=1 -> BLE runs freely; psram=0 -> UI must obtain risk acknowledgement
+    // before BLE actually scans (active reflects the runtime bleActive() decision).
+    je.field(F("psram"),              (int32_t)(psramFound() ? 1 : 0));
+    je.field(F("ble_enable"),         settings.sat.bBleEnable);
+    je.field(F("risk_ack"),           settings.sat.bBleRiskAck);
+    je.field(F("active"),             bleActive());
     je.field(F("dropped_since_full"), (int32_t)_bleRosterFullCount);
     je.field(F("selected_mac"),       settings.sat.sBleMAC);
     je.field(F("name_prefix"),        settings.sat.sBleNamePrefix);    // TASK-895

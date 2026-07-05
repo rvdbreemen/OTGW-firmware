@@ -12,11 +12,34 @@
 
 ## File Inventory
 
+### Two coexisting UI bundles
+
+The device ships two independent web UI bundles side by side on LittleFS:
+
+- **Classic bundle**: `index.html`, `index.js`, `graph.js`, `sat.js`, `sat-slider.js`, `theme-toggle.js`, `echarts-theme.js`, `components.css`, `ds-tokens.css`.
+- **V2 bundle**: `v2.html`, `v2.js`, `v2.css` — a single-page app with a tabbed shell.
+
+Which bundle the root path serves is a device-wide setting persisted in `settings.ini`; each UI exposes a switch button to flip the setting and reload into the other bundle. Both bundles are served from the same LittleFS image; confirm the current asset list with `git ls-files src/OTGW-firmware/data`.
+
 ### Core HTML & Entrypoint
 
 | File | Size | Purpose |
 |------|------|---------|
-| `index.html` | ~11 KB | Main SPA entry point; loads CSS (with theme detection), JS modules, and ECharts library. Template-driven layout with page sections for Home, SAT, Settings, Advanced modes. Includes OT-Direct panel (OTGW32 only). |
+| `index.html` | ~11 KB | Classic SPA entry point; loads CSS (with theme detection), JS modules, and ECharts library. Template-driven layout with page sections for Home, SAT, Settings, Advanced modes. Includes OT-Direct panel (OTGW32 only). Loads its scripts sequentially with retry so a transient `503` from the file-serve backpressure gate does not leave the page half-initialised. |
+| `v2.html` | V2 SPA entry point; loads `v2.css` and `v2.js`. Tabbed shell driven by the WebSocket live stream and the `/api/v2/*` REST API. |
+
+### V2 UI Bundle (tabbed SPA)
+
+`v2.html` / `v2.js` / `v2.css` form a self-contained single-page app organised as a tabbed shell:
+
+- **Home** — device / gateway overview.
+- **Connection** — network and connectivity state.
+- **Monitor** — sub-tabs: **Log**, **Stats**, **Graph**, **Debug**.
+- **Advanced** — sub-tabs: **PIC**, **Debug**, **File System**, **System**.
+- **SAT** — Smart Autotune Thermostat dashboard.
+- **Settings** — device configuration.
+
+The live OT stream is fed by the same `/ws` WebSocket used by the classic UI; all reads and mutations go through the `/api/v2/*` REST API.
 
 ### Stylesheets (Design-System Migration)
 
@@ -29,6 +52,9 @@ The previous trio `index.css` / `index_dark.css` / `index_common.css` and the `F
 | `design.html` | Living component gallery / style guide — every reusable widget rendered once with token labels for visual regression review. Not linked from the SPA; loaded directly when iterating on tokens. |
 | `theme-toggle.js` | Sun/moon toggle button; persists choice in `localStorage`, applies the right `data-theme` attribute, fires a `themechange` event for the ECharts theme listener. |
 | `echarts-theme.js` | ECharts theme registration (light + dark); listens for `themechange` and re-renders graph y-axes / legends. |
+| `v2.css` | Stylesheet for the v2 tabbed SPA (`v2.html` / `v2.js`). Independent of the classic `components.css` / `ds-tokens.css` sheets. |
+
+Web fonts live under `data/fonts/` (`inter-400.woff2`, `inter-700.woff2`, `jetbrains-mono-400.woff2`) and are served locally so the UI renders without internet access.
 
 ### JavaScript Modules
 
@@ -606,12 +632,18 @@ All visible widgets (header, nav tabs, tables, settings fields, OT log viewer, f
 1. ESP8266 firmware (`OTGW-firmware.ino`) initializes LittleFS at startup
 2. Files in `data/` directory are embedded during build: `python build.py` packs all files into SPIFFS/LittleFS image
 3. HTTP server routes:
-   - `/` → `/index.html`
-   - `/ds-tokens.css`, `/components.css` → CSS files
-   - `/index.js`, `/graph.js`, `/sat.js`, `/sat-slider.js`, `/theme-toggle.js`, `/echarts-theme.js` → JavaScript modules
+   - `/` → the classic or v2 shell, selected by the device-wide UI setting
+   - `/index.html`, `/v2.html` → the two shell entrypoints
+   - `/ds-tokens.css`, `/components.css`, `/v2.css` → CSS files
+   - `/index.js`, `/graph.js`, `/sat.js`, `/sat-slider.js`, `/theme-toggle.js`, `/echarts-theme.js`, `/v2.js` → JavaScript modules
    - `/pic16f88/*`, `/pic16f1847/*` → PIC firmware binaries and version files
    - `/api/*` → REST endpoints (handled by firmware C++ code)
    - `/ws` → WebSocket endpoint (handled by firmware C++ code)
+
+### Cache & Backpressure Policy
+
+- **`Cache-Control: no-cache` + ETag revalidation (ADR-163, amends ADR-139)**: static assets ship with stable URLs (no `?v=` query versioning) and a `Cache-Control: no-cache` header, so the browser may store an asset but must revalidate it every load via `If-None-Match`. The ETag is derived from the filesystem hash (combined with the asset path so the two shells never collide on one validator); an unchanged filesystem returns `304`, an OTA/FS upgrade changes the hash and returns `200` with fresh content on the next load.
+- **503 backpressure gate (ADR-147)**: the LittleFS file-serve path is allocation-bounded and refuses a new file serve under heap pressure or excessive concurrency with a cheap `503`, so abusive concurrency cannot drive the ESP32-S3 out of memory. The classic UI loads its scripts sequentially with retry to survive a transient `503`.
 
 ### File Size Constraints
 

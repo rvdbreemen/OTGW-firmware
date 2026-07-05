@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="color-scheme" content="light dark">
 <title>OTGW firmware</title>
-<link rel="stylesheet" href="ds-tokens.css">
-<link rel="stylesheet" href="v2.css">
 <script>
   // Pre-paint theme (shared key with the classic UI) to avoid flash-of-wrong-theme.
   (function(){
@@ -18,33 +16,94 @@
     }catch(e){}
   })();
 </script>
-<script src="./v2.js" defer></script>
+<script>
+  // TASK-978: load the stylesheets + v2.js with retry-on-503. A 503'd/reset
+  // <link>/<script> has no native retry, so the UI would render unstyled (CSS
+  // dropped) or dead (v2.js dropped) with nothing surfaced. Retry with linear
+  // backoff, mirroring the classic index.html loader (TASK-960).
+  // TASK-989: load SEQUENTIALLY (ds-tokens -> v2.css -> v2.js), one connection
+  // at a time. A parallel burst of asset connections is what collapses the S3
+  // heap under concurrent serving (AsyncTCP accepts unconditionally; measured
+  // freeheap 22K->3.8K); serializing the three big assets removes the burst at
+  // the source instead of relying on the serve gates to shed it.
+  (function(){
+    var MAX = 8;
+    function loadCss(href, then){
+      var attempt = 0;
+      (function go(){
+        var l = document.createElement('link');
+        l.rel = 'stylesheet'; l.href = href;
+        l.onload = function(){ if (then) then(); };
+        l.onerror = function(){
+          if (l.parentNode) l.parentNode.removeChild(l);
+          if (++attempt <= MAX) setTimeout(go, 200 * attempt);
+          else { console.error('[loader] gave up on ' + href); if (then) then(); }
+        };
+        document.head.appendChild(l);
+      })();
+    }
+    function loadJs(){
+      var jsAttempt = 0;
+      (function go(){
+        var s = document.createElement('script');
+        s.src = './v2.js'; s.defer = true;
+        s.onerror = function(){
+          if (s.parentNode) s.parentNode.removeChild(s);
+          if (++jsAttempt <= MAX) setTimeout(go, 200 * jsAttempt);
+          else console.error('[loader] gave up on v2.js');
+        };
+        document.head.appendChild(s);
+      })();
+    }
+    loadCss('ds-tokens.css', function(){ loadCss('v2.css', loadJs); });
+  })();
+</script>
 </head>
 <body>
 
 
 <div class="headerrow">
   <span class="big">OTGW firmware <span class="sub">· v2</span></span>
+  <!-- TASK-983: firmware-authentic identity chips (hostname·version + IP·Wi-Fi bars).
+       Filled once from /api/v2/device/info at startup; the Wi-Fi bars + dBm refresh
+       live from the /api/v2/health poll (fetchConn). -->
+  <span class="hdr-net">
+    <span class="hdr-id" id="hdrHost" title="Hostname · firmware version">…</span>
+    <span class="hdr-id" id="hdrNet" title="Network connection">…</span>
+  </span>
+  <span class="hdr-spacer"></span>
+  <span class="hdr-status" id="hdrStatus" title="Connectivity status">
+    <span class="hdr-dot"></span><span id="hdrStatMode">…</span>
+  </span>
+  <!-- TASK-999: connectivity pill moved up onto the header line (was a strip below the nav). -->
+  <div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
+  <!-- TASK-983: shown only while OT-replay simulation is active (polled via /api/v2/simulate). -->
+  <span class="hdr-sim hidden" id="hdrSim" title="Simulation active — values may be replayed, not live from the boiler">SIMULATION</span>
   <span class="sub" id="clock">--:--:--</span>
   <button type="button" class="theme-toggle" id="uiToggle" title="Switch back to the classic UI">↩ Classic UI</button>
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">🌙 Dark</button>
 </div>
 <div class="switcher">
   <button class="seg active" data-page="home"><b>Home</b><small>opening page</small></button>
+  <button class="seg" data-page="sat"><b>SAT</b><small>thermostat · control · technical</small></button>
   <button class="seg" data-page="monitor"><b>Monitor</b><small>log · stats · support · graph · connection</small></button>
   <button class="seg" data-page="settings"><b>Settings</b><small>grouped &amp; scannable</small></button>
+  <button class="seg" data-page="advanced"><b>Advanced</b><small>pic · debug · files · system</small></button>
 </div>
-<!-- always-visible connectivity strip — glance scale; click any pill for the detail map -->
-<div class="connstrip" id="connStrip" title="Connectivity — tap for details"></div>
-
 <div class="wrap">
 
 <!-- ════════════════ PAGE: HOME ════════════════ -->
 <div id="page-home" class="page active">
-<div class="cchips">
-  <button class="cchip active" data-design="a">System view</button>
-  <button class="cchip" data-design="b">At a glance</button>
-  <button class="cchip" data-design="c">Mission control</button>
+<div class="viewpick" id="viewPick">
+  <button type="button" class="viewpick-btn" id="viewPickBtn" aria-haspopup="true" aria-expanded="false" title="Choose home view">
+    <svg width="15" height="15" viewBox="0 0 15 15" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><rect x="1" y="1" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="1" width="5.5" height="5.5" rx="1"/><rect x="1" y="8.5" width="5.5" height="5.5" rx="1"/><rect x="8.5" y="8.5" width="5.5" height="5.5" rx="1"/></svg>
+    <span class="vp-lead">View:</span><span id="viewPickLabel">System view</span><span class="vp-car">▾</span>
+  </button>
+  <div class="viewpick-menu" id="viewPickMenu" role="menu">
+    <button type="button" class="vp-item active" data-design="a" role="menuitem"><span class="vp-chk">✓</span><span>System view<small>the heating system, live</small></span></button>
+    <button type="button" class="vp-item" data-design="b" role="menuitem"><span class="vp-chk">✓</span><span>At a glance<small>phone-first, one dial</small></span></button>
+    <button type="button" class="vp-item" data-design="c" role="menuitem"><span class="vp-chk">✓</span><span>Mission control<small>live strip chart + raw bus</small></span></button>
+  </div>
 </div>
 
 <!-- ============ DESIGN A — SYSTEM VIEW ============ -->
@@ -55,6 +114,8 @@
         <button class="seg2btn active" data-appl="gas">🔥 Boiler</button>
         <button class="seg2btn" data-appl="hp">⚡ Heat pump</button>
       </span>
+      <!-- TASK-984: injected-value badge. Hidden when zero; opens the override panel. -->
+      <button class="ovr-badge hidden" id="aOvrBadge" style="margin-left:auto" title="The gateway is injecting values onto the OT bus — click for detail">⛓ <span id="aOvrCount">0</span> injected</button>
     </div>
 
     <svg class="schematic" id="schem" viewBox="0 0 800 470" role="img"
@@ -298,6 +359,105 @@
 </section>
 </div><!-- /page-home -->
 
+<!-- ════════════════ PAGE: SAT (TASK-986) ════════════════ -->
+<!-- Smart Autotune Thermostat control surface. Three cumulative depth layers
+     (Thermostat / Control / Technical) toggled by .satview-btn, persisted in
+     localStorage 'otgw-v2-satview'. Bound to GET /api/v2/sat/status (polled 5s
+     while this page is visible only) + POST /api/v2/sat/{enable,target,preset,
+     mode,settings/<name>}. History accumulates client-side (no history endpoint,
+     by design — matches the classic sat.js). -->
+<div id="page-sat" class="page">
+  <div class="sat-head">
+    <div class="sat-title">SAT · Smart Autotune Thermostat <span class="sat-pill off" id="satPill">…</span></div>
+    <label class="sat-switch" style="margin-left:auto"><span id="satEnableLbl">Enabled</span><input type="checkbox" class="sw" id="satEnable"></label>
+  </div>
+
+  <div class="sat-views">
+    <button class="satview-btn active" data-sv="simple"><b>🏠 Thermostat</b><small>simple</small></button>
+    <button class="satview-btn" data-sv="control"><b>🎛 Control</b><small>operational</small></button>
+    <button class="satview-btn" data-sv="technical"><b>🔬 Technical</b><small>the control loop</small></button>
+  </div>
+
+  <!-- no-data banner: shown when /api/v2/sat/status is unreachable (older firmware / build without SAT) -->
+  <div class="card" id="satNoData" style="display:none;text-align:center;color:var(--muted)">SAT status is unavailable on this device.</div>
+
+  <div id="satBody" class="sv-simple">
+    <!-- L1 Thermostat — dial + presets + hint (the header toggle already carries enable/disable) -->
+    <div class="sat-l1">
+      <div class="sat-thermo-wrap">
+        <div class="sat-dial-card">
+          <svg viewBox="0 0 240 240" id="satDial" aria-label="Room thermostat"></svg>
+          <div class="sat-steps"><button class="stepbtn" id="satDown" aria-label="lower target">−</button><button class="stepbtn" id="satUp" aria-label="raise target">+</button></div>
+        </div>
+        <div class="sat-side">
+          <div class="sat-status-big" id="satStatusBig">—</div>
+          <div class="sat-side-lbl">Presets</div>
+          <div class="sat-presets" id="satPresets"></div>
+          <div class="sat-hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- L2 Control — history, hot water, burner cycle, live tiles, heating curve, control status, weather -->
+    <div class="sat-l2">
+      <div class="card"><h4>Temperature history <span class="sub">live</span></h4>
+        <svg viewBox="0 0 600 200" id="satHistChart" preserveAspectRatio="none" style="height:200px"></svg>
+        <div class="legend" id="satHistLegend"></div></div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card sat-mini"><h4>Hot water</h4>
+          <div class="kv">
+            <div class="kv-row"><span class="kv-k">DHW setpoint</span><span class="kv-v"><input type="range" min="40" max="65" value="50" id="satDhwSlider" class="sat-slider" aria-label="DHW setpoint"> <b id="satDhwR">—</b></span></div>
+            <div class="kv-row" id="satDhwEnableRow" style="display:none"><span class="kv-k">DHW enable (HW=)</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnable" aria-label="DHW enable"></span></div>
+          </div></div>
+        <div class="card sat-mini"><h4>Burner cycle mode</h4><div class="ds-seg-row" id="satCycleRow"><button class="ds-seg" data-mode="continuous">Continuous</button><button class="ds-seg" data-mode="pwm">PWM</button></div><div class="sub" id="satCycleSub">—</div></div>
+      </div>
+      <div class="sat-tiles4">
+        <div class="sat-tile"><div class="l">Outside</div><div class="v" id="satOut">—</div></div>
+        <div class="sat-tile"><div class="l">Boiler setpoint <span class="tag">SAT → boiler</span></div><div class="v hot" id="satFlowSet">—</div></div>
+        <div class="sat-tile"><div class="l">Room</div><div class="v" id="satRoom">—</div></div>
+        <div class="sat-tile is-target"><div class="l">Target</div><div class="v" id="satTargetT">—</div></div>
+      </div>
+      <div class="card sat-curve-hero"><h4>Heating curve <span class="sub" id="satCurveLbl"></span></h4>
+        <div class="curve-wrap">
+          <svg viewBox="0 0 600 300" id="satCurveBig"></svg>
+          <div class="curve-side">
+            <div class="curve-legend" id="satCurveLegend"></div>
+            <div class="marker-head">Calibration markers <span class="sub">learned points</span></div>
+            <ul class="marker-list" id="satMarkerList"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Control status</h4><div class="kv" id="satControlStatus"></div></div>
+        <div class="card"><h4>Weather <span class="sub">Open-Meteo</span></h4><div class="kv" id="satWeatherKv"></div>
+          <button class="tbtn" id="satDetectLoc" style="margin-top:8px">Detect location</button>
+          <span class="sub" id="satCoords" style="margin-left:8px"></span></div>
+      </div>
+    </div>
+
+    <!-- L3 Technical — health, PID, PWM/cycle, smart features, external sensors, simulation, raw JSON -->
+    <div class="sat-l3">
+      <div class="card"><h4>Health</h4><div class="health-strip" id="satHealth"></div></div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>PID controller</h4><div class="kv" id="satPidKv"></div></div>
+        <div class="card"><h4>PWM &amp; cycle tracking</h4><div class="kv" id="satPwmKv"></div></div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Smart features</h4><div class="kv" id="satSmartKv"></div></div>
+        <div class="card"><h4>External sensors</h4><div class="kv" id="satExtKv"></div></div>
+      </div>
+      <div class="sat-row2 sat-row-2up">
+        <div class="card"><h4>Simulation &amp; diagnostics</h4><div class="kv" id="satSimKv"></div>
+          <label class="sat-switch" style="margin-top:10px"><span>Bench simulation</span><input type="checkbox" class="sw" id="satSim"></label>
+          <div class="sub" id="satSimHint" style="margin-top:6px"></div></div>
+        <div class="card"><h4><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ Raw data (JSON)</button></h4>
+          <pre class="raw-json" id="satRawJson" style="display:none"></pre></div>
+      </div>
+      <p class="sat-hint" style="margin-top:2px">Every knob behind these readouts lives in <b>Settings → SAT</b>.</p>
+    </div>
+  </div>
+</div><!-- /page-sat -->
+
 <!-- ════════════════ PAGE: MONITOR ════════════════ -->
 <div id="page-monitor" class="page">
 
@@ -312,19 +472,25 @@
   <div id="mlog" class="mpanel active">
     <div class="toolbar">
       <button class="tbtn" id="logPause">⏸ Pause</button>
-      <button class="tbtn">Clear</button>
-      <button class="tbtn">⬇ Download</button>
+      <button class="tbtn" id="logClear">Clear</button>
+      <button class="tbtn" id="logDownload">⬇ Download</button>
       <input class="tsearch" id="logSearch" placeholder="Filter frames… (e.g. 19, Boiler, DHW)">
       <span class="tchip on" id="chipScroll">Auto-scroll</span>
       <span class="tchip on" id="chipTs">Timestamps</span>
+      <!-- TASK-970: Log power-features (SAT-only filter, auto-download, stream-to-file). -->
+      <span class="tchip" id="chipSatOnly" title="Show only SAT narration lines">SAT only</span>
+      <span class="tchip" id="chipAutoDl" title="Download the log automatically every 15 minutes">Auto-download</span>
+      <span class="tchip" id="chipStream" title="Stream frames straight to a local file (Chrome/Edge)">Stream to file</span>
     </div>
-    <!-- TASK-965: send a raw OTGW command (PS=1, TT=20.5, GW=1, ...). Works on PIC
-         and OT-Direct (OTGW32 translates PIC commands to OT frames natively). -->
-    <div class="toolbar">
-      <input class="tsearch" id="otCmdInput" placeholder="Send OTGW command… (e.g. PS=1, TT=20.5)" aria-label="OTGW command" style="flex:1">
-      <button class="tbtn" id="otCmdSend">Send</button>
-      <span class="tchip" id="otCmdStatus" style="display:none" aria-live="polite"></span>
+    <!-- TASK-965/981: send a raw OTGW command (PS=1, TT=20.5, GW=1, ...). Works on PIC
+         and OT-Direct (OTGW32 translates PIC commands to OT frames natively). The prompt
+         label is bound to the live command interface (PIC › vs OT ›) in fetchConn. -->
+    <div class="cmdbar" id="otCmdBar">
+      <span class="cmdbar-prompt" id="otCmdPrompt">PIC &rsaquo;</span>
+      <input class="cmdbar-in" id="otCmdInput" maxlength="14" autocomplete="off" spellcheck="false" placeholder="Command, e.g. PS=1, TT=20.5, GW=1" aria-label="OTGW command">
+      <button class="cmdbar-send" id="otCmdSend">Send</button>
     </div>
+    <span class="tchip" id="otCmdStatus" style="display:none;margin:0 0 8px" aria-live="polite"></span>
     <div class="console" id="monLog" role="log" aria-live="polite" aria-label="Live OpenTherm log"></div>
     <div class="statfoot">
       <span>Lines: <b id="logCount">0</b></span>
@@ -343,6 +509,15 @@
       <thead><tr><th>MsgID</th><th>Description</th><th>Direction</th><th>Interval</th><th>Count</th><th style="text-align:right">Value</th></tr></thead>
       <tbody></tbody>
     </table>
+    </div>
+    <!-- TASK-969: gateway overrides + boiler-unsupported panels (parity w/ Classic Statistics) -->
+    <div class="set-group" style="margin-top:14px">
+      <h3>Active gateway overrides</h3>
+      <div id="ovStatList"></div>
+    </div>
+    <div class="set-group" style="margin-top:14px">
+      <h3>Boiler unsupported messages</h3>
+      <div id="boilerUnsupList"></div>
     </div>
   </div>
 
@@ -368,6 +543,9 @@
       <span class="tchip">4 h</span><span class="tchip">24 h</span>
       <span style="flex:1"></span>
       <button class="tbtn">📷 PNG</button><button class="tbtn">⬇ CSV</button>
+      <!-- TASK-971: auto-save the graph as PNG/CSV on an interval. -->
+      <span class="tchip" id="chipAutoPng" title="Auto-save a PNG every 5 minutes">Auto-PNG</span>
+      <span class="tchip" id="chipAutoCsv" title="Auto-save a CSV every 5 minutes">Auto-CSV</span>
     </div>
     <div class="graphcard">
       <div class="legend">
@@ -405,10 +583,10 @@
       <svg viewBox="0 0 820 360" id="connMap" role="img" aria-label="Connectivity map">
         <!-- links (drawn first, under the nodes) -->
         <g id="cnLinks">
-          <path id="lk-therm"  class="cn-link" d="M150,86 H300"/>
-          <path id="fl-therm"  class="cn-flow" d="M150,86 H300"/>
-          <path id="lk-boiler" class="cn-link" d="M150,274 H300"/>
-          <path id="fl-boiler" class="cn-flow" d="M150,274 H300"/>
+          <path id="lk-therm"  class="cn-link" d="M150,86 H264 V180 H300"/>
+          <path id="fl-therm"  class="cn-flow" d="M150,86 H264 V180 H300"/>
+          <path id="lk-boiler" class="cn-link" d="M150,274 H264 V180 H300"/>
+          <path id="fl-boiler" class="cn-flow" d="M150,274 H264 V180 H300"/>
           <path id="lk-wifi"   class="cn-link" d="M470,180 H560"/>
           <path id="fl-wifi"   class="cn-flow" d="M470,180 H560"/>
           <path id="lk-mqtt"   class="cn-link" d="M700,150 V104 H760"/>
@@ -466,6 +644,11 @@
           <circle class="cn-statedot" id="dot-ws" cx="808" cy="278" r="7"/>
         </g>
         <text class="cn-sub" x="760" y="344">This browser</text>
+        <!-- TASK-984: override signal on the OT bus (elbows converge at y=180). Hidden when zero. -->
+        <g id="cnOvr" style="cursor:pointer;display:none" role="button" aria-label="Active gateway overrides — click for detail">
+          <rect x="200" y="167" width="96" height="26" rx="13" fill="color-mix(in srgb,var(--zone-warn) 16%,var(--panel))" stroke="var(--zone-warn)" stroke-width="1.5"/>
+          <text id="cnOvrTxt" x="248" y="184" text-anchor="middle" font-size="12" font-weight="700" fill="var(--zone-warn)" font-family="var(--font-sans)">⛓ 0 injected</text>
+        </g>
       </svg>
     </div>
 
@@ -493,6 +676,7 @@
       </div>
     </div>
   </div>
+
 </div><!-- /page-monitor -->
 
 <!-- ════════════════ PAGE: SETTINGS ════════════════ -->
@@ -513,9 +697,105 @@
   </div>
 </div><!-- /page-settings -->
 
+<!-- ════════════════ PAGE: ADVANCED (TASK-982) ════════════════ -->
+<!-- Top-level Advanced page: the power-user screens that used to live under
+     Monitor > Debug. Four sub-tabs; data is fetched on tab-open (not page init). -->
+<div id="page-advanced" class="page">
+
+  <div class="subtabs" id="advTabs">
+    <button class="subtab active" data-adv="pic">PIC firmware</button>
+    <button class="subtab" data-adv="debug">Debug Information</button>
+    <button class="subtab" data-adv="files">File System</button>
+    <button class="subtab" data-adv="system">System</button>
+  </div>
+
+  <!-- ---- PIC firmware (relocated + restyled from Monitor > Debug, TASK-972) ---- -->
+  <div id="adv-pic" class="mpanel active">
+    <div id="picNone" class="crashlog-ok" style="display:none;background:none;border-color:var(--border);color:var(--muted)">
+      No PIC detected — PIC firmware flashing is unavailable on this board (OT-Direct / OTGW32).</div>
+    <div id="picFlash">
+      <div class="pic-head">
+        <div><span class="k">PIC Device</span><b id="picHeadDev">…</b></div>
+        <div><span class="k">PIC Type</span><b id="picHeadType">…</b></div>
+        <div><span class="k">PIC Firmware Version</span><b id="picHeadVer">…</b></div>
+      </div>
+      <div id="picBanner" class="pic-banner" style="display:none"></div>
+      <div class="ble-ctrls" style="margin-bottom:12px">
+        <button id="picCheckUpd" class="tbtn">🔄 Check for updates</button>
+      </div>
+      <!-- filled by renderPicFiles(): header row + one .picrow per firmware file -->
+      <div class="pictable" id="picFiles"></div>
+      <div id="picProg" class="pic-progress" style="display:none">
+        <div class="track"><div class="fill" id="picProgBar"></div></div>
+        <div class="lbl" id="picProgTxt">Ready to flash</div>
+      </div>
+      <div class="adv-card" style="margin-top:14px">
+        <h4>Gateway settings <span style="font-weight:400;color:var(--muted);font-size:.8rem">· cached PR= values</span></h4>
+        <div class="prtable" id="picPrTable"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ---- Debug Information (relocated from Monitor > Debug, TASK-967) ---- -->
+  <div id="adv-debug" class="mpanel">
+    <div id="dbgCrashOk" class="crashlog-ok" style="display:none">✓ No crash logs recorded since last boot.</div>
+    <pre id="dbgCrash" class="console" style="display:none;max-height:320px;white-space:pre-wrap">—</pre>
+    <div id="dbgGroups"></div>
+    <details style="margin-top:6px">
+      <summary style="cursor:pointer;color:var(--muted);font-size:.8rem">Raw debug dump (/api/v2/debug)</summary>
+      <pre id="dbgInfo" class="console" style="max-height:340px;white-space:pre-wrap;margin-top:8px">Loading…</pre>
+    </details>
+  </div>
+
+  <!-- ---- File System — in-page FSexplorer (TASK-982) ---- -->
+  <div id="adv-files" class="mpanel">
+    <h3 class="fs-title">File system (LittleFS)</h3>
+    <div class="fs-crumb" id="fsCrumb">Current directory: /</div>
+    <table class="fstable"><tbody id="fsTableBody"></tbody></table>
+    <div class="fs-usage" id="fsUsage"></div>
+    <div class="fs-bar"><i id="fsBar" style="width:0%"></i></div>
+    <fieldset class="fs-upload">
+      <legend>Upload file</legend>
+      <div class="row">
+        <input type="file" id="fsFile">
+        <button class="fs-btn" id="fsUpload" disabled style="min-height:38px;padding:8px 16px">Upload</button>
+        <span id="fsUploadHint" style="font-size:.76rem;color:var(--muted)">Files land in the current directory.</span>
+      </div>
+    </fieldset>
+    <p style="font-size:.78rem;color:var(--muted);margin:0">
+      <a class="fsact" href="/FSexplorer" style="color:var(--accent);font-weight:600">Open classic /FSexplorer ›</a></p>
+  </div>
+
+  <!-- ---- System (relocated Tools + new device status + actions, TASK-968/982) ---- -->
+  <div id="adv-system" class="mpanel">
+    <div class="adv-card" style="margin-bottom:14px">
+      <h4>Device status</h4>
+      <div class="fs-btnrow" style="gap:8px">
+        <span class="fw-badge fw-conn" id="sysConn" title="Live WebSocket link to the gateway">● …</span>
+        <span class="fw-badge fw-mode" id="sysMode" title="Current OpenTherm rewrite mode">⇄ …</span>
+        <span class="fw-badge fw-sim hidden" id="sysSim" title="Simulation active: OT replay / sensor simulation">SIMULATION</span>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0">Live gateway link, current OT-rewrite mode, and simulation state.</p>
+    </div>
+    <div class="fs-actions" style="border-top:0;padding-top:0">
+      <h4>System Actions <span style="font-weight:400;color:var(--muted);font-size:.8rem">· device-wide</span></h4>
+      <div class="fs-btnrow">
+        <button class="fs-btn primary" data-act="update">Update Firmware</button>
+        <button class="fs-btn" data-act="reboot">ReBoot</button>
+        <button class="fs-btn" data-act="onboarding">Run setup wizard</button>
+        <button class="fs-btn danger" data-act="resetwifi">Reset Wireless</button>
+        <button class="fs-btn" data-act="home">Home</button>
+      </div>
+      <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0"><b>Update Firmware</b> → OTA sketch / filesystem upload · <b>ReBoot</b> → restart the device · <b>Reset Wireless</b> → clear Wi-Fi &amp; reboot into AP-mode setup · <b>Home</b> → back to the dashboard.</p>
+    </div>
+  </div>
+</div><!-- /page-advanced -->
+
 <div class="foot">OTGW firmware · v2 Web UI · live from the OpenTherm bus</div>
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite">Settings saved</div>
+<!-- TASK-984: floating override-detail panel (fixed position). Opened by #aOvrBadge (Home) and #cnOvr (Monitor map). -->
+<div class="ovr-panel" id="ovrPanel"></div>
 
 
 </body>

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.303
+**  Version  : v2.0.0-alpha.326
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -272,6 +272,8 @@ void setup() {
 
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf(PSTR("Booting....[%s]\r\n\r\n"), _VERSION);
+  SetupDebugf(PSTR("PSRAM: found=%d size=%u | BLE default %s\r\n"),
+    (int)psramFound(), (unsigned)ESP.getPsramSize(), psramFound() ? "ON" : "gated (no PSRAM)");
 
   //setup randomseed the right way
   randomSeed(platformHardwareRandom()); // Hardware RNG to seed the Random PRNG

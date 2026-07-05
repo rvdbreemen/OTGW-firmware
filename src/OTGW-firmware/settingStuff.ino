@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.303
+**  Version  : v2.0.0-alpha.326
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -287,6 +287,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, true);
   writeJsonBoolKV(file, F("ui_autoexport"), settings.ui.bAutoExport, true);
   writeJsonBoolKV(file, F("ui_usev2"), settings.ui.bUseV2, true);
+  writeJsonBoolKV(file, F("ui_onboarded"), settings.ui.bOnboarded, true);
   writeJsonIntKV(file, F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, true);
   writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settings.sensors.bEnabled, true);
   writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settings.sensors.bLegacyFormat, true);
@@ -406,6 +407,7 @@ void writeSettings(bool show)
   // serialised unconditionally (fields exist on both platforms) so settings.json
   // round-trips between ESP8266 and ESP32; on ESP8266 these write zero/empty.
   writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
+  writeJsonBoolKV(file, F("SATbleriskack"), settings.sat.bBleRiskAck, true);
   writeJsonBoolKV(file, F("SATblefailover"), settings.sat.bBleFailover, true);
   writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC, true);
   writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval, true);
@@ -502,11 +504,13 @@ void writeSettings(bool show)
 // TASK-648: set true while parsing if the file carries the MQTTuseLegacyOtTopics key.
 // Absent on a 1.x.x config (predates ADR-106) -> readSettings defaults to legacy topics.
 static bool g_sawLegacyTopicsKey = false;
+static bool g_sawOnboardedKey = false;   // TASK-997: set when ui_onboarded is parsed; its absence marks a pre-feature (existing) install
 
 void readSettings(bool show)
 {
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   g_sawLegacyTopicsKey = false;  // reset per parse; updateSetting() sets it when the key is seen
+  g_sawOnboardedKey = false;     // TASK-997: same sentinel pattern for the first-time-setup flag
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
@@ -583,6 +587,16 @@ void readSettings(bool show)
     settings.mqtt.bUseLegacyOtTopics = true;   // 1.x.x upgrade: keep old topic names so existing automations survive
     settingsDirty = true;                      // deferred persist; the key then exists on the next boot
     DebugTln(F("[Settings] 1.x.x upgrade detected (no MQTTuseLegacyOtTopics key): defaulting to legacy OT topics. Opt in to new topics in settings."));
+  }
+  // TASK-997: first-time-setup wizard runs ONLY on a genuinely fresh device. A fresh
+  // install has no settings file, so writeSettings() above created it WITH ui_onboarded
+  // (=false) and the re-read sees the key -> onboard. An EXISTING install that predates
+  // this feature parsed a file WITHOUT the key -> migrate it to onboarded so the wizard
+  // never appears for already-configured users ("only the first time ever").
+  if (!g_sawOnboardedKey) {
+    settings.ui.bOnboarded = true;
+    settingsDirty = true;              // persist the key so this migration runs once
+    DebugTln(F("[Settings] existing install (no ui_onboarded key): marking as already onboarded."));
   }
   // TASK-648 Task 6: NO stamp seeding here. bLastPublishedLegacy=false on a
   // legacy upgrade boot means "stamp says modern, but mode is now legacy" —
@@ -829,6 +843,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("ui_autodownloadlog"))==0) settings.ui.bAutoDownloadLog = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("ui_autoexport"))==0)      settings.ui.bAutoExport = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("ui_usev2"))==0)          settings.ui.bUseV2 = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("ui_onboarded"))==0)    { settings.ui.bOnboarded = EVALBOOLEAN(newValue); g_sawOnboardedKey = true; }  // TASK-997: key presence = existing install (see readSettings migration)
   else if (strcasecmp_P(field, PSTR("ui_graphtimewindow"))==0) {
     int val = atoi(newValue);
     settings.ui.iGraphTimeWindow = constrain(val, 1, 1440);
@@ -1101,6 +1116,7 @@ void updateSetting(const char *field, const char *newValue)
   // ESP-abstraction Tier 2 (TASK-742): parsed unconditionally so a settings.json
   // written on either platform round-trips; harmless no-op fields on ESP8266.
   else if (strcasecmp_P(field, PSTR("SATbleenable")) == 0)  settings.sat.bBleEnable = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATbleriskack")) == 0) settings.sat.bBleRiskAck = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblefailover")) == 0) settings.sat.bBleFailover = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATblemac")) == 0)      strlcpy(settings.sat.sBleMAC, newValue, sizeof(settings.sat.sBleMAC));
   else if (strcasecmp_P(field, PSTR("SATbleinterval")) == 0) settings.sat.iBleInterval = constrain(atoi(newValue), 10, 300);

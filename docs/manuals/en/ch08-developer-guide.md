@@ -228,6 +228,76 @@ No user configuration is required. `loopEthernet()` guards itself with `if (!sta
 
 ---
 
+### Build Targets and Boards (2.0.0)
+
+The `dev` line (firmware 2.0.0) is ESP32-S3-only, built on an async + FreeRTOS stack. ESP8266 has been dropped from this line and continues only on the `otgw-1.x.x` maintenance line. The dual arduino-cli/PlatformIO description and the `esp8266` environment covered above apply to the 1.x line; on 2.0.0 the build is PlatformIO-only and every target is an ESP32-S3.
+
+#### Fixed Build Targets (ADR-126)
+
+The board is chosen at compile time. There is no runtime hardware detection on the two fixed single-engine targets; each links exactly one OpenTherm engine. Three environments are defined in `platformio.ini`:
+
+| Target (`--target`) | Hardware | OpenTherm engine |
+|---|---|---|
+| `esp32` | OTGW32 / OT-Thing PCB | OTDirect (direct GPIO bus) |
+| `esp32-classic` | OTGW Classic + LOLIN S3 Mini | PIC (OTGWSerial over UART) |
+| `esp32-combo` | Either of the above, boot-detected | Both engines linked in |
+
+Build with the wrapper or `build.py`:
+
+```bash
+./build.sh                             # firmware + filesystem, all three targets
+python build.py --target esp32         # OTGW32 (OTDirect) only
+python build.py --target esp32-classic # S3-in-Classic-socket (PIC) only
+python build.py --target esp32-combo   # combo (boot-detected) only
+```
+
+`esp32` is the default PlatformIO environment. `esp32-classic` and `esp32-combo` extend it (`extends = env:esp32`), inheriting the platform, board, `lib_deps` and `build_unflags`, and override only `build_flags`, `lib_ignore` and (for combo) the partition table.
+
+#### Combo Boot Detection (ADR-127 / ADR-158 / ADR-160)
+
+The `esp32-combo` binary links both OT engines and selects one at boot. The `iBoardMode` setting picks the mode:
+
+| `iBoardMode` | Mode | Hardware |
+|---|---|---|
+| `0` | AUTO | re-probe PIC vs OTDirect (and S3 Mini vs S3 Mini Pro) at boot |
+| `1` | Force PIC | LOLIN S3 Mini in the Classic socket |
+| `2` | OTDirect | OTGW32 direct GPIO bus |
+| `3` | Force PIC | LOLIN S3 Mini Pro in the Classic socket |
+
+The S3 Mini Pro is distinguished from the plain S3 Mini by its on-board QMI8658C IMU. The Pro reroutes its Classic I2C headers and needs a different Classic pin map; `state.hw.bClassicPro` records the result. AUTO re-probes the PIC on every boot: the detection is persist-once, but a wrong verdict is re-evaluated at the next boot rather than being frozen in place.
+
+#### PSRAM
+
+Every S3 build defines `BOARD_HAS_PSRAM` and selects the `qio_qspi` memory type (`board_build.arduino.memory_type`). PSRAM is therefore detected at runtime, not per board: `psramFound()` is the single discriminator and drives the PSRAM-aware BLE default (`bleActive()` in `SATble.ino`). A board without PSRAM boots gracefully (BOOT_INIT is off, so `psramInit()` returns false with no abort). A future PSRAM-equipped OTGW32 revision auto-enables BLE with the same firmware and no rebuild.
+
+#### Async Web Stack Tuning
+
+The async stack replaces the synchronous `WebServer` + `PubSubClient` path (ADR-123). `platformio.ini` tunes it in the global `[env]` so all three targets inherit the settings:
+
+- `CONFIG_ASYNC_TCP_STACK_SIZE=16384`: a controlled load-ramp A/B proved the old 4096-byte stack overflowed in AsyncTCP's low-heap cleanup path under a concurrent burst, wedging port 80 permanently. 16384 lets the task survive that path so the server recovers once load drops.
+- NimBLE is trimmed to a passive-scan observer-only footprint (`ROLE_PERIPHERAL`/`BROADCASTER`/`CENTRAL_DISABLED`, one connection slot, no bonds or CCCDs, 23-byte MTU) to reclaim internal DRAM. SATble only scans (`setActiveScan(false)`); it never connects or advertises.
+
+#### Partition Layout
+
+The ESP32-S3 partition table `partitions_otgw_esp32.csv` (shared by `esp32` and `esp32-classic`) is a single-app (no OTA) 4 MB layout: a 2.375 MB app slot at `0x10000` and a 1.5 MB LittleFS (label `spiffs`) at offset `0x270000`, plus a 64 KB coredump. The `esp32-combo` target has its own partition table (`partitions_otgw_esp32_combo.csv`) because the both-engines binary is larger; giving combo its own table keeps the shared table's filesystem offset from moving.
+
+#### Flashing (flash_esp.py)
+
+`flash_esp.py` reads the LittleFS offset from the partition CSV (`_read_fs_offset_from_csv()`) instead of hardcoding it, so the flash offset can never drift from the firmware build. It detects the installed esptool major version and picks the matching subcommand form: esptool v5 uses the hyphenated `write-flash`/`erase-flash`, while v4 and earlier accept only the underscore form. ESP32-S3 full-erase is opt-in (`-e`), so a normal flash preserves NVS (saved WiFi credentials); the merged image carries a fresh partition table and otadata, so it still boots cleanly. Each build is archived (bin/elf/zip) so a later crash backtrace can be decoded with addr2line.
+
+#### Relevant ADRs
+
+| ADR | Topic |
+|-----|-------|
+| ADR-126 | Fixed build targets (no runtime hardware detection) |
+| ADR-158 | LOLIN S3 Mini Pro Classic variant (IMU-detected) |
+| ADR-160 | Combo AUTO re-probe (persist-once, re-evaluate on boot) |
+| ADR-130 | PIC-UART FreeRTOS task |
+| ADR-146 | Streaming JsonEmit writer (ArduinoJson removed) |
+| ADR-147 / ADR-149 | Async static-serve config and LWIP TCP-pcb limits |
+
+---
+
 ### C4 Architecture Overview
 
 The firmware uses a four-level C4 model documented in `docs/c4/`. Read the relevant level before touching code.

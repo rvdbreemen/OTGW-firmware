@@ -7,7 +7,9 @@
   --bg:var(--bg-app);
   --panel:var(--bg-surface);
   --panel-2:var(--brand-faint);
-  --nav:var(--brand-cyan);
+  --nav:#383838;   /* TASK-999: dark header/nav strip in BOTH themes (matches the design's
+                      #383838 header) so the 1a accent underline reads in light mode too;
+                      header text is already #fff on --nav, so no other change is needed. */
   --text:var(--fg-2);
   --muted:var(--fg-4);
   --border:var(--border-1);
@@ -31,20 +33,53 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .headerrow{display:flex;align-items:center;gap:10px;background:var(--nav);
     color:#fff;padding:10px 14px;font-weight:700;box-shadow:var(--shadow);flex-wrap:wrap}
   html[data-theme="dark"] .headerrow{color:#e8e8ea}
-  .headerrow .big{font-size:1.05rem;margin-right:auto}
+  .headerrow .big{font-size:1.05rem}
   .headerrow .sub{font-weight:400;opacity:.9;font-size:.8rem}
   .theme-toggle{cursor:pointer;user-select:none;border:1px solid rgba(255,255,255,.4);
     border-radius:8px;padding:8px 12px;font-size:.85rem;min-height:40px;
     /* button reset so <button> matches the old <span> look + stays keyboard-operable */
     background:transparent;color:inherit;font-family:inherit;line-height:1.2}
-  .switcher{display:flex;gap:6px;background:var(--nav);padding:8px 12px 12px;flex-wrap:wrap}
-  .seg{flex:1;min-width:104px;min-height:48px;border:0;border-radius:12px;cursor:pointer;
-    background:rgba(255,255,255,.18);color:#fff;font-family:var(--font-sans);
-    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
-  html[data-theme="dark"] .seg{color:#e8e8ea}
-  .seg b{font-size:.92rem}
-  .seg small{font-size:.66rem;opacity:.85;letter-spacing:.04em;text-transform:uppercase}
-  .seg.active{background:var(--bg);color:var(--text)}
+  /* firmware-authentic header status pill — synced from the live CONN model in renderConnStrip */
+  .hdr-spacer{margin-left:auto}
+  .hdr-status{font-size:.66rem;font-weight:700;border-radius:20px;padding:4px 10px;
+    display:inline-flex;align-items:center;gap:6px;white-space:nowrap;line-height:1;
+    background:color-mix(in srgb,var(--zone-ok) 28%,transparent);color:#fff}
+  .hdr-status.down{background:color-mix(in srgb,var(--zone-alert) 30%,transparent)}
+  .hdr-status .hdr-dot{width:7px;height:7px;border-radius:50%;background:var(--zone-ok);box-shadow:0 0 6px var(--zone-ok)}
+  .hdr-status.down .hdr-dot{background:var(--zone-alert);box-shadow:0 0 6px var(--zone-alert)}
+  /* TASK-983: firmware-authentic identity chips (hostname·version + IP·Wi-Fi bars) + SIMULATION badge */
+  .headerrow .hdr-id{font-family:var(--font-mono);font-size:.72rem;font-weight:600;
+    display:inline-flex;align-items:center;
+    opacity:.95;background:rgba(255,255,255,.16);border-radius:6px;padding:3px 8px}
+  .hdr-net{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+  .hdr-id small{font-weight:600;opacity:.6;font-size:.62rem;margin-left:2px}
+  .hdr-id .cdot{width:7px;height:7px;border-radius:50%;background:var(--zone-ok);box-shadow:0 0 6px var(--zone-ok);margin-right:5px}
+  .hdr-id.ap .cdot{background:var(--zone-warn);box-shadow:0 0 6px var(--zone-warn)}
+  .hdr-id .wbars{display:inline-flex;align-items:flex-end;gap:2px;height:13px;margin-right:5px}
+  .hdr-id .wbars i{width:3px;background:var(--zone-ok);border-radius:1px}
+  .hdr-id .wbars i.off{background:var(--gauge-track)}
+  html[data-theme="dark"] .headerrow .hdr-id{background:rgba(255,255,255,.09)}
+  .hdr-sim{font-size:.66rem;font-weight:700;border-radius:20px;padding:4px 10px;white-space:nowrap;
+    line-height:1;display:inline-flex;align-items:center;letter-spacing:.03em;
+    background:color-mix(in srgb,var(--zone-warn) 82%,#000);color:#fff}
+  .hdr-sim.hidden{display:none}
+  /* Narrow phones: the mono hostname·version chip is wide and would push the header
+     to a third row — drop the identity chips, keep the status pill + clock + toggles. */
+  @media(max-width:480px){.hdr-net{display:none}}
+  /* TASK-999 — nav design "1a underlined text tabs" (Material/GitHub). The
+     subtitle-heavy pills are gone: the top level is one clean text row where the
+     active section carries a 3px accent underline. Sub-views live in the page's
+     own sub-tab row (.subtabs), which uses the same underline pattern at 2px. */
+  .switcher{display:flex;gap:2px;background:var(--nav);padding:0 10px;align-items:stretch;
+    overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .seg{flex:0 0 auto;border:0;border-bottom:3px solid transparent;background:none;cursor:pointer;
+    color:rgba(255,255,255,.82);font-family:var(--font-sans);padding:13px 16px 10px;white-space:nowrap;
+    display:flex;align-items:center;gap:6px;transition:color .15s,border-color .15s}
+  .seg b{font-size:.9rem;font-weight:600}
+  .seg small{display:none}   /* 1a: no subtitle — sub-views are the .subtabs row */
+  .seg:hover{color:#fff}
+  .seg.active{border-bottom-color:var(--accent);color:var(--accent)}
+  .seg.active b{font-weight:700}
 
   .wrap{max-width:1020px;margin:0 auto;padding:16px}
   .design{display:none}
@@ -227,18 +262,36 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* ================= primary pages + concept chips ================= */
   .page{display:none}
   .page.active{display:block}
-  .cchips{display:flex;gap:8px;margin:0 0 14px;flex-wrap:wrap}
-  .cchip{border:1px solid var(--border);background:var(--panel);color:var(--text);
-    border-radius:20px;padding:9px 16px;font-size:.82rem;cursor:pointer;min-height:40px;
-    font-family:var(--font-sans)}
-  .cchip.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  /* Home view picker — one unobtrusive dropdown (design update 2026-07-01). */
+  .viewpick{position:relative;display:flex;justify-content:flex-end;margin:0 0 12px}
+  .viewpick-btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--panel);
+    color:var(--text);border-radius:10px;padding:8px 12px;font-size:.82rem;font-weight:600;cursor:pointer;
+    font-family:var(--font-sans);min-height:40px}
+  .viewpick-btn .vp-car{opacity:.55;font-size:.7rem;margin-left:1px}
+  .viewpick-btn .vp-lead{color:var(--muted);font-weight:600}
+  .viewpick-menu{position:absolute;top:calc(100% + 6px);right:0;z-index:30;background:var(--panel);
+    border:1px solid var(--border);border-radius:12px;box-shadow:0 8px 16px rgba(0,0,0,.2);padding:6px;
+    display:none;min-width:210px}
+  .viewpick-menu.show{display:block}
+  .vp-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;border:0;background:none;
+    color:var(--text);border-radius:8px;padding:9px 11px;font-size:.85rem;cursor:pointer;font-family:var(--font-sans);min-height:40px}
+  .vp-item:hover{background:color-mix(in srgb,var(--accent) 10%,transparent)}
+  .vp-item .vp-chk{width:1em;font-size:.8rem;color:var(--accent);opacity:0}
+  .vp-item.active{font-weight:700}
+  .vp-item.active .vp-chk{opacity:1}
+  .vp-item small{display:block;color:var(--muted);font-size:.7rem;font-weight:400;margin-top:1px}
 
   /* ================= MONITOR page ================= */
-  .subtabs{display:flex;gap:6px;margin:2px 0 14px;flex-wrap:wrap}
-  .subtab{border:1px solid var(--border);background:var(--panel);color:var(--muted);
-    border-radius:10px;padding:10px 18px;font-size:.86rem;cursor:pointer;min-height:44px;
-    font-family:var(--font-sans);font-weight:700}
-  .subtab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+  /* TASK-999 — sub-header bars as 1a underlined text tabs (the second tier). Sits
+     on the content surface (not the nav), so muted text + an accent underline reads
+     in both themes. The 1px baseline is the tab-row rule the active 2px sits on. */
+  .subtabs{display:flex;gap:2px;margin:2px 0 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    border-bottom:1px solid var(--border)}
+  .subtab{flex:0 0 auto;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);
+    padding:9px 14px 8px;margin-bottom:-1px;font-size:.84rem;cursor:pointer;white-space:nowrap;
+    font-family:var(--font-sans);font-weight:500;transition:color .15s,border-color .15s}
+  .subtab:hover{color:var(--text)}
+  .subtab.active{border-bottom-color:var(--accent);color:var(--accent);font-weight:600}
   .mpanel{display:none}
   .mpanel.active{display:block}
   .toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
@@ -255,6 +308,15 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     white-space:pre-wrap;overflow-wrap:anywhere}  /* TASK-957: one frame per line, wrap long frames */
   .console .t{color:#00bffe}.console .b{color:#79f2c0}.console .ts{color:#566069}
   .console .err{color:#ff5a4d}
+  /* TASK-981: command-bar echo colours — sent command (>), PIC ack (<), error/NG (!). */
+  .console .cmd{color:#ffd479}.console .rsp{color:#9a9a9e}
+  /* TASK-981: dedicated OTGW command bar (prompt + borderless mono input + Send). */
+  .cmdbar{display:flex;align-items:center;gap:8px;margin-bottom:8px;background:#0a0e14;border:1px solid var(--border);border-radius:10px;padding:6px 8px 6px 12px}
+  .cmdbar-prompt{font-family:var(--font-mono);font-size:.8rem;color:#79f2c0;font-weight:700;flex:0 0 auto}
+  .cmdbar-in{flex:1;min-width:0;background:none;border:0;outline:none;color:#e8e8ea;font-family:var(--font-mono);font-size:.8rem;padding:6px 2px}
+  .cmdbar-in::placeholder{color:#566069}
+  .cmdbar-send{flex:0 0 auto;border:0;background:var(--accent);color:#fff;border-radius:8px;padding:8px 16px;font-size:.8rem;font-weight:700;cursor:pointer;font-family:var(--font-sans);min-height:36px}
+  .cmdbar-send:hover{filter:brightness(1.08)}
   .statfoot{display:flex;gap:16px;font-size:.76rem;color:var(--muted);padding:8px 4px 0;flex-wrap:wrap}
   table.stats{width:100%;border-collapse:collapse;background:var(--panel);border-radius:12px;
     overflow:hidden;box-shadow:var(--shadow);font-size:.84rem}
@@ -362,6 +424,10 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     width:46%;max-width:220px;border:1px solid var(--border);background:var(--panel-2);
     color:var(--text);border-radius:8px;padding:8px 10px;font-size:.84rem;font-family:var(--font-sans)}
   .srow.dirty .slbl::before{content:'●';color:var(--zone-warn);margin-right:6px;font-size:.7rem}
+  /* TASK-985: webhook Send-test-call action row appended to the Webhook settings group. */
+  .wh-actions{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+  .wh-status{font-size:.8rem;color:var(--muted);font-family:var(--font-mono)}
+  .wh-status.ok{color:var(--zone-ok)}
   .sw{appearance:none;width:44px;height:24px;background:var(--tile-off);border-radius:12px;
     position:relative;cursor:pointer;transition:background .2s;flex:0 0 auto}
   .sw:checked{background:var(--accent)}
@@ -406,7 +472,23 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* state vocabulary — one set of colours used everywhere */
   .st-ok{--s:var(--zone-ok)} .st-warn{--s:var(--zone-warn)} .st-down{--s:var(--zone-alert)}
   .st-off{--s:var(--tile-off)} .st-unknown{--s:var(--muted)} .st-mode{--s:var(--accent)}
-  .connstrip{display:flex;gap:8px;background:var(--nav);padding:0 12px 12px;overflow-x:auto}
+  /* TASK-999 — the connectivity pill now lives inline in the header line (moved up
+     from a full-width strip below the nav), so it drops the --nav band + padding. */
+  .connstrip{display:inline-flex;gap:8px;align-items:center}
+  .connstrip:empty{display:none}
+  /* TASK-999: the moved connStrip is now the single header connectivity pill, so the
+     older coarse status chip is redundant — hide it to match the mockup's one pill. */
+  .hdr-status{display:none}
+  /* single worst-of health-summary pill (the per-node detail lives on Monitor › Connection) */
+  .connsum{flex:0 0 auto;display:inline-flex;align-items:center;gap:8px;border:0;border-radius:20px;
+    padding:7px 14px;cursor:pointer;color:#fff;font-size:.78rem;font-weight:700;font-family:var(--font-sans);
+    min-height:36px;white-space:nowrap;background:color-mix(in srgb,var(--zone-ok) 30%,var(--nav))}
+  html[data-theme="dark"] .connsum{color:#e8e8ea}
+  .connsum.warn{background:color-mix(in srgb,var(--zone-warn) 32%,var(--nav))}
+  .connsum.down{background:color-mix(in srgb,var(--zone-alert) 34%,var(--nav))}
+  .connsum .d{width:9px;height:9px;border-radius:50%;background:var(--zone-ok)}
+  .connsum.warn .d{background:var(--zone-warn)} .connsum.down .d{background:var(--zone-alert)}
+  .connsum .go{opacity:.7;font-weight:600}
   .connpill{flex:0 0 auto;display:flex;align-items:center;gap:7px;background:rgba(255,255,255,.16);
     border:0;border-radius:20px;padding:7px 12px;cursor:pointer;color:#fff;font-size:.78rem;
     font-family:var(--font-sans);min-height:36px;white-space:nowrap}
@@ -416,6 +498,23 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   @keyframes cpPulse{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--s) 40%,transparent)}}
   .connpill .pk{opacity:.8}
   .connpill .pv{font-weight:700}
+
+  /* TASK-984: override-injection visibility — Home A badge + on-bus map badge + floating panel.
+     Panel is read-only: the ADR-118 store carries {id,kind,value,age} only (no orig value / Clear). */
+  .ovr-badge{border:1.5px solid var(--zone-warn);background:color-mix(in srgb,var(--zone-warn) 16%,var(--panel));
+    color:var(--zone-warn);border-radius:20px;padding:5px 12px;font-size:.76rem;font-weight:700;cursor:pointer;
+    font-family:var(--font-sans);min-height:32px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+  .ovr-badge.hidden{display:none}
+  .ovr-panel{position:fixed;top:128px;right:14px;width:300px;background:var(--panel);
+    border:1px solid var(--zone-warn);border-radius:12px;box-shadow:0 10px 28px rgba(0,0,0,.22);
+    padding:13px 15px;z-index:40;display:none}
+  .ovr-panel.show{display:block}
+  .ovr-panel h4{margin:0 0 4px;font-size:.86rem;display:flex;align-items:center;gap:7px}
+  .ovr-panel .sub{font-size:.72rem;color:var(--muted);margin:0 0 8px}
+  .ovr-item{font-size:.82rem;padding:8px 0;border-top:1px solid var(--border)}
+  .ovr-item:first-of-type{border-top:0}
+  .ovr-item .r1{display:flex;align-items:center;gap:8px}
+  .ovr-item .r2{font-size:.72rem;color:var(--muted);margin-top:2px}
 
   .connlegend{display:flex;flex-wrap:wrap;gap:14px;background:var(--panel);border:1px solid var(--border);
     border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);margin-bottom:14px;font-size:.8rem}
@@ -459,8 +558,214 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* ================= TASK-932 mobile review: tap targets + readability ≤719px ================= */
   @media(max-width:719px){
     /* lift sub-44px controls to the 44px comfortable touch target */
-    .connpill,.seg2btn,.cchip,.tbtn,.theme-toggle{min-height:44px}
+    .connsum,.connpill,.seg2btn,.viewpick-btn,.vp-item,.tbtn,.theme-toggle,.ovr-badge{min-height:44px}
     /* bump the smallest labels for phone readability */
     .ble-tag{font-size:.66rem}
     .mc-cell .lbl{font-size:.68rem}
   }
+
+  /* ================= ADVANCED page (TASK-982): PIC · Debug · File System · System ================= */
+  /* Device-status badges (System tab) — firmware-authentic pills synced from the CONN model. */
+  .fw-badge{font-size:.66rem;font-weight:700;letter-spacing:.02em;border-radius:20px;
+    padding:4px 10px;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;line-height:1}
+  .fw-conn{background:color-mix(in srgb,var(--zone-ok) 34%,transparent);color:#fff}
+  .fw-conn.down{background:color-mix(in srgb,var(--zone-alert) 42%,transparent)}
+  /* Deviation from mockup: mockup fw-mode is white-on-rgba-white (built for the dark
+     header). In v2 these badges sit on a light --panel card, so use a neutral, theme
+     readable chip instead of the near-invisible translucent-white original. */
+  .fw-mode{background:var(--panel-2);color:var(--text);border:1px solid var(--border)}
+  .fw-sim{background:color-mix(in srgb,var(--zone-warn) 82%,#000);color:#fff}
+  .fw-badge.hidden{display:none}
+  .adv-card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:16px 18px;margin:0 0 14px}
+  .adv-card h4{margin:0 0 12px;font-size:.95rem}
+  .pic-head{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;
+    background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:12px}
+  .pic-head>div{display:flex;flex-direction:column;gap:3px}
+  .pic-head .k{font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .pic-head b{font-family:var(--font-mono);font-size:1.05rem}
+  .pic-banner{border-radius:10px;padding:10px 14px;font-size:.84rem;font-weight:700;margin-bottom:12px}
+  .pic-banner.warn{background:color-mix(in srgb,var(--zone-warn) 16%,transparent);
+    border:1px solid color-mix(in srgb,var(--zone-warn) 50%,transparent);color:var(--zone-warn)}
+  .pic-banner.ok{background:color-mix(in srgb,var(--zone-ok) 14%,transparent);
+    border:1px solid color-mix(in srgb,var(--zone-ok) 45%,transparent);color:var(--zone-ok)}
+  .pictable{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  /* six columns: name · version · size · refresh · flash · delete (v2 keeps Delete + two-click flash the mockup omits) */
+  .picrow{display:grid;grid-template-columns:1fr 62px 76px 40px 40px 40px;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);font-size:.84rem}
+  .picrow:last-child{border-bottom:0}
+  .picrow.head{background:var(--panel-2);font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700}
+  .picrow .fname{font-family:var(--font-mono);font-weight:700;overflow:hidden;text-overflow:ellipsis}
+  .picrow .fver,.picrow .fsize{font-family:var(--font-mono);color:var(--muted)}
+  .picrow.newer .fver{color:var(--zone-ok)}
+  .picempty{padding:14px;color:var(--muted);font-size:.83rem}
+  .picbtn{width:34px;height:34px;border:1px solid var(--border);background:var(--panel-2);border-radius:8px;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.9rem;color:var(--text)}
+  .picbtn:hover{border-color:var(--accent);color:var(--accent)}
+  .picbtn.armed{border-color:var(--zone-alert);color:var(--zone-alert)}
+  .picbtn.del:hover{border-color:var(--zone-alert);color:var(--zone-alert)}
+  .pic-progress{margin:14px 0 0}
+  .pic-progress .track{height:12px;background:var(--gauge-track);border-radius:6px;overflow:hidden}
+  .pic-progress .fill{height:100%;width:0;background:var(--accent);border-radius:6px;transition:width .25s}
+  .pic-progress .lbl{font-size:.76rem;color:var(--muted);margin-top:6px}
+  .prtable{display:grid;grid-template-columns:1fr auto;gap:7px 14px;font-size:.82rem}
+  .prtable .prk{color:var(--muted)}
+  .prtable .prv{font-family:var(--font-mono);text-align:right;font-weight:700}
+  .devinfo-group{margin:0 0 14px}
+  .devinfo-group h4{margin:0 0 8px 2px;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
+  .devinfo-rows{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}
+  .devinforow{display:grid;grid-template-columns:1fr auto;gap:12px;padding:9px 14px;border-bottom:1px solid var(--border);font-size:.83rem}
+  .devinforow:last-child{border-bottom:0}
+  .devinforow:nth-child(even){background:color-mix(in srgb,var(--panel-2) 55%,transparent)}
+  .devinfocolumn1{color:var(--muted)}
+  .devinfocolumn2{font-family:var(--font-mono);font-weight:700;text-align:right;color:var(--text)}
+  .crashlog-ok{display:flex;align-items:center;gap:8px;background:color-mix(in srgb,var(--zone-ok) 12%,transparent);
+    border:1px solid color-mix(in srgb,var(--zone-ok) 40%,transparent);color:var(--zone-ok);
+    border-radius:10px;padding:10px 14px;font-size:.84rem;font-weight:700;margin-bottom:14px}
+  .fs-title{margin:0 0 10px;font-size:1.05rem}
+  .fs-crumb{font-family:var(--font-mono);font-size:.82rem;font-weight:700;margin:0 0 8px;color:var(--text)}
+  .fstable{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;overflow:hidden;box-shadow:var(--shadow);font-size:.83rem}
+  .fstable td{padding:8px 12px;border-bottom:1px solid var(--border)}
+  .fstable tr:last-child td{border-bottom:0}
+  .fstable tr:hover td{background:color-mix(in srgb,var(--accent) 6%,transparent)}
+  .fstable .fn{font-family:var(--font-mono);font-weight:700}
+  .fstable .fn.dir{color:var(--accent);cursor:pointer}
+  .fstable .fsz{font-family:var(--font-mono);color:var(--muted);white-space:nowrap}
+  .fstable a.fsact{color:var(--accent);text-decoration:none;font-weight:600;font-size:.78rem;cursor:pointer}
+  .fstable a.del{color:var(--zone-alert)}
+  .fs-usage{margin:12px 0 4px;font-size:.82rem;color:var(--muted)}
+  .fs-usage b{color:var(--text)}
+  .fs-bar{height:10px;background:var(--gauge-track);border-radius:5px;overflow:hidden;margin-bottom:16px}
+  .fs-bar i{display:block;height:100%;background:var(--accent);border-radius:5px}
+  .fs-upload{background:var(--panel-2);border:1px dashed var(--border);border-radius:12px;padding:14px 16px;margin:0 0 16px}
+  .fs-upload legend{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+  .fs-upload .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .fs-actions{border-top:2px solid var(--border);padding-top:14px}
+  .fs-actions h4{margin:0 0 10px;font-size:.95rem}
+  .fs-btnrow{display:flex;gap:10px;flex-wrap:wrap}
+  .fs-btn{border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;
+    padding:11px 16px;font-size:.85rem;font-weight:700;cursor:pointer;min-height:44px;
+    font-family:var(--font-sans);transition:transform .15s,box-shadow .15s}
+  .fs-btn:hover{transform:translateY(-2px);box-shadow:0 4px 10px rgba(0,0,0,.15)}
+  .fs-btn:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
+  .fs-btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+  .fs-btn.danger{border-color:color-mix(in srgb,var(--zone-alert) 55%,var(--border));color:var(--zone-alert)}
+  .fs-btn.danger:hover{background:color-mix(in srgb,var(--zone-alert) 12%,transparent)}
+
+  /* ================= SAT page (TASK-986): thermostat · control · technical ================= */
+  /* Ported from the design mockup (docs/design/boiler-dashboard-concepts.html) onto the
+     v2 token aliases. Cumulative reveal: Thermostat shows L1, Control adds L2, Technical
+     adds L3. Bound to real /api/v2/sat/status data (renderSatPage in v2.js). */
+  .sat-switch{display:inline-flex;align-items:center;gap:9px;font-size:.85rem;font-weight:700;color:var(--text);cursor:pointer;user-select:none}
+  .sat-head{display:flex;align-items:center;gap:12px;margin:2px 2px 12px;flex-wrap:wrap}
+  .sat-title{font-size:1.05rem;font-weight:700;display:flex;align-items:center;gap:10px}
+  .sat-pill{font-size:.7rem;font-weight:700;color:#fff;background:var(--hot);border-radius:10px;padding:3px 10px}
+  .sat-pill.idle{background:var(--tile-off)} .sat-pill.off{background:var(--tile-off)}
+  /* TASK-999: SAT depth-level nav (Thermostat/Control/Technical) as 1a underlined
+     text tabs — the same second-tier pattern as .subtabs, keeping the small hint. */
+  .sat-views{display:flex;gap:2px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    border-bottom:1px solid var(--border)}
+  .satview-btn{flex:0 0 auto;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);
+    cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:9px 16px 8px;
+    margin-bottom:-1px;white-space:nowrap;font-family:var(--font-sans);transition:color .15s,border-color .15s}
+  .satview-btn b{font-size:.86rem;font-weight:600}
+  .satview-btn small{font-size:.62rem;color:inherit;opacity:.7;text-transform:uppercase;letter-spacing:.04em}
+  .satview-btn:hover{color:var(--text)}
+  .satview-btn.active{border-bottom-color:var(--accent);color:var(--accent)}
+  .satview-btn.active small{color:var(--accent);opacity:.85}
+  /* cumulative reveal: Thermostat shows L1 only; Control adds L2; Technical adds L3 */
+  .sat-l1{display:block}
+  .sat-l2,.sat-l3{display:none}
+  #satBody.sv-simple .sat-l2,#satBody.sv-simple .sat-l3{display:none}
+  #satBody.sv-control .sat-l2{display:block}
+  #satBody.sv-technical .sat-l2,#satBody.sv-technical .sat-l3{display:block}
+  .sat-thermo-wrap{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:center;
+    background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:var(--shadow);padding:18px;margin-bottom:16px}
+  @media(max-width:719px){.sat-thermo-wrap{grid-template-columns:1fr}}
+  .sat-dial-card{text-align:center}
+  .sat-dial-card svg{width:240px;height:240px;max-width:100%}
+  .sat-side{min-width:0}
+  .sat-steps{margin-top:4px;display:flex;gap:10px;justify-content:center}
+  .sat-side-lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin:10px 0 6px}
+  .sat-status-big{font-size:1.2rem;font-weight:700}
+  .sat-presets{display:flex;flex-wrap:wrap;gap:7px}
+  .sat-preset{border:1px solid var(--border);background:var(--panel-2);color:var(--text);border-radius:20px;
+    padding:8px 14px;font-size:.8rem;cursor:pointer;min-height:38px;font-family:var(--font-sans)}
+  .sat-preset.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .ds-seg-row{display:inline-flex;gap:4px;flex-wrap:wrap}
+  .ds-seg{border:1px solid var(--border);background:var(--panel-2);color:var(--muted);border-radius:8px;
+    padding:7px 13px;font-size:.8rem;cursor:pointer;min-height:36px;font-family:var(--font-sans)}
+  .ds-seg.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
+  .sat-hint{font-size:.78rem;color:var(--muted);margin-top:12px}
+  .sat-slider{width:110px;max-width:100%;vertical-align:middle;accent-color:var(--accent);cursor:pointer}
+  .sat-tiles4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  @media(max-width:719px){.sat-tiles4{grid-template-columns:1fr 1fr}}
+  .sat-tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:13px 14px}
+  .sat-tile.is-target{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+  .sat-tile .l{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .sat-tile .v{font-size:1.7rem;font-weight:700;margin-top:4px}
+  .sat-tile .v.hot{color:var(--hot)}
+  .sat-tile .tag{font-size:.56rem;background:color-mix(in srgb,var(--hot) 16%,transparent);color:var(--hot);border-radius:6px;padding:1px 6px;letter-spacing:0}
+  .sat-row2{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+  .sat-row2.sat-row-2up{grid-template-columns:1fr 1fr}
+  @media(max-width:899px){.sat-row2{grid-template-columns:1fr 1fr}.sat-row2.sat-row-2up{grid-template-columns:1fr}}
+  @media(max-width:520px){.sat-row2{grid-template-columns:1fr}}
+  .page .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:var(--shadow);padding:14px 16px;margin-bottom:14px}
+  .sat-mini h4,.card h4{margin:0 0 8px;font-size:.82rem;display:flex;align-items:center;gap:8px}
+  .sat-mini .sub,.card .sub{font-size:.7rem;color:var(--muted);font-weight:400}
+  .kv{display:grid;grid-template-columns:1fr 1fr;gap:2px 18px}
+  .kv-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:.82rem}
+  .kv-k{color:var(--muted)} .kv-v{font-family:var(--font-mono);font-weight:700;text-align:right}
+  @media(max-width:560px){.kv{grid-template-columns:1fr}}
+  #satHistChart{width:100%;display:block}
+  .sat-curve-hero .curve-wrap{display:grid;grid-template-columns:1fr 210px;gap:14px;align-items:start}
+  @media(max-width:719px){.sat-curve-hero .curve-wrap{grid-template-columns:1fr}}
+  .curve-side{min-width:0}
+  #satCurveBig{width:100%;height:auto;display:block}
+  .curve-legend{display:flex;flex-direction:column;gap:6px;font-size:.76rem;color:var(--muted);margin-bottom:10px}
+  .curve-legend i{display:inline-block;width:16px;height:10px;border-radius:3px;margin-right:6px;vertical-align:middle}
+  .marker-head{font-size:.74rem;color:var(--muted);text-transform:uppercase;letter-spacing:.03em;font-weight:700;margin-bottom:6px}
+  .marker-list{list-style:none;margin:0;padding:0;font-size:.8rem}
+  .marker-list li{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border)}
+  .marker-list li span{color:var(--muted)} .marker-list li b{font-family:var(--font-mono);color:var(--zone-ok)}
+  .health-strip{display:flex;flex-wrap:wrap;gap:16px}
+  .health-item{display:flex;align-items:center;gap:7px;font-size:.84rem;font-weight:600}
+  .hdot{width:11px;height:11px;border-radius:50%;background:var(--tile-off)}
+  .hdot.ok{background:var(--zone-ok)} .hdot.warn{background:var(--zone-warn)} .hdot.alert{background:var(--zone-alert)}
+  .hdot.idle{background:var(--tile-off)}
+  .raw-toggle{border:0;background:none;color:var(--accent);font-weight:700;cursor:pointer;font-size:.86rem;font-family:var(--font-sans);padding:0}
+  .raw-json{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;
+    font-family:var(--font-mono);font-size:.72rem;color:var(--text);overflow:auto;max-height:240px;margin:6px 0 0;white-space:pre-wrap}
+  @media(max-width:719px){.satview-btn,.sat-preset,.ds-seg{min-height:44px}}
+
+  /* TASK-990: sensor-discovery toast (PR-649 "OTGW Patterns and Tokens" pattern).
+     A newly discovered, still-unassigned sensor surfaces as a floating card
+     bottom-right with a one-tap Assign / Ignore. Colour-coded by bus:
+     BLE --cold (fed by /api/v2/sat/ble/discovery), 1-Wire/Dallas --hot. */
+  .discover-stack{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:10px;z-index:60;max-width:340px}
+  .discover-card{background:var(--panel);border:1px solid var(--border);border-left:4px solid var(--accent);border-radius:12px;
+    box-shadow:0 10px 28px rgba(0,0,0,.22);padding:12px 13px;display:flex;gap:11px;align-items:flex-start;animation:discIn .3s ease}
+  .discover-card.ble{border-color:var(--cold);border-left-color:var(--cold)}
+  .discover-card.dallas{border-color:var(--hot);border-left-color:var(--hot)}
+  @keyframes discIn{from{transform:translateX(24px);opacity:0}to{transform:none;opacity:1}}
+  .discover-ic{width:24px;height:24px;border-radius:50%;flex:0 0 auto;margin-top:2px}
+  .discover-card.ble .discover-ic{background:var(--cold);box-shadow:0 0 8px var(--cold)}
+  .discover-card.dallas .discover-ic{background:var(--hot);box-shadow:0 0 8px var(--hot)}
+  .discover-bd{flex:1;min-width:0}
+  .discover-bd .t{font-weight:700;font-size:13.5px;color:var(--fg-1)}
+  .discover-bd .s{font-size:11.5px;color:var(--muted);font-family:var(--font-mono);margin-top:2px;line-height:1.5;word-break:break-word}
+  .discover-act{margin-top:9px;display:flex;gap:8px;flex-wrap:wrap}
+  .discover-act button{font-size:12.5px;border-radius:9px;padding:8px 13px;cursor:pointer;border:1px solid var(--border);
+    background:var(--panel-2);color:var(--text);min-height:38px;font-family:inherit}
+  .discover-act .primary{background:var(--accent);color:#fff;border:0;font-weight:700}
+  .discover-x{cursor:pointer;color:var(--muted);font-size:18px;line-height:1;padding:0 2px;background:none;border:0}
+
+  /* TASK-991: bench-mode -> simulation prompt. When the gateway sees no boiler or
+     thermostat on the OT bus (a bench setup, PIC boards only), offer once to enable
+     simulation mode. The firmware refuses sim when a real boiler is present. */
+  .sim-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:70;display:flex;align-items:center;justify-content:center;padding:20px;animation:discIn .2s ease}
+  .sim-modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;box-shadow:0 18px 50px rgba(0,0,0,.4);max-width:420px;width:100%;padding:20px 22px}
+  .sim-modal h3{margin:0 0 8px;font-size:1.05rem;color:var(--fg-1);display:flex;align-items:center;gap:8px}
+  .sim-modal p{margin:0 0 16px;font-size:.9rem;color:var(--muted);line-height:1.5}
+  .sim-modal .acts{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+  .sim-modal button{font-size:.88rem;border-radius:9px;padding:9px 15px;cursor:pointer;border:1px solid var(--border);background:var(--panel-2);color:var(--text);min-height:40px;font-family:inherit}
+  .sim-modal .primary{background:var(--accent);color:#fff;border:0;font-weight:700}

@@ -39,10 +39,12 @@ With SAT, every control loop cycle (default 30 seconds):
 
 #### Via the Web UI
 
+The v2 web UI presents SAT as a single page with three depth levels, so you see only as much as you need: a simple thermostat view (dial, presets, current status), a control view (control mode, boiler status, coefficient, deadband, PID output), and a technical view (health, raw PID terms, PWM/cycle detail, simulation, raw JSON). All three share the same UI shell described in chapter 3.
+
 1. Open the web interface (`http://otgw.local/`).
 2. Go to the SAT tab or Settings > SAT.
 3. Set "SAT Enabled" to on.
-4. Choose your heating system type (auto-detect, radiators, heat pump, or underfloor).
+4. Choose your heating system (auto, radiators, or underfloor) and your heating source (auto, gas boiler, heat pump, or hybrid). System and source are separate settings (see below).
 5. Set the target room temperature and heating curve coefficient.
 6. Save settings.
 
@@ -73,7 +75,8 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | Setting | Default | Range | Description |
 |---|---|---|---|
 | `satenabled` | false | bool | Master on/off switch |
-| `satheatsystem` | 0 | 0-3 | 0 = auto-detect, 1 = radiators, 2 = heat pump, 3 = underfloor |
+| `satsystem` | 0 | 0-2 | Heating SYSTEM (heat distribution): 0 = auto (defaults to radiators), 1 = radiators, 2 = underfloor |
+| `satsource` | 0 | 0-3 | Heating SOURCE (energy device): 0 = auto, 1 = gas boiler, 2 = heat pump, 3 = hybrid |
 | `sattargettemp` | 20.0 | 5-30 C | Desired room temperature |
 | `satcoefficient` | 1.5 | 0.1-5.0 | Heating curve steepness |
 | `satdeadband` | 0.1 | 0.05-2.0 C | PID deadband width |
@@ -83,6 +86,17 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satforcepwm` | false | bool | Force PWM mode regardless of boiler modulation |
 | `satmaxrelmod` | 100 | 0-100 % | Maximum relative modulation sent to boiler (MM= command) |
 | `satmanufacturer` | 0 | 0-18 | Boiler manufacturer (0 = auto-detect) |
+
+#### Heating source versus heating system
+
+SAT keeps two orthogonal choices apart:
+
+- The heating **system** (`satsystem`) is how heat is distributed: radiators or underfloor. It drives the base offset of the heating curve, the hard temperature ceiling (underfloor is capped lower), and the per-system cold cutoff.
+- The heating **source** (`satsource`) is the energy device: gas boiler, heat pump, or hybrid. It drives timing (minimum on-time, cycles) and, for heat pumps, forcing maximum relative modulation.
+
+Source selection is manual and authoritative: whatever you set is what SAT controls against. SAT can also derive a source hint from the OpenTherm bus (a cooling-capable boiler is likely a heat pump), but that auto-detect is only a hint for display and never overrides your manual choice.
+
+A per-system **cold cutoff** (COLD_SETPOINT: 28.2 C for radiators, 21.0 C for underfloor) means that when genuinely low demand drives the requested flow setpoint below that threshold, SAT commands the boiler fully off rather than firing for a trickle of heat. This avoids needless short cycles on mild days.
 
 #### Preset temperatures
 
@@ -428,29 +442,50 @@ When `satzonecount` is 1 (default), SAT operates in single-zone mode and this fe
 
 ### 5.16 BLE Temperature Sensor (ESP32 Only)
 
-On ESP32 builds (OTGW32 / Thermo-Nova), SAT scans for BLE temperature sensors and uses one as the room temperature input. The BLE stack is **NimBLE-Arduino** (ADR-092), which replaced Bluedroid in 2.0.0 and frees roughly 400 KB of flash. Supported advertising formats:
+On ESP32 builds (OTGW32 / Thermo-Nova / LOLIN S3 Mini), SAT scans for BLE temperature sensors and can use one as the room temperature input. BLE sensors are surfaced under their own **Sensors** category in the web UI (not buried under SAT), alongside the 1-Wire and GPIO sensors. Scanning is a passive, continuous background activity that is **on by default** (subject to the PSRAM gate below), so sensors appear on their own over time. The BLE stack is **NimBLE-Arduino** (ADR-092), which replaced Bluedroid in 2.0.0 and frees roughly 400 KB of flash. Supported advertising formats:
 
 - **ATC/pvvx custom firmware** (Xiaomi LYWSD03MMC with custom firmware): service data UUID 0x181A. Reports temperature, humidity, and battery level.
 - **BTHome v2**: service data UUID 0xFCD2. Standard BTHome protocol for temperature and humidity sensors. Encrypted advertisements are rejected.
+- **Xiaomi MiBeacon** (stock Mijia sensors such as MJ_HT_V1 and the unencrypted LYWSD03MMC): service data UUID 0xFE95. Plaintext frames are decoded directly. **Encrypted MiBeacon v4/v5** frames are also supported: provide a per-sensor bindkey and SAT decrypts them in place with AES-128-CCM. Bindkeys are entered per sensor in the roster (a trusted-LAN feature). They are write-only: the UI shows only whether a key is set, never the key itself.
 
 The radio runs a **continuous scan** from boot (TASK-494). Every format-pass advertisement is folded into a persistent 8-slot roster, regardless of whether it is currently selected. The `satbleinterval` setting controls the publish / state-update cadence; it does **not** throttle the radio scan itself.
 
+#### PSRAM-aware default
+
+One combined firmware image ships for all ESP32 boards; `psramFound()` decides at runtime whether BLE actually scans:
+
+- **Boards with PSRAM** (for example the LOLIN S3 Mini): BLE runs by default. The extra RAM absorbs the NimBLE stack without destabilising the rest of the firmware.
+- **Boards without PSRAM** (for example the OTGW32): BLE stays dormant even when enabled. The web UI shows a consent dialog that warns about the instability risk of running BLE without PSRAM. Only after you accept (setting `satbleriskack`) does the radio start scanning.
+
+In short, BLE is active when it is enabled AND (the board has PSRAM OR you have acknowledged the risk).
+
 #### Self-discovering roster (TASK-508)
 
-Open the SAT settings panel in the web UI to see the discovered roster: each entry shows the last temperature, RSSI, and age. Give entries friendly labels ("Living room", "Bedroom"); the active sensor is selected from the roster. Auto-select promotes the single fresh sensor when only one is in range. Labels propagate to Home Assistant via the retained discovery configs (per-MAC entities are created automatically). "Forget" wipes a slot and clears its HA discovery topics with zero-byte retained payloads.
+Open the **Sensors** category in the web UI to see the discovered roster, an 8-slot list. Each entry shows the last temperature, RSSI, and age. Give entries friendly names ("Living room", "Bedroom") and rename them at any time; the active sensor is selected from the roster. Auto-select promotes the single fresh sensor when only one is in range. Labels propagate to Home Assistant via the retained discovery configs (per-MAC entities are created automatically). "Forget" wipes a slot and clears its HA discovery topics with zero-byte retained payloads.
+
+The Sensors card offers three controls:
+
+- **Rescan**: trigger an active-scan name burst so freshly powered sensors announce themselves immediately instead of waiting for the next passive advertisement.
+- **Clear roster**: wipe all eight slots (a two-press confirm guards against accidents).
+- **Name-prefix filter**: type a case-insensitive prefix to narrow the roster by the sensor's advertised BLE name. By default this only filters the display. Enable the **restrict roster** toggle to promote it to an ingestion gate: sensors whose known name does not match the prefix are then kept out of the roster entirely. Sensors with an empty or unknown name are always admitted.
 
 The roster is exposed at:
 
 - `GET /api/v2/sat/ble/discovery` - JSON dump of all roster slots
 - `POST /api/v2/sat/ble/select` `{"mac":"AA:BB:.."}` - promote MAC to active sensor
 - `POST /api/v2/sat/ble/label`  `{"mac":"AA:BB:..","label":"Living room"}` - rename a slot
+- `POST /api/v2/sat/ble/bindkey` `{"mac":"AA:BB:..","key":"<32 hex>"}` - set (or clear, with an empty key) a slot's encrypted-MiBeacon bindkey. Write-only.
+- `POST /api/v2/sat/ble/rescan` - trigger an active-scan name burst
 - `POST /api/v2/sat/ble/forget` `{"mac":"AA:BB:.."}` - drop slot and clean up HA
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satbleenable` | false | bool | Enable BLE temperature sensor scanning |
+| `satbleenable` | true | bool | Enable BLE sensor scanning (passive, continuous). No-op on boards without a BLE radio |
+| `satbleriskack` | false | bool | On a board WITHOUT PSRAM, acknowledge the instability risk so BLE may scan. Ignored on PSRAM boards (`psramFound()` gates instead) |
 | `satblemac` | "" | MAC address | Active sensor MAC (set via roster select; empty = auto-select first fresh entry) |
 | `satbleinterval` | 30 | 10-300 s | Publish / state-update cadence (NOT scan rate; scan is continuous) |
+| `satblenameprefix` | "" | up to 23 chars | Name-prefix filter (case-insensitive; empty = off) |
+| `satblenamefilteringest` | false | bool | false = filter the display only; true = also gate roster ingestion (restrict roster) |
 
 #### MQTT topic shape
 

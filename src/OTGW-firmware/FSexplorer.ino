@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.303
+**  Version  : v2.0.0-alpha.326
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -109,6 +109,22 @@ static void serveVersionedAsset(const char* path, const __FlashStringHelper* mim
   webSendFile(path, mime, /*gzip=*/false);
 }
 
+// TASK-989: fonts are large immutable binaries referenced from ds-tokens.css
+// (@font-face). Unlike the HTML/CSS/JS shell they never change between releases,
+// so serve them with a long immutable max-age: after the first visit the browser
+// never asks again (not even a 304 probe), removing three parallel connections
+// from every page load. They previously fell through to the onNotFound catch-all
+// (no cache headers -> refetched per load, plus String churn on the async task).
+static void serveImmutableAsset(const char* path, const __FlashStringHelper* mime) {
+  if (!LittleFS.exists(path)) {
+    webPushHeader(F("Cache-Control"), F("no-cache"));
+    webSend(404, F("text/plain"), F("File not found"));
+    return;
+  }
+  webPushHeader(F("Cache-Control"), F("max-age=31536000, immutable"));
+  webSendFile(path, mime, /*gzip=*/false);
+}
+
 // Serve /FSexplorer.html for the no-index fallback routes (/, /index, /index.html).
 static void sendFSexplorerFallback(AsyncWebServerRequest *request) {
   webBeginRequest(request);
@@ -136,6 +152,19 @@ static void sendIndex(AsyncWebServerRequest *request) {
     serveVersionedAsset("/index.html", F("text/html; charset=UTF-8"));
   }
 }
+
+// TASK-989 NOTE: a server-level heap-guard middleware (shed/abort on low maxblock,
+// ahead of every handler) was implemented here and REMOVED after on-device A/B
+// load-ramps falsified the approach: a floor above idle maxblock (~11.7K on the
+// bench S3 with BLE on) sheds at rest; a floor below it fires only AFTER the
+// admitted handlers have already collapsed the heap (reactive = one burst too
+// late); and a hard request->abort() tier (tcp_abort from the async task) killed
+// the entire network stack under a conc>=12 burst (RST storm corrupting LWIP —
+// port 80 AND telnet dead, esptool-reset-only). The existing per-domain gates
+// (webFileGateTryAdmit, REST in-flight cap) already bound handler concurrency;
+// the effective levers against the burst wedge are ASYNC_TCP_STACK_SIZE=16384
+// (platformio.ini) and reducing the offered load (serialized asset loading,
+// staggered API polls, gzip). Full evidence: TASK-989, buglog bug-145..147.
 
 //=====================================================================================
 void startWebserver(){
@@ -171,6 +200,10 @@ void startWebserver(){
   server.on("/v2.html",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); if (!checkHttpAuth()) return; serveVersionedAsset("/v2.html", F("text/html; charset=UTF-8")); });
   server.on("/v2.js",            HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2.js",            F("application/javascript")); });
   server.on("/v2.css",           HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2.css",           F("text/css")); });
+  // TASK-989: immutable-cached font routes (see serveImmutableAsset above).
+  server.on("/fonts/inter-400.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-400.woff2",          F("font/woff2")); });
+  server.on("/fonts/inter-700.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-700.woff2",          F("font/woff2")); });
+  server.on("/fonts/jetbrains-mono-400.woff2", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/jetbrains-mono-400.woff2", F("font/woff2")); });
 #if HAS_PIC
   //otgw pic functions
   server.on("/pic", HTTP_ANY, upgradepic);

@@ -2,9 +2,9 @@
 
 ## Status
 
-Proposed. Date: 2026-06-29.
+Accepted. Date: 2026-07-04 (Proposed 2026-06-29; accepted by the maintainer Robert van den Breemen 2026-07-04 after verifying the `/api/v2/sat/ble/roster` endpoint and its write-only bindkey contract are implemented in `restAPI.ino`).
 
-**Decision Maker:** User: Robert van den Breemen (maintainer). This ADR documents a decision already built and verified on-device under TASK-935 (commit `3dffd4d6`) and hardened under TASK-946 (commit `5d6ac053`) on the 2.0.0 `dev` line. It is filed as `Proposed` so the maintainer can review the two reusable patterns it establishes (a dedicated structured endpoint for an indexed collection, and a write-only-secret REST contract) before they are treated as binding precedent. It is guideline-level per ADR-080: there is no `evaluate.py` gate; the write-only property was verified by source audit across every emit path rather than by an automated check. Do not flip to Accepted until the maintainer signs off on the two patterns.
+**Decision Maker:** User: Robert van den Breemen (maintainer). This ADR documents a decision already built and verified on-device under TASK-935 (commit `3dffd4d6`) and hardened under TASK-946 (commit `5d6ac053`) on the 2.0.0 `dev` line. It was filed as `Proposed` for the maintainer to review the two reusable patterns it establishes (a dedicated structured endpoint for an indexed collection, and a write-only-secret REST contract) before they are treated as binding precedent. It is guideline-level per ADR-080: there is no `evaluate.py` gate; the write-only property was verified by source audit across every emit path rather than by an automated check. The maintainer signed off on both patterns on 2026-07-04.
 
 ## Status History
 
@@ -14,6 +14,11 @@ status_history:
     changed_by: Agent
     reason: Initial decision record for the SAT BLE roster REST endpoint and its write-only-secret contract (TASK-935 + TASK-946 input hardening), built and verified on OTGW32 alpha.285
     changed_via: adr-kit
+  - date: 2026-07-04
+    status: Accepted
+    changed_by: maintainer (Robert van den Breemen)
+    reason: Accepted after code-implementation verification (BLE roster endpoint + write-only bindkey live in restAPI.ino) on maintainer instruction in-session; the two reusable patterns are signed off.
+    changed_via: manual
 
 ## Context
 

@@ -562,6 +562,27 @@ paths:
                         type: integer
                       maxfreeblock:
                         type: integer
+                      psram_found:
+                        type: integer
+                        description: '1 when PSRAM is present, 0 when absent (ESP32-S3)'
+                      psram_size:
+                        type: integer
+                        description: Total PSRAM size in bytes (0 when absent)
+                      psram_free:
+                        type: integer
+                        description: Free PSRAM in bytes
+                      flash_size:
+                        type: integer
+                        description: Flash chip size in bytes
+                      internal_free:
+                        type: integer
+                        description: Free internal (non-PSRAM) heap in bytes
+                      internal_maxblk:
+                        type: integer
+                        description: Largest free internal (non-PSRAM) heap block in bytes
+                      chip_model_est:
+                        type: string
+                        description: 'Best-effort ESP32-S3 package part number extrapolated from flash + PSRAM (e.g. "ESP32-S3FH4R2", "ESP32-S3FN8")'
                       chipid:
                         type: string
                       coreversion:
@@ -3189,6 +3210,87 @@ paths:
           description: MAC not present in roster
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/sat/ble/bindkey:
+    post:
+      security:
+        - basicAuth: []
+      tags:
+        - SAT
+      summary: Provision a roster slot's encrypted-MiBeacon bindkey (ESP32 only)
+      description: |
+        Sets the per-sensor encrypted-MiBeacon bindkey for the named MAC
+        (TASK-930). If the MAC is not yet in the roster a slot is allocated for
+        it (encrypted sensors cannot self-announce). An empty `key` clears the
+        stored bindkey.
+
+        **The bindkey is a write-only secret.** It is validated here, never
+        logged, and never echoed back. The roster and discovery responses expose
+        only a `has_bindkey` boolean, never the key itself. Gated on
+        `HAS_SAT_BLE`; the whole `/v2/sat/ble/*` family returns 404 on builds
+        without BLE.
+
+        Validation: `key` must be empty (clears) or exactly 32 hex characters
+        (else 400).
+      operationId: setSatBleBindkey
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mac, key]
+              properties:
+                mac:
+                  type: string
+                  example: "AA:BB:CC:DD:EE:FF"
+                key:
+                  type: string
+                  pattern: '^([0-9A-Fa-f]{32})?$'
+                  description: Exactly 32 hex characters, or empty string to clear (write-only)
+      responses:
+        '200':
+          description: Bindkey stored
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusOk'
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: BLE not supported on this build
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '507':
+          description: Roster full (no free slot to allocate for a new MAC)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApiError'
+    put:
+      security:
+        - basicAuth: []
+      tags:
+        - SAT
+      summary: Provision a roster slot's bindkey (PUT alias)
+      operationId: setSatBleBindkeyPut
+      requestBody:
+        $ref: '#/paths/~1v2~1sat~1ble~1bindkey/post/requestBody'
+      responses:
+        '200':
+          description: Bindkey stored
+        '400':
+          $ref: '#/components/responses/BadRequestJson'
+        '404':
+          description: BLE not supported on this build
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '507':
+          description: Roster full (no free slot to allocate for a new MAC)
 
   /v2/sat/ble/roster:
     get:

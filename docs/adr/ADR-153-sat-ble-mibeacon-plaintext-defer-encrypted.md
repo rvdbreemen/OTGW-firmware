@@ -9,7 +9,7 @@
 
 ## Status
 
-Proposed, 2026-06-25. Authored from TASK-930 (maintainer-approved plan, 2026-06-25).
+Accepted, 2026-07-04 (Proposed 2026-06-25; accepted by the maintainer Robert van den Breemen 2026-07-04 after verifying the plaintext Xiaomi MiBeacon 0xFE95 decoder is implemented in `SATble.ino`). Authored from TASK-930 (maintainer-approved plan, 2026-06-25).
 Guideline-level per ADR-080: no automated CI gate — correct advertisement decoding
 is only fully observable against a live sensor on hardware (the field-validation AC).
 Acceptance is the maintainer's manual checkpoint; this ADR is not self-accepted.
