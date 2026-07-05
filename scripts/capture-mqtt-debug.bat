@@ -450,9 +450,9 @@ function Install-Mosquitto {
     }
 
     Add-SummaryLine "Mosquitto install: winget install started"
-    & $winget.Source install --id EclipseMosquitto.Mosquitto -e --accept-package-agreements --accept-source-agreements
+    & $winget.Source install --id EclipseFoundation.Mosquitto -e --accept-package-agreements --accept-source-agreements
     if ($LASTEXITCODE -ne 0) {
-        throw "winget failed to install EclipseMosquitto.Mosquitto (exit code $LASTEXITCODE)."
+        throw "winget failed to install EclipseFoundation.Mosquitto (exit code $LASTEXITCODE)."
     }
 
     Add-SummaryLine "Mosquitto install: winget install completed"
