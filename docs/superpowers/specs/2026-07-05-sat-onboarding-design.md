@@ -54,7 +54,13 @@ Two firmware-vs-HA parity caveats, carried into the design deliberately:
 5. **Migration:** existing SAT users (`satenabled` already true, no
    `sat_onboarded` key) are shown the wizard **once** on their next SAT-page
    visit, so they benefit from the guided sources/health check.
-6. **Deferred (explicit):** crashevans' Off→Observe→Advise→Assist→Control ladder
+6. **No source selection in the wizard:** onboarding never binds a sensor input
+   (BLE, DS18B20, thermostat-over-MQTT, weather). Those live in their own settings;
+   the wizard only shows source *health* read-only. Deliberate deviation from HA's
+   `sensors` step.
+7. **Tuning has no raw P/I/D:** confirmed with maintainer — firmware exposes none,
+   so Manual tuning = `satcoefficient` (curve slope) + `satautogains` only.
+8. **Deferred (explicit):** crashevans' Off→Observe→Advise→Assist→Control ladder
    needs SAT run-modes the firmware does not have. Captured as a separate backlog
    task, not built here.
 
@@ -82,30 +88,35 @@ Three entry points, all funnel into one `startSatOnboarding()`:
 
 ## Screens (full-screen overlay, HA-parity, on-device-adapted)
 
+**No sensor-source selection happens in the wizard** (maintainer decision,
+2026-07-05). The wizard never asks the user to pick a room sensor, outside-temp
+source, or any input (BLE / DS18B20 / thermostat-over-MQTT / weather). Those are
+configured in their own dedicated settings (Sensors page, SAT weather Detect
+Location, etc.). The wizard only *surfaces whether sources are healthy*
+(read-only, screen 5) and points the user at where to configure a missing one.
+This is a deliberate deviation from HA's `sensors` step: SAT commissioning here
+covers the control parameters, not sensor wiring.
+
 1. **Welcome** — "Let's tune SAT for your system." States SAT stays disabled
    until Finish.
 2. **Heating system** — Radiators / Underfloor / Heat pump choice-cards. Writes
    `satsystem` (+ `satsource` when Heat pump). Pre-fill `satsource` from the
    TASK-997 answer so gas/HP is not asked twice.
-3. **Room temperature** — pick a BLE sensor from the live roster
-   (`GET /api/v2/sat/ble/roster`) → `satsensorarea0`. "None yet" allowed, with a
-   warning that SAT needs a room sensor to control well.
-4. **Outside temperature** — radio: *From OpenTherm bus* (offered when MsgID 27
-   Toutside is live) vs *Weather service* (`satweatherenable` + `satweatherlat/lon`,
-   reusing the Detect-location helper from `sat.js`). Shows which is currently
-   available.
-5. **Manufacturer** — `satmanufacturer` dropdown, defaulted to the OT member-id
+3. **Manufacturer** — `satmanufacturer` dropdown, defaulted to the OT member-id
    auto-detect, editable. Mirrors HA's `manufacturer` step.
-6. **Tuning** — Automatic (default; `satautogains`=1.0, keep `satcoefficient`
+4. **Tuning** — Automatic (default; `satautogains`=1.0, keep `satcoefficient`
    default) vs Manual (reveal `satcoefficient` slope slider + `satautogains`).
-   On-device analog of HA's automatic_gains → pid_controller branch.
-7. **Sources health** — read-only checklist from `/api/v2/health` + `sat/status`:
+   On-device analog of HA's automatic_gains → pid_controller branch. Firmware has
+   no raw P/I/D (confirmed with maintainer), so Manual = curve slope + auto-gains,
+   not P/I/D fields.
+5. **Sources health** — read-only checklist from `/api/v2/health` + `sat/status`:
    OT bus online · Room temp available · Outside temp available · Flow temp ·
-   Return temp (if supported) · MQTT connected. Green/amber. Warns before enabling
-   when a critical source is missing.
-8. **Done** — summary card (system, sources, tuning). `commit()` writes every
-   collected key **plus `satenabled=true` and `sat_onboarded=true`**, closes the
-   overlay, refreshes the SAT page.
+   Return temp (if supported) · MQTT connected. Green/amber. When a critical source
+   is missing, warns and links to the relevant settings page — but does **not** let
+   the user select or bind a source here.
+6. **Done** — summary card (system, tuning, source-health snapshot). `commit()`
+   writes every collected key **plus `satenabled=true` and `sat_onboarded=true`**,
+   closes the overlay, refreshes the SAT page.
 
 ## Firmware change (minimal — mirrors `ui_onboarded` exactly)
 
@@ -128,8 +139,9 @@ settings are added — every wizard answer targets an existing key.
 
 ## Files touched
 
-- `src/OTGW-firmware/data/v2.js` — `startSatOnboarding()` + the three trigger
-  hooks + two re-run buttons (SAT page, Advanced>System).
+- `src/OTGW-firmware/data/v2.js` — `startSatOnboarding()` (6 screens, no source
+  pickers) + the three trigger hooks + two re-run buttons (SAT page,
+  Advanced>System).
 - `src/OTGW-firmware/data/v2.html` / `v2.css` — re-run button(s), any wizard-only
   styles not covered by the shared overlay CSS.
 - `src/OTGW-firmware/settingStuff.ino` — `sat_onboarded` write + parse + migration.

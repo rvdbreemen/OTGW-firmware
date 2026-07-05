@@ -148,7 +148,7 @@ const landPrompt = (sel) =>
   `5. featureSummary: 1-2 plain sentences on the user-facing feature/improvement (for #alpha-testing). Empty if nothing committed.\n` +
   `Return committed/commitHash/pushed/newStatus/prereleaseTag/featureSummary/note.`
 const announcePrompt = (sel, land) =>
-  `Report TASK ${sel.taskId} to Discord per the alpha-channel policy (memory feedback_discord_alpha_channel). Use mcp__discord-mcp__discord_post_message. English, facts only.\n` +
+  `Report TASK ${sel.taskId} to Discord per the alpha-channel policy (memory feedback_discord_alpha_channel). Use mcp__discord-mcp__send_message (params: channelId, message). English, facts only.\n` +
   `1. Post a one-line completion to #dev-sat-mqtt (channel_id 1105556725714649128): "✅ ${sel.taskId} (${land.newStatus}) — <one-line what landed>. Commit ${land.commitHash}${land.prereleaseTag ? ' (' + land.prereleaseTag + ')' : ''} on ${BRANCH}." plus the hardware gate if In Review.\n` +
   (land.prereleaseTag
     ? `2. SEMVER STEP: also post a short feature note to #alpha-testing (channel_id 1514720723980259460): "🔧 2.0.0-${land.prereleaseTag} (dev milestone) — ${land.featureSummary}". If it returns "Missing Access", note that the bot lacks access and continue (do NOT retry).\n`
@@ -332,7 +332,7 @@ if (haveAdrWork && SKIP_ADR_EVAL) {
         log(`ADR Evaluation landed ${created.length} Proposed ADR(s): ${adrsDrafted.map(a => a.adr).join(', ')} — commit ${adrLand.commitHash}. Awaiting maintainer acceptance.`)
         // 6. ANNOUNCE the drafted ADRs to #dev-sat-mqtt for the maintainer to review/accept.
         await agent(
-          `Post ONE maintainer-facing note to Discord #dev-sat-mqtt (channel_id 1105556725714649128) via mcp__discord-mcp__discord_post_message. English, facts only. NEVER #beta-testing.\n` +
+          `Post ONE maintainer-facing note to Discord #dev-sat-mqtt (channelId 1105556725714649128) via mcp__discord-mcp__send_message (params: channelId, message). English, facts only. NEVER #beta-testing.\n` +
           `Message: "📋 ${created.length} Proposed ADR(s) drafted this drain run for review: ${adrsDrafted.map(a => a.adr + ' (' + a.title + ')').join(', ')}. Commit ${adrLand.commitHash} on ${BRANCH}. Acceptance is the maintainer's call." Return a one-line confirmation.`,
           { label: 'adr-announce', phase: 'ADR Evaluation' }
         )

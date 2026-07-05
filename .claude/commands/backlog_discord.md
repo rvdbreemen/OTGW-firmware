@@ -22,7 +22,7 @@ Monitor `#dev-sat-mqtt` for backlog-related requests, execute them via the Backl
 
 1. Read `.claude/discord_backlog_last_checked.txt`. If absent, default to 1 hour ago.
 2. **Early-exit (B4)**: if timestamp is < 5 minutes old → print "Nothing new (checked < 5 min ago)" and stop.
-3. Fetch messages: `mcp__discord-mcp__fetch_channel_history` with `channel_id="1105556725714649128"` and `limit=25`.
+3. Fetch messages: `mcp__discord-mcp__read_messages` with `channelId="1105556725714649128"` and `count="25"`.
 4. Filter to messages after the last-checked timestamp. Discard the rest immediately.
 5. Ignore messages from bots and maintainer (user ID `384411356616720384`).
 6. Write current UTC timestamp to `.claude/discord_backlog_last_checked.txt`.
@@ -48,7 +48,7 @@ For qualifying messages:
   Then `Read` with the full Windows path.
 - **All other attachments**: skip silently.
 
-Discord CDN URLs expire ~7 days after posting. On 403: re-call `fetch_channel_history` for a fresh URL.
+Discord CDN URLs expire ~7 days after posting. On 403: re-call `read_messages` for a fresh URL.
 
 ### Phase 2: Identify actionable messages
 
@@ -88,7 +88,7 @@ For each actionable message:
    | Help | No command — use the compact help text below |
 
 3. Format and post the response (see formatting guidelines below).
-4. Post via `mcp__discord-mcp__discord_post_message` with `channel_id="1105556725714649128"`.
+4. Post via `mcp__discord-mcp__send_message` with `channelId="1105556725714649128"` and `message="<text>"`.
 
 ### Phase 4: Conversational follow-ups
 

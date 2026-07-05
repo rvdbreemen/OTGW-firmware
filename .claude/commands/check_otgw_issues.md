@@ -145,7 +145,7 @@ Invoke-WebRequest -Uri "<CDN URL>" -OutFile "$dir\<filename>" -UseBasicParsing
 ```
 Then: `Read` with the full Windows path (Claude Code can display images).
 
-**CDN URL expiry**: Discord CDN URLs expire ~7 days after posting (signed `ex=<hex-epoch>`). On 403: re-call `fetch_channel_history` to get a fresh signed URL.
+**CDN URL expiry**: Discord CDN URLs expire ~7 days after posting (signed `ex=<hex-epoch>`). On 403: re-call `read_messages` to get a fresh signed URL.
 
 **Triage output MUST include** a one-line attachment summary for each fetched item:
 `"<filename> (<size>, pass1: <webfetch verdict>): <grep findings or image description>"`
