@@ -1,11 +1,11 @@
 ---
 id: TASK-983
 title: 'feat(v2-webui): header identity chips + SIMULATION badge'
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-01 22:21'
-updated_date: '2026-07-02 05:26'
+updated_date: '2026-07-04 04:23'
 labels: []
 dependencies: []
 ordinal: 195000

@@ -3,11 +3,11 @@ id: TASK-982
 title: >-
   feat(v2-webui): top-level Advanced page (PIC / Debug Information / File System
   / System)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-01 22:19'
-updated_date: '2026-07-02 05:26'
+updated_date: '2026-07-04 04:23'
 labels: []
 dependencies: []
 ordinal: 194000

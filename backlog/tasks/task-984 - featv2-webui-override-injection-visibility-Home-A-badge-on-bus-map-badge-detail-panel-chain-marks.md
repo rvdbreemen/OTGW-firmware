@@ -3,11 +3,11 @@ id: TASK-984
 title: >-
   feat(v2-webui): override-injection visibility (Home A badge, on-bus map badge,
   detail panel, chain marks)
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-01 22:23'
-updated_date: '2026-07-02 05:26'
+updated_date: '2026-07-04 04:23'
 labels: []
 dependencies: []
 ordinal: 196000
