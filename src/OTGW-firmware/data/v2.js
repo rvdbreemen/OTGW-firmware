@@ -1580,6 +1580,11 @@
   // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
   // normal toggle — never list it as an editable setting.
   var SET_HIDE = { ui_usev2: 1 };
+  // TASK-1012: internal onboarding-completion flags. Hidden from the settings LIST only
+  // (NOT from setData — satOnbNeeded()/the ui_onboarded logic read setData). Rendering them
+  // as editable "Onboarded" checkboxes would let a user tick one and permanently bypass the
+  // wizard + its enable-interception. SET_HIDE strips from setData, so it can't be used here.
+  var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1 };
   function humanizeKey(k) {
     var s = k.replace(/^(sat|otd|gpiosensors|gpiooutputs|s0counter|mqtt|wifi|eth|ntp|webhook|ui_|dallas)/, '');
     if (!s) s = k;
@@ -1684,7 +1689,7 @@
       cols.appendChild(head);
       // masonry container; cards grouped by sub-group
       var wrap = document.createElement('div'); wrap.className = 'set-cards';
-      var keys = keysForCat(id, q);
+      var keys = keysForCat(id, q).filter(function (k) { return !SET_HIDE_ROW[k]; });   // TASK-1012: never render internal onboarding flags
       var bySub = {}; var subOrder = [];
       keys.forEach(function (k) { var s = subFor(k); if (!(s in bySub)) { bySub[s] = []; subOrder.push(s); } bySub[s].push(k); });
       subOrder.forEach(function (s) {
@@ -1824,6 +1829,11 @@
   function saveSettings() {
     var keys = Object.keys(setDirty);
     if (!keys.length) return;
+    // TASK-1012: intercept satenabled false->on for a not-yet-onboarded SAT. Do NOT
+    // enable now — run the wizard, which enables at Finish. Strip the key from this save.
+    var satEnabling = ('satenabled' in setDirty) && ('' + setDirty.satenabled) === 'true' &&
+      !(setData.satenabled && ('' + setData.satenabled.value) === 'true') && satOnbNeeded();
+    if (satEnabling) { delete setDirty.satenabled; keys = Object.keys(setDirty); }
     var chain = Promise.resolve();
     keys.forEach(function (k) {
       chain = chain.then(function () {
@@ -1842,6 +1852,7 @@
       setDirty = {};
       var t = document.getElementById('toast'); if (t) { t.textContent = 'Settings saved'; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2000); }
       renderSettings();
+      if (satEnabling) startSatOnboarding('enable');   // TASK-1012: wizard owns the actual enable
     }).catch(function () {
       var t = document.getElementById('toast'); if (t) { t.textContent = 'Save failed'; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2500); }
     });
@@ -2712,6 +2723,7 @@
   function advAction(act) {
     if (act === 'home') { showPage('home'); return; }
     if (act === 'onboarding') { startOnboarding(); return; }   // TASK-997: re-run the first-time setup wizard on demand
+    if (act === 'sat-onboarding') { _satOnbShown = false; startSatOnboarding('rerun'); return; }   // TASK-1012: re-run the SAT setup wizard on demand
     if (act === 'update') { window.location.href = '/update'; return; }   // OTA sketch / filesystem upload page
     if (act === 'reboot') {
       if (!window.confirm('Reboot the OTGW device now? The Web UI will be unavailable for a few seconds.')) return;
@@ -2803,6 +2815,11 @@
     if (!satMarkersLoaded) { satMarkersLoaded = true; fetchSatMarkers(); }
     if (satPollTimer) clearInterval(satPollTimer);
     satPollTimer = setInterval(fetchSatPage, 5000);
+    // TASK-1012: existing SAT users see the wizard once on first SAT-page visit.
+    if (setData && setData.satenabled && ('' + setData.satenabled.value) === 'true') maybeShowSatOnboarding('migrate');
+    // Wire the "Re-run setup" button (guarded so re-entry doesn't double-bind).
+    var rb = document.getElementById('satRerunSetup');
+    if (rb && !rb._wired) { rb._wired = true; rb.addEventListener('click', function () { _satOnbShown = false; startSatOnboarding('rerun'); }); }
   }
   function satPageStop() { if (satPollTimer) { clearInterval(satPollTimer); satPollTimer = null; } }
 
@@ -3200,6 +3217,11 @@
 
     var en = document.getElementById('satEnable');
     if (en) en.addEventListener('change', function () {
+      // TASK-1012: intercept enabling a not-yet-onboarded SAT — run the wizard instead
+      // of enabling now (it enables at Finish). Revert the toggle meanwhile.
+      if (en.checked && !(satLastData && satLastData.enabled) && satOnbNeeded()) {
+        en.checked = false; startSatOnboarding('enable'); return;
+      }
       satEnPending = true;
       satPost('enable', en.checked ? '1' : '0')
         .then(function () { satEnPending = false; setTimeout(fetchSatPage, 300); })
@@ -3519,6 +3541,250 @@
       else if (a === 'test') { testConn(); }
       else if (a === 'finish') { syncInputs(); commit(function () { st.screen = 'done'; render(); }); }
       else if (a === 'go') { close(); fetchSettings(); showPage('home'); }
+    });
+    render();
+  }
+
+  // ── TASK-1012: SAT onboarding wizard (design "SAT Onboarding.dc.html") ──
+  // Fires when a not-yet-onboarded SAT is enabled (Settings save OR SAT-page toggle,
+  // both intercepted so SAT is NOT enabled until Finish), and once for existing SAT
+  // users on their first SAT-page visit (migrate). Six screens: Welcome, Heating
+  // system, Manufacturer, Tuning, Sources-health (read-only), Done. Writes only
+  // existing keys + sat_onboarded. Second instance of the startOnboarding engine.
+  var _satOnbShown = false;
+  // System choice → satsystem value + starting heating-curve slope (satcoefficient).
+  var SAT_SYS = { radiators: { sys: '1', slope: 1.4 }, underfloor: { sys: '2', slope: 0.6 }, hp: { sys: '0', slope: 0.8 } };
+  function satOnbNeeded() {
+    var ob = setData.sat_onboarded;
+    return !(ob && ('' + ob.value) === 'true');   // falsy / absent (old firmware) => needed
+  }
+  // reason: 'enable' (just switched on) | 'migrate' (existing user, SAT-page visit) | 'rerun' (manual)
+  function maybeShowSatOnboarding(reason) {
+    if (_satOnbShown || document.getElementById('satOnbBack')) return;
+    if (reason !== 'rerun' && !satOnbNeeded()) return;
+    startSatOnboarding(reason);
+  }
+  function startSatOnboarding(reason) {
+    if (document.getElementById('satOnbBack')) return;
+    _satOnbShown = true;
+    var migrate = (reason === 'migrate');
+    var curSys = setData.satsystem ? ('' + setData.satsystem.value) : '0';
+    var curSrc = setData.satsource ? ('' + setData.satsource.value) : '1';
+    var st = {
+      screen: 'welcome',
+      system: curSys === '1' ? 'radiators' : curSys === '2' ? 'underfloor' : (curSrc === '2' ? 'hp' : 'radiators'),
+      mfr: setData.satmanufacturer ? ('' + setData.satmanufacturer.value) : '0',
+      tuning: 'auto',
+      slope: null,   // lazily defaulted from system
+      gains: (setData.satautogains && setData.satautogains.value != null) ? ('' + setData.satautogains.value) : '1.0',
+      finishing: false
+    };
+    if (st.slope == null) st.slope = SAT_SYS[st.system].slope;
+
+    var back = document.createElement('div'); back.id = 'satOnbBack';
+    back.setAttribute('style', 'position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;overflow:auto');
+    document.body.appendChild(back);
+
+    var CARD = 'background:var(--panel);border:1px solid var(--border);border-radius:16px;box-shadow:0 8px 26px rgba(0,0,0,.32)';
+    var PRIM = 'margin-left:auto;background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:13.5px;border-radius:10px;padding:11px 24px;cursor:pointer;min-height:44px';
+    var GHOST = 'background:none;border:1px solid var(--border);color:var(--text);font-weight:600;font-size:13.5px;border-radius:10px;padding:11px 18px;cursor:pointer;min-height:44px';
+    var MONO = 'font-family:ui-monospace,SFMono-Regular,Menlo,monospace';
+    function esc(s) { return ('' + (s == null ? '' : s)).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;'); }
+    // Reject on non-ok so a 503 (ADR-147 heap-gate under the finish burst), 401/403
+    // or reboot does NOT masquerade as success (mirrors the saveSettings r.ok audit fix).
+    function post(name, value) {
+      return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: name, value: value }) })
+        .then(function (r) { if (!r.ok) throw new Error('POST ' + name + ' -> ' + r.status); return r; });
+    }
+    function close() { if (back.parentNode) back.parentNode.removeChild(back); }
+    function dismiss() { if (migrate) { post('sat_onboarded', true).then(function () { }, function () { }); } close(); }
+    function slopePct(v) { return Math.round(((v - 0.2) / (2.4 - 0.2)) * 100); }
+    function syncInputs() {
+      var mf = back.querySelector('#satOnbMfr'); if (mf) st.mfr = mf.value;
+      var gn = back.querySelector('#satOnbGains'); if (gn) st.gains = gn.value;
+      var sl = back.querySelector('#satOnbSlope'); if (sl) st.slope = parseFloat(sl.value);
+    }
+    function optCard(sel) {
+      return 'display:flex;align-items:center;gap:13px;width:100%;text-align:left;border-radius:12px;padding:14px 15px;cursor:pointer;font-family:inherit;' +
+        (sel ? 'background:color-mix(in srgb,var(--accent) 12%,var(--panel));border:2px solid var(--accent)' : 'background:var(--bg);border:1.5px solid var(--border)');
+    }
+    function dot(sel) { return 'width:18px;height:18px;border-radius:50%;box-sizing:border-box;flex:0 0 auto;' + (sel ? 'border:5px solid var(--accent)' : 'border:1.5px solid var(--muted)'); }
+    function recBadge() { return '<span style="font-weight:600;font-size:9.5px;letter-spacing:.05em;color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:2px 8px">RECOMMENDED</span>'; }
+
+    // Written at Finish: satsystem + satmanufacturer + satcoefficient (effective slope) +
+    // satautogains + satenabled + sat_onboarded. Heat pump also writes satsource=2.
+    function commit(then) {
+      var m = SAT_SYS[st.system] || SAT_SYS.radiators;
+      var eff = (st.tuning === 'manual') ? st.slope : m.slope;
+      var w = [post('satsystem', m.sys), post('satmanufacturer', st.mfr), post('satcoefficient', '' + eff)];
+      if (st.system === 'hp') w.push(post('satsource', 2));
+      w.push(post('satautogains', st.tuning === 'manual' ? ('' + st.gains) : '1.0'));
+      w.push(post('satenabled', true));   // SAT enabled ONLY here
+      // Distinct fulfil/reject: a failed write must NOT advance to the "SAT is now
+      // controlling your boiler" screen. then(true)=all persisted, then(false)=a POST failed.
+      Promise.all(w).then(function () { return post('sat_onboarded', true); }).then(function () { then(true); }, function () { then(false); });
+    }
+
+    var health = null, healthErr = false;
+    function loadHealth() {
+      health = null; healthErr = false;
+      Promise.all([
+        fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
+        fetch(APIGW + 'v2/sat/status').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+      ]).then(function (res) {
+        var h = (res[0] && res[0].health) || res[0] || {}, s = res[1] || {};
+        health = {
+          ot: !!h.otgwconnected,
+          otAge: (typeof h.boiler_age_s === 'number' && h.boiler_age_s >= 0) ? h.boiler_age_s : null,
+          mqtt: !!h.mqttconnected,
+          room: (s.room_temp == null) ? null : s.room_temp,
+          outside: (s.outside_temp == null) ? null : s.outside_temp
+        };
+        if (back.querySelector('#satOnbHealth')) render();
+      }).catch(function () { healthErr = true; if (back.querySelector('#satOnbHealth')) render(); });
+    }
+    function healthRow(label, ok, valHtml, last) {
+      var c = ok ? 'var(--zone-ok)' : 'var(--zone-warn)';   // theme-aware (--ok/--warn are not defined)
+      return '<div style="display:flex;align-items:center;gap:12px;padding:13px 0;' + (last ? '' : 'border-bottom:1px solid var(--border)') + '">' +
+        '<span style="width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:' + c + ';box-shadow:0 0 7px ' + c + '"></span>' +
+        '<span style="font-weight:600;font-size:13px;color:var(--text)">' + label + '</span>' +
+        '<span style="margin-left:auto;font-size:11.5px;color:' + c + '">' + valHtml + '</span></div>';
+    }
+
+    function render() {
+      var steps = ['system', 'mfr', 'tuning', 'sources'];
+      var idx = steps.indexOf(st.screen), total = steps.length;
+      var h = '';
+      h += '<div style="background:var(--nav);display:flex;align-items:center;gap:11px;padding:12px 18px">' +
+        '<span style="width:16px;height:16px;border-radius:4px;background:var(--accent);box-shadow:0 0 8px var(--accent);flex:0 0 auto"></span>' +
+        '<span style="font-weight:700;font-size:15px;color:#fff">OTGW firmware</span>' +
+        '<span style="font-weight:600;font-size:10px;color:rgba(255,255,255,.6);letter-spacing:.05em;' + MONO + '">SAT SETUP</span></div>';
+      h += '<div style="flex:1;display:flex;align-items:flex-start;justify-content:center;padding:44px 18px 60px"><div style="width:100%;max-width:580px">';
+      if (idx >= 0) {
+        h += '<div style="margin:0 0 20px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px">' +
+          '<span style="font-weight:700;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)">Step ' + (idx + 1) + ' of ' + total + '</span>' +
+          '<span style="font-weight:600;font-size:12px;color:var(--text)">' + ['Heating system', 'Manufacturer', 'Tuning', 'Sources health'][idx] + '</span></div>' +
+          '<div style="height:5px;border-radius:3px;background:var(--bg);overflow:hidden"><span style="display:block;height:100%;border-radius:3px;background:var(--accent);transition:width .25s;width:' + Math.round(((idx + 1) / total) * 100) + '%"></span></div></div>';
+      }
+      if (st.screen === 'welcome') {
+        h += '<div style="' + CARD + ';padding:34px 30px;text-align:center">' +
+          '<div style="width:54px;height:54px;border-radius:14px;background:color-mix(in srgb,var(--accent) 18%,transparent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px"><span style="width:16px;height:16px;border-radius:4px;background:var(--accent);box-shadow:0 0 12px var(--accent)"></span></div>' +
+          '<h1 style="font-weight:700;font-size:25px;color:var(--text);margin:0 0 8px">Let\'s tune SAT for your system</h1>' +
+          '<p style="font:400 13.5px/1.65 inherit;color:var(--muted);margin:0 auto 8px;max-width:440px">The <b style="color:var(--text)">Smart Autotune Thermostat</b> takes over control of your boiler, driving flow temperature from the room. Four short questions set it up.</p>' +
+          '<div style="display:inline-flex;align-items:center;gap:8px;margin:6px auto 22px;padding:8px 14px;background:var(--bg);border:1px solid var(--border);border-radius:10px"><span style="width:9px;height:9px;border-radius:50%;background:var(--zone-warn);box-shadow:0 0 7px var(--zone-warn);flex:0 0 auto"></span><span style="font-weight:500;font-size:12px;color:var(--text)">SAT stays <b>disabled</b> until you finish, nothing changes on your boiler yet.</span></div>' +
+          '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button data-sa="notnow" style="' + GHOST + '">Not now</button>' +
+          '<button data-sa="begin" style="background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:15px;border-radius:11px;padding:13px 30px;cursor:pointer;min-height:48px">Get started</button></div></div>';
+      } else if (st.screen === 'system') {
+        function sysCard(k, title, desc) {
+          return '<button data-sa="sys-' + k + '" style="' + optCard(st.system === k) + '"><span style="' + dot(st.system === k) + '"></span>' +
+            '<div style="text-align:left"><span style="font-weight:700;font-size:14.5px;color:var(--text)">' + title + '</span><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:3px 0 0">' + desc + '</p></div></button>';
+        }
+        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">What kind of heating do you have?</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">Sets the heating curve and control interval SAT starts from. <span style="' + MONO + '">satsystem</span></p>' +
+          '<div style="display:flex;flex-direction:column;gap:10px">' +
+          sysCard('radiators', 'Radiators', 'High-temperature emitters. Steeper curve, faster response.') +
+          sysCard('underfloor', 'Underfloor heating', 'Low-temperature, high inertia. Gentle curve, long cycles.') +
+          sysCard('hp', 'Heat pump', 'Air/water heat pump. Also sets the appliance source to heat pump.') + '</div>' +
+          (st.system === 'hp' ? '<div style="display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:10px 13px;background:var(--bg);border:1px solid var(--border);border-radius:10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent);margin-top:3px;flex:0 0 auto"></span><span style="font-weight:500;font-size:11.5px;line-height:1.5;color:var(--muted)">Writes <span style="' + MONO + ';color:var(--text)">satsource = heat pump</span> alongside <span style="' + MONO + ';color:var(--text)">satsystem</span>.</span></div>' : '') +
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-welcome" style="' + GHOST + '">Back</button><button data-sa="to-mfr" style="' + PRIM + '">Continue</button></div></div>';
+      } else if (st.screen === 'mfr') {
+        var mopts = (typeof ENUM_OPTS !== 'undefined' && ENUM_OPTS.satmanufacturer ? ENUM_OPTS.satmanufacturer : [[0, 'Auto']]).map(function (o) {
+          return '<option value="' + o[0] + '"' + (('' + st.mfr) === ('' + o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>';
+        }).join('');
+        var det = (satLastData && satLastData.manufacturer) ? esc(satLastData.manufacturer) : 'read from the OT bus';
+        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">Which boiler do you have?</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">Applies known modulation limits for your make. <span style="' + MONO + '">satmanufacturer</span></p>' +
+          '<button data-sa="pick-auto" style="' + optCard(st.mfr === '0') + '"><span style="' + dot(st.mfr === '0') + '"></span>' +
+          '<div style="text-align:left;flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Auto-detect</span>' + recBadge() + '</div>' +
+          '<p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">Reads the OpenTherm member-id from the bus. Detected: <span style="' + MONO + ';color:var(--text)">' + det + '</span></p></div></button>' +
+          '<div style="margin-top:14px"><label style="font-weight:600;font-size:11.5px;color:var(--muted);display:block;margin-bottom:6px">Or set it manually</label>' +
+          '<select id="satOnbMfr" style="width:100%;min-height:44px;-webkit-appearance:none;appearance:none;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;padding:11px 34px 11px 12px;font-weight:500;font-size:13.5px;cursor:pointer">' + mopts + '</select></div>' +
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-system" style="' + GHOST + '">Back</button><button data-sa="to-tuning" style="' + PRIM + '">Continue</button></div></div>';
+      } else if (st.screen === 'tuning') {
+        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">How should SAT tune itself?</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">SAT has no raw P/I/D, pick automatic learning, or set the curve slope yourself.</p>' +
+          '<div style="display:flex;flex-direction:column;gap:10px">' +
+          '<button data-sa="tune-auto" style="' + optCard(st.tuning === 'auto') + '"><span style="' + dot(st.tuning === 'auto') + '"></span><div style="text-align:left;flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Automatic</span>' + recBadge() + '</div><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">SAT learns your home\'s response over ~2 weeks and adjusts gains. <span style="' + MONO + '">satautogains = 1.0</span></p></div></button>' +
+          '<button data-sa="tune-manual" style="' + optCard(st.tuning === 'manual') + '"><span style="' + dot(st.tuning === 'manual') + '"></span><div style="text-align:left;flex:1"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Manual</span><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">Set the heating-curve slope yourself; auto-gains off. For experienced users.</p></div></button></div>';
+        if (st.tuning === 'manual') {
+          var pct = slopePct(st.slope);
+          h += '<div style="margin-top:16px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">' +
+            '<div style="display:flex;align-items:baseline;margin-bottom:12px"><div><span style="font-weight:600;font-size:13px;color:var(--text)">Heating curve slope</span><p style="font:400 11px inherit;color:var(--muted);margin:2px 0 0">Flow temp rise per °C of outdoor drop · <span style="' + MONO + '">satcoefficient</span></p></div>' +
+            '<span id="satOnbSlopeVal" style="margin-left:auto;font-weight:600;font-size:17px;' + MONO + ';color:var(--accent)">' + st.slope.toFixed(1) + '</span></div>' +
+            '<input id="satOnbSlope" type="range" class="satonb-slope" min="0.2" max="2.4" step="0.1" value="' + st.slope + '" style="width:100%;background-image:linear-gradient(90deg,var(--accent) ' + pct + '%,var(--tile-off,#54565a) ' + pct + '%)">' +
+            '<div style="display:flex;justify-content:space-between;margin-top:7px;font-weight:500;font-size:10px;color:var(--muted)"><span>Gentle · underfloor</span><span>Steep · radiators</span></div>' +
+            '<div style="display:flex;align-items:center;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)"><div style="flex:1"><span style="font-weight:600;font-size:13px;color:var(--text)">Auto-gains multiplier</span><p style="font:400 11px inherit;color:var(--muted);margin:2px 0 0">Scales learned corrections · <span style="' + MONO + '">satautogains</span></p></div>' +
+            '<input id="satOnbGains" value="' + esc(st.gains) + '" inputmode="decimal" style="width:74px;min-height:44px;text-align:center;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;padding:9px 8px;font-weight:600;font-size:13.5px;' + MONO + '"></div></div>';
+        }
+        h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-mfr" style="' + GHOST + '">Back</button><button data-sa="to-sources" style="' + PRIM + '">Continue</button></div></div>';
+      } else if (st.screen === 'sources') {
+        var rows;
+        if (health == null && !healthErr) {
+          rows = '<div style="padding:22px 0;text-align:center;color:var(--muted);font-size:12.5px">Checking sources…</div>';
+        } else {
+          var hh = health || {};
+          rows = healthRow('OpenTherm bus', !!hh.ot, hh.ot ? ('Online' + (hh.otAge != null ? ' · ' + hh.otAge + 's ago' : '')) : 'Offline') +
+            healthRow('Room temperature', hh.room != null, hh.room != null ? (hh.room.toFixed(1) + ' °C') : 'Not detected') +
+            healthRow('Outside temperature', hh.outside != null, hh.outside != null ? (hh.outside.toFixed(1) + ' °C') : 'Not detected') +
+            healthRow('MQTT', !!hh.mqtt, hh.mqtt ? 'Connected' : 'Not connected', true);
+        }
+        var warnOutside = health && health.outside == null;
+        h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">Source health check</h1>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">SAT reads these from your existing setup. This is a read-only check, configure inputs on their own pages. <span style="' + MONO + '">/api/v2/health</span></p>' +
+          '<div id="satOnbHealth" style="background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:2px 16px">' + rows + '</div>' +
+          (warnOutside ? '<div style="display:flex;align-items:flex-start;gap:9px;margin-top:14px;padding:11px 13px;background:color-mix(in srgb,var(--zone-warn) 12%,var(--bg));border:1px solid color-mix(in srgb,var(--zone-warn) 40%,var(--border));border-radius:10px"><span style="width:8px;height:8px;border-radius:50%;background:var(--zone-warn);box-shadow:0 0 7px var(--zone-warn);margin-top:3px;flex:0 0 auto"></span><span style="font-weight:500;font-size:12px;line-height:1.5;color:var(--text)">No outside temperature. SAT will run without weather compensation until you set a location under <b>SAT ▸ Weather</b>. Not required to continue.</span></div>' : '') +
+          (st.finishErr ? '<div style="margin-top:14px;padding:11px 13px;background:color-mix(in srgb,var(--zone-alert) 12%,var(--bg));border:1px solid color-mix(in srgb,var(--zone-alert) 45%,var(--border));border-radius:10px;font-weight:500;font-size:12px;line-height:1.5;color:var(--text)">Could not save the settings, SAT was not enabled. Check the device is reachable and try again.</div>' : '') +
+          '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-tuning" style="' + GHOST + '">Back</button><button data-sa="finish" style="' + PRIM + '"' + (st.finishing ? ' disabled' : '') + '>' + (st.finishing ? 'Enabling…' : (st.finishErr ? 'Retry' : 'Enable SAT')) + '</button></div></div>';
+      } else if (st.screen === 'done') {
+        var sysL = { radiators: 'Radiators', underfloor: 'Underfloor heating', hp: 'Heat pump' }[st.system];
+        var mfrL = (typeof ENUM_OPTS !== 'undefined' && ENUM_OPTS.satmanufacturer ? (ENUM_OPTS.satmanufacturer.filter(function (o) { return ('' + o[0]) === ('' + st.mfr); })[0] || [0, 'Auto'])[1] : 'Auto');
+        var tuneL = st.tuning === 'auto' ? 'Automatic (auto-gains)' : ('Manual · slope ' + st.slope.toFixed(1));
+        h += '<div style="' + CARD + ';padding:30px 28px;text-align:center"><div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:#04222c">✓</div>' +
+          '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">SAT is now controlling your boiler</h1>' +
+          '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:420px">Room-driven control is live. It may take a heating cycle or two to settle.</p>' +
+          '<div style="text-align:left;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:6px 16px;margin:0 0 20px">' +
+          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">Heating system</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + sysL + '</span></div>' +
+          '<div style="display:flex;align-items:center;padding:11px 0;border-bottom:1px solid var(--border)"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">Boiler</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + esc(mfrL) + '</span></div>' +
+          '<div style="display:flex;align-items:center;padding:11px 0"><span style="font-weight:500;font-size:12.5px;color:var(--muted)">Tuning</span><span style="margin-left:auto;font-weight:600;font-size:12.5px;color:var(--text)">' + tuneL + '</span></div></div>' +
+          '<p style="font:400 11px/1.6 inherit;color:var(--muted);margin:0 0 20px;text-align:left">Written to settings: <span style="' + MONO + '">satenabled=on · sat_onboarded=on</span> plus every answer above.</p>' +
+          '<div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap"><button data-sa="restart" style="' + GHOST + '">Run setup again</button>' +
+          '<button data-sa="go" style="background:var(--accent);border:0;color:#04222c;font-weight:700;font-size:15px;border-radius:11px;padding:13px 28px;cursor:pointer;min-height:48px">Open SAT dashboard</button></div></div>';
+      }
+      h += '</div></div>';
+      back.innerHTML = h;
+      // live-update slope without a full re-render (keeps thumb focus)
+      var sl = back.querySelector('#satOnbSlope');
+      if (sl) sl.addEventListener('input', function () {
+        st.slope = parseFloat(sl.value);
+        var v = back.querySelector('#satOnbSlopeVal'); if (v) v.textContent = st.slope.toFixed(1);
+        sl.style.backgroundImage = 'linear-gradient(90deg,var(--accent) ' + slopePct(st.slope) + '%,var(--tile-off,#54565a) ' + slopePct(st.slope) + '%)';
+      });
+      var mf = back.querySelector('#satOnbMfr');
+      if (mf) mf.addEventListener('change', function () { st.mfr = mf.value; render(); });
+    }
+
+    back.addEventListener('click', function (ev) {
+      var t = ev.target.closest && ev.target.closest('[data-sa]'); if (!t) return;
+      var a = t.getAttribute('data-sa');
+      if (a === 'begin') { st.screen = 'system'; render(); }
+      else if (a === 'notnow') { dismiss(); }
+      else if (a === 'sys-radiators' || a === 'sys-underfloor' || a === 'sys-hp') { st.system = a.slice(4); st.slope = SAT_SYS[st.system].slope; render(); }
+      else if (a === 'back-welcome') { st.screen = 'welcome'; render(); }
+      else if (a === 'to-mfr') { st.screen = 'mfr'; render(); }
+      else if (a === 'pick-auto') { st.mfr = '0'; render(); }
+      else if (a === 'back-system') { syncInputs(); st.screen = 'system'; render(); }
+      else if (a === 'to-tuning') { syncInputs(); st.screen = 'tuning'; render(); }
+      else if (a === 'tune-auto') { syncInputs(); st.tuning = 'auto'; render(); }
+      else if (a === 'tune-manual') { syncInputs(); st.tuning = 'manual'; render(); }
+      else if (a === 'back-mfr') { syncInputs(); st.screen = 'mfr'; render(); }
+      else if (a === 'to-sources') { syncInputs(); st.screen = 'sources'; render(); loadHealth(); }
+      else if (a === 'back-tuning') { st.screen = 'tuning'; render(); }
+      else if (a === 'finish') {
+        if (st.finishing) return; st.finishing = true; st.finishErr = false; render();
+        commit(function (ok) { st.finishing = false; if (ok) { st.screen = 'done'; } else { st.finishErr = true; } render(); });
+      }
+      else if (a === 'restart') { st.screen = 'welcome'; st.system = 'radiators'; st.mfr = '0'; st.tuning = 'auto'; st.slope = SAT_SYS.radiators.slope; st.gains = '1.0'; render(); }
+      else if (a === 'go') { close(); fetchSettings(); showPage('sat'); }
     });
     render();
   }

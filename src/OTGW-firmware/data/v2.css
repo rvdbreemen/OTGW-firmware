@@ -697,6 +697,12 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .ds-seg.active{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:700}
   .sat-hint{font-size:.78rem;color:var(--muted);margin-top:12px}
   .sat-slider{width:110px;max-width:100%;vertical-align:middle;accent-color:var(--accent);cursor:pointer}
+  /* TASK-1012: SAT onboarding heating-curve slope slider. 44px tall for a ≥44px touch
+     target; the visible 6px track is the inline background-image, centred via background-size. */
+  .satonb-slope{-webkit-appearance:none;appearance:none;height:44px;background-color:transparent;background-repeat:no-repeat;background-position:center;background-size:100% 6px;outline:none;cursor:pointer}
+  .satonb-slope::-webkit-slider-thumb{-webkit-appearance:none;width:20px;height:20px;border-radius:50%;background:#fff;border:3px solid var(--accent);cursor:pointer}
+  .satonb-slope::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid var(--accent);cursor:pointer}
+  .satonb-slope::-moz-range-track{height:6px;background:transparent}
   .sat-tiles4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
   @media(max-width:719px){.sat-tiles4{grid-template-columns:1fr 1fr}}
   .sat-tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;box-shadow:var(--shadow);padding:13px 14px}

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.326
+**  Version  : v2.0.0-alpha.327
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -288,6 +288,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("ui_autoexport"), settings.ui.bAutoExport, true);
   writeJsonBoolKV(file, F("ui_usev2"), settings.ui.bUseV2, true);
   writeJsonBoolKV(file, F("ui_onboarded"), settings.ui.bOnboarded, true);
+  writeJsonBoolKV(file, F("sat_onboarded"), settings.ui.bSatOnboarded, true);
   writeJsonIntKV(file, F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, true);
   writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settings.sensors.bEnabled, true);
   writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settings.sensors.bLegacyFormat, true);
@@ -844,6 +845,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("ui_autoexport"))==0)      settings.ui.bAutoExport = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("ui_usev2"))==0)          settings.ui.bUseV2 = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("ui_onboarded"))==0)    { settings.ui.bOnboarded = EVALBOOLEAN(newValue); g_sawOnboardedKey = true; }  // TASK-997: key presence = existing install (see readSettings migration)
+  else if (strcasecmp_P(field, PSTR("sat_onboarded"))==0)     settings.ui.bSatOnboarded = EVALBOOLEAN(newValue);  // TASK-1012: no g_sawKey migration — defaults false so existing SAT users are prompted once (client gates on satenabled)
   else if (strcasecmp_P(field, PSTR("ui_graphtimewindow"))==0) {
     int val = atoi(newValue);
     settings.ui.iGraphTimeWindow = constrain(val, 1, 1440);

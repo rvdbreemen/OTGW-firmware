@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.326
+**  Version  : v2.0.0-alpha.327
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3495,6 +3495,7 @@ void sendDeviceSettings()
   addBool(F("ui_autoexport"), settings.ui.bAutoExport, "b");
   addBool(F("ui_usev2"), settings.ui.bUseV2, "b");
   addBool(F("ui_onboarded"), settings.ui.bOnboarded, "b");
+  addBool(F("sat_onboarded"), settings.ui.bSatOnboarded, "b");   // TASK-1012: SAT onboarding wizard persist flag
   addInt(F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, "i", 0, 1440);
   addBool(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
   addBool(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
@@ -3860,6 +3861,7 @@ static const char* const PROGMEM knownSettings[] = {
   // TASK-933 P2: SAT keys that already had GET + dispatch but were missing from the
   // whitelist (POST-blocked), plus the masked weather API key. isKnownSetting is a
   // linear scan so position is cosmetic; grouped here for traceability.
+  "sat_onboarded",   // TASK-1012: SAT onboarding wizard persist flag (POST-writable)
   "satautogains", "satcyclesperhour", "saterrormon", "satheatingmode", "sathpcycle",
   "satmaxmodulation", "satsensormaxage", "satsolarfreezeint", "satvalveoffset", "satweatherapikey",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",

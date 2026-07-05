@@ -369,7 +369,8 @@
 <div id="page-sat" class="page">
   <div class="sat-head">
     <div class="sat-title">SAT · Smart Autotune Thermostat <span class="sat-pill off" id="satPill">…</span></div>
-    <label class="sat-switch" style="margin-left:auto"><span id="satEnableLbl">Enabled</span><input type="checkbox" class="sw" id="satEnable"></label>
+    <button id="satRerunSetup" class="fs-btn" style="margin-left:auto">Re-run setup</button>
+    <label class="sat-switch" style="margin-left:12px"><span id="satEnableLbl">Enabled</span><input type="checkbox" class="sw" id="satEnable"></label>
   </div>
 
   <div class="sat-views">
@@ -783,6 +784,7 @@
         <button class="fs-btn primary" data-act="update">Update Firmware</button>
         <button class="fs-btn" data-act="reboot">ReBoot</button>
         <button class="fs-btn" data-act="onboarding">Run setup wizard</button>
+        <button class="fs-btn" data-act="sat-onboarding">Run SAT setup</button>
         <button class="fs-btn danger" data-act="resetwifi">Reset Wireless</button>
         <button class="fs-btn" data-act="home">Home</button>
       </div>
