@@ -949,17 +949,18 @@ var SAT = (function() {
         { name: 'SATweatherlon', value: lon },
         { name: 'SATweatherenable', value: '1' }
       ];
-      var promises = [];
-      for (var i = 0; i < settings.length; i++) {
-        promises.push(
-          fetch(APIGW + 'v2/settings', {
+      // POST each setting SEQUENTIALLY (one at a time) so we never fire a
+      // concurrent burst at the REST backpressure gate. Deferring the fetch
+      // into each reduce step is what serializes them.
+      settings.reduce(function(chain, s) {
+        return chain.then(function() {
+          return fetch(APIGW + 'v2/settings', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: '{"name":"' + settings[i].name + '","value":"' + settings[i].value + '"}'
-          })
-        );
-      }
-      Promise.all(promises).then(function() {
+            body: '{"name":"' + s.name + '","value":"' + s.value + '"}'
+          });
+        });
+      }, Promise.resolve()).then(function() {
         showFeedback('Location set: ' + lat + ', ' + lon, false);
         // Refresh weather data after a short delay
         setTimeout(fetchWeather, 2000);
@@ -993,17 +994,18 @@ var SAT = (function() {
             { name: 'SATweatherlat', value: latStr },
             { name: 'SATweatherlon', value: lonStr }
           ];
-          var promises = [];
-          for (var i = 0; i < settings.length; i++) {
-            promises.push(
-              fetch(APIGW + 'v2/settings', {
+          // POST each setting SEQUENTIALLY (one at a time) so we never fire a
+          // concurrent burst at the REST backpressure gate. Deferring the fetch
+          // into each reduce step is what serializes them.
+          settings.reduce(function(chain, s) {
+            return chain.then(function() {
+              return fetch(APIGW + 'v2/settings', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: '{"name":"' + settings[i].name + '","value":"' + settings[i].value + '"}'
-              })
-            );
-          }
-          Promise.all(promises)
+                body: '{"name":"' + s.name + '","value":"' + s.value + '"}'
+              });
+            });
+          }, Promise.resolve())
             .then(function() {
               // Refresh displayed coords.
               fetchWeather();
@@ -1091,23 +1093,25 @@ var SAT = (function() {
   }
 
   function persistOwmSettings(key) {
-    var posts = [];
-    posts.push(fetch(APIGW + 'v2/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{"name":"SATweatherapikey","value":"' + String(key).replace(/"/g, '') + '"}'
-    }));
-    posts.push(fetch(APIGW + 'v2/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: '{"name":"SATweatherenable","value":"1"}'
-    }));
-
-    return Promise.all(posts)
-      .then(function(responses) {
-        for (var i = 0; i < responses.length; i++) {
-          if (responses[i] && !responses[i].ok) throw new Error('HTTP ' + responses[i].status);
-        }
+    // Plain descriptors (not pre-launched fetches) so we can POST them
+    // SEQUENTIALLY (one at a time) and never fire a concurrent burst at the
+    // REST backpressure gate. First non-ok response throws and aborts the chain.
+    var posts = [
+      '{"name":"SATweatherapikey","value":"' + String(key).replace(/"/g, '') + '"}',
+      '{"name":"SATweatherenable","value":"1"}'
+    ];
+    return posts.reduce(function(chain, body) {
+      return chain.then(function() {
+        return fetch(APIGW + 'v2/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: body
+        }).then(function(resp) {
+          if (resp && !resp.ok) throw new Error('HTTP ' + resp.status);
+        });
+      });
+    }, Promise.resolve())
+      .then(function() {
         showFeedback('OWM key saved; weather enabled', false);
         setTimeout(fetchWeather, 2000);
       });

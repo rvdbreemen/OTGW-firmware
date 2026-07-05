@@ -2583,5 +2583,25 @@
   ],
   "occurrences": 1,
   "last_seen": "2026-07-03"
+ },
+ {
+  "id": "bug-149",
+  "timestamp": "2026-07-05",
+  "error_message": "SAT onboarding wizard final step: 'Could not save the settings, SAT was not enabled. Check the device is reachable and try again.'",
+  "file": "src/OTGW-firmware/data/v2.js",
+  "root_cause": "commit() fired 6-7 settings POSTs concurrently via Promise.all; the REST backpressure gate (restAPI.ino:2455, TASK-884) caps concurrent /api requests at 4 (2 under <24KB maxblock, 1 under <16KB) and 503s the excess. Promise.all rejected on the first 503, sometimes after satenabled itself was the dropped write, leaving a partial save with SAT still disabled. post() fires the fetch eagerly, so building an array of post() calls already launched the burst.",
+  "fix": "Serialize all settings writes: build [name,value] descriptors and run them one at a time via a reduce promise chain (kv.reduce((c,p)=>c.then(()=>post(p[0],p[1])),Promise.resolve())). Applied to SAT commit, MQTT onboarding commit, testConn, weather-detect, and loadHealth in v2.js. Maintainer rule recorded: NEVER fire more than one /api call at a time (CLAUDE.md frontend-JS rules). Companion audit serialized the remaining bursts in index.js/sat.js and index.html CSS links.",
+  "tags": [
+   "rest-backpressure",
+   "503",
+   "promise-all",
+   "single-flight",
+   "sat-onboarding",
+   "TASK-1014",
+   "TASK-884"
+  ],
+  "related_bugs": [],
+  "occurrences": 1,
+  "last_seen": "2026-07-05"
  }
 ]

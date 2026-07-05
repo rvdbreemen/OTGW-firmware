@@ -9,8 +9,6 @@
          The actual active scheme is still driven by the html color-scheme
          declaration in the loaded stylesheet below. -->
     <meta name="color-scheme" content="light dark">
-    <link rel="stylesheet" href="ds-tokens.css">
-    <link rel="stylesheet" href="components.css">
 
     <script>
       (function() {
@@ -29,19 +27,46 @@
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"
             integrity="sha384-BQKzmHvQLMCAnL3UtDBA1Al5tFjsCz1wrMlIUA1wkzo14DYkRWjywW+p9pCj0cwd"
             crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <!-- TASK-960: load app scripts SEQUENTIALLY with retry. The old parallel
-         <script> burst (6 files at once) fragmented the ESP32 heap and tripped
-         the file-serve gate (ADR-147), which 503s the excess under pressure —
-         and a 503'd index.js silently kills the whole UI ([hostname]/[version]
-         placeholders, empty log). Serializing removes the burst (one file at a
-         time never trips the gate); the retry recovers any transient 503 so the
-         UI never dies on a dropped asset. Order preserved: index.js defines the
-         APIGW global that graph.js/sat.js use, so it must load first. -->
+    <!-- TASK-960: load app assets SEQUENTIALLY with retry. The old parallel
+         burst (two <link> CSS tags + 6 <script> files at once) fragmented the
+         ESP32 heap and tripped the file-serve gate (ADR-147), which 503s the
+         excess under pressure — and a 503'd asset silently kills the whole UI
+         (unstyled page, [hostname]/[version] placeholders, empty log).
+         The CSS was moved off static <link> tags into this loader so the ENTIRE
+         page load is one connection at a time: ds-tokens.css -> components.css
+         -> then the scripts. One file at a time never trips the gate; the retry
+         recovers any transient 503 so the UI never dies on a dropped asset.
+         Order preserved: index.js defines the APIGW global that graph.js/sat.js
+         use, so it must load first among the scripts. The echarts CDN <script>
+         above hits an external host (not the device), so it stays parallel and
+         is intentionally not part of this chain. -->
     <script>
       (function () {
+        var MAX_RETRY = 8;
         var SCRIPTS = ['./index.js', './graph.js', './sat.js',
                        './echarts-theme.js', './theme-toggle.js', './sat-slider.js'];
-        var MAX_RETRY = 8;
+        // Load one stylesheet with retry-on-error, then invoke `then` (mirrors
+        // the script loader below and v2.html's loadCss).
+        function loadCss(href, then) {
+          var attempt = 0;
+          (function attemptLoad() {
+            var l = document.createElement('link');
+            l.rel = 'stylesheet';
+            l.href = href;
+            l.onload = function () { if (then) then(); };
+            l.onerror = function () {
+              if (l.parentNode) l.parentNode.removeChild(l);
+              if (++attempt <= MAX_RETRY) {
+                // Linear backoff: the gate frees a slot as in-flight serves finish.
+                setTimeout(attemptLoad, 200 * attempt);
+              } else {
+                console.error('[loader] gave up on ' + href + ' after ' + MAX_RETRY + ' tries');
+                if (then) then(); // continue so a dropped stylesheet can't block scripts
+              }
+            };
+            document.head.appendChild(l);
+          })();
+        }
         function load(i) {
           if (i >= SCRIPTS.length) return;
           var attempt = 0;
@@ -63,7 +88,11 @@
             document.head.appendChild(s);
           })();
         }
-        load(0);
+        // CSS first (sequential), then start the scripts chain — at most one
+        // device request in flight across the whole page load.
+        loadCss('ds-tokens.css', function () {
+          loadCss('components.css', function () { load(0); });
+        });
       })();
     </script>
     <title>OTGW firmware</title>

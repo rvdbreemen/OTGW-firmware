@@ -3199,11 +3199,14 @@
     txt('satCoords', 'Detecting…');
     navigator.geolocation.getCurrentPosition(function (pos) {
       var lat = pos.coords.latitude.toFixed(4), lon = pos.coords.longitude.toFixed(4);
-      var posts = [['SATweatherlat', lat], ['SATweatherlon', lon]].map(function (kv) {
-        return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: kv[0], value: kv[1] }) })
-          .then(function (r) { if (!r.ok) throw new Error(r.status); return r; });
-      });
-      Promise.all(posts).then(function () { txt('satCoords', lat + ', ' + lon); setTimeout(fetchSatPageWeather, 1500); }).catch(function () { txt('satCoords', 'Save failed'); });
+      // Land the two coords one at a time (never both at once) so the REST
+      // backpressure gate (restAPI.ino, TASK-884) is never tripped.
+      [['SATweatherlat', lat], ['SATweatherlon', lon]].reduce(function (c, kv) {
+        return c.then(function () {
+          return fetch(APIGW + 'v2/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: kv[0], value: kv[1] }) })
+            .then(function (r) { if (!r.ok) throw new Error(r.status); return r; });
+        });
+      }, Promise.resolve()).then(function () { txt('satCoords', lat + ', ' + lon); setTimeout(fetchSatPageWeather, 1500); }).catch(function () { txt('satCoords', 'Save failed'); });
     }, function () { txt('satCoords', 'Location error'); }, { timeout: 10000 });
   }
 
@@ -3437,16 +3440,22 @@
       var t = back.querySelector('#onbTopic'); if (t) st.topic = t.value;
     }
     function commit(then) {
-      var w = [post('satsource', st.appliance === 'hp' ? 2 : 1), post('mqttenable', st.mqtt)];
+      var kv = [['satsource', st.appliance === 'hp' ? 2 : 1], ['mqttenable', st.mqtt]];
       if (st.mqtt) {
-        w.push(post('mqttbroker', st.broker), post('mqttbrokerport', parseInt(st.port, 10) || 1883), post('mqttuser', st.user), post('mqtttoptopic', st.topic));
-        if (st.pass) w.push(post('mqttpasswd', st.pass));
+        kv.push(['mqttbroker', st.broker], ['mqttbrokerport', parseInt(st.port, 10) || 1883], ['mqttuser', st.user], ['mqtttoptopic', st.topic]);
+        if (st.pass) kv.push(['mqttpasswd', st.pass]);
       }
-      Promise.all(w).then(function () { return post('ui_onboarded', true); }).then(then, then);
+      kv.push(['ui_onboarded', true]);   // onboarding flag last
+      // One POST at a time (never a concurrent burst) so the REST backpressure
+      // gate (restAPI.ino, TASK-884) is never tripped by the settings write.
+      kv.reduce(function (c, p) { return c.then(function () { return post(p[0], p[1]); }); }, Promise.resolve()).then(then, then);
     }
     function testConn() {
       if (st.test === 'testing') return; syncInputs(); st.test = 'testing'; render();
-      Promise.all([post('mqttenable', true), post('mqttbroker', st.broker), post('mqttbrokerport', parseInt(st.port, 10) || 1883), post('mqttuser', st.user)].concat(st.pass ? [post('mqttpasswd', st.pass)] : [])).then(function () {
+      var kv = [['mqttenable', true], ['mqttbroker', st.broker], ['mqttbrokerport', parseInt(st.port, 10) || 1883], ['mqttuser', st.user]];
+      if (st.pass) kv.push(['mqttpasswd', st.pass]);
+      // Land the credentials one at a time (never a burst) before polling for the connection.
+      kv.reduce(function (c, p) { return c.then(function () { return post(p[0], p[1]); }); }, Promise.resolve()).then(function () {
         var tries = 0;
         (function poll() {
           fetch(APIGW + 'v2/device/info').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
@@ -3616,22 +3625,34 @@
     function commit(then) {
       var m = SAT_SYS[st.system] || SAT_SYS.radiators;
       var eff = (st.tuning === 'manual') ? st.slope : m.slope;
-      var w = [post('satsystem', m.sys), post('satmanufacturer', st.mfr), post('satcoefficient', '' + eff)];
-      if (st.system === 'hp') w.push(post('satsource', 2));
-      w.push(post('satautogains', st.tuning === 'manual' ? ('' + st.gains) : '1.0'));
-      w.push(post('satenabled', true));   // SAT enabled ONLY here
-      // Distinct fulfil/reject: a failed write must NOT advance to the "SAT is now
-      // controlling your boiler" screen. then(true)=all persisted, then(false)=a POST failed.
-      Promise.all(w).then(function () { return post('sat_onboarded', true); }).then(function () { then(true); }, function () { then(false); });
+      // Land the settings ONE AT A TIME (never a concurrent burst). The REST
+      // backpressure gate (restAPI.ino, TASK-884) caps concurrent /api requests
+      // at 4 and tightens toward 1 under heap pressure, so firing all 6-7 writes
+      // via Promise.all made the excess 503 and the commit fail ("SAT was not
+      // enabled") -- often dropping satenabled itself, leaving a partial write.
+      // Sequential keeps exactly one POST in flight, so the gate is never tripped
+      // and the write order is guaranteed.
+      var kv = [['satsystem', m.sys], ['satmanufacturer', st.mfr], ['satcoefficient', '' + eff]];
+      if (st.system === 'hp') kv.push(['satsource', 2]);
+      kv.push(['satautogains', st.tuning === 'manual' ? ('' + st.gains) : '1.0']);
+      kv.push(['satenabled', true]);       // SAT enabled ONLY here, after the tuning writes land
+      kv.push(['sat_onboarded', true]);    // onboarding flag last, once everything else persisted
+      // then(true)=all persisted, then(false)=a POST failed (any reject aborts the chain,
+      // so a failed write must NOT advance to the "SAT is now controlling your boiler" screen).
+      kv.reduce(function (c, p) { return c.then(function () { return post(p[0], p[1]); }); }, Promise.resolve())
+        .then(function () { then(true); }, function () { then(false); });
     }
 
     var health = null, healthErr = false;
     function loadHealth() {
       health = null; healthErr = false;
-      Promise.all([
-        fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; }),
-        fetch(APIGW + 'v2/sat/status').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
-      ]).then(function (res) {
+      // One request at a time -- fetch /health, then /sat/status only after it
+      // resolves. No concurrent burst (see the REST backpressure gate, TASK-884).
+      fetch(APIGW + 'v2/health').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+        .then(function (h0) {
+          return fetch(APIGW + 'v2/sat/status').then(function (r) { return r.ok ? r.json() : null; }).catch(function () { return null; })
+            .then(function (s0) { return [h0, s0]; });
+        }).then(function (res) {
         var h = (res[0] && res[0].health) || res[0] || {}, s = res[1] || {};
         health = {
           ot: !!h.otgwconnected,

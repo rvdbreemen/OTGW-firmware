@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.327
+**  Version  : v2.0.0-alpha.328
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4037,20 +4037,30 @@ function refreshDallasSensorAreas() {
 
   var emptyAreas = [{sensor:''},{sensor:''},{sensor:''},{sensor:''}];
 
-  Promise.all([
-    fetch(APIGW + 'v2/sensors').then(function(r) {
-      if (!r.ok) return null;
-      return r.json();
-    }).catch(function() { return null; }),
-    fetch(APIGW + 'v2/sensors/labels').then(function(r) {
-      if (!r.ok) return {};
-      return r.json();
-    }).catch(function() { return {}; }),
-    fetch(APIGW + 'v2/sat/sensor-areas').then(function(r) {
-      if (!r.ok) return { areas: emptyAreas };
-      return r.json();
-    }).catch(function() { return { areas: emptyAreas }; })
-  ]).then(function(results) {
+  // Fetch the 3 GETs SEQUENTIALLY (one at a time) so the frontend never fires a
+  // concurrent burst at the REST backpressure gate. Each item catches to its own
+  // fallback so the chain never rejects; results stays [statusJson, labelsMap, areaData].
+  var results = [];
+  Promise.resolve()
+    .then(function() {
+      return fetch(APIGW + 'v2/sensors').then(function(r) {
+        if (!r.ok) return null;
+        return r.json();
+      }).catch(function() { return null; }).then(function(v) { results.push(v); });
+    })
+    .then(function() {
+      return fetch(APIGW + 'v2/sensors/labels').then(function(r) {
+        if (!r.ok) return {};
+        return r.json();
+      }).catch(function() { return {}; }).then(function(v) { results.push(v); });
+    })
+    .then(function() {
+      return fetch(APIGW + 'v2/sat/sensor-areas').then(function(r) {
+        if (!r.ok) return { areas: emptyAreas };
+        return r.json();
+      }).catch(function() { return { areas: emptyAreas }; }).then(function(v) { results.push(v); });
+    })
+    .then(function() {
     var statusJson = results[0];
     var labelsMap  = results[1] || {};
     var areaData   = results[2] || { areas: emptyAreas };
@@ -4587,21 +4597,25 @@ function saveSATSettingsGroup(groupId) {
 
   if (msgEl) msgEl.textContent = 'Saving\u2026';
 
-  var promises = changed.map(function(item) {
-    return fetch(APIGW + 'v2/settings', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-      body: JSON.stringify({ name: item.key, value: item.value }),
-      mode: 'cors'
-    }).then(function(resp) {
-      if (!resp.ok) throw new Error(item.key + ': HTTP ' + resp.status);
-      var el = document.getElementById('SAT_' + item.key);
-      if (el) el.className = 'sat-setting-input';
-      return resp;
+  // POST each changed setting SEQUENTIALLY (one at a time) so we never fire a
+  // concurrent burst at the REST backpressure gate. Deferring the fetch call into
+  // each reduce step is what serializes them; a pre-built promise array would have
+  // already launched all requests. First failure aborts the chain (acceptable).
+  changed.reduce(function(chain, item) {
+    return chain.then(function() {
+      return fetch(APIGW + 'v2/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+        body: JSON.stringify({ name: item.key, value: item.value }),
+        mode: 'cors'
+      }).then(function(resp) {
+        if (!resp.ok) throw new Error(item.key + ': HTTP ' + resp.status);
+        var el = document.getElementById('SAT_' + item.key);
+        if (el) el.className = 'sat-setting-input';
+        return resp;
+      });
     });
-  });
-
-  Promise.all(promises)
+  }, Promise.resolve())
     .then(function() {
       if (msgEl) { msgEl.textContent = 'Saved successfully.'; setTimeout(function() { if (msgEl) msgEl.textContent = ''; }, 2500); }
     })
