@@ -1684,7 +1684,16 @@ def create_merged_binary(project_dir, semver, target, compress=False, include_fi
         # default; the previous project-local search missed that path. Search
         # order tries the most likely locations first.
         boot_app = None
-        search_roots = [
+        search_roots = []
+        # Honour a relocated PlatformIO core FIRST. The core dir defaults to
+        # ~/.platformio but is commonly moved via PLATFORMIO_CORE_DIR (e.g. to
+        # D:\DevData\platformio here); without this the merged-binary step fails
+        # with "boot_app0.bin not found" even though the framework is installed.
+        _pio_core = os.environ.get("PLATFORMIO_CORE_DIR")
+        if _pio_core:
+            search_roots.append(Path(_pio_core) / "packages" / "framework-arduinoespressif32")
+            search_roots.append(Path(_pio_core) / "packages")
+        search_roots += [
             Path.home() / ".platformio" / "packages" / "framework-arduinoespressif32",
             Path.home() / ".platformio" / "packages",
             project_dir / ".platformio" / "packages",
@@ -1859,8 +1868,15 @@ def check_platformio():
     system = platform.system()
 
     def _pio_in_path():
+        # Invoke PlatformIO as a MODULE under the current interpreter, never the
+        # bare `pio` console script. A `pip install platformio` into a portable
+        # embed Python installs the package but generates NO pio.exe wrapper, so
+        # `pio --version` fails even though `python -m platformio` works fine.
+        # This also guarantees pio runs under sys.executable (the 3.10-3.13 the
+        # wrapper selected), so it is never rejected by pio's own version guard.
         try:
-            r = subprocess.run(["pio", "--version"], capture_output=True, text=True, check=False)
+            r = subprocess.run([sys.executable, "-m", "platformio", "--version"],
+                               capture_output=True, text=True, check=False)
             if r.returncode == 0:
                 print_success(f"PlatformIO: {r.stdout.strip()}")
                 return True
@@ -1938,7 +1954,9 @@ def build_firmware_pio(project_dir, target):
         "MINGW_PREFIX", "MINGW_CHOST", "MINGW_PACKAGE_PREFIX",
     })
     pio_env = {k: v for k, v in os.environ.items() if k not in _MSYS_KEYS}
-    run_command(["pio", "run", "-e", env_name], cwd=project_dir, env=pio_env)
+    # `python -m platformio`, not bare `pio`: a portable embed Python has the
+    # package but no pio.exe wrapper (see _pio_in_path).
+    run_command([sys.executable, "-m", "platformio", "run", "-e", env_name], cwd=project_dir, env=pio_env)
     # TASK-337: pio's pre-flight Python version rejection prints "Python version
     # must be between 3.10 and 3.13" but exits 0, leaving no firmware.bin behind.
     # Verify the artifact exists rather than trusting the subprocess exit code.
@@ -1960,7 +1978,8 @@ def build_filesystem_pio(project_dir, target):
         "MINGW_PREFIX", "MINGW_CHOST", "MINGW_PACKAGE_PREFIX",
     })
     pio_env = {k: v for k, v in os.environ.items() if k not in _MSYS_KEYS}
-    run_command(["pio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir, env=pio_env)
+    # `python -m platformio`, not bare `pio` (see _pio_in_path / build_firmware_pio).
+    run_command([sys.executable, "-m", "platformio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir, env=pio_env)
     # TASK-337: same fail-fast pattern as build_firmware_pio. The buildfs target
     # can also be silently skipped on toolchain misconfiguration.
     verify_artifact_exists(

@@ -31,7 +31,12 @@ if not defined PYTHON_EXE (
     exit /b 1
 )
 
-set "PATH=%PYTHON_DIR%;%PATH%"
+rem Put BOTH the interpreter dir and its pip "Scripts" dir on PATH. For a venv,
+rem python.exe already lives in Scripts (PYTHON_DIR) so pio.exe is covered; for
+rem the portable embed runtime python.exe is in the root and pip installs console
+rem scripts (pio.exe) into %PYTHON_DIR%Scripts, which build.py would otherwise
+rem never find ("Could not find or install PlatformIO").
+set "PATH=%PYTHON_DIR%;%PYTHON_DIR%Scripts;%PATH%"
 set "PYTHONPATH=%SCRIPT_DIR%;%PYTHONPATH%"
 
 call :ensure_pip
@@ -55,19 +60,23 @@ call :use_python_if_valid "%BUILD_VENV_PY%"
 exit /b 0
 
 :find_python
-py -3 -c "import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+rem Only a 3.10-3.13 interpreter is acceptable as the venv base (see
+rem :use_python_if_valid). If the host only has e.g. 3.14, this returns 1 so the
+rem caller falls through to the portable-3.12 bootstrap instead of building a
+rem .build-venv on an interpreter the espressif32 platform will later reject.
+py -3 -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
 if not errorlevel 1 (
     set "BASE_PYTHON=py -3"
     exit /b 0
 )
 
-python -c "import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+python -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
 if not errorlevel 1 (
     set "BASE_PYTHON=python"
     exit /b 0
 )
 
-python3 -c "import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+python3 -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
 if not errorlevel 1 (
     set "BASE_PYTHON=python3"
     exit /b 0
@@ -76,8 +85,12 @@ if not errorlevel 1 (
 exit /b 1
 
 :use_python_if_valid
+rem Accept ONLY Python 3.10-3.13: the espressif32 platform (pioarduino) refuses
+rem anything outside that range ("Python version must be between 3.10 and 3.13"),
+rem so a bare version_info[0]==3 check would happily pick the host 3.14 and the
+rem pio run would fail late. Rejecting here forces the portable-3.12 bootstrap.
 if not exist "%~1" exit /b 1
-"%~1" -c "import sys; raise SystemExit(0 if sys.version_info[0] == 3 else 1)" >nul 2>nul
+"%~1" -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
 if errorlevel 1 exit /b 1
 set "PYTHON_EXE=%~1"
 set "PYTHON_DIR=%~dp1"
