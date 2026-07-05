@@ -1,3 +1,47 @@
+# Daily Issue Report — 2026-07-05
+
+**Generated:** 2026-07-05 07:10 UTC
+**Window:** Last 24 hours (since 2026-07-04 07:10 UTC)
+
+## GitHub Issues
+
+**Repository:** rvdbreemen/OTGW-firmware
+
+No open issues were updated in the last 24 hours.
+
+Two issues were **closed** within the last 24 hours (notable for completeness):
+
+### [#666] winget failed to install EclipseMosquitto.Mosquitto
+- **Reporter:** Pistoletjes
+- **Closed:** 2026-07-05 (today)
+- **Classification:** Bug report (tooling/script)
+- **Summary:** The `winget` package ID for Mosquitto in `scripts/capture-mqtt-debug.bat` was incorrect. The old ID `EclipseMosquitto.Mosquitto` failed; the correct ID is `EclipseFoundation.Mosquitto`. Reported 2026-06-27, fixed and closed today.
+- **URL:** https://github.com/rvdbreemen/OTGW-firmware/issues/666
+
+### [#665] Switching heating and cooling with Honeywell Round Modulation Heat/Cool
+- **Reporter:** jelvank
+- **Closed:** 2026-07-04 (yesterday)
+- **Classification:** Bug report (firmware / HA MQTT auto-discovery)
+- **Summary:** With a TripleSolar heat pump in Auto mode (heating + cooling via OpenTherm), the HA climate entity showed the wrong mode and wrong setpoint. After providing capture-script logs, a fix was released in firmware v1.7.1-beta. Issue closed as completed and assigned to milestone 1.7.1.
+- **URL:** https://github.com/rvdbreemen/OTGW-firmware/issues/665
+
+## Tweakers Forum (GoT thread #1653967)
+
+**Feed fetched:** 2026-07-05 07:10 UTC
+**Exclusions:** Posts by `number3` (maintainer alias) and `rvdbreemen` are excluded.
+
+**Result:** No new user posts in the last 24 hours.
+
+Most recent non-excluded activity: **tjanssen** on 2026-06-29 reported another disconnect and requested an HA auto-discovery uptime sensor. `number3` acknowledged on 2026-07-01 — uptime is already published on MQTT, HA auto-discovery sensor planned for next beta.
+
+## Summary
+
+No new open issues in the last 24 hours. Two issues closed today/yesterday:
+- Script bug #666 (wrong Mosquitto winget ID in capture-mqtt-debug.bat) — closed today.
+- Firmware bug #665 (heat/cool mode switching not represented correctly in HA) — closed yesterday, fix in 1.7.1 milestone.
+
+---
+
 # Daily Issue Report — 2026-07-04
 
 **Generated:** 2026-07-04 07:09 UTC
@@ -109,7 +153,7 @@ The most recent user activity (tjanssen, Jun 29) requesting an uptime HA auto-di
 ---
 
 # Daily Issue Report — 2026-07-01
-
+# Daily Issue Report — 2026-06-30
 ## GitHub Issues (updated in last 24h)
 
 No GitHub issues were updated in the last 24 hours.
