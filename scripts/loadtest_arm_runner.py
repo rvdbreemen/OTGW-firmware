@@ -71,15 +71,17 @@ def fetch_json(url, timeout=3.0):
         return None
 
 
-def fetch_telnet_banner_min_free(host, timeout=3.0):
-    """Fallback heap read via the telnet welcome banner's 'minFree <N>' field."""
+def fetch_telnet_banner_current_free(host, timeout=3.0):
+    """Fallback heap read via the telnet welcome banner's 'free <N>' field (CURRENT free
+    heap - not 'minFree', which is the same non-resettable all-time-low watermark as
+    hd_min_free_heap and is equally useless for an aliveness check)."""
     try:
         with socket.create_connection((host, 23), timeout=timeout) as s:
             s.settimeout(timeout)
             data = s.recv(4096).decode(errors="replace")
     except OSError:
         return None
-    m = re.search(r"minFree\s+(\d+)", data)
+    m = re.search(r"Heap\s*:\s*free\s+(\d+)", data)
     return int(m.group(1)) if m else None
 
 
@@ -106,15 +108,21 @@ class Watchdog:
             return
 
         # TASK-1017 landed its hwm/counter stats on the existing /api/v2/device/info
-        # payload (hd_* fields) - there is no dedicated /api/v2/device/info route.
+        # payload, nested under a top-level "device" object. NOTE: hd_min_free_heap is
+        # the native ESP32 allocator's all-time-low watermark and is NOT resettable (not
+        # even by telnet 'z') - once it dips once, it stays low for the rest of the
+        # device's uptime, so it is useless as a "is the device currently healthy" signal
+        # (a watchdog built on it false-positives on every arm after the first real dip).
+        # The watchdog needs the CURRENT free heap ("freeheap", top-level, refreshed live
+        # every call) to decide whether THIS arm is in trouble.
         info = fetch_json(f"http://{self.host}/api/v2/device/info")
-        min_free = None
+        current_free = None
         if info:
-            min_free = info.get("hd_min_free_heap")
-        if min_free is None:
-            min_free = fetch_telnet_banner_min_free(self.host)
-        if min_free is not None and min_free < self.heap_floor:
-            self._record("heap_below_floor", f"min_free={min_free} floor={self.heap_floor}")
+            current_free = info.get("device", {}).get("freeheap")
+        if current_free is None:
+            current_free = fetch_telnet_banner_current_free(self.host)
+        if current_free is not None and current_free < self.heap_floor:
+            self._record("heap_below_floor", f"current_free={current_free} floor={self.heap_floor}")
             return
 
         crashlog = fetch_json(f"http://{self.host}/api/v2/device/crashlog")
