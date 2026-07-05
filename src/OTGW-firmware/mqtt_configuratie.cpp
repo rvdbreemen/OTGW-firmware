@@ -647,7 +647,7 @@ const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storag
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
 const char ha_name_gateway_mode[] PROGMEM = "Gateway_Mode";
 const char ha_name_otgw_connected[] PROGMEM = "OTGW_Connected";
-// ========== Sensor array (289 entries, sorted by id) ==========
+// ========== Sensor array (335 entries) ==========
 const uint16_t MQTT_HA_SENSOR_COUNT = 335;  // +5 (uptime, unsupported_msgids, ws/mqtt/http_fragskips)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
@@ -1189,7 +1189,8 @@ const MqttHaBinSensorCfg PROGMEM mqttHaBinSensors[] = {
     {113, 0x00, ha_lbl_solar_storage_system_type, ha_name_solar_storage_system_type, HaIcon::checkbox_marked_circle, HaEntityCat::none, true},
     // --- Pseudo-ID 244: gateway/OTGW connection status ---
     // Both use IS_PIC (0x08) -> otgw-pic/{gateway_mode,otgw_connected}. Values
-    // publish "on"/"off" via CCONOFF (default on_off payload).
+    // publish "ON"/"OFF" via CCONOFF; the on_off payload writes no pl_on/pl_off,
+    // so HA's default ON/OFF payloads apply and match.
     {244, 0x08, ha_lbl_gateway_mode,   ha_name_gateway_mode,   HaIcon::lan_connect, HaEntityCat::diagnostic, true},
     {244, 0x08, ha_lbl_otgw_connected, ha_name_otgw_connected, HaIcon::lan_connect, HaEntityCat::diagnostic, true},
 };
