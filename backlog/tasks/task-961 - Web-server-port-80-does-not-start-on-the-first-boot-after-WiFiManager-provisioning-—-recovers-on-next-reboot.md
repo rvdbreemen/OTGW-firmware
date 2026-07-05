@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-30 22:07'
+updated_date: '2026-07-05 22:42'
 labels: []
 dependencies: []
 ordinal: 173000
@@ -23,3 +24,11 @@ Observed on bench OTGW32 .39 (alpha.298+02f6470) after the maintainer flashed + 
 - [ ] #2 Root cause identified: why server.begin()'s listener does not bind after the AP->STA provisioning transition (captive-portal teardown / netif-not-ready ordering)
 - [ ] #3 Fix: web server reliably listens on port 80 on the FIRST boot after provisioning (e.g. (re)begin the server after STA IP is up, or tear down the provisioning server cleanly); verified on-device through a real provisioning cycle
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Reproduced live 2026-07-05 on classic-S3 + PIC 6.6 (alpha.327+827abbc). After WiFiManager provisioning, first boot: device joined LAN (192.168.1.219), ping OK, telnet port 23 OPEN, but HTTP port 80 dead — curl / returned HTTP 000 on 5/5 tries over ~30s. Single hard-reset (esptool --after hard_reset) fixed it: port 80 came up HTTP 200 within 5s of reboot, /api/v2/device/info served normally. Confirms 'web server does not start on first boot after provisioning, recovers on next reboot'. Repro is deterministic here: happens every fresh provision, clears on any reboot.
+
+Independently reproduced 2026-07-06 on Classic-S3 COM8 (192.168.88.64) during TASK-1016 provisioning: first boot after SoftAP provisioning had telnet/OT/MQTT alive but HTTP port 80 actively refused (curl 000). A --update re-flash (forces reboot, preserves WiFi creds) fixed it immediately — HTTP 200 + WS 101 after. Confirms AC#1 repro on current HEAD (alpha.328+f32071c), not just the older 02f64705 build.
+<!-- SECTION:NOTES:END -->

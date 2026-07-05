@@ -2326,6 +2326,10 @@ finally {
                 '/api/v2/device/time',
                 '/api/v2/flash/status',
                 '/api/v2/sat/status'
+                # Note: TASK-1017's load-test hwm/counter stats (hd_rest_inflight_hwm,
+                # hd_webfile_inflight_hwm, hd_rest_503, hd_webfile_503, hd_tcp_active_pcbs,
+                # etc.) ride on the existing /api/v2/device/info payload above - there is
+                # no separate /api/v2/stats route, so no extra probe entry is needed here.
             )
             Write-Host "Running post-capture HTTP probes (curl) -> curl-probes.log"
             Invoke-HttpProbes -DeviceHost $DeviceHost -ProbeLog $httpProbeLog -TimeoutSeconds $HttpProbeTimeoutSeconds -Paths $httpProbePaths
