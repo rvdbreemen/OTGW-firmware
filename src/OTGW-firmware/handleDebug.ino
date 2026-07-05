@@ -196,6 +196,12 @@ static void dumpDebugInfo() {
       (unsigned long)state.heapdiag.aMaxBlockBucket[2],
       (unsigned long)state.heapdiag.aMaxBlockBucket[3],
       (unsigned long)state.heapdiag.aMaxBlockBucket[4]);
+    // TASK-1017 load-test instrumentation (resettable via telnet 'z'):
+    Debugf(PSTR("rest_inflight_hwm: %u\r\n"), (unsigned)state.heapdiag.iRestInflightHwm);
+    Debugf(PSTR("webfile_inflight_hwm: %u\r\n"), (unsigned)state.heapdiag.iWebfileInflightHwm);
+    Debugf(PSTR("tcp_active_pcbs: %u\r\n"), (unsigned)state.heapdiag.iTcpActivePcbs);
+    Debugf(PSTR("rest_503: %lu\r\n"), (unsigned long)state.heapdiag.iRest503Count);
+    Debugf(PSTR("webfile_503: %lu\r\n"), (unsigned long)state.heapdiag.iWebfile503Count);
 
     Debugln(F("[state.discovery]"));
     Debugf(PSTR("published_topics: %lu\r\n"), (unsigned long)state.discovery.iPublishedTopicCount);

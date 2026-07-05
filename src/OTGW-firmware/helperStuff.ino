@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.328
+**  Version  : v2.0.0-alpha.329
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -429,6 +429,8 @@ void sampleHeapWatermark() {
   else if (mb < 16384) b = 3;
   else                 b = 4;
   state.heapdiag.aMaxBlockBucket[b]++;
+  // TASK-1017: lwIP active TCP PCB count, loop-task-only (see platformTcpActivePcbCount).
+  state.heapdiag.iTcpActivePcbs = platformTcpActivePcbCount();
 }
 
 // Zero the soak window: watermark, histogram, and the cumulative pressure counters,
@@ -452,7 +454,13 @@ void resetHeapWatermark() {
   state.heapdiag.iDripCooldownSkipCount    = 0;
   state.heapdiag.iDripSlowModeCount        = 0;
   state.heapdiag.iMaxLoopGapMs             = 0;
-  sampleHeapWatermark();   // re-seed iMinMaxBlock + first histogram tick (no 0xFFFFFFFF window)
+  // TASK-1017 load-test instrumentation:
+  state.heapdiag.iRestInflightHwm          = 0;
+  state.heapdiag.iWebfileInflightHwm       = 0;
+  state.heapdiag.iRest503Count             = 0;
+  state.heapdiag.iWebfile503Count          = 0;
+  state.heapdiag.iTcpActivePcbs            = 0;
+  sampleHeapWatermark();   // re-seed iMinMaxBlock + first histogram tick (no 0xFFFFFFFF window) + tcp pcb count
 }
 
 bool isRebootPending() {

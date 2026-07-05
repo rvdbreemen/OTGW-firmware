@@ -27,6 +27,8 @@
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_flash.h>
+#include <lwip/priv/tcp_priv.h>  // tcp_active_pcbs (platformTcpActivePcbCount)
+#include <lwip/tcpip.h>          // LOCK_TCPIP_CORE/UNLOCK_TCPIP_CORE (platformTcpActivePcbCount)
 
 // ---- ADR-123 async/FreeRTOS stack (TASK-865.4) ---------------------------
 // Foundation headers for the 2.0.0 ESP32-S3 event-driven migration. Included
@@ -235,6 +237,28 @@ inline uint32_t platformMinFreeHeap() {
 // No-op on ESP32: the heap allocator tracks min-free internally.
 inline void platformUpdateMinFreeHeap() {
   // intentionally empty
+}
+
+// TASK-1017: count of active lwIP TCP PCBs (established/handshaking TCP
+// connections), for load-test observability of connection-level pressure
+// (TASK-879 class: PCB pool exhaustion under flood). tcp_active_pcbs is an
+// internal lwIP linked list (lwip/priv/tcp_priv.h) normally only walked from
+// the tcpip thread; this build has CONFIG_LWIP_TCPIP_CORE_LOCKING=y (verified
+// in the arduino-esp32 sdkconfig), so LOCK_TCPIP_CORE()/UNLOCK_TCPIP_CORE()
+// is a real mutex safe to take from any task (the documented pattern for
+// touching lwIP internals from application code). Sample from the 1 Hz loop
+// task only (helperStuff.ino sampleHeapWatermark) — never from a per-request
+// hot path, since a live per-response walk would (a) break the REST chunked
+// emit's determinism contract (byte-identical JSON across re-run windows,
+// see DeviceInfoSnap) and (b) add lock contention to the async_tcp task.
+inline uint16_t platformTcpActivePcbCount() {
+  uint16_t count = 0;
+  LOCK_TCPIP_CORE();
+  for (struct tcp_pcb *pcb = tcp_active_pcbs; pcb != nullptr; pcb = pcb->next) {
+    count++;
+  }
+  UNLOCK_TCPIP_CORE();
+  return count;
 }
 
 // Exception cause from the last reset. ESP32 does not expose a direct

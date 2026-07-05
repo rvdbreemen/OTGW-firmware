@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.328
+**  Version  : v2.0.0-alpha.329
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -459,6 +459,12 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   // TASK-934 soak instrumentation (pure observation; reset by telnet 'z'):
   uint32_t iMinMaxBlock            = 0xFFFFFFFF; // smallest contiguous free block (maxBlock) seen since boot/reset
   uint32_t aMaxBlockBucket[5]      = {0, 0, 0, 0, 0}; // 1 Hz maxBlock histogram, mutually-exclusive ranges: [0]<2k [1]2k-4k [2]4k-8k [3]8k-16k [4]>=16k
+  // TASK-1017 load-test instrumentation (ADR-147 gate observability; reset by telnet 'z'):
+  uint8_t  iRestInflightHwm        = 0; // high-watermark of concurrent REST in-flight requests (restAPI.ino restInFlight) since boot/reset
+  uint8_t  iWebfileInflightHwm     = 0; // high-watermark of concurrent web-file-serve in-flight requests (restAPI.ino webFileInFlight) since boot/reset
+  uint32_t iRest503Count           = 0; // lifetime REST 503s from the concurrency gate (processAPI)
+  uint32_t iWebfile503Count        = 0; // lifetime web-file-serve 503s from the concurrency gate (webFileGateTryAdmit)
+  uint16_t iTcpActivePcbs          = 0; // lwIP active TCP PCB count, sampled 1 Hz from the loop task (platformTcpActivePcbCount)
 };
 
 enum RestPerfTarget : uint8_t {

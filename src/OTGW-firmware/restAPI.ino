@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.328
+**  Version  : v2.0.0-alpha.329
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -88,9 +88,11 @@ bool webFileGateTryAdmit() {
   if (webFileInFlight >= cap) {
     RESTDebugTf(PSTR("WEBFILE BUSY: %u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
                 webFileInFlight, cap, platformFreeHeap(), mb);
+    state.heapdiag.iWebfile503Count++;  // TASK-1017: load-test instrumentation
     return false;
   }
   webFileInFlight++;
+  if (webFileInFlight > state.heapdiag.iWebfileInflightHwm) state.heapdiag.iWebfileInflightHwm = webFileInFlight;  // TASK-1017
   return true;
 }
 void webFileGateRelease() { if (webFileInFlight) webFileInFlight--; }
@@ -2463,10 +2465,12 @@ void processAPI(AsyncWebServerRequest *request)
   if (restInFlight >= effectiveCap) {
     RESTDebugTf(PSTR("REST BUSY: %u/%u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
                 restInFlight, REST_MAX_INFLIGHT, effectiveCap, platformFreeHeap(), platformMaxFreeBlock());
+    state.heapdiag.iRest503Count++;  // TASK-1017: load-test instrumentation
     sendApiError(503, F("Server busy: too many concurrent requests, please retry"));
     return;
   }
   restInFlight++;
+  if (restInFlight > state.heapdiag.iRestInflightHwm) state.heapdiag.iRestInflightHwm = restInFlight;  // TASK-1017
   request->onDisconnect([]() { if (restInFlight) restInFlight--; });
 
   // Static buffers save ~356 bytes of stack. Safe under ESPAsyncWebServer's
@@ -2770,6 +2774,7 @@ struct DeviceInfoSnap {
   bool      gatewayFirmware;
   uint32_t  freeHeap;
   uint32_t  maxFreeBlock;
+  uint32_t  heapMinFree;         // TASK-1017: platformMinFreeHeap(), frozen (was a live read the closure would need)
   uint8_t   fragPct;
   uint16_t  pendingDiscoveryIds;
   int32_t   rssi;
@@ -2815,6 +2820,7 @@ void sendDeviceInfoV2()
   snap->gatewayFirmware = isGatewayFirmware();
   snap->freeHeap        = platformFreeHeap();
   snap->maxFreeBlock    = platformMaxFreeBlock();
+  snap->heapMinFree     = platformMinFreeHeap();  // TASK-1017
   snap->fragPct         = getHeapFragmentation();
   snap->pendingDiscoveryIds = countPendingDiscoveryIds();
   snap->rssi            = WiFi.RSSI();
@@ -2991,6 +2997,18 @@ void sendDeviceInfoV2()
     je.field(F("hd_enter_low"),        snap->st.heapdiag.iEnteredLowCount);
     je.field(F("hd_enter_warning"),    snap->st.heapdiag.iEnteredWarningCount);
     je.field(F("hd_enter_critical"),   snap->st.heapdiag.iEnteredCriticalCount);
+    // TASK-1017: load-test instrumentation. min_max_block/min_free_heap/max_loop_gap_ms
+    // already existed (telnet banner + dumpDebugInfo); mirrored here for the REST harness.
+    // rest/webfile_inflight_hwm, tcp_active_pcbs, rest/webfile_503 are new counters,
+    // reset alongside the other heapdiag fields by telnet 'z' (resetHeapWatermark).
+    je.field(F("hd_min_max_block"),        snap->st.heapdiag.iMinMaxBlock);
+    je.field(F("hd_min_free_heap"),        snap->heapMinFree);
+    je.field(F("hd_max_loop_gap_ms"),      snap->st.heapdiag.iMaxLoopGapMs);
+    je.field(F("hd_rest_inflight_hwm"),    (uint32_t)snap->st.heapdiag.iRestInflightHwm);
+    je.field(F("hd_webfile_inflight_hwm"), (uint32_t)snap->st.heapdiag.iWebfileInflightHwm);
+    je.field(F("hd_tcp_active_pcbs"),      (uint32_t)snap->st.heapdiag.iTcpActivePcbs);
+    je.field(F("hd_rest_503"),             snap->st.heapdiag.iRest503Count);
+    je.field(F("hd_webfile_503"),          snap->st.heapdiag.iWebfile503Count);
 
     // --- Flash, sketch & filesystem storage (values cached at boot by cacheBootFlashInfo) ---
     je.field(F("sketchsize"),       sBootFlash.sketchSize);
