@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.329
+**  Version  : v2.0.0-alpha.330
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -41,7 +41,7 @@ static int16_t restResponseStatus = 0;
 // chunked/pull-based streaming, scoped to TASK-883. restInFlight is async_tcp-task-local
 // (all handlers serialize on the one async_tcp task; no atomic needed).
 #ifndef REST_MAX_INFLIGHT
-#define REST_MAX_INFLIGHT 4   // override with -DREST_MAX_INFLIGHT=255 to disable the gate (A/B "raw" arm)
+#define REST_MAX_INFLIGHT 2   // ADR-165: empirically confirmed hard ceiling (was 4); override with -DREST_MAX_INFLIGHT=255 to disable the gate (A/B "raw" arm)
 #endif
 static uint8_t restInFlight = 0;
 
@@ -55,7 +55,7 @@ static uint8_t restInFlight = 0;
 static inline uint8_t restEffectiveInflightCap() {
   // <=1 = minimal cap; ==255 = the "disable the gate" A/B raw-arm sentinel
   // (line 35). Both bypass the heap-tier clamp so 255 measures truly unmitigated
-  // behaviour under load, not gated-vs-gated. Shipped default is 4 -> falls through.
+  // behaviour under load, not gated-vs-gated. Shipped default is 2 (ADR-165) -> falls through.
   if (REST_MAX_INFLIGHT <= 1 || REST_MAX_INFLIGHT >= 255) return REST_MAX_INFLIGHT;
   const uint32_t mb = platformMaxFreeBlock();
   if (mb < 16000) return 1;
@@ -72,12 +72,14 @@ static inline uint8_t restEffectiveInflightCap() {
 // when too many are already building OR the largest free block is too low, returning a
 // cheap 503 instead of pushing another FD alloc into the fragmentation wall. SEPARATE
 // counter from the REST gate (restInFlight) keeps the proven REST path untouched; same
-// heap-tier clamp. Base cap 6 = one browser's HTTP/1.1 per-origin parallel-connection
-// limit, so a normal single-browser asset burst is never throttled while the heap is
-// healthy. async_tcp-task-local (handlers serialize on the one task) -> no atomic. Defined
-// here, not in the header, because platformMaxFreeBlock() is in scope at this point.
+// heap-tier clamp. Base cap 2 (was 6) per ADR-165's empirical parallelism study: nominal
+// (non-overload) load already produced visible 503s above N=2 on esp32-classic, so a
+// normal single-browser asset burst is deliberately gated below the browser's own
+// HTTP/1.1 per-origin parallel-connection ceiling. async_tcp-task-local (handlers
+// serialize on the one task) -> no atomic. Defined here, not in the header, because
+// platformMaxFreeBlock() is in scope at this point.
 #ifndef WEB_FILE_MAX_INFLIGHT
-#define WEB_FILE_MAX_INFLIGHT 6
+#define WEB_FILE_MAX_INFLIGHT 2
 #endif
 static uint8_t webFileInFlight = 0;
 bool webFileGateTryAdmit() {

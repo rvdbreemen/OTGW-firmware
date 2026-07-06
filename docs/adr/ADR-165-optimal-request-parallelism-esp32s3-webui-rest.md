@@ -1,7 +1,7 @@
 ---
 id: ADR-165
 title: "Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)"
-status: Proposed
+status: Accepted
 date: 2026-07-06
 tags: [esp32s3, rest-api, webui, concurrency, backpressure, load-test, task1015, task1014, task884, task1017]
 supersedes: []
@@ -14,21 +14,23 @@ deciders: [Robert van den Breemen]
 
 ## Status
 
-Proposed. Date: 2026-07-06.
+Accepted. Date: 2026-07-06.
 
-**Not yet Accepted, by design.** This ADR documents the outcome of an empirical
-load-test study whose own design spec
-(`docs/superpowers/specs/2026-07-06-parallelism-loadtest-design.md`, section
-"Non-goals") states: "No production push until Phase 2 confirms N* and the
-maintainer signs off." Phase 2 has confirmed N*=2 (TASK-1024), but the
-maintainer (Robert van den Breemen) has not yet reviewed this record or
-authorized baking N=2 into production defaults. This ADR must stay `Proposed`
-until that review happens. Do not flip it to `Accepted` as part of drafting it.
+**Accepted by explicit maintainer review** (Robert van den Breemen, 2026-07-06,
+in-session sign-off after reading this ADR). N*=2 is now the confirmed
+production ceiling for `REST_MAX_INFLIGHT` and `WEB_FILE_MAX_INFLIGHT` on the
+`esp32-classic` target. The three bake-in actions previously deferred (see
+Decision) are executed as part of accepting this ADR: the production
+`build_flags` defaults are lowered to 2, and `CLAUDE.md`'s single-flight rule
+is updated to reference this hard cap. A client-side `MAX_INFLIGHT` JS knob is
+NOT implemented — the current frontend's single-flight discipline (N=1) is
+already within the new N=2 ceiling, so no client change is required to honor
+this cap; that knob remains unbuilt future work if throughput ever motivates
+raising client concurrency above 1 (bounded at 2 by this ADR either way).
 
-**Guideline-level, no code shipped with this ADR** (per ADR-080 framing): this
-ADR is a record of a measurement, not a code change. The three bake-in actions
-it recommends (see Decision, "What this ADR does NOT yet authorize") are
-separate follow-up work gated behind maintainer sign-off on this record.
+**Cross-target scope note (unchanged by acceptance):** this ADR's data covers
+only `esp32-classic`. Generalizing N*=2 to `esp32-otgw32` (OTDirect, different
+heap headroom profile) remains unverified, per the Risks section below.
 
 ## Status History
 
@@ -37,6 +39,11 @@ status_history:
     status: Proposed
     changed_by: Agent (TASK-1026)
     reason: Initial decision record documenting the TASK-1015 two-phase parallelism load-test study (method, data, chosen N*=2). Left Proposed per the study's own non-goal ("no production push until the maintainer signs off").
+    changed_via: adr-kit
+  - date: 2026-07-06
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "Read the ADR, approved N*=2 as the new hard limit. Directed the bake-in: lower REST_MAX_INFLIGHT/WEB_FILE_MAX_INFLIGHT production defaults to 2 and update CLAUDE.md's single-flight rule to document the cap. No client-side MAX_INFLIGHT knob requested (current N=1 client discipline is already within the new N=2 ceiling)."
     changed_via: adr-kit
 
 ## Context
@@ -170,32 +177,26 @@ at offered=4=2xN):
   `MAX_INFLIGHT` knob would need, if and when such a knob is implemented (see
   below — it does not exist yet).
 
-### What this ADR does NOT yet authorize
+### Bake-in status (post-acceptance)
 
-This ADR is a measurement record. It explicitly does **not** authorize any of
-the following, all of which remain gated behind maintainer review of this
-record:
+At Proposed status, this ADR explicitly withheld authorization for three
+follow-up actions pending maintainer review. Following acceptance
+(2026-07-06), the maintainer authorized two of the three; the third remains
+deliberately unbuilt:
 
-1. **Changing the production `build_flags` defaults.** The shipped defaults in
-   `src/OTGW-firmware/restAPI.ino` remain `REST_MAX_INFLIGHT=4` (line 44) and
-   `WEB_FILE_MAX_INFLIGHT=6` (line 80), UNCHANGED. The study built and flashed
-   `esp32-classic` with `PLATFORMIO_BUILD_FLAGS=-DREST_MAX_INFLIGHT=2
-   -DWEB_FILE_MAX_INFLIGHT=2` overrides for test purposes only; those
-   overrides were never merged into `platformio.ini` or the `#ifndef` defaults.
-2. **Implementing a client-side `MAX_INFLIGHT` concurrency knob in the
-   frontend.** No such JS constant exists in `v2.js` (or elsewhere in
-   `src/OTGW-firmware/data/`) today. The current frontend remains fully
-   single-flight (N=1 offered concurrency for real browser traffic), per the
-   TASK-1014 fix and the binding project rule in `CLAUDE.md`
-   ("Single-flight API calls (NEVER burst)"). That rule is documented in
-   `CLAUDE.md` directly and is not itself the subject of a standalone prior
-   ADR; this ADR is the first to record a measured alternative to it.
-3. **Updating `CLAUDE.md`'s single-flight rule** (e.g. to "at most N=2 in
-   flight") to reflect the confirmed N*.
-
-Each of these three is a discrete follow-up action to be taken only after the
-maintainer reviews this ADR and either accepts it as-is or requests changes.
-Bundling them into this ADR's authorship would pre-empt that review.
+1. **Production `build_flags` defaults — DONE.** `src/OTGW-firmware/restAPI.ino`'s
+   `REST_MAX_INFLIGHT` (was 4, line 44) and `WEB_FILE_MAX_INFLIGHT` (was 6,
+   line 80) are lowered to `2`, matching the Phase 2-confirmed N*. This is now
+   the hard production ceiling for both gates on `esp32-classic`.
+2. **Client-side `MAX_INFLIGHT` concurrency knob — NOT built, by choice.** No
+   such JS constant was added to `v2.js`. The current frontend's single-flight
+   discipline (N=1, from TASK-1014) is already within the new N=2 ceiling, so
+   no client change was needed to honor this ADR's cap. This remains available
+   future work if throughput ever motivates raising client-offered
+   concurrency (bounded at 2 by this ADR regardless).
+3. **`CLAUDE.md`'s single-flight rule — DONE.** Updated from a flat
+   "single-flight (NEVER burst)" statement to document the confirmed N<=2 hard
+   cap, citing this ADR.
 
 ### Tooling bugs found and fixed during the study (not firmware defects)
 
@@ -302,11 +303,13 @@ N=4 already run 31 in 8 seconds, well above the N=2 baseline of 0).
 
 **Trade-offs**
 
-- This ADR alone changes no running behavior: the shipped `REST_MAX_INFLIGHT`
-  (4), `WEB_FILE_MAX_INFLIGHT` (6), and the client's forced single-flight
-  (N=1) remain in production until the three bake-in actions are separately
-  authorized and executed. Readers must not assume N=2 is live in the field
-  from this ADR's existence alone.
+- Post-acceptance, the shipped `REST_MAX_INFLIGHT` and `WEB_FILE_MAX_INFLIGHT`
+  are both lowered from their prior values (4 and 6 respectively) to 2. This
+  is a stricter gate than before for any workload that was relying on
+  offered concurrency above 2 slipping through without a 503 (there was no
+  such supported workload — the client was already single-flight — but any
+  future feature that fires more than 2 concurrent `/api` or file requests
+  will now shed sooner than it would have under the old 4/6 caps).
 - The study measured only the `esp32-classic` target. Generalizing N*=2 to
   `esp32-otgw32` (different heap headroom profile, OTDirect instead of PIC) is
   explicitly unverified; the design spec calls this out as a risk requiring a
@@ -318,14 +321,8 @@ N=4 already run 31 in 8 seconds, well above the N=2 baseline of 0).
 
 **Risks and mitigations**
 
-- *Risk*: someone reads this ADR's Decision section and bakes N=2 into
-  `platformio.ini` build flags, `v2.js`, or `CLAUDE.md` without the maintainer
-  review this ADR is explicitly waiting on.
-  *Mitigation*: the Status section states in the first paragraph that this ADR
-  is deliberately `Proposed`, not `Accepted`, and the Decision section lists
-  the three bake-in actions it does NOT authorize, by name and file.
 - *Risk*: N*=2, measured only on `esp32-classic`, gets silently assumed to
-  also hold on `esp32-otgw32` once this ADR is eventually accepted.
+  also hold on `esp32-otgw32`.
   *Mitigation*: the design spec's own Risks section already flags this
   cross-check as outstanding; a follow-up task should confirm or re-derive N*
   on `esp32-otgw32` before that target's build flags are changed to match.
@@ -358,13 +355,11 @@ N=4 already run 31 in 8 seconds, well above the N=2 baseline of 0).
   `webFileGateTryAdmit()` both consult the heap-tier machine
   (`platformMaxFreeBlock()`) to tighten their caps under pressure; this
   study's confirmed N*=2 sits inside, and does not change, that tier contract.
-- **Supersedes (once Accepted) the pure single-flight rule established by
-  TASK-1014** (`CLAUDE.md`, "Single-flight API calls (NEVER burst)"). That
-  rule was never itself the subject of a standalone ADR; this ADR is the
-  first record proposing a measured, less-conservative alternative (N=2) to
-  it. Per the Decision section above, `CLAUDE.md` is not updated by this ADR
-  and stays governed by the TASK-1014 rule until this ADR is Accepted and the
-  bake-in follow-up lands.
+- **Supersedes the pure single-flight rule established by TASK-1014**
+  (`CLAUDE.md`, "Single-flight API calls (NEVER burst)"). That rule was never
+  itself the subject of a standalone ADR; this ADR is the first record of a
+  measured alternative to it. `CLAUDE.md` is updated per the Bake-in status
+  section above to document the confirmed N<=2 hard cap.
 
 ## References
 
