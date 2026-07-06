@@ -354,6 +354,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-159: Symmetric Presence-Gating of the External 0x26 Watchdog (Amends ADR-135)](ADR-159-symmetric-0x26-watchdog-presence-gating.md)** 🆕 *(Accepted)*  
   Proposed, guideline-level (ADR-080). Presence-gates the external 0x26 watchdog symmetrically (feed/arm only when present) instead of the unconditional feed. Amends ADR-135.
 
+- **[ADR-165: Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)](ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md)** 🆕 *(Proposed)*  
+  Proposed, not yet Accepted (maintainer sign-off pending). Documents the TASK-1015 two-phase load-test study (capacity curve + policy confirmation) on `esp32-classic`: N*=2 is the highest offered concurrency with zero incidents AND zero nominal-load 503s. Does NOT yet authorize changing the shipped `REST_MAX_INFLIGHT`/`WEB_FILE_MAX_INFLIGHT` defaults, adding a client `MAX_INFLIGHT` knob, or updating the CLAUDE.md single-flight rule. Complements ADR-149, ADR-147.
+
 ### Development and Build
 
 - **[ADR-013: Arduino Framework Over ESP-IDF](ADR-013-arduino-framework-over-esp-idf.md)**  
