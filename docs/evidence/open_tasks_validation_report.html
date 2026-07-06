@@ -1,0 +1,537 @@
+<title>Closing the Loop — 6 Open Tasks</title>
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --panel: #ffffff;
+    --panel-2: #efece4;
+    --ink: #1c1f1a;
+    --muted: #63665f;
+    --border: #ded9cb;
+    --accent: #c1571f;
+    --accent-ink: #ffffff;
+    --ok: #3f7d4f;
+    --ok-bg: #e7f0e5;
+    --warn: #a3761d;
+    --warn-bg: #f5ecd8;
+    --block: #b0432f;
+    --block-bg: #f6e6e0;
+    --mono-tint: #efece2;
+    --shadow: 0 1px 2px rgba(30,25,15,0.06), 0 8px 24px -12px rgba(30,25,15,0.18);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15161a;
+      --panel: #1c1e23;
+      --panel-2: #22242a;
+      --ink: #e9e7df;
+      --muted: #9a9d9a;
+      --border: #34363d;
+      --accent: #e07a3f;
+      --accent-ink: #1a1200;
+      --ok: #7cbf8e;
+      --ok-bg: #1c2a20;
+      --warn: #d8ac54;
+      --warn-bg: #2c260f;
+      --block: #e08272;
+      --block-bg: #2e1b17;
+      --mono-tint: #202227;
+      --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 28px -12px rgba(0,0,0,0.6);
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #15161a; --panel: #1c1e23; --panel-2: #22242a; --ink: #e9e7df; --muted: #9a9d9a;
+    --border: #34363d; --accent: #e07a3f; --accent-ink: #1a1200;
+    --ok: #7cbf8e; --ok-bg: #1c2a20; --warn: #d8ac54; --warn-bg: #2c260f;
+    --block: #e08272; --block-bg: #2e1b17; --mono-tint: #202227;
+    --shadow: 0 1px 2px rgba(0,0,0,0.4), 0 8px 28px -12px rgba(0,0,0,0.6);
+  }
+  :root[data-theme="light"] {
+    --bg: #f6f4ef; --panel: #ffffff; --panel-2: #efece4; --ink: #1c1f1a; --muted: #63665f;
+    --border: #ded9cb; --accent: #c1571f; --accent-ink: #ffffff;
+    --ok: #3f7d4f; --ok-bg: #e7f0e5; --warn: #a3761d; --warn-bg: #f5ecd8;
+    --block: #b0432f; --block-bg: #f6e6e0; --mono-tint: #efece2;
+    --shadow: 0 1px 2px rgba(30,25,15,0.06), 0 8px 24px -12px rgba(30,25,15,0.18);
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: -apple-system, "Segoe UI", "Inter", system-ui, sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  code, .mono, .ac-id, .cmd, .field {
+    font-family: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  }
+
+  .wrap { max-width: 860px; margin: 0 auto; padding: 56px 24px 96px; }
+
+  header.masthead {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 28px;
+    margin-bottom: 40px;
+  }
+  .eyebrow {
+    font-family: ui-monospace, "SF Mono", Consolas, monospace;
+    font-size: 12px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 10px;
+  }
+  h1 {
+    font-size: clamp(28px, 4vw, 38px);
+    line-height: 1.15;
+    margin: 0 0 12px;
+    text-wrap: balance;
+    letter-spacing: -0.01em;
+  }
+  .lede {
+    color: var(--muted);
+    font-size: 16px;
+    max-width: 62ch;
+    margin: 0 0 22px;
+  }
+
+  .stat-row {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    box-shadow: var(--shadow);
+  }
+  .stat b { font-size: 20px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 12.5px; }
+
+  nav.toc {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 48px;
+  }
+  nav.toc .toc-title {
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 10px;
+  }
+  nav.toc ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 20px;
+  }
+  nav.toc li a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--ink);
+    text-decoration: none;
+    font-size: 14px;
+    padding: 3px 0;
+  }
+  nav.toc li a:hover { color: var(--accent); }
+  nav.toc .tid {
+    font-family: ui-monospace, monospace;
+    font-size: 12.5px;
+    color: var(--muted);
+    flex: 0 0 auto;
+  }
+  nav.toc li a span.tname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  section.task {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    margin-bottom: 28px;
+    overflow: hidden;
+    scroll-margin-top: 20px;
+  }
+  .task-head {
+    padding: 22px 26px 18px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .task-head h2 {
+    font-size: 19px;
+    margin: 0 0 4px;
+    text-wrap: balance;
+  }
+  .task-head .tid {
+    font-family: ui-monospace, monospace;
+    font-size: 13px;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  .chip {
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+    flex: 0 0 auto;
+  }
+  .chip.block { background: var(--block-bg); color: var(--block); }
+  .chip.warn { background: var(--warn-bg); color: var(--warn); }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); }
+
+  .task-body { padding: 20px 26px 26px; }
+
+  .ac-list { margin: 0 0 22px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+  .ac-list li { display: flex; align-items: flex-start; gap: 10px; font-size: 14.5px; }
+  .ac-mark {
+    flex: 0 0 auto;
+    width: 18px; height: 18px;
+    border-radius: 5px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
+    margin-top: 1px;
+  }
+  .ac-mark.done { background: var(--ok-bg); color: var(--ok); }
+  .ac-mark.open { background: var(--panel-2); color: var(--muted); border: 1px solid var(--border); }
+  .ac-list .ac-id { color: var(--muted); font-size: 12.5px; margin-right: 2px; }
+  .ac-list li.is-done { color: var(--muted); text-decoration: line-through; text-decoration-color: var(--border); }
+
+  h3.section-label {
+    font-size: 11.5px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 22px 0 10px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  h3.section-label::after {
+    content: "";
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .blocker {
+    background: var(--warn-bg);
+    border: 1px solid color-mix(in srgb, var(--warn) 35%, var(--border));
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 14px;
+    margin-bottom: 4px;
+  }
+  .blocker b { color: var(--warn); }
+  .blocker.hard { background: var(--block-bg); border-color: color-mix(in srgb, var(--block) 35%, var(--border)); }
+  .blocker.hard b { color: var(--block); }
+
+  ol.steps, ul.steps {
+    margin: 0;
+    padding-left: 22px;
+    font-size: 14.5px;
+  }
+  ol.steps li, ul.steps li { margin-bottom: 9px; }
+  ol.steps li:last-child, ul.steps li:last-child { margin-bottom: 0; }
+
+  code.field, span.cmd {
+    background: var(--mono-tint);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 13px;
+  }
+  pre {
+    background: var(--mono-tint);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 13px;
+    overflow-x: auto;
+    margin: 8px 0 0;
+  }
+  pre code { background: none; border: none; padding: 0; }
+
+  .close-box {
+    background: var(--ok-bg);
+    border: 1px solid color-mix(in srgb, var(--ok) 35%, var(--border));
+    border-radius: 8px;
+    padding: 14px 16px;
+    font-size: 14px;
+  }
+  .close-box b { color: var(--ok); }
+
+  .evidence-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--muted);
+    margin-top: 10px;
+  }
+  .evidence-link code { margin: 0; }
+
+  footer {
+    margin-top: 50px;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 13px;
+  }
+
+  @media (max-width: 560px) {
+    nav.toc ol { grid-template-columns: 1fr; }
+    .task-head { flex-direction: column; }
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">OTGW-firmware &middot; dev branch &middot; 2026-07-06</p>
+    <h1>Closing the loop on 6 open tasks</h1>
+    <p class="lede">Everything reachable without you has been verified on-device with evidence in <code class="field">docs/evidence/</code>. What's left needs either a decision only you can make, or access to hardware this bench doesn't have. Below: exactly what's blocking each one, how to check it yourself, and the shortest path to <code class="field">Done</code>.</p>
+    <div class="stat-row">
+      <div class="stat"><b>6</b><span>open tasks</span></div>
+      <div class="stat"><b>3</b><span>need your decision</span></div>
+      <div class="stat"><b>2</b><span>need hardware I don't have</span></div>
+      <div class="stat"><b>1</b><span>needs a longer soak</span></div>
+    </div>
+  </header>
+
+  <nav class="toc">
+    <p class="toc-title">Jump to a task</p>
+    <ol>
+      <li><a href="#task-956"><span class="tid">956</span><span class="tname">Heap-frag soak</span></a></li>
+      <li><a href="#task-964"><span class="tid">964</span><span class="tname">OT-Direct override</span></a></li>
+      <li><a href="#task-972"><span class="tid">972</span><span class="tname">PIC flash UI</span></a></li>
+      <li><a href="#task-989"><span class="tid">989</span><span class="tname">HTTP-000 wedge</span></a></li>
+      <li><a href="#task-994"><span class="tid">994</span><span class="tname">BLE DRAM research</span></a></li>
+      <li><a href="#task-995"><span class="tid">995</span><span class="tname">PSRAM-aware BLE</span></a></li>
+    </ol>
+  </nav>
+
+  <!-- 956 -->
+  <section class="task" id="task-956">
+    <div class="task-head">
+      <div>
+        <div class="tid">TASK-956</div>
+        <h2>Heap-frag soak &mdash; prove or disprove ESP32-S3 gating</h2>
+      </div>
+      <span class="chip warn">Needs a longer run</span>
+    </div>
+    <div class="task-body">
+      <ul class="ac-list">
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#1</span> Instrumented firmware flashed, healthy-heap reset at soak start</span></li>
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#2</span> Fragmenting load driven, capture collected</span></li>
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#3</span> Verdict recorded against the proof criterion</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#4</span> Phase-3 gating removal (if proven) &mdash; or evidence documented on the ADRs (if not)</span></li>
+      </ul>
+
+      <h3 class="section-label">Where it stands</h3>
+      <p>A 2-hour representative-load soak ran clean: zero tier-machine engagements, zero drops, zero 503s the entire window. That's a genuinely good sign &mdash; but it's 2 hours against a spec written for 24&ndash;72 hours, with two substitutions (onboard OT simulation instead of the real emulator, no MQTT broker reachable from this environment). Per house rule, a partial bench run doesn't get to call itself the formal proof.</p>
+
+      <div class="blocker">
+        <b>Blocking:</b> a soak long enough, and complete enough (MQTT included), to trust the "gating is dead weight" conclusion enough to delete code over it.
+      </div>
+
+      <h3 class="section-label">How to validate it yourself</h3>
+      <ol class="steps">
+        <li>Read <code class="field">docs/evidence/task956_heap_soak_2h_verdict.md</code> &mdash; the full 2-hour dataset and its honest limits.</li>
+        <li>If you want to extend it: <span class="cmd">python scripts/heap_soak_driver.py --host &lt;device-ip&gt; --duration-hours 24</span> on a device that isn't doing anything else, ideally one that can reach your MQTT broker.</li>
+        <li>Watch for any of <code class="field">enter_warning</code>, <code class="field">enter_critical</code>, or <code class="field">drip_slowmode</code> going non-zero at any point &mdash; that alone disproves the "gating is unnecessary" hypothesis and the task closes the other way (document it on ADR-089/121, keep the gating).</li>
+      </ol>
+
+      <h3 class="section-label">How to close it</h3>
+      <p><b>If a full soak stays clean:</b> remove the drip/tier gating, update <code class="field">evaluate.py</code>'s ADR-089/121 checks and the ADRs themselves, rebuild, re-soak once more to confirm no regression, then mark Done.</p>
+      <p><b>If a full soak isn't practical right now:</b> tell me to keep the gating and document this session's 2-hour evidence directly on ADR-089/121 as a data point (not a full proof) &mdash; that's a five-minute doc change I can make, and it closes the task honestly without pretending the 24&ndash;72h proof happened.</p>
+    </div>
+  </section>
+
+  <!-- 964 -->
+  <section class="task" id="task-964">
+    <div class="task-head">
+      <div>
+        <div class="tid">TASK-964</div>
+        <h2>v2 parity: OT-Direct manual override apply UI</h2>
+      </div>
+      <span class="chip block">Needs a live boiler</span>
+    </div>
+    <div class="task-body">
+      <ul class="ac-list">
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#1</span> v2 exposes the override control, POSTs correctly, status reflects it</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#2</span> Verified on-device that an override actually takes effect on the OT bus</span></li>
+      </ul>
+
+      <h3 class="section-label">Where it stands</h3>
+      <p>The UI is built, wired to the real endpoint, and verified end-to-end on a bench OT-Direct device: apply and clear both round-trip correctly, the active-overrides list updates, zero console errors. What's never been observed is the override actually changing what a real boiler does &mdash; because the bench units have no boiler wired to the OT bus.</p>
+
+      <div class="blocker hard">
+        <b>Blocking:</b> a device with a live appliance on the OpenTherm bus. Not something I can substitute or work around &mdash; there's no meaningful way to simulate "the boiler responded to the override" without a boiler.
+      </div>
+
+      <h3 class="section-label">How to validate it yourself</h3>
+      <ol class="steps">
+        <li>On a gateway with a real boiler attached, open the v2 UI &rarr; <span class="cmd">Monitor &rsaquo; Connection</span> (only visible on OT-Direct hardware).</li>
+        <li>Pick an override action (e.g. <span class="cmd">SR</span> stored-response), set a MsgID and hex value, hit Apply.</li>
+        <li>Watch the boiler's actual behavior change, or watch the corresponding OT status field flip in the UI/telnet log within the next OT cycle (~1s).</li>
+        <li>Clear the override and confirm behavior reverts.</li>
+      </ol>
+
+      <h3 class="section-label">How to close it</h3>
+      <div class="close-box"><b>Do the test above</b>, then tell me what you saw (or paste a screenshot/telnet snippet) &mdash; I'll check AC#2 and flip the task to Done in one message.</div>
+    </div>
+  </section>
+
+  <!-- 972 -->
+  <section class="task" id="task-972">
+    <div class="task-head">
+      <div>
+        <div class="tid">TASK-972</div>
+        <h2>v2 parity: PIC firmware flash UI</h2>
+      </div>
+      <span class="chip block">I won't do this without your say-so</span>
+    </div>
+    <div class="task-body">
+      <ul class="ac-list">
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#1</span> v2 exposes the PIC-flash entry, correctly hidden on non-PIC boards</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#2</span> Field-validated: the actual flash flow, on a real PIC</span></li>
+      </ul>
+
+      <h3 class="section-label">Where it stands</h3>
+      <p>Everything short of pulling the trigger is verified: the card is hidden correctly on boards with no PIC, renders correctly when forced, handles the no-PIC 503 gracefully. The one thing untested is a real PIC flash through the new UI &mdash; and that's deliberate. A wrong or interrupted PIC flash bricks the PIC. This project's own standing rule (and my own operating rules) say that action needs your explicit go-ahead each time, not a default green light.</p>
+
+      <div class="blocker hard">
+        <b>Blocking:</b> your explicit authorization. I will not autonomously flash PIC firmware, even for testing &mdash; this is a bricking-capable action by design.
+      </div>
+
+      <h3 class="section-label">How to validate it yourself</h3>
+      <ol class="steps">
+        <li>On the bench Classic-S3 (COM8, has a real PIC), open v2 &rarr; <span class="cmd">Monitor &rsaquo; Debug &rsaquo; PIC firmware</span>.</li>
+        <li>Confirm the current PIC version and available firmware list look right.</li>
+        <li>If you want to actually flash: pick a firmware file, confirm twice (the UI's own brick-safety gate), and watch the progress bar to completion.</li>
+        <li>Confirm the PIC comes back reporting the new version afterward.</li>
+      </ol>
+
+      <h3 class="section-label">How to close it</h3>
+      <div class="close-box"><b>Tell me explicitly</b> "go ahead and flash the PIC on COM8" (or do it yourself and report back) &mdash; either way, once a real flash succeeds once, AC#2 is done and the task closes.</div>
+    </div>
+  </section>
+
+  <!-- 989 -->
+  <section class="task" id="task-989">
+    <div class="task-head">
+      <div>
+        <div class="tid">TASK-989</div>
+        <h2>Eliminate the HTTP-000 wedge, harden concurrent serving</h2>
+      </div>
+      <span class="chip warn">Scope decision, not a bug</span>
+    </div>
+    <div class="task-body">
+      <ul class="ac-list">
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#1</span> Stack-size fix &mdash; permanent wedge eliminated</span></li>
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#2</span> Heap-guard middleware &mdash; confirmed under a 10&times; overload ramp, zero wedges</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#3</span> Bundle <code class="field">ds-tokens.css</code> into <code class="field">v2.css</code></span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#4</span> Serve static assets gzipped</span></li>
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#5</span> Field validation &mdash; desktop + mobile load fully styled after the ramp</span></li>
+      </ul>
+
+      <h3 class="section-label">Where it stands</h3>
+      <p>The bug this task was actually filed for &mdash; the device wedging permanently under load &mdash; is fixed and proven with real overload testing. What's left (AC#3/#4) is pure performance polish: fewer requests, smaller transfers. Neither is a broken thing to fix; both are new build-pipeline surface with a real trade-off to weigh.</p>
+
+      <h3 class="section-label">The actual decision</h3>
+      <p><b>CSS bundling (AC#3):</b> <code class="field">ds-tokens.css</code> is shared by four pages, not just v2. Bundling it into v2.css means either (a) a build-time concatenation step in <code class="field">build.py</code> &mdash; clean, but touches the build pipeline &mdash; or (b) hand-copying the CSS variables into v2.css, which drifts out of sync the next time someone edits ds-tokens.css.</p>
+      <p><b>Gzip (AC#4):</b> the serving code already supports it &mdash; <code class="field">webSendFile(path, type, gzip=true)</code> just needs pre-compressed <code class="field">.gz</code> files in the LittleFS image and an Accept-Encoding check per route. Neither piece exists yet; both are a build.py change plus route rewiring.</p>
+
+      <h3 class="section-label">How to close it</h3>
+      <p><b>Option A &mdash; ship as-is:</b> the wedge is fixed, that was the point of the task. Tell me to close AC#3/#4 as "won't do" (or spin them into a separate, lower-priority perf task) and I'll mark 989 Done today.</p>
+      <p><b>Option B &mdash; go for the polish:</b> tell me to build the concatenation step + gzip pipeline. It's real work (a build.py change, a route change, a fresh ramp to confirm it helps) but nothing I can't do &mdash; just wanted your sign-off before touching the build pipeline again this session.</p>
+    </div>
+  </section>
+
+  <!-- 994 -->
+  <section class="task" id="task-994">
+    <div class="task-head">
+      <div>
+        <div class="tid">TASK-994</div>
+        <h2>Research: minimize BLE's internal-DRAM footprint</h2>
+      </div>
+      <span class="chip warn">Your call on the payoff</span>
+    </div>
+    <div class="task-body">
+      <ul class="ac-list">
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#1</span> 6 hypotheses documented with pros/cons</span></li>
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#2</span> Test plan adversarially reviewed (by an independent agent, findings incorporated)</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#3</span> On-device evidence for the untested hypotheses</span></li>
+        <li class="is-done"><span class="ac-mark done">&check;</span><span><span class="ac-id">#4</span> Implementation proposal with 3 options</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#5</span> Your decision on which option (if any) to pursue</span></li>
+      </ul>
+
+      <h3 class="section-label">Where it stands</h3>
+      <p>The research is done and independently stress-tested &mdash; the adversarial review actually caught two overstated claims (fixed: the PSRAM hypothesis was more constrained than first written, and the "lazy init" precedent for controller teardown turned out not to exist in the codebase at all). A fresh on-device reading also replaced the stale baseline this task was opened against: the real gap today is roughly 35&ndash;40KB, not the originally reported 64KB, because the NimBLE trim from a related fix already closed most of it.</p>
+
+      <h3 class="section-label">The actual decision</h3>
+      <p>Three options, in <code class="field">docs/evidence/task994_ble_dram_hypotheses.md</code>:</p>
+      <ol class="steps">
+        <li><b>A &mdash; do nothing further.</b> The remaining gap is small and the symptom it was chasing (unstyled UI under load) is already fixed by other work this session. My recommendation.</li>
+        <li><b>B &mdash; lazy BLE controller init/deinit.</b> Reclaims the full remaining gap during idle windows, but it's a from-scratch feature (not an extension of anything existing) and needs its own stability soak before shipping.</li>
+        <li><b>C &mdash; PSRAM-backed BLE allocations.</b> Highest theoretical payoff, but NimBLE ships as a precompiled library on this toolchain, so the config knob that would enable this may not even be reachable without forking the framework. Likely not worth it.</li>
+      </ol>
+
+      <h3 class="section-label">How to close it</h3>
+      <div class="close-box"><b>Tell me A, B, or C.</b> A closes the task today (nothing left to build). B or C become new backlog tasks with their own scope &mdash; I'd write those up once you pick.</div>
+    </div>
+  </section>
+
+  <!-- 995 -->
+  <section class="task" id="task-995">
+    <div class="task-head">
+      <div>
+        <div class="tid">TASK-995</div>
+        <h2>PSRAM-aware BLE default + consent gate</h2>
+      </div>
+      <span class="chip block">Waiting on 994, then on hardware</span>
+    </div>
+    <div class="task-body">
+      <ul class="ac-list">
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#1</span> esp32-classic + esp32-combo build with PSRAM active</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#2</span> BLE default follows PSRAM presence at fresh settings init</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#3</span> No-PSRAM boards get a consent dialog before enabling BLE</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#4</span> Host-pool memory trims applied and measured</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#5</span> On-device evidence, PSRAM on vs off</span></li>
+        <li><span class="ac-mark open"></span><span><span class="ac-id">#6</span> OTGW32 physical validation</span></li>
+      </ul>
+
+      <h3 class="section-label">Where it stands</h3>
+      <p>Untouched this pass, correctly. Every AC here assumes a specific implementation direction &mdash; and that direction is exactly what TASK-994 is asking you to decide on. Building this before that decision would mean guessing at scope, or building something you then have to unwind.</p>
+
+      <div class="blocker hard">
+        <b>Blocking:</b> TASK-994's decision (above) first. Then, separately, an OTGW32 board &mdash; AC#6 says so explicitly and none is connected here.
+      </div>
+
+      <h3 class="section-label">How to close it</h3>
+      <div class="close-box">Resolve TASK-994 first. If you pick option B or C there, this task's scope gets rewritten around that choice and I'll re-plan its ACs with you before touching code.</div>
+    </div>
+  </section>
+
+  <footer>
+    Generated from live backlog state, <code>backlog task &lt;id&gt; --plain</code>, 2026-07-06. Evidence referenced above lives in <code>docs/evidence/</code> on <code>origin/dev</code>.
+  </footer>
+
+</div>
