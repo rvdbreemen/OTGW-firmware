@@ -3,11 +3,11 @@ id: TASK-978
 title: >-
   Investigate ESP32-S3 combo heap regression + file-serve leak starving
   static-asset serving (CSS not loading)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-01 21:51'
-updated_date: '2026-07-02 03:35'
+updated_date: '2026-07-06 05:05'
 labels: []
 dependencies: []
 ordinal: 190000
@@ -21,10 +21,10 @@ On alpha.311 combo (bench .64), static-file serving returns HTTP 200 with a 0-by
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Leak source identified: is freeheap decline from the file-serve failure path, device/info path, or idle background (MQTT/WS/BLE/discovery)?
-- [ ] #2 Boot-heap regression bisected/attributed alpha.291->alpha.311 (which change consumed the ~67KB)
-- [ ] #3 Concrete fix or mitigation proposed (free-on-failure, gate floor, buffer strategy, or leaner build for PIC boards)
-- [ ] #4 Verified on-device: static CSS serves reliably (8/8 full) after the fix
+- [x] #1 Leak source identified: is freeheap decline from the file-serve failure path, device/info path, or idle background (MQTT/WS/BLE/discovery)?
+- [x] #2 Boot-heap regression bisected/attributed alpha.291->alpha.311 (which change consumed the ~67KB)
+- [x] #3 Concrete fix or mitigation proposed (free-on-failure, gate floor, buffer strategy, or leaner build for PIC boards)
+- [x] #4 Verified on-device: static CSS serves reliably (8/8 full) after the fix
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -37,4 +37,12 @@ ROOT CAUSE (4-agent workflow, file:line evidence). NOT a leak and NOT primarily 
 CORRECTED ROOT CAUSE (earlier 0-body readings were a curl -o /dev/null + MSYS_NO_PATHCONV=1 write-error artifact, NOT a board failure — SEQUENTIAL serving is 9/9 perfect, verified via curl|wc -c). REAL bug = CONCURRENT-load 503s: a browser fetches ~9 v2 assets in parallel; during the burst maxfreeblock drops to ~18KB; the ADR-147 file gate (webFileGateTryAdmit) clamps cap to 2 (cap=1 <16000, cap=2 <24000) and returns 503+Retry-After for the rest. Measured: parallel load -> 2/9 served (v2.css+v2.js), 7/9 got HTTP 503. The v2 UI loads CSS/JS via <link>/<script> which do NOT retry 503 -> those assets never load -> UNSTYLED UI = the user's report. So heap headroom DOES matter but only under concurrency (sequential is fine). The BLE-on-by-default regression (TASK-975, ~36-67KB internal DRAM) lowers headroom -> gate clamps harder -> more 503s. FIX DIRECTION (confirmed correct): aggressive internal-DRAM reduction (BLE footprint + static buffers) raises maxfreeblock under the burst -> higher gate cap -> assets serve. Secondary robustness: frontend retry-on-503 for v2 <link>/<script> assets, and/or gzip the FS assets to cut per-serve size/time. NOTE bench board muddied by ~15 reflash/reset cycles this session; app=alpha.311+9d29eea, FS=fresh alpha.312.
 
 FIX IMPLEMENTED + ON-DEVICE VALIDATED (alpha.313, bench .64). Gate confirmed at restAPI.ino:83 webFileGateTryAdmit(): cap=WEB_FILE_MAX_INFLIGHT(=4), ->2 when maxBlock<24000, ->1 when <16000. Browser fires ~9 parallel assets -> gate 503s the excess -> <link>/<script> don't retry -> unstyled. TWO FIXES: (1) PRIMARY frontend retry-on-503 loader in data/v2.html: ds-tokens.css + v2.css + v2.js now loaded via createElement + onerror->retry with linear backoff (200ms*attempt, 8 tries), ported from the classic index.html TASK-960 loader. Confirmed served on device (6 loader markers in GET /v2.html). This makes every asset arrive as gate slots free. (2) HEADROOM HELPER NimBLE trim in platformio.ini [env] build_flags: passive-scan-only (observer) -> -DCONFIG_BT_NIMBLE_ROLE_PERIPHERAL_DISABLED, ROLE_BROADCASTER_DISABLED, MAX_CONNECTIONS=1, MAX_BONDS=0, MAX_CCCDS=0, ATT_PREFERRED_MTU=23. MEASURED concurrent-serve (parallel curl, no browser retry): BASELINE stock NimBLE 4/9->2/9->1/9 (cap COLLAPSES as fragmentation drops maxblock <16KB); AFTER NimBLE trim 6/9->5/9->8/9 (cap STAYS 4, maxblock 73KB holds). The trim stops the cap collapse; the loader mops up the residual 503s in the browser -> 9/9. BUILDS green (esp32-combo). UNCOMMITTED: platformio.ini + data/v2.html changes are flashed to .64 but NOT committed — active parallel work in this worktree (branch advanced to alpha.313 TASK-979/980/981, v2.html modified under me, playwright in use). Commit held pending coordination + a real-browser styled-render check. Helps ALL boards incl no-PSRAM OTGW32.
+
+Re-verified 2026-07-06 on current dev HEAD (alpha.330): both fixes described in the 'FIX IMPLEMENTED' note (frontend retry-on-503 loader in v2.html, NimBLE role/connection trim in platformio.ini) ARE present and committed in the current tree -- the earlier 'uncommitted, held pending coordination' concern from that session is resolved, they landed at some point after. AC#4 fresh evidence: (a) raw concurrent httpx burst (9 simultaneous requests, no retry) still shows the underlying gate 503ing most of them (2/9 pass) -- expected and even tighter now under ADR-165's N=2 production cap, this is the gate WORKING as designed, not a regression; (b) a real headless-Edge CDP session loading /v2.html shows v2.css, ds-tokens.css, and v2.js ALL landing 200 (retry loader transparently handles the initial gate pressure) with a screenshot confirming the fully-styled v2 UI (docs/evidence/task978_static_asset_retry_verify.png). AC#1 (not a leak, fragmentation) and AC#2 (BLE-default TASK-975 regression) and AC#3 (fix: retry loader + NimBLE trim) were already answered in the investigation notes; AC#4 is now freshly confirmed against the current N=2-gated build. All 4 ACs pass.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Root cause: not a heap leak, but chronic internal-DRAM fragmentation from ESPAsyncWebServer's per-serve send buffer, masked at low BLE footprint and exposed when BLE flipped on-by-default (TASK-975, ~36-67KB internal DRAM). Fix: frontend retry-on-503 loader (v2.html, linear backoff) + NimBLE role/connection trim (platformio.ini) to reduce the DRAM footprint and let the gate cap hold higher under fragmentation. Both fixes confirmed present in current dev and freshly re-verified on-device: real-browser CDP trace shows all three core assets (v2.css/ds-tokens.css/v2.js) landing 200, screenshot confirms fully-styled v2 UI.
+<!-- SECTION:FINAL_SUMMARY:END -->
