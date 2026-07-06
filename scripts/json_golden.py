@@ -26,6 +26,9 @@ ENDPOINTS = [
 VOLATILE_EXACT = {
  "uptime","bootcount","lastreset","compiled","fwversion","coreversion","sdkversion",
  "freeheap","heap","maxfreeblock","minfreeheap","hd_fragmentation_pct","sketchsize",
+ # internal-DRAM counterparts of freeheap/maxfreeblock (PSRAM-aware heap split,
+ # TASK-978/994) on /v2/device/info + /v2/device/time -- live, fluctuate every fetch:
+ "internal_free","internal_maxblk",
  "freesketchspace","wifirssi","wifiquality","wifiquality_text","time","datetime",
  "dateTime","epoch","timestamp","millis","now","flashchipmode","lastreset",
  # flash/version artifacts (app-only flash -> fw githash changes, fs unchanged):
@@ -47,7 +50,7 @@ _BOOLSTR = {"true": True, "false": False}
 def is_volatile(k):
     return k in VOLATILE_EXACT or any(k.startswith(p) for p in VOLATILE_PREFIX)
 
-def fetch(host, ep):
+def fetch(host, ep, _retried=False):
     url = "http://%s/api%s" % (host, ep)
     try:
         with urllib.request.urlopen(url, timeout=12) as r:
@@ -55,6 +58,13 @@ def fetch(host, ep):
     except urllib.error.HTTPError as e:
         return e.code, e.read().decode("utf-8","replace")
     except Exception as e:
+        # One retry: a transient http.client.IncompleteRead (seen on the larger
+        # endpoints like /v2/debug and /v2/settings against a freshly-booted
+        # device still settling) is not a real endpoint failure -- confirmed by
+        # a plain curl succeeding immediately after. Retrying once smooths over
+        # that class of one-off hiccup instead of baking "ERR:..." into a golden.
+        if not _retried:
+            return fetch(host, ep, _retried=True)
         return 0, "ERR:%s" % e
 
 def safe_name(ep):

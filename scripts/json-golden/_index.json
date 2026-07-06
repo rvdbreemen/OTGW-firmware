@@ -6,12 +6,12 @@
   },
   "/v2/debug": {
     "status": 200,
-    "bytes": 6379,
+    "bytes": 6377,
     "file": "v2_debug.json"
   },
   "/v2/settings": {
     "status": 200,
-    "bytes": 9838,
+    "bytes": 9959,
     "file": "v2_settings.json"
   },
   "/v2/sensors": {
@@ -31,12 +31,12 @@
   },
   "/v2/device/info": {
     "status": 200,
-    "bytes": 2282,
+    "bytes": 2633,
     "file": "v2_device_info.json"
   },
   "/v2/device/time": {
     "status": 200,
-    "bytes": 263,
+    "bytes": 312,
     "file": "v2_device_time.json"
   },
   "/v2/device/crashlog": {
@@ -71,12 +71,12 @@
   },
   "/v2/filesystem/files": {
     "status": 200,
-    "bytes": 1797,
+    "bytes": 1685,
     "file": "v2_filesystem_files.json"
   },
   "/v2/filesystem/hash-check": {
     "status": 200,
-    "bytes": 76,
+    "bytes": 75,
     "file": "v2_filesystem_hash_check.json"
   },
   "/v2/simulate": {
@@ -86,12 +86,12 @@
   },
   "/v2/otgw/otmonitor": {
     "status": 200,
-    "bytes": 777,
+    "bytes": 751,
     "file": "v2_otgw_otmonitor.json"
   },
   "/v2/otgw/telegraf": {
     "status": 200,
-    "bytes": 777,
+    "bytes": 751,
     "file": "v2_otgw_telegraf.json"
   },
   "/v2/discovery": {
@@ -116,12 +116,12 @@
   },
   "/v2/sat": {
     "status": 200,
-    "bytes": 2647,
+    "bytes": 2646,
     "file": "v2_sat.json"
   },
   "/v2/sat/status": {
     "status": 200,
-    "bytes": 2647,
+    "bytes": 2646,
     "file": "v2_sat_status.json"
   },
   "/v2/sat/status?detail=full": {
@@ -141,7 +141,7 @@
   },
   "/v2/sat/ble/discovery": {
     "status": 200,
-    "bytes": 148,
+    "bytes": 208,
     "file": "v2_sat_ble_discovery.json"
   },
   "/v2/sat/markers": {
