@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.330
+**  Version  : v2.0.0-alpha.331
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -61,6 +61,17 @@ extern void blinkLEDnow(uint8_t);
   #define Debugln(...)    ({ OTGWSerial.println(__VA_ARGS__); })
   #define Debugf(...)     ({ OTGWSerial.printf_P(__VA_ARGS__); })
 #endif
+
+// TASK-959: shared with restAPI.ino's device/info emit so the v2/Classic Flash
+// Utility UI can hide the firmware-upload option before the user ever tries it,
+// rather than only rejecting the upload after the fact (see _handleUploadStart
+// below, which independently re-checks this — the UI hint is a courtesy, not
+// the safety boundary). Dynamic: an 8MB dual-slot table flips this to true.
+inline bool hasSpareAppOtaSlot() {
+  const esp_partition_t *running  = esp_ota_get_running_partition();
+  const esp_partition_t *nextSlot = esp_ota_get_next_update_partition(nullptr);
+  return nextSlot != nullptr && nextSlot != running;
+}
 
 class OTGWUpdateServer {
 public:
@@ -285,9 +296,7 @@ private:
       // nextSlot != running and re-enable OTA app updates automatically.
       // The 4MB merged image is deliberately NOT accepted over OTA (USB-only);
       // a plain firmware.bin app image is the only firmware upload we handle.
-      const esp_partition_t *running  = esp_ota_get_running_partition();
-      const esp_partition_t *nextSlot = esp_ota_get_next_update_partition(nullptr);
-      if (nextSlot == nullptr || nextSlot == running) {
+      if (!hasSpareAppOtaSlot()) {
         strlcpy(_updaterError,
                 "app update is USB-only on this board (single app slot); use flash_otgw.bat over USB",
                 sizeof(_updaterError));

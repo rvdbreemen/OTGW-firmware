@@ -331,6 +331,7 @@ heap-frag soak, TASK-934):
 
 - Never write to `Serial` after OTGW init (it's the PIC serial link)
 - Never flash PIC firmware over WiFi using OTmonitor (bricks the PIC)
+- **App/firmware OTA is USB-only on 4MB single-app-slot boards** (esp32-classic, esp32-combo). The 4MB partition table has one app slot (app0/ota_0) and no ota_1 — an app-image OTA write targets the running partition and bricks the device (empirically confirmed, TASK-959). `_handleUploadStart` (`OTGW-ModUpdateServer-esp32.h`) rejects it before any `Update.begin()`, and the `/update` page hides the firmware-flash form when `app_ota_available=false` (`/api/v2/device/info`). **Filesystem (LittleFS) OTA still works fine over WiFi** — only the app/firmware image is USB-only. Use `flash_otgw.bat` (app-only `--update`, preserves WiFi/NVS) for firmware. Dual-slot app OTA needs an 8MB module (future PCB rev); the check is dynamic (`hasSpareAppOtaSlot()`) and re-enables itself automatically if the partition table ever gains an `ota_1`.
 - Never add HTTPS/WSS
 - Always `addOTWGcmdtoqueue()` for OTGW commands
 - Always validate buffer sizes before string operations

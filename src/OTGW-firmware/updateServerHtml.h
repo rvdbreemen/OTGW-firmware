@@ -448,6 +448,30 @@ static const char UpdateServerIndex[] PROGMEM =
          
          initUploadForm('fwForm', 'flash');
          initUploadForm('fsForm', 'filesystem');
+
+         // TASK-959: single-app-slot boards (4MB combo/classic — app0/ota_0 only,
+         // no ota_1) cannot receive a firmware/app OTA write without overwriting
+         // the running partition. The backend already rejects the upload before
+         // any Update.begin() (OTGW-ModUpdateServer-esp32.h), but hiding the form
+         // here stops a user from ever hitting that error in the first place.
+         fetch('/api/v2/device/info', { cache: 'no-store' })
+           .then(function(r) { return r.ok ? r.json() : null; })
+           .then(function(d) {
+             var info = (d && d.device) ? d.device : d;
+             if (info && info.app_ota_available === false) {
+               var fwForm = document.getElementById('fwForm');
+               if (fwForm) {
+                 var note = document.createElement('div');
+                 note.style.cssText = 'padding:12px;border:1px solid #7aaad6;border-radius:6px;background:#eef6ff;margin:12px 0';
+                 note.innerHTML = '<b>Firmware (app) update is USB-only on this board</b><br>' +
+                   'This board has a single app slot (no spare OTA partition), so writing a firmware image over WiFi ' +
+                   'would overwrite the running app and could brick the device. Use <code>flash_otgw.bat</code> over USB instead. ' +
+                   'Filesystem (LittleFS) updates below are unaffected.';
+                 fwForm.parentNode.replaceChild(note, fwForm);
+               }
+             }
+           })
+           .catch(function() { /* info fetch failing must not block the FS-only path */ });
        })();
      </script>
      </html>)";

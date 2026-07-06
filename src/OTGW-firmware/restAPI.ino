@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.330
+**  Version  : v2.0.0-alpha.331
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3021,6 +3021,10 @@ void sendDeviceInfoV2()
     je.field(F("flashchipspeed"),   sBootFlash.flashChipSpeedMHz);
     je.field(F("flashchipmode"),    flashMode[sBootFlash.flashChipModeIdx < 4 ? sBootFlash.flashChipModeIdx : 4]);
     je.field(F("LittleFSsize"),     sBootFlash.littleFSSizeMB);
+    // TASK-959: lets the Flash Utility UI hide/disable the firmware-upload option
+    // before the user tries it on a single-app-slot board (app OTA would brick
+    // the running partition — see hasSpareAppOtaSlot() / _handleUploadStart).
+    je.field(F("app_ota_available"), hasSpareAppOtaSlot());
 
     // --- Reliability drops (heap-pressure side effects) ---
     je.field(F("hd_ws_drops"),         snap->st.heapdiag.iWsDropsTotal);
