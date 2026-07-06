@@ -1,3 +1,29 @@
+# Daily Issue Report — 2026-07-06
+
+**Generated:** 2026-07-06 07:09 UTC
+**Window:** Last 24 hours (since 2026-07-05 07:09 UTC)
+
+## GitHub Issues
+
+**Repository:** rvdbreemen/OTGW-firmware
+
+No open issues were updated in the last 24 hours.
+
+## Tweakers Forum (GoT thread #1653967)
+
+**Feed fetched:** 2026-07-06 07:09 UTC
+**Filter:** Posts by `number3` and `rvdbreemen` excluded.
+
+No new posts from the last 24 hours. Most recent non-excluded post:
+
+- **tjanssen** (Mon, 29 Jun 2026): Reported a disconnect over the weekend and requested an uptime sensor so resets would be easier to spot. (number3 replied on 2026-07-01 that uptime is already published via MQTT but not yet as a Home Assistant auto-discovery sensor — to be added in the next beta.)
+
+## Summary
+
+No new issues in the last 24 hours.
+
+---
+
 # Daily Issue Report — 2026-07-05
 
 **Generated:** 2026-07-05 07:10 UTC
