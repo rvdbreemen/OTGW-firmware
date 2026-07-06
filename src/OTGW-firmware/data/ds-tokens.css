@@ -117,8 +117,10 @@
 
   /* v2 dashboard (TASK-908) — heating-system color vocabulary.
      Genuinely new physical tokens: --hot/--cold/--dhw/--gauge-track.
-     zone-*/tile-* are RECONCILED ALIASES onto the official status palette
-     (ADR-091): one source of truth for ok/warn/alert across both UIs. */
+     zone- and tile- prefixed tokens are RECONCILED ALIASES onto the official
+     status palette (ADR-091): one source of truth for ok/warn/alert across
+     both UIs. (Previously written as "zone-*/tile-*", which embeds a literal
+     "*/" and closes this comment early -- a real parser bug, not a typo.) */
   --hot:               #ff5a3c;   /* flow / heat — warm red-orange */
   --cold:              #2f8fe8;   /* return / cold — blue */
   --dhw:               #ff9b3c;   /* domestic hot water — amber-orange */

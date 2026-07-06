@@ -44,20 +44,66 @@
         document.head.appendChild(l);
       })();
     }
-    function loadJs(){
+    function loadJs(then){
       var jsAttempt = 0;
       (function go(){
         var s = document.createElement('script');
         s.src = './v2.js'; s.defer = true;
+        s.onload = function(){ if (then) then(); };
         s.onerror = function(){
           if (s.parentNode) s.parentNode.removeChild(s);
           if (++jsAttempt <= MAX) setTimeout(go, 200 * jsAttempt);
-          else console.error('[loader] gave up on v2.js');
+          else { console.error('[loader] gave up on v2.js'); if (then) then(); }
         };
         document.head.appendChild(s);
       })();
     }
-    loadCss('v2-bundle.css', loadJs);
+    // v2-bundle.css -> v2.js -> fonts, STRICTLY chained (each step's "then" only
+    // fires after the previous one lands). loadCss()/loadJs() return immediately
+    // (they fire-and-continue via callback, not a blocking call) -- starting the
+    // font loader right after calling loadCss(), rather than inside its "then",
+    // was the bug that let font1 race the still-in-flight v2-bundle.css fetch
+    // (plus the browser's own automatic favicon.ico fetch) for the same
+    // WEB_FILE_MAX_INFLIGHT=2 slots, 503ing repeatedly even one-font-at-a-time.
+    loadCss('v2-bundle.css', function(){
+      loadJs(function(){ loadFontsSequentially(); });
+    });
+
+    // Field bug (esp32-otgw32, 2026-07-06): the 3 self-hosted fonts used to ship
+    // as @font-face rules inside v2-bundle.css. The browser fetches every
+    // @font-face src the instant that CSS parses, as an uncontrolled NATIVE
+    // parallel burst -- no JS ever sees it, so the retry-on-503 loader above
+    // cannot help. 3 simultaneous font fetches exceed WEB_FILE_MAX_INFLIGHT=2
+    // (ADR-165); the shed request 503s and, unlike CSS/JS, a browser-native
+    // font fetch never retries -- it fails permanently until a full reload.
+    // Fix: v2-bundle.css no longer carries @font-face (build.py,
+    // generate_v2_css_bundle strips it); load the 3 fonts here instead via the
+    // FontFace() API, deliberately ONE AT A TIME with retry, same backoff
+    // pattern as loadCss above. Peak concurrent font requests: 1.
+    function loadFontsSequentially(){
+      if (!window.FontFace) return;   // very old browser: page still works, system-font fallback
+      var fonts = [
+        { family: 'Inter',          url: '/fonts/inter-400.woff2',          weight: '400' },
+        { family: 'Inter',          url: '/fonts/inter-700.woff2',          weight: '700' },
+        { family: 'JetBrains Mono', url: '/fonts/jetbrains-mono-400.woff2', weight: '400' }
+      ];
+      function loadOne(i){
+        if (i >= fonts.length) return;
+        var f = fonts[i], attempt = 0;
+        (function go(){
+          var face = new FontFace(f.family, "url('" + f.url + "') format('woff2')",
+            { weight: f.weight, style: 'normal', display: 'swap' });
+          face.load().then(function (loaded) {
+            document.fonts.add(loaded);
+            loadOne(i + 1);
+          }).catch(function () {
+            if (++attempt <= MAX) setTimeout(go, 200 * attempt);
+            else { console.error('[loader] gave up on font ' + f.url); loadOne(i + 1); }
+          });
+        })();
+      }
+      loadOne(0);
+    }
   })();
 </script>
 </head>
