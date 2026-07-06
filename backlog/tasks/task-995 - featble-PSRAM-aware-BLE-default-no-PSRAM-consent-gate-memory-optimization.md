@@ -3,11 +3,11 @@ id: TASK-995
 title: >-
   feat(ble): PSRAM-aware BLE default + no-PSRAM consent gate + memory
   optimization
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-03 20:38'
-updated_date: '2026-07-06 05:34'
+updated_date: '2026-07-06 16:52'
 labels: []
 dependencies: []
 ordinal: 207000
@@ -33,4 +33,6 @@ PSRAM present -> activate PSRAM, BLE default ON, verify system memory offloads t
 
 <!-- SECTION:NOTES:BEGIN -->
 Blocked on TASK-994's AC#5 (maintainer decision between options A/B/C). This task's ACs (PSRAM-aware BLE default, consent-gate UI, host-pool trims) presuppose a specific implementation direction that TASK-994's research has not yet been decided on by the maintainer. Also AC#6 explicitly needs OTGW32 hardware ('pending board connection') which is not available in this environment. No action taken this pass -- correctly sequenced behind TASK-994, not re-litigating scope here.
+
+SUPERSEDED: TASK-994 (the research this task's ACs presuppose the outcome of) was closed 2026-07-06 with the maintainer selecting Option A (do nothing further on BLE internal-DRAM reduction). This task's entire scope -- PSRAM-aware BLE default, consent-gate UI, host-pool trims -- was Option B/C territory in TASK-994's proposal, neither of which was chosen. No implementation path remains open. Closing as Won't Do rather than leaving indefinitely blocked; can be reopened if a future session revisits the BLE-DRAM question with a different decision.
 <!-- SECTION:NOTES:END -->

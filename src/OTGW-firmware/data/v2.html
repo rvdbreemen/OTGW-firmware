@@ -21,11 +21,13 @@
   // <link>/<script> has no native retry, so the UI would render unstyled (CSS
   // dropped) or dead (v2.js dropped) with nothing surfaced. Retry with linear
   // backoff, mirroring the classic index.html loader (TASK-960).
-  // TASK-989: load SEQUENTIALLY (ds-tokens -> v2.css -> v2.js), one connection
-  // at a time. A parallel burst of asset connections is what collapses the S3
-  // heap under concurrent serving (AsyncTCP accepts unconditionally; measured
-  // freeheap 22K->3.8K); serializing the three big assets removes the burst at
-  // the source instead of relying on the serve gates to shed it.
+  // TASK-989: load SEQUENTIALLY (v2-bundle.css -> v2.js), one connection at a
+  // time. A parallel burst of asset connections is what collapses the S3 heap
+  // under concurrent serving (AsyncTCP accepts unconditionally; measured
+  // freeheap 22K->3.8K); serializing the assets removes the burst at the
+  // source instead of relying on the serve gates to shed it. v2-bundle.css is
+  // ds-tokens.css + v2.css concatenated at build time (build.py,
+  // generate_v2_css_bundle) -- one request instead of two on first paint.
   (function(){
     var MAX = 8;
     function loadCss(href, then){
@@ -55,7 +57,7 @@
         document.head.appendChild(s);
       })();
     }
-    loadCss('ds-tokens.css', function(){ loadCss('v2.css', loadJs); });
+    loadCss('v2-bundle.css', loadJs);
   })();
 </script>
 </head>

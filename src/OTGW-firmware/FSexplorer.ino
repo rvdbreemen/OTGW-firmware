@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.331
+**  Version  : v2.0.0-alpha.332
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -200,6 +200,11 @@ void startWebserver(){
   server.on("/v2.html",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); if (!checkHttpAuth()) return; serveVersionedAsset("/v2.html", F("text/html; charset=UTF-8")); });
   server.on("/v2.js",            HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2.js",            F("application/javascript")); });
   server.on("/v2.css",           HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2.css",           F("text/css")); });
+  // TASK-989: ds-tokens.css + v2.css concatenated at build time (build.py,
+  // generate_v2_css_bundle) -- v2.html loads this instead of the two separate
+  // files, cutting one request off its critical path. /v2.css and
+  // /ds-tokens.css stay routed above for design.html/index.html/FSexplorer.html.
+  server.on("/v2-bundle.css",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2-bundle.css",    F("text/css")); });
   // TASK-989: immutable-cached font routes (see serveImmutableAsset above).
   server.on("/fonts/inter-400.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-400.woff2",          F("font/woff2")); });
   server.on("/fonts/inter-700.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-700.woff2",          F("font/woff2")); });
