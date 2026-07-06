@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-03 20:38'
-updated_date: '2026-07-03 20:39'
+updated_date: '2026-07-06 05:34'
 labels: []
 dependencies: []
 ordinal: 207000
@@ -28,3 +28,9 @@ PSRAM present -> activate PSRAM, BLE default ON, verify system memory offloads t
 - [ ] #5 Evidence: internal free/maxblk + ramp with BLE on, PSRAM off vs on, on S3-Mini
 - [ ] #6 OTGW32 physical validation (pending board connection)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Blocked on TASK-994's AC#5 (maintainer decision between options A/B/C). This task's ACs (PSRAM-aware BLE default, consent-gate UI, host-pool trims) presuppose a specific implementation direction that TASK-994's research has not yet been decided on by the maintainer. Also AC#6 explicitly needs OTGW32 hardware ('pending board connection') which is not available in this environment. No action taken this pass -- correctly sequenced behind TASK-994, not re-litigating scope here.
+<!-- SECTION:NOTES:END -->
