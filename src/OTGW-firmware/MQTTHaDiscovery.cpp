@@ -2152,7 +2152,7 @@ PGM_P haEntityCatStr(HaEntityCat ec) {
 // MqttJsonWriter& parameters.
 //
 // Copyright (c) 2021-2026 Robert van den Breemen
-// TERMS OF USE: MIT License.
+// TERMS OF USE: GNU GPLv3.
 // ---------------------------------------------------------------------------
 
 #include <Arduino.h>

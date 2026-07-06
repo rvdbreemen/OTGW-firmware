@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : NTPtypes.h
-**  Version  : v2.0.0-alpha.333
+**  Version  : v2.0.0-alpha.334
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -12,7 +12,7 @@
 **  Requires NTP_DEFAULT_TIMEZONE and NTP_HOST_DEFAULT from OTGW-firmware.h;
 **  must therefore be included AFTER the #define block in that header.
 **
-**  TERMS OF USE: MIT License. See OTGW-firmware.h for the full notice.
+**  TERMS OF USE: GNU GPLv3. See OTGW-firmware.h for the full notice.
 ***************************************************************************
 */
 

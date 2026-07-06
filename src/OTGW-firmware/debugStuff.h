@@ -27,7 +27,7 @@
 **  debugTelnet (SimpleTelnet<1>, declared in OTGW-firmware.h, defined in
 **  networkStuff.ino).
 **
-**  TERMS OF USE: MIT License. See OTGW-firmware.h for the full notice.
+**  TERMS OF USE: GNU GPLv3. See OTGW-firmware.h for the full notice.
 ***************************************************************************
 */
 

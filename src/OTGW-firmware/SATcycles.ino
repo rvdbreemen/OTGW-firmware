@@ -11,7 +11,7 @@
 **  and classifies each completed cycle to drive PWM auto-switching.
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
-**  TERMS OF USE: MIT License. See bottom of OTGW-firmware.h
+**  TERMS OF USE: GNU GPLv3. See bottom of OTGW-firmware.h
 ***************************************************************************
 */
 

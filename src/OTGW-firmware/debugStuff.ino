@@ -23,7 +23,7 @@
 **        second so high-volume flags (bMQTTGate) do not burn CPU on
 **        ZonedDateTime conversions or free-list walks on every debug line.
 **
-**  TERMS OF USE: MIT License. See OTGW-firmware.h for the full notice.
+**  TERMS OF USE: GNU GPLv3. See OTGW-firmware.h for the full notice.
 ***************************************************************************
 */
 

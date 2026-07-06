@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : S0types.h
-**  Version  : v2.0.0-alpha.333
+**  Version  : v2.0.0-alpha.334
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -9,7 +9,7 @@
 **  Contents:
 **    - S0Section (settings.s0 — GPIO pin, debounce, pulses/kW, interval)
 **
-**  TERMS OF USE: MIT License. See OTGW-firmware.h for the full notice.
+**  TERMS OF USE: GNU GPLv3. See OTGW-firmware.h for the full notice.
 ***************************************************************************
 */
 

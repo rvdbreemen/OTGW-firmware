@@ -2,7 +2,7 @@
 
 [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
 [![GitHub release](https://img.shields.io/github/v/release/rvdbreemen/OTGW-firmware?style=flat-square)](https://github.com/rvdbreemen/OTGW-firmware/releases)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
+[![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 
 OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on the ESP32 Wi-Fi module inside the OTGW device, monitors the OpenTherm bus between your thermostat and boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API. With v2.0.0, the firmware also runs natively on the OTGW32 board with an ESP32, adding direct GPIO OpenTherm control, Ethernet, BLE room sensors, and a OLED display.
 
@@ -369,4 +369,6 @@ And to everyone who keeps reporting issues, pushing for more, and helping others
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+GNU General Public License v3.0. See [LICENSE](LICENSE).
+
+Relicensed from MIT to GPLv3 on 2026-07-06. This applies to the project's own code (Robert van den Breemen, sole copyright holder); third-party vendored libraries (`src/libraries/OpenTherm`, `src/libraries/OTGWSerial`) and the LGPL-2.1-licensed portions of `FSexplorer.ino` keep their original licenses and copyright notices unchanged.

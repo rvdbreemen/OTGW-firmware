@@ -1,6 +1,6 @@
 // MQTTstuff.h -- HA MQTT Discovery data layer
 // Compact PROGMEM arrays + streaming constructor declarations
-// Part of OTGW-firmware, MIT license
+// Part of OTGW-firmware, GNU GPLv3
 //
 // Copyright (c) 2021-2026 Robert van den Breemen
 //

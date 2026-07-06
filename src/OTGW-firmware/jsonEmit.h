@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : jsonEmit.h
-**  Version  : v2.0.0-alpha.333
+**  Version  : v2.0.0-alpha.334
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -33,7 +33,7 @@
 **  every volatile field exactly once. (The ArduinoJson chunked path in ADR-145
 **  is safe only because it replays an immutable document snapshot.)
 **
-**  TERMS OF USE: MIT License. See bottom of file.
+**  TERMS OF USE: GNU GPLv3. See bottom of file.
 ***************************************************************************
 */
 

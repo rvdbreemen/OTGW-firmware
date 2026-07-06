@@ -1,5 +1,5 @@
 // mqtt_discovery_verify.cpp -- discovery-verify state machine (ADR-062)
-// Part of OTGW-firmware, MIT license
+// Part of OTGW-firmware, GNU GPLv3
 //
 // Copyright (c) 2021-2026 Robert van den Breemen
 //

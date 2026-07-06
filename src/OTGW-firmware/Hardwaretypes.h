@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Hardwaretypes.h
-**  Version  : v2.0.0-alpha.333
+**  Version  : v2.0.0-alpha.334
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -14,7 +14,7 @@
 **  AFTER boards.h in OTGW-firmware.h. (bOLEDPresent is unconditional: OLED
 **  presence is detected at runtime, not gated at compile time — ADR-114.)
 **
-**  TERMS OF USE: MIT License. See OTGW-firmware.h for the full notice.
+**  TERMS OF USE: GNU GPLv3. See OTGW-firmware.h for the full notice.
 ***************************************************************************
 */
 

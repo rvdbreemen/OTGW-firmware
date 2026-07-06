@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : PICtypes.h
-**  Version  : v2.0.0-alpha.333
+**  Version  : v2.0.0-alpha.334
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -11,7 +11,7 @@
 **    - PicSettingsSection (state.picSettings — values polled via PR= commands)
 **    - PICBootSection    (settings.picBoot  — commands to inject at boot)
 **
-**  TERMS OF USE: MIT License. See OTGW-firmware.h for the full notice.
+**  TERMS OF USE: GNU GPLv3. See OTGW-firmware.h for the full notice.
 ***************************************************************************
 */
 

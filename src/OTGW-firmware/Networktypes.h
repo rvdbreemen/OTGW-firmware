@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Networktypes.h
-**  Version  : v2.0.0-alpha.333
+**  Version  : v2.0.0-alpha.334
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -16,7 +16,7 @@
 **  Requires HAS_ETH_CAPABLE / _VERSION_PRERELEASE from boards.h; include
 **  AFTER boards.h.
 **
-**  TERMS OF USE: MIT License. See OTGW-firmware.h for the full notice.
+**  TERMS OF USE: GNU GPLv3. See OTGW-firmware.h for the full notice.
 ***************************************************************************
 */
 
