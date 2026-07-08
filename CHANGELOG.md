@@ -8,13 +8,21 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+_No unreleased changes yet. New work on `otgw-1.x.x` lands here._
+
+## [1.7.1] - 2026-07-09
+
+Home Assistant integration release for the 1.x (ESP8266) line: cooling support in the climate entity plus new gateway and device-health auto-discovery sensors. No breaking changes versus v1.7.0. Full notes: [RELEASE_NOTES_1.7.1.md](RELEASE_NOTES_1.7.1.md).
+
 ### Added
-- Gateway mode and OTGW-connected state as Home Assistant binary-sensor auto-discovery entities, gated by the discovery index so they publish once and self-heal. Home Assistant can now see whether the gateway is in gateway or monitor mode and whether the OTGW link is up, without scraping the debug page. (beta.6)
-- Uptime, unsupported-message-id count and per-path fragskip counters (`http_fragskips` / `mqtt_fragskips` / `ws_fragskips`) as Home Assistant auto-discovery sensors, so long-running-device health and the heap-fragmentation back-off activity are visible in Home Assistant. (beta.6)
+- Unified off/heat/cool Home Assistant climate entity. The MQTT climate ("Thermostat") entity now represents cooling: `modes` are `off`/`heat`/`cool`, driven by new `hvac_mode` and `hvac_action` topics computed from the OpenTherm status bits. Cooling-capable systems (for example a Honeywell Round Modulation Heat/Cool on a heatpump) previously showed as heating-only, carrying the cooling setpoint with no way to reflect cooling. Mode is reflective (the thermostat owns heat/cool switching), and `hvac_action` reads the central-heating bit rather than flame, so DHW hot-water draws do not show as heating. Validated against real gas-boiler (idle, DHW, active heating) and heatpump (cooling) captures. (GH #665, ADR-085)
+- `hvac_mode` and `hvac_action` exposed as standalone discoverable Home Assistant sensors (off/heat/cool and off/idle/heating/cooling). (TASK-941)
+- Gateway mode and OTGW-connected state as Home Assistant binary-sensor auto-discovery entities, gated by the discovery index so they publish once and self-heal. Home Assistant can now see whether the gateway is in gateway or monitor mode and whether the OTGW link is up, without scraping the debug page.
+- Uptime, unsupported-message-id count and per-path fragskip counters (`http_fragskips` / `mqtt_fragskips` / `ws_fragskips`) as Home Assistant auto-discovery sensors, so long-running-device health and the heap-fragmentation back-off activity are visible in Home Assistant.
 
 ### Fixed
-- Build break on the uptime sensor: the discovery table referenced `HaUnit::s` (seconds) but that unit was never added to the `HaUnit` enum or its string mapper, so the firmware did not compile. Added the `s` unit (the uptime value is published in seconds). The gateway-mode, OTGW-connected and uptime/fragskip sensors above therefore reach devices for the first time in this build. (beta.6)
-- Unified heat/cool/off Home Assistant climate entity. The MQTT climate ("Thermostat") entity now represents cooling: `modes` are `off`/`heat`/`cool`, driven by new `hvac_mode` and `hvac_action` topics computed from the OpenTherm status bits. Cooling-capable systems (for example a Honeywell Round Modulation Heat/Cool on a heatpump) previously showed as heating-only, carrying the cooling setpoint with no way to reflect cooling. Mode is reflective (the thermostat owns heat/cool switching), and `hvac_action` reads the central-heating bit rather than flame, so DHW hot-water draws do not show as heating. `hvac_mode` and `hvac_action` are also exposed as standalone discoverable sensors. Validated against real gas-boiler (idle, DHW, active heating) and heatpump (cooling) captures. (GH #665, TASK-941)
+- Build break on the uptime sensor: the discovery table referenced `HaUnit::s` (seconds) but that unit was never added to the `HaUnit` enum or its string mapper, so the firmware did not compile. Added the `s` unit (the uptime value is published in seconds). The climate, gateway-mode, OTGW-connected and uptime/fragskip entities therefore reach devices for the first time in this release.
+- Corrected a stale Mosquitto winget package ID in the `capture-mqtt-debug` diagnostic helper, which broke its automatic MQTT-client install step. (GH #666, PR #671)
 
 ## [1.7.0] - 2026-06-25
 

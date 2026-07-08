@@ -4,6 +4,14 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.7.1
+
+**No breaking changes versus v1.7.0.**
+
+A Home Assistant integration release. All new entities (unified off/heat/cool climate, `hvac_mode` / `hvac_action` sensors, gateway-mode and OTGW-connected binary-sensors, uptime / unsupported-message-id / fragskip sensors) are additive auto-discovery topics. No MQTT topic renames, REST API changes, or settings-format changes.
+
+---
+
 ## v1.7.0
 
 **No breaking changes versus v1.6.1.**

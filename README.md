@@ -4,9 +4,23 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.0](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.0), which adds heap-fragmentation crash-proofing and a RAM / heap-headroom optimization pass (about 6.6 KB of static RAM reclaimed, the largest-contiguous-block floor under load restored to roughly the 1.3.5 level).
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.1](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.1), a Home Assistant integration release adding cooling support to the climate entity plus new gateway and device-health auto-discovery sensors.
 
-## What's New in v1.7.0
+## What's New in v1.7.1
+
+v1.7.1 is a Home Assistant integration release for the 1.x (ESP8266) line. No breaking changes versus v1.7.0.
+
+- **Cooling support in the climate entity**: the Home Assistant MQTT climate entity now models `off`/`heat`/`cool`, driven by new `hvac_mode` and `hvac_action` topics from the OpenTherm status bits. Cooling-capable systems (for example a Honeywell Round Modulation Heat/Cool on a heatpump) no longer show as heating-only. `hvac_action` reads the central-heating bit, not flame, so domestic-hot-water draws do not read as heating. (GH #665, ADR-085)
+- **HVAC Mode and HVAC Action sensors**: the climate topics are also exposed as two standalone discoverable sensors (`off`/`heat`/`cool` and `off`/`idle`/`heating`/`cooling`).
+- **Gateway mode and OTGW-connected binary-sensors**: see gateway/monitor mode and the OTGW-to-PIC link state in Home Assistant, index-gated so they publish once and self-heal.
+- **Device-health sensors**: uptime, unsupported-message-id count, and the heap-fragmentation back-off counters (`http_fragskips` / `mqtt_fragskips` / `ws_fragskips`) are now auto-discovery sensors.
+- Fixes: a compile break (missing seconds unit) that kept the previous betas from shipping, so these entities reach devices for the first time; a stale Mosquitto winget package ID in the `capture-mqtt-debug` helper.
+
+Full release notes: [RELEASE_NOTES_1.7.1.md](RELEASE_NOTES_1.7.1.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
+
+## What was new in v1.7.0
 
 v1.7.0 is a stability and headroom release for the 1.x (ESP8266) line.
 
@@ -89,11 +103,25 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.6.1
+## Latest stable release: v1.7.1
 
-`v1.6.1` is the current stable release on `main`. MQTT on-change publishing is now the default, with a redesigned boiler-unsupported diagnostics panel and a set of MQTT and Web UI reliability fixes on top of v1.6.0.
+`v1.7.1` is the current stable release on `main`. It adds cooling support to the Home Assistant climate entity (a unified off/heat/cool entity for heatpump and Heat/Cool-thermostat users), plus gateway-mode, OTGW-connected, uptime and heap-health auto-discovery sensors.
 
-Full release notes: [RELEASE_NOTES_1.6.1.md](RELEASE_NOTES_1.6.1.md)
+Full release notes: [RELEASE_NOTES_1.7.1.md](RELEASE_NOTES_1.7.1.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.1)
+
+## Previous stable release: v1.7.0
+
+`v1.7.0` is a stability and headroom release: heap-fragmentation crash-proofing and a RAM / heap-headroom optimization pass (about 6.6 KB of static RAM reclaimed).
+
+Full release notes: [docs/releases/RELEASE_NOTES_1.7.0.md](docs/releases/RELEASE_NOTES_1.7.0.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.0)
+
+## Previous stable release: v1.6.1
+
+`v1.6.1` delivered MQTT on-change publishing as the default, a redesigned boiler-unsupported diagnostics panel, and a set of MQTT and Web UI reliability fixes on top of v1.6.0.
+
+Full release notes: [docs/releases/RELEASE_NOTES_1.6.1.md](docs/releases/RELEASE_NOTES_1.6.1.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.6.1)
 
 ## Previous stable release: v1.6.0
