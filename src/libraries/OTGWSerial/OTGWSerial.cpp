@@ -43,7 +43,7 @@
 
 #define byteswap(val) (((val << 8) | (val >> 8)) & 0xffff)
 
-#ifdef DEBUG
+#ifdef OTGWSERIAL_DEBUG
 #define Dprintf(...) if (debugfunc) debugfunc(__VA_ARGS__)
 OTGWDebugFunction *debugfunc = nullptr;
 #else
@@ -119,6 +119,15 @@ unsigned short p16f1847recover(unsigned short addr, unsigned short *code) {
 
 OTGWUpgrade::OTGWUpgrade(OTGWSerial *serial)
   : serial(serial), stage(FWSTATE_IDLE) {
+    // Explicitly zero the receive-framing state: these members were never
+    // initialized, so a heap-allocated instance started with junk in bufpos/
+    // checksum/cmdcode and the first Timeout diagnostic dumped stale heap
+    // bytes as if they were received data (TASK-972).
+    bufpos = 0;
+    checksum = 0;
+    cmdcode = 0;
+    buffer[0] = '\0';
+    lastaction = millis();
 }
 
 OTGWUpgrade::~OTGWUpgrade() {
@@ -589,9 +598,13 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
      case FWSTATE_RSET:
         if (packet != nullptr) {
             byte fwcommand[] = {CMD_VERSION, 3};
-            progress(WEIGHT_RESET);
+            // Send the command BEFORE the progress callback: the callback can
+            // spend >100ms in application code (WebSocket/JSON), and the PIC
+            // bootloader only waits a bounded time after its ETX handshake
+            // for the first STX (TASK-972).
             fwCommand(fwcommand, sizeof(fwcommand));
             stage = FWSTATE_VERSION;
+            progress(WEIGHT_RESET);
         } else {
             serial->resetPic();
         }
@@ -781,7 +794,7 @@ OTGWError OTGWUpgrade::finishUpgrade(OTGWError result) {
 void OTGWUpgrade::upgradeEvent(int ch) {
     bool dle;
 
-    // Dprintf("upgradeEvent(%d)\n", ch);
+    // Dprintf(PSTR("upgradeEvent(%02x)\n"), ch);
     dle = bufpos < sizeof(buffer) && buffer[bufpos] == DLE;
     if (!dle && ch == STX) {
         serial->SetLED(1);
@@ -839,10 +852,12 @@ OTGWSerial::OTGWSerial(int resetPin, int progressLed, int rxPin, int txPin)
     (void)txPin;
     HardwareSerial::begin(9600, SERIAL_8N1);
 #elif defined(ESP32)
-: HardwareSerial(1), _reset(resetPin), _led(progressLed) {
-    // ESP32 Serial1 needs explicit RX/TX pin assignment. The pins are passed
-    // by the application at instantiation (board pin macros from boards.h are
-    // not visible in this translation unit).
+: HardwareSerial(0), _reset(resetPin), _led(progressLed) {
+    // ESP32-S3: use UART0 — the PIC pins on the Classic socket (GPIO43/44) are
+    // UART0's native IO_MUX pins, avoiding the GPIO-matrix TX routing that is
+    // suspected of corrupting outbound bytes (TASK-972). The Arduino console is
+    // on native USB (ARDUINO_USB_CDC_ON_BOOT=1, TASK-850), so UART0 is free.
+    // RX/TX pin assignment is passed by the application at instantiation.
     if (rxPin >= 0 && txPin >= 0) {
         HardwareSerial::begin(9600, SERIAL_8N1, rxPin, txPin);
     } else {
@@ -962,7 +977,7 @@ String OTGWSerial::processorToString() {
     return processorToString(processor());
 }
 
-#ifdef DEBUG
+#ifdef OTGWSERIAL_DEBUG
 void OTGWSerial::registerDebugFunc(OTGWDebugFunction *func) {
     debugfunc = func;
 }

@@ -26,6 +26,11 @@
 #ifndef OTGWSerial_h
 #define OTGWSerial_h
 
+// Compile the upgrade-diagnostics hook (Dprintf -> registered debug callback).
+// The callback is a nullptr no-op unless the application registers one via
+// registerDebugFunc(); runtime cost without a callback is a single test.
+#define OTGWSERIAL_DEBUG 1
+
 #include <HardwareSerial.h>
 #include <FS.h>
 
@@ -182,7 +187,7 @@ public:
    void registerFinishedCallback(OTGWUpgradeFinished *func);
    void registerProgressCallback(OTGWUpgradeProgress *func);
    void registerFirmwareCallback(OTGWFirmwareReport *func);
-#ifdef DEBUG
+#ifdef OTGWSERIAL_DEBUG
    void registerDebugFunc(OTGWDebugFunction *func);
 #endif
 

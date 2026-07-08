@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.335
+**  Version  : v2.0.0-alpha.336
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5502,8 +5502,25 @@ void fwreportinfo(OTGWFirmware fw, const char *version) {
     sendMQTTversioninfo();
 }
 
+#ifdef OTGWSERIAL_DEBUG
+// Route the OTGWSerial upgrade-state-machine diagnostics (Dprintf) to the
+// telnet debugger. Shows retry stages, timeout hexdumps of received bytes and
+// bootloader responses during a PIC flash (TASK-972 handshake diagnosis).
+static void picUpgradeDebug(const char *fmt, ...) {
+  char buf[160];
+  va_list args;
+  va_start(args, fmt);
+  vsnprintf_P(buf, sizeof(buf), fmt, args);
+  va_end(args);
+  DebugTf(PSTR("[OTGWSerial] %s"), buf);
+}
+#endif
+
 void fwupgradestart(const char *hexfile) {
   DebugTln(F("--- fwupgradestart() ---"));
+#ifdef OTGWSERIAL_DEBUG
+  OTGWSerial.registerDebugFunc(picUpgradeDebug);
+#endif
   DebugTf(PSTR("Hex file path: %s\r\n"), hexfile);
   OTGWError result;
   
