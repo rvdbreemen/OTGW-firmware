@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.336
+**  Version  : v2.0.0-alpha.337
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -351,7 +351,13 @@ void setup() {
     SetupDebugln(F("Board mode: forced OT-Direct (manual override, no PIC probe)"));
     initOTDirect();              // UART1 already torn down before startWiFi()
   } else {
-    // UART1 was closed before the WiFi portal; re-open it for the PIC probe.
+    // TASK-972: silence the IDF/ROM console before touching the PIC UART.
+    // The primary IDF console is UART0 on GPIO43 = the PIC RX line; WiFi
+    // driver/error-log output would otherwise be transmitted into the PIC
+    // (SE responses at runtime, aborted bootloader handshake during a PIC
+    // firmware flash). The USB-Serial-JTAG console remains available.
+    platformMuteUart0Console();
+    // The PIC UART was closed before the WiFi portal; re-open it for the probe.
     OTGWSerial.begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX);
     // ADR-158: bind the PIC reset / firmware-progress-LED to the live Classic
     // pin map (S3 Mini vs S3 Mini Pro) BEFORE detectPIC() drives them. The PIC

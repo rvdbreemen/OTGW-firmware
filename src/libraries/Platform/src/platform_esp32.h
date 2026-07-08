@@ -313,6 +313,22 @@ inline void platformRestart() {
   ESP.restart();
 }
 
+// Mute the IDF/ROM console on UART0 (TASK-972). On PIC-carrying boards the
+// primary IDF console (CONFIG_ESP_CONSOLE_UART_NUM=0, GPIO43) is physically
+// the PIC RX line: any esp_log/ets_printf output (WiFi driver bcn_timeout,
+// AsyncTCP warnings, error logs) is transmitted INTO the PIC. A single such
+// byte during the PIC bootloader's STX window aborts a PIC firmware flash,
+// and the PIC application answers stray log lines with SE (syntax error).
+// The USB-Serial-JTAG secondary console is unaffected; call this once on
+// boards where UART0 is bound to the PIC.
+extern "C" void ets_install_putc1(void (*p)(char c));
+inline int platformNullLogVprintf(const char *, va_list) { return 0; }
+inline void platformNullRomPutc(char) {}
+inline void platformMuteUart0Console() {
+  esp_log_set_vprintf(platformNullLogVprintf);
+  ets_install_putc1(platformNullRomPutc);
+}
+
 // Hardware random
 inline uint32_t platformHardwareRandom() {
   return esp_random();
