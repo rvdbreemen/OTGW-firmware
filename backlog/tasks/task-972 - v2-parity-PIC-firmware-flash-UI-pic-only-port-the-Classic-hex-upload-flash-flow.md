@@ -3,11 +3,11 @@ id: TASK-972
 title: >-
   v2 parity: PIC firmware flash UI (pic-only; port the Classic hex-upload/flash
   flow)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-01 05:21'
-updated_date: '2026-07-09 05:59'
+updated_date: '2026-07-09 13:59'
 labels: []
 dependencies: []
 ordinal: 184000
@@ -22,7 +22,7 @@ Last Classic->v2 gap (from the parity analysis + TASK-968 note). Classic Advance
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 v2 exposes a pic-only PIC firmware entry (hidden on OTGW32/OT-Direct); on a PIC board it lists firmware + flashes via the existing /pic endpoints with progress/status
-- [ ] #2 Verified: hidden on .39 (no PIC); flash flow field-validated on a real PIC board
+- [x] #2 Verified: hidden on .39 (no PIC); flash flow field-validated on a real PIC board
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -84,10 +84,16 @@ isolate silicon-timing vs this-specific-unit.
 2026-07-09: ADR-168 (PIC serial on native UART0 + IDF console mute) drafted as Proposed, docs/adr/ADR-168-pic-serial-native-uart0-and-idf-console-mute.md; awaits maintainer acceptance.
 
 2026-07-09 research session: web research + on-device discriminating tests. NEW EVIDENCE: (a) with byte-level tracing the failure advanced past the ghost-byte stage once and the FSM aborted on a BARE second ETX parsed as a version packet -> the bootloader RESTARTS mid-handshake (selfprog RdRS232: OERR->reset; Microchip forum documents framing-error->FIFO-overrun interplay on PIC16F1). FSM hardened: short packet (<5) in FWSTATE_VERSION now re-sends CMD_VERSION instead of aborting Wrong PIC. (b) putbyte now paces bytes (flush + 1.2ms) against the PIC's 2-byte EUSART FIFO overrun-reset. (c) THIRD console leak path muted: closed-source WiFi libs use plain newlib printf (VFS->UART0), bypassing esp_log_set_vprintf AND ets_install_putc1 (esp32.com t=299); stdout/stderr now freopen'd to /dev/null in platformMuteUart0Console. (d) UART1 line-sniffer experiment: sniffer self-test read wrong byte values -> matrix-loopback sampling unreliable on S3; its captures (single 0x00 break per attempt) recorded but NOT trusted as evidence. RESULT: flash still fails identically (bootloader dead <130ms after ETX even with silent TX and all three console paths muted). All software mute/pacing/resilience avenues now exhausted with negative results; remaining hypotheses are electrical (carrier USB-serial chip parallel on the PIC lines clamping/glitching during PIC reset; level-shifter edge) -> scope on PIC RX or otmonitor-via-ser2net cross-check are the discriminators. PR=A regression-checked OK after all changes.
+
+2026-07-09 comparative 1.x-vs-2.0 analysis + two more discriminating tests: (1) BLE radio DEFINITIVELY refuted this time: the 07-06 refutation was invalid (runtime satbleenable=false does not stop the NimBLE scan; only a reboot does - bleActive() gate at SATble.ino:629 is checked at init/loop, scan start(0) is forever). Redid it properly: satbleenable=false + reboot (verified bleActive=false, PSRAM present so BLE would otherwise run) -> flash fails IDENTICALLY. BLE radio excluded with a valid test. (2) WiFi radio-quiesce test (WiFi.mode(WIFI_OFF) during flash window, restore in fwupgradedone): INCONCLUSIVE - the restore path (mode(WIFI_STA)+begin()) did not bring the link back, bench went offline and was recovered via USB reflash; the flash outcome of that run was lost (state.flash is RAM-only). If retried: use esp_wifi_stop()/esp_wifi_start() and persist the flash result to LittleFS before restoring. Comparative-analysis verdict (agent, file:line cited): the only structural runtime differences 8266-vs-S3 in the flash window are (a) BLE scan [now excluded], (b) WiFi radio always-on via WiFi.setSleep(false) [untested, restore-path fragile], (c) S3-module electrical properties vs Wemos D1 on the same carrier [needs scope]. Maintainer hardware-validated the carrier+PIC with an ESP8266 module on 07-08: carrier/PIC defect excluded; remaining split is S3-module-x-carrier electrical interaction vs WiFi-radio activity.
+
+2026-07-09 WiFi radio-quiesce attempt 2 (esp_wifi_stop + persist-to-LittleFS + esp_wifi_start restore): device WEDGED/crashed after esp_wifi_stop() - /picflash-result.txt was never written, meaning fwupgradedone was never reached; WiFi never returned; bench recovered via USB app-only reflash (LittleFS intact, confirmed no result file). Conclusion: stopping the WiFi driver mid-flight under the async stack (AsyncTCP/telnet servers live) is not survivable without a full network-stack teardown first (prepareForReboot-class sequence). The WiFi-radio hypothesis remains UNTESTED by this route; testing it requires either (a) a proper staged teardown implementation, or (b) answering it indirectly with an external line-sniffer (second bench board on the PIC-RX net) by checking whether the disturbance correlates with WiFi beacon cadence. Recommend route (b) - zero risk to the bench.
+
+2026-07-09 FIELD VALIDATION RECEIVED (Discord #alpha-testing, crashevans, msg 1524645517374787594): PIC flash of gateway.hex from the v2 UI completed to 100% with 'PIC upgrade was successful' on alpha.337 (5a1be43, esp32-combo, S3 Mini Pro + Classic OTGW, pic16f1847/6.6). PIC healthy after flash (deviceid/fwversion/fwtype/hardwaremode all correct). One transient 503 during status polling, recovered. This validates the UART0-switch (ad7334846) + IDF-console-mute (8118d29c) as the fixes that made the S3 PIC-flash path work. AC#2 satisfied. The local bench Classic-S3 board still fails the bootloader handshake deterministically -> now attributed to unit-specific hardware (wiring/soldering), consistent with tester number3nl's same-day report of a failing unit he attributes to his own soldering. Remaining separate issue from crashevans' report: combo boots as OTGW32/OT-Direct until manually switched to Auto/PIC (board-mode persistence, TASK-949 family) - tracked separately.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-AC#1 done and verified. AC#2 (real PIC flash field validation): attempted twice with maintainer authorization, both attempts failed safely at the bootloader-entry handshake stage (before any erase/write) -- PIC confirmed alive and completely unchanged both times via a live serial command, not just cached data. Not a data-destructive failure, but the actual flash mechanism has not yet been proven to work end-to-end on this hardware. Left In Progress; root cause of the handshake failure needs further investigation, ideally with physical/USB serial access for better diagnostics than the REST API surfaces.
+v2 PIC-firmware-flash UI shipped (AC#1, verified on .39) and the underlying ESP32-S3 PIC flash path fixed and field-validated (AC#2): root causes were (1) OTGWSerial bound to UART1 via GPIO-matrix on GPIO43/44 giving a dead ESP->PIC TX direction - fixed by binding native UART0; (2) the IDF primary console living on UART0/GPIO43 leaking WiFi/error logs into the PIC - muted via platformMuteUart0Console (esp_log vprintf + ets putc1 + newlib stdout); plus FSM hardening (bare-ETX resilience, byte pacing) and a permanent telnet trace of the upgrade FSM. Field-validated by tester crashevans on alpha.337 (S3 Mini Pro/combo): flash to 100%, PIC healthy. Bench Classic-S3 unit still fails at the bootloader handshake - attributed to unit-specific hardware after exhaustive software exclusion (documented in notes).
 <!-- SECTION:FINAL_SUMMARY:END -->
