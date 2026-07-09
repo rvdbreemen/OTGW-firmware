@@ -1,0 +1,26 @@
+---
+id: TASK-1034
+title: >-
+  webui v2: polish bundle from real-use test - BLE toast stacking, humidity
+  precision, connection-map copy, classic artifacts
+status: To Do
+assignee: []
+created_date: '2026-07-09 18:11'
+labels: []
+dependencies: []
+ordinal: 243000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+From the same 2026-07-09 real-use test on the S3 Mini Pro: (a) BLE 'New sensor discovered' toasts stack 4-high, never auto-dismiss, and cover content on EVERY page/tab until Assign/Ignore/x is clicked per toast - they should auto-collapse into one grouped toast or a badge and auto-dismiss after a timeout (roster page remains the place to act); (b) Sensors>BLE roster shows raw float humidity '57.950001%' - round to 1 decimal or integer; (c) Monitor>Connection boiler card shows contradictory copy: 'The boiler (OT slave) is answering.' directly above 'Boiler not answering - check the OT wiring / boiler power.' - the static explainer line should adapt to (or be removed for) the actual state; (d) classic UI keeps literal 'Wait for it...' text visible top-left after full load. All cosmetic/UX, no functional breakage; everything else in the walkthrough (Home system view, Monitor tabs, Settings all 13 sections, Advanced Debug/System, dark/light) rendered and behaved correctly with zero JS exceptions.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 BLE discovery toasts group/auto-dismiss and no longer permanently cover page content
+- [ ] #2 Humidity values render with sane precision everywhere they appear
+- [ ] #3 Connection-map boiler/thermostat cards show state-consistent copy
+- [ ] #4 Classic 'Wait for it...' placeholder clears after load
+<!-- AC:END -->
