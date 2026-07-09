@@ -1,7 +1,7 @@
-# Daily Issue Report — 2026-07-08
+# Daily Issue Report — 2026-07-09
 
-**Generated:** 2026-07-08 07:10 UTC
-**Window:** Last 24 hours (since 2026-07-07 07:10 UTC)
+**Generated:** 2026-07-09 07:10 UTC
+**Window:** Last 24 hours (since 2026-07-08 07:10 UTC)
 
 ## GitHub Issues
 
@@ -9,20 +9,17 @@
 
 No open issues were updated in the last 24 hours.
 
-_Context: Repository has 2 open issues total; last activity was on 2026-05-09._
+_Context: Repository has 2 open issues total (both feature requests); last activity was on 2026-05-09._
 
----
+## Tweakers Forum (GoT thread #1653967)
 
-## Tweakers Forum
+**Feed fetched:** 2026-07-09 07:10 UTC
+**Filter:** Posts by `number3` and `rvdbreemen` excluded.
 
-**Thread:** [OTGW] OpenTherm gateway — Duurzame energie en installaties
+No new posts from the last 24 hours.
 
-No new posts in the last 24 hours (excluding posts by `number3` / `rvdbreemen`).
-
-_Context: Most recent eligible post was by `tjanssen` on 2026-06-29, requesting an uptime sensor for easier disconnect diagnostics._
-
----
+_Most recent non-excluded post: **tjanssen** (Sun, 29 Jun 2026) — requested an uptime sensor in HA auto-discovery after recurring disconnects._
 
 ## Summary
 
-No new issues in the last 24 hours.
+**No new issues in the last 24 hours.**
