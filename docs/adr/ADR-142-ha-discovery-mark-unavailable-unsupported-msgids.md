@@ -1,7 +1,7 @@
 ---
 id: ADR-142
 title: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List
-status: Proposed
+status: Deferred
 date: 2026-06-04
 tags: [mqtt, ha-discovery, availability, opentherm, boiler, unsupported-msgid, observability]
 supersedes: []
@@ -14,7 +14,16 @@ deciders: [Robert van den Breemen]
 
 ## Status
 
-Proposed. **Binding** (per ADR-080): the CI gate is an extension of the
+Deferred to Milestone 2.1.0. Not awaiting an acceptance sign-off: the
+feature is unimplemented (no `availability_mode` in `src/`) and its named CI
+gate `check_ha_discovery_msgid_availability_list` does not yet exist in
+`evaluate.py`. Per ADR-080 this ADR CANNOT flip to Accepted until that gate
+lands in the same implementation commit as the feature. Until then it stays
+Deferred rather than plain Proposed, so it does not read as ready for review.
+
+The decision content below (Approach B) still stands as the intended design.
+
+**Binding** (per ADR-080): the CI gate is an extension of the
 golden-file discovery test in `tests/` (introduced by ADR-122 / TASK-648) to
 assert, for at least one OT msgID whose `isBoilerMsgIdUnsupportedRead()` or
 `isBoilerMsgIdUnsupportedWrite()` returns true, that the emitted discovery
@@ -37,6 +46,11 @@ status_history:
     status: Proposed
     changed_by: Claude (TASK-687)
     reason: Documents Approach B (publish discovery + mark-unavailable via availability list) as decided by maintainer on 2026-06-01. Cross-references ADR-102 to reconcile capability-gating vs liveness-gating concerns.
+    changed_via: adr-kit
+  - date: 2026-07-09
+    status: Deferred
+    changed_by: Agent (TASK-1002)
+    reason: Relabelled Proposed -> Deferred to 2.1.0. The feature is unimplemented (no availability_mode in src/) and the named gate check_ha_discovery_msgid_availability_list does not exist in evaluate.py; per ADR-080 that gate is a precondition of acceptance and must land with the implementation. Deferral makes explicit that this is not awaiting a review sign-off.
     changed_via: adr-kit
 
 ## Context

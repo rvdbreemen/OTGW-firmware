@@ -3,9 +3,10 @@ id: TASK-948
 title: >-
   Document session decisions: 4 Proposed ADRs (159-162) + REST API docs for 3
   new endpoints
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-29 10:44'
+updated_date: '2026-07-09 20:32'
 labels:
   - async-esp32s3
 dependencies: []
@@ -20,7 +21,19 @@ Capture this session's directly-landed architectural decisions as Proposed ADRs 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ADR-159..162 drafted Proposed, each passing the 4 adr-quality gates (Completeness/Evidence/Clarity/Consistency), correct amends/related links, no number collision
-- [ ] #2 docs/api/openapi.yaml + README.md document the 3 new REST endpoints (methods, params, responses, auth, the bindkey write-only note)
+- [x] #1 ADR-159..162 drafted Proposed, each passing the 4 adr-quality gates (Completeness/Evidence/Clarity/Consistency), correct amends/related links, no number collision
+- [x] #2 docs/api/openapi.yaml + README.md document the 3 new REST endpoints (methods, params, responses, auth, the bindkey write-only note)
 - [ ] #3 evaluate.py --quick green (ADR references resolve); docs-only, no firmware change
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-07-09 drain verify: git-truth check — ADR-159 (0x26 symmetric gating), ADR-160 (combo auto re-probe never persists), ADR-161 (BLE roster REST + write-only secret), ADR-162 (SAT force-boiler test hook) all exist as files with the described titles/content, all Proposed. A2: /api/v2/mqtt/republish, /api/v2/sat/force-boiler, /api/v2/sat/ble/roster present in docs/api/openapi.yaml. Deliverable complete.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Session's hand-driven architectural decisions captured as Proposed ADR-159..162 and the 3 new REST endpoints documented in openapi.yaml — verified present in git.
+<!-- SECTION:FINAL_SUMMARY:END -->
