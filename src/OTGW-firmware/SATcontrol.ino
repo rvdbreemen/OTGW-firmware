@@ -618,6 +618,7 @@ static bool     _pwm_waitingForFlame       = false;
 static uint32_t _pwm_waitForFlameStartMs   = 0;    // Timestamp when flame wait began (for 180s timeout)
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
 static uint32_t _pwm_lastOffTimeMs         = 1;    // Last PWM off-phase duration (ms); 0 = saturation (duty wants continuous ON). Read by the off_time==0 saturation guard.
+static uint32_t _pwm_lastOnTimeMs          = 0;    // Last PWM on-phase duration (ms) = Python pwm_state.on_time_seconds. Read by the cycle classifier's SHORT_CYCLING threshold (TASK-891.4 AC#3).
 // Python HEATER_STARTUP_TIMEFRAME: max wait for ignition before giving up
 static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeout
 
@@ -676,6 +677,7 @@ static float satApplyPWM(float pidOutput)
     // Range 5: Over-max - continuous ON (no CS startup sequence needed)
     state.sat.bPwmFlameRequested = true;
     _pwm_lastOffTimeMs = 0;   // off_time==0: duty wants continuous ON (saturation signal)
+    _pwm_lastOnTimeMs  = maxMs; // continuous ON: report the full period as on-time (TASK-891.4)
     return pidOutput;
   } else if (duty < dutyMin) {
     // Range 1: Ultra-low - keep off or let existing flame finish min-on
@@ -705,6 +707,7 @@ static float satApplyPWM(float pidOutput)
     if (onTimeMs < minOnMs) onTimeMs = minOnMs;
   }
   _pwm_lastOffTimeMs = offTimeMs;   // record for the off_time==0 saturation guard (Python pwm off_time)
+  _pwm_lastOnTimeMs  = onTimeMs;    // record for the cycle-classifier SHORT threshold (Python pwm on_time, TASK-891.4)
 
   // --- PWM state machine with 4-step CS startup sequence ---
   uint32_t sinceFlameStart = millis() - satCycleGetFlameOnStartMs();
@@ -778,6 +781,10 @@ static float satApplyPWM(float pidOutput)
 // Last PWM off-phase duration in ms (0 = saturation: duty calc wants continuous ON).
 // Read by satCycleCheckAutoSwitch() for the off_time==0 saturation guard (Python pwm off_time).
 uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }
+
+// Last PWM on-phase duration in ms (Python pwm_state.on_time_seconds).
+// Read by the cycle classifier's PWM SHORT_CYCLING threshold (TASK-891.4 AC#3).
+uint32_t satPwmLastOnTimeMs() { return _pwm_lastOnTimeMs; }
 
 //=====================================================================
 //=== Preset Handling ===
@@ -2067,6 +2074,18 @@ void satSendStatusJSON()
     je.field(F("duty_ratio"),           snap->st.sat.fDutyRatio);
     je.field(F("overshoot_fraction"),   snap->st.sat.fOvershootFraction);
     je.field(F("underheat_fraction"),   snap->st.sat.fUnderheatFraction);
+    // TASK-891.4 classifier-depth parity metrics
+    je.field(F("cycle_req_setpoint_error"),  snap->st.sat.fCycleReqSetpointError);
+    je.field(F("cycle_time_in_band_sec"),    snap->st.sat.fCycleTimeInBandSec);
+    je.field(F("cycle_total_overshoot_sec"), snap->st.sat.fCycleTotalOvershootSec);
+    je.field(F("cycle_t_first_overshoot"),   snap->st.sat.fCycleTimeToFirstOvershoot);
+    je.field(F("cycle_t_sustained_overshoot"), snap->st.sat.fCycleTimeToSustainedOvershoot);
+    je.field(F("off_with_demand_sec"),       snap->st.sat.fOffWithDemandSec);
+    je.field(F("24h_cycles"),                (int32_t)snap->st.sat.i24hCycles);
+    je.field(F("24h_duty_ratio"),            snap->st.sat.f24hDutyRatio);
+    je.field(F("24h_overshoot_fraction"),    snap->st.sat.f24hOvershootFraction);
+    je.field(F("24h_underheat_fraction"),    snap->st.sat.f24hUnderheatFraction);
+    je.field(F("24h_long_cycle_fraction"),   snap->st.sat.f24hLongCycleFraction);
     je.field(F("cycle_phase"),          snap->phaseName);
     je.field(F("phase_duration_sec"),   (int32_t)snap->phaseDurationSec);
     je.field(F("pwm_duty"),             snap->st.sat.fPwmDutyCycle);
@@ -2396,10 +2415,11 @@ void satPublishMQTT()
 
   {
     static const char* const ccNames[] = {
-      "none", "good", "overshoot", "underheat", "short", "uncertain"
+      "none", "good", "overshoot", "underheat", "short", "uncertain",
+      "underheat_pwm", "insufficient"
     };
     int ccIdx = (int)state.sat.eLastCycleClass;
-    if (ccIdx < 0 || ccIdx > 5) ccIdx = 0;
+    if (ccIdx < 0 || ccIdx > 7) ccIdx = 0;
     publishIfChangedS(F("sat/cycle_class"), ccNames[ccIdx], s_cycle_class, false);
   }
 
@@ -2641,6 +2661,7 @@ void satPublishMQTT()
   {
     bool cycleProb = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT ||
                       state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT ||
+                      state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT_PWM ||
                       state.sat.eLastCycleClass == SAT_CYCLE_SHORT);
     publishIfChangedBStr(F("sat/cycle_health"), cycleProb, s_cycle_health, "ON", "OFF", true);
   }
@@ -4024,7 +4045,8 @@ static void satAutoTuneUpdate()
 
     // Classify the completed cycle
     bool isOvershoot = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT);
-    bool isUnderheat = (state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT);
+    bool isUnderheat = (state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT ||
+                        state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT_PWM);
 
     if (isOvershoot) _at_overshootCount++;
     if (isUnderheat) _at_undershootCount++;
@@ -4211,9 +4233,10 @@ void satControlLoop()
   // Sample cycle data frequently (every loop call)
   satCycleSample();
 
-  // Update rolling 4-hour window statistics once per minute (Task #227)
+  // Update rolling 4-hour + 24-hour window statistics once per minute (Task #227, TASK-891.4)
   if (DUE(timerSAT4hStats)) {
     satGetWindow4hStats();
+    satGetWindow24hStats();
   }
 
   // Main control loop on timer

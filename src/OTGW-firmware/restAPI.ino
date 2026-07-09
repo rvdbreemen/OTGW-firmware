@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.341
+**  Version  : v2.0.0-alpha.342
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -907,14 +907,16 @@ static void satSendHealthJSON()
                       && (state.sat.eBoilerStatus != SAT_BS_STALLED_IGNITION);
   bool cycleHealth     = (state.sat.eLastCycleClass != SAT_CYCLE_OVERSHOOT)
                       && (state.sat.eLastCycleClass != SAT_CYCLE_UNDERHEAT)
+                      && (state.sat.eLastCycleClass != SAT_CYCLE_UNDERHEAT_PWM)
                       && (state.sat.eLastCycleClass != SAT_CYCLE_SHORT);
 
   // --- Cycle class / kind names (kept in PROGMEM via static const) ---
   static const char* const ccNames[] = {
-    "none", "good", "overshoot", "underheat", "short", "uncertain"
+    "none", "good", "overshoot", "underheat", "short", "uncertain",
+    "underheat_pwm", "insufficient"
   };
   int ccIdx = (int)state.sat.eLastCycleClass;
-  if (ccIdx < 0 || ccIdx > 5) ccIdx = 0;
+  if (ccIdx < 0 || ccIdx > 7) ccIdx = 0;
 
   static const char* const ckNames[] = {
     "unknown", "ch", "dhw", "mixed"

@@ -48,6 +48,41 @@ static SATWindowRecord _win4h[SAT_WIN4H_SIZE];
 static SAT_RING_IDX_T  _win4hHead  = 0;   // next write position
 static SAT_RING_IDX_T  _win4hCount = 0;   // valid entries (0..SAT_WIN4H_SIZE)
 
+// --- Rolling 24-hour DAILY window (TASK-891.4, Python DAILY_WINDOW_SECONDS) ---
+// HEAP DISCIPLINE (AC#6): a full per-cycle 24h ring at 4h-window density would be
+// ~6x the 4h ring (~52 KB on ESP32) and blow the 40k heap floor. Instead the daily
+// window is a REDUCED-RESOLUTION aggregate: 24 coarse hourly buckets holding running
+// counts/sums only. Duty and the overshoot/underheat/long-cycle fractions are exact
+// from these sums; per-cycle percentiles and the true median-on-duration are DROPPED
+// (documented reduction — the 4h window still carries full-depth percentiles).
+// Cost: SAT_DAILY_BUCKETS * sizeof(SATDailyBucket) = 24 * 20 = 480 bytes static DRAM.
+static const uint32_t SAT_DAILY_BUCKET_MS = 3600UL * 1000UL; // 1-hour bucket granularity
+static const uint8_t  SAT_DAILY_BUCKETS   = 24;              // 24 buckets => 24h rolling window
+static const float    SAT_LONG_CYCLE_SEC  = 600.0f;         // >= this on-time counts as a "long" cycle (Python TARGET_MIN_ON_TIME_SECONDS)
+
+struct SATDailyBucket {
+  uint32_t bucketIdx;    // millis()/SAT_DAILY_BUCKET_MS this bucket represents (0 = empty slot)
+  uint16_t nCycles;      // cycles ending in this bucket-hour
+  uint16_t nOvershoot;   // of which classified OVERSHOOT
+  uint16_t nUnderheat;   // of which UNDERHEAT or UNDERHEAT_PWM
+  uint16_t nLong;        // of which on-time >= SAT_LONG_CYCLE_SEC
+  uint32_t sumOnMs;      // total flame-on ms
+  uint32_t sumOffMs;     // total flame-off ms (for duty)
+};
+static SATDailyBucket _daily[SAT_DAILY_BUCKETS];
+static uint8_t        _dailyHead  = 0;   // next write position
+static uint8_t        _dailyCount = 0;   // valid buckets (0..SAT_DAILY_BUCKETS)
+
+// Forward decl: satGetColdSetpoint() is static in SATcontrol.ino (compiled before
+// this file in the single-TU concatenation). Declared here so a linkage surprise
+// surfaces at compile time rather than silently.
+static float satGetColdSetpoint();
+
+// TASK-891.4 classifier / shape-metric constants
+static const float SAT_IN_BAND_MARGIN_C     = 1.0f;   // |flow - control_sp| <= this => in-band (Python IN_BAND_MARGIN_CELSIUS)
+static const float SAT_CYCLE_SHORT_FLOOR_SEC = 30.0f; // sane floor for PWM short-cycle threshold when configured on-time is unset/0
+static const float SAT_SHAPE_WARMUP_SEC     = 60.0f;  // shape metrics ignore the first N s of a cycle (Python effective_warmup cap = min(60, 0.25*duration); streaming approx uses the 60s cap)
+
 // Accumulator for flow-return delta during active cycle
 static float    _cycle_sumFlowRetDelta = 0.0f;
 static uint16_t _cycle_deltasamples   = 0;
@@ -79,6 +114,15 @@ static uint16_t _cycle_dhwSamples       = 0;   // samples where DHW was active
 static uint16_t _cycle_totalSamples     = 0;   // total samples this cycle
 static SATCyclePhase _cycle_phase       = SAT_CP_IDLE;
 static uint32_t _cycle_phaseStartMs     = 0;
+
+// --- TASK-891.4: per-cycle shape metrics (AC#4) + off-with-demand (AC#5) ---
+// Accumulated in satCycleSample() (post-warmup), snapshotted to state.sat at flame-off.
+static float    _cycle_timeInBandSec    = 0.0f;   // sum of intervals with |flow - control_sp| <= SAT_IN_BAND_MARGIN_C
+static float    _cycle_totalOvershootSec = 0.0f;  // sum of intervals with (flow - control_sp) >= overshoot margin
+static float    _cycle_overshootStreakSec = 0.0f; // current contiguous overshoot run length
+static float    _cycle_timeToFirstOvershootSec = -1.0f;     // -1 = none yet
+static float    _cycle_timeToSustainedOvershootSec = -1.0f; // -1 = none yet
+static uint32_t _cycle_lastFlameOffMs   = 0;      // millis() of the previous flame-off edge (for off-with-demand gating)
 
 // --- Sustained State Detection ---
 static float    _sustain_overshootSec   = 0.0f;
@@ -184,6 +228,28 @@ void satCycleInit()
   state.sat.f4hUnderheatFraction = 0.0f;
   state.sat.f4hFlowRetDeltaP50   = 0.0f;
   state.sat.f4hFlowRetDeltaP90   = 0.0f;
+  // Rolling 24-hour DAILY window (TASK-891.4)
+  memset(_daily, 0, sizeof(_daily));
+  _dailyHead  = 0;
+  _dailyCount = 0;
+  state.sat.i24hCycles            = 0;
+  state.sat.f24hDutyRatio         = 0.0f;
+  state.sat.f24hOvershootFraction = 0.0f;
+  state.sat.f24hUnderheatFraction = 0.0f;
+  state.sat.f24hLongCycleFraction = 0.0f;
+  // Per-cycle shape metrics + off-with-demand (TASK-891.4)
+  _cycle_timeInBandSec               = 0.0f;
+  _cycle_totalOvershootSec           = 0.0f;
+  _cycle_overshootStreakSec          = 0.0f;
+  _cycle_timeToFirstOvershootSec     = -1.0f;
+  _cycle_timeToSustainedOvershootSec = -1.0f;
+  _cycle_lastFlameOffMs              = millis();
+  state.sat.fCycleReqSetpointError        = 0.0f;
+  state.sat.fCycleTimeInBandSec           = 0.0f;
+  state.sat.fCycleTotalOvershootSec       = 0.0f;
+  state.sat.fCycleTimeToFirstOvershoot    = -1.0f;
+  state.sat.fCycleTimeToSustainedOvershoot = -1.0f;
+  state.sat.fOffWithDemandSec             = 0.0f;
   // Daily median recommendation (Task #228): reset intra-day buffer, keep daily ring intact
   _hcr_sHead  = 0;
   _hcr_sCount = 0;
@@ -263,7 +329,9 @@ void satGetWindow4hStats()
     sumOffMs   += _win4h[idx].offDurationMs;
     sumP90Flow += _win4h[idx].p90FlowTemp;
     if (_win4h[idx].eClass == (uint8_t)SAT_CYCLE_OVERSHOOT) nOvershoot++;
-    if (_win4h[idx].eClass == (uint8_t)SAT_CYCLE_UNDERHEAT) nUnderheat++;
+    // Both continuous and PWM underheat count toward the underheat fraction (TASK-891.4).
+    if (_win4h[idx].eClass == (uint8_t)SAT_CYCLE_UNDERHEAT ||
+        _win4h[idx].eClass == (uint8_t)SAT_CYCLE_UNDERHEAT_PWM) nUnderheat++;
     if (_win4h[idx].avgFlowRetDelta >= 0.0f) {  // sentinel -1 means no data
       deltas[nDeltas++] = _win4h[idx].avgFlowRetDelta;
     }
@@ -325,6 +393,84 @@ void satGetWindow4hStats()
           state.sat.f4hDutyRatio,
           state.sat.f4hOvershootFraction, state.sat.f4hUnderheatFraction,
           state.sat.f4hFlowRetDeltaP50, state.sat.f4hFlowRetDeltaP90);
+}
+
+//=== Rolling 24-hour DAILY window (TASK-891.4) ===
+// Record a completed cycle into the coarse hourly-bucket ring. Reuses the current
+// bucket while the cycle-end falls in the same wall-clock hour, else opens a new one.
+static void _dailyRecord(uint32_t nowMs, uint32_t onMs, uint32_t offMs,
+                         SATCycleClass cls, float durationSec)
+{
+  uint32_t bidx = nowMs / SAT_DAILY_BUCKET_MS;
+
+  // Locate the most-recently-written bucket; reuse it if it is the same hour.
+  uint8_t slot;
+  if (_dailyCount > 0) {
+    uint8_t last = (uint8_t)((_dailyHead + SAT_DAILY_BUCKETS - 1) % SAT_DAILY_BUCKETS);
+    if (_daily[last].bucketIdx == bidx) {
+      slot = last;   // same hour: accumulate into existing bucket
+    } else {
+      slot = _dailyHead;   // new hour: open a fresh bucket
+      memset(&_daily[slot], 0, sizeof(_daily[slot]));
+      _daily[slot].bucketIdx = bidx;
+      _dailyHead = (uint8_t)((_dailyHead + 1) % SAT_DAILY_BUCKETS);
+      if (_dailyCount < SAT_DAILY_BUCKETS) _dailyCount++;
+    }
+  } else {
+    slot = _dailyHead;
+    memset(&_daily[slot], 0, sizeof(_daily[slot]));
+    _daily[slot].bucketIdx = bidx;
+    _dailyHead = (uint8_t)((_dailyHead + 1) % SAT_DAILY_BUCKETS);
+    _dailyCount = 1;
+  }
+
+  _daily[slot].nCycles++;
+  if (cls == SAT_CYCLE_OVERSHOOT) _daily[slot].nOvershoot++;
+  if (cls == SAT_CYCLE_UNDERHEAT || cls == SAT_CYCLE_UNDERHEAT_PWM) _daily[slot].nUnderheat++;
+  if (durationSec >= SAT_LONG_CYCLE_SEC) _daily[slot].nLong++;
+  _daily[slot].sumOnMs  += onMs;
+  _daily[slot].sumOffMs += offMs;
+}
+
+// Aggregate the last 24h of hourly buckets into state.sat.f24h*. Reduced-resolution:
+// counts/sums only (duty + fractions are exact; percentiles/median are not carried).
+void satGetWindow24hStats()
+{
+  uint32_t bidx   = millis() / SAT_DAILY_BUCKET_MS;
+  uint32_t cutoff = (bidx >= (uint32_t)SAT_DAILY_BUCKETS) ? (bidx - SAT_DAILY_BUCKETS + 1) : 0;
+
+  uint32_t nC = 0, nO = 0, nU = 0, nL = 0;
+  uint64_t sOn = 0, sOff = 0;
+  for (uint8_t i = 0; i < _dailyCount; i++) {
+    if (_daily[i].nCycles == 0) continue;
+    if (_daily[i].bucketIdx < cutoff || _daily[i].bucketIdx > bidx) continue; // outside 24h
+    nC  += _daily[i].nCycles;
+    nO  += _daily[i].nOvershoot;
+    nU  += _daily[i].nUnderheat;
+    nL  += _daily[i].nLong;
+    sOn += _daily[i].sumOnMs;
+    sOff += _daily[i].sumOffMs;
+  }
+
+  state.sat.i24hCycles = (uint16_t)((nC > 0xFFFFu) ? 0xFFFFu : nC);
+  if (nC == 0) {
+    state.sat.f24hDutyRatio         = 0.0f;
+    state.sat.f24hOvershootFraction = 0.0f;
+    state.sat.f24hUnderheatFraction = 0.0f;
+    state.sat.f24hLongCycleFraction = 0.0f;
+    return;
+  }
+  float fn = (float)nC;
+  float totalMs = (float)(sOn + sOff);
+  state.sat.f24hDutyRatio         = (totalMs > 0.0f) ? ((float)sOn / totalMs) : 0.0f;
+  state.sat.f24hOvershootFraction = (float)nO / fn;
+  state.sat.f24hUnderheatFraction = (float)nU / fn;
+  state.sat.f24hLongCycleFraction = (float)nL / fn;
+
+  SATDebugTf(PSTR("SAT 24h: n=%lu duty=%.2f overshoot=%.2f underheat=%.2f long=%.2f\r\n"),
+          (unsigned long)nC, state.sat.f24hDutyRatio,
+          state.sat.f24hOvershootFraction, state.sat.f24hUnderheatFraction,
+          state.sat.f24hLongCycleFraction);
 }
 
 //=== Per-cycle flow temperature p-percentile (Task #225) ===
@@ -433,7 +579,7 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
   // Update EMA fractions
   _ema_overshootFrac = EMA_ALPHA * (cls == SAT_CYCLE_OVERSHOOT ? 1.0f : 0.0f)
                      + (1.0f - EMA_ALPHA) * _ema_overshootFrac;
-  _ema_underheatFrac = EMA_ALPHA * (cls == SAT_CYCLE_UNDERHEAT ? 1.0f : 0.0f)
+  _ema_underheatFrac = EMA_ALPHA * ((cls == SAT_CYCLE_UNDERHEAT || cls == SAT_CYCLE_UNDERHEAT_PWM) ? 1.0f : 0.0f)
                      + (1.0f - EMA_ALPHA) * _ema_underheatFrac;
   _ema_longCycleFrac = EMA_ALPHA * (durationSec > 600.0f ? 1.0f : 0.0f)
                      + (1.0f - EMA_ALPHA) * _ema_longCycleFrac;
@@ -474,29 +620,67 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 //     p90=51.8C (<57 → no overshoot), p10=48.2C (<53 → underheat): UNDERHEAT
 //     With old classifier: also UNDERHEAT (min_flow=48.2<53). No regression.
 //     [p10 advantage: brief cold pocket at ignition start doesn't skew result]
-static SATCycleClass _cycleClassify(float durationSec, float p90FlowTemp, float p10FlowTemp, float setpoint, float overshootSec)
+// TASK-891.4: mode-aware classifier (Python cycles/classifier.py parity).
+//   controlSp   = sent CH setpoint at cycle start (state.sat.fFinalSetpoint) — Python control_setpoint.
+//   requestedSp = PID requested setpoint snapshot at flame-off (state.sat.fPidOutput) — Python requested_setpoint.
+// Constant-per-cycle approximation: because percentile(flow - c) == percentile(flow) - c for a
+// per-cycle constant c, both error metrics are derived from the existing flow tail ring by
+// shifting the tail percentiles — no second per-sample ring is needed (heap win, AC#1/#6).
+//   flow_control_setpoint_error.p{50,90} = tailP{50,90} - controlSp
+//   flow_requested_setpoint_error.p90    = tailP90       - requestedSp
+// Ordering honours the no-regression clause: INSUFFICIENT -> SHORT -> OVERSHOOT (both modes) ->
+// mode-specific underheat -> GOOD/UNCERTAIN. Keeping SHORT ahead of OVERSHOOT prevents a short
+// overshooting cycle from flipping SHORT->OVERSHOOT.
+static SATCycleClass _cycleClassify(float durationSec, float tailP90, float tailP50,
+                                    float controlSp, float requestedSp, float overshootSec,
+                                    uint16_t sampleCount, bool isPwm, float onTimeSec)
 {
-  // Too short → short cycling (unchanged per AC#4)
-  if (durationSec < SAT_CYCLE_SHORT_DURATION_SEC) {
+  // INSUFFICIENT_DATA: no duration or too few samples (Python classify() duration<=0 + tracker <3 samples)
+  if (durationSec <= 0.0f || sampleCount < 3) {
+    return SAT_CYCLE_INSUFFICIENT;
+  }
+
+  const float coldSp     = satGetColdSetpoint();
+  const float ctrlErrP90 = tailP90 - controlSp;
+  const float ctrlErrP50 = tailP50 - controlSp;
+  const float reqErrP90  = tailP90 - requestedSp;
+
+  // SHORT cycling: PWM keys off < 80% of the configured on-time (AC#3, Python _classify_pwm);
+  // continuous keeps the fixed floor. Sane floor when the configured on-time is unset/0.
+  float shortThreshSec;
+  if (isPwm) {
+    shortThreshSec = (onTimeSec > 0.0f) ? fmaxf(SAT_CYCLE_SHORT_FLOOR_SEC, onTimeSec * 0.8f)
+                                        : SAT_CYCLE_SHORT_DURATION_SEC;
+  } else {
+    shortThreshSec = SAT_CYCLE_SHORT_DURATION_SEC;
+  }
+  if (durationSec < shortThreshSec) {
     return SAT_CYCLE_SHORT;
   }
 
-  // Significant overshoot: p90 of flow temp exceeds setpoint + margin AND overshoot timer confirms.
-  // Using p90 rather than max_flow avoids false OVERSHOOT from brief ignition spikes.
-  // Equivalent to Python CycleClassifier.classify() tail-percentile check.
-  if (p90FlowTemp > setpoint + settings.sat.fOvershootMargin && overshootSec > 10.0f) {
+  // Significant overshoot — kept in BOTH modes (no-regression): p90 control-error over margin
+  // AND overshoot timer confirms (guards against brief ignition spikes).
+  if (ctrlErrP90 >= settings.sat.fOvershootMargin && overshootSec > 10.0f) {
     return SAT_CYCLE_OVERSHOOT;
   }
 
-  // Flow never reached setpoint → underheat.
-  // Using p10 rather than min_flow gives a stable signal not skewed by brief cold pockets
-  // (e.g. sensor lag at flame-on). Mirrors Python use of lower-percentile flow check.
-  if (p10FlowTemp < setpoint - SAT_UNDERSHOOT_MARGIN_C) {
+  if (isPwm) {
+    // PWM underheat: tail P90 of requested-error <= -3 AND requested > COLD_SETPOINT (Python _classify_pwm)
+    if (reqErrP90 <= -SAT_UNDERSHOOT_MARGIN_C) {
+      if (requestedSp < coldSp) return SAT_CYCLE_UNCERTAIN;
+      return SAT_CYCLE_UNDERHEAT_PWM;
+    }
+    return SAT_CYCLE_GOOD;
+  }
+
+  // Continuous underheat: tail P50 of control-error <= -3 AND requested > COLD_SETPOINT (Python _classify_continuous)
+  if (ctrlErrP50 <= -SAT_UNDERSHOOT_MARGIN_C) {
+    if (requestedSp < coldSp) return SAT_CYCLE_UNCERTAIN;
     return SAT_CYCLE_UNDERHEAT;
   }
 
   // Not enough data for a confident classification
-  if (durationSec < SAT_CYCLE_SHORT_DURATION_SEC * 2) {
+  if (durationSec < SAT_CYCLE_SHORT_DURATION_SEC * 2.0f) {
     return SAT_CYCLE_UNCERTAIN;
   }
 
@@ -510,6 +694,16 @@ void satCycleOnFlameChange(bool flameOn)
 
   if (flameOn && !_cycle_flameOn) {
     // Flame just turned ON — start new cycle
+    // TASK-891.4 (AC#5): demand-gated off-with-demand duration. The flame-off gap that
+    // just ended only counts if heat demand was present (CH on, not DHW, setpoint above
+    // flow temp), mirroring Python CycleTracker._compute_off_with_demand_duration.
+    {
+      float offSec = (_cycle_lastFlameOffMs > 0) ? (float)(now - _cycle_lastFlameOffMs) / 1000.0f : 0.0f;
+      bool demandPresent = (!state.sat.bDhwActive)
+                        && ((OTcurrentSystemState.Statusflags & 0x02) != 0)  // Bit 1 = CH active
+                        && (state.sat.fFinalSetpoint > satGetFlowTemp());
+      state.sat.fOffWithDemandSec = demandPresent ? offSec : 0.0f;
+    }
     _cycle_flameOn = true;
     _cycle_flameOnStartMs = now;
     _cycle_maxFlowTemp = satGetFlowTemp();
@@ -547,6 +741,12 @@ void satCycleOnFlameChange(bool flameOn)
     // Reset flow-return delta accumulator (Task #227)
     _cycle_sumFlowRetDelta = 0.0f;
     _cycle_deltasamples    = 0;
+    // Reset per-cycle shape accumulators (TASK-891.4 AC#4)
+    _cycle_timeInBandSec               = 0.0f;
+    _cycle_totalOvershootSec           = 0.0f;
+    _cycle_overshootStreakSec          = 0.0f;
+    _cycle_timeToFirstOvershootSec     = -1.0f;
+    _cycle_timeToSustainedOvershootSec = -1.0f;
   }
   else if (!flameOn && _cycle_flameOn) {
     // Flame just turned OFF — complete the cycle
@@ -577,13 +777,29 @@ void satCycleOnFlameChange(bool flameOn)
     float tailP50 = (_tail_sampleCount >= 10) ? _tailPercentile(50) : (p90 + p10) * 0.5f;
     SATDebugTf(PSTR("SAT cycle classify: fullP90=%.1f tailP90=%.1f tailP50=%.1f tailP10=%.1f tailN=%u\r\n"),
                p90, tailP90, tailP50, tailP10, (unsigned)_tail_sampleCount);
-    SATCycleClass cls = _cycleClassify(durationSec, tailP90, tailP10,
-                                        _cycle_setpointAtStart, _cycle_overshootSec);
+    // TASK-891.4: mode-aware classification. Snapshot the PID requested setpoint at flame-off
+    // (it drifts across a multi-minute cycle) and pick the SHORT threshold from the configured
+    // PWM on-time. isPwm follows the active control mode (Python pwm_state.enabled).
+    float requestedSp = state.sat.fPidOutput;
+    bool  isPwm       = (state.sat.eControlMode == SAT_MODE_PWM);
+    float onTimeSec   = (float)satPwmLastOnTimeMs() / 1000.0f;
+    SATCycleClass cls = _cycleClassify(durationSec, tailP90, tailP50,
+                                        _cycle_setpointAtStart, requestedSp,
+                                        _cycle_overshootSec, _cycle_totalSamples,
+                                        isPwm, onTimeSec);
     _cycleRecord(cls, durationSec, _cycle_maxFlowTemp, _cycle_overshootSec);
+
+    // Expose the 2nd error metric (AC#1) + shape metrics (AC#4) for state/JSON.
+    state.sat.fCycleReqSetpointError         = tailP90 - requestedSp;
+    state.sat.fCycleTimeInBandSec            = _cycle_timeInBandSec;
+    state.sat.fCycleTotalOvershootSec        = _cycle_totalOvershootSec;
+    state.sat.fCycleTimeToFirstOvershoot     = _cycle_timeToFirstOvershootSec;
+    state.sat.fCycleTimeToSustainedOvershoot = _cycle_timeToSustainedOvershootSec;
     {
       // Map the cycle class enum to a plain word for the observer.
       static const char *const _satCycleWord[] = { "none", "GOOD", "overshoot",
-                                                   "underheat", "short", "uncertain" };
+                                                   "underheat", "short", "uncertain",
+                                                   "underheat_pwm", "insufficient" };
       const char *verdict = ((uint8_t)cls < (sizeof(_satCycleWord)/sizeof(_satCycleWord[0])))
                             ? _satCycleWord[(uint8_t)cls] : "?";
       satNarratef_P(PSTR("Flame off: cycle %s, %.0fs on, peak flow %.0f\xc2\xb0""C"),
@@ -607,11 +823,17 @@ void satCycleOnFlameChange(bool flameOn)
       _win4h[_win4hHead].eClass         = (uint8_t)cls;
       _win4hHead = (_win4hHead + 1) % SAT_WIN4H_SIZE;
       if (_win4hCount < SAT_WIN4H_SIZE) _win4hCount++;
+
+      // Mirror into the reduced-resolution 24h daily window (TASK-891.4 AC#5)
+      _dailyRecord(now, onMs, offMs, cls, durationSec);
     }
 
-    SATDebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs\r\n"),
+    // Remember this flame-off edge for the next cycle's off-with-demand gating (AC#5)
+    _cycle_lastFlameOffMs = now;
+
+    SATDebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs inBand=%.0fs\r\n"),
             state.sat.iCycleCount, (int)cls, durationSec,
-            _cycle_maxFlowTemp, p90, p10, _cycle_overshootSec);
+            _cycle_maxFlowTemp, p90, p10, _cycle_overshootSec, _cycle_totalOvershootSec);
   }
 }
 
@@ -656,6 +878,30 @@ void satCycleSample()
   float elapsed = (float)(now - _cycle_lastSampleMs) / 1000.0f;
   if (flowTemp > _cycle_setpointAtStart + settings.sat.fOvershootMargin) {
     _cycle_overshootSec += elapsed;
+  }
+
+  // --- Shape metrics (TASK-891.4 AC#4) — accumulated over flow-control setpoint error,
+  //     post-warmup (Python _build_cycle_shape_metrics uses observation_start after the
+  //     effective warmup). Streaming approximation: skip the first SAT_SHAPE_WARMUP_SEC.
+  float sinceOnSec = (float)(now - _cycle_flameOnStartMs) / 1000.0f;
+  if (sinceOnSec >= SAT_SHAPE_WARMUP_SEC) {
+    float ctrlErr = flowTemp - _cycle_setpointAtStart;
+    if (fabsf(ctrlErr) <= SAT_IN_BAND_MARGIN_C) {
+      _cycle_timeInBandSec += elapsed;               // time_in_band_seconds
+    }
+    if (ctrlErr >= settings.sat.fOvershootMargin) {  // >= overshoot margin (Python OVERSHOOT_MARGIN_CELSIUS, >=3 to count)
+      _cycle_totalOvershootSec += elapsed;           // total_overshoot_seconds
+      if (_cycle_timeToFirstOvershootSec < 0.0f) {
+        _cycle_timeToFirstOvershootSec = sinceOnSec; // time_to_first_overshoot
+      }
+      _cycle_overshootStreakSec += elapsed;
+      if (_cycle_timeToSustainedOvershootSec < 0.0f &&
+          _cycle_overshootStreakSec >= SAT_OVERSHOOT_SUSTAIN_SEC) {
+        _cycle_timeToSustainedOvershootSec = sinceOnSec; // time_to_sustained_overshoot (first >=60s run)
+      }
+    } else {
+      _cycle_overshootStreakSec = 0.0f;              // streak broken
+    }
   }
 
   // Track DHW vs CH samples for cycle kind detection

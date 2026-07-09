@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.341
+**  Version  : v2.0.0-alpha.342
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -61,7 +61,15 @@ enum SATFallbackReason : uint8_t {
 };
 enum SATCycleClass  : uint8_t {
   SAT_CYCLE_NONE = 0, SAT_CYCLE_GOOD, SAT_CYCLE_OVERSHOOT,
-  SAT_CYCLE_UNDERHEAT, SAT_CYCLE_SHORT, SAT_CYCLE_UNCERTAIN
+  SAT_CYCLE_UNDERHEAT, SAT_CYCLE_SHORT, SAT_CYCLE_UNCERTAIN,
+  // TASK-891.4 classifier-depth parity: split UNDERHEAT into continuous
+  // (SAT_CYCLE_UNDERHEAT) vs PWM (SAT_CYCLE_UNDERHEAT_PWM), and add an
+  // explicit no-confident-data class. Both new values follow their sibling
+  // everywhere: UNDERHEAT_PWM is an underheat outcome (fraction counters,
+  // health), INSUFFICIENT is a no-classification outcome (like UNCERTAIN).
+  // Python parity: cycles/classifier.py (_classify_pwm / _classify_continuous)
+  // — Python has a single UNDERHEAT; the firmware keeps them distinct.
+  SAT_CYCLE_UNDERHEAT_PWM, SAT_CYCLE_INSUFFICIENT
 };
 enum SATCycleKind : uint8_t {
   SAT_CK_UNKNOWN = 0, SAT_CK_CH, SAT_CK_DHW, SAT_CK_MIXED
@@ -177,6 +185,19 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    f4hUnderheatFraction  = 0.0f;   // Fraction of underheat cycles in last 4h
   float    f4hFlowRetDeltaP50    = 0.0f;   // Median flow-return delta across last 4h cycles (°C)
   float    f4hFlowRetDeltaP90    = 0.0f;   // p90 flow-return delta across last 4h cycles (°C)
+  // --- TASK-891.4: classifier-depth parity metrics (per last completed cycle) ---
+  float    fCycleReqSetpointError = 0.0f;  // tail-P90 (flow - PID requested setpoint) °C — 2nd error metric, distinct from control-setpoint error (AC#1). Python flow_requested_setpoint_error.
+  float    fCycleTimeInBandSec    = 0.0f;  // seconds where |flow - control_setpoint| <= 1.0 °C (AC#4)
+  float    fCycleTotalOvershootSec = 0.0f; // seconds flow-control error >= overshoot margin, post-warmup (AC#4). Distinct from fCycleOvershootSec (whole-cycle, no warmup).
+  float    fCycleTimeToFirstOvershoot = -1.0f;     // seconds from flame-on to first overshoot sample (-1 = none) (AC#4)
+  float    fCycleTimeToSustainedOvershoot = -1.0f; // seconds from flame-on to first >=60s overshoot run (-1 = none) (AC#4)
+  float    fOffWithDemandSec      = 0.0f;  // demand-gated flame-off duration before this cycle (0 = no demand present) (AC#5). Python off_with_demand_duration.
+  // --- TASK-891.4: rolling 24h DAILY window (reduced-resolution aggregate; percentiles/median dropped vs 4h to stay within the 40k heap floor, AC#5/#6) ---
+  uint16_t i24hCycles             = 0;     // Complete cycles in last 24h
+  float    f24hDutyRatio          = 0.0f;  // Windowed duty ratio over last 24h
+  float    f24hOvershootFraction  = 0.0f;  // Fraction of overshoot cycles in last 24h
+  float    f24hUnderheatFraction  = 0.0f;  // Fraction of underheat cycles (both continuous + PWM) in last 24h
+  float    f24hLongCycleFraction  = 0.0f;  // Fraction of cycles >= 600s on-time in last 24h (Python long_cycle_fraction)
   // PWM state
   float fPwmDutyCycle            = 0.0f;
   bool  bPwmFlameRequested       = false;

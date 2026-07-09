@@ -52,7 +52,7 @@ var SAT = (function() {
 
   // --- Mode / Status label maps ---
   var MODE_LABELS  = ['Off', 'Continuous', 'PWM'];
-  var CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain'];
+  var CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain', 'Underheat (PWM)', 'Insufficient'];
   var BOILER_LABELS = {
     'off': 'Off', 'idle': 'Idle', 'preheating': 'Preheating',
     'at_setpoint': 'At Setpoint', 'modulating_up': 'Modulating Up',
@@ -360,7 +360,7 @@ var SAT = (function() {
       if (dot) dot.className = 'sat-health-dot ' + (ok ? 'sat-health-ok' : 'sat-health-problem');
     }
     setHealth('sat-health-device', d.boiler_status !== 'off');
-    setHealth('sat-health-cycle', !(['overshoot','underheat','short'].includes(d.last_cycle_class)));
+    setHealth('sat-health-cycle', !(['overshoot','underheat','underheat_pwm','short'].includes(d.last_cycle_class)));
     setHealth('sat-health-flame', !d.safety_tripped);
     setHealth('sat-health-pressure', !d.pressure_alarm);
     setHealth('sat-health-setpoint', !d.setpoint_mismatch);
