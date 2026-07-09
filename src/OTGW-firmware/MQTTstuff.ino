@@ -1489,6 +1489,7 @@ void publishNonOTDiscoveryConfigs()
   setMQTTConfigPending(OTGWpicinfoid);      // PIC info
   setMQTTConfigPending(OTGWpicsettingsid);  // PIC settings
   setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
+  setMQTTConfigPending(OTGWconnstatusid);   // gateway_mode + otgw_connected binary-sensors (faux id 244)
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
 }

@@ -571,6 +571,10 @@ byte      OTGWfwinfoid       = 248;
 byte      OTGWpicinfoid      = 249;
 byte      OTGWpicsettingsid  = 250;
 byte      OTGWpiccontrolsid  = 251;
+// Gateway/OTGW connection-status discovery pseudo-ID (TASK-1035): anchors the
+// gateway_mode + otgw_connected binary-sensors (otgw-pic/{gateway_mode,otgw_connected},
+// PIC-gated). Must be queued in publishNonOTDiscoveryConfigs() like the others.
+byte      OTGWconnstatusid   = 244;
 
 //Now load Debug & network library
 #include "Debug.h"
