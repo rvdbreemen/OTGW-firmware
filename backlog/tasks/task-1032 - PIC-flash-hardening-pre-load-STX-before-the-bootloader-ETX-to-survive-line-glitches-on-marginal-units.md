@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-09 15:45'
+updated_date: '2026-07-09 21:26'
 labels: []
 dependencies: []
 ordinal: 241000
@@ -19,7 +20,13 @@ Follow-up from the TASK-972 investigation. The selfprog bootloader (otgw-6.6 sel
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Early-STX handshake implemented behind the existing upgrade FSM (OTGWSerial), protocol-compatible with selfprog.asm (analyse WaitForSTX/ReSync/GetNextDat byte-by-byte before coding)
+- [x] #1 Early-STX handshake implemented behind the existing upgrade FSM (OTGWSerial), protocol-compatible with selfprog.asm (analyse WaitForSTX/ReSync/GetNextDat byte-by-byte before coding)
 - [ ] #2 No regression on a known-good board (field tester with working flash, e.g. S3 Mini Pro combo)
 - [ ] #3 Bench Classic-S3 (marginal unit) retried with the hardening: outcome recorded either way in TASK-972 follow-up notes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-07-09 AC#1 byte-level protocol analysis (otgw-6.6 selfprog.asm). Flow: after reset the bootloader inits EUSART, sends ETX (WrRS232), then enters WaitForSTX -> Pause(16) which returns IMMEDIATELY if RCIF is set (a byte already in the 2-byte FIFO). So an STX we transmit BEFORE the bootloader reaches WaitForSTX sits in the FIFO; Pause returns at once, RdRS232 reads it, it IS STX (Z set), skpz falls into ReSync -> GetNextDat waits (no inner timeout) for the rest of the frame. GetNextDat treats an unprotected STX as a ReSync restart and ETX as end-of-frame with a checksum test; a checksum FAIL routes to StartOfLine which waits for a fresh STX (bootloader STAYS ALIVE) — this is the property the hardening exploits. IMPLEMENTATION would need to split fwCommand's leading STX from its {payload+checksum+ETX} in FWSTATE_RSET: send STX early (post-resetPic), then the remainder after the bootloader's ETX arrives, keeping DLE-escaping + running checksum intact.\n\nDISPOSITION (not shipped): this changes the bootloader handshake timing for ALL boards — there is no way to scope it to marginal units. The healthy PIC-flash path was only field-validated this week (crashevans alpha.337, my Pro alpha.341) and the benefit here is SPECULATIVE (the bench Classic-S3 marginal unit is most likely hardware-defective per number3nl's own 'must be my soldering' conclusion). Shipping a delicate STX-preload change to a just-stabilized critical path for unproven marginal-hardware resilience is not justified as an aggressive-drain close; kept OPEN with this analysis. If pursued later: implement behind the FSM, hard-gate on a 100%-flash no-regression test on the Pro (COM10) AND the Classic-S3 (COM8), revert on any regression.
+<!-- SECTION:NOTES:END -->
