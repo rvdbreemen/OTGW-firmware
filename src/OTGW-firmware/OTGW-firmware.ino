@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.339
+**  Version  : v2.0.0-alpha.341
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -346,10 +346,31 @@ void setup() {
   // live PIC + no live OT bus (bench / non-production).
 #if HAS_RUNTIME_HW_DETECT
   if (settings.iBoardMode == 2) {
-    // MANUAL force OT-Direct (user-set; auto never writes 2). Skip the PIC probe
-    // by explicit user request.
-    SetupDebugln(F("Board mode: forced OT-Direct (manual override, no PIC probe)"));
-    initOTDirect();              // UART1 already torn down before startWiFi()
+    // Forced OT-Direct. TASK-1031 recovery probe: since auto no longer persists 2
+    // (a no-PIC auto result stays iBoardMode=0), a persisted 2 is either a
+    // deliberate user force OR a legacy value stuck by the old auto-persist on a
+    // board that actually has a live PIC. Probe once — a PIC present here always
+    // means OT-Direct is wrong (OT-Direct needs the OTGW32 direct-OT transceiver;
+    // a PIC-equipped Classic board has no such path, the PIC *is* its OT
+    // interface), so correct to Classic and re-persist. A genuine OTGW32 finds no
+    // PIC and stays OT-Direct. Same UART-open/probe/close shape as the auto path
+    // below, so the ADR-125 floating-PIC-RX concern is handled identically (the
+    // UART is torn down before initOTDirect when no PIC is found).
+    platformMuteUart0Console();
+    OTGWSerial.begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX);
+    OTGWSerial.setResetPin(activePicRst());
+    OTGWSerial.setProgressLed(activeLed2());
+    detectPIC();
+    if (isPICEnabled()) {
+      settings.iBoardMode = state.hw.bClassicPro ? 3 : 1;
+      writeSettings(false);
+      SetupDebugf(PSTR("Board mode: forced OT-Direct but a live PIC was found -> correcting to Classic %s (iBoardMode=%d) -- TASK-1031 recovery\r\n"),
+                  state.hw.bClassicPro ? "S3 Mini Pro" : "S3 Mini", (int)settings.iBoardMode);
+    } else {
+      OTGWSerial.end();          // tear down UART1 before OT-Direct (ADR-125)
+      initOTDirect();
+      SetupDebugln(F("Board mode: forced OT-Direct (no PIC found, OT-Direct confirmed)"));
+    }
   } else {
     // TASK-972: silence the IDF/ROM console before touching the PIC UART.
     // The primary IDF console is UART0 on GPIO43 = the PIC RX line; WiFi
@@ -368,15 +389,16 @@ void setup() {
       SetupDebugln(F("Board mode: forced PIC"));
       detectPIC();               // sets HW_MODE_PIC, or HW_MODE_DEGRADED if dead
     } else {
-      // AUTO (iBoardMode==0): FIRST-BOOT detection, then PERSIST once (TASK-949,
-      // conservative redesign — replaces TASK-947's never-persist). Retry detectPIC
-      // a few times so a transient miss does not mis-detect; PIC present => Classic
-      // (Pro vs regular from the IMU probe), no PIC after retries => OTGW32/OT-Direct
-      // (bench default). The verdict is written to LittleFS, so later boots take the
-      // forced path above (line 359) and skip the auto branch — and that path's
-      // detectPIC() does its own clean PIC reset, recovering from the early IMU
-      // probe's transient on GPIO 12. iBoardMode is the soft setting: the user can
-      // change it in the settings menu if detection is ever wrong.
+      // AUTO (iBoardMode==0): FIRST-BOOT detection, then persist ONLY a positive
+      // Classic verdict (TASK-949 persist-once, refined by TASK-1031 to an
+      // ASYMMETRIC persist). Retry detectPIC a few times so a transient miss does
+      // not mis-detect; PIC present => persist Classic (Pro=3 / regular=1 from the
+      // IMU probe) and later boots take the forced path (line 348) whose
+      // detectPIC() re-checks the PIC each boot. No PIC after retries => run
+      // OT-Direct for this boot but do NOT persist (see below): the forced
+      // OT-Direct path skips the PIC probe, so persisting a false-negative would
+      // trap a live-PIC board in OT-Direct. iBoardMode is the soft setting: the
+      // user can still force a mode in the settings menu.
       SetupDebugln(F("Board mode: auto — first-boot PIC detection (retried)"));
       bool picFound = false;
       for (uint8_t attempt = 0; attempt < 3 && !picFound; attempt++) {
@@ -390,14 +412,21 @@ void setup() {
                     state.hw.bClassicPro ? "S3 Mini Pro" : "S3 Mini", (int)settings.iBoardMode);
       } else {
         // No live PIC after retries: tear down UART1 BEFORE OT-direct so a floating
-        // PIC-RX pin can't drive an RX interrupt storm (ADR-125). No PIC + no OT bus
-        // = bench (non-production): OTGW32/OT-Direct is the safe default.
+        // PIC-RX pin can't drive an RX interrupt storm (ADR-125). Run as OTGW32/
+        // OT-Direct for THIS boot, but do NOT persist the negative verdict
+        // (TASK-1031): the forced OT-Direct path (iBoardMode==2) skips detectPIC()
+        // entirely, so persisting a transient first-boot PIC-miss would stick a
+        // live-PIC board in OT-Direct until the user manually resets to Auto.
+        // Leaving iBoardMode=0 (auto) re-probes every boot until a PIC is seen,
+        // then persists the positive Classic verdict. A genuine OTGW32 just pays a
+        // benign PIC-NACK probe each boot.
         OTGWSerial.end();
-        initOTDirect();            // sets HW_MODE_OT_DIRECT
-        if (state.hw.eMode == HW_MODE_OT_DIRECT) settings.iBoardMode = 2;
-        SetupDebugln(F("Board mode: auto -> no PIC -> OTGW32/OT-Direct (persisting iBoardMode=2)"));
+        initOTDirect();            // sets HW_MODE_OT_DIRECT for this boot only
+        SetupDebugln(F("Board mode: auto -> no PIC -> OTGW32/OT-Direct (this boot; NOT persisted, re-probes next boot -- TASK-1031)"));
       }
-      if (settings.iBoardMode != 0) writeSettings(false);   // persist once; later boots use the forced path
+      // Persist ONLY a positive (Classic 1/3) verdict; a no-PIC result stays
+      // iBoardMode=0 so auto-detection self-heals a transient miss on the next boot.
+      if (settings.iBoardMode != 0) writeSettings(false);
     }
   }
   // The resolved mode may select the other pin map than the pre-detection
@@ -954,6 +983,7 @@ void loop()
     }
     s_lastLoopMs = nowMs;
   }
+
 
   DECLARE_TIMER_SEC(timer1s,   1,   SKIP_MISSED_TICKS);
   DECLARE_TIMER_SEC(timer3s,   3,   SKIP_MISSED_TICKS);
