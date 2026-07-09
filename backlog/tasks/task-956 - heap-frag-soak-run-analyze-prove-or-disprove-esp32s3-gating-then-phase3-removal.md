@@ -3,11 +3,11 @@ id: TASK-956
 title: >-
   test(heap): run the heap-frag soak + analyze — prove/disprove ESP32-S3 gating,
   then Phase-3 removal if proven
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-25 21:30'
-updated_date: '2026-07-09 19:39'
+updated_date: '2026-07-09 21:18'
 labels:
   - heap
   - soak
@@ -124,4 +124,12 @@ data point as sufficient combined evidence and proceeding to draft the
 ADR-089/121 supersession with these two soaks cited together.
 
 2026-07-09 drain decision (user: 'draft ADR-supersession, Proposed'): the ADR-supersession ALREADY EXISTS — ADR-167 (Retire the ESP8266-Era Heap Tier Machine and Per-Consumer Gating on the ESP32-S3-Only Dev Branch), Proposed 2026-07-06, drafted from this task's soak evidence, with removal explicitly deferred to a Phase-3 follow-up and status held Proposed pending the maintainer's accept-readiness review. That is exactly the chosen disposition, so no new ADR is needed (a draft ADR-169 amend-variant was started and reverted to avoid two conflicting Proposed ADRs on the same evidence). ACTION FOR CLOSURE: AC#4 becomes 'maintainer accepts ADR-167 -> create the Phase-3 removal task (evaluate.py ADR-089/121 gates + ADR status flips + re-soak)'. TASK-956's investigation deliverable (soak + verdict + Proposed ADR) is complete; only the accept-gate + Phase-3 impl remain, both maintainer-gated. Recommend: keep In Progress pending ADR-167 acceptance, OR close TASK-956 as 'investigation done, Phase-3 tracked separately once ADR-167 accepted'.
+
+2026-07-09 drain: the INVESTIGATION deliverable (AC#1-3) is complete — instrumented firmware flashed, fragmenting load driven, 10h soak run, verdict recorded (0 tier escalations, min_max_block floor 10.7KB, all gating counters 0), and the decision drafted as Proposed ADR-167. AC#4 (the actual Phase-3 gating removal) is a separate maintainer-gated step: it cannot proceed until ADR-167 is Accepted (removing safety gating is the maintainer's call), and it must update the 4 evaluate.py gates + ADR-089/121 together. Split that into its own task (Phase-3 removal, gated on ADR-167) rather than holding this investigation open indefinitely. Closing 956 as investigation-complete.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Heap-frag soak investigation complete: 10h representative-load soak on ESP32-S3 showed the preventive gating never engaged (0 tier escalations, comfortable max-free-block floor). Verdict recorded, decision drafted as Proposed ADR-167. The actual Phase-3 gating removal is split into a follow-up task gated on ADR-167 acceptance (it must land with the evaluate.py ADR-089/121 gate updates).
+<!-- SECTION:FINAL_SUMMARY:END -->

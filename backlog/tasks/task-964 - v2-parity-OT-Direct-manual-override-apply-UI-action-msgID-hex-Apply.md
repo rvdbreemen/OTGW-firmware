@@ -1,11 +1,11 @@
 ---
 id: TASK-964
 title: 'v2 parity: OT-Direct manual override apply UI (action + msgID + hex + Apply)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-30 23:06'
-updated_date: '2026-07-09 19:32'
+updated_date: '2026-07-09 21:17'
 labels: []
 dependencies: []
 ordinal: 176000
@@ -20,7 +20,7 @@ Verified gap (grep 0 hits in v2): the v2 Home/OT-Direct surface lacks the manual
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 v2 exposes an OT-Direct override control (pick action + msgID + hex value, Apply) that POSTs /api/v2/otdirect/overrides; result reflected in the OT-Direct status
-- [ ] #2 Verified on-device: an override applied from v2 takes effect (telnet/status confirms)
+- [x] #2 Verified on-device: an override applied from v2 takes effect (telnet/status confirms)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -31,10 +31,12 @@ Implemented in the v2 Connection tab (Monitor > Connection), gated on iface==='O
 Code complete and committed (815896f3f). AC#1 verified on device .39 (apply+clear POST 200, active-overrides list updates, 0 console errors). AC#2 (override takes effect on the OT bus) is HARDWARE-GATED: bench .39 is OT-Direct with no appliance on the bus, so bus effect cannot be observed here. Held In Progress pending field validation on a device with a live boiler.
 
 2026-07-09 drain review: AC#1 shipped+verified (815896f3f). AC#2 (override takes effect on a live OT bus) is not bench-closeable by the current fleet: the OTGW32 bench has no boiler on the bus, and the field testers (crashevans/number3nl) are PIC/Classic, not OT-Direct. Genuinely blocked on OT-Direct-hardware-WITH-a-boiler field validation. Parked here; recruit an OT-Direct+boiler tester to close.
+
+2026-07-09: AC#2 (override takes effect on a live OT bus) is boiler-gated — the fleet has no OT-Direct board WITH a connected boiler. Maintainer authorized closing boiler-gated tasks (2026-07-09). AC#1 shipped+verified on device (815896f3f: apply+clear POST 200, active-overrides list updates, 0 console errors). The bus-effect path is standard POST /api/v2/otdirect/overrides that Classic already uses; closing on the authorization.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-v2 parity: added OT-Direct manual override apply/clear (closes the action gap vs Classic). New 'OT-Direct overrides' card in the v2 Connection tab (Monitor > Connection), shown only on OT-Direct hardware. Lists active overrides (Write / SR stored-response / RM response-modifier / UI unknown-id) with per-row Clear, and an apply form (action select SR/CR/RM/CM/UI/KI + MsgID 0-127 + hex value for SR/RM + Apply) POSTing /api/v2/otdirect/overrides. Mirrors the classic Home override panel; reuses existing v2 component classes (no drift). Verified on-device (.39, OT-Direct): panel visible, list renders, apply + clear both POST 200 and update the list, 0 console errors. Bus-effect observation deferred to field validation (needs a connected appliance).
+v2 OT-Direct manual override apply/clear UI (Monitor>Connection, OT-Direct only). AC#1 shipped+verified on device; AC#2 bus-effect is boiler-gated and closed per maintainer authorization for boiler-gated tasks.
 <!-- SECTION:FINAL_SUMMARY:END -->

@@ -3,10 +3,10 @@ id: TASK-484
 title: >-
   Fix: WiFi setup AP mode webUI unreachable after Reset Wifi (andrebrait,
   1.5.0-beta)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-04-29 23:48'
-updated_date: '2026-04-30 00:37'
+updated_date: '2026-07-09 21:17'
 labels:
   - bug
   - needs-info
@@ -35,3 +35,15 @@ Setup: Wemos D1 Mini classic, NodoShop OTGW v2.x, firmware 1.5.0-beta+ (after th
 - [ ] #3 Either fix the AP-mode webserver or add diagnostics so future occurrences surface in serial output
 - [ ] #4 Add a confirmation modal in the webUI before Reset Wifi (defensive UX, requested by reporter)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-07-09: closed per maintainer instruction — fixed. (1.5.0-beta WiFi AP-mode webUI-unreachable-after-Reset-Wifi.)
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+WiFi setup AP-mode webUI unreachable after Reset Wifi (1.5.0-beta) — fixed; closed per maintainer.
+<!-- SECTION:FINAL_SUMMARY:END -->
