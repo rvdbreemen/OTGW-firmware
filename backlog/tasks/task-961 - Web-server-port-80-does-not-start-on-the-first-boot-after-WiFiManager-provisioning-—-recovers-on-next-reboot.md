@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-30 22:07'
-updated_date: '2026-07-05 22:42'
+updated_date: '2026-07-09 21:26'
 labels: []
 dependencies: []
 ordinal: 173000
@@ -31,4 +31,6 @@ Observed on bench OTGW32 .39 (alpha.298+02f6470) after the maintainer flashed + 
 Reproduced live 2026-07-05 on classic-S3 + PIC 6.6 (alpha.327+827abbc). After WiFiManager provisioning, first boot: device joined LAN (192.168.1.219), ping OK, telnet port 23 OPEN, but HTTP port 80 dead — curl / returned HTTP 000 on 5/5 tries over ~30s. Single hard-reset (esptool --after hard_reset) fixed it: port 80 came up HTTP 200 within 5s of reboot, /api/v2/device/info served normally. Confirms 'web server does not start on first boot after provisioning, recovers on next reboot'. Repro is deterministic here: happens every fresh provision, clears on any reboot.
 
 Independently reproduced 2026-07-06 on Classic-S3 COM8 (192.168.88.64) during TASK-1016 provisioning: first boot after SoftAP provisioning had telnet/OT/MQTT alive but HTTP port 80 actively refused (curl 000). A --update re-flash (forces reboot, preserves WiFi creds) fixed it immediately — HTTP 200 + WS 101 after. Confirms AC#1 repro on current HEAD (alpha.328+f32071c), not just the older 02f64705 build.
+
+2026-07-09 drain review: cannot fully close autonomously — AC#1/#3 require a real provisioning cycle (wipe WiFi creds -> SoftAP -> enter WiFi credentials -> reboot -> check port 80). Entering WiFi credentials is a user/credential action I do not perform, and wiping creds would drop the bench device off the network mid-drain. Kept open for a maintainer-driven provisioning cycle; the fix direction (re-begin the AsyncWebServer after the STA IP is up, or cleanly tear down the captive-portal server) is documented in the description.
 <!-- SECTION:NOTES:END -->

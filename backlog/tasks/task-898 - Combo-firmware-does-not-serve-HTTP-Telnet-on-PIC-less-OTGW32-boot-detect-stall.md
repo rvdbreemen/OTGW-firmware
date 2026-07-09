@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-06-21 16:22'
-updated_date: '2026-06-29 04:32'
+updated_date: '2026-07-09 21:26'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -42,4 +42,6 @@ Impact: blocks the maintainer directive to make esp32-combo the single shipped b
 UPDATE 2026-06-21: did NOT reproduce after a clean erase_flash + fresh esp32-combo merged-full flash + WiFi provisioning. The combo serves HTTP fine (HTTP 200 on /api/v2/sat/ble/discovery) on the KeepOut2 network (device 192.168.88.39). The earlier 'port 80/23 refused' was observed only on the Koekie network on a device that had just been through the active-burst crash + several back-to-back flashes — likely a transient corrupt/half-boot state, not a combo boot-detect stall. Possibly related to task-853 (combo captive-portal boot-sequence ordering). Downgraded to medium; reopen to HIGH only if it recurs on a clean flash.
 
 BENCH EVIDENCE 2026-06-29 (OTGW32 @192.168.88.39, alpha.285, ESP32 build, PIC-less): HTTP /api/v2/health -> 200 AND Telnet :23 OPEN while otgwconnected:false / OT-Direct. The esp32 (OTGW32) build serves both services fine PIC-less. HOWEVER 898 is COMBO-build-specific (runtime boot-detect stall); the combo build has a different partition table, so validating it requires a merged flash that erases NVS -> SoftAP -> user-gated provisioning, which would strand the bench. Not closeable autonomously on a single networked board; needs a combo flash + on-site provisioning.
+
+2026-07-09 drain review: cannot close — AC#1/#4 need a PIC-less OTGW32 board, which is not on the bench/network this session (scanned 192.168.1.143/.88.143/.1.39/.88.39, none reachable). NOTE: the boot-detect that caused the original stall has since been heavily reworked (TASK-947/949/ADR-160 + the TASK-1031 fix landed today: no-PIC now leaves iBoardMode=0 and proceeds to initOTDirect rather than blocking on a phantom PIC), so this may already be fixed — but that must be CONFIRMED on a real PIC-less OTGW32 before closing. Kept open pending that hardware.
 <!-- SECTION:NOTES:END -->
