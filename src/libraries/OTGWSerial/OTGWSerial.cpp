@@ -610,6 +610,18 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
         }
         break;
      case FWSTATE_VERSION:
+        if (data != nullptr && len < 5) {
+            // A bare/short ETX in VERSION stage is the bootloader announcing
+            // itself AGAIN: its RdRS232 hard-resets the PIC on an EUSART
+            // overrun (selfprog.asm), after which the fresh bootloader sends
+            // a new ETX. Parsing it as a version packet reads stale buffer
+            // bytes and aborts with "Wrong PIC" (TASK-972). Re-send the
+            // version request to the (re)started bootloader instead.
+            byte fwcommand[] = {CMD_VERSION, 3};
+            Dprintf(PSTR("Short packet (%d) in VERSION stage, re-sending version request\n"), len);
+            fwCommand(fwcommand, sizeof(fwcommand));
+            break;
+        }
         if (data != nullptr) {
             Dprintf(PSTR("Bootloader version %d.%d\n"), packet[3], packet[4]);
             OTGWProcessor pic;
@@ -1003,6 +1015,13 @@ void OTGWSerial::SetLED(int state) {
 
 void OTGWSerial::putbyte(uint8_t c) {
     HardwareSerial::write(c);
+    // Pace upgrade-protocol bytes: wait until the byte physically left the
+    // UART before queueing the next. The PIC bootloader services its 2-byte
+    // EUSART FIFO byte-by-byte and HARD-RESETS on overrun (selfprog.asm
+    // RdRS232: OERR -> reset), which restarts the handshake mid-frame
+    // (observed as a second bare ETX, TASK-972).
+    HardwareSerial::flush();
+    delayMicroseconds(1200);
 }
 
 void OTGWSerial::progress(int pct) {

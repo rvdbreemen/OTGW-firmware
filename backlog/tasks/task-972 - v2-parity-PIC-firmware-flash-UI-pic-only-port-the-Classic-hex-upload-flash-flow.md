@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-01 05:21'
-updated_date: '2026-07-09 03:47'
+updated_date: '2026-07-09 05:59'
 labels: []
 dependencies: []
 ordinal: 184000
@@ -82,6 +82,8 @@ isolate silicon-timing vs this-specific-unit.
 2026-07-09: IDF-console hypothesis tested. sdkconfig proof: CONFIG_ESP_CONSOLE_UART_NUM=0 (GPIO43 = PIC RX line), USB-JTAG only SECONDARY -> esp_log/ets_printf output physically transmits into the PIC. Added platformMuteUart0Console() (esp_log_set_vprintf null + ets_install_putc1 no-op), called on the PIC path in setup() before OTGWSerial.begin. This is correct regardless (stray logs caused SE responses from the PIC app), and PR=A still works after the change. HOWEVER the flash still fails identically: bootloader exits <130ms after its ETX. The deterministic ghost-byte source on the PIC RX line remains unidentified; console-mute did not remove it (either wifi-lib output bypasses both hooks, or the source is electrical: CH340 parallel on the carrier lines / level-shifter edge during PIC reset). Hardware measurement (scope/LA on PIC RX between ETX and STX) is now genuinely the only remaining discriminator. Alternative cross-check: flash via otmonitor over ser2net 25238 on this same board.
 
 2026-07-09: ADR-168 (PIC serial on native UART0 + IDF console mute) drafted as Proposed, docs/adr/ADR-168-pic-serial-native-uart0-and-idf-console-mute.md; awaits maintainer acceptance.
+
+2026-07-09 research session: web research + on-device discriminating tests. NEW EVIDENCE: (a) with byte-level tracing the failure advanced past the ghost-byte stage once and the FSM aborted on a BARE second ETX parsed as a version packet -> the bootloader RESTARTS mid-handshake (selfprog RdRS232: OERR->reset; Microchip forum documents framing-error->FIFO-overrun interplay on PIC16F1). FSM hardened: short packet (<5) in FWSTATE_VERSION now re-sends CMD_VERSION instead of aborting Wrong PIC. (b) putbyte now paces bytes (flush + 1.2ms) against the PIC's 2-byte EUSART FIFO overrun-reset. (c) THIRD console leak path muted: closed-source WiFi libs use plain newlib printf (VFS->UART0), bypassing esp_log_set_vprintf AND ets_install_putc1 (esp32.com t=299); stdout/stderr now freopen'd to /dev/null in platformMuteUart0Console. (d) UART1 line-sniffer experiment: sniffer self-test read wrong byte values -> matrix-loopback sampling unreliable on S3; its captures (single 0x00 break per attempt) recorded but NOT trusted as evidence. RESULT: flash still fails identically (bootloader dead <130ms after ETX even with silent TX and all three console paths muted). All software mute/pacing/resilience avenues now exhausted with negative results; remaining hypotheses are electrical (carrier USB-serial chip parallel on the PIC lines clamping/glitching during PIC reset; level-shifter edge) -> scope on PIC RX or otmonitor-via-ser2net cross-check are the discriminators. PR=A regression-checked OK after all changes.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

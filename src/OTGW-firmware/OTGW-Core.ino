@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.337
+**  Version  : v2.0.0-alpha.338
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5547,6 +5547,7 @@ void fwupgradestart(const char *hexfile) {
   // flash path (handlePicFlashBackgroundTasks -> picSerialPumpUpgrade) keeps the
   // upgrade state machine ticking from here on.
   waitForPICTaskParked();
+
 
   // Turn on LED to indicate flashing
   digitalWrite(LED1, LOW);

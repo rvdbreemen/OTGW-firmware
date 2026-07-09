@@ -327,6 +327,12 @@ inline void platformNullRomPutc(char) {}
 inline void platformMuteUart0Console() {
   esp_log_set_vprintf(platformNullLogVprintf);
   ets_install_putc1(platformNullRomPutc);
+  // Third leak path: closed-source components (WiFi libs) partly use plain
+  // newlib printf, which reaches UART0 through the VFS console — bypassing
+  // BOTH hooks above (see esp32.com/viewtopic.php?t=299: "some closed source
+  // parts still use ets_printf and printf"). Point stdout/stderr at /dev/null.
+  freopen("/dev/null", "w", stdout);
+  freopen("/dev/null", "w", stderr);
 }
 
 // Hardware random
