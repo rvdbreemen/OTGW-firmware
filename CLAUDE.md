@@ -528,6 +528,7 @@ The benefit of writing the plan once is symmetry: agents see the same intent, th
 
 This project uses [adr-kit](https://github.com/rvdbreemen/adr-kit) for Architecture Decision Records. The skill, the `adr-generator` subagent, and the path-specific instructions are loaded via the plugin.
 
+- **Before implementing a feature or architectural change, run `/adr-kit:context <topic>` first** (e.g. "mqtt discovery", "heap allocation", "ble scanning") to surface the 3-5 most relevant Accepted ADRs before you write code. With 160+ ADRs this is the efficient way to honour existing decisions without reading the whole set; it is read-only and safe to call from parallel subagents. Feed the same topic you would use to describe the change.
 - Use `/adr-kit:adr` (or invoke the `adr-generator` subagent) when authoring a new ADR.
 - During coding work, follow the rules in the plugin's `instructions/adr.coding.md`.
 - During code review, apply the six named ADR checks in the plugin's `instructions/adr.review.md`.

@@ -515,7 +515,7 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 ### SAT Subsystem
 
-- **[ADR-169: PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate](ADR-169-psram-aware-ble-default-with-no-psram-consent-gate.md)** 🆕 *(Proposed)*  
+- **[ADR-169: PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate](ADR-169-psram-aware-ble-default-with-no-psram-consent-gate.md)** *(Accepted)*  
   Proposed. Documents the code-only decision from TASK-995 (commit 2f3bd23d3): BLE runs by default only where `psramFound()` is true; on no-PSRAM boards (OTGW32) it stays dormant behind a persisted user-consent flag (`bBleRiskAck`) that acknowledges the internal-DRAM-headroom instability risk. `psramFound()` is the single runtime discriminator across one combined firmware image (`-DBOARD_HAS_PSRAM` global). Memory-headroom policy tied to the ADR-147 / ADR-149 concurrent web-serve budget; enforced by a declarative `require_pattern` on the `bleActive()` gate. Related to ADR-092, ADR-126, ADR-161; TASK-988 validates the PSRAM assumption before acceptance.
 
 - **[ADR-085: SAT (Smart Autotune Thermostat) Integration](ADR-085-sat-smart-autotune-thermostat-integration.md)** 🆕  

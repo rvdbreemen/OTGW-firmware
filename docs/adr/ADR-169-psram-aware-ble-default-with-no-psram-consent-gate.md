@@ -2,13 +2,13 @@
 
 ## Status
 
-Proposed. Date: 2026-07-09.
+Accepted. Date: 2026-07-09.
 
 This ADR documents an architectural decision that already shipped as code in
-TASK-995 (commit 2f3bd23d3). It does NOT flip to Accepted here: acceptance is
-the maintainer's own determination, made later, once the ship-gate noted in the
-Context (graceful boot on a genuinely PSRAM-less S3, and TASK-988's PSRAM
-real-utility validation) is satisfied.
+TASK-995 (commit 2f3bd23d3). Accepted by the maintainer on 2026-07-09. The
+open PSRAM real-utility validation (TASK-988) does not block acceptance of the
+consent-gate policy itself; it may lead to a later amending ADR if the
+~64 KB / PSRAM-headroom premise is measured to differ materially.
 
 ## Status History
 
@@ -17,6 +17,11 @@ status_history:
     status: Proposed
     changed_by: Agent (adr-generator, on maintainer instruction)
     reason: Documents the code-only decision introduced by TASK-995 (commit 2f3bd23d3): BLE runs by default on PSRAM boards and stays dormant behind a persisted user-consent flag (bBleRiskAck) on no-PSRAM boards, with psramFound() as the single runtime discriminator across one combined firmware image. Status intentionally stays Proposed pending the maintainer's own accept-readiness review.
+    changed_via: adr-kit
+  - date: 2026-07-09
+    status: Accepted
+    changed_by: User: Robert van den Breemen
+    reason: Maintainer accepted the PSRAM-aware BLE default + no-PSRAM consent-gate policy. All four verification gates pass (Completeness/Evidence/Clarity/Consistency); the decision matches shipped code (SATble.ino:629-631). TASK-988's PSRAM real-utility validation stays open as a possible later amendment, not a blocker on the policy.
     changed_via: adr-kit
 
 ## Context
