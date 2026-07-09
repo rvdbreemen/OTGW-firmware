@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-25 21:30'
-updated_date: '2026-07-06 20:51'
+updated_date: '2026-07-09 19:39'
 labels:
   - heap
   - soak
@@ -122,4 +122,6 @@ one more clean re-soak (no concurrent hardware testing on the same unit) to
 settle the loop-gap question, or accepting this 10h result plus the June 30
 data point as sufficient combined evidence and proceeding to draft the
 ADR-089/121 supersession with these two soaks cited together.
+
+2026-07-09 drain decision (user: 'draft ADR-supersession, Proposed'): the ADR-supersession ALREADY EXISTS — ADR-167 (Retire the ESP8266-Era Heap Tier Machine and Per-Consumer Gating on the ESP32-S3-Only Dev Branch), Proposed 2026-07-06, drafted from this task's soak evidence, with removal explicitly deferred to a Phase-3 follow-up and status held Proposed pending the maintainer's accept-readiness review. That is exactly the chosen disposition, so no new ADR is needed (a draft ADR-169 amend-variant was started and reverted to avoid two conflicting Proposed ADRs on the same evidence). ACTION FOR CLOSURE: AC#4 becomes 'maintainer accepts ADR-167 -> create the Phase-3 removal task (evaluate.py ADR-089/121 gates + ADR status flips + re-soak)'. TASK-956's investigation deliverable (soak + verdict + Proposed ADR) is complete; only the accept-gate + Phase-3 impl remain, both maintainer-gated. Recommend: keep In Progress pending ADR-167 acceptance, OR close TASK-956 as 'investigation done, Phase-3 tracked separately once ADR-167 accepted'.
 <!-- SECTION:NOTES:END -->

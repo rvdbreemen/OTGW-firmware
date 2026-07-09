@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-30 23:06'
-updated_date: '2026-07-01 19:34'
+updated_date: '2026-07-09 19:32'
 labels: []
 dependencies: []
 ordinal: 176000
@@ -29,6 +29,8 @@ Verified gap (grep 0 hits in v2): the v2 Home/OT-Direct surface lacks the manual
 Implemented in the v2 Connection tab (Monitor > Connection), gated on iface==='OT-Direct' (fetchConn). New 'OT-Direct overrides' card (reuses set-group/ble-row/ble-ctrls/tbtn — no new CSS classes, drift gate clean): lists the 4 override arrays from GET /api/v2/otdirect/overrides (write/response=SR/modify=RM/unknown=UI) with a per-row Clear (cr/cm/ki), plus an apply form (6-action select SR/CR/RM/CM/UI/KI + MsgID + hex value shown only for SR/RM + Apply) that POSTs ?action=&msgid=&value=. Mirrors the classic Home override panel. Verified live on .39 (OT-Direct): panel shows, lists 'Write MsgID 1 0x2D00', Apply UI msgid 30 -> row+Clear (POST ui 200), Clear -> gone (POST ki 200), 0 console errors. AC#2 (bus effect) is field-validation: .39 has no boiler (OT bus offline) so the override is accepted+stored+listed but the on-bus effect needs a real appliance to observe.
 
 Code complete and committed (815896f3f). AC#1 verified on device .39 (apply+clear POST 200, active-overrides list updates, 0 console errors). AC#2 (override takes effect on the OT bus) is HARDWARE-GATED: bench .39 is OT-Direct with no appliance on the bus, so bus effect cannot be observed here. Held In Progress pending field validation on a device with a live boiler.
+
+2026-07-09 drain review: AC#1 shipped+verified (815896f3f). AC#2 (override takes effect on a live OT bus) is not bench-closeable by the current fleet: the OTGW32 bench has no boiler on the bus, and the field testers (crashevans/number3nl) are PIC/Classic, not OT-Direct. Genuinely blocked on OT-Direct-hardware-WITH-a-boiler field validation. Parked here; recruit an OT-Direct+boiler tester to close.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
