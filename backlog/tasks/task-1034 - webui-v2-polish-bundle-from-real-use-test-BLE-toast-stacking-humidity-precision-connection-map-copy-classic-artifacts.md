@@ -3,9 +3,11 @@ id: TASK-1034
 title: >-
   webui v2: polish bundle from real-use test - BLE toast stacking, humidity
   precision, connection-map copy, classic artifacts
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-07-09 18:11'
+updated_date: '2026-07-09 18:33'
 labels: []
 dependencies: []
 ordinal: 243000
@@ -19,8 +21,20 @@ From the same 2026-07-09 real-use test on the S3 Mini Pro: (a) BLE 'New sensor d
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 BLE discovery toasts group/auto-dismiss and no longer permanently cover page content
-- [ ] #2 Humidity values render with sane precision everywhere they appear
-- [ ] #3 Connection-map boiler/thermostat cards show state-consistent copy
-- [ ] #4 Classic 'Wait for it...' placeholder clears after load
+- [x] #1 BLE discovery toasts group/auto-dismiss and no longer permanently cover page content
+- [x] #2 Humidity values render with sane precision everywhere they appear
+- [x] #3 Connection-map boiler/thermostat cards show state-consistent copy
+- [x] #4 Classic 'Wait for it...' placeholder clears after load
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Grouped BLE discovery toasts (single card, N-count, View->Sensors roster, 15s auto-dismiss), humidity rounded to 1 decimal in roster (toast already rounded), connection-map healthy-copy now omitted on down/warn state (uniform for all nodes), classic Wait-for-it placeholder cleared on first devinfo. Verified on-device: SAT/Advanced/FS pages clean, no toast pile-up, no JS errors.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+v2/classic UX polish from the real-use test: grouped auto-dismissing BLE discovery toasts, sane humidity precision, state-consistent connection-map copy, and the classic 'Wait for it...' artifact cleared.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -15,6 +15,25 @@
 
   var APIGW = location.protocol + '//' + location.host + '/api/';
 
+  // ---------- fetch with 503-retry (TASK-1033) ----------
+  // The REST backpressure gate (ADR-165) 503s transiently during load bursts.
+  // Retry only on HTTP 503 and network errors, with doubling backoff, and return
+  // the final Response (or rethrow the final network error). Retries are strictly
+  // sequential — the next attempt fires only after the previous one failed — so
+  // this never adds request concurrency (the N<=2 cap stays intact).
+  function fetchWithRetry(url, opts, tries, delayMs) {
+    tries = (tries === undefined) ? 3 : tries;
+    delayMs = (delayMs === undefined) ? 400 : delayMs;
+    function again() {
+      return new Promise(function (res) { setTimeout(res, delayMs); })
+        .then(function () { return fetchWithRetry(url, opts, tries - 1, delayMs * 2); });
+    }
+    return fetch(url, opts).then(
+      function (r) { return (r.status === 503 && tries > 1) ? again() : r; },
+      function (err) { if (tries > 1) return again(); throw err; }
+    );
+  }
+
   // ---------- theme (shared key with classic UI) ----------
   function applyTheme(dark) {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
@@ -1996,7 +2015,7 @@
         var bh = (s.hum !== undefined) ? s.hum : s.humidity;
         if (bt !== undefined || bh !== undefined) {
           var val = document.createElement('div'); val.className = 'ble-val';
-          val.textContent = (bt !== undefined ? bt + '°' : '') + (bh !== undefined ? '  ' + bh + '%' : '');
+          val.textContent = (bt !== undefined ? bt + '°' : '') + (bh !== undefined ? '  ' + (Math.round(bh * 10) / 10) + '%' : '');
           row.appendChild(val);
         }
         // TASK-931: bindkey state — encrypted Xiaomi MiBeacon sensors show a lock
@@ -2194,7 +2213,9 @@
     body.appendChild(nm);
     var det = c.detail || (c.seen != null ? connRecency(c) : '');
     if (det) { var dd = document.createElement('div'); dd.className = 'det'; dd.textContent = det; body.appendChild(dd); }
-    if (c.exp) { var ex = document.createElement('div'); ex.className = 'exp'; ex.textContent = c.exp; body.appendChild(ex); }
+    // The exp line describes the healthy state ("… is answering") — showing it
+    // while the node is down/degraded contradicts the fix hint, so omit it there.
+    if (c.exp && c.s !== 'st-down' && c.s !== 'st-warn') { var ex = document.createElement('div'); ex.className = 'exp'; ex.textContent = c.exp; body.appendChild(ex); }
     if ((c.s === 'st-down' || c.s === 'st-warn') && c.fix) { var fx = document.createElement('div'); fx.className = 'fix'; fx.textContent = '▸ ' + c.fix; body.appendChild(fx); }
     row.appendChild(badge); row.appendChild(body);
     return row;
@@ -2315,15 +2336,20 @@
     if (devInfoCache && (now - devInfoTs) < 8000) { cb(devInfoCache); return; }
     if (devInfoInflight) { devInfoInflight.push(cb); return; }
     devInfoInflight = [cb];
-    fetch(APIGW + 'v2/device/info').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      var d = (j && j.device) || {};
-      devInfoCache = d; devInfoTs = Date.now();
-      simActive = (d.otgwsimulation === true || d.otgwsimulation === 'true');
+    fetchWithRetry(APIGW + 'v2/device/info').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var d = (j && j.device) || null;
+      if (d) {
+        devInfoCache = d; devInfoTs = Date.now();
+        simActive = (d.otgwsimulation === true || d.otgwsimulation === 'true');
+      }
       var cbs = devInfoInflight; devInfoInflight = null;
-      cbs.forEach(function (fn) { try { fn(d); } catch (e) { } });
+      // A failed/empty answer passes the stale cache if we have one, else null
+      // ("unknown"): callers must never derive a negative capability verdict
+      // (e.g. "No PIC") from null — only from an explicit successful snapshot.
+      cbs.forEach(function (fn) { try { fn(d || devInfoCache); } catch (e) { } });
     }).catch(function () {
       var cbs = devInfoInflight || []; devInfoInflight = null;
-      cbs.forEach(function (fn) { try { fn(devInfoCache || {}); } catch (e) { } });
+      cbs.forEach(function (fn) { try { fn(devInfoCache); } catch (e) { } });
     });
   }
   function yesno(b) { return (b === undefined || b === null) ? undefined : (b === false || b === 'false' || b === 0) ? 'No' : 'Yes'; }
@@ -2331,7 +2357,7 @@
   // ---------- Advanced > Debug Information (TASK-967/982) ----------
   function fetchDebug() {
     // Grouped device info (mockup devinfo-groups), from the cached device/info snapshot.
-    withDeviceInfo(function (d) { renderDebugGroups(d); });
+    withDeviceInfo(function (d) { renderDebugGroups(d || {}); });
     // Crashlog: green ok-banner when clean; the detail <pre> only when a crash exists.
     fetch(APIGW + 'v2/device/crashlog').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var c = (j && j.crashlog) || {};
@@ -2403,12 +2429,24 @@
   // ---------- Advanced > PIC firmware flash (TASK-972/982) ----------
   var PICBASE = location.protocol + '//' + location.host + '/';   // /pic is a top-level route, not under /api/v2
   var picPollTimer = null, picBusy = false, picDevVer = '';
+  var PIC_NONE_MSG = 'No PIC detected — PIC firmware flashing is unavailable on this board (OT-Direct / OTGW32).';
+  var picGateRetries = 0;
   function fetchPic() {
     var wrap = document.getElementById('picFlash'), none = document.getElementById('picNone');
     withDeviceInfo(function (d) {
+      if (!d || d.otcommandinterface === undefined) {
+        // Gating snapshot unknown (device/info failed even after retries): never
+        // conclude "No PIC" from a missing answer. Show a neutral checking state
+        // and re-poll a few times; only a successful snapshot decides the card.
+        if (wrap) wrap.style.display = 'none';
+        if (none) { none.style.display = ''; none.textContent = 'Checking device capabilities…'; }
+        if (picGateRetries < 5) { picGateRetries++; setTimeout(fetchPic, 2000); }
+        return;
+      }
+      picGateRetries = 0;
       var isPic = (d.otcommandinterface || '') === 'PIC';
       if (wrap) wrap.style.display = isPic ? '' : 'none';      // hidden on OTGW32 / OT-Direct
-      if (none) none.style.display = isPic ? 'none' : '';
+      if (none) { none.style.display = isPic ? 'none' : ''; if (!isPic) none.textContent = PIC_NONE_MSG; }
       var ssim = document.getElementById('sysSim'); if (ssim) ssim.classList.toggle('hidden', !simActive);
       if (!isPic) return;
       picDevVer = ('' + (d.picfwversion || '')).trim();        // for the .newer highlight
@@ -2503,6 +2541,7 @@
     fetch(APIGW + 'v2/pic/settings').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var s = (j && j.pic_settings) || {};
       withDeviceInfo(function (d) {
+        d = d || {};
         el.textContent = '';
         var rows = [
           ['PIC firmware version', prv(d.picfwversion)],
@@ -2585,7 +2624,7 @@
   }
   function fetchFsList(path) {
     if (typeof path === 'string') fsCurrentPath = path;
-    fetch(APIGW + 'v2/filesystem/files?path=' + encodeURIComponent(fsCurrentPath))
+    fetchWithRetry(APIGW + 'v2/filesystem/files?path=' + encodeURIComponent(fsCurrentPath))
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (json) {
         if (!Array.isArray(json)) { renderFsError('Failed to read the file system.'); return; }
@@ -2606,7 +2645,10 @@
     var body = document.getElementById('fsTableBody'); if (!body) return;
     body.textContent = '';
     var tr = document.createElement('tr'); var td = document.createElement('td');
-    td.colSpan = 4; td.style.color = 'var(--muted)'; td.style.padding = '12px'; td.textContent = msg;
+    td.colSpan = 4; td.style.color = 'var(--muted)'; td.style.padding = '12px'; td.textContent = msg + ' ';
+    var retry = document.createElement('button'); retry.className = 'tbtn'; retry.textContent = 'Retry';
+    retry.addEventListener('click', function () { fetchFsList(); });
+    td.appendChild(retry);
     tr.appendChild(td); body.appendChild(tr);
   }
   function renderFsList(files, summary) {
@@ -2832,11 +2874,23 @@
   }
 
   function fetchSatPage() {
-    fetch(APIGW + 'v2/sat/status')
-      .then(function (r) { return r.ok ? r.json() : null; })
-      .then(function (d) {
+    fetchWithRetry(APIGW + 'v2/sat/status')
+      .then(function (r) { return r.ok ? r.json().catch(function () { return null; }).then(function (j) { return { status: r.status, json: j }; }) : { status: r.status, json: null }; })
+      .then(function (res) {
+        var d = res.json;
         var nd = document.getElementById('satNoData'), body = document.getElementById('satBody');
-        if (!d || typeof d !== 'object') { if (nd) nd.style.display = ''; if (body) body.style.display = 'none'; return; }
+        if (!d || typeof d !== 'object') {
+          // Distinguish "this device has no SAT endpoint" (404) from a transient
+          // load-shed 503: the latter self-heals on the 5 s poll, so say so.
+          if (nd) {
+            nd.textContent = (res.status === 404)
+              ? 'SAT status is unavailable on this device.'
+              : 'Couldn’t load SAT status — retrying…';
+            nd.style.display = '';
+          }
+          if (body) body.style.display = 'none';
+          return;
+        }
         if (nd) nd.style.display = 'none'; if (body) body.style.display = '';
         satLastData = d;
         try { renderSatPage(d); } catch (e) { }
@@ -3337,6 +3391,52 @@
     stack.appendChild(card);
     // No auto-expire: the card stays until the user acts on it (Assign / Ignore / ×).
   }
+  // TASK-1034: BLE discoveries collapse into ONE grouped card ("N new BLE sensors
+  // discovered") with a single View action — the Sensors roster is the place to
+  // act — and auto-dismiss after 15 s. Nothing is lost: the roster keeps them.
+  var bleDiscoverPending = {};   // mac -> sub line of the pending (unshown-seen) sensor
+  var bleDiscoverTimer = null;
+  function bleDiscoverDismiss() {
+    if (bleDiscoverTimer) { clearTimeout(bleDiscoverTimer); bleDiscoverTimer = null; }
+    Object.keys(bleDiscoverPending).forEach(function (m) { markDiscoverSeen(m); });
+    bleDiscoverPending = {};
+    var stack = document.getElementById('discoverStack');
+    var card = stack && stack.querySelector('[data-ble-group]');
+    if (card && card.parentNode) card.parentNode.removeChild(card);
+  }
+  function goToSensorRoster() {
+    setActiveCat = 'sensors'; showPage('settings'); renderSettings();
+    setTimeout(function () { var el = document.querySelector('[class*="ble-row"]'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 350);
+  }
+  function showBleDiscoverGroup() {
+    var macs = Object.keys(bleDiscoverPending);
+    if (!macs.length) return;
+    var stack = getDiscoverStack();
+    var card = stack.querySelector('[data-ble-group]');
+    if (!card) {
+      card = document.createElement('div');
+      card.className = 'discover-card ble';
+      card.setAttribute('data-ble-group', '1');
+      var ic = document.createElement('span'); ic.className = 'discover-ic';
+      var bd = document.createElement('div'); bd.className = 'discover-bd';
+      var t = document.createElement('div'); t.className = 't';
+      var ss = document.createElement('div'); ss.className = 's';
+      var act = document.createElement('div'); act.className = 'discover-act';
+      var view = document.createElement('button'); view.className = 'primary'; view.textContent = 'View';
+      view.addEventListener('click', function () { bleDiscoverDismiss(); goToSensorRoster(); });
+      act.appendChild(view);
+      bd.appendChild(t); bd.appendChild(ss); bd.appendChild(act);
+      var x = document.createElement('button'); x.className = 'discover-x'; x.setAttribute('aria-label', 'Dismiss'); x.textContent = '×';
+      x.addEventListener('click', bleDiscoverDismiss);
+      card.appendChild(ic); card.appendChild(bd); card.appendChild(x);
+      stack.appendChild(card);
+    }
+    var tEl = card.querySelector('.t'), sEl = card.querySelector('.s');
+    if (tEl) tEl.textContent = (macs.length === 1) ? 'New BLE sensor discovered' : macs.length + ' new BLE sensors discovered';
+    if (sEl) sEl.textContent = (macs.length === 1) ? bleDiscoverPending[macs[0]] : 'View them in Settings › Sensors.';
+    if (bleDiscoverTimer) clearTimeout(bleDiscoverTimer);
+    bleDiscoverTimer = setTimeout(bleDiscoverDismiss, 15000);
+  }
   // BLE discovery: /api/v2/sat/ble/discovery (mac + temp/hum).
   function pollDiscovery(retriesLeft) {
     fetch(APIGW + 'v2/sat/ble/discovery', { cache: 'no-store' })
@@ -3344,15 +3444,18 @@
       .then(function (j) {
         if (!j || !Array.isArray(j.sensors)) return;
         var seen = discoverSeenSet();
+        var fresh = false;
         j.sensors.forEach(function (s) {
-          if (!s || !s.valid || !s.mac || seen[s.mac]) return;
+          if (!s || !s.valid || !s.mac || seen[s.mac] || bleDiscoverPending[s.mac]) return;
           if (s.label && s.label.trim()) { markDiscoverSeen(s.mac); return; }   // already named -> not "new"
           var nm = (s.name && s.name.trim()) || '';
           var sub = (nm ? nm + ' · ' : '') + s.mac;
           if (typeof s.temp === 'number') sub += ' · ' + s.temp.toFixed(1) + '°C';
           if (typeof s.hum === 'number') sub += ' / ' + Math.round(s.hum) + '%';
-          showDiscoverCard({ id: s.mac, bus: 'ble', title: 'New BLE sensor discovered', sub: sub });
+          bleDiscoverPending[s.mac] = sub;
+          fresh = true;
         });
+        if (fresh) showBleDiscoverGroup();
       })
       .catch(function () {
         // Board momentarily saturated under the page's concurrent load (the
@@ -3847,7 +3950,8 @@
   // OT-Direct boards (OTGW32) have no PIC firmware, so the PIC tab is dead there.
   function applyPicTabVisibility() {
     withDeviceInfo(function (d) {
-      var isPic = !!(d && d.otcommandinterface === 'PIC');
+      if (!d) return;   // snapshot unknown — keep the tab as-is rather than hide it on a failed fetch
+      var isPic = (d.otcommandinterface === 'PIC');
       var btn = document.querySelector('#advTabs [data-adv="pic"]');
       var panel = document.getElementById('adv-pic');
       if (btn) btn.classList.toggle('hidden', !isPic);
@@ -3967,7 +4071,7 @@
     startDiscoveryPolling();
     // TASK-983/992: one delayed device/info fetch feeds BOTH the header identity
     // chips and the PIC-tab visibility (withDeviceInfo dedups + caches 8s).
-    setTimeout(function () { applyPicTabVisibility(); withDeviceInfo(fillHeaderIdentity); }, 1200);
+    setTimeout(function () { applyPicTabVisibility(); withDeviceInfo(function (d) { if (d) fillHeaderIdentity(d); }); }, 1200);
     // TASK-991: on a bench setup (no boiler/thermostat on the bus, PIC board), offer
     // simulation mode once. Delayed past the boot burst so the bus state has settled.
     setTimeout(maybePromptSimulation, 12000);

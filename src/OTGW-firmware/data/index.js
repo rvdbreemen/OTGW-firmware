@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.338
+**  Version  : v2.0.0-alpha.339
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -93,12 +93,32 @@ function isDallasAddress(entry) {
   return (len === 8 || len === 9 || len === 16) &&
          /^[0-9A-Fa-f]+$/.test(name);
 }
+// ============================================================================
+// Fetch with 503-retry (TASK-1033). The REST backpressure gate (ADR-165) 503s
+// transiently during load bursts. Retry only on HTTP 503 and network errors,
+// with doubling backoff, and return the final Response (or rethrow the final
+// network error). Retries are strictly sequential — the next attempt fires only
+// after the previous one failed — so this never adds request concurrency (the
+// N<=2 cap stays intact).
+function fetchWithRetry(url, opts, tries, delayMs) {
+  tries = (tries === undefined) ? 3 : tries;
+  delayMs = (delayMs === undefined) ? 400 : delayMs;
+  function again() {
+    return new Promise(function (res) { setTimeout(res, delayMs); })
+      .then(function () { return fetchWithRetry(url, opts, tries - 1, delayMs * 2); });
+  }
+  return fetch(url, opts).then(
+    function (r) { return (r.status === 503 && tries > 1) ? again() : r; },
+    function (err) { if (tries > 1) return again(); throw err; }
+  );
+}
+
 // Global cache for Dallas sensor labels (loaded from /dallas_labels.ini)
 var dallasLabelsCache = {};
 
 // Function to fetch Dallas sensor labels from backend
 function fetchDallasLabels() {
-  return fetch(APIGW + 'v2/sensors/labels')
+  return fetchWithRetry(APIGW + 'v2/sensors/labels')
     .then(function(response) {
       if (!response.ok) {
         console.warn('Failed to fetch Dallas labels:', response.status);
@@ -5498,7 +5518,7 @@ const DEV_INFO_MAX_RETRIES = 5;
 function refreshDevInfo() {
   const devNameEl = document.getElementById('devName');
   if (devNameEl) devNameEl.textContent = "";
-  fetch(APIGW + "v2/device/info")
+  fetchWithRetry(APIGW + "v2/device/info")
     .then(response => {
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -5532,6 +5552,14 @@ function refreshDevInfo() {
         // mDNS name surfaced on hover instead of repeated inline.
         devNameEl.textContent = hostname + (ipaddress ? " · " + ipaddress : "");
         devNameEl.title = hostname ? ("Reachable at " + hostname + ".local") : "";
+      }
+
+      // TASK-1034: the header is populated, so the literal "Wait for it..."
+      // boot placeholder has served its purpose — drop it if it still shows
+      // (the OT monitor table replaces it on its own first successful render).
+      const waitingEl = document.getElementById('waiting');
+      if (waitingEl && waitingEl.parentNode && waitingEl.textContent === 'Wait for it...') {
+        waitingEl.parentNode.removeChild(waitingEl);
       }
     })
     .catch(function (error) {
