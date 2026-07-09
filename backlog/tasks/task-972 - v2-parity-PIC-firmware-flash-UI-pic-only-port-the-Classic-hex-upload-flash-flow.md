@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-01 05:21'
-updated_date: '2026-07-08 23:07'
+updated_date: '2026-07-09 03:47'
 labels: []
 dependencies: []
 ordinal: 184000
@@ -80,6 +80,8 @@ isolate silicon-timing vs this-specific-unit.
 2026-07-08 deep-dive (dev, esp32-classic bench .64, alpha.331-336): ROOT CAUSE #1 FOUND AND FIXED. ESP->PIC TX was structurally broken on esp32-classic: OTGWSerial bound UART1 routed via the GPIO matrix onto GPIO43/44; outbound bytes never reached the PIC intact (all PR=/GW= commands were silently retried forever; the 'PR=A works' evidence from 07-06 was a false positive - fwreportinfo fires on the reset BANNER, an RX-only path). FIX: OTGWSerial now binds UART0 (GPIO43/44 are its native IO_MUX pins; console is safe on USB-CDC since TASK-850). VERIFIED on-device: PR=A answers in <50ms, GW=R resets the PIC (banner +57ms), evaluate 0 fails.\n\nAlso fixed two latent library bugs found during diagnosis: (a) OTGWUpgrade ctor never initialized bufpos/checksum/cmdcode/lastaction (heap junk; timeout hexdumps showed stale heap bytes as fake RX), (b) FWSTATE_RSET sent the progress callback (>100ms of WS/JSON work) BEFORE fwCommand, delaying CMD_VERSION relative to the bootloader window; order swapped. Permanent diagnostics: OTGWSERIAL_DEBUG hook now compiled in, picUpgradeDebug routes the library's upgrade-FSM trace to telnet during a flash.\n\nROOT CAUSE #2 STILL OPEN (flash itself): with TX fixed, the flash still fails at FWSTATE_VERSION. Instrumented byte-level: MCLR/GW=R reset works, bootloader ETX arrives, but the bootloader exits to the app within ~130ms even when the ESP sends NOTHING after the ETX (diagnostic silent-line build). selfprog.asm WaitForSTX aborts on the FIRST received byte != STX and Pause() early-exits on RCIF -> evidence points to a spurious byte/glitch on the PIC RX line around the PIC's own reset transition on this S3-on-Classic-carrier combo (possibly CH340-parallel-line or level-shifter edge). Refuted hypotheses this session: BLE starvation (was already), poll cadence, MCLR-edge-only glitch (pinless GW=R reset fails identically), byte pacing/2-byte-FIFO overrun, uninit members, callback latency. Next step requires hardware: scope/logic analyzer on PIC RX during reset, or a second PIC board.
 
 2026-07-09: IDF-console hypothesis tested. sdkconfig proof: CONFIG_ESP_CONSOLE_UART_NUM=0 (GPIO43 = PIC RX line), USB-JTAG only SECONDARY -> esp_log/ets_printf output physically transmits into the PIC. Added platformMuteUart0Console() (esp_log_set_vprintf null + ets_install_putc1 no-op), called on the PIC path in setup() before OTGWSerial.begin. This is correct regardless (stray logs caused SE responses from the PIC app), and PR=A still works after the change. HOWEVER the flash still fails identically: bootloader exits <130ms after its ETX. The deterministic ghost-byte source on the PIC RX line remains unidentified; console-mute did not remove it (either wifi-lib output bypasses both hooks, or the source is electrical: CH340 parallel on the carrier lines / level-shifter edge during PIC reset). Hardware measurement (scope/LA on PIC RX between ETX and STX) is now genuinely the only remaining discriminator. Alternative cross-check: flash via otmonitor over ser2net 25238 on this same board.
+
+2026-07-09: ADR-168 (PIC serial on native UART0 + IDF console mute) drafted as Proposed, docs/adr/ADR-168-pic-serial-native-uart0-and-idf-console-mute.md; awaits maintainer acceptance.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
