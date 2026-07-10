@@ -2835,7 +2835,7 @@
   var satDhwDirty = false;              // user dragging the DHW slider — defer status echo
   var satEnPending = false, satDhwEnPending = false, satSimPending = false;  // in-flight POST guards
   var SAT_MODE_LABELS = ['Off', 'Continuous', 'PWM'];      // control_mode enum
-  var SAT_CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain'];  // last_cycle_class
+  var SAT_CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain', 'Underheat (PWM)', 'Insufficient'];  // last_cycle_class (6/7 added TASK-891.4)
   var SAT_PRESET_NAMES = ['None', 'Away', 'Eco', 'Comfort', 'Sleep', 'Activity', 'Home'];   // active_preset enum
   var SAT_PRESETS = [['home', '🏠 Home'], ['away', '🚪 Away'], ['eco', '🌱 Eco'], ['comfort', '🛋 Comfort'], ['sleep', '🌙 Sleep'], ['activity', '🏃 Activity']];
   var SAT_BOILER_LABELS = {
