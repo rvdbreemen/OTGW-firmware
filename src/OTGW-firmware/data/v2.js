@@ -3114,7 +3114,7 @@
 
   function satRenderHealth(d) {
     var box = document.getElementById('satHealth'); if (!box) return;
-    var lc = d.last_cycle_class | 0, badCycle = (lc === 2 || lc === 3 || lc === 4);
+    var lc = d.last_cycle_class | 0, badCycle = (lc === 2 || lc === 3 || lc === 4 || lc === 6); // 6 = UNDERHEAT_PWM (TASK-891.4)
     var items = [
       ['Device', (d.boiler_status && d.boiler_status !== 'off') ? 'ok' : 'idle'],
       ['Cycle', badCycle ? 'warn' : 'ok'],

@@ -645,6 +645,14 @@ static SATCycleClass _cycleClassify(float durationSec, float tailP90, float tail
   const float ctrlErrP50 = tailP50 - controlSp;
   const float reqErrP90  = tailP90 - requestedSp;
 
+  // PWM underheat takes PRIORITY over SHORT (Python _classify_pwm checks underheat first;
+  // SHORT is only the non-underheat branch). Review fix: a short underheating PWM burst is
+  // UNDERHEAT_PWM, not SHORT_CYCLING, else it distorts the underheat fraction / health verdict.
+  if (isPwm && reqErrP90 <= -SAT_UNDERSHOOT_MARGIN_C) {
+    if (requestedSp < coldSp) return SAT_CYCLE_UNCERTAIN;
+    return SAT_CYCLE_UNDERHEAT_PWM;
+  }
+
   // SHORT cycling: PWM keys off < 80% of the configured on-time (AC#3, Python _classify_pwm);
   // continuous keeps the fixed floor. Sane floor when the configured on-time is unset/0.
   float shortThreshSec;
@@ -665,11 +673,7 @@ static SATCycleClass _cycleClassify(float durationSec, float tailP90, float tail
   }
 
   if (isPwm) {
-    // PWM underheat: tail P90 of requested-error <= -3 AND requested > COLD_SETPOINT (Python _classify_pwm)
-    if (reqErrP90 <= -SAT_UNDERSHOOT_MARGIN_C) {
-      if (requestedSp < coldSp) return SAT_CYCLE_UNCERTAIN;
-      return SAT_CYCLE_UNDERHEAT_PWM;
-    }
+    // PWM underheat already handled above (before SHORT); a non-short non-overshoot PWM cycle is GOOD.
     return SAT_CYCLE_GOOD;
   }
 
@@ -831,9 +835,9 @@ void satCycleOnFlameChange(bool flameOn)
     // Remember this flame-off edge for the next cycle's off-with-demand gating (AC#5)
     _cycle_lastFlameOffMs = now;
 
-    SATDebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs inBand=%.0fs\r\n"),
+    SATDebugTf(PSTR("SAT cycle #%d: class=%d dur=%.0fs maxFlow=%.1f p90=%.1f p10=%.1f overshoot=%.0fs totOvershoot=%.0fs inBand=%.0fs\r\n"),
             state.sat.iCycleCount, (int)cls, durationSec,
-            _cycle_maxFlowTemp, p90, p10, _cycle_overshootSec, _cycle_totalOvershootSec);
+            _cycle_maxFlowTemp, p90, p10, _cycle_overshootSec, _cycle_totalOvershootSec, _cycle_timeInBandSec);
   }
 }
 

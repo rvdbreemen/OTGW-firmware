@@ -616,9 +616,17 @@ void OTGWUpgrade::stateMachine(const unsigned char *packet, int len) {
             // overrun (selfprog.asm), after which the fresh bootloader sends
             // a new ETX. Parsing it as a version packet reads stale buffer
             // bytes and aborts with "Wrong PIC" (TASK-972). Re-send the
-            // version request to the (re)started bootloader instead.
+            // version request to the (re)started bootloader instead — but
+            // bound it: a PIC stuck in an overrun-reset loop would otherwise
+            // ping-pong forever (the outer timeout is refreshed on each
+            // re-send via lastaction, TASK-891.4 review). Cap re-sends.
+            if (++retries >= 10) {
+                serial->resetPic();
+                finishUpgrade(OTGW_ERROR_RETRIES);
+                return;
+            }
             byte fwcommand[] = {CMD_VERSION, 3};
-            Dprintf(PSTR("Short packet (%d) in VERSION stage, re-sending version request\n"), len);
+            Dprintf(PSTR("Short packet (%d) in VERSION stage, re-sending version request (retry %d)\n"), len, retries);
             fwCommand(fwcommand, sizeof(fwcommand));
             break;
         }
@@ -822,8 +830,10 @@ void OTGWUpgrade::upgradeEvent(int ch) {
             Dprintf(PSTR("Invalid checksum: 0x%02x\n"), checksum);
             stateMachine();
         }
-    } else if (bufpos >= sizeof(buffer)) {
-        // Prevent overwriting the program data
+    } else if (bufpos >= sizeof(buffer) - 1) {
+        // Prevent overwriting the program data. Reserve the last byte for the
+        // trailing '\0' below so buffer[bufpos] = '\0' after the ++ can never
+        // write buffer[sizeof(buffer)] (one-byte overrun, TASK-891.4 review).
     } else if (!dle && ch == DLE) {
         buffer[bufpos] = ch;
     } else {
