@@ -1,7 +1,7 @@
-# Daily Issue Report — 2026-07-09
+# Daily Issue Report — 2026-07-10
 
-**Generated:** 2026-07-09 07:10 UTC
-**Window:** Last 24 hours (since 2026-07-08 07:10 UTC)
+**Generated:** 2026-07-10 07:10 UTC
+**Window:** Last 24 hours (since 2026-07-09 07:10 UTC)
 
 ## GitHub Issues
 
@@ -13,12 +13,12 @@ _Context: Repository has 2 open issues total (both feature requests); last activ
 
 ## Tweakers Forum (GoT thread #1653967)
 
-**Feed fetched:** 2026-07-09 07:10 UTC
+**Feed fetched:** 2026-07-10 07:10 UTC
 **Filter:** Posts by `number3` and `rvdbreemen` excluded.
 
 No new posts from the last 24 hours.
 
-_Most recent non-excluded post: **tjanssen** (Sun, 29 Jun 2026) — requested an uptime sensor in HA auto-discovery after recurring disconnects._
+_Most recent non-excluded post: **tjanssen** (Mon, 29 Jun 2026) — requested an uptime sensor in HA auto-discovery after recurring disconnects._
 
 ## Summary
 
