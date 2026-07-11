@@ -55,6 +55,13 @@ rem before find_python runs) so the venv command silently no-ops and .build-venv
 rem never created -> the bogus "Python 3 not found".
 call :find_python
 if errorlevel 1 exit /b 0
+rem We only reach here when any existing .build-venv was already rejected as
+rem out-of-range at line 19. Running `python -m venv` over a stale venv built
+rem from a DIFFERENT base interpreter can leave a half-upgraded/mismatched
+rem runtime (pyvenv.cfg says one version, python.exe is another), which then
+rem breaks pip/pio late. Wipe the invalid venv first so it is cleanly rebuilt
+rem on the correct 3.10-3.13 base.
+if exist "%BUILD_VENV_DIR%" rd /s /q "%BUILD_VENV_DIR%" >nul 2>nul
 %BASE_PYTHON% -m venv "%BUILD_VENV_DIR%" >nul 2>nul
 call :use_python_if_valid "%BUILD_VENV_PY%"
 exit /b 0
@@ -64,6 +71,11 @@ rem Only a 3.10-3.13 interpreter is acceptable as the venv base (see
 rem :use_python_if_valid). If the host only has e.g. 3.14, this returns 1 so the
 rem caller falls through to the portable-3.12 bootstrap instead of building a
 rem .build-venv on an interpreter the espressif32 platform will later reject.
+rem NOTE: do NOT probe explicit minors via the py launcher (`py -3.12`, `py -3.13`,
+rem ...). On Windows the launcher, when the requested minor is NOT registered,
+rem can hang a non-interactive/hidden process on the "Python not found" Microsoft
+rem Store redirect prompt (observed: build.bat stuck for 100s+). `py -3` (bare)
+rem never redirects because at least one 3.x is present, so it is safe.
 py -3 -c "import sys; v=sys.version_info; raise SystemExit(0 if (v[0]==3 and 10<=v[1]<=13) else 1)" >nul 2>nul
 if not errorlevel 1 (
     set "BASE_PYTHON=py -3"
