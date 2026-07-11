@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-10T07:10:44.842Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-11T07:09:45.548Z
 > Files: 543 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/06-claude/
@@ -799,7 +799,7 @@
 
 ## docs/
 
-- `daily-issue-report.md` — Daily Issue Report — 2026-07-10 (~180 tok)
+- `daily-issue-report.md` — Daily Issue Report — 2026-07-11 (~169 tok)
 
 ## src/OTGW-firmware/data/
 
