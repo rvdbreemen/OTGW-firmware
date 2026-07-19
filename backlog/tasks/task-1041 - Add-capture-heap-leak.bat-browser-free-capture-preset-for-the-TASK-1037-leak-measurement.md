@@ -38,8 +38,10 @@ The wrapper must also tell the operator what invalidates the run, since that is 
 - [ ] #2 A run produces telnet and MQTT logs with zero REST requests from the capture tooling in the telnet log
 - [x] #3 Output lands under logs/heap-leak, separate from normal diagnostic captures
 - [x] #4 The script prints, before starting, that the web UI must stay closed for the duration
-- [ ] #5 Referenced from TASK-1040 as the capture method for the no-mdns experiment
+- [x] #5 Referenced from TASK-1040 as the capture method for the no-mdns experiment
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
