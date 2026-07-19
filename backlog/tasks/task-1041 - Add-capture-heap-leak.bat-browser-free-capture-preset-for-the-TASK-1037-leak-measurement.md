@@ -3,9 +3,11 @@ id: TASK-1041
 title: >-
   Add capture-heap-leak.bat: browser-free capture preset for the TASK-1037 leak
   measurement
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-19 15:26'
+updated_date: '2026-07-19 15:27'
 labels: []
 dependencies: []
 priority: high
