@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 21:53'
-updated_date: '2026-07-19 22:04'
+updated_date: '2026-07-19 22:27'
 labels: []
 dependencies: []
 priority: high
@@ -60,4 +60,24 @@ Valkuil onderweg, opgelost: GATEWAY_MODE_REFRESH_INTERVAL telt status-poll-ticks
 Verificatie: node --check schoon op index.js, build completed successfully zonder compileerfouten, artefacten vers om 00:02. Evaluator 34 passed / 1 failed, waarbij die ene (1 unresolved ADR reference van 1408) pre-existing is.
 
 AC6 blijft OPEN: hardware-verificatie ontbreekt. Te controleren op een toestel: loopt de klok vloeiend en klopt hij met de apparaattijd, blijven heap en modusvelden bijwerken, en verschijnt er geen 429 in de console bij een enkel geopend tabblad.
+
+HARDWARE-VERIFICATIE 2026-07-20, bench-toestel 192.168.88.68 (MAC 84:F3:EB:22:B8:E1), build 1.7.2-beta.1+ccb5014.
+
+Ratelimiet:
+- otmonitor: 1e request 200, direct daarna 429 met Retry-After: 2, Cache-Control: no-store, RateLimit "default";r=0;t=2, RateLimit-Policy "default";q=1;w=2, Content-Type application/problem+json en de volledige RFC 9457 body.
+- device/time: 429 met Retry-After: 4 en w=4, dus het per-endpoint venster werkt.
+- Na 5s wachten weer 200: het venster heropent.
+- device/info en health: drie snelle requests achter elkaar, alle drie 200. Niet-gelimiteerde routes zijn ongemoeid.
+
+Klok:
+- Weergave liep van 00:23:34 naar 00:23:37 over 3 seconden reele tijd, lokaal getikt.
+- devClockOffsetMs = 7196717, dus ~+2 uur zomertijd van het apparaat plus ~3,3 s echte klokscheefstand, automatisch geleerd uit het epoch/dateTime-paar. Geen tijdzonedatabase in de browser.
+
+Console: nul 429-meldingen, nul errors of warnings. Alleen een informatieve LOG-regel.
+
+Geserveerde index.js draagt de wijzigingen: 9 treffers op de klokfuncties, intervallen 2000 en 5000, GATEWAY_MODE_REFRESH_INTERVAL = 12.
+
+Niet gemeten: de feitelijke requests per minuut in de browser. De automatiseringstab stond op visibilityState "hidden", waardoor de UI niet pollt en Chrome de timers throttlet. De 43/min volgt rekenkundig uit de geverifieerde intervallen, maar is niet waargenomen.
+
+Kanttekening bij de opstelling: de ESP zat los van het carrier board, dus picavailable=false en geen MQTT-broker geconfigureerd.
 <!-- SECTION:NOTES:END -->
