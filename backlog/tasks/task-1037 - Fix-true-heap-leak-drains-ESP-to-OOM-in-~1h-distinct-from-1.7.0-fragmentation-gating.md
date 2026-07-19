@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-19 15:24'
+updated_date: '2026-07-19 21:20'
 labels: []
 dependencies: []
 references:
@@ -63,4 +63,18 @@ Note on the 1.6.1 full capture: it is NOT usable as leak evidence. The capture s
 Related: TASK-1038 (recovery no-op), TASK-1039 (HTTP gate latch).
 
 Discriminating experiment tracked as TASK-1040 (build 1.7.1-no-mdns.1).
+
+2026-07-19 avond: eerste capture met het nieuwe browservrije script (transcript-20260719-210025, 1.7.1+c50cbcc, device 48E72958B013). Run 21:00 tot 22:00, apparaat stierf tijdens de meting.
+
+Verloop: vrije heap schommelt 50 minuten rond 19-20 KB terwijl maxBlock vastgepind staat op 10976 (25% frag in de banner). Vanaf 21:50 zakken beide samen: 16224 -> 13240 -> 11008 -> 7928. Om 22:00:21 weer emergencyHeapRecovery met before=1352 after=1352 delta=+0. Laatste regel 22:00:22: HEAP-FRAG skip MQTT (maxBlock=760, heap=1608). De twee Exception (2)-regels in dit bestand staan in de crashlog-sectie en zijn historie, niet live.
+
+BELANGRIJKSTE BEVINDING: er stonden TWEE OTGW-webpagina's open tijdens de meting, terwijl de tooling-browser uit stond (-SkipBrowserCapture bevestigd in de summary). Aangetoond via de poll-architectuur in data/index.js: per open pagina lopen twee onafhankelijke 1s-timers, index.js:269 (refreshOTmonitor -> /api/v2/otgw/otmonitor) en index.js:281 (refreshDevTime + refreshGatewayMode -> /api/v2/device/time, en gethrottled /api/v2/device/info). Per tabblad dus 60 + 60 + ~1 per minuut.
+
+Gemeten over 60 minuten: otmonitor 7192 (121/min), device/time 7190 (121/min), device/info 118 (~2/min). Alle drie exact factor 2 boven het per-tabblad-verwachtingspatroon. Twee sessies, sluitend over drie onafhankelijke endpoints.
+
+Dat verklaart ook de 365/min in de browsergedreven capture van vanochtend: zijn twee sessies plus onze headless Edge.
+
+CORRECTIE op eerdere notitie: de claim dat het lek ook zonder weblast optreedt is NIET houdbaar. In otgw-171.log stond de REST-toggle op [0], dus REST-verkeer werd daar niet gelogd. Afwezigheid van REST-regels betekende daar "niet gelogd", niet "niet gebeurd". Die vergelijking is ongeldig.
+
+Volgende stap is goedkoop en sluit direct iets uit: alle OTGW-tabbladen dicht en kijken of het apparaat dan langer dan anderhalf uur haalt. Geen nieuwe firmware nodig.
 <!-- SECTION:NOTES:END -->
