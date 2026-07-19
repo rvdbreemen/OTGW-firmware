@@ -825,6 +825,85 @@ static const char kRouteDiscovery[]  PROGMEM = "discovery";
 static const char kRouteDebugDump[]  PROGMEM = "debug";
 static const char kRouteMqtt[]       PROGMEM = "mqtt";
 
+//=======================================================================
+// Poll rate limit on the two endpoints the web UI drives from 1-second
+// timers (data/index.js:269 refreshOTmonitor, :281 refreshDevTime).
+//
+// Each open page costs 2 req/s forever, whether or not anyone is looking at
+// it. A field capture (TASK-1037) showed two forgotten tabs sustaining
+// 242 req/min for an hour until the gateway died. The firmware had no way to
+// say "slow down", so it says it here.
+//
+// The budget is per endpoint and global, not per client: capping aggregate
+// load is the whole point, and a per-client budget would let N clients each
+// poll at the full rate. Cost is one uint32_t per limited endpoint.
+//=======================================================================
+#define API_RATE_LIMIT_WINDOW_MS 1000UL
+
+static const char kSubOtmonitor[] PROGMEM = "otmonitor";
+static const char kSubTime[]      PROGMEM = "time";
+
+struct ApiRateLimit {
+  PGM_P    resource;      // words[3]
+  PGM_P    subresource;   // words[4]
+  uint32_t lastServedMs;
+};
+
+static ApiRateLimit kRateLimitedRoutes[] = {
+  { kRouteOtgw,   kSubOtmonitor, 0 },
+  { kRouteDevice, kSubTime,      0 },
+};
+
+// RFC 9457 problem+json. 429 (RFC 6585) is the right code here rather than
+// 503: the caller exceeded a quota, the service itself is fine. The heap
+// gate's existing 503s keep their meaning.
+static void sendApiRateLimited(uint32_t retryAfterSec) {
+  restResponseStatus = 429;
+  char jsonBuff[320];
+  snprintf_P(jsonBuff, sizeof(jsonBuff),
+    PSTR("{\"type\":\"https://github.com/rvdbreemen/OTGW-firmware/problems/rate-limit-exceeded\","
+         "\"title\":\"Rate limit exceeded\",\"status\":429,"
+         "\"detail\":\"This endpoint serves at most 1 request per second. Retry after %lu second(s).\"}"),
+    (unsigned long)retryAfterSec);
+
+  char hdrBuff[48];
+  snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("%lu"), (unsigned long)retryAfterSec);
+  httpServer.sendHeader(F("Retry-After"), hdrBuff);
+  httpServer.sendHeader(F("Cache-Control"), F("no-store"));
+  // RateLimit/RateLimit-Policy are an IETF httpapi draft, not a standard, as of
+  // July 2026. Sent as extra signal; Retry-After is the part clients honour.
+  snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("\"default\";r=0;t=%lu"), (unsigned long)retryAfterSec);
+  httpServer.sendHeader(F("RateLimit"), hdrBuff);
+  httpServer.sendHeader(F("RateLimit-Policy"), F("\"default\";q=1;w=1"));
+  sendCorsOriginHeader();
+  httpServer.send(429, F("application/problem+json"), jsonBuff);
+}
+
+// Returns false and answers with 429 when the caller is over budget.
+// Only GET is limited; a mutation never shares a budget with a poll.
+static bool checkApiRateLimit(const char* words[], uint8_t wc, HTTPMethod method) {
+  if (method != HTTP_GET || wc <= 4) return true;
+
+  const uint32_t now = millis();
+  for (uint8_t i = 0; i < (sizeof(kRateLimitedRoutes) / sizeof(kRateLimitedRoutes[0])); i++) {
+    ApiRateLimit& rl = kRateLimitedRoutes[i];
+    if (strcmp_P(words[3], rl.resource) != 0)    continue;
+    if (strcmp_P(words[4], rl.subresource) != 0) continue;
+
+    // Unsigned subtraction handles the 49-day millis() rollover correctly.
+    const uint32_t elapsed = now - rl.lastServedMs;
+    if (rl.lastServedMs != 0 && elapsed < API_RATE_LIMIT_WINDOW_MS) {
+      // Round up so Retry-After never says 0, which would invite an immediate retry.
+      const uint32_t remainMs = API_RATE_LIMIT_WINDOW_MS - elapsed;
+      sendApiRateLimited((remainMs + 999UL) / 1000UL);
+      return false;
+    }
+    rl.lastServedMs = now;
+    return true;
+  }
+  return true;
+}
+
 static const ApiRoute kV2Routes[] = {
   { kRouteHealth,     handleHealth },
   { kRouteSettings,   handleSettings },
@@ -901,6 +980,11 @@ void processAPI()
         for (const ApiRoute* r = kV2Routes; r->segment != nullptr; r++) {
           if (strcmp_P(words[3], r->segment) == 0) {
             restResponseStatus = 200; // default; overwritten by sendApiError if handler fails
+            // Poll budget for the two UI-driven endpoints; answers 429 itself.
+            if (!checkApiRateLimit(words, wc, method)) {
+              RESTDebugTf(PSTR("REST %s %s => 429 rate-limited %lums\r\n"), httpMethodToStr(method), originalURI, millis() - startMs);
+              return;
+            }
             r->handler(words, wc, method, originalURI);
             RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r->segment, millis() - startMs);
             return;

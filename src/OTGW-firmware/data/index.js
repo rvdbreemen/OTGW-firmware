@@ -3206,7 +3206,9 @@ function refreshDevTime() {
   fetch(APIGW + "v2/device/time")
     .then(response => {
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        var err = new Error(`HTTP ${response.status}: ${response.statusText}`);
+        err.status = response.status;  // see refreshOTmonitor: lets the catch skip 429 quietly
+        throw err;
       }
       return response.json();
     })
@@ -3239,6 +3241,7 @@ function refreshDevTime() {
       renderBottomMessage();
     })
     .catch(function (error) {
+      if (error && error.status === 429) return;  // gateway pacing us, not a failure
       var p = document.createElement('p');
       p.appendChild(
         document.createTextNode('Error: ' + error.message)
@@ -3952,7 +3955,12 @@ function refreshOTmonitor() {
   fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
     .then(response => {
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        var err = new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // Tag the status so the catch can tell "server is pacing us" (429)
+        // apart from a real failure. Without this the UI shows an error banner
+        // once a second whenever a second tab is open.
+        err.status = response.status;
+        throw err;
       }
       return response.json();
     })
@@ -4135,6 +4143,9 @@ function refreshOTmonitor() {
     })
     .catch(function (error) {
       if (flashModeActive || !isPageVisible()) return;
+      // 429 is the gateway pacing our polling, not a failure. Skip this cycle
+      // quietly; the next timer tick retries and the server grants it.
+      if (error && error.status === 429) return;
       var msg = (error && error.message) ? error.message : 'Load failed';
       if (msg.indexOf('Load failed') !== -1 || msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1) {
         console.warn("refreshOTmonitor warning:", error);
