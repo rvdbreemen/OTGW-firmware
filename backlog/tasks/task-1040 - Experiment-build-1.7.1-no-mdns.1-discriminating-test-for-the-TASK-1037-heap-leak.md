@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 15:23'
+updated_date: '2026-07-19 15:35'
 labels: []
 dependencies: []
 priority: high
@@ -45,3 +46,14 @@ Known side effects to communicate to the tester:
 - [ ] #5 At least 4 hours of heap telemetry collected on the tester device, or a crash captured, whichever comes first
 - [ ] #6 Result recorded in TASK-1037 as either 'mDNS is leak and crash site' or 'mDNS is crash site only', with the heap trend as evidence
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Capture method for this experiment: scripts/capture-heap-leak.bat (TASK-1041, committed c7d48646). Do NOT use capture-mqtt-debug.bat directly, its headless browser and debug-toggle enabling are exactly the load that made the earlier captures unreadable for leak purposes.
+
+Run it on both arms, same conditions, web UI closed:
+- arm A: stock 1.7.1, several hours
+- arm B: 1.7.1-no-mdns.1, several hours
+Compare the free-heap and maxBlock trends.
+<!-- SECTION:NOTES:END -->
