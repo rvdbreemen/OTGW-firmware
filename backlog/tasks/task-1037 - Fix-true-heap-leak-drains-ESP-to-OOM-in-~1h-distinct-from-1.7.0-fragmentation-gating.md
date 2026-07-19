@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-19 15:03'
+updated_date: '2026-07-19 15:24'
 labels: []
 dependencies: []
 references:
@@ -61,4 +61,6 @@ Speculative, not proven: mDNS may be both the leak and the crash site. LEAmDNS k
 Note on the 1.6.1 full capture: it is NOT usable as leak evidence. The capture script drives a headless Edge at 365 REST requests/min, and that run shows the fragmentation profile (maxBlock pinned at 5352 while free stayed 10-13 KB), not the leak ramp. Also found: his broker holds stale retained HA discovery from the 1.7.1 era (sw_version 1.7.1+c50cbcc on hvac_mode, hvac_action, uptime, fragskips, *_override) that the running 1.6.1 never fills, so those entities sit unavailable in HA independently of the reboots.
 
 Related: TASK-1038 (recovery no-op), TASK-1039 (HTTP gate latch).
+
+Discriminating experiment tracked as TASK-1040 (build 1.7.1-no-mdns.1).
 <!-- SECTION:NOTES:END -->
