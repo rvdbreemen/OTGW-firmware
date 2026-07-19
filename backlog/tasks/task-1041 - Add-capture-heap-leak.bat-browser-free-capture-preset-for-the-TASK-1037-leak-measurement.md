@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 15:26'
-updated_date: '2026-07-19 21:20'
+updated_date: '2026-07-19 22:28'
 labels: []
 dependencies: []
 priority: high
@@ -35,7 +35,7 @@ The wrapper must also tell the operator what invalidates the run, since that is 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 scripts/capture-heap-leak.bat exists and forwards user arguments to capture-mqtt-debug.bat after the preset flags
-- [ ] #2 A run produces telnet and MQTT logs with zero REST requests from the capture tooling in the telnet log
+- [x] #2 A run produces telnet and MQTT logs with zero REST requests from the capture tooling in the telnet log
 - [x] #3 Output lands under logs/heap-leak, separate from normal diagnostic captures
 - [x] #4 The script prints, before starting, that the web UI must stay closed for the duration
 - [x] #5 Referenced from TASK-1040 as the capture method for the no-mdns experiment
@@ -59,4 +59,6 @@ AC2 blijft OPEN, en het criterium was te zwak geformuleerd. Er stonden 14500 RES
 ONTWERPGAT gevonden: -SkipDebugToggles levert GEEN stille capture op. Het garandeert alleen dat het script niets aanzet. Dit apparaat had alle toggles (OTmsg, REST API, MQTT, MQTTGate, Sensors, NTP) al op [1] staan, vermoedelijk nog van de browsergedreven capture van diezelfde ochtend die ze allemaal aanzette. De wrapper erfde die toestand en de capture werd alsnog volledig verbose.
 
 Voor een echt rustige meting is een extra optie nodig die de toggles actief UIT zet in plaats van ze met rust te laten, met herstel van de oorspronkelijke stand na afloop. Overweeg -QuietDebugToggles naast de bestaande -SkipDebugToggles, en documenteer het verschil: "raak niets aan" versus "zet stil".
+
+2026-07-20 hardware: run tegen bench-toestel 192.168.88.68 leverde een telnet-log met nul REST GET-regels en uitsluitend logHeapStats. AC2 daarmee gedekt.
 <!-- SECTION:NOTES:END -->
