@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.7.1
+**  Version  : v1.7.1-no-mdns.1
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -551,7 +551,9 @@ static void handlePicFlashBackgroundTasks()
   OTGWstream.loop();          // Keep OTGWstream clients alive during PIC flash
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // Keep HTTP active
+#ifndef OTGW_DISABLE_MDNS
   MDNS.update();              // Keep MDNS active for network discovery
+#endif
   handleOTGW();               // REQUIRED for PIC flash - processes serial communication
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }

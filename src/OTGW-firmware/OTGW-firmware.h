@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.1
+**  Version  : v1.7.1-no-mdns.1
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -11,6 +11,19 @@
 
 #ifndef OTGW_FIRMWARE_H
 #define OTGW_FIRMWARE_H
+
+// ---------------------------------------------------------------------------
+// EXPERIMENT BUILD ONLY - branch exp-no-mdns-1.7.1, TASK-1040. Do not merge.
+//
+// Compiles mDNS out entirely: startMDNS() becomes a logged no-op and the three
+// MDNS.update() call sites drop away. This is the discriminating test for the
+// TASK-1037 heap leak. mDNS is the confirmed crash site (unchecked new in
+// LEAmDNS _readRRAnswer under OOM) and a candidate for the leak itself. With it
+// gone, a flat heap means both, a still-decaying heap means crash site only.
+//
+// Cost: otgw.local stops resolving. Reach the device by IP.
+// ---------------------------------------------------------------------------
+#define OTGW_DISABLE_MDNS 1
 
 #include <Arduino.h>
 

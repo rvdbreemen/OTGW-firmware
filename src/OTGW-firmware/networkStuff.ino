@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v1.7.1
+**  Version  : v1.7.1-no-mdns.1
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -394,6 +394,13 @@ void startTelnet()
 //=======================================================================
 void startMDNS(const char *hostname)
 {
+#ifdef OTGW_DISABLE_MDNS
+  // Experiment build (TASK-1040): mDNS is the confirmed crash site under OOM and
+  // a candidate for the leak itself. Compiled out so the heap trend can be read
+  // without it. Callers are left untouched; this becomes a logged no-op.
+  (void)hostname;
+  DebugTln(F("mDNS DISABLED in this build (experiment) - reach the device by IP\r\n"));
+#else
   DebugTf(PSTR("mDNS setup as [%s.local]\r\n"), hostname);
   if (MDNS.begin(hostname))               // Start the mDNS responder for Hostname.local
   {
@@ -404,6 +411,7 @@ void startMDNS(const char *hostname)
     DebugTln(F("Error setting up MDNS responder!\r\n"));
   }
   MDNS.addService("http", "tcp", 80);
+#endif
 } // startMDNS()
 
 void startLLMNR(const char *hostname)

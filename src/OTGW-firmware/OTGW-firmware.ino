@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.7.1
+**  Version  : v1.7.1-no-mdns.1
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -376,7 +376,9 @@ static void handleEspFlashBackgroundTasks()
   OTGWstream.loop();          // Keep OTGWstream clients alive during flash
   handleDebug();              // Keep telnet debug active for monitoring
   httpServer.handleClient();  // MUST continue - processes upload chunks
+#ifndef OTGW_DISABLE_MDNS
   MDNS.update();              // Keep MDNS active for network discovery
+#endif
   handleWebSocket();          // Keep WebSocket service responsive during flash
 }
 
@@ -424,7 +426,9 @@ void doBackgroundTasks()
       // faults. Skip serving while maxBlock is too low so the heap can coalesce; clients
       // retry. Flash-upload handlers (handleEsp/PicFlashBackgroundTasks) are NOT gated.
       if (canServeHttp()) httpServer.handleClient();
+#ifndef OTGW_DISABLE_MDNS
       MDNS.update();
+#endif
       loopNTP();
     }
   } //otherwise, just wait until reconnected gracefully
