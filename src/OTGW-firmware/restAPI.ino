@@ -838,33 +838,37 @@ static const char kRouteMqtt[]       PROGMEM = "mqtt";
 // load is the whole point, and a per-client budget would let N clients each
 // poll at the full rate. Cost is one uint32_t per limited endpoint.
 //=======================================================================
-#define API_RATE_LIMIT_WINDOW_MS 1000UL
-
+// Each window sits at ~75% of the interval the web UI actually polls at
+// (2s for otmonitor, 5s for device status, see data/index.js). setInterval is
+// not exact: background throttling and GC shift ticks, so a tick arriving at
+// 1990ms is normal. A window equal to the client interval would hand 429s to a
+// well-behaved client for no reason.
 static const char kSubOtmonitor[] PROGMEM = "otmonitor";
 static const char kSubTime[]      PROGMEM = "time";
 
 struct ApiRateLimit {
   PGM_P    resource;      // words[3]
   PGM_P    subresource;   // words[4]
+  uint32_t windowMs;
   uint32_t lastServedMs;
 };
 
 static ApiRateLimit kRateLimitedRoutes[] = {
-  { kRouteOtgw,   kSubOtmonitor, 0 },
-  { kRouteDevice, kSubTime,      0 },
+  { kRouteOtgw,   kSubOtmonitor, 1500UL, 0 },
+  { kRouteDevice, kSubTime,      4000UL, 0 },
 };
 
 // RFC 9457 problem+json. 429 (RFC 6585) is the right code here rather than
 // 503: the caller exceeded a quota, the service itself is fine. The heap
 // gate's existing 503s keep their meaning.
-static void sendApiRateLimited(uint32_t retryAfterSec) {
+static void sendApiRateLimited(uint32_t retryAfterSec, uint32_t windowSec) {
   restResponseStatus = 429;
   char jsonBuff[320];
   snprintf_P(jsonBuff, sizeof(jsonBuff),
     PSTR("{\"type\":\"https://github.com/rvdbreemen/OTGW-firmware/problems/rate-limit-exceeded\","
          "\"title\":\"Rate limit exceeded\",\"status\":429,"
-         "\"detail\":\"This endpoint serves at most 1 request per second. Retry after %lu second(s).\"}"),
-    (unsigned long)retryAfterSec);
+         "\"detail\":\"This endpoint serves at most 1 request per %lu second(s). Retry after %lu second(s).\"}"),
+    (unsigned long)windowSec, (unsigned long)retryAfterSec);
 
   char hdrBuff[48];
   snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("%lu"), (unsigned long)retryAfterSec);
@@ -874,7 +878,8 @@ static void sendApiRateLimited(uint32_t retryAfterSec) {
   // July 2026. Sent as extra signal; Retry-After is the part clients honour.
   snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("\"default\";r=0;t=%lu"), (unsigned long)retryAfterSec);
   httpServer.sendHeader(F("RateLimit"), hdrBuff);
-  httpServer.sendHeader(F("RateLimit-Policy"), F("\"default\";q=1;w=1"));
+  snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("\"default\";q=1;w=%lu"), (unsigned long)windowSec);
+  httpServer.sendHeader(F("RateLimit-Policy"), hdrBuff);
   sendCorsOriginHeader();
   httpServer.send(429, F("application/problem+json"), jsonBuff);
 }
@@ -892,10 +897,10 @@ static bool checkApiRateLimit(const char* words[], uint8_t wc, HTTPMethod method
 
     // Unsigned subtraction handles the 49-day millis() rollover correctly.
     const uint32_t elapsed = now - rl.lastServedMs;
-    if (rl.lastServedMs != 0 && elapsed < API_RATE_LIMIT_WINDOW_MS) {
+    if (rl.lastServedMs != 0 && elapsed < rl.windowMs) {
       // Round up so Retry-After never says 0, which would invite an immediate retry.
-      const uint32_t remainMs = API_RATE_LIMIT_WINDOW_MS - elapsed;
-      sendApiRateLimited((remainMs + 999UL) / 1000UL);
+      const uint32_t remainMs = rl.windowMs - elapsed;
+      sendApiRateLimited((remainMs + 999UL) / 1000UL, (rl.windowMs + 999UL) / 1000UL);
       return false;
     }
     rl.lastServedMs = now;

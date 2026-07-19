@@ -266,7 +266,11 @@ function startOTmonitorPolling() {
     return;
   }
   if (!tid) {
-    tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+    // 2s, not 1s. Measured on a real boiler (60 min capture, TASK-1044): the
+    // fastest-moving values (RelModLevel, TrOverride, TSet, Tboiler) change once
+    // every 5 to 6 seconds, so 1 Hz returned five identical payloads per real
+    // change. Every open page costs the gateway this poll forever.
+    tid = setInterval(function () { refreshOTmonitor(); }, 2000);
   }
 }
 
@@ -278,12 +282,17 @@ function stopOTmonitorPolling() {
 }
 
 function startTimeUpdates() {
+  startDeviceClock();   // 1 Hz display, no network
   if (!timeupdate) {
-    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+    // 5s: what is left in this response is heap, status message, PS mode and the
+    // simulation flag, none of which need sub-5-second freshness. The clock now
+    // ticks locally, so nothing here is time-critical.
+    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 5000);
   }
 }
 
 function stopTimeUpdates() {
+  stopDeviceClock();
   if (timeupdate) {
     clearInterval(timeupdate);
     timeupdate = null;
@@ -333,7 +342,9 @@ var graphRedrawTimer = null;
 let gatewayModeRefreshCounter = 0;
 let gatewayModeRefreshInFlight = false; // Prevents double-triggering even when force=true
 let gatewayModeLastKnown = null; // "gateway" | "monitor"
-const GATEWAY_MODE_REFRESH_INTERVAL = 60; // 60s max polling interval (at most once a minute)
+// Counted in status-poll ticks, not seconds. The tick moved from 1s to 5s
+// (TASK-1044), so this had to move from 60 to 12 to keep the same ~60s cadence.
+const GATEWAY_MODE_REFRESH_INTERVAL = 12; // 12 ticks x 5s = at most once a minute
 
 function updateGatewayModeIndicator(value) {
   const statusEl = document.getElementById('gatewayModeStatus');
@@ -3201,6 +3212,52 @@ function updateHeapDisplay() {
 }
 
 //============================================================================
+//============================================================================
+// Device clock: learned from the API, ticked locally.
+//
+// The clock used to be the only thing forcing /api/v2/device/time to a 1-second
+// poll. It does not need the network to run: one response carries both `epoch`
+// (device UTC) and `dateTime` (device wall clock), and the pair yields two
+// offsets - our skew against the device clock, and the device's timezone shift.
+// Add them and the browser can render the device's wall clock locally, without a
+// timezone database. A DST change is picked up at the next status poll.
+let devClockOffsetMs = null;   // Date.now() + this = device wall clock, read as UTC
+let devClockTimer = null;
+
+function learnDeviceClock(devtime) {
+  if (!devtime || devtime.epoch === undefined || !devtime.dateTime) return;
+  const epochMs = Number(devtime.epoch) * 1000;
+  if (!isFinite(epochMs) || epochMs <= 0) return;
+  // "YYYY-MM-DD HH:MM:SS" read as if UTC: the difference against epoch IS the
+  // device's timezone offset, sign included.
+  const wallMs = Date.parse(String(devtime.dateTime).replace(' ', 'T') + 'Z');
+  if (isNaN(wallMs)) return;
+  devClockOffsetMs = (epochMs - Date.now()) + (wallMs - epochMs);
+  renderDeviceClock();
+}
+
+function renderDeviceClock() {
+  if (devClockOffsetMs === null) return;
+  const el = document.getElementById('theTime');
+  if (!el) return;
+  const d = new Date(Date.now() + devClockOffsetMs);
+  const p = function (n) { return String(n).padStart(2, '0'); };
+  // Rendered as UTC on purpose: the timezone shift is already inside the offset.
+  el.textContent = d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) +
+                   ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+}
+
+function startDeviceClock() {
+  if (!devClockTimer) devClockTimer = setInterval(renderDeviceClock, 1000);
+}
+
+function stopDeviceClock() {
+  if (devClockTimer) {
+    clearInterval(devClockTimer);
+    devClockTimer = null;
+  }
+}
+
 function refreshDevTime() {
   //console.log("Refresh api/v2/device/time ..");
   fetch(APIGW + "v2/device/time")
@@ -3218,10 +3275,7 @@ function refreshDevTime() {
       const hasPsmode = (devtime.psmode !== undefined);
       const newPSmode = hasPsmode ? (devtime.psmode === true || devtime.psmode === 'true') : isPSmode;
       
-      if (devtime.dateTime) {
-        const timeEl = document.getElementById('theTime');
-        if (timeEl) timeEl.textContent = devtime.dateTime;
-      }
+      learnDeviceClock(devtime);
       statusMessageText = devtime.message || '';
       if (devtime.freeheap !== undefined)    currentFreeHeap = devtime.freeheap;
       if (devtime.maxfreeblock !== undefined) currentMaxFreeBlock = devtime.maxfreeblock;
