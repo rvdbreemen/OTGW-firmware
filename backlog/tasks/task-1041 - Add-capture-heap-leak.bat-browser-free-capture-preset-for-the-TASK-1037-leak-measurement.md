@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 15:26'
-updated_date: '2026-07-19 15:35'
+updated_date: '2026-07-19 21:20'
 labels: []
 dependencies: []
 priority: high
@@ -41,8 +41,6 @@ The wrapper must also tell the operator what invalidates the run, since that is 
 - [x] #5 Referenced from TASK-1040 as the capture method for the no-mdns experiment
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -53,4 +51,12 @@ Scope grew by one item beyond the original description, deliberately: the worker
 Verified: PowerShell payload parses clean, new switch in help, wrapper delegates --help, bounded run against a dead host produced a transcript under logs/heap-leak with all three provenance lines (toggle policy, browser disabled, poll interval 3600s).
 
 AC2 and AC5 remain open: AC2 needs a run against a live device to confirm zero tooling REST requests in telnet.log, AC5 needs TASK-1040 to reference this script. Committed as c7d48646.
+
+2026-07-19 avond: eerste veldrun met capture-heap-leak.bat (martreides, transcript-20260719-210025). Script werkte end-to-end. Alle drie de provenance-regels stonden in de summary: "Debug toggle policy: leave as-is (-SkipDebugToggles)", "Browser capture: disabled (-SkipBrowserCapture)", "Crash-log poll interval: 3600s". Output landde onder logs/heap-leak. De tooling zelf genereerde geen browserlast.
+
+AC2 blijft OPEN, en het criterium was te zwak geformuleerd. Er stonden 14500 REST-requests in de telnet-log, maar geen daarvan kwam van de tooling: het waren twee door de gebruiker geopende webpagina's (zie TASK-1037). Het criterium moet dus onderscheiden tussen tooling-REST en overige REST, anders is het niet af te vinken op een apparaat waar iemand een tabblad open heeft.
+
+ONTWERPGAT gevonden: -SkipDebugToggles levert GEEN stille capture op. Het garandeert alleen dat het script niets aanzet. Dit apparaat had alle toggles (OTmsg, REST API, MQTT, MQTTGate, Sensors, NTP) al op [1] staan, vermoedelijk nog van de browsergedreven capture van diezelfde ochtend die ze allemaal aanzette. De wrapper erfde die toestand en de capture werd alsnog volledig verbose.
+
+Voor een echt rustige meting is een extra optie nodig die de toggles actief UIT zet in plaats van ze met rust te laten, met herstel van de oorspronkelijke stand na afloop. Overweeg -QuietDebugToggles naast de bestaande -SkipDebugToggles, en documenteer het verschil: "raak niets aan" versus "zet stil".
 <!-- SECTION:NOTES:END -->
