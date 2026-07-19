@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 15:26'
-updated_date: '2026-07-19 15:27'
+updated_date: '2026-07-19 15:35'
 labels: []
 dependencies: []
 priority: high
@@ -34,9 +34,9 @@ The wrapper must also tell the operator what invalidates the run, since that is 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 scripts/capture-heap-leak.bat exists and forwards user arguments to capture-mqtt-debug.bat after the preset flags
+- [x] #1 scripts/capture-heap-leak.bat exists and forwards user arguments to capture-mqtt-debug.bat after the preset flags
 - [ ] #2 A run produces telnet and MQTT logs with zero REST requests from the capture tooling in the telnet log
-- [ ] #3 Output lands under logs/heap-leak, separate from normal diagnostic captures
-- [ ] #4 The script prints, before starting, that the web UI must stay closed for the duration
+- [x] #3 Output lands under logs/heap-leak, separate from normal diagnostic captures
+- [x] #4 The script prints, before starting, that the web UI must stay closed for the duration
 - [ ] #5 Referenced from TASK-1040 as the capture method for the no-mdns experiment
 <!-- AC:END -->
