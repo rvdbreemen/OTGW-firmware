@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 21:20'
-updated_date: '2026-07-19 21:26'
+updated_date: '2026-07-19 21:30'
 labels: []
 dependencies: []
 priority: medium
@@ -24,9 +24,9 @@ Needed: an option that actively turns the toggles off for the duration and resto
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A switch exists that turns the listed debug toggles off at connect when they are on
+- [x] #1 A switch exists that turns the listed debug toggles off at connect when they are on
 - [ ] #2 Original toggle state is restored when the capture ends, including on Ctrl+C
-- [ ] #3 capture-heap-leak.bat uses the silencing option instead of the leave-as-is option
-- [ ] #4 Run summary records which of the two policies was applied
+- [x] #3 capture-heap-leak.bat uses the silencing option instead of the leave-as-is option
+- [x] #4 Run summary records which of the two policies was applied
 - [ ] #5 Verified on a device that starts with all toggles on: the resulting telnet log contains only periodic heap stats and no per-message OT or MQTT gate output
 <!-- AC:END -->
