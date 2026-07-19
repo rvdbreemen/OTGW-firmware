@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 21:31'
-updated_date: '2026-07-19 22:27'
+updated_date: '2026-07-19 22:31'
 labels: []
 dependencies: []
 priority: high
@@ -82,3 +82,23 @@ Niet gemeten: de feitelijke requests per minuut in de browser. De automatisering
 
 Kanttekening bij de opstelling: de ESP zat los van het carrier board, dus picavailable=false en geen MQTT-broker geconfigureerd.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Rate-limits the two endpoints the web UI polls, /api/v2/otgw/otmonitor and /api/v2/device/time, and answers excess requests with a proper 429 instead of serving them.
+
+Why: each open web UI page drives two 1-second timers, so every forgotten tab costs the gateway 2 req/s indefinitely. A field capture traced a device that died after 60 minutes to two open pages sustaining 242 req/min (TASK-1037). The firmware had no way to say slow down.
+
+Firmware: a two-entry table with one uint32_t of state per endpoint, checked in the v2 dispatcher before the handler, GET only, with unsigned arithmetic so the 49-day millis() rollover is safe. Retry-After rounds up so it never says 0. Responses carry Retry-After, Cache-Control: no-store, an RFC 9457 application/problem+json body, and the IETF draft RateLimit / RateLimit-Policy headers, marked in the code as draft rather than standard.
+
+429 rather than 503 on purpose: the heap gate's existing 503s mean the device as a whole is in trouble, this means one caller exceeded a quota while the service is fine.
+
+Web UI updated in the same change, because the firmware side alone would have been a regression: an unhandled 429 produced a console error and a visible error banner once a second on the second tab. Both fetch handlers now tag the status on the Error and skip 429 quietly.
+
+Design choice worth naming for review: the budget is per endpoint and global rather than per client. Capping aggregate load is the goal, and a per-client budget would let N clients each poll at the full rate. The trade-off is that a well-behaved client can receive 429 because another client is polling, which is looser than the per-client reading of 429 semantics.
+
+Verified on hardware (bench device 192.168.88.68, build 1.7.2-beta.1+ccb5014): first request 200, immediate second 429 with the full header set and body; device/time returned Retry-After 4 matching its own window; the window reopened after 5s; device/info and health served three rapid requests each without limiting; browser console showed zero 429 errors and no stuck display. Build clean, evaluator 34/37 with the single failure confirmed pre-existing.
+
+Open: this changes the REST contract of two v2 endpoints, so an ADR is still owed.
+<!-- SECTION:FINAL_SUMMARY:END -->
