@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 21:31'
-updated_date: '2026-07-19 21:33'
+updated_date: '2026-07-19 21:41'
 labels: []
 dependencies: []
 priority: high
@@ -37,10 +37,10 @@ Scope note requiring a decision: this task implements a per-endpoint global budg
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Both endpoints serve at most 1 request per second; excess requests receive 429
-- [ ] #2 429 response carries Retry-After, Cache-Control no-store, and an application/problem+json body with type, title, status and detail
-- [ ] #3 No other endpoint is rate-limited, in particular flash upload and crashlog polling are unaffected
-- [ ] #4 Rate-limit state costs no dynamic allocation and no String usage
-- [ ] #5 Build passes and evaluator shows no new failures
+- [x] #1 Both endpoints serve at most 1 request per second; excess requests receive 429
+- [x] #2 429 response carries Retry-After, Cache-Control no-store, and an application/problem+json body with type, title, status and detail
+- [x] #3 No other endpoint is rate-limited, in particular flash upload and crashlog polling are unaffected
+- [x] #4 Rate-limit state costs no dynamic allocation and no String usage
+- [x] #5 Build passes and evaluator shows no new failures
 - [ ] #6 Web UI behaviour under 429 verified: no console error storm, no stuck display
 <!-- AC:END -->
