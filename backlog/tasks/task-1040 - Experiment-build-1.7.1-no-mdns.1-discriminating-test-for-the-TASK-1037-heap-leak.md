@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 15:23'
-updated_date: '2026-07-19 18:05'
+updated_date: '2026-07-19 18:06'
 labels: []
 dependencies: []
 priority: high
@@ -41,7 +41,7 @@ Known side effects to communicate to the tester:
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Build produced from the v1.7.1 tag with mDNS as the only functional difference, verified by diff against the tag
-- [x] #2 Version reports as 1.7.1-no-mdns.1 in the telnet banner, the web UI and the MQTT version topic
+- [ ] #2 Version reports as 1.7.1-no-mdns.1 in the telnet banner, the web UI and the MQTT version topic
 - [ ] #3 Firmware and filesystem binaries built and verified to boot, with WiFi, MQTT and the web UI reachable by IP
 - [ ] #4 Tester briefed on the otgw.local loss and the update-check downgrade risk before flashing
 - [ ] #5 At least 4 hours of heap telemetry collected on the tester device, or a crash captured, whichever comes first
@@ -68,4 +68,18 @@ Built and verified:
 Gotcha worth remembering: passing --prerelease to autoinc-semver.py is NOT enough when _VERSION_PRERELEASE is commented out in version.h. It writes the derived strings, but the build then regenerates version.h and the tag silently disappears. The first build produced a binary calling itself plain 1.7.1, indistinguishable from stock. Set the define active first.
 
 Remaining: AC3 (boot + reachability by IP), AC4 (brief the tester), AC5 (4h telemetry), AC6 (record the verdict in TASK-1037). Capture with scripts/capture-heap-leak.bat from TASK-1041, web UI closed.
+
+Worktree: RvdB/wt-no-mdns on branch exp-no-mdns-1.7.1, rooted at v1.7.1 (5475feee). Commit 3a56b39f.
+
+Built and verified:
+- build.bat completes, 0 errors.
+- Artifacts: OTGW-firmware-1.7.1-no-mdns.1+5475fee.ino.bin (743104 B), .littlefs.bin (2072576 B), .elf preserved for addr2line.
+- xtensa-lx106-elf-nm on the .elf reports 0 MDNSResponder symbols: the whole library is out of the link, including the stcMDNS_RRAnswer constructor at the decoded crash address. Control: LLMNR, deliberately left enabled, still contributes 21 symbols. This is stronger evidence than a size diff, which was misleading here because the first build already had mDNS off.
+- Functional diff vs v1.7.1 is exactly the OTGW_DISABLE_MDNS flag plus the four guards. Everything else in the 26-file diff is version-banner churn and the githash in data/version.hash.
+
+Gotcha worth remembering: passing --prerelease to autoinc-semver.py is NOT enough when _VERSION_PRERELEASE sits commented out in version.h. The script writes the derived strings, but the build then regenerates version.h from the (still commented) define and the tag silently disappears. The first build produced a binary calling itself plain 1.7.1, indistinguishable from stock, which is exactly the confusion this task set out to avoid. Set the define active first.
+
+AC2 deliberately left unchecked: version.h and the artifact names are right, but "reports as" needs an actual boot. Verify on the telnet banner, the web UI and the MQTT version topic once flashed.
+
+Remaining: AC2, AC3 (boot plus reachability by IP), AC4 (brief the tester), AC5 (4h telemetry), AC6 (verdict into TASK-1037). Capture with scripts/capture-heap-leak.bat from TASK-1041, web UI closed for the duration.
 <!-- SECTION:NOTES:END -->
