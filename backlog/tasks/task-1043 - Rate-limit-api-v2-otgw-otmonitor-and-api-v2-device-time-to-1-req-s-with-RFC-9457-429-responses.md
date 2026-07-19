@@ -3,7 +3,7 @@ id: TASK-1043
 title: >-
   Rate-limit /api/v2/otgw/otmonitor and /api/v2/device/time to 1 req/s with RFC
   9457 429 responses
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-19 21:31'
