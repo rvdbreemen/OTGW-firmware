@@ -71,6 +71,7 @@ param(
     [int]$TelnetReconnectDelayMilliseconds = 500,
     [ValidateRange(250, 60000)]
     [int]$TelnetPostDisconnectDelayMilliseconds = 1000,
+    [switch]$SkipDebugToggles,
     [switch]$SkipBrowserCapture,
     [string]$BrowserUrl,
     [int]$BrowserDebugPort = 9222,
@@ -100,6 +101,13 @@ $telnetReconnectDelayMilliseconds = $TelnetReconnectDelayMilliseconds
 # not log, and are excluded by label.
 $script:DebugToggleSimulators = @('SensorSim', 'OTGW-Sim')
 
+# Leave every toggle as the device already has it. For heap-leak measurement the
+# capture must stay as close to an idle device as possible: turning on OTmsg,
+# REST API, MQTT and MQTTGate adds continuous telnet output, which puts the
+# instrument itself on the suspect list. logHeapStats is periodic and prints
+# regardless of any toggle, so the heap trend survives.
+$script:SkipDebugToggles = $SkipDebugToggles.IsPresent
+
 function Show-Help {
     Write-Host "OTGW MQTT diagnostic capture"
     Write-Host ""
@@ -113,6 +121,10 @@ function Show-Help {
     Write-Host "  on are left as-is. Simulator toggles (SensorSim, OTGW-Sim) are never touched. Toggle keys"
     Write-Host "  are parsed from the banner, so 1.x and 2.0.0/OTGW32 layouts both work."
     Write-Host "  It then sends 'q' (read settings) and 'D' (dump settings/state) so they land in telnet.log."
+    Write-Host "  -SkipDebugToggles             Leave every toggle as the device has it. Use for heap-leak"
+    Write-Host "                                measurement, where the extra telnet output would put the"
+    Write-Host "                                instrument itself on the suspect list. logHeapStats is"
+    Write-Host "                                periodic and prints regardless, so the heap trend survives."
     Write-Host ""
     Write-Host "Interactive mode:"
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
@@ -1178,7 +1190,11 @@ function Connect-TelnetCapture {
         Add-SummaryLine "Telnet connected: $((Get-Date).ToString('o'))"
 
         $banner = Read-InitialTelnetBanner -Stream $stream -Writer $Writer
-        $toggleAction = Enable-AllTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
+        $toggleAction = if ($script:SkipDebugToggles) {
+            "skipped (-SkipDebugToggles): toggles left as the device had them"
+        } else {
+            Enable-AllTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
+        }
         Add-SummaryLine "Debug toggle actions: $toggleAction"
 
         $dumpAction = Request-SettingsDump -Stream $stream -Writer $Writer
@@ -1907,6 +1923,10 @@ Add-SummaryLine "SkipToolInstall: $([bool]$SkipToolInstall)"
 Add-SummaryLine "Tool stderr log: $toolErrorLog"
 if ($savedSettingsPath) { Add-SummaryLine "Settings prefill saved: $savedSettingsPath" }
 Add-SummaryLine "Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)"
+# Record the toggle policy up front, not only on a successful connect, so a shared
+# transcript always says how it was captured. Reading a capture without knowing
+# what load the tooling itself applied costs more time than printing this line.
+Add-SummaryLine ("Debug toggle policy: " + $(if ($script:SkipDebugToggles) { "leave as-is (-SkipDebugToggles)" } else { "enable all that are off" }))
 
 $telnetClient = $null
 $stream = $null
