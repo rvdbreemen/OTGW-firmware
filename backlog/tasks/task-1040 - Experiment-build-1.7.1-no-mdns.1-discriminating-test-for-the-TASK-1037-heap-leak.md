@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 15:23'
-updated_date: '2026-07-19 17:49'
+updated_date: '2026-07-19 18:05'
 labels: []
 dependencies: []
 priority: high
@@ -40,13 +40,15 @@ Known side effects to communicate to the tester:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Build produced from the v1.7.1 tag with mDNS as the only functional difference, verified by diff against the tag
-- [ ] #2 Version reports as 1.7.1-no-mdns.1 in the telnet banner, the web UI and the MQTT version topic
+- [x] #1 Build produced from the v1.7.1 tag with mDNS as the only functional difference, verified by diff against the tag
+- [x] #2 Version reports as 1.7.1-no-mdns.1 in the telnet banner, the web UI and the MQTT version topic
 - [ ] #3 Firmware and filesystem binaries built and verified to boot, with WiFi, MQTT and the web UI reachable by IP
 - [ ] #4 Tester briefed on the otgw.local loss and the update-check downgrade risk before flashing
 - [ ] #5 At least 4 hours of heap telemetry collected on the tester device, or a crash captured, whichever comes first
 - [ ] #6 Result recorded in TASK-1037 as either 'mDNS is leak and crash site' or 'mDNS is crash site only', with the heap trend as evidence
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
