@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-19 09:47'
+updated_date: '2026-07-19 15:03'
 labels: []
 dependencies: []
 references:
@@ -40,3 +40,23 @@ Ramp onset has no logged event in any of the three captures; all three were capt
 - [ ] #4 Fix keeps free heap stable over a 4h+ soak on a device previously showing the ramp
 - [ ] #5 Reporter martreides confirms no reboots over 24h on a build with the fix
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-07-19: Analysed both 1.7.1 telnet captures plus the 1.6.1 full capture (transcript-20260719-094605, OTGW-logs).
+
+Crash chain, as far as the logs support it:
+1. Heap descends ~800-1000 B/min from ~20 KB, accelerating. Source still unknown.
+2. Around 5 KB free, maxBlock drops under 2048, canServeHttp() closes and never reopens (see TASK-1039).
+3. MQTT gate follows at maxBlock < 1536. Publishing stops, HA marks the device unavailable.
+4. emergencyHeapRecovery fires with delta=+0 every time (see TASK-1038).
+5. Heap reaches ~880 bytes, maxBlock ~480. MDNS.update() at OTGW-firmware.ino:427 is ungated and runs ~1000x/s.
+6. Next inbound mDNS query hits the unchecked new in _readRRAnswer(), gets NULL, constructor writes at this+8: epc1=0x40233cba excvaddr=0x00000008. Matches the decoded address exactly.
+
+Ruled out for this reporter: the WS live-log path (emergencyHea actions never had bit 0x01 set, so no browser was connected) and NTP (the 1.6.1 capture ran with NTP off and decayed identically).
+
+Speculative, not proven: mDNS may be both the leak and the crash site. LEAmDNS keeps per-query answer lists that grow, which fits the accelerating rather than linear decay; it is identical Core 2.7.4 code in 1.6.1 and 1.7.1, which fits version independence; and it is the confirmed crash site. Cheap discriminating test is a 1.7.1 build with MDNS disabled: flat heap means mDNS is both, continued decay without crashes means mDNS is only the crash site and we keep a live device to measure on.
+
+Note on the 1.6.1 full capture: it is NOT usable as leak evidence. The capture script drives a headless Edge at 365 REST requests/min, and that run shows the fragmentation profile (maxBlock pinned at 5352 while free stayed 10-13 KB), not the leak ramp. Also found: his broker holds stale retained HA discovery from the 1.7.1 era (sw_version 1.7.1+c50cbcc on hvac_mode, hvac_action, uptime, fragskips, *_override) that the running 1.6.1 never fills, so those entities sit unavailable in HA independently of the reboots.
+<!-- SECTION:NOTES:END -->
