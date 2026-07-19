@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 21:53'
-updated_date: '2026-07-19 22:30'
+updated_date: '2026-07-19 22:32'
 labels: []
 dependencies: []
 priority: high
@@ -83,3 +83,21 @@ Kanttekening bij de opstelling: de ESP zat los van het carrier board, dus picava
 
 AC6 afgerond op hardware: klok volgde de echte verstreken tijd (60s vooruit over 60s wandklok, ondanks Chrome-timerthrottling in de achtergrondtab), heap-display werkte bij van 19584/19208 naar 18792/18200, console zonder 429 of errors. De requests-per-minuut zelf blijven onmeetbaar in een geautomatiseerde achtergrondtab: Chrome throttlet timers op browserniveau, los van de visibilityState-override die de app-gates opent. De 43/min volgt rekenkundig uit de geverifieerde intervallen 2000/5000 in de geserveerde index.js.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Removes the reason the web UI polled the gateway once a second, rather than only capping it server-side as TASK-1043 did.
+
+Measured on a 60-minute field capture from a real boiler: 133 OpenTherm frames/min, 3515 Read-Ack/Write-Ack in the hour, and the four fastest-moving values (RelModLevel, TrOverride, TSet, Tboiler) each change about once every 5 to 6 seconds. Polling otmonitor at 1 Hz therefore returned five to six identical payloads per real change, forever, per open page.
+
+The clock was the only thing that genuinely wanted 1 Hz, and it does not need the network for it. One /api/v2/device/time response already carries both epoch and the formatted dateTime, and the pair yields two offsets: the browser's skew against the device clock, and the device's timezone shift. Added together the browser renders the device wall clock locally at 1 Hz with no timezone database shipped to the client, and a DST change is picked up at the next status poll.
+
+Rates per open page: otmonitor 1s to 2s, device status 1s to 5s. Server windows follow at 1500ms and 4000ms, deliberately below the client intervals, because setInterval is not exact and a window equal to the interval would hand 429s to a well-behaved client. One page goes from 121 to 43 requests per minute.
+
+Also fixed a coupling that would have drifted silently: GATEWAY_MODE_REFRESH_INTERVAL counts status-poll ticks, not seconds, so moving the tick from 1s to 5s would have stretched gateway-mode refresh from every minute to every five. Moved from 60 to 12 with the arithmetic written down.
+
+Verified on hardware (bench device 192.168.88.68, build 1.7.2-beta.1+ccb5014): the clock ticked in step with real elapsed time, devClockOffsetMs came out at 7196717 which is the device's +2h summer time plus about 3.3s of genuine clock skew, the heap display kept updating (19584/19208 to 18792/18200), and the console showed no 429 and no errors. The served index.js carries the new intervals and the corrected constant.
+
+Not measured: requests per minute in the browser. Chrome throttles timers in a backgrounded automation tab at browser level, independent of the page's own visibility gates, so the 43/min figure follows arithmetically from the verified intervals rather than from observation.
+<!-- SECTION:FINAL_SUMMARY:END -->
