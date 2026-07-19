@@ -6,8 +6,16 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
+updated_date: '2026-07-19 09:47'
 labels: []
 dependencies: []
+references:
+  - >-
+    Discord #nederlandse-ondersteuning msg 1527629013210632323 +
+    1528302834876022795 (martreides
+  - 2026-07-17/19); logs otgw-161.log
+  - otgw-171.log
+  - otgw-171-2.log
 priority: high
 ordinal: 156000
 ---
