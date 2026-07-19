@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 15:26'
-updated_date: '2026-07-19 22:28'
+updated_date: '2026-07-19 22:31'
 labels: []
 dependencies: []
 priority: high
@@ -62,3 +62,21 @@ Voor een echt rustige meting is een extra optie nodig die de toggles actief UIT 
 
 2026-07-20 hardware: run tegen bench-toestel 192.168.88.68 leverde een telnet-log met nul REST GET-regels en uitsluitend logHeapStats. AC2 daarmee gedekt.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds scripts/capture-heap-leak.bat, a browser-free capture preset for heap-leak measurement, plus the -SkipDebugToggles switch it needed on the shared worker.
+
+Why: the existing capture-mqtt-debug.bat drives a headless browser at 365 REST requests/min and switches on every telnet debug toggle. A field capture made that way shows the HTTP fragmentation path rather than the leak under investigation (TASK-1037).
+
+Changes:
+- New thin preset wrapper (not a second implementation) so it inherits future fixes to the 2213-line worker: -SkipBrowserCapture, -CrashlogPollSeconds 3600, -OutputRoot logs/heap-leak, with user arguments forwarded after the preset.
+- New -SkipDebugToggles switch on capture-mqtt-debug.bat.
+- Run summary now records the toggle policy unconditionally, so a shared transcript always states how it was captured.
+- The wrapper warns before starting that the web UI must stay closed, since one open dashboard invalidates the run.
+
+Verified on hardware (bench device 192.168.88.68, 2026-07-20): a real run produced a telnet log with zero REST GET lines from the tooling and all three provenance lines in the summary.
+
+Follow-up: -SkipDebugToggles turned out not to guarantee a quiet capture, since it only promises not to switch anything on. TASK-1042 adds -QuietDebugToggles for that.
+<!-- SECTION:FINAL_SUMMARY:END -->
