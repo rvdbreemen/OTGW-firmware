@@ -42,3 +42,22 @@ The server window is deliberately set below the client interval (about 75%). set
 - [x] #5 Build passes and evaluator shows no new failures
 - [ ] #6 Verified on hardware: clock runs smoothly, heap and mode fields still update, no 429 in the console under a single open tab
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Geimplementeerd in commit 38bea0f2.
+
+Web UI (data/index.js):
+- learnDeviceClock() leidt twee offsets af uit een enkel antwoord: (epoch*1000 - Date.now()) is de scheefstand tussen browser- en apparaatklok, (parse(dateTime als UTC) - epoch*1000) is de tijdzoneverschuiving van het apparaat. Opgeteld in devClockOffsetMs.
+- renderDeviceClock() tikt op 1 Hz en rendert bewust met getUTC*: de zoneverschuiving zit al in de offset, nogmaals lokaliseren zou dubbeltellen.
+- otmonitor-interval 1000 -> 2000, statusinterval 1000 -> 5000.
+
+Firmware (restAPI.ino): windowMs is nu een veld per endpoint (otmonitor 1500, device/time 4000) in plaats van een gedeelde constante. De problem+json detail en de RateLimit-Policy header rapporteren het echte venster.
+
+Valkuil onderweg, opgelost: GATEWAY_MODE_REFRESH_INTERVAL telt status-poll-ticks en geen seconden. Met de tick van 1s naar 5s zou gateway-mode stil van elke minuut naar elke vijf minuten zijn geschoven. Constante van 60 naar 12, met de rekensom in het commentaar.
+
+Verificatie: node --check schoon op index.js, build completed successfully zonder compileerfouten, artefacten vers om 00:02. Evaluator 34 passed / 1 failed, waarbij die ene (1 unresolved ADR reference van 1408) pre-existing is.
+
+AC6 blijft OPEN: hardware-verificatie ontbreekt. Te controleren op een toestel: loopt de klok vloeiend en klopt hij met de apparaattijd, blijven heap en modusvelden bijwerken, en verschijnt er geen 429 in de console bij een enkel geopend tabblad.
+<!-- SECTION:NOTES:END -->
