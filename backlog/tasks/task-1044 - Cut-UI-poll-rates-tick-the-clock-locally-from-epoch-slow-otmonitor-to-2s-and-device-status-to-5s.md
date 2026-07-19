@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 21:53'
-updated_date: '2026-07-19 21:55'
+updated_date: '2026-07-19 22:04'
 labels: []
 dependencies: []
 priority: high
@@ -35,10 +35,10 @@ The server window is deliberately set below the client interval (about 75%). set
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Clock display updates every second without a network request, derived from the epoch member
-- [ ] #2 Device timezone is honoured without shipping a timezone database to the browser
-- [ ] #3 otmonitor polls at 2s and device/time at 5s per open page
-- [ ] #4 Server rate-limit windows sit below the client intervals so normal timer jitter does not trigger 429
-- [ ] #5 Build passes and evaluator shows no new failures
+- [x] #1 Clock display updates every second without a network request, derived from the epoch member
+- [x] #2 Device timezone is honoured without shipping a timezone database to the browser
+- [x] #3 otmonitor polls at 2s and device/time at 5s per open page
+- [x] #4 Server rate-limit windows sit below the client intervals so normal timer jitter does not trigger 429
+- [x] #5 Build passes and evaluator shows no new failures
 - [ ] #6 Verified on hardware: clock runs smoothly, heap and mode fields still update, no 429 in the console under a single open tab
 <!-- AC:END -->
