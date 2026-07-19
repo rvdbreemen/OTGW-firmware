@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 21:53'
-updated_date: '2026-07-19 22:27'
+updated_date: '2026-07-19 22:30'
 labels: []
 dependencies: []
 priority: high
@@ -40,7 +40,7 @@ The server window is deliberately set below the client interval (about 75%). set
 - [x] #3 otmonitor polls at 2s and device/time at 5s per open page
 - [x] #4 Server rate-limit windows sit below the client intervals so normal timer jitter does not trigger 429
 - [x] #5 Build passes and evaluator shows no new failures
-- [ ] #6 Verified on hardware: clock runs smoothly, heap and mode fields still update, no 429 in the console under a single open tab
+- [x] #6 Verified on hardware: clock runs smoothly, heap and mode fields still update, no 429 in the console under a single open tab
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -80,4 +80,6 @@ Geserveerde index.js draagt de wijzigingen: 9 treffers op de klokfuncties, inter
 Niet gemeten: de feitelijke requests per minuut in de browser. De automatiseringstab stond op visibilityState "hidden", waardoor de UI niet pollt en Chrome de timers throttlet. De 43/min volgt rekenkundig uit de geverifieerde intervallen, maar is niet waargenomen.
 
 Kanttekening bij de opstelling: de ESP zat los van het carrier board, dus picavailable=false en geen MQTT-broker geconfigureerd.
+
+AC6 afgerond op hardware: klok volgde de echte verstreken tijd (60s vooruit over 60s wandklok, ondanks Chrome-timerthrottling in de achtergrondtab), heap-display werkte bij van 19584/19208 naar 18792/18200, console zonder 429 of errors. De requests-per-minuut zelf blijven onmeetbaar in een geautomatiseerde achtergrondtab: Chrome throttlet timers op browserniveau, los van de visibilityState-override die de app-gates opent. De 43/min volgt rekenkundig uit de geverifieerde intervallen 2000/5000 in de geserveerde index.js.
 <!-- SECTION:NOTES:END -->
