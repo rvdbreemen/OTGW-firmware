@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 14:59'
+updated_date: '2026-07-19 15:13'
 labels: []
 dependencies: []
 priority: high
@@ -29,3 +30,24 @@ Scope: give recovery at least one action that reclaims memory when no WS/stream 
 - [ ] #3 Rate-limit interval justified against the observed collapse rate, with the reasoning recorded in the task
 - [ ] #4 delta=+0 no longer appears in a reproduction of the martreides collapse profile
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Strict ordering. Step 2 is worthless before step 1 lands: firing a no-op earlier still reclaims nothing. Zero bytes at 03:02 is as useless as zero bytes at 03:04.
+
+1. Make recovery actually reclaim in the MQTT-only, no-browser configuration.
+   - Audit what is actually holding heap in the martreides collapse profile (lwIP pcbs and rx buffers of unserviced HTTP connections are the prime suspect, see TASK-1039).
+   - Give emergencyHeapRecovery at least one action that returns bytes when hasWebSocketClients() is false and no OTGWstream clients exist.
+   - Verify by log: delta must be measurably positive in a reproduction. This is the gate on the whole task.
+
+2. Only once step 1 shows delta > 0, move the trigger earlier.
+   - OTGW-firmware.ino:403 currently fires only at HEAP_CRITICAL (freeHeap < 1536). Both captures show the first attempt at before=888, far past the point of rescue.
+   - Move to HEAP_WARNING (3072) or HEAP_LOW (5120). Pick based on measured recovery yield at each level, not on intuition.
+   - Watch for thrash against the existing TASK-553 drip-mode hysteresis, which already uses HEAP_LOW as its entry trigger and HEAP_LOW_RESTORE_THRESHOLD (6144) to restore.
+
+3. Re-evaluate EMERGENCY_RECOVERY_INTERVAL_MS (30000) against the observed collapse rate.
+   - In otgw-171.log the run from first gate trip to crash is under 90 seconds, so a 30s rate limit allows at most two or three attempts. Record the reasoning either way.
+
+Do NOT raise HTTP_SERVE_MIN_MAXBLOCK or MQTT_PUBLISH_MIN_MAXBLOCK as part of this task. Those gates throttle consumers rather than reclaiming memory, they are field-calibrated against the 1460-byte TCP MSS cliff, and raising them makes the TASK-1039 latch engage earlier.
+<!-- SECTION:PLAN:END -->
