@@ -48,8 +48,6 @@ Known side effects to communicate to the tester:
 - [ ] #6 Result recorded in TASK-1037 as either 'mDNS is leak and crash site' or 'mDNS is crash site only', with the heap trend as evidence
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -59,4 +57,15 @@ Run it on both arms, same conditions, web UI closed:
 - arm A: stock 1.7.1, several hours
 - arm B: 1.7.1-no-mdns.1, several hours
 Compare the free-heap and maxBlock trends.
+
+Worktree: D:\Users\Robert\Documents\GitHub\RvdB\wt-no-mdns on branch exp-no-mdns-1.7.1, rooted at v1.7.1 (5475feee). Commit 3a56b39f.
+
+Built and verified:
+- build.bat completes, 0 errors
+- artifacts OTGW-firmware-1.7.1-no-mdns.1+5475fee.ino.bin (743104 B) + .littlefs.bin (2072576 B) + .elf preserved
+- xtensa-lx106-elf-nm on the .elf reports 0 MDNSResponder symbols, so the whole library including the stcMDNS_RRAnswer constructor at the decoded crash address is out of the link. Control: LLMNR, deliberately left enabled, still contributes 21 symbols.
+
+Gotcha worth remembering: passing --prerelease to autoinc-semver.py is NOT enough when _VERSION_PRERELEASE is commented out in version.h. It writes the derived strings, but the build then regenerates version.h and the tag silently disappears. The first build produced a binary calling itself plain 1.7.1, indistinguishable from stock. Set the define active first.
+
+Remaining: AC3 (boot + reachability by IP), AC4 (brief the tester), AC5 (4h telemetry), AC6 (record the verdict in TASK-1037). Capture with scripts/capture-heap-leak.bat from TASK-1041, web UI closed.
 <!-- SECTION:NOTES:END -->
