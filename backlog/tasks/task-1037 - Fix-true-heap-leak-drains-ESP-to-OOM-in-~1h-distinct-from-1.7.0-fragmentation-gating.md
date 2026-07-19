@@ -59,4 +59,6 @@ Ruled out for this reporter: the WS live-log path (emergencyHea actions never ha
 Speculative, not proven: mDNS may be both the leak and the crash site. LEAmDNS keeps per-query answer lists that grow, which fits the accelerating rather than linear decay; it is identical Core 2.7.4 code in 1.6.1 and 1.7.1, which fits version independence; and it is the confirmed crash site. Cheap discriminating test is a 1.7.1 build with MDNS disabled: flat heap means mDNS is both, continued decay without crashes means mDNS is only the crash site and we keep a live device to measure on.
 
 Note on the 1.6.1 full capture: it is NOT usable as leak evidence. The capture script drives a headless Edge at 365 REST requests/min, and that run shows the fragmentation profile (maxBlock pinned at 5352 while free stayed 10-13 KB), not the leak ramp. Also found: his broker holds stale retained HA discovery from the 1.7.1 era (sw_version 1.7.1+c50cbcc on hvac_mode, hvac_action, uptime, fragskips, *_override) that the running 1.6.1 never fills, so those entities sit unavailable in HA independently of the reboots.
+
+Related: TASK-1038 (recovery no-op), TASK-1039 (HTTP gate latch).
 <!-- SECTION:NOTES:END -->
