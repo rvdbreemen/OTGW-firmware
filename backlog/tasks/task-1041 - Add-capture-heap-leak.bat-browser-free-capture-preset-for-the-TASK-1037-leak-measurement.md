@@ -40,3 +40,15 @@ The wrapper must also tell the operator what invalidates the run, since that is 
 - [x] #4 The script prints, before starting, that the web UI must stay closed for the duration
 - [ ] #5 Referenced from TASK-1040 as the capture method for the no-mdns experiment
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented as a preset wrapper (scripts/capture-heap-leak.bat) plus one new switch on the shared worker.
+
+Scope grew by one item beyond the original description, deliberately: the worker enables OTmsg, REST API, MQTT, MQTTGate, Sensors and NTP on every connect, so -SkipBrowserCapture alone would still have left the capture noisy. Added -SkipDebugToggles to capture-mqtt-debug.bat. Also made the run summary record the toggle policy unconditionally, so a shared transcript always states how it was captured.
+
+Verified: PowerShell payload parses clean, new switch in help, wrapper delegates --help, bounded run against a dead host produced a transcript under logs/heap-leak with all three provenance lines (toggle policy, browser disabled, poll interval 3600s).
+
+AC2 and AC5 remain open: AC2 needs a run against a live device to confirm zero tooling REST requests in telnet.log, AC5 needs TASK-1040 to reference this script. Committed as c7d48646.
+<!-- SECTION:NOTES:END -->
