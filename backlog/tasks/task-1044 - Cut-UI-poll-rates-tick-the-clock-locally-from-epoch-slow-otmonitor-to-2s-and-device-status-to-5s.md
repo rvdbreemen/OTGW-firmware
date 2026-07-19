@@ -3,9 +3,11 @@ id: TASK-1044
 title: >-
   Cut UI poll rates: tick the clock locally from epoch, slow otmonitor to 2s and
   device status to 5s
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-19 21:53'
+updated_date: '2026-07-19 21:55'
 labels: []
 dependencies: []
 priority: high
