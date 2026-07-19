@@ -44,3 +44,21 @@ Scope note requiring a decision: this task implements a per-endpoint global budg
 - [x] #5 Build passes and evaluator shows no new failures
 - [ ] #6 Web UI behaviour under 429 verified: no console error storm, no stuck display
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Geimplementeerd in commit 6828a0cc.
+
+Firmware (restAPI.ino): tabel kRateLimitedRoutes met twee entries, elk een uint32_t. Check zit in de dispatcher voor de handler-aanroep, alleen op HTTP_GET, met unsigned aftrekken zodat de 49-daagse millis()-rollover geen gat geeft. Retry-After rondt naar boven af zodat er nooit 0 uitkomt. sendApiRateLimited stuurt Retry-After, Cache-Control no-store, RateLimit en RateLimit-Policy, en een RFC 9457 problem+json body via snprintf_P. Geen String, geen allocatie.
+
+Web UI (data/index.js): zonder deze helft zou de firmware-wijziging een regressie zijn. Een onafgevangen 429 gaf elke seconde console.error plus een zichtbare foutbanner op het tweede tabblad. Beide fetch-handlers taggen nu err.status en de catch slaat 429 stil over.
+
+Bewust genomen ontwerpkeuze, expliciet ter review: de limiet is per endpoint globaal, niet per client. Dat is de enige variant die de totale belasting begrenst. Keerzijde: een keurige client kan 429 krijgen doordat een andere client pollt, wat losser is dan de per-client-lezing van 429 in de RFC. Per client zou een IP-tabel kosten en tien tabbladen weer tien requests per seconde toestaan.
+
+Verificatie: build completed successfully, artefacten vers om 23:39. Evaluator 34/37; de ene failure (1 unresolved ADR reference van 1408) is pre-existing, bevestigd door evaluate.py opnieuw te draaien tegen een gestashte tree.
+
+AC6 blijft OPEN: gedrag onder 429 is code-matig afgevangen maar niet op hardware waargenomen. Vereist een apparaat met twee tabbladen open en een blik op de console.
+
+Openstaand: deze wijziging raakt het REST-contract van twee v2-endpoints, dus er hoort een ADR bij. Nog niet opgesteld, wacht op akkoord van de maintainer.
+<!-- SECTION:NOTES:END -->
