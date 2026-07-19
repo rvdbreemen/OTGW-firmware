@@ -30,3 +30,19 @@ Needed: an option that actively turns the toggles off for the duration and resto
 - [x] #4 Run summary records which of the two policies was applied
 - [ ] #5 Verified on a device that starts with all toggles on: the resulting telnet log contains only periodic heap stats and no per-message OT or MQTT gate output
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Geimplementeerd in commit a3c27ade.
+
+- Disable-AllTelnetDebugIfNeeded spiegelt de bestaande enable-functie: zelfde bannerparsing, flipt elke toggle die op [1] staat naar uit, en onthoudt de ingedrukte keys in $script:ToggledOffKeys.
+- Restore-TelnetDebugToggles zet exact die keys terug. Draait in het bestaande finally-blok, voor het disposen van de telnet-writer en -client, zodat de stream nog leeft. Bewust best-effort: bij een gecrasht of herstart apparaat is de stream dood, en een mislukt herstel mag de uitkomst van de capture niet maskeren. Meldt gedeeltelijk herstel expliciet in de summary.
+- Simulator-toggles blijven onaangeroerd, net als in het enable-pad.
+- capture-heap-leak.bat gebruikt nu -QuietDebugToggles in plaats van -SkipDebugToggles.
+- De summary onderscheidt nu drie policies: silence-and-restore, leave-as-is, enable-all.
+
+Geverifieerd: payload parseert schoon, beide switches staan in de help, en een begrensde run tegen een dood adres schrijft "Debug toggle policy: silence all that are on, restore on exit (-QuietDebugToggles)" naar het transcript.
+
+AC2 en AC5 blijven open: het flip-en-herstel-pad zelf vraagt een levend apparaat. AC5 (telnet-log bevat alleen periodieke heap-stats) is pas af te vinken op een toestel dat met alle toggles aan begint.
+<!-- SECTION:NOTES:END -->
