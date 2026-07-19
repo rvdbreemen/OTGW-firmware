@@ -72,6 +72,7 @@ param(
     [ValidateRange(250, 60000)]
     [int]$TelnetPostDisconnectDelayMilliseconds = 1000,
     [switch]$SkipDebugToggles,
+    [switch]$QuietDebugToggles,
     [switch]$SkipBrowserCapture,
     [string]$BrowserUrl,
     [int]$BrowserDebugPort = 9222,
@@ -108,6 +109,15 @@ $script:DebugToggleSimulators = @('SensorSim', 'OTGW-Sim')
 # regardless of any toggle, so the heap trend survives.
 $script:SkipDebugToggles = $SkipDebugToggles.IsPresent
 
+# -QuietDebugToggles goes one step further: it actively switches OFF every toggle
+# that is on, and switches them back at the end. -SkipDebugToggles alone is not
+# enough for a quiet capture: it only promises the script will not turn anything
+# ON, so a device left verbose by an earlier run stays verbose (field run
+# 2026-07-19). Labels flipped at the last connect are remembered here so the
+# teardown can restore exactly those and nothing else.
+$script:QuietDebugToggles = $QuietDebugToggles.IsPresent
+$script:ToggledOffKeys = @()
+
 function Show-Help {
     Write-Host "OTGW MQTT diagnostic capture"
     Write-Host ""
@@ -121,10 +131,14 @@ function Show-Help {
     Write-Host "  on are left as-is. Simulator toggles (SensorSim, OTGW-Sim) are never touched. Toggle keys"
     Write-Host "  are parsed from the banner, so 1.x and 2.0.0/OTGW32 layouts both work."
     Write-Host "  It then sends 'q' (read settings) and 'D' (dump settings/state) so they land in telnet.log."
-    Write-Host "  -SkipDebugToggles             Leave every toggle as the device has it. Use for heap-leak"
-    Write-Host "                                measurement, where the extra telnet output would put the"
-    Write-Host "                                instrument itself on the suspect list. logHeapStats is"
-    Write-Host "                                periodic and prints regardless, so the heap trend survives."
+    Write-Host "  -SkipDebugToggles             Leave every toggle as the device has it. Does NOT guarantee a"
+    Write-Host "                                quiet capture: a device left verbose by an earlier run stays"
+    Write-Host "                                verbose."
+    Write-Host "  -QuietDebugToggles            Actively switch OFF every toggle that is on, and switch them"
+    Write-Host "                                back at the end. Use for heap-leak measurement, where the extra"
+    Write-Host "                                telnet output would put the instrument itself on the suspect"
+    Write-Host "                                list. logHeapStats is periodic and prints regardless, so the"
+    Write-Host "                                heap trend survives."
     Write-Host ""
     Write-Host "Interactive mode:"
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
@@ -1124,6 +1138,85 @@ function Enable-AllTelnetDebugIfNeeded {
     return ($results -join "; ")
 }
 
+function Disable-AllTelnetDebugIfNeeded {
+    param(
+        [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
+        [Parameter(Mandatory = $true)][System.IO.StreamWriter]$Writer,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][AllowNull()][string]$Banner
+    )
+
+    # Mirror image of Enable-AllTelnetDebugIfNeeded: same banner parsing, but flips
+    # every toggle showing [1] to off. Records the keys it flipped in
+    # $script:ToggledOffKeys so the teardown can put them back exactly as found.
+    # Simulator toggles are never touched, same as the enable path.
+    $results = New-Object System.Collections.Generic.List[string]
+    $flipped = New-Object System.Collections.Generic.List[string]
+    $pattern = '(?:^|\s)(?<key>\S)\s+(?<label>[A-Za-z][A-Za-z0-9 /]*?)\s*\[(?<state>[01])\]'
+    $seen = New-Object System.Collections.Generic.HashSet[string]
+
+    foreach ($m in [regex]::Matches($Banner, $pattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)) {
+        $key = $m.Groups['key'].Value
+        $label = $m.Groups['label'].Value.Trim()
+        $state = $m.Groups['state'].Value
+        if ([string]::IsNullOrWhiteSpace($label)) { continue }
+        if (-not $seen.Add($label)) { continue }
+
+        if ($script:DebugToggleSimulators -contains $label) {
+            $results.Add("$label=skipped (simulator)") | Out-Null
+            continue
+        }
+
+        if ($state -eq "1") {
+            $bytes = [System.Text.Encoding]::ASCII.GetBytes($key)
+            $Stream.Write($bytes, 0, $bytes.Length)
+            $Stream.Flush()
+            Start-Sleep -Milliseconds 300
+            [void](Read-TelnetAvailable -Stream $Stream -Writer $Writer)
+            $flipped.Add($key) | Out-Null
+            $results.Add("$label=off (sent '$key')") | Out-Null
+        }
+        else {
+            $results.Add("$label=already-off") | Out-Null
+        }
+    }
+
+    $script:ToggledOffKeys = @($flipped)
+
+    if ($results.Count -eq 0) {
+        return "no debug toggles found in banner"
+    }
+    return ($results -join "; ")
+}
+
+function Restore-TelnetDebugToggles {
+    param(
+        [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream
+    )
+
+    # Put back every toggle this run switched off. Best-effort by design: when the
+    # device crashed or rebooted the stream is dead, and a failed restore must not
+    # mask the real outcome of the capture.
+    if (-not $script:ToggledOffKeys -or $script:ToggledOffKeys.Count -eq 0) {
+        return $null
+    }
+
+    $restored = 0
+    foreach ($key in $script:ToggledOffKeys) {
+        try {
+            $bytes = [System.Text.Encoding]::ASCII.GetBytes($key)
+            $Stream.Write($bytes, 0, $bytes.Length)
+            $Stream.Flush()
+            Start-Sleep -Milliseconds 200
+            $restored++
+        }
+        catch {
+            return "Debug toggles restore: partial ($restored of $($script:ToggledOffKeys.Count)) - $($_.Exception.Message)"
+        }
+    }
+    $script:ToggledOffKeys = @()
+    return "Debug toggles restored: $restored toggle(s) switched back on."
+}
+
 function Send-TelnetKeyAndDrain {
     param(
         [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
@@ -1190,7 +1283,9 @@ function Connect-TelnetCapture {
         Add-SummaryLine "Telnet connected: $((Get-Date).ToString('o'))"
 
         $banner = Read-InitialTelnetBanner -Stream $stream -Writer $Writer
-        $toggleAction = if ($script:SkipDebugToggles) {
+        $toggleAction = if ($script:QuietDebugToggles) {
+            Disable-AllTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
+        } elseif ($script:SkipDebugToggles) {
             "skipped (-SkipDebugToggles): toggles left as the device had them"
         } else {
             Enable-AllTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
@@ -1926,7 +2021,10 @@ Add-SummaryLine "Telnet timeout strategy: adaptive (base + retry backoff, capped
 # Record the toggle policy up front, not only on a successful connect, so a shared
 # transcript always says how it was captured. Reading a capture without knowing
 # what load the tooling itself applied costs more time than printing this line.
-Add-SummaryLine ("Debug toggle policy: " + $(if ($script:SkipDebugToggles) { "leave as-is (-SkipDebugToggles)" } else { "enable all that are off" }))
+Add-SummaryLine ("Debug toggle policy: " + $(
+    if ($script:QuietDebugToggles) { "silence all that are on, restore on exit (-QuietDebugToggles)" }
+    elseif ($script:SkipDebugToggles) { "leave as-is (-SkipDebugToggles)" }
+    else { "enable all that are off" }))
 
 $telnetClient = $null
 $stream = $null
@@ -2159,6 +2257,18 @@ finally {
     }
     elseif ($mqttProcess) {
         Add-SummaryLine "mosquitto_sub exit code: $($mqttProcess.ExitCode)"
+    }
+
+    # Restore toggles BEFORE the writer and client go away. Best-effort: a crashed
+    # or rebooted device leaves a dead stream, and that must not derail shutdown.
+    if ($telnetClient -and $script:ToggledOffKeys -and $script:ToggledOffKeys.Count -gt 0) {
+        try {
+            $restoreMsg = Restore-TelnetDebugToggles -Stream $telnetClient.GetStream()
+            if ($restoreMsg) { Add-SummaryLine $restoreMsg }
+        }
+        catch {
+            Add-SummaryLine "Debug toggles restore failed (device likely gone): $($_.Exception.Message)"
+        }
     }
 
     if ($telnetWriter) {

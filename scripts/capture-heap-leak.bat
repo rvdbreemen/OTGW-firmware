@@ -16,11 +16,15 @@ rem  logHeapStats reports.
 rem
 rem  PRESET
 rem    -SkipBrowserCapture          no browser, no REST load
-rem    -SkipDebugToggles            do not switch on OTmsg/REST/MQTT/MQTTGate
-rem                                 logging; keeps telnet output near-silent so
-rem                                 the instrument is not itself a suspect.
-rem                                 logHeapStats prints regardless, once a
-rem                                 minute, which is the number we came for
+rem    -QuietDebugToggles           switch OFF OTmsg/REST/MQTT/MQTTGate logging
+rem                                 for the run and switch it back at the end,
+rem                                 so the instrument is not itself a suspect.
+rem                                 Not the same as -SkipDebugToggles, which
+rem                                 only promises not to turn anything ON and
+rem                                 therefore leaves a device verbose when an
+rem                                 earlier run left it that way (field run
+rem                                 2026-07-19). logHeapStats prints regardless,
+rem                                 once a minute, which is the number we came for
 rem    -CrashlogPollSeconds 3600    still catches a crash within the hour,
 rem                                 without the 30s poll (~1021 ms, ~3.4 KB of
 rem                                 free heap per poll) perturbing the run
@@ -66,7 +70,7 @@ echo   the merged transcript.
 echo  ============================================================
 echo.
 
-call "%INNER%" -SkipBrowserCapture -SkipDebugToggles -CrashlogPollSeconds 3600 -OutputRoot logs/heap-leak %*
+call "%INNER%" -SkipBrowserCapture -QuietDebugToggles -CrashlogPollSeconds 3600 -OutputRoot logs/heap-leak %*
 endlocal & exit /b %ERRORLEVEL%
 
 :help
