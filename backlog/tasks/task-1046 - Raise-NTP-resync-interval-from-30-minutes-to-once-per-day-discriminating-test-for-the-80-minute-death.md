@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-20 20:14'
-updated_date: '2026-07-20 20:25'
+updated_date: '2026-07-20 20:26'
 labels: []
 dependencies: []
 priority: high
@@ -32,3 +32,9 @@ Change is a single constant: NTP_RESYNC_TIME in OTGW-firmware.h from 1800 to 864
 - [x] #3 Build passes and evaluator shows no new failures
 - [ ] #4 Field/bench observation records whether the 80-minute sawtooth flattens (confirm or refute the resync-path hypothesis)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+NTP_RESYNC_TIME 1800 -> 86400 in commit 6eda7ce2. Build clean, evaluator 34/37 (single failure pre-existing). AC4 (does the 80-minute sawtooth flatten?) stays open: needs a multi-hour run on the beta, which is exactly what the 1.7.2-beta.1 release directory is for.
+<!-- SECTION:NOTES:END -->
