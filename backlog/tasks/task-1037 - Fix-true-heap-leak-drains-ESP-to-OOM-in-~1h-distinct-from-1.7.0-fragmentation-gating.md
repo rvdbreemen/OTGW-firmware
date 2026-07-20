@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-19 21:20'
+updated_date: '2026-07-20 19:52'
 labels: []
 dependencies: []
 references:
@@ -77,4 +77,26 @@ Dat verklaart ook de 365/min in de browsergedreven capture van vanochtend: zijn 
 CORRECTIE op eerdere notitie: de claim dat het lek ook zonder weblast optreedt is NIET houdbaar. In otgw-171.log stond de REST-toggle op [0], dus REST-verkeer werd daar niet gelogd. Afwezigheid van REST-regels betekende daar "niet gelogd", niet "niet gebeurd". Die vergelijking is ongeldig.
 
 Volgende stap is goedkoop en sluit direct iets uit: alle OTGW-tabbladen dicht en kijken of het apparaat dan langer dan anderhalf uur haalt. Geen nieuwe firmware nodig.
+
+UITSLAG DISCRIMINEREND EXPERIMENT (TASK-1040), capture transcript-20260720-191135, build 1.7.1-no-mdns.1+5475fee, device 48E72958B013, boot 19:11, dood 20:34:47 (83 min uptime).
+
+VERDICT: mDNS is NIET het lek. Het verval treedt zonder mDNS gewoon op. Maar het beeld is genuanceerder dan een simpel nee.
+
+1. NIEUW EN OPVALLEND: 59 minuten lang stond de heap byte-identiek stil op 20992 vrij / 14416 grootste blok, sample na sample. Dat is in geen enkele eerdere capture voorgekomen; stock-builds schommelden altijd honderden bytes. Het weghalen van mDNS elimineerde alle idle-churn volledig.
+
+2. Vanaf 20:12 alsnog een monotoon en versnellend verval: 20992 -> 4528 in 22 minuten, van ~100 B/min oplopend naar ~1500 B/min.
+
+3. Het toestel is gestorven om 20:34:47. Bewijs: laatste telnet-regel 20:34:47, capture pas gestopt 20:40:14, en het toggle-herstel meldde "partial (1 of 2) - An existing connection was forcibly closed by the remote host". De verbinding was dus al hard weg.
+
+4. GEEN crash-signatuur beschikbaar voor deze dood. De reboot_log is alleen bij boot en bij poll #2 opgehaald, beide voor 20:34. Wat er in reboot_log staat is historie van voor deze build (Software/System restart, External Watchdog, en een oudere Exception (2)). Om te weten hoe deze build stierf is de reboot_log van de VOLGENDE boot nodig.
+
+5. Onset valt samen met twee gebeurtenissen in dezelfde minuut: NTP-resync om 20:11:31 (met timezone-lookup) en crashlog-poll #2 om ~20:11:37 (de capture-samenvatting bevestigt "2 polls"). Allebei hadden echter een onschuldige eerste keer: NTP om 19:41:30 zonder enig effect (heap bleef exact 20992), crashlog om 19:11:37 idem. Dat pleit tegen een simpel lek-per-gebeurtenis.
+
+6. NIET veroorzaakt door MQTT- of OT-belasting. OTGW-publicaties liggen vlak op 195-272 per 5 minuten over de hele run, ook dwars door de onset heen. OT-frames idem.
+
+7. De discovery-republish (119 configs) zit NA uptime 4847s, dus na 20:32, twintig minuten NA de onset. Gevolg, geen oorzaak; vermoedelijk een MQTT-herverbinding onder heap-druk.
+
+BLINDE VLEK, en dit is nu het belangrijkste punt: met -QuietDebugToggles staat REST-logging uit, dus browser- en REST-verkeer is in deze capture ONZICHTBAAR. Uit de vorige run weten we dat deze gebruiker twee tabbladen open had. Een browser die om 20:12 opengaat zou exact dit patroon geven en zou hier niet te zien zijn.
+
+CONSEQUENTIE VOOR DE TOOLING: het stille script loste instrument-perturbatie op en creeerde een nieuw gat. De volgende meting moet OTmsg, MQTT, MQTTGate en Sensors stil houden maar REST API AAN laten. Dat is precies de verdachte belasting, en die kost weinig logvolume.
 <!-- SECTION:NOTES:END -->
