@@ -3,7 +3,7 @@ id: TASK-1042
 title: >-
   Add -QuietDebugToggles: actively silence telnet debug toggles for leak
   measurement
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-19 21:20'
