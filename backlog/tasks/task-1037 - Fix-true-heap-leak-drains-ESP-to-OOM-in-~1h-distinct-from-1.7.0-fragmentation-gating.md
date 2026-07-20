@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-20 21:05'
+updated_date: '2026-07-20 21:24'
 labels: []
 dependencies: []
 references:
@@ -113,4 +113,24 @@ Correctie op eerdere sessie-notitie: doTaskMinuteChanged roept hour/day/yearChan
 RESTEREND, niet te scheiden in deze capture: onset valt samen met tweede NTP-resync (22:20) EN tweede crashlog-poll van het script (~22:21, "2 polls"). Minuten uit elkaar, niet isoleerbaar. Plus REST-verkeer onzichtbaar (oude -QuietDebugToggles capture), dus browser-activiteit rond de onset niet te zien.
 
 VOLGENDE: beta.2 (NTP 1x/dag) isoleert de NTP-tak; nieuwe capture met -KeepDebugToggles "REST API,NTP" maakt REST + resync beide zichtbaar in een run.
+
+REGRESSIE-ANALYSE 2026-07-20, drie captures (no-mdns 1.7.1, beta.1 1.7.2, stock 1.7.1+c50cbcc), verschillende boottijden en firmware.
+
+HARDE, UPTIME-GEBONDEN GETALLEN (uit sendMQTTuptime-ankers + logHeapStats):
+- Dood: uptime 4853 / 4978 / 5035 s (~82 min). Drie verschillende wandklok-boottijden (19:11, 20:39, 21:20), zelfde uptime bij dood. => WANDKLOK UITGESLOTEN, dood is uptime-gebonden.
+- Onset (laatste stabiele heap-sample voor onomkeerbare daling): 3893 / 3895 / 3898 s. Spreiding 5 SECONDEN over drie captures. => deterministische trigger, geen jitter.
+- NTP resync #2: uptime 3611 / 3612 s (exact 2x1800 + ~11s boot-sync-offset).
+- resync #1 op 1810/1811 s: NUL effect (heap byte-stabiel eromheen).
+- onset = resync#2 + 285 s (284 / 286, spreiding 2 s).
+- daling-duur onset->dood: ~1050-1140 s (~18 min).
+
+WAT DE 5-SECONDEN-LOCK UITSLUIT: alles met jitter. DNS-latency, netwerk, MQTT-reconnect, browser-activiteit, mDNS-queries -> allemaal variabel, kunnen geen 5s-spreiding geven. Ook eerder uitgesloten: mDNS (no-mdns stierf identiek), timezone/AceTime (statische cache CACHE_SIZE=3, heap byte-stabiel 3800 aanroepen lang), discovery-verify (draaide bewijsbaar niet, nul verify-regels; uur-trigger viel voor uptime>=3600).
+
+WAT OVERBLIJFT als tijdgebonden oorzaak, twee kandidaten, beide uptime-deterministisch:
+1. Vertraagd gevolg van NTP resync #2. De resync-CALL zelf is goedkoop op Core 2.7.4 (int-overload van configTime doet alleen setServer, geen sntp_stop/init). Maar 285s na de resync begint de daling, met 2s spreiding. Dat past bij een SDK-sntp DNS/retry-cyclus die door de resync in gang is gezet en pas na een vaste timeout allocaties doet. Niet bewezen, wel het beste passende mechanisme.
+2. do5minevent tick op uptime 3900 s (timer5min, 13e tick). Valt binnen het onset-venster [3896, 3956]. MAAR: 12 eerdere ticks waren onschadelijk, dus alleen relevant als resync#2 iets in de toestand veranderde dat de eerstvolgende do5min-cyclus laat lekken.
+
+WAAROM resync#2 wel en resync#1 niet: onverklaard uit de logs. loopNTP-code is identiek per resync. Dit is de enige echte open vraag.
+
+BESLISSENDE TEST, al gebouwd: beta.2 (NTP resync 86400s). Geen resync#2 meer voor 24u. Overleeft beta.2 ruim voorbij 82 min -> resync-pad is de dader. Sterft beta.2 alsnog op ~82 min uptime -> resync uitgesloten, dan is het de do5minevent-3900s-tick of een ander uptime-slot, en moet ik met per-seconde heap-telemetrie (nieuwe capture, -KeepDebugToggles) het exacte allocatiemoment vangen.
 <!-- SECTION:NOTES:END -->
