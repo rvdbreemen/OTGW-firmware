@@ -151,6 +151,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-085: Unified Off/Heat/Cool HA Climate Entity Derived from OpenTherm Status Bits](ADR-085-ha-climate-heat-cool-from-ot-status-bits.md)** *(Accepted)*
   Replaces the heating-only HA Thermostat entity with a unified off/heat/cool climate entity driven by two firmware-computed topics (`<pub>/hvac_mode`, `<pub>/hvac_action`) derived from the MsgID 0 status bits. Mode is reflective (no `mode_command_topic`; the thermostat owns heat/cool switching); heating reads the central-heating slave bit, not flame, so DHW does not show as heating. Fixes GH #665 (cooling invisible on a heatpump). Mirror of 2.0.0 ADR-156.
 
+- **[ADR-086: Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses](ADR-086-rate-limit-ui-polled-rest-endpoints.md)** *(Proposed)*
+  Caps `/api/v2/otgw/otmonitor` and `/api/v2/device/time` with a per-endpoint budget (1500 ms and 4000 ms windows), answering excess GETs with `429` plus `Retry-After`, `Cache-Control: no-store` and an RFC 9457 `application/problem+json` body. Prompted by a field capture where two forgotten browser tabs sustained 242 req/min for an hour and the gateway died. Uses `429` rather than the heap gate's `503` so per-caller throttling stays distinguishable from device-wide distress. The budget is global per endpoint rather than per client, which caps aggregate load at the cost of a looser reading of 429 semantics.
+
 ### System Architecture
 
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  
