@@ -2,7 +2,7 @@
 
 ## Status
 
-Proposed, 2026-07-20.
+Accepted. Date: 2026-07-20.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer) requested the rate limit and specified the response shape (429 with `Retry-After`, `application/problem+json` per RFC 9457, optional draft `RateLimit` headers). The scope choice inside that request, a per-endpoint global budget rather than a per-client one, was made by the agent and is flagged for review in Consequences.
 
@@ -13,6 +13,11 @@ status_history:
     status: Proposed
     changed_by: Agent
     reason: Records the 429 rate limit shipped under TASK-1043 on the otgw-1.x.x line; awaiting maintainer acceptance
+    changed_via: adr-kit
+  - date: 2026-07-20
+    status: Accepted
+    changed_by: User
+    reason: Maintainer accepted after review, including the flagged global-versus-per-client scope choice; implementation verified on bench device 192.168.88.68 build 1.7.2-beta.1+ccb5014
     changed_via: adr-kit
 
 ## Context
