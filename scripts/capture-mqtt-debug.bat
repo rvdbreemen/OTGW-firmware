@@ -73,6 +73,7 @@ param(
     [int]$TelnetPostDisconnectDelayMilliseconds = 1000,
     [switch]$SkipDebugToggles,
     [switch]$QuietDebugToggles,
+    [string]$KeepDebugToggles,
     [switch]$SkipBrowserCapture,
     [string]$BrowserUrl,
     [int]$BrowserDebugPort = 9222,
@@ -116,7 +117,24 @@ $script:SkipDebugToggles = $SkipDebugToggles.IsPresent
 # 2026-07-19). Labels flipped at the last connect are remembered here so the
 # teardown can restore exactly those and nothing else.
 $script:QuietDebugToggles = $QuietDebugToggles.IsPresent
-$script:ToggledOffKeys = @()
+
+# -KeepDebugToggles names the toggles that must stay ON while the rest is
+# silenced, and are switched ON when the device has them off. Blanket silencing
+# turned out to be too blunt: the no-mdns capture of 2026-07-20 silenced REST
+# API along with everything else, so browser load (the prime suspect) was
+# invisible for the whole run, and NTP was reduced to three unconditional lines
+# at the exact moment the heap started collapsing.
+# Deliberately NOT named after the parameter: a param variable already lives
+# in script scope, so that name would alias the [string] parameter and coerce this
+# array back into a string.
+$script:KeepToggleLabels = @()
+if ($KeepDebugToggles) {
+    $script:KeepToggleLabels = @($KeepDebugToggles -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+
+# Keys this run flipped, in either direction. A toggle is a flip, so re-sending
+# the same key restores it whichever way it was moved.
+$script:ToggledKeys = @()
 
 function Show-Help {
     Write-Host "OTGW MQTT diagnostic capture"
@@ -139,6 +157,12 @@ function Show-Help {
     Write-Host "                                telnet output would put the instrument itself on the suspect"
     Write-Host "                                list. logHeapStats is periodic and prints regardless, so the"
     Write-Host "                                heap trend survives."
+    Write-Host "  -KeepDebugToggles <list>      Comma-separated toggle labels to keep ON while the rest is"
+    Write-Host "                                silenced, switched ON when the device has them off. Restored"
+    Write-Host "                                with the others at the end. Example:"
+    Write-Host '                                  -QuietDebugToggles -KeepDebugToggles "REST API,NTP"'
+    Write-Host "                                Blanket silencing hides the load you are hunting; keep the few"
+    Write-Host "                                low-volume toggles that cover your hypothesis."
     Write-Host ""
     Write-Host "Interactive mode:"
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
@@ -1145,9 +1169,10 @@ function Disable-AllTelnetDebugIfNeeded {
         [Parameter(Mandatory = $true)][AllowEmptyString()][AllowNull()][string]$Banner
     )
 
-    # Mirror image of Enable-AllTelnetDebugIfNeeded: same banner parsing, but flips
-    # every toggle showing [1] to off. Records the keys it flipped in
-    # $script:ToggledOffKeys so the teardown can put them back exactly as found.
+    # Mirror image of Enable-AllTelnetDebugIfNeeded: same banner parsing, but
+    # drives every toggle to its wanted state. Labels in -KeepDebugToggles are
+    # driven ON, everything else OFF. Records the keys it flipped in
+    # $script:ToggledKeys so the teardown can put them back exactly as found.
     # Simulator toggles are never touched, same as the enable path.
     $results = New-Object System.Collections.Generic.List[string]
     $flipped = New-Object System.Collections.Generic.List[string]
@@ -1166,21 +1191,25 @@ function Disable-AllTelnetDebugIfNeeded {
             continue
         }
 
-        if ($state -eq "1") {
+        # Wanted state: ON for anything on the keep list, OFF for the rest.
+        $keep = ($script:KeepToggleLabels -contains $label)
+        $wanted = if ($keep) { "1" } else { "0" }
+
+        if ($state -ne $wanted) {
             $bytes = [System.Text.Encoding]::ASCII.GetBytes($key)
             $Stream.Write($bytes, 0, $bytes.Length)
             $Stream.Flush()
             Start-Sleep -Milliseconds 300
             [void](Read-TelnetAvailable -Stream $Stream -Writer $Writer)
             $flipped.Add($key) | Out-Null
-            $results.Add("$label=off (sent '$key')") | Out-Null
+            $results.Add("$label=$(if ($keep) { 'on (kept)' } else { 'off' }) (sent '$key')") | Out-Null
         }
         else {
-            $results.Add("$label=already-off") | Out-Null
+            $results.Add("$label=already-$(if ($keep) { 'on (kept)' } else { 'off' })") | Out-Null
         }
     }
 
-    $script:ToggledOffKeys = @($flipped)
+    $script:ToggledKeys = @($flipped)
 
     if ($results.Count -eq 0) {
         return "no debug toggles found in banner"
@@ -1193,15 +1222,15 @@ function Restore-TelnetDebugToggles {
         [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream
     )
 
-    # Put back every toggle this run switched off. Best-effort by design: when the
-    # device crashed or rebooted the stream is dead, and a failed restore must not
-    # mask the real outcome of the capture.
-    if (-not $script:ToggledOffKeys -or $script:ToggledOffKeys.Count -eq 0) {
+    # Put back every toggle this run moved, in either direction. Best-effort by
+    # design: when the device crashed or rebooted the stream is dead, and a failed
+    # restore must not mask the real outcome of the capture.
+    if (-not $script:ToggledKeys -or $script:ToggledKeys.Count -eq 0) {
         return $null
     }
 
     $restored = 0
-    foreach ($key in $script:ToggledOffKeys) {
+    foreach ($key in $script:ToggledKeys) {
         try {
             $bytes = [System.Text.Encoding]::ASCII.GetBytes($key)
             $Stream.Write($bytes, 0, $bytes.Length)
@@ -1210,10 +1239,10 @@ function Restore-TelnetDebugToggles {
             $restored++
         }
         catch {
-            return "Debug toggles restore: partial ($restored of $($script:ToggledOffKeys.Count)) - $($_.Exception.Message)"
+            return "Debug toggles restore: partial ($restored of $($script:ToggledKeys.Count)) - $($_.Exception.Message)"
         }
     }
-    $script:ToggledOffKeys = @()
+    $script:ToggledKeys = @()
     return "Debug toggles restored: $restored toggle(s) switched back on."
 }
 
@@ -2022,7 +2051,13 @@ Add-SummaryLine "Telnet timeout strategy: adaptive (base + retry backoff, capped
 # transcript always says how it was captured. Reading a capture without knowing
 # what load the tooling itself applied costs more time than printing this line.
 Add-SummaryLine ("Debug toggle policy: " + $(
-    if ($script:QuietDebugToggles) { "silence all that are on, restore on exit (-QuietDebugToggles)" }
+    if ($script:QuietDebugToggles) {
+        if ($script:KeepToggleLabels.Count -gt 0) {
+            "silence all except [" + ($script:KeepToggleLabels -join ', ') + "], restore on exit (-QuietDebugToggles -KeepDebugToggles)"
+        } else {
+            "silence all that are on, restore on exit (-QuietDebugToggles)"
+        }
+    }
     elseif ($script:SkipDebugToggles) { "leave as-is (-SkipDebugToggles)" }
     else { "enable all that are off" }))
 
@@ -2261,7 +2296,7 @@ finally {
 
     # Restore toggles BEFORE the writer and client go away. Best-effort: a crashed
     # or rebooted device leaves a dead stream, and that must not derail shutdown.
-    if ($telnetClient -and $script:ToggledOffKeys -and $script:ToggledOffKeys.Count -gt 0) {
+    if ($telnetClient -and $script:ToggledKeys -and $script:ToggledKeys.Count -gt 0) {
         try {
             $restoreMsg = Restore-TelnetDebugToggles -Stream $telnetClient.GetStream()
             if ($restoreMsg) { Add-SummaryLine $restoreMsg }

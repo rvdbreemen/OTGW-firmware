@@ -16,15 +16,20 @@ rem  logHeapStats reports.
 rem
 rem  PRESET
 rem    -SkipBrowserCapture          no browser, no REST load
-rem    -QuietDebugToggles           switch OFF OTmsg/REST/MQTT/MQTTGate logging
-rem                                 for the run and switch it back at the end,
-rem                                 so the instrument is not itself a suspect.
-rem                                 Not the same as -SkipDebugToggles, which
-rem                                 only promises not to turn anything ON and
-rem                                 therefore leaves a device verbose when an
-rem                                 earlier run left it that way (field run
-rem                                 2026-07-19). logHeapStats prints regardless,
-rem                                 once a minute, which is the number we came for
+rem    -QuietDebugToggles           switch OFF the high-volume logging (OTmsg,
+rem                                 MQTT, MQTTGate, Sensors) for the run and
+rem                                 switch it back at the end, so the instrument
+rem                                 is not itself a suspect. Not the same as
+rem                                 -SkipDebugToggles, which only promises not to
+rem                                 turn anything ON and therefore leaves a device
+rem                                 verbose when an earlier run left it that way
+rem    -KeepDebugToggles            REST API and NTP stay ON. Blanket silencing
+rem                                 was too blunt: the 2026-07-20 capture hid the
+rem                                 browser load (the prime suspect) and reduced
+rem                                 the NTP resync to three lines at the exact
+rem                                 moment the heap started collapsing. These two
+rem                                 cost a handful of lines per second and cover
+rem                                 both open hypotheses
 rem    -CrashlogPollSeconds 3600    still catches a crash within the hour,
 rem                                 without the 30s poll (~1021 ms, ~3.4 KB of
 rem                                 free heap per poll) perturbing the run
@@ -70,7 +75,7 @@ echo   the merged transcript.
 echo  ============================================================
 echo.
 
-call "%INNER%" -SkipBrowserCapture -QuietDebugToggles -CrashlogPollSeconds 3600 -OutputRoot logs/heap-leak %*
+call "%INNER%" -SkipBrowserCapture -QuietDebugToggles -KeepDebugToggles "REST API,NTP" -CrashlogPollSeconds 3600 -OutputRoot logs/heap-leak %*
 endlocal & exit /b %ERRORLEVEL%
 
 :help
