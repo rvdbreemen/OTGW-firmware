@@ -3,7 +3,7 @@ id: TASK-1045
 title: >-
   Selective debug toggles in the heap-leak capture: keep REST API and NTP,
   silence the rest
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-20 19:58'
