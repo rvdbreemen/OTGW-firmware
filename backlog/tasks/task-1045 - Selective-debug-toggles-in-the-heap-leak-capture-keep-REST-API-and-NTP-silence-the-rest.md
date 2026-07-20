@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-20 19:58'
-updated_date: '2026-07-20 20:05'
+updated_date: '2026-07-20 20:13'
 labels: []
 dependencies: []
 priority: high
@@ -30,10 +30,10 @@ Restore must stay symmetric: a toggle is a flip, so re-sending the same key rest
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A -KeepDebugToggles option accepts a comma-separated label list that is left on, and switched on when the device has it off
-- [ ] #2 Labels not on the keep list are silenced as before
-- [ ] #3 Restore returns every toggle the run moved, in either direction
-- [ ] #4 capture-heap-leak.bat keeps REST API and NTP on by default
-- [ ] #5 Run summary records both the policy and the keep list
-- [ ] #6 Verified on hardware: telnet log shows REST requests and the full NTP sync sequence, and no per-message OT or MQTT gate output
+- [x] #1 A -KeepDebugToggles option accepts a comma-separated label list that is left on, and switched on when the device has it off
+- [x] #2 Labels not on the keep list are silenced as before
+- [x] #3 Restore returns every toggle the run moved, in either direction
+- [x] #4 capture-heap-leak.bat keeps REST API and NTP on by default
+- [x] #5 Run summary records both the policy and the keep list
+- [x] #6 Verified on hardware: telnet log shows REST requests and the full NTP sync sequence, and no per-message OT or MQTT gate output
 <!-- AC:END -->
