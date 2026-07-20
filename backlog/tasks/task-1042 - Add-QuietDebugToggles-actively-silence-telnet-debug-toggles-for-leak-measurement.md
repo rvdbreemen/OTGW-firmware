@@ -31,8 +31,6 @@ Needed: an option that actively turns the toggles off for the duration and resto
 - [x] #5 Verified on a device that starts with all toggles on: the resulting telnet log contains only periodic heap stats and no per-message OT or MQTT gate output
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -60,3 +58,9 @@ Heap-basislijn op 1.7.2-beta.1: 19056 vrij, 14032 grootste blok, HEALTHY.
 
 AC2 is hiermee gedekt voor de normale afsluiting. Herstel na Ctrl+C is niet apart uitgelokt; de code loopt via hetzelfde finally-blok, maar dat pad is niet waargenomen.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds -QuietDebugToggles (silence all, restore on exit); superseded in practice by the selective -KeepDebugToggles of TASK-1045 for leak captures, but the restore-in-either-direction machinery it introduced is what 1045 builds on. Verified on hardware 2026-07-20.
+<!-- SECTION:FINAL_SUMMARY:END -->
