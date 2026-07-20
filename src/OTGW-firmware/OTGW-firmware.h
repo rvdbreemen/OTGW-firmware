@@ -69,7 +69,7 @@ void setLed(int8_t, uint8_t);
 #define SETTINGS_FILE         "/settings.ini"
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"
-#define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
+#define NTP_RESYNC_TIME 86400 //seconds = once per day (was 1800/30min; TASK-1046 discriminating test for the ~80-minute heap death that lines up with the resync path). NTP still syncs at boot; 24h drift is far below the 1s display resolution.
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
 #define MQTT_DEFAULT_PUBLISH_INTERVAL_SEC 60
 #define CMSG_SIZE  512   // General-purpose scratch buffer (webhook, REST API, JSON, MQTT topic render).
