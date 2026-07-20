@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-20 19:52'
+updated_date: '2026-07-20 21:05'
 labels: []
 dependencies: []
 references:
@@ -99,4 +99,18 @@ VERDICT: mDNS is NIET het lek. Het verval treedt zonder mDNS gewoon op. Maar het
 BLINDE VLEK, en dit is nu het belangrijkste punt: met -QuietDebugToggles staat REST-logging uit, dus browser- en REST-verkeer is in deze capture ONZICHTBAAR. Uit de vorige run weten we dat deze gebruiker twee tabbladen open had. Een browser die om 20:12 opengaat zou exact dit patroon geven en zou hier niet te zien zijn.
 
 CONSEQUENTIE VOOR DE TOOLING: het stille script loste instrument-perturbatie op en creeerde een nieuw gat. De volgende meting moet OTmsg, MQTT, MQTTGate en Sensors stil houden maar REST API AAN laten. Dat is precies de verdachte belasting, en die kost weinig logvolume.
+
+2026-07-20: derde capture (transcript-20260720-212118, beta.1 525921b, martreides device). Zelfde signatuur: boot 21:20, heap byte-stabiel ~20048 gedurende 63 min, collapse vanaf 22:24, dood ~22:43. NTP-resyncs 21:50 (geen effect) en 22:20 (onset +4min). Bevestigt over drie captures: verval begint na de TWEEDE resync, eerste is onschuldig.
+
+TIMEZONE/ZONE-PROCESSING UITGESLOTEN als lek. Bewijs, niet vermoeden:
+- ExtendedZoneProcessorCache<CACHE_SIZE=3> (OTGW-firmware.h:523-527) is statisch, compile-time gealloceerd. createForZoneName haalt een processor uit die vaste pool en alloceert geen heap per aanroep.
+- createForZoneName draait ELKE SECONDE via minuteChanged() (helperStuff.ino:700, aangeroepen op OTGW-firmware.ino:462). In de 63 min voor de collapse ~3800 aanroepen, heap byte-identiek 20048. Een per-call lek zou de heap nooit stabiel laten. Dit weerlegt de eerdere hypothese dat createForZoneName intern alloceert.
+- Geen enkel timezone-spoor in de fout: geen Timezone Invalid, geen assert, geen zone-error, geen heap-junk. De enige tz-regel is "Starting timezone lookup for [Europe/Amsterdam]" per resync, en die gebruikt dezelfde gratis cache. Rode haring.
+- De eerste resync doet dezelfde lookup zonder schade.
+
+Correctie op eerdere sessie-notitie: doTaskMinuteChanged roept hour/day/yearChanged aan die ELK opnieuw createForZoneName doen (helperStuff.ino:673-720), dus 4 aanroepen op een minuutwissel en 1 per seconde anders. Inefficient (aparte TimeZone per helper i.p.v. gedeeld), maar heap-neutraal door de statische cache. Geen lek.
+
+RESTEREND, niet te scheiden in deze capture: onset valt samen met tweede NTP-resync (22:20) EN tweede crashlog-poll van het script (~22:21, "2 polls"). Minuten uit elkaar, niet isoleerbaar. Plus REST-verkeer onzichtbaar (oude -QuietDebugToggles capture), dus browser-activiteit rond de onset niet te zien.
+
+VOLGENDE: beta.2 (NTP 1x/dag) isoleert de NTP-tak; nieuwe capture met -KeepDebugToggles "REST API,NTP" maakt REST + resync beide zichtbaar in een run.
 <!-- SECTION:NOTES:END -->
