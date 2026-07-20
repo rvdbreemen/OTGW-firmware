@@ -37,3 +37,13 @@ Restore must stay symmetric: a toggle is a flip, so re-sending the same key rest
 - [x] #5 Run summary records both the policy and the keep list
 - [x] #6 Verified on hardware: telnet log shows REST requests and the full NTP sync sequence, and no per-message OT or MQTT gate output
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds -KeepDebugToggles to the capture worker and wires capture-heap-leak.bat to keep REST API and NTP on while silencing the high-volume toggles.
+
+Motivation: the no-mdns capture (TASK-1040) proved blanket silencing was too blunt. It hid REST/browser load (the prime suspect) and reduced the NTP resync to three lines exactly when the heap began collapsing.
+
+Verified on bench 192.168.88.68: policy line reads 'silence all except [REST API, NTP]', REST API and NTP kept on, OTmsg silenced, toggles restored on exit. Committed 033dcfa9.
+<!-- SECTION:FINAL_SUMMARY:END -->
