@@ -33,10 +33,10 @@ Change is a single constant: NTP_RESYNC_TIME in OTGW-firmware.h from 1800 to 864
 - [x] #4 Field/bench observation records whether the 80-minute sawtooth flattens (confirm or refute the resync-path hypothesis)
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 NTP_RESYNC_TIME 1800 -> 86400 in commit 6eda7ce2. Build clean, evaluator 34/37 (single failure pre-existing). AC4 (does the 80-minute sawtooth flatten?) stays open: needs a multi-hour run on the beta, which is exactly what the 1.7.2-beta.1 release directory is for.
+
+2026-07-21: beta.2 capture bewijst dat de NTP-resync NIET de oorzaak is. Nul resync-events (86400s werkte), toestel sterft toch op dezelfde uptime (onset 3900s, dood 5040s). De ~82-min zaagtand vlakte NIET af. Resync-pad uitgesloten; hypothese weerlegd. AC4 afgerond met negatief resultaat, wat de bedoeling van een discriminerende test is.
 <!-- SECTION:NOTES:END -->
