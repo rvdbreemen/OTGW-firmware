@@ -3,7 +3,7 @@ id: TASK-1046
 title: >-
   Raise NTP resync interval from 30 minutes to once per day (discriminating test
   for the 80-minute death)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-20 20:14'
 updated_date: '2026-07-21 19:59'
