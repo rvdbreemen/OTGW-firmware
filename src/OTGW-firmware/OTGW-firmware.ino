@@ -220,6 +220,14 @@ void doTaskEvery1s(){
   handleOTGWqueue(); //just check if there are commands to retry
   state.uptime.iSeconds++;
 
+#if HEAP_ONSET_DIAG
+  // TASK-1037 diagnostic: per-second heap sampling in the onset window only.
+  // No-op outside the window and compiled out entirely in production builds.
+  if (state.uptime.iSeconds >= HEAP_ONSET_FROM_S && state.uptime.iSeconds <= HEAP_ONSET_TO_S) {
+    logHeapStats();
+  }
+#endif
+
   if (wifiPortalResetWindowExpired()) {
     SetupDebugTln(F("Reset trigger window expired, clearing pending reset count"));
     clearWifiPortalResetState();

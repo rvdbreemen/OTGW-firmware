@@ -70,6 +70,17 @@ void setLed(int8_t, uint8_t);
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"
 #define NTP_RESYNC_TIME 86400 //seconds = once per day (was 1800/30min; TASK-1046 discriminating test for the ~80-minute heap death that lines up with the resync path). NTP still syncs at boot; 24h drift is far below the 1s display resolution.
+// Diagnostic (TASK-1037): 1 Hz heap sampling in a bounded uptime window so the
+// ~3900s onset of the heap death is captured at per-second resolution instead
+// of the normal 60s logHeapStats cadence. OFF by default: a production build
+// never emits this. A diagnostic build defines HEAP_ONSET_DIAG=1 and flashes to
+// a test device. Window covers the onset (~3900s) with margin on both sides.
+#ifndef HEAP_ONSET_DIAG
+#define HEAP_ONSET_DIAG 0
+#endif
+#define HEAP_ONSET_FROM_S 3500UL
+#define HEAP_ONSET_TO_S   4500UL
+
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
 #define MQTT_DEFAULT_PUBLISH_INTERVAL_SEC 60
 #define CMSG_SIZE  512   // General-purpose scratch buffer (webhook, REST API, JSON, MQTT topic render).
