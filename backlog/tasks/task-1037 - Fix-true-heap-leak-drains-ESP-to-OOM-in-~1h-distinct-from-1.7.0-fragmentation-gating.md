@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-21 19:59'
+updated_date: '2026-07-21 20:13'
 labels: []
 dependencies: []
 references:
@@ -152,4 +152,6 @@ STAND VAN ELIMINATIE (allemaal weg): mDNS, timezone/AceTime, discovery-verify, N
 WAT OVERBLIJFT: een intrinsieke, uptime-vaste trigger in het venster (3900, 3960)s. logHeapStats is boot-gesynct (60s), dus laatste-stabiel=3900 => echte onset in (3900,3960). Beste resterende kandidaat: do5minevent-tick. sendMQTTuptime (in do5min) vuurt op 3634 en 3934s; de tick op 3934 valt precies in het onset-venster, terwijl 11 eerdere ticks onschadelijk waren. Waarom tick #13 wel: onverklaard. do5min doet sendMQTTuptime/versioninfo/stateinformation, publishOverrideStates, publishAllPICsettings.
 
 VOLGENDE STAP: capture met het NIEUWE script (-KeepDebugToggles "REST API,NTP") plus MQTT-toggle aan, zodat het exacte allocatiemoment rond 3934s zichtbaar wordt. De tester gebruikte nog het oude blanket-quiet script. Overweeg extra: per-seconde heap-sampling in het onset-venster.
+
+2026-07-21: diagnose-build 1.7.2-onset.1 (commit bc067cc, worktree wt-onset, branch exp-heap-onset) gebouwd met HEAP_ONSET_DIAG=1: 1Hz heap-sampling in uptime-venster [3500,4500]s. Plus nieuw capture-heap-onset.bat (keep REST,MQTT,MQTTGate,NTP; distinct naam tegen stale-copy-verwarring). Release-map OTGW-release-1.7.2-onset.1. Sampler default OFF gecommit op otgw-1.x.x (bc067ccf). Doel: exact allocatiemoment rond 3934s op event-niveau vangen.
 <!-- SECTION:NOTES:END -->
