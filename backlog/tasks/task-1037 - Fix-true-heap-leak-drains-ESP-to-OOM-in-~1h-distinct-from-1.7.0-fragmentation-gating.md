@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-20 21:24'
+updated_date: '2026-07-21 19:59'
 labels: []
 dependencies: []
 references:
@@ -133,4 +133,23 @@ WAT OVERBLIJFT als tijdgebonden oorzaak, twee kandidaten, beide uptime-determini
 WAAROM resync#2 wel en resync#1 niet: onverklaard uit de logs. loopNTP-code is identiek per resync. Dit is de enige echte open vraag.
 
 BESLISSENDE TEST, al gebouwd: beta.2 (NTP resync 86400s). Geen resync#2 meer voor 24u. Overleeft beta.2 ruim voorbij 82 min -> resync-pad is de dader. Sterft beta.2 alsnog op ~82 min uptime -> resync uitgesloten, dan is het de do5minevent-3900s-tick of een ander uptime-slot, en moet ik met per-seconde heap-telemetrie (nieuwe capture, -KeepDebugToggles) het exacte allocatiemoment vangen.
+
+2026-07-21 BESLISSEND: beta.2 (1.7.2-beta.2+482d934, NTP-resync 86400s) capture transcript-20260721-201357, device 48E72958B013, boot 20:04:19.
+
+NTP UITGESLOTEN. Bevestigd: NUL NTP-resync-events in de hele capture (geen Start time syncing, geen Time synced, geen Resync needed). De 86400s-wijziging werkte, er was geen resync op 3600s. En toch sterft het toestel, zelfde patroon: onset uptime 3900s, dood uptime 5040s.
+
+Vierde capture op een rij met identieke onset:
+- no-mdns 3898s, beta.1 3895s, 1.7.1 3893s, beta.2 3900s. Spreiding 7 seconden over VIER firmwares en beide NTP-instellingen.
+
+Daarmee is ook de "285s na resync#2"-correlatie ontmaskerd als toeval: resync#2 lag bij 30-min-NTP op 3611s, toevallig ~285s voor de echte ~3900s-trigger. Zonder resync (beta.2) blijft de onset op 3900s. NTP was een rode haring.
+
+Crashlog-poll OOK uitgesloten: poll #1 om 20:13:59, poll #2 rond 21:14 (uptime ~4180s), dus NA de onset (3900s). En de Grafana-veldgrafiek toont dezelfde ~80-min zaagtand zonder mijn script.
+
+Firmware-gedrag op uptime 3600: geen. De twee uptime>3600-checks (runNightlyRestartCheck, discovery-verify) vereisen bNightlyRestart (default false) resp. hourChanged; geen van beide vuurt in deze captures.
+
+STAND VAN ELIMINATIE (allemaal weg): mDNS, timezone/AceTime, discovery-verify, NTP-resync, crashlog-poll, wandklok.
+
+WAT OVERBLIJFT: een intrinsieke, uptime-vaste trigger in het venster (3900, 3960)s. logHeapStats is boot-gesynct (60s), dus laatste-stabiel=3900 => echte onset in (3900,3960). Beste resterende kandidaat: do5minevent-tick. sendMQTTuptime (in do5min) vuurt op 3634 en 3934s; de tick op 3934 valt precies in het onset-venster, terwijl 11 eerdere ticks onschadelijk waren. Waarom tick #13 wel: onverklaard. do5min doet sendMQTTuptime/versioninfo/stateinformation, publishOverrideStates, publishAllPICsettings.
+
+VOLGENDE STAP: capture met het NIEUWE script (-KeepDebugToggles "REST API,NTP") plus MQTT-toggle aan, zodat het exacte allocatiemoment rond 3934s zichtbaar wordt. De tester gebruikte nog het oude blanket-quiet script. Overweeg extra: per-seconde heap-sampling in het onset-venster.
 <!-- SECTION:NOTES:END -->
