@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-20 20:14'
-updated_date: '2026-07-20 20:26'
+updated_date: '2026-07-21 19:59'
 labels: []
 dependencies: []
 priority: high
@@ -30,8 +30,10 @@ Change is a single constant: NTP_RESYNC_TIME in OTGW-firmware.h from 1800 to 864
 - [x] #1 NTP_RESYNC_TIME set to 86400 seconds
 - [x] #2 NTP still syncs at boot
 - [x] #3 Build passes and evaluator shows no new failures
-- [ ] #4 Field/bench observation records whether the 80-minute sawtooth flattens (confirm or refute the resync-path hypothesis)
+- [x] #4 Field/bench observation records whether the 80-minute sawtooth flattens (confirm or refute the resync-path hypothesis)
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
