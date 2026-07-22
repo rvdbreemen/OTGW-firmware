@@ -3,9 +3,11 @@ id: TASK-1048
 title: >-
   Replace discovery auto-verify readback with unconditional daily drip republish
   (ADR-062 redesign)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-22 17:59'
+updated_date: '2026-07-22 18:00'
 labels:
   - bug
   - mqtt
