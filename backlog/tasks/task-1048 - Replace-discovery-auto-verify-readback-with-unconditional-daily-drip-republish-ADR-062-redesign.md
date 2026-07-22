@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-22 17:59'
-updated_date: '2026-07-22 18:00'
+updated_date: '2026-07-22 18:11'
 labels:
   - bug
   - mqtt
@@ -25,10 +25,10 @@ Field root cause (transcript OTGW-48E72958B013): discovery auto-verify subscribe
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Discovery verify wildcard-subscribe + count + markAllPending-on-partial-read path removed/bypassed
-- [ ] #2 Daily (and first-run) trigger performs unconditional drip republish instead of verify readback
-- [ ] #3 No hourly retry-storm: trigger runs at most daily, heap-gated
-- [ ] #4 Superseding ADR authored (Proposed) for ADR-062 change
-- [ ] #5 Version bumped to 1.7.2-beta.3
-- [ ] #6 python build.py firmware+fs exit 0, evaluate --quick no new failures
+- [x] #1 Discovery verify wildcard-subscribe + count + markAllPending-on-partial-read path removed/bypassed
+- [x] #2 Daily (and first-run) trigger performs unconditional drip republish instead of verify readback
+- [x] #3 No hourly retry-storm: trigger runs at most daily, heap-gated
+- [x] #4 Superseding ADR authored (Proposed) for ADR-062 change
+- [x] #5 Version bumped to 1.7.2-beta.3
+- [x] #6 python build.py firmware+fs exit 0, evaluate --quick no new failures
 <!-- AC:END -->
