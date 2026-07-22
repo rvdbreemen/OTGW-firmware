@@ -4,6 +4,7 @@ title: Bench hypothese-testsuite voor de ~82-min heap-dood (TASK-1037)
 status: To Do
 assignee: []
 created_date: '2026-07-21 21:13'
+updated_date: '2026-07-22 01:00'
 labels: []
 dependencies: []
 priority: high
@@ -30,8 +31,8 @@ VOLGORDE (fail-fast op sterkste hypothese): probe-1 fast-SNTP eerst. Dood in min
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Fast-SNTP probe (30s interval) gedraaid op bench; heap-gedrag vastgelegd
-- [ ] #2 H1 SDK-SNTP bevestigd of uitgesloten met bewijs
+- [x] #1 Fast-SNTP probe (30s interval) gedraaid op bench; heap-gedrag vastgelegd
+- [x] #2 H1 SDK-SNTP bevestigd of uitgesloten met bewijs
 - [ ] #3 Bij uitsluiting H1: H2 (static IP) en H4 (MQTT) getest via runtime-settings
 - [ ] #4 Conclusie met de bewezen of resterende oorzaak vastgelegd in TASK-1037
 <!-- AC:END -->
