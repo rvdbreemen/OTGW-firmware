@@ -3,7 +3,7 @@ id: TASK-1048
 title: >-
   Replace discovery auto-verify readback with unconditional daily drip republish
   (ADR-062 redesign)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-22 17:59'
