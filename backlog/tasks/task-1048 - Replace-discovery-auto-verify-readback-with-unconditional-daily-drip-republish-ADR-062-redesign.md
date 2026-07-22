@@ -32,3 +32,15 @@ Field root cause (transcript OTGW-48E72958B013): discovery auto-verify subscribe
 - [x] #5 Version bumped to 1.7.2-beta.3
 - [x] #6 python build.py firmware+fs exit 0, evaluate --quick no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Option 5 implemented (KISS): removed automatic startDiscoveryVerification() from both hourly-first-run and daily triggers in OTGW-firmware.ino. Daily trigger now does unconditional markAllMQTTConfigPending() drip republish, guarded by MQTT-connected + no-drip-in-progress + maxFreeBlock>=8000. Deleted hourly retry block. Added markAllMQTTConfigPending forward-decl to OTGW-firmware.h (concat-order fix). Manual verify paths (POST /api/v2/discovery, telnet debug) left intact.
+
+Authored ADR-087 (Proposed) superseding ADR-062. ADR-062 NOT yet flipped to Superseded (awaits user acceptance of ADR-087; never self-approve).
+
+Build: build.bat exit 0, fresh beta.3 bins (ino 764688B + littlefs 2072576B, 20:09). evaluate --quick 97.3%, single failure (unresolved ADR ref) confirmed pre-existing via stash test — not new.
+
+NOT committed: pre-commit adr-judge (ADR-062 llm_judge:true) will block until ADR-087 accepted + ADR-062 status flipped.
+<!-- SECTION:NOTES:END -->
