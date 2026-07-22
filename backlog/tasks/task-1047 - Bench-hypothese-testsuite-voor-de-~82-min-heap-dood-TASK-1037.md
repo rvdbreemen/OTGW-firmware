@@ -36,3 +36,20 @@ VOLGORDE (fail-fast op sterkste hypothese): probe-1 fast-SNTP eerst. Dood in min
 - [x] #3 Bij uitsluiting H1: H2 (static IP) en H4 (MQTT) getest via runtime-settings
 - [x] #4 Conclusie met de bewezen of resterende oorzaak vastgelegd in TASK-1037
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Systematische hypothese-suite op bench-toestel (192.168.88.68, geen PIC), vier tests, elk gedocumenteerd/uitgevoerd/bewezen.
+
+T1 fast-SNTP-probe (SDK-SNTP-interval geforceerd naar 30s via weak-function-override): heap 15min vlak over ~30 versnelde updates. H1 (SDK-SNTP-update-lek) ONWAAR.
+T2 MQTT uit: vlak tot 68min, voorbij veld-onset. Bench reproduceert niet.
+T3 MQTT aan (lokale broker) op de fast-SNTP-build: vlak tot 66min. Sluit ook fast-SNTP+MQTT samen uit.
+T4 OT-simulator (replay /otgw_simulation.log, OT-waardes bevestigd op broker) + MQTT: vlak tot 67min, 1Hz-telnet-heap byte-stabiel.
+
+CONCLUSIE: de spontane ~3900s-heap-dood reproduceert op de bench in GEEN configuratie. Uitgesloten met bench-bewijs: SDK-SNTP-update, MQTT-connectie/publish op zich, OT-frame-decode->MQTT-pad (via sim). Eerder al uitgesloten (veldlogs): mDNS, timezone/AceTime, discovery-verify, firmware-NTP-resync, crashlog-poll, wandklok.
+
+LEIDENDE RESTERENDE KANDIDAAT: DHCP-lease-vernieuwing. Uptime-vast (lease-timer vanaf boot), router-afhankelijk (verklaart waarom de bench op een ander netwerk niet reproduceert), SDK/lwIP-niveau (versie-onafhankelijk). Een lease van ~2u geeft T1-renewal op ~60min, wat past bij de onset op 65min/3900s met 7s-spreiding. Niet op de bench te testen (mijn router-lease verschilt); H2 is een VELDTEST.
+
+DECISIEVE VOLGENDE STAP: static IP op martreides' toestel (runtime-setting, geen build). Stopt de ~82min-dood => DHCP bevestigd.
+<!-- SECTION:FINAL_SUMMARY:END -->
