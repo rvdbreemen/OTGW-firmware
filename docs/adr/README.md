@@ -154,6 +154,9 @@ Architecture Decision Records capture important architectural decisions along wi
 - **[ADR-086: Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses](ADR-086-rate-limit-ui-polled-rest-endpoints.md)** *(Accepted)*
   Caps `/api/v2/otgw/otmonitor` and `/api/v2/device/time` with a per-endpoint budget (1500 ms and 4000 ms windows), answering excess GETs with `429` plus `Retry-After`, `Cache-Control: no-store` and an RFC 9457 `application/problem+json` body. Prompted by a field capture where two forgotten browser tabs sustained 242 req/min for an hour and the gateway died. Uses `429` rather than the heap gate's `503` so per-caller throttling stays distinguishable from device-wide distress. The budget is global per endpoint rather than per client, which caps aggregate load at the cost of a looser reading of 429 semantics.
 
+- **[ADR-087: Unconditional daily drip republish replaces automatic discovery-verify readback](ADR-087-daily-drip-republish-replaces-discovery-verify-readback.md)** *(Accepted, supersedes ADR-062)*
+  Removes the automatic discovery-verify readback of ADR-062. A field transcript (OTGW-48E72958B013) showed the wildcard-subscribe readback receiving only 26 of 124 retained configs under the reduced PubSubClient buffer, falsely declaring 98 missing, and triggering a runaway republish + hourly retry that leaked heap to a hard death at 82 min uptime. The daily trigger now performs an unconditional, heap-gated drip republish (`markAllMQTTConfigPending()`) as the Gap-A auto-heal; the manual `POST /api/v2/discovery` diagnostic path is retained. Ships in 1.7.2-beta.3 (TASK-1048).
+
 ### System Architecture
 
 - **[ADR-007: Timer-Based Task Scheduling](ADR-007-timer-based-task-scheduling.md)**  

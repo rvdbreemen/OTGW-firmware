@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.2-beta.2
+**  Version  : v1.7.2-beta.3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -218,6 +218,7 @@ void maybeWarnFlashMismatch();                  // one-shot flash-config sanity 
 bool     startDiscoveryVerification();
 bool     isDiscoveryVerificationActive();
 uint16_t countPendingDiscoveryIds();
+void     markAllMQTTConfigPending();  // TASK-1048: daily discovery drip re-announce trigger (defined in MQTTstuff.ino)
 void     incPublishedTopicCount();    // called by streaming helpers in mqtt_configuratie.cpp (ADR-044 shim)
 void addOTWGcmdtoqueue(const char* ,  int , const bool = false, const int16_t = 1000);
 void sendLogToWebSocket(const char* logMessage);

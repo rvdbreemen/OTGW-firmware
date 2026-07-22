@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v1.7.2-beta.2
+**  Version  : v1.7.2-beta.3
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -335,24 +335,24 @@ void doTaskMinuteChanged(){
   if (hourFlag) {
     runNightlyRestartCheck();     // TASK-345: moved from doTaskEvery60s
     sendMQTTheapdiag();            // TASK-346: moved from doTaskEvery60s
-    // TASK-704: first-run trigger — if verify has never completed (epoch==0) and
-    // auto-verify is on, attempt it every hour until it succeeds. startDiscovery-
-    // Verification() enforces all preconditions (NTP, uptime>3600s, heap, no drip,
-    // MQTT connected) internally and is a no-op when any precondition fails.
-    // Once a verify completes (even aborted), iLastVerifyEpoch becomes non-zero and
-    // this path stays silent; the daily trigger at midnight handles subsequent runs.
-    if (settings.mqtt.bDiscoveryAutoVerify && state.discovery.iLastVerifyEpoch == 0) {
-      startDiscoveryVerification();
-    }
   }
 
   // Daily consumers (TASK-351).
   if (dayFlag) {
-    // Daily MQTT discovery verification. Opt-in via settings.mqtt.bDiscoveryAutoVerify
-    // (default true). Preconditions (NTP sync, uptime>3600, heap>=6000, no pending
-    // drip, MQTT connected) are enforced inside startDiscoveryVerification(), so
-    // this call is unconditional here and startup-safe.
-    if (settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification();
+    // TASK-1048: unconditional daily drip republish of retained discovery configs
+    // as auto-heal. Replaces the discovery-verify readback (wildcard subscribe +
+    // count), which mis-counted retained configs under the reduced PubSubClient
+    // buffer, falsely declared configs missing, and triggered a runaway
+    // republish+hourly-retry loop that leaked heap to death (~82 min in the field).
+    // markAllMQTTConfigPending() only sets pending bits; loopMQTTDiscovery() drains
+    // one ID per heap-gated tick, so the daily heal is bounded and self-throttling.
+    // Guards: opted in, MQTT up, not already dripping, healthy max block.
+    if (settings.mqtt.bDiscoveryAutoVerify
+        && state.mqtt.bConnected
+        && countPendingDiscoveryIds() == 0
+        && ESP.getMaxFreeBlockSize() >= 8000) {
+      markAllMQTTConfigPending();
+    }
   }
 
   // Yearly consumers: SR=22 via sendtimecommand(dayFlag, yearFlag) above is the
