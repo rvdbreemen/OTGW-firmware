@@ -42,8 +42,6 @@ Ramp onset has no logged event in any of the three captures; all three were capt
 - [ ] #5 Reporter martreides confirms no reboots over 24h on a build with the fix
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -202,4 +200,12 @@ MEETFOUT die dit eerder verborg: beta.3-run gebruikte blanket-quiet preset (sile
 FIX (393db8b3, Option 5 KISS): verify-readback verwijderd; daily trigger doet unconditional heap-gated drip-republish (guards: MQTT-up + geen drip bezig + maxBlock>=8000); hourly first-run retry geschrapt. Geen wildcard-subscribe, geen count, geen false-missing, geen retry-storm.
 
 RESTEREND: alleen AC#4 (4h+ soak op post-fix build >=393db8b3) + AC#5 (reporter 24h bevestiging). AC#1/#3 nu voldaan door deze analyse + fix-commit bewijs.
+
+2026-07-23 SOAK-PLAN (A): HEAD (5514505) bevat fix 393db8b3. Post-fix build.bat draait (firmware+fs). Bench: COM3 = USB-SERIAL CH340 (WeMos D1 mini / NodoShop OTGW ESP8266), kandidaat 1.x bench-device.
+
+HARDWARE-CAVEAT AC#4: reporter (martreides) device 48E72958B013 is remote/niet bereikbaar. Bench-soak op COM3 = sanity-check, geen volledige AC#4 tenzij bench 124 discovery-configs + verkleinde PubSubClient-buffer reproduceert. Volledige AC#4 vraagt post-fix build op reporter-device of exacte repro-bench.
+
+Soak-preset: capture-heap-onset.bat (houdt REST+MQTT+MQTTGate+NTP aan), NIET de blanket-quiet preset. Let op uptime-uurgrenzen 60/120/180 min. Verwacht: heap vlak, op dag-grens 1 heap-gated drip-republish.
+
+AC#4 en AC#5 zijn hardware/reporter-gated = niet self-verifiable; blijven open tot bench-soak draait resp. reporter 24h bevestigt.
 <!-- SECTION:NOTES:END -->
