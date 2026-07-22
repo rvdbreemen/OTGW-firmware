@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-21 20:13'
+updated_date: '2026-07-22 01:00'
 labels: []
 dependencies: []
 references:
@@ -154,4 +154,29 @@ WAT OVERBLIJFT: een intrinsieke, uptime-vaste trigger in het venster (3900, 3960
 VOLGENDE STAP: capture met het NIEUWE script (-KeepDebugToggles "REST API,NTP") plus MQTT-toggle aan, zodat het exacte allocatiemoment rond 3934s zichtbaar wordt. De tester gebruikte nog het oude blanket-quiet script. Overweeg extra: per-seconde heap-sampling in het onset-venster.
 
 2026-07-21: diagnose-build 1.7.2-onset.1 (commit bc067cc, worktree wt-onset, branch exp-heap-onset) gebouwd met HEAP_ONSET_DIAG=1: 1Hz heap-sampling in uptime-venster [3500,4500]s. Plus nieuw capture-heap-onset.bat (keep REST,MQTT,MQTTGate,NTP; distinct naam tegen stale-copy-verwarring). Release-map OTGW-release-1.7.2-onset.1. Sampler default OFF gecommit op otgw-1.x.x (bc067ccf). Doel: exact allocatiemoment rond 3934s op event-niveau vangen.
+
+=== EINDCONCLUSIE BENCH-SUITE (T1-T4) ===
+De bench reproduceert de ~3900s-dood in GEEN enkele configuratie:
+- T1 fast-SNTP (30s): vlak. SNTP-frequentie irrelevant.
+- T2 MQTT uit: vlak tot 68min.
+- T3 MQTT aan (geen OT): vlak tot 66min. (ook fast-SNTP+MQTT samen getest: vlak)
+- T4 OT-sim + MQTT: vlak tot 67min.
+
+UITGESLOTEN met bench-bewijs: SDK-SNTP-update, MQTT-connectie/publish op zich,
+OT-frame-decode->MQTT-publish-pad (via sim).
+
+RESTERENDE VERSCHILLEN bench vs veld (kandidaten die de bench NIET kan namaken):
+1. DHCP-lease-vernieuwing. LEIDENDE KANDIDAAT. Uptime-vast (lease-timer vanaf
+   DHCP-acquire bij boot), router-afhankelijk (verklaart waarom de bench op MIJN
+   netwerk niet reproduceert: andere lease-duur), SDK/lwIP-niveau (versie-
+   onafhankelijk, matcht alle 4 veld-captures). Als de D-Link (dlink-CBEF) een
+   lease van ~130min heeft, valt T1 (50%) op ~65min = 3900s. STERKE fit met de
+   7s-spreiding en de vaste uptime-lock.
+2. Echte PIC (serieel UART-verkeer via OTGWSerial). Minder waarschijnlijk: zou
+   per-verkeer lekken, niet uptime-vast op 3900s.
+3. Veld-broker-specifiek (zigbee2mqtt-firehose, retained configs).
+
+DISCRIMINERENDE VELDTEST (H2/DHCP): zet op martreides' toestel een STATIC IP
+(runtime-setting, geen build). Stopt de ~82min-dood => DHCP-lease-vernieuwing
+bevestigd. Blijft hij => DHCP uit, dan echte-PIC of broker.
 <!-- SECTION:NOTES:END -->
