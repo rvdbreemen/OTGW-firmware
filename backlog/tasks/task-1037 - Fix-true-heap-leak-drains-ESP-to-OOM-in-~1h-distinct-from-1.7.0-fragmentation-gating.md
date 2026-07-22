@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-22 01:00'
+updated_date: '2026-07-22 01:30'
 labels: []
 dependencies: []
 references:
@@ -179,4 +179,6 @@ RESTERENDE VERSCHILLEN bench vs veld (kandidaten die de bench NIET kan namaken):
 DISCRIMINERENDE VELDTEST (H2/DHCP): zet op martreides' toestel een STATIC IP
 (runtime-setting, geen build). Stopt de ~82min-dood => DHCP-lease-vernieuwing
 bevestigd. Blijft hij => DHCP uit, dan echte-PIC of broker.
+
+2026-07-22 bench-suite eindstand: 11 hypotheses met bewijs uitgesloten (incl. DHCP: bench renewt elke 5min flat; crashlog-serving: geen cumulatief lek). Bench reproduceert de dood in GEEN configuratie. Cause is field-specifiek: leidende kandidaat is het ECHTE-PIC seriele UART-pad (sim bypasst het), of de veld-broker. Diagnose-build onset.5 (1Hz-heap op onset + DHCP-lease-logging) is de decisieve veld-capture. Volledig testlog: OTGW-logs/HEAP-TESTLOG.md.
 <!-- SECTION:NOTES:END -->
