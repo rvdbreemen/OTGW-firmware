@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-22 17:59'
-updated_date: '2026-07-22 18:11'
+updated_date: '2026-07-22 18:18'
 labels:
   - bug
   - mqtt
@@ -44,3 +44,17 @@ Build: build.bat exit 0, fresh beta.3 bins (ino 764688B + littlefs 2072576B, 20:
 
 NOT committed: pre-commit adr-judge (ADR-062 llm_judge:true) will block until ADR-087 accepted + ADR-062 status flipped.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Replaced ADR-062 automatic discovery-verify readback with an unconditional, heap-gated daily drip republish (option 5, KISS), fixing the ~82 min field heap-death.
+
+Root cause (field transcript OTGW-48E72958B013): auto-verify subscribed homeassistant/+/<node>/#, read back only 26 of 124 retained configs under the reduced PubSubClient buffer, falsely declared 98 missing, triggered full republish, and re-armed hourly -> heap leak -> death.
+
+Changes: OTGW-firmware.ino daily trigger now calls markAllMQTTConfigPending() guarded by MQTT-connected + no-drip + maxFreeBlock>=8000; hourly first-run retry deleted; forward-decl added to OTGW-firmware.h. Manual verify (POST /api/v2/discovery, telnet) retained. ADR-087 authored and Accepted, supersedes ADR-062 (status flipped, README updated). Version 1.7.2-beta.3.
+
+Verification: build.bat exit 0, fresh beta.3 bins (ino 764688B + littlefs 2072576B); evaluate --quick 97.3% (single failure confirmed pre-existing via stash test). Committed 393db8b3, pushed origin/otgw-1.x.x.
+
+Follow-up: field A/B validation by tester on beta.3 (death should disappear); manual verify readback leak still open (TASK-1037).
+<!-- SECTION:FINAL_SUMMARY:END -->
