@@ -1,7 +1,7 @@
 ---
 id: TASK-1047
 title: Bench hypothese-testsuite voor de ~82-min heap-dood (TASK-1037)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-07-21 21:13'
 updated_date: '2026-07-22 01:02'
