@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-22 01:30'
+updated_date: '2026-07-22 22:42'
 labels: []
 dependencies: []
 references:
@@ -181,4 +181,22 @@ DISCRIMINERENDE VELDTEST (H2/DHCP): zet op martreides' toestel een STATIC IP
 bevestigd. Blijft hij => DHCP uit, dan echte-PIC of broker.
 
 2026-07-22 bench-suite eindstand: 11 hypotheses met bewijs uitgesloten (incl. DHCP: bench renewt elke 5min flat; crashlog-serving: geen cumulatief lek). Bench reproduceert de dood in GEEN configuratie. Cause is field-specifiek: leidende kandidaat is het ECHTE-PIC seriele UART-pad (sim bypasst het), of de veld-broker. Diagnose-build onset.5 (1Hz-heap op onset + DHCP-lease-logging) is de decisieve veld-capture. Volledig testlog: OTGW-logs/HEAP-TESTLOG.md.
+
+2026-07-23: NIEUWE CAPTURE-ANALYSE (transcript-20260722-203911, beta.3+36c91e5, device 48E72958B013) — ROOT CAUSE BEVESTIGD + FIX GEïDENTIFICEERD.
+
+Buildhash 36c91e57 (20:00:52) is PRE-FIX: 17 min vóór fix-commit 393db8b3 (20:17:57, TASK-1048). git merge-base --is-ancestor bevestigt 36c91e5 is ancestor van 393db8b3. Deze capture is dus retro-bevestiging van pre-fix gedrag, niet een nieuw lek.
+
+Heap-trace: vlak ~20200 B, 57 min (20:39-21:36), dan monotoon versnellend verval 19920->5152 in 21 min (~800 -> ~1500 B/min). maxBlock volgt free omlaag (10792->4816) = aaneengesloten verlies = echte leak, geen frag. emergencyHeapRecovery delta=+0 (alles gerefereerd). Eindigt in MQTT throttle (drops=60) + HTTP-frag skip + dood ~21:58. Reboots=3, crashlog External Watchdog = staart van eerdere leak-cycli.
+
+ONSET = uptime ~60 min (device boot 20:36, Up 0:03 bij start). Eerste hourChanged na uptime>3600 -> discovery-verify vuurt. Matcht ADR-062 mechanisme exact.
+
+ROOT CAUSE (uit fix-commit 393db8b3): auto-verify subscribet homeassistant/+/<node>/# om retained configs te tellen; onder verkleinde PubSubClient-buffer leest maar 26 van 124 terug; verklaart 98 vals-missing; markAllMQTTConfigPending() -> volledige republish; iLastVerifyEpoch==0 -> herbewapent elk uur. verify->false-missing->republish leaks tot dood.
+
+CORRECTIE OP EERDERE NOTITIE: de "web-load driven" hypothese is een RODE HARING voor dit lek. Deze run had Debug RestAPI:true maar exact 1 REST GET het hele uur (tool crashlog-poll), 0 browser-polls (geen otmonitor/device/time/info regels). Geen web-sessie actief, lek trad tóch op. Echte trigger = MQTT discovery-verify, niet REST-polling storm. De dubbele-tab REST-observatie uit 19-07 blijft geldig als APARTE frag-druk, maar is niet dit lek.
+
+MEETFOUT die dit eerder verborg: beta.3-run gebruikte blanket-quiet preset (silence all except REST API+NTP), die MQTT-publish/verify-events verbergt. capture-heap-onset.bat (Jul 21) houdt REST+MQTT+MQTTGate+NTP aan en had de verify-storm zichtbaar gemaakt.
+
+FIX (393db8b3, Option 5 KISS): verify-readback verwijderd; daily trigger doet unconditional heap-gated drip-republish (guards: MQTT-up + geen drip bezig + maxBlock>=8000); hourly first-run retry geschrapt. Geen wildcard-subscribe, geen count, geen false-missing, geen retry-storm.
+
+RESTEREND: alleen AC#4 (4h+ soak op post-fix build >=393db8b3) + AC#5 (reporter 24h bevestiging). AC#1/#3 nu voldaan door deze analyse + fix-commit bewijs.
 <!-- SECTION:NOTES:END -->
