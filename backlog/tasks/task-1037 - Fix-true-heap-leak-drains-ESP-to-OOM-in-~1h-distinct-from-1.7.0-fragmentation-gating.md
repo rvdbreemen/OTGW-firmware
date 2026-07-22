@@ -3,10 +3,11 @@ id: TASK-1037
 title: >-
   Fix: true heap leak drains ESP to OOM in ~1h (distinct from 1.7.0
   fragmentation gating)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-22 22:43'
+updated_date: '2026-07-22 22:44'
 labels: []
 dependencies: []
 references:
