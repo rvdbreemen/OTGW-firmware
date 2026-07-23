@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-23 04:37'
+updated_date: '2026-07-23 06:04'
 labels: []
 dependencies: []
 references:
@@ -216,4 +216,10 @@ Flash faalt op USB-laag, 4 pogingen: (1) 460800 stub -> "Failed to write to targ
 GEVOLG: partial write op 0x0, bench boot firmware niet tot succesvolle her-flash. HERSTEL vraagt hands-on: andere data-USB-kabel + poort (geen hub), evt GPIO0-low manual bootmode, dan volledige erase+flash beide bins. Encoding-noot: flash_esp.py crasht op cp1252-console; draai met PYTHONIOENCODING=utf-8 PYTHONUTF8=1.
 
 SOAK wacht op werkende flash-verbinding. Build-artefact staat klaar.
+
+2026-07-23 FLASH GESLAAGD via ROM-loader. Oplossing: esptool --no-stub write_flash omzeilt de stub-RAM-checksum die op deze CH340-kabel elke stub-upload deed falen. Traag (~4 min, 77 kbit/s ROM-loader) maar exit=0, beide bins geverifieerd (fw 764688B @0x0, littlefs 2072576B @0x200000, Hash verified). Geen erase -> WiFi-creds behouden.
+
+Bench-device 84:f3:eb:22:b8:e1 boot 1.7.2-beta.3+08d628c (post-fix), verschijnt op 192.168.88.68. Verse boot: freeheap 18632, maxfreeblock 18264 (~2% frag), HEALTHY. Klaar voor soak.
+
+CH340-flash-recept voor toekomst: PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m esptool --port COM3 -b 115200 --no-stub --before default_reset --after hard_reset write_flash --flash_mode dio 0x0 <fw> 0x200000 <fs>
 <!-- SECTION:NOTES:END -->
