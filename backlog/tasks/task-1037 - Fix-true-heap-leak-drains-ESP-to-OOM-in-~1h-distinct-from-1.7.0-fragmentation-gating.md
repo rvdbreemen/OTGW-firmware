@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-23 06:04'
+updated_date: '2026-07-23 06:09'
 labels: []
 dependencies: []
 references:
@@ -222,4 +222,6 @@ SOAK wacht op werkende flash-verbinding. Build-artefact staat klaar.
 Bench-device 84:f3:eb:22:b8:e1 boot 1.7.2-beta.3+08d628c (post-fix), verschijnt op 192.168.88.68. Verse boot: freeheap 18632, maxfreeblock 18264 (~2% frag), HEALTHY. Klaar voor soak.
 
 CH340-flash-recept voor toekomst: PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m esptool --port COM3 -b 115200 --no-stub --before default_reset --after hard_reset write_flash --flash_mode dio 0x0 <fw> 0x200000 <fs>
+
+2026-07-23 SOAK GESTART op post-fix bench. Device 192.168.88.68, fw 1.7.2-beta.3+08d628c, MQTT connected=true (broker homeassistant.local, door user ingesteld via web-UI; Claude raakte wachtwoord niet aan). Lichte REST-heap-poller ipv capture-heap-onset.bat (kernsignaal is device-interne heap via /api/v2/device/info; vermijdt broker-mosquitto_sub + wachtwoord). Interval 30s, ~4.5h, CSV: C:\Users\rvdbr\AppData\Local\Temp/otgw_soak_08d628c_20260723-080837.csv. Start freeheap 17072 / maxfreeblock 16296 @ uptime 0:05. Discriminator: pre-fix lekte op uptime~1h (verify-storm bij uptime>3600); post-fix moet vlak blijven over 1h/2h/3h grenzen. Bench broker (echte HA) houdt retained otgw-configs = verify-pad wordt uitgeoefend.
 <!-- SECTION:NOTES:END -->
