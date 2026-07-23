@@ -8,7 +8,19 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-_No unreleased changes yet. New work on `otgw-1.x.x` lands here._
+### Fixed
+- Spontaneous heap death and ~1 to 1.5 hour reboot loop on long-running devices (the "true leak", distinct from the 1.7.0 fragmentation gating). Root cause: the automatic MQTT discovery-verify (ADR-062) subscribed to `homeassistant/+/<node>/#` to count retained discovery configs, but under the reduced PubSubClient buffer it read back only a fraction of them, falsely declared the rest missing, and triggered a full discovery republish that re-armed every hour. Verify to false-missing to republish leaked heap until the device ran out of memory and the external watchdog reset it. The verify readback is removed. The daily auto-heal is now an unconditional, heap-gated drip republish of the retained configs (guarded by MQTT connected, no drip already in progress, and a healthy largest-contiguous block), and the hourly first-run retry is deleted. No wildcard subscribe, no count, no false-missing, no retry storm. Confirmed on the bench: 5 hour soak with MQTT connected to a real broker holds the free heap flat where the previous build died at about 80 minutes. (TASK-1037, TASK-1048, ADR-087)
+- Gateway-mode and OTGW-connected Home Assistant discovery entities are queued at boot so they publish once and self-heal, instead of only appearing after a mode change. (TASK-1035)
+
+### Changed
+- NTP now resyncs once per day instead of every 30 minutes, cutting periodic allocation churn on long-running devices. (TASK-1046)
+- Web UI ticks the clock locally and polls the device less often; the two UI-polled endpoints (`/api/v2/otgw/otmonitor`, `/api/v2/device/time`) are rate-limited to 1 request per second server-side, reducing the HTTP load a couple of open dashboard tabs put on the device. (TASK-1043, TASK-1044)
+
+### Added
+- Per-second heap sampling in the onset window for leak diagnosis, off by default. (TASK-1037)
+
+### Documentation
+- `scripts/capture-heap-soak.bat`: browser-free, low-perturbation long-run capture preset for confirming heap stability over a 24 hour soak on a fixed build. Complements `capture-heap-onset.bat` (which hunts the leak onset on an unfixed build). (TASK-1037)
 
 ## [1.7.1] - 2026-07-09
 
