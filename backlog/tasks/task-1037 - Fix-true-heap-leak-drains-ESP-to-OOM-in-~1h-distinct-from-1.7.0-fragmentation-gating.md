@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-23 11:09'
+updated_date: '2026-07-23 17:00'
 labels: []
 dependencies: []
 references:
@@ -41,8 +41,6 @@ Ramp onset has no logged event in any of the three captures; all three were capt
 - [x] #4 Fix keeps free heap stable over a 4h+ soak on a device previously showing the ramp
 - [ ] #5 Reporter martreides confirms no reboots over 24h on a build with the fix
 <!-- AC:END -->
-
-
 
 ## Implementation Notes
 
@@ -232,4 +230,6 @@ CH340-flash-recept voor toekomst: PYTHONIOENCODING=utf-8 PYTHONUTF8=1 python -m 
 Heap rotsvlak: freeheap 16976-18400 (~1400B jitter, geen trend), maxblock volgt free (~5% frag, stabiel). 1h/2h/3h/4h/5h uptime-grenzen alle vlak -- exact waar pre-fix (36c91e5) de verify-storm vuurde (onset ~57min, dood ~78min). Post-fix 08d628c lekte niet op enige grens.
 
 CAVEAT AC#4: dit is een equivalente-hardware bench (WeMos D1 mini + PIC 6.6, Core 2.7.4), NIET letterlijk reporter-device 48E72958B013. Maar het lek-mechanisme (MQTT-connected + retained HA-configs) is hier reeel uitgeoefend en bleef 5h vlak. Sterk self-verifiable bewijs dat de fix het pad dicht. Resterend echt-wereld gate = AC#5 (reporter martreides 24h op 08d628c).
+
+2026-07-23 BETA PUBLISHED: v1.7.2-beta.4 (commit 221589f) op otgw-1.x.x, GitHub prerelease live met bin+littlefs+SHA256SUMS+flash scripts+bundle. Bevat de discovery-verify leak-fix (393db8b3). CHANGELOG [Unreleased] bijgewerkt (leak-fix voorop). Nieuw: scripts/capture-heap-soak.bat = browser-vrije low-perturbation 24h confirmatie-capture voor testers (complement van capture-heap-onset.bat). Bump beta.3->beta.4 via bin/bump-prerelease.sh, build+eval groen (1 pre-existing baseline ADR-ref failure, unrelated). Discord #beta-testing aankondiging = checkpoint, wacht op user-akkoord. AC#5 (martreides 24h) = na uitrol naar reporter.
 <!-- SECTION:NOTES:END -->
