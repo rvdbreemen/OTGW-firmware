@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-22 22:44'
+updated_date: '2026-07-23 04:37'
 labels: []
 dependencies: []
 references:
@@ -208,4 +208,12 @@ HARDWARE-CAVEAT AC#4: reporter (martreides) device 48E72958B013 is remote/niet b
 Soak-preset: capture-heap-onset.bat (houdt REST+MQTT+MQTTGate+NTP aan), NIET de blanket-quiet preset. Let op uptime-uurgrenzen 60/120/180 min. Verwacht: heap vlak, op dag-grens 1 heap-gated drip-republish.
 
 AC#4 en AC#5 zijn hardware/reporter-gated = niet self-verifiable; blijven open tot bench-soak draait resp. reporter 24h bevestigt.
+
+2026-07-23 FLASH GEBLOKKEERD (bench COM3, MAC 84:f3:eb:22:b8:e1 — bench-device, NIET reporter 48E72958B013). Post-fix build 1.7.2-beta.3+08d628c gebouwd + geverifieerd (bin 0.73MB @00:50, littlefs 1.98MB, HEAD bevat fix 393db8b3).
+
+Flash faalt op USB-laag, 4 pogingen: (1) 460800 stub -> "Failed to write to target RAM 0107 Checksum error"; (2) 115200 stub -> zelfde; (3) --no-stub ROM-loader begon write@0x0 dan "No more data to read from serial port" + reset mid-write; (4) flash_id stub -> zelfde RAM-checksum. ROM-loader leest wel MAC = ROM-bootloader leeft, maar elke stub/RAM-upload corrumpeert = signal-integriteit CH340-kabel/poort, geen software-fix.
+
+GEVOLG: partial write op 0x0, bench boot firmware niet tot succesvolle her-flash. HERSTEL vraagt hands-on: andere data-USB-kabel + poort (geen hub), evt GPIO0-low manual bootmode, dan volledige erase+flash beide bins. Encoding-noot: flash_esp.py crasht op cp1252-console; draai met PYTHONIOENCODING=utf-8 PYTHONUTF8=1.
+
+SOAK wacht op werkende flash-verbinding. Build-artefact staat klaar.
 <!-- SECTION:NOTES:END -->
