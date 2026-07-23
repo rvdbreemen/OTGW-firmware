@@ -38,9 +38,11 @@ Ramp onset has no logged event in any of the three captures; all three were capt
 - [x] #1 Leak reproduced locally or on a bench device with a heap trace that identifies the allocating subsystem
 - [ ] #2 Confirmed whether the leak persists with no telnet client and no web UI open (capture-mqtt-debug + USB serial from reporter)
 - [x] #3 Root cause identified at file/function level and documented with evidence
-- [ ] #4 Fix keeps free heap stable over a 4h+ soak on a device previously showing the ramp
+- [x] #4 Fix keeps free heap stable over a 4h+ soak on a device previously showing the ramp
 - [ ] #5 Reporter martreides confirms no reboots over 24h on a build with the fix
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
