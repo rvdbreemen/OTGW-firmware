@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.344
+**  Version  : v2.0.0-alpha.345
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -297,31 +297,160 @@ function stopPICsettingsRefreshTimer() {
   }
 }
 
+// Poll periods. Named, not inline, because the firmware's rate-limit windows are
+// derived from them at ~75% and evaluate.py::check_poll_window_coupling reads both
+// sides to stop them drifting apart. Changing one without the other either hands
+// 429s to a well-behaved client or leaves the limiter slack.
+const OTMONITOR_POLL_MS = 2000;  // measured (1.x TASK-1044): the fastest-moving OT values
+                                 // (RelModLevel, TrOverride, TSet, Tboiler) change once every
+                                 // 5-6 s, so 1 Hz returned ~5 identical payloads per real change.
+const DEVTIME_POLL_MS   = 5000;  // heap / status message / PS mode / network indicator. The clock
+                                 // now ticks locally, so nothing in this response is time-critical.
+
+// ---------------------------------------------------------------------------
+// Paced poller (ADR-173).
+//
+// The gateway's poll budget is GLOBAL per endpoint, not per client. Two dashboards
+// on identical periods phase-lock: whichever arrives first each cycle keeps the
+// window and the other is refused every single time, forever, with no visible
+// reason. Slowing the loser down does not help — a slower loser still arrives
+// second. Breaking the lock requires the loser to MOVE, so a 429 reschedules this
+// client at a uniformly random offset inside its period. P(collide again) falls
+// geometrically; expected escape is 1-2 cycles.
+//
+// setInterval cannot do this: its phase is fixed for the life of the timer. Hence
+// a self-rescheduling setTimeout.
+//
+// Deliberately NOT routed through fetchWithRetry(): retrying a poll whose next tick
+// is 2 s away is pointless, its network-error retry triples request count exactly
+// while the device is rebooting, and the extra in-flight request fights the N<=2
+// convention (ADR-165) that fetchWithRetry's own comment exists to protect.
+// ---------------------------------------------------------------------------
+function makePacedPoller(opts) {
+  // opts: { periodMs, run() -> Promise<{status, retryAfterMs}|null>, onStale(bool) }
+  var timer = null, inFlight = false, refusals = 0, stale = false;
+
+  function setStale(v) {
+    if (v !== stale) { stale = v; if (opts.onStale) { try { opts.onStale(v); } catch (e) {} } }
+  }
+
+  function schedule(delayMs) {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(tick, delayMs);
+  }
+
+  // N>2 dashboards: after sustained refusal, slow down as well as move, so this
+  // client stops adding load it is never going to be served.
+  function backoffPeriod() {
+    return opts.periodMs * (refusals >= 4 ? Math.min(4, 1 << (refusals - 3)) : 1);
+  }
+
+  function penalise(delayMs) {
+    refusals++;
+    if (refusals >= 3) setStale(true);
+    schedule(delayMs);
+  }
+
+  function tick() {
+    if (inFlight) { schedule(opts.periodMs); return; }   // slow response: never stack requests
+    inFlight = true;
+    opts.run().then(function (info) {
+      inFlight = false;
+      if (!info) { schedule(opts.periodMs); return; }     // caller opted out (hidden / flashing)
+      if (info.status === 429) {
+        // Jitter across a FULL period, not a fraction: the winner's phase is unknown.
+        penalise((info.retryAfterMs || 0) + Math.random() * opts.periodMs);
+        return;
+      }
+      if (info.status !== 200) { penalise(backoffPeriod()); return; }
+      refusals = 0; setStale(false); schedule(opts.periodMs);
+    }, function () {
+      inFlight = false;
+      penalise(backoffPeriod());                          // device likely rebooting
+    });
+  }
+
+  return {
+    start: function () { if (!timer) schedule(opts.periodMs); },
+    stop:  function () {
+      if (timer) { clearTimeout(timer); timer = null; }
+      inFlight = false; refusals = 0; setStale(false);
+    }
+  };
+}
+
+// Retry-After is not a CORS-safelisted response header, so headers.get() returns
+// null cross-origin. The firmware repeats the value as `retry_after` in the RFC 9457
+// body for exactly that case; pollFailureInfo() prefers the header and falls back.
+function pollFailureInfo(response) {
+  var secs = parseFloat(response.headers.get('Retry-After'));
+  if (isFinite(secs) && secs > 0) {
+    return Promise.resolve({ status: response.status, retryAfterMs: secs * 1000 });
+  }
+  return response.json().then(function (body) {
+    var b = (body && isFinite(body.retry_after)) ? body.retry_after * 1000 : 0;
+    return { status: response.status, retryAfterMs: b };
+  }, function () {
+    return { status: response.status, retryAfterMs: 0 };
+  });
+}
+
+// Marks a UI region as showing paced/stale data. Styled in components.css.
+// Takes CSS selectors, not ids: the OT monitor table is created at runtime by
+// applyOTmonitor() and carries a class, not an id.
+function setRegionStale(selectors, isStale, reason) {
+  selectors.forEach(function (sel) {
+    var els = document.querySelectorAll(sel);
+    for (var i = 0; i < els.length; i++) {
+      if (isStale) { els[i].setAttribute('data-stale', ''); els[i].setAttribute('title', reason); }
+      else { els[i].removeAttribute('data-stale'); els[i].removeAttribute('title'); }
+    }
+  });
+}
+
+const PACED_REASON = 'Gateway is pacing updates — another dashboard or client is polling. Values may be a few seconds old.';
+
+var otmonitorPoller = makePacedPoller({
+  periodMs: OTMONITOR_POLL_MS,
+  run: function () { return refreshOTmonitor(); },
+  onStale: function (v) { setRegionStale(['.otmontable'], v, PACED_REASON); }
+});
+
+var devTimePoller = makePacedPoller({
+  periodMs: DEVTIME_POLL_MS,
+  run: function () { refreshGatewayMode(false); return refreshDevTime(); },
+  onStale: function (v) { setRegionStale(['#theTime', '#heap-info'], v, PACED_REASON); }
+});
+
 function startOTmonitorPolling() {
   if (!isMainPageActive()) {
     return;
   }
   if (!tid) {
-    tid = setInterval(function () { refreshOTmonitor(); }, 1000);
+    tid = 1;                 // retained as the "polling active" flag
+    otmonitorPoller.start();
   }
 }
 
 function stopOTmonitorPolling() {
   if (tid) {
-    clearInterval(tid);
+    otmonitorPoller.stop();
     tid = 0;
   }
 }
 
 function startTimeUpdates() {
+  startDeviceClock();        // 1 Hz display, no network
   if (!timeupdate) {
-    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 1000);
+    timeupdate = 1;          // retained as the "updates active" flag
+    devTimePoller.start();
   }
 }
 
 function stopTimeUpdates() {
+  stopDeviceClock();
   if (timeupdate) {
-    clearInterval(timeupdate);
+    devTimePoller.stop();
     timeupdate = null;
   }
 }
@@ -397,7 +526,11 @@ var graphRedrawTimer = null;
 let gatewayModeRefreshCounter = 0;
 let gatewayModeRefreshInFlight = false; // Prevents double-triggering even when force=true
 let gatewayModeLastKnown = null; // "gateway" | "monitor"
-const GATEWAY_MODE_REFRESH_INTERVAL = 60; // 60s max polling interval (at most once a minute)
+// Counted in device-status poll TICKS, not seconds. The tick moved from 1000ms to
+// DEVTIME_POLL_MS (5000ms) in ADR-173, so this had to move from 60 to 12 to keep the
+// same ~60s wall-clock cadence. Getting this wrong is silent: it would turn a
+// once-a-minute gateway-mode poll into a once-every-five-minutes one.
+const GATEWAY_MODE_REFRESH_INTERVAL = 12; // 12 ticks x 5s = at most once a minute
 
 function updateGatewayModeIndicator(value) {
   const statusEl = document.getElementById('gatewayModeStatus');
@@ -3566,7 +3699,7 @@ function settingsPage() {
 function webhookPage() {
   disconnectOTLogWebSocket();
   stopOTDStatusPolling();
-  clearInterval(tid);
+  stopOTmonitorPolling();   // ADR-173: tid is a flag now, not a timer handle
   refreshDevTime();
   document.getElementById("displayMainPage").classList.remove('active');
   document.getElementById("displayDeviceInfo").classList.remove('active');
@@ -4734,22 +4867,85 @@ function updateHeapDisplay() {
 }
 
 //============================================================================
+// Device clock: learned from the API, ticked locally (ADR-173).
+//
+// The clock used to be the only thing forcing /api/v2/device/time to a 1-second
+// poll. It does not need the network to run: one response carries both `epoch`
+// (device UTC) and `dateTime` (device wall clock), and the difference between them
+// is the device's timezone shift. Add our own skew against the device and the
+// browser can render the device's wall clock locally, with no timezone database.
+// A DST change is picked up at the next status poll.
+let devClockOffsetMs = null;   // Date.now() + this = device wall clock, read as UTC
+let devClockTimer = null;
+
+function learnDeviceClock(devtime) {
+  if (!devtime || devtime.epoch === undefined || !devtime.dateTime) return false;
+  const epochMs = Number(devtime.epoch) * 1000;
+  if (!isFinite(epochMs) || epochMs <= 0) return false;
+  // "YYYY-MM-DD HH:MM:SS" parsed as if UTC: the difference against epoch IS the
+  // device's timezone offset, sign included.
+  const wallMs = Date.parse(String(devtime.dateTime).replace(' ', 'T') + 'Z');
+  if (isNaN(wallMs)) return false;
+  devClockOffsetMs = wallMs - Date.now();
+  renderDeviceClock();
+  return true;
+}
+
+function renderDeviceClock() {
+  if (devClockOffsetMs === null) return;
+  const el = document.getElementById('theTime');
+  if (!el) return;
+  const d = new Date(Date.now() + devClockOffsetMs);
+  const p = function (n) { return String(n).padStart(2, '0'); };
+  // Rendered as UTC on purpose: the timezone shift is already inside the offset.
+  el.textContent = d.getUTCFullYear() + '-' + p(d.getUTCMonth() + 1) + '-' + p(d.getUTCDate()) +
+                   ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds());
+}
+
+function startDeviceClock() {
+  if (!devClockTimer) devClockTimer = setInterval(renderDeviceClock, 1000);
+}
+
+function stopDeviceClock() {
+  if (devClockTimer) {
+    clearInterval(devClockTimer);
+    devClockTimer = null;
+  }
+}
+
+//============================================================================
+// Resolves to {status, retryAfterMs}; never rejects. The paced poller reads the
+// status to tell "the gateway is pacing us" (429) from a real failure.
 function refreshDevTime() {
   //console.log("Refresh api/v2/device/time ..");
-  fetch(APIGW + "v2/device/time")
+  return fetch(APIGW + "v2/device/time")
     .then(response => {
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        return pollFailureInfo(response);
       }
-      return response.json();
+      return response.json().then(json => {
+        applyDevTime(json);
+        return { status: 200 };
+      });
     })
-    .then(json => {
+    .catch(function (error) {
+      console.warn('refreshDevTime failed:', error);
+      return { status: 0 };
+    });
+} // refreshDevTime()
+
+//============================================================================
+function applyDevTime(json) {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       const devtime = json.devtime || {};
       const hasPsmode = (devtime.psmode !== undefined);
       const newPSmode = hasPsmode ? (devtime.psmode === true || devtime.psmode === 'true') : isPSmode;
-      
-      if (devtime.dateTime) {
+
+      // ADR-173: learn the offset and let the local 1 Hz tick render it. If the
+      // offset cannot be learned (device without NTP: epoch 0 / unparseable
+      // dateTime), fall back to writing whatever the device reports — otherwise
+      // #theTime stays stuck on its [00:00:00] placeholder forever.
+      if (!learnDeviceClock(devtime) && devtime.dateTime) {
         const timeEl = document.getElementById('theTime');
         if (timeEl) timeEl.textContent = devtime.dateTime;
       }
@@ -4774,15 +4970,7 @@ function refreshDevTime() {
         applyOTGWSimulationState(devtime.otgwsimulation);
       }
       renderBottomMessage();
-    })
-    .catch(function (error) {
-      var p = document.createElement('p');
-      p.appendChild(
-        document.createTextNode('Error: ' + error.message)
-      );
-    });
-
-} // refreshDevTime()
+} // applyDevTime()
 
 //============================================================================
 // Apply PS=1 mode state to the UI
@@ -5579,18 +5767,38 @@ function refreshDevInfo() {
 } // refreshDevInfo()
 
 //============================================================================  
+// Resolves to {status, retryAfterMs}, or null when this client opted out of the
+// cycle. Never rejects — the paced poller reads the status.
 function refreshOTmonitor() {
-  if (flashModeActive || !isPageVisible() || !isMainPageActive()) return;
+  if (flashModeActive || !isPageVisible() || !isMainPageActive()) return Promise.resolve(null);
 
   data = {};
-  fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
+  return fetch(APIGW + "v2/otgw/otmonitor")  //api/v2/otgw/otmonitor
     .then(response => {
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        return pollFailureInfo(response);
       }
-      return response.json();
+      return response.json().then(json => { applyOTmonitor(json); return { status: 200 }; });
     })
-    .then(json => {
+    .catch(function (error) {
+      if (flashModeActive || !isPageVisible()) return { status: 0 };
+      var msg = (error && error.message) ? error.message : 'Load failed';
+      if (msg.indexOf('Load failed') !== -1 || msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1) {
+        console.warn("refreshOTmonitor warning:", error);
+      } else {
+        console.error("refreshOTmonitor error:", error);
+      }
+      var waiting = document.getElementById('waiting');
+      if (waiting) {
+        waiting.textContent = 'Error: ' + msg + ' (Retrying...)';
+        waiting.className = 'waiting-error';
+      }
+      return { status: 0 };
+    });
+} // refreshOTmonitor()
+
+//============================================================================
+function applyOTmonitor(json) {
       //console.log("parsed .., data is ["+ JSON.stringify(json)+"]");
       data = json.otmonitor;
 
@@ -5789,23 +5997,7 @@ function refreshOTmonitor() {
           }
         }
       }
-    })
-    .catch(function (error) {
-      if (flashModeActive || !isPageVisible()) return;
-      var msg = (error && error.message) ? error.message : 'Load failed';
-      if (msg.indexOf('Load failed') !== -1 || msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1) {
-        console.warn("refreshOTmonitor warning:", error);
-      } else {
-        console.error("refreshOTmonitor error:", error);
-      }
-      var waiting = document.getElementById('waiting');
-      if (waiting) {
-        waiting.textContent = 'Error: ' + msg + ' (Retrying...)';
-        waiting.className = 'waiting-error';
-      }
-    });
-
-} // refreshOTmonitor()
+} // applyOTmonitor()
 
 
 function refreshDeviceInfo() {

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.344
+**  Version  : v2.0.0-alpha.345
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1711,6 +1711,10 @@ void sendMQTTheapdiag(){
   publishStatU32(F("otgw-firmware/stats/disc_last_orphan"),         (unsigned long)state.discovery.iLastOrphanCount);
   publishStatU32(F("otgw-firmware/stats/disc_published_topics"),    (unsigned long)state.discovery.iPublishedTopicCount);
   publishStatU32(F("otgw-firmware/stats/disc_last_verify_epoch"),   (unsigned long)state.discovery.iLastVerifyEpoch);
+  // ADR-170: the automatic path is now a drip re-announce, not a verify, so
+  // disc_last_verify_epoch above only advances on a MANUAL verify. This is the
+  // topic that shows the daily auto-heal is alive.
+  publishStatU32(F("otgw-firmware/stats/disc_last_daily_heal_epoch"), (unsigned long)state.discovery.iLastDailyHealEpoch);
 
   // TASK-934 soak instrumentation: worst-case watermarks + maxBlock histogram
   publishStatU32(F("otgw-firmware/stats/min_max_block"),   (unsigned long)state.heapdiag.iMinMaxBlock);
@@ -1970,6 +1974,39 @@ void clearMQTTConfigPending()
   memset(MQTTautoCfgPendingMap, 0, sizeof(MQTTautoCfgPendingMap));
 }
 //===========================================================================================
+// queueNonOTDiscoveryIds() — the SINGLE definition of "which non-bus-seen IDs need a
+// discovery config queued" (ADR-171).
+//
+// These faux IDs never arrive on the OT bus, so JIT publish (ADR-100) can never reach
+// them: an ID missing from this list is announced only when something else calls
+// markAllMQTTConfigPending(). Both queueing entry points call this helper, so the boot
+// set and the republish set cannot drift apart again — they had, and 243/245/251/252/
+// 253/254/255 were boot-unreachable, which meant SAT never announced itself to Home
+// Assistant on a clean boot until a settings save or a manual republish.
+//
+// Enforced by evaluate.py::check_non_ot_discovery_single_source.
+//===========================================================================================
+static void queueNonOTDiscoveryIds()
+{
+  setMQTTConfigPending(0);                  // climate: thermostat + DHW control
+  setMQTTConfigPending(27);                 // number: outside temperature override
+  setMQTTConfigPending(OTGWhvacid);         // 242 TASK-942 hvac_mode/hvac_action companions
+  setMQTTConfigPending(OTGWotdirectid);     // 243 ADR-124 OTDirect flame metrics
+  setMQTTConfigPending(OTGWpiccontrolsid);  // 244 resetgateway button + GPIO/LED selects
+  setMQTTConfigPending(OTGWs0dataid);       // 245 S0 pulse counters
+  setMQTTConfigPending(OTGWdallasdataid);   // 246 Dallas temperature sensors
+  setMQTTConfigPending(OTGWheapstatsid);    // 247 heap / discovery statistics
+  setMQTTConfigPending(OTGWfwinfoid);       // 248 firmware info
+  setMQTTConfigPending(OTGWpicinfoid);      // 249 PIC info
+  setMQTTConfigPending(OTGWpicsettingsid);  // 250 PIC settings
+  setMQTTConfigPending(OTGWdiag200id);      // 251 SAT / flame diagnostics
+  setMQTTConfigPending(OTGWsatcoreid);      // 252 TASK-543 SAT control/PID/cycle/stats
+  setMQTTConfigPending(OTGWsatweatherid);   // 253 TASK-543 SAT BLE/pressure/weather
+  setMQTTConfigPending(OTGWsatbinaryid);    // 254 TASK-543 SAT binaries + flame status
+  setMQTTConfigPending(OTGWsatzoneid);      // 255 TASK-543 dynamic SAT zone discovery
+  dripDeviceInfoPending = true;  // ADR-140: first drip entity carries the full single-device block
+}
+//===========================================================================================
 // publishNonOTDiscoveryConfigs() — queue only the non-OT discovery configs for drip publish.
 // Called at boot, top-topic change, and broker restart.
 // OT ID configs are NOT queued here; they publish JIT as each MsgID arrives on the bus.
@@ -1991,16 +2028,7 @@ void publishNonOTDiscoveryConfigs()
     // so we return here; it will have queued the non-OT IDs too.
     return;
   }
-  setMQTTConfigPending(0);                  // climate: thermostat + DHW control
-  setMQTTConfigPending(OTGWhvacid);         // TASK-942: hvac_mode/hvac_action companion sensors (faux id 242; not bus-seen, so it must be marked explicitly here or the sensors never publish on boot/reconnect)
-  setMQTTConfigPending(27);                 // number: outside temperature override
-  setMQTTConfigPending(OTGWdallasdataid);   // Dallas temperature sensors
-  setMQTTConfigPending(OTGWheapstatsid);    // heap / discovery statistics
-  setMQTTConfigPending(OTGWfwinfoid);       // firmware info
-  setMQTTConfigPending(OTGWpicinfoid);      // PIC info
-  setMQTTConfigPending(OTGWpicsettingsid);  // PIC settings
-  setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
-  dripDeviceInfoPending = true;  // ADR-140: first drip entity carries the full single-device block
+  queueNonOTDiscoveryIds();  // ADR-171: same set markAllMQTTConfigPending() queues
   MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
 }
 //===========================================================================================
@@ -2033,30 +2061,12 @@ void markAllMQTTConfigPending()
       setMQTTConfigPending(static_cast<uint8_t>(i));
     }
   }
-  // Mark climate (ID 0) and number (ID 27) as pending
-  setMQTTConfigPending(0);   // climate thermostat + DHW
-  setMQTTConfigPending(27);  // number Toutside override
-  // Also mark the Dallas sensor pseudo-ID
-  setMQTTConfigPending(OTGWdallasdataid);
-  // Heap/discovery statistics discovery (TASK-346): 17 retained otgw-firmware/stats/* topics
-  setMQTTConfigPending(OTGWheapstatsid);
-  // Diagnostic discovery (TASK-540 / TASK-541): firmware info, PIC info, PIC settings.
-  // PIC pseudo-IDs use MQTT_HA_FLAG_IS_PIC_ENTRY so they self-skip when isPICEnabled() is false.
-  setMQTTConfigPending(OTGWfwinfoid);
-  setMQTTConfigPending(OTGWpicinfoid);
-  setMQTTConfigPending(OTGWpicsettingsid);
-  // PIC control entities (pseudo-ID 244): resetgateway button + gpioa/gpiob/leda-f
-  // selects. Discovery unconditional like the other PIC pseudo-IDs; the
-  // set-commands and otgw-pic/ state topics are PIC-gated at their source.
-  setMQTTConfigPending(OTGWpiccontrolsid);
-  // ADR-124: OTDirect flame metrics (split out of 251) -> OT-Core (Pic) device.
-  setMQTTConfigPending(OTGWotdirectid);
-  // 2.0.0-specific diagnostic discovery (TASK-541): SAT BLE/pressure health.
-  setMQTTConfigPending(OTGWdiag200id);
-  // TASK-543: SAT user-facing discovery stays unconditional on this dual-target branch.
-  // Platform/runtime-specific publishers decide whether entities show live state.
-  setMQTTConfigPending(OTGWsatzoneid);
-  dripDeviceInfoPending = true;  // ADR-140: first drip entity carries the full single-device block
+  // ADR-171: the non-bus-seen faux IDs come from the shared helper, so this set and the
+  // boot set in publishNonOTDiscoveryConfigs() cannot drift. Runs AFTER the memset above;
+  // setMQTTConfigPending() is an idempotent bitSet, so overlap with the LUT walk is a no-op.
+  // PIC pseudo-IDs carry MQTT_HA_FLAG_IS_PIC_ENTRY and self-skip when isPICEnabled() is false;
+  // SAT discovery stays unconditional on this dual-target branch per the TASK-543 decision.
+  queueNonOTDiscoveryIds();
   MQTTDebugTln(F("MQTT discovery: all IDs marked pending for async drip publish"));
 }
 //===========================================================================================
@@ -2124,6 +2134,15 @@ static bool discoveryDripIsHeapHealthyForRestore() {
   return platformFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD;
 #endif
 }
+
+// ADR-170: public wrapper so the daily discovery auto-heal can ask the drip's OWN
+// question — "would the drainer run this job at full speed right now?" — instead of
+// carrying a second heap constant. Deliberately NOT a new threshold: 1.x used a bare
+// ESP.getMaxFreeBlockSize() >= 8000, which is an ESP8266 "20% of heap is contiguous"
+// bar and would be both meaningless here and a third heap number on a branch that
+// already has two. Delegating also means ADR-167 (retire the tier machine) cannot
+// leave a stale literal behind in the auto-heal path.
+bool discoveryDripHeapHealthy() { return discoveryDripIsHeapHealthyForRestore(); }
 
 void loopMQTTDiscovery()
 {

@@ -2098,3 +2098,22 @@ body.dark .sat-settings-group,
   background: var(--bg-surface);
   border-color: var(--border-1);
 }
+
+/* ---------------------------------------------------------------------------
+   Paced / stale data indicator (ADR-173).
+
+   Set by index.js setRegionStale() after >=3 consecutive refusals from the
+   gateway's poll rate limiter (HTTP 429) or a sustained fetch failure. It says
+   "these numbers stopped moving and here is why", which is the difference
+   between a paced dashboard and one the user thinks is broken.
+
+   Deliberately subtle: an occasional 429 is normal with two tabs open and
+   self-heals within a cycle, so only a persistent stall reaches this state.
+   Uses existing tokens only - no new custom properties (ADR-091).
+   --------------------------------------------------------------------------- */
+[data-stale] {
+  opacity: .55;
+  color: var(--status-warn-text);
+  transition: opacity .3s ease-in-out;
+  cursor: help;
+}

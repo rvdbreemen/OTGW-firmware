@@ -636,6 +636,143 @@ class EvaluationResult:
         return f"{color}{icon} [{self.category}] {self.name}: {self.message}{Colors.ENDC}"
 
 
+def non_ot_discovery_single_source(mqtt_text: str) -> Dict[str, bool]:
+    """ADR-171: boot and republish discovery queues must share one non-OT ID set.
+
+    ``publishNonOTDiscoveryConfigs()`` (boot / top-topic change / broker restart)
+    and ``markAllMQTTConfigPending()`` (force-republish, settings save, daily
+    heal per ADR-170) both queue the non-bus-seen faux IDs. They drifted once:
+    243/245/251/252/253/254/255 were missing from the boot path, so SAG/OTDirect/S0
+    entities never announced on a clean boot. Rather than pin an ID list here
+    (which would itself need maintaining), assert the structural property that
+    makes re-drift impossible: exactly one helper owns the list and both entry
+    points delegate to it.
+    """
+    def _body(name: str) -> str:
+        m = re.search(r"^void\s+" + re.escape(name) + r"\s*\(\s*\)\s*\{", mqtt_text, re.MULTILINE)
+        if not m:
+            return ""
+        depth, i = 0, m.end() - 1
+        for j in range(i, len(mqtt_text)):
+            if mqtt_text[j] == "{":
+                depth += 1
+            elif mqtt_text[j] == "}":
+                depth -= 1
+                if depth == 0:
+                    return mqtt_text[i:j]
+        return mqtt_text[i:]
+
+    boot = _body("publishNonOTDiscoveryConfigs")
+    mark = _body("markAllMQTTConfigPending")
+    return {
+        "helper_defined": bool(re.search(r"static\s+void\s+queueNonOTDiscoveryIds\s*\(\s*\)", mqtt_text)),
+        "boot_found": bool(boot),
+        "markall_found": bool(mark),
+        "boot_delegates": "queueNonOTDiscoveryIds()" in boot,
+        "markall_delegates": "queueNonOTDiscoveryIds()" in mark,
+        # Neither entry point may hand-maintain its own list any more.
+        "boot_no_direct_calls": "setMQTTConfigPending(" not in boot,
+    }
+
+
+def discovery_autoheal_shape(firmware_text: str, mqtt_text: str) -> Dict[str, bool]:
+    """ADR-170: the daily auto-heal is a drip republish, never a verify readback.
+
+    The regression this prevents is someone re-adding an automatic
+    ``startDiscoveryVerification()`` trigger (that is exactly what killed a 1.x
+    field device, via an hourly retry that re-armed on every false-missing).
+    """
+    return {
+        "no_auto_verify_trigger": "startDiscoveryVerification()" not in firmware_text,
+        "daily_marks_all": "markAllMQTTConfigPending()" in firmware_text,
+        "daily_heap_gated": "discoveryDripHeapHealthy()" in firmware_text,
+        # The wrapper must delegate, not declare a second heap threshold.
+        "wrapper_delegates": bool(
+            re.search(
+                r"bool\s+discoveryDripHeapHealthy\s*\(\s*\)\s*\{\s*return\s+"
+                r"discoveryDripIsHeapHealthyForRestore\s*\(\s*\)\s*;\s*\}",
+                mqtt_text,
+            )
+        ),
+    }
+
+
+def api_rate_limit_alias_coverage(rest_text: str) -> Dict[str, object]:
+    """ADR-172: an aliased endpoint must not bypass or split the poll budget.
+
+    ``/api/v2/otgw/otmonitor`` and ``/api/v2/otgw/telegraf`` are served by one
+    branch emitting identical bytes. On the 1.x line only ``otmonitor`` was in the
+    rate-limit table, so a caller could route around the cap by alternating paths;
+    giving the alias its OWN row would instead halve the protection. Both failure
+    modes are the same bug, so this gate scans handlers for alias disjunctions of
+    the form ``strcmp_P(words[4], PSTR("a")) == 0 || strcmp_P(words[4], PSTR("b")) == 0``
+    and requires: if any member is rate-limited, all members are, with the SAME
+    budget id. This also catches a future third alias added to the same branch.
+    """
+    # subresource -> budget id, from the PROGMEM route table.
+    table = re.search(r"kApiRateLimitRoutes\[\]\s*PROGMEM\s*=\s*\{(.*?)\};", rest_text, re.DOTALL)
+    limited: Dict[str, str] = {}
+    if table:
+        for res, sub, budget in re.findall(r"\{\s*(\w+)\s*,\s*(\w+)\s*,\s*(\w+)\s*\}", table.group(1)):
+            name = re.search(r"" + re.escape(sub) + r"\[\]\s*PROGMEM\s*=\s*\"([^\"]+)\"", rest_text)
+            if name:
+                limited[name.group(1)] = budget
+
+    alias_ok = True
+    offenders = []
+    disj = re.compile(
+        r'strcmp_P\(\s*words\[4\]\s*,\s*PSTR\("(\w+)"\)\s*\)\s*==\s*0'
+        r'(?:\s*\|\|\s*strcmp_P\(\s*words\[4\]\s*,\s*PSTR\("(\w+)"\)\s*\)\s*==\s*0)+'
+    )
+    for m in disj.finditer(rest_text):
+        members = [g for g in m.groups() if g]
+        budgets = {limited.get(x) for x in members}
+        if any(b is not None for b in budgets) and len(budgets) != 1:
+            alias_ok = False
+            offenders.append("|".join(members))
+
+    return {
+        "hook_before_handler": bool(
+            re.search(r"checkApiRateLimit\(words,\s*wc,\s*method\)[\s\S]{0,400}?r\.handler\(", rest_text)
+        ),
+        "table_present": bool(table),
+        "alias_budgets_consistent": alias_ok,
+        "problem_json": 'webSend(429, F("application/problem+json")' in rest_text,
+        "headers_complete": all(
+            h in rest_text for h in ('F("Retry-After")', 'F("Cache-Control")', 'F("RateLimit")', 'F("RateLimit-Policy")')
+        ),
+        "offenders": offenders,
+    }
+
+
+def poll_window_coupling(rest_text: str, index_js_text: str) -> Dict[str, object]:
+    """ADR-172/173: server rate-limit windows must track the shipped client periods.
+
+    A window that creeps up to the client interval hands 429s to a well-behaved
+    client; one that falls far below it leaves the limiter slack. 1.x recorded this
+    coupling as a prose comment only, which is what let the two drift.
+    """
+    def _js_const(name: str):
+        m = re.search(r"const\s+" + re.escape(name) + r"\s*=\s*(\d+)", index_js_text)
+        return int(m.group(1)) if m else None
+
+    windows = [int(w) for w in re.findall(r"\{\s*(\d+)UL,\s*0,\s*\d+,\s*false\s*\}", rest_text)]
+    otmon, devtime = _js_const("OTMONITOR_POLL_MS"), _js_const("DEVTIME_POLL_MS")
+
+    pairs, bad = [], []
+    if len(windows) >= 2 and otmon and devtime:
+        pairs = [(windows[0], otmon, "otmonitor"), (windows[1], devtime, "device/time")]
+        for win, period, label in pairs:
+            if not (0.5 * period <= win <= 0.9 * period):
+                bad.append(f"{label}: window {win}ms vs client {period}ms")
+
+    return {
+        "constants_found": bool(otmon and devtime and len(windows) >= 2),
+        "ratios_ok": not bad,
+        "offenders": bad,
+    }
+
+
 class WorkspaceEvaluator:
     """Main evaluation framework"""
     
@@ -2290,6 +2427,94 @@ class WorkspaceEvaluator:
                 sample
             ))
 
+    # ===== 1.7.2-beta.4 PORT GATES (TASK-1037 / ADR-170..173) =====
+
+    def _read_fw(self, name: str) -> str:
+        try:
+            return (config.FIRMWARE_ROOT / name).read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            return ""
+
+    def check_non_ot_discovery_single_source(self):
+        """ADR-171 gate."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Non-OT Discovery Single Source (ADR-171) ==={Colors.ENDC}")
+        r = non_ot_discovery_single_source(self._read_fw("MQTTstuff.ino"))
+        if not (r["boot_found"] and r["markall_found"]):
+            self.add_result(EvaluationResult(
+                "ADR", "non-OT discovery single source", "WARN",
+                "Could not locate both discovery queueing functions in MQTTstuff.ino"))
+            return
+        missing = [k for k, v in r.items() if k not in ("boot_found", "markall_found") and not v]
+        if missing:
+            self.add_result(EvaluationResult(
+                "ADR", "non-OT discovery single source", "FAIL",
+                f"ADR-171 violated: {', '.join(missing)}",
+                "publishNonOTDiscoveryConfigs() and markAllMQTTConfigPending() must both "
+                "delegate to queueNonOTDiscoveryIds(); the boot path must not hand-maintain "
+                "its own setMQTTConfigPending() list (that drift hid SAT discovery at boot)"))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR", "non-OT discovery single source", "PASS",
+                "Both discovery queueing entry points delegate to queueNonOTDiscoveryIds()"))
+
+    def check_discovery_autoheal_shape(self):
+        """ADR-170 gate."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Discovery Auto-Heal Shape (ADR-170) ==={Colors.ENDC}")
+        r = discovery_autoheal_shape(self._read_fw("OTGW-firmware.ino"), self._read_fw("MQTTstuff.ino"))
+        missing = [k for k, v in r.items() if not v]
+        if missing:
+            self.add_result(EvaluationResult(
+                "ADR", "discovery auto-heal shape", "FAIL",
+                f"ADR-170 violated: {', '.join(missing)}",
+                "The daily auto-heal must be a heap-gated markAllMQTTConfigPending() drip. "
+                "Re-adding an automatic startDiscoveryVerification() trigger reintroduces the "
+                "false-missing republish loop that killed a 1.x field device in 82 minutes"))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR", "discovery auto-heal shape", "PASS",
+                "Daily heal is a heap-gated drip republish; no automatic verify trigger"))
+
+    def check_api_rate_limit_alias_coverage(self):
+        """ADR-172 gate."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== API Rate-Limit Alias Coverage (ADR-172) ==={Colors.ENDC}")
+        r = api_rate_limit_alias_coverage(self._read_fw("restAPI.ino"))
+        offenders = r.pop("offenders", [])
+        missing = [k for k, v in r.items() if not v]
+        if missing:
+            detail = "Aliased endpoints serving identical payloads must share ONE budget id"
+            if offenders:
+                detail += f" — inconsistent alias group(s): {', '.join(offenders)}"
+            self.add_result(EvaluationResult(
+                "ADR", "API rate-limit alias coverage", "FAIL",
+                f"ADR-172 violated: {', '.join(missing)}", detail))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR", "API rate-limit alias coverage", "PASS",
+                "Rate limiter hooked before dispatch; alias budgets consistent; problem+json headers complete"))
+
+    def check_poll_window_coupling(self):
+        """ADR-172/173 gate."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Poll/Window Coupling (ADR-172/173) ==={Colors.ENDC}")
+        try:
+            index_js = (config.FIRMWARE_ROOT / "data" / "index.js").read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            index_js = ""
+        r = poll_window_coupling(self._read_fw("restAPI.ino"), index_js)
+        if not r["constants_found"]:
+            self.add_result(EvaluationResult(
+                "ADR", "poll/window coupling", "WARN",
+                "Could not read both the rate-limit windows and the index.js poll constants"))
+        elif not r["ratios_ok"]:
+            self.add_result(EvaluationResult(
+                "ADR", "poll/window coupling", "FAIL",
+                f"Server window drifted from the client poll period: {'; '.join(r['offenders'])}",
+                "Each window must sit between 50% and 90% of the interval the shipped UI polls at. "
+                "Too high 429s a well-behaved client; too low leaves the limiter slack"))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR", "poll/window coupling", "PASS",
+                "Rate-limit windows track the shipped client poll periods"))
+
     def check_coding_standards(self):
         """Check coding standards and best practices"""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Coding Standards ==={Colors.ENDC}")
@@ -3624,6 +3849,10 @@ class WorkspaceEvaluator:
         self.check_design_system_drift()              # TASK-470, ADR-091 FAIL gate (TASK-480 grace complete)
         self.check_ps_summary_master_topic_gate()     # ADR-066 amendment / TASK-483
         self.check_adr_references_resolve()           # TASK-355/368
+        self.check_non_ot_discovery_single_source()   # TASK-1037, ADR-171
+        self.check_discovery_autoheal_shape()         # TASK-1037, ADR-170
+        self.check_api_rate_limit_alias_coverage()    # TASK-1037, ADR-172
+        self.check_poll_window_coupling()             # TASK-1037, ADR-172/173
 
         if not quick:
             # Detailed checks

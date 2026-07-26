@@ -542,5 +542,149 @@ class TestProgmemComplianceIntegration(unittest.TestCase):
         self.assertEqual(bridge_checks[0].status, "PASS")
 
 
+class TestNonOTDiscoverySingleSource(unittest.TestCase):
+    """ADR-171 gate: both discovery queueing entry points share one ID list."""
+
+    GOOD = (
+        "static void queueNonOTDiscoveryIds()\n{\n"
+        "  setMQTTConfigPending(0);\n  setMQTTConfigPending(OTGWsatzoneid);\n"
+        "  dripDeviceInfoPending = true;\n}\n"
+        "void publishNonOTDiscoveryConfigs()\n{\n"
+        "  if (!settings.mqtt.bEnable) return;\n  queueNonOTDiscoveryIds();\n}\n"
+        "void markAllMQTTConfigPending()\n{\n"
+        "  clearMQTTConfigDone();\n  queueNonOTDiscoveryIds();\n}\n"
+    )
+
+    def test_passes_when_both_delegate(self):
+        r = evaluate.non_ot_discovery_single_source(self.GOOD)
+        self.assertTrue(all(r.values()), r)
+
+    def test_detects_boot_path_with_its_own_hand_maintained_list(self):
+        """The exact shape of the bug: boot enumerates its own (shorter) list."""
+        bad = self.GOOD.replace(
+            "  if (!settings.mqtt.bEnable) return;\n  queueNonOTDiscoveryIds();\n",
+            "  setMQTTConfigPending(0);\n  setMQTTConfigPending(OTGWfwinfoid);\n",
+        )
+        r = evaluate.non_ot_discovery_single_source(bad)
+        self.assertFalse(r["boot_delegates"])
+        self.assertFalse(r["boot_no_direct_calls"])
+
+    def test_detects_markall_not_delegating(self):
+        bad = self.GOOD.replace(
+            "  clearMQTTConfigDone();\n  queueNonOTDiscoveryIds();\n",
+            "  clearMQTTConfigDone();\n",
+        )
+        self.assertFalse(evaluate.non_ot_discovery_single_source(bad)["markall_delegates"])
+
+
+class TestDiscoveryAutohealShape(unittest.TestCase):
+    """ADR-170 gate: the daily heal is a drip republish, never a verify readback."""
+
+    FW_GOOD = (
+        "if (dayFlag) {\n"
+        "  if (settings.mqtt.bDiscoveryAutoVerify && discoveryDripHeapHealthy()) {\n"
+        "    markAllMQTTConfigPending();\n  }\n}\n"
+    )
+    MQTT_GOOD = (
+        "bool discoveryDripHeapHealthy() { return discoveryDripIsHeapHealthyForRestore(); }\n"
+    )
+
+    def test_passes_on_drip_shape(self):
+        r = evaluate.discovery_autoheal_shape(self.FW_GOOD, self.MQTT_GOOD)
+        self.assertTrue(all(r.values()), r)
+
+    def test_detects_reintroduced_automatic_verify(self):
+        """The 82-minute-death regression: an automatic verify trigger comes back."""
+        bad = self.FW_GOOD + "  if (settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification();\n"
+        r = evaluate.discovery_autoheal_shape(bad, self.MQTT_GOOD)
+        self.assertFalse(r["no_auto_verify_trigger"])
+
+    def test_detects_wrapper_declaring_its_own_threshold(self):
+        """Porting 1.x's `>= 8000` literal instead of delegating must fail."""
+        bad_mqtt = "bool discoveryDripHeapHealthy() { return platformMaxFreeBlock() >= 8000; }\n"
+        r = evaluate.discovery_autoheal_shape(self.FW_GOOD, bad_mqtt)
+        self.assertFalse(r["wrapper_delegates"])
+
+
+class TestApiRateLimitAliasCoverage(unittest.TestCase):
+    """ADR-172 gate: an aliased endpoint cannot bypass or split the poll budget."""
+
+    HEAD = (
+        'static const char kSubOtmonitor[] PROGMEM = "otmonitor";\n'
+        'static const char kSubTelegraf[]  PROGMEM = "telegraf";\n'
+        'static const char kSubTime[]      PROGMEM = "time";\n'
+    )
+    HANDLER = (
+        'if (strcmp_P(words[4], PSTR("otmonitor")) == 0 || strcmp_P(words[4], PSTR("telegraf")) == 0) {\n'
+        "  sendOTmonitorV2();\n}\n"
+    )
+    DISPATCH = (
+        "if (!checkApiRateLimit(words, wc, method)) { return; }\n r.handler(words, wc, method, originalURI);\n"
+    )
+    SENDER = (
+        'webPushHeader(F("Retry-After"), hdrBuff); webPushHeader(F("Cache-Control"), F("no-store"));\n'
+        'webPushHeader(F("RateLimit"), hdrBuff); webPushHeader(F("RateLimit-Policy"), hdrBuff);\n'
+        'webSend(429, F("application/problem+json"), jsonBuff);\n'
+    )
+
+    def _src(self, rows: str) -> str:
+        return (self.HEAD + "static const ApiRateLimitRoute kApiRateLimitRoutes[] PROGMEM = {"
+                + rows + "};\n" + self.HANDLER + self.DISPATCH + self.SENDER)
+
+    def test_passes_when_aliases_share_a_budget(self):
+        r = evaluate.api_rate_limit_alias_coverage(self._src(
+            "{ kRouteOtgw, kSubOtmonitor, RL_BUDGET_OTMONITOR },"
+            "{ kRouteOtgw, kSubTelegraf, RL_BUDGET_OTMONITOR },"
+            "{ kRouteDevice, kSubTime, RL_BUDGET_DEVICE_TIME },"))
+        self.assertTrue(r["alias_budgets_consistent"])
+        self.assertEqual(r["offenders"], [])
+
+    def test_detects_the_1x_telegraf_bypass(self):
+        """1.x shipped only otmonitor in the table; telegraf served the same bytes uncapped."""
+        r = evaluate.api_rate_limit_alias_coverage(self._src(
+            "{ kRouteOtgw, kSubOtmonitor, RL_BUDGET_OTMONITOR },"
+            "{ kRouteDevice, kSubTime, RL_BUDGET_DEVICE_TIME },"))
+        self.assertFalse(r["alias_budgets_consistent"])
+        self.assertIn("otmonitor|telegraf", r["offenders"])
+
+    def test_detects_alias_given_its_own_budget(self):
+        """The other half of the same bug: two rows, two windows, half the protection."""
+        r = evaluate.api_rate_limit_alias_coverage(self._src(
+            "{ kRouteOtgw, kSubOtmonitor, RL_BUDGET_OTMONITOR },"
+            "{ kRouteOtgw, kSubTelegraf, RL_BUDGET_TELEGRAF },"
+            "{ kRouteDevice, kSubTime, RL_BUDGET_DEVICE_TIME },"))
+        self.assertFalse(r["alias_budgets_consistent"])
+
+    def test_detects_missing_dispatch_hook(self):
+        src = self._src("{ kRouteOtgw, kSubOtmonitor, RL_BUDGET_OTMONITOR },").replace(self.DISPATCH, "")
+        self.assertFalse(evaluate.api_rate_limit_alias_coverage(src)["hook_before_handler"])
+
+
+class TestPollWindowCoupling(unittest.TestCase):
+    """ADR-172/173 gate: server windows track the shipped client poll periods."""
+
+    REST = "{ 1500UL, 0, 2, false },\n{ 4000UL, 0, 2, false },\n"
+    JS = "const OTMONITOR_POLL_MS = 2000;\nconst DEVTIME_POLL_MS   = 5000;\n"
+
+    def test_passes_at_shipped_values(self):
+        r = evaluate.poll_window_coupling(self.REST, self.JS)
+        self.assertTrue(r["constants_found"])
+        self.assertTrue(r["ratios_ok"], r["offenders"])
+
+    def test_detects_window_creeping_up_to_the_client_interval(self):
+        """A window == the client period 429s a perfectly well-behaved client."""
+        r = evaluate.poll_window_coupling("{ 2000UL, 0, 2, false },\n{ 4000UL, 0, 2, false },\n", self.JS)
+        self.assertFalse(r["ratios_ok"])
+
+    def test_detects_client_speeding_up_without_the_server(self):
+        fast_js = "const OTMONITOR_POLL_MS = 1000;\nconst DEVTIME_POLL_MS   = 5000;\n"
+        r = evaluate.poll_window_coupling(self.REST, fast_js)
+        self.assertFalse(r["ratios_ok"])
+
+    def test_reports_missing_constants_rather_than_passing(self):
+        r = evaluate.poll_window_coupling(self.REST, "// no constants here")
+        self.assertFalse(r["constants_found"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

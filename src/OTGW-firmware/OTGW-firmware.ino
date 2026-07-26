@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.344
+**  Version  : v2.0.0-alpha.345
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -836,11 +836,35 @@ void doTaskMinuteChanged(){
 
   // Daily consumers (TASK-351).
   if (dayFlag) {
-    // Daily MQTT discovery verification. Opt-in via settings.mqtt.bDiscoveryAutoVerify
-    // (default true). Preconditions (NTP sync, uptime>3600, heap>=6000, no pending
-    // drip, MQTT connected) are enforced inside startDiscoveryVerification(), so
-    // this call is unconditional here and startup-safe.
-    if (settings.mqtt.bDiscoveryAutoVerify) startDiscoveryVerification();
+    // ADR-170: unconditional daily drip republish of the retained discovery configs,
+    // replacing ADR-062's automatic verify readback. The readback subscribed to a
+    // node-scoped wildcard and compared a received count against an expected count;
+    // a partial read (the normal outcome under a retained-config flood) was misread
+    // as "configs missing" and triggered a full republish, which on the 1.x line
+    // re-armed hourly and leaked heap until the device died (1.x ADR-087, 82 min).
+    //
+    // markAllMQTTConfigPending() only sets pending bits; loopMQTTDiscovery() drains
+    // ONE id per heap-gated tick (2s healthy / 10s under pressure), so the heal is
+    // bounded, self-throttling and outbound-only: no wildcard subscribe, no count,
+    // no false-missing, no retry storm. The manual diagnostic verify path
+    // (POST /api/v2/discovery, telnet) is deliberately left untouched.
+    //
+    // isNTPtimeSet() is load-bearing, not belt-and-braces: dayChanged() reads
+    // time(nullptr) against a static lastday and is NOT itself NTP-guarded, so it
+    // fires a second time when the clock jumps from 1970 to real time at first sync.
+    // The uptime gate then skips a device that finished announcing minutes ago.
+    if (settings.mqtt.bDiscoveryAutoVerify
+        && settings.mqtt.bEnable
+        && state.mqtt.bConnected
+        && isNTPtimeSet()
+        && state.uptime.iSeconds > 3600
+        && !isDiscoveryVerificationActive()   // do not move the target under a manual verify
+        && countPendingDiscoveryIds() == 0    // a drip is already draining; do not restart it
+        && discoveryDripHeapHealthy()) {
+      markAllMQTTConfigPending();
+      state.discovery.iLastDailyHealEpoch = (uint32_t)time(nullptr);
+      DebugTln(F("[ADR-170] daily discovery re-announce: all configs queued for drip"));
+    }
   }
 
   // Yearly consumers: SR=22 via sendtimecommand(dayFlag, yearFlag) above is the

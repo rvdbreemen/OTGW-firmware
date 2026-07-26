@@ -762,6 +762,8 @@ paths:
                         description: "True when the device has fallen back to AP mode (SSID: OTGW-<MAC>, IP: 192.168.4.1). Only present in pre-release builds and only when AP fallback is active."
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v2/device/crashlog:
     get:
@@ -1223,6 +1225,8 @@ paths:
                     description: Map of OpenTherm data entries
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v2/otgw/telegraf:
     get:
@@ -1232,6 +1236,16 @@ paths:
       description: |
         Same response as `/v2/otgw/otmonitor`. Provided as a compatibility alias
         for Telegraf monitoring system integration.
+
+        **This alias SHARES one rate-limit budget with `/v2/otgw/otmonitor`**
+        (ADR-172). They are served by the same code path and emit the same bytes,
+        so they are one endpoint for quota purposes — requests to either consume
+        the same tokens, and alternating between them does not raise the ceiling.
+
+        Budget: 1 request per 1.5 s sustained, burst 2. A scrape interval of 10 s
+        or slower will effectively never be paced, even alongside an open
+        dashboard. Scraping faster than ~2 s will draw `429`s, and Telegraf's
+        `inputs.http` does not retry.
       operationId: getTelegraf
       responses:
         '200':
@@ -1242,6 +1256,8 @@ paths:
                 type: object
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /v2/otgw/messages/{msgid}:
     get:
@@ -4608,6 +4624,69 @@ components:
           interval_ms: 1000
 
   responses:
+    RateLimited:
+      description: |
+        Poll rate limit exceeded (ADR-172).
+
+        This endpoint carries a per-endpoint poll budget. The budget is **global,
+        not per client**: capping the aggregate load an ESP32 gateway accepts is
+        the point, so a well-behaved client can still be paced because another
+        client is polling. Sustained rate is one request per window with a burst
+        of 2.
+
+        Distinct from `503`: a `503` means the device as a whole is in trouble
+        (too many concurrent requests, or a heap floor), while `429` means this
+        caller exceeded a quota and the service is otherwise healthy.
+
+        `Retry-After` is authoritative, but it is **not a CORS-safelisted response
+        header**, so cross-origin callers cannot read it. The same value is
+        repeated as the `retry_after` member of the RFC 9457 body for that case.
+      headers:
+        Retry-After:
+          description: Seconds to wait before retrying (RFC 9110 §10.2.3). Rounded up, never 0.
+          schema:
+            type: integer
+            example: 2
+        Cache-Control:
+          description: Always `no-store`, so an intermediary cannot serve a stale rate-limit error.
+          schema:
+            type: string
+            example: "no-store"
+        RateLimit:
+          description: |
+            Remaining quota and reset hint. IETF `httpapi` Internet-Draft, not a
+            standard as of July 2026 — sent as extra signal only.
+          schema:
+            type: string
+            example: '"poll";r=0;t=2'
+        RateLimit-Policy:
+          description: Burst size and window for this endpoint's budget (same draft caveat).
+          schema:
+            type: string
+            example: '"poll";q=2;w=2'
+      content:
+        application/problem+json:
+          schema:
+            type: object
+            properties:
+              type:
+                type: string
+                format: uri
+                example: "https://github.com/rvdbreemen/OTGW-firmware/problems/rate-limit-exceeded"
+              title:
+                type: string
+                example: "Rate limit exceeded"
+              status:
+                type: integer
+                example: 429
+              retry_after:
+                type: integer
+                description: Seconds to wait. Mirrors the `Retry-After` header for cross-origin callers.
+                example: 2
+              detail:
+                type: string
+                example: "This endpoint serves at most 1 request per 2 second(s) (burst 2). Retry after 2 second(s)."
+
     BadRequestJson:
       description: Bad request - invalid parameters
       content:

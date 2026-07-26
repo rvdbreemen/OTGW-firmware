@@ -2,7 +2,15 @@
 
 ## Status
 
-Accepted
+Accepted. **Automatic mechanism superseded by ADR-170 (Proposed, 2026-07-26).**
+
+ADR-170 removes the *automatic* daily invocation of the readback described here.
+The rest of this ADR remains in force and in code: the manual verify endpoint
+(`POST /api/v2/discovery`, telnet), the `state.discovery` counters, and the two
+CI gates (`check_discovery_counter_instrumented`,
+`check_publishedtopic_counter_reset`) are all unchanged. Read ADR-170 before
+relying on automatic gap detection — it no longer exists; recovery is now
+time-based via a daily drip republish.
 
 ## Context
 

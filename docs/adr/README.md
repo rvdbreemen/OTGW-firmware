@@ -513,6 +513,18 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-120: Platform Abstraction Headers Promoted to the src/libraries/Platform Library](ADR-120-platform-abstraction-promoted-to-library.md)** 🆕  
   Moves the `platform*.h` abstraction headers into a dedicated `src/libraries/Platform` library; extends ADR-061/ADR-115's abstraction-file organization.
 
+- **[ADR-170: Unconditional Daily Drip Republish Replaces the Automatic Discovery-Verify Readback](ADR-170-daily-drip-republish-replaces-discovery-verify-readback.md)** 🆕 *(Proposed)*  
+  Port of 1.x ADR-087 (TASK-1037). Removes ADR-062's automatic wildcard-subscribe readback: a count comparison cannot distinguish "the broker lacks this config" from "the broker did not deliver it in our window", and on the 1.x line a partial read (26 of 124) was misread as 98 missing and drove a republish loop that killed a device in 82 minutes. The daily trigger now performs a heap-gated `markAllMQTTConfigPending()` drip republish; the manual verify endpoint is retained. The heap precondition delegates to the drip's own restore predicate rather than porting 1.x's ESP8266-shaped `>= 8000` literal. Note the 1.x failure is **not** known to reproduce here (espMqttClient, chunk-aware inbound, no hourly retry) — see "Evidence limitations". Gated by `check_discovery_autoheal_shape`.
+
+- **[ADR-171: Boot and Republish Discovery Queues Share One Non-OT ID Set](ADR-171-non-ot-discovery-single-source.md)** 🆕 *(Proposed)*  
+  2.0.0-only. `publishNonOTDiscoveryConfigs()` and `markAllMQTTConfigPending()` had drifted: seven never-bus-seen faux IDs (243/245/251/252/253/254/255) were missing from the boot path, so SAT, OTDirect flame metrics and the S0 counters never announced to Home Assistant on a clean boot — only after a settings save or manual republish, which is why it went unnoticed. Both entry points now delegate to one `queueNonOTDiscoveryIds()` helper. Gated by `check_non_ot_discovery_single_source`.
+
+- **[ADR-172: Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses](ADR-172-rate-limit-ui-polled-rest-endpoints.md)** 🆕 *(Proposed)*  
+  Port of 1.x ADR-086 (TASK-1037), correcting two defects found by adversarial review of 1.7.2-beta.4: the `telegraf` alias served identical bytes uncapped, and two dashboards phase-locked so the same client was refused every cycle. Adds a per-endpoint global budget checked before handler dispatch, with aliases sharing one budget id and GCRA burst 2 (so telegraf is limited without being starved at ~75%). `retry_after` is repeated in the problem body because `Retry-After` is not CORS-safelisted. 503 (device-wide) stays ordered before and semantically distinct from 429 (endpoint quota). Gated by `check_api_rate_limit_alias_coverage` and `check_poll_window_coupling`.
+
+- **[ADR-173: Client Poll Pacing, Locally-Ticked Device Clock, and 429 Re-Phasing](ADR-173-client-poll-pacing-local-clock-429-rephase.md)** 🆕 *(Proposed)*  
+  Port of 1.x TASK-1044 plus the client half of the anti-starvation fix. Classic `index.js` polls at 2 s / 5 s (measured: the fastest OT values change once per 5-6 s) and ticks the device clock locally from `epoch` + `dateTime`. Both `setInterval`s become a self-rescheduling `setTimeout` poller that **re-phases** on 429 — a phase lock is a phase problem, so rate backoff alone cannot break it. After ≥3 consecutive refusals the affected region is marked `data-stale` rather than left silently frozen. `v2.js` is out of scope (WebSocket-driven, already ticks locally).
+
 ### SAT Subsystem
 
 - **[ADR-169: PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate](ADR-169-psram-aware-ble-default-with-no-psram-consent-gate.md)** *(Accepted)*  
