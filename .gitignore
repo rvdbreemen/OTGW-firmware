@@ -102,4 +102,7 @@ capture-settings.json
 .env
 
 # graphify knowledge-graph output (generated, rebuild with: graphify update src)
-graphify-out/
+graphify-out/*
+!graphify-out/graph.json
+!graphify-out/GRAPH_REPORT.md
+src/graphify-out/
