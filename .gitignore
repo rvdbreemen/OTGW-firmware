@@ -100,3 +100,6 @@ capture-settings.json
 *.secrets.json
 *.secret.json
 .env
+
+# graphify knowledge-graph output (generated, rebuild with: graphify update src)
+graphify-out/

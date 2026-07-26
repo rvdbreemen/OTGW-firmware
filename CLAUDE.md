@@ -535,3 +535,15 @@ This project uses [adr-kit](https://github.com/rvdbreemen/adr-kit) for Architect
 - An ADR cannot flip from `Proposed` to `Accepted` until it passes all four verification gates: Completeness, Evidence, Clarity, Consistency.
 
 ADR files live at `docs/adr/ADR-XXX-title.md`. Status flow: `Proposed` to `Accepted`, then immutable. To reverse a decision, write a superseding ADR rather than editing the original.
+
+## graphify
+
+This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.
+
+**Scope: the graph covers `src/` only** (firmware sources, vendored libs, web assets — 1628 nodes, 93 communities). It does NOT index docs/, backlog/, or scripts/; for those, use the C4 docs and `backlog` CLI as usual.
+
+Rules:
+- For questions about firmware code structure ("what calls X", "how does Y connect to Z", "trace flow through W"), first run `graphify query "<question>"` when graphify-out/graph.json exists. Use `graphify path "<A>" "<B>"` for relationships and `graphify explain "<concept>"` for focused concepts. These return a scoped subgraph, usually much smaller than GRAPH_REPORT.md or raw grep output (~13x fewer tokens per query, measured).
+- Read graphify-out/GRAPH_REPORT.md only for broad architecture review or when query/path/explain do not surface enough context.
+- After modifying code under `src/`, run `graphify update src` to keep the graph current (AST-only, no API cost). Never `graphify update .` — the repo root has 1900+ files and would trigger a full re-scan.
+- The graph complements, never replaces, the docs/c4/ reading rules above: C4 answers "which component owns this"; the graph answers "what actually connects to what" at symbol level.
