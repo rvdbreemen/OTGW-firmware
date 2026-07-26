@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.345
+**  Version  : v2.0.0-alpha.346
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2550,7 +2550,15 @@ static void sendApiRateLimited(uint32_t retryAfterSec, uint32_t windowSec, uint8
 // Signed differences so the 49-day millis() rollover can neither open a hole nor
 // wedge the budget shut. `primed` replaces 1.x's `lastServedMs != 0` sentinel,
 // which granted one free request if a stamp ever landed on millis() == 0.
-static uint32_t rateLimitTryAdmit(ApiRateLimitBudget& b, uint32_t now) {
+//
+// Takes the budget INDEX, not a reference. The Arduino .ino prototype generator
+// hoists a declaration of every .ino function to the top of the combined
+// translation unit, ahead of this file's type definitions — so a user-defined
+// type in the signature produces a prototype referencing an undeclared type and
+// the build fails with "redeclared as different kind of entity". Builtin
+// parameter types keep the generated prototype valid.
+static uint32_t rateLimitTryAdmit(uint8_t budgetIdx, uint32_t now) {
+  ApiRateLimitBudget& b = gApiRateLimitBudgets[budgetIdx];
   if (!b.primed) { b.primed = true; b.tat = now; }
   const uint32_t tolerance = (uint32_t)(b.burstTokens - 1) * b.windowMs;
   const int32_t  early     = (int32_t)((b.tat - tolerance) - now);
@@ -2571,9 +2579,9 @@ static bool checkApiRateLimit(const char words[][API_WORD_LEN], uint8_t wc, HTTP
     if (strcmp_P(words[3], rt.resource)    != 0) continue;
     if (strcmp_P(words[4], rt.subresource) != 0) continue;
 
-    ApiRateLimitBudget& b = gApiRateLimitBudgets[rt.budget];
-    const uint32_t waitMs = rateLimitTryAdmit(b, now);
+    const uint32_t waitMs = rateLimitTryAdmit(rt.budget, now);
     if (waitMs == 0) return true;
+    const ApiRateLimitBudget& b = gApiRateLimitBudgets[rt.budget];
     // Round up so Retry-After never says 0, which would invite an immediate retry.
     sendApiRateLimited((waitMs + 999UL) / 1000UL,
                        (b.windowMs + 999UL) / 1000UL,
