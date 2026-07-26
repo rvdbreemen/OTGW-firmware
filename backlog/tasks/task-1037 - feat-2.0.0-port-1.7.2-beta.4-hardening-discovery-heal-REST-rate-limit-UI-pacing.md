@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-26 22:06'
-updated_date: '2026-07-26 22:29'
+updated_date: '2026-07-26 22:37'
 labels: []
 dependencies: []
 ordinal: 246000
@@ -47,7 +47,7 @@ Granularity: maintainer chose one task / one prerelease tag. Tradeoff accepted: 
 - [x] #12 ADR-170..173 written (Proposed); ADR-062 gets a supersession note for its automatic mechanism only
 - [x] #13 evaluate.py gains gates for alias-budget coverage, poll/window coupling, non-OT single source, and auto-heal shape, each as a module-level fn with tests in tests/test_evaluate.py
 - [x] #14 openapi.yaml documents the 429 on /v2/device/time, /v2/otgw/otmonitor and /v2/otgw/telegraf, and states in prose that the two otgw paths share one budget
-- [ ] #15 ./build.sh green for esp32 target, python evaluate.py exit 0, python tests/test_evaluate.py green
+- [x] #15 ./build.sh green for esp32 target, python evaluate.py exit 0, python tests/test_evaluate.py green
 - [ ] #16 Hardware: fresh boot with wiped broker announces SAT (252-255), diag (251), OTDirect (243) and S0 (245) discovery without a manual republish
 <!-- AC:END -->
 
@@ -76,4 +76,10 @@ Pushed to claude/otgw-adversarial-review-4wg4uc; draft PR #673 opened against de
 CI note: the 'ADR lint + index-check' job failed on the first push with 'ADR-166 (Proposed) is MISSING from docs/adr/README.md'. Confirmed PRE-EXISTING: origin/dev's README has zero ADR-166 references, so index-check was already red on the base branch before this work. Fixed in a follow-up docs-only commit (b4db0ba2) because it is a two-line index entry and it was blocking this PR's checks. Both adr_governance.py lint --strict and index-check now report 0 fail over 173 ADRs locally.
 
 AC #15 (build) is expected to be closed by CI rather than locally: the PR runs 'pio run -e esp32', 'esp32-classic' and 'esp32-combo' on runners with network access, which is the first real compile of this C++. Self check-in scheduled to re-verify.
+
+AC #15 CLOSED via CI. All 11 checks green on e39fc65e: pio run -e esp32, -e esp32-classic and -e esp32-combo all SUCCESS, plus evaluate.py --quick, ADR lint + index-check, claude-review, CodeQL and all four CodeQL Analyze jobs. This is the first successful compile of this port's C++ — it could not be built locally (sandbox proxy 403s GitHub archive/release downloads, so no ESP32 toolchain in the container).
+
+One real defect was found by that first compile and fixed in e39fc65e: the Arduino .ino prototype generator hoists a declaration of every .ino function to the top of the combined TU, ahead of restAPI.ino's type definitions, so rateLimitTryAdmit(ApiRateLimitBudget&, uint32_t) produced a prototype naming an undeclared type and the definition then collided with it ('redeclared as different kind of entity'). All three targets failed on it. Fixed by passing the budget INDEX (uint8_t) and resolving the reference internally; no behavioural change. Hand-verification could not have caught this - the fault is in generated code, not in the source as written, which is exactly why the unbuilt state was flagged rather than glossed.
+
+Remaining open: AC #10 (two-tab starvation, needs two browsers against a bench device) and AC #16 (fresh boot + wiped broker confirming SAT/diag/OTDirect/S0 discovery). Both need hardware. Separately, a sibling otgw-1.x.x task is still needed for the two review defects (telegraf bypass, 429 phase-lock starvation) on that line - it requires its own worktree.
 <!-- SECTION:NOTES:END -->
