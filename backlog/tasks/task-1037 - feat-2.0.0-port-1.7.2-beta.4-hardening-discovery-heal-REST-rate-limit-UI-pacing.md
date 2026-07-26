@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-26 22:06'
-updated_date: '2026-07-26 22:26'
+updated_date: '2026-07-26 22:29'
 labels: []
 dependencies: []
 ordinal: 246000
@@ -70,4 +70,10 @@ Verified: python evaluate.py --quick -> 80 checks, 0 FAIL (1 pre-existing WARN, 
 BLOCKER - firmware build could not run here. ./build.sh --target esp32 fails in toolchain provisioning, not compilation. Two separate environment faults: (1) ~/.platformio/penv had no pip - repaired with ensurepip; (2) the remaining failure is the agent proxy returning 403 for github.com archive/release downloads, so 'uv pip install' cannot fetch the pioarduino platformio-core zip, and ~/.platformio/packages contains only tool-esp_install (the entire ESP32-S3 toolchain and framework are absent). Nothing in this repo can fix that. The C++ in this commit is therefore UNCOMPILED. Verified by hand instead: webPushHeader/webSend overloads match the calls, WEB_MAX_PENDING_HEADERS reaches restAPI.ino via OTGW-firmware.h:930 -> networkStuff.h:32, and the const char[][API_WORD_LEN] parameter conversion is the same one kV2Routes handlers already rely on.
 
 Remaining ACs (10, 15, 16) need a machine that can build and a bench device.
+
+Pushed to claude/otgw-adversarial-review-4wg4uc; draft PR #673 opened against dev (https://github.com/rvdbreemen/OTGW-firmware/pull/673).
+
+CI note: the 'ADR lint + index-check' job failed on the first push with 'ADR-166 (Proposed) is MISSING from docs/adr/README.md'. Confirmed PRE-EXISTING: origin/dev's README has zero ADR-166 references, so index-check was already red on the base branch before this work. Fixed in a follow-up docs-only commit (b4db0ba2) because it is a two-line index entry and it was blocking this PR's checks. Both adr_governance.py lint --strict and index-check now report 0 fail over 173 ADRs locally.
+
+AC #15 (build) is expected to be closed by CI rather than locally: the PR runs 'pio run -e esp32', 'esp32-classic' and 'esp32-combo' on runners with network access, which is the first real compile of this C++. Self check-in scheduled to re-verify.
 <!-- SECTION:NOTES:END -->
