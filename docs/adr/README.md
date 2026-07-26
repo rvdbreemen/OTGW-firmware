@@ -466,6 +466,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-067: SSD1306Ascii Text-Only OLED Library](ADR-067-ssd1306ascii-oled-library.md)** 🆕  
   Use the lighter SSD1306Ascii library for OLED rendering instead of the full Adafruit GFX stack; saves flash and avoids heap allocation. *(Lives here because OLED is bound to the OTA/diagnostics surface; OTGW32-only.)*
 
+- **[ADR-166: Single-app-slot boards — firmware/app OTA is USB-only, filesystem OTA stays on WiFi](ADR-166-single-app-slot-ota-policy.md)** *(Proposed)*  
+  On a 4 MB partition table with one app slot, an app-image OTA write targets the running partition and bricks the device (empirically confirmed, TASK-959). Firmware/app OTA is therefore rejected outright on any board with no spare `ota_X`; LittleFS OTA over WiFi is unaffected. The check is dynamic (`hasSpareAppOtaSlot()` compares the running partition against the next update slot), not board-name-based, so it re-enables itself automatically if a future 8 MB module gains an `ota_1`. Enforced at two layers: the backend before any `Update.begin()`, and the `/update` page hiding the firmware form via `app_ota_available`.
+
 ### OTGW32 and Dual Platform
 
 - **[ADR-063: OTGW32 Hardware Support — Dual Build Targets with Runtime Feature Detection](ADR-063-otgw32-hardware-support.md)** 🆕  
