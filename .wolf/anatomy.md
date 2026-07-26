@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-11T07:09:45.548Z
-> Files: 543 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-07-26T22:31:55.108Z
+> Files: 544 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ../../../Claude/Projects/Kluis/06-claude/
 
@@ -800,6 +800,10 @@
 ## docs/
 
 - `daily-issue-report.md` — Daily Issue Report — 2026-07-11 (~169 tok)
+
+## src/OTGW-firmware/
+
+- `restAPI.ino` — include <string.h> (~57341 tok)
 
 ## src/OTGW-firmware/data/
 

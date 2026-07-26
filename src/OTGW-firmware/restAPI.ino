@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.344
+**  Version  : v2.0.0-alpha.346
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2452,6 +2452,146 @@ static const ApiRoute kV2Routes[] PROGMEM = {
 };
 
 //=======================================================================
+// Poll rate limit (ADR-172) on the endpoints the web UI drives from timers.
+//
+// Every open dashboard costs the gateway its poll rate forever, whether or not
+// anyone is looking at it. A field capture (1.x TASK-1037) recorded two pages
+// sustaining 242 req/min for an hour until the device died. The firmware had no
+// way to say "slow down", so it says it here.
+//
+// The budget is per ENDPOINT and GLOBAL, not per client: capping aggregate load
+// is the whole point, and a per-client budget would let N clients each poll at
+// the full rate.
+//
+// Windows sit at ~75% of the interval the shipped UI actually polls at
+// (OTMONITOR_POLL_MS / DEVTIME_POLL_MS in data/index.js). setInterval is not
+// exact — background throttling and GC shift ticks — so a window equal to the
+// client interval would hand 429s to a well-behaved client for no reason.
+// The coupling is enforced by evaluate.py::check_poll_window_coupling.
+//=======================================================================
+static const char kSubOtmonitor[] PROGMEM = "otmonitor";
+static const char kSubTelegraf[]  PROGMEM = "telegraf";
+static const char kSubTime[]      PROGMEM = "time";
+
+enum : uint8_t { RL_BUDGET_OTMONITOR = 0, RL_BUDGET_DEVICE_TIME, RL_BUDGET_COUNT };
+
+// Route -> budget index. /otgw/otmonitor and /otgw/telegraf are ALIASES: one
+// branch in handleOtgw() calls the same sendOTmonitorV2() and emits the same
+// bytes. They MUST share a budget — giving each its own row would let a caller
+// halve the device's protection just by alternating the two paths.
+// Enforced by evaluate.py::check_api_rate_limit_alias_coverage.
+struct ApiRateLimitRoute { PGM_P resource; PGM_P subresource; uint8_t budget; };
+static const ApiRateLimitRoute kApiRateLimitRoutes[] PROGMEM = {
+  { kRouteOtgw,   kSubOtmonitor, RL_BUDGET_OTMONITOR   },
+  { kRouteOtgw,   kSubTelegraf,  RL_BUDGET_OTMONITOR   },
+  { kRouteDevice, kSubTime,      RL_BUDGET_DEVICE_TIME },
+};
+
+// GCRA (leaky bucket as a virtual clock). Sustained rate is exactly 1 per
+// windowMs with burstTokens of slack.
+//
+// burst 2, not 1, for three reasons:
+//  - a burst-1 window starves the telegraf alias: an agent arriving at a random
+//    phase against one dashboard is refused ~75% of the time (1500/2000) and
+//    Telegraf's inputs.http does not retry. A limiter that includes telegraf
+//    only by making it unusable has not solved anything.
+//  - it is the server half of the anti-starvation fix: two dashboards at the
+//    shipped interval both get served, so the client phase-lock never arms.
+//  - it matches REST_MAX_INFLIGHT 2 (ADR-165) — "sized for two consumers",
+//    said in the time domain instead of the concurrency domain.
+// A flat-out attacker still gets only 40 req/min here (vs the 242 that killed
+// the field device), so the sustained protection is unchanged from 1.x.
+struct ApiRateLimitBudget { uint32_t windowMs; uint32_t tat; uint8_t burstTokens; bool primed; };
+static ApiRateLimitBudget gApiRateLimitBudgets[RL_BUDGET_COUNT] = {
+  { 1500UL, 0, 2, false },   // otmonitor + telegraf  (UI polls at OTMONITOR_POLL_MS = 2000)
+  { 4000UL, 0, 2, false },   // device/time           (UI polls at DEVTIME_POLL_MS  = 5000)
+};
+
+// RFC 9457 problem+json. 429 (RFC 6585) rather than the heap gate's 503: the
+// caller exceeded a quota while the service itself is fine, and an operator
+// reading a log must be able to tell those apart.
+//
+// Stages 4 headers + CORS = 5 of WEB_MAX_PENDING_HEADERS. webPushHeader() drops
+// silently past the cap (webServerCompat.h), so 5 of 6 — DO NOT ADD A SIXTH.
+static_assert(WEB_MAX_PENDING_HEADERS >= 5,
+  "sendApiRateLimited stages 4 headers + CORS; webPushHeader drops silently past the cap (ADR-172)");
+
+static void sendApiRateLimited(uint32_t retryAfterSec, uint32_t windowSec, uint8_t burst) {
+  restResponseStatus = 429;
+  char jsonBuff[360];
+  // retry_after is repeated in the BODY on purpose: Retry-After is not a
+  // CORS-safelisted response header, so headers.get('Retry-After') returns null
+  // for any cross-origin client — exactly the population sendCorsOriginHeader()
+  // exists for. RFC 9457 s3.2 permits extension members.
+  snprintf_P(jsonBuff, sizeof(jsonBuff),
+    PSTR("{\"type\":\"https://github.com/rvdbreemen/OTGW-firmware/problems/rate-limit-exceeded\","
+         "\"title\":\"Rate limit exceeded\",\"status\":429,\"retry_after\":%lu,"
+         "\"detail\":\"This endpoint serves at most 1 request per %lu second(s) "
+         "(burst %u). Retry after %lu second(s).\"}"),
+    (unsigned long)retryAfterSec, (unsigned long)windowSec, (unsigned)burst,
+    (unsigned long)retryAfterSec);
+
+  char hdrBuff[64];
+  snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("%lu"), (unsigned long)retryAfterSec);
+  webPushHeader(F("Retry-After"), hdrBuff);
+  webPushHeader(F("Cache-Control"), F("no-store"));
+  // RateLimit / RateLimit-Policy are an IETF httpapi Internet-Draft, not a
+  // standard, as of July 2026. Sent as extra signal; Retry-After is the part
+  // clients can be relied upon to honour.
+  snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("\"poll\";r=0;t=%lu"), (unsigned long)retryAfterSec);
+  webPushHeader(F("RateLimit"), hdrBuff);
+  snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("\"poll\";q=%u;w=%lu"), (unsigned)burst, (unsigned long)windowSec);
+  webPushHeader(F("RateLimit-Policy"), hdrBuff);
+  sendCorsOriginHeader();
+  webSend(429, F("application/problem+json"), jsonBuff);
+}
+
+// Returns 0 when admitted, else milliseconds until the next token.
+// Signed differences so the 49-day millis() rollover can neither open a hole nor
+// wedge the budget shut. `primed` replaces 1.x's `lastServedMs != 0` sentinel,
+// which granted one free request if a stamp ever landed on millis() == 0.
+//
+// Takes the budget INDEX, not a reference. The Arduino .ino prototype generator
+// hoists a declaration of every .ino function to the top of the combined
+// translation unit, ahead of this file's type definitions — so a user-defined
+// type in the signature produces a prototype referencing an undeclared type and
+// the build fails with "redeclared as different kind of entity". Builtin
+// parameter types keep the generated prototype valid.
+static uint32_t rateLimitTryAdmit(uint8_t budgetIdx, uint32_t now) {
+  ApiRateLimitBudget& b = gApiRateLimitBudgets[budgetIdx];
+  if (!b.primed) { b.primed = true; b.tat = now; }
+  const uint32_t tolerance = (uint32_t)(b.burstTokens - 1) * b.windowMs;
+  const int32_t  early     = (int32_t)((b.tat - tolerance) - now);
+  if (early > 0) return (uint32_t)early;
+  b.tat = (((int32_t)(now - b.tat) > 0) ? now : b.tat) + b.windowMs;
+  return 0;
+}
+
+// Returns false and answers with 429 when the caller is over budget.
+// Only GET is limited: a mutation must never share a budget with a poll.
+static bool checkApiRateLimit(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method) {
+  if (method != HTTP_GET || wc <= 4) return true;
+
+  const uint32_t now = millis();
+  for (size_t i = 0; i < (sizeof(kApiRateLimitRoutes) / sizeof(kApiRateLimitRoutes[0])); i++) {
+    ApiRateLimitRoute rt;
+    memcpy_P(&rt, &kApiRateLimitRoutes[i], sizeof(rt));   // same pattern as kV2Routes
+    if (strcmp_P(words[3], rt.resource)    != 0) continue;
+    if (strcmp_P(words[4], rt.subresource) != 0) continue;
+
+    const uint32_t waitMs = rateLimitTryAdmit(rt.budget, now);
+    if (waitMs == 0) return true;
+    const ApiRateLimitBudget& b = gApiRateLimitBudgets[rt.budget];
+    // Round up so Retry-After never says 0, which would invite an immediate retry.
+    sendApiRateLimited((waitMs + 999UL) / 1000UL,
+                       (b.windowMs + 999UL) / 1000UL,
+                       b.burstTokens);
+    return false;
+  }
+  return true;
+}
+
+//=======================================================================
 void processAPI(AsyncWebServerRequest *request)
 {
   // Bind the per-request context. processAPI is reached from the /api route AND
@@ -2538,6 +2678,15 @@ void processAPI(AsyncWebServerRequest *request)
           if (r.segment == nullptr) break;  // sentinel
           if (strcmp_P(words[3], r.segment) == 0) {
             restResponseStatus = 200; // default; overwritten by sendApiError if handler fails
+            // ADR-172: poll budget for the UI-driven endpoints; answers 429 itself.
+            // Placed after restInFlight++ and the onDisconnect registration above, so
+            // the in-flight counter stays balanced on this early return (same shape as
+            // the 414 / 500 early returns).
+            if (!checkApiRateLimit(words, wc, method)) {
+              RESTDebugTf(PSTR("REST %s %s => 429 rate-limited %lums\r\n"),
+                          httpMethodToStr(method), originalURI, millis() - startMs);
+              return;
+            }
             r.handler(words, wc, method, originalURI);
             RESTDebugTf(PSTR("REST %s %s => %d v2/%S %lums\r\n"), httpMethodToStr(method), originalURI, restResponseStatus, r.segment, millis() - startMs);
             return;

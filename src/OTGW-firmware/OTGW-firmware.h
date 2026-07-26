@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.344
+**  Version  : v2.0.0-alpha.346
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -278,6 +278,7 @@ void doRestart(const char* reason);      // canonical reboot path: flushSettings
 bool     startDiscoveryVerification();
 bool     isDiscoveryVerificationActive();
 uint16_t countPendingDiscoveryIds();
+bool     discoveryDripHeapHealthy();   // ADR-170: drip's own restore predicate, reused by the daily auto-heal
 void     incPublishedTopicCount();    // called by streaming helpers in MQTTHaDiscovery.cpp (ADR-044 shim)
 void sendLogToWebSocket(const char* logMessage);
 
@@ -426,6 +427,10 @@ enum class VerifyOutcome : uint8_t {
 
 struct DiscoverySection {                    // state.discovery — MQTT auto-discovery verify telemetry (ADR-062)
   uint32_t iLastVerifyEpoch         = 0;     // unix-epoch of last endVerify (0 = never)
+  uint32_t iLastDailyHealEpoch      = 0;     // ADR-170: unix-epoch of last daily drip re-announce (0 = never).
+                                             // Under automatic operation iLastVerifyEpoch now only moves on a
+                                             // MANUAL verify, so without this the retained last_verify_epoch
+                                             // topic freezes and reads as "verification is broken" in HA.
   uint32_t iVerifyRunCount          = 0;     // lifetime verify-start counter
   uint32_t iRepublishTriggeredCount = 0;     // lifetime count where missing>0 → markAllMQTTConfigPending
   uint32_t iPublishedTopicCount     = 0;     // running counter incremented by stream helpers after endPublish
