@@ -1,9 +1,11 @@
 ---
 id: TASK-1049
 title: 'Fix mDNS OOM crash: null-check unchecked new in LEAmDNS _readRRAnswer'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-27 20:22'
+updated_date: '2026-07-27 20:24'
 labels:
   - bug
   - mdns
