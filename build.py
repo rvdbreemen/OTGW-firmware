@@ -290,6 +290,52 @@ def install_dependencies(project_dir, config_file):
         print_info(f"Installing {lib}...")
         run_command(cmd_base + ["lib", "install", lib])
 
+    patch_lea_mdns_oom(project_dir)
+
+
+def patch_lea_mdns_oom(project_dir):
+    """Patch ESP8266 core 2.7.4 LEAmDNS: null-safe RRAnswer allocation under OOM.
+
+    Plain 'new stcMDNS_RRAnswerX(...)' in _readRRAnswer() runs the constructor on
+    NULL when the heap is exhausted (core 2.7.4 'new' returns NULL instead of
+    throwing), crashing with Exception (2) epc1=0x40233cba excvaddr=0x00000008.
+    'new (std::nothrow)' makes the compiler emit a null-check before the
+    constructor, so OOM degrades to a dropped mDNS answer (callers already
+    handle a NULL pointer). The core lives under the gitignored arduino/ tree,
+    so this patch is applied on every build; it is idempotent.
+    """
+    target = (project_dir / "arduino" / "packages" / "esp8266" / "hardware" /
+              "esp8266" / "2.7.4" / "libraries" / "ESP8266mDNS" / "src" /
+              "LEAmDNS_Transfer.cpp")
+    if not target.exists():
+        print_warning(f"LEAmDNS patch target not found, skipping: {target}")
+        return
+
+    content = target.read_text(encoding="utf-8")
+    if "std::nothrow" in content:
+        print_info("LEAmDNS OOM patch already applied.")
+        return
+
+    patched = content.replace(
+        '#include "LEAmDNS_lwIPdefs.h"',
+        '#include <new>\n\n#include "LEAmDNS_lwIPdefs.h"', 1)
+    count = 0
+    for rrtype in ("A", "PTR", "TXT", "AAAA", "SRV", "Generic"):
+        old = (f"p_rpRRAnswer = new stcMDNS_RRAnswer{rrtype}(header, u32TTL);\n"
+               f"            bResult = _readRRAnswer{rrtype}(*(stcMDNS_RRAnswer{rrtype}*&)p_rpRRAnswer, u16RDLength);")
+        new = (f"p_rpRRAnswer = new (std::nothrow) stcMDNS_RRAnswer{rrtype}(header, u32TTL);\n"
+               f"            bResult = (p_rpRRAnswer) && _readRRAnswer{rrtype}(*(stcMDNS_RRAnswer{rrtype}*&)p_rpRRAnswer, u16RDLength);")
+        if old in patched:
+            patched = patched.replace(old, new, 1)
+            count += 1
+
+    if count != 6:
+        print_warning(f"LEAmDNS OOM patch matched {count}/6 allocation sites; core layout changed? Not writing.")
+        return
+
+    target.write_text(patched, encoding="utf-8")
+    print_info("LEAmDNS OOM patch applied (6 allocation sites null-safe).")
+
 
 def install_arduino_cli(system):
     """Install arduino-cli if not present. Returns the installation directory."""
