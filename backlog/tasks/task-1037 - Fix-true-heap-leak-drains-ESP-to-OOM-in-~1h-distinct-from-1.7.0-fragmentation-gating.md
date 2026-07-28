@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 09:45'
-updated_date: '2026-07-23 17:00'
+updated_date: '2026-07-28 20:09'
 labels: []
 dependencies: []
 references:
@@ -232,4 +232,6 @@ Heap rotsvlak: freeheap 16976-18400 (~1400B jitter, geen trend), maxblock volgt 
 CAVEAT AC#4: dit is een equivalente-hardware bench (WeMos D1 mini + PIC 6.6, Core 2.7.4), NIET letterlijk reporter-device 48E72958B013. Maar het lek-mechanisme (MQTT-connected + retained HA-configs) is hier reeel uitgeoefend en bleef 5h vlak. Sterk self-verifiable bewijs dat de fix het pad dicht. Resterend echt-wereld gate = AC#5 (reporter martreides 24h op 08d628c).
 
 2026-07-23 BETA PUBLISHED: v1.7.2-beta.4 (commit 221589f) op otgw-1.x.x, GitHub prerelease live met bin+littlefs+SHA256SUMS+flash scripts+bundle. Bevat de discovery-verify leak-fix (393db8b3). CHANGELOG [Unreleased] bijgewerkt (leak-fix voorop). Nieuw: scripts/capture-heap-soak.bat = browser-vrije low-perturbation 24h confirmatie-capture voor testers (complement van capture-heap-onset.bat). Bump beta.3->beta.4 via bin/bump-prerelease.sh, build+eval groen (1 pre-existing baseline ADR-ref failure, unrelated). Discord #beta-testing aankondiging = checkpoint, wacht op user-akkoord. AC#5 (martreides 24h) = na uitrol naar reporter.
+
+2026-07-28 cross-ref: second field case (beta.4 reporter, Pi-hole network) root-caused to DHCP option 42 -> lwIP 2.1.2 SNTP timer-chain leak (TASK-1050, full research there). Explains the residual open question in this task: the ~3900s uptime-locked onset matches DHCP T1 renewal AND/OR second SNTP poll (first sync+3600s); bench non-repro explained (bench router sends no option 42). D-Link at this reporter presumably also sends option 42 with an unsynced NTP responder. Static-IP field test confirmed DHCP path. Fix: sntp_servermode_dhcp(0) in beta.5.
 <!-- SECTION:NOTES:END -->
