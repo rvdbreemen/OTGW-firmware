@@ -124,7 +124,14 @@ void setup() {
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
   WatchDogEnabled(0); // turn off watchdog
-  
+
+  // Ignore DHCP-supplied NTP servers (option 42). lwIP2 is built with
+  // LWIP_DHCP_GET_NTP_SRV=1, so every DHCP renewal would push the router's
+  // NTP server into the SDK SNTP module - leaking heap on routers that send
+  // option 42 (Pi-hole, some D-Link). We run our own NTP via startNTP().
+  // Must run before the persistent-WiFi auto-connect completes DHCP.
+  sntp_servermode_dhcp(0);
+
   SetupDebugln(F("\r\n[OTGW firmware - Nodoshop version]\r\n"));
   SetupDebugf(PSTR("Booting....[%s]\r\n\r\n"), _VERSION);
   

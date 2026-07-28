@@ -32,6 +32,7 @@ inline size_t strlcpy_P(char *dst, PGM_P src, size_t size) {
 
 #include <AceTime.h>
 // #include <TimeLib.h>
+#include <lwip/apps/sntp.h>     // sntp_servermode_dhcp(): ignore DHCP option 42 (TASK-1050)
 
 // DEBUGGING: Uncomment the next line to disable WebSocket functionality
 // #define DISABLE_WEBSOCKET
