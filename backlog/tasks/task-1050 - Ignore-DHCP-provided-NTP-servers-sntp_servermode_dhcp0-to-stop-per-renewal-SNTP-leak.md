@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-28 17:39'
-updated_date: '2026-07-28 17:42'
+updated_date: '2026-07-28 17:49'
 labels:
   - bug
   - network
@@ -24,10 +24,10 @@ Field evidence (beta.4 reporter with Pi-hole DHCP + static-IP fix; pi-hole disco
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 sntp_servermode_dhcp(0) is called at boot before DHCP can deliver option 42
-- [ ] #2 Firmware NTP sync via pool.ntp.org still works (settings-driven loopNTP unaffected)
-- [ ] #3 python build.py --firmware exits 0
-- [ ] #4 python evaluate.py --quick shows no new failures
+- [x] #1 sntp_servermode_dhcp(0) is called at boot before DHCP can deliver option 42
+- [x] #2 Firmware NTP sync via pool.ntp.org still works (settings-driven loopNTP unaffected)
+- [x] #3 python build.py --firmware exits 0
+- [x] #4 python evaluate.py --quick shows no new failures
 - [ ] #5 Field validation: reporter on DHCP (Pi-hole network) survives well past the ~90min renewal boundary on a build with this change
 <!-- AC:END -->
 
@@ -41,4 +41,6 @@ Field evidence (beta.4 reporter with Pi-hole DHCP + static-IP fix; pi-hole disco
 
 <!-- SECTION:NOTES:BEGIN -->
 Scope per user: firmware-side one-liner ONLY, no additional SDK/core patches (the igmp_leavegroup + second UdpContext nullcheck proposals are explicitly out of scope). Include added at OTGW-firmware.h:35; call at top of setup() right after WatchDogEnabled(0). lwip/apps/sntp.h is extern-C-guarded; symbol confirmed present in liblwip2*.a; guarded decl is the real function in our build since SNTP_GET_SERVERS_FROM_DHCP=1.
+
+Built clean: exit 0 + fresh bin (764752B). Committed as 6eceed8f (include OTGW-firmware.h:35, call top of setup()). AC2 rationale: loopNTP/startNTP use configTime with settings-driven hostname (pool.ntp.org) via sntp_setservername; sntp_servermode_dhcp(0) only stops DHCP option-42 injection, does not touch name-based slots. Evaluator: same single pre-existing ADR-087 reference failure, nothing new. Artifact rebuild with commit hash running. AC5 (field validation on Pi-hole network past 90-min boundary) remains open - reporter-gated.
 <!-- SECTION:NOTES:END -->
