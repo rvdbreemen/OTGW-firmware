@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-28 17:39'
-updated_date: '2026-07-28 17:40'
+updated_date: '2026-07-28 17:42'
 labels:
   - bug
   - network
@@ -30,3 +30,15 @@ Field evidence (beta.4 reporter with Pi-hole DHCP + static-IP fix; pi-hole disco
 - [ ] #4 python evaluate.py --quick shows no new failures
 - [ ] #5 Field validation: reporter on DHCP (Pi-hole network) survives well past the ~90min renewal boundary on a build with this change
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Verify LWIP_DHCP_GET_NTP_SRV=1 in prebuilt lwIP2 (done: lwipopts.h:958)\n2. Add #include <lwip/apps/sntp.h> to OTGW-firmware.h\n3. Call sntp_servermode_dhcp(0) at top of setup(), before persistent-WiFi autoconnect completes DHCP\n4. Build + evaluate gates\n5. Test build to reporter (Pi-hole network) for field validation past 90-min renewal boundary
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Scope per user: firmware-side one-liner ONLY, no additional SDK/core patches (the igmp_leavegroup + second UdpContext nullcheck proposals are explicitly out of scope). Include added at OTGW-firmware.h:35; call at top of setup() right after WatchDogEnabled(0). lwip/apps/sntp.h is extern-C-guarded; symbol confirmed present in liblwip2*.a; guarded decl is the real function in our build since SNTP_GET_SERVERS_FROM_DHCP=1.
+<!-- SECTION:NOTES:END -->
