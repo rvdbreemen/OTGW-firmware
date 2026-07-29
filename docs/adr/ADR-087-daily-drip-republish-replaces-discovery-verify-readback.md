@@ -18,6 +18,7 @@ status_history:
     status: Accepted
     changed_by: User
     reason: Maintainer accepted after review; supersedes ADR-062, ships in 1.7.2-beta.3
+    changed_via: adr-kit
 
 ## Context
 

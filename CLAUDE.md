@@ -233,6 +233,12 @@ python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
 python evaluate.py --quick   # Fast check
 ```
 
+### Flashing & Windows quirks
+- **Local (unreleased) build:** `flash_otgw.bat` pulls the GitHub *release*, not `build/`. For a locally-built firmware use `flash_esp.py --firmware build/<..>.ino.bin --filesystem build/<..>.littlefs.bin --port COMx` (no `--erase` preserves WiFi creds).
+- **CH340 flash failure:** every esptool stub upload failing on `0107 Checksum error` (RAM) while the MAC still reads = CH340 signal integrity, not a dead board. Add `--no-stub` to flash via the ROM loader (slow but reliable).
+- **cp1252 console crash:** flash_esp.py/esptool die on `'charmap' codec can't encode 'ℹ'`; prefix `PYTHONIOENCODING=utf-8 PYTHONUTF8=1`.
+- **build.bat on Windows:** run via PowerShell, not git-bash `cmd /c build.bat &` (swallows output, builds unreliably). Verify on `build/*.ino.bin` mtime + "Build completed successfully", not exit 0.
+
 ## Settings & State Architecture (ADR-051)
 
 - `OTGWSettings settings` — persistent, serialized to LittleFS as JSON
