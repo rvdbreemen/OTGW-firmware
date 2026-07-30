@@ -2,15 +2,24 @@
 
 Canonical locations for release documentation:
 
-- **Current/active release notes**: `docs/releases/`
-- **Archived historical release notes**: `docs/releases/archive/`
+- **Current release notes** (the release on `main`): repository root, as `RELEASE_NOTES_<version>.md`
+- **Previous release notes**: `docs/releases/`
+- **Archived historical release notes** (pre-1.3.5): `docs/releases/archive/`
 
-## Current release notes
+Each release also has a GitHub release body, kept alongside its notes as `RELEASE_GITHUB_<version>.md`.
 
-- [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md)
-- [RELEASE_NOTES_1.5.0-beta.md](RELEASE_NOTES_1.5.0-beta.md)
-- [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md)
-- [RELEASE_NOTES_1.3.5.md](RELEASE_NOTES_1.3.5.md)
+## Previous release notes
+
+- [RELEASE_NOTES_1.7.1.md](RELEASE_NOTES_1.7.1.md) ([GitHub body](RELEASE_GITHUB_1.7.1.md))
+- [RELEASE_NOTES_1.7.0.md](RELEASE_NOTES_1.7.0.md) ([GitHub body](RELEASE_GITHUB_1.7.0.md))
+- [RELEASE_NOTES_1.7.0-beta.md](RELEASE_NOTES_1.7.0-beta.md)
+- [RELEASE_NOTES_1.6.1.md](RELEASE_NOTES_1.6.1.md) ([GitHub body](RELEASE_GITHUB_1.6.1.md))
+- [RELEASE_NOTES_1.6.0.md](RELEASE_NOTES_1.6.0.md) ([GitHub body](RELEASE_GITHUB_1.6.0.md))
+- [RELEASE_NOTES_1.6.0-beta.md](RELEASE_NOTES_1.6.0-beta.md)
+- [RELEASE_NOTES_1.5.0.md](RELEASE_NOTES_1.5.0.md) ([GitHub body](RELEASE_GITHUB_1.5.0.md))
+- [RELEASE_NOTES_1.5.0-beta.md](RELEASE_NOTES_1.5.0-beta.md) ([GitHub body](RELEASE_GITHUB_1.5.0-beta.md))
+- [RELEASE_NOTES_1.4.1.md](RELEASE_NOTES_1.4.1.md) ([GitHub body](RELEASE_GITHUB_1.4.1.md))
+- [RELEASE_NOTES_1.3.5.md](RELEASE_NOTES_1.3.5.md) ([GitHub body](RELEASE_GITHUB_1.3.5.md))
 
 ## Archived release notes
 
