@@ -8,6 +8,10 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+## [1.7.2] - 2026-07-30
+
+Long-run stability release for the 1.x (ESP8266) line: two genuine heap leaks fixed, both of which drained long-running devices to an out-of-memory reboot after roughly 1 to 1.5 hours. v1.7.0 fixed heap fragmentation; this release fixes the leaks that remained. No breaking changes versus v1.7.1. Full notes: [RELEASE_NOTES_1.7.2.md](RELEASE_NOTES_1.7.2.md).
+
 ### Fixed
 - Heap leak on every DHCP lease renewal on networks whose DHCP server advertises an NTP server (option 42), for example Pi-hole and some D-Link routers. The prebuilt lwIP2 in core 2.7.4 is compiled with `LWIP_DHCP_GET_NTP_SRV=1`, so each renewal pushed the router's NTP server into the SDK SNTP module and leaked memory until the device ran out and rebooted. Field signature was an uptime-locked onset at the first lease renewal (typically around 90 minutes) followed by a reset, which looked like the discovery-republish leak but is a separate cause. The firmware runs its own NTP client, so DHCP-supplied servers were never wanted: `sntp_servermode_dhcp(0)` is now called at the top of `setup()`, before the persistent-WiFi auto-connect can complete DHCP. (TASK-1050)
 - Crash when an mDNS answer arrived while the heap was exhausted (`Exception (2) epc1=0x40233cba excvaddr=0x8`). Plain `new` in ESP8266 core 2.7.4 returns NULL on failure but still runs the constructor, so the six `stcMDNS_RRAnswer` allocation sites in `_readRRAnswer()` dereferenced NULL. They now use `new (std::nothrow)` with a null guard; the callers already handled a NULL answer. The core tree is gitignored, so `build.py` re-applies this patch idempotently after every core install. (TASK-1049)

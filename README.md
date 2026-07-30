@@ -4,9 +4,25 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.1](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.1), a Home Assistant integration release adding cooling support to the climate entity plus new gateway and device-health auto-discovery sensors.
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.2), a long-run stability release fixing two heap leaks that drained long-running devices to an out-of-memory reboot.
 
-## What's New in v1.7.1
+## What's New in v1.7.2
+
+v1.7.2 is a long-run stability release for the 1.x (ESP8266) line. v1.7.0 fixed heap *fragmentation*; this release fixes the two genuine heap *leaks* that were still draining devices to an out-of-memory reboot after roughly 1 to 1.5 hours. No breaking changes versus v1.7.1.
+
+- **Heap leak fixed: MQTT discovery-verify retry storm.** The automatic discovery-verify read back only a fraction of the retained configs under the reduced PubSubClient buffer, falsely declared the rest missing, and triggered a republish that re-armed every hour. That loop leaked until the device ran out of memory. The verify readback is removed; the daily auto-heal is now an unconditional, heap-gated drip republish. Bench-confirmed over a 5 hour soak. (TASK-1037, TASK-1048, ADR-087)
+- **Heap leak fixed: DHCP-supplied NTP servers (option 42).** On networks whose DHCP server advertises an NTP server (Pi-hole, several D-Link routers), every lease renewal leaked memory through the SDK's SNTP module. The firmware runs its own NTP client, so `sntp_servermode_dhcp(0)` now disables this at boot. The field signature was an uptime-locked reboot around 90 minutes. (TASK-1050)
+- **Crash fixed: mDNS answer on an exhausted heap.** The six `stcMDNS_RRAnswer` allocation sites now use `new (std::nothrow)` with a null guard, so out-of-memory drops the answer instead of faulting the device. Patched into the core at build time. (TASK-1049)
+- **Less periodic churn**: NTP resyncs once per day instead of every 30 minutes, the web UI ticks its clock locally and polls less, and the two UI-polled REST endpoints are rate-limited to 1 request per second server-side. (TASK-1043, TASK-1044, TASK-1046, ADR-086)
+- Also fixed: gateway-mode and OTGW-connected discovery entities are queued at boot, so they publish once and self-heal instead of appearing only after a mode change. (TASK-1035)
+
+Flash **both** firmware and filesystem: the reduced polling lives in the web assets.
+
+Full release notes: [RELEASE_NOTES_1.7.2.md](RELEASE_NOTES_1.7.2.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
+
+## What was new in v1.7.1
 
 v1.7.1 is a Home Assistant integration release for the 1.x (ESP8266) line. No breaking changes versus v1.7.0.
 
@@ -16,7 +32,7 @@ v1.7.1 is a Home Assistant integration release for the 1.x (ESP8266) line. No br
 - **Device-health sensors**: uptime, unsupported-message-id count, and the heap-fragmentation back-off counters (`http_fragskips` / `mqtt_fragskips` / `ws_fragskips`) are now auto-discovery sensors.
 - Fixes: a compile break (missing seconds unit) that kept the previous betas from shipping, so these entities reach devices for the first time; a stale Mosquitto winget package ID in the `capture-mqtt-debug` helper.
 
-Full release notes: [RELEASE_NOTES_1.7.1.md](RELEASE_NOTES_1.7.1.md)
+Full release notes: [docs/releases/RELEASE_NOTES_1.7.1.md](docs/releases/RELEASE_NOTES_1.7.1.md)
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
 
@@ -103,11 +119,18 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.7.1
+## Latest stable release: v1.7.2
 
-`v1.7.1` is the current stable release on `main`. It adds cooling support to the Home Assistant climate entity (a unified off/heat/cool entity for heatpump and Heat/Cool-thermostat users), plus gateway-mode, OTGW-connected, uptime and heap-health auto-discovery sensors.
+`v1.7.2` is the current stable release on `main`. It fixes two genuine heap leaks that drained long-running devices to an out-of-memory reboot after roughly 1 to 1.5 hours (the MQTT discovery-verify retry storm, and DHCP-supplied NTP servers via option 42), plus the mDNS out-of-memory crash that was their visible symptom.
 
-Full release notes: [RELEASE_NOTES_1.7.1.md](RELEASE_NOTES_1.7.1.md)
+Full release notes: [RELEASE_NOTES_1.7.2.md](RELEASE_NOTES_1.7.2.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.2)
+
+## Previous stable release: v1.7.1
+
+`v1.7.1` added cooling support to the Home Assistant climate entity (a unified off/heat/cool entity for heatpump and Heat/Cool-thermostat users), plus gateway-mode, OTGW-connected, uptime and heap-health auto-discovery sensors.
+
+Full release notes: [docs/releases/RELEASE_NOTES_1.7.1.md](docs/releases/RELEASE_NOTES_1.7.1.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.1)
 
 ## Previous stable release: v1.7.0

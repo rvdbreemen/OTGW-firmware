@@ -4,6 +4,24 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.7.2
+
+**No breaking changes versus v1.7.1.** No MQTT topic renames, no REST API removals, no settings-format changes, and no migration on upgrade.
+
+### Behaviour change: two REST endpoints are rate-limited to 1 request per second (ADR-086)
+
+`/api/v2/otgw/otmonitor` and `/api/v2/device/time` now enforce a 1 request per second budget per caller. A caller over budget receives HTTP `429` with an RFC 9457 `application/problem+json` body instead of the data. These are the two endpoints the web UI polls, and the UI was changed in the same release to stay well inside the budget.
+
+Impact is limited to custom tooling: a script or a Home Assistant REST sensor polling either endpoint faster than once per second will start seeing `429`. Slow the poll to 1 second or handle the response. Every other REST endpoint is unaffected, and the Home Assistant integration path is MQTT, not REST polling, so standard HA setups see no change.
+
+### Behaviour change: MQTT discovery-verify readback removed (ADR-087, supersedes ADR-062)
+
+The automatic discovery-verify that subscribed to `homeassistant/+/<node>/#`, counted retained configs, and republished what it believed was missing, is removed. It leaked heap through a false-missing to republish loop that re-armed hourly. The daily auto-heal is now an unconditional, heap-gated drip republish of the retained discovery configs, and the hourly first-run retry is deleted.
+
+No user-facing configuration changes and no topics change shape. The visible difference is that discovery self-healing is now time-based (a daily drip) rather than triggered by a verify result, so a manually cleared retained config heals on the next drip rather than within the hour.
+
+---
+
 ## v1.7.1
 
 **No breaking changes versus v1.7.0.**
