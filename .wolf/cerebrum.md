@@ -68,6 +68,42 @@ Moved TASK-687 to In Progress on the basis of its title, then found it carried
 milestone 3.0.0 and an explicit maintainer parking decision. Read the frontmatter
 milestone and the tail of Implementation Notes BEFORE flipping status.
 
+### 2026-08-01: A 100% survival rate in an adversarial verify means the verifiers rubber-stamped
+The dead-code workflow returned 43 candidates and 43 survivals, with verifiers
+explicitly told to default to not-dead. Hand-checking a sample found two false
+positives (bleMatchesConfiguredMAC, live in tests/; OTValueType, documented in
+docs/). Treat a zero-refutation rate as a smell, not a success, and spot-check
+before acting.
+
+### 2026-08-01: Scope the reference search wider than src/ before calling a symbol dead
+"Unreferenced" is scope-relative. src/-only, src/+tests/, and whole-repo gave
+three different answers. Always check evaluate.py, tests/ and docs/ before
+deleting: a gate that greps a function body by name breaks silently, and a
+documented type costs doc churn.
+
+### 2026-08-01: Count symbol FAMILIES, not just individual symbols
+The sweep found print_flag8 but missed print_flag8flag8. Listing every print_*
+in OTGW-Core.ino with its reference count made both obvious at a glance: every
+other member had a caller, those two had none.
+
+### 2026-08-01: The off-branch of a HAS_* flag is not dead code
+A capability flag's #else exists so a future board can turn the feature off.
+Deleting it converts a working fallback into a compile error. Only remove a
+branch when the flag is a platform discriminator that can never vary (e.g.
+HAS_FRAGMENTATION_AWARE_HEAP_GATE, ESP8266-vs-ESP32 on an ESP32-only line).
+
+### 2026-08-01: Never launch a second build while one is running in this worktree
+Two concurrent build.bat runs share .pio/build and fail with Windows error
+3221225794 (0xC0000142, STATUS_DLL_INIT_FAILED) on dozens of framework objects
+- it looks like a toolchain meltdown, not a collision. Recovery: rm -rf the
+affected .pio/build/<env> and rebuild solo. Build targets SERIALLY in the
+foreground (each fits inside the 600s tool timeout).
+
+### 2026-08-01: Brace-match when scripting code deletion; never end on a bare "}"
+Cutting a JS function by "first line whose strip() == '}'" truncated
+safeGetElementById at its inner if-block brace and broke index.js. Use a real
+brace matcher that skips strings and comments, and run node --check afterwards.
+
 ## Decision Log
 
 - 2026-05-05: MQTT discovery drip policy is platform-aware on 2.0.0. ESP8266 keeps the existing `HEAP_LOW` / 2000ms cooldown behavior; ESP32 uses a shorter status-burst cooldown and only enters discovery slow-mode when both free heap and largest allocatable block are genuinely low.
