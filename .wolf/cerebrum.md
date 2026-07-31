@@ -41,6 +41,33 @@
 - **2026-05-29**: Do NOT run `pio run -e esp8266` and `pio run -e esp32` in parallel in the same worktree to "build in parallel". The arduino sketch-concat step (.ino -> .ino.cpp) shares an intermediate across envs even though each env has its own `.pio/build/<env>` dir; concurrent runs race and one env fails with `OTGW-firmware.ino.cpp: No such file or directory`. Firmware builds must be serial per tree; only `buildfs` (filesystem, no concat) parallelizes safely. For true parallel firmware builds use separate git worktrees. Recovery: `rm -rf .pio/build/<env>` then rebuild that env solo. See buglog bug-073.
 <!-- Format: [YYYY-MM-DD] Description of what went wrong and what to do instead. -->
 
+### 2026-07-31: Fetch origin before analysing branch state
+Analysed dev for 1.x-port candidates against a local tree that was 6 commits
+behind origin/dev, and created five backlog tasks. Three were already done
+upstream (24be052f2, ADR-170/172/173). Always `git fetch` and check
+`git rev-list --left-right --count HEAD...origin/<branch>` BEFORE any
+cross-branch gap analysis, not after the tasks are written.
+
+### 2026-07-31: A conflict marker in a shared header lies about where the error is
+`version.h` held an unresolved stash-pop conflict whose two sides were
+byte-identical apart from CRLF vs LF. The build failed with ~40 AceTime
+'acetime_t does not name a type' errors and ONE real line:
+`version.h:8:1: error: version control conflict marker in file`. When a build
+suddenly fails inside a dependency, grep the log for the FIRST `error:` line
+before believing the cascade. Logged as bug-150.
+
+### 2026-07-31: An Accepted ADR can still contradict itself on surfaces it did not enumerate
+ADR-167 item 1 said delete the heap tier-entry counters; item 4 said preserve
+heap observability. Neither noticed the counters feed three MQTT stats topics,
+three HA discovery entities, REST fields and the web UI. Before executing an
+ADR's removal list, grep each named symbol for downstream consumers and take
+published contracts back to the maintainer rather than resolving it yourself.
+
+### 2026-07-31: Check milestone + parking notes before picking up an old task
+Moved TASK-687 to In Progress on the basis of its title, then found it carried
+milestone 3.0.0 and an explicit maintainer parking decision. Read the frontmatter
+milestone and the tail of Implementation Notes BEFORE flipping status.
+
 ## Decision Log
 
 - 2026-05-05: MQTT discovery drip policy is platform-aware on 2.0.0. ESP8266 keeps the existing `HEAP_LOW` / 2000ms cooldown behavior; ESP32 uses a shorter status-burst cooldown and only enters discovery slow-mode when both free heap and largest allocatable block are genuinely low.
