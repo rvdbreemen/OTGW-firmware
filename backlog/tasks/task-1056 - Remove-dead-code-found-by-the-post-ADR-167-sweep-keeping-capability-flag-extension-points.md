@@ -3,7 +3,7 @@ id: TASK-1056
 title: >-
   Remove dead code found by the post-ADR-167 sweep, keeping capability-flag
   extension points
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-31 22:26'
