@@ -4,6 +4,7 @@ title: 'adr-kit WS3: ''adr index'' generator (README from files, --check mode)'
 status: To Do
 assignee: []
 created_date: '2026-07-04 16:31'
+updated_date: '2026-07-06 19:54'
 labels:
   - adr-kit
   - governance
@@ -23,3 +24,13 @@ The hand-maintained index rotted (19 missing, 12 stale labels, a dup, wrong coun
 - [ ] #2 adr index --check green immediately after generation; idempotent
 - [ ] #3 Human narrative sections preserved via sentinels
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Codex
+created: 2026-07-06 19:54
+---
+Moved to adr-kit backlog as TASK-19; original OTGW task archived because the work belongs to the adr-kit repo board.
+---
+<!-- COMMENTS:END -->

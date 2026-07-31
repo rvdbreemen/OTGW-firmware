@@ -4,7 +4,7 @@ title: 'Modbus TCP client for heat pump integration (ESP32-only, experimental)'
 status: To Do
 assignee: []
 created_date: '2026-05-20 18:31'
-updated_date: '2026-05-20 21:33'
+updated_date: '2026-07-09 21:58'
 labels:
   - feature
   - esp32-only
@@ -14,6 +14,7 @@ labels:
   - energy
   - milestone-v2.1.0
   - deferred-from-v2.0.0
+milestone: 2.1.0
 dependencies:
   - TASK-640
 priority: low
@@ -79,3 +80,9 @@ Related: TASK-640 (narrative dependency, not blocking — feature is architectur
 - [ ] #34 First-poll burst publish: on subsystem (re)start (boot, re-enable, register map reload), the first successful poll publishes ALL register values via modbusPublishMQTT() regardless of the publish-interval gating. Prevents HA from showing 'unknown' for up to one heartbeat interval after boot
 - [ ] #35 Discovery orphan cleanup on register map reload: when a register is removed from modbus.json and the map is reloaded, the previously published retained HA discovery topics for that register MUST be cleared (empty retained payload), AND retained value topics under <topPrefix>/value/<nodeId>/modbus/<removed_name> MUST be cleared. Follows ADR-093 orphan cleanup policy. Verify HA entity disappears within one discovery cycle
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-07-09: deferred to release 2.1.0 per maintainer — Modbus TCP heat-pump client is experimental, out of the 2.0.0 drain scope.
+<!-- SECTION:NOTES:END -->

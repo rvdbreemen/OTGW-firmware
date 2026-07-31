@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-04 16:30'
-updated_date: '2026-07-04 16:46'
+updated_date: '2026-07-06 19:54'
 labels:
   - adr-kit
   - governance
@@ -28,3 +28,13 @@ Reconciliation: adr-kit already has overlapping roadmap tasks (TASK-417..424, 74
 
 Proof landed for WS2/WS3/WS6 (repo-local): scripts/adr_governance.py + CI workflow + unit tests; live docs/adr tree now lint-clean and fully indexed (164 ADRs, 0 missing, 0 dup). The governance tool found and closed 24 index gaps beyond the audit window (ADR-91..120). WS1/WS4/WS5/WS7 remain adr-kit-repo work (reconcile with TASK-422/424).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Codex
+created: 2026-07-06 19:54
+---
+Moved to adr-kit backlog as TASK-16; original OTGW task archived because the work belongs to the adr-kit repo board.
+---
+<!-- COMMENTS:END -->

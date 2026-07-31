@@ -27,6 +27,7 @@
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_flash.h>
+#include <esp_sntp.h>            // esp_sntp_servermode_dhcp() (platformIgnoreDhcpNtp)
 #include <lwip/priv/tcp_priv.h>  // tcp_active_pcbs (platformTcpActivePcbCount)
 #include <lwip/tcpip.h>          // LOCK_TCPIP_CORE/UNLOCK_TCPIP_CORE (platformTcpActivePcbCount)
 
@@ -206,6 +207,20 @@ inline char platformGetResetReasonChar() {
 // shared startNTP() code path stays platform-neutral.
 inline void platformNtpHostnameFix(const char *hostname) {
   (void)hostname;
+}
+
+// Refuse DHCP-supplied NTP servers (DHCP option 42). The Arduino-ESP32 esp32s3
+// sdkconfig ships CONFIG_LWIP_DHCP_GET_NTP_SRV=y, so lwIP hands every
+// DHCP-offered NTP server to the SNTP module on each lease renewal. On the
+// ESP8266 line the same setting leaked heap every renewal on routers that
+// actually send option 42 (Pi-hole, some D-Link), with a field signature of an
+// uptime-locked heap onset at the T1 renewal followed by a reboot (1.x
+// TASK-1050). We configure our own server in startNTP(), so a DHCP-supplied
+// one is unwanted regardless of whether it leaks here.
+//
+// Must be called before the persistent-WiFi auto-connect can complete DHCP.
+inline void platformIgnoreDhcpNtp() {
+  esp_sntp_servermode_dhcp(0);
 }
 
 // Heap information

@@ -3,10 +3,10 @@ id: TASK-961
 title: >-
   Web server (port 80) does not start on the first boot after WiFiManager
   provisioning — recovers on next reboot
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-30 22:07'
-updated_date: '2026-07-09 21:26'
+updated_date: '2026-07-09 22:24'
 labels: []
 dependencies: []
 ordinal: 173000
@@ -33,4 +33,6 @@ Reproduced live 2026-07-05 on classic-S3 + PIC 6.6 (alpha.327+827abbc). After Wi
 Independently reproduced 2026-07-06 on Classic-S3 COM8 (192.168.88.64) during TASK-1016 provisioning: first boot after SoftAP provisioning had telnet/OT/MQTT alive but HTTP port 80 actively refused (curl 000). A --update re-flash (forces reboot, preserves WiFi creds) fixed it immediately — HTTP 200 + WS 101 after. Confirms AC#1 repro on current HEAD (alpha.328+f32071c), not just the older 02f64705 build.
 
 2026-07-09 drain review: cannot fully close autonomously — AC#1/#3 require a real provisioning cycle (wipe WiFi creds -> SoftAP -> enter WiFi credentials -> reboot -> check port 80). Entering WiFi credentials is a user/credential action I do not perform, and wiping creds would drop the bench device off the network mid-drain. Kept open for a maintainer-driven provisioning cycle; the fix direction (re-begin the AsyncWebServer after the STA IP is up, or cleanly tear down the captive-portal server) is documented in the description.
+
+2026-07-10: closed + archived per maintainer. Port-80-not-listening-on-first-boot-after-provisioning — closing without a dedicated repro (needs a provisioning cycle with WiFi credentials); a plain reboot recovers it and the maintainer chose to close.
 <!-- SECTION:NOTES:END -->

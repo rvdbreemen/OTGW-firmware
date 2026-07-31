@@ -1,10 +1,10 @@
 ---
 id: TASK-950
 title: 'Combo: gate IMU probe on persisted boardmode WITHOUT the boot-hang reorder'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-29 18:36'
-updated_date: '2026-07-09 21:26'
+updated_date: '2026-07-09 22:24'
 labels:
   - async-esp32s3
 dependencies: []
@@ -29,4 +29,6 @@ Deferred from TASK-949. Goal (maintainer design): on a cached/forced boot, SKIP 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-07-09 drain review: kept open — high boot-hang risk. TASK-949's attempt to get iBoardMode before the IMU probe (by moving LittleFS.begin+readSettings to setup() top) HUNG boot on real hardware (reverted d7a34f4a). A safe fix needs a minimal dependency-free early read of just the boardmode key (or an RTC/NVS cache) without relocating readSettings — delicate, and a wrong move hangs the bench boards (USB-reflash recovery only). Related to today's TASK-1031 work but distinct. This one warrants a dedicated careful session with on-device boot verification, not an aggressive-drain pass, per the boot-hang landmine.
+
+2026-07-10: closed + archived per maintainer. Combo IMU-probe gating on cached boot deferred/dropped — the boot-hang landmine (TASK-949 hung boot on the reorder) makes it not worth the risk vs the small benefit; the current unconditional IMU probe is benign in practice.
 <!-- SECTION:NOTES:END -->

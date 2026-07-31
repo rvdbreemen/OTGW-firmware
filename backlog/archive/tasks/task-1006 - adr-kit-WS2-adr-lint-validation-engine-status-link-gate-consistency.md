@@ -4,7 +4,7 @@ title: 'adr-kit WS2: ''adr lint'' validation engine (status/link/gate consistenc
 status: To Do
 assignee: []
 created_date: '2026-07-04 16:31'
-updated_date: '2026-07-04 16:38'
+updated_date: '2026-07-06 19:54'
 labels:
   - adr-kit
   - governance
@@ -30,3 +30,13 @@ Replace human review of ADR consistency; make ADR-080 machine-checked. Rules: sc
 <!-- SECTION:NOTES:BEGIN -->
 Reconcile with TASK-422 (adr-kit v0.10 standalone adr-lint CLI for CI): this WS2 overlaps; extend 422 with the ADR-080 gate-existence rule and status<->superseded_by reciprocity rather than duplicate.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Codex
+created: 2026-07-06 19:54
+---
+Moved to adr-kit backlog as TASK-18; original OTGW task archived because the work belongs to the adr-kit repo board.
+---
+<!-- COMMENTS:END -->

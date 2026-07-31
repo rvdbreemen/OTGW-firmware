@@ -3,9 +3,10 @@ id: TASK-892
 title: >-
   SAT hybrid systems: slave OTGW -> master OTGW coordination (heat pump +
   separate gas boiler)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-06-20 21:11'
+updated_date: '2026-07-09 22:24'
 labels: []
 milestone: 2.0.0
 dependencies: []
@@ -25,3 +26,9 @@ From #dev-sat-mqtt 2026-06-20 (George + Robert). Hybrid installs run a heat pump
 - [ ] #2 Master SAT consumes the gas-boiler-firing signal and factors it into hybrid control decisions.
 - [ ] #3 Field-validate on Robert's two-OTGW (Elga heat pump + gas boiler) setup.
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-07-10: closed + archived per maintainer. SAT hybrid-systems slave/master OTGW coordination (heat pump + separate gas boiler) — the larger coordination feature requires the maintainer's own two-OTGW Elga+gas hardware to design+field-validate (AC#3); the KISS manual hybrid device-type is already handled in TASK-891.8 (Done). Closed as a maintainer scope decision; can be reopened as a fresh 2.1.0+ feature if pursued.
+<!-- SECTION:NOTES:END -->

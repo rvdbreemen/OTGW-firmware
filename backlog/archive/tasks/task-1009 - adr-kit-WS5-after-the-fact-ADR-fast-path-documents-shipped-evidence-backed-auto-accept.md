@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-04 16:31'
+updated_date: '2026-07-06 19:54'
 labels:
   - adr-kit
   - governance
@@ -26,3 +27,13 @@ ordinal: 221000
 - [ ] #3 Broken pointer or documents_shipped:false does NOT auto-accept
 - [ ] #4 auto vs assist strictness configurable
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Codex
+created: 2026-07-06 19:54
+---
+Moved to adr-kit backlog as TASK-21; original OTGW task archived because the work belongs to the adr-kit repo board.
+---
+<!-- COMMENTS:END -->

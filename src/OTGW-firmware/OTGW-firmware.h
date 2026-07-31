@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.347
+**  Version  : v2.0.0-alpha.348
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -126,7 +126,7 @@ void setLed(uint8_t, uint8_t);
 #define SETTINGS_FILE         "/settings.ini"
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"
-#define NTP_RESYNC_TIME 1800 //seconds = every 30 minutes
+#define NTP_RESYNC_TIME 86400 //seconds = once per day. Was 1800 (30 min); raised on the 1.x line under TASK-1046 while hunting a recurring SNTP allocation cycle, and ported here as TASK-1051. NTP still syncs at boot, and 24h of drift stays far below the 1s the UI displays.
 #define HOME_ASSISTANT_DISCOVERY_PREFIX   "homeassistant"  // Home Assistant discovery prefix
 #define CMSG_SIZE  512   // General-purpose scratch buffer (webhook, REST API, JSON, MQTT topic render).
                          // All known users need ≤512 bytes.  MQTT autoconfig reads templates

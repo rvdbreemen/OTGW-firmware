@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-07-04 16:31'
+updated_date: '2026-07-06 19:54'
 labels:
   - adr-kit
   - governance
@@ -26,3 +27,13 @@ Whenever ADR skills run, check whether the index needs regenerating and whether 
 - [ ] #3 A shipped-but-Proposed ADR is surfaced as a fast-path candidate
 - [ ] #4 Material drift auto-triggers an audit pass
 <!-- AC:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+author: Codex
+created: 2026-07-06 19:54
+---
+Moved to adr-kit backlog as TASK-22; original OTGW task archived because the work belongs to the adr-kit repo board.
+---
+<!-- COMMENTS:END -->
