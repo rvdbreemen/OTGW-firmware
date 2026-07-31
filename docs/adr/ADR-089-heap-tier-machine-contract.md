@@ -2,7 +2,25 @@
 
 ## Status
 
-Accepted. Date: 2026-04-26. Amends ADR-030 (4-state heap health system) by re-baselining tier thresholds on Crashevans field-log evidence (TASK-344), adding fragmentation-aware promotion (HEAP_FRAG_PROMOTE_MAXBLOCK), and adding tier-entry counter instrumentation (TASK-346).
+Superseded by ADR-167. Date superseded: 2026-07-31 (TASK-1036).
+
+Originally: Accepted. Date: 2026-04-26. Amends ADR-030 (4-state heap health system) by re-baselining tier thresholds on Crashevans field-log evidence (TASK-344), adding fragmentation-aware promotion (HEAP_FRAG_PROMOTE_MAXBLOCK), and adding tier-entry counter instrumentation (TASK-346).
+
+The decision text below is preserved unedited per the immutability rule. It remains binding on the `otgw-1.x.x` ESP8266 line, whose own ADR numbering is independent. On `dev` (ESP32-S3-only, 2.0.0) ADR-167 retired it: the re-baselined 1536/3072/5120 ladder reverted to ADR-030's 3072/5120/8192, the fragmentation-aware promotion was removed, and sub-rule 4's consumer-side throttling collapsed to a CRITICAL-only block. Sub-rule 3's tier-entry counters were deliberately KEPT on `dev` as telemetry (they feed published MQTT stats topics and HA entities), but they are no longer a gate input and no longer carry a CI gate. The three named `evaluate.py` gates for sub-rules 1-3 were removed in the same commit, per ADR-080.
+
+## Status History
+
+status_history:
+  - date: 2026-04-26
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Captures the drifted-but-real heap tier contract (re-baselined thresholds per TASK-344, fragmentation-aware promotion, tier-entry counters per TASK-346) and brings its three binding sub-rules under ADR-080 governance with named CI gates.
+    changed_via: adr-kit
+  - date: 2026-07-31
+    status: Superseded
+    changed_by: Maintainer (Robert van den Breemen), applied by Agent under TASK-1036
+    reason: Superseded by ADR-167 on the ESP32-S3-only dev branch. Sub-rule 1's ESP8266-tuned ladder reverted to ADR-030's 3072/5120/8192, sub-rule 2's fragmentation-aware promotion was deleted, and sub-rule 4's consumer throttling collapsed to a CRITICAL-only block. Sub-rule 3's tier-entry counters were kept as telemetry (published MQTT stats topics + HA entities) but no longer gate anything. The three named evaluate.py gates were removed in the same commit per ADR-080. Remains in force on otgw-1.x.x.
+    changed_via: adr-kit
 
 ## Context
 

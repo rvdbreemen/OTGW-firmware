@@ -2,13 +2,15 @@
 
 ## Status
 
-Proposed. Date: 2026-07-06.
+Accepted. Date: 2026-07-31.
 
-This ADR documents a decision to remove code in a separate follow-up
-implementation task. It does NOT flip to Accepted here: acceptance
-(including whether the evidence below is sufficient, or whether a longer
-soak is required first) is the maintainer's own determination, made later.
-See "Evidence Limitations" in Context.
+The maintainer's accept-readiness review, which the Proposed status was
+waiting on, has been given: the 10-hour representative-load soak is
+accepted as sufficient evidence and no longer soak is required. The
+Evidence Limitations recorded in Context stand as disclosed and are not
+retracted by acceptance; they describe the bounds of the evidence, not a
+defect in the decision. Removal of the machinery remains a separate
+implementation task (TASK-1036, Phase-3).
 
 ## Status History
 
@@ -17,6 +19,11 @@ status_history:
     status: Proposed
     changed_by: Agent (adr-generator, on maintainer instruction)
     reason: Documents the maintainer-authorized decision to retire ADR-089/ADR-121 heap-tier gating on the ESP32-S3-only dev branch, backed by TASK-956 soak evidence. Removal itself is deferred to a Phase-3 follow-up task (TASK-956 AC#4, not yet created). Status intentionally stays Proposed pending the maintainer's own accept-readiness review.
+    changed_via: adr-kit
+  - date: 2026-07-31
+    status: Accepted
+    changed_by: Maintainer (Robert van den Breemen), applied by Agent
+    reason: Maintainer accept-readiness review completed and acceptance instructed directly. adr-kit quality gates scored A (0.92 overall) with Completeness 1.0, Evidence 0.80, Clarity 0.80, Consistency 1.0; the only open findings are two low-severity nits (no external https link, undefined acronyms) which do not affect the decision. Phase-3 removal proceeds under TASK-1036.
     changed_via: adr-kit
 
 ## Context
@@ -251,7 +258,7 @@ decision record without prematurely claiming sufficiency.
   127.7-minute reboot gap mid-run).
 
 Enforcement section omitted: this ADR documents a decision to remove
-enforcement machinery in a future task. As Proposed, it carries no code
-surface of its own to enforce; the actual removal, and any retirement of
-the `evaluate.py` gates, is the Phase-3 follow-up task's job, not this
-ADR's.
+enforcement machinery in a separate task. It carries no code surface of
+its own to enforce; the actual removal, and the retirement of the four
+`evaluate.py` gate functions listed above, is TASK-1036's job (Phase-3),
+not this ADR's.

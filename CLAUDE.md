@@ -233,7 +233,7 @@ ADRs in `docs/adr/`. Read before changes to: architecture, NFRs, API contracts, 
 **Binding ADRs** (pattern-level, enforced by `evaluate.py` or tests — see ADR-080):
 - **ADR-004**: No `String` in hot paths (SAT*, MQTTstuff, restAPI, OTGW-Core, OTDirect)
 - **ADR-088**: MQTT status-burst windowing + post-burst cooldown (gated by `check_status_publishers_wrap_burst`, `check_status_burst_cooldown_bound`, `check_drip_consults_deferred` in evaluate.py)
-- **ADR-089**: Heap tier-machine contract (amends ADR-030; gated by `check_heap_tier_thresholds_ordered`, `check_heap_fragmentation_promotion`, `check_heap_tier_entry_counters` in evaluate.py)
+- **ADR-167**: Heap tier machine and per-consumer gating retired on this branch (supersedes ADR-089 and ADR-121). `getHeapHealth()` keeps ADR-030's 3072/5120/8192 ladder for emergency recovery and tier-entry telemetry only; `canSendWebSocket()` / `canPublishMQTT()` block on CRITICAL and nothing else. No CI gate: the four `evaluate.py` gates that enforced ADR-089/ADR-121 were removed with the code (TASK-1036)
 - **ADR-091**: Design-system class drift gate (gated by `check_design_system_drift` in evaluate.py; WARN for one release, TASK-480 promotes to FAIL)
 
 **Structural / architectural ADRs** (reviewed at PR, no automated gate — see ADR-080):

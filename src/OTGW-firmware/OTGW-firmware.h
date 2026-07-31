@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.346
+**  Version  : v2.0.0-alpha.347
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -197,10 +197,8 @@ enum HeapHealthLevel {
 // in helperStuff.ino) because MQTTstuff.ino is concatenated before helperStuff.ino
 // in the Arduino sketch build, so a #define in helperStuff would not be visible
 // to MQTTstuff. ESP32 path uses a different helper with platform-scaled values.
-#define HEAP_LOW_RESTORE_THRESHOLD 6144  // bytes (HEAP_LOW_THRESHOLD + 1024)
+#define HEAP_LOW_RESTORE_THRESHOLD 6144  // bytes; ESP8266-only path, sized against ADR-089's old HEAP_LOW_THRESHOLD of 5120 (+1KB). Not rebased on ADR-030's 8192 because dev compiles the ESP32 branch, which never reads this.
 HeapHealthLevel getHeapHealth();
-HeapHealthLevel getHeapHealthForWebSocket();   // ADR-121 Option B: WS-consumer heap ladder
-HeapHealthLevel getHeapHealthForMQTT();        // ADR-121 Option B: MQTT-consumer heap ladder
 uint8_t getHeapFragmentation();
 bool canSendWebSocket();
 bool canPublishMQTT();

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.346
+**  Version  : v2.0.0-alpha.347
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -878,52 +878,26 @@ bool replaceAll(char *buffer, const size_t bufSize, const char *token, const cha
 // Heap Monitoring and Backpressure Management
 //===========================================================================================
 
-// Heap thresholds for different severity levels
-// Rationale: ESP8266 typically has ~40KB RAM after core libraries.
-// Tuned on tester log data (Crashevans, v1.4.0-beta+0d6942a, debug_2a.txt)
-// combined with the burst-reduction fixes from TASK-338/339/340/342. Each
-// tier is sized to cover a specific allocation risk:
-// - CRITICAL (1.5KB): leaves just one lwIP pbuf (~1.5KB) worth of headroom.
-//                     Eronder = near-certain crash zone.
-// - WARNING  (3KB):   2x pbuf + streaming chunk. Also the floor for
-//                     accepting new WebSocket clients (see webSocketStuff.ino).
-// - LOW      (5KB):   sits below the expected in-burst dip floor after the
-//                     1.4.1 burst-reduction fixes. Throttling fires only on
-//                     abnormal pressure (longer uptime, fragmentation,
-//                     extra WS clients), not on routine bursts.
-// - HEALTHY (>=5KB):  sufficient for steady-state operation.
-#define HEAP_CRITICAL_THRESHOLD   1536   // Critical: Stop all non-essential operations
-#define HEAP_WARNING_THRESHOLD    3072   // Warning: Start throttling messages
-#define HEAP_LOW_THRESHOLD        5120   // Low: Begin reducing message frequency
+// Heap thresholds for different severity levels (ADR-030's original ladder).
+//
+// ADR-167 retired ADR-089's re-baselined ESP8266 thresholds (1536/3072/5120)
+// on this ESP32-S3-only branch: those numbers were tuned on the Crashevans
+// ESP8266 field log (TASK-344) against a ~40KB heap, and are meaningless
+// against the S3's DRAM. Two soak runs (TASK-956: a synthetic-extreme 6.7h
+// run and a representative 10h run) recorded zero LOW/WARNING/CRITICAL
+// entries and zero WS/MQTT drops, so the re-baselined ladder never engaged.
+// What remains is ADR-030's original ladder, kept for one reason only: the
+// emergency-recovery trigger in doBackgroundTasks() and the tier-entry
+// telemetry. It is no longer a throttling gate.
+#define HEAP_CRITICAL_THRESHOLD   3072   // Critical: emergency recovery + block non-essential traffic
+#define HEAP_WARNING_THRESHOLD    5120   // Warning: observability tier only (no throttling)
+#define HEAP_LOW_THRESHOLD        8192   // Low: observability tier only (no throttling)
 
-// ADR-121 Option B: per-consumer heap threshold ladders. The WebSocket live-log
-// gate and the MQTT publish gate each get their OWN ladder so that relaxing one
-// (e.g. keeping HA sensors available longer at low heap) can never loosen the
-// other. Step-1 is STRUCTURAL and behaviour-equivalent: both ladders equal the
-// shared HEAP_* defaults. The WS-strict / MQTT-relaxed *values* are telemetry-
-// gated (ADR-121 AC#8) and tuned later from on-device logHeapStats; only the
-// independent-ladder structure is decided here. Enforced by
-// evaluate.py::check_per_consumer_heap_gate.
-#define WS_HEAP_CRITICAL_THRESHOLD    HEAP_CRITICAL_THRESHOLD
-#define WS_HEAP_WARNING_THRESHOLD     HEAP_WARNING_THRESHOLD
-#define WS_HEAP_LOW_THRESHOLD         HEAP_LOW_THRESHOLD
-#define MQTT_HEAP_CRITICAL_THRESHOLD  HEAP_CRITICAL_THRESHOLD
-#define MQTT_HEAP_WARNING_THRESHOLD   HEAP_WARNING_THRESHOLD
-#define MQTT_HEAP_LOW_THRESHOLD       HEAP_LOW_THRESHOLD
-
-// Throttling state
-static uint32_t lastWebSocketSendMs = 0;
-static uint32_t lastMQTTPublishMs = 0;
+// Drop accounting for the CRITICAL-only gates (ADR-167)
 static uint32_t lastWebSocketWarningMs = 0;
 static uint32_t lastMQTTWarningMs = 0;
 static uint32_t webSocketDropCount = 0;
 static uint32_t mqttDropCount = 0;
-
-// Minimum intervals when heap is under pressure (milliseconds)
-#define WEBSOCKET_THROTTLE_MS_WARNING  50   // 50ms = max 20 msg/sec when heap is low
-#define WEBSOCKET_THROTTLE_MS_CRITICAL 200  // 200ms = max 5 msg/sec when heap is critical
-#define MQTT_THROTTLE_MS_WARNING       100  // 100ms = max 10 msg/sec when heap is low
-#define MQTT_THROTTLE_MS_CRITICAL      500  // 500ms = max 2 msg/sec when heap is critical
 
 // Diagnostic logging intervals (milliseconds)
 #define WARNING_LOG_INTERVAL_MS        10000  // Log warnings every 10 seconds
@@ -932,19 +906,21 @@ static uint32_t mqttDropCount = 0;
 // HeapHealthLevel enum defined in OTGW-firmware.h
 
 //===========================================================================================
-// Check current heap health level
+// Check current heap health level.
 //
-// Primary signal is platformFreeHeap(). When freeHeap is already in LOW tier,
-// we additionally consult ESP.getMaxFreeBlockSize() so that fragmentation
-// promotes the level by one tier. Rationale: umm_malloc has no compaction,
-// so a 1.2KB discovery payload can fail when maxBlock<1.2KB even though
-// total free looks ok. Promoting early lets the publish gate start throttling
-// BEFORE the next allocation silently fails.
+// Single signal: platformFreeHeap() against ADR-030's ladder. ADR-167 removed
+// the fragmentation-aware promotion ADR-089 added here (it consulted
+// platformMaxFreeBlock() to promote LOW -> WARNING early, so an ESP8266
+// umm_malloc allocation would back off before failing). ESP32-S3 does not
+// share umm_malloc's no-compaction failure mode, and across two TASK-956 soak
+// runs the promotion path never fired, so it was pure cost on this branch.
 //
-// Perf note: getMaxFreeBlockSize() walks the full free list. We only call it
-// outside the HEALTHY path, so the common case stays cheap.
+// The tier-entry counters stay. They are no longer a gate input: they are
+// telemetry, published on otgw-firmware/stats/enter_{low,warning,critical},
+// exposed as three HA diagnostic sensors, in state.heap.entered_* over REST
+// and on the telnet heap page. Keeping them satisfies ADR-167's own
+// observability mitigation and avoids breaking those published contracts.
 //===========================================================================================
-constexpr uint32_t HEAP_FRAG_PROMOTE_MAXBLOCK = 1536;   // maxBlock below this while freeHeap in LOW -> promote to WARNING (matched to CRITICAL)
 HeapHealthLevel getHeapHealth() {
   static HeapHealthLevel lastLevel = HEAP_HEALTHY;
   uint32_t freeHeap = platformFreeHeap();
@@ -955,14 +931,7 @@ HeapHealthLevel getHeapHealth() {
   } else if (freeHeap < HEAP_WARNING_THRESHOLD) {
     level = HEAP_WARNING;
   } else if (freeHeap < HEAP_LOW_THRESHOLD) {
-    // Fragmentation check: if contiguous block is already small, promote
-    // one tier so callers back off before the next alloc fails.
-    uint32_t maxBlock = platformMaxFreeBlock();
-    if (maxBlock < HEAP_FRAG_PROMOTE_MAXBLOCK) {
-      level = HEAP_WARNING;
-    } else {
-      level = HEAP_LOW;
-    }
+    level = HEAP_LOW;
   } else {
     level = HEAP_HEALTHY;
   }
@@ -980,50 +949,6 @@ HeapHealthLevel getHeapHealth() {
 }
 
 //===========================================================================================
-// ADR-121 Option B: per-consumer tier evaluation against an independent ladder.
-//
-// This duplicates getHeapHealth()'s tier+fragmentation logic on purpose: the
-// ADR-089 evaluate.py gates parse getHeapHealth()'s body verbatim (it must keep
-// HEAP_FRAG_PROMOTE_MAXBLOCK and the three tier-entry counters inline), so the
-// shared logic cannot be factored out without breaking those binding gates.
-// heapTierWithThresholds() is pure (no counters); the canonical tier-entry
-// counting stays solely in getHeapHealth().
-//===========================================================================================
-static HeapHealthLevel heapTierWithThresholds(uint32_t critical, uint32_t warning, uint32_t low) {
-  uint32_t freeHeap = platformFreeHeap();
-  if (freeHeap < critical) return HEAP_CRITICAL;
-  if (freeHeap < warning)  return HEAP_WARNING;
-  if (freeHeap < low) {
-    // Same fragmentation promotion as getHeapHealth(): a small contiguous block
-    // promotes one tier so the gate backs off before the next alloc fails.
-    return (platformMaxFreeBlock() < HEAP_FRAG_PROMOTE_MAXBLOCK) ? HEAP_WARNING : HEAP_LOW;
-  }
-  return HEAP_HEALTHY;
-}
-
-//===========================================================================================
-// Per-consumer heap health (ADR-121 Option B). Each consumer evaluates its OWN
-// ladder. Both call getHeapHealth() once so the canonical ADR-089 tier-entry
-// counters stay live regardless of which consumer is active (the counter logic
-// is transition-based on a static lastLevel, so the extra call is idempotent
-// within a tier). At step-1 the per-consumer thresholds equal the shared HEAP_*
-// defaults, so these return exactly what getHeapHealth() would.
-//===========================================================================================
-HeapHealthLevel getHeapHealthForWebSocket() {
-  (void)getHeapHealth();   // keep canonical ADR-089 tier-entry counters live
-  return heapTierWithThresholds(WS_HEAP_CRITICAL_THRESHOLD,
-                                WS_HEAP_WARNING_THRESHOLD,
-                                WS_HEAP_LOW_THRESHOLD);
-}
-
-HeapHealthLevel getHeapHealthForMQTT() {
-  (void)getHeapHealth();   // keep canonical ADR-089 tier-entry counters live
-  return heapTierWithThresholds(MQTT_HEAP_CRITICAL_THRESHOLD,
-                                MQTT_HEAP_WARNING_THRESHOLD,
-                                MQTT_HEAP_LOW_THRESHOLD);
-}
-
-//===========================================================================================
 // Return heap fragmentation as a percentage (0 = no fragmentation, 100 = max).
 // Delegates to platformHeapFragmentation() which on ESP8266 uses the native
 // ESP.getHeapFragmentation() and on ESP32 computes 100 - (maxBlk*100/freeHeap).
@@ -1034,111 +959,49 @@ uint8_t getHeapFragmentation() {
 }
 
 //===========================================================================================
-// Check if we can send a WebSocket message (with backpressure)
+// Check if we can send a WebSocket message.
+//
+// ADR-167 removed ADR-121's per-consumer ladder and the LOW/WARNING throttle
+// arms: across two TASK-956 soak runs neither tier was ever entered and
+// ws_drops stayed at zero, so the rate limiting was cost without effect on
+// ESP32-S3. What remains is the ADR-030 emergency behaviour: refuse to send
+// while the heap is CRITICAL, so the live log cannot be the allocation that
+// tips an already-starving device over. Callers are unchanged.
 //===========================================================================================
 bool canSendWebSocket() {
-  HeapHealthLevel heapLevel = getHeapHealthForWebSocket();   // ADR-121 Option B: WS ladder
+  if (getHeapHealth() != HEAP_CRITICAL) return true;
+
+  webSocketDropCount++;
+  state.heapdiag.iWsDropsTotal++;
+  // Log periodically (use unsigned arithmetic for rollover safety)
   uint32_t now = millis();
-  
-  // Critical: block WebSocket messages completely
-  if (heapLevel == HEAP_CRITICAL) {
-    webSocketDropCount++;
-    state.heapdiag.iWsDropsTotal++;
-    // Log warning periodically (use unsigned arithmetic for rollover safety)
-    if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
-      DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u, maxBlock=%u bytes)\r\n"),
-              webSocketDropCount, platformFreeHeap(), platformMaxFreeBlock());
-      lastWebSocketWarningMs = now;
-    }
-    return false;
-  }
-  
-  // Warning: aggressive throttling
-  if (heapLevel == HEAP_WARNING) {
-    // Use unsigned arithmetic to handle millis() rollover correctly
-    if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_CRITICAL) {
-      webSocketDropCount++;
-      state.heapdiag.iWsDropsTotal++;
-      return false;
-    }
-  }
-  
-  // Low: moderate throttling
-  if (heapLevel == HEAP_LOW) {
-    // Use unsigned arithmetic to handle millis() rollover correctly
-    if ((uint32_t)(now - lastWebSocketSendMs) < WEBSOCKET_THROTTLE_MS_WARNING) {
-      webSocketDropCount++;
-      state.heapdiag.iWsDropsTotal++;
-      return false;
-    }
-  }
-  
-  // Update last send time
-  lastWebSocketSendMs = now;
-  
-  // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
-  if (webSocketDropCount > 0 && (uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
-    DebugTf(PSTR("WebSocket throttled: dropped %u msgs (heap=%u, maxBlock=%u bytes)\r\n"),
+  if ((uint32_t)(now - lastWebSocketWarningMs) > WARNING_LOG_INTERVAL_MS) {
+    DebugTf(PSTR("HEAP-CRITICAL: Blocking WebSocket (dropped %u msgs, heap=%u, maxBlock=%u bytes)\r\n"),
             webSocketDropCount, platformFreeHeap(), platformMaxFreeBlock());
     lastWebSocketWarningMs = now;
-    webSocketDropCount = 0; // reset counter after reporting
+    webSocketDropCount = 0;   // reset counter after reporting
   }
-  
-  return true;
+  return false;
 }
 
 //===========================================================================================
-// Check if we can publish an MQTT message (with backpressure)
+// Check if we can publish an MQTT message. Same ADR-167 reasoning as
+// canSendWebSocket(): CRITICAL-only, no LOW/WARNING throttling.
 //===========================================================================================
 bool canPublishMQTT() {
-  HeapHealthLevel heapLevel = getHeapHealthForMQTT();   // ADR-121 Option B: MQTT ladder
+  if (getHeapHealth() != HEAP_CRITICAL) return true;
+
+  mqttDropCount++;
+  state.heapdiag.iMqttDropsTotal++;
+  // Log periodically (use unsigned arithmetic for rollover safety)
   uint32_t now = millis();
-  
-  // Critical: block MQTT messages completely
-  if (heapLevel == HEAP_CRITICAL) {
-    mqttDropCount++;
-    state.heapdiag.iMqttDropsTotal++;
-    // Log warning periodically (use unsigned arithmetic for rollover safety)
-    if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
-      DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u, maxBlock=%u bytes)\r\n"),
-              mqttDropCount, platformFreeHeap(), platformMaxFreeBlock());
-      lastMQTTWarningMs = now;
-    }
-    return false;
-  }
-  
-  // Warning: aggressive throttling
-  if (heapLevel == HEAP_WARNING) {
-    // Use unsigned arithmetic to handle millis() rollover correctly
-    if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_CRITICAL) {
-      mqttDropCount++;
-      state.heapdiag.iMqttDropsTotal++;
-      return false;
-    }
-  }
-  
-  // Low: moderate throttling
-  if (heapLevel == HEAP_LOW) {
-    // Use unsigned arithmetic to handle millis() rollover correctly
-    if ((uint32_t)(now - lastMQTTPublishMs) < MQTT_THROTTLE_MS_WARNING) {
-      mqttDropCount++;
-      state.heapdiag.iMqttDropsTotal++;
-      return false;
-    }
-  }
-  
-  // Update last publish time
-  lastMQTTPublishMs = now;
-  
-  // Log warning if we're dropping messages (use unsigned arithmetic for rollover safety)
-  if (mqttDropCount > 0 && (uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
-    DebugTf(PSTR("MQTT throttled: dropped %u msgs (heap=%u, maxBlock=%u bytes)\r\n"),
+  if ((uint32_t)(now - lastMQTTWarningMs) > WARNING_LOG_INTERVAL_MS) {
+    DebugTf(PSTR("HEAP-CRITICAL: Blocking MQTT (dropped %u msgs, heap=%u, maxBlock=%u bytes)\r\n"),
             mqttDropCount, platformFreeHeap(), platformMaxFreeBlock());
     lastMQTTWarningMs = now;
-    mqttDropCount = 0; // reset counter after reporting
+    mqttDropCount = 0;   // reset counter after reporting
   }
-  
-  return true;
+  return false;
 }
 
 //===========================================================================================

@@ -2,7 +2,20 @@
 
 ## Status
 
-Accepted (Option B), 2026-06-02. Decision Maker: Robert van den Breemen.
+Superseded by ADR-167. Date superseded: 2026-07-31 (TASK-1036).
+
+ADR-167 retired the per-consumer split on the ESP32-S3-only `dev` branch:
+`getHeapHealthForWebSocket()`, `getHeapHealthForMQTT()`, the shared
+`heapTierWithThresholds()` helper and the `WS_HEAP_*` / `MQTT_HEAP_*` ladders
+are gone, and `canSendWebSocket()` / `canPublishMQTT()` now share a single
+CRITICAL-only check. This ADR's own Consequences section predicted the reason
+verbatim: on ESP32 "the gate is near-always open and the behavioural change
+there is negligible". Two TASK-956 soak runs confirmed it, recording zero
+ws_drops and zero mqtt_drops. The `check_per_consumer_heap_gate` CI gate was
+removed in the same commit, per ADR-080. The decision text below is preserved
+unedited per the immutability rule.
+
+Originally: Accepted (Option B), 2026-06-02. Decision Maker: Robert van den Breemen.
 
 Classification: **binding** amendment to ADR-089. Option B adds per-consumer heap
 thresholds, which changes the tier contract, so per ADR-080 this ADR MUST have a
@@ -25,6 +38,11 @@ status_history:
     status: Accepted
     changed_by: Robert van den Breemen
     reason: Maintainer selected Option B (independent per-consumer heap thresholds) so relaxing the MQTT gate cannot loosen the WebSocket gate. Binding amendment to ADR-089; CI gate check_per_consumer_heap_gate + the implementation land under TASK-779. Concrete WS-strict/MQTT-relaxed values are telemetry-gated (George's logHeapStats, AC#8).
+    changed_via: adr-kit
+  - date: 2026-07-31
+    status: Superseded
+    changed_by: Maintainer (Robert van den Breemen), applied by Agent under TASK-1036
+    reason: Superseded by ADR-167 on the ESP32-S3-only dev branch. The per-consumer split never diverged from the shared ladder in practice and never fired on ESP32-S3 across two TASK-956 soak runs (zero ws_drops, zero mqtt_drops), exactly as this ADR's own Consequences section predicted. Phase-3 removal deleted getHeapHealthForWebSocket/ForMQTT, heapTierWithThresholds and the WS_/MQTT_HEAP_* ladders, and retired check_per_consumer_heap_gate per ADR-080. Remains in force on otgw-1.x.x.
     changed_via: adr-kit
 
 ## Context

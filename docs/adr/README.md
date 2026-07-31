@@ -97,17 +97,17 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-044: Global State — extern Declaration in Header, Definition in .ino](ADR-044-global-state-header-definition-pattern.md)** 🆕  
   `extern` declarations in headers + single definition in owning `.ino` to avoid ODR violations in any multi-TU build; applies to `msglastupdated[]`, `mqttlastsent[]`, `mqttPublishAllowed`, etc.
 
-- **[ADR-089: Heap Tier Machine Contract](ADR-089-heap-tier-machine-contract.md)** *(Proposed for supersession by ADR-167)*  
-  Amends ADR-030: re-baselines tier thresholds to 1536/3072/5120 bytes (Crashevans field log evidence, TASK-344), adds fragmentation-aware promotion (`HEAP_FRAG_PROMOTE_MAXBLOCK` = 1536), adds tier-entry counters (`iEnteredLowCount`/`Warning`/`Critical`, TASK-346) with hourly retained MQTT publication. Three sub-rules CI-gated, two explicitly labelled guideline-level. Defense-in-depth peer with ADR-088. ADR-167 (Proposed) documents that this tier machine is ESP8266-era overhead unnecessary on the ESP32-S3-only `dev` branch, per TASK-956 soak evidence; removal is a deferred Phase-3 task, not yet accepted.
+- **[ADR-089: Heap Tier Machine Contract](ADR-089-heap-tier-machine-contract.md)** *(Superseded by ADR-167 on `dev`; in force on `otgw-1.x.x`)*  
+  Amends ADR-030: re-baselines tier thresholds to 1536/3072/5120 bytes (Crashevans field log evidence, TASK-344), adds fragmentation-aware promotion (`HEAP_FRAG_PROMOTE_MAXBLOCK` = 1536), adds tier-entry counters (`iEnteredLowCount`/`Warning`/`Critical`, TASK-346) with hourly retained MQTT publication. Three sub-rules CI-gated, two explicitly labelled guideline-level. Defense-in-depth peer with ADR-088. ADR-167 (Accepted 2026-07-31) found this tier machine to be ESP8266-era overhead unnecessary on the ESP32-S3-only `dev` branch, per TASK-956 soak evidence. TASK-1036 performed the removal on `dev`: thresholds reverted to ADR-030's 3072/5120/8192, fragmentation promotion deleted, consumer gating collapsed to CRITICAL-only, and the three CI gates retired. The tier-entry counters were deliberately kept as telemetry.
 
 - **[ADR-090: Re-entrancy Guard Pattern for Shared Scratch Buffers](ADR-090-re-entrancy-guard-pattern-shared-scratch-buffers.md)** 🆕  
   Guideline-level ADR (per ADR-080: 2 instances in 1 file is below the recurrence bar for binding pattern-level enforcement; no CI gate). Documents the acquisition contract for file-scope or function-local-static mutable scratch state shared across re-entrant call paths in the cooperative ESP8266 model. Two existing exemplars in `MQTTstuff.ino`: RAII `MQTTAutoConfigSessionLock` (preferred for new code) and the `publishToSourceTopic` function-local `inUse` flag.
 
-- **[ADR-121: Per-Consumer Heap Gating for the WebSocket Live-Log vs MQTT Publish](ADR-121-per-consumer-heap-gating-websocket-vs-mqtt.md)** *(Proposed for supersession by ADR-167)*  
-  Accepted (binding amendment to ADR-089). Splits heap gating per consumer: the WebSocket live-log yields under heap pressure while MQTT publishing keeps a lower floor, so the OT-hot path degrades gracefully instead of starving MQTT. ADR-167 (Proposed) documents that this per-consumer split is likewise ESP8266-era overhead unnecessary on the ESP32-S3-only `dev` branch; removal is a deferred Phase-3 task, not yet accepted.
+- **[ADR-121: Per-Consumer Heap Gating for the WebSocket Live-Log vs MQTT Publish](ADR-121-per-consumer-heap-gating-websocket-vs-mqtt.md)** *(Superseded by ADR-167 on `dev`; in force on `otgw-1.x.x`)*  
+  Accepted (binding amendment to ADR-089). Splits heap gating per consumer: the WebSocket live-log yields under heap pressure while MQTT publishing keeps a lower floor, so the OT-hot path degrades gracefully instead of starving MQTT. ADR-167 (Accepted 2026-07-31) found this per-consumer split to be likewise unnecessary on the ESP32-S3-only `dev` branch; TASK-1036 removed it and retired `check_per_consumer_heap_gate`.
 
-- **[ADR-167: Retire the ESP8266-Era Heap Tier Machine and Per-Consumer Gating on the ESP32-S3-Only Dev Branch](ADR-167-esp32s3-heap-tier-gating-removal-supersedes-adr089-adr121.md)** 🆕 *(Proposed)*  
-  Documents the maintainer-authorized decision to retire ADR-089's tier machine and ADR-121's per-consumer WS/MQTT gating on `dev` (ESP32-S3-only), backed by TASK-956 soak evidence: a 6.7h synthetic-extreme run (alpha.286) and a 10h representative-load run (alpha.331+a82bfda) with `hd_min_max_block` never below 10,740 bytes and zero tier-entry/drop events in either run. Actual removal (and retiring the four `evaluate.py` gates) is deferred to a Phase-3 follow-up task (TASK-956 AC#4, not yet created). Status intentionally stays Proposed: evidence limitations (10h vs the 24-72h originally scoped; no MQTT discovery republish traffic) are disclosed openly, and acceptance is the maintainer's own call.
+- **[ADR-167: Retire the ESP8266-Era Heap Tier Machine and Per-Consumer Gating on the ESP32-S3-Only Dev Branch](ADR-167-esp32s3-heap-tier-gating-removal-supersedes-adr089-adr121.md)** 🆕 *(Accepted)*  
+  Documents the maintainer-authorized decision to retire ADR-089's tier machine and ADR-121's per-consumer WS/MQTT gating on `dev` (ESP32-S3-only), backed by TASK-956 soak evidence: a 6.7h synthetic-extreme run (alpha.286) and a 10h representative-load run (alpha.331+a82bfda) with `hd_min_max_block` never below 10,740 bytes and zero tier-entry/drop events in either run. Accepted 2026-07-31 on the maintainer's own accept-readiness review; the disclosed evidence limitations (10h vs the 24-72h originally scoped; no MQTT discovery republish traffic in the representative leg) stand as stated and were judged sufficient. The removal, and the retirement of the four `evaluate.py` gates, landed under TASK-1036.
 
 - **[ADR-141: Adopt ArduinoJson v7 for JSON on the ESP32-S3 2.0.0 line](ADR-141-adopt-arduinojson-v7-esp32s3.md)** *(Superseded by ADR-146)*  
   Short-lived decision to adopt ArduinoJson v7 for JSON on the ESP32-S3 2.0.0 line (reversing ADR-042); reverted to a hand-rolled streaming writer in ADR-146.
@@ -765,13 +765,16 @@ Don't create ADRs for:
 
 ## Implementation Notes
 
-**Heap Tier Thresholds (per ADR-089, amends ADR-030):**
+**Heap Tier Thresholds on `dev` (ADR-030's ladder, restored by ADR-167):**
 
-- `HEAP_CRITICAL` — less than 1536 bytes (emergency mode)
-- `HEAP_WARNING` — 1536 to 3072 bytes (throttle aggressively)
-- `HEAP_LOW` — 3072 to 5120 bytes (reduce message rates)
-- `HEAP_HEALTHY` — greater than 5120 bytes
-- Fragmentation-aware promotion: `HEAP_FRAG_PROMOTE_MAXBLOCK` = 1536
+- `HEAP_CRITICAL` — less than 3072 bytes (emergency recovery; the only tier that still gates anything)
+- `HEAP_WARNING` — 3072 to 5120 bytes (observability only)
+- `HEAP_LOW` — 5120 to 8192 bytes (observability only)
+- `HEAP_HEALTHY` — greater than 8192 bytes
+- No fragmentation-aware promotion: ADR-089's `HEAP_FRAG_PROMOTE_MAXBLOCK` was removed by ADR-167
+
+On `otgw-1.x.x` (ESP8266) ADR-089's re-baselined ladder is still in force:
+1536 / 3072 / 5120 with `HEAP_FRAG_PROMOTE_MAXBLOCK` = 1536.
 
 **Verifying memory measurements:**
 
