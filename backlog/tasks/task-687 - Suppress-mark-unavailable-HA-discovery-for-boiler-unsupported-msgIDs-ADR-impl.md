@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-05-24 06:47'
-updated_date: '2026-06-30 04:45'
+updated_date: '2026-07-31 20:49'
 labels:
   - ha-discovery
   - opentherm
@@ -104,4 +104,6 @@ No ADR file or code written this session due to the channel failure (writing wit
 Moved In Progress -> To Do (maintainer decision 2026-06-20): explicitly PARKED for milestone 2.1.0. Only ADR-142 (Proposed) exists; no implementation (availability-list gating, clear-on-ack recovery, runtime override, CI gate, docs all absent). Parking in To Do so the In Progress column reflects actual active work. Unpark when 2.1.0 starts: first drive ADR-142 to Accepted via adr-kit, then implement.
 
 PARKED for release 3.0.0 (maintainer decision 2026-06-30): suppress/mark-unavailable HA discovery for boiler-unsupported msgIDs is a substantial ADR-gated feature (ADR draft+accept, discovery-publisher change, runtime force-publish override, recovery path, 3-tester field validation across distinct boilers, docs). Not in scope for the 2.0.0 line; deferred to the 3.0.0 milestone.
+
+2026-07-31: picked up during a backlog-drain pass, then put straight back to To Do. Re-parked, not started. The task carries milestone 3.0.0 and an explicit maintainer parking decision of 2026-06-30; ADR-142 exists only as Proposed, and AC#6 requires field validation by three Discord testers on distinct boiler models. Nothing here is self-verifiable and starting it would override a standing maintainer decision. UNBLOCKS WHEN: the 3.0.0 milestone opens. First action then is to drive ADR-142 to Accepted via adr-kit (approach B, per the 2026-06-01 decision), then implement.
 <!-- SECTION:NOTES:END -->

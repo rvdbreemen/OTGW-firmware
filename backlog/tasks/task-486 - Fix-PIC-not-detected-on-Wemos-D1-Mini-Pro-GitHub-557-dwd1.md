@@ -4,7 +4,7 @@ title: 'Fix: PIC not detected on Wemos D1 Mini Pro (GitHub #557, dwd1)'
 status: To Do
 assignee: []
 created_date: '2026-04-29 23:49'
-updated_date: '2026-06-28 05:23'
+updated_date: '2026-07-31 20:50'
 labels:
   - bug
   - needs-info
@@ -45,4 +45,6 @@ GitHub: https://github.com/rvdbreemen/OTGW-firmware/issues/557
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-06-28 (issue scan): GH #557 still OPEN, awaiting reporter. dwd1 confirmed the PIC menu DOES appear when he swaps back to the original Wemos D1 board, so it is board-specific to his alternate ESP board (2026-04-29, screenshot attached). Maintainer root-caused 2026-05-05: not a missing board-profile setting -- PIC comms are hard-wired to ESP8266 UART0 (TX/GPIO1, RX/GPIO3) via OTGWSerial(UART0) and PIC reset is hard-wired to D5, so a board whose wiring differs won't see the PIC. dwd1 (2026-06-25) said he will capture the needed details 'in the following days' -- still pending. Keep needs-info until his capture arrives.
+
+BLOCKED, 2026-07-31 (backlog-drain triage). Carries the needs-info label and depends on GitHub #557 reporter dwd1 supplying a boot log from the affected Wemos D1 Mini Pro. We cannot reproduce without either that log or the same board. This is blocked on a third party, not on engineering effort. UNBLOCKS WHEN: the reporter supplies a boot/telnet log, or a D1 Mini Pro reaches the bench.
 <!-- SECTION:NOTES:END -->

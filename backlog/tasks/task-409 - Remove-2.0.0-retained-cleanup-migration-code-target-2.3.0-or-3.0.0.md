@@ -4,7 +4,7 @@ title: 'Remove 2.0.0 retained-cleanup migration code (target: 2.3.0 or 3.0.0)'
 status: To Do
 assignee: []
 created_date: '2026-04-24 19:57'
-updated_date: '2026-04-30 00:37'
+updated_date: '2026-07-31 20:50'
 labels:
   - migration-cleanup
   - future-work
@@ -59,3 +59,9 @@ Related: ADR-084 (generic OT-bus state topics), ADR-065 (otgw-pic MQTT subtree, 
 - [ ] #7 Release notes for the target version contain an entry like 'Removed: 2.0.0 retained-cleanup migration helper (no user action required)'
 - [ ] #8 ADR-084 status updated to reflect that migration is complete, or a new ADR supersedes ADR-084 documenting migration closure
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+NOT BLOCKED, DEFERRED BY DESIGN, 2026-07-31 (backlog-drain triage). This is a future-dated marker, not pending work: the retained-cleanup migration code must stay in place until 2.3.0 or 3.0.0, because removing it early strands users upgrading from older retained-topic layouts. Left To Do deliberately so the reminder survives; it should not be counted as backlog debt. UNBLOCKS WHEN: the 2.3.0 or 3.0.0 milestone opens.
+<!-- SECTION:NOTES:END -->

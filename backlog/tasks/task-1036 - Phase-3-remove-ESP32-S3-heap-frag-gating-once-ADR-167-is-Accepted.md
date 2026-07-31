@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-09 21:17'
-updated_date: '2026-07-31 20:16'
+updated_date: '2026-07-31 20:50'
 labels: []
 dependencies: []
 ordinal: 245000
@@ -41,4 +41,6 @@ Verification: python evaluate.py 90 checks / 0 failures / exit 0. python tests/t
 INCIDENTAL FIX: the first build failed on 'src/OTGW-firmware/version.h:8:1: error: version control conflict marker in file', cascading into ~40 bogus AceTime 'acetime_t does not name a type' errors. Pre-existing, unrelated to this task: an unresolved stash-pop conflict left in the working tree, whose two sides were byte-identical apart from CRLF vs LF. Resolved by keeping the upstream side and stripping the markers. Logged as bug-150 in .wolf/buglog.json.
 
 AC#4 (re-soak) is NOT done and is not self-verifiable: it needs a clean multi-hour soak on dedicated hardware with no concurrent testing on the same unit. Left unchecked deliberately.
+
+2026-07-31 status: ACs 1-3 complete and pushed as 9c0a7e78a. AC#4 is the only thing outstanding and is BLOCKED on hardware: it needs a clean multi-hour soak on a dedicated unit with no concurrent testing on the same board (the TASK-956 10h run was already contaminated by parallel PIC-flash testing, which is what produced its 1027ms loop-gap blemish). Left In Progress rather than Done so the open field-validation is visible. UNBLOCKS WHEN: a bench unit is free for an uninterrupted soak window.
 <!-- SECTION:NOTES:END -->

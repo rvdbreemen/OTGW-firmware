@@ -4,7 +4,7 @@ title: 'Modbus TCP client for heat pump integration (ESP32-only, experimental)'
 status: To Do
 assignee: []
 created_date: '2026-05-20 18:31'
-updated_date: '2026-07-09 21:58'
+updated_date: '2026-07-31 20:50'
 labels:
   - feature
   - esp32-only
@@ -85,4 +85,6 @@ Related: TASK-640 (narrative dependency, not blocking — feature is architectur
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-07-09: deferred to release 2.1.0 per maintainer — Modbus TCP heat-pump client is experimental, out of the 2.0.0 drain scope.
+
+BLOCKED ON SCOPING, 2026-07-31 (backlog-drain triage). A Modbus TCP client is new feature work of epic size (register maps per heat-pump vendor, polling model, settings surface, HA discovery shape, error/timeout semantics), not backlog drainage. Starting it from the current one-line description would mean inventing the requirements. UNBLOCKS WHEN: the maintainer scopes it, at minimum which heat pumps to target and whether it is read-only telemetry or also control.
 <!-- SECTION:NOTES:END -->
