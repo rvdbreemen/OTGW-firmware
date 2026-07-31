@@ -110,7 +110,6 @@
 #define HAS_SAT_BLE          1  // ESP32-S3 BLE radio present (SATble.ino room-sensor support)
 #define HAS_WEATHER_FORECAST 1  // Full weather incl. 24h hourly forecast arrays (independent of HAS_SAT)
 #define HAS_REST_TX_COALESCING 1  // sync WebServer stalls ~9ms/sendContent on ESP32; coalesce into 4KB chunks (TASK-743)
-#define HAS_FRAGMENTATION_AWARE_HEAP_GATE 1  // ESP32-S3: gate drip on freeHeap+maxAllocBlock, not the ESP8266 tier machine (TASK-743)
 #define HW_TYPE_NAME      "otgw32"        // Static hardware-type slug / board class (ADR-113)
 #define BOARD_NAME        "Nodoshop OTGW32 (ESP32-S3)"  // Display string (boardName())
 #define HAS_LEDC_LED      1    // LEDs PWM-dimmed via ledc (LED_BRIGHTNESS above)
@@ -178,7 +177,6 @@ typedef uint16_t SAT_RING_IDX_T;
 #define HAS_SAT_BLE          1  // S3 BLE radio present (SATble room sensors)
 #define HAS_WEATHER_FORECAST 1  // S3 RAM budget allows the hourly forecast arrays
 #define HAS_REST_TX_COALESCING 1  // same sync-WebServer stall as OTGW32 (TASK-743)
-#define HAS_FRAGMENTATION_AWARE_HEAP_GATE 1  // ESP32-S3 heap gating (TASK-743)
 #define HW_TYPE_NAME      "otgw-classic"  // Static hardware-type slug / board class (ADR-113)
 #define BOARD_NAME        "Nodoshop OTGW Classic (ESP32-S3)"  // Display string (boardName())
 #define HAS_LEDC_LED      1    // S3 ledc PWM dimming, same as OTGW32

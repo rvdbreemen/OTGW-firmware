@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.348
+**  Version  : v2.0.0-alpha.349
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2107,14 +2107,10 @@ constexpr uint8_t DISCOVERY_INTERVAL_SLOW   = 10;  // seconds (heap pressure bac
 constexpr uint8_t DRIP_RESTORE_K_TICKS      = 2;   // TASK-555: consecutive healthy ticks required to restore
 
 static bool discoveryDripHasHeapPressure() {
-#if HAS_FRAGMENTATION_AWARE_HEAP_GATE
-  // ESP32-S3 has far more DRAM than ESP8266, so the drip should only slow down
-  // when both total free heap and the largest allocatable block are genuinely low.
+  // Slow the drip only when both total free heap and the largest allocatable
+  // block are genuinely low. The ESP8266 alternative (a HEAP_LOW tier check
+  // from TASK-370) was removed with the tier machine under ADR-167/TASK-1036.
   return (platformFreeHeap() < 16384U) && (platformMaxFreeBlock() < 8192U);
-#else
-  // ESP8266 keeps the existing HEAP_LOW-based backoff policy from TASK-370.
-  return getHeapHealth() >= HEAP_LOW;
-#endif
 }
 
 // Companion to discoveryDripHasHeapPressure(): returns true when heap is
@@ -2122,17 +2118,10 @@ static bool discoveryDripHasHeapPressure() {
 // (TASK-553 / TASK-555). Used together with the K-ticks counter to gate
 // slow->normal restoration.
 static bool discoveryDripIsHeapHealthyForRestore() {
-#if HAS_FRAGMENTATION_AWARE_HEAP_GATE
-  // ~12-15% deadband above entry thresholds (16384/8192). Conservative
-  // starting values; ESP32-S3 has ~300KB DRAM so thrash is unlikely in
-  // field but pattern-symmetry with ESP8266 keeps the port clean. Tunable
-  // post-validation.
+  // ~12-15% deadband above the entry thresholds (16384/8192). Conservative
+  // starting values; the S3 has ~300KB DRAM so thrash is unlikely in field.
+  // Tunable post-validation.
   return (platformFreeHeap() >= 18432U) && (platformMaxFreeBlock() >= 9216U);
-#else
-  // ESP8266: 1KB deadband above HEAP_LOW_THRESHOLD (5120). See declaration
-  // in OTGW-firmware.h for sizing rationale.
-  return platformFreeHeap() >= HEAP_LOW_RESTORE_THRESHOLD;
-#endif
 }
 
 // ADR-170: public wrapper so the daily discovery auto-heal can ask the drip's OWN
