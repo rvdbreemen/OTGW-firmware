@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.349
+**  Version  : v2.0.0-alpha.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -100,7 +100,8 @@ bool webFileGateTryAdmit() {
 void webFileGateRelease() { if (webFileInFlight) webFileInFlight--; }
 
 // Zero-allocation HTTP method to string (returns PROGMEM pointer).
-// Replaces strHTTPmethod() which returned String (heap allocation per call).
+// Replaced an older helper that returned String, i.e. a heap allocation per
+// call; that helper has since been deleted (ADR-004, no String in hot paths).
 static const char* httpMethodToStr(HTTPMethod m) {
   switch (m) {
     case HTTP_GET:     return "GET";

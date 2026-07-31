@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.349
+**  Version  : v2.0.0-alpha.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -43,20 +43,6 @@ function safeJSONParse(text) {
     console.error('safeJSONParse: Parse error:', e.message);
     return null;
   }
-}
-
-/**
- * Safely get element by ID with optional warning
- * @param {string} id - Element ID
- * @param {boolean} warnIfMissing - Whether to log warning if not found
- * @returns {Element|null} The element or null
- */
-function safeGetElementById(id, warnIfMissing = false) {
-  const element = document.getElementById(id);
-  if (!element && warnIfMissing) {
-    console.warn(`Element not found: #${id}`);
-  }
-  return element;
 }
 
 function ensureWebkitScrollbarStyles() {
@@ -1120,7 +1106,6 @@ let otLogResizeTimer = null;
 // See: https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API
 let logDirectoryHandle = null;
 let fileStreamHandle = null;
-let fileWritableStream = null; // Deprecated, kept for cleanup just in case
 let logWriteQueue = [];
 let isLogWriting = false;
 let isStreamingToFile = false;
@@ -1509,14 +1494,6 @@ function startPersistenceTimer() {
   }, PERSISTENCE_INTERVAL_MS);
   
   console.log('Started localStorage persistence (debounced saves + 30s fallback)');
-}
-
-function stopPersistenceTimer() {
-  if (persistenceTimer) {
-    clearInterval(persistenceTimer);
-    persistenceTimer = null;
-    console.log('Stopped localStorage persistence timer');
-  }
 }
 
 function stopScheduledOTLogWebSocketInit() {
@@ -3317,13 +3294,6 @@ const escapeHtml = (function() {
     return String(text).replace(escapeRegex, char => escapeMap[char]);
   };
 })();
-
-//============================================================================  
-function loadUISettings() {
-  // Deprecated wrapper kept for compatibility with older call sites.
-  // The canonical loader is loadPersistentUI() using ui_* setting names.
-  loadPersistentUI();
-}
 
 function saveUISetting(field, value) {
   // Wrapper to ensure we use the backend API with canonical ui_* setting names.
@@ -7311,25 +7281,6 @@ function translateTooltip(longName) {
 
 } // translateTooltip()
 
-
-
-//============================================================================  
-function setBackGround(field, newColor) {
-  //console.log("setBackground("+field+", "+newColor+")");
-  const element = document.getElementById(field);
-  if (element) {
-    element.dataset.customBg = newColor;
-    element.style.background = newColor; // Keep for now if used functionally
-  }
-} // setBackGround()
-
-
-//============================================================================  
-function getBackGround(field) {
-  //console.log("getBackground("+field+")");
-  const element = document.getElementById(field);
-  return element ? (element.dataset.customBg || element.style.background) : '';
-} // getBackGround()
 
 
 //============================================================================  

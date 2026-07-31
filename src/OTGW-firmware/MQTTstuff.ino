@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.349
+**  Version  : v2.0.0-alpha.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1812,22 +1812,6 @@ bool publishMQTTOnOff(const char* topic, bool value) {
 
 bool publishMQTTOnOff(const __FlashStringHelper* topic, bool value) {
   return sendMQTTData(topic, value ? "ON" : "OFF");
-}
-
-/**
- * Publish numeric value as string to MQTT topic
- * Reduces duplicate pattern of number-to-string conversion with static buffer
- */
-void publishMQTTNumeric(const char* topic, float value, uint8_t decimals = 2) {
-  static char buffer[16];
-  dtostrf(value, 1, decimals, buffer);
-  sendMQTTData(topic, buffer);
-}
-
-void publishMQTTNumeric(const __FlashStringHelper* topic, float value, uint8_t decimals = 2) {
-  static char buffer[16];
-  dtostrf(value, 1, decimals, buffer);
-  sendMQTTData(topic, buffer);
 }
 
 /**

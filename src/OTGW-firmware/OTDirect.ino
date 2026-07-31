@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.349
+**  Version  : v2.0.0-alpha.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -368,13 +368,6 @@ static bool otCmdEnqueue(uint32_t frame) {
     OTDDebugTf(PSTR("OTD: queue high-water=%u (capacity=%u)\r\n"),
                (unsigned)depth, (unsigned)OT_CMD_QUEUE_SIZE);
   }
-  return true;
-}
-
-static bool otCmdDequeue(uint32_t &frame) {
-  if (otCmdQueueEmpty()) return false;
-  frame = otCmdQueue[otCmdTail];
-  otCmdTail = (otCmdTail + 1) % OT_CMD_QUEUE_SIZE;
   return true;
 }
 

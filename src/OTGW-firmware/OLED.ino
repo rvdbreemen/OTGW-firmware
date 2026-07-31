@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.349
+**  Version  : v2.0.0-alpha.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -634,19 +634,6 @@ void oledShowConfigMode(const char* ssid, const char* pw, const char* url) {
   // timer does not blank it while the user is reading it during config.
   oledPage = 1;
   oledLastRenderedPage = 0xFF;  // force a clean redraw once loopOLED resumes
-  oledLastActivity = millis();
-}
-
-// ---------------------------------------------------------------------------
-// oledWake - external call to wake display (e.g. on network state change)
-// ---------------------------------------------------------------------------
-void oledWake() {
-  if (!oledPresent) return;
-  if (oledPage == 0) {
-    oledPage = 1;
-    oledDisplay.ssd1306WriteCmd(0xAF);  // DISPLAYON
-    oledLastRefresh = 0;
-  }
   oledLastActivity = millis();
 }
 

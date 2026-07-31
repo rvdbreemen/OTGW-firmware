@@ -1535,32 +1535,6 @@ bool satHandleZoneSetpoint(uint8_t zone, const char* value)
   return true;
 }
 
-// Handler: push HVAC mode for zone n (1-based). TASK-593 / SAT Python PR #172.
-// Accepts an HA-style HVACMode string: "off" marks the zone OFF (excluded from PID
-// + P75 aggregation); any heating mode ("heat", "auto", "heat_cool", ...) clears the
-// OFF flag. The freshness timestamp is updated so a mode message alone keeps the zone
-// from going stale. The actual exclusion happens in satZonePidStep() via z.bOff.
-bool satHandleZoneMode(uint8_t zone, const char* value)
-{
-  if (zone < 1 || zone > SAT_MAX_ZONES) return false;
-  if (!value || !*value) return false;
-  uint8_t idx = zone - 1;
-  bool wasOff = satZones[idx].bOff;
-  bool nowOff = (strcasecmp_P(value, PSTR("off")) == 0);
-  satZones[idx].bOff          = nowOff;
-  satZones[idx].iLastUpdateMs = millis();
-  if (nowOff && !wasOff) {
-    // HEAT -> OFF edge: reset PID memory eagerly (AC#3). The next control cycle's
-    // satZonePidExclude() would reset it anyway, so this only guarantees a clean
-    // integral for any reader in the window before that tick (e.g. diagnostics).
-    satZones[idx].fPidIntegral = 0.0f;
-    satZones[idx].fPrevError   = 0.0f;
-    satZones[idx].fPidOutput   = SAT_MIN_SETPOINT;
-  }
-  SATDebugTf(PSTR("SAT zone %u: mode=%s (off=%d)\r\n"), zone, value, nowOff ? 1 : 0);
-  return true;
-}
-
 // Reset a zone's PID memory so re-activation starts from a clean integral.
 // Called on every early-return (OFF / invalid / stale) so an excluded zone does
 // not carry a stale integral when it later returns to HEAT. Zeroing an already-

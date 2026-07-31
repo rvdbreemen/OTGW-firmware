@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.349
+**  Version  : v2.0.0-alpha.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -316,8 +316,6 @@ void weatherPublishMQTT();
 void satBLEInit();
 void satBLELoop();
 void satBLEUpdateState();
-float satBLEGetTemperature();
-float satBLEGetHumidity();
 void satBLEPublishMQTT();
 void satBLESendStatusJSON(JsonEmit& je, const SATRuntimeSection& sat, bool bleFailoverActive);  // TASK-885/883: appends ble_* fields from a frozen SAT snapshot into the caller's open SAT-status object (deterministic streaming)
 bool satBLEFailoverActive();                // TASK-883: read the BLE failover flag for per-response snapshotting
@@ -361,7 +359,6 @@ bool satHandleExternalOutdoor(const char* value);
 bool satHandleTargetTemp(const char* value);
 bool satHandleZoneRoomTemp(uint8_t zone, const char* value);
 bool satHandleZoneSetpoint(uint8_t zone, const char* value);
-bool satHandleZoneMode(uint8_t zone, const char* value);  // TASK-593: HVACMode.OFF per zone
 void satHandleEnabled(const char* value);
 void satHandleHeatingMode(const char* value);
 void satDisable();
@@ -387,8 +384,6 @@ void satHCRReset();
 void satHCRAddSample();
 const char* satHeatingCurveRecommendation();
 // Cycle window persistence and flush (Task #237, defined in SATcycles.ino / SATcontrol.ino)
-void satSaveCycleWindow();
-void satLoadCycleWindow();
 void satFlushCycleWindow();
 void satFlushShortLivedData();
 

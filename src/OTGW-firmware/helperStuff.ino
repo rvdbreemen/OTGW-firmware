@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.349
+**  Version  : v2.0.0-alpha.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -792,29 +792,6 @@ const char* getFilesystemHash(){
   return _githash;
 }
 
-
-String strHTTPmethod(HTTPMethod method)
-{
-  switch (method)
-  {
-    case HTTPMethod::HTTP_GET:
-      return "GET";
-    case HTTPMethod::HTTP_POST:
-      return "POST";
-    case HTTPMethod::HTTP_PUT:
-      return "PUT";
-    case HTTPMethod::HTTP_PATCH:
-      return "PATCH";
-    case HTTPMethod::HTTP_DELETE:
-      return "DELETE";
-    case HTTPMethod::HTTP_OPTIONS:
-      return "OPTIONS";
-    case HTTPMethod::HTTP_HEAD:
-      return "HEAD";
-    default:
-      return "";
-  }
-}
 
 /*
   RSSI signal quality to percentage quad function

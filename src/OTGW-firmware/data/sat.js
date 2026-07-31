@@ -72,21 +72,6 @@ var SAT = (function() {
     if (e) e.textContent = text;
   }
 
-  function setHTML(id, html) {
-    var e = el(id);
-    if (e) e.innerHTML = html;
-  }
-
-  function addClass(id, cls) {
-    var e = el(id);
-    if (e) e.classList.add(cls);
-  }
-
-  function removeClass(id, cls) {
-    var e = el(id);
-    if (e) e.classList.remove(cls);
-  }
-
   function isLittleFSMismatchMessage(message) {
     if (typeof message !== 'string') return false;
     var normalized = message.toLowerCase();

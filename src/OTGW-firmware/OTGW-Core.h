@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.349
+**  Version  : v2.0.0-alpha.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -802,7 +802,6 @@ extern OTOverrideEntry_t otOverrideStore[OVERRIDE_STORE_MAX];
 // Capture hook: record (find-or-allocate) an override value for msg id. Pure RAM write.
 void recordOTOverride(uint8_t id, uint8_t kind, float value);
 // True if an entry for id exists and is within the active timeout.
-bool isOTOverrideActive(uint8_t id);
 // PROGMEM-safe label for a kind ("answer" / "substituted").
 const __FlashStringHelper* overrideKindLabel(uint8_t kind);
 // Periodic publisher: emit retained <label>/override per active entry (MQTT path only).

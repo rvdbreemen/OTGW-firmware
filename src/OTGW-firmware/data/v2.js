@@ -1100,7 +1100,6 @@
   }
 
   // ---------- Monitor > Graph (same strip chart, g-prefixed ids) ----------
-  function setG(id, key) { var el = document.getElementById(id); if (el) el.setAttribute('points', seriesPoints(key)); }
   function windowedSamples() {
     if (!graphWindowMs) return samples;
     var cutoff = Date.now() - graphWindowMs;

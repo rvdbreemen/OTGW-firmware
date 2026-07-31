@@ -898,28 +898,6 @@ void satBLEUpdateState()
 }
 
 //=====================================================================
-// Get best BLE temperature for SAT (returns 0.0 if no valid reading)
-//=====================================================================
-float satBLEGetTemperature()
-{
-  if (state.sat.bBleTempValid) {
-    return state.sat.fBleTemp;
-  }
-  return 0.0f;
-}
-
-//=====================================================================
-// Get BLE humidity
-//=====================================================================
-float satBLEGetHumidity()
-{
-  if (state.sat.bBleTempValid) {
-    return state.sat.fBleHumidity;
-  }
-  return 0.0f;
-}
-
-//=====================================================================
 // Publish BLE sensor data to MQTT
 // (MAC compact-form helper satBLEMacToCompact() lives in MQTTstuff.ino;
 //  declared in OTGW-firmware.h. TASK-492 consolidated the duplicate

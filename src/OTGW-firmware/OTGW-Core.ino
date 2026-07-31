@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.349
+**  Version  : v2.0.0-alpha.350
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2403,16 +2403,6 @@ void recordOTOverride(uint8_t id, uint8_t kind, float value) {
   otOverrideStore[slot].lastSeen = (now == 0) ? 1 : now;  // 0 reserved as "empty" sentinel
 }
 
-bool isOTOverrideActive(uint8_t id) {
-  const uint32_t now = millis();
-  for (int i = 0; i < OVERRIDE_STORE_MAX; i++) {
-    if (otOverrideStore[i].lastSeen != 0 && otOverrideStore[i].id == id) {
-      return (now - otOverrideStore[i].lastSeen) < OVERRIDE_ACTIVE_TIMEOUT;
-    }
-  }
-  return false;
-}
-
 const __FlashStringHelper* overrideKindLabel(uint8_t kind) {
   return (kind == OT_OVERRIDE_ANSWER) ? F("answer") : F("substituted");
 }
@@ -2955,46 +2945,6 @@ void print_flag8u8(uint16_t& value)
     strlcat(otTopic, "_code", sizeof(otTopic));
     sendMQTTData(otTopic, _msg);
     value = OTdata.u16(); 
-  }
-}
-
-void print_flag8(uint16_t& value)
-{
-  
-  AddLogf("%s = flag8 = [%s] - decimal = [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-
-   if (is_value_valid(OTdata, OTlookupitem)){
-    //Build string for MQTT
-    otTopic[0] = '\0';
-    //flag8 value
-    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
-    strlcat(otTopic, "_flag8", sizeof(otTopic));
-    sendMQTTData(otTopic, byte_to_binary(OTdata.valueLB));
-    value = OTdata.u16();
-  }
-}
-
-
-void print_flag8flag8(uint16_t& value)
-{ 
-  //Build string for MQTT
-  otTopic[0] = '\0';
-  //flag8 valueHB
-  
-  AddLogf("%s = HB flag8[%s] -[%3d] ", OTlookupitem.label, byte_to_binary(OTdata.valueHB), OTdata.valueHB);
-
-  if (is_value_valid(OTdata, OTlookupitem)){
-    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
-    strlcat(otTopic, "_hb_flag8", sizeof(otTopic));
-    sendMQTTData(otTopic, byte_to_binary(OTdata.valueHB));
-  }
-  //flag8 valueLB
-  AddLogf("%s = LB flag8[%s] - [%3d]", OTlookupitem.label, byte_to_binary(OTdata.valueLB), OTdata.valueLB);
-  if (is_value_valid(OTdata, OTlookupitem)){
-    strlcpy(otTopic, messageIDToString(static_cast<OTLibMessageID>(OTdata.id)), sizeof(otTopic));
-    strlcat(otTopic, "_lb_flag8", sizeof(otTopic));
-    sendMQTTData(otTopic, byte_to_binary(OTdata.valueLB));
-    value = OTdata.u16();
   }
 }
 

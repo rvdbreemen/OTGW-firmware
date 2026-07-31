@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-31 22:26'
-updated_date: '2026-07-31 22:54'
+updated_date: '2026-07-31 23:07'
 labels: []
 dependencies: []
 ordinal: 251000
@@ -32,9 +32,29 @@ KEEP - false positives the src/-only sweep produced: bleMatchesConfiguredMAC is 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 ADR-167 residue removed: HEAP_LOW_RESTORE_THRESHOLD, both HAS_FRAGMENTATION_AWARE_HEAP_GATE #else arms, and the flag itself retired from boards.h in the same commit
-- [ ] #2 All 12 unreferenced C symbols removed together with any orphaned declarations
-- [ ] #3 All 10 unreferenced JS symbols removed from data/
-- [ ] #4 bleMatchesConfiguredMAC, OTValueType and every capability-flag off-branch are left in place, with the reason recorded in the task notes
-- [ ] #5 build.bat with no --target: all three envs green for BOTH firmware and filesystem (6 SUCCESS lines), because a branch dead under one board may be live under another
-- [ ] #6 python evaluate.py shows no new failures and python tests/test_evaluate.py still passes
+- [x] #2 All 12 unreferenced C symbols removed together with any orphaned declarations
+- [x] #3 All 10 unreferenced JS symbols removed from data/
+- [x] #4 bleMatchesConfiguredMAC, OTValueType and every capability-flag off-branch are left in place, with the reason recorded in the task notes
+- [x] #5 build.bat with no --target: all three envs green for BOTH firmware and filesystem (6 SUCCESS lines), because a branch dead under one board may be live under another
+- [x] #6 python evaluate.py shows no new failures and python tests/test_evaluate.py still passes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Landed in two commits so testers get a clean A/B signal.
+
+Commit 1 (ADR-167 residue): HEAP_LOW_RESTORE_THRESHOLD plus its 12-line rationale block, both HAS_FRAGMENTATION_AWARE_HEAP_GATE #else arms in MQTTstuff.ino, and the flag itself retired from both board branches of boards.h so it did not become a fresh dead symbol.
+
+Commit 2 (unreferenced symbols): 13 C definitions + 6 orphaned declarations + 10 JS symbols, 265 lines of C and 65 of JS.
+
+FOUND BEYOND THE SWEEP: print_flag8flag8. The sweep reported only print_flag8; counting the whole print_* family at once showed both have zero callers while every other member has at least one. Family-level counting catches what symbol-level auditing misses.
+
+CORRECTED THE SWEEP: bleMatchesConfiguredMAC and OTValueType were both reported dead and are both alive. The workflow scoped its greps to src/, so it could not see tests/test_ble_parsers.cpp or the three docs files. Kept, and recorded here.
+
+METHOD NOTE for whoever runs the next sweep: the workflow returned 43 candidates and 43 survivals, i.e. a zero refutation rate against verifiers explicitly told to default to not-dead. That is a signal the verifiers agreed with the finders rather than testing them independently. Hand-checking a sample found the two false positives above. Do not trust a 100% survival rate.
+
+Also fixed a comment in restAPI.ino:103 that pointed at strHTTPmethod, which this commit deletes.
+
+Verification: all three targets (esp32, esp32-classic, esp32-combo) SUCCESS for firmware AND filesystem, built serially from wiped .pio/build dirs; node --check clean on index.js/v2.js/sat.js; evaluate.py 94 checks 0 failures; tests/test_evaluate.py 61 tests OK.
+<!-- SECTION:NOTES:END -->
