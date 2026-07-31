@@ -3,11 +3,11 @@ id: TASK-1052
 title: >-
   Port 1.x TASK-1050: ignore DHCP-supplied NTP servers (option 42) via a
   platform shim
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-31 19:51'
-updated_date: '2026-07-31 20:33'
+updated_date: '2026-07-31 21:03'
 labels: []
 dependencies: []
 ordinal: 247000
@@ -25,8 +25,11 @@ Port of otgw-1.x.x commit 6eceed8f7 (v1.7.2). VERIFIED APPLICABLE ON ESP32-S3: D
 - [x] #2 setup() calls platformIgnoreDhcpNtp() before any WiFi/DHCP path, with a comment citing the sdkconfig evidence
 - [x] #3 no raw esp_sntp/sntp symbol appears outside the platform headers
 - [x] #4 build.bat green for esp32 target
-- [x] #5 python evaluate.py --quick shows no new abstraction-boundary violations
+- [ ] #5 python evaluate.py --quick shows no new abstraction-boundary violations
+- [ ] #6 Field-verified on a bench S3 against a DHCP server that sends option 42: no DHCP-supplied NTP server in the SNTP config after boot AND after a forced lease renewal
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
@@ -36,4 +39,12 @@ AC#1 amended in flight: platform_esp8266.h does NOT exist on this branch. dev is
 platformIgnoreDhcpNtp() wraps esp_sntp_servermode_dhcp(0), with #include <esp_sntp.h> added alongside the other esp_* includes. Called as the FIRST statement of setup(), ahead of the runtime hardware detect and anything that can bring up WiFi, so no DHCP handshake can complete before it runs. No raw sntp/esp_sntp symbol appears outside the platform header (verified by grep). evaluate.py 94 checks / 0 failures, no new abstraction-boundary violations; build.bat --target esp32 SUCCESS for firmware and filesystem.
 
 Evidence for applicability, since my first read of this was wrong: D:/DevData/platformio/packages/framework-arduinoespressif32-libs/esp32s3/sdkconfig:2819 has CONFIG_LWIP_DHCP_GET_NTP_SRV=y. I had initially assumed ESP-IDF defaulted this off and that the port was unnecessary.
+
+STATUS CORRECTED 2026-07-31: moved back from Done to In Progress. It was closed on a green compile, which is the wrong bar for this change. The entire value of esp_sntp_servermode_dhcp(0) is runtime behaviour across DHCP lease renewals; a build proves only that the symbol resolves.
+
+Specific unverified risk: the shim is called as the FIRST statement of setup(), i.e. before esp_netif/lwIP bring-up. The 1.x original did the same on ESP8266, but that is a different SDK, and an lwIP-side servermode flag set before tcpip_init() may simply be re-initialised by it. If so the call is a silent no-op and the leak path stays open.
+
+FIELD VALIDATION NEEDED (new AC#6): on a bench S3, boot on a network whose DHCP server sends option 42, then confirm no DHCP-supplied server appears in the SNTP configuration and that only settings.ntp.sHostname is in use. Re-check after a forced lease renewal, since the renewal is the actual leak trigger. If the flag does not survive lwIP init, move the call to just after the netif is up and before WiFi.begin().
+
+TASK-1051 (the resync interval) is unaffected and remains correctly Done: it is a compile-time constant with no runtime handshake to verify.
 <!-- SECTION:NOTES:END -->
