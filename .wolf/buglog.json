@@ -2645,10 +2645,10 @@
   {
     "id": "bug-151",
     "timestamp": "2026-08-03T00:00:00+02:00",
-    "error_message": "platformIgnoreDhcpNtp() called as the first statement of setup(): esp_sntp_servermode_dhcp() dispatches via tcpip_callback(), whose LWIP_ASSERT(\"Invalid mbox\", sys_mbox_valid_val(tcpip_mbox)) fires when tcpip_init() has not run yet.",
+    "error_message": "assert failed: tcpip_callback /IDF/components/lwip/lwip/src/api/tcpip.c:318 (Invalid mbox) -> boot loop (55 ROM banners in 30s) on ESP32-S3. Caused by platformIgnoreDhcpNtp() being called as the first statement of setup(), before lwIP is up.",
     "file": "src/OTGW-firmware/networkStuff.ino",
     "root_cause": "esp_sntp_servermode_dhcp() is not a plain flag setter; it posts do_servermode_dhcp to the lwIP thread. tcpip_mbox stays NULL until tcpip_init(), and Arduino initArduino() never calls esp_netif_init() - the first one comes from WiFi.mode() -> wifiLowLevelInit() -> Network.begin(). The assert is live in this build (CONFIG_LWIP_ESP_LWIP_ASSERT=y + assertions enabled -> LWIP_PLATFORM_ASSERT = __assert_func), so the call aborts rather than silently failing.",
-    "fix": "Moved the call from the top of setup() to directly under WiFi.mode(WIFI_STA) in startWiFi(), the first point where lwIP is provably up and still ahead of the T1 lease renewal that triggers the leak. Ordering contract documented at the shim (platform_esp32.h) and at the call site. Deliberately did NOT pull esp_netif_init() into the shim: that would move stack bring-up to boot t=0 (TASK-949 reordering class).",
+    "fix": "Moved the call from the top of setup() to directly under WiFi.mode(WIFI_STA) in startWiFi(), the first point where lwIP is provably up and still ahead of the T1 lease renewal that triggers the leak. Ordering contract documented at the shim (platform_esp32.h) and at the call site. Deliberately did NOT pull esp_netif_init() into the shim: that would move stack bring-up to boot t=0 (TASK-949 reordering class). CONFIRMED ON HARDWARE 2026-08-03 by an A/B flash on the bench OTGW32: old placement boot-loops with the exact assert above, new placement boots clean (1 ROM banner, 0 asserts, 45s). Affected builds: alpha.348 through alpha.350.",
     "tags": [
       "ntp",
       "dhcp",
@@ -2660,6 +2660,6 @@
     ],
     "related_bugs": [],
     "occurrences": 1,
-    "last_seen": "2026-08-03T00:00:00+02:00"
+    "last_seen": "2026-08-03T20:35:00+02:00"
   }
 ]

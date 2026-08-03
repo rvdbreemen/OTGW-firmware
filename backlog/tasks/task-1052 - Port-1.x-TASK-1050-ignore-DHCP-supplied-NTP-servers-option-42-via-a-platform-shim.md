@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-31 19:51'
-updated_date: '2026-08-03 17:15'
+updated_date: '2026-08-03 18:36'
 labels: []
 dependencies: []
 ordinal: 247000
@@ -65,4 +65,20 @@ Verification: python evaluate.py --quick 76 checks / 0 FAIL (1 pre-existing WARN
 STILL OPEN and NOT claimed: no bench board is attached (no serial ports present, 192.168.1.143 unreachable), so nothing here is hardware-confirmed. The abort behaviour of the OLD placement is a source-derived prediction, not an observed boot. AC#6 unchanged.
 
 AC bookkeeping: AC#1 checked as amended - platform_esp8266.h does not exist on this ESP32-S3-only branch, so platform_esp32.h is the only header there is to add the shim to. AC#5 checked; the evaluator has been green across both the original commit and this one.
+
+HARDWARE A/B DONE 2026-08-03 on the bench OTGW32 (ESP32-S3, COM4, USB-CDC console). The source-derived prediction is now an observed fact.
+
+Method: flash alpha.351 (fixed placement), capture 45s of boot console; then rebuild the SAME tree with only the call moved back to the top of setup(), flash app-only, capture 30s; then restore and re-verify. Reset triggered by an RTS/DTR pulse, output read straight off COM4.
+
+OLD placement (call as first statement of setup()) - boot loop:
+  assert failed: tcpip_callback /IDF/components/lwip/lwip/src/api/tcpip.c:318 (Invalid mbox)
+  Backtrace: 0x403827ad:0x3fcebca0 0x40382775:0x3fcebcc0 0x403899ce:0x3fcebce0 0x420978a3:0x3fcebe20 0x42095221:0x3fcebe40 0x420319f5:0x3fcebe60 0x420706ff:0x3fcec0f0 0x4038372d:0x3fcec120
+  Rebooting...
+55 ROM banners in 30 seconds. Exactly the file, line and assertion text predicted from the toolchain sources.
+
+NEW placement (under WiFi.mode(WIFI_STA) in startWiFi()): 1 ROM banner in 45s and again in 40s after the re-flash, zero assert/abort/panic hits, no re-enumeration of the USB-CDC port. Boots and stays up.
+
+CONSEQUENCE WORTH FLAGGING: dev has been boot-looping on ESP32-S3 for every build from alpha.348 (57177d910, 2026-07-31) through alpha.350. Any tester who flashed one of those got a device that never reaches setup(). Fixed from alpha.351 (3530b9b1).
+
+AC#6 STILL OPEN and unchanged. The bench board is provisioned for a 192.168.1.x network while this host sits on 192.168.88.x, so it is not reachable for a runtime SNTP inspection, and no DHCP server sending option 42 was involved in this test. What is proven is that the shim now RUNS instead of aborting; what is NOT proven is that a DHCP-offered NTP server is actually refused afterwards and stays refused across a forced lease renewal.
 <!-- SECTION:NOTES:END -->
