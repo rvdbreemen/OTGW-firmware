@@ -218,7 +218,19 @@ inline void platformNtpHostnameFix(const char *hostname) {
 // TASK-1050). We configure our own server in startNTP(), so a DHCP-supplied
 // one is unwanted regardless of whether it leaks here.
 //
-// Must be called before the persistent-WiFi auto-connect can complete DHCP.
+// ORDERING CONTRACT: the TCP/IP stack must already be up when this runs.
+// esp_sntp_servermode_dhcp() does not touch the flag directly; it hands the
+// work to the lwIP thread via tcpip_callback(), whose first statement is
+// LWIP_ASSERT("Invalid mbox", sys_mbox_valid_val(tcpip_mbox)). tcpip_mbox is
+// NULL until tcpip_init() runs, and this build keeps that assert live
+// (CONFIG_LWIP_ESP_LWIP_ASSERT=y plus assertions enabled, so lwIP's
+// port/esp32xx/include/arch/cc.h maps LWIP_PLATFORM_ASSERT to __assert_func).
+// Calling this before the stack is up therefore aborts rather than silently
+// doing nothing. Arduino's initArduino() never brings lwIP up: the first
+// esp_netif_init() in our boot path comes from WiFi.mode() ->
+// wifiLowLevelInit() -> Network.begin(). Hence the call site sits immediately
+// after WiFi.mode(WIFI_STA) in startWiFi(), which is also still ahead of the
+// leak trigger (the T1 lease renewal).
 inline void platformIgnoreDhcpNtp() {
   esp_sntp_servermode_dhcp(0);
 }

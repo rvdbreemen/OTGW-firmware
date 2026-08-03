@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.350
+**  Version  : v2.0.0-alpha.351
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -81,6 +81,15 @@ void resetWiFiSettings(void)
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+
+  // Refuse DHCP-supplied NTP servers (option 42): we run our own NTP in
+  // startNTP(), and the DHCP-fed path leaks heap on every lease renewal
+  // (TASK-1052, ported from 1.x TASK-1050). This MUST stay directly under
+  // WiFi.mode(): that call is what brings lwIP up (wifiLowLevelInit() ->
+  // Network.begin() -> esp_netif_init()), and the shim aborts when the TCP/IP
+  // stack is not initialized yet. See platformIgnoreDhcpNtp() for the full
+  // ordering contract and the sdkconfig evidence.
+  platformIgnoreDhcpNtp();
 
   // TASK-725 (port of TASK-548): apply static IP before any connect attempt.
   // Empty sStaticIp = DHCP (default) → leave OS DHCP mode unchanged.

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.350
+**  Version  : v2.0.0-alpha.351
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -242,12 +242,6 @@ static void applyResolvedComboPins()
 
 //=====================================================================
 void setup() {
-
-  // Refuse DHCP-supplied NTP servers (option 42) before anything can bring up
-  // WiFi and complete a DHCP handshake. We run our own NTP in startNTP(), and
-  // the DHCP-fed path leaks heap on every lease renewal (TASK-1052, ported from
-  // 1.x TASK-1050). See platformIgnoreDhcpNtp() for the sdkconfig evidence.
-  platformIgnoreDhcpNtp();
 
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
