@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-07 20:14'
-updated_date: '2026-08-07 20:33'
+updated_date: '2026-08-07 21:15'
 labels:
   - bug
   - mqtt
@@ -29,14 +29,16 @@ Reported by nico55 (Discord #nederlandse-ondersteuning, 2026-08-06/07) on 1.7.2+
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Root cause confirmed with evidence: identify whether hvac_mode is published non-retained, never published since boot, or both
+- [x] #1 Root cause confirmed with evidence: identify whether hvac_mode is published non-retained, never published since boot, or both
 - [ ] #2 After an HA restart (homeassistant/status -> online) the climate entity shows a real mode within one publish cycle, without an ESP reboot
-- [ ] #3 Fix does not reintroduce the ADR-073 bulk discovery republish storm; if the ADR-073 no-op decision must change, a superseding ADR is authored and Accepted first
-- [ ] #4 hvac_action and other change-gated state topics are covered by the same fix or explicitly documented as out of scope
-- [ ] #5 python build.py --firmware exits 0
-- [ ] #6 python evaluate.py --quick shows no new failures
+- [x] #3 Fix does not reintroduce the ADR-073 bulk discovery republish storm; if the ADR-073 no-op decision must change, a superseding ADR is authored and Accepted first
+- [x] #4 hvac_action and other change-gated state topics are covered by the same fix or explicitly documented as out of scope
+- [x] #5 python build.py --firmware exits 0
+- [x] #6 python evaluate.py --quick shows no new failures
 - [ ] #7 Field validation: nico55 confirms entities survive an HA Core update on the fix build
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
