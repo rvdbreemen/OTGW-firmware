@@ -8,6 +8,13 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+### Fixed
+- Home Assistant entities stayed on "unknown" after every Home Assistant Core restart, and only a gateway reboot brought them back. Discovery configs are retained, so Home Assistant rebuilt the entities from the broker, but state topics are not retained and most values publish only when they change: a freshly restarted Home Assistant subscribed and then waited for a value the firmware had no reason to send. The `homeassistant/status` transition from `offline` to `online` now resets the publish gates, so every tracked value re-publishes as first-seen. That covers the 128 OpenTherm message-id slots, the status and ventilation-status bit and byte fan-outs, the ASF, RBP and Remote Override fan-outs, and `hvac_mode` and `hvac_action`. The republish is paced by OpenTherm bus arrival rather than emitted in one burst, and discovery itself is untouched, so the just-in-time discovery behaviour is unchanged. Reported with a full diagnostic capture that recorded a real Home Assistant restart, which is what made the cause findable. (TASK-1058, ADR-088)
+- `hvac_mode` and `hvac_action` could latch a value Home Assistant never received. Both publishers discarded the result of the MQTT send and updated their in-memory cache regardless, while the force flag that triggered the send was already cleared. A single dropped publish therefore stranded the topic until the thermostat mode genuinely changed. They now update the cache only after a confirmed send, and fall back to the unset state otherwise so the next OpenTherm frame retries. (TASK-1058)
+
+### Changed
+- The "MQTT Home Assistant Reboot Detection" setting is deprecated and no longer shown in the web interface. Detecting a Home Assistant restart now always requires observing it go offline first, which is what that setting used to switch off. Requiring the full offline-to-online transition also means a retained Home Assistant birth message, which some setups publish and the broker then replays on every reconnect, cannot trigger a republish on an ordinary reconnect. The setting is still read from and written to `settings.ini`, so existing configurations load unchanged; it simply no longer affects behaviour. (TASK-1058, ADR-088)
+
 ## [1.7.2] - 2026-07-30
 
 Long-run stability release for the 1.x (ESP8266) line: two genuine heap leaks fixed, both of which drained long-running devices to an out-of-memory reboot after roughly 1 to 1.5 hours. v1.7.0 fixed heap fragmentation; this release fixes the leaks that remained. No breaking changes versus v1.7.1. Full notes: [RELEASE_NOTES_1.7.2.md](RELEASE_NOTES_1.7.2.md).
