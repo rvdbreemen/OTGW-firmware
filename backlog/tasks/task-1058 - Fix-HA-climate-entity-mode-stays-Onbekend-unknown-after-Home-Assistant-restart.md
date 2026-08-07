@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-07 20:14'
-updated_date: '2026-08-07 21:15'
+updated_date: '2026-08-07 21:33'
 labels:
   - bug
   - mqtt
@@ -36,7 +36,10 @@ Reported by nico55 (Discord #nederlandse-ondersteuning, 2026-08-06/07) on 1.7.2+
 - [x] #5 python build.py --firmware exits 0
 - [x] #6 python evaluate.py --quick shows no new failures
 - [ ] #7 Field validation: nico55 confirms entities survive an HA Core update on the fix build
+- [ ] #8 hvac_mode/hvac_action latch their RAM cache only on a confirmed send, so a dropped publish retries instead of stranding the topic until the mode changes
 <!-- AC:END -->
+
+
 
 
 
