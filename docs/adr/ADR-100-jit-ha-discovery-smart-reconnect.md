@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted, 2026-05-08. Decision Maker: User: Robert van den Breemen (rvdbreemen).
+Superseded by ADR-174, 2026-08-07. Originally Accepted, 2026-05-08. Decision Maker: User: Robert van den Breemen (rvdbreemen).
+
+ADR-174 replaces the `HA restart (homeassistant/status → online)` trigger-table row below. All other decisions in this ADR — JIT discovery for OpenTherm MsgIDs, the non-OT config set, the broker-restart heuristic, and the force path — remain in force and are restated by reference in ADR-174.
 
 ## Context
 
