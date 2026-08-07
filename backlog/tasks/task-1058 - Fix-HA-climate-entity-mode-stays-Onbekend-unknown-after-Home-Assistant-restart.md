@@ -3,10 +3,11 @@ id: TASK-1058
 title: >-
   Fix: HA climate entity mode stays Onbekend/unknown after Home Assistant
   restart
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-07 20:14'
-updated_date: '2026-08-07 20:15'
+updated_date: '2026-08-07 20:27'
 labels:
   - bug
   - mqtt
