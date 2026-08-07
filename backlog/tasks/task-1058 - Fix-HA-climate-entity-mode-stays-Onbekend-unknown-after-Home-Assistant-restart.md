@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-07 20:14'
-updated_date: '2026-08-07 20:27'
+updated_date: '2026-08-07 20:33'
 labels:
   - bug
   - mqtt
@@ -37,3 +37,12 @@ Reported by nico55 (Discord #nederlandse-ondersteuning, 2026-08-06/07) on 1.7.2+
 - [ ] #6 python evaluate.py --quick shows no new failures
 - [ ] #7 Field validation: nico55 confirms entities survive an HA Core update on the fix build
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-07 investigation (pre-ADR):
+- requestMQTTRepublishAll() (OTGW-Core.ino:1359) already covers every on-change gate: resetMqttTrackedState() clears mqttlastsent[128] + status/VH bit+byte + ASF/RBP/RO slots; requestMQTTStatusRepublish() sets the 4 mqttForceNext*StatusPublish flags. hvac_mode/hvac_action are covered TRANSITIVELY: publishMasterStatusState/publishSlaveStatusState pass forcePublish into publishHvacMode/publishHvacAction (OTGW-Core.ino:1725, 1770). No new force mechanism needed - one call site.
+- Storm is bounded by design: resetMqttTrackedState only clears timers. Republish is demand-driven, paced by OT bus traffic as each MsgID next arrives (~1 msg/s), not a synchronous flood. Same path already runs in production on the offline>5min reconnect branch.
+- Retained-birth risk CHECKED against nico55 capture: homeassistant/status appears only at mqtt.log lines 1990 (offline) and 2376 (online), both live during the 21:18:55/21:20:22 HA restart, and NOT in the retained flush (which runs to line 352+ of homeassistant/*/config). So HA birth is not retained here (HA default retain=false). BUT retain is user-configurable, and with bHaRebootDetect=false the handler sets bHAcycle=true on every online, so a retained birth would fire a republish on every firmware MQTT reconnect. A guard is warranted.
+<!-- SECTION:NOTES:END -->
