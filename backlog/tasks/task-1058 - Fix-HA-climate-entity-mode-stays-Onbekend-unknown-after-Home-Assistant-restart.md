@@ -39,10 +39,6 @@ Reported by nico55 (Discord #nederlandse-ondersteuning, 2026-08-06/07) on 1.7.2+
 - [ ] #8 hvac_mode/hvac_action latch their RAM cache only on a confirmed send, so a dropped publish retries instead of stranding the topic until the mode changes
 <!-- AC:END -->
 
-
-
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -50,4 +46,9 @@ Reported by nico55 (Discord #nederlandse-ondersteuning, 2026-08-06/07) on 1.7.2+
 - requestMQTTRepublishAll() (OTGW-Core.ino:1359) already covers every on-change gate: resetMqttTrackedState() clears mqttlastsent[128] + status/VH bit+byte + ASF/RBP/RO slots; requestMQTTStatusRepublish() sets the 4 mqttForceNext*StatusPublish flags. hvac_mode/hvac_action are covered TRANSITIVELY: publishMasterStatusState/publishSlaveStatusState pass forcePublish into publishHvacMode/publishHvacAction (OTGW-Core.ino:1725, 1770). No new force mechanism needed - one call site.
 - Storm is bounded by design: resetMqttTrackedState only clears timers. Republish is demand-driven, paced by OT bus traffic as each MsgID next arrives (~1 msg/s), not a synchronous flood. Same path already runs in production on the offline>5min reconnect branch.
 - Retained-birth risk CHECKED against nico55 capture: homeassistant/status appears only at mqtt.log lines 1990 (offline) and 2376 (online), both live during the 21:18:55/21:20:22 HA restart, and NOT in the retained flush (which runs to line 352+ of homeassistant/*/config). So HA birth is not retained here (HA default retain=false). BUT retain is user-configurable, and with bHaRebootDetect=false the handler sets bHAcycle=true on every online, so a retained birth would fire a republish on every firmware MQTT reconnect. A guard is warranted.
+
+2026-08-07 adversarial review (4 lenses, 7 findings raised, 6 refuted, 1 confirmed):
+CONFIRMED and fixed: publishHvacMode/publishHvacAction (OTGW-Core.ino:1665/1678) discarded sendMQTTData bool and latched mqttLastHvacMode/Action unconditionally. resetMqttTrackedState() does not cover those two caches, and the force flag is cleared at :1707/:1751 BEFORE the fan-out, so a single dropped send stranded hvac_mode until the mode genuinely changed - defeating ADR-088 Confirmation step 2 on the exact topic the ADR was written about. Pre-existing (the reconnect branch at MQTTstuff.ino:873 had the same exposure), not introduced by this change.
+Fix: latch on confirmed send, else fall back to the -1 unset sentinel so the next OT frame retries. Matches the ADR-076 commit-on-success pattern already used by publishStatusBitMQTT at :1557. No new force flag or mechanism, so ADR-088 Must Not is respected.
+Note: reviewer attributed the drop to HEAP_LOW throttling; verified the exposure is wider - sendMQTTData has four false-return paths including an ordinary endPublish TCP failure, and the ADR-088 capture gateway was HEAP_HEALTHY at 18-19KB.
 <!-- SECTION:NOTES:END -->
