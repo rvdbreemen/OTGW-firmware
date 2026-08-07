@@ -6,10 +6,16 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-07 20:14'
+updated_date: '2026-08-07 20:15'
 labels:
   - bug
   - mqtt
 dependencies: []
+references:
+  - >-
+    Discord #nederlandse-ondersteuning nico55 2026-08-06/07 msg
+    1535369849235054738; capture
+    transcript-20260807-211337-1.7.2+728426c-OTGW-otgw-E8DB84DC4538.txt
 priority: high
 ordinal: 170000
 ---
