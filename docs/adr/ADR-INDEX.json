@@ -1,0 +1,4983 @@
+{
+  "$schema": "../../schemas/adr-index.schema.json",
+  "schema_version": 2,
+  "adrs": [
+    {
+      "id": "ADR-001",
+      "title": "ESP8266 Platform Selection",
+      "path": "ADR-001-esp8266-platform-selection.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2016-01-01",
+      "decision_summary": "Use the ESP8266 (NodeMCU v1.0 / Wemos D1 mini) as the network controller platform with the Arduino framework.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-002",
+      "title": "Modular .ino File Architecture",
+      "path": "ADR-002-modular-ino-architecture.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2018-06-01",
+      "decision_summary": "Adopt a modular .ino file architecture where the firmware is split into 14+ separate .ino files, each responsible for...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-003",
+      "title": "HTTP-Only Network Architecture (No HTTPS)",
+      "path": "ADR-003-http-only-no-https.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2018-01-01",
+      "decision_summary": "Use HTTP-only protocols.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/**/*.{ino,cpp,h}"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-004",
+      "title": "Static Buffer Allocation Strategy",
+      "path": "ADR-004-static-buffer-allocation.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2020-01-01",
+      "decision_summary": "Adopt static buffer allocation with bounded sizes throughout the codebase.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-053"
+      }
+    },
+    {
+      "id": "ADR-005",
+      "title": "WebSocket for Real-Time Streaming",
+      "path": "ADR-005-websocket-real-time-streaming.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2019-06-01",
+      "decision_summary": "Use WebSocket protocol on a dedicated port (81) for real-time OpenTherm message streaming.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-006",
+      "title": "MQTT Integration Pattern",
+      "path": "ADR-006-mqtt-integration-pattern.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2018-06-01",
+      "decision_summary": "Implement MQTT client with Home Assistant Auto-Discovery support using the PubSubClient library.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-007",
+      "title": "Timer-Based Task Scheduling",
+      "path": "ADR-007-timer-based-task-scheduling.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2018-06-01",
+      "decision_summary": "Implement a timer-based task scheduling system using safe macros that handle millisecond rollover correctly.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-008",
+      "title": "LittleFS for Configuration Persistence",
+      "path": "ADR-008-littlefs-configuration-persistence.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2020-06-01",
+      "decision_summary": "Use LittleFS as the filesystem for configuration and web UI files.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-009",
+      "title": "PROGMEM Usage for String Literals",
+      "path": "ADR-009-progmem-string-literals.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2018-06-01",
+      "decision_summary": "MANDATORY: All string literals MUST use PROGMEM to store them in flash memory instead of RAM.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-010",
+      "title": "Multiple Concurrent Network Services",
+      "path": "ADR-010-multiple-concurrent-network-services.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2019-01-01",
+      "decision_summary": "Run multiple network services on separate ports, each optimized for its specific use case.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-011",
+      "title": "External Hardware Watchdog for Reliability",
+      "path": "ADR-011-external-hardware-watchdog.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2018-01-01",
+      "decision_summary": "Use an external I2C hardware watchdog chip that must be fed regularly by the ESP8266, or it will force a hardware reset.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-012",
+      "title": "PIC Firmware Upgrade via Web UI",
+      "path": "ADR-012-pic-firmware-upgrade-via-web.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2019-06-01",
+      "decision_summary": "Implement PIC firmware flashing directly in the ESP8266 Web UI with WebSocket progress streaming.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-013",
+      "title": "Arduino Framework Over ESP-IDF",
+      "path": "ADR-013-arduino-framework-over-esp-idf.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2016-01-01",
+      "decision_summary": "Use the Arduino framework (ESP8266 Arduino Core) for all firmware development.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-014",
+      "title": "Dual Build System (Makefile + Python Script)",
+      "path": "ADR-014-dual-build-system.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2020-01-01",
+      "decision_summary": "Provide dual build system: Makefile (primary) + build.py wrapper (convenience).",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-015",
+      "title": "NTP and AceTime for Time Management",
+      "path": "ADR-015-ntp-acetime-time-management.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2021-10-16",
+      "decision_summary": "Use NTP (Network Time Protocol) for synchronization combined with AceTime library for timezone handling.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-016",
+      "title": "OpenTherm Command Queue with Deduplication",
+      "path": "ADR-016-opentherm-command-queue.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2018-06-01",
+      "decision_summary": "Implement a command queue with automatic deduplication and sequential processing.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-017",
+      "title": "WiFiManager for Initial Configuration",
+      "path": "ADR-017-wifimanager-initial-configuration.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2018-01-01",
+      "decision_summary": "Use WiFiManager library to create a captive portal for initial WiFi configuration.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-018",
+      "title": "ArduinoJson for Data Interchange",
+      "path": "ADR-018-arduinojson-data-interchange.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2018-01-01",
+      "decision_summary": "Use ArduinoJson library for all structured data interchange.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-042"
+      }
+    },
+    {
+      "id": "ADR-019",
+      "title": "REST API Versioning Strategy",
+      "path": "ADR-019-rest-api-versioning-strategy.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2020-06-01",
+      "decision_summary": "Adopt URL path-based API versioning with indefinite version support (no deprecation).",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-020",
+      "title": "Dallas DS18B20 Temperature Sensor Integration",
+      "path": "ADR-020-dallas-ds18b20-sensor-integration.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2019-01-01",
+      "decision_summary": "Integrate Dallas DS18B20 sensors via OneWire protocol with dynamic discovery and MQTT publishing.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-021",
+      "title": "S0 Pulse Counter Hardware Interrupt Architecture",
+      "path": "ADR-021-s0-pulse-counter-interrupt-architecture.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2020-01-01",
+      "decision_summary": "Use hardware interrupt-driven pulse counting with ISR-safe debounce logic.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-022",
+      "title": "GPIO Output Control (Bit-Flag Triggered Relays)",
+      "path": "ADR-022-gpio-output-bit-flag-control.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2020-06-01",
+      "decision_summary": "Implement stateless GPIO output control triggered by configurable OpenTherm status bit.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-023",
+      "title": "File System Explorer HTTP Architecture",
+      "path": "ADR-023-filesystem-explorer-http-api.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2019-01-01",
+      "decision_summary": "Implement HTTP-based file system explorer with streaming upload/download and integrated firmware update capability.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-024",
+      "title": "Debug Telnet Command Console",
+      "path": "ADR-024-debug-telnet-command-console.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2018-06-01",
+      "decision_summary": "Implement character-driven telnet command console using TelnetStream library with menu-based command system.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-025",
+      "title": "Safari WebSocket Connection Management During Firmware Upload",
+      "path": "ADR-025-safari-websocket-connection-management.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-01-29",
+      "decision_summary": "Proactively close WebSocket before upload starts, rely entirely on HTTP polling during flash operations.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-026",
+      "title": "Conditional JavaScript Cache-Busting for Firmware/Filesystem Version Mismatches",
+      "path": "ADR-026-conditional-javascript-cache-busting.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-01-31",
+      "decision_summary": "Implement conditional cache-busting that activates only during firmware/filesystem version mismatches, with normal br...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-027",
+      "title": "Version Mismatch Warning System in Web UI",
+      "path": "ADR-027-version-mismatch-warning-system.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-01-31",
+      "decision_summary": "Add prominent red warning banner in Web UI that automatically shows when firmware and filesystem versions mismatch, h...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-028",
+      "title": "File Streaming Over Loading for Memory Safety",
+      "path": "ADR-028-file-streaming-over-loading.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-01",
+      "decision_summary": "MANDATORY: Never load files >2KB entirely into RAM.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-029",
+      "title": "Simple XHR-Based OTA Flash (KISS Principle)",
+      "path": "ADR-029-simple-xhr-ota-flash.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-04",
+      "decision_summary": "Adopt Simple XHR-Based OTA Flash (Alternative 3)",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-030",
+      "title": "Heap Memory Monitoring and Emergency Recovery",
+      "path": "ADR-030-heap-memory-monitoring-emergency-recovery.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-07",
+      "decision_summary": "Implement proactive heap monitoring with 4-level health system and adaptive throttling.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-031",
+      "title": "Two-Microcontroller Coordination Architecture",
+      "path": "ADR-031-two-microcontroller-coordination-architecture.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-07",
+      "decision_summary": "Adopt Master/Slave architecture with ESP8266 as master, PIC as slave.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-032",
+      "title": "No Authentication Pattern (Local Network Security Model)",
+      "path": "ADR-032-no-authentication-local-network-security.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-07",
+      "decision_summary": "Do NOT implement authentication on any network interface.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-056"
+      }
+    },
+    {
+      "id": "ADR-033",
+      "title": "Dallas Sensor Custom Labels and Graph Visualization",
+      "path": "ADR-033-dallas-sensor-custom-labels-graph-visualization.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-07",
+      "decision_summary": "Implement a comprehensive sensor labeling and graphing system with three main components:",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-034",
+      "title": "Non-Blocking Modal Dialogs for User Input",
+      "path": "ADR-034-non-blocking-modal-dialogs.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-04",
+      "decision_summary": "Use custom HTML/CSS modal dialogs instead of native prompt() and alert() for all user input.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-035",
+      "title": "RESTful API Compliance Strategy",
+      "path": "ADR-035-restful-api-compliance-strategy.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-16",
+      "decision_summary": "Expand the v2 API with RESTful-compliant endpoints and standardized error handling, while keeping v0 and v1 unchanged.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-036",
+      "title": "Boot Sequence Initialization Ordering",
+      "path": "ADR-036-boot-sequence-ordering.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-16",
+      "decision_summary": "Maintain a strictly ordered boot sequence in setup() with documented dependency rationale for each phase.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-037",
+      "title": "Gateway Mode Detection via PR=M Polling",
+      "path": "ADR-037-gateway-mode-detection.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-16",
+      "decision_summary": "Poll the PIC firmware every 30 seconds using PR=M with a 60-second hard throttle cache, and publish mode changes to M...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-038",
+      "title": "OpenTherm Message Data Flow Pipeline",
+      "path": "ADR-038-opentherm-data-flow-pipeline.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-16",
+      "decision_summary": "Implement a synchronous fan-out pipeline where handleOTGW() reads serial data and dispatches complete lines to proces...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-039",
+      "title": "Real-Time OTGraph Charting Architecture",
+      "path": "ADR-039-otgraph-real-time-charting.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-16",
+      "decision_summary": "Implement a 5-grid ECharts-based charting module (OTGraph) with dynamic Dallas sensor registration, dual-theme palett...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-040",
+      "title": "MQTT Source-Specific Topics for OpenTherm Values",
+      "path": "ADR-040-mqtt-source-specific-topics.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-16",
+      "decision_summary": "Implement additive source-specific MQTT topics and Home Assistant discovery entries, controlled by an opt-in setting...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-041",
+      "title": "Just-In-Time Home Assistant MQTT Discovery",
+      "path": "ADR-041-jit-ha-discovery.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-05-08",
+      "decision_summary": "Drop Path A from all automatic triggers.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-073"
+      }
+    },
+    {
+      "id": "ADR-042",
+      "title": "Streaming JSON I/O — No ArduinoJson",
+      "path": "ADR-042-streaming-json-no-arduinojson.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-02-28",
+      "decision_summary": "Never use ArduinoJson in this firmware.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/**/*.{ino,cpp,h}",
+          "src/**"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-043",
+      "title": "Reset-Pattern WiFi Recovery Trigger",
+      "path": "ADR-043-reset-pattern-wifi-recovery.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-01",
+      "decision_summary": "Implement a triple-reset trigger within a 10-second window to force WiFi recovery mode:",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-044",
+      "title": "Global State — extern Declaration in Header, Definition in .ino",
+      "path": "ADR-044-global-state-header-definition-pattern.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-05",
+      "decision_summary": "Use extern declarations in the header and a single definition in the owning .ino file.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-045",
+      "title": "PS=1 Print Summary Parsing",
+      "path": "ADR-045-ps1-print-summary-parsing.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-03-02",
+      "decision_summary": "Implement processPSSummary() that fully parses PS=1 summary lines and publishes each field through the existing decod...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-046"
+      }
+    },
+    {
+      "id": "ADR-046",
+      "title": "PS=1 Summary Translation with Shared Publish Helpers",
+      "path": "ADR-046-ps1-summary-translation-shared-publish-helpers.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-07",
+      "decision_summary": "Treat PS=1 as a dedicated summary-translation path with shared publish/state helpers, not as a synthetic raw-frame ad...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-045"
+        ],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-047",
+      "title": "Non-Blocking WiFi Reconnect State Machine",
+      "path": "ADR-047-nonblocking-wifi-reconnect.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-03-01",
+      "decision_summary": "Replace the blocking restartWifi() with a non-blocking state machine loopWifi() that runs cooperatively in the main l...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-061"
+      }
+    },
+    {
+      "id": "ADR-048",
+      "title": "Non-Blocking Webhook State Machine with Retry",
+      "path": "ADR-048-nonblocking-webhook-state-machine.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-01",
+      "decision_summary": "Refactor webhook into a three-state machine that decouples detection from sending and adds retry with a fixed 30s bac...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-049",
+      "title": "String Class Prohibition in Protocol Paths",
+      "path": "ADR-049-string-prohibition-protocol-paths.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-01",
+      "decision_summary": "Prohibit the Arduino String class as a return type or local variable in any function that executes on the OpenTherm m...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/{MQTTstuff,OTGW-Core,SATcontrol,SATcycles,SATpid,SATpressure,SATweather,restAPI,jsonStuff,handleDebug,networkStuff}.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-050",
+      "title": "Centralized API Route Dispatch Table",
+      "path": "ADR-050-centralized-api-route-dispatch.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-01",
+      "decision_summary": "Replace the monolithic if-else chain with a function-pointer dispatch table.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-051",
+      "title": "Dual Encapsulating Structs (Settings + State)",
+      "path": "ADR-051-dual-encapsulating-structs.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-01",
+      "decision_summary": "Group all globals into two top-level structs with named sub-sections:",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-052",
+      "title": "MQTT Publish Eligibility and Reconnect Refresh Contract",
+      "path": "ADR-052-mqtt-publish-eligibility-contract.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-17",
+      "decision_summary": "Define MQTT publish eligibility as a first-seen OR value-changed OR stale-refresh contract, with MQTT reconnect reset...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-053",
+      "title": "Large Feature Buffer Static Allocation",
+      "path": "ADR-053-large-feature-buffer-static-allocation.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-21",
+      "decision_summary": "All feature-specific working buffers must be declared as global arrays — never heap-allocated, never local static, ne...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-054",
+      "title": "Optional HTTP Basic Authentication for Settings",
+      "path": "ADR-054-optional-http-basic-auth.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-02-24",
+      "decision_summary": "Add optional HTTP Basic Authentication to sensitive endpoints only.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-056"
+      }
+    },
+    {
+      "id": "ADR-055",
+      "title": "Webhook Outbound HTTP Integration",
+      "path": "ADR-055-webhook-outbound-http-integration.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-03-02",
+      "decision_summary": "Implement a configurable outbound HTTP webhook that fires once on each rising or falling edge of a selected OpenTherm...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-057"
+      }
+    },
+    {
+      "id": "ADR-056",
+      "title": "Protected Admin Endpoint Security and Secret-Handling Contract",
+      "path": "ADR-056-protected-admin-endpoint-security-and-secret-handling-contract.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-21",
+      "decision_summary": "Define a single protected-admin contract for OTGW-firmware.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-057",
+      "title": "Webhook Delivery, Retry, and Protected Test Endpoint Policy",
+      "path": "ADR-057-webhook-delivery-retry-and-protected-test-endpoint-policy.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-21",
+      "decision_summary": "Define the webhook feature as a best-effort, local-network, edge-triggered outbound HTTP delivery mechanism with boun...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-055"
+        ],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-058",
+      "title": "Non-blocking PIC Command/Response for PR= Queries",
+      "path": "ADR-058-nonblocking-pic-command-response.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-27",
+      "decision_summary": "Replace all executeCommand(\"PR=...\") calls with non-blocking command queue submissions, and process responses asynchr...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-059",
+      "title": "Ser2net Queue Awareness and Serial Bus Coordination",
+      "path": "ADR-059-ser2net-queue-awareness.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-28",
+      "decision_summary": "Keep ser2net as a direct serial passthrough, but make the command queue aware of ser2net traffic so it can avoid conf...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-060",
+      "title": "PIC Availability Guard Pattern",
+      "path": "ADR-060-pic-availability-guard-pattern.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-03-31",
+      "decision_summary": "Introduce a central PIC availability guard via isPICEnabled() that all PIC-dependent code paths check before proceeding.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-061",
+      "title": "WiFi Reconnect Timeout Tuning",
+      "path": "ADR-061-wifi-reconnect-timeout-tuning.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-04-03",
+      "decision_summary": "Increase the per-attempt timeout from 5 seconds to 30 seconds and reduce max retries from 15 to 10.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-062",
+      "title": "— Retained discovery verification via wildcard subscribe with RAM-tuned buffer resize",
+      "path": "ADR-062-retained-discovery-verification.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-07-22",
+      "decision_summary": "Introduce an active verification mechanism that:",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-087"
+      }
+    },
+    {
+      "id": "ADR-064",
+      "title": "— Time-boundary consume-on-read helpers MUST have exactly one call site",
+      "path": "ADR-064-time-boundary-single-caller-contract.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-04-20",
+      "decision_summary": "Each of the four helpers has exactly one call site in the entire firmware.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-065",
+      "title": "— otgw-pic/ MQTT subtree as stable public topic API",
+      "path": "ADR-065-otgw-pic-mqtt-subtree.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-04-23",
+      "decision_summary": "The otgw-pic/ MQTT subtree is a stable public topic API.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-066",
+      "title": "MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification",
+      "path": "ADR-066-mqtt-publish-gating-by-source-and-slave-echo.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-04-28",
+      "decision_summary": "Gate MQTT publication of OpenTherm Write-Ack values per topic-class:",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-067",
+      "title": "— HA Discovery State Reconciliation on OTA Upgrade",
+      "path": "ADR-067-ha-discovery-state-reconciliation-on-ota-upgrade.md",
+      "format": "canonical",
+      "status": "Deprecated",
+      "date": "2026-05-04",
+      "decision_summary": "The feature is removed from the firmware.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-068",
+      "title": "bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive",
+      "path": "ADR-068-bseparatesources-mutually-exclusive-base-and-source-variants.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-05-07",
+      "decision_summary": "bSeparateSources becomes a binary toggle: either base entities or source-variant entities are published for source-te...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-070"
+      }
+    },
+    {
+      "id": "ADR-069",
+      "title": "MQTT Source-Subtopic Worldview Semantics",
+      "path": "ADR-069-mqtt-source-topic-worldview-semantics.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-05-19",
+      "decision_summary": "Adopt the worldview model for source-separated MQTT subtopics.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-075"
+      }
+    },
+    {
+      "id": "ADR-070",
+      "title": "MQTT Source-Topic Sibling-Suffix Shape",
+      "path": "ADR-070-mqtt-source-topic-sibling-suffix-shape.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-05-07",
+      "decision_summary": "Use sibling-suffix topic shape ( ) instead of nested children ( / ) for source-separated state topics:",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/MQTTstuff.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-068"
+        ],
+        "superseded_by": "ADR-071"
+      }
+    },
+    {
+      "id": "ADR-071",
+      "title": "MQTT Discovery Topic Sibling-Suffix Shape (Supersedes ADR-070)",
+      "path": "ADR-071-mqtt-discovery-topic-sibling-suffix-shape.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-05-07",
+      "decision_summary": "Use sibling-suffix shape for discovery topics in addition to state topics:",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/mqtt_configuratie.cpp"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-070"
+        ],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-072",
+      "title": "— HA Discovery Friendly-Name Format",
+      "path": "ADR-072-ha-discovery-friendly-name-format.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": null,
+      "decision_summary": "Output format.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-073",
+      "title": "JIT HA Discovery with Smart Reconnect (Supersedes ADR-041)",
+      "path": "ADR-073-jit-ha-discovery-smart-reconnect.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-08-07",
+      "decision_summary": "markAllMQTTConfigPending() is removed from all automatic call sites.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-041"
+        ],
+        "superseded_by": "ADR-088"
+      }
+    },
+    {
+      "id": "ADR-074",
+      "title": "HA Entity Availability Reflects the MQTT Link, Not OpenTherm-Bus Liveness",
+      "path": "ADR-074-ha-availability-reflects-mqtt-link-not-ot-bus.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-05-16",
+      "decision_summary": "HA entity availability MUST reflect only the ESP↔MQTT link.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/**/*.{ino,cpp,h}"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-075",
+      "title": "MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement",
+      "path": "ADR-075-mqtt-source-topic-proxy-answer-routing.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-05-19",
+      "decision_summary": "Refine worldview routing to distinguish a proxy-answer A (no preceding B) from an answer-override A (preceded by B).",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-069"
+        ],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-076",
+      "title": "MQTT Status Fan-Out — Drop Global Rate-Gate, Keep Per-Slot Heartbeat",
+      "path": "ADR-076-mqtt-status-fanout-drop-global-rate-gate.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-05-21",
+      "decision_summary": "Remove the global rate-gate from the MQTT status fan-out.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-077",
+      "title": "MQTT — Publish HA-Core-Style Self-Describing Aliases for Capability, State, Type, and Fault Bits under `settings.mqtt.bPublishHaCoreAliases`",
+      "path": "ADR-077-mqtt-ha-core-capability-flag-aliases.md",
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-05-21",
+      "decision_summary": "Add a single bool to the persisted MQTT settings sub-section and a corresponding flag bit to MqttHaBinSensorCfg:",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": "ADR-078"
+      }
+    },
+    {
+      "id": "ADR-078",
+      "title": "Defer HA-Core Capability-Flag Aliases — Ship on 2.0.0 Only, Revert from `dev`",
+      "path": "ADR-078-defer-ha-core-aliases-to-2-0-0-revert-from-dev.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-05-21",
+      "decision_summary": "Revert the ADR-077 implementation on dev via git revert 8050df3d --no-edit (single revert commit).",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/**"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-079",
+      "title": "Emergency Heap Recovery Actions",
+      "path": "ADR-079-emergency-heap-recovery-actions.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-05-23",
+      "decision_summary": "When getHeapHealth() == HEAPCRITICAL, emergencyHeapRecovery() performs the following three actions in order, gated by...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/helperStuff.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-080",
+      "title": "MQTT connect() socket timeout accepted as known main-loop sync-blocker",
+      "path": "ADR-080-mqtt-connect-socket-timeout-as-accepted-sync-blocker.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-05-23",
+      "decision_summary": "Accept the existing MQTTclient.setSocketTimeout(15) as a known synchronous blocker bounded by:",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/MQTTstuff.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-081",
+      "title": "MQTT on-change publishing as the default with one-time interval migration",
+      "path": "ADR-081-mqtt-on-change-publishing-default.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-05-31",
+      "decision_summary": "Introduce a persisted boolean setting MQTTonChangePublishing (struct field settings.mqtt.bOnChangePublishing) with a...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-082",
+      "title": "Surface gateway overrides as distinct override state",
+      "path": "ADR-082-surface-gateway-overrides-as-distinct-override-state.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-06-01",
+      "decision_summary": "Decision maker: User: Robert van den Breemen (chose: cover ALL gateway override message types, not just Toutside; exp...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-083",
+      "title": "Per-Consumer Heap Gating (WebSocket vs MQTT decoupling)",
+      "path": "ADR-083-per-consumer-heap-gating.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": null,
+      "decision_summary": "Give each heap consumer its own threshold ladder while keeping a single shared CRITICAL out-of-memory floor.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-084",
+      "title": "Build-Time ESP8266 Core Patch for the HTTP NULL-Alloc Crash",
+      "path": "ADR-084-build-time-core-patch-http-null-alloc.md",
+      "format": "nygard",
+      "status": "Rejected",
+      "date": "2026-06-10",
+      "decision_summary": "Commit a unified-diff patch under patches/ and have build.py re-apply it to the freshly-installed ESP8266 core after...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-085",
+      "title": "Unified Off/Heat/Cool Home Assistant Climate Entity Derived from OpenTherm Status Bits",
+      "path": "ADR-085-ha-climate-heat-cool-from-ot-status-bits.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-06-27",
+      "decision_summary": "Surface a single unified off/heat/cool climate entity, driven by two new firmware-computed MQTT topics, with mode swi...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-086",
+      "title": "Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses",
+      "path": "ADR-086-rate-limit-ui-polled-rest-endpoints.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-07-20",
+      "decision_summary": "Enforce a per-endpoint request budget in the firmware for /api/v2/otgw/otmonitor and /api/v2/device/time, and answer...",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/**/*.ino",
+          "src/OTGW-firmware/restAPI.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-087",
+      "title": "Unconditional daily drip republish replaces automatic discovery-verify readback",
+      "path": "ADR-087-daily-drip-republish-replaces-discovery-verify-readback.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-07-22",
+      "decision_summary": "Remove the automatic discovery-verify readback.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [
+          "ADR-062"
+        ],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-088",
+      "title": "Republish on-change gated MQTT state when Home Assistant comes back online",
+      "path": "ADR-088-republish-on-change-gated-mqtt-state-when-home-assistant-comes-back-online.md",
+      "format": "madr",
+      "status": "Accepted",
+      "date": "2026-08-07",
+      "decision_summary": "Chosen option: Option A, because it repairs every gated value through a mechanism the firmware already ships and alre...",
+      "topics": [
+        "availability",
+        "discovery",
+        "home-assistant",
+        "mqtt",
+        "state-republish"
+      ],
+      "aliases": [
+        "HA restart republish",
+        "homeassistant/status online trigger",
+        "hvac_mode unknown after HA restart"
+      ],
+      "components": [
+        "MQTT HA status handler",
+        "MQTT publish gating"
+      ],
+      "symbols": [
+        "bHAcycle",
+        "bHaRebootDetect",
+        "publishHvacAction",
+        "publishHvacMode",
+        "requestMQTTRepublishAll",
+        "requestMQTTStatusRepublish",
+        "resetMqttTrackedState"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "The homeassistant/status handler calls requestMQTTRepublishAll() when, and only when, an online payload follows an observed offline payload.",
+          "bHAcycle is set to true only by an observed offline payload.",
+          "settings.mqtt.bHaRebootDetect continues to be parsed from and written to the settings file."
+        ],
+        "must_not": [
+          "The homeassistant/status handler must not call clearMQTTConfigDone(), clearMQTTConfigPending(), publishNonOTDiscoveryConfigs() or markAllMQTTConfigPending().",
+          "No new per-value force flag or parallel republish mechanism may be introduced; requestMQTTRepublishAll() is the single entry point.",
+          "settings.mqtt.bHaRebootDetect must not gate any behaviour."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "src/OTGW-firmware/MQTTstuff.ino, the homeassistant/status handler.",
+          "Field validation by the reporting user across a Home Assistant Core update, tracked in backlog TASK-1058."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "source": "ADR-001",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-001",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-001",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-001",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-002",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-002",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-003",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-003",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-004",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-004",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-004",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-004",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-004",
+      "target": "ADR-012",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-004",
+      "target": "ADR-053",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-005",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-005",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-005",
+      "target": "ADR-010",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-005",
+      "target": "ADR-025",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-006",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-006",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-006",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-006",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-007",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-007",
+      "target": "ADR-002",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-007",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-008",
+      "target": "ADR-002",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-008",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-008",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-008",
+      "target": "ADR-015",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-009",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-009",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-010",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-010",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-010",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-010",
+      "target": "ADR-019",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-011",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-011",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-011",
+      "target": "ADR-012",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-011",
+      "target": "ADR-029",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-011",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-012",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-012",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-012",
+      "target": "ADR-060",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-013",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-013",
+      "target": "ADR-002",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-013",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-014",
+      "target": "ADR-002",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-014",
+      "target": "ADR-013",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-015",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-015",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-015",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-016",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-016",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-016",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-016",
+      "target": "ADR-035",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-017",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-017",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-018",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-018",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-018",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-018",
+      "target": "ADR-042",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-019",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-019",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-019",
+      "target": "ADR-018",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-019",
+      "target": "ADR-035",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-020",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-020",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-020",
+      "target": "ADR-018",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-020",
+      "target": "ADR-019",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-020",
+      "target": "ADR-034",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-021",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-021",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-022",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-023",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-023",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-023",
+      "target": "ADR-010",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-024",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-024",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-024",
+      "target": "ADR-010",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-025",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-025",
+      "target": "ADR-010",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-025",
+      "target": "ADR-023",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-026",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-026",
+      "target": "ADR-023",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-026",
+      "target": "ADR-025",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-026",
+      "target": "ADR-027",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-027",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-027",
+      "target": "ADR-018",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-027",
+      "target": "ADR-025",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-027",
+      "target": "ADR-026",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-028",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-028",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-028",
+      "target": "ADR-023",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-028",
+      "target": "ADR-026",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-029",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-029",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-029",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-029",
+      "target": "ADR-011",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-030",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-030",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-030",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-030",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-030",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-030",
+      "target": "ADR-011",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-031",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-031",
+      "target": "ADR-011",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-031",
+      "target": "ADR-012",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-031",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-031",
+      "target": "ADR-060",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-032",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-032",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-032",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-032",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-032",
+      "target": "ADR-010",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-032",
+      "target": "ADR-056",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-033",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-033",
+      "target": "ADR-018",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-033",
+      "target": "ADR-019",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-033",
+      "target": "ADR-020",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-033",
+      "target": "ADR-034",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-034",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-034",
+      "target": "ADR-020",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-035",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-035",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-035",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-035",
+      "target": "ADR-019",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-035",
+      "target": "ADR-032",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-036",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-036",
+      "target": "ADR-010",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-036",
+      "target": "ADR-011",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-036",
+      "target": "ADR-015",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-036",
+      "target": "ADR-017",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-036",
+      "target": "ADR-031",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-037",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-037",
+      "target": "ADR-015",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-037",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-037",
+      "target": "ADR-031",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-038",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-038",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-038",
+      "target": "ADR-010",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-038",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-038",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-038",
+      "target": "ADR-031",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-039",
+      "target": "ADR-005",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-039",
+      "target": "ADR-020",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-039",
+      "target": "ADR-026",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-039",
+      "target": "ADR-033",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-039",
+      "target": "ADR-034",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-039",
+      "target": "ADR-038",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-040",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-040",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-040",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-040",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-040",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-040",
+      "target": "ADR-038",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-041",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-041",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-041",
+      "target": "ADR-040",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-041",
+      "target": "ADR-073",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-042",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-042",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-042",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-042",
+      "target": "ADR-018",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-043",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-043",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-043",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-043",
+      "target": "ADR-017",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-043",
+      "target": "ADR-036",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-044",
+      "target": "ADR-002",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-044",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-044",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-045",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-045",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-045",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-045",
+      "target": "ADR-037",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-045",
+      "target": "ADR-038",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-045",
+      "target": "ADR-041",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-045",
+      "target": "ADR-046",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-046",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-046",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-046",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-046",
+      "target": "ADR-037",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-046",
+      "target": "ADR-038",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-046",
+      "target": "ADR-041",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-046",
+      "target": "ADR-045",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-046",
+      "target": "ADR-045",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-047",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-047",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-047",
+      "target": "ADR-011",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-047",
+      "target": "ADR-048",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-047",
+      "target": "ADR-061",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-048",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-048",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-048",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-048",
+      "target": "ADR-032",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-048",
+      "target": "ADR-047",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-049",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-049",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-049",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-050",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-050",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-050",
+      "target": "ADR-019",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-050",
+      "target": "ADR-035",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-051",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-051",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-051",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-052",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-052",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-052",
+      "target": "ADR-038",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-052",
+      "target": "ADR-041",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-052",
+      "target": "ADR-044",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-052",
+      "target": "ADR-046",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-052",
+      "target": "ADR-047",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-053",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-053",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-053",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-053",
+      "target": "ADR-009",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-053",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-054",
+      "target": "ADR-001",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-054",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-054",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-054",
+      "target": "ADR-032",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-054",
+      "target": "ADR-056",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-055",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-055",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-055",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-055",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-055",
+      "target": "ADR-011",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-055",
+      "target": "ADR-022",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-055",
+      "target": "ADR-032",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-055",
+      "target": "ADR-057",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-056",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-056",
+      "target": "ADR-029",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-056",
+      "target": "ADR-032",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-056",
+      "target": "ADR-035",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-056",
+      "target": "ADR-050",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-056",
+      "target": "ADR-054",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-057",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-057",
+      "target": "ADR-007",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-057",
+      "target": "ADR-032",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-057",
+      "target": "ADR-048",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-057",
+      "target": "ADR-055",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-057",
+      "target": "ADR-055",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-057",
+      "target": "ADR-056",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-058",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-058",
+      "target": "ADR-028",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-058",
+      "target": "ADR-037",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-059",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-059",
+      "target": "ADR-031",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-059",
+      "target": "ADR-058",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-060",
+      "target": "ADR-012",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-060",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-060",
+      "target": "ADR-031",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-060",
+      "target": "ADR-037",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-060",
+      "target": "ADR-038",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-061",
+      "target": "ADR-047",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-062",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-062",
+      "target": "ADR-040",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-062",
+      "target": "ADR-044",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-062",
+      "target": "ADR-050",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-062",
+      "target": "ADR-051",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-062",
+      "target": "ADR-087",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-064",
+      "target": "ADR-062",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-065",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-066",
+      "target": "ADR-040",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-066",
+      "target": "ADR-051",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-066",
+      "target": "ADR-052",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-067",
+      "target": "ADR-040",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-067",
+      "target": "ADR-068",
+      "type": "amended-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-067",
+      "target": "ADR-068",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-068",
+      "target": "ADR-040",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-068",
+      "target": "ADR-041",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-068",
+      "target": "ADR-051",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-068",
+      "target": "ADR-066",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-068",
+      "target": "ADR-067",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-068",
+      "target": "ADR-070",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-069",
+      "target": "ADR-040",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-069",
+      "target": "ADR-065",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-069",
+      "target": "ADR-066",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-069",
+      "target": "ADR-067",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-069",
+      "target": "ADR-068",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-069",
+      "target": "ADR-075",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-070",
+      "target": "ADR-065",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-070",
+      "target": "ADR-066",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-070",
+      "target": "ADR-067",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-070",
+      "target": "ADR-068",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-070",
+      "target": "ADR-068",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-070",
+      "target": "ADR-069",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-070",
+      "target": "ADR-071",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-070",
+      "target": "ADR-097",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-065",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-066",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-067",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-068",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-069",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-070",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-070",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-097",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-071",
+      "target": "ADR-098",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-072",
+      "target": "ADR-041",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-072",
+      "target": "ADR-067",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-072",
+      "target": "ADR-099",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-073",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-073",
+      "target": "ADR-040",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-073",
+      "target": "ADR-041",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-073",
+      "target": "ADR-041",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-073",
+      "target": "ADR-062",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-073",
+      "target": "ADR-067",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-073",
+      "target": "ADR-088",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-074",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-074",
+      "target": "ADR-062",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-074",
+      "target": "ADR-073",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-074",
+      "target": "ADR-102",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-075",
+      "target": "ADR-040",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-075",
+      "target": "ADR-065",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-075",
+      "target": "ADR-066",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-075",
+      "target": "ADR-068",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-075",
+      "target": "ADR-069",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-075",
+      "target": "ADR-069",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-075",
+      "target": "ADR-096",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-076",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-076",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-076",
+      "target": "ADR-038",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-076",
+      "target": "ADR-044",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-076",
+      "target": "ADR-052",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-076",
+      "target": "ADR-074",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-077",
+      "target": "ADR-052",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-077",
+      "target": "ADR-065",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-077",
+      "target": "ADR-070",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-077",
+      "target": "ADR-074",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-077",
+      "target": "ADR-076",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-077",
+      "target": "ADR-078",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
+      "source": "ADR-077",
+      "target": "ADR-098",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-077",
+      "target": "ADR-105",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-078",
+      "target": "ADR-077",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-078",
+      "target": "ADR-105",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-078",
+      "target": "ADR-106",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-079",
+      "target": "ADR-062",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-079",
+      "target": "ADR-073",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-079",
+      "target": "ADR-107",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-080",
+      "target": "ADR-047",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-080",
+      "target": "ADR-079",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-081",
+      "target": "ADR-006",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-081",
+      "target": "ADR-052",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-082",
+      "target": "ADR-069",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-082",
+      "target": "ADR-075",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-082",
+      "target": "ADR-118",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-083",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-083",
+      "target": "ADR-076",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-083",
+      "target": "ADR-079",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-085",
+      "target": "ADR-031",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-085",
+      "target": "ADR-041",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-085",
+      "target": "ADR-042",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-085",
+      "target": "ADR-071",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-085",
+      "target": "ADR-076",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-085",
+      "target": "ADR-081",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-085",
+      "target": "ADR-156",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-086",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-086",
+      "target": "ADR-035",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-086",
+      "target": "ADR-049",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-086",
+      "target": "ADR-050",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-087",
+      "target": "ADR-040",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-087",
+      "target": "ADR-062",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-087",
+      "target": "ADR-062",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-087",
+      "target": "ADR-086",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-088",
+      "target": "ADR-073",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-088",
+      "target": "ADR-074",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-088",
+      "target": "ADR-100",
+      "type": "related",
+      "resolved": false
+    }
+  ]
+}

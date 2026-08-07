@@ -1663,8 +1663,10 @@ static void publishHvacMode(bool forcePublish)
                     : (hb & 0x04)                  ? 2   // cooling_enable -> cool
                     :                                1;  // connected, not cooling -> heat
   if (forcePublish || mode != mqttLastHvacMode) {
-    sendMQTTData("hvac_mode", mode == 2 ? "cool" : mode == 1 ? "heat" : "off");
-    mqttLastHvacMode = mode;
+    // ADR-076: latch the cache only when the send landed. forcePublish is one-shot and the
+    // caller already cleared it, so latching a dropped send would strand hvac_mode until the
+    // mode genuinely changes. Fall back to the unset sentinel instead, so the next frame retries.
+    mqttLastHvacMode = sendMQTTData("hvac_mode", mode == 2 ? "cool" : mode == 1 ? "heat" : "off") ? mode : -1;
   }
 }
 
@@ -1676,9 +1678,10 @@ static void publishHvacAction(bool forcePublish)
                       : (lb & 0x02)                  ? 2   // centralheating -> heating
                       :                                1;  // else           -> idle
   if (forcePublish || action != mqttLastHvacAction) {
-    sendMQTTData("hvac_action",
-                 action == 3 ? "cooling" : action == 2 ? "heating" : action == 1 ? "idle" : "off");
-    mqttLastHvacAction = action;
+    // ADR-076: see publishHvacMode — latch only on a confirmed send, else reset to unset so
+    // the next frame retries rather than stranding hvac_action on a one-shot force.
+    mqttLastHvacAction = sendMQTTData("hvac_action",
+                 action == 3 ? "cooling" : action == 2 ? "heating" : action == 1 ? "idle" : "off") ? action : -1;
   }
 }
 
