@@ -1417,7 +1417,6 @@
     mqtttoptopic:    { cat: 'mqtt', sub: 'Connection', label: 'Top topic' },
     mqttuniqueid:    { cat: 'mqtt', sub: 'Connection', label: 'Unique id' },
     mqtthaprefix:    { cat: 'mqtt', sub: 'HA & publishing', label: 'HA discovery prefix' },
-    mqttharebootdetection:  { cat: 'mqtt', sub: 'HA & publishing', label: 'HA reboot detection' },
     mqttonchangepublishing: { cat: 'mqtt', sub: 'HA & publishing', label: 'Publish on change' },
     mqttinterval:    { cat: 'mqtt', sub: 'HA & publishing', label: 'Publish interval', hint: 'Seconds' },
     mqttotmessage:   { cat: 'mqtt', sub: 'HA & publishing', label: 'Publish raw OT messages' },

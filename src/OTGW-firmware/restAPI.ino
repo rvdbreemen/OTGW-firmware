@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.351
+**  Version  : v2.0.0-alpha.352
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3642,7 +3642,8 @@ void sendDeviceSettings()
   addStr(F("mqttpasswd"), mqttPasswordPlaceholder, "p", 100);
   addStr(F("mqtttoptopic"), CSTR(settings.mqtt.sTopTopic), "s", 15);
   addStr(F("mqtthaprefix"), CSTR(settings.mqtt.sHaprefix), "s", 20);
-  addBool(F("mqttharebootdetection"), settings.mqtt.bHaRebootDetect, "b");
+  // mqttharebootdetection is deprecated (ADR-174) and no longer offered in the UI. It stays in
+  // knownSettings and in the settings file so existing configs and older clients still load.
   addStr(F("mqttuniqueid"), CSTR(settings.mqtt.sUniqueid), "s", 20);
   addBool(F("mqttotmessage"), settings.mqtt.bOTmessage, "b");
   addBool(F("mqttonchangepublishing"), settings.mqtt.bOnChangePublishing, "b");

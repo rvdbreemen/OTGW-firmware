@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.351
+**  Version  : v2.0.0-alpha.352
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -7429,7 +7429,6 @@ var translateFields = [
   , ["mqttconnected", "MQTT Connected"]
   , ["mqttenable", "MQTT Enabled"]
   , ["mqtthaprefix", "MQTT Auto-Discovery Prefix"]
-  , ["mqttharebootdetection", "MQTT Home Assistant Reboot Detection"]
   , ["ntpenable", "NTP Enabled"]
   , ["ntptimezone", "NTP Timezone"]
   , ["ntphostname", "NTP Hostname"]
@@ -7663,7 +7662,6 @@ var translateTooltips = [
   , ["mqtttoptopic", "Base topic used for all MQTT publish and command topics."]
   , ["mqttuniqueid", "Unique device ID used for MQTT discovery. Change only if you need a new device identity."]
   , ["mqtthaprefix", "Home Assistant discovery prefix. Keep the default unless your HA setup uses a custom prefix."]
-  , ["mqttharebootdetection", "Enable this if Home Assistant should republish discovery after it restarts."]
   , ["mqttonchangepublishing", "Recommended. When on, the gateway publishes a value the moment it changes and otherwise only re-sends it once per MQTT Interval as a heartbeat. This keeps Home Assistant fresh while cutting broker traffic. When off, every OpenTherm message is published as it arrives (legacy firehose), which is much noisier. Turning this off sets the interval to 0; turning it on sets a 60 second interval."]
   , ["mqttinterval", "Heartbeat interval in seconds: how often an unchanged value is re-published so Home Assistant does not flag the sensor as unavailable. Changed values are always published immediately regardless of this setting. Only used when MQTT Publish On-Change is on; 60 is a good default, lower means fresher data but more traffic."]
   , ["mqttotmessage", "Publish raw OpenTherm messages on MQTT for diagnostics and advanced integrations."]

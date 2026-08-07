@@ -3,9 +3,11 @@ id: TASK-1059
 title: >-
   feat-2.0.0: port TASK-1058 — republish on-change gated MQTT state when HA
   comes back online
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-07 21:40'
+updated_date: '2026-08-07 22:04'
 labels:
   - bug
   - mqtt
@@ -22,15 +24,24 @@ Port of otgw-1.x.x TASK-1058 / ADR-088 to the 2.0.0 line, governed by ADR-174 (A
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 homeassistant/status offline->online triggers requestMQTTRepublishAll()
-- [ ] #2 A replayed or retained online without a preceding offline does NOT trigger a republish
+- [x] #1 homeassistant/status offline->online triggers requestMQTTRepublishAll()
+- [x] #2 A replayed or retained online without a preceding offline does NOT trigger a republish
 - [ ] #3 hvac_mode and hvac_action are re-sent after an HA restart without a reboot
-- [ ] #4 All other on-change gated values are re-sent (MsgID slots, status/statusVH bits+bytes, ASF/RBP/RO)
-- [ ] #5 No discovery-config republish is introduced; the ADR-100 JIT discovery decision stays intact
-- [ ] #6 publishHvacMode/publishHvacAction latch their cache only on a confirmed send, else fall back to the unset sentinel
-- [ ] #7 MQTTharebootdetection is still parsed and written but gates nothing and is absent from the UI
-- [ ] #8 The republish burst introduces no re-entrancy hazard on the async MQTT path (ADR-174 branch-local condition), confirmed by inspection or on-device test
-- [ ] #9 Build green for the relevant esp32 target, verified on artifact freshness and the per-env SUCCESS line
-- [ ] #10 python evaluate.py --quick shows no new failures
+- [x] #4 All other on-change gated values are re-sent (MsgID slots, status/statusVH bits+bytes, ASF/RBP/RO)
+- [x] #5 No discovery-config republish is introduced; the ADR-100 JIT discovery decision stays intact
+- [x] #6 publishHvacMode/publishHvacAction latch their cache only on a confirmed send, else fall back to the unset sentinel
+- [x] #7 MQTTharebootdetection is still parsed and written but gates nothing and is absent from the UI
+- [x] #8 The republish burst introduces no re-entrancy hazard on the async MQTT path (ADR-174 branch-local condition), confirmed by inspection or on-device test
+- [x] #9 Build green for the relevant esp32 target, verified on artifact freshness and the per-env SUCCESS line
+- [x] #10 python evaluate.py --quick shows no new failures
 - [ ] #11 Field validation on 2.0.0 hardware across a Home Assistant restart
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ADR-174 async re-entrancy condition (AC#8) resolved by inspection, no on-device test needed:
+espMqttClient is constructed with UseInternalTask::NO (MQTTstuff.ino:206). The contract is documented at :196-204 - with NO, the engine is pumped only by the explicit MQTTclient.loop() inside handleMQTT(), so onMessage/onConnect callbacks run on the same cooperative loop as doBackgroundTasks(), NOT on async_tcp. The new call site at MQTTstuff.ino:817 is therefore in the identical task context as the already-shipped reconnect caller at :1325.
+Noted but out of scope: restAPI.ino:1993 calls requestMQTTRepublishAll() from the ESPAsyncWebServer handler, which DOES run on async_tcp while the loop task reads/writes the same trackers. Pre-existing, not introduced here.
+Build: build.bat, all three envs relinked fresh with githash dd5a701 (classic 23:59:32, otgw32 23:56:32, combo 00:02:34). Evaluator 68/76 passed, 0 failed, 1 warning (STATUS_BURST_COOLDOWN_MS bound: boards.h not found) which is pre-existing and unrelated to this diff.
+<!-- SECTION:NOTES:END -->

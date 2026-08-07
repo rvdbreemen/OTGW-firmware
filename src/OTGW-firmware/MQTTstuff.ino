@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.351
+**  Version  : v2.0.0-alpha.352
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -799,11 +799,9 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) 
 
   if (strcasecmp_P(topic, PSTR("homeassistant/status")) == 0) {
     //incoming message on status, detect going down
-    if (!settings.mqtt.bHaRebootDetect) {
-      //So if the HA reboot detection is turned of, we will just look for HA going online.
-      //This means everytime there is "online" message, we will restart MQTT configuration, including the HA Auto Discovery. 
-      bHAcycle = true; 
-    }
+    // ADR-174: bHAcycle is armed ONLY by an observed "offline". HA's birth message may be
+    // retained, in which case the broker replays "online" on every MQTT reconnect; requiring
+    // a real transition keeps those replays from triggering a republish.
     if (strcasecmp_P(msgPayload, PSTR("offline")) == 0){
       //home assistant went down
       DebugTln(F("Home Assistant went offline!"));
@@ -811,8 +809,12 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) 
     } else if ((strcasecmp_P(msgPayload, PSTR("online")) == 0) && bHAcycle){
       DebugTln(F("Home Assistant went online!"));
       bHAcycle = false; //clear flag, so it does not trigger again
-      // HA restart does not affect broker retained messages; no discovery republish needed.
-      // Retained configs are already on the broker; HA reads them via homeassistant/# subscription.
+      // Discovery configs are retained, so HA rebuilds entities from the broker on its own.
+      // State is not retained and most values publish only on change, so a freshly restarted
+      // HA would sit on "unknown" until each value happened to change. Reset the publish
+      // gates so every tracked value re-publishes as first-seen (ADR-174, supersedes ADR-100).
+      // Paced by OT bus arrival, not a synchronous flood. Discovery is deliberately untouched.
+      requestMQTTRepublishAll();
     } else {
       DebugTf(PSTR("Home Assistant Status=[%s] and HA cycle status [%s]\r\n"), msgPayload, CBOOLEAN(bHAcycle)); 
     }
