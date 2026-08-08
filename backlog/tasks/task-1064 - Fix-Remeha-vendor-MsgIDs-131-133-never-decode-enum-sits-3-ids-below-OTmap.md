@@ -1,7 +1,7 @@
 ---
 id: TASK-1064
 title: 'Fix: Remeha vendor MsgIDs 131-133 never decode (enum sits 3 ids below OTmap)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-08 10:52'
