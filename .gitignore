@@ -1,6 +1,14 @@
 node_modules/*
 package-lock.json
 *.log
+# ...except the OT replay fixtures under scripts/tests, which are committed test
+# assets rather than captured output. Named one by one on purpose: scripts/tests
+# also fills with capture logs from every gate run, and a blanket
+# "!scripts/tests/*.log" un-ignores those too. otgw-1.x.x took the blanket route
+# and now carries a growing list of individual capture names to re-ignore; an
+# allowlist of the two fixtures needs no maintenance.
+!scripts/tests/otgw_simulation.log
+!scripts/tests/otgw_simulation_coverage.log
 *.bin
 *.elf
 .vscode/*
