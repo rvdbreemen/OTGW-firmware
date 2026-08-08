@@ -3,9 +3,11 @@ id: TASK-1066
 title: >-
   Fix: four vh_* status bits never republish on the 60s heartbeat (StatusVH slot
   starvation)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-08 12:55'
+updated_date: '2026-08-08 13:13'
 labels:
   - bug
   - mqtt
