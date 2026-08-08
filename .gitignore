@@ -93,3 +93,7 @@ wifi-profiles.json
 *.secrets.json
 *.secret.json
 .env
+# coverage-gate run artefacts (the fixture and baseline ARE committed, runs are not)
+scripts/tests/last-coverage-run.log
+scripts/tests/verify-run.log
+scripts/tests/baseline-run-steady.log

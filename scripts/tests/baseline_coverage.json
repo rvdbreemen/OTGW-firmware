@@ -1,6 +1,6 @@
 {
  "counts": {
-  "mqtt_topics": 383,
+  "mqtt_topics": 361,
   "msgids": 143,
   "ot_keys": 370
  },
@@ -1026,58 +1026,6 @@
    "OFF",
    "ON"
   ],
-  "otgw-firmware/hostname": [
-   "OTGW1"
-  ],
-  "otgw-firmware/reboot_count": [
-   "7"
-  ],
-  "otgw-firmware/reboot_reason": [
-   "External System"
-  ],
-  "otgw-firmware/uptime": [],
-  "otgw-firmware/version": [
-   "1.7.3-beta.3+5f852a0"
-  ],
-  "otgw-pic/boiler_connected": [
-   "ON"
-  ],
-  "otgw-pic/designer": [
-   "Schelte Bron"
-  ],
-  "otgw-pic/deviceid": [
-   "pic16f88"
-  ],
-  "otgw-pic/firmwaretype": [
-   "gateway"
-  ],
-  "otgw-pic/otgw_connected": [
-   "ON"
-  ],
-  "otgw-pic/picavailable": [
-   "ON"
-  ],
-  "otgw-pic/settings/dhw_override": [
-   "A"
-  ],
-  "otgw-pic/settings/gpio": [
-   "00"
-  ],
-  "otgw-pic/settings/gpio_states": [
-   "00"
-  ],
-  "otgw-pic/settings/setback": [
-   "16.00"
-  ],
-  "otgw-pic/settings/setpoint_override": [
-   "N"
-  ],
-  "otgw-pic/thermostat_connected": [
-   "ON"
-  ],
-  "otgw-pic/version": [
-   "5.8"
-  ],
   "rbp_dhw_setpoint": [
    "ON"
   ],
@@ -1151,16 +1099,10 @@
   "summerwintertime": [
    "OFF"
   ],
-  "vh_bypass_automatic_status": [
-   "OFF"
-  ],
   "vh_bypass_mode": [
    "OFF"
   ],
   "vh_bypass_position": [
-   "OFF"
-  ],
-  "vh_bypass_status": [
    "OFF"
   ],
   "vh_configuration": [
@@ -1176,9 +1118,6 @@
    "ON"
   ],
   "vh_diagnostic_indicator": [
-   "OFF"
-  ],
-  "vh_fault": [
    "OFF"
   ],
   "vh_free_ventilation_mode": [
@@ -1197,9 +1136,6 @@
    "ON"
   ],
   "vh_ventilation_enabled": [
-   "ON"
-  ],
-  "vh_ventilation_mode": [
    "ON"
   ],
   "water_over_temperature": [

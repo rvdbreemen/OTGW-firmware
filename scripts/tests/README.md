@@ -93,10 +93,17 @@ normalized fingerprint, and that fingerprint is compared against a committed
 baseline taken from a known-good firmware.
 
 ```
-# 1. run the fixture (upload + start as above) and capture telnet:23 to a file
-# 2. check it against the baseline
-python coverage_baseline.py compare mycapture.log        # exit 1 on any drift
+# one command: upload, start, capture, stop, compare. exit 0 = match, 1 = drift.
+python run_coverage_test.py --host otgw1.local
+
+# or against a capture you already have
+python coverage_baseline.py compare mycapture.log
 ```
+`run_coverage_test.py` stops the simulation in a `finally` block, so a failed
+capture or a drifting comparison never leaves a bench publishing synthetic
+OpenTherm data to a real broker. It refuses a capture shorter than one fixture
+loop, because a partial loop reports topics as MISSING that had simply not come
+round yet, which is indistinguishable from a regression.
 
 What the fingerprint keeps, because it characterises firmware behaviour:
 - for each `(prefix, msgtype, msgid)`: the decoded label and rendered value
@@ -109,17 +116,29 @@ broker host, topic root. Non-ASCII is dropped from values too: captures carry
 cp1252 degree signs, so the same firmware would otherwise fingerprint
 differently depending on how the log was decoded.
 
-Two properties worth knowing:
+Also dropped entirely: `otgw-pic/*` and `otgw-firmware/*`. Those are driven by
+PIC polling on its own timer (ADR-037) and by device metadata, not by the OT
+fixture. Whether they land inside a given capture window is timing, not decode
+behaviour, and including them made the gate flap.
+
+Three properties worth knowing, each learned by getting it wrong first:
 - **Stability is proven, not assumed.** `python coverage_baseline.py selftest
   <capture>` fingerprints two halves of one capture and diffs them. On the
-  v1.7.3-beta.3 reference capture that reports 0 unstable keys across 370 keys.
-- **Compare needs at least one complete loop** (about 5.3 minutes, and prefer 2+).
-  A capture cut mid-loop reports topics as MISSING simply because they had not
-  come round yet. The selftest halves show this: 383 topics versus 379.
+  committed baseline capture that is 0 unstable keys across 370.
+- **Record from at least 2 full loops.** Value sets need to be complete. A
+  1.2-loop capture yielded a baseline missing Status(0) variants, so a longer run
+  then reported them as NEW. `selftest` catches exactly this: it failed on the
+  short capture and passed on the 2.2-loop one.
+- **Record from a steady-state device, never from one that just booted.** A boot
+  brings a discovery drip and `[force]` publishes that a steady-state run will
+  never reproduce. The first baseline here was taken across a boot and made every
+  subsequent healthy run FAIL with four MISSING `vh_*` topics.
 
-The committed baseline is from **v1.7.3-beta.3+5f852a0**, validated on
-otgw1.local over 20 minutes / 3.7 loops: 370 keys, 143 distinct MsgIDs, 383 MQTT
-topics, all 6 message types, all 5 source prefixes, zero exceptions, flat heap.
+The committed baseline is from **v1.7.3-beta.3+5f852a0** on otgw1.local: a
+steady-state 700 s / 2.2-loop run giving 370 keys, 143 distinct MsgIDs and 361
+fixture-driven MQTT topics, all 6 message types and all 5 source prefixes. It was
+verified by recording from one capture and comparing against a second,
+independent run, which passed.
 
 The raw reference capture is deliberately not committed (about 1 MB, against
 27 KB for the largest other asset here). It lives outside the firmware repo at

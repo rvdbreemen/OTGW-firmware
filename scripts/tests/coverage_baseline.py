@@ -47,6 +47,12 @@ VOLATILE_TOPIC_RX = re.compile(
     r"(otgw-firmware/uptime$|otgw-firmware/stats/|/epoch|_epoch$|/timestamp$)"
 )
 
+# Topics not driven by the OT fixture at all: PIC polling on its own timer
+# (ADR-037 PR=M) and firmware/device metadata. Whether they land inside a given
+# capture window is a matter of timing, not of decode behaviour, so including
+# them makes the gate flap. Dropped entirely rather than payload-stripped.
+NON_FIXTURE_TOPIC_RX = re.compile(r"^(otgw-pic/|otgw-firmware/)")
+
 # Device- and site-specific fragments stripped so a baseline is portable between
 # benches: topic root, uniqueid/MAC, broker host.
 TOPIC_STRIP_RX = re.compile(r"^[^/]+/(value|set)/otgw-[0-9A-Fa-f]+/")
@@ -93,6 +99,8 @@ def fingerprint(lines) -> dict:
         m = MQTT_RX.search(line)
         if m:
             topic = normalise_topic(m.group("topic"))
+            if NON_FIXTURE_TOPIC_RX.search(topic):
+                continue
             mqtt.setdefault(topic, set())
             if not VOLATILE_TOPIC_RX.search(topic):
                 mqtt[topic].add(m.group("payload"))
