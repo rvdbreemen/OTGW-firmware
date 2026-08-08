@@ -1,7 +1,7 @@
 ---
 id: TASK-1062
 title: Add an OT decode-coverage simulation asset and its generator
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-08 09:58'
