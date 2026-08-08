@@ -52,6 +52,40 @@ the full decode -> state -> MQTT -> WS path runs. Combine with `overload.py`
 for the complete field-shaped load. (The replay flag is runtime state and
 resets on reboot; re-enable after each flash. LittleFS survives app-only OTA.)
 
+### `otgw_simulation_coverage.log` + `make_simulation_coverage.py` (decode-coverage fixture)
+A second, complementary fixture. Where `otgw_simulation.log` optimises for
+**sustained realistic load** (2445 frames, 21 MsgIDs), this one optimises for
+**breadth**: 423 frames covering all 134 ids in `OTmap[]` plus 9 out-of-map ids,
+all six OpenTherm message types, and all five source prefixes including the
+`E` parity-error path. Use it to check that a firmware change did not break any
+decode or publish path; use the load fixture to check stability.
+
+Upload and run it exactly like the load fixture (same `/upload` +
+`/api/v2/simulate/start` flow, same `/otgw_simulation.log` filename on device).
+One loop takes about 5.3 minutes at the default 750 ms pacing.
+
+Regenerate after `OTmap[]` gains ids:
+```
+python make_simulation_coverage.py            # reads OTGW-Core.h + ../../../OTGW-logs
+```
+The generator harvests every real frame it can find in the capture corpus (67
+OTmap ids appear in real captures) and synthesises the remaining 67 that no real
+boiler implements, choosing values per `ot_*` type so the f8.8, s16, u16, u8u8
+and flag8 decoders all do real work. Status(0) is interleaved in two alternating
+variants so the bit and byte fan-outs fire on *change* each loop, not only
+first-seen.
+
+Two things to know before hand-editing any fixture:
+- `readOTGWSimulationLine()` returns **every** non-empty line to the parser. It
+  does not skip comments, so a `#` header would be decoded as a frame.
+- Parity is not verified ESP-side; the PIC signals it with an `E` prefix
+  (`OTGW-Core.ino`). Synthetic frames therefore do not need valid parity, and an
+  `E` line is the only way to reach that branch.
+
+Measured on otgw1.local (ESP8266, 1.7.3-beta.3): one loop decoded 143 distinct
+MsgIDs, published 394 distinct MQTT topics, with zero exceptions, zero discarded
+lines and flat heap.
+
 ## Notes
 - Flash arms over OTA, not USB: `curl -F "firmware=@x.ino.bin" "http://<ip>/update?cmd=0"`.
   USB serial flashing fails on a PIC-connected unit (PIC stream corrupts the bootloader).

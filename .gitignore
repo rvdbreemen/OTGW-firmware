@@ -1,6 +1,10 @@
 node_modules/*
 package-lock.json
 *.log
+# ...except the OT replay fixtures under scripts/tests, which are committed test
+# assets rather than captured output. Without this the *.log rule above silently
+# ignores them and they can only be added with `git add -f`.
+!scripts/tests/*.log
 *.bin
 *.elf
 .vscode/*
