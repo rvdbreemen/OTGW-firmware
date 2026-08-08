@@ -3,11 +3,11 @@ id: TASK-1070
 title: >-
   feat-2.0.0: port the OT coverage fixture and baseline regression gate from
   otgw-1.x.x
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-08 16:05'
-updated_date: '2026-08-08 21:21'
+updated_date: '2026-08-08 22:04'
 labels:
   - test
   - tooling
@@ -24,14 +24,14 @@ The 1.x line has a decode-coverage fixture (423 frames, all 134 OTmap ids, all 6
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 scripts/tests/ on this branch carries the coverage fixture, its generator, the baseline tool and the one-command runner
-- [ ] #2 The generator regenerates the fixture from this branch's OTmap and the shared capture corpus, and the result is frames-only with no comment lines
-- [ ] #3 The runner works against an ESP32-S3 bench device: upload, start, capture, stop, compare, and stops the simulation even on failure
-- [ ] #4 A baseline is recorded from a steady-state multi-loop run on 2.0.0 hardware, not from a boot window
-- [ ] #5 selftest reports 0 unstable keys on the recorded baseline capture
-- [ ] #6 An independent run against the recorded baseline reports PASS
-- [ ] #7 The gate is used to confirm TASK-1068 and TASK-1069 on device, closing their outstanding hardware ACs
-- [ ] #8 scripts/tests/README or equivalent documents the workflow and the branch-specific bits
+- [x] #1 scripts/tests/ on this branch carries the coverage fixture, its generator, the baseline tool and the one-command runner
+- [x] #2 The generator regenerates the fixture from this branch's OTmap and the shared capture corpus, and the result is frames-only with no comment lines
+- [x] #3 The runner works against an ESP32-S3 bench device: upload, start, capture, stop, compare, and stops the simulation even on failure
+- [x] #4 A baseline is recorded from a steady-state multi-loop run on 2.0.0 hardware, not from a boot window
+- [x] #5 selftest reports 0 unstable keys on the recorded baseline capture
+- [x] #6 An independent run against the recorded baseline reports PASS
+- [x] #7 The gate is used to confirm TASK-1068 and TASK-1069 on device, closing their outstanding hardware ACs
+- [x] #8 scripts/tests/README or equivalent documents the workflow and the branch-specific bits
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -100,3 +100,26 @@ Gating is source-aware: the fingerprint records mqtt_source and mqtt presence is
 
 Baseline re-recorded from the broker: 369 OT keys, 143 distinct MsgIDs, 225 MQTT topics. The broker sees one topic MORE than the best telnet run ever managed (224, with a low of 215), which is the lossless observation showing itself.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ports the otgw-1.x.x OT coverage gate to 2.0.0 and makes it hold on this branch. A replay-fixture run is reduced to a normalized fingerprint and diffed against a committed baseline, so a decode or publish regression fails one command instead of needing an eyeball.
+
+Porting it unchanged produced a gate that failed on healthy firmware. Two independent causes, both fixed:
+
+1. Decode lines now come from the debug telnet with MQTT debug OFF. With it on, a MsgID fanning out to ~9 topics emits its publish lines in ~10 ms, overruns the telnet and drops what follows, which swallowed AC0630000 decode line while the frame itself was processed normally. Measured back-to-back: MQTT debug on gives 24 spliced lines and 363/366 keys reproducible between halves of one capture; off gives 1 spliced line, 369/369, and all 376 distinct fixture frames seen at least twice.
+2. Topics now come from an MQTT subscription rather than the same lossy publish log. Two identical runs differed by 9 topics (smaller a strict SUBSET of larger, so loss is subtractive sampling) while payloads differed on 0 of 215 shared topics. A broker sees every publish, so presence became observable and is gated. MQTTDebugTf gates the log line and never the publish, so both collectors share ONE 694s window; the earlier two-pass workaround was removed rather than kept.
+
+New scripts/tests/mqtt_topic_capture.py: subscribe-only MQTT 3.1.1 client on stdlib sockets, four packet types, no paho (the rig is stdlib-only). Gating is source-aware: the fingerprint records mqtt_source and gates mqtt presence only when baseline and run both came from the broker, so a broker baseline can never be compared against a telnet run as if equal. --topics telnet keeps the old source with presence reported, not gated.
+
+Four subscriber traps handled, each of which corrupts a baseline silently rather than failing: scope to the device under test (the broker carries a second OTGW and normalise_topic strips the uniqueid that distinguishes them); discard the retained flush; discard the backlog buffered between subscribe and window start (74 messages in a measured run, which put an idle-period boiler_connected OFF into a window whose simulation ran throughout); and read the broker from the device rather than from _secrets, whose stored host is stale and unreachable.
+
+Robustness also: toggles are driven by the per-toggle echo instead of the telnet banner (menu spliced away by live output) or the D dump (~290 lines, truncated at 8 KB on a busy device), and a 25s preflight aborts when the replay is not advancing, added after one run looped the fixture first five lines for 694s and wrote 30 of 376 frames as a baseline.
+
+Verified on the bench S3 (Classic + PIC 6.6, alpha.354+a7e06f8): baseline 369 OT keys, 143 distinct MsgIDs, 225 MQTT topics, all 6 message types, all 5 source prefixes; an independent run PASSes with zero differences; selftest 0 unstable keys across 369. Evaluator 68 pass / 0 fail. No firmware source touched.
+
+Closes the outstanding hardware ACs of TASK-1068 (131/132/133 decode as RemehadFdUcodes / RemehaServicemessage / RemehaDetectionConnectedSCU, while 128/129/130 stay Unknown message) and TASK-1069 (status_vh_slave publishes on interval once per loop, all 17 vh_* topics present including the four previously starved).
+
+Follow-ups filed separately: TASK-1071 (replay on OTDirect), TASK-1073 (/api/v2/simulate reports active where replay cannot run).
+<!-- SECTION:FINAL_SUMMARY:END -->
