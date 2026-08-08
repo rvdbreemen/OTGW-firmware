@@ -39,8 +39,6 @@ Reported by nico55 (Discord #nederlandse-ondersteuning, 2026-08-06/07) on 1.7.2+
 - [x] #8 hvac_mode/hvac_action latch their RAM cache only on a confirmed send, so a dropped publish retries instead of stranding the topic until the mode changes
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -53,4 +51,9 @@ Reported by nico55 (Discord #nederlandse-ondersteuning, 2026-08-06/07) on 1.7.2+
 CONFIRMED and fixed: publishHvacMode/publishHvacAction (OTGW-Core.ino:1665/1678) discarded sendMQTTData bool and latched mqttLastHvacMode/Action unconditionally. resetMqttTrackedState() does not cover those two caches, and the force flag is cleared at :1707/:1751 BEFORE the fan-out, so a single dropped send stranded hvac_mode until the mode genuinely changed - defeating ADR-088 Confirmation step 2 on the exact topic the ADR was written about. Pre-existing (the reconnect branch at MQTTstuff.ino:873 had the same exposure), not introduced by this change.
 Fix: latch on confirmed send, else fall back to the -1 unset sentinel so the next OT frame retries. Matches the ADR-076 commit-on-success pattern already used by publishStatusBitMQTT at :1557. No new force flag or mechanism, so ADR-088 Must Not is respected.
 Note: reviewer attributed the drop to HEAP_LOW throttling; verified the exposure is wider - sendMQTTData has four false-return paths including an ordinary endPublish TCP failure, and the ADR-088 capture gateway was HEAP_HEALTHY at 18-19KB.
+
+2026-08-08 field validation CONFIRMED. nico55 in Discord #nederlandse-ondersteuning, 07:38 UTC: "Bovenstaande zoals omschreven uitgevoerd en helemaal goed nu. Klasse" (did exactly as described, all good now). That closes AC#7.
+AC#2 was verified on bench hardware beforehand (otgw1.local, 1.7.3-beta.2+290dddb): a real offline->online transition logged "Home Assistant went online!" at 08:03:16.881 and hvac_mode published 419ms later at 08:03:17.300, with no reboot. hvac_mode appeared exactly once in the whole 10-minute capture, and that once was the republish.
+AC#8 implemented as commit-on-success in publishHvacMode/publishHvacAction; logic verified by inspection, and indirectly on device since every observed publish latched correctly. Forcing a sendMQTTData failure on demand is not practical on the bench.
+Shipped in v1.7.3-beta.2; v1.7.3-beta.3 adds the TASK-1060 heartbeat on top.
 <!-- SECTION:NOTES:END -->
