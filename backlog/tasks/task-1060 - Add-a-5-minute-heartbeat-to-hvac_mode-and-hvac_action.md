@@ -1,9 +1,11 @@
 ---
 id: TASK-1060
 title: Add a 5-minute heartbeat to hvac_mode and hvac_action
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-08 06:09'
+updated_date: '2026-08-08 06:10'
 labels:
   - bug
   - mqtt
