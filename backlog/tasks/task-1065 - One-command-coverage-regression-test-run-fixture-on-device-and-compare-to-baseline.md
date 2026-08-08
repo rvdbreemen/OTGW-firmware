@@ -3,9 +3,11 @@ id: TASK-1065
 title: >-
   One-command coverage regression test: run fixture on device and compare to
   baseline
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-08 12:25'
+updated_date: '2026-08-08 13:51'
 labels:
   - test
   - tooling
