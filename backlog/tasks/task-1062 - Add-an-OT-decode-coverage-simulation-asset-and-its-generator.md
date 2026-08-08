@@ -22,9 +22,9 @@ The existing scripts/tests/otgw_simulation.log is a 2445-line realistic replay b
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 scripts/tests/otgw_simulation_coverage.log is committed and contains only raw frame lines (no comments: the replayer feeds every non-empty line to the parser)
-- [ ] #2 The generator script is committed and regenerates the asset from OTmap plus the capture corpus
-- [ ] #3 scripts/tests/README.md documents the asset, how it differs from the load rig, and how to run it
-- [ ] #4 Coverage is asserted on device: all 134 OTmap ids decode, all 6 message types and all 5 source prefixes appear
-- [ ] #5 A full validation run on the bench shows zero exceptions, zero discarded lines and no heap regression
+- [x] #1 scripts/tests/otgw_simulation_coverage.log is committed and contains only raw frame lines (no comments: the replayer feeds every non-empty line to the parser)
+- [x] #2 The generator script is committed and regenerates the asset from OTmap plus the capture corpus
+- [x] #3 scripts/tests/README.md documents the asset, how it differs from the load rig, and how to run it
+- [x] #4 Coverage is asserted on device: all 134 OTmap ids decode, all 6 message types and all 5 source prefixes appear
+- [x] #5 A full validation run on the bench shows zero exceptions, zero discarded lines and no heap regression
 <!-- AC:END -->
