@@ -28,3 +28,9 @@ The existing scripts/tests/otgw_simulation.log is a 2445-line realistic replay b
 - [x] #4 Coverage is asserted on device: all 134 OTmap ids decode, all 6 message types and all 5 source prefixes appear
 - [x] #5 A full validation run on the bench shows zero exceptions, zero discarded lines and no heap regression
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds scripts/tests/otgw_simulation_coverage.log (423 frames) and its generator make_simulation_coverage.py, complementing the existing load fixture. Covers all 134 OTmap ids plus 9 out-of-map ids, all 6 message types and all 5 source prefixes including the E parity-error path. Built from 232 real frames harvested across 60 captures, supplemented with 67 synthetic frames for ids no real boiler implements. Verified on otgw1.local over 20 minutes: 143 distinct MsgIDs decoded, 383 MQTT topics published, zero exceptions, zero discarded lines, flat heap. README documents two traps found the hard way: the replayer does not skip comment lines, and parity is signalled by an E prefix rather than computed. .gitignore gained a negation for scripts/tests/*.log since the blanket rule silently ignored the asset.
+<!-- SECTION:FINAL_SUMMARY:END -->
