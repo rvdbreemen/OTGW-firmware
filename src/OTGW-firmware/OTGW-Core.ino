@@ -1650,6 +1650,20 @@ static void buildStatusSlaveText(uint8_t valueLB, char *statusText, size_t statu
 // is disconnected. Published on change, and on force (reconnect/interval).
 static int8_t mqttLastHvacMode   = -1;  // -1 unset, 0 off, 1 heat, 2 cool
 static int8_t mqttLastHvacAction = -1;  // -1 unset, 0 off, 1 idle, 2 heating, 3 cooling
+// Heartbeat: a stable mode is otherwise only re-sent on a real change or an HA restart, so a
+// consumer that missed the last publish stays stale indefinitely. Longer than the 60 s status
+// heartbeat because these two are slow-moving intent, not per-cycle demand. (TASK-1060)
+static constexpr uint16_t HVAC_HEARTBEAT_INTERVAL_SEC = 300;
+static uint16_t mqttLastHvacModeSent   = TRACKED_TIME_UNSEEN;
+static uint16_t mqttLastHvacActionSent = TRACKED_TIME_UNSEEN;
+
+// True when the per-value heartbeat window has elapsed. Never true before the first send:
+// an unset slot publishes because the value differs from the -1 sentinel, not on a timer.
+static bool hvacHeartbeatDue(uint16_t lastSent)
+{
+  return hasTrackedTime(lastSent)
+      && (elapsedTrackedSeconds(currentTrackedSeconds(), lastSent) >= HVAC_HEARTBEAT_INTERVAL_SEC);
+}
 
 static void publishHvacMode(bool forcePublish)
 {
@@ -1662,11 +1676,18 @@ static void publishHvacMode(bool forcePublish)
   const int8_t mode = !state.otgw.bThermostatState ? 0   // off when no thermostat
                     : (hb & 0x04)                  ? 2   // cooling_enable -> cool
                     :                                1;  // connected, not cooling -> heat
-  if (forcePublish || mode != mqttLastHvacMode) {
+  if (forcePublish || mode != mqttLastHvacMode || hvacHeartbeatDue(mqttLastHvacModeSent)) {
     // ADR-076: latch the cache only when the send landed. forcePublish is one-shot and the
     // caller already cleared it, so latching a dropped send would strand hvac_mode until the
     // mode genuinely changes. Fall back to the unset sentinel instead, so the next frame retries.
-    mqttLastHvacMode = sendMQTTData("hvac_mode", mode == 2 ? "cool" : mode == 1 ? "heat" : "off") ? mode : -1;
+    // The heartbeat stamp moves only on a confirmed send for the same reason: a dropped publish
+    // must retry on the next frame, not restart the 5-minute window. (TASK-1060)
+    if (sendMQTTData("hvac_mode", mode == 2 ? "cool" : mode == 1 ? "heat" : "off")) {
+      mqttLastHvacMode     = mode;
+      mqttLastHvacModeSent = currentTrackedSeconds();
+    } else {
+      mqttLastHvacMode = -1;
+    }
   }
 }
 
@@ -1677,11 +1698,17 @@ static void publishHvacAction(bool forcePublish)
                       : (lb & 0x10)                  ? 3   // cooling        -> cooling
                       : (lb & 0x02)                  ? 2   // centralheating -> heating
                       :                                1;  // else           -> idle
-  if (forcePublish || action != mqttLastHvacAction) {
+  if (forcePublish || action != mqttLastHvacAction || hvacHeartbeatDue(mqttLastHvacActionSent)) {
     // ADR-076: see publishHvacMode — latch only on a confirmed send, else reset to unset so
-    // the next frame retries rather than stranding hvac_action on a one-shot force.
-    mqttLastHvacAction = sendMQTTData("hvac_action",
-                 action == 3 ? "cooling" : action == 2 ? "heating" : action == 1 ? "idle" : "off") ? action : -1;
+    // the next frame retries rather than stranding hvac_action on a one-shot force. The
+    // heartbeat stamp follows the same rule. (TASK-1060)
+    if (sendMQTTData("hvac_action",
+                     action == 3 ? "cooling" : action == 2 ? "heating" : action == 1 ? "idle" : "off")) {
+      mqttLastHvacAction     = action;
+      mqttLastHvacActionSent = currentTrackedSeconds();
+    } else {
+      mqttLastHvacAction = -1;
+    }
   }
 }
 
