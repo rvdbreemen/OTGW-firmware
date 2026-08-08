@@ -24,11 +24,11 @@ TASK-1063 produced a baseline and a compare mode, but running the test is still 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A single command runs the whole cycle against a device: upload fixture, start simulation, capture, stop simulation, compare to baseline
-- [ ] #2 The simulation is stopped even when the capture fails or the comparison finds drift, so the bench is never left publishing synthetic data
-- [ ] #3 Capture duration defaults to at least one full fixture loop and the runner refuses a duration that would cut a loop short
-- [ ] #4 Exit code is 0 on a clean match and non-zero on drift or on any device error
-- [ ] #5 The raw capture is written to a file so a drift can be investigated afterwards
-- [ ] #6 Proven end to end against otgw1.local: a clean run reports PASS
-- [ ] #7 scripts/tests/README.md documents the one-command form
+- [x] #1 A single command runs the whole cycle against a device: upload fixture, start simulation, capture, stop simulation, compare to baseline
+- [x] #2 The simulation is stopped even when the capture fails or the comparison finds drift, so the bench is never left publishing synthetic data
+- [x] #3 Capture duration defaults to at least one full fixture loop and the runner refuses a duration that would cut a loop short
+- [x] #4 Exit code is 0 on a clean match and non-zero on drift or on any device error
+- [x] #5 The raw capture is written to a file so a drift can be investigated afterwards
+- [x] #6 Proven end to end against otgw1.local: a clean run reports PASS
+- [x] #7 scripts/tests/README.md documents the one-command form
 <!-- AC:END -->
