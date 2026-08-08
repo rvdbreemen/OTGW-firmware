@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-08 12:55'
-updated_date: '2026-08-08 13:28'
+updated_date: '2026-08-08 13:49'
 labels:
   - bug
   - mqtt
@@ -28,8 +28,10 @@ Found by the TASK-1065 coverage gate on v1.7.3-beta.3, and independently reporte
 - [x] #2 All four topics republish on their 60s heartbeat in a steady-state run with no boot and no force
 - [x] #3 No other status or statusVH bit changes its publish cadence (compare gate output before and after)
 - [x] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
-- [ ] #5 Coverage baseline re-recorded deliberately, with the diff reviewed and containing only the four newly-appearing vh_* topics
+- [x] #5 Coverage baseline re-recorded deliberately, with the diff reviewed and containing only the four newly-appearing vh_* topics
 <!-- AC:END -->
+
+
 
 ## Implementation Notes
 
