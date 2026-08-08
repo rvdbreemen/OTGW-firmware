@@ -2691,7 +2691,9 @@
         "verification": []
       },
       "scope": {
-        "path_globs": []
+        "path_globs": [
+          "src/OTGW-firmware/OTGW-firmware.ino"
+        ]
       },
       "metadata": {
         "binding": false,

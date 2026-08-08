@@ -91,5 +91,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-084 | Rejected | - | Commit a unified-diff patch under patches/ and have build.py re-apply it to the freshly-installed ESP8266 core after... |
 | ADR-085 | Accepted | - | Surface a single unified off/heat/cool climate entity, driven by two new firmware-computed MQTT topics, with mode swi... |
 | ADR-086 | Accepted | `src/OTGW-firmware/**/*.ino`, `src/OTGW-firmware/restAPI.ino` | Enforce a per-endpoint request budget in the firmware for /api/v2/otgw/otmonitor and /api/v2/device/time, and answer... |
-| ADR-087 | Accepted | - | Remove the automatic discovery-verify readback. |
+| ADR-087 | Accepted | `src/OTGW-firmware/OTGW-firmware.ino` | Remove the automatic discovery-verify readback. |
 | ADR-088 | Accepted | - | Chosen option: Option A, because it repairs every gated value through a mechanism the firmware already ships and alre... |
