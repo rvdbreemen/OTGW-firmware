@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-08 06:09'
-updated_date: '2026-08-08 06:36'
+updated_date: '2026-08-08 06:37'
 labels:
   - bug
   - mqtt
@@ -31,3 +31,12 @@ Bench-confirmed gap found while validating TASK-1058 on otgw1.local (1.7.3-beta.
 - [x] #7 python evaluate.py --quick shows no new failures
 - [x] #8 Verified on device: two consecutive heartbeat publishes observed roughly 5 minutes apart with a stable value and no reboot
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Bench-verified on otgw1.local (192.168.88.16, ESP8266, fw 1.7.3-beta.2+3d66b20):
+- hvac_mode published 08:21:07 and 08:26:07, exactly 300s apart, value unchanged ("off"), no reboot. Heartbeat lands on interval.
+- Before the change, the same device published hvac_mode exactly ONCE in a 10-minute capture, and only because the ADR-088 HA-restart force fired.
+- AC#2 (hvac_action) NOT verified on hardware: publishSlaveStatusState was called 0 times because the boiler does not answer MsgID 0 on this bench, despite 622 boiler frames. Same code path and same helper as hvac_mode, but untested on device. Needs a bench with a responding boiler or the simulator.
+<!-- SECTION:NOTES:END -->
