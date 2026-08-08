@@ -22,11 +22,11 @@ The coverage fixture (TASK-1062) proves breadth but produces no reusable verdict
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A tool reduces a telnet capture of the fixture run to a normalized JSON fingerprint, deterministic across repeated runs of the same firmware
-- [ ] #2 The fingerprint excludes all volatile fields: timestamps, heap and max-block, uptime, RSSI, device uniqueid/MAC, broker host
-- [ ] #3 A committed baseline JSON is generated from the validated v1.7.3-beta.3 capture
-- [ ] #4 Compare mode prints a readable diff of added/removed/changed entries and exits non-zero on any drift
-- [ ] #5 Re-running compare on the same capture reports zero drift (idempotence proven, not assumed)
-- [ ] #6 Compare on a genuinely different capture is shown to detect drift, so the gate is proven to have teeth
-- [ ] #7 scripts/tests/README.md documents the baseline workflow and how to refresh the baseline deliberately
+- [x] #1 A tool reduces a telnet capture of the fixture run to a normalized JSON fingerprint, deterministic across repeated runs of the same firmware
+- [x] #2 The fingerprint excludes all volatile fields: timestamps, heap and max-block, uptime, RSSI, device uniqueid/MAC, broker host
+- [x] #3 A committed baseline JSON is generated from the validated v1.7.3-beta.3 capture
+- [x] #4 Compare mode prints a readable diff of added/removed/changed entries and exits non-zero on any drift
+- [x] #5 Re-running compare on the same capture reports zero drift (idempotence proven, not assumed)
+- [x] #6 Compare on a genuinely different capture is shown to detect drift, so the gate is proven to have teeth
+- [x] #7 scripts/tests/README.md documents the baseline workflow and how to refresh the baseline deliberately
 <!-- AC:END -->
