@@ -36,3 +36,13 @@ Releases since v1.0.0 are GitHub immutable. The post-publish workflow .github/wo
 <!-- SECTION:PLAN:BEGIN -->
 1. /release SKILL.md Phase 5: split step 6 into (a) generate SHA256SUMS from build/*.bin, (b) upload bins+scripts+SHA256SUMS to draft, (c) hard pre-publish gate asserting all 5 assets present before --draft=false.\n2. RELEASE_PROCESS.md: same upload+gate update at step 7-9.\n3. Delete .github/workflows/release-assets.yml (dead, immutable-incompatible).\n4. Verify no doc references flash-bundle zip (done).\n5. Docs-only + CI removal: commit, push otgw-1.x.x.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-08 backlog audit. Partially shipped, NOT done.
+The beta path is fixed: v1.7.3-beta.2 and v1.7.3-beta.3 both carry all six assets, generated self-contained by .github/workflows/beta-prerelease.yml (SHA256SUMS at line 163-171, flash scripts and bundle at 180+).
+The STABLE path is still broken: v1.7.2 carries only four assets (flash_otgw.bat, flash_otgw.sh, the .ino.bin and the .littlefs.bin). SHA256SUMS and OTGW-firmware-<version>-flash-bundle.zip are missing.
+Also still missing is the pre-publish GATE the title asks for: the beta workflow GENERATES the assets but nothing asserts all six are present before the release is flipped out of draft. Generation without verification is what let the stable path regress unnoticed.
+Moved back to To Do: real work remains and nobody is on it.
+<!-- SECTION:NOTES:END -->
