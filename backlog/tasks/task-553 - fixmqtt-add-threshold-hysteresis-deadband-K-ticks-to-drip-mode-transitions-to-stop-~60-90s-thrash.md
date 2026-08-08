@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 08:45'
-updated_date: '2026-05-07 09:07'
+updated_date: '2026-08-08 14:35'
 labels:
   - mqtt
   - heap
@@ -71,6 +71,8 @@ Key design decisions during implementation:
 - consecutiveHealthyTicks counter only advances post-DUE so it tracks actual timer-tick events, not loop-iteration counts. Counter resets on slow-mode entry to enforce K fresh healthy ticks before restore.
 
 Build: ./build.sh --firmware exit 0, no new warnings (734236 bytes / 70
+
+2026-08-08 backlog audit: kept In Progress. Shipped-claim refuted by an independent verifier, so not closed. Needs a human decision.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
