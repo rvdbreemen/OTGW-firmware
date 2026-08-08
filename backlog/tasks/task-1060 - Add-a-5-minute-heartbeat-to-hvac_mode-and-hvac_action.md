@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-08 06:09'
-updated_date: '2026-08-08 06:10'
+updated_date: '2026-08-08 06:36'
 labels:
   - bug
   - mqtt
@@ -22,12 +22,12 @@ Bench-confirmed gap found while validating TASK-1058 on otgw1.local (1.7.3-beta.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 hvac_mode is published at least every 5 minutes when its value does not change
+- [x] #1 hvac_mode is published at least every 5 minutes when its value does not change
 - [ ] #2 hvac_action is published at least every 5 minutes when its value does not change
-- [ ] #3 A genuine value change still publishes immediately, without waiting for the heartbeat
-- [ ] #4 The heartbeat timestamp is stamped only on a confirmed send, so a dropped publish retries rather than resetting the interval
-- [ ] #5 The ADR-088 HA-restart force path still works and is not duplicated or bypassed by the heartbeat
-- [ ] #6 python build.py --firmware exits 0, verified on artifact freshness and the success line
-- [ ] #7 python evaluate.py --quick shows no new failures
-- [ ] #8 Verified on device: two consecutive heartbeat publishes observed roughly 5 minutes apart with a stable value and no reboot
+- [x] #3 A genuine value change still publishes immediately, without waiting for the heartbeat
+- [x] #4 The heartbeat timestamp is stamped only on a confirmed send, so a dropped publish retries rather than resetting the interval
+- [x] #5 The ADR-088 HA-restart force path still works and is not duplicated or bypassed by the heartbeat
+- [x] #6 python build.py --firmware exits 0, verified on artifact freshness and the success line
+- [x] #7 python evaluate.py --quick shows no new failures
+- [x] #8 Verified on device: two consecutive heartbeat publishes observed roughly 5 minutes apart with a stable value and no reboot
 <!-- AC:END -->
