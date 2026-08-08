@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-08 15:09'
-updated_date: '2026-08-08 15:10'
+updated_date: '2026-08-08 15:14'
 labels:
   - tooling
   - ci
@@ -22,10 +22,10 @@ Three beta runs in one session (beta.2, beta.3, beta.4) plus the TASK-936 stable
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 beta-prerelease.yml attaches the capture scripts and a generated RELEASE_ASSETS.md, and includes them in the flash bundle
-- [ ] #2 Phase 3 of the skill uses a TASK-NNN set comparison between commits since LATEST_PUBLIC and the CHANGELOG [Unreleased] section, replacing the keyword grep
-- [ ] #3 Phase 6 of the skill documents the audit-then-stage recipe: prove every src/ change is banner-or-version-only, then stage by explicit path
-- [ ] #4 Phase 8 of the skill lists the full expected asset set matching what beta-prerelease.yml now attaches
-- [ ] #5 beta-prerelease.yml YAML parses and every run block passes bash -n
-- [ ] #6 The RELEASE_ASSETS.md generator is executed, not assumed, and its output inspected
+- [x] #1 beta-prerelease.yml attaches the capture scripts and a generated RELEASE_ASSETS.md, and includes them in the flash bundle
+- [x] #2 Phase 3 of the skill uses a TASK-NNN set comparison between commits since LATEST_PUBLIC and the CHANGELOG [Unreleased] section, replacing the keyword grep
+- [x] #3 Phase 6 of the skill documents the audit-then-stage recipe: prove every src/ change is banner-or-version-only, then stage by explicit path
+- [x] #4 Phase 8 of the skill lists the full expected asset set matching what beta-prerelease.yml now attaches
+- [x] #5 beta-prerelease.yml YAML parses and every run block passes bash -n
+- [x] #6 The RELEASE_ASSETS.md generator is executed, not assumed, and its output inspected
 <!-- AC:END -->
