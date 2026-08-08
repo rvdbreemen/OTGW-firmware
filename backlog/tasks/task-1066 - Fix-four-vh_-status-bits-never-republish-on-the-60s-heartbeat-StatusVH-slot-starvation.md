@@ -3,7 +3,7 @@ id: TASK-1066
 title: >-
   Fix: four vh_* status bits never republish on the 60s heartbeat (StatusVH slot
   starvation)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-08 12:55'
