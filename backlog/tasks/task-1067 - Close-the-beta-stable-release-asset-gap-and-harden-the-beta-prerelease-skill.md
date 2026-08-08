@@ -1,9 +1,11 @@
 ---
 id: TASK-1067
 title: Close the beta/stable release-asset gap and harden the beta-prerelease skill
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-08 15:09'
+updated_date: '2026-08-08 15:10'
 labels:
   - tooling
   - ci
