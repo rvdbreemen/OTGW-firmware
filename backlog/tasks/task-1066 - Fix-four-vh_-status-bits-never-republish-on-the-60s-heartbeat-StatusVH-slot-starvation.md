@@ -30,3 +30,13 @@ Found by the TASK-1065 coverage gate on v1.7.3-beta.3, and independently reporte
 - [x] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 - [ ] #5 Coverage baseline re-recorded deliberately, with the diff reviewed and containing only the four newly-appearing vh_* topics
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Root cause CONFIRMED, and it is a slot collision exactly as hypothesised.
+mqttlastsentstatusvhbit[16] documents its own contract in the declaration: "slots 0-7=master, 8-15=slave". publishStatusVHState used 0,1,2,3 for the master bits and publishSlaveStatusVHState ALSO used 0,1,2,3,4,6 for the slave bits. The master fan-out stamps slots 0-3 microseconds before the slave fan-out reads them, so elapsedTrackedSeconds is ~0 and the 60s heartbeat never elapses for the slave bits sharing those slots.
+That predicts exactly which topics starve, and the prediction matches the field data: slots 0-3 (vh_fault, vh_ventilation_mode, vh_bypass_status, vh_bypass_automatic_status) never heartbeat, while slots 4 and 6 (vh_free_ventliation_status, vh_diagnostic_indicator) have no master counterpart and kept publishing normally.
+Fix: slave bits moved to 8,9,10,11,12,14, matching both the declared contract and the OT_Statusflags fan-out which already uses 8-15 correctly. Verified no duplicate slot remains.
+Verified on device via the coverage gate: all four topics now publish in a steady-state run with no boot and no force.
+<!-- SECTION:NOTES:END -->
