@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.353
+**  Version  : v2.0.0-alpha.354
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2355,12 +2355,19 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
     if (sendMQTTData(F("status_vh_slave"), statusText)) confirmMQTTPublishByteSlot();
     else                                                mqttPendingByteSlot.pending = false;
   }
-  publishStatusVHBitMQTT(0, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB, "ventilation_fault");
-  publishStatusVHBitMQTT(1, "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB, "ventilation_active");
-  publishStatusVHBitMQTT(2, "vh_bypass_status",           (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB, "ventilation_bypass_status");
-  publishStatusVHBitMQTT(3, "vh_bypass_automatic_status", (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB, "ventilation_bypass_automatic");
-  publishStatusVHBitMQTT(4, "vh_free_ventliation_status", (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB, "ventilation_free_status");
-  publishStatusVHBitMQTT(6, "vh_diagnostic_indicator",    (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB, "ventilation_diagnostic");
+  // Slave bits live in slots 8-15, per the mqttlastsentstatusvhbit[] contract and
+  // matching the OT_Statusflags fan-out. They previously reused the master's slots
+  // 0-4, so the master fan-out stamped those slots microseconds earlier and the
+  // slave bits' 60s heartbeat never elapsed: vh_fault, vh_ventilation_mode,
+  // vh_bypass_status and vh_bypass_automatic_status only ever published on
+  // first-seen or on a force. Slots 4 and 6 had no master counterpart, which is
+  // why those two alone kept heartbeating. (TASK-1069)
+  publishStatusVHBitMQTT(8, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB, "ventilation_fault");
+  publishStatusVHBitMQTT(9, "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB, "ventilation_active");
+  publishStatusVHBitMQTT(10, "vh_bypass_status",           (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB, "ventilation_bypass_status");
+  publishStatusVHBitMQTT(11, "vh_bypass_automatic_status", (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB, "ventilation_bypass_automatic");
+  publishStatusVHBitMQTT(12, "vh_free_ventliation_status", (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB, "ventilation_free_status");
+  publishStatusVHBitMQTT(14, "vh_diagnostic_indicator",    (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB, "ventilation_diagnostic");
   endStatusBurst();
 }
 

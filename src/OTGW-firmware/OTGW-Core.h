@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.353
+**  Version  : v2.0.0-alpha.354
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -339,7 +339,12 @@ enum OTLibMessageID {
 	OT_OpenThermVersionSlave, // f8.8  The implemented version of the OpenTherm Protocol Specification in the slave. 
 	OT_MasterVersion, // u8 / u8  Master product version number and type 
 	OT_SlaveVersion, // u8 / u8  Slave product version number and type
-	OT_RemehadFdUcodes, // u8 / u8 Remeha dF-/dU-codes
+	// Explicit: ids 128-130 are unassigned OEM space (OTmap[] holds empty
+	// placeholders there). Without the =131 these three would fall on 128/129/130,
+	// three below their real ids, so MsgIDs 131-133 decoded as "Unknown message"
+	// while 128-130 produced label-less output. Numbering per
+	// docs/opentherm specification/New OT data-ids.txt. (TASK-1068)
+	OT_RemehadFdUcodes = 131, // u8 / u8 Remeha dF-/dU-codes
 	OT_RemehaServicemessage, // u8 / u8 Remeha Servicemessage
 	OT_RemehaDetectionConnectedSCU, // u8 / u8 Remeha detection connected SCU’s
 };
