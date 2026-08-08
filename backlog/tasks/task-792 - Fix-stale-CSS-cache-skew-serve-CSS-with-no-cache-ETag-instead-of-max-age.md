@@ -1,11 +1,11 @@
 ---
 id: TASK-792
 title: 'Fix stale-CSS cache-skew: serve CSS with no-cache + ETag instead of max-age'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-31 20:57'
-updated_date: '2026-05-31 21:02'
+updated_date: '2026-08-08 14:34'
 labels: []
 dependencies: []
 ---
