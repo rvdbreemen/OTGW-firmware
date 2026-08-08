@@ -32,3 +32,9 @@ TASK-1063 produced a baseline and a compare mode, but running the test is still 
 - [x] #6 Proven end to end against otgw1.local: a clean run reports PASS
 - [x] #7 scripts/tests/README.md documents the one-command form
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds run_coverage_test.py: upload fixture, start simulation, capture, stop, compare against the baseline in one command. Exit 0 match, 1 drift, 2 device error or too-short request. The simulation is stopped in a finally block so a failed capture never leaves a bench publishing synthetic data, and a capture shorter than one fixture loop is refused because a partial loop reports false MISSING topics. Its first runs found two flaws in the baseline itself, both fixed: the baseline had been recorded across a device boot (force publishes no steady-state run reproduces), and the fingerprint included otgw-pic/* and otgw-firmware/* topics that follow their own timers rather than the fixture. Proven end to end: baseline recorded from one capture, independent run reports PASS. Subsequently used to verify TASK-1064 and TASK-1066, where it reported exactly the 23 intended differences and no collateral.
+<!-- SECTION:FINAL_SUMMARY:END -->
