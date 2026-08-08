@@ -29,3 +29,12 @@ Found by the TASK-1063 baseline validation run on v1.7.3-beta.3. OpenThermMessag
 - [x] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 - [ ] #6 Coverage baseline is re-recorded deliberately, with the diff reviewed and shown to contain only the intended id 128-133 changes
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Fix: added an explicit = 131 to OT_RemehadFdUcodes so the three Remeha vendor members land on 131/132/133 instead of 128/129/130. Follows the enum idiom already used 7 times to bridge id gaps.
+Proved surgical: computed enum values from git HEAD and from the working tree and diffed them. 116 members before and after, 0 added, 0 removed, exactly 3 changed (128->131, 129->132, 130->133). All three now match their OTmap[] label.
+Verified on otgw1.local via the TASK-1065 coverage gate. ids 131/132/133 moved from "Unknown message [131] value [40830305]" to "RemehadFdUcodes = 3 / 5" and siblings, and six new MQTT topics appeared (Remeha*_hb_u8/_lb_u8). ids 128/129/130 moved from label-less "= 0 / 0" to "Unknown message [128]", which is the correct output for unassigned OEM space now that they no longer hit the Remeha decode cases.
+Authoritative numbering: docs/opentherm specification/New OT data-ids.txt (ID 131 dF-/dU-codes, ID 132 Servicemessage, ID 133 detection connected SCUs).
+<!-- SECTION:NOTES:END -->
