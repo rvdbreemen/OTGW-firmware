@@ -3,11 +3,11 @@ id: TASK-936
 title: >-
   Make flash scripts + SHA256SUMS reliably attach to every release (pre-publish
   gate)
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-25 19:55'
-updated_date: '2026-08-08 14:35'
+updated_date: '2026-08-08 14:49'
 labels:
   - release
   - tooling
