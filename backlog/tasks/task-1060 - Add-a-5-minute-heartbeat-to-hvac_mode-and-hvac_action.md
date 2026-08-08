@@ -47,3 +47,17 @@ Simulation run on otgw1.local closes the remaining gap:
 - Change-driven path also proven: simulation stopped 10:01:41, thermostat 30s timeout fired, both topics published "off" at 10:02:09 (28s later), well before the 300s window would have elapsed at 10:06. A real change still preempts the heartbeat.
 AC#4 (stamp only on confirmed send) remains inspection-only: forcing a sendMQTTData failure on demand is not practical on the bench.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Adds a 5-minute heartbeat to hvac_mode and hvac_action, which were the only on-change gated MQTT topics with no interval republish.
+
+Problem: both publishers gated solely on "forcePublish || value != cache". Every neighbouring status topic republishes on STATUS_HEARTBEAT_INTERVAL_SEC=60 through the ADR-076 per-slot heartbeat, but these two had no timer at all, so a stable thermostat mode was re-sent only on a real change or an HA restart. Any consumer that missed the last publish stayed stale indefinitely. Bench-confirmed before the fix: hvac_mode published exactly once in a 10-minute capture, and only because the ADR-088 restart force fired.
+
+Change: HVAC_HEARTBEAT_INTERVAL_SEC=300 plus a per-value last-sent timestamp, reusing the existing tracked-time helpers rather than adding a timer. The stamp moves only on a confirmed send, matching the commit-on-success rule from TASK-1058, so a dropped publish retries on the next frame instead of restarting the window. A genuine change still publishes immediately and the ADR-088 force path is untouched.
+
+Verified on real hardware (otgw1.local, ESP8266, 1.7.3-beta.2+3d66b20), using an uploaded 2-line OT simulation log to drive the slave-status path: hvac_mode 300s apart, hvac_action 300s apart, both with unchanged values, and both publishing within 28s on a real value change.
+
+Risk: adds two MQTT publishes per 5 minutes per device. Negligible next to the existing 60s status fan-out.
+<!-- SECTION:FINAL_SUMMARY:END -->
