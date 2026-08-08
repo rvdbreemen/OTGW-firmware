@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-08 10:52'
-updated_date: '2026-08-08 13:49'
+updated_date: '2026-08-08 13:50'
 labels:
   - bug
   - opentherm
@@ -30,8 +30,6 @@ Found by the TASK-1063 baseline validation run on v1.7.3-beta.3. OpenThermMessag
 - [x] #6 Coverage baseline is re-recorded deliberately, with the diff reviewed and shown to contain only the intended id 128-133 changes
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -40,3 +38,9 @@ Proved surgical: computed enum values from git HEAD and from the working tree an
 Verified on otgw1.local via the TASK-1065 coverage gate. ids 131/132/133 moved from "Unknown message [131] value [40830305]" to "RemehadFdUcodes = 3 / 5" and siblings, and six new MQTT topics appeared (Remeha*_hb_u8/_lb_u8). ids 128/129/130 moved from label-less "= 0 / 0" to "Unknown message [128]", which is the correct output for unassigned OEM space now that they no longer hit the Remeha decode cases.
 Authoritative numbering: docs/opentherm specification/New OT data-ids.txt (ID 131 dF-/dU-codes, ID 132 Servicemessage, ID 133 detection connected SCUs).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+OpenThermMessageID is id-indexed but its three Remeha vendor members fell on 128/129/130 while OTmap[] declares them at 131/132/133. Since processOT casts the id straight to the enum, MsgIDs 131-133 decoded as 'Unknown message' and never produced labelled topics, while 128-130 wrongly hit the Remeha decode cases and emitted label-less output. Fixed with an explicit = 131, following the idiom the enum already uses 7 times. Numbering per the repo's own spec file. Proved surgical by diffing computed enum values across the change: 116 members both sides, exactly 3 changed, none added or removed. Verified on hardware through the coverage gate: 131/132/133 now decode to their labels with six new Remeha MQTT topics, and 128/129/130 correctly report Unknown message for unassigned OEM space.
+<!-- SECTION:FINAL_SUMMARY:END -->
