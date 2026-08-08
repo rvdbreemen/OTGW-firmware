@@ -183,9 +183,30 @@ git log --pretty=format:'%h %s' "${LATEST_PUBLIC}..HEAD" -- src/OTGW-firmware/ s
 grep -A 35 "## \[Unreleased\]" CHANGELOG.md | head -40
 ```
 
+**Do NOT decide this by eye or by keyword grep.** Reading for a topic word gives
+false passes: on beta.4 a search for `remeha|vh_|ventilation` matched the word
+"ventilation-status" inside an unrelated bullet carried over from beta.2, while
+BOTH new fixes were in fact absent. Compare TASK identifiers as sets instead.
+It is mechanical and cannot false-pass:
+
+```bash
+# TASK-NNN referenced by commits since the last public release...
+git log --pretty=%s%n%b "${LATEST_PUBLIC}..HEAD" -- src/OTGW-firmware/ src/libraries/ \
+  | grep -oE 'TASK-[0-9]+' | sort -u > /tmp/tasks_in_commits
+# ...versus TASK-NNN already written up under [Unreleased]
+sed -n '/## \[Unreleased\]/,/^## \[/p' CHANGELOG.md \
+  | grep -oE 'TASK-[0-9]+' | sort -u > /tmp/tasks_in_changelog
+comm -23 /tmp/tasks_in_commits /tmp/tasks_in_changelog   # tasks shipped but NOT documented
+```
+
 **Decision:**
-- Every commit subject since `LATEST_PUBLIC` appears under CHANGELOG `## [Unreleased]` → pass silently, continue to Phase 4.
-- Any commit missing → refresh the CHANGELOG now. Stop and ask only if the gap is ambiguous; otherwise edit in-session.
+- `comm` prints nothing → the CHANGELOG accounts for everything. Continue to Phase 4.
+- `comm` prints a TASK id → that change is undocumented. Refresh the CHANGELOG now.
+  Stop and ask only if the gap is ambiguous; otherwise edit in-session.
+
+A commit with no TASK reference (a `[no-task]` docs commit, a `chore(release)`)
+will not appear on either side, which is correct: those need no CHANGELOG entry.
+Skim the commit subjects for anything user-visible that carries no TASK id.
 
 **Authoring rules (P3 — write immediately, keep only filename in context):**
 
@@ -261,6 +282,23 @@ git diff --ignore-cr-at-eol --name-only    # --ignore-cr-at-eol hides EOL-only c
 unrelated tracked file that another tool touched in this frequently-dirty
 worktree.
 
+**Audit first, then stage.** The bump rewrites a version banner in ~24 files, so
+a bump run has ~27 dirty paths and enumerating them by hand is the easiest place
+in this skill to make a mistake. Do not eyeball it. Prove the whole `src/` diff
+is banner-and-version churn only, and *then* stage by name. If the filter below
+prints anything other than version lines, an unrelated change is riding along
+and belongs in its own commit:
+
+```bash
+# Should print only _VERSION / _SEMVER_ / githash lines. Anything else = stop.
+git diff --ignore-cr-at-eol -- src/ \
+  | grep -E '^[+-]' | grep -v '^[+-][+-]' \
+  | grep -viE 'Version *: *v?[0-9]+\.[0-9]+\.[0-9]+-|_VERSION_|_SEMVER_|^[+-]$'
+
+# The dirty list to stage, for copying into the git add below:
+git status --short | grep -v '^??' | awk '{print $2}'
+```
+
 ```bash
 # The 1.x bin/bump-prerelease.sh updates version banners across ~24 files and
 # does NOT auto-stage. For a bump run, list the banner files it rewrote plus:
@@ -333,10 +371,18 @@ gh release view "${TAG}" --json tagName,isPrerelease,isDraft,assets \
   --jq '{tag: .tagName, prerelease: .isPrerelease, draft: .isDraft, assets: [.assets[].name]}'
 ```
 
-Required: `prerelease: true`, `draft: false`, and all six assets: `*.ino.bin`,
-`*.littlefs.bin`, `SHA256SUMS`, `flash_otgw.sh`, `flash_otgw.bat`,
+Required: `prerelease: true`, `draft: false`, and all nine assets: `*.ino.bin`,
+`*.littlefs.bin`, `SHA256SUMS`, `RELEASE_ASSETS.md`, `flash_otgw.sh`,
+`flash_otgw.bat`, `capture-mqtt-debug.bat`, `capture-usb-serial.bat`,
 `OTGW-firmware-*-flash-bundle.zip`. `draft: true` means CI stopped between
 attaching assets and flipping the draft flag (Trap 1).
+
+The capture scripts and `RELEASE_ASSETS.md` are there because a beta asks its
+testers to report findings, and nearly every bug fixed on this line was found
+from a capture rather than a description. Shipping the ask without the tool is
+the gap they close. Count them: if the list is short, a later edit dropped an
+asset from one of the two upload paths in `beta-prerelease.yml` (the draft
+top-up and the fresh create both carry the full list).
 
 `release not found` while the run still reads `in_progress` is not a failure, it
 just means you asked early. `release not found` after `completed success` is.
