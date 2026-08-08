@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-08 12:55'
-updated_date: '2026-08-08 13:49'
+updated_date: '2026-08-08 13:50'
 labels:
   - bug
   - mqtt
@@ -31,8 +31,6 @@ Found by the TASK-1065 coverage gate on v1.7.3-beta.3, and independently reporte
 - [x] #5 Coverage baseline re-recorded deliberately, with the diff reviewed and containing only the four newly-appearing vh_* topics
 <!-- AC:END -->
 
-
-
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
@@ -42,3 +40,9 @@ That predicts exactly which topics starve, and the prediction matches the field 
 Fix: slave bits moved to 8,9,10,11,12,14, matching both the declared contract and the OT_Statusflags fan-out which already uses 8-15 correctly. Verified no duplicate slot remains.
 Verified on device via the coverage gate: all four topics now publish in a steady-state run with no boot and no force.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The StatusVH slave bit fan-out reused the master's tracker slots 0-4, violating the contract documented on mqttlastsentstatusvhbit[] ('slots 0-7=master, 8-15=slave') that the OT_Statusflags fan-out already honours. The master stamps those slots microseconds before the slave reads them, so elapsed time is ~0 and the 60s heartbeat never fires. The hypothesis predicted exactly which topics starve and matched the field data: the four bits colliding with master slots published only on first-seen or force, while the two whose slots had no master counterpart kept heartbeating. Slave bits moved to 8-14, no duplicate slots remain. Verified on hardware: all four topics publish in a steady-state run with no boot and no force.
+<!-- SECTION:FINAL_SUMMARY:END -->
