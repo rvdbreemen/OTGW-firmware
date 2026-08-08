@@ -1,11 +1,11 @@
 ---
 id: TASK-903
 title: 'WifiSection: store static IP/subnet/gateway/DNS as uint8 quads, not String'
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-06-22 18:03'
-updated_date: '2026-06-22 19:12'
+updated_date: '2026-08-08 14:35'
 labels: []
 dependencies: []
 ---
