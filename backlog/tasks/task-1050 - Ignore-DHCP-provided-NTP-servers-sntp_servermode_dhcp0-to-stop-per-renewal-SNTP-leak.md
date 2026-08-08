@@ -3,11 +3,11 @@ id: TASK-1050
 title: >-
   Ignore DHCP-provided NTP servers (sntp_servermode_dhcp(0)) to stop per-renewal
   SNTP leak
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-28 17:39'
-updated_date: '2026-07-28 20:09'
+updated_date: '2026-08-08 14:34'
 labels:
   - bug
   - network
