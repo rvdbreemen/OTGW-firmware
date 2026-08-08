@@ -108,11 +108,18 @@ Keep the function for symmetry with the 2.0.0 worktree port, but no recovery act
 ```json
 {
   "forbid_pattern": [
-    { "pattern": "MQTTclient\\.disconnect\\(\\)", "path_glob": "src/OTGW-firmware/helperStuff.ino", "message": "ADR-079: do not disconnect MQTT in emergencyHeapRecovery() — reconnect cost exceeds heap recovered. See ADR Decision section, 'Explicitly NOT done'." },
-    { "pattern": "debugTelnet\\.(stop|disconnect)\\(\\)", "path_glob": "src/OTGW-firmware/helperStuff.ino", "message": "ADR-079: do not drop telnet clients in emergencyHeapRecovery() — operators need live diagnostics during heap incidents." }
+    {
+      "pattern": "MQTTclient\\.disconnect\\(\\)",
+      "path_glob": "src/OTGW-firmware/helperStuff.ino",
+      "message": "ADR-079: do not disconnect MQTT in emergencyHeapRecovery() — reconnect cost exceeds heap recovered. See ADR Decision section, 'Explicitly NOT done'."
+    },
+    {
+      "pattern": "debugTelnet\\.(stop|disconnect)\\(\\)",
+      "path_glob": "src/OTGW-firmware/helperStuff.ino",
+      "message": "ADR-079: do not drop telnet clients in emergencyHeapRecovery() — operators need live diagnostics during heap incidents."
+    }
   ],
-  "require_pattern": [],
-  "llm_judge": false
+  "require_pattern": []
 }
 ```
 

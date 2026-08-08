@@ -115,11 +115,18 @@ The revert touches the same 30 files that the implementation touched; the build 
 ```json
 {
   "forbid_pattern": [
-    { "pattern": "MQTT_HA_FLAG_IS_HA_CORE_ALIAS", "path_glob": "src/OTGW-firmware/**", "message": "ADR-078: HA-core alias flag bit is reverted on dev. The naming design lives on 2.0.0 (ADR-106). Do not re-introduce on dev." },
-    { "pattern": "bPublishHaCoreAliases", "path_glob": "src/OTGW-firmware/**", "message": "ADR-078: bPublishHaCoreAliases settings field is reverted on dev. Use ADR-106's bUseLegacyOtTopics on 2.0.0 if you mean the new naming-mode toggle." }
+    {
+      "pattern": "MQTT_HA_FLAG_IS_HA_CORE_ALIAS",
+      "path_glob": "src/OTGW-firmware/**",
+      "message": "ADR-078: HA-core alias flag bit is reverted on dev. The naming design lives on 2.0.0 (ADR-106). Do not re-introduce on dev."
+    },
+    {
+      "pattern": "bPublishHaCoreAliases",
+      "path_glob": "src/OTGW-firmware/**",
+      "message": "ADR-078: bPublishHaCoreAliases settings field is reverted on dev. Use ADR-106's bUseLegacyOtTopics on 2.0.0 if you mean the new naming-mode toggle."
+    }
   ],
-  "require_pattern": [],
-  "llm_judge": false
+  "require_pattern": []
 }
 ```
 

@@ -129,8 +129,7 @@ The 2.0.0 line carries the same change under a sibling ADR (ADR-098 Proposed, pa
       "path_glob": "src/OTGW-firmware/mqtt_configuratie.cpp",
       "message": "Discovery topics for source variants must use sibling-suffix shape (`%s/sensor/%s/%s_%s/config`) per ADR-071. Nested-children format is rejected by HA's discovery TOPIC_MATCHER (object_id character class excludes '/')."
     }
-  ],
-  "llm_judge": false
+  ]
 }
 ```
 

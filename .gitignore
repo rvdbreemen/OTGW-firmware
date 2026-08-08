@@ -100,3 +100,11 @@ scripts/tests/baseline-run-steady.log
 scripts/tests/newbaseline.log
 scripts/tests/verify2.log
 scripts/tests/fixverify.log
+
+# adr-kit per-machine state. .adr-kit.local.json holds the signer name and which
+# client CLI the judge calls: facts about one machine, not project decisions.
+# Tracking it would write one person's name into every teammate's acceptances.
+# The .adr-kit-state.json pair is a local cache with a lock file.
+docs/adr/.adr-kit.local.json
+docs/adr/.adr-kit-state.json
+docs/adr/.adr-kit-state.json.lock

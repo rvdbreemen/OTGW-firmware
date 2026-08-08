@@ -93,10 +93,13 @@ Probe with a 1 s TCP open against `MQTTbrokerIPchar:iBrokerPort`; only call `con
 ```json
 {
   "forbid_pattern": [
-    { "pattern": "MQTTclient\\.setSocketTimeout\\((?!15\\))", "path_glob": "src/OTGW-firmware/MQTTstuff.ino", "message": "ADR-080: do not change MQTTclient.setSocketTimeout from 15. The value is the accepted sync-blocker envelope (worst case 15 s, retry-gated to 42 s). To change it, supersede ADR-080 with a new ADR that captures the new envelope." }
+    {
+      "pattern": "MQTTclient\\.setSocketTimeout\\((?!15\\))",
+      "path_glob": "src/OTGW-firmware/MQTTstuff.ino",
+      "message": "ADR-080: do not change MQTTclient.setSocketTimeout from 15. The value is the accepted sync-blocker envelope (worst case 15 s, retry-gated to 42 s). To change it, supersede ADR-080 with a new ADR that captures the new envelope."
+    }
   ],
-  "require_pattern": [],
-  "llm_judge": false
+  "require_pattern": []
 }
 ```
 
