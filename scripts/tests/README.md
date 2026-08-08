@@ -86,6 +86,54 @@ Measured on otgw1.local (ESP8266, 1.7.3-beta.3): one loop decoded 143 distinct
 MsgIDs, published 394 distinct MQTT topics, with zero exceptions, zero discarded
 lines and flat heap.
 
+### `coverage_baseline.py` + `baseline_coverage.json` (regression gate)
+The coverage fixture proves breadth, but a run on its own still has to be
+eyeballed. This turns it into a pass/fail gate: a capture is reduced to a
+normalized fingerprint, and that fingerprint is compared against a committed
+baseline taken from a known-good firmware.
+
+```
+# 1. run the fixture (upload + start as above) and capture telnet:23 to a file
+# 2. check it against the baseline
+python coverage_baseline.py compare mycapture.log        # exit 1 on any drift
+```
+
+What the fingerprint keeps, because it characterises firmware behaviour:
+- for each `(prefix, msgtype, msgid)`: the decoded label and rendered value
+- for each MQTT topic: the **set** of payloads published
+- which message types and source prefixes were exercised at all
+
+What it strips, because it varies per run or per bench and would be pure noise:
+timestamps, heap and max-block columns, task ids, uptime, device uniqueid/MAC,
+broker host, topic root. Non-ASCII is dropped from values too: captures carry
+cp1252 degree signs, so the same firmware would otherwise fingerprint
+differently depending on how the log was decoded.
+
+Two properties worth knowing:
+- **Stability is proven, not assumed.** `python coverage_baseline.py selftest
+  <capture>` fingerprints two halves of one capture and diffs them. On the
+  v1.7.3-beta.3 reference capture that reports 0 unstable keys across 370 keys.
+- **Compare needs at least one complete loop** (about 5.3 minutes, and prefer 2+).
+  A capture cut mid-loop reports topics as MISSING simply because they had not
+  come round yet. The selftest halves show this: 383 topics versus 379.
+
+The committed baseline is from **v1.7.3-beta.3+5f852a0**, validated on
+otgw1.local over 20 minutes / 3.7 loops: 370 keys, 143 distinct MsgIDs, 383 MQTT
+topics, all 6 message types, all 5 source prefixes, zero exceptions, flat heap.
+
+The raw reference capture is deliberately not committed (about 1 MB, against
+27 KB for the largest other asset here). It lives outside the firmware repo at
+`OTGW-logs/validation-beta3-coverage.log`. Nothing depends on it: `selftest`
+works on whatever capture you produce.
+
+Refresh the baseline **only deliberately**, when a diff has been reviewed and the
+new behaviour is the intended behaviour:
+```
+python coverage_baseline.py record newcapture.log
+```
+Committing a refreshed baseline without reading the diff first defeats the point
+of having one.
+
 ## Notes
 - Flash arms over OTA, not USB: `curl -F "firmware=@x.ino.bin" "http://<ip>/update?cmd=0"`.
   USB serial flashing fails on a PIC-connected unit (PIC stream corrupts the bootloader).
