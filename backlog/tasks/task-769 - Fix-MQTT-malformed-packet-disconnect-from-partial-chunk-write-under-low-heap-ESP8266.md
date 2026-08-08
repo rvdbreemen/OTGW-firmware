@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-05-31 13:00'
+updated_date: '2026-08-08 14:35'
 labels:
   - bug
 dependencies: []
@@ -121,6 +121,8 @@ A large part of the thread is a SEPARATE topic (HA entity categorization: sensor
 What is genuinely supported: (1) malformed-packet/corruption is the priority bug per Rob; (2) the web UI logging (WebSocket live-log) is a load driver - no logging = snappy UI - consistent with the WS-trigger hypothesis; (3) regression vs 1.5.0 on ESP8266. NOT in the chat: specific heap numbers, board model, reconnect-tradeoff ratification.
 
 Sourcing of the decouple/fold decisions: these came from the USER AskUserQuestion answers THIS session (Decouple WS from MQTT -> then Fold into TASK-779), NOT from the chat. The free~5800/maxBlock~1300 figures are from Georges telnet log (prior session), not this chat.
+
+2026-08-08 backlog audit: kept In Progress. An auditor judged this shipped; an independent verifier refuted that, so it was not closed. Closing an unfinished task is worse than leaving it open. Needs a human decision on whether the remaining work is real.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
