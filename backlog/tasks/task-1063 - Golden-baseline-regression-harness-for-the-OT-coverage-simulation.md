@@ -1,7 +1,7 @@
 ---
 id: TASK-1063
 title: Golden-baseline regression harness for the OT coverage simulation
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-08 10:43'
