@@ -97,3 +97,6 @@ wifi-profiles.json
 scripts/tests/last-coverage-run.log
 scripts/tests/verify-run.log
 scripts/tests/baseline-run-steady.log
+scripts/tests/newbaseline.log
+scripts/tests/verify2.log
+scripts/tests/fixverify.log

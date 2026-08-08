@@ -1,6 +1,6 @@
 {
  "counts": {
-  "mqtt_topics": 361,
+  "mqtt_topics": 371,
   "msgids": 143,
   "ot_keys": 370
  },
@@ -607,6 +607,24 @@
   "RelativeVentilation_thermostat": [
    "0"
   ],
+  "RemehaDetectionConnectedSCU_hb_u8": [
+   "3"
+  ],
+  "RemehaDetectionConnectedSCU_lb_u8": [
+   "5"
+  ],
+  "RemehaServicemessage_hb_u8": [
+   "3"
+  ],
+  "RemehaServicemessage_lb_u8": [
+   "5"
+  ],
+  "RemehadFdUcodes_hb_u8": [
+   "3"
+  ],
+  "RemehadFdUcodes_lb_u8": [
+   "5"
+  ],
   "RemoteOverrideOperatingMode_dhw_mode": [
    "no_override"
   ],
@@ -1099,10 +1117,16 @@
   "summerwintertime": [
    "OFF"
   ],
+  "vh_bypass_automatic_status": [
+   "OFF"
+  ],
   "vh_bypass_mode": [
    "OFF"
   ],
   "vh_bypass_position": [
+   "OFF"
+  ],
+  "vh_bypass_status": [
    "OFF"
   ],
   "vh_configuration": [
@@ -1118,6 +1142,9 @@
    "ON"
   ],
   "vh_diagnostic_indicator": [
+   "OFF"
+  ],
+  "vh_fault": [
    "OFF"
   ],
   "vh_free_ventilation_mode": [
@@ -1136,6 +1163,9 @@
    "ON"
   ],
   "vh_ventilation_enabled": [
+   "ON"
+  ],
+  "vh_ventilation_mode": [
    "ON"
   ],
   "water_over_temperature": [
@@ -1327,7 +1357,7 @@
   },
   "B|Data-Invalid|131": {
    "rendered": [
-    "Unknown message [131] value [60830000] f8.8 [0.00] u16 [0] s16 [0]"
+    "RemehadFdUcodes = 0 / 0"
    ],
    "src": "Boiler"
   },
@@ -1533,13 +1563,13 @@
   },
   "B|Read-Ack|128": {
    "rendered": [
-    "= 0 / 0"
+    "Unknown message [128] value [40800000] f8.8 [0.00] u16 [0] s16 [0]"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|129": {
    "rendered": [
-    "= 0 / 0"
+    "Unknown message [129] value [40810000] f8.8 [0.00] u16 [0] s16 [0]"
    ],
    "src": "Boiler"
   },
@@ -1551,25 +1581,25 @@
   },
   "B|Read-Ack|130": {
    "rendered": [
-    "= 0 / 0"
+    "Unknown message [130] value [40820000] f8.8 [0.00] u16 [0] s16 [0]"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|131": {
    "rendered": [
-    "Unknown message [131] value [40830305] f8.8 [3.02] u16 [773] s16 [773]"
+    "RemehadFdUcodes = 3 / 5"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|132": {
    "rendered": [
-    "Unknown message [132] value [40840305] f8.8 [3.02] u16 [773] s16 [773]"
+    "RemehaServicemessage = 3 / 5"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|133": {
    "rendered": [
-    "Unknown message [133] value [40850305] f8.8 [3.02] u16 [773] s16 [773]"
+    "RemehaDetectionConnectedSCU = 3 / 5"
    ],
    "src": "Boiler"
   },
@@ -2692,38 +2722,38 @@
   },
   "T|Read-Data|128": {
    "rendered": [
-    "= 0 / 0"
+    "Unknown message [128] value [800000] f8.8 [0.00] u16 [0] s16 [0]"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|129": {
    "rendered": [
-    "= 0 / 0"
+    "Unknown message [129] value [810000] f8.8 [0.00] u16 [0] s16 [0]"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|130": {
    "rendered": [
-    "= 0 / 0"
+    "Unknown message [130] value [820000] f8.8 [0.00] u16 [0] s16 [0]"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|131": {
    "rendered": [
-    "Unknown message [131] value [830000] f8.8 [0.00] u16 [0] s16 [0]",
-    "Unknown message [131] value [830305] f8.8 [3.02] u16 [773] s16 [773]"
+    "RemehadFdUcodes = 0 / 0",
+    "RemehadFdUcodes = 3 / 5"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|132": {
    "rendered": [
-    "Unknown message [132] value [840305] f8.8 [3.02] u16 [773] s16 [773]"
+    "RemehaServicemessage = 3 / 5"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|133": {
    "rendered": [
-    "Unknown message [133] value [850305] f8.8 [3.02] u16 [773] s16 [773]"
+    "RemehaDetectionConnectedSCU = 3 / 5"
    ],
    "src": "Thermostat"
   },
