@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-08 10:52'
-updated_date: '2026-08-08 13:10'
+updated_date: '2026-08-08 13:28'
 labels:
   - bug
   - opentherm
@@ -22,10 +22,10 @@ Found by the TASK-1063 baseline validation run on v1.7.3-beta.3. OpenThermMessag
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 OT_RemehadFdUcodes, OT_RemehaServicemessage and OT_RemehaDetectionConnectedSCU are renumbered to 131, 132 and 133 to match OTmap and the spec file
-- [ ] #2 MsgIDs 131/132/133 decode to their mapped labels instead of 'Unknown message'
-- [ ] #3 MsgIDs 128/129/130 no longer hit the Remeha decode cases and stop emitting label-less output
-- [ ] #4 No other enum member changes numeric value (verify by diffing computed enum values before and after)
-- [ ] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [x] #1 OT_RemehadFdUcodes, OT_RemehaServicemessage and OT_RemehaDetectionConnectedSCU are renumbered to 131, 132 and 133 to match OTmap and the spec file
+- [x] #2 MsgIDs 131/132/133 decode to their mapped labels instead of 'Unknown message'
+- [x] #3 MsgIDs 128/129/130 no longer hit the Remeha decode cases and stop emitting label-less output
+- [x] #4 No other enum member changes numeric value (verify by diffing computed enum values before and after)
+- [x] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 - [ ] #6 Coverage baseline is re-recorded deliberately, with the diff reviewed and shown to contain only the intended id 128-133 changes
 <!-- AC:END -->
