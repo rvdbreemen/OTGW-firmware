@@ -1,9 +1,11 @@
 ---
 id: TASK-1064
 title: 'Fix: Remeha vendor MsgIDs 131-133 never decode (enum sits 3 ids below OTmap)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-08 10:52'
+updated_date: '2026-08-08 13:10'
 labels:
   - bug
   - opentherm
