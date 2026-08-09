@@ -2773,12 +2773,12 @@
     },
     {
       "id": "ADR-089",
-      "title": "Run the ADR pre-commit judge declarative-only until the LLM pass is bounded",
-      "path": "ADR-089-run-the-adr-pre-commit-judge-declarative-only-until-the-llm-pass-is-bounded.md",
+      "title": "Judge ADRs declaratively per commit and semantically once a week",
+      "path": "ADR-089-judge-adrs-declaratively-per-commit-and-semantically-once-a-week.md",
       "format": "madr",
       "status": "Proposed",
       "date": "2026-08-09",
-      "decision_summary": "Chosen option: Option A, because it restores the blocking behaviour that is both cheap and proven, without putting an...",
+      "decision_summary": "Chosen option: Option A, because the cost is a per-ADR multiplier rather than a per-call latency, so it belongs on a...",
       "topics": [
         "adr-kit",
         "developer-experience",
@@ -2786,16 +2786,17 @@
         "tooling"
       ],
       "aliases": [
-        "adr judge llm pass disabled",
-        "llm_enabled false",
-        "pre-commit hook re-enabled"
+        "adr judge weekly pass",
+        "llm_enabled false with --llm override",
+        "one model call per ADR"
       ],
       "components": [
         ".githooks/pre-commit",
-        "docs/adr/.adr-kit.json"
+        "docs/adr/.adr-kit.json",
+        "scripts/adr-judge-weekly.py"
       ],
       "symbols": [
-        "ADR_KIT_HOOK_DISABLE",
+        "ADR_KIT_NO_LLM",
         "judge.backend",
         "judge.llm_enabled"
       ],
@@ -2803,20 +2804,23 @@
       "decision_contract": {
         "must": [
           ".githooks/pre-commit is the adr-kit wrapper with no early exit 0 above the ADRKITHOOKDISABLE guard.",
-          "judge.llmenabled stays false until a run over an empty diff is shown to return within the hook's budget.",
-          "The declarative pass keeps blocking: a rule violation exits non-zero."
+          "judge.llmenabled stays false, so the commit path never makes a model call.",
+          "The weekly pass makes exactly one isolated call per ADR and prints that ADR's verdict before starting the next.",
+          "The weekly pass writes a report a human can read after the fact."
         ],
         "must_not": [
-          "Do not disable the hook again by editing the wrapper. The wrapper is refreshed by /adr-kit:install-hooks and a hand-edit is silently reverted on the next upgrade; use ADRKITHOOKDISABLE=1 for a single commit, or --uninstall to remove it d...",
-          "Do not re-introduce judge.llmcmd or judge.llmmodel. They are retired and degrade silently rather than failing.",
-          "Do not commit docs/adr/.adr-kit.local.json. It holds the signer name and the client choice, which are facts about one machine."
+          "Do not enable judge.llmenabled while unscoped ADRs outnumber scoped ones. That is the condition that makes the commit path unbounded, not the backend.",
+          "Do not disable the hook by editing the wrapper; /adr-kit:install-hooks refreshes it and a hand-edit is silently reverted. Use ADRKITHOOKDISABLE=1 for one commit, or --uninstall deliberately.",
+          "Do not re-introduce judge.llmcmd or judge.llmmodel. Both are retired in 0.47.0 and degrade silently instead of failing.",
+          "Do not commit docs/adr/.adr-kit.local.json; it names one machine's signer."
         ],
         "exceptions": [
-          "ADRKITNOLLM=1 and ADRKITHOOKDISABLE=1 remain available per commit."
+          "ADRKITNOLLM=1 and ADRKITHOOKDISABLE=1 remain available per commit.",
+          "--only ADR-NNN re-checks a single ADR after a fix without a full pass."
         ],
         "verification": [
-          "docs/adr/.adr-kit.json: judge.llmenabled is false, judge.backend is host.",
-          "echo \"\" | bin/adr-judge --diff - --adr-dir docs/adr/ exits 0 promptly.",
+          "docs/adr/.adr-kit.json: judge.llmenabled is false.",
+          "python scripts/adr-judge-weekly.py --only ADR-085 exits 0 and writes logs/adr-judge-weekly.md.",
           ".gitignore covers docs/adr/.adr-kit.local.json."
         ]
       },
