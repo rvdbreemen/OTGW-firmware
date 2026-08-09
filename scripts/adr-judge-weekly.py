@@ -14,15 +14,27 @@ goes rather than at the end, and writes a report. `--llm` overrides the config's
 llm_enabled=false for this invocation only; the hook keeps reading the config and
 stays fast.
 
-    python scripts/adr-judge-weekly.py                 # last 7 days on this branch
-    python scripts/adr-judge-weekly.py --since 14.days
+It is self-throttling, so CI can call it on every build. A stamp file records
+when the pass last actually ran and what it concluded. Inside the interval the
+runner exits in milliseconds without touching a model.
+
+The remembered verdict matters as much as the timestamp: stamping a run that
+found violations and then skipping for a week would turn CI green while the
+violation stands. So a skip replays the previous violations and keeps failing
+until a run comes back clean.
+
+    python scripts/adr-judge-weekly.py                 # runs, or skips if fresh
+    python scripts/adr-judge-weekly.py --status        # what the stamp says
+    python scripts/adr-judge-weekly.py --force         # ignore the interval
     python scripts/adr-judge-weekly.py --only ADR-085  # re-check one after a fix
 
-Exit 0 when no ADR reports a violation, 1 when any does, 2 on a setup error.
+Exit 0 when no ADR reports a violation (or the stamp is fresh and was clean),
+1 when any does, 2 on a setup error.
 """
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import json
 import os
 import re
@@ -34,6 +46,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent
 ADR_DIR = REPO / "docs" / "adr"
+# Tracked on purpose: the interval is shared state. A CI runner starts from a
+# clean checkout every time, so a gitignored stamp would make every build a full
+# pass, which is the opposite of the point. Override with $ADR_JUDGE_STAMP when
+# the runner prefers a cache directory over a commit.
+STAMP = Path(os.environ.get("ADR_JUDGE_STAMP") or (ADR_DIR / ".adr-judge-last-run.json"))
 ENFORCEMENT_RX = re.compile(r"## Enforcement.*?```json\n(.*?)```", re.S)
 ADR_ID_RX = re.compile(r"^(ADR-\d+)")
 
@@ -87,6 +104,37 @@ def judged_adrs(only: str | None) -> list[tuple[str, bool]]:
     return out
 
 
+def read_stamp() -> dict | None:
+    try:
+        return json.loads(STAMP.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None                        # absent or corrupt: treat as never run
+
+
+def stamp_age_days(stamp: dict) -> float | None:
+    try:
+        last = dt.datetime.fromisoformat(stamp["last_run"])
+    except (KeyError, ValueError, TypeError):
+        return None
+    if last.tzinfo is None:
+        last = last.replace(tzinfo=dt.timezone.utc)
+    return (dt.datetime.now(dt.timezone.utc) - last).total_seconds() / 86400
+
+
+def write_stamp(judged: int, violations: list[str], duration_s: float, since: str) -> None:
+    STAMP.parent.mkdir(parents=True, exist_ok=True)
+    head = subprocess.run(["git", "rev-parse", "HEAD"], cwd=REPO,
+                          capture_output=True, text=True).stdout.strip()
+    STAMP.write_text(json.dumps({
+        "last_run": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "commit": head,
+        "since": since,
+        "judged": judged,
+        "violations": violations,
+        "duration_s": round(duration_s, 1),
+    }, indent=2) + "\n", encoding="utf-8")
+
+
 def write_diff(since: str, out_path: Path) -> int:
     rev = subprocess.run(["git", "rev-list", "-1", f"--before={since} ago", "HEAD"],
                          cwd=REPO, capture_output=True, text=True).stdout.strip()
@@ -108,7 +156,41 @@ def main() -> int:
     ap.add_argument("--timeout", type=int, default=120,
                     help="per-ADR timeout in seconds (default 120)")
     ap.add_argument("--report", default=str(REPO / "logs" / "adr-judge-weekly.md"))
+    ap.add_argument("--max-age-days", type=float, default=7.0,
+                    help="re-judge only when the last pass is older than this "
+                         "(default 7); CI can call the runner every build")
+    ap.add_argument("--force", action="store_true",
+                    help="judge now regardless of how recent the last pass was")
+    ap.add_argument("--status", action="store_true",
+                    help="print what the stamp records and exit")
     args = ap.parse_args()
+
+    stamp = read_stamp()
+    age = stamp_age_days(stamp) if stamp else None
+
+    if args.status:
+        if not stamp:
+            print(f"no stamp at {STAMP}; the pass has never completed here")
+            return 0
+        print(json.dumps(stamp, indent=2))
+        print(f"age: {age:.2f} days" if age is not None else "age: unparseable")
+        return 0
+
+    # Deterministic fast path. Costs a file read, so CI can call this on every
+    # build and only pay for the real pass once per interval.
+    if stamp and age is not None and age < args.max_age_days and not args.force and not args.only:
+        remembered = stamp.get("violations") or []
+        if remembered:
+            # Do NOT report clean just because the stamp is fresh: the last pass
+            # found something and skipping would hide it for the rest of the week.
+            print(f"last pass {age:.1f}d ago found {len(remembered)} violation(s), "
+                  f"still unresolved: {', '.join(remembered)}")
+            print(f"stamp: {STAMP}")
+            print("Fix them and re-run with --force, or re-check one with --only ADR-NNN.")
+            return 1
+        print(f"skip: last pass {age:.1f}d ago was clean over {stamp.get('judged', '?')} "
+              f"ADR(s); next due in {args.max_age_days - age:.1f}d")
+        return 0
 
     judge = find_judge()
     adrs = judged_adrs(args.only)
@@ -178,6 +260,22 @@ def main() -> int:
         if detail:
             lines += ["", "  ```", *(f"  {d}" for d in detail.splitlines()), "  ```", ""]
     report.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    # Stamp only a pass that actually judged everything. Two ways it can fail to:
+    # a --only run covered one ADR, and a run with timeouts or lookup errors
+    # reached no verdict for those. Either would reset the clock on the strength
+    # of work that did not happen, and the next six days of CI would report a
+    # coverage the repository never got.
+    unjudged = [r[0] for r in results if r[1] not in ("OK", "VIOLATION")]
+    if args.only:
+        print(f"stamp : not written (--only judged 1 of the ADR set)")
+    elif unjudged:
+        print(f"stamp : NOT written; {len(unjudged)} ADR(s) reached no verdict "
+              f"({', '.join(unjudged[:5])}{'...' if len(unjudged) > 5 else ''}). "
+              f"The next run will judge the full set again.")
+    else:
+        write_stamp(len(results), [r[0] for r in violations], total, args.since)
+        print(f"stamp : {STAMP}")
 
     print(f"\njudged {len(results)} ADRs in {total/60:.1f} min; "
           f"{len(violations)} violation(s), {len(problems) - len(violations)} other issue(s)")

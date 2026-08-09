@@ -2806,7 +2806,9 @@
           ".githooks/pre-commit is the adr-kit wrapper with no early exit 0 above the ADRKITHOOKDISABLE guard.",
           "judge.llmenabled stays false, so the commit path never makes a model call.",
           "The weekly pass makes exactly one isolated call per ADR and prints that ADR's verdict before starting the next.",
-          "The weekly pass writes a report a human can read after the fact."
+          "The weekly pass writes a report a human can read after the fact.",
+          "The stamp is written only when every ADR in the set reached a verdict. A timeout, a lookup failure or any other non-verdict outcome leaves the previous stamp in place, so the next invocation judges the full set again. A --only run never...",
+          "The stamp records the verdict as well as the time, and a skip over a stamp carrying violations replays them and exits non-zero."
         ],
         "must_not": [
           "Do not enable judge.llmenabled while unscoped ADRs outnumber scoped ones. That is the condition that makes the commit path unbounded, not the backend.",

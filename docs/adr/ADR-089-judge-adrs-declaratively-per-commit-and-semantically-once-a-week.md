@@ -126,6 +126,19 @@ config and stays fast. Each ADR's verdict, elapsed time and scoped-or-not status
 prints as soon as that ADR finishes, and a markdown report lands in
 `logs/adr-judge-weekly.md`.
 
+The pass throttles itself rather than relying on a scheduler. A tracked stamp
+file, `docs/adr/.adr-judge-last-run.json`, records when the pass last completed,
+over how many ADRs, and what it concluded. Inside the interval the runner exits
+in under half a second without touching a model, so CI can invoke it on every
+build and only pays for the real pass once a week.
+
+Two rules keep that stamp honest. It is written **only** when the pass actually
+judged the full set: a `--only` run and a run where any ADR timed out or errored
+both leave the clock untouched, because otherwise six days of CI would report
+coverage the repository never received. And the stamp remembers the verdict, not
+just the time: a skip over a stamp that recorded violations replays them and
+exits non-zero, so a failing week cannot go green by waiting.
+
 `judge.backend = host` with `host_client = claude-code-cli` stays as configured.
 The backend is not the bottleneck: at 64 sequential calls, even a 2-second
 backend costs over two minutes per commit, which is still unacceptable at commit
@@ -149,6 +162,12 @@ advisory`; two commits on 2026-08-09 took 21 s and under 1 s.
 * The weekly pass makes exactly one isolated call per ADR and prints that ADR's
   verdict before starting the next.
 * The weekly pass writes a report a human can read after the fact.
+* The stamp is written only when every ADR in the set reached a verdict. A
+  timeout, a lookup failure or any other non-verdict outcome leaves the previous
+  stamp in place, so the next invocation judges the full set again. A `--only`
+  run never stamps.
+* The stamp records the verdict as well as the time, and a skip over a stamp
+  carrying violations replays them and exits non-zero.
 
 ### Must Not
 
@@ -244,9 +263,15 @@ advisory`; two commits on 2026-08-09 took 21 s and under 1 s.
   Breemen:** 64 of the 65 opted-in ADRs declare no `path_glob`, so they are in
   scope for every diff including an empty one. The run was not hung; it was
   working through 64 sequential calls at roughly 20 s each.
-* [ ] Should the weekly pass be scheduled (cron, CI job, or a reminder), and
-  should it run against the branch diff or the full tree? Until this is decided
-  the pass runs only when invoked by hand.
+* [x] Should the weekly pass be scheduled (cron, CI job, or a reminder)? —
+  **Answered 2026-08-09 by User: Robert van den Breemen:** no external scheduler.
+  The runner throttles itself on a stamp file, so CI calls it on every build and
+  it decides for itself whether the interval has elapsed. A skip costs a file
+  read.
+* [ ] Should the stamp be committed by CI after a real pass, or held in a runner
+  cache via `$ADR_JUDGE_STAMP`? Committing shares the interval across every
+  checkout, which is the point; a cache keeps CI from writing to the repository.
+  Until this is settled the stamp is tracked and updated by whoever ran the pass.
 
 ## Related Decisions
 
