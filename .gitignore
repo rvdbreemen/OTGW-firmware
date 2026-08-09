@@ -108,3 +108,6 @@ scripts/tests/fixverify.log
 docs/adr/.adr-kit.local.json
 docs/adr/.adr-kit-state.json
 docs/adr/.adr-kit-state.json.lock
+# .adr-kit-readiness.json is the guardian's disposable Proposed-queue cache,
+# regenerated per machine by the SessionStart nudge.
+docs/adr/.adr-kit-readiness.json

@@ -68,24 +68,33 @@ and `bin/adr-judge` now states "one call per Accepted ADR on every commit"
 (line 1208) and "each ADR gets its own" (line 1284). There is no thread pool or
 `concurrent.futures` anywhere in the script, so the calls run one after another.
 
-**Almost nothing is scoped.** Of the 65 ADRs the LLM pass would evaluate, **64
-declare no `path_glob` at all**: their Enforcement block is `{"llm_judge": true}`
-with no rules. An ADR without a scope is in scope for every commit, including one
-with an empty diff. Only ADR-087 is bounded.
+**Almost nothing is scoped.** Of the 68 ADRs the LLM pass evaluates (Accepted,
+with an Enforcement block, `llm_judge` not reasoned off — the same set the
+pre-commit hook reports as "checked 68 ADR(s)"), **58 declare no `path_glob` at
+all**: their Enforcement block is `{"llm_judge": true}` with no rules. An ADR
+without a scope is in scope for every commit, including one with an empty diff.
+Ten are bounded. Counting this correctly requires reading Status from BOTH
+frontmatter and the `## Status` prose section: most 1.x ADRs carry the latter,
+and a frontmatter-only reader classifies a Superseded ADR as judgeable.
 
 This is not visible by grepping. `llm_judge` defaults to TRUE as of 0.47.0, and
 the migration removed the explicit `"llm_judge": false` rather than writing
 `true`, so an opted-in ADR usually contains no `llm_judge` key at all.
 
-**A call costs about 18 to 26 seconds.** Measured on this machine with the `host`
-backend and the Claude Code CLI: 17.7 s for one ADR against a 1.6 KB diff, 25.8 s
-against a 436 KB week diff. A trivial `claude -p "Answer with the single word:
-ok"` takes 23.5 s, so most of that is process startup rather than inference.
+**A call costs 20 to 28 seconds, and ADR size barely moves it.** Empirical
+sample of 9 ADRs spanning a 21x range of Decision length (415 to 8722 chars),
+each judged in isolation against the same 436 KB week diff: 20.2 s min, 21.7 s
+median, 22.6 s mean, 27.8 s max, stdev 2.5 s. A 21x larger ADR costs 1.38x the
+time, because most of a call is CLI startup rather than inference — a trivial
+`claude -p "Answer with the single word: ok"` takes 23.5 s by itself. The
+runner's per-call timeout is therefore 180 s (6.5x the observed max): bounded,
+not strict, since the observed failure mode was never a slow call but many
+sequential ones.
 
-Multiplied out: 64 unscoped ADRs at roughly 20 s each is about 20 minutes of
-blocking on **every** commit, including one that changes a single comment. That
-is what an earlier observation of "an empty diff did not return within 90 s"
-actually was: the first few of 64 calls.
+Multiplied out: 58 unscoped ADRs at ~23 s each is about 22 minutes of blocking
+on **every** commit, including one that changes a single comment. That is what
+an earlier observation of "an empty diff did not return within 90 s" actually
+was: the first few of dozens of sequential calls.
 
 ## Decision Drivers
 
@@ -104,7 +113,7 @@ actually was: the first few of 64 calls.
   week over the week's diff, one call per ADR, reporting per ADR as it goes.
 * Option B: enable the LLM pass in the hook and accept the latency.
 * Option C: leave the hook disabled entirely, as it was since May.
-* Option D: give all 64 unscoped ADRs a `path_glob` so the hook only calls for
+* Option D: give all 58 unscoped ADRs a `path_glob` so the hook only calls for
   ADRs the commit actually touches.
 * Option E: switch to a faster backend (OpenRouter or local Ollama) and keep the
   pass in the hook.
@@ -126,21 +135,34 @@ config and stays fast. Each ADR's verdict, elapsed time and scoped-or-not status
 prints as soon as that ADR finishes, and a markdown report lands in
 `logs/adr-judge-weekly.md`.
 
-The pass throttles itself rather than relying on a scheduler. A tracked stamp
-file, `docs/adr/.adr-judge-last-run.json`, records when the pass last completed,
-over how many ADRs, and what it concluded. Inside the interval the runner exits
-in under half a second without touching a model, so CI can invoke it on every
-build and only pays for the real pass once a week.
+The pass throttles itself rather than relying on a scheduler, and it does so
+**per ADR**. The tracked stamp file `docs/adr/.adr-judge-last-run.json` records,
+for each ADR, when it was last judged, what the verdict was, and against which
+commit. A run judges only the ADRs whose record is older than the interval (or
+absent), so inside the interval the runner exits in under half a second, CI can
+invoke it on every build, and the real cost is paid once a week.
 
-Two rules keep that stamp honest. It is written **only** when the pass actually
-judged the full set: a `--only` run and a run where any ADR timed out or errored
-both leave the clock untouched, because otherwise six days of CI would report
-coverage the repository never received. And the stamp remembers the verdict, not
-just the time: a skip over a stamp that recorded violations replays them and
-exits non-zero, so a failing week cannot go green by waiting.
+Per ADR rather than per run, because that is what survives partial work: an ADR
+stamps itself the moment it reaches a verdict, so an interrupted 25-minute sweep
+keeps everything it established; an ADR that times out stays due while its
+neighbours stay fresh; and a newly added ADR has no record and is judged on the
+next invocation instead of waiting out someone else's interval. Only a real
+verdict (OK or VIOLATION) stamps — a timeout or lookup failure never does. The
+stamp also remembers the verdict: a skip over a recorded VIOLATION replays it
+and exits non-zero, so a failing week cannot go green by waiting. `--force`
+ignores every timestamp and judges the full set; `--only ADR-NNN` re-checks one
+without resetting anything else.
+
+The same design has been proposed upstream as adr-kit TASK-146 (with the
+advisory-per-machine versus tracked-state tension named explicitly); this
+runner is the bridge until that lands. Two upstream improvements from this
+work already merged in adr-kit PR #82: the migration now reports the whole-set
+cost picture (`summary: {judged_after, unbounded_after}`), and the upgrade
+skill finishes the backend setup and forces the per-commit-versus-cadence
+choice.
 
 `judge.backend = host` with `host_client = claude-code-cli` stays as configured.
-The backend is not the bottleneck: at 64 sequential calls, even a 2-second
+The backend is not the bottleneck: at 58 sequential calls, even a 2-second
 backend costs over two minutes per commit, which is still unacceptable at commit
 time and irrelevant once a week.
 
@@ -162,12 +184,11 @@ advisory`; two commits on 2026-08-09 took 21 s and under 1 s.
 * The weekly pass makes exactly one isolated call per ADR and prints that ADR's
   verdict before starting the next.
 * The weekly pass writes a report a human can read after the fact.
-* The stamp is written only when every ADR in the set reached a verdict. A
-  timeout, a lookup failure or any other non-verdict outcome leaves the previous
-  stamp in place, so the next invocation judges the full set again. A `--only`
-  run never stamps.
-* The stamp records the verdict as well as the time, and a skip over a stamp
-  carrying violations replays them and exits non-zero.
+* Stamps are per ADR and written only on a real verdict (OK or VIOLATION). A
+  timeout or lookup failure leaves that ADR due while others keep their fresh
+  record; an interrupted run keeps every verdict it reached.
+* A recorded VIOLATION keeps the outcome non-zero, on runs and on skips, until a
+  re-judge clears it.
 
 ### Must Not
 
@@ -198,7 +219,7 @@ advisory`; two commits on 2026-08-09 took 21 s and under 1 s.
 
 * Commits are gated again after ten weeks with no check at all, at a cost that
   does not show up in the workflow.
-* Every ADR is judged weekly, including the 64 that no regex can guard, which is
+* Every ADR is judged weekly, including the 58 that no regex can guard, which is
   strictly more semantic coverage than the batched pre-commit design ever gave.
 * A long run is legible: the reader sees which ADR is being judged, what it said,
   and how long it took, instead of a silent process.
@@ -228,7 +249,7 @@ advisory`; two commits on 2026-08-09 took 21 s and under 1 s.
 ### Option B
 
 * Good, because it is the tool's intended full configuration.
-* Bad, because 64 unscoped ADRs at roughly 20 s each is about 20 minutes per
+* Bad, because 58 unscoped ADRs at roughly 23 s each is about 22 minutes per
   commit, measured, not estimated.
 
 ### Option C
@@ -241,7 +262,7 @@ advisory`; two commits on 2026-08-09 took 21 s and under 1 s.
 
 * Good, because it would make the hook's cost proportional to the commit, which
   is the theoretically right answer.
-* Bad, because it requires authoring a defensible `path_glob` for 64 Accepted
+* Bad, because it requires authoring a defensible `path_glob` for 58 Accepted
   ADRs, and Accepted ADRs are immutable except for their Status line, so most
   would need superseding. Worth doing incrementally for new ADRs; not a
   precondition for having a working judge now.
@@ -251,7 +272,7 @@ advisory`; two commits on 2026-08-09 took 21 s and under 1 s.
 * Good, because per-call latency would drop; most of the measured 18 to 26 s is
   CLI startup, not inference, so an HTTP backend would plausibly reach a few
   seconds.
-* Bad, because the calls are sequential and there are 64 of them: a 3-second
+* Bad, because the calls are sequential and there are 58 of them: a 3-second
   backend still costs over three minutes per commit. It also sends every diff to
   a third party and adds a per-token cost, in exchange for making a weekly job
   faster than it needs to be.
@@ -260,9 +281,12 @@ advisory`; two commits on 2026-08-09 took 21 s and under 1 s.
 
 * [x] Why does the `host` backend not return promptly on an empty diff, when no
   ADR should be in scope? — **Answered 2026-08-09 by User: Robert van den
-  Breemen:** 64 of the 65 opted-in ADRs declare no `path_glob`, so they are in
+  Breemen:** 58 of the 68 judged ADRs declare no `path_glob`, so they are in
   scope for every diff including an empty one. The run was not hung; it was
-  working through 64 sequential calls at roughly 20 s each.
+  working through dozens of sequential calls at roughly 23 s each. (Interim
+  counts of 65 and 74 in earlier drafts were reader errors: the first required
+  an explicit `llm_judge: true` where absence means true, the second missed
+  Status recorded in prose rather than frontmatter.)
 * [x] Should the weekly pass be scheduled (cron, CI job, or a reminder)? —
   **Answered 2026-08-09 by User: Robert van den Breemen:** no external scheduler.
   The runner throttles itself on a stamp file, so CI calls it on every build and

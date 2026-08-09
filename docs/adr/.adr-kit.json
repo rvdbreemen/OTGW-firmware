@@ -11,5 +11,9 @@
     "consistency": "always_strict",
     "evidence": "advisory_before_strict_from"
   },
-  "strict_from": "ADR-081"
+  "strict_from": "ADR-081",
+  "guardian": {
+    "llm_stale_days": 7,
+    "llm_autorun": false
+  }
 }

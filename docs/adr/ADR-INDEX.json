@@ -2807,8 +2807,8 @@
           "judge.llmenabled stays false, so the commit path never makes a model call.",
           "The weekly pass makes exactly one isolated call per ADR and prints that ADR's verdict before starting the next.",
           "The weekly pass writes a report a human can read after the fact.",
-          "The stamp is written only when every ADR in the set reached a verdict. A timeout, a lookup failure or any other non-verdict outcome leaves the previous stamp in place, so the next invocation judges the full set again. A --only run never...",
-          "The stamp records the verdict as well as the time, and a skip over a stamp carrying violations replays them and exits non-zero."
+          "Stamps are per ADR and written only on a real verdict (OK or VIOLATION). A timeout or lookup failure leaves that ADR due while others keep their fresh record; an interrupted run keeps every verdict it reached.",
+          "A recorded VIOLATION keeps the outcome non-zero, on runs and on skips, until a re-judge clears it."
         ],
         "must_not": [
           "Do not enable judge.llmenabled while unscoped ADRs outnumber scoped ones. That is the condition that makes the commit path unbounded, not the backend.",
