@@ -105,7 +105,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-097 | Accepted | - | Gate MQTT publication of OpenTherm Write-Ack values per topic-class: |
 | ADR-098 | Accepted | `src/OTGW-firmware/MQTTHaDiscovery.cpp` | Use sibling-suffix shape for discovery topics in addition to state topics: |
 | ADR-099 | Accepted | - | Output format. |
-| ADR-100 | Accepted | - | Identical to ADR-073 §1–§5 (including broker restart heuristic §3, now implemented). |
+| ADR-100 | Superseded | - | Identical to ADR-073 §1–§5 (including broker restart heuristic §3, now implemented). |
 | ADR-101 | Accepted | `src/**/*.{ino,cpp,h}` | OTGW-firmware 2.0.0 uses flat per-value MQTT topics. |
 | ADR-102 | Accepted | `src/OTGW-firmware/**/*.{ino,cpp,h}` | HA entity availability MUST reflect only the ESP↔MQTT link. |
 | ADR-103 | Accepted | - | Refine worldview routing to distinguish a proxy-answer A (no preceding B) from an answer-override A (preceded by B). |
@@ -180,3 +180,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-172 | Proposed | - | A per-endpoint, globally-shared poll budget checked in the v2 dispatcher immediately before the handler call (restAPI... |
 | ADR-173 | Proposed | - | OTMONITORPOLLMS = 2000 and DEVTIMEPOLLMS = 5000, as named constants rather than inline literals, because checkpollwin... |
 | ADR-174 | Accepted | - | Chosen option: Option A, because homeassistant/status is a Home Assistant side contract and the two firmware lines mu... |
+| ADR-175 | Proposed | `scripts/tests/coverage_baseline.py` | Chosen option: Option A, because it is the only one that makes topic presence an observation rather than a sample, an... |

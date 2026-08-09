@@ -3090,8 +3090,8 @@
       "title": "JIT HA Discovery with Smart Reconnect (Port of dev ADR-073)",
       "path": "ADR-100-jit-ha-discovery-smart-reconnect.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2026-05-08",
+      "status": "Superseded",
+      "date": "2026-08-07",
       "decision_summary": "Identical to ADR-073 §1–§5 (including broker restart heuristic §3, now implemented).",
       "topics": [],
       "aliases": [],
@@ -3113,7 +3113,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-174"
       }
     },
     {
@@ -5511,6 +5511,73 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-175",
+      "title": "Gate the OT coverage fixture on a lossless evidence source",
+      "path": "ADR-175-gate-the-ot-coverage-fixture-on-a-lossless-evidence-source.md",
+      "format": "madr",
+      "status": "Proposed",
+      "date": "2026-08-09",
+      "decision_summary": "Chosen option: Option A, because it is the only one that makes topic presence an observation rather than a sample, an...",
+      "topics": [
+        "mqtt",
+        "observability",
+        "regression-gate",
+        "testing"
+      ],
+      "aliases": [
+        "broker subscription for topic presence",
+        "coverage gate evidence source",
+        "telnet capture is lossy"
+      ],
+      "components": [
+        "scripts/tests/coverage_baseline.py",
+        "scripts/tests/mqtt_topic_capture.py",
+        "scripts/tests/run_coverage_test.py"
+      ],
+      "symbols": [
+        "mqtt_presence_gated",
+        "mqtt_source",
+        "PRESENCE_GATED"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "The ot, msgtypes and sources sections gate on MISSING, NEW and CHANGED.",
+          "The mqtt section gates on CHANGED always, and on MISSING and NEW only when mqttpresencegated() holds, that is when baseline and run both carry mqttsource: \"broker\".",
+          "A broker collector scopes its observations to the device under test, drains and discards the retained flush before the window opens, and discards the backlog buffered between subscribe and window start.",
+          "The broker host, port, user and top topic come from the device under test, and the runner raises rather than falling back when the device does not report a usable broker and MAC.",
+          "The capture window is at least two full fixture loops.",
+          "A run confirms the replay is advancing before committing to the full window."
+        ],
+        "must_not": [
+          "Do not gate topic presence read from the debug log.",
+          "Do not refresh the baseline to make a diff disappear without explaining the diff first.",
+          "Do not take the intersection of several runs as a baseline."
+        ],
+        "exceptions": [
+          "--topics telnet remains available for a bench with no broker access. It sets mqttsource: \"telnet\", which downgrades presence to reporting automatically; no separate opt-out exists or is needed."
+        ],
+        "verification": [
+          "scripts/tests/coveragebaseline.py::mqttpresencegated",
+          "scripts/tests/coveragebaseline.py::PRESENCEGATED",
+          "python scripts/tests/runcoveragetest.py --host --http-password"
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "scripts/tests/coverage_baseline.py"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -7612,6 +7679,12 @@
       "source": "ADR-100",
       "target": "ADR-073",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-100",
+      "target": "ADR-174",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -10221,6 +10294,18 @@
     {
       "source": "ADR-174",
       "target": "ADR-100",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-175",
+      "target": "ADR-116",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-175",
+      "target": "ADR-140",
       "type": "related",
       "resolved": true
     }
