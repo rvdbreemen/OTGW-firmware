@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-10 20:47'
-updated_date: '2026-08-10 21:01'
+updated_date: '2026-08-10 21:03'
 labels: []
 dependencies: []
 ordinal: 178000
@@ -27,3 +27,16 @@ release-assets.yml triggers on release:published, but the repo enforces immutabl
 - [ ] #6 No release step can report success while having attached nothing: either the workflow is gone, or it fails loudly when an expected asset is absent rather than skipping silently
 - [ ] #7 The workflow_dispatch backfill path is removed or documented as impossible, since assets cannot be added to any already-published release
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Add scripts/make_release_assets.py: generates SHA256SUMS, RELEASE_ASSETS.md and the flash-bundle zip from build/ output (stdlib hashlib+zipfile, no zip binary needed), and prints the exact gh release create asset list.
+2. Delete .github/workflows/release-assets.yml (cannot ever succeed post-publish; its workflow_dispatch backfill is impossible too).
+3. Fix the stale cross-references in beta-prerelease.yml and .claude/skills/beta-prerelease/SKILL.md that point at the deleted workflow.
+4. Rewrite RELEASE_PROCESS.md Phase 7 to generate assets and attach ALL of them to the DRAFT, with an explicit asset-count verification before publish.
+5. Document the two immutable-release facts in RELEASE_PROCESS.md: no asset can be added after publish, and a published tag name is permanently reserved even after deleting the release.
+6. Mirror the same steps in .claude/skills/release/SKILL.md Phase 5.
+7. Correct the KennisBank note immutable-release-breekt-asset-upload.
+8. Verify: run the generator against the current build/ output and confirm it reproduces the v1.7.4 assets byte-for-byte on SHA256SUMS content.
+<!-- SECTION:PLAN:END -->
