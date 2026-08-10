@@ -4,6 +4,20 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.7.3
+
+**No breaking changes versus v1.7.2.** No MQTT topic renames, no REST API removals, no settings-format changes, and no migration on upgrade. This is a Home Assistant integration and OpenTherm decoding fix release.
+
+### Behaviour change: "MQTT Home Assistant Reboot Detection" is deprecated (ADR-088)
+
+The setting is no longer shown in the web interface and no longer affects behaviour. Detecting a Home Assistant restart now always requires observing it go offline first, which is what this setting used to switch off. Requiring the full offline-to-online transition also means a retained Home Assistant birth message, which some setups publish and the broker then replays on every reconnect, cannot trigger a republish on an ordinary reconnect. The setting is still read from and written to `settings.ini`, so existing configurations load unchanged and no migration is needed.
+
+### Behaviour change: OpenTherm message IDs 128 to 133 decode differently
+
+Message ids 131, 132 and 133 (the Remeha vendor messages) previously produced `Unknown message` and no entity; they now decode and gain three Home Assistant sensors. Ids 128 to 130, which are unassigned OEM ids, previously produced label-less output because they were being decoded as if they were the Remeha messages; they no longer do. Automations that parsed the label-less 128 to 130 output are the only thing affected, and that output was never meaningful.
+
+---
+
 ## v1.7.2
 
 **No breaking changes versus v1.7.1.** No MQTT topic renames, no REST API removals, no settings-format changes, and no migration on upgrade.

@@ -10,14 +10,15 @@ Each release also has a GitHub release body, kept alongside its notes as `RELEAS
 
 At release time the outgoing version's notes and GitHub body move from the repository root into this directory, and the new version's notes take their place at the root.
 
-## Current release: v1.7.2
+## Current release: v1.7.3
 
-- [RELEASE_NOTES_1.7.2.md](../../RELEASE_NOTES_1.7.2.md) ([GitHub body](../../RELEASE_GITHUB_1.7.2.md)) ([download](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.2))
+- [RELEASE_NOTES_1.7.3.md](../../RELEASE_NOTES_1.7.3.md) ([GitHub body](../../RELEASE_GITHUB_1.7.3.md)) ([download](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.3))
 
-Long-run stability release: fixes the MQTT discovery-verify heap leak and the DHCP option 42 NTP-server leak, plus the mDNS out-of-memory crash that was their visible symptom.
+Home Assistant integration and OpenTherm decoding fixes: entities survive a Home Assistant Core restart, Remeha message IDs 131 to 133 decode, and four ventilation topics honour their heartbeat again.
 
 ## Previous release notes
 
+- [RELEASE_NOTES_1.7.2.md](RELEASE_NOTES_1.7.2.md) ([GitHub body](RELEASE_GITHUB_1.7.2.md))
 - [RELEASE_NOTES_1.7.1.md](RELEASE_NOTES_1.7.1.md) ([GitHub body](RELEASE_GITHUB_1.7.1.md))
 - [RELEASE_NOTES_1.7.0.md](RELEASE_NOTES_1.7.0.md) ([GitHub body](RELEASE_GITHUB_1.7.0.md))
 - [RELEASE_NOTES_1.7.0-beta.md](RELEASE_NOTES_1.7.0-beta.md)

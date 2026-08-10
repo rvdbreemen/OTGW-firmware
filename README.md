@@ -4,9 +4,25 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.2](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.2), a long-run stability release fixing two heap leaks that drained long-running devices to an out-of-memory reboot.
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.3](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.3), a Home Assistant integration and OpenTherm decoding fix release.
 
-## What's New in v1.7.2
+## What's New in v1.7.3
+
+v1.7.3 is a fix release for the 1.x (ESP8266) line. No breaking changes versus v1.7.2.
+
+- **Entities no longer stay on "unknown" after a Home Assistant Core restart.** Discovery configs are retained so Home Assistant rebuilds the entities, but state topics are not, and most values publish only when they change: a restarted Home Assistant was waiting for data the gateway had no reason to send. The `offline` to `online` transition on `homeassistant/status` now re-publishes every tracked value as first-seen, paced by OpenTherm bus traffic rather than emitted in one burst. Discovery itself is unchanged. (TASK-1058, ADR-088)
+- **`hvac_mode` and `hvac_action` no longer latch a value Home Assistant never received**, and now republish at least every 5 minutes. They were the only on-change gated topics without a heartbeat; on a bench gateway, `hvac_mode` published exactly once across a ten minute capture before the fix. (TASK-1058, TASK-1060)
+- **Remeha message IDs 131, 132 and 133 now decode.** The vendor messages (dF-/dU-codes, service message, connected SCU detection) were logged as `Unknown message` and produced no sensors, because the internal message-id list sat three positions below the message table. Remeha qSense and Tzerra owners gain three working entities. (TASK-1064)
+- **Four ventilation and heat-recovery topics refresh again**: `vh_fault`, `vh_ventilation_mode`, `vh_bypass_status` and `vh_bypass_automatic_status` published once at startup and never on their one minute heartbeat, because the master-side status fan-out reset their shared timers microseconds before the slave-side fan-out read them. (TASK-1066)
+- **Deprecated**: the "MQTT Home Assistant Reboot Detection" setting is no longer shown and no longer affects behaviour. It is still read from and written to `settings.ini`, so existing configurations load unchanged.
+
+Flash **both** firmware and filesystem. Settings are preserved.
+
+Full release notes: [RELEASE_NOTES_1.7.3.md](RELEASE_NOTES_1.7.3.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
+
+## What was new in v1.7.2
 
 v1.7.2 is a long-run stability release for the 1.x (ESP8266) line. v1.7.0 fixed heap *fragmentation*; this release fixes the two genuine heap *leaks* that were still draining devices to an out-of-memory reboot after roughly 1 to 1.5 hours. No breaking changes versus v1.7.1.
 
@@ -18,7 +34,7 @@ v1.7.2 is a long-run stability release for the 1.x (ESP8266) line. v1.7.0 fixed 
 
 Flash **both** firmware and filesystem: the reduced polling lives in the web assets.
 
-Full release notes: [RELEASE_NOTES_1.7.2.md](RELEASE_NOTES_1.7.2.md)
+Full release notes: [docs/releases/RELEASE_NOTES_1.7.2.md](docs/releases/RELEASE_NOTES_1.7.2.md)
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
 
@@ -119,14 +135,21 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.7.2
+## Latest stable release: v1.7.3
 
-`v1.7.2` is the current stable release on `main`. It fixes two genuine heap leaks that drained long-running devices to an out-of-memory reboot after roughly 1 to 1.5 hours (the MQTT discovery-verify retry storm, and DHCP-supplied NTP servers via option 42), plus the mDNS out-of-memory crash that was their visible symptom.
+`v1.7.3` is the current stable release on `main`. Home Assistant entities survive a Core restart instead of sitting on "unknown", the Remeha vendor message IDs 131 to 133 decode for the first time, and four ventilation and heat-recovery topics honour their one minute heartbeat again.
 
-Full release notes: [RELEASE_NOTES_1.7.2.md](RELEASE_NOTES_1.7.2.md)
+Full release notes: [RELEASE_NOTES_1.7.3.md](RELEASE_NOTES_1.7.3.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.3)
+
+## Previous stable release: v1.7.2
+
+`v1.7.2` fixed two genuine heap leaks that drained long-running devices to an out-of-memory reboot after roughly 1 to 1.5 hours (the MQTT discovery-verify retry storm, and DHCP-supplied NTP servers via option 42), plus the mDNS out-of-memory crash that was their visible symptom.
+
+Full release notes: [docs/releases/RELEASE_NOTES_1.7.2.md](docs/releases/RELEASE_NOTES_1.7.2.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.2)
 
-## Previous stable release: v1.7.1
+## Earlier stable release: v1.7.1
 
 `v1.7.1` added cooling support to the Home Assistant climate entity (a unified off/heat/cool entity for heatpump and Heat/Cool-thermostat users), plus gateway-mode, OTGW-connected, uptime and heap-health auto-discovery sensors.
 
