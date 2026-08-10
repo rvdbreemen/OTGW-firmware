@@ -1,12 +1,14 @@
-# OTGW-firmware v1.7.3 Release Notes
+# OTGW-firmware v1.7.4 Release Notes
 
 **Release date:** 2026-08-10
 **Branch:** main (from otgw-1.x.x)
-**Compare:** [v1.7.2...v1.7.3](https://github.com/rvdbreemen/OTGW-firmware/compare/v1.7.2...v1.7.3)
+**Compare:** [v1.7.2...v1.7.4](https://github.com/rvdbreemen/OTGW-firmware/compare/v1.7.2...v1.7.4)
 
 ## Overview
 
-v1.7.3 is a Home Assistant integration and OpenTherm decoding release for the 1.x (ESP8266) line. Entities no longer go to "unknown" after a Home Assistant Core restart, three Remeha vendor message IDs decode for the first time, and four ventilation topics that only ever published once at startup now honour their heartbeat. No breaking changes versus v1.7.2.
+v1.7.4 is a Home Assistant integration and OpenTherm decoding release for the 1.x (ESP8266) line. Entities no longer go to "unknown" after a Home Assistant Core restart, three Remeha vendor message IDs decode for the first time, and four ventilation topics that only ever published once at startup now honour their heartbeat. No breaking changes versus v1.7.2.
+
+**There is no v1.7.3 stable release.** The 1.7.3 beta line (beta.1 through beta.4) is what this release ships; the stable tag was skipped for a release-tooling reason and the version number was rolled forward. If you are running `1.7.3-beta.4`, this release is the same code plus the version bump.
 
 ## Bug fixes
 

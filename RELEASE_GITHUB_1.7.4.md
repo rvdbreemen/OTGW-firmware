@@ -1,8 +1,10 @@
 **Home Assistant entities survive a Core restart, and three Remeha message IDs decode for the first time.**
 
-v1.7.3 is a fix release for the 1.x (ESP8266) line. No breaking changes versus v1.7.2.
+v1.7.4 is a fix release for the 1.x (ESP8266) line. No breaking changes versus v1.7.2.
 
-Full release notes: [RELEASE_NOTES_1.7.3.md](https://github.com/rvdbreemen/OTGW-firmware/blob/main/RELEASE_NOTES_1.7.3.md) | [README](https://github.com/rvdbreemen/OTGW-firmware/blob/main/README.md) | [CHANGELOG](https://github.com/rvdbreemen/OTGW-firmware/blob/main/CHANGELOG.md)
+There is no v1.7.3 stable release: the 1.7.3 beta line is what ships here, with the version rolled forward. If you run `1.7.3-beta.4`, this is the same code plus the bump.
+
+Full release notes: [RELEASE_NOTES_1.7.4.md](https://github.com/rvdbreemen/OTGW-firmware/blob/main/RELEASE_NOTES_1.7.4.md) | [README](https://github.com/rvdbreemen/OTGW-firmware/blob/main/README.md) | [CHANGELOG](https://github.com/rvdbreemen/OTGW-firmware/blob/main/CHANGELOG.md)
 
 ## Bug fixes
 

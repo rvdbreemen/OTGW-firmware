@@ -4,7 +4,7 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
-## v1.7.3
+## v1.7.4
 
 **No breaking changes versus v1.7.2.** No MQTT topic renames, no REST API removals, no settings-format changes, and no migration on upgrade. This is a Home Assistant integration and OpenTherm decoding fix release.
 

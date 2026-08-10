@@ -4,11 +4,11 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.3](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.3), a Home Assistant integration and OpenTherm decoding fix release.
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.4](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.4), a Home Assistant integration and OpenTherm decoding fix release.
 
-## What's New in v1.7.3
+## What's New in v1.7.4
 
-v1.7.3 is a fix release for the 1.x (ESP8266) line. No breaking changes versus v1.7.2.
+v1.7.4 is a fix release for the 1.x (ESP8266) line. No breaking changes versus v1.7.2.
 
 - **Entities no longer stay on "unknown" after a Home Assistant Core restart.** Discovery configs are retained so Home Assistant rebuilds the entities, but state topics are not, and most values publish only when they change: a restarted Home Assistant was waiting for data the gateway had no reason to send. The `offline` to `online` transition on `homeassistant/status` now re-publishes every tracked value as first-seen, paced by OpenTherm bus traffic rather than emitted in one burst. Discovery itself is unchanged. (TASK-1058, ADR-088)
 - **`hvac_mode` and `hvac_action` no longer latch a value Home Assistant never received**, and now republish at least every 5 minutes. They were the only on-change gated topics without a heartbeat; on a bench gateway, `hvac_mode` published exactly once across a ten minute capture before the fix. (TASK-1058, TASK-1060)
@@ -18,7 +18,7 @@ v1.7.3 is a fix release for the 1.x (ESP8266) line. No breaking changes versus v
 
 Flash **both** firmware and filesystem. Settings are preserved.
 
-Full release notes: [RELEASE_NOTES_1.7.3.md](RELEASE_NOTES_1.7.3.md)
+Full release notes: [RELEASE_NOTES_1.7.4.md](RELEASE_NOTES_1.7.4.md)
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
 
@@ -135,12 +135,12 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.7.3
+## Latest stable release: v1.7.4
 
-`v1.7.3` is the current stable release on `main`. Home Assistant entities survive a Core restart instead of sitting on "unknown", the Remeha vendor message IDs 131 to 133 decode for the first time, and four ventilation and heat-recovery topics honour their one minute heartbeat again.
+`v1.7.4` is the current stable release on `main`. Home Assistant entities survive a Core restart instead of sitting on "unknown", the Remeha vendor message IDs 131 to 133 decode for the first time, and four ventilation and heat-recovery topics honour their one minute heartbeat again.
 
-Full release notes: [RELEASE_NOTES_1.7.3.md](RELEASE_NOTES_1.7.3.md)
-Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.3)
+Full release notes: [RELEASE_NOTES_1.7.4.md](RELEASE_NOTES_1.7.4.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.4)
 
 ## Previous stable release: v1.7.2
 

@@ -6,9 +6,9 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 For full release notes per version, see the matching `RELEASE_NOTES_<version>.md` file. Current release notes live at the repository root; previous release notes are archived in [`docs/releases/`](docs/releases/).
 
-## [1.7.3] - 2026-08-10
+## [1.7.4] - 2026-08-10
 
-Home Assistant integration and OpenTherm decoding release for the 1.x (ESP8266) line: entities survive a Home Assistant Core restart, three Remeha vendor message IDs decode for the first time, and four ventilation topics honour their heartbeat again. No breaking changes versus v1.7.2. Full notes: [RELEASE_NOTES_1.7.3.md](RELEASE_NOTES_1.7.3.md).
+Home Assistant integration and OpenTherm decoding release for the 1.x (ESP8266) line: entities survive a Home Assistant Core restart, three Remeha vendor message IDs decode for the first time, and four ventilation topics honour their heartbeat again. No breaking changes versus v1.7.2. Full notes: [RELEASE_NOTES_1.7.4.md](RELEASE_NOTES_1.7.4.md).
 
 ### Fixed
 - Home Assistant entities stayed on "unknown" after every Home Assistant Core restart, and only a gateway reboot brought them back. Discovery configs are retained, so Home Assistant rebuilt the entities from the broker, but state topics are not retained and most values publish only when they change: a freshly restarted Home Assistant subscribed and then waited for a value the firmware had no reason to send. The `homeassistant/status` transition from `offline` to `online` now resets the publish gates, so every tracked value re-publishes as first-seen. That covers the 128 OpenTherm message-id slots, the status and ventilation-status bit and byte fan-outs, the ASF, RBP and Remote Override fan-outs, and `hvac_mode` and `hvac_action`. The republish is paced by OpenTherm bus arrival rather than emitted in one burst, and discovery itself is untouched, so the just-in-time discovery behaviour is unchanged. Reported with a full diagnostic capture that recorded a real Home Assistant restart, which is what made the cause findable. (TASK-1058, ADR-088)

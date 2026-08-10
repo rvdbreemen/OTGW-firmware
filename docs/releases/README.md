@@ -10,9 +10,9 @@ Each release also has a GitHub release body, kept alongside its notes as `RELEAS
 
 At release time the outgoing version's notes and GitHub body move from the repository root into this directory, and the new version's notes take their place at the root.
 
-## Current release: v1.7.3
+## Current release: v1.7.4
 
-- [RELEASE_NOTES_1.7.3.md](../../RELEASE_NOTES_1.7.3.md) ([GitHub body](../../RELEASE_GITHUB_1.7.3.md)) ([download](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.3))
+- [RELEASE_NOTES_1.7.4.md](../../RELEASE_NOTES_1.7.4.md) ([GitHub body](../../RELEASE_GITHUB_1.7.4.md)) ([download](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.4))
 
 Home Assistant integration and OpenTherm decoding fixes: entities survive a Home Assistant Core restart, Remeha message IDs 131 to 133 decode, and four ventilation topics honour their heartbeat again.
 
