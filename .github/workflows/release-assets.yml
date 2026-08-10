@@ -2,25 +2,46 @@ name: Upload flash scripts and bundle to release
 
 # Runs when a GitHub Release is published.
 #
-# Three things happen:
+# Five things happen:
 #   1. flash_otgw.sh and flash_otgw.bat are uploaded as individual release assets.
 #   2. A SHA256SUMS file is generated for the firmware/filesystem binaries
 #      and uploaded as a release asset. flash_otgw.sh / flash_otgw.bat fetch
 #      and verify against this file on auto-download.
-#   3. A self-contained zip bundle is created and uploaded:
+#   3. RELEASE_ASSETS.md is generated, explaining what each asset is, how to
+#      verify a download, and how to produce a capture when reporting a bug.
+#   4. The diagnostic capture scripts are attached, so a bug report can carry a
+#      real log rather than a description.
+#   5. A self-contained zip bundle is created and uploaded:
 #        OTGW-firmware-<version>-flash-bundle.zip
 #      Contents:
 #        README.md                           top-level project readme
+#        RELEASE_ASSETS.md                   what each asset is / how to report a bug
 #        FLASH_GUIDE.md                      flashing guide (from docs/guides/)
 #        flash_otgw.sh                       Linux/macOS flash script
 #        flash_otgw.bat                      Windows flash script
 #        SHA256SUMS                          integrity manifest for the bins
+#        capture/                            diagnostic capture scripts + example config
 #        OTGW-firmware-*.ino.bin             firmware binary
 #        OTGW-firmware*.littlefs.bin         filesystem binary
+#
+# Finally the job asserts every expected asset is actually attached and fails if
+# any is missing. Generation is not attachment: v1.5.0 through v1.7.2 all shipped
+# without SHA256SUMS or the bundle because this job errored out mid-upload and
+# nothing checked the result.
 
 on:
   release:
     types: [published]
+  # Manual re-run against an existing release. Two uses: testing a change to this
+  # workflow without cutting a release, and backfilling a past release whose
+  # assets are incomplete. Adding assets to an immutable release is permitted;
+  # only deleting is not, which is why overwrite_files stays false below.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing release tag to attach assets to (e.g. v1.7.2)'
+        required: true
+        type: string
 
 jobs:
   upload-flash-assets:
@@ -29,11 +50,15 @@ jobs:
     permissions:
       contents: write   # required to upload release assets
 
+    env:
+      # One name for the target tag regardless of how the job was triggered.
+      RELEASE_TAG: ${{ github.event.release.tag_name || inputs.tag }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.release.tag_name }}
+          ref: ${{ github.event.release.tag_name || inputs.tag }}
 
       # ---- Download the firmware and filesystem binaries from this release ----
       - name: Download release binaries
@@ -41,7 +66,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           mkdir -p bundle_staging
-          gh release download "${{ github.event.release.tag_name }}" \
+          gh release download "${{ env.RELEASE_TAG }}" \
             --pattern "*.ino.bin" \
             --pattern "*.littlefs.bin" \
             --dir bundle_staging
@@ -61,10 +86,75 @@ jobs:
           echo "--- SHA256SUMS ---"
           cat SHA256SUMS
 
+      # ---- Describe what each asset is ----------------------------------------
+      # Attached as its own asset AND placed inside the bundle. A release page
+      # listing seven files with no explanation is a support burden; this is the
+      # cheapest possible answer to "which one do I download?".
+      - name: Write RELEASE_ASSETS.md
+        run: |
+          TAG="${{ env.RELEASE_TAG }}"
+          VERSION="${TAG#v}"
+          cat > RELEASE_ASSETS.md <<EOF
+          # What is in this release (${TAG})
+
+          ## Just want to flash it?
+
+          Download **OTGW-firmware-${VERSION}-flash-bundle.zip**. It contains both
+          binaries, both flash scripts, the flashing guide and the checksums, so it
+          is the only file most people need.
+
+          Flash **both** the firmware and the filesystem. Some releases change the
+          web interface, and flashing only the firmware leaves the old interface in
+          place. Your settings are preserved.
+
+          ## The individual files
+
+          | Asset | What it is |
+          |---|---|
+          | \`OTGW-firmware-${VERSION}+<githash>.ino.bin\` | The firmware. Flash to the ESP8266. |
+          | \`OTGW-firmware.${VERSION}+<githash>.littlefs.bin\` | The filesystem: web interface and assets. Flash alongside the firmware. |
+          | \`OTGW-firmware-${VERSION}-flash-bundle.zip\` | Everything below, in one download. Start here. |
+          | \`flash_otgw.bat\` | Flash helper for Windows. |
+          | \`flash_otgw.sh\` | Flash helper for Linux and macOS. |
+          | \`SHA256SUMS\` | Checksums for the two binaries. The flash scripts verify against this automatically. |
+          | \`capture-mqtt-debug.bat\` | Diagnostic capture, Windows. Run this before reporting a bug. |
+          | \`capture-usb-serial.bat\` | Diagnostic capture over USB, for a device that will not come up on WiFi. |
+          | \`RELEASE_ASSETS.md\` | This file. |
+
+          ## Verifying a download
+
+          \`\`\`
+          sha256sum -c SHA256SUMS          # Linux/macOS
+          certutil -hashfile <file> SHA256 # Windows, compare by eye
+          \`\`\`
+
+          The flash scripts do this for you when they download a release themselves.
+
+          ## Reporting a problem
+
+          A log makes the difference between a guess and a diagnosis. Please run a
+          capture and attach the single transcript file it produces:
+
+          1. Run \`capture-mqtt-debug.bat\` (it will ask for your gateway address and
+             MQTT broker details; \`capture-settings.example.json\` in the bundle shows
+             the format if you prefer to pre-fill them).
+          2. Reproduce the problem while it runs, then stop it with Q.
+          3. Attach the \`transcript-*.txt\` it wrote. It bundles the telnet log, the
+             MQTT stream, the browser console and the crash log into one file.
+
+          Report on Discord in #beta-testing, or open an issue at
+          https://github.com/rvdbreemen/OTGW-firmware/issues
+
+          Captures may contain your WiFi SSID, MQTT username and broker address.
+          They do not contain your MQTT password. Review before posting publicly.
+          EOF
+          echo "--- RELEASE_ASSETS.md ---"
+          cat RELEASE_ASSETS.md
+
       # ---- Build the zip bundle -----------------------------------------------
       - name: Create flash bundle zip
         run: |
-          TAG="${{ github.event.release.tag_name }}"
+          TAG="${{ env.RELEASE_TAG }}"
           # Strip leading 'v' for the filename (v1.5.0 -> 1.5.0)
           VERSION="${TAG#v}"
           BUNDLE_NAME="OTGW-firmware-${VERSION}-flash-bundle"
@@ -78,12 +168,21 @@ jobs:
           cp README.md                        "${BUNDLE_DIR}/"
           cp docs/guides/FLASH_GUIDE.md       "${BUNDLE_DIR}/"
 
+          # Diagnostic capture scripts, so a bug report can carry a real log
+          # instead of a description. capture-mqtt-debug is the general one;
+          # capture-usb-serial is for a device that will not come up on WiFi.
+          mkdir -p "${BUNDLE_DIR}/capture"
+          cp scripts/capture-mqtt-debug.bat       "${BUNDLE_DIR}/capture/"
+          cp scripts/capture-usb-serial.bat       "${BUNDLE_DIR}/capture/"
+          cp scripts/capture-settings.example.json "${BUNDLE_DIR}/capture/"
+
           # Firmware and filesystem binaries downloaded in the previous step
           cp bundle_staging/*.ino.bin         "${BUNDLE_DIR}/"
           cp bundle_staging/*.littlefs.bin    "${BUNDLE_DIR}/"
 
-          # Integrity manifest
+          # Integrity manifest and the asset guide
           cp SHA256SUMS                       "${BUNDLE_DIR}/"
+          cp RELEASE_ASSETS.md                "${BUNDLE_DIR}/"
 
           # Make shell script executable inside the zip
           chmod +x "${BUNDLE_DIR}/flash_otgw.sh"
@@ -92,11 +191,64 @@ jobs:
           echo "BUNDLE_ZIP=${BUNDLE_NAME}.zip" >> "$GITHUB_ENV"
 
       # ---- Upload individual scripts + bundle to the release ------------------
+      #
+      # overwrite_files: false is load-bearing, not a preference. With the default
+      # (true) the action DELETES an already-attached asset before re-uploading it.
+      # The release process attaches flash_otgw.sh/.bat itself, so this step tried
+      # to delete them, and GitHub rejects that on an immutable release:
+      #   Validation Failed: "Cannot delete asset from an immutable release"
+      # That killed the whole step before SHA256SUMS and the bundle finished
+      # uploading, which is why every stable release from v1.5.0 to v1.7.2 shipped
+      # without them while the betas (draft-first, so no delete) were fine.
+      # With false, already-present assets are skipped and the new ones still land.
       - name: Upload assets to release
         uses: softprops/action-gh-release@v2
         with:
+          overwrite_files: false
           files: |
             flash_otgw.sh
             flash_otgw.bat
             SHA256SUMS
+            RELEASE_ASSETS.md
+            scripts/capture-mqtt-debug.bat
+            scripts/capture-usb-serial.bat
             ${{ env.BUNDLE_ZIP }}
+
+      # ---- Pre-publish gate: prove every expected asset actually landed -------
+      # Generating an asset is not the same as attaching it. Without this check a
+      # silent upload failure looks identical to success, which is exactly how the
+      # missing SHA256SUMS went unnoticed across nine consecutive releases.
+      - name: Verify all expected assets are attached
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ env.RELEASE_TAG }}"
+          attached="$(gh release view "$TAG" --json assets --jq '.assets[].name')"
+          echo "--- attached assets ---"
+          echo "$attached"
+
+          missing=0
+          require() {
+            if ! echo "$attached" | grep -qx -- "$1"; then
+              echo "ERROR: missing expected release asset: $1"
+              missing=1
+            fi
+          }
+          require "flash_otgw.sh"
+          require "flash_otgw.bat"
+          require "SHA256SUMS"
+          require "RELEASE_ASSETS.md"
+          require "capture-mqtt-debug.bat"
+          require "capture-usb-serial.bat"
+          require "${{ env.BUNDLE_ZIP }}"
+
+          # The binaries come from the release itself, but a release without them
+          # is broken regardless of who was supposed to attach them.
+          echo "$attached" | grep -q '\.ino\.bin$'      || { echo "ERROR: no *.ino.bin attached"; missing=1; }
+          echo "$attached" | grep -q '\.littlefs\.bin$' || { echo "ERROR: no *.littlefs.bin attached"; missing=1; }
+
+          if [ "$missing" -ne 0 ]; then
+            echo "Release $TAG is incomplete. See the errors above."
+            exit 1
+          fi
+          echo "All expected assets are attached."

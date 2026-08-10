@@ -3,11 +3,11 @@ id: TASK-1040
 title: >-
   Experiment build 1.7.1-no-mdns.1: discriminating test for the TASK-1037 heap
   leak
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-19 15:23'
-updated_date: '2026-07-20 19:52'
+updated_date: '2026-08-08 14:34'
 labels: []
 dependencies: []
 priority: high

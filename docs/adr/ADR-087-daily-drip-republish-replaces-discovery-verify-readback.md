@@ -93,3 +93,31 @@ Rejected: primary-source field evidence shows ADR-062's automatic path exhausts 
 - Field transcript: `transcript-20260721-225026-1.7.2-onset.1+bc067cc OTGW-48E72958B013`; analysis in `OTGW-logs/FIELD-ROOTCAUSE-discovery-verify-runaway.md`.
 - Implementation: `src/OTGW-firmware/OTGW-firmware.ino` daily/hourly trigger block; `markAllMQTTConfigPending()` `MQTTstuff.ino:1505`; `loopMQTTDiscovery()` `MQTTstuff.ino:1538`.
 - Task: TASK-1048. Related leak-fix task: TASK-1037.
+
+## Enforcement
+
+```json
+{
+  "forbid_pattern": [
+    {
+      "pattern": "startDiscoveryVerification",
+      "path_glob": "src/OTGW-firmware/OTGW-firmware.ino",
+      "message": "ADR-087: the automatic daily/hourly path must not start a verify readback; it drip-republishes via markAllMQTTConfigPending(). The manual paths in restAPI.ino and handleDebug.ino are retained and unaffected."
+    }
+  ],
+  "require_pattern": [
+    {
+      "pattern": "markAllMQTTConfigPending",
+      "path_glob": "src/OTGW-firmware/OTGW-firmware.ino",
+      "message": "ADR-087: the daily auto-heal is an unconditional drip republish."
+    }
+  ],
+  "llm_judge": true
+}
+```
+
+The declarative rules pin which path may start a readback. `llm_judge` covers
+what regex cannot see: the four cheap preconditions guarding the daily trigger
+(`bDiscoveryAutoVerify`, `bConnected`, `countPendingDiscoveryIds() == 0`,
+`getMaxFreeBlockSize() >= 8000`) are what keep the heal bounded, and dropping
+one of them still matches every pattern above.

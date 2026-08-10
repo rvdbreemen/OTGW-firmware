@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v1.7.2
+**  Version  : v1.7.3-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1650,6 +1650,20 @@ static void buildStatusSlaveText(uint8_t valueLB, char *statusText, size_t statu
 // is disconnected. Published on change, and on force (reconnect/interval).
 static int8_t mqttLastHvacMode   = -1;  // -1 unset, 0 off, 1 heat, 2 cool
 static int8_t mqttLastHvacAction = -1;  // -1 unset, 0 off, 1 idle, 2 heating, 3 cooling
+// Heartbeat: a stable mode is otherwise only re-sent on a real change or an HA restart, so a
+// consumer that missed the last publish stays stale indefinitely. Longer than the 60 s status
+// heartbeat because these two are slow-moving intent, not per-cycle demand. (TASK-1060)
+static constexpr uint16_t HVAC_HEARTBEAT_INTERVAL_SEC = 300;
+static uint16_t mqttLastHvacModeSent   = TRACKED_TIME_UNSEEN;
+static uint16_t mqttLastHvacActionSent = TRACKED_TIME_UNSEEN;
+
+// True when the per-value heartbeat window has elapsed. Never true before the first send:
+// an unset slot publishes because the value differs from the -1 sentinel, not on a timer.
+static bool hvacHeartbeatDue(uint16_t lastSent)
+{
+  return hasTrackedTime(lastSent)
+      && (elapsedTrackedSeconds(currentTrackedSeconds(), lastSent) >= HVAC_HEARTBEAT_INTERVAL_SEC);
+}
 
 static void publishHvacMode(bool forcePublish)
 {
@@ -1662,9 +1676,18 @@ static void publishHvacMode(bool forcePublish)
   const int8_t mode = !state.otgw.bThermostatState ? 0   // off when no thermostat
                     : (hb & 0x04)                  ? 2   // cooling_enable -> cool
                     :                                1;  // connected, not cooling -> heat
-  if (forcePublish || mode != mqttLastHvacMode) {
-    sendMQTTData("hvac_mode", mode == 2 ? "cool" : mode == 1 ? "heat" : "off");
-    mqttLastHvacMode = mode;
+  if (forcePublish || mode != mqttLastHvacMode || hvacHeartbeatDue(mqttLastHvacModeSent)) {
+    // ADR-076: latch the cache only when the send landed. forcePublish is one-shot and the
+    // caller already cleared it, so latching a dropped send would strand hvac_mode until the
+    // mode genuinely changes. Fall back to the unset sentinel instead, so the next frame retries.
+    // The heartbeat stamp moves only on a confirmed send for the same reason: a dropped publish
+    // must retry on the next frame, not restart the 5-minute window. (TASK-1060)
+    if (sendMQTTData("hvac_mode", mode == 2 ? "cool" : mode == 1 ? "heat" : "off")) {
+      mqttLastHvacMode     = mode;
+      mqttLastHvacModeSent = currentTrackedSeconds();
+    } else {
+      mqttLastHvacMode = -1;
+    }
   }
 }
 
@@ -1675,10 +1698,17 @@ static void publishHvacAction(bool forcePublish)
                       : (lb & 0x10)                  ? 3   // cooling        -> cooling
                       : (lb & 0x02)                  ? 2   // centralheating -> heating
                       :                                1;  // else           -> idle
-  if (forcePublish || action != mqttLastHvacAction) {
-    sendMQTTData("hvac_action",
-                 action == 3 ? "cooling" : action == 2 ? "heating" : action == 1 ? "idle" : "off");
-    mqttLastHvacAction = action;
+  if (forcePublish || action != mqttLastHvacAction || hvacHeartbeatDue(mqttLastHvacActionSent)) {
+    // ADR-076: see publishHvacMode — latch only on a confirmed send, else reset to unset so
+    // the next frame retries rather than stranding hvac_action on a one-shot force. The
+    // heartbeat stamp follows the same rule. (TASK-1060)
+    if (sendMQTTData("hvac_action",
+                     action == 3 ? "cooling" : action == 2 ? "heating" : action == 1 ? "idle" : "off")) {
+      mqttLastHvacAction     = action;
+      mqttLastHvacActionSent = currentTrackedSeconds();
+    } else {
+      mqttLastHvacAction = -1;
+    }
   }
 }
 
@@ -1885,12 +1915,19 @@ static void publishSlaveStatusVHState(uint8_t valueLB, const char *statusText)
     if (sendMQTTData(F("status_vh_slave"), statusText)) confirmMQTTPublishByteSlot();
     else                                                mqttPendingByteSlot.pending = false;
   }
-  publishStatusVHBitMQTT(0, "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(1, "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(2, "vh_bypass_status",           (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(3, "vh_bypass_automatic_status", (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(4, "vh_free_ventliation_status", (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB);
-  publishStatusVHBitMQTT(6, "vh_diagnostic_indicator",    (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB);
+  // Slave bits live in slots 8-15, per the mqttlastsentstatusvhbit[] contract and
+  // matching the OT_Statusflags fan-out. They previously reused the master's slots
+  // 0-4, so the master fan-out stamped those slots microseconds earlier and the
+  // slave bits' 60s heartbeat never elapsed: vh_fault, vh_ventilation_mode,
+  // vh_bypass_status and vh_bypass_automatic_status only ever published on
+  // first-seen or on a force. Slots 4 and 6 had no master counterpart, which is
+  // why those two alone kept heartbeating. (TASK-1066)
+  publishStatusVHBitMQTT(8,  "vh_fault",                   (valueLB & 0x01), (previousStatus & 0x01), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(9,  "vh_ventilation_mode",        (valueLB & 0x02), (previousStatus & 0x02), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(10, "vh_bypass_status",           (valueLB & 0x04), (previousStatus & 0x04), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(11, "vh_bypass_automatic_status", (valueLB & 0x08), (previousStatus & 0x08), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(12, "vh_free_ventliation_status", (valueLB & 0x10), (previousStatus & 0x10), forcePublish, previousStatus, valueLB);
+  publishStatusVHBitMQTT(14, "vh_diagnostic_indicator",    (valueLB & 0x40), (previousStatus & 0x40), forcePublish, previousStatus, valueLB);
   endStatusBurst();
 }
 

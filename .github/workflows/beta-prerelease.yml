@@ -170,6 +170,63 @@ jobs:
           echo "--- SHA256SUMS ---"
           cat SHA256SUMS
 
+      # A beta asks its testers to report findings, so the tools for producing a
+      # usable report ship with it. This matters more here than on a stable
+      # release: betas are where the bug reports actually come from.
+      - name: Write RELEASE_ASSETS.md
+        run: |
+          TAG="${{ steps.tag.outputs.tag }}"
+          VERSION="${{ steps.tag.outputs.version }}"
+          cat > RELEASE_ASSETS.md <<EOF
+          # What is in this beta (${TAG})
+
+          This is a **beta**. It is for testing, and reporting back is the point.
+
+          ## Flashing it
+
+          Download **OTGW-firmware-${VERSION}-flash-bundle.zip**: it holds both
+          binaries, both flash scripts, the guide and the checksums, so it is the
+          only file most people need.
+
+          Flash **both** the firmware and the filesystem. Betas frequently change
+          the web interface, and flashing only the firmware leaves the old
+          interface in place against new firmware. Settings are preserved.
+
+          ## The individual files
+
+          | Asset | What it is |
+          |---|---|
+          | \`OTGW-firmware-${VERSION}+<githash>.ino.bin\` | The firmware. |
+          | \`OTGW-firmware.${VERSION}+<githash>.littlefs.bin\` | The filesystem: web interface and assets. Flash alongside the firmware. |
+          | \`OTGW-firmware-${VERSION}-flash-bundle.zip\` | Everything in one download. Start here. |
+          | \`flash_otgw.bat\` / \`flash_otgw.sh\` | Flash helpers for Windows and Linux/macOS. |
+          | \`SHA256SUMS\` | Checksums for the two binaries; the flash helpers verify against this. |
+          | \`capture-mqtt-debug.bat\` | Diagnostic capture, Windows. Run this when something misbehaves. |
+          | \`capture-usb-serial.bat\` | Diagnostic capture over USB, for a device that will not come up on WiFi. |
+          | \`RELEASE_ASSETS.md\` | This file. |
+
+          ## Reporting something
+
+          A log is the difference between a guess and a diagnosis. Nearly every
+          bug fixed in this line was found from a capture, not from a
+          description.
+
+          1. Run \`capture-mqtt-debug.bat\`. It asks for your gateway address and
+             MQTT broker details (\`capture-settings.example.json\` inside the
+             bundle shows the format if you would rather pre-fill them).
+          2. Reproduce the problem while it runs, then press Q to stop.
+          3. Attach the \`transcript-*.txt\` it produced. One file, containing the
+             telnet log, the MQTT stream, the browser console and the crash log.
+
+          Post it in **#beta-testing** on Discord, or open an issue at
+          https://github.com/rvdbreemen/OTGW-firmware/issues
+
+          A capture contains your WiFi SSID, MQTT username and broker address. It
+          does not contain your MQTT password. Have a look before posting publicly.
+          EOF
+          echo "--- RELEASE_ASSETS.md ---"
+          cat RELEASE_ASSETS.md
+
       - name: Build flash bundle zip
         id: bundle
         run: |
@@ -180,9 +237,16 @@ jobs:
           cp flash_otgw.sh             "${BUNDLE_DIR}/"
           cp flash_otgw.bat            "${BUNDLE_DIR}/"
           cp README.md                 "${BUNDLE_DIR}/"
+          cp RELEASE_ASSETS.md         "${BUNDLE_DIR}/"
           if [ -f docs/guides/FLASH_GUIDE.md ]; then
             cp docs/guides/FLASH_GUIDE.md "${BUNDLE_DIR}/"
           fi
+          # Capture tooling, so a tester can produce a transcript without hunting
+          # through the repository for it.
+          mkdir -p "${BUNDLE_DIR}/capture"
+          cp scripts/capture-mqtt-debug.bat        "${BUNDLE_DIR}/capture/"
+          cp scripts/capture-usb-serial.bat        "${BUNDLE_DIR}/capture/"
+          cp scripts/capture-settings.example.json "${BUNDLE_DIR}/capture/"
           cp staging/*.ino.bin         "${BUNDLE_DIR}/"
           cp staging/*.littlefs.bin    "${BUNDLE_DIR}/"
           cp SHA256SUMS                "${BUNDLE_DIR}/"
@@ -303,8 +367,11 @@ jobs:
             gh release upload "${TAG}" \
               "${FW}" "${FS}" \
               SHA256SUMS \
+              RELEASE_ASSETS.md \
               flash_otgw.sh \
               flash_otgw.bat \
+              scripts/capture-mqtt-debug.bat \
+              scripts/capture-usb-serial.bat \
               "${BUNDLE}" \
               --clobber
             gh release edit "${TAG}" --prerelease --title "${TAG}" --notes-file release_body.md
@@ -322,8 +389,11 @@ jobs:
               --notes-file release_body.md \
               "${FW}" "${FS}" \
               SHA256SUMS \
+              RELEASE_ASSETS.md \
               flash_otgw.sh \
               flash_otgw.bat \
+              scripts/capture-mqtt-debug.bat \
+              scripts/capture-usb-serial.bat \
               "${BUNDLE}"
           fi
 

@@ -132,3 +132,17 @@ Cross-line sibling (separate numbering, not part of this `otgw-1.x.x` tree's ind
 - Reference-precedence policy: `other-projects/CLAUDE.md`.
 
 This ADR has **no `Enforcement` block**. The decision is a structural HA-representation choice that spans a firmware status-bit derivation, a reflective no-command-topic choice, and a discovery payload shape; its correctness is semantic (the mode/action precedence and the "mirror, do not command" rule), not a single mechanically-expressible code boundary, and there is no `evaluate.py` gate for it. This matches ADR-080's structural-versus-pattern split. Drift is caught at PR review against this ADR and the four reference captures, and in-session via `/adr-kit:judge`. If the maintainer wants the pre-commit judge to actively surface future climate-discovery changes for semantic review, this can be upgraded to an `llm_judge: true` Enforcement block.
+
+## Enforcement
+
+```json
+{
+  "llm_judge": true
+}
+```
+
+Enabled per the upgrade path this ADR names above: the correctness here is
+semantic (mode/action precedence, and the reflective mirror-do-not-command
+rule), so the judge reads the diff against the Decision rather than matching a
+pattern. No declarative rules, deliberately: this ADR states there is no single
+mechanically-expressible code boundary to guard.

@@ -1,0 +1,3416 @@
+{
+ "counts": {
+  "mqtt_topics": 371,
+  "msgids": 143,
+  "ot_keys": 370
+ },
+ "mqtt": {
+  "ASFFaultCodeVH_code": [
+   "0"
+  ],
+  "ASFFaultCodeVH_flag8": [
+   "00001000"
+  ],
+  "ASF_flags": [
+   "00000000"
+  ],
+  "ActualExhaustFanSpeed": [
+   "296"
+  ],
+  "ActualExhaustFanSpeed_boiler": [
+   "296"
+  ],
+  "ActualExhaustFanSpeed_thermostat": [
+   "296"
+  ],
+  "ActualSupplyFanSpeed": [
+   "0"
+  ],
+  "ActualSupplyFanSpeed_boiler": [
+   "0"
+  ],
+  "ActualSupplyFanSpeed_thermostat": [
+   "0"
+  ],
+  "BrandSerialNumber_hb_u8": [
+   "3"
+  ],
+  "BrandSerialNumber_lb_u8": [
+   "5"
+  ],
+  "BrandVersion_hb_u8": [
+   "0"
+  ],
+  "BrandVersion_lb_u8": [
+   "0"
+  ],
+  "Brand_hb_u8": [
+   "0"
+  ],
+  "Brand_lb_u8": [
+   "199"
+  ],
+  "BurnerOperationHours": [
+   "1511"
+  ],
+  "BurnerOperationHours_boiler": [
+   "1511"
+  ],
+  "BurnerOperationHours_thermostat": [
+   "1511"
+  ],
+  "BurnerStarts": [
+   "13621"
+  ],
+  "BurnerStarts_boiler": [
+   "13621"
+  ],
+  "BurnerStarts_thermostat": [
+   "13621"
+  ],
+  "BurnerUnsuccessfulStarts": [
+   "25"
+  ],
+  "BurnerUnsuccessfulStarts_boiler": [
+   "25"
+  ],
+  "BurnerUnsuccessfulStarts_thermostat": [
+   "25"
+  ],
+  "CHPressure": [
+   "0.68"
+  ],
+  "CHPressure_boiler": [
+   "0.68"
+  ],
+  "CHPressure_thermostat": [
+   "0.68"
+  ],
+  "CHPumpOperationHours": [
+   "444"
+  ],
+  "CHPumpOperationHours_boiler": [
+   "444"
+  ],
+  "CHPumpOperationHours_thermostat": [
+   "444"
+  ],
+  "CHPumpStarts": [
+   "1210"
+  ],
+  "CHPumpStarts_boiler": [
+   "1210"
+  ],
+  "CHPumpStarts_thermostat": [
+   "1210"
+  ],
+  "CO2LevelExhaustAir": [
+   "100"
+  ],
+  "CO2LevelExhaustAir_boiler": [
+   "100"
+  ],
+  "CO2LevelExhaustAir_thermostat": [
+   "100"
+  ],
+  "Command_hb_u8": [
+   "3"
+  ],
+  "Command_lb_u8": [
+   "5"
+  ],
+  "Command_remote_command": [
+   "Unknown command"
+  ],
+  "ControlSetpointVH": [
+   "7"
+  ],
+  "ControlSetpointVH_boiler": [
+   "7"
+  ],
+  "ControlSetpointVH_hb_u8": [
+   "0"
+  ],
+  "ControlSetpointVH_hb_u8_boiler": [
+   "0"
+  ],
+  "ControlSetpointVH_hb_u8_thermostat": [
+   "0"
+  ],
+  "ControlSetpointVH_lb_u8": [
+   "7"
+  ],
+  "ControlSetpointVH_lb_u8_boiler": [
+   "7"
+  ],
+  "ControlSetpointVH_lb_u8_thermostat": [
+   "7"
+  ],
+  "ControlSetpointVH_thermostat": [
+   "7"
+  ],
+  "CoolingControl": [
+   "0.00"
+  ],
+  "CoolingControl_boiler": [
+   "0.00"
+  ],
+  "CoolingControl_thermostat": [
+   "0.00"
+  ],
+  "CoolingOperationHours": [
+   "100"
+  ],
+  "CoolingOperationHours_boiler": [
+   "100"
+  ],
+  "CoolingOperationHours_thermostat": [
+   "100"
+  ],
+  "CumulativeElectricityProduction": [
+   "100"
+  ],
+  "CumulativeElectricityProduction_boiler": [
+   "100"
+  ],
+  "CumulativeElectricityProduction_thermostat": [
+   "100"
+  ],
+  "DHWBurnerOperationHours": [
+   "26"
+  ],
+  "DHWBurnerOperationHours_boiler": [
+   "26"
+  ],
+  "DHWBurnerOperationHours_thermostat": [
+   "26"
+  ],
+  "DHWBurnerStarts": [
+   "4067"
+  ],
+  "DHWBurnerStarts_boiler": [
+   "4067"
+  ],
+  "DHWBurnerStarts_thermostat": [
+   "4067"
+  ],
+  "DHWFlowRate": [
+   "0.00"
+  ],
+  "DHWFlowRate_boiler": [
+   "0.00"
+  ],
+  "DHWFlowRate_thermostat": [
+   "0.00"
+  ],
+  "DHWPumpValveOperationHours": [
+   "91"
+  ],
+  "DHWPumpValveOperationHours_boiler": [
+   "91"
+  ],
+  "DHWPumpValveOperationHours_thermostat": [
+   "91"
+  ],
+  "DHWPumpValveStarts": [
+   "3089"
+  ],
+  "DHWPumpValveStarts_boiler": [
+   "3089"
+  ],
+  "DHWPumpValveStarts_thermostat": [
+   "3089"
+  ],
+  "Date_day_of_month": [
+   "1",
+   "27"
+  ],
+  "Date_month": [
+   "1"
+  ],
+  "DayTime_dayofweek": [
+   "Friday",
+   "Unknown"
+  ],
+  "DayTime_hour": [
+   "1",
+   "17",
+   "18"
+  ],
+  "DayTime_minutes": [
+   "0",
+   "1",
+   "59"
+  ],
+  "DiagnosticCodeVH": [
+   "0"
+  ],
+  "DiagnosticCodeVH_boiler": [
+   "0"
+  ],
+  "DiagnosticCodeVH_thermostat": [
+   "0"
+  ],
+  "ElectricityProducerHours": [
+   "100"
+  ],
+  "ElectricityProducerHours_boiler": [
+   "100"
+  ],
+  "ElectricityProducerHours_thermostat": [
+   "100"
+  ],
+  "ElectricityProducerStarts": [
+   "100"
+  ],
+  "ElectricityProducerStarts_boiler": [
+   "100"
+  ],
+  "ElectricityProducerStarts_thermostat": [
+   "100"
+  ],
+  "ElectricityProduction": [
+   "100"
+  ],
+  "ElectricityProduction_boiler": [
+   "100"
+  ],
+  "ElectricityProduction_thermostat": [
+   "100"
+  ],
+  "ExhaustInletTemperature": [
+   "0.77"
+  ],
+  "ExhaustInletTemperature_boiler": [
+   "0.77"
+  ],
+  "ExhaustInletTemperature_thermostat": [
+   "0.77"
+  ],
+  "ExhaustOutletTemperature": [
+   "0.78"
+  ],
+  "ExhaustOutletTemperature_boiler": [
+   "0.78"
+  ],
+  "ExhaustOutletTemperature_thermostat": [
+   "0.78"
+  ],
+  "FHBindexFHBvalue_hb_u8": [
+   "0"
+  ],
+  "FHBindexFHBvalue_lb_u8": [
+   "65"
+  ],
+  "FHBsize_hb_u8": [
+   "5"
+  ],
+  "FHBsize_lb_u8": [
+   "0"
+  ],
+  "FanSpeed_hb_u8": [
+   "0"
+  ],
+  "FanSpeed_lb_u8": [
+   "0"
+  ],
+  "FaultBufferEntryVH_hb_u8": [
+   "1"
+  ],
+  "FaultBufferEntryVH_lb_u8": [
+   "0"
+  ],
+  "FaultBufferSizeVH_hb_u8": [
+   "0"
+  ],
+  "FaultBufferSizeVH_lb_u8": [
+   "1"
+  ],
+  "FlameSignalTooLow": [
+   "7"
+  ],
+  "FlameSignalTooLow_boiler": [
+   "7"
+  ],
+  "FlameSignalTooLow_thermostat": [
+   "7"
+  ],
+  "MasterVersion_hb_u8": [
+   "0"
+  ],
+  "MasterVersion_lb_u8": [
+   "0"
+  ],
+  "MaxCapacityMinModLevel_hb_u8": [
+   "35"
+  ],
+  "MaxCapacityMinModLevel_lb_u8": [
+   "25"
+  ],
+  "MaxRelModLevelSetting": [
+   "100.00"
+  ],
+  "MaxRelModLevelSetting_boiler": [
+   "0.00",
+   "100.00"
+  ],
+  "MaxRelModLevelSetting_thermostat": [
+   "0.00"
+  ],
+  "MaxTSet": [
+   "55.00",
+   "75.00",
+   "83.00"
+  ],
+  "MaxTSetUBMaxTSetLB_value_hb": [
+   "83"
+  ],
+  "MaxTSetUBMaxTSetLB_value_hb_boiler": [
+   "83"
+  ],
+  "MaxTSetUBMaxTSetLB_value_hb_thermostat": [
+   "83"
+  ],
+  "MaxTSetUBMaxTSetLB_value_lb": [
+   "33"
+  ],
+  "MaxTSetUBMaxTSetLB_value_lb_boiler": [
+   "33"
+  ],
+  "MaxTSetUBMaxTSetLB_value_lb_thermostat": [
+   "33"
+  ],
+  "MaxTSet_boiler": [
+   "55.00",
+   "55.21",
+   "75.00",
+   "83.00"
+  ],
+  "MaxTSet_thermostat": [
+   "55.00",
+   "55.21",
+   "75.00"
+  ],
+  "NominalVentilationValue": [
+   "50"
+  ],
+  "NominalVentilationValue_boiler": [
+   "50"
+  ],
+  "NominalVentilationValue_hb_u8": [
+   "50"
+  ],
+  "NominalVentilationValue_hb_u8_boiler": [
+   "50"
+  ],
+  "NominalVentilationValue_hb_u8_thermostat": [
+   "50"
+  ],
+  "NominalVentilationValue_lb_u8": [
+   "50"
+  ],
+  "NominalVentilationValue_lb_u8_boiler": [
+   "50"
+  ],
+  "NominalVentilationValue_lb_u8_thermostat": [
+   "50"
+  ],
+  "NominalVentilationValue_thermostat": [
+   "50"
+  ],
+  "OEMDiagnosticCode": [
+   "0"
+  ],
+  "OEMDiagnosticCode_boiler": [
+   "0"
+  ],
+  "OEMDiagnosticCode_thermostat": [
+   "0"
+  ],
+  "OEMFaultCode": [
+   "0"
+  ],
+  "OpenThermVersionMaster": [
+   "25.00"
+  ],
+  "OpenThermVersionMaster_boiler": [
+   "25.00"
+  ],
+  "OpenThermVersionMaster_thermostat": [
+   "25.00"
+  ],
+  "OpenThermVersionSlave": [
+   "3.00",
+   "4.00"
+  ],
+  "OpenThermVersionSlave_boiler": [
+   "3.00",
+   "4.00"
+  ],
+  "OpenThermVersionSlave_thermostat": [
+   "3.00",
+   "4.00"
+  ],
+  "OpenthermVersionVH": [
+   "4.00"
+  ],
+  "OpenthermVersionVH_boiler": [
+   "4.00"
+  ],
+  "OpenthermVersionVH_thermostat": [
+   "4.00"
+  ],
+  "OperatingMode_HC1_HC2_DHW_hb_u8": [
+   "0"
+  ],
+  "OperatingMode_HC1_HC2_DHW_hb_u8_boiler": [
+   "0"
+  ],
+  "OperatingMode_HC1_HC2_DHW_hb_u8_thermostat": [
+   "0"
+  ],
+  "OperatingMode_HC1_HC2_DHW_lb_u8": [
+   "0",
+   "1"
+  ],
+  "OperatingMode_HC1_HC2_DHW_lb_u8_boiler": [
+   "0",
+   "1"
+  ],
+  "OperatingMode_HC1_HC2_DHW_lb_u8_thermostat": [
+   "0"
+  ],
+  "PowerCycles": [
+   "100"
+  ],
+  "PowerCycles_boiler": [
+   "100"
+  ],
+  "PowerCycles_thermostat": [
+   "100"
+  ],
+  "RBP_flags_read_write": [
+   "00000001",
+   "00000011"
+  ],
+  "RBP_flags_transfer_enable": [
+   "00000011"
+  ],
+  "RFSensorStatusInformation_battery_indication": [
+   "no_indication"
+  ],
+  "RFSensorStatusInformation_battery_indication_code": [
+   "0"
+  ],
+  "RFSensorStatusInformation_sensor_index": [
+   "0"
+  ],
+  "RFSensorStatusInformation_sensor_type": [
+   "room_temperature_controller"
+  ],
+  "RFSensorStatusInformation_sensor_type_code": [
+   "0"
+  ],
+  "RFSensorStatusInformation_signal_strength": [
+   "no_indication"
+  ],
+  "RFSensorStatusInformation_signal_strength_code": [
+   "0"
+  ],
+  "RFstrengthbatterylevel_hb_u8": [
+   "0"
+  ],
+  "RFstrengthbatterylevel_hb_u8_boiler": [
+   "0"
+  ],
+  "RFstrengthbatterylevel_hb_u8_thermostat": [
+   "0"
+  ],
+  "RFstrengthbatterylevel_lb_u8": [
+   "0"
+  ],
+  "RFstrengthbatterylevel_lb_u8_boiler": [
+   "0"
+  ],
+  "RFstrengthbatterylevel_lb_u8_thermostat": [
+   "0"
+  ],
+  "RelModLevel": [
+   "0.00"
+  ],
+  "RelModLevel_boiler": [
+   "0.00"
+  ],
+  "RelModLevel_thermostat": [
+   "0.00"
+  ],
+  "RelativeHumidity": [
+   "25.00"
+  ],
+  "RelativeHumidityExhaustAir": [
+   "7"
+  ],
+  "RelativeHumidityExhaustAir_boiler": [
+   "7"
+  ],
+  "RelativeHumidityExhaustAir_hb_u8": [
+   "0"
+  ],
+  "RelativeHumidityExhaustAir_hb_u8_boiler": [
+   "0"
+  ],
+  "RelativeHumidityExhaustAir_hb_u8_thermostat": [
+   "0"
+  ],
+  "RelativeHumidityExhaustAir_lb_u8": [
+   "7"
+  ],
+  "RelativeHumidityExhaustAir_lb_u8_boiler": [
+   "7"
+  ],
+  "RelativeHumidityExhaustAir_lb_u8_thermostat": [
+   "7"
+  ],
+  "RelativeHumidityExhaustAir_thermostat": [
+   "7"
+  ],
+  "RelativeHumidity_boiler": [
+   "25.00"
+  ],
+  "RelativeHumidity_thermostat": [
+   "25.00"
+  ],
+  "RelativeVentilation": [
+   "0"
+  ],
+  "RelativeVentilation_boiler": [
+   "0"
+  ],
+  "RelativeVentilation_hb_u8": [
+   "0"
+  ],
+  "RelativeVentilation_hb_u8_boiler": [
+   "0"
+  ],
+  "RelativeVentilation_hb_u8_thermostat": [
+   "0"
+  ],
+  "RelativeVentilation_lb_u8": [
+   "0"
+  ],
+  "RelativeVentilation_lb_u8_boiler": [
+   "0"
+  ],
+  "RelativeVentilation_lb_u8_thermostat": [
+   "0"
+  ],
+  "RelativeVentilation_thermostat": [
+   "0"
+  ],
+  "RemehaDetectionConnectedSCU_hb_u8": [
+   "3"
+  ],
+  "RemehaDetectionConnectedSCU_lb_u8": [
+   "5"
+  ],
+  "RemehaServicemessage_hb_u8": [
+   "3"
+  ],
+  "RemehaServicemessage_lb_u8": [
+   "5"
+  ],
+  "RemehadFdUcodes_hb_u8": [
+   "3"
+  ],
+  "RemehadFdUcodes_lb_u8": [
+   "5"
+  ],
+  "RemoteOverrideOperatingMode_dhw_mode": [
+   "no_override"
+  ],
+  "RemoteOverrideOperatingMode_dhw_mode_code": [
+   "0"
+  ],
+  "RemoteOverrideOperatingMode_hc1_mode": [
+   "auto",
+   "no_override"
+  ],
+  "RemoteOverrideOperatingMode_hc1_mode_code": [
+   "0",
+   "1"
+  ],
+  "RemoteOverrideOperatingMode_hc2_mode": [
+   "no_override"
+  ],
+  "RemoteOverrideOperatingMode_hc2_mode_code": [
+   "0"
+  ],
+  "RemoteOverrideOperatingMode_manual_dhw_push": [
+   "OFF"
+  ],
+  "RemoteParameterSettingVH_hb_flag8": [
+   "00000001"
+  ],
+  "RemoteParameterSettingVH_lb_flag8": [
+   "00000010"
+  ],
+  "RoomRemoteOverrideFunction_flag8": [
+   "00000000",
+   "00000011"
+  ],
+  "SolarStorageASFflags_code": [
+   "3"
+  ],
+  "SolarStorageASFflags_flag8": [
+   "00000010"
+  ],
+  "SolarStorageFHBindexFHBvalue_hb_u8": [
+   "3"
+  ],
+  "SolarStorageFHBindexFHBvalue_lb_u8": [
+   "5"
+  ],
+  "SolarStorageFHBsize_hb_u8": [
+   "3"
+  ],
+  "SolarStorageFHBsize_lb_u8": [
+   "5"
+  ],
+  "SolarStorageTSP_hb_u8": [
+   "3"
+  ],
+  "SolarStorageTSP_lb_u8": [
+   "5"
+  ],
+  "SolarStorageTSPindexTSPvalue_hb_u8": [
+   "3"
+  ],
+  "SolarStorageTSPindexTSPvalue_lb_u8": [
+   "5"
+  ],
+  "SolarStorageVersionType_hb_u8": [
+   "3"
+  ],
+  "SolarStorageVersionType_lb_u8": [
+   "5"
+  ],
+  "SupplyInletTemperature": [
+   "25.00"
+  ],
+  "SupplyInletTemperature_boiler": [
+   "25.00"
+  ],
+  "SupplyInletTemperature_thermostat": [
+   "25.00"
+  ],
+  "SupplyOutletTemperature": [
+   "0.00"
+  ],
+  "SupplyOutletTemperature_boiler": [
+   "0.00"
+  ],
+  "SupplyOutletTemperature_thermostat": [
+   "0.00"
+  ],
+  "TRoomCH2": [
+   "25.00"
+  ],
+  "TRoomCH2_boiler": [
+   "25.00"
+  ],
+  "TRoomCH2_thermostat": [
+   "25.00"
+  ],
+  "TSPEntryVH_hb_u8": [
+   "3"
+  ],
+  "TSPEntryVH_lb_u8": [
+   "5"
+  ],
+  "TSPNumberVH_hb_u8": [
+   "3"
+  ],
+  "TSPNumberVH_lb_u8": [
+   "5"
+  ],
+  "TSP_hb_u8": [
+   "4"
+  ],
+  "TSP_lb_u8": [
+   "0"
+  ],
+  "TSPindexTSPvalue_hb_u8": [
+   "0"
+  ],
+  "TSPindexTSPvalue_lb_u8": [
+   "105"
+  ],
+  "TSet": [
+   "10.00"
+  ],
+  "TSet_boiler": [
+   "0.00",
+   "10.00"
+  ],
+  "TSet_thermostat": [
+   "0.00"
+  ],
+  "Tboiler": [
+   "28.00"
+  ],
+  "Tboiler_boiler": [
+   "28.00"
+  ],
+  "Tboiler_thermostat": [
+   "28.00"
+  ],
+  "Tdhw": [
+   "27.00"
+  ],
+  "Tdhw2": [
+   "25.00"
+  ],
+  "Tdhw2_boiler": [
+   "25.00"
+  ],
+  "Tdhw2_thermostat": [
+   "25.00"
+  ],
+  "TdhwSet": [
+   "28.99",
+   "43.00",
+   "54.00"
+  ],
+  "TdhwSetUBTdhwSetLB_value_hb": [
+   "65"
+  ],
+  "TdhwSetUBTdhwSetLB_value_hb_boiler": [
+   "65"
+  ],
+  "TdhwSetUBTdhwSetLB_value_hb_thermostat": [
+   "65"
+  ],
+  "TdhwSetUBTdhwSetLB_value_lb": [
+   "40"
+  ],
+  "TdhwSetUBTdhwSetLB_value_lb_boiler": [
+   "40"
+  ],
+  "TdhwSetUBTdhwSetLB_value_lb_thermostat": [
+   "40"
+  ],
+  "TdhwSet_boiler": [
+   "28.99",
+   "43.00",
+   "54.00"
+  ],
+  "TdhwSet_thermostat": [
+   "28.99",
+   "43.00",
+   "54.00"
+  ],
+  "Tdhw_boiler": [
+   "27.00"
+  ],
+  "Tdhw_thermostat": [
+   "27.00"
+  ],
+  "TflowCH2": [
+   "25.00"
+  ],
+  "TflowCH2_boiler": [
+   "25.00"
+  ],
+  "TflowCH2_thermostat": [
+   "25.00"
+  ],
+  "Theatexchanger": [
+   "25.00"
+  ],
+  "Theatexchanger_boiler": [
+   "25.00"
+  ],
+  "Theatexchanger_thermostat": [
+   "25.00"
+  ],
+  "Toutside": [
+   "19.40",
+   "25.00",
+   "7.10"
+  ],
+  "Toutside_boiler": [
+   "19.40",
+   "25.00",
+   "7.10"
+  ],
+  "Toutside_thermostat": [
+   "25.00",
+   "7.10"
+  ],
+  "Tr": [
+   "23.40"
+  ],
+  "TrOverride": [
+   "0.00"
+  ],
+  "TrOverride2": [
+   "25.00"
+  ],
+  "TrOverride2_boiler": [
+   "25.00"
+  ],
+  "TrOverride2_thermostat": [
+   "25.00"
+  ],
+  "TrOverride_boiler": [
+   "0.00"
+  ],
+  "TrOverride_thermostat": [
+   "0.00"
+  ],
+  "TrSet": [
+   "23.00"
+  ],
+  "TrSetCH2": [
+   "25.00"
+  ],
+  "TrSetCH2_boiler": [
+   "25.00"
+  ],
+  "TrSetCH2_thermostat": [
+   "25.00"
+  ],
+  "TrSet_boiler": [
+   "16.00",
+   "23.00"
+  ],
+  "TrSet_thermostat": [
+   "16.00",
+   "23.00"
+  ],
+  "Tr_boiler": [
+   "23.40"
+  ],
+  "Tr_thermostat": [
+   "23.40"
+  ],
+  "Tret": [
+   "27.00"
+  ],
+  "Tret_boiler": [
+   "27.00"
+  ],
+  "Tret_thermostat": [
+   "27.00"
+  ],
+  "TsetCH2": [
+   "25.00"
+  ],
+  "TsetCH2_boiler": [
+   "25.00"
+  ],
+  "TsetCH2_thermostat": [
+   "25.00"
+  ],
+  "Tsolarcollector": [
+   "-20"
+  ],
+  "Tsolarcollector_boiler": [
+   "-20"
+  ],
+  "Tsolarcollector_thermostat": [
+   "-20"
+  ],
+  "Tsolarstorage": [
+   "25.00"
+  ],
+  "Tsolarstorage_boiler": [
+   "25.00"
+  ],
+  "Tsolarstorage_thermostat": [
+   "25.00"
+  ],
+  "VersionTypeVH_hb_u8": [
+   "0"
+  ],
+  "VersionTypeVH_lb_u8": [
+   "0"
+  ],
+  "Year": [
+   "2001",
+   "2023"
+  ],
+  "Year_boiler": [
+   "2001",
+   "2023"
+  ],
+  "Year_thermostat": [
+   "2001",
+   "2023"
+  ],
+  "air_pressure_fault": [
+   "OFF"
+  ],
+  "centralheating": [
+   "OFF",
+   "ON"
+  ],
+  "centralheating2": [
+   "OFF"
+  ],
+  "ch2_enable": [
+   "OFF"
+  ],
+  "ch2_present": [
+   "OFF"
+  ],
+  "ch_enable": [
+   "OFF"
+  ],
+  "control_type_modulation": [
+   "ON"
+  ],
+  "cooling": [
+   "OFF"
+  ],
+  "cooling_config": [
+   "OFF"
+  ],
+  "cooling_enable": [
+   "OFF"
+  ],
+  "dhw_blocking": [
+   "OFF"
+  ],
+  "dhw_config": [
+   "OFF"
+  ],
+  "dhw_enable": [
+   "OFF",
+   "ON"
+  ],
+  "dhw_present": [
+   "ON"
+  ],
+  "diagnostic_indicator": [
+   "OFF"
+  ],
+  "domestichotwater": [
+   "OFF"
+  ],
+  "electric_production": [
+   "OFF"
+  ],
+  "fault": [
+   "OFF"
+  ],
+  "flame": [
+   "OFF",
+   "ON"
+  ],
+  "gas_flame_fault": [
+   "OFF"
+  ],
+  "heat_cool_mode_control": [
+   "OFF"
+  ],
+  "hvac_action": [
+   "heating",
+   "idle"
+  ],
+  "hvac_mode": [
+   "heat"
+  ],
+  "lockout_reset": [
+   "OFF"
+  ],
+  "low_water_pressure": [
+   "OFF"
+  ],
+  "master_configuration": [
+   "00000001"
+  ],
+  "master_configuration_smart_power": [
+   "ON"
+  ],
+  "master_low_off_pump_control_function": [
+   "OFF"
+  ],
+  "master_memberid_code": [
+   "13",
+   "173"
+  ],
+  "otc_active": [
+   "OFF",
+   "ON"
+  ],
+  "rbp_dhw_setpoint": [
+   "ON"
+  ],
+  "rbp_max_ch_setpoint": [
+   "ON"
+  ],
+  "rbp_rw_dhw_setpoint": [
+   "ON"
+  ],
+  "rbp_rw_max_ch_setpoint": [
+   "OFF",
+   "ON"
+  ],
+  "remote_override_manual_change_priority": [
+   "OFF",
+   "ON"
+  ],
+  "remote_override_program_change_priority": [
+   "OFF",
+   "ON"
+  ],
+  "remote_water_filling_function": [
+   "OFF"
+  ],
+  "service_request": [
+   "OFF"
+  ],
+  "slave_configuration": [
+   "00000011"
+  ],
+  "slave_memberid_code": [
+   "0"
+  ],
+  "solar_storage_master_mode": [
+   "1"
+  ],
+  "solar_storage_mode_status": [
+   "1"
+  ],
+  "solar_storage_slave_configuration": [
+   "00000010"
+  ],
+  "solar_storage_slave_fault_indicator": [
+   "OFF"
+  ],
+  "solar_storage_slave_memberid_code": [
+   "3"
+  ],
+  "solar_storage_slave_status": [
+   "0"
+  ],
+  "solar_storage_system_type": [
+   "OFF"
+  ],
+  "status_master": [
+   "-----W--",
+   "-D---W--",
+   "-D-O-W--"
+  ],
+  "status_slave": [
+   "--------",
+   "-C------",
+   "-C-F----"
+  ],
+  "status_vh_master": [
+   "V-------"
+  ],
+  "status_vh_slave": [
+   "-V------"
+  ],
+  "summerwintertime": [
+   "OFF"
+  ],
+  "vh_bypass_automatic_status": [
+   "OFF"
+  ],
+  "vh_bypass_mode": [
+   "OFF"
+  ],
+  "vh_bypass_position": [
+   "OFF"
+  ],
+  "vh_bypass_status": [
+   "OFF"
+  ],
+  "vh_configuration": [
+   "00000001"
+  ],
+  "vh_configuration_bypass": [
+   "OFF"
+  ],
+  "vh_configuration_speed_control": [
+   "OFF"
+  ],
+  "vh_configuration_system_type": [
+   "ON"
+  ],
+  "vh_diagnostic_indicator": [
+   "OFF"
+  ],
+  "vh_fault": [
+   "OFF"
+  ],
+  "vh_free_ventilation_mode": [
+   "OFF"
+  ],
+  "vh_free_ventliation_status": [
+   "OFF"
+  ],
+  "vh_memberid_code": [
+   "162"
+  ],
+  "vh_rw_nominal_ventilation_value": [
+   "OFF"
+  ],
+  "vh_transfer_enable_nominal_ventilation_value": [
+   "ON"
+  ],
+  "vh_ventilation_enabled": [
+   "ON"
+  ],
+  "vh_ventilation_mode": [
+   "ON"
+  ],
+  "water_over_temperature": [
+   "OFF"
+  ]
+ },
+ "msgtypes": [
+  "Data-Invalid",
+  "Read-Ack",
+  "Read-Data",
+  "Unknown-Data-Id",
+  "Write-Ack",
+  "Write-Data"
+ ],
+ "ot": {
+  "A|Read-Ack|0": {
+   "rendered": [
+    "Status = Slave [--------]"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Read-Ack|100": {
+   "rendered": [
+    "RoomRemoteOverrideFunction = flag8 = [00000000] - decimal = [ 0]"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Read-Ack|125": {
+   "rendered": [
+    "OpenThermVersionSlave = 3.00"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Read-Ack|2": {
+   "rendered": [
+    "MasterConfigMemberIDcode = Master Config[00000000] MemberID code [ 0]"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Read-Ack|27": {
+   "rendered": [
+    "Toutside = 7.10 C"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Read-Ack|56": {
+   "rendered": [
+    "TdhwSet = 28.99 C"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Read-Ack|57": {
+   "rendered": [
+    "MaxTSet = 75.00 C"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Read-Ack|6": {
+   "rendered": [
+    "RBPflags = M[00000011] OEM fault code [ 1]"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Read-Ack|9": {
+   "rendered": [
+    "TrOverride = 0.00 C"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Read-Ack|99": {
+   "rendered": [
+    "OperatingMode_HC1_HC2_DHW = DHW[0:no_override push:OFF] HC1[0:no_override] HC2[0:no_override]"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|115": {
+   "rendered": [
+    "OEMDiagnosticCode (boiler does not implement)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|127": {
+   "rendered": [
+    "SlaveVersion = 0 / 0 (boiler does not implement)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|15": {
+   "rendered": [
+    "MaxCapacityMinModLevel = 0 / 0 kW/% (boiler does not implement)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|19": {
+   "rendered": [
+    "DHWFlowRate (boiler does not implement)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|24": {
+   "rendered": [
+    "Tr (boiler rejected write)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|26": {
+   "rendered": [
+    "Tdhw (boiler does not implement)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|27": {
+   "rendered": [
+    "Toutside (boiler does not implement)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|33": {
+   "rendered": [
+    "Texhaust (boiler does not implement)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|36": {
+   "rendered": [
+    "ElectricalCurrentBurnerFlame (boiler does not implement)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|7": {
+   "rendered": [
+    "CoolingControl (boiler rejected write)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Unknown-Data-Id|98": {
+   "rendered": [
+    "RFstrengthbatterylevel = sensor_type[0:room_temperature_controller] sensor_index[0] signal[0:no_indication] battery[0:no_indication] (boiler rejected write)"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Write-Ack|1": {
+   "rendered": [
+    "TSet"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Write-Ack|14": {
+   "rendered": [
+    "MaxRelModLevelSetting"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Write-Ack|16": {
+   "rendered": [
+    "TrSet"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Write-Ack|2": {
+   "rendered": [
+    "MasterConfigMemberIDcode = Master Config[00000001] MemberID code [ 13]"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "A|Write-Ack|20": {
+   "rendered": [
+    "DayTime = Friday - 17:59"
+   ],
+   "src": "Answer Thermostat"
+  },
+  "B|Data-Invalid|11": {
+   "rendered": [
+    "TSPindexTSPvalue = 7 / 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Data-Invalid|123": {
+   "rendered": [
+    "DHWBurnerOperationHours"
+   ],
+   "src": "Boiler"
+  },
+  "B|Data-Invalid|13": {
+   "rendered": [
+    "FHBindexFHBvalue = 5 / 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Data-Invalid|131": {
+   "rendered": [
+    "RemehadFdUcodes = 0 / 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Data-Invalid|26": {
+   "rendered": [
+    "Tdhw"
+   ],
+   "src": "Boiler"
+  },
+  "B|Data-Invalid|27": {
+   "rendered": [
+    "Toutside"
+   ],
+   "src": "Boiler"
+  },
+  "B|Data-Invalid|33": {
+   "rendered": [
+    "Texhaust"
+   ],
+   "src": "Boiler"
+  },
+  "B|Data-Invalid|56": {
+   "rendered": [
+    "TdhwSet"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|0": {
+   "rendered": [
+    "Status = Slave [--------]",
+    "Status = Slave [-C------]",
+    "Status = Slave [-C-F----]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|10": {
+   "rendered": [
+    "TSP = 4 / 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|100": {
+   "rendered": [
+    "RoomRemoteOverrideFunction = flag8 = [00000011] - decimal = [ 3]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|101": {
+   "rendered": [
+    ""
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|102": {
+   "rendered": [
+    "SolarStorageASFflags = M[00000010] - [ 3]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|103": {
+   "rendered": [
+    "SolarStorageSlaveConfigMemberIDcode = Solar Storage Slave Config[00000010] MemberID code [ 3]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|104": {
+   "rendered": [
+    "SolarStorageVersionType = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|105": {
+   "rendered": [
+    "SolarStorageTSP = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|106": {
+   "rendered": [
+    "SolarStorageTSPindexTSPvalue = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|107": {
+   "rendered": [
+    "SolarStorageFHBsize = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|108": {
+   "rendered": [
+    "SolarStorageFHBindexFHBvalue = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|109": {
+   "rendered": [
+    "ElectricityProducerStarts = 100"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|11": {
+   "rendered": [
+    "TSPindexTSPvalue = 0 / 105"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|110": {
+   "rendered": [
+    "ElectricityProducerHours = 100"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|111": {
+   "rendered": [
+    "ElectricityProduction = 100"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|112": {
+   "rendered": [
+    "CumulativeElectricityProduction = 100"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|113": {
+   "rendered": [
+    "BurnerUnsuccessfulStarts = 25"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|114": {
+   "rendered": [
+    "FlameSignalTooLow = 7"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|115": {
+   "rendered": [
+    "OEMDiagnosticCode = 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|116": {
+   "rendered": [
+    "BurnerStarts = 13621"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|117": {
+   "rendered": [
+    "CHPumpStarts = 1210"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|118": {
+   "rendered": [
+    "DHWPumpValveStarts = 3089"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|119": {
+   "rendered": [
+    "DHWBurnerStarts = 4067"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|12": {
+   "rendered": [
+    "FHBsize = 5 / 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|120": {
+   "rendered": [
+    "BurnerOperationHours = 1511 hrs"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|121": {
+   "rendered": [
+    "CHPumpOperationHours = 444 hrs"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|122": {
+   "rendered": [
+    "DHWPumpValveOperationHours = 91 hrs"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|123": {
+   "rendered": [
+    "DHWBurnerOperationHours = 26 hrs"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|125": {
+   "rendered": [
+    "OpenThermVersionSlave = 4.00"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|128": {
+   "rendered": [
+    "Unknown message [128] value [40800000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|129": {
+   "rendered": [
+    "Unknown message [129] value [40810000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|13": {
+   "rendered": [
+    "FHBindexFHBvalue = 0 / 65"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|130": {
+   "rendered": [
+    "Unknown message [130] value [40820000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|131": {
+   "rendered": [
+    "RemehadFdUcodes = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|132": {
+   "rendered": [
+    "RemehaServicemessage = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|133": {
+   "rendered": [
+    "RemehaDetectionConnectedSCU = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|15": {
+   "rendered": [
+    "MaxCapacityMinModLevel = 35 / 25 kW/%"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|17": {
+   "rendered": [
+    "RelModLevel = 0.00 %"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|18": {
+   "rendered": [
+    "CHPressure = 0.68 bar"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|19": {
+   "rendered": [
+    "DHWFlowRate = 0.00 l/min"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|20": {
+   "rendered": [
+    "DayTime = Unknown - 01:01"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|200": {
+   "rendered": [
+    "Unknown message [200] value [40C80000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|202": {
+   "rendered": [
+    "Unknown message [202] value [C0CA0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|204": {
+   "rendered": [
+    "Unknown message [204] value [C0CC0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|206": {
+   "rendered": [
+    "Unknown message [206] value [C0CE000E] f8.8 [0.05] u16 [14] s16 [14]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|21": {
+   "rendered": [
+    "Date = 1 / 1"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|22": {
+   "rendered": [
+    "Year = 2001"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|25": {
+   "rendered": [
+    "Tboiler = 28.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|26": {
+   "rendered": [
+    "Tdhw = 27.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|27": {
+   "rendered": [
+    "Toutside = 25.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|28": {
+   "rendered": [
+    "Tret = 27.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|29": {
+   "rendered": [
+    "Tsolarstorage = 25.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|3": {
+   "rendered": [
+    "SlaveConfigMemberIDcode = Slave Config[00000011] MemberID code [ 0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|30": {
+   "rendered": [
+    "Tsolarcollector = -20 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|31": {
+   "rendered": [
+    "TflowCH2 = 25.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|32": {
+   "rendered": [
+    "Tdhw2 = 25.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|34": {
+   "rendered": [
+    "Theatexchanger = 25.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|35": {
+   "rendered": [
+    "FanSpeed = 0 / 0 Hz"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|38": {
+   "rendered": [
+    "RelativeHumidity = 25.00 %"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|39": {
+   "rendered": [
+    "TrOverride2 = 25.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|40": {
+   "rendered": [
+    "Unknown message [40] value [40280000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|41": {
+   "rendered": [
+    "Unknown message [41] value [40290000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|42": {
+   "rendered": [
+    "Unknown message [42] value [402A0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|43": {
+   "rendered": [
+    "Unknown message [43] value [402B0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|44": {
+   "rendered": [
+    "Unknown message [44] value [402C0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|45": {
+   "rendered": [
+    "Unknown message [45] value [402D0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|46": {
+   "rendered": [
+    "Unknown message [46] value [402E0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|47": {
+   "rendered": [
+    "Unknown message [47] value [402F0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|48": {
+   "rendered": [
+    "TdhwSetUBTdhwSetLB = 65 / 40 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|49": {
+   "rendered": [
+    "MaxTSetUBMaxTSetLB = 83 / 33 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|5": {
+   "rendered": [
+    "ASFflags = ASF flags[00000000] OEM faultcode [ 0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|50": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 50 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|51": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 51 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|52": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 52 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|53": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 53 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|54": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 54 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|55": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 55 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|56": {
+   "rendered": [
+    "TdhwSet = 43.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|57": {
+   "rendered": [
+    "MaxTSet = 75.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|58": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 58 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|59": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 59 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|6": {
+   "rendered": [
+    "RBPflags = M[00000011] OEM fault code [ 3]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|60": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 60 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|61": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 61 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|62": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 62 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|63": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 63 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|64": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 64 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|65": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 65 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|66": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 66 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|67": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 67 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|68": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 68 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|69": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 69 ignored)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|70": {
+   "rendered": [
+    "StatusVH = VH Slave [-V------]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|72": {
+   "rendered": [
+    "ASFFaultCodeVH = M[00001000] - [ 0]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|73": {
+   "rendered": [
+    "DiagnosticCodeVH = 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|74": {
+   "rendered": [
+    "ConfigMemberIDVH = VH Config[00000001] MemberID code [162]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|75": {
+   "rendered": [
+    "OpenthermVersionVH = 4.00"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|76": {
+   "rendered": [
+    "VersionTypeVH = 0 / 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|77": {
+   "rendered": [
+    "RelativeVentilation = 0 % (LB used, HB=0)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|78": {
+   "rendered": [
+    "RelativeHumidityExhaustAir = 7 % (LB used, HB=0)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|79": {
+   "rendered": [
+    "CO2LevelExhaustAir = 100 ppm"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|80": {
+   "rendered": [
+    "SupplyInletTemperature = 25.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|81": {
+   "rendered": [
+    "SupplyOutletTemperature = 0.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|82": {
+   "rendered": [
+    "ExhaustInletTemperature = 0.77 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|83": {
+   "rendered": [
+    "ExhaustOutletTemperature = 0.78 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|84": {
+   "rendered": [
+    "ActualExhaustFanSpeed = 296 rpm"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|85": {
+   "rendered": [
+    "ActualSupplyFanSpeed = 0 rpm"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|86": {
+   "rendered": [
+    "RemoteParameterSettingVH = HB flag8[00000001] -[ 1] RemoteParameterSettingVH = LB flag8[00000010] - [ 2]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|87": {
+   "rendered": [
+    "NominalVentilationValue = 50 % (HB used, LB=50)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|88": {
+   "rendered": [
+    "TSPNumberVH = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|89": {
+   "rendered": [
+    "TSPEntryVH = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|9": {
+   "rendered": [
+    "TrOverride = 0.00 C"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|90": {
+   "rendered": [
+    "FaultBufferSizeVH = 0 / 1"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|91": {
+   "rendered": [
+    "FaultBufferEntryVH = 1 / 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|92": {
+   "rendered": [
+    "Unknown message [92] value [405C00F1] f8.8 [0.94] u16 [241] s16 [241]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|93": {
+   "rendered": [
+    "Brand = 0 / 199"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|94": {
+   "rendered": [
+    "BrandVersion = 0 / 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|95": {
+   "rendered": [
+    "BrandSerialNumber = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|96": {
+   "rendered": [
+    "CoolingOperationHours = 100 hrs"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|97": {
+   "rendered": [
+    "PowerCycles = 100"
+   ],
+   "src": "Boiler"
+  },
+  "B|Read-Ack|99": {
+   "rendered": [
+    "OperatingMode_HC1_HC2_DHW = DHW[0:no_override push:OFF] HC1[0:no_override] HC2[0:no_override]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|0": {
+   "rendered": [
+    "Status = Slave [--------] (boiler does not implement)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|14": {
+   "rendered": [
+    "MaxRelModLevelSetting (boiler rejected write)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|16": {
+   "rendered": [
+    "TrSet (boiler rejected write)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|17": {
+   "rendered": [
+    "RelModLevel (boiler rejected write)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|2": {
+   "rendered": [
+    "MasterConfigMemberIDcode = Master Config[00000001] MemberID code [ 13] (boiler rejected write)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|205": {
+   "rendered": [
+    "Unknown message [205] value [70CD0000] f8.8 [0.00] u16 [0] s16 [0] (boiler does not implement)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|206": {
+   "rendered": [
+    "Unknown message [206] value [70CE0000] f8.8 [0.00] u16 [0] s16 [0] (boiler does not implement)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|210": {
+   "rendered": [
+    "Unknown message [210] value [F0D20000] f8.8 [0.00] u16 [0] s16 [0] (boiler rejected write)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|211": {
+   "rendered": [
+    "Unknown message [211] value [70D30000] f8.8 [0.00] u16 [0] s16 [0] (boiler rejected write)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|215": {
+   "rendered": [
+    "Unknown message [215] value [F0D70000] f8.8 [0.00] u16 [0] s16 [0] (boiler rejected write)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|24": {
+   "rendered": [
+    "Tr (boiler rejected write)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|240": {
+   "rendered": [
+    "Unknown message [240] value [70F00000] f8.8 [0.00] u16 [0] s16 [0] (boiler does not implement)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|25": {
+   "rendered": [
+    "Tboiler (boiler does not implement)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|27": {
+   "rendered": [
+    "Toutside (boiler does not implement)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|36": {
+   "rendered": [
+    "ElectricalCurrentBurnerFlame (boiler does not implement)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|57": {
+   "rendered": [
+    "MaxTSet (boiler rejected write)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|9": {
+   "rendered": [
+    "TrOverride (boiler does not implement)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Unknown-Data-Id|99": {
+   "rendered": [
+    "OperatingMode_HC1_HC2_DHW = DHW[0:no_override push:OFF] HC1[0:no_override] HC2[0:no_override] (boiler does not implement)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|1": {
+   "rendered": [
+    "TSet"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|124": {
+   "rendered": [
+    "OpenThermVersionMaster"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|126": {
+   "rendered": [
+    "MasterVersion = 0 / 0"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|14": {
+   "rendered": [
+    "MaxRelModLevelSetting"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|16": {
+   "rendered": [
+    "TrSet"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|2": {
+   "rendered": [
+    "MasterConfigMemberIDcode = Master Config[00000001] MemberID code [173]"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|20": {
+   "rendered": [
+    "DayTime = Friday - 18:00"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|21": {
+   "rendered": [
+    "Date = 1 / 27"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|22": {
+   "rendered": [
+    "Year"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|23": {
+   "rendered": [
+    "TrSetCH2"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|24": {
+   "rendered": [
+    "Tr"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|37": {
+   "rendered": [
+    "TRoomCH2"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|4": {
+   "rendered": [
+    "Command = 3 / 5"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|56": {
+   "rendered": [
+    "TdhwSet"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|57": {
+   "rendered": [
+    "MaxTSet"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|71": {
+   "rendered": [
+    "ControlSetpointVH = 7 % (LB used, HB=0)"
+   ],
+   "src": "Boiler"
+  },
+  "B|Write-Ack|8": {
+   "rendered": [
+    "TsetCH2"
+   ],
+   "src": "Boiler"
+  },
+  "E|Write-Data|0": {
+   "rendered": [
+    "P Status = Master [-----W--] <ignored>"
+   ],
+   "src": "Parity Error"
+  },
+  "R|Read-Data|0": {
+   "rendered": [
+    "Status = Master [-----W--]"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|10": {
+   "rendered": [
+    "TSP = 0 / 0"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|100": {
+   "rendered": [
+    "RoomRemoteOverrideFunction = flag8 = [00000000] - decimal = [ 0]"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|11": {
+   "rendered": [
+    "TSPindexTSPvalue = 0 / 0"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|113": {
+   "rendered": [
+    "BurnerUnsuccessfulStarts"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|114": {
+   "rendered": [
+    "FlameSignalTooLow"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|115": {
+   "rendered": [
+    "OEMDiagnosticCode"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|116": {
+   "rendered": [
+    "BurnerStarts"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|117": {
+   "rendered": [
+    "CHPumpStarts"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|118": {
+   "rendered": [
+    "DHWPumpValveStarts"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|119": {
+   "rendered": [
+    "DHWBurnerStarts"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|12": {
+   "rendered": [
+    "FHBsize = 0 / 0"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|120": {
+   "rendered": [
+    "BurnerOperationHours"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|121": {
+   "rendered": [
+    "CHPumpOperationHours"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|122": {
+   "rendered": [
+    "DHWPumpValveOperationHours"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|123": {
+   "rendered": [
+    "DHWBurnerOperationHours"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|125": {
+   "rendered": [
+    "OpenThermVersionSlave"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|13": {
+   "rendered": [
+    "FHBindexFHBvalue = 5 / 0"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|15": {
+   "rendered": [
+    "MaxCapacityMinModLevel = 0 / 0 kW/%"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|17": {
+   "rendered": [
+    "RelModLevel"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|18": {
+   "rendered": [
+    "CHPressure"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|20": {
+   "rendered": [
+    "DayTime = Unknown - 00:00"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|21": {
+   "rendered": [
+    "Date = 0 / 0"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|22": {
+   "rendered": [
+    "Year"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|25": {
+   "rendered": [
+    "Tboiler"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|26": {
+   "rendered": [
+    "Tdhw"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|28": {
+   "rendered": [
+    "Tret"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|3": {
+   "rendered": [
+    "SlaveConfigMemberIDcode = Slave Config[00000000] MemberID code [ 0]"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|35": {
+   "rendered": [
+    "FanSpeed = 0 / 0 Hz"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|48": {
+   "rendered": [
+    "TdhwSetUBTdhwSetLB"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|49": {
+   "rendered": [
+    "MaxTSetUBMaxTSetLB"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|5": {
+   "rendered": [
+    "ASFflags = ASF flags[00000000] OEM faultcode [ 0]"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|56": {
+   "rendered": [
+    "TdhwSet"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|57": {
+   "rendered": [
+    "MaxTSet"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|6": {
+   "rendered": [
+    "RBPflags = M[00000000] OEM fault code [ 0]"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|9": {
+   "rendered": [
+    "TrOverride"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Read-Data|99": {
+   "rendered": [
+    "OperatingMode_HC1_HC2_DHW = DHW[0:no_override push:OFF] HC1[0:no_override] HC2[0:no_override]"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Write-Data|1": {
+   "rendered": [
+    "TSet = 10.00 C"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Write-Data|14": {
+   "rendered": [
+    "MaxRelModLevelSetting = 100.00 %"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Write-Data|27": {
+   "rendered": [
+    "Toutside = 19.40 C"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Write-Data|57": {
+   "rendered": [
+    "MaxTSet = 83.00 C"
+   ],
+   "src": "Request Boiler"
+  },
+  "R|Write-Data|99": {
+   "rendered": [
+    "OperatingMode_HC1_HC2_DHW = DHW[0:no_override push:OFF] HC1[1:auto] HC2[0:no_override]"
+   ],
+   "src": "Request Boiler"
+  },
+  "T|Read-Data|0": {
+   "rendered": [
+    "Status = Master [-D---W--]",
+    "Status = Master [-D-O-W--]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|100": {
+   "rendered": [
+    "RoomRemoteOverrideFunction = flag8 = [00000000] - decimal = [ 0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|101": {
+   "rendered": [
+    "SolarStorageMaster = Solar Storage Master Mode [1]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|102": {
+   "rendered": [
+    "SolarStorageASFflags = M[00000010] - [ 3]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|103": {
+   "rendered": [
+    "SolarStorageSlaveConfigMemberIDcode = Solar Storage Slave Config[00000010] MemberID code [ 3]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|104": {
+   "rendered": [
+    "SolarStorageVersionType = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|105": {
+   "rendered": [
+    "SolarStorageTSP = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|106": {
+   "rendered": [
+    "SolarStorageTSPindexTSPvalue = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|107": {
+   "rendered": [
+    "SolarStorageFHBsize = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|108": {
+   "rendered": [
+    "SolarStorageFHBindexFHBvalue = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|109": {
+   "rendered": [
+    "ElectricityProducerStarts"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|110": {
+   "rendered": [
+    "ElectricityProducerHours"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|111": {
+   "rendered": [
+    "ElectricityProduction"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|112": {
+   "rendered": [
+    "CumulativeElectricityProduction"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|113": {
+   "rendered": [
+    "BurnerUnsuccessfulStarts"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|114": {
+   "rendered": [
+    "FlameSignalTooLow"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|115": {
+   "rendered": [
+    "OEMDiagnosticCode"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|116": {
+   "rendered": [
+    "BurnerStarts"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|119": {
+   "rendered": [
+    "DHWBurnerStarts"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|120": {
+   "rendered": [
+    "BurnerOperationHours"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|123": {
+   "rendered": [
+    "DHWBurnerOperationHours"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|125": {
+   "rendered": [
+    "OpenThermVersionSlave"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|127": {
+   "rendered": [
+    "SlaveVersion = 0 / 0"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|128": {
+   "rendered": [
+    "Unknown message [128] value [800000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|129": {
+   "rendered": [
+    "Unknown message [129] value [810000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|130": {
+   "rendered": [
+    "Unknown message [130] value [820000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|131": {
+   "rendered": [
+    "RemehadFdUcodes = 0 / 0",
+    "RemehadFdUcodes = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|132": {
+   "rendered": [
+    "RemehaServicemessage = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|133": {
+   "rendered": [
+    "RemehaDetectionConnectedSCU = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|15": {
+   "rendered": [
+    "MaxCapacityMinModLevel = 0 / 0 kW/%"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|17": {
+   "rendered": [
+    "RelModLevel"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|18": {
+   "rendered": [
+    "CHPressure"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|19": {
+   "rendered": [
+    "DHWFlowRate"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|200": {
+   "rendered": [
+    "Unknown message [200] value [80C80000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|202": {
+   "rendered": [
+    "Unknown message [202] value [CA0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|204": {
+   "rendered": [
+    "Unknown message [204] value [CC0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|205": {
+   "rendered": [
+    "Unknown message [205] value [80CD0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|206": {
+   "rendered": [
+    "Unknown message [206] value [80CE0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|240": {
+   "rendered": [
+    "Unknown message [240] value [F00000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|25": {
+   "rendered": [
+    "Tboiler"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|26": {
+   "rendered": [
+    "Tdhw"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|27": {
+   "rendered": [
+    "Toutside"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|28": {
+   "rendered": [
+    "Tret"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|29": {
+   "rendered": [
+    "Tsolarstorage"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|3": {
+   "rendered": [
+    "SlaveConfigMemberIDcode = Slave Config[00000000] MemberID code [ 0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|30": {
+   "rendered": [
+    "Tsolarcollector"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|31": {
+   "rendered": [
+    "TflowCH2"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|32": {
+   "rendered": [
+    "Tdhw2"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|33": {
+   "rendered": [
+    "Texhaust"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|34": {
+   "rendered": [
+    "Theatexchanger"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|36": {
+   "rendered": [
+    "ElectricalCurrentBurnerFlame"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|38": {
+   "rendered": [
+    "RelativeHumidity"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|39": {
+   "rendered": [
+    "TrOverride2"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|40": {
+   "rendered": [
+    "Unknown message [40] value [280000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|41": {
+   "rendered": [
+    "Unknown message [41] value [290000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|42": {
+   "rendered": [
+    "Unknown message [42] value [2A0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|43": {
+   "rendered": [
+    "Unknown message [43] value [2B0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|44": {
+   "rendered": [
+    "Unknown message [44] value [2C0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|45": {
+   "rendered": [
+    "Unknown message [45] value [2D0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|46": {
+   "rendered": [
+    "Unknown message [46] value [2E0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|47": {
+   "rendered": [
+    "Unknown message [47] value [2F0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|48": {
+   "rendered": [
+    "TdhwSetUBTdhwSetLB"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|49": {
+   "rendered": [
+    "MaxTSetUBMaxTSetLB"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|5": {
+   "rendered": [
+    "ASFflags = ASF flags[00000000] OEM faultcode [ 0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|50": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 50 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|51": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 51 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|52": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 52 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|53": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 53 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|54": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 54 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|55": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 55 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|56": {
+   "rendered": [
+    "TdhwSet"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|57": {
+   "rendered": [
+    "MaxTSet"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|58": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 58 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|59": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 59 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|6": {
+   "rendered": [
+    "RBPflags = M[00000000] OEM fault code [ 0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|60": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 60 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|61": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 61 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|62": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 62 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|63": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 63 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|64": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 64 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|65": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 65 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|66": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 66 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|67": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 67 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|68": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 68 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|69": {
+   "rendered": [
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 69 ignored)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|70": {
+   "rendered": [
+    "StatusVH = VH Master [V-------]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|72": {
+   "rendered": [
+    "ASFFaultCodeVH = M[00000000] - [ 0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|73": {
+   "rendered": [
+    "DiagnosticCodeVH"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|74": {
+   "rendered": [
+    "ConfigMemberIDVH = VH Config[00000000] MemberID code [ 0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|75": {
+   "rendered": [
+    "OpenthermVersionVH"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|76": {
+   "rendered": [
+    "VersionTypeVH = 0 / 0"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|77": {
+   "rendered": [
+    "RelativeVentilation = 0 % (LB used, HB=0)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|78": {
+   "rendered": [
+    "RelativeHumidityExhaustAir = 7 % (LB used, HB=0)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|79": {
+   "rendered": [
+    "CO2LevelExhaustAir"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|80": {
+   "rendered": [
+    "SupplyInletTemperature"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|81": {
+   "rendered": [
+    "SupplyOutletTemperature"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|82": {
+   "rendered": [
+    "ExhaustInletTemperature"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|83": {
+   "rendered": [
+    "ExhaustOutletTemperature"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|84": {
+   "rendered": [
+    "ActualExhaustFanSpeed"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|85": {
+   "rendered": [
+    "ActualSupplyFanSpeed"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|86": {
+   "rendered": [
+    "RemoteParameterSettingVH = HB flag8[00000001] -[ 1] RemoteParameterSettingVH = LB flag8[00000010] - [ 2]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|87": {
+   "rendered": [
+    "NominalVentilationValue = 0 % (HB used, LB=0)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|88": {
+   "rendered": [
+    "TSPNumberVH = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|89": {
+   "rendered": [
+    "TSPEntryVH = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|9": {
+   "rendered": [
+    "TrOverride"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|90": {
+   "rendered": [
+    "FaultBufferSizeVH = 0 / 0"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|91": {
+   "rendered": [
+    "FaultBufferEntryVH = 0 / 0"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|92": {
+   "rendered": [
+    "Unknown message [92] value [5C0000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|93": {
+   "rendered": [
+    "Brand = 0 / 0"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|94": {
+   "rendered": [
+    "BrandVersion = 0 / 0"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|95": {
+   "rendered": [
+    "BrandSerialNumber = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|96": {
+   "rendered": [
+    "CoolingOperationHours"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|97": {
+   "rendered": [
+    "PowerCycles"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Read-Data|99": {
+   "rendered": [
+    "OperatingMode_HC1_HC2_DHW = DHW[0:no_override push:OFF] HC1[0:no_override] HC2[0:no_override]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|1": {
+   "rendered": [
+    "TSet = 10.00 C"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|124": {
+   "rendered": [
+    "OpenThermVersionMaster = 25.00"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|126": {
+   "rendered": [
+    "MasterVersion = 0 / 0"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|14": {
+   "rendered": [
+    "MaxRelModLevelSetting = 100.00 %"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|16": {
+   "rendered": [
+    "TrSet = 23.00 C"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|17": {
+   "rendered": [
+    "RelModLevel"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|2": {
+   "rendered": [
+    "MasterConfigMemberIDcode = Master Config[00000001] MemberID code [ 13]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|20": {
+   "rendered": [
+    "DayTime = Friday - 18:00"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|21": {
+   "rendered": [
+    "Date = 1 / 27"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|210": {
+   "rendered": [
+    "Unknown message [210] value [10D2E401] f8.8 [-28.00] u16 [58369] s16 [-7167]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|211": {
+   "rendered": [
+    "Unknown message [211] value [10D30000] f8.8 [0.00] u16 [0] s16 [0]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|215": {
+   "rendered": [
+    "Unknown message [215] value [10D716C9] f8.8 [22.79] u16 [5833] s16 [5833]"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|22": {
+   "rendered": [
+    "Year = 2023"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|23": {
+   "rendered": [
+    "TrSetCH2 = 25.00 C"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|24": {
+   "rendered": [
+    "Tr = 23.40 C"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|37": {
+   "rendered": [
+    "TRoomCH2 = 25.00 C"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|4": {
+   "rendered": [
+    "Command = 3 / 5"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|56": {
+   "rendered": [
+    "TdhwSet = 54.00 C"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|57": {
+   "rendered": [
+    "MaxTSet = 55.00 C"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|7": {
+   "rendered": [
+    "CoolingControl = 0.00 %"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|71": {
+   "rendered": [
+    "ControlSetpointVH = 7 % (LB used, HB=0)"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|8": {
+   "rendered": [
+    "TsetCH2 = 25.00 C"
+   ],
+   "src": "Thermostat"
+  },
+  "T|Write-Data|98": {
+   "rendered": [
+    "RFstrengthbatterylevel = sensor_type[0:room_temperature_controller] sensor_index[0] signal[0:no_indication] battery[0:no_indication]"
+   ],
+   "src": "Thermostat"
+  }
+ },
+ "sources": [
+  "Answer Thermostat",
+  "Boiler",
+  "Parity Error",
+  "Request Boiler",
+  "Thermostat"
+ ]
+}

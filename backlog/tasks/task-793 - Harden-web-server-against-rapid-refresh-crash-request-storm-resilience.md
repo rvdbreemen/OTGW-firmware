@@ -4,6 +4,7 @@ title: Harden web server against rapid-refresh crash (request-storm resilience)
 status: To Do
 assignee: []
 created_date: '2026-05-31 21:20'
+updated_date: '2026-08-08 14:35'
 labels:
   - webui
   - stability
@@ -36,3 +37,9 @@ Source: webserver-resilience audit (session 2026-05-31). build.py + evaluate.py 
 - [ ] #5 Scripted rapid-refresh storm no longer crashes or reboots the device; it degrades to 503/slower under extreme load; python build.py exits 0 and python evaluate.py --quick shows no new failures
 - [ ] #6 Eventual fix is ported to the 2.0.0 worktree as a sibling task
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-08 backlog audit: verdict PARTIAL. Some hardening landed but named acceptance criteria remain unmet. Left in To Do rather than In Progress because nobody is actively working it; In Progress on this board means someone is.
+<!-- SECTION:NOTES:END -->

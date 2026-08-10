@@ -1,0 +1,35 @@
+{
+  "adrs": {
+    "ADR-006": {
+      "commit": "d5c7581fd3b1bf3bed57c5c45ae7969abc716a9d",
+      "last_run": "2026-08-09T07:54:55+00:00",
+      "seconds": 22.5,
+      "verdict": "OK"
+    },
+    "ADR-029": {
+      "commit": "d5c7581fd3b1bf3bed57c5c45ae7969abc716a9d",
+      "last_run": "2026-08-09T07:55:16+00:00",
+      "seconds": 20.9,
+      "verdict": "OK"
+    },
+    "ADR-058": {
+      "commit": "d5c7581fd3b1bf3bed57c5c45ae7969abc716a9d",
+      "last_run": "2026-08-09T07:59:02+00:00",
+      "seconds": 21.1,
+      "verdict": "OK"
+    },
+    "ADR-064": {
+      "commit": "d5c7581fd3b1bf3bed57c5c45ae7969abc716a9d",
+      "last_run": "2026-08-09T07:54:03+00:00",
+      "seconds": 25.1,
+      "verdict": "OK"
+    },
+    "ADR-077": {
+      "commit": "d5c7581fd3b1bf3bed57c5c45ae7969abc716a9d",
+      "last_run": "2026-08-09T07:54:32+00:00",
+      "seconds": 0.5,
+      "verdict": "OK"
+    }
+  },
+  "schema": 1
+}

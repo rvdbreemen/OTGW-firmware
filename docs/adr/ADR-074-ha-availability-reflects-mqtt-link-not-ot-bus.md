@@ -172,7 +172,6 @@ is exactly correct HA availability semantics for every entity.
       "path_glob": "src/OTGW-firmware/**/*.{ino,cpp,h}",
       "message": "ADR-074: do not publish OT-bus liveness to the base namespace topic — it is the HA avty_t and must reflect only the MQTT link (birth/LWT). Use the otgw_connected sensor for OT-bus liveness."
     }
-  ],
-  "llm_judge": false
+  ]
 }
 ```

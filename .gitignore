@@ -1,6 +1,10 @@
 node_modules/*
 package-lock.json
 *.log
+# ...except the OT replay fixtures under scripts/tests, which are committed test
+# assets rather than captured output. Without this the *.log rule above silently
+# ignores them and they can only be added with `git add -f`.
+!scripts/tests/*.log
 *.bin
 *.elf
 .vscode/*
@@ -89,3 +93,21 @@ wifi-profiles.json
 *.secrets.json
 *.secret.json
 .env
+# coverage-gate run artefacts (the fixture and baseline ARE committed, runs are not)
+scripts/tests/last-coverage-run.log
+scripts/tests/verify-run.log
+scripts/tests/baseline-run-steady.log
+scripts/tests/newbaseline.log
+scripts/tests/verify2.log
+scripts/tests/fixverify.log
+
+# adr-kit per-machine state. .adr-kit.local.json holds the signer name and which
+# client CLI the judge calls: facts about one machine, not project decisions.
+# Tracking it would write one person's name into every teammate's acceptances.
+# The .adr-kit-state.json pair is a local cache with a lock file.
+docs/adr/.adr-kit.local.json
+docs/adr/.adr-kit-state.json
+docs/adr/.adr-kit-state.json.lock
+# .adr-kit-readiness.json is the guardian's disposable Proposed-queue cache,
+# regenerated per machine by the SessionStart nudge.
+docs/adr/.adr-kit-readiness.json

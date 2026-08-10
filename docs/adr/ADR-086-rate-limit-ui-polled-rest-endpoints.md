@@ -131,7 +131,6 @@ Rejected because the field evidence shows the failure is reachable by ordinary u
       "path_glob": "src/OTGW-firmware/restAPI.ino",
       "message": "The v2 dispatcher must keep calling checkApiRateLimit() before invoking a handler (ADR-086)."
     }
-  ],
-  "llm_judge": false
+  ]
 }
 ```
