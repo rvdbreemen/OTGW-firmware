@@ -1,10 +1,11 @@
 ---
 id: TASK-1074
 title: release-assets.yml cannot attach assets to an immutable release after publish
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-10 20:47'
-updated_date: '2026-08-10 20:58'
+updated_date: '2026-08-10 21:01'
 labels: []
 dependencies: []
 ordinal: 178000
