@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-10 20:47'
-updated_date: '2026-08-10 21:03'
+updated_date: '2026-08-10 21:13'
 labels: []
 dependencies: []
 ordinal: 178000
@@ -19,14 +19,16 @@ release-assets.yml triggers on release:published, but the repo enforces immutabl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The /release skill and docs/process/RELEASE_PROCESS.md generate SHA256SUMS, RELEASE_ASSETS.md, the capture scripts and the flash-bundle zip and attach them to the DRAFT before publishing
-- [ ] #2 release-assets.yml either runs pre-publish or is removed, so no release depends on a post-publish upload that cannot succeed
-- [ ] #3 A release dry-run confirms flash_otgw.sh auto-download verifies against SHA256SUMS from releases/latest/download
-- [ ] #4 docs/process/RELEASE_PROCESS.md documents that a published immutable release permanently reserves its tag name, so a deleted release cannot be republished under the same tag
-- [ ] #5 The false premise is corrected everywhere it is stated: the comment at .github/workflows/release-assets.yml:6 claiming 'Adding assets to an immutable release is permitted; only deleting is not', and the KennisBank note immutable-release-breekt-asset-upload
-- [ ] #6 No release step can report success while having attached nothing: either the workflow is gone, or it fails loudly when an expected asset is absent rather than skipping silently
-- [ ] #7 The workflow_dispatch backfill path is removed or documented as impossible, since assets cannot be added to any already-published release
+- [x] #1 The /release skill and docs/process/RELEASE_PROCESS.md generate SHA256SUMS, RELEASE_ASSETS.md, the capture scripts and the flash-bundle zip and attach them to the DRAFT before publishing
+- [x] #2 release-assets.yml either runs pre-publish or is removed, so no release depends on a post-publish upload that cannot succeed
+- [x] #3 A release dry-run confirms flash_otgw.sh auto-download verifies against SHA256SUMS from releases/latest/download
+- [x] #4 docs/process/RELEASE_PROCESS.md documents that a published immutable release permanently reserves its tag name, so a deleted release cannot be republished under the same tag
+- [x] #5 The false premise is corrected everywhere it is stated: the comment at .github/workflows/release-assets.yml:6 claiming 'Adding assets to an immutable release is permitted; only deleting is not', and the KennisBank note immutable-release-breekt-asset-upload
+- [x] #6 No release step can report success while having attached nothing: either the workflow is gone, or it fails loudly when an expected asset is absent rather than skipping silently
+- [x] #7 The workflow_dispatch backfill path is removed or documented as impossible, since assets cannot be added to any already-published release
 <!-- AC:END -->
+
+
 
 ## Implementation Plan
 
