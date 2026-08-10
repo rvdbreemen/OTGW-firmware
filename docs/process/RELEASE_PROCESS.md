@@ -269,39 +269,69 @@ Once the checklist is complete:
 
 5. **Commit the release build** on `main` and push to remote.
 
-6. **Create draft GitHub release (creates the tag):**
-
-   Derive a short title (3-6 words) that summarizes the release theme. Format: `v<version> — <Short Title>`.
-
-   Examples: `v1.3.2 — File Explorer Reliability Fix`, `v1.4.0 — REST API v3 & Prometheus`, `v1.3.1 — Command Queue & CS Override Fix`.
+6. **Generate the release assets.** This repository publishes **immutable** releases, so every asset has to exist before the release is published (see "Immutable releases" below). Do not rely on any workflow to add them afterwards; none can.
 
    ```bash
-   gh release create v<version> --target main --title "v<version> — <Short Title>" --notes-file RELEASE_GITHUB_<version>.md --draft
+   python scripts/make_release_assets.py --version <version>
    ```
 
-   This creates the `v<version>` tag on the latest `main` commit and a draft release. The release is not yet visible to the public.
+   This writes `SHA256SUMS`, `RELEASE_ASSETS.md` and `OTGW-firmware-<version>-flash-bundle.zip` into `build/release-assets/`, and prints the complete 9-asset list. It refuses to run if the binaries for `<version>` are missing or ambiguous in `build/`.
 
-7. **Upload build artifacts to the draft release:**
+7. **Create the draft GitHub release with every asset attached (creates the tag):**
+
+   Derive a short title (3-6 words) that summarizes the release theme. Format: `v<version> - <Short Title>`.
+
+   Examples: `v1.3.2 - File Explorer Reliability Fix`, `v1.4.0 - REST API v3 & Prometheus`, `v1.7.4 - Home Assistant Restart Recovery`.
 
    ```bash
-   gh release upload v<version> build/*.ino.bin build/*.littlefs.bin --clobber
+   ASSETS="$(python scripts/make_release_assets.py --version <version> --print-gh-args)"
+   eval gh release create v<version> --target main \
+     --title "v<version> - <Short Title>" \
+     --notes-file RELEASE_GITHUB_<version>.md \
+     --draft $ASSETS
    ```
 
-8. **Verify artifacts are attached:**
+   This creates the `v<version>` tag on the latest `main` commit and a draft release carrying all nine assets. The release is not yet visible to the public.
+
+8. **Verify all nine assets are attached. This gate is mandatory:**
 
    ```bash
+   gh release view v<version> --json assets --jq '.assets|length'    # MUST print 9
    gh release view v<version> --json assets --jq '.assets[].name'
    ```
 
-   Confirm that `.ino.bin` and `.littlefs.bin` are listed.
+   Expected: both binaries, `flash_otgw.sh`, `flash_otgw.bat`, `SHA256SUMS`, `RELEASE_ASSETS.md`, `capture-mqtt-debug.bat`, `capture-usb-serial.bat`, and the flash-bundle zip.
 
-9. **Publish the release (only after artifacts are confirmed):**
+   A missing `SHA256SUMS` is not cosmetic: `flash_otgw.sh` and `flash_otgw.bat` verify their auto-download against it and exit with `EXIT_SHA_MISMATCH` when it is absent, which breaks the documented flashing path. Fix the draft now, because after publishing it cannot be fixed at all.
+
+9. **Publish the release (only after the asset count is confirmed):**
 
    ```bash
    gh release edit v<version> --draft=false --latest
    ```
 
-   This makes the release public and marks it as the latest release. Once published, the release is immutable — assets can no longer be changed.
+   This makes the release public and marks it as the latest release. The release is now immutable and permanent.
+
+10. **Verify the published download path end to end:**
+
+    ```bash
+    curl -sSL -o /tmp/SHA256SUMS https://github.com/rvdbreemen/OTGW-firmware/releases/latest/download/SHA256SUMS
+    cat /tmp/SHA256SUMS
+    ```
+
+    This is the exact URL the flash scripts use. If it 404s, the release is broken for every user of `flash_otgw.sh` / `flash_otgw.bat` and cannot be repaired: cut the next patch version.
+
+---
+
+## Immutable releases: two rules that cannot be worked around
+
+This repository has immutable releases enabled. Two consequences govern the whole release flow, both learned the hard way during the v1.7.3 attempt on 2026-08-10.
+
+**1. After publishing, no asset can ever be added.** Not "deleting is blocked but adding is fine" — every upload fails with `Cannot upload asset <name> to an immutable release`. Any workflow triggered on `release: published` is therefore structurally too late. The old `release-assets.yml` worked this way and failed on every stable release from v1.5.0 to v1.7.3, which is why those releases shipped without `SHA256SUMS` and the flash bundle. It was deleted in TASK-1074. Attach everything to the draft.
+
+**2. Publishing permanently reserves the tag name, and deleting the release does not free it.** Recreating a release on the same tag fails with `HTTP 422: tag_name was used by an immutable release`. Deleting the git tag does not help; the reservation is on the name. There is no recovery path.
+
+The practical rule follows directly: **never delete a published release intending to redo it.** If a published release is wrong, roll the version forward and ship the next patch number. v1.7.3 was burned exactly this way and shipped as v1.7.4, leaving a dangling `v1.7.3` tag with no release behind it.
 
 ---
 
@@ -466,12 +496,17 @@ gh release create v<version>-beta \
 
 ### Phase P4: Upload artefacts
 
+Normally `beta-prerelease.yml` does this for you. When running the manual flow, generate the same asset set the workflow would, so the beta is not published missing its checksums:
+
 ```bash
-gh release upload v<version>-beta build/*.ino.bin build/*.littlefs.bin --clobber
+python scripts/make_release_assets.py --version <version>-beta
+eval gh release upload v<version>-beta --clobber \
+  "$(python scripts/make_release_assets.py --version <version>-beta --print-gh-args)"
+gh release view v<version>-beta --json assets --jq '.assets|length'   # expect 9
 gh release view v<version>-beta --json assets --jq '.assets[].name'
 ```
 
-Confirm both `.ino.bin` and `.littlefs.bin` are listed.
+Confirm both `.ino.bin` and `.littlefs.bin` are listed, along with `SHA256SUMS` and the flash bundle. Uploading to a **draft** is allowed; the immutability lock only applies once published.
 
 ### Phase P5: Publish the prerelease
 

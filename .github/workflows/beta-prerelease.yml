@@ -2,8 +2,9 @@ name: Beta prerelease publish
 
 # Fires when a prerelease tag is pushed (any tag with a dash after the
 # version, e.g. v1.6.0-beta.4, v1.6.0-alpha.2, v1.6.0-rc.1). Stable tags
-# (v1.5.0, no dash) are NOT matched; those are handled by the /release
-# skill and the release-assets.yml workflow chains in on release:published.
+# (v1.5.0, no dash) are NOT matched; those are handled entirely by the
+# /release skill, which generates its assets with
+# scripts/make_release_assets.py and attaches them to the draft.
 #
 # What this workflow does (self-contained, single job):
 #   1. Build firmware + filesystem binaries with build.py.
@@ -23,9 +24,13 @@ name: Beta prerelease publish
 #      "Cannot upload assets to an immutable release".
 #
 # Self-contained because GITHUB_TOKEN-created release events do not trigger
-# downstream workflows. The previous version relied on release-assets.yml
-# chaining in on release:published, which silently does not fire for beta
+# downstream workflows. An earlier version relied on a release-assets.yml
+# chaining in on release:published, which silently did not fire for beta
 # tags. SHA256SUMS / flash scripts / bundle are now generated here.
+#
+# That workflow has since been deleted outright (TASK-1074): on a repository
+# with immutable releases NO asset can be attached after publish, so a
+# release:published trigger is always too late, for stable tags as well.
 #
 # Manual re-run: workflow_dispatch with a tag input lets the maintainer
 # re-publish a stuck draft without pushing a new tag.

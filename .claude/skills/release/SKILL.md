@@ -181,20 +181,27 @@ Proceed directly after Phase 4 approval.
    git push origin main
    git status --short   # MUST be clean (no leftover banner/build changes) before creating the tag
    ```
-5. **Create draft GitHub release**:
+5. **Generate the release assets**. Releases are immutable: nothing can be attached after publishing, so all of it must be on the draft.
    ```bash
-   gh release create v<version> --target main \
+   python scripts/make_release_assets.py --version <version>
+   ```
+   Writes `SHA256SUMS`, `RELEASE_ASSETS.md` and the flash-bundle zip to `build/release-assets/`, and prints the 9-asset list.
+6. **Create the draft release with every asset in one call**:
+   ```bash
+   eval gh release create v<version> --target main \
      --title "v<version> - <Short Title>" \
-     --notes-file RELEASE_GITHUB_<version>.md --draft
+     --notes-file RELEASE_GITHUB_<version>.md --draft \
+     "$(python scripts/make_release_assets.py --version <version> --print-gh-args)"
    ```
    Derive the short title (3-6 words) from the release theme. Examples: `v1.3.2 - File Explorer Reliability Fix`.
-6. **Upload artifacts**:
+7. **Verify the asset count. Mandatory gate, do not skip**:
    ```bash
-   gh release upload v<version> build/*.ino.bin build/*.littlefs.bin \
-     flash_otgw.sh flash_otgw.bat --clobber
+   gh release view v<version> --json assets --jq '.assets|length'   # MUST print 9
+   gh release view v<version> --json assets --jq '.assets[].name'
    ```
-7. **Verify artifacts**: `gh release view v<version> --json assets --jq '.assets[].name'`
+   A missing `SHA256SUMS` breaks `flash_otgw.sh` / `flash_otgw.bat` auto-download with `EXIT_SHA_MISMATCH`. Fix the draft now; after publishing it is unfixable.
 8. **Publish**: `gh release edit v<version> --draft=false --latest`
+9. **Verify the live download path**: `curl -sSI https://github.com/rvdbreemen/OTGW-firmware/releases/latest/download/SHA256SUMS | head -1` must not be a 404. This is the URL the flash scripts use.
 
 ### Phase 6: Post-release, Discord announcement & sync dev
 
@@ -232,7 +239,11 @@ Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping st
 - **Always push to remote after every commit**
 - **Stage the WHOLE build sweep, not just `version.h`**: every `python build.py` runs `autoinc-semver --update-all`, which rewrites `version.h`, `data/version.hash`, and the `Version :` banner comments across ~24 source/data files. After any build-output commit (Phase 2, Phase 5, Phase 6 bump) run `git status --short` and confirm a clean tree before proceeding. Leftover banner changes committed late, or on `main` before tagging, mean the published tag carries stale `-beta` source comments (the binary version stays correct via `version.h`).
 - **Run git mutations SERIALLY, never in parallel tool calls**: `git checkout`, `git stash`, `git merge`, and `git commit` issued concurrently race on the index and working tree and produce corrupt or misleading state. Chain them with `&&` in one command or run them one at a time. Only read-only `git` queries may overlap.
-- **Always create releases as draft first**: upload artifacts, verify, then publish
+- **Always create releases as draft first**: attach every asset, verify the count is 9, then publish
+- **Releases are immutable, and this has two hard consequences**:
+  1. **Nothing can be attached after publishing.** Not even additions: the API rejects every upload with `Cannot upload asset X to an immutable release`. This is why no workflow can attach release assets on `release: published`, and why `release-assets.yml` was deleted (TASK-1074). Everything goes on the draft.
+  2. **A published tag name is permanently reserved.** Deleting the release does NOT free it; recreating a release on that tag fails with `HTTP 422: tag_name was used by an immutable release`, and deleting the git tag does not help either.
+- **Never delete a published release intending to republish it.** There is no way back. If a published release is wrong, roll the version forward and ship the next patch number. This is exactly how v1.7.3 was burned and had to ship as v1.7.4.
 - **No CI workflows for releases**: builds done locally via `python build.py`
 - **Only 2 mandatory checkpoints**: Phase 4 (content review) and Phase 6 (Discord messages)
 - **Conditional stops only**: merge conflicts, missing ADRs, build failures, zero code changes
