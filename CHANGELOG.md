@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog 1.1.0](https://keepachangelog.com/en/1.
 
 For full release notes per version, see the matching `RELEASE_NOTES_<version>.md` file. Current release notes live at the repository root; previous release notes are archived in [`docs/releases/`](docs/releases/).
 
+## [Unreleased]
+
+_No unreleased changes yet. New work on `otgw-1.x.x` lands here._
+
 ## [1.7.4] - 2026-08-10
 
 Home Assistant integration and OpenTherm decoding release for the 1.x (ESP8266) line: entities survive a Home Assistant Core restart, three Remeha vendor message IDs decode for the first time, and four ventilation topics honour their heartbeat again. No breaking changes versus v1.7.2. Full notes: [RELEASE_NOTES_1.7.4.md](RELEASE_NOTES_1.7.4.md).
