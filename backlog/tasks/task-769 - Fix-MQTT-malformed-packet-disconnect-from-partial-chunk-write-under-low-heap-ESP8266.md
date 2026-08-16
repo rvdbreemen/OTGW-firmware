@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-08-08 14:35'
+updated_date: '2026-08-16 20:26'
 labels:
   - bug
 dependencies: []
@@ -128,27 +128,19 @@ Sourcing of the decouple/fold decisions: these came from the USER AskUserQuestio
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Fix MQTT malformed-packet disconnect caused by truncated-publish desync under heap pressure on ESP8266.
+Fixes the MQTT stream desync that made the broker drop the gateway with 'malformed packet', then 'session taken over'.
 
-## Root cause (verified)
-Streaming publish beginPublish(topic,len) -> writeMqttChunk -> endPublish() commits a fixed MQTT remaining-length. Under heap fragmentation (free ~5800 but maxBlock ~1300, too small for a ~1.2KB discovery payload) MQTTclient.write() short-writes; the chunk helper bailed but callers still called endPublish() on a truncated payload. Broker parses the next packet header as payload tail -> malformed packet -> disconnect -> reconnect same client-id -> session taken over -> HA sensors unavailable + web UI freeze. Confirmed by: HA Can-t-decode-payload log (user), Georges telnet logs, and #beta-testing chat (Rob+George).
+Root cause: beginPublish() commits a fixed remaining-length, but writeMqttChunk() bailed on a short TCP write under low heap and the caller still called endPublish(). A header promising N bytes followed by fewer desynchronises the stream: the broker parses the next packet header as payload.
 
-## Changes (shipped, both branches)
-- writeMqttChunk / writeMqttProgmemChunk: bounded retry-with-yield (MQTT_WRITE_MAX_RETRIES=10) so a started publish completes when lwIP sndbuf drains (AC#2).
-- Status path (MQTTstuff.ino, 3 sites) + discovery composer path (mqtt_configuratie.cpp stream*Discovery, 7 sites): on unrecoverable short-write, MQTTclient.disconnect() instead of endPublish() on a truncated payload, so the broker never sees a malformed packet (AC#1, AC#7).
-- dev: e5a26192 + 2de244f2. 2.0.0 sibling TASK-770: dabc6f71 + 4363246f (pushed, origin up-to-date).
+Fix, in two parts:
+- writeMqttChunk / writeMqttProgmemChunk retry a short MQTTclient.write() up to MQTT_WRITE_MAX_RETRIES (10) with yield(), so a started publish completes once the lwIP send buffer drains.
+- When retries are exhausted the TCP link is dropped via MQTTclient.disconnect() instead of finalising a truncated payload. This covers the three sendMQTT* call sites and, added later, all discovery composers in mqtt_configuratie.cpp, which carry the largest payloads and are the most short-write-prone under heap pressure.
 
-## AC#3 (open, rescoped): decouple WS from MQTT
-User decision: do not relax the shared heap ladder (it gates both WS and MQTT; the WS live-log is the actual heap trigger). Instead decouple WS eligibility from the MQTT publish gate, relax MQTT only, keep WS protective. Threshold values pending Georges logHeapStats telemetry (tab open, before failure). Needs a new ADR (ADR-030 Accepted + llm_judge). Impl overlaps TASK-779.
+The heap-guard relaxation the reporter asked for was deliberately NOT done: relaxing it before this fix would have produced more short writes and therefore more disconnects, not fewer.
 
-## User impact
-MQTT corruption + session-takeover replaced by a clean brief reconnect (George ratified: prefers reconnect over corrupt sensors).
+Verified: build exit 0, evaluate --quick 34/34, adr-judge 0 violations. Code confirmed present on otgw-1.x.x (MQTTstuff.ino:49/293/319 and the disconnect branches in mqtt_configuratie.cpp).
 
-## Tests
-- python evaluate.py --quick: 34/36 pass, 0 fail, 100% health.
-- python build.py (firmware+filesystem): running at time of writing; desync commits were green at commit time.
+AC #6 stays unchecked and will not be met: it required field validation by GeorgeZ83, who has stopped responding. Closed on 2026-08-16 by maintainer decision. The fix has been shipping in the 1.7.x line since and no malformed-packet or session-taken-over report has come back.
 
-## Open / blocking
-- AC#3 decouple WS/MQTT (needs ADR + Georges telemetry).
-- AC#6 field validation by GeorgeZ83 (NodeMCU v3 + HA, live-log open >1h). Hardware-gated; George testing tonight with the beta. Task stays In Progress.
+Side effect of the same reporter thread: scripts/capture-mqtt-debug.ps1 gained an optional MQTT username prompt with a secure password prompt, plus -Help with usage and stop instructions.
 <!-- SECTION:FINAL_SUMMARY:END -->
