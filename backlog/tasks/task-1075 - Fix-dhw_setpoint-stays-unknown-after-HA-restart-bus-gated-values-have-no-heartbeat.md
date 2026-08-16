@@ -6,10 +6,16 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-16 19:49'
+updated_date: '2026-08-16 19:50'
 labels:
   - bug
   - needs-info
 dependencies: []
+references:
+  - 'Discord #nederlandse-ondersteuning'
+  - stefan_24213
+  - '2026-08-14'
+  - msg 1537891894216884255
 priority: medium
 ordinal: 179000
 ---
