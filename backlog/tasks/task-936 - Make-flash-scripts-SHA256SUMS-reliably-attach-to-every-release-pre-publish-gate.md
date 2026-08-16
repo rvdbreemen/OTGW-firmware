@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-06-25 19:55'
-updated_date: '2026-08-08 14:54'
+updated_date: '2026-08-16 20:28'
 labels:
   - release
   - tooling
@@ -53,3 +53,15 @@ FIX: overwrite_files: false, so existing assets are skipped instead of deleted a
 ALSO ADDED: RELEASE_ASSETS.md explaining every asset, how to verify a download and how to produce a capture when reporting a bug; the capture scripts as standalone assets and in a capture/ folder in the bundle; a workflow_dispatch trigger taking a tag, so the workflow can be tested without cutting a release and can backfill past releases; and the pre-publish GATE the task title asks for, asserting every expected asset is actually attached and failing the job if not.
 VERIFIED SO FAR: YAML parses, all five run blocks pass bash -n, and the RELEASE_ASSETS.md generator was executed for real (renders correctly, no unresolved expansions). NOT yet verified against a live release: that needs either a workflow_dispatch run against v1.7.2 or the next stable release.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded by TASK-1074. Closed 2026-08-16 without checking its own acceptance criteria, because TASK-1074 solved the same problem a different and better way.
+
+What this task assumed: that release-assets.yml could be repaired, that SHA256SUMS generation should move into the manual draft-upload step, and that the flash-bundle zip should be dropped. Its own partial fix (commit 91691b5c7, overwrite_files:false) addressed the visible error, 'Cannot delete asset from an immutable release', which softprops/action-gh-release triggered by deleting an asset before re-uploading it.
+
+What was actually wrong: ordering, not deletion. On an immutable release GitHub also rejects pure additions after publish, so a release:published trigger is structurally too late no matter how it is configured, and the workflow_dispatch backfill path was impossible by construction. TASK-1074 deleted .github/workflows/release-assets.yml outright, added scripts/make_release_assets.py, and moved every asset onto the DRAFT before publish, with an asset-count verification as the pre-publish gate this task asked for.
+
+Two of the ACs here are now factually wrong and should not be resurrected: AC #5 declares the flash-bundle zip intentionally dropped, while TASK-1074 generates it; AC #1-#3 describe repairs to a workflow that no longer exists. AC #4 (remove the dead workflow) was satisfied by TASK-1074.
+<!-- SECTION:FINAL_SUMMARY:END -->
