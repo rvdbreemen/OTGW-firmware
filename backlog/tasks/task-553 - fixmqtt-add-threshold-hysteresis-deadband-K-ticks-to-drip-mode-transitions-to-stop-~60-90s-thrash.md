@@ -3,7 +3,7 @@ id: TASK-553
 title: >-
   fix(mqtt): add threshold-hysteresis (deadband + K-ticks) to drip mode
   transitions to stop ~60-90s thrash
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-07 08:45'
