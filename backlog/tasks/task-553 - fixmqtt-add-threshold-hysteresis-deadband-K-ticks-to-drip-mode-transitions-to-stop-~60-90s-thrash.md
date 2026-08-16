@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-05-07 08:45'
-updated_date: '2026-08-08 14:35'
+updated_date: '2026-08-16 20:27'
 labels:
   - mqtt
   - heap
@@ -106,4 +106,8 @@ Risks / Follow-ups
 - Field validation needed to confirm the thrash is gone in live operation. AC #7 is the gate.
 - If thrash persists after deployment, conservative fallback to N=2048 deadband (HEAP_LOW_RESTORE_THRESHOLD = 7168) is documented in the description.
 - 2.0.0 sibling task TASK-555 ports the same pattern with platform-aware deadband for ESP32-S3.
+
+Closed 2026-08-16 by maintainer decision. AC #7 (a field-log re-capture over a 5-minute window under steady healthy heap) stays unchecked and will not be met: no tester is available for it. The implementation ACs (#1-#6, #8) are all satisfied and the change shipped in commit 2b21fd6b; the outstanding item was confirmation of the observed effect in the field, not the code.
+
+Note for anyone reopening this: an earlier shipped-claim on this task was refuted by an independent verifier, which is why it sat In Progress rather than being closed at implementation time. The refutation concerned the claim of completion, not a demonstrated defect in the change.
 <!-- SECTION:FINAL_SUMMARY:END -->
