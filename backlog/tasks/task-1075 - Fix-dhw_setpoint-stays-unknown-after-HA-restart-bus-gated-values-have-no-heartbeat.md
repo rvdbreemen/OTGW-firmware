@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-16 19:49'
-updated_date: '2026-08-16 19:50'
+updated_date: '2026-08-16 19:54'
 labels:
   - bug
   - needs-info
@@ -37,3 +37,9 @@ Needs from reporter: firmware version in use, and a telnet capture showing wheth
 - [ ] #3 Fix does not introduce a publish flood: republish stays paced, consistent with ADR-088
 - [ ] #4 Reporter confirms the fix on his own system
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-16: Robert asked stefan_24213 for a capture in Discord #nederlandse-ondersteuning. Blocked on that reply: no investigation or fix work until the log arrives, since the root cause is code-reading only so far and he may simply be on pre-1.7.4.
+<!-- SECTION:NOTES:END -->
