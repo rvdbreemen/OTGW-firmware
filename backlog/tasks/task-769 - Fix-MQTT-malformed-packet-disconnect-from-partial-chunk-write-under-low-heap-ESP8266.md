@@ -3,11 +3,11 @@ id: TASK-769
 title: >-
   Fix: MQTT malformed-packet disconnect from partial chunk write under low heap
   (ESP8266)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-30 21:42'
-updated_date: '2026-08-16 20:26'
+updated_date: '2026-08-16 20:27'
 labels:
   - bug
 dependencies: []
