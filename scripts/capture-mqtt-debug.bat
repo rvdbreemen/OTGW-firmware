@@ -487,10 +487,14 @@ function Install-Mosquitto {
         throw "mosquitto_sub was not found and winget is not available. Install Mosquitto manually or pass -MosquittoSubPath."
     }
 
-    Add-SummaryLine "Mosquitto install: winget install started"
-    & $winget.Source install --id EclipseMosquitto.Mosquitto -e --accept-package-agreements --accept-source-agreements
+    # The publisher is Eclipse Foundation, so the winget id is EclipseFoundation.Mosquitto.
+    # The old id EclipseMosquitto.Mosquitto matches no package and fails for every user
+    # who does not already have mosquitto_sub installed.
+    $wingetPackageId = "EclipseFoundation.Mosquitto"
+    Add-SummaryLine "Mosquitto install: winget install started ($wingetPackageId)"
+    & $winget.Source install --id $wingetPackageId -e --accept-package-agreements --accept-source-agreements
     if ($LASTEXITCODE -ne 0) {
-        throw "winget failed to install EclipseMosquitto.Mosquitto (exit code $LASTEXITCODE)."
+        throw "winget failed to install $wingetPackageId (exit code $LASTEXITCODE)."
     }
 
     Add-SummaryLine "Mosquitto install: winget install completed"
