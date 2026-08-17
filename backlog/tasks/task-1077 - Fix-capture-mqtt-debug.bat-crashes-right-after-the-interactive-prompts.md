@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-17 05:51'
-updated_date: '2026-08-17 06:02'
+updated_date: '2026-08-17 06:09'
 labels:
   - bug
   - tooling
@@ -37,8 +37,22 @@ Needed from reporter: the exact error text on screen, and whether logs/mqtt-diag
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The actual failure is identified from the reporter's error text or a local reproduction, not from the hypothesis above alone
-- [ ] #2 A missing mosquitto_sub or missing winget produces a plain actionable message with a manual-install pointer, instead of an unhandled throw
-- [ ] #3 A failure between the prompts and the run-folder creation still leaves a diagnosable artefact, or the run folder is created before that window
+- [x] #1 The actual failure is identified from the reporter's error text or a local reproduction, not from the hypothesis above alone
+- [x] #2 A missing mosquitto_sub or missing winget produces a plain actionable message with a manual-install pointer, instead of an unhandled throw
+- [x] #3 A failure between the prompts and the run-folder creation still leaves a diagnosable artefact, or the run folder is created before that window
 - [ ] #4 stefan_24213 completes a capture with the fixed script
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-17: root cause confirmed from Stefan's own transcript, not from the hypothesis. summary.txt line: "Error: winget failed to install EclipseMosquitto.Mosquitto (exit code -1978335212)". The exit code is recorded verbatim and deliberately not interpreted: the fix does not depend on why winget failed.
+
+Locally reproduced the sibling branch (winget absent) by running a patched copy with $env:OTGW_FAKE_PF and a stripped PATH. Identical outcome: unhandled throw, red stacktrace, exit 1. Both branches funnel into the same rethrow at the outer catch.
+
+Correction to the original triage: telnet had NOT connected yet when Stefan's run died. Order is browser, crashlog, Resolve-MosquittoSub, telnet writer, telnet connect, so the abort happened before any telnet data existed. That is why telnet.log was "(not present)".
+
+AC #3 needed no work: the run folder and script.error.log are created before the failure window, and Stefan's transcript proves the artefact survived and was uploadable.
+
+Fix: wrap the Resolve-MosquittoSub call site so a failed auto-resolve disables the MQTT stream instead of aborting the capture. An explicit -MosquittoSubPath that does not exist stays fatal. Verified against the bench device: exit 0, no stacktrace, "MQTT capture disabled" in the summary, telnet section populated (25601-byte transcript).
+<!-- SECTION:NOTES:END -->
