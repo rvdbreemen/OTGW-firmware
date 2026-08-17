@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-17 05:51'
-updated_date: '2026-08-17 06:09'
+updated_date: '2026-08-17 06:12'
 labels:
   - bug
   - tooling
@@ -40,7 +40,7 @@ Needed from reporter: the exact error text on screen, and whether logs/mqtt-diag
 - [x] #1 The actual failure is identified from the reporter's error text or a local reproduction, not from the hypothesis above alone
 - [x] #2 A missing mosquitto_sub or missing winget produces a plain actionable message with a manual-install pointer, instead of an unhandled throw
 - [x] #3 A failure between the prompts and the run-folder creation still leaves a diagnosable artefact, or the run folder is created before that window
-- [ ] #4 stefan_24213 completes a capture with the fixed script
+- [x] #4 stefan_24213 completes a capture with the fixed script
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -55,4 +55,8 @@ Correction to the original triage: telnet had NOT connected yet when Stefan's ru
 AC #3 needed no work: the run folder and script.error.log are created before the failure window, and Stefan's transcript proves the artefact survived and was uploadable.
 
 Fix: wrap the Resolve-MosquittoSub call site so a failed auto-resolve disables the MQTT stream instead of aborting the capture. An explicit -MosquittoSubPath that does not exist stays fatal. Verified against the bench device: exit 0, no stacktrace, "MQTT capture disabled" in the summary, telnet section populated (25601-byte transcript).
+
+2026-08-17 correction: the winget failure was NOT a broken winget on the reporter's machine. The script used package id EclipseMosquitto.Mosquitto, which matches no package. Verified locally: "winget show EclipseMosquitto.Mosquitto" returns "No package found matching input criteria" with exit code -1978335212, byte for byte the code in the reporter's log, while "winget show EclipseFoundation.Mosquitto" returns Eclipse Mosquitto MQTT broker 2.1.2, publisher Eclipse Foundation. The auto-install was therefore broken for every user without mosquitto_sub already installed, not just for him.
+
+Fixed the id. The live install path was deliberately not executed on the maintainer machine: mosquitto is already installed there, so a winget run would mutate the machine without proving anything the "winget show" resolution does not already prove.
 <!-- SECTION:NOTES:END -->
