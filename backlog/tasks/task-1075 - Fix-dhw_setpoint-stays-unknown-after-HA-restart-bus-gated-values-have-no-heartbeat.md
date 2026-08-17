@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-16 19:49'
-updated_date: '2026-08-17 17:53'
+updated_date: '2026-08-17 20:58'
 labels:
   - bug
   - needs-info
@@ -58,4 +58,20 @@ So the entity is not stale, it was never fed. His thermostat/boiler pair simply 
 This sharpens the original hypothesis. ADR-088 republish-on-HA-online resets the publish gates so each value re-publishes "as first-seen", paced by OT bus arrival. For a value that never arrives on the bus, that mechanism can never deliver anything, no matter how often HA restarts. A republish that waits for the bus cannot repair a value the bus does not carry.
 
 Open and not answerable from this capture: whether the firmware holds a last-known TdhwSet in RAM. The device uptime is 468179 s (5.4 days) and the web UI shows 60, which suggests it does, but the capture contains no HA restart (no homeassistant/status transition in 26 minutes), so the republish path was never exercised here. If the firmware does hold the value, the fix is to publish the stored value on HA-online instead of only re-arming the gate.
+
+2026-08-17 design analysis, no code written. Decision deferred by the maintainer until stefan_24213 delivers a capture containing a real HA restart plus the new REST snapshot (TASK-1079).
+
+Code finding that reframes the bug: requestMQTTRepublishAll() calls resetMqttTrackedState(), which sets every mqttlastsent[] slot to TRACKED_TIME_UNSEEN. That array packs the last published value in bits 31-16 and the last publish time in bits 15-0, so on an HA restart the firmware erases its own record of what it knew and then waits for the bus to re-teach it. For values the bus carries constantly this is invisible; for MsgID 56 on this reporter's system it is fatal. The problem is not that the value is unknowable, it is that it is discarded.
+
+Second fact constraining any fix: the entire publish path is frame-driven. shouldPublishMQTTForID() is reached from OT frame processing, and the 60s heartbeat only ticks when a frame arrives. "Just force the heartbeat" therefore cannot deliver a value the bus does not carry.
+
+Two real options.
+Option A, publish state topics retained. Smallest change, makes requestMQTTRepublishAll redundant for state, and also covers restarts the firmware never observes (HA reinstalled or moved, broker reconnect). Costs: retained topics persist, so a renamed topic leaves an orphan that must be cleared with an empty retained payload. Stale values after the gateway goes offline are already handled by avty_t per ADR-074.
+Option B, keep the stored value and republish it on HA-online, dripped, for every slot whose timestamp is not UNSEEN. Stays inside the current semantics and touches no broker behaviour, but needs the packed u16 routed back through the correct formatter and needs pacing to avoid the ADR-073 republish storm.
+
+Recommendation on file: Option A, because it removes machinery instead of refining it and fixes the whole class rather than this one topic. Either way it supersedes ADR-088, so it needs an ADR before implementation.
+
+Hard constraint for both: never publish a value that was never seen. Emitting 0 for MsgID 56 would render 0 degrees on the card, which is fabricated data and worse than unknown. The existing TRACKED_TIME_UNSEEN marker is the correct gate.
+
+If the snapshot shows messages/56 value 0.000, neither option helps this reporter: his gateway never learned the setpoint over OpenTherm, the web UI value comes from elsewhere, and the question becomes whether the gateway should request MsgID 56 itself or whether the DHW card should stop promising a target it cannot source.
 <!-- SECTION:NOTES:END -->
