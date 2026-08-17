@@ -4,11 +4,18 @@ title: 'Fix: capture-mqtt-debug.bat crashes right after the interactive prompts'
 status: To Do
 assignee: []
 created_date: '2026-08-17 05:51'
+updated_date: '2026-08-17 05:52'
 labels:
   - bug
   - tooling
   - needs-info
-dependencies: []
+dependencies:
+  - TASK-1075
+references:
+  - 'Discord #nederlandse-ondersteuning'
+  - stefan_24213
+  - '2026-08-17'
+  - msg 1538786515428184115
 priority: high
 ordinal: 180000
 ---
