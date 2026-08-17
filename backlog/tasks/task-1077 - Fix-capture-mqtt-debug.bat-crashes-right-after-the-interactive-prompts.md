@@ -1,10 +1,11 @@
 ---
 id: TASK-1077
 title: 'Fix: capture-mqtt-debug.bat crashes right after the interactive prompts'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-17 05:51'
-updated_date: '2026-08-17 05:52'
+updated_date: '2026-08-17 06:02'
 labels:
   - bug
   - tooling
