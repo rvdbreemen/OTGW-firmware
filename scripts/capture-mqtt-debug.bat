@@ -75,6 +75,7 @@ param(
     [switch]$QuietDebugToggles,
     [string]$KeepDebugToggles,
     [switch]$SkipBrowserCapture,
+    [switch]$SkipRestSnapshot,
     [string]$BrowserUrl,
     [int]$BrowserDebugPort = 9222,
     [string]$BrowserPath,
@@ -176,6 +177,11 @@ function Show-Help {
     Write-Host "  Chrome DevTools Protocol and its console/network output is written to browser.log."
     Write-Host "  Browser/tool stderr is captured in error.txt, which is also merged into the final transcript."
     Write-Host "  -SkipBrowserCapture            Disable the browser capture entirely (telnet + MQTT only)."
+    Write-Host "  -SkipRestSnapshot              Skip the post-capture REST snapshot of the firmware's own state."
+    Write-Host "                                 The snapshot runs once after the capture stops and records device"
+    Write-Host "                                 info, otmonitor, boiler-support and the in-RAM value of a curated"
+    Write-Host "                                 set of OpenTherm message ids. Settings are never captured, because"
+    Write-Host "                                 they contain the MQTT broker credentials."
     Write-Host "  -BrowserUrl <url>             Page to load (default http://<DeviceHost>/)."
     Write-Host "  -BrowserDebugPort <port>     CDP remote-debugging port (default 9222; auto-bumped if busy)."
     Write-Host "  -BrowserPath <path>          Explicit msedge.exe/chrome.exe path (default: auto-detect)."
@@ -901,6 +907,85 @@ function New-ToolErrorLog {
     return $ErrorPath
 }
 
+function Invoke-RestSnapshot {
+    # A capture shows what crosses the OT bus and what reaches MQTT, but not what
+    # the firmware itself believes. That gap cost a full round trip with a reporter
+    # once: his log proved the DHW setpoint was never published because MsgID 56
+    # never appears on his bus, but could not say whether the firmware still held a
+    # last-known value. This snapshot answers that.
+    #
+    # Runs once, AFTER the live capture has stopped, so it never adds load to the
+    # device during the measurement. Every request is time-bounded and every failure
+    # is recorded as a line, because a snapshot that hangs would cost the tester the
+    # capture they just spent time producing.
+    #
+    # /api/v2/settings is deliberately NOT captured: it carries the MQTT broker
+    # credentials, and this transcript is a file testers upload to a public channel.
+    param(
+        [Parameter(Mandatory = $true)][string]$DeviceHost,
+        [Parameter(Mandatory = $true)][string]$SnapshotLog,
+        [int]$TimeoutSeconds = 5
+    )
+
+    # Curated id list: the setpoint and temperature family that field questions keep
+    # landing on. A bulk endpoint does not exist (the web UI reads these over the
+    # WebSocket), and probing all 128 ids would hammer an ESP8266 for little gain.
+    $messageIds = @(
+        @(1,  'TSet'),
+        @(9,  'TrOverride'),
+        @(14, 'MaxRelModLevelSetting'),
+        @(16, 'TrSet'),
+        @(17, 'RelModLevel'),
+        @(18, 'CHPressure'),
+        @(24, 'Tr'),
+        @(25, 'Tboiler'),
+        @(26, 'Tdhw'),
+        @(28, 'Tret'),
+        @(48, 'TdhwSetUBTdhwSetLB'),
+        @(56, 'TdhwSet'),
+        @(57, 'MaxTSet')
+    )
+
+    $endpoints = New-Object System.Collections.Generic.List[object]
+    $endpoints.Add(@{ Label = 'device info';    Path = '/api/v2/device/info' })         | Out-Null
+    $endpoints.Add(@{ Label = 'otmonitor';      Path = '/api/v2/otgw/otmonitor' })      | Out-Null
+    $endpoints.Add(@{ Label = 'boiler support'; Path = '/api/v2/otgw/boiler-support' }) | Out-Null
+    foreach ($entry in $messageIds) {
+        $endpoints.Add(@{ Label = "msgid $($entry[0]) $($entry[1])"; Path = "/api/v2/otgw/messages/$($entry[0])" }) | Out-Null
+    }
+
+    $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
+    $writer = New-Object System.IO.StreamWriter -ArgumentList $SnapshotLog, $false, $utf8NoBom
+    try {
+        $writer.WriteLine("OTGW REST snapshot - firmware state after the capture stopped")
+        $writer.WriteLine("Generated: $((Get-Date).ToString('o'))")
+        $writer.WriteLine("Device: http://$DeviceHost")
+        $writer.WriteLine("Note: a message id the firmware has never seen reads 0; compare against the OT bus traffic above.")
+        $writer.WriteLine("")
+
+        foreach ($endpoint in $endpoints) {
+            $uri = "http://$DeviceHost$($endpoint.Path)"
+            $writer.WriteLine("--- $($endpoint.Label)  [$($endpoint.Path)]")
+            try {
+                $response = Invoke-WebRequest -Uri $uri -TimeoutSec $TimeoutSeconds -UseBasicParsing -ErrorAction Stop
+                $writer.WriteLine("HTTP $([int]$response.StatusCode)")
+                $writer.WriteLine(($response.Content).Trim())
+            }
+            catch {
+                $writer.WriteLine("ERROR: $($_.Exception.Message)")
+            }
+            $writer.WriteLine("")
+        }
+    }
+    finally {
+        $writer.Flush()
+        $writer.Close()
+        $writer.Dispose()
+    }
+
+    return $SnapshotLog
+}
+
 function New-MergedTranscript {
     param(
         [Parameter(Mandatory = $true)][string]$RunPath,
@@ -922,7 +1007,8 @@ function New-MergedTranscript {
         @{ Title = "OTGW TELNET DEBUG (telnet.log)";  File = "telnet.log" },
         @{ Title = "MQTT BROKER STREAM (mqtt.log)";   File = "mqtt.log" },
         @{ Title = "BROWSER DEVTOOLS (browser.log)";  File = "browser.log" },
-        @{ Title = "DEVICE CRASH LOG (crashlog.log)"; File = "crashlog.log" }
+        @{ Title = "DEVICE CRASH LOG (crashlog.log)"; File = "crashlog.log" },
+        @{ Title = "REST SNAPSHOT (rest-snapshot.log)"; File = "rest-snapshot.log" }
     )
 
     $utf8NoBom = New-Object System.Text.UTF8Encoding -ArgumentList $false
@@ -974,7 +1060,7 @@ function Remove-IntermediateCaptureFiles {
     $transcriptFullPath = [System.IO.Path]::GetFullPath($TranscriptPath)
     $removed = New-Object System.Collections.Generic.List[string]
 
-    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log", "browser.stderr.log", "crashlog.log", "script.error.log")) {
+    foreach ($file in @("summary.txt", "telnet.log", "mqtt.log", "mqtt.stderr.log", "browser.log", "browser.stderr.log", "crashlog.log", "script.error.log", "rest-snapshot.log")) {
         $path = Join-Path -Path $RunPath -ChildPath $file
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             continue
@@ -2030,6 +2116,7 @@ $mqttErrorLog = Join-Path -Path $runPath -ChildPath "mqtt.stderr.log"
 $browserLog = Join-Path -Path $runPath -ChildPath "browser.log"
 $browserErrorLog = Join-Path -Path $runPath -ChildPath "browser.stderr.log"
 $crashlogLog = Join-Path -Path $runPath -ChildPath "crashlog.log"
+$restSnapshotLog = Join-Path -Path $runPath -ChildPath "rest-snapshot.log"
 $toolErrorLog = Join-Path -Path $runPath -ChildPath "error.txt"
 $scriptErrorLog = Join-Path -Path $runPath -ChildPath "script.error.log"
 $script:SummaryPath = Join-Path -Path $runPath -ChildPath "summary.txt"
@@ -2371,6 +2458,22 @@ finally {
 
     if ($cancelHandler) {
         [System.Console]::remove_CancelKeyPress($cancelHandler)
+    }
+
+    # Snapshot the firmware's own view now that the live capture has stopped, so the
+    # transcript answers "what does the device believe" alongside "what crossed the bus".
+    if (-not $SkipRestSnapshot) {
+        try {
+            Write-Host "Reading REST snapshot from the device -> rest-snapshot.log"
+            Invoke-RestSnapshot -DeviceHost $DeviceHost -SnapshotLog $restSnapshotLog -TimeoutSeconds 5 | Out-Null
+            Add-SummaryLine "REST snapshot: written to rest-snapshot.log"
+        }
+        catch {
+            Add-SummaryLine "REST snapshot: failed - $($_.Exception.Message)"
+        }
+    }
+    else {
+        Add-SummaryLine "REST snapshot: disabled (-SkipRestSnapshot)."
     }
 
     $captureMetadata = Get-CaptureDeviceMetadata -DeviceHost $DeviceHost -TelnetLog $telnetLog
