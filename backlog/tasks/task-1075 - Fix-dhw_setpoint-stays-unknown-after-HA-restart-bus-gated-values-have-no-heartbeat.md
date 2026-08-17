@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-16 19:49'
-updated_date: '2026-08-17 05:49'
+updated_date: '2026-08-17 17:53'
 labels:
   - bug
   - needs-info
@@ -44,4 +44,18 @@ Needs from reporter: firmware version in use, and a telnet capture showing wheth
 2026-08-16: Robert asked stefan_24213 for a capture in Discord #nederlandse-ondersteuning. Blocked on that reply: no investigation or fix work until the log arrives, since the root cause is code-reading only so far and he may simply be on pre-1.7.4.
 
 2026-08-17: stefan_24213 confirms he runs v1.7.4, so the ADR-088 HA-online republish is already in his build and this is a separate defect, not the fix he was missing. He also reports the capture script crashes after he fills in all the prompts, repeated several times, so no log yet. Robert suggested plain telnet to otgw.local:23 as a fallback.
+
+2026-08-17: analysed a full capture from stefan_24213 (transcript-20260817-081204, 1.7.4+b77304b, 994 KB, ~26 min, telnet + MQTT both present).
+
+Confirmed chain:
+- The DHW control card takes its target temperature from temp_stat_t = OTGW/value/<id>/TdhwSet. Discovery for it is published twice in the capture, so HA does build the entity.
+- OTGW/value/<id>/TdhwSet is never published, not once, in the whole capture.
+- OpenTherm data-id 0x38 (56, TdhwSet) does not appear on his bus at all. Frame histogram over the telnet section: ids 0,1,2,3,5,9,14,16,17,24,25,26,57,116,120,123 are present; 56 is absent. Neighbouring id 57 (MaxTSet) occurs 28 times, so the parse is sound.
+- Tdhw (id 26, current DHW temperature) publishes normally at 27.16-27.20, which is why the card shows a current temperature but no target.
+
+So the entity is not stale, it was never fed. His thermostat/boiler pair simply does not exchange MsgID 56 in normal operation. Manually setting the card to 60 sends SW=60, which makes the value known and publishable, which is exactly the workaround he found.
+
+This sharpens the original hypothesis. ADR-088 republish-on-HA-online resets the publish gates so each value re-publishes "as first-seen", paced by OT bus arrival. For a value that never arrives on the bus, that mechanism can never deliver anything, no matter how often HA restarts. A republish that waits for the bus cannot repair a value the bus does not carry.
+
+Open and not answerable from this capture: whether the firmware holds a last-known TdhwSet in RAM. The device uptime is 468179 s (5.4 days) and the web UI shows 60, which suggests it does, but the capture contains no HA restart (no homeassistant/status transition in 26 minutes), so the republish path was never exercised here. If the firmware does hold the value, the fix is to publish the stored value on HA-online instead of only re-arming the gate.
 <!-- SECTION:NOTES:END -->
