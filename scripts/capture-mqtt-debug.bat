@@ -2143,24 +2143,56 @@ try {
         }
     }
 
-    $mosquitto = Resolve-MosquittoSub -ExplicitPath $MosquittoSubPath -SkipInstall:$SkipToolInstall
-    Add-SummaryLine "mosquitto_sub: $($mosquitto.Path)"
-    Add-SummaryLine "mosquitto_sub source: $($mosquitto.Source)"
-    Add-SummaryLine "Mosquitto installed by script: $($mosquitto.Installed)"
-    Add-SummaryLine "Mosquitto directory added to current PATH: $($mosquitto.CurrentPathAdded)"
-    Add-SummaryLine "Mosquitto directory added to user PATH: $($mosquitto.UserPathAdded)"
+    # The MQTT stream is a bonus; the telnet log is the reason this script exists.
+    # A missing or uninstallable mosquitto_sub used to abort the whole run here,
+    # before telnet had even connected, so the reporter ended up with no capture
+    # at all. Degrade instead: say loudly that MQTT is off, and keep capturing.
+    # An explicit -MosquittoSubPath that does not exist stays fatal, because a
+    # wrong path the user typed themselves should not be silently ignored.
+    $mosquitto = $null
+    if (-not [string]::IsNullOrWhiteSpace($MosquittoSubPath)) {
+        $mosquitto = Resolve-MosquittoSub -ExplicitPath $MosquittoSubPath -SkipInstall:$SkipToolInstall
+    }
+    else {
+        try {
+            $mosquitto = Resolve-MosquittoSub -SkipInstall:$SkipToolInstall
+        }
+        catch {
+            $mosquittoError = $_.Exception.Message
+            Add-SummaryLine "MQTT capture disabled: $mosquittoError"
+            Add-ToolErrorLine -Path $scriptErrorLog -Line "MQTT capture disabled: $mosquittoError"
+            Write-Host ""
+            Write-Host "WARNING: mosquitto_sub is unavailable, so the MQTT broker stream will NOT be captured." -ForegroundColor Yellow
+            Write-Host "  Reason: $mosquittoError" -ForegroundColor Yellow
+            Write-Host "  The telnet capture continues and is usually enough to diagnose a problem." -ForegroundColor Yellow
+            Write-Host "  To capture MQTT too, install Mosquitto from https://mosquitto.org/download/" -ForegroundColor Yellow
+            Write-Host "  and re-run, or point the script at an existing copy:" -ForegroundColor Yellow
+            Write-Host "    capture-mqtt-debug.bat -MosquittoSubPath ""C:\Program Files\mosquitto\mosquitto_sub.exe""" -ForegroundColor Yellow
+            Write-Host ""
+        }
+    }
+
+    if ($mosquitto) {
+        Add-SummaryLine "mosquitto_sub: $($mosquitto.Path)"
+        Add-SummaryLine "mosquitto_sub source: $($mosquitto.Source)"
+        Add-SummaryLine "Mosquitto installed by script: $($mosquitto.Installed)"
+        Add-SummaryLine "Mosquitto directory added to current PATH: $($mosquitto.CurrentPathAdded)"
+        Add-SummaryLine "Mosquitto directory added to user PATH: $($mosquitto.UserPathAdded)"
+    }
 
     $telnetWriter = New-Utf8Writer -Path $telnetLog
-    $mqttProcess = Start-MosquittoSub `
-        -ExecutablePath $mosquitto.Path `
-        -MqttLog $mqttLog `
-        -MqttErrorLog $mqttErrorLog `
-        -HostName $BrokerHost `
-        -Port $BrokerPort `
-        -SubscriptionTopic $Topic `
-        -UserName $Username `
-        -PlainPassword $Password
-    Add-SummaryLine "mosquitto_sub started: pid $($mqttProcess.Id)"
+    if ($mosquitto) {
+        $mqttProcess = Start-MosquittoSub `
+            -ExecutablePath $mosquitto.Path `
+            -MqttLog $mqttLog `
+            -MqttErrorLog $mqttErrorLog `
+            -HostName $BrokerHost `
+            -Port $BrokerPort `
+            -SubscriptionTopic $Topic `
+            -UserName $Username `
+            -PlainPassword $Password
+        Add-SummaryLine "mosquitto_sub started: pid $($mqttProcess.Id)"
+    }
 
     if ($DurationSeconds -gt 0) {
         $deadline = (Get-Date).AddSeconds($DurationSeconds)
@@ -2170,12 +2202,12 @@ try {
     }
 
     Add-SummaryLine "Capture started: $((Get-Date).ToString('o'))"
-    Write-Host "Capturing telnet and MQTT output in $runPath"
+    Write-Host "$(if ($mosquitto) { 'Capturing telnet and MQTT output' } else { 'Capturing telnet output (MQTT disabled)' }) in $runPath"
     Write-Host "Press Q to stop cleanly and leave a transcript timestamp-version-host-uniqueid file. Run with -Help for options."
     Write-Host "Ctrl+C and Ctrl+Break also stop capture; Ctrl+C may still trigger a cmd.exe batch-job prompt."
 
     while (-not (Test-CaptureStopRequested) -and (Get-Date) -lt $deadline) {
-        if ($mqttProcess.HasExited) {
+        if ($mqttProcess -and $mqttProcess.HasExited) {
             Add-SummaryLine "mosquitto_sub exited during capture with code $($mqttProcess.ExitCode)."
             break
         }
