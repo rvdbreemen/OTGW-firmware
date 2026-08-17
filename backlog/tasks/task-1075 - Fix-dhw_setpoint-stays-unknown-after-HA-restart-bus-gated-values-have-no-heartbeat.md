@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-16 19:49'
-updated_date: '2026-08-16 19:54'
+updated_date: '2026-08-17 05:49'
 labels:
   - bug
   - needs-info
@@ -42,4 +42,6 @@ Needs from reporter: firmware version in use, and a telnet capture showing wheth
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-08-16: Robert asked stefan_24213 for a capture in Discord #nederlandse-ondersteuning. Blocked on that reply: no investigation or fix work until the log arrives, since the root cause is code-reading only so far and he may simply be on pre-1.7.4.
+
+2026-08-17: stefan_24213 confirms he runs v1.7.4, so the ADR-088 HA-online republish is already in his build and this is a separate defect, not the fix he was missing. He also reports the capture script crashes after he fills in all the prompts, repeated several times, so no log yet. Robert suggested plain telnet to otgw.local:23 as a fallback.
 <!-- SECTION:NOTES:END -->
