@@ -1,9 +1,11 @@
 ---
 id: TASK-1079
 title: Add a REST value snapshot to the capture script
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-17 20:08'
+updated_date: '2026-08-17 20:10'
 labels:
   - tooling
   - diagnostics
