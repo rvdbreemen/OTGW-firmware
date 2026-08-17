@@ -1,5 +1,5 @@
 ---
-id: TASK-611
+id: TASK-1076
 title: Standalone HA discovery wipe script
 status: Done
 assignee:
