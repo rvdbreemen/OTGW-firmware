@@ -40,7 +40,7 @@ Needed from reporter: the exact error text on screen, and whether logs/mqtt-diag
 - [x] #1 The actual failure is identified from the reporter's error text or a local reproduction, not from the hypothesis above alone
 - [x] #2 A missing mosquitto_sub or missing winget produces a plain actionable message with a manual-install pointer, instead of an unhandled throw
 - [x] #3 A failure between the prompts and the run-folder creation still leaves a diagnosable artefact, or the run folder is created before that window
-- [x] #4 stefan_24213 completes a capture with the fixed script
+- [ ] #4 stefan_24213 completes a capture with the fixed script
 <!-- AC:END -->
 
 ## Implementation Notes
