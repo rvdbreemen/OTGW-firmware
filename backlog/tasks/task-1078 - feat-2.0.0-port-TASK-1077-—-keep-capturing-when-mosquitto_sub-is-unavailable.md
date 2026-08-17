@@ -1,7 +1,7 @@
 ---
 id: TASK-1078
 title: 'feat-2.0.0: port TASK-1077 — keep capturing when mosquitto_sub is unavailable'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-17 06:17'
