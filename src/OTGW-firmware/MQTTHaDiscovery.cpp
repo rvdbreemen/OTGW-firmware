@@ -881,8 +881,8 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     { 18, 0x00, ha_lbl_chpressure, ha_name_water_pressure_in_ch_circuit, HaDeviceClass::none, HaUnit::bar, HaStateClass::measurement, HaIcon::gauge, HaEntityCat::none, true},
     { 18, 0x07, ha_lbl_chpressure, ha_name_water_pressure_in_ch_circuit, HaDeviceClass::pressure, HaUnit::bar, HaStateClass::measurement, HaIcon::gauge, HaEntityCat::none, true},
     // --- OT ID 19 ---
-    { 19, 0x00, ha_lbl_dhwflowrate, ha_name_water_flow_rate_in_dhw_circuit, HaDeviceClass::none, HaUnit::l_min, HaStateClass::measurement, HaIcon::water, HaEntityCat::none, true},
-    { 19, 0x07, ha_lbl_dhwflowrate, ha_name_water_flow_rate_in_dhw_circuit_2, HaDeviceClass::none, HaUnit::l_min, HaStateClass::measurement, HaIcon::water, HaEntityCat::none, true},
+    { 19, 0x00, ha_lbl_dhwflowrate, ha_name_water_flow_rate_in_dhw_circuit, HaDeviceClass::water, HaUnit::l_min, HaStateClass::measurement, HaIcon::water, HaEntityCat::none, true},
+    { 19, 0x07, ha_lbl_dhwflowrate, ha_name_water_flow_rate_in_dhw_circuit_2, HaDeviceClass::water, HaUnit::l_min, HaStateClass::measurement, HaIcon::water, HaEntityCat::none, true},
     // --- OT ID 20 ---
     { 20, 0x00, ha_lbl_daytime_dayofweek, ha_name_daytime_dayofweek, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::calendar, HaEntityCat::none, true},
     { 20, 0x00, ha_lbl_daytime_hour, ha_name_daytime_hour, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::calendar, HaEntityCat::none, true},
