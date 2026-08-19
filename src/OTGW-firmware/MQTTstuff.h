@@ -141,6 +141,7 @@ enum class HaDeviceClass : uint8_t {
     temperature,        // "temperature"
     pressure,           // "pressure"
     humidity,           // "humidity"
+    water,              // "water"
     power,              // "power"
     power_factor,       // "power_factor"
     energy,             // "energy"
