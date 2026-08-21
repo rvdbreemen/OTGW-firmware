@@ -3,10 +3,11 @@ id: TASK-1075
 title: >-
   Fix: dhw_setpoint stays unknown after HA restart (bus-gated values have no
   heartbeat)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-16 19:49'
-updated_date: '2026-08-21 18:52'
+updated_date: '2026-08-21 19:07'
 labels:
   - bug
   - needs-info
@@ -37,6 +38,33 @@ Needs from reporter: firmware version in use, and a telnet capture showing wheth
 - [ ] #3 Fix does not introduce a publish flood: republish stays paced, consistent with ADR-088
 - [ ] #4 Reporter confirms the fix on his own system
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Option B, scalar-only replay of stored values on HA-online. ADR first (supersedes ADR-088), no code before maintainer approval.
+
+1. ADR (Proposed): replay stored scalar values on HA-online instead of only re-arming the publish gates. Must address pacing, because ADR-088 Consequences explicitly rest on "the burst is paced by OpenTherm bus arrival rather than emitted synchronously".
+
+2. New function republishStoredScalarValues(), called from the homeassistant/status offline->online handler alongside the existing requestMQTTRepublishAll().
+   - Set: the 16 restLastUpdated slots MINUS REST_UPDATED_STATUSFLAGS and REST_UPDATED_ASFFLAGS = 14 scalar MsgIDs. The two status words fan out to bit topics and already have their own force path via requestMQTTStatusRepublish() (OTGW-Core.ino:1365-1369).
+   - Seen-gate: getMsgLastUpdated(id) != 0. Sound: TRACKED_TIME_UNSEEN is 0xFFFF and currentTrackedSeconds() ranges [0,65534], so no collision (OTGW-Core.ino:341-342).
+   - Value: getOTGWValue(id), which formats from OTcurrentSystemState and needs no OTdata. Copy into a local immediately: it returns a shared static char[32] and the publish path can yield.
+   - Topic: messageIDToString(id) into a local char[OT_TOPIC_LEN], same as print_f88 does at OTGW-Core.ino:2004.
+   - Publish: sendMQTTData(topic, msg). Master topic only; publishToSourceTopic deliberately not called in this change.
+   - Pacing: static cursor, one MsgID per doBackgroundTasks tick behind the existing heap gate. No synchronous loop.
+   - mqttlastsent[] deliberately not updated; at worst the next real frame republishes once as first-seen.
+
+3. Do NOT reuse decodeAndPublishStatusAndConfigValue(). It routes through print_f88, which reads the global OTdata frame rather than its argument (OTGW-Core.ino:1977), so it is frame-bound and would publish the wrong value off-frame.
+
+4. Bench reproduction on the Docker Mosquitto rig, no boiler needed: send SW=60 to populate TdhwSet, publish homeassistant/status offline then online, assert OTGW/value/<id>/TdhwSet appears. This is the AC #2 pass/fail.
+
+5. python build.py --firmware exit 0 + python evaluate.py --quick no new failures.
+
+6. AC #4 needs stefan_24213 to confirm on his own system, so this task stays In Progress after the code is green.
+
+Open for maintainer: whether the 2.0.0 worktree gets a sibling task (MQTT/HA contract change, CLAUDE.md says almost always yes).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
