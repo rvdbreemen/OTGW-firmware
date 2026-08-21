@@ -3,14 +3,14 @@ id: TASK-1075
 title: >-
   Fix: dhw_setpoint stays unknown after HA restart (bus-gated values have no
   heartbeat)
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-08-16 19:49'
-updated_date: '2026-08-21 19:07'
+updated_date: '2026-08-21 19:47'
 labels:
   - bug
-  - needs-info
+  - wontfix-pending
 dependencies: []
 references:
   - 'Discord #nederlandse-ondersteuning'
@@ -114,4 +114,10 @@ The open question is now answered. The firmware DOES hold the value.
 Consequence for the two options on file: the branch "if the snapshot shows messages/56 value 0.000, neither option helps" is ruled out. The gateway knows 60 C, keeps knowing it, and still cannot deliver it to HA across a restart. Option A (retained state topics) and Option B (republish the stored value on HA-online) both remain viable, and the hard constraint about never publishing an unseen value is not violated by either, since this value is seen.
 
 AC #1 is met by this capture: root cause confirmed against reporter data rather than code reading. Not flipping it here because the fix decision and ADR still need the maintainer.
+
+2026-08-21: maintainer decided not to fix this. Status set back to To Do and unassigned; the implementation plan stays on the task as the record of what the fix would have been, should this come back.
+
+What is settled and does not need redoing if it does come back: root cause confirmed against two of the reporter捕 captures, the gateway holds TdhwSet 60 C across an HA restart, MsgID 56 is absent from his bus, and getOTGWValue + restLastUpdated are the frame-independent primitives a fix would use. decodeAndPublishStatusAndConfigValue is NOT usable (frame-bound via global OTdata).
+
+Not done: no ADR written, no code, no 2.0.0 sibling task. Reporter has a working workaround (set the DHW card to 60 manually, which sends SW=60).
 <!-- SECTION:NOTES:END -->
