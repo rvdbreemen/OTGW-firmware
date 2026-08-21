@@ -4,8 +4,7 @@ title: >-
   Fix: dhw_setpoint stays unknown after HA restart (bus-gated values have no
   heartbeat)
 status: To Do
-assignee:
-  - '@claude'
+assignee: []
 created_date: '2026-08-16 19:49'
 updated_date: '2026-08-21 19:47'
 labels:
