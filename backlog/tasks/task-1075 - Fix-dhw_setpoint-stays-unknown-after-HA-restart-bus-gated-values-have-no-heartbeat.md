@@ -6,10 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-16 19:49'
-updated_date: '2026-08-21 19:47'
+updated_date: '2026-08-21 19:48'
 labels:
   - bug
-  - wontfix-pending
+  - wontfix
 dependencies: []
 references:
   - 'Discord #nederlandse-ondersteuning'
@@ -120,3 +120,23 @@ What is settled and does not need redoing if it does come back: root cause confi
 
 Not done: no ADR written, no code, no 2.0.0 sibling task. Reporter has a working workaround (set the DHW card to 60 manually, which sends SW=60).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+WON'T DO. Maintainer decided on 2026-08-21 not to fix this.
+
+What was reported: stefan_24213, Discord #nederlandse-ondersteuning, 2026-08-14. After a Home Assistant restart the DHW control card falls back to 21 C and dhw_setpoint stays unknown, while the OTGW web UI shows 60 C.
+
+Diagnosis is complete and confirmed against two of his captures (2026-08-17 and 2026-08-21, the latter containing a real homeassistant/status offline-to-online transition plus the TASK-1079 REST snapshot):
+- MsgID 56 (TdhwSet) never appears on his OT bus. Frame histogram: 0,1,2,3,5,9,14,16,17,24,25,26,57,116,120,123 present, 56 absent, in both captures.
+- The gateway does hold the value. REST /api/v2/otgw/messages/56 returns 60.000, gated behind getMsgLastUpdated(), so it is learned rather than a default.
+- OTGW/value/<id>/TdhwSet is never published, before or after the HA-online transition. ADR-088 republish only re-arms the publish gates and then waits for a bus frame that never comes.
+- The 21 C is Home Assistant filling in an empty temp_stat_t. The card declares min_temp 40, so 21 is not a value the gateway could ever send.
+
+Workaround, confirmed working by the reporter: set the DHW card to 60 by hand, which sends SW=60 over the bus and makes the value publishable.
+
+The implementation plan for the fix that was not built remains on the task. Key facts for anyone reopening this: getOTGWValue() plus restLastUpdated[] are the frame-independent primitives to use; decodeAndPublishStatusAndConfigValue() is not usable because it routes through print_f88, which reads the global OTdata frame rather than its argument (OTGW-Core.ino:1977). Any fix supersedes ADR-088 and needs an ADR plus a decision on a 2.0.0 sibling task.
+
+No ADR written, no code changed, no sibling task created.
+<!-- SECTION:FINAL_SUMMARY:END -->
