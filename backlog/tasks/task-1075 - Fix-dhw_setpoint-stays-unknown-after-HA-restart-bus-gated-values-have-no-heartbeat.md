@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-16 19:49'
-updated_date: '2026-08-17 20:58'
+updated_date: '2026-08-21 18:52'
 labels:
   - bug
   - needs-info
@@ -74,4 +74,16 @@ Recommendation on file: Option A, because it removes machinery instead of refini
 Hard constraint for both: never publish a value that was never seen. Emitting 0 for MsgID 56 would render 0 degrees on the card, which is fabricated data and worse than unknown. The existing TRACKED_TIME_UNSEEN marker is the correct gate.
 
 If the snapshot shows messages/56 value 0.000, neither option helps this reporter: his gateway never learned the setpoint over OpenTherm, the web UI value comes from elsewhere, and the question becomes whether the gateway should request MsgID 56 itself or whether the DHW card should stop promising a target it cannot source.
+
+2026-08-21: analysed transcript-20260821-193910 (1.7.4+b77304b, 11 min, telnet + MQTT + REST snapshot). This is the capture the task was blocked on: it contains a real HA restart AND the TASK-1079 REST snapshot.
+
+The open question is now answered. The firmware DOES hold the value.
+- REST snapshot /api/v2/otgw/messages/56 returns TdhwSet 60.000 C, and otmonitor returns dhwsetpoint 60.000. restAPI.ino:1166 gates that otmonitor entry behind getMsgLastUpdated(OT_TdhwSet), so the entry is only emitted for a message the firmware has actually seen. The 60 C is a learned value, not a default.
+- HA restarted during the capture: homeassistant/status offline followed by online in the MQTT stream. The ADR-088 republish path was therefore exercised.
+- OTGW/value/<id>/TdhwSet was still never published, not once, before or after the HA-online transition. The only occurrences of TdhwSet in the MQTT stream are the discovery config for the sensor and the dhw_control climate config whose temp_stat_t points at that topic.
+- MsgID 56 is again absent from the bus. Frame histogram over the telnet section: ids 0,1,2,3,5,9,14,16,17,24,25,26,57,116,120,123 present, 56 absent. Same as the 2026-08-17 capture, so this is his steady state and not a sampling artefact.
+
+Consequence for the two options on file: the branch "if the snapshot shows messages/56 value 0.000, neither option helps" is ruled out. The gateway knows 60 C, keeps knowing it, and still cannot deliver it to HA across a restart. Option A (retained state topics) and Option B (republish the stored value on HA-online) both remain viable, and the hard constraint about never publishing an unseen value is not violated by either, since this value is seen.
+
+AC #1 is met by this capture: root cause confirmed against reporter data rather than code reading. Not flipping it here because the fix decision and ADR still need the maintainer.
 <!-- SECTION:NOTES:END -->
