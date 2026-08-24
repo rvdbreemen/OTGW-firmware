@@ -145,6 +145,8 @@ enum class HaDeviceClass : uint8_t {
     power_factor,       // "power_factor"
     energy,             // "energy"
     carbon_dioxide,     // "carbon_dioxide"
+    volume_flow_rate,   // "volume_flow_rate" (a rate, e.g. l/min — not "water",
+                        // which HA reserves for a cumulative volume in L/m3/gal)
     _count
 };
 
