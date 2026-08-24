@@ -4292,17 +4292,37 @@ void processOT(const char *buf, int len){
               thermostatFileDirty = true;
             }
           }
-        } else {
+        } else if (!(OTdata.rsptype == OTGW_ANSWER_THERMOSTAT && OTdata.bAnswerOverride)) {
           // Slave frame — track boiler-side response classification.
+          //
+          // The masterslave bit alone is not enough to call a frame boiler
+          // evidence: a gateway-generated override answer to the thermostat is
+          // a type-7 with masterslave==1, and counting it marked msgids the
+          // boiler had just Write-Acked as "not implemented" (GH #677). A
+          // proxy A with no preceding B still counts, per ADR-075 — the same
+          // distinction is_value_valid_for_master_topic() already makes.
           if (OTdata.type == OT_READ_ACK) {
             if ((boilerAckedRead[idx] & mask) == 0) {
               boilerAckedRead[idx] |= mask;
               boilerFileDirty = true;
             }
+            // A real answer retracts an earlier "unsupported" verdict. Without
+            // this the bitmap is a one-way latch that is persisted and reloaded
+            // at boot, so one bad observation brands the msgid forever.
+            if ((boilerUnsupportedRead[idx] & mask) != 0) {
+              boilerUnsupportedRead[idx] &= ~mask;
+              boilerUnsupportedDirty = true;
+              boilerFileDirty        = true;
+            }
           } else if (OTdata.type == OT_WRITE_ACK) {
             if ((boilerAckedWrite[idx] & mask) == 0) {
               boilerAckedWrite[idx] |= mask;
               boilerFileDirty = true;
+            }
+            if ((boilerUnsupportedWrite[idx] & mask) != 0) {
+              boilerUnsupportedWrite[idx] &= ~mask;
+              boilerUnsupportedDirty = true;
+              boilerFileDirty        = true;
             }
           } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
             // Master direction is read from boilerLastMasterWasWrite (set on
