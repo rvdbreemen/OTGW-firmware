@@ -21,6 +21,12 @@ ordinal: 183000
 GitHub #675 (Jeroenll): DHW Water Flow Rate In DHW Circuit MQTT discovery config lacks device_class: water. Adding it lets the entity be added to the HA Energy dashboard.
 <!-- SECTION:DESCRIPTION:END -->
 
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 DHW flowrate sensor (MsgID 19, both rows) carries device_class: volume_flow_rate, the class HA defines for l/min
+- [ ] #2 device_class: water is NOT set on this sensor, because HA restricts that class to cumulative volume units and would reject an l/min entity
+<!-- AC:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
