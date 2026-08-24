@@ -4271,9 +4271,13 @@ void processOT(const char *buf, int len){
       }
 
       // TASK-685 / TASK-686 / TASK-688: maintain the six per-msgID bitmaps that
-      // describe each side of the OT bus. Dirty flags fire only on 0->1
-      // transitions so the periodic publishers (MQTT every minute, file every
-      // 15 min) do work exactly once per newly-discovered (id, direction).
+      // describe each side of the OT bus. Dirty flags fire on 0->1 transitions
+      // so the periodic publishers (MQTT every minute, file every 15 min) do
+      // work once per newly-discovered (id, direction).
+      // TASK-1080: the unsupported bitmaps also have a 1->0 transition — a
+      // genuine boiler Ack retracts an earlier "does not implement" verdict —
+      // so they are no longer monotonic. The retraction is gated on a real B
+      // frame, which bounds how often it can fire.
       {
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
@@ -4309,7 +4313,16 @@ void processOT(const char *buf, int len){
             // A real answer retracts an earlier "unsupported" verdict. Without
             // this the bitmap is a one-way latch that is persisted and reloaded
             // at boot, so one bad observation brands the msgid forever.
-            if ((boilerUnsupportedRead[idx] & mask) != 0) {
+            //
+            // Retraction deliberately demands stricter evidence than the set:
+            // only a genuine B frame from the boiler. bAnswerOverride alone is
+            // not enough, because it is set only when a B preceded the A — a
+            // gateway that answers the thermostat outright (an SR= response
+            // override, or a synthesised answer) emits (T,A) with no B, so the
+            // flag stays false and such a frame would otherwise clear a verdict
+            // the boiler really gave. Setting stays permissive so a proxy A
+            // still counts as boiler evidence (ADR-075).
+            if (OTdata.rsptype == OTGW_BOILER && (boilerUnsupportedRead[idx] & mask) != 0) {
               boilerUnsupportedRead[idx] &= ~mask;
               boilerUnsupportedDirty = true;
               boilerFileDirty        = true;
@@ -4319,7 +4332,8 @@ void processOT(const char *buf, int len){
               boilerAckedWrite[idx] |= mask;
               boilerFileDirty = true;
             }
-            if ((boilerUnsupportedWrite[idx] & mask) != 0) {
+            // Same stricter rule as the read side above: only a genuine B.
+            if (OTdata.rsptype == OTGW_BOILER && (boilerUnsupportedWrite[idx] & mask) != 0) {
               boilerUnsupportedWrite[idx] &= ~mask;
               boilerUnsupportedDirty = true;
               boilerFileDirty        = true;
