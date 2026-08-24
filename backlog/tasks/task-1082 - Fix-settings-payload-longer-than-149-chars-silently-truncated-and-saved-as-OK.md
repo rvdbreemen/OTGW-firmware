@@ -1,9 +1,11 @@
 ---
 id: TASK-1082
 title: 'Fix: settings payload longer than 149 chars silently truncated and saved as OK'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-24 19:03'
+updated_date: '2026-08-24 19:04'
 labels:
   - bug
 dependencies: []
@@ -19,8 +21,8 @@ Found while investigating the Discord webhook report (marceld91d, 2026-08-24). p
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 extractJsonField returns false when a quoted value does not fit the destination buffer, instead of returning a truncated value with true
-- [ ] #2 postSettings accepts the full 200-character payload and surfaces a 400 error via sendApiError when the value is too long, instead of reporting Saved
-- [ ] #3 A host-compiled validation harness exercises the real extractJsonField (not a copy) and demonstrably fails before the fix and passes after
-- [ ] #4 All callers of extractJsonField audited for the changed return contract; any behaviour change outside this defect documented
+- [x] #1 extractJsonField returns false when a quoted value does not fit the destination buffer, instead of returning a truncated value with true
+- [x] #2 postSettings accepts the full 200-character payload and surfaces a 400 error via sendApiError when the value is too long, instead of reporting Saved
+- [x] #3 A host-compiled validation harness exercises the real extractJsonField (not a copy) and demonstrably fails before the fix and passes after
+- [x] #4 All callers of extractJsonField audited for the changed return contract; any behaviour change outside this defect documented
 <!-- AC:END -->
