@@ -26,4 +26,7 @@ GitHub #677 (RonVervoort): after firmware update, thermostat's real room temp (M
 <!-- AC:BEGIN -->
 - [x] #1 Root cause of Tr (MsgID 24) value being zeroed in the write-forward path identified
 - [x] #2 Gateway no longer reports false Unknown-Data-Id / not-implemented for MsgID 24 when boiler acks correctly
+- [ ] #3 The zeroed R-frame and the 0.00 canonical Tr are documented as NOT ESP-side defects: frame relay is the PIC's job, and canonical carrying the boiler-side worldview is ADR-069 by design
+- [ ] #4 A previously persisted false unsupported bit self-heals on live traffic without the user deleting /ot-boiler.json
+- [ ] #5 RonVervoort confirms 24W no longer appears in retained otgw-firmware/boiler/unsupported_msgids
 <!-- AC:END -->
