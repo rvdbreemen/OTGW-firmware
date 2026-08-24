@@ -1,6 +1,6 @@
 /*********
 **  Program  : webhook.ino
-**  Version  : v2.0.0-alpha.354
+**  Version  : v2.0.0-alpha.355
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -100,7 +100,9 @@ static bool isLocalUrl(const char* url) {
 // Supported variables:
 //   {state}      — "ON" or "OFF" (the current trigger-bit state)
 //   {tboiler}    — boiler flow temperature (°C, 1 decimal)
-//   {tr}         — room temperature (°C, 1 decimal)
+//   {tr}         — room temperature (°C, 1 decimal), or the JSON literal
+//                  null while no room temperature has ever been observed
+//                  (OTcurrentSystemState.Tr is NAN-init per TASK-522)
 //   {tset}       — CH water setpoint (°C, 1 decimal)
 //   {tdhw}       — DHW temperature (°C, 1 decimal)
 //   {relmod}     — relative modulation level (%, 0 decimals)
@@ -115,6 +117,8 @@ static bool isLocalUrl(const char* url) {
 // relay such as a Node-RED flow or Home Assistant webhook automation, as
 // this device only makes outbound HTTP calls to local-network hosts.
 //=======================================================================
+// ==== host-testable payload expander: BEGIN ==== (extracted verbatim by
+// test/host/build_and_run.ps1 - do not remove or reword these two sentinels)
 static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool stateOn) {
   bool truncated = false;
   size_t di = 0;
@@ -136,7 +140,12 @@ static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool state
     char val[16] = "";
     if      (strcmp_P(varName, PSTR("state"))      == 0) { snprintf_P(val, sizeof(val), stateOn ? PSTR("ON") : PSTR("OFF")); }
     else if (strcmp_P(varName, PSTR("tboiler"))    == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tboiler); }
-    else if (strcmp_P(varName, PSTR("tr"))         == 0) { if (isnan(OTcurrentSystemState.Tr)) strlcpy_P(val, PSTR("--"), sizeof(val)); else snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tr); }
+    // {tr} sits in a NUMERIC position in the documented template {"tr":{tr}},
+    // so the "no reading yet" placeholder must be the JSON literal null. The
+    // earlier "--" produced {"tr":--}, which no JSON parser accepts. Tr is the
+    // ONLY NAN-initialised field in OTcurrentSystemState (OTGW-Core.h:73,
+    // TASK-522); every other numeric variable below is 0.0f-init and never NAN.
+    else if (strcmp_P(varName, PSTR("tr"))         == 0) { if (isnan(OTcurrentSystemState.Tr)) strlcpy_P(val, PSTR("null"), sizeof(val)); else snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tr); }
     else if (strcmp_P(varName, PSTR("tset"))       == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.TSet); }
     else if (strcmp_P(varName, PSTR("tdhw"))       == 0) { snprintf_P(val, sizeof(val), PSTR("%.1f"), OTcurrentSystemState.Tdhw); }
     else if (strcmp_P(varName, PSTR("relmod"))     == 0) { snprintf_P(val, sizeof(val), PSTR("%.0f"), OTcurrentSystemState.RelModLevel); }
@@ -160,6 +169,7 @@ static bool expandPayload(const char* tmpl, char* out, size_t outLen, bool state
   out[di] = '\0';
   return truncated;
 }
+// ==== host-testable payload expander: END ====
 
 //=======================================================================
 // ADR-123 Phase-4 webhook sender task plumbing. WebhookJob (the value-copy

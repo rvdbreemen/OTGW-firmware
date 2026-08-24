@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : jsonStuff
-**  Version  : v2.0.0-alpha.354
+**  Version  : v2.0.0-alpha.355
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -744,6 +744,8 @@ void sendJsonSettingObj(const __FlashStringHelper* cName, bool bValue, const cha
 // cases incl. key-in-value, escapes, \u, truncation, adversarial no-throw).
 // Not safe from ISR (uses a caller buffer); fine under doBackgroundTasks.
 //=======================================================================
+// ==== host-testable JSON scanner: BEGIN ==== (extracted verbatim by
+// test/host/build_and_run.ps1 - do not remove or reword these two sentinels)
 static inline int xjfHex(char c) {
   if (c >= '0' && c <= '9') return c - '0';
   if (c >= 'a' && c <= 'f') return c - 'a' + 10;
@@ -776,12 +778,15 @@ static inline const char* xjfSkipWs(const char* p) {
   return p;
 }
 // Read a JSON string starting AT the opening '"'. If out!=NULL, write unescaped
-// bytes (NUL-terminated, TRUNCATED to cap-1 = strlcpy semantics, matching the
-// old strlcpy(result, v.as<const char*>(), resultSize)). Truncation never fails
-// the parse: scanning continues to the closing quote so the caller position
-// stays well-formed. Returns pointer PAST the closing '"', or NULL only if
-// unterminated/malformed.
-static const char* xjfReadString(const char* p, char* out, size_t cap) {
+// bytes (NUL-terminated, TRUNCATED to cap-1 = strlcpy semantics). Truncation
+// never fails the PARSE: scanning continues to the closing quote so the caller
+// position stays well-formed. When truncated!=NULL it is set true iff at least
+// one byte did not fit, so a caller that must not silently shorten a value
+// (extractJsonFieldImpl on a matched key) can reject instead of storing half a
+// value while reporting success. Returns pointer PAST the closing '"', or NULL
+// only if unterminated/malformed.
+static const char* xjfReadString(const char* p, char* out, size_t cap, bool* truncated) {
+  if (truncated) *truncated = false;
   if (*p != '"') return NULL;
   p++;
   size_t oi = 0;
@@ -856,6 +861,7 @@ static const char* xjfReadString(const char* p, char* out, size_t cap) {
   }
   if (*p != '"') return NULL;                       // unterminated
   if (out) out[oi] = '\0';
+  if (truncated) *truncated = full;
   return p + 1;
 }
 // Skip a value that begins at '{' or '['; balanced, respecting string contents
@@ -865,7 +871,7 @@ static const char* xjfSkipValue(const char* p) {
   int depth = 0;
   while (*p) {
     char c = *p;
-    if (c == '"') { p = xjfReadString(p, NULL, 0); if (!p) return NULL; continue; }
+    if (c == '"') { p = xjfReadString(p, NULL, 0, NULL); if (!p) return NULL; continue; }
     if (c == '{' || c == '[') { depth++; p++; continue; }
     if (c == '}' || c == ']') { depth--; p++; if (depth == 0) return p; continue; }
     p++;
@@ -886,15 +892,28 @@ static bool extractJsonFieldImpl(const char* json, const char* key,
     if (*p == '}' || *p == '\0') return false;      // end of object: not found
     if (*p != '"') return false;                    // malformed at key position
     char kbuf[48];
-    const char* after = xjfReadString(p, kbuf, sizeof(kbuf));
+    // A key longer than kbuf-1 is truncated on purpose: it simply cannot match
+    // any real setting name, and truncating keeps the scan position valid so a
+    // later key in the same object is still found.
+    const char* after = xjfReadString(p, kbuf, sizeof(kbuf), NULL);
     if (!after) return false;
     p = xjfSkipWs(after);
     if (*p != ':') return false;
     p = xjfSkipWs(p + 1);
     bool match = (strcmp(kbuf, key) == 0);
     if (*p == '"') {                                // string value
-      if (match) return (xjfReadString(p, result, resultSize) != NULL);
-      const char* np = xjfReadString(p, NULL, 0);   // skip wholesale
+      if (match) {
+        // A value that does not fit is an ERROR, not a silent shortening: the
+        // caller would otherwise store half a value and report success.
+        // On the unterminated-string exit xjfReadString returns before writing
+        // its NUL, so `result` can hold un-terminated bytes: re-empty it here,
+        // otherwise a caller that only tests result[0] reads past the end.
+        bool trunc = false;
+        if (xjfReadString(p, result, resultSize, &trunc) == NULL) { result[0] = '\0'; return false; }
+        if (trunc) { result[0] = '\0'; return false; }
+        return true;
+      }
+      const char* np = xjfReadString(p, NULL, 0, NULL);   // skip wholesale
       if (!np) return false;
       p = np;
     } else if (*p == '{' || *p == '[') {            // container value
@@ -909,7 +928,9 @@ static bool extractJsonFieldImpl(const char* json, const char* key,
       size_t len = (size_t)(p - start);
       if (match) {
         if (len == 4 && strncmp_P(start, PSTR("null"), 4) == 0) return false;
-        if (len > resultSize - 1) len = resultSize - 1;   // strlcpy-style truncation
+        // Same rule as the string branch: a token that does not fit is an
+        // error, never a silent shortening (a halved number is a wrong number).
+        if (len > resultSize - 1) return false;
         memcpy(result, start, len);
         result[len] = '\0';
         return true;
@@ -934,6 +955,7 @@ bool extractJsonField(const String& json, const __FlashStringHelper* key,
                       char* result, size_t resultSize) {
   return extractJsonField(json.c_str(), key, result, resultSize);
 }
+// ==== host-testable JSON scanner: END ====
 
 //=======================================================================
 // Read one "key":"value" string pair from a flat JSON object file.

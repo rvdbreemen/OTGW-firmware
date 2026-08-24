@@ -79,7 +79,7 @@ OpenTherm values:
 |----------------|---------------------------------|------------------|
 | `{state}`      | Current trigger-bit state       | `ON` or `OFF`    |
 | `{tboiler}`    | Boiler flow water temperature   | `72.5`           |
-| `{tr}`         | Room temperature                | `20.1`           |
+| `{tr}`         | Room temperature                | `20.1` or `null` |
 | `{tset}`       | CH water temperature setpoint   | `75.0`           |
 | `{tdhw}`       | DHW (hot water) temperature     | `55.3`           |
 | `{relmod}`     | Relative modulation level (%)   | `47`             |
@@ -91,6 +91,12 @@ OpenTherm values:
 Values are formatted with sensible precision (1 decimal for temperatures, 2 for pressure,
 0 for modulation). Booleans are lowercase JSON `true` / `false`. Unknown `{placeholders}`
 are passed through unchanged — useful for catching typos.
+
+`{tr}` expands to the JSON literal `null` until a room temperature has actually been
+observed (`OTcurrentSystemState.Tr` starts as NaN, so a gateway without a thermostat
+never sees one). The body therefore stays parseable in a numeric position such as
+`{"tr":{tr}}`. Every other numeric variable starts at `0.0` and always expands to a
+number.
 
 ---
 

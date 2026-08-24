@@ -356,7 +356,7 @@
 - **Supported Variables**:
   - `{state}` → "ON" or "OFF"
   - `{tboiler}` → boiler flow temp (%.1f)
-  - `{tr}` → room temp (%.1f)
+  - `{tr}` → room temp (%.1f), or the JSON literal `null` while Tr is NaN (never observed)
   - `{tset}` → CH water setpoint (%.1f)
   - `{tdhw}` → DHW temp (%.1f)
   - `{relmod}` → relative modulation level (%.0f %)

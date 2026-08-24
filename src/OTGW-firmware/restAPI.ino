@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.354
+**  Version  : v2.0.0-alpha.355
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1830,7 +1830,13 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       char areaBuf[4], sensorBuf[18];
       areaBuf[0] = '\0'; sensorBuf[0] = '\0';
       extractJsonField(body, F("area"),   areaBuf,   sizeof(areaBuf));
-      extractJsonField(body, F("sensor"), sensorBuf, sizeof(sensorBuf));
+      // 'sensor' is a required member of this body ("" is how a client clears a
+      // mapping, and an empty JSON string still extracts as true). Checking the
+      // return keeps an over-long address a 400 instead of being read as a
+      // clear now that an unfitting value no longer lands truncated.
+      if (!extractJsonField(body, F("sensor"), sensorBuf, sizeof(sensorBuf))) {
+        sendApiError(400, F("Missing or oversized 'sensor' field")); return;
+      }
       if (areaBuf[0] == '\0') { sendApiError(400, F("Missing 'area' field (0-3)")); return; }
       int areaIdx = atoi(areaBuf);
       if (areaIdx < 0 || areaIdx >= 4) { sendApiError(400, F("'area' must be 0-3")); return; }
@@ -4081,10 +4087,17 @@ void postSettings()
     return;
   }
 
-  // 150 bytes covers the largest setting value (settingOTGWcommands, max 128 chars).
-  char newValue[150];
+  // 201 bytes = the largest settings value in the tree, settings.webhook.sPayload
+  // (char[201], i.e. 200 chars + NUL); next largest are sCommands/sError at 129.
+  // extractJsonField's resultSize counts the NUL, so 201 stores a full 200-char
+  // payload byte-identically. The old 150 silently truncated a 201-byte payload
+  // mid-JSON while this handler still answered 200 "Saved".
+  char newValue[201];
   if (!extractJsonField(body, F("value"), newValue, sizeof(newValue))) {
-    webSend(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
+    // extractJsonField returns a bare bool, so "absent" and "too long for the
+    // buffer" are not distinguishable here; one honest 400 covers both rather
+    // than guessing at a 413.
+    webSend(400, F("application/json"), F("{\"error\":\"Missing or oversized value\"}"));
     return;
   }
 

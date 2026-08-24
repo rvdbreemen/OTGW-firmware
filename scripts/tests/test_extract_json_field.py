@@ -4,11 +4,12 @@ Algorithm validation for the hand-rolled inbound JSON field extractor that
 replaces ArduinoJson's deserializeJson in extractJsonField() (TASK-886, full
 ADR-141 revert).
 
-There is NO host C compiler in this environment (only the xtensa cross-toolchain,
-which cannot run on the host), so this Python implementation mirrors the C
-control flow 1:1. It validates the ALGORITHM; the C transcription is then
-syntax-checked by the real esp32 build and exercised on-device by the ~18 POST
-callers. The single property that matters and was broken in the pre-ArduinoJson
+This Python implementation mirrors the C control flow 1:1 and validates the
+ALGORITHM only. For a harness that compiles and runs the ACTUAL C code out of
+jsonStuff.ino on the host, see test/host/build_and_run.ps1 (MSVC from Visual
+Studio Build Tools; the xtensa cross-toolchain cannot run host code). Prefer
+that one when a change must be proven against the shipped bytes rather than
+against a mirror. The single property that matters and was broken in the pre-ArduinoJson
 scanner: a key-looking substring INSIDE a string value must never be matched as
 a key. That is guaranteed here by skipping every value wholesale (strings,
 nested objects, nested arrays) instead of substring-scanning.
@@ -46,15 +47,16 @@ def _put_utf8(out, cp):
         out.append(0x80 | (cp & 0x3F))
 
 
-def _read_string(s, i, out, cap):
+def _read_string(s, i, out, cap, trunc=None):
     """
     s[i] must be the opening '"'. If out is not None, append unescaped bytes,
-    TRUNCATING to cap-1 (strlcpy semantics, matching the old ArduinoJson path
-    via strlcpy(result, v.as<const char*>(), resultSize)). Truncation does NOT
-    fail the parse: scanning continues to the closing quote so the caller's
-    position stays well-formed. A partial multibyte \\u sequence is dropped
-    rather than written half (no invalid UTF-8 tail). Returns index PAST the
-    closing '"', or None only if unterminated/malformed. Mirrors xjf_readString.
+    TRUNCATING to cap-1 (strlcpy semantics). Truncation does NOT fail the parse:
+    scanning continues to the closing quote so the caller's position stays
+    well-formed. When `trunc` is a list, a single bool is appended saying whether
+    anything did not fit, so a caller that must not silently shorten a value can
+    reject instead. A partial multibyte \\u sequence is dropped rather than
+    written half (no invalid UTF-8 tail). Returns index PAST the closing '"', or
+    None only if unterminated/malformed. Mirrors xjf_readString.
     """
     if i >= len(s) or s[i] != '"':
         return None
@@ -123,6 +125,8 @@ def _read_string(s, i, out, cap):
         i += 1
     if i >= len(s) or s[i] != '"':
         return None  # unterminated
+    if trunc is not None:
+        trunc.append(full)
     return i + 1
 
 
@@ -190,8 +194,12 @@ def extract_json_field(json_str, key, cap=64):
         if i < n and s[i] == '"':
             if match:
                 out = []
-                np = _read_string(s, i, out, cap)
+                trunc = []
+                np = _read_string(s, i, out, cap, trunc)
                 if np is None:
+                    return None
+                # a value that does not fit is an ERROR, never a silent shortening
+                if trunc and trunc[0]:
                     return None
                 return bytes(out).decode('utf-8', 'replace')
             np = _read_string(s, i, None, 0)
@@ -213,7 +221,9 @@ def extract_json_field(json_str, key, cap=64):
             if match:
                 if token == 'null':
                     return None
-                return token[:cap - 1]
+                if len(token) > cap - 1:
+                    return None  # same rule: does not fit -> reject
+                return token
         i = _skip_ws(s, i)
         if i < n and s[i] == ',':
             i += 1
@@ -289,33 +299,46 @@ def main():
         else:
             print(f"pass  {desc:32}  -> {ascii(got)}")
 
-    # truncation / overflow safety: value longer than the result buffer must be
-    # truncated to cap-1 (strlcpy semantics), succeed, never overflow, never throw.
+    # overflow safety: a value longer than the result buffer must be REJECTED,
+    # never truncated-and-reported-as-success (the caller cannot tell the
+    # difference and would store half a value). Never overflow, never throw.
     long_val = "x" * 200
     got = extract_json_field('{"k":"' + long_val + '"}', "k", cap=16)
-    if got is None or len(got) != 15:
-        print(f"FAIL  truncation bound (strlcpy)      got len={None if got is None else len(got)} (want 15)")
+    if got is not None:
+        print(f"FAIL  overflow rejected                got={ascii(got)} (want None)")
         fails += 1
     else:
-        print(f"pass  truncation bound (strlcpy)       -> len {len(got)} == 15")
+        print("pass  overflow rejected                -> None")
+
+    # ...and a value that fits EXACTLY still succeeds (cap-1 usable bytes).
+    got = extract_json_field('{"k":"' + "x" * 15 + '"}', "k", cap=16)
+    if got != "x" * 15:
+        print(f"FAIL  exact fit accepted               got={ascii(got)} (want 15 x's)")
+        fails += 1
+    else:
+        print("pass  exact fit accepted               -> len 15 == cap-1")
 
     # 4-byte UTF-8 drop-at-cap (L1): a surrogate-pair emoji whose 4-byte expansion
     # would straddle the cap-1 boundary must be dropped WHOLE (no partial 4-byte
     # sequence on the wire), result NUL-terminated and <= cap-1. cap=6 -> "ab"
     # occupies 2, leaving room 3 < 4, so the emoji is dropped and `full` stops "cd".
     # Exercises the need==4 guard in xjf_putUtf8 + the oi==before truncation path.
-    got = extract_json_field('{"k":"ab\\uD83D\\uDE00cd"}', "k", cap=6)
-    if got != "ab":
-        print(f"FAIL  4-byte drop-at-cap              got={ascii(got)} (want 'ab')")
+    # Checked at the _read_string level, because extract_json_field now rejects
+    # any truncated value outright: what matters here is that the buffer holds
+    # "ab" and never a half-written 4-byte sequence.
+    out, trunc = [], []
+    _read_string('"ab\\uD83D\\uDE00cd"', 0, out, 6, trunc)
+    if bytes(out).decode('utf-8', 'replace') != "ab" or not trunc[0]:
+        print(f"FAIL  4-byte drop-at-cap              got={ascii(bytes(out))} trunc={trunc}")
         fails += 1
     else:
-        print(f"pass  4-byte drop-at-cap               -> {ascii(got)} (emoji dropped whole)")
+        print("pass  4-byte drop-at-cap               -> 'ab' (emoji dropped whole, truncation flagged)")
 
     print()
     if fails:
         print(f"RESULT: {fails} FAIL")
         sys.exit(1)
-    print(f"RESULT: all {len(CASES) + 2} pass")
+    print(f"RESULT: all {len(CASES) + 3} pass")
 
 
 if __name__ == "__main__":
