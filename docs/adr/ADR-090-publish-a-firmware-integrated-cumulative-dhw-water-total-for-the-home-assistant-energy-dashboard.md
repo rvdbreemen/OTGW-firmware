@@ -128,11 +128,20 @@ dashboard, and its value is non-decreasing across a graceful reboot of the gatew
 ### Must
 
 * Publish the cumulative total as a separate entity. The existing MsgID 19 rate sensor
-  keeps unit `l/min` and gains `device_class: volume_flow_rate`; it must not be
-  retyped as `water`.
-* Persist the running total across reboot.
+  keeps unit `l/min` and `device_class: volume_flow_rate`; it must not be
+  retyped as `water`. (Already satisfied by TASK-1081.)
+* Accumulate as **elapsed time × flow**, never as a fixed volume per sample. This is
+  what makes the count independent of how many frames happen to carry the same
+  reading, and it is mandated identically on the 2.0.0 peer so both firmwares report
+  the same total for the same boiler.
+* Persist the running total across reboot, in its own small file rather than in
+  `settings.ini`: `writeSettings()` rewrites the whole settings blob, so a counter
+  update would drag WiFi credentials through a power-loss window.
 * Bound the LittleFS write rate with an explicit rule rather than writing on every
   publish.
+* Register the new entity in the boot-publish path for non-OT discovery configs if it
+  is given a faux message id, or it will be absent in Home Assistant until the first
+  value arrives.
 * State the sampling limitation in user-facing documentation for the new entity, so
   the number is not mistaken for a metrologically valid water meter.
 
@@ -141,6 +150,9 @@ dashboard, and its value is non-decreasing across a graceful reboot of the gatew
 * Set `device_class: water` on any sensor whose unit is not one of
   `L, gal, m³, ft³, CCF, MCF`.
 * Write the persisted counter to flash on every MQTT publish.
+* Accumulate a fixed volume per received sample. MsgID 19 can legitimately arrive
+  more than once per real exchange, so per-sample accumulation makes the total a
+  function of frame traffic rather than of water.
 * Introduce the `String` class in the integration or publish path (ADR-004).
 
 ### Exceptions
@@ -217,7 +229,7 @@ dashboard, and its value is non-decreasing across a graceful reboot of the gatew
       without naming values. This must be verified against Home Assistant source or a
       live instance before acceptance; the Confirmation section currently assumes
       `total_increasing`.
-- [ ] What is the concrete flash-write rule? Candidates: a delta-litres threshold, a
+- [x] What is the concrete flash-write rule? Candidates: a delta-litres threshold, a — **Answered 2026-08-24 by User: Robert van den Breemen:** Rule: write when delta >= 10 L, OR when 15 minutes have elapsed AND delta > 0, plus one write on graceful reboot. Bounds unclean-reboot loss to 10 L and the write rate to at most 96/day worst case, typically about 8/day. Wear is NOT the deciding factor. Naive single-sector arithmetic (100000 cycles / 120 writes per day = 2.3 years) does not apply because LittleFS wear-levels across the partition; a small dedicated file survives on the order of a century even at a 1 L cadence. Assumptions labelled: 120 L/day household DHW draw (external, no repo source) and 100000 erase cycles (industry-standard NOR figure, no datasheet read). The choice is therefore made on failure mode, not endurance: keep the counter out of settings.ini so a counter write never drags WiFi credentials through a power-loss window; use its own small file. Analysis performed on the 2.0.0 tree where the SAT precedents live; the conclusion is platform-independent, but the ESP8266 partition sizes should be confirmed before implementation here.
       minimum interval floor, or both, plus a write on graceful reboot. The chosen
       numbers must be justified against an estimated erase-cycle budget, not picked by
       feel.
@@ -228,9 +240,9 @@ dashboard, and its value is non-decreasing across a graceful reboot of the gatew
 - [x] How is the integration performed between two sparse samples — last-value hold, — **Answered 2026-08-24 by User: Robert van den Breemen:** Zero-hold, counting only across intervals bounded by a non-zero flow reading, with the usable interval capped at a maximum so a long sampling gap cannot invent litres. This biases the total to UNDER-count, which is the safe direction for a figure users will read as a meter. Last-value hold and trapezoidal were both rejected because across a long gap they invent flow that never happened. The same method is mandated on the 2.0.0 peer so both firmwares report the same total for the same boiler. Decided by the maintainer.
       trapezoidal, or zero-hold — and what is the error characteristic of the chosen
       method when the gap is minutes rather than seconds?
-- [ ] Is the counter user-resettable, and if so through which surface (REST, MQTT
+- [x] Is the counter user-resettable, and if so through which surface (REST, MQTT — **Answered 2026-08-24 by User: Robert van den Breemen:** Yes, through a paired REST and MQTT surface, matching whichever paired reset idiom exists on this line. The S0 pulse counter is NOT a usable precedent: it is a plain RAM global that is never persisted and has no reset, so it starts at zero every boot. The reset must zero the RAM counter AND the persisted file in one operation and immediately publish 0, so Home Assistant records a clean total_increasing reset rather than a partial regression. The exact 1.x route and MQTT command surface must be confirmed against this tree before implementation; the pattern was derived on the 2.0.0 tree.
       command, web UI)? A meter with no reset is awkward after a boiler change.
-- [ ] Measured RAM and flash cost of the counter plus the new discovery entity, to
+- [x] Measured RAM and flash cost of the counter plus the new discovery entity, to — **Answered 2026-08-24 by User: Robert van den Breemen:** ESTIMATE, not measured: about 20 bytes of RAM and roughly 500-800 bytes of flash. RAM breakdown assumes accumulating in millilitres as uint32_t rather than float litres (exact, no drift, range 4.29 M L): total, last-sample timestamp, last flow, last-persisted value, last-persist timestamp, 4 bytes each. No persistence buffer is needed if the write uses a stack-local buffer as the SAT energy persister does. Flash: about 28 bytes for one discovery table row (derived from struct layout with 4-byte pointers, not compiled), plus label and friendly-name strings, plus the new device-class and unit cases, giving about 100 bytes for the entity; the integration and persistence logic is the remaining 400-700. The measurement that would settle it is two builds of the same environment differing only by this change, diffed on binary size or on -Wl,-Map section totals. That was not run.
       confirm the change is affordable under ADR-030's headroom policy.
 
 ## Related Decisions
