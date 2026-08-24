@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-24 18:12'
-updated_date: '2026-08-24 20:04'
+updated_date: '2026-08-24 20:08'
 labels:
   - enhancement
 dependencies: []
@@ -23,6 +23,6 @@ GitHub #675 (Jeroenll): DHW Water Flow Rate In DHW Circuit MQTT discovery config
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 DHW flowrate sensor discovery config includes device_class: water
+- [x] #1 DHW flowrate sensor discovery config includes device_class: water
 - [ ] #2 Entity remains selectable/usable in HA Energy dashboard water section
 <!-- AC:END -->
