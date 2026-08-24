@@ -562,7 +562,9 @@ void sendJsonSettingObj(const __FlashStringHelper* cName, bool bValue, const cha
 //   - Bool literals:  {"key":true}     → result = "true"
 //   - Numbers:        {"key":42}       → result = "42"
 // 'key' is a PROGMEM string (use F() macro at call site).
-// Returns true if the field was found and result was populated.
+// Returns true if the field was found and the FULL value fitted in result.
+// Returns false when the field is missing, malformed, or longer than
+// resultSize-1: a truncated value is never reported as success.
 // NOTE: Uses cMsg as scratch for building the search pattern.
 //       Safe: String::indexOf() does not yield, so cMsg cannot be clobbered mid-use.
 //       Not safe to call from ISR or concurrently.
@@ -587,19 +589,26 @@ bool extractJsonField(const char* json, const __FlashStringHelper* key,
     // Quoted string value — scan for closing quote respecting backslash escapes
     p++; // skip opening quote
     size_t ri = 0;
+    bool overflow = false;
     while (*p != '\0') {
       if (*p == '\\' && *(p + 1) != '\0') {
         p++;
         if (ri < resultSize - 1) result[ri++] = unescapeJsonChar(*p);
+        else                     overflow = true;
         p++;
         continue;
       }
       if (*p == '"') break;
       if (ri < resultSize - 1) result[ri++] = *p;
+      else                     overflow = true;
       p++;
     }
     if (*p != '"') return false; // no closing quote found
     result[ri] = '\0';
+    // The value is longer than the destination. Returning a truncated string
+    // with true is silent data loss: the caller stores half a value and still
+    // reports success. Fail instead, like the unquoted branch below.
+    if (overflow) { result[0] = '\0'; return false; }
     return true;
   } else {
     // Unquoted value: bool literal (true/false) or number

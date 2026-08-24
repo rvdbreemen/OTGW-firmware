@@ -1606,10 +1606,13 @@ void postSettings()
     return;
   }
 
-  // 150 bytes covers the largest setting value (settingOTGWcommands, max 128 chars).
-  char newValue[150];
+  // 201 bytes matches the largest writable setting value, settings.webhook.sPayload[201]
+  // (web UI maxlen 200). Must not be smaller: extractJsonField() rejects a value that
+  // does not fit rather than storing a truncated one.
+  char newValue[201];
   if (!extractJsonField(body, F("value"), newValue, sizeof(newValue))) {
-    httpServer.send(400, F("application/json"), F("{\"error\":\"Missing value\"}"));
+    DebugTf(PSTR("postSettings: field [%s] value missing or too long, rejected\r\n"), field);
+    sendApiError(400, F("Missing value, or value longer than 200 characters"));
     return;
   }
 
