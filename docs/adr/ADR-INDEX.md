@@ -94,3 +94,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-087 | Accepted | `src/OTGW-firmware/OTGW-firmware.ino` | Remove the automatic discovery-verify readback. |
 | ADR-088 | Accepted | - | Chosen option: Option A, because it repairs every gated value through a mechanism the firmware already ships and alre... |
 | ADR-089 | Proposed | - | Chosen option: Option A, because the cost is a per-ADR multiplier rather than a per-call latency, so it belongs on a... |
+| ADR-090 | Proposed | - | Chosen option: Option A, because the maintainer decided that an Energy dashboard figure should work out of the box, w... |

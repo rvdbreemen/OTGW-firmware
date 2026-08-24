@@ -2837,6 +2837,66 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-090",
+      "title": "Publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard",
+      "path": "ADR-090-publish-a-firmware-integrated-cumulative-dhw-water-total-for-the-home-assistant-energy-dashboard.md",
+      "format": "madr",
+      "status": "Proposed",
+      "date": "2026-08-24",
+      "decision_summary": "Chosen option: Option A, because the maintainer decided that an Energy dashboard figure should work out of the box, w...",
+      "topics": [
+        "home-assistant",
+        "mqtt-discovery",
+        "opentherm",
+        "persistence"
+      ],
+      "aliases": [
+        "device_class water energy dashboard",
+        "DHW water total",
+        "MsgID 19 integration"
+      ],
+      "components": [
+        "DHW water total counter",
+        "MQTT HA discovery table"
+      ],
+      "symbols": [
+        "DHWFlowRate",
+        "HaDeviceClass"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Publish the cumulative total as a separate entity. The existing MsgID 19 rate sensor keeps unit l/min and gains deviceclass: volumeflowrate; it must not be retyped as water.",
+          "Persist the running total across reboot.",
+          "Bound the LittleFS write rate with an explicit rule rather than writing on every publish.",
+          "State the sampling limitation in user-facing documentation for the new entity, so the number is not mistaken for a metrologically valid water meter."
+        ],
+        "must_not": [
+          "Set deviceclass: water on any sensor whose unit is not one of L, gal, m³, ft³, CCF, MCF.",
+          "Write the persisted counter to flash on every MQTT publish.",
+          "Introduce the String class in the integration or publish path (ADR-004)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "src/OTGW-firmware/mqttconfiguratie.cpp discovery rows for MsgID 19 and for the new total entity.",
+          "Manual check against a live Home Assistant instance that the entity is offered as an Energy dashboard water source."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -5047,6 +5107,24 @@
       "target": "ADR-100",
       "type": "related",
       "resolved": false
+    },
+    {
+      "source": "ADR-090",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-090",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-090",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
     }
   ]
 }
