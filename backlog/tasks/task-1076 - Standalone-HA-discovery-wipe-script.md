@@ -5,10 +5,12 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-16 08:59'
-updated_date: '2026-05-16 09:10'
+updated_date: '2026-08-24 18:11'
 labels:
   - tooling
 dependencies: []
+references:
+  - 'https://github.com/rvdbreemen/OTGW-firmware/issues/677'
 ---
 
 ## Description
