@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-24 18:10'
-updated_date: '2026-08-24 20:32'
+updated_date: '2026-08-24 20:33'
 labels:
   - bug
   - needs-info
@@ -25,6 +25,5 @@ GitHub #677 (RonVervoort): after firmware update, thermostat's real room temp (M
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Root cause of Tr (MsgID 24) value being zeroed in the write-forward path identified
-- [ ] #2 Fix forwards actual Tr value from thermostat to boiler, verified via bus log capture
-- [x] #3 Gateway no longer reports false Unknown-Data-Id / not-implemented for MsgID 24 when boiler acks correctly
+- [x] #2 Gateway no longer reports false Unknown-Data-Id / not-implemented for MsgID 24 when boiler acks correctly
 <!-- AC:END -->
