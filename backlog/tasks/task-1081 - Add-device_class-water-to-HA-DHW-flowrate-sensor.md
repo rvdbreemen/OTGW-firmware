@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-24 18:12'
-updated_date: '2026-08-24 20:20'
+updated_date: '2026-08-24 20:21'
 labels:
   - enhancement
 dependencies: []
@@ -23,8 +23,8 @@ GitHub #675 (Jeroenll): DHW Water Flow Rate In DHW Circuit MQTT discovery config
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 DHW flowrate sensor (MsgID 19, both rows) carries device_class: volume_flow_rate, the class HA defines for l/min
-- [ ] #2 device_class: water is NOT set on this sensor, because HA restricts that class to cumulative volume units and would reject an l/min entity
+- [x] #1 DHW flowrate sensor (MsgID 19, both rows) carries device_class: volume_flow_rate, the class HA defines for l/min
+- [x] #2 device_class: water is NOT set on this sensor, because HA restricts that class to cumulative volume units and would reject an l/min entity
 <!-- AC:END -->
 
 ## Implementation Notes
