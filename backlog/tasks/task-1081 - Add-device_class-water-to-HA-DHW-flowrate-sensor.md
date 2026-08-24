@@ -1,7 +1,7 @@
 ---
 id: TASK-1081
 title: Add device_class water to HA DHW flowrate sensor
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-24 18:12'
