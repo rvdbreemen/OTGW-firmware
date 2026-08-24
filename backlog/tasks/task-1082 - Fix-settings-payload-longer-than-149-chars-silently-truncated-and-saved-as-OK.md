@@ -9,6 +9,11 @@ updated_date: '2026-08-24 19:04'
 labels:
   - bug
 dependencies: []
+references:
+  - 'Discord #nederlandse-ondersteuning'
+  - marceld91d
+  - '2026-08-24'
+  - msg 1541374278895796284
 priority: medium
 ordinal: 184000
 ---
