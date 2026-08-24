@@ -1,10 +1,11 @@
 ---
 id: TASK-1080
 title: 'Fix: MsgID 24 (Tr) forwarded to boiler as 0.00°C, breaks Tr write path'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-24 18:10'
-updated_date: '2026-08-24 18:11'
+updated_date: '2026-08-24 20:26'
 labels:
   - bug
   - needs-info
