@@ -4,9 +4,12 @@ title: Add device_class water to HA DHW flowrate sensor
 status: To Do
 assignee: []
 created_date: '2026-08-24 18:12'
+updated_date: '2026-08-24 18:13'
 labels:
   - enhancement
 dependencies: []
+references:
+  - 'https://github.com/rvdbreemen/OTGW-firmware/issues/675'
 priority: low
 ordinal: 183000
 ---
