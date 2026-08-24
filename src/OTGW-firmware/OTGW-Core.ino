@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.356
+**  Version  : v2.0.0-alpha.357
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4774,9 +4774,14 @@ void processOT(const char *buf, int len, bool suppressOutput){
 
       // TASK-691 / TASK-692 / TASK-693 port (dev TASK-685/686/688): maintain
       // the six per-msgID bitmaps that describe each side of the OT bus.
-      // Dirty flags fire only on 0->1 transitions so the periodic publishers
-      // (MQTT every minute, file every 15 min) do work exactly once per
+      // Dirty flags fire on 0->1 transitions so the periodic publishers
+      // (MQTT every minute, file every 15 min) do work once per
       // newly-discovered (id, direction).
+      // TASK-1084: the unsupported bitmaps also have a 1->0 transition — a
+      // genuine boiler Ack retracts an earlier "does not implement" verdict —
+      // so they are no longer monotonic. That retraction is gated on a real B
+      // frame, which also stops this line's own synthesised answers from
+      // clearing a verdict, and bounds how often it can fire.
       {
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
@@ -4795,17 +4800,48 @@ void processOT(const char *buf, int len, bool suppressOutput){
               thermostatFileDirty = true;
             }
           }
-        } else {
+        } else if (!(OTdata.rsptype == OTGW_ANSWER_THERMOSTAT && OTdata.bAnswerOverride)) {
           // Slave frame — track boiler-side response classification.
+          //
+          // The masterslave bit alone is not enough to call a frame boiler
+          // evidence: a gateway-generated override answer to the thermostat is
+          // a type-7 with masterslave==1, and counting it marked msgids the
+          // boiler had just Write-Acked as "not implemented" (GH #677). A
+          // proxy A with no preceding B still counts, per ADR-103 — the same
+          // distinction is_value_valid_for_master_topic() already makes.
           if (OTdata.type == OT_READ_ACK) {
             if ((boilerAckedRead[idx] & mask) == 0) {
               boilerAckedRead[idx] |= mask;
               boilerFileDirty = true;
             }
+            // A real answer retracts an earlier "unsupported" verdict. Without
+            // this the bitmap is a one-way latch that is persisted and reloaded
+            // at boot, so one bad observation brands the msgid forever.
+            //
+            // Retraction deliberately demands stricter evidence than the set:
+            // only a genuine B frame from the boiler. bAnswerOverride alone is
+            // not enough, because it is set only when a B preceded the A. This
+            // line answers the thermostat itself in several places — the SR=
+            // response-override table (OTDirect.ino:1966) and master mode
+            // (OTDirect.ino:2503) both emit (T,A) with no B — so the flag stays
+            // false and such a frame would otherwise clear a verdict the boiler
+            // really gave. Setting stays permissive so a proxy A still counts
+            // as boiler evidence (ADR-103).
+            if (OTdata.rsptype == OTGW_BOILER && (boilerUnsupportedRead[idx] & mask) != 0) {
+              boilerUnsupportedRead[idx] &= ~mask;
+              boilerUnsupportedDirty = true;
+              boilerFileDirty        = true;
+            }
           } else if (OTdata.type == OT_WRITE_ACK) {
             if ((boilerAckedWrite[idx] & mask) == 0) {
               boilerAckedWrite[idx] |= mask;
               boilerFileDirty = true;
+            }
+            // Same stricter rule as the read side above: only a genuine B.
+            if (OTdata.rsptype == OTGW_BOILER && (boilerUnsupportedWrite[idx] & mask) != 0) {
+              boilerUnsupportedWrite[idx] &= ~mask;
+              boilerUnsupportedDirty = true;
+              boilerFileDirty        = true;
             }
           } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
             // Master direction is read from boilerLastMasterWasWrite (set on
