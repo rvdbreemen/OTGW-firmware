@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-24 18:10'
-updated_date: '2026-08-24 20:34'
+updated_date: '2026-08-24 21:03'
 labels:
   - bug
   - needs-info
@@ -30,3 +30,17 @@ GitHub #677 (RonVervoort): after firmware update, thermostat's real room temp (M
 - [x] #4 A previously persisted false unsupported bit self-heals on live traffic without the user deleting /ot-boiler.json
 - [ ] #5 RonVervoort confirms 24W no longer appears in retained otgw-firmware/boiler/unsupported_msgids
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-24: adversarial verification (5 independent skeptics + synthesis) found a BLOCKING defect in the first version of this fix, already pushed as a8683414f. Fixed in a follow-up commit.
+
+Defect: the gate tested bAnswerOverride, which is set ONLY when a real B frame preceded the A within 500 ms (OTGW-Core.ino:4242-4252). A gateway that answers the thermostat outright emits (T,A) with no B, so bAnswerOverride stays false, the frame passed the gate, and its Ack CLEARED a genuine boiler 'does not implement' verdict — the exact opposite of the bug being fixed.
+
+Confirmed reachable on 2.0.0 in stock configuration, no user setup: networkStuff.ino:814/820 self-issues SR=21 and SR=22 (date/year) every minute via sendtimecommand(), and OTDirect.ino:1966-1970 then answers every later thermostat read of MsgID 21/22 with a synthesised READ_ACK, explicitly 'don't forward to boiler'. Most boilers do not implement 21/22, so a truthful unsupported bit gets destroyed in RAM, in the retained MQTT CSV and on flash. On 1.x the same shape is plausible via ADR-075's own description of proxy answers but was not confirmed from primary source.
+
+Fix: retraction now demands rsptype == OTGW_BOILER, a genuine B frame. Setting stays permissive so a proxy A still counts as boiler evidence (ADR-075). This is free for the reported bug: GH #677's own log shows B50180000 Write-Ack, a real B, so MsgID 24 still self-heals.
+
+Also corrected the block comment that still claimed the bitmaps are monotonic.
+<!-- SECTION:NOTES:END -->
