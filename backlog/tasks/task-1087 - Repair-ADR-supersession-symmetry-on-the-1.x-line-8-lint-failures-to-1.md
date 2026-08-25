@@ -1,9 +1,11 @@
 ---
 id: TASK-1087
 title: Repair ADR supersession symmetry on the 1.x line (8 lint failures to 1)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-25 07:21'
+updated_date: '2026-08-25 09:07'
 labels:
   - tooling
 dependencies: []
