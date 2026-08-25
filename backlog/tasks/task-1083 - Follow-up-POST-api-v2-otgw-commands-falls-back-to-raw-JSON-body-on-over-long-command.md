@@ -41,3 +41,19 @@ Verified facts:
 
 So this is a status-code change (413 -> 400), not a functional regression. The underlying issue is a design smell: a bool now carries two distinct outcomes (not-found vs too-long) that a fallback caller cannot tell apart. Harmless here; a hazard for the next caller that adds a fallback path. Priority stays low.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Took the second route the AC offered rather than the tri-state redesign: the commands handler no longer takes the raw-body fallback blind.
+
+POST /api/v2/otgw/commands accepts either {"command":"XX=y"} or a bare XX=y body, and used a false return from extractJsonField to mean 'not JSON with a command key'. Since TASK-1082 that helper also returns false when the value does not fit cmdBuf[64], and the fallback could not tell the two apart: on a JSON body with an over-long value it handed the raw JSON to the PIC command path as if it were the command.
+
+The handler now checks whether the body names the key before falling back. If it does, a false return can only mean the value was too long, so it answers 400 with a message that says so. If it does not, the plain-text fallback runs exactly as before.
+
+This deliberately avoids redesigning extractJsonField's return type. A tri-state would touch a shared helper and all three call sites to fix one endpoint whose real-world impact was a status code, and the smaller change makes the error message truthful, which the tri-state would not have improved on.
+
+Verified by walking all four body shapes: valid JSON command, bare text command, JSON with an over-long value, and JSON without a command key. Only the third changes, and it changes from a misleading 'Invalid command format' to an accurate over-length error. Build exit 0, evaluator 35/37 with 0 failures.
+
+Known edge: a plain-text body that literally contains the string "command" now takes the error path instead of the fallback. Both paths already rejected such a body, since it cannot satisfy the two-letter-then-equals shape check within 14 characters.
+<!-- SECTION:FINAL_SUMMARY:END -->
