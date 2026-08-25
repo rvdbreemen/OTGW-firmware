@@ -5,13 +5,12 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-17 05:51'
-updated_date: '2026-08-17 06:12'
+updated_date: '2026-08-22 08:13'
 labels:
   - bug
   - tooling
   - needs-info
-dependencies:
-  - TASK-1075
+dependencies: []
 references:
   - 'Discord #nederlandse-ondersteuning'
   - stefan_24213
