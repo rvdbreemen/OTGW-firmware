@@ -1,8 +1,8 @@
 ---
 id: "ADR-176"
 title: "Publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard"
-status: "Proposed"
-date: "2026-08-24"
+status: "Accepted"
+date: "2026-08-25"
 binding: false
 gate: null
 documents_shipped: false
@@ -34,7 +34,7 @@ format: "madr"
 
 ## Status
 
-Proposed, 2026-08-24.
+Accepted, 2026-08-25.
 
 ## Status History
 
@@ -45,6 +45,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-08-25
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted by the maintainer as the 2.0.0 peer of ADR-090, after all seven open questions were resolved with measured or code-verified answers.
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context and Problem Statement
@@ -78,7 +83,7 @@ Two constraints frame the design on this line:
 - MsgID 19 is not emitted on a timer. It appears only when a master asks for it, so the
   sample stream is sparse and irregular. This is a property of the OpenTherm bus and is
   identical on both firmware lines.
-- This line targets the ESP32-S3, so RAM is far less scarce than on the 1.x ESP8266.
+- This line targets the ESP32-S3, so random-access memory (RAM) is far less scarce than on the 1.x ESP8266.
   Flash-erase wear on the persisted counter remains a real cost, and the OTDirect path
   means MsgID 19 can also originate from this firmware's own master scheduler rather
   than from a PIC-relayed bus observation.
@@ -162,7 +167,7 @@ The entity name, unit and device class match the 1.x line's entity exactly.
 
 * Set `device_class: water` on any sensor whose unit is not one of
   `L, gal, m³, ft³, CCF, MCF`.
-* Write the persisted counter to flash on every MQTT publish.
+* Write the persisted counter to flash on every message-queue telemetry transport (MQTT) publish.
 * Accumulate a fixed volume per received sample. MsgID 19 legitimately arrives more
   than once per real exchange — the OTDirect cache replay
   (`OTDirect.ino:2525-2526`) and the PS=1 summary self-echo (`OTDirect.ino:1563`)
@@ -245,27 +250,16 @@ The entity name, unit and device class match the 1.x line's entity exactly.
 
 ## Open Questions
 
-- [x] Does the Home Assistant Energy dashboard require `state_class: total_increasing` — **Answered 2026-08-24 by User: Robert van den Breemen:** Neither is required. Verified against Home Assistant core dev branch, homeassistant/components/energy/validate.py: water sources go through the shared helper _async_validate_usage_stat, which accepts state_class MEASUREMENT, TOTAL or TOTAL_INCREASING. MEASUREMENT additionally requires a last_reset attribute. Accepted units come from WATER_USAGE_UNITS: L, gal, m3, ft3, CCF, MCF, and device_class must be SensorDeviceClass.WATER. The design therefore uses device_class water, unit L, state_class total_increasing: permitted, needs no last_reset, and matches the non-decreasing counter chosen below.
-      specifically, or does it also accept `total`? The developer sensor documentation
-      confirms the valid *units* for `device_class: water` but states no state-class
-      requirement, and <https://www.home-assistant.io/docs/energy/water/> says only to
-      "set and provide the `device_class`, `state_class`, and `unit_of_measurement`"
-      without naming values. Verify against Home Assistant source or a live instance
-      before acceptance; the Confirmation section currently assumes `total_increasing`.
-- [x] On the OTDirect path, is MsgID 19 counted once or twice when this firmware is the — **Answered 2026-08-24 by User: Robert van den Breemen:** Counted once per real exchange on every path, PROVIDED the integrator is time-based. Verified: MsgID 19 is OT_READ (OTGW-Core.h:387) and is_value_valid_for_master_topic admits it only as OT_READ_ACK (OTGW-Core.ino:1631), so request frames never write state. Classic PIC, OTDirect gateway mode and OTDirect master mode each yield exactly one write per exchange. Two extra sample sources exist: in master mode with a thermostat attached, handleMasterModeSlaveFrame replays the cached value as a synthetic READ_ACK A frame (OTDirect.ino:2525-2526), which reaches canonical by design as a proxy A (ADR-103); and under PS=1 emitSummaryLine feeds its own summary back through processOT (OTDirect.ino:1563) roughly every 800 ms. Neither adds litres under the settled zero-hold rule, because litres = flow x actual elapsed time and an extra sample only subdivides an interval. Under per-sample fixed-volume accumulation the PS=1 echo alone would inflate the total by about 12x (800 ms echo against a 10 s true poll, OTDirect.ino:55 and :57). There are TWO state write sites, not one: print_f88 at OTGW-Core.ino:2500 and updatePSSummaryFloatState at OTGW-Core.ino:4038, the latter bypassing print_f88 entirely. A single helper must be called from both. Residual hazard to guard: if the 3-strike UNKNOWN_DATA_ID rule disables schedule entry 19 (OTDirect.ino:1300-1310) after the cache held a non-zero flow, the A-replay keeps serving a frozen non-zero value at the thermostat poll rate, each interval short enough to stay under the cap, and the counter runs away. Exclude the cache-replay path from accumulation, or bound it by an independent liveness signal.
-      master? Name the single accumulation point and how the other path is excluded.
-- [x] What is the concrete flash-write rule, and what erase-cycle budget justifies the — **Answered 2026-08-24 by User: Robert van den Breemen:** Rule: write when delta >= 10 L, OR when 15 minutes have elapsed AND delta > 0, plus one write on graceful reboot. This bounds unclean-reboot loss to 10 L and the write rate to at most 96/day worst case. Wear turned out NOT to be the deciding factor. Naive single-sector arithmetic (100000 cycles / 120 writes per day = 2.3 years) does not apply, because LittleFS wear-levels across the partition: the spiffs partition is 0x180000 = 384 blocks of 4 KB with roughly 140 free after web assets, giving about 14 M block-erases, so a small dedicated file at about 3 block-erases per write survives roughly 105 years even at a 1 L cadence, and about 1575 years at the recommended cadence. Assumptions labelled: 120 L/day household DHW draw (external, no repo source) and 100000 erase cycles (industry-standard NOR figure, no datasheet read; the repo already uses this figure at OTGW-firmware.ino:886 and SATcontrol.ino:1784). Since every option survives by two orders of magnitude, the choice is made on failure mode instead: see the storage-location answer below.
-      chosen numbers?
-- [x] What does the design do about a partial regression after an unclean reboot — — **Answered 2026-08-24 by User: Robert van den Breemen:** Resume from the last persisted value and accept the undercount. The counter never decreases, so Home Assistant never sees a reset and the long-term statistic stays coherent. The litres accumulated since the last flash write are lost permanently on an unclean reboot; that error is bounded by the write cadence and is the deliberate price of never corrupting the statistic. Same answer as the 1.x peer. Decided by the maintainer.
-      accept it, resume from the last persisted value and undercount, or publish a
-      deliberate full reset so Home Assistant restarts the statistic cleanly?
-- [x] How is the integration performed between two sparse samples — last-value hold, — **Answered 2026-08-24 by User: Robert van den Breemen:** Zero-hold, counting only across intervals bounded by a non-zero flow reading, with the usable interval capped at a maximum so a long sampling gap cannot invent litres. Biases to UNDER-count, the safe direction for a meter. Last-value hold and trapezoidal rejected because across a long gap they invent flow that never happened. Identical to the 1.x peer by mandate, so both firmwares report the same total for the same boiler. Decided by the maintainer.
-      trapezoidal, or zero-hold — and what is the error characteristic when the gap is
-      minutes rather than seconds? The answer must match the 1.x line so the two
-      firmwares do not report different totals for the same boiler.
-- [x] Is the counter user-resettable, and through which surface? — **Answered 2026-08-24 by User: Robert van den Breemen:** Yes, through a paired REST and MQTT surface, following the reset_integral / flush idiom which is the only paired reset pattern in this firmware: REST at restAPI.ino:1253-1257 and the MQTT dispatch row at MQTTstuff.ino:670 with its adapter at :618. Proposed: POST /api/v2/otgw/reset_water_total plus an MQTT set/<nodeId>/otgw/reset_water_total command. The reset must zero the RAM counter AND the persisted file in one operation and immediately publish 0, so Home Assistant records a clean total_increasing reset rather than a partial regression. Note the S0 pulse counter is NOT a usable precedent: OTGWs0pulseCountTot (OTGW-firmware.h:850) is a plain RAM global that is never persisted and has no reset, so it starts at zero every boot.
-- [x] Does the persisted counter belong in the existing settings store or in its own — **Answered 2026-08-24 by User: Robert van den Breemen:** Its own file, NOT settings.ini, and the reason is the failure mode rather than wear. writeSettings() opens SETTINGS_FILE with mode w (settingStuff.ino:244) and rewrites the whole roughly 7 KB blob, so every counter update would drag all persistent configuration through a power-loss window. Losing WiFi credentials to a water-counter write is a far worse outcome than losing 10 L. Follow the existing satSaveEnergyState() pattern instead (SATcontrol.ino:1788-1798): a small dedicated JSON file, a stack-local 64-byte buffer, no new global. NVS is technically the best fit and the 20 KB nvs partition is present and unused for application data, but the repo has no precedent for hot-value NVS writes and platform_esp32.h:370-375 warns against timer-driven ones, so a dedicated LittleFS file wins on KISS and on matching four existing peers. Note the 'match the 1.x line' mandate binds the user-visible entity contract, not the storage mechanism, so choosing NVS later on this line only would be legitimate.
-      file, given it changes far more often than settings do?
+All resolved. Answers are retained rather than deleted: the reasoning is what a
+future reader needs in order to re-evaluate the decision.
+
+- [x] Does the Home Assistant Energy dashboard require `state_class: total_increasing` specifically, or does it also accept `total`? — **Answered 2026-08-24 by User: Robert van den Breemen:** Neither is required. Verified against Home Assistant core, `homeassistant/components/energy/validate.py`: water sources go through the shared helper `_async_validate_usage_stat`, which accepts `MEASUREMENT`, `TOTAL` or `TOTAL_INCREASING`. `MEASUREMENT` additionally requires a `last_reset` attribute. Accepted units come from `WATER_USAGE_UNITS` (`L, gal, m3, ft3, CCF, MCF`) and the device class must be `SensorDeviceClass.WATER`. The design therefore uses `device_class: water`, unit `L`, `state_class: total_increasing`.
+- [x] On the OTDirect path, is MsgID 19 counted once or twice when this firmware is the master? — **Answered 2026-08-24 by User: Robert van den Breemen:** Once per real exchange on every path, PROVIDED the integrator is time-based. MsgID 19 is `OT_READ` (`OTGW-Core.h:387`) and `is_value_valid_for_master_topic` admits it only as `OT_READ_ACK` (`:1631`), so request frames never write state. Classic PIC (the OpenTherm Gateway's PIC microcontroller), OTDirect gateway mode and OTDirect master mode each yield exactly one write per exchange. Two extra sample sources exist: in master mode with a thermostat attached, `handleMasterModeSlaveFrame` replays the cached value as a synthetic READ_ACK A frame (`OTDirect.ino:2525-2526`), reaching canonical by design as a proxy A (ADR-103); and under PS=1, `emitSummaryLine` feeds its own summary back through `processOT` (`OTDirect.ino:1563`) roughly every 800 ms. Neither adds litres under the settled zero-hold rule, because litres are elapsed time times flow and an extra sample only subdivides an interval. Under per-sample accumulation the PS=1 echo alone would inflate the total about twelvefold (800 ms echo against a 10 s true poll). Note there are *two* state write sites, not one: `print_f88` (`OTGW-Core.ino:2500`) and `updatePSSummaryFloatState` (`:4038`), the latter bypassing the former entirely, so a single helper must be called from both. Residual hazard to guard: if the 3-strike UNKNOWN_DATA_ID rule disables schedule entry 19 (`OTDirect.ino:1300-1310`) while the cache holds a non-zero flow, the replay keeps serving that frozen value at the thermostat poll rate, each gap short enough to pass the interval cap, and the counter runs away. Exclude the cache-replay path from accumulation, or bound it by an independent liveness signal.
+- [x] What is the concrete flash-write rule, and what erase-cycle budget justifies the chosen numbers? — **Answered 2026-08-24 by User: Robert van den Breemen:** Write when delta >= 10 L, or when 15 minutes have elapsed and delta > 0, plus one write on graceful reboot. That bounds unclean-reboot loss to 10 L and the write rate to at most 96/day worst case. Wear is *not* the deciding factor: the naive single-sector figure (100000 cycles / 120 writes per day = 2.3 years) does not apply because LittleFS wear-levels across the partition. The `spiffs` partition is `0x180000`, 384 blocks of 4 KB with roughly 140 free after web assets, giving about 14 M block-erases, so a small dedicated file at about 3 block-erases per write survives roughly 105 years even at a 1 L cadence and about 1575 years at the recommended cadence. Assumptions labelled as such: 120 L/day household draw (external, no repo source) and 100000 erase cycles (industry-standard figure for the kind of flash memory these boards use (NOR flash) (the flash type these boards use), no datasheet read; the repo already uses this figure at `OTGW-firmware.ino:886` and `SATcontrol.ino:1784`).
+- [x] What does the design do about a partial regression after an unclean reboot? — **Answered 2026-08-24 by User: Robert van den Breemen:** Resume from the last persisted value and accept the undercount. The counter never decreases, so Home Assistant never sees a reset and the long-term statistic stays coherent. The litres accumulated since the last flash write are lost permanently; that error is bounded by the write cadence and is the deliberate price of never corrupting the statistic. Same answer as the 1.x peer.
+- [x] How is the integration performed between two sparse samples, and what is its error characteristic when the gap is minutes rather than seconds? — **Answered 2026-08-24 by User: Robert van den Breemen:** Zero-hold: count only across intervals bounded by a non-zero flow reading, with the usable interval capped so a long sampling gap cannot invent litres. Biases to UNDER-count, the safe direction for a meter. Last-value hold and trapezoidal were rejected because across a long gap they invent flow that never happened. Identical to the 1.x peer by mandate, so both firmwares report the same total for the same boiler.
+- [x] Is the counter user-resettable, and through which surface? — **Answered 2026-08-24 by User: Robert van den Breemen:** Yes, through a paired REST and MQTT surface, following the `reset_integral` / `flush` idiom, which is the only paired reset pattern in this firmware: REST at `restAPI.ino:1253-1257` and the MQTT dispatch row at `MQTTstuff.ino:670` with its adapter at `:618`. Proposed: `POST /api/v2/otgw/reset_water_total` plus an MQTT `set/<nodeId>/otgw/reset_water_total` command. The reset must zero the RAM counter *and* the persisted file in one operation and immediately publish 0, so Home Assistant records a clean reset rather than a partial regression. The S0 pulse counter is *not* a usable precedent: `OTGWs0pulseCountTot` (`OTGW-firmware.h:850`) is a plain RAM global, never persisted, with no reset.
+- [x] Does the persisted counter belong in the existing settings store or in its own file, given it changes far more often than settings do? — **Answered 2026-08-24 by User: Robert van den Breemen:** Its own file, *not* `settings.ini`, and the reason is the failure mode rather than wear. `writeSettings()` opens `SETTINGS_FILE` with mode `w` (`settingStuff.ino:244`) and rewrites the whole roughly 7 KB blob, so every counter update would drag all persistent configuration through a power-loss window. Losing WiFi credentials to a water-counter write is a far worse outcome than losing 10 L. Follow the existing `satSaveEnergyState()` pattern instead (`SATcontrol.ino:1788-1798`): a small dedicated JSON file, a stack-local 64-byte buffer, no new global. Non-Volatile Storage (NVS) is technically the best fit, and the 20 KB `nvs` partition is present and unused for application data, but the repo has no precedent for hot-value writes to that store and `platform_esp32.h:370-375` warns against timer-driven ones. The 'match the 1.x line' mandate binds the user-visible entity contract, not the storage mechanism.
 
 ## Related Decisions
 
