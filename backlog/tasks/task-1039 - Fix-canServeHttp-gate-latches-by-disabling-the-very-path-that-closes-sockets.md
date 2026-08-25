@@ -1,9 +1,11 @@
 ---
 id: TASK-1039
 title: 'Fix: canServeHttp gate latches by disabling the very path that closes sockets'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-07-19 15:01'
+updated_date: '2026-08-25 17:54'
 labels: []
 dependencies: []
 priority: high
