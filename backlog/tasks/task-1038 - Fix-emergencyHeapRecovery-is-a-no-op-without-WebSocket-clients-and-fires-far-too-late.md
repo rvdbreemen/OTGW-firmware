@@ -52,3 +52,15 @@ Strict ordering. Step 2 is worthless before step 1 lands: firing a no-op earlier
 
 Do NOT raise HTTP_SERVE_MIN_MAXBLOCK or MQTT_PUBLISH_MIN_MAXBLOCK as part of this task. Those gates throttle consumers rather than reclaiming memory, they are field-calibrated against the 1460-byte TCP MSS cliff, and raising them makes the TASK-1039 latch engage earlier.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-25: parked, needs a superseding ADR before any code. ADR-079 is Accepted and its Decision binds exactly what this task wants to change: the trigger is fixed at getHeapHealth() == HEAP_CRITICAL, the 30-second EMERGENCY_RECOVERY_INTERVAL_MS is named in the same sentence, and the action list is exactly three items. Moving the trigger to WARNING or LOW contradicts it, and adding a fourth action contradicts the closed list.
+
+Worse for this task specifically: ADR-079 already considered and REJECTED the obvious fourth action. Its 'Explicitly NOT done' section rules out dropping telnet (the operator needs the diagnostic window during an incident) and rules out an MQTT disconnect/reconnect on the grounds that the reconnect cost, 15 seconds blocking plus a retained-state resync burst, exceeds the heap it recovers. Any new action has to beat that reasoning, not ignore it.
+
+So the work is: draft a superseding ADR that (a) argues the tier change from evidence, since the martreides captures show first recovery at 888 bytes free with maxBlock already around 500, which is past the point where anything can be reclaimed, and (b) names an action that reclaims memory in an MQTT-only, no-browser configuration without falling into what ADR-079 rejected. Then grill it, then have the maintainer accept it, then implement.
+
+Related and already fixed: TASK-1039 removed the HTTP gate latch, so one source of unreleased sockets during the same window is gone. That does not close this task, because recovery still has no action with any effect when no WebSocket or stream client exists.
+<!-- SECTION:NOTES:END -->
