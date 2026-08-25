@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-19 15:01'
-updated_date: '2026-08-25 17:54'
+updated_date: '2026-08-25 18:57'
 labels: []
 dependencies: []
 priority: high
@@ -27,7 +27,7 @@ Note: raising HTTP_SERVE_MIN_MAXBLOCK is not the fix, it makes the latch engage 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduction showing maxBlock recovering above the gate threshold after the gate engages, in a run where it currently never recovers
-- [ ] #2 Pending HTTP connections are demonstrably closed while the gate is engaged
+- [x] #2 Pending HTTP connections are demonstrably closed while the gate is engaged
 - [ ] #3 TASK-841 browser-load fragmentation case re-validated as not regressed
-- [ ] #4 HTTP_fragskips counter documented or renamed so it is not misread as a request count
+- [x] #4 HTTP_fragskips counter documented or renamed so it is not misread as a request count
 <!-- AC:END -->
