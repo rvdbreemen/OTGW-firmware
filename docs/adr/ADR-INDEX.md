@@ -147,7 +147,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-139 | Accepted | - | PRIMARY: ETag + bounded max-age is the project-wide cache-busting standard for ALL web UI static assets, served as pl... |
 | ADR-140 | Accepted | - | 2.0.0 publishes ONE HA device per hardware OTGW and clusters entities with entitycategory, matching the 1.6.x model. |
 | ADR-141 | Accepted | - | Adopt ArduinoJson v7 for firmware JSON building on the ESP32-S3 2.0.0 line, replacing the hand-rolled streaming/two-p... |
-| ADR-142 | Deferred | - | The firmware publishes HA discovery configs for all OT-map entities as today. |
+| ADR-142 | Rejected | - | The firmware publishes HA discovery configs for all OT-map entities as today. |
 | ADR-143 | Accepted | - | Move both telnet instances to the AsyncTCP transport provided by the upstream SimpleTelnet 2.0.0 library (AsyncSimple... |
 | ADR-144 | Rejected | - | Change -DCONFIGASYNCTCPRUNNINGCORE=1 to =0 in the GLOBAL [env] buildflags of platformio.ini (applies to esp32, esp32-... |
 | ADR-145 | Superseded | - | restSendJson serves JSON as a chunked, pull-based response that holds no whole-response buffer. |

@@ -3148,7 +3148,7 @@
       },
       "metadata": {
         "binding": true,
-        "gate": null,
+        "gate": "bin/adr-judge",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -4471,8 +4471,8 @@
       "title": "HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List",
       "path": "ADR-142-ha-discovery-mark-unavailable-unsupported-msgids.md",
       "format": "canonical",
-      "status": "Deferred",
-      "date": "2026-07-09",
+      "status": "Rejected",
+      "date": "2026-08-25",
       "decision_summary": "The firmware publishes HA discovery configs for all OT-map entities as today.",
       "topics": [],
       "aliases": [],
@@ -4489,8 +4489,8 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": true,
-        "gate": "check_ha_discovery_msgid_availability_list",
+        "binding": false,
+        "gate": null,
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],

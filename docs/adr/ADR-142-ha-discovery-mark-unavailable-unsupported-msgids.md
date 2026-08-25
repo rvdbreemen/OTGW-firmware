@@ -1,7 +1,7 @@
 ---
 id: ADR-142
 title: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List
-status: "Deferred"
+status: "Rejected"
 date: 2026-06-04
 tags:
   - "mqtt"
@@ -22,8 +22,8 @@ related:
   - "ADR-080"
 deciders:
   - "Robert van den Breemen"
-binding: true
-gate: "check_ha_discovery_msgid_availability_list"
+binding: false
+gate: null
 documents_shipped: false
 verified_in: []
 ---
@@ -32,30 +32,27 @@ verified_in: []
 
 ## Status
 
-Deferred to Milestone 2.1.0. Not awaiting an acceptance sign-off: the
-feature is unimplemented (no `availability_mode` in `src/`) and its named CI
-gate `check_ha_discovery_msgid_availability_list` does not yet exist in
-`evaluate.py`. Per ADR-080 this ADR CANNOT flip to Accepted until that gate
-lands in the same implementation commit as the feature. Until then it stays
-Deferred rather than plain Proposed, so it does not read as ready for review.
+**Rejected, 2026-08-25.** This ADR proposed marking entities for OpenTherm
+message IDs the boiler does not implement as unavailable, using an MQTT
+`availability` list plus `availability_mode: all` (Approach B below).
 
-The decision content below (Approach B) still stands as the intended design.
+It was never implemented, and the maintainer has decided it will not be. No
+`availability_mode` was ever added to `src/`, and the CI gate its own
+acceptance depended on (`check_ha_discovery_msgid_availability_list`) was
+never written. The record is closed here rather than left open, so it stops
+reading as planned work.
 
-**Binding** (per ADR-080): the CI gate is an extension of the
-golden-file discovery test in `tests/` (introduced by ADR-122 / TASK-648) to
-assert, for at least one OT msgID whose `isBoilerMsgIdUnsupportedRead()` or
-`isBoilerMsgIdUnsupportedWrite()` returns true, that the emitted discovery
-payload includes (a) an `availability` list with two entries — the device LWT
-and the per-msgID availability topic — and (b) `availability_mode: all`. The
-gate must land in the same implementation commit as the feature and must not
-be deferred. Name: `check_ha_discovery_msgid_availability_list` (to be added
-to `evaluate.py` and/or the golden-file test harness).
+It previously carried the non-standard status "Deferred to Milestone 2.1.0"
+(TASK-1002), to signal it was blocked on an unbuilt feature rather than
+awaiting review. That distinction no longer applies, and "Deferred" is not a
+value the ADR schema recognises, so it could never be machine-read correctly
+in any case.
 
-The three-boiler field validation (AC#6) is a *verification* acceptance
-criterion, not the CI gate; it is not automated.
-
-**Decision Maker:** Robert van den Breemen.
-**Milestone:** 2.1.0
+Everything below is retained as the historical record of what was considered
+and why. It is no longer the intended design. Anyone revisiting the
+underlying problem, that a boiler-unsupported msgID still publishes a
+discovery entity which never updates, should write a new ADR rather than
+reviving this one.
 
 ## Status History
 
@@ -71,6 +68,11 @@ status_history:
     changed_by: Agent (TASK-1002)
     reason: Relabelled Proposed -> Deferred to 2.1.0. The feature is unimplemented (no availability_mode in src/) and the named gate check_ha_discovery_msgid_availability_list does not exist in evaluate.py; per ADR-080 that gate is a precondition of acceptance and must land with the implementation. Deferral makes explicit that this is not awaiting a review sign-off.
     changed_via: adr-kit
+  - date: 2026-08-25
+    status: Rejected
+    changed_by: "User: Robert van den Breemen"
+    reason: Closed as Rejected. Never implemented and not expected to be; the non-standard Deferred status is retired with it.
+    changed_via: manual
 ```
 
 ## Context
