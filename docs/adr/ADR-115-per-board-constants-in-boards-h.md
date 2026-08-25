@@ -17,6 +17,13 @@ related:
   - "ADR-079"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: "check_esp_abstraction_boundary"
+documents_shipped: true
+verified_in:
+  - "src/libraries/Platform/src/boards.h:SAT_FLOW_SAMPLE_SIZE"
+  - "evaluate.py:check_esp_abstraction_boundary"
+  - "commit:d4be6d4e"
 ---
 
 # ADR-115: Per-Board Numeric Constants and Typedefs Live in boards.h

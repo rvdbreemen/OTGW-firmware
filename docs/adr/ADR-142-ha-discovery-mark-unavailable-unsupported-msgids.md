@@ -22,6 +22,10 @@ related:
   - "ADR-080"
 deciders:
   - "Robert van den Breemen"
+binding: true
+gate: "check_ha_discovery_msgid_availability_list"
+documents_shipped: false
+verified_in: []
 ---
 
 # ADR-142: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List

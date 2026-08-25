@@ -24,6 +24,11 @@ related:
   - "ADR-139"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: true
+verified_in:
+  - "src/libraries/SimpleTelnet/src/AsyncSimpleTelnet.h"
 ---
 
 # ADR-143: Telnet + ser2net transport on AsyncTCP (AsyncSimpleTelnet) to remove loop-task socket-write blocking

@@ -8,7 +8,7 @@ gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: "ADR-170"
+superseded_by: null
 ---
 # ADR-062 — Retained discovery verification via wildcard subscribe with RAM-tuned buffer resize
 

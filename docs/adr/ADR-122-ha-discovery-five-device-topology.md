@@ -26,6 +26,10 @@ related:
   - "ADR-124"
 deciders:
   - "Robert van den Breemen"
+binding: true
+gate: "check_ha_discovery_device_routing"
+documents_shipped: false
+verified_in: []
 ---
 
 # ADR-122: HA Discovery Five-Device Topology

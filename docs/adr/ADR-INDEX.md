@@ -165,7 +165,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-157 | Accepted | - | Heating-source selection is manual configuration (settings.sat.iHeatingSource = GASBOILER / HEATPUMP / HYBRID), autho... |
 | ADR-158 | Accepted | - | Implemented on claude/esp32-s3-mini-pro-support-0i6uu9 (combo extension); this ADR records the design as built. |
 | ADR-159 | Accepted | - | On every HASPICWATCHDOG build, the external 0x26 secondary watchdog is presence-gated SYMMETRICALLY: both the periodi... |
-| ADR-160 | Proposed | - | On the combo board (HASRUNTIMEHWDETECT), AUTO hardware detection (settings.iBoardMode == 0) re-probes the PIC on ever... |
+| ADR-160 | Superseded | - | On the combo board (HASRUNTIMEHWDETECT), AUTO hardware detection (settings.iBoardMode == 0) re-probes the PIC on ever... |
 | ADR-161 | Accepted | - | Expose the BLE roster over REST v2 as a dedicated endpoint /api/v2/sat/ble/roster (GET / PUT / DELETE), not as ~27 fl... |
 | ADR-162 | Accepted | - | Add a deliberate, transient, auth-gated test hook: a REST (Representational State Transfer) endpoint POST /api/v2/sat... |
 | ADR-163 | Accepted | - | Serve Web UI static assets with Cache-Control: no-cache (the browser may store but MUST revalidate via If-None-Match... |

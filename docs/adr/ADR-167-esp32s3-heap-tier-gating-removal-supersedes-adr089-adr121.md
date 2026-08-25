@@ -7,8 +7,10 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
 superseded_by: null
+supersedes:
+  - "ADR-089"
+  - "ADR-121"
 ---
 # ADR-167 Retire the ESP8266-Era Heap Tier Machine and Per-Consumer Gating on the ESP32-S3-Only Dev Branch
 

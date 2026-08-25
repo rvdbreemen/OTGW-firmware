@@ -7,8 +7,9 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
 superseded_by: null
+supersedes:
+  - "ADR-004"
 ---
 # ADR-053: Large Feature Buffer Static Allocation
 

@@ -24,6 +24,10 @@ related:
   - "ADR-131"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
 ---
 
 # ADR-141: Adopt ArduinoJson v7 for JSON on the ESP32-S3 2.0.0 line

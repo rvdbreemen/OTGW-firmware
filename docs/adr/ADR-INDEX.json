@@ -1300,7 +1300,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-018"
+        ],
         "superseded_by": "ADR-141"
       }
     },
@@ -1643,7 +1645,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-004"
+        ],
         "superseded_by": null
       }
     },
@@ -1736,7 +1740,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-054"
+        ],
         "superseded_by": null
       }
     },
@@ -1893,7 +1899,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-001"
+        ],
         "superseded_by": null
       }
     },
@@ -1925,7 +1933,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": "ADR-170"
+        "superseded_by": null
       }
     },
     {
@@ -2172,9 +2180,7 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [
-          "ADR-004"
-        ],
+        "supersedes": [],
         "superseded_by": null
       }
     },
@@ -2329,7 +2335,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-047"
+        ],
         "superseded_by": null
       }
     },
@@ -2453,9 +2461,7 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [
-          "ADR-051"
-        ],
+        "supersedes": [],
         "superseded_by": null
       }
     },
@@ -2954,7 +2960,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": "ADR-097"
+        "superseded_by": "ADR-119"
       }
     },
     {
@@ -3049,7 +3055,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [
-          "ADR-097"
+          "ADR-119"
         ],
         "superseded_by": null
       }
@@ -3307,7 +3313,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [
-          "ADR-077"
+          "ADR-105"
         ],
         "superseded_by": null
       }
@@ -3591,9 +3597,13 @@
       },
       "metadata": {
         "binding": false,
-        "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "gate": "check_esp_abstraction_boundary",
+        "documents_shipped": true,
+        "verified_in": [
+          "src/libraries/Platform/src/boards.h:SAT_FLOW_SAMPLE_SIZE",
+          "evaluate.py:check_esp_abstraction_boundary",
+          "commit:d4be6d4e"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -3623,8 +3633,12 @@
       "metadata": {
         "binding": false,
         "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "documents_shipped": true,
+        "verified_in": [
+          "src/OTGW-firmware/MQTTstuff.h:MQTT_DEFAULT_PUBLISH_INTERVAL_SEC",
+          "src/OTGW-firmware/MQTTstuff.h:bOnChangePublishing",
+          "commit:5f846c38"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -3654,8 +3668,13 @@
       "metadata": {
         "binding": false,
         "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "documents_shipped": true,
+        "verified_in": [
+          "src/OTGW-firmware/SATtypes.h:bSimulation",
+          "commit:daf99b0f",
+          "commit:4c33241b",
+          "commit:2445a0da"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -3750,9 +3769,12 @@
       },
       "metadata": {
         "binding": false,
-        "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "gate": "check_esp_abstraction_boundary",
+        "documents_shipped": true,
+        "verified_in": [
+          "src/libraries/Platform/src/platform.h:PLATFORM_INT_DISTINCT_FROM_INT32",
+          "evaluate.py:ESP_ABSTRACTION_ALLOWED_FILES"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -3811,8 +3833,8 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
+        "binding": true,
+        "gate": "check_ha_discovery_device_routing",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -3846,9 +3868,7 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [
-          "ADR-082"
-        ],
+        "supersedes": [],
         "superseded_by": null
       }
     },
@@ -3875,10 +3895,12 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
+        "binding": true,
+        "gate": "tests/webui/ha-discovery-golden.test.mjs",
         "documents_shipped": false,
-        "verified_in": [],
+        "verified_in": [
+          "tests/webui/ha-discovery-golden.test.mjs"
+        ],
         "supersedes": [
           "ADR-122"
         ],
@@ -4467,8 +4489,8 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
+        "binding": true,
+        "gate": "check_ha_discovery_msgid_availability_list",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -4500,8 +4522,10 @@
       "metadata": {
         "binding": false,
         "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "documents_shipped": true,
+        "verified_in": [
+          "src/libraries/SimpleTelnet/src/AsyncSimpleTelnet.h"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -4591,10 +4615,12 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "binding": true,
+        "gate": "check_no_arduinojson",
+        "documents_shipped": true,
+        "verified_in": [
+          "evaluate.py:check_no_arduinojson"
+        ],
         "supersedes": [
           "ADR-141",
           "ADR-145"
@@ -4628,7 +4654,10 @@
         "binding": false,
         "gate": null,
         "documents_shipped": false,
-        "verified_in": [],
+        "verified_in": [
+          "platformio.ini:CONFIG_ASYNC_TCP_STACK_SIZE",
+          "src/OTGW-firmware/webServerCompat.h:webFileGateTryAdmit"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -4689,8 +4718,11 @@
       "metadata": {
         "binding": false,
         "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "documents_shipped": true,
+        "verified_in": [
+          "src/OTGW-firmware/webSocketStuff.ino:MAX_WEBSOCKET_CLIENTS",
+          "src/OTGW-firmware/restAPI.ino:restEffectiveInflightCap"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -5010,8 +5042,8 @@
       "title": "Combo board: AUTO hardware detection re-probes every boot and never persists its verdict",
       "path": "ADR-160-combo-auto-board-detect-per-boot-no-persist.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-06-29",
+      "status": "Superseded",
+      "date": "2026-07-04",
       "decision_summary": "On the combo board (HASRUNTIMEHWDETECT), AUTO hardware detection (settings.iBoardMode == 0) re-probes the PIC on ever...",
       "topics": [],
       "aliases": [],
@@ -5033,7 +5065,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-164"
       }
     },
     {
@@ -5154,8 +5186,14 @@
       "metadata": {
         "binding": false,
         "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "documents_shipped": true,
+        "verified_in": [
+          "src/OTGW-firmware/OTGW-firmware.ino:probeProImu",
+          "src/OTGW-firmware/OTGW-firmware.ino:activePicRst",
+          "commit:c3afa5f4f",
+          "commit:7f69f6b91",
+          "commit:d7a34f4ad"
+        ],
         "supersedes": [
           "ADR-160"
         ],
@@ -5188,7 +5226,9 @@
         "binding": false,
         "gate": null,
         "documents_shipped": false,
-        "verified_in": [],
+        "verified_in": [
+          "src/OTGW-firmware/restAPI.ino:WEB_FILE_MAX_INFLIGHT"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -5218,8 +5258,11 @@
       "metadata": {
         "binding": false,
         "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "documents_shipped": true,
+        "verified_in": [
+          "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h:hasSpareAppOtaSlot",
+          "src/OTGW-firmware/restAPI.ino:app_ota_available"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -5251,7 +5294,10 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-089",
+          "ADR-121"
+        ],
         "superseded_by": null
       }
     },
@@ -5348,9 +5394,7 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [
-          "ADR-062"
-        ],
+        "supersedes": [],
         "superseded_by": null
       }
     },
@@ -5509,7 +5553,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-100"
+        ],
         "superseded_by": null
       }
     },
@@ -6610,6 +6656,12 @@
     },
     {
       "source": "ADR-042",
+      "target": "ADR-018",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-042",
       "target": "ADR-141",
       "type": "superseded-by",
       "resolved": true
@@ -6940,6 +6992,12 @@
     },
     {
       "source": "ADR-053",
+      "target": "ADR-004",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-053",
       "target": "ADR-006",
       "type": "related",
       "resolved": true
@@ -7077,6 +7135,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-056",
+      "target": "ADR-054",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
       "source": "ADR-057",
       "target": "ADR-003",
       "type": "related",
@@ -7149,9 +7213,9 @@
       "resolved": true
     },
     {
-      "source": "ADR-062",
-      "target": "ADR-170",
-      "type": "superseded-by",
+      "source": "ADR-061",
+      "target": "ADR-001",
+      "type": "supersedes",
       "resolved": true
     },
     {
@@ -7185,14 +7249,8 @@
       "resolved": true
     },
     {
-      "source": "ADR-070",
-      "target": "ADR-004",
-      "type": "supersedes",
-      "resolved": true
-    },
-    {
-      "source": "ADR-079",
-      "target": "ADR-051",
+      "source": "ADR-075",
+      "target": "ADR-047",
       "type": "supersedes",
       "resolved": true
     },
@@ -7630,7 +7688,7 @@
     },
     {
       "source": "ADR-095",
-      "target": "ADR-097",
+      "target": "ADR-119",
       "type": "superseded-by",
       "resolved": true
     },
@@ -7762,7 +7820,7 @@
     },
     {
       "source": "ADR-098",
-      "target": "ADR-097",
+      "target": "ADR-119",
       "type": "supersedes",
       "resolved": true
     },
@@ -8038,12 +8096,6 @@
     },
     {
       "source": "ADR-106",
-      "target": "ADR-077",
-      "type": "supersedes",
-      "resolved": true
-    },
-    {
-      "source": "ADR-106",
       "target": "ADR-078",
       "type": "related",
       "resolved": true
@@ -8058,6 +8110,12 @@
       "source": "ADR-106",
       "target": "ADR-105",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-106",
+      "target": "ADR-105",
+      "type": "supersedes",
       "resolved": true
     },
     {
@@ -8550,12 +8608,6 @@
       "source": "ADR-123",
       "target": "ADR-082",
       "type": "related",
-      "resolved": true
-    },
-    {
-      "source": "ADR-123",
-      "target": "ADR-082",
-      "type": "supersedes",
       "resolved": true
     },
     {
@@ -10161,6 +10213,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-160",
+      "target": "ADR-164",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-161",
       "target": "ADR-050",
       "type": "related",
@@ -10318,8 +10376,20 @@
     },
     {
       "source": "ADR-167",
+      "target": "ADR-089",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-167",
       "target": "ADR-121",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-167",
+      "target": "ADR-121",
+      "type": "supersedes",
       "resolved": true
     },
     {
@@ -10374,12 +10444,6 @@
       "source": "ADR-170",
       "target": "ADR-062",
       "type": "related",
-      "resolved": true
-    },
-    {
-      "source": "ADR-170",
-      "target": "ADR-062",
-      "type": "supersedes",
       "resolved": true
     },
     {
@@ -10494,6 +10558,12 @@
       "source": "ADR-174",
       "target": "ADR-100",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-174",
+      "target": "ADR-100",
+      "type": "supersedes",
       "resolved": true
     },
     {

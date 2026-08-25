@@ -15,6 +15,12 @@ related:
   - "ADR-126"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: true
+verified_in:
+  - "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h:hasSpareAppOtaSlot"
+  - "src/OTGW-firmware/restAPI.ino:app_ota_available"
 ---
 
 # ADR-166: Single-app-slot boards: firmware/app OTA is USB-only, filesystem OTA stays on WiFi

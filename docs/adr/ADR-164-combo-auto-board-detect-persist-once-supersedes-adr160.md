@@ -12,8 +12,6 @@ tags:
   - "boot"
   - "reliability"
   - "i2c"
-supersedes:
-  - "ADR-160"
 superseded_by: null
 related:
   - "ADR-126"
@@ -22,6 +20,17 @@ related:
   - "ADR-160"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: true
+verified_in:
+  - "src/OTGW-firmware/OTGW-firmware.ino:probeProImu"
+  - "src/OTGW-firmware/OTGW-firmware.ino:activePicRst"
+  - "commit:c3afa5f4f"
+  - "commit:7f69f6b91"
+  - "commit:d7a34f4ad"
+supersedes:
+  - "ADR-160"
 ---
 
 # ADR-164: Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)

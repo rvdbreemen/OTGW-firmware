@@ -29,6 +29,11 @@ related:
   - "ADR-145"
 deciders:
   - "Robert van den Breemen"
+binding: true
+gate: "check_no_arduinojson"
+documents_shipped: true
+verified_in:
+  - "evaluate.py:check_no_arduinojson"
 ---
 
 # ADR-146: Revert ADR-141 -- remove ArduinoJson, return to a hand-rolled streaming JSON writer (JsonEmit) on the ESP32-S3 REST path

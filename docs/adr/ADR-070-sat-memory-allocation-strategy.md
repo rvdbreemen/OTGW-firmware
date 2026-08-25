@@ -7,9 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes:
-  - "ADR-004"
 superseded_by: null
+supersedes: []
 ---
 # ADR-070: SAT Memory Allocation Strategy
 

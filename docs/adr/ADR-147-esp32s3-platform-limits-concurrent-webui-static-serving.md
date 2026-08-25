@@ -27,6 +27,12 @@ related:
   - "ADR-146"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: false
+verified_in:
+  - "platformio.ini:CONFIG_ASYNC_TCP_STACK_SIZE"
+  - "src/OTGW-firmware/webServerCompat.h:webFileGateTryAdmit"
 ---
 
 # ADR-147: ESP32-S3 platform limits for concurrent webui static-file serving -- keep LittleFS, guard the file-serve path, adopt the AsyncTCP config block (TASK-879)

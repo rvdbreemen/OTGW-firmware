@@ -7,9 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes:
-  - "ADR-082"
 superseded_by: null
+supersedes: []
 ---
 # ADR-123: 2.0.0 Concurrency Model — FreeRTOS PIC Task + Event-Driven Async Networking (ESP32-S3 only, ESP8266 dropped)
 

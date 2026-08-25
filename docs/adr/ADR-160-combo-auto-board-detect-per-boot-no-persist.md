@@ -8,7 +8,7 @@ gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-164"
 ---
 # ADR-160 Combo board: AUTO hardware detection re-probes every boot and never persists its verdict
 
@@ -37,6 +37,11 @@ status_history:
     changed_by: Agent
     reason: Capture the maintainer decision (TASK-947) that combo AUTO detection re-probes every boot and never writes its verdict into the manual-override field, closing the ADR-127 stranding bug.
     changed_via: adr-kit
+  - date: 2026-07-04
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: Superseded by ADR-164 after the never-persist rule hung boot on-device and was reverted (commit d7a34f4ad). Appended by hand; the original transition was performed without the lifecycle tool.
+    changed_via: manual
 
 ## Context
 

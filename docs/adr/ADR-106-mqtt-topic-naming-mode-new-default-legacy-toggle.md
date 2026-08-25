@@ -7,9 +7,9 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes:
-  - "ADR-077"
 superseded_by: null
+supersedes:
+  - "ADR-105"
 ---
 # ADR-106: MQTT Topic Naming Mode — New Self-Describing Names by Default, Legacy OT-Spec Names via `settings.mqtt.bUseLegacyOtTopics` (Mutually Exclusive)
 

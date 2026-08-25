@@ -7,9 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes:
-  - "ADR-051"
 superseded_by: null
+supersedes: []
 ---
 # ADR-079 Per-component Type Headers (amendment to ADR-051)
 

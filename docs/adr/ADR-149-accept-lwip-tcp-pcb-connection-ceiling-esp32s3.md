@@ -25,6 +25,12 @@ related:
   - "ADR-147"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: true
+verified_in:
+  - "src/OTGW-firmware/webSocketStuff.ino:MAX_WEBSOCKET_CLIENTS"
+  - "src/OTGW-firmware/restAPI.ino:restEffectiveInflightCap"
 ---
 
 # ADR-149: Accept the LWIP TCP-pcb connection ceiling on the ESP32-S3, do not raise CONFIG_LWIP_MAX_ACTIVE_TCP (TASK-884)

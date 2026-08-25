@@ -7,9 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes:
-  - "ADR-062"
 superseded_by: null
+supersedes: []
 ---
 # ADR-170 Unconditional Daily Drip Republish Replaces the Automatic Discovery-Verify Readback
 

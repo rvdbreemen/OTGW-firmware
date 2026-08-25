@@ -7,9 +7,9 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
+superseded_by: "ADR-098"
 supersedes:
   - "ADR-095"
-superseded_by: "ADR-098"
 ---
 # ADR-119: MQTT Source-Topic Sibling-Suffix Shape (feature-2.0.0 port of ADR-070; renumbered from ADR-097)
 

@@ -23,6 +23,11 @@ related:
   - "ADR-089"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: false
+verified_in:
+  - "src/OTGW-firmware/restAPI.ino:WEB_FILE_MAX_INFLIGHT"
 ---
 
 # ADR-165: Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)

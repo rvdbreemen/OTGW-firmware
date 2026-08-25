@@ -17,6 +17,13 @@ related:
   - "ADR-088"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: true
+verified_in:
+  - "src/OTGW-firmware/MQTTstuff.h:MQTT_DEFAULT_PUBLISH_INTERVAL_SEC"
+  - "src/OTGW-firmware/MQTTstuff.h:bOnChangePublishing"
+  - "commit:5f846c38"
 ---
 
 # ADR-116: MQTT On-Change Publishing as the Default with One-Time Interval Migration

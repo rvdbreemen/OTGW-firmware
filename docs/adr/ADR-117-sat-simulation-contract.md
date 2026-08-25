@@ -16,6 +16,14 @@ related:
   - "ADR-088"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: null
+documents_shipped: true
+verified_in:
+  - "src/OTGW-firmware/SATtypes.h:bSimulation"
+  - "commit:daf99b0f"
+  - "commit:4c33241b"
+  - "commit:2445a0da"
 ---
 
 # ADR-117: SAT Simulation Contract — Bus Isolation, Boiler-Absence Availability, Command Trace

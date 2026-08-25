@@ -7,7 +7,6 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
 superseded_by: null
 topics:
   - "mqtt"
@@ -32,6 +31,8 @@ symbols:
   - "bHaRebootDetect"
 context_scope: "selective"
 format: "madr"
+supersedes:
+  - "ADR-100"
 ---
 
 <!-- markdownlint-disable MD025 -->

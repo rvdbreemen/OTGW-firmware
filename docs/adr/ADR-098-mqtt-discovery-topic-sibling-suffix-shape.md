@@ -7,9 +7,9 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes:
-  - "ADR-097"
 superseded_by: null
+supersedes:
+  - "ADR-119"
 ---
 # ADR-098: MQTT Discovery Topic Sibling-Suffix Shape (Supersedes ADR-097)
 

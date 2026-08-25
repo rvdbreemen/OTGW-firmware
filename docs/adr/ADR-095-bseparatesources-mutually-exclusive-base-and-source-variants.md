@@ -8,7 +8,7 @@ gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: "ADR-097"
+superseded_by: "ADR-119"
 ---
 # ADR-095: bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive (feature-2.0.0 port of ADR-068)
 

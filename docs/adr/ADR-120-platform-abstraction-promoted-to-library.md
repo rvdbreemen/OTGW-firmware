@@ -20,6 +20,12 @@ related:
   - "ADR-079"
 deciders:
   - "Robert van den Breemen"
+binding: false
+gate: "check_esp_abstraction_boundary"
+documents_shipped: true
+verified_in:
+  - "src/libraries/Platform/src/platform.h:PLATFORM_INT_DISTINCT_FROM_INT32"
+  - "evaluate.py:ESP_ABSTRACTION_ALLOWED_FILES"
 ---
 
 # ADR-120: Platform Abstraction Headers Promoted to the src/libraries/Platform Library

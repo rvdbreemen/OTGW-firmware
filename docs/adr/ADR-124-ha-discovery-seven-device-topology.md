@@ -27,6 +27,11 @@ related:
   - "ADR-080"
 deciders:
   - "Robert van den Breemen"
+binding: true
+gate: "tests/webui/ha-discovery-golden.test.mjs"
+documents_shipped: false
+verified_in:
+  - "tests/webui/ha-discovery-golden.test.mjs"
 ---
 
 # ADR-124: HA Discovery Seven-Device Topology — Dedicated OT-Core and Sensors Devices, Gateway via_device Hub
