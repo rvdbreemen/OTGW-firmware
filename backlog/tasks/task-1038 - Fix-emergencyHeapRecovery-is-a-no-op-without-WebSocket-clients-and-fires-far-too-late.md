@@ -78,3 +78,19 @@ Not closed as 'already fixed', because nothing here was fixed: the correct readi
 
 If HEAP_CRITICAL is ever observed again on a post-1.7.2 build, that warrants a fresh task with fresh captures rather than reviving this one. The distinguishing question for such a report: do free heap and maxBlock fall together (a leak, as here) or does maxBlock collapse while free heap holds (fragmentation, which is what the 1.7.0 gates address)?
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as wontfix. No code changed and none was needed.
+
+The task read 'delta=+0' from emergencyHeapRecovery as proof that recovery cannot reclaim anything in an MQTT-only configuration, and proposed a fourth recovery action plus an earlier trigger tier. TASK-1037 recorded the same log line and identified what it actually means: everything allocated was still referenced, because the device was leaking. Recovery reclaiming zero bytes was the correct outcome, not a malfunction.
+
+That leak (DHCP option 42 SNTP injection per lease renewal, and the mDNS null-allocation crash under exhaustion) was fixed and shipped in v1.7.2 under TASK-1037, which is Done. This task's evidence is from 1.7.1 captures that predate the fix.
+
+The supporting premise fails too: the firmware is not memory-starved. The same captures show about 20 KB free for the first 35 to 40 minutes, and v1.7.0 had already reclaimed roughly 6.6 KB of static RAM. The 888-byte reading is the end state of a leak, not the operating point.
+
+Implementing this would have required a superseding ADR against ADR-079, which explicitly fixes the CRITICAL trigger, the 30-second interval and the three-action list, and which had already considered and rejected the obvious additions (dropping telnet, reconnecting MQTT) with reasons that still hold. Writing that ADR to optimise for a state the firmware no longer reaches would have made the record worse, not better.
+
+ADR-079 stands unchanged. A future HEAP_CRITICAL report on a post-1.7.2 build should open a new task with new captures; the question that separates the two failure modes is whether free heap and maxBlock fall together (leak) or maxBlock collapses alone (fragmentation).
+<!-- SECTION:FINAL_SUMMARY:END -->
