@@ -3,11 +3,11 @@ id: TASK-1038
 title: >-
   Fix: emergencyHeapRecovery is a no-op without WebSocket clients and fires far
   too late
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-07-19 14:59'
-updated_date: '2026-08-25 19:04'
+updated_date: '2026-08-25 19:05'
 labels: []
 dependencies: []
 priority: high
