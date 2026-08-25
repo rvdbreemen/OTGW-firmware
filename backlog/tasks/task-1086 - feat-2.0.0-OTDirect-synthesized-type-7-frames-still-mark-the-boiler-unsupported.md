@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-24 20:32'
+updated_date: '2026-08-24 21:14'
 labels:
   - bug
 dependencies: []
@@ -29,4 +30,17 @@ Why this was not fixed in the same change: the obvious discriminator does not wo
 - [ ] #2 Genuine B frames from a real boiler on the OTDirect gateway path still count as boiler evidence
 - [ ] #3 Proxy A frames that legitimately stand in for a boiler answer (ADR-103) still count
 - [ ] #4 Verified on a bench device in OTDirect master mode with no boiler attached: no msgid is reported unsupported
+- [ ] #5 Locally synthesized answers cannot RETRACT a genuine unsupported verdict either — the current rsptype == OTGW_BOILER guard blocks the (T,A) cases but NOT loopback mode, which fabricates frames labelled 'B' (OTDirect.ino:1213-1215)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-24: scope widened after adversarial verification of the TASK-1084 fix.
+
+Original scope covered only the SET direction (synthesized type-7 A frames marking the boiler unsupported). Verification showed the RETRACT direction is the same class of problem and was briefly worse: a synthesized READ_ACK/WRITE_ACK could clear a genuine verdict. That is now blocked by requiring rsptype == OTGW_BOILER on the retraction, which covers every (T,A) synthesis site.
+
+What that guard does NOT cover, and is the remaining work here: loopback mode bridges fabricated frames labelled 'B' (OTGW_BOILER) at OTDirect.ino:1213-1215, built from the PROGMEM table at :1188-1204, including type-7 for unknown ids and type-5 WRITE_ACK. Those pass a rsptype-based guard by construction, so they can both set and clear capability bits with no boiler present at all.
+
+Note OTDirect.ino:293 already carries the needed idea elsewhere in the same file: 'if (IS_LOOPBACK_MODE()) return false;   // synthetic responses are not a real boiler'. The bitmap block has no equivalent check. A loopback-mode check may be the cheap 80 percent fix, ahead of the full frame-origin plumbing.
+<!-- SECTION:NOTES:END -->
