@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-25 18:53'
-updated_date: '2026-08-25 20:50'
+updated_date: '2026-08-25 21:00'
 labels:
   - bug
   - adr-required
@@ -29,7 +29,7 @@ Needs its own ADR before implementation.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Whether OTA needs an entry point independent of the HTTP heap gate is decided and recorded in its own ADR
+- [x] #1 Whether OTA needs an entry point independent of the HTTP heap gate is decided and recorded in its own ADR
 - [ ] #2 If yes: an upload POST is accepted while canServeHttp() is refusing, without reintroducing the unchecked 2100-byte HTTPUpload allocation below the gate threshold
 - [ ] #3 Verified on the bench: a device held below the gate threshold can still be flashed over the air
 <!-- AC:END -->
