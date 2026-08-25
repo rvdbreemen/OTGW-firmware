@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-25 07:21'
-updated_date: '2026-08-25 09:07'
+updated_date: '2026-08-25 09:09'
 labels:
   - tooling
 dependencies: []
@@ -33,7 +33,7 @@ DO NOT use bin/adr supersede for this. Proven on real data in this repo: it repl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The seven reciprocal supersedes entries are present and strict lint reports FAIL 1 on the 1.x tree
-- [ ] #2 ADR-032 superseded_by is null and its prose is unchanged
-- [ ] #3 No ADR body line changed, verified by diff
+- [x] #1 The seven reciprocal supersedes entries are present and strict lint reports FAIL 1 on the 1.x tree
+- [x] #2 ADR-032 superseded_by is null and its prose is unchanged
+- [x] #3 No ADR body line changed, verified by diff
 <!-- AC:END -->
