@@ -1,13 +1,32 @@
 ---
 id: ADR-147
 title: "ESP32-S3 platform limits for concurrent webui static-file serving: keep LittleFS, guard the file-serve path, adopt the AsyncTCP config block (TASK-879)"
-status: Accepted
+status: "Accepted"
 date: 2026-06-19
-tags: [esp32s3, littlefs, asynctcp, lwip, webserver, static-files, heap, concurrency, task879, platform-limits]
+tags:
+  - "esp32s3"
+  - "littlefs"
+  - "asynctcp"
+  - "lwip"
+  - "webserver"
+  - "static-files"
+  - "heap"
+  - "concurrency"
+  - "task879"
+  - "platform-limits"
 supersedes: []
-superseded_by: []
-related: [ADR-080, ADR-088, ADR-089, ADR-128, ADR-139, ADR-144, ADR-145, ADR-146]
-deciders: [Robert van den Breemen]
+superseded_by: null
+related:
+  - "ADR-080"
+  - "ADR-088"
+  - "ADR-089"
+  - "ADR-128"
+  - "ADR-139"
+  - "ADR-144"
+  - "ADR-145"
+  - "ADR-146"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-147: ESP32-S3 platform limits for concurrent webui static-file serving -- keep LittleFS, guard the file-serve path, adopt the AsyncTCP config block (TASK-879)

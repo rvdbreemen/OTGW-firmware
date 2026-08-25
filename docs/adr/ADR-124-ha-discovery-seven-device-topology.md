@@ -1,13 +1,32 @@
 ---
 id: ADR-124
 title: HA Discovery Seven-Device Topology — Dedicated OT-Core and Sensors Devices, Gateway via_device Hub
-status: Superseded
+status: "Superseded"
 date: 2026-06-05
-tags: [mqtt, ha-discovery, topology, via-device, pic, otdirect, sensors, dallas, s0, esp, gateway]
-supersedes: [ADR-122]
-superseded_by: [ADR-140]
-related: [ADR-122, ADR-077, ADR-070, ADR-106, ADR-088, ADR-080]
-deciders: [Robert van den Breemen]
+tags:
+  - "mqtt"
+  - "ha-discovery"
+  - "topology"
+  - "via-device"
+  - "pic"
+  - "otdirect"
+  - "sensors"
+  - "dallas"
+  - "s0"
+  - "esp"
+  - "gateway"
+supersedes:
+  - "ADR-122"
+superseded_by: "ADR-140"
+related:
+  - "ADR-122"
+  - "ADR-077"
+  - "ADR-070"
+  - "ADR-106"
+  - "ADR-088"
+  - "ADR-080"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-124: HA Discovery Seven-Device Topology — Dedicated OT-Core and Sensors Devices, Gateway via_device Hub

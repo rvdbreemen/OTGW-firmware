@@ -1,13 +1,20 @@
 ---
 id: ADR-166
 title: "Single-app-slot boards: firmware/app OTA is USB-only, filesystem OTA stays on WiFi"
-status: Proposed
+status: "Proposed"
 date: 2026-07-06
-tags: [esp32s3, ota, partitions, safety, task959]
+tags:
+  - "esp32s3"
+  - "ota"
+  - "partitions"
+  - "safety"
+  - "task959"
 supersedes: []
-superseded_by: []
-related: [ADR-126]
-deciders: [Robert van den Breemen]
+superseded_by: null
+related:
+  - "ADR-126"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-166: Single-app-slot boards: firmware/app OTA is USB-only, filesystem OTA stays on WiFi

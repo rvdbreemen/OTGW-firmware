@@ -1,7 +1,7 @@
 ---
 id: "ADR-140"
 title: "Single-Device HA Discovery Topology with Source-Prefix Entity Clustering in One Device (align 2.0.0 with the 1.6.x single-device model)"
-status: "Accepted"
+status: "Amended"
 date: "2026-06-20"
 binding: false
 gate: null

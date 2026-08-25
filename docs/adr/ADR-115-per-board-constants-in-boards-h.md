@@ -1,13 +1,22 @@
 ---
 id: ADR-115
 title: Per-Board Numeric Constants and Typedefs Live in boards.h
-status: Accepted
+status: "Accepted"
 date: 2026-05-30
-tags: [architecture, esp32, abstraction, portability, boards]
+tags:
+  - "architecture"
+  - "esp32"
+  - "abstraction"
+  - "portability"
+  - "boards"
 supersedes: []
-superseded_by: []
-related: [ADR-061, ADR-051, ADR-079]
-deciders: [Robert van den Breemen]
+superseded_by: null
+related:
+  - "ADR-061"
+  - "ADR-051"
+  - "ADR-079"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-115: Per-Board Numeric Constants and Typedefs Live in boards.h

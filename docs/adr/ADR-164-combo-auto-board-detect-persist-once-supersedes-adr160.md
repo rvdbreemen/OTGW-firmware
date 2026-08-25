@@ -1,13 +1,27 @@
 ---
 id: ADR-164
 title: "Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)"
-status: Accepted
+status: "Accepted"
 date: 2026-07-04
-tags: [board-detection, combo, otgw32, esp32s3, pic, boot, reliability, i2c]
-supersedes: [ADR-160]
-superseded_by: []
-related: [ADR-126, ADR-127, ADR-158, ADR-160]
-deciders: [Robert van den Breemen]
+tags:
+  - "board-detection"
+  - "combo"
+  - "otgw32"
+  - "esp32s3"
+  - "pic"
+  - "boot"
+  - "reliability"
+  - "i2c"
+supersedes:
+  - "ADR-160"
+superseded_by: null
+related:
+  - "ADR-126"
+  - "ADR-127"
+  - "ADR-158"
+  - "ADR-160"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-164: Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)

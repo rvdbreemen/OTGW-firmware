@@ -1,13 +1,21 @@
 ---
 id: ADR-117
 title: SAT Simulation Contract — Bus Isolation, Boiler-Absence Availability, Command Trace
-status: Accepted
+status: "Accepted"
 date: 2026-06-01
-tags: [sat, simulation, safety, opentherm, otgw32]
+tags:
+  - "sat"
+  - "simulation"
+  - "safety"
+  - "opentherm"
+  - "otgw32"
 supersedes: []
-superseded_by: []
-related: [ADR-051, ADR-088]
-deciders: [Robert van den Breemen]
+superseded_by: null
+related:
+  - "ADR-051"
+  - "ADR-088"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-117: SAT Simulation Contract — Bus Isolation, Boiler-Absence Availability, Command Trace

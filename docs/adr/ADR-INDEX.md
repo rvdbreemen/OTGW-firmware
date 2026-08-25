@@ -16,7 +16,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-008 | Accepted | - | Use LittleFS as the filesystem for configuration and web UI files. |
 | ADR-009 | Accepted | - | MANDATORY: All string literals MUST use PROGMEM to store them in flash memory instead of RAM. |
 | ADR-010 | Accepted | - | Run multiple network services on separate ports, each optimized for its specific use case. |
-| ADR-011 | Accepted | - | Use an external I2C hardware watchdog chip that must be fed regularly by the ESP8266, or it will force a hardware reset. |
+| ADR-011 | Amended | - | Use an external I2C hardware watchdog chip that must be fed regularly by the ESP8266, or it will force a hardware reset. |
 | ADR-012 | Accepted | - | Implement PIC firmware flashing directly in the ESP8266 Web UI with WebSocket progress streaming. |
 | ADR-013 | Accepted | - | Use the Arduino framework (ESP8266 Arduino Core) for all firmware development. |
 | ADR-014 | Superseded | - | Provide dual build system: Makefile (primary) + build.py wrapper (convenience). |

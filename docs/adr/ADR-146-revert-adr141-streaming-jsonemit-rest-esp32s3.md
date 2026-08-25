@@ -1,13 +1,34 @@
 ---
 id: ADR-146
 title: "Revert ADR-141: remove ArduinoJson, return to a hand-rolled streaming JSON writer (JsonEmit) on the ESP32-S3 REST path"
-status: Accepted
+status: "Accepted"
 date: 2026-06-19
-tags: [json, arduinojson, rest, esp32s3, memory, streaming, jsonemit, heap, evaluate]
-supersedes: [ADR-141, ADR-145]
-superseded_by: []
-related: [ADR-042, ADR-080, ADR-088, ADR-089, ADR-128, ADR-139, ADR-140, ADR-141, ADR-145]
-deciders: [Robert van den Breemen]
+tags:
+  - "json"
+  - "arduinojson"
+  - "rest"
+  - "esp32s3"
+  - "memory"
+  - "streaming"
+  - "jsonemit"
+  - "heap"
+  - "evaluate"
+supersedes:
+  - "ADR-141"
+  - "ADR-145"
+superseded_by: null
+related:
+  - "ADR-042"
+  - "ADR-080"
+  - "ADR-088"
+  - "ADR-089"
+  - "ADR-128"
+  - "ADR-139"
+  - "ADR-140"
+  - "ADR-141"
+  - "ADR-145"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-146: Revert ADR-141 -- remove ArduinoJson, return to a hand-rolled streaming JSON writer (JsonEmit) on the ESP32-S3 REST path

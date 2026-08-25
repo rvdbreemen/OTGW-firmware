@@ -1,13 +1,29 @@
 ---
 id: ADR-143
 title: Telnet + ser2net transport on AsyncTCP (AsyncSimpleTelnet) to remove loop-task socket-write blocking
-status: Accepted
+status: "Accepted"
 date: 2026-06-17
-tags: [telnet, ser2net, asynctcp, twdt, core-pinning, loop-stall, esp32s3, simpletelnet]
+tags:
+  - "telnet"
+  - "ser2net"
+  - "asynctcp"
+  - "twdt"
+  - "core-pinning"
+  - "loop-stall"
+  - "esp32s3"
+  - "simpletelnet"
 supersedes: []
-superseded_by: []
-related: [ADR-024, ADR-123, ADR-131, ADR-132, ADR-133, ADR-135, ADR-139]
-deciders: [Robert van den Breemen]
+superseded_by: null
+related:
+  - "ADR-024"
+  - "ADR-123"
+  - "ADR-131"
+  - "ADR-132"
+  - "ADR-133"
+  - "ADR-135"
+  - "ADR-139"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-143: Telnet + ser2net transport on AsyncTCP (AsyncSimpleTelnet) to remove loop-task socket-write blocking

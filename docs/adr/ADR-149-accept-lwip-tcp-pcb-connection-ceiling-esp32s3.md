@@ -1,13 +1,30 @@
 ---
 id: ADR-149
 title: "Accept the LWIP TCP-pcb connection ceiling on the ESP32-S3: keep the app-level connection mitigations, do not raise CONFIG_LWIP_MAX_ACTIVE_TCP (TASK-884)"
-status: Accepted
+status: "Accepted"
 date: 2026-06-20
-tags: [esp32s3, lwip, asynctcp, websocket, webserver, twdt, concurrency, connection-flood, platform-limits, task884, task879, task883]
+tags:
+  - "esp32s3"
+  - "lwip"
+  - "asynctcp"
+  - "websocket"
+  - "webserver"
+  - "twdt"
+  - "concurrency"
+  - "connection-flood"
+  - "platform-limits"
+  - "task884"
+  - "task879"
+  - "task883"
 supersedes: []
-superseded_by: []
-related: [ADR-080, ADR-089, ADR-135, ADR-147]
-deciders: [Robert van den Breemen]
+superseded_by: null
+related:
+  - "ADR-080"
+  - "ADR-089"
+  - "ADR-135"
+  - "ADR-147"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-149: Accept the LWIP TCP-pcb connection ceiling on the ESP32-S3, do not raise CONFIG_LWIP_MAX_ACTIVE_TCP (TASK-884)

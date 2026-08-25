@@ -317,7 +317,7 @@
       "title": "External Hardware Watchdog for Reliability",
       "path": "ADR-011-external-hardware-watchdog.md",
       "format": "unknown",
-      "status": "Accepted",
+      "status": "Amended",
       "date": null,
       "decision_summary": "Use an external I2C hardware watchdog chip that must be fed regularly by the ESP8266, or it will force a hardware reset.",
       "topics": [],
@@ -4596,7 +4596,8 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [
-          "ADR-141"
+          "ADR-141",
+          "ADR-145"
         ],
         "superseded_by": null
       }
@@ -8476,6 +8477,12 @@
     {
       "source": "ADR-122",
       "target": "ADR-124",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-122",
+      "target": "ADR-124",
       "type": "superseded-by",
       "resolved": true
     },
@@ -9627,6 +9634,18 @@
     },
     {
       "source": "ADR-143",
+      "target": "ADR-132",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-143",
+      "target": "ADR-133",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-143",
       "target": "ADR-135",
       "type": "related",
       "resolved": true
@@ -9776,6 +9795,18 @@
       "resolved": true
     },
     {
+      "source": "ADR-146",
+      "target": "ADR-145",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-147",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-147",
       "target": "ADR-088",
       "type": "related",
@@ -9784,6 +9815,12 @@
     {
       "source": "ADR-147",
       "target": "ADR-089",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-147",
+      "target": "ADR-128",
       "type": "related",
       "resolved": true
     },
@@ -10186,6 +10223,30 @@
     {
       "source": "ADR-163",
       "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-164",
+      "target": "ADR-126",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-164",
+      "target": "ADR-127",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-164",
+      "target": "ADR-158",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-164",
+      "target": "ADR-160",
       "type": "related",
       "resolved": true
     },

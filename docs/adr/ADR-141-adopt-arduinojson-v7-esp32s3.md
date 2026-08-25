@@ -1,13 +1,29 @@
 ---
 id: ADR-141
 title: Adopt ArduinoJson v7 for JSON on the ESP32-S3 2.0.0 line
-status: Superseded by ADR-146
+status: "Superseded"
 date: 2026-06-15
-tags: [json, arduinojson, mqtt, ha-discovery, rest, esp32s3, memory]
-supersedes: [ADR-042]
-superseded_by: [ADR-146]
-related: [ADR-042, ADR-018, ADR-128, ADR-140, ADR-089, ADR-077, ADR-131]
-deciders: [Robert van den Breemen]
+tags:
+  - "json"
+  - "arduinojson"
+  - "mqtt"
+  - "ha-discovery"
+  - "rest"
+  - "esp32s3"
+  - "memory"
+supersedes:
+  - "ADR-042"
+superseded_by: "ADR-146"
+related:
+  - "ADR-042"
+  - "ADR-018"
+  - "ADR-128"
+  - "ADR-140"
+  - "ADR-089"
+  - "ADR-077"
+  - "ADR-131"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-141: Adopt ArduinoJson v7 for JSON on the ESP32-S3 2.0.0 line

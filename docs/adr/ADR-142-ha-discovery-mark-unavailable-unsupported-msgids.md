@@ -1,13 +1,27 @@
 ---
 id: ADR-142
 title: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List
-status: Deferred
+status: "Deferred"
 date: 2026-06-04
-tags: [mqtt, ha-discovery, availability, opentherm, boiler, unsupported-msgid, observability]
+tags:
+  - "mqtt"
+  - "ha-discovery"
+  - "availability"
+  - "opentherm"
+  - "boiler"
+  - "unsupported-msgid"
+  - "observability"
 supersedes: []
-superseded_by: []
-related: [ADR-077, ADR-088, ADR-093, ADR-102, ADR-122, ADR-080]
-deciders: [Robert van den Breemen]
+superseded_by: null
+related:
+  - "ADR-077"
+  - "ADR-088"
+  - "ADR-093"
+  - "ADR-102"
+  - "ADR-122"
+  - "ADR-080"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-142: HA Discovery — Mark Unsupported MsgID Entities Unavailable via Availability List

@@ -1,13 +1,25 @@
 ---
 id: ADR-120
 title: Platform Abstraction Headers Promoted to the src/libraries/Platform Library
-status: Accepted
+status: "Accepted"
 date: 2026-06-02
-tags: [architecture, esp32, esp8266, abstraction, portability, build, library]
+tags:
+  - "architecture"
+  - "esp32"
+  - "esp8266"
+  - "abstraction"
+  - "portability"
+  - "build"
+  - "library"
 supersedes: []
-superseded_by: []
-related: [ADR-061, ADR-115, ADR-083, ADR-079]
-deciders: [Robert van den Breemen]
+superseded_by: null
+related:
+  - "ADR-061"
+  - "ADR-115"
+  - "ADR-083"
+  - "ADR-079"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-120: Platform Abstraction Headers Promoted to the src/libraries/Platform Library

@@ -1,13 +1,31 @@
 ---
 id: ADR-122
 title: HA Discovery Five-Device Topology
-status: Superseded by ADR-124
+status: "Superseded"
 date: 2026-06-03
-tags: [mqtt, ha-discovery, topology, legacy-mode, sat, esp, gateway, boiler, thermostat]
+tags:
+  - "mqtt"
+  - "ha-discovery"
+  - "topology"
+  - "legacy-mode"
+  - "sat"
+  - "esp"
+  - "gateway"
+  - "boiler"
+  - "thermostat"
 supersedes: []
-superseded_by: [ADR-124]
-related: [ADR-077, ADR-070, ADR-106, ADR-096, ADR-103, ADR-088, ADR-080, ADR-124]
-deciders: [Robert van den Breemen]
+superseded_by: "ADR-124"
+related:
+  - "ADR-077"
+  - "ADR-070"
+  - "ADR-106"
+  - "ADR-096"
+  - "ADR-103"
+  - "ADR-088"
+  - "ADR-080"
+  - "ADR-124"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-122: HA Discovery Five-Device Topology

@@ -1,7 +1,7 @@
 ---
 id: "ADR-011"
 title: "External Hardware Watchdog for Reliability"
-status: "Accepted"
+status: "Amended"
 date: null
 binding: false
 gate: null

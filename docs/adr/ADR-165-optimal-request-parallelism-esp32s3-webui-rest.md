@@ -1,13 +1,28 @@
 ---
 id: ADR-165
 title: "Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)"
-status: Accepted
+status: "Accepted"
 date: 2026-07-06
-tags: [esp32s3, rest-api, webui, concurrency, backpressure, load-test, task1015, task1014, task884, task1017]
+tags:
+  - "esp32s3"
+  - "rest-api"
+  - "webui"
+  - "concurrency"
+  - "backpressure"
+  - "load-test"
+  - "task1015"
+  - "task1014"
+  - "task884"
+  - "task1017"
 supersedes: []
-superseded_by: []
-related: [ADR-149, ADR-147, ADR-145, ADR-089]
-deciders: [Robert van den Breemen]
+superseded_by: null
+related:
+  - "ADR-149"
+  - "ADR-147"
+  - "ADR-145"
+  - "ADR-089"
+deciders:
+  - "Robert van den Breemen"
 ---
 
 # ADR-165: Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)
