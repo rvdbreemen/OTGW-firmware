@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-24 19:05'
-updated_date: '2026-08-25 18:07'
+updated_date: '2026-08-25 18:12'
 labels:
   - bug
 dependencies: []
@@ -23,8 +23,8 @@ Surfaced by the extractJsonField return-contract change in TASK-1082. At restAPI
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 extractJsonField distinguishes not-found from too-long at its call sites, or the commands handler stops using the raw-body fallback for an over-long command value
-- [ ] #2 An over-long command value produces an explicit error rather than a silently mangled command
+- [x] #1 extractJsonField distinguishes not-found from too-long at its call sites, or the commands handler stops using the raw-body fallback for an over-long command value
+- [x] #2 An over-long command value produces an explicit error rather than a silently mangled command
 <!-- AC:END -->
 
 ## Implementation Notes
