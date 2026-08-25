@@ -1,7 +1,7 @@
 ---
 id: "ADR-092"
 title: "Keep a recovery route reachable when the HTTP heap gate refuses"
-status: "Proposed"
+status: "Accepted"
 date: "2026-08-25"
 binding: false
 gate: null
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "madr"
 topics:
   - "heap"
   - "ota"
@@ -26,6 +25,7 @@ symbols:
   - "bESPactive"
   - "handleDebug"
 context_scope: "selective"
+format: "madr"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -34,7 +34,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-08-25.
+Accepted, 2026-08-25.
 
 ## Status History
 
@@ -45,6 +45,16 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-08-25
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted by the maintainer after grilling. Single-key telnet command, no confirmation; MQTT deferred to its own decision.
+    changed_via: adr-kit lifecycle
+  - date: 2026-08-25
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Maintainer-authorised correction to the answered MQTT open question. The follow-up task it referred to was dropped the same day, so the record now reads "not pursued" instead of "deferred". Decision, drivers, options and consequences unchanged.
+    changed_via: maintainer-authorised correction
 ```
 
 ## Context and Problem Statement
@@ -205,15 +215,8 @@ decision if operators report that manual recovery is not enough.
 
 ## Open Questions
 
-- [ ] Should the reboot command require a confirmation keystroke? Every other
-      telnet command is a single character with an immediate effect, so a
-      confirmation would break that convention, but rebooting a boiler gateway
-      by mistyping one letter is a different order of consequence from toggling
-      a debug flag.
-- [ ] Should the same action be exposed over the message-queue telemetry transport (MQTT) as well? Home Assistant users
-      are more likely to have MQTT than a telnet client to hand, and a command
-      topic already exists. Against: MQTT is precisely what a heap-pressured
-      device may have stopped servicing, so it is the less reliable of the two.
+- [x] Should the reboot command require a confirmation keystroke? — **Answered 2026-08-25 by User: Robert van den Breemen:** No. One key, like every other command. handleDebugChar(char c) reads a single character and dispatches immediately, and handleDebug.ino contains no confirmation pattern anywhere, so a two-key sequence would be the only exception in the console and would need its own explanation. The consequence of a mistyped key is bounded: a reboot preserves settings, the device returns within seconds, and the deferred-reboot mechanism this decision mandates already refuses to fire while isFlashing(), which covers the one case where an accidental restart would do real harm. Decided by the maintainer.
+- [x] Should the same action be exposed over the message-queue telemetry transport (MQTT) as well? — **Answered 2026-08-25 by User: Robert van den Breemen:** Telnet only, and MQTT is not pursued. A follow-up task was opened for it and then dropped the same day: the maintainer saw no reason to spend time on a second channel for an action that already has one. This closes the question rather than deferring it; anyone who wants an MQTT reboot later starts a fresh decision, not a waiting one. The reason MQTT loses is scope, not reachability, and stating that corrects the draft: an earlier version of this record argued that MQTT is the channel a heap-pressured device stops servicing. That is only half true. canPublishMQTT() gates PUBLISHING, but handleMQTT() runs in the same loop branch as telnet and before the HTTP gate, so an inbound command would most likely still arrive. The real argument is that an MQTT reboot is a new external effect on a channel shared with a broker, and deserves its own decision about who may send it. Telnet already sits inside ADR-032's trusted-local-network model, so adding a command there changes no trust boundary.
 
 ## Related Decisions
 

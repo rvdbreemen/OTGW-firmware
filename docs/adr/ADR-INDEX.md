@@ -96,4 +96,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-089 | Accepted | - | Chosen option: Option A, because the cost is a per-ADR multiplier rather than a per-call latency, so it belongs on a... |
 | ADR-090 | Accepted | - | Chosen option: Option A, because the maintainer decided that an Energy dashboard figure should work out of the box, w... |
 | ADR-091 | Accepted | - | Chosen option: Option A. |
-| ADR-092 | Proposed | - | Chosen option: Option A. |
+| ADR-092 | Accepted | - | Chosen option: Option A. |

@@ -2977,7 +2977,7 @@
       "title": "Keep a recovery route reachable when the HTTP heap gate refuses",
       "path": "ADR-092-keep-a-recovery-route-reachable-when-the-http-heap-gate-refuses.md",
       "format": "madr",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-08-25",
       "decision_summary": "Chosen option: Option A.",
       "topics": [
