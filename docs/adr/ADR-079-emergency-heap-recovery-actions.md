@@ -1,3 +1,15 @@
+---
+id: "ADR-079"
+title: "Emergency Heap Recovery Actions"
+status: "Accepted"
+date: "2026-05-23"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-079: Emergency Heap Recovery Actions
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-014"
+title: "Dual Build System (Makefile + Python Script)"
+status: "Accepted"
+date: "2020-01-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-014: Dual Build System (Makefile + Python Script)
 
 ## Status

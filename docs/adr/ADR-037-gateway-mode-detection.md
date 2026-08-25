@@ -1,3 +1,15 @@
+---
+id: "ADR-037"
+title: "Gateway Mode Detection via PR=M Polling"
+status: "Accepted"
+date: "2026-02-16"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-037: Gateway Mode Detection via PR=M Polling
 
 ## Status

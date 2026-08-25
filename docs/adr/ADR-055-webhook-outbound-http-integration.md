@@ -1,3 +1,15 @@
+---
+id: "ADR-055"
+title: "Webhook Outbound HTTP Integration"
+status: "Superseded"
+date: "2026-03-02"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-057"
+---
 # ADR-055: Webhook Outbound HTTP Integration
 
 ## Status

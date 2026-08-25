@@ -1,3 +1,15 @@
+---
+id: "ADR-009"
+title: "PROGMEM Usage for String Literals"
+status: "Accepted"
+date: "2018-06-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-009: PROGMEM Usage for String Literals
 
 ## Status

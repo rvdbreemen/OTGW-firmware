@@ -1,3 +1,15 @@
+---
+id: "ADR-035"
+title: "RESTful API Compliance Strategy"
+status: "Accepted"
+date: "2026-02-16"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-035: RESTful API Compliance Strategy
 
 ## Status

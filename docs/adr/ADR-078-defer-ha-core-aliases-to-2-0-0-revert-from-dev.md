@@ -1,3 +1,15 @@
+---
+id: "ADR-078"
+title: "Defer HA-Core Capability-Flag Aliases — Ship on 2.0.0 Only, Revert from `dev`"
+status: "Accepted"
+date: "2026-05-21"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-078: Defer HA-Core Capability-Flag Aliases — Ship on 2.0.0 Only, Revert from `dev`
 
 ## Status

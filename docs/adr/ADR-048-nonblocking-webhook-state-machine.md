@@ -1,3 +1,15 @@
+---
+id: "ADR-048"
+title: "Non-Blocking Webhook State Machine with Retry"
+status: "Accepted"
+date: "2026-03-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-048: Non-Blocking Webhook State Machine with Retry
 
 ## Status

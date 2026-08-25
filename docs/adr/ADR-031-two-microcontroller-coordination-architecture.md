@@ -1,3 +1,15 @@
+---
+id: "ADR-031"
+title: "Two-Microcontroller Coordination Architecture"
+status: "Accepted"
+date: "2026-02-07"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-031: Two-Microcontroller Coordination Architecture
 
 ## Status

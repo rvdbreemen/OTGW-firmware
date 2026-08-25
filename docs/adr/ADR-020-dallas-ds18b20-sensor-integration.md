@@ -1,3 +1,15 @@
+---
+id: "ADR-020"
+title: "Dallas DS18B20 Temperature Sensor Integration"
+status: "Accepted"
+date: "2019-01-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-020: Dallas DS18B20 Temperature Sensor Integration
 
 ## Status

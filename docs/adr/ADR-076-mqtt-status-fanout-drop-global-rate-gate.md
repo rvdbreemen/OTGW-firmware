@@ -1,3 +1,15 @@
+---
+id: "ADR-076"
+title: "MQTT Status Fan-Out — Drop Global Rate-Gate, Keep Per-Slot Heartbeat"
+status: "Accepted"
+date: "2026-05-21"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-076: MQTT Status Fan-Out — Drop Global Rate-Gate, Keep Per-Slot Heartbeat
 
 ## Status

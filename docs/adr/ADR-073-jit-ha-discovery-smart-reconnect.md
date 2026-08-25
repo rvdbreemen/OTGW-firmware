@@ -1,3 +1,16 @@
+---
+id: "ADR-073"
+title: "JIT HA Discovery with Smart Reconnect (Supersedes ADR-041)"
+status: "Superseded"
+date: "2026-08-07"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-041"
+superseded_by: "ADR-088"
+---
 # ADR-073: JIT HA Discovery with Smart Reconnect (Supersedes ADR-041)
 
 ## Status

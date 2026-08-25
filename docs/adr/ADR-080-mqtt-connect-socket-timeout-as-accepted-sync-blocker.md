@@ -1,3 +1,15 @@
+---
+id: "ADR-080"
+title: "MQTT connect() socket timeout accepted as known main-loop sync-blocker"
+status: "Accepted"
+date: "2026-05-23"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-080: MQTT connect() socket timeout accepted as known main-loop sync-blocker
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-067"
+title: "— HA Discovery State Reconciliation on OTA Upgrade"
+status: "Deprecated"
+date: "2026-05-04"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-067 — HA Discovery State Reconciliation on OTA Upgrade
 
 ## Status

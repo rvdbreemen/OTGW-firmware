@@ -1,3 +1,15 @@
+---
+id: "ADR-003"
+title: "HTTP-Only Network Architecture (No HTTPS)"
+status: "Accepted"
+date: "2018-01-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-003: HTTP-Only Network Architecture (No HTTPS)
 
 ## Status

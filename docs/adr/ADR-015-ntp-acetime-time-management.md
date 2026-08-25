@@ -1,3 +1,15 @@
+---
+id: "ADR-015"
+title: "NTP and AceTime for Time Management"
+status: "Accepted"
+date: "2021-10-16"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-015: NTP and AceTime for Time Management
 
 ## Status

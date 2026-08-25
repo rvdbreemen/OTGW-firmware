@@ -1,3 +1,15 @@
+---
+id: "ADR-061"
+title: "WiFi Reconnect Timeout Tuning"
+status: "Accepted"
+date: "2026-04-03"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-061: WiFi Reconnect Timeout Tuning
 
 ## Status

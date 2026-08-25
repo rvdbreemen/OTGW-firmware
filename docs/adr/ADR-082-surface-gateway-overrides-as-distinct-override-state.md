@@ -1,3 +1,15 @@
+---
+id: "ADR-082"
+title: "Surface gateway overrides as distinct override state"
+status: "Accepted"
+date: "2026-06-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-082: Surface gateway overrides as distinct override state
 
 ## Status

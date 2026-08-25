@@ -1,3 +1,15 @@
+---
+id: "ADR-065"
+title: "— otgw-pic/ MQTT subtree as stable public topic API"
+status: "Accepted"
+date: "2026-04-23"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-065 — otgw-pic/ MQTT subtree as stable public topic API
 
 ## Status

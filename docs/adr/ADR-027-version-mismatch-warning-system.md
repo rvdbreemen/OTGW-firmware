@@ -1,3 +1,15 @@
+---
+id: "ADR-027"
+title: "Version Mismatch Warning System in Web UI"
+status: "Accepted"
+date: "2026-01-31"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-027: Version Mismatch Warning System in Web UI
 
 ## Status

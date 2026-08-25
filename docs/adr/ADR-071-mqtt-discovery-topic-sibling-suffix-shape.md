@@ -1,3 +1,16 @@
+---
+id: "ADR-071"
+title: "MQTT Discovery Topic Sibling-Suffix Shape (Supersedes ADR-070)"
+status: "Accepted"
+date: "2026-05-07"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-070"
+superseded_by: null
+---
 # ADR-071: MQTT Discovery Topic Sibling-Suffix Shape (Supersedes ADR-070)
 
 ## Status

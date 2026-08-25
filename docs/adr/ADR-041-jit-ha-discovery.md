@@ -1,3 +1,15 @@
+---
+id: "ADR-041"
+title: "Just-In-Time Home Assistant MQTT Discovery"
+status: "Superseded"
+date: "2026-05-08"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-073"
+---
 # ADR-041: Just-In-Time Home Assistant MQTT Discovery
 
 ## Status

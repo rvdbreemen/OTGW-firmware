@@ -1,3 +1,15 @@
+---
+id: "ADR-056"
+title: "Protected Admin Endpoint Security and Secret-Handling Contract"
+status: "Accepted"
+date: "2026-03-21"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-056: Protected Admin Endpoint Security and Secret-Handling Contract
 
 ## Status

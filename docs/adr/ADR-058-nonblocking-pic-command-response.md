@@ -1,3 +1,15 @@
+---
+id: "ADR-058"
+title: "Non-blocking PIC Command/Response for PR= Queries"
+status: "Accepted"
+date: "2026-03-27"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-058: Non-blocking PIC Command/Response for PR= Queries
 
 ## Status

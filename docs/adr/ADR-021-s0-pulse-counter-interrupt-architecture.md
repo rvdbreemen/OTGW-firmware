@@ -1,3 +1,15 @@
+---
+id: "ADR-021"
+title: "S0 Pulse Counter Hardware Interrupt Architecture"
+status: "Accepted"
+date: "2020-01-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-021: S0 Pulse Counter Hardware Interrupt Architecture
 
 ## Status

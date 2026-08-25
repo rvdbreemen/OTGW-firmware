@@ -1,3 +1,15 @@
+---
+id: "ADR-042"
+title: "Streaming JSON I/O — No ArduinoJson"
+status: "Accepted"
+date: "2026-02-28"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-042: Streaming JSON I/O — No ArduinoJson
 
 ## Status

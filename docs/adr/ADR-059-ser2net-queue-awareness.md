@@ -1,3 +1,15 @@
+---
+id: "ADR-059"
+title: "Ser2net Queue Awareness and Serial Bus Coordination"
+status: "Accepted"
+date: "2026-03-28"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-059: Ser2net Queue Awareness and Serial Bus Coordination
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-083"
+title: "Per-Consumer Heap Gating (WebSocket vs MQTT decoupling)"
+status: "Proposed"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-083: Per-Consumer Heap Gating (WebSocket vs MQTT decoupling)
 
 ## Status

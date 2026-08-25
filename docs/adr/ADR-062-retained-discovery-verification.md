@@ -1,3 +1,15 @@
+---
+id: "ADR-062"
+title: "— Retained discovery verification via wildcard subscribe with RAM-tuned buffer resize"
+status: "Superseded"
+date: "2026-07-22"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-087"
+---
 # ADR-062 — Retained discovery verification via wildcard subscribe with RAM-tuned buffer resize
 
 ## Status

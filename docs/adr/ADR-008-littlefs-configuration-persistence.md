@@ -1,3 +1,15 @@
+---
+id: "ADR-008"
+title: "LittleFS for Configuration Persistence"
+status: "Accepted"
+date: "2020-06-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-008: LittleFS for Configuration Persistence
 
 ## Status

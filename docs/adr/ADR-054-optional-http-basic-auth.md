@@ -1,3 +1,15 @@
+---
+id: "ADR-054"
+title: "Optional HTTP Basic Authentication for Settings"
+status: "Superseded"
+date: "2026-02-24"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-056"
+---
 # ADR-054: Optional HTTP Basic Authentication for Settings
 
 ## Status

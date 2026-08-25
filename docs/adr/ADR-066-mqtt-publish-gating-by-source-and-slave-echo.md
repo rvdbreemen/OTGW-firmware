@@ -1,3 +1,15 @@
+---
+id: "ADR-066"
+title: "MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification"
+status: "Proposed"
+date: "2026-04-28"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-066: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification
 
 ## Status

@@ -1,3 +1,16 @@
+---
+id: "ADR-057"
+title: "Webhook Delivery, Retry, and Protected Test Endpoint Policy"
+status: "Accepted"
+date: "2026-03-21"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-055"
+superseded_by: null
+---
 # ADR-057: Webhook Delivery, Retry, and Protected Test Endpoint Policy
 
 ## Status

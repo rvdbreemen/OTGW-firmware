@@ -1,3 +1,15 @@
+---
+id: "ADR-084"
+title: "Build-Time ESP8266 Core Patch for the HTTP NULL-Alloc Crash"
+status: "Rejected"
+date: "2026-06-10"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-084: Build-Time ESP8266 Core Patch for the HTTP NULL-Alloc Crash
 
 ## Status

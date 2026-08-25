@@ -1,3 +1,15 @@
+---
+id: "ADR-022"
+title: "GPIO Output Control (Bit-Flag Triggered Relays)"
+status: "Accepted"
+date: "2020-06-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-022: GPIO Output Control (Bit-Flag Triggered Relays)
 
 ## Status

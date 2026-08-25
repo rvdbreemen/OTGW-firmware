@@ -1,3 +1,15 @@
+---
+id: "ADR-039"
+title: "Real-Time OTGraph Charting Architecture"
+status: "Accepted"
+date: "2026-02-16"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-039: Real-Time OTGraph Charting Architecture
 
 ## Status

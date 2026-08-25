@@ -1,3 +1,15 @@
+---
+id: "ADR-023"
+title: "File System Explorer HTTP Architecture"
+status: "Accepted"
+date: "2019-01-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-023: File System Explorer HTTP Architecture
 
 ## Status

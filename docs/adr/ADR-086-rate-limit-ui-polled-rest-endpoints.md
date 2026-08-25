@@ -1,3 +1,15 @@
+---
+id: "ADR-086"
+title: "Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses"
+status: "Accepted"
+date: "2026-07-20"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-086: Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses
 
 ## Status

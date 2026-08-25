@@ -1,3 +1,15 @@
+---
+id: "ADR-081"
+title: "MQTT on-change publishing as the default with one-time interval migration"
+status: "Accepted"
+date: "2026-05-31"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-081: MQTT on-change publishing as the default with one-time interval migration
 
 ## Status

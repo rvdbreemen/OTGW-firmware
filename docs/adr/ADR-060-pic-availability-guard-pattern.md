@@ -1,3 +1,15 @@
+---
+id: "ADR-060"
+title: "PIC Availability Guard Pattern"
+status: "Accepted"
+date: "2026-03-31"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-060: PIC Availability Guard Pattern
 
 ## Status

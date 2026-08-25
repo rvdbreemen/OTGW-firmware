@@ -1,3 +1,15 @@
+---
+id: "ADR-053"
+title: "Large Feature Buffer Static Allocation"
+status: "Accepted"
+date: "2026-03-21"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-053: Large Feature Buffer Static Allocation
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-002"
+title: "Modular .ino File Architecture"
+status: "Accepted"
+date: "2018-06-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-002: Modular .ino File Architecture
 
 ## Status

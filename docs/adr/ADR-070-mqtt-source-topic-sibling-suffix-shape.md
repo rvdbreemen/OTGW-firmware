@@ -1,3 +1,16 @@
+---
+id: "ADR-070"
+title: "MQTT Source-Topic Sibling-Suffix Shape"
+status: "Superseded"
+date: "2026-05-07"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-068"
+superseded_by: "ADR-071"
+---
 # ADR-070: MQTT Source-Topic Sibling-Suffix Shape
 
 ## Status

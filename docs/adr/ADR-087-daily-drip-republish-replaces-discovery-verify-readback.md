@@ -1,3 +1,16 @@
+---
+id: "ADR-087"
+title: "Unconditional daily drip republish replaces automatic discovery-verify readback"
+status: "Accepted"
+date: "2026-07-22"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-062"
+superseded_by: null
+---
 # ADR-087: Unconditional daily drip republish replaces automatic discovery-verify readback
 
 ## Status

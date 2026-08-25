@@ -1,3 +1,15 @@
+---
+id: "ADR-010"
+title: "Multiple Concurrent Network Services"
+status: "Accepted"
+date: "2019-01-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-010: Multiple Concurrent Network Services
 
 ## Status

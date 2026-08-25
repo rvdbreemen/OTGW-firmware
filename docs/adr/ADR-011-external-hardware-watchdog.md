@@ -1,3 +1,15 @@
+---
+id: "ADR-011"
+title: "External Hardware Watchdog for Reliability"
+status: "Accepted"
+date: "2018-01-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-011: External Hardware Watchdog for Reliability
 
 ## Status

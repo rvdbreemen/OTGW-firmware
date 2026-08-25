@@ -1,3 +1,15 @@
+---
+id: "ADR-033"
+title: "Dallas Sensor Custom Labels and Graph Visualization"
+status: "Accepted"
+date: "2026-02-07"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-033: Dallas Sensor Custom Labels and Graph Visualization
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-005"
+title: "WebSocket for Real-Time Streaming"
+status: "Accepted"
+date: "2019-06-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-005: WebSocket for Real-Time Streaming
 
 ## Status
