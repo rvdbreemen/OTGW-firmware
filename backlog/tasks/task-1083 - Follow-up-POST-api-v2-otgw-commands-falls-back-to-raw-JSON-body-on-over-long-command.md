@@ -3,10 +3,11 @@ id: TASK-1083
 title: >-
   Follow-up: POST /api/v2/otgw/commands falls back to raw JSON body on over-long
   command
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-24 19:05'
-updated_date: '2026-08-24 19:35'
+updated_date: '2026-08-25 18:07'
 labels:
   - bug
 dependencies: []
