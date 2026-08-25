@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-25 18:53'
+updated_date: '2026-08-25 20:50'
 labels:
   - bug
   - adr-required
@@ -32,3 +33,19 @@ Needs its own ADR before implementation.
 - [ ] #2 If yes: an upload POST is accepted while canServeHttp() is refusing, without reintroducing the unchecked 2100-byte HTTPUpload allocation below the gate threshold
 - [ ] #3 Verified on the bench: a device held below the gate threshold can still be flashed over the air
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-25: ADR-092 drafted (Proposed) covering this. Recommends Option A, a telnet reboot command, over giving OTA its own entry point below the gate.
+
+Reasoning, all source-verified: bESPactive is set in exactly one place, _handleUploadStart at OTGW-ModUpdateServer-impl.h:286, which is an upload callback of an ordinary HTTP route registered at :151 on httpServer. Routes on httpServer run only from handleClient(), which canServeHttp() gates. So the loop comment claiming the flash handlers are not gated is true of a flash in progress and false of starting one.
+
+Telnet survives the gate: debugTelnet.loop() runs before it, and ADR-079 keeps telnet clients connected during an incident by design. So an operator can already reach a gated device; what they cannot do is act, because handleDebug.ino has no reboot command and no ESP.restart call anywhere in it. The nearest thing, 'r' at :179, only reconnects WiFi and only when WiFi is already down.
+
+Option B (an OTA entry point below the gate) was rejected: it needs a body path avoiding the parser's unchecked 2100-byte contiguous allocation, which exceeds HTTP_SERVE_MIN_MAXBLOCK, so it means a second upload implementation or a raw-stream reader on the exact path where failure bricks a device.
+
+Option C (auto-reboot on sustained CRITICAL) was rejected as a first step and kept as a later option. TASK-1037's leak was diagnosable only because the device stayed up long enough to be captured; a reboot loop would have destroyed that evidence.
+
+Blocked on maintainer acceptance of ADR-092. Two open questions in it, both for the maintainer: whether the command needs a confirmation keystroke against the single-character convention, and whether the same action should also exist over MQTT.
+<!-- SECTION:NOTES:END -->
