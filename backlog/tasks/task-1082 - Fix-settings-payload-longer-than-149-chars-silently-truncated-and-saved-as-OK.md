@@ -1,7 +1,7 @@
 ---
 id: TASK-1082
 title: 'Fix: settings payload longer than 149 chars silently truncated and saved as OK'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-24 19:03'
