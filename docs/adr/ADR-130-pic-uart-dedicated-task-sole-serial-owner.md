@@ -1,3 +1,15 @@
+---
+id: "ADR-130"
+title: "PIC-UART Dedicated FreeRTOS Task as Sole OTGWSerial Owner (ADR-123 Phase 1)"
+status: "Accepted"
+date: "2026-06-13"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-130 PIC-UART Dedicated FreeRTOS Task as Sole OTGWSerial Owner (ADR-123 Phase 1)
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-100"
+title: "JIT HA Discovery with Smart Reconnect (Port of dev ADR-073)"
+status: "Superseded"
+date: "2026-08-07"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-174"
+---
 # ADR-100: JIT HA Discovery with Smart Reconnect (Port of dev ADR-073)
 
 ## Status

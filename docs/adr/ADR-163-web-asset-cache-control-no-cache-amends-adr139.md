@@ -1,3 +1,15 @@
+---
+id: "ADR-163"
+title: "Web UI Static Assets Use Cache-Control: no-cache (Always-Revalidate via ETag); Amends ADR-139's Bounded max-age"
+status: "Accepted"
+date: "2026-06-30"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-163 Web UI Static Assets Use Cache-Control: no-cache (Always-Revalidate via ETag); Amends ADR-139's Bounded max-age
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-135"
+title: "ESP32 TWDT is the Primary Watchdog, External 0x26 Chip Demoted to Optional Secondary (Amends ADR-011)"
+status: "Accepted"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-135 ESP32 TWDT is the Primary Watchdog, External 0x26 Chip Demoted to Optional Secondary (Amends ADR-011)
 
 ## Status

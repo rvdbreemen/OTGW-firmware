@@ -1,3 +1,15 @@
+---
+id: "ADR-072"
+title: "SAT Platform Compatibility Layer — ESP8266 vs. OTGW32"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-072: SAT Platform Compatibility Layer — ESP8266 vs. OTGW32
 
 **Status:** Accepted

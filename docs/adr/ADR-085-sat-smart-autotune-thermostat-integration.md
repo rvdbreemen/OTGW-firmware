@@ -1,3 +1,15 @@
+---
+id: "ADR-085"
+title: "SAT (Smart Autotune Thermostat) Integration"
+status: "Accepted"
+date: "2026-04-02"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-085: SAT (Smart Autotune Thermostat) Integration
 
 ## Status

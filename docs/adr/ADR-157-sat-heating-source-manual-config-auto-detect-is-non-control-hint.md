@@ -1,3 +1,15 @@
+---
+id: "ADR-157"
+title: "SAT Heating-Source Selection Is Manual Configuration; Auto-Detect Is a Non-Control Hint"
+status: "Accepted"
+date: "2026-06-29"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-157: SAT Heating-Source Selection Is Manual Configuration; Auto-Detect Is a Non-Control Hint
 
 ## Status

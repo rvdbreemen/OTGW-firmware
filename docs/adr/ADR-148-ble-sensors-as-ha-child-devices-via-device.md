@@ -1,3 +1,15 @@
+---
+id: "ADR-148"
+title: "BLE Sensors as Separate Home Assistant Child Devices via via_device (amend ADR-140's single-device rule for BLE probes only)"
+status: "Accepted"
+date: "2026-06-20"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-148: BLE Sensors as Separate Home Assistant Child Devices via via_device (amend ADR-140's single-device rule for BLE probes only)
 
 ## Status

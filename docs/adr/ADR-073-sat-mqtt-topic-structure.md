@@ -1,3 +1,15 @@
+---
+id: "ADR-073"
+title: "SAT MQTT Topic Structure"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-073: SAT MQTT Topic Structure
 
 **Status:** Accepted

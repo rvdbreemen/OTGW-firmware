@@ -1,3 +1,15 @@
+---
+id: "ADR-012"
+title: "PIC Firmware Upgrade via Web UI"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-012: PIC Firmware Upgrade via Web UI
 
 **Status:** Accepted  

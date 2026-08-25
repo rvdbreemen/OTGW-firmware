@@ -1,3 +1,15 @@
+---
+id: "ADR-145"
+title: "Serve REST JSON via a chunked, pull-based response that re-serializes per TCP window (no whole-response buffer)"
+status: "Superseded"
+date: "2026-06-18"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-146"
+---
 # ADR-145 Serve REST JSON via a chunked, pull-based response that re-serializes per TCP window (no whole-response buffer)
 
 ## Status

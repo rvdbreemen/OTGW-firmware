@@ -1,3 +1,15 @@
+---
+id: "ADR-016"
+title: "OpenTherm Command Queue with Deduplication"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-016: OpenTherm Command Queue with Deduplication
 
 **Status:** Accepted  

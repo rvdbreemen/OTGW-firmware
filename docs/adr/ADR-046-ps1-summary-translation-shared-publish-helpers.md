@@ -1,3 +1,16 @@
+---
+id: "ADR-046"
+title: "PS=1 Summary Translation with Shared Publish Helpers"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-045"
+superseded_by: null
+---
 # ADR-046: PS=1 Summary Translation with Shared Publish Helpers
 
 **Status:** Accepted  

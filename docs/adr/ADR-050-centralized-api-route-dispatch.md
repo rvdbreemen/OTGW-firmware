@@ -1,3 +1,15 @@
+---
+id: "ADR-050"
+title: "Centralized API Route Dispatch Table"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-050: Centralized API Route Dispatch Table
 
 **Status:** Accepted

@@ -1,3 +1,15 @@
+---
+id: "ADR-077"
+title: "Streaming MQTT HA Discovery Architecture"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-077 Streaming MQTT HA Discovery Architecture
 
 ## Status

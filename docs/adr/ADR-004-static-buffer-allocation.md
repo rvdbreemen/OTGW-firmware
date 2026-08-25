@@ -1,3 +1,15 @@
+---
+id: "ADR-004"
+title: "Static Buffer Allocation Strategy"
+status: "Superseded"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-053"
+---
 # ADR-004: Static Buffer Allocation Strategy
 
 **Status:** Superseded by ADR-053  

@@ -1,3 +1,15 @@
+---
+id: "ADR-014"
+title: "Dual Build System (Makefile + Python Script)"
+status: "Superseded"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-083"
+---
 # ADR-014: Dual Build System (Makefile + Python Script)
 
 **Status:** Superseded by ADR-083

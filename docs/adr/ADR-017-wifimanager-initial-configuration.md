@@ -1,3 +1,15 @@
+---
+id: "ADR-017"
+title: "WiFiManager for Initial Configuration"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-017: WiFiManager for Initial Configuration
 
 **Status:** Accepted  

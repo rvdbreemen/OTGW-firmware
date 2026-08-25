@@ -1,3 +1,16 @@
+---
+id: "ADR-170"
+title: "Unconditional Daily Drip Republish Replaces the Automatic Discovery-Verify Readback"
+status: "Proposed"
+date: "2026-07-26"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-062"
+superseded_by: null
+---
 # ADR-170 Unconditional Daily Drip Republish Replaces the Automatic Discovery-Verify Readback
 
 ## Status

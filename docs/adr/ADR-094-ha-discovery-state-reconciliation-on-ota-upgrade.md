@@ -1,3 +1,15 @@
+---
+id: "ADR-094"
+title: "Home Assistant discovery state reconciliation on OTA upgrade (feature-2.0.0 port of ADR-067)"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-094: Home Assistant discovery state reconciliation on OTA upgrade (feature-2.0.0 port of ADR-067)
 
 ## Status

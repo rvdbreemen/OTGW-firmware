@@ -1,3 +1,15 @@
+---
+id: "ADR-096"
+title: "MQTT Source-Subtopic Worldview Semantics"
+status: "Superseded"
+date: "2026-05-19"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-103"
+---
 # ADR-096: MQTT Source-Subtopic Worldview Semantics
 
 ## Status

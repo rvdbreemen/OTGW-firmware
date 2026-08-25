@@ -1,3 +1,16 @@
+---
+id: "ADR-136"
+title: "Retire / Simplify the WiFi-Reconnect, Webhook, and PIC PR= State Machines (ADR-123 Phase 4)"
+status: "Accepted"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-048"
+superseded_by: null
+---
 # ADR-136 Retire / Simplify the WiFi-Reconnect, Webhook, and PIC PR= State Machines (ADR-123 Phase 4)
 
 ## Status

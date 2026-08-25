@@ -1,3 +1,15 @@
+---
+id: "ADR-029"
+title: "Simple XHR-Based OTA Flash (KISS Principle)"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-029: Simple XHR-Based OTA Flash (KISS Principle)
 
 **Status:** Accepted

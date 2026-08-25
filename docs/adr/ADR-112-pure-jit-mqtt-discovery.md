@@ -1,3 +1,15 @@
+---
+id: "ADR-112"
+title: "Pure JIT MQTT Discovery (2.0.0 sibling of dev ADR-073)"
+status: "Accepted"
+date: "2026-05-27"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-112: Pure JIT MQTT Discovery (2.0.0 sibling of dev ADR-073)
 
 ## Status

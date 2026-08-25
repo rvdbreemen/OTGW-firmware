@@ -1,3 +1,15 @@
+---
+id: "ADR-171"
+title: "Boot and Republish Discovery Queues Share One Non-OT ID Set"
+status: "Proposed"
+date: "2026-07-26"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-171 Boot and Republish Discovery Queues Share One Non-OT ID Set
 
 ## Status

@@ -1,3 +1,16 @@
+---
+id: "ADR-083"
+title: "PlatformIO as primary build system for dual-target firmware"
+status: "Accepted"
+date: "2026-04-24"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-014"
+superseded_by: null
+---
 # ADR-083: PlatformIO as primary build system for dual-target firmware
 
 ## Status

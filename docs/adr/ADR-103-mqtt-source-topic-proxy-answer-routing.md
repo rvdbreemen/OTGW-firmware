@@ -1,3 +1,16 @@
+---
+id: "ADR-103"
+title: "MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement"
+status: "Accepted"
+date: "2026-05-19"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-096"
+superseded_by: null
+---
 # ADR-103: MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement
 
 ## Status

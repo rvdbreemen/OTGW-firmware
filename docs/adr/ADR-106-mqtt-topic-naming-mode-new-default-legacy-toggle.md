@@ -1,3 +1,16 @@
+---
+id: "ADR-106"
+title: "MQTT Topic Naming Mode — New Self-Describing Names by Default, Legacy OT-Spec Names via `settings.mqtt.bUseLegacyOtTopics` (Mutually Exclusive)"
+status: "Accepted"
+date: "2026-05-21"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-077"
+superseded_by: null
+---
 # ADR-106: MQTT Topic Naming Mode — New Self-Describing Names by Default, Legacy OT-Spec Names via `settings.mqtt.bUseLegacyOtTopics` (Mutually Exclusive)
 
 ## Status

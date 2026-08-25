@@ -1,3 +1,15 @@
+---
+id: "ADR-134"
+title: "OTA Upload Handler on AsyncWebServer onUpload (ADR-123 Phase 3, closes the OTA seam ADR-132 opened)"
+status: "Accepted"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-134 OTA Upload Handler on AsyncWebServer onUpload (ADR-123 Phase 3, closes the OTA seam ADR-132 opened)
 
 ## Status

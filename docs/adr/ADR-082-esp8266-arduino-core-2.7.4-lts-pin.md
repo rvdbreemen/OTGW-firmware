@@ -1,3 +1,15 @@
+---
+id: "ADR-082"
+title: "ESP8266 Arduino Core 2.7.4 LTS pin for the 2.0.0 line"
+status: "Superseded"
+date: "2026-06-12"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-128"
+---
 # ADR-082: ESP8266 Arduino Core 2.7.4 LTS pin for the 2.0.0 line
 
 <!-- adr-kit-lint: skip consistency -->

@@ -1,3 +1,15 @@
+---
+id: "ADR-067"
+title: "SSD1306Ascii Text-Only OLED Library"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-067: SSD1306Ascii Text-Only OLED Library
 
 **Status:** Accepted

@@ -1,3 +1,15 @@
+---
+id: "ADR-053"
+title: "Large Feature Buffer Static Allocation"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-053: Large Feature Buffer Static Allocation
 
 **Status:** Accepted. The [ADR-141](ADR-141-adopt-arduinojson-v7-esp32s3.md) (2026-06-15) narrowing, which let REST-response and inbound JSON I/O on the 2.0.0 ESP32-S3-only line use ArduinoJson v7 heap documents, was reverted by [ADR-146](ADR-146-revert-adr141-streaming-jsonemit-rest-esp32s3.md) (2026-06-19): ArduinoJson is removed and REST JSON returns to a static/streaming writer (`jsonEmit.h`), so the static-buffer rule again governs the REST JSON path in addition to the **settings-persistence** path (manual `wStrF`/`applySettingFromFile`, TASK-867 AC#6) and all non-JSON buffers. This status line is the sanctioned immutability exception (body below unedited).  

@@ -1,3 +1,15 @@
+---
+id: "ADR-129"
+title: "OT-Frame Queue and OTGWState Mutex Foundation (ADR-123 Phase 1)"
+status: "Accepted"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-129 OT-Frame Queue and OTGWState Mutex Foundation (ADR-123 Phase 1)
 
 ## Status

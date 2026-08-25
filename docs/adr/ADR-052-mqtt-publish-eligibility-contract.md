@@ -1,3 +1,15 @@
+---
+id: "ADR-052"
+title: "MQTT Publish Eligibility and Reconnect Refresh Contract"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-052: MQTT Publish Eligibility and Reconnect Refresh Contract
 
 **Status:** Accepted  

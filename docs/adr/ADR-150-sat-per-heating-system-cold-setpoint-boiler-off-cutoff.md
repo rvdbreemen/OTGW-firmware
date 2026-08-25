@@ -1,3 +1,15 @@
+---
+id: "ADR-150"
+title: "SAT Per-Heating-System COLD_SETPOINT (Active Boiler-Off Cutoff on Low Demand)"
+status: "Accepted"
+date: "2026-06-24"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-150: SAT Per-Heating-System COLD_SETPOINT (Active Boiler-Off Cutoff on Low Demand)
 
 ## Status

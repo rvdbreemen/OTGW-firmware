@@ -1,3 +1,15 @@
+---
+id: "ADR-091"
+title: "Design-System Class Drift Gated by evaluate.py"
+status: "Accepted"
+date: "2026-04-28"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-091 Design-System Class Drift Gated by evaluate.py
 
 ## Status

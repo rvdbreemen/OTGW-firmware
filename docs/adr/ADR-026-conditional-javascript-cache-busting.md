@@ -1,3 +1,15 @@
+---
+id: "ADR-026"
+title: "Conditional JavaScript Cache-Busting for Firmware/Filesystem Version Mismatches"
+status: "Superseded"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-139"
+---
 # ADR-026: Conditional JavaScript Cache-Busting for Firmware/Filesystem Version Mismatches
 
 **Status:** Superseded by ADR-139 (2026-06-15)  

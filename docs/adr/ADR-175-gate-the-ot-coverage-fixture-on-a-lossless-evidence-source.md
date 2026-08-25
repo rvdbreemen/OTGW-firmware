@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "madr"
 topics:
   - "testing"
   - "regression-gate"
@@ -28,6 +27,7 @@ symbols:
   - "PRESENCE_GATED"
   - "mqtt_source"
 context_scope: "selective"
+format: "madr"
 ---
 
 <!-- markdownlint-disable MD025 -->

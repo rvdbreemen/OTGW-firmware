@@ -1,3 +1,16 @@
+---
+id: "ADR-131"
+title: "MQTT Engine on espMqttClient: Async Connect, Single Publish Chokepoint (ADR-123 Phase 2)"
+status: "Accepted"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-108"
+superseded_by: null
+---
 # ADR-131 MQTT Engine on espMqttClient: Async Connect, Single Publish Chokepoint (ADR-123 Phase 2)
 
 ## Status

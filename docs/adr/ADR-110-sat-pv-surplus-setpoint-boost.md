@@ -1,3 +1,15 @@
+---
+id: "ADR-110"
+title: "sat-pv-surplus-setpoint-boost"
+status: "Accepted"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-110-sat-pv-surplus-setpoint-boost
 
 ## Status

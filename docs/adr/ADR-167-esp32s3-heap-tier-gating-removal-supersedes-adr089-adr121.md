@@ -1,3 +1,15 @@
+---
+id: "ADR-167"
+title: "Retire the ESP8266-Era Heap Tier Machine and Per-Consumer Gating on the ESP32-S3-Only Dev Branch"
+status: "Accepted"
+date: "2026-07-31"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-167 Retire the ESP8266-Era Heap Tier Machine and Per-Consumer Gating on the ESP32-S3-Only Dev Branch
 
 ## Status

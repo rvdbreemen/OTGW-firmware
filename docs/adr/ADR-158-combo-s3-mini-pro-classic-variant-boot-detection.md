@@ -1,3 +1,15 @@
+---
+id: "ADR-158"
+title: "Combo board: add the LOLIN S3 Mini Pro as a third boot-detected Classic variant"
+status: "Accepted"
+date: "2026-06-29"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-158 Combo board: add the LOLIN S3 Mini Pro as a third boot-detected Classic variant
 
 ## Status

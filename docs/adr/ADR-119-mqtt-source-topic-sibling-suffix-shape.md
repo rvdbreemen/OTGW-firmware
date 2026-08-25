@@ -1,3 +1,16 @@
+---
+id: "ADR-119"
+title: "MQTT Source-Topic Sibling-Suffix Shape (feature-2.0.0 port of ADR-070; renumbered from ADR-097)"
+status: "Superseded"
+date: "2026-05-07"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-095"
+superseded_by: "ADR-098"
+---
 # ADR-119: MQTT Source-Topic Sibling-Suffix Shape (feature-2.0.0 port of ADR-070; renumbered from ADR-097)
 
 > **Renumber note (2026-06-02):** this ADR was originally filed as **ADR-097**.

@@ -1,3 +1,15 @@
+---
+id: "ADR-154"
+title: "— Encrypted Xiaomi MiBeacon (v4/v5) via mbedtls AES-CCM with Per-Roster-Slot Bindkey Secret Storage"
+status: "Accepted"
+date: "2026-07-04"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-154 — Encrypted Xiaomi MiBeacon (v4/v5) via mbedtls AES-CCM with Per-Roster-Slot Bindkey Secret Storage
 
 - **Status**: Proposed

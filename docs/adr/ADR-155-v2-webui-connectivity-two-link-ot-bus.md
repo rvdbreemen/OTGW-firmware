@@ -1,3 +1,15 @@
+---
+id: "ADR-155"
+title: "v2 Web UI Connectivity Model — Two-Link OT Bus, MODE Separated from HEALTH, Five-State Vocabulary"
+status: "Accepted"
+date: "2026-06-26"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-155: v2 Web UI Connectivity Model — Two-Link OT Bus, MODE Separated from HEALTH, Five-State Vocabulary
 
 ## Status

@@ -1,3 +1,16 @@
+---
+id: "ADR-139"
+title: "ETag + Bounded max-age as the Project-Wide Cache-Busting Standard for Web UI Static Assets (Retire ?v= Query Versioning and the Chunked Index Rewriter); Align AsyncTCP Task Config with the EMS-ESP32 Blueprint"
+status: "Accepted"
+date: "2026-06-15"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-026"
+superseded_by: null
+---
 # ADR-139 ETag + Bounded max-age as the Project-Wide Cache-Busting Standard for Web UI Static Assets (Retire ?v= Query Versioning and the Chunked Index Rewriter); Align AsyncTCP Task Config with the EMS-ESP32 Blueprint
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-168"
+title: "PIC Serial Link Binds Native UART0 on GPIO43/44; IDF Console Muted on the PIC Path"
+status: "Proposed"
+date: "2026-07-09"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-168 PIC Serial Link Binds Native UART0 on GPIO43/44; IDF Console Muted on the PIC Path
 
 ## Status

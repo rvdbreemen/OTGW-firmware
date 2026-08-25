@@ -1,3 +1,15 @@
+---
+id: "ADR-006"
+title: "MQTT Integration Pattern"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-006: MQTT Integration Pattern
 
 **Status:** Accepted

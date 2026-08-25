@@ -1,3 +1,15 @@
+---
+id: "ADR-066"
+title: "Thermostat Auto-Detection and Master Mode"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-066: Thermostat Auto-Detection and Master Mode
 
 **Status:** Accepted

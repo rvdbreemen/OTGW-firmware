@@ -1,3 +1,15 @@
+---
+id: "ADR-041"
+title: "Just-In-Time Home Assistant MQTT Discovery"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-041: Just-In-Time Home Assistant MQTT Discovery
 
 **Status:** Accepted

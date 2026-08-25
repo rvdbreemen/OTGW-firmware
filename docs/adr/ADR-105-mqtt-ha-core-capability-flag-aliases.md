@@ -1,3 +1,15 @@
+---
+id: "ADR-105"
+title: "MQTT — Publish HA-Core-Style Self-Describing Aliases for Capability, State, Type, and Fault Bits under `settings.mqtt.bPublishHaCoreAliases`"
+status: "Superseded"
+date: "2026-05-21"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-106"
+---
 # ADR-105: MQTT — Publish HA-Core-Style Self-Describing Aliases for Capability, State, Type, and Fault Bits under `settings.mqtt.bPublishHaCoreAliases`
 
 ## Status

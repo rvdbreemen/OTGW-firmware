@@ -7,7 +7,7 @@
       "title": "ESP8266 Platform Selection",
       "path": "ADR-001-esp8266-platform-selection.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Use the ESP8266 (NodeMCU v1.0 / Wemos D1 mini) as the network controller platform with the Arduino framework.",
       "topics": [],
@@ -30,7 +30,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-061"
       }
     },
     {
@@ -38,7 +38,7 @@
       "title": "Modular .ino File Architecture",
       "path": "ADR-002-modular-ino-architecture.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Adopt a modular .ino file architecture where the firmware is split into 14+ separate .ino files, each responsible for...",
       "topics": [],
@@ -69,7 +69,7 @@
       "title": "HTTP-Only Network Architecture (No HTTPS)",
       "path": "ADR-003-http-only-no-https.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Use HTTP-only protocols.",
       "topics": [],
@@ -100,7 +100,7 @@
       "title": "Static Buffer Allocation Strategy",
       "path": "ADR-004-static-buffer-allocation.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Adopt static buffer allocation with bounded sizes throughout the codebase.",
       "topics": [],
@@ -123,7 +123,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-053"
       }
     },
     {
@@ -131,7 +131,7 @@
       "title": "WebSocket for Real-Time Streaming",
       "path": "ADR-005-websocket-real-time-streaming.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Use WebSocket protocol on a dedicated port (81) for real-time OpenTherm message streaming.",
       "topics": [],
@@ -154,7 +154,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-133"
       }
     },
     {
@@ -162,7 +162,7 @@
       "title": "MQTT Integration Pattern",
       "path": "ADR-006-mqtt-integration-pattern.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement MQTT client with Home Assistant Auto-Discovery support using the PubSubClient library.",
       "topics": [],
@@ -193,7 +193,7 @@
       "title": "Timer-Based Task Scheduling",
       "path": "ADR-007-timer-based-task-scheduling.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement a timer-based task scheduling system using safe macros that handle millisecond rollover correctly.",
       "topics": [],
@@ -224,7 +224,7 @@
       "title": "LittleFS for Configuration Persistence",
       "path": "ADR-008-littlefs-configuration-persistence.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Use LittleFS as the filesystem for configuration and web UI files.",
       "topics": [],
@@ -255,7 +255,7 @@
       "title": "PROGMEM Usage for String Literals",
       "path": "ADR-009-progmem-string-literals.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "MANDATORY: All string literals MUST use PROGMEM to store them in flash memory instead of RAM.",
       "topics": [],
@@ -286,7 +286,7 @@
       "title": "Multiple Concurrent Network Services",
       "path": "ADR-010-multiple-concurrent-network-services.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Run multiple network services on separate ports, each optimized for its specific use case.",
       "topics": [],
@@ -317,7 +317,7 @@
       "title": "External Hardware Watchdog for Reliability",
       "path": "ADR-011-external-hardware-watchdog.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Use an external I2C hardware watchdog chip that must be fed regularly by the ESP8266, or it will force a hardware reset.",
       "topics": [],
@@ -348,7 +348,7 @@
       "title": "PIC Firmware Upgrade via Web UI",
       "path": "ADR-012-pic-firmware-upgrade-via-web.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement PIC firmware flashing directly in the ESP8266 Web UI with WebSocket progress streaming.",
       "topics": [],
@@ -379,7 +379,7 @@
       "title": "Arduino Framework Over ESP-IDF",
       "path": "ADR-013-arduino-framework-over-esp-idf.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Use the Arduino framework (ESP8266 Arduino Core) for all firmware development.",
       "topics": [],
@@ -410,7 +410,7 @@
       "title": "Dual Build System (Makefile + Python Script)",
       "path": "ADR-014-dual-build-system.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Provide dual build system: Makefile (primary) + build.py wrapper (convenience).",
       "topics": [],
@@ -433,7 +433,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-083"
       }
     },
     {
@@ -441,7 +441,7 @@
       "title": "NTP and AceTime for Time Management",
       "path": "ADR-015-ntp-acetime-time-management.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Use NTP (Network Time Protocol) for synchronization combined with AceTime library for timezone handling.",
       "topics": [],
@@ -472,7 +472,7 @@
       "title": "OpenTherm Command Queue with Deduplication",
       "path": "ADR-016-opentherm-command-queue.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement a command queue with automatic deduplication and sequential processing.",
       "topics": [],
@@ -503,7 +503,7 @@
       "title": "WiFiManager for Initial Configuration",
       "path": "ADR-017-wifimanager-initial-configuration.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Use WiFiManager library to create a captive portal for initial WiFi configuration.",
       "topics": [],
@@ -534,7 +534,7 @@
       "title": "ArduinoJson for Data Interchange",
       "path": "ADR-018-arduinojson-data-interchange.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Use ArduinoJson library for all structured data interchange.",
       "topics": [],
@@ -557,7 +557,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-042"
       }
     },
     {
@@ -565,7 +565,7 @@
       "title": "REST API Versioning Strategy",
       "path": "ADR-019-rest-api-versioning-strategy.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Adopt URL path-based API versioning with indefinite version support (no deprecation).",
       "topics": [],
@@ -596,7 +596,7 @@
       "title": "Dallas DS18B20 Temperature Sensor Integration",
       "path": "ADR-020-dallas-ds18b20-sensor-integration.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Integrate Dallas DS18B20 sensors via OneWire protocol with dynamic discovery and MQTT publishing.",
       "topics": [],
@@ -627,7 +627,7 @@
       "title": "S0 Pulse Counter Hardware Interrupt Architecture",
       "path": "ADR-021-s0-pulse-counter-interrupt-architecture.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Use hardware interrupt-driven pulse counting with ISR-safe debounce logic.",
       "topics": [],
@@ -658,7 +658,7 @@
       "title": "GPIO Output Control (Bit-Flag Triggered Relays)",
       "path": "ADR-022-gpio-output-bit-flag-control.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement stateless GPIO output control triggered by configurable OpenTherm status bit.",
       "topics": [],
@@ -689,7 +689,7 @@
       "title": "File System Explorer HTTP Architecture",
       "path": "ADR-023-filesystem-explorer-http-api.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement HTTP-based file system explorer with streaming upload/download and integrated firmware update capability.",
       "topics": [],
@@ -720,7 +720,7 @@
       "title": "Debug Telnet Command Console",
       "path": "ADR-024-debug-telnet-command-console.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement character-driven telnet command console using TelnetStream library with menu-based command system.",
       "topics": [],
@@ -751,7 +751,7 @@
       "title": "Safari WebSocket Connection Management During Firmware Upload",
       "path": "ADR-025-safari-websocket-connection-management.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Proactively close WebSocket before upload starts, rely entirely on HTTP polling during flash operations.",
       "topics": [],
@@ -782,7 +782,7 @@
       "title": "Conditional JavaScript Cache-Busting for Firmware/Filesystem Version Mismatches",
       "path": "ADR-026-conditional-javascript-cache-busting.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Implement conditional cache-busting that activates only during firmware/filesystem version mismatches, with normal br...",
       "topics": [],
@@ -805,7 +805,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-139"
       }
     },
     {
@@ -813,7 +813,7 @@
       "title": "Version Mismatch Warning System in Web UI",
       "path": "ADR-027-version-mismatch-warning-system.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Add prominent red warning banner in Web UI that automatically shows when firmware and filesystem versions mismatch, h...",
       "topics": [],
@@ -844,7 +844,7 @@
       "title": "File Streaming Over Loading for Memory Safety",
       "path": "ADR-028-file-streaming-over-loading.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "MANDATORY: Never load files >2KB entirely into RAM.",
       "topics": [],
@@ -875,7 +875,7 @@
       "title": "Simple XHR-Based OTA Flash (KISS Principle)",
       "path": "ADR-029-simple-xhr-ota-flash.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Adopt Simple XHR-Based OTA Flash (Alternative 3)",
       "topics": [],
@@ -906,7 +906,7 @@
       "title": "Heap Memory Monitoring and Emergency Recovery",
       "path": "ADR-030-heap-memory-monitoring-emergency-recovery.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement proactive heap monitoring with 4-level health system and adaptive throttling.",
       "topics": [],
@@ -937,7 +937,7 @@
       "title": "Two-Microcontroller Coordination Architecture",
       "path": "ADR-031-two-microcontroller-coordination-architecture.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Adopt Master/Slave architecture with ESP8266 as master, PIC as slave.",
       "topics": [],
@@ -968,7 +968,7 @@
       "title": "No Authentication Pattern (Local Network Security Model)",
       "path": "ADR-032-no-authentication-local-network-security.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Do NOT implement authentication on any network interface.",
       "topics": [],
@@ -1030,7 +1030,7 @@
       "title": "Non-Blocking Modal Dialogs for User Input",
       "path": "ADR-034-non-blocking-modal-dialogs.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Use custom HTML/CSS modal dialogs instead of native prompt() and alert() for all user input.",
       "topics": [],
@@ -1061,7 +1061,7 @@
       "title": "RESTful API Compliance Strategy",
       "path": "ADR-035-restful-api-compliance-strategy.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Expand the v2 API with RESTful-compliant endpoints and standardized error handling, while keeping v0 and v1 unchanged.",
       "topics": [],
@@ -1092,7 +1092,7 @@
       "title": "Boot Sequence Initialization Ordering",
       "path": "ADR-036-boot-sequence-ordering.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Maintain a strictly ordered boot sequence in setup() with documented dependency rationale for each phase.",
       "topics": [],
@@ -1123,7 +1123,7 @@
       "title": "Gateway Mode Detection via PR=M Polling",
       "path": "ADR-037-gateway-mode-detection.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Poll the PIC firmware every 30 seconds using PR=M with a 60-second hard throttle cache, and publish mode changes to M...",
       "topics": [],
@@ -1154,7 +1154,7 @@
       "title": "OpenTherm Message Data Flow Pipeline",
       "path": "ADR-038-opentherm-data-flow-pipeline.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement a synchronous fan-out pipeline where handleOTGW() reads serial data and dispatches complete lines to proces...",
       "topics": [],
@@ -1185,7 +1185,7 @@
       "title": "Real-Time OTGraph Charting Architecture",
       "path": "ADR-039-otgraph-real-time-charting.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement a 5-grid ECharts-based charting module (OTGraph) with dynamic Dallas sensor registration, dual-theme palett...",
       "topics": [],
@@ -1216,7 +1216,7 @@
       "title": "MQTT Source-Specific Topics for OpenTherm Values",
       "path": "ADR-040-mqtt-source-specific-topics.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement additive source-specific MQTT topics and Home Assistant discovery entries, controlled by an opt-in setting...",
       "topics": [],
@@ -1247,7 +1247,7 @@
       "title": "Just-In-Time Home Assistant MQTT Discovery",
       "path": "ADR-041-jit-ha-discovery.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Drop Path A from all automatic triggers.",
       "topics": [],
@@ -1278,7 +1278,7 @@
       "title": "Streaming JSON I/O — No ArduinoJson",
       "path": "ADR-042-streaming-json-no-arduinojson.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Never use ArduinoJson in this firmware.",
       "topics": [],
@@ -1301,7 +1301,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-141"
       }
     },
     {
@@ -1309,7 +1309,7 @@
       "title": "Reset-Pattern WiFi Recovery Trigger",
       "path": "ADR-043-reset-pattern-wifi-recovery.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement a triple-reset trigger within a 10-second window to force WiFi recovery mode:",
       "topics": [],
@@ -1340,7 +1340,7 @@
       "title": "Global State — extern Declaration in Header, Definition in .ino",
       "path": "ADR-044-global-state-header-definition-pattern.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Use extern declarations in the header and a single definition in the owning .ino file.",
       "topics": [],
@@ -1371,7 +1371,7 @@
       "title": "PS=1 Print Summary Parsing",
       "path": "ADR-045-ps1-print-summary-parsing.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Implement processPSSummary() that fully parses PS=1 summary lines and publishes each field through the existing decod...",
       "topics": [],
@@ -1394,7 +1394,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-046"
       }
     },
     {
@@ -1402,7 +1402,7 @@
       "title": "PS=1 Summary Translation with Shared Publish Helpers",
       "path": "ADR-046-ps1-summary-translation-shared-publish-helpers.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Treat PS=1 as a dedicated summary-translation path with shared publish/state helpers, not as a synthetic raw-frame ad...",
       "topics": [],
@@ -1435,7 +1435,7 @@
       "title": "Non-Blocking WiFi Reconnect State Machine",
       "path": "ADR-047-nonblocking-wifi-reconnect.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Replace the blocking restartWifi() with a non-blocking state machine loopWifi() that runs cooperatively in the main l...",
       "topics": [],
@@ -1458,7 +1458,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-075"
       }
     },
     {
@@ -1466,7 +1466,7 @@
       "title": "Non-Blocking Webhook State Machine with Retry",
       "path": "ADR-048-nonblocking-webhook-state-machine.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Refactor webhook into a three-state machine that decouples detection from sending and adds retry with a fixed 30s bac...",
       "topics": [],
@@ -1489,7 +1489,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-136"
       }
     },
     {
@@ -1497,7 +1497,7 @@
       "title": "String Class Prohibition in Protocol Paths",
       "path": "ADR-049-string-prohibition-protocol-paths.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Prohibit the Arduino String class as a return type or local variable in any function that executes on the OpenTherm m...",
       "topics": [],
@@ -1528,7 +1528,7 @@
       "title": "Centralized API Route Dispatch Table",
       "path": "ADR-050-centralized-api-route-dispatch.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Replace the monolithic if-else chain with a function-pointer dispatch table.",
       "topics": [],
@@ -1559,7 +1559,7 @@
       "title": "Dual Encapsulating Structs (Settings + State)",
       "path": "ADR-051-dual-encapsulating-structs.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Group all globals into two top-level structs with named sub-sections:",
       "topics": [],
@@ -1590,7 +1590,7 @@
       "title": "MQTT Publish Eligibility and Reconnect Refresh Contract",
       "path": "ADR-052-mqtt-publish-eligibility-contract.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Define MQTT publish eligibility as a first-seen OR value-changed OR stale-refresh contract, with MQTT reconnect reset...",
       "topics": [],
@@ -1621,7 +1621,7 @@
       "title": "Large Feature Buffer Static Allocation",
       "path": "ADR-053-large-feature-buffer-static-allocation.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "All feature-specific working buffers must be declared as global arrays — never heap-allocated, never local static, ne...",
       "topics": [],
@@ -1652,7 +1652,7 @@
       "title": "Optional HTTP Basic Authentication for Settings",
       "path": "ADR-054-optional-http-basic-auth.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Add optional HTTP Basic Authentication to sensitive endpoints only.",
       "topics": [],
@@ -1675,7 +1675,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-056"
       }
     },
     {
@@ -1683,7 +1683,7 @@
       "title": "Webhook Outbound HTTP Integration",
       "path": "ADR-055-webhook-outbound-http-integration.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": null,
       "decision_summary": "Implement a configurable outbound HTTP webhook that fires once on each rising or falling edge of a selected OpenTherm...",
       "topics": [],
@@ -1706,7 +1706,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-057"
       }
     },
     {
@@ -1714,7 +1714,7 @@
       "title": "Protected Admin Endpoint Security and Secret-Handling Contract",
       "path": "ADR-056-protected-admin-endpoint-security-and-secret-handling-contract.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Define a single protected-admin contract for OTGW-firmware.",
       "topics": [],
@@ -1745,7 +1745,7 @@
       "title": "Webhook Delivery, Retry, and Protected Test Endpoint Policy",
       "path": "ADR-057-webhook-delivery-retry-and-protected-test-endpoint-policy.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Define the webhook feature as a best-effort, local-network, edge-triggered outbound HTTP delivery mechanism with boun...",
       "topics": [],
@@ -1778,7 +1778,7 @@
       "title": "Non-blocking PIC Command/Response for PR= Queries",
       "path": "ADR-058-nonblocking-pic-command-response.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Replace all executeCommand(\"PR=...\") calls with non-blocking command queue submissions, and process responses asynchr...",
       "topics": [],
@@ -1809,7 +1809,7 @@
       "title": "Ser2net Queue Awareness and Serial Bus Coordination",
       "path": "ADR-059-ser2net-queue-awareness.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Keep ser2net as a direct serial passthrough, but make the command queue aware of ser2net traffic so it can avoid conf...",
       "topics": [],
@@ -1840,7 +1840,7 @@
       "title": "PIC Availability Guard Pattern",
       "path": "ADR-060-pic-availability-guard-pattern.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Introduce a central PIC availability guard via isPICEnabled() that all PIC-dependent code paths check before proceeding.",
       "topics": [],
@@ -1871,7 +1871,7 @@
       "title": "Unified ESP8266/ESP32 Platform Abstraction",
       "path": "ADR-061-unified-esp8266-esp32-platform-abstraction.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Introduce a compile-time platform abstraction layer using three headers:",
       "topics": [],
@@ -1933,7 +1933,7 @@
       "title": "OTGW32 Hardware Support — Dual Build Targets with Runtime Feature Detection",
       "path": "ADR-063-otgw32-hardware-support.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "| Build Target | MCU | OTGW Hardware | PlatformIO env | |---|---|---|---| | ESP8266 PIC | ESP8266 | PIC16F1847 co-pro...",
       "topics": [],
@@ -1964,7 +1964,7 @@
       "title": "OT-Direct Operating Mode Architecture",
       "path": "ADR-064-ot-direct-operating-mode-architecture.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "enum OTDirectMode : uint8t { OTDMODEBYPASS = 0, // Transparent relay, no modification (relay ON, OT-direct inactive)...",
       "topics": [],
@@ -2026,7 +2026,7 @@
       "title": "Thermostat Auto-Detection and Master Mode",
       "path": "ADR-066-thermostat-auto-detection-master-mode.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "When bAutoDetect is enabled (default: true) and the configured mode is Gateway:",
       "topics": [],
@@ -2057,7 +2057,7 @@
       "title": "SSD1306Ascii Text-Only OLED Library",
       "path": "ADR-067-ssd1306ascii-oled-library.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Replace Adafruit SSD1306 + Adafruit GFX with the SSD1306Ascii library (greiman/SSD1306Ascii, pinned at version 1.3.5).",
       "topics": [],
@@ -2088,7 +2088,7 @@
       "title": "OT-Direct Schedule Tuning Constants",
       "path": "ADR-068-ot-direct-schedule-tuning-constants.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "All constants listed above are Accepted as implemented.",
       "topics": [],
@@ -2119,7 +2119,7 @@
       "title": "SAT PID v3 Controller Implementation",
       "path": "ADR-069-sat-pid-v3-implementation.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement SAT PID v3 as defined in the SAT Python pid.py (thermo-nova branch), ported to C in SATpid.ino.",
       "topics": [],
@@ -2150,7 +2150,7 @@
       "title": "SAT Memory Allocation Strategy",
       "path": "ADR-070-sat-memory-allocation-strategy.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "All SAT algorithm state uses static file-scope variables (never heap, never large stack locals, never String class).",
       "topics": [],
@@ -2183,7 +2183,7 @@
       "title": "SAT Heating Curve Algorithm",
       "path": "ADR-071-sat-heating-curve-algorithm.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement the SAT polynomial heating curve exactly as used in the SAT Python thermo-nova branch, ported to C in SATco...",
       "topics": [],
@@ -2214,7 +2214,7 @@
       "title": "SAT Platform Compatibility Layer — ESP8266 vs. OTGW32",
       "path": "ADR-072-sat-platform-compatibility-layer.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "SAT source files contain no platform preprocessor guards.",
       "topics": [],
@@ -2245,7 +2245,7 @@
       "title": "SAT MQTT Topic Structure",
       "path": "ADR-073-sat-mqtt-topic-structure.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "SAT MQTT topics follow the existing firmware flat-key convention with a sat/ prefix:",
       "topics": [],
@@ -2276,7 +2276,7 @@
       "title": "ADR Audit — SAT Integration Phase",
       "path": "ADR-074-adr-audit-sat-integration-phase.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "No existing ADRs require status changes beyond those already applied.",
       "topics": [],
@@ -2307,7 +2307,7 @@
       "title": "WiFi Reconnect Timeout Tuning",
       "path": "ADR-075-wifi-reconnect-timeout-tuning.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Increase the per-attempt timeout from 5 seconds to 30 seconds and reduce max retries from 15 to 10.",
       "topics": [],
@@ -2338,7 +2338,7 @@
       "title": "SAT OPV (Optimal Valve Position) Calibration",
       "path": "ADR-076-sat-opv-calibration.md",
       "format": "unknown",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": null,
       "decision_summary": "Implement an active OPV calibration procedure as a state machine in SATcontrol.ino (satOvpCalibrate()), triggered by...",
       "topics": [],
@@ -5672,6 +5672,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-001",
+      "target": "ADR-061",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-002",
       "target": "ADR-007",
       "type": "related",
@@ -5726,6 +5732,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-004",
+      "target": "ADR-053",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-005",
       "target": "ADR-003",
       "type": "related",
@@ -5747,6 +5759,12 @@
       "source": "ADR-005",
       "target": "ADR-025",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-005",
+      "target": "ADR-133",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -5936,6 +5954,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-014",
+      "target": "ADR-083",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-015",
       "target": "ADR-005",
       "type": "related",
@@ -6005,6 +6029,12 @@
       "source": "ADR-018",
       "target": "ADR-008",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-018",
+      "target": "ADR-042",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -6155,6 +6185,12 @@
       "source": "ADR-026",
       "target": "ADR-027",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-026",
+      "target": "ADR-139",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -6572,6 +6608,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-042",
+      "target": "ADR-141",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-043",
       "target": "ADR-001",
       "type": "related",
@@ -6656,6 +6698,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-045",
+      "target": "ADR-046",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-046",
       "target": "ADR-004",
       "type": "related",
@@ -6728,6 +6776,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-047",
+      "target": "ADR-075",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-048",
       "target": "ADR-003",
       "type": "related",
@@ -6755,6 +6809,12 @@
       "source": "ADR-048",
       "target": "ADR-047",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-048",
+      "target": "ADR-136",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -6926,6 +6986,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-054",
+      "target": "ADR-056",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-055",
       "target": "ADR-003",
       "type": "related",
@@ -6965,6 +7031,12 @@
       "source": "ADR-055",
       "target": "ADR-032",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-055",
+      "target": "ADR-057",
+      "type": "superseded-by",
       "resolved": true
     },
     {

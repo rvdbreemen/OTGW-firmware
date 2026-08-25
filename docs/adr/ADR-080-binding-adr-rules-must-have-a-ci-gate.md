@@ -1,3 +1,15 @@
+---
+id: "ADR-080"
+title: "Binding ADR rules must have a CI gate"
+status: "Accepted"
+date: "2026-04-19"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-080 Binding ADR rules must have a CI gate
 
 ## Status

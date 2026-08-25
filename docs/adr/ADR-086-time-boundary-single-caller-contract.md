@@ -1,3 +1,15 @@
+---
+id: "ADR-086"
+title: "— Time-boundary consume-on-read helpers MUST have exactly one call site"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-086 — Time-boundary consume-on-read helpers MUST have exactly one call site
 
 ## Status

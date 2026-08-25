@@ -1,3 +1,15 @@
+---
+id: "ADR-038"
+title: "OpenTherm Message Data Flow Pipeline"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-038: OpenTherm Message Data Flow Pipeline
 
 **Status:** Accepted  

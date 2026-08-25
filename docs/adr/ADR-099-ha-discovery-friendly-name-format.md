@@ -1,3 +1,15 @@
+---
+id: "ADR-099"
+title: "— HA Discovery Friendly-Name Format"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-099 — HA Discovery Friendly-Name Format
 
 ## Status

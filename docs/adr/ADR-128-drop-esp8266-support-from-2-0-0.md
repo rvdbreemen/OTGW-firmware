@@ -1,3 +1,16 @@
+---
+id: "ADR-128"
+title: "Drop ESP8266 Support from the 2.0.0 Line (Supersedes ADR-082)"
+status: "Accepted"
+date: "2026-06-12"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-082"
+superseded_by: null
+---
 # ADR-128: Drop ESP8266 Support from the 2.0.0 Line (Supersedes ADR-082)
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-078"
+title: "MQTT Sub-command Dispatch Tables"
+status: "Accepted"
+date: "2026-04-19"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-078 MQTT Sub-command Dispatch Tables
 
 ## Status

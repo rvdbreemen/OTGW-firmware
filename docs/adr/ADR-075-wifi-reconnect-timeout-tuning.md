@@ -1,3 +1,15 @@
+---
+id: "ADR-075"
+title: "WiFi Reconnect Timeout Tuning"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-075: WiFi Reconnect Timeout Tuning
 
 **Status:** Accepted

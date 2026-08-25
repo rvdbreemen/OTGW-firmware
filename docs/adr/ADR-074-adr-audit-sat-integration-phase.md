@@ -1,3 +1,15 @@
+---
+id: "ADR-074"
+title: "ADR Audit — SAT Integration Phase"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-074: ADR Audit — SAT Integration Phase
 
 **Status:** Accepted

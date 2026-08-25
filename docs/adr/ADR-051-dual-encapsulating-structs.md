@@ -1,3 +1,15 @@
+---
+id: "ADR-051"
+title: "Dual Encapsulating Structs (Settings + State)"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-051: Dual Encapsulating Structs (Settings + State)
 
 **Status:** Accepted

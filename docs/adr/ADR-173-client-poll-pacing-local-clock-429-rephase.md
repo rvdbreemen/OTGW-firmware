@@ -1,3 +1,15 @@
+---
+id: "ADR-173"
+title: "Client Poll Pacing, Locally-Ticked Device Clock, and 429 Re-Phasing"
+status: "Proposed"
+date: "2026-07-26"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-173 Client Poll Pacing, Locally-Ticked Device Clock, and 429 Re-Phasing
 
 ## Status

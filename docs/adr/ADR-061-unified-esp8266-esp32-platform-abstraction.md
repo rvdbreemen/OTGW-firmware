@@ -1,3 +1,15 @@
+---
+id: "ADR-061"
+title: "Unified ESP8266/ESP32 Platform Abstraction"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-061: Unified ESP8266/ESP32 Platform Abstraction
 
 **Status:** Accepted

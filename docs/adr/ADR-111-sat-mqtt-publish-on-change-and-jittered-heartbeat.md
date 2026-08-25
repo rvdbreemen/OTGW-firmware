@@ -1,3 +1,15 @@
+---
+id: "ADR-111"
+title: "SAT MQTT publish — on-change + jittered heartbeat"
+status: "Accepted"
+date: "2026-05-26"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-111 SAT MQTT publish — on-change + jittered heartbeat
 
 ## Status

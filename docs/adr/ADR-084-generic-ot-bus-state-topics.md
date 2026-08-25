@@ -1,3 +1,15 @@
+---
+id: "ADR-084"
+title: "Generic OT-bus state MQTT topics (amends ADR-065)"
+status: "Accepted"
+date: "2026-04-24"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-084 Generic OT-bus state MQTT topics (amends ADR-065)
 
 ## Status

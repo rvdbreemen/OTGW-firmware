@@ -1,3 +1,15 @@
+---
+id: "ADR-113"
+title: "Hardware-type as codepath-selection contract"
+status: "Accepted"
+date: "2026-05-29"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-113 Hardware-type as codepath-selection contract
 
 ## Status

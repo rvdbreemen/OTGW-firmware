@@ -1,3 +1,15 @@
+---
+id: "ADR-025"
+title: "Safari WebSocket Connection Management During Firmware Upload"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-025: Safari WebSocket Connection Management During Firmware Upload
 
 **Status:** Accepted  

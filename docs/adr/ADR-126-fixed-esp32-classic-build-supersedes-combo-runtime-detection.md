@@ -1,3 +1,16 @@
+---
+id: "ADR-126"
+title: "Fixed esp32-classic build supersedes combo runtime detection"
+status: "Superseded"
+date: "2026-06-12"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-125"
+superseded_by: "ADR-127"
+---
 # ADR-126 Fixed esp32-classic build supersedes combo runtime detection
 
 ## Status

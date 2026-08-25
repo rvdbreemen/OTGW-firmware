@@ -1,3 +1,15 @@
+---
+id: "ADR-162"
+title: "Sanctioned SAT Force-Boiler Test Hook in Production Firmware"
+status: "Accepted"
+date: "2026-07-04"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-162: Sanctioned SAT Force-Boiler Test Hook in Production Firmware
 
 ## Status

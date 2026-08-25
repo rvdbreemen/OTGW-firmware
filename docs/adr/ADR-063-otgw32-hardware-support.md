@@ -1,3 +1,15 @@
+---
+id: "ADR-063"
+title: "OTGW32 Hardware Support — Dual Build Targets with Runtime Feature Detection"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-063: OTGW32 Hardware Support — Dual Build Targets with Runtime Feature Detection
 
 **Status:** Accepted

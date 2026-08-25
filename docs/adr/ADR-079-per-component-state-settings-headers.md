@@ -1,3 +1,16 @@
+---
+id: "ADR-079"
+title: "Per-component Type Headers (amendment to ADR-051)"
+status: "Accepted"
+date: "2026-04-19"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-051"
+superseded_by: null
+---
 # ADR-079 Per-component Type Headers (amendment to ADR-051)
 
 ## Status

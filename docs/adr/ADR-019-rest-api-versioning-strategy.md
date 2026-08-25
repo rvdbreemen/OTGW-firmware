@@ -1,3 +1,15 @@
+---
+id: "ADR-019"
+title: "REST API Versioning Strategy"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-019: REST API Versioning Strategy
 
 **Status:** Accepted  

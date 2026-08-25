@@ -1,3 +1,15 @@
+---
+id: "ADR-048"
+title: "Non-Blocking Webhook State Machine with Retry"
+status: "Superseded"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-136"
+---
 # ADR-048: Non-Blocking Webhook State Machine with Retry
 
 **Status:** Superseded by ADR-136 (2026-06-14) on the 2.0.0 ESP32-S3 line

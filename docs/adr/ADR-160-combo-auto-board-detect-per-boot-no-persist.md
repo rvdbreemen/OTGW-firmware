@@ -1,3 +1,15 @@
+---
+id: "ADR-160"
+title: "Combo board: AUTO hardware detection re-probes every boot and never persists its verdict"
+status: "Superseded"
+date: "2026-07-04"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-160 Combo board: AUTO hardware detection re-probes every boot and never persists its verdict
 
 ## Status

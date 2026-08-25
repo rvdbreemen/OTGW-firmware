@@ -1,3 +1,15 @@
+---
+id: "ADR-107"
+title: "Emergency Heap Recovery Actions (2.0.0 platform variant)"
+status: "Accepted"
+date: "2026-05-23"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-107: Emergency Heap Recovery Actions (2.0.0 platform variant)
 
 ## Status

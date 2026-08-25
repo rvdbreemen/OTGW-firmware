@@ -1,3 +1,15 @@
+---
+id: "ADR-047"
+title: "Non-Blocking WiFi Reconnect State Machine"
+status: "Superseded"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-075"
+---
 # ADR-047: Non-Blocking WiFi Reconnect State Machine
 
 **Status:** Superseded by ADR-075 (timeout and retry parameters only; state machine design unchanged)

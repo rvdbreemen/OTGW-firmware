@@ -1,3 +1,15 @@
+---
+id: "ADR-013"
+title: "Arduino Framework Over ESP-IDF"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-013: Arduino Framework Over ESP-IDF
 
 **Status:** Accepted  

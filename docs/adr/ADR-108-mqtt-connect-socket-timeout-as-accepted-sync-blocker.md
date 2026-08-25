@@ -1,3 +1,15 @@
+---
+id: "ADR-108"
+title: "MQTT connect() socket timeout accepted as known main-loop sync-blocker (2.0.0)"
+status: "Superseded"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-131"
+---
 # ADR-108: MQTT connect() socket timeout accepted as known main-loop sync-blocker (2.0.0)
 
 ## Status

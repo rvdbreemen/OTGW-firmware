@@ -1,3 +1,15 @@
+---
+id: "ADR-159"
+title: "Symmetric Presence-Gating of the External 0x26 Watchdog (Amends ADR-135)"
+status: "Accepted"
+date: "2026-07-04"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-159 Symmetric Presence-Gating of the External 0x26 Watchdog (Amends ADR-135)
 
 ## Status

@@ -1,3 +1,15 @@
+---
+id: "ADR-156"
+title: "Unified Off/Heat/Cool Home Assistant Climate Entity Derived from OpenTherm Status Bits"
+status: "Accepted"
+date: "2026-06-27"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-156: Unified Off/Heat/Cool Home Assistant Climate Entity Derived from OpenTherm Status Bits
 
 ## Status

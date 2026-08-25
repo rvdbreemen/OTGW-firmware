@@ -1,3 +1,15 @@
+---
+id: "ADR-034"
+title: "Non-Blocking Modal Dialogs for User Input"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-034: Non-Blocking Modal Dialogs for User Input
 
 **Status:** Accepted  

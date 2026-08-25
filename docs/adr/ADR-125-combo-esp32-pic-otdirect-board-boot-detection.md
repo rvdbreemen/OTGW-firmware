@@ -1,3 +1,15 @@
+---
+id: "ADR-125"
+title: "Combo ESP32-S3 board: one binary, runtime PIC/OTDirect selection"
+status: "Superseded"
+date: "2026-06-10"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-126"
+---
 # ADR-125 Combo ESP32-S3 board: one binary, runtime PIC/OTDirect selection
 
 ## Status

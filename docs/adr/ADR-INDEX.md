@@ -6,82 +6,82 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 
 | ADR | Status | Scope | Decision |
 | --- | --- | --- | --- |
-| ADR-001 | Proposed | - | Use the ESP8266 (NodeMCU v1.0 / Wemos D1 mini) as the network controller platform with the Arduino framework. |
-| ADR-002 | Proposed | - | Adopt a modular .ino file architecture where the firmware is split into 14+ separate .ino files, each responsible for... |
-| ADR-003 | Proposed | - | Use HTTP-only protocols. |
-| ADR-004 | Proposed | - | Adopt static buffer allocation with bounded sizes throughout the codebase. |
-| ADR-005 | Proposed | - | Use WebSocket protocol on a dedicated port (81) for real-time OpenTherm message streaming. |
-| ADR-006 | Proposed | - | Implement MQTT client with Home Assistant Auto-Discovery support using the PubSubClient library. |
-| ADR-007 | Proposed | - | Implement a timer-based task scheduling system using safe macros that handle millisecond rollover correctly. |
-| ADR-008 | Proposed | - | Use LittleFS as the filesystem for configuration and web UI files. |
-| ADR-009 | Proposed | - | MANDATORY: All string literals MUST use PROGMEM to store them in flash memory instead of RAM. |
-| ADR-010 | Proposed | - | Run multiple network services on separate ports, each optimized for its specific use case. |
-| ADR-011 | Proposed | - | Use an external I2C hardware watchdog chip that must be fed regularly by the ESP8266, or it will force a hardware reset. |
-| ADR-012 | Proposed | - | Implement PIC firmware flashing directly in the ESP8266 Web UI with WebSocket progress streaming. |
-| ADR-013 | Proposed | - | Use the Arduino framework (ESP8266 Arduino Core) for all firmware development. |
-| ADR-014 | Proposed | - | Provide dual build system: Makefile (primary) + build.py wrapper (convenience). |
-| ADR-015 | Proposed | - | Use NTP (Network Time Protocol) for synchronization combined with AceTime library for timezone handling. |
-| ADR-016 | Proposed | - | Implement a command queue with automatic deduplication and sequential processing. |
-| ADR-017 | Proposed | - | Use WiFiManager library to create a captive portal for initial WiFi configuration. |
-| ADR-018 | Proposed | - | Use ArduinoJson library for all structured data interchange. |
-| ADR-019 | Proposed | - | Adopt URL path-based API versioning with indefinite version support (no deprecation). |
-| ADR-020 | Proposed | - | Integrate Dallas DS18B20 sensors via OneWire protocol with dynamic discovery and MQTT publishing. |
-| ADR-021 | Proposed | - | Use hardware interrupt-driven pulse counting with ISR-safe debounce logic. |
-| ADR-022 | Proposed | - | Implement stateless GPIO output control triggered by configurable OpenTherm status bit. |
-| ADR-023 | Proposed | - | Implement HTTP-based file system explorer with streaming upload/download and integrated firmware update capability. |
-| ADR-024 | Proposed | - | Implement character-driven telnet command console using TelnetStream library with menu-based command system. |
-| ADR-025 | Proposed | - | Proactively close WebSocket before upload starts, rely entirely on HTTP polling during flash operations. |
-| ADR-026 | Proposed | - | Implement conditional cache-busting that activates only during firmware/filesystem version mismatches, with normal br... |
-| ADR-027 | Proposed | - | Add prominent red warning banner in Web UI that automatically shows when firmware and filesystem versions mismatch, h... |
-| ADR-028 | Proposed | - | MANDATORY: Never load files >2KB entirely into RAM. |
-| ADR-029 | Proposed | - | Adopt Simple XHR-Based OTA Flash (Alternative 3) |
-| ADR-030 | Proposed | - | Implement proactive heap monitoring with 4-level health system and adaptive throttling. |
-| ADR-031 | Proposed | - | Adopt Master/Slave architecture with ESP8266 as master, PIC as slave. |
-| ADR-032 | Proposed | - | Do NOT implement authentication on any network interface. |
+| ADR-001 | Superseded | - | Use the ESP8266 (NodeMCU v1.0 / Wemos D1 mini) as the network controller platform with the Arduino framework. |
+| ADR-002 | Accepted | - | Adopt a modular .ino file architecture where the firmware is split into 14+ separate .ino files, each responsible for... |
+| ADR-003 | Accepted | - | Use HTTP-only protocols. |
+| ADR-004 | Superseded | - | Adopt static buffer allocation with bounded sizes throughout the codebase. |
+| ADR-005 | Superseded | - | Use WebSocket protocol on a dedicated port (81) for real-time OpenTherm message streaming. |
+| ADR-006 | Accepted | - | Implement MQTT client with Home Assistant Auto-Discovery support using the PubSubClient library. |
+| ADR-007 | Accepted | - | Implement a timer-based task scheduling system using safe macros that handle millisecond rollover correctly. |
+| ADR-008 | Accepted | - | Use LittleFS as the filesystem for configuration and web UI files. |
+| ADR-009 | Accepted | - | MANDATORY: All string literals MUST use PROGMEM to store them in flash memory instead of RAM. |
+| ADR-010 | Accepted | - | Run multiple network services on separate ports, each optimized for its specific use case. |
+| ADR-011 | Accepted | - | Use an external I2C hardware watchdog chip that must be fed regularly by the ESP8266, or it will force a hardware reset. |
+| ADR-012 | Accepted | - | Implement PIC firmware flashing directly in the ESP8266 Web UI with WebSocket progress streaming. |
+| ADR-013 | Accepted | - | Use the Arduino framework (ESP8266 Arduino Core) for all firmware development. |
+| ADR-014 | Superseded | - | Provide dual build system: Makefile (primary) + build.py wrapper (convenience). |
+| ADR-015 | Accepted | - | Use NTP (Network Time Protocol) for synchronization combined with AceTime library for timezone handling. |
+| ADR-016 | Accepted | - | Implement a command queue with automatic deduplication and sequential processing. |
+| ADR-017 | Accepted | - | Use WiFiManager library to create a captive portal for initial WiFi configuration. |
+| ADR-018 | Superseded | - | Use ArduinoJson library for all structured data interchange. |
+| ADR-019 | Accepted | - | Adopt URL path-based API versioning with indefinite version support (no deprecation). |
+| ADR-020 | Accepted | - | Integrate Dallas DS18B20 sensors via OneWire protocol with dynamic discovery and MQTT publishing. |
+| ADR-021 | Accepted | - | Use hardware interrupt-driven pulse counting with ISR-safe debounce logic. |
+| ADR-022 | Accepted | - | Implement stateless GPIO output control triggered by configurable OpenTherm status bit. |
+| ADR-023 | Accepted | - | Implement HTTP-based file system explorer with streaming upload/download and integrated firmware update capability. |
+| ADR-024 | Accepted | - | Implement character-driven telnet command console using TelnetStream library with menu-based command system. |
+| ADR-025 | Accepted | - | Proactively close WebSocket before upload starts, rely entirely on HTTP polling during flash operations. |
+| ADR-026 | Superseded | - | Implement conditional cache-busting that activates only during firmware/filesystem version mismatches, with normal br... |
+| ADR-027 | Accepted | - | Add prominent red warning banner in Web UI that automatically shows when firmware and filesystem versions mismatch, h... |
+| ADR-028 | Accepted | - | MANDATORY: Never load files >2KB entirely into RAM. |
+| ADR-029 | Accepted | - | Adopt Simple XHR-Based OTA Flash (Alternative 3) |
+| ADR-030 | Accepted | - | Implement proactive heap monitoring with 4-level health system and adaptive throttling. |
+| ADR-031 | Accepted | - | Adopt Master/Slave architecture with ESP8266 as master, PIC as slave. |
+| ADR-032 | Accepted | - | Do NOT implement authentication on any network interface. |
 | ADR-033 | Accepted | - | Implement a comprehensive sensor labeling and graphing system with three main components: |
-| ADR-034 | Proposed | - | Use custom HTML/CSS modal dialogs instead of native prompt() and alert() for all user input. |
-| ADR-035 | Proposed | - | Expand the v2 API with RESTful-compliant endpoints and standardized error handling, while keeping v0 and v1 unchanged. |
-| ADR-036 | Proposed | - | Maintain a strictly ordered boot sequence in setup() with documented dependency rationale for each phase. |
-| ADR-037 | Proposed | - | Poll the PIC firmware every 30 seconds using PR=M with a 60-second hard throttle cache, and publish mode changes to M... |
-| ADR-038 | Proposed | - | Implement a synchronous fan-out pipeline where handleOTGW() reads serial data and dispatches complete lines to proces... |
-| ADR-039 | Proposed | - | Implement a 5-grid ECharts-based charting module (OTGraph) with dynamic Dallas sensor registration, dual-theme palett... |
-| ADR-040 | Proposed | - | Implement additive source-specific MQTT topics and Home Assistant discovery entries, controlled by an opt-in setting... |
-| ADR-041 | Proposed | - | Drop Path A from all automatic triggers. |
-| ADR-042 | Proposed | - | Never use ArduinoJson in this firmware. |
-| ADR-043 | Proposed | - | Implement a triple-reset trigger within a 10-second window to force WiFi recovery mode: |
-| ADR-044 | Proposed | - | Use extern declarations in the header and a single definition in the owning .ino file. |
-| ADR-045 | Proposed | - | Implement processPSSummary() that fully parses PS=1 summary lines and publishes each field through the existing decod... |
-| ADR-046 | Proposed | - | Treat PS=1 as a dedicated summary-translation path with shared publish/state helpers, not as a synthetic raw-frame ad... |
-| ADR-047 | Proposed | - | Replace the blocking restartWifi() with a non-blocking state machine loopWifi() that runs cooperatively in the main l... |
-| ADR-048 | Proposed | - | Refactor webhook into a three-state machine that decouples detection from sending and adds retry with a fixed 30s bac... |
-| ADR-049 | Proposed | - | Prohibit the Arduino String class as a return type or local variable in any function that executes on the OpenTherm m... |
-| ADR-050 | Proposed | - | Replace the monolithic if-else chain with a function-pointer dispatch table. |
-| ADR-051 | Proposed | - | Group all globals into two top-level structs with named sub-sections: |
-| ADR-052 | Proposed | - | Define MQTT publish eligibility as a first-seen OR value-changed OR stale-refresh contract, with MQTT reconnect reset... |
-| ADR-053 | Proposed | - | All feature-specific working buffers must be declared as global arrays — never heap-allocated, never local static, ne... |
-| ADR-054 | Proposed | - | Add optional HTTP Basic Authentication to sensitive endpoints only. |
-| ADR-055 | Proposed | - | Implement a configurable outbound HTTP webhook that fires once on each rising or falling edge of a selected OpenTherm... |
-| ADR-056 | Proposed | - | Define a single protected-admin contract for OTGW-firmware. |
-| ADR-057 | Proposed | - | Define the webhook feature as a best-effort, local-network, edge-triggered outbound HTTP delivery mechanism with boun... |
-| ADR-058 | Proposed | - | Replace all executeCommand("PR=...") calls with non-blocking command queue submissions, and process responses asynchr... |
-| ADR-059 | Proposed | - | Keep ser2net as a direct serial passthrough, but make the command queue aware of ser2net traffic so it can avoid conf... |
-| ADR-060 | Proposed | - | Introduce a central PIC availability guard via isPICEnabled() that all PIC-dependent code paths check before proceeding. |
-| ADR-061 | Proposed | - | Introduce a compile-time platform abstraction layer using three headers: |
+| ADR-034 | Accepted | - | Use custom HTML/CSS modal dialogs instead of native prompt() and alert() for all user input. |
+| ADR-035 | Accepted | - | Expand the v2 API with RESTful-compliant endpoints and standardized error handling, while keeping v0 and v1 unchanged. |
+| ADR-036 | Accepted | - | Maintain a strictly ordered boot sequence in setup() with documented dependency rationale for each phase. |
+| ADR-037 | Accepted | - | Poll the PIC firmware every 30 seconds using PR=M with a 60-second hard throttle cache, and publish mode changes to M... |
+| ADR-038 | Accepted | - | Implement a synchronous fan-out pipeline where handleOTGW() reads serial data and dispatches complete lines to proces... |
+| ADR-039 | Accepted | - | Implement a 5-grid ECharts-based charting module (OTGraph) with dynamic Dallas sensor registration, dual-theme palett... |
+| ADR-040 | Accepted | - | Implement additive source-specific MQTT topics and Home Assistant discovery entries, controlled by an opt-in setting... |
+| ADR-041 | Accepted | - | Drop Path A from all automatic triggers. |
+| ADR-042 | Superseded | - | Never use ArduinoJson in this firmware. |
+| ADR-043 | Accepted | - | Implement a triple-reset trigger within a 10-second window to force WiFi recovery mode: |
+| ADR-044 | Accepted | - | Use extern declarations in the header and a single definition in the owning .ino file. |
+| ADR-045 | Superseded | - | Implement processPSSummary() that fully parses PS=1 summary lines and publishes each field through the existing decod... |
+| ADR-046 | Accepted | - | Treat PS=1 as a dedicated summary-translation path with shared publish/state helpers, not as a synthetic raw-frame ad... |
+| ADR-047 | Superseded | - | Replace the blocking restartWifi() with a non-blocking state machine loopWifi() that runs cooperatively in the main l... |
+| ADR-048 | Superseded | - | Refactor webhook into a three-state machine that decouples detection from sending and adds retry with a fixed 30s bac... |
+| ADR-049 | Accepted | - | Prohibit the Arduino String class as a return type or local variable in any function that executes on the OpenTherm m... |
+| ADR-050 | Accepted | - | Replace the monolithic if-else chain with a function-pointer dispatch table. |
+| ADR-051 | Accepted | - | Group all globals into two top-level structs with named sub-sections: |
+| ADR-052 | Accepted | - | Define MQTT publish eligibility as a first-seen OR value-changed OR stale-refresh contract, with MQTT reconnect reset... |
+| ADR-053 | Accepted | - | All feature-specific working buffers must be declared as global arrays — never heap-allocated, never local static, ne... |
+| ADR-054 | Superseded | - | Add optional HTTP Basic Authentication to sensitive endpoints only. |
+| ADR-055 | Superseded | - | Implement a configurable outbound HTTP webhook that fires once on each rising or falling edge of a selected OpenTherm... |
+| ADR-056 | Accepted | - | Define a single protected-admin contract for OTGW-firmware. |
+| ADR-057 | Accepted | - | Define the webhook feature as a best-effort, local-network, edge-triggered outbound HTTP delivery mechanism with boun... |
+| ADR-058 | Accepted | - | Replace all executeCommand("PR=...") calls with non-blocking command queue submissions, and process responses asynchr... |
+| ADR-059 | Accepted | - | Keep ser2net as a direct serial passthrough, but make the command queue aware of ser2net traffic so it can avoid conf... |
+| ADR-060 | Accepted | - | Introduce a central PIC availability guard via isPICEnabled() that all PIC-dependent code paths check before proceeding. |
+| ADR-061 | Accepted | - | Introduce a compile-time platform abstraction layer using three headers: |
 | ADR-062 | Accepted | - | Introduce an active verification mechanism that: |
-| ADR-063 | Proposed | - | \| Build Target \| MCU \| OTGW Hardware \| PlatformIO env \| \|---\|---\|---\|---\| \| ESP8266 PIC \| ESP8266 \| PIC16F1847 co-pro... |
-| ADR-064 | Proposed | - | enum OTDirectMode : uint8t { OTDMODEBYPASS = 0, // Transparent relay, no modification (relay ON, OT-direct inactive)... |
+| ADR-063 | Accepted | - | \| Build Target \| MCU \| OTGW Hardware \| PlatformIO env \| \|---\|---\|---\|---\| \| ESP8266 PIC \| ESP8266 \| PIC16F1847 co-pro... |
+| ADR-064 | Accepted | - | enum OTDirectMode : uint8t { OTDMODEBYPASS = 0, // Transparent relay, no modification (relay ON, OT-direct inactive)... |
 | ADR-065 | Accepted | - | The otgw-pic/ MQTT subtree is a stable public topic API. |
-| ADR-066 | Proposed | - | When bAutoDetect is enabled (default: true) and the configured mode is Gateway: |
-| ADR-067 | Proposed | - | Replace Adafruit SSD1306 + Adafruit GFX with the SSD1306Ascii library (greiman/SSD1306Ascii, pinned at version 1.3.5). |
-| ADR-068 | Proposed | - | All constants listed above are Accepted as implemented. |
-| ADR-069 | Proposed | - | Implement SAT PID v3 as defined in the SAT Python pid.py (thermo-nova branch), ported to C in SATpid.ino. |
-| ADR-070 | Proposed | - | All SAT algorithm state uses static file-scope variables (never heap, never large stack locals, never String class). |
-| ADR-071 | Proposed | - | Implement the SAT polynomial heating curve exactly as used in the SAT Python thermo-nova branch, ported to C in SATco... |
-| ADR-072 | Proposed | - | SAT source files contain no platform preprocessor guards. |
-| ADR-073 | Proposed | - | SAT MQTT topics follow the existing firmware flat-key convention with a sat/ prefix: |
-| ADR-074 | Proposed | - | No existing ADRs require status changes beyond those already applied. |
-| ADR-075 | Proposed | - | Increase the per-attempt timeout from 5 seconds to 30 seconds and reduce max retries from 15 to 10. |
-| ADR-076 | Proposed | - | Implement an active OPV calibration procedure as a state machine in SATcontrol.ino (satOvpCalibrate()), triggered by... |
+| ADR-066 | Accepted | - | When bAutoDetect is enabled (default: true) and the configured mode is Gateway: |
+| ADR-067 | Accepted | - | Replace Adafruit SSD1306 + Adafruit GFX with the SSD1306Ascii library (greiman/SSD1306Ascii, pinned at version 1.3.5). |
+| ADR-068 | Accepted | - | All constants listed above are Accepted as implemented. |
+| ADR-069 | Accepted | - | Implement SAT PID v3 as defined in the SAT Python pid.py (thermo-nova branch), ported to C in SATpid.ino. |
+| ADR-070 | Accepted | - | All SAT algorithm state uses static file-scope variables (never heap, never large stack locals, never String class). |
+| ADR-071 | Accepted | - | Implement the SAT polynomial heating curve exactly as used in the SAT Python thermo-nova branch, ported to C in SATco... |
+| ADR-072 | Accepted | - | SAT source files contain no platform preprocessor guards. |
+| ADR-073 | Accepted | - | SAT MQTT topics follow the existing firmware flat-key convention with a sat/ prefix: |
+| ADR-074 | Accepted | - | No existing ADRs require status changes beyond those already applied. |
+| ADR-075 | Accepted | - | Increase the per-attempt timeout from 5 seconds to 30 seconds and reduce max retries from 15 to 10. |
+| ADR-076 | Accepted | - | Implement an active OPV calibration procedure as a state machine in SATcontrol.ino (satOvpCalibrate()), triggered by... |
 | ADR-077 | Accepted | - | Home Assistant MQTT discovery is emitted by streaming compose functions living in src/OTGW-firmware/MQTTHaDiscovery.cpp. |
 | ADR-078 | Accepted | - | MQTT sub-command handlers use PROGMEM dispatch tables in the style of kV2Routes[]. |
 | ADR-079 | Accepted | - | Section struct declarations move into per-component headers, following a consistent state .h / settings .h naming sch... |

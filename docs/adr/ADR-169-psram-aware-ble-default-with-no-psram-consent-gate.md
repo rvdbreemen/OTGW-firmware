@@ -1,3 +1,15 @@
+---
+id: "ADR-169"
+title: "PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate"
+status: "Accepted"
+date: "2026-07-09"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-169 PSRAM-Aware BLE Default with a No-PSRAM Instability-Consent Gate
 
 ## Status

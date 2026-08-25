@@ -1,3 +1,15 @@
+---
+id: "ADR-121"
+title: "Per-Consumer Heap Gating for the WebSocket Live-Log vs MQTT Publish"
+status: "Superseded"
+date: "2026-07-31"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-167"
+---
 # ADR-121: Per-Consumer Heap Gating for the WebSocket Live-Log vs MQTT Publish
 
 ## Status

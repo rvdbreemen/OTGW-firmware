@@ -1,3 +1,15 @@
+---
+id: "ADR-064"
+title: "OT-Direct Operating Mode Architecture"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-064: OT-Direct Operating Mode Architecture
 
 **Status:** Accepted

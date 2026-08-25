@@ -1,3 +1,15 @@
+---
+id: "ADR-018"
+title: "ArduinoJson for Data Interchange"
+status: "Superseded"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-042"
+---
 # ADR-018: ArduinoJson for Data Interchange
 
 **Status:** Superseded by ADR-042  

@@ -1,3 +1,15 @@
+---
+id: "ADR-102"
+title: "HA Entity Availability Reflects the MQTT Link, Not OpenTherm-Bus Liveness (2.0.0)"
+status: "Accepted"
+date: "2026-05-16"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-102: HA Entity Availability Reflects the MQTT Link, Not OpenTherm-Bus Liveness (2.0.0)
 
 ## Status

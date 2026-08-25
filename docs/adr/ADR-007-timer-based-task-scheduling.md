@@ -1,3 +1,15 @@
+---
+id: "ADR-007"
+title: "Timer-Based Task Scheduling"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-007: Timer-Based Task Scheduling
 
 **Status:** Accepted  

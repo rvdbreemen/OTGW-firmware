@@ -1,3 +1,15 @@
+---
+id: "ADR-095"
+title: "bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive (feature-2.0.0 port of ADR-068)"
+status: "Superseded"
+date: "2026-05-07"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-097"
+---
 # ADR-095: bSeparateSources Makes Base and Source-Variant Entities Mutually Exclusive (feature-2.0.0 port of ADR-068)
 
 **Status:** Superseded by ADR-097, 2026-05-07

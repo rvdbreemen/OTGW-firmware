@@ -1,3 +1,15 @@
+---
+id: "ADR-144"
+title: "Move the AsyncTCP service task to core 0 (amend ADR-139's core-1 pin); fix the under-load IDF Task-Watchdog reboot"
+status: "Rejected"
+date: "2026-06-18"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-144 Move the AsyncTCP service task to core 0 (amend ADR-139's core-1 pin); fix the under-load IDF Task-Watchdog reboot
 
 ## Status

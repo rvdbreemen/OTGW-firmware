@@ -1,3 +1,15 @@
+---
+id: "ADR-030"
+title: "Heap Memory Monitoring and Emergency Recovery"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-030: Heap Memory Monitoring and Emergency Recovery
 
 **Status:** Accepted  

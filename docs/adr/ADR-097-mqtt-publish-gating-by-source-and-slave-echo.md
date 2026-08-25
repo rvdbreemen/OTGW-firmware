@@ -1,3 +1,15 @@
+---
+id: "ADR-097"
+title: "MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification"
+status: "Accepted"
+date: "2026-05-27"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-097: MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification
 
 **Status:** Accepted, 2026-05-27

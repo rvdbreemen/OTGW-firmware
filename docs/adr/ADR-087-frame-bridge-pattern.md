@@ -1,3 +1,15 @@
+---
+id: "ADR-087"
+title: "Frame Bridge Pattern: Raw OT Frames to PIC-Format Text"
+status: "Accepted"
+date: "2026-04-04"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-087: Frame Bridge Pattern: Raw OT Frames to PIC-Format Text
 
 ## Status

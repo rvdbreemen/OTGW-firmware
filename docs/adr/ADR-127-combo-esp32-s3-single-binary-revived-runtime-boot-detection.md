@@ -1,3 +1,16 @@
+---
+id: "ADR-127"
+title: "Combo ESP32-S3 single binary revived: runtime PIC/OTDirect boot detection (supersedes ADR-126)"
+status: "Accepted"
+date: "2026-06-12"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-126"
+superseded_by: null
+---
 # ADR-127 Combo ESP32-S3 single binary revived: runtime PIC/OTDirect boot detection (supersedes ADR-126)
 
 ## Status

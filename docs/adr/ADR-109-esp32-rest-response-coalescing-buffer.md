@@ -1,3 +1,15 @@
+---
+id: "ADR-109"
+title: "— ESP32 REST response coalescing buffer"
+status: "Superseded"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-132"
+---
 # ADR-109 — ESP32 REST response coalescing buffer
 
 ## Status

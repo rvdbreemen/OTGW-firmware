@@ -1,3 +1,15 @@
+---
+id: "ADR-040"
+title: "MQTT Source-Specific Topics for OpenTherm Values"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-040: MQTT Source-Specific Topics for OpenTherm Values
 
 **Status:** Accepted  

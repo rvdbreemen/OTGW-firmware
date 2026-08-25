@@ -1,3 +1,15 @@
+---
+id: "ADR-049"
+title: "String Class Prohibition in Protocol Paths"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-049: String Class Prohibition in Protocol Paths
 
 **Status:** Accepted

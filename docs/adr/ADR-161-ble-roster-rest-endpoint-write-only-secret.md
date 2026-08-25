@@ -1,3 +1,15 @@
+---
+id: "ADR-161"
+title: "Dedicated REST Endpoint for the SAT BLE Sensor Roster with a Write-Only Per-Slot Secret"
+status: "Accepted"
+date: "2026-07-04"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-161: Dedicated REST Endpoint for the SAT BLE Sensor Roster with a Write-Only Per-Slot Secret
 
 ## Status

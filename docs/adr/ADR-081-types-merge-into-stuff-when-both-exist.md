@@ -1,3 +1,15 @@
+---
+id: "ADR-081"
+title: "Types merge into `<Component>stuff.h` when both headers exist (amendment to ADR-079)"
+status: "Accepted"
+date: "2026-04-19"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 #  ADR-081 Types merge into `<Component>stuff.h` when both headers exist (amendment to ADR-079)
 
 ## Status

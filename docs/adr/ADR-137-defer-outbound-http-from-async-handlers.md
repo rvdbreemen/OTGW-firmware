@@ -1,3 +1,15 @@
+---
+id: "ADR-137"
+title: "Defer Outbound HTTP Initiated From an Async Handler to loop() Context (Amends ADR-132)"
+status: "Accepted"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-137 Defer Outbound HTTP Initiated From an Async Handler to loop() Context (Amends ADR-132)
 
 ## Status

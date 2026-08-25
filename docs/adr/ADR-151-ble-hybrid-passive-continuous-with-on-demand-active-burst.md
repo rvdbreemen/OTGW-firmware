@@ -1,3 +1,15 @@
+---
+id: "ADR-151"
+title: "— BLE Name Capture Stays on the Passive-Continuous Scan (Active-Scan Burst Rejected)"
+status: "Accepted"
+date: "2026-06-22"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-151 — BLE Name Capture Stays on the Passive-Continuous Scan (Active-Scan Burst Rejected)
 
 - **Status**: Accepted

@@ -1,3 +1,15 @@
+---
+id: "ADR-069"
+title: "SAT PID v3 Controller Implementation"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-069: SAT PID v3 Controller Implementation
 
 **Status:** Accepted

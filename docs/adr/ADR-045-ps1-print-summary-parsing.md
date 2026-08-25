@@ -1,3 +1,15 @@
+---
+id: "ADR-045"
+title: "PS=1 Print Summary Parsing"
+status: "Superseded"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-046"
+---
 # ADR-045: PS=1 Print Summary Parsing
 
 **Status:** Superseded by ADR-046  

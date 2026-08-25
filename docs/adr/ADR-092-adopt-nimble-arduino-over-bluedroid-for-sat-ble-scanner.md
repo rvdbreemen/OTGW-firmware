@@ -1,3 +1,15 @@
+---
+id: "ADR-092"
+title: "— Adopt NimBLE-Arduino over Bluedroid for SAT BLE Scanner"
+status: "Accepted"
+date: "2026-04-30"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-092 — Adopt NimBLE-Arduino over Bluedroid for SAT BLE Scanner
 
 - **Status**: Accepted

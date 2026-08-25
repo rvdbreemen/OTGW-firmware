@@ -1,3 +1,15 @@
+---
+id: "ADR-093"
+title: "Home Assistant Discovery Retained-Config Orphan Cleanup"
+status: "Accepted"
+date: "2026-05-01"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-093 Home Assistant Discovery Retained-Config Orphan Cleanup
 
 ## Status

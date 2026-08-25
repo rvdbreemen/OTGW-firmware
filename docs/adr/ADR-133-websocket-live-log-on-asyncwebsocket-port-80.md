@@ -1,3 +1,16 @@
+---
+id: "ADR-133"
+title: "WebSocket Live-Log on AsyncWebSocket at /ws on Port 80 (ADR-123 Phase 3, supersedes ADR-005)"
+status: "Accepted"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-005"
+superseded_by: null
+---
 # ADR-133 WebSocket Live-Log on AsyncWebSocket at /ws on Port 80 (ADR-123 Phase 3, supersedes ADR-005)
 
 ## Status

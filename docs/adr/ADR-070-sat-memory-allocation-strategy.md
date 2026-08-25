@@ -1,3 +1,16 @@
+---
+id: "ADR-070"
+title: "SAT Memory Allocation Strategy"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes:
+  - "ADR-004"
+superseded_by: null
+---
 # ADR-070: SAT Memory Allocation Strategy
 
 **Status:** Accepted

@@ -1,3 +1,15 @@
+---
+id: "ADR-036"
+title: "Boot Sequence Initialization Ordering"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-036: Boot Sequence Initialization Ordering
 
 **Status:** Accepted  

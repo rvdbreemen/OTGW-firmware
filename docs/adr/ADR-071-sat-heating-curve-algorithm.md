@@ -1,3 +1,15 @@
+---
+id: "ADR-071"
+title: "SAT Heating Curve Algorithm"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-071: SAT Heating Curve Algorithm
 
 **Status:** Accepted

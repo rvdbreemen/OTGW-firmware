@@ -1,3 +1,15 @@
+---
+id: "ADR-005"
+title: "WebSocket for Real-Time Streaming"
+status: "Superseded"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: "ADR-133"
+---
 # ADR-005: WebSocket for Real-Time Streaming
 
 **Status:** Superseded by ADR-133 (2026-06-14)  

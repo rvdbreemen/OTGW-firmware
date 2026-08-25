@@ -1,3 +1,15 @@
+---
+id: "ADR-138"
+title: "PIC-UART Control-Method Park Handshake, TX Requeue-to-Front Ordering, and Progress-Path Heap-Gate Decision (Amends ADR-130 and ADR-133)"
+status: "Accepted"
+date: "2026-06-14"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-138 PIC-UART Control-Method Park Handshake, TX Requeue-to-Front Ordering, and Progress-Path Heap-Gate Decision (Amends ADR-130 and ADR-133)
 
 ## Status

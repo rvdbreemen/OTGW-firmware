@@ -1,3 +1,15 @@
+---
+id: "ADR-024"
+title: "Debug Telnet Command Console"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-024: Debug Telnet Command Console
 
 **Status:** Accepted  

@@ -1,3 +1,15 @@
+---
+id: "ADR-028"
+title: "File Streaming Over Loading for Memory Safety"
+status: "Accepted"
+date: null
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-028: File Streaming Over Loading for Memory Safety
 
 **Status:** Accepted  

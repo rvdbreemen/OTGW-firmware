@@ -1,3 +1,15 @@
+---
+id: "ADR-090"
+title: "Re-entrancy Guard Pattern for Shared Scratch Buffers"
+status: "Accepted"
+date: "2026-04-26"
+binding: false
+gate: null
+documents_shipped: false
+verified_in: []
+supersedes: []
+superseded_by: null
+---
 # ADR-090 Re-entrancy Guard Pattern for Shared Scratch Buffers
 
 ## Status
