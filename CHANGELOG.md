@@ -8,7 +8,18 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
-_No unreleased changes yet. New work on `otgw-1.x.x` lands here._
+### Fixed
+
+- **The "boiler does not implement" panel could report an id the boiler demonstrably answers.** The per-message-id capability bitmap was maintained from a frame's master/slave bit alone. A gateway override answer to the thermostat is a type-7 with that bit set, so it counted as boiler evidence and marked the id unsupported, while the boiler's own Write-Ack had already marked the same id as acked. The bit was published retained and persisted to `/ot-boiler.json`, so it survived reboots and nothing ever cleared it. Override answers are no longer boiler evidence, and a genuine boiler Ack now retracts an earlier verdict, so existing false entries clear themselves from live traffic without deleting any file. The retraction requires a real boiler frame: a gateway that answers the thermostat outright emits no boiler frame at all, and must not be able to clear a truthful verdict. (GH #677, TASK-1080)
+- **Settings values longer than 149 characters were silently truncated and reported as saved.** A webhook payload template over that length was stored cut off mid-JSON while the API returned HTTP 200. Two independent causes: the settings POST handler read into an undersized buffer, and the JSON field extractor discarded what did not fit while still reporting success. The extractor now fails instead of truncating, and the buffer matches the largest writable setting. Verified with a host-compiled harness under `test/` that exercises the shipped parser and fails against the pre-fix code. (TASK-1082, follow-up TASK-1083)
+
+### Changed
+
+- **The DHW flow rate sensor is now typed `device_class: volume_flow_rate`.** GitHub #675 asked for `device_class: water`, but Home Assistant restricts that class to cumulative volume units (`L`, `gal`, `m3`, `ft3`, `CCF`, `MCF`), and this sensor is `l/min` with `state_class: measurement`. A water-classed rate entity is rejected by HA. Note this does not place the sensor on the Energy dashboard: that needs a cumulative total, which is a separate entity still in design (ADR-090, proposed). (GH #675, TASK-1081)
+
+### Documentation
+
+- ADR-090 proposed: publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard. Records that a firmware-side integration is not more accurate than a Home Assistant helper (both see the same sparse MsgID 19 samples), and settles the reboot, flash-wear and integration-method questions. Status is Proposed; not implemented.
 
 ## [1.7.4] - 2026-08-10
 
