@@ -13,7 +13,7 @@
 # Nothing is spent until an author sets llm_judge:true on an ADR.
 # Turn it off project-wide:  set judge.llm_enabled:false in docs/adr/.adr-kit.json
 # Turn it off per commit:    ADR_KIT_NO_LLM=1 git commit ...
-# Choose the backend:        python bin/adr-judge --set-backend {host,openrouter,ollama}
+# Record the host client:    python bin/adr-judge --set-backend host --host-client <id>
 # On-demand LLM review:      /adr-kit:judge  (in a Claude Code session)
 #
 # As of v0.17.0 a flock concurrency guard serializes the heavy LLM passes so
@@ -52,7 +52,7 @@ set -e
 # freezes at install time. adr-guardian compares this stamp against the
 # installed plugin version and nudges /adr-kit:upgrade when the wrapper lags.
 # Maintained by scripts/bump-version.py; do not edit by hand.
-ADR_KIT_WRAPPER_VERSION="0.47.0"
+ADR_KIT_WRAPPER_VERSION="0.51.0"
 
 if [ "${ADR_KIT_HOOK_DISABLE:-0}" = "1" ]; then
   echo "[adr-kit] hook disabled for this commit (ADR_KIT_HOOK_DISABLE=1)" >&2
@@ -234,7 +234,7 @@ esac
 # Run the judge.
 #   - declarative pass:  always-on; fast, regex-only, exits non-zero on violation
 #   - LLM pass (default on): one isolated call per llm_judge:true ADR, on the
-#                        backend judge.backend selects (host/openrouter/ollama);
+#                        host client the installer recorded (ADR-036);
 #                        disabled by ADR_KIT_NO_LLM=1 or judge.llm_enabled:false;
 #                        suppressed under lock contention (_NO_LLM_OVERRIDE)
 # Exit codes:
@@ -249,7 +249,12 @@ _T0=$(_ms_now)
 # below -- including the violation report -- would never run and the commit
 # would be blocked with no explanation at all.
 set +e
-ADR_OUT=$(git diff --cached --unified=0 | ADR_KIT_NO_LLM="${_NO_LLM_OVERRIDE:-0}" "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/" --repo-root "$ROOT" --snapshot staged $_LLM_FLAG 2>&1)
+# The lock override forces the LLM pass off; otherwise the operator's own
+# ADR_KIT_NO_LLM stands. Hard-coding 0 as the fallback silently discarded the
+# opt-out this hook advertises in its own header and in its slow-commit
+# warning, which matters now that a configured backend makes that pass cost
+# one model call per in-scope ADR.
+ADR_OUT=$(git diff --cached --unified=0 | ADR_KIT_NO_LLM="${_NO_LLM_OVERRIDE:-${ADR_KIT_NO_LLM:-0}}" "$ADR_JUDGE" --diff - --adr-dir "$ROOT/docs/adr/" --repo-root "$ROOT" --snapshot staged $_LLM_FLAG 2>&1)
 ADR_EXIT=$?
 set -e
 _T1=$(_ms_now)

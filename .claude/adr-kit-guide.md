@@ -1,4 +1,4 @@
-<!-- adr-kit-guide v0.47.0 -->
+<!-- adr-kit-guide v0.51.0 -->
 <!-- Canonical project-side ADR guide. Copied from the plugin's templates/adr-kit-guide.md to .claude/adr-kit-guide.md by /adr-kit:init, /adr-kit:upgrade, and /adr-kit:setup. -->
 <!-- This file is plain markdown — readable by Claude Code, headless `claude -p`, shell scripts in pre-commit hooks, evaluator scripts, and any agent that doesn't process @-imports. Do not embed Claude-Code-specific syntax inside this file. -->
 
@@ -159,14 +159,14 @@ After `/adr-kit:init` (or `/adr-kit:install-hooks`), every `git commit` runs `bi
 - **Declarative pass** — always-on; fast, regex-only, no LLM. A violation exits non-zero and blocks the commit.
 - **LLM pass (on by default as of v0.43.0, ADR-017)** — each `llm_judge: true` ADR gets its **own isolated call**; they are never batched. Batching was reversed deliberately: a shared prompt let one ADR's Decision text flip another ADR's verdict, reproduced three times out of three, and the forged pass was indistinguishable from a genuine one. The model is resolved from the host agent (`judge.backend`), not pinned. Any `VIOLATION` blocks the commit with the model's one-sentence reason. An unavailable backend degrades to declarative-only and never blocks a legitimate commit.
 
-**Cost shape.** Since per-ADR isolation replaced batching, cost and latency are **linear in the number of `llm_judge: true` ADRs** — one model call each, not one call total. The old figure (roughly $0.10–0.30 per commit for 50 ADRs on one batched call) no longer holds and would under-estimate a large set by an order of magnitude. The mitigating fact is that `llm_judge` defaults to `false`, so the population is empty until an author opts an ADR in. Select the backend with `python bin/adr-judge --set-backend {host,openrouter,ollama}`; inspect the effective settings with `--show-config`.
+**Cost shape.** Since per-ADR isolation replaced batching, cost and latency are **linear in the number of `llm_judge: true` ADRs** — one model call each, not one call total. The old figure (roughly $0.10–0.30 per commit for 50 ADRs on one batched call) no longer holds and would under-estimate a large set by an order of magnitude. The mitigating fact is that `llm_judge` defaults to `false`, so the population is empty until an author opts an ADR in. The judge runs on the host client's own model (the only backend, ADR-036); inspect the effective settings with `python bin/adr-judge --show-config`.
 
 **Knobs:**
 - The LLM pass is on by default; `judge.llm_enabled: false` in `docs/adr/.adr-kit.json` turns it off project-wide.
 - Re-enable it for one commit after that: `ADR_KIT_LLM=1 git commit -m "…"`
 - Disable LLM pass per commit: `ADR_KIT_NO_LLM=1 git commit -m "…"`
 - Disable hook entirely per commit: `ADR_KIT_HOOK_DISABLE=1 git commit -m "…"`
-- Switch backend or model: `python bin/adr-judge --set-backend openrouter --model <provider/model>` (or `ollama --model <tag>`). `judge.llm_model` and `judge.llm_cmd` are deprecated and ignored: repository-tracked config may select among backends but may never supply a command, endpoint or credential (ADR-017).
+- Record the host client: `python bin/adr-judge --set-backend host --host-client <client-id>`. `judge.llm_model` and `judge.llm_cmd` are deprecated and ignored: repository-tracked config may never supply a command, endpoint or credential (ADR-017, ADR-036).
 - Remove permanently: `/adr-kit:install-hooks --uninstall`
 
 ## The signer

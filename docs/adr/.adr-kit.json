@@ -1,6 +1,7 @@
 {
   "_clarity_note": "Clarity gate is always_advisory because the tool has no acronym whitelist. Project-domain acronyms (MQTT, OTGW, HTTP, REST, PIC, ESP8266, FIFO, ...) are well-known in context and expanding them in 79 existing Accepted ADRs would violate the immutability rule. New ADRs should still avoid bare adjectives and use imperative voice — adr-generator enforces this at authoring time.",
   "_comment": "adr-kit project policy — see docs/adr/.adr-kit.json schema in plugin for full reference.",
+  "_judge_note": "judge.llm_enabled is false on purpose, not by neglect. 68 ADRs carry llm_judge:true and 58 of those declare no path_glob, so the per-commit pass would make 58 isolated model calls on every commit regardless of what the diff touches. At the measured 20-28s per call that is roughly 20-27 minutes of blocking per commit, and no faster model fixes a per-ADR multiplier. The declarative Enforcement pass still runs on every commit at millisecond cost. Semantic review happens instead on the guardian llm tier (guardian.llm_stale_days: 7, llm_autorun: false so cost is always confirmed first), or on demand via /adr-kit:judge. Revisit if the unscoped count drops by giving those ADRs a path_glob.",
   "judge": {
     "backend": "host",
     "llm_enabled": false
