@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.357
+**  Version  : v2.0.0-alpha.358
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -330,14 +330,39 @@ static void handleCommandSubmit(const char* cmdStr) {
   webSend(202, F("application/json"), F("{\"status\":\"queued\"}"));
 }
 
+// TASK-1073: why replay cannot run on this board, or nullptr when it can.
+static PGM_P otgwSimulationUnavailableReason() {
+#if HAS_PIC
+  if (isOTDirectEnabled()) {
+    static const char rDirect[] PROGMEM = "board is in OT-Direct mode; replay runs on the PIC serial path";
+    return rDirect;
+  }
+  return nullptr;
+#else
+  static const char rNoPic[] PROGMEM = "this build has no PIC serial path";
+  return rNoPic;
+#endif
+}
+
 static void sendSimulationStatus() {
   static const char kOTGWSimulationFile[] PROGMEM = "/otgw_simulation.log";
-  char jsonBuf[160];
-  snprintf_P(jsonBuf, sizeof(jsonBuf),
-             PSTR("{\"simulation\":{\"active\":%s,\"file\":\"%S\",\"interval_ms\":%lu}}"),
-             state.debug.bOTGWSimulation ? "true" : "false",
-             reinterpret_cast<PGM_P>(kOTGWSimulationFile),
-             static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
+  // active must reflect what actually happens, not merely what the flag says.
+  // On a board where the pump cannot run, echoing the flag is a lie (TASK-1073).
+  PGM_P reason = otgwSimulationUnavailableReason();
+  char jsonBuf[240];
+  if (reason != nullptr) {
+    snprintf_P(jsonBuf, sizeof(jsonBuf),
+               PSTR("{\"simulation\":{\"active\":false,\"available\":false,\"reason\":\"%S\",\"file\":\"%S\",\"interval_ms\":%lu}}"),
+               reason,
+               reinterpret_cast<PGM_P>(kOTGWSimulationFile),
+               static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
+  } else {
+    snprintf_P(jsonBuf, sizeof(jsonBuf),
+               PSTR("{\"simulation\":{\"active\":%s,\"available\":true,\"file\":\"%S\",\"interval_ms\":%lu}}"),
+               state.debug.bOTGWSimulation ? "true" : "false",
+               reinterpret_cast<PGM_P>(kOTGWSimulationFile),
+               static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
+  }
   sendCorsOriginHeader();
   webSend(200, F("application/json"), jsonBuf);
 }
@@ -657,6 +682,20 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 
   if (wc > 4 && strcmp_P(words[4], PSTR("start")) == 0) {
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    // TASK-1073: refuse rather than report a replay that cannot happen. Enabling
+    // the flag here used to answer active:true on a PIC-less or OT-Direct board
+    // while the pump never ran; the failure was silent and cost a capture cycle
+    // to diagnose. Stopping stays allowed everywhere, so a board that somehow
+    // has the flag set can always clear it.
+#if HAS_PIC
+    if (isOTDirectEnabled()) {
+      sendApiError(409, F("Frame replay unavailable: board is in OT-Direct mode; replay runs on the PIC serial path"));
+      return;
+    }
+#else
+    sendApiError(409, F("Frame replay unavailable: this build has no PIC serial path"));
+    return;
+#endif
     setOTGWSimulationEnabled(true);
     sendSimulationStatus();
     return;

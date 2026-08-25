@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.357
+**  Version  : v2.0.0-alpha.358
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -520,6 +520,20 @@ inline bool isOTDirectEnabled() {
   return state.hw.eMode == HW_MODE_OT_DIRECT;
 #else
   return false;  // compiled out on PIC boards
+#endif
+}
+
+// TASK-1073: can the serial frame-replay simulator actually run here?
+// The replay pump lives on the PIC serial path, so it is compiled out entirely
+// without HAS_PIC, and it returns early while the board is in OT-Direct mode.
+// The REST endpoints must consult this before reporting replay active: a PIC-less
+// or OT-Direct board otherwise answers active:true while not one fixture frame is
+// replayed, a silent failure that looks exactly like success.
+inline bool canReplayOTGWSimulation() {
+#if HAS_PIC
+  return !isOTDirectEnabled();
+#else
+  return false;
 #endif
 }
 

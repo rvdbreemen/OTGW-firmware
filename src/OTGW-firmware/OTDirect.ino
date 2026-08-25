@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.357
+**  Version  : v2.0.0-alpha.358
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1189,15 +1189,29 @@ static unsigned long simulateLoopbackResponse(unsigned long request) {
   uint8_t msgId = (request >> 16) & 0xFF;
   uint8_t reqType = (request >> 28) & 0x07;
 
-  uint16_t data = pgm_read_word(&otLoopbackData[msgId]);
-
-  // WRITE_DATA (type 1) — accept the write, echo data back as WRITE_ACK
+  // WRITE_DATA (type 1) — accept the write, echo data back as WRITE_ACK.
+  // Answered before the table lookup: a write never reads otLoopbackData, so it
+  // stays valid across the whole 0-255 id range.
   if (reqType == 1) {
     uint16_t writeData = request & 0xFFFF;
     return buildOTResponse(5, msgId, writeData);  // type 5 = WRITE_ACK
   }
 
+  // TASK-1072: msgId spans 0-255 but the table holds 128 entries. Reading past
+  // the end is a valid flash access on ESP32 so it does not fault; it silently
+  // fabricates a value from whatever PROGMEM follows and returns it as a
+  // READ_ACK. That range is the OEM/vendor area, which includes the Remeha ids
+  // 131-133 that TASK-1068 made decodable, so an unguarded lookup can feed the
+  // decoder invented Remeha data. An id the table does not cover is simply one
+  // this simulated boiler does not implement, which is what UNKNOWN_DATA_ID says.
+  constexpr uint8_t kLoopbackTableEntries =
+      (uint8_t)(sizeof(otLoopbackData) / sizeof(otLoopbackData[0]));
+  if (msgId >= kLoopbackTableEntries) {
+    return buildOTResponse(7, msgId, 0);  // type 7 = UNKNOWN_DATA_ID
+  }
+
   // READ_DATA (type 0) — look up simulated value
+  uint16_t data = pgm_read_word(&otLoopbackData[msgId]);
   if (data == 0xFFFF) {
     return buildOTResponse(7, msgId, 0);  // type 7 = UNKNOWN_DATA_ID
   }

@@ -4,6 +4,7 @@ title: 'Fix: /api/v2/simulate reports active on boards where replay cannot run'
 status: To Do
 assignee: []
 created_date: '2026-08-08 19:12'
+updated_date: '2026-08-25 19:45'
 labels:
   - bug
   - api
@@ -21,9 +22,9 @@ setOTGWSimulationEnabled() (restAPI.ino:345) flips state.debug.bOTGWSimulation w
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 POST /api/v2/simulate/start on a board where the replay pump cannot run does not report active:true
-- [ ] #2 The response says why replay is unavailable (no PIC path on this build, or the board is in OT-Direct mode), not a bare error
-- [ ] #3 GET /api/v2/simulate reflects the same reality: it never reports active on a board where nothing is replayed
-- [ ] #4 Behaviour on a PIC board in PIC mode is unchanged: start still enables replay and reports active
-- [ ] #5 Build green for the esp32 targets and python evaluate.py --quick shows no new failures
+- [x] #1 POST /api/v2/simulate/start on a board where the replay pump cannot run does not report active:true
+- [x] #2 The response says why replay is unavailable (no PIC path on this build, or the board is in OT-Direct mode), not a bare error
+- [x] #3 GET /api/v2/simulate reflects the same reality: it never reports active on a board where nothing is replayed
+- [x] #4 Behaviour on a PIC board in PIC mode is unchanged: start still enables replay and reports active
+- [x] #5 Build green for the esp32 targets and python evaluate.py --quick shows no new failures
 <!-- AC:END -->

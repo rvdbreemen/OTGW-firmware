@@ -3,9 +3,11 @@ id: TASK-1072
 title: >-
   Fix: loopback simulateLoopbackResponse reads past otLoopbackData[128] for
   MsgIDs above 127
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-08 18:19'
+updated_date: '2026-08-25 19:45'
 labels:
   - bug
   - otdirect
@@ -22,9 +24,9 @@ Found 2026-08-08 while assessing whether loopback mode could substitute for the 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 simulateLoopbackResponse bounds-checks msgId against the table size before indexing
-- [ ] #2 A loopback request for any MsgID above the table range returns UNKNOWN_DATA_ID rather than fabricated data
-- [ ] #3 The table size is expressed once (for example sizeof(otLoopbackData)/sizeof(otLoopbackData[0])) so the guard cannot drift from the declaration
-- [ ] #4 Existing in-range loopback behaviour is unchanged for ids 0-127
-- [ ] #5 Build green for the relevant esp32 targets and python evaluate.py --quick shows no new failures
+- [x] #1 simulateLoopbackResponse bounds-checks msgId against the table size before indexing
+- [x] #2 A loopback request for any MsgID above the table range returns UNKNOWN_DATA_ID rather than fabricated data
+- [x] #3 The table size is expressed once (for example sizeof(otLoopbackData)/sizeof(otLoopbackData[0])) so the guard cannot drift from the declaration
+- [x] #4 Existing in-range loopback behaviour is unchanged for ids 0-127
+- [x] #5 Build green for the relevant esp32 targets and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
