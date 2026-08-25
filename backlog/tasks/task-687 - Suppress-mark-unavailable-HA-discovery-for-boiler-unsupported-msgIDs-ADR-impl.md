@@ -3,11 +3,11 @@ id: TASK-687
 title: >-
   Suppress / mark-unavailable HA discovery for boiler-unsupported msgIDs (ADR +
   impl)
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-24 06:47'
-updated_date: '2026-07-31 20:49'
+updated_date: '2026-08-25 17:53'
 labels:
   - ha-discovery
   - opentherm
@@ -106,4 +106,20 @@ Moved In Progress -> To Do (maintainer decision 2026-06-20): explicitly PARKED f
 PARKED for release 3.0.0 (maintainer decision 2026-06-30): suppress/mark-unavailable HA discovery for boiler-unsupported msgIDs is a substantial ADR-gated feature (ADR draft+accept, discovery-publisher change, runtime force-publish override, recovery path, 3-tester field validation across distinct boilers, docs). Not in scope for the 2.0.0 line; deferred to the 3.0.0 milestone.
 
 2026-07-31: picked up during a backlog-drain pass, then put straight back to To Do. Re-parked, not started. The task carries milestone 3.0.0 and an explicit maintainer parking decision of 2026-06-30; ADR-142 exists only as Proposed, and AC#6 requires field validation by three Discord testers on distinct boiler models. Nothing here is self-verifiable and starting it would override a standing maintainer decision. UNBLOCKS WHEN: the 3.0.0 milestone opens. First action then is to drive ADR-142 to Accepted via adr-kit (approach B, per the 2026-06-01 decision), then implement.
+
+2026-08-25: closed as wontfix. Its governing decision, ADR-142, was rejected by the maintainer on the grounds that the feature will not be implemented. Leaving this task open would leave the backlog claiming planned work that the decision record explicitly says will not happen.
+
+The underlying problem is real and unchanged: a msgID the boiler answers with Unknown-Data-Id still gets a Home Assistant discovery entity that never receives a value, so cards and automations referencing it sit on unknown indefinitely. What was rejected is Approach B specifically, the MQTT availability-list plus availability_mode: all. Anyone picking the problem up again should write a new ADR rather than reviving ADR-142; the rejected record retains the full design and its pre-rejection terms as historical context.
+
+The per-msgID capability bitmaps this task depended on (TASK-684/685/686) remain in place and are unaffected. They also received real repairs today: gateway override answers no longer count as boiler evidence, and a genuine boiler Ack now retracts an earlier unsupported verdict.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as wontfix, not completed. ADR-142, the decision this task implements, was rejected: the availability-list approach will not be built.
+
+The problem it addressed still exists. A msgID the boiler refuses with Unknown-Data-Id still gets a discovery entity that never updates. What is off the table is Approach B (an MQTT availability list with availability_mode: all), not the problem. A fresh ADR is the right route if it is revisited; ADR-142 keeps the full design and its pre-rejection terms for reference.
+
+Nothing was implemented and nothing was reverted. The capability bitmaps from TASK-684/685/686 that this task built on stay in place.
+<!-- SECTION:FINAL_SUMMARY:END -->

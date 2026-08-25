@@ -3,11 +3,11 @@ id: TASK-1084
 title: >-
   feat-2.0.0: port TASK-1082 — settings value silently truncated, plus {tr}
   emits invalid JSON
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-24 19:38'
-updated_date: '2026-08-24 21:13'
+updated_date: '2026-08-25 17:52'
 labels:
   - bug
 dependencies: []
@@ -48,3 +48,17 @@ Retraction now demands rsptype == OTGW_BOILER. Setting stays permissive so a pro
 
 Residual, tracked as TASK-1086: loopback mode fabricates frames labelled 'B' (OTDirect.ino:1213-1215), which this guard cannot exclude, and the synthesised type-7 A frames still SET unsupported bits. TASK-1086 scope should cover retraction as well as set.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ported the truncation fix to the 2.0.0 line and fixed a 2.0.0-only invalid-JSON defect.
+
+Unlike 1.x, BOTH scanner branches truncated here: xjfReadString tracked a full flag it never reported upward, and the bare-token branch did strlcpy-style shortening, so a number could be silently halved. Both now fail instead. The unterminated-string exit, which returned before writing its NUL, now clears the destination too. Resulting contract: extractJsonField leaves the destination empty and NUL-terminated on every false return, which is what makes the return-ignoring callers safe. All 15 call sites audited; the sensor-areas PATCH needed a matching change because an oversized address would otherwise have read as the documented empty-clears.
+
+Separately, Tr is NAN-initialised on this line and the {tr} webhook substitution emitted the literal --, which no JSON parser accepts in a numeric position, so the documented example template yielded {"tr":--} until a room temperature was observed. It now emits null. Only {tr} was affected; every other numeric variable is 0.0f-initialised and was deliberately left alone.
+
+Verified with a host-compiled harness that slices the code under test verbatim from the shipped sources: 6 of 27 checks fail with the fix reverted, all 27 pass with it applied. Build green on all six env rows, evaluator identical to baseline.
+
+This task also carried the GH #677 unsupported-bitmap fix in its hardened form; see the implementation notes for why the first version was unsafe on this line specifically.
+<!-- SECTION:FINAL_SUMMARY:END -->
