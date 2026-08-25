@@ -41,6 +41,7 @@ current guidance.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-18
     status: Proposed
@@ -52,6 +53,7 @@ status_history:
     changed_by: Agent
     reason: Hardware experiment refuted the loopTask-starvation premise. Core-0 build still rebooted (3x in a 1.5-min 8-worker flood); decoded panic named async_tcp itself as the trip task (CPU 0), loopTask healthy on CPU 1. Root cause is an O(n^2) cbuf::resize realloc loop in serializeJson(doc, AsyncResponseStream) from the 1460-byte default buffer growing one byte at a time, not core affinity. Real fix is a bug fix in restSendJson (pre-size to measureJson(doc)); RUNNING_CORE restored to ADR-139's 1. Kept for the investigation trail.
     changed_via: manual
+```
 
 ## Context
 

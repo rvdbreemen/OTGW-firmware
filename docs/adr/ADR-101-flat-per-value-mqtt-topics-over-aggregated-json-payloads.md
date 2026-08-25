@@ -3,8 +3,8 @@ id: "ADR-101"
 title: "Flat Per-Value MQTT Topics Over Aggregated JSON Payloads"
 status: "Accepted"
 date: "2026-05-08"
-binding: false
-gate: null
+binding: true
+gate: "bin/adr-judge"
 documents_shipped: false
 verified_in: []
 supersedes: []

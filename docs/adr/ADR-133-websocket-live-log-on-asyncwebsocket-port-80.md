@@ -34,6 +34,7 @@ from this architectural acceptance.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-14
     status: Proposed
@@ -45,6 +46,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted the Phase-3 WebSocket consolidation onto AsyncWebSocket at /ws on port 80; supersedes ADR-005
     changed_via: manual
+```
 
 ## Context
 

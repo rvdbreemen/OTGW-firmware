@@ -42,6 +42,7 @@ imperative-build/async-send bridge both stand. It changes only *how* the built
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-18
     status: Proposed
@@ -53,6 +54,7 @@ status_history:
     changed_by: Agent
     reason: Superseded by ADR-146; the chunked-pull approach was retired when ArduinoJson was reverted on the ESP32-S3, so the re-serialize-per-chunk idiom no longer applies
     changed_via: adr-kit
+```
 
 ## Context
 

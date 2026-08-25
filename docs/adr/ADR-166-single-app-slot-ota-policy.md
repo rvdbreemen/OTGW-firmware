@@ -38,6 +38,7 @@ specific record yet.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-06
     status: Proposed
@@ -45,6 +46,7 @@ status_history:
     reason: Initial decision record documenting the single-app-slot app-OTA rejection (backend, alpha.311) and the new frontend hide added in this pass. Left Proposed pending maintainer review.
     changed_via: adr-kit
     changed_via: adr-kit
+```
 
 ## Context
 

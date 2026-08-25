@@ -24,6 +24,7 @@ task may reference OTGWSerial') lands in seq6" - this ADR carries that boundary.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-13
     status: Proposed
@@ -35,6 +36,7 @@ status_history:
     changed_by: User
     reason: Accepted by the maintainer (Robert) on the same day
     changed_via: adr-kit
+```
 
 ## Context
 

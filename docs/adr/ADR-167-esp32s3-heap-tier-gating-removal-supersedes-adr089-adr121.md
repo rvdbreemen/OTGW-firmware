@@ -28,6 +28,7 @@ implementation task (TASK-1036, Phase-3).
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-06
     status: Proposed
@@ -39,6 +40,7 @@ status_history:
     changed_by: Maintainer (Robert van den Breemen), applied by Agent
     reason: Maintainer accept-readiness review completed and acceptance instructed directly. adr-kit quality gates scored A (0.92 overall) with Completeness 1.0, Evidence 0.80, Clarity 0.80, Consistency 1.0; the only open findings are two low-severity nits (no external https link, undefined acronyms) which do not affect the decision. Phase-3 removal proceeds under TASK-1036.
     changed_via: adr-kit
+```
 
 ## Context
 

@@ -23,12 +23,14 @@ the maintainer's own determination, made later, per project rule.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-09
     status: Proposed
     changed_by: Agent (adr-generator, diagnosis-driven)
     reason: Documents the UART0 rebind and IDF console mute that restored the ESP-to-PIC command channel on esp32-classic, verified on the bench device 2026-07-08/09 (TASK-972). Maintainer acceptance pending.
     changed_via: adr-kit
+```
 
 ## Context
 

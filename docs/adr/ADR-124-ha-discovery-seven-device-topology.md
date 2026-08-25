@@ -68,6 +68,7 @@ field-test, not binding-by-CI.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-05
     status: Proposed
@@ -79,6 +80,7 @@ status_history:
     changed_by: Claude (TASK-826)
     reason: Implementation landed — seven-device HaDevice enum, OT-Core (pic/otdirect) + Sensors devices, Gateway via_device hub, OTDirect flame metrics split to pseudo-ID 243. Golden-file discovery test updated for seven devices + via_device; esp32 + esp8266 builds green; evaluate.py --quick green. Gates satisfied (Completeness, Evidence, Clarity, Consistency).
     changed_via: manual
+```
 
 ## Context
 

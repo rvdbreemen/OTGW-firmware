@@ -45,6 +45,7 @@ three ESP32-S3 targets plus the field kill-test described under Consequences.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-17
     status: Proposed
@@ -56,6 +57,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Accepted by the maintainer in session ("accepteer adr 143") after the async transport implementation built green on all three ESP32-S3 targets (esp32 98.7% flash, esp32-classic 96.0%, esp32-combo 94.8%) and evaluate.py --quick stayed clean. Field kill-test (curl with no telnet/ser2net client attached) remains the runtime confirmation, tracked under TASK-866/879.
     changed_via: manual
+```
 
 ## Context
 

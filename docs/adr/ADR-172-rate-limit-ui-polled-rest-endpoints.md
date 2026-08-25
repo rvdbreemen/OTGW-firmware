@@ -20,12 +20,14 @@ Port of `otgw-1.x.x` ADR-086, with four deliberate divergences (below).
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-26
     status: Proposed
     changed_by: Agent
     reason: Ports 1.x ADR-086 (TASK-1043) to the 2.0.0 async line as part of TASK-1037, incorporating two defects found by adversarial review of 1.7.2-beta.4.
     changed_via: manual
+```
 
 ## Context
 

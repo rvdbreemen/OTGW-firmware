@@ -53,6 +53,7 @@ ship with this ADR.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-20
     status: Proposed
@@ -64,6 +65,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer-authorized acceptance. Robert explicitly authorized accepting ADR-149 on 2026-06-20 after the adr-kit gates passed (adr-quality grade A 0.96; adr-lint default gates completeness/audit/consistency pass strictly).
     changed_via: adr-kit
+```
 
 ## Context
 

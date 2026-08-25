@@ -31,6 +31,7 @@ this ADR promoted to binding.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-29
     status: Proposed
@@ -42,6 +43,7 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Superseded by ADR-164 after the never-persist rule hung boot on-device and was reverted (commit d7a34f4ad). Appended by hand; the original transition was performed without the lifecycle tool.
     changed_via: manual
+```
 
 ## Context
 

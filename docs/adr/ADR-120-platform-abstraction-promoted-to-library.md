@@ -38,12 +38,14 @@ Accepted. Date: 2026-06-02.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-02
     status: Accepted
     changed_by: User
     reason: Approved the Tier 6 relocation; implementation landed and builds green on both targets (esp8266 84.7% flash, esp32 95.7% flash)
     changed_via: backlog
+```
 
 ## Context
 

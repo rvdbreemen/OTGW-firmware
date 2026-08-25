@@ -37,6 +37,7 @@ epic TASK-865, separate from this architectural acceptance.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-14
     status: Proposed
@@ -48,6 +49,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted the Phase-3 HTTP move to ESPAsyncWebServer with the imperative-push to async-pull bridge; supersedes ADR-109
     changed_via: manual
+```
 
 ## Context
 

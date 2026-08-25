@@ -25,6 +25,7 @@ runtime probe. If a regression reintroduces a compile-time OLED gate, a
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-05-29
     status: Proposed
@@ -36,6 +37,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted; TASK-757 shipped and the TASK-758 button-ISR shim follow-up is complete, so the known exception noted at proposal time is resolved
     changed_via: adr-kit
+```
 
 ## Context
 

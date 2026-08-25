@@ -54,6 +54,7 @@ heap headroom profile) remains unverified, per the Risks section below.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-06
     status: Proposed
@@ -65,6 +66,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: "Read the ADR, approved N*=2 as the new hard limit. Directed the bake-in: lower REST_MAX_INFLIGHT/WEB_FILE_MAX_INFLIGHT production defaults to 2 and update CLAUDE.md's single-flight rule to document the cap. No client-side MAX_INFLIGHT knob requested (current N=1 client discipline is already within the new N=2 ceiling)."
     changed_via: adr-kit
+```
 
 ## Context
 

@@ -40,6 +40,7 @@ the failing scenario, AC#8) and will be set in the implementation commit; the
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-02
     status: Proposed
@@ -56,6 +57,7 @@ status_history:
     changed_by: Maintainer (Robert van den Breemen), applied by Agent under TASK-1036
     reason: Superseded by ADR-167 on the ESP32-S3-only dev branch. The per-consumer split never diverged from the shared ladder in practice and never fired on ESP32-S3 across two TASK-956 soak runs (zero ws_drops, zero mqtt_drops), exactly as this ADR's own Consequences section predicted. Phase-3 removal deleted getHeapHealthForWebSocket/ForMQTT, heapTierWithThresholds and the WS_/MQTT_HEAP_* ladders, and retired check_per_consumer_heap_gate per ADR-080. Remains in force on otgw-1.x.x.
     changed_via: adr-kit
+```
 
 ## Context
 

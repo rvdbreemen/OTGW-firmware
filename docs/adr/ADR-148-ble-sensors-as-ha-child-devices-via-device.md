@@ -26,6 +26,7 @@ stays superseded.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-20
     status: Proposed
@@ -37,6 +38,7 @@ status_history:
     changed_by: maintainer (Robert van den Breemen)
     reason: Accepted by the maintainer (authorized this session, 2026-06-20). The BLE-probe carve-out is adopted: each BLE probe is emitted as its own HA child-device linked to the main OTGW device by via_device, while all non-BLE entities remain inside the single OTGW device per ADR-140. Acceptance gates passed (adr-quality 0.90 grade A: Completeness 1.00, Evidence 0.70, Clarity 0.80, Consistency 1.00; adr-lint default gates PASS strictly). ADR-140 receives the reciprocal "Amended by ADR-148" back-link on acceptance. ADR-124 stays superseded; no automated CI gate (guideline-level per ADR-080, field-validated like ADR-140).
     changed_via: adr-kit
+```
 
 ## Context
 

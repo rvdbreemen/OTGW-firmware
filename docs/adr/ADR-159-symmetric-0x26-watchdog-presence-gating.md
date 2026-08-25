@@ -33,6 +33,7 @@ symmetric presence-gated arm+feed.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-29
     status: Proposed
@@ -44,6 +45,7 @@ status_history:
     changed_by: maintainer (Robert van den Breemen)
     reason: Accepted after code-implementation verification (symmetric 0x26 arm+feed gating live in OTGW-Core.ino) on maintainer instruction in-session.
     changed_via: manual
+```
 
 ## Context
 

@@ -41,6 +41,7 @@ once the existing direct-read sites that are intentionally exempt
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-01
     status: Proposed
@@ -57,6 +58,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Accepted by the maintainer. The SAT simulation contract (bus-tx isolation, boiler-absence edge-triggered availability gate, command trace, wrapper read convention) is in place on the ESP32-S3 line; enforced by code review + the documented self-checks (guideline-level per ADR-080).
     changed_via: manual
+```
 
 ## Context
 

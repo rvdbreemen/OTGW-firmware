@@ -59,6 +59,7 @@ legacy mode reproduces the pre-split payload byte-for-byte against a captured
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-03
     status: Proposed
@@ -70,6 +71,7 @@ status_history:
     changed_by: Claude (TASK-826)
     reason: Maintainer (Robert van den Breemen) revised the topology to seven devices — splitting the OpenTherm-core (PIC/OTDirect) and the physical hardware sensors (Dallas + S0) into their own devices and adding a Gateway via_device hub (a deliberate divergence from the HA-core parity that motivated §8's via_device omission). Carried-forward parts of this ADR remain authoritative as referenced by ADR-124.
     changed_via: adr-kit
+```
 
 ## Context
 

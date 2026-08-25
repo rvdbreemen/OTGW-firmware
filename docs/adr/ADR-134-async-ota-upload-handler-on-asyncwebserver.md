@@ -44,6 +44,7 @@ this architectural acceptance.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-14
     status: Proposed
@@ -55,6 +56,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted the Phase-3 OTA upload move onto AsyncWebServer onUpload, closing the OTA seam; carries the ADR-029/ADR-011 flash logic unchanged
     changed_via: manual
+```
 
 ## Context
 

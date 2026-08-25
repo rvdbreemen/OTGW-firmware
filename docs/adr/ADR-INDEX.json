@@ -3017,8 +3017,8 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
+        "binding": true,
+        "gate": "check_ps_summary_master_topic_gate",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -3147,7 +3147,7 @@
         ]
       },
       "metadata": {
-        "binding": false,
+        "binding": true,
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],

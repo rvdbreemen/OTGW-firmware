@@ -1,7 +1,18 @@
 {
   "_comment_top": "OTGW-firmware lint policy (adr-kit v0.9.0+). ADRs 1 through 81 predate adoption of the four canonical adr-kit gates and use a legacy structure (Decision drivers, Pros and Cons, Risks and Mitigations subsections). They are linted in advisory mode for completeness/evidence/clarity. ADRs 82 onward are linted strictly, so any new ADR is held to the canonical-seven section list out of the box. Consistency stays always_strict regardless of strict_from: filename / heading mismatches and duplicate ADR numbers are real bugs at any age.",
 
-  "_comment_template_choice": "We deliberately do NOT override template.required_sections here. The recent ADRs (082+) currently lack a few canonical headings (Status as heading, Related Decisions, References); the FAIL output is the actionable next step. If at some point we adopt a project-specific template (for example: only ## Context / ## Decision / ## Consequences as load-bearing headings, with Status inline as a bold prefix), add a template.required_sections array here listing the project's actual required headings, and the FAILs will resolve.",
+  "_comment_template_choice": "Overridden 2026-08-25. The precondition this comment itself named has been met: the project HAS adopted Status as an inline bold prefix. Measured across the 176 ADRs, 73 of the 86 completeness failures were that single convention, not 86 incomplete records. required_sections therefore lists the canonical seven MINUS the Status heading, so the gate stops reporting a house convention as a defect while still reporting real gaps. This is also the only lever that works: adr-lint returns FAIL before severity is consulted under --strict, and bin/adr accept passes --strict, so severity.completeness changes nothing (measured 86 to 86). Accepted side effect: 3 ADRs now surface in default mode on a genuinely missing Alternatives Considered, which the previous format=unknown branch was masking.",
+
+  "template": {
+    "required_sections": [
+      "## Context",
+      "## Decision",
+      "## Alternatives Considered",
+      "## Consequences",
+      "## Related Decisions",
+      "## References"
+    ]
+  },
 
   "strict_from": "ADR-082",
 

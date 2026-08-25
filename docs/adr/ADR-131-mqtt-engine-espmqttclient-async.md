@@ -26,6 +26,7 @@ whose premise no longer holds once `connect()` is asynchronous.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-13
     status: Proposed
@@ -37,6 +38,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted espMqttClient with UseInternalTask::NO as the Phase-2 MQTT engine (async connect, single-threaded loop-pumped); discussed and confirmed the deferral of a dedicated MQTT task to Phase 3+
     changed_via: manual
+```
 
 ## Context
 

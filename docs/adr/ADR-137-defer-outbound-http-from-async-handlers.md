@@ -29,6 +29,7 @@ and tracked under epic TASK-865.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-14
     status: Proposed
@@ -40,6 +41,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted the generalization of the ADR-132 bridge to outbound HTTP from async handlers (PIC update-check + refresh deferred to loop); amends ADR-132
     changed_via: manual
+```
 
 ## Context
 

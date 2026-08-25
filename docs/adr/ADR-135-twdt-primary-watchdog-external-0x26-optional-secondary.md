@@ -36,6 +36,7 @@ TASK-865, separate from this architectural acceptance.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-14
     status: Proposed
@@ -47,6 +48,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: "Maintainer accepted after folding the unconditional-0x26-feed fix into TASK-865.12: arm, feed and boot-read now all run unconditionally on HAS_PIC_WATCHDOG (no isPICEnabled() gate), removing the arm-unconditional/feed-gated asymmetry that could spurious-reset-loop a combo on an old Classic PCB with a dead PIC. Amends ADR-011."
     changed_via: manual
+```
 
 ## Context
 

@@ -20,12 +20,14 @@ Accepted. Date: 2026-06-26.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-26
     status: Accepted
     changed_by: User
     reason: Initial decision record; model implemented in alpha.268 and merged at alpha.274 on origin/dev, live-verified on a real OTGW32
     changed_via: adr-kit
+```
 
 ## Context
 

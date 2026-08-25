@@ -36,12 +36,14 @@ Accepted. Date: 2026-05-30.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-05-30
     status: Accepted
     changed_by: User
     reason: Documents the boards.h home chosen in TASK-743 Tier 3a; implementation already landed (commit d4be6d4e, alpha.106) and builds green on both targets
     changed_via: adr-kit
+```
 
 ## Context
 

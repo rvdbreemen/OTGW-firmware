@@ -18,12 +18,14 @@ Proposed. Date: 2026-07-26.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-26
     status: Proposed
     changed_by: Agent
     reason: Records the single-helper fix for a boot/republish discovery asymmetry found while mapping the 1.7.2-beta.4 port (TASK-1037). 2.0.0-only; no 1.x sibling.
     changed_via: manual
+```
 
 ## Context
 

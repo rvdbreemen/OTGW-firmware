@@ -20,6 +20,7 @@ Accepted. Date: 2026-07-04 (Proposed 2026-06-29; accepted by the maintainer Robe
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-29
     status: Proposed
@@ -31,6 +32,7 @@ status_history:
     changed_by: maintainer (Robert van den Breemen)
     reason: Accepted after code-implementation verification (BLE roster endpoint + write-only bindkey live in restAPI.ino) on maintainer instruction in-session; the two reusable patterns are signed off.
     changed_via: manual
+```
 
 ## Context
 

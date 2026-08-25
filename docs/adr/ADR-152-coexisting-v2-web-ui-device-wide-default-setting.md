@@ -20,12 +20,14 @@ Accepted. Date: 2026-06-24 (maintainer approval).
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-24
     status: Accepted
     changed_by: User
     reason: Initial decision record; v2 Web UI ships alongside classic, selected by settings.ui.bUseV2
     changed_via: adr-kit
+```
 
 ## Context
 

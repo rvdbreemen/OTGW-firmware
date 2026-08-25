@@ -20,6 +20,7 @@ Accepted. Date: 2026-06-27.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-27
     status: Proposed
@@ -31,6 +32,7 @@ status_history:
     changed_by: User
     reason: 2.0.0 port landed on origin/dev (commit 94890099, alpha.279); ESP32 build SUCCESS with fresh firmware.bin, evaluate.py Failed 0 (ESP abstraction clean); implementation parity with 1.x build 7b2d3cdd verified (both helpers evaluate disconnect-first); four verification gates pass (adr-lint PASS strictly, adr-quality 0.96 grade A)
     changed_via: adr-kit
+```
 
 ## Context
 

@@ -36,6 +36,7 @@ before the flip to Accepted).
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-15
     status: Proposed
@@ -47,6 +48,7 @@ status_history:
     changed_by: maintainer (Robert van den Breemen)
     reason: Accepted with the maintainer naming directive folded into §2 — in-device clustering uses five source/engine prefixes (esp_/pic_/otd_/sat_/sensors_), not the seven functional categories. Boiler/thermostat disambiguation moves to the 1.x bilateral _boiler/_thermostat suffix; gateway/OT-core fold onto the active engine prefix (pic_ or otd_). Supersedes ADR-124.
     changed_via: manual
+```
 
 ## Context
 

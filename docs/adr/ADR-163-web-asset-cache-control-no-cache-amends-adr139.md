@@ -20,6 +20,7 @@ Accepted. Date: 2026-06-30.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-30
     status: Proposed
@@ -31,6 +32,7 @@ status_history:
     changed_by: User
     reason: Maintainer approved the no-cache redirect (revised TASK-958 plan). Hardware-verified on OTGW32 @192.168.88.39 - warm 304 revalidations are ungated and a changed FS returns the new asset immediately. ADR-139 gains "Amended by ADR-163" for its cache-control value only.
     changed_via: adr-kit
+```
 
 ## Context
 

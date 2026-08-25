@@ -36,6 +36,7 @@ Accepted. Date: 2026-05-31.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-05-31
     status: Proposed
@@ -47,6 +48,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted the ported decision; implementation shipped on the 2.0.0 line (commit 5f846c38). Status section flipped to Accepted; this entry records the matching transition.
     changed_via: adr-kit
+```
 
 ## Context
 

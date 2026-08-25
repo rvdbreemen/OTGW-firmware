@@ -23,6 +23,7 @@ until Phase 1." This ADR carries that Phase-1 boundary.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-13
     status: Proposed
@@ -34,6 +35,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted the Phase-1 queue + OTGWState mutex foundation
     changed_via: manual
+```
 
 ## Context
 

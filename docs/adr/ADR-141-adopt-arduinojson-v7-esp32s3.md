@@ -48,12 +48,14 @@ on the ESP32-S3 line; until then this ADR is a decision of record, not yet CI-en
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-15
     status: Accepted
     changed_by: maintainer (Robert van den Breemen)
     reason: Reverse the no-ArduinoJson stance for the ESP32-S3-only 2.0.0 line. ADR-128 dropped ESP8266 (the RAM/fragmentation premise of ADR-042); the ESP32-S3 has 300 KB+ heap. The hand-rolled two-pass MqttJsonWriter is the source of review findings F1 (MEASURE/WRITE desync) and F5 (manual string-escaping gap). Both ESP32 reference projects (OT-Thing, EMS-ESP32) use ArduinoJson v7. Adopt it, starting with the MQTT HA-discovery path.
     changed_via: manual
+```
 
 ## Context
 

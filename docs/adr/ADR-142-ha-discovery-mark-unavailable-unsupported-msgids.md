@@ -59,6 +59,7 @@ criterion, not the CI gate; it is not automated.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-04
     status: Proposed
@@ -70,6 +71,7 @@ status_history:
     changed_by: Agent (TASK-1002)
     reason: Relabelled Proposed -> Deferred to 2.1.0. The feature is unimplemented (no availability_mode in src/) and the named gate check_ha_discovery_msgid_availability_list does not exist in evaluate.py; per ADR-080 that gate is a precondition of acceptance and must land with the implementation. Deferral makes explicit that this is not awaiting a review sign-off.
     changed_via: adr-kit
+```
 
 ## Context
 

@@ -34,6 +34,7 @@ and tracked under epic TASK-865.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-14
     status: Proposed
@@ -45,6 +46,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted the PIC-UART control-method park handshake, TX requeue-to-front ordering, sim-mode park, progress dedupe, and the ADR-133 progress-path heap-gate note; amends ADR-130 and ADR-133
     changed_via: manual
+```
 
 ## Context
 

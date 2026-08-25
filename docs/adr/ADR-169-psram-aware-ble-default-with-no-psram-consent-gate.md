@@ -24,6 +24,7 @@ consent-gate policy itself; it may lead to a later amending ADR if the
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-09
     status: Proposed
@@ -35,6 +36,7 @@ status_history:
     changed_by: User: Robert van den Breemen
     reason: Maintainer accepted the PSRAM-aware BLE default + no-PSRAM consent-gate policy. All four verification gates pass (Completeness/Evidence/Clarity/Consistency); the decision matches shipped code (SATble.ino:629-631). TASK-988's PSRAM real-utility validation stays open as a possible later amendment, not a blocker on the policy.
     changed_via: adr-kit
+```
 
 ## Context
 

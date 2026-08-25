@@ -22,12 +22,14 @@ materially different on this branch than on 1.x.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-26
     status: Proposed
     changed_by: Agent
     reason: Ports the 1.x ADR-087 decision (TASK-1048) to the 2.0.0 line as part of TASK-1037. Maintainer directed porting the removal regardless of whether the 1.x root cause reproduces here.
     changed_via: manual
+```
 
 ## Context
 

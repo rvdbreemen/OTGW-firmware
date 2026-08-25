@@ -22,6 +22,7 @@ The decision text below is preserved unedited per the immutability rule. It rema
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-04-26
     status: Accepted
@@ -33,6 +34,7 @@ status_history:
     changed_by: Maintainer (Robert van den Breemen), applied by Agent under TASK-1036
     reason: Superseded by ADR-167 on the ESP32-S3-only dev branch. Sub-rule 1's ESP8266-tuned ladder reverted to ADR-030's 3072/5120/8192, sub-rule 2's fragmentation-aware promotion was deleted, and sub-rule 4's consumer throttling collapsed to a CRITICAL-only block. Sub-rule 3's tier-entry counters were kept as telemetry (published MQTT stats topics + HA entities) but no longer gate anything. The three named evaluate.py gates were removed in the same commit per ADR-080. Remains in force on otgw-1.x.x.
     changed_via: adr-kit
+```
 
 ## Context
 

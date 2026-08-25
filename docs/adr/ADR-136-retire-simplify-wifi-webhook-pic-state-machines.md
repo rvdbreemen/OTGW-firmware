@@ -35,6 +35,7 @@ behaviour that was never about blocking-avoidance.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-14
     status: Proposed
@@ -46,6 +47,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted the Phase-4 per-machine verdict (webhook FSM collapsed onto a dedicated task; WiFi-reconnect and PIC PR= machines retained with rationale); supersedes ADR-048 on the 2.0.0 line
     changed_via: manual
+```
 
 ## Context
 

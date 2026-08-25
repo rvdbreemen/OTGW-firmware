@@ -52,6 +52,7 @@ added to it (the sanctioned immutability exception), its body unedited.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-04
     status: Proposed
@@ -63,6 +64,7 @@ status_history:
     changed_by: maintainer (Robert van den Breemen)
     reason: Accepted after code-implementation verification (persist-once + 3x retry live at OTGW-firmware.ino:341-405) on maintainer instruction in-session, choosing a superseding ADR over an in-place amendment for a genuine decision reversal.
     changed_via: manual
+```
 
 ## Context
 

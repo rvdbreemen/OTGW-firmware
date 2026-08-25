@@ -57,6 +57,7 @@ core-1 pin therefore stands unchanged; the real fix is a bug fix in
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-14
     status: Proposed
@@ -68,6 +69,7 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted ADR-139 by name in session after the agent reverted the loop's premature self-acceptance and presented the decision. ETag + bounded max-age=60 adopted as the project-wide web-asset cache-busting standard; the chunked index rewriter retired in favour of library-managed AsyncFileResponse streaming. The out-of-scope REST_STREAM_BUFFER_SIZE change was pulled out of this ADR's code surface as a separate decision. Back-references applied to ADR-132 (Amended by) and ADR-026 (Superseded by). Hardware confirmation of the /-hang fix remains field-validation (TASK-866).
     changed_via: manual
+```
 
 ## Context
 

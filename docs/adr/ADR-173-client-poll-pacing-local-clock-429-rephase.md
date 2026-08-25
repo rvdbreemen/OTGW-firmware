@@ -21,12 +21,14 @@ starvation defect found in 1.7.2-beta.4.
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-07-26
     status: Proposed
     changed_by: Agent
     reason: Ports 1.x TASK-1044 to the 2.0.0 classic UI as part of TASK-1037, adding the anti-starvation re-phasing that 1.x lacks.
     changed_via: manual
+```
 
 ## Context
 

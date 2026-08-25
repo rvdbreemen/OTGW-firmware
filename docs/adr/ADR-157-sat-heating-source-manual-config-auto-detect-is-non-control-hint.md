@@ -20,6 +20,7 @@ Accepted. Date: 2026-06-29. (Proposed 2026-06-28; accepted by the maintainer 202
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-28
     status: Proposed
@@ -31,6 +32,7 @@ status_history:
     changed_by: Agent
     reason: Maintainer accepted; passed the four quality gates and on-device validation of the manual-authoritative / detect-is-a-hint invariant (TASK-943, alpha.285).
     changed_via: adr-kit
+```
 
 ## Context
 

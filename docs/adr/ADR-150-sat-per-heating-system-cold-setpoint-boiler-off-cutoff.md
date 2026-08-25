@@ -18,6 +18,7 @@ Accepted. Date: 2026-06-24 (maintainer approval; landed: satGetColdSetpoint()). 
 
 ## Status History
 
+```yaml
 status_history:
   - date: 2026-06-21
     status: Proposed
@@ -29,6 +30,7 @@ status_history:
     changed_by: User
     reason: Accepted by the maintainer; landed satGetColdSetpoint()
     changed_via: adr-kit
+```
 
 ## Context
 
