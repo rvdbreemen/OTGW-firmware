@@ -457,6 +457,16 @@ static void handleOtgw(const char* words[], uint8_t wc, HTTPMethod method, const
     const String& body = httpServer.arg(0);
     char cmdBuf[64] = "";
     if (!extractJsonField(body, F("command"), cmdBuf, sizeof(cmdBuf))) {
+      // The endpoint accepts either {"command":"XX=y"} or a bare "XX=y" body, and a
+      // false return used to mean only "not JSON with a command key". Since that
+      // helper also fails on a value too long for cmdBuf (TASK-1082), the fallback
+      // can no longer be taken blind: on a JSON body it would hand the raw JSON to
+      // the PIC path as if it were the command. If the body names the key, treat a
+      // failure as an over-long value and say so.
+      if (strstr_P(body.c_str(), PSTR("\"command\"")) != nullptr) {
+        sendApiError(400, F("Command value missing or longer than 63 characters"));
+        return;
+      }
       strlcpy(cmdBuf, body.c_str(), sizeof(cmdBuf));
     }
     handleCommandSubmit(cmdBuf);
