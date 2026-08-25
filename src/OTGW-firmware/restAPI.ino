@@ -854,18 +854,28 @@ static const char kRouteMqtt[]       PROGMEM = "mqtt";
 // 1990ms is normal. A window equal to the client interval would hand 429s to a
 // well-behaved client for no reason.
 static const char kSubOtmonitor[] PROGMEM = "otmonitor";
+static const char kSubTelegraf[]  PROGMEM = "telegraf";
 static const char kSubTime[]      PROGMEM = "time";
 
 struct ApiRateLimit {
   PGM_P    resource;      // words[3]
   PGM_P    subresource;   // words[4]
+  PGM_P    aliasSub;      // words[4] alias sharing this budget, or nullptr
   uint32_t windowMs;
   uint32_t lastServedMs;
 };
 
+// TASK-1057 defect A: /otgw/telegraf and /otgw/otmonitor are the same handler
+// returning the same payload, but only otmonitor was listed, so a client that
+// switched paths polled without any cap and defeated ADR-086 outright.
+//
+// The alias shares ONE budget rather than getting a row of its own. A second row
+// would carry its own lastServedMs, so a client alternating between the two paths
+// would still poll at twice the intended rate — capped on paper, uncapped in
+// practice, which is the failure this fixes.
 static ApiRateLimit kRateLimitedRoutes[] = {
-  { kRouteOtgw,   kSubOtmonitor, 1500UL, 0 },
-  { kRouteDevice, kSubTime,      4000UL, 0 },
+  { kRouteOtgw,   kSubOtmonitor, kSubTelegraf, 1500UL, 0 },
+  { kRouteDevice, kSubTime,      nullptr,      4000UL, 0 },
 };
 
 // RFC 9457 problem+json. 429 (RFC 6585) is the right code here rather than
@@ -903,7 +913,8 @@ static bool checkApiRateLimit(const char* words[], uint8_t wc, HTTPMethod method
   for (uint8_t i = 0; i < (sizeof(kRateLimitedRoutes) / sizeof(kRateLimitedRoutes[0])); i++) {
     ApiRateLimit& rl = kRateLimitedRoutes[i];
     if (strcmp_P(words[3], rl.resource) != 0)    continue;
-    if (strcmp_P(words[4], rl.subresource) != 0) continue;
+    if (strcmp_P(words[4], rl.subresource) != 0 &&
+        (rl.aliasSub == nullptr || strcmp_P(words[4], rl.aliasSub) != 0)) continue;
 
     // Unsigned subtraction handles the 49-day millis() rollover correctly.
     const uint32_t elapsed = now - rl.lastServedMs;
