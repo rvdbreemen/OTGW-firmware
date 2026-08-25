@@ -3,9 +3,11 @@ id: TASK-1090
 title: >-
   Close the two ADR-172/173 review defects on the 1.x line (telegraf bypass, 429
   phase-lock)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-25 19:46'
+updated_date: '2026-08-25 19:47'
 labels:
   - bug
 dependencies: []
@@ -25,7 +27,7 @@ Defect B: checkApiRateLimit keeps a single lastServedMs window per route with bu
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The telegraf and otmonitor paths share ONE rate-limit budget, so alternating between them cannot exceed the cap
+- [x] #1 The telegraf and otmonitor paths share ONE rate-limit budget, so alternating between them cannot exceed the cap
 - [ ] #2 A 429 response causes the client to re-phase with a random offset, so two dashboards cannot stay locked in mutual refusal
-- [ ] #3 Build green and evaluate.py --quick shows no new failures
+- [x] #3 Build green and evaluate.py --quick shows no new failures
 <!-- AC:END -->
