@@ -142,6 +142,7 @@ enum HeapHealthLevel {
 // Field calibration: beta.6 served 521 requests fine at maxBlock floor 1944, so the
 // gate sits just above the cliff (2048), not so high it refuses healthy serving.
 #define HTTP_SERVE_MIN_MAXBLOCK 2048     // bytes
+#define HTTP_REAP_INTERVAL_MS   100      // forced reap cadence while canServeHttp() is closed
 HeapHealthLevel getHeapHealth();
 uint8_t getHeapFragmentation();
 bool canSendWebSocket();
@@ -343,7 +344,12 @@ struct HeapDiagSection {                 // state.heapdiag — per-boot heap-pre
   uint16_t iMqttDropsTotal          = 0; // per-boot MQTT messages dropped due to heap pressure
   uint16_t iMqttMaxBlockSkips       = 0; // MQTT publishes skipped by the maxBlock pre-flight gate (fragmentation guard)
   uint16_t iWsMaxBlockSkips         = 0; // WebSocket sends skipped by the maxBlock pre-flight gate (fragmentation guard)
-  uint16_t iHttpFragSkips           = 0; // httpServer.handleClient() ticks skipped by the maxBlock gate (HTTP-load fragmentation guard)
+  // TASK-1039: these two are LOOP-TICK / EVENT counters, not request counts, and they must
+  // not wrap: field data shows ~365 ticks/s, so a uint16 wraps in roughly three minutes.
+  // They overlap by construction — canServeHttp() counts the tick, then the reaper may run
+  // on that same tick — so gate ticks are the superset.
+  uint32_t iHttpFragSkips           = 0; // loop ticks on which the maxBlock gate withheld httpServer.handleClient()
+  uint32_t iHttpReaped              = 0; // pending HTTP connections released by reapPendingHttpConnections()
   uint16_t iEnteredLowCount         = 0; // transitions into HEAP_LOW tier (from HEALTHY)
   uint16_t iEnteredWarningCount     = 0; // transitions into HEAP_WARNING tier
   uint16_t iEnteredCriticalCount    = 0; // transitions into HEAP_CRITICAL tier

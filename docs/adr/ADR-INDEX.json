@@ -2912,6 +2912,65 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-091",
+      "title": "A heap refusal must not suppress the cleanup path it depends on",
+      "path": "ADR-091-a-heap-refusal-must-not-suppress-the-cleanup-path-it-depends-on.md",
+      "format": "madr",
+      "status": "Accepted",
+      "date": "2026-08-25",
+      "decision_summary": "Chosen option: Option A.",
+      "topics": [
+        "back-pressure",
+        "esp8266",
+        "heap",
+        "http"
+      ],
+      "aliases": [
+        "canServeHttp latch",
+        "HTTP serve gate self-deadlock",
+        "reapPendingHttpConnections"
+      ],
+      "components": [
+        "HTTP loop-pump heap gate"
+      ],
+      "symbols": [
+        "canServeHttp",
+        "HTTP_SERVE_MIN_MAXBLOCK",
+        "reapPendingHttpConnections"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep the release path free of allocation and of handler code, so that it is valid at any largest-block size.",
+          "Bound how often the release path runs, so it cannot starve the cooperative loop.",
+          "Count the gate's activity in units that are honest about what they measure. The existing counter records loop ticks, not requests, and must be named and typed accordingly."
+        ],
+        "must_not": [
+          "Force the full request pump through as a way of escaping the gate. Its multipart parser makes an unchecked contiguous allocation larger than the gate threshold, so there is no block size at which that is safe.",
+          "Raise HTTPSERVEMINMAXBLOCK as a remedy for the latch. A higher threshold makes the gate engage sooner, so it makes the latch more reachable, not less.",
+          "Let the release path block. Closing a connection through a flushing call can wait hundreds of milliseconds inside the loop."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "src/OTGW-firmware/helperStuff.ino — canServeHttp() and the reaper beside it.",
+          "src/OTGW-firmware/OTGW-firmware.ino — the loop call site, where refusing to serve now selects the reaper rather than doing nothing."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -5168,6 +5227,24 @@
     {
       "source": "ADR-090",
       "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-091",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-091",
+      "target": "ADR-079",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-091",
+      "target": "ADR-086",
       "type": "related",
       "resolved": true
     }

@@ -1214,6 +1214,9 @@ void sendMQTTheapdiag(){
   publishStatU32(F("otgw-firmware/stats/ws_fragskips"),          (unsigned long)state.heapdiag.iWsMaxBlockSkips);
   publishStatU32(F("otgw-firmware/stats/mqtt_fragskips"),        (unsigned long)state.heapdiag.iMqttMaxBlockSkips);
   publishStatU32(F("otgw-firmware/stats/http_fragskips"),        (unsigned long)state.heapdiag.iHttpFragSkips);
+  // Topic name kept for compatibility: it is retained and may be bound to HA sensors.
+  // It counts loop ticks on which the HTTP gate was shut, not requests (TASK-1039).
+  publishStatU32(F("otgw-firmware/stats/http_reaped"),           (unsigned long)state.heapdiag.iHttpReaped);
   publishStatU32(F("otgw-firmware/stats/enter_low"),             (unsigned long)state.heapdiag.iEnteredLowCount);
   publishStatU32(F("otgw-firmware/stats/enter_warning"),         (unsigned long)state.heapdiag.iEnteredWarningCount);
   publishStatU32(F("otgw-firmware/stats/enter_critical"),        (unsigned long)state.heapdiag.iEnteredCriticalCount);

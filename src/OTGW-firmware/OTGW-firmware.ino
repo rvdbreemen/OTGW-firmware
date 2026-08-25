@@ -438,7 +438,11 @@ void doBackgroundTasks()
       // browser/dashboard load the webserver fragments the heap until a later alloc
       // faults. Skip serving while maxBlock is too low so the heap can coalesce; clients
       // retry. Flash-upload handlers (handleEsp/PicFlashBackgroundTasks) are NOT gated.
+      // TASK-1039: when the gate is shut, still release pending connections. handleClient()
+      // is the only thing that frees them, so withholding it alone makes the gate hold
+      // itself shut; the reaper does that release without running any handler or allocating.
       if (canServeHttp()) httpServer.handleClient();
+      else                reapPendingHttpConnections();
       MDNS.update();
       loopNTP();
     }

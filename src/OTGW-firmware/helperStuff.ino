@@ -1133,6 +1133,38 @@ bool canServeHttp() {
 }
 
 //===========================================================================================
+// Release pending HTTP connections while canServeHttp() withholds the pump (TASK-1039).
+//
+// handleClient() is the only code that drains WiFiServer's unclaimed queue, and a
+// ClientContext frees its receive chain only when its refcount reaches zero. Nothing else
+// ever refs an unclaimed context. So with the pump off, every pending connection keeps its
+// pcb and its receive buffers, and the maxBlock the gate is waiting for can never come
+// back: the gate holds itself shut. Field evidence (martreides 1.7.1) shows maxBlock then
+// oscillating between 480 and 1872 and never crossing 2048 again for the rest of the run.
+//
+// Pop and release them directly instead. available() hands over ownership, the WiFiClient
+// destructor unrefs, and unref() discards the received data, closes and deletes. Nothing
+// here allocates, so it is safe at any maxBlock — unlike handleClient(), whose multipart
+// parser does an unchecked `new HTTPUpload()` of 2100 bytes contiguous, which is ABOVE
+// HTTP_SERVE_MIN_MAXBLOCK. That is why the pump cannot simply be forced through instead.
+//
+// Deliberately no c.stop(): stop() flushes first and can block for up to 300 ms. Letting
+// the WiFiClient go out of scope reaches the same release with no wait.
+//===========================================================================================
+void reapPendingHttpConnections() {
+  static uint32_t lastReapMs = 0;
+  uint32_t now = millis();
+  if ((uint32_t)(now - lastReapMs) < HTTP_REAP_INTERVAL_MS) return;
+  lastReapMs = now;
+  // Bounded by the backlog limit (5). hasClient() as the loop condition avoids the
+  // optimistic_yield() that available() performs on the empty path.
+  while (httpServer.getServer().hasClient()) {
+    WiFiClient c = httpServer.getServer().available();
+    state.heapdiag.iHttpReaped++;
+  }
+}
+
+//===========================================================================================
 // Get heap statistics for debugging
 //===========================================================================================
 void logHeapStats() {
@@ -1148,13 +1180,14 @@ void logHeapStats() {
     case HEAP_CRITICAL: levelStr = "CRITICAL"; break;
   }
   
-  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u, WS_fragskips=%u, MQTT_fragskips=%u, HTTP_fragskips=%u\r\n"),
+  DebugTf(PSTR("Heap: %u bytes free, %u max block, level=%s, WS_drops=%u, MQTT_drops=%u, WS_fragskips=%u, MQTT_fragskips=%u, HTTP_gate_ticks=%u, HTTP_reaped=%u\r\n"),
           freeHeap, maxBlock, levelStr,
           (uint32_t)state.heapdiag.iWsDropsTotal,
           (uint32_t)state.heapdiag.iMqttDropsTotal,
           (uint32_t)state.heapdiag.iWsMaxBlockSkips,
           (uint32_t)state.heapdiag.iMqttMaxBlockSkips,
-          (uint32_t)state.heapdiag.iHttpFragSkips);
+          (uint32_t)state.heapdiag.iHttpFragSkips,
+          (uint32_t)state.heapdiag.iHttpReaped);
 }
 
 //===========================================================================================
