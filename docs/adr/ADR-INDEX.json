@@ -2971,6 +2971,65 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-092",
+      "title": "Keep a recovery route reachable when the HTTP heap gate refuses",
+      "path": "ADR-092-keep-a-recovery-route-reachable-when-the-http-heap-gate-refuses.md",
+      "format": "madr",
+      "status": "Proposed",
+      "date": "2026-08-25",
+      "decision_summary": "Chosen option: Option A.",
+      "topics": [
+        "esp8266",
+        "heap",
+        "ota",
+        "recovery"
+      ],
+      "aliases": [
+        "OTA unreachable under heap pressure",
+        "remote recovery route",
+        "telnet reboot command"
+      ],
+      "components": [
+        "Recovery route under heap pressure"
+      ],
+      "symbols": [
+        "bESPactive",
+        "canServeHttp",
+        "handleDebug"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep the recovery route free of allocation, so it works in the state it exists for.",
+          "Route the reboot through the existing deferred-reboot mechanism rather than calling ESP.restart() inline, so it cannot fire mid-flash. That mechanism already guards on isFlashing().",
+          "Log the reboot and its reason before it happens, so a field capture shows an operator-initiated restart rather than an unexplained gap."
+        ],
+        "must_not": [
+          "Reboot automatically on heap state. This decision adds an operator action, not a policy.",
+          "Accept a firmware upload below the HTTP gate. The parser's unchecked 2100-byte contiguous allocation exceeds the gate threshold, so there is no safe band.",
+          "Drop telnet during a heap incident in order to free memory. ADR-079 rejected that for its own reasons, and this decision now depends on telnet staying up."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "src/OTGW-firmware/handleDebug.ino — the new command in the telnet command table.",
+          "src/OTGW-firmware/helperStuff.ino — the deferred-reboot mechanism it calls."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -5245,6 +5304,24 @@
     {
       "source": "ADR-091",
       "target": "ADR-086",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-092",
+      "target": "ADR-032",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-092",
+      "target": "ADR-079",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-092",
+      "target": "ADR-091",
       "type": "related",
       "resolved": true
     }
