@@ -25,3 +25,13 @@ Follow-on from TASK-1081 and GitHub #675. The rate sensor is now correctly typed
 - [ ] #3 Accumulation is elapsed-time x flow, hooked at both state write sites, and one real litre of flow is counted exactly once (bench-verified, including OTDirect master mode with a thermostat on the 2.0.0 peer)
 - [ ] #4 Counter persists across reboot, never decreases, and is resettable through the paired REST and MQTT surface
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-25: unblocked. ADR-090 accepted by the maintainer. Its peer ADR-176 is accepted on the 2.0.0 line, so the entity contract is agreed across both lines before either implementation starts.
+
+Design is settled and does not need re-litigating: accumulate as elapsed time times flow (never a fixed volume per sample), zero-hold with a capped interval biased to under-count, resume-and-accept-undercount on unclean reboot so the counter never decreases, persist in its own small file rather than settings.ini, write on delta >= 10 L or a 15-minute floor plus one write on graceful reboot, and expose a paired REST and MQTT reset.
+
+Two traps recorded in the ADR that are easy to miss when implementing: if the entity gets a faux message id it must be registered in the boot-publish path for non-OT discovery configs or it is simply absent in HA until the first value arrives; and on the 2.0.0 peer the accumulator must be called from BOTH state write sites, because updatePSSummaryFloatState bypasses print_f88 entirely.
+<!-- SECTION:NOTES:END -->
