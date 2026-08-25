@@ -54,6 +54,27 @@ underlying problem, that a boiler-unsupported msgID still publishes a
 discovery entity which never updates, should write a new ADR rather than
 reviving this one.
 
+### Record as it stood before rejection
+
+Retained verbatim so nothing is lost by the closure above. These were the
+terms the decision carried while it was open; none of them is in force.
+
+> **Binding** (per ADR-080): the CI gate is an extension of the
+> golden-file discovery test in `tests/` (introduced by ADR-122 / TASK-648) to
+> assert, for at least one OT msgID whose `isBoilerMsgIdUnsupportedRead()` or
+> `isBoilerMsgIdUnsupportedWrite()` returns true, that the emitted discovery
+> payload includes (a) an `availability` list with two entries, the device LWT
+> and the per-msgID availability topic, and (b) `availability_mode: all`. The
+> gate must land in the same implementation commit as the feature and must not
+> be deferred. Name: `check_ha_discovery_msgid_availability_list` (to be added
+> to `evaluate.py` and/or the golden-file test harness).
+>
+> The three-boiler field validation (AC#6) is a *verification* acceptance
+> criterion, not the CI gate; it is not automated.
+>
+> **Decision Maker:** Robert van den Breemen.
+> **Milestone:** 2.1.0
+
 ## Status History
 
 ```yaml
