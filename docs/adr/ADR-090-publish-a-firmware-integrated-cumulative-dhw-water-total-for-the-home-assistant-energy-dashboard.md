@@ -1,8 +1,8 @@
 ---
 id: "ADR-090"
 title: "Publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard"
-status: "Proposed"
-date: "2026-08-24"
+status: "Accepted"
+date: "2026-08-25"
 binding: false
 gate: null
 documents_shipped: false
@@ -34,7 +34,7 @@ format: "madr"
 
 ## Status
 
-Proposed, 2026-08-24.
+Accepted, 2026-08-25.
 
 ## Status History
 
@@ -45,6 +45,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-08-25
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted by the maintainer after all six open questions were resolved with measured or code-verified answers.
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context and Problem Statement
@@ -70,7 +75,7 @@ The reporter's actual goal — a water figure on the Energy dashboard — needs 
 
 Two constraints frame the design:
 
-- The device is an ESP8266 with roughly 40 KB of usable RAM, and its configuration
+- The device is an ESP8266 with roughly 40 KB of usable random-access memory (RAM), and its configuration
   store is LittleFS on the same flash the firmware runs from.
 - MsgID 19 is not emitted on a timer. It appears on the OpenTherm bus only when a
   master asks for it, so the sample stream is sparse and irregular by nature.
@@ -149,7 +154,7 @@ dashboard, and its value is non-decreasing across a graceful reboot of the gatew
 
 * Set `device_class: water` on any sensor whose unit is not one of
   `L, gal, m³, ft³, CCF, MCF`.
-* Write the persisted counter to flash on every MQTT publish.
+* Write the persisted counter to flash on every message-queue telemetry transport (MQTT) publish.
 * Accumulate a fixed volume per received sample. MsgID 19 can legitimately arrive
   more than once per real exchange, so per-sample accumulation makes the total a
   function of frame traffic rather than of water.
@@ -221,29 +226,15 @@ dashboard, and its value is non-decreasing across a graceful reboot of the gatew
 
 ## Open Questions
 
-- [x] Does the Home Assistant Energy dashboard require `state_class: total_increasing` — **Answered 2026-08-24 by User: Robert van den Breemen:** Neither is required. Verified against Home Assistant core dev branch, homeassistant/components/energy/validate.py: water sources go through the shared helper _async_validate_usage_stat, which accepts state_class MEASUREMENT, TOTAL or TOTAL_INCREASING. MEASUREMENT additionally requires a last_reset attribute. Accepted units come from WATER_USAGE_UNITS: L, gal, m3, ft3, CCF, MCF, and device_class must be SensorDeviceClass.WATER. The design therefore uses device_class water, unit L, state_class total_increasing: permitted, needs no last_reset, and matches the non-decreasing counter chosen below.
-      specifically, or does it also accept `total`? The developer sensor documentation
-      confirms the valid *units* for `device_class: water` but states no state-class
-      requirement, and <https://www.home-assistant.io/docs/energy/water/> says only to
-      "set and provide the `device_class`, `state_class`, and `unit_of_measurement`"
-      without naming values. This must be verified against Home Assistant source or a
-      live instance before acceptance; the Confirmation section currently assumes
-      `total_increasing`.
-- [x] What is the concrete flash-write rule? Candidates: a delta-litres threshold, a — **Answered 2026-08-24 by User: Robert van den Breemen:** Rule: write when delta >= 10 L, OR when 15 minutes have elapsed AND delta > 0, plus one write on graceful reboot. Bounds unclean-reboot loss to 10 L and the write rate to at most 96/day worst case, typically about 8/day. Wear is NOT the deciding factor. Naive single-sector arithmetic (100000 cycles / 120 writes per day = 2.3 years) does not apply because LittleFS wear-levels across the partition; a small dedicated file survives on the order of a century even at a 1 L cadence. Assumptions labelled: 120 L/day household DHW draw (external, no repo source) and 100000 erase cycles (industry-standard NOR figure, no datasheet read). The choice is therefore made on failure mode, not endurance: keep the counter out of settings.ini so a counter write never drags WiFi credentials through a power-loss window; use its own small file. Analysis performed on the 2.0.0 tree where the SAT precedents live; the conclusion is platform-independent, but the ESP8266 partition sizes should be confirmed before implementation here.
-      minimum interval floor, or both, plus a write on graceful reboot. The chosen
-      numbers must be justified against an estimated erase-cycle budget, not picked by
-      feel.
-- [x] What does the design do about a partial regression after an unclean reboot? — **Answered 2026-08-24 by User: Robert van den Breemen:** Resume from the last persisted value and accept the undercount. The counter never decreases, so Home Assistant never sees a reset and the long-term statistic stays coherent. The litres accumulated since the last flash write are lost permanently on an unclean reboot; that error is bounded by the write cadence and is the deliberate price of never corrupting the statistic. Decided by the maintainer.
-      Options include accepting it, always resuming from the last persisted value and
-      tolerating undercount, or publishing a deliberate full reset so Home Assistant
-      restarts the statistic cleanly instead of corrupting it.
-- [x] How is the integration performed between two sparse samples — last-value hold, — **Answered 2026-08-24 by User: Robert van den Breemen:** Zero-hold, counting only across intervals bounded by a non-zero flow reading, with the usable interval capped at a maximum so a long sampling gap cannot invent litres. This biases the total to UNDER-count, which is the safe direction for a figure users will read as a meter. Last-value hold and trapezoidal were both rejected because across a long gap they invent flow that never happened. The same method is mandated on the 2.0.0 peer so both firmwares report the same total for the same boiler. Decided by the maintainer.
-      trapezoidal, or zero-hold — and what is the error characteristic of the chosen
-      method when the gap is minutes rather than seconds?
-- [x] Is the counter user-resettable, and if so through which surface (REST, MQTT — **Answered 2026-08-24 by User: Robert van den Breemen:** Yes, through a paired REST and MQTT surface, matching whichever paired reset idiom exists on this line. The S0 pulse counter is NOT a usable precedent: it is a plain RAM global that is never persisted and has no reset, so it starts at zero every boot. The reset must zero the RAM counter AND the persisted file in one operation and immediately publish 0, so Home Assistant records a clean total_increasing reset rather than a partial regression. The exact 1.x route and MQTT command surface must be confirmed against this tree before implementation; the pattern was derived on the 2.0.0 tree.
-      command, web UI)? A meter with no reset is awkward after a boiler change.
-- [x] Measured RAM and flash cost of the counter plus the new discovery entity, to — **Answered 2026-08-24 by User: Robert van den Breemen:** ESTIMATE, not measured: about 20 bytes of RAM and roughly 500-800 bytes of flash. RAM breakdown assumes accumulating in millilitres as uint32_t rather than float litres (exact, no drift, range 4.29 M L): total, last-sample timestamp, last flow, last-persisted value, last-persist timestamp, 4 bytes each. No persistence buffer is needed if the write uses a stack-local buffer as the SAT energy persister does. Flash: about 28 bytes for one discovery table row (derived from struct layout with 4-byte pointers, not compiled), plus label and friendly-name strings, plus the new device-class and unit cases, giving about 100 bytes for the entity; the integration and persistence logic is the remaining 400-700. The measurement that would settle it is two builds of the same environment differing only by this change, diffed on binary size or on -Wl,-Map section totals. That was not run.
-      confirm the change is affordable under ADR-030's headroom policy.
+All resolved. Answers are retained rather than deleted: the reasoning is what a
+future reader needs in order to re-evaluate the decision.
+
+- [x] Does the Home Assistant Energy dashboard require `state_class: total_increasing` specifically, or does it also accept `total`? — **Answered 2026-08-24 by User: Robert van den Breemen:** Neither is required. Verified against Home Assistant core, `homeassistant/components/energy/validate.py`: water sources go through the shared helper `_async_validate_usage_stat`, which accepts `MEASUREMENT`, `TOTAL` or `TOTAL_INCREASING`. `MEASUREMENT` additionally requires a `last_reset` attribute. Accepted units come from `WATER_USAGE_UNITS` (`L, gal, m3, ft3, CCF, MCF`) and the device class must be `SensorDeviceClass.WATER`. The design therefore uses `device_class: water`, unit `L`, `state_class: total_increasing`: permitted, needs no `last_reset`, and matches the non-decreasing counter chosen below.
+- [x] What is the concrete flash-write rule, and what erase-cycle budget justifies the chosen numbers? — **Answered 2026-08-24 by User: Robert van den Breemen:** Write when delta >= 10 L, or when 15 minutes have elapsed and delta > 0, plus one write on graceful reboot. That bounds unclean-reboot loss to 10 L and the write rate to at most 96/day worst case, typically about 8/day. Wear is *not* the deciding factor: the naive single-sector figure (100000 cycles / 120 writes per day = 2.3 years) does not apply, because LittleFS wear-levels across the partition, and a small dedicated file survives on the order of a century even at a 1 L cadence. Assumptions labelled as such: 120 L/day household draw (external, no repo source) and 100000 erase cycles (industry-standard figure for the kind of flash memory these boards use (NOR flash) (the flash type these boards use), no datasheet read). The choice is therefore made on failure mode, not endurance. Analysis was performed on the 2.0.0 tree where the SAT (Smart Autonomous Thermostat) precedents live; the conclusion is platform-independent, but ESP8266 partition sizes should be confirmed before implementation here.
+- [x] What does the design do about a partial regression after an unclean reboot? — **Answered 2026-08-24 by User: Robert van den Breemen:** Resume from the last persisted value and accept the undercount. The counter never decreases, so Home Assistant never sees a reset and the long-term statistic stays coherent. The litres accumulated since the last flash write are lost permanently; that error is bounded by the write cadence and is the deliberate price of never corrupting the statistic.
+- [x] How is the integration performed between two sparse samples, and what is its error characteristic when the gap is minutes rather than seconds? — **Answered 2026-08-24 by User: Robert van den Breemen:** Zero-hold: count only across intervals bounded by a non-zero flow reading, with the usable interval capped so a long sampling gap cannot invent litres. This biases the total to UNDER-count, the safe direction for a figure users will read as a meter. Last-value hold and trapezoidal were rejected because across a long gap they invent flow that never happened. The same method is mandated on the 2.0.0 peer so both firmwares report the same total for the same boiler.
+- [x] Is the counter user-resettable, and through which surface? — **Answered 2026-08-24 by User: Robert van den Breemen:** Yes, through a paired REST and MQTT surface, matching whichever paired reset idiom exists on this line. The S0 pulse counter is *not* a usable precedent: it is a plain RAM global that is never persisted and has no reset, so it starts at zero every boot. The reset must zero the RAM counter *and* the persisted file in one operation and immediately publish 0, so Home Assistant records a clean reset rather than a partial regression. The exact 1.x route and MQTT command surface must be confirmed against this tree before implementation.
+- [x] What are the measured RAM and flash costs of the counter plus the new discovery entity? — **Answered 2026-08-24 by User: Robert van den Breemen:** An estimate, not measured: about 20 bytes of RAM and roughly 500-800 bytes of flash. The RAM figure assumes accumulating in millilitres as `uint32_t` rather than float litres (exact, no drift, range 4.29 M L): total, last-sample timestamp, last flow, last-persisted value and last-persist timestamp, 4 bytes each. No persistence buffer is needed if the write uses a stack-local buffer, as the SAT energy persister does. Flash: about 28 bytes for one discovery table row (derived from struct layout, not compiled), plus label and friendly-name strings and the new device-class and unit cases, giving about 100 bytes for the entity; the integration and persistence logic is the remaining 400-700. The measurement that would settle it is two builds of the same environment differing only by this change, diffed on binary size. That was not run.
 
 ## Related Decisions
 

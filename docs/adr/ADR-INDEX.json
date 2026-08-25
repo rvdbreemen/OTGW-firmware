@@ -2776,8 +2776,8 @@
       "title": "Judge ADRs declaratively per commit and semantically once a week",
       "path": "ADR-089-judge-adrs-declaratively-per-commit-and-semantically-once-a-week.md",
       "format": "madr",
-      "status": "Proposed",
-      "date": "2026-08-09",
+      "status": "Accepted",
+      "date": "2026-08-25",
       "decision_summary": "Chosen option: Option A, because the cost is a per-ADR multiplier rather than a per-call latency, so it belongs on a...",
       "topics": [
         "adr-kit",
@@ -2843,8 +2843,8 @@
       "title": "Publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard",
       "path": "ADR-090-publish-a-firmware-integrated-cumulative-dhw-water-total-for-the-home-assistant-energy-dashboard.md",
       "format": "madr",
-      "status": "Proposed",
-      "date": "2026-08-24",
+      "status": "Accepted",
+      "date": "2026-08-25",
       "decision_summary": "Chosen option: Option A, because the maintainer decided that an Energy dashboard figure should work out of the box, w...",
       "topics": [
         "home-assistant",
@@ -2877,7 +2877,7 @@
         ],
         "must_not": [
           "Set deviceclass: water on any sensor whose unit is not one of L, gal, m³, ft³, CCF, MCF.",
-          "Write the persisted counter to flash on every MQTT publish.",
+          "Write the persisted counter to flash on every message-queue telemetry transport (MQTT) publish.",
           "Accumulate a fixed volume per received sample. MsgID 19 can legitimately arrive more than once per real exchange, so per-sample accumulation makes the total a function of frame traffic rather than of water.",
           "Introduce the String class in the integration or publish path (ADR-004)."
         ],

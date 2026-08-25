@@ -1,15 +1,14 @@
 ---
 id: "ADR-089"
 title: "Judge ADRs declaratively per commit and semantically once a week"
-status: "Proposed"
-date: "2026-08-09"
+status: "Accepted"
+date: "2026-08-25"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "madr"
 topics:
   - "tooling"
   - "pre-commit"
@@ -28,6 +27,7 @@ symbols:
   - "judge.backend"
   - "ADR_KIT_NO_LLM"
 context_scope: "selective"
+format: "madr"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -36,7 +36,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-08-09.
+Accepted, 2026-08-25.
 
 ## Status History
 
@@ -47,6 +47,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-08-25
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "Accepted by the maintainer. Final open question settled: the judge stamp is committed by CI so one interval covers the whole repository."
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context and Problem Statement
@@ -292,10 +297,16 @@ advisory`; two commits on 2026-08-09 took 21 s and under 1 s.
   The runner throttles itself on a stamp file, so CI calls it on every build and
   it decides for itself whether the interval has elapsed. A skip costs a file
   read.
-* [ ] Should the stamp be committed by CI after a real pass, or held in a runner
-  cache via `$ADR_JUDGE_STAMP`? Committing shares the interval across every
-  checkout, which is the point; a cache keeps CI from writing to the repository.
-  Until this is settled the stamp is tracked and updated by whoever ran the pass.
+* [x] Should the stamp be committed by CI after a real pass, or held in a runner
+  cache via `$ADR_JUDGE_STAMP`? — **Answered 2026-08-25 by User: Robert van den
+  Breemen:** Committed. One interval for the whole repository is the point: a
+  runner cache would make each runner and each checkout keep its own clock, so a
+  pass advertised as weekly would in practice run once per week per machine, and
+  on a cold cache every time. That defeats the cost control this decision exists
+  for. The accepted cost is that CI writes the stamp file back to the repository
+  after a real pass, which needs write access and a commit that must not
+  retrigger the build. The interim arrangement (stamp tracked, updated by
+  whoever ran the pass) ends: it depended on a human remembering to commit it.
 
 ## Related Decisions
 
