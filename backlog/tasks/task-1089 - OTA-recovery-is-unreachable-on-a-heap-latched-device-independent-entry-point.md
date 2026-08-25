@@ -48,4 +48,12 @@ Option B (an OTA entry point below the gate) was rejected: it needs a body path 
 Option C (auto-reboot on sustained CRITICAL) was rejected as a first step and kept as a later option. TASK-1037's leak was diagnosable only because the device stayed up long enough to be captured; a reboot loop would have destroyed that evidence.
 
 Blocked on maintainer acceptance of ADR-092. Two open questions in it, both for the maintainer: whether the command needs a confirmation keystroke against the single-character convention, and whether the same action should also exist over MQTT.
+
+2026-08-25: ADR-092 Accepted after grilling, so implementation is unblocked. Two settled points that bind the work:
+
+Single key, no confirmation, consistent with every other telnet command. handleDebugChar reads one character and dispatches immediately, and the console has no confirmation pattern anywhere, so a two-key sequence would be its only exception. The mistype risk is bounded: a reboot preserves settings, the device returns in seconds, and the deferred-reboot mechanism refuses to fire while isFlashing(), which is the one case where an accidental restart would do real harm.
+
+Telnet only. MQTT is a separate decision, tracked separately. Note the reason changed during grilling: the draft argued MQTT is unreachable under heap pressure, which is only half true. canPublishMQTT() gates publishing, but handleMQTT() runs in the same loop branch as telnet and before the HTTP gate, so an inbound command would most likely still arrive. The real argument is scope, since an MQTT reboot is a new external effect on a channel shared with a broker.
+
+Implementation per the Decision Contract: route through the existing deferred-reboot mechanism rather than calling ESP.restart() inline, and log the reboot and its reason first so a field capture shows an operator-initiated restart rather than an unexplained gap.
 <!-- SECTION:NOTES:END -->
