@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-07-19 14:59'
-updated_date: '2026-08-25 19:05'
+updated_date: '2026-08-25 20:46'
 labels: []
 dependencies: []
 priority: high
@@ -63,4 +63,18 @@ Worse for this task specifically: ADR-079 already considered and REJECTED the ob
 So the work is: draft a superseding ADR that (a) argues the tier change from evidence, since the martreides captures show first recovery at 888 bytes free with maxBlock already around 500, which is past the point where anything can be reclaimed, and (b) names an action that reclaims memory in an MQTT-only, no-browser configuration without falling into what ADR-079 rejected. Then grill it, then have the maintainer accept it, then implement.
 
 Related and already fixed: TASK-1039 removed the HTTP gate latch, so one source of unreleased sockets during the same window is gone. That does not close this task, because recovery still has no action with any effect when no WebSocket or stream client exists.
+
+2026-08-25: closed as wontfix. The premise does not survive contact with TASK-1037's own findings.
+
+This task was built on 'every emergencyHeapRecovery() invocation logs delta=+0 actions=0x06', read as evidence that recovery is structurally incapable of reclaiming anything. TASK-1037 records the same observation and draws the opposite, correct conclusion: 'free heap and maxBlock fall together (frag stays ~3%), and emergencyHeapRecovery reports before=888 after=888 delta=+0 actions=0x06 - recovery reclaims zero bytes, meaning everything allocated is still referenced.'
+
+delta=+0 was therefore not a defect in recovery. It is the signature of a leak. Recovery reclaimed nothing because nothing was reclaimable: every allocation was still referenced. The helper behaved correctly.
+
+TASK-1037 is Done. The leak it identified (DHCP option 42 pushing SNTP servers on every lease renewal, plus the mDNS null-allocation crash on an exhausted heap) was fixed and shipped in v1.7.2. The captures this task reasons from are 1.7.1, i.e. from before that fix.
+
+The other premise also does not hold. Baseline headroom on this firmware is not scarce: the same captures show heap flat at around 20 KB for 35 to 40 minutes after boot, and v1.7.0 had already reclaimed roughly 6.6 KB of static RAM and restored the under-load contiguous-block floor to about 11 KB. The 888-byte state this task treats as the operating point is the terminal stage of a leak, not the normal condition. Designing an earlier trigger and a fourth recovery action around it would be optimising for a state the firmware no longer reaches.
+
+Not closed as 'already fixed', because nothing here was fixed: the correct reading is that there was never a defect in emergencyHeapRecovery to fix. ADR-079 stands as written, and no superseding ADR is needed.
+
+If HEAP_CRITICAL is ever observed again on a post-1.7.2 build, that warrants a fresh task with fresh captures rather than reviving this one. The distinguishing question for such a report: do free heap and maxBlock fall together (a leak, as here) or does maxBlock collapse while free heap holds (fragmentation, which is what the 1.7.0 gates address)?
 <!-- SECTION:NOTES:END -->
