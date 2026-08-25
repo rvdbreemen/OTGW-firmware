@@ -1,4 +1,4 @@
-<!-- adr-kit-guide v0.51.0 -->
+<!-- adr-kit-guide v0.54.0 -->
 <!-- Canonical project-side ADR guide. Copied from the plugin's templates/adr-kit-guide.md to .claude/adr-kit-guide.md by /adr-kit:init, /adr-kit:upgrade, and /adr-kit:setup. -->
 <!-- This file is plain markdown — readable by Claude Code, headless `claude -p`, shell scripts in pre-commit hooks, evaluator scripts, and any agent that doesn't process @-imports. Do not embed Claude-Code-specific syntax inside this file. -->
 
@@ -240,7 +240,7 @@ When `/adr-kit:adr` is asked to write or accept an ADR, it actively pushes back 
 
 ## Guardian (v0.18.0+)
 
-The ADR Guardian is a periodic staleness detector that injects an `[adr-guardian]` nudge block at Claude Code SessionStart when a health tier is due. It never blocks session start, never runs an LLM, and emits nothing when nothing is due. A completed guardian sweep also runs `bin/adr-guardian refresh-readiness`, which atomically writes a 24-hour Proposed-ADR queue to `docs/adr/.adr-kit-readiness.json`. SessionStart only reads that bounded cache and offers at most three resumable `/adr-kit:grill ADR-NNN` actions; it never calculates readiness or starts an interview in the hook.
+The ADR Guardian is a periodic staleness detector that injects an `[adr-guardian]` nudge block at Claude Code SessionStart when a health tier is due. It never blocks session start, never runs an LLM, and emits nothing when nothing is due. A completed guardian sweep also runs `bin/adr-guardian refresh-readiness`, which atomically writes a 24-hour Proposed-ADR queue to `docs/adr/.adr-kit-readiness.json`. SessionStart only reads that bounded cache and offers at most three resumable `/adr-kit:grill ADR-NNN` actions; it never calculates readiness or starts an interview in the hook. At the next user-visible prompt, the first eligible unfinished or unclear Proposed ADR is handed to the active client's grill workflow through `AUTO_GRILL_PENDING`; the workflow remains human-gated.
 
 **Two-tier cadence:**
 
@@ -277,6 +277,9 @@ The ADR Guardian is a periodic staleness detector that injects an `[adr-guardian
   }
 }
 ```
+
+Set `grill.auto_start` to `false` to keep unfinished-ADR handoffs advisory.
+`ADR_KIT_AUTO_GRILL_DISABLE=1` is the emergency per-process override.
 
 **Hook install paths (both are shipped):**
 - Plugin-level (default): the adr-kit plugin declares a `SessionStart` hook in `.claude-plugin/plugin.json`. Auto-registers when the plugin is enabled. Self-guards (no-ops in non-ADR projects).
