@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-25 18:53'
-updated_date: '2026-08-25 21:00'
+updated_date: '2026-08-25 21:08'
 labels:
   - bug
   - adr-required
@@ -56,4 +56,6 @@ Single key, no confirmation, consistent with every other telnet command. handleD
 Telnet only. MQTT is a separate decision, tracked separately. Note the reason changed during grilling: the draft argued MQTT is unreachable under heap pressure, which is only half true. canPublishMQTT() gates publishing, but handleMQTT() runs in the same loop branch as telnet and before the HTTP gate, so an inbound command would most likely still arrive. The real argument is scope, since an MQTT reboot is a new external effect on a channel shared with a broker.
 
 Implementation per the Decision Contract: route through the existing deferred-reboot mechanism rather than calling ESP.restart() inline, and log the reboot and its reason first so a field capture shows an operator-initiated restart rather than an unexplained gap.
+
+2026-08-25: ADR-092 Accepted. Telnet reboot only. The MQTT variant is closed, not deferred: a follow-up task was opened and dropped the same day because the maintainer saw no reason to spend time on a second channel for an action that already has one. ADR-092's answered open question was corrected to say so, with maintainer authorisation recorded in its Status History. Remaining work here is AC#2/AC#3, which ADR-092 reshapes: no upload is accepted below the gate (Option B was rejected), so AC#2 becomes 'a single-key telnet command reboots a gated device through the existing deferred-reboot mechanism' and AC#3 verifies that on the bench.
 <!-- SECTION:NOTES:END -->
