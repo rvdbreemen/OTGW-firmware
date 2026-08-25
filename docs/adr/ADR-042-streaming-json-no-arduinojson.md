@@ -7,7 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-018"
 superseded_by: null
 ---
 # ADR-042: Streaming JSON I/O — No ArduinoJson

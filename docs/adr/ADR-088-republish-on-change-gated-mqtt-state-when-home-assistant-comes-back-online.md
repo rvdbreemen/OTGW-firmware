@@ -7,7 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-073"
 superseded_by: null
 topics:
   - "mqtt"

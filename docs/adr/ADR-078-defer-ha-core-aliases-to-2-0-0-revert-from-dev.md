@@ -7,7 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-077"
 superseded_by: null
 ---
 # ADR-078: Defer HA-Core Capability-Flag Aliases — Ship on 2.0.0 Only, Revert from `dev`

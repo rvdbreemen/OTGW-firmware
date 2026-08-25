@@ -7,7 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-054"
 superseded_by: null
 ---
 # ADR-056: Protected Admin Endpoint Security and Secret-Handling Contract

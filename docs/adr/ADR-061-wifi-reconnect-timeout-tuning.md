@@ -7,7 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-047"
 superseded_by: null
 ---
 # ADR-061: WiFi Reconnect Timeout Tuning

@@ -993,7 +993,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": "ADR-056"
+        "superseded_by": null
       }
     },
     {
@@ -1305,7 +1305,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-018"
+        ],
         "superseded_by": null
       }
     },
@@ -1650,7 +1652,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-004"
+        ],
         "superseded_by": null
       }
     },
@@ -1743,7 +1747,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-054"
+        ],
         "superseded_by": null
       }
     },
@@ -1900,7 +1906,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-047"
+        ],
         "superseded_by": null
       }
     },
@@ -2412,7 +2420,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-077"
+        ],
         "superseded_by": null
       }
     },
@@ -2767,7 +2777,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-073"
+        ],
         "superseded_by": null
       }
     },
@@ -3588,12 +3600,6 @@
       "resolved": true
     },
     {
-      "source": "ADR-032",
-      "target": "ADR-056",
-      "type": "superseded-by",
-      "resolved": true
-    },
-    {
       "source": "ADR-033",
       "target": "ADR-008",
       "type": "related",
@@ -3879,6 +3885,12 @@
       "source": "ADR-042",
       "target": "ADR-018",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-042",
+      "target": "ADR-018",
+      "type": "supersedes",
       "resolved": true
     },
     {
@@ -4195,6 +4207,12 @@
     },
     {
       "source": "ADR-053",
+      "target": "ADR-004",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-053",
       "target": "ADR-006",
       "type": "related",
       "resolved": true
@@ -4326,6 +4344,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-056",
+      "target": "ADR-054",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
       "source": "ADR-057",
       "target": "ADR-003",
       "type": "related",
@@ -4437,6 +4461,12 @@
       "source": "ADR-061",
       "target": "ADR-047",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-061",
+      "target": "ADR-047",
+      "type": "supersedes",
       "resolved": true
     },
     {
@@ -4915,6 +4945,12 @@
     },
     {
       "source": "ADR-078",
+      "target": "ADR-077",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-078",
       "target": "ADR-105",
       "type": "related",
       "resolved": false
@@ -5097,6 +5133,12 @@
       "source": "ADR-088",
       "target": "ADR-073",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-088",
+      "target": "ADR-073",
+      "type": "supersedes",
       "resolved": true
     },
     {

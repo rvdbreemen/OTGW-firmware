@@ -8,7 +8,7 @@ gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: "ADR-056"
+superseded_by: null
 ---
 # ADR-032: No Authentication Pattern (Local Network Security Model)
 
