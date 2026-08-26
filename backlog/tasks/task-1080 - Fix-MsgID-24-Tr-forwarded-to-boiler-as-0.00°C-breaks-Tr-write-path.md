@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-24 18:10'
-updated_date: '2026-08-24 21:03'
+updated_date: '2026-08-26 19:23'
 labels:
   - bug
   - needs-info
@@ -43,4 +43,14 @@ Confirmed reachable on 2.0.0 in stock configuration, no user setup: networkStuff
 Fix: retraction now demands rsptype == OTGW_BOILER, a genuine B frame. Setting stays permissive so a proxy A still counts as boiler evidence (ADR-075). This is free for the reported bug: GH #677's own log shows B50180000 Write-Ack, a real B, so MsgID 24 still self-heals.
 
 Also corrected the block comment that still claimed the bitmaps are monotonic.
+
+- 2026-08-26: Two new independent reports confirm the Tr write path is broken and rule out thermostat/wiring.
+- GH #678 (dafdaf01): Remeha iSense + Remeha Tzerra Plus, PIC 6.7. Tr froze at 0.0 C exactly at the PIC update moment. Reporter then swapped in a Honeywell Round Modulation (T87M2018), a different vendor and a pure OT master: same 0.0 C. Thermostat and wiring excluded.
+- Discord #english-support (vijgie, 2026-08-26 19:01Z): same symptom, same two thermostat models, PS=1 trace:
+    Thermostat T10181A87 [MsgID=24][WRITE_DATA] -Tr = 26.53 C <ignored>
+    Request Boiler R90180000 [MsgID=24][WRITE_DATA] >Tr = 0.00 C
+    Boiler B50180000 [MsgID=24][WRITE_ACK] -Tr = 0.00 C <ignored>
+  Thermostat sends a valid 26.53 C, the gateway forwards 0.00 C to the boiler.
+- Note: GH #678 reporter runs ESP firmware 0.10.2+50c3ed2, which is ancient; vijgie was pointed at v1.7.5-beta.2. Confirm whether beta.2 still reproduces before assuming a PIC-6.7-only regression.
+- No compatible older PIC hex to downgrade to: 6.7 is the first hex for the P16F1847, 5.8 and below target the P16F88.
 <!-- SECTION:NOTES:END -->
