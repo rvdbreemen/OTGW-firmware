@@ -256,6 +256,10 @@ void doTaskEvery60s(){
 
   //== do tasks ==
 
+  // TASK-1091: republish the cumulative DHW water total unconditionally, so a
+  // restarted Home Assistant refills the entity without waiting for a draw.
+  publishDHWWaterMeter(true);
+
   // Re-check FS/firmware hash match every 60s so the warning persists
   // even if other runtime status messages are set and cleared elsewhere.
   checklittlefshash();

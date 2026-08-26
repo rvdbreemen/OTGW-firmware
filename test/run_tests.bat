@@ -34,19 +34,22 @@ if errorlevel 1 (
   call "%VCVARS%" >nul
 )
 
-REM --- build -----------------------------------------------------------
-echo Building test\host\test_extractJsonField.cpp ...
-cl /nologo /EHsc /std:c++17 /W3 /wd4996 ^
-   /Fe:"%OUTDIR%\test_extractJsonField.exe" ^
-   /Fo:"%OUTDIR%\\" ^
-   "%TESTDIR%host\test_extractJsonField.cpp"
-if errorlevel 1 (
-  echo BUILD FAILED
-  exit /b 2
+REM --- build + run each host test --------------------------------------
+set "RC=0"
+for %%T in (test_extractJsonField test_dhwWaterMeter) do (
+  echo Building test\host\%%T.cpp ...
+  cl /nologo /EHsc /std:c++17 /W3 /wd4996 ^
+     /Fe:"%OUTDIR%\%%T.exe" ^
+     /Fo:"%OUTDIR%\%%T." ^
+     "%TESTDIR%host\%%T.cpp"
+  if errorlevel 1 (
+    echo BUILD FAILED: %%T
+    exit /b 2
+  )
+  echo.
+  "%OUTDIR%\%%T.exe"
+  if errorlevel 1 set "RC=1"
+  echo.
 )
 
-REM --- run -------------------------------------------------------------
-echo.
-"%OUTDIR%\test_extractJsonField.exe"
-set "RC=%ERRORLEVEL%"
 exit /b %RC%

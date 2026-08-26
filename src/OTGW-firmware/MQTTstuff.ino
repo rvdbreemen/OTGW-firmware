@@ -1125,6 +1125,23 @@ void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper
   sendMQTTDataPic(label, static_cast<const char*>(valueBuf));
 }
 
+//===========================================================================================
+// publishDHWWaterMeter() — publish the cumulative DHW water volume (TASK-1091).
+// Called on the 60s heartbeat with force=true so a restarted Home Assistant
+// refills the entity within a minute; the value itself is accumulated in
+// dhwWaterMeter.ino as MsgID 19 frames arrive.
+//===========================================================================================
+void publishDHWWaterMeter(const bool force)
+{
+  static float lastPublishedL = -1.0f;
+  if (!settings.mqtt.bEnable) return;
+  if (!force && dhwWaterTotalL == lastPublishedL) return;
+
+  char msg[16] = {0};
+  dtostrf(dhwWaterTotalL, 0, 1, msg);
+  if (sendMQTTData(F("dhw_water_total"), msg, false)) lastPublishedL = dhwWaterTotalL;
+}
+
 //===================[ Send useful information to MQTT ]======================
 
 void sendMQTTuptime(){
@@ -1495,6 +1512,7 @@ void publishNonOTDiscoveryConfigs()
   setMQTTConfigPending(OTGWpicsettingsid);  // PIC settings
   setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
   setMQTTConfigPending(OTGWconnstatusid);   // gateway_mode + otgw_connected binary-sensors (faux id 244)
+  setMQTTConfigPending(OTGWdhwmeterid);     // cumulative DHW water meter (faux id 243)
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
 }

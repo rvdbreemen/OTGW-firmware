@@ -2005,7 +2005,13 @@ void print_f88(float& value)
     char topic[OT_TOPIC_LEN]; strlcpy(topic, messageIDToString(static_cast<OpenThermMessageID>(OTdata.id)), sizeof(topic));  // copy scratch ptr to local (OTmap now PROGMEM-backed; defends if feedWatchDog ever yields)
     if (validForMaster) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
-    if (validForMaster) value = _value;
+    if (validForMaster) {
+      value = _value;
+      // TASK-1091: MsgID 19 (DHWFlowRate) also feeds the cumulative water meter.
+      // Literal id, not OT_DHWFlowRate: OpenThermMessageID is a dense enum and
+      // its values do not equal the OpenTherm message ids.
+      if (OTdata.id == 19) updateDHWWaterMeter(_value, millis());
+    }
   }
 }
 

@@ -594,6 +594,16 @@ byte      OTGWpiccontrolsid  = 251;
 // gateway_mode + otgw_connected binary-sensors (otgw-pic/{gateway_mode,otgw_connected},
 // PIC-gated). Must be queued in publishNonOTDiscoveryConfigs() like the others.
 byte      OTGWconnstatusid   = 244;
+// Cumulative DHW water meter discovery pseudo-ID (TASK-1091): anchors the
+// dhw_water_total sensor that Home Assistant's Energy dashboard consumes.
+// Must be queued in publishNonOTDiscoveryConfigs() like the others.
+byte      OTGWdhwmeterid     = 243;
+
+// Cumulative DHW water meter (TASK-1091) — see dhwWaterMeter.ino.
+extern float dhwWaterTotalL;
+void updateDHWWaterMeter(float flowLitresPerMin, uint32_t nowMs);
+void resetDHWWaterMeter();
+void publishDHWWaterMeter(const bool force = false);
 
 //Now load Debug & network library
 #include "Debug.h"

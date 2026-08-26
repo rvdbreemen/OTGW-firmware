@@ -62,6 +62,7 @@ const char ha_lbl_trset[] PROGMEM = "TrSet";
 const char ha_lbl_relmodlevel[] PROGMEM = "RelModLevel";
 const char ha_lbl_chpressure[] PROGMEM = "CHPressure";
 const char ha_lbl_dhwflowrate[] PROGMEM = "DHWFlowRate";
+const char ha_lbl_dhw_water_total[] PROGMEM = "dhw_water_total";
 const char ha_lbl_daytime_dayofweek[] PROGMEM = "DayTime_dayofweek";
 const char ha_lbl_daytime_hour[] PROGMEM = "DayTime_hour";
 const char ha_lbl_daytime_minutes[] PROGMEM = "DayTime_minutes";
@@ -647,8 +648,9 @@ const char ha_name_solar_storage_slave_fault_indicator[] PROGMEM = "solar_storag
 const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_type";
 const char ha_name_gateway_mode[] PROGMEM = "Gateway_Mode";
 const char ha_name_otgw_connected[] PROGMEM = "OTGW_Connected";
+const char ha_name_dhw_water_total[] PROGMEM = "DHW_Water_Total";
 // ========== Sensor array (335 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 335;  // +5 (uptime, unsupported_msgids, ws/mqtt/http_fragskips)
+const uint16_t MQTT_HA_SENSOR_COUNT = 336;  // +5 (uptime, unsupported_msgids, ws/mqtt/http_fragskips), +1 (dhw_water_total)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1117,6 +1119,12 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {250, 0x08, ha_lbl_pic_set_reset_cause,         ha_name_pic_set_reset_cause,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {250, 0x08, ha_lbl_pic_set_standalone_interval, ha_name_pic_set_standalone_interval, HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
     {250, 0x08, ha_lbl_pic_set_voltage_ref,         ha_name_pic_set_voltage_ref,         HaDeviceClass::none, HaUnit::none, HaStateClass::none, HaIcon::information_outline, HaEntityCat::diagnostic, true},
+    // --- Pseudo-ID 243: cumulative DHW water meter (TASK-1091) ---
+    // Derived on the device by integrating MsgID 19, so it carries no source
+    // flags: there is one value, not a per-source view of a bus message.
+    // device_class water + state_class total_increasing is what the Home
+    // Assistant Energy dashboard requires of a water meter.
+    {243, 0x00, ha_lbl_dhw_water_total, ha_name_dhw_water_total, HaDeviceClass::water, HaUnit::L, HaStateClass::total_increasing, HaIcon::water, HaEntityCat::none, true},
 };
 
 // ========== Binary sensor array (53 entries, sorted by id) ==========
@@ -1440,7 +1448,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 240
     0xFFFF, // id 241
     0xFFFF, // id 242
-    0xFFFF, // id 243
+    335, // id 243, 1 entry (dhw_water_total, TASK-1091)
     0xFFFF, // id 244
     284, // id 245, 4 entries
     288, // id 246, 1 entry
@@ -1729,6 +1737,7 @@ PGM_P haDeviceClassStr(HaDeviceClass dc) {
         case HaDeviceClass::energy: { static const char s[] PROGMEM = "energy"; return s; }
         case HaDeviceClass::carbon_dioxide: { static const char s[] PROGMEM = "carbon_dioxide"; return s; }
         case HaDeviceClass::volume_flow_rate: { static const char s[] PROGMEM = "volume_flow_rate"; return s; }
+        case HaDeviceClass::water: { static const char s[] PROGMEM = "water"; return s; }
         default: return nullptr;
     }
 }
@@ -1751,6 +1760,7 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::s: { static const char s[] PROGMEM = "s"; return s; }
         case HaUnit::h: { static const char s[] PROGMEM = "h"; return s; }
         case HaUnit::bytes: { static const char s[] PROGMEM = "B"; return s; }
+        case HaUnit::L: { static const char s[] PROGMEM = "L"; return s; }
         default: return nullptr;
     }
 }
