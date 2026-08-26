@@ -3086,6 +3086,81 @@
         ],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-094",
+      "title": "Correct the DHW water total record: announce gating, live citations and measured costs",
+      "path": "ADR-094-correct-the-dhw-water-total-record-announce-gating-live-citations-and-measured-costs.md",
+      "format": "madr",
+      "status": "Proposed",
+      "date": "2026-08-26",
+      "decision_summary": "Chosen option: Option A, because a reader who lands on ADR-093 through the index has no way to know that six of its c...",
+      "topics": [
+        "home-assistant",
+        "mqtt-discovery",
+        "opentherm",
+        "persistence"
+      ],
+      "aliases": [
+        "DHW water total",
+        "dhw_water_total",
+        "MsgID 19 integration",
+        "water meter announce gating"
+      ],
+      "components": [
+        "DHW water total counter"
+      ],
+      "symbols": [
+        "dhwWaterMeterHasData",
+        "dhwWaterMeterNeedsAnnounce",
+        "markAllMQTTConfigPending",
+        "updateDHWWaterMeter"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Publish the cumulative total as a separate entity from the MsgID 19 rate sensor, which keeps deviceclass: volumeflowrate and the unit string L/min (capital L, the value Home Assistant accepts).",
+          "Accumulate as elapsed time times flow, never as a fixed volume per received sample.",
+          "Refuse to integrate an interval longer than an explicit named clamp, and update the sample timestamp anyway so the skipped gap is not charged to the next sample.",
+          "Withhold the state publish AND the discovery announcement, on every path that can queue a discovery config, until at least one MsgID 19 frame has decoded on this boot. markAllMQTTConfigPending() is a path.",
+          "Keep the announce latch outside the publisher and re-arm it wherever the broker-restart path clears the discovery done-bitmap.",
+          "Feed the integrator only from frames that are valid for the master topic, so gateway substitutions and answer overrides (ADR-066, ADR-082) never reach the meter.",
+          "State the sampling limitation wherever the entity is described to users, so the number is not mistaken for a metrologically valid water meter."
+        ],
+        "must_not": [
+          "Persist the running total to flash, in any file, at any cadence.",
+          "Register the water-total pseudo-ID in publishNonOTDiscoveryConfigs(), or mark it pending in markAllMQTTConfigPending() or any other path, while dhwWaterMeterHasData() is false.",
+          "Set deviceclass: water on any sensor whose unit is outside the set Home Assistant accepts for that class. The authoritative list is DEVICECLASSUNITS[SensorDeviceClass.WATER] in homeassistant/components/sensor/const.py, cross-checked agai...",
+          "Introduce the String class in the integration or publish path (ADR-049)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "src/OTGW-firmware/dhwWaterMeter.ino — integrator, clamp, first-frame gate, announce latch.",
+          "src/OTGW-firmware/MQTTstuff.ino:882,1146,1148,1554 — latch re-arm on broker restart, state gate, JIT announce, and the auto-heal scan gate.",
+          "test/host/testdhwWaterMeter.cpp — 18 host checks, run with test\\runtests.bat.",
+          "Manual check against a live Home Assistant that the entity is offered as an Energy dashboard water source, and that a gateway with no MsgID 19 traffic still has no such entity after a day boundary."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/**",
+          "src/OTGW-firmware/dhwWaterMeter.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": true,
+        "verified_in": [
+          "src/OTGW-firmware/dhwWaterMeter.ino",
+          "src/OTGW-firmware/MQTTstuff.ino",
+          "test/host/test_dhwWaterMeter.cpp"
+        ],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -5421,6 +5496,72 @@
       "source": "ADR-093",
       "target": "ADR-090",
       "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-008",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-041",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-049",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-066",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-073",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-082",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-088",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-090",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-093",
+      "type": "related",
       "resolved": true
     }
   ]

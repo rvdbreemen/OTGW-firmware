@@ -98,3 +98,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-091 | Accepted | - | Chosen option: Option A. |
 | ADR-092 | Accepted | - | Chosen option: Option A. |
 | ADR-093 | Accepted | `src/OTGW-firmware/**`, `src/OTGW-firmware/MQTTstuff.ino`, `src/OTGW-firmware/dhwWaterMeter.ino` | Chosen option: Option A, because it delivers the same user-visible outcome as ADR-090 (a working Energy dashboard fig... |
+| ADR-094 | Proposed | `src/OTGW-firmware/**`, `src/OTGW-firmware/dhwWaterMeter.ino` | Chosen option: Option A, because a reader who lands on ADR-093 through the index has no way to know that six of its c... |
