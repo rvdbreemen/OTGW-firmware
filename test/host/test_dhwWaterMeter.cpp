@@ -128,7 +128,17 @@ int main() {
   checkNear(dhwWaterTotalL, 6.0f, "negative flow does not decrease the total");
 
   //--------------------------------------------------------------------
-  // (i) The total is monotonic across a long realistic run.
+  // (i) Nothing is reported until a MsgID 19 frame has actually decoded.
+  //     Most installations never carry that id, and a meter pinned at
+  //     0.0 L would be a fiction rather than a measurement.
+  //--------------------------------------------------------------------
+  resetDHWWaterMeter();
+  check(!dhwWaterMeterHasData(), "no data before the first MsgID 19 frame");
+  updateDHWWaterMeter(4.0f, 1000);
+  check(dhwWaterMeterHasData(), "has data once a frame has decoded");
+
+  //--------------------------------------------------------------------
+  // (j) The total is monotonic across a long realistic run.
   //--------------------------------------------------------------------
   resetDHWWaterMeter();
   float previous = 0.0f;

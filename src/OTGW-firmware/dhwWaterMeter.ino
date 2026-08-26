@@ -64,6 +64,16 @@ void updateDHWWaterMeter(float flowLitresPerMin, uint32_t nowMs)
 }
 
 //===========================================================================================
+// True once a MsgID 19 frame has ever decoded on this boot. Callers use this to
+// stay silent on installations whose thermostat never requests that id: without
+// it every gateway would grow a water meter entity pinned at 0.0 L.
+//===========================================================================================
+bool dhwWaterMeterHasData()
+{
+  return dhwMeterSeeded;
+}
+
+//===========================================================================================
 // Test seam: drop the accumulated total and forget the last sample time.
 //===========================================================================================
 void resetDHWWaterMeter()

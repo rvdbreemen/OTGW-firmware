@@ -603,7 +603,8 @@ byte      OTGWdhwmeterid     = 243;
 extern float dhwWaterTotalL;
 void updateDHWWaterMeter(float flowLitresPerMin, uint32_t nowMs);
 void resetDHWWaterMeter();
-void publishDHWWaterMeter(const bool force = false);
+bool dhwWaterMeterHasData();
+void publishDHWWaterMeter();
 
 //Now load Debug & network library
 #include "Debug.h"

@@ -1127,19 +1127,29 @@ void sendMQTTDataPic(const __FlashStringHelper* label, const __FlashStringHelper
 
 //===========================================================================================
 // publishDHWWaterMeter() — publish the cumulative DHW water volume (TASK-1091).
-// Called on the 60s heartbeat with force=true so a restarted Home Assistant
-// refills the entity within a minute; the value itself is accumulated in
-// dhwWaterMeter.ino as MsgID 19 frames arrive.
+// Runs on the 60s heartbeat, so a restarted Home Assistant refills the entity
+// within a minute; the value is accumulated in dhwWaterMeter.ino as MsgID 19
+// frames arrive.
+//
+// Silent until the first MsgID 19 frame decodes. The gateway does not poll that
+// id, so on an installation whose thermostat never asks for it there is no water
+// meter to report, and publishing 0.0 forever would be a fiction. Discovery is
+// announced the same way OT IDs are: JIT, on first data.
 //===========================================================================================
-void publishDHWWaterMeter(const bool force)
+void publishDHWWaterMeter()
 {
-  static float lastPublishedL = -1.0f;
   if (!settings.mqtt.bEnable) return;
-  if (!force && dhwWaterTotalL == lastPublishedL) return;
+  if (!dhwWaterMeterHasData()) return;
+
+  static bool discoveryAnnounced = false;
+  if (!discoveryAnnounced) {
+    setMQTTConfigPending(OTGWdhwmeterid);
+    discoveryAnnounced = true;
+  }
 
   char msg[16] = {0};
   dtostrf(dhwWaterTotalL, 0, 1, msg);
-  if (sendMQTTData(F("dhw_water_total"), msg, false)) lastPublishedL = dhwWaterTotalL;
+  sendMQTTData(F("dhw_water_total"), msg, false);
 }
 
 //===================[ Send useful information to MQTT ]======================
@@ -1512,7 +1522,6 @@ void publishNonOTDiscoveryConfigs()
   setMQTTConfigPending(OTGWpicsettingsid);  // PIC settings
   setMQTTConfigPending(OTGWpiccontrolsid);  // PIC controls: resetgateway button, GPIO/LED selects
   setMQTTConfigPending(OTGWconnstatusid);   // gateway_mode + otgw_connected binary-sensors (faux id 244)
-  setMQTTConfigPending(OTGWdhwmeterid);     // cumulative DHW water meter (faux id 243)
   dripDeviceInfoPending = true;
   MQTTDebugTln(F("MQTT discovery: non-OT configs queued; OT IDs will publish JIT"));
 }
