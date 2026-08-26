@@ -1,14 +1,14 @@
 ---
 id: "ADR-090"
 title: "Publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard"
-status: "Accepted"
-date: "2026-08-25"
+status: "Superseded"
+date: "2026-08-26"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-093"
 topics:
   - "home-assistant"
   - "mqtt-discovery"
@@ -34,7 +34,7 @@ format: "madr"
 
 ## Status
 
-Accepted, 2026-08-25.
+Superseded by ADR-093, 2026-08-26.
 
 ## Status History
 
@@ -49,6 +49,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Accepted by the maintainer after all six open questions were resolved with measured or code-verified answers.
+    changed_via: adr-kit lifecycle
+  - date: 2026-08-26
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: Superseded by ADR-093
     changed_via: adr-kit lifecycle
 ```
 

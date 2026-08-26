@@ -1,15 +1,15 @@
 ---
 id: "ADR-093"
 title: "Keep the cumulative DHW water total in RAM and announce it on first data"
-status: "Proposed"
+status: "Accepted"
 date: "2026-08-26"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-090"
 superseded_by: null
-format: "madr"
 topics:
   - "home-assistant"
   - "mqtt-discovery"
@@ -28,6 +28,7 @@ symbols:
   - "publishDHWWaterMeter"
   - "DHW_METER_MAX_GAP_MS"
 context_scope: "selective"
+format: "madr"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -36,7 +37,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-08-26.
+Accepted, 2026-08-26.
 
 ## Status History
 
@@ -47,6 +48,16 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-08-26
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
+  - date: 2026-08-26
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Supersedes ADR-090
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context and Problem Statement
@@ -80,7 +91,7 @@ contradict those requirements:
   partial one. The existing `s0pulsecounttot` counter in this firmware is
   RAM-only for the same reason (`src/OTGW-firmware/OTGW-firmware.h:573`).
 - **Boot-publishing the entity manufactures a meter that does not exist.** The
-  gateway does not poll MsgID 19; frames appear only when the thermostat
+  OTGW (OpenTherm Gateway) does not poll MsgID 19; frames appear only when the thermostat
   requests that id, and many thermostats never do. Registering the pseudo-ID in
   `publishNonOTDiscoveryConfigs()` therefore gives *every* gateway a water meter
   entity pinned at 0.0 L, including those whose bus carries no flow data at all.
@@ -114,7 +125,7 @@ built on an unpolled message id, and it needs a recorded decision.
 
 ## Considered Options
 
-* **Option A — RAM-only counter, JIT discovery, explicit gap clamp.** Integrate
+* **Option A — RAM-only counter, JIT (just in time) discovery, explicit gap clamp.** Integrate
   in RAM, publish nothing until the first MsgID 19 frame decodes, announce
   discovery at that same moment, and refuse to integrate any interval longer
   than a fixed clamp.
@@ -140,7 +151,7 @@ Home Assistant reads the drop as a meter reset and keeps the long-run sum, so
 the Energy dashboard survives what the gateway forgets. No LittleFS file, no
 write-cadence rule, and no partial-restore window.
 
-**Discovery is announced just in time, on first data.** `publishDHWWaterMeter()`
+**Discovery is announced JIT, on first data.** `publishDHWWaterMeter()`
 returns without publishing until `dhwWaterMeterHasData()` is true, and queues
 the discovery config at that same first publish
 (`src/OTGW-firmware/MQTTstuff.ino:1139-1152`). This matches how OT message ids
@@ -174,8 +185,8 @@ continues across that reset rather than dropping.
 
 Verified on 2026-08-26 against the live Home Assistant at
 `homeassistant.local:8123` without flashing, by publishing a discovery config
-carrying exactly the fields this entity emits: `GET
-/api/states/sensor.otgw_unit_probe` returned 200 with `state: "42.0"` and
+carrying exactly the fields this entity emits: a GET (read) request to
+`/api/states/sensor.otgw_unit_probe` returned 200 with `state: "42.0"` and
 attributes `device_class: water`, `unit_of_measurement: L`, `state_class:
 total_increasing`. The paired negative control for TASK-1092 (the same config
 with lowercase `l/min` on `volume_flow_rate`) produced no entity at all, which
@@ -195,7 +206,7 @@ is what a unit rejection looks like from the outside.
 * Withhold both the state publish and the discovery announcement until at least
   one MsgID 19 frame has decoded on this boot.
 * Feed the integrator only from frames that are valid for the master topic, so
-  gateway substitutions and answer overrides (ADR-066, ADR-082) never reach the
+  OT (OpenTherm) gateway substitutions and answer overrides (ADR-066, ADR-082) never reach the
   meter.
 * State the sampling limitation wherever the entity is described to users, so
   the number is not mistaken for a metrologically valid water meter.
@@ -206,7 +217,7 @@ is what a unit rejection looks like from the outside.
 * Register the water-total pseudo-ID in `publishNonOTDiscoveryConfigs()` or any
   other unconditional boot-publish path.
 * Set `device_class: water` on any sensor whose unit is not one of
-  `L, gal, m3, ft3, CCF, MCF`.
+  `L, gal, m3, ft3, CCF (centum cubic feet), MCF (mille cubic feet)`.
 * Introduce the `String` class in the integration or publish path (ADR-004).
 
 ### Exceptions
@@ -260,7 +271,7 @@ is what a unit rejection looks like from the outside.
   between two frames, the flow may never be sampled while non-zero.
   *Mitigation:* none available in firmware; this is a property of an unpolled
   message id. Users who need better resolution can request MsgID 19 more often
-  from the thermostat side (`AA=19`).
+  from the thermostat side with AA (the gateway's alternative-request command), as `AA=19`.
 * **Two totals can coexist and disagree.** A user who already built the Home
   Assistant helper now has both. They will not match, because
   `max_sub_interval` integrates across silence and the firmware clamp does not.
@@ -297,7 +308,7 @@ is what a unit rejection looks like from the outside.
 * Good, because it is the smallest possible firmware surface.
 * Good, because a Home Assistant helper is user-resettable and user-tunable.
 * Bad, because it reverses a maintainer decision that the Energy dashboard
-  should work out of the box, and MQTT discovery cannot create the helpers on
+  should work out of the box, and MQTT (Message Queuing Telemetry Transport) discovery cannot create the helpers on
   the user's behalf.
 
 ## Open Questions
@@ -322,7 +333,7 @@ is what a unit rejection looks like from the outside.
 ## References
 
 * TASK-1091 (implementation), TASK-1092 (the `L/min` unit fix this depends on).
-* GH #675 — the original request, the reporter's Home Assistant helper recipe,
+* GH (GitHub) issue #675 — the original request, the reporter's Home Assistant helper recipe,
   and the error log that identified the unit rejection:
   <https://github.com/rvdbreemen/OTGW-firmware/issues/675>
 * `src/OTGW-firmware/dhwWaterMeter.ino:38,40,48,60,71`
