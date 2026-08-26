@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-26 19:23'
-updated_date: '2026-08-26 20:03'
+updated_date: '2026-08-26 20:15'
 labels:
   - bug
   - enhancement
@@ -28,12 +28,24 @@ Integrate MsgID 19 on the device and publish it as its own auto-discovered entit
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A cumulative DHW water volume is published on its own MQTT topic, separate from the flow rate topic
+- [x] #1 A cumulative DHW water volume is published on its own MQTT topic, separate from the flow rate topic
 - [ ] #2 The entity is auto-discovered with device_class water, unit L and state_class total_increasing, and is selectable in the Energy dashboard water section with no user configuration
-- [ ] #3 A gap between MsgID 19 frames longer than the clamp is not integrated: silence never adds volume, even when the last seen flow was non-zero
-- [ ] #4 The counter is not persisted across reboot, and the task records why that is acceptable
-- [ ] #5 The integrator is covered by a host-compiled test: normal cadence, over-clamp gap, millis() wrap and zero flow
+- [x] #3 A gap between MsgID 19 frames longer than the clamp is not integrated: silence never adds volume, even when the last seen flow was non-zero
+- [x] #4 The counter is not persisted across reboot, and the task records why that is acceptable
+- [x] #5 The integrator is covered by a host-compiled test: normal cadence, over-clamp gap, millis() wrap and zero flow
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- Scope went feature -> docs -> feature. The docs route was rejected because HA MQTT discovery cannot create integration/template helpers, so every user would have to wire the meter to their own entity id by hand.
+- Correction to the earlier rationale for NOT building this: HA max_sub_interval is not more accurate than a device-side clamp, it is less safe. It holds the last reading and keeps integrating during silence, so a bus that falls quiet at 8 l/min keeps adding water that never flowed. The firmware clamp does the opposite: an interval over 60 s is a measurement gap and adds nothing.
+- Integration is the right-hand rectangle rule: each sample applies to the interval before it. At the start of a draw this under-counts roughly one sample interval, at the end it stops immediately. No sample history kept.
+- Hook sits in print_f88() on the validForMaster branch only, so gateway substitutions and answer overrides never feed the meter. Uses literal id 19, not OT_DHWFlowRate: OpenThermMessageID is a dense enum whose values are not the message ids (same trap as the Remeha 131-133 bug).
+- Discovery entry appended at the end of mqttHaSensors[] (index 335, count 335 -> 336) so no existing offset moves; mqttHaSensorIndex[243] points at it. Only publishNonOTDiscoveryConfigs() needs the explicit enqueue; markAllMQTTConfigPending() reaches 243 through the index scan.
+- Cost: +400 bytes flash (761608 vs 761208), RAM 52644 bytes global. Build green, evaluator 37 checks / 0 failed. Host tests: 11 checks, 0 failures.
+- AC #2 is only half self-verifiable: the config is emitted with device_class water / unit L / state_class total_increasing, but that HA accepts it and offers it in the Energy dashboard needs a real HA instance. Field item.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
