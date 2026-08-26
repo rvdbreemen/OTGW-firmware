@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-26 19:48'
-updated_date: '2026-08-26 19:55'
+updated_date: '2026-08-26 20:43'
 labels:
   - bug
 dependencies: []
@@ -24,7 +24,7 @@ Regression introduced in v1.7.5-beta.2. The DHWFlowRate discovery config gained 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 haUnitStr(HaUnit::l_min) returns 'L/min'
-- [ ] #2 Home Assistant accepts the DHWFlowRate discovery config with no unit/device_class error in the log, and the sensor shows a value again
+- [x] #2 Home Assistant accepts the DHWFlowRate discovery config with no unit/device_class error in the log, and the sensor shows a value again
 - [x] #3 No other entity changes unit: HaUnit::l_min is used only by the two MsgID 19 entries
 <!-- AC:END -->
 
@@ -45,4 +45,9 @@ Regression introduced in v1.7.5-beta.2. The DHWFlowRate discovery config gained 
 - OTGW-Core.h:373 keeps lowercase l/min on purpose: that is the OT log and REST display label, not an HA discovery field.
 - Build: build.bat green, 'Build completed successfully!', sketch 761208 bytes (72%); firmware + littlefs binaries fresh. evaluate.py --quick: 37 checks, 35 passed, 0 failed, health 100%.
 - AC #2 needs a real HA instance: reporter confirmation on GH #675 after the next beta.
+
+- Verified against the live HA at homeassistant.local:8123 on 2026-08-26 with a paired probe, no flashing needed.
+- Positive: a discovery config with device_class volume_flow_rate + unit L/min produced sensor.otgw_flow_probe, state 7.5, attributes unit_of_measurement=L/min, device_class=volume_flow_rate.
+- Negative control: the identical config with the old lowercase l/min produced no entity at all (404 after 3 s). That is the reported symptom reproduced on demand, and it confirms the single-character fix is both necessary and sufficient.
+- All probe topics cleared afterwards; the three probe entities return 404.
 <!-- SECTION:NOTES:END -->
