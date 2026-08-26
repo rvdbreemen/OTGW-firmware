@@ -3,11 +3,11 @@ id: TASK-1093
 title: >-
   Fix: DHW water meter discovery leaks via daily auto-heal and never
   re-announces after broker restart
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-26 21:28'
-updated_date: '2026-08-26 21:44'
+updated_date: '2026-08-26 21:45'
 labels:
   - bug
 dependencies: []
@@ -42,3 +42,25 @@ Two defects found by adversarial review of ADR-093, both shipped in v1.7.5-beta.
 - Host tests now 18 checks, 0 failures, including three new latch cases. Build green (761776 bytes), evaluator 35/37 with 0 failures. Shipped in v1.7.5-beta.4.
 - The record side is ADR-094 (Proposed).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Repairs the water total entity that v1.7.5-beta.3 shipped. Both defects broke the same promise: that the entity is announced only when there is a meter to announce.
+
+What was wrong:
+- The daily discovery auto-heal re-announced the entity on gateways with no MsgID 19 traffic. markAllMQTTConfigPending() marks every row in the discovery table and the water meter has one, so those users gained a retained config for an entity that never receives state and shows as unknown.
+- After a broker restart the entity never came back. The announce latch was a function-local static, out of reach of the broker-restart path that clears the done bitmap, so the config was never re-published until the gateway rebooted.
+
+Changes:
+- MQTTstuff.ino: the table scan in markAllMQTTConfigPending() skips pseudo-ID 243 while dhwWaterMeterHasData() is false; the broker-restart path re-arms the announce latch next to clearMQTTConfigDone().
+- dhwWaterMeter.ino: the latch moves to file scope behind dhwWaterMeterNeedsAnnounce(), markDHWWaterMeterAnnounced() and forgetDHWWaterMeterAnnounce().
+- OTGW-firmware.h: three declarations.
+- test/host/test_dhwWaterMeter.cpp: three new cases covering the latch across a simulated broker restart.
+
+User impact: a gateway whose thermostat never requests MsgID 19 no longer grows a stateless water entity, and one that does keeps the entity across a broker restart without a reboot.
+
+Tests: host tests 18 checks / 0 failures. Build green, sketch 765776 bytes. evaluate.py --quick 35/37 pass, 0 failures. Shipped in v1.7.5-beta.4.
+
+Origin: found by adversarial review of ADR-093 rather than in the field. The record side of the same review is ADR-094, Proposed, which corrects sixteen further findings in the ADR text itself.
+<!-- SECTION:FINAL_SUMMARY:END -->
