@@ -3030,6 +3030,77 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-093",
+      "title": "Keep the cumulative DHW water total in RAM and announce it on first data",
+      "path": "ADR-093-keep-the-cumulative-dhw-water-total-in-ram-and-announce-it-on-first-data.md",
+      "format": "madr",
+      "status": "Proposed",
+      "date": "2026-08-26",
+      "decision_summary": "Chosen option: Option A, because it delivers the same user-visible outcome as ADR-090 (a working Energy dashboard fig...",
+      "topics": [
+        "home-assistant",
+        "mqtt-discovery",
+        "opentherm",
+        "persistence"
+      ],
+      "aliases": [
+        "DHW water total",
+        "dhw_water_total",
+        "MsgID 19 integration",
+        "water meter gap clamp"
+      ],
+      "components": [
+        "DHW water total counter"
+      ],
+      "symbols": [
+        "DHW_METER_MAX_GAP_MS",
+        "dhwWaterMeterHasData",
+        "publishDHWWaterMeter",
+        "updateDHWWaterMeter"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Publish the cumulative total as a separate entity from the MsgID 19 rate sensor, which keeps deviceclass: volumeflowrate and the unit string L/min (capital L, the value Home Assistant accepts).",
+          "Accumulate as elapsed time times flow, never as a fixed volume per received sample.",
+          "Refuse to integrate an interval longer than an explicit clamp, and update the sample timestamp anyway so the skipped gap is not charged to the next sample.",
+          "Withhold both the state publish and the discovery announcement until at least one MsgID 19 frame has decoded on this boot.",
+          "Feed the integrator only from frames that are valid for the master topic, so gateway substitutions and answer overrides (ADR-066, ADR-082) never reach the meter.",
+          "State the sampling limitation wherever the entity is described to users, so the number is not mistaken for a metrologically valid water meter."
+        ],
+        "must_not": [
+          "Persist the running total to flash, in any file, at any cadence.",
+          "Register the water-total pseudo-ID in publishNonOTDiscoveryConfigs() or any other unconditional boot-publish path.",
+          "Set deviceclass: water on any sensor whose unit is not one of L, gal, m3, ft3, CCF, MCF.",
+          "Introduce the String class in the integration or publish path (ADR-004)."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "src/OTGW-firmware/dhwWaterMeter.ino — integrator, clamp, and the first-frame gate.",
+          "test/host/testdhwWaterMeter.cpp — host-compiled tests covering normal cadence, the clamp boundary at 60000 and 60001 ms, an over-clamp gap, the interval after a gap, millis() wrap, zero and negative flow, the no-data-before-first-frame g...",
+          "src/OTGW-firmware/mqttconfiguratie.cpp:1127 — the pseudo-ID 243 discovery row.",
+          "Manual check against a live Home Assistant that the entity is offered as an Energy dashboard water source."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/**",
+          "src/OTGW-firmware/MQTTstuff.ino",
+          "src/OTGW-firmware/dhwWaterMeter.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -5322,6 +5393,36 @@
     {
       "source": "ADR-092",
       "target": "ADR-091",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-093",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-093",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-093",
+      "target": "ADR-066",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-093",
+      "target": "ADR-082",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-093",
+      "target": "ADR-090",
       "type": "related",
       "resolved": true
     }
