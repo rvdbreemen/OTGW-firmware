@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-26 19:23'
-updated_date: '2026-08-26 20:17'
+updated_date: '2026-08-26 20:29'
 labels:
   - bug
   - enhancement
@@ -45,6 +45,10 @@ Integrate MsgID 19 on the device and publish it as its own auto-discovered entit
 - Discovery entry appended at the end of mqttHaSensors[] (index 335, count 335 -> 336) so no existing offset moves; mqttHaSensorIndex[243] points at it. Only publishNonOTDiscoveryConfigs() needs the explicit enqueue; markAllMQTTConfigPending() reaches 243 through the index scan.
 - Cost: +400 bytes flash (761608 vs 761208), RAM 52644 bytes global. Build green, evaluator 37 checks / 0 failed. Host tests: 11 checks, 0 failures.
 - AC #2 is only half self-verifiable: the config is emitted with device_class water / unit L / state_class total_increasing, but that HA accepts it and offers it in the Energy dashboard needs a real HA instance. Field item.
+
+- Unit/device_class checked against the primary source, HA core homeassistant/components/sensor/const.py on dev. DEVICE_CLASS_UNITS[SensorDeviceClass.WATER] = {CENTUM_CUBIC_FEET, CUBIC_FEET, CUBIC_METERS, GALLONS, LITERS, MILLE_CUBIC_FEET}, and UnitOfVolume.LITERS is the string 'L'. DEVICE_CLASS_STATE_CLASSES allows TOTAL and TOTAL_INCREASING for WATER. So water + L + total_increasing is valid by the same table that rejected l/min in TASK-1092.
+- Still not an end-to-end observation: no discovery config has been through a running HA. A probe publish against homeassistant.local needs the Mosquitto password for user robert, which the OTGW REST API does not expose. Broker confirmed as homeassistant.local:1883 from OTGW1 settings.
+- AC #2 stays unchecked on that distinction: the config is provably well-formed, but nobody has yet seen HA build the entity.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
