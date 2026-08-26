@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-26 19:23'
-updated_date: '2026-08-26 20:15'
+updated_date: '2026-08-26 20:17'
 labels:
   - bug
   - enhancement
@@ -50,11 +50,24 @@ Integrate MsgID 19 on the device and publish it as its own auto-discovered entit
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Re-scoped from a firmware feature to documentation, and shipped the recipe.
+The gateway now publishes its own cumulative DHW water volume, so the Home Assistant Energy dashboard works with no user configuration.
 
-Why: the reporter on GH #675 had already built the cumulative water total in Home Assistant with the integration (Riemann sum) platform plus a template sensor, and confirmed it on v1.7.4. A device-side integrator was designed in full and then rejected: the gateway does not poll MsgID 19, so its arrival cadence is a property of each installation. Integrating that on the ESP8266 means multiplying a live flow reading by however long the bus happened to be quiet, producing an error no user can check. HA max_sub_interval solves exactly that on the host side, with a real clock and no cooperative scheduler to starve.
+Why: the flow rate sensor is a rate, and the Energy dashboard needs device_class water with state_class total_increasing. The reporter on GH #675 built that host-side with HA integration + template helpers, but MQTT discovery cannot create those, so shipping that answer means every user wires it to their own entity id by hand. Publishing the total from the device removes the step entirely.
 
-What changed: docs/guides/HA_DHW_WATER_METER.md, a new guide carrying the working YAML with credit to Jeroenll, a per-setting table explaining why method: left and max_sub_interval: 1min are there, a warning to substitute your own entity id, the prerequisite that the flow rate sensor must be valid (see TASK-1092 for the L/min fix that restores it after v1.7.5-beta.2), and a section recording why the firmware ships no counter of its own.
+Changes:
+- dhwWaterMeter.ino (new): two-variable integrator over MsgID 19. An interval longer than 60 s is a measurement gap and adds nothing, which is the point: the gateway does not poll MsgID 19, so the bus can fall silent at 8 l/min, and holding the last reading across that silence would invent water. Right-hand rectangle rule, no sample history.
+- OTGW-Core.ino: fed from print_f88() on the validForMaster branch only, so gateway substitutions and answer overrides never reach the meter. Literal id 19, since OpenThermMessageID values are not message ids.
+- MQTTstuff.ino: dhw_water_total topic, force-published on the 60s heartbeat so a restarted HA refills within a minute.
+- mqtt_configuratie.cpp / MQTTstuff.h: discovery pseudo-ID 243 with device_class water, unit L, state_class total_increasing. Appended at the end of the sensor array so no existing index offset moves. Adds HaDeviceClass::water and HaUnit::L.
+- test/host/test_dhwWaterMeter.cpp (new) and a run_tests.bat that builds every host test instead of one hardcoded file.
 
-No firmware change, so no build gate applies. The four original ACs about an MQTT topic, a discovery entity, reboot persistence and metered accuracy were removed with the scope change.
+User impact: a DHW Water Total entity appears under the existing OTGW device and can be selected in the Energy dashboard water section. It starts at zero after a reboot; HA treats that as a meter reset and keeps the long-run sum.
+
+Tests: host tests 11 checks / 0 failures (normal cadence, clamp boundary at 60000 and 60001 ms, over-clamp gap, interval after a gap, millis() wrap, zero and negative flow, monotonicity over 500 samples). Build green, sketch 761608 bytes (72%), globals 52644 bytes. evaluate.py --quick 37 checks, 0 failed.
+
+Cost: +400 bytes flash, 8 bytes RAM.
+
+Open: AC #2 is only half self-verifiable. The discovery config carries the right fields, but confirmation that HA accepts it and lists it in the Energy dashboard needs a real HA instance. Prerequisite for anyone testing on beta.2: TASK-1092, which fixes the l/min unit that made the source flow rate sensor unavailable.
+
+Related: depends on the flow rate entity being valid (TASK-1092). Recipe and diagnosis came from Jeroenll on GH #675.
 <!-- SECTION:FINAL_SUMMARY:END -->
