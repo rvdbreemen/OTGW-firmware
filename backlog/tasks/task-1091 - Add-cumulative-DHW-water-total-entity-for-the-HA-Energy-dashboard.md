@@ -1,11 +1,11 @@
 ---
 id: TASK-1091
-title: Add cumulative DHW water total entity for the HA Energy dashboard
+title: Document the Home Assistant recipe for cumulative DHW water consumption
 status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-26 19:23'
-updated_date: '2026-08-26 19:31'
+updated_date: '2026-08-26 19:51'
 labels:
   - bug
   - enhancement
@@ -19,13 +19,12 @@ ordinal: 190000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-GH #675 follow-up. The DHW flow rate sensor now carries device_class volume_flow_rate as of 1.7.5-beta.2, which is correct but keeps it off the Home Assistant Energy dashboard: that panel needs a cumulative total (device_class water, state_class total_increasing, unit m3 or L), not a rate. Reporter Jeroenll asked for the Energy dashboard specifically, so the rate fix does not close their request. This task covers designing and shipping the separate cumulative entity: integrate the flow rate over time on the device, decide persistence across reboot, and publish it as its own HA discovery entity.
+GH #675 follow-up, re-scoped. The reporter (Jeroenll) built the cumulative water total in Home Assistant itself, using the integration (Riemann sum) platform on the DHW flow rate sensor plus a template sensor carrying device_class water and state_class total_increasing, and confirmed it works on v1.7.4. That covers the Energy dashboard request without any firmware change. A device-side integrator was designed and deliberately rejected: MsgID 19 is not polled by the gateway, so its arrival cadence is install-dependent, and integrating it on the ESP8266 would carry a systematic error that HA's max_sub_interval handles correctly on the host side. Ship the recipe as documentation instead, with credit to the reporter and the reasoning for not building it into the firmware.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A cumulative DHW water volume value is published on its own MQTT topic, separate from the flow rate topic
-- [ ] #2 The entity is auto-discovered in Home Assistant with device_class water and state_class total_increasing, and is selectable in the Energy dashboard water section
-- [ ] #3 The counter survives a gateway reboot, or the chosen non-persistent behaviour is documented in the task with its rationale
-- [ ] #4 Integration accuracy is validated against a known DHW draw and the observed error is recorded
+- [ ] #1 A guide in docs/guides/ describes the integration + template sensor recipe with working YAML, and names the entity ids a reader must substitute
+- [ ] #2 The guide states why the firmware does not ship its own cumulative counter (MsgID 19 arrival is thermostat-driven and install-dependent) and credits the reporter
+- [ ] #3 The guide notes the prerequisite that the DHW flow rate sensor must be present and valid, referencing the L/min unit fix (TASK-1092)
 <!-- AC:END -->
