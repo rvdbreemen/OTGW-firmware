@@ -3,9 +3,11 @@ id: TASK-1093
 title: >-
   Fix: DHW water meter discovery leaks via daily auto-heal and never
   re-announces after broker restart
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-26 21:28'
+updated_date: '2026-08-26 21:29'
 labels:
   - bug
 dependencies: []
