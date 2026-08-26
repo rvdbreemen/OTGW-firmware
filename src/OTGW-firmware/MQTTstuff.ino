@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v1.7.5-beta.3
+**  Version  : v1.7.5-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -876,6 +876,10 @@ void handleMQTT()
             clearMQTTConfigDone();
             clearMQTTConfigPending();
             publishNonOTDiscoveryConfigs();
+            // TASK-1093: the water meter announces itself JIT and latches that it
+            // did. Its retained config went with the rest, so re-arm the latch or
+            // the entity never comes back without a reboot.
+            forgetDHWWaterMeterAnnounce();
           } else {
             DebugTf(PSTR("[MQTT] offline %lums <= threshold, broker retains topics — skipping republish\r\n"), (unsigned long)offlineMs);
           }
@@ -1141,10 +1145,9 @@ void publishDHWWaterMeter()
   if (!settings.mqtt.bEnable) return;
   if (!dhwWaterMeterHasData()) return;
 
-  static bool discoveryAnnounced = false;
-  if (!discoveryAnnounced) {
+  if (dhwWaterMeterNeedsAnnounce()) {
     setMQTTConfigPending(OTGWdhwmeterid);
-    discoveryAnnounced = true;
+    markDHWWaterMeterAnnounced();
   }
 
   char msg[16] = {0};
@@ -1544,6 +1547,11 @@ void markAllMQTTConfigPending()
     uint16_t sIdx = readSensorIndex(static_cast<uint8_t>(i));
     uint16_t bIdx = readBinSensorIndex(static_cast<uint8_t>(i));
     if (sIdx != MQTT_HA_INDEX_NONE || bIdx != MQTT_HA_INDEX_NONE) {
+      // TASK-1093 / ADR-093: the water meter is announced on first MsgID 19 data.
+      // This scan covers every table row, so without the gate the daily discovery
+      // auto-heal re-announces it on a gateway whose bus never carries that id,
+      // leaving a retained config for an entity that never receives state.
+      if (static_cast<uint8_t>(i) == OTGWdhwmeterid && !dhwWaterMeterHasData()) continue;
       setMQTTConfigPending(static_cast<uint8_t>(i));
     }
   }

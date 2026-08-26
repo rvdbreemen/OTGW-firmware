@@ -1,7 +1,7 @@
 /*
  ***************************************************************************
  **  Program  : dhwWaterMeter
- **  Version  : v1.7.5-beta.3
+ **  Version  : v1.7.5-beta.4
  **
  **  Copyright (c) 2026 Robert van Breemen
  **
@@ -40,6 +40,10 @@ static const uint32_t DHW_METER_MAX_GAP_MS = 60000UL;
 float           dhwWaterTotalL  = 0.0f;   // litres since boot (not persisted)
 static uint32_t dhwMeterLastMs  = 0;
 static bool     dhwMeterSeeded  = false;
+// Whether this boot has already announced the discovery config. File scope, not
+// a function-local static, so the broker-restart path can clear it: a restarted
+// broker drops the retained config, and the entity must be announced again.
+static bool     dhwMeterAnnounced = false;
 
 //===========================================================================================
 // Fold one MsgID 19 reading into the running total.
@@ -74,6 +78,26 @@ bool dhwWaterMeterHasData()
 }
 
 //===========================================================================================
+// Discovery-announce latch. dhwWaterMeterNeedsAnnounce() reports whether the
+// config still has to go out; forgetDHWWaterMeterAnnounce() re-arms it after a
+// broker restart has thrown the retained configs away.
+//===========================================================================================
+bool dhwWaterMeterNeedsAnnounce()
+{
+  return !dhwMeterAnnounced;
+}
+
+void markDHWWaterMeterAnnounced()
+{
+  dhwMeterAnnounced = true;
+}
+
+void forgetDHWWaterMeterAnnounce()
+{
+  dhwMeterAnnounced = false;
+}
+
+//===========================================================================================
 // Test seam: drop the accumulated total and forget the last sample time.
 //===========================================================================================
 void resetDHWWaterMeter()
@@ -81,6 +105,7 @@ void resetDHWWaterMeter()
   dhwWaterTotalL = 0.0f;
   dhwMeterLastMs = 0;
   dhwMeterSeeded = false;
+  dhwMeterAnnounced = false;
 }
 
  /***************************************************************************

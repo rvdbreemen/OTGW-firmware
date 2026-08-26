@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v1.7.5-beta.3
+**  Version  : v1.7.5-beta.4
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -604,6 +604,9 @@ extern float dhwWaterTotalL;
 void updateDHWWaterMeter(float flowLitresPerMin, uint32_t nowMs);
 void resetDHWWaterMeter();
 bool dhwWaterMeterHasData();
+bool dhwWaterMeterNeedsAnnounce();
+void markDHWWaterMeterAnnounced();
+void forgetDHWWaterMeterAnnounce();
 void publishDHWWaterMeter();
 
 //Now load Debug & network library

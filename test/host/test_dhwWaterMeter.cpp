@@ -138,7 +138,23 @@ int main() {
   check(dhwWaterMeterHasData(), "has data once a frame has decoded");
 
   //--------------------------------------------------------------------
-  // (j) The total is monotonic across a long realistic run.
+  // (j) The discovery-announce latch. It must hold across ordinary
+  //     publishes, and re-arm when a broker restart throws the retained
+  //     config away, or the entity never comes back without a reboot.
+  //--------------------------------------------------------------------
+  resetDHWWaterMeter();
+  check(dhwWaterMeterNeedsAnnounce(), "announce is pending on a fresh boot");
+  markDHWWaterMeterAnnounced();
+  check(!dhwWaterMeterNeedsAnnounce(), "announce latches after the first publish");
+  updateDHWWaterMeter(5.0f, 1000);
+  updateDHWWaterMeter(5.0f, 11000);
+  check(!dhwWaterMeterNeedsAnnounce(), "ordinary samples do not re-arm the announce");
+  forgetDHWWaterMeterAnnounce();
+  check(dhwWaterMeterNeedsAnnounce(), "broker restart re-arms the announce");
+  checkNear(dhwWaterTotalL, 0.8333f, "re-arming the announce does not disturb the total");
+
+  //--------------------------------------------------------------------
+  // (k) The total is monotonic across a long realistic run.
   //--------------------------------------------------------------------
   resetDHWWaterMeter();
   float previous = 0.0f;
