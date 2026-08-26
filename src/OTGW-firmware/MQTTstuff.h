@@ -68,7 +68,7 @@ enum class HaUnit : uint8_t {
     degC,               // degrees Celsius
     percent,            // "%"
     bar,                // "bar"
-    l_min,              // "l/min"
+    l_min,              // "L/min" (HA UnitOfVolumeFlowRate.LITERS_PER_MINUTE; lowercase l is rejected)
     kW,                 // "kW"
     W,                  // "W"
     kWh,                // "kWh"
