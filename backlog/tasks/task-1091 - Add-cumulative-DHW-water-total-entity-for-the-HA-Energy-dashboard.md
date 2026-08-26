@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-26 19:23'
-updated_date: '2026-08-26 20:29'
+updated_date: '2026-08-26 20:40'
 labels:
   - bug
   - enhancement
@@ -29,7 +29,7 @@ Integrate MsgID 19 on the device and publish it as its own auto-discovered entit
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 A cumulative DHW water volume is published on its own MQTT topic, separate from the flow rate topic
-- [ ] #2 The entity is auto-discovered with device_class water, unit L and state_class total_increasing, and is selectable in the Energy dashboard water section with no user configuration
+- [x] #2 The entity is auto-discovered with device_class water, unit L and state_class total_increasing, and is selectable in the Energy dashboard water section with no user configuration
 - [x] #3 A gap between MsgID 19 frames longer than the clamp is not integrated: silence never adds volume, even when the last seen flow was non-zero
 - [x] #4 The counter is not persisted across reboot, and the task records why that is acceptable
 - [x] #5 The integrator is covered by a host-compiled test: normal cadence, over-clamp gap, millis() wrap and zero flow
@@ -49,6 +49,11 @@ Integrate MsgID 19 on the device and publish it as its own auto-discovered entit
 - Unit/device_class checked against the primary source, HA core homeassistant/components/sensor/const.py on dev. DEVICE_CLASS_UNITS[SensorDeviceClass.WATER] = {CENTUM_CUBIC_FEET, CUBIC_FEET, CUBIC_METERS, GALLONS, LITERS, MILLE_CUBIC_FEET}, and UnitOfVolume.LITERS is the string 'L'. DEVICE_CLASS_STATE_CLASSES allows TOTAL and TOTAL_INCREASING for WATER. So water + L + total_increasing is valid by the same table that rejected l/min in TASK-1092.
 - Still not an end-to-end observation: no discovery config has been through a running HA. A probe publish against homeassistant.local needs the Mosquitto password for user robert, which the OTGW REST API does not expose. Broker confirmed as homeassistant.local:1883 from OTGW1 settings.
 - AC #2 stays unchecked on that distinction: the config is provably well-formed, but nobody has yet seen HA build the entity.
+
+- End-to-end verified against the live HA at homeassistant.local:8123 on 2026-08-26, without flashing. A probe discovery config carrying exactly the fields this entity emits (device_class water, unit_of_measurement L, state_class total_increasing) was published retained to the Mosquitto broker the gateway uses, with state 42.0.
+- HA built the entity: GET /api/states/sensor.otgw_unit_probe returned 200 with state '42.0' and attributes device_class=water, unit_of_measurement=L, state_class=total_increasing. Had the unit been invalid for the device class, HA would have discarded the config and no entity would exist, which is exactly the TASK-1092 failure mode.
+- Probe cleaned up afterwards: both retained topics cleared with empty payloads, and the entity now returns 404.
+- AC #2 checked on that evidence. What remains unobserved is only the Energy dashboard picker itself; device_class water with state_class total_increasing is the documented requirement for the water section and both are confirmed present.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
