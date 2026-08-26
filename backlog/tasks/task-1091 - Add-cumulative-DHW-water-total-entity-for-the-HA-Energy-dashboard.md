@@ -1,10 +1,11 @@
 ---
 id: TASK-1091
 title: Add cumulative DHW water total entity for the HA Energy dashboard
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-26 19:23'
-updated_date: '2026-08-26 19:25'
+updated_date: '2026-08-26 19:31'
 labels:
   - bug
   - enhancement
