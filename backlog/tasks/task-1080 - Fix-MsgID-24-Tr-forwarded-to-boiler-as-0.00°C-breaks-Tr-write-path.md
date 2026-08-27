@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-24 18:10'
-updated_date: '2026-08-26 19:23'
+updated_date: '2026-08-27 18:46'
 labels:
   - bug
   - needs-info
@@ -53,4 +53,9 @@ Also corrected the block comment that still claimed the bitmaps are monotonic.
   Thermostat sends a valid 26.53 C, the gateway forwards 0.00 C to the boiler.
 - Note: GH #678 reporter runs ESP firmware 0.10.2+50c3ed2, which is ancient; vijgie was pointed at v1.7.5-beta.2. Confirm whether beta.2 still reproduces before assuming a PIC-6.7-only regression.
 - No compatible older PIC hex to downgrade to: 6.7 is the first hex for the P16F1847, 5.8 and below target the P16F88.
+
+- 2026-08-27: root cause identified by hvxl (Schelte Bron, PIC author) on GH #677. This is a PIC firmware bug, not an ESP bug. The RT command overrides the room temperature sent to the boiler; RT=0 passes on the thermostat value and is supposed to be the default after a PIC restart, but is not, due to a bug in the PIC firmware. Sending RT=0 restores forwarding.
+- Scope note from the same reply: this only matters for systems that act on the received room temperature, notably some WeHeat heat pumps. Most boilers are controlled through the control setpoint and ignore Tr entirely, which explains why only a few users see it.
+- Firmware-side mitigation to consider: add RT=0 to the boot command sequence so a PIC restart cannot leave the override latched. That is a workaround for a PIC defect, so weigh it against masking the upstream bug.
+- Correction to the note of 2026-08-26: the claim that 6.7 is the first hex for the P16F1847 is wrong. hvxl states all 6.x firmwares target the P16F1847 and older versions remain downloadable by version, for example https://otgw.tclcode.com/download/gateway-6.6.hex. Downgrading to compare IS therefore possible.
 <!-- SECTION:NOTES:END -->
