@@ -1,8 +1,8 @@
 ---
 id: "ADR-094"
 title: "Correct the DHW water total record: announce gating, live citations and measured costs"
-status: "Proposed"
-date: "2026-08-26"
+status: "Accepted"
+date: "2026-08-27"
 binding: false
 gate: null
 documents_shipped: true
@@ -10,9 +10,9 @@ verified_in:
   - "src/OTGW-firmware/dhwWaterMeter.ino"
   - "src/OTGW-firmware/MQTTstuff.ino"
   - "test/host/test_dhwWaterMeter.cpp"
-supersedes: []
+supersedes:
+  - "ADR-093"
 superseded_by: null
-format: "madr"
 topics:
   - "home-assistant"
   - "mqtt-discovery"
@@ -31,6 +31,7 @@ symbols:
   - "dhwWaterMeterNeedsAnnounce"
   - "markAllMQTTConfigPending"
 context_scope: "selective"
+format: "madr"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -39,7 +40,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-08-26.
+Accepted, 2026-08-27.
 
 ## Status History
 
@@ -50,6 +51,16 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-08-27
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Supersedes ADR-093
+    changed_via: adr-kit lifecycle
+  - date: 2026-08-27
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context and Problem Statement
@@ -93,7 +104,7 @@ Decision Contract. ADR-093 also declared ADR-090's remaining requirements
 "satisfied" without auditing them; two were not. ADR-090 Must #2 mandates the
 same accumulation method on the 2.0.0 peer so both firmwares report the same
 total for the same boiler, and its Open Question 5 requires the counter to be
-user-resettable through a paired REST and MQTT surface. The shipped 1.x
+user-resettable through a paired REST and MQTT (Message Queuing Telemetry Transport) surface. The shipped 1.x
 implementation has no reset surface at all.
 
 **Two claims about Home Assistant were overstated.** `total_increasing` does
@@ -212,7 +223,7 @@ boundary, which is the one remaining field check.
 * Refuse to integrate an interval longer than an explicit named clamp, and
   update the sample timestamp anyway so the skipped gap is not charged to the
   next sample.
-* Withhold the state publish AND the discovery announcement, on every path that
+* Withhold the state publish and, equally, the discovery announcement, on every path that
   can queue a discovery config, until at least one MsgID 19 frame has decoded
   on this boot. `markAllMQTTConfigPending()` is a path.
 * Keep the announce latch outside the publisher and re-arm it wherever the
@@ -314,12 +325,12 @@ boundary, which is the one remaining field check.
 
 ## Open Questions
 
-* [ ] Should the cumulative total be user-resettable, and through which
+- [x] Should the cumulative total be user-resettable, and through which — **Answered 2026-08-27 by User: Robert van den Breemen:** No reset surface. A reboot zeroes the counter and Home Assistant reads that as a meter reset, so the operation the user needs already exists; a paired REST and MQTT reset would add API surface for something a power cycle already does on a counter that is deliberately not persisted. The s0pulsecounttot counter on this line has the same shape and the same absence, so this is the established idiom rather than an exception. ADR-090's Open Question 5 answered yes on the assumption of a persisted counter, where a reset also has to clear the file; that assumption no longer holds.
   surface? ADR-090 Open Question 5 answered yes, through a paired REST and MQTT
   surface, but the shipped 1.x implementation has none: the only way to zero
   the counter is a reboot. Either implement the paired surface or record that a
   RAM-only counter with a reboot-to-zero is the accepted reset mechanism.
-* [ ] How is the 1.x accumulation reconciled with the 2.0.0 peer? ADR-090
+- [x] How is the 1.x accumulation reconciled with the 2.0.0 peer? ADR-090 — **Answered 2026-08-27 by User: Robert van den Breemen:** Tracked as TASK-1094 rather than settled here. The 1.x implementation was built without reading the 2.0.0 peer record, which lives in the other worktree, so any claim of parity now would be unverified. TASK-1094 reads the peer record and compares the two on the points that change the number a user sees: whether the peer persists, what its gap rule is and what cap value it uses, and whether each sample is applied to the preceding or the following interval. Divergence is then either fixed on one line or recorded as deliberate on both. This ADR does not claim parity in the meantime.
   Must #2 mandates the same method on both lines so the two firmwares report
   the same total for the same boiler. The 2.0.0 peer record lives in the other
   worktree and has not been read against this implementation, in particular

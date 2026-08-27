@@ -1,15 +1,15 @@
 ---
 id: "ADR-093"
 title: "Keep the cumulative DHW water total in RAM and announce it on first data"
-status: "Accepted"
-date: "2026-08-26"
+status: "Superseded"
+date: "2026-08-27"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes:
   - "ADR-090"
-superseded_by: null
+superseded_by: "ADR-094"
 topics:
   - "home-assistant"
   - "mqtt-discovery"
@@ -37,7 +37,7 @@ format: "madr"
 
 ## Status
 
-Accepted, 2026-08-26.
+Superseded by ADR-094, 2026-08-27.
 
 ## Status History
 
@@ -57,6 +57,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Supersedes ADR-090
+    changed_via: adr-kit lifecycle
+  - date: 2026-08-27
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: Superseded by ADR-094
     changed_via: adr-kit lifecycle
 ```
 

@@ -3019,8 +3019,8 @@
       "title": "Keep the cumulative DHW water total in RAM and announce it on first data",
       "path": "ADR-093-keep-the-cumulative-dhw-water-total-in-ram-and-announce-it-on-first-data.md",
       "format": "madr",
-      "status": "Accepted",
-      "date": "2026-08-26",
+      "status": "Superseded",
+      "date": "2026-08-27",
       "decision_summary": "Chosen option: Option A, because it delivers the same user-visible outcome as ADR-090 (a working Energy dashboard fig...",
       "topics": [
         "home-assistant",
@@ -3045,29 +3045,10 @@
       ],
       "context_scope": "selective",
       "decision_contract": {
-        "must": [
-          "Publish the cumulative total as a separate entity from the MsgID 19 rate sensor, which keeps deviceclass: volumeflowrate and the unit string L/min (capital L, the value Home Assistant accepts).",
-          "Accumulate as elapsed time times flow, never as a fixed volume per received sample.",
-          "Refuse to integrate an interval longer than an explicit clamp, and update the sample timestamp anyway so the skipped gap is not charged to the next sample.",
-          "Withhold both the state publish and the discovery announcement until at least one MsgID 19 frame has decoded on this boot.",
-          "Feed the integrator only from frames that are valid for the master topic, so OT (OpenTherm) gateway substitutions and answer overrides (ADR-066, ADR-082) never reach the meter.",
-          "State the sampling limitation wherever the entity is described to users, so the number is not mistaken for a metrologically valid water meter."
-        ],
-        "must_not": [
-          "Persist the running total to flash, in any file, at any cadence.",
-          "Register the water-total pseudo-ID in publishNonOTDiscoveryConfigs() or any other unconditional boot-publish path.",
-          "Set deviceclass: water on any sensor whose unit is not one of L, gal, m3, ft3, CCF (centum cubic feet), MCF (mille cubic feet).",
-          "Introduce the String class in the integration or publish path (ADR-004)."
-        ],
-        "exceptions": [
-          "None."
-        ],
-        "verification": [
-          "src/OTGW-firmware/dhwWaterMeter.ino — integrator, clamp, and the first-frame gate.",
-          "test/host/testdhwWaterMeter.cpp — host-compiled tests covering normal cadence, the clamp boundary at 60000 and 60001 ms, an over-clamp gap, the interval after a gap, millis() wrap, zero and negative flow, the no-data-before-first-frame g...",
-          "src/OTGW-firmware/mqttconfiguratie.cpp:1127 — the pseudo-ID 243 discovery row.",
-          "Manual check against a live Home Assistant that the entity is offered as an Energy dashboard water source."
-        ]
+        "must": [],
+        "must_not": [],
+        "exceptions": [],
+        "verification": []
       },
       "scope": {
         "path_globs": [
@@ -3084,7 +3065,7 @@
         "supersedes": [
           "ADR-090"
         ],
-        "superseded_by": null
+        "superseded_by": "ADR-094"
       }
     },
     {
@@ -3092,8 +3073,8 @@
       "title": "Correct the DHW water total record: announce gating, live citations and measured costs",
       "path": "ADR-094-correct-the-dhw-water-total-record-announce-gating-live-citations-and-measured-costs.md",
       "format": "madr",
-      "status": "Proposed",
-      "date": "2026-08-26",
+      "status": "Accepted",
+      "date": "2026-08-27",
       "decision_summary": "Chosen option: Option A, because a reader who lands on ADR-093 through the index has no way to know that six of its c...",
       "topics": [
         "home-assistant",
@@ -3122,7 +3103,7 @@
           "Publish the cumulative total as a separate entity from the MsgID 19 rate sensor, which keeps deviceclass: volumeflowrate and the unit string L/min (capital L, the value Home Assistant accepts).",
           "Accumulate as elapsed time times flow, never as a fixed volume per received sample.",
           "Refuse to integrate an interval longer than an explicit named clamp, and update the sample timestamp anyway so the skipped gap is not charged to the next sample.",
-          "Withhold the state publish AND the discovery announcement, on every path that can queue a discovery config, until at least one MsgID 19 frame has decoded on this boot. markAllMQTTConfigPending() is a path.",
+          "Withhold the state publish and, equally, the discovery announcement, on every path that can queue a discovery config, until at least one MsgID 19 frame has decoded on this boot. markAllMQTTConfigPending() is a path.",
           "Keep the announce latch outside the publisher and re-arm it wherever the broker-restart path clears the discovery done-bitmap.",
           "Feed the integrator only from frames that are valid for the master topic, so gateway substitutions and answer overrides (ADR-066, ADR-082) never reach the meter.",
           "State the sampling limitation wherever the entity is described to users, so the number is not mistaken for a metrologically valid water meter."
@@ -3158,7 +3139,9 @@
           "src/OTGW-firmware/MQTTstuff.ino",
           "test/host/test_dhwWaterMeter.cpp"
         ],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-093"
+        ],
         "superseded_by": null
       }
     }
@@ -5499,6 +5482,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-093",
+      "target": "ADR-094",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-094",
       "target": "ADR-004",
       "type": "related",
@@ -5562,6 +5551,12 @@
       "source": "ADR-094",
       "target": "ADR-093",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-094",
+      "target": "ADR-093",
+      "type": "supersedes",
       "resolved": true
     }
   ]
