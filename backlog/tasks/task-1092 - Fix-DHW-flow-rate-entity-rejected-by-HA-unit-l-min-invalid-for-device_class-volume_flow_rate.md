@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-26 19:48'
-updated_date: '2026-08-26 20:43'
+updated_date: '2026-08-27 18:47'
 labels:
   - bug
 dependencies: []
@@ -50,6 +50,8 @@ Regression introduced in v1.7.5-beta.2. The DHWFlowRate discovery config gained 
 - Positive: a discovery config with device_class volume_flow_rate + unit L/min produced sensor.otgw_flow_probe, state 7.5, attributes unit_of_measurement=L/min, device_class=volume_flow_rate.
 - Negative control: the identical config with the old lowercase l/min produced no entity at all (404 after 3 s). That is the reported symptom reproduced on demand, and it confirms the single-character fix is both necessary and sufficient.
 - All probe topics cleared afterwards; the three probe entities return 404.
+
+- 2026-08-27: field-confirmed on GH #675 after v1.7.5-beta.4. The reporter sees the flow rate sensor created correctly again, which closes the loop on the l/min to L/min fix.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
