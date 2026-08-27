@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-26 19:23'
-updated_date: '2026-08-26 20:43'
+updated_date: '2026-08-27 18:47'
 labels:
   - bug
   - enhancement
@@ -54,6 +54,8 @@ Integrate MsgID 19 on the device and publish it as its own auto-discovered entit
 - HA built the entity: GET /api/states/sensor.otgw_unit_probe returned 200 with state '42.0' and attributes device_class=water, unit_of_measurement=L, state_class=total_increasing. Had the unit been invalid for the device class, HA would have discarded the config and no entity would exist, which is exactly the TASK-1092 failure mode.
 - Probe cleaned up afterwards: both retained topics cleared with empty payloads, and the entity now returns 404.
 - AC #2 checked on that evidence. What remains unobserved is only the Energy dashboard picker itself; device_class water with state_class total_increasing is the documented requirement for the water section and both are confirmed present.
+
+- 2026-08-27: field-confirmed by the reporter on GH #675 after flashing v1.7.5-beta.4: "Can confirm the sensors are now created correctly and are accepted in the energy dashboard!" He will compare the firmware total against his own Home Assistant helper total over the coming days, which is the divergence check this task asked for.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
