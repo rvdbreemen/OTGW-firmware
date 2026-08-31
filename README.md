@@ -4,6 +4,8 @@
 [![GitHub release](https://img.shields.io/github/v/release/rvdbreemen/OTGW-firmware?style=flat-square)](https://github.com/rvdbreemen/OTGW-firmware/releases)
 [![License: GPLv3](https://img.shields.io/badge/License-GPLv3-blue.svg?style=flat-square)](LICENSE)
 
+> **ALPHA — not released.** The 2.0.0 is unreleased software in the ALPHA state, only available for alpha testers at this point.
+
 OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heating controller. It runs on an ESP32-S3 (LOLIN S3 Mini) in the traditional NodoShop OTGW with the PIC co-processor, monitors the OpenTherm bus between your thermostat and boiler, and connects your entire heating system to your home automation platform via MQTT, a browser-based web interface, and a REST API. That combination is the supported hardware.
 
 A prototype ESP32 board that drives OpenTherm directly, without a PIC, also exists. It is a prototype and nothing more at this time.
