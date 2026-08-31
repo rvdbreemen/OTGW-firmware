@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-31 16:46'
-updated_date: '2026-08-31 16:46'
+updated_date: '2026-08-31 16:49'
 labels: []
 dependencies: []
 ordinal: 265000
@@ -23,6 +23,12 @@ The 2.0.0 README markets the OTGW32 board as if it were an available product. It
 - [x] #2 ESP32 direct-OpenTherm variant described as prototype, not for sale, possibly future
 - [x] #3 Build/feature facts (esp32 env, OTDirect, W5500, BLE) stay accurate
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Follow-up: README now names the ESP32-S3 (LOLIN S3 Mini) in the traditional OTGW with PIC as THE supported hardware. The prototype ESP32 board gets two short mentions (intro, hardware section) and no feature marketing: prototype feature list removed, platform table collapsed to the supported column.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
