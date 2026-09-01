@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.359
+**  Version  : v2.0.0-alpha.360
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -38,6 +38,17 @@
 const String &contentType(String& filename);
 // forward declaration — used in setupFSexplorer() before its definition below.
 static void sendFSexplorerRedirect();
+
+// Outcome of the upload currently being received: true only once the target file
+// opened AND every chunk written full-length. handleFileUpload() latches it; the
+// /upload POST completion handler reads and clears it to pick 303 vs 507. It must
+// live at file scope because the response is emitted from that completion handler,
+// which cannot see handleFileUpload()'s locals.
+// KNOWN RESIDUAL: unlike the file handle (now per-request, on request->_tempFile),
+// this single flag is shared. Two concurrent uploads can therefore have the status
+// code attributed to the wrong request — while the file CONTENTS stay correct per
+// request, which is the part that used to corrupt.
+static bool s_uploadOk = false;
 
 #define MAX_FILES_IN_LIST   40
 
@@ -267,17 +278,28 @@ void setupFSexplorer(){
   server.on("/api/firmwarefilelist", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); apifirmwarefilelist(); });  // DEPRECATED: unversioned (ADR-035)
   server.on("/api/listfiles",        HTTP_ANY, [](AsyncWebServerRequest *r){ webBeginRequest(r); apilistfiles(); });         // DEPRECATED: unversioned (ADR-035)
   // server.on("/LittleFSformat", HTTP_GET, formatLittleFS);
-  // /upload: the body completion handler runs after the upload finished. If
-  // auth failed, handleFileUpload skipped the write; send the 401 challenge here.
-  // If auth succeeded, handleFileUpload already queued the 303 redirect body.
+  // /upload: the body completion handler runs after the upload finished. If auth
+  // or the same-origin check failed, handleFileUpload skipped the open and wrote
+  // nothing; send the 401/403 here. This handler owns the whole response.
   server.on("/upload", HTTP_POST,
     [](AsyncWebServerRequest *request) {
       webBeginRequest(request);
-      // checkHttpAuth() sends a 401 challenge when auth is required and failed.
-      // On success, redirect back to FSexplorer.html (303 + Location) — the same
-      // outcome the sync server produced with the raw `Header` literal.
+      // Latch and clear the outcome handleFileUpload() recorded, so a later POST
+      // to /upload cannot inherit this request's result.
+      const bool uploadOk = s_uploadOk;
+      s_uploadOk = false;
+      // checkHttpAuth() sends a 401 challenge when auth is required and failed,
+      // or a 403 when the origin check failed.
       if (!checkHttpAuth()) return;
-      if (!g_responseSent) sendFSexplorerRedirect();
+      if (g_responseSent) return;
+      // Only report success when the file actually opened and every chunk was
+      // written. A 303 here used to be sent unconditionally, so an upload onto a
+      // full filesystem (or onto a directory name) reported success with no bytes
+      // stored. The client already alerts on any non-200 (FSexplorer.html).
+      if (!uploadOk) { webSendStatus(507); return; }
+      // Redirect back to FSexplorer.html (303 + Location) — the same outcome the
+      // sync server produced with the raw `Header` literal.
+      sendFSexplorerRedirect();
     },
     handleFileUpload);
   server.on("/ReBoot",        HTTP_ANY, reBootESP);
@@ -302,7 +324,11 @@ void setupFSexplorer(){
     }
     // TASK-683 port: emit one outcome-bearing line per static request — 200
     // gated on bRestAPI (chatty debug surface), 404 always-on (actionable).
-    String path = request->urlDecode(request->url());
+    // ESPAsyncWebServer already URL-decoded _url in _parseReqHead() (WebRequest.cpp),
+    // so decoding a second time here corrupts any '%' or '+' in a stored filename.
+    // The sync ESP8266WebServer does NOT decode, which is why the 1.x tree keeps its
+    // own urlDecode at the same spot — do not "restore" the symmetry on this tree.
+    String path = request->url();
     const bool served = handleFile(String(path));
     if (!served) {
       webSendP(404, PSTR("text/plain"), PSTR("FileNotFound\r\n"));
@@ -436,6 +462,11 @@ void apilistfiles()
       size_t len = strnlen(deletePath, sizeof(deletePath) - 2);
       memmove(deletePath + 1, deletePath, len + 1);
       deletePath[0] = '/';
+      // strnlen caps len at 62, so exactly at the strlcpy truncation point the byte
+      // moved into the last slot is a real character, not the terminator — leaving
+      // all 64 bytes non-zero and sending strlen() off the end of the array. Force
+      // the terminator. No-op for every path of 62 characters or fewer.
+      deletePath[sizeof(deletePath) - 1] = '\0';
     }
     DebugTf(PSTR("Delete -> [%s]\r\n"), deletePath);
     if (!LittleFS.exists(deletePath)) {
@@ -496,6 +527,12 @@ void apilistfiles()
     unsigned long totalBytes = fsInfo.totalBytes;
     unsigned long usedBytesRaw = fsInfo.usedBytes;
     unsigned long usedBytes = (unsigned long)(usedBytesRaw * 1.05);
+    // Clamp BEFORE the subtraction: past 95.238% full the 5% margin pushes usedBytes
+    // over totalBytes and the 32-bit subtraction wraps to ~4 GB, which defeats the
+    // frontend's only "not enough space!" guard (nBytes > freeBytes). Clamping
+    // usedBytes (rather than flooring freeBytes) also keeps used + free == total, so
+    // the panel cannot read "used 2.03 MB of 2.00 MB".
+    if (usedBytes > totalBytes) usedBytes = totalBytes;
     unsigned long freeBytes = totalBytes - usedBytes;
     je.beginObject();                       // summary {
     je.field(F("usedBytes"),  (uint32_t)usedBytes);    // unsigned long
@@ -533,6 +570,20 @@ bool handleFile(String&& path)
   }
   if (!LittleFS.exists("/FSexplorer.html")) { webSendP(200, PSTR("text/html; charset=UTF-8"), (PGM_P)Helper); return true; }
   if (path.endsWith("/")) path += F("index.html");
+  // ADR-056 §1: settings.ini stores httppasswd and MQTTpasswd in cleartext, so this
+  // read path sits INSIDE the protected admin boundary — it is not one of the "read
+  // paths that do not expose secret values" the open carve-out covers. Every sibling
+  // operation on this handler already gates; only the read did not, so setting an
+  // admin password created the secret that an unauthenticated GET then handed out.
+  {
+    const char *sp = path.c_str();
+    while (sp[0] == '/' && sp[1] == '/') sp++;   // collapse a "//settings.ini" alias
+    if (strcasecmp_P(sp, PSTR(SETTINGS_FILE)) == 0 && !checkHttpAuth()) {
+      // true, not false: checkHttpAuth() already sent the 401/403, and the
+      // onNotFound catch-all sends its own 404 when handleFile() returns false.
+      return true;
+    }
+  }
   if (!LittleFS.exists(path)) return false;
   // contentType() mutates its argument into the mime string, so snapshot the
   // file path first, then derive the mime from a throwaway copy.
@@ -545,24 +596,65 @@ bool handleFile(String&& path)
 
 
 //=====================================================================================
+// Same-origin (CSRF) test for the upload body callback (ADR-056 §2). Mirrors
+// isSameOriginRequest() in restAPI.ino exactly, including its deliberate
+// permissiveness when the client sends no Origin/Referer at all (curl, Home
+// Assistant, OTmonitor) and its rejection of a malformed origin — the start gate
+// and the completion gate MUST agree, or a request passes one and fails the other.
+// It reads the headers straight off `request` instead of going through
+// headerCompat()/hostHeaderCompat(): those read the global currentRequest, which is
+// not bound to THIS request during body parsing, and webBeginRequest() would clear
+// g_responseSent / g_pendingHeaders mid-request. getHeader() matches the header name
+// case-insensitively (WebRequest.cpp), same as the compat shim.
+static bool uploadSameOrigin(AsyncWebServerRequest *request) {
+  const AsyncWebHeader *o = request->getHeader("Origin");
+  if (!o || o->value().length() == 0) o = request->getHeader("Referer");
+  if (!o || o->value().length() == 0) return true;   // no origin header — allow
+  const String &host = request->host();
+  if (host.length() == 0) return true;               // cannot validate without Host
+  const String &origin = o->value();
+  int schemeSep = origin.indexOf("://");
+  if (schemeSep < 0) return false;                   // malformed Origin/Referer
+  String originHost = origin.substring(schemeSep + 3);
+  int slash = originHost.indexOf('/');
+  if (slash >= 0) originHost = originHost.substring(0, slash);
+  return originHost.equalsIgnoreCase(host);
+}
+
+//=====================================================================================
 // Async upload handler. ESPAsyncWebServer calls this per chunk:
 //   (request, filename, index, data, len, final)
 // index==0 marks the first chunk (== UPLOAD_FILE_START), final==true the last
-// (== UPLOAD_FILE_END). The 303 redirect body is queued by the /upload POST
-// completion handler in setupFSexplorer(), not here.
+// (== UPLOAD_FILE_END). The response (303 / 401 / 403 / 507) is owned entirely by
+// the /upload POST completion handler in setupFSexplorer(); never send from here.
+//
+// Per-upload state lives on request->_tempFile, NOT in function-local statics. The
+// sync ESP8266WebServer serialised whole requests, so one static File slot was safe;
+// ESPAsyncWebServer invokes this callback per chunk DURING body reception, so two
+// simultaneous uploads interleave and a static File would be reassigned out from
+// under the first one. _tempFile is a public member of AsyncWebServerRequest
+// (ESPAsyncWebServer.h) that ~AsyncWebServerRequest closes (WebRequest.cpp), so an
+// aborted upload cleans itself up. No collision with the library's own use of the
+// slot: only AsyncStaticWebHandler touches _tempFile, and its canHandle() requires
+// HTTP_GET (WebHandlers.cpp), so it can never see this POST.
 void handleFileUpload(AsyncWebServerRequest *request, const String &filename,
                       size_t index, uint8_t *data, size_t len, bool final)
 {
-  static File fsUploadFile;
-  static bool uploadAuthorized = true;
-
   if (index == 0)
   {
-    // Auth: do NOT send a response here (the POST completion handler does).
-    // If auth fails, skip the open so nothing is written.
-    uploadAuthorized = (settings.sHTTPpasswd[0] == '\0' ||
-                        request->authenticate("admin", settings.sHTTPpasswd));
-    if (!uploadAuthorized) return;
+    s_uploadOk = false;   // static: reset per upload or a stale result carries over
+
+    // Authorize BEFORE the open. The same-origin check used to run only in the POST
+    // completion handler, i.e. after LittleFS.open(...,"w") had already truncated the
+    // target and every chunk had been written — the 403 was emitted after the
+    // filesystem had changed. Deciding here means a cross-origin POST writes nothing.
+    // Do NOT send a response from this callback; the completion handler owns it, and
+    // its own checkHttpAuth() re-runs both tests to pick 401 vs 403.
+    if (settings.sHTTPpasswd[0] != '\0')
+    {
+      if (!request->authenticate("admin", settings.sHTTPpasswd)) return;
+      if (!uploadSameOrigin(request)) return;
+    }
 
     String fn = filename;
     if (fn.length() > 30) fn = fn.substring(fn.length() - 30, fn.length());  // trim to 30 chars
@@ -570,22 +662,30 @@ void handleFileUpload(AsyncWebServerRequest *request, const String &filename,
     const AsyncWebParameter *pp = request->getParam("path", true);
     if (!pp) pp = request->getParam("path", false);
     if (pp) { path = pp->value(); if (!path.endsWith("/")) path += F("/"); }
-    String fullname = path + request->urlDecode(fn);
+    // No urlDecode: RFC 7578 §4.2 filename= is a raw basename and browsers do not
+    // percent-encode it. Decoding it turned '+' into a space and truncated the name
+    // at any literal '%' (invalid hex made strtol yield an embedded NUL), so
+    // '50%.csv' was stored as '/50'.
+    String fullname = path + fn;
     if (fullname.startsWith("//")) fullname = fullname.substring(1);
 
     DebugT(F("FileUpload Name: ")); Debugln(fullname);
-    fsUploadFile = LittleFS.open(fullname, "w");
+    request->_tempFile = LittleFS.open(fullname, "w");
+    s_uploadOk = (bool)request->_tempFile;
   }
 
-  if (uploadAuthorized && len && fsUploadFile)
+  if (len && request->_tempFile)
   {
-    fsUploadFile.write(data, len);
+    // A short write means ENOSPC (or a name colliding with a directory, where the
+    // impl returns 0). lfs_file_write returns the full count on success and the
+    // wrapper returns 0 on error, so there are no benign short writes to tolerate.
+    if (request->_tempFile.write(data, len) != len) s_uploadOk = false;
   }
 
   if (final)
   {
-    if (fsUploadFile) fsUploadFile.close();
-    if (uploadAuthorized) {
+    if (request->_tempFile) {
+      request->_tempFile.close();
       DebugT(F("FileUpload Size: ")); Debugln((String)(index + len));
     }
   }
@@ -637,9 +737,14 @@ bool freeSpace(uint16_t const& printsize)
   FSInfo fsInfo;
   platformFSInfo(fsInfo);
   unsigned long totalB = fsInfo.totalBytes;
-  unsigned long usedB  = fsInfo.usedBytes;
-  Debugln(formatBytes(totalB - (unsigned long)(usedB * 1.05)) + " im LittleFS frei");
-  return (totalB - (unsigned long)(usedB * 1.05) > printsize);
+  unsigned long usedB  = (unsigned long)(fsInfo.usedBytes * 1.05);
+  // Same clamp as apilistfiles(): past 95.238% full the 5% margin pushes usedB over
+  // totalB and the 32-bit subtraction wraps to ~4 GB, so this would answer "yes,
+  // there is room" on a completely full filesystem.
+  if (usedB > totalB) usedB = totalB;
+  const unsigned long freeB = totalB - usedB;
+  Debugln(formatBytes(freeB) + " im LittleFS frei");
+  return (freeB > printsize);
 
 } // freeSpace()
 

@@ -1,7 +1,7 @@
 <!--
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v2.0.0-alpha.359
+**  Version  : v2.0.0-alpha.360
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -159,6 +159,12 @@
 
                        let fullPath = currentPath === '/' ? files[i].name : currentPath + '/' + files[i].name;
                        if (currentPath !== '/' && !fullPath.startsWith('/')) fullPath = '/' + fullPath;
+                       // Percent-encode per SEGMENT so '/' stays a separator. Assigning the raw
+                       // path to href lets the URL parser re-read reserved characters: 'notes#1.txt'
+                       // becomes path '/notes' + fragment '1.txt' and 404s, while the Delete link on
+                       // the same row works because it already runs encodeURIComponent. The server
+                       // decodes once, so this round-trips '#', '?', '+' and a literal '%'.
+                       const hrefPath = fullPath.split('/').map(encodeURIComponent).join('/');
 
                        if (files[i].type === 'dir') {
                          const nameCell = row.insertCell();
@@ -187,7 +193,7 @@
                          nameCell.width = '20%';
                          nameCell.setAttribute('nowrap', '');
                          const fileLink = document.createElement('a');
-                         fileLink.href = fullPath;
+                         fileLink.href = hrefPath;
                          fileLink.target = '_blank';
                          fileLink.textContent = files[i].name;
                          nameCell.appendChild(fileLink);
@@ -203,8 +209,8 @@
                          downloadCell.width = '10%';
                          downloadCell.setAttribute('nowrap', '');
                          const downloadLink = document.createElement('a');
-                         downloadLink.href = fullPath;
-                         downloadLink.download = files[i].name;
+                         downloadLink.href = hrefPath;
+                         downloadLink.download = files[i].name;   // raw: a save-as name, not a URL
                          downloadLink.textContent = ' Download ';
                          downloadCell.appendChild(downloadLink);
 
@@ -212,12 +218,19 @@
                          deleteCell.width = '10%';
                          deleteCell.setAttribute('nowrap', '');
 
+                         // Footgun guard: no Delete link next to a load-bearing asset. The v2/SAT
+                         // assets below ship in data/ and have their own routes in FSexplorer.ino,
+                         // but were never added here, so deleting v2.js left a blank page at '/'
+                         // whenever settings.ui.bUseV2 is on.
                          const protectedFiles = ['FSexplorer.html', 'FSexplorer.png',
                                                  'index.html', 'index.js',
                                                  'index_common.css', 'components.css',
                                                  'ds-tokens.css', 'graph.js',
                                                  'design.html', 'favicon.ico',
                                                  'settings.png',
+                                                 'v2.html', 'v2.js', 'v2.css', 'v2-bundle.css',
+                                                 'sat.js', 'sat-slider.js',
+                                                 'theme-toggle.js', 'echarts-theme.js',
                                                  'inter-400.woff2', 'inter-700.woff2',
                                                  'jetbrains-mono-400.woff2'];
                          if (!protectedFiles.includes(files[i].name)) {
@@ -307,6 +320,24 @@
 
              fileInput.addEventListener('change', () => {
                  if (!fileInput.files.length) return;
+                 // The server trims a name longer than 30 characters to its LAST 30 and reports
+                 // plain success, so the file lands under a name the user never chose (and the
+                 // post-upload highlight, which looks for the original name, silently misses).
+                 // Refuse it here instead; the server-side trim stays as the non-UI backstop.
+                 if (fileInput.files[0].name.length > 30) {
+                   if (fileSize) {
+                     fileSize.innerHTML = '';
+                     const strong = document.createElement('strong');
+                     strong.style.color = 'red';
+                     strong.textContent = 'Filename is ' + fileInput.files[0].name.length +
+                                          ' characters, max 30 - rename the file before uploading.';
+                     const p = document.createElement('p');
+                     p.appendChild(strong);
+                     fileSize.appendChild(p);
+                   }
+                   uploadBtn.setAttribute('disabled', 'disabled');
+                   return;
+                 }
                  let nBytes = fileInput.files[0].size, output = `${nBytes} Byte`;
                  for (var aMultiples = [
                      ' KB',
