@@ -1,11 +1,11 @@
 ---
 id: TASK-1098
 title: FSexplorer free-space guard is defeated by a 32-bit underflow
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-01 18:30'
-updated_date: '2026-09-01 19:14'
+updated_date: '2026-09-01 19:17'
 labels:
   - audit
   - fsexplorer
