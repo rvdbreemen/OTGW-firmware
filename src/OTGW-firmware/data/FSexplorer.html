@@ -157,6 +157,10 @@
 
                        let fullPath = currentPath === '/' ? files[i].name : currentPath + '/' + files[i].name;
                        if (currentPath !== '/' && !fullPath.startsWith('/')) fullPath = '/' + fullPath;
+                       // Encode per segment so '/' stays a separator: assigning the raw path to
+                       // href lets the URL parser eat a '#' as a fragment and a '?' as a query,
+                       // so those files could be deleted (that link encodes) but never opened.
+                       const hrefPath = fullPath.split('/').map(encodeURIComponent).join('/');
 
                        if (files[i].type === 'dir') {
                          const nameCell = row.insertCell();
@@ -185,7 +189,7 @@
                          nameCell.width = '20%';
                          nameCell.setAttribute('nowrap', '');
                          const fileLink = document.createElement('a');
-                         fileLink.href = fullPath;
+                         fileLink.href = hrefPath;
                          fileLink.target = '_blank';
                          fileLink.textContent = files[i].name;
                          nameCell.appendChild(fileLink);
@@ -201,8 +205,8 @@
                          downloadCell.width = '10%';
                          downloadCell.setAttribute('nowrap', '');
                          const downloadLink = document.createElement('a');
-                         downloadLink.href = fullPath;
-                         downloadLink.download = files[i].name;
+                         downloadLink.href = hrefPath;
+                         downloadLink.download = files[i].name;   // raw: this is a filename, not a URL
                          downloadLink.textContent = ' Download ';
                          downloadCell.appendChild(downloadLink);
 
@@ -305,6 +309,23 @@
 
              fileInput.addEventListener('change', () => {
                  if (!fileInput.files.length) return;
+                 // The server trims anything over 30 chars down to its LAST 30 characters and
+                 // still answers success, so the file lands under a name nobody chose. Refuse
+                 // it here instead, symmetric with the free-space branch below.
+                 if (fileInput.files[0].name.length > 30) {
+                   if (fileSize) {
+                     fileSize.innerHTML = '';
+                     const strong = document.createElement('strong');
+                     strong.style.color = 'red';
+                     strong.textContent = 'Filename too long (' + fileInput.files[0].name.length +
+                                          ' chars, max 30) - rename it before uploading.';
+                     const p = document.createElement('p');
+                     p.appendChild(strong);
+                     fileSize.appendChild(p);
+                   }
+                   uploadBtn.setAttribute('disabled', 'disabled');
+                   return;
+                 }
                  let nBytes = fileInput.files[0].size, output = `${nBytes} Byte`;
                  for (var aMultiples = [
                      ' KB',

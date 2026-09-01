@@ -57,6 +57,12 @@ const char Helper[] PROGMEM =
   "  <input type='submit' name='SUBMIT' value='Flash Utility'/>\n"
   "</form>\n";
 const char Header[] PROGMEM = "HTTP/1.1 303 OK\r\nLocation:FSexplorer.html\r\nCache-Control: no-cache\r\n";
+// Sent instead of the 303 when the upload never opened or a write came up short, so the
+// client's existing non-200 branch ("Upload failed!") fires instead of reporting success.
+// Raw status line like Header above, not httpServer.send(): the response is written from
+// inside the upload callback, i.e. while the request body is still being parsed, so it
+// must not mutate the server's _contentLength/_chunked response state.
+const char UploadFailed[] PROGMEM = "HTTP/1.1 507 Insufficient Storage\r\nContent-Type: text/plain\r\nConnection: close\r\n\r\nUpload failed: filesystem full or path invalid\r\n";
 
 // Heap-fragmentation guard for static-file serving (TASK-843, confirmed root cause).
 // ESP8266WebServer streamFile() -> BufferedStreamDataSource::get_buffer() does an
@@ -261,9 +267,12 @@ void startWebserver(){
 
   // Enable collection of If-None-Match so index.html ETag conditional requests work.
   // TASK-398: use array form (works on both Core 2.7.4 and 3.1.2; single-arg overload is 3.x-only).
+  // Origin/Referer: the ADR-054 CSRF same-origin check (isSameOriginRequest) reads these.
+  // The sync WebServer only stores allowlisted headers, so without them the check is a no-op
+  // and every cross-origin request passes the "no origin header" permissive branch.
   {
-    static const char *otaHeaderKeys[] = {"If-None-Match"};
-    httpServer.collectHeaders(otaHeaderKeys, 1);
+    static const char *otaHeaderKeys[] = {"If-None-Match", "Origin", "Referer"};
+    httpServer.collectHeaders(otaHeaderKeys, 3);
   }
 
   httpServer.begin();
@@ -275,38 +284,25 @@ void startWebserver(){
 //=====================================================================================
 void setupFSexplorer(){
   LittleFS.begin();
-  if (LittleFS.exists("/FSexplorer.html"))
-  {
-    httpServer.on("/FSexplorer.html", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
-      streamFileGuarded(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
-    httpServer.on("/FSexplorer", []() {
-      File f = LittleFS.open("/FSexplorer.html", "r");
-      if (!f) { httpServer.send(404, F("text/plain"), F("File not found")); return; }
-      streamFileGuarded(f, F("text/html; charset=UTF-8"));
-      f.close();
-    });
-  }
-  else
-  {
-    // FSexplorer.html not on filesystem (FS not mounted or file missing).
-    // Register routes that serve the Helper page, which includes a link to the
-    // Flash Utility at /update so the user can upload the filesystem image.
-    auto sendHelper = []() {
-      httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper);
-    };
-    httpServer.on("/FSexplorer.html", sendHelper);
-    httpServer.on("/FSexplorer", sendHelper);
-  }
+  // Register once, decide per request: /upload answers with a 303 straight back to
+  // /FSexplorer.html, so a bootstrap upload of that file must take effect on the very
+  // next GET. Latching the choice at boot kept serving the Helper page until a reboot.
+  // The open() result doubles as the existence test, so a file that exists but cannot
+  // be opened now falls back to the Helper page instead of a bare 404.
+  auto sendFSexplorer = []() {
+    File f = LittleFS.open("/FSexplorer.html", "r");
+    if (!f) { httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper); return; }
+    streamFileGuarded(f, F("text/html; charset=UTF-8"));
+    f.close();
+  };
+  httpServer.on("/FSexplorer.html", sendFSexplorer);
+  httpServer.on("/FSexplorer",      sendFSexplorer);
   httpServer.on("/api/firmwarefilelist", apifirmwarefilelist);  // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
   httpServer.on("/api/listfiles", apilistfiles);               // DEPRECATED: unversioned, will be removed in v1.3.0 (see ADR-035)
   // httpServer.on("/LittleFSformat", formatLittleFS);
   httpServer.on("/upload", HTTP_POST, []() {
-    // If auth failed, handleFileUpload skipped the write; send 401 challenge here.
-    // If auth succeeded, the 303 redirect was already sent by handleFileUpload.
+    // If auth or the origin check failed, handleFileUpload skipped the write; send the
+    // 401/403 here. If it passed, handleFileUpload already sent the 303 (or a 507).
     checkHttpAuth();
   }, handleFileUpload);
   httpServer.on("/ReBoot", reBootESP);
@@ -443,6 +439,7 @@ void apilistfiles()
       size_t len = strnlen(deletePath, sizeof(deletePath) - 2);
       memmove(deletePath + 1, deletePath, len + 1);
       deletePath[0] = '/';
+      deletePath[sizeof(deletePath) - 1] = '\0';  // strnlen cap can shift a non-NUL into the last slot
     }
     DebugTf(PSTR("Delete -> [%s]\r\n"), deletePath);
     if (!LittleFS.exists(deletePath)) {
@@ -467,7 +464,10 @@ void apilistfiles()
   httpServer.send(200, F("application/json"), F(""));
   httpServer.sendContent(F("["));
 
-  char buf[100];
+  // 128 (was 100): an escaped 31-char name can reach 62 chars, plus ~43 chars of
+  // template, size digits and type. buf[100] would truncate mid-entry and emit
+  // invalid JSON, which is the very failure the escaping below prevents.
+  char buf[128];
   bool first = true;
   int fileCount = 0;
   bool truncated = false;
@@ -481,9 +481,14 @@ void apilistfiles()
     if (!first) httpServer.sendContent(F(","));
     first = false;
 
+    // Escape the name: a single '"' or '\' in a filename would otherwise emit invalid
+    // JSON and break the whole listing (response.json() throws, no Delete link renders,
+    // so the offending file can no longer be removed from the UI).
+    char nameEsc[64];
+    escapeJsonStringTo(dir.fileName().c_str(), nameEsc, sizeof(nameEsc));
     snprintf_P(buf, sizeof(buf),
       PSTR("{\"name\":\"%s\",\"size\":%ld,\"type\":\"%s\"}"),
-      dir.fileName().c_str(), (long)dir.fileSize(),
+      nameEsc, (long)dir.fileSize(),
       dir.isDirectory() ? "dir" : "file");
     httpServer.sendContent(buf);
     fileCount++;
@@ -494,6 +499,7 @@ void apilistfiles()
   LittleFS.info(fsInfo);
   if (!first) httpServer.sendContent(F(","));
   unsigned long usedBytes = (unsigned long)(fsInfo.usedBytes * 1.05);
+  if (usedBytes > fsInfo.totalBytes) usedBytes = fsInfo.totalBytes;  // clamp: the 5% margin can exceed total, and the subtraction below is 32-bit unsigned
   unsigned long freeBytes = fsInfo.totalBytes - usedBytes;
   snprintf_P(buf, sizeof(buf),
     PSTR("{\"usedBytes\":%lu,\"totalBytes\":%lu,\"freeBytes\":%lu,\"truncated\":%s}"),
@@ -520,25 +526,40 @@ bool handleFile(String&& path)
   }
   if (!LittleFS.exists("/FSexplorer.html")) httpServer.send_P(200, PSTR("text/html; charset=UTF-8"), Helper); //Upload the FSexplorer.html
   if (path.endsWith("/")) path += F("index.html");
+  // ADR-056 sec.1: settings.ini holds httppasswd + MQTTpasswd in cleartext, so this read
+  // path is inside the protected boundary, not the unprotected read carve-out. Compare
+  // BEFORE contentType() below, which rewrites `path` in place into the MIME string.
+  if (strcasecmp_P(path.c_str(), PSTR(SETTINGS_FILE)) == 0 && !checkHttpAuth()) {
+    return true;  // 401/403 already sent; returning false would make onNotFound double-send a 404
+  }
   return LittleFS.exists(path) ? ({File f = LittleFS.open(path, "r"); streamFileGuarded(f, contentType(path)); f.close(); true;}) : false;
 
 } // handleFile()
 
 
 //=====================================================================================
-void handleFileUpload() 
+static bool isSameOriginRequest();   // ADR-054 CSRF check, defined in restAPI.ino
+
+void handleFileUpload()
 {
   static File fsUploadFile;
   static bool uploadAuthorized = true;
+  static bool uploadOk = false;   // did this upload actually reach the filesystem?
   HTTPUpload& upload = httpServer.upload();
-  if (upload.status == UPLOAD_FILE_START) 
+  if (upload.status == UPLOAD_FILE_START)
   {
-    // Check auth by reading headers only - does NOT send a response.
-    // If auth is required and fails, skip the file open so nothing is written.
-    uploadAuthorized = (settings.sHTTPpasswd[0] == '\0' || httpServer.authenticate("admin", settings.sHTTPpasswd));
+    // Reset BEFORE the auth early-return: these are statics, so without the reset a
+    // previous request's outcome would decide this one's response.
+    uploadOk = false;
+    // Check auth + same origin by reading headers only - does NOT send a response.
+    // If the check fails, skip the file open so nothing is written. The origin test
+    // belongs here, not in the completion handler: that one only runs after the whole
+    // body has been parsed, i.e. after the file was already truncated and written.
+    uploadAuthorized = (settings.sHTTPpasswd[0] == '\0' ||
+                        (httpServer.authenticate("admin", settings.sHTTPpasswd) && isSameOriginRequest()));
     if (!uploadAuthorized) return;
 
-    if (upload.filename.length() > 30) 
+    if (upload.filename.length() > 30)
     {
       upload.filename = upload.filename.substring(upload.filename.length() - 30, upload.filename.length());  // Dateinamen auf 30 Zeichen kürzen
     }
@@ -547,29 +568,39 @@ void handleFileUpload()
         path = httpServer.arg("path");
         if (!path.endsWith("/")) path += F("/");
     }
-    String filename = path + httpServer.urlDecode(upload.filename);
+    // No urlDecode: RFC 7578 sec.4.2 filename= is a literal basename, not a
+    // percent-encoded token. Decoding it turned '+' into a space and truncated
+    // the name at any '%'.
+    String filename = path + upload.filename;
     if(filename.startsWith("//")) filename = filename.substring(1);
-    
+
     DebugT(F("FileUpload Name: ")); Debugln(filename);
     fsUploadFile = LittleFS.open(filename, "w");
-  } 
-  else if (upload.status == UPLOAD_FILE_WRITE) 
+    uploadOk = (bool)fsUploadFile;
+  }
+  else if (upload.status == UPLOAD_FILE_WRITE)
   {
     DebugT(F("FileUpload Data: ")); Debugln((String)upload.currentSize);
-    if (fsUploadFile)
-      fsUploadFile.write(upload.buf, upload.currentSize);
-  } 
-  else if (upload.status == UPLOAD_FILE_END) 
+    // uploadAuthorized in the gate: an aborted upload leaves fsUploadFile open (there is
+    // no UPLOAD_FILE_ABORTED branch), and an unauthenticated request would otherwise
+    // write straight through that stale handle.
+    if (uploadAuthorized && fsUploadFile) {
+      // write() returns 0 on error and the full count on success, so != is a real short write.
+      if (fsUploadFile.write(upload.buf, upload.currentSize) != upload.currentSize) uploadOk = false;
+    }
+  }
+  else if (upload.status == UPLOAD_FILE_END)
   {
     if (fsUploadFile)
       fsUploadFile.close();
     if (uploadAuthorized) {
       DebugT(F("FileUpload Size: ")); Debugln((String)upload.totalSize);
-      httpServer.sendContent(Header);
+      if (uploadOk) httpServer.sendContent(Header);
+      else          httpServer.sendContent(UploadFailed);
     }
   }
-  
-} // handleFileUpload() 
+
+} // handleFileUpload()
 
 
 //=====================================================================================

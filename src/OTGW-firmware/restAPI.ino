@@ -142,7 +142,11 @@ static bool isSameOriginRequest() {
 bool checkHttpAuth() {
   if (settings.sHTTPpasswd[0] == '\0') return true;  // auth disabled
 
-  if (httpServer.method() == HTTP_OPTIONS) return true;  // allow CORS preflight
+  // No OPTIONS short-circuit here on purpose: every FSexplorer route is registered with
+  // the 2-arg on(), i.e. HTTP_ANY, and the query string is parsed for OPTIONS too. An
+  // unauthenticated preflight could therefore reach /api/listfiles?delete=..., /ReBoot
+  // and /ResetWireless. Legitimate CORS preflights are answered upstream in processAPI()
+  // (sendApiOptions() -> 204) before this function is ever called.
 
   if (!httpServer.authenticate("admin", settings.sHTTPpasswd)) {
     httpServer.requestAuthentication();
