@@ -1,9 +1,11 @@
 ---
 id: TASK-1099
 title: settings.ini is served without authentication and carries the admin password
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-01 18:31'
+updated_date: '2026-09-01 18:40'
 labels:
   - audit
   - fsexplorer
