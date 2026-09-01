@@ -529,8 +529,15 @@ bool handleFile(String&& path)
   // ADR-056 sec.1: settings.ini holds httppasswd + MQTTpasswd in cleartext, so this read
   // path is inside the protected boundary, not the unprotected read carve-out. Compare
   // BEFORE contentType() below, which rewrites `path` in place into the MIME string.
-  if (strcasecmp_P(path.c_str(), PSTR(SETTINGS_FILE)) == 0 && !checkHttpAuth()) {
-    return true;  // 401/403 already sent; returning false would make onNotFound double-send a 404
+  {
+    // Collapse a leading "//" run first: LittleFS resolves "//settings.ini" to the same
+    // file, so a plain compare against "/settings.ini" would leave that alias as an
+    // unauthenticated bypass (verified on device).
+    const char *sp = path.c_str();
+    while (sp[0] == '/' && sp[1] == '/') sp++;
+    if (strcasecmp_P(sp, PSTR(SETTINGS_FILE)) == 0 && !checkHttpAuth()) {
+      return true;  // 401/403 already sent; returning false would make onNotFound double-send a 404
+    }
   }
   return LittleFS.exists(path) ? ({File f = LittleFS.open(path, "r"); streamFileGuarded(f, contentType(path)); f.close(); true;}) : false;
 
