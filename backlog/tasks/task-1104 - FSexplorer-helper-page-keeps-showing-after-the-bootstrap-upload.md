@@ -1,9 +1,11 @@
 ---
 id: TASK-1104
 title: FSexplorer helper page keeps showing after the bootstrap upload
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-01 18:37'
+updated_date: '2026-09-01 18:41'
 labels:
   - audit
   - fsexplorer
