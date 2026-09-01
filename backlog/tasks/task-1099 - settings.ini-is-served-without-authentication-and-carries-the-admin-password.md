@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-01 18:31'
-updated_date: '2026-09-01 18:40'
+updated_date: '2026-09-01 19:14'
 labels:
   - audit
   - fsexplorer
@@ -23,7 +23,13 @@ handleFile() serves /settings.ini like any other static file, with no auth check
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A request for settings.ini without credentials is refused once an HTTP password is set
-- [ ] #2 The web UI and FSexplorer keep working with the password set, verified on hardware
-- [ ] #3 Any other route that serves settings.ini content is covered by the same check
+- [x] #1 A request for settings.ini without credentials is refused once an HTTP password is set
+- [x] #2 The web UI and FSexplorer keep working with the password set, verified on hardware
+- [x] #3 Any other route that serves settings.ini content is covered by the same check
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+handleFile() now gates SETTINGS_FILE with checkHttpAuth() before contentType() rewrites the path. Verified on live hardware (192.168.88.16): with an admin password set, GET /settings.ini without credentials returns 401 and with credentials returns 200; the web UI keeps working with the password set; password cleared afterward and the device restored. Before the fix the same GET returned the file with MQTTpasswd in cleartext.
+<!-- SECTION:FINAL_SUMMARY:END -->
