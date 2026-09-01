@@ -1,7 +1,7 @@
 ---
 id: TASK-1096
 title: FSexplorer upload ignores current subdirectory
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-01 17:00'
