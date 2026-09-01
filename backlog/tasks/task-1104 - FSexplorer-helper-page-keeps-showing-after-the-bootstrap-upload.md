@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-01 18:37'
-updated_date: '2026-09-01 18:41'
+updated_date: '2026-09-01 19:16'
 labels:
   - audit
   - fsexplorer
@@ -21,5 +21,11 @@ The /FSexplorer and /FSexplorer.html routes are bound at boot to the result of a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 After uploading FSexplorer.html through the helper, the redirect serves the real explorer without a reboot
+- [x] #1 After uploading FSexplorer.html through the helper, the redirect serves the real explorer without a reboot
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The /FSexplorer and /FSexplorer.html routes are registered once with a per-request lambda that opens the file and falls back to the Helper page, replacing the boot-time existence latch. A bootstrap upload of FSexplorer.html now takes effect on the next GET without a reboot. Code-verified and built green; exercising it needs a device booted with an empty LittleFS, not reproducible on the provisioned bench device.
+<!-- SECTION:FINAL_SUMMARY:END -->
