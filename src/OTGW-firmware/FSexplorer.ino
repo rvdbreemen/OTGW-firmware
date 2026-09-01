@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.358
+**  Version  : v2.0.0-alpha.359
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -429,7 +429,7 @@ void apilistfiles()
   // --- Delete handler: local buffer instead of global cMsg ---
   if (hasArgCompat("delete")) {
     if (!checkHttpAuth()) return;  // 401 already sent
-    char deletePath[34];  // LittleFS paths are max 31 chars + '/' prefix + '\0'
+    char deletePath[64];  // filename is max 31 chars, but a subdirectory prefix adds to that
     strlcpy(deletePath, argCompat("delete"), sizeof(deletePath));
     // Normalize: LittleFS paths must start with '/'
     if (deletePath[0] != '/' && deletePath[0] != '\0') {
