@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-01 18:31'
-updated_date: '2026-09-01 19:17'
+updated_date: '2026-09-01 19:29'
 labels:
   - audit
   - fsexplorer
@@ -32,4 +32,6 @@ handleFile() serves /settings.ini like any other static file, with no auth check
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
 handleFile() now gates SETTINGS_FILE with checkHttpAuth() before contentType() rewrites the path. Verified on live hardware (192.168.88.16): with an admin password set, GET /settings.ini without credentials returns 401 and with credentials returns 200; the web UI keeps working with the password set; password cleared afterward and the device restored. Before the fix the same GET returned the file with MQTTpasswd in cleartext.
+
+Follow-up (commit 77797fa4): the initial gate compared against /settings.ini exactly, but //settings.ini resolves to the same file and bypassed it (verified live: 401 vs 200). Gate now collapses a leading // run, matching 2.0.0. Re-verified on hardware: /, // and /// settings.ini all 401 unauthenticated, 200 with credentials.
 <!-- SECTION:FINAL_SUMMARY:END -->
