@@ -1,0 +1,26 @@
+---
+id: TASK-1098
+title: FSexplorer free-space guard is defeated by a 32-bit underflow
+status: To Do
+assignee: []
+created_date: '2026-09-01 18:30'
+labels:
+  - audit
+  - fsexplorer
+dependencies: []
+priority: high
+ordinal: 195000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+api/listfiles reports freeBytes as fsInfo.totalBytes - (usedBytes * 1.05). Once LittleFS passes 95.238 percent full that subtraction wraps in 32-bit unsigned arithmetic and answers about 4 GB free on a 2 MB partition. FSexplorer.html uses that value as its only 'not enough space' check, so the Upload button stays enabled and the upload proceeds into a filesystem that cannot hold it. freeSpace() carries the same underflow. Found by the FSexplorer audit of 2026-09-01, finding 1 of 18.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 freeBytes never exceeds totalBytes, whatever the fill level
+- [ ] #2 The UI refuses an upload larger than the real free space on a nearly full filesystem
+- [ ] #3 freeSpace() uses the same clamped arithmetic
+<!-- AC:END -->
