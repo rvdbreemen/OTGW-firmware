@@ -1,11 +1,11 @@
 ---
 id: TASK-1102
 title: FSexplorer mishandles reserved characters in file and directory names
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-01 18:34'
-updated_date: '2026-09-01 19:16'
+updated_date: '2026-09-01 19:18'
 labels:
   - audit
   - fsexplorer
