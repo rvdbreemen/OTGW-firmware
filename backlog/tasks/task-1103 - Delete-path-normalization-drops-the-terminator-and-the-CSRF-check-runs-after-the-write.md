@@ -3,11 +3,11 @@ id: TASK-1103
 title: >-
   Delete path normalization drops the terminator, and the CSRF check runs after
   the write
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-01 18:36'
-updated_date: '2026-09-01 19:16'
+updated_date: '2026-09-01 19:18'
 labels:
   - audit
   - fsexplorer
