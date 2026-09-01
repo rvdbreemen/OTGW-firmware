@@ -383,7 +383,7 @@
                     uploadBtn.style.display = 'inline-block';
                 };
 
-                xhr.open('POST', '/upload');
+                xhr.open('POST', uploadForm.action);
                 xhr.send(formData);
              });
           });

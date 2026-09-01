@@ -436,7 +436,7 @@ void apilistfiles()
   // --- Delete handler: local buffer instead of global cMsg ---
   if (httpServer.hasArg("delete")) {
     if (!checkHttpAuth()) return;  // 401 already sent
-    char deletePath[34];  // LittleFS paths are max 31 chars + '/' prefix + '\0'
+    char deletePath[64];  // filename is max 31 chars, but a subdirectory prefix adds to that
     strlcpy(deletePath, httpServer.arg("delete").c_str(), sizeof(deletePath));
     // Normalize: LittleFS paths must start with '/'
     if (deletePath[0] != '/' && deletePath[0] != '\0') {
