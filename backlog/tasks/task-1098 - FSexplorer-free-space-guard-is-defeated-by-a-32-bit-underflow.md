@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-01 18:30'
-updated_date: '2026-09-01 18:40'
+updated_date: '2026-09-01 19:14'
 labels:
   - audit
   - fsexplorer
@@ -22,7 +22,13 @@ api/listfiles reports freeBytes as fsInfo.totalBytes - (usedBytes * 1.05). Once 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 freeBytes never exceeds totalBytes, whatever the fill level
-- [ ] #2 The UI refuses an upload larger than the real free space on a nearly full filesystem
-- [ ] #3 freeSpace() uses the same clamped arithmetic
+- [x] #1 freeBytes never exceeds totalBytes, whatever the fill level
+- [x] #2 The UI refuses an upload larger than the real free space on a nearly full filesystem
+- [x] #3 freeSpace() uses the same clamped arithmetic
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Clamped usedBytes to totalBytes before the 32-bit subtraction in apilistfiles(), so freeBytes can no longer underflow to ~4 GB above 95.2% fill. 1.x freeSpace() uses double arithmetic and was already correct, left untouched. Build and evaluator green. The 95%-full trigger cannot be reached on the bench device, so AC1/AC2 are code-and-logic verified rather than hardware-exercised; the arithmetic is now monotonic (used+free==total) by construction.
+<!-- SECTION:FINAL_SUMMARY:END -->
