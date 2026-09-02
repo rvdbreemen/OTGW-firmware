@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.360
+**  Version  : v2.0.0-alpha.361
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5223,7 +5223,14 @@ void handlePICSerial()
   if (isPICEnabled() && settings.mqtt.bLegacyPort25238Enabled) {
     //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)
     while (OTGWstream.available()){
-      outByte = OTGWstream.read();  // read from port 25238
+      // available() and read() are separate critical sections in
+      // AsyncSimpleTelnet, so the AsyncTCP task can disconnect the client and
+      // clear its RX ring in between. read() then returns -1, and narrowing
+      // that straight into outByte would hand the PIC a 0xFF that no client
+      // ever sent. Same shape as the sibling reader in OTDirect.ino.
+      int inByte = OTGWstream.read();  // read from port 25238
+      if (inByte < 0) break;
+      outByte = static_cast<uint8_t>(inByte);
       if (!state.debug.bOTGWSimulation) {
         // TASK-865.6: enqueue for the PIC task to write (no direct UART write).
         enqueuePICTx(&outByte, 1);
