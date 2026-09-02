@@ -3,9 +3,11 @@ id: TASK-1108
 title: >-
   PIC flash aborts when the WebSocket is unavailable instead of falling back to
   polling
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-02 20:42'
+updated_date: '2026-09-02 20:44'
 labels: []
 dependencies: []
 ordinal: 203000
