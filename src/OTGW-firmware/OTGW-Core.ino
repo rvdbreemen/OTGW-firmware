@@ -449,6 +449,10 @@ void setupOTConcurrency() {
   if (otTxQueue == nullptr) {
     otTxQueue = platformQueueCreate(OT_TX_QUEUE_DEPTH, sizeof(OTTxMsg));
   }
+  // TASK-1111: PIC-UART raw RX passthrough queue (task producer -> loop writer).
+  if (otRawQueue == nullptr) {
+    otRawQueue = platformQueueCreate(OT_RAW_QUEUE_DEPTH, sizeof(OTRawMsg));
+  }
 }
 
 // enqueueOTFrame — producer-side. Copy the line (null-terminated), enqueue by
@@ -477,6 +481,22 @@ bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput, uint8_t so
 static void reportPendingPICRxErrors();
 #endif
 
+// drainOTRawQueue — consumer-side of the byte-transparent 25238 passthrough
+// (TASK-1111). Pops every chunk the PIC task queued and writes the bytes
+// verbatim to OTGWstream: no line assembly, no synthesised CR/LF, so a payload
+// without a terminator and an embedded CR/LF/NUL byte both survive. Drained
+// unconditionally — the producer is the side gated on
+// settings.mqtt.bLegacyPort25238Enabled, so a chunk queued just before the
+// setting was switched off can never pin the queue full.
+void drainOTRawQueue() {
+  if (otRawQueue == nullptr) return;
+  OTRawMsg raw;
+  while (platformQueueReceive(otRawQueue, &raw, 0)) {
+    OTGWstream.write(raw.bytes, raw.len);
+    feedWatchDog();                            // bound worst-case drain time
+  }
+}
+
 // drainOTFrameQueue — consumer-side. Dequeue every pending frame and parse it
 // under the OTStateLock (writer side). Called from loop() AFTER
 // doBackgroundTasks() so it never nests with the re-entrant
@@ -489,20 +509,22 @@ void drainOTFrameQueue() {
   // single (loop) thread.
   reportPendingPICRxErrors();
 #endif
+  // TASK-1111: flush the raw passthrough first, and before the frame-queue
+  // guard below — port 25238 must keep working even if otFrameQueue failed
+  // to create. This is now the ONLY thing feeding 25238 on the PIC path, so a
+  // client sees no interleaving between a raw and a line stream.
+  drainOTRawQueue();
   if (otFrameQueue == nullptr) return;
   OTFrameMsg msg;
   while (platformQueueReceive(otFrameQueue, &msg, 0)) {
-    // PIC-only loop-side side-effects (moved off the PIC task, TASK-865.6):
-    // the LED blink and the ser2net 25238 mirror used to run producer-side in
-    // dispatchOTGWInputLine. OTDirect mirrors producer-side itself, so gate on
-    // source to avoid double-emitting OTDirect frames to 25238.
+    // PIC-only loop-side side-effect (moved off the PIC task, TASK-865.6): the
+    // LED blink, gated on source so an OTDirect frame does not blink the PIC
+    // LED. The ser2net 25238 mirror that used to sit here is gone: it emitted
+    // whole assembled lines only, so a payload without a terminator never
+    // reached the client. Port 25238 is now fed byte-for-byte by
+    // drainOTRawQueue() above (TASK-1111).
     if (msg.source == OTFRAME_SRC_PIC) {
       blinkLEDnow(LED2);
-      if (settings.mqtt.bLegacyPort25238Enabled) {
-        OTGWstream.write(reinterpret_cast<const uint8_t*>(msg.line), msg.len);
-        OTGWstream.write('\r');
-        OTGWstream.write('\n');
-      }
     }
     // processOT() acquires OTStateLock internally (writer side), covering all
     // five processOT call sites uniformly — not just this consumer. Do NOT wrap
@@ -516,6 +538,10 @@ void drainOTFrameQueue() {
 // Definitions for the TX queue (declared in OTGW-Core.h) and the dedicated
 // FreeRTOS PIC-UART task. See the header for the full design rationale.
 PlatformQueue otTxQueue = nullptr;            // raw-byte loop->task TX queue
+
+// TASK-1111: raw PIC-byte passthrough queue (task producer -> loop consumer).
+// Feeds the byte-transparent ser2net mirror on port 25238; see OTGW-Core.h.
+PlatformQueue otRawQueue = nullptr;           // raw-byte task->loop passthrough queue
 
 // TASK-865.15: loop-side park request for the resetPic() direct UART write.
 // resetPic() (vendored OTGWSerial.cpp) writes "GW=R\r" straight to the UART and
@@ -540,6 +566,9 @@ static uint32_t        otTxQueueDrops   = 0;         // diagnostic: full-TX-queu
 static volatile bool     g_picRxOverrunPending  = false;  // UART HW overrun seen
 static volatile bool     g_picRxErrorPending    = false;  // UART HW framing/parity error seen
 static volatile uint32_t g_picRxOverflowPending = 0;      // line-buffer overflows since last report
+// TASK-1111: passthrough chunks dropped on a full otRawQueue. Same contract:
+// counted in task context, reported loop-side by reportPendingPICRxErrors().
+static volatile uint32_t g_picRawDropPending    = 0;      // raw chunks dropped since last report
 #endif
 
 // enqueuePICTx — producer-side. Copy the bytes verbatim and queue by value for
@@ -588,6 +617,24 @@ void picSerialPumpUpgrade() {
   (void)OTGWSerial.available();
 }
 
+// picSerialFlushRawChunk — task-side helper for the 25238 passthrough
+// (TASK-1111). Hands one chunk to the loop consumer and reopens the buffer. A
+// full queue DROPS the chunk and bumps a counter; the reporting happens
+// loop-side (reportPendingPICRxErrors), never here in task context.
+static void picSerialFlushRawChunk(uint8_t *chunk, uint8_t &len) {
+  if (len == 0) return;
+  if (otRawQueue != nullptr) {
+    OTRawMsg raw;
+    memcpy(raw.bytes, chunk, len);
+    raw.len = len;
+    if (!platformQueueSend(otRawQueue, &raw)) {
+      // non-compound assign: volatile++ is deprecated in C++20 (-Wvolatile)
+      g_picRawDropPending = g_picRawDropPending + 1;
+    }
+  }
+  len = 0;
+}
+
 // picSerialDrainOnce — OWNER FN. The task body's single work unit: drain the RX
 // FIFO into complete CR/LF lines (enqueued onto the OTFrame queue with
 // source=PIC) and drain the TX queue out to the UART. This is the SOLE runtime
@@ -608,12 +655,34 @@ void picSerialDrainOnce() {
   static bool    discardCurrentReadLine = false;
   static uint32_t droppedReadLines = 0;
 
+  // TASK-1111: the byte-transparent 25238 passthrough. The chunk is static so
+  // it survives across task ticks: at 9600 baud (~1.04 ms/byte) with a 2 ms
+  // task tick each pass sees only 1-2 bytes, so flushing at the end of every
+  // pass would emit 1-2 byte chunks — one queue slot and one TCP segment
+  // per two bytes. Coalescing over OT_RAW_COALESCE_MS puts a whole line in one
+  // chunk. The task is the sole caller (evaluate.py UART-owner gate), so the
+  // statics need no locking.
+  static uint8_t  sRawChunk[OT_RAW_CHUNK_MAX];
+  static uint8_t  sRawChunkLen = 0;
+  static uint32_t sRawChunkOpenedMs = 0;
+
   // Detect-only (no reporting in task context): set flags, report loop-side.
   if (platformSerialHasOverrun(OTGWSerial)) g_picRxOverrunPending = true;
   if (platformSerialHasRxError(OTGWSerial)) g_picRxErrorPending   = true;
 
   while (OTGWSerial.available()) {
     uint8_t outByte = OTGWSerial.read();
+    // TASK-1111: copy to the passthrough BEFORE the line assembly below, so a
+    // byte the parser discards (the CR/LF terminator, or a line dropped after a
+    // buffer overflow) still reaches the network client verbatim. Enqueued only
+    // while the legacy port is enabled, so queue slots are not burned when
+    // nobody can be listening. A plain settings READ: no OTGWState write and no
+    // network I/O happen here in task context (ADR-123).
+    if (settings.mqtt.bLegacyPort25238Enabled) {
+      if (sRawChunkLen == 0) sRawChunkOpenedMs = millis();
+      sRawChunk[sRawChunkLen++] = outByte;
+      if (sRawChunkLen == OT_RAW_CHUNK_MAX) picSerialFlushRawChunk(sRawChunk, sRawChunkLen);
+    }
     if (outByte == '\r' || outByte == '\n') {
       if ((bytes_read == 0) && !discardCurrentReadLine) continue;
 
@@ -649,6 +718,16 @@ void picSerialDrainOnce() {
     feedWatchDog();
   }
 
+  // TASK-1111: hand the open passthrough chunk over once the coalescing window
+  // has elapsed. Checked on every task tick, not only when a byte arrives, so a
+  // trailing partial chunk — the stranded-prompt case this fix exists for
+  // — is never left sitting in the buffer. While the task is parked (flash,
+  // replay simulation) the check does not run, so those few bytes go out on the
+  // first unparked pass: late, but in order and bounded.
+  if (sRawChunkLen > 0 && (millis() - sRawChunkOpenedMs) >= OT_RAW_COALESCE_MS) {
+    picSerialFlushRawChunk(sRawChunk, sRawChunkLen);
+  }
+
   // ---- TX: drain the command/relay byte queue out to the UART --------------
   OTTxMsg tx;
   while (platformQueueReceive(otTxQueue, &tx, 0)) {
@@ -676,6 +755,8 @@ void picSerialDrainOnce() {
 // loop-side) + telnet + MQTT/WS publish. Read-and-clear; the tiny race with the
 // task setting a flag again is acceptable for diagnostics.
 #if HAS_PIC
+static uint32_t g_picRawDropTotal = 0;        // loop-side cumulative, for context
+
 static void reportPendingPICRxErrors() {
   if (g_picRxOverrunPending) {
     g_picRxOverrunPending = false;
@@ -696,6 +777,14 @@ static void reportPendingPICRxErrors() {
     char overflowCountBuf[12] = {0};
     utoa(OTcurrentSystemState.errorBufferOverflow, overflowCountBuf, 10);
     sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
+  }
+  uint32_t rawDrops = g_picRawDropPending;
+  if (rawDrops) {
+    g_picRawDropPending = 0;
+    g_picRawDropTotal += rawDrops;
+    DebugTf(PSTR("ser2net passthrough queue full: dropped %lu chunk(s), %lu total\r\n"),
+            static_cast<unsigned long>(rawDrops),
+            static_cast<unsigned long>(g_picRawDropTotal));
   }
 }
 #endif
@@ -3731,6 +3820,15 @@ static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay
   }
 
   if (haveReplayLine) {
+    // TASK-1111: the replay synthesises lines and never passes the PIC UART, so
+    // it has no raw byte stream to ride on (drainOTRawQueue). Write to the
+    // ser2net clients here, reproducing exactly what the removed loop-side line
+    // mirror used to do for simulated PIC input.
+    if (settings.mqtt.bLegacyPort25238Enabled) {
+      OTGWstream.write(reinterpret_cast<const uint8_t*>(sReplay), replayLen);
+      OTGWstream.write('\r');
+      OTGWstream.write('\n');
+    }
     dispatchOTGWInputLine(sReplay, replayLen);
     state.debug.iOTGWSimulationNextDueMs = millis() + state.debug.iOTGWSimulationIntervalMs;
     return true;

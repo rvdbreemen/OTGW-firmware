@@ -658,6 +658,49 @@ extern PlatformQueue otTxQueue;   // raw-byte producer(loop)->consumer(task) TX 
 // queue; callers never touch OTGWSerial.write() themselves.
 bool enqueuePICTx(const uint8_t *buf, size_t len);
 
+// ===== TASK-1111: byte-transparent PIC passthrough to port 25238 ==========
+//
+// The ser2net mirror used to be line-based: the loop-side frame consumer wrote
+// each assembled line followed by a synthesised CRLF. A payload that carries no
+// line terminator therefore never reached an OTmonitor client (the diagnose PIC
+// firmware declares its prompt as da "Enter test number: \032", where \032 is an
+// end-of-string sentinel that is never transmitted, so the prompt genuinely has
+// no newline), and a CR/LF/NUL inside a payload was eaten as a terminator.
+//
+// The passthrough is now a raw byte stream. It cannot be written from the PIC
+// task (ADR-123 byte-I/O-only mandate: no network I/O in task context), so it
+// crosses the task/loop seam through its own value queue, exactly like the
+// frame path: picSerialDrainOnce() copies every byte it reads into a chunk and
+// enqueues it, drainOTRawQueue() writes the chunks verbatim to OTGWstream. Line
+// assembly still runs in the task, but only to feed the OT parser — it no
+// longer gates what the network client receives.
+#define OT_RAW_CHUNK_MAX 64
+struct OTRawMsg {
+  uint8_t bytes[OT_RAW_CHUNK_MAX];  // raw PIC bytes, forwarded verbatim
+  uint8_t len;                      // payload length (1..OT_RAW_CHUNK_MAX)
+};
+static_assert(std::is_trivially_copyable<OTRawMsg>::value,
+              "OTRawMsg must be trivially copyable for value-copy FreeRTOS queue");
+
+// Depth 16 of 65-byte items (~1 KB SRAM). How much slack that buys depends on
+// how full the chunks are, so the producer coalesces on a time window instead
+// of on "the RX FIFO is momentarily empty": the task ticks every 2 ms and the
+// PIC runs at 9600 baud (~1.04 ms/byte), so an end-of-burst flush would emit
+// 1-2 byte chunks — one queue slot and one TCP segment per two bytes, and only
+// ~32 bytes of total buffering. With the window, one OT line (~11 bytes) or one
+// window's worth of a sustained stream (~29 bytes) travels as a single chunk:
+// ~16 bursts of normal traffic, or ~0.5 s of continuous 9600-baud wire time,
+// before the queue can fill. The added latency is invisible next to a prompt
+// that is currently stranded forever.
+#define OT_RAW_QUEUE_DEPTH 16
+#define OT_RAW_COALESCE_MS 30
+extern PlatformQueue otRawQueue;  // raw-byte producer(task)->consumer(loop) queue
+
+// drainOTRawQueue — consumer-side. Pops every pending chunk and writes it
+// verbatim to OTGWstream (port 25238). Runs in loop() context, called from
+// drainOTFrameQueue(); no CR/LF is ever synthesised on this path.
+void drainOTRawQueue();
+
 // startPICSerialTask — create the dedicated PIC-UART task exactly once (ADR-044),
 // called once from setup(). No-op on builds without a PIC (HAS_PIC==0): the
 // function and its single call site exist so the abstraction is unconditional,
