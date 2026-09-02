@@ -1,11 +1,11 @@
 ---
 id: TASK-1109
 title: Make the serial-to-network bridge on port 25238 binary transparent
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-02 20:53'
-updated_date: '2026-09-02 21:05'
+updated_date: '2026-09-02 21:23'
 labels: []
 dependencies: []
 ordinal: 204000
@@ -38,4 +38,14 @@ SimpleTelnet itself was checked and is already byte transparent: read()/write() 
 build.py --firmware: Build completed successfully, build/OTGW-firmware-1.7.5-beta.6+1dc3307.ino.bin fresh. evaluate.py --quick: 37 checks, 35 passed, 0 failed, health 100%.
 
 End-to-end device confirmation (a client seeing a prompt without a newline) is still pending a deploy.
+
+DEVICE-VERIFIED on 192.168.88.68 running 1.7.5-beta.6+35dd50a (firmware + filesystem deployed OTA, LegacyPort25238Enabled turned on).
+
+Raw capture of port 25238 for 22s: 98 recv() calls, 318 bytes, 69 of them NOT ending on a line terminator. Fragments such as R0 / 000 / PR / : S / =16. arrive as they come off the UART. Under the old line-buffered code a client could only ever receive whole CRLF-terminated lines, so this is a positive test that the passthrough is live.
+
+CR/LF pairs arrive intact and unduplicated, confirming no synthesised terminator on the passthrough path.
+
+Trade-off worth recording: the stream now costs more TCP segments than before (measured ~4.5 packets/s at idle OT traffic versus ~1.3/s line-buffered), because a flush happens per handleOTGW() tick rather than per line. At 9600 baud that is bounded and cheap; the 64-byte chunk only fills during a sustained burst.
+
+Primary source for the reported symptom, found by the review fan-out: diagnose.asm:1544 declares the prompt as da "Enter test number: " - the 032 is an end-of-string sentinel that is never transmitted, so the prompt genuinely carries no newline and was stranded in sRead forever while the PIC blocked in GetString.
 <!-- SECTION:NOTES:END -->
