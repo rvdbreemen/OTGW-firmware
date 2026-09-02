@@ -3159,14 +3159,17 @@ void sendOTGW(const char* buf, int len)
   } else OTGWDebugln(F("Error: Write buffer not big enough!"));
 }
 
+// Hand one complete, NUL-terminated line to the OT parser.
+// Forwarding to the ser2net clients is NOT done here: handleOTGW() passes every
+// serial byte through to OTGWstream as it arrives, so that a payload without a
+// line terminator still reaches the client and embedded CR/LF/NUL bytes survive
+// (TASK-1109). Callers that synthesise lines without going through the serial
+// read loop must write to OTGWstream themselves.
 static void dispatchOTGWInputLine(const char* buf, size_t len)
 {
   if (len == 0) return;
 
   blinkLEDnow(LED2);
-  OTGWstream.write(reinterpret_cast<const uint8_t*>(buf), len);
-  OTGWstream.write('\r');
-  OTGWstream.write('\n');
   processOT(buf, len);
 }
 
@@ -3242,6 +3245,11 @@ static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay
   }
 
   if (haveReplayLine) {
+    // Synthetic lines never pass the serial read loop, so they need their own
+    // write to the ser2net clients (see dispatchOTGWInputLine).
+    OTGWstream.write(reinterpret_cast<const uint8_t*>(sReplay), replayLen);
+    OTGWstream.write('\r');
+    OTGWstream.write('\n');
     dispatchOTGWInputLine(sReplay, replayLen);
     state.debug.iOTGWSimulationNextDueMs = millis() + state.debug.iOTGWSimulationIntervalMs;
     return true;
@@ -4594,10 +4602,12 @@ void processOT(const char *buf, int len){
 ** it can handle the other messages to, like PS=1/PS=0 etc.
 ** 
 ** Also, this code bit implements the serial 2 network (port 25238). The serial port 
-** is forwarded to port 25238, and visavera. So you can use it with OTmonitor (the 
-** original OpenTherm program that comes with the hardware). The serial port and 
-** ser2net port 25238 are both "line read" into the read buffer (coming from OTGW 
-** thru serial) and write buffer  (coming from 25238 going to serial).
+** is forwarded to port 25238, and visavera. So you can use it with OTmonitor (the
+** original OpenTherm program that comes with the hardware). Both directions are
+** byte transparent: every byte read from the serial port is passed straight to
+** port 25238, and every byte from port 25238 is written straight to the serial
+** port. Line assembly happens alongside the passthrough, purely to feed the OT
+** parser — it never gates what the network client receives (TASK-1109).
 **
 ** The write buffer (incoming from port 25238) is also line printed to the Debug (port 23).
 ** The read line buffer is per line parsed by the proces OT parser code (processOT (buf, len)).
@@ -4612,6 +4622,15 @@ void handleOTGW()
   // so 4 lines/tick easily keeps up at steady state and bounds the worst
   // case (boot dump, ser2net paste) to ~5-10ms instead of 10-50ms stalls.
   #define HANDLE_OTGW_LINES_PER_CALL 4
+  // TASK-1109: the ser2net passthrough is byte-oriented, so the line cap alone
+  // no longer bounds the serial drain — a payload that carries no terminator
+  // would run until the UART FIFO is empty. 256 bytes is ~266ms of 9600-baud
+  // wire time, well above anything one loop tick produces at steady state.
+  #define HANDLE_OTGW_BYTES_PER_CALL 256
+  // Coalescing chunk for the passthrough. A per-byte WiFiClient::write() emits
+  // one TCP segment per byte on the ESP8266 core, which a 30-byte OT line would
+  // turn into 30 packets.
+  #define OTGW_PASSTHRU_CHUNK 64
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
@@ -4649,9 +4668,27 @@ void handleOTGW()
     // in the UART RX buffer and are drained on the next doBackgroundTasks().
     // No yield() inside this loop: the static sRead/bytes_read state would
     // be clobbered if handleOTGW() re-entered via yield -> doBackgroundTasks.
+    // TASK-1109: forward every byte to the ser2net clients exactly as it comes
+    // off the wire, independent of the line assembly below. A prompt that ends
+    // without a newline reaches the client immediately, and CR/LF/NUL bytes
+    // inside a payload survive instead of being eaten as terminators. The
+    // buffer is on the stack and always flushed before returning, so a
+    // re-entrant handleOTGW() cannot inherit a half-filled chunk.
+    uint8_t passthru[OTGW_PASSTHRU_CHUNK];
+    uint8_t passthruLen = 0;
+
     uint8_t serialLinesProcessed = 0;
-    while (OTGWSerial.available() && serialLinesProcessed < HANDLE_OTGW_LINES_PER_CALL) {
+    uint16_t serialBytesProcessed = 0;
+    while (OTGWSerial.available()
+           && serialLinesProcessed < HANDLE_OTGW_LINES_PER_CALL
+           && serialBytesProcessed < HANDLE_OTGW_BYTES_PER_CALL) {
       outByte = OTGWSerial.read();
+      serialBytesProcessed++;
+      passthru[passthruLen++] = outByte;
+      if (passthruLen == sizeof(passthru)) {
+        OTGWstream.write(passthru, passthruLen);
+        passthruLen = 0;
+      }
       if (outByte == '\r' || outByte == '\n') {
         if ((bytes_read == 0) && !discardCurrentReadLine) continue;
 
@@ -4689,10 +4726,18 @@ void handleOTGW()
           sendMQTTData(F("Error_BufferOverflow"), overflowCountBuf);
           overflowsSinceLastReport = 0;
         }
-        // Drop this line until next CR/LF to avoid forwarding partial/corrupted data
+        // Drop this line until next CR/LF so the OT parser never sees a
+        // truncated message. The ser2net passthrough above is unaffected —
+        // the client still receives every byte.
         bytes_read = 0;
         discardCurrentReadLine = true;
       }
+    }
+
+    // Flush whatever is left in the coalescing buffer; nothing may survive
+    // this call (see the passthru declaration above).
+    if (passthruLen > 0) {
+      OTGWstream.write(passthru, passthruLen);
     }
   }
 

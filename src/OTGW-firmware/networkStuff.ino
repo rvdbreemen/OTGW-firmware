@@ -226,7 +226,11 @@ void refreshServicesAfterWifiReconnect() {
   startMQTT();
 
   // Drop stale WS clients from before the WiFi outage; server keeps listening.
-  doWebSocketClose();
+  // Must be disconnect(), not close(): WebSocketsServer::close() also calls
+  // _server->close() and clears _runnning, which unbinds port 81 for good —
+  // begin() is only ever called from setup(), so the OT-log stream (and the
+  // PIC flash progress that rides on it) stays dead until the next reboot.
+  doWebSocketDisconnectAll();
 }
 
 void loopWifi() {
