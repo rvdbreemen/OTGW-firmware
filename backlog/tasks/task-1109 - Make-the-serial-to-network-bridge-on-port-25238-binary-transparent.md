@@ -1,9 +1,11 @@
 ---
 id: TASK-1109
 title: Make the serial-to-network bridge on port 25238 binary transparent
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-02 20:53'
+updated_date: '2026-09-02 20:54'
 labels: []
 dependencies: []
 ordinal: 204000
