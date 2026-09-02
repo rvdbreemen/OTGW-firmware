@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-02 21:45'
-updated_date: '2026-09-02 22:01'
+updated_date: '2026-09-02 22:03'
 labels: []
 dependencies: []
 ordinal: 271000
@@ -68,4 +68,6 @@ Adapted, not copied, from commit c71a3252 on otgw-1.x.x. That branch needed two 
 Verified: node --check clean; check_design_system_drift.py reports no drift (the new class is defined, ADR-091 gate satisfied); evaluate.py --quick exit 0.
 
 Outstanding: AC #6 (build + evaluator) is unchecked - the parent session owns the build. AC #2 and #4 are checked on static evidence (setTimeout plus call-site enumeration; resolved token contrast) because no browser was reachable this session - the chrome-devtools, playwright and browser MCP servers all failed to connect.
+
+Prerelease bump deliberately deferred, not forgotten: this commit carries OTGW_BUMP_HOOK_DISABLE=1 (the bypass documented at .githooks/pre-commit line 8 and gated at line 16). bin/bump-prerelease.sh read-modify-writes every source file in the working tree, including files a second agent held open for edit at the time, so bumping from here risked losing their work. Both changes ship to the branch in one batch minutes apart, so the parent session runs a single bump covering both - one tag is the honest record of this batch, two would not be.
 <!-- SECTION:FINAL_SUMMARY:END -->
