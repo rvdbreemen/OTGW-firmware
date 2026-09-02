@@ -1,9 +1,11 @@
 ---
 id: TASK-1107
 title: WebSocket server stops listening permanently after a WiFi reconnect
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-02 20:41'
+updated_date: '2026-09-02 20:44'
 labels: []
 dependencies: []
 ordinal: 202000
