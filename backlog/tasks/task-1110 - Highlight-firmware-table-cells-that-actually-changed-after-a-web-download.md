@@ -1,9 +1,11 @@
 ---
 id: TASK-1110
 title: Highlight firmware table cells that actually changed after a web download
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-02 21:24'
+updated_date: '2026-09-02 21:25'
 labels: []
 dependencies: []
 ordinal: 205000
