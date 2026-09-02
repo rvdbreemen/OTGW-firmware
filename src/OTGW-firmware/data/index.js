@@ -5096,6 +5096,7 @@ function refreshFirmware() {
         //--- size on screen ---
         var sizDiv = document.createElement("div");
         sizDiv.setAttribute("class", "piccolumn3");
+        sizDiv.id = "firmware_size_" + files[i].name;
         sizDiv.textContent = files[i].size;
         rowDiv.appendChild(sizDiv);
         //--- refresh icon ---
@@ -5287,8 +5288,8 @@ function pollPICRefresh(name, oldVersion, iconEl, attempt) {
         return;
       }
       if (entry) {
-        var versionEl = document.getElementById('firmware_version_' + name);
-        if (versionEl) versionEl.textContent = entry.version;
+        setFirmwareCell(document.getElementById('firmware_version_' + name), entry.version);
+        setFirmwareCell(document.getElementById('firmware_size_' + name), entry.size);
       }
       if (iconEl) { iconEl.style.opacity = ''; iconEl.style.cursor = ''; }
     })
@@ -5298,6 +5299,26 @@ function pollPICRefresh(name, oldVersion, iconEl, attempt) {
     });
 }
 
+
+//============================================================================
+// Write a value into a firmware-table cell and flag it when it actually
+// changed, so a download that fetched something new is visible and a no-op
+// refresh stays quiet. The highlight clears itself; clicking again restarts
+// the timer instead of scheduling a second one.
+var FIRMWARE_CELL_HIGHLIGHT_MS = 15000;
+
+function setFirmwareCell(el, newValue) {
+  if (!el) return;
+  var next = String(newValue === undefined || newValue === null ? '' : newValue);
+  if (el.textContent === next) return;
+  el.textContent = next;
+  if (el.firmwareCellTimer) clearTimeout(el.firmwareCellTimer);
+  el.classList.add('firmware-cell-updated');
+  el.firmwareCellTimer = setTimeout(function() {
+    el.classList.remove('firmware-cell-updated');
+    el.firmwareCellTimer = null;
+  }, FIRMWARE_CELL_HIGHLIGHT_MS);
+}
 
 //============================================================================
 // Gateway Settings panel — populated from GET /api/v2/pic/settings
@@ -8077,7 +8098,7 @@ function performFlash(filename) {
     // Start failsafe polling every 5 seconds
     startFlashPolling();
 
-    // Wait for WebSocket to be OPEN before sending flash command
+    // Give the WebSocket a moment to open so progress can stream live.
     let attempts = 0;
     const waitForWS = setInterval(() => {
         attempts++;
@@ -8085,20 +8106,20 @@ function performFlash(filename) {
         if ((otLogWS && otLogWS.readyState === 1) || attempts > 50) { // 5s timeout
              clearInterval(waitForWS);
 
-             if (!otLogWS || otLogWS.readyState !== 1) {
-                console.error("Flash aborted: WebSocket timeout");
-                if (pctText) pctText.textContent = "Error: Connection timed out. Cannot track progress.";
-                if (progressBar) progressBar.classList.add('error');
-                isFlashing = false;
-                toggleInteraction(true);
-                // Restart polling
-                startOTmonitorPolling();
-                startTimeUpdates();
-                return;
+             // ADR-025: flash progress rides on HTTP polling, which
+             // startFlashPolling() armed above. A WebSocket that never opens
+             // costs live log lines, not the flash itself, so the upgrade
+             // request goes out either way.
+             const liveLog = !!(otLogWS && otLogWS.readyState === 1);
+             if (!liveLog) {
+                console.warn("Flash: WebSocket unavailable, tracking progress via polling only");
              }
 
-             if (pctText) pctText.textContent = "Starting upgrade for " + filename + "...";
-             
+             if (pctText) {
+                pctText.textContent = "Starting upgrade for " + filename +
+                                      (liveLog ? "..." : " (progress via polling)...");
+             }
+
              fetch(localURL + '/pic?action=upgrade&name=' + filename)
                 .then(response => {
                    if (!response.ok) {

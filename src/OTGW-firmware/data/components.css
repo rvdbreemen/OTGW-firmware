@@ -1103,6 +1103,13 @@ body.dark .settings-group-body > .settingDiv > .settings-input-container,
   padding: 8px 15px;
   border: 1px solid #ddd;
   text-align: left;
+  transition: background-color 0.6s ease;
+}
+/* A cell whose value a web download actually changed. Cleared from script
+   after 15s; the transition above fades it in and back out. --status-ok-bg
+   flips with [data-theme], so one rule reads in light and dark. */
+.picrow .firmware-cell-updated {
+  background-color: var(--status-ok-bg);
 }
 .piccolumn4, .piccolumn5 {
   display: table-cell;
