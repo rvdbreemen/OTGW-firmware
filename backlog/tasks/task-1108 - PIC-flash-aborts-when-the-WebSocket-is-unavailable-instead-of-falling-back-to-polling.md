@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-02 20:42'
-updated_date: '2026-09-02 20:44'
+updated_date: '2026-09-02 21:04'
 labels: []
 dependencies: []
 ordinal: 203000
@@ -21,8 +21,16 @@ performFlash() in data/index.js (~line 5710-5731) waits up to 5s for otLogWS.rea
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The upgrade request is sent regardless of WebSocket state; a missing WebSocket degrades progress reporting to polling instead of blocking the flash
-- [ ] #2 When the WebSocket is unavailable the UI says progress is tracked via polling, not that the operation failed
-- [ ] #3 When the WebSocket is available it is still used for live progress, with polling as the failsafe
+- [x] #1 The upgrade request is sent regardless of WebSocket state; a missing WebSocket degrades progress reporting to polling instead of blocking the flash
+- [x] #2 When the WebSocket is unavailable the UI says progress is tracked via polling, not that the operation failed
+- [x] #3 When the WebSocket is available it is still used for live progress, with polling as the failsafe
 - [ ] #4 Flashing a hex file on a device with port 81 closed reaches 100% and reports completion
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Proved the back-end is healthy by bypassing the gate: GET /pic?action=upgrade&name=gateway.hex on 192.168.88.68 with port 81 closed returned {"status":"started"} and the PIC went 6.6 -> 6.8 in 27s, "Result code: 0, Errors: 0, Retries: 0". Capture in scratchpad/capture-otgw68-picflash.txt. Polling on /api/v2/flash/status reported 17/37/56/76/95/100 percent throughout, so the failsafe channel alone is sufficient.
+
+AC 4 still open: needs the rebuilt LittleFS deployed to a device with port 81 closed and the flash driven from the browser.
+<!-- SECTION:NOTES:END -->
