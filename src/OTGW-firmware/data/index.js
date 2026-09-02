@@ -3459,6 +3459,7 @@ function refreshFirmware() {
         //--- size on screen ---
         var sizDiv = document.createElement("div");
         sizDiv.setAttribute("class", "piccolumn3");
+        sizDiv.id = "firmware_size_" + files[i].name;
         sizDiv.textContent = files[i].size;
         rowDiv.appendChild(sizDiv);
         //--- refresh icon ---
@@ -3483,8 +3484,8 @@ function refreshFirmware() {
             .then(function(updatedFiles) {
               var entry = updatedFiles.find(function(f) { return f.name === refreshName; });
               if (entry) {
-                var versionEl = document.getElementById('firmware_version_' + refreshName);
-                if (versionEl) versionEl.textContent = entry.version;
+                setFirmwareCell(document.getElementById('firmware_version_' + refreshName), entry.version);
+                setFirmwareCell(document.getElementById('firmware_size_' + refreshName), entry.size);
               }
               refreshImg.style.opacity = '';
               refreshImg.style.cursor = '';
@@ -3594,6 +3595,26 @@ function refreshFirmware() {
 
 }
 
+
+//============================================================================
+// Write a value into a firmware-table cell and flag it when it actually
+// changed, so a download that fetched something new is visible and a no-op
+// refresh stays quiet. The highlight clears itself; clicking again restarts
+// the timer instead of scheduling a second one.
+var FIRMWARE_CELL_HIGHLIGHT_MS = 15000;
+
+function setFirmwareCell(el, newValue) {
+  if (!el) return;
+  var next = String(newValue === undefined || newValue === null ? '' : newValue);
+  if (el.textContent === next) return;
+  el.textContent = next;
+  if (el.firmwareCellTimer) clearTimeout(el.firmwareCellTimer);
+  el.classList.add('firmware-cell-updated');
+  el.firmwareCellTimer = setTimeout(function() {
+    el.classList.remove('firmware-cell-updated');
+    el.firmwareCellTimer = null;
+  }, FIRMWARE_CELL_HIGHLIGHT_MS);
+}
 
 //============================================================================
 // Gateway Settings panel — populated from GET /api/v2/pic/settings
