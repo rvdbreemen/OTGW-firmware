@@ -1,20 +1,36 @@
 ---
 id: "ADR-038"
 title: "OpenTherm Message Data Flow Pipeline"
-status: "Accepted"
-date: "2026-02-16"
+status: "Superseded"
+date: "2026-09-03"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-095"
 ---
 # ADR-038: OpenTherm Message Data Flow Pipeline
 
 ## Status
 
-Accepted, 2026-02-16. Updated 2026-02-16 (Initial documentation of existing pattern).
+Superseded by ADR-095, 2026-09-03.
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-02-16
+    status: Accepted
+    changed_by: unknown
+    reason: Recovered from the record as it stood before this transition; this ADR predates the status_history convention. The actor was never recorded and is not guessed here.
+    changed_via: unrecorded
+  - date: 2026-09-03
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: Superseded by ADR-095
+    changed_via: adr-kit lifecycle
+```
+
 
 ## Context
 

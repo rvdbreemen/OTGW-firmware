@@ -43,7 +43,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-035 | Accepted | - | Expand the v2 API with RESTful-compliant endpoints and standardized error handling, while keeping v0 and v1 unchanged. |
 | ADR-036 | Accepted | - | Maintain a strictly ordered boot sequence in setup() with documented dependency rationale for each phase. |
 | ADR-037 | Accepted | - | Poll the PIC firmware every 30 seconds using PR=M with a 60-second hard throttle cache, and publish mode changes to M... |
-| ADR-038 | Accepted | - | Implement a synchronous fan-out pipeline where handleOTGW() reads serial data and dispatches complete lines to proces... |
+| ADR-038 | Superseded | - | Implement a synchronous fan-out pipeline where handleOTGW() reads serial data and dispatches complete lines to proces... |
 | ADR-039 | Accepted | - | Implement a 5-grid ECharts-based charting module (OTGraph) with dynamic Dallas sensor registration, dual-theme palett... |
 | ADR-040 | Accepted | - | Implement additive source-specific MQTT topics and Home Assistant discovery entries, controlled by an opt-in setting... |
 | ADR-041 | Superseded | - | Drop Path A from all automatic triggers. |
@@ -99,3 +99,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-092 | Accepted | - | Chosen option: Option A. |
 | ADR-093 | Superseded | `src/OTGW-firmware/**`, `src/OTGW-firmware/MQTTstuff.ino`, `src/OTGW-firmware/dhwWaterMeter.ino` | Chosen option: Option A, because it delivers the same user-visible outcome as ADR-090 (a working Energy dashboard fig... |
 | ADR-094 | Accepted | `src/OTGW-firmware/**`, `src/OTGW-firmware/dhwWaterMeter.ino` | Chosen option: Option A, because a reader who lands on ADR-093 through the index has no way to know that six of its c... |
+| ADR-095 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option A, because the defect was never a disagreement about the right behaviour. |

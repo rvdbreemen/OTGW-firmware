@@ -1156,8 +1156,8 @@
       "title": "OpenTherm Message Data Flow Pipeline",
       "path": "ADR-038-opentherm-data-flow-pipeline.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2026-02-16",
+      "status": "Superseded",
+      "date": "2026-09-03",
       "decision_summary": "Implement a synchronous fan-out pipeline where handleOTGW() reads serial data and dispatches complete lines to proces...",
       "topics": [],
       "aliases": [],
@@ -1179,7 +1179,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-095"
       }
     },
     {
@@ -3144,6 +3144,81 @@
         ],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-095",
+      "title": "OpenTherm data flow pipeline with an enforced byte-transparent serial bridge",
+      "path": "ADR-095-opentherm-data-flow-pipeline-with-an-enforced-byte-transparent-serial-bridge.md",
+      "format": "madr",
+      "status": "Accepted",
+      "date": "2026-09-03",
+      "decision_summary": "Chosen option: Option A, because the defect was never a disagreement about the right behaviour.",
+      "topics": [
+        "binary-transparency",
+        "data-flow",
+        "fan-out",
+        "ser2net",
+        "serial-bridge"
+      ],
+      "aliases": [
+        "OpenTherm message pipeline",
+        "OTmonitor bridge",
+        "port 25238",
+        "serial to network bridge"
+      ],
+      "components": [
+        "dispatchOTGWInputLine",
+        "handleOTGW",
+        "OTGWstream",
+        "processOT"
+      ],
+      "symbols": [
+        "HANDLE_OTGW_BYTES_PER_CALL",
+        "HANDLE_OTGW_LINES_PER_CALL",
+        "OTGW_PASSTHRU_CHUNK"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Forward every byte read from the PIC serial port to OTGWstream verbatim, independent of any line assembly.",
+          "Preserve carriage return, line feed, NUL and every byte above 0x7F exactly as received on the forwarding path.",
+          "Flush any coalescing buffer before the serial reader returns, so no byte outlives the call that read it.",
+          "Bound the serial drain by a byte cap as well as a line cap, because a payload without terminators no longer reaches the line cap.",
+          "Keep feeding complete, NUL-terminated lines to processOT() for decoding.",
+          "Give any producer that synthesises lines without passing through the serial reader, such as the simulation replay path, its own write to OTGWstream."
+        ],
+        "must_not": [
+          "Gate a forwarded byte on the arrival of a line terminator.",
+          "Synthesise, translate or normalise a line terminator on the forwarding path.",
+          "Withhold from the network client a line that the parser rejects for its own reasons, such as a buffer overflow.",
+          "Hold coalesced bytes in state that survives the serial reader, which would let a re-entrant call inherit a partial chunk."
+        ],
+        "exceptions": [
+          "The OT-Direct bridge writes synthesised lines to port 25238 because it decodes frames itself and has no raw byte stream to forward. Byte transparency is undefined there and this contract does not apply to it.",
+          "The telnet debug console on port 23 is a human-facing line protocol, not a data bridge, and is out of scope."
+        ],
+        "verification": [
+          "Source anchor: OTGWPASSTHRUCHUNK in src/OTGW-firmware/OTGW-Core.ino, checked by the Enforcement block below.",
+          "Field check: connect a raw TCP client to port 25238 and confirm that reads arrive mid-line rather than one whole line per read."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/OTGW-Core.ino"
+        ]
+      },
+      "metadata": {
+        "binding": true,
+        "gate": "OTGW_PASSTHRU_CHUNK",
+        "documents_shipped": true,
+        "verified_in": [
+          "src/OTGW-firmware/OTGW-Core.ino"
+        ],
+        "supersedes": [
+          "ADR-038"
+        ],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -3997,6 +4072,12 @@
       "source": "ADR-038",
       "target": "ADR-031",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-038",
+      "target": "ADR-095",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -5556,6 +5637,30 @@
     {
       "source": "ADR-094",
       "target": "ADR-093",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-095",
+      "target": "ADR-010",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-095",
+      "target": "ADR-016",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-095",
+      "target": "ADR-038",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-095",
+      "target": "ADR-038",
       "type": "supersedes",
       "resolved": true
     }
