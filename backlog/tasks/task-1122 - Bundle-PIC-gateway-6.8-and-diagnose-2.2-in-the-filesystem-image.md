@@ -1,9 +1,11 @@
 ---
 id: TASK-1122
 title: Bundle PIC gateway 6.8 and diagnose 2.2 in the filesystem image
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-03 21:22'
+updated_date: '2026-09-03 21:27'
 labels:
   - bug
 dependencies: []
