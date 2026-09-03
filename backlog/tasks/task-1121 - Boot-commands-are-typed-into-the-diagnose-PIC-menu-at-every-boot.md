@@ -1,11 +1,11 @@
 ---
 id: TASK-1121
 title: Boot commands are typed into the diagnose PIC menu at every boot
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-03 20:17'
-updated_date: '2026-09-03 21:54'
+updated_date: '2026-09-03 21:55'
 labels:
   - bug
 dependencies: []
@@ -52,3 +52,20 @@ The first attempt at this fix gated inside sendOTGWbootcmd() while leaving the c
 
 AC #2 is verified by mechanism rather than on a gateway PIC: the same one-shot path is proven to fire and to have a resolved firmware type, and the gate is negative, so a non-diagnose PIC cannot be skipped.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Boot commands are no longer typed into the diagnose PIC menu.
+
+The diagnose image is a menu that reads single keystrokes, so the default GW=1 boot command arrived as G, W, =, 1 and CR and selected menu entries at every boot. Reported by Schelte Bron, author of the PIC firmware.
+
+Changes:
+- sendOTGWbootcmd() (OTGW-Core.ino) returns early when OTGWSerial.firmwareType() == FIRMWARE_DIAG. The polarity is negative on purpose: firmwareType() starts at FIRMWARE_UNKNOWN, so an unidentified PIC still gets its boot commands and only a confirmed diagnose PIC is spared. A positive isGatewayFirmware() test would fail closed and drop boot commands on a gateway whose banner was missed. The typed accessor is used rather than state.pic.sType, a char[32] whose == is a pointer comparison.
+- The call moved out of setup() into a one-shot in doTaskEvery1s(), because in setup() there is no firmware type to test: detectPIC() stops at the bootloader ETX before the application banner. A three-second cap keeps a PIC that never sends a banner from losing its boot commands.
+- The PR=A writer at OTGW-firmware.ino:284 is documented as deliberately ungated: it only runs while the device id is unknown, which implies an unknown firmware type, so a FIRMWARE_DIAG test could never fire there, and gating the other way would disable the only automatic recovery from a failed boot probe.
+
+Tests: hardware-verified on a gateway running diagnose 2.2 (capture in the implementation notes). build.py --firmware completed successfully; evaluate.py --quick 35/37 pass, 0 failures.
+
+Risk: boot commands now go out up to three seconds later than before. They were already queued rather than written directly, and handleOTGWqueue() only drains from the same one-second task, so the change to when the PIC actually sees them is smaller than the change to when they are queued.
+<!-- SECTION:FINAL_SUMMARY:END -->
