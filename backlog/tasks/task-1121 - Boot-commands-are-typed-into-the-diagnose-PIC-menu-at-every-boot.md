@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-03 20:17'
-updated_date: '2026-09-03 20:55'
+updated_date: '2026-09-03 21:00'
 labels:
   - bug
 dependencies: []
@@ -27,3 +27,12 @@ sendOTGWbootcmd() (OTGW-Core.ino:868, worktree wt-otgw-1.x.x) guards on isPICEna
 - [ ] #4 The latent PR=A writer at OTGW-firmware.ino:284 is either gated the same way or documented as deliberately left alone, with the reason
 - [ ] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Gate sendOTGWbootcmd() (OTGW-Core.ino:868) negatively on the typed accessor: return early when OTGWSerial.firmwareType() == FIRMWARE_DIAG. Precedent for the call shape is networkStuff.ino:563, which already does firmwareType() != FIRMWARE_OTGW for the time command with the same intent.
+2. Record the polarity reasoning in the comment, because the obvious fix is the wrong one: a positive isGatewayFirmware() gate fails closed and would drop boot commands on real gateways, since at that point in setup() the type is whatever detectPIC() happened to catch.
+3. Decide AC #4 on the latent PR=A writer at OTGW-firmware.ino:284 rather than reflexively gating it, and document whichever way it goes.
+4. Build and run the evaluator.
+<!-- SECTION:PLAN:END -->
