@@ -38,12 +38,33 @@ Follow these phases in order. There are only **2 mandatory checkpoints** (marked
 
 ### Phase 0: Prepare — clean state & detect previous release
 
-1. **Ensure you are on `dev`**: `git checkout dev`
+**The release source branch is `otgw-1.x.x`, never `dev`.** Since the branch-model
+change of 2026-06-20, `dev` carries the 2.0.0 ESP32/SAT line. Merging it into
+`main` would publish an ESP32 alpha as the stable release that ESP8266 users pull
+through the flash scripts, and a published tag is immutable, so it can only be
+rolled forward, never withdrawn. That mistake was caught once, unexecuted, with
+1334 alpha commits queued behind it. If a phase below ever tells you to touch
+`dev`, the skill is wrong and you stop.
+
+The 1.x line lives in its own worktree. Run this skill FROM `wt-otgw-1.x.x`. Do
+NOT `git checkout otgw-1.x.x` inside another tree: the branch is already checked
+out in the worktree and the checkout fails.
+
+1. **Worktree preflight (every time).** Relative paths resolve against the working
+   directory, not the repo, so a tool call that lands in a sibling worktree
+   silently builds and tags the wrong branch:
+   ```bash
+   cd "$(git rev-parse --show-toplevel)"   # worktree root
+   git rev-parse --abbrev-ref HEAD          # MUST print otgw-1.x.x
+   ```
+   Anything else: stop.
 2. **Commit and push any uncommitted changes**:
-   - `git status` — if dirty: stage, commit, push
-   - `git pull` — incorporate remote changes
-   - `git push origin dev` — sync local and remote
-   - Verify: `git status` must show `nothing to commit, working tree clean`
+   - `git status` — if dirty: stage by explicit path, commit, push
+   - `git pull --ff-only origin otgw-1.x.x` — incorporate remote changes
+   - `git push origin otgw-1.x.x` — sync local and remote
+   - Verify no *tracked* modification outside the release change remains. This
+     worktree routinely carries untracked tool droppings (`graphify-out/`,
+     `.external-reviews/`); leave those untracked and never `git add -A`.
 3. **Detect the latest GitHub release**:
    ```bash
    gh release view --json tagName,name,publishedAt \
@@ -70,13 +91,13 @@ Check whether architectural changes since the previous release require new or up
    ```
    Read only the top-5 returned ADRs to check whether they cover the changes made.
 3. For each significant change not covered by an existing ADR: ask the user if a new ADR is needed.
-4. If new ADRs are needed, create them now on `dev` before proceeding.
+4. If new ADRs are needed, create them now on `otgw-1.x.x` before proceeding.
 
 **Conditional stop:** Only pause if ADRs are actually needed. Otherwise proceed automatically.
 
-### Phase 2: Stabilize dev branch
+### Phase 2: Stabilize the release branch
 
-1. Commit all open/uncommitted changes on `dev` and push to remote.
+1. Commit all open/uncommitted changes on `otgw-1.x.x` and push to remote.
 2. Run the build and filter output (R2):
    ```bash
    mkdir -p .tmp
@@ -90,19 +111,30 @@ Check whether architectural changes since the previous release require new or up
    ```bash
    git add src/OTGW-firmware/
    git commit -m "chore(release): build version.h for v<version> release prep"
-   git push origin dev
+   git push origin otgw-1.x.x
    git status --short src/OTGW-firmware/   # MUST be empty
    ```
 
 **No checkpoint.** Proceed automatically to Phase 3 on success.
 
-### Phase 3: Merge dev to main
+### Phase 3: Confirm main is behind, not divergent
 
-1. `git checkout main && git pull origin main`
-2. `git merge dev`
-3. Verify merge succeeded without conflicts.
+`main` is not the release source and is not merged into here. It is brought up to
+the release afterwards, in Phase 6. All this phase does is prove that merge will
+be trivial when it comes:
 
-**Conditional stop:** Only pause on merge conflicts.
+```bash
+git fetch origin
+git rev-list --left-right --count origin/main...origin/otgw-1.x.x
+```
+
+The left number is commits `main` has that the release branch does not. It MUST
+be `0`: the release branch is expected to contain everything already released.
+
+**Conditional stop:** a non-zero left count means `main` carries work that never
+came back to the 1.x line. Stop and reconcile before releasing, because the
+Phase 6 merge would otherwise be a real merge with conflicts on a branch users
+download from.
 
 ### Phase 4: Gather changes, contributors & generate documentation (R1, R3, R4)
 
@@ -165,7 +197,7 @@ Do NOT paste full document contents into context. The user reads the files direc
 
 Proceed directly after Phase 4 approval.
 
-1. **Commit all outstanding changes on `main`** and push.
+1. **Commit all outstanding changes on `otgw-1.x.x`** and push.
 2. **Remove pre-release from `version.h`**: comment out `_VERSION_PRERELEASE` so the build produces a clean `v<version>`. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
 3. **Run the release build (R2)**:
    ```bash
@@ -173,14 +205,16 @@ Proceed directly after Phase 4 approval.
    echo "Exit: $?"
    ```
    Fix any issues. Read `.tmp/build_release_final.log` only on failure.
-4. **Commit the FULL release build output** and push `main`.
+4. **Commit the FULL release build output** and push `otgw-1.x.x`.
    _The clean-version build rewrites `version.h`, `data/version.hash`, AND the `Version :` banner comments across ~24 source/data files. Stage the entire sweep (not just `version.h`) and confirm the tree is clean BEFORE tagging, otherwise the published tag carries stale `-beta` banners in source comments:_
    ```bash
    git add src/OTGW-firmware/
    git commit -m "chore(release): v<version> production build (remove prerelease tag)"
-   git push origin main
+   git push origin otgw-1.x.x
    git status --short   # MUST be clean (no leftover banner/build changes) before creating the tag
    ```
+   Push before creating the release. A tag targeting a commit the remote does not
+   have yet resolves to nothing.
 5. **Generate the release assets**. Releases are immutable: nothing can be attached after publishing, so all of it must be on the draft.
    ```bash
    python scripts/make_release_assets.py --version <version>
@@ -188,7 +222,7 @@ Proceed directly after Phase 4 approval.
    Writes `SHA256SUMS`, `RELEASE_ASSETS.md` and the flash-bundle zip to `build/release-assets/`, and prints the 9-asset list.
 6. **Create the draft release with every asset in one call**:
    ```bash
-   eval gh release create v<version> --target main \
+   eval gh release create v<version> --target otgw-1.x.x \
      --title "v<version> - <Short Title>" \
      --notes-file RELEASE_GITHUB_<version>.md --draft \
      "$(python scripts/make_release_assets.py --version <version> --print-gh-args)"
@@ -203,7 +237,7 @@ Proceed directly after Phase 4 approval.
 8. **Publish**: `gh release edit v<version> --draft=false --latest`
 9. **Verify the live download path**: `curl -sSI https://github.com/rvdbreemen/OTGW-firmware/releases/latest/download/SHA256SUMS | head -1` must not be a 404. This is the URL the flash scripts use.
 
-### Phase 6: Post-release, Discord announcement & sync dev
+### Phase 6: Post-release, Discord announcement, sync main & open the next cycle
 
 1. Verify release artifacts are attached to the GitHub release.
 2. Remind user to flash a device and check `GET /api/v2/device/info`.
@@ -215,23 +249,42 @@ Proceed directly after Phase 4 approval.
 **CHECKPOINT 2: Show both Discord messages to the user before sending.**
 
 4. **Send Discord messages** after approval.
-5. **Sync dev branch**:
-   - `git checkout dev && git merge main`
+5. **Bring `main` up to the published release.** This happens AFTER publication,
+   not before: the release is cut from `otgw-1.x.x`, and `main` is the record of
+   what is currently released. Phase 3 already proved this is a fast-forward.
+   ```bash
+   git push origin otgw-1.x.x:main
+   git rev-list --left-right --count origin/main...origin/otgw-1.x.x   # MUST be 0<TAB>0
+   ```
+   This advances `main` on the remote without checking it out, so the release
+   worktree never leaves its own branch. Git refuses a non-fast-forward push by
+   default, so a diverged `main` fails here instead of silently gaining a merge
+   commit. Do NOT reach for `--force`: a non-fast-forward means `main` carries
+   work that never came back to the 1.x line, which is a reconcile, not a push.
+6. **Open the next cycle on `otgw-1.x.x`**, in this order:
    - Bump `version.h`: increment patch, uncomment `_VERSION_PRERELEASE`, set to `beta`
    - Run `autoinc-semver.py` to update derived strings
    - Commit: `feat: Bump version to v<next>-beta for development`
-   - Push `dev`
+   - Push `otgw-1.x.x`
+
+   The order matters. `bin/bump-prerelease.sh` parses an existing prerelease tag
+   and cannot reopen one from a clean stable build, so the sync in step 5 must be
+   finished before this bump, never after.
+
+**`dev` is not touched by any step of this skill.** It carries the 2.0.0
+ESP32/SAT line and has its own release path.
 
 ## Phase 7: Post-publication corrections
 
 When release notes need updating after publish, do all three in the same round:
 
-1. Edit files in the repo (`RELEASE_NOTES_<version>.md`, `README.md`, `RELEASE_GITHUB_<version>.md`) on `main`.
-2. Commit and push to `main`.
+1. Edit files in the repo (`RELEASE_NOTES_<version>.md`, `README.md`, `RELEASE_GITHUB_<version>.md`) on `otgw-1.x.x`.
+2. Commit and push to `otgw-1.x.x`.
 3. Update the live GitHub release body: `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md`
-4. Merge `main` back into `dev`: `git checkout dev && git merge main && git push origin dev`
+4. Fast-forward `main` again so it keeps matching the release:
+   `git push origin otgw-1.x.x:main`
 
-Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping step 4 means the next beta cycle starts from stale release docs.
+Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping step 4 leaves `main` describing an older release than the one that is published.
 
 ## Important rules
 
@@ -251,4 +304,5 @@ Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping st
 - **Read `docs/process/RELEASE_PROCESS.md`** at the start of every release
 - **All release notes and GitHub release messages MUST be in English**
 - **No emojis** in release notes unless the existing format uses them
-- **GitHub release body is decoupled from the repo file**: after any edit to `RELEASE_GITHUB_<version>.md`, run `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md` and merge `main` back into `dev`
+- **GitHub release body is decoupled from the repo file**: after any edit to `RELEASE_GITHUB_<version>.md`, run `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md` and fast-forward `main` onto `otgw-1.x.x` again
+- **Release from `otgw-1.x.x`, then bring `main` forward.** `main` is the record of what is currently released, not the source of a release. It is never merged into the release branch, and `dev` (the 2.0.0 ESP32 line) is never merged into `main` by this skill.
