@@ -4,9 +4,27 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.4](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.4), a Home Assistant integration and OpenTherm decoding fix release.
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.5](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.5), a security and fix release. If your gateway has an admin password set, upgrade: v1.7.4 and earlier served `settings.ini`, which holds that password in cleartext, without authentication.
 
-## What's New in v1.7.4
+## What's New in v1.7.5
+
+v1.7.5 is a security and fix release for the 1.x (ESP8266) line. One breaking change versus v1.7.4: port 25238 accepts one client instead of two.
+
+- **Security: `settings.ini` was served without authentication.** It holds `httppasswd` and `MQTTpasswd` in cleartext, and the file-serving path had no auth check while every sibling operation did, so an unauthenticated client on the local network could read both credentials off a password-protected gateway and replay them. Now gated, including the `//settings.ini` alias that resolves to the same file. If your gateway has an admin password and sits on a network you do not fully trust, change that password and your MQTT password after upgrading. (TASK-1099, ADR-056)
+- **Security: a CORS preflight could reach protected routes unauthenticated**, and the same-origin check could never read its own headers, so it always passed. Both fixed, which turns origin enforcement on for every route behind `checkHttpAuth()`. The `/upload` same-origin check also ran only after the file had been written. (TASK-1100, TASK-1101, TASK-1103)
+- **Updating the PIC firmware from the web works again.** Three defects sat between the button and the PIC: the WebSocket server stopped listening for good after a single WiFi reconnect, the flash button gated the whole operation on that WebSocket and gave up before ever sending the request, and port 25238 buffered until a line terminator arrived, so a prompt carrying no newline never reached a client. All reported by Schelte Bron, author of the PIC firmware. (TASK-1107, TASK-1108, TASK-1109, ADR-095)
+- **Boot commands are no longer typed into the diagnose firmware's menu.** That image reads single keystrokes, so the default `GW=1` arrived as `G`, `W`, `=`, `1` and CR and selected menu entries at every boot. (TASK-1121)
+- **New: a cumulative DHW water total for the Home Assistant Energy dashboard.** The gateway integrates MsgID 19 itself and publishes `dhw_water_total` as an auto-discovered sensor, selectable in the Energy dashboard water section with no helper and no YAML. Nothing is published until a MsgID 19 frame has actually decoded. (GH #675, TASK-1091, ADR-093, ADR-094)
+- **The bundled PIC images are now gateway 6.8 and diagnose 2.2.** Gateway 6.8 also carries the PIC-side fix behind GH #677 and GH #678, where MsgID 24 stopped reaching the boiler after updating to PIC 6.7. (TASK-1122)
+- **Breaking: port 25238 accepts one client instead of two.** Two clients writing at once spliced their bytes into a single command stream toward the PIC. The library cannot tell a reader from a writer, so a passive second consumer is refused as well. (TASK-1115)
+
+Flash **both** firmware and filesystem. Settings are preserved.
+
+Full release notes: [RELEASE_NOTES_1.7.5.md](RELEASE_NOTES_1.7.5.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
+
+## What was new in v1.7.4
 
 v1.7.4 is a fix release for the 1.x (ESP8266) line. No breaking changes versus v1.7.2.
 
@@ -135,14 +153,21 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.7.4
+## Latest stable release: v1.7.5
 
-`v1.7.4` is the current stable release on `main`. Home Assistant entities survive a Core restart instead of sitting on "unknown", the Remeha vendor message IDs 131 to 133 decode for the first time, and four ventilation and heat-recovery topics honour their one minute heartbeat again.
+`v1.7.5` is the current stable release on `main`. It closes a credential leak (`settings.ini`, holding the admin and MQTT passwords in cleartext, was served without authentication), makes updating the PIC firmware from the web work again, and adds a cumulative hot-water total for the Home Assistant Energy dashboard. One breaking change: port 25238 accepts one client instead of two.
+
+Full release notes: [RELEASE_NOTES_1.7.5.md](RELEASE_NOTES_1.7.5.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.5)
+
+## Previous stable release: v1.7.4
+
+`v1.7.4` made Home Assistant entities survive a Core restart instead of sitting on "unknown", decoded the Remeha vendor message IDs 131 to 133 for the first time, and restored the one minute heartbeat on four ventilation and heat-recovery topics.
 
 Full release notes: [RELEASE_NOTES_1.7.4.md](RELEASE_NOTES_1.7.4.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.4)
 
-## Previous stable release: v1.7.2
+## Older stable release: v1.7.2
 
 `v1.7.2` fixed two genuine heap leaks that drained long-running devices to an out-of-memory reboot after roughly 1 to 1.5 hours (the MQTT discovery-verify retry storm, and DHCP-supplied NTP servers via option 42), plus the mDNS out-of-memory crash that was their visible symptom.
 

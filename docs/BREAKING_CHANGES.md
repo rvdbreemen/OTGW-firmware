@@ -4,6 +4,36 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.7.5
+
+### Breaking: port 25238 accepts one client instead of two (TASK-1115)
+
+The OTmonitor bridge on port 25238 now has a single connection slot. Previously it had two.
+
+The port is a bidirectional serial link, and the library underneath has no per-client stream identity: the read path serves whichever connected client happens to have data. Two clients writing at the same time spliced their bytes into a single command stream toward the PIC, so one client's partial line could concatenate with another's into a malformed command. Within one client the order always held; between clients it did not. A single slot removes that failure mode outright.
+
+**Who is affected.** The second slot existed for the "Home Assistant plus one debug consumer" case, and the library cannot tell a reader from a writer, so a passive second consumer is refused as well. If you run the Home Assistant OpenTherm Gateway integration and OTmonitor (or any second tool) against port 25238 at the same time from different addresses, the second connection is now refused.
+
+**What still works.** A reconnect from the same address takes the session over, so a client that crashed or was killed reclaims the port immediately instead of waiting for a timeout. A single client, which is the normal setup, is unaffected.
+
+**If this affects you**, report it in `#beta-testing` on Discord. Serving one writer alongside several readers is possible, but it needs a per-client read API in the library and a change to every caller, and whether that work is justified depends on how many people are in this situation.
+
+### Behaviour change: origin enforcement is now active on protected routes (TASK-1100, ADR-054, ADR-056)
+
+`collectHeaders()` registered only `If-None-Match`, so the same-origin check could never read `Origin` or `Referer` and always passed. Both headers are now collected, which turns origin enforcement on for every route that calls `checkHttpAuth()`, and a `CORS` preflight no longer short-circuits authentication on those routes.
+
+This only engages on a gateway that has an admin password set. A passwordless gateway, which is the default, is unaffected. Custom tooling that posts to a protected route from a different origin against a password-protected gateway will now receive HTTP 403.
+
+### Behaviour change: configured boot commands are sent up to three seconds later (TASK-1121)
+
+Boot commands used to be queued at the end of `setup()`. They are now queued once the PIC has identified itself, or after three seconds if it never does, so the firmware can tell a diagnose PIC (whose menu reads them as keystrokes) from a gateway. They were already queued rather than written directly to the serial port, and the queue only drains from the same one-second task, so the change to when the PIC actually sees them is smaller than the change to when they are queued.
+
+### Data change: the bundled PIC images are now gateway 6.8 and diagnose 2.2 (TASK-1122)
+
+The filesystem image shipped gateway 6.6 and diagnose 2.1 and now ships the current upstream versions. This changes only what a fresh flash starts with; it does not flash your PIC. Upgrading the PIC remains an explicit action in the web interface.
+
+---
+
 ## v1.7.4
 
 **No breaking changes versus v1.7.2.** No MQTT topic renames, no REST API removals, no settings-format changes, and no migration on upgrade. This is a Home Assistant integration and OpenTherm decoding fix release.
