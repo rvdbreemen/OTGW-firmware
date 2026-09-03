@@ -135,14 +135,17 @@ came back to the 1.x line. Stop and reconcile before releasing, because the
 Phase 5 merge would otherwise be a real merge with conflicts on a branch users
 download from.
 
-**Why the build does not happen on `main`.** Every `python build.py` rewrites
-`version.h`, `data/version.hash` and the `Version :` banner in about 24 files.
-Building on `main` would put those commits only on `main`, so it would stop
-being a strict subset of `otgw-1.x.x` and this guard would trip at the next
-release. The de-beta edit and the release build therefore both happen on
-`otgw-1.x.x`; `main` receives the finished result by fast-forward and is tagged
-there, which also satisfies the rule that a tag goes on a branch only once that
-branch demonstrably contains the release content.
+**Why the de-beta and the build happen on `main`, not here.** `otgw-1.x.x` is
+the ongoing 1.x development line, and a development line should never carry a
+stable version stamp in its history: it would read `beta.8`, then `1.7.5`, then
+`1.7.6-beta.1`. So Phase 5 moves this worktree to `main`, removes the prerelease
+stamp there, builds there, and tags there. `main` is then briefly ahead of
+`otgw-1.x.x` by the de-beta and build commits, and Phase 6 merges it back, which
+is what makes this guard true again for the next release.
+
+The build runs in this same worktree rather than a dedicated one because the
+357 MB `arduino/` toolchain is gitignored and lives here; a separate worktree
+for `main` would bootstrap it from scratch on every release.
 
 ### Phase 4: Gather changes, contributors & generate documentation (R1, R3, R4)
 
@@ -205,53 +208,59 @@ Do NOT paste full document contents into context. The user reads the files direc
 
 Proceed directly after Phase 4 approval.
 
-1. **Commit all outstanding changes on `otgw-1.x.x`** and push.
-2. **Remove pre-release from `version.h`**: comment out `_VERSION_PRERELEASE` so the build produces a clean `v<version>`. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
-3. **Run the release build (R2)**:
+1. **Commit all outstanding changes on `otgw-1.x.x`** and push. This is the last
+   step that happens on the development line: everything from here until Phase 6
+   is done on `main`.
+2. **Move this worktree to `main` and merge the release in.**
+   ```bash
+   git fetch origin
+   git checkout main
+   git pull --ff-only origin main
+   git merge otgw-1.x.x          # fast-forward, see below
+   ```
+   Working directly on `main` in this worktree is deliberate and approved: the
+   357 MB `arduino/` toolchain is gitignored and lives here, so a separate
+   worktree for `main` would have to bootstrap it on every release.
+
+   **The worktree is now off `otgw-1.x.x` until Phase 6 step 5 puts it back.**
+   That is the one window where the Phase 0 preflight would fail, and that is
+   the point: if a run aborts here, the next `/release` invocation stops on the
+   branch assertion instead of quietly building the wrong thing. If you find
+   this worktree on `main` outside a release, an earlier run died mid-flight;
+   finish or unwind it before starting anything else.
+
+   **Never `--no-ff`.** The merge must fast-forward. A merge commit would exist
+   only on `main`, and while Phase 6 merges `main` back into `otgw-1.x.x`
+   anyway, a fast-forward keeps the two branches genuinely identical instead of
+   entangling them with cross-merges every release. If it refuses to
+   fast-forward, `main` carries work that never came back to the 1.x line: stop
+   and reconcile, do not force it.
+3. **Remove the prerelease stamp**, on `main`: comment out `_VERSION_PRERELEASE`
+   so the build produces a clean `v<version>`. This is why the de-beta happens
+   here and not on `otgw-1.x.x`: a development line should never carry a stable
+   version stamp in its history.
+   Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
+4. **Run the release build (R2)**, still on `main`:
    ```bash
    python build.py 2>&1 | tee .tmp/build_release_final.log | tail -10
    echo "Exit: $?"
    ```
-   Fix any issues. Read `.tmp/build_release_final.log` only on failure.
-4. **Commit the FULL release build output** and push `otgw-1.x.x`.
-   _The clean-version build rewrites `version.h`, `data/version.hash`, AND the `Version :` banner comments across ~24 source/data files. Stage the entire sweep (not just `version.h`) and confirm the tree is clean BEFORE tagging, otherwise the published tag carries stale `-beta` banners in source comments:_
+   Fix any issues. Read `.tmp/build_release_final.log` only on failure. Do not
+   trust the exit code alone: confirm `build/*.ino.bin` and `build/*.littlefs.bin`
+   carry a fresh mtime and that the log contains `Build completed successfully`.
+5. **Commit the FULL release build output and push `main`.**
+   _The clean-version build rewrites `version.h`, `data/version.hash`, AND the
+   `Version :` banner comments across ~24 source/data files. Stage the entire
+   sweep and confirm a clean tree BEFORE tagging, otherwise the published tag
+   carries stale `-beta` banners in source comments:_
    ```bash
    git add src/OTGW-firmware/
    git commit -m "chore(release): v<version> production build (remove prerelease tag)"
-   git push origin otgw-1.x.x
-   git status --short   # MUST be clean (no leftover banner/build changes) before creating the tag
+   git push origin main
+   git status --short   # MUST be clean before creating the release
    ```
-   Push before merging. A tag targeting a commit the remote does not have yet
-   resolves to nothing.
-5. **Merge `otgw-1.x.x` into `main`.** The release is tagged on `main`, so `main`
-   must contain the finished release build first. `main` is normally checked out
-   in no worktree, and it must not be checked out in the release worktree: that
-   would move the release tree off its own branch, the hazard the Phase 0
-   preflight guards against, and an interrupted run would leave it parked on
-   `main`. Use a throwaway worktree:
-   ```bash
-   git fetch origin
-   git worktree add ../wt-release-main main
-   git -C ../wt-release-main pull --ff-only origin main
-   git -C ../wt-release-main merge otgw-1.x.x       # fast-forward, see below
-   git -C ../wt-release-main push origin main
-   git worktree remove ../wt-release-main
-   git rev-list --left-right --count origin/main...origin/otgw-1.x.x   # MUST be 0<TAB>0
-   ```
-
-   **Never `--no-ff` here.** A merge commit would live only on `main`, so `main`
-   would then be one commit ahead of `otgw-1.x.x`, the Phase 3 guard would trip
-   at the next release, and the only way to clear it would be merging `main`
-   back into the 1.x line. The release sync is one-way by design, and that one
-   cosmetic merge point costs the invariant that `main` is a strict subset of
-   the release branch, permanently. Let it fast-forward.
-
-   If the merge refuses to fast-forward, `main` carries work that never came
-   back to the 1.x line. Stop and reconcile; do not force it and do not paper
-   over it with a merge commit. If a previous run was interrupted and
-   `../wt-release-main` still exists, clear it with
-   `git worktree remove --force ../wt-release-main` before retrying: a stale
-   worktree holds the branch and blocks the next attempt.
+   Push before creating the release. A tag targeting a commit the remote does
+   not have yet resolves to nothing.
 6. **Generate the release assets**. Releases are immutable: nothing can be attached after publishing, so all of it must be on the draft.
    ```bash
    python scripts/make_release_assets.py --version <version>
@@ -286,19 +295,23 @@ Proceed directly after Phase 4 approval.
 **CHECKPOINT 2: Show both Discord messages to the user before sending.**
 
 4. **Send Discord messages** after approval.
-5. **Confirm the released state is on `otgw-1.x.x`.** Phase 5 merged the release
-   branch into `main` by fast-forward, so the two are already identical and
-   nothing needs merging back. Prove it rather than assume it:
+5. **Return this worktree to `otgw-1.x.x` and merge `main` back.** This is the
+   step that puts the released version onto the development line and restores
+   the Phase 3 invariant for the next release. It is also what returns the
+   worktree to the branch the Phase 0 preflight expects.
    ```bash
-   git fetch origin
+   git checkout otgw-1.x.x
+   git pull --ff-only origin otgw-1.x.x
+   git merge main                # brings the de-beta + release build commits over
+   git push origin otgw-1.x.x
    git rev-list --left-right --count origin/main...origin/otgw-1.x.x   # MUST be 0<TAB>0
    ```
-   A non-zero right number means work landed on `otgw-1.x.x` after the merge and
-   is NOT in the release. That is fine, it belongs to the next cycle, but check
-   it was not something you meant to ship.
+   Do not skip this. Leaving it undone means the worktree stays parked on `main`,
+   the next `/release` stops on the preflight, and the next beta cycle would be
+   opened on the wrong branch.
 6. **Reopen the next beta cycle on `otgw-1.x.x`.** Order matters:
    `bin/bump-prerelease.sh` parses an existing prerelease tag and cannot reopen
-   one from a clean stable build, so step 5 must be settled first.
+   one from a clean stable build, so step 5 must be finished first.
 
    **Ask which part to bump. Do not assume.** Release history carries both
    shapes: 1.7.0, 1.7.1, 1.7.2 and 1.7.4 are patch steps inside one minor line,
@@ -326,10 +339,18 @@ When release notes need updating after publish, do all three in the same round:
 1. Edit files in the repo (`RELEASE_NOTES_<version>.md`, `README.md`, `RELEASE_GITHUB_<version>.md`) on `otgw-1.x.x`.
 2. Commit and push to `otgw-1.x.x`.
 3. Update the live GitHub release body: `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md`
-4. Merge `otgw-1.x.x` into `main` again so it keeps matching the release, using
-   the throwaway-worktree form from Phase 6 step 5 (never `--no-ff`).
+4. Carry the same edit onto `main`, since `main` is what the published tag points
+   at and what a reader lands on from the release page:
+   ```bash
+   git checkout main && git pull --ff-only origin main
+   git merge otgw-1.x.x          # fast-forward
+   git push origin main
+   git checkout otgw-1.x.x       # ALWAYS return; the Phase 0 preflight expects it
+   ```
+   These are documentation-only edits, so they carry no version stamp and can
+   safely originate on `otgw-1.x.x`, unlike the de-beta and build commits.
 
-Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping step 4 leaves `main` describing an older release than the one that is published.
+Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping step 4 leaves `main` describing an older release than the one that is published. Forgetting the final `git checkout otgw-1.x.x` parks this worktree on `main`, which the next `/release` will refuse on the preflight.
 
 ## Important rules
 
@@ -350,5 +371,6 @@ Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping st
 - **All release notes and GitHub release messages MUST be in English**
 - **No emojis** in release notes unless the existing format uses them
 - **GitHub release body is decoupled from the repo file**: after any edit to `RELEASE_GITHUB_<version>.md`, run `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md` and merge `otgw-1.x.x` into `main` again
-- **The merge into `main` must fast-forward. Never `--no-ff`.** A merge commit exists only on `main`, leaving it ahead of the release branch, which trips the Phase 3 guard at the next release and can then only be cleared by merging `main` back into the 1.x line. The release sync is one-way; keep `main` a strict subset of `otgw-1.x.x`.
+- **Both merges must fast-forward. Never `--no-ff`.** `otgw-1.x.x` into `main` in Phase 5, and `main` back into `otgw-1.x.x` in Phase 6, are both fast-forwards by construction. A merge commit would leave the two branches permanently entangled with a cross-merge per release instead of genuinely identical.
+- **This worktree leaves `otgw-1.x.x` during Phase 5 and MUST be returned in Phase 6 step 5.** That window is deliberate: the de-beta stamp and the release build belong on `main`, not in the history of a development line. If a run aborts inside it, the worktree stays on `main` and the Phase 0 preflight of the next invocation stops on the branch assertion. That is the safety net, not a bug.
 - **Release from `otgw-1.x.x`, then bring `main` forward.** `main` is the record of what is currently released, not the source of a release. It is never merged into the release branch, and `dev` (the 2.0.0 ESP32 line) is never merged into `main` by this skill.
