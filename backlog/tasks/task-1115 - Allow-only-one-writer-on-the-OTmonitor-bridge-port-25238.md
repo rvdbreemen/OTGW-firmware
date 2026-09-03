@@ -1,9 +1,11 @@
 ---
 id: TASK-1115
 title: Allow only one writer on the OTmonitor bridge port 25238
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-03 05:05'
+updated_date: '2026-09-03 05:12'
 labels: []
 dependencies: []
 ordinal: 206000
