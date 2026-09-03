@@ -1,9 +1,11 @@
 ---
 id: TASK-1118
 title: Repoint the release skill at otgw-1.x.x and publish before merging to main
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-03 19:21'
+updated_date: '2026-09-03 19:22'
 labels: []
 dependencies: []
 ordinal: 208000
