@@ -19,6 +19,10 @@ All task ops go through **`backlog` CLI** — never edit task files direct. CLI 
 
 Full CLI reference: @.claude/backlog-cli-reference.md
 
+**CLI quirks:** `backlog task create` can hang ~2 min while still writing the file —
+verify with `ls backlog/tasks/`, do not retry. The CLI auto-commits task files, so
+they are already committed by the time you stage code.
+
 ## Task pickup (MANDATORY)
 
 Pick up any task — new or existing — **first** action before code, research, file read:
@@ -135,6 +139,11 @@ This project uses [adr-kit](https://github.com/rvdbreemen/adr-kit). All architec
 
 Authoring: `/adr-kit:adr` (or the `adr-generator` subagent).
 Pre-commit verification: `bin/adr-judge` runs declarative `Enforcement` rules at commit time. ADRs with `llm_judge: true` are reviewed in-session via `/adr-kit:judge`.
+Lifecycle commands (`adr new|propose|accept|supersede|answer`) are NOT in repo `bin/` —
+run them from the plugin cache: `python "$LOCALAPPDATA/adr-kit/marketplaces/<ver>/bin/adr"`.
+`adr accept` refuses on the clarity gate: acronyms of 3 to 5 letters need `ACRO (expansion)`
+on the same line, before first use. A title acronym can never satisfy that, so keep the
+distinct undefined ones under three.
 <!-- ADR-KIT STUB END -->
 
 ## Naming Conventions
@@ -166,13 +175,20 @@ Use `pgm_strncmp_PP()` and `pgm_read_char()` (defined in `MQTTstuff.h`) for safe
 Never pass PROGMEM pointers to `printf %s`, `MQTTclient.write()`, or `writeMqttChunk()`.
 Use `writeMqttProgmemChunk()` for PROGMEM data to MQTT.
 
-### No String class in hot paths (ADR-004)
+### No String class in hot paths (ADR-049; ADR-004 is superseded by ADR-053)
 - Use `char[]` buffers with `strlcpy`, `strncat`, `snprintf_P`
 - `String` only acceptable in setup/init code or truly one-off contexts
 - Heap fragmentation on ESP8266 is real stability concern
 
 ### No ArduinoJson — build JSON manually
 JSON output uses `snprintf_P` and helpers like `sendJsonMapEntry`. Parsing uses `parseJsonKVLine()`. ArduinoJson allocator fragments heap and streaming-discovery code (ADR-042) explicitly avoids it. Don't introduce for new JSON paths.
+
+### HA discovery table (mqtt_configuratie.cpp)
+Append new sensor rows at the END of `mqttHaSensors[]`, bump `MQTT_HA_SENSOR_COUNT`,
+and point `mqttHaSensorIndex[id]` at the new offset. Inserting mid-array shifts every
+downstream offset. A table row is enough to publish: `markAllMQTTConfigPending()`
+scans every row with no data gate, so an entity meant to appear only on first data
+needs its gate THERE too, not only in its publisher (ADR-094).
 
 ### Binary data: use memcmp_P, never strncmp_P/strstr_P (CRITICAL)
 `strncmp_P`/`strstr_P` on binary data causes Exception (2) crashes. Use:
@@ -213,7 +229,10 @@ Never flash PIC firmware over WiFi using OTmonitor — can brick PIC.
 
 ## Testing model
 
-No automated unit/integration tests exist. Validation pipeline:
+Host-compiled tests exist under `test/host/` (MSVC, run with `test\run_tests.bat`,
+currently 18 checks over jsonStuff and dhwWaterMeter). They compile the REAL `.ino`
+via `#include` against `arduino_shim.h` — emulate the platform, never the code under
+test. Everything else is unvalidated by automation. Validation pipeline:
 1. `python build.py --firmware` exits 0 (firmware compiles clean)
 2. `python evaluate.py --quick` shows no new failures (PROGMEM/safety lint)
 3. Beta build deployed via OTA; field validation in Discord `#beta-testing`
@@ -286,6 +305,9 @@ Concrete rules that override default "ask first":
 - **Other remote branches** (`feature-*` other than 2.0.0 line, `fix-*`, etc.): require explicit per-instance confirmation unless user granted standing permission for that specific branch in this same section.
 
 In doubt whether push "logical", err toward asking. Cost of one extra prompt small; cost of unwanted force-push large.
+
+Discord caps a message at 2000 characters. Beta announcements routinely exceed that —
+draft, then count before sending.
 
 ## Versioning policy
 
