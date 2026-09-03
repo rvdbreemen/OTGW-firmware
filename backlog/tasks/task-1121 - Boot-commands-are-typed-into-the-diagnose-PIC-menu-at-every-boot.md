@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-03 20:17'
-updated_date: '2026-09-03 21:00'
+updated_date: '2026-09-03 21:54'
 labels:
   - bug
 dependencies: []
@@ -21,11 +21,11 @@ sendOTGWbootcmd() (OTGW-Core.ino:868, worktree wt-otgw-1.x.x) guards on isPICEna
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Configured boot commands are not sent when the PIC runs the diagnose firmware
-- [ ] #2 Boot commands still run unchanged on a gateway PIC, including on the very first boot when the firmware type is not yet known
-- [ ] #3 The gate uses the typed OTGWSerial::firmwareType() accessor, not a string comparison against state.pic.sType
-- [ ] #4 The latent PR=A writer at OTGW-firmware.ino:284 is either gated the same way or documented as deliberately left alone, with the reason
-- [ ] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [x] #1 Configured boot commands are not sent when the PIC runs the diagnose firmware
+- [x] #2 Boot commands still run unchanged on a gateway PIC, including on the very first boot when the firmware type is not yet known
+- [x] #3 The gate uses the typed OTGWSerial::firmwareType() accessor, not a string comparison against state.pic.sType
+- [x] #4 The latent PR=A writer at OTGW-firmware.ino:284 is either gated the same way or documented as deliberately left alone, with the reason
+- [x] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -36,3 +36,19 @@ sendOTGWbootcmd() (OTGW-Core.ino:868, worktree wt-otgw-1.x.x) guards on isPICEna
 3. Decide AC #4 on the latent PR=A writer at OTGW-firmware.ino:284 rather than reflexively gating it, and document whichever way it goes.
 4. Build and run the evaluator.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Hardware-verified on the bench gateway at 192.168.88.68, which runs diagnose 2.2, with otgwcommandenable=true and otgwcommands="GW=1" set for the test and restored to false afterwards.
+
+Capture of the boot sequence on 1.7.5-beta.8+c87ea4c:
+- 07:28:20.016 fwreportinfo: Current firmware type: diagnose
+- 07:28:20.456 sendOTGWboot(889): Boot commands skipped: PIC runs diagnose firmware
+
+The banner lands 0.44s before the decision, which is the whole point of the change: from setup() the decision runs first, against FIRMWARE_UNKNOWN.
+
+The first attempt at this fix gated inside sendOTGWbootcmd() while leaving the call in setup(), which was dead code. detectPIC() stops at the bootloader ETX before the application banner, and nothing reads the port again until doBackgroundTasks() is unfenced, so firmwareType() was still FIRMWARE_UNKNOWN there. Flagged by an adversarial design review and confirmed by reading find(), resetPic(), matchBanner() and the doBackgroundTasks() call order. The call now runs once from doTaskEvery1s(), with a three-second cap.
+
+AC #2 is verified by mechanism rather than on a gateway PIC: the same one-shot path is proven to fire and to have a resolved firmware type, and the gate is negative, so a non-diagnose PIC cannot be skipped.
+<!-- SECTION:NOTES:END -->
