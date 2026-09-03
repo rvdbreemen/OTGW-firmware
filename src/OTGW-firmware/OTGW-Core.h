@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.361
+**  Version  : v2.0.0-alpha.362
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -18,13 +18,19 @@
 #include <platform.h>    // PlatformQueue/PlatformMutex + platformQueue*/platformMutex* shims (TASK-865.5)
 
 // OTGW Serial 2 network port
-// AsyncSimpleTelnet<2> in streaming mode — AsyncTCP transport (non-blocking writes).
-// Two clients: enough for HA + one debug consumer; saves heap vs <4> on lwIP 2.x.
+// AsyncSimpleTelnet<1> in streaming mode — AsyncTCP transport (non-blocking writes).
+// ONE client. This port is a bidirectional serial bridge and the library has no
+// per-client stream identity: read() returns a bare int, and available()/read()
+// serve whichever slot has data. Two clients writing at once therefore splice into
+// one PIC command stream (TASK-1116). The slot was <2> for "HA + one debug
+// consumer"; a passive second consumer is now refused too, because the library
+// cannot tell a reader from a writer. A reconnect from the same address still
+// takes over the session, so a client that crashed can reclaim the port.
 // Negotiation is forced to NEG_OFF at begin() (startPICStream): port 25238 is a RAW
 // serial bridge for OTmonitor, so binary 0xFF bytes must pass through untouched —
 // the library default NEG_REFUSE would parse/strip them as telnet IAC (TASK-866/879).
 #define OTGW_SERIAL_PORT 25238     // changed the port to original default of OTmonitor
-AsyncSimpleTelnet<2> OTGWstream(OTGW_SERIAL_PORT);
+AsyncSimpleTelnet<1> OTGWstream(OTGW_SERIAL_PORT);
 
 //Depends on the library
 #define OTGW_COMMAND_TOPIC "command"
