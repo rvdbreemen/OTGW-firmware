@@ -1,9 +1,11 @@
 ---
 id: TASK-1121
 title: Boot commands are typed into the diagnose PIC menu at every boot
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-03 20:17'
+updated_date: '2026-09-03 20:55'
 labels:
   - bug
 dependencies: []
