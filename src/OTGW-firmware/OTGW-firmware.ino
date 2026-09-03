@@ -278,6 +278,16 @@ void doTaskEvery60s(){
   // only automatic path to re-detect a real PIC and re-enable all PIC functions.
   // Writes directly to serial (bypassing the guarded command queue).
   // Banner response in processOT() sets state.pic.bAvailable = true on success.
+  //
+  // Deliberately NOT gated on firmware type, unlike sendOTGWbootcmd() (TASK-1121).
+  // On a diagnose PIC these five bytes would be menu input, but this only runs
+  // while the device id is unknown, and an unknown device id means an unknown
+  // firmware type too: firmwareType() is FIRMWARE_UNKNOWN, so a FIRMWARE_DIAG
+  // test would never fire here and would add a gate that cannot trigger. Testing
+  // the other way, refusing unless the PIC is known to be a gateway, would
+  // disable the only automatic path back from a failed boot probe and strand the
+  // device with all PIC functions off. Probing an unidentified PIC is worth one
+  // stray line in a menu that a reset clears.
   if ((strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0)
       || (strcmp_P(state.pic.sDeviceid, PSTR("no pic found")) == 0)
       || (state.pic.sDeviceid[0] == '\0')) {

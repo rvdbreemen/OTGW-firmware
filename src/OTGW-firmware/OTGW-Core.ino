@@ -868,6 +868,26 @@ void publishAllPICsettings() {
 void sendOTGWbootcmd(){
   if (!isPICEnabled()) return;
   if (!settings.otgw.bEnable) return;
+  // The diagnose PIC image is a menu that reads single keystrokes, so a boot
+  // command such as GW=1 does not arrive as a command at all: G, W, =, 1 and CR
+  // select menu entries and start tests. Skip them on a PIC identified as
+  // diagnose (TASK-1121, reported by Schelte Bron).
+  //
+  // The polarity is the point, and the obvious version is wrong. This runs from
+  // setup() (OTGW-firmware.ino:205), two lines after resetOTGW() restarts the
+  // PIC, and nothing reads the serial port again until state.bSetupComplete is
+  // set at the end of setup(). The firmware type here is therefore whatever
+  // detectPIC() happened to catch inside its find(ETX) window, which is timing
+  // dependent. A positive isGatewayFirmware() test would fail CLOSED and
+  // silently drop boot commands on real gateways. firmwareType() starts at
+  // FIRMWARE_UNKNOWN, so testing for FIRMWARE_DIAG fails OPEN: an unidentified
+  // PIC still gets its boot commands, only a confirmed diagnose PIC is spared.
+  // Typed accessor rather than state.pic.sType: that is a char[32], so == would
+  // compare pointers and never match. Same shape as networkStuff.ino:563.
+  if (OTGWSerial.firmwareType() == FIRMWARE_DIAG) {
+    OTGWDebugTln(F("Boot commands skipped: PIC runs diagnose firmware"));
+    return;
+  }
   OTGWDebugTf(PSTR("OTGW boot message = [%s]\r\n"), CSTR(settings.otgw.sCommands));
 
   // parse and execute commands
