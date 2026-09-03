@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-24 18:10'
-updated_date: '2026-08-27 18:46'
+updated_date: '2026-09-03 16:46'
 labels:
   - bug
   - needs-info
@@ -58,4 +58,10 @@ Also corrected the block comment that still claimed the bitmaps are monotonic.
 - Scope note from the same reply: this only matters for systems that act on the received room temperature, notably some WeHeat heat pumps. Most boilers are controlled through the control setpoint and ignore Tr entirely, which explains why only a few users see it.
 - Firmware-side mitigation to consider: add RT=0 to the boot command sequence so a PIC restart cannot leave the override latched. That is a workaround for a PIC defect, so weigh it against masking the upstream bug.
 - Correction to the note of 2026-08-26: the claim that 6.7 is the first hex for the P16F1847 is wrong. hvxl states all 6.x firmwares target the P16F1847 and older versions remain downloadable by version, for example https://otgw.tclcode.com/download/gateway-6.6.hex. Downgrading to compare IS therefore possible.
+
+2026-09-03 issue sweep: the reporter closed this out himself on GitHub. RonVervoort commented on 2026-08-29T21:28:11Z: "Flashing PIC to 6.8 did the job. Room Temperature is visible again in OT monitor and MQTT." An earlier comment the same evening noted that after flashing ESP beta.4 the 24W message disappeared but RT was still missing, which is consistent with the PIC being the variable rather than the ESP firmware.
+
+So the evidence now points at an outdated PIC image, not at the Tr write path in this firmware. Re-assess before spending more on it: if nothing here is actually broken, this should be closed as not-a-defect and GH #677 closed with that explanation, rather than left open at HIGH.
+
+Source: https://github.com/rvdbreemen/OTGW-firmware/issues/677
 <!-- SECTION:NOTES:END -->
