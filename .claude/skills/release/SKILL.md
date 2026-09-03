@@ -249,18 +249,38 @@ Proceed directly after Phase 4 approval.
 **CHECKPOINT 2: Show both Discord messages to the user before sending.**
 
 4. **Send Discord messages** after approval.
-5. **Bring `main` up to the published release.** This happens AFTER publication,
-   not before: the release is cut from `otgw-1.x.x`, and `main` is the record of
-   what is currently released. Phase 3 already proved this is a fast-forward.
+5. **Merge `otgw-1.x.x` into `main`.** This happens AFTER publication, not
+   before: the release is cut from `otgw-1.x.x`, and `main` is the record of
+   what is currently released. Phase 3 already proved this fast-forwards.
+
+   `main` is normally checked out in no worktree, and it must not be checked out
+   in the release worktree: that would move the release tree off its own branch,
+   the exact hazard the Phase 0 preflight guards against, and an interrupted run
+   would leave it parked on `main`. Do the merge in a throwaway worktree:
    ```bash
-   git push origin otgw-1.x.x:main
+   git fetch origin
+   git worktree add ../wt-release-main main
+   git -C ../wt-release-main pull --ff-only origin main
+   git -C ../wt-release-main merge otgw-1.x.x       # fast-forward, see below
+   git -C ../wt-release-main push origin main
+   git worktree remove ../wt-release-main
    git rev-list --left-right --count origin/main...origin/otgw-1.x.x   # MUST be 0<TAB>0
    ```
-   This advances `main` on the remote without checking it out, so the release
-   worktree never leaves its own branch. Git refuses a non-fast-forward push by
-   default, so a diverged `main` fails here instead of silently gaining a merge
-   commit. Do NOT reach for `--force`: a non-fast-forward means `main` carries
-   work that never came back to the 1.x line, which is a reconcile, not a push.
+
+   **Never `--no-ff` here.** A merge commit would live only on `main`, so `main`
+   would then be one commit ahead of `otgw-1.x.x`, the Phase 3 guard would trip
+   at the next release, and the only way to clear it would be merging `main`
+   back into the 1.x line. The release sync is one-way by design, and that one
+   cosmetic merge point costs you the invariant that `main` is a strict subset
+   of the release branch permanently. Let it fast-forward.
+
+   If the merge refuses to fast-forward, `main` carries work that never came
+   back to the 1.x line. Stop and reconcile; do not force it and do not paper
+   over it with a merge commit.
+
+   If a previous run was interrupted and `../wt-release-main` still exists,
+   remove it with `git worktree remove --force ../wt-release-main` before
+   retrying; a stale worktree holds the branch and blocks the next attempt.
 6. **Open the next cycle on `otgw-1.x.x`**, in this order:
    - Bump `version.h`: increment patch, uncomment `_VERSION_PRERELEASE`, set to `beta`
    - Run `autoinc-semver.py` to update derived strings
@@ -281,8 +301,8 @@ When release notes need updating after publish, do all three in the same round:
 1. Edit files in the repo (`RELEASE_NOTES_<version>.md`, `README.md`, `RELEASE_GITHUB_<version>.md`) on `otgw-1.x.x`.
 2. Commit and push to `otgw-1.x.x`.
 3. Update the live GitHub release body: `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md`
-4. Fast-forward `main` again so it keeps matching the release:
-   `git push origin otgw-1.x.x:main`
+4. Merge `otgw-1.x.x` into `main` again so it keeps matching the release, using
+   the throwaway-worktree form from Phase 6 step 5 (never `--no-ff`).
 
 Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping step 4 leaves `main` describing an older release than the one that is published.
 
@@ -304,5 +324,6 @@ Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping st
 - **Read `docs/process/RELEASE_PROCESS.md`** at the start of every release
 - **All release notes and GitHub release messages MUST be in English**
 - **No emojis** in release notes unless the existing format uses them
-- **GitHub release body is decoupled from the repo file**: after any edit to `RELEASE_GITHUB_<version>.md`, run `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md` and fast-forward `main` onto `otgw-1.x.x` again
+- **GitHub release body is decoupled from the repo file**: after any edit to `RELEASE_GITHUB_<version>.md`, run `gh release edit v<version> --notes-file RELEASE_GITHUB_<version>.md` and merge `otgw-1.x.x` into `main` again
+- **The merge into `main` must fast-forward. Never `--no-ff`.** A merge commit exists only on `main`, leaving it ahead of the release branch, which trips the Phase 3 guard at the next release and can then only be cleared by merging `main` back into the 1.x line. The release sync is one-way; keep `main` a strict subset of `otgw-1.x.x`.
 - **Release from `otgw-1.x.x`, then bring `main` forward.** `main` is the record of what is currently released, not the source of a release. It is never merged into the release branch, and `dev` (the 2.0.0 ESP32 line) is never merged into `main` by this skill.
