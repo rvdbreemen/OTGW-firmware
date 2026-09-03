@@ -202,7 +202,10 @@ void setup() {
   initOutputs();
   
   WatchDogEnabled(1);   // turn on watchdog
-  sendOTGWbootcmd();   
+  // Boot commands are no longer sent here; doTaskEvery1s() sends them once the
+  // PIC has identified itself. Sending from setup() would defeat the diagnose
+  // gate inside sendOTGWbootcmd(), because no banner has been read at this
+  // point and firmwareType() is still FIRMWARE_UNKNOWN (TASK-1121).
   //Blink LED2 to signal setup done
   setLed(LED1, OFF);
   blinkLED(LED2, 3, 100);
@@ -226,6 +229,21 @@ void doTaskEvery1s(){
   //== do tasks ==
   handleOTGWqueue(); //just check if there are commands to retry
   state.uptime.iSeconds++;
+
+  // Configured boot commands, sent once, deferred out of setup() (TASK-1121).
+  // sendOTGWbootcmd() skips a diagnose PIC, whose menu reads GW=1 as the five
+  // keystrokes G, W, =, 1 and CR. That gate needs a firmware type to test, and
+  // setup() has none: detectPIC() stops at the bootloader's ETX, before the
+  // application banner, and nothing reads the port again until this loop runs,
+  // so firmwareType() there is still FIRMWARE_UNKNOWN. handleOTGW() drains the
+  // banner from the receive buffer within the first ticks. The three-second cap
+  // keeps a PIC that never sends a banner from losing its boot commands.
+  static bool bBootCommandsSent = false;
+  if (!bBootCommandsSent
+      && (OTGWSerial.firmwareType() != FIRMWARE_UNKNOWN || state.uptime.iSeconds >= 3)) {
+    bBootCommandsSent = true;
+    sendOTGWbootcmd();
+  }
 
 #if HEAP_ONSET_DIAG
   // TASK-1037 diagnostic: per-second heap sampling in the onset window only.

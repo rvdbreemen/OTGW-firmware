@@ -873,13 +873,14 @@ void sendOTGWbootcmd(){
   // select menu entries and start tests. Skip them on a PIC identified as
   // diagnose (TASK-1121, reported by Schelte Bron).
   //
-  // The polarity is the point, and the obvious version is wrong. This runs from
-  // setup() (OTGW-firmware.ino:205), two lines after resetOTGW() restarts the
-  // PIC, and nothing reads the serial port again until state.bSetupComplete is
-  // set at the end of setup(). The firmware type here is therefore whatever
-  // detectPIC() happened to catch inside its find(ETX) window, which is timing
-  // dependent. A positive isGatewayFirmware() test would fail CLOSED and
-  // silently drop boot commands on real gateways. firmwareType() starts at
+  // The caller matters: this is reached from doTaskEvery1s(), not from setup(),
+  // precisely so there is a firmware type to test. In setup() there is none,
+  // because detectPIC() stops at the bootloader's ETX and the application
+  // banner is not read until the main loop runs.
+  //
+  // The polarity is the point, and the obvious version is wrong. A positive
+  // isGatewayFirmware() test would fail CLOSED and silently drop boot commands
+  // on a gateway whose banner was missed. firmwareType() starts at
   // FIRMWARE_UNKNOWN, so testing for FIRMWARE_DIAG fails OPEN: an unidentified
   // PIC still gets its boot commands, only a confirmed diagnose PIC is spared.
   // Typed accessor rather than state.pic.sType: that is a char[32], so == would
