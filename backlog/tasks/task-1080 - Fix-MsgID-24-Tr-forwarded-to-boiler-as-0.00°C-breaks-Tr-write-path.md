@@ -1,14 +1,13 @@
 ---
 id: TASK-1080
 title: 'Fix: MsgID 24 (Tr) forwarded to boiler as 0.00°C, breaks Tr write path'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-24 18:10'
-updated_date: '2026-09-03 16:46'
+updated_date: '2026-09-03 16:49'
 labels:
   - bug
-  - needs-info
 dependencies: []
 references:
   - 'https://github.com/rvdbreemen/OTGW-firmware/issues/677'
@@ -28,7 +27,7 @@ GitHub #677 (RonVervoort): after firmware update, thermostat's real room temp (M
 - [x] #2 Gateway no longer reports false Unknown-Data-Id / not-implemented for MsgID 24 when boiler acks correctly
 - [x] #3 The zeroed R-frame and the 0.00 canonical Tr are documented as NOT ESP-side defects: frame relay is the PIC's job, and canonical carrying the boiler-side worldview is ADR-069 by design
 - [x] #4 A previously persisted false unsupported bit self-heals on live traffic without the user deleting /ot-boiler.json
-- [ ] #5 RonVervoort confirms 24W no longer appears in retained otgw-firmware/boiler/unsupported_msgids
+- [x] #5 RonVervoort confirms 24W no longer appears in retained otgw-firmware/boiler/unsupported_msgids
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -64,4 +63,26 @@ Also corrected the block comment that still claimed the bitmaps are monotonic.
 So the evidence now points at an outdated PIC image, not at the Tr write path in this firmware. Re-assess before spending more on it: if nothing here is actually broken, this should be closed as not-a-defect and GH #677 closed with that explanation, rather than left open at HIGH.
 
 Source: https://github.com/rvdbreemen/OTGW-firmware/issues/677
+
+2026-09-03 closure. AC 5 was already satisfied and nobody noticed: RonVervoort reported on 2026-08-29T20:39:14Z that "After flashing to beta.4, the 24W messageID disappeared". That is the field confirmation this task was waiting for, and it confirms the self-heal works on live traffic without deleting /ot-boiler.json.
+
+ESP-side fix verified present in shipped code, not taken on trust from the notes: OTGW-Core.ino:4339 and :4350 both gate retraction on OTdata.rsptype == OTGW_BOILER, with the comment explaining why bAnswerOverride was insufficient.
+
+The remaining symptom, Tr relayed as 0.00, was never an ESP defect. hvxl (Schelte Bron, the PIC firmware author) identified it on 2026-08-25: PIC 6.7 introduced the RT command with an uninitialised variable. RT=0 means "pass on the thermostat value" and should be the default after a PIC restart but was not. PIC 6.8 fixes it upstream, which the reporter confirmed on 2026-08-29T21:28:11Z: "Flashing PIC to 6.8 did the job."
+
+Deliberately NOT doing the RT=0 boot-command mitigation that the 2026-08-27 note floated. Three reasons: PIC 6.8 fixes the defect at source so the workaround targets one superseded PIC version; RT is a legitimate feature for overriding the room temperature sent to the boiler, so issuing RT=0 on every boot would silently disable it for anyone using it on purpose; and it would mask an upstream bug in our own boot sequence forever. Users still on 6.7 have a documented one-command fix.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed the false "boiler does not implement MsgID 24" verdict, and established that the Tr=0.00 symptom underneath it was never ours.
+
+Two defects were tangled in this report. The one that was ours: the per-message-id capability bitmap treated any frame with the slave bit set as boiler evidence, so a gateway override answer could mark an id unsupported while the boiler had already acked it, and the verdict was published retained and persisted to flash with nothing that could clear it. Retraction now demands a genuine boiler frame (rsptype == OTGW_BOILER, OTGW-Core.ino:4339 and :4350) while setting stays permissive per ADR-075, so existing false entries clear themselves from live traffic. An adversarial review caught a blocking defect in the first version of that fix, where the gate tested bAnswerOverride and would have cleared truthful verdicts; that was corrected before shipping.
+
+The one that was not ours: Tr relayed to the boiler as 0.00. On classic hardware the ESP never relays OpenTherm frames, the PIC does. The PIC author identified an uninitialised RT variable introduced in PIC 6.7 and fixed in 6.8.
+
+Both halves confirmed in the field by the reporter: the 24W entry disappeared after flashing ESP beta.4, and room temperature returned after flashing PIC 6.8.
+
+No RT=0 boot-command workaround was added; the reasoning is in the notes.
+<!-- SECTION:FINAL_SUMMARY:END -->
