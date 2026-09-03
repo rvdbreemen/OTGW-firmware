@@ -3,9 +3,11 @@ id: TASK-1119
 title: >-
   Express the release sync to main as an explicit merge, without moving the
   release worktree
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-03 19:32'
+updated_date: '2026-09-03 19:33'
 labels: []
 dependencies: []
 ordinal: 209000
