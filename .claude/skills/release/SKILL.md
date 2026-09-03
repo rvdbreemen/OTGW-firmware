@@ -119,9 +119,8 @@ Check whether architectural changes since the previous release require new or up
 
 ### Phase 3: Confirm main is behind, not divergent
 
-`main` is not the release source and is not merged into here. It is brought up to
-the release afterwards, in Phase 6. All this phase does is prove that merge will
-be trivial when it comes:
+`main` is merged in Phase 5, after the release build. All this phase does is
+prove that merge will be a clean fast-forward when it comes:
 
 ```bash
 git fetch origin
@@ -133,8 +132,17 @@ be `0`: the release branch is expected to contain everything already released.
 
 **Conditional stop:** a non-zero left count means `main` carries work that never
 came back to the 1.x line. Stop and reconcile before releasing, because the
-Phase 6 merge would otherwise be a real merge with conflicts on a branch users
+Phase 5 merge would otherwise be a real merge with conflicts on a branch users
 download from.
+
+**Why the build does not happen on `main`.** Every `python build.py` rewrites
+`version.h`, `data/version.hash` and the `Version :` banner in about 24 files.
+Building on `main` would put those commits only on `main`, so it would stop
+being a strict subset of `otgw-1.x.x` and this guard would trip at the next
+release. The de-beta edit and the release build therefore both happen on
+`otgw-1.x.x`; `main` receives the finished result by fast-forward and is tagged
+there, which also satisfies the rule that a tag goes on a branch only once that
+branch demonstrably contains the release content.
 
 ### Phase 4: Gather changes, contributors & generate documentation (R1, R3, R4)
 
@@ -213,50 +221,14 @@ Proceed directly after Phase 4 approval.
    git push origin otgw-1.x.x
    git status --short   # MUST be clean (no leftover banner/build changes) before creating the tag
    ```
-   Push before creating the release. A tag targeting a commit the remote does not
-   have yet resolves to nothing.
-5. **Generate the release assets**. Releases are immutable: nothing can be attached after publishing, so all of it must be on the draft.
-   ```bash
-   python scripts/make_release_assets.py --version <version>
-   ```
-   Writes `SHA256SUMS`, `RELEASE_ASSETS.md` and the flash-bundle zip to `build/release-assets/`, and prints the 9-asset list.
-6. **Create the draft release with every asset in one call**:
-   ```bash
-   eval gh release create v<version> --target otgw-1.x.x \
-     --title "v<version> - <Short Title>" \
-     --notes-file RELEASE_GITHUB_<version>.md --draft \
-     "$(python scripts/make_release_assets.py --version <version> --print-gh-args)"
-   ```
-   Derive the short title (3-6 words) from the release theme. Examples: `v1.3.2 - File Explorer Reliability Fix`.
-7. **Verify the asset count. Mandatory gate, do not skip**:
-   ```bash
-   gh release view v<version> --json assets --jq '.assets|length'   # MUST print 9
-   gh release view v<version> --json assets --jq '.assets[].name'
-   ```
-   A missing `SHA256SUMS` breaks `flash_otgw.sh` / `flash_otgw.bat` auto-download with `EXIT_SHA_MISMATCH`. Fix the draft now; after publishing it is unfixable.
-8. **Publish**: `gh release edit v<version> --draft=false --latest`
-9. **Verify the live download path**: `curl -sSI https://github.com/rvdbreemen/OTGW-firmware/releases/latest/download/SHA256SUMS | head -1` must not be a 404. This is the URL the flash scripts use.
-
-### Phase 6: Post-release, Discord announcement, sync main & open the next cycle
-
-1. Verify release artifacts are attached to the GitHub release.
-2. Remind user to flash a device and check `GET /api/v2/device/info`.
-3. **Prepare Discord announcements**:
-   - Dutch in `#nederlandse-ondersteuning` (channel ID: `815561033036333076`)
-   - English in `#english-support` (channel ID: `931267109726593116`)
-   - Both messages include: version, summary, contributor shoutout, download link
-
-**CHECKPOINT 2: Show both Discord messages to the user before sending.**
-
-4. **Send Discord messages** after approval.
-5. **Merge `otgw-1.x.x` into `main`.** This happens AFTER publication, not
-   before: the release is cut from `otgw-1.x.x`, and `main` is the record of
-   what is currently released. Phase 3 already proved this fast-forwards.
-
-   `main` is normally checked out in no worktree, and it must not be checked out
-   in the release worktree: that would move the release tree off its own branch,
-   the exact hazard the Phase 0 preflight guards against, and an interrupted run
-   would leave it parked on `main`. Do the merge in a throwaway worktree:
+   Push before merging. A tag targeting a commit the remote does not have yet
+   resolves to nothing.
+5. **Merge `otgw-1.x.x` into `main`.** The release is tagged on `main`, so `main`
+   must contain the finished release build first. `main` is normally checked out
+   in no worktree, and it must not be checked out in the release worktree: that
+   would move the release tree off its own branch, the hazard the Phase 0
+   preflight guards against, and an interrupted run would leave it parked on
+   `main`. Use a throwaway worktree:
    ```bash
    git fetch origin
    git worktree add ../wt-release-main main
@@ -271,25 +243,78 @@ Proceed directly after Phase 4 approval.
    would then be one commit ahead of `otgw-1.x.x`, the Phase 3 guard would trip
    at the next release, and the only way to clear it would be merging `main`
    back into the 1.x line. The release sync is one-way by design, and that one
-   cosmetic merge point costs you the invariant that `main` is a strict subset
-   of the release branch permanently. Let it fast-forward.
+   cosmetic merge point costs the invariant that `main` is a strict subset of
+   the release branch, permanently. Let it fast-forward.
 
    If the merge refuses to fast-forward, `main` carries work that never came
    back to the 1.x line. Stop and reconcile; do not force it and do not paper
-   over it with a merge commit.
+   over it with a merge commit. If a previous run was interrupted and
+   `../wt-release-main` still exists, clear it with
+   `git worktree remove --force ../wt-release-main` before retrying: a stale
+   worktree holds the branch and blocks the next attempt.
+6. **Generate the release assets**. Releases are immutable: nothing can be attached after publishing, so all of it must be on the draft.
+   ```bash
+   python scripts/make_release_assets.py --version <version>
+   ```
+   Writes `SHA256SUMS`, `RELEASE_ASSETS.md` and the flash-bundle zip to `build/release-assets/`, and prints the 9-asset list.
+7. **Create the draft release with every asset in one call**, targeting `main`:
+   ```bash
+   eval gh release create v<version> --target main \
+     --title "v<version> - <Short Title>" \
+     --notes-file RELEASE_GITHUB_<version>.md --draft \
+     "$(python scripts/make_release_assets.py --version <version> --print-gh-args)"
+   ```
+   Derive the short title (3-6 words) from the release theme. Examples: `v1.3.2 - File Explorer Reliability Fix`.
+8. **Verify the asset count. Mandatory gate, do not skip**:
+   ```bash
+   gh release view v<version> --json assets --jq '.assets|length'   # MUST print 9
+   gh release view v<version> --json assets --jq '.assets[].name'
+   ```
+   A missing `SHA256SUMS` breaks `flash_otgw.sh` / `flash_otgw.bat` auto-download with `EXIT_SHA_MISMATCH`. Fix the draft now; after publishing it is unfixable.
+9. **Publish**: `gh release edit v<version> --draft=false --latest`
+10. **Verify the live download path**: `curl -sSI https://github.com/rvdbreemen/OTGW-firmware/releases/latest/download/SHA256SUMS | head -1` must not be a 404. This is the URL the flash scripts use.
 
-   If a previous run was interrupted and `../wt-release-main` still exists,
-   remove it with `git worktree remove --force ../wt-release-main` before
-   retrying; a stale worktree holds the branch and blocks the next attempt.
-6. **Open the next cycle on `otgw-1.x.x`**, in this order:
-   - Bump `version.h`: increment patch, uncomment `_VERSION_PRERELEASE`, set to `beta`
-   - Run `autoinc-semver.py` to update derived strings
-   - Commit: `feat: Bump version to v<next>-beta for development`
-   - Push `otgw-1.x.x`
+### Phase 6: Post-release, Discord announcement & reopen the next beta cycle
 
-   The order matters. `bin/bump-prerelease.sh` parses an existing prerelease tag
-   and cannot reopen one from a clean stable build, so the sync in step 5 must be
-   finished before this bump, never after.
+1. Verify release artifacts are attached to the GitHub release.
+2. Remind user to flash a device and check `GET /api/v2/device/info`.
+3. **Prepare Discord announcements**:
+   - Dutch in `#nederlandse-ondersteuning` (channel ID: `815561033036333076`)
+   - English in `#english-support` (channel ID: `931267109726593116`)
+   - Both messages include: version, summary, contributor shoutout, download link
+
+**CHECKPOINT 2: Show both Discord messages to the user before sending.**
+
+4. **Send Discord messages** after approval.
+5. **Confirm the released state is on `otgw-1.x.x`.** Phase 5 merged the release
+   branch into `main` by fast-forward, so the two are already identical and
+   nothing needs merging back. Prove it rather than assume it:
+   ```bash
+   git fetch origin
+   git rev-list --left-right --count origin/main...origin/otgw-1.x.x   # MUST be 0<TAB>0
+   ```
+   A non-zero right number means work landed on `otgw-1.x.x` after the merge and
+   is NOT in the release. That is fine, it belongs to the next cycle, but check
+   it was not something you meant to ship.
+6. **Reopen the next beta cycle on `otgw-1.x.x`.** Order matters:
+   `bin/bump-prerelease.sh` parses an existing prerelease tag and cannot reopen
+   one from a clean stable build, so step 5 must be settled first.
+
+   **Ask which part to bump. Do not assume.** Release history carries both
+   shapes: 1.7.0, 1.7.1, 1.7.2 and 1.7.4 are patch steps inside one minor line,
+   while 1.6.1 to 1.7.0 is a minor step. Patch is the common case, minor opens a
+   new feature line. This is a one-word decision that shows up in every beta tag
+   of the coming cycle, so put it to the maintainer.
+
+   Then, on `otgw-1.x.x`:
+   - Edit `version.h`: bump the agreed part, and uncomment `_VERSION_PRERELEASE`
+     so the line reads `beta.1` again
+   - Run `scripts/autoinc-semver.py` to refresh the derived `_SEMVER_*` strings
+     and the banners
+   - Verify: `grep -n "PRERELEASE\|_SEMVER_FULL" src/OTGW-firmware/version.h`
+   - Stage the whole sweep by explicit path, commit
+     `feat: bump version to v<next>-beta.1 for development`, push `otgw-1.x.x`
+   - `git status --short src/OTGW-firmware/` MUST be empty afterwards
 
 **`dev` is not touched by any step of this skill.** It carries the 2.0.0
 ESP32/SAT line and has its own release path.
