@@ -3,9 +3,10 @@ id: TASK-1120
 title: >-
   Reorder the release skill: de-beta and build on otgw-1.x.x, merge to main,
   publish from main, then reopen the next beta
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-03 19:36'
+updated_date: '2026-09-03 19:40'
 labels: []
 dependencies: []
 ordinal: 210000
@@ -19,9 +20,29 @@ Follow-up to TASK-1118 and TASK-1119, correcting the order after the maintainer 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The de-beta edit and the release build both happen on otgw-1.x.x, so main never carries a commit the release branch lacks
-- [ ] #2 main receives the release by merge, and the tag and GitHub release target main
-- [ ] #3 After publication the released state is confirmed present on otgw-1.x.x before the next cycle is opened
-- [ ] #4 The reopen step asks whether the next cycle is a patch or a minor instead of hardcoding one, and re-enables the prerelease tag
-- [ ] #5 The ordering constraint is written down: the sync must precede the bump, because bump-prerelease.sh cannot reopen a prerelease from a clean stable build
+- [x] #1 The de-beta edit and the release build both happen on otgw-1.x.x, so main never carries a commit the release branch lacks
+- [x] #2 main receives the release by merge, and the tag and GitHub release target main
+- [x] #3 After publication the released state is confirmed present on otgw-1.x.x before the next cycle is opened
+- [x] #4 The reopen step asks whether the next cycle is a patch or a minor instead of hardcoding one, and re-enables the prerelease tag
+- [x] #5 The ordering constraint is written down: the sync must precede the bump, because bump-prerelease.sh cannot reopen a prerelease from a clean stable build
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Phase 5 now runs: de-beta edit, release build, commit the full sweep, push, THEN merge otgw-1.x.x into main in a throwaway worktree, then create and publish the draft with --target main. Phase 6 no longer merges anything; it proves main and otgw-1.x.x are identical and then reopens the cycle.
+
+The reopen step asks patch-or-minor instead of hardcoding. The old text said "increment patch", which would have been wrong at 1.6.1 to 1.7.0; hardcoding minor would be wrong at 1.7.0 through 1.7.4. Both shapes appear in the published history, so it is a per-release decision and the skill puts it to the maintainer.
+
+Verified after editing: no occurrence of the old ref-push form, no "increment patch", no "sync dev" heading. Every branch operation targets otgw-1.x.x except the release itself, which targets main by design.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Reordered /release to the flow the maintainer specified: out of beta, merge to main, publish from main, then reopen the next beta on otgw-1.x.x.
+
+The substantive constraint is why the build stays on otgw-1.x.x rather than moving to main with the tag. Every build rewrites version.h, data/version.hash and the banner in about 24 files; running it on main would leave those commits only on main, so main would stop being a strict subset of the release branch and the Phase 3 guard would trip at the next release. Building on otgw-1.x.x and letting main fast-forward to the finished result satisfies the requested order, keeps the release sync one-way, and still tags a branch that demonstrably contains the release.
+
+The reopen step now asks whether the next cycle is a patch or a minor. The previous text hardcoded patch, which the 1.6.1 to 1.7.0 step contradicts, and hardcoding minor would contradict 1.7.0 through 1.7.4. It is a per-release call that propagates into every beta tag of the cycle.
+<!-- SECTION:FINAL_SUMMARY:END -->
