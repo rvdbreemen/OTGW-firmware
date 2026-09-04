@@ -261,6 +261,11 @@ function stopPICsettingsRefreshTimer() {
   }
 }
 
+// Poll periods, named so the 429 re-phase below can draw its delay from the
+// same number the timer runs on.
+var OTMONITOR_POLL_MS  = 2000;
+var TIMEUPDATE_POLL_MS = 5000;
+
 function startOTmonitorPolling() {
   if (!isMainPageActive()) {
     return;
@@ -270,7 +275,7 @@ function startOTmonitorPolling() {
     // fastest-moving values (RelModLevel, TrOverride, TSet, Tboiler) change once
     // every 5 to 6 seconds, so 1 Hz returned five identical payloads per real
     // change. Every open page costs the gateway this poll forever.
-    tid = setInterval(function () { refreshOTmonitor(); }, 2000);
+    tid = setInterval(function () { refreshOTmonitor(); }, OTMONITOR_POLL_MS);
   }
 }
 
@@ -281,13 +286,59 @@ function stopOTmonitorPolling() {
   }
 }
 
+// TASK-1090: break a phase lock after a 429.
+//
+// The gateway grants one request per second per endpoint (ADR-086). setInterval
+// keeps a fixed phase, so two dashboards opened at the same moment poll at the
+// same instants forever: one wins every window and the other is refused every
+// window. Skipping the cycle quietly, which is what the catch handlers used to
+// do on their own, leaves that arrangement exactly as it was.
+//
+// Re-arming the timer after a delay drawn uniformly from one full period gives
+// the loser a uniformly random phase, so it lands outside the winner's window
+// with probability (period - 1s) / period: 50% per attempt at the 2 second
+// poll, 80% at the 5 second one, and every further refusal draws again. The
+// cost is bounded by exactly one skipped cycle, which is what a 429 already
+// cost before this.
+function rephaseDelayMs(periodMs) {
+  return Math.floor(Math.random() * periodMs);
+}
+
+function rephaseOTmonitorPolling() {
+  if (!tid) return;                    // not polling; nothing to re-phase
+  clearInterval(tid);
+  tid = 0;
+  setTimeout(function () {
+    if (tid) return;                   // something restarted polling while we waited
+    if (flashModeActive) return;       // flash mode stops polling deliberately
+    if (!isPageVisible()) return;      // tab hidden; visibilitychange owns the restart
+    startOTmonitorPolling();           // re-checks isMainPageActive() itself
+  }, rephaseDelayMs(OTMONITOR_POLL_MS));
+}
+
+function rephaseTimeUpdates() {
+  if (!timeupdate) return;
+  clearInterval(timeupdate);
+  timeupdate = null;
+  setTimeout(function () {
+    if (timeupdate) return;
+    if (flashModeActive) return;
+    if (!isPageVisible()) return;
+    // startTimeUpdates() is deliberately not main-page scoped: exitFlashMode()
+    // and page load both call it from elsewhere, so isMainPageActive() must not
+    // gate this one. The local 1 Hz device clock is guarded inside
+    // startDeviceClock() and keeps running throughout.
+    startTimeUpdates();
+  }, rephaseDelayMs(TIMEUPDATE_POLL_MS));
+}
+
 function startTimeUpdates() {
   startDeviceClock();   // 1 Hz display, no network
   if (!timeupdate) {
     // 5s: what is left in this response is heap, status message, PS mode and the
     // simulation flag, none of which need sub-5-second freshness. The clock now
     // ticks locally, so nothing here is time-critical.
-    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, 5000);
+    timeupdate = setInterval(function () { refreshDevTime(); refreshGatewayMode(false); }, TIMEUPDATE_POLL_MS);
   }
 }
 
@@ -3295,7 +3346,9 @@ function refreshDevTime() {
       renderBottomMessage();
     })
     .catch(function (error) {
-      if (error && error.status === 429) return;  // gateway pacing us, not a failure
+      // Gateway pacing us, not a failure. Re-phase so a second dashboard in
+      // lockstep with us stops losing every window (TASK-1090).
+      if (error && error.status === 429) { rephaseTimeUpdates(); return; }
       var p = document.createElement('p');
       p.appendChild(
         document.createTextNode('Error: ' + error.message)
@@ -4219,8 +4272,9 @@ function refreshOTmonitor() {
     .catch(function (error) {
       if (flashModeActive || !isPageVisible()) return;
       // 429 is the gateway pacing our polling, not a failure. Skip this cycle
-      // quietly; the next timer tick retries and the server grants it.
-      if (error && error.status === 429) return;
+      // quietly, and re-phase so a second dashboard polling in lockstep with us
+      // stops losing every window (TASK-1090).
+      if (error && error.status === 429) { rephaseOTmonitorPolling(); return; }
       var msg = (error && error.message) ? error.message : 'Load failed';
       if (msg.indexOf('Load failed') !== -1 || msg.indexOf('Failed to fetch') !== -1 || msg.indexOf('NetworkError') !== -1) {
         console.warn("refreshOTmonitor warning:", error);
