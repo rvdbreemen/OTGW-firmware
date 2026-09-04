@@ -57,9 +57,9 @@ on:
         required: true
         type: string
       ref:
-        description: 'Branch or commit to tag if `tag` does not yet exist (must be `dev` or a 7-40 char hex SHA — main and PR refs are rejected; stable releases use the /release skill). Ignored when the tag already exists.'
+        description: 'Branch or commit to tag if `tag` does not yet exist (must be `dev`, `otgw-1.x.x`, or a 7-40 char hex SHA — main and PR refs are rejected; stable releases use the /release skill). Required when the tag does not exist yet; ignored when it does.'
         required: false
-        default: 'dev'
+        default: ''
         type: string
 
 jobs:
@@ -77,20 +77,38 @@ jobs:
         run: |
           TAG="${{ inputs.tag }}"
           REF="${{ inputs.ref }}"
-          # TASK-656: hard-restrict the ref to dev or a 7-40 char hex SHA.
-          # This workflow is the BETA-prerelease pipeline — stable releases (main)
-          # go through the /release skill and a different workflow chain, so main
-          # is intentionally NOT allowed here. gh api would otherwise resolve
-          # arbitrary refs (refs/pull/<N>/head, feature/...) and a maintainer
-          # dispatch could publish a prerelease from un-reviewed PR code. The
-          # tag-already-exists path is exempt because the tag itself is the
-          # source of truth at that point.
+          # TASK-656: hard-restrict the ref to a known development line or a
+          # 7-40 char hex SHA. This workflow is the BETA-prerelease pipeline —
+          # stable releases (main) go through the /release skill and a different
+          # workflow chain, so main is intentionally NOT allowed here. gh api
+          # would otherwise resolve arbitrary refs (refs/pull/<N>/head,
+          # feature/...) and a maintainer dispatch could publish a prerelease
+          # from un-reviewed PR code. The tag-already-exists path is exempt
+          # because the tag itself is the source of truth at that point.
+          #
+          # TASK-1117: two development lines feed this workflow, not one.
+          # `dev` carries 2.0.0 (ESP32) and `otgw-1.x.x` carries the 1.x
+          # maintenance line, and every beta this workflow has actually
+          # published came from the latter. There is deliberately NO default:
+          # a default of `dev` meant that re-publishing a stuck 1.x beta with a
+          # missing tag would tag dev HEAD and ship 2.0.0 ESP32 code under a
+          # 1.7.x version number. Making the caller name the line fails closed.
           if ! gh api "repos/${{ github.repository }}/git/refs/tags/${TAG}" >/dev/null 2>&1; then
-            if ! echo "${REF}" | grep -qE '^(dev|[0-9a-f]{7,40})$'; then
-              echo "ERROR: ref '${REF}' is not allowed. Must be 'dev' or a 7-40 char hex commit SHA."
-              echo "       Beta-prerelease workflow is dev-only; stable releases use the /release skill."
+            if [ -z "${REF}" ]; then
+              echo "ERROR: tag '${TAG}' does not exist yet, so 'ref' is required."
+              echo "       Name the development line the tag belongs to: 'dev' (2.0.0/ESP32)"
+              echo "       or 'otgw-1.x.x' (1.x maintenance), or an explicit commit SHA."
+              echo "       There is no default on purpose: guessing the wrong line publishes"
+              echo "       one line's code under the other line's version number."
+              exit 1
+            fi
+            if ! echo "${REF}" | grep -qE '^(dev|otgw-1\.x\.x|[0-9a-f]{7,40})$'; then
+              echo "ERROR: ref '${REF}' is not allowed. Must be 'dev', 'otgw-1.x.x',"
+              echo "       or a 7-40 char hex commit SHA."
+              echo "       Beta-prerelease publishes from development lines only; stable"
+              echo "       releases use the /release skill."
               echo "       This guard also prevents publishing from arbitrary PR refs (refs/pull/<N>/head)."
-              echo "       See TASK-656."
+              echo "       See TASK-656, TASK-1117."
               exit 1
             fi
             SHA=$(gh api "repos/${{ github.repository }}/commits/${REF}" --jq '.sha')
@@ -294,8 +312,10 @@ jobs:
           # section is omitted entirely (graceful fallback to the pre-digest
           # release body shape).
           DIGEST_FILE=""
+          DIGEST_SOURCE=""
           if [ -n "${NOTES_PATH}" ]; then
             DIGEST_FILE="release_body_digest.md"
+            DIGEST_SOURCE="${NOTES_PATH}"
             if grep -q '<!-- digest:end -->' "${NOTES_PATH}"; then
               awk '/<!-- digest:end -->/{exit} {print}' "${NOTES_PATH}" > "${DIGEST_FILE}"
               echo "Digest extracted from ${NOTES_PATH} (above '<!-- digest:end -->' marker)."
@@ -307,50 +327,106 @@ jobs:
             sed -i '1{/^# /d}' "${DIGEST_FILE}"
           fi
 
+          # TASK-1117: a RELEASE_NOTES_<version>.md file is written at STABLE
+          # release time, so during a beta cycle the loop above finds nothing and
+          # the release page used to lead with a glossary of what a .ino.bin is.
+          # CHANGELOG.md's "## [Unreleased]" section is the one thing that IS
+          # current on every beta: the /beta-prerelease skill compares the TASK
+          # ids in the commits against the ids under that heading and refuses to
+          # ship until they match. So it is the best available answer to the only
+          # question a tester opens this page for.
+          if [ -z "${DIGEST_FILE}" ] && [ -f CHANGELOG.md ]; then
+            CANDIDATE="release_body_digest.md"
+            awk '
+              /^## \[Unreleased\]/ { inside = 1; next }
+              inside && /^## \[/    { exit }
+              inside                { print }
+            ' CHANGELOG.md > "${CANDIDATE}"
+            # A heading with nothing under it is worse than no section at all.
+            if grep -qE '[^[:space:]]' "${CANDIDATE}"; then
+              DIGEST_FILE="${CANDIDATE}"
+              DIGEST_SOURCE="CHANGELOG.md (Unreleased)"
+              echo "Digest extracted from the CHANGELOG [Unreleased] section."
+            else
+              rm -f "${CANDIDATE}"
+              echo "WARN: CHANGELOG.md has no non-empty [Unreleased] section at this tag;"
+              echo "      the release body will carry no change summary. Fill it in before the next beta."
+            fi
+          fi
+
+          # TASK-1117: derive the branch instead of asserting one. This body used
+          # to state "Published automatically from a tag push on the `dev` branch"
+          # on every beta, which was false on every beta this workflow has ever
+          # published: they are all tagged on otgw-1.x.x. Name a branch only when
+          # exactly one contains the tag, and say nothing when it is ambiguous.
+          # A missing sentence is a smaller defect than a confident wrong one.
+          BRANCHES=$(git branch -r --contains "${TAG}" --format='%(refname:short)' 2>/dev/null \
+                       | sed 's|^origin/||' | grep -vE '^(HEAD|$)' | sort -u || true)
+          BRANCH_COUNT=$(printf '%s\n' "${BRANCHES}" | grep -cE '[^[:space:]]' || true)
+          if [ "${BRANCH_COUNT}" = "1" ]; then
+            PROVENANCE="Built and published automatically from the \`${BRANCHES}\` branch."
+          else
+            PROVENANCE="Built and published automatically from the tagged commit."
+            echo "Tag ${TAG} is on ${BRANCH_COUNT} branches; omitting the branch name from the body."
+          fi
+
           {
             echo "Beta prerelease **${TAG}**."
             echo ""
-            echo "Published automatically from a tag push on the \`dev\` branch."
-            echo ""
-            echo "### What is in this build"
-            echo ""
-            echo "- [\`README.md\`](https://github.com/${REPO}/blob/${TAG}/README.md) — landing page and current dev-line status."
-            echo "- [\`CHANGELOG.md\`](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md) — running change log for the next release."
-            if [ -n "${NOTES_LINK}" ]; then
-              echo "- [Read the full release notes for this line](${NOTES_LINK})."
-            fi
+            echo "${PROVENANCE}"
             echo ""
             if [ -n "${DIGEST_FILE}" ] && [ -s "${DIGEST_FILE}" ]; then
-              echo "## What's new since the last public release"
+              echo "## What is in this build"
               echo ""
               cat "${DIGEST_FILE}"
               echo ""
-              if [ -n "${NOTES_LINK}" ]; then
-                echo "_Read the full release notes: [${NOTES_PATH}](${NOTES_LINK})._"
-                echo ""
-              fi
+            else
+              echo "## What is in this build"
+              echo ""
+              echo "No change summary was available at this tag. See the diff link below."
+              echo ""
             fi
-            echo "### Compare to the latest public release"
-            echo ""
             if [ -n "${PREV}" ]; then
-              echo "Diff vs **${PREV}** (current Latest stable): https://github.com/${REPO}/compare/${PREV}...${TAG}"
+              echo "Every change since the last stable release: https://github.com/${REPO}/compare/${PREV}...${TAG}"
             else
               echo "No prior public release detected; diff link omitted."
             fi
             echo ""
-            echo "### Assets"
+            echo "## Flashing"
+            echo ""
+            echo "Flash **both** the firmware and the filesystem. A new firmware with an old"
+            echo "filesystem keeps serving the previous web interface, which is the most common"
+            echo "cause of \"the fix is not there\" after an update. Settings are preserved."
+            echo ""
+            echo "\`OTGW-firmware-${VERSION}-flash-bundle.zip\` holds both images, both flash"
+            echo "scripts, the guide and the checksums, so it is the only asset most people need."
+            echo ""
+            echo "## Reporting"
+            echo ""
+            echo "This is a beta, and reporting back is the point. Findings go to Discord"
+            echo "\`#beta-testing\`, good and bad. A capture says more than a description:"
+            echo "\`capture-mqtt-debug.bat\` and \`capture-usb-serial.bat\` are attached for that."
+            echo ""
+            echo "<details><summary>What each asset is</summary>"
             echo ""
             echo "- \`*.ino.bin\` — firmware image (flash via Web UI, OTA, or \`flash_otgw.sh\`/\`.bat\`)."
             echo "- \`*.littlefs.bin\` — filesystem image (Web UI assets, settings template)."
             echo "- \`SHA256SUMS\` — integrity manifest used by the flash helpers."
             echo "- \`flash_otgw.sh\` / \`flash_otgw.bat\` — Linux/macOS and Windows flash helpers."
+            echo "- \`capture-mqtt-debug.bat\` / \`capture-usb-serial.bat\` — capture helpers for bug reports."
             echo "- \`OTGW-firmware-${VERSION}-flash-bundle.zip\` — self-contained zip with binaries, scripts, README and SHA256SUMS."
             echo ""
-            echo "### Field testing"
+            echo "</details>"
             echo ""
-            echo "Beta builds target non-production OTGWs. Please flash and report findings in Discord \`#beta-testing\` (good and bad)."
+            echo "---"
+            echo ""
+            echo "[\`CHANGELOG.md\`](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md)"
+            if [ -n "${NOTES_LINK}" ]; then
+              echo " | [full release notes](${NOTES_LINK})"
+            fi
+            echo " | [\`README.md\`](https://github.com/${REPO}/blob/${TAG}/README.md)"
           } > release_body.md
-          echo "--- release body ---"
+          echo "--- release body (digest source: ${DIGEST_SOURCE:-none}) ---"
           cat release_body.md
 
       - name: Publish prerelease (draft-first, attach assets atomically)
@@ -383,7 +459,8 @@ jobs:
           elif gh release view "${TAG}" >/dev/null 2>&1; then
             echo "ERROR: ${TAG} already exists as a published release."
             echo "This repo enforces immutable releases; the tag is reserved permanently."
-            echo "Recovery: bump the prerelease (e.g. beta.N -> beta.N+1) on dev and push the new tag."
+            echo "Recovery: bump the prerelease (e.g. beta.N -> beta.N+1) on the development"
+            echo "line this tag came from (dev for 2.0.0, otgw-1.x.x for 1.x) and push the new tag."
             exit 1
           else
             echo "Creating draft prerelease ${TAG} with all assets in one atomic call."
