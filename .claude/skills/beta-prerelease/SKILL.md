@@ -28,6 +28,47 @@ No arguments. Reads the current `_VERSION_PRERELEASE` and either increments it v
 
 Run when a firmware change under `src/OTGW-firmware/**` or `src/libraries/**` is committed and ready for field testing. Do NOT use for docs-only commits or full releases to `main` (use `/release <version>` for those).
 
+### The demand gate — answer this before Phase 0
+
+**A beta is justified by someone needing the build, not by a task needing a
+checkbox.** Every published tag name is burned permanently, and every beta asks
+real people to reflash a device wired to their heating. Name who is waiting for
+this one, and what they get, in one sentence. If that sentence is about the
+repository rather than about a person, stop.
+
+Justified:
+
+- A reporter is blocked and this build is what they test.
+- A field-reported defect is fixed and needs confirmation on hardware you do not have.
+- The maintainer asked for a build.
+- Enough has accumulated since the last beta that testers benefit from a checkpoint.
+
+NOT justified on its own:
+
+- An acceptance criterion says "verified against a real published prerelease".
+  Close the task at N-1 of N and let that criterion land on the next beta that
+  exists for one of the reasons above. A criterion is a description of proof,
+  not a reason to manufacture the thing being proved.
+- A backlog goal wants the board empty.
+- Work is committed and the tree is clean. That is a precondition, not a reason.
+- The changes are real but nobody reported them and nobody is waiting.
+
+**Check the demand, do not assume it.** Read `#beta-testing` before deciding: if
+the only messages since the last beta are the bot's own announcements, there is
+no one waiting, and that is a finding, not a formality.
+
+**Timing counts too.** Publishing a beta within a day of a stable release
+contradicts the announcement that just told users to flash the stable one.
+`latest` still points at the stable release and a prerelease does not hijack the
+flash scripts, so the harm is bounded, but the mixed message is real. Wait,
+unless the beta fixes something the stable release broke.
+
+This gate exists because `v1.7.6-beta.1` was published three hours after the
+v1.7.5 announcement, with no field reports behind any of its three changes and
+no human message in `#beta-testing` since v1.7.4, to satisfy AC #3 of TASK-1117.
+The prep was worth doing: it caught a CHANGELOG defect before it shipped. The
+publish was not.
+
 ## How this differs from /release
 
 | Aspect | `/release` | `/beta-prerelease` |
@@ -74,6 +115,11 @@ Facts that follow from the worktree layout and that the phases below depend on:
 - `backlog/` on this branch is not the dev tree's backlog. Cross-tree TASK-NNN
   references cannot satisfy the commit-msg hook here (see Phase 6).
 
+0. **Pass the demand gate** ("When to use" above). State in one sentence who is
+   waiting for this build and what they get. If that sentence names the
+   repository rather than a person, stop here and say so instead of continuing.
+   Reading `#beta-testing` since the last beta is part of this step, not
+   optional colour.
 1. Confirm the branch and anchor the cwd (preflight above).
 2. Verify state. Do NOT require a fully clean `git status`: this worktree
    routinely carries untracked tool droppings (`graphify-out/`,
@@ -448,6 +494,9 @@ fresh suffix per dry-run.
 
 ## Important rules
 
+- **A beta needs demand, not just readiness.** Name the person waiting for the
+  build before Phase 0. Closing a task, emptying a board or satisfying an
+  acceptance criterion is not demand. See "The demand gate".
 - **Never use em dashes** in any generated text.
 - **Anchor the worktree before anything else**: `cd "$(git rev-parse --show-toplevel)"` plus a branch assertion (Trap 8).
 - **Always push to remote after every commit**, and push the branch before the tag.
