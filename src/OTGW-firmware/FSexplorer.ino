@@ -74,6 +74,10 @@ const char UploadFailed[] PROGMEM = "HTTP/1.1 507 Insufficient Storage\r\nConten
 // path (F()) and accept a String mime (contentType()).
 static bool streamFileGuarded(File &f, const __FlashStringHelper *mime) {
   if (ESP.getMaxFreeBlockSize() < HTTP_SERVE_MIN_MAXBLOCK) {
+    // Retry-After makes the refusal actionable rather than just visible: a client
+    // that honours it backs off instead of re-requesting immediately and keeping
+    // the heap exactly as fragmented as it already is (TASK-793).
+    httpServer.sendHeader(F("Retry-After"), F("2"));
     httpServer.send(503, F("text/plain"), F("Low memory, please retry"));
     return false;
   }
@@ -82,6 +86,10 @@ static bool streamFileGuarded(File &f, const __FlashStringHelper *mime) {
 }
 static bool streamFileGuarded(File &f, const String &mime) {
   if (ESP.getMaxFreeBlockSize() < HTTP_SERVE_MIN_MAXBLOCK) {
+    // Retry-After makes the refusal actionable rather than just visible: a client
+    // that honours it backs off instead of re-requesting immediately and keeping
+    // the heap exactly as fragmented as it already is (TASK-793).
+    httpServer.sendHeader(F("Retry-After"), F("2"));
     httpServer.send(503, F("text/plain"), F("Low memory, please retry"));
     return false;
   }
@@ -172,6 +180,15 @@ void startWebserver(){
       // Use a fixed-size line buffer instead of String to avoid heap fragmentation.
       static char lineBuf[320];  // longest index.html line ~252 chars; 320 ample (was 512). readBytesUntil tracks sizeof-1
       while (f.available()) {
+        // Stop writing to a socket that is already gone (TASK-793). index.html is
+        // about 11 KB, so a rapid-refresh storm leaves this loop streaming chunks
+        // into closed connections while the next request waits. Each sendContent()
+        // on a dead client still walks the write path before failing, which is
+        // wasted loop time exactly when the device is under pressure.
+        if (!httpServer.client().connected()) {
+          DebugTln(F("sendIndex: client disconnected, abandoning stream"));
+          break;
+        }
         int n = f.readBytesUntil('\n', lineBuf, sizeof(lineBuf) - 1);
         lineBuf[n] = '\0';
         // Strip trailing CR if present
@@ -558,6 +575,15 @@ void handleFileUpload()
     // Reset BEFORE the auth early-return: these are statics, so without the reset a
     // previous request's outcome would decide this one's response.
     uploadOk = false;
+    // Defensive close (TASK-793). fsUploadFile is a static, so a handle left open
+    // by an earlier request survives into this one. LittleFS allows a bounded
+    // number of open handles, and a client that disconnects mid-upload used to
+    // leak one every time, so a rapid-refresh storm during an upload could
+    // exhaust them and leave the filesystem unable to open anything at all.
+    if (fsUploadFile) {
+      DebugTln(F("FileUpload: stale handle open at START, closing it"));
+      fsUploadFile.close();
+    }
     // Check auth + same origin by reading headers only - does NOT send a response.
     // If the check fails, skip the file open so nothing is written. The origin test
     // belongs here, not in the completion handler: that one only runs after the whole
@@ -588,9 +614,10 @@ void handleFileUpload()
   else if (upload.status == UPLOAD_FILE_WRITE)
   {
     DebugT(F("FileUpload Data: ")); Debugln((String)upload.currentSize);
-    // uploadAuthorized in the gate: an aborted upload leaves fsUploadFile open (there is
-    // no UPLOAD_FILE_ABORTED branch), and an unauthenticated request would otherwise
-    // write straight through that stale handle.
+    // uploadAuthorized in the gate: an unauthenticated request would otherwise write
+    // straight through a stale handle. The abort branch below now closes that handle,
+    // but this check is what stops an unauthorised body reaching the filesystem, so it
+    // stays regardless.
     if (uploadAuthorized && fsUploadFile) {
       // write() returns 0 on error and the full count on success, so != is a real short write.
       if (fsUploadFile.write(upload.buf, upload.currentSize) != upload.currentSize) uploadOk = false;
@@ -605,6 +632,16 @@ void handleFileUpload()
       if (uploadOk) httpServer.sendContent(Header);
       else          httpServer.sendContent(UploadFailed);
     }
+  }
+  else if (upload.status == UPLOAD_FILE_ABORTED)
+  {
+    // TASK-793. The server raises this when the client disconnects mid-body.
+    // Without a branch here the handle stayed open for the lifetime of the
+    // sketch, one per abort, until LittleFS ran out of open files. No response
+    // is written: the socket that would have carried it is already gone.
+    DebugTln(F("FileUpload ABORTED, closing handle"));
+    if (fsUploadFile) fsUploadFile.close();
+    uploadOk = false;
   }
 
 } // handleFileUpload()
