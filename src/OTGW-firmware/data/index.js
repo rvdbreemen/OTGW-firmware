@@ -288,18 +288,32 @@ function stopOTmonitorPolling() {
 
 // TASK-1090: break a phase lock after a 429.
 //
-// The gateway grants one request per second per endpoint (ADR-086). setInterval
-// keeps a fixed phase, so two dashboards opened at the same moment poll at the
-// same instants forever: one wins every window and the other is refused every
-// window. Skipping the cycle quietly, which is what the catch handlers used to
-// do on their own, leaves that arrangement exactly as it was.
+// The server keeps ONE lastServedMs per route, shared by every client, with a
+// window of 1500 ms for otgw/otmonitor and 4000 ms for device/time
+// (restAPI.ino kRateLimitedRoutes, ADR-086). setInterval keeps a fixed phase,
+// so two dashboards opened at the same moment poll at the same instants
+// forever: one wins every window and the other is refused every window.
+// Skipping the cycle quietly, which is what the catch handlers used to do on
+// their own, leaves that arrangement exactly as it was.
 //
-// Re-arming the timer after a delay drawn uniformly from one full period gives
-// the loser a uniformly random phase, so it lands outside the winner's window
-// with probability (period - 1s) / period: 50% per attempt at the 2 second
-// poll, 80% at the 5 second one, and every further refusal draws again. The
-// cost is bounded by exactly one skipped cycle, which is what a 429 already
-// cost before this.
+// Note both routes have period < 2 x window (2000 < 3000, 5000 < 8000). Two
+// clients polling at the UI's own rate therefore exceed the budget at EVERY
+// phase, so this cannot make both of them succeed every cycle. What it removes
+// is the permanent loser: re-arming after a delay drawn uniformly from one
+// period gives the refused client a random phase, so the refusal rotates
+// between clients instead of pinning on one forever.
+//
+// Simulated against the real windows above, two clients starting in phase,
+// 300 seeds, 120 s each: without this, 300 of 300 runs left one client with
+// ZERO grants, on both routes and at three clients as well. With it, none.
+// Total throughput barely moves (60 to 64 grants on otmonitor, 24 to 25 on
+// device/time) and the split stays uneven, around 39/24. This redistributes
+// service, it does not create capacity.
+//
+// Re-phasing on ANY 429 is deliberate, including one from an ad-hoc
+// refreshDevTime() rather than from the timer: lastServedMs is global to the
+// route, so a refusal anywhere means the periodic tick would have been refused
+// too.
 function rephaseDelayMs(periodMs) {
   return Math.floor(Math.random() * periodMs);
 }
@@ -310,7 +324,11 @@ function rephaseOTmonitorPolling() {
   tid = 0;
   setTimeout(function () {
     if (tid) return;                   // something restarted polling while we waited
-    if (flashModeActive) return;       // flash mode stops polling deliberately
+    if (flashModeActive) return;       // ESP flash page stops polling deliberately
+    if (isFlashing) return;            // PIC or ESP flash in progress: performFlash()
+                                       // sets isFlashing, never flashModeActive, so
+                                       // without this the orphan would re-arm polling
+                                       // that performFlash() had just torn down
     if (!isPageVisible()) return;      // tab hidden; visibilitychange owns the restart
     startOTmonitorPolling();           // re-checks isMainPageActive() itself
   }, rephaseDelayMs(OTMONITOR_POLL_MS));
@@ -323,6 +341,10 @@ function rephaseTimeUpdates() {
   setTimeout(function () {
     if (timeupdate) return;
     if (flashModeActive) return;
+    if (isFlashing) return;   // performFlash() sets isFlashing, not flashModeActive,
+                              // and its stopTimeUpdates() cannot cancel this pending
+                              // timeout because nothing holds its handle. Without
+                              // this guard the status poll comes back mid-flash.
     if (!isPageVisible()) return;
     // startTimeUpdates() is deliberately not main-page scoped: exitFlashMode()
     // and page load both call it from elsewhere, so isMainPageActive() must not

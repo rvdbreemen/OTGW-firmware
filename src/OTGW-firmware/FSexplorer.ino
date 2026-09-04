@@ -181,7 +181,7 @@ void startWebserver(){
       static char lineBuf[320];  // longest index.html line ~252 chars; 320 ample (was 512). readBytesUntil tracks sizeof-1
       while (f.available()) {
         // Stop writing to a socket that is already gone (TASK-793). index.html is
-        // about 11 KB, so a rapid-refresh storm leaves this loop streaming chunks
+        // about 17.6 KB, so a rapid-refresh storm leaves this loop streaming chunks
         // into closed connections while the next request waits. Each sendContent()
         // on a dead client still walks the write path before failing, which is
         // wasted loop time exactly when the device is under pressure.
@@ -576,10 +576,11 @@ void handleFileUpload()
     // previous request's outcome would decide this one's response.
     uploadOk = false;
     // Defensive close (TASK-793). fsUploadFile is a static, so a handle left open
-    // by an earlier request survives into this one. LittleFS allows a bounded
-    // number of open handles, and a client that disconnects mid-upload used to
-    // leak one every time, so a rapid-refresh storm during an upload could
-    // exhaust them and leave the filesystem unable to open anything at all.
+    // by an earlier request survives into this one. An open LittleFS file holds
+    // heap for its descriptor and cache buffer, and a leaked one is never
+    // returned until the next reboot, on a device whose scarce resource is
+    // exactly that heap. The abort branch below is the primary fix; this is the
+    // backstop for any path that reaches START with one still open.
     if (fsUploadFile) {
       DebugTln(F("FileUpload: stale handle open at START, closing it"));
       fsUploadFile.close();
@@ -637,8 +638,9 @@ void handleFileUpload()
   {
     // TASK-793. The server raises this when the client disconnects mid-body.
     // Without a branch here the handle stayed open for the lifetime of the
-    // sketch, one per abort, until LittleFS ran out of open files. No response
-    // is written: the socket that would have carried it is already gone.
+    // sketch, one per abort, each holding the heap for its descriptor and cache
+    // buffer and never returning it. No response is written: the socket that
+    // would have carried it is already gone.
     DebugTln(F("FileUpload ABORTED, closing handle"));
     if (fsUploadFile) fsUploadFile.close();
     uploadOk = false;

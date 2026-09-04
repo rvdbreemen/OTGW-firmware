@@ -42,8 +42,9 @@ name: Beta prerelease publish
 # immutable-release upload restriction, NOT as a review checkpoint.
 # Anyone with `contents: write` on the repo can therefore trigger a
 # published prerelease. The `ref` input on workflow_dispatch is
-# hard-restricted (below) to dev / main / explicit commit SHAs to prevent
-# publishing arbitrary PR-head refs.
+# hard-restricted (below) to dev / otgw-1.x.x / explicit commit SHAs to
+# prevent publishing arbitrary PR-head refs. main is NOT allowed: stable
+# releases go through the /release skill.
 # See TASK-656 for the design discussion.
 
 on:
@@ -325,6 +326,16 @@ jobs:
             fi
             # Strip the leading H1 if present; the release body provides its own H2 heading.
             sed -i '1{/^# /d}' "${DIGEST_FILE}"
+            # An empty digest must not suppress the CHANGELOG fallback below, which
+            # is gated on DIGEST_FILE being unset. A notes file that is all sentinel
+            # and no content would otherwise produce "no change summary available"
+            # while a perfectly good [Unreleased] section sat unused.
+            if ! grep -qE '[^[:space:]]' "${DIGEST_FILE}"; then
+              echo "WARN: digest from ${NOTES_PATH} is empty; falling back to the CHANGELOG."
+              rm -f "${DIGEST_FILE}"
+              DIGEST_FILE=""
+              DIGEST_SOURCE=""
+            fi
           fi
 
           # TASK-1117: a RELEASE_NOTES_<version>.md file is written at STABLE
@@ -420,11 +431,15 @@ jobs:
             echo ""
             echo "---"
             echo ""
-            echo "[\`CHANGELOG.md\`](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md)"
+            # One echo, not three. GitHub renders a single newline in a release
+            # body as a hard break, so emitting these separately stacked the link
+            # row into three lines instead of one pipe-separated row.
+            FOOTER="[\`CHANGELOG.md\`](https://github.com/${REPO}/blob/${TAG}/CHANGELOG.md)"
             if [ -n "${NOTES_LINK}" ]; then
-              echo " | [full release notes](${NOTES_LINK})"
+              FOOTER="${FOOTER} | [full release notes](${NOTES_LINK})"
             fi
-            echo " | [\`README.md\`](https://github.com/${REPO}/blob/${TAG}/README.md)"
+            FOOTER="${FOOTER} | [\`README.md\`](https://github.com/${REPO}/blob/${TAG}/README.md)"
+            echo "${FOOTER}"
           } > release_body.md
           echo "--- release body (digest source: ${DIGEST_SOURCE:-none}) ---"
           cat release_body.md
