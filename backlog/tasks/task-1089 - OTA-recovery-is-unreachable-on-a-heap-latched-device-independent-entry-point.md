@@ -3,11 +3,11 @@ id: TASK-1089
 title: >-
   OTA recovery is unreachable on a heap-latched device (independent entry
   point?)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-25 18:53'
-updated_date: '2026-09-04 06:41'
+updated_date: '2026-09-04 06:42'
 labels:
   - bug
   - adr-required
@@ -31,8 +31,8 @@ Needs its own ADR before implementation.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Whether OTA needs an entry point independent of the HTTP heap gate is decided and recorded in its own ADR
-- [ ] #2 A reboot can be triggered from the telnet console, which stays reachable when canServeHttp() is refusing, and it routes through the deferred-reboot mechanism rather than calling ESP.restart() inline
-- [ ] #3 Verified on the bench: the command appears in the console help, triggers the reboot with its reason logged before it happens, and the device comes back
+- [x] #2 A reboot can be triggered from the telnet console, which stays reachable when canServeHttp() is refusing, and it routes through the deferred-reboot mechanism rather than calling ESP.restart() inline
+- [x] #3 Verified on the bench: the command appears in the console help, triggers the reboot with its reason logged before it happens, and the device comes back
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -59,4 +59,37 @@ Telnet only. MQTT is a separate decision, tracked separately. Note the reason ch
 Implementation per the Decision Contract: route through the existing deferred-reboot mechanism rather than calling ESP.restart() inline, and log the reboot and its reason first so a field capture shows an operator-initiated restart rather than an unexplained gap.
 
 2026-08-25: ADR-092 Accepted. Telnet reboot only. The MQTT variant is closed, not deferred: a follow-up task was opened and dropped the same day because the maintainer saw no reason to spend time on a second channel for an action that already has one. ADR-092's answered open question was corrected to say so, with maintainer authorisation recorded in its Status History. Remaining work here is AC#2/AC#3, which ADR-092 reshapes: no upload is accepted below the gate (Option B was rejected), so AC#2 becomes 'a single-key telnet command reboots a gated device through the existing deferred-reboot mechanism' and AC#3 verifies that on the bench.
+
+2026-09-04: implemented ADR-092 Option A and replaced the two stale acceptance criteria.
+
+ACs #2 and #3 as written described Option B, giving OTA its own entry point below the heap gate. ADR-092 answered AC #1 with a NO on exactly that option: it would need a body-consuming path avoiding the 2100-byte parser allocation, which means a second upload implementation or a raw-stream reader, both substantial new code on the path where failure bricks the device. Checking criteria that describe a rejected design would have been false, so they were removed and replaced with criteria for the option that was actually accepted. AC #1 is unchanged and still checked.
+
+Implementation: handleDebug.ino gains 'R', which calls requestDeferredReboot("telnet operator request"). Uppercase because lowercase 'r' is the WiFi and MQTT reconnect immediately above it. Deferred rather than inline per the Decision Contract: loop() calls performDeferredReboot() only when !isFlashing(), so a reboot requested mid-flash waits rather than bricking the device, and it fires outside the console callback so the acknowledgement has left the socket. requestDeferredReboot() stores a const char* and logs; it allocates nothing, which is the property that matters on a starved heap.
+
+Bench verification on 192.168.88.68 running 1.7.6-beta.1+24eb2ef:
+  h -> "R) Reboot the ESP (deferred; waits if a flash is running)"
+  R -> handleDebugC(211): Reboot requested from the telnet console
+       requestDefer(499): [reboot] deferred request: "telnet operator request" heap=17328 minHeap=16832 maxBlk=16424 frag=6 flashing=0
+       performDefer(506): [reboot] performing deferred reboot after 3ms defer
+       doRestart(639): [reboot] doRestart("telnet operator request") begin
+       doRestart(654): [reboot] calling ESP.restart() after 2019ms total
+Device came back and answered /api/v2/device/info.
+
+One correction made before shipping: the first draft of the comment said doTaskEvery1s() services the deferred reboot. It is loop() (OTGW-firmware.ino:531), which also means the reboot fires at full loop rate rather than up to a second later.
+
+Not verified, and deliberately not claimed: that the command works while the gate is actually engaged. Holding a device below the contiguous-block threshold on demand is not something this bench can do reliably. The argument rests on debugTelnet.loop() running before the gate in doBackgroundTasks() and on requestDeferredReboot() allocating nothing, both source-verified.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A stranded gateway can now be recovered without physical access.
+
+Everything served on httpServer runs from handleClient(), which canServeHttp() withholds under heap pressure, so a device whose gate had engaged could be neither flashed nor rebooted over HTTP. Telnet stays reachable by design (ADR-079) and its loop runs before the gate, but the console had no way to act: no reboot command and no ESP.restart call anywhere in handleDebug.ino.
+
+The telnet console gains 'R', which requests a deferred reboot. It routes through the existing mechanism rather than calling ESP.restart() inline, so a reboot asked for mid-flash waits instead of bricking the device, and it allocates nothing, which is the property that matters in the state it exists for.
+
+This implements ADR-092 Option A. Option B, giving OTA its own entry point below the gate, was rejected in that ADR on cost and risk, so the two acceptance criteria describing it were replaced rather than checked.
+
+Verified on the bench: the command appears in the help, logs its reason before acting, reboots 3 ms after the request, and the device comes back. Full log in the implementation notes.
+<!-- SECTION:FINAL_SUMMARY:END -->
