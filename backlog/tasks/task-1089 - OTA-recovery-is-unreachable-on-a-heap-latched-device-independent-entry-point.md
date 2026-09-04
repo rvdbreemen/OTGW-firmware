@@ -3,10 +3,11 @@ id: TASK-1089
 title: >-
   OTA recovery is unreachable on a heap-latched device (independent entry
   point?)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-25 18:53'
-updated_date: '2026-08-25 21:08'
+updated_date: '2026-09-04 06:41'
 labels:
   - bug
   - adr-required
@@ -30,8 +31,8 @@ Needs its own ADR before implementation.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Whether OTA needs an entry point independent of the HTTP heap gate is decided and recorded in its own ADR
-- [ ] #2 If yes: an upload POST is accepted while canServeHttp() is refusing, without reintroducing the unchecked 2100-byte HTTPUpload allocation below the gate threshold
-- [ ] #3 Verified on the bench: a device held below the gate threshold can still be flashed over the air
+- [ ] #2 A reboot can be triggered from the telnet console, which stays reachable when canServeHttp() is refusing, and it routes through the deferred-reboot mechanism rather than calling ESP.restart() inline
+- [ ] #3 Verified on the bench: the command appears in the console help, triggers the reboot with its reason logged before it happens, and the device comes back
 <!-- AC:END -->
 
 ## Implementation Notes
