@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-06-22 18:03'
-updated_date: '2026-09-04 06:02'
+updated_date: '2026-09-04 06:45'
 labels: []
 dependencies: []
 ---
@@ -43,4 +43,20 @@ Evidence:
 So either the change was written and later reverted, or the criteria were checked ahead of the work. Both leave the same false state on the board, and either way the ACs did not describe the tree. Nothing is lost by unchecking: if an implementation does exist somewhere, re-checking is one command.
 
 Status stays To Do. Note this is not the first time: the task was moved from In Progress back to To Do on 2026-08-13, deferring active work.
+
+2026-09-04: declined, with the numbers. Archiving rather than implementing.
+
+What it buys: WifiSection is 5 x char[16] = 80 bytes; as 5 x uint8_t[4] it is 20. Saving 60 bytes of static RAM, about 0.15 percent of the roughly 40 KB budget.
+
+What it costs: 45 usage sites across six files (networkStuff.ino, settingStuff.ino, restAPI.ino, OTGW-Core.ino, OTGW-firmware.ino, OTGW-firmware.h), a persisted-format decision, REST round-tripping quads back to dotted strings for the UI, and AC #5 as written accepts that static-IP users re-enter their configuration once. The failure mode of that path is a gateway that comes back on a different address, which for a unit wired to a boiler means someone walks to it.
+
+What it does NOT buy: AC #3 promised no string parse at runtime. There already is none. networkStuff.ino:59-65 calls ip.fromString() once at boot, outside any hot path, so the conversion cost being removed is a single parse per reboot.
+
+Why now: the RAM audit in .external-reviews/ram-audit-state-struct-findings.md finds 100 bytes in one area at risk:low, impact:none, with no settings-format change and no migration. FlashSection.sError[129] -> [48] alone is 80 bytes and changes one buffer size. This task is therefore the worst available RAM trade: less saving than the alternatives, concentrated on the one code path whose failure mode is an unreachable device.
+
+The pressure that motivated this is also gone. v1.7.0 reclaimed about 6.6 KB by moving the OpenTherm message-name table to flash, which is two orders of magnitude more for a fraction of the risk.
+
+Separately, the five checked criteria on this task were false when found: they claimed the quads had landed while OTGW-firmware.h:492 still declared char sStaticIp[16], and nothing matching existed on the 2.0.0 line either. They were unchecked with that evidence earlier today. This task has now failed to land twice, having also been moved from In Progress back to To Do on 2026-08-13.
+
+Reopen if a concrete RAM shortfall makes 60 bytes decisive AND the cheaper targets in the audit are already taken.
 <!-- SECTION:NOTES:END -->
