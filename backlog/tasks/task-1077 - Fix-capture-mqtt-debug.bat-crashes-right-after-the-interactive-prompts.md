@@ -1,11 +1,11 @@
 ---
 id: TASK-1077
 title: 'Fix: capture-mqtt-debug.bat crashes right after the interactive prompts'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-17 05:51'
-updated_date: '2026-08-22 08:13'
+updated_date: '2026-09-04 05:59'
 labels:
   - bug
   - tooling
@@ -58,4 +58,20 @@ Fix: wrap the Resolve-MosquittoSub call site so a failed auto-resolve disables t
 2026-08-17 correction: the winget failure was NOT a broken winget on the reporter's machine. The script used package id EclipseMosquitto.Mosquitto, which matches no package. Verified locally: "winget show EclipseMosquitto.Mosquitto" returns "No package found matching input criteria" with exit code -1978335212, byte for byte the code in the reporter's log, while "winget show EclipseFoundation.Mosquitto" returns Eclipse Mosquitto MQTT broker 2.1.2, publisher Eclipse Foundation. The auto-install was therefore broken for every user without mosquitto_sub already installed, not just for him.
 
 Fixed the id. The live install path was deliberately not executed on the maintainer machine: mosquitto is already installed there, so a winget run would mutate the machine without proving anything the "winget show" resolution does not already prove.
+
+2026-09-04 board cleanup: closed on the maintainer's call. AC #4 (stefan_24213 completes a capture with the fixed script) stays UNCHECKED: no feedback ever came back from the reporter, and the task cannot wait on a person indefinitely.
+
+ACs #1 to #3 are met and shipped. What remains unproven is only the reporter-side confirmation, not the fix.
+
+If the crash resurfaces, reopen from here rather than starting fresh: the diagnosis and the three landed guards are recorded in this task.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+capture-mqtt-debug.bat no longer throws unhandled right after the interactive prompts.
+
+The failure was identified rather than assumed (AC #1), and three guards landed: a missing mosquitto_sub or missing winget now produces a plain actionable message with a manual-install pointer instead of an unhandled throw (AC #2), and a failure between the prompts and the run-folder creation still leaves a diagnosable artefact (AC #3).
+
+Closed with AC #4 unchecked. That criterion required the original reporter, stefan_24213, to complete a capture with the fixed script, and no feedback arrived. The fix is not blocked on that confirmation; only the field proof is. Reopen if the crash is reported again.
+<!-- SECTION:FINAL_SUMMARY:END -->
