@@ -190,6 +190,21 @@ Generate each document and write it to disk immediately after creation. Keep onl
 2. Generate `RELEASE_GITHUB_<version>.md` → write to repo root → note: "Written."
 3. Update `docs/BREAKING_CHANGES.md` (prepend new section) → note: "Updated."
 4. Update `README.md` (demote old "What's New", add new section) → note: "Updated."
+5. **Close the `CHANGELOG.md` section.** Rename `## [Unreleased]` to
+   `## [<version>] - YYYY-MM-DD` and open a fresh, empty `## [Unreleased]`
+   above it → note: "Updated."
+
+   Do not skip this and do not defer it to Phase 6. The whole beta cycle
+   accumulates under `[Unreleased]`, and if it is still called that at the
+   tagged commit, the released CHANGELOG has no section for the version it
+   ships. Worse, `beta-prerelease.yml` sources its release body from
+   `[Unreleased]`, so the *next* beta page advertises the entire previous
+   release as new. v1.7.5 shipped this way and had to be repaired afterwards.
+
+   Verify before moving on:
+   ```bash
+   grep -n "^## \[" CHANGELOG.md | head -3   # [Unreleased] then [<version>] - <date>
+   ```
 
 **CHECKPOINT 1: Present a compact summary to the user (R3):**
 ```
