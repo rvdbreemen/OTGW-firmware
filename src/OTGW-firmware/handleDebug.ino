@@ -129,6 +129,7 @@ void handleDebugChar(char c){
                 Debugln(F("  q) Force read settings"));
                 Debugln(F("  F) Force MQTT discovery for ALL message IDs"));
                 Debugln(F("  r) Reconnect WiFi & refresh MQTT/WS clients"));
+                Debugln(F("  R) Reboot the ESP (deferred; waits if a flash is running)"));
                 Debugln(F("  p) Reset PIC manually"));
                 Debugln(F("  a) Send PR=A to identify PIC firmware version & type"));
                 Debugln(F("  s/S) Toggle OTGW serial-simulation replay"));
@@ -188,6 +189,27 @@ void handleDebugChar(char c){
                     DebugTln(F("Reconnecting MQTT"));
                     startMQTT();
                 } else DebugTln(F("MQTT is connected"));
+                break;
+            case 'R':
+                // ADR-092: the recovery route for a device whose HTTP heap gate
+                // has engaged. Everything on httpServer runs from handleClient(),
+                // which canServeHttp() withholds, so a gated device cannot be
+                // flashed or rebooted over HTTP. Telnet stays reachable by design
+                // (ADR-079) and debugTelnet.loop() runs before the gate, so this
+                // is the one path an operator still has.
+                //
+                // Deferred, not ESP.restart() here: loop() calls
+                // performDeferredReboot() only when !isFlashing(), so a reboot
+                // requested mid-flash waits instead of bricking the device.
+                // It also fires outside this callback, so the console line
+                // above has left the socket before the reset.
+                // requestDeferredReboot() stores a const char* and logs; it
+                // allocates nothing, which is the point on a starved heap.
+                //
+                // Uppercase on purpose. Lowercase 'r' is the WiFi/MQTT reconnect
+                // right above, and these are single-keystroke commands.
+                DebugTln(F("Reboot requested from the telnet console"));
+                requestDeferredReboot("telnet operator request");
                 break;
             case '1':
                 state.debug.bOTmsg = !state.debug.bOTmsg;
