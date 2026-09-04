@@ -1,9 +1,11 @@
 ---
 id: TASK-1117
 title: The beta release workflow claims every prerelease came from the dev branch
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-03 05:13'
+updated_date: '2026-09-04 06:13'
 labels: []
 dependencies: []
 ordinal: 207000
@@ -21,3 +23,12 @@ beta-prerelease.yml writes the GitHub release body itself, and that body contain
 - [ ] #2 A published beta release page leads with what the build changes rather than with a glossary of asset types
 - [ ] #3 The change is verified against a real published prerelease, not only by reading the workflow
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Fix the false branch statement: derive the branch that actually contains the tag with git branch -r --contains, name it only when exactly one branch matches, and omit the clause otherwise. Never hardcode a branch name.
+2. Fix the same dev assumption in the workflow_dispatch ref guard, which today accepts only dev or a SHA and defaults to dev. On this line a stuck 1.x beta would be tagged at dev HEAD, publishing 2.0.0 code under a 1.7.x version. Allow otgw-1.x.x, drop the default, and fail closed when a missing tag is dispatched with no ref.
+3. Reorder the body so it leads with substance: pull the CHANGELOG [Unreleased] section at the tagged commit, which the beta-prerelease skill already keeps current, and fall back to the RELEASE_NOTES digest. Demote the asset glossary below it.
+4. Verify by executing the composition block locally against a real tagged commit, then against a real published prerelease when the next beta ships.
+<!-- SECTION:PLAN:END -->
