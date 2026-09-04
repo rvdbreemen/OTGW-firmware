@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-03 05:13'
-updated_date: '2026-09-04 06:13'
+updated_date: '2026-09-04 06:18'
 labels: []
 dependencies: []
 ordinal: 207000
@@ -19,8 +19,8 @@ beta-prerelease.yml writes the GitHub release body itself, and that body contain
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The generated release body no longer names a branch the tag did not come from
-- [ ] #2 A published beta release page leads with what the build changes rather than with a glossary of asset types
+- [x] #1 The generated release body no longer names a branch the tag did not come from
+- [x] #2 A published beta release page leads with what the build changes rather than with a glossary of asset types
 - [ ] #3 The change is verified against a real published prerelease, not only by reading the workflow
 <!-- AC:END -->
 
@@ -32,3 +32,17 @@ beta-prerelease.yml writes the GitHub release body itself, and that body contain
 3. Reorder the body so it leads with substance: pull the CHANGELOG [Unreleased] section at the tagged commit, which the beta-prerelease skill already keeps current, and fall back to the RELEASE_NOTES digest. Demote the asset glossary below it.
 4. Verify by executing the composition block locally against a real tagged commit, then against a real published prerelease when the next beta ships.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-04: implemented and verified by execution.
+
+AC #1: the branch is derived (git branch -r --contains the tag), named only when exactly one branch matches, otherwise the body says "from the tagged commit". Unit-tested across one match (otgw-1.x.x, dev), two matches, and zero. The workflow can no longer name a branch the tag did not come from.
+
+AC #2: the body now opens with the change summary. RELEASE_NOTES_<version>.md stays preferred, but it does not exist during a beta cycle, so the CHANGELOG [Unreleased] section is the fallback. Executed the real composition step against a worktree at tag v1.7.5-beta.8: it found no notes file, fell back to the CHANGELOG, and produced a body opening on the Security section instead of the asset glossary. The glossary is now a collapsed block below Flashing and Reporting.
+
+Also fixed, same root assumption: the workflow_dispatch ref guard accepted only dev or a SHA and defaulted to dev, so re-publishing a stuck 1.x beta with a missing tag would have tagged dev HEAD and shipped 2.0.0 ESP32 code under a 1.7.x version. otgw-1.x.x is now allowed, the default is gone, and an empty ref fails closed. TASK-656 properties preserved: main and PR refs still rejected, verified by test.
+
+AC #3 open: it requires a real published prerelease. The next beta on this line will exercise it.
+<!-- SECTION:NOTES:END -->
