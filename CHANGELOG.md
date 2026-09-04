@@ -8,6 +8,22 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+### Added
+
+- **A reboot command on the telnet console.** Everything served on `httpServer` runs from `handleClient()`, which `canServeHttp()` withholds under heap pressure, so a device whose gate had engaged could be neither flashed nor rebooted over HTTP. Telnet stays reachable by design and its loop runs before the gate, but the console had no way to act: there was no reboot command and no `ESP.restart` call anywhere in it. `R` now requests a deferred reboot, routed through the existing mechanism so a reboot asked for mid-flash waits instead of bricking the device, and allocating nothing, which is the property that matters in the state it exists for. Verified on a bench gateway: the reboot fired 3 ms after the keystroke and the device came back. (TASK-1089, ADR-092)
+
+### Fixed
+
+- **Two dashboards open at once left one of them permanently refused.** The gateway grants one request per second per endpoint, and both web-interface pollers ran on a fixed-phase timer, so two browsers opened at the same moment polled at the same instants forever: one won every window and the other was refused every window. The refused client skipped the cycle quietly, which preserved the lock rather than breaking it. On a 429 the timer is now re-armed after a delay drawn from one full poll period, giving it a random phase. Measured against a simulation of the rate-limit window: before, 200 of 200 runs left one client with zero successful requests over two minutes; after, none. (TASK-1090, ADR-086)
+- **An upload that was interrupted leaked a file handle.** A client disconnecting mid-body left the file open for the lifetime of the sketch, one handle per interruption, and LittleFS allows only a bounded number. A rapid-refresh storm during an upload could exhaust them and leave the filesystem unable to open anything at all. Interrupted uploads are now closed, and a stale handle is closed defensively when the next upload starts. (TASK-793)
+- **The main page kept streaming to browsers that had already gone away.** `index.html` is about 11 KB and was streamed without ever checking whether the client was still connected, and every write to a closed socket still walks the write path before failing, which costs loop time exactly when the device is under load. The stream now stops. The two low-memory refusals also carry `Retry-After`, so a refused client backs off instead of re-requesting immediately and holding the heap in the state that caused the refusal. Measured under a scripted storm: completed requests rose from 14 of 47 to 18 of 47 at six concurrent clients, with no crash and no reboot in any run. (TASK-793)
+
+### Internal
+
+- **The beta release page no longer claims a branch the tag did not come from.** The generated body stated that every prerelease came from a tag push on `dev`, which was false on every beta ever published from this line: they are all tagged on `otgw-1.x.x`. The branch is now derived from the tag, and named only when exactly one branch contains it. The same assumption sat in the manual re-publish guard, which accepted only `dev` and defaulted to it, so re-publishing a stuck 1.x beta would have tagged 2.0.0 code under a 1.7.x version. The body also now leads with what the build changes instead of a glossary of asset types. (TASK-1117)
+
+## [1.7.5] - 2026-09-04
+
 ### Security
 
 - **settings.ini was served without authentication, so setting an admin password published it.** The file holds httppasswd and MQTTpasswd in cleartext, and the file-serving path had no auth check while every sibling operation did. An unauthenticated client on the LAN could read both credentials from a password-protected gateway and replay them. The read is now gated with the same check as the delete and reboot operations, including a leading `//settings.ini` alias that resolves to the same file. Verified on a live gateway: with a password set the request returns 401 unauthenticated and 200 with credentials. (TASK-1099, ADR-056)
