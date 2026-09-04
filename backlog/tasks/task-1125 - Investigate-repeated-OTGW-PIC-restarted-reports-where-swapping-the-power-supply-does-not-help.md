@@ -6,11 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 20:58'
+updated_date: '2026-09-04 20:59'
 labels:
   - bug
   - needs-info
   - support
 dependencies: []
+references:
+  - 'https://gathering.tweakers.net/forum/list_message/86072000#86072000'
 priority: medium
 ordinal: 213000
 ---
