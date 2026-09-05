@@ -3365,9 +3365,25 @@ function diagnosePage() {
   if (typeof initOTLogWebSocket === 'function') initOTLogWebSocket();
   wireDiagnoseControls();
   setDiagnoseMessage('', false);
+  requestDiagnoseMenu();
   var input = document.getElementById('diagnoseLine');
   if (input) input.focus();
 } // diagnosePage()
+
+// The PIC only prints its menu when it is asked, so a screen opened after the menu has
+// scrolled past shows nothing at all. Ask for it once, but ONLY while the pane is still
+// empty: a bare CR ends a running test, and a user who opened test 2 and came back to
+// this page must not have it cancelled underneath them.
+function requestDiagnoseMenu() {
+  var pane = document.getElementById('diagnoseOutput');
+  if (!pane || pane.textContent.length) return;
+  // The socket is opened just above and needs a moment; without the delay the menu is
+  // printed before anyone is listening and the pane stays empty anyway.
+  setTimeout(function () {
+    var p = document.getElementById('diagnoseOutput');
+    if (p && !p.textContent.length) sendDiagnoseData('\r');
+  }, 800);
+}
 
 // Called from the /api/v2/device/info handlers. Unhides the nav entry, and on the first
 // detection of a diagnose PIC brings the screen up by itself, which is the whole point:
