@@ -341,10 +341,20 @@
       </div>
       <h1>PIC diagnose</h1>
       <p id="diagnoseIntro">
-        The PIC is running diagnose firmware, so it speaks a test menu instead of the
-        OpenTherm protocol. Pick a test by typing its number and pressing Enter. While a
-        test runs the PIC stays silent and reacts to single keys; press Enter to return
-        to the menu.
+        The PIC is running diagnose firmware, so it offers a test menu instead of speaking
+        OpenTherm. Type a test number and press Enter. The menu reads a whole line, so send
+        one number at a time.
+      </p>
+      <p id="diagnoseBehaviour">
+        What happens next differs per test. Tests 1, 2 and 3 keep running until you press
+        Enter, and test 1 produces no output at all while it runs, so a quiet screen is
+        normal there. Test 5 ends by asking you for a reference voltage setting. Test 4
+        needs a loop between the two interfaces, and is the one test that interrupts
+        communication between thermostat and boiler.
+      </p>
+      <p id="diagnoseReference">
+        Which connections each test needs, and how to read its results, is described on
+        <a href="https://otgw.tclcode.com/diagnose.html" target="_blank" rel="noopener">Schelte Bron's diagnostic firmware page</a>.
       </p>
       <pre id="diagnoseOutput" class="diagnose-output" aria-live="polite"></pre>
       <div class="diagnose-input-row">
