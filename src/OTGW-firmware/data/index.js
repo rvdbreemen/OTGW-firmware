@@ -5954,16 +5954,22 @@ function handleFlashCompletion(filename, error) {
     // flash that silently did not take leaves you on the home page rather than on a
     // diagnose screen with a PIC that cannot drive it.
     setTimeout(function () {
-        fetch(APIGW + 'v2/device/info')
-            .then(function (response) { return response.ok ? response.json() : null; })
-            .then(function (json) {
-                var dev = (json && json.device) || {};
-                applyDiagnoseAvailability(dev.picfwtype);
-                // No branch needed: showMainPage() sends you to the diagnose screen when
-                // the PIC runs diagnose firmware, and to the regular home page otherwise.
-                showMainPage();
-            })
-            .catch(function (err) { console.warn('post-flash screen switch skipped:', err); });
+        // Decide from the file that was just flashed, not from a fresh device query.
+        //
+        // The first version of this fetched /device/info here and it silently did nothing
+        // twice on hardware: the ESP has just finished a PIC flash, is re-detecting the
+        // banner and is rate limiting the UI polls, so the request stalled and never
+        // settled. A pending fetch has no timeout, hits neither .then nor .catch, and
+        // leaves no trace. fwInfo.type is already known, synchronous, and cannot hang.
+        //
+        // A wrong guess is self-healing: refreshFirmware() at +2s and the regular
+        // device-info poll both call applyDiagnoseAvailability() with what the device
+        // actually reports, so the nav and the Home routing correct themselves shortly
+        // after even if the flash did not take.
+        applyDiagnoseAvailability(fwInfo.type);
+        // No branch needed: showMainPage() sends you to the diagnose screen when diagnose
+        // firmware is present, and to the regular home page otherwise.
+        showMainPage();
     }, 10000);
 
     // Restart polling
@@ -6102,41 +6108,13 @@ function handleFlashMessage(data) {
             
             // Handle completion states
             if (msg.state === 'end') {
-                // Success
-                stopFlashPolling(); // Stop failsafe polling
-                isFlashing = false;
-                toggleInteraction(true);
-                clearLogBuffer();
-
-                if (progressBar) {
-                    progressBar.style.width = "100%";
-                    if (progressBar.classList.contains('error')) progressBar.classList.remove('error');
-                }
-
-                // Parse firmware info from filename
-                const fwInfo = parseFirmwareInfo(msg.filename || currentFlashFilename);
-
-                // Update UI immediately with TARGET version (optimistic)
-                let elType = document.getElementById('pic_type_display');
-                let elVer = document.getElementById('pic_version_display');
-                if (elType) elType.textContent = fwInfo.type;
-                if (elVer) elVer.textContent = fwInfo.version;
-                
-                if (pctText) pctText.textContent = "Successfully flashed to " + fwInfo.type + " " + fwInfo.version;
-                
-                // Trigger actual hardware refresh in background
-                setTimeout(() => refreshFirmware(), 2000); // Give PIC 2s to boot
-
-                // Reset progress bar after 10 seconds
-                setTimeout(function() {
-                    if (progressSection) progressSection.classList.remove('active');
-                    if (progressBar) progressBar.style.width = "0%";
-                    if (pctText) pctText.textContent = "Ready to flash";
-                }, 10000);
-                
-                // Restart polling
-                startOTmonitorPolling();
-                startTimeUpdates();
+                // Success. Delegate rather than repeat: this branch used to carry its own
+                // copy of the completion logic, identical to handleFlashCompletion() line
+                // for line. That duplication silently cost us the post-flash screen switch
+                // (TASK-1127), because the WebSocket reports 'end' before the 5 second
+                // failsafe poll notices, so THIS path is the one that normally runs and it
+                // never learned about the new behaviour. One completion path now.
+                handleFlashCompletion(msg.filename, null);
             } else if (msg.state === 'error' || msg.state === 'abort') {
                 // Error or abort
                 stopFlashPolling(); // Stop failsafe polling
