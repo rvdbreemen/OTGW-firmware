@@ -3344,8 +3344,6 @@ function sendDiagnoseLine() {
 function wireDiagnoseControls() {
   var input = document.getElementById('diagnoseLine');
   var sendBtn = document.getElementById('diagnoseSend');
-  var keypad = document.getElementById('diagnoseKeypad');
-  var redraw = document.getElementById('diagnoseRedraw');
 
   if (input && !input.dataset.wired) {
     input.dataset.wired = '1';
@@ -3356,20 +3354,6 @@ function wireDiagnoseControls() {
   if (sendBtn && !sendBtn.dataset.wired) {
     sendBtn.dataset.wired = '1';
     sendBtn.addEventListener('click', sendDiagnoseLine);
-  }
-  if (redraw && !redraw.dataset.wired) {
-    redraw.dataset.wired = '1';
-    redraw.addEventListener('click', function () { sendDiagnoseData('\r'); });
-  }
-  if (keypad && !keypad.dataset.wired) {
-    keypad.dataset.wired = '1';
-    keypad.addEventListener('click', function (ev) {
-      var btn = ev.target && ev.target.closest ? ev.target.closest('.diagnose-key') : null;
-      if (!btn) return;
-      var key = btn.getAttribute('data-key');
-      if (!key) return;                       // the redraw button has its own handler
-      sendDiagnoseData(key === 'ENTER' ? '\r' : key);
-    });
   }
 }
 

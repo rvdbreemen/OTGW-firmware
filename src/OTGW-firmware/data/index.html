@@ -347,8 +347,8 @@
       </p>
       <p id="diagnoseBehaviour">
         What happens next differs per test. Tests 1, 2 and 3 keep running until you press
-        Enter, and test 1 produces no output at all while it runs, so a quiet screen is
-        normal there. Test 5 ends by asking you for a reference voltage setting. Test 4
+        Enter with the box empty, and test 1 produces no output at all while it runs, so a
+        quiet screen is normal there. Test 5 ends by asking you for a reference voltage setting. Test 4
         needs a loop between the two interfaces, and is the one test that interrupts
         communication between thermostat and boiler.
       </p>
@@ -363,15 +363,6 @@
                placeholder="Type a test number, then Enter">
         <button type="button" id="diagnoseSend" class="diagnose-btn">Send</button>
       </div>
-      <div class="diagnose-keypad" id="diagnoseKeypad">
-        <button type="button" class="diagnose-key diagnose-key-wide" data-key="ENTER">Enter</button>
-        <button type="button" class="diagnose-key diagnose-key-wide" id="diagnoseRedraw">Redraw menu</button>
-      </div>
-      <p class="diagnose-hint">
-        The text box sends a whole line, which is what the menu expects. Enter sends a
-        bare carriage return on its own, which submits a choice or leaves a running test.
-        Nothing here is queued: bytes go straight to the PIC.
-      </p>
       <div id="diagnoseMessage"></div>
     </div>
 

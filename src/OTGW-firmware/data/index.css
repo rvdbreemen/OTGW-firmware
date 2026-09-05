@@ -1421,25 +1421,12 @@ body.disable-interaction {
   padding: 0.4rem 0.5rem;
   font-family: Consolas, "Courier New", monospace;
 }
-.diagnose-btn,
-.diagnose-key {
+.diagnose-btn {
   padding: 0.45rem 0.9rem;
   min-width: 2.8rem;
   cursor: pointer;
   font-family: Consolas, "Courier New", monospace;
   font-size: 0.95rem;
-}
-.diagnose-keypad {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin: 0.5rem 0;
-}
-.diagnose-key-wide { min-width: 8rem; }
-.diagnose-hint {
-  font-size: 0.85rem;
-  opacity: 0.8;
-  margin: 0.4rem 0 0 0;
 }
 .diagnose-error { color: #c0392b; font-weight: bold; }
 .diagnose-ok { color: inherit; }
