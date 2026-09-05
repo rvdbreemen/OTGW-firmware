@@ -3,9 +3,10 @@ id: TASK-1126
 title: >-
   PIC self-heal is gateway-only: the banner match is case-sensitive and diagnose
   spells it differently
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-04 21:22'
+updated_date: '2026-09-05 08:07'
 labels:
   - bug
 dependencies: []
@@ -21,8 +22,28 @@ Found by the diagnose-firmware design analysis (docs/plan/DIAGNOSE_FIRMWARE_SUPP
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 fwreportinfo() sets state.pic.bAvailable when it is false, so a banner from any of the three firmware types re-enables PIC functions
-- [ ] #2 No other behaviour change in fwreportinfo(): sendMQTTversioninfo() is still called exactly once per banner
+- [x] #1 fwreportinfo() sets state.pic.bAvailable when it is false, so a banner from any of the three firmware types re-enables PIC functions
+- [x] #2 No other behaviour change in fwreportinfo(): sendMQTTversioninfo() is still called exactly once per banner
 - [ ] #3 On a gateway PIC, picavailable stays true across boot and across a PIC reflash
-- [ ] #4 On a diagnose PIC, picavailable is true and picfwtype is diagnose, verified on hardware
+- [x] #4 On a diagnose PIC, picavailable is true and picfwtype is diagnose, verified on hardware
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-05: implemented in fwreportinfo() and shipped alongside TASK-1127. Verified on the bench unit running diagnose 2.2: picavailable stays true and picfwtype stays diagnose across the deploy and across repeated banner redraws.
+
+AC #3 (gateway PIC keeps picavailable true across boot and across a PIC reflash) is NOT checked: no gateway PIC was available, and reflashing one needs explicit authorisation. The change only ever ADDS a set of bAvailable when it is false, and touches nothing else, so it cannot take availability away from a gateway.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A banner from any PIC firmware type now re-enables PIC functions, not just a gateway banner.
+
+The only runtime path that set state.pic.bAvailable matched OTGW_BANNER ("OpenTherm Gateway") with a case-sensitive strstr. The diagnose PIC says "Opentherm gateway diagnostics" with a lowercase g and the interface PIC says "OpenTherm Interface", so neither could ever match. Meanwhile fwreportinfo(), the banner callback that fires for all three types, already maintained the firmware type but never touched the availability flag. The type self-healed for every PIC; availability self-healed only for a gateway.
+
+Severity was an asymmetry rather than an outage: the find(ETX) probe in detectPIC() does succeed against diagnose.hex, demonstrated by the bench unit reporting picavailable true. The risk was that one missed ETX would be permanent for a non-gateway PIC, leaving every PIC route on 503 including the /pic route that is the only way back to gateway.hex.
+
+Found as Stage 0 of the diagnose-firmware design analysis, kept as its own change because it stands alone.
+<!-- SECTION:FINAL_SUMMARY:END -->
