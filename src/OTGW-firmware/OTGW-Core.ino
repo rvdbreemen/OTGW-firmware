@@ -5147,6 +5147,18 @@ void fwreportinfo(OTGWFirmware fw, const char *version) {
         break;
       }
     }
+    // TASK-1126: this callback is the only banner handler that fires for ALL three
+    // firmware types. The gateway-only self-heal in processOT() cannot help diagnose
+    // or interface: it matches OTGW_BANNER ("OpenTherm Gateway") with a case-sensitive
+    // strstr, while the diagnose PIC announces "Opentherm gateway diagnostics" with a
+    // lowercase g, and the interface PIC says "OpenTherm Interface". Without this,
+    // bAvailable is set exactly once by the find(ETX) probe in detectPIC(), and if that
+    // probe ever misses, every PIC route answers 503 forever, including the /pic route
+    // that is the only way to flash gateway.hex back.
+    if (!state.pic.bAvailable) {
+      state.pic.bAvailable = true;
+      DebugTln(F("PIC detected via firmware banner: PIC functions re-enabled"));
+    }
     strlcpy(state.pic.sFwversion, version, sizeof(state.pic.sFwversion));
     //state.pic.sFwversion = String(OTGWSerial.firmwareVersion());
     DebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
