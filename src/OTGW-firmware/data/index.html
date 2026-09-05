@@ -354,23 +354,13 @@
         <button type="button" id="diagnoseSend" class="diagnose-btn">Send</button>
       </div>
       <div class="diagnose-keypad" id="diagnoseKeypad">
-        <button type="button" class="diagnose-key" data-key="1">1</button>
-        <button type="button" class="diagnose-key" data-key="2">2</button>
-        <button type="button" class="diagnose-key" data-key="3">3</button>
-        <button type="button" class="diagnose-key" data-key="4">4</button>
-        <button type="button" class="diagnose-key" data-key="5">5</button>
-        <button type="button" class="diagnose-key" data-key="6">6</button>
-        <button type="button" class="diagnose-key" data-key="7">7</button>
-        <button type="button" class="diagnose-key" data-key="8">8</button>
-        <button type="button" class="diagnose-key" data-key="9">9</button>
-        <button type="button" class="diagnose-key" data-key="0">0</button>
         <button type="button" class="diagnose-key diagnose-key-wide" data-key="ENTER">Enter</button>
         <button type="button" class="diagnose-key diagnose-key-wide" id="diagnoseRedraw">Redraw menu</button>
       </div>
       <p class="diagnose-hint">
-        The keys above send one character immediately, which is what a running test
-        expects. The text box above them sends a whole line, which is what the menu
-        expects. Nothing here is queued: bytes go straight to the PIC.
+        The text box sends a whole line, which is what the menu expects. Enter sends a
+        bare carriage return on its own, which submits a choice or leaves a running test.
+        Nothing here is queued: bytes go straight to the PIC.
       </p>
       <div id="diagnoseMessage"></div>
     </div>

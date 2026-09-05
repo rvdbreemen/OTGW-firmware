@@ -3175,6 +3175,17 @@ function checkFSMismatch() {
 
 function showMainPage() {
   console.log("showMainPage()");
+  // On a diagnose PIC the diagnose screen IS the home screen (TASK-1127). The regular
+  // home page is built around OpenTherm telemetry, and a PIC running diagnose firmware
+  // produces none of it, so that page would sit there permanently empty.
+  //
+  // The redirect lives here rather than at each call site because showMainPage() has
+  // five callers, including the Home button, the post-flash switch and two error paths.
+  // Routing centrally means none of them can disagree, and none of them had to change.
+  if (diagnoseAvailable) {
+    diagnosePage();
+    return;
+  }
   stopOTmonitorPolling();
   
   // Exit flash mode if it was active
@@ -3256,9 +3267,13 @@ function webhookPage() {
 // Measured against a real diagnose 2.2 PIC, and the input design follows from it:
 //   - At the menu the PIC is LINE based and echoes what you type. So the text box sends a
 //     whole line and we must not echo locally, or every character would appear twice.
-//   - Inside a running test the PIC consumes single keys and echoes NOTHING. So the keypad
-//     sends one byte immediately, and the user gets no confirmation from the PIC.
+//   - Inside a running test the PIC consumes single keys and echoes NOTHING.
 //   - Enter is a bare CR (0x0D). It both submits a menu choice and leaves a running test.
+//
+// The keypad deliberately carries no digit buttons: the maintainer found a 0-9 row ugly,
+// and the menu is line based anyway, so the text box covers it. sendDiagnoseData() still
+// takes an arbitrary string, so a bare digit with no CR remains one call away if a test
+// ever turns out to need it.
 //   - On connect the PIC sends nothing at all; it sits silently on its prompt. Hence the
 //     explicit "Redraw menu" button, which just sends a CR to provoke a redraw.
 //===========================================================================================
@@ -5925,7 +5940,32 @@ function handleFlashCompletion(filename, error) {
         if (progressBar) progressBar.style.width = "0%";
         if (pctText) pctText.textContent = "Ready to flash";
     }, 10000);
-    
+
+    // TASK-1127: leave the flash page for whichever screen now makes sense. Diagnose
+    // firmware gets the diagnose screen; anything else, gateway included, goes home.
+    //
+    // Ten seconds, because the PIC reboots after a flash and the ESP only learns the new
+    // firmware type when the banner arrives; asking sooner would still read the old type.
+    //
+    // The DEVICE decides, not the filename. fwInfo.type is parsed from the file the user
+    // picked, so it says what was intended; /device/info says what the ESP actually
+    // re-detected. Routing on the device's answer means the diagnose screen only ever
+    // opens when the gateway genuinely knows it is talking to a diagnose PIC, and a
+    // flash that silently did not take leaves you on the home page rather than on a
+    // diagnose screen with a PIC that cannot drive it.
+    setTimeout(function () {
+        fetch(APIGW + 'v2/device/info')
+            .then(function (response) { return response.ok ? response.json() : null; })
+            .then(function (json) {
+                var dev = (json && json.device) || {};
+                applyDiagnoseAvailability(dev.picfwtype);
+                // No branch needed: showMainPage() sends you to the diagnose screen when
+                // the PIC runs diagnose firmware, and to the regular home page otherwise.
+                showMainPage();
+            })
+            .catch(function (err) { console.warn('post-flash screen switch skipped:', err); });
+    }, 10000);
+
     // Restart polling
     startOTmonitorPolling();
     startTimeUpdates();
