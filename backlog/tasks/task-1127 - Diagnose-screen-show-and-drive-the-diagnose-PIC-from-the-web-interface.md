@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-05 07:30'
-updated_date: '2026-09-05 12:31'
+updated_date: '2026-09-05 13:15'
 labels:
   - feature
 dependencies: []
@@ -110,6 +110,12 @@ One known rough edge, not a regression and not fixed: deep-linking to #tabPICfla
 - Test 2 stayed silent because this bench unit has no thermostat: the OT log shows "Thermostat disconnected". Consistent with the source page, which requires a thermostat for test 2.
 - Flashed back to gateway.hex: flash-status 100% "PIC upgrade was successful", picfwtype gateway 6.8, UI back on displayMainPage with diagnoseAvailable=false and 0 of 6 diagnose tabs visible, live OT traffic.
 - Earlier note about a failed flash back was wrong: the maintainer had flashed the PIC to diagnose himself.
+
+2026-09-05 (3): Regression found and fixed. Removing the Redraw button took away the only way to get the menu on screen, because the PIC prints it only when asked. Reproduced: output pane 0 characters four seconds after the screen auto-opened.
+- diagnosePage() now calls requestDiagnoseMenu(), which sends the same bare CR the button sent. Fires only while the pane is empty, so returning to the screen cannot cancel a running test, and waits 800 ms for the OT-log socket.
+- Second pass: the bare CR makes the prompt answer "Invalid test" before redrawing, which would head every visit. Trimmed, but only for our own request. The first attempt trimmed the incoming chunk and failed, because the reply arrives over several socket frames and the first is just the newline. Now trims the accumulated pane text and keeps the flag armed until the banner lands, with a five second failsafe.
+- Verified on 1.7.6-beta.1+c939aa1 against a diagnose 2.2 PIC: cold page load shows the full menu with no "Invalid test"; typing 9 still shows "Invalid test", so a real complaint is not swallowed; test 1 echoes and stays silent, empty Enter returns the menu.
+- Screenshots: bewijs-A-menu-koud-openen.png, bewijs-B-test1-en-terug.png.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
