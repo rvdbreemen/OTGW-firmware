@@ -1,6 +1,6 @@
 ---
 name: beta-prerelease
-description: Publish an OTGW-firmware beta prerelease — bump _VERSION_PRERELEASE, push to otgw-1.x.x, tag, and let CI build + publish the GitHub prerelease
+description: Publish an OTGW-firmware beta prerelease — tag the version already in version.h, let CI build and publish the GitHub prerelease, then bump _VERSION_PRERELEASE for the next cycle
 disable-model-invocation: true
 ---
 
@@ -14,7 +14,7 @@ Publish a single beta build to field testers in Discord `#beta-testing`. Lightwe
 /beta-prerelease
 ```
 
-No arguments. Reads the current `_VERSION_PRERELEASE` and either increments it via `bin/bump-prerelease.sh` or adopts it unchanged when a previous run already bumped but never shipped the tag (Phase 2).
+No arguments. Publishes the `_VERSION_PRERELEASE` that is already in `version.h`, then bumps it afterwards with `bin/bump-prerelease.sh` so the tree carries the next, unpublished number (Phase 2 and Phase 10).
 
 ## Token-efficiency rules (apply throughout all phases)
 
@@ -170,52 +170,38 @@ Facts that follow from the worktree layout and that the phases below depend on:
 
 Skip by default. Only pause if the staged firmware change introduces a new architectural pattern, dependency, or NFR shift. Most beta cycles do not need this gate.
 
-### Phase 2: Bump prerelease (or adopt an unshipped one)
+### Phase 2: Confirm the number to publish (do NOT bump here)
 
-**Decide before running the helper.** The bump is not always owed. Take the
-value already in `version.h` (Phase 0 step 6) and ask two questions:
+**You publish the number that is already in `version.h`.** The bump happens
+after the tag is out, in Phase 10. The tree therefore always carries an
+*unpublished* number, which is the point: every local or OTA build made between
+betas reports a version that no published tag uses, so a tester saying "on
+beta.3 I see..." can only mean the release you published, never someone's bench
+build wearing the same string.
 
-1. Is `v${SEMVER_CORE}-${CURRENT_PRERELEASE}` absent from the Phase 0 step 7
-   release listing (never published, and never burned)?
-2. Is everything between the commit that set that value and `HEAD` release noise
-   only, i.e. no firmware surface change?
-   ```bash
-   CUR=$(grep -oP '(?<=_VERSION_PRERELEASE ).*' src/OTGW-firmware/version.h | tr -d '\r')
-   BUMP_COMMIT=$(git log -1 --format=%H -G"_VERSION_PRERELEASE ${CUR//./\\.}" \
-                   -- src/OTGW-firmware/version.h)
-   git log --oneline "${BUMP_COMMIT}..HEAD"
-   git diff --name-only "${BUMP_COMMIT}..HEAD" -- src/OTGW-firmware/ src/libraries/
-   ```
-   Empty `git diff` output means the firmware surface is identical to the bump
-   commit, so whatever landed since is backlog or docs noise.
+Take `CUR_PRERELEASE` from Phase 0 step 6 and check one thing:
 
-   Use `-G` (diff-content regex), NOT `-S` (pickaxe on occurrence *count*). A
-   bump rewrites the value on an existing line, so the count of
-   `_VERSION_PRERELEASE` never changes and `-S` walks right past it: on this repo
-   it returns a 2632-era build commit instead. Escaping the dot in the value
-   keeps `beta.5` from also matching `betaX5`.
+**Is `v${SEMVER_CORE}-${CUR_PRERELEASE}` absent from the Phase 0 step 7 release
+listing?** Absent means never published and never burned, so it is free to use.
 
-**Both yes: adopt it, do NOT bump.** `NEW_PRERELEASE` = the current value, skip
-straight to Phase 3. A previous run that committed the bump but never pushed the
-tag leaves exactly this state. Bumping over it means that beta number never
-exists for testers and you rewrite `version.h` for nothing.
+- **Absent: publish it.** `PRERELEASE="${CUR_PRERELEASE}"`. Continue to Phase 3.
+- **Present: the tree is stale**, which means a previous run published without
+  bumping afterwards, or someone bumped by hand and lost. Recover by bumping
+  until the number is free, and say so in the Phase 6 commit message:
 
-**Otherwise: bump.**
+  ```bash
+  bin/bump-prerelease.sh   # repeat while the resulting tag is in the step 7 listing
+  ```
 
-```bash
-bin/bump-prerelease.sh
-```
+  A burned-and-deleted tag (Trap 2) looks the same and is handled the same way.
+  The helper does NOT git-add; you stage in Phase 6.
 
-Prints the transition (e.g. `beta.3 -> beta.4`). Store the new value as `NEW_PRERELEASE`. The helper does NOT git-add — you stage in Phase 6.
-
-If Phase 0 step 7 shows the next number is burned (Trap 2), run the helper again
-to skip past it and record the skipped tag in the Phase 6 commit message.
-
-Assemble the tag: `TAG="v${SEMVER_CORE}-${NEW_PRERELEASE}"`
+Either way, set `PRERELEASE` to the value now in `version.h` and assemble the
+tag: `TAG="v${SEMVER_CORE}-${PRERELEASE}"`
 
 ### Phase 3: Refresh README + CHANGELOG + RELEASE_NOTES (mandatory, P2, P3)
 
-The GitHub Action reads these files at the tagged commit. Stale narrative at the tag = stale release page (Trap 1). Refresh immediately after the bump so `NEW_PRERELEASE` is known.
+The GitHub Action reads these files at the tagged commit. Stale narrative at the tag = stale release page (Trap 1). Refresh before the tag is pushed, so the release page describes what it ships.
 
 **Staleness check (P2 — targeted extractions, not full reads):**
 
@@ -287,7 +273,7 @@ Select-String -Path logs\build_beta.log -Pattern "Build completed successfully" 
 ```
 
 1. `build/*.ino.bin` and `build/*.littlefs.bin` both carry a mtime from this run.
-2. Their filenames embed the expected `${SEMVER_CORE}-${NEW_PRERELEASE}` (the
+2. Their filenames embed the expected `${SEMVER_CORE}-${PRERELEASE}` (the
    `+<githash>` suffix will track whatever commit you are on, which is fine).
 3. The log contains the literal `Build completed successfully!` line.
 
@@ -328,10 +314,12 @@ git diff --ignore-cr-at-eol --name-only    # --ignore-cr-at-eol hides EOL-only c
 unrelated tracked file that another tool touched in this frequently-dirty
 worktree.
 
-**Audit first, then stage.** The bump rewrites a version banner in ~24 files, so
-a bump run has ~27 dirty paths and enumerating them by hand is the easiest place
-in this skill to make a mistake. Do not eyeball it. Prove the whole `src/` diff
-is banner-and-version churn only, and *then* stage by name. If the filter below
+**Audit first, then stage.** In the normal case this commit is small: the
+CHANGELOG plus the build stamp, because no bump happened. It grows to ~27 dirty
+paths only on the recovery path where Phase 2 had to bump past a taken number,
+and enumerating that by hand is the easiest place in this skill to make a
+mistake. Do not eyeball it either way. Prove the whole `src/` diff is
+banner-and-version churn only, and *then* stage by name. If the filter below
 prints anything other than version lines, an unrelated change is riding along
 and belongs in its own commit:
 
@@ -346,15 +334,17 @@ git status --short | grep -v '^??' | awk '{print $2}'
 ```
 
 ```bash
-# The 1.x bin/bump-prerelease.sh updates version banners across ~24 files and
-# does NOT auto-stage. For a bump run, list the banner files it rewrote plus:
+# Normal case: the CHANGELOG plus the build stamp from Phase 4.
 git add CHANGELOG.md src/OTGW-firmware/version.h src/OTGW-firmware/data/version.hash
 # ...and your firmware change paths, spelled out.
+# Recovery case only (Phase 2 had to bump past a taken number): also list the
+# ~24 banner files bin/bump-prerelease.sh rewrote. It does NOT auto-stage.
 
 git commit -F - <<'EOF'
-chore(release): ${NEW_PRERELEASE}
+chore(release): ${PRERELEASE}
 
-<what is in this beta, and why the version stamp moved>
+<what is in this beta. Say the version stamp did NOT move, or, on the recovery
+path, which taken numbers were skipped and why>
 
 Gates: build.bat verified (fresh build/*.ino.bin + *.littlefs.bin, literal
 "Build completed successfully"). evaluate.py --quick <N>/<M> pass; any
@@ -386,9 +376,9 @@ reaching for `--no-verify`.
 
 ```bash
 SEMVER_CORE=$(grep '_SEMVER_CORE ' src/OTGW-firmware/version.h | awk -F'"' '{print $2}')
-TAG="v${SEMVER_CORE}-${NEW_PRERELEASE}"
+TAG="v${SEMVER_CORE}-${PRERELEASE}"
 
-git tag -a "${TAG}" -m "Beta prerelease ${NEW_PRERELEASE}"
+git tag -a "${TAG}" -m "Beta prerelease ${PRERELEASE}"
 git push origin "${TAG}"
 ```
 
@@ -444,9 +434,9 @@ CI writes the release body itself. To replace it with your own narrative:
 Prepare announcement for `#beta-testing` (channel ID `914498730001072149`). Diff link points at `LATEST_PUBLIC` (testers want to see what changed since the last stable, not since a previous beta).
 
 ```
-Beta ${NEW_PRERELEASE} is up.
+Beta ${PRERELEASE} is up.
 
-Version: ${SEMVER_CORE}-${NEW_PRERELEASE}
+Version: ${SEMVER_CORE}-${PRERELEASE}
 What is new: <one or two sentences>
 Download: https://github.com/rvdbreemen/OTGW-firmware/releases/tag/${TAG}
 Diff vs ${LATEST_PUBLIC}: https://github.com/rvdbreemen/OTGW-firmware/compare/${LATEST_PUBLIC}...${TAG}
@@ -460,6 +450,40 @@ real reply. A background-task notification (build finished, `gh run watch`
 returned) is not approval, and neither is your own earlier message saying you
 would post it. Nothing goes to Discord without a human "yes" in this turn or a
 later one.
+
+### Phase 10: Bump for the next cycle (mandatory, closes the run)
+
+Only now does `_VERSION_PRERELEASE` move. The tag is out, so the number it used
+is spent, and leaving it in `version.h` would make every subsequent bench build
+report a version string that a published release already owns. A tester's "on
+beta.4 I see..." then has two possible meanings, and the reply you give depends
+on which one it was.
+
+```bash
+bin/bump-prerelease.sh          # ${PRERELEASE} -> the next number
+python evaluate.py --quick      # the bump rewrites ~24 files; confirm nothing broke
+```
+
+Stage the whole sweep by explicit path, using the same audit as Phase 6 to prove
+it is banner-and-version churn only, then commit and push:
+
+```bash
+git commit -F - <<'EOF'
+chore(release): open <next> after publishing ${PRERELEASE}
+
+v${SEMVER_CORE}-${PRERELEASE} is published, so that number is spent. Moves the
+tree to the next unpublished one, which keeps every build made between betas
+distinguishable from anything a tester can download.
+EOF
+
+git push origin otgw-1.x.x
+```
+
+**Do not skip this because the run "already succeeded".** The publish is what
+makes the bump owed, so a run that stops at Phase 9 leaves the repository in the
+exact state Phase 2 has to detect and repair. Finish it in the same session.
+
+Do NOT tag this commit. The next `/beta-prerelease` publishes it.
 
 ## Dry-run (testing without publishing)
 
@@ -489,7 +513,7 @@ fresh suffix per dry-run.
 4. **Trap 4: Diff link to previous beta hides what testers care about** — always link vs `LATEST_PUBLIC` (the non-prerelease "Latest" release), not the previous beta tag.
 5. **Trap 5: Stale narrative at tagged commit is permanent** — Phase 3 refresh runs before the tag is pushed for this reason. Skipping Phase 3 = stale release page that cannot be edited after publish.
 6. **Trap 6: `gh run watch` with no run ID fakes a green CI wait** — the ID-less form needs a TTY for its run picker. Without one it prints the flag usage block and **exits 0 immediately**, so a still-`in_progress` run reads as finished and you announce a release that does not exist yet. Always resolve the ID first (Phase 8) and cross-check with `gh run view`. Same class as `build.py` exiting 0 on a failed compile: an exit code that does not mean what it looks like.
-7. **Trap 7: the bump may already have happened** — a previous run can leave `_VERSION_PRERELEASE` bumped and committed but the tag never pushed, which `git tag --list` shows as "this beta does not exist". Bumping again buries a perfectly good, never-shipped beta number and rewrites `version.h` for nothing. Phase 2 decides between adopt and bump; the discriminator is the Phase 0 step 7 release listing plus an empty firmware diff since the bump commit.
+7. **Trap 7: a run that stopped before Phase 10 leaves a spent number in the tree** — the publish happens at the number already in `version.h`, and the bump follows it. A run abandoned after the tag went out (or before this ordering existed) leaves `_VERSION_PRERELEASE` naming a published release, so every bench build wears a version string a tester can also download. Phase 2 detects it against the Phase 0 step 7 release listing and repairs it by bumping until the number is free. `git tag --list` is not enough on its own: it cannot see a burned-and-deleted tag (Trap 2).
 8. **Trap 8: relative paths follow the cwd, not the repo** — `bin/bump-prerelease.sh`, `build.bat` and `.githooks/` all resolve against the working directory. A tool call that starts in a sibling worktree (dev, or one of the `wt-*` experiment trees) bumps and tags the wrong branch without complaining. Anchor with `cd "$(git rev-parse --show-toplevel)"` and assert the branch, every time (Phase 0 preflight).
 
 ## Important rules
@@ -504,5 +528,7 @@ fresh suffix per dry-run.
 - **Build and evaluator gates are mandatory** — do not push a tag if either is red.
 - **Never trust an exit code as a gate.** `build.py` exits 0 on a failed target and `gh run watch` exits 0 without watching. Verify on artefacts, log lines and API state instead (Phase 4, Phase 8).
 - **Stage by explicit path.** No `git add -A`, no `git add $(git diff --name-only)`.
+- **Publish the number already in `version.h`, bump afterwards.** Phase 2 only confirms the number is free; Phase 10 moves it once the tag is out. That keeps the working tree on an unpublished number at all times, so no bench build can wear a version string a tester could also have downloaded.
+- **Phase 10 is part of the run, not a follow-up.** Stopping after the Discord post leaves the tree in the broken state Phase 2 exists to repair.
 - **One checkpoint**: the Discord announcement in Phase 9. A background-task notification is not approval.
 - **Do NOT bypass the bump-check hook** with `OTGW_BUMP_HOOK_DISABLE=1` — if the hook blocks, you forgot to stage `version.h` / `data/version.hash`.
