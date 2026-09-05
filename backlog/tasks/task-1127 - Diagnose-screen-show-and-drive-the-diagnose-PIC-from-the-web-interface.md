@@ -1,7 +1,7 @@
 ---
 id: TASK-1127
 title: 'Diagnose screen: show and drive the diagnose PIC from the web interface'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-05 07:30'
@@ -93,3 +93,19 @@ A third thing cost real time and is worth recording as a development gotcha rath
 
 One known rough edge, not a regression and not fixed: deep-linking to #tabPICflash on a diagnose PIC loses a race against the once-per-load auto-show and lands on the diagnose screen instead. The PIC firmware page stays reachable through Advanced, which is how the flash back to gateway was performed, so nothing is unreachable.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The web interface can now show and drive a PIC running diagnose firmware, so no external tool is needed.
+
+On a diagnose PIC the diagnose screen IS the home screen: the regular home page is built around OpenTherm telemetry that a diagnose PIC does not produce, so it would sit there empty. The redirect lives inside showMainPage() rather than at its call sites, so the Home button, the post-flash switch and the error paths all agree. On a gateway PIC nothing changes and every diagnose element stays hidden.
+
+The design follows a measurement of the real menu, and one finding contradicted the brief: the menu is LINE based, not per keystroke. Sending 1, 4, 6 without Enter produced only echoes and then "Invalid test", because the PIC had buffered "146". Inside a running test the opposite holds, keys are consumed silently with no echo. Hence a text box for the menu and an Enter key that sends a bare CR, which both submits a choice and leaves a test. The digit keypad was dropped at the maintainer's request once the line-based behaviour made it redundant.
+
+Output mirrors the existing port 25238 passthrough onto the OT-log WebSocket with an STX prefix, so there is no second server and no extra static RAM. Input is POST /api/v2/otgw/diagnose, which writes bytes verbatim and is gated positively on FIRMWARE_DIAG with 409 otherwise; it cannot use the command queue, because sendOTGW() appends CR+LF below every validator and an appended Enter would end the test just started.
+
+One firmware fix was required rather than optional: the diagnose PIC reprints its banner on every menu redraw, so every keypress re-entered fwreportinfo() and published MQTT version info. It now publishes only on a real change.
+
+Verified end to end on hardware across a full gateway -> diagnose -> gateway round trip driven from the browser, including live test readings and the ten second post-flash screen switch in both directions.
+<!-- SECTION:FINAL_SUMMARY:END -->
