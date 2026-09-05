@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-05 07:30'
-updated_date: '2026-09-05 10:35'
+updated_date: '2026-09-05 12:31'
 labels:
   - feature
 dependencies: []
@@ -101,6 +101,15 @@ One known rough edge, not a regression and not fixed: deep-linking to #tabPICfla
 - Round trip re-run: PIC was found on diagnose 2.2 (menu answered live over the WS bridge), flashed back to gateway.hex 6.8, flash-status reported success, UI returned to the normal home screen with diagnoseAvailable=false, 0 of 6 diagnose tabs visible, and live OT traffic.
 - Copy checked against the REAL menu: 1 LED test, 2 Bit timing thermostat, 3 Bit timing boiler, 4 Delay symmetry, 5 Voltage levels, 6 Idle times, 7 Temperature sensor.
 - Cosmetic, pre-existing: "Redraw menu" sends a bare CR, so the PIC answers "Invalid test" before redrawing.
+
+2026-09-05 (2): Removed the Enter and Redraw buttons at the maintainer's request. Both sent a bare CR, which the text box already does on an empty Enter.
+- Gone: the keypad div and its two buttons, the hint paragraph that only explained them, the keypad/redraw wiring in wireDiagnoseControls(), and the .diagnose-key / .diagnose-keypad / .diagnose-key-wide / .diagnose-hint CSS.
+- Behaviour paragraph now reads "press Enter with the box empty" so leaving a running test stays discoverable.
+- Validated on hardware at 1.7.6-beta.1+cb807be against a diagnose 2.2 PIC: fresh load auto-routes to the diagnose page, no Enter/Redraw/keypad/hint in the DOM, wireDiagnoseControls() carries no keypad wiring (so not a cached script).
+- Interaction proven end to end: empty Enter returns the menu; "1" echoes and then stays silent (LED test produces no output, as documented); empty Enter leaves the test and redraws the menu. Same leave-behaviour confirmed for test 2.
+- Test 2 stayed silent because this bench unit has no thermostat: the OT log shows "Thermostat disconnected". Consistent with the source page, which requires a thermostat for test 2.
+- Flashed back to gateway.hex: flash-status 100% "PIC upgrade was successful", picfwtype gateway 6.8, UI back on displayMainPage with diagnoseAvailable=false and 0 of 6 diagnose tabs visible, live OT traffic.
+- Earlier note about a failed flash back was wrong: the maintainer had flashed the PIC to diagnose himself.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
