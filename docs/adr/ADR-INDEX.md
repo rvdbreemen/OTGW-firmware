@@ -182,4 +182,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-174 | Accepted | - | Chosen option: Option A, because homeassistant/status is a Home Assistant side contract and the two firmware lines mu... |
 | ADR-175 | Proposed | `scripts/tests/coverage_baseline.py` | Chosen option: Option A, because it is the only one that makes topic presence an observation rather than a sample, an... |
 | ADR-176 | Accepted | - | Chosen option: Option A, because the maintainer decided the Energy dashboard should work out of the box rather than r... |
-| ADR-177 | Proposed | - | Chosen option: Option A, because state the decisive rationale. |
+| ADR-177 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option A, because the damaging edits share a small, precise syntactic signature. |

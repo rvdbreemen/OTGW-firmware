@@ -1,7 +1,7 @@
 ---
 id: "ADR-177"
 title: "Keep the PIC byte stream verbatim from the serial task to every consumer"
-status: "Proposed"
+status: "Accepted"
 date: "2026-09-05"
 binding: true
 gate: "adr-judge declarative rules on the raw-path files"
@@ -9,23 +9,23 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "madr"
 topics:
-  - pic-serial
-  - byte-transparency
-  - diagnose-firmware
+  - "pic-serial"
+  - "byte-transparency"
+  - "diagnose-firmware"
 aliases:
-  - raw passthru
-  - otRawQueue
-  - byte-transparent bridge
+  - "raw passthru"
+  - "otRawQueue"
+  - "byte-transparent bridge"
 components:
-  - OTGW-Core raw PIC byte path
-  - otRawQueue producer and consumer
+  - "OTGW-Core raw PIC byte path"
+  - "otRawQueue producer and consumer"
 symbols:
-  - drainOTRawQueue
-  - otRawQueue
-  - OT_RAW_CHUNK_MAX
+  - "drainOTRawQueue"
+  - "otRawQueue"
+  - "OT_RAW_CHUNK_MAX"
 context_scope: "selective"
+format: "madr"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -34,7 +34,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-09-05.
+Accepted, 2026-09-05.
 
 ## Status History
 
@@ -45,6 +45,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-09-05
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context and Problem Statement
@@ -84,7 +89,7 @@ the rule is currently unrecorded on this branch.
   covers it without constraining unrelated line-oriented code in the same file.
 * A decision that no gate checks is a comment, and comments do not survive refactors.
 
-## Considered Options
+## Alternatives Considered
 
 * **Option A** — state the rule and enforce it with declarative regex rules over
   the raw-path file.

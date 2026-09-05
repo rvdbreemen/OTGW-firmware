@@ -5697,34 +5697,58 @@
       "title": "Keep the PIC byte stream verbatim from the serial task to every consumer",
       "path": "ADR-177-keep-the-pic-byte-stream-verbatim-from-the-serial-task-to-every-consumer.md",
       "format": "madr",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-09-05",
-      "decision_summary": "Chosen option: Option A, because state the decisive rationale.",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
+      "decision_summary": "Chosen option: Option A, because the damaging edits share a small, precise syntactic signature.",
+      "topics": [
+        "byte-transparency",
+        "diagnose-firmware",
+        "pic-serial"
+      ],
+      "aliases": [
+        "byte-transparent bridge",
+        "otRawQueue",
+        "raw passthru"
+      ],
+      "components": [
+        "OTGW-Core raw PIC byte path",
+        "otRawQueue producer and consumer"
+      ],
+      "symbols": [
+        "drainOTRawQueue",
+        "OT_RAW_CHUNK_MAX",
+        "otRawQueue"
+      ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "State required implementation constraints."
+          "Copy PIC bytes on the raw path verbatim, as a (pointer, length) pair.",
+          "Preserve length exactly. A chunk of N bytes reaches every consumer as N bytes.",
+          "Let a consumer add framing around the payload, such as a WebSocket frame prefix, provided the payload itself is untouched."
         ],
         "must_not": [
-          "State prohibited implementation choices."
+          "Assemble the raw path into lines, or wait for a terminator before forwarding.",
+          "Synthesise or append \\r or \\n.",
+          "Trim, pad, case-fold or otherwise normalise the payload.",
+          "Treat the payload as a NUL-terminated string."
         ],
         "exceptions": [
-          "State explicit exceptions, or None."
+          "The line-assembled path that produces OpenTherm frames is unaffected. This decision governs the raw path only.",
+          "A consumer whose transport cannot carry arbitrary bytes may encode its own copy at the edge, provided the queued payload is untouched and the encoding is documented at the call site. There is exactly one today: forwardDiagnoseChunk() dro..."
         ],
         "verification": [
-          "Name the test, command, or source anchor that verifies this decision."
+          "bin/adr-judge declarative rules, see the Enforcement block below.",
+          "evaluate.py::checkpicuarttaskownsserial remains the complementary gate on UART ownership."
         ]
       },
       "scope": {
-        "path_globs": []
+        "path_globs": [
+          "src/OTGW-firmware/OTGW-Core.ino"
+        ]
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
+        "binding": true,
+        "gate": "adr-judge declarative rules on the raw-path files",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -10614,6 +10638,18 @@
     {
       "source": "ADR-175",
       "target": "ADR-140",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-177",
+      "target": "ADR-095",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-177",
+      "target": "ADR-130",
       "type": "related",
       "resolved": true
     }
