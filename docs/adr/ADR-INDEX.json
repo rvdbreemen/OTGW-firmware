@@ -5691,6 +5691,45 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-177",
+      "title": "Keep the PIC byte stream verbatim from the serial task to every consumer",
+      "path": "ADR-177-keep-the-pic-byte-stream-verbatim-from-the-serial-task-to-every-consumer.md",
+      "format": "madr",
+      "status": "Proposed",
+      "date": "2026-09-05",
+      "decision_summary": "Chosen option: Option A, because state the decisive rationale.",
+      "topics": [],
+      "aliases": [],
+      "components": [],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "State required implementation constraints."
+        ],
+        "must_not": [
+          "State prohibited implementation choices."
+        ],
+        "exceptions": [
+          "State explicit exceptions, or None."
+        ],
+        "verification": [
+          "Name the test, command, or source anchor that verifies this decision."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
