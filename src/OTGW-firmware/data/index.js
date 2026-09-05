@@ -3290,14 +3290,18 @@ function appendDiagnoseOutput(text) {
   // Normalise line endings: the PIC sends CRLF, and a lone CR inside a <pre> would
   // otherwise render as a stray glyph rather than a break.
   var clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  var next = pane.textContent + clean;
   if (diagnoseDropInvalid) {
     // Our menu request is a bare CR, which the prompt rejects before redrawing it.
     // Opening the screen is not the user making a mistake, so drop that one complaint.
-    // First reply only: a later "Invalid test" is the user's own typo and must show.
-    diagnoseDropInvalid = false;
-    clean = clean.replace(/^\s*Invalid test\n/, '');
+    // Trim the accumulated text, not this chunk: the reply arrives in several socket
+    // frames and the first one is often just the newline, which would consume the flag
+    // before the words "Invalid test" ever showed up.
+    next = next.replace(/^\s*Invalid test\n/, '');
+    // Once the banner lands we know whether the prompt complained, so stop watching.
+    // Anything later is the user's own typo and must stay visible.
+    if (next.indexOf('diagnostics - Version') !== -1) diagnoseDropInvalid = false;
   }
-  var next = pane.textContent + clean;
   if (next.length > DIAG_MAX_CHARS) next = next.slice(next.length - DIAG_MAX_CHARS);
   pane.textContent = next;
   pane.scrollTop = pane.scrollHeight;
@@ -3393,6 +3397,9 @@ function requestDiagnoseMenu() {
     if (!p || p.textContent.length) return;
     diagnoseDropInvalid = true;
     sendDiagnoseData('\r');
+    // If no banner ever arrives the flag would otherwise stay armed and swallow a real
+    // complaint much later on. Five seconds is far past any answer this prompt gives.
+    setTimeout(function () { diagnoseDropInvalid = false; }, 5000);
   }, 800);
 }
 
