@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-05 15:32'
-updated_date: '2026-09-05 15:36'
+updated_date: '2026-09-05 19:08'
 labels:
   - bug
   - pic
@@ -50,4 +50,24 @@ Codevergelijking 1.x versus 2.0.0: OTGWSerial::resetPic() is regel voor regel id
 Spoor dat de aandacht verdient (boards.h in src/libraries/Platform/src/): er bestaan twee pinmappen voor classic-op-S3 die precies op de resetlijn verschillen. Gewone LOLIN S3 Mini: PIN_PIC_RST 12, I2C 36/35. S3 Mini Pro: PIN_CLASSIC_PRO_PIC_RST 40, I2C 11/12. De PIC-UART is in beide 43/44. Alleen de combo-build detecteert het verschil, via de QMI8658C IMU op de Pro-bus; de esp32-classic build gebruikt de Mini-map onvoorwaardelijk.
 
 Dat verklaart de klasse fout exact: een resetlijn op de verkeerde GPIO laat normale UART-communicatie intact (PR=A antwoordt) maar bereikt de bootloader nooit (0% voortgang, Too many retries op FWSTATE_RSET). Het MAC pleit tegen deze verklaring voor DIT bord, maar het is wel de plek om te kijken: verifieer met een scoop of logic analyzer of GPIO12 tijdens een flashpoging daadwerkelijk 100 ms laag gaat, en of dat pootje op deze unit met de PIC-reset verbonden is.
+
+2026-09-05 avond, met netwerktoegang. Doorbraak in reproduceerbaarheid, en een verschuiving van de diagnose.
+
+Bord opnieuw geflasht met verse alpha.362+ed79ac1 (eerst esp32-combo, daarna esp32-classic, beide merged-full op 0x0) en headless geprovisioneerd met bin/provision-wifi-ap.py. Het bord draait op 192.168.88.63.
+
+DE FLASH IS NIET HET PROBLEEM, DE PIC-DETECTIE IS DAT. Het telnet-commando p (Manual reset PIC) geeft:
+  detectPIC( 970): No ETX found after reset: no Pic detected!
+  detectPIC( 971): All PIC-related functions are disabled (no PIC-based OTGW detected)
+Dat is dezelfde handshake-fase als waar de flash op strandde (FWSTATE_RSET), maar nu met een enkele toetsaanslag te reproduceren in plaats van met een flashpoging. Elke verdere diagnose kan dus goedkoop en zonder risico voor de PIC.
+
+Twee onafhankelijke builds komen tot dezelfde conclusie:
+- esp32-combo: hardware.mode = OT-Direct. De boot-detectie vond geen PIC en koos de OTDirect-engine. Er stroomden wel OT-frames (Request Boiler R80000100), dus die kwamen uit OTDirect, niet uit een PIC.
+- esp32-classic: hardware.mode = Degraded. Deze build verwacht een PIC, vindt er geen, en valt terug.
+In beide gevallen antwoordt het commando a (PR=A) met "PIC not available or not active in this mode".
+
+Dat is een verschil met juli, toen op ditzelfde MAC (ac:27:6e:ce:45:d8) na elke mislukte flash nog wel een echte PIC antwoordde met firmware 6.6, pic16f1847, gateway. Er is sindsdien dus iets veranderd aan de hardware-opstelling of aan de PIC zelf.
+
+Open vraag die alleen fysiek te beantwoorden is: in welke carrier zit deze S3 nu. Als het een OTGW32-carrier is in plaats van een Classic, verklaart dat alles wat hier gemeten is, inclusief de werkende OTDirect-frames. Zit hij wel op een Classic-carrier, dan blijft de resetlijn de eerste verdachte: verifieer met een scoop of GPIO12 tijdens commando p daadwerkelijk ~100 ms laag gaat.
+
+Los hiervan gevonden en apart de moeite waard: de webserver start op geen van beide builds. Poort 80 wordt actief geweigerd (dus niet gehangen, en niet de AsyncTCP-wedge uit ADR-139: CONFIG_ASYNC_TCP_STACK_SIZE staat al op 16384), terwijl telnet op 23 gewoon werkt en de firmware verder volledig draait: MQTT, OT-verwerking, BLE-sensoren, heap ~48k. Dat verdient een eigen taak.
 <!-- SECTION:NOTES:END -->
