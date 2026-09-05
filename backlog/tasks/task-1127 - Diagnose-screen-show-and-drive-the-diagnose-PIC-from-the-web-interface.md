@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-05 07:30'
-updated_date: '2026-09-05 09:51'
+updated_date: '2026-09-05 10:35'
 labels:
   - feature
 dependencies: []
@@ -92,6 +92,15 @@ Two real defects were found by doing this rather than by reasoning about it, bot
 A third thing cost real time and is worth recording as a development gotcha rather than a defect: index.js is cache-busted with ?v=<githash>, taken from data/version.hash. Iterating WITHOUT committing leaves that key unchanged, so the browser keeps serving its cached copy even though the device has the new file. Two apparent test failures were this. Verified by reading handleFlashCompletion.toString() in the page and finding the old body while curl showed the new one on the device. Commit before browser-testing a JS change, or the browser lies to you.
 
 One known rough edge, not a regression and not fixed: deep-linking to #tabPICflash on a diagnose PIC loses a race against the once-per-load auto-show and lands on the diagnose screen instead. The PIC firmware page stays reachable through Advanced, which is how the flash back to gateway was performed, so nothing is unreachable.
+
+2026-09-05: Reworked the on-screen explanation after Schelte Bron reported it was only true for test 1.
+- Replaced the single paragraph with three short ones plus a link to https://otgw.tclcode.com/diagnose.html. No table, per maintainer instruction to keep the web app simple.
+- Deliberately states no ending for tests 6 and 7: the source page does not, and Schelte's summary sentence is contradicted by the page for test 5.
+- Dropped the old "press single keys during a test" instruction; every send path here appends CR and the digit buttons were removed, so that advice was unusable.
+- Verified on 192.168.88.68 (1.7.6-beta.1+d3a4952): copy renders, link has target=_blank rel=noopener.
+- Round trip re-run: PIC was found on diagnose 2.2 (menu answered live over the WS bridge), flashed back to gateway.hex 6.8, flash-status reported success, UI returned to the normal home screen with diagnoseAvailable=false, 0 of 6 diagnose tabs visible, and live OT traffic.
+- Copy checked against the REAL menu: 1 LED test, 2 Bit timing thermostat, 3 Bit timing boiler, 4 Delay symmetry, 5 Voltage levels, 6 Idle times, 7 Temperature sensor.
+- Cosmetic, pre-existing: "Redraw menu" sends a bare CR, so the PIC answers "Invalid test" before redrawing.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
