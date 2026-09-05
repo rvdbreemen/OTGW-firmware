@@ -4633,6 +4633,40 @@ void processOT(const char *buf, int len){
 ** The write buffer (incoming from port 25238) is also line printed to the Debug (port 23).
 ** The read line buffer is per line parsed by the proces OT parser code (processOT (buf, len)).
 */
+// Coalescing chunk for the passthrough. A per-byte WiFiClient::write() emits
+// one TCP segment per byte on the ESP8266 core, which a 30-byte OT line would
+// turn into 30 packets. At file scope because forwardDiagnoseChunk() sizes its
+// frame buffer from it too (ADR-095 requires this literal to stay in this file).
+#define OTGW_PASSTHRU_CHUNK 64
+
+// TASK-1127: mirror the raw PIC stream to the browser while the PIC runs diagnose
+// firmware, so the diagnose screen needs no external tool. Only ever active on a
+// diagnose PIC, so a gateway pays one enum compare per chunk and nothing else.
+//
+// Frames carry an STX prefix because the same socket already carries OpenTherm log
+// lines; the frontend routes on that prefix. Bytes outside printable ASCII are
+// dropped rather than escaped: WebSocket text frames must be valid UTF-8, and the
+// only control bytes this firmware emits are CR, LF and the 0x04 it sends before a
+// menu redraw, which is protocol noise on a screen that shows text.
+#define DIAG_WS_PREFIX "\x02""DIAG"
+static void forwardDiagnoseChunk(const uint8_t *data, uint8_t len) {
+  if (len == 0) return;
+  if (OTGWSerial.firmwareType() != FIRMWARE_DIAG) return;
+  if (!hasWebSocketClients() || !canSendWebSocket()) return;
+
+  char frame[sizeof(DIAG_WS_PREFIX) + OTGW_PASSTHRU_CHUNK];
+  uint8_t out = 0;
+  memcpy_P(frame, PSTR(DIAG_WS_PREFIX), sizeof(DIAG_WS_PREFIX) - 1);
+  out = sizeof(DIAG_WS_PREFIX) - 1;
+  for (uint8_t i = 0; i < len; i++) {
+    const uint8_t c = data[i];
+    if ((c >= 0x20 && c <= 0x7E) || c == '\r' || c == '\n') frame[out++] = (char)c;
+  }
+  if (out == sizeof(DIAG_WS_PREFIX) - 1) return;   // nothing printable in this chunk
+  frame[out] = '\0';
+  sendLogToWebSocket(frame);
+}
+
 void handleOTGW()
 {
   //handle serial communication and line processing
@@ -4648,10 +4682,6 @@ void handleOTGW()
   // would run until the UART FIFO is empty. 256 bytes is ~266ms of 9600-baud
   // wire time, well above anything one loop tick produces at steady state.
   #define HANDLE_OTGW_BYTES_PER_CALL 256
-  // Coalescing chunk for the passthrough. A per-byte WiFiClient::write() emits
-  // one TCP segment per byte on the ESP8266 core, which a 30-byte OT line would
-  // turn into 30 packets.
-  #define OTGW_PASSTHRU_CHUNK 64
   static char sRead[MAX_BUFFER_READ];
   static char sWrite[MAX_BUFFER_WRITE];
   static size_t bytes_read = 0;
@@ -4708,6 +4738,7 @@ void handleOTGW()
       passthru[passthruLen++] = outByte;
       if (passthruLen == sizeof(passthru)) {
         OTGWstream.write(passthru, passthruLen);
+        forwardDiagnoseChunk(passthru, passthruLen);
         passthruLen = 0;
       }
       if (outByte == '\r' || outByte == '\n') {
@@ -4759,6 +4790,7 @@ void handleOTGW()
     // this call (see the passthru declaration above).
     if (passthruLen > 0) {
       OTGWstream.write(passthru, passthruLen);
+      forwardDiagnoseChunk(passthru, passthruLen);
     }
   }
 
@@ -5147,6 +5179,13 @@ void fwreportinfo(OTGWFirmware fw, const char *version) {
         break;
       }
     }
+    // Snapshot before the copies below, so the publish gate at the end can tell a
+    // genuine change from the diagnose firmware simply redrawing its menu (TASK-1127).
+    const bool bannerChanged =
+        (strcmp(state.pic.sFwversion, version) != 0) ||
+        (strcmp(state.pic.sDeviceid, OTGWSerial.processorToString().c_str()) != 0) ||
+        (strcmp(state.pic.sType, OTGWSerial.firmwareToString(fw).c_str()) != 0);
+
     // TASK-1126: this callback is the only banner handler that fires for ALL three
     // firmware types. The gateway-only self-heal in processOT() cannot help diagnose
     // or interface: it matches OTGW_BANNER ("OpenTherm Gateway") with a case-sensitive
@@ -5167,7 +5206,16 @@ void fwreportinfo(OTGWFirmware fw, const char *version) {
     //instead of using the firmware string
     strlcpy(state.pic.sType, OTGWSerial.firmwareToString(fw).c_str(), sizeof(state.pic.sType));
     OTGWDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
-    sendMQTTversioninfo();
+    // TASK-1127: publish only when something actually changed. Measured on hardware:
+    // the diagnose PIC reprints its full banner on EVERY return to its menu, so each
+    // redraw re-enters this callback. Without this gate an interactive diagnose
+    // session publishes MQTT version info on every keypress. Comparing costs three
+    // strcmp against buffers we were about to overwrite anyway.
+    if (bannerChanged) {
+      sendMQTTversioninfo();
+    } else {
+      OTGWDebugTln(F("Banner repeat, nothing changed: MQTT version publish skipped"));
+    }
 }
 
 void fwupgradestart(const char *hexfile) {

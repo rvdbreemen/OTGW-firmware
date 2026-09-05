@@ -1391,3 +1391,55 @@ body.disable-interaction {
   margin-right: 8px;
   cursor: pointer;
 }
+
+/* Diagnose screen (TASK-1127). Only reachable when the PIC runs diagnose firmware. */
+.diagnose-output {
+  white-space: pre;
+  overflow: auto;
+  max-height: 22rem;
+  min-height: 12rem;
+  padding: 0.6rem 0.8rem;
+  margin: 0.5rem 0;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.25;
+  border: 1px solid #999;
+  border-radius: 4px;
+  background: #111;
+  color: #d0f0d0;
+}
+.diagnose-input-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.5rem 0;
+  flex-wrap: wrap;
+}
+.diagnose-line {
+  flex: 1 1 16rem;
+  min-width: 10rem;
+  padding: 0.4rem 0.5rem;
+  font-family: Consolas, "Courier New", monospace;
+}
+.diagnose-btn,
+.diagnose-key {
+  padding: 0.45rem 0.9rem;
+  min-width: 2.8rem;
+  cursor: pointer;
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 0.95rem;
+}
+.diagnose-keypad {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.5rem 0;
+}
+.diagnose-key-wide { min-width: 8rem; }
+.diagnose-hint {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin: 0.4rem 0 0 0;
+}
+.diagnose-error { color: #c0392b; font-weight: bold; }
+.diagnose-ok { color: inherit; }

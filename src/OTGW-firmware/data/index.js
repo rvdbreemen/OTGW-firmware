@@ -373,7 +373,7 @@ function stopTimeUpdates() {
 }
 
 function setActivePageSection(activeId) {
-  ['displayMainPage', 'displaySettingsPage', 'displayDeviceInfo', 'displayPICflash', 'displayWebhookPage'].forEach(function(id) {
+  ['displayMainPage', 'displaySettingsPage', 'displayDeviceInfo', 'displayPICflash', 'displayWebhookPage', 'displayDiagnosePage'].forEach(function(id) {
     var section = document.getElementById(id);
     if (!section) return;
     if (id === activeId) section.classList.add('active');
@@ -1745,6 +1745,14 @@ function initOTLogWebSocket(force) {
         return;
       }
 
+      // Diagnose frames carry an STX prefix and are not OpenTherm log lines, so they are
+      // routed to the diagnose pane and must not reach the log buffer (TASK-1127).
+      if (typeof handleDiagnoseMessage === "function") {
+        if (handleDiagnoseMessage(event.data)) {
+          return;
+        }
+      }
+
       if (typeof handleFlashMessage === "function") {
         if (handleFlashMessage(event.data)) {
           return;
@@ -3029,6 +3037,15 @@ function initMainPage() {
       });
     }
   );
+  Array.from(document.getElementsByClassName('tabDiagnose')).forEach(
+    function (el, idx, arr) {
+      el.addEventListener('click', function () {
+        diagnosePage();
+        toggleHidden('adv_dropdown', true);
+        toggleHidden('btnSaveSettings', true);
+      });
+    }
+  );
   Array.from(document.getElementsByClassName('tabWebhook')).forEach(
     function (el, idx, arr) {
       el.addEventListener('click', function () {
@@ -3091,6 +3108,7 @@ function initMainPage() {
         .then(function(json) {
           var d = json.device || {};
           applyPICAvailability(d.picavailable);
+          applyDiagnoseAvailability(d.picfwtype);
           if (picAvailable) {
             firmwarePage();
           } else {
@@ -3218,10 +3236,155 @@ function webhookPage() {
   document.getElementById("displayDeviceInfo").classList.remove('active');
   document.getElementById("displayPICflash").classList.remove('active');
   document.getElementById("displaySettingsPage").classList.remove('active');
+  // Sixth section (TASK-1127). This function hand-clears instead of calling
+  // setActivePageSection(), so a new section has to be listed here too or two
+  // sections render at once.
+  var diagSec = document.getElementById("displayDiagnosePage");
+  if (diagSec) diagSec.classList.remove('active');
   refreshWebhookPage();
   document.getElementById("displayWebhookPage").classList.add('active');
 
 } // webhookPage()
+
+//===========================================================================================
+// Diagnose screen (TASK-1127)
+//
+// Shown only when the PIC runs diagnose firmware, where it speaks a test menu instead of
+// the OpenTherm protocol. Output arrives over the existing OT-log WebSocket, tagged with an
+// STX prefix by forwardDiagnoseChunk() in the firmware, so this needs no second socket.
+//
+// Measured against a real diagnose 2.2 PIC, and the input design follows from it:
+//   - At the menu the PIC is LINE based and echoes what you type. So the text box sends a
+//     whole line and we must not echo locally, or every character would appear twice.
+//   - Inside a running test the PIC consumes single keys and echoes NOTHING. So the keypad
+//     sends one byte immediately, and the user gets no confirmation from the PIC.
+//   - Enter is a bare CR (0x0D). It both submits a menu choice and leaves a running test.
+//   - On connect the PIC sends nothing at all; it sits silently on its prompt. Hence the
+//     explicit "Redraw menu" button, which just sends a CR to provoke a redraw.
+//===========================================================================================
+var DIAG_WS_PREFIX = '\x02DIAG';
+var DIAG_MAX_CHARS = 8000;      // keep the pane bounded; the PIC can be chatty under a test
+var diagnoseAvailable = false;
+var diagnoseAutoShown = false;
+
+function appendDiagnoseOutput(text) {
+  var pane = document.getElementById('diagnoseOutput');
+  if (!pane || !text) return;
+  // Normalise line endings: the PIC sends CRLF, and a lone CR inside a <pre> would
+  // otherwise render as a stray glyph rather than a break.
+  var clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  var next = pane.textContent + clean;
+  if (next.length > DIAG_MAX_CHARS) next = next.slice(next.length - DIAG_MAX_CHARS);
+  pane.textContent = next;
+  pane.scrollTop = pane.scrollHeight;
+}
+
+// Returns true when the frame was a diagnose frame and has been consumed.
+function handleDiagnoseMessage(data) {
+  if (typeof data !== 'string' || data.indexOf(DIAG_WS_PREFIX) !== 0) return false;
+  appendDiagnoseOutput(data.substring(DIAG_WS_PREFIX.length));
+  return true;
+}
+
+function setDiagnoseMessage(msg, isError) {
+  var el = document.getElementById('diagnoseMessage');
+  if (!el) return;
+  el.textContent = msg || '';
+  el.className = isError ? 'diagnose-error' : 'diagnose-ok';
+}
+
+// Send bytes verbatim. The firmware writes them straight to the UART, so a trailing CR is
+// the caller's decision: appending one to a keypress would end a running test.
+function sendDiagnoseData(data) {
+  if (!data) return;
+  fetch(APIGW + 'v2/otgw/diagnose', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: data })
+  })
+  .then(function (response) {
+    if (!response.ok) {
+      if (response.status === 409) throw new Error('PIC is not running diagnose firmware');
+      if (response.status === 503) throw new Error('No PIC detected');
+      throw new Error('HTTP ' + response.status);
+    }
+    return response.json();
+  })
+  .then(function () { setDiagnoseMessage('', false); })
+  .catch(function (err) {
+    console.error('diagnose send failed:', err);
+    setDiagnoseMessage('Could not send: ' + (err && err.message ? err.message : 'unknown error'), true);
+  });
+}
+
+function sendDiagnoseLine() {
+  var input = document.getElementById('diagnoseLine');
+  if (!input) return;
+  // CR only. The menu acts on CR, and sending LF as well would submit twice.
+  sendDiagnoseData(input.value + '\r');
+  input.value = '';
+  input.focus();
+}
+
+function wireDiagnoseControls() {
+  var input = document.getElementById('diagnoseLine');
+  var sendBtn = document.getElementById('diagnoseSend');
+  var keypad = document.getElementById('diagnoseKeypad');
+  var redraw = document.getElementById('diagnoseRedraw');
+
+  if (input && !input.dataset.wired) {
+    input.dataset.wired = '1';
+    input.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); sendDiagnoseLine(); }
+    });
+  }
+  if (sendBtn && !sendBtn.dataset.wired) {
+    sendBtn.dataset.wired = '1';
+    sendBtn.addEventListener('click', sendDiagnoseLine);
+  }
+  if (redraw && !redraw.dataset.wired) {
+    redraw.dataset.wired = '1';
+    redraw.addEventListener('click', function () { sendDiagnoseData('\r'); });
+  }
+  if (keypad && !keypad.dataset.wired) {
+    keypad.dataset.wired = '1';
+    keypad.addEventListener('click', function (ev) {
+      var btn = ev.target && ev.target.closest ? ev.target.closest('.diagnose-key') : null;
+      if (!btn) return;
+      var key = btn.getAttribute('data-key');
+      if (!key) return;                       // the redraw button has its own handler
+      sendDiagnoseData(key === 'ENTER' ? '\r' : key);
+    });
+  }
+}
+
+function diagnosePage() {
+  setActivePageSection('displayDiagnosePage');
+  stopOTmonitorPolling();
+  // Output rides on the OT-log socket, so make sure it is up: webhookPage() and the
+  // flash flow both tear it down.
+  if (typeof initOTLogWebSocket === 'function') initOTLogWebSocket();
+  wireDiagnoseControls();
+  setDiagnoseMessage('', false);
+  var input = document.getElementById('diagnoseLine');
+  if (input) input.focus();
+} // diagnosePage()
+
+// Called from the /api/v2/device/info handlers. Unhides the nav entry, and on the first
+// detection of a diagnose PIC brings the screen up by itself, which is the whole point:
+// on diagnose firmware there is no gateway telemetry, so the main page has nothing to show.
+// Auto-navigation happens ONCE per page load so it cannot fight the user afterwards.
+function applyDiagnoseAvailability(picfwtype) {
+  diagnoseAvailable = (typeof picfwtype === 'string' && picfwtype.toLowerCase() === 'diagnose');
+  Array.from(document.getElementsByClassName('diagnose-only')).forEach(function (el) {
+    if (diagnoseAvailable) el.classList.remove('hidden');
+    else el.classList.add('hidden');
+  });
+  if (diagnoseAvailable && !diagnoseAutoShown) {
+    diagnoseAutoShown = true;
+    diagnosePage();
+  }
+}
 
 function toggleHidden(className, hideOnly) {
   Array.from(document.getElementsByClassName(className)).forEach(
@@ -4077,6 +4240,7 @@ function refreshDevInfo() {
       applyParsedGatewayMode(parseGatewayModeValue(device.otgwmode));
       applyOTGWSimulationState(device.otgwsimulation);
       applyPICAvailability(device.picavailable);
+      applyDiagnoseAvailability(device.picfwtype);
 
       const versionEl = document.getElementById('devVersion');
       if (versionEl) versionEl.textContent = version;
@@ -4329,6 +4493,7 @@ function refreshDeviceInfo() {
       const device = json.device || {};
       applyOTGWSimulationState(device.otgwsimulation);
       applyPICAvailability(device.picavailable);
+      applyDiagnoseAvailability(device.picfwtype);
       for (let key in device) {
         if (key === 'otgwsimulation') continue;
         console.log("[" + key + "]=>[" + device[key] + "]");

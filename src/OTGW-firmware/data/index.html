@@ -51,6 +51,7 @@
           <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
           <div class="adv_dropdown hidden">
             <span class="list_item tabPICflash pic-only">PIC firmware</span>
+            <span class="list_item tabDiagnose diagnose-only hidden">Diagnose</span>
             <span class="list_item tabWebhook">Webhook</span>
             <span class="list_item tabDeviceInfo">Debug Information</span>
             <span class="list_item FSexplorer">File system contents</span>
@@ -249,6 +250,7 @@
           <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
           <div class="adv_dropdown hidden">
             <span class="list_item tabPICflash pic-only">PIC firmware</span>
+            <span class="list_item tabDiagnose diagnose-only hidden">Diagnose</span>
             <span class="list_item tabWebhook">Webhook</span>
             <span class="list_item tabDeviceInfo">Debug Information</span>
             <span class="list_item FSexplorer">File system contents</span>
@@ -267,6 +269,7 @@
           <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
           <div class="adv_dropdown hidden">
             <span class="list_item tabPICflash pic-only">PIC firmware</span>
+            <span class="list_item tabDiagnose diagnose-only hidden">Diagnose</span>
             <span class="list_item tabWebhook">Webhook</span>
             <span class="list_item tabDeviceInfo">Debug Information</span>
             <span class="list_item FSexplorer">File system contents</span>
@@ -286,6 +289,7 @@
           <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
           <div class="adv_dropdown hidden">
             <span class="list_item tabPICflash pic-only">PIC firmware</span>
+            <span class="list_item tabDiagnose diagnose-only hidden">Diagnose</span>
             <span class="list_item tabWebhook">Webhook</span>
             <span class="list_item tabDeviceInfo">Debug Information</span>
             <span class="list_item FSexplorer">File system contents</span>
@@ -305,6 +309,7 @@
           <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
           <div class="adv_dropdown hidden">
             <span class="list_item tabPICflash pic-only">PIC firmware</span>
+            <span class="list_item tabDiagnose diagnose-only hidden">Diagnose</span>
             <span class="list_item tabWebhook">Webhook</span>
             <span class="list_item tabDeviceInfo">Debug Information</span>
             <span class="list_item FSexplorer">File system contents</span>
@@ -314,6 +319,62 @@
       <div id="webhookPage"></div>
       <div id="webhookMessage"></div>
     </div>
+
+    <!-- Diagnose screen (TASK-1127). Shown only when the PIC runs diagnose firmware.
+         The nav entry carries class "diagnose-only" and is unhidden by applyDiagnoseAvailability(). -->
+    <div id="displayDiagnosePage" class="page-section">
+      <div class="nav-container">
+        <div class='nav-left'>
+          <button type="button" class='home nav-item tabButton'>Home</button>
+        </div>
+        <div class='nav-right'>
+          <button type="button" class='basicSettings nav-item tabButton'>Settings</button>
+          <button type="button" class='adminSettings nav-item tabButton'>Advanced</button>
+          <div class="adv_dropdown hidden">
+            <span class="list_item tabPICflash pic-only">PIC firmware</span>
+            <span class="list_item tabDiagnose diagnose-only hidden">Diagnose</span>
+            <span class="list_item tabWebhook">Webhook</span>
+            <span class="list_item tabDeviceInfo">Debug Information</span>
+            <span class="list_item FSexplorer">File system contents</span>
+          </div>
+        </div>
+      </div>
+      <h1>PIC diagnose</h1>
+      <p id="diagnoseIntro">
+        The PIC is running diagnose firmware, so it speaks a test menu instead of the
+        OpenTherm protocol. Pick a test by typing its number and pressing Enter. While a
+        test runs the PIC stays silent and reacts to single keys; press Enter to return
+        to the menu.
+      </p>
+      <pre id="diagnoseOutput" class="diagnose-output" aria-live="polite"></pre>
+      <div class="diagnose-input-row">
+        <input type="text" id="diagnoseLine" class="diagnose-line" maxlength="32"
+               autocomplete="off" spellcheck="false"
+               placeholder="Type a test number, then Enter">
+        <button type="button" id="diagnoseSend" class="diagnose-btn">Send</button>
+      </div>
+      <div class="diagnose-keypad" id="diagnoseKeypad">
+        <button type="button" class="diagnose-key" data-key="1">1</button>
+        <button type="button" class="diagnose-key" data-key="2">2</button>
+        <button type="button" class="diagnose-key" data-key="3">3</button>
+        <button type="button" class="diagnose-key" data-key="4">4</button>
+        <button type="button" class="diagnose-key" data-key="5">5</button>
+        <button type="button" class="diagnose-key" data-key="6">6</button>
+        <button type="button" class="diagnose-key" data-key="7">7</button>
+        <button type="button" class="diagnose-key" data-key="8">8</button>
+        <button type="button" class="diagnose-key" data-key="9">9</button>
+        <button type="button" class="diagnose-key" data-key="0">0</button>
+        <button type="button" class="diagnose-key diagnose-key-wide" data-key="ENTER">Enter</button>
+        <button type="button" class="diagnose-key diagnose-key-wide" id="diagnoseRedraw">Redraw menu</button>
+      </div>
+      <p class="diagnose-hint">
+        The keys above send one character immediately, which is what a running test
+        expects. The text box above them sends a whole line, which is what the menu
+        expects. Nothing here is queued: bytes go straight to the PIC.
+      </p>
+      <div id="diagnoseMessage"></div>
+    </div>
+
     <div class="footer">
       <div class="nav-left">
         <button type="button" class='nav-item tabButton btnSaveSettings hidden'>Save</button>

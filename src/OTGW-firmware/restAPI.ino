@@ -474,6 +474,48 @@ static void handleOtgw(const char* words[], uint8_t wc, HTTPMethod method, const
       strlcpy(cmdBuf, body.c_str(), sizeof(cmdBuf));
     }
     handleCommandSubmit(cmdBuf);
+  } else if (strcmp_P(words[4], PSTR("diagnose")) == 0) {
+    // POST /api/v2/otgw/diagnose — body {"data":"1\r"} — TASK-1127.
+    //
+    // Writes the bytes to the PIC VERBATIM. It cannot go through
+    // addOTWGcmdtoqueue()/sendOTGW(), because that path appends CR+LF below every
+    // validator, and the diagnose firmware reads single keystrokes while a test is
+    // running: an appended Enter would end the test the user just started. It also
+    // rejects anything not shaped like LL=value, which a bare digit is not.
+    //
+    // Measured on hardware: at the menu the PIC is line-based and echoes what you
+    // type; inside a running test it consumes keys silently. So the caller decides
+    // whether to append CR, and this endpoint never decides for them.
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (!isPICEnabled()) { sendApiError(503, F("No PIC detected")); return; }
+    if (OTGWSerial.firmwareType() != FIRMWARE_DIAG) {
+      // Positive test on the typed accessor. Refusing on anything else keeps this
+      // raw writer unreachable on a gateway, where it would bypass the command
+      // queue and the OpenTherm parser both.
+      sendApiError(409, F("PIC is not running diagnose firmware"));
+      return;
+    }
+    {
+      const String& body = httpServer.arg(0);
+      char dataBuf[33] = "";
+      if (!extractJsonField(body, F("data"), dataBuf, sizeof(dataBuf))) {
+        sendApiError(400, F("Missing data, or longer than 32 characters"));
+        return;
+      }
+      // Printable ASCII plus CR only. LF is deliberately not forwarded: the menu
+      // acts on CR, and sending both would submit twice.
+      uint8_t sent = 0;
+      for (const char *q = dataBuf; *q != '\0'; q++) {
+        const uint8_t c = (uint8_t)*q;
+        if ((c >= 0x20 && c <= 0x7E) || c == '\r') { OTGWSerial.write(c); sent++; }
+      }
+      OTGWSerial.flush();
+      DebugTf(PSTR("Diagnose input: %u byte(s) written to PIC\r\n"), (unsigned)sent);
+      sendCorsOriginHeader();
+      char okBuf[48];
+      snprintf_P(okBuf, sizeof(okBuf), PSTR("{\"status\":\"sent\",\"bytes\":%u}"), (unsigned)sent);
+      httpServer.send(200, F("application/json"), okBuf);
+    }
   } else if (strcmp_P(words[4], PSTR("command")) == 0) {
     // POST /api/v2/otgw/command/{cmd} — backward compat alias (prefer /commands)
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
