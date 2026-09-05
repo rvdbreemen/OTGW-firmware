@@ -3281,6 +3281,8 @@ var DIAG_WS_PREFIX = '\x02DIAG';
 var DIAG_MAX_CHARS = 8000;      // keep the pane bounded; the PIC can be chatty under a test
 var diagnoseAvailable = false;
 var diagnoseAutoShown = false;
+// Set while the screen's own menu request is in flight, see requestDiagnoseMenu().
+var diagnoseDropInvalid = false;
 
 function appendDiagnoseOutput(text) {
   var pane = document.getElementById('diagnoseOutput');
@@ -3288,6 +3290,13 @@ function appendDiagnoseOutput(text) {
   // Normalise line endings: the PIC sends CRLF, and a lone CR inside a <pre> would
   // otherwise render as a stray glyph rather than a break.
   var clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  if (diagnoseDropInvalid) {
+    // Our menu request is a bare CR, which the prompt rejects before redrawing it.
+    // Opening the screen is not the user making a mistake, so drop that one complaint.
+    // First reply only: a later "Invalid test" is the user's own typo and must show.
+    diagnoseDropInvalid = false;
+    clean = clean.replace(/^\s*Invalid test\n/, '');
+  }
   var next = pane.textContent + clean;
   if (next.length > DIAG_MAX_CHARS) next = next.slice(next.length - DIAG_MAX_CHARS);
   pane.textContent = next;
@@ -3381,7 +3390,9 @@ function requestDiagnoseMenu() {
   // printed before anyone is listening and the pane stays empty anyway.
   setTimeout(function () {
     var p = document.getElementById('diagnoseOutput');
-    if (p && !p.textContent.length) sendDiagnoseData('\r');
+    if (!p || p.textContent.length) return;
+    diagnoseDropInvalid = true;
+    sendDiagnoseData('\r');
   }, 800);
 }
 
