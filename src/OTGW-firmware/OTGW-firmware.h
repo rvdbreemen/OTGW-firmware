@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.362
+**  Version  : v2.0.0-alpha.363
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -637,8 +637,15 @@ inline constexpr bool hardwareHasPIC() { return HAS_PIC; }
 
 #if HAS_PIC
 inline bool isGatewayFirmware() { return strcmp_P(state.pic.sType, PSTR("gateway")) == 0; }
+// Diagnostic firmware replaces the OpenTherm protocol with an interactive text
+// test menu, so anything that assumes OT semantics has to know. Uses the typed
+// accessor rather than state.pic.sType, because this is also read from PIC-task
+// context: firmwareType() returns a library-owned static and touches no
+// OTGWState (ADR-123).
+inline bool isDiagnoseFirmware() { return OTGWSerial.firmwareType() == FIRMWARE_DIAG; }
 #else
 inline bool isGatewayFirmware() { return false; }
+inline bool isDiagnoseFirmware() { return false; }
 #endif
 
 //===================[ Persistent Settings — serialized to LittleFS (ADR-051) ]===================

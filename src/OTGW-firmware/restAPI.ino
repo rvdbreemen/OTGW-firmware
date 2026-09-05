@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.362
+**  Version  : v2.0.0-alpha.363
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -744,6 +744,43 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing command")); return; }
     handleCommandSubmit(words[5]);
+  } else if (strcmp_P(words[4], PSTR("diagnose")) == 0) {
+    // POST /api/v2/otgw/diagnose — raw keystrokes for the PIC's diagnostic test
+    // menu, which speaks text rather than OpenTherm. Deliberately BYPASSES the
+    // command queue: that queue exists for OTGW commands with retry semantics,
+    // and a menu wants the bytes as typed, in order, once.
+    //
+    // Fail-closed on the firmware type. Unlike the boot-command skip, which is
+    // fail-open so an unidentified PIC still gets its commands, there is no
+    // sensible reason to push menu keystrokes at a gateway PIC.
+    if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
+    if (!isPICEnabled()) { sendApiError(503, F("No PIC detected - PIC functions disabled")); return; }
+    if (!isDiagnoseFirmware()) { sendApiError(409, F("PIC is not running diagnostic firmware")); return; }
+
+    const char* body = bodyCompat();
+    char dataBuf[33] = "";
+    if (!extractJsonField(body, F("data"), dataBuf, sizeof(dataBuf))) {
+      strlcpy(dataBuf, body ? body : "", sizeof(dataBuf));
+    }
+
+    // Printable ASCII plus CR only. The menu reads a line and acts on CR; an LF
+    // would submit a second, empty choice and redraw the menu unasked.
+    uint8_t outBytes[sizeof(dataBuf)];
+    size_t outLen = 0;
+    for (size_t i = 0; dataBuf[i] != '\0' && outLen < sizeof(outBytes); i++) {
+      const char c = dataBuf[i];
+      if (c == '\r' || (c >= 0x20 && c <= 0x7E)) outBytes[outLen++] = static_cast<uint8_t>(c);
+    }
+    if (outLen == 0) { sendApiError(400, F("Nothing sendable in body")); return; }
+
+    // enqueuePICTx returns false on a full TX queue, so say what actually went
+    // rather than assuming the whole payload was handed over.
+    if (!enqueuePICTx(outBytes, outLen)) { sendApiError(503, F("PIC transmit queue full")); return; }
+    sendCorsOriginHeader();
+    char resp[48];
+    snprintf_P(resp, sizeof(resp), PSTR("{\"status\":\"sent\",\"bytes\":%u}"),
+               static_cast<unsigned>(outLen));
+    webSend(202, F("application/json"), resp);
   } else if (strcmp_P(words[4], PSTR("discovery")) == 0 || strcmp_P(words[4], PSTR("autoconfigure")) == 0) {
     // POST /api/v2/otgw/discovery (or /autoconfigure compat alias)
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
@@ -3314,6 +3351,11 @@ void sendHealth()
     else                          je.field(F("otcommandinterface"), F("None"));
     if (isPICEnabled()) {
       je.field(F("otgwmode"), !isGatewayFirmware() ? "N/A" : state.otBus.bGatewayModeKnown ? CCONOFF(state.otBus.bGatewayMode) : "detecting");
+      // TASK-1128: the web interface selects the diagnose screen on this value,
+      // and device/info is fetched once per page load. Riding along on the 15 s
+      // health poll is what lets a PIC reflash be noticed without a reload, and
+      // it costs no extra request, which matters under ADR-165's parallelism cap.
+      je.field(F("picfwtype"), state.pic.sType);
     }
     je.field(F("ntpenable"),      settings.ntp.bEnable);
     je.field(F("littlefsMounted"), LittleFSmounted);

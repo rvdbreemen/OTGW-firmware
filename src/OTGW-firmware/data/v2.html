@@ -137,6 +137,7 @@
   <button class="seg" data-page="monitor"><b>Monitor</b><small>log · stats · support · graph · connection</small></button>
   <button class="seg" data-page="settings"><b>Settings</b><small>grouped &amp; scannable</small></button>
   <button class="seg" data-page="advanced"><b>Advanced</b><small>pic · debug · files · system</small></button>
+  <button class="seg hidden" data-page="diagnose"><b>Diagnose</b><small>PIC test menu</small></button>
 </div>
 <div class="wrap">
 
@@ -840,6 +841,45 @@
     </div>
   </div>
 </div><!-- /page-advanced -->
+
+<!-- ════════════════ PAGE: DIAGNOSE ════════════════ -->
+<!-- TASK-1128: shown only while device/info (and the health poll) report
+     picfwtype "diagnose". A board without a PIC never sends that field at all,
+     so this is a firmware-type test, not a hardware mode. -->
+<div id="page-diagnose" class="page">
+  <div class="card">
+    <h4>PIC diagnose <span class="sub">interactive test menu on the PIC serial line</span></h4>
+
+    <div id="diagBanner" class="pic-banner warn" style="display:none"></div>
+
+    <p class="cat-desc">
+      The PIC is running diagnostic firmware, so it offers a test menu instead of
+      speaking OpenTherm. Type a test number and press Enter. The menu reads a
+      whole line, so send one number at a time.
+    </p>
+
+    <div class="cmdbar" id="diagBar">
+      <span class="cmdbar-prompt" id="diagPrompt">DIAG &rsaquo;</span>
+      <input class="cmdbar-in" id="diagInput" maxlength="32" autocomplete="off" spellcheck="false"
+             placeholder="Test number, then Enter (empty Enter leaves a running test)"
+             aria-label="Diagnose test number">
+      <button class="cmdbar-send" id="diagSend">Send</button>
+    </div>
+    <span class="tchip" id="diagStatus" style="display:none;margin:0 0 8px" aria-live="polite"></span>
+
+    <div class="console" id="diagOut" role="log" aria-live="polite" aria-label="PIC diagnose output"></div>
+
+    <p style="font-size:.75rem;color:var(--muted);margin:10px 2px 0">
+      What happens next differs per test. Tests 1, 2 and 3 keep running until you press
+      Enter with the box empty, and test 1 produces no output at all while it runs, so a
+      quiet screen is normal there. Test 5 ends by asking you for a reference voltage
+      setting. Test 4 needs a loop between the two interfaces, and is the one test that
+      interrupts communication between thermostat and boiler. Which connections each test
+      needs, and how to read its results, is described on
+      <a href="https://otgw.tclcode.com/diagnose.html" target="_blank" rel="noopener">Schelte Bron's diagnostic firmware page</a>.
+    </p>
+  </div>
+</div><!-- /page-diagnose -->
 
 <div class="foot">OTGW firmware · v2 Web UI · live from the OpenTherm bus</div>
 </div>

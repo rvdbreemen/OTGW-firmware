@@ -131,6 +131,15 @@ diagnose screen rather than being withheld.
 
 * The line-assembled path that produces OpenTherm frames is unaffected. This
   decision governs the raw path only.
+* A consumer whose transport cannot carry arbitrary bytes may encode **its own
+  copy** at the edge, provided the queued payload is untouched and the encoding
+  is documented at the call site. There is exactly one today:
+  `forwardDiagnoseChunk()` drops non-printables other than CR and LF before
+  handing the text to `sendLogToWebSocket()`, which takes a NUL-terminated
+  string and would otherwise truncate at the first zero byte. Note what this
+  exception does **not** license: it is a lossy render for a text channel, so a
+  consumer that needs the true bytes must read them from the queue, not from
+  the WebSocket.
 
 ### Verification
 

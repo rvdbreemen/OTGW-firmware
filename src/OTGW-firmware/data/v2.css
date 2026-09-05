@@ -80,6 +80,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .seg:hover{color:#fff}
   .seg.active{border-bottom-color:var(--accent);color:var(--accent)}
   .seg.active b{font-weight:700}
+  .seg.hidden{display:none}  /* TASK-1128: Diagnose appears only on a diagnose PIC */
 
   .wrap{max-width:1020px;margin:0 auto;padding:16px}
   .design{display:none}

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.362
+**  Version  : v2.0.0-alpha.363
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -481,18 +481,57 @@ bool enqueueOTFrame(const char *buf, size_t len, bool suppressOutput, uint8_t so
 static void reportPendingPICRxErrors();
 #endif
 
-// drainOTRawQueue — consumer-side of the byte-transparent 25238 passthrough
-// (TASK-1111). Pops every chunk the PIC task queued and writes the bytes
-// verbatim to OTGWstream: no line assembly, no synthesised CR/LF, so a payload
-// without a terminator and an embedded CR/LF/NUL byte both survive. Drained
-// unconditionally — the producer is the side gated on
-// settings.mqtt.bLegacyPort25238Enabled, so a chunk queued just before the
-// setting was switched off can never pin the queue full.
+// Marks a WebSocket frame as diagnose output rather than an OpenTherm log line.
+// STX is chosen because the diagnose menu is plain text and can never contain it.
+#define DIAG_WS_PREFIX "\x02""DIAG"
+
+// forwardDiagnoseChunk — mirrors the raw PIC stream onto the OT-log WebSocket
+// while the PIC runs diagnostic firmware, which is how the web interface shows
+// the test menu. Self-gated, so the caller does not have to care.
+//
+// The payload crosses the queue verbatim (ADR-177). Here, at the transport
+// edge, non-printables other than CR and LF are dropped: sendLogToWebSocket
+// takes a NUL-terminated string, so an embedded NUL would silently truncate the
+// frame, and a stray control byte would corrupt the prefix framing. That is a
+// text-transport encoding on a copy, not a change to the stream itself, and it
+// is named as the one exception in ADR-177.
+static void forwardDiagnoseChunk(const uint8_t *data, uint8_t len) {
+#if HAS_PIC
+  if (data == nullptr || len == 0) return;
+  if (!isDiagnoseFirmware()) return;
+  if (!hasWebSocketClients() || !canSendWebSocket()) return;
+
+  char frame[sizeof(DIAG_WS_PREFIX) + OT_RAW_CHUNK_MAX];
+  memcpy(frame, DIAG_WS_PREFIX, sizeof(DIAG_WS_PREFIX) - 1);
+  size_t out = sizeof(DIAG_WS_PREFIX) - 1;
+  for (uint8_t i = 0; i < len; i++) {
+    const uint8_t c = data[i];
+    if (c == '\r' || c == '\n' || (c >= 0x20 && c <= 0x7E)) frame[out++] = static_cast<char>(c);
+  }
+  if (out == sizeof(DIAG_WS_PREFIX) - 1) return;   // nothing printable survived
+  frame[out] = '\0';
+  sendLogToWebSocket(frame);
+#else
+  (void)data; (void)len;
+#endif
+}
+
+// drainOTRawQueue — consumer-side of the byte-transparent raw PIC stream
+// (TASK-1111). Pops every chunk the PIC task queued and passes the bytes on
+// verbatim: no line assembly, no synthesised CR/LF, so a payload without a
+// terminator and an embedded CR/LF/NUL byte both survive (ADR-177).
+//
+// Still DEQUEUES unconditionally, which is what keeps a chunk queued just
+// before a setting changed from pinning the queue full. What is conditional is
+// where each chunk GOES. That split matters since TASK-1128 widened the
+// producer to also run for a diagnose PIC: without the port test below, bytes
+// would reach a port 25238 the user had switched off.
 void drainOTRawQueue() {
   if (otRawQueue == nullptr) return;
   OTRawMsg raw;
   while (platformQueueReceive(otRawQueue, &raw, 0)) {
-    OTGWstream.write(raw.bytes, raw.len);
+    if (settings.mqtt.bLegacyPort25238Enabled) OTGWstream.write(raw.bytes, raw.len);
+    forwardDiagnoseChunk(raw.bytes, raw.len);  // self-gated on diagnose firmware
     feedWatchDog();                            // bound worst-case drain time
   }
 }
@@ -674,11 +713,16 @@ void picSerialDrainOnce() {
     uint8_t outByte = OTGWSerial.read();
     // TASK-1111: copy to the passthrough BEFORE the line assembly below, so a
     // byte the parser discards (the CR/LF terminator, or a line dropped after a
-    // buffer overflow) still reaches the network client verbatim. Enqueued only
-    // while the legacy port is enabled, so queue slots are not burned when
-    // nobody can be listening. A plain settings READ: no OTGWState write and no
-    // network I/O happen here in task context (ADR-123).
-    if (settings.mqtt.bLegacyPort25238Enabled) {
+    // buffer overflow) still reaches the network client verbatim. A plain
+    // settings read plus a library static: no OTGWState write and no network
+    // I/O happen here in task context (ADR-123).
+    //
+    // TASK-1128 widened this from "legacy port only" to also admit a diagnose
+    // PIC, whose test menu the web interface renders from this same raw stream.
+    // Its prompt carries no terminator (ADR-177), so the line assembly below can
+    // never produce it and only this copy will. The consumer decides who gets
+    // the bytes, so nothing reaches port 25238 while that port is switched off.
+    if (settings.mqtt.bLegacyPort25238Enabled || isDiagnoseFirmware()) {
       if (sRawChunkLen == 0) sRawChunkOpenedMs = millis();
       sRawChunk[sRawChunkLen++] = outByte;
       if (sRawChunkLen == OT_RAW_CHUNK_MAX) picSerialFlushRawChunk(sRawChunk, sRawChunkLen);

@@ -55,7 +55,7 @@
     document.querySelectorAll('.seg').forEach(function (s) {
       s.classList.toggle('active', s.dataset.page === p);
     });
-    ['home', 'sat', 'monitor', 'settings', 'advanced'].forEach(function (k) {
+    ['home', 'sat', 'monitor', 'settings', 'advanced', 'diagnose'].forEach(function (k) {
       var el = document.getElementById('page-' + k);
       if (el) el.classList.toggle('active', k === p);
     });
@@ -66,6 +66,7 @@
     if (p === 'monitor' && isMonitorLogVisible()) renderLog();
     if (p === 'settings') fetchSettings();
     if (p === 'sat') satPageStart();
+    if (p === 'diagnose') diagnosePageEnter();
     // TASK-982: entering Advanced re-asserts its active sub-tab (restore-on-refresh,
     // TASK-808) and loads that tab's data on demand.
     if (p === 'advanced') {
@@ -418,6 +419,11 @@
     var d = ev.data;
     if (typeof d !== 'string') return;
     if (d.indexOf('"type":"keepalive"') !== -1) return;
+    // TASK-1128: diagnose output rides this same socket behind an STX marker.
+    // Tested BEFORE rawFromLine, which reads a fixed slice at offset 19 and
+    // regex-tests it, so arbitrary menu text could otherwise be mistaken for an
+    // OpenTherm frame and pollute the stats model.
+    if (handleDiagnoseMessage(d)) return;
     if (d.charAt(0) === '{' || d.charAt(0) === '[') return; // JSON status, not a frame
     var raw = rawFromLine(d);
     if (raw) {
@@ -1152,6 +1158,9 @@
       connRssi = (typeof h.wifirssi === 'number' && h.wifirssi !== 0) ? h.wifirssi : null;
       var iface = h.otcommandinterface || '';
       var isPic = iface === 'PIC';
+      // TASK-1128: picfwtype rides this poll so a PIC reflash is noticed without
+      // a page reload. Absent on a board with no PIC, which reads as not-diagnose.
+      applyDiagnoseAvailability(h.picfwtype);
       // Two-link OT bus: on PIC use the independent thermostat/boiler flags; on
       // OT-Direct the firmware does not populate the sub-states, so both follow
       // bOnline (otgwconnected) — honest single-bus health on OT-Direct hardware.
@@ -2817,6 +2826,140 @@
     }).catch(function () { showCmdStatus('Send failed', false); });
   }
 
+  // ======================= Diagnose page (TASK-1128) =======================
+  // Owns #page-diagnose. The page exists only while the PIC runs diagnostic
+  // firmware, reported as picfwtype "diagnose" by device/info and by the health
+  // poll. A board with no PIC never sends that field at all, so this one test
+  // also covers the hardware gate and no board-class check is needed.
+  var DIAG_WS_PREFIX = '\x02DIAG';
+  var DIAG_MAX_CHARS = 8000;
+  var diagAvailable = false;
+  var diagAutoShown = false;
+  var diagDropInvalid = false;
+
+  function showDiagStatus(msg, ok) {
+    var st = document.getElementById('diagStatus'); if (!st) return;
+    st.textContent = msg; st.style.display = ''; st.classList.toggle('on', !!ok);
+    clearTimeout(st._t); st._t = setTimeout(function () { st.style.display = 'none'; }, 2600);
+  }
+
+  // Device text never touches innerHTML. .console is white-space:pre-wrap, so a
+  // plain textContent append renders the menu exactly as the PIC sent it.
+  function appendDiagnoseOutput(text) {
+    var pane = document.getElementById('diagOut');
+    if (!pane || !text) return;
+    var clean = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+    var next = pane.textContent + clean;
+    if (diagDropInvalid) {
+      // Our own menu request is a bare CR, which the prompt rejects before
+      // redrawing. Opening the screen is not the user making a mistake, so drop
+      // that one complaint. Trimmed on the accumulated text rather than on this
+      // chunk: the reply arrives over several socket frames and the first is
+      // often just the newline, which would spend the flag too early.
+      next = next.replace(/^\s*Invalid test\n/, '');
+      if (next.indexOf('diagnostics - Version') !== -1) diagDropInvalid = false;
+    }
+    if (next.length > DIAG_MAX_CHARS) next = next.slice(next.length - DIAG_MAX_CHARS);
+    pane.textContent = next;
+    pane.scrollTop = pane.scrollHeight;
+  }
+
+  // Returns true when the frame was diagnose output and has been consumed.
+  function handleDiagnoseMessage(d) {
+    if (typeof d !== 'string' || d.indexOf(DIAG_WS_PREFIX) !== 0) return false;
+    appendDiagnoseOutput(d.substring(DIAG_WS_PREFIX.length));
+    return true;
+  }
+
+  function sendDiagnoseData(data) {
+    return fetch(APIGW + 'v2/otgw/diagnose', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: data })
+    }).then(function (r) {
+      if (r.status === 202 || r.ok) return true;
+      return r.json().then(function (j) {
+        showDiagStatus((j && j.error && j.error.message) ? j.error.message : ('Error ' + r.status), false);
+        return false;
+      }).catch(function () { showDiagStatus('Error ' + r.status, false); return false; });
+    }).catch(function () { showDiagStatus('Send failed', false); return false; });
+  }
+
+  function sendDiagnoseLine() {
+    var inp = document.getElementById('diagInput'); if (!inp) return;
+    // CR only. The menu acts on CR, and an LF would submit a second, empty
+    // choice and redraw the menu unasked.
+    sendDiagnoseData(inp.value + '\r');
+    inp.value = '';
+    inp.focus();
+  }
+
+  // The PIC prints its menu only when asked, so a screen opened after the menu
+  // scrolled past would show nothing at all. Ask once, and ONLY while the pane
+  // is still empty: a bare CR ends a running test, and a user who started test 2
+  // and came back to this page must not have it cancelled underneath them.
+  function requestDiagnoseMenu() {
+    var pane = document.getElementById('diagOut');
+    if (!pane || pane.textContent.length) return;
+    setTimeout(function () {
+      var p = document.getElementById('diagOut');
+      if (!p || p.textContent.length) return;
+      diagDropInvalid = true;
+      sendDiagnoseData('\r');
+      // If no banner ever arrives the flag would stay armed and swallow a real
+      // complaint much later. Five seconds is far past any answer this prompt gives.
+      setTimeout(function () { diagDropInvalid = false; }, 5000);
+    }, 800);
+  }
+
+  function wireDiagnoseControls() {
+    var inp = document.getElementById('diagInput');
+    var btn = document.getElementById('diagSend');
+    if (inp && !inp.dataset.wired) {
+      inp.dataset.wired = '1';
+      inp.addEventListener('keydown', function (ev) {
+        if (ev.key === 'Enter') { ev.preventDefault(); sendDiagnoseLine(); }
+      });
+    }
+    if (btn && !btn.dataset.wired) {
+      btn.dataset.wired = '1';
+      btn.addEventListener('click', sendDiagnoseLine);
+    }
+  }
+
+  function diagnosePageEnter() {
+    wireDiagnoseControls();
+    var banner = document.getElementById('diagBanner');
+    if (banner) {
+      // Reachable through a stale localStorage page restore, or by staying put
+      // while the PIC is reflashed back to gateway.
+      banner.style.display = diagAvailable ? 'none' : '';
+      if (!diagAvailable) banner.textContent = 'The PIC is not running diagnostic firmware, so there is no test menu to show.';
+    }
+    if (!diagAvailable) return;
+    requestDiagnoseMenu();
+    var inp = document.getElementById('diagInput');
+    if (inp) inp.focus();
+  }
+
+  // Called from the health poll. Reveals the nav entry, and on the first
+  // detection brings the screen up by itself, which is the point: on diagnostic
+  // firmware there is no OpenTherm telemetry, so every other page is empty.
+  // Auto-navigation happens ONCE per page load so it cannot fight the user.
+  function applyDiagnoseAvailability(picfwtype) {
+    var now = (typeof picfwtype === 'string' && picfwtype.toLowerCase() === 'diagnose');
+    if (now === diagAvailable) return;
+    diagAvailable = now;
+    var seg = document.querySelector('.seg[data-page="diagnose"]');
+    if (seg) seg.classList.toggle('hidden', !diagAvailable);
+    if (diagAvailable && !diagAutoShown) {
+      diagAutoShown = true;
+      showPage('diagnose');
+    } else if (!diagAvailable) {
+      var pg = document.getElementById('page-diagnose');
+      if (pg && pg.classList.contains('active')) showPage('home');
+    }
+  }
+
   // ======================= SAT page (TASK-986) =======================
   // Owns #page-sat. Polls GET /api/v2/sat/status every 5 s ONLY while the page
   // is visible (satPageStart/Stop, driven by showPage). Renders three cumulative
@@ -4042,7 +4185,12 @@
     var bDisc = document.getElementById('btnDiscard'); if (bDisc) bDisc.addEventListener('click', discardSettings);
 
     wireSat();   // TASK-986: bind SAT-page controls before the page is restored below
-    var sp = localStorage.getItem('otgw-v2-page'); showPage(sp || 'home');
+    // TASK-1128: the restore runs well before the first health poll says whether
+    // a diagnose PIC is present, so a board reflashed back to gateway would drop
+    // the user on a dead page. Let the poll re-open it if it is still warranted.
+    var sp = localStorage.getItem('otgw-v2-page');
+    if (sp === 'diagnose') sp = null;
+    showPage(sp || 'home');
     var sd = localStorage.getItem('otgw-v2-design'); showDesign(sd || 'a');
     renderConnStrip();
     tick();
