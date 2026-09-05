@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-05 07:30'
-updated_date: '2026-09-05 08:07'
+updated_date: '2026-09-05 09:51'
 labels:
   - feature
 dependencies: []
@@ -25,7 +25,7 @@ Maintainer request, 2026-09-05: when the PIC runs diagnose firmware, the web int
 - [x] #2 The screen appears automatically when the PIC is identified as diagnose firmware, and is absent for gateway and interface firmware
 - [x] #3 Raw PIC output, including a prompt that carries no line terminator, is visible in the browser without any external tool
 - [x] #4 Single keystrokes can be sent from the browser to the PIC without a trailing CR or LF being appended, and Enter can be sent as its own explicit key
-- [ ] #5 The ESP still detects a firmware type change, so reflashing gateway.hex from the same screen returns the device to normal operation without a reboot
+- [x] #5 The ESP still detects a firmware type change, so reflashing gateway.hex from the same screen returns the device to normal operation without a reboot
 - [x] #6 python build.py exits 0 with a per-target success line, python evaluate.py --quick shows no new failures, and the screen is verified on the bench unit running diagnose 2.2
 <!-- AC:END -->
 
@@ -73,4 +73,23 @@ Build trap worth recording: the first build exited 0 while having failed, leavin
 AC #5 IS NOT CHECKED. It requires reflashing gateway.hex to prove the ESP notices the firmware type changing back, and flashing the PIC needs explicit per-instance authorisation. The mechanism is in place and source-verified: the passthrough still reads through OTGWSerial::read(), so matchBanner() keeps running and a gateway banner would re-type the PIC. It is the proof that is missing, not the code.
 
 AC #2 second half is code-verified rather than hardware-verified: the nav entry carries "hidden" in the markup and is only unhidden for picfwtype "diagnose", but no gateway PIC was available to observe its absence.
+
+2026-09-05: full round trip verified on hardware with maintainer authorisation to flash the PIC. gateway 6.8 -> diagnose 2.2 -> gateway 6.8, driven entirely from the web interface.
+
+Evidence:
+- On gateway 6.8: main page active, diagnoseAvailable false, all six diagnose nav entries hidden, diagnose section not rendered.
+- Flash to diagnose 2.2: the diagnose screen comes up by itself, and test 5 returns live readings (Power supply 3.302, Reference 1.473, Thermostat 2.921, Boiler 0.000) with the typed digit echoed exactly once.
+- Flash back to gateway 6.8 from that same screen: after the ten second timer the UI lands on the main page, diagnoseAvailable false, nav entries hidden again, OpenTherm traffic flowing in the log.
+
+AC #5 is now checked: the ESP re-detected the firmware type in both directions and the UI followed, so a user who flashes diagnose can always get back to gateway from the same screen.
+
+Two real defects were found by doing this rather than by reasoning about it, both now fixed:
+
+1. TWO COMPLETION PATHS. handleFlashCompletion() is the HTTP-polling failsafe, but handleFlashMessage() carried an inline copy of the same logic for the WebSocket "end" state. The WebSocket wins the race, so the copy was the path that actually ran and it never learned about the post-flash switch. The copy is gone; that branch delegates to handleFlashCompletion().
+
+2. THE SWITCH FETCHED /device/info AND THE REQUEST STALLED. Right after a PIC flash the ESP is re-detecting the banner and rate limiting the UI polls. A pending fetch has no timeout and reaches neither .then nor .catch, so the timer expired and nothing happened, with no trace in the console. It now decides from fwInfo.type, which is synchronous and cannot hang, and a wrong guess self-heals because refreshFirmware() and the regular device-info poll both correct applyDiagnoseAvailability() shortly after.
+
+A third thing cost real time and is worth recording as a development gotcha rather than a defect: index.js is cache-busted with ?v=<githash>, taken from data/version.hash. Iterating WITHOUT committing leaves that key unchanged, so the browser keeps serving its cached copy even though the device has the new file. Two apparent test failures were this. Verified by reading handleFlashCompletion.toString() in the page and finding the old body while curl showed the new one on the device. Commit before browser-testing a JS change, or the browser lies to you.
+
+One known rough edge, not a regression and not fixed: deep-linking to #tabPICflash on a diagnose PIC loses a race against the once-per-load auto-show and lands on the diagnose screen instead. The PIC firmware page stays reachable through Advanced, which is how the flash back to gateway was performed, so nothing is unreachable.
 <!-- SECTION:NOTES:END -->
