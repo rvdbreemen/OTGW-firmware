@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-05 15:32'
-updated_date: '2026-09-05 19:08'
+updated_date: '2026-09-05 19:13'
 labels:
   - bug
   - pic
@@ -70,4 +70,12 @@ Dat is een verschil met juli, toen op ditzelfde MAC (ac:27:6e:ce:45:d8) na elke 
 Open vraag die alleen fysiek te beantwoorden is: in welke carrier zit deze S3 nu. Als het een OTGW32-carrier is in plaats van een Classic, verklaart dat alles wat hier gemeten is, inclusief de werkende OTDirect-frames. Zit hij wel op een Classic-carrier, dan blijft de resetlijn de eerste verdachte: verifieer met een scoop of GPIO12 tijdens commando p daadwerkelijk ~100 ms laag gaat.
 
 Los hiervan gevonden en apart de moeite waard: de webserver start op geen van beide builds. Poort 80 wordt actief geweigerd (dus niet gehangen, en niet de AsyncTCP-wedge uit ADR-139: CONFIG_ASYNC_TCP_STACK_SIZE staat al op 16384), terwijl telnet op 23 gewoon werkt en de firmware verder volledig draait: MQTT, OT-verwerking, BLE-sensoren, heap ~48k. Dat verdient een eigen taak.
+
+CORRECTIE, zelfde avond. De maintainer meldt dat de ESP op dit moment LOS van de carrier zit.
+
+Daarmee vervalt alle PIC-bewijs van vanavond. Geen PIC gedetecteerd, No ETX found after reset, combo die OT-Direct kiest, classic die Degraded wordt en de I2C-fouten op de classic-bus: dat is allemaal het verwachte gedrag van een losgekoppeld bord, niet een defect. De 0x26 watchdog en de PIC zitten op de carrier.
+
+Wat blijft staan is het oorspronkelijke onderwerp van deze taak: de mislukte flashpogingen van 2026-07-06, toen het bord WEL op de carrier zat en PR=A na elke poging een echte pic16f1847 v6.6 liet horen, terwijl de bootloader-entry op FWSTATE_RSET strandde op 0%.
+
+Winst die wel overeind blijft: het telnet-commando p (Manual reset PIC) doorloopt precies dezelfde detectiestap en logt No ETX found after reset. Zodra het bord terug op de carrier zit is dat dus de goedkope reproductie, in plaats van een flashpoging. Verwacht gedrag na terugplaatsen: p vindt de PIC wel. Doet hij dat niet, dan is de resetlijn opnieuw verdachte nummer een.
 <!-- SECTION:NOTES:END -->

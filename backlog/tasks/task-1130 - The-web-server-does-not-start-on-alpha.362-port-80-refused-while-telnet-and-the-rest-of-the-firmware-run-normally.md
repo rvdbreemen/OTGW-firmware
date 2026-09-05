@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-05 19:08'
+updated_date: '2026-09-05 19:13'
 labels:
   - bug
   - webserver
@@ -26,3 +27,13 @@ Observed on the bench ESP32-S3 (MAC ac:27:6e:ce:45:d8) at 2.0.0-alpha.362+ed79ac
 - [ ] #2 GET /api/v2/device/info answers on a freshly flashed and provisioned bench board
 - [ ] #3 Whatever start-order or gate caused this is covered so it cannot regress silently
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+CAVEAT bij de waarneming: de ESP zat tijdens deze meting LOS van de carrier. Dat verklaart de PIC- en I2C-observaties in TASK-1129, maar het verklaart op zichzelf niet waarom poort 80 wordt geweigerd, want de webserver hoort niet van de carrier af te hangen.
+
+Wel moet dit opnieuw gemeten worden met het bord op de carrier voordat er conclusies aan verbonden worden. Denkbaar is dat een mislukte I2C- of OLED-initialisatie de opstartvolgorde verstoort en de listener nooit wordt aangemaakt; dat zou juist een echte bug zijn, maar het is nu niet onderscheiden van een meetartefact.
+
+Herhaal na terugplaatsen: flash, provisioneer, en test poort 80 op beide builds.
+<!-- SECTION:NOTES:END -->
