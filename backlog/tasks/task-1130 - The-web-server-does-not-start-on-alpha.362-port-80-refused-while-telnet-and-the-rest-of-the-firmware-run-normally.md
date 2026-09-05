@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-05 19:08'
-updated_date: '2026-09-05 19:13'
+updated_date: '2026-09-05 19:23'
 labels:
   - bug
   - webserver
@@ -36,4 +36,10 @@ CAVEAT bij de waarneming: de ESP zat tijdens deze meting LOS van de carrier. Dat
 Wel moet dit opnieuw gemeten worden met het bord op de carrier voordat er conclusies aan verbonden worden. Denkbaar is dat een mislukte I2C- of OLED-initialisatie de opstartvolgorde verstoort en de listener nooit wordt aangemaakt; dat zou juist een echte bug zijn, maar het is nu niet onderscheiden van een meetartefact.
 
 Herhaal na terugplaatsen: flash, provisioneer, en test poort 80 op beide builds.
+
+REPRODUCEERT NIET met carrier aangesloten. Na een harde herstart is poort 80 gewoon OPEN en antwoordt GET /api/v2/device/info volledig, met heap rond 51k.
+
+De eerdere weigering trad op terwijl de ESP los van de carrier zat en de firmware in Degraded respectievelijk OT-Direct mode draaide, direct na provisioning. Of de oorzaak de ontbrekende carrier was of die specifieke boot valt uit deze waarnemingen niet te scheiden.
+
+Voorstel: sluiten als niet-reproduceerbaar. Komt het terug, dan is het onderscheidende gegeven dat telnet blijft werken terwijl poort 80 weigert, wat betekent dat de listener nooit is aangemaakt.
 <!-- SECTION:NOTES:END -->

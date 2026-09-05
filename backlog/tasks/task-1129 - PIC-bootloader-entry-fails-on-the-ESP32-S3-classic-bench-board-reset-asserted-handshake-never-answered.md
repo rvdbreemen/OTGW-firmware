@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-05 15:32'
-updated_date: '2026-09-05 19:13'
+updated_date: '2026-09-05 19:23'
 labels:
   - bug
   - pic
@@ -78,4 +78,14 @@ Daarmee vervalt alle PIC-bewijs van vanavond. Geen PIC gedetecteerd, No ETX foun
 Wat blijft staan is het oorspronkelijke onderwerp van deze taak: de mislukte flashpogingen van 2026-07-06, toen het bord WEL op de carrier zat en PR=A na elke poging een echte pic16f1847 v6.6 liet horen, terwijl de bootloader-entry op FWSTATE_RSET strandde op 0%.
 
 Winst die wel overeind blijft: het telnet-commando p (Manual reset PIC) doorloopt precies dezelfde detectiestap en logt No ETX found after reset. Zodra het bord terug op de carrier zit is dat dus de goedkope reproductie, in plaats van een flashpoging. Verwacht gedrag na terugplaatsen: p vindt de PIC wel. Doet hij dat niet, dan is de resetlijn opnieuw verdachte nummer een.
+
+Met carrier aangesloten en na een herstart: REPRODUCEERT NIET.
+
+  detectPIC( 967): ETX found after reset: Pic detected!
+
+Het telnet-commando p vindt de PIC direct. device/info meldt hardware_type otgw-classic, hardwaremode PIC, otcommandinterface PIC, picdeviceid pic16f1847. De bootloader-entry die in juli op FWSTATE_RSET strandde, faalt vandaag dus niet op deze stap.
+
+De PIC draait op dit moment diagnose-firmware 2.2, niet gateway 6.6 zoals in juli. Iemand heeft hem sindsdien dus wel degelijk succesvol geflasht, wat op zichzelf pleit tegen een structureel defect in het flashpad op dit bord.
+
+Status: het oorspronkelijke symptoom is niet reproduceerbaar en er is geen aanwijzing meer voor een defect. Voorstel is deze taak te sluiten en TASK-972 AC#2 opnieuw te beproeven met een echte flash vanuit de v2-UI, in plaats van hier op een spook te blijven jagen. Wel bewaren: commando p is de goedkope reproductie van de detectiestap, mocht het ooit terugkomen.
 <!-- SECTION:NOTES:END -->
