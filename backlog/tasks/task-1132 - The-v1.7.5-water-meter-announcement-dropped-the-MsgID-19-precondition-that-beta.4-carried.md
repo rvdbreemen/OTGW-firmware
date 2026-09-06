@@ -1,13 +1,11 @@
 ---
 id: TASK-1132
-title: >-
-  The v1.7.5 water-meter announcement dropped the MsgID 19 precondition that
-  beta.4 carried
+title: The water-meter docs state the MsgID 19 precondition but never the remedy
 status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-06 16:42'
-updated_date: '2026-09-06 16:43'
+updated_date: '2026-09-06 16:45'
 labels:
   - documentation
 dependencies: []
@@ -18,19 +16,19 @@ ordinal: 216000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-The cumulative DHW water total (TASK-1091) is announced to Home Assistant only after a MsgID 19 frame has actually decoded. That gate is deliberate (TASK-1093, ADR-093): without it every gateway whose thermostat never requests MsgID 19 gains a retained config for an entity that sits at 'unknown' forever.
+The cumulative DHW water total (TASK-1091) is announced to Home Assistant only after a MsgID 19 frame has actually decoded. That gate is deliberate (TASK-1093, ADR-093).
 
-The beta.4 announcement told users this in so many words: 'It appears only once your thermostat has actually requested MsgID 19, so no entity means your bus carries no DHW flow data, not a broken build.' When the release text was condensed for stable v1.7.5 that sentence was dropped, leaving 'New: a cumulative hot water total for the Home Assistant Energy dashboard. No helper and no YAML needed.'
+Premise correction, recorded because the task was opened on the wrong one: RELEASE_NOTES_1.7.5.md:69, RELEASE_GITHUB_1.7.5.md:26 and README.md:17 all DO state that precondition. Verified by reading them. The omission was in the Discord release announcement, which condensed the item to 'Nieuw: een cumulatieve warmwatermeter voor het Energy-dashboard van Home Assistant. Geen helper en geen YAML nodig.' That message is sent and is not being retracted.
 
-Result, observed once already: stefan_24213 in Discord #nederlandse-ondersteuning on 2026-09-06 updated to 1.7.5, saw no sensor, and asked whether he had to do something himself. The answer is that his boiler and thermostat have to exchange MsgID 19, and that AA=19 makes the gateway ask for it when the thermostat does not. Every subsequent user on a bus without DHW flow data will hit the same wall.
+What survives is the half none of the three documents carries: what the reader should DO about it. They state the fact and stop. A thermostat that never requests MsgID 19 will never produce the entity, and the gateway does not poll that id on its own, so the remedy is AA=19 (addalternative), which makes the gateway substitute the request itself. That command appears in the repository exactly once, as a row in the command table at docs/api/MQTT.md:474, with no connection to the water meter.
 
-CHANGELOG.md already states the precondition correctly under [1.7.5]; the omission is in the reader-facing release notes and the published GitHub release body. This is documentation only: no firmware change, no new build, no reflash.
+Observed cost of the gap: stefan_24213 in Discord #nederlandse-ondersteuning on 2026-09-06 updated to 1.7.5, saw no sensor, and asked. The maintainer answered by hand with MsgID 19 and the AA=19 hint. Every later user on a bus without DHW flow data needs the same answer.
+
+Documentation only: no firmware change, no new build, no reflash.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 RELEASE_NOTES_1.7.5.md states that the entity appears only after a MsgID 19 frame decodes, and that no entity means the bus carries no DHW flow data rather than a broken build
-- [ ] #2 The reader is told what to do about it: AA=19 makes the gateway request MsgID 19 itself when the thermostat never asks
-- [ ] #3 The published GitHub release body for v1.7.5 carries the same correction
-- [ ] #4 README wording for the feature does not promise an entity without naming the precondition
+- [ ] #1 The reader is told what to do about it: AA=19 makes the gateway request MsgID 19 itself when the thermostat never asks
+- [ ] #2 The published GitHub release body for v1.7.5 carries the same correction
 <!-- AC:END -->
