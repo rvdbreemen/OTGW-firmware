@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-06 16:42'
-updated_date: '2026-09-06 16:45'
+updated_date: '2026-09-06 16:48'
 labels:
   - documentation
 dependencies: []
@@ -29,10 +29,10 @@ Documentation only: no firmware change, no new build, no reflash.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The reader is told what to do about it: AA=19 makes the gateway request MsgID 19 itself when the thermostat never asks
-- [ ] #2 The published GitHub release body for v1.7.5 carries the same correction
-- [ ] #3 README.md, RELEASE_NOTES_1.7.5.md and RELEASE_GITHUB_1.7.5.md each name the remedy alongside the precondition they already state
-- [ ] #4 The remedy is stated accurately: the gateway does not poll MsgID 19, AA=19 adds it to the alternative-message table, and that table is finite (NS - No Space)
+- [x] #1 The reader is told what to do about it: AA=19 makes the gateway request MsgID 19 itself when the thermostat never asks
+- [x] #2 The published GitHub release body for v1.7.5 carries the same correction
+- [x] #3 README.md, RELEASE_NOTES_1.7.5.md and RELEASE_GITHUB_1.7.5.md each name the remedy alongside the precondition they already state
+- [x] #4 The remedy is stated accurately: the gateway does not poll MsgID 19, AA=19 adds it to the alternative-message table, and that table is finite (NS - No Space)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -45,3 +45,12 @@ Documentation only: no firmware change, no new build, no reflash.
 5. Carry the same edit onto main, because main is what the published v1.7.5 tag points at and what a reader reaches from the release page. Return the worktree to otgw-1.x.x afterwards.
 6. Docs-only, so the build and evaluator gates do not apply under the push policy.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- Premise was wrong and is corrected in the description: all three documents already stated the MsgID 19 precondition. Verified by reading RELEASE_NOTES_1.7.5.md:69, RELEASE_GITHUB_1.7.5.md:26 and README.md:17. Only the Discord announcement dropped it, and that message stands.
+- What was actually missing everywhere: the remedy. Added AA=19 beside the precondition in all three, de-duplicated in the release notes where the paragraph already opened with "The gateway does not poll MsgID 19".
+- Published release body updated and verified live. Worth recording: v1.7.5 reports isImmutable true, and gh release edit --notes-file still succeeded. Immutability covers assets and the tag, not the notes.
+- main NOT synced. origin/main is 0 behind and otgw-1.x.x is 61 ahead, so a fast-forward would drag the whole 1.7.6-beta line onto the release branch. A cherry-pick of the docs commit is the right tool and needs per-instance confirmation for an origin/main push.
+<!-- SECTION:NOTES:END -->
