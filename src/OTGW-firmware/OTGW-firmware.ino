@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.363
+**  Version  : v2.0.0-alpha.364
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -442,6 +442,18 @@ void setup() {
   // readable via FSexplorer after a power cycle when no console is attached.
   appendBootDetectLog();
 #else
+  #if HAS_PIC
+  // TASK-1131: the primary IDF console is UART0, and on a fixed PIC board that
+  // is the same peripheral on the same pins as the PIC link (HardwareSerial(0),
+  // GPIO44/43). Every esp_log line was therefore transmitted INTO the PIC.
+  // ADR-168 already decided this must be muted on the PIC path, but both of the
+  // existing call sites sit in the HAS_RUNTIME_HW_DETECT arm above, which is
+  // combo-only, so the fixed Classic target never got it. ARDUINO_USB_CDC_ON_BOOT
+  // does not help: it remaps the Arduino Serial object, not the IDF console.
+  // This cannot cover the ROM boot banner or the OTGWSerial global constructor,
+  // both of which run before setup().
+  platformMuteUart0Console();
+  #endif
   detectPIC();
   #if HAS_DIRECT_OT
   initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.363
+**  Version  : v2.0.0-alpha.364
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -687,6 +687,13 @@ static void picSerialFlushRawChunk(uint8_t *chunk, uint8_t &len) {
 // loop-side reportPendingPICRxErrors() (called from drainOTFrameQueue) does the
 // actual reporting + OTGWState write under OTStateLock. The LED blink and the
 // ser2net 25238 mirror likewise moved to the loop-side consumer.
+//
+// feedWatchDog() belongs to that same list and used to be called from here
+// anyway (TASK-1131). It could not do its job: ADR-135 subscribes the loop task
+// only, so the TWDT reset failed with "task not found" and the IDF logged that
+// on a console this board shares with the PIC. The 0x26 feed and the LED blink
+// inside it are loop-side work too, and doing them here put an I2C transaction
+// and a GPIO write in task context.
 void picSerialDrainOnce() {
   // ---- RX: read bytes, assemble lines, enqueue each complete line ----------
   static char    sRead[MAX_BUFFER_READ];
@@ -759,7 +766,6 @@ void picSerialDrainOnce() {
       bytes_read = 0;
       discardCurrentReadLine = true;
     }
-    feedWatchDog();
   }
 
   // TASK-1111: hand the open passthrough chunk over once the coalescing window
@@ -790,7 +796,6 @@ void picSerialDrainOnce() {
       platformQueueSendToFront(otTxQueue, &tx);
       break;
     }
-    feedWatchDog();
   }
 }
 
@@ -1457,7 +1462,14 @@ void feedWatchDog() {
   DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
   if (DUE(timerWD)) {
     // PRIMARY: reset the ESP32 TWDT (loop task).
-    if (s_twdtReady) esp_task_wdt_reset();
+    // Tested on the CALLER's subscription, not only on s_twdtReady. That flag
+    // says "initWatchDog ran"; it says nothing about which task is asking, so a
+    // caller on any other task sailed through it and the IDF answered
+    // "esp_task_wdt_reset: task not found" on the console. On a board where the
+    // console shares UART0 with the PIC that log line was transmitted into the
+    // PIC (TASK-1131). ADR-135 subscribes the loop task only, so an off-loop
+    // caller is now a silent no-op rather than a log storm.
+    if (s_twdtReady && esp_task_wdt_status(NULL) == ESP_OK) esp_task_wdt_reset();
     // SECONDARY: feed the external 0x26 chip — ONLY if it was detected at init
     // (TASK-945). Feeding an absent/non-responding 0x26 every 100ms spams the
     // ESP32-S3 i2c-ng [E] log; an absent chip cannot bite anyway.
@@ -1514,7 +1526,9 @@ void WatchDogEnabled(byte stateWatchdog) {
 
 void feedWatchDog() {
   DECLARE_TIMER_MS(timerWD, 100, SKIP_MISSED_TICKS);
-  if (DUE(timerWD) && s_twdtReady) {
+  // Subscription test, not just the boot flag: see the note in the
+  // HAS_PIC_WATCHDOG branch above (TASK-1131).
+  if (DUE(timerWD) && s_twdtReady && esp_task_wdt_status(NULL) == ESP_OK) {
     esp_task_wdt_reset();
   }
   DECLARE_TIMER_MS(timerWDBlink, 1000, SKIP_MISSED_TICKS);
