@@ -1,11 +1,11 @@
 ---
 id: TASK-1132
 title: The water-meter docs state the MsgID 19 precondition but never the remedy
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-06 16:42'
-updated_date: '2026-09-06 17:10'
+updated_date: '2026-09-06 17:11'
 labels:
   - documentation
 dependencies: []
