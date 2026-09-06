@@ -34,3 +34,14 @@ Documentation only: no firmware change, no new build, no reflash.
 - [ ] #3 README.md, RELEASE_NOTES_1.7.5.md and RELEASE_GITHUB_1.7.5.md each name the remedy alongside the precondition they already state
 - [ ] #4 The remedy is stated accurately: the gateway does not poll MsgID 19, AA=19 adds it to the alternative-message table, and that table is finite (NS - No Space)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Verified the premise first: all three documents already state the precondition, so the change is additive, not corrective. Only the Discord announcement dropped it, and that message stands.
+2. Append the remedy to the three reader-facing places, in the sentence that already states the precondition, so the fact and the action sit together rather than in separate paragraphs.
+3. Keep it one clause: the gateway does not poll MsgID 19, so AA=19 makes it ask. Do not restate the OpenTherm version or the entity attributes, which are already there.
+4. Update the published GitHub release body with gh release edit --notes-file, per the /release skill Phase 7.
+5. Carry the same edit onto main, because main is what the published v1.7.5 tag points at and what a reader reaches from the release page. Return the worktree to otgw-1.x.x afterwards.
+6. Docs-only, so the build and evaluator gates do not apply under the push policy.
+<!-- SECTION:PLAN:END -->
