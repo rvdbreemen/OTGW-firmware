@@ -25,7 +25,7 @@ symbols:
   - "HaDeviceClass"
   - "DHWFlowRate"
 context_scope: "selective"
-format: "madr"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -52,7 +52,7 @@ status_history:
     changed_via: adr-kit lifecycle
 ```
 
-## Context and Problem Statement
+## Context
 
 GitHub issue [#675](https://github.com/rvdbreemen/OTGW-firmware/issues/675) was filed
 against the 1.x line, asking for `device_class: water` on the DHW (Domestic Hot Water)
@@ -107,7 +107,7 @@ cumulative entity.
 * The user-visible entity contract must match the 1.x line, so a user moving between
   firmware lines sees the same sensor rather than a renamed or retyped one.
 
-## Considered Options
+## Alternatives Considered
 
 * **Option A — Firmware-integrated cumulative total.** Integrate MsgID 19 over time,
   persist the running litre count, and publish it as a new discovery entity with
@@ -118,7 +118,7 @@ cumulative entity.
 * **Option C — Do nothing.** Leave the sensor without a device class and close #675
   explaining that a flow rate is not a meter.
 
-## Decision Outcome
+## Decision
 
 Chosen option: **Option A**, because the maintainer decided the Energy dashboard should
 work out of the box rather than requiring every user to discover and configure a Home

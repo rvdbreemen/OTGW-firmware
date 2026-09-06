@@ -25,7 +25,7 @@ symbols:
   - "otRawQueue"
   - "OT_RAW_CHUNK_MAX"
 context_scope: "selective"
-format: "madr"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -52,7 +52,7 @@ status_history:
     changed_via: adr-kit lifecycle
 ```
 
-## Context and Problem Statement
+## Context
 
 The PIC can be loaded with the diagnostic firmware instead of the gateway
 firmware. That firmware speaks an interactive text menu rather than the
@@ -97,7 +97,7 @@ the rule is currently unrecorded on this branch.
   read the diff semantically.
 * **Option C** — write nothing, and rely on the existing comments plus review.
 
-## Decision Outcome
+## Decision
 
 Chosen option: **Option A**, because the damaging edits share a small, precise
 syntactic signature. The raw payload travels as a `(pointer, length)` pair, and

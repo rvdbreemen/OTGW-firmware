@@ -27,7 +27,7 @@ symbols:
   - "PRESENCE_GATED"
   - "mqtt_source"
 context_scope: "selective"
-format: "madr"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -49,7 +49,7 @@ status_history:
     changed_via: adr-kit
 ```
 
-## Context and Problem Statement
+## Context
 
 The OT coverage gate reduces a replay-fixture run to a normalized fingerprint and
 diffs it against a committed baseline, so a decode or publish regression fails
@@ -93,7 +93,7 @@ volume and no SAT/BLE traces sharing the stream.
 * The bench and the maintainer's production gateway share one MQTT broker.
 * The test rig is standard-library only; adding a dependency is a real cost.
 
-## Considered Options
+## Alternatives Considered
 
 * Option A: read decoded frames from telnet with MQTT debug off, and read topics
   from an MQTT broker subscription; gate presence only where it is observable.
@@ -103,7 +103,7 @@ volume and no SAT/BLE traces sharing the stream.
 * Option D: do nothing, and accept a gate that reports differences a reader must
   triage by hand every run.
 
-## Decision Outcome
+## Decision
 
 Chosen option: **Option A**, because it is the only one that makes topic presence
 an observation rather than a sample, and because a firmware detail makes it free:

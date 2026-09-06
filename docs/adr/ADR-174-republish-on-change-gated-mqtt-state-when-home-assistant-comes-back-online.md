@@ -7,6 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
+supersedes:
+  - "ADR-100"
 superseded_by: null
 topics:
   - "mqtt"
@@ -30,9 +32,7 @@ symbols:
   - "publishHvacAction"
   - "bHaRebootDetect"
 context_scope: "selective"
-format: "madr"
-supersedes:
-  - "ADR-100"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -59,7 +59,7 @@ status_history:
     changed_via: adr-kit lifecycle
 ```
 
-## Context and Problem Statement
+## Context
 
 This ADR ports the decision from `otgw-1.x.x` ADR-088 to the 2.0.0 worktree, exactly as ADR-100 ported ADR-073. The context and evidence are identical and are not restated in full here; see ADR-088 for the complete field report and capture analysis.
 
@@ -94,13 +94,13 @@ With it, any `online` payload counts, including a retained birth message replaye
 * The trigger must not fire on ordinary MQTT reconnects, under any broker or Home Assistant retain configuration.
 * Both firmware lines must agree on `homeassistant/status` semantics, because it is a Home Assistant side contract and a divergence would make the two branches behave differently against the same broker.
 
-## Considered Options
+## Alternatives Considered
 
 * **Option A**: mirror ADR-088 exactly — trigger `requestMQTTRepublishAll()` on a genuine `offline` to `online` transition.
 * **Option B**: leave 2.0.0 on the ADR-100 no-action rule and fix only the 1.x line.
 * **Option C**: design a different trigger for 2.0.0, taking advantage of the async MQTT path.
 
-## Decision Outcome
+## Decision
 
 Chosen option: **Option A**, because `homeassistant/status` is a Home Assistant side contract and the two firmware lines must not disagree about it.
 
