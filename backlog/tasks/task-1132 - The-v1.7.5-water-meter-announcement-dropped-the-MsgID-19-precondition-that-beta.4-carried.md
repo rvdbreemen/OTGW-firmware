@@ -31,4 +31,6 @@ Documentation only: no firmware change, no new build, no reflash.
 <!-- AC:BEGIN -->
 - [ ] #1 The reader is told what to do about it: AA=19 makes the gateway request MsgID 19 itself when the thermostat never asks
 - [ ] #2 The published GitHub release body for v1.7.5 carries the same correction
+- [ ] #3 README.md, RELEASE_NOTES_1.7.5.md and RELEASE_GITHUB_1.7.5.md each name the remedy alongside the precondition they already state
+- [ ] #4 The remedy is stated accurately: the gateway does not poll MsgID 19, AA=19 adds it to the alternative-message table, and that table is finite (NS - No Space)
 <!-- AC:END -->
