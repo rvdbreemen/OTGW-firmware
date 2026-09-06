@@ -3,9 +3,11 @@ id: TASK-1132
 title: >-
   The v1.7.5 water-meter announcement dropped the MsgID 19 precondition that
   beta.4 carried
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-06 16:42'
+updated_date: '2026-09-06 16:43'
 labels:
   - documentation
 dependencies: []
