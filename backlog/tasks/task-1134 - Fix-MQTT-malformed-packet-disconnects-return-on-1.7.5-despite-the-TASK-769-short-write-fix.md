@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:20'
-updated_date: '2026-09-17 20:32'
+updated_date: '2026-09-17 20:47'
 labels:
   - bug
 dependencies: []
@@ -34,3 +34,13 @@ TASK-769 (Done) fixed truncated-payload desync by disconnecting instead of calli
 - [ ] #5 python evaluate.py --quick shows no new failures
 - [ ] #6 Field validation by mrfox7688 and/or jaronbor on 1.x: no malformed-packet disconnects over at least 3 days
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Falsify or confirm the re-entrancy hypothesis by tracing every yield/feedWatchDog/delayms site inside the chunked publish path (AC1).
+2. If falsified, find the real desync source in the vendored PubSubClient and verify the premise it rests on against the ESP8266 core the firmware builds with (AC3).
+3. Fix at the caller contract, one edit per file: beginMqttPublish() for the MQTTstuff.ino paths, one shared helper for the nine composer call sites in mqtt_configuratie.cpp.
+4. Prove defect and remedy with a host test compiled against the REAL PubSubClient.cpp and a short-writing fake client (AC7).
+5. Build, evaluate, commit.
+<!-- SECTION:PLAN:END -->
