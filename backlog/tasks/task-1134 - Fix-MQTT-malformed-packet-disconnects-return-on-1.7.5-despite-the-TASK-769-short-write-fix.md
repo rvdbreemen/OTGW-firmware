@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:20'
-updated_date: '2026-09-17 20:48'
+updated_date: '2026-09-17 20:49'
 labels:
   - bug
 dependencies: []
@@ -75,4 +75,12 @@ Evidence (AC7): test/host/test_mqttBeginPublishDesync.cpp, 15 checks, compiled a
 Harness: new test/host/pubsub_shim/ (Arduino.h, Client.h, Stream.h, IPAddress.h) emulates the platform only; run_tests.bat gained the test and an /I for the shim.
 
 First run of the test failed 5 of 12 checks because beginPublish is gated on PubSubClient::connected(), which reports the SESSION state; without a CONNACK no bytes are ever written. Fixed by opening a real session in each case.
+
+Validation run 2026-09-17:
+- testun_tests.bat: 3 suites, 51 checks, 0 failures, exit 0 (18 jsonStuff + 18 dhwWaterMeter + 15 new).
+- build.bat: "Build completed successfully", exit 0, 0 compile errors. Fresh artifacts OTGW-firmware-1.7.6-beta.3+b2b1b89.ino.bin and .littlefs.bin written 22:46:48 local.
+- python evaluate.py --quick: 37 checks, 35 passed, 0 warnings, 0 failed, 2 info, health 100 percent, exit 0.
+- version.h diff is build churn only (_VERSION_BUILD, githash, date/time); _VERSION_PRERELEASE stays beta.3, so no beta tag was spent.
+
+Note on AC4 wording: build.bat was used, not python build.py --firmware. Project policy is that build.bat is the entrypoint and that firmware AND filesystem are built; build.bat covers the AC4 gate and more.
 <!-- SECTION:NOTES:END -->
