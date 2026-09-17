@@ -82,4 +82,6 @@ Validation run 2026-09-17:
 - version.h diff is build churn only (_VERSION_BUILD, githash, date/time); _VERSION_PRERELEASE stays beta.3, so no beta tag was spent.
 
 Note on AC4 wording: build.bat was used, not python build.py --firmware. Project policy is that build.bat is the entrypoint and that firmware AND filesystem are built; build.bat covers the AC4 gate and more.
+
+AC2 removed: it was the 'if reachable' branch of AC1 and AC3 is its mutually exclusive twin. AC1 falsified reachability, so AC2 described work that must not happen. Removed rather than left unchecked, so the remaining unchecked box is the genuine one (field validation).
 <!-- SECTION:NOTES:END -->
