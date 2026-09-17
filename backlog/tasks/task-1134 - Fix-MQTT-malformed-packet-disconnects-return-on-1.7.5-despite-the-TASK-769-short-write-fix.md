@@ -33,6 +33,7 @@ TASK-769 (Done) fixed truncated-payload desync by disconnecting instead of calli
 - [ ] #4 python build.py --firmware exits 0
 - [ ] #5 python evaluate.py --quick shows no new failures
 - [ ] #6 Field validation by mrfox7688 and/or jaronbor on 1.x: no malformed-packet disconnects over at least 3 days
+- [ ] #7 A host test compiled against the real PubSubClient reproduces the desync (partial header on the wire, link still up, next packet appended) and shows the caller contract prevents it, without dropping a healthy connection
 <!-- AC:END -->
 
 ## Implementation Plan
