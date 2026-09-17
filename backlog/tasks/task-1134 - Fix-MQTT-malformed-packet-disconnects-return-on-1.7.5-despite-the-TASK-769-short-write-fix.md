@@ -27,13 +27,13 @@ TASK-769 (Done) fixed truncated-payload desync by disconnecting instead of calli
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Determine whether MQTTclient.loop() (and therefore PINGREQ) is reachable between beginMqttPublish() and endPublish(), by tracing every yield/feedWatchDog/delayms site inside the chunked publish path; record the verdict with file:line evidence either way
+- [x] #1 Determine whether MQTTclient.loop() (and therefore PINGREQ) is reachable between beginMqttPublish() and endPublish(), by tracing every yield/feedWatchDog/delayms site inside the chunked publish path; record the verdict with file:line evidence either way
 - [ ] #2 If reachable: a publish in progress cannot be interrupted by any other socket writer (guard, or PINGREQ deferred until the packet is complete)
-- [ ] #3 If not reachable: the alternative desync source is identified from mrfox7688's Mosquitto log and named with evidence, and this task is re-scoped accordingly
-- [ ] #4 python build.py --firmware exits 0
-- [ ] #5 python evaluate.py --quick shows no new failures
+- [x] #3 If not reachable: the alternative desync source is identified from mrfox7688's Mosquitto log and named with evidence, and this task is re-scoped accordingly
+- [x] #4 python build.py --firmware exits 0
+- [x] #5 python evaluate.py --quick shows no new failures
 - [ ] #6 Field validation by mrfox7688 and/or jaronbor on 1.x: no malformed-packet disconnects over at least 3 days
-- [ ] #7 A host test compiled against the real PubSubClient reproduces the desync (partial header on the wire, link still up, next packet appended) and shows the caller contract prevents it, without dropping a healthy connection
+- [x] #7 A host test compiled against the real PubSubClient reproduces the desync (partial header on the wire, link still up, next packet appended) and shows the caller contract prevents it, without dropping a healthy connection
 <!-- AC:END -->
 
 ## Implementation Plan
