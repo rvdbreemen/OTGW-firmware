@@ -64,4 +64,15 @@ Premise verified one layer down, not assumed: ESP8266 core 2.7.4 ClientContext.h
 Why TASK-769 did not cover this: it hardened the PAYLOAD half (writeMqttChunk/writeMqttProgmemChunk plus the composer failure branches) and left the header half open.
 
 Note for future readers: PubSubClient::endPublish() is "return 1;" unconditionally, so every "if (!client.endPublish())" branch in MQTTstuff.ino and mqtt_configuratie.cpp is dead code. Left untouched here, unrelated surface.
+
+Fix (2 files, 12 call sites, no duplication):
+- MQTTstuff.ino beginMqttPublish(): MQTTclient.disconnect() added to the beginPublish failure branch. Covers sendMQTTData char*, the PROGMEM overload and the third site at line ~1331.
+- mqtt_configuratie.cpp: new static beginDiscoveryPublish(client, topic, payloadLen) drops the link on failure; the nine composer call sites now route through it instead of calling client.beginPublish() bare.
+
+Deliberate: the disconnect is unconditional on false. beginPublish collapses "wrote nothing" and "wrote part of the header" into the same false and the caller cannot tell them apart without changing the library, so the link is dropped either way. A needless reconnect costs one gap; a desynchronised stream costs every packet after it. Users on #682 will still see gaps, but a clean drop instead of a malformed-packet drop.
+
+Evidence (AC7): test/host/test_mqttBeginPublishDesync.cpp, 15 checks, compiled against the REAL libraries/PubSubClient/src/PubSubClient.cpp with a fake Client that short-writes and replays a CONNACK. Case 1 reproduces the defect: beginPublish returns false, bytes ARE on the wire, connection still up, and a following publish is appended to the desynchronised stream. Case 2 shows the caller contract drops the link and nothing is appended. Case 3 shows a healthy connection is not dropped.
+Harness: new test/host/pubsub_shim/ (Arduino.h, Client.h, Stream.h, IPAddress.h) emulates the platform only; run_tests.bat gained the test and an /I for the shim.
+
+First run of the test failed 5 of 12 checks because beginPublish is gated on PubSubClient::connected(), which reports the SESSION state; without a CONNACK no bytes are ever written. Fixed by opening a real session in each case.
 <!-- SECTION:NOTES:END -->
