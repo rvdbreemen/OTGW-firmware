@@ -342,7 +342,21 @@ static bool beginMqttPublish(const char *topic, size_t len, bool retain)
     return false;
   }
   if (!MQTTclient.beginPublish(topic, len, retain)) {
+    // beginPublish() writes the fixed header and the topic to the socket in one
+    // _client->write() and only reports whether the full count went out. On
+    // ESP8266 that write returns a partial count once the lwIP send buffer stays
+    // full until the 5 s timeout (ClientContext.h _write_from_source returns
+    // _written after _is_timeout()), so a failure here can leave half a PUBLISH
+    // header on the wire with the connection still up. The broker then reads the
+    // next packet -- a PINGREQ or the next publish -- as the payload that header
+    // promised, and drops the client with "malformed packet" (GH #682).
+    //
+    // false covers both a partial write and one that never started, and the two
+    // are indistinguishable from here, so drop the link either way: a needless
+    // reconnect costs one gap, a desynchronised stream costs every packet after
+    // it. TASK-769 applied the same remedy to the payload half of this publish.
     PrintMQTTError();
+    MQTTclient.disconnect();
     return false;
   }
   return true;

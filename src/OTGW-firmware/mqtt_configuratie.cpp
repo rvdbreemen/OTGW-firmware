@@ -2246,6 +2246,32 @@ static constexpr uint32_t STREAM_HEAP_MIN = 4000;  // Streaming needs ~200 bytes
 static constexpr size_t   STREAM_TOPIC_MAX = 200;
 
 // ---------------------------------------------------------------------------
+// Open a streaming discovery publish, dropping the link when the header write
+// fails.
+//
+// PubSubClient::beginPublish() writes the fixed header and the topic straight
+// to the socket with a single _client->write() and reports only whether the
+// full count went out. On ESP8266 that write returns a partial count when the
+// lwIP send buffer stays full until the 5 s timeout (ClientContext.h
+// _write_from_source returns _written after _is_timeout()), so a failure can
+// leave half a PUBLISH header on the wire while the connection stays up. The
+// broker then reads the next packet as the payload the header promised and
+// drops the client with "malformed packet" (GH #682).
+//
+// A caller cannot tell a partial write from one that never started, because
+// both arrive as false, so the link is dropped on either. Reconnecting after a
+// header that wrote nothing costs one reconnect; keeping a connection whose
+// stream is desynchronised costs every packet after it. This mirrors what
+// TASK-769 did for the payload half of the same publish.
+// ---------------------------------------------------------------------------
+static bool beginDiscoveryPublish(PubSubClient &client, const char *topic, size_t payloadLen)
+{
+  if (client.beginPublish(topic, payloadLen, true)) return true;
+  client.disconnect();
+  return false;
+}
+
+// ---------------------------------------------------------------------------
 // Public API: streamSensorDiscovery
 // ---------------------------------------------------------------------------
 bool streamSensorDiscovery(PubSubClient &client,
@@ -2268,7 +2294,7 @@ bool streamSensorDiscovery(PubSubClient &client,
   if (!composeSensorPayload(measure, cfg, ctx)) return false;
 
   // Begin publish with exact payload length
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+  if (!beginDiscoveryPublish(client, topic, measure.byteCount)) return false;
 
   // Write pass
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
@@ -2303,7 +2329,7 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
   MqttJsonWriter measure(MqttJsonWriter::MEASURE);
   if (!composeBinSensorPayload(measure, cfg, ctx)) return false;
 
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+  if (!beginDiscoveryPublish(client, topic, measure.byteCount)) return false;
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeBinSensorPayload(writer, cfg, ctx) || !writer.ok) {
@@ -2429,7 +2455,7 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
   MqttJsonWriter measure(MqttJsonWriter::MEASURE);
   if (!compose(measure)) return false;
 
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+  if (!beginDiscoveryPublish(client, topic, measure.byteCount)) return false;
 
   // Write pass
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
@@ -2537,7 +2563,7 @@ bool streamHvacSensorDiscovery(PubSubClient &client,
   MqttJsonWriter measure(MqttJsonWriter::MEASURE);
   if (!compose(measure)) return false;
 
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+  if (!beginDiscoveryPublish(client, topic, measure.byteCount)) return false;
 
   // Write pass
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
@@ -2633,7 +2659,7 @@ bool streamOverrideSensorDiscovery(PubSubClient &client,
   MqttJsonWriter measure(MqttJsonWriter::MEASURE);
   if (!compose(measure)) return false;
 
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+  if (!beginDiscoveryPublish(client, topic, measure.byteCount)) return false;
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
@@ -2885,7 +2911,7 @@ bool streamClimateDiscovery(PubSubClient &client,
   MqttJsonWriter measure(MqttJsonWriter::MEASURE);
   if (!compose(measure)) return false;
 
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+  if (!beginDiscoveryPublish(client, topic, measure.byteCount)) return false;
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
@@ -2969,7 +2995,7 @@ bool streamNumberDiscovery(PubSubClient &client,
   MqttJsonWriter measure(MqttJsonWriter::MEASURE);
   if (!compose(measure)) return false;
 
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+  if (!beginDiscoveryPublish(client, topic, measure.byteCount)) return false;
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
@@ -3042,7 +3068,7 @@ bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
   MqttJsonWriter measure(MqttJsonWriter::MEASURE);
   if (!composeButtonPayload(measure, ctx)) return false;
 
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+  if (!beginDiscoveryPublish(client, topic, measure.byteCount)) return false;
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeButtonPayload(writer, ctx) || !writer.ok) {
@@ -3210,7 +3236,7 @@ bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryC
   MqttJsonWriter measure(MqttJsonWriter::MEASURE);
   if (!composeSelectPayload(measure, selectIdx, ctx)) return false;
 
-  if (!client.beginPublish(topic, measure.byteCount, true)) return false;
+  if (!beginDiscoveryPublish(client, topic, measure.byteCount)) return false;
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeSelectPayload(writer, selectIdx, ctx) || !writer.ok) {

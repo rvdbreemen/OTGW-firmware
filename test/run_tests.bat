@@ -36,9 +36,10 @@ if errorlevel 1 (
 
 REM --- build + run each host test --------------------------------------
 set "RC=0"
-for %%T in (test_extractJsonField test_dhwWaterMeter) do (
+for %%T in (test_extractJsonField test_dhwWaterMeter test_mqttBeginPublishDesync) do (
   echo Building test\host\%%T.cpp ...
   cl /nologo /EHsc /std:c++17 /W3 /wd4996 ^
+     /I"%TESTDIR%host\pubsub_shim" ^
      /Fe:"%OUTDIR%\%%T.exe" ^
      /Fo:"%OUTDIR%\%%T." ^
      "%TESTDIR%host\%%T.cpp"
