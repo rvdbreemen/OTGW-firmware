@@ -4,9 +4,12 @@ title: 'Fix: MQTT keeps reporting boiler connected while the PIC is absent'
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:21'
+updated_date: '2026-09-17 20:22'
 labels:
   - bug
 dependencies: []
+references:
+  - 'Discord #nederlandse-ondersteuning / tranquil_kiwi_32924 / 2026-09-17'
 priority: medium
 ordinal: 218000
 ---
