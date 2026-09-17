@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:20'
-updated_date: '2026-09-17 20:47'
+updated_date: '2026-09-17 20:48'
 labels:
   - bug
 dependencies: []
@@ -45,3 +45,23 @@ TASK-769 (Done) fixed truncated-payload desync by disconnecting instead of calli
 4. Prove defect and remedy with a host test compiled against the REAL PubSubClient.cpp and a short-writing fake client (AC7).
 5. Build, evaluate, commit.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC1 verdict: NOT reachable. The re-entrancy hypothesis in the task description is falsified.
+- feedWatchDog() (OTGW-Core.ino:957-978) does I2C watchdog feed plus blinkLEDnow(); its own yield() is commented out at line 977.
+- delayms() (helperStuff.ino:1296-1301) is the only caller of doBackgroundTasks(), and it is not on any publish path.
+- yield() on ESP8266 switches to the SDK cont task and never re-enters loop(), so no user code and therefore no MQTTclient.loop() runs inside writeMqttChunk.
+- handleMQTTcallback() (MQTTstuff.ino:624) does not publish; requestMQTTRepublishAll() only sets gates.
+PINGREQ cannot be emitted from inside a publish. The reporter did see one adjacent to the corruption, but as a neighbour, not as the interleaver.
+
+AC3: real desync source found in the header write, not the payload.
+PubSubClient::beginPublish() (libraries/PubSubClient/src/PubSubClient.cpp:265-280) writes the fixed header plus topic with ONE _client->write() and returns rc == expected. On a short write it has already put bytes on the wire and returns false. Every one of the 12 call sites treated that false as nothing-happened and returned without dropping the link, so the connection stayed up carrying half a PUBLISH header. Whatever went out next (a PINGREQ, or the next publish) is read by the broker as the payload that header promised: malformed packet.
+
+Premise verified one layer down, not assumed: ESP8266 core 2.7.4 ClientContext.h::_write_from_source (line 455) breaks its loop on _is_timeout() and returns _written, so a partial count from _client->write() is real. The 5 s socket timeout is reached when the lwIP send buffer stays full, which is a backpressure condition and needs no low heap. That fits #682: two reporters on different routers, no heap complaints, failures during bursts of small publishes where the header dominates the write.
+
+Why TASK-769 did not cover this: it hardened the PAYLOAD half (writeMqttChunk/writeMqttProgmemChunk plus the composer failure branches) and left the header half open.
+
+Note for future readers: PubSubClient::endPublish() is "return 1;" unconditionally, so every "if (!client.endPublish())" branch in MQTTstuff.ino and mqtt_configuratie.cpp is dead code. Left untouched here, unrelated surface.
+<!-- SECTION:NOTES:END -->
