@@ -3,10 +3,11 @@ id: TASK-1134
 title: >-
   Fix: MQTT malformed-packet disconnects return on 1.7.5 despite the TASK-769
   short-write fix
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-17 20:20'
-updated_date: '2026-09-17 20:21'
+updated_date: '2026-09-17 20:32'
 labels:
   - bug
 dependencies: []
