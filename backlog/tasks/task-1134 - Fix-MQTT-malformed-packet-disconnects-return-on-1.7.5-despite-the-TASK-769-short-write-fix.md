@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:20'
-updated_date: '2026-09-17 20:49'
+updated_date: '2026-09-17 20:50'
 labels:
   - bug
 dependencies: []
@@ -85,3 +85,30 @@ Note on AC4 wording: build.bat was used, not python build.py --firmware. Project
 
 AC2 removed: it was the 'if reachable' branch of AC1 and AC3 is its mutually exclusive twin. AC1 falsified reachability, so AC2 described work that must not happen. Removed rather than left unchecked, so the remaining unchecked box is the genuine one (field validation).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closes the header half of the MQTT stream desync that TASK-769 only closed for payloads, and that came back as malformed-packet disconnects on 1.7.5 (GH #682).
+
+What was wrong
+PubSubClient::beginPublish() writes the fixed header and the topic to the socket with a single _client->write() and returns only whether the full count went out. On ESP8266 that write returns a PARTIAL count once the lwIP send buffer stays full until the 5 s socket timeout (core 2.7.4, ClientContext.h::_write_from_source returns _written after _is_timeout()). All 12 call sites treated the resulting false as "nothing happened" and returned with the link still up, leaving half a PUBLISH header on the wire. The broker then reads the next packet, a PINGREQ or the next publish, as the payload that header promised, and drops the client: "malformed packet".
+
+This needs no low heap, only send-buffer backpressure, which is why two reporters on different routers hit it during bursts of small value publishes and why reducing MQTT traffic did not cure it. The 42 s reconnect gap they both measured is timerMQTTwaitforconnect (MQTTstuff.ino:775), the firmware backoff, not a network property.
+
+The re-entrancy hypothesis the task was opened on was falsified first: feedWatchDog() has its yield() commented out, delayms() is the only doBackgroundTasks() caller and is not on a publish path, and yield() does not re-enter loop() on ESP8266. PINGREQ cannot be emitted from inside a publish.
+
+What changed
+- MQTTstuff.ino: beginMqttPublish() drops the TCP link when beginPublish fails. Covers all three MQTTstuff call sites.
+- mqtt_configuratie.cpp: new beginDiscoveryPublish() helper does the same; the nine discovery composers route through it instead of calling beginPublish bare. One helper, not nine pasted disconnects, so a tenth composer cannot quietly miss it.
+
+The disconnect is unconditional on false by design: beginPublish collapses "wrote nothing" and "wrote a partial header" into one false and a caller cannot separate them without forking the library. Dropping a connection that wrote nothing costs one reconnect; keeping one whose stream is desynchronised costs every packet after it. User-visible effect: the gaps #682 reporters complain about become clean drops instead of malformed-packet drops.
+
+Tests
+New test/host/test_mqttBeginPublishDesync.cpp, 15 checks, compiled against the REAL vendored PubSubClient.cpp with a fake Client that short-writes and replays a CONNACK. It reproduces the defect (bytes on the wire, link up, next publish appended to a desynchronised stream), shows the caller contract prevents it, and shows a healthy connection is not dropped. New test/host/pubsub_shim/ emulates the platform only.
+
+Validation: run_tests.bat 51 checks 0 failures; build.bat exit 0 with fresh artifacts; evaluate.py --quick 37 checks, 0 failed, 100 percent.
+
+Risk and follow-up
+Unproven on hardware. Field validation by mrfox7688 and jaronbor over at least 3 days is the remaining acceptance criterion, so the task stays In Progress. A 13th call site added later would reintroduce the gap; a source-level guard for that is not part of this change. PubSubClient::endPublish() returns 1 unconditionally, so every "if (!endPublish())" branch in both files is dead code, noted but deliberately left alone.
+<!-- SECTION:FINAL_SUMMARY:END -->
