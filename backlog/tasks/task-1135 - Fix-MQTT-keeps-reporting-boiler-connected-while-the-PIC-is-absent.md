@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-18 05:21'
+updated_date: '2026-09-18 05:24'
 labels:
   - bug
 dependencies: []
@@ -87,4 +87,12 @@ A previously dead mechanism revived, not claimed in the original commit. publish
 Same class as what the 2.0.0 port reported for the TASK-565 offline-to-online edge at SATcontrol.ino:4141: a documented mechanism that could never fire because the flag it keyed on could never fall.
 
 Other consumers checked and unaffected beyond now reading a correct value: handleDebug.ino:76-81 (debug dump), networkStuff.ino:345-348 (status line), restAPI.ino:846 and 1325 (REST fields).
+
+Ordering check after the 2.0.0 port pointed out that the heartbeat is the thing that refreshes these topics for a restarted HA.
+
+In loop() the dispatch order is do15minevent, do5minevent, doTaskEvery60s, doTaskEvery3s, doTaskEvery1s. So the 5-minute heartbeat runs BEFORE the 3-second liveness tick within the same iteration. There is therefore a bounded window in which the heartbeat can republish one stale value: if a heartbeat lands after the 30 s timeout has logically expired but before the next tick has evaluated it, it publishes connected once more. The tick corrects it within 3 seconds.
+
+Left as is, deliberately. Worst case is a 3-second-old value republished once per 5 minutes, self-correcting, against a 30 second timeout. Calling evaluateOTBusLiveness() from the top of sendMQTTstateinformation() would close it at the cost of a double publish on the same tick, which is a worse trade for a window this small. Recorded so a future reader does not mistake it for an oversight.
+
+Also worth keeping straight, because the two branches differ here: 1.x had an isPICEnabled() gate on the heartbeat, so on a PIC-less gateway it was SILENT and Home Assistant simply held its last value. 2.0.0 has no such gate, so there the same defect actively re-confirmed a stale connected every 5 minutes. Same symptom for the user, different mechanism. Removing the 1.x gate is safe precisely because the tick now keeps the value correct before the heartbeat repeats it.
 <!-- SECTION:NOTES:END -->
