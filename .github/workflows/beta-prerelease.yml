@@ -226,6 +226,7 @@ jobs:
           | \`flash_otgw.bat\` / \`flash_otgw.sh\` | Flash helpers for Windows and Linux/macOS. |
           | \`SHA256SUMS\` | Checksums for the two binaries; the flash helpers verify against this. |
           | \`capture-mqtt-debug.bat\` | Diagnostic capture, Windows. Run this when something misbehaves. |
+          | \`capture-otgw.sh\` | The same capture for Linux, WSL and macOS. Needs only bash and curl. |
           | \`capture-usb-serial.bat\` | Diagnostic capture over USB, for a device that will not come up on WiFi. |
           | \`RELEASE_ASSETS.md\` | This file. |
 
@@ -235,12 +236,19 @@ jobs:
           bug fixed in this line was found from a capture, not from a
           description.
 
-          1. Run \`capture-mqtt-debug.bat\`. It asks for your gateway address and
-             MQTT broker details (\`capture-settings.example.json\` inside the
-             bundle shows the format if you would rather pre-fill them).
-          2. Reproduce the problem while it runs, then press Q to stop.
-          3. Attach the \`transcript-*.txt\` it produced. One file, containing the
-             telnet log, the MQTT stream, the browser console and the crash log.
+          1. On Windows, run \`capture-mqtt-debug.bat\`. It asks for your gateway
+             address and MQTT broker details (\`capture-settings.example.json\`
+             inside the bundle shows the format if you would rather pre-fill
+             them). On Linux, WSL or macOS, run
+             \`./capture/capture-otgw.sh --host <your-gateway>\` instead. That
+             one needs nothing installed beyond bash and curl.
+          2. Reproduce the problem while it runs. Press Q to stop the Windows
+             capture, Ctrl+C to stop the shell one; either way the files are
+             still written.
+          3. Attach what it produced. The Windows capture makes a single
+             \`transcript-*.txt\`. The shell capture makes a directory named
+             \`otgw-capture-*\`, so zip that and attach the zip. Start by reading
+             its \`summary.txt\`, which says what was captured and what was not.
 
           Post it in **#beta-testing** on Discord, or open an issue at
           https://github.com/rvdbreemen/OTGW-firmware/issues
@@ -270,7 +278,9 @@ jobs:
           mkdir -p "${BUNDLE_DIR}/capture"
           cp scripts/capture-mqtt-debug.bat        "${BUNDLE_DIR}/capture/"
           cp scripts/capture-usb-serial.bat        "${BUNDLE_DIR}/capture/"
+          cp scripts/capture-otgw.sh               "${BUNDLE_DIR}/capture/"
           cp scripts/capture-settings.example.json "${BUNDLE_DIR}/capture/"
+          chmod +x "${BUNDLE_DIR}/capture/capture-otgw.sh"
           cp staging/*.ino.bin         "${BUNDLE_DIR}/"
           cp staging/*.littlefs.bin    "${BUNDLE_DIR}/"
           cp SHA256SUMS                "${BUNDLE_DIR}/"
