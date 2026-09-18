@@ -34,8 +34,7 @@ Retention is NOT involved: sendMQTTData takes retain = false by default (OTGW-fi
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 With no PIC detected, the boiler/thermostat connected topics publish false rather than retaining their last true value
-- [ ] #2 The retraction is published, not only held in RAM, so a Home Assistant that reconnects sees the false state
-- [ ] #3 Reproduced before the fix and verified after, on a device with the PIC absent
-- [ ] #4 python build.py --firmware exits 0
-- [ ] #5 python evaluate.py --quick shows no new failures
+- [ ] #2 Reproduced before the fix and verified after, on a device with the PIC absent
+- [ ] #3 python build.py --firmware exits 0
+- [ ] #4 python evaluate.py --quick shows no new failures
 <!-- AC:END -->
