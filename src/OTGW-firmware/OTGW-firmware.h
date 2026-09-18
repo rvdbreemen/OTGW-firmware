@@ -42,7 +42,8 @@ extern SimpleTelnet<1> debugTelnet;   // defined in networkStuff.ino
 #include "Wire.h"
 #include "safeTimers.h"
 #include <OTGWSerial.h>         // Schelte Bron's Serial class - it upgrades and more
-#include "OTGW-Core.h"          // Core code for this firmware 
+#include "OTGW-Core.h"          // Core code for this firmware
+#include "otBusLiveness.h"      // OT-bus presence decision, host-testable (TASK-1135)
 #include <OneWire.h>            // required for Dallas sensor library
 #include <DallasTemperature.h>  // Miles Burton's - Arduino Dallas library
 

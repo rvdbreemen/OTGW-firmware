@@ -4185,32 +4185,37 @@ static bool bOTGWpreviousstate = false;
 //===========================================================================================
 void evaluateOTBusLiveness(bool firstMessage)
 {
-  // A PIC flash stops the stream for longer than the 30 s window by design, so
-  // evaluating during one would drive every entity to false and back on each
-  // PIC update. Leave the last known state standing until the flash finishes.
-  if (isFlashing()) return;
+  // The decision itself is a pure function in otBusLiveness.h, unit-tested on
+  // the host with a driven clock. This function only applies the verdict and
+  // publishes it. Flash suppression is part of the verdict, not of this caller:
+  // a PIC flash stops the stream for longer than the timeout by design, so the
+  // decision freezes rather than flapping every entity on each update.
+  const OtBusLiveness v = evalOtBusLiveness(time(nullptr),
+                                            epochBoilerlastseen,
+                                            epochThermostatlastseen,
+                                            bOTGWboilerpreviousstate,
+                                            bOTGWthermostatpreviousstate,
+                                            bOTGWpreviousstate,
+                                            firstMessage,
+                                            isFlashing());
 
-  const time_t now = time(nullptr);
+  state.otgw.bBoilerState = v.bBoiler;
+  state.otgw.bThermostatState = v.bThermostat;
+  state.otgw.bOnline = v.bOnline;
 
-  //If the Boiler messages have not been seen for 30 seconds, then set the state to false.
-  state.otgw.bBoilerState = (now < (epochBoilerlastseen + 30));
-  if ((state.otgw.bBoilerState != bOTGWboilerpreviousstate) || firstMessage) {
+  if (v.bBoilerChanged) {
     sendMQTTDataPic(F("boiler_connected"), CCONOFF(state.otgw.bBoilerState));
     bOTGWboilerpreviousstate = state.otgw.bBoilerState;
   }
 
-  //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
-  state.otgw.bThermostatState = (now < (epochThermostatlastseen + 30));
-  if ((state.otgw.bThermostatState != bOTGWthermostatpreviousstate) || firstMessage) {
+  if (v.bThermostatChanged) {
     sendMQTTDataPic(F("thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
     publishHvacMode(false);    // GH #665: re-evaluate hvac_mode/action on thermostat connect/disconnect (off when gone)
     publishHvacAction(false);
     bOTGWthermostatpreviousstate = state.otgw.bThermostatState;
   }
 
-  //OpenTherm is active when at least one side (boiler or thermostat) is communicating on the bus.
-  state.otgw.bOnline = state.otgw.bBoilerState || state.otgw.bThermostatState;
-  if ((state.otgw.bOnline != bOTGWpreviousstate) || firstMessage) {
+  if (v.bOnlineChanged) {
     sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
     // ADR-074: availability of HA entities reflects MQTT-link state (LWT/birth),
     // not OT-bus liveness. Do not republish to MQTTPubNamespace on bus state changes —
