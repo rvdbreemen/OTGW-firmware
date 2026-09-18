@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-18 04:47'
+updated_date: '2026-09-18 04:53'
 labels:
   - bug
 dependencies: []
@@ -41,3 +41,14 @@ Retention is NOT involved: sendMQTTData takes retain = false by default (OTGW-fi
 - [ ] #6 Evaluation is suppressed while the PIC is being flashed, so a PIC update does not flap the entities
 - [ ] #7 The thermostat transition keeps its coupled publishHvacMode(false)/publishHvacAction(false) calls, so the HA climate entity does not hold a stale mode
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Verify the premises in code before writing anything (done: the recorded cause was wrong, corrected in the description).
+2. Extract the liveness evaluation out of processOT() into evaluateOTBusLiveness(), promoting the five statics to file scope.
+3. Call it from processOT() (frame arrived) and from doTaskEvery3s() (silence), above that function early return.
+4. Drop the isPICEnabled() gate for the three bus-presence values in both the on-change path and the 5-minute heartbeat; keep it for gateway_mode.
+5. Suppress evaluation while isFlashing().
+6. Build, evaluate, host tests, commit. Hardware verification stays with the maintainer.
+<!-- SECTION:PLAN:END -->
