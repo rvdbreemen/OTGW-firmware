@@ -33,13 +33,13 @@ Retention is NOT involved: sendMQTTData takes retain = false by default (OTGW-fi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With no PIC detected, the boiler/thermostat connected topics publish false rather than retaining their last true value
+- [x] #1 With no PIC detected, the boiler/thermostat connected topics publish false rather than retaining their last true value
 - [ ] #2 Reproduced before the fix and verified after, on a device with the PIC absent
-- [ ] #3 python build.py --firmware exits 0
-- [ ] #4 python evaluate.py --quick shows no new failures
-- [ ] #5 The liveness timeout is evaluated on a periodic tick independent of message arrival, so a bus that goes completely silent still flips to false within roughly the 30s window
-- [ ] #6 Evaluation is suppressed while the PIC is being flashed, so a PIC update does not flap the entities
-- [ ] #7 The thermostat transition keeps its coupled publishHvacMode(false)/publishHvacAction(false) calls, so the HA climate entity does not hold a stale mode
+- [x] #3 python build.py --firmware exits 0
+- [x] #4 python evaluate.py --quick shows no new failures
+- [x] #5 The liveness timeout is evaluated on a periodic tick independent of message arrival, so a bus that goes completely silent still flips to false within roughly the 30s window
+- [x] #6 Evaluation is suppressed while the PIC is being flashed, so a PIC update does not flap the entities
+- [x] #7 The thermostat transition keeps its coupled publishHvacMode(false)/publishHvacAction(false) calls, so the HA climate entity does not hold a stale mode
 <!-- AC:END -->
 
 ## Implementation Plan
