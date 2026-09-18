@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-18 05:10'
+updated_date: '2026-09-18 05:21'
 labels:
   - bug
 dependencies: []
@@ -77,4 +77,14 @@ test/host/test_otBusLiveness.cpp, 23 checks: clock movement alone flips the verd
 HONEST LIMIT, do not let this read as more than it is: the tests pin the DECISION, not the WIRING. The original defect was that the decision was only reachable from the message path, which is a call-site property no unit test of this function can observe. A test suite that is green here would still be green if someone deleted the evaluateOTBusLiveness(false) call from doTaskEvery3s(). That call site is guarded by review only. An evaluator rule asserting a periodic caller exists would close it; not built.
 
 Suite is now 74 checks over four files. evaluate.py --quick picked the new file up by itself: 38 checks, 36 pass, 0 failed.
+
+Consumer audit 2026-09-18, prompted by the 2.0.0 port finding the same pattern there.
+
+Single writer confirmed on 1.x. state.otgw.bOnline is written only at OTGW-Core.ino:4204. There is no second source like OTDirect on 2.0.0, where bOnline has five extra writers and the port had to make the tick clear-only. That rule is 2.0.0-specific and must NOT be ported back; the 1.x fix is correct as written.
+
+A previously dead mechanism revived, not claimed in the original commit. publishHvacMode() reads bThermostatState at OTGW-Core.ino:1697 and publishHvacAction() at 1718, and the comment above the first states that hvac_mode off is reserved for a disconnected thermostat (GH #665). Those functions are reached from the status-frame decode at 1776 and 1821, and from the liveness transition. So off was reachable while ONE side went quiet and the other kept talking, because frames still arrived and the timeout still got evaluated. On a bus that went completely silent it was unreachable: no frames, no evaluation, no call, and the climate entity held its last mode indefinitely. The fix makes off reachable in both cases.
+
+Same class as what the 2.0.0 port reported for the TASK-565 offline-to-online edge at SATcontrol.ino:4141: a documented mechanism that could never fire because the flag it keyed on could never fall.
+
+Other consumers checked and unaffected beyond now reading a correct value: handleDebug.ino:76-81 (debug dump), networkStuff.ino:345-348 (status line), restAPI.ino:846 and 1325 (REST fields).
 <!-- SECTION:NOTES:END -->
