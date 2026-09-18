@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-18 05:24'
+updated_date: '2026-09-18 05:25'
 labels:
   - bug
 dependencies: []
@@ -95,4 +95,17 @@ In loop() the dispatch order is do15minevent, do5minevent, doTaskEvery60s, doTas
 Left as is, deliberately. Worst case is a 3-second-old value republished once per 5 minutes, self-correcting, against a 30 second timeout. Calling evaluateOTBusLiveness() from the top of sendMQTTstateinformation() would close it at the cost of a double publish on the same tick, which is a worse trade for a window this small. Recorded so a future reader does not mistake it for an oversight.
 
 Also worth keeping straight, because the two branches differ here: 1.x had an isPICEnabled() gate on the heartbeat, so on a PIC-less gateway it was SILENT and Home Assistant simply held its last value. 2.0.0 has no such gate, so there the same defect actively re-confirmed a stale connected every 5 minutes. Same symptom for the user, different mechanism. Removing the 1.x gate is safe precisely because the tick now keeps the value correct before the heartbeat repeats it.
+
+1.x consumer sweep closed 2026-09-18, using the split the 2.0.0 port proposed as the test: flag-derived consumers were wrong, timestamp-derived consumers were always correct.
+
+On 1.x that split does not apply, because the timestamp side does not exist. epochBoilerlastseen and epochThermostatlastseen are written only in processOT() and read only by the new evaluation. There is no boiler_age_s or thermostat_age_s REST field and nothing computes a bus age. So every consumer on this branch was flag-derived, and there was no independent correct signal anywhere that could have served as a cross-check. The blast radius is smaller than on 2.0.0, but the single point of truth was the only point of truth.
+
+Checked and clean, so nothing further to fix here:
+- Frontend: only index.js and graph.js exist on this branch. index.js references the three fields at 5714-5717 and 5776-5779, both label and tooltip tables, display only. No conditional logic keyed on the flags, so the v2 bench-prompt (v2.js maybePromptSimulation) and the sat.js sim-control finding are 2.0.0-only.
+- No OLED.ino on this branch.
+- mqtt_configuratie.cpp does not reference the flags at all, so no HA discovery gate hangs on them. The ADR-094 caveat about markAllMQTTConfigPending() scanning every row with no data gate does not bite here for that reason.
+- Edge detectors: only the three previousstate statics that exist to detect the publish transition itself. No TASK-565-style consumer, so nothing was silently dead beyond the hvac mappers already recorded.
+- Firmware consumers remain the set already inventoried: the two hvac mappers, the MQTT heartbeat, networkStuff status line, handleDebug dump, restAPI fields.
+
+Idea, not filed: 2.0.0 exposes boiler_age_s and thermostat_age_s on REST and feeds them into otLinkState(ok, age) so the UI can show a degrading link rather than a binary flag. 1.x has no equivalent. That is a feature rather than part of this fix, and it would also give this branch the independent signal it currently lacks.
 <!-- SECTION:NOTES:END -->
