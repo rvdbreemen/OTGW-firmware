@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-18 04:53'
+updated_date: '2026-09-18 05:10'
 labels:
   - bug
 dependencies: []
@@ -65,4 +65,16 @@ Design choices and why:
 - isFlashing() is checked inside evaluateOTBusLiveness() even though the doTaskEvery3s() caller is already inside an if (!isFlashing()) block, because processOT() can also reach it.
 
 Gates: build.bat green with fresh artifacts; evaluate.py --quick 35/37, 0 failed; run_tests.bat 51 checks 0 failures; adr-judge 0 violations.
+
+Host test added in 5e668887.
+
+The decision moved into src/OTGW-firmware/otBusLiveness.h as evalOtBusLiveness(), a pure function of the clock, the two last-seen stamps, the previously published values, a force-publish flag and a flashing flag. It returns the three presence values plus which ones the caller must publish. evaluateOTBusLiveness() now only applies and publishes that verdict.
+
+Flash suppression deliberately moved INTO the verdict instead of being an early return in the caller. As an early return it was untestable; as part of the verdict it is AC6 covered by test.
+
+test/host/test_otBusLiveness.cpp, 23 checks: clock movement alone flips the verdict with no new frame, the exact boundary (now < lastSeen + 30, so exactly 30 counts as gone), the two sides independent with bOnline as their OR, a gateway that never heard anything, the flash freeze including that force-publish does not punch through and that absence is preserved as faithfully as presence, and a 100-tick silent run that converges to absent and publishes exactly once.
+
+HONEST LIMIT, do not let this read as more than it is: the tests pin the DECISION, not the WIRING. The original defect was that the decision was only reachable from the message path, which is a call-site property no unit test of this function can observe. A test suite that is green here would still be green if someone deleted the evaluateOTBusLiveness(false) call from doTaskEvery3s(). That call site is guarded by review only. An evaluator rule asserting a periodic caller exists would close it; not built.
+
+Suite is now 74 checks over four files. evaluate.py --quick picked the new file up by itself: 38 checks, 36 pass, 0 failed.
 <!-- SECTION:NOTES:END -->
