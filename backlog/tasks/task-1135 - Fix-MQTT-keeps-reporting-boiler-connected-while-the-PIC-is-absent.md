@@ -18,11 +18,17 @@ ordinal: 218000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Reported by tranquil_kiwi_32924 in Discord #nederlandse-ondersteuning, 2026-09-17. On 1.7.4 with PIC 6.7 the web interface reported no PIC present, while MQTT kept publishing that the boiler was connected - with both the boiler and the thermostat physically disconnected from the gateway.
+Reported by tranquil_kiwi_32924 in Discord #nederlandse-ondersteuning, 2026-09-17. On 1.7.4 with PIC 6.7 the web interface reported no PIC present while MQTT kept publishing that the boiler was connected, with both the boiler and the thermostat physically disconnected.
 
-The web-side half of his report (PIC detection never recovering when diagnose or interface firmware is loaded) is already fixed by TASK-1126 and shipped in 1.7.6-beta.2. This task covers the half that is not: connection flags published to MQTT are not retracted when their precondition goes false. Same class as the unsupported_msgids bug from GH #677, whose fix pattern was that contrary evidence retracts an earlier verdict.
+The web-side half (PIC detection never recovering under diagnose or interface firmware) is TASK-1126, shipped in 1.7.6-beta.2. This task covers the MQTT half.
 
-Note the reporter has ordered a replacement PIC, so his own device may stop reproducing; the staleness is verifiable on any gateway by pulling the PIC connection.
+CAUSE CORRECTED 2026-09-18 after reading the code. The original description said the flags are not retracted because contrary evidence never arrives, by analogy with the unsupported_msgids bug of GH #677. That is wrong and would have produced a fix against a cause that does not exist. Two independent defects:
+
+1. The liveness timeout is only evaluated when a message arrives. OTGW-Core.ino:4198 computes state.otgw.bBoilerState = (now < (epochBoilerlastseen+30)) inside the OT-message processing path, and line 4205 does the same for the thermostat. If the PIC stops delivering entirely, that code never runs, so the 30 second timeout cannot fire in exactly the case it exists for. bBoilerState keeps its last value until reboot, and bOnline with it.
+
+2. Both publish paths are gated on PIC presence. The on-change publishes at OTGW-Core.ino:4200, 4208 and 4219 sit behind if (isPICEnabled()), and the 5-minute heartbeat sendMQTTstateinformation() (MQTTstuff.ino:1291) opens with if (!isPICEnabled()) return. A gateway whose PIC is gone therefore publishes nothing on these topics at all, even if the RAM state were correct.
+
+Retention is NOT involved: sendMQTTData takes retain = false by default (OTGW-firmware.h:174), so no retained true is pinned on the broker. Home Assistant keeps showing connected because nothing ever contradicts it and the heartbeat that would is gated off.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
