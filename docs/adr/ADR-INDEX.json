@@ -567,8 +567,8 @@
       "title": "REST API Versioning Strategy",
       "path": "ADR-019-rest-api-versioning-strategy.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2020-06-01",
+      "status": "Superseded",
+      "date": "2026-09-18",
       "decision_summary": "Adopt URL path-based API versioning with indefinite version support (no deprecation).",
       "topics": [],
       "aliases": [],
@@ -590,7 +590,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-096"
       }
     },
     {
@@ -3225,7 +3225,7 @@
       "title": "Serve one REST API version at a time and remove superseded ones",
       "path": "ADR-096-serve-one-rest-api-version-at-a-time-and-remove-superseded-ones.md",
       "format": "madr",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-09-18",
       "decision_summary": "Chosen option: Option A, because it is what the firmware already does, the maintainer confirms it was intended, and t...",
       "topics": [
@@ -3670,6 +3670,12 @@
       "source": "ADR-019",
       "target": "ADR-035",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-019",
+      "target": "ADR-096",
+      "type": "superseded-by",
       "resolved": true
     },
     {

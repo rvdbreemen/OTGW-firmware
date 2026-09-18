@@ -1,20 +1,46 @@
 ---
 id: "ADR-019"
 title: "REST API Versioning Strategy"
-status: "Accepted"
-date: "2020-06-01"
+status: "Superseded"
+date: "2026-09-18"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-096"
 ---
 # ADR-019: REST API Versioning Strategy
 
 ## Status
 
-Accepted, 2020-06-01 (v1 introduced), 2024-01-01 (v2 introduced). Updated 2026-02-16 (Added ADR-035 cross-reference for v2 RESTful expansion).
+Superseded by ADR-096, 2026-09-18.
+
+## Status History
+
+```yaml
+status_history:
+  - date: 2020-06-01
+    status: Accepted
+    changed_by: unknown
+    reason: v1 introduced
+    changed_via: unrecorded
+  - date: 2024-01-01
+    status: Accepted
+    changed_by: unknown
+    reason: v2 introduced
+    changed_via: unrecorded
+  - date: 2026-02-16
+    status: Accepted
+    changed_by: unknown
+    reason: Added ADR-035 cross-reference for v2 RESTful expansion
+    changed_via: unrecorded
+  - date: 2026-09-18
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: "Superseded by ADR-096: the firmware serves one API version and answers 410 for removed ones"
+    changed_via: adr-kit lifecycle
+```
 
 ## Context
 

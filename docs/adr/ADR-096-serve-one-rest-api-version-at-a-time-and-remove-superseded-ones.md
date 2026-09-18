@@ -1,7 +1,7 @@
 ---
 id: "ADR-096"
 title: "Serve one REST API version at a time and remove superseded ones"
-status: "Proposed"
+status: "Accepted"
 date: "2026-09-18"
 binding: false
 gate: null
@@ -11,7 +11,6 @@ verified_in:
 supersedes:
   - "ADR-019"
 superseded_by: null
-format: "madr"
 topics:
   - "rest-api-versioning"
   - "api-lifecycle"
@@ -26,6 +25,7 @@ symbols:
   - "kV2Routes"
   - "sendApiError"
 context_scope: "selective"
+format: "madr"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -34,7 +34,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-09-18.
+Accepted, 2026-09-18.
 
 ## Status History
 
@@ -45,6 +45,16 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: ADR-019 promised indefinite version coexistence; the code removed v0 and v1 in PR #459 and nothing recorded the reversal
     changed_via: adr-kit
+  - date: 2026-09-18
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: "Superseded by ADR-096: the firmware serves one API version and answers 410 for removed ones"
+    changed_via: adr-kit lifecycle
+  - date: 2026-09-18
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Maintainer confirmed in session that removing v0 and v1 was intentional; the record now matches shipped behaviour
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context and Problem Statement

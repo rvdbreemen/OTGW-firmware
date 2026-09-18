@@ -24,7 +24,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-016 | Accepted | - | Implement a command queue with automatic deduplication and sequential processing. |
 | ADR-017 | Accepted | - | Use WiFiManager library to create a captive portal for initial WiFi configuration. |
 | ADR-018 | Superseded | - | Use ArduinoJson library for all structured data interchange. |
-| ADR-019 | Accepted | - | Adopt URL path-based API versioning with indefinite version support (no deprecation). |
+| ADR-019 | Superseded | - | Adopt URL path-based API versioning with indefinite version support (no deprecation). |
 | ADR-020 | Accepted | - | Integrate Dallas DS18B20 sensors via OneWire protocol with dynamic discovery and MQTT publishing. |
 | ADR-021 | Accepted | - | Use hardware interrupt-driven pulse counting with ISR-safe debounce logic. |
 | ADR-022 | Accepted | - | Implement stateless GPIO output control triggered by configurable OpenTherm status bit. |
@@ -100,4 +100,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-093 | Superseded | `src/OTGW-firmware/**`, `src/OTGW-firmware/MQTTstuff.ino`, `src/OTGW-firmware/dhwWaterMeter.ino` | Chosen option: Option A, because it delivers the same user-visible outcome as ADR-090 (a working Energy dashboard fig... |
 | ADR-094 | Accepted | `src/OTGW-firmware/**`, `src/OTGW-firmware/dhwWaterMeter.ino` | Chosen option: Option A, because a reader who lands on ADR-093 through the index has no way to know that six of its c... |
 | ADR-095 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option A, because the defect was never a disagreement about the right behaviour. |
-| ADR-096 | Proposed | `src/**/*.{ino,cpp,h,js}` | Chosen option: Option A, because it is what the firmware already does, the maintainer confirms it was intended, and t... |
+| ADR-096 | Accepted | `src/**/*.{ino,cpp,h,js}` | Chosen option: Option A, because it is what the firmware already does, the maintainer confirms it was intended, and t... |
