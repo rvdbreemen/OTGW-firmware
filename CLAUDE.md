@@ -267,7 +267,7 @@ python evaluate.py --quick   # Fast check
 
 ## REST API Versioning
 
-- `/api/v0/` — legacy; `/api/v1/` — standard; `/api/v2/` — current preferred
+- `/api/v2/` is the only version served. `/api/v0/` and `/api/v1/` are removed: both return 410 with "API version removed; use /api/v2" (`restAPI.ino:1068-1069`). Do not add endpoints to them.
 - Dispatch table in `restAPI.ino` (`kV2Routes[]`) — add new endpoints by adding one entry
 - Always return JSON errors via `sendApiError(httpCode, F("message"))`
 
