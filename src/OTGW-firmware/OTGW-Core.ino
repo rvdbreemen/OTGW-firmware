@@ -4757,6 +4757,85 @@ bool isThermostatMsgIdSentWrite(uint8_t id) {
 bool getBoilerUnsupportedDirty()   { return boilerUnsupportedDirty; }
 void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 
+//===========================================================================================
+// evaluateOTBusLiveness() — derive boiler/thermostat/bus presence from the
+// per-link last-seen stamps and publish the transitions.
+//
+// TASK-1137 (port of 1.x TASK-1135). This evaluation used to live inside
+// processOT(), so it only ran when a frame arrived. A source that stopped
+// delivering therefore left the 30 s window unevaluated forever: the timeout
+// could not fire in the one case it exists for, and the presence flags held
+// their last value until reboot. It now runs from processOT() (a frame is
+// reflected at once) AND from the 3 s tick in loop() (silence is reflected too).
+//
+// One evaluation covers BOTH sources. The PIC path and OTDirect both funnel
+// through enqueueOTFrame() -> drainOTFrameQueue() -> processOT(), which writes
+// the same two stamps (state.otBus.tBoilerLastSeen / tThermostatLastSeen), so
+// there is nothing OTDirect-specific to evaluate separately.
+//
+// Trigger::Tick may only LOWER state.otBus.bOnline, never raise it. Two reasons,
+// both real:
+//   - A liveness window only ever expires. Raising a presence flag needs
+//     evidence, and the evidence is a frame, which runs processOT().
+//   - OTDirect is a SECOND writer of bOnline (OTDirect.ino ~860/866/1230/1284/
+//     1394): it clears the flag the moment an MsgID 0 probe goes unanswered,
+//     well before the 30 s stamp expires. A tick that re-derived bOnline from
+//     the OR would undo that every 3 s for up to half a minute, flapping both
+//     the MQTT entity and OTDirect's own busOffline scheduling decision.
+// bBoilerState / bThermostatState need no such rule: processOT() is their only
+// writer, and between frames their stamps cannot move forward, so recomputing
+// them can only ever lower them.
+//
+// Deliberately NOT under OTStateLock. These are three independent single-word
+// bools that cannot tear; the lock exists so multi-field REST/webhook snapshot
+// readers see a consistent set. OTDirect already writes bOnline lock-free at the
+// five sites above, so writing them here without the lock is the established
+// pattern — and taking the non-recursive mutex on a path processOT() may already
+// hold it on would be the novel risk, not omitting it.
+//===========================================================================================
+void evaluateOTBusLiveness(OTBusLivenessTrigger trigger)
+{
+  // A PIC or ESP flash stops the stream for longer than the 30 s window by
+  // design, so evaluating during one would drive every entity to false and back
+  // on each update. Leave the last known state standing until the flash ends.
+  if (isFlashing()) return;
+
+  const time_t now          = time(nullptr);
+  const bool   forcePublish = (trigger == OTBusLivenessTrigger::FirstFrame);
+
+  // Dedup against the live flags rather than separate shadow copies: for the
+  // two link flags they are identical (single writer), and for bOnline the live
+  // value is the only one that includes OTDirect's writes.
+
+  //If the Boiler messages have not been seen for 30 seconds, then set the state to false.
+  const bool bBoiler = (now < (state.otBus.tBoilerLastSeen + 30));
+  if ((bBoiler != state.otBus.bBoilerState) || forcePublish) {
+    state.otBus.bBoilerState = bBoiler;
+    publishBoilerConnectedState();
+  }
+
+  //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
+  const bool bThermostat = (now < (state.otBus.tThermostatLastSeen + 30));
+  if ((bThermostat != state.otBus.bThermostatState) || forcePublish) {
+    state.otBus.bThermostatState = bThermostat;
+    publishThermostatConnectedState();
+    publishHvacMode(false);    // GH #665: re-evaluate hvac_mode/action on thermostat connect/disconnect (off when gone)
+    publishHvacAction(false);
+  }
+
+  //OpenTherm is active when at least one side (boiler or thermostat) is communicating on the bus.
+  const bool bOnline = state.otBus.bBoilerState || state.otBus.bThermostatState;
+  if (trigger == OTBusLivenessTrigger::Tick) {
+    if (!bOnline && state.otBus.bOnline) {      // clear-only: see the header comment
+      state.otBus.bOnline = false;
+      publishOTGWConnectedState();
+    }
+  } else if ((bOnline != state.otBus.bOnline) || forcePublish) {
+    state.otBus.bOnline = bOnline;             // remember state, so we can detect statechanges
+    publishOTGWConnectedState();
+  }
+}
+
 void processOT(const char *buf, int len, bool suppressOutput){
   // TASK-865.5 (ADR-123 Phase-1): processOT() is THE writer of the decoded
   // OTGWState snapshot (OTcurrentSystemState.*, state.otBus.*). Acquire the
@@ -4778,10 +4857,8 @@ void processOT(const char *buf, int len, bool suppressOutput){
   // PIC does the equivalent internally on ESP8266.
   // Per-link last-seen now lives in state.otBus (tBoilerLastSeen/tThermostatLastSeen)
   // so /api/v2/health can emit per-link recency for the v2 connectivity degraded/stale
-  // state (ADR-155). Same single source of truth feeds the 30 s connected window below.
-  static bool bOTGWboilerpreviousstate = false;
-  static bool bOTGWthermostatpreviousstate = false;
-  static bool bOTGWpreviousstate = false;
+  // state (ADR-155). Same single source of truth feeds the 30 s connected window,
+  // which evaluateOTBusLiveness() derives (TASK-1137).
   time_t now = time(nullptr);
 
   if (isvalidotmsg(buf, len)) {
@@ -4824,29 +4901,11 @@ void processOT(const char *buf, int len, bool suppressOutput){
       OTdata.rsptype = OTGW_PARITY_ERROR;
     } 
 
-    //If the Boiler messages have not been seen for 30 seconds, then set the state to false.
-    state.otBus.bBoilerState = (now < (state.otBus.tBoilerLastSeen+30));
-    if ((state.otBus.bBoilerState != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
-      publishBoilerConnectedState();
-      bOTGWboilerpreviousstate = state.otBus.bBoilerState;
-    }
-
-    //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
-    state.otBus.bThermostatState = (now < (state.otBus.tThermostatLastSeen+30));
-    if ((state.otBus.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){
-      publishThermostatConnectedState();
-      publishHvacMode(false);    // GH #665: re-evaluate hvac_mode/action on thermostat connect/disconnect (off when gone)
-      publishHvacAction(false);
-      bOTGWthermostatpreviousstate = state.otBus.bThermostatState;
-    }
-
-    //OpenTherm is active when at least one side (boiler or thermostat) is communicating on the bus.
-    state.otBus.bOnline = state.otBus.bBoilerState || state.otBus.bThermostatState;
-    if ((state.otBus.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
-      publishOTGWConnectedState();
-      // nodeMCU online/offline zelf naar 'otgw-firmware/' pushen
-      bOTGWpreviousstate = state.otBus.bOnline; //remember state, so we can detect statechanges
-    }
+    // TASK-1137: reflect this frame in the bus-presence entities right away.
+    // The same evaluation runs on the 3 s tick in loop() so that silence is
+    // reflected too — see evaluateOTBusLiveness().
+    evaluateOTBusLiveness(cntOTmessagesprocessed == 1 ? OTBusLivenessTrigger::FirstFrame
+                                                     : OTBusLivenessTrigger::Frame);
 
     //clear ot log buffer
     ClrLog();

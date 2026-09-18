@@ -581,6 +581,20 @@ static_assert(std::is_trivially_copyable<OTFrameMsg>::value,
 extern PlatformQueue otFrameQueue;      // OTFrameMsg producer->consumer queue
 extern PlatformMutex otStateMutex;      // guards the decoded OTGWState snapshot
 
+// TASK-1137: OT-bus liveness re-evaluation trigger. The 30 s window that turns
+// "heard recently" into "gone" has to be evaluated when NO frame arrives — that
+// is the one case a liveness timeout exists for — so evaluateOTBusLiveness() is
+// called both from processOT() and from the periodic tick in loop().
+// Prototyped here because the sketch file is concatenated first and its
+// doTaskEvery3s() calls the function defined later in OTGW-Core.ino.
+enum class OTBusLivenessTrigger : uint8_t {
+  FirstFrame,  // very first frame after boot: publish all three unconditionally
+  Frame,       // a frame arrived: full evaluation, may raise or lower
+  Tick,        // periodic re-evaluation, no frame: may only lower
+};
+
+void evaluateOTBusLiveness(OTBusLivenessTrigger trigger);
+
 // enqueueOTFrame — producer-side helper. Copies up to MAX_BUFFER_READ-1 bytes,
 // null-terminates, and sends by value. Returns false on a full queue (counted
 // as a diagnostic drop; never falls back to inline processOT, which would
