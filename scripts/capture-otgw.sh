@@ -54,6 +54,8 @@ OUT_DIR=""
 TELNET_PORT="23"
 CRASH_POLL_SEC="3600"   # slow on purpose: catches a reboot without perturbing
 ASSUME_YES="0"
+RECONNECT="0"           # keep watching across dropouts instead of stopping at the first
+PROBE_SEC="10"          # REST reachability probe interval while reconnecting
 
 # Recorded for summary.txt so a shared capture can be judged without
 # reverse-engineering it. Set as each source is decided.
@@ -77,6 +79,11 @@ $SCRIPT_NAME $SCRIPT_VERSION - OTGW diagnostic capture (Linux, WSL, macOS)
   --mqtt-topic TOPIC   topic filter (default: $MQTT_TOPIC)
   --telnet-port N      debug port (default: $TELNET_PORT)
   --crash-poll N       crash endpoint poll interval in seconds (default: $CRASH_POLL_SEC)
+  --reconnect          for intermittent dropouts: keep reconnecting across
+                       outages instead of stopping at the first one, and probe
+                       reachability every --probe seconds so the log shows the
+                       moment it went away and the moment it came back
+  --probe N            reachability probe interval with --reconnect (default: ${PROBE_SEC}s)
   --yes                skip the confirmation prompt
   --help               this text
 
@@ -133,6 +140,8 @@ while [ $# -gt 0 ]; do
         --mqtt-topic)  MQTT_TOPIC="${2:-}"; shift 2 ;;
         --telnet-port) TELNET_PORT="${2:-}"; shift 2 ;;
         --crash-poll)  CRASH_POLL_SEC="${2:-}"; shift 2 ;;
+        --reconnect)   RECONNECT="1"; shift ;;
+        --probe)       PROBE_SEC="${2:-}"; shift 2 ;;
         --yes|-y)      ASSUME_YES="1"; shift ;;
         --help|-h)     usage; exit 0 ;;
         *) warn "Unknown option: $1"; warn "Try --help."; exit 2 ;;
@@ -192,8 +201,10 @@ write_summary() {
         echo "Sources, and the load each applied to the device:"
         # Read the counter live rather than relying on the post-loop append: an
         # interrupted run never reaches that line, and the line count is exactly
-        # what tells a reader whether a short capture holds anything.
-        if [ "${TELNET_OK:-0}" = "1" ]; then
+        # what tells a reader whether a short capture holds anything. Reconnect
+        # mode already puts the count in SRC_TELNET, so it is skipped here to
+        # avoid printing the number twice.
+        if [ "${TELNET_OK:-0}" = "1" ] && [ "${RECONNECT:-0}" != "1" ]; then
             echo "  telnet   : $SRC_TELNET; ${LINES:-0} lines"
         else
             echo "  telnet   : $SRC_TELNET"
@@ -218,6 +229,7 @@ cleanup() {
     # what ran. Killing a pid that already exited is not an error here.
     if [ -n "${MQTT_PID:-}" ]; then kill "$MQTT_PID" 2>/dev/null || true; fi
     if [ -n "${CRASH_PID:-}" ]; then kill "$CRASH_PID" 2>/dev/null || true; fi
+    if [ -n "${PROBE_PID:-}" ]; then kill "$PROBE_PID" 2>/dev/null || true; fi
     write_summary
     log ""
     log "Capture written to: $OUT_DIR"
@@ -374,7 +386,9 @@ fi
 # reporter minutes for an empty directory. Say what failed and stop now. The
 # files written so far are still there, and summary.txt still names the cause,
 # which is what makes the aborted run diagnosable.
-if [ "$TELNET_OK" != "1" ] && [ "$REST_OK" -eq 0 ] && [ -z "$MQTT_PID" ] && [ -z "$CRASH_PID" ]; then
+# Not in --reconnect mode: there, a device that is unreachable right now is the
+# normal starting state, because waiting for it to come back is the whole job.
+if [ "$RECONNECT" != "1" ] && [ "$TELNET_OK" != "1" ] && [ "$REST_OK" -eq 0 ] && [ -z "$MQTT_PID" ] && [ -z "$CRASH_PID" ]; then
     EXIT_REASON="nothing was reachable: telnet failed and all $REST_FAIL REST calls failed, so there was nothing to wait for"
     warn ""
     warn "Nothing on $DEVICE_HOST answered: neither port $TELNET_PORT nor the REST API."
@@ -389,6 +403,81 @@ log "Capturing until $(date -d "@$DEADLINE" '+%H:%M:%S' 2>/dev/null || date -r "
 
 LINES=0
 FAST_FAILS=0
+
+# --reconnect: for a device that goes away and comes back. Stopping at the first
+# dropout would throw away the recovery, which is usually the half that says
+# what happened. A reachability probe runs alongside so probe.log carries a line
+# per interval whether or not the device answers: that is what dates the outage
+# and lets it be lined up against telnet.log.
+if [ "$RECONNECT" = "1" ]; then
+    PROBE_LOG="$OUT_DIR/probe.log"
+    {
+        echo "# OTGW reachability probe"
+        echo "# one line per ${PROBE_SEC}s, whether or not the device answers"
+        echo "# http=200 answering, http=000 no answer at all"
+        echo "#"
+    } > "$PROBE_LOG"
+
+    (
+        while :; do
+            _code="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "$REST_BASE/device/info" 2>/dev/null)"
+            printf '%s http=%s\n' "$(timestamp)" "${_code:-000}" >> "$PROBE_LOG"
+            sleep "$PROBE_SEC"
+        done
+    ) &
+    PROBE_PID=$!
+    SRC_REST="$SRC_REST; plus a reachability probe every ${PROBE_SEC}s (see probe.log)"
+
+    log "mode     : reconnect, watching across dropouts"
+    log "probe    : every ${PROBE_SEC}s into probe.log"
+
+    # Starts at 1 when the first connection already succeeded during setup, so
+    # the summary counts connections and not just the reconnections after them.
+    if [ "$TELNET_OK" = "1" ]; then CONNECTIONS=1; else CONNECTIONS=0; fi
+    while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+        if [ "$TELNET_OK" != "1" ]; then
+            printf '%s --- reconnecting ---\n' "$(timestamp)" >> "$TELNET_LOG"
+            if exec 3<>"/dev/tcp/$DEVICE_HOST/$TELNET_PORT" 2>/dev/null; then
+                TELNET_OK="1"
+                CONNECTIONS=$(( CONNECTIONS + 1 ))
+                printf '%s --- connected ---\n' "$(timestamp)" >> "$TELNET_LOG"
+            else
+                sleep 10
+                continue
+            fi
+        fi
+
+        _t_before="$(date +%s)"
+        if IFS= read -r -t 30 line <&3; then
+            printf '%s %s\n' "$(timestamp)" "$line" >> "$TELNET_LOG"
+            LINES=$(( LINES + 1 ))
+            FAST_FAILS=0
+            if [ $((LINES % 200)) -eq 0 ]; then
+                printf '\r  %s lines, %s connection(s)' "$LINES" "$CONNECTIONS"
+            fi
+        else
+            if [ $(( $(date +%s) - _t_before )) -lt 2 ]; then
+                FAST_FAILS=$(( FAST_FAILS + 1 ))
+            else
+                FAST_FAILS=0
+            fi
+            if [ "$FAST_FAILS" -ge 3 ]; then
+                printf '%s --- connection lost ---\n' "$(timestamp)" >> "$TELNET_LOG"
+                exec 3<&- 2>/dev/null || true
+                TELNET_OK="0"
+                FAST_FAILS=0
+            fi
+        fi
+    done
+    exec 3<&- 2>/dev/null || true
+    kill "$PROBE_PID" 2>/dev/null || true
+    printf '\r'
+    log "telnet   : $LINES lines across $CONNECTIONS connection(s)"
+    SRC_TELNET="reconnect mode; $LINES lines across $CONNECTIONS connection(s), $(( CONNECTIONS > 0 ? CONNECTIONS - 1 : 0 )) dropout(s) survived"
+    EXIT_REASON="completed the requested ${DURATION_MIN} minute window in reconnect mode"
+    exit 0
+fi
+
 if [ "$TELNET_OK" = "1" ]; then
     while [ "$(date +%s)" -lt "$DEADLINE" ]; do
         # read -t returns non-zero on timeout as well as on EOF, so the loop
