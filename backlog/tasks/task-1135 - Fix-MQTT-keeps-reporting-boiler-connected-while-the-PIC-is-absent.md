@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-18 04:46'
+updated_date: '2026-09-18 04:47'
 labels:
   - bug
 dependencies: []
@@ -37,4 +37,7 @@ Retention is NOT involved: sendMQTTData takes retain = false by default (OTGW-fi
 - [ ] #2 Reproduced before the fix and verified after, on a device with the PIC absent
 - [ ] #3 python build.py --firmware exits 0
 - [ ] #4 python evaluate.py --quick shows no new failures
+- [ ] #5 The liveness timeout is evaluated on a periodic tick independent of message arrival, so a bus that goes completely silent still flips to false within roughly the 30s window
+- [ ] #6 Evaluation is suppressed while the PIC is being flashed, so a PIC update does not flap the entities
+- [ ] #7 The thermostat transition keeps its coupled publishHvacMode(false)/publishHvacAction(false) calls, so the HA climate entity does not hold a stale mode
 <!-- AC:END -->
