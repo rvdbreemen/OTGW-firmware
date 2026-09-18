@@ -1288,13 +1288,18 @@ void sendMQTTheapdiag(){
 Publish state information of PIC firmware version information to MQTT broker.
 */
 void sendMQTTstateinformation(){
-  if (!isPICEnabled()) return;
+  // TASK-1135: the bus-presence values are NOT gated on isPICEnabled(). These
+  // topics are not retained, so this heartbeat is the only thing that refreshes
+  // them for a Home Assistant that restarted. Withholding it on a gateway whose
+  // PIC is absent left HA holding "connected" indefinitely, which is the state
+  // an absent PIC most needs to contradict.
   sendMQTTDataPic(F("boiler_connected"), CCONOFF(state.otgw.bBoilerState));
   sendMQTTDataPic(F("thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+  sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
+  if (!isPICEnabled()) return;   // gateway_mode below describes the PIC itself
   if (state.otgw.bGatewayModeKnown) {
     sendMQTTDataPic(F("gateway_mode"), CCONOFF(state.otgw.bGatewayMode));
   }
-  sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
   // ADR-074: do NOT write OT-bus state to the MQTT availability topic. The LWT/birth
   // pair on <toptopic>/<hostname> owns availability and reflects MQTT-link state.
 }

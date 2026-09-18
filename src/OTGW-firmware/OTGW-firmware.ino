@@ -264,6 +264,14 @@ void doTaskEvery1s(){
 //===[ Do task every 3s ]===
 void doTaskEvery3s(){
   //== do tasks ==
+
+  // TASK-1135: re-evaluate OT-bus presence. processOT() evaluates it on every
+  // frame, which covers a bus that is talking; this covers one that has gone
+  // quiet. Without it the 30 s timeout could never fire in the case it exists
+  // for, because the code that computes it only ran when a frame arrived.
+  // Must stay ABOVE the picSettingsCycleActive early-return below.
+  evaluateOTBusLiveness(false);
+
   if (!picSettingsCycleActive) return;
   queryNextPICsetting();
 }

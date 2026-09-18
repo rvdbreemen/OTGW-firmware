@@ -4155,12 +4155,71 @@ bool isThermostatMsgIdSentWrite(uint8_t id) {
 bool getBoilerUnsupportedDirty()   { return boilerUnsupportedDirty; }
 void clearBoilerUnsupportedDirty() { boilerUnsupportedDirty = false; }
 
+//===========================================================================================
+// OT-bus liveness: who was last heard, and what we last told MQTT about it.
+//
+// File-scope rather than static locals in processOT() because the timeout that
+// turns "heard recently" into "gone" has to be evaluated when NO message
+// arrives. That is the whole point of a liveness timeout, and it was the defect
+// in TASK-1135: the evaluation lived inside the message-processing path, so a
+// PIC that stopped delivering left the last value standing until reboot.
+//===========================================================================================
+static time_t epochBoilerlastseen = 0;
+static time_t epochThermostatlastseen = 0;
+static bool bOTGWboilerpreviousstate = false;
+static bool bOTGWthermostatpreviousstate = false;
+static bool bOTGWpreviousstate = false;
+
+//===========================================================================================
+// evaluateOTBusLiveness() — derive boiler/thermostat/bus presence and publish
+// the transitions.
+//
+// Called both from processOT() (so a frame that arrives is reflected at once)
+// and from the periodic tick in doBackgroundTasks() (so silence is reflected
+// too). firstMessage forces a publish on the very first frame after boot,
+// which is what cntOTmessagesprocessed==1 used to express inline.
+//
+// The publishes are deliberately NOT gated on isPICEnabled(). An absent PIC is
+// not a reason to stay quiet about the bus; it is the reason the bus is dead,
+// and the entities have to say so.
+//===========================================================================================
+void evaluateOTBusLiveness(bool firstMessage)
+{
+  // A PIC flash stops the stream for longer than the 30 s window by design, so
+  // evaluating during one would drive every entity to false and back on each
+  // PIC update. Leave the last known state standing until the flash finishes.
+  if (isFlashing()) return;
+
+  const time_t now = time(nullptr);
+
+  //If the Boiler messages have not been seen for 30 seconds, then set the state to false.
+  state.otgw.bBoilerState = (now < (epochBoilerlastseen + 30));
+  if ((state.otgw.bBoilerState != bOTGWboilerpreviousstate) || firstMessage) {
+    sendMQTTDataPic(F("boiler_connected"), CCONOFF(state.otgw.bBoilerState));
+    bOTGWboilerpreviousstate = state.otgw.bBoilerState;
+  }
+
+  //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
+  state.otgw.bThermostatState = (now < (epochThermostatlastseen + 30));
+  if ((state.otgw.bThermostatState != bOTGWthermostatpreviousstate) || firstMessage) {
+    sendMQTTDataPic(F("thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
+    publishHvacMode(false);    // GH #665: re-evaluate hvac_mode/action on thermostat connect/disconnect (off when gone)
+    publishHvacAction(false);
+    bOTGWthermostatpreviousstate = state.otgw.bThermostatState;
+  }
+
+  //OpenTherm is active when at least one side (boiler or thermostat) is communicating on the bus.
+  state.otgw.bOnline = state.otgw.bBoilerState || state.otgw.bThermostatState;
+  if ((state.otgw.bOnline != bOTGWpreviousstate) || firstMessage) {
+    sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
+    // ADR-074: availability of HA entities reflects MQTT-link state (LWT/birth),
+    // not OT-bus liveness. Do not republish to MQTTPubNamespace on bus state changes —
+    // the LWT/birth pair on <toptopic>/<hostname> owns the availability topic.
+    bOTGWpreviousstate = state.otgw.bOnline; //remember state, so we can detect statechanges
+  }
+}
+
 void processOT(const char *buf, int len){
-  static time_t epochBoilerlastseen = 0;
-  static time_t epochThermostatlastseen = 0;
-  static bool bOTGWboilerpreviousstate = false;
-  static bool bOTGWthermostatpreviousstate = false;
-  static bool bOTGWpreviousstate = false;
   time_t now = time(nullptr);
 
   if (isvalidotmsg(buf, len)) { 
@@ -4194,35 +4253,9 @@ void processOT(const char *buf, int len){
       OTdata.rsptype = OTGW_PARITY_ERROR;
     } 
 
-    //If the Boiler messages have not been seen for 30 seconds, then set the state to false. 
-    state.otgw.bBoilerState = (now < (epochBoilerlastseen+30));
-    if ((state.otgw.bBoilerState != bOTGWboilerpreviousstate) || (cntOTmessagesprocessed==1)) {
-      if (isPICEnabled()) sendMQTTDataPic(F("boiler_connected"), CCONOFF(state.otgw.bBoilerState));
-      bOTGWboilerpreviousstate = state.otgw.bBoilerState;
-    }
-
-    //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
-    state.otgw.bThermostatState = (now < (epochThermostatlastseen+30));
-    if ((state.otgw.bThermostatState != bOTGWthermostatpreviousstate) || (cntOTmessagesprocessed==1)){
-      if (isPICEnabled()) {
-        sendMQTTDataPic(F("thermostat_connected"), CCONOFF(state.otgw.bThermostatState));
-        publishHvacMode(false);    // GH #665: re-evaluate hvac_mode/action on thermostat connect/disconnect (off when gone)
-        publishHvacAction(false);
-      }
-      bOTGWthermostatpreviousstate = state.otgw.bThermostatState;
-    }
-
-    //OpenTherm is active when at least one side (boiler or thermostat) is communicating on the bus.
-    state.otgw.bOnline = state.otgw.bBoilerState || state.otgw.bThermostatState;
-    if ((state.otgw.bOnline != bOTGWpreviousstate) || (cntOTmessagesprocessed==1)){
-      if (isPICEnabled()) {
-        sendMQTTDataPic(F("otgw_connected"), CCONOFF(state.otgw.bOnline));
-      }
-      // ADR-074: availability of HA entities reflects MQTT-link state (LWT/birth),
-      // not OT-bus liveness. Do not republish to MQTTPubNamespace on bus state changes —
-      // the LWT/birth pair on <toptopic>/<hostname> owns the availability topic.
-      bOTGWpreviousstate = state.otgw.bOnline; //remember state, so we can detect statechanges
-    }
+    // Reflect this frame in the bus-presence entities right away. The same
+    // evaluation runs on a periodic tick so that silence is reflected too.
+    evaluateOTBusLiveness(cntOTmessagesprocessed == 1);
 
     //clear ot log buffer
     ClrLog();
