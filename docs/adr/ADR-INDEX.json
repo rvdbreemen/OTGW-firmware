@@ -3219,6 +3219,66 @@
         ],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-096",
+      "title": "Serve one REST API version at a time and remove superseded ones",
+      "path": "ADR-096-serve-one-rest-api-version-at-a-time-and-remove-superseded-ones.md",
+      "format": "madr",
+      "status": "Proposed",
+      "date": "2026-09-18",
+      "decision_summary": "Chosen option: Option A, because it is what the firmware already does, the maintainer confirms it was intended, and t...",
+      "topics": [
+        "api-lifecycle",
+        "breaking-changes",
+        "rest-api-versioning"
+      ],
+      "aliases": [
+        "410 Gone for old API versions",
+        "api version removal",
+        "single API version"
+      ],
+      "components": [
+        "restAPI"
+      ],
+      "symbols": [
+        "kV2Routes",
+        "sendApiError"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Serve exactly one REST API version at a time; /api/v2/ is current.",
+          "Answer a request for a removed version with 410 and a message naming the current version, via sendApiError.",
+          "Register new endpoints in kV2Routes[] only.",
+          "When a future version supersedes v2, write a superseding ADR before removing v2."
+        ],
+        "must_not": [
+          "Reintroduce /api/v0/ or /api/v1/ route handling.",
+          "Answer a removed version with 404, which is indistinguishable from a typo in the path and tells the client nothing."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": []
+      },
+      "scope": {
+        "path_globs": [
+          "src/**/*.{ino,cpp,h,js}"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": true,
+        "verified_in": [
+          "src/OTGW-firmware/restAPI.ino"
+        ],
+        "supersedes": [
+          "ADR-019"
+        ],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -5164,7 +5224,7 @@
       "source": "ADR-075",
       "target": "ADR-096",
       "type": "related",
-      "resolved": false
+      "resolved": true
     },
     {
       "source": "ADR-076",
@@ -5662,6 +5722,36 @@
       "source": "ADR-095",
       "target": "ADR-038",
       "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-096",
+      "target": "ADR-019",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-096",
+      "target": "ADR-019",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-096",
+      "target": "ADR-035",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-096",
+      "target": "ADR-042",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-096",
+      "target": "ADR-050",
+      "type": "related",
       "resolved": true
     }
   ]
