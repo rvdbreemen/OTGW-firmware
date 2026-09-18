@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-18 04:54'
-updated_date: '2026-09-18 05:16'
+updated_date: '2026-09-18 05:17'
 labels:
   - bug
 dependencies: []
@@ -31,12 +31,12 @@ Also differs: presence values publish under the generic namespace per ADR-084, n
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The liveness timeout is evaluated on a periodic tick independent of frame arrival, for every source that feeds the presence flags
-- [ ] #2 Evaluation is suppressed while a PIC or ESP flash is in progress so an update does not flap the entities
-- [ ] #3 The OTDirect path is explicitly covered or explicitly ruled out, with the reason recorded
-- [ ] #4 The effect on SATcontrol.ino:1171 is assessed and recorded: does a correctly-falling bBoilerState change any SAT decision, and is that change wanted
-- [ ] #5 Any coupled publishes on a thermostat transition (hvac mode/action equivalents) are preserved
-- [ ] #6 Build green for the relevant target and evaluate.py --quick shows no new failures
+- [x] #1 The liveness timeout is evaluated on a periodic tick independent of frame arrival, for every source that feeds the presence flags
+- [x] #2 Evaluation is suppressed while a PIC or ESP flash is in progress so an update does not flap the entities
+- [x] #3 The OTDirect path is explicitly covered or explicitly ruled out, with the reason recorded
+- [x] #4 The effect on SATcontrol.ino:1171 is assessed and recorded: does a correctly-falling bBoilerState change any SAT decision, and is that change wanted
+- [x] #5 Any coupled publishes on a thermostat transition (hvac mode/action equivalents) are preserved
+- [x] #6 Build green for the relevant target and evaluate.py --quick shows no new failures
 - [ ] #7 Hardware verification by the maintainer with the source absent
 <!-- AC:END -->
 
@@ -120,3 +120,40 @@ Note: esp32-combo fits here at 81.3%, so the known partition-overfit condition d
 
 Zero compile errors. The only warnings in the log are pre-existing AsyncTCP deprecation notices and the LTO serial-compilation note.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ports the 1.x OT-bus liveness fix (otgw-1.x.x 020e8198) to the 2.0.0 line, adapted to this tree rather than copied.
+
+## The defect
+
+The 30 s window that turns 'heard recently' into 'gone' was computed inside processOT(), so it was only evaluated when a frame arrived. A source that stopped delivering left the window unevaluated forever: the timeout could not fire in the one case it exists for, and boiler_connected / thermostat_connected / otgw_connected held their last value until reboot.
+
+## The change
+
+evaluateOTBusLiveness(OTBusLivenessTrigger) in OTGW-Core.ino:4760-4837, called from processOT() (FirstFrame / Frame) and from doTaskEvery3s() (Tick, above the picSettingsCycleActive early return). Suppressed while isFlashing(), which on this branch covers both an ESP and a PIC flash. Enum + prototype in OTGW-Core.h:584-596, because the sketch file is concatenated first.
+
+## Four deliberate divergences from the 1.x patch
+
+1. No MQTTstuff.ino change. Half of the 1.x fix was removing an isPICEnabled() gate from the presence publishes; on 2.0.0 that gate is already absent, and ADR-084 already removed the otgw-pic/* and otgw-otdirect/* duplicate topics the task description still named.
+2. One evaluation covers both sources. OTDirect's bridgeFrameToParser() enqueues via enqueueOTFrame() rather than calling processOT() directly, so both paths write the same two stamps. Nothing OTDirect-specific is left to evaluate.
+3. Trigger::Tick may only LOWER bOnline. A liveness window only ever expires, and raising needs a frame, which runs processOT(). The rule also keeps the tick from fighting OTDirect, a second writer of bOnline that clears it on an unanswered MsgID 0 probe well before the stamp expires; re-deriving from the OR would flap the entity, the OTDirect WebSocket status line and OTDirect's busOffline scheduling for up to 30 s.
+4. The three shadow statics are gone; change detection compares against the live state.otBus flags. Behaviour-identical for the two link flags (single writer), strictly more correct for bOnline, where a shadow would desynchronise from OTDirect's writes and suppress a publish that is owed.
+
+Not under OTStateLock, deliberately: three single-word bools cannot tear, the lock exists for multi-field snapshot readers, and OTDirect already writes bOnline lock-free. Taking a non-recursive mutex on a path processOT() may already hold it on would be the novel risk.
+
+## SAT impact (AC #4)
+
+satBoilerHardwarePresent() (SATcontrol.ino:1167-1177) is an availability gate that blocks SAT simulation, never a heat-demand path. A correctly-falling bBoilerState lets a bench rig enable simulation again 30 s after the boiler goes away, exactly what the comment at SATcontrol.ino:1188 already anticipates. It also revives the TASK-565 offline-to-online edge at SATcontrol.ino:4141, which resets the write-on-change command cache so a recovering boiler gets the current CS/MM/CH/TC immediately; on the PIC path that edge could never fire because bOnline could never fall. Both effects are wanted.
+
+## Verification
+
+build.bat, one solo run, all six PlatformIO envs SUCCESS, literal 'Build completed successfully!' banner, fresh artifacts by mtime, zero compile errors. evaluate.py --quick: 76 checks, 0 failed, health 98.7% (its one warning, boards.h not found, is pre-existing and unrelated).
+
+Committed locally as a3e9a7fd with OTGW_BUMP_HOOK_DISABLE=1. NOT pushed: the maintainer asked to review first, and a prerelease bump is still owed before this ships to testers (bin/bump-prerelease.sh rewrites ~43 files and stages them all, which is unsafe in this dirty worktree alongside other agents).
+
+## Open
+
+AC #7 only: confirming the entities flip with the source physically absent needs a bench device.
+<!-- SECTION:FINAL_SUMMARY:END -->
