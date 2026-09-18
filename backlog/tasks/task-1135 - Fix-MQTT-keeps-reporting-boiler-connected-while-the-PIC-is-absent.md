@@ -52,3 +52,17 @@ Retention is NOT involved: sendMQTTData takes retain = false by default (OTGW-fi
 5. Suppress evaluation while isFlashing().
 6. Build, evaluate, host tests, commit. Hardware verification stays with the maintainer.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implemented in 020e8198.
+
+Design choices and why:
+- Reused the existing doTaskEvery3s() slot instead of adding a timer. 3 s against a 30 s window is ample and costs no new timer state. The call sits ABOVE that function early return on picSettingsCycleActive, which would otherwise skip it most of the time.
+- The five liveness statics (epochBoilerlastseen, epochThermostatlastseen and the three previous-state flags) moved from processOT() locals to file scope in OTGW-Core.ino rather than into OTGWState. Smaller surface, and it keeps them out of the state struct that an open RAM audit is already looking at.
+- otgw_connected is published ungated together with the other two. It is derived from them (bOnline = bBoilerState || bThermostatState), so gating it on PIC presence while its inputs are ungated would make the heartbeat contradict the on-change path.
+- isFlashing() is checked inside evaluateOTBusLiveness() even though the doTaskEvery3s() caller is already inside an if (!isFlashing()) block, because processOT() can also reach it.
+
+Gates: build.bat green with fresh artifacts; evaluate.py --quick 35/37, 0 failed; run_tests.bat 51 checks 0 failures; adr-judge 0 violations.
+<!-- SECTION:NOTES:END -->
