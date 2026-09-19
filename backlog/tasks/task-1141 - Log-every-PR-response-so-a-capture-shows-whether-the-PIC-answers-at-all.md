@@ -1,10 +1,11 @@
 ---
 id: TASK-1141
 title: 'Log every PR: response so a capture shows whether the PIC answers at all'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-19 15:35'
-updated_date: '2026-09-19 15:36'
+updated_date: '2026-09-19 15:44'
 labels:
   - diagnostics
   - enhancement
