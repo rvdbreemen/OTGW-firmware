@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:20'
-updated_date: '2026-09-17 20:50'
+updated_date: '2026-09-19 15:56'
 labels:
   - bug
 dependencies: []
@@ -84,6 +84,8 @@ Validation run 2026-09-17:
 Note on AC4 wording: build.bat was used, not python build.py --firmware. Project policy is that build.bat is the entrypoint and that firmware AND filesystem are built; build.bat covers the AC4 gate and more.
 
 AC2 removed: it was the 'if reachable' branch of AC1 and AC3 is its mutually exclusive twin. AC1 falsified reachability, so AC2 described work that must not happen. Removed rather than left unchecked, so the remaining unchecked box is the genuine one (field validation).
+
+2026-09-19: Field validation gate (AC #5) is running. mrfox7688 flashed v1.7.6-beta.3 on 2026-09-18 06:41 UTC and wrote he will monitor and report back (issues/682#issuecomment). jaronbor quoted the release note but has not reported flashing. Three clean days puts the earliest verdict at 2026-09-21. Nothing to do here until then; beta.4 (the TASK-1135 liveness change) waits on this verdict by explicit maintainer decision.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
