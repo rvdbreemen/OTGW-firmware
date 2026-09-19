@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-19 05:09'
-updated_date: '2026-09-19 15:55'
+updated_date: '2026-09-19 18:43'
 labels:
   - bug
   - needs-info
@@ -37,7 +37,7 @@ Gateway Mode Monitor with GW-mode detecting in the banner is the detail most wor
 - [ ] #1 A telnet banner taken at least five minutes after boot is obtained, so the liveness window has elapsed and Boiler/Thermostat OFF means something
 - [ ] #2 It is established whether the same symptom really reproduces on 1.7.1, including whether the filesystem was flashed alongside the firmware
 - [ ] #3 Either a firmware cause is identified with evidence, or the issue is closed as hardware or wiring with the reasoning recorded for the next reader
-- [ ] #4 The reporter has run GW=1 followed by PR=M and reported both the PR=M reply and whether OpenTherm frames appeared afterwards
+- [x] #4 The reporter has run GW=1 followed by PR=M and reported both the PR=M reply and whether OpenTherm frames appeared afterwards
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -76,4 +76,6 @@ Reporter's own results: pump works with the OTGW removed and thermostat wired di
 Open caveat: monitor mode alone does not explain a silent bus, a monitoring OTGW still reports the traffic it sees. Two questions remain: why monitor mode, and why no frames.
 
 Discriminating test requested from the reporter: GW=1 then PR=M via the web UI command box, then watch for T/B frames. Also asked whether the PIC firmware was flashed recently (build date is three weeks old).
+
+2026-09-19 evening: the GW=1 discriminator ran (Appiejs, 16:37 UTC). PIC accepted it, PR: M=G confirmed on three subsequent polls, and STILL zero OpenTherm frames: the log after the PIC-settings cycle holds only PR=M / PR: M=G pairs every 60 to 120 s. So monitor mode was a stored setting, not the cause. Maintainer replied on the issue (17:33, 17:36): no OT traffic of any kind while the ESP-PIC link is healthy points at the OT-bus interface or the cabling, not firmware. Reporter (17:46) suspects the board is damaged where the cables enter and will inspect with debug tomorrow. Firmware side is exhausted for now; AC #3 leans toward closing as hardware once the reporter reports back.
 <!-- SECTION:NOTES:END -->
