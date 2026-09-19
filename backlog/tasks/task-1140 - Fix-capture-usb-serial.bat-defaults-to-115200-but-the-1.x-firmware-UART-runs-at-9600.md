@@ -1,0 +1,38 @@
+---
+id: TASK-1140
+title: >-
+  Fix: capture-usb-serial.bat defaults to 115200 but the 1.x firmware UART runs
+  at 9600
+status: To Do
+assignee: []
+created_date: '2026-09-19 14:28'
+labels:
+  - bug
+dependencies: []
+priority: high
+ordinal: 221000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+Found while analysing the capture Appiejs attached to GH #684 on 2026-09-19. His usb-serial.log is 541 bytes of framing garbage, and the cause is our tooling rather than his device.
+
+The 1.x firmware never sets 115200. The only baud in the tree is HardwareSerial::begin(9600, SERIAL_8N1) at src/libraries/OTGWSerial/OTGWSerial.cpp:836, because that UART is the PIC link and the PIC runs at 9600. A grep for 115200 across src/OTGW-firmware/ and src/libraries/OTGWSerial/ returns nothing.
+
+scripts/capture-usb-serial.bat declares [int]$Baud = 115200 (line 68) and its help text states that 115200 is 'the OTGW application baud, which is what the exception dump + stack trace print at' (lines 96-97). For this firmware both halves of that sentence look wrong: the application baud is 9600, and the ESP8266 panic handler prints over the same UART at whatever divisor is currently configured, so a crash dump on this firmware should also come out at 9600. That second point is reasoned from how the core works and is NOT verified on hardware; verify before relying on it.
+
+Consequence: every reporter who runs the script as documented captures unreadable bytes, and neither they nor we can tell from the file that the rate was the problem rather than the device. It cost one full round trip on #684 already.
+
+The -Baud 74880 advice for the boot-ROM reset-cause banner is unrelated and stays correct.
+
+Check the 2.0.0 copy separately before changing anything there: that line is ESP32 and its console baud may genuinely differ.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [ ] #1 The default baud matches what the 1.x firmware actually configures, with the source line cited in the script
+- [ ] #2 The help text no longer claims 115200 is the application baud, and says which rate to use for what
+- [ ] #3 A capture taken with the new default against a real 1.x gateway yields readable OTGW PIC output rather than framing garbage
+- [ ] #4 The 2.0.0 copy is checked and either changed with its own justification or explicitly left alone
+<!-- AC:END -->
