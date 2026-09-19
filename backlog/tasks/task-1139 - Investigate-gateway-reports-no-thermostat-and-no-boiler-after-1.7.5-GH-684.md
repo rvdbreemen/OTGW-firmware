@@ -4,10 +4,13 @@ title: 'Investigate: gateway reports no thermostat and no boiler after 1.7.5 (GH
 status: To Do
 assignee: []
 created_date: '2026-09-19 05:09'
+updated_date: '2026-09-19 05:10'
 labels:
   - bug
   - needs-info
 dependencies: []
+references:
+  - 'https://github.com/rvdbreemen/OTGW-firmware/issues/684'
 priority: medium
 ordinal: 220000
 ---
