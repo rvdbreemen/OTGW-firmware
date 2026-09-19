@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-18 04:54'
-updated_date: '2026-09-18 05:22'
+updated_date: '2026-09-19 18:20'
 labels:
   - bug
 dependencies: []
@@ -129,6 +129,8 @@ Two premises in this task description, written by the 1.x side, were stale. Corr
 What the 1.x side contributed back after reading this report:
 - On 1.x, state.otgw.bOnline has a SINGLE writer. The clear-only rule needed here because of OTDirect five extra writers is 2.0.0-specific and was deliberately not applied to 1.x.
 - The 1.x analogue of the dead TASK-565 edge is the HA climate entity: publishHvacMode() reserves hvac_mode off for a disconnected thermostat but could not reach it on a fully silent bus. Same class of finding, different consumer.
+
+2026-09-19: Shipped as 2.0.0-alpha.365 (batch bump, commit chore(release): alpha.365). Build re-verified by the maintainer's session before push: six SUCCESS steps, artifacts stamped alpha.365+10c0929, flash 77.1 to 81.3 percent, evaluate.py --quick 76/0. AC #7 (hardware verification with the source absent) remains the only open item; it needs the maintainer's bench OTGW32 with the OT bus pulled and boiler_connected observed falling within about 30 s.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
