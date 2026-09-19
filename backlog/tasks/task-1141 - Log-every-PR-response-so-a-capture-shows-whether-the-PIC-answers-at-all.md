@@ -4,10 +4,14 @@ title: 'Log every PR: response so a capture shows whether the PIC answers at all
 status: To Do
 assignee: []
 created_date: '2026-09-19 15:35'
+updated_date: '2026-09-19 15:36'
 labels:
   - diagnostics
   - enhancement
 dependencies: []
+references:
+  - 'https://github.com/rvdbreemen/OTGW-firmware/issues/684'
+  - 'src/OTGW-firmware/OTGW-Core.ino:726-836'
 priority: medium
 ordinal: 222000
 ---
