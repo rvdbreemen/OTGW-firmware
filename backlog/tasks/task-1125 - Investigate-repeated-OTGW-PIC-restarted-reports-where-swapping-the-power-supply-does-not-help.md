@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-04 20:58'
-updated_date: '2026-09-04 20:59'
+updated_date: '2026-09-19 15:59'
 labels:
   - bug
   - needs-info
@@ -30,3 +30,17 @@ Reported on Tweakers by Compizfox, 2026-09-04 20:03 UTC: recurring "OTGW PIC res
 - [ ] #2 If the ESP is stable, the deliberate reset paths (MQTT reset topic, ser2net GW=R, telnet p, command-queue GW=R as in TASK-538) are ruled in or out against their setup
 - [ ] #3 The outcome is reported back on the Tweakers thread, including the finding that a PSU swap cannot help when the ESP is the one restarting the PIC
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-19: Closed by maintainer decision without contacting the reporter. In the 15 days since the report (2026-09-04) no question was ever posted on the Tweakers thread, and the thread shows nothing further from Compizfox (RSS checked 2026-09-19; only an unrelated for-sale post on 2026-09-13). The analysis in the description stands as the best current reading: the 'OTGW PIC restarted' event fires on every PIC boot, the ESP resets the PIC deliberately on each of its own boots, so a rebooting ESP explains the symptom and a PSU swap cannot. Unverified against the reporter's device. If the report resurfaces, start from that description and ask for the ESP firmware version and the Reboots/Up counters.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed without a fix and without reporter contact, by maintainer decision on 2026-09-19.
+
+No code changed. The description records the most likely mechanism (ESP reboots resetting the PIC, making the PSU irrelevant) and the two facts needed to confirm it (ESP firmware version, and whether the Reboots/Up counters track the PIC events). None of the three acceptance criteria were met because the reporter was never asked; the thread went quiet on its own.
+<!-- SECTION:FINAL_SUMMARY:END -->
