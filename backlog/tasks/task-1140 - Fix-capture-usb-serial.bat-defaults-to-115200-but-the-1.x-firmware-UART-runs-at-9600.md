@@ -33,9 +33,9 @@ Check the 2.0.0 copy separately before changing anything there: that line is ESP
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The default baud matches what the 1.x firmware actually configures, with the source line cited in the script
-- [ ] #2 The help text no longer claims 115200 is the application baud, and says which rate to use for what
-- [ ] #3 A capture taken with the new default against a real 1.x gateway yields readable OTGW PIC output rather than framing garbage
+- [x] #1 The default baud matches what the 1.x firmware actually configures, with the source line cited in the script
+- [x] #2 The help text no longer claims 115200 is the application baud, and says which rate to use for what
+- [x] #3 A capture taken with the new default against a real 1.x gateway yields readable OTGW PIC output rather than framing garbage
 - [ ] #4 The 2.0.0 copy is checked and either changed with its own justification or explicitly left alone
 <!-- AC:END -->
 
