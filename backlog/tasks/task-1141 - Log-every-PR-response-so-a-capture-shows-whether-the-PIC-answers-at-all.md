@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-19 15:35'
-updated_date: '2026-09-19 15:44'
+updated_date: '2026-09-19 15:49'
 labels:
   - diagnostics
   - enhancement
@@ -44,3 +44,27 @@ Goal is diagnosability only. No behaviour change, no new setting.
 - [ ] #5 python build.py --firmware exits 0
 - [ ] #6 A telnet capture from the bench OTGW on COM3 with OT-message debug enabled shows one new line per PR= query the ESP sends, including for registers whose value did not change
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+VERIFICATION KILLED THIS TASK. The premise is false. No code was written.
+
+I re-read Appiejs's actual telnet capture instead of trusting my summary of it, and the capture contains 17 PR: lines, not zero. Every one of the 16 PR= queries got an answer from the PIC, and the existing logging showed it:
+
+  handlePRresp( 828): handlePRresponse: PR=S updated to [1.00]
+  PR: S=1.00
+
+Two mechanisms already cover what this task wanted to add:
+
+1. handlePRresponse's own change-log fired for all 16 registers (OTGW-Core.ino:828).
+2. More importantly, the CALLER prints the raw line unconditionally. OTGW-Core.ino:4556 does a bare Debugln(buf), and Debugln is debugTelnet.println with no gate at all (Debug.h:20). It is not behind state.debug.bOTmsg.
+
+Point 2 falsifies the whole task, including the "unchanged value logs nothing" gap that was its strongest argument. The tail of the capture proves it directly: the repeat PR=M polls at 16:56:37 and 16:57:37 produced NO handlePRresp line, because the value had not changed, and yet "PR: M=M" still printed both times.
+
+AC #2's first guard is also dead code: the caller at OTGW-Core.ino:4552-4555 already tests buf[2]==':' and buf[0]=='P' && buf[1]=='R' before calling, so len<4 and the prefix check can never fail.
+
+So "no PR: lines in a capture" does mean the PIC did not answer. The diagnostic question this task existed to answer is already answerable with shipped firmware.
+
+What the capture actually shows, for whoever picks up #684: the PIC is healthy and answers everything (v6.8, 4MHz, build 25-08-2026), and reports PR: M=M three times over two minutes. M = monitor mode, not gateway mode. That, plus zero OT frames in four minutes, is the real lead.
+<!-- SECTION:NOTES:END -->
