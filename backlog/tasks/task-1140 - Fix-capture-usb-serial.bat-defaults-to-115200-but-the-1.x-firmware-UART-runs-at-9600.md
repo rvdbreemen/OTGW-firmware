@@ -3,9 +3,11 @@ id: TASK-1140
 title: >-
   Fix: capture-usb-serial.bat defaults to 115200 but the 1.x firmware UART runs
   at 9600
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-19 14:28'
+updated_date: '2026-09-19 14:46'
 labels:
   - bug
 dependencies: []
