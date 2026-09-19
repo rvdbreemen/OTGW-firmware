@@ -4,7 +4,7 @@ title: 'Investigate: gateway reports no thermostat and no boiler after 1.7.5 (GH
 status: To Do
 assignee: []
 created_date: '2026-09-19 05:09'
-updated_date: '2026-09-19 05:10'
+updated_date: '2026-09-19 14:23'
 labels:
   - bug
   - needs-info
@@ -37,3 +37,9 @@ Gateway Mode Monitor with GW-mode detecting in the banner is the detail most wor
 - [ ] #2 It is established whether the same symptom really reproduces on 1.7.1, including whether the filesystem was flashed alongside the firmware
 - [ ] #3 Either a firmware cause is identified with evidence, or the issue is closed as hardware or wiring with the reasoning recorded for the next reader
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-19: asked Appiejs on GH #684 for (a) a telnet banner taken 5+ minutes after boot, since the one he posted reads Up: 0(d)-00:00 and Boiler/Thermostat OFF is expected that early, (b) whether the boiler still runs normally on his thermostat, which separates 'the OTGW sees nothing' from 'there is nothing on the bus', and (c) whether the 1.7.1 test included the filesystem, because firmware-without-filesystem keeps serving the previous web interface and would make 'same result' mean something else. Also flagged Gateway Mode Monitor as worth confirming as deliberate. Pointed at Schelte's hardware checklist as the next step if it still reads empty after five minutes.
+<!-- SECTION:NOTES:END -->
