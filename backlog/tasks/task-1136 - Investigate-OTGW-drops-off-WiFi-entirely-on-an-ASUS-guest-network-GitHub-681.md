@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-17 20:22'
-updated_date: '2026-09-17 20:23'
+updated_date: '2026-09-19 15:56'
 labels:
   - bug
   - needs-info
@@ -29,6 +29,12 @@ Leading non-firmware explanation: the device sits on a 2.4GHz GUEST network on a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reporter has run the gateway on the normal SSID (not the guest network) for at least one week and reported whether the dropouts persist
-- [ ] #2 If they persist off the guest network: a capture is collected and a firmware-side root cause is identified or ruled out with evidence
+- [ ] #1 If they persist off the guest network: a capture is collected and a firmware-side root cause is identified or ruled out with evidence
+- [ ] #2 During an outage, a capture shows whether the telnet stream (port 23) keeps flowing while HTTP returns no response, which separates a wedged web server from a dead network stack; the reporter runs the bash snippet posted on issue 681
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-19: Removed the original AC #1 (run a week on the normal SSID). Its premise was wrong and was corrected on the issue on 2026-09-18 19:38 UTC: DenSinH stated in his original report that the main 2.4/5 GHz network showed the same dropouts, and his router's wireless log shows the OTGW still Associated and Authorized while the outage is in progress. So this is not a WiFi association loss and moving SSID tests nothing. His last reply (2026-09-18 07:09) mentions 4 dropout-free days after switching Wireless mode to Legacy, with a router restart in between, so that number is not yet meaningful. Blocked on the reporter running the capture snippet; no reply since my correction.
+<!-- SECTION:NOTES:END -->
