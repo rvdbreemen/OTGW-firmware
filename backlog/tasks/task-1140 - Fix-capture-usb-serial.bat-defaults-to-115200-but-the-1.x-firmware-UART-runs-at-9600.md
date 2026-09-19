@@ -38,3 +38,20 @@ Check the 2.0.0 copy separately before changing anything there: that line is ESP
 - [ ] #3 A capture taken with the new default against a real 1.x gateway yields readable OTGW PIC output rather than framing garbage
 - [ ] #4 The 2.0.0 copy is checked and either changed with its own justification or explicitly left alone
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Fixed in 79cb3a04.
+
+Evidence, real hardware (CH340 OTGW on COM3):
+- Reading the port directly: 9600 gives readable GW=R (the firmware polling the PIC for gateway mode), 115200 gives 0 bytes in the same window.
+- capture-usb-serial.bat with the new 9600 default wrote '16:40:59.229  GW=R', 20 bytes, fully printable.
+- The bytes immediately after a reset are unreadable at 9600 as expected: that is the ESP8266 boot ROM banner at 74880, which is why the -Baud 74880 advice stays in the help.
+
+Evidence, capture-otgw.sh serial mode against a pseudo-terminal (WSL cannot reach a COM port without usbipd, which is not installed here): realistic PIC output gives 80 clean lines with no warning, the wrong-baud byte pattern gets 20 of 20 lines flagged, and a --serial path that does not exist exits 2.
+
+Bug caught by that test before shipping: OTGW lines are CRLF terminated, read strips the LF and leaves the CR, and 0x0D is outside printable ASCII, so the garbage detector counted 77 of 81 healthy lines as a baud mismatch. Stripping the CR first fixed it. Without the pseudo-terminal case this would have shipped as a false alarm telling reporters their working capture was broken.
+
+Still open: AC about the 2.0.0 copy. Not checked, deliberately: that tree is ESP32 and its console baud may genuinely be 115200.
+<!-- SECTION:NOTES:END -->
