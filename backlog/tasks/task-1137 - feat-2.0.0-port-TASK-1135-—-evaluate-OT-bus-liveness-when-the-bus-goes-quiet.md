@@ -1,11 +1,11 @@
 ---
 id: TASK-1137
 title: 'feat-2.0.0: port TASK-1135 — evaluate OT-bus liveness when the bus goes quiet'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-18 04:54'
-updated_date: '2026-09-19 18:20'
+updated_date: '2026-09-19 18:38'
 labels:
   - bug
 dependencies: []
@@ -37,7 +37,7 @@ Also differs: presence values publish under the generic namespace per ADR-084, n
 - [x] #4 The effect on SATcontrol.ino:1171 is assessed and recorded: does a correctly-falling bBoilerState change any SAT decision, and is that change wanted
 - [x] #5 Any coupled publishes on a thermostat transition (hvac mode/action equivalents) are preserved
 - [x] #6 Build green for the relevant target and evaluate.py --quick shows no new failures
-- [ ] #7 Hardware verification by the maintainer with the source absent
+- [x] #7 Hardware verification by the maintainer with the source absent
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -131,6 +131,16 @@ What the 1.x side contributed back after reading this report:
 - The 1.x analogue of the dead TASK-565 edge is the HA climate entity: publishHvacMode() reserves hvac_mode off for a disconnected thermostat but could not reach it on a fully silent bus. Same class of finding, different consumer.
 
 2026-09-19: Shipped as 2.0.0-alpha.365 (batch bump, commit chore(release): alpha.365). Build re-verified by the maintainer's session before push: six SUCCESS steps, artifacts stamped alpha.365+10c0929, flash 77.1 to 81.3 percent, evaluate.py --quick 76/0. AC #7 (hardware verification with the source absent) remains the only open item; it needs the maintainer's bench OTGW32 with the OT bus pulled and boiler_connected observed falling within about 30 s.
+
+2026-09-19 hardware verification (AC #7), bench OTGW32 (ESP32-S3, MAC 10:20:ba:21:b4:f8, 192.168.88.61, combo image, hardware_type otgw32), nothing attached to the OT bus. Source-absent was produced with loopback (GW=L, synthetic boiler raises boiler_connected) followed by monitor mode (GW=0: no injected frames, nothing attached, so the bus is truly silent). Read via /api/v2/device/info boilerconnected every ~6 s.
+
+BEFORE, alpha.354 (pre-fix): loopback true at +8 s; after GW=0 still true at +7, +13, ... +97 s. Never fell. Defect reproduced.
+
+AFTER, alpha.365, same board, flashed with flash_otgw.bat --update (app 0x10000 + fs 0x270000): loopback true at +8 s; after GW=0 true through +26 s, FALSE at +32 s and stays false. Fix verified on hardware.
+
+Control for the test design: on alpha.354 with GW=2 (master) instead of GW=0, the flag DID fall at +34 s, because master mode keeps injecting request frames and each frame ticked the old frame-driven evaluation. Only a fully silent bus exposes the defect, which is the case the fix exists for. resetTransientState() runs on every mode change but does not touch state.otBus presence flags (grep + the 27 s of true after the switch), so the mode switch itself is not what cleared the flag.
+
+Side observation: the fs flash reset LittleFS settings; the board came back in gateway mode instead of the master mode it had. WiFi (NVS) survived. Restored to master after the test.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -168,4 +178,6 @@ Committed locally as a3e9a7fd with OTGW_BUMP_HOOK_DISABLE=1. NOT pushed: the mai
 ## Open
 
 AC #7 only: confirming the entities flip with the source physically absent needs a bench device.
+
+Hardware verification (AC #7) done 2026-09-19 on the bench OTGW32: before/after on the same board, silent bus via loopback then monitor mode. alpha.354 held boiler_connected true for 97+ s; alpha.365 dropped it at 32 s. Details in Implementation Notes.
 <!-- SECTION:FINAL_SUMMARY:END -->
