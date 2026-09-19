@@ -65,3 +65,19 @@ Two things found in that tree worth recording, neither acted on:
 
 2. The 2.0.0 tree already ships capture-mqtt-debug.sh (1584 lines) and capture-mqtt-debug-macos.sh for Linux and macOS, using bash plus embedded Python workers. I built the 1.x capture-otgw.sh without first checking whether a portable capture already existed in the sibling tree. Mine is not redundant (450 lines, bash and curl only, no python3 dependency, and the 1.x REST surface differs) but the overlap is real and the check should have come first.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Both capture scripts assumed the USB serial link runs at 115200. The firmware never sets that: OTGWSerial.cpp:836 does HardwareSerial::begin(9600, SERIAL_8N1), because that UART is the PIC link and the PIC runs at 9600.
+
+The cost was real. On GH #684 a reporter followed the documented instructions and got 541 bytes of framing garbage. It read as a hardware fault and cost a full round trip before anyone questioned the tool.
+
+Changes: capture-usb-serial.bat defaults to 9600 and its help no longer calls 115200 the application baud. capture-otgw.sh gains --serial and --baud so a gateway that will not come up on WiFi can be captured from Linux or macOS, and it now says plainly in summary.txt when a capture looks like a baud mismatch.
+
+Verified on real hardware (CH340 OTGW on COM3): reading the port directly gives readable GW=R at 9600 and 0 bytes at 115200; the fixed script wrote '16:40:59.229  GW=R', fully printable. The shell script was verified against a pseudo-terminal, because WSL cannot reach a COM port without usbipd: clean output passes without warning, the wrong-baud pattern is flagged 20 of 20, and a bad --serial path exits 2.
+
+That pseudo-terminal case earned its keep: it caught the garbage detector counting 77 of 81 healthy lines as a mismatch, because OTGW lines are CRLF terminated and the surviving CR is outside printable ASCII. That would have shipped as a false alarm telling reporters their working capture was broken.
+
+No 2.0.0 copy existed to change, and changing one would have been wrong: the PIC link there is on dedicated pins, separate from the USB console. Two things noted there and not acted on: capture-serial.py defaults to 115200, and that tree already ships a Linux and macOS capture I did not check for before writing this one.
+<!-- SECTION:FINAL_SUMMARY:END -->
