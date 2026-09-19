@@ -2,132 +2,67 @@
 
 > OpenWolf's learning memory. Updated automatically as the AI learns from interactions.
 > Do not edit manually unless correcting an error.
-> Last updated: 2026-05-01
+> Last updated: 2026-08-23
 
 ## User Preferences
-
-<!-- How the user likes things done. Code style, tools, patterns, communication. -->
+- Build firmware FOREGROUND, serially; verify `firmware.bin` mtime+size. Never trust `build.py` exit 0.
+- Version bump = one changeset via `bin/bump-prerelease.sh` (stages version.h + version.hash + ~42 banners).
+- OTGWSerial is the ONLY editable vendored lib; all other `src/libraries/**` read-only.
+- ADRs: never edit an Accepted ADR; write a new Proposed "…(Amends ADR-XXX)".
 
 ## Key Learnings
-- **ADR current-status detection has NO canonical line.** Status lives in frontmatter `status:` on some ADRs, `## Status` prose first-word on others, inline `- **Status:**` on others. Every Accepted ADR ALSO keeps a "Proposed <date>" line in its `## Status History` / status_history block. To find truly-Proposed ADRs read in priority order (frontmatter → `## Status` prose → inline `**Status:**`); NEVER grep the bare word "Proposed" (false-positives on history). 2026-06-24 audit: a naive grep claimed 31 Proposed but only 5 were (122/142/145/150/152). To FLIP a status, anchor the canonical line (`^status: Proposed$`), never a substring that also matches the history block, and `git diff` before commit. (bug-036)
-- **End-of-loop ADR evaluation (implement-next-task) — IMPLEMENTED TASK-928, 2026-06-24.** Per maintainer directive the loop no longer drafts a Proposed ADR per task mid-drain. Instead, after the drain for-loop exits (fires on every break, guarded by `completed.length`), one ADR-Evaluation pass reviews the whole-run diff (`startHead..HEAD`, captured before Audit) + landed task bodies, dedups architectural decisions ACROSS tasks into one ADR each, the JS assigns ADR numbers from glob-max (no LLM number-picking → no collision), drafts one Proposed ADR per decision, runs the self-accept governance guard (travelled intact from the old per-task path), commits them in one `docs(adr): ... (TASK-865)` commit (docs-only, no bump; epic file tracked so the commit-msg hook passes), pushes, and announces "N Proposed ADRs drafted for review" to #dev-sat-mqtt. Each ADR's References cites the contributing task ids + commit hashes (replaces the lost per-task atomicity). Acceptance + superseded-marking stay the maintainer's manual checkpoint by design. Parallel lanes inherit `skipAdrEval` from `skipBump` and defer the pass to serial integration (no cross-lane ADR-number race). Process-death recovery (2026-06-25): Land stamps the task note `ADR-PENDING`; the pass stamps `ADR-EVALUATED: <ids|none>` ONLY on confirmed completion; if the pass dies first the marker survives in git so the next run's Audit returns the task in `adrOrphans` and the pass re-sweeps it; enumerate greps `docs/adr/` for the task ids and skips already-documented decisions, so a retry after partial death never double-drafts. Eval brain dry-run-validated (2 report-only Workflow runs): maxAdrNumber 152 -> JS assigns 153; dedup correctly skip-already-adr ADR-056/102/152 AND did NOT over-skip on ADR-150's passing mention of the un-ADR'd split; positive-detection correctly drafted ADR-153 for the SAT dual-axis split (commit a9047177), folding settings/API additions + bug fixes into the one ADR. Author/guard/land/announce reuse the proven per-task prompts (not separately re-run).
-- **Combo flash budget (ADR-127)**: esp32-combo zit op 98.4% van het 1.875MB app-slot (~30KB over). Elke feature op de combo eerst tegen dit target meten; -flto staat al aan.
-- **backlog CLI auto-commit in dev-worktree**: `backlog task edit` in de dev tree commit zelf ("Update task TASK-NNN"); in de 2.0.0 tree niet. Na CLI-edits in dev: niets meer te stagen, alleen pushen.
 
+### Build / tooling
+- **`firmware.bin` mtime+size is the only trustworthy build signal.** `build.py` exits 0 on per-env compile failure; require literal `Successfully created ESP32S3 image` / `SUCCESS`. Concurrent runs share `.pio/build` → 0xC0000142 or `OTGW-firmware.ino.cpp: No such file or directory`. Recovery: `rm -rf .pio/build/<env>`, rebuild solo. Only `buildfs` parallelizes. LTO link needs ~2GB RAM. esptool v5 cp1252 crash → prefix `PYTHONUTF8=1`. Never pipe build output through `Select-Object -First N`. `build.sh` self-bootstraps Python/pip.
+- App-only flash preserving WiFi+settings: `esptool write-flash 0x0 bootloader 0x8000 partitions 0xe000 boot_app0 0x10000 firmware` — NOT merged-full @0x0 (wipes NVS).
+- On dependency build failure, grep the FIRST `error:` line; a conflict marker in `version.h` produced ~40 bogus AceTime errors. (bug-150)
+- Firmware epoch is AceTime `time(nullptr)`, never TimeLib `now()`.
+- Combo flash budget (ADR-127): esp32-combo at 98.4% of the 1.875MB app slot; `-flto` already on.
+- Dict-spread in `TARGETS` silently inherits later keys (`slug`) → artifact name collisions. Set explicit values. (bug-120)
+- Vendored libs compile WITHOUT `boards.h` — `#if defined(PIN_XXX)` always takes fallback. Pass pins via per-env `-D` build_flags; verify in `.pio/build/<env>/…/<lib>.cpp.d`. (bug-119)
+- Git Bash `ps` cannot see native Windows processes; use `tasklist //FI "PID eq <pid>"`.
 
-- **Settings page layout (DS:SETTINGS-GROUP):** `.settings-group-body` is a 2-col grid (`var(--settings-label-w, max-content) 1fr`); rows subgrid into it. Anything appended into a `.settings-group-body` becomes a grid item — wide content (e.g. the WiFi-scan panel's full-width `<p>`) inflates the shared col-1 `max-content` track and stretches every label. Full-width sub-panels MUST use `grid-column: 1 / -1` (like `.fixed-ip-section` and now `#wifi-scan-panel`). And `normalizeSettingsLabelWidth()` must measure ONLY real row labels (`.settings-group-body .settingDiv > .settings-field-container`), never the broad descendant selector. (TASK-763, bug-076)
-- **Project:** OTGW-firmware
-- **Description:** [![Join the Discord chat](https://img.shields.io/discord/812969634638725140.svg?style=flat-square)](https://discord.gg/zjW3ju7vGQ)
-- On the 2.0.0 branch, `hd_drip_cooldown_skip` is a post-status-burst pacing counter from `MQTTstuff.ino`, not a heap-pressure counter; the actual heap-pressure counter is `hd_drip_slowmode`.
-- On ESP32, `platformMaxFreeBlock()` uses `ESP.getMaxAllocHeap()` as a live runtime value. Docs and diagnostics should describe it as the largest allocatable block, not with the ESP8266-specific `getMaxFreeBlockSize()` wording.
-- **Removing a published REST/MQTT field is coupled to its frontend consumer.** Dropping `picavailable` from `/api/v2/device/info` (ADR-113 stage 2, TASK-754) silently breaks `index.js` if not migrated in the SAME build: `picAvailable = !!d.picavailable` becomes `false`, and the `#tabPICflash` route gated on it makes the PIC-flash page unreachable. Backend field removal + frontend rewrite must ship atomically (one `build.py` → firmware + LittleFS). Split a deprecation removal into "non-coupled (MQTT publish, HA discovery) now" vs "coupled (REST field + JS consumer) atomically" — never ship the REST half alone.
-- **The HA discovery sensor loop bound is exact, not slack.** `doAutoConfigureMsgid()` iterates `while (sIdx < MQTT_HA_SENSOR_COUNT)` and breaks on id-change, so `MQTT_HA_SENSOR_COUNT` MUST equal the row count of `mqttHaSensors[]`. If COUNT < rows, the trailing OT-id's entries are silently never discovered (found id-254 flame_status dark this way, bug-088). When adding/removing a row, update COUNT and the `mqttHaSensorIndex[]` offsets together; `evaluate.py check_ha_sensor_index_consistency` validates the index but NOT the COUNT.
-- **`satSendStatusJSON()` (SATcontrol.ino) is a CROSS-FILE open-streaming map, NOT self-contained.** It opens `sendStartJsonMap("")`, emits ~120 fields, then calls `satBLESendStatusJSON()` (in SATble.ino, real on ESP32-S3 / no-op on ESP8266) which appends ~10 more fields (`ble_enable`, `ble_temp`, `ble_humidity`, `ble_rssi`, …) into the SAME open stream, THEN `sendEndJsonMap("")`. The streaming model lets a function in another file contribute to one map. ArduinoJson v7's `restSendJson(doc)` serializes-and-finalizes a complete `{...}` in one shot, so you CANNOT convert `satSendStatusJSON` to a single `JsonDocument` without either (a) editing `satBLESendStatusJSON`'s signature in SATble.ino to take a `JsonObject&` — out of scope for a single-file conversion — or (b) dropping the BLE fields (a real data regression: the SAT dashboard reads them). Under an "edit only this file" constraint the correct move is to LEAVE `satSendStatusJSON` streaming and report the coupling. A full migration must convert SATcontrol.ino + SATble.ino together (pass the JsonObject down). (ADR-141 / ArduinoJson v7 output migration.)
+### Git / backlog / ADR
+- **Fetch before any cross-branch gap analysis.** `git fetch` + `git rev-list --left-right --count HEAD...origin/<branch>` FIRST; a 6-commit-stale tree produced 3 dead tasks.
+- `backlog task edit` AUTO-COMMITS in the dev worktree (wipes your index); not in the 2.0.0 tree. Never leave staged work during CLI calls, and don't re-commit ADR/task files afterwards — check `git log` first. Dev commit-msg hook demands a task file for EVERY `TASK-NNN` token — don't cite 2.0.0 ids in dev commits. Exemptions: `chore(meta|release|housekeeping|daily-report):`; version-banner housekeeping needs `OTGW_BUMP_HOOK_DISABLE=1`.
+- `other-projects/` is a submodule of private `rvdbreemen/OTGW-other-projects`. Commit inside it, then the gitlink.
+- **ADR status has no canonical line.** Read in priority order: frontmatter `status:` → `## Status` prose → inline `**Status:**`. NEVER grep bare "Proposed" (a naive grep claimed 31, real was 5). Flip only the anchored line, `git diff` before commit. (bug-036)
+- An Accepted ADR can contradict itself on surfaces it never enumerated (ADR-167: delete counters vs preserve observability, while counters fed MQTT/HA/REST/UI). Grep each named symbol for consumers before executing a removal list.
+- Check frontmatter milestone + tail of Implementation Notes before picking up an old task (TASK-687 parked, milestone 3.0.0).
+- End-of-loop ADR evaluation (TASK-928): one pass reviews `startHead..HEAD`, dedups decisions, assigns numbers from glob-max, drafts Proposed ADRs, commits docs-only. `ADR-PENDING` / `ADR-EVALUATED:` markers give process-death recovery. Acceptance stays manual.
+
+### Firmware / code
+- `hd_drip_cooldown_skip` is post-status-burst pacing; the heap-pressure counter is `hd_drip_slowmode`.
+- `platformMaxFreeBlock()` on ESP32 = `ESP.getMaxAllocHeap()`.
+- **Removing a published REST/MQTT field is coupled to its frontend consumer.** Backend removal + JS rewrite must ship in ONE `build.py` (firmware + LittleFS). Dropping `picavailable` made `#tabPICflash` unreachable.
+- `MQTT_HA_SENSOR_COUNT` must EXACTLY equal the row count of `mqttHaSensors[]`; a short count silently darkens the trailing OT id. Update `mqttHaSensorIndex[]` offsets together. (bug-088)
+- `satSendStatusJSON()` is a CROSS-FILE open stream: `satBLESendStatusJSON()` (SATble.ino) appends into the same open map. Migrate SATcontrol.ino + SATble.ino together.
+- Settings page: `.settings-group-body` is a 2-col grid; full-width sub-panels MUST use `grid-column: 1 / -1`; `normalizeSettingsLabelWidth()` measures only real row labels. (bug-076)
+- SAT REST writes: `/sat/enable`, `/sat/target`, `/sat/preset`, `/sat/mode`, `/sat/settings/dhw_setpoint|dhw_enable`, `/sat/settings/simulation`. Bare text/plain bodies. Classic `sat.js` is ground truth.
+
+### Dead-code / refactor discipline
+- Scope reference searches wider than `src/`: `evaluate.py`, `tests/`, `docs/` give different answers.
+- Count symbol FAMILIES (all `print_*`), not individuals — that's how `print_flag8flag8` surfaced.
+- The `#else` branch of a `HAS_*` flag is NOT dead code; only remove when the flag is an invariant platform discriminator.
+- 100% survival in an adversarial verify = rubber-stamping. Spot-check before acting (43/43 survived; 2 false positives).
+- Brace-match when scripting deletion; never cut on a bare `}`. Run `node --check` after.
+
+### Misc
+- `DesignSync` (claude_design MCP) is NOT inherited by sub-agents — do design reads in the main thread. Check whether a design already shipped before rebuilding.
+- LOLIN S3 Mini D1-mini footprint (outer row): RST=EN, A0=2, D0=4, D1=36(SCL), D2=35(SDA), D3=18, D4=16, D5=12, D6=13, D7=11, D8=10, TX=43, RX=44.
+- Concurrent edits to `v2.html`: `git diff -U1` to split coalesced hunks, filter foreign ones, `git apply --cached --unidiff-zero`.
 
 ## Do-Not-Repeat
-- **2026-06-24**: NEVER flip an ADR's status by replacing the first bare "Proposed" match in a file. Accepted ADRs keep "Proposed <date>" in their `## Status History` / status_history block; a substring replace rewrites that history (corrupted 21 files this way → "Accepted 2026-05-26"). Detect true current status per-file (frontmatter `status:` → `## Status` prose → inline `**Status:**`), flip ONLY that anchored line, `git diff` before commit. Same root made the initial "31 Proposed" count wrong (real = 5). (bug-036)
-- **2026-06-14**: NEVER amend an **Accepted** ADR in-place by adding an "Amendment N" body section + an Agent-authored Accepted status_history entry. adr-kit immutability + the ADR-task governance rule both forbid touching an Accepted ADR's body/Status. When an AC literally says "amend ADR-XXX" but ADR-XXX is Accepted, the governance rule WINS: write a NEW Proposed ADR titled "...(Amends ADR-XXX)" that lifts the amendment prose, carry the relationship from the new ADR's Status preamble + Related section, and leave the old ADR untouched. Pattern this repo already uses: ADR-135 amends ADR-011, ADR-089 amends ADR-030. (TASK-865.14: caught a diff that had edited Accepted ADR-132; reverted it, relocated to new Proposed ADR-137.) For StructuredOutput: adrAction="created" (a new file that *amends* is not "amended"/"superseding" in adr-kit's vocabulary — those describe what happened to the OLD ADR, and here nothing did); adrFiles = new ADR + README (the index edit must be staged too or the ADR ships orphaned).
-- **2026-06-13**: Bij het herleven van een removal-commit (revert-reconstructie zoals ec55a1fb): loop ALLE hunks van de removal-diff af als checklist; de `if (!isPICEnabled()) initEthernet()`-gate zat in een ander deel van setup() dan het detectieblok en werd gemist (bug-121). Gevangen door ADR-verificatiepass (code-vs-claim).
-- **2026-06-26**: The `DesignSync` tool (claude_design MCP for claude.ai/design projects) is NOT inherited by spawned sub-agents — a delegated asset import fails with "No matching deferred tools found" inside the Agent. Do all Design-project reads in the MAIN thread (large `get_file` results persist to disk; only a ~2KB preview enters context, so binaries don't flood it). `list_projects` hides `PROJECT_TYPE_PROJECT` projects and `get_project` returns no `updatedAt`, so a design project's last-modified isn't readable via the API — content-match on the PR # instead. When asked to "implement a design", FIRST check if it already shipped (the OTGW v2 UI was already built under TASK-908) — verify before rebuilding; the live code is often well past a day-old audit's snapshot, so re-diff per `file:line` before calling anything "open".
-- **2026-06-27**: `firmware.bin` freshness (mtime + size delta) is the ONLY trustworthy firmware-build signal here. `build.py` exits 0 even when a per-env compile FAILS, and a stale `firmware.bin` from an earlier build looks "fresh" — this burned me TWICE this session (declared alpha.276/277 "build green" on a 20:33 stale binary while `restAPI.ino` failed to compile; dev firmware was broken 62bf7252..5a7eda6d). The bug: I wrote `now()` for epoch — but the firmware uses AceTime + **`time(nullptr)`** everywhere (OTGW-Core.ino:4557, restAPI.ino:1592/3158), NOT TimeLib, so `'now' was not declared in this scope`. ALWAYS build firmware FOREGROUND via direct `~/.platformio/penv/Scripts/python.exe -m platformio run -e esp32`, require the literal `Successfully created ESP32S3 image` / `SUCCESS` line AND a fresh `firmware.bin` timestamp+size — never trust `build.py` exit 0 or a background-build "completed" notification (their stdout buffers; the log shows only the first line). LTO link needs ~2GB free RAM; kill zombie compilers if it OOMs. esptool v5 progress bar crashes on Windows cp1252 (`UnicodeEncodeError`) → prefix `PYTHONUTF8=1`. App-only flash preserving WiFi+settings (OTGW32 partitions): `esptool write-flash 0x0 bootloader 0x8000 partitions 0xe000 boot_app0 0x10000 firmware` (leaves nvs@0x9000 + spiffs@0x270000 intact), NOT merged-full @0x0 (wipes NVS).
-
-
-<!-- Mistakes made and corrected. Each entry prevents the same mistake recurring. -->
-- **2026-05-26**: For WSL/Linux build reliability, do not assume system Python/pip exists or that package-manager installs are acceptable. `build.sh` must self-bootstrap an isolated local Python runtime and pip non-interactively when needed.
-- **2026-05-26**: Version bump in 2.0.0 src files (comment headers) from a `build.py` run lands as unstaged changes. The pre-commit hook blocks the commit with "does not bump _VERSION_PRERELEASE" even when the version was already bumped in a previous commit. Use `OTGW_BUMP_HOOK_DISABLE=1 git commit` with a `chore(meta):` prefix to commit the housekeeping header updates. The commit-msg hook requires either a TASK-NNN reference or an exemption prefix (`chore(meta):`, `chore(release):`, `chore(housekeeping):`, `chore(daily-report):`).
-- **2026-05-26**: The backlog CLI auto-stages and auto-commits task file changes. The adr-kit pre-commit hook can auto-change ADR Status from Proposed to Accepted. Do not manually re-write or re-commit ADR files after `backlog task edit` — check git log first to avoid duplicating the commit.
-- **2026-05-26**: On Windows, overlapping `build.bat`/`pio` runs can leave locked `.pio\build` artifacts and cause false missing-bin/link errors. Before concluding there is a source regression, ensure only one PlatformIO process is active and rerun once clean.
-- **2026-05-30**: OTGWSerial is an INDEPENDENT external/vendored library (src/libraries/OTGWSerial) and must NOT be pulled into the firmware platform abstraction. Do NOT add platform*() shims into it (no platformPicSerialBegin), do NOT remove its internal `#if defined(ESP8266)/(ESP32)` — those are library-internal and legitimate, exactly like a third-party lib. It belongs in evaluate.py's ESP_ABSTRACTION_EXCLUDED_LIB_DIRS (like SimpleTelnet). Maintainer directive during TASK-743 Tier 3: the ESP-abstraction rule governs APPLICATION code only, never the vendored libraries. (Voids TASK-743 AC#4.)
-- **2026-05-29**: Do NOT run `pio run -e esp8266` and `pio run -e esp32` in parallel in the same worktree to "build in parallel". The arduino sketch-concat step (.ino -> .ino.cpp) shares an intermediate across envs even though each env has its own `.pio/build/<env>` dir; concurrent runs race and one env fails with `OTGW-firmware.ino.cpp: No such file or directory`. Firmware builds must be serial per tree; only `buildfs` (filesystem, no concat) parallelizes safely. For true parallel firmware builds use separate git worktrees. Recovery: `rm -rf .pio/build/<env>` then rebuild that env solo. See buglog bug-073.
-<!-- Format: [YYYY-MM-DD] Description of what went wrong and what to do instead. -->
-
-### 2026-07-31: Fetch origin before analysing branch state
-Analysed dev for 1.x-port candidates against a local tree that was 6 commits
-behind origin/dev, and created five backlog tasks. Three were already done
-upstream (24be052f2, ADR-170/172/173). Always `git fetch` and check
-`git rev-list --left-right --count HEAD...origin/<branch>` BEFORE any
-cross-branch gap analysis, not after the tasks are written.
-
-### 2026-07-31: A conflict marker in a shared header lies about where the error is
-`version.h` held an unresolved stash-pop conflict whose two sides were
-byte-identical apart from CRLF vs LF. The build failed with ~40 AceTime
-'acetime_t does not name a type' errors and ONE real line:
-`version.h:8:1: error: version control conflict marker in file`. When a build
-suddenly fails inside a dependency, grep the log for the FIRST `error:` line
-before believing the cascade. Logged as bug-150.
-
-### 2026-07-31: An Accepted ADR can still contradict itself on surfaces it did not enumerate
-ADR-167 item 1 said delete the heap tier-entry counters; item 4 said preserve
-heap observability. Neither noticed the counters feed three MQTT stats topics,
-three HA discovery entities, REST fields and the web UI. Before executing an
-ADR's removal list, grep each named symbol for downstream consumers and take
-published contracts back to the maintainer rather than resolving it yourself.
-
-### 2026-07-31: Check milestone + parking notes before picking up an old task
-Moved TASK-687 to In Progress on the basis of its title, then found it carried
-milestone 3.0.0 and an explicit maintainer parking decision. Read the frontmatter
-milestone and the tail of Implementation Notes BEFORE flipping status.
-
-### 2026-08-01: A 100% survival rate in an adversarial verify means the verifiers rubber-stamped
-The dead-code workflow returned 43 candidates and 43 survivals, with verifiers
-explicitly told to default to not-dead. Hand-checking a sample found two false
-positives (bleMatchesConfiguredMAC, live in tests/; OTValueType, documented in
-docs/). Treat a zero-refutation rate as a smell, not a success, and spot-check
-before acting.
-
-### 2026-08-01: Scope the reference search wider than src/ before calling a symbol dead
-"Unreferenced" is scope-relative. src/-only, src/+tests/, and whole-repo gave
-three different answers. Always check evaluate.py, tests/ and docs/ before
-deleting: a gate that greps a function body by name breaks silently, and a
-documented type costs doc churn.
-
-### 2026-08-01: Count symbol FAMILIES, not just individual symbols
-The sweep found print_flag8 but missed print_flag8flag8. Listing every print_*
-in OTGW-Core.ino with its reference count made both obvious at a glance: every
-other member had a caller, those two had none.
-
-### 2026-08-01: The off-branch of a HAS_* flag is not dead code
-A capability flag's #else exists so a future board can turn the feature off.
-Deleting it converts a working fallback into a compile error. Only remove a
-branch when the flag is a platform discriminator that can never vary (e.g.
-HAS_FRAGMENTATION_AWARE_HEAP_GATE, ESP8266-vs-ESP32 on an ESP32-only line).
-
-### 2026-08-01: Never launch a second build while one is running in this worktree
-Two concurrent build.bat runs share .pio/build and fail with Windows error
-3221225794 (0xC0000142, STATUS_DLL_INIT_FAILED) on dozens of framework objects
-- it looks like a toolchain meltdown, not a collision. Recovery: rm -rf the
-affected .pio/build/<env> and rebuild solo. Build targets SERIALLY in the
-foreground (each fits inside the 600s tool timeout).
-
-### 2026-08-01: Brace-match when scripting code deletion; never end on a bare "}"
-Cutting a JS function by "first line whose strip() == '}'" truncated
-safeGetElementById at its inner if-block brace and broke index.js. Use a real
-brace matcher that skips strings and comments, and run node --check afterwards.
+- **2026-08-01**: Never trust a zero-refutation verify pass; never delete a `HAS_*` `#else`.
+- **2026-07-31**: Never analyse branch gaps against an unfetched tree.
+- **2026-06-24**: Never flip ADR status by replacing the first bare "Proposed" (corrupted 21 files).
+- **2026-06-14**: Never amend an Accepted ADR in place; write a new Proposed one. StructuredOutput: `adrAction="created"`, stage the README index edit too.
+- **2026-06-13**: When reviving a removal-commit, walk ALL hunks of the removal diff as a checklist. (bug-121)
+- **2026-05-30**: Never pull OTGWSerial into the platform abstraction.
+- **2026-05-29 / 2026-08-01**: Never run two builds concurrently in one worktree.
+- **2026-05-26**: Don't re-commit ADR/task files after `backlog task edit`.
 
 ## Decision Log
-
-- 2026-05-05: MQTT discovery drip policy is platform-aware on 2.0.0. ESP8266 keeps the existing `HEAP_LOW` / 2000ms cooldown behavior; ESP32 uses a shorter status-burst cooldown and only enters discovery slow-mode when both free heap and largest allocatable block are genuinely low.
-
-<!-- Significant technical decisions with rationale. Why X was chosen over Y. -->
-- (2026-06-10) LOLIN S3 Mini D1-mini footprint map (outer pin row, from official diagram): RST=EN, A0=2, D0=4, D1=36(SCL), D2=35(SDA), D3=18, D4=16, D5=12(SCK), D6=13(MISO), D7=11(MOSI), D8=10(SS), TX=43, RX=44. Inner row = extra S3 GPIOs, NOT footprint. Variant file: ~/.platformio/packages/framework-arduinoespressif32/variants/lolin_s3_mini/pins_arduino.h (A0..A17 there are ADC aliases, not holes).
-- (2026-06-10) Version bump MUST land as one changeset: bin/bump-prerelease.sh stages version.h + version.hash + all ~42 banner files itself (autoinc-semver.py --print-updated). Never hand-stage only version.h. Gotcha: Windows Python stdout is CRLF; bash read loops must strip \r before git add.
-- (2026-06-10) NEVER pipe build.py through 'Select-Object -First N' (or any early-terminating filter): PowerShell kills the pipeline after N matches but the build process tree keeps running detached -> orphaned concurrent build, .pio collisions (bug-034 class), false 'failed exit 1'. Run build.py with '*> logfile' and grep the log afterwards.
-- (2026-06-11) other-projects/ is a git SUBMODULE of private repo rvdbreemen/OTGW-other-projects (2.0.0 branch). Never commit its content into the main repo; update flow: commit+push inside other-projects/, then commit the new gitlink in the parent. Dev worktree still has a plain (non-submodule) copy until wired.
-- (2026-06-11) Dev-worktree backlog CLI AUTO-COMMITS elke task create/edit (eigen git commits, reset-stage cyclus wist je index!). 2.0.0-worktree niet. Op dev: NOOIT iets gestaged laten staan tijdens backlog-CLI calls; stage pas na de laatste task edit. Dev commit-msg hook eist taakfile voor ELK TASK-NNN token - cite geen 2.0.0-taaknummers in dev-commits (al bekend, opnieuw bevestigd).
-
-### TU-visibility: vendored libs zien boards.h niet (2026-06-12)
-- `src/libraries/**` translation units compilen ZONDER boards.h in hun include-keten. Een `#if defined(PIN_XXX)` in vendored-lib code valt dus altijd terug op de fallback, ook al staat de macro netjes in boards.h.
-- Pinconfiguratie moet vendored libs bereiken via `-D` build_flags in platformio.ini per env (of via constructor-argumenten vanuit een app-TU, zoals PICRST al doet).
-- Verificatiemethode: grep de `.pio/build/<env>/.../<lib>.cpp.d` dependency file — staat boards.h er niet in, dan zag de preprocessor de macro niet. (bug-119, PIC-detect esp32-classic)
-
-### OTGWSerial = enige bewerkbare vendored lib (2026-06-12)
-- Robert gaf expliciete uitzondering: `src/libraries/OTGWSerial/` mag direct aangepast worden. Alle andere `src/libraries/**` blijven read-only. Context: PIC UART pin-binding fix (bug-119, TASK-862).
-
-### Dict-spread in TARGETS erft later toegevoegde keys (2026-06-12)
-- `TARGETS['esp32-classic'] = {**TARGETS['esp32'], ...}` erfde stilletjes `slug='esp32-otgw32'` toen TASK-856 die key aan de esp32-entry toevoegde — artifact-namen botsten (bug-120). Bij toevoegen van een key aan een TARGETS-entry: check alle spread-afgeleiden en zet daar een expliciete waarde.
-
-## Key Learnings (2026-07-02)
-- When two sessions edit v2.html concurrently (this batch's UI work + a foreign TASK-978 head loader), git coalesces adjacent hunks (<2x context lines apart). To stage ONLY your body hunks and leave the foreign <head> change unstaged: `git diff -U1` to force minimal context so hunks split, filter out hunks containing the foreign markers (TASK-978/ds-tokens.css/loadCss), then `git apply --cached --unidiff-zero`. Verified across TASK-980..987.
-- SAT REST write routes: enable=/sat/enable (NOT /sat/settings/satenabled), target=/sat/target, preset=/sat/preset, mode=/sat/mode, dhw=/sat/settings/dhw_setpoint|dhw_enable, sim=/sat/settings/simulation (key literally 'simulation', not 'satsimulation'). Bodies are bare text/plain (captured via webCaptureBody). Classic sat.js is the ground truth for these.
-
-- **Git Bash `ps` ziet geen native Windows-processen** (2026-07-02): een via PowerShell Start-Process gestart proces is onzichtbaar voor MSYS `ps -p <pid>`; een monitor die daarop test krijgt vals "proces weg". Gebruik `tasklist //FI "PID eq <pid>"` vanuit Git Bash, of check via PowerShell Get-Process.
+- 2026-05-05: MQTT discovery drip is platform-aware on 2.0.0 — ESP8266 keeps `HEAP_LOW`/2000ms; ESP32 uses a shorter burst cooldown and enters slow-mode only when free heap AND largest block are both low.
+- 2026-06-12: Maintainer grants OTGWSerial as the one editable vendored lib (TASK-862).
+- 2026-06-24: The implement-next-task loop drafts ADRs once at end-of-run, not per task.

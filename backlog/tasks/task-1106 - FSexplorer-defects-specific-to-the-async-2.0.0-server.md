@@ -1,11 +1,11 @@
 ---
 id: TASK-1106
 title: FSexplorer defects specific to the async 2.0.0 server
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-01 18:39'
-updated_date: '2026-09-01 19:24'
+updated_date: '2026-09-01 19:26'
 labels:
   - audit
   - fsexplorer

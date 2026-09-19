@@ -1,81 +1,78 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-07-26T22:31:55.108Z
-> Files: 544 tracked | Anatomy hits: 0 | Misses: 0
-
-## ../../../Claude/Projects/Kluis/06-claude/
-
-- `kb-calibrate-set.json` (~1348 tok)
-
-## ../LLmWiki-KennisBank/
-
-- `CHANGELOG.md` — Changelog (~9526 tok)
-- `CONFIGURATION.md` — CONFIGURATION (~9715 tok)
-
-## ../LLmWiki-KennisBank/scripts/
-
-- `_hooks_manifest.py` — _hooks_manifest.py - de canonieke lijst van KennisBank-hooks. (~348 tok)
-- `_rank.py` — _rank.py - retrieval-scoring: relevance x recency x importance + graafbuur. (~1630 tok)
-- `_usage.py` — _usage.py - usage-telemetrie voor de retrieval-feedbackloop. (~1477 tok)
-- `kb-calibrate.py` — kb-calibrate.py - drempel-kalibratie voor het actieve embeddingmodel. (~2178 tok)
-- `kb-recall.py` — kb-recall.py - geheugen-recall over kb-index.db (lokaal, fail-soft). (~1802 tok)
-- `kb-retrieve.py` — UserPromptSubmit hook: inject relevant KennisBank wiki snippets for a prompt. (~2529 tok)
-- `kb-usage-scan.py` — SessionEnd hook: sluit de retrieval-feedbackloop. (~1063 tok)
-- `stale-check.py` — parse_frontmatter, parse_date, load_sessie_dates, mentions_article (~1620 tok)
-
-## ../LLmWiki-KennisBank/tests/
-
-- `test_kb_calibrate.py` — Tests voor scripts/kb-calibrate.py - drempel-kalibratie (pure functies). (~821 tok)
-- `test_usage.py` — Tests voor scripts/_usage.py en kb-usage-scan.py - de retrieval-feedbackloop. (~1447 tok)
+> Auto-maintained by OpenWolf. Last scanned: 2026-08-24T04:00:14.094Z
+> Files: 538 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
+- `.bb-diag.log` (~0 tok)
 - `.codex` (~0 tok)
 - `.gitattributes` — Git attributes (~139 tok)
-- `.gitignore` — Git ignore rules (~677 tok)
+- `.gitignore` — Git ignore rules (~865 tok)
 - `.gitmodules` (~164 tok)
 - `.mcp.json` (~56 tok)
 - `.tmp_esp32_build.log` (~11793 tok)
 - `AGENTS.md` — OTGW-firmware: Codex Agent Instructions (~10728 tok)
 - `AUTHORS` — Authors (~19 tok)
-- `build.bat` (~1617 tok)
-- `build.py` — Colors: asset_slug, disable, print_step, print_success + 7 more (~32176 tok)
+- `build.bat` (~2156 tok)
+- `build.py` — Colors: asset_slug, disable, print_step, print_success + 7 more (~33360 tok)
 - `build.sh` (~1576 tok)
-- `CHANGELOG.md` — Change log (~8375 tok)
-- `CLAUDE.md` — OpenWolf (~10033 tok)
+- `CHANGELOG.md` — Change log (~8497 tok)
+- `CLAUDE.md` — OpenWolf (~11430 tok)
 - `config.py` — Base Paths (~268 tok)
-- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 more (~47028 tok)
+- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 more (~48699 tok)
 - `flash_esp.py` — Colors: disable, print_header, print_success, print_error + 10 more (~10963 tok)
-- `flash_otgw.bat` (~2804 tok)
+- `flash_otgw.bat` (~3987 tok)
 - `flash_otgw.sh` — flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware (Linux/macOS) (~3385 tok)
-- `LICENSE` — Project license (~295 tok)
+- `LICENSE` — Project license (~9374 tok)
 - `Makefile` — Make build targets (~2037 tok)
 - `partitions_otgw_esp32_combo.csv` — OTGW-firmware ESP32-S3 COMBO partition table — single app (no OTA), 4MB flash (~364 tok)
 - `partitions_otgw_esp32.csv` — OTGW-firmware ESP32-S3 partition table — single app (no OTA), 4MB flash (~275 tok)
-- `platformio.ini` — Declares used (~3999 tok)
-- `README.md` — Project documentation (~5272 tok)
+- `platformio.ini` — Declares used (~4646 tok)
+- `README.md` — Project documentation (~5365 tok)
 
-## .build-venv/
+## .build-python/
 
-- `.gitignore` — Git ignore rules (~19 tok)
-- `pyvenv.cfg` (~93 tok)
+- `_asyncio.pyd` (~19556 tok)
+- `_bz2.pyd` (~22819 tok)
+- `_ctypes.pyd` (~33651 tok)
+- `_decimal.pyd` (~69018 tok)
+- `_elementtree.pyd` (~35527 tok)
+- `_hashlib.pyd` (~18171 tok)
+- `_lzma.pyd` (~42234 tok)
+- `_msi.pyd` (~12276 tok)
+- `_multiprocessing.pyd` (~9832 tok)
+- `_overlapped.pyd` (~15102 tok)
+- `_queue.pyd` (~8880 tok)
+- `_socket.pyd` (~22596 tok)
+- `_sqlite3.pyd` (~33281 tok)
+- `_ssl.pyd` (~47488 tok)
+- `_uuid.pyd` (~7109 tok)
+- `_wmi.pyd` (~10597 tok)
+- `_zoneinfo.pyd` (~13084 tok)
+- `LICENSE.txt` (~9219 tok)
+- `pyexpat.pyd` (~53993 tok)
+- `python.cat` (~149648 tok)
+- `python312._pth` (~36 tok)
+- `select.pyd` (~8696 tok)
+- `winsound.pyd` (~8331 tok)
 
-## .build-venv/Lib/site-packages/
+## .build-python/Lib/site-packages/
 
-- `_cffi_backend.cp314-win_amd64.pyd` (~48038 tok)
+- `_cffi_backend.cp312-win_amd64.pyd` (~48028 tok)
 - `distutils-precedence.pth` (~41 tok)
 - `reedsolo.py` — -*- coding: utf-8 -*- (~20281 tok)
 
-## .build-venv/Lib/site-packages/_distutils_hack/
+## .build-python/Lib/site-packages/_distutils_hack/
 
 - `__init__.py` — don't import any costly modules (~1930 tok)
 - `override.py` (~13 tok)
 
-## .build-venv/Lib/site-packages/_yaml/
+## .build-python/Lib/site-packages/_yaml/
 
 - `__init__.py` — This is a stub package designed to roughly emulate the _yaml (~401 tok)
 
-## .build-venv/Lib/site-packages/bitarray-3.8.2.dist-info/
+## .build-python/Lib/site-packages/bitarray-3.8.2.dist-info/
 
 - `INSTALLER` (~2 tok)
 - `METADATA` — Declares which (~9413 tok)
@@ -83,16 +80,16 @@
 - `top_level.txt` (~3 tok)
 - `WHEEL` (~27 tok)
 
-## .build-venv/Lib/site-packages/bitarray-3.8.2.dist-info/licenses/
+## .build-python/Lib/site-packages/bitarray-3.8.2.dist-info/licenses/
 
 - `LICENSE` — Project license (~656 tok)
 
-## .build-venv/Lib/site-packages/bitarray/
+## .build-python/Lib/site-packages/bitarray/
 
 - `__init__.py` — frozenbitarray: test (~664 tok)
 - `__init__.pyi` — This stub, as well as util.pyi, are tested with Python 3.10 and mypy 1.11.2 (~1539 tok)
-- `_bitarray.cp314-win_amd64.pyd` (~18152 tok)
-- `_util.cp314-win_amd64.pyd` (~12326 tok)
+- `_bitarray.cp312-win_amd64.pyd` (~18969 tok)
+- `_util.cp312-win_amd64.pyd` (~13002 tok)
 - `bitarray.h` — Declares char (~3194 tok)
 - `py.typed` (~0 tok)
 - `pythoncapi_compat.h` — Header file providing new C API functions to old Python versions. (~21888 tok)
@@ -102,7 +99,7 @@
 - `util.py` — bitarray is published under the PSF license. (~6240 tok)
 - `util.pyi` (~809 tok)
 
-## .build-venv/Lib/site-packages/bitstring-4.4.0.dist-info/
+## .build-python/Lib/site-packages/bitstring-4.4.0.dist-info/
 
 - `INSTALLER` (~2 tok)
 - `METADATA` — Declares as (~1497 tok)
@@ -110,11 +107,11 @@
 - `top_level.txt` (~3 tok)
 - `WHEEL` (~25 tok)
 
-## .build-venv/Lib/site-packages/bitstring-4.4.0.dist-info/licenses/
+## .build-python/Lib/site-packages/bitstring-4.4.0.dist-info/licenses/
 
 - `LICENSE` — Project license (~297 tok)
 
-## .build-venv/Lib/site-packages/bitstring/
+## .build-python/Lib/site-packages/bitstring/
 
 - `__init__.py` — returns: bytealigned, bytealigned, lsb0, lsb0 + 19 more (~4194 tok)
 - `__main__.py` — main (~474 tok)
@@ -138,7 +135,7 @@
 - `py.typed` (~0 tok)
 - `utils.py` — A token name followed by optional : then an integer number (~2700 tok)
 
-## .build-venv/Lib/site-packages/cffi-2.0.0.dist-info/
+## .build-python/Lib/site-packages/cffi-2.0.0.dist-info/
 
 - `entry_points.txt` (~19 tok)
 - `INSTALLER` (~2 tok)
@@ -147,12 +144,12 @@
 - `top_level.txt` (~5 tok)
 - `WHEEL` (~27 tok)
 
-## .build-venv/Lib/site-packages/cffi-2.0.0.dist-info/licenses/
+## .build-python/Lib/site-packages/cffi-2.0.0.dist-info/licenses/
 
 - `AUTHORS` (~56 tok)
 - `LICENSE` — Project license (~300 tok)
 
-## .build-venv/Lib/site-packages/cffi/
+## .build-python/Lib/site-packages/cffi/
 
 - `__init__.py` (~146 tok)
 - `_cffi_errors.h` — ifndef CFFI_MESSAGEBOX (~1117 tok)
@@ -177,87 +174,25 @@
 - `vengine_gen.py` — DEPRECATED: implementation for ffi.verify() (~7697 tok)
 - `verifier.py` — DEPRECATED: implementation for ffi.verify() (~3195 tok)
 
-## .build-venv/Lib/site-packages/click-8.4.2.dist-info/
-
-- `INSTALLER` (~2 tok)
-- `METADATA` — Declares toolkit (~699 tok)
-- `RECORD` (~676 tok)
-- `WHEEL` (~22 tok)
-
-## .build-venv/Lib/site-packages/click-8.4.2.dist-info/licenses/
-
-- `LICENSE.txt` (~369 tok)
-
-## .build-venv/Lib/site-packages/click/
-
-- `__init__.py` (~1324 tok)
-- `_compat.py` — URL configuration (~5394 tok)
-- `_termui_impl.py` — _BufferedTextPagerStream: render_finish, pct, time_per_iteration, eta + 10 more (~9066 tok)
-- `_textwrap.py` — TextWrapper: extra_indent, indent_only (~1792 tok)
-- `_utils.py` — Declares import (~285 tok)
-- `_winconsole.py` — This module is based on the excellent work by Adam Bartoš who (~2441 tok)
-- `core.py` — ParameterSource: batch, augment_usage_errors, iter_params_for_processing, sort_key (~40176 tok)
-- `decorators.py` — to: pass_context, new_func, pass_obj, new_func + 24 more (~5632 tok)
-- `exceptions.py` — ClickException: format_message, show, show, format_message + 5 more (~3390 tok)
-- `formatting.py` — Can force a width.  This is used by the test system (~2984 tok)
-- `globals.py` — get_current_context, get_current_context, get_current_context, push_context + 2 more (~550 tok)
-- `parser.py` — _Option: takes_value, process, process, add_option + 2 more (~5444 tok)
-- `py.typed` (~0 tok)
-- `shell_completion.py` — CompletionItem: shell_complete, func_name, source_vars, source + 9 more (~6463 tok)
-- `termui.py` — hidden_prompt_func, prompt, prompt_func, confirm + 4 more (~9490 tok)
-- `testing.py` — EchoingStdin: read, read1, readline, readlines + 14 more (~7560 tok)
-- `types.py` — ParamTypeInfoDict: to_info_dict, get_metavar, get_missing_message, convert + 11 more (~12797 tok)
-- `utils.py` — URL configuration (~5983 tok)
-
-## .build-venv/Lib/site-packages/colorama-0.4.6.dist-info/
-
-- `INSTALLER` (~2 tok)
-- `METADATA` — multiple: all (~4574 tok)
-- `RECORD` (~580 tok)
-- `WHEEL` (~28 tok)
-
-## .build-venv/Lib/site-packages/colorama-0.4.6.dist-info/licenses/
-
-- `LICENSE.txt` (~373 tok)
-
-## .build-venv/Lib/site-packages/colorama/
-
-- `__init__.py` (~76 tok)
-- `ansi.py` — AnsiCodes: code_to_chars, set_title, clear_screen, clear_line + 5 more (~721 tok)
-- `ansitowin32.py` — StreamWrapper: write, isatty, closed, should_wrap + 10 more (~3180 tok)
-- `initialise.py` — reset_all, init, deinit, just_fix_windows_console + 3 more (~950 tok)
-- `win32.py` — from winbase.h (~1766 tok)
-- `winterm.py` — WinColor: get_osfhandle, get_attrs, set_attrs, reset_all + 11 more (~2039 tok)
-
-## .build-venv/Lib/site-packages/colorama/tests/
-
-- `__init__.py` (~22 tok)
-- `ansi_test.py` — Test file (~812 tok)
-- `ansitowin32_test.py` — Tests: closed_shouldnt_raise_on_closed_stream, closed_shouldnt_raise_on_detached_stream, reset_all_shouldnt_raise_on_closed_orig_stdout, wrap_shoul... (~3051 tok)
-- `initialise_test.py` — Test file (~1926 tok)
-- `isatty_test.py` — Tests: TTY, nonTTY, withPycharm, withPycharmTTYOverride + 3 more (~534 tok)
-- `utils.py` — StreamTTY: isatty, isatty, osname, replace_by + 2 more (~309 tok)
-- `winterm_test.py` — Test file (~1060 tok)
-
-## .build-venv/Lib/site-packages/cryptography-49.0.0.dist-info/
+## .build-python/Lib/site-packages/cryptography-49.0.0.dist-info/
 
 - `INSTALLER` (~2 tok)
 - `METADATA` (~1159 tok)
 - `RECORD` (~4669 tok)
 - `WHEEL` (~26 tok)
 
-## .build-venv/Lib/site-packages/cryptography-49.0.0.dist-info/licenses/
+## .build-python/Lib/site-packages/cryptography-49.0.0.dist-info/licenses/
 
 - `LICENSE` — Project license (~53 tok)
 - `LICENSE.APACHE` — Declares name (~3030 tok)
 - `LICENSE.BSD` (~409 tok)
 
-## .build-venv/Lib/site-packages/cryptography-49.0.0.dist-info/sboms/
+## .build-python/Lib/site-packages/cryptography-49.0.0.dist-info/sboms/
 
 - `cryptography-rust.cyclonedx.json` (~13027 tok)
 - `sbom.json` (~350 tok)
 
-## .build-venv/Lib/site-packages/cryptography/
+## .build-python/Lib/site-packages/cryptography/
 
 - `__about__.py` — This file is dual licensed under the terms of the Apache License, Version (~128 tok)
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~104 tok)
@@ -266,30 +201,30 @@
 - `py.typed` (~0 tok)
 - `utils.py` — This file is dual licensed under the terms of the Apache License, Version (~1224 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/
+## .build-python/Lib/site-packages/cryptography/hazmat/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~130 tok)
 - `_oid.py` — This file is dual licensed under the terms of the Apache License, Version (~5109 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/asn1/
+## .build-python/Lib/site-packages/cryptography/hazmat/asn1/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~222 tok)
 - `asn1.py` — This file is dual licensed under the terms of the Apache License, Version (~5472 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/backends/
+## .build-python/Lib/site-packages/cryptography/hazmat/backends/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~104 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/backends/openssl/
+## .build-python/Lib/site-packages/cryptography/hazmat/backends/openssl/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~88 tok)
 - `backend.py` — This file is dual licensed under the terms of the Apache License, Version (~3026 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/bindings/
+## .build-python/Lib/site-packages/cryptography/hazmat/bindings/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~52 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/bindings/_rust/
+## .build-python/Lib/site-packages/cryptography/hazmat/bindings/_rust/
 
 - `__init__.pyi` — This file is dual licensed under the terms of the Apache License, Version (~610 tok)
 - `_openssl.pyi` — This file is dual licensed under the terms of the Apache License, Version (~61 tok)
@@ -302,7 +237,7 @@
 - `test_support.pyi` — This file is dual licensed under the terms of the Apache License, Version (~202 tok)
 - `x509.pyi` — This file is dual licensed under the terms of the Apache License, Version (~2722 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/bindings/_rust/openssl/
+## .build-python/Lib/site-packages/cryptography/hazmat/bindings/_rust/openssl/
 
 - `__init__.pyi` — This file is dual licensed under the terms of the Apache License, Version (~414 tok)
 - `aead.pyi` — This file is dual licensed under the terms of the Apache License, Version (~1222 tok)
@@ -325,23 +260,23 @@
 - `x25519.pyi` — This file is dual licensed under the terms of the Apache License, Version (~140 tok)
 - `x448.pyi` — This file is dual licensed under the terms of the Apache License, Version (~135 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/bindings/openssl/
+## .build-python/Lib/site-packages/cryptography/hazmat/bindings/openssl/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~52 tok)
 - `_conditional.py` — This file is dual licensed under the terms of the Apache License, Version (~1604 tok)
 - `binding.py` — This file is dual licensed under the terms of the Apache License, Version (~1059 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/decrepit/
+## .build-python/Lib/site-packages/cryptography/hazmat/decrepit/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~62 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/decrepit/ciphers/
+## .build-python/Lib/site-packages/cryptography/hazmat/decrepit/ciphers/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~62 tok)
 - `algorithms.py` — This file is dual licensed under the terms of the Apache License, Version (~1019 tok)
 - `modes.py` — This file is dual licensed under the terms of the Apache License, Version (~472 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/primitives/
+## .build-python/Lib/site-packages/cryptography/hazmat/primitives/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~52 tok)
 - `_asymmetric.py` — This file is dual licensed under the terms of the Apache License, Version (~152 tok)
@@ -357,7 +292,7 @@
 - `padding.py` — This file is dual licensed under the terms of the Apache License, Version (~533 tok)
 - `poly1305.py` — This file is dual licensed under the terms of the Apache License, Version (~102 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/primitives/asymmetric/
+## .build-python/Lib/site-packages/cryptography/hazmat/primitives/asymmetric/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~52 tok)
 - `dh.py` — This file is dual licensed under the terms of the Apache License, Version (~1118 tok)
@@ -374,7 +309,7 @@
 - `x25519.py` — This file is dual licensed under the terms of the Apache License, Version (~1111 tok)
 - `x448.py` — This file is dual licensed under the terms of the Apache License, Version (~1118 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/primitives/ciphers/
+## .build-python/Lib/site-packages/cryptography/hazmat/primitives/ciphers/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~195 tok)
 - `aead.py` — This file is dual licensed under the terms of the Apache License, Version (~182 tok)
@@ -382,7 +317,7 @@
 - `base.py` — This file is dual licensed under the terms of the Apache License, Version (~1216 tok)
 - `modes.py` — This file is dual licensed under the terms of the Apache License, Version (~1714 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/primitives/kdf/
+## .build-python/Lib/site-packages/cryptography/hazmat/primitives/kdf/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~297 tok)
 - `argon2.py` — This file is dual licensed under the terms of the Apache License, Version (~181 tok)
@@ -393,7 +328,7 @@
 - `scrypt.py` — This file is dual licensed under the terms of the Apache License, Version (~169 tok)
 - `x963kdf.py` — This file is dual licensed under the terms of the Apache License, Version (~131 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/primitives/serialization/
+## .build-python/Lib/site-packages/cryptography/hazmat/primitives/serialization/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~488 tok)
 - `base.py` — This file is dual licensed under the terms of the Apache License, Version (~176 tok)
@@ -401,13 +336,13 @@
 - `pkcs7.py` — This file is dual licensed under the terms of the Apache License, Version (~4000 tok)
 - `ssh.py` — This file is dual licensed under the terms of the Apache License, Version (~15369 tok)
 
-## .build-venv/Lib/site-packages/cryptography/hazmat/primitives/twofactor/
+## .build-python/Lib/site-packages/cryptography/hazmat/primitives/twofactor/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~74 tok)
 - `hotp.py` — This file is dual licensed under the terms of the Apache License, Version (~931 tok)
 - `totp.py` — This file is dual licensed under the terms of the Apache License, Version (~472 tok)
 
-## .build-venv/Lib/site-packages/cryptography/x509/
+## .build-python/Lib/site-packages/cryptography/x509/
 
 - `__init__.py` — This file is dual licensed under the terms of the Apache License, Version (~2364 tok)
 - `base.py` — This file is dual licensed under the terms of the Apache License, Version (~7731 tok)
@@ -419,21 +354,21 @@
 - `oid.py` — This file is dual licensed under the terms of the Apache License, Version (~266 tok)
 - `verification.py` — This file is dual licensed under the terms of the Apache License, Version (~274 tok)
 
-## .build-venv/Lib/site-packages/esp_rfc2217_server/
+## .build-python/Lib/site-packages/esp_rfc2217_server/
 
 - `__init__.py` — SPDX-FileCopyrightText: 2009-2015 Chris Liechti (~1351 tok)
 - `__main__.py` — SPDX-FileCopyrightText: 2014-2024 Fredrik Ahlberg, Angus Gratton, (~76 tok)
 - `esp_port_manager.py` — SPDX-FileCopyrightText: 2014-2024 Fredrik Ahlberg, Angus Gratton, (~1031 tok)
 - `redirector.py` — SPDX-FileCopyrightText: 2014-2024 Fredrik Ahlberg, Angus Gratton, (~883 tok)
 
-## .build-venv/Lib/site-packages/espefuse/
+## .build-python/Lib/site-packages/espefuse/
 
 - `__init__.py` — SPDX-FileCopyrightText: 2016-2025 Espressif Systems (Shanghai) CO LTD (~2054 tok)
 - `__main__.py` — SPDX-FileCopyrightText: 2016-2022 Espressif Systems (Shanghai) CO LTD (~53 tok)
 - `cli_util.py` — SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD (~2633 tok)
 - `efuse_interface.py` — SPDX-FileCopyrightText: 2025 Espressif Systems (Shanghai) CO LTD (~2126 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/
+## .build-python/Lib/site-packages/espefuse/efuse/
 
 - `__init__.py` (~0 tok)
 - `base_fields.py` — This file describes the common eFuses structures for chips (~14470 tok)
@@ -443,7 +378,7 @@
 - `mem_definition_base.py` — This file describes eFuses fields and registers for ESP32 chip (~2874 tok)
 - `util.py` — This file consists of the common useful functions for eFuse (~590 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32/
 
 - `__init__.py` (~44 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32 chip (~1572 tok)
@@ -451,7 +386,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32 chip (~1814 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32 chip (~3589 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32c2/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32c2/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-C2 chip (~1106 tok)
@@ -459,7 +394,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-C2 chip (~1611 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-C2 chip (~3352 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32c3/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32c3/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-C3 chip (~965 tok)
@@ -467,7 +402,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-C3 chip (~2176 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-C3 chip (~3699 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32c5/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32c5/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-C5 chip (~964 tok)
@@ -475,7 +410,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-C5 chip (~2168 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-C5 chip (~3436 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32c6/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32c6/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-C6 chip (~964 tok)
@@ -483,7 +418,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-C6 chip (~1925 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-C6 chip (~3866 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32c61/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32c61/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-C61 chip (~964 tok)
@@ -491,7 +426,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-C61 chip (~1820 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-C61 chip (~3453 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32e22/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32e22/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-E22 chip (~966 tok)
@@ -499,7 +434,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-E22 chip (~1821 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-E22 chip (~3298 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32h2/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32h2/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-H2 chip (~957 tok)
@@ -507,7 +442,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-H2 chip (~1948 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-H2 chip (~4026 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32h21/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32h21/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-H21 chip (~958 tok)
@@ -515,7 +450,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-H21 chip (~1926 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-H21 chip (~3378 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32h4/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32h4/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-H4 chip (~957 tok)
@@ -523,7 +458,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-H4 chip (~1946 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-H4 chip (~3396 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32p4/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32p4/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-P4 chip (~964 tok)
@@ -531,7 +466,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-P4 chip (~2144 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-P4 chip (~3473 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32s2/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32s2/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-S2 chip (~969 tok)
@@ -539,7 +474,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32 chip (~2344 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32S2 chip (~4618 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32s3/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32s3/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-S3 chip (~959 tok)
@@ -547,7 +482,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-S3 chip (~2043 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-S3 chip (~4658 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse/esp32s31/
+## .build-python/Lib/site-packages/espefuse/efuse/esp32s31/
 
 - `__init__.py` (~45 tok)
 - `emulate_efuse_controller.py` — This file describes eFuses controller for ESP32-S31 chip (~937 tok)
@@ -555,7 +490,7 @@
 - `mem_definition.py` — This file describes eFuses fields and registers for ESP32-S31 chip (~1831 tok)
 - `operations.py` — This file includes the operations with eFuses for ESP32-S31 chip (~3397 tok)
 
-## .build-venv/Lib/site-packages/espefuse/efuse_defs/
+## .build-python/Lib/site-packages/espefuse/efuse_defs/
 
 - `esp32.yaml` (~5243 tok)
 - `esp32c2.yaml` (~4685 tok)
@@ -574,17 +509,17 @@
 - `esp32s3.yaml` — Declares that (~12122 tok)
 - `esp32s31.yaml` — Declares of (~13498 tok)
 
-## .build-venv/Lib/site-packages/espsecure/
+## .build-python/Lib/site-packages/espsecure/
 
 - `__init__.py` — SPDX-FileCopyrightText: 2016-2025 Espressif Systems (Shanghai) CO LTD (~19940 tok)
 - `__main__.py` — SPDX-FileCopyrightText: 2016-2022 Espressif Systems (Shanghai) CO LTD (~54 tok)
 
-## .build-venv/Lib/site-packages/espsecure/esp_hsm_sign/
+## .build-python/Lib/site-packages/espsecure/esp_hsm_sign/
 
 - `__init__.py` — SPDX-FileCopyrightText: 2023-2025 Espressif Systems (Shanghai) CO LTD (~1943 tok)
 - `exceptions.py` — SPDX-FileCopyrightText: 2023-2025 Espressif Systems (Shanghai) CO LTD (~595 tok)
 
-## .build-venv/Lib/site-packages/esptool-5.3.1.dist-info/
+## .build-python/Lib/site-packages/esptool-5.3.1.dist-info/
 
 - `entry_points.txt` (~87 tok)
 - `INSTALLER` (~2 tok)
@@ -594,11 +529,11 @@
 - `top_level.txt` (~12 tok)
 - `WHEEL` (~25 tok)
 
-## .build-venv/Lib/site-packages/esptool-5.3.1.dist-info/licenses/
+## .build-python/Lib/site-packages/esptool-5.3.1.dist-info/licenses/
 
 - `LICENSE` — Project license (~4825 tok)
 
-## .build-venv/Lib/site-packages/esptool/
+## .build-python/Lib/site-packages/esptool/
 
 - `__init__.py` — SPDX-FileCopyrightText: 2014-2025 Fredrik Ahlberg, Angus Gratton, (~12259 tok)
 - `__main__.py` — SPDX-FileCopyrightText: 2014-2022 Fredrik Ahlberg, Angus Gratton, (~71 tok)
@@ -612,7 +547,7 @@
 - `uf2_writer.py` — SPDX-FileCopyrightText: 2020-2025 Espressif Systems (Shanghai) CO LTD (~845 tok)
 - `util.py` — SPDX-FileCopyrightText: 2014-2025 Fredrik Ahlberg, Angus Gratton, (~2502 tok)
 
-## .build-venv/Lib/site-packages/esptool/targets/
+## .build-python/Lib/site-packages/esptool/targets/
 
 - `__init__.py` (~281 tok)
 - `esp32.py` — SPDX-FileCopyrightText: 2014-2025 Fredrik Ahlberg, Angus Gratton, (~4666 tok)
@@ -631,7 +566,7 @@
 - `esp32s31.py` — SPDX-FileCopyrightText: 2025-2026 Fredrik Ahlberg, Angus Gratton, (~2416 tok)
 - `esp8266.py` — SPDX-FileCopyrightText: 2014-2025 Fredrik Ahlberg, Angus Gratton, (~1563 tok)
 
-## .build-venv/Lib/site-packages/esptool/targets/stub_flasher/1/
+## .build-python/Lib/site-packages/esptool/targets/stub_flasher/1/
 
 - `esp32.json` (~1451 tok)
 - `esp32c2.json` (~1384 tok)
@@ -645,7 +580,7 @@
 - `esp8266.json` (~3488 tok)
 - `README.md` — Project documentation (~74 tok)
 
-## .build-venv/Lib/site-packages/esptool/targets/stub_flasher/2/
+## .build-python/Lib/site-packages/esptool/targets/stub_flasher/2/
 
 - `esp32.json` (~2463 tok)
 - `esp32c2.json` (~2415 tok)
@@ -665,7 +600,7 @@
 - `LICENSE-MIT` (~292 tok)
 - `README.md` — Project documentation (~69 tok)
 
-## .build-venv/Lib/site-packages/intelhex-2.3.0.dist-info/
+## .build-python/Lib/site-packages/intelhex-2.3.0.dist-info/
 
 - `AUTHORS.rst` (~143 tok)
 - `INSTALLER` (~2 tok)
@@ -675,7 +610,7 @@
 - `top_level.txt` (~3 tok)
 - `WHEEL` (~30 tok)
 
-## .build-venv/Lib/site-packages/intelhex/
+## .build-python/Lib/site-packages/intelhex/
 
 - `__init__.py` — Intel HEX format manipulation library. (~14887 tok)
 - `__main__.py` — All rights reserved. (~536 tok)
@@ -685,7 +620,7 @@
 - `getsizeof.py` — Recursive version sys.getsizeof(). Extendable with custom handlers. (~622 tok)
 - `test.py` — Test suite for IntelHex library. (~20185 tok)
 
-## .build-venv/Lib/site-packages/markdown_it/
+## .build-python/Lib/site-packages/markdown_it/
 
 - `__init__.py` — A Python port of Markdown-It (~33 tok)
 - `_compat.py` (~10 tok)
@@ -702,12 +637,12 @@
 - `tree.py` — A tree representation of a linear markdown-it token stream. (~3175 tok)
 - `utils.py` — OptionsType: maxNesting, maxNesting, html, html + 15 more (~1755 tok)
 
-## .build-venv/Lib/site-packages/markdown_it/cli/
+## .build-python/Lib/site-packages/markdown_it/cli/
 
 - `__init__.py` (~0 tok)
 - `parse.py` — main, convert, convert_stdin, convert_file + 3 more (~961 tok)
 
-## .build-venv/Lib/site-packages/markdown_it/common/
+## .build-python/Lib/site-packages/markdown_it/common/
 
 - `__init__.py` (~0 tok)
 - `entities.py` — HTML5 entities map: { name -> characters }. (~45 tok)
@@ -716,21 +651,21 @@
 - `normalize_url.py` — normalizeLink, normalizeLinkText, validateLink (~734 tok)
 - `utils.py` — Utilities for parsing source text (~2488 tok)
 
-## .build-venv/Lib/site-packages/markdown_it/helpers/
+## .build-python/Lib/site-packages/markdown_it/helpers/
 
 - `__init__.py` — Functions for parsing Links (~73 tok)
 - `parse_link_destination.py` — _Result: parseLinkDestination (~545 tok)
 - `parse_link_label.py` — parseLinkLabel (~297 tok)
 - `parse_link_title.py` — Parse link title (~650 tok)
 
-## .build-venv/Lib/site-packages/markdown_it/presets/
+## .build-python/Lib/site-packages/markdown_it/presets/
 
 - `__init__.py` — gfm_like: make, make (~453 tok)
 - `commonmark.py` — Commonmark default options. (~812 tok)
 - `default.py` — markdown-it default options. (~510 tok)
 - `zero.py` — make (~596 tok)
 
-## .build-venv/Lib/site-packages/markdown_it/rules_block/
+## .build-python/Lib/site-packages/markdown_it/rules_block/
 
 - `__init__.py` (~170 tok)
 - `blockquote.py` — Block quotes (~3288 tok)
@@ -746,7 +681,7 @@
 - `state_block.py` — StateBlock: push, isEmpty, skipEmptyLines, skipSpaces + 7 more (~2407 tok)
 - `table.py` — GFM table, https://github.github.com/gfm/#tables-extension- (~2195 tok)
 
-## .build-venv/Lib/site-packages/markdown_it/rules_core/
+## .build-python/Lib/site-packages/markdown_it/rules_core/
 
 - `__init__.py` (~113 tok)
 - `block.py` — block (~107 tok)
@@ -758,7 +693,7 @@
 - `state_core.py` — Declares StateCore (~163 tok)
 - `text_join.py` — Join raw text tokens with the rest of the text (~571 tok)
 
-## .build-venv/Lib/site-packages/markdown_it/rules_inline/
+## .build-python/Lib/site-packages/markdown_it/rules_inline/
 
 - `__init__.py` (~199 tok)
 - `autolink.py` — Process autolinks '<protocol:...>' (~590 tok)
@@ -777,7 +712,7 @@
 - `strikethrough.py` — ~~strike through~~ (and optionally ~single tilde~) (~1477 tok)
 - `text.py` — Skip text characters for text token, place those to pending buffer (~160 tok)
 
-## .build-venv/Lib/site-packages/markdown_it_py-4.2.0.dist-info/
+## .build-python/Lib/site-packages/markdown_it_py-4.2.0.dist-info/
 
 - `entry_points.txt` (~15 tok)
 - `INSTALLER` (~2 tok)
@@ -785,28 +720,57 @@
 - `RECORD` (~2895 tok)
 - `WHEEL` (~22 tok)
 
-## .build-venv/Lib/site-packages/markdown_it_py-4.2.0.dist-info/licenses/
+## .build-python/Lib/site-packages/markdown_it_py-4.2.0.dist-info/licenses/
 
 - `LICENSE` — Project license (~288 tok)
 - `LICENSE.markdown-it` (~287 tok)
 
-## .build-venv/Lib/site-packages/mdurl/
+## .build-python/Lib/site-packages/mdurl-0.1.2.dist-info/
+
+- `INSTALLER` (~2 tok)
+- `LICENSE` — Project license (~624 tok)
+- `METADATA` (~437 tok)
+- `RECORD` (~308 tok)
+- `WHEEL` (~22 tok)
+
+## .build-python/Lib/site-packages/mdurl/
 
 - `__init__.py` (~157 tok)
 - `_decode.py` — get_decode_cache, decode, repl_func_with_cache (~859 tok)
 - `_encode.py` — get_encode_cache, encode (~744 tok)
 - `_format.py` — format (~179 tok)
+- `_parse.py` — Permission is hereby granted, free of charge, to any person obtaining a (~3250 tok)
+- `_url.py` — Declares URL (~82 tok)
+- `py.typed` — Marker file for PEP 561 (~7 tok)
 
-## docs/
+## .build-python/Lib/site-packages/pip/
 
-- `daily-issue-report.md` — Daily Issue Report — 2026-07-11 (~169 tok)
+- `__init__.py` — main (~102 tok)
+- `__main__.py` — Remove '' and current working directory from the first entry (~250 tok)
+- `__pip-runner__.py` — Execute exactly this copy of pip, within a different environment. (~415 tok)
+- `py.typed` (~77 tok)
 
-## src/OTGW-firmware/
+## .build-python/Lib/site-packages/pip/_internal/
 
-- `restAPI.ino` — include <string.h> (~57341 tok)
+- `__init__.py` — init_logging() must be called before any call to logging.getLogger() (~146 tok)
+- `build_env.py` — Build Environment used for isolation during sdist building (~6261 tok)
+- `cache.py` — Cache Management (~2956 tok)
+- `configuration.py` — Configuration management setup (~4163 tok)
+- `exceptions.py` — Exceptions used throughout package. (~9188 tok)
+- `main.py` — main (~97 tok)
+- `pyproject.py` — URL configuration (~1302 tok)
+- `self_outdated_check.py` — View: get (~2314 tok)
+- `wheel_builder.py` — Orchestrator for building wheels from InstallRequirements. (~2575 tok)
 
-## src/OTGW-firmware/data/
+## .build-python/Lib/site-packages/pip/_internal/cli/
 
-- `v2.css` — Styles: 13 vars (~15274 tok)
-- `v2.html` — OTGW firmware (~11760 tok)
-- `v2.js` — applyTheme: initTheme, showPage, showDesign + 8 more (~62571 tok)
+- `__init__.py` — Subpackage containing all of pip's command line interface related code (~38 tok)
+- `autocompletion.py` — Logic that powers autocompletion installed by ``pip completion``. (~2056 tok)
+- `base_command.py` — Base Command class, and related routines (~2737 tok)
+- `cmdoptions.py` — PipOption: raise_option_error, make_option_group, check_dist_restriction, check_build_constraints + 3 more (~10741 tok)
+- `command_context.py` — CommandContextMixIn: main_context, enter_context (~234 tok)
+- `index_command.py` — SessionCommandMixin: get_default_session, should_exclude_prerelease, pip_version_check (~2027 tok)
+- `main_parser.py` — A single place for constructing and exposing the main parser (~1258 tok)
+- `main.py` — Primary application entrypoint. (~897 tok)
+- `parser.py` — Base option parser setup (~3951 tok)
+- `progress_bars.py` — SQLAlchemy model (~1345 tok)

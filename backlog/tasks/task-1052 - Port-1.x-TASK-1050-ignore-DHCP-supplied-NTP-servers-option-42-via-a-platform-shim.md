@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-31 19:51'
-updated_date: '2026-08-03 18:36'
+updated_date: '2026-08-25 19:39'
 labels: []
 dependencies: []
 ordinal: 247000
@@ -81,4 +81,8 @@ NEW placement (under WiFi.mode(WIFI_STA) in startWiFi()): 1 ROM banner in 45s an
 CONSEQUENCE WORTH FLAGGING: dev has been boot-looping on ESP32-S3 for every build from alpha.348 (57177d910, 2026-07-31) through alpha.350. Any tester who flashed one of those got a device that never reaches setup(). Fixed from alpha.351 (3530b9b1).
 
 AC#6 STILL OPEN and unchanged. The bench board is provisioned for a 192.168.1.x network while this host sits on 192.168.88.x, so it is not reachable for a runtime SNTP inspection, and no DHCP server sending option 42 was involved in this test. What is proven is that the shim now RUNS instead of aborting; what is NOT proven is that a DHCP-offered NTP server is actually refused afterwards and stays refused across a forced lease renewal.
+
+2026-08-25 backlog sweep: code is implemented and committed on this branch; verified by git rather than by the task file. TASK-1068 and TASK-1069 both landed in a7e06f8df; TASK-1052's shim is at platform_esp32.h:234 with the call at networkStuff.ino:92. Every AC except the on-device one is met.
+
+Left In Progress deliberately. The remaining AC needs ESP32 hardware in the loop, which no amount of code reading can substitute for, and flipping the task to Done would claim a verification that never happened.
 <!-- SECTION:NOTES:END -->

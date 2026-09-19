@@ -1,11 +1,11 @@
 ---
 id: TASK-1113
 title: Highlight firmware table cells that actually changed after a web download
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-02 21:45'
-updated_date: '2026-09-02 22:03'
+updated_date: '2026-09-02 22:56'
 labels: []
 dependencies: []
 ordinal: 271000
@@ -24,7 +24,7 @@ Port of TASK-1110 on otgw-1.x.x, adapted because this branch diverged. pollPICRe
 - [x] #3 A cell whose value did not change is not highlighted, so a no-op refresh and an exhausted retry budget both stay visually quiet
 - [x] #4 The highlight is legible in both the light and the dark theme used by this branch
 - [x] #5 Repeated clicks restart the highlight rather than leaving a stuck or double-scheduled timer
-- [ ] #6 python build.py exits 0 for the default target and python evaluate.py --quick shows no new failures
+- [x] #6 python build.py exits 0 for the default target and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,6 +50,8 @@ Port of TASK-1110 on otgw-1.x.x, adapted because this branch diverged. pollPICRe
 - Verified: node --check src/OTGW-firmware/data/index.js clean. python tools/check_design_system_drift.py reports "OK - no drift", 0 referenced-but-undefined classes, so .firmware-cell-updated is properly defined for the ADR-091 gate. CSS brace balance went 383/383 to 384/384, exactly one new rule.
 - AC #6 left unchecked on purpose: the parent session owns the build (serial builds per worktree) and runs python build.py plus evaluate.py.
 - No browser verification this session: chrome-devtools, playwright and browser MCP servers all failed to connect.
+
+Build AC closed by the parent session on a quiet tree: same run as TASK-1112. build.bat green across all three ESP32 targets and their filesystem images, evaluate.py --quick 68/76 pass with 0 failed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

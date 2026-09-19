@@ -2661,5 +2661,21 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-08-03T20:35:00+02:00"
+  },
+  {
+    "id": "bug-152",
+    "timestamp": "2026-09-18T07:05:00+02:00",
+    "error_message": "cmd /c build.bat -> \"'build.bat' is not recognized as an internal or external command, operable program or batch file\" and exit 1, while dir build.bat in the same cmd session lists the file. Three build invocations lost to it.",
+    "file": "build.bat",
+    "root_cause": "The session environment sets NoDefaultCurrentDirectoryInExePath=1. cmd.exe then refuses to resolve a bare command name against the current directory, so a batch file in the cwd is invisible to the command resolver even though the file is there and cd /d succeeded. The error text blames the file, which sends you looking for a missing or corrupt build.bat instead of at the resolver.",
+    "fix": "Invoke the wrapper with an explicit relative or absolute path: cmd /c \"cd /d <repo> && .\\build.bat\". The leading .\\ bypasses the PATH-only resolution. Same applies to any bare .bat/.exe in the repo root (flash_otgw.bat, build.sh via sh).",
+    "tags": [
+      "build",
+      "windows",
+      "cmd",
+      "environment",
+      "tooling",
+      "false-alarm"
+    ]
   }
 ]

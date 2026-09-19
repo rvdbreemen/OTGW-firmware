@@ -1,11 +1,11 @@
 ---
 id: TASK-1105
 title: 'feat-2.0.0: port the FSexplorer audit fixes from the 1.x line'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-01 18:39'
-updated_date: '2026-09-01 19:24'
+updated_date: '2026-09-01 19:26'
 labels:
   - audit
   - fsexplorer

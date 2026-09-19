@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-18 04:54'
-updated_date: '2026-09-18 05:17'
+updated_date: '2026-09-18 05:22'
 labels:
   - bug
 dependencies: []
@@ -119,6 +119,16 @@ Literal 'Build completed successfully!' banner at build3.log:1047, wrapper exit 
 Note: esp32-combo fits here at 81.3%, so the known partition-overfit condition did not trigger on this build.
 
 Zero compile errors. The only warnings in the log are pre-existing AsyncTCP deprecation notices and the LTO serial-compilation note.
+
+Two premises in this task description, written by the 1.x side, were stale. Corrected by the implementer and recorded here so the description is not trusted as-is by a later reader:
+
+1. The task claimed OTDirect has its own topics, otgw-otdirect/boiler_connected and friends. It does not on 2.0.0. MQTTstuff.ino:1731-1736 records that ADR-084 removed the otgw-pic/* and otgw-otdirect/* duplicates; presence publishes only to the generic namespace.
+
+2. The task implied OTDirect feeds the parser on a separate path needing separate treatment. bridgeFrameToParser() (OTDirect.ino:702) does not call processOT() directly: it enqueues with OTFRAME_SRC_OTDIRECT and drainOTFrameQueue() feeds processOT(). Both sources therefore write the SAME two last-seen stamps, so one evaluation covers both by construction.
+
+What the 1.x side contributed back after reading this report:
+- On 1.x, state.otgw.bOnline has a SINGLE writer. The clear-only rule needed here because of OTDirect five extra writers is 2.0.0-specific and was deliberately not applied to 1.x.
+- The 1.x analogue of the dead TASK-565 edge is the HA climate entity: publishHvacMode() reserves hvac_mode off for a disconnected thermostat but could not reach it on a fully silent bus. Same class of finding, different consumer.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

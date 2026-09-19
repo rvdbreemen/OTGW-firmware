@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-08 15:43'
-updated_date: '2026-08-08 15:55'
+updated_date: '2026-08-25 19:39'
 labels:
   - bug
   - mqtt
@@ -31,3 +31,11 @@ Port of otgw-1.x.x TASK-1066, verified present on this branch: publishStatusVHBi
 - [x] #5 Behaviour matches the otgw-1.x.x implementation
 - [ ] #6 On-device verification that all four topics republish on their heartbeat (blocked: needs ESP32 hardware)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-08-25 backlog sweep: code is implemented and committed on this branch; verified by git rather than by the task file. TASK-1068 and TASK-1069 both landed in a7e06f8df; TASK-1052's shim is at platform_esp32.h:234 with the call at networkStuff.ino:92. Every AC except the on-device one is met.
+
+Left In Progress deliberately. The remaining AC needs ESP32 hardware in the loop, which no amount of code reading can substitute for, and flipping the task to Done would claim a verification that never happened.
+<!-- SECTION:NOTES:END -->

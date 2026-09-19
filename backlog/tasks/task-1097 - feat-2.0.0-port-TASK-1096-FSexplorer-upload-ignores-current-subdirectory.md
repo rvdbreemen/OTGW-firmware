@@ -1,11 +1,11 @@
 ---
 id: TASK-1097
 title: 'feat-2.0.0: port TASK-1096 - FSexplorer upload ignores current subdirectory'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-01 17:22'
-updated_date: '2026-09-01 17:41'
+updated_date: '2026-09-01 17:42'
 labels: []
 dependencies: []
 ordinal: 266000

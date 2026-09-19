@@ -3,11 +3,11 @@ id: TASK-1112
 title: >-
   PIC flash aborts when the WebSocket is unavailable instead of falling back to
   polling
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-02 21:44'
-updated_date: '2026-09-02 22:01'
+updated_date: '2026-09-02 22:56'
 labels: []
 dependencies: []
 ordinal: 270000
@@ -24,7 +24,7 @@ Port of TASK-1108 on otgw-1.x.x. performFlash() in data/index.js (around lines 8
 - [x] #1 The upgrade request is sent regardless of WebSocket state; a missing WebSocket degrades progress reporting to polling instead of blocking the flash
 - [x] #2 When the WebSocket is unavailable the UI says progress is tracked via polling, not that the operation failed
 - [x] #3 When the WebSocket is available it is still used for live progress, with polling as the failsafe
-- [ ] #4 python build.py exits 0 for the default target and python evaluate.py --quick shows no new failures
+- [x] #4 python build.py exits 0 for the default target and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -45,6 +45,8 @@ Port of TASK-1108 on otgw-1.x.x. performFlash() in data/index.js (around lines 8
 - Verified: node --check src/OTGW-firmware/data/index.js returned clean. python evaluate.py --quick exited 0 (68 passed, 1 warning, 0 failed) - but that run also covered another agent's in-flight .ino edits, so it is not a clean receipt for this task.
 - AC #4 left unchecked on purpose: firmware builds are serialised per worktree in this session and the parent session owns the build. The parent runs python build.py and evaluate.py.
 - No browser verification was possible this session: the chrome-devtools, playwright and browser MCP servers all failed to connect.
+
+Build AC closed by the parent session on a quiet tree, after both agents had committed: build.bat green for esp32, esp32-classic and esp32-combo plus all three filesystem images (six SUCCESS lines, "Build completed successfully"), binaries fresh and stamped 2.0.0-alpha.361+87e5015. evaluate.py --quick: 76 checks, 68 passed, 0 failed, 1 pre-existing warning (boards.h path drift, unrelated).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
