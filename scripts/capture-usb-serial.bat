@@ -14,9 +14,9 @@ rem  worker is embedded at the bottom (after the PSPAYLOAD marker) and extracted
 rem  a temporary .ps1 at run time. Same launcher pattern as capture-mqtt-debug.bat.
 rem
 rem  Usage:
-rem    capture-usb-serial.bat                  (auto-detect COM port, 115200 baud)
+rem    capture-usb-serial.bat                  (auto-detect COM port, 9600 baud)
 rem    capture-usb-serial.bat --help
-rem    capture-usb-serial.bat -Port COM5 -Baud 115200
+rem    capture-usb-serial.bat -Port COM5 -Baud 9600
 rem    capture-usb-serial.bat -Baud 74880      (boot-ROM reset-cause banner)
 rem  All arguments are forwarded verbatim to the embedded PowerShell script.
 rem
@@ -65,7 +65,14 @@ param(
     [switch]$Help,
     [string]$Port,
     [ValidateRange(300, 921600)]
-    [int]$Baud = 115200,
+    # 9600, because that is what this firmware puts on the UART:
+    # src/libraries/OTGWSerial/OTGWSerial.cpp:836 does
+    # HardwareSerial::begin(9600, SERIAL_8N1). That UART is the PIC link and the
+    # PIC runs at 9600, so the ESP matches it. This defaulted to 115200 and the
+    # help called that "the OTGW application baud", which is wrong: a reporter
+    # on GH #684 captured 541 bytes of framing garbage and neither he nor we
+    # could tell from the file that the rate was the problem.
+    [int]$Baud = 9600,
     [string]$OutputRoot = "logs/usb-serial",
     [int]$DurationSeconds
 )
@@ -93,8 +100,12 @@ function Show-Help {
     Write-Host "  FTDI, 'USB Serial', 'Silicon Labs') via its friendly name. Pass -Port COMn to force one."
     Write-Host ""
     Write-Host "Baud:"
-    Write-Host "  Default 115200 = the OTGW application baud, which is what the exception dump + stack"
-    Write-Host "  trace print at. For the boot-ROM reset-cause line ('ets ... rst cause:N') pass -Baud 74880."
+    Write-Host "  Default 9600 = what this firmware configures on the UART (OTGWSerial.cpp:836). That"
+    Write-Host "  line is the PIC link, so 9600 is the rate the OpenTherm traffic comes out at."
+    Write-Host "  Capturing at another rate yields framing garbage that looks like a broken device"
+    Write-Host "  but is only a wrong baud."
+    Write-Host "  For the boot-ROM reset-cause line ('ets ... rst cause:N') pass -Baud 74880: that"
+    Write-Host "  banner is printed by the ROM before any firmware runs, at its own fixed rate."
     Write-Host ""
     Write-Host "Important:"
     Write-Host "  This holds the COM port exclusively. OTmonitor and firmware flashing cannot share it"

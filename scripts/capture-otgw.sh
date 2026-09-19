@@ -56,6 +56,14 @@ CRASH_POLL_SEC="3600"   # slow on purpose: catches a reboot without perturbing
 ASSUME_YES="0"
 RECONNECT="0"           # keep watching across dropouts instead of stopping at the first
 PROBE_SEC="10"          # REST reachability probe interval while reconnecting
+SERIAL_DEV=""           # capture the USB serial link instead of telnet
+SERIAL_AUTO="0"         # --serial given with no device: auto-detect one
+# 9600 because that is what the firmware configures: OTGWSerial.cpp:836 does
+# HardwareSerial::begin(9600, SERIAL_8N1). That UART is the PIC link, and the
+# PIC runs at 9600, so the ESP matches it. Capturing at any other rate yields
+# framing garbage that looks like a broken device. The Windows script defaulted
+# to 115200 and cost a reporter a round trip on GH #684 for exactly this.
+SERIAL_BAUD="9600"
 
 # Recorded for summary.txt so a shared capture can be judged without
 # reverse-engineering it. Set as each source is decided.
@@ -84,6 +92,11 @@ $SCRIPT_NAME $SCRIPT_VERSION - OTGW diagnostic capture (Linux, WSL, macOS)
                        reachability every --probe seconds so the log shows the
                        moment it went away and the moment it came back
   --probe N            reachability probe interval with --reconnect (default: ${PROBE_SEC}s)
+  --serial [DEV]       capture the USB serial link instead of telnet, for a
+                       gateway that will not come up on WiFi. Without DEV it
+                       looks for one. --host is then optional.
+  --baud N             serial rate (default: $SERIAL_BAUD, which is what the
+                       firmware configures; see OTGWSerial.cpp:836)
   --yes                skip the confirmation prompt
   --help               this text
 
@@ -142,6 +155,15 @@ while [ $# -gt 0 ]; do
         --crash-poll)  CRASH_POLL_SEC="${2:-}"; shift 2 ;;
         --reconnect)   RECONNECT="1"; shift ;;
         --probe)       PROBE_SEC="${2:-}"; shift 2 ;;
+        --serial)
+            # Optional argument: --serial /dev/ttyUSB0, or bare --serial to
+            # auto-detect. A following word starting with - is the next flag.
+            case "${2:-}" in
+                ""|-*) SERIAL_AUTO="1"; shift ;;
+                *)     SERIAL_DEV="$2"; shift 2 ;;
+            esac
+            ;;
+        --baud)        SERIAL_BAUD="${2:-}"; shift 2 ;;
         --yes|-y)      ASSUME_YES="1"; shift ;;
         --help|-h)     usage; exit 0 ;;
         *) warn "Unknown option: $1"; warn "Try --help."; exit 2 ;;
@@ -160,11 +182,16 @@ else
 fi
 
 # ------------------------------------------------------------------- prompts ---
-if [ -z "$DEVICE_HOST" ]; then
+# Serial mode is for a gateway that will not come up on WiFi, so an address is
+# optional there: without one the network sources simply stay off.
+SERIAL_MODE="0"
+if [ -n "$SERIAL_DEV" ] || [ "$SERIAL_AUTO" = "1" ]; then SERIAL_MODE="1"; fi
+
+if [ -z "$DEVICE_HOST" ] && [ "$SERIAL_MODE" != "1" ]; then
     printf 'Gateway address (IP or hostname): '
     read -r DEVICE_HOST
 fi
-if [ -z "$DEVICE_HOST" ]; then
+if [ -z "$DEVICE_HOST" ] && [ "$SERIAL_MODE" != "1" ]; then
     warn "No gateway address given. Nothing to capture."
     exit 2
 fi
@@ -209,6 +236,7 @@ write_summary() {
         else
             echo "  telnet   : $SRC_TELNET"
         fi
+        echo "  serial   : $SRC_SERIAL"
         echo "  rest     : $SRC_REST"
         echo "  crashlog : $SRC_CRASH"
         echo "  mqtt     : $SRC_MQTT"
@@ -275,11 +303,74 @@ fi
 #  call site rather than inside each helper.
 # =============================================================================
 
+# --- 0. serial (only when asked; replaces telnet as the primary source) ------
+SERIAL_LOG="$OUT_DIR/usb-serial.log"
+SERIAL_OK="0"
+SRC_SERIAL="not attempted"
+
+if [ "$SERIAL_MODE" = "1" ]; then
+    # Auto-detect covers the usual adapters. cu.* rather than tty.* on macOS:
+    # opening tty.* blocks until carrier detect, cu.* does not.
+    if [ -z "$SERIAL_DEV" ]; then
+        for _cand in /dev/ttyUSB* /dev/ttyACM* /dev/cu.usbserial* /dev/cu.wchusbserial* /dev/cu.SLAB_USBtoUART*; do
+            if [ -e "$_cand" ]; then SERIAL_DEV="$_cand"; break; fi
+        done
+    fi
+
+    if [ -z "$SERIAL_DEV" ]; then
+        SRC_SERIAL="FAILED: no serial device found (looked for ttyUSB*, ttyACM*, cu.usbserial*)"
+        warn "serial   : no device found. Plug the gateway in over USB, or pass --serial /dev/ttyUSB0"
+    elif [ ! -e "$SERIAL_DEV" ]; then
+        # An explicitly named path that does not exist is a typo, and a typo
+        # deserves a hard failure rather than a silent fallback.
+        warn "serial   : $SERIAL_DEV does not exist."
+        EXIT_REASON="the serial device given with --serial does not exist: $SERIAL_DEV"
+        SRC_SERIAL="FAILED: $SERIAL_DEV does not exist"
+        exit 2
+    else
+        # stty takes -F on Linux and -f on BSD/macOS. Try the one that works.
+        STTY_FLAG="-F"
+        if ! stty -F "$SERIAL_DEV" -a >/dev/null 2>&1; then
+            if stty -f "$SERIAL_DEV" -a >/dev/null 2>&1; then STTY_FLAG="-f"; fi
+        fi
+        # clocal: do not wait for carrier detect, which never arrives on a plain
+        # USB-serial adapter. -hupcl: do not drop DTR on close, which on many
+        # adapters resets the ESP and would reboot the device being diagnosed.
+        if stty "$STTY_FLAG" "$SERIAL_DEV" "$SERIAL_BAUD" cs8 -cstopb -parenb raw -echo clocal -hupcl 2>/dev/null; then
+            if exec 4<"$SERIAL_DEV" 2>/dev/null; then
+                SERIAL_OK="1"
+                SRC_SERIAL="$SERIAL_DEV at ${SERIAL_BAUD} 8N1, read only"
+                log "serial   : $SERIAL_DEV at ${SERIAL_BAUD} baud"
+            else
+                SRC_SERIAL="FAILED: cannot open $SERIAL_DEV (permissions? try the dialout group)"
+                warn "serial   : cannot open $SERIAL_DEV. On Linux you usually need to be in the dialout group."
+            fi
+        else
+            SRC_SERIAL="FAILED: stty could not configure $SERIAL_DEV at ${SERIAL_BAUD}"
+            warn "serial   : stty could not configure $SERIAL_DEV"
+        fi
+    fi
+
+    {
+        echo "# OTGW USB serial capture"
+        echo "# device  : ${SERIAL_DEV:-none found}"
+        echo "# baud    : $SERIAL_BAUD 8N1"
+        echo "# started : $(timestamp)"
+        echo "# note    : 9600 is what the firmware configures (OTGWSerial.cpp:836)."
+        echo "#           A capture at any other rate produces framing garbage that"
+        echo "#           looks like a broken device but is only a wrong baud."
+        echo "#"
+    } > "$SERIAL_LOG"
+fi
+
 # --- 1. telnet -------------------------------------------------------------
 TELNET_LOG="$OUT_DIR/telnet.log"
 TELNET_OK="0"
 
-if [ "$HAVE_DEVTCP" = "1" ]; then
+if [ -z "$DEVICE_HOST" ]; then
+    # Serial-only run: no address was given, so there is no network side.
+    SRC_TELNET="skipped: no --host given (serial-only run)"
+elif [ "$HAVE_DEVTCP" = "1" ]; then
     if exec 3<>"/dev/tcp/$DEVICE_HOST/$TELNET_PORT" 2>/dev/null; then
         TELNET_OK="1"
         SRC_TELNET="connected via /dev/tcp, passive read only (no debug toggles sent)"
@@ -317,7 +408,7 @@ REST_FAIL=0
     echo "#"
 } > "$REST_LOG"
 
-for ep in device/info settings debug otgw/otmonitor otgw/boiler-support device/crashlog; do
+for ep in $( [ -n "$DEVICE_HOST" ] && echo device/info settings debug otgw/otmonitor otgw/boiler-support device/crashlog ); do
     {
         echo ""
         echo "===== GET /api/v2/$ep ====="
@@ -328,8 +419,12 @@ for ep in device/info settings debug otgw/otmonitor otgw/boiler-support device/c
         REST_FAIL=$((REST_FAIL + 1))
     fi
 done
-SRC_REST="one pass over 6 endpoints at start: $REST_OK ok, $REST_FAIL failed"
-log "rest     : $REST_OK ok, $REST_FAIL failed"
+if [ -n "$DEVICE_HOST" ]; then
+    SRC_REST="one pass over 6 endpoints at start: $REST_OK ok, $REST_FAIL failed"
+    log "rest     : $REST_OK ok, $REST_FAIL failed"
+else
+    SRC_REST="skipped: no --host given (serial-only run)"
+fi
 
 # --- 3. crash endpoint poller (optional, slow) -----------------------------
 CRASH_LOG="$OUT_DIR/crashlog.log"
@@ -388,7 +483,7 @@ fi
 # which is what makes the aborted run diagnosable.
 # Not in --reconnect mode: there, a device that is unreachable right now is the
 # normal starting state, because waiting for it to come back is the whole job.
-if [ "$RECONNECT" != "1" ] && [ "$TELNET_OK" != "1" ] && [ "$REST_OK" -eq 0 ] && [ -z "$MQTT_PID" ] && [ -z "$CRASH_PID" ]; then
+if [ "$SERIAL_MODE" != "1" ] && [ "$RECONNECT" != "1" ] && [ "$TELNET_OK" != "1" ] && [ "$REST_OK" -eq 0 ] && [ -z "$MQTT_PID" ] && [ -z "$CRASH_PID" ]; then
     EXIT_REASON="nothing was reachable: telnet failed and all $REST_FAIL REST calls failed, so there was nothing to wait for"
     warn ""
     warn "Nothing on $DEVICE_HOST answered: neither port $TELNET_PORT nor the REST API."
@@ -403,6 +498,57 @@ log "Capturing until $(date -d "@$DEADLINE" '+%H:%M:%S' 2>/dev/null || date -r "
 
 LINES=0
 FAST_FAILS=0
+
+# --- serial capture --------------------------------------------------------
+# Reads whatever the ESP puts on its UART, which on this firmware is the PIC
+# conversation. Line-oriented in normal operation, so read -r works; the -t
+# guard means a stream with no newlines (the signature of a wrong baud) still
+# honours the deadline instead of blocking forever.
+if [ "$SERIAL_MODE" = "1" ]; then
+    if [ "$SERIAL_OK" != "1" ]; then
+        warn "serial   : nothing to read. See summary.txt."
+        EXIT_REASON="the serial device could not be opened"
+        exit 1
+    fi
+    log ""
+    log "Capturing serial for ${DURATION_MIN} min. Ctrl+C stops early and still writes the files."
+    NONPRINT=0
+    while [ "$(date +%s)" -lt "$DEADLINE" ]; do
+        if IFS= read -r -t 10 line <&4; then
+            # OTGW lines are CRLF-terminated. read strips the LF and leaves the
+            # CR, which is both noise in the log and, because 0x0D is outside
+            # printable ASCII, enough to make every healthy line look like a
+            # baud mismatch. Strip it before anything else looks at the line.
+            line="${line%$'\r'}"
+            # A blank line after that strip is the tail of a CRLF pair, not
+            # data. Dropping it keeps the line count honest.
+            [ -z "$line" ] && continue
+            printf '%s %s\n' "$(timestamp)" "$line" >> "$SERIAL_LOG"
+            LINES=$(( LINES + 1 ))
+            # A wrong baud shows up as bytes outside printable ASCII. Counting
+            # them lets the summary say "this looks like a baud mismatch"
+            # instead of leaving the reporter to puzzle over mojibake.
+            case "$line" in
+                *[!\ -~]*) NONPRINT=$(( NONPRINT + 1 )) ;;
+            esac
+            if [ $((LINES % 100)) -eq 0 ]; then
+                printf '\r  %s lines' "$LINES"
+            fi
+        fi
+    done
+    exec 4<&- 2>/dev/null || true
+    printf '\r'
+    log "serial   : $LINES lines captured"
+    SRC_SERIAL="$SRC_SERIAL; $LINES lines"
+    if [ "$LINES" -gt 0 ] && [ "$NONPRINT" -ge $(( LINES / 2 )) ]; then
+        SRC_SERIAL="$SRC_SERIAL; WARNING $NONPRINT of $LINES lines contain non-printable bytes, which usually means the baud rate is wrong (this firmware uses 9600)"
+        warn ""
+        warn "serial   : $NONPRINT of $LINES lines look like garbage."
+        warn "           That is normally a baud mismatch. This firmware uses 9600."
+    fi
+    EXIT_REASON="completed the requested ${DURATION_MIN} minute serial capture"
+    exit 0
+fi
 
 # --reconnect: for a device that goes away and comes back. Stopping at the first
 # dropout would throw away the recovery, which is usually the half that says
