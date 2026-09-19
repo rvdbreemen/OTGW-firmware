@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-18 05:25'
+updated_date: '2026-09-19 15:56'
 labels:
   - bug
 dependencies: []
@@ -108,4 +108,6 @@ Checked and clean, so nothing further to fix here:
 - Firmware consumers remain the set already inventoried: the two hvac mappers, the MQTT heartbeat, networkStuff status line, handleDebug dump, restAPI fields.
 
 Idea, not filed: 2.0.0 exposes boiler_age_s and thermostat_age_s on REST and feeds them into otLinkState(ok, age) so the UI can show a degrading link rather than a binary flag. 1.x has no equivalent. That is a feature rather than part of this fix, and it would also give this branch the independent signal it currently lacks.
+
+2026-09-19: AC #2 (before/after on a device with the PIC absent) is the only open item and it is hardware-gated. The code is committed on otgw-1.x.x but is in no published build: beta.4 is deliberately held until the beta.3 verdict on #682 (see TASK-1134). Two ways to close AC #2: publish beta.4 and have tranquil_kiwi confirm on their PIC-less device, or flash the bench OTGW on COM3 with a local build and pull the OT bus to force the silent-bus path (that exercises AC #5's code path on hardware, but not literally PIC-absent). Neither is done here; flashing bench hardware with an unreleased build needs the maintainer's go. Host coverage: test/host/test_otBusLiveness.cpp, 23 checks, green.
 <!-- SECTION:NOTES:END -->
