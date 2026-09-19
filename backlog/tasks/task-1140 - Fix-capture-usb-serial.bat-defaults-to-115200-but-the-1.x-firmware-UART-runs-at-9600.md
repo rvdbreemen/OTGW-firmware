@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-19 14:28'
-updated_date: '2026-09-19 14:46'
+updated_date: '2026-09-19 14:48'
 labels:
   - bug
 dependencies: []
@@ -54,4 +54,14 @@ Evidence, capture-otgw.sh serial mode against a pseudo-terminal (WSL cannot reac
 Bug caught by that test before shipping: OTGW lines are CRLF terminated, read strips the LF and leaves the CR, and 0x0D is outside printable ASCII, so the garbage detector counted 77 of 81 healthy lines as a baud mismatch. Stripping the CR first fixed it. Without the pseudo-terminal case this would have shipped as a false alarm telling reporters their working capture was broken.
 
 Still open: AC about the 2.0.0 copy. Not checked, deliberately: that tree is ESP32 and its console baud may genuinely be 115200.
+
+AC4 resolved: there is no capture-usb-serial.bat in the 2.0.0 tree, so there was no copy to change. Nothing was touched there.
+
+It would have been wrong to change anyway. On 2.0.0 the PIC link runs on dedicated pins (OTGWSerial(PICRST, LED2, PIN_PIC_RX, PIN_PIC_TX) in OTGW-firmware.h:78-80) at 9600, but that is a different interface from the USB console, so 9600 is not automatically right for a console capture there.
+
+Two things found in that tree worth recording, neither acted on:
+
+1. scripts/capture-serial.py defaults to --baud 115200. Whether that is right depends on which interface it is pointed at, and on ESP32-S3 those are genuinely separate. Not verified, not changed, flagged only.
+
+2. The 2.0.0 tree already ships capture-mqtt-debug.sh (1584 lines) and capture-mqtt-debug-macos.sh for Linux and macOS, using bash plus embedded Python workers. I built the 1.x capture-otgw.sh without first checking whether a portable capture already existed in the sibling tree. Mine is not redundant (450 lines, bash and curl only, no python3 dependency, and the 1.x REST surface differs) but the overlap is real and the check should have come first.
 <!-- SECTION:NOTES:END -->
