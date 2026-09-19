@@ -68,3 +68,15 @@ So "no PR: lines in a capture" does mean the PIC did not answer. The diagnostic 
 
 What the capture actually shows, for whoever picks up #684: the PIC is healthy and answers everything (v6.8, 4MHz, build 25-08-2026), and reports PR: M=M three times over two minutes. M = monitor mode, not gateway mode. That, plus zero OT frames in four minutes, is the real lead.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed without code. Verification falsified the premise.
+
+The task assumed a capture cannot show whether the PIC answers a PR= query. It can. OTGW-Core.ino:4556 prints every PR: line with a bare Debugln(buf), which Debug.h:20 defines as debugTelnet.println with no gate. Appiejs's capture carries all 17 PR: replies, including two repeat PR=M polls whose value had not changed and which therefore produced no handlePRresponse log, yet still printed.
+
+Adding the proposed logging would have duplicated output that already ships, and one of the guards it wanted to instrument is unreachable from the only call site.
+
+No files changed. Build and evaluator gates not run because nothing was built.
+<!-- SECTION:FINAL_SUMMARY:END -->
