@@ -4807,15 +4807,19 @@ void evaluateOTBusLiveness(OTBusLivenessTrigger trigger)
   // two link flags they are identical (single writer), and for bOnline the live
   // value is the only one that includes OTDirect's writes.
 
+  // A stamp of 0 means never heard and reads as absent whatever the clock says:
+  // before NTP sync time() counts up from 0, so without that rule a freshly
+  // booted gateway on a silent bus reported both sides present for 30 s
+  // (seen on the 1.x bench, TASK-1135; ported as TASK-1144).
   //If the Boiler messages have not been seen for 30 seconds, then set the state to false.
-  const bool bBoiler = (now < (state.otBus.tBoilerLastSeen + 30));
+  const bool bBoiler = (state.otBus.tBoilerLastSeen != 0) && (now < (state.otBus.tBoilerLastSeen + 30));
   if ((bBoiler != state.otBus.bBoilerState) || forcePublish) {
     state.otBus.bBoilerState = bBoiler;
     publishBoilerConnectedState();
   }
 
   //If the Thermostat messages have not been seen for 30 seconds, then set the state to false.
-  const bool bThermostat = (now < (state.otBus.tThermostatLastSeen + 30));
+  const bool bThermostat = (state.otBus.tThermostatLastSeen != 0) && (now < (state.otBus.tThermostatLastSeen + 30));
   if ((bThermostat != state.otBus.bThermostatState) || forcePublish) {
     state.otBus.bThermostatState = bThermostat;
     publishThermostatConnectedState();
