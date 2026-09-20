@@ -112,15 +112,18 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     // server sees the desired hostname. Avoid forcing a reconnect here so we
     // don't accidentally drop a working connection and fall back into the
     // WiFiManager config portal on transient failures.
-    String currentHostname = WiFi.hostname();
-    if (currentHostname == hostname)
+    // WiFi.hostname() returns a String by API; copy it out in the same statement
+    // so the temporary dies here (TASK-1141, ADR-049). 32 chars is the DHCP limit.
+    char currentHostname[33];
+    strlcpy(currentHostname, WiFi.hostname().c_str(), sizeof(currentHostname));
+    if (strcmp(currentHostname, hostname) == 0)
     {
       DebugTln(F("Wifi already connected with correct hostname, skipping hostname update."));
     }
     else
     {
       DebugTf(PSTR("Wifi connected with hostname '%s', updating to '%s' without reconnect.\r\n"),
-              currentHostname.c_str(), hostname);
+              currentHostname, hostname);
       // Update the hostname for future DHCP negotiations; the current lease
       // will typically keep using the old hostname until the next reconnect.
       WiFi.hostname(hostname);

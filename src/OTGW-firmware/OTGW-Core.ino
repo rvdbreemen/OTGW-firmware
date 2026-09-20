@@ -5365,15 +5365,26 @@ bool validateIntelHex(const char *filepath) {
   return valid && hasEof;
 }
 
-String checkforupdatepic(String filename){
+// Builds "http://otgw.tclcode.com/download/<deviceid>/<filename>" into url.
+// TASK-1141 / ADR-049: char[] instead of String concatenation.
+static void buildPicDownloadUrl(const char* filename, char* url, size_t urlSize) {
+  snprintf_P(url, urlSize, PSTR("http://otgw.tclcode.com/download/%s/%s"), state.pic.sDeviceid, filename);
+}
+
+// Asks Schelte's site for the current version of a PIC hex (HTTP HEAD, X-Version
+// header) and writes it into latest, or "" when the request fails.
+// TASK-1141 / ADR-049: caller-provided char[] instead of a String return.
+void checkforupdatepic(const char* filename, char* latest, size_t latestSize) {
   WiFiClient client;
   HTTPClient http;
-  String latest = "";
   int code;
+  if (latestSize > 0) latest[0] = '\0';
 
   // Security note: download is over unencrypted HTTP; ensure device is on a
   // trusted local network and is not reachable from untrusted networks.
-  http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
+  char url[96];
+  buildPicDownloadUrl(filename, url, sizeof(url));
+  http.begin(client, url);
   char useragent[40] = "esp8266-otgw-firmware/";
   strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
   http.setUserAgent(useragent);
@@ -5383,49 +5394,58 @@ String checkforupdatepic(String filename){
     for (int i = 0; i< http.headers(); i++) {
       DebugTf(PSTR("%s: %s\r\n"), hexheaders[i], http.header(i).c_str());
     }
-    latest = http.header(1);
-    DebugTf(PSTR("Update %s -> [%s]\r\n"), filename.c_str(), latest.c_str());
+    // http.header() returns a String by API; copy it out in the same statement.
+    strlcpy(latest, http.header(1).c_str(), latestSize);
+    DebugTf(PSTR("Update %s -> [%s]\r\n"), filename, latest);
   } else OTGWDebugln(F("Failed to fetch version from Schelte Bron website"));
   http.end(); // Always close connection, even on failure (Finding #24)
-
-  return latest; 
 }
 
-void refreshpic(String filename, String version) {
+void refreshpic(const char* filename, const char* version) {
   if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) == 0) return; // no pic version found, don't upgrade
 
   WiFiClient client;
   HTTPClient http;
-  String latest;
+  char latest[32];
   int code;
 
-  latest = checkforupdatepic(filename);
+  checkforupdatepic(filename, latest, sizeof(latest));
 
-  if (latest != version) {
-    OTGWDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), state.pic.sDeviceid, filename.c_str(), version.c_str(), latest.c_str());
+  // Same comparison as before: an empty latest (fetch failed) still differs from
+  // a non-empty version and proceeds to the download. Behaviour kept as-is.
+  if (strcmp(latest, version) != 0) {
+    OTGWDebugTf(PSTR("Update (%s)%s: %s -> %s\r\n"), state.pic.sDeviceid, filename, version, latest);
     OTGWDebugTln(F("NOTE: PIC firmware is downloaded over plain HTTP (no TLS); ensure device is on a trusted local network."));
-    http.begin(client, "http://otgw.tclcode.com/download/" + String(state.pic.sDeviceid) + "/" + filename);
+    char url[96];
+    buildPicDownloadUrl(filename, url, sizeof(url));
+    http.begin(client, url);
     char useragent[40] = "esp8266-otgw-firmware/";
     strlcat(useragent, _SEMVER_CORE, sizeof(useragent));
     http.setUserAgent(useragent);
     code = http.GET();
     if (code == HTTP_CODE_OK) {
-      String hexpath = "/" + String(state.pic.sDeviceid) + "/" + filename;
+      // Same sizing as pendingUpgradePath: "/" + deviceid (max 32) + "/" + hex name.
+      char hexpath[80];
+      snprintf_P(hexpath, sizeof(hexpath), PSTR("/%s/%s"), state.pic.sDeviceid, filename);
       File f = LittleFS.open(hexpath, "w");
       if (f) {
         http.writeToStream(&f);
         f.close();
         // Validate the downloaded file is a well-formed Intel HEX before accepting it.
         // This rejects truncated or non-HEX responses that could corrupt the PIC.
-        if (!validateIntelHex(hexpath.c_str())) {
+        if (!validateIntelHex(hexpath)) {
           OTGWDebugTln(F("ERROR: Downloaded file failed Intel HEX validation - discarding"));
           LittleFS.remove(hexpath);
         } else {
-          String verfile = hexpath;
-          verfile.replace(".hex", ".ver");
+          // Sibling ".ver" file: swap the extension in place.
+          char verfile[80];
+          strlcpy(verfile, hexpath, sizeof(verfile));
+          char* ext = strrchr(verfile, '.');
+          if (ext != nullptr && strcmp_P(ext, PSTR(".hex")) == 0) strcpy_P(ext, PSTR(".ver"));
           f = LittleFS.open(verfile, "w");
           if (f) {
-            f.print(latest + "\n");
+            f.print(latest);
+            f.print('\n');
             f.close();
             OTGWDebugTln(F("Update successful"));
           }

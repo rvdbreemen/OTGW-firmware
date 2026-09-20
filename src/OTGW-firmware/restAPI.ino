@@ -643,13 +643,16 @@ static void handleOtgw(const char* words[], uint8_t wc, HTTPMethod method, const
 static void handleWebhook(const char* words[], uint8_t wc, HTTPMethod method, const char* originalURI) {
   if (wc > 4 && strcmp_P(words[4], PSTR("test")) == 0) {
     if (method != HTTP_POST && method != HTTP_PUT) { sendApiMethodNotAllowed(F("POST")); return; }
-    String stateParam = httpServer.arg(F("state"));
-    if (!stateParam.length()) {
+    // httpServer.arg() returns a String by API; copy it out in the same statement
+    // so the temporary dies here (TASK-1141, ADR-049).
+    char stateParam[8];
+    strlcpy(stateParam, httpServer.arg(F("state")).c_str(), sizeof(stateParam));
+    if (stateParam[0] == '\0') {
       sendApiError(400, F("Missing required 'state' parameter; expected on|1 or off|0"));
       return;
     }
-    bool isOn  = (stateParam.equalsIgnoreCase("on")  || stateParam == "1");
-    bool isOff = (stateParam.equalsIgnoreCase("off") || stateParam == "0");
+    bool isOn  = (strcasecmp_P(stateParam, PSTR("on"))  == 0 || strcmp_P(stateParam, PSTR("1")) == 0);
+    bool isOff = (strcasecmp_P(stateParam, PSTR("off")) == 0 || strcmp_P(stateParam, PSTR("0")) == 0);
     if (!isOn && !isOff) {
       sendApiError(400, F("Invalid state; expected on|1 or off|0"));
       return;
@@ -1461,22 +1464,22 @@ void sendPICUpdateCheck()
   // On-demand PIC firmware update check.
   // Only called when the user opens the PIC firmware tab — never on a timer.
   // Makes an outbound HTTP HEAD request to otgw.tclcode.com.
-  String latest = "";
+  char latest[32] = "";   // same width as state.pic.sFwversion; holds the X-Version header value
   if (strcmp_P(state.pic.sDeviceid, PSTR("unknown")) != 0 && state.pic.sDeviceid[0] != '\0') {
-    String picFile;
+    char picFile[16];
     if (strcmp_P(state.pic.sType, PSTR("diagnose")) == 0) {
-      picFile = F("diagnose.hex");
+      strcpy_P(picFile, PSTR("diagnose.hex"));
     } else if (strcmp_P(state.pic.sType, PSTR("interface")) == 0) {
-      picFile = F("interface.hex");
+      strcpy_P(picFile, PSTR("interface.hex"));
     } else {
-      picFile = F("gateway.hex");
+      strcpy_P(picFile, PSTR("gateway.hex"));
     }
-    latest = checkforupdatepic(picFile);
+    checkforupdatepic(picFile, latest, sizeof(latest));
   }
-  bool updateAvailable = (latest.length() > 0 && latest != String(state.pic.sFwversion));
+  bool updateAvailable = (latest[0] != '\0' && strcmp(latest, state.pic.sFwversion) != 0);
   sendStartJsonMap(F("pic_update"));
   sendJsonMapEntry(F("current"), state.pic.sFwversion);
-  sendJsonMapEntry(F("latest"), latest.c_str());
+  sendJsonMapEntry(F("latest"), latest);
   sendJsonMapEntry(F("update_available"), updateAvailable);
   sendEndJsonMap(F("pic_update"));
 } // sendPICUpdateCheck()
@@ -1799,14 +1802,32 @@ void sendApiNotFound(const char *URI)
   httpServer.sendContent_P(PSTR("<style>body { background-color: lightgray; font-size: 15pt;}</style></head><body>"));
   httpServer.sendContent_P(PSTR("<h1>OTGW firmware</h1><b1>"));
   httpServer.sendContent_P(PSTR("<br>[<b>"));
-  // HTML-escape URI to prevent reflected XSS
-  String escapedURI = String(URI);
-  escapedURI.replace(F("&"), F("&amp;"));
-  escapedURI.replace(F("<"), F("&lt;"));
-  escapedURI.replace(F(">"), F("&gt;"));
-  escapedURI.replace(F("\""), F("&quot;"));
-  escapedURI.replace(F("'"), F("&#39;"));
-  httpServer.sendContent(escapedURI);
+  // HTML-escape URI to prevent reflected XSS. Bounded char[] instead of String
+  // (TASK-1141, ADR-049); a URI longer than the buffer is echoed truncated,
+  // which is fine for a 404 page. The guard leaves room for the longest entity
+  // ("&quot;", 6 bytes) plus the terminator.
+  char escaped[256];
+  size_t n = 0;
+  for (const char* p = URI; *p != '\0' && n < sizeof(escaped) - 7; p++) {
+    PGM_P rep = nullptr;
+    switch (*p) {
+      case '&':  rep = PSTR("&amp;");  break;
+      case '<':  rep = PSTR("&lt;");   break;
+      case '>':  rep = PSTR("&gt;");   break;
+      case '"':  rep = PSTR("&quot;"); break;
+      case '\'': rep = PSTR("&#39;");  break;
+      default:   break;
+    }
+    if (rep) {
+      size_t len = strlen_P(rep);
+      memcpy_P(escaped + n, rep, len);
+      n += len;
+    } else {
+      escaped[n++] = *p;
+    }
+  }
+  escaped[n] = '\0';
+  httpServer.sendContent(escaped);
   httpServer.sendContent_P(PSTR("</b>] is not a valid "));
   httpServer.sendContent_P(PSTR("</body></html>\r\n"));
 
