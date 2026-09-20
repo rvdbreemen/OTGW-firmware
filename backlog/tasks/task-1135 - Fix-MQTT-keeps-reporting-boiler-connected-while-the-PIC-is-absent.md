@@ -1,11 +1,11 @@
 ---
 id: TASK-1135
 title: 'Fix: MQTT keeps reporting boiler connected while the PIC is absent'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-20 12:20'
+updated_date: '2026-09-20 13:35'
 labels:
   - bug
 dependencies: []
@@ -34,7 +34,7 @@ Retention is NOT involved: sendMQTTData takes retain = false by default (OTGW-fi
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 With no PIC detected, the boiler/thermostat connected topics publish false rather than retaining their last true value
-- [ ] #2 Reproduced before the fix and verified after, on a device with the PIC absent
+- [x] #2 Reproduced before the fix and verified after, on a device with the PIC absent
 - [x] #3 python build.py --firmware exits 0
 - [x] #4 python evaluate.py --quick shows no new failures
 - [x] #5 The liveness timeout is evaluated on a periodic tick independent of message arrival, so a bus that goes completely silent still flips to false within roughly the 30s window
@@ -130,3 +130,9 @@ Flash route note for the next reader: web OTA from curl only works when it mimic
 
 AC #2 as written asks for a device with the PIC absent. What was done instead is the silent-bus path on a real ESP8266 with a diagnose PIC and the firmware's own simulator as the frame source, before and after on the same board. Left unchecked so the maintainer decides whether that substitution satisfies it.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Hardware AC #2 accepted by the maintainer on 2026-09-20 on the silent-bus substitution (real ESP8266, diagnose PIC, firmware simulator as frame source, before/after on one board: beta.1 held the flags 109+ s, this fix drops them at 32 s). The never-heard guard found during that verification shipped as c4a7827ea with host test case (g); first polls after boot now read false on both bench boards.
+<!-- SECTION:FINAL_SUMMARY:END -->
