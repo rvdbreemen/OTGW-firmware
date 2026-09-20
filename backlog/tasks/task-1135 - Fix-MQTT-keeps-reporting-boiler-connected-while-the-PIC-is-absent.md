@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-20 12:09'
+updated_date: '2026-09-20 12:20'
 labels:
   - bug
 dependencies: []
@@ -40,7 +40,7 @@ Retention is NOT involved: sendMQTTData takes retain = false by default (OTGW-fi
 - [x] #5 The liveness timeout is evaluated on a periodic tick independent of message arrival, so a bus that goes completely silent still flips to false within roughly the 30s window
 - [x] #6 Evaluation is suppressed while the PIC is being flashed, so a PIC update does not flap the entities
 - [x] #7 The thermostat transition keeps its coupled publishHvacMode(false)/publishHvacAction(false) calls, so the HA climate entity does not hold a stale mode
-- [ ] #8 On a fresh boot with no frames, the presence flags read false before the first frame arrives (a last-seen of 0 means never heard, regardless of the clock); covered by a host test case
+- [x] #8 On a fresh boot with no frames, the presence flags read false before the first frame arrives (a last-seen of 0 means never heard, regardless of the clock); covered by a host test case
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -125,4 +125,8 @@ Two findings along the way:
 2. BOOT ARTIFACT introduced by this fix: right after boot, with no frames at all, all three flags read TRUE for about 30 s and then fell. Cause: otBusLiveness.h compares now < lastSeen + 30 and its comment assumes lastSeen 0 is always in the past, which holds only after NTP sync. Before sync time() counts from 0, so 0 + 30 is in the future. Pre-fix builds never evaluated without a frame and so never showed this. Fix within this task: a never-heard guard (lastSeen 0 means absent, whatever now is), with a host test case.
 
 Flash route note for the next reader: web OTA from curl only works when it mimics the update page's XHR exactly (POST /update?size=<bytes>, -H "Expect:", paced to about 100 KB/s). A plain curl -F upload dropped the connection after the updater had stopped its services and left the board hanging; USB via this CH340 fails ("Serial data stream stopped") even with --no-stub; a clean RTS pulse with DTR high on COM3 recovers a board stuck in the bootloader.
+
+2026-09-20 never-heard guard shipped as c4a7827ea (otBusLiveness.h plus host test case g, 25 checks green). Bench 192.168.88.68 flashed OTA with the combined build 014d380: the first four polls after the firmware reboot and the first three after the filesystem reboot all read boiler/thermostat/otgw false with no frames, where the previous beta.4 build read true for about 30 s. The silent-bus test on this build: sim on true within 6 s, sim off false at +32 s.
+
+AC #2 as written asks for a device with the PIC absent. What was done instead is the silent-bus path on a real ESP8266 with a diagnose PIC and the firmware's own simulator as the frame source, before and after on the same board. Left unchecked so the maintainer decides whether that substitution satisfies it.
 <!-- SECTION:NOTES:END -->
