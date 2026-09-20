@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:21'
-updated_date: '2026-09-19 18:39'
+updated_date: '2026-09-20 12:09'
 labels:
   - bug
 dependencies: []
@@ -40,6 +40,7 @@ Retention is NOT involved: sendMQTTData takes retain = false by default (OTGW-fi
 - [x] #5 The liveness timeout is evaluated on a periodic tick independent of message arrival, so a bus that goes completely silent still flips to false within roughly the 30s window
 - [x] #6 Evaluation is suppressed while the PIC is being flashed, so a PIC update does not flap the entities
 - [x] #7 The thermostat transition keeps its coupled publishHvacMode(false)/publishHvacAction(false) calls, so the HA climate entity does not hold a stale mode
+- [ ] #8 On a fresh boot with no frames, the presence flags read false before the first frame arrives (a last-seen of 0 means never heard, regardless of the clock); covered by a host test case
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -112,4 +113,16 @@ Idea, not filed: 2.0.0 exposes boiler_age_s and thermostat_age_s on REST and fee
 2026-09-19: AC #2 (before/after on a device with the PIC absent) is the only open item and it is hardware-gated. The code is committed on otgw-1.x.x but is in no published build: beta.4 is deliberately held until the beta.3 verdict on #682 (see TASK-1134). Two ways to close AC #2: publish beta.4 and have tranquil_kiwi confirm on their PIC-less device, or flash the bench OTGW on COM3 with a local build and pull the OT bus to force the silent-bus path (that exercises AC #5's code path on hardware, but not literally PIC-absent). Neither is done here; flashing bench hardware with an unreleased build needs the maintainer's go. Host coverage: test/host/test_otBusLiveness.cpp, 23 checks, green.
 
 2026-09-19: The 2.0.0 sibling (TASK-1137, same mechanism ported) passed hardware verification on the bench OTGW32: pre-fix alpha.354 held boiler_connected true for 97+ s on a silent bus, alpha.365 dropped it at 32 s (before/after on one board, loopback then monitor mode). That is evidence for the design, not for this AC: AC #2 asks for an ESP8266 running this 1.x build with the PIC absent, and no such device is on the bench. Still gated on beta.4 plus tranquil_kiwi, or a 1.x bench flash.
+
+2026-09-20 hardware verification (AC #2), bench ESP8266 OTGW at 192.168.88.68 (COM3, MAC 84:f3:eb:22:b8:e1, diagnose PIC loaded, so no real OT traffic ever). PIC-absent was not available; the silent-bus path was exercised instead with the firmware's own OT simulator: a four-frame /otgw_simulation.log (T00000000, B40000002, T80190000, B40192800, parity-correct) replayed via POST /api/v2/simulate/start, then stopped. Read via /api/v2/device/info every ~6 s.
+
+BEFORE, 1.7.6-beta.1 (pre-fix): sim on, boiler/thermostat/otgw true at +4 s. Sim off: still true at +109 s. Never fell. Defect reproduced.
+
+AFTER, local beta.4 build 7083cf0 (this fix) flashed OTA on the same board: sim on, true at +4 s. Sim off: true through +26 s, FALSE at +32 s for all three. Fix verified.
+
+Two findings along the way:
+1. The filesystem OTA replaced LittleFS and deleted the uploaded simulation file, so the first after-test injected nothing; it was redone with the file re-uploaded. Only the redo counts.
+2. BOOT ARTIFACT introduced by this fix: right after boot, with no frames at all, all three flags read TRUE for about 30 s and then fell. Cause: otBusLiveness.h compares now < lastSeen + 30 and its comment assumes lastSeen 0 is always in the past, which holds only after NTP sync. Before sync time() counts from 0, so 0 + 30 is in the future. Pre-fix builds never evaluated without a frame and so never showed this. Fix within this task: a never-heard guard (lastSeen 0 means absent, whatever now is), with a host test case.
+
+Flash route note for the next reader: web OTA from curl only works when it mimics the update page's XHR exactly (POST /update?size=<bytes>, -H "Expect:", paced to about 100 KB/s). A plain curl -F upload dropped the connection after the updater had stopped its services and left the board hanging; USB via this CH340 fails ("Serial data stream stopped") even with --no-stub; a clean RTS pulse with DTR high on COM3 recovers a board stuck in the bootloader.
 <!-- SECTION:NOTES:END -->
