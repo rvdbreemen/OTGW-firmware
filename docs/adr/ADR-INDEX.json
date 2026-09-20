@@ -2589,7 +2589,7 @@
       "id": "ADR-084",
       "title": "Build-Time ESP8266 Core Patch for the HTTP NULL-Alloc Crash",
       "path": "ADR-084-build-time-core-patch-http-null-alloc.md",
-      "format": "nygard",
+      "format": "canonical",
       "status": "Rejected",
       "date": "2026-06-10",
       "decision_summary": "Commit a unified-diff patch under patches/ and have build.py re-apply it to the freshly-installed ESP8266 core after...",
@@ -5415,6 +5415,24 @@
     {
       "source": "ADR-083",
       "target": "ADR-079",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-084",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-084",
+      "target": "ADR-030",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-084",
+      "target": "ADR-083",
       "type": "related",
       "resolved": true
     },
