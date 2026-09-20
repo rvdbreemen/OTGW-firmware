@@ -1,10 +1,11 @@
 ---
 id: TASK-1141
 title: Remove String from the ten ADR-049 sites the whole-codebase audit surfaced
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-20 11:21'
-updated_date: '2026-09-20 11:24'
+updated_date: '2026-09-20 11:55'
 labels:
   - tech-debt
   - adr-049
