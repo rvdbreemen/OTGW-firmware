@@ -151,6 +151,29 @@ int main() {
     check(publishes == 1, "boiler_connected was published exactly once, not on every tick");
   }
 
+  //-------------------------------------------------------------------
+  // (g) Never heard means absent, whatever the clock says. Before NTP sync the
+  //     ESP8266 clock counts up from 0, so `now < 0 + TIMEOUT` was true for the
+  //     first TIMEOUT seconds after boot and a silent bus read as present.
+  //     Seen on the bench (TASK-1135); this pins the guard.
+  //-------------------------------------------------------------------
+  std::printf("\n(g) a side never heard is absent even on an unsynced clock\n");
+  {
+    for (time_t now = 0; now < OTBUS_PRESENCE_TIMEOUT_SEC; now += 3) {
+      OtBusLiveness v = evalOtBusLiveness(now, 0, 0, false, false, false, false, false);
+      if (v.bBoiler || v.bThermostat || v.bOnline) {
+        check(false, "never-heard sides read absent on a small clock");
+        break;
+      }
+      if (now + 3 >= OTBUS_PRESENCE_TIMEOUT_SEC) check(true, "never-heard sides read absent on a small clock");
+    }
+    // One side heard on that same small clock still counts, so the guard is
+    // about lastSeen being 0, not about the clock being small.
+    OtBusLiveness v = evalOtBusLiveness(5, 0, 4, false, false, false, false, false);
+    check(!v.bBoiler && v.bThermostat && v.bOnline,
+          "a side heard at t=4 is present at t=5 while the never-heard side stays absent");
+  }
+
   std::printf("\n%d checks, %d failures\n", g_checks, g_failures);
   return g_failures == 0 ? 0 : 1;
 }

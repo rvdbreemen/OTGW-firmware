@@ -47,8 +47,10 @@ struct OtBusLiveness {
 //   PIC update would drive the entities to false and back.
 //
 // Comparison is `now < lastSeen + TIMEOUT`, so a side heard exactly TIMEOUT
-// seconds ago counts as gone. A lastSeen of 0 (never heard) is in the past for
-// any sane clock, so a gateway that has never seen traffic reads as absent.
+// seconds ago counts as gone. A lastSeen of 0 means never heard and reads as
+// absent whatever the clock says: before NTP sync time() counts up from 0, so
+// without that rule a freshly booted gateway on a silent bus reported both
+// sides present for the first TIMEOUT seconds (seen on the bench, TASK-1135).
 //===========================================================================================
 inline OtBusLiveness evalOtBusLiveness(time_t now,
                                        time_t boilerLastSeen,
@@ -71,8 +73,8 @@ inline OtBusLiveness evalOtBusLiveness(time_t now,
     return r;
   }
 
-  r.bBoiler = (now < (boilerLastSeen + OTBUS_PRESENCE_TIMEOUT_SEC));
-  r.bThermostat = (now < (thermostatLastSeen + OTBUS_PRESENCE_TIMEOUT_SEC));
+  r.bBoiler = (boilerLastSeen != 0) && (now < (boilerLastSeen + OTBUS_PRESENCE_TIMEOUT_SEC));
+  r.bThermostat = (thermostatLastSeen != 0) && (now < (thermostatLastSeen + OTBUS_PRESENCE_TIMEOUT_SEC));
   r.bOnline = r.bBoiler || r.bThermostat;
 
   r.bBoilerChanged = (r.bBoiler != prevBoiler) || forcePublish;
