@@ -289,6 +289,10 @@ static inline bool otIsVentSlave() {
 // the availability gate must read a signal that synthetic-online does NOT set,
 // otherwise enabling simulation would immediately disable itself. Called cross-file
 // from satBoilerHardwarePresent() in SATcontrol.ino.
+// TASK-1138: this exclusion is local to the SAT gate. The generic presence flag
+// state.otBus.bBoilerState (stamped in processOT, OTGW-Core.ino) deliberately
+// DOES count loopback B-frames, so a bench rig in loopback reports
+// boiler_connected. The asymmetry is by decision, not drift.
 bool otDirectBoilerPresent() {
   if (IS_LOOPBACK_MODE()) return false;   // synthetic responses are not a real boiler
   return otBoilerCacheValid[3];

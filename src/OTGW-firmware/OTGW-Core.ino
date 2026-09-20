@@ -4885,6 +4885,13 @@ void processOT(const char *buf, int len, bool suppressOutput){
 
     // source of otmsg
     if (buf[0]=='B'){
+      // TASK-1138: a B-frame from OTDirect loopback (GW=L) lands here too and
+      // counts as boiler presence by decision. Loopback exists to make the stack
+      // behave as if a boiler were attached, and bBoilerState is that signal.
+      // otDirectBoilerPresent() (OTDirect.ino) excludes loopback for a different
+      // reason: it gates SAT simulation, which would disable itself the moment
+      // its own synthetic traffic raised the flag. The two sites differ on
+      // purpose; do not "fix" one to match the other.
       state.otBus.tBoilerLastSeen = now;
       OTdata.rsptype = OTGW_BOILER;
       // TASK-795 §4.2: a real boiler frame arrived on the PIC bus. If SAT
