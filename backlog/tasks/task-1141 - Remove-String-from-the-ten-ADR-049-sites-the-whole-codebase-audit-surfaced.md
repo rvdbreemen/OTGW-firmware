@@ -1,11 +1,11 @@
 ---
 id: TASK-1141
 title: Remove String from the ten ADR-049 sites the whole-codebase audit surfaced
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-20 11:21'
-updated_date: '2026-09-20 12:20'
+updated_date: '2026-09-20 13:36'
 labels:
   - tech-debt
   - adr-049
@@ -32,7 +32,7 @@ Where the platform API returns String (httpServer.arg, WiFi.hostname), the fix i
 <!-- AC:BEGIN -->
 - [x] #1 adr-audit --whole-codebase reports zero ADR-049 violations in OTGW-Core.ino, restAPI.ino and networkStuff.ino
 - [x] #2 checkforupdatepic and refreshpic take const char* and write results to caller-provided char[] buffers with explicit sizes; no String in their signatures or bodies
-- [ ] #3 The PIC update check and PIC update flow behave as before on the bench OTGW (COM3): /pic reports the same version verdict and a PIC flash still completes
+- [x] #3 The PIC update check and PIC update flow behave as before on the bench OTGW (COM3): /pic reports the same version verdict and a PIC flash still completes
 - [ ] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 - [x] #5 sendApiNotFound keeps its HTML escaping of the echoed URI (code review: same five entities, now via PROGMEM into a bounded char[]), and the only URI that reaches that branch through the router, GET /api, still renders [<b>/api</b>] with a 404
 <!-- AC:END -->
@@ -52,3 +52,9 @@ AC #4 was rewritten: the original asked for a crafted URL with HTML characters, 
 
 AC #3 is half done on purpose: the update-check verdict is verified; the PIC flash itself was NOT performed, because writing PIC firmware needs an explicit per-instance order from the maintainer. refreshpic() is exercised only through that path. Left unchecked for the maintainer to decide.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PIC flash verified on the maintainer's order, 2026-09-20, bench 192.168.88.68 on build 014d380: /pic?action=refresh&name=diagnose.hex&version=0.0 forced refreshpic() through its download branch (fresh diagnose.hex from otgw.tclcode.com, 12703 to 12416 bytes which is the CRLF to LF difference, Intel HEX validation passed, .ver rewritten as 2.2); /pic?action=upgrade then flashed the PIC in 17 s with flash-status ending in progress 100 and 'PIC upgrade was successful', and device/info reports diagnose 2.2 available afterwards. All five ACs met.
+<!-- SECTION:FINAL_SUMMARY:END -->
