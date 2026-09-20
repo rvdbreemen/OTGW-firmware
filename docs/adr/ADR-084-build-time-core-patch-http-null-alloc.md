@@ -60,7 +60,7 @@ Negative / risks:
 - If the board-manager core version is ever bumped, the patch context may need regeneration (the loud-fail check makes this obvious rather than silent).
 - A second build path that flashes without `build.py` would not get the patch; the firmware-side gate (retained) covers that case.
 
-## Related
+## Related Decisions
 
 - TASK-844 (this patch + build.py apply-step), TASK-843 (firmware-side `canServeHttp`/`streamFileGuarded` gate, 1.7.0-beta.3), TASK-841/837 (earlier heap crash-proofing).
 - ADR-030 / ADR-083 (heap-health ladder and per-consumer gating), ADR-004 (no String in hot paths — the firmware itself is allocation-disciplined; the bug is in the core).
