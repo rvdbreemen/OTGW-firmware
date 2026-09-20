@@ -1,11 +1,11 @@
 ---
 id: TASK-1139
 title: 'Investigate: gateway reports no thermostat and no boiler after 1.7.5 (GH #684)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-19 05:09'
-updated_date: '2026-09-19 18:43'
+updated_date: '2026-09-20 13:34'
 labels:
   - bug
   - needs-info
@@ -36,7 +36,7 @@ Gateway Mode Monitor with GW-mode detecting in the banner is the detail most wor
 <!-- AC:BEGIN -->
 - [ ] #1 A telnet banner taken at least five minutes after boot is obtained, so the liveness window has elapsed and Boiler/Thermostat OFF means something
 - [ ] #2 It is established whether the same symptom really reproduces on 1.7.1, including whether the filesystem was flashed alongside the firmware
-- [ ] #3 Either a firmware cause is identified with evidence, or the issue is closed as hardware or wiring with the reasoning recorded for the next reader
+- [x] #3 Either a firmware cause is identified with evidence, or the issue is closed as hardware or wiring with the reasoning recorded for the next reader
 - [x] #4 The reporter has run GW=1 followed by PR=M and reported both the PR=M reply and whether OpenTherm frames appeared afterwards
 <!-- AC:END -->
 
@@ -79,3 +79,13 @@ Discriminating test requested from the reporter: GW=1 then PR=M via the web UI c
 
 2026-09-19 evening: the GW=1 discriminator ran (Appiejs, 16:37 UTC). PIC accepted it, PR: M=G confirmed on three subsequent polls, and STILL zero OpenTherm frames: the log after the PIC-settings cycle holds only PR=M / PR: M=G pairs every 60 to 120 s. So monitor mode was a stored setting, not the cause. Maintainer replied on the issue (17:33, 17:36): no OT traffic of any kind while the ESP-PIC link is healthy points at the OT-bus interface or the cabling, not firmware. Reporter (17:46) suspects the board is damaged where the cables enter and will inspect with debug tomorrow. Firmware side is exhausted for now; AC #3 leans toward closing as hardware once the reporter reports back.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Closed as a PIC-side fault, not firmware. Reporter (Appiejs, heat pump, 1.7.5) saw no OpenTherm traffic at all while the ESP-PIC link was healthy: every PR= query answered, PIC gateway 6.8 reported, GW=1 accepted and confirmed by PR: M=G, still zero frames. Direct thermostat-to-pump wiring worked and rewiring the OTGW changed nothing. What fixed it: loading the diagnose PIC firmware and then reloading gateway 6.8, a full reprogramming of the PIC. GitHub #684 closed on that reasoning (issues/684#issuecomment-5750129465).
+
+Lessons recorded in the notes: the PR: reply path was misread once (corrected publicly); monitor mode (PR: M=M) was a stored setting and a red herring; the bench capture tooling defaulted to the wrong baud and was fixed along the way (TASK-1140).
+
+Open follow-up: TASK-1143, wrong-looking values on 1.7.6-beta.3 that the reporter mentioned in passing; two needs-info questions were asked in the closing comment.
+<!-- SECTION:FINAL_SUMMARY:END -->
