@@ -3,11 +3,11 @@ id: TASK-1144
 title: >-
   feat-2.0.0: port TASK-1135 follow-up: a last-seen of 0 means never heard,
   whatever the clock says
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-20 12:12'
-updated_date: '2026-09-20 12:12'
+updated_date: '2026-09-20 12:21'
 labels:
   - port
   - otbus
@@ -28,7 +28,17 @@ The 2.0.0 port (TASK-1137, evaluateOTBusLiveness in OTGW-Core.ino around line 48
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 evaluateOTBusLiveness treats a last-seen stamp of 0 as absent regardless of now, for both the boiler and the thermostat stamp
-- [ ] #2 Right after a cold boot with nothing on the bus, /api/v2/device/info reports boilerconnected and thermostatconnected false from the first successful poll, verified on the bench OTGW32
-- [ ] #3 Build green for esp32-combo and evaluate.py --quick shows no new failures
+- [x] #1 evaluateOTBusLiveness treats a last-seen stamp of 0 as absent regardless of now, for both the boiler and the thermostat stamp
+- [x] #2 Right after a cold boot with nothing on the bus, /api/v2/device/info reports boilerconnected and thermostatconnected false from the first successful poll, verified on the bench OTGW32
+- [x] #3 Build green for esp32-combo and evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ported the never-heard guard from otgw-1.x.x c4a7827ea: evaluateOTBusLiveness() now requires a non-zero last-seen stamp before the 30 s window can say present, for both the boiler and the thermostat side. Without it a freshly booted gateway on a silent bus read both sides present until the clock passed 30 s, because time() counts from 0 before NTP sync.
+
+Verified on the bench OTGW32 (192.168.88.61) after flashing the combo build 0a2439a: the first five polls of /api/v2/device/info after boot all report boilerconnected and thermostatconnected false with nothing on the bus.
+
+Gates: build.bat --target esp32-combo, two SUCCESS steps, fresh artifact, flash 81.3 percent. evaluate.py --quick 76 checks, 0 failed, 1 pre-existing warning. Committed as 072dbbfac without a prerelease bump (batch convention); rides into the next alpha.
+<!-- SECTION:FINAL_SUMMARY:END -->
