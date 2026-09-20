@@ -92,8 +92,7 @@ class ESP8266HTTPUpdateServerTemplate
 
 using ESP8266HTTPUpdateServer = esp8266httpupdateserver::ESP8266HTTPUpdateServerTemplate<WiFiServer>;
 
-namespace BearSSL {
-using ESP8266HTTPUpdateServerSecure = esp8266httpupdateserver::ESP8266HTTPUpdateServerTemplate<WiFiServerSecure>;
-};
+// The upstream header also declared a TLS-flavoured alias over WiFiServerSecure.
+// This firmware is HTTP-only (ADR-003) and never referenced it, so it is gone.
 
 #endif

@@ -454,9 +454,9 @@ bool updateRebootLog(String text)
 //      build assumption (PUYA chips, NodeMCU/Wemos variants, flash-mode mismatch).
 //
 // All log output uses the "[reboot]" or "[flash]" prefix so the lifecycle is
-// greppable across the telnet log. After debugTelnet.stop() runs inside
-// prepareForReboot(), subsequent Debug* calls silently drop — we flush before
-// that point so the last-seen state is always visible to an external logger.
+// greppable across the telnet log. Once prepareForReboot() has shut the telnet
+// server down, subsequent Debug* calls silently drop — we flush before that
+// point so the last-seen state is always visible to an external logger.
 
 // Heap watermark. Updated from loop() via rebootHeapWatermarkTick().
 static uint32_t g_minFreeHeap = 0xFFFFFFFFUL;
