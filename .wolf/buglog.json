@@ -2677,5 +2677,23 @@
       "tooling",
       "false-alarm"
     ]
+  },
+  {
+    "id": "bug-153",
+    "timestamp": "2026-09-20T14:30:00+02:00",
+    "error_message": "Right after boot, with no OpenTherm frame ever received, /api/v2/device/info reported boilerconnected, thermostatconnected and otgwconnected true for about 30 s, then false. Seen on the 1.x bench after the TASK-1135 liveness fix; the same comparison exists in the 2.0.0 port (TASK-1137).",
+    "file": "src/OTGW-firmware/OTGW-Core.ino (evaluateOTBusLiveness), 1.x: src/OTGW-firmware/otBusLiveness.h",
+    "root_cause": "The verdict is `now < lastSeen + 30`. A never-heard side has lastSeen 0, and the comment assumed 0 is always in the past. Before NTP sync time() counts up from 0, so 0 + 30 sits in the future for the first 30 s after boot. Pre-fix builds never evaluated without a frame, which is why the artifact only appeared once the periodic tick existed.",
+    "fix": "Require a non-zero stamp before the window can say present: `(lastSeen != 0) && (now < lastSeen + 30)` for both sides. 1.x c4a7827ea with host test case (g); 2.0.0 072dbbfac (TASK-1144). Verified on both bench boards: first polls after boot read false.",
+    "tags": [
+      "otbus",
+      "liveness",
+      "boot",
+      "ntp",
+      "time",
+      "presence",
+      "TASK-1135",
+      "TASK-1144"
+    ]
   }
 ]
