@@ -4,6 +4,7 @@ title: Remove String from the ten ADR-049 sites the whole-codebase audit surface
 status: To Do
 assignee: []
 created_date: '2026-09-20 11:21'
+updated_date: '2026-09-20 11:24'
 labels:
   - tech-debt
   - adr-049
@@ -34,3 +35,11 @@ Where the platform API returns String (httpServer.arg, WiFi.hostname), the fix i
 - [ ] #4 sendApiNotFound still HTML-escapes &, <, >, and quotes in the echoed URI (reflected-XSS guard preserved), verified with a crafted 404 URL
 - [ ] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ID notice: the backlog CLI reused 1141 for this task on 2026-09-20. The archived task-1141 (Log every PR: response so a capture shows whether the PIC answers at all, closed the day before with its premise falsified) is a different record; commits from 2026-09-19 that cite TASK-1141 refer to that one. The CLI treats archived IDs as free (five other IDs exist in both backlog/tasks and backlog/archive/tasks), so this is tooling behaviour, not a copy.
+
+Prior art: TASK-679 (Done) already replaced the String HTTP args in upgradepic(), and TASK-678 (Done) the String path in the firmware file list. The ten sites here are what those two left behind: the helpers checkforupdatepic()/refreshpic() still take and return String, plus the four request-path sites in restAPI.ino and networkStuff.ino.
+<!-- SECTION:NOTES:END -->
