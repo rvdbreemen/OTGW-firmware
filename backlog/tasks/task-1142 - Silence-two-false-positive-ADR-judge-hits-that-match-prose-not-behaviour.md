@@ -1,11 +1,11 @@
 ---
 id: TASK-1142
 title: 'Silence two false-positive ADR judge hits that match prose, not behaviour'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-20 11:21'
-updated_date: '2026-09-20 11:22'
+updated_date: '2026-09-20 11:28'
 labels:
   - housekeeping
   - adr
@@ -30,8 +30,23 @@ Out of scope, left as known noise: ADR-042 matching its own citation in a commen
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 OTGW-ModUpdateServer.h no longer declares the BearSSL namespace alias, and grep confirms nothing references ESP8266HTTPUpdateServerSecure
-- [ ] #2 The helperStuff.ino comment keeps its meaning without the literal debugTelnet.stop() token
-- [ ] #3 adr-judge over the two files reports no ADR-003 and no ADR-079 hit; the whole-codebase audit drops from 14 to 12 hits
-- [ ] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [x] #1 OTGW-ModUpdateServer.h no longer declares the BearSSL namespace alias, and grep confirms nothing references ESP8266HTTPUpdateServerSecure
+- [x] #2 The helperStuff.ino comment keeps its meaning without the literal debugTelnet.stop() token
+- [x] #3 adr-judge over the two files reports no ADR-003 and no ADR-079 hit; the whole-codebase audit drops from 14 to 12 hits
+- [x] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Two false-positive ADR judge hits removed at the code side; no behaviour change.
+
+- OTGW-ModUpdateServer.h: deleted the inherited BearSSL namespace alias (ESP8266HTTPUpdateServerSecure over WiFiServerSecure). grep over src/ confirms nothing referenced it; the firmware is HTTP-only per ADR-003.
+- helperStuff.ino: reworded the comment that carried the literal debugTelnet.stop() token; same meaning.
+
+Evidence: adr-judge on the diff 0 violations; whole-codebase adr-audit dropped from 14 to 12 hits, with ADR-003 and ADR-079 no longer listed. build.bat produced fresh firmware and filesystem (13:26, Build completed successfully). evaluate.py --quick 38/38, health 100 percent.
+
+Remaining 12: ten ADR-049 String sites tracked in TASK-1141, plus two pattern-literal hits (ADR-042 matching its own citation in a comment, ADR-094 wanting the HasData gate on the same line) that need sharper Enforcement patterns via supersession, not code.
+
+Shipped on otgw-1.x.x as 7be7678a8.
+<!-- SECTION:FINAL_SUMMARY:END -->
