@@ -1,9 +1,11 @@
 ---
 id: TASK-1142
 title: 'Silence two false-positive ADR judge hits that match prose, not behaviour'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-20 11:21'
+updated_date: '2026-09-20 11:22'
 labels:
   - housekeeping
   - adr
