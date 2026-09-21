@@ -3,10 +3,11 @@ id: TASK-1146
 title: >-
   Fix: port 25238 discards the first command after connect, breaking the HA
   opentherm_gw integration
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-21 18:58'
-updated_date: '2026-09-21 18:59'
+updated_date: '2026-09-21 19:09'
 labels:
   - bug
 dependencies: []
