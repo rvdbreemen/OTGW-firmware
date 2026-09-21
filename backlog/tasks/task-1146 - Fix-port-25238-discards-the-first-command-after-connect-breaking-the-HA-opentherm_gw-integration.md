@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-21 18:58'
-updated_date: '2026-09-21 19:13'
+updated_date: '2026-09-21 20:02'
 labels:
   - bug
 dependencies: []
@@ -58,3 +58,24 @@ Residual accepted: a telnet option byte could coincidentally equal a command cha
 
 Completion: AC #5 is not self-verifiable, so the task stays In Progress with that blocking AC named in the Final Summary once everything else is green.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+On-device verification on the bench 1.x ESP8266 (192.168.88.68, PIC gateway 6.8), firmware-only web OTA the XHR way.
+
+Reproduced first on the OLD build (1.7.6-beta.4+014d380), which is what makes the after-figure mean something. Same script, four write delays after connect, 8 trials each:
+- zero-delay 5/8 answered, 1ms 7/8, 5ms 8/8, 20ms 8/8
+- the misses returned raw R00000000 frames, matching the report that the port looks alive while the command is gone
+- an earlier attempt at a flat 20ms delay did NOT reproduce, because by then accept() has already run and drained an empty buffer. The race only opens when the bytes land before the first loop() pass.
+
+After flashing the fix (+b6b3c98): 8/8 at every delay, 32/32 total, plus a later 10/10 immediate run. 42/42 with zero misses.
+
+Port 23 regression check: banner delivered (1631 bytes) and the h command answered in three sessions, including two where a real telnet clients IAC DO/WILL burst was written at zero delay so it landed before accept. No spurious command fired, which is the handleDebugChar default: break path behaving as the plan predicted.
+
+AC #2 verified with the real client rather than deferred: pyotgw 2.2.3, the exact version from the report, against socket://192.168.88.68:25238. 3/3 connects succeeded, no cannot_connect.
+
+One honest caveat, not claimed as fixed: each 3-attempt pyotgw run logs exactly 2 "Timed out waiting for command: PS, value: 0" lines during init. The count is stable across runs, unlike the random misses of the discard bug, and it never prevents the connection. This bench unit has no boiler or thermostat attached (thermostatconnected false), which is a plausible cause. Out of scope for #685; flagging rather than burying it.
+
+Device health after the runs: no crashlog, lastreset Software/System restart from the OTA only, bootcount stable at 2, heap ~18 KB, MQTT connected.
+<!-- SECTION:NOTES:END -->
