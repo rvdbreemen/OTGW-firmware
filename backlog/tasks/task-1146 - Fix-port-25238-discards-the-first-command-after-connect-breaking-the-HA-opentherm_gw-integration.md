@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-21 18:58'
-updated_date: '2026-09-21 19:09'
+updated_date: '2026-09-21 19:13'
 labels:
   - bug
 dependencies: []
@@ -39,3 +39,22 @@ Scope note: the fix lands inside the vendored SimpleTelnet submodule. There is n
 - [ ] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 - [ ] #5 petrister confirms on a beta build that the HA integration connects
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. SimpleTelnet repo: branch from cc4c88e, backport the _drainClient() half of upstream a909731 (delete the inbound-discard loop, keep the outbound flush). Skip the _releaseSlot()/_flushTx() half - it lives in AsyncSimpleTelnet.h, which does not exist at cc4c88e. Commit and push.
+2. Bump the 1.x submodule pointer to the new commit, commit in the superproject.
+3. Verify: python build.py --firmware exits 0; python evaluate.py --quick shows no new failures.
+4. On-device on the bench 1.x ESP8266 (192.168.88.68) via web OTA: a socket client that writes immediately after connect gets its reply on 25238; port 23 console still behaves.
+5. Ask petrister on GH #685 to confirm the HA opentherm_gw integration connects.
+6. 2.0.0: verification only. Append a note to TASK-1145 that the adopted commit also closes #685; do not touch its AC list.
+
+Rejected alternative: bump 1.x straight to origin/main. cc4c88e is an ancestor so it is mechanically clean, but the delta is the library 2.0.0 rewrite (+3261/-674, new SimpleTelnetCore.h, async transport, RFC 854 negotiation). Two verified blockers: (a) upstream defaults to NEG_REFUSE which strips IAC, breaking byte transparency on the raw 25238 port - 2.0.0 compensates with setTelnetNegotiation(NEG_OFF) at OTGW-Core.ino:5563, so a 1.x bump would need the same; (b) ESP8266 Core 2.7.4 compatibility of the rewrite is unverified, and cc4c88e exists specifically for dual-target WiFiServer accept()/available().
+
+Safety verified at the 1.x pin rather than inherited from upstream: port 25238 runs streaming mode (_onInput == nullptr) so nothing filters it, which is correct for a raw port. Port 23 is setLineMode(false), so _handleCharInput passes every byte and the >=0x80 guard in _handleLineInput is never reached - upstream's _filterByte premise does not transfer. Checked the consumer instead: handleDebugChar()'s switch ends in 'default: break;' (handleDebug.ino:284), so stray IAC bytes are silently ignored.
+
+Residual accepted: a telnet option byte could coincidentally equal a command char (all commands >=0x20); standard clients negotiate options <=39, colliding with none. The proper fix is upstream's IAC state machine, reachable only via the full bump.
+
+Completion: AC #5 is not self-verifiable, so the task stays In Progress with that blocking AC named in the Final Summary once everything else is green.
+<!-- SECTION:PLAN:END -->
