@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-21 18:58'
-updated_date: '2026-09-21 20:03'
+updated_date: '2026-09-21 20:05'
 labels:
   - bug
 dependencies: []
@@ -80,6 +80,15 @@ One honest caveat, not claimed as fixed: each 3-attempt pyotgw run logs exactly 
 Device health after the runs: no crashlog, lastreset Software/System restart from the OTA only, bootcount stable at 2, heap ~18 KB, MQTT connected.
 
 Wording drift on AC #3, flagged rather than silently accepted. It reads "the telnet debug console on port 23 still discards telnet negotiation on connect (no regression)". After this fix the console deliberately does NOT discard any more, so the literal text is false while the intent, no regression on port 23, is met and verified. Checked against the intent. If the wording matters for the record it should be reworded to "the telnet debug console on port 23 is unaffected (no regression)".
+
+Resolved the pyotgw PS-timeout caveat rather than leaving it open. Probed the commands directly on the fixed build:
+- PS=1 -> "PS: 1" followed by an all-zero summary line
+- PS=0 -> "PS: 0"
+- PR=A -> "PR: A=OpenTherm Gateway 6.8"
+
+All three answer correctly. The summary is all zeros because this bench unit has no boiler and no thermostat, so pyotgw waits during init for values an empty bus never produces. Not a firmware defect and not a residue of the discard bug. No follow-up task opened; noted on GH #685 so the question is not left hanging.
+
+Filesystem deliberately NOT flashed, recorded so nobody assumes a full-image verification happened. The fix commit touches CHANGELOG.md and the SimpleTelnet submodule only, zero files under src/OTGW-firmware/data/, so the LittleFS image is byte-identical in content to the one the unit already runs. Flashing it would also wipe /otgw_simulation.log, which the bench needs for silent-bus tests. Firmware-only OTA was the right scope here; a beta release still ships both, as the release notes always state.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
