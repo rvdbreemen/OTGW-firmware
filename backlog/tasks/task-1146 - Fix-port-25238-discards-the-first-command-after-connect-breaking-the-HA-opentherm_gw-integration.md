@@ -33,10 +33,10 @@ Scope note: the fix lands inside the vendored SimpleTelnet submodule. There is n
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A client that writes a command immediately after the TCP connect on port 25238 gets its reply; the command is no longer discarded
-- [ ] #2 Home Assistant's opentherm_gw integration completes setup against socket://<ip>:25238 without cannot_connect
-- [ ] #3 The telnet debug console on port 23 still discards telnet negotiation on connect (no regression)
-- [ ] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [x] #1 A client that writes a command immediately after the TCP connect on port 25238 gets its reply; the command is no longer discarded
+- [x] #2 Home Assistant's opentherm_gw integration completes setup against socket://<ip>:25238 without cannot_connect
+- [x] #3 The telnet debug console on port 23 still discards telnet negotiation on connect (no regression)
+- [x] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 - [ ] #5 petrister confirms on a beta build that the HA integration connects
 <!-- AC:END -->
 
