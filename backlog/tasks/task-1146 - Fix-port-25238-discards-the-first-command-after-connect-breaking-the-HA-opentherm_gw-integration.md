@@ -81,3 +81,51 @@ Device health after the runs: no crashlog, lastreset Software/System restart fro
 
 Wording drift on AC #3, flagged rather than silently accepted. It reads "the telnet debug console on port 23 still discards telnet negotiation on connect (no regression)". After this fix the console deliberately does NOT discard any more, so the literal text is false while the intent, no regression on port 23, is met and verified. Checked against the intent. If the wording matters for the record it should be reworded to "the telnet debug console on port 23 is unaffected (no regression)".
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixes the port 25238 defect behind GH #685: the first command a client sent after connecting was discarded, so Home Assistants opentherm_gw integration failed with cannot_connect.
+
+## Cause
+
+SimpleTelnet::_drainClient() read and threw away every pending inbound byte at accept, justified as flushing telnet negotiation. The server only accepts a client on the next loop() pass, so a client that pipelines a command with connect() had that command waiting in the receive buffer when the drain ran, and lost it. pyotgw writes PS=0 about 20 ms after the TCP handshake and waits for PS: 0, which never came, while raw OpenTherm frames kept streaming on the same connection and made the port look healthy.
+
+The loop was unconditional and could not tell an IAC sequence from payload. Port 25238 runs in streaming mode (_onInput == nullptr), so _processInput() never runs there and the drain was the only thing touching those bytes, on a port that speaks no telnet at all.
+
+## Change
+
+One change, in the vendored SimpleTelnet submodule: _drainClient() now flushes outbound only. Backport of upstream a909731 onto the 1.x line, which predates the librarys 2.0.0 rewrite. Only the _drainClient half applies; the _releaseSlot/_flushTx half lives in AsyncSimpleTelnet.h, which does not exist on this line.
+
+- SimpleTelnet: branch fix/no-discard-at-accept-1x, commit a297bf4, pushed.
+- Firmware: submodule bump plus CHANGELOG, commit 3ef40d692, pushed to origin/otgw-1.x.x.
+
+Rejected the alternative of bumping straight to origin/main. cc4c88e is an ancestor so it is mechanically clean, but the delta is the 2.0.0 rewrite (+3261/-674). Two verified blockers: upstream defaults to NEG_REFUSE which strips IAC and would break byte transparency on the raw port (2.0.0 compensates with setTelnetNegotiation(NEG_OFF) at OTGW-Core.ino:5563), and ESP8266 Core 2.7.4 compatibility of the rewrite is unverified.
+
+## Verification
+
+Bug reproduced on the old build first, then re-tested after flashing, same script:
+
+| write delay | before (+014d380) | after (+b6b3c98) |
+|---|---|---|
+| zero-delay | 5/8 answered | 8/8 |
+| 1 ms | 7/8 | 8/8 |
+| 5 ms | 8/8 | 8/8 |
+| 20 ms | 8/8 | 8/8 |
+
+Plus a later 10/10 immediate run: 42/42 with zero misses after the fix.
+
+pyotgw 2.2.3, the exact version from the report, connects 3/3 with no cannot_connect. Port 23 unaffected: banner and h command answered in three sessions, two of them with a real telnet clients IAC burst written at zero delay so it landed before accept; no spurious command fired.
+
+Build green (1.7.6-beta.4+b6b3c98, firmware and filesystem). Evaluator 38 checks, 0 failures.
+
+## Risks and follow-ups
+
+- Accepted residual: a telnet option byte could coincidentally equal a console command char (all commands are >= 0x20). Standard clients negotiate options <= 39, colliding with none. The proper answer is upstreams IAC state machine, reachable only via the full bump.
+- Unrelated observation, not fixed and not claimed: each 3-attempt pyotgw run logs exactly 2 PS command timeouts during init. Stable count, never blocks the connection, and this bench unit has no boiler or thermostat attached.
+- The 2.0.0 line already carries this fix via its own adoption of a909731; no sibling task was needed.
+
+## Blocking AC
+
+AC #5 requires petrister to confirm on a beta build. Not self-verifiable, so the task stays In Progress until he reports back on GH #685.
+<!-- SECTION:FINAL_SUMMARY:END -->
