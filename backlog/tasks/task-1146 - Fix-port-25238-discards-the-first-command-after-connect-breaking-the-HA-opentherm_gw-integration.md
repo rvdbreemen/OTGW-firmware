@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-21 18:58'
-updated_date: '2026-09-21 20:02'
+updated_date: '2026-09-21 20:03'
 labels:
   - bug
 dependencies: []
@@ -78,4 +78,6 @@ AC #2 verified with the real client rather than deferred: pyotgw 2.2.3, the exac
 One honest caveat, not claimed as fixed: each 3-attempt pyotgw run logs exactly 2 "Timed out waiting for command: PS, value: 0" lines during init. The count is stable across runs, unlike the random misses of the discard bug, and it never prevents the connection. This bench unit has no boiler or thermostat attached (thermostatconnected false), which is a plausible cause. Out of scope for #685; flagging rather than burying it.
 
 Device health after the runs: no crashlog, lastreset Software/System restart from the OTA only, bootcount stable at 2, heap ~18 KB, MQTT connected.
+
+Wording drift on AC #3, flagged rather than silently accepted. It reads "the telnet debug console on port 23 still discards telnet negotiation on connect (no regression)". After this fix the console deliberately does NOT discard any more, so the literal text is false while the intent, no regression on port 23, is met and verified. Checked against the intent. If the wording matters for the record it should be reworded to "the telnet debug console on port 23 is unaffected (no regression)".
 <!-- SECTION:NOTES:END -->
