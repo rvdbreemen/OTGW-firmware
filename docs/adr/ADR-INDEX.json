@@ -5754,6 +5754,68 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-178",
+      "title": "Widen the SAT area-sensor reference to accept a BLE MAC alongside a Dallas address",
+      "path": "ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-09-22",
+      "decision_summary": "settings.sat.sSensorArea becomes char[4][18] and holds a sensor reference that is either a 16-character Dallas addres...",
+      "topics": [
+        "ble sensors",
+        "dallas sensors",
+        "sat area sensors",
+        "settings schema"
+      ],
+      "aliases": [
+        "area sensor mapping",
+        "satsensorarea",
+        "sSensorArea"
+      ],
+      "components": [
+        "/api/v2/sat/sensor-areas",
+        "settings.sat.sSensorArea"
+      ],
+      "symbols": [
+        "satSetAreaTemp",
+        "sSensorArea"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "settings.sat.sSensorArea[n] is sized for the wider form (at least 18 bytes).",
+          "PATCH /api/v2/sat/sensor-areas accepts an empty string (clear), 16 hex characters, or a 17-character MAC with colons at positions 2, 5, 8, 11 and 14, and normalises to uppercase. Anything else is a 400.",
+          "A settings file written before this change, holding Dallas-only values, loads unchanged.",
+          "Each area has one in-firmware writer. A source claims an area only when the stored reference matches that source's own address form."
+        ],
+        "must_not": [
+          "Do not add a separate type/source field to disambiguate. The value's shape is the discriminator, and a second field could disagree with it.",
+          "Do not widen the field without widening the satsensorarea settings maxima (restAPI.ino), or a valid MAC is silently truncated on the settings round-trip."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "tests/webui/sat-area-sensor-mapping.test.mjs — drives the shipped UI against both sensor sources and asserts a selected BLE MAC reaches PATCH /api/v2/sat/sensor-areas intact.",
+          "src/OTGW-firmware/SATtypes.h — field declaration and its width.",
+          "src/OTGW-firmware/restAPI.ino — the sensor-areas validation branch."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/**/*.h"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -10650,6 +10712,18 @@
     {
       "source": "ADR-177",
       "target": "ADR-130",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-178",
+      "target": "ADR-051",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-178",
+      "target": "ADR-165",
       "type": "related",
       "resolved": true
     }

@@ -11,37 +11,23 @@
     "audit_findings": 0
   },
   "retire_seen": [],
-  "last_nudged": "2026-07-05T20:32:37.980415+00:00",
+  "last_nudged": "2026-07-20T02:00:08.509054+00:00",
   "watch": {
     "nudges": {
-      "ADR-106|src/OTGW-firmware/data/ds-tokens.css": "2026-07-06T17:28:08.664222+00:00",
-      "ADR-077|src/OTGW-firmware/data/ds-tokens.css": "2026-07-06T17:28:08.664222+00:00",
-      "ADR-090|src/OTGW-firmware/data/ds-tokens.css": "2026-07-06T17:28:08.664222+00:00",
-      "ADR-002|build.py": "2026-07-06T17:35:43.578928+00:00",
-      "ADR-013|build.py": "2026-07-06T17:35:43.578928+00:00",
-      "ADR-049|build.py": "2026-07-06T17:35:43.578928+00:00",
-      "ADR-106|src/OTGW-firmware/data/v2.html": "2026-07-06T17:36:16.881741+00:00",
-      "ADR-077|src/OTGW-firmware/data/v2.html": "2026-07-06T17:36:16.881741+00:00",
-      "ADR-090|src/OTGW-firmware/data/v2.html": "2026-07-06T17:36:16.881741+00:00",
-      "ADR-091|src/OTGW-firmware/data/v2.html": "2026-07-06T17:41:05.357839+00:00",
-      "ADR-065|src/OTGW-firmware/data/v2.html": "2026-07-06T17:41:05.357839+00:00",
-      "ADR-093|src/OTGW-firmware/data/v2.html": "2026-07-06T17:41:05.357839+00:00",
-      "ADR-094|src/OTGW-firmware/data/v2.html": "2026-07-06T17:41:29.605436+00:00",
-      "ADR-098|src/OTGW-firmware/data/v2.html": "2026-07-06T17:41:29.605436+00:00",
-      "ADR-101|src/OTGW-firmware/data/v2.html": "2026-07-06T17:41:29.605436+00:00",
-      "ADR-154|scripts/json_golden.py": "2026-07-06T18:55:39.860702+00:00",
-      "ADR-154|scripts/relicense_mit_to_gplv3.py": "2026-07-06T20:25:18.005162+00:00",
-      "ADR-098|docs/adr/README.md": "2026-07-06T21:01:08.448493+00:00"
+      "ADR-002|build.bat": "2026-07-11T19:06:08.934011+00:00",
+      "ADR-013|build.bat": "2026-07-11T19:06:08.934011+00:00",
+      "ADR-049|build.bat": "2026-07-11T19:06:08.934011+00:00",
+      "ADR-061|build.bat": "2026-07-11T19:07:00.389626+00:00",
+      "ADR-063|build.bat": "2026-07-11T19:07:00.389626+00:00",
+      "ADR-077|build.bat": "2026-07-11T19:07:00.389626+00:00",
+      "ADR-083|build.bat": "2026-07-11T19:18:06.885149+00:00",
+      "ADR-092|build.bat": "2026-07-11T19:18:06.885149+00:00",
+      "ADR-098|build.bat": "2026-07-11T19:18:06.885149+00:00"
     }
   },
   "inject": {
     "nudges": {
-      "ADR-106|src/OTGW-firmware/data/ds-tokens.css": "2026-07-06T17:28:06.802291+00:00",
-      "ADR-002|build.py": "2026-07-06T17:35:41.893529+00:00",
-      "ADR-106|src/OTGW-firmware/data/v2.html": "2026-07-06T17:36:15.198087+00:00",
-      "ADR-154|scripts/json_golden.py": "2026-07-06T18:55:38.191973+00:00",
-      "ADR-154|scripts/relicense_mit_to_gplv3.py": "2026-07-06T20:25:16.345527+00:00",
-      "ADR-098|docs/adr/README.md": "2026-07-06T21:01:06.742186+00:00"
+      "ADR-002|build.bat": "2026-07-11T19:05:49.707359+00:00"
     }
   }
 }

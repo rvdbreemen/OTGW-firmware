@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.368
+**  Version  : v2.0.0-alpha.369
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -4128,7 +4128,7 @@ function buildDallasSensorAreasPanel(page) {
   arrow.className = 'sat-settings-arrow';
   arrow.textContent = '▼';
   toggleBtn.appendChild(arrow);
-  toggleBtn.appendChild(document.createTextNode(' DS18B20 Area Sensor Mapping'));
+  toggleBtn.appendChild(document.createTextNode(' Area Sensor Mapping'));
   toggleBtn.addEventListener('click', function() {
     toggleSATSettingsGroup('sat-grp-dallas-areas-header');
   }, false);
@@ -4140,7 +4140,7 @@ function buildDallasSensorAreasPanel(page) {
 
   var hint = document.createElement('p');
   hint.className = 'sat-label';
-  hint.textContent = 'Map a discovered DS18B20 sensor to each SAT area. Temperature is auto-forwarded on each poll cycle.';
+  hint.textContent = 'Map any discovered sensor to each SAT area: a wired DS18B20 or a BLE sensor from the roster. Temperature is auto-forwarded on each poll cycle.';
   body.appendChild(hint);
 
   var grid = document.createElement('div');
@@ -4184,9 +4184,18 @@ function refreshDallasSensorAreas() {
       }).catch(function() { return { areas: emptyAreas }; }).then(function(v) { results.push(v); });
     })
     .then(function() {
+      // TASK-1153: BLE roster is the second sensor source. Still sequential, so the
+      // frontend never exceeds the N<=2 in-flight cap (ADR-165).
+      return fetch(APIGW + 'v2/sat/ble/discovery').then(function(r) {
+        if (!r.ok) return null;
+        return r.json();
+      }).catch(function() { return null; }).then(function(v) { results.push(v); });
+    })
+    .then(function() {
     var statusJson = results[0];
     var labelsMap  = results[1] || {};
     var areaData   = results[2] || { areas: emptyAreas };
+    var bleData    = results[3];
     var areas      = areaData.areas || emptyAreas;
 
     var sensors = [];
@@ -4194,7 +4203,16 @@ function refreshDallasSensorAreas() {
     if (devObj) {
       Object.keys(devObj).forEach(function(addr) {
         var upperAddr = addr.toUpperCase();
-        sensors.push({ address: upperAddr, label: labelsMap[addr] || labelsMap[upperAddr] || '' });
+        sensors.push({ address: upperAddr, label: labelsMap[addr] || labelsMap[upperAddr] || '', source: 'DS18B20' });
+      });
+    }
+    // BLE sensors are addressed by MAC; the 17-char shape is what tells the firmware
+    // this area is owned by the BLE path rather than the Dallas poll loop.
+    if (bleData && Array.isArray(bleData.sensors)) {
+      bleData.sensors.forEach(function(b) {
+        var mac = (b && b.mac ? String(b.mac) : '').toUpperCase();
+        if (!mac) return;
+        sensors.push({ address: mac, label: b.label || b.name || '', source: 'BLE' });
       });
     }
     renderDallasSensorAreas(grid, sensors, areas);
@@ -4228,7 +4246,9 @@ function renderDallasSensorAreas(grid, sensors, areas) {
         if (!addr) return;
         var opt = document.createElement('option');
         opt.value = addr;
-        opt.textContent = s.label ? (s.label + ' (' + addr + ')') : addr;
+        // Name the source so two 12-hex-looking strings are not mistaken for each other.
+        var suffix = s.source ? (' [' + s.source + ']') : '';
+        opt.textContent = (s.label ? (s.label + ' (' + addr + ')') : addr) + suffix;
         if (addr === currentAddr) opt.selected = true;
         sel.appendChild(opt);
       });

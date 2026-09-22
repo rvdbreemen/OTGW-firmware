@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.368
+**  Version  : v2.0.0-alpha.369
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -518,7 +518,12 @@ struct SATSection {
   uint16_t iZoneTimeoutS       = 300;  // Seconds without update before zone is considered inactive (default 5 min)
   float    fZoneAggregationHeadroom = 5.0f; // Headroom added to P75 zone aggregate (°C, default 5.0)
   // TASK-587: DS18B20 sensor-to-SAT-area mapping (area 0..3)
-  char sSensorArea[4][17] = {{0}};  // Dallas address (16 hex chars + null) per area; empty = unmapped
+  // Area sensor reference: either a Dallas address (16 hex chars) or a BLE MAC
+  // ("AA:BB:CC:DD:EE:FF", 17 chars), so the field is sized for the wider of the two.
+  // Empty = unmapped. Widened from [17] for TASK-1153; Dallas-only values load
+  // unchanged. Which source owns an area follows from the value's own shape, so an
+  // area always has exactly one writer.
+  char sSensorArea[4][18] = {{0}};
   // PV-surplus setpoint boost (TASK-640)
   bool     bPvBoostEnabled        = false;   // Enable PV-surplus boost
   uint16_t iPvBoostThresholdW     = 1500;    // Surplus threshold in W (100-10000)

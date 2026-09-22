@@ -1,7 +1,7 @@
 ---
 id: TASK-1151
 title: 'OLED status rows keep the tail of the previous, longer text'
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:37'
@@ -40,3 +40,20 @@ ADR NOTE: ADR-067 records 'Accepted: at 1 Hz refresh with clear() first', which 
 - [x] #9 python build.py --target esp32 exits 0 with a fresh firmware.bin; python evaluate.py --quick shows no new FAILs
 - [ ] #10 Field-verified on the bench OTGW32 with an Ethernet cable plugged and unplugged
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Evidence: tests/test_oled_row_clear.cpp (new, 11/11 pass, compiled with MSVC per tests/README.md). Models the display as an 8x21 character grid.
+
+- Negative control reproduces the reported corruption from the OLD positioning: 'IP: 0.0.0.0.1.150' verbatim, and an 'Ethernet'-over-SSID tail. Without that the test would only confirm its own assumption.
+- Fixed path yields exactly 'Ethernet' and 'IP: 0.0.0.0'.
+- Skipped-row case: a populated RSSI row goes blank via oledClearRow().
+- Static assertion over OLED.ino: zero raw oledDisplay.setRow( remain, 42 oledRow references, clearToEOL is actually called. This is what covers all 38 writers, not just the few the test drives.
+
+build.bat green on esp32, esp32-classic and esp32-combo with zero warnings from OLED.ino; evaluate.py --quick 0 failures, 98.7%. Shipped as 572cd9a0 under alpha.368.
+
+AC7 correction: the 'manual-padding workaround' the verification pass flagged at OLED.ino:311-314 is not a stale-tail workaround. F("on  ") vs F("off ") is column alignment that keeps 'DHW:' at a fixed column; removing it would render 'CH:onDHW:on'. Kept and documented in place rather than removed.
+
+AC2, AC3, AC6 and AC10 need an OLED on a 2.0.0 board. None was reachable this session: the OTGW32 (192.168.88.61) is in ARP but does not answer, the S3 Mini Pro is not on the network, and 192.168.88.68 is the 1.x ESP8266 unit.
+<!-- SECTION:NOTES:END -->

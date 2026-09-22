@@ -1522,7 +1522,7 @@
     satzonecount:        { cat: 'sat', label: 'Zone count' },
     satzonetimeout:      { cat: 'sat', label: 'Zone sensor timeout', hint: 'Seconds' },
     satzoneheadroom:     { cat: 'sat', label: 'Zone headroom', hint: '°C' },
-    satsensorarea0:      { cat: 'sat', label: 'Area 0 sensor' },
+    satsensorarea0:      { cat: 'sat', label: 'Area 0 sensor', hint: 'DS18B20 or BLE' },
     satsensorarea1:      { cat: 'sat', label: 'Area 1 sensor' },
     satsensorarea2:      { cat: 'sat', label: 'Area 2 sensor' },
     satsensorarea3:      { cat: 'sat', label: 'Area 3 sensor' },
@@ -1653,6 +1653,7 @@
       });
       renderSettings();
       fetchBle();
+      populateAreaSensorChoices();  // TASK-1153: turn the four area fields into pickers
       maybeShowOnboarding();   // TASK-997: first-time wizard, once settings (ui_onboarded) are known
     }).catch(function () { });
   }
@@ -2113,6 +2114,47 @@
     }
   }
   var graphWindowMs = 3600000;
+  // TASK-1153: the four SAT area-sensor fields used to be raw text inputs, so you had
+  // to type a Dallas address by hand and a BLE sensor could not be chosen at all.
+  // They are plain settings keys, so the existing ENUM_OPTS select path renders them
+  // once it has options — no new field type needed. Fetches are sequential to stay
+  // within the N<=2 in-flight cap (ADR-165).
+  function populateAreaSensorChoices() {
+    var opts = [['', '-- none --']];
+    fetch(APIGW + 'v2/sensors')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .catch(function () { return null; })
+      .then(function (statusJson) {
+        var devObj = statusJson && statusJson.sensors && statusJson.sensors.devices;
+        if (devObj) {
+          Object.keys(devObj).forEach(function (addr) {
+            var up = String(addr).toUpperCase();
+            opts.push([up, up + ' [DS18B20]']);
+          });
+        }
+        return fetch(APIGW + 'v2/sat/ble/discovery')
+          .then(function (r) { return r.ok ? r.json() : null; })
+          .catch(function () { return null; });
+      })
+      .then(function (ble) {
+        if (ble && Array.isArray(ble.sensors)) {
+          ble.sensors.forEach(function (b) {
+            var mac = (b && b.mac ? String(b.mac) : '').toUpperCase();
+            if (!mac) return;
+            var name = b.label || b.name || '';
+            opts.push([mac, (name ? name + ' (' + mac + ')' : mac) + ' [BLE]']);
+          });
+        }
+        // Only take over the fields once there is something to choose from; with no
+        // sensors at all the plain text input remains the more useful control.
+        if (opts.length > 1) {
+          for (var i = 0; i < 4; i++) ENUM_OPTS['satsensorarea' + i] = opts;
+          renderSettings();
+        }
+      })
+      .catch(function () { /* leave the text inputs in place */ });
+  }
+
   var ENUM_OPTS = {
     satsource: [[0, 'Auto'], [1, 'Gas Boiler'], [2, 'Heat Pump'], [3, 'Hybrid']],
     satsystem: [[0, 'Auto'], [1, 'Radiators'], [2, 'Underfloor']],

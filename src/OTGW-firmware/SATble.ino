@@ -836,6 +836,18 @@ void satBLEUpdateState()
 
     sensorCount++;
     if (firstFreshSlot < 0) firstFreshSlot = i;
+
+    // TASK-1153: area fan-out. An area maps to exactly one sensor reference, so a
+    // BLE MAC and a Dallas address can never claim the same area and each area keeps
+    // a single writer. The Dallas poll loop does the mirror of this in sensors_ext.ino.
+    if (!isnan(snap.fTemperature)) {
+      for (uint8_t areaIdx = 0; areaIdx < 4; areaIdx++) {
+        if (settings.sat.sSensorArea[areaIdx][0] == '\0') continue;
+        if (strcasecmp(settings.sat.sSensorArea[areaIdx], settings.sat.sBleMac[i]) == 0) {
+          satSetAreaTemp(areaIdx, snap.fTemperature);
+        }
+      }
+    }
     if (havePin && pinnedSlot < 0 &&
         strcasecmp(settings.sat.sBleMac[i], settings.sat.sBleMAC) == 0) {
       pinnedSlot = i;

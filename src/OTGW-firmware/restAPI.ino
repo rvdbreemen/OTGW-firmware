@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.368
+**  Version  : v2.0.0-alpha.369
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1916,9 +1916,14 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       if (areaBuf[0] == '\0') { sendApiError(400, F("Missing 'area' field (0-3)")); return; }
       int areaIdx = atoi(areaBuf);
       if (areaIdx < 0 || areaIdx >= 4) { sendApiError(400, F("'area' must be 0-3")); return; }
-      // Validate sensor: empty (clear) or exactly 16 hex chars
+      // Validate sensor: empty (clear), a Dallas address (16 hex chars) or a BLE
+      // MAC ("AA:BB:CC:DD:EE:FF"). The two shapes are unambiguous by length, so the
+      // stored value alone says which source owns the area (TASK-1153).
       size_t slen = strlen(sensorBuf);
-      if (slen != 0 && slen != 16) { sendApiError(400, F("'sensor' must be 16 hex chars or empty string")); return; }
+      if (slen != 0 && slen != 16 && slen != 17) {
+        sendApiError(400, F("'sensor' must be a 16-hex Dallas address, a 17-char BLE MAC, or empty"));
+        return;
+      }
       if (slen == 16) {
         for (size_t ci = 0; ci < 16; ci++) {
           if (!isxdigit((unsigned char)sensorBuf[ci])) {
@@ -1926,8 +1931,19 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
             return;
           }
         }
-        // Normalize to uppercase
         for (size_t ci = 0; ci < 16; ci++) sensorBuf[ci] = toupper((unsigned char)sensorBuf[ci]);
+      }
+      else if (slen == 17) {
+        for (size_t ci = 0; ci < 17; ci++) {
+          const bool wantColon = ((ci % 3) == 2);
+          if (wantColon) {
+            if (sensorBuf[ci] != ':') { sendApiError(400, F("'sensor' MAC must be AA:BB:CC:DD:EE:FF")); return; }
+          } else if (!isxdigit((unsigned char)sensorBuf[ci])) {
+            sendApiError(400, F("'sensor' MAC must be AA:BB:CC:DD:EE:FF"));
+            return;
+          }
+        }
+        for (size_t ci = 0; ci < 17; ci++) sensorBuf[ci] = toupper((unsigned char)sensorBuf[ci]);
       }
       char settingKey[16];
       snprintf_P(settingKey, sizeof(settingKey), PSTR("SATsensorarea%d"), areaIdx);
@@ -3955,10 +3971,10 @@ void sendDeviceSettings()
   addInt (F("satzonecount"),      settings.sat.iZoneCount, "i", 1, 4);
   addInt (F("satzonetimeout"),    settings.sat.iZoneTimeoutS, "i", 30, 3600);
   // DS18B20 sensor-to-area mapping (TASK-587): 16-hex Dallas addresses
-  addStr (F("satsensorarea0"),    CSTR(settings.sat.sSensorArea[0]), "s", 16);
-  addStr (F("satsensorarea1"),    CSTR(settings.sat.sSensorArea[1]), "s", 16);
-  addStr (F("satsensorarea2"),    CSTR(settings.sat.sSensorArea[2]), "s", 16);
-  addStr (F("satsensorarea3"),    CSTR(settings.sat.sSensorArea[3]), "s", 16);
+  addStr (F("satsensorarea0"),    CSTR(settings.sat.sSensorArea[0]), "s", 17);
+  addStr (F("satsensorarea1"),    CSTR(settings.sat.sSensorArea[1]), "s", 17);
+  addStr (F("satsensorarea2"),    CSTR(settings.sat.sSensorArea[2]), "s", 17);
+  addStr (F("satsensorarea3"),    CSTR(settings.sat.sSensorArea[3]), "s", 17);
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fDhwSetpoint,             1, 1, tmpBuf); addNum(F("satdhwsetpoint"),      tmpBuf, "f", 0, 60);
