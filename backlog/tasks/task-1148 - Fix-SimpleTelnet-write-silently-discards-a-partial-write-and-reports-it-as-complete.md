@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:08'
-updated_date: '2026-09-22 06:28'
+updated_date: '2026-09-22 10:17'
 labels:
   - bug
 dependencies: []
@@ -45,12 +45,12 @@ The user owns this library and has given standing permission to improve it.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A short write no longer reports more bytes than were actually accepted by the TCP stack
-- [ ] #2 No fixed per-line delay is introduced; any waiting is bounded and only incurred when the send buffer is actually full
-- [ ] #3 The OT frame path shows no new serial overruns or dropped frames under the same burst test
-- [ ] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
-- [ ] #5 Bytes that still cannot be written after the retry budget are counted per client and the count is readable, so loss becomes observable instead of silent
-- [ ] #6 Burst loss is measurably lower than the TASK-1147 baseline against a broker as lossless observer; residual loss is permitted and must show up in the counter
+- [x] #1 A short write no longer reports more bytes than were actually accepted by the TCP stack
+- [x] #2 No fixed per-line delay is introduced; any waiting is bounded and only incurred when the send buffer is actually full
+- [x] #3 The OT frame path shows no new serial overruns or dropped frames under the same burst test
+- [x] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [x] #5 Bytes that still cannot be written after the retry budget are counted per client and the count is readable, so loss becomes observable instead of silent
+- [x] #6 Burst loss is measurably lower than the TASK-1147 baseline against a broker as lossless observer; residual loss is permitted and must show up in the counter
 - [ ] #7 Re-entrancy is safe: a write() that yields cannot be re-entered for the same client and interleave output
 <!-- AC:END -->
 
