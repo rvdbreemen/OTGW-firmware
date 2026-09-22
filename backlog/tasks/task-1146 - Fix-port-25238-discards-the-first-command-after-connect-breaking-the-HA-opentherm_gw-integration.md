@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-21 18:58'
-updated_date: '2026-09-21 20:05'
+updated_date: '2026-09-22 17:17'
 labels:
   - bug
 dependencies: []
@@ -89,6 +89,8 @@ Resolved the pyotgw PS-timeout caveat rather than leaving it open. Probed the co
 All three answer correctly. The summary is all zeros because this bench unit has no boiler and no thermostat, so pyotgw waits during init for values an empty bus never produces. Not a firmware defect and not a residue of the discard bug. No follow-up task opened; noted on GH #685 so the question is not left hanging.
 
 Filesystem deliberately NOT flashed, recorded so nobody assumes a full-image verification happened. The fix commit touches CHANGELOG.md and the SimpleTelnet submodule only, zero files under src/OTGW-firmware/data/, so the LittleFS image is byte-identical in content to the one the unit already runs. Flashing it would also wipe /otgw_simulation.log, which the bench needs for silent-bus tests. Firmware-only OTA was the right scope here; a beta release still ships both, as the release notes always state.
+
+2026-09-22: petrister replied on GH #685. He will flash the beta once published, re-enable port 25238 and add the opentherm_gw integration on HA 2026.8.3, then report back. AC #5 stays blocked until a beta carrying 3ef40d692 is actually released.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
