@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 05:16'
+updated_date: '2026-09-22 05:35'
 labels:
   - bug
 dependencies: []
@@ -63,4 +63,23 @@ What differs between the failing and passing observations: the failing runs were
 Note run 2 of the failing pair produced ZERO MQTT publishes of any kind over 35 s, not merely no sensor publishes. That reframes the symptom: it may never have been sensor-specific. The remaining silent gate is !MQTTclient.connected(), which device/info cannot disprove because mqttconnected there is a cached flag. That gate is now instrumented too, so the next occurrence will name itself.
 
 Next step is to catch the failing state WITH the instrumentation in place, rather than to guess at the latch. The scaffolding must stay on the bench device until then.
+
+RESOLVED, and the answer is that there is no bug in the Dallas MQTT path. My earlier reproduction was a measurement artifact and I am retracting it.
+
+A local mosquitto was pointed at (single-field settings POST of mqttbroker only, so the stored MQTT password was never touched) and subscribed to # as a lossless observer. Three runs of the same simulator test, telnet observation next to broker observation:
+
+  run1 | telnet: reads=6 pubs=0 | BROKER: 6 sensor messages | telnet undercounts by 6
+  run2 | telnet: reads=9 pubs=9 | BROKER: 9 sensor messages | match
+  run3 | telnet: reads=3 pubs=0 | BROKER: 6 sensor messages | telnet undercounts by 6
+
+The broker received every sensor publish in all three runs. The telnet debug console dropped the corresponding log lines in two of them, and in run 3 it even dropped half the sensor READ lines. So what I measured earlier was the absence of a log line, not the absence of a publish.
+
+Consequences:
+1. The Dallas sensor to MQTT path is correct. sendMQTTData is called, the gates pass, the broker gets OTGW/value/<node id>/<16-hex address>.
+2. indigo_lights report is NOT reproduced. It must not be answered as a confirmed firmware bug. The drafted Discord message saying it was confirmed was never sent, and must not be.
+3. mqttPublishAllowed, the heap drop gate and the fragmentation gate were each independently exonerated earlier with counters, which still stands.
+
+What IS real and worth keeping: the telnet console silently drops output under load, so any diagnosis resting on it alone is unreliable. That matches the known 2.0.0 note about telnet losing decode lines during publish bursts; this confirms the same on 1.x. A lossless broker subscription is the correct instrument for any publish question.
+
+The diagnostic scaffolding has been reverted from the working tree. The bench still runs the instrumented build +b317263 and its broker setting has been restored to homeassistant.local.
 <!-- SECTION:NOTES:END -->
