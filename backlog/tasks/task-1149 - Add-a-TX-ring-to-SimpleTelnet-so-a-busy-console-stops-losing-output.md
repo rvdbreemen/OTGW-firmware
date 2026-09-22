@@ -4,9 +4,10 @@ title: Add a TX ring to SimpleTelnet so a busy console stops losing output
 status: To Do
 assignee: []
 created_date: '2026-09-22 06:27'
-updated_date: '2026-09-22 06:28'
+updated_date: '2026-09-22 11:25'
 labels:
   - bug
+  - wontfix
 dependencies:
   - TASK-1148
 references:
