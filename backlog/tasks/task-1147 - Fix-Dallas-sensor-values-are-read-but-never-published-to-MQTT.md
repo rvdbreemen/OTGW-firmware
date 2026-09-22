@@ -4,9 +4,12 @@ title: 'Fix: Dallas sensor values are read but never published to MQTT'
 status: To Do
 assignee: []
 created_date: '2026-09-22 05:02'
+updated_date: '2026-09-22 05:03'
 labels:
   - bug
 dependencies: []
+references:
+  - 'Discord #nederlandse-ondersteuning / indigo_light + .otgw / 2026-09-21'
 priority: high
 ordinal: 226000
 ---
