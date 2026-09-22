@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 05:40'
+updated_date: '2026-09-22 05:41'
 labels:
   - bug
   - needs-info
@@ -83,4 +83,10 @@ Consequences:
 What IS real and worth keeping: the telnet console silently drops output under load, so any diagnosis resting on it alone is unreliable. That matches the known 2.0.0 note about telnet losing decode lines during publish bursts; this confirms the same on 1.x. A lossless broker subscription is the correct instrument for any publish question.
 
 The diagnostic scaffolding has been reverted from the working tree. The bench still runs the instrumented build +b317263 and its broker setting has been restored to homeassistant.local.
+
+Parked pending reporter input. Moved back to To Do and labelled needs-info, because the task as written has no valid premise any more: the Dallas MQTT path was shown to work, and the apparent failure was telnet log loss.
+
+Do not start work on this from the title alone. Either it gets reframed around what indigo_light actually observes, or it is closed as not reproducible. The one genuine finding worth keeping, that the telnet console silently drops output under load, belongs in its own task rather than under this title.
+
+Bench state: broker restored to homeassistant.local, diagnostic scaffolding reverted from the tree, and the device is being reflashed back to a build that matches committed code.
 <!-- SECTION:NOTES:END -->
