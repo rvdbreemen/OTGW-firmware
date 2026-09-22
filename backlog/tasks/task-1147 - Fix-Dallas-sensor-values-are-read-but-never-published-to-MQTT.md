@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 06:09'
+updated_date: '2026-09-22 17:17'
 labels:
   - bug
   - needs-info
@@ -91,4 +91,20 @@ Do not start work on this from the title alone. Either it gets reframed around w
 Bench state: broker restored to homeassistant.local, diagnostic scaffolding reverted from the tree, and the device is being reflashed back to a build that matches committed code.
 
 The telnet loss that invalidated this task now has its own root cause and task: TASK-1148. SimpleTelnet write() discards the tail of a partial write and returns size anyway (SimpleTelnet_impl.tpp:218-238), so under burst the console silently truncates.
+
+2026-09-22: the reporter answered the validation question, and .otgw (Schelte Bron) supplied the fact that reframes this whole task: "De sensor hangt aan de PIC, niet aan een Wemos pin." This was never about a Dallas sensor on a OneWire GPIO, which is the subsystem I investigated.
+
+Evidence from indigo_light. His webGUI OT log shows:
+  18:55:35.448290 > PR=E
+  18:55:35.464041 < PR: E=19.19
+So the value exists and reaches the web interface, because the web interface renders the raw OT log. He also reports the HA entity sensor.opentherm_gateway_otgw_outside_temperature carrying no value, and a "PIC Temp Sensor" entity reading 0. Firmware 1.7.5-beta.6+2bf8888, which is old.
+
+Cause, verified in code:
+1. The firmware sends PR=A,B,C,D,G,I,L,M,N,O,P,Q,R,S,T. It never sends E, and never parses a PR: E= response. The PIC-attached sensor temperature therefore has no MQTT topic at all.
+2. The "PIC Temp Sensor" entity is not a temperature. PR=D fills state.picSettings.sTempSensor (OTGW-Core.ino:796-798), published to otgw-pic/settings/temp_sensor, declared at mqtt_configuratie.cpp:1114 as msgid 250 sub 0x08 in the diagnostic category. It reports the sensor FUNCTION SETTING, so a 0 there is a configuration readout, not a failed measurement.
+3. His "Outside Temperature" entity is OT MsgID 27, which stays empty because nothing on his bus supplies an outside temperature. That is exactly why he wants the PIC sensor in the first place.
+
+So this is a MISSING FEATURE, not a defect: expose the PIC-attached temperature sensor by querying PR=E and publishing the result. Nothing is broken in the sense the title claims.
+
+The title and the bug label are now both wrong. Needs a maintainer decision: retitle and convert to a feature request, or close this and open a fresh one.
 <!-- SECTION:NOTES:END -->
