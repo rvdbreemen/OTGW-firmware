@@ -2986,6 +2986,14 @@
     waiting_flame: 'Waiting flame', overshoot_cooling: 'Overshoot cooling', post_cycle: 'Post-cycle',
     heating: 'Heating', cooling: 'Cooling', heating_hot_water: 'Heating hot water'
   };
+  // Boiler states in which the burner produces no heat. Everything else counts as firing.
+  var SAT_BOILER_IDLE = { off: 1, idle: 1, anti_cycling: 1, post_cycle: 1, overshoot_cooling: 1 };
+  // Is the burner actually running? Falls back to the control-loop flag only when the
+  // firmware did not send boiler_status.
+  function satBurnerIsFiring(d) {
+    if (!d || d.boiler_status === undefined) return !!(d && d.active);
+    return !SAT_BOILER_IDLE[d.boiler_status];
+  }
   // Heating-curve constants — JS port of satCalcHeatingCurve() in SATcontrol.ino.
   var SAT_HC_FLOOR = 20.0, SAT_HC_RAD = 27.2, SAT_HC_REF = 20.0;
 
@@ -3079,7 +3087,9 @@
   }
 
   function renderSatPage(d) {
-    var enabled = !!d.enabled, active = !!d.active, heating = enabled && active;
+    // `active` means the SAT control loop is engaged; it does NOT mean the burner is
+    // running. Deriving "heating" from it made the pill read Heating with a cold boiler.
+    var enabled = !!d.enabled, active = !!d.active, heating = enabled && satBurnerIsFiring(d);
 
     var pill = document.getElementById('satPill');
     if (pill) {
@@ -3096,7 +3106,7 @@
     else if (d.safety_tripped) big = 'Safety tripped!';
     else if (d.window_open) big = 'Window open';
     else if (d.summer_active) big = 'Summer mode';
-    else if (active) big = 'Heating to ' + satFmt(d.target_temp, 1, '°');
+    else if (heating) big = 'Heating to ' + satFmt(d.target_temp, 1, '°');
     else big = 'At target · idle';
     txt('satStatusBig', big);
     satRenderPresets(d);

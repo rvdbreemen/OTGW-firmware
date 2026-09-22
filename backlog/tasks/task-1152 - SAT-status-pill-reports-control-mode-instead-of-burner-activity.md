@@ -1,9 +1,11 @@
 ---
 id: TASK-1152
 title: SAT status pill reports control mode instead of burner activity
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-22 06:38'
+updated_date: '2026-09-22 09:25'
 labels: []
 dependencies: []
 ordinal: 287000
@@ -27,11 +29,11 @@ CONTRACT TO WRITE DOWN: 'active' means the SAT control loop is engaged (set at S
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The classic SAT pill (#sat-status-badge, sat.js:161-178) no longer prints a control-mode label; its heating/idle text derives from the status JSON boiler_status
-- [ ] #2 Pill precedence is explicit and matches the simple-view summary (sat.js:294-305): Disabled -> Safety Tripped -> Window open -> Summer mode -> activity
-- [ ] #3 Control mode (Off / Continuous / PWM) stays visible in its own Control Mode row (sat.js:209, index.html:590); no information is lost, only relocated
-- [ ] #4 v2.js:3082 stops computing heating = enabled && active; the v2 pill (3084-3087) and satStatusBig (3098-3100) use the same boiler_status-derived activity state
+- [x] #1 The classic SAT pill (#sat-status-badge, sat.js:161-178) no longer prints a control-mode label; its heating/idle text derives from the status JSON boiler_status
+- [x] #2 Pill precedence is explicit and matches the simple-view summary (sat.js:294-305): Disabled -> Safety Tripped -> Window open -> Summer mode -> activity
+- [x] #3 Control mode (Off / Continuous / PWM) stays visible in its own Control Mode row (sat.js:209, index.html:590); no information is lost, only relocated
+- [x] #4 v2.js:3082 stops computing heating = enabled && active; the v2 pill (3084-3087) and satStatusBig (3098-3100) use the same boiler_status-derived activity state
 - [ ] #5 No firmware change is made; verified as a data-assets-only change with a filesystem build
 - [ ] #6 Verified with SAT enabled and the burner off (on device or against a captured /api/v2/sat/status payload): the pill reads Idle and the Control Mode row still reads Continuous
-- [ ] #7 docs/c4/c4-code-web-assets.md records the active-versus-boiler_status contract in one line
+- [x] #7 docs/c4/c4-code-web-assets.md records the active-versus-boiler_status contract in one line
 <!-- AC:END -->

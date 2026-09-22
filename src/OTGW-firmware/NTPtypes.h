@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : NTPtypes.h
-**  Version  : v2.0.0-alpha.366
+**  Version  : v2.0.0-alpha.367
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

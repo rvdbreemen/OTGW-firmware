@@ -311,6 +311,14 @@ Encapsulated object `SAT` with internal state and methods:
 - `SAT.startPolling(): void` — Begin 5-second poll loop
 - `SAT.stopPolling(): void` — Stop polling, clear timers
 
+**Status vocabulary (TASK-1152).** `active` means the SAT control loop is engaged
+(`SATcontrol.ino`); `boiler_status` means what the burner is actually doing. They are
+not interchangeable. The status pill reports *activity*, derived from `boiler_status`;
+the control mode (Off / Continuous / PWM) belongs in the Control Mode row, never in the
+pill. Reporting the mode there made an idle boiler read "Continuous". The same rule
+applies to `v2.js` (`satBurnerIsFiring()`); guarded by
+`tests/webui/sat-status-pill.test.mjs`.
+
 #### Heating Curve
 
 - `SAT.calculateHeatingCurve(outsideTemp: number): number` — Compute setpoint using heating curve formula (constants defined as HC_BASE_OFFSET_FLOOR, HC_REF_TEMP, etc.)

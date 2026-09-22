@@ -64,6 +64,20 @@ var SAT = (function() {
     'heating_hot_water': 'Heating Hot Water'
   };
 
+  // Boiler states in which the burner is not producing heat. Everything else in
+  // BOILER_LABELS counts as firing. `active` is NOT a substitute: it means the SAT
+  // control loop is engaged (SATcontrol.ino), not that the burner is running.
+  var BOILER_IDLE_STATUS = {
+    'off': 1, 'idle': 1, 'anti_cycling': 1, 'post_cycle': 1, 'overshoot_cooling': 1
+  };
+
+  // Is the burner actually producing heat right now? Falls back to the control-loop
+  // state only when the firmware did not send boiler_status.
+  function burnerIsFiring(d) {
+    if (!d || d.boiler_status === undefined) return !!(d && d.active);
+    return !BOILER_IDLE_STATUS[d.boiler_status];
+  }
+
   // --- DOM helpers ---
   function el(id) { return document.getElementById(id); }
 
@@ -168,12 +182,19 @@ var SAT = (function() {
       } else if (d.safety_tripped) {
         badge.textContent = 'Safety Tripped';
         badge.className = 'ds-pill is-error';
-      } else if (d.active) {
-        badge.textContent = MODE_LABELS[d.control_mode] || 'Active';
-        badge.className = 'ds-pill is-ok';
-      } else {
-        badge.textContent = 'Idle';
+      } else if (d.window_open) {
+        badge.textContent = 'Window open';
         badge.className = 'ds-pill is-warn';
+      } else if (d.summer_active) {
+        badge.textContent = 'Summer mode';
+        badge.className = 'ds-pill is-warn';
+      } else {
+        // Burner activity, never the control mode. 'Continuous' answers "how does SAT
+        // modulate", which is not what a status pill is asked. The mode stays visible
+        // in the Control Mode row below.
+        var firing = burnerIsFiring(d);
+        badge.textContent = BOILER_LABELS[d.boiler_status] || (firing ? 'Active' : 'Idle');
+        badge.className = 'ds-pill ' + (firing ? 'is-ok' : 'is-warn');
       }
     }
 
