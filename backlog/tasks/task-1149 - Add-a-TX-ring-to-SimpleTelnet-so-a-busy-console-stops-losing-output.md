@@ -4,7 +4,7 @@ title: Add a TX ring to SimpleTelnet so a busy console stops losing output
 status: To Do
 assignee: []
 created_date: '2026-09-22 06:27'
-updated_date: '2026-09-22 11:25'
+updated_date: '2026-09-22 11:26'
 labels:
   - bug
   - wontfix
@@ -85,3 +85,17 @@ What replaces it: TASK-1148 shipped the honest return value, the bounded retry a
 
 The design work is not lost. This record keeps the backport plan, the ordering rule that a direct write must never overtake a buffered tail, the sizing table and the measured RAM figures, so reopening would start from the numbers rather than from scratch.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Not implemented. Closed as WONT DO on 2026-09-22 because the TX ring would not solve enough to justify its RAM.
+
+After TASK-1148 was measured on hardware, the only scenario still losing bytes is a client that has stopped reading AND has an artificially shrunk receive window (SO_RCVBUF 2048), which costs about 250 B. Every realistic profile, including a slow reader at 64 B/s and a stalled reader with a normal window, now loses nothing.
+
+The ring would cost about 1,048 bytes of static RAM, 5.9 percent of the roughly 17.9 KB free while running, and would not even absorb a burst: 512 bytes holds 4.8 of 43 measured peak lines. Wrong trade on a device with about 40 KB usable.
+
+TASK-1148 covers the real need: honest return value, bounded retry, and per-client drop counters exposed as telnet_tx_dropped and otgwstream_tx_dropped. Those counters are the trigger to reopen this: if they climb in the field, the evidence exists. Until then there is nothing to fix.
+
+The design notes, ordering rule, sizing table and measured RAM figures are kept in the task so a reopen starts from the numbers.
+<!-- SECTION:FINAL_SUMMARY:END -->
