@@ -6,9 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-22 06:08'
+updated_date: '2026-09-22 06:09'
 labels:
   - bug
 dependencies: []
+references:
+  - 'src/libraries/SimpleTelnet/src/SimpleTelnet_impl.tpp:218-238'
+  - 'Discord #nederlandse-ondersteuning / indigo_light / 2026-09-21'
 priority: medium
 ordinal: 227000
 ---
