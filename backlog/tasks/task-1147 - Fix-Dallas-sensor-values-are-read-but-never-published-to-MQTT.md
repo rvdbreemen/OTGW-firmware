@@ -51,10 +51,13 @@ HISTORY. This record began as a bug report, "Dallas sensor values are read but n
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A Dallas sensor value reaches MQTT under the simulator: a publish to <toptopic>/value/<node id>/<16-hex address> is observed on the telnet MQTT debug log
-- [ ] #2 The exact gate that suppressed the publish is identified and named in the notes, not just worked around
-- [ ] #3 The fix does not make sensor publishes bypass a heap or interval gate that exists for a reason
-- [ ] #4 Verified on the bench with the simulator, and the reporter confirms real sensors reach HA
+- [ ] #1 The firmware queries PR=E on an agreed cadence and parses the PR: E=<value> reply
+- [ ] #2 The reading is published to its own MQTT topic with a Home Assistant discovery entry, typed as a temperature in degrees Celsius
+- [ ] #3 A gateway with no sensor on the PIC publishes nothing rather than a zero or an error string, so an absent entity means no sensor and not a broken build
+- [ ] #4 The existing PIC Temp Sensor diagnostic entity (PR=D, settings/temp_sensor) is left alone, and the new entity is named so the two cannot be confused
+- [ ] #5 Polling PR=E does not measurably disturb OpenTherm traffic on the shared serial line
+- [ ] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [ ] #7 indigo_light confirms the value reaches Home Assistant on his gateway
 <!-- AC:END -->
 
 ## Implementation Notes
