@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 05:41'
+updated_date: '2026-09-22 06:09'
 labels:
   - bug
   - needs-info
@@ -89,4 +89,6 @@ Parked pending reporter input. Moved back to To Do and labelled needs-info, beca
 Do not start work on this from the title alone. Either it gets reframed around what indigo_light actually observes, or it is closed as not reproducible. The one genuine finding worth keeping, that the telnet console silently drops output under load, belongs in its own task rather than under this title.
 
 Bench state: broker restored to homeassistant.local, diagnostic scaffolding reverted from the tree, and the device is being reflashed back to a build that matches committed code.
+
+The telnet loss that invalidated this task now has its own root cause and task: TASK-1148. SimpleTelnet write() discards the tail of a partial write and returns size anyway (SimpleTelnet_impl.tpp:218-238), so under burst the console silently truncates.
 <!-- SECTION:NOTES:END -->
