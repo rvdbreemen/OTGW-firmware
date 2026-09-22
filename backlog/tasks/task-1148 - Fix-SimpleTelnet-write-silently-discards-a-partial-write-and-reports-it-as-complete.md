@@ -3,10 +3,11 @@ id: TASK-1148
 title: >-
   Fix: SimpleTelnet write() silently discards a partial write and reports it as
   complete
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-22 06:08'
-updated_date: '2026-09-22 06:09'
+updated_date: '2026-09-22 06:17'
 labels:
   - bug
 dependencies: []
