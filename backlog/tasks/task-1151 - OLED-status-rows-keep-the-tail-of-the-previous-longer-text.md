@@ -1,9 +1,11 @@
 ---
 id: TASK-1151
 title: 'OLED status rows keep the tail of the previous, longer text'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-22 06:37'
+updated_date: '2026-09-22 09:50'
 labels: []
 dependencies: []
 ordinal: 286000
@@ -27,14 +29,14 @@ ADR NOTE: ADR-067 records 'Accepted: at 1 Hz refresh with clear() first', which 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Redrawing any OLED status row with shorter text leaves no characters of the previous text visible
+- [x] #1 Redrawing any OLED status row with shorter text leaves no characters of the previous text visible
 - [ ] #2 Plugging Ethernet into an OTGW32 shows exactly 'Ethernet' on row 2, with no SSID remnant
 - [ ] #3 Unplugging Ethernet shows exactly the new IP on row 3, with no remnant of the previous address
-- [ ] #4 The fix covers the whole class: page 2 flame row (OLED.ino:294-304), page 4 CH/DHW flags (OLED.ino:391-394) and every fmtFloatOrDash() call site
-- [ ] #5 Conditionally skipped rows are blanked rather than left stale, specifically the RSSI row (OLED.ino:245-254) on Ethernet transport
+- [x] #4 The fix covers the whole class: page 2 flame row (OLED.ino:294-304), page 4 CH/DHW flags (OLED.ino:391-394) and every fmtFloatOrDash() call site
+- [x] #5 Conditionally skipped rows are blanked rather than left stale, specifically the RSSI row (OLED.ino:245-254) on Ethernet transport
 - [ ] #6 No visible flicker at the 5 s refresh cadence (OLED_REFRESH_MS) and no loop-timing regression from extra I2C traffic
-- [ ] #7 The manual-padding workaround at OLED.ino:311-314 is removed in favour of the uniform mechanism, or documented as deliberate
-- [ ] #8 ADR-067's clear() consequence is reconciled with the shipped clear-on-page-change strategy
-- [ ] #9 python build.py --target esp32 exits 0 with a fresh firmware.bin; python evaluate.py --quick shows no new FAILs
+- [x] #7 The manual-padding workaround at OLED.ino:311-314 is removed in favour of the uniform mechanism, or documented as deliberate
+- [x] #8 ADR-067's clear() consequence is reconciled with the shipped clear-on-page-change strategy
+- [x] #9 python build.py --target esp32 exits 0 with a fresh firmware.bin; python evaluate.py --quick shows no new FAILs
 - [ ] #10 Field-verified on the bench OTGW32 with an Ethernet cable plugged and unplugged
 <!-- AC:END -->

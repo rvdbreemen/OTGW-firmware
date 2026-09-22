@@ -14,6 +14,7 @@ cover isolated, deterministic functions only.
 | `test_dallas_address.cpp` | `getDallasAddress()` hex-string conversion for Dallas DS18B20 ROM codes |
 | `test_otdirect_override.cpp` | TT/TC remote-override f8.8 round-trip, sign-extend, clamp, honour-cycle, auto-clear, plus otCmdEnqueue coalesce-by-MsgID semantics across MsgIDs 1, 14, 16, 100 |
 | `test_ble_parsers.cpp` | ATC/pvvx + BTHome v2 byte-layout parsers (TASK-487 / TASK-498), encrypted-flag rejection (3A-M4), packet-id prefix skip (2A-M3), and MAC-filter strict-vs-empty paths (3A-M2) |
+| `test_oled_row_clear.cpp` | OLED row clearing (TASK-1151). Models the display as a character grid and reproduces the reported `Ethernet6617823` / `0.0.0.0.1.150` tails with the old positioning, proves `oledRow()` removes them, and statically asserts `OLED.ino` has no raw `oledDisplay.setRow(` left so no call site can reintroduce the hazard |
 
 ## Building and running
 

@@ -117,3 +117,9 @@ src/graphify-out/
 
 # Host test harness build output (test/host/build_and_run.ps1)
 test/host/generated/
+
+# Host unit-test build artifacts (tests/README.md: g++ -o *.out, MSVC *.exe/*.obj)
+tests/*.out
+tests/*.exe
+tests/*.obj
+tests/*.pdb

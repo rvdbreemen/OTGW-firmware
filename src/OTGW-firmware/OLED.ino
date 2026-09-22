@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OLED.ino
-**  Version  : v2.0.0-alpha.367
+**  Version  : v2.0.0-alpha.368
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -23,7 +23,9 @@
 **    (portable: works on both ESP8266 and ESP32, TASK-758)
 **  - Auto-off after 30s of inactivity; button press wakes from off
 **  - 5 s display refresh (non-blocking, cooperative); clear() only on
-**    page change (SSD1306Ascii overwrites in place)
+**    page change. SSD1306Ascii overwrites in place, which leaves the tail of
+**    longer previous text behind, so every row write goes through oledRow()
+**    (position + clearToEOL) and skipped rows are blanked with oledClearRow().
 **
 **  Pages (0=off, 1-5=content):
 **  1 Network   - transport, IP, MQTT broker + status
@@ -118,6 +120,31 @@ static const char* fmtFloatOrDash(float val) {
 }
 
 // ---------------------------------------------------------------------------
+// oledRow - position at the start of a status row, blanking whatever is there
+//
+// The display is cleared only on a page change, so a row rewritten with SHORTER
+// text used to keep the tail of the previous, longer text. Plugging in Ethernet
+// wrote "Ethernet" (8 chars) over "WiFi: <ssid>" and showed "Ethernet6617823";
+// a shorter IP over a longer one showed "0.0.0.0.1.150" (TASK-1151). Every row
+// write goes through here so no call site can forget the clear.
+// ---------------------------------------------------------------------------
+static void oledRow(uint8_t row) {
+  oledDisplay.setCursor(0, row);
+  oledDisplay.clearToEOL();
+  oledDisplay.setCursor(0, row);
+}
+
+// ---------------------------------------------------------------------------
+// oledClearRow - blank a row that this page deliberately does not write
+//
+// A row that is conditionally skipped (RSSI on Ethernet, IP/RSSI while offline)
+// keeps whatever the previous page state left there. Blank it explicitly.
+// ---------------------------------------------------------------------------
+static void oledClearRow(uint8_t row) {
+  oledRow(row);
+}
+
+// ---------------------------------------------------------------------------
 // probeOLED - check if SSD1306 responds on I2C
 // ---------------------------------------------------------------------------
 static bool probeOLED() {
@@ -129,8 +156,7 @@ static bool probeOLED() {
 // drawHeader - common header row with title and page indicator
 // ---------------------------------------------------------------------------
 static void drawHeader(const __FlashStringHelper* title) {
-  oledDisplay.setRow(0);
-  oledDisplay.setCol(0);
+  oledRow(0);
   oledDisplay.print(title);
   // Page indicator on the right (col 108 = 18 chars * 6px)
   oledDisplay.setCol(108);
@@ -138,8 +164,7 @@ static void drawHeader(const __FlashStringHelper* title) {
   oledDisplay.print('/');
   oledDisplay.print(OLED_NUM_PAGES - 1);
   // Separator line: fill row 1 with dashes
-  oledDisplay.setRow(1);
-  oledDisplay.setCol(0);
+  oledRow(1);
   for (uint8_t i = 0; i < OLED_COLS; i++) oledDisplay.print('-');
 }
 
@@ -153,21 +178,17 @@ static void drawHeader(const __FlashStringHelper* title) {
 static void drawConfigHeader() {
   // Like drawHeader() but without the page counter — the config screen is not
   // part of the button-cycled page set, so "n/5" would be misleading here.
-  oledDisplay.setRow(0);
-  oledDisplay.setCol(0);
+  oledRow(0);
   oledDisplay.print(F("WiFi Setup"));
-  oledDisplay.setRow(1);
-  oledDisplay.setCol(0);
+  oledRow(1);
   for (uint8_t i = 0; i < OLED_COLS; i++) oledDisplay.print('-');
 }
 
 static void drawConfigBody(const char* ssid, const char* pw, const char* url) {
-  oledDisplay.setRow(2);
-  oledDisplay.setCol(0);
+  oledRow(2);
   oledDisplay.print(F("Connect to WiFi:"));
 
-  oledDisplay.setRow(3);
-  oledDisplay.setCol(0);
+  oledRow(3);
   oledDisplay.print(F("SSID: "));
   if (ssid && ssid[0]) {
     char ssidBuf[OLED_COLS + 1];
@@ -179,19 +200,16 @@ static void drawConfigBody(const char* ssid, const char* pw, const char* url) {
 
   uint8_t row = 4;
   if (pw && pw[0]) {
-    oledDisplay.setRow(row++);
-    oledDisplay.setCol(0);
+    oledRow(row++);
     oledDisplay.print(F("PW:   "));
     char pwBuf[OLED_COLS + 1];
     strlcpy(pwBuf, pw, sizeof(pwBuf));
     oledDisplay.print(pwBuf);
   }
 
-  oledDisplay.setRow(6);
-  oledDisplay.setCol(0);
+  oledRow(6);
   oledDisplay.print(F("Then open:"));
-  oledDisplay.setRow(7);
-  oledDisplay.setCol(0);
+  oledRow(7);
   if (url && url[0]) {
     char urlBuf[OLED_COLS + 1];
     strlcpy(urlBuf, url, sizeof(urlBuf));
@@ -221,8 +239,7 @@ static void drawPageConfig() {
 static void drawPageNetwork() {
   drawHeader(F("Network"));
 
-  oledDisplay.setRow(2);
-  oledDisplay.setCol(0);
+  oledRow(2);
   if (isNetworkUp()) {
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
     if (state.net.eMode == NET_ETHERNET) {
@@ -237,32 +254,34 @@ static void drawPageNetwork() {
       oledDisplay.print(ssidBuf);
     }
 
-    oledDisplay.setRow(3);
-    oledDisplay.setCol(0);
+    oledRow(3);
     oledDisplay.print(F("IP: "));
     oledDisplay.print(getActiveIP());
 
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
     if (state.net.eMode != NET_ETHERNET) {
 #endif
-      oledDisplay.setRow(4);
-      oledDisplay.setCol(0);
+      oledRow(4);
       snprintf_P(oledBuf, sizeof(oledBuf), PSTR("RSSI: %d dBm"), (int)WiFi.RSSI());
       oledDisplay.print(oledBuf);
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
+    } else {
+      // Wired: there is no RSSI. Without this the last WiFi reading stays on screen.
+      oledClearRow(4);
     }
 #endif
   } else {
     oledDisplay.print(F("Network: offline"));
+    // Rows 3 and 4 are not written while offline; blank the stale IP and RSSI.
+    oledClearRow(3);
+    oledClearRow(4);
   }
 
   // MQTT status + broker
-  oledDisplay.setRow(5);
-  oledDisplay.setCol(0);
+  oledRow(5);
   oledDisplay.print(state.mqtt.bConnected ? F("MQTT: connected") : F("MQTT: offline"));
 
-  oledDisplay.setRow(6);
-  oledDisplay.setCol(0);
+  oledRow(6);
   // Truncate broker to fit
   char brokerBuf[OLED_COLS + 1];
   strlcpy(brokerBuf, settings.mqtt.sBroker, sizeof(brokerBuf));
@@ -276,21 +295,18 @@ static void drawPageOTStatus() {
   drawHeader(F("OT Status"));
 
   // Hardware mode
-  oledDisplay.setRow(2);
-  oledDisplay.setCol(0);
+  oledRow(2);
   oledDisplay.print(F("Mode: "));
   oledDisplay.print(hardwareModeName());
 
   // Bus online/offline
-  oledDisplay.setRow(3);
-  oledDisplay.setCol(0);
+  oledRow(3);
   oledDisplay.print(F("Bus:  "));
   oledDisplay.print(state.otBus.bOnline ? F("online") : F("offline"));
 
   // Flame and modulation
   bool flameOn = (OTcurrentSystemState.SlaveStatus & 0x08) != 0;
-  oledDisplay.setRow(4);
-  oledDisplay.setCol(0);
+  oledRow(4);
   if (flameOn) {
     float mod = OTcurrentSystemState.RelModLevel;
     if (isnan(mod)) {
@@ -306,16 +322,18 @@ static void drawPageOTStatus() {
   // CH / DHW active flags
   bool chActive  = (OTcurrentSystemState.SlaveStatus & 0x02) != 0;
   bool dhwActive = (OTcurrentSystemState.SlaveStatus & 0x04) != 0;
-  oledDisplay.setRow(5);
-  oledDisplay.setCol(0);
+  oledRow(5);
   oledDisplay.print(F("CH:"));
+  // The trailing spaces are column alignment, not tail-clearing: they pad "on" to
+  // the width of "off" so "DHW:" always starts at the same column. oledRow() handles
+  // the stale-tail hazard; this padding stays because dropping it would render
+  // "CH:onDHW:on".
   oledDisplay.print(chActive  ? F("on  ") : F("off "));
   oledDisplay.print(F("DHW:"));
   oledDisplay.print(dhwActive ? F("on")   : F("off"));
 
   // Setpoint and boiler temp - guard each float independently
-  oledDisplay.setRow(6);
-  oledDisplay.setCol(0);
+  oledRow(6);
   oledDisplay.print(F("Set:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TSet));
   oledDisplay.print(F(" Boil:"));
@@ -329,15 +347,13 @@ static void drawPageDevice() {
   drawHeader(F("Device"));
 
   // Firmware version
-  oledDisplay.setRow(2);
-  oledDisplay.setCol(0);
+  oledRow(2);
   snprintf_P(oledBuf, sizeof(oledBuf), PSTR("FW %d.%d.%d-" OLED_STR(_VERSION_PRERELEASE)),
     _VERSION_MAJOR, _VERSION_MINOR, _VERSION_PATCH);
   oledDisplay.print(oledBuf);
 
   // Hostname (truncated to fit)
-  oledDisplay.setRow(3);
-  oledDisplay.setCol(0);
+  oledRow(3);
   char hostBuf[OLED_COLS + 1];
   strlcpy(hostBuf, settings.sHostname, sizeof(hostBuf));
   oledDisplay.print(hostBuf);
@@ -347,19 +363,16 @@ static void drawPageDevice() {
   uint32_t days = secs / 86400;
   uint32_t hrs  = (secs % 86400) / 3600;
   uint32_t mins = (secs % 3600) / 60;
-  oledDisplay.setRow(5);
-  oledDisplay.setCol(0);
+  oledRow(5);
   snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Up: %ud %02uh %02um"), (unsigned)days, (unsigned)hrs, (unsigned)mins);
   oledDisplay.print(oledBuf);
 
   // Free heap and reboot count
-  oledDisplay.setRow(6);
-  oledDisplay.setCol(0);
+  oledRow(6);
   snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Heap: %u B"), (unsigned)platformFreeHeap());
   oledDisplay.print(oledBuf);
 
-  oledDisplay.setRow(7);
-  oledDisplay.setCol(0);
+  oledRow(7);
   snprintf_P(oledBuf, sizeof(oledBuf), PSTR("Reboots: %u"), (unsigned)state.uptime.iRebootCount);
   oledDisplay.print(oledBuf);
 }
@@ -375,8 +388,7 @@ static void drawPageDashboard() {
   bool dhwActive = (OTcurrentSystemState.SlaveStatus & 0x04) != 0;
 
   // Row 2: Flame + modulation, CH/DHW status
-  oledDisplay.setRow(2);
-  oledDisplay.setCol(0);
+  oledRow(2);
   if (flameOn) {
     float mod = OTcurrentSystemState.RelModLevel;
     if (isnan(mod)) {
@@ -394,24 +406,21 @@ static void drawPageDashboard() {
   if (dhwActive) oledDisplay.print(F("DHW"));
 
   // Row 4: Setpoint and boiler temp
-  oledDisplay.setRow(4);
-  oledDisplay.setCol(0);
+  oledRow(4);
   oledDisplay.print(F("Set:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TSet));
   oledDisplay.print(F(" Boil:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tboiler));
 
   // Row 5: Return and DHW temp
-  oledDisplay.setRow(5);
-  oledDisplay.setCol(0);
+  oledRow(5);
   oledDisplay.print(F("Ret:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tret));
   oledDisplay.print(F(" DHW :"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tdhw));
 
   // Row 6: Pressure and outside temp
-  oledDisplay.setRow(6);
-  oledDisplay.setCol(0);
+  oledRow(6);
   oledDisplay.print(F("Bar:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.CHPressure));
   oledDisplay.print(F(" Out :"));
@@ -425,34 +434,28 @@ static void drawPageHeating() {
   drawHeader(F("Heating"));
 
   // HC1
-  oledDisplay.setRow(2);
-  oledDisplay.setCol(0);
+  oledRow(2);
   oledDisplay.print(F("HC1:"));
-  oledDisplay.setRow(3);
-  oledDisplay.setCol(0);
+  oledRow(3);
   oledDisplay.print(F(" Set:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TrSet));
   oledDisplay.print(F(" Rm:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tr));
-  oledDisplay.setRow(4);
-  oledDisplay.setCol(0);
+  oledRow(4);
   oledDisplay.print(F(" Flow:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tboiler));
   oledDisplay.print(F(" Ret:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.Tret));
 
   // HC2
-  oledDisplay.setRow(5);
-  oledDisplay.setCol(0);
+  oledRow(5);
   oledDisplay.print(F("HC2:"));
-  oledDisplay.setRow(6);
-  oledDisplay.setCol(0);
+  oledRow(6);
   oledDisplay.print(F(" Set:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TrSetCH2));
   oledDisplay.print(F(" Rm:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TRoomCH2));
-  oledDisplay.setRow(7);
-  oledDisplay.setCol(0);
+  oledRow(7);
   oledDisplay.print(F(" Flow:"));
   oledDisplay.print(fmtFloatOrDash(OTcurrentSystemState.TflowCH2));
 }
@@ -488,7 +491,7 @@ void initOLED() {
   oledDrawFlame(56, 0);                 // 16x16 flame centred on rows 0-1 (col 56..71)
 
   oledDisplay.set2X();
-  oledDisplay.setRow(2);
+  oledRow(2);
   // ADR-125: name follows the boot-detected mode (set before initOLED()).
   // isOTDirectEnabled() is compile-time false on the fixed ESP8266 and true on
   // the fixed OTGW32, so the fixed boards render exactly as before.
@@ -500,14 +503,12 @@ void initOLED() {
     oledDisplay.print(F("OTGW"));
   }
   oledDisplay.set1X();
-  oledDisplay.setRow(4);
+  oledRow(4);
   oledDisplay.setCol(13);               // "OpenTherm Gateway" = 102px, centred
   oledDisplay.print(F("OpenTherm Gateway"));
-  oledDisplay.setRow(6);
-  oledDisplay.setCol(0);
+  oledRow(6);
   oledDisplay.println(F("Press button for info"));
-  oledDisplay.setRow(7);
-  oledDisplay.setCol(0);
+  oledRow(7);
   // Our WiFi wipe is a triple-reset (shouldForceWifiConfigPortal), not a
   // reset-hold, so the hint must name the right gesture for this firmware.
   oledDisplay.print(F("Triple-reset = config"));
