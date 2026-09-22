@@ -1374,6 +1374,12 @@ void sendDeviceInfoV2()
   // Bytes the debug console and the port-25238 bridge could not hand to the TCP
   // stack (TASK-1148). Read here rather than over telnet: telnet is the lossy
   // channel under test, so it cannot be its own instrument.
+  // TASK-1154: how often a publish was deferred because its header would not
+  // fit the TCP send buffer, and how often the link was dropped to stop a
+  // half-written PUBLISH. Both count events where the socket stalled for five
+  // seconds, so a rising figure is a network symptom, not a tuning knob.
+  sendJsonMapEntry(F("mqtt_sndbuf_skips"),         state.heapdiag.iMqttSndbufSkips);
+  sendJsonMapEntry(F("mqtt_desync_drops"),         state.heapdiag.iMqttDesyncDrops);
   sendJsonMapEntry(F("telnet_tx_dropped"),         (uint32_t)debugTelnet.txDroppedTotal());
   sendJsonMapEntry(F("otgwstream_tx_dropped"),     (uint32_t)OTGWstream.txDroppedTotal());
 

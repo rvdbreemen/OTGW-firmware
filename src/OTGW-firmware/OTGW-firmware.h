@@ -344,6 +344,12 @@ struct HeapDiagSection {                 // state.heapdiag — per-boot heap-pre
   uint16_t iWsDropsTotal            = 0; // per-boot WebSocket messages dropped due to heap pressure
   uint16_t iMqttDropsTotal          = 0; // per-boot MQTT messages dropped due to heap pressure
   uint16_t iMqttMaxBlockSkips       = 0; // MQTT publishes skipped by the maxBlock pre-flight gate (fragmentation guard)
+  // TASK-1154. A short write means the socket accepted zero bytes for five
+  // consecutive seconds (WiFiClient _timeout = 5000, and ClientContext::_is_timeout()
+  // resets its clock on every byte of progress), so both of these count severe
+  // events, not routine backpressure.
+  uint16_t iMqttSndbufSkips         = 0; // publishes deferred because the header+topic would not fit in tcp_sndbuf
+  uint16_t iMqttDesyncDrops         = 0; // times the link was dropped to stop a half-written PUBLISH desynchronising the broker
   uint16_t iWsMaxBlockSkips         = 0; // WebSocket sends skipped by the maxBlock pre-flight gate (fragmentation guard)
   // TASK-1039: these two are LOOP-TICK / EVENT counters, not request counts, and they must
   // not wrap: field data shows ~365 ticks/s, so a uint16 wraps in roughly three minutes.
