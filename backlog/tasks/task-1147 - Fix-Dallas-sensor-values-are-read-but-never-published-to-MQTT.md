@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 17:23'
+updated_date: '2026-09-22 21:16'
 labels:
   - enhancement
 dependencies: []
@@ -126,4 +126,20 @@ Cause, verified in code:
 So this is a MISSING FEATURE, not a defect: expose the PIC-attached temperature sensor by querying PR=E and publishing the result. Nothing is broken in the sense the title claims.
 
 The title and the bug label are now both wrong. Needs a maintainer decision: retitle and convert to a feature request, or close this and open a fresh one.
+
+2026-09-22 evening: RESOLVED for the reporter, by a route that does not need this feature. Read before implementing anything here.
+
+.otgw pointed out that his thermostat never requests ID27, and suggested pushing the value onto the bus instead with AA=27. indigo_light did that and reported back: "Hij komt in HA binnen, mijn cascade geeft de DS18B20 voorrang op de Hue en er is een MsgID 27 / Toutside bijgekomen in de OTGW Gui bij OT support". So the PIC injects the attached sensor as OpenTherm MsgID 27, the firmware decodes it through the ordinary OT path, and it reaches Home Assistant with no firmware change at all. He is now installing the sensor permanently.
+
+That removes the justification this task was rewritten around. The use case, driving a boiler that has no outdoor probe from a sensor on the gateway, is already served by AA=27.
+
+What is left, and it is thinner:
+- Whether PR=E has independent value, namely reading the sensor WITHOUT injecting it on the OpenTherm bus. Unknown: the maintainer asked .otgw on 2026-09-22 21:12 what PR=E actually does, and that is still unanswered. Do not design against a guess.
+- Whether AA=27 deserves to be documented or surfaced in the web interface. Two people needed Schelte to find it, which is a discoverability gap rather than a missing feature.
+
+Two things to watch, neither a defect today:
+- .otgw: "Ik meen dat ik het zo heb gemaakt dat hij de buitentemperatuur blijft sturen, ook als de ketel UnknownDataID terug stuurt. Maar houd het even in de gaten."
+- indigo_light sees MsgID 27 in the OT Support tab with no boiler Ack. That is correct behaviour for a boiler that does not implement it, and the TASK-1134-era work already stopped override answers from being counted as boiler evidence. Worth a glance if anyone reports that panel misreporting.
+
+Recommendation: do not implement PR=E polling on current evidence. Either park this until the maintainer has the answer from .otgw, or reduce it to the documentation question, which is the part with a demonstrated user need.
 <!-- SECTION:NOTES:END -->
