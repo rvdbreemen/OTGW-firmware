@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.370
+**  Version  : v2.0.0-alpha.371
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5314,6 +5314,41 @@ void processOT(const char *buf, int len, bool suppressOutput){
 ** The write buffer (incoming from port 25238) is also line printed to the Debug (port 23).
 ** The read line buffer is per line parsed by the proces OT parser code (processOT (buf, len)).
 */
+// ---------------------------------------------------------------------------
+// handleOTReplay — drive the /otgw_simulation.log frame replay, on any transport
+//
+// TASK-1071. The replay used to be called from handlePICSerial(), which returns
+// early when isOTDirectEnabled() (an ADR-127 guard that is right for the PIC UART
+// and wrong for the replay). On an OTGW32 the endpoint therefore reported
+// active:true while not one fixture frame was ever decoded — a silent failure
+// that looked like success.
+//
+// Nothing in the replay path is PIC-specific: replayNextOTGWSimulationLine() ends
+// at dispatchOTGWInputLine(), the same line dispatcher a real frame reaches. The
+// only PIC-bound work (park the serial task, flush its RX so the live UART cannot
+// interleave with the fixture) already sits behind #if HAS_PIC inside the pump.
+//
+// So the replay gets its own loop-side home and the PIC gate goes back to being
+// only about the PIC.
+// ---------------------------------------------------------------------------
+void handleOTReplay()
+{
+  static size_t bytes_read = 0;
+  static size_t bytes_write = 0;
+  static bool   discardCurrentReadLine = false;
+  static File   otgwSimulationFile;
+  static bool   otgwSimulationWasEnabled = false;
+  static char   sReplay[MAX_BUFFER_READ];
+
+  handlePICSerialSimulation(otgwSimulationFile,
+                            otgwSimulationWasEnabled,
+                            bytes_read,
+                            bytes_write,
+                            discardCurrentReadLine,
+                            sReplay,
+                            sizeof(sReplay));
+}
+
 void handlePICSerial()
 {
 #if HAS_PIC
@@ -5330,23 +5365,8 @@ void handlePICSerial()
   // the OT path — skip entirely. Compile-time false on fixed PIC boards.
   if (isOTDirectEnabled()) return;
   static char sWrite[MAX_BUFFER_WRITE];
-  static size_t bytes_read = 0;   // unused by the relay; kept for the sim signature
   static size_t bytes_write = 0;
-  static bool discardCurrentReadLine = false;
   static uint8_t outByte;
-  static File otgwSimulationFile;
-  static bool otgwSimulationWasEnabled = false;
-  static char sReplay[MAX_BUFFER_READ];
-
-  if (handlePICSerialSimulation(otgwSimulationFile,
-                           otgwSimulationWasEnabled,
-                           bytes_read,
-                           bytes_write,
-                           discardCurrentReadLine,
-                           sReplay,
-                           sizeof(sReplay))) {
-    return;
-  }
 
   if (isPICEnabled() && settings.mqtt.bLegacyPort25238Enabled) {
     //handle incoming data from network (port 25238) sent to serial port OTGW (WRITE BUFFER)

@@ -3,10 +3,11 @@ id: TASK-1071
 title: >-
   Make the OT frame-replay simulator work on OTDirect boards, not only the PIC
   path
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-08 18:17'
-updated_date: '2026-08-08 19:13'
+updated_date: '2026-09-22 10:51'
 labels:
   - bug
   - tooling
@@ -27,10 +28,10 @@ The /api/v2/simulate file replay is bound to the PIC serial path and is silently
 <!-- AC:BEGIN -->
 - [ ] #1 With simulation enabled on an OTDirect board and no PIC attached, replayed fixture lines reach processOT and appear as decoded OT frames in the debug log
 - [ ] #2 The replay drives the same decode, state and MQTT publish path as real frames, so the coverage gate produces the same shape of output as on 1.x
-- [ ] #3 Replay still works unchanged on a board that does have a PIC; the PIC path is not regressed
-- [ ] #4 /api/v2/simulate reports a state that reflects reality: enabling it on a board where replay cannot run must not report active, or must report why
+- [x] #3 Replay still works unchanged on a board that does have a PIC; the PIC path is not regressed
+- [x] #4 /api/v2/simulate reports a state that reflects reality: enabling it on a board where replay cannot run must not report active, or must report why
 - [ ] #5 The TASK-1070 coverage gate runs end to end against an OTDirect board: upload, start, capture, stop, compare
-- [ ] #6 Build green for the relevant esp32 targets and python evaluate.py --quick shows no new failures
+- [x] #6 Build green for the relevant esp32 targets and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -54,4 +55,16 @@ Three layers, only one of which is worth building:
 Fixture portability checked: otgw_simulation_coverage.log is 423 lines, 100% matching ^[TBRAE][0-9A-F]{8}$, zero PIC-only banner or PS= lines, so no filtered variant is needed. Prefix histogram B=189 T=163 R=43 A=27 E=1. OTDirect emits only T/R/B/A (bridgeFrameToParser call sites), never E, so exactly one fixture line (421: E10000000) is unreachable on an OTDirect board.
 
 SEPARATE DEFECT, split out: setOTGWSimulationEnabled() (restAPI.ino:345) sets state.debug.bOTGWSimulation with no mode or capability check, and sendSimulationStatus() (333) reports active straight from that flag. On an OTDirect board the API reports active:true while nothing is ever replayed. Silent no-op plus a lying status. Fixable in a few lines independently of the replay work; covers AC #4 on its own.
+
+PREMISE CORRECTION (verified on dev HEAD e462ba3a9, 2026-09-22). The observed symptom is real - replay is inert on OTDirect - but the described mechanism is wrong, so a fix written against it would have missed.
+
+Task says: 'handlePICSerialSimulation lives in the PIC serial task, and picSerialTaskShouldPark() returns true whenever isOTDirectEnabled(), so that task parks permanently and the replay never runs.'
+
+Actually: the replay pump is LOOP-SIDE, not in the task. handlePICSerialSimulation() has exactly one call site, OTGW-Core.ino:5341, inside handlePICSerial() (defined 5317). The header comment there states it deliberately: after TASK-865.6 the UART drain moved to the task, and handlePICSerial() keeps 'only the loop-side work that does NOT touch the UART directly: the OTGW replay simulation and the ser2net relay'.
+
+The real blocker is one line earlier: OTGW-Core.ino:5331, 'if (isOTDirectEnabled()) return;' - an ADR-127 early return that exits handlePICSerial() before the replay is ever reached.
+
+Also worth recording: picSerialTaskShouldPark() (OTGW-Core.ino:867-873) parks on state.debug.bOTGWSimulation as well as isOTDirectEnabled(). That is deliberate and correct - on a PIC board, enabling simulation parks the UART task so the loop-side replay is the only writer. It is not a bug and must not be 'fixed'.
+
+Target entry point for the fix: OTDirect.ino:704-716 bridgeFrameToParser(), documented as 'format a 32-bit OT frame and feed to processOT()', which is the path real OTDirect frames already take.
 <!-- SECTION:NOTES:END -->

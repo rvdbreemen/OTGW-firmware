@@ -1,11 +1,11 @@
 ---
 id: TASK-1150
 title: Define and enforce a single TSet (MsgID 1) owner while SAT is enabled
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:37'
-updated_date: '2026-09-22 10:24'
+updated_date: '2026-09-22 10:25'
 labels: []
 dependencies: []
 ordinal: 285000
@@ -59,4 +59,14 @@ buildStatusRequest() is used in two places: the setup connectivity probe (861) a
 Conclusion, and it is worse than the narrowed reading in the task description: SAT's CH= does reach the boiler in gateway mode, but only on the gateway's OWN MsgID 0 frames, interleaved with the thermostat's frames carrying the thermostat's own CH bit. So the ADR-150 cold cutoff is not reliably held by CH=0 either; whose bit applies depends on which MsgID 0 the boiler saw last. Finding 3's exposure is therefore not limited to the DHW-active window.
 
 This must inform the fix: TSet ownership cannot be solved by MsgID 1 arbitration alone while two masters keep publishing conflicting MsgID 0 status bits.
+
+Shipped as e462ba3a under alpha.370. Build green on esp32, esp32-classic, esp32-combo with no warnings from SATcontrol.ino or OTDirect.ino; evaluate.py --quick 0 failures.
+
+ADR-179 (Proposed, lints clean) records both maintainer decisions of 2026-09-22: the thermostat-timeout setback keeps outranking SAT as a fail-safe, and an external CS= is refused rather than silently winning.
+
+AC10 (field validation on an OTGW32: SAT enabled, safety trip forced, TSet must not revert) is NOT ticked. No 2.0.0 board was reachable: 192.168.88.61 is in ARP but does not answer, and 192.168.88.68 is the 1.x ESP8266 unit.
+
+Carried forward on ADR-179 as Open Questions, both out of scope for MsgID 1:
+- Gateway mode emits the gateway's own MsgID 0 alongside the thermostat's, with opposing CH-enable bits, so SAT's CH= is not reliably honoured. Needs its own decision.
+- The gateway.asm CommandExpiry reading stays an unverified single-source inference.
 <!-- SECTION:NOTES:END -->

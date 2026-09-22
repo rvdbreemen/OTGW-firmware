@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.370
+**  Version  : v2.0.0-alpha.371
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -683,19 +683,19 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
   if (wc > 4 && strcmp_P(words[4], PSTR("start")) == 0) {
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
     // TASK-1073: refuse rather than report a replay that cannot happen. Enabling
-    // the flag here used to answer active:true on a PIC-less or OT-Direct board
-    // while the pump never ran; the failure was silent and cost a capture cycle
-    // to diagnose. Stopping stays allowed everywhere, so a board that somehow
-    // has the flag set can always clear it.
-#if HAS_PIC
-    if (isOTDirectEnabled()) {
-      sendApiError(409, F("Frame replay unavailable: board is in OT-Direct mode; replay runs on the PIC serial path"));
+    // the flag used to answer active:true while the pump never ran; the failure was
+    // silent and cost a capture cycle to diagnose. Stopping stays allowed
+    // everywhere, so a board that somehow has the flag set can always clear it.
+    //
+    // TASK-1071 removed the OT-Direct half of that refusal: replay is now driven by
+    // handleOTReplay() from the loop instead of from inside the PIC-gated
+    // handlePICSerial(), and the fixture reaches processOT() through the same
+    // dispatchOTGWInputLine() a real frame takes. So OT-Direct boards can replay,
+    // and refusing them here would now block the very case this endpoint exists for.
+    if (!LittleFSmounted) {
+      sendApiError(409, F("Frame replay unavailable: LittleFS is not mounted, so the fixture cannot be read"));
       return;
     }
-#else
-    sendApiError(409, F("Frame replay unavailable: this build has no PIC serial path"));
-    return;
-#endif
     setOTGWSimulationEnabled(true);
     sendSimulationStatus();
     return;

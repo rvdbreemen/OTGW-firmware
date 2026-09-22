@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.370
+**  Version  : v2.0.0-alpha.371
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -975,6 +975,7 @@ void doBackgroundTasks()
       handleDebug();
       handleOTGWstream();          // OTGW serial bridge on TCP port 25238
       handleMQTT();                 // MQTT transmissions
+      handleOTReplay();             // TASK-1071: fixture replay, transport-independent
       handlePICSerial();            // OTGW/PIC handling
 #if HAS_DIRECT_OT
       // Run the OT-direct engine only when the OT-direct hardware is active

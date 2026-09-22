@@ -1,10 +1,10 @@
 ---
 id: TASK-1073
 title: 'Fix: /api/v2/simulate reports active on boards where replay cannot run'
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-08-08 19:12'
-updated_date: '2026-08-25 19:45'
+updated_date: '2026-09-22 10:50'
 labels:
   - bug
   - api
@@ -28,3 +28,15 @@ setOTGWSimulationEnabled() (restAPI.ino:345) flips state.debug.bOTGWSimulation w
 - [x] #4 Behaviour on a PIC board in PIC mode is unchanged: start still enables replay and reports active
 - [x] #5 Build green for the esp32 targets and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Closing as shipped-then-partly-superseded (2026-09-22).
+
+The work landed earlier: handleSimulate() refused /api/v2/simulate/start with a 409 and a reason instead of reporting active:true where the pump could not run, and all four ACs were ticked. The status was simply never flipped.
+
+TASK-1071 has now superseded the OT-Direct half of that refusal. Replay is driven from the loop by handleOTReplay() instead of from inside the PIC-gated handlePICSerial(), so an OT-Direct board CAN replay, and the 409 'board is in OT-Direct mode; replay runs on the PIC serial path' would block exactly the case the endpoint exists for. It is replaced by a 409 that is still true: LittleFS not mounted means the fixture cannot be read.
+
+AC2 as written ('the board is in OT-Direct mode') is therefore stale by design change, not unmet. The principle it encodes - never report active where nothing is replayed - is intact.
+<!-- SECTION:NOTES:END -->
