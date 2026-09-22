@@ -86,6 +86,10 @@ Note on AC4 wording: build.bat was used, not python build.py --firmware. Project
 AC2 removed: it was the 'if reachable' branch of AC1 and AC3 is its mutually exclusive twin. AC1 falsified reachability, so AC2 described work that must not happen. Removed rather than left unchecked, so the remaining unchecked box is the genuine one (field validation).
 
 2026-09-19: Field validation gate (AC #5) is running. mrfox7688 flashed v1.7.6-beta.3 on 2026-09-18 06:41 UTC and wrote he will monitor and report back (issues/682#issuecomment). jaronbor quoted the release note but has not reported flashing. Three clean days puts the earliest verdict at 2026-09-21. Nothing to do here until then; beta.4 (the TASK-1135 liveness change) waits on this verdict by explicit maintainer decision.
+
+2026-09-22: AC #5 satisfied. mrfox7688 on GH #682: 'The beta firmware appears to have fixed the original malformed-packet symptom. During the last few days after firmware update I found no malformed packet messages in the Mosquitto log.' Beta.3 shipped 2026-09-18, so that is four days of field running.
+
+He reports a separate remaining problem in the same comment: repeated clean reconnects (disconnected: Success, connection closed by client) and several session taken over events. That is NOT the malformed-packet defect and is tracked separately, because it looks like a consequence of this very fix: both remedy sites call MQTTclient.disconnect() on a failed write (MQTTstuff.ino:359 and :1059), which sends a clean DISCONNECT that Mosquitto logs as exactly those strings.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
