@@ -1,10 +1,11 @@
 ---
 id: TASK-1147
 title: 'Fix: Dallas sensor values are read but never published to MQTT'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 05:03'
+updated_date: '2026-09-22 05:10'
 labels:
   - bug
 dependencies: []
