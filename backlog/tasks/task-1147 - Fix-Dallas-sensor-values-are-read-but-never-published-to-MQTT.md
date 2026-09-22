@@ -1,36 +1,52 @@
 ---
 id: TASK-1147
-title: 'Fix: Dallas sensor values are read but never published to MQTT'
+title: >-
+  feat: expose the PIC-attached temperature sensor (PR=E) over MQTT and HA
+  discovery
 status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 17:17'
+updated_date: '2026-09-22 17:23'
 labels:
-  - bug
-  - needs-info
+  - enhancement
 dependencies: []
 references:
   - 'Discord #nederlandse-ondersteuning / indigo_light + .otgw / 2026-09-21'
-priority: high
+priority: medium
 ordinal: 226000
 ---
 
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Reported in Discord #nederlandse-ondersteuning by indigo_light, corroborated by .otgw (Schelte Bron): a sensor value shows in the OTGW web interface but is not published over MQTT, so it never reaches Home Assistant.
+The OTGW hardware can carry a temperature sensor on the PIC. The PIC reports its reading through the PR=E command, and this firmware never asks for it, so the value reaches nothing: no MQTT topic, no Home Assistant entity, no REST field. Requested by indigo_light in Discord #nederlandse-ondersteuning on 2026-09-21, with the decisive detail supplied by .otgw (Schelte Bron): the sensor hangs on the PIC, not on a Wemos GPIO pin.
 
-Reproduced on the bench (192.168.88.68, 1.7.6-beta.4+b6b3c98) using the built-in Dallas simulator, which runs the same publish path as real sensors because initSensors() sets bSensorsDetected = true in its simulation branch (sensors_ext.ino:145).
+His use case is a boiler with no outdoor probe. He wants a wired sensor on the gateway to drive the outside temperature, and is currently working around it with a wireless Hue motion sensor fed through SAT.
 
-Observed over two runs via the telnet console with MQTT debug (key 3) and sensor debug (key 5) enabled, then sim on (key d):
-- Sensors are read every poll: 'Sensor [0] 28D0000000000001 = 30.0C [sim]', three sensors, repeated each cycle.
-- Not one MQTT publish carries a sensor address. In the first run 14 other publishes went out within 300 ms of the sensor poll (status_master, ch_enable, dhw_enable and so on), so MQTT itself was working.
-- The REST endpoint /api/v2/sensors does report the values, which is why the web interface shows them. That is the asymmetry the reporter sees.
+EVIDENCE. His web interface OT log shows the value arriving:
 
-The heap gate is NOT the cause, which is worth recording because it was the first hypothesis: /api/v2/device/info reports hd_mqtt_drops 0 and hd_ws_drops 0, so canPublishMQTT() has never dropped a message on this device.
+    18:55:35.448290 > PR=E
+    18:55:35.464041 < PR: E=19.19
 
-The publish call at sensors_ext.ino:286 is unconditional inside 'if (settings.mqtt.bEnable)', and that setting is true. The sensor debug line immediately above it prints, so execution reaches the call. sendMQTTData() must therefore be returning at one of its early gates, all of which sit above its own MQTTDebugTf logging line (MQTTstuff.ino:1038-1050). Remaining suspect is mqttPublishAllowed, the OTPublishGate interval gate, possibly observed closed because pollSensors() runs while an outer gated scope is open. Not yet proven.
+The web interface renders the raw OT log, which is why the value is visible there while nothing carries it to MQTT.
+
+VERIFIED IN CODE, three separate findings:
+
+1. The firmware sends PR=A, B, C, D, G, I, L, M, N, O, P, Q, R, S and T. It never sends E, and there is no parser for a `PR: E=` response. The measured temperature therefore has no topic at all. This is the whole gap.
+
+2. The existing "PIC Temp Sensor" entity is not a temperature and must not be mistaken for one. PR=D fills state.picSettings.sTempSensor (OTGW-Core.ino:796-798), published to otgw-pic/settings/temp_sensor and declared at mqtt_configuratie.cpp:1114 as msgid 250 sub 0x08 in the diagnostic category. It reports the sensor FUNCTION SETTING, so the 0 the reporter sees there is a configuration readout, not a failed measurement.
+
+3. His "Outside Temperature" entity is OT MsgID 27 and stays empty because nothing on his bus supplies an outside temperature. That is precisely why he wants the PIC sensor.
+
+SCOPE. Query PR=E on a sensible cadence, parse the reply, publish it, and give it Home Assistant discovery. Two design questions the implementer should settle with the maintainer before coding:
+
+- What cadence. PR=E is a PIC round trip on the same serial line the OpenTherm traffic uses, so polling it too often costs bus time. The existing PIC settings block is fetched once; a live temperature needs repeating, which is a different pattern.
+- Whether the value should merely be exposed as its own sensor, or should additionally be usable AS the outside temperature toward the boiler. The second is a larger decision: the firmware already accepts an outside override through <toptopic>/set/<node id>/outside, which translates to OT=<value>, so a Home Assistant automation can already close that loop today without any firmware change. Doing it inside the firmware would duplicate a path that already works.
+
+Also worth deciding: whether a PIC without a sensor attached should publish nothing at all rather than a zero or an error string, following the same reasoning as the DHW water total, which stays silent until real data exists (ADR-094).
+
+HISTORY. This record began as a bug report, "Dallas sensor values are read but never published to MQTT", and that framing was wrong twice over. The first investigation chased a Dallas sensor on a OneWire GPIO, which is a different subsystem entirely and works correctly. A second apparent reproduction turned out to be the test harness toggling MQTT debug off on alternate runs, since the debug keys are toggles rather than switches. Both retractions are in the notes below and are worth reading before trusting any earlier conclusion here.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
