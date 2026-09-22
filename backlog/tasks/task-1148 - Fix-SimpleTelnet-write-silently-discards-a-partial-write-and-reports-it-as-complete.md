@@ -119,22 +119,32 @@ write() treated any non-zero return from WiFiClient::write() as full success. On
 
 ## Change
 
-- SimpleTelnet f73cc7f on branch fix/honest-write-bounded-retry: retry the remainder under a step budget and a wall-clock budget, return the count actually accepted, count the shortfall per client, expose txDropped()/txDroppedTotal(). write(uint8_t) now delegates to the buffer overload so both paths share one implementation.
-- Firmware ce9a302ef: submodule bump plus telnet_tx_dropped and otgwstream_tx_dropped in /api/v2/device/info. Read over REST deliberately, because telnet is the channel under test and cannot be its own instrument.
+- SimpleTelnet f73cc7f and ef451af on branch fix/honest-write-bounded-retry: retry the remainder under a step budget and a wall-clock budget, return the count actually accepted, count the shortfall per client, expose txDropped()/txDroppedTotal(). write(uint8_t) now delegates to the buffer overload so both paths share one implementation.
+- Firmware ce9a302ef and 8c10f0d37: submodule bump plus telnet_tx_dropped and otgwstream_tx_dropped in /api/v2/device/info. Read over REST deliberately, because telnet is the channel under test and cannot be its own instrument.
 
 The retry yields between attempts, because only a yield lets lwIP drain. That introduces re-entrancy, which is guarded: a nested write() to the same instance takes what fits without yielding, since re-entering would interleave two lines into one corrupted stream.
 
 A fixed per-line delay was rejected with numbers. At the measured peak of 43 console lines per second, 1 ms per line blocks the loop 43 ms per burst second, 5 ms blocks 215 ms and 20 ms blocks 860 ms, on an idle device. Serial is reserved for the PIC, so a stalled loop costs OpenTherm frames. A fixed delay is also paid on every line, including the overwhelming majority where the send buffer was empty.
 
+## The first commit shipped a dead retry
+
+Caught while checking the re-entrancy AC instead of ticking it. write() computes outer = !_inWrite and then sets _inWrite = true before calling _writeToClient(), whose loop guarded with `if (_inWrite) break`. That is always true on the first pass, so the retry never ran: A worked, B was dead code. Build, evaluator and an on-device stress run all passed with half the change inert, because every gate exercised the counter, which belongs to A.
+
+Fixed in ef451af by passing the nesting state explicitly as mayYield = outer and guarding with `if (!mayYield) break`. A comment at that line records why testing _inWrite there is wrong.
+
+Lesson: verifying a mechanism means proving the mechanism ran, not that the feature around it compiled.
+
 ## Measured drop rate
 
-| scenario | dropped |
-|---|---|
-| normally reading client | 0 B |
-| slow reader, 512 B/s | 0 B |
-| reader fully stalled, normal RX window, 60 s | 0 B |
-| reader stalled with SO_RCVBUF forced to 2048 | first loss at 42 s, 227 B |
-| identical repeat of that last case | 0 B in 75 s |
+| scenario | retry inert | retry working |
+|---|---|---|
+| normally reading client | 0 B | 0 B |
+| slow reader, 512 B/s | 0 B | 0 B |
+| slow reader, 64 B/s, 45 s | 133 B | **0 B in 4 of 4 runs** |
+| reader stalled, normal RX window, 60 s | 0 B | 0 B |
+| reader stalled, SO_RCVBUF 2048 | 227 B at 42 s (0 B in a repeat) | 258 B at 41 s / 243 B at 34 s |
+
+The 64 B/s row is the one that proves the retry runs: the window reopens periodically there, so a working retry can win, and it does. The last row is the honest half: with the reader fully stalled the window never reopens inside the 2 ms budget, so loss persists. The retry is not meant to rescue a client that stopped reading; what changed is that the residue is counted instead of invisible.
 
 Loss is backpressure-driven, not load-driven, and it is rare. A stalled reader alone is not enough: the client kernel buffers roughly 64 KB while the console emits a few hundred bytes per second, so it takes minutes to matter.
 
