@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:20'
-updated_date: '2026-09-19 15:56'
+updated_date: '2026-09-22 21:14'
 labels:
   - bug
 dependencies: []
@@ -31,7 +31,7 @@ TASK-769 (Done) fixed truncated-payload desync by disconnecting instead of calli
 - [x] #2 If not reachable: the alternative desync source is identified from mrfox7688's Mosquitto log and named with evidence, and this task is re-scoped accordingly
 - [x] #3 python build.py --firmware exits 0
 - [x] #4 python evaluate.py --quick shows no new failures
-- [ ] #5 Field validation by mrfox7688 and/or jaronbor on 1.x: no malformed-packet disconnects over at least 3 days
+- [x] #5 Field validation by mrfox7688 and/or jaronbor on 1.x: no malformed-packet disconnects over at least 3 days
 - [x] #6 A host test compiled against the real PubSubClient reproduces the desync (partial header on the wire, link still up, next packet appended) and shows the caller contract prevents it, without dropping a healthy connection
 <!-- AC:END -->
 
