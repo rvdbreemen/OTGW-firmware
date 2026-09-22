@@ -81,3 +81,48 @@ VERIFICATION reuses the TASK-1147 rig: local mosquitto subscribed as lossless ob
 <!-- SECTION:NOTES:BEGIN -->
 Scope narrowed on maintainer instruction: A and B here, the TX ring split out to TASK-1149 so its ~1 KB RAM cost can be judged after A+B are measured on hardware. AC #2 was removed rather than left standing, because it required that no whole publish line is lost, which A+B cannot deliver without a buffer. Replaced by three ACs that A+B can actually be held to: a per-client drop counter, measurably lower loss than the TASK-1147 baseline with residual loss permitted but counted, and re-entrancy safety.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Makes SimpleTelnet::write() honest and adds a bounded retry, so console output can no longer disappear without anything being able to notice.
+
+## Cause
+
+write() treated any non-zero return from WiFiClient::write() as full success. On ESP8266 a short write is the normal result once the lwIP send buffer fills (core 2.7.4, ClientContext.h::_write_from_source returns _written after _is_timeout()), so the unwritten tail was discarded while the caller was told the whole buffer went out. Same defect class as TASK-769 and TASK-1134 on the MQTT side, where a short write desynchronised the stream; here it silently truncated the console.
+
+## Change
+
+- SimpleTelnet f73cc7f on branch fix/honest-write-bounded-retry: retry the remainder under a step budget and a wall-clock budget, return the count actually accepted, count the shortfall per client, expose txDropped()/txDroppedTotal(). write(uint8_t) now delegates to the buffer overload so both paths share one implementation.
+- Firmware ce9a302ef: submodule bump plus telnet_tx_dropped and otgwstream_tx_dropped in /api/v2/device/info. Read over REST deliberately, because telnet is the channel under test and cannot be its own instrument.
+
+The retry yields between attempts, because only a yield lets lwIP drain. That introduces re-entrancy, which is guarded: a nested write() to the same instance takes what fits without yielding, since re-entering would interleave two lines into one corrupted stream.
+
+A fixed per-line delay was rejected with numbers. At the measured peak of 43 console lines per second, 1 ms per line blocks the loop 43 ms per burst second, 5 ms blocks 215 ms and 20 ms blocks 860 ms, on an idle device. Serial is reserved for the PIC, so a stalled loop costs OpenTherm frames. A fixed delay is also paid on every line, including the overwhelming majority where the send buffer was empty.
+
+## Measured drop rate
+
+| scenario | dropped |
+|---|---|
+| normally reading client | 0 B |
+| slow reader, 512 B/s | 0 B |
+| reader fully stalled, normal RX window, 60 s | 0 B |
+| reader stalled with SO_RCVBUF forced to 2048 | first loss at 42 s, 227 B |
+| identical repeat of that last case | 0 B in 75 s |
+
+Loss is backpressure-driven, not load-driven, and it is rare. A stalled reader alone is not enough: the client kernel buffers roughly 64 KB while the console emits a few hundred bytes per second, so it takes minutes to matter.
+
+## Correction worth reading before trusting the earlier notes
+
+The missing lines that started this investigation were NOT transport loss. The debug keys are toggles, not switches. A harness pressing 3 at the start of every run flips MQTT debug on, off, on, off, and four presses in one session echo false, true, false, true. The runs that appeared to lose every publish line were runs with MQTT debug turned off, which produced the alternating 0/9/0 pattern that looked like probabilistic loss. Re-measured with the toggle driven off its echo, telnet read lines and publish lines match exactly: 6/6, 3/3, 3/3.
+
+So the practical impact of this defect is far smaller than TASK-1147 suggested, and that task's premise is retracted. The defect itself is still real, demonstrable in the code and measured at 227 bytes under backpressure. What it actually fixes is observability: the counter read 0 through every normal test, which is evidence rather than an assumption.
+
+## Cost and verification
+
+16 bytes of static RAM, measured from the ELF: 52712 to 52728 of 81920. Build green (1.7.6-beta.4+f808d34, firmware and filesystem), evaluator 38 checks and 0 failures, verified on the bench gateway at 192.168.88.68.
+
+## Follow-up
+
+TASK-1149 holds the deferred TX ring, which is what would actually eliminate the residual loss, at roughly 1 KB of RAM. Given the measured drop rate, that cost now looks hard to justify and the task should be re-read with these numbers before anyone starts it.
+<!-- SECTION:FINAL_SUMMARY:END -->
