@@ -123,3 +123,6 @@ tests/*.out
 tests/*.exe
 tests/*.obj
 tests/*.pdb
+
+# adr-kit transient lock
+docs/adr/.adr-kit-state.json.lock
