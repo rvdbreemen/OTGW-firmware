@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-22 21:15'
-updated_date: '2026-09-22 21:16'
+updated_date: '2026-09-22 21:25'
 labels:
   - bug
 dependencies:
@@ -53,3 +53,65 @@ OPEN QUESTION FOR THE REPORTER, already asked by him in the other direction: he 
 - [ ] #4 Any change preserves the TASK-769/TASK-1134 guarantee: the broker never sees a truncated or malformed publish
 - [ ] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+RESEARCH: can a half-written PUBLISH be closed off without dropping the connection?
+
+Short answer: not at the protocol level. MQTT 3.1.1 has no way to abort a packet. The fixed header carries a Remaining Length, and from the moment those bytes are on the wire the broker will consume exactly that many more bytes as this packet. There is no cancel, no escape sequence and no resynchronisation marker in the protocol. Once a partial PUBLISH is out, the only correct outcomes are: finish the declared byte count, or destroy the transport. That is a property of MQTT, not of PubSubClient or of this firmware, and no amount of local cleverness changes it.
+
+So the useful question is not how to abort, but how never to arrive there.
+
+WHAT THE STACK ACTUALLY DOES, verified in Core 2.7.4.
+
+- WiFiClient sets _timeout = 5000 in its constructor (WiFiClient.cpp:81 and :88) and applies it with _client->setTimeout(_timeout) before every write (WiFiClient.cpp:169).
+- ClientContext::_write_from_source loops: push what fits with _write_some(), then block in a 1 ms delay loop until the peer ACKs free up space, and give up when _is_timeout().
+- _is_timeout() is millis() - _op_start_time > _timeout_ms, and _op_start_time is reset on every _write_some() that makes progress (ClientContext.h:441-444).
+
+That last detail matters and corrects the loose wording in our own CHANGELOG. The 5 seconds is a NO-PROGRESS timeout, not a total duration. A short write therefore does not mean "the buffer was briefly full". It means the socket accepted zero bytes for five consecutive seconds. That is a severe condition.
+
+Two consequences follow immediately:
+1. For mrfox7688, reconnecting every 30 to 60 seconds means his TCP socket stalls completely for five seconds, over and over. That is a network or Wi-Fi problem surfacing as an MQTT symptom, not a tuning parameter we can turn.
+2. Every one of those events also blocks the cooperative loop for five seconds inside write(). That cost is invisible today and nobody has accounted for it. It is arguably worse than the reconnect it produces.
+
+WHERE THE ASYMMETRY IS.
+
+- Payload half: writeMqttChunk (MQTTstuff.ino:285-306) already retries, MQTT_WRITE_MAX_RETRIES = 10, with feedWatchDog() and yield() between attempts. It only gives up, and disconnects, after those retries.
+- Header half: beginPublish (PubSubClient.cpp:526-541) writes the fixed header and topic in ONE _client->write() and returns true only if the full count went out. There is no retry, and no way to add one from outside: PubSubClient does not tell us how many bytes went out, and its assembly buffer is internal. endPublish() is a no-op that returns 1 (PubSubClient.cpp:543-545), so there is no framing state to interrogate either.
+
+So the header is the half that cannot be recovered, and it is also the half with no retry.
+
+OPTIONS EVALUATED.
+
+A. Prevention: refuse to start a packet that cannot be framed.
+   WiFiClient::availableForWrite() exists on 2.7.4 and returns tcp_sndbuf(_pcb) (WiFiClient.cpp:209-211, ClientContext.h:162-165), which is exactly the quantity that decides whether a write will be short. wifiClient is a global in OTGW-firmware.h:525, so it is directly reachable without a PubSubClient getter.
+   Checking that the header plus topic fits before calling beginPublish() costs one comparison and removes the unrecoverable case entirely. A publish that cannot be framed is deferred and counted, never started.
+   Caveat: TCP_SND_BUF is 2 * TCP_MSS (lwipopts.h:1326), so requiring the WHOLE packet to fit would refuse large discovery configs that would otherwise succeed, because write() legitimately completes them across several ACK rounds. Requiring only the header plus topic to fit avoids that: it is small, almost always available, and it is the only part with no recovery path.
+   VERDICT: best option. Strictly reduces disconnects, and it also avoids the hidden five-second loop stall for the refused case.
+
+B. Write the header ourselves, with the same retry the payload has.
+   Build the PUBLISH fixed header, the Remaining Length varint and the topic by hand, then write them through MQTTclient.write(buf, len), which is a thin passthrough (PubSubClient.cpp:552-555), using the writeMqttChunk retry loop. That removes the asymmetry completely rather than avoiding it.
+   Costs: reimplementing varint Remaining Length encoding correctly, and taking ownership of a piece of protocol framing PubSubClient currently owns. A bug here produces exactly the malformed packets we are trying to prevent.
+   VERDICT: viable, more surface, only worth doing if A proves insufficient.
+
+C. Pad the packet to its declared length.
+   If K of N declared bytes are out, write N-K filler bytes so the framing stays valid and only one payload is corrupt.
+   This does not work, and the reason is decisive: the situation only arises because the socket refuses bytes. The padding needs the same socket. If we could write the padding we could have written the real payload. It trades a guaranteed gap for a corrupted value that probably cannot be delivered either.
+   VERDICT: reject.
+
+D. Current behaviour: MQTTclient.disconnect() at MQTTstuff.ino:359 and :1059.
+   Correct as a last resort and must stay. It is also the direct cause of the "connection closed by client" lines in mrfox7688's broker log, because disconnect() sends a clean MQTT DISCONNECT.
+
+RECOMMENDED SHAPE.
+
+1. Pre-flight the header plus topic against availableForWrite(). Defer and count when it does not fit. This is where the unrecoverable case is eliminated.
+2. Keep the existing payload retry.
+3. Keep the disconnect as the final fallback, because nothing else is correct once a partial packet is on the wire.
+4. Count both the deferrals and the remedy firings, and expose them over REST. Right now the only way to know how often this happens is to read the broker's log, which is the same blindness TASK-1148 removed for the telnet console.
+
+WHAT TO TELL THE REPORTER.
+The clean disconnects are the fix working as designed. The thing worth chasing on his side is why the socket stalls for five seconds at a time, because that is what each disconnect proves happened.
+
+UNVERIFIED, flagged rather than asserted: the numeric value of TCP_MSS on this build was not found in lwipopts.h, so the exact sndbuf figure (2 * MSS) is not pinned down. It does not change any conclusion above, since option A deliberately only requires the small header to fit, but anyone tuning a threshold should measure it first.
+<!-- SECTION:NOTES:END -->
