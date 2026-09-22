@@ -61,3 +61,27 @@ ADR: still open. This adds a buffering layer to the serial bridge path and spend
 - [ ] #5 No new serial overruns or dropped OT frames under the burst test
 - [ ] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+WONT DO, closed on maintainer decision 2026-09-22. The ring would not solve enough to be worth its RAM.
+
+The case for it collapsed once TASK-1148 was measured on hardware. A ring only helps where the bounded retry cannot, and that turns out to be a corner nobody reaches:
+
+  normally reading client        0 B lost
+  slow reader, 512 B/s           0 B lost
+  slow reader, 64 B/s            0 B lost after the retry fix (was 133 B)
+  reader stalled, normal window  0 B lost over 60 s
+  reader stalled + SO_RCVBUF 2048   ~250 B, the only case still losing
+
+That last row is the whole remaining problem, and it needs a client that has stopped reading AND an artificially shrunk receive window. A real client would have to stall for minutes before its kernel buffer, roughly 64 KB against a console emitting a few hundred bytes per second, even filled.
+
+Against that, the cost measured from the ELF: about 1,048 bytes static for 512 bytes per instance across the two SimpleTelnet<1> instances. That is 5.9 percent of the roughly 17.9 KB actually free while running, permanently gone from the heap the heap gates steer on. And a 512 byte ring holds 4.8 of the 43 lines in a measured peak burst, about 11 percent, so it would not even absorb the burst: it smooths, and correctness would still come from drain frequency.
+
+Spending 6 percent of live heap to improve a case that only appears under a deliberately crippled client is the wrong trade on a device with about 40 KB of usable RAM.
+
+What replaces it: TASK-1148 shipped the honest return value, the bounded retry and per-client drop counters, readable as telnet_tx_dropped and otgwstream_tx_dropped in /api/v2/device/info. If those counters ever climb in the field, that is the evidence that would justify reopening this. Until then there is nothing to fix.
+
+The design work is not lost. This record keeps the backport plan, the ordering rule that a direct write must never overtake a buffered tail, the sizing table and the measured RAM figures, so reopening would start from the numbers rather than from scratch.
+<!-- SECTION:NOTES:END -->
