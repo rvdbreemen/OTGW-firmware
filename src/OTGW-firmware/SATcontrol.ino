@@ -327,6 +327,12 @@ static inline void satResetCmdCache() {
   state.sat.iLastSentTCMs  = 0;
 }
 
+// TASK-1150: true only while SAT itself is submitting a command through the shared
+// command queue. Set around SAT's own enqueue and read by the OTDirect CS= handler, so
+// it can tell SAT's own setpoint from an external one without a second command path.
+static bool _satCmdInFlight = false;
+bool satCommandInFlight() { return _satCmdInFlight; }
+
 // Enqueue CS=<setpoint> only if value changed (rounded to 0.1) or refresh
 // window elapsed. Returns true when an enqueue happened.
 static bool satEnqueueIfChangedCS(float setpoint) {
@@ -337,7 +343,13 @@ static bool satEnqueueIfChangedCS(float setpoint) {
   if (state.sat.bLastSentValid && newQ == oldQ && !stale) return false;
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), setpoint);
+  // TASK-1150: mark this CS= as SAT's own. External CS= is refused while SAT owns the
+  // control setpoint, and SAT uses the same generic command queue as everyone else, so
+  // without this marker SAT would reject itself. handleOTDirectCommand() runs
+  // synchronously from addCommandToQueue(), so the flag is set for exactly this call.
+  _satCmdInFlight = true;
   addCommandToQueue(buf, strlen(buf), false, 0);
+  _satCmdInFlight = false;
   state.sat.fLastSentCS     = (float)newQ / 10.0f;
   state.sat.iLastSentCSMs   = now;
   state.sat.bLastSentValid  = true;
@@ -1847,6 +1859,27 @@ static void satLoadEstimatedEnergy()
     state.sat.fEstEnergyLastSavedKWh = kwh;
     SATDebugTf(PSTR("SAT: estimated energy restored (%.3f kWh)\r\n"), kwh);
   }
+}
+
+//=== Does SAT own the control setpoint (MsgID 1)? — TASK-1150 / ADR-179 ===
+//
+// Keyed on SAT being ENABLED, deliberately not on state.sat.bActive. A safety trip
+// clears bActive but leaves the user's intent (settings.sat.bEnabled) untouched, and
+// the boot window before the first control tick has the same shape. Keying on bActive
+// re-armed the OTDirect heating curve in exactly those windows, which is the conflict
+// sergeantd reported: SAT and the curve taking turns on TSet.
+//
+// One documented exception, decided by the maintainer 2026-09-22: the thermostat-timeout
+// setback (OTDirect.ino) is a fail-safe and deliberately outranks this ownership. If the
+// thermostat goes quiet AND SAT is not commanding, something must still keep the house
+// from freezing.
+bool satOwnsControlSetpoint()
+{
+#if defined(HAS_SAT) && HAS_SAT
+  return settings.sat.bEnabled;
+#else
+  return false;
+#endif
 }
 
 //=== Cleanly disable SAT and release boiler control ===

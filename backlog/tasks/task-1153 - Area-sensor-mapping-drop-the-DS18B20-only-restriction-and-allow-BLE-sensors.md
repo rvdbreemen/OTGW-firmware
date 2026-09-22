@@ -1,7 +1,7 @@
 ---
 id: TASK-1153
 title: 'Area sensor mapping: drop the DS18B20-only restriction and allow BLE sensors'
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:38'
@@ -40,3 +40,15 @@ SCHEMA IMPACT: widening sSensorArea from a Dallas-only field to a multi-source s
 - [ ] #9 An ADR (or ADR-051 amendment) records widening sSensorArea to a multi-source sensor reference, including the migration
 - [x] #10 python build.py green for the ESP32 targets; python evaluate.py --quick shows no new failures
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Shipped under alpha.369. Build green on esp32, esp32-classic and esp32-combo; evaluate.py --quick 0 failures, 98.7%.
+
+Evidence: tests/webui/sat-area-sensor-mapping.test.mjs (new) drives the shipped classic UI in headless Chrome over CDP, serving both sensor sources plus the current mappings. 12/12 checks pass; the same harness reports 6 failures against the parent commit, including 'the BLE sensor is offered' and a PATCH that carried an empty sensor value, so it fails for the right reason.
+
+AC2 (a BLE temperature actually reaching state.sat.fAreaTemp[N] on device) needs hardware and is NOT ticked. The fan-out is implemented in satBLEUpdateState() and mirrors the Dallas path in sensors_ext.ino:298, but no 2.0.0 board with a BLE sensor was reachable this session.
+
+AC9 is satisfied by ADR-178 (Proposed, lints clean). It carries one Open Question for the maintainer: when an area's mapped BLE sensor goes stale, hold the last value or fall back? Area mapping deliberately has no failover - a substitute sensor in a different room would report the wrong area - but that needs confirming before the ADR can be accepted.
+<!-- SECTION:NOTES:END -->

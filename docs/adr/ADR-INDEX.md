@@ -184,3 +184,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-176 | Accepted | - | Chosen option: Option A, because the maintainer decided the Energy dashboard should work out of the box rather than r... |
 | ADR-177 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option A, because the damaging edits share a small, precise syntactic signature. |
 | ADR-178 | Proposed | `src/OTGW-firmware/**/*.h` | settings.sat.sSensorArea becomes char[4][18] and holds a sensor reference that is either a 16-character Dallas addres... |
+| ADR-179 | Proposed | - | While SAT is enabled, SAT owns MsgID 1. |

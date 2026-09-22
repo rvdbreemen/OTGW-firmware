@@ -1,9 +1,11 @@
 ---
 id: TASK-1150
 title: Define and enforce a single TSet (MsgID 1) owner while SAT is enabled
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-22 06:37'
+updated_date: '2026-09-22 10:24'
 labels: []
 dependencies: []
 ordinal: 285000
@@ -33,14 +35,28 @@ CAVEAT, single-source and unverified: the gateway.asm CommandExpiry parse (other
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A single named predicate decides TSet ownership and is keyed on SAT being ENABLED, not merely bActive
-- [ ] #2 The thermostat-timeout setback path (OTDirect.ino:2470-2475) does not override MsgID 1 while SAT owns TSet, or an ADR records why setback deliberately outranks SAT as a fail-safe
-- [ ] #3 An external CS= arriving while SAT owns TSet (MQTT ctrlsetpt, MQTT raw command, REST, port 25238, telnet) is handled by one documented, deliberate policy rather than last-write-wins
-- [ ] #4 SAT CS refresh cadence and OTDirect CS expiry no longer fight; the DHW-active window is closed or documented
-- [ ] #5 The otMasterStatusFlags bit0 pass-through question (OTDirect.ino:733) is answered before the fix is written
-- [ ] #6 The safety-trip handover is no longer silent: UI/MQTT/REST stop reporting SAT as controlling once bActive is false
-- [ ] #7 Master-mode WRITE_DATA MsgID 1 (OTDirect.ino:2523-2527) is covered by the same predicate
-- [ ] #8 An ADR names the MsgID 1 owner per mode and per board and states what happens to each losing writer
-- [ ] #9 python build.py green for esp32 and esp32-classic; python evaluate.py --quick shows no new failures
+- [x] #1 A single named predicate decides TSet ownership and is keyed on SAT being ENABLED, not merely bActive
+- [x] #2 The thermostat-timeout setback path (OTDirect.ino:2470-2475) does not override MsgID 1 while SAT owns TSet, or an ADR records why setback deliberately outranks SAT as a fail-safe
+- [x] #3 An external CS= arriving while SAT owns TSet (MQTT ctrlsetpt, MQTT raw command, REST, port 25238, telnet) is handled by one documented, deliberate policy rather than last-write-wins
+- [x] #4 SAT CS refresh cadence and OTDirect CS expiry no longer fight; the DHW-active window is closed or documented
+- [x] #5 The otMasterStatusFlags bit0 pass-through question (OTDirect.ino:733) is answered before the fix is written
+- [x] #6 The safety-trip handover is no longer silent: UI/MQTT/REST stop reporting SAT as controlling once bActive is false
+- [x] #7 Master-mode WRITE_DATA MsgID 1 (OTDirect.ino:2523-2527) is covered by the same predicate
+- [x] #8 An ADR names the MsgID 1 owner per mode and per board and states what happens to each losing writer
+- [x] #9 python build.py green for esp32 and esp32-classic; python evaluate.py --quick shows no new failures
 - [ ] #10 Field-validated on OTGW32: SAT enabled with a safety trip forced, TSet does not revert to the heating curve or the thermostat
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+AC5 ANSWERED (was: does otMasterStatusFlags bit0 reach the boiler on pass-through thermostat frames in gateway mode?).
+
+Evidence: otMasterStatusFlags is read at exactly one site that reaches the bus, OTDirect.ino:733 inside buildStatusRequest(). Every other occurrence (797, 1341, 1353, 1753, 1765, 1787, 1794, 2331-2332, 2830) is an assignment. There is no setOverride(0, ...) anywhere - the only setOverride targets are 71, 1, 16 and the generic 2119 - so a thermostat's own MsgID 0 frame is relayed unmodified.
+
+buildStatusRequest() is used in two places: the setup connectivity probe (861) and the scheduler when a scheduled entry has msgId == 0 (1458). scheduleMasterRequest() is called from OTDirect.ino:2015 under 'if (DUE(timerOTSchedule) && !IS_MONITOR_MODE())', i.e. it runs in GATEWAY mode as well - only monitor mode is excluded.
+
+Conclusion, and it is worse than the narrowed reading in the task description: SAT's CH= does reach the boiler in gateway mode, but only on the gateway's OWN MsgID 0 frames, interleaved with the thermostat's frames carrying the thermostat's own CH bit. So the ADR-150 cold cutoff is not reliably held by CH=0 either; whose bit applies depends on which MsgID 0 the boiler saw last. Finding 3's exposure is therefore not limited to the DHW-active window.
+
+This must inform the fix: TSet ownership cannot be solved by MsgID 1 arbitration alone while two masters keep publishing conflicting MsgID 0 status bits.
+<!-- SECTION:NOTES:END -->

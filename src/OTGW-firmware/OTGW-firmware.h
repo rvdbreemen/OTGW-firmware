@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.369
+**  Version  : v2.0.0-alpha.370
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -353,6 +353,15 @@ void satBLERescanRequest();   // TASK-895: trigger an on-demand active-scan name
 // SAT (Smart Autotune Thermostat) forward declarations — defined in SATcontrol.ino, SATpid.ino, SATcycles.ino
 void initSAT();
 void satControlLoop();
+// TASK-1150 / ADR-179: single predicate for "does SAT own the control setpoint
+// (MsgID 1) right now". Keyed on SAT being ENABLED, not on bActive: a
+// safety-tripped SAT is still the owner, it just is not commanding, and handing
+// TSet back to the heating curve in that window is how the two used to fight.
+bool satOwnsControlSetpoint();
+// TASK-1150: true only while SAT is itself submitting a command through the shared
+// command queue, so the CS= handler can refuse an EXTERNAL setpoint without refusing
+// SAT's own.
+bool satCommandInFlight();
 void satPublishMQTT();
 bool satHandleExternalTemp(const char* value);
 bool satHandleExternalOutdoor(const char* value);

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.369
+**  Version  : v2.0.0-alpha.370
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -2030,7 +2030,15 @@ void loopOTDirect() {
     loopFlameRatio();
     // TASK-442: expire CS/C2 overrides if not refreshed within heartbeat window.
     uint32_t nowExp = millis();
-    if (otCSLastCommandMs != 0 && (uint32_t)(nowExp - otCSLastCommandMs) > OT_CSC2_EXPIRY_MS) {
+    // TASK-1150: the heartbeat guards against an external actor that set CS= and then
+    // vanished. SAT is not that actor: it refreshes on change or every
+    // SAT_CMD_REFRESH_MS (300 s), five times this window, so expiring its override
+    // handed TSet back to the thermostat for the remainder of every quiet stretch —
+    // exactly during the ADR-150 cold cutoff and while DHW is active, when SAT
+    // deliberately holds a stable setpoint. While SAT owns the setpoint the override
+    // stays; SAT itself clears it on satDisable().
+    if (otCSLastCommandMs != 0 && !satOwnsControlSetpoint() &&
+        (uint32_t)(nowExp - otCSLastCommandMs) > OT_CSC2_EXPIRY_MS) {
       OTDDebugTln(F("OTD: CS heartbeat expired, clearing MsgID 1 override"));
       clearWriteOverride(1);
       otCSLastCommandMs = 0;
@@ -2064,13 +2072,15 @@ void loopOTDirect() {
 
   // TASK-183: PI room compensation — run every 60s
   if ((millis() - otNextPiCtrl) >= OT_PI_INTERVAL_MS || otNextPiCtrl == 0) {
-    // TASK-761: SAT owns the CH setpoint (MsgID 1) via its CS= override when
-    // active. OTDirect must not also drive MsgID 1, otherwise the heating-curve
-    // writer and SAT fight over TSet (observed flip-flop 45<->10 every 60s).
-    // Mirror the loopCHHysteresis() SAT bypass below; keep otNextPiCtrl
-    // advancing so PI/heating-curve resume cleanly when SAT disengages.
+    // TASK-761: SAT owns the CH setpoint (MsgID 1), so OTDirect must not also drive
+    // MsgID 1 or the heating-curve writer and SAT fight over TSet (observed flip-flop
+    // 45<->10 every 60 s). TASK-1150 widened the gate from state.sat.bActive to
+    // satOwnsControlSetpoint(): bActive drops on a safety trip and during the boot
+    // window while the user still has SAT enabled, and re-arming the curve there is
+    // the same conflict in a narrower window. Keep otNextPiCtrl advancing so the
+    // PI/heating curve resumes cleanly once SAT is actually disabled.
 #if defined(HAS_SAT) && HAS_SAT
-    if (!state.sat.bActive) {
+    if (!satOwnsControlSetpoint()) {
 #endif
       loopPiCtrl();
       // Apply heating curve flow in master mode when CH mode is not fixed
@@ -2520,8 +2530,11 @@ static void handleMasterModeSlaveFrame(unsigned long frame) {
     // WRITE_DATA — accept and echo back as WRITE_ACK
     uint16_t dataVal = frame & 0xFFFF;
     response = buildOTResponse(5, msgId, dataVal);  // 5 = WRITE_ACK
-    // Apply thermostat's TSet as our write cache so scheduler sends it to boiler
-    if (msgId == 1 && dataVal != 0) {
+    // Apply thermostat's TSet as our write cache so scheduler sends it to boiler.
+    // TASK-1150: not while SAT owns the control setpoint — a thermostat writing MsgID 1
+    // in master mode would otherwise silently replace SAT's setpoint. The WRITE_ACK is
+    // still echoed above so the thermostat sees a well-formed exchange.
+    if (msgId == 1 && dataVal != 0 && !satOwnsControlSetpoint()) {
       setOverride(1, dataVal);
       updateWriteCache(1, dataVal);
     }
@@ -2618,6 +2631,16 @@ void handleOTDirectCommand(const char* buf, int len) {
 
   // CS=xx.x — Control setpoint (MsgID 1 = TSet). Value 0 clears override.
   if (cmd0 == 'C' && cmd1 == 'S') {
+    // TASK-1150 / ADR-179: while SAT owns the control setpoint, an EXTERNAL CS= is
+    // refused rather than silently winning by being the last writer. Maintainer
+    // decision 2026-09-22: a visible refusal beats a race whose outcome depends on
+    // timing. SAT's own CS= arrives through the same queue, so it is let through on
+    // the in-flight marker; disable SAT to steer TSet by hand.
+    if (satOwnsControlSetpoint() && !satCommandInFlight()) {
+      OTDDebugTln(F("OT-direct: CS= refused, SAT owns the control setpoint (disable SAT to override)"));
+      otDirectBridgeProcessStatus("NG");
+      return;
+    }
     float temp = atof(value);
     bool enqueued = true;
     if (temp == 0.0f) {

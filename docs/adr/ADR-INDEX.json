@@ -5816,6 +5816,66 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-179",
+      "title": "Name the owner of the OpenTherm control setpoint while SAT is enabled",
+      "path": "ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-09-22",
+      "decision_summary": "While SAT is enabled, SAT owns MsgID 1.",
+      "topics": [
+        "control setpoint ownership",
+        "msgid 1 tset",
+        "otdirect write arbitration",
+        "sat arbitration"
+      ],
+      "aliases": [
+        "MsgID 1 owner",
+        "satOwnsControlSetpoint",
+        "TSet owner"
+      ],
+      "components": [
+        "OTDirect MsgID 1 writers",
+        "satOwnsControlSetpoint()"
+      ],
+      "symbols": [
+        "satCommandInFlight",
+        "satOwnsControlSetpoint"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Exactly one predicate decides TSet ownership, and it is keyed on SAT being enabled.",
+          "The OTDirect heating-curve / PI writer, the master-mode thermostat WRITEDATA path and external CS= all consult that predicate.",
+          "While SAT owns the setpoint, the CS heartbeat does not expire the MsgID 1 override. The heartbeat exists for an external actor that set a setpoint and vanished; SAT is not that actor, and it clears its own override in satDisable().",
+          "A refused external CS= is reported (NG plus a telnet line), never silently dropped."
+        ],
+        "must_not": [
+          "Do not gate a TSet writer on state.sat.bActive. That is the bug this ADR exists to close.",
+          "Do not gate SAT's own CS= on ownership, or SAT refuses itself."
+        ],
+        "exceptions": [
+          "The thermostat-timeout setback (OTDirect.ino:2470-2475) may write MsgID 1 while SAT owns it. Maintainer decision, 2026-09-22: it is a fail-safe, and if the thermostat has gone quiet and SAT is not commanding, something must still keep th..."
+        ],
+        "verification": [
+          "src/OTGW-firmware/SATcontrol.ino — satOwnsControlSetpoint() and satCommandInFlight().",
+          "src/OTGW-firmware/OTDirect.ino — the gated heating-curve, master-mode WRITEDATA, CS= and CS-expiry sites.",
+          "Field validation on an OTGW32: with SAT enabled and a safety trip forced, TSet must not revert to the heating curve or the thermostat."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -10724,6 +10784,18 @@
     {
       "source": "ADR-178",
       "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-179",
+      "target": "ADR-150",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-179",
+      "target": "ADR-162",
       "type": "related",
       "resolved": true
     }
