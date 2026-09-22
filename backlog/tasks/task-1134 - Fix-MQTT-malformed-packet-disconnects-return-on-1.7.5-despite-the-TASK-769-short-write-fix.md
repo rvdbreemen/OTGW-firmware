@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:20'
-updated_date: '2026-09-22 21:14'
+updated_date: '2026-09-22 21:27'
 labels:
   - bug
 dependencies: []
@@ -90,6 +90,8 @@ AC2 removed: it was the 'if reachable' branch of AC1 and AC3 is its mutually exc
 2026-09-22: AC #5 satisfied. mrfox7688 on GH #682: 'The beta firmware appears to have fixed the original malformed-packet symptom. During the last few days after firmware update I found no malformed packet messages in the Mosquitto log.' Beta.3 shipped 2026-09-18, so that is four days of field running.
 
 He reports a separate remaining problem in the same comment: repeated clean reconnects (disconnected: Success, connection closed by client) and several session taken over events. That is NOT the malformed-packet defect and is tracked separately, because it looks like a consequence of this very fix: both remedy sites call MQTTclient.disconnect() on a failed write (MQTTstuff.ino:359 and :1059), which sends a clean DISCONNECT that Mosquitto logs as exactly those strings.
+
+Wording correction, carried here so the next reader does not inherit the loose version. This task's notes and the CHANGELOG describe the short write as happening 'once the lwIP send buffer stays full until the 5 second socket timeout', which reads as a total duration. It is not. _is_timeout() is millis() - _op_start_time > _timeout_ms and _op_start_time is reset by every _write_some() that makes progress (ClientContext.h:441-444), so it is a NO-PROGRESS timeout. A short write therefore proves the socket accepted zero bytes for five consecutive seconds, which is a far more severe condition than a briefly full buffer. WiFiClient sets _timeout = 5000 in its constructor (WiFiClient.cpp:81, :88) and nothing in this firmware shortens it, so that default is live on every publish path. Full analysis on TASK-1154.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
