@@ -4,10 +4,14 @@ title: Add a TX ring to SimpleTelnet so a busy console stops losing output
 status: To Do
 assignee: []
 created_date: '2026-09-22 06:27'
+updated_date: '2026-09-22 06:28'
 labels:
   - bug
 dependencies:
   - TASK-1148
+references:
+  - 'src/libraries/SimpleTelnet/src/SimpleTelnet_impl.tpp:218-238'
+  - '2.0.0 reference: src/AsyncSimpleTelnet.h:53-115 (SimpleTelnetRing)'
 priority: low
 ordinal: 228000
 ---
