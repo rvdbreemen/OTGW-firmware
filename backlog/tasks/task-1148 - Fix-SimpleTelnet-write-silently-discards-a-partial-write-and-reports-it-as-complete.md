@@ -80,6 +80,16 @@ VERIFICATION reuses the TASK-1147 rig: local mosquitto subscribed as lossless ob
 
 <!-- SECTION:NOTES:BEGIN -->
 Scope narrowed on maintainer instruction: A and B here, the TX ring split out to TASK-1149 so its ~1 KB RAM cost can be judged after A+B are measured on hardware. AC #2 was removed rather than left standing, because it required that no whole publish line is lost, which A+B cannot deliver without a buffer. Replaced by three ACs that A+B can actually be held to: a per-client drop counter, measurably lower loss than the TASK-1147 baseline with residual loss permitted but counted, and re-entrancy safety.
+
+SELF-CAUGHT DEFECT IN THE FIRST COMMIT, found while checking AC #7 instead of assuming it. The bounded retry never ran.
+
+write() computed outer = !_inWrite and then set _inWrite = true BEFORE calling _writeToClient(). Inside that helper the guard read if (_inWrite) break, which is therefore always true. Every short write broke out on the first pass, so B was dead code while A worked. The 227 bytes measured under backpressure were measured with no retry at all.
+
+Fixed by passing the nesting state explicitly: _writeToClient(idx, buf, size, bool mayYield), with mayYield = outer, and the guard now reads if (!mayYield) break. A comment at that line records why testing _inWrite there is wrong, so it does not get reintroduced.
+
+AC #6 unchecked as well, on a separate ground: it asks for burst loss measurably lower than the TASK-1147 baseline, but that baseline turned out to be a toggle artifact rather than transport loss, so there is no valid figure to beat. It needs rewording or removal rather than a tick.
+
+Lesson for the record: the first commit passed build, evaluator and an on-device stress test while half the change was inert. None of those gates could see it, because the counter they exercise belongs to A. Verifying a mechanism means proving the mechanism ran, not that the feature it belongs to compiled.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
