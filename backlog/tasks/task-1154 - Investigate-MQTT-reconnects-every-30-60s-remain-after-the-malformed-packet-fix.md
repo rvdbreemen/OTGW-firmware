@@ -115,6 +115,8 @@ WHAT TO TELL THE REPORTER.
 The clean disconnects are the fix working as designed. The thing worth chasing on his side is why the socket stalls for five seconds at a time, because that is what each disconnect proves happened.
 
 UNVERIFIED, flagged rather than asserted: the numeric value of TCP_MSS on this build was not found in lwipopts.h, so the exact sndbuf figure (2 * MSS) is not pinned down. It does not change any conclusion above, since option A deliberately only requires the small header to fit, but anyone tuning a threshold should measure it first.
+
+AC #3 closed: answered mrfox7688 on GH #682 (comment 5784793893). Told him plainly that the clean disconnects are the fix operating, that MQTT has no packet abort so there is no gentler in-band option, and that each disconnect proves his socket accepted zero bytes for five consecutive seconds, which is a network condition rather than a firmware parameter. Also named the limit honestly: the pre-flight lowers the frequency, it cannot remove the drop. Asked him to read mqtt_sndbuf_skips and mqtt_desync_drops after a churn period once a beta carries this, since desync_drops climbing would mean the pre-flight is missing cases.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
