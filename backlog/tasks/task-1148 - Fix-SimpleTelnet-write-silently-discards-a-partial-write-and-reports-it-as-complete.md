@@ -3,11 +3,11 @@ id: TASK-1148
 title: >-
   Fix: SimpleTelnet write() reports a partial write as complete (honest return +
   bounded retry)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:08'
-updated_date: '2026-09-22 10:32'
+updated_date: '2026-09-22 10:33'
 labels:
   - bug
 dependencies: []
