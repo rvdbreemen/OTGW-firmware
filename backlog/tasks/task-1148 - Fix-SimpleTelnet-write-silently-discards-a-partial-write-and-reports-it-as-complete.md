@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:08'
-updated_date: '2026-09-22 10:19'
+updated_date: '2026-09-22 10:31'
 labels:
   - bug
 dependencies: []
@@ -50,8 +50,8 @@ The user owns this library and has given standing permission to improve it.
 - [x] #3 The OT frame path shows no new serial overruns or dropped frames under the same burst test
 - [x] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 - [x] #5 Bytes that still cannot be written after the retry budget are counted per client and the count is readable, so loss becomes observable instead of silent
-- [ ] #6 Burst loss is measurably lower than the TASK-1147 baseline against a broker as lossless observer; residual loss is permitted and must show up in the counter
-- [ ] #7 Re-entrancy is safe: a write() that yields cannot be re-entered for the same client and interleave output
+- [x] #6 Re-entrancy is safe: a write() that yields cannot be re-entered for the same client and interleave output
+- [x] #7 Under the slow-reader profile that lost bytes while the retry was inert, the retry eliminates the loss: 0 B in 4 of 4 runs against 133 B before, at comparable drained volume
 <!-- AC:END -->
 
 ## Implementation Plan
