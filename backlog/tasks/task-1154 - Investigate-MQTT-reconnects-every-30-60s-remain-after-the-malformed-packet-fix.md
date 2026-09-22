@@ -116,3 +116,58 @@ The clean disconnects are the fix working as designed. The thing worth chasing o
 
 UNVERIFIED, flagged rather than asserted: the numeric value of TCP_MSS on this build was not found in lwipopts.h, so the exact sndbuf figure (2 * MSS) is not pinned down. It does not change any conclusion above, since option A deliberately only requires the small header to fit, but anyone tuning a threshold should measure it first.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Stops the firmware starting a PUBLISH it cannot frame, which is the only point where the reconnects reported on GH #682 could be prevented rather than cured.
+
+## The protocol answer to the question asked
+
+There is no way to close off a half-written MQTT packet without breaking the transport. MQTT 3.1.1 has no abort: once a PUBLISH fixed header carrying a Remaining Length is on the wire, the broker will consume exactly that many following bytes as this packet. Finish the declared count, or destroy the connection. That is a property of the protocol, not of PubSubClient or this firmware.
+
+So the fix is prevention, not recovery.
+
+## What changed
+
+beginMqttPublish() pre-flights wifiClient.availableForWrite() against the part that has no recovery path: the fixed header byte, the Remaining Length varint, the two-byte topic length and the topic. beginPublish() emits exactly that in one write() and reports only whether the full count went out, PubSubClient does not say how many bytes left, and endPublish() is a no-op, so nothing can resume it. The payload half already retries in writeMqttChunk().
+
+Only the header is checked, deliberately. TCP_SND_BUF is 2 * TCP_MSS, so demanding room for the whole packet would refuse large discovery configs that legitimately complete across several ACK rounds.
+
+Counters mqtt_sndbuf_skips and mqtt_desync_drops are exposed in /api/v2/device/info. The second one counts both remedy sites, header and payload.
+
+## A wrong first version, and how it was caught
+
+The first implementation deferred as soon as availableForWrite() came up short. On a post-OTA boot that skipped 35 to 40 publishes, because the 766 KB upload had just saturated the radio and the buffer was transiently full. Those publishes would have succeeded after a wait of milliseconds, so the change traded a brief delay for a dropped message, which is worse than the defect.
+
+It was caught by measuring the counter on a healthy device rather than only under the fault. The check now gives lwIP the same bounded drain chance writeMqttChunk() already used, and defers only when the room never appears.
+
+## Measured
+
+| scenario | sndbuf_skips | desync_drops |
+|---|---|---|
+| clean reboot, healthy broker | 0 | 0 |
+| post-OTA boot, defer-on-first-look | 35-40 | 0 |
+| post-OTA boot, with the drain wait | 0 | 0 |
+| broker stops reading, 150 s | 38 | 0 |
+
+The last row is the proof. Against a broker that completes the handshake and then never reads again, 38 publishes were deferred and the desync remedy never fired. The link did close eventually, on keepalive, which is correct for a dead broker and is not counted as a desync drop.
+
+## What this does not do
+
+It lowers how often the disconnect fires; it cannot remove it. availableForWrite() is a snapshot and nothing reserves that space between the check and beginPublish()'s write. The drop therefore stays as the last resort, because once a partial packet is out nothing else is correct.
+
+## Rejected alternatives, with reasons
+
+- Padding the packet to its declared length to keep framing valid. Rejected: the situation only exists because the socket refuses bytes, and the padding needs that same socket. If the padding could be written, the real payload could have been.
+- Writing the header by hand so it can be retried like the payload. Viable but it moves protocol framing out of the library, and a mistake there produces exactly the malformed packets this is meant to prevent. Kept in reserve if the pre-flight proves insufficient.
+- Temporising the discovery burst. Not needed: the drip timer, DISCOVERY_INTERVAL_SLOW under heap pressure and the status-burst window already pace it, and a clean boot on a calm network produces no deferrals at all.
+
+## Correction carried into the record
+
+Our own notes and CHANGELOG described the short write as happening "until the 5 second socket timeout", which reads as a total duration. WiFiClient sets _timeout = 5000 and ClientContext::_is_timeout() resets its clock on every byte of progress (ClientContext.h:441-444), so it is a no-progress timeout. A short write proves the socket accepted zero bytes for five consecutive seconds, and also blocks the cooperative loop for that time. That severity is the real story behind mrfox7688's reconnect frequency.
+
+## Cost and verification
+
+4 bytes of static RAM (52728 to 52732). Build green, evaluator 38 checks and 0 failures, validated on the bench gateway at 192.168.88.68 with a purpose-built stalling broker. Broker settings restored afterwards; the stored MQTT password was never touched, because the settings POST takes one field per request.
+<!-- SECTION:FINAL_SUMMARY:END -->
