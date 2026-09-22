@@ -1,13 +1,13 @@
 ---
 id: TASK-1148
 title: >-
-  Fix: SimpleTelnet write() silently discards a partial write and reports it as
-  complete
+  Fix: SimpleTelnet write() reports a partial write as complete (honest return +
+  bounded retry)
 status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:08'
-updated_date: '2026-09-22 06:17'
+updated_date: '2026-09-22 06:26'
 labels:
   - bug
 dependencies: []
@@ -46,10 +46,12 @@ The user owns this library and has given standing permission to improve it.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 A short write no longer reports more bytes than were actually accepted by the TCP stack
-- [ ] #2 Console output survives a burst at least as well as the measured baseline: against a broker subscribed as lossless observer, telnet no longer loses whole publish lines in a repeat of the TASK-1147 three-run test
-- [ ] #3 No fixed per-line delay is introduced; any waiting is bounded and only incurred when the send buffer is actually full
-- [ ] #4 The OT frame path shows no new serial overruns or dropped frames under the same burst test
-- [ ] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [ ] #2 No fixed per-line delay is introduced; any waiting is bounded and only incurred when the send buffer is actually full
+- [ ] #3 The OT frame path shows no new serial overruns or dropped frames under the same burst test
+- [ ] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [ ] #5 Bytes that still cannot be written after the retry budget are counted per client and the count is readable, so loss becomes observable instead of silent
+- [ ] #6 Burst loss is measurably lower than the TASK-1147 baseline against a broker as lossless observer; residual loss is permitted and must show up in the counter
+- [ ] #7 Re-entrancy is safe: a write() that yields cannot be re-entered for the same client and interleave output
 <!-- AC:END -->
 
 ## Implementation Plan
