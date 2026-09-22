@@ -3,10 +3,11 @@ id: TASK-1154
 title: >-
   Investigate: MQTT reconnects every 30-60s remain after the malformed-packet
   fix
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-22 21:15'
-updated_date: '2026-09-22 21:25'
+updated_date: '2026-09-22 21:29'
 labels:
   - bug
 dependencies:
