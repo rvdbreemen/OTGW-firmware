@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 05:11'
+updated_date: '2026-09-22 05:16'
 labels:
   - bug
 dependencies: []
@@ -48,4 +48,19 @@ Ruled out by reading the code, before instrumenting: the re-entrancy route. The 
 Also ruled out: the heap gate. /api/v2/device/info reports hd_mqtt_drops 0, so canPublishMQTT() has never refused on this device.
 
 WHY INSTRUMENTATION IS IN THE TREE RIGHT NOW: two of the five gates in sendMQTTData() return false without logging anything, which is the reason this defect was invisible for so long. Added a temporary MQTTDebugTf on the mqttPublishAllowed and !connected branches of the char* overload only (MQTTstuff.ino:1041-1042), tagged GATEDIAG. This is diagnostic scaffolding, NOT the fix. It must be either removed or deliberately kept as a permanent diagnosability improvement before this task is committed. Do not ship it unreviewed.
+
+CORRECTION to my earlier note, and it matters: mqttPublishAllowed is NOT the cause, and the sensor publish path is not permanently broken.
+
+The instrumented build (+b317263) answered it directly. Over one 30 s run with the simulator:
+- 280 GATEDIAG refusals by mqttPublishAllowed, of which ZERO carried a sensor address
+- all 280 were the eight OT status bits (status_master, ch_enable, dhw_enable, cooling_enable, otc_active, ch2_enable, summerwintertime, dhw_blocking), 35 each, which is the interval gate doing exactly its designed job on unchanged values
+- 6 sensor publishes SUCCEEDED: OTGW/value/otgw-84F3EB22B8E1/28D0000000000001 and the two siblings
+
+So the earlier finding needs a qualifier. The two pre-instrumentation runs genuinely showed sensor reads with no sensor publish, twice, which is why I called it reproduced. But on a freshly flashed and rebooted device the same code publishes fine. The defect is therefore STATE-DEPENDENT, not a dead code path.
+
+What differs between the failing and passing observations: the failing runs were on a device with roughly a day of uptime (firmware +b6b3c98), the passing run was minutes after a reboot. That points at something that latches over uptime rather than at a gate that is wrong by construction.
+
+Note run 2 of the failing pair produced ZERO MQTT publishes of any kind over 35 s, not merely no sensor publishes. That reframes the symptom: it may never have been sensor-specific. The remaining silent gate is !MQTTclient.connected(), which device/info cannot disprove because mqttconnected there is a cached flag. That gate is now instrumented too, so the next occurrence will name itself.
+
+Next step is to catch the failing state WITH the instrumentation in place, rather than to guess at the latch. The scaffolding must stay on the bench device until then.
 <!-- SECTION:NOTES:END -->
