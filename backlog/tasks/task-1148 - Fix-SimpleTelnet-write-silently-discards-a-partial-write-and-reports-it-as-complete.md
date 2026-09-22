@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:08'
-updated_date: '2026-09-22 06:27'
+updated_date: '2026-09-22 06:28'
 labels:
   - bug
 dependencies: []
@@ -75,3 +75,9 @@ Do not introduce a fixed per-line delay. Measured cost at the 43 line per second
 
 VERIFICATION reuses the TASK-1147 rig: local mosquitto subscribed as lossless observer, bench pointed at it with a single-field settings POST of mqttbroker only so the stored MQTT password is never touched, then the three-run sensor-simulator test. Baseline to beat: telnet lost all six sensor publish lines in two of three runs and half the sensor read lines in one. Restore the broker setting afterwards.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Scope narrowed on maintainer instruction: A and B here, the TX ring split out to TASK-1149 so its ~1 KB RAM cost can be judged after A+B are measured on hardware. AC #2 was removed rather than left standing, because it required that no whole publish line is lost, which A+B cannot deliver without a buffer. Replaced by three ACs that A+B can actually be held to: a per-client drop counter, measurably lower loss than the TASK-1147 baseline with residual loss permitted but counted, and re-entrancy safety.
+<!-- SECTION:NOTES:END -->
