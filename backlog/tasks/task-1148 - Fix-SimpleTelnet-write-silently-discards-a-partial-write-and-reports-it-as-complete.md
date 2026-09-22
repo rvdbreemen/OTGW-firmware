@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:08'
-updated_date: '2026-09-22 10:31'
+updated_date: '2026-09-22 10:32'
 labels:
   - bug
 dependencies: []
@@ -90,6 +90,22 @@ Fixed by passing the nesting state explicitly: _writeToClient(idx, buf, size, bo
 AC #6 unchecked as well, on a separate ground: it asks for burst loss measurably lower than the TASK-1147 baseline, but that baseline turned out to be a toggle artifact rather than transport loss, so there is no valid figure to beat. It needs rewording or removal rather than a tick.
 
 Lesson for the record: the first commit passed build, evaluator and an on-device stress test while half the change was inert. None of those gates could see it, because the counter they exercise belongs to A. Verifying a mechanism means proving the mechanism ran, not that the feature it belongs to compiled.
+
+Guard fix validated on the bench (192.168.88.68, 1.7.6-beta.4+7804daa).
+
+Discriminating profile, slow reader at 64 B/s for 45 s, which is the regime where a working retry can win because the send window reopens periodically:
+  broken (retry inert): 133 B dropped, 2880 B drained
+  fixed:               0 B dropped in 4 of 4 runs, 2688-2869 B drained
+
+Pathological profile, reader fully stalled with SO_RCVBUF forced to 2048, where the window never reopens inside the 2 ms budget:
+  broken: first loss 42 s, 227 B (and 0 B in an identical repeat)
+  fixed:  first loss 41 s, 258 B / first loss 34 s, 243 B
+
+That second table is the honest half: the retry does not rescue a client that has stopped reading, and is not meant to. What changed there is that the loss is counted instead of invisible.
+
+AC #6 was removed rather than ticked. It demanded burst loss measurably lower than the TASK-1147 baseline, and that baseline turned out to be a toggle artifact rather than transport loss, so there was no valid figure to beat. Replaced with a criterion tied to the slow-reader measurement that actually exists.
+
+AC #7 checked on two grounds. By construction: mayYield is outer, evaluated as !_inWrite before the flag is set, so a nested call always receives false and cannot yield. Empirically: six stress runs with every debug flag plus the simulator produced no interleaved or spliced lines.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
