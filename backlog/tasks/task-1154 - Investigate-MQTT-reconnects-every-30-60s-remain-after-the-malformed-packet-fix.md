@@ -6,9 +6,13 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-22 21:15'
+updated_date: '2026-09-22 21:16'
 labels:
   - bug
-dependencies: []
+dependencies:
+  - TASK-1134
+references:
+  - 'https://github.com/rvdbreemen/OTGW-firmware/issues/682'
 priority: high
 ordinal: 228000
 ---
