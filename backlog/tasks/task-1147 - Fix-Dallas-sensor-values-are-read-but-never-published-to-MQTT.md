@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 05:10'
+updated_date: '2026-09-22 05:11'
 labels:
   - bug
 dependencies: []
@@ -39,3 +39,13 @@ The publish call at sensors_ext.ino:286 is unconditional inside 'if (settings.mq
 - [ ] #3 The fix does not make sensor publishes bypass a heap or interval gate that exists for a reason
 - [ ] #4 Verified on the bench with the simulator, and the reporter confirms real sensors reach HA
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Ruled out by reading the code, before instrumenting: the re-entrancy route. The OTPublishGate scope at OTGW-Core.ino:4511-4519 is tight, and decodeAndPublishOTValue() contains no feedWatchDog(), yield() or delay(). sendMQTTData() only reaches its own feedWatchDog() on the success path, so a CLOSED gate cannot yield into doBackgroundTasks() and re-enter pollSensors(). mqttPublishAllowed remains the suspect, but not via re-entrancy.
+
+Also ruled out: the heap gate. /api/v2/device/info reports hd_mqtt_drops 0, so canPublishMQTT() has never refused on this device.
+
+WHY INSTRUMENTATION IS IN THE TREE RIGHT NOW: two of the five gates in sendMQTTData() return false without logging anything, which is the reason this defect was invisible for so long. Added a temporary MQTTDebugTf on the mqttPublishAllowed and !connected branches of the char* overload only (MQTTstuff.ino:1041-1042), tagged GATEDIAG. This is diagnostic scaffolding, NOT the fix. It must be either removed or deliberately kept as a permanent diagnosability improvement before this task is committed. Do not ship it unreviewed.
+<!-- SECTION:NOTES:END -->
