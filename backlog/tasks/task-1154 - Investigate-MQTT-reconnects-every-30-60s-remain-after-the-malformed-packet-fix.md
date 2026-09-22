@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 21:15'
-updated_date: '2026-09-22 21:51'
+updated_date: '2026-09-22 21:53'
 labels:
   - bug
 dependencies:
@@ -50,7 +50,7 @@ OPEN QUESTION FOR THE REPORTER, already asked by him in the other direction: he 
 <!-- AC:BEGIN -->
 - [x] #1 The hypothesis is confirmed or refuted with evidence: are the logged disconnects our own MQTTclient.disconnect() calls from the short-write remedy, or something else
 - [x] #2 A counter exists for publishes aborted by the short-write remedy, readable without telnet, so reconnect frequency is observable instead of inferred from broker logs
-- [ ] #3 mrfox7688 is given a straight answer on whether the clean disconnects are expected behaviour from the beta
+- [x] #3 mrfox7688 is given a straight answer on whether the clean disconnects are expected behaviour from the beta
 - [x] #4 Any change preserves the TASK-769/TASK-1134 guarantee: the broker never sees a truncated or malformed publish
 - [x] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
