@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:08'
-updated_date: '2026-09-22 06:26'
+updated_date: '2026-09-22 06:27'
 labels:
   - bug
 dependencies: []
@@ -57,27 +57,21 @@ The user owns this library and has given standing permission to improve it.
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Maintainer chose A+B+C combined. Backport the ring from the 2.0.0 async variant rather than inventing one.
+SCOPE NARROWED by maintainer decision: do A (honest return) and B (bounded retry) here. The C option, a TX ring, is deferred to its own task so its RAM cost can be judged after A+B are measured.
 
-1. Backport SimpleTelnetRing<N> into the 1.x header. Self-contained, ~60 lines, no heap, template on capacity, depends on nothing from SimpleTelnetCore. Its push() already returns the count actually stored and drops the overflow, which is the drop-newest policy we want for a console.
+RAM cost of this task: a per-client uint32 drop counter only. Two instances of SimpleTelnet<1> exist (debugTelnet at networkStuff.ino:24, OTGWstream at OTGW-Core.h:28), so 8 bytes total. Effectively free, against a measured static budget of 52,712 of 81,920 bytes DRAM and roughly 17.9 KB free heap while running.
 
-2. Add _tx[MAX_CLIENTS] at SIMPLETELNET_TX_BUF_LEN (512 default, overridable) plus a per-client dropped-byte counter.
+WHAT A+B CAN AND CANNOT DO. Without a ring there is nowhere to park an unwritten tail, so under a sustained burst bytes will still be lost. A+B change two things that matter anyway: the function stops claiming it wrote bytes it discarded, and it tries harder before giving up. The remaining loss becomes counted rather than invisible, which is the property that cost two false diagnoses in TASK-1147.
 
-3. write(buf,size) becomes: if the ring already holds data, push there FIRST and do not attempt a direct write, otherwise output reorders; else try the direct write and push only the remainder. Then one bounded inline flush (B). Return written + buffered (A).
+IMPLEMENTATION
 
-4. loop() calls _flushTx(i) per active client (C). loop() is already called from OTGW-Core.ino:550-551, OTGW-firmware.ino:431-432 and the flash-wait loop at :472-473, so the drain point exists and runs during PIC flashing too.
+A. write(const uint8_t*, size_t) returns the number of bytes actually accepted, not size. Check the call sites first: the Stream contract lets callers act on the return value, and Print::write chains on it. DebugTf ignores it today, but the contract change is observable and must be deliberate.
 
-5. _flushTx: peekN into a 256 byte stack chunk, client.write, discard what was accepted, stop on a zero-byte write or empty ring, bounded iterations so it cannot spin.
+B. Bounded retry of the remainder. On ESP8266 an immediate retry is pointless because only a yield lets lwIP drain, so the loop must be write / yield / write under a hard budget expressed in both iterations and elapsed millis. Budget stays small: the measured peak is 43 lines per second on an idle bench, and the OT path must not stall because Serial is reserved for the PIC.
 
-6. _disconnectClient flushes once before stop(), matching what upstream a909731 did for the async side.
+RE-ENTRANCY, the main hazard this task introduces. yield() inside write() is exactly the documented re-entrancy route: doBackgroundTasks can be re-entered through feedWatchDog and yield, and anything it reaches may call DebugTf again, which would nest a second write() into the same client and interleave two lines into corrupted output. Guard with a per-instance in-write flag: a nested call takes the single-attempt path with no yield, accepts what it can, counts the rest and returns honestly. That degrades to current behaviour under nesting, which is acceptable; silent interleaving is not.
 
-SIZING EVIDENCE (bench .88.68): mean log line 107 bytes, p95 177, peak burst 43 lines in one second on an IDLE device. A burst is therefore about 4.6 KB, and a 512 byte ring holds only 4.8 lines, roughly 11 percent of it. The ring is a smoothing buffer, not a burst reservoir: correctness depends on drain frequency from loop(), not on capacity. Sizing it to swallow a whole burst would cost about 4.6 KB per client, which is not available (free heap on the bench is about 17.9 KB). Two instances at 512 bytes costs 1 KB static, which is the accepted price.
+Do not introduce a fixed per-line delay. Measured cost at the 43 line per second peak: 1 ms costs 43 ms of blocked loop per burst second, 5 ms costs 215 ms, 20 ms costs 860 ms, and that is on an idle device. The library already rejected this in _drainClient with the comment that it deliberately avoids delay() in a cooperative scheduler. A fixed delay also pays on every line including the overwhelming majority where the send buffer was empty, whereas a retry pays only where congestion actually occurs.
 
-Consequence to state plainly: a sustained burst can still overflow. The difference is that it then increments a counter instead of vanishing silently, which is the actual defect being fixed.
-
-RISKS TO HANDLE:
-- Re-entrancy: doBackgroundTasks can re-enter through feedWatchDog and yield while _flushTx is mid-write, so an in-flush guard is needed.
-- OTGWstream on port 25238 shares this write path, where ADR-095 byte transparency applies. The ring strictly improves that case because ordering is preserved and less is lost, but the overflow policy must be a counted drop, never a silent one.
-
-OPEN FOR MAINTAINER: whether this needs an ADR. It adds a buffering layer to the serial bridge path and spends RAM, which the project rules would normally treat as architecturally significant.
+VERIFICATION reuses the TASK-1147 rig: local mosquitto subscribed as lossless observer, bench pointed at it with a single-field settings POST of mqttbroker only so the stored MQTT password is never touched, then the three-run sensor-simulator test. Baseline to beat: telnet lost all six sensor publish lines in two of three runs and half the sensor read lines in one. Restore the broker setting afterwards.
 <!-- SECTION:PLAN:END -->
