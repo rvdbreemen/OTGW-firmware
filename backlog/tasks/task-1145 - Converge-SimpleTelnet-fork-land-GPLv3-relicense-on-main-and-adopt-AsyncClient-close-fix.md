@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-21 18:43'
-updated_date: '2026-09-21 19:12'
+updated_date: '2026-09-21 20:03'
 labels: []
 dependencies: []
 ordinal: 284000
@@ -44,6 +44,14 @@ AC4 met: build.bat green on all three targets (esp32, esp32-classic, esp32-combo
 AC5 precision note: the AsyncSimpleTelnet instances are gone (27 -> 0). ONE AsyncClient::close(bool) warning remains in the build log, from .pio/libdeps/esp32/espMqttClient/src/Transport/ClientAsync.cpp:45 - a different upstream library, outside this task's scope. The AC was worded absolutely ('no longer appear in the build log') and is therefore not literally satisfied; the SimpleTelnet-scoped intent is. Recorded here rather than silently reinterpreted.
 
 Open, deliberately not blocking this task: the two behavioural fixes (_flushTx before _tx clear; removal of the inbound-discard loop) are unexercised by a green build. They want a bench check against OTmonitor over the ser2net bridge (ADR-143).
+
+Cross-reference from the 1.x line (TASK-1146, GH #685): the a909731 adopted here also closes a user-visible defect, it is not only the cosmetic warning cleanup.
+
+Removing the unconditional inbound-discard loop is what makes port 25238 keep the first command a client sends. Before it, a client that pipelined a command with connect() lost that command, because the server only accepts on the next loop() pass and the drain ran on a buffer that already held it. Home Assistants opentherm_gw integration (pyotgw writes PS=0 about 20 ms after the handshake) failed with cannot_connect because of exactly this.
+
+Measured on the 1.x bench unit before and after the equivalent change: zero-delay writes went from 5/8 answered to 8/8, and pyotgw 2.2.3 from failing to 3/3 connects. This tree has carried the fix since alpha.366; the 1.x line got a backport of the same commit today.
+
+No AC change intended here, this is context only. ACs #4 and #5 still stand on their own terms.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
