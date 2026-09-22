@@ -1371,6 +1371,11 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("hd_drip_burst_skip"),        state.heapdiag.iDripActiveBurstSkipCount);
   sendJsonMapEntry(F("hd_drip_cooldown_skip"),     state.heapdiag.iDripCooldownSkipCount);
   sendJsonMapEntry(F("hd_drip_slowmode"),          state.heapdiag.iDripSlowModeCount);
+  // Bytes the debug console and the port-25238 bridge could not hand to the TCP
+  // stack (TASK-1148). Read here rather than over telnet: telnet is the lossy
+  // channel under test, so it cannot be its own instrument.
+  sendJsonMapEntry(F("telnet_tx_dropped"),         (uint32_t)debugTelnet.txDroppedTotal());
+  sendJsonMapEntry(F("otgwstream_tx_dropped"),     (uint32_t)OTGWstream.txDroppedTotal());
 
   sendEndJsonMap(F("device"));
 
