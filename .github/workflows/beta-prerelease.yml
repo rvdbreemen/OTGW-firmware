@@ -240,8 +240,10 @@ jobs:
              address and MQTT broker details (\`capture-settings.example.json\`
              inside the bundle shows the format if you would rather pre-fill
              them). On Linux, WSL or macOS, run
-             \`./capture/capture-otgw.sh --host <your-gateway>\` instead. That
-             one needs nothing installed beyond bash and curl.
+             \`bash capture-otgw.sh --host <your-gateway>\` instead (in the bundle
+             it sits under \`capture/\`). That one needs nothing installed beyond
+             bash and curl, and running it through \`bash\` means a downloaded
+             copy needs no \`chmod +x\` first.
           2. Reproduce the problem while it runs. Press Q to stop the Windows
              capture, Ctrl+C to stop the shell one; either way the files are
              still written.
@@ -426,7 +428,8 @@ jobs:
             echo ""
             echo "This is a beta, and reporting back is the point. Findings go to Discord"
             echo "\`#beta-testing\`, good and bad. A capture says more than a description:"
-            echo "\`capture-mqtt-debug.bat\` and \`capture-usb-serial.bat\` are attached for that."
+            echo "\`capture-mqtt-debug.bat\` (Windows) and \`capture-otgw.sh\` (Linux, WSL, macOS, run as"
+            echo "\`bash capture-otgw.sh --host <your-gateway>\`) are attached for that."
             echo ""
             echo "<details><summary>What each asset is</summary>"
             echo ""
@@ -434,7 +437,7 @@ jobs:
             echo "- \`*.littlefs.bin\` — filesystem image (Web UI assets, settings template)."
             echo "- \`SHA256SUMS\` — integrity manifest used by the flash helpers."
             echo "- \`flash_otgw.sh\` / \`flash_otgw.bat\` — Linux/macOS and Windows flash helpers."
-            echo "- \`capture-mqtt-debug.bat\` / \`capture-usb-serial.bat\` — capture helpers for bug reports."
+            echo "- \`capture-mqtt-debug.bat\` (Windows), \`capture-otgw.sh\` (Linux, WSL, macOS), \`capture-usb-serial.bat\` (Windows, over USB) — capture helpers for bug reports."
             echo "- \`OTGW-firmware-${VERSION}-flash-bundle.zip\` — self-contained zip with binaries, scripts, README and SHA256SUMS."
             echo ""
             echo "</details>"
@@ -478,6 +481,7 @@ jobs:
               flash_otgw.bat \
               scripts/capture-mqtt-debug.bat \
               scripts/capture-usb-serial.bat \
+              scripts/capture-otgw.sh \
               "${BUNDLE}" \
               --clobber
             gh release edit "${TAG}" --prerelease --title "${TAG}" --notes-file release_body.md
@@ -501,6 +505,7 @@ jobs:
               flash_otgw.bat \
               scripts/capture-mqtt-debug.bat \
               scripts/capture-usb-serial.bat \
+              scripts/capture-otgw.sh \
               "${BUNDLE}"
           fi
 
