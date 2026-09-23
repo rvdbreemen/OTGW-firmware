@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-23 18:14'
-updated_date: '2026-09-23 19:46'
+updated_date: '2026-09-23 20:20'
 labels:
   - sat
   - safety
@@ -34,6 +34,8 @@ OTcurrentSystemState.Tr (MsgID 24) is written on decode and never expires. When 
 
 <!-- SECTION:NOTES:BEGIN -->
 Design: state.otBus.iTrThermostatMs is stamped only when the THERMOSTAT writes MsgID 24 (live T-frame Write-Data in processOT, or the PS=1 summary Tr). satGetRoomTemp() treats Tr as NaN once that stamp exists and is older than SAT_STALE_TEMP_MS (5 min), which hands the loop to the existing skip -> safety-trip chain. Gateway-originated MsgID 24 (master scheduler re-sending its write cache, TR= overrides) cannot restamp it; a Tr that never came from a thermostat keeps its previous behaviour. PS=1 is covered by stamping in updatePSSummaryFloatState. Bench A/B on OTGW32 (gateway mode, coverage fixture replay): pre-fix alpha.371 07:40-07:50, SAT kept regulating on room=23.4 for 10+ min after the replay ended. alpha.375: replayed 'Thermostat T90181766 24 Write-Data > Tr = 23.40' at 21:35:45, replay stopped, SAT enabled; room=23.4 at Tr age 41..290 s, room=null from 324 s, SAFETY TRIPPED at 588 s. Test-method note: the device-side /otgw_simulation.log had been replaced by a smaller log without MsgID 24; the coverage fixture was re-uploaded for this run.
+
+Hardware path check: OTDirect feeds physical thermostat frames to processOT as 'T' lines (bridgeFrameToParser('T', ...) at OTDirect.ino:1231 and :1974), so the stamp is set on real OTGW32 hardware too, not only by the replay.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
