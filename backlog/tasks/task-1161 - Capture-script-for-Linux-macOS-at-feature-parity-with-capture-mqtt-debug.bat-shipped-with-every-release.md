@@ -3,11 +3,11 @@ id: TASK-1161
 title: >-
   Capture script for Linux/macOS at feature parity with capture-mqtt-debug.bat,
   shipped with every release
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-23 19:11'
-updated_date: '2026-09-23 20:23'
+updated_date: '2026-09-23 20:24'
 labels:
   - feature
   - tooling
@@ -31,12 +31,12 @@ Goal: a Linux/macOS capture that uses the Windows script as its template and mat
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A written feature inventory of capture-mqtt-debug.bat maps every feature to its implementation in the shell script, or to a documented platform reason why it cannot exist there
-- [ ] #2 The shell script runs on bash 3.2 (macOS default) and on Linux bash, requires only bash + curl + standard POSIX tools, and treats optional tools (mosquitto_sub, nc) as degrade-not-abort
-- [ ] #3 Validated on this machine under WSL Ubuntu against the bench gateway 192.168.88.68: a full capture run produces every output the Windows script produces, and the summary reports what was and was not captured
-- [ ] #4 scripts/make_release_assets.py attaches capture-otgw.sh as an individual asset and in the bundle; RELEASE_ASSETS.md and the /release skill asset count reflect it
-- [ ] #5 beta-prerelease.yml attaches capture-otgw.sh (TASK-1156) and the release text describes it as the Linux/macOS equivalent
-- [ ] #6 shellcheck (or bash -n where shellcheck is unavailable) passes on the script, and the flash-scripts-lint workflow covers it if that workflow lints shell scripts
+- [x] #1 A written feature inventory of capture-mqtt-debug.bat maps every feature to its implementation in the shell script, or to a documented platform reason why it cannot exist there
+- [x] #2 The shell script runs on bash 3.2 (macOS default) and on Linux bash, requires only bash + curl + standard POSIX tools, and treats optional tools (mosquitto_sub, nc) as degrade-not-abort
+- [x] #3 Validated on this machine under WSL Ubuntu against the bench gateway 192.168.88.68: a full capture run produces every output the Windows script produces, and the summary reports what was and was not captured
+- [x] #4 scripts/make_release_assets.py attaches capture-otgw.sh as an individual asset and in the bundle; RELEASE_ASSETS.md and the /release skill asset count reflect it
+- [x] #5 beta-prerelease.yml attaches capture-otgw.sh (TASK-1156) and the release text describes it as the Linux/macOS equivalent
+- [x] #6 shellcheck (or bash -n where shellcheck is unavailable) passes on the script, and the flash-scripts-lint workflow covers it if that workflow lints shell scripts
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -99,3 +99,33 @@ Behaviour changes against the previous capture-otgw.sh 1.x:
 
 Extras on top of the Windows script: -Serial [dev] with -Baud (usb-serial.log, CR strip, timestamps, baud-mismatch warning; the Windows side has capture-usb-serial.bat) and -ProbeSeconds (probe.log).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The Linux, WSL and macOS capture now matches the Windows one, and ships with every release. A macOS reporter on GH #682 could not capture at all before this.
+
+What changed
+- scripts/capture-otgw.sh 2.0.0 is rewritten with capture-mqtt-debug.bat as the template. It has the same options (PowerShell or GNU spelling), prompts, remembered settings, toggle policies with restore, q+D dump, reconnect logic, crash-log poller, REST snapshot, metadata resolution and single merged transcript. The headless browser capture uses an embedded stdlib-only python3 CDP client. The feature-by-feature mapping and every deliberate difference are in the notes.
+- Written for bash 3.2. Read and write on one socket go through a background worker and a FIFO, because bash 3.2 has no coproc and no fractional read -t.
+- Shipping: make_release_assets.py attaches it to stable releases and sets the exec bit for .sh files in the bundle. Asset counts go from 9 to 10 in the release and beta skills and in RELEASE_PROCESS.md. The beta release text describes the new flow.
+- CI: flash-scripts-lint.yml runs bash -n and shellcheck on it, and now also triggers on otgw-1.x.x. It never ran on the 1.x line after the June branch change.
+
+Verified in WSL Ubuntu 24.04 against the bench gateway (192.168.88.68). The gateway was pointed at a temporary local broker with a single-field POST, and afterwards restored to homeassistant.local:1883. The MQTT password was never touched.
+- Default run: telnet (toggles on, D dump), MQTT, browser (console plus ~70 net lines), crash log, REST snapshot and metadata all present; the transcript is named from telnet metadata.
+- Quiet+Keep: exactly the right toggles flipped and restored. Device state checked over telnet before and after.
+- Reboot mid-capture: ESP.restart() detected, reconnected after 1 attempt, toggles re-applied, reboot_log.txt change recorded.
+- Q, Ctrl+C (real SIGINT through a pty) and duration stops all leave a complete transcript, with no leftover processes or temp dirs.
+- Degrade paths: no mosquitto_sub (install hint, telnet continues), unreachable host (timeouts growing 6 to 10 s), drvfs output dir, remembered prompt defaults. The password was never written to the settings file or the transcript.
+- Serial through a pty: clean input gives timestamped lines with no CRs; garbage input gives the baud-mismatch warning.
+- A full run under a locally built bash 3.2.57 (the macOS version) passes. shellcheck 0.9.0 clean. evaluate.py --quick 0 failed.
+- The D and q dumps mask both passwords (handleDebug.ino:28/38, verified in code). The 6 password mentions in the test transcripts were all masked.
+
+Not verified, and why
+- A real Mac. BSD date, sed, awk, stty, tail and pkill, Apple bash and the python3-stub guard were checked by review only. The first macOS field capture is the real test.
+- Serial against real hardware: WSL has no COM passthrough.
+
+Known behaviour: Ctrl+C also reaches mosquitto_sub, which exits at that moment instead of being stopped by the script. It has no effect on the data.
+
+Commits: 6d0c25b8a, 2b1c67a09.
+<!-- SECTION:FINAL_SUMMARY:END -->
