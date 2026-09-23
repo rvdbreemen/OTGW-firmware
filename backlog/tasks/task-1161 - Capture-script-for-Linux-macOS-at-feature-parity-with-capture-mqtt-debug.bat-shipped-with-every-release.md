@@ -3,9 +3,11 @@ id: TASK-1161
 title: >-
   Capture script for Linux/macOS at feature parity with capture-mqtt-debug.bat,
   shipped with every release
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-23 19:11'
+updated_date: '2026-09-23 19:12'
 labels:
   - feature
   - tooling
