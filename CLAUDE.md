@@ -194,6 +194,7 @@ Done.**
 ### Architecture rules
 
 - PIC commands: always `addOTWGcmdtoqueue()`, never direct serial write
+- SAT's own `CS=` (the `CS=0` releases included) goes through `satEnqueueOwnCS()`. While SAT is enabled it owns MsgID 1, and the OTDirect handler refuses any unmarked `CS=` as external (ADR-179), SAT's own included
 - Timers: `DECLARE_TIMER_SEC()` / `DECLARE_TIMER_MS()` + `DUE()` (see `safeTimers.h`)
 - `doBackgroundTasks()` can re-enter (called from inside `doAutoConfigure()`'s file-reading loop). Shared scratch state must declare an acquisition contract: see ADR-090 for the pattern (RAII or inUse-flag, both with fail-safe on contention)
 - Typed control flow: `enum class` or numeric IDs, never string tokens as discriminators
@@ -264,21 +265,21 @@ Per **ADR-080**, a new pattern-level ADR MUST either reference its CI gate (in `
 
 ```bash
 ./build.sh                   # Preferred — firmware + filesystem (handles venv)
-python build.py              # Build firmware + filesystem, all three targets
-python build.py --target esp32-classic   # One target: esp8266 | esp32 | esp32-classic
+python build.py              # Build firmware + filesystem, all targets
+python build.py --target esp32-combo     # One target: esp32 | esp32-classic | esp32-combo | all
 python build.py --firmware   # Firmware only (also the push-policy gate)
 python build.py --clean      # Clean build
 python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
 python evaluate.py --quick   # Fast check
 ```
 
-Three fixed build targets (ADR-126 — no runtime hardware detection):
+Build targets on `dev` (`build.py --target` choices; ESP8266 exists only on `otgw-1.x.x`):
 
 | Target | Hardware | Asset name token |
 |---|---|---|
-| `esp8266` | OTGW Classic + Wemos D1 mini (PIC) | `esp8266` |
 | `esp32` | OTGW32 / OT-Thing PCB (OTDirect) | `esp32-otgw32` |
 | `esp32-classic` | OTGW Classic + LOLIN S3 Mini (PIC) | `esp32-classic` |
+| `esp32-combo` | One image for both boards, PIC or OTDirect picked at boot (ADR-127); the default for S3 builds and what the bench runs | `esp32-combo` |
 
 Asset naming: `OTGW-firmware-<token>-<semver>+<githash>-flash.zip` (plus
 `.ino.bin`, `.littlefs.bin`, merged bins and `.elf`). Never run two builds
@@ -309,6 +310,13 @@ heap-frag soak, TASK-934):
   `python tests/test_evaluate.py` (stdlib unittest, no pytest).
 - **Flash:** `flash_otgw.bat --board esp32` (auto-detects the S3 over USB
   VID/PID 303A:1001; `--port COMx` to force). esptool-only — works on any Python.
+  `--update --app <bin>` writes the app only; add `--fs <bin>` only when the
+  LittleFS assets changed.
+- **Before any bench flash, save the settings:** `curl http://<ip>/api/v2/settings >
+  <scratch>/settings.json`. A `--fs` flash resets every setting (mode reverts to
+  `gateway`), and after an app-only flash compare the settings against that copy
+  (TASK-1160). Check the downloaded size of a static file such as `/settings.ini`
+  before trusting it: the device can serve it truncated.
 - **Load (fragmenting):** `python scripts/sat_boiler_emulator.py --host <ip>` for
   synthetic OT traffic; combine with concurrent Web UI polling + MQTT discovery
   republish to exercise heap pressure.
