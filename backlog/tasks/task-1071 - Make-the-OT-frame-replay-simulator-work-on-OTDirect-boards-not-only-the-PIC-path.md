@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-08-08 18:17'
-updated_date: '2026-09-23 06:27'
+updated_date: '2026-09-23 19:58'
 labels:
   - bug
   - tooling
@@ -75,4 +75,8 @@ Implementation: option B of the two shapes considered. handleOTReplay() is a new
 AC1, AC2 and AC5 need an OTDirect board: upload the fixture, start, capture, confirm processOT lines appear and the coverage gate runs end to end. No 2.0.0 board was reachable this session (192.168.88.61 in ARP but not answering; 192.168.88.68 is the 1.x ESP8266).
 
 2026-09-23 bench validation on OTGW32 (OT-Direct, no PIC, 192.168.88.61), alpha.371+7be6ec5 app+fs. run_coverage_test.py --topics telnet ran end to end: upload, start, preflight (33 distinct frames, replay advancing), 694 s capture (7415 telnet lines), stop, compare. Decoded 369 OT keys over 143 MsgIDs: the same counts as the PIC-bench baseline. processOT lines appear for all five source prefixes (e.g. 'processOT (5170): Request Boiler R900E6400 14 Write-Data > MaxRelModLevelSetting = 100.00 %'), so AC1 and AC5 are met. Gate verdict FAIL, 15 CHANGED, all MsgID 56/57, and the cause is not OT-Direct: in the first loop (07:27) 56/57 render as TdhwSet/MaxTSet because no OT version had been seen since the fresh flash; the replayed 'OpenThermVersionSlave = 4.00' arrives at 07:28:33, and in the second loop (07:32) the same frames render 'Reserved in OpenTherm v4.x profile'. AUTO profile works as designed; the gate depends on device state before the window (the baseline was recorded on a device that already knew the version). AC2 is open on its MQTT half: after the fs flash the bench had no broker, so 0 topics were captured (225 informational MISSING). Needs a re-run with a broker, or a re-run on a device that has already seen MsgID 124/125.
+
+2026-09-23 evening: AC4 reopened. On alpha.375 (OT-Direct) POST /api/v2/simulate/start sets the flag and the replay runs (device/info otgwsimulation=true, thermostatconnected=true), but the response reports active=false, available=false, reason 'board is in OT-Direct mode; replay runs on the PIC serial path'. otgwSimulationUnavailableReason() still encodes the TASK-1073 premise that this task removed. Fix: the only remaining reason is an unmounted filesystem, matching the start route's 409.
+
+AC4 re-met in alpha.376: otgwSimulationUnavailableReason() now only reports an unmounted filesystem. Bench (OT-Direct): POST /simulate/start -> {active:true, available:true}; GET /simulate while running -> active:true; after /simulate/stop -> active:false, available:true. AC2 still open on its MQTT half (no broker on the bench).
 <!-- SECTION:NOTES:END -->

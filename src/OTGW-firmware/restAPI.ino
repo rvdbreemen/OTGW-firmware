@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.375
+**  Version  : v2.0.0-alpha.376
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -330,18 +330,15 @@ static void handleCommandSubmit(const char* cmdStr) {
   webSend(202, F("application/json"), F("{\"status\":\"queued\"}"));
 }
 
-// TASK-1073: why replay cannot run on this board, or nullptr when it can.
+// TASK-1073: why replay cannot run on this board, or nullptr when it can. Since
+// TASK-1071 the replay runs loop-side on every board and transport, so the only
+// thing it needs is the filesystem that holds the fixture.
 static PGM_P otgwSimulationUnavailableReason() {
-#if HAS_PIC
-  if (isOTDirectEnabled()) {
-    static const char rDirect[] PROGMEM = "board is in OT-Direct mode; replay runs on the PIC serial path";
-    return rDirect;
+  if (!LittleFSmounted) {
+    static const char rNoFs[] PROGMEM = "filesystem not mounted; the fixture cannot be read";
+    return rNoFs;
   }
   return nullptr;
-#else
-  static const char rNoPic[] PROGMEM = "this build has no PIC serial path";
-  return rNoPic;
-#endif
 }
 
 static void sendSimulationStatus() {
