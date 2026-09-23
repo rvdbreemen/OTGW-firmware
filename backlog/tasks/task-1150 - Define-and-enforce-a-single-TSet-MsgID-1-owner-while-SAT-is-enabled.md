@@ -1,11 +1,11 @@
 ---
 id: TASK-1150
 title: Define and enforce a single TSet (MsgID 1) owner while SAT is enabled
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:37'
-updated_date: '2026-09-22 10:25'
+updated_date: '2026-09-23 06:35'
 labels: []
 dependencies: []
 ordinal: 285000
@@ -44,7 +44,7 @@ CAVEAT, single-source and unverified: the gateway.asm CommandExpiry parse (other
 - [x] #7 Master-mode WRITE_DATA MsgID 1 (OTDirect.ino:2523-2527) is covered by the same predicate
 - [x] #8 An ADR names the MsgID 1 owner per mode and per board and states what happens to each losing writer
 - [x] #9 python build.py green for esp32 and esp32-classic; python evaluate.py --quick shows no new failures
-- [ ] #10 Field-validated on OTGW32: SAT enabled with a safety trip forced, TSet does not revert to the heating curve or the thermostat
+- [x] #10 Field-validated on OTGW32: SAT enabled with a safety trip forced, TSet does not revert to the heating curve or the thermostat
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -69,4 +69,16 @@ AC10 (field validation on an OTGW32: SAT enabled, safety trip forced, TSet must 
 Carried forward on ADR-179 as Open Questions, both out of scope for MsgID 1:
 - Gateway mode emits the gateway's own MsgID 0 alongside the thermostat's, with opposing CH-enable bits, so SAT's CH= is not reliably honoured. Needs its own decision.
 - The gateway.asm CommandExpiry reading stays an unverified single-source inference.
+
+2026-09-23 bench validation found a defect in the shipped fix (alpha.370/371) and fixed it in alpha.372. SAT's three CS=0 releases (satDisable, boot safety, deferred boot safety) called addCommandToQueue() without the in-flight marker. On a safety trip settings.sat.bEnabled stays true, so the OTDirect CS= handler refused SAT's own release as external and the MsgID 1 override stayed pinned at SAT's last setpoint (the CS expiry is skipped while SAT owns TSet), contradicting ADR-179's 'it clears its own override in satDisable()'. Fix: one helper satEnqueueOwnCS() that every SAT CS= goes through.
+
+Bench A/B on OTGW32 (OT-Direct master mode, 192.168.88.61). Trip forced by SAT regulating on an external room temp (satexternaltemp=true, sensormaxage=60), then letting it go stale with Tr NaN after a reboot: 10 skips at 30 s, then SAFETY TRIPPED. Observable: /api/v2/otdirect/overrides write list. alpha.371 (reproduced 3x): at 08:14:06 telnet shows 'OTD: cmd "CS=0"' then 'OT-direct: CS= refused, SAT owns the control setpoint', and the MsgID 1 override stays at 2560 (10.0 C) 40 s later. alpha.372: at 08:33:21 'OTD: cmd "CS=0"' with no refusal; the MsgID 1 override is gone by 08:33:23 and still absent at 08:34:22 (past one 60 s PI interval), so the heating curve did not re-arm. AC10 met.
+
+Side findings, not fixed here: (1) OT-bus Tr (MsgID 24) has no staleness, so a vanished thermostat leaves SAT regulating on a frozen room temp; (2) POST /api/v2/sat/enable/1 with an empty body cleared the trip but left settings.sat.bEnabled false; (3) the settings-POST satenabled toggle does not clear a trip; (4) an RTS hard reset drops the deferred settings write (SAT settings reverted after the flash, a /ReBoot kept them).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Names one owner for MsgID 1 while SAT is enabled (ADR-179) and makes every competing writer consult it. Bench validation on the OTGW32 found that the alpha.370/371 fix refused SAT's own CS=0 release after a safety trip, pinning TSet at SAT's last value; alpha.372 routes every SAT CS= through satEnqueueOwnCS() and the hardware A/B shows the override released after the trip, with the heating curve staying out.
+<!-- SECTION:FINAL_SUMMARY:END -->

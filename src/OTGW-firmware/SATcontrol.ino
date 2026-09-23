@@ -333,6 +333,17 @@ static inline void satResetCmdCache() {
 static bool _satCmdInFlight = false;
 bool satCommandInFlight() { return _satCmdInFlight; }
 
+// Every CS= that SAT itself sends goes through here, including the CS=0 releases in
+// satDisable() and the boot-safety path. External CS= is refused while SAT owns the
+// control setpoint, and SAT uses the same generic command queue as everyone else, so
+// an unmarked SAT CS= is refused as if it were external. handleOTDirectCommand() runs
+// synchronously from addCommandToQueue(), so the flag is set for exactly this call.
+static void satEnqueueOwnCS(const char* cmd) {
+  _satCmdInFlight = true;
+  addCommandToQueue(cmd, strlen(cmd), false, 0);
+  _satCmdInFlight = false;
+}
+
 // Enqueue CS=<setpoint> only if value changed (rounded to 0.1) or refresh
 // window elapsed. Returns true when an enqueue happened.
 static bool satEnqueueIfChangedCS(float setpoint) {
@@ -343,13 +354,7 @@ static bool satEnqueueIfChangedCS(float setpoint) {
   if (state.sat.bLastSentValid && newQ == oldQ && !stale) return false;
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), setpoint);
-  // TASK-1150: mark this CS= as SAT's own. External CS= is refused while SAT owns the
-  // control setpoint, and SAT uses the same generic command queue as everyone else, so
-  // without this marker SAT would reject itself. handleOTDirectCommand() runs
-  // synchronously from addCommandToQueue(), so the flag is set for exactly this call.
-  _satCmdInFlight = true;
-  addCommandToQueue(buf, strlen(buf), false, 0);
-  _satCmdInFlight = false;
+  satEnqueueOwnCS(buf);
   state.sat.fLastSentCS     = (float)newQ / 10.0f;
   state.sat.iLastSentCSMs   = now;
   state.sat.bLastSentValid  = true;
@@ -1899,7 +1904,7 @@ void satDisable()
   // physical thermostat resumes authority -- OTGW is a gateway between thermostat and boiler.
   // (This is the disabled-handover only; while SAT is ENABLED it implements a per-heating-system
   // COLD_SETPOINT cold-cutoff that commands the boiler off on low demand -- see ADR-150 / TASK-891.2.)
-  addCommandToQueue("CS=0", 4, false, 0);
+  satEnqueueOwnCS("CS=0");
   // TASK-565: clear the write-on-change cache so the next satControlLoop
   // (re-enable, fallback, or recommissioning) re-emits all four SAT commands.
   satResetCmdCache();
@@ -3355,7 +3360,7 @@ void initSAT()
   // Send CS=0 so the thermostat controls the boiler until SAT's first
   // control loop iteration computes a proper setpoint (~30s).
   if (hasOTCommandInterface()) {
-    addCommandToQueue("CS=0", 4, false, 0);
+    satEnqueueOwnCS("CS=0");
     _sat_bootCS0sent = true;
     SATDebugTln(F("SAT: boot safety - sent CS=0 to release stale control override"));
   }
@@ -4225,7 +4230,7 @@ void satControlLoop()
   // Boot safety deferred: if CS=0 wasn't sent during initSAT(), send it on the
   // first call where an OT command interface is available.
   if (!_sat_bootCS0sent && hasOTCommandInterface()) {
-    addCommandToQueue("CS=0", 4, false, 0);
+    satEnqueueOwnCS("CS=0");
     _sat_bootCS0sent = true;
     SATDebugTln(F("SAT: deferred boot safety — sent CS=0"));
   }

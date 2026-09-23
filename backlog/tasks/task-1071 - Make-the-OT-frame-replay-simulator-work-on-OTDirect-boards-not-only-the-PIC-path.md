@@ -3,11 +3,11 @@ id: TASK-1071
 title: >-
   Make the OT frame-replay simulator work on OTDirect boards, not only the PIC
   path
-status: In Progress
+status: In Review
 assignee:
   - '@claude'
 created_date: '2026-08-08 18:17'
-updated_date: '2026-09-22 10:51'
+updated_date: '2026-09-23 06:27'
 labels:
   - bug
   - tooling
@@ -26,11 +26,11 @@ The /api/v2/simulate file replay is bound to the PIC serial path and is silently
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With simulation enabled on an OTDirect board and no PIC attached, replayed fixture lines reach processOT and appear as decoded OT frames in the debug log
+- [x] #1 With simulation enabled on an OTDirect board and no PIC attached, replayed fixture lines reach processOT and appear as decoded OT frames in the debug log
 - [ ] #2 The replay drives the same decode, state and MQTT publish path as real frames, so the coverage gate produces the same shape of output as on 1.x
 - [x] #3 Replay still works unchanged on a board that does have a PIC; the PIC path is not regressed
 - [x] #4 /api/v2/simulate reports a state that reflects reality: enabling it on a board where replay cannot run must not report active, or must report why
-- [ ] #5 The TASK-1070 coverage gate runs end to end against an OTDirect board: upload, start, capture, stop, compare
+- [x] #5 The TASK-1070 coverage gate runs end to end against an OTDirect board: upload, start, capture, stop, compare
 - [x] #6 Build green for the relevant esp32 targets and python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
@@ -67,4 +67,12 @@ The real blocker is one line earlier: OTGW-Core.ino:5331, 'if (isOTDirectEnabled
 Also worth recording: picSerialTaskShouldPark() (OTGW-Core.ino:867-873) parks on state.debug.bOTGWSimulation as well as isOTDirectEnabled(). That is deliberate and correct - on a PIC board, enabling simulation parks the UART task so the loop-side replay is the only writer. It is not a bug and must not be 'fixed'.
 
 Target entry point for the fix: OTDirect.ino:704-716 bridgeFrameToParser(), documented as 'format a 32-bit OT frame and feed to processOT()', which is the path real OTDirect frames already take.
+
+Shipped as 7be6ec5c under alpha.371. Build green on esp32, esp32-classic and esp32-combo; evaluate.py --quick 0 failures.
+
+Implementation: option B of the two shapes considered. handleOTReplay() is a new loop-side function in OTGW-Core.ino, called from OTGW-firmware.ino before handlePICSerial(); the replay statics moved with it. Option A (hoisting the call above the isOTDirectEnabled() early return) was rejected because it leaves the replay living inside a PIC-named, PIC-gated function, which is the placement that caused this bug.
+
+AC1, AC2 and AC5 need an OTDirect board: upload the fixture, start, capture, confirm processOT lines appear and the coverage gate runs end to end. No 2.0.0 board was reachable this session (192.168.88.61 in ARP but not answering; 192.168.88.68 is the 1.x ESP8266).
+
+2026-09-23 bench validation on OTGW32 (OT-Direct, no PIC, 192.168.88.61), alpha.371+7be6ec5 app+fs. run_coverage_test.py --topics telnet ran end to end: upload, start, preflight (33 distinct frames, replay advancing), 694 s capture (7415 telnet lines), stop, compare. Decoded 369 OT keys over 143 MsgIDs: the same counts as the PIC-bench baseline. processOT lines appear for all five source prefixes (e.g. 'processOT (5170): Request Boiler R900E6400 14 Write-Data > MaxRelModLevelSetting = 100.00 %'), so AC1 and AC5 are met. Gate verdict FAIL, 15 CHANGED, all MsgID 56/57, and the cause is not OT-Direct: in the first loop (07:27) 56/57 render as TdhwSet/MaxTSet because no OT version had been seen since the fresh flash; the replayed 'OpenThermVersionSlave = 4.00' arrives at 07:28:33, and in the second loop (07:32) the same frames render 'Reserved in OpenTherm v4.x profile'. AUTO profile works as designed; the gate depends on device state before the window (the baseline was recorded on a device that already knew the version). AC2 is open on its MQTT half: after the fs flash the bench had no broker, so 0 topics were captured (225 informational MISSING). Needs a re-run with a broker, or a re-run on a device that has already seen MsgID 124/125.
 <!-- SECTION:NOTES:END -->

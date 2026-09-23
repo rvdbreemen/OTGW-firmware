@@ -137,8 +137,10 @@ the two without introducing a second command path.
 
 ### Verification
 
-- `src/OTGW-firmware/SATcontrol.ino` — `satOwnsControlSetpoint()` and
-  `satCommandInFlight()`.
+- `src/OTGW-firmware/SATcontrol.ino` — `satOwnsControlSetpoint()`, `satCommandInFlight()`
+  and `satEnqueueOwnCS()`, the single path every SAT `CS=` takes, the `CS=0` releases in
+  `satDisable()` and the boot-safety path included. A SAT `CS=` sent any other way is
+  refused as external while SAT is enabled (found on the bench 2026-09-23, alpha.371).
 - `src/OTGW-firmware/OTDirect.ino` — the gated heating-curve, master-mode WRITE_DATA,
   `CS=` and CS-expiry sites.
 - Field validation on an OTGW32: with SAT enabled and a safety trip forced, TSet must not
