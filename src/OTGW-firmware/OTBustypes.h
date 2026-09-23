@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTBustypes.h
-**  Version  : v2.0.0-alpha.374
+**  Version  : v2.0.0-alpha.375
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -33,4 +33,9 @@ struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (
   // window AND the v2 connectivity per-link recency / "degraded/stale" state (ADR-155).
   time_t tBoilerLastSeen     = 0;
   time_t tThermostatLastSeen = 0;
+  // millis() of the last room temperature (MsgID 24) the THERMOSTAT wrote, from a
+  // live T frame or the PS=1 summary; 0 = never. Gateway-originated MsgID 24 frames
+  // (the master scheduler re-sending its write cache, TR= overrides) do not stamp
+  // it, so a vanished thermostat's value ages out for SAT (TASK-1157).
+  uint32_t iTrThermostatMs   = 0;
 };

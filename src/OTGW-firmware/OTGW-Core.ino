@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.374
+**  Version  : v2.0.0-alpha.375
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4181,6 +4181,15 @@ static bool parsePSSummaryFlag8Flag8(const char *text, uint8_t &upperByte, uint8
   return true;
 }
 
+// The thermostat just reported the room temperature (TASK-1157). Called for a live
+// T-frame Write-Data MsgID 24 and for the PS=1 summary's Tr, which the PIC takes from
+// the thermostat too. 0 is reserved for "never".
+static void stampThermostatRoomTemp()
+{
+  state.otBus.iTrThermostatMs = millis();
+  if (state.otBus.iTrThermostatMs == 0) state.otBus.iTrThermostatMs = 1;
+}
+
 static void updatePSSummaryFloatState(uint8_t msgid, float fval)
 {
   switch (msgid) {
@@ -4193,7 +4202,7 @@ static void updatePSSummaryFloatState(uint8_t msgid, float fval)
     case 18: OTcurrentSystemState.CHPressure            = fval; break;
     case 19: OTcurrentSystemState.DHWFlowRate           = fval; break;
     case 23: OTcurrentSystemState.TrSetCH2              = fval; break;
-    case 24: OTcurrentSystemState.Tr                    = fval; break;
+    case 24: OTcurrentSystemState.Tr                    = fval; stampThermostatRoomTemp(); break;
     case 25: OTcurrentSystemState.Tboiler               = fval; break;
     case 26: OTcurrentSystemState.Tdhw                  = fval; break;
     case 27: OTcurrentSystemState.Toutside              = fval; break;
@@ -5152,6 +5161,9 @@ void processOT(const char *buf, int len, bool suppressOutput){
           if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
           else                                        mqttPendingSlot.pending = false;
         }
+      }
+      if (OTdata.id == 24 && OTdata.rsptype == OTGW_THERMOSTAT && OTdata.type == OT_WRITE_DATA) {
+        stampThermostatRoomTemp();
       }
 
       if (OTdata.skipthis || OTdata.bGatewaySubstituted) AddLog(" <ignored> ");

@@ -63,7 +63,7 @@ static const float    SAT_HARD_MAX_FLOOR     = 50.0f;   // Absolute ceiling for 
 static const float    SAT_HARD_MAX_RAD       = 80.0f;   // Absolute ceiling for radiator heating
 static const float    SAT_GLOBAL_MAX_SETPOINT = 65.0f;  // Python MAXIMUM_SETPOINT: global safety ceiling for all heating systems
 static const uint32_t SAT_STALE_TEMP_BLE_MS  = 300000UL; // 5 min: BLE indoor temp considered stale
-static const uint32_t SAT_STALE_TEMP_MS      = 300000UL; // 5 min: legacy alias (kept for any future use)
+static const uint32_t SAT_STALE_TEMP_MS      = 300000UL; // 5 min: thermostat-sourced Tr older than this is stale for SAT (TASK-1157)
 static const uint32_t SAT_STALE_OUTDOOR_MS   = 600000UL; // 10 min: external outdoor temp considered stale
 static const uint8_t  SAT_MAX_SKIP_COUNT     = 10;       // Consecutive invalid-input skips before disable
 static const uint8_t  SAT_MAX_PIC_FAILS      = 5;        // Consecutive PIC comm failures before disable
@@ -1018,6 +1018,15 @@ static float satGetRoomTemp()
   // without a thermostat, Tr stays NAN forever — isnan() distinguishes "never observed"
   // from a real reading without the static-bool bookkeeping that TASK-521 introduced.
   float otRoom = OTcurrentSystemState.Tr;  // OT message ID 24
+  // TASK-1157: Tr never expires on its own, so a thermostat that went quiet left SAT
+  // regulating on its last reading indefinitely. Once the thermostat has reported Tr,
+  // a reading it has not refreshed within SAT_STALE_TEMP_MS counts as never observed,
+  // which hands the loop to the existing skip -> safety-trip chain. A Tr that never
+  // came from a thermostat (e.g. a TR= feed) keeps its previous behaviour.
+  if (state.otBus.iTrThermostatMs != 0 &&
+      (millis() - state.otBus.iTrThermostatMs) > SAT_STALE_TEMP_MS) {
+    otRoom = NAN;
+  }
   const bool trGhost = isnan(otRoom);
 
   // Task #21: If in fallback mode and OT room temp is invalid, use thermal estimation
