@@ -312,11 +312,15 @@ heap-frag soak, TASK-934):
   VID/PID 303A:1001; `--port COMx` to force). esptool-only — works on any Python.
   `--update --app <bin>` writes the app only; add `--fs <bin>` only when the
   LittleFS assets changed.
-- **Before any bench flash, save the settings:** `curl http://<ip>/api/v2/settings >
-  <scratch>/settings.json`. A `--fs` flash resets every setting (mode reverts to
-  `gateway`), and after an app-only flash compare the settings against that copy
-  (TASK-1160). Check the downloaded size of a static file such as `/settings.ini`
-  before trusting it: the device can serve it truncated.
+- **Settings live on LittleFS:** any flash that writes a filesystem image (`--fs`,
+  or bare `--update`, which auto-picks app + fs) resets every setting (mode reverts
+  to `gateway`). `--update --app <bin>` writes the app only and keeps them (before
+  TASK-1160 it silently added a littlefs image found in `build\`). Save
+  `curl http://<ip>/api/v2/settings` first when a filesystem write is involved.
+  Check the downloaded size of a static file such as `/settings.ini` before
+  trusting it: the device can serve it truncated.
+- **Never `sed -i` a `.bat`:** it strips the CRLF line endings and cmd then fails
+  with `'M' is not recognized`. Edit with the Edit tool and check the endings.
 - **Load (fragmenting):** `python scripts/sat_boiler_emulator.py --host <ip>` for
   synthetic OT traffic; combine with concurrent Web UI polling + MQTT discovery
   republish to exercise heap pressure.

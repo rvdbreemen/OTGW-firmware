@@ -12,11 +12,14 @@ REM    FACTORY (default):  erases the whole flash and writes a single
 REM                        *-merged-full.bin. WiFi credentials AND settings are
 REM                        wiped. Use for a clean install / recovery.
 REM
-REM    UPDATE (--update):  writes the firmware image (app) and the filesystem
+REM    UPDATE (--update):  writes the firmware image (app) and/or the filesystem
 REM                        image (LittleFS) at their partition offsets WITHOUT
 REM                        erasing flash. NVS is left untouched, so the stored
-REM                        WiFi credentials (and other NVS state) SURVIVE. Use
-REM                        to push a new build to an already-provisioned device.
+REM                        WiFi credentials (and other NVS state) SURVIVE. The
+REM                        settings (settings.ini) live on LittleFS: writing a
+REM                        filesystem image resets them, an app-only update keeps
+REM                        them. With --app and/or --fs only those images are
+REM                        written; bare --update auto-picks both.
 REM
 REM  Partition offsets (all 2.0.0 ESP32-S3 targets share partitions_otgw_esp32*.csv):
 REM    app0 (firmware) = 0x10000    spiffs (LittleFS) = 0x270000    nvs = 0x9000
@@ -24,10 +27,10 @@ REM
 REM  Usage:
 REM    flash_otgw.bat                         (factory: auto-pick merged-full)
 REM    flash_otgw.bat --bin <merged-full.bin> (factory: explicit image)
-REM    flash_otgw.bat --update                (update: auto-pick app + fs, keep WiFi)
+REM    flash_otgw.bat --update                (update: auto-pick app + fs, keep WiFi, resets settings)
 REM    flash_otgw.bat --update --app <fw.bin> --fs <littlefs.bin>
 REM    flash_otgw.bat --update --app <fw.bin> (update: firmware only, keep WiFi)
-REM    flash_otgw.bat --update --fs <littlefs.bin> (update: filesystem only, keep WiFi)
+REM    flash_otgw.bat --update --fs <littlefs.bin> (update: filesystem only, keep WiFi, resets settings)
 REM    flash_otgw.bat --port COMx  --board esp32  --baud N
 REM    flash_otgw.bat --help
 REM ============================================================================
@@ -193,7 +196,13 @@ if defined APP_FILE echo    Firmware: !APP_NAME!   -^> !APP_OFFSET!
 if defined FS_FILE  echo    Filesys:  !FS_NAME!   -^> !FS_OFFSET!
 echo    Board:    %BOARD_NAME%
 echo    Baud:     %ARG_BAUD%
-echo    Effect:   Overwrites app/filesystem only. NVS WiFi + settings kept.
+if defined FS_FILE (
+    echo    Effect:   WiFi credentials ^(NVS^) kept. The filesystem is REPLACED:
+    echo              settings.ini and every other file on it are lost. Save
+    echo              http://^<device^>/settings.ini first if you want to keep them.
+) else (
+    echo    Effect:   Firmware only. WiFi credentials and settings kept.
+)
 exit /b 0
 
 :summary_factory
@@ -208,6 +217,7 @@ exit /b 0
 :done_update
 echo  Update flashed. WiFi credentials preserved - the device
 echo  should rejoin your network on reboot with no re-config.
+if defined FS_FILE echo  The filesystem was replaced: settings are back at defaults. Restore a saved settings.ini through the File Explorer, or reconfigure.
 exit /b 0
 
 :done_factory
@@ -291,6 +301,12 @@ if not "%ARG_FS%"=="" (
     set "FS_FILE=%ARG_FS%"
 )
 
+REM An explicit --app or --fs means exactly that image: auto-detection only runs
+REM when neither was given. Pairing a picked-up LittleFS image with an explicit
+REM --app silently replaced the filesystem, and with it settings.ini (TASK-1160).
+if defined APP_FILE goto :select_update_done
+if defined FS_FILE  goto :select_update_done
+
 REM Auto-detect app (firmware) when not given explicitly.
 if not defined APP_FILE (
     for %%F in ("%SCRIPT_DIR%OTGW-firmware-*.ino.bin") do if not defined APP_FILE set "APP_FILE=%%F"
@@ -304,6 +320,7 @@ if not defined FS_FILE (
     if not defined FS_FILE for %%F in ("%SCRIPT_DIR%.pio\build\*\littlefs.bin") do if not defined FS_FILE set "FS_FILE=%%F"
 )
 
+:select_update_done
 if not defined APP_FILE if not defined FS_FILE (
     echo [ERROR] Update mode found neither a firmware nor a filesystem image.
     echo         Provide --app ^<firmware.bin^> and/or --fs ^<littlefs.bin^>, or run
@@ -336,10 +353,10 @@ echo.
 echo Usage:
 echo   flash_otgw.bat                          Factory: auto-pick merged-full.
 echo   flash_otgw.bat --bin ^<merged-full.bin^>   Factory: explicit merged image.
-echo   flash_otgw.bat --update                  Update: auto-pick app + fs, keep WiFi.
+echo   flash_otgw.bat --update                  Update: auto-pick app + fs, keep WiFi, resets settings.
 echo   flash_otgw.bat --update --app ^<fw.bin^> --fs ^<littlefs.bin^>
 echo   flash_otgw.bat --update --app ^<fw.bin^>   Update firmware only, keep WiFi.
-echo   flash_otgw.bat --update --fs ^<littlefs.bin^>  Update filesystem only, keep WiFi.
+echo   flash_otgw.bat --update --fs ^<littlefs.bin^>  Update filesystem only, keep WiFi, resets settings.
 echo.
 echo Targeting:
 echo   --port COMx          Serial port (auto-detect via USB VID/PID 303A:1001).
