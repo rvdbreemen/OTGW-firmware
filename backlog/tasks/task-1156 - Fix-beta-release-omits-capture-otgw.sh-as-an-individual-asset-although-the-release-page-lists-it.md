@@ -3,11 +3,11 @@ id: TASK-1156
 title: >-
   Fix: beta release omits capture-otgw.sh as an individual asset although the
   release page lists it
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-23 18:09'
-updated_date: '2026-09-23 18:54'
+updated_date: '2026-09-23 21:21'
 labels:
   - bug
   - ci
@@ -29,7 +29,7 @@ Field impact: mrfox7688 (GH #682, 2026-09-23) said he cannot run the capture scr
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The next published beta lists capture-otgw.sh among its individual release assets (gh release view <tag> --json assets)
+- [x] #1 The next published beta lists capture-otgw.sh among its individual release assets (gh release view <tag> --json assets)
 - [x] #2 Every file named in the release-body asset table is attached to the release, checked against the create and the draft top-up upload lists
 - [x] #3 chmod/exec bit question for a directly downloaded .sh is handled or documented in the release body (macOS users download it without the zip)
 <!-- AC:END -->
@@ -56,4 +56,6 @@ Changes (.github/workflows/beta-prerelease.yml, commit 3b22de4d7):
 Verified: the YAML parses, every asset in the table appears in both upload paths, and the script runs through bash without the exec bit.
 
 Open: AC #1 can only be checked once the next beta is published (gh release view <tag> --json assets). Left In Progress for that reason. No beta will be cut just to check it.
+
+AC #1 verified on v1.7.6-beta.6 (CI run 35921797045): gh release view lists capture-otgw.sh among 10 assets, prerelease true, draft false.
 <!-- SECTION:FINAL_SUMMARY:END -->
