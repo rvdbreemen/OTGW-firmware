@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-22 21:16'
+updated_date: '2026-09-23 18:09'
 labels:
   - enhancement
 dependencies: []
@@ -142,4 +142,6 @@ Two things to watch, neither a defect today:
 - indigo_light sees MsgID 27 in the OT Support tab with no boiler Ack. That is correct behaviour for a boiler that does not implement it, and the TASK-1134-era work already stopped override answers from being counted as boiler evidence. Worth a glance if anyone reports that panel misreporting.
 
 Recommendation: do not implement PR=E polling on current evidence. Either park this until the maintainer has the answer from .otgw, or reduce it to the documentation question, which is the part with a demonstrated user need.
+
+2026-09-23: Antwoord van .otgw (Discord #nederlandse-ondersteuning, 22-09 22:14 en 23-09 06:29): PR=E rapporteert de laatst gemeten temperatuur van de sensor op de GPIO-poort van de PIC. Periodiek sturen (elke paar minuten) kan, maar alleen zinvol als GPIO2 voor temperatuurmeting is geconfigureerd. indigo_light vroeg daarna of de AA=27-opstelling niet gewoon permanent volstaat; .otgw: "Robert denkt verder dan alleen jouw specifieke geval". Blokkade (wat doet PR=E) is hiermee opgeheven.
 <!-- SECTION:NOTES:END -->
