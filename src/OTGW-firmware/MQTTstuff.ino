@@ -47,6 +47,12 @@ constexpr size_t  MQTT_TOPIC_MAX_LEN = 200;
 constexpr size_t  MQTT_CLIENT_BUFFER_SIZE = 384;
 constexpr size_t  MQTT_PROGMEM_STAGE_LEN = 63;
 constexpr uint8_t MQTT_WRITE_MAX_RETRIES = 10;  // retry short TCP writes (yield to let lwIP sndbuf drain) before declaring desync
+// TASK-1155. WiFiClient sets _timeout = 5000 and ClientContext::_is_timeout() resets
+// its clock on every byte of progress, so a short write already proves five seconds
+// with zero progress. Retrying after that just waits another five seconds, up to
+// MQTT_WRITE_MAX_RETRIES times, with the PIC serial line undrained. Bound the whole
+// chunk write to one such timeout instead.
+constexpr uint32_t MQTT_WRITE_STALL_BUDGET_MS = 5000;
 // Minimum free heap required before attempting a discovery publish.
 // Streaming HA discovery (ADR-042: streaming JSON, no ArduinoJson) only needs
 // ~200 bytes per chunk, so the historical 1200-byte floor is obsolete. Value
@@ -286,11 +292,13 @@ static bool writeMqttChunk(const char *data, size_t len)
 {
   const size_t CHUNK_SIZE = 128;
   size_t pos = 0;
+  const uint32_t started = millis();
   while (pos < len) {
     size_t chunkLen = (len - pos) > CHUNK_SIZE ? CHUNK_SIZE : (len - pos);
     size_t written = 0;
     uint8_t attempts = 0;
-    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES) {
+    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES
+           && (uint32_t)(millis() - started) < MQTT_WRITE_STALL_BUDGET_MS) {
       size_t w = MQTTclient.write(reinterpret_cast<const uint8_t*>(data + pos + written), chunkLen - written);
       written += w;
       if (written < chunkLen) { feedWatchDog(); yield(); attempts++; }
@@ -309,6 +317,7 @@ static bool writeMqttProgmemChunk(PGM_P data, size_t len)
 {
   char stage[MQTT_PROGMEM_STAGE_LEN + 1];
   size_t pos = 0;
+  const uint32_t started = millis();
   while (pos < len) {
     size_t chunkLen = (len - pos) > MQTT_PROGMEM_STAGE_LEN ? MQTT_PROGMEM_STAGE_LEN : (len - pos);
     for (size_t i = 0; i < chunkLen; i++) {
@@ -316,7 +325,8 @@ static bool writeMqttProgmemChunk(PGM_P data, size_t len)
     }
     size_t written = 0;
     uint8_t attempts = 0;
-    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES) {
+    while (written < chunkLen && attempts < MQTT_WRITE_MAX_RETRIES
+           && (uint32_t)(millis() - started) < MQTT_WRITE_STALL_BUDGET_MS) {
       size_t w = MQTTclient.write(reinterpret_cast<const uint8_t*>(stage + written), chunkLen - written);
       written += w;
       if (written < chunkLen) { feedWatchDog(); yield(); attempts++; }
@@ -346,35 +356,28 @@ static size_t mqttFrameHeaderSize(size_t topicLen, size_t payloadLen)
   return 1 + varint + 2 + topicLen;
 }
 
-static bool beginMqttPublish(const char *topic, size_t len, bool retain)
+// Send-buffer pre-flight (TASK-1154, TASK-1155). A short write inside beginPublish()
+// leaves half a PUBLISH header on the wire, and MQTT has no way to abort a packet
+// once its Remaining Length is out, so the only remedy left is to drop the link.
+// Refusing to START a frame that does not fit avoids that dead end.
+//
+// Only the header and topic are checked, not the payload: TCP_SND_BUF is just
+// 2*TCP_MSS, and a large discovery config legitimately completes across several ACK
+// rounds inside one blocking write(). The header is the half PubSubClient gives no
+// way to resume, and it is small enough that this check almost always passes.
+//
+// A momentarily full buffer is normal during a burst and drains in milliseconds, so
+// lwIP gets a bounded, non-blocking chance to drain (availableForWrite() never
+// blocks) before the publish is deferred. This lowers how often the disconnect
+// fires but cannot remove it: the reading is a snapshot and nothing reserves that
+// space until beginPublish() actually writes.
+//
+// Shared by every publish path, including the discovery composers in
+// mqtt_configuratie.cpp, which is why it is not file-static.
+bool mqttFrameFitsSndbuf(const char *topic, size_t payloadLen)
 {
-  // Defense-in-depth maxBlock pre-flight: covers any publish path that reaches
-  // here without going through canPublishMQTT(). PubSubClient/lwIP need a
-  // contiguous buffer; refuse (graceful skip, NOT an error) when the largest
-  // block is below the floor rather than let the alloc fail and fault.
-  if (ESP.getMaxFreeBlockSize() < MQTT_PUBLISH_MIN_MAXBLOCK) {
-    state.heapdiag.iMqttMaxBlockSkips++;
-    return false;
-  }
-  // Send-buffer pre-flight (TASK-1154). A short write inside beginPublish()
-  // leaves half a PUBLISH header on the wire, and MQTT has no way to abort a
-  // packet once its Remaining Length is out, so the only remedy left is to drop
-  // the link. Refusing to START a frame that does not fit avoids that dead end.
-  //
-  // Only the header and topic are checked, not the payload: TCP_SND_BUF is just
-  // 2*TCP_MSS, and a large discovery config legitimately completes across several
-  // ACK rounds through the retry in writeMqttChunk(). The header is the half that
-  // cannot be retried, and it is small enough that this check almost always passes.
-  //
-  // This lowers how often the remedy fires, it does not eliminate it:
-  // availableForWrite() is a snapshot and nothing reserves that space until
-  // beginPublish() actually writes. The disconnect below therefore stays.
-  const size_t frameLen = mqttFrameHeaderSize(strlen(topic), len);
+  const size_t frameLen = mqttFrameHeaderSize(strlen(topic), payloadLen);
   size_t avail = wifiClient.availableForWrite();
-  // A momentarily full send buffer is normal during the discovery burst and
-  // drains in milliseconds, so deferring on the first look would skip publishes
-  // that were going to succeed. Give lwIP the same bounded chance to drain that
-  // writeMqttChunk() gives it, and only defer when the room never appears.
   for (uint8_t i = 0; i < MQTT_WRITE_MAX_RETRIES && avail < frameLen; i++) {
     feedWatchDog();
     yield();
@@ -386,12 +389,35 @@ static bool beginMqttPublish(const char *topic, size_t len, bool retain)
                 topic, (unsigned)avail, (unsigned)frameLen);
     return false;
   }
+  return true;
+}
+
+// Counter half of mqttDropLinkOnDesync(), which lives in mqtt_configuratie.cpp.
+// It cannot live here: the Arduino preprocessor hoists a prototype for every .ino
+// function to the top of the concatenated sketch, ahead of <PubSubClient.h>, so a
+// .ino signature naming PubSubClient does not compile. This half names no class.
+void mqttCountDesyncDrop()
+{
+  state.heapdiag.iMqttDesyncDrops++;
+}
+
+static bool beginMqttPublish(const char *topic, size_t len, bool retain)
+{
+  // Defense-in-depth maxBlock pre-flight: covers any publish path that reaches
+  // here without going through canPublishMQTT(). PubSubClient/lwIP need a
+  // contiguous buffer; refuse (graceful skip, NOT an error) when the largest
+  // block is below the floor rather than let the alloc fail and fault.
+  if (ESP.getMaxFreeBlockSize() < MQTT_PUBLISH_MIN_MAXBLOCK) {
+    state.heapdiag.iMqttMaxBlockSkips++;
+    return false;
+  }
+  if (!mqttFrameFitsSndbuf(topic, len)) return false;
 
   if (!MQTTclient.beginPublish(topic, len, retain)) {
     // beginPublish() writes the fixed header and the topic to the socket in one
     // _client->write() and only reports whether the full count went out. On
     // ESP8266 that write returns a partial count once the lwIP send buffer stays
-    // full until the 5 s timeout (ClientContext.h _write_from_source returns
+    // full for the 5 s no-progress timeout (ClientContext.h _write_from_source returns
     // _written after _is_timeout()), so a failure here can leave half a PUBLISH
     // header on the wire with the connection still up. The broker then reads the
     // next packet -- a PINGREQ or the next publish -- as the payload that header
@@ -402,8 +428,7 @@ static bool beginMqttPublish(const char *topic, size_t len, bool retain)
     // reconnect costs one gap, a desynchronised stream costs every packet after
     // it. TASK-769 applied the same remedy to the payload half of this publish.
     PrintMQTTError();
-    state.heapdiag.iMqttDesyncDrops++;
-    MQTTclient.disconnect();
+    mqttDropLinkOnDesync(MQTTclient);
     return false;
   }
   return true;
@@ -1103,8 +1128,7 @@ bool sendMQTTData(const char* topic, const char *json, const bool retain)
   if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttChunk(json, payloadLen)) {
     // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-769)
-    state.heapdiag.iMqttDesyncDrops++;
-    MQTTclient.disconnect();
+    mqttDropLinkOnDesync(MQTTclient);
     return false;
   }
   if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
@@ -1153,7 +1177,7 @@ bool sendMQTTData(const __FlashStringHelper *topic, const __FlashStringHelper *j
   if (!beginMqttPublish(full_topic, payloadLen, retain)) return false;
   if (!writeMqttProgmemChunk(payload, payloadLen)) {
     // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-769)
-    MQTTclient.disconnect();
+    mqttDropLinkOnDesync(MQTTclient);
     return false;
   }
   if (!MQTTclient.endPublish()) { PrintMQTTError(); return false; }
@@ -1397,7 +1421,7 @@ void sendMQTT(const char* topic, const char *json) {
   const size_t len = strlen(json);
   if (!beginMqttPublish(topic, len, true)) return;
   // desync: drop TCP so broker never sees a truncated/malformed publish (TASK-769)
-  if (!writeMqttChunk(json, len)) { MQTTclient.disconnect(); return; }
+  if (!writeMqttChunk(json, len)) { mqttDropLinkOnDesync(MQTTclient); return; }
   if (!MQTTclient.endPublish()) PrintMQTTError();
   feedWatchDog();
 }

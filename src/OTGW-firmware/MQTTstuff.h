@@ -302,6 +302,15 @@ struct HaDiscoveryContext {
 
 // Forward declarations for chunk writers (defined in MQTTstuff.ino)
 bool writeMqttChunkExt(const char *data, size_t len);
+
+// TASK-1155. Shared by every publish path, including the discovery composers in
+// mqtt_configuratie.cpp, so the send-buffer pre-flight and the desync counter cover
+// all of them. mqttFrameFitsSndbuf() and mqttCountDesyncDrop() are defined in
+// MQTTstuff.ino, mqttDropLinkOnDesync() in mqtt_configuratie.cpp (a .ino signature
+// cannot name PubSubClient, see mqttCountDesyncDrop()).
+bool mqttFrameFitsSndbuf(const char *topic, size_t payloadLen);
+void mqttCountDesyncDrop();
+void mqttDropLinkOnDesync(PubSubClient &client);
 bool writeMqttProgmemChunkExt(PGM_P data, size_t len);
 bool writeMqttByteExt(uint8_t b);
 

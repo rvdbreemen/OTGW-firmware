@@ -348,8 +348,10 @@ struct HeapDiagSection {                 // state.heapdiag — per-boot heap-pre
   // consecutive seconds (WiFiClient _timeout = 5000, and ClientContext::_is_timeout()
   // resets its clock on every byte of progress), so both of these count severe
   // events, not routine backpressure.
-  uint16_t iMqttSndbufSkips         = 0; // publishes deferred because the header+topic would not fit in tcp_sndbuf
-  uint16_t iMqttDesyncDrops         = 0; // times the link was dropped to stop a half-written PUBLISH desynchronising the broker
+  // uint32 (TASK-1155): these are read over a churn period of days, and the TASK-1039
+  // note below applies to them too, a counter meant for field reading must not wrap.
+  uint32_t iMqttSndbufSkips         = 0; // publishes deferred because the header+topic would not fit in tcp_sndbuf
+  uint32_t iMqttDesyncDrops         = 0; // times the link was dropped to stop a half-written PUBLISH desynchronising the broker
   uint16_t iWsMaxBlockSkips         = 0; // WebSocket sends skipped by the maxBlock pre-flight gate (fragmentation guard)
   // TASK-1039: these two are LOOP-TICK / EVENT counters, not request counts, and they must
   // not wrap: field data shows ~365 ticks/s, so a uint16 wraps in roughly three minutes.

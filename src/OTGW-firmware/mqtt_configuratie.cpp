@@ -2264,10 +2264,26 @@ static constexpr size_t   STREAM_TOPIC_MAX = 200;
 // stream is desynchronised costs every packet after it. This mirrors what
 // TASK-769 did for the payload half of the same publish.
 // ---------------------------------------------------------------------------
+// The one place a half-written PUBLISH is abandoned (TASK-769, TASK-1134, TASK-1155).
+// Every desync remedy in the firmware goes through here so mqtt_desync_drops counts
+// all of them: a counter that misses most sites reads low for the wrong reason,
+// which is worse than having no counter. Defined in this .cpp rather than beside
+// the other MQTT helpers because a .ino signature cannot name PubSubClient.
+void mqttDropLinkOnDesync(PubSubClient &client)
+{
+  mqttCountDesyncDrop();
+  client.disconnect();
+}
+
 static bool beginDiscoveryPublish(PubSubClient &client, const char *topic, size_t payloadLen)
 {
+  // TASK-1155. Discovery configs are the largest payloads this firmware sends, so
+  // they need the same send-buffer pre-flight as every other publish. A deferral
+  // is safe here: the discovery drip leaves the pending bit set on a false return
+  // and retries on its next tick.
+  if (!mqttFrameFitsSndbuf(topic, payloadLen)) return false;
   if (client.beginPublish(topic, payloadLen, true)) return true;
-  client.disconnect();
+  mqttDropLinkOnDesync(client);
   return false;
 }
 
@@ -2299,7 +2315,7 @@ bool streamSensorDiscovery(PubSubClient &client,
   // Write pass
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeSensorPayload(writer, cfg, ctx) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    mqttDropLinkOnDesync(client);  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2333,7 +2349,7 @@ bool streamBinarySensorDiscovery(PubSubClient &client,
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeBinSensorPayload(writer, cfg, ctx) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    mqttDropLinkOnDesync(client);  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2460,7 +2476,7 @@ bool streamDallasSensorDiscovery(PubSubClient &client,
   // Write pass
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    mqttDropLinkOnDesync(client);  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2568,7 +2584,7 @@ bool streamHvacSensorDiscovery(PubSubClient &client,
   // Write pass
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    mqttDropLinkOnDesync(client);  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2663,7 +2679,7 @@ bool streamOverrideSensorDiscovery(PubSubClient &client,
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    mqttDropLinkOnDesync(client);  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2915,7 +2931,7 @@ bool streamClimateDiscovery(PubSubClient &client,
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    mqttDropLinkOnDesync(client);  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -2999,7 +3015,7 @@ bool streamNumberDiscovery(PubSubClient &client,
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!compose(writer) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    mqttDropLinkOnDesync(client);  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -3072,7 +3088,7 @@ bool streamButtonDiscovery(PubSubClient &client, HaDiscoveryContext &ctx)
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeButtonPayload(writer, ctx) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    mqttDropLinkOnDesync(client);  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 
@@ -3240,7 +3256,7 @@ bool streamSelectDiscovery(PubSubClient &client, uint8_t selectIdx, HaDiscoveryC
 
   MqttJsonWriter writer(MqttJsonWriter::WRITE);
   if (!composeSelectPayload(writer, selectIdx, ctx) || !writer.ok) {
-    client.disconnect();  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
+    mqttDropLinkOnDesync(client);  // desync: drop TCP instead of finalising a truncated payload (TASK-769)
     return false;
   }
 

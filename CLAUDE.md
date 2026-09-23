@@ -91,7 +91,7 @@ Single translation unit — Arduino concatenates every `.ino` in `src/OTGW-firmw
 
 - `setup()` — boot sequence: filesystem, settings, WiFi, MQTT, OTGW PIC reset, web/REST handlers.
 - `loop()` — calls `doBackgroundTasks()` and yields.
-- `doBackgroundTasks()` — actual work loop: timers, queue draining, watchdog, MQTT publish. **Re-entrant** via `feedWatchDog()` → `yield()` (see "Static buffers, cooperative scheduling" below).
+- `doBackgroundTasks()` — actual work loop: timers, queue draining, watchdog, MQTT publish. **Re-entrant** via `delayms()`, which spins `doBackgroundTasks()` (see "Static buffers, cooperative scheduling" below).
 
 Sibling `.ino` files in same directory organised by feature (`MQTTstuff.ino`, `restAPI.ino`, `OTGW-Core.ino`, `networkStuff.ino`, `settingStuff.ino`, …). Each contributes free functions to single translation unit; no class-based modules.
 
@@ -216,7 +216,10 @@ All frontend JavaScript must work in Chrome, Firefox, Safari (latest + 2 version
 **Log container contract:** `.ot-log-content` has `white-space: pre` (in `index.css`); `\n` is line separator. Prefer `textContent` over `innerHTML` for plain text — skips HTML parser and per-line escape, avoids accidental injection from log content.
 
 ### Static buffers, cooperative scheduling
-- Re-entrancy: `doBackgroundTasks()` can be re-entered via `feedWatchDog()` → `yield()`
+- Re-entrancy: `doBackgroundTasks()` can be re-entered via `delayms()` (helperStuff.ino), which loops on
+  `doBackgroundTasks()`. Live path: telnet debug key `b` → `handleDebugChar()` → `blinkLED()` → `delayms()`,
+  reached from inside `doBackgroundTasks()`, nested for ~5 s. `feedWatchDog()` does NOT yield: its `yield()`
+  is commented out, so older notes naming `feedWatchDog()` → `yield()` as the path are wrong (TASK-1155).
 - Buffers shared across yield window must be local/static, not global scratch buffers
 - `mqttAutoCfgScratch` and `ot_log_buffer` have documented ownership rules — respect them
 
