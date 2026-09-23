@@ -9,18 +9,23 @@ name: Flash scripts lint
 #      flash_otgw.bat. The two scripts must stay in lockstep so that the
 #      pinned SHA256 constants below the version line stay valid for both.
 #   2. flash_otgw.sh passes `bash -n` (parse check).
+#   3. scripts/capture-otgw.sh passes `bash -n` and shellcheck. It is the
+#      Linux/macOS capture shipped with every release, and a syntax error
+#      there costs a reporter the log that would have diagnosed their bug.
 
 on:
   push:
-    branches: [dev, main]
+    branches: [dev, main, otgw-1.x.x]
     paths:
       - 'flash_otgw.sh'
       - 'flash_otgw.bat'
+      - 'scripts/capture-otgw.sh'
       - '.github/workflows/flash-scripts-lint.yml'
   pull_request:
     paths:
       - 'flash_otgw.sh'
       - 'flash_otgw.bat'
+      - 'scripts/capture-otgw.sh'
       - '.github/workflows/flash-scripts-lint.yml'
 
 permissions:
@@ -55,3 +60,8 @@ jobs:
 
       - name: bash -n flash_otgw.sh
         run: bash -n flash_otgw.sh
+
+      - name: bash -n and shellcheck capture-otgw.sh
+        run: |
+          bash -n scripts/capture-otgw.sh
+          shellcheck -s bash scripts/capture-otgw.sh

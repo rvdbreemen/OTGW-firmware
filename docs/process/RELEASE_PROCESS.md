@@ -275,7 +275,7 @@ Once the checklist is complete:
    python scripts/make_release_assets.py --version <version>
    ```
 
-   This writes `SHA256SUMS`, `RELEASE_ASSETS.md` and `OTGW-firmware-<version>-flash-bundle.zip` into `build/release-assets/`, and prints the complete 9-asset list. It refuses to run if the binaries for `<version>` are missing or ambiguous in `build/`.
+   This writes `SHA256SUMS`, `RELEASE_ASSETS.md` and `OTGW-firmware-<version>-flash-bundle.zip` into `build/release-assets/`, and prints the complete 10-asset list. It refuses to run if the binaries for `<version>` are missing or ambiguous in `build/`.
 
 7. **Create the draft GitHub release with every asset attached (creates the tag):**
 
@@ -291,16 +291,16 @@ Once the checklist is complete:
      --draft $ASSETS
    ```
 
-   This creates the `v<version>` tag on the latest `main` commit and a draft release carrying all nine assets. The release is not yet visible to the public.
+   This creates the `v<version>` tag on the latest `main` commit and a draft release carrying all ten assets. The release is not yet visible to the public.
 
-8. **Verify all nine assets are attached. This gate is mandatory:**
+8. **Verify all ten assets are attached. This gate is mandatory:**
 
    ```bash
-   gh release view v<version> --json assets --jq '.assets|length'    # MUST print 9
+   gh release view v<version> --json assets --jq '.assets|length'    # MUST print 10
    gh release view v<version> --json assets --jq '.assets[].name'
    ```
 
-   Expected: both binaries, `flash_otgw.sh`, `flash_otgw.bat`, `SHA256SUMS`, `RELEASE_ASSETS.md`, `capture-mqtt-debug.bat`, `capture-usb-serial.bat`, and the flash-bundle zip.
+   Expected: both binaries, `flash_otgw.sh`, `flash_otgw.bat`, `SHA256SUMS`, `RELEASE_ASSETS.md`, `capture-mqtt-debug.bat`, `capture-otgw.sh`, `capture-usb-serial.bat`, and the flash-bundle zip.
 
    A missing `SHA256SUMS` is not cosmetic: `flash_otgw.sh` and `flash_otgw.bat` verify their auto-download against it and exit with `EXIT_SHA_MISMATCH` when it is absent, which breaks the documented flashing path. Fix the draft now, because after publishing it cannot be fixed at all.
 

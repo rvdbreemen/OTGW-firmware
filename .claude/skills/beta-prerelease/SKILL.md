@@ -407,10 +407,10 @@ gh release view "${TAG}" --json tagName,isPrerelease,isDraft,assets \
   --jq '{tag: .tagName, prerelease: .isPrerelease, draft: .isDraft, assets: [.assets[].name]}'
 ```
 
-Required: `prerelease: true`, `draft: false`, and all nine assets: `*.ino.bin`,
+Required: `prerelease: true`, `draft: false`, and all ten assets: `*.ino.bin`,
 `*.littlefs.bin`, `SHA256SUMS`, `RELEASE_ASSETS.md`, `flash_otgw.sh`,
-`flash_otgw.bat`, `capture-mqtt-debug.bat`, `capture-usb-serial.bat`,
-`OTGW-firmware-*-flash-bundle.zip`. `draft: true` means CI stopped between
+`flash_otgw.bat`, `capture-mqtt-debug.bat`, `capture-otgw.sh`,
+`capture-usb-serial.bat`, `OTGW-firmware-*-flash-bundle.zip`. `draft: true` means CI stopped between
 attaching assets and flipping the draft flag (Trap 1).
 
 The capture scripts and `RELEASE_ASSETS.md` are there because a beta asks its

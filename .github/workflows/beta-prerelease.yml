@@ -236,21 +236,16 @@ jobs:
           bug fixed in this line was found from a capture, not from a
           description.
 
-          1. On Windows, run \`capture-mqtt-debug.bat\`. It asks for your gateway
-             address and MQTT broker details (\`capture-settings.example.json\`
-             inside the bundle shows the format if you would rather pre-fill
-             them). On Linux, WSL or macOS, run
-             \`bash capture-otgw.sh --host <your-gateway>\` instead (in the bundle
-             it sits under \`capture/\`). That one needs nothing installed beyond
-             bash and curl, and running it through \`bash\` means a downloaded
-             copy needs no \`chmod +x\` first.
-          2. Reproduce the problem while it runs. Press Q to stop the Windows
-             capture, Ctrl+C to stop the shell one; either way the files are
-             still written.
-          3. Attach what it produced. The Windows capture makes a single
-             \`transcript-*.txt\`. The shell capture makes a directory named
-             \`otgw-capture-*\`, so zip that and attach the zip. Start by reading
-             its \`summary.txt\`, which says what was captured and what was not.
+          1. On Windows, run \`capture-mqtt-debug.bat\`. On Linux, WSL or macOS, run
+             \`bash capture-otgw.sh\` (in the bundle it sits under \`capture/\`; running it
+             through \`bash\` means a downloaded copy needs no \`chmod +x\`). Both ask for
+             your gateway address and MQTT broker details and take the same options,
+             for example \`-DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10\`.
+          2. Reproduce the problem while it runs, then press Q to stop it (Ctrl+C
+             works too). Either way the transcript is still written.
+          3. Attach the single \`transcript-*.txt\` it produced. It bundles the telnet
+             log, the MQTT stream, the browser console, the crash log and a summary
+             of what was and was not captured.
 
           Post it in **#beta-testing** on Discord, or open an issue at
           https://github.com/rvdbreemen/OTGW-firmware/issues

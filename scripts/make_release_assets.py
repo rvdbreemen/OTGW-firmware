@@ -39,10 +39,12 @@ BUNDLE_DOCS = [
     Path("docs/guides/FLASH_GUIDE.md"),
 ]
 
-# Copied into the bundle under capture/, and attached as individual assets
-# (the .bat ones) so a bug report can carry a real log.
+# Copied into the bundle under capture/, and attached as individual assets so
+# a bug report can carry a real log. capture-otgw.sh is the Linux/WSL/macOS
+# counterpart of capture-mqtt-debug.bat.
 CAPTURE_SCRIPTS = [
     Path("scripts/capture-mqtt-debug.bat"),
+    Path("scripts/capture-otgw.sh"),
     Path("scripts/capture-usb-serial.bat"),
 ]
 CAPTURE_EXTRA = [Path("scripts/capture-settings.example.json")]
@@ -116,6 +118,7 @@ place. Your settings are preserved.
 | `flash_otgw.sh` | Flash helper for Linux and macOS. |
 | `SHA256SUMS` | Checksums for the two binaries. The flash scripts verify against this automatically. |
 | `capture-mqtt-debug.bat` | Diagnostic capture, Windows. Run this before reporting a bug. |
+| `capture-otgw.sh` | The same diagnostic capture for Linux, WSL and macOS. |
 | `capture-usb-serial.bat` | Diagnostic capture over USB, for a device that will not come up on WiFi. |
 | `RELEASE_ASSETS.md` | This file. |
 
@@ -133,9 +136,11 @@ The flash scripts do this for you when they download a release themselves.
 A log makes the difference between a guess and a diagnosis. Please run a
 capture and attach the single transcript file it produces:
 
-1. Run `capture-mqtt-debug.bat` (it will ask for your gateway address and
-   MQTT broker details; `capture-settings.example.json` in the bundle shows
-   the format if you prefer to pre-fill them).
+1. On Windows, run `capture-mqtt-debug.bat`. On Linux, WSL or macOS, run
+   `bash capture-otgw.sh` (running it through `bash` means a downloaded copy
+   needs no `chmod +x`). Both ask for your gateway address and MQTT broker
+   details, and both take the same options, for example
+   `-DeviceHost 192.168.1.50 -BrokerHost 192.168.1.10`.
 2. Reproduce the problem while it runs, then stop it with Q.
 3. Attach the `transcript-*.txt` it wrote. It bundles the telnet log, the
    MQTT stream, the browser console and the crash log into one file.
@@ -187,7 +192,16 @@ def build_bundle(out_dir: Path, version: str, binaries: list[Path],
         zip_path.unlink()
     with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as archive:
         for entry in sorted(staging.rglob("*")):
-            archive.write(entry, entry.relative_to(out_dir))
+            arcname = entry.relative_to(out_dir)
+            if entry.suffix == ".sh":
+                # A zip built on Windows carries no exec bit, so set it here:
+                # unzip on Linux/macOS then yields a runnable script.
+                info = zipfile.ZipInfo.from_file(entry, arcname)
+                info.external_attr = (0o100755 << 16)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                archive.writestr(info, entry.read_bytes())
+            else:
+                archive.write(entry, arcname)
 
     shutil.rmtree(staging)
     return zip_path
@@ -225,8 +239,7 @@ def main() -> int:
         REPO_ROOT / "flash_otgw.bat",
         sums,
         assets_md,
-        REPO_ROOT / CAPTURE_SCRIPTS[0],
-        REPO_ROOT / CAPTURE_SCRIPTS[1],
+        *(REPO_ROOT / rel for rel in CAPTURE_SCRIPTS),
         bundle,
     ]
 

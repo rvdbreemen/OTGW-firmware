@@ -280,7 +280,7 @@ Proceed directly after Phase 4 approval.
    ```bash
    python scripts/make_release_assets.py --version <version>
    ```
-   Writes `SHA256SUMS`, `RELEASE_ASSETS.md` and the flash-bundle zip to `build/release-assets/`, and prints the 9-asset list.
+   Writes `SHA256SUMS`, `RELEASE_ASSETS.md` and the flash-bundle zip to `build/release-assets/`, and prints the 10-asset list.
 7. **Create the draft release with every asset in one call**, targeting `main`:
    ```bash
    eval gh release create v<version> --target main \
@@ -291,7 +291,7 @@ Proceed directly after Phase 4 approval.
    Derive the short title (3-6 words) from the release theme. Examples: `v1.3.2 - File Explorer Reliability Fix`.
 8. **Verify the asset count. Mandatory gate, do not skip**:
    ```bash
-   gh release view v<version> --json assets --jq '.assets|length'   # MUST print 9
+   gh release view v<version> --json assets --jq '.assets|length'   # MUST print 10
    gh release view v<version> --json assets --jq '.assets[].name'
    ```
    A missing `SHA256SUMS` breaks `flash_otgw.sh` / `flash_otgw.bat` auto-download with `EXIT_SHA_MISMATCH`. Fix the draft now; after publishing it is unfixable.
@@ -373,7 +373,7 @@ Skipping step 3 leaves the repo and GitHub release page out of sync. Skipping st
 - **Always push to remote after every commit**
 - **Stage the WHOLE build sweep, not just `version.h`**: every `python build.py` runs `autoinc-semver --update-all`, which rewrites `version.h`, `data/version.hash`, and the `Version :` banner comments across ~24 source/data files. After any build-output commit (Phase 2, Phase 5, Phase 6 bump) run `git status --short` and confirm a clean tree before proceeding. Leftover banner changes committed late, or on `main` before tagging, mean the published tag carries stale `-beta` source comments (the binary version stays correct via `version.h`).
 - **Run git mutations SERIALLY, never in parallel tool calls**: `git checkout`, `git stash`, `git merge`, and `git commit` issued concurrently race on the index and working tree and produce corrupt or misleading state. Chain them with `&&` in one command or run them one at a time. Only read-only `git` queries may overlap.
-- **Always create releases as draft first**: attach every asset, verify the count is 9, then publish
+- **Always create releases as draft first**: attach every asset, verify the count is 10, then publish
 - **Releases are immutable, and this has two hard consequences**:
   1. **Nothing can be attached after publishing.** Not even additions: the API rejects every upload with `Cannot upload asset X to an immutable release`. This is why no workflow can attach release assets on `release: published`, and why `release-assets.yml` was deleted (TASK-1074). Everything goes on the draft.
   2. **A published tag name is permanently reserved.** Deleting the release does NOT free it; recreating a release on that tag fails with `HTTP 422: tag_name was used by an immutable release`, and deleting the git tag does not help either.
