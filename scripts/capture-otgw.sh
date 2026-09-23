@@ -305,7 +305,7 @@ command -v curl >/dev/null 2>&1 || die "curl is required and was not found. Inst
 
 # /dev/tcp is a bash feature that some distributions build out. Check once, up
 # front, so the failure is a sentence rather than a silent empty telnet.log.
-if bash -c 'exec 3<>/dev/tcp/127.0.0.1/1' 2>&1 | grep -qi 'not supported\|no such file'; then
+if bash -c 'exec 3<>/dev/tcp/127.0.0.1/1' 2>&1 | grep -qiE 'not supported|no such file'; then
     [ "$SERIAL_MODE" = "1" ] || die "This bash has no /dev/tcp support, so the telnet stream cannot be captured."
 fi
 
@@ -509,8 +509,14 @@ CONNECT_OFFSET=0
 
 log_size() { if [ -f "$1" ]; then wc -c < "$1" | tr -d ' '; else echo 0; fi; }
 
+# Every background worker starts with trap '' INT. A subshell resets the main
+# script's Ctrl+C trap to the default action, so without this Ctrl+C would kill
+# the workers mid-write instead of letting the teardown stop them. An ignored
+# signal stays ignored across exec, so cat, curl, the browser and python3
+# inherit it too.
 telnet_worker() {
     # $1 host $2 port $3 fifo $4 connected-flag $5 log
+    trap '' INT
     exec 3<>"/dev/tcp/$1/$2" || exit 7
     : > "$4"
     cat "$3" >&3 &
@@ -561,7 +567,7 @@ drain_telnet() {
 read_initial_banner() {
     local deadline=$(( $(now_ms) + 6000 ))
     while [ "$(now_ms)" -lt "$deadline" ]; do
-        if telnet_since_connect | grep -q "Press 'h' for command menu\|OTGW-Sim"; then
+        if telnet_since_connect | grep -qE "Press 'h' for command menu|OTGW-Sim"; then
             break
         fi
         sleep 0.1
@@ -768,6 +774,7 @@ http_get_resilient() {
 }
 
 crashlog_worker() {
+    trap '' INT
     local polls=0 last_crash="" last_reboot="" trimmed elapsed
     local reboot_url="$1"
     crash_line "crashlog endpoint: $CRASHLOG_URL"
@@ -814,6 +821,7 @@ crashlog_worker() {
 }
 
 probe_worker() {
+    trap '' INT
     printf '# OTGW reachability probe, one line per %ss: http=200 answering, http=000 no answer\n' "$PROBE_SECONDS" > "$PROBE_LOG"
     while ! stop_requested; do
         printf '%s http=%s\n' "$(iso_now)" "$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://$DEVICE_HOST/api/v2/device/info" 2>/dev/null || true)" >> "$PROBE_LOG"
@@ -1060,11 +1068,11 @@ BROWSER_SANDBOX_NOTE=""
 
 start_browser() {
     # $1 browser $2 port $3 extra flag (optional)
-    "$1" --headless=new --disable-gpu --no-first-run --no-default-browser-check \
+    ( trap '' INT; exec "$1" --headless=new --disable-gpu --no-first-run --no-default-browser-check \
         --disable-extensions --disable-background-networking --mute-audio \
         --disable-logging --log-level=3 --remote-allow-origins=\* \
         --remote-debugging-port="$2" --user-data-dir="$BROWSER_PROFILE" ${3:+"$3"} \
-        about:blank >/dev/null 2>>"$BROWSER_ERROR_LOG" &
+        about:blank ) >/dev/null 2>>"$BROWSER_ERROR_LOG" &
     BROWSER_PID=$!
 }
 
@@ -1093,7 +1101,7 @@ start_browser_capture() {
         start_browser "$browser" "$port" "--no-sandbox"
     fi
     write_cdp_worker "$worker"
-    python3 "$worker" "$port" "$BROWSER_URL" "$BROWSER_LOG" "$STOP_FLAG" "$STATE_DIR/browser.status" "$browser" \
+    ( trap '' INT; exec python3 "$worker" "$port" "$BROWSER_URL" "$BROWSER_LOG" "$STOP_FLAG" "$STATE_DIR/browser.status" "$browser" ) \
         2>>"$BROWSER_ERROR_LOG" &
     CDP_PID=$!
 }
@@ -1424,7 +1432,7 @@ elif resolve_mosquitto_sub; then
     set -- -h "$BROKER_HOST" -p "$BROKER_PORT" -t "$TOPIC" -v
     [ -n "$USERNAME" ] && set -- "$@" -u "$USERNAME"
     [ -n "$USERNAME" ] && [ -n "$PASSWORD" ] && set -- "$@" -P "$PASSWORD"
-    "$MOSQUITTO" "$@" > "$MQTT_LOG" 2> "$MQTT_ERROR_LOG" &
+    ( trap '' INT; exec "$MOSQUITTO" "$@" ) > "$MQTT_LOG" 2> "$MQTT_ERROR_LOG" &
     MQTT_PID=$!
     set --
     add_summary_line "mosquitto_sub started: pid $MQTT_PID"
@@ -1438,6 +1446,35 @@ else
     warn "  Or point the script at an existing copy: -MosquittoSubPath /path/to/mosquitto_sub"
     warn ""
 fi
+
+# OTGW lines are CRLF-terminated. read strips the LF and leaves the CR, which is
+# noise in the log and, being outside printable ASCII, would make every healthy
+# line look like a baud mismatch. A blank line after that strip is the tail of
+# a CRLF pair, not data.
+serial_worker() {
+    trap '' INT
+    local line
+    while IFS= read -r line; do
+        line="${line%$'\r'}"
+        [ -z "$line" ] && continue
+        printf '%s %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$line" >> "$SERIAL_LOG"
+    done < "$SERIAL_DEV"
+}
+
+# A wrong baud shows up as bytes outside printable ASCII. Saying so in the
+# summary spares the reporter a round trip over mojibake (GH #684).
+serial_summary() {
+    local total bad
+    # -a and LC_ALL=C: garbage bytes would otherwise make grep call the file
+    # binary and print "Binary file matches" instead of the lines.
+    total="$(LC_ALL=C grep -avc '^#' "$SERIAL_LOG" 2>/dev/null)"; total="${total:-0}"
+    bad="$(LC_ALL=C grep -av '^#' "$SERIAL_LOG" 2>/dev/null | LC_ALL=C grep -ac '[^[:print:][:space:]]')"; bad="${bad:-0}"
+    add_summary_line "Serial capture: $total lines"
+    if [ "$total" -gt 0 ] && [ "$bad" -ge $(( total / 2 )) ]; then
+        add_summary_line "Serial capture: WARNING $bad of $total lines contain non-printable bytes, which usually means the baud rate is wrong (this firmware uses 9600)"
+        warn "serial   : $bad of $total lines look like garbage. That is normally a baud mismatch; this firmware uses 9600."
+    fi
+}
 
 # ----------------------------------------------------------------- serial mode ---
 if [ "$SERIAL_MODE" = "1" ]; then
@@ -1462,7 +1499,7 @@ if [ "$SERIAL_MODE" = "1" ]; then
         STTY_FLAG="-F"
         stty -F "$SERIAL_DEV" -a >/dev/null 2>&1 || STTY_FLAG="-f"
         if stty "$STTY_FLAG" "$SERIAL_DEV" "$SERIAL_BAUD" cs8 -cstopb -parenb raw -echo clocal -hupcl 2>>"$SCRIPT_ERROR_LOG"; then
-            cat "$SERIAL_DEV" >> "$SERIAL_LOG" 2>>"$SCRIPT_ERROR_LOG" &
+            serial_worker 2>>"$SCRIPT_ERROR_LOG" &
             SERIAL_PID=$!
             write_capture_status "Serial capture: $SERIAL_DEV at $SERIAL_BAUD 8N1, read only"
         else
@@ -1592,7 +1629,10 @@ if [ -n "$TOGGLED_KEYS" ]; then
 fi
 close_telnet
 
-if [ -n "$SERIAL_PID" ]; then kill "$SERIAL_PID" 2>/dev/null; wait "$SERIAL_PID" 2>/dev/null; fi
+if [ -n "$SERIAL_PID" ]; then
+    kill -PIPE "$SERIAL_PID" 2>/dev/null; wait "$SERIAL_PID" 2>/dev/null
+    serial_summary
+fi
 [ "$STOP_BROWSER" = "1" ] && stop_browser_capture
 if [ -n "$CRASHLOG_PID" ]; then
     WAITED=0
