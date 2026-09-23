@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 19:11'
-updated_date: '2026-09-23 19:15'
+updated_date: '2026-09-23 20:23'
 labels:
   - feature
   - tooling
@@ -56,3 +56,46 @@ Goal: a Linux/macOS capture that uses the Windows script as its template and mat
 3. Lint: shellcheck, bash -n; flash-scripts-lint workflow coverage.
 4. Validate in WSL Ubuntu against 192.168.88.68: default run, quiet+keep toggles with restore check, forced reboot mid-capture (reconnect + crashlog), MQTT mirror, browser capture, Q stop, duration stop, transcript naming. Mac-specific paths (bash 3.2, BSD date/stty) checked by static review and a bash 3.2 build if obtainable.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+## Feature inventory: capture-mqtt-debug.bat -> capture-otgw.sh 2.0.0
+
+| Windows feature | Shell implementation |
+|---|---|
+| All 25 parameters (-DeviceHost ... -CrashlogPollSeconds), ValidateRange | Same names, case-insensitive, PS or GNU spelling; int_opt enforces the same ranges |
+| Interactive prompts, [default] prefill, username prompt rule, SecureString password | read_with_default; same bound/unbound rules; read -rs for the password |
+| Settings file %LOCALAPPDATA%\OTGW-capture (password never saved) | ${XDG_CONFIG_HOME:-~/.config}/otgw-capture/capture-settings.json, same keys, password never saved |
+| Run folder logs/mqtt-diagnostics/yyyyMMdd-HHmmss | Same |
+| summary.txt line set, toggle policy line up front | Same lines and wording, plus one Platform line |
+| Telnet TcpClient read+write | Background worker: /dev/tcp fd + cat into telnet.log, FIFO for writes |
+| Banner parse, enable-all / Skip / Quiet+Keep, simulators excluded, restore on exit | Same regex semantics in awk, same result strings; flipped keys via a state file |
+| q + D dump with idle drain (800 ms, cap 5 s) | Same, drain measured on telnet.log growth |
+| Reconnect: post-disconnect delay, reconnect delay, adaptive timeout (base+min(n-1,6), cap 20) | Same arithmetic and status lines |
+| ESP.restart() marker with 512-byte overlap | Same, scanned on telnet.log byte offsets |
+| mosquitto_sub: explicit path fatal, PATH, common paths, install, degrade with warning | Same; install = brew on macOS (no sudo), printed apt/dnf/pacman/zypper/apk hint on Linux |
+| mosquitto_sub exit ends the capture | Same |
+| Browser: Edge/Chrome headless, CDP port auto-bump, temp profile, console/exception/Log/net/FAILED/PENDING | Chrome/Chromium/Edge/Brave incl. macOS app bundles and snap; embedded stdlib python3 CDP client, same event mapping and line format; --no-sandbox retry recorded in summary |
+| Crash-log worker: 30 s, crashlog + reboot_log.txt, change-only, resilient GET (10 s, 1 retry, 1.5 s), classified transport error | Same, curl exit codes classified (Timeout, ConnectFailure, ...) |
+| REST snapshot after stop, curated msgids, never /api/v2/settings | Same list and format |
+| Metadata: telnet.log, /api/v2/debug, /api/v2/settings, /api/v2/device/info, MAC fallback | Same order and prefer-existing rules |
+| error.txt (script/mqtt/browser stderr), merged transcript, intermediates removed | Same sections and titles |
+| Q key, Ctrl+C, -DurationSeconds | Same; Q polled via /dev/tty |
+
+Deliberate non-parity, with the platform reason:
+- No user-PATH mutation after a mosquitto install: Homebrew and distro packages already land on PATH.
+- winget -> brew on macOS; on Linux an install hint only, because the package manager needs sudo.
+- No Ctrl+Break / cmd batch-job prompt: those are cmd.exe artefacts.
+- Q latency is 1 s on bash 3.x (no fractional read -t, verified on 3.2.57); 0.2 s on bash 4+. Capture itself runs in background processes and loses nothing.
+- A Windows browser cannot be driven from WSL; the summary says so.
+
+Behaviour changes against the previous capture-otgw.sh 1.x:
+- Default duration is until stopped (was 10 min).
+- Debug toggles are switched on by default (was passive); -SkipDebugToggles / -QuietDebugToggles restore the old behaviour.
+- The browser capture is on by default (was deliberately absent); -SkipBrowserCapture turns it off.
+- Output is one transcript file (was a directory to zip).
+- No early abort when nothing is reachable: it keeps retrying, as the Windows script does, with a status line per attempt.
+
+Extras on top of the Windows script: -Serial [dev] with -Baud (usb-serial.log, CR strip, timestamps, baud-mismatch warning; the Windows side has capture-usb-serial.bat) and -ProbeSeconds (probe.log).
+<!-- SECTION:NOTES:END -->
