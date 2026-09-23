@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.373
+**  Version  : v2.0.0-alpha.374
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -967,6 +967,11 @@ void updateSetting(const char *field, const char *newValue)
     // Only disable on actual enabled→disabled transition, and not during boot
     if (wasEnabled && !settings.sat.bEnabled && state.bSetupComplete) {
       satDisable();
+    }
+    // Re-enabling from any path resumes a tripped SAT (TASK-1159). Not during the
+    // boot-time file parse: a trip does not survive a reboot anyway.
+    if (!wasEnabled && settings.sat.bEnabled && state.bSetupComplete) {
+      satClearSafetyTrip();
     }
   }
   else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 2);  // 0=auto,1=radiators,2=underfloor

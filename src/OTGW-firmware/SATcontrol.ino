@@ -1700,19 +1700,27 @@ bool satHandleTargetTemp(const char* value)
   return false;
 }
 
+// The one place a safety trip is cleared (TASK-1159). Called from the SATenabled
+// false->true transition in updateSetting() (settings page, settings POST) and from
+// satHandleEnabled() (SAT pages, MQTT), where an enable is an explicit resume even if
+// SAT was already enabled. No-op when nothing is tripped, so a caller that reaches it
+// twice for one action narrates once.
+void satClearSafetyTrip()
+{
+  if (!state.sat.bSafetyTripped) return;
+  state.sat.bSafetyTripped = false;
+  satNarrate_P(PSTR("Safety cleared: SAT may resume"));
+  _sat_consecutiveSkips = 0;
+  _sat_picFailCount = 0;
+}
+
 void satHandleEnabled(const char* value)
 {
   if (!value || !*value) return;
   bool enabled = EVALBOOLEAN(value);
   // Route through updateSetting() so the change persists to flash
   updateSetting("SATenabled", enabled ? "1" : "0");
-  if (enabled) {
-    // Clear safety trip so SAT can resume
-    state.sat.bSafetyTripped = false;
-    satNarrate_P(PSTR("Safety cleared: SAT may resume"));
-    _sat_consecutiveSkips = 0;
-    _sat_picFailCount = 0;
-  }
+  if (enabled) satClearSafetyTrip();
   SATDebugTf(PSTR("SAT: %s\r\n"), enabled ? "enabled" : "disabled");
 }
 
