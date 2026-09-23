@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:08'
-updated_date: '2026-09-22 10:33'
+updated_date: '2026-09-23 05:50'
 labels:
   - bug
 dependencies: []
@@ -106,6 +106,14 @@ That second table is the honest half: the retry does not rescue a client that ha
 AC #6 was removed rather than ticked. It demanded burst loss measurably lower than the TASK-1147 baseline, and that baseline turned out to be a toggle artifact rather than transport loss, so there was no valid figure to beat. Replaced with a criterion tied to the slow-reader measurement that actually exists.
 
 AC #7 checked on two grounds. By construction: mayYield is outer, evaluated as !_inWrite before the flag is set, so a nested call always receives false and cannot yield. Empirically: six stress runs with every debug flag plus the simulator produced no interleaved or spliced lines.
+
+CORRECTION (TASK-1155, 2026-09-23). This record overclaims and should be read with this note.
+
+Part B, the bounded retry, never worked, and not only because of the guard fixed in ef451af. SimpleTelnet sets each client write timeout to 1000 ms, and ClientContext::_write_from_source only returns a short count after that much time with zero progress. So when write() sees a short count at least 1000 ms have already passed, which always exceeds the 2 ms budget: the loop broke before any second write, every time. The retry is removed in SimpleTelnet 2a40633.
+
+AC #7 ("the retry eliminates the loss at 64 B/s: 0 B in 4 of 4 runs against 133 B before") is therefore wrong as stated. The 133 B was a single run on a phenomenon that had already given 227 B and 0 B on identical repeats; it was noise, and both builds behaved identically. What actually changed behaviour is Part A, the honest return value and the drop counter, which stays.
+
+The beta.4 release notes and the #beta-testing announcement say the console now retries. That is inaccurate for beta.4; the CHANGELOG [Unreleased] entry is corrected for the next beta.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
