@@ -3,9 +3,11 @@ id: TASK-1156
 title: >-
   Fix: beta release omits capture-otgw.sh as an individual asset although the
   release page lists it
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-23 18:09'
+updated_date: '2026-09-23 18:51'
 labels:
   - bug
   - ci
