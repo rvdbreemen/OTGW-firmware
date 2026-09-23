@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 21:15'
-updated_date: '2026-09-22 21:53'
+updated_date: '2026-09-23 05:50'
 labels:
   - bug
 dependencies:
@@ -117,6 +117,12 @@ The clean disconnects are the fix working as designed. The thing worth chasing o
 UNVERIFIED, flagged rather than asserted: the numeric value of TCP_MSS on this build was not found in lwipopts.h, so the exact sndbuf figure (2 * MSS) is not pinned down. It does not change any conclusion above, since option A deliberately only requires the small header to fit, but anyone tuning a threshold should measure it first.
 
 AC #3 closed: answered mrfox7688 on GH #682 (comment 5784793893). Told him plainly that the clean disconnects are the fix operating, that MQTT has no packet abort so there is no gentler in-band option, and that each disconnect proves his socket accepted zero bytes for five consecutive seconds, which is a network condition rather than a firmware parameter. Also named the limit honestly: the pre-flight lowers the frequency, it cannot remove the drop. Asked him to read mqtt_sndbuf_skips and mqtt_desync_drops after a churn period once a beta carries this, since desync_drops climbing would mean the pre-flight is missing cases.
+
+CORRECTION (TASK-1155, 2026-09-23). As shipped in beta.4, mqtt_desync_drops counted only 2 of 14 desync sites, and the discovery composers bypassed the send-buffer pre-flight entirely via beginDiscoveryPublish(). Both fixed in 1f4de1c68: every site now routes through mqttDropLinkOnDesync(), and discovery is pre-flighted too.
+
+Consequence for the field measurement asked of mrfox7688 on GH #682: on beta.4 a low desync count is not evidence, because most sites did not count. The reading guidance also changes: with discovery included, a healthy boot shows a few dozen sndbuf deferrals (about 59 on the bench), so the stall signal is the count still climbing after boot settles, not its absolute value.
+
+Also fixed there: writeMqttChunk could hold the loop for up to ten 5 s write timeouts; now bounded to one, measured longest unresponsive gap 4.9 s.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
