@@ -5,7 +5,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:38'
-updated_date: '2026-09-22 10:06'
+updated_date: '2026-09-23 18:04'
 labels: []
 dependencies: []
 ordinal: 288000
@@ -30,7 +30,7 @@ SCHEMA IMPACT: widening sSensorArea from a Dallas-only field to a multi-source s
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The panel is titled 'Area Sensor Mapping' with no DS18B20 in title or hint, in the classic UI and in v2
-- [ ] #2 A BLE roster sensor can be assigned to a SAT area and its temperature reaches state.sat.fAreaTemp[N] on the normal update cadence, verified on-device with at least one BLE sensor
+- [x] #2 A BLE roster sensor can be assigned to a SAT area and its temperature reaches state.sat.fAreaTemp[N] on the normal update cadence, verified on-device with at least one BLE sensor
 - [x] #3 The persisted area-sensor field accepts both a 16-hex Dallas address and an 18-byte BLE MAC; existing Dallas-only settings.json files load unchanged after upgrade
 - [x] #4 GET and PATCH /api/v2/sat/sensor-areas accept and return both address forms; invalid values still 400; the GET response buffer is sized for the widest case
 - [x] #5 The area dropdown is populated from all discovered sensors (Dallas via /api/v2/sensors, BLE via /api/v2/sat/ble/discovery), each showing its user label where one exists
@@ -51,4 +51,6 @@ Evidence: tests/webui/sat-area-sensor-mapping.test.mjs (new) drives the shipped 
 AC2 (a BLE temperature actually reaching state.sat.fAreaTemp[N] on device) needs hardware and is NOT ticked. The fan-out is implemented in satBLEUpdateState() and mirrors the Dallas path in sensors_ext.ino:298, but no 2.0.0 board with a BLE sensor was reachable this session.
 
 AC9 is satisfied by ADR-178 (Proposed, lints clean). It carries one Open Question for the maintainer: when an area's mapped BLE sensor goes stale, hold the last value or fall back? Area mapping deliberately has no failover - a substitute sensor in a different room would report the wrong area - but that needs confirming before the ADR can be accepted.
+
+2026-09-23 on-device validation on OTGW32 (192.168.88.61, alpha.372, no PSRAM so satbleriskack=true for the test). BLE roster found 4 ATC sensors. PATCH /api/v2/sat/sensor-areas mapped A4:C1:38:FE:A8:7C to area 0 and A4:C1:38:96:53:CD to area 1 (both returned in GET in 17-char MAC form). On the next BLE interval tick /api/v2/debug showed state.sat.area0_temp=22.41 and area1_temp=23.99, matching the roster temps of those two MACs (22.43 / 23.99). AC2 met. AC9 stays open on the ADR-178 stale-sensor question.
 <!-- SECTION:NOTES:END -->

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.372
+**  Version  : v2.0.0-alpha.373
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -176,15 +176,19 @@ inline bool hasArgCompat(const char* name) {
 
 // Raw request body (the sync WebServer's arg("plain") / arg(0)). Returns the
 // buffer captured by the onRequestBody hook for the current request, or "" if
-// none. Only valid for the in-flight request (owner sanity check).
-inline const char* bodyCompat() {
-  if (currentRequest && g_requestBody.owner == currentRequest && g_requestBody.len > 0) {
-    return g_requestBody.data;
-  }
-  return "";
-}
+// none. Only valid for the in-flight request.
+//
+// The owner match alone is not enough: g_requestBody is never cleared, and a
+// body-less request allocated at the same heap address as the previous one
+// passes it and reads the stale body (TASK-1158: POST /sat/enable/1 without a
+// body parsed a preceding settings POST's "false"). The request's own
+// Content-Length decides whether it has a body at all.
 inline bool hasBodyCompat() {
-  return currentRequest && g_requestBody.owner == currentRequest && g_requestBody.len > 0;
+  return currentRequest && currentRequest->contentLength() > 0 &&
+         g_requestBody.owner == currentRequest && g_requestBody.len > 0;
+}
+inline const char* bodyCompat() {
+  return hasBodyCompat() ? g_requestBody.data : "";
 }
 
 // F()-keyed overloads. The sync WebServer's "plain" pseudo-arg is the raw POST

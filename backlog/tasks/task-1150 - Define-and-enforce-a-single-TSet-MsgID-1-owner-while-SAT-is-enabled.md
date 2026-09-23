@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-22 06:37'
-updated_date: '2026-09-23 06:35'
+updated_date: '2026-09-23 18:13'
 labels: []
 dependencies: []
 ordinal: 285000
@@ -75,6 +75,8 @@ Carried forward on ADR-179 as Open Questions, both out of scope for MsgID 1:
 Bench A/B on OTGW32 (OT-Direct master mode, 192.168.88.61). Trip forced by SAT regulating on an external room temp (satexternaltemp=true, sensormaxage=60), then letting it go stale with Tr NaN after a reboot: 10 skips at 30 s, then SAFETY TRIPPED. Observable: /api/v2/otdirect/overrides write list. alpha.371 (reproduced 3x): at 08:14:06 telnet shows 'OTD: cmd "CS=0"' then 'OT-direct: CS= refused, SAT owns the control setpoint', and the MsgID 1 override stays at 2560 (10.0 C) 40 s later. alpha.372: at 08:33:21 'OTD: cmd "CS=0"' with no refusal; the MsgID 1 override is gone by 08:33:23 and still absent at 08:34:22 (past one 60 s PI interval), so the heating curve did not re-arm. AC10 met.
 
 Side findings, not fixed here: (1) OT-bus Tr (MsgID 24) has no staleness, so a vanished thermostat leaves SAT regulating on a frozen room temp; (2) POST /api/v2/sat/enable/1 with an empty body cleared the trip but left settings.sat.bEnabled false; (3) the settings-POST satenabled toggle does not clear a trip; (4) an RTS hard reset drops the deferred settings write (SAT settings reverted after the flash, a /ReBoot kept them).
+
+Correction 2026-09-23 (evening): side finding (4) above is wrong as stated. A plain RTS hard reset (esptool read_mac) keeps pending settings (marker satsensormaxage=120 survived). The real symptom: an app-only USB flash (flash_otgw.bat --update --app) resets the SAT keys in /settings.ini to compiled defaults, reproduced twice, while OTD/MQTT keys in the same file survive and the file itself is rewritten. Tracked as its own task.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
