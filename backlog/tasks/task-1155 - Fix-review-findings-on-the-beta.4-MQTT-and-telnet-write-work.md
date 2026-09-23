@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 05:26'
-updated_date: '2026-09-23 05:27'
+updated_date: '2026-09-23 05:51'
 labels:
   - bug
 dependencies: []
@@ -27,11 +27,11 @@ Self-review of TASK-1148 and TASK-1154 after beta.4 shipped found five defects.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every desync remedy site increments mqtt_desync_drops, through one shared helper, verified by a grep that finds no bare desync disconnect left
-- [ ] #2 The inert SimpleTelnet retry is removed rather than left in place, behaviour-neutral, with the honest byte count and the drop counter kept
-- [ ] #3 writeMqttChunk and writeMqttProgmemChunk can no longer hold the loop for more than one socket timeout
-- [ ] #4 The false re-entrancy claim is corrected in code comments and CLAUDE.md, with the evidence cited
-- [ ] #5 Both counters are uint32_t
-- [ ] #6 CHANGELOG and the TASK-1148 and TASK-1154 records no longer overclaim
-- [ ] #7 python build.py --firmware exits 0, python evaluate.py --quick shows no new failures, and the host tests pass
+- [x] #1 Every desync remedy site increments mqtt_desync_drops, through one shared helper, verified by a grep that finds no bare desync disconnect left
+- [x] #2 The inert SimpleTelnet retry is removed rather than left in place, behaviour-neutral, with the honest byte count and the drop counter kept
+- [x] #3 writeMqttChunk and writeMqttProgmemChunk can no longer hold the loop for more than one socket timeout
+- [x] #4 The false re-entrancy claim is corrected in code comments and CLAUDE.md, with the evidence cited
+- [x] #5 Both counters are uint32_t
+- [x] #6 CHANGELOG and the TASK-1148 and TASK-1154 records no longer overclaim
+- [x] #7 python build.py --firmware exits 0, python evaluate.py --quick shows no new failures, and the host tests pass
 <!-- AC:END -->
