@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 21:15'
-updated_date: '2026-09-23 05:50'
+updated_date: '2026-09-23 18:09'
 labels:
   - bug
 dependencies:
@@ -123,6 +123,8 @@ CORRECTION (TASK-1155, 2026-09-23). As shipped in beta.4, mqtt_desync_drops coun
 Consequence for the field measurement asked of mrfox7688 on GH #682: on beta.4 a low desync count is not evidence, because most sites did not count. The reading guidance also changes: with discovery included, a healthy boot shows a few dozen sndbuf deferrals (about 59 on the bench), so the stall signal is the count still climbing after boot settles, not its absolute value.
 
 Also fixed there: writeMqttChunk could hold the loop for up to ten 5 s write timeouts; now bounded to one, measured longest unresponsive gap 4.9 s.
+
+2026-09-23: jaronbor (GH #682) meldt op beta.3 geen malformed packets meer, wel een periode met veel disconnects (07:01 "exceeded timeout" = broker-keepalive verlopen, daarna 3x plain "disconnected" binnen 3 min), met dagen ertussen zonder problemen. Wacht op beta.5. mrfox7688: flash van beta.4 mislukt, OTGW bleef hangen; kan capture-script niet draaien want macOS (capture-otgw.sh zit wel in de flash-bundle zip, onder capture/).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
