@@ -3,11 +3,11 @@ id: TASK-1146
 title: >-
   Fix: port 25238 discards the first command after connect, breaking the HA
   opentherm_gw integration
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-21 18:58'
-updated_date: '2026-09-22 17:17'
+updated_date: '2026-09-24 16:41'
 labels:
   - bug
 dependencies: []
@@ -37,7 +37,7 @@ Scope note: the fix lands inside the vendored SimpleTelnet submodule. There is n
 - [x] #2 Home Assistant's opentherm_gw integration completes setup against socket://<ip>:25238 without cannot_connect
 - [x] #3 The telnet debug console on port 23 still discards telnet negotiation on connect (no regression)
 - [x] #4 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
-- [ ] #5 petrister confirms on a beta build that the HA integration connects
+- [x] #5 petrister confirms on a beta build that the HA integration connects
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -139,4 +139,6 @@ Build green (1.7.6-beta.4+b6b3c98, firmware and filesystem). Evaluator 38 checks
 ## Blocking AC
 
 AC #5 requires petrister to confirm on a beta build. Not self-verifiable, so the task stays In Progress until he reports back on GH #685.
+
+Field confirmation (AC #5): petrister on GH #685, 2026-09-23 18:13 UTC, on v1.7.6-beta.4 with HA 2026.8.3 / pyotgw 2.2.3: the opentherm_gw config flow completed on the first attempt, 187 entities loaded, live climate values, no errors in the HA log. Hardware: Nodo OTGW, PIC gateway 6.8, Intergas Kombi Kompakt HRE 28/24 A, Honeywell T87M. Issue closed by the maintainer 2026-09-24.
 <!-- SECTION:FINAL_SUMMARY:END -->
