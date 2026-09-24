@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 21:15'
-updated_date: '2026-09-23 18:09'
+updated_date: '2026-09-24 16:41'
 labels:
   - bug
 dependencies:
@@ -125,6 +125,9 @@ Consequence for the field measurement asked of mrfox7688 on GH #682: on beta.4 a
 Also fixed there: writeMqttChunk could hold the loop for up to ten 5 s write timeouts; now bounded to one, measured longest unresponsive gap 4.9 s.
 
 2026-09-23: jaronbor (GH #682) meldt op beta.3 geen malformed packets meer, wel een periode met veel disconnects (07:01 "exceeded timeout" = broker-keepalive verlopen, daarna 3x plain "disconnected" binnen 3 min), met dagen ertussen zonder problemen. Wacht op beta.5. mrfox7688: flash van beta.4 mislukt, OTGW bleef hangen; kan capture-script niet draaien want macOS (capture-otgw.sh zit wel in de flash-bundle zip, onder capture/).
+
+2026-09-24: jaronbor (GH #682) on beta.5, screenshots at uptime 00:24 and 02:07 (boot ~19:54): mqtt_sndbuf_skips 71 -> 235, mqtt_desync_drops 0, hd_drip_cooldown_skip 47 -> 231, disc_pending_ids 0, WiFi 92-94%, heap stable, mqttconnected true. The two Mosquitto "disconnected" lines (19:51:27, 19:52:16) predate the 19:54 boot, so they fall in the flash window; no later disconnects posted.
+Reading: desync 0 = no half-written frame reached the link. hd_drip_cooldown_skip counts drip ticks in the post-burst cooldown BEFORE the pending check (MQTTstuff.ino:1751), so with pending 0 it counts idle ticks and is harmless. Hypothesis (unverified): sndbuf skips track Status bursts on a busy bus, not a stalling link. That contradicts the guidance given on #682 ("climbing after boot = stalling link"). Open question: a deferred value publish is a lost update; 164 in 1h43m may mean HA misses values. Needs a bench measurement with real bus traffic (simulator), which the beta.5 bench runs never had.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
