@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-23 19:11'
-updated_date: '2026-09-23 20:24'
+updated_date: '2026-09-24 16:41'
 labels:
   - feature
   - tooling
@@ -98,6 +98,8 @@ Behaviour changes against the previous capture-otgw.sh 1.x:
 - No early abort when nothing is reachable: it keeps retrying, as the Windows script does, with a status line per attempt.
 
 Extras on top of the Windows script: -Serial [dev] with -Baud (usb-serial.log, CR strip, timestamps, baud-mismatch warning; the Windows side has capture-usb-serial.bat) and -ProbeSeconds (probe.log).
+
+2026-09-24: mrfox7688 (GH #682) reports the 2.0.0 capture script works on his Mac. First real macOS confirmation of the BSD-userland paths that were review-only.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
