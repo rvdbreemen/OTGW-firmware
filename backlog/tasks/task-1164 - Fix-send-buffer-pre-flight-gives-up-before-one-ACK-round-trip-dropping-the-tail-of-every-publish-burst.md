@@ -3,9 +3,11 @@ id: TASK-1164
 title: >-
   Fix: send-buffer pre-flight gives up before one ACK round trip, dropping the
   tail of every publish burst
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-24 20:01'
+updated_date: '2026-09-24 20:02'
 labels:
   - bug
   - mqtt
