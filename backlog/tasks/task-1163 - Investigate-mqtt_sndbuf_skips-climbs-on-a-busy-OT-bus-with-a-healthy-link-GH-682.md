@@ -3,9 +3,11 @@ id: TASK-1163
 title: >-
   Investigate: mqtt_sndbuf_skips climbs on a busy OT bus with a healthy link (GH
   #682)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-24 18:36'
+updated_date: '2026-09-24 18:36'
 labels:
   - bug
   - mqtt
