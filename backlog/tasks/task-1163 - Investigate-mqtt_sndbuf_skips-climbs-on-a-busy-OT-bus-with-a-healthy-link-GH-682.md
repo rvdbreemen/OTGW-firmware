@@ -3,11 +3,11 @@ id: TASK-1163
 title: >-
   Investigate: mqtt_sndbuf_skips climbs on a busy OT bus with a healthy link (GH
   #682)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-24 18:36'
-updated_date: '2026-09-24 19:09'
+updated_date: '2026-09-24 20:00'
 labels:
   - bug
   - mqtt
@@ -30,7 +30,7 @@ On beta.5 jaronbor (GH #682) reports mqtt_sndbuf_skips 71 -> 235 over 1h43m with
 - [x] #1 Skip rate measured on the bench gateway with simulated OT bus traffic, with the gateway publishing to a broker that is subscribed to losslessly
 - [x] #2 For each deferred publish it is established from code whether the value is lost, retried, or republished later (on-change, heartbeat, discovery drip), with file:line
 - [x] #3 Measured: whether values published by the device differ from what a lossless broker subscription received during the run (lost updates counted)
-- [ ] #4 Conclusion and next step posted on GH #682, stated as measured fact or explicitly as hypothesis
+- [x] #4 Conclusion and next step posted on GH #682, stated as measured fact or explicitly as hypothesis
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -56,3 +56,16 @@ This is a regression introduced by TASK-1154. Before it, beginPublish() blocked 
 
 Relevance to GH #682: jaronbor ~1.6 skips/min is consistent with the 5-minute burst tail (8 per block); nothing in his data points at a stalling link.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+mqtt_sndbuf_skips climbing on a healthy link (GH #682) is explained, measured, and reported.
+
+- Bench (simulated busy bus, lossless broker subscription, 17m45s): 484 of 484 OT value updates arrived on time, desync 0. OT values are not affected.
+- Source: do5minevent() publishes ~30 topics in one burst; mqttFrameFitsSndbuf() gives up after 10 yield() calls, shorter than one ACK round trip, so the tail (otgw-pic/settings/*, ~12 topics) is dropped every 5 minutes; the hourly heapdiag burst loses its tail the same way. Non-OT publishes have no retry.
+- This is a regression from TASK-1154: before it, beginPublish() blocked briefly and these topics arrived.
+- Correction to the earlier "stalling link" guidance and the measured conclusion are posted on GH #682.
+
+Follow-up: fix (time-bounded pre-flight wait with a short back-off after a deferral) is proposed, not yet approved or implemented.
+<!-- SECTION:FINAL_SUMMARY:END -->
