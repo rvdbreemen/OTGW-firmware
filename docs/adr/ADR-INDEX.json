@@ -3279,6 +3279,71 @@
         ],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-097",
+      "title": "Allow two writers on port 25238 by forwarding each command line to the PIC whole",
+      "path": "ADR-097-allow-two-writers-on-port-25238-by-forwarding-each-command-line-to-the-pic-whole.md",
+      "format": "madr",
+      "status": "Proposed",
+      "date": "2026-09-26",
+      "decision_summary": "Chosen option: Option C, decided by the maintainer on 2026-09-26, because it is the only option that lets two command...",
+      "topics": [
+        "command-framing",
+        "multi-client",
+        "port-25238",
+        "ser2net",
+        "serial-bridge"
+      ],
+      "aliases": [
+        "command splicing",
+        "otmonitor port",
+        "two clients on 25238"
+      ],
+      "components": [
+        "OTGWstream inbound path (port 25238 to PIC)",
+        "SimpleTelnet per-slot read API"
+      ],
+      "symbols": [
+        "availableFrom",
+        "OTGW_NET_LINE_ATOMIC",
+        "OTGWstream",
+        "readFrom"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Forward a network command to the PIC only once its line is complete, in one write, from one client's buffer.",
+          "Keep one line buffer per slot, so one client's partial line can never reach another client's command.",
+          "Discard, never truncate-and-forward, a line that overflows its buffer.",
+          "Keep the PIC-to-client passthrough of ADR-095 unchanged."
+        ],
+        "must_not": [
+          "Forward network bytes to the PIC one at a time as they arrive.",
+          "Share a single line buffer between slots.",
+          "Raise the slot count above two without a new ADR that measures the heap cost."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "OTGWNETLINEATOMIC is present in src/OTGW-firmware/OTGW-Core.ino (Enforcement block below).",
+          "The bench test in Confirmation, recorded in the implementing task."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/OTGW-Core.ino"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": "OTGW_NET_LINE_ATOMIC",
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -5050,7 +5115,7 @@
       "source": "ADR-070",
       "target": "ADR-097",
       "type": "related",
-      "resolved": false
+      "resolved": true
     },
     {
       "source": "ADR-071",
@@ -5098,7 +5163,7 @@
       "source": "ADR-071",
       "target": "ADR-097",
       "type": "related",
-      "resolved": false
+      "resolved": true
     },
     {
       "source": "ADR-071",
@@ -5775,6 +5840,12 @@
     {
       "source": "ADR-096",
       "target": "ADR-050",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-097",
+      "target": "ADR-095",
       "type": "related",
       "resolved": true
     }

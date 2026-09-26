@@ -101,3 +101,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-094 | Accepted | `src/OTGW-firmware/**`, `src/OTGW-firmware/dhwWaterMeter.ino` | Chosen option: Option A, because a reader who lands on ADR-093 through the index has no way to know that six of its c... |
 | ADR-095 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option A, because the defect was never a disagreement about the right behaviour. |
 | ADR-096 | Accepted | `src/**/*.{ino,cpp,h,js}` | Chosen option: Option A, because it is what the firmware already does, the maintainer confirms it was intended, and t... |
+| ADR-097 | Proposed | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option C, decided by the maintainer on 2026-09-26, because it is the only option that lets two command... |
