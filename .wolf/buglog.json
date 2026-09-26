@@ -2695,5 +2695,75 @@
       "TASK-1135",
       "TASK-1144"
     ]
+  },
+  {
+    "id": "bug-154",
+    "timestamp": "2026-09-23T08:40:00",
+    "error_message": "After a SAT safety trip on OT-Direct, telnet shows 'CS= refused, SAT owns the control setpoint' and the MsgID 1 override stays pinned at SAT's last setpoint",
+    "file": "src/OTGW-firmware/SATcontrol.ino",
+    "root_cause": "Ownership gate (TASK-1150) refuses unmarked CS=; only satEnqueueIfChangedCS set the in-flight marker, the three CS=0 releases called addCommandToQueue directly, and a trip leaves bEnabled true",
+    "fix": "satEnqueueOwnCS() helper; every SAT CS= goes through it (alpha.372, 29288c815). Bench A/B confirmed",
+    "tags": [
+      "sat",
+      "otdirect",
+      "tset",
+      "msgid1",
+      "safety-trip",
+      "marker",
+      "adr-179"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-23T08:40:00"
+  },
+  {
+    "id": "bug-155",
+    "timestamp": "2026-09-23T22:30:00",
+    "error_message": "POST /api/v2/sat/enable/1 without body disabled SAT (HTTP 200) right after a settings POST",
+    "file": "src/OTGW-firmware/webServerCompat.h",
+    "root_cause": "g_requestBody owned by request pointer, never cleared; body-less request at reused heap address read the stale body (ABA)",
+    "fix": "hasBodyCompat()/bodyCompat() also require contentLength()>0 (TASK-1158, alpha.373)",
+    "tags": [
+      "rest",
+      "async",
+      "aba",
+      "body"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-23T22:30:00"
+  },
+  {
+    "id": "bug-156",
+    "timestamp": "2026-09-23T22:30:00",
+    "error_message": "Toggling SAT off/on on the settings page left a safety trip set",
+    "file": "src/OTGW-firmware/settingStuff.ino",
+    "root_cause": "only satHandleEnabled() cleared the trip; updateSetting(SATenabled) did not",
+    "fix": "satClearSafetyTrip() called on false->true transition after setup (TASK-1159, alpha.374)",
+    "tags": [
+      "sat",
+      "safety-trip",
+      "settings"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-23T22:30:00"
+  },
+  {
+    "id": "bug-157",
+    "timestamp": "2026-09-23T22:30:00",
+    "error_message": "SAT kept regulating 10+ min on the last room temp after the thermostat went quiet",
+    "file": "src/OTGW-firmware/SATcontrol.ino",
+    "root_cause": "OTcurrentSystemState.Tr never expires",
+    "fix": "thermostat-sourced MsgID 24 stamps iTrThermostatMs; stale after 5 min -> NaN -> skip/trip chain (TASK-1157, alpha.375)",
+    "tags": [
+      "sat",
+      "tr",
+      "staleness",
+      "safety"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-23T22:30:00"
   }
 ]

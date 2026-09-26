@@ -1,7 +1,44 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-08-24T04:00:14.094Z
-> Files: 538 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-09-23T22:08:15.612Z
+> Files: 600 tracked | Anatomy hits: 0 | Misses: 0
+
+## ../../../Claude/Projects/Kluis/01-raw/sessies/
+
+- `raw-sessie-2026-09-22-otgw-discord-backlog-naar-taken-met-bewijs.md` — Sessie-log 2026-09-22 (~1860 tok)
+- `raw-sessie-2026-09-23-otgw-bench-round-flashtool-settings-rollback.md` — Sessie-log 2026-09-23 (~1670 tok)
+
+## ../../../Claude/Projects/Kluis/02-wiki/
+
+- `aba-bij-pointer-eigenaarschap-van-requestbuffers.md` — ABA bij pointer-eigenaarschap van request-buffers (~682 tok)
+- `community-labels-gesleuteld-op-id-overleven-herclustering-niet.md` — Community-labels gesleuteld op ID overleven herclustering niet (~1040 tok)
+- `dependency-vrij-browserharnas-via-cdp.md` — Dependency-vrij browserharnas via CDP (~1195 tok)
+- `discord-bot-publiceert-geen-bestanden.md` — Een Discord-bot publiceert geen bestanden zonder Manage Webhooks (~883 tok)
+- `eigenaarschapsmarker-via-een-helper.md` — Een eigenaarschapsmarker hoort in één helper (~688 tok)
+- `fix-bij-het-startpunt-plus-statische-gate.md` — Fix bij het startpunt plus een statische gate (~879 tok)
+- `fixture-die-de-bug-bevestigt.md` — Fixture die de bug bevestigt (~1858 tok)
+- `needs-info-label-bewijst-geen-gestelde-vraag.md` — Een needs-info-label bewijst niet dat er een vraag is gesteld (~573 tok)
+- `schijnbaar-nondeterminisme-zit-buiten-het-apparaat.md` — Schijnbaar nondeterminisme zit vaak buiten het apparaat (~909 tok)
+- `taakpremissen-verifieren-voor-je-fixt.md` — Taakpremissen verifieren voor je fixt (~1812 tok)
+- `timeout-venster-tegen-nooit-gezette-stempel-voor-kloksync.md` — Een timeout-venster tegen een nooit-gezette stempel is vóór kloksync waar (~1478 tok)
+
+## ../../../Claude/Projects/Kluis/graphify-out/
+
+- `.graphify_chunk_01.json` (~9025 tok)
+- `.graphify_chunk_02.json` (~14074 tok)
+- `.graphify_chunk_03.json` (~8448 tok)
+- `.graphify_chunk_04.json` (~12079 tok)
+- `.graphify_chunk_05.json` (~11278 tok)
+- `.graphify_chunk_06.json` (~8082 tok)
+- `.graphify_chunk_07.json` (~13465 tok)
+- `.graphify_chunk_08.json` (~8885 tok)
+- `.graphify_chunk_09.json` (~8984 tok)
+- `.graphify_chunk_10.json` (~8098 tok)
+- `.graphify_chunk_11.json` — Declares for (~7715 tok)
+- `.graphify_chunk_12.json` (~8091 tok)
+- `.graphify_chunk_13.json` (~7494 tok)
+- `.graphify_chunk_14.json` (~11458 tok)
+- `.graphify_chunk_15.json` (~6585 tok)
 
 ## ./
 
@@ -18,11 +55,11 @@
 - `build.py` — Colors: asset_slug, disable, print_step, print_success + 7 more (~33360 tok)
 - `build.sh` (~1576 tok)
 - `CHANGELOG.md` — Change log (~8497 tok)
-- `CLAUDE.md` — OpenWolf (~11430 tok)
+- `CLAUDE.md` — OpenWolf (~11638 tok)
 - `config.py` — Base Paths (~268 tok)
 - `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 more (~48699 tok)
 - `flash_esp.py` — Colors: disable, print_header, print_success, print_error + 10 more (~10963 tok)
-- `flash_otgw.bat` (~3987 tok)
+- `flash_otgw.bat` (~4180 tok)
 - `flash_otgw.sh` — flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware (Linux/macOS) (~3385 tok)
 - `LICENSE` — Project license (~9374 tok)
 - `Makefile` — Make build targets (~2037 tok)
@@ -774,3 +811,58 @@
 - `main.py` — Primary application entrypoint. (~897 tok)
 - `parser.py` — Base option parser setup (~3951 tok)
 - `progress_bars.py` — SQLAlchemy model (~1345 tok)
+
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/f6696d17-a7fd-457e-a425-2c485a876eeb/scratchpad/
+
+- `bootwatch.py` — Watch a device through a reboot: wait until it goes down, then attach telnet (~458 tok)
+- `dmcp.py` — Minimal streamable-HTTP MCP client for the local discord-mcp server. (~412 tok)
+- `fix_chunk05.py` (~2200 tok)
+- `inidiff.py` — Compare two settings.ini snapshots key by key. (~278 tok)
+- `patch_chunk01.py` — -*- coding: utf-8 -*- (~7160 tok)
+- `resetstress.py` — TASK-1160 reproducer: set a unique marker, reset the chip after a variable delay, (~584 tok)
+- `residue-report.md` (~961 tok)
+- `step4.py` (~1018 tok)
+- `tcap.py` — Telnet capture with debug toggles driven by their echo. (~304 tok)
+- `trtest.py` — TASK-1157 bench test: wait for the replayed thermostat Tr write, stop the replay, (~769 tok)
+- `validate_chunk01.py` (~669 tok)
+- `validate_chunk05.py` (~582 tok)
+
+## docs/adr/
+
+- `ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md` — ADR-178 Widen the SAT area-sensor reference to accept a BLE MAC alongside a Dallas address (~2142 tok)
+- `ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md` — ADR-179 Name the owner of the OpenTherm control setpoint while SAT is enabled (~2634 tok)
+
+## docs/c4/
+
+- `c4-code-web-assets.md` — C4 Code Level: Web Assets Module (~11150 tok)
+
+## src/OTGW-firmware/
+
+- `OLED.ino` — Declares stack (~7113 tok)
+- `OTBustypes.h` (~536 tok)
+- `OTDirect.ino` — Declares instances (~42342 tok)
+- `OTGW-Core.ino` — Declares char (~83771 tok)
+- `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~12968 tok)
+- `OTGW-firmware.ino` — Declares WifiPortalResetState (~13772 tok)
+- `restAPI.ino` — include <string.h> (~60166 tok)
+- `SATble.ino` — Declares uint32_t (~15837 tok)
+- `SATcontrol.ino` — Declares float (~59619 tok)
+- `SATtypes.h` — Declares declaration (~10305 tok)
+- `settingStuff.ino` — include <ctype.h> (~22166 tok)
+- `webServerCompat.h` — Declares uint8_t (~5138 tok)
+
+## src/OTGW-firmware/data/
+
+- `index.js` — Safely parse JSON with validation and error handling (~110750 tok)
+- `sat.js` — API routes: GET (1 endpoints) (~16941 tok)
+- `v2.js` — fetchWithRetry: again, applyTheme, initTheme + 10 more (~84366 tok)
+
+## tests/
+
+- `README.md` — Project documentation (~899 tok)
+- `test_oled_row_clear.cpp` — TASK-1151 — OLED status rows must not keep the tail of longer previous text. (~1826 tok)
+
+## tests/webui/
+
+- `sat-area-sensor-mapping.test.mjs` — TASK-1153 — the SAT area-sensor mapping must offer BLE sensors, not DS18B20 only. (~2170 tok)
+- `sat-status-pill.test.mjs` — TASK-1152 regression guard: the SAT status pill must report BURNER ACTIVITY, (~3556 tok)

@@ -53,6 +53,8 @@
 - Concurrent edits to `v2.html`: `git diff -U1` to split coalesced hunks, filter foreign ones, `git apply --cached --unidiff-zero`.
 
 ## Do-Not-Repeat
+- [2026-09-23] Never `sed -i` a `.bat`/CRLF file from Git Bash: it stripped every CR from flash_otgw.bat and cmd failed with `'M' is not recognized`. Use the Edit tool, then check endings.
+- [2026-09-23] When a bench symptom looks nondeterministic, list what changed OUTSIDE the device between runs (build mode, contents of build/, tool args) before instrumenting firmware. TASK-1160 was flash_otgw.bat auto-adding a littlefs image, present only after full builds.
 - **2026-08-01**: Never trust a zero-refutation verify pass; never delete a `HAS_*` `#else`.
 - **2026-07-31**: Never analyse branch gaps against an unfetched tree.
 - **2026-06-24**: Never flip ADR status by replacing the first bare "Proposed" (corrupted 21 files).
