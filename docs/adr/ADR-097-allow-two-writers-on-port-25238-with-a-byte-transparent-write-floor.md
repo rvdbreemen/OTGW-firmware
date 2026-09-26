@@ -78,7 +78,13 @@ The bridge must stay byte transparent in both directions. ADR-095 (Accepted)
 enforces this for the PIC-to-client direction with the `OTGW_PASSTHRU_CHUNK`
 symbol. For the client-to-PIC direction the maintainer set the same requirement
 on 2026-09-26: every byte a client sends reaches the PIC unchanged, in order,
-without being added to, dropped, reframed or held for a line terminator. The
+without being added to, dropped, reframed or held for a line terminator. One
+reason is PIC firmware upgrades: flashing the PIC through OTmonitor over port
+25238 is discouraged but supported, and can work. OTmonitor, written by Schelte
+Bron, is the only tool proven to upgrade the PIC this way (maintainer,
+2026-09-26), so its upgrade traffic is the reference the design must carry. That traffic is binary, so it
+contains CR bytes and every other byte value, and a single foreign byte inserted
+into it can leave the PIC unbootable. The
 current inbound path already does that for one client
 (`src/OTGW-firmware/OTGW-Core.ino`, the `OTGWstream.available()` loop at about
 line 4841): each byte is written to the PIC as it is read
@@ -133,9 +139,14 @@ by the maintainer on 2026-09-26 because it reframes the client-to-PIC stream.
    * The other slot is not read at all while the floor is held. Its bytes stay in
      its own TCP receive buffer, so nothing is copied, reordered or dropped, and
      TCP flow control holds the sender back if it keeps sending.
-   * The floor is released after the holder sends CR (the end of a command),
-     after the holder has sent nothing for `OTGW_NET_FLOOR_IDLE_MS`, or when the
-     holder disconnects. Release happens only between bytes, never inside one.
+   * The floor is released only on silence or disconnect, never on the content
+     of the stream. A holder that has sent only printable ASCII, CR and LF since
+     taking the floor releases it after `OTGW_NET_FLOOR_IDLE_MS` without a byte.
+     Once the holder has sent any other byte value, the stream is treated as
+     binary (a PIC firmware upgrade) and the floor is released only after
+     `OTGW_NET_FLOOR_BINARY_IDLE_MS` without a byte, long enough to cover the
+     bootloader's pauses between blocks. A CR never releases the floor, because
+     a binary stream contains CR bytes. Release happens only between bytes.
    * The existing side effects keep observing the holder's stream as they do now.
    The rule is named by the symbol `OTGW_NET_WRITE_FLOOR` in the code.
 4. The PIC-to-client direction does not change and stays governed by ADR-095.
@@ -150,9 +161,13 @@ by the maintainer on 2026-09-26 because it reframes the client-to-PIC stream.
 * No interleaving: two clients send commands in a tight loop at the same time for
   several minutes; every command the PIC answers matches one client's command
   exactly, and the PIC reports no malformed command.
-* A client that holds the floor without sending CR releases it after
-  `OTGW_NET_FLOOR_IDLE_MS`, and the other client's command then goes through
-  intact.
+* A client that holds the floor releases it after `OTGW_NET_FLOOR_IDLE_MS` of
+  silence, and the other client's command then goes through intact.
+* A binary stream with pauses shorter than `OTGW_NET_FLOOR_BINARY_IDLE_MS`, and
+  containing CR bytes, keeps the floor from start to end while the second client
+  sends commands in a loop: the serial side receives the binary stream with no
+  foreign byte inside it. This is tested with a byte-pattern stream and the
+  serial side captured, never with a real PIC upgrade.
 * The Home Assistant `opentherm_gw` integration and a second tool connect at the
   same time and both work.
 * Heap after two clients have streamed for 30 minutes stays at the level measured
@@ -166,14 +181,16 @@ by the maintainer on 2026-09-26 because it reframes the client-to-PIC stream.
   and in order.
 * Read from only one slot at a time while the floor is held; leave the other
   slot's bytes unread in its socket.
-* Release the floor only between bytes: after CR, after
-  `OTGW_NET_FLOOR_IDLE_MS` of silence, or on disconnect.
+* Release the floor only between bytes, and only on silence
+  (`OTGW_NET_FLOOR_IDLE_MS`, or `OTGW_NET_FLOOR_BINARY_IDLE_MS` once the holder
+  has sent a non-text byte) or on disconnect.
 * Keep the PIC-to-client passthrough of ADR-095 unchanged.
 
 ### Must Not
 
 * Buffer, reframe, strip, add or delay client bytes on their way to the PIC.
 * Wait for a line terminator before forwarding a byte.
+* Release the floor because of a byte value, CR included.
 * Read two slots in the same pass while the floor is held.
 * Raise the slot count above two without a new ADR that measures the heap cost.
 
@@ -201,17 +218,23 @@ by the maintainer on 2026-09-26 because it reframes the client-to-PIC stream.
 
 ### Negative
 
-* While one client holds the floor, the other client's command waits: at most
-  until the holder's CR, or `OTGW_NET_FLOOR_IDLE_MS` after its last byte.
-  Mitigation: commands are short, and the idle timeout bounds the wait for a
-  client that never sends CR.
-* A holder that sends a continuous stream without CR and without pauses keeps
-  the floor for as long as it streams. Mitigation: no known client does this for
-  commands; binary transfers such as PIC flashing are already forbidden on this
-  port.
-* The value of `OTGW_NET_FLOOR_IDLE_MS` is a trade-off between the waiting
-  client's latency and splitting a holder's pause in the middle of a command. It
-  is set by measurement during implementation (see Open Questions).
+* While one client holds the floor, the other client's command waits until the
+  holder has been silent for `OTGW_NET_FLOOR_IDLE_MS`. Mitigation: commands are
+  short, and the idle timeout is small.
+* During a PIC firmware upgrade the other client cannot write at all, for the
+  whole transfer plus `OTGW_NET_FLOOR_BINARY_IDLE_MS`. That is the intent: its
+  commands would otherwise land inside the upgrade. Its output side still
+  receives the PIC's bytes, which during an upgrade are bootloader replies.
+* The text/binary distinction is a scheduling rule, not a filter: it never
+  changes a byte. Risk: a text client that sends a stray non-text byte holds the
+  floor for the long timeout once. Mitigation: that costs the other client up to
+  `OTGW_NET_FLOOR_BINARY_IDLE_MS` of delay, nothing more.
+* Risk: a bootloader pause longer than `OTGW_NET_FLOOR_BINARY_IDLE_MS` lets the
+  other client write mid-upgrade. Mitigation: the value is set with margin above
+  the longest pause measured in a real OTmonitor upgrade capture; flashing over
+  the network stays discouraged in the documentation.
+* The values of both timeouts are set by measurement during implementation (see
+  Open Questions).
 * Two tools can still send commands that contradict each other, for example two
   different setpoints. That is a configuration conflict between the tools, the
   same as before v1.7.5, and the firmware does not arbitrate it.
@@ -237,21 +260,27 @@ by the maintainer on 2026-09-26 because it reframes the client-to-PIC stream.
 
 * Good, because both tools work and interleaving is impossible.
 * Bad, because it reframes the client-to-PIC stream: bytes wait for CR, and data
-  without CR never reaches the PIC. Rejected by the maintainer: client-to-PIC
-  must be 100% byte transparent.
+  without CR never reaches the PIC, which breaks a PIC firmware upgrade. Rejected
+  by the maintainer: client-to-PIC must be 100% byte transparent.
 
 ### Option D: two writers with a write floor
 
 * Good, because both tools work, interleaving is impossible, and every byte stays
   transparent with no added buffer.
+* Good, because a binary upgrade stream keeps exclusive access to the PIC.
 * Bad, because a waiting client's command is delayed while the other holds the
-  floor, and an idle timeout has to be chosen.
+  floor, and two timeouts have to be chosen by measurement.
 
 ## Open Questions
 
 * [ ] What value should `OTGW_NET_FLOOR_IDLE_MS` have? Proposal: start at 100 ms
   and set it from the gap measured between bytes of one command from OTmonitor and
   the Home Assistant integration.
+* [ ] What value should `OTGW_NET_FLOOR_BINARY_IDLE_MS` have? Proposal: start at
+  3000 ms and set it with margin above the longest pause in an OTmonitor upgrade
+  capture (OTmonitor is the only proven network upgrade tool), taken without
+  flashing a PIC on this project's bench, for example by asking Schelte Bron for
+  the bootloader's worst-case block timing.
 
 ## Related Decisions
 

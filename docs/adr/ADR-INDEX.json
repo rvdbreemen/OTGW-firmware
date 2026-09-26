@@ -3316,12 +3316,13 @@
         "must": [
           "Forward every byte from the floor holder to the PIC as it is read, unchanged and in order.",
           "Read from only one slot at a time while the floor is held; leave the other slot's bytes unread in its socket.",
-          "Release the floor only between bytes: after CR, after OTGWNETFLOORIDLEMS of silence, or on disconnect.",
+          "Release the floor only between bytes, and only on silence (OTGWNETFLOORIDLEMS, or OTGWNETFLOORBINARYIDLEMS once the holder has sent a non-text byte) or on disconnect.",
           "Keep the PIC-to-client passthrough of ADR-095 unchanged."
         ],
         "must_not": [
           "Buffer, reframe, strip, add or delay client bytes on their way to the PIC.",
           "Wait for a line terminator before forwarding a byte.",
+          "Release the floor because of a byte value, CR included.",
           "Read two slots in the same pass while the floor is held.",
           "Raise the slot count above two without a new ADR that measures the heap cost."
         ],
