@@ -53,6 +53,14 @@ constexpr uint8_t MQTT_WRITE_MAX_RETRIES = 10;  // retry short TCP writes (yield
 // MQTT_WRITE_MAX_RETRIES times, with the PIC serial line undrained. Bound the whole
 // chunk write to one such timeout instead.
 constexpr uint32_t MQTT_WRITE_STALL_BUDGET_MS = 5000;
+// TASK-1164. How long the send-buffer pre-flight waits for tcp_sndbuf room before
+// deferring a publish. Room only comes back when the broker ACKs, so the wait has
+// to cover one ACK round trip including the broker's delayed ACK; a count of
+// yield() calls returns long before that and dropped the tail of every burst.
+constexpr uint32_t MQTT_SNDBUF_WAIT_MS = 200;
+// After a deferral, later publishes skip the wait for this long. A broker that has
+// stopped reading then costs one wait per burst instead of one per publish.
+constexpr uint32_t MQTT_SNDBUF_BACKOFF_MS = 1000;
 // Minimum free heap required before attempting a discovery publish.
 // Streaming HA discovery (ADR-042: streaming JSON, no ArduinoJson) only needs
 // ~200 bytes per chunk, so the historical 1200-byte floor is obsolete. Value
@@ -366,24 +374,38 @@ static size_t mqttFrameHeaderSize(size_t topicLen, size_t payloadLen)
 // rounds inside one blocking write(). The header is the half PubSubClient gives no
 // way to resume, and it is small enough that this check almost always passes.
 //
-// A momentarily full buffer is normal during a burst and drains in milliseconds, so
-// lwIP gets a bounded, non-blocking chance to drain (availableForWrite() never
-// blocks) before the publish is deferred. This lowers how often the disconnect
-// fires but cannot remove it: the reading is a snapshot and nothing reserves that
-// space until beginPublish() actually writes.
+// A full buffer is normal during a burst: room comes back when the broker ACKs,
+// which takes one round trip plus the broker's delayed ACK. The publish therefore
+// waits up to MQTT_SNDBUF_WAIT_MS of wall-clock time before it is deferred
+// (TASK-1164; a count of yield() calls returned before any ACK could arrive, and
+// the tail of each 5-minute burst was dropped). This lowers how often the
+// disconnect fires but cannot remove it: the reading is a snapshot and nothing
+// reserves that space until beginPublish() actually writes.
+//
+// A deferral starts a back-off in which the wait is skipped, so a broker that has
+// stopped reading stalls the loop once per burst, not once per publish.
 //
 // Shared by every publish path, including the discovery composers in
 // mqtt_configuratie.cpp, which is why it is not file-static.
 bool mqttFrameFitsSndbuf(const char *topic, size_t payloadLen)
 {
+  static uint32_t lastDeferMs = 0;
+  static bool     deferredOnce = false;
+
   const size_t frameLen = mqttFrameHeaderSize(strlen(topic), payloadLen);
   size_t avail = wifiClient.availableForWrite();
-  for (uint8_t i = 0; i < MQTT_WRITE_MAX_RETRIES && avail < frameLen; i++) {
-    feedWatchDog();
-    yield();
-    avail = wifiClient.availableForWrite();
+  const bool inBackoff = deferredOnce && (millis() - lastDeferMs) < MQTT_SNDBUF_BACKOFF_MS;
+  if (avail < frameLen && !inBackoff) {
+    const uint32_t start = millis();
+    while (avail < frameLen && (millis() - start) < MQTT_SNDBUF_WAIT_MS) {
+      feedWatchDog();
+      delay(1);   // not yield(): the loop has to sleep for lwIP to process the ACK
+      avail = wifiClient.availableForWrite();
+    }
   }
   if (avail < frameLen) {
+    lastDeferMs = millis();
+    deferredOnce = true;
     state.heapdiag.iMqttSndbufSkips++;
     MQTTDebugTf(PSTR("MQTT: deferring [%s], sndbuf %u < frame %u\r\n"),
                 topic, (unsigned)avail, (unsigned)frameLen);
