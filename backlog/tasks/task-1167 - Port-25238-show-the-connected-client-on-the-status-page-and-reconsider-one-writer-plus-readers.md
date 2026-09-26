@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-26 16:06'
+updated_date: '2026-09-26 16:20'
 labels:
   - feature
   - port-25238
@@ -59,4 +59,20 @@ The single-client rule exists because two writers spliced their bytes into one c
 - Build green 1.7.6-beta.7+1b0a1b7, evaluate 36/36, static RAM +60 B (DATA 3120->3124, BSS 39168->39224).
 - NOT verified on hardware: bench offline (TASK-1165). AC #3 (answer iandury_ and Schelte) waits for the maintainer's go and ideally for a validated build.
 - Nothing pushed: otgw-1.x.x also carries the unvalidated TASK-1164 fix.
+
+## Beta announcement text (maintainer-approved 2026-09-26; include verbatim in the next /beta-prerelease announcement, marked as a breaking change; do not post before the bench validation of AC #4/#5 passed)
+
+Breaking change: port 25238 (the legacy OTmonitor port) accepts two clients again.
+
+v1.7.5 limited the port to one client, because two tools writing at the same time could mix their bytes into one broken command for the PIC. That left anyone running Home Assistant or Domoticz next to OTmonitor stuck on v1.7.4.
+
+What changes in this beta:
+- Two clients can connect at the same time, for example the Home Assistant OpenTherm Gateway integration and OTmonitor. Both receive everything the PIC sends.
+- Only one client at a time can send to the PIC. It keeps that right until it has been quiet for 100 ms. The other client's command waits in the meantime and then goes through whole. Commands can no longer get mixed up.
+- Nothing is changed on the way through. Every byte a client sends reaches the PIC exactly as sent, in both directions. The port is still fully transparent.
+- A PIC firmware upgrade from OTmonitor over this port is protected. Once a client sends binary data, it keeps the right to send until it has been quiet for 3 seconds, so the other client cannot interrupt an upgrade. Upgrading the PIC over the network remains discouraged; the web interface's PIC flash page is the safer route.
+- A third connection is refused. If it comes from the same address as a client that is already connected, it replaces that client instead, so a tool that crashed and reconnects gets its place back.
+- The Device Info page and /api/v2/device/info now show how many clients are connected, their addresses, and the last address that was refused. If OTmonitor cannot connect, that tells you who holds the port.
+
+If you run two tools against port 25238, we would like to hear how it behaves.
 <!-- SECTION:NOTES:END -->
