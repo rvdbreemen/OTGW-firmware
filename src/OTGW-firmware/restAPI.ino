@@ -1382,6 +1382,13 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("mqtt_desync_drops"),         state.heapdiag.iMqttDesyncDrops);
   sendJsonMapEntry(F("telnet_tx_dropped"),         (uint32_t)debugTelnet.txDroppedTotal());
   sendJsonMapEntry(F("otgwstream_tx_dropped"),     (uint32_t)OTGWstream.txDroppedTotal());
+  // TASK-1167: who is on port 25238, and who was last turned away because every
+  // slot was taken. A refused OTmonitor looked exactly like a disabled port.
+  char streamClientIp[16] = {0};   // clientIP() keeps a stale address after a disconnect
+  if (OTGWstream.connectedCount()) strlcpy(streamClientIp, OTGWstream.clientIP(0), sizeof(streamClientIp));
+  sendJsonMapEntry(F("otgwstream_clients"),        (uint32_t)OTGWstream.connectedCount());
+  sendJsonMapEntry(F("otgwstream_client_ip"),      streamClientIp);
+  sendJsonMapEntry(F("otgwstream_last_refused_ip"), OTGWstream.getLastAttemptIP());
 
   sendEndJsonMap(F("device"));
 
