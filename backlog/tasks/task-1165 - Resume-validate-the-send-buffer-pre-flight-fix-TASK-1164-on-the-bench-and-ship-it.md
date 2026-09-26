@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-26 14:47'
-updated_date: '2026-09-26 15:05'
+updated_date: '2026-09-26 16:47'
 labels:
   - bug
   - mqtt
@@ -69,4 +69,6 @@ TASK-1163 (Done) measured that mqttFrameFitsSndbuf() gave up after 10 yield() ca
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-09-26: GH #682 mrfox7688 reports a corrupted TSet payload (10.à
+
+2026-09-26: the unvalidated work (TASK-1164 fix, TASK-1167 write floor + status fields, ADR-066/083/097 changes) is pushed to the separate branch origin/otgw-1.x.x-pending-bench-validation (f87d93bde), NOT to origin/otgw-1.x.x. SimpleTelnet per-slot API pushed as origin/feat/per-slot-read (e8d01df) in rvdbreemen/SimpleTelnet. Local otgw-1.x.x still carries the same commits ahead of origin; merge the pending branch into otgw-1.x.x only after the bench validation passes.
 <!-- SECTION:NOTES:END -->
