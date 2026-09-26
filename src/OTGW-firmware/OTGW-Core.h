@@ -15,17 +15,15 @@
 #define OTGWCore_h
 
 // OTGW Serial 2 network port
-// SimpleTelnet<1> in streaming mode — drop-in replacement for TelnetStreamClass
-// ONE client. This port is a bidirectional serial bridge, and the library has no
-// per-client stream identity: read() returns a bare int, and available()/read()
-// serve whichever slot has data. Two clients writing at once therefore splice
-// into one PIC command stream, so client A's half-line and client B's line
-// concatenate into a single malformed command. One slot removes that failure
-// mode (TASK-1115). The slot was <2> for "HA + one debug consumer"; a passive
-// second consumer is now refused too, because the library cannot tell a reader
-// from a writer.
+// SimpleTelnet<2> in streaming mode — drop-in replacement for TelnetStreamClass
+// TWO clients (ADR-097), for example Home Assistant plus OTmonitor. Both receive
+// every byte from the PIC. Toward the PIC, handleOTGW() reads one slot at a time
+// through availableFrom()/readFrom() under a write floor, so two writers can
+// never interleave their bytes into one malformed command, and every byte still
+// reaches the PIC unchanged.
 #define OTGW_SERIAL_PORT 25238     // changed the port to original default of OTmonitor
-SimpleTelnet<1> OTGWstream(OTGW_SERIAL_PORT);
+constexpr uint8_t OTGW_NET_SLOTS = 2;
+SimpleTelnet<OTGW_NET_SLOTS> OTGWstream(OTGW_SERIAL_PORT);
 
 //Depends on the library 
 #define OTGW_COMMAND_TOPIC "command"

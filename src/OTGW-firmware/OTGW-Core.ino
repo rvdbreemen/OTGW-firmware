@@ -4705,6 +4705,17 @@ static void forwardDiagnoseChunk(const uint8_t *data, uint8_t len) {
   sendLogToWebSocket(frame);
 }
 
+// Write floor for port 25238 (ADR-097). Starting values, to be confirmed by
+// measurement: the text timeout must exceed the gap between the bytes of one
+// command, the binary timeout the longest pause of the PIC bootloader between
+// blocks during an OTmonitor upgrade.
+constexpr uint32_t OTGW_NET_FLOOR_IDLE_MS        = 100;
+constexpr uint32_t OTGW_NET_FLOOR_BINARY_IDLE_MS = 3000;
+static int8_t   netFloorSlot       = -1;     // slot that may write to the PIC, -1 = free
+static uint8_t  netFloorLastHolder = OTGW_NET_SLOTS - 1;
+static bool     netFloorBinary     = false;  // holder has sent a non-text byte
+static uint32_t netFloorLastByteMs = 0;
+
 void handleOTGW()
 {
   //handle serial communication and line processing
@@ -4838,8 +4849,43 @@ void handleOTGW()
   // of milliseconds and starve MQTT/WS/HTTP. Static sWrite/bytes_write state
   // again forbids yielding inside the loop.
   uint8_t netLinesProcessed = 0;
-  while (OTGWstream.available() && netLinesProcessed < HANDLE_OTGW_LINES_PER_CALL){
-    outByte = OTGWstream.read();  // read from port 25238
+
+  // OTGW_NET_WRITE_FLOOR (ADR-097): two clients may be connected, but only one
+  // may write to the PIC at a time. The holder's bytes go to the PIC exactly as
+  // before, one by one and unchanged; the other slot is simply not read, so its
+  // bytes wait untouched in its own TCP buffer. The floor is released only on
+  // silence or disconnect, never on a byte value: a PIC upgrade from OTmonitor
+  // is binary and contains CR bytes, and a second client's byte landing inside
+  // it can leave the PIC unbootable. Once the holder sends a non-text byte the
+  // stream counts as binary and gets the long idle timeout.
+  if (netFloorSlot >= 0) {
+    const uint32_t idleLimit = netFloorBinary ? OTGW_NET_FLOOR_BINARY_IDLE_MS : OTGW_NET_FLOOR_IDLE_MS;
+    if (!OTGWstream.isSlotActive(netFloorSlot)
+        || (OTGWstream.availableFrom(netFloorSlot) == 0 && (millis() - netFloorLastByteMs) >= idleLimit)) {
+      netFloorSlot = -1;
+      bytes_write = 0;   // the command observer starts clean for the next holder
+    }
+  }
+  if (netFloorSlot < 0) {
+    // Start the search after the previous holder, so two busy clients alternate.
+    for (uint8_t n = 1; n <= OTGW_NET_SLOTS; n++) {
+      const uint8_t idx = (uint8_t)((netFloorLastHolder + n) % OTGW_NET_SLOTS);
+      if (OTGWstream.availableFrom(idx) > 0) {
+        netFloorSlot = (int8_t)idx;
+        netFloorLastHolder = idx;
+        netFloorBinary = false;
+        netFloorLastByteMs = millis();
+        break;
+      }
+    }
+  }
+
+  while (netFloorSlot >= 0 && OTGWstream.availableFrom(netFloorSlot) > 0 && netLinesProcessed < HANDLE_OTGW_LINES_PER_CALL){
+    outByte = OTGWstream.readFrom(netFloorSlot);  // read from port 25238, floor holder only
+    netFloorLastByteMs = millis();
+    if (!((outByte >= 0x20 && outByte <= 0x7E) || outByte == '\r' || outByte == '\n')) {
+      netFloorBinary = true;
+    }
     if (!state.debug.bOTGWSimulation) {
       OTGWSerial.write(outByte);    // write to serial port
     }

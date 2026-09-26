@@ -5643,7 +5643,7 @@ var translateFields = [
   , ["hd_drip_burst_skip", "Discovery Drip Skipped (active burst)"]
   , ["hd_drip_cooldown_skip", "Discovery Drip Skipped (cooldown)"]
   , ["otgwstream_clients", "Port 25238: Connected Clients"]
-  , ["otgwstream_client_ip", "Port 25238: Client Address"]
+  , ["otgwstream_client_ip", "Port 25238: Client Addresses"]
   , ["otgwstream_last_refused_ip", "Port 25238: Last Refused Address"]
   , ["hd_drip_slowmode", "Discovery Drip Slow-mode (count)"]
   , ["disc_published_topics", "Discovery Topics Published"]

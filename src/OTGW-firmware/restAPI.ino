@@ -1384,8 +1384,18 @@ void sendDeviceInfoV2()
   sendJsonMapEntry(F("otgwstream_tx_dropped"),     (uint32_t)OTGWstream.txDroppedTotal());
   // TASK-1167: who is on port 25238, and who was last turned away because every
   // slot was taken. A refused OTmonitor looked exactly like a disabled port.
-  char streamClientIp[16] = {0};   // clientIP() keeps a stale address after a disconnect
-  if (OTGWstream.connectedCount()) strlcpy(streamClientIp, OTGWstream.clientIP(0), sizeof(streamClientIp));
+  // Addresses of the occupied slots, comma separated. isSlotActive() guards each
+  // one, because clientIP() keeps a stale address after a disconnect.
+  char streamClientIp[40] = {0};   // two dotted quads, a comma and the NUL
+  for (uint8_t i = 0; i < OTGW_NET_SLOTS; i++) {
+    if (!OTGWstream.isSlotActive(i)) continue;
+    const size_t len = strlen(streamClientIp);
+    if (len > 0 && len + 1 < sizeof(streamClientIp)) {
+      streamClientIp[len] = ',';
+      streamClientIp[len + 1] = '\0';
+    }
+    strlcat(streamClientIp, OTGWstream.clientIP(i), sizeof(streamClientIp));
+  }
   sendJsonMapEntry(F("otgwstream_clients"),        (uint32_t)OTGWstream.connectedCount());
   sendJsonMapEntry(F("otgwstream_client_ip"),      streamClientIp);
   sendJsonMapEntry(F("otgwstream_last_refused_ip"), OTGWstream.getLastAttemptIP());
