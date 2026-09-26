@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-26 15:11'
+updated_date: '2026-09-26 15:21'
 labels:
   - feature
   - port-25238
@@ -35,3 +35,19 @@ The single-client rule exists because two writers spliced their bytes into one c
 - [ ] #2 A decision is recorded on multi-client support (for example one writer plus N read-only clients), with the command-splicing risk addressed
 - [ ] #3 iandury_ and Schelte Bron are answered in #nederlandse-ondersteuning
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Part 1 (done, no ADR): device/info fields otgwstream_clients / _client_ip / _last_refused_ip + UI labels. Committed locally.
+2. ADR-097 Proposed (committed). WAIT for maintainer acceptance before any multi-client code.
+3. After acceptance: SimpleTelnet per-slot read API (availableFrom/readFrom/slot-active) on a library branch; OTGWstream -> SimpleTelnet<2>; per-slot line buffers, forward on CR as one write, discard overflow whole, side effects per line; OTGW_NET_LINE_ATOMIC symbol.
+4. Bench test per ADR-097 Confirmation (two concurrent writers, CR-less and overflow lines, HA + second tool, heap 30 min). Needs the bench back online (see TASK-1165).
+5. Answer iandury_ and Schelte in #nederlandse-ondersteuning (with maintainer go).
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-26: part 1 implemented and built (1.7.6-beta.7+a10e939, build green, evaluate 36/36); not verified on hardware because the bench 192.168.88.68 is offline (TASK-1165). Maintainer chose option C (two writers, whole-line forwarding); ADR-097 written as Proposed and awaiting review. Commits are local only: otgw-1.x.x also carries the unvalidated TASK-1164 fix, so nothing is pushed until that is validated.
+<!-- SECTION:NOTES:END -->
