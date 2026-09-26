@@ -1,8 +1,8 @@
 ---
 id: "ADR-066"
 title: "MQTT Publish Gating by Source and Per-MsgID Slave-Echo Classification"
-status: "Proposed"
-date: "2026-04-28"
+status: "Accepted"
+date: "2026-09-26"
 binding: true
 gate: "bSlaveEchoesValue"
 documents_shipped: true
@@ -39,7 +39,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-04-28.
+Accepted, 2026-09-26.
 
 Documents shipped behaviour: implemented in TASK-478 (live OpenTherm bus path)
 and TASK-483 (PS=1 summary path), extended by TASK-571 (MsgIDs 1 and 8). The text
@@ -57,6 +57,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal (TASK-478)
     changed_via: unrecorded
+  - date: 2026-09-26
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

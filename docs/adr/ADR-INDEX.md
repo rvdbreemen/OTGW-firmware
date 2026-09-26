@@ -70,7 +70,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-062 | Superseded | - | Introduce an active verification mechanism that: |
 | ADR-064 | Accepted | - | Each of the four helpers has exactly one call site in the entire firmware. |
 | ADR-065 | Accepted | - | The otgw-pic/ MQTT subtree is a stable public topic API. |
-| ADR-066 | Proposed | `src/OTGW-firmware/MQTTstuff.ino`, `src/OTGW-firmware/OTGW-Core.ino` | Never publish a Write-Ack value on canonical, and publish a boiler Write-Ack on the source topics only for MsgIDs who... |
+| ADR-066 | Accepted | `src/OTGW-firmware/MQTTstuff.ino`, `src/OTGW-firmware/OTGW-Core.ino` | Never publish a Write-Ack value on canonical, and publish a boiler Write-Ack on the source topics only for MsgIDs who... |
 | ADR-067 | Deprecated | - | The feature is removed from the firmware. |
 | ADR-068 | Superseded | - | bSeparateSources becomes a binary toggle: either base entities or source-variant entities are published for source-te... |
 | ADR-069 | Superseded | - | Adopt the worldview model for source-separated MQTT subtopics. |
