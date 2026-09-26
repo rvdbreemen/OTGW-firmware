@@ -1,7 +1,7 @@
 ---
 id: "ADR-097"
 title: "Allow two writers on port 25238 with a byte-transparent write floor"
-status: "Proposed"
+status: "Accepted"
 date: "2026-09-26"
 binding: false
 gate: "OTGW_NET_WRITE_FLOOR"
@@ -9,7 +9,6 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "madr"
 topics:
   - "serial-bridge"
   - "ser2net"
@@ -30,6 +29,7 @@ symbols:
   - "availableFrom"
   - "readFrom"
 context_scope: "selective"
+format: "madr"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -38,7 +38,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-09-26.
+Accepted, 2026-09-26.
 
 ## Status History
 
@@ -49,6 +49,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-09-26
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context and Problem Statement
@@ -273,10 +278,10 @@ by the maintainer on 2026-09-26 because it reframes the client-to-PIC stream.
 
 ## Open Questions
 
-* [ ] What value should `OTGW_NET_FLOOR_IDLE_MS` have? Proposal: start at 100 ms
+- [x] What value should `OTGW_NET_FLOOR_IDLE_MS` have? Proposal: start at 100 ms — **Answered 2026-09-26 by User: Robert van den Breemen:** 100 ms as the starting value; the implementing task measures the gap between bytes of one command from OTmonitor and the Home Assistant integration and adjusts it if that gap comes close.
   and set it from the gap measured between bytes of one command from OTmonitor and
   the Home Assistant integration.
-* [ ] What value should `OTGW_NET_FLOOR_BINARY_IDLE_MS` have? Proposal: start at
+- [x] What value should `OTGW_NET_FLOOR_BINARY_IDLE_MS` have? Proposal: start at — **Answered 2026-09-26 by User: Robert van den Breemen:** 3000 ms as the starting value; to be confirmed against the bootloader's worst-case block timing (ask Schelte Bron) or an OTmonitor upgrade capture, never by flashing a PIC on the bench.
   3000 ms and set it with margin above the longest pause in an OTmonitor upgrade
   capture (OTmonitor is the only proven network upgrade tool), taken without
   flashing a PIC on this project's bench, for example by asking Schelte Bron for

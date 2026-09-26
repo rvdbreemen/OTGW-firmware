@@ -3285,7 +3285,7 @@
       "title": "Allow two writers on port 25238 with a byte-transparent write floor",
       "path": "ADR-097-allow-two-writers-on-port-25238-with-a-byte-transparent-write-floor.md",
       "format": "madr",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-09-26",
       "decision_summary": "Chosen option: Option D, because it is the only option that lets two command-sending tools share the port while keepi...",
       "topics": [
