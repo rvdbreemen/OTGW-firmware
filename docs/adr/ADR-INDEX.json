@@ -2012,11 +2012,31 @@
       "format": "canonical",
       "status": "Proposed",
       "date": "2026-04-28",
-      "decision_summary": "Gate MQTT publication of OpenTherm Write-Ack values per topic-class:",
-      "topics": [],
-      "aliases": [],
-      "components": [],
-      "symbols": [],
+      "decision_summary": "Never publish a Write-Ack value on canonical, and publish a boiler Write-Ack on the source topics only for MsgIDs who...",
+      "topics": [
+        "mqtt",
+        "ps-summary",
+        "slave-echo",
+        "source-topics",
+        "write-ack"
+      ],
+      "aliases": [
+        "master-topic gate",
+        "non-echo MsgIDs",
+        "Write-Ack flapping"
+      ],
+      "components": [
+        "canonical MQTT value topics",
+        "PS=1 summary publish path",
+        "source-separated topics (_thermostat / _boiler)"
+      ],
+      "symbols": [
+        "bSlaveEchoesValue",
+        "check_ps_summary_master_topic_gate",
+        "is_msgid_valid_for_master_topic_in_ps_summary",
+        "is_value_valid_for_master_topic",
+        "publishToSourceTopic"
+      ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [],
@@ -2025,13 +2045,21 @@
         "verification": []
       },
       "scope": {
-        "path_globs": []
+        "path_globs": [
+          "src/OTGW-firmware/MQTTstuff.ino",
+          "src/OTGW-firmware/OTGW-Core.ino"
+        ]
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
-        "documents_shipped": false,
-        "verified_in": [],
+        "binding": true,
+        "gate": "bSlaveEchoesValue",
+        "documents_shipped": true,
+        "verified_in": [
+          "src/OTGW-firmware/OTGW-Core.ino",
+          "src/OTGW-firmware/MQTTstuff.ino",
+          "src/OTGW-firmware/OTGW-Core.h",
+          "evaluate.py"
+        ],
         "supersedes": [],
         "superseded_by": null
       }
@@ -2559,8 +2587,8 @@
       "title": "Per-Consumer Heap Gating (WebSocket vs MQTT decoupling)",
       "path": "ADR-083-per-consumer-heap-gating.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": null,
+      "status": "Rejected",
+      "date": "2026-09-26",
       "decision_summary": "Give each heap consumer its own threshold ladder while keeping a single shared CRITICAL out-of-memory floor.",
       "topics": [],
       "aliases": [],
@@ -4979,6 +5007,18 @@
     {
       "source": "ADR-066",
       "target": "ADR-052",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-066",
+      "target": "ADR-071",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-066",
+      "target": "ADR-075",
       "type": "related",
       "resolved": true
     },

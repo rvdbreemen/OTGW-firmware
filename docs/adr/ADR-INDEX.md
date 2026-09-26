@@ -70,7 +70,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-062 | Superseded | - | Introduce an active verification mechanism that: |
 | ADR-064 | Accepted | - | Each of the four helpers has exactly one call site in the entire firmware. |
 | ADR-065 | Accepted | - | The otgw-pic/ MQTT subtree is a stable public topic API. |
-| ADR-066 | Proposed | - | Gate MQTT publication of OpenTherm Write-Ack values per topic-class: |
+| ADR-066 | Proposed | `src/OTGW-firmware/MQTTstuff.ino`, `src/OTGW-firmware/OTGW-Core.ino` | Never publish a Write-Ack value on canonical, and publish a boiler Write-Ack on the source topics only for MsgIDs who... |
 | ADR-067 | Deprecated | - | The feature is removed from the firmware. |
 | ADR-068 | Superseded | - | bSeparateSources becomes a binary toggle: either base entities or source-variant entities are published for source-te... |
 | ADR-069 | Superseded | - | Adopt the worldview model for source-separated MQTT subtopics. |
@@ -87,7 +87,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-080 | Accepted | `src/OTGW-firmware/MQTTstuff.ino` | Accept the existing MQTTclient.setSocketTimeout(15) as a known synchronous blocker bounded by: |
 | ADR-081 | Accepted | - | Introduce a persisted boolean setting MQTTonChangePublishing (struct field settings.mqtt.bOnChangePublishing) with a... |
 | ADR-082 | Accepted | - | Decision maker: User: Robert van den Breemen (chose: cover ALL gateway override message types, not just Toutside; exp... |
-| ADR-083 | Proposed | - | Give each heap consumer its own threshold ladder while keeping a single shared CRITICAL out-of-memory floor. |
+| ADR-083 | Rejected | - | Give each heap consumer its own threshold ladder while keeping a single shared CRITICAL out-of-memory floor. |
 | ADR-084 | Rejected | - | Commit a unified-diff patch under patches/ and have build.py re-apply it to the freshly-installed ESP8266 core after... |
 | ADR-085 | Accepted | - | Surface a single unified off/heat/cool climate entity, driven by two new firmware-computed MQTT topics, with mode swi... |
 | ADR-086 | Accepted | `src/OTGW-firmware/**/*.ino`, `src/OTGW-firmware/restAPI.ino` | Enforce a per-endpoint request budget in the firmware for /api/v2/otgw/otmonitor and /api/v2/device/time, and answer... |

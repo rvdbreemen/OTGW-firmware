@@ -1,8 +1,8 @@
 ---
 id: "ADR-083"
 title: "Per-Consumer Heap Gating (WebSocket vs MQTT decoupling)"
-status: "Proposed"
-date: null
+status: "Rejected"
+date: "2026-09-26"
 binding: false
 gate: null
 documents_shipped: false
@@ -14,7 +14,23 @@ superseded_by: null
 
 ## Status
 
-Proposed
+Rejected, 2026-09-26.
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-06-02
+    status: Proposed
+    changed_by: unknown
+    reason: "Recovered from the record as it stood before this transition; this ADR predates the status_history convention. The actor was never recorded and is not guessed here. The Status line read: Proposed, 2026-06-02."
+    changed_via: unrecorded
+  - date: 2026-09-26
+    status: Rejected
+    changed_by: "User: Robert van den Breemen"
+    reason: "Not reproduced in four months: the only evidence was one device later suspected of faulty or clone hardware (TASK-779 notes, 2026-06-05), the telemetry that was to set the MQTT thresholds never arrived, and later heap work (ADR-091, ADR-092, rate limits) changed the picture. If WebSocket load starves MQTT again, a new ADR will be written from measurements."
+    changed_via: adr-kit lifecycle
+```
+
 
 Supersedes the single-ladder gating decision in ADR-030 (the four-level health system stays; this ADR changes *who* consults it).
 
