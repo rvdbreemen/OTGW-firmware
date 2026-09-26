@@ -3282,14 +3282,14 @@
     },
     {
       "id": "ADR-097",
-      "title": "Allow two writers on port 25238 by forwarding each command line to the PIC whole",
-      "path": "ADR-097-allow-two-writers-on-port-25238-by-forwarding-each-command-line-to-the-pic-whole.md",
+      "title": "Allow two writers on port 25238 with a byte-transparent write floor",
+      "path": "ADR-097-allow-two-writers-on-port-25238-with-a-byte-transparent-write-floor.md",
       "format": "madr",
       "status": "Proposed",
       "date": "2026-09-26",
-      "decision_summary": "Chosen option: Option C, decided by the maintainer on 2026-09-26, because it is the only option that lets two command...",
+      "decision_summary": "Chosen option: Option D, because it is the only option that lets two command-sending tools share the port while keepi...",
       "topics": [
-        "command-framing",
+        "binary-transparency",
         "multi-client",
         "port-25238",
         "ser2net",
@@ -3298,7 +3298,8 @@
       "aliases": [
         "command splicing",
         "otmonitor port",
-        "two clients on 25238"
+        "two clients on 25238",
+        "write floor"
       ],
       "components": [
         "OTGWstream inbound path (port 25238 to PIC)",
@@ -3306,29 +3307,30 @@
       ],
       "symbols": [
         "availableFrom",
-        "OTGW_NET_LINE_ATOMIC",
+        "OTGW_NET_WRITE_FLOOR",
         "OTGWstream",
         "readFrom"
       ],
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Forward a network command to the PIC only once its line is complete, in one write, from one client's buffer.",
-          "Keep one line buffer per slot, so one client's partial line can never reach another client's command.",
-          "Discard, never truncate-and-forward, a line that overflows its buffer.",
+          "Forward every byte from the floor holder to the PIC as it is read, unchanged and in order.",
+          "Read from only one slot at a time while the floor is held; leave the other slot's bytes unread in its socket.",
+          "Release the floor only between bytes: after CR, after OTGWNETFLOORIDLEMS of silence, or on disconnect.",
           "Keep the PIC-to-client passthrough of ADR-095 unchanged."
         ],
         "must_not": [
-          "Forward network bytes to the PIC one at a time as they arrive.",
-          "Share a single line buffer between slots.",
+          "Buffer, reframe, strip, add or delay client bytes on their way to the PIC.",
+          "Wait for a line terminator before forwarding a byte.",
+          "Read two slots in the same pass while the floor is held.",
           "Raise the slot count above two without a new ADR that measures the heap cost."
         ],
         "exceptions": [
           "None."
         ],
         "verification": [
-          "OTGWNETLINEATOMIC is present in src/OTGW-firmware/OTGW-Core.ino (Enforcement block below).",
-          "The bench test in Confirmation, recorded in the implementing task."
+          "OTGWNETWRITEFLOOR is present in src/OTGW-firmware/OTGW-Core.ino (Enforcement block below).",
+          "The bench tests in Confirmation, recorded in the implementing task."
         ]
       },
       "scope": {
@@ -3338,7 +3340,7 @@
       },
       "metadata": {
         "binding": false,
-        "gate": "OTGW_NET_LINE_ATOMIC",
+        "gate": "OTGW_NET_WRITE_FLOOR",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
