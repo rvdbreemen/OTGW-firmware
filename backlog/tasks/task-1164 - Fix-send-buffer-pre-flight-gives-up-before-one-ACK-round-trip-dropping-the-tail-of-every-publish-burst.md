@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-24 20:01'
-updated_date: '2026-09-26 14:33'
+updated_date: '2026-09-26 14:48'
 labels:
   - bug
   - mqtt
@@ -48,4 +48,6 @@ State:
 - The restore POSTs (broker back to homeassistant.local:1883) could NOT reach the device. Its setting still points at 192.168.88.32:1884, and the test broker is now stopped, so when the bench comes back it has no MQTT and Home Assistant gets no data from it until the broker setting is restored. Simulator state: stop POST also did not arrive; check /api/v2/simulate when back.
 
 Next when resumed: 1) bring the bench back (RTS recovery if needed), 2) restore broker + stop sim, 3) crashlog/reboot_log, 4) analyse sub1164.log, 5) rerun AC #1-#3.
+
+2026-09-26: continuation is TASK-1165 (resume task with full state, rig and next steps). Test artefacts copied to logs/task-1164-sndbuf/.
 <!-- SECTION:NOTES:END -->
