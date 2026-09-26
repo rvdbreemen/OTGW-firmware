@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-26 16:20'
+updated_date: '2026-09-26 16:47'
 labels:
   - feature
   - port-25238
@@ -75,4 +75,6 @@ What changes in this beta:
 - The Device Info page and /api/v2/device/info now show how many clients are connected, their addresses, and the last address that was refused. If OTmonitor cannot connect, that tells you who holds the port.
 
 If you run two tools against port 25238, we would like to hear how it behaves.
+
+2026-09-26: the unvalidated work (TASK-1164 fix, TASK-1167 write floor + status fields, ADR-066/083/097 changes) is pushed to the separate branch origin/otgw-1.x.x-pending-bench-validation (f87d93bde), NOT to origin/otgw-1.x.x. SimpleTelnet per-slot API pushed as origin/feat/per-slot-read (e8d01df) in rvdbreemen/SimpleTelnet. Local otgw-1.x.x still carries the same commits ahead of origin; merge the pending branch into otgw-1.x.x only after the bench validation passes.
 <!-- SECTION:NOTES:END -->
