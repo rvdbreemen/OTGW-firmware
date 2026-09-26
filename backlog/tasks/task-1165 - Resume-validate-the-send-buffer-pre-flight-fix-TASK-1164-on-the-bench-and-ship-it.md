@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-26 14:47'
+updated_date: '2026-09-26 15:05'
 labels:
   - bug
   - mqtt
@@ -63,3 +64,9 @@ TASK-1163 (Done) measured that mqttFrameFitsSndbuf() gave up after 10 yield() ca
 - [ ] #6 Test rig torn down and the bench restored at the end of the session, verified over telnet (broker line) and /api/v2/simulate
 - [ ] #7 TASK-1164 ACs checked and closed; the fix commit pushed to origin/otgw-1.x.x only after the above pass
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-26: GH #682 mrfox7688 reports a corrupted TSet payload (10.à
+<!-- SECTION:NOTES:END -->
