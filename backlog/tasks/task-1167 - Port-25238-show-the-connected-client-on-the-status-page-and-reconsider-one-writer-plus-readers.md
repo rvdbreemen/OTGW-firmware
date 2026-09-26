@@ -3,9 +3,11 @@ id: TASK-1167
 title: >-
   Port 25238: show the connected client on the status page, and reconsider one
   writer plus readers
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-26 15:04'
+updated_date: '2026-09-26 15:11'
 labels:
   - feature
   - port-25238
