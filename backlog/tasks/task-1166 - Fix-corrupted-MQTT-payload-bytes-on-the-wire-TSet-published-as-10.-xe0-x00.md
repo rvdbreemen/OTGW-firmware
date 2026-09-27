@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 07:45'
+updated_date: '2026-09-27 07:48'
 labels:
   - bug
   - mqtt
@@ -29,6 +29,23 @@ mrfox7688 (GH #682, 2026-09-26, on 1.7.6-beta.5) saw Home Assistant reject a pay
 - [ ] #3 Fix verified: after the fix, a forced short write/retry on the payload path cannot put bytes on the wire that differ from the formatted payload
 - [ ] #4 Reporter informed on GH #682
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Root cause: mqttDropLinkOnDesync() (mqtt_configuratie.cpp:2272) calls PubSubClient::disconnect(), which writes the 2-byte DISCONNECT packet E0 00 into the unfinished PUBLISH before closing. The broker reads it as payload (or as header bytes on the header-short path).
+
+Scope: otgw-1.x.x only (2.0.0 has no mqttDropLinkOnDesync; checked ../OTGW-firmware). No version bump (release-prep only). No push.
+
+1. Host test first (test/host/test_mqttPayloadDesyncDisconnect.cpp, added to run_tests.bat), against the REAL vendored PubSubClient: fake client with a TOTAL byte budget (exactly N bytes then stall) plus a mini broker-side parser that returns completed PUBLISH frames. Red case: payload 2 bytes short + PubSubClient::disconnect() -> parser delivers topic .../cooling_enable with payload 4F E0 00 (field symptom, byte for byte). Also 1-short (00 parsed as next header) and header-short.
+2. Fix: mqttDropLinkOnDesync() closes the transport (wifiClient.stop(), extern in the .cpp) and writes nothing. Counter unchanged. PubSubClient::connected() then sees the dead socket and moves _state CONNECTED -> CONNECTION_LOST; handleMQTT() reconnects on connected()==false as today.
+3. Green cases: after a transport stop, the parser delivers no frame for 1-, 2-, >2-short and header-short; nothing is appended after the truncation point; connected()==false and a later publish writes nothing.
+4. Correct the existing test_mqttBeginPublishDesync case 2, which models the drop as mqtt.disconnect() (the defect).
+5. build.bat (firmware+fs), evaluate.py --quick, run_tests.bat.
+6. Reporter reply on GH #682 after build (AC#4); a retained publish hit by this may stay corrupt on the broker until the next republish.
+
+Limit: mqttDropLinkOnDesync itself is not compiled on the host (mqtt_configuratie.cpp is too entangled); the test proves the transport-close contract the new body uses. Stated in Final Summary.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
