@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 07:48'
+updated_date: '2026-09-27 09:02'
 labels:
   - bug
   - mqtt
@@ -29,4 +30,11 @@ The commit rationale ("eliminates the TCP_SND_BUF temporary copy in WiFiClient, 
 - [ ] #1 The heap cost of setSync(false) is measured on the bench (free heap and max block during a discovery burst), not estimated
 - [ ] #2 Whether a >300 ms stall followed by buffer reuse changes retransmitted bytes is demonstrated (bench or host) or ruled out, with evidence
 - [ ] #3 A decision (keep sync, drop sync, or copy before write) is recorded with the numbers
+- [ ] #4 Bench A/B experiment run with setSync(true) and setSync(false) on the same build and load, reporting free heap, max free block and heap fragmentation for both (idle, discovery burst, 5-minute housekeeping burst)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-27 (Robert): parked until a 1.x bench is available. Then run the setSync true/false experiment on the bench. RAM impact MUST be measured and weighed in the decision; no decision on correctness alone.
+<!-- SECTION:NOTES:END -->
