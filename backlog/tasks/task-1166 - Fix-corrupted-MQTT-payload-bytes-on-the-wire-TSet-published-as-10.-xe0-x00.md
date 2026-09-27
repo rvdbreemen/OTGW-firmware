@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 09:17'
+updated_date: '2026-09-27 19:49'
 labels:
   - bug
   - mqtt
@@ -62,6 +62,9 @@ Limit: mqttDropLinkOnDesync itself is not compiled on the host (mqtt_configurati
 - Matches every hit: payload length right, last 2 bytes E0 00. Exactly 2 bytes missing -> PUBLISH completes with E0 00 and is delivered to HA; 1 missing -> E0 ends payload and 00 is parsed as next packet header (malformed); >2 missing -> broker waits, gets EOF, discards. The "OFF" payload is a string literal, so the source buffer cannot be the corruption: the bytes are the DISCONNECT packet.
 - So the TASK-769/1134/1155 desync remedy itself injects the corruption.
 - Separate latent issue found: wifiClient.setSync(true) (MQTTstuff.ino:709, commit 0d6942a9f, since v1.4.1) makes lwIP tcp_write reference caller memory without TCP_WRITE_FLAG_COPY (core 2.7.4 ClientContext.h:518). wait_until_sent() gives up after 300 ms without progress, write() still returns the full count, caller buffer (static/stack/PubSubClient buffer) is then reused while unacked bytes may still be retransmitted from it.
+
+2026-09-27 bench A/B (.88.68, PIC gateway 6.8 + simulator, MQTT to a raw-capture stall broker on the laptop :1884 that closes its receive window 5.5-9 s in the middle of a triggered discovery burst, POST /api/v2/otgw/discovery every ~40 s). Harness: scratchpad stallbroker.py + analyze.py.
+Run A, pre-fix 1.7.6-beta.7+e7696a9, 900 s: 22 triggers, 27 stalls, 1928 publishes, device mqtt_desync_drops 7. Broker saw 6 truncated frames, ALL 6 ending in e0 00 (DISCONNECT written into the unfinished PUBLISH), e.g. head 31db0700 (987-byte discovery frame) cut at 580 bytes, tail ...2f5472 e000. A first zombie-broker run caught the same (tail ...4531 e000).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
@@ -84,4 +87,5 @@ Limits: mqttDropLinkOnDesync itself is not compiled on the host (mqtt_configurat
 
 Follow-up: TASK-1168 (setSync(true) buffer lifetime), parked for a bench A/B with RAM measurement.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
 <!-- SECTION:FINAL_SUMMARY:END -->
