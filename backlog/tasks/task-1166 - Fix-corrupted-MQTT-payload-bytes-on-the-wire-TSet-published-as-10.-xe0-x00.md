@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 07:48'
+updated_date: '2026-09-27 09:11'
 labels:
   - bug
   - mqtt
@@ -24,9 +24,9 @@ mrfox7688 (GH #682, 2026-09-26, on 1.7.6-beta.5) saw Home Assistant reject a pay
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The code path that publishes TSet is traced from formatting to write, with file:line, and every buffer it passes through is shown to outlive the write (or the defect is identified)
-- [ ] #2 The failure is reproduced on the bench or the mechanism is demonstrated in a host test, before any fix
-- [ ] #3 Fix verified: after the fix, a forced short write/retry on the payload path cannot put bytes on the wire that differ from the formatted payload
+- [x] #1 The code path that publishes TSet is traced from formatting to write, with file:line, and every buffer it passes through is shown to outlive the write (or the defect is identified)
+- [x] #2 The failure is reproduced on the bench or the mechanism is demonstrated in a host test, before any fix
+- [x] #3 Fix verified: after the fix, a forced short write/retry on the payload path cannot put bytes on the wire that differ from the formatted payload
 - [ ] #4 Reporter informed on GH #682
 <!-- AC:END -->
 
@@ -63,3 +63,22 @@ Limit: mqttDropLinkOnDesync itself is not compiled on the host (mqtt_configurati
 - So the TASK-769/1134/1155 desync remedy itself injects the corruption.
 - Separate latent issue found: wifiClient.setSync(true) (MQTTstuff.ino:709, commit 0d6942a9f, since v1.4.1) makes lwIP tcp_write reference caller memory without TCP_WRITE_FLAG_COPY (core 2.7.4 ClientContext.h:518). wait_until_sent() gives up after 300 ms without progress, write() still returns the full count, caller buffer (static/stack/PubSubClient buffer) is then reused while unacked bytes may still be retransmitted from it.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Fixed corrupted MQTT payloads (GH #682): the desync remedy itself injected the bytes.
+
+Root cause: mqttDropLinkOnDesync() (mqtt_configuratie.cpp) abandoned a half-written PUBLISH with PubSubClient::disconnect(), which writes DISCONNECT (E0 00) before closing. The broker, still inside the announced PUBLISH, read those bytes as payload. 2 bytes short -> "...E0 00" delivered (the field hits: 10.E0 00 on TSet, O E0 00 on cooling_enable/domestichotwater); 1 byte short -> 00 parsed as a reserved packet type (malformed-packet drop).
+
+Change (commit 351d98b40, otgw-1.x.x, not pushed):
+- mqttDropLinkOnDesync() now calls wifiClient.stop() and writes nothing, then client.connected() so PubSubClient moves to CONNECTION_LOST; handleMQTT() reconnects on connected()==false as before. Counter unchanged. Covers all 14 desync sites (payload and header paths, discovery included).
+- New test/host/test_mqttPayloadDesyncDisconnect.cpp (27 checks), real vendored PubSubClient + budget client + broker-side parser: reproduces both field payloads byte for byte with disconnect(); with a transport stop, 1/2/3/5 bytes short and a short header deliver no frame and nothing malformed, session reports lost, nothing reaches the wire afterwards; healthy publish untouched.
+- test_mqttBeginPublishDesync case 2 modelled the drop as disconnect() and never inspected the wire; now uses the transport-close contract and checks the drop writes nothing (would fail with disconnect()).
+
+Verification: testun_tests.bat all pass (18+18+16+27+25); build.bat "Build completed successfully" (1.7.6-beta.7 bins 11:09); evaluate.py --quick 0 failed.
+
+Limits: mqttDropLinkOnDesync itself is not compiled on the host (mqtt_configuratie.cpp too entangled); the test proves the contract its new body uses. Not yet validated on hardware or by the reporter. Retained publishes hit before this fix may hold a corrupt value on the broker until republished.
+
+Follow-up: TASK-1168 (setSync(true) buffer lifetime), parked for a bench A/B with RAM measurement.
+<!-- SECTION:FINAL_SUMMARY:END -->
