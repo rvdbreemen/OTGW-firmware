@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 21:15'
+updated_date: '2026-09-27 21:47'
 labels:
   - feature
   - port-25238
@@ -99,4 +99,8 @@ If you run two tools against port 25238, we would like to hear how it behaves.
 - Finding to investigate: otgwstream_tx_dropped went 0 -> 237 during T1-T5 (PIC->client bytes dropped). Most likely T2 (52 KB to each client in 180 s); not yet attributed.
 
 - Heap baseline, ONE client (pyotgw, get_reports every 15 s), 1800 s, device/info every 5 s (scratchpad heap_baseline_1client.csv): 354 samples, reports 116 ok / 0 fail, freeheap min 12960 avg 16890, maxblock min 11592 avg 12884, no reboot (uptime 00:49 -> 01:19). otgwstream_tx_dropped 237 -> 241 in one step at t=1246 s with a single client: PIC->client loss also occurs with one client, so the 237 is not (only) a two-client effect. pyotgw logged 22 warnings while alone.
+
+- Heap run TWO clients (OTmonitor by the maintainer + pyotgw, same script as baseline), 1800 s: 355 samples, clients 2 throughout, no reboot (uptime 01:20 -> 01:50), pyotgw get_reports 116 ok / 0 fail, 40 warnings (baseline 22). freeheap avg 16663 vs 16890 baseline (-227 B), min 11648 vs 12960; maxblock avg 12840 vs 12884, but three dips below 11 KB (baseline none): 10944 @265 s, 6296 @720.6 s, 9728 @1330 s. otgwstream_tx_dropped 245 -> 253 @713.8 s -> 265 @720.6 s, the same moment as the 6.3 KB maxblock dip.
+- pyotgw's connection watchdog reconnected once during the run and the reconnect task died with IndexError in process_statusfields_v4 (PS=1 summary line with fewer fields than expected), "Task exception was never retrieved". Same crash as T5 with a busy second client; never seen with pyotgw alone. Plausible cause: a truncated or interleaved summary line (tx drop at ~714-720 s or OTmonitor traffic); not yet attributed. In HA this would leave the integration without a working reconnect.
+- Verdict: NOT clean. Beta held pending maintainer decision.
 <!-- SECTION:NOTES:END -->
