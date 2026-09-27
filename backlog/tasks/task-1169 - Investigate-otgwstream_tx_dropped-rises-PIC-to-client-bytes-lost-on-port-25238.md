@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-27 21:22'
+updated_date: '2026-09-27 21:47'
 labels:
   - bug
   - port-25238
@@ -27,3 +28,9 @@ Found during the TASK-1167 bench validation on .88.68 (build 1.7.6-beta.7+3bc71d
 - [ ] #3 It is established whether 1.7.6-beta.6 and v1.7.4 drop too under the same load (old vs new)
 - [ ] #4 A fix, or a recorded decision why the loss is acceptable, with the before/after byte counts
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-27 two-client run (OTmonitor + pyotgw): tx_dropped 245 -> 253 -> 265 at t=714-721 s, coinciding with the lowest maxblock sample of the run (6296 B, baseline min 11592). Suggests the drop path is tied to a failed or refused allocation when the largest free block is small.
+<!-- SECTION:NOTES:END -->
