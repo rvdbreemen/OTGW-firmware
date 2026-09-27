@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 20:37'
+updated_date: '2026-09-27 20:41'
 labels:
   - feature
   - port-25238
@@ -89,4 +89,12 @@ If you run two tools against port 25238, we would like to hear how it behaves.
   - B sending PR=A every 1 s already before pyotgw connects: pyotgw init gets B's answers (both clients receive all PIC output, ADR-095), logs "Unknown message in command queue", retries, and finally crashes in its own PS=1 status parser (IndexError). Init-time contention, inherent to a shared PIC output stream, not a splice: serial side stays clean.
   - Steady state 120 s, pyotgw get_reports every ~5 s: B silent 21 ok / 1 fail (about=None, pyotgw own); B PR=A every 5 s 22 ok / 0 fail with 36 recovered retries.
   - Pending: real OTmonitor next to pyotgw (maintainer runs OTmonitor).
+
+- Maintainer note: pyotgw (core of the legacy HA serial integration) assumes it is the only reader and writer on the serial bus, so foreign answers breaking its command matching are inherent to sharing the port, not a floor defect. Realistic test = OTmonitor + pyotgw together (maintainer runs OTmonitor).
+- AC#5 (NAS 192.168.88.36 as a second source address):
+  - Refusal: two laptop clients connected, third from the NAS closed at once (0.0 s), last_refused_ip = 192.168.88.36, both laptop clients kept. PASS.
+  - Takeover: laptop L1 + NAS connected, new laptop connection takes over L1's slot (L1 closed, L3 answered PR=A), NAS unaffected. PASS.
+  - Device Info page (headless Edge, Advanced > Debug Information): Connected Clients 2 / Client Addresses 192.168.88.32,192.168.88.32 / Last Refused Address 192.168.88.36. Screenshot scratchpad AC5_deviceinfo.png. PASS.
+  - Finding (minor): a same-address TAKEOVER also sets last_refused_ip (getLastAttemptIP is set whenever all slots are full), so "Last Refused Address" can show an address that was not refused.
+- Finding to investigate: otgwstream_tx_dropped went 0 -> 237 during T1-T5 (PIC->client bytes dropped). Most likely T2 (52 KB to each client in 180 s); not yet attributed.
 <!-- SECTION:NOTES:END -->
