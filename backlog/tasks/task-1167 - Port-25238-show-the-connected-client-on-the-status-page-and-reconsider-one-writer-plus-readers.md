@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-26 16:47'
+updated_date: '2026-09-27 20:31'
 labels:
   - feature
   - port-25238
@@ -77,4 +77,10 @@ What changes in this beta:
 If you run two tools against port 25238, we would like to hear how it behaves.
 
 2026-09-26: the unvalidated work (TASK-1164 fix, TASK-1167 write floor + status fields, ADR-066/083/097 changes) is pushed to the separate branch origin/otgw-1.x.x-pending-bench-validation (f87d93bde), NOT to origin/otgw-1.x.x. SimpleTelnet per-slot API pushed as origin/feat/per-slot-read (e8d01df) in rvdbreemen/SimpleTelnet. Local otgw-1.x.x still carries the same commits ahead of origin; merge the pending branch into otgw-1.x.x only after the bench validation passes.
+
+2026-09-27 bench validation ADR-097 (.88.68, build 1.7.6-beta.7+3bc71d6 = 56301d5df+78b1e4553+1164+1166; SimpleTelnet e8d01df). Serial side captured read-only on COM3 (CH340 sees ESP TX->PIC RX; DTR/RTS low, no reset, uptime unchanged); capture verified with PR=A. Clients TCP_NODELAY. Harness + captures: scratchpad cap.py/sercap.py, T*_serial*.bin.
+- T1 byte transparency: 512 bytes (0..255 up and down) arrive byte-exact and contiguous, nothing extra. PASS.
+- T2 two writers 180 s, paced 0-150 ms, PR= queries only: 4804 sent, 4804 CR-segments on serial, per-command counts equal, 0 unexpected segments, 0 PIC errors. PASS. Note: PIC answered 3796/4804 (drops queries when busy); not a splice.
+- T3 idle release (MQTT connected; first attempt without broker showed 1 s+ forwarding stalls from reconnect attempts): A splits PR|=A with a pause while B sends PR=G. 50/80 ms: B inside A 0/40. 120/300 ms: 39/40 (1 network reorder). Threshold confirmed with positive control. Two ~1 s forwarding delays seen, order kept.
+- T4 binary floor: 5x96-byte non-text chunks with CR/NUL, B sends PR=G every 200 ms. Pause 1.0 s and 2.5 s: A stream contiguous, 0 B commands inside. Positive control 3.5 s: 70 B commands inside. PASS.
 <!-- SECTION:NOTES:END -->
