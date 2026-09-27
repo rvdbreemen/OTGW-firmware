@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 19:49'
+updated_date: '2026-09-27 20:04'
 labels:
   - bug
   - mqtt
@@ -65,6 +65,9 @@ Limit: mqttDropLinkOnDesync itself is not compiled on the host (mqtt_configurati
 
 2026-09-27 bench A/B (.88.68, PIC gateway 6.8 + simulator, MQTT to a raw-capture stall broker on the laptop :1884 that closes its receive window 5.5-9 s in the middle of a triggered discovery burst, POST /api/v2/otgw/discovery every ~40 s). Harness: scratchpad stallbroker.py + analyze.py.
 Run A, pre-fix 1.7.6-beta.7+e7696a9, 900 s: 22 triggers, 27 stalls, 1928 publishes, device mqtt_desync_drops 7. Broker saw 6 truncated frames, ALL 6 ending in e0 00 (DISCONNECT written into the unfinished PUBLISH), e.g. head 31db0700 (987-byte discovery frame) cut at 580 bytes, tail ...2f5472 e000. A first zombie-broker run caught the same (tail ...4531 e000).
+
+Run B, fix 1.7.6-beta.7+3bc71d6, same harness and schedule, 900 s: 22 triggers, 29 stalls, 1839 publishes, device mqtt_desync_drops 8. Broker saw 8 truncated frames, NONE ending in e0 00 (0 disconnect_injected, 0 corrupt_delivered, 0 malformed, 0 non_utf8), 8 connections = reconnect after every drop. Frame n=4 was a small non-retained OFF publish on .../electric_production cut after the topic with all 3 payload bytes missing; the broker discarded it at EOF.
+A vs B: disconnect_injected 6/6 -> 0/8. Not reproduced on the bench: the exact 1- or 2-bytes-short case that delivers or malforms (stalls land mostly on large discovery frames); that case is covered by the host test.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
