@@ -118,11 +118,15 @@ static bool openSession(PubSubClient& mqtt, ShortWritingClient& net) {
 // The caller contract as the firmware now implements it: any false from
 // beginPublish() drops the link. A partial write and a write that never
 // started both arrive as false and cannot be told apart from here, so the
-// link goes down either way.
+// link goes down either way. The drop closes the transport and writes
+// nothing, as mqttDropLinkOnDesync() does (TASK-1166): PubSubClient::disconnect()
+// would append DISCONNECT (E0 00) behind the partial header.
 //---------------------------------------------------------------------
-static bool beginPublishOrDropLink(PubSubClient& mqtt, const char* topic, size_t payloadLen) {
+static bool beginPublishOrDropLink(PubSubClient& mqtt, ShortWritingClient& net,
+                                   const char* topic, size_t payloadLen) {
   if (mqtt.beginPublish(topic, payloadLen, true)) return true;
-  mqtt.disconnect();
+  net.stop();
+  mqtt.connected();
   return false;
 }
 
@@ -173,10 +177,11 @@ int main() {
     check(openSession(mqtt, net), "a session is established before the case runs");
 
     net.acceptBytes = 8;
-    const bool started = beginPublishOrDropLink(mqtt, kTopic, std::strlen(kPayload));
+    const bool started = beginPublishOrDropLink(mqtt, net, kTopic, std::strlen(kPayload));
 
     check(!started, "the wrapper reports failure too");
-    check(net.stopCalls == 1, "the wrapper dropped the TCP link");
+    check(net.wire.size() == 8, "the drop itself wrote nothing behind the partial header");
+    check(net.stopCalls >= 1, "the wrapper dropped the TCP link");
     check(net.connected() == 0, "the connection is closed");
 
     // A publish attempted afterwards cannot reach the wire, so the broker
@@ -199,7 +204,7 @@ int main() {
     check(openSession(mqtt, net), "a session is established before the case runs");
 
     net.acceptBytes = 1024;
-    const bool started = beginPublishOrDropLink(mqtt, kTopic, std::strlen(kPayload));
+    const bool started = beginPublishOrDropLink(mqtt, net, kTopic, std::strlen(kPayload));
 
     check(started, "a full header write succeeds");
     check(net.stopCalls == 0, "a healthy connection is not dropped");

@@ -28,6 +28,7 @@
 //   Selects        : 8 entries (pseudo-ID 251: gpioa/gpiob/leda-f)
 
 #include "MQTTstuff.h"
+#include <WiFiClient.h>
 
 // ========== Named PROGMEM strings: Labels ==========
 const char ha_lbl_status_master[] PROGMEM = "status_master";
@@ -1880,6 +1881,7 @@ inline size_t strlcpy_P(char *dst, PGM_P src, size_t size) {
 // External functions from the .ino translation unit.
 extern bool canPublishMQTT();
 extern void feedWatchDog();
+extern WiFiClient wifiClient;           // MQTTclient's transport (OTGW-firmware.h), closed by mqttDropLinkOnDesync()
 extern void incPublishedTopicCount();   // ADR-062 / TASK-349: called after every successful retained discovery publish
 
 // ---------------------------------------------------------------------------
@@ -2269,10 +2271,18 @@ static constexpr size_t   STREAM_TOPIC_MAX = 200;
 // all of them: a counter that misses most sites reads low for the wrong reason,
 // which is worse than having no counter. Defined in this .cpp rather than beside
 // the other MQTT helpers because a .ino signature cannot name PubSubClient.
+//
+// The link is closed at the TCP level and nothing more is written (TASK-1166).
+// PubSubClient::disconnect() would first send DISCONNECT (bytes E0 00), and the
+// broker, still inside the PUBLISH the header announced, reads those bytes as
+// payload: 2 bytes short delivers "...E0 00" to subscribers, 1 byte short turns
+// the 00 into a malformed packet (GH #682). A bare close leaves the frame
+// incomplete, and the broker discards an incomplete frame on EOF.
 void mqttDropLinkOnDesync(PubSubClient &client)
 {
   mqttCountDesyncDrop();
-  client.disconnect();
+  wifiClient.stop();
+  client.connected();   // sees the closed socket, moves the session to CONNECTION_LOST
 }
 
 static bool beginDiscoveryPublish(PubSubClient &client, const char *topic, size_t payloadLen)
