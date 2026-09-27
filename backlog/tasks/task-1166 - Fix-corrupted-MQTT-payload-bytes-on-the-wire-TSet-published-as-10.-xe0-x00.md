@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 07:42'
+updated_date: '2026-09-27 07:45'
 labels:
   - bug
   - mqtt
@@ -38,4 +38,11 @@ mrfox7688 (GH #682, 2026-09-26, on 1.7.6-beta.5) saw Home Assistant reject a pay
 2026-09-26 19:56 UTC: mrfox7688 answered on GH #682 (1.7.6-beta.5+58d490d, uptime 1d 00:36):
 - mqtt_sndbuf_skips 5548 (~3.8/min, up from ~1.6/min reported earlier), mqtt_desync_drops 13.
 - 3 more "Can't decode payload" hits 18:09-18:42, all b'Oà
+
+2026-09-27 root-cause trace (AC#1):
+- Publish path: sendMQTTData() MQTTstuff.ino:1132 -> beginMqttPublish() :426 (PubSubClient::beginPublish writes header+topic) -> writeMqttChunk() :299 (payload straight from caller pointer via MQTTclient.write) -> endPublish (no-op). On a short payload write, :1151 calls mqttDropLinkOnDesync() (mqtt_configuratie.cpp:2272) = client.disconnect().
+- PubSubClient 2.8 disconnect() (libraries/PubSubClient/src/PubSubClient.cpp:660) writes MQTTDISCONNECT = bytes E0 00 BEFORE stop(). Mid-frame, the broker reads those 2 bytes as the rest of the promised payload.
+- Matches every hit: payload length right, last 2 bytes E0 00. Exactly 2 bytes missing -> PUBLISH completes with E0 00 and is delivered to HA; 1 missing -> E0 ends payload and 00 is parsed as next packet header (malformed); >2 missing -> broker waits, gets EOF, discards. The "OFF" payload is a string literal, so the source buffer cannot be the corruption: the bytes are the DISCONNECT packet.
+- So the TASK-769/1134/1155 desync remedy itself injects the corruption.
+- Separate latent issue found: wifiClient.setSync(true) (MQTTstuff.ino:709, commit 0d6942a9f, since v1.4.1) makes lwIP tcp_write reference caller memory without TCP_WRITE_FLAG_COPY (core 2.7.4 ClientContext.h:518). wait_until_sent() gives up after 300 ms without progress, write() still returns the full count, caller buffer (static/stack/PubSubClient buffer) is then reused while unacked bytes may still be retransmitted from it.
 <!-- SECTION:NOTES:END -->
