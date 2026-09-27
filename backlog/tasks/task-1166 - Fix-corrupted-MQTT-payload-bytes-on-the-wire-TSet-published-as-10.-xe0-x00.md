@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 09:11'
+updated_date: '2026-09-27 09:17'
 labels:
   - bug
   - mqtt
@@ -67,6 +67,7 @@ Limit: mqttDropLinkOnDesync itself is not compiled on the host (mqtt_configurati
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
 Fixed corrupted MQTT payloads (GH #682): the desync remedy itself injected the bytes.
 
 Root cause: mqttDropLinkOnDesync() (mqtt_configuratie.cpp) abandoned a half-written PUBLISH with PubSubClient::disconnect(), which writes DISCONNECT (E0 00) before closing. The broker, still inside the announced PUBLISH, read those bytes as payload. 2 bytes short -> "...E0 00" delivered (the field hits: 10.E0 00 on TSet, O E0 00 on cooling_enable/domestichotwater); 1 byte short -> 00 parsed as a reserved packet type (malformed-packet drop).
@@ -76,9 +77,11 @@ Change (commit 351d98b40, otgw-1.x.x, not pushed):
 - New test/host/test_mqttPayloadDesyncDisconnect.cpp (27 checks), real vendored PubSubClient + budget client + broker-side parser: reproduces both field payloads byte for byte with disconnect(); with a transport stop, 1/2/3/5 bytes short and a short header deliver no frame and nothing malformed, session reports lost, nothing reaches the wire afterwards; healthy publish untouched.
 - test_mqttBeginPublishDesync case 2 modelled the drop as disconnect() and never inspected the wire; now uses the transport-close contract and checks the drop writes nothing (would fail with disconnect()).
 
-Verification: testun_tests.bat all pass (18+18+16+27+25); build.bat "Build completed successfully" (1.7.6-beta.7 bins 11:09); evaluate.py --quick 0 failed.
+Verification: test
+un_tests.bat all pass (18+18+16+27+25); build.bat "Build completed successfully", rebuilt after the commit (bins +3bc71d6 = fix 351d98b40 + backlog autocommit; version.h prerelease label comes from a foreign uncommitted edit, not a spent tag); evaluate.py --quick 0 failed.
 
 Limits: mqttDropLinkOnDesync itself is not compiled on the host (mqtt_configuratie.cpp too entangled); the test proves the contract its new body uses. Not yet validated on hardware or by the reporter. Retained publishes hit before this fix may hold a corrupt value on the broker until republished.
 
 Follow-up: TASK-1168 (setSync(true) buffer lifetime), parked for a bench A/B with RAM measurement.
+<!-- SECTION:FINAL_SUMMARY:END -->
 <!-- SECTION:FINAL_SUMMARY:END -->
