@@ -242,6 +242,25 @@ test. Everything else is unvalidated by automation. Validation pipeline:
 
 Don't look for jest/pytest — no runner. Hardware-in-the-loop is only behavioural test.
 
+## Bug fixing: reproduce, then prove (maintainer rule, Robert)
+
+1. **Every new bug is made reproducible.** No capture logs from the reporter →
+   always ask for them (`capture-mqtt-debug.bat` / `capture-otgw.sh` transcript,
+   plus whatever the symptom needs: broker log, HA log, device/info counters).
+   A description alone is not enough to fix against.
+2. **Read the code critically, and be very critical of your own proposed fix.**
+   More important still: collect evidence (logging, captures, browser
+   screenshots). Do not believe you fixed something; prove it, with real tests.
+3. **Best evidence = the real situation**, else a faithful simulation or a test
+   harness that reproduces the problem. Run it against the OLD code (shows the
+   failure) and against the FIX (shows it gone). Old-vs-fix on the same
+   reproduction is the proof; a green run on the fix alone is not.
+
+A host test that re-implements the code under test instead of calling it proves
+nothing about that code (TASK-1166: the desync test modelled the drop with the
+same `disconnect()` that caused the bug). Say so when a test cannot reach the
+real function, and close the gap on the bench.
+
 ## Build Commands
 
 Preferred wrapper (handles venv setup): `./build.sh` (macOS/Linux) or `build.bat` (Windows). Both invoke `build.py` underneath and build firmware + filesystem. Use direct `python build.py` only when wrapper unavailable.
