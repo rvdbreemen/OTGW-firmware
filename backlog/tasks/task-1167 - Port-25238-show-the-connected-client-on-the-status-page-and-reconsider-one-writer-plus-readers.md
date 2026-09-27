@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 20:31'
+updated_date: '2026-09-27 20:37'
 labels:
   - feature
   - port-25238
@@ -83,4 +83,10 @@ If you run two tools against port 25238, we would like to hear how it behaves.
 - T2 two writers 180 s, paced 0-150 ms, PR= queries only: 4804 sent, 4804 CR-segments on serial, per-command counts equal, 0 unexpected segments, 0 PIC errors. PASS. Note: PIC answered 3796/4804 (drops queries when busy); not a splice.
 - T3 idle release (MQTT connected; first attempt without broker showed 1 s+ forwarding stalls from reconnect attempts): A splits PR|=A with a pause while B sends PR=G. 50/80 ms: B inside A 0/40. 120/300 ms: 39/40 (1 network reorder). Threshold confirmed with positive control. Two ~1 s forwarding delays seen, order kept.
 - T4 binary floor: 5x96-byte non-text chunks with CR/NUL, B sends PR=G every 200 ms. Pause 1.0 s and 2.5 s: A stream contiguous, 0 B commands inside. Positive control 3.5 s: 70 B commands inside. PASS.
+
+- T5 pyotgw 2.2.3 (the library the HA opentherm_gw integration uses, NOT the integration itself) + second client B:
+  - pyotgw alone: connect OK, 0 warnings. With B connected but silent: connect OK, 0 warnings.
+  - B sending PR=A every 1 s already before pyotgw connects: pyotgw init gets B's answers (both clients receive all PIC output, ADR-095), logs "Unknown message in command queue", retries, and finally crashes in its own PS=1 status parser (IndexError). Init-time contention, inherent to a shared PIC output stream, not a splice: serial side stays clean.
+  - Steady state 120 s, pyotgw get_reports every ~5 s: B silent 21 ok / 1 fail (about=None, pyotgw own); B PR=A every 5 s 22 ok / 0 fail with 36 recovered retries.
+  - Pending: real OTmonitor next to pyotgw (maintainer runs OTmonitor).
 <!-- SECTION:NOTES:END -->
