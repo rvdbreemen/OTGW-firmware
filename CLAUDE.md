@@ -288,6 +288,26 @@ wipe the affected `.pio/build/<env>` dir and rebuild solo to recover.
 
 ---
 
+## Bug fixing: reproduce, then prove (maintainer rule, Robert)
+
+1. **Every new bug is made reproducible.** No capture logs from the reporter →
+   always ask for them (`capture-mqtt-debug.bat` / `capture-otgw.sh` transcript,
+   plus whatever the symptom needs: broker log, HA log, device/info counters).
+   A description alone is not enough to fix against.
+2. **Read the code critically, and be very critical of your own proposed fix.**
+   More important still: collect evidence (logging, captures, browser
+   screenshots). Do not believe you fixed something; prove it, with real tests.
+3. **Best evidence = the real situation**, else a faithful simulation or a test
+   harness that reproduces the problem. Run it against the OLD code (shows the
+   failure) and against the FIX (shows it gone). Old-vs-fix on the same
+   reproduction is the proof; a green run on the fix alone is not.
+
+A host test that re-implements the code under test instead of calling it proves
+nothing about that code. Say so when a test cannot reach the real function, and
+close the gap on the bench.
+
+---
+
 ## Test automation (on-device / soak)
 
 End-to-end loop for firmware changes that need on-device validation (e.g. the
