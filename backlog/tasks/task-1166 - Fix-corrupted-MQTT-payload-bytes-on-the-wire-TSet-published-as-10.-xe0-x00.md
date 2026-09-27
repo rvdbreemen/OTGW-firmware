@@ -1,11 +1,11 @@
 ---
 id: TASK-1166
 title: 'Fix: corrupted MQTT payload bytes on the wire (TSet published as 10.\xe0\x00)'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 20:04'
+updated_date: '2026-09-27 20:07'
 labels:
   - bug
   - mqtt
@@ -27,7 +27,7 @@ mrfox7688 (GH #682, 2026-09-26, on 1.7.6-beta.5) saw Home Assistant reject a pay
 - [x] #1 The code path that publishes TSet is traced from formatting to write, with file:line, and every buffer it passes through is shown to outlive the write (or the defect is identified)
 - [x] #2 The failure is reproduced on the bench or the mechanism is demonstrated in a host test, before any fix
 - [x] #3 Fix verified: after the fix, a forced short write/retry on the payload path cannot put bytes on the wire that differ from the formatted payload
-- [ ] #4 Reporter informed on GH #682
+- [x] #4 Reporter informed on GH #682
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -89,6 +89,10 @@ un_tests.bat all pass (18+18+16+27+25); build.bat "Build completed successfully"
 Limits: mqttDropLinkOnDesync itself is not compiled on the host (mqtt_configuratie.cpp too entangled); the test proves the contract its new body uses. Not yet validated on hardware or by the reporter. Retained publishes hit before this fix may hold a corrupt value on the broker until republished.
 
 Follow-up: TASK-1168 (setSync(true) buffer lifetime), parked for a bench A/B with RAM measurement.
+
+Bench A/B (added 2026-09-27, .88.68 with PIC gateway 6.8 + simulator, raw-capture stall broker closing its receive window mid discovery burst, 15 min per run): pre-fix e7696a9 put e0 00 into 6 of 6 truncated frames (7 desync drops); fix 3bc71d6 into 0 of 8 (8 drops, reconnect after each, 0 corrupt/malformed/non-UTF-8 of 1839 publishes). The exact 1-2-bytes-short field variant did not occur on the bench (stalls hit large discovery frames); it is covered by the host test.
+
+Reporter informed on GH #682 (issuecomment-5859395071): cause, bench evidence, fix in the next beta.
 <!-- SECTION:FINAL_SUMMARY:END -->
 
 <!-- SECTION:FINAL_SUMMARY:END -->
