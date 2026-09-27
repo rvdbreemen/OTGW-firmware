@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 20:41'
+updated_date: '2026-09-27 21:15'
 labels:
   - feature
   - port-25238
@@ -97,4 +97,6 @@ If you run two tools against port 25238, we would like to hear how it behaves.
   - Device Info page (headless Edge, Advanced > Debug Information): Connected Clients 2 / Client Addresses 192.168.88.32,192.168.88.32 / Last Refused Address 192.168.88.36. Screenshot scratchpad AC5_deviceinfo.png. PASS.
   - Finding (minor): a same-address TAKEOVER also sets last_refused_ip (getLastAttemptIP is set whenever all slots are full), so "Last Refused Address" can show an address that was not refused.
 - Finding to investigate: otgwstream_tx_dropped went 0 -> 237 during T1-T5 (PIC->client bytes dropped). Most likely T2 (52 KB to each client in 180 s); not yet attributed.
+
+- Heap baseline, ONE client (pyotgw, get_reports every 15 s), 1800 s, device/info every 5 s (scratchpad heap_baseline_1client.csv): 354 samples, reports 116 ok / 0 fail, freeheap min 12960 avg 16890, maxblock min 11592 avg 12884, no reboot (uptime 00:49 -> 01:19). otgwstream_tx_dropped 237 -> 241 in one step at t=1246 s with a single client: PIC->client loss also occurs with one client, so the 237 is not (only) a two-client effect. pyotgw logged 22 warnings while alone.
 <!-- SECTION:NOTES:END -->
