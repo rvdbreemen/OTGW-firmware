@@ -1,10 +1,11 @@
 ---
 id: TASK-1166
 title: 'Fix: corrupted MQTT payload bytes on the wire (TSet published as 10.\xe0\x00)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 07:37'
+updated_date: '2026-09-27 07:42'
 labels:
   - bug
   - mqtt
