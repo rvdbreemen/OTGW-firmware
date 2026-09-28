@@ -3,10 +3,11 @@ id: TASK-1136
 title: >-
   Investigate: OTGW drops off WiFi entirely on an ASUS guest network (GitHub
   #681)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-17 20:22'
-updated_date: '2026-09-19 15:56'
+updated_date: '2026-09-28 20:07'
 labels:
   - bug
   - needs-info
