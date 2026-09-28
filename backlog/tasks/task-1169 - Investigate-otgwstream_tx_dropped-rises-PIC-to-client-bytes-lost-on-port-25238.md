@@ -3,11 +3,11 @@ id: TASK-1169
 title: >-
   Investigate: otgwstream_tx_dropped rises, PIC-to-client bytes lost on port
   25238
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-27 21:22'
-updated_date: '2026-09-28 04:01'
+updated_date: '2026-09-28 07:08'
 labels:
   - bug
   - port-25238
@@ -27,7 +27,7 @@ Found during the TASK-1167 bench validation on .88.68 (build 1.7.6-beta.7+3bc71d
 - [x] #1 The code path that increments otgwstream_tx_dropped is traced with file:line, and the condition that triggers it (client TCP window, write size, heap gate or other) is identified with evidence
 - [x] #2 The loss is reproduced on the bench with a harness that counts bytes on the serial side against bytes each client received
 - [x] #3 It is established whether 1.7.6-beta.6 and v1.7.4 drop too under the same load (old vs new)
-- [ ] #4 A fix, or a recorded decision why the loss is acceptable, with the before/after byte counts
+- [x] #4 A fix, or a recorded decision why the loss is acceptable, with the before/after byte counts
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -46,3 +46,15 @@ Found during the TASK-1167 bench validation on .88.68 (build 1.7.6-beta.7+3bc71d
 - Also observed: a slow client blocks the whole loop ~1 s per short write (PIC serial not drained meanwhile), and a client that pauses reading for ~9 s is disconnected.
 - Open: AC#4 fix or decision, for the maintainer (options: accept + document; per-client non-blocking backlog in SimpleTelnet, needs library approval and RAM).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Established that port-25238 output loss is pre-existing, not caused by the ADR-097 second writer, and routed the fix to TASK-1170.
+
+Cause: every client socket has a 1000 ms write timeout (SimpleTelnet_impl.tpp:445). A client that makes no send progress for 1 s (not reading, or no ACKs during a WiFi stall) makes WiFiClient::write() return short; SimpleTelnet counts the rest as otgwstream_tx_dropped (SimpleTelnet_impl.tpp:222) and drops the client after repeated zero writes. The loop blocks ~1 s per short write meanwhile.
+
+Evidence: identical harness (t1169.py, one client not reading for 10 s) on beta.6 and the beta.7 candidate: 127 bytes dropped and disconnect after ~9 s on both. v1.7.4/1.7.5 by code only: same timeout, and write() returned the full size on a partial write (silent loss).
+
+Decision (maintainer, 2026-09-28): fix with non-blocking per-client buffered writers, TASK-1170 (ADR + measured RAM first).
+<!-- SECTION:FINAL_SUMMARY:END -->
