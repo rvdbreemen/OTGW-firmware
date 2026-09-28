@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-27 07:48'
-updated_date: '2026-09-28 04:45'
+updated_date: '2026-09-28 04:47'
 labels:
   - bug
   - mqtt
@@ -33,6 +33,16 @@ The commit rationale ("eliminates the TCP_SND_BUF temporary copy in WiFiClient, 
 - [ ] #3 A decision (keep sync, drop sync, or copy before write) is recorded with the numbers
 - [ ] #4 Bench A/B experiment run with setSync(true) and setSync(false) on the same build and load, reporting free heap, max free block and heap fragmentation for both (idle, discovery burst, 5-minute housekeeping burst)
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Same firmware source, only wifiClient.setSync() differs: A = beta.7 as shipped (true, 1.7.6-beta.7+63a2f72), B = local build with setSync(false), firmware-only OTA, not committed.
+2. Per variant, identical load (scratchpad variant.sh): clean run 480 s (120 s idle, then POST /api/v2/otgw/discovery every 60 s; 5-minute housekeeping burst occurs naturally) + stall run 600 s (stall broker closes its receive window 5.5-9 s mid discovery burst).
+3. device/info sampled every 1 s: freeheap, maxfreeblock, hd_fragmentation_pct. Samples classified by phase using broker publish timestamps (idle / discovery / housekeeping / stall).
+4. Integrity per run (AC#2): broker checks every PUBLISH for foreign topics, invalid discovery JSON, non-UTF-8, E0 00 tails, reserved packet types.
+5. Compare A vs B per phase; decision with the numbers for the maintainer.
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
