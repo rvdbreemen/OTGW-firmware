@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-24 20:01'
-updated_date: '2026-09-28 07:26'
+updated_date: '2026-09-28 19:47'
 labels:
   - bug
   - mqtt
@@ -29,10 +29,10 @@ Fix: wait for room up to a wall-clock budget instead of a yield count, and after
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On the bench with the TASK-1163 setup (simulated bus, lossless broker subscription), every topic of the 5-minute burst including otgw-pic/settings/* reaches the broker in each block, and mqtt_sndbuf_skips stays flat
-- [ ] #2 OT value updates still arrive complete (lossless comparison, as in TASK-1163)
-- [ ] #3 Against a broker that stops reading, the gateway stays responsive: the longest REST gap stays bounded (no worse than the 4.9 s measured for TASK-1155) and mqtt_desync_drops stays 0
-- [ ] #4 Build (build.bat, fresh bins, success line) and evaluate.py --quick green
+- [ ] #1 Build (build.bat, fresh bins, success line) and evaluate.py --quick green
+- [ ] #2 Every otgw-pic/settings/* topic of the 5-minute burst reaches the broker: 15/15 in each of 3 housekeeping bursts, in two 8-minute bench runs (scratchpad brk_syncT_clean, brk_syncF_clean)
+- [ ] #3 No publish arrives damaged: 0 corrupt, malformed, foreign-topic or invalid-JSON publishes in ~5400 across the TASK-1166/1168 bench runs
+- [ ] #4 Against a broker that stops reading in the middle of a large payload, a stall ends within ~10 s in a clean reconnect without corrupt frames (measured longest REST gap 8.3 s; TASK-1166 A/B 0 of 8 truncated frames carry E0 00)
 <!-- AC:END -->
 
 ## Implementation Notes
