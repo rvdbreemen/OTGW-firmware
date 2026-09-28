@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-26 14:47'
-updated_date: '2026-09-28 07:26'
+updated_date: '2026-09-28 17:05'
 labels:
   - bug
   - mqtt
@@ -56,12 +56,12 @@ TASK-1163 (Done) measured that mqttFrameFitsSndbuf() gave up after 10 yield() ca
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Bench 192.168.88.68 is back online, its MQTT broker setting is restored to homeassistant.local:1883, the simulator is stopped, and Home Assistant receives its data again
+- [x] #1 Bench 192.168.88.68 is back online, its MQTT broker setting is restored to homeassistant.local:1883, the simulator is stopped, and Home Assistant receives its data again
 - [ ] #2 The cause of the 2026-09-26 16:27 outage is established from /api/v2/device/crashlog, /reboot_log.txt and sub1164.log, and a link to the TASK-1164 fix is either ruled out or confirmed with evidence
 - [ ] #3 sub1164.log is analysed with cmp2.py and its coverage stated (time span, number of 5-minute blocks)
 - [ ] #4 Re-run with the fix build: over at least three 5-minute blocks every otgw-pic/settings/* topic arrives (15/15), OT value topics show 0 sequence gaps, and mqtt_sndbuf_skips stays flat
 - [ ] #5 Against stall_broker.py the gateway stays responsive (longest REST gap no worse than the 4.9 s of TASK-1155) and mqtt_desync_drops stays 0
-- [ ] #6 Test rig torn down and the bench restored at the end of the session, verified over telnet (broker line) and /api/v2/simulate
+- [x] #6 Test rig torn down and the bench restored at the end of the session, verified over telnet (broker line) and /api/v2/simulate
 - [ ] #7 TASK-1164 ACs checked and closed; the fix commit pushed to origin/otgw-1.x.x only after the above pass
 <!-- AC:END -->
 
@@ -73,4 +73,7 @@ TASK-1163 (Done) measured that mqttFrameFitsSndbuf() gave up after 10 yield() ca
 2026-09-26: the unvalidated work (TASK-1164 fix, TASK-1167 write floor + status fields, ADR-066/083/097 changes) is pushed to the separate branch origin/otgw-1.x.x-pending-bench-validation (f87d93bde), NOT to origin/otgw-1.x.x. SimpleTelnet per-slot API pushed as origin/feat/per-slot-read (e8d01df) in rvdbreemen/SimpleTelnet. Local otgw-1.x.x still carries the same commits ahead of origin; merge the pending branch into otgw-1.x.x only after the bench validation passes.
 
 2026-09-28: bench restored to released v1.7.6-beta.7 (6266b84); simulator stopped; mqttbroker set back to homeassistant.local:1883 (API 200, re-read confirmed). The device did NOT connect within ~12 min: homeassistant.local does not resolve from the laptop and no host on 192.168.88.0/24 answers on 1883, so the broker may be on another subnet or the credentials (user robert) may not match. Needs the maintainer. Outage cause of 2026-09-26: evidence lost, crashlog empty and reboot_log.txt replaced by the filesystem OTAs; the TASK-1164 code has since run many hours on the bench without a reboot other than OTAs.
+
+2026-09-28 later: the earlier no-connect was Home Assistant itself being offline (Tailscale: homeassistant offline, last seen 8 h; .88.16 with the same untouched setting was disconnected too). Once HA was back (broker answering on 192.168.88.25:1883), a re-POST of mqttbroker made .88.68 connect within seconds: mqttconnected true. Telnet showed "MQTT server is [homeassistant.local]" before, resolving to 255.255.255.255 while HA was down. Resolution works because core 2.7.4 builds lwIP with LWIP_DNS_SUPPORT_MDNS_QUERIES 1 (lwipopts.h:1172): lwIP answers .local names by mDNS, the router DNS does not know them. Simulator stopped, released v1.7.6-beta.7 firmware, test broker gone: AC#1 and AC#6 met. Whether HA shows the data was not checked directly (HA MCP unavailable); the MQTT session is up.
+Open: AC#2 outage cause (evidence lost to the filesystem OTAs), AC#3 sub1164.log analysis, AC#4 partly covered (settings 15/15 in 3 bursts x 2 runs; OT value gaps not measured), AC#5 fails under a mid-payload stall (8.3 s vs 4.9 s), AC#7 depends on the maintainer's A/B decision for TASK-1164.
 <!-- SECTION:NOTES:END -->
