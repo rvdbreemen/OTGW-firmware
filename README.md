@@ -4,9 +4,25 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.5](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.5), a security and fix release. If your gateway has an admin password set, upgrade: v1.7.4 and earlier served `settings.ini`, which holds that password in cleartext, without authentication.
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.6](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.6), a reliability release for MQTT and port 25238. If your gateway has an admin password set and still runs v1.7.4 or earlier, upgrade: those versions served `settings.ini`, which holds that password in cleartext, without authentication.
 
-## What's New in v1.7.5
+## What's New in v1.7.6
+
+v1.7.6 is a reliability release for the 1.x (ESP8266) line, driven by field reports on GH #682 and GH #685. One breaking change versus v1.7.5: port 25238 accepts two clients again, with one writer at a time.
+
+- **No more corrupted MQTT values or "malformed packet" disconnects when the network is slow.** Four defects on the same publish path were fixed in turn, the last of which wrote the MQTT DISCONNECT packet (`E0 00`) into an unfinished message, so Home Assistant received values like `10.\xe0\x00`. New counters `mqtt_sndbuf_skips` and `mqtt_desync_drops` in `/api/v2/device/info`. (GH #682, TASK-1134, TASK-1154, TASK-1164, TASK-1166)
+- **The Home Assistant OpenTherm Gateway integration can connect over port 25238 again.** The first command after connecting was discarded. (GH #685, TASK-1146)
+- **Boiler and thermostat no longer stay "connected" after the PIC goes silent.** (TASK-1135)
+- **New: a diagnose screen in the web interface** when the PIC runs the diagnostic firmware, a telnet reboot command (`R`), and `capture-otgw.sh` for Linux, WSL and macOS. (TASK-1127, TASK-1089, TASK-1161)
+- **Breaking: port 25238 accepts two clients again, with one writer at a time.** Both receive everything the PIC sends; a client keeps the right to send until it has been quiet for 100 ms (3 seconds after binary data), so commands cannot get mixed. Device Info shows who holds the port. (ADR-097, TASK-1167)
+
+Flash **both** firmware and filesystem. Settings are preserved.
+
+Full release notes: [RELEASE_NOTES_1.7.6.md](RELEASE_NOTES_1.7.6.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+Full per-commit detail: [`CHANGELOG.md`](CHANGELOG.md). Architectural rationale in the linked ADRs under [`docs/adr/`](docs/adr/).
+
+## What was new in v1.7.5
 
 v1.7.5 is a security and fix release for the 1.x (ESP8266) line. One breaking change versus v1.7.4: port 25238 accepts one client instead of two.
 
@@ -153,14 +169,21 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.7.5
+## Latest stable release: v1.7.6
 
-`v1.7.5` is the current stable release on `main`. It closes a credential leak (`settings.ini`, holding the admin and MQTT passwords in cleartext, was served without authentication), makes updating the PIC firmware from the web work again, and adds a cumulative hot-water total for the Home Assistant Energy dashboard. One breaking change: port 25238 accepts one client instead of two.
+`v1.7.6` is the current stable release on `main`. It fixes a chain of MQTT defects that ended in corrupted values and "malformed packet" disconnects, lets the Home Assistant OpenTherm Gateway integration connect over port 25238 again, and brings back two clients on that port with one writer at a time. One breaking change: port 25238 accepts two clients again.
+
+Full release notes: [RELEASE_NOTES_1.7.6.md](RELEASE_NOTES_1.7.6.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.6)
+
+## Previous stable release: v1.7.5
+
+`v1.7.5` closed a credential leak (`settings.ini`, holding the admin and MQTT passwords in cleartext, was served without authentication), made updating the PIC firmware from the web work again, and added a cumulative hot-water total for the Home Assistant Energy dashboard.
 
 Full release notes: [RELEASE_NOTES_1.7.5.md](RELEASE_NOTES_1.7.5.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.5)
 
-## Previous stable release: v1.7.4
+## Older stable release: v1.7.4
 
 `v1.7.4` made Home Assistant entities survive a Core restart instead of sitting on "unknown", decoded the Remeha vendor message IDs 131 to 133 for the first time, and restored the one minute heartbeat on four ventilation and heat-recovery topics.
 

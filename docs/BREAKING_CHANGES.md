@@ -4,6 +4,20 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.7.6
+
+### Breaking: port 25238 accepts two clients again, with one writer at a time (ADR-097, TASK-1167)
+
+v1.7.5 limited the OTmonitor bridge on port 25238 to one client. v1.7.6 has two slots again, under a write floor that keeps the two clients' commands apart.
+
+**What changes.** Two clients can connect at the same time, for example the Home Assistant OpenTherm Gateway integration and OTmonitor. Both receive everything the PIC sends. Only one client at a time can send to the PIC: it keeps that right until it has been quiet for 100 ms, and the other client's command waits and then goes through whole. Once a client sends a non-text byte, as during an OTmonitor PIC upgrade, it keeps the right until it has been quiet for 3 seconds. Every byte still reaches the PIC exactly as sent.
+
+**Who is affected.** A tool that was refused on v1.7.5 because another client held the port now gets in. A command can be delayed by up to 100 ms after the other client's last byte. A third connection is refused, unless it comes from the address of an already connected client, which it then replaces.
+
+**What to watch for.** Tools that assume they are alone on the line, such as the `pyotgw` library behind the Home Assistant integration, can be confused by answers to the other tool's commands, most visibly while they connect. `/api/v2/device/info` and the Device Info page show `otgwstream_clients`, `otgwstream_client_ip` and `otgwstream_last_refused_ip`.
+
+---
+
 ## v1.7.5
 
 ### Breaking: port 25238 accepts one client instead of two (TASK-1115)

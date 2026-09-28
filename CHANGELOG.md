@@ -8,6 +8,8 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+## [1.7.6] - 2026-09-28
+
 ### Added
 
 - **The Linux, WSL and macOS capture now does what the Windows one does, and ships with every release.** `capture-otgw.sh` was rewritten with `capture-mqtt-debug.bat` as its template: the same options (`-DeviceHost`, `-BrokerHost`, `-QuietDebugToggles`, ...), the same sources (telnet with debug toggles and a settings dump, MQTT, a headless-browser devtools log, the crash log, and a REST snapshot after the stop), automatic reconnect across a reboot, Q to stop, and one merged `transcript-*.txt` to attach. It runs on bash 3.2, so on a stock Mac, and needs only bash and curl; mosquitto_sub and python3 plus a Chromium-family browser are used when present and reported as missing when not. It is now attached to stable releases as well as betas, and CI checks it with shellcheck. A macOS reporter on GH #682 could not produce a capture before this. (TASK-1156, TASK-1161)
