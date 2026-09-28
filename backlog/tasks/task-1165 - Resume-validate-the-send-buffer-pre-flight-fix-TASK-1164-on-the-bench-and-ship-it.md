@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-26 14:47'
-updated_date: '2026-09-26 16:47'
+updated_date: '2026-09-28 07:26'
 labels:
   - bug
   - mqtt
@@ -71,4 +71,6 @@ TASK-1163 (Done) measured that mqttFrameFitsSndbuf() gave up after 10 yield() ca
 2026-09-26: GH #682 mrfox7688 reports a corrupted TSet payload (10.à
 
 2026-09-26: the unvalidated work (TASK-1164 fix, TASK-1167 write floor + status fields, ADR-066/083/097 changes) is pushed to the separate branch origin/otgw-1.x.x-pending-bench-validation (f87d93bde), NOT to origin/otgw-1.x.x. SimpleTelnet per-slot API pushed as origin/feat/per-slot-read (e8d01df) in rvdbreemen/SimpleTelnet. Local otgw-1.x.x still carries the same commits ahead of origin; merge the pending branch into otgw-1.x.x only after the bench validation passes.
+
+2026-09-28: bench restored to released v1.7.6-beta.7 (6266b84); simulator stopped; mqttbroker set back to homeassistant.local:1883 (API 200, re-read confirmed). The device did NOT connect within ~12 min: homeassistant.local does not resolve from the laptop and no host on 192.168.88.0/24 answers on 1883, so the broker may be on another subnet or the credentials (user robert) may not match. Needs the maintainer. Outage cause of 2026-09-26: evidence lost, crashlog empty and reboot_log.txt replaced by the filesystem OTAs; the TASK-1164 code has since run many hours on the bench without a reboot other than OTAs.
 <!-- SECTION:NOTES:END -->
