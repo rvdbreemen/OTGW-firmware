@@ -3,10 +3,11 @@ id: TASK-1169
 title: >-
   Investigate: otgwstream_tx_dropped rises, PIC-to-client bytes lost on port
   25238
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-27 21:22'
-updated_date: '2026-09-27 21:47'
+updated_date: '2026-09-28 03:45'
 labels:
   - bug
   - port-25238
