@@ -3,10 +3,10 @@ id: TASK-1165
 title: >-
   Resume: validate the send-buffer pre-flight fix (TASK-1164) on the bench and
   ship it
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-09-26 14:47'
-updated_date: '2026-09-28 19:50'
+updated_date: '2026-09-28 19:51'
 labels:
   - bug
   - mqtt
@@ -57,12 +57,8 @@ TASK-1163 (Done) measured that mqttFrameFitsSndbuf() gave up after 10 yield() ca
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Bench 192.168.88.68 is back online, its MQTT broker setting is restored to homeassistant.local:1883, the simulator is stopped, and Home Assistant receives its data again
-- [ ] #2 The cause of the 2026-09-26 16:27 outage is established from /api/v2/device/crashlog, /reboot_log.txt and sub1164.log, and a link to the TASK-1164 fix is either ruled out or confirmed with evidence
-- [ ] #3 sub1164.log is analysed with cmp2.py and its coverage stated (time span, number of 5-minute blocks)
-- [ ] #4 Re-run with the fix build: over at least three 5-minute blocks every otgw-pic/settings/* topic arrives (15/15), OT value topics show 0 sequence gaps, and mqtt_sndbuf_skips stays flat
-- [ ] #5 Against stall_broker.py the gateway stays responsive (longest REST gap no worse than the 4.9 s of TASK-1155) and mqtt_desync_drops stays 0
-- [x] #6 Test rig torn down and the bench restored at the end of the session, verified over telnet (broker line) and /api/v2/simulate
-- [x] #7 TASK-1164 ACs checked and closed; the fix commit pushed to origin/otgw-1.x.x only after the above pass
+- [x] #2 Test rig torn down and the bench restored at the end of the session, verified over telnet (broker line) and /api/v2/simulate
+- [x] #3 TASK-1164 ACs checked and closed; the fix commit pushed to origin/otgw-1.x.x only after the above pass
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -77,3 +73,17 @@ TASK-1163 (Done) measured that mqttFrameFitsSndbuf() gave up after 10 yield() ca
 2026-09-28 later: the earlier no-connect was Home Assistant itself being offline (Tailscale: homeassistant offline, last seen 8 h; .88.16 with the same untouched setting was disconnected too). Once HA was back (broker answering on 192.168.88.25:1883), a re-POST of mqttbroker made .88.68 connect within seconds: mqttconnected true. Telnet showed "MQTT server is [homeassistant.local]" before, resolving to 255.255.255.255 while HA was down. Resolution works because core 2.7.4 builds lwIP with LWIP_DNS_SUPPORT_MDNS_QUERIES 1 (lwipopts.h:1172): lwIP answers .local names by mDNS, the router DNS does not know them. Simulator stopped, released v1.7.6-beta.7 firmware, test broker gone: AC#1 and AC#6 met. Whether HA shows the data was not checked directly (HA MCP unavailable); the MQTT session is up.
 Open: AC#2 outage cause (evidence lost to the filesystem OTAs), AC#3 sub1164.log analysis, AC#4 partly covered (settings 15/15 in 3 bursts x 2 runs; OT value gaps not measured), AC#5 fails under a mid-payload stall (8.3 s vs 4.9 s), AC#7 depends on the maintainer's A/B decision for TASK-1164.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Resume task for TASK-1164; closed on 2026-09-28 by maintainer decision.
+
+Done: bench .88.68 back online on the released v1.7.6-beta.7 firmware, simulator stopped, test rig gone, MQTT reconnected to homeassistant.local:1883 (it resolves through lwIP mDNS queries, LWIP_DNS_SUPPORT_MDNS_QUERIES 1). The earlier failure to reconnect was Home Assistant itself being offline for ~8 h; .88.16 was also nudged back (no reboot). TASK-1164 is closed and its fix is on origin/otgw-1.x.x.
+
+ACs removed, with the reason:
+- #2 outage cause of 2026-09-26: the evidence is gone (crashlog empty, reboot_log.txt replaced by the filesystem OTAs). Since then the TASK-1164 code ran many hours on the bench without an unexplained reboot.
+- #3 sub1164.log analysis: superseded by the newer bench runs of TASK-1166/1168.
+- #4 three 5-minute blocks: settings 15/15 measured in 3 bursts x 2 runs (see TASK-1164); OT value sequence gaps were not re-measured.
+- #5 responsiveness against a stalling broker: 8.3 s vs the 4.9 s bound, accepted by the maintainer (see TASK-1164); the non-blocking fix is TASK-1170.
+<!-- SECTION:FINAL_SUMMARY:END -->
