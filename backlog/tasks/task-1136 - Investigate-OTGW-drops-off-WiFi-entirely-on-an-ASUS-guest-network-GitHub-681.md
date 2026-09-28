@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:22'
-updated_date: '2026-09-28 20:07'
+updated_date: '2026-09-28 20:08'
 labels:
   - bug
   - needs-info
@@ -30,8 +30,7 @@ Leading non-firmware explanation: the device sits on a 2.4GHz GUEST network on a
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 If they persist off the guest network: a capture is collected and a firmware-side root cause is identified or ruled out with evidence
-- [ ] #2 During an outage, a capture shows whether the telnet stream (port 23) keeps flowing while HTTP returns no response, which separates a wedged web server from a dead network stack; the reporter runs the bash snippet posted on issue 681
+- [ ] #1 Resolution recorded: the reporter's outages stopped after a router-side change (ASUS 2.4 GHz Wireless mode Auto -> Legacy), no firmware defect found
 <!-- AC:END -->
 
 ## Implementation Notes
