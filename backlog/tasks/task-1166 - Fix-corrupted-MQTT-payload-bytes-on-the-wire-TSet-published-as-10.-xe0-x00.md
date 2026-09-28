@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 20:07'
+updated_date: '2026-09-28 06:01'
 labels:
   - bug
   - mqtt
@@ -68,6 +68,8 @@ Run A, pre-fix 1.7.6-beta.7+e7696a9, 900 s: 22 triggers, 27 stalls, 1928 publish
 
 Run B, fix 1.7.6-beta.7+3bc71d6, same harness and schedule, 900 s: 22 triggers, 29 stalls, 1839 publishes, device mqtt_desync_drops 8. Broker saw 8 truncated frames, NONE ending in e0 00 (0 disconnect_injected, 0 corrupt_delivered, 0 malformed, 0 non_utf8), 8 connections = reconnect after every drop. Frame n=4 was a small non-retained OFF publish on .../electric_production cut after the topic with all 3 payload bytes missing; the broker discarded it at EOF.
 A vs B: disconnect_injected 6/6 -> 0/8. Not reproduced on the bench: the exact 1- or 2-bytes-short case that delivers or malforms (stalls land mostly on large discovery frames); that case is covered by the host test.
+
+2026-09-28 correction: the "separate latent issue" noted above (setSync(true) buffer reuse) does not exist. lwIP on core 2.7.4 always copies (LWIP_NETIF_TX_SINGLE_PBUF forces TCP_WRITE_FLAG_COPY). Measured and closed in TASK-1168.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
