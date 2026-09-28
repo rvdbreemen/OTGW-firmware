@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-26 14:47'
-updated_date: '2026-09-28 17:05'
+updated_date: '2026-09-28 19:50'
 labels:
   - bug
   - mqtt
@@ -62,7 +62,7 @@ TASK-1163 (Done) measured that mqttFrameFitsSndbuf() gave up after 10 yield() ca
 - [ ] #4 Re-run with the fix build: over at least three 5-minute blocks every otgw-pic/settings/* topic arrives (15/15), OT value topics show 0 sequence gaps, and mqtt_sndbuf_skips stays flat
 - [ ] #5 Against stall_broker.py the gateway stays responsive (longest REST gap no worse than the 4.9 s of TASK-1155) and mqtt_desync_drops stays 0
 - [x] #6 Test rig torn down and the bench restored at the end of the session, verified over telnet (broker line) and /api/v2/simulate
-- [ ] #7 TASK-1164 ACs checked and closed; the fix commit pushed to origin/otgw-1.x.x only after the above pass
+- [x] #7 TASK-1164 ACs checked and closed; the fix commit pushed to origin/otgw-1.x.x only after the above pass
 <!-- AC:END -->
 
 ## Implementation Notes
