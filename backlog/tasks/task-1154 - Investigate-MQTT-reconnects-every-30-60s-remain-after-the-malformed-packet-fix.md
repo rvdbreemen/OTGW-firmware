@@ -3,11 +3,11 @@ id: TASK-1154
 title: >-
   Investigate: MQTT reconnects every 30-60s remain after the malformed-packet
   fix
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-22 21:15'
-updated_date: '2026-09-24 16:41'
+updated_date: '2026-09-28 06:24'
 labels:
   - bug
 dependencies:
@@ -183,4 +183,6 @@ Our own notes and CHANGELOG described the short write as happening "until the 5 
 ## Cost and verification
 
 4 bytes of static RAM (52728 to 52732). Build green, evaluator 38 checks and 0 failures, validated on the bench gateway at 192.168.88.68 with a purpose-built stalling broker. Broker settings restored afterwards; the stored MQTT password was never touched, because the settings POST takes one field per request.
+
+Follow-up (2026-09-28): the remedy this task introduced dropped the link with PubSubClient::disconnect(), which wrote DISCONNECT (E0 00) into the unfinished PUBLISH. Fixed in TASK-1166 (v1.7.6-beta.7): the link is now closed without writing anything.
 <!-- SECTION:FINAL_SUMMARY:END -->
