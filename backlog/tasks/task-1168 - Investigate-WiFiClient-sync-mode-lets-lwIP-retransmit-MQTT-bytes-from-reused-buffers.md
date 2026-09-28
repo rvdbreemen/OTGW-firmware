@@ -3,10 +3,11 @@ id: TASK-1168
 title: >-
   Investigate: WiFiClient sync mode lets lwIP retransmit MQTT bytes from reused
   buffers
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-27 07:48'
-updated_date: '2026-09-27 09:02'
+updated_date: '2026-09-28 04:45'
 labels:
   - bug
   - mqtt
