@@ -4,10 +4,11 @@ title: Non-blocking buffered writers for port 25238 clients and MQTT
 status: To Do
 assignee: []
 created_date: '2026-09-28 04:06'
-updated_date: '2026-09-28 19:52'
+updated_date: '2026-09-28 19:57'
 labels:
   - feature
   - port-25238
+  - wontfix
 dependencies:
   - TASK-1164
 priority: medium
@@ -38,4 +39,6 @@ Goal: writes to port-25238 clients never block the loop, and a briefly slow clie
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-09-28 scope extended (maintainer, TASK-1164 decision): the same blocking-write problem exists on the MQTT path. With a broker that stops reading mid-payload, one WiFiClient::write() blocks up to 5 s and the 5 s MQTT_WRITE_STALL_BUDGET_MS is only checked between writes, so the loop is held up to 8.3 s (measured) before the link is dropped. One design for both writers.
+
+WON'T DO. Maintainer decided on 2026-09-28 not to build this: v1.7.6-beta.7 works well for users. The measured behaviour stays as documented in TASK-1164 and TASK-1169: a stalled port-25238 client loses output and is dropped after ~9 s, and a broker that stops reading mid-payload holds the loop up to ~8 s before a clean reconnect. Related earlier decision: TASK-1149 (TX ring for SimpleTelnet), also won't do.
 <!-- SECTION:NOTES:END -->
