@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-24 20:01'
-updated_date: '2026-09-26 14:48'
+updated_date: '2026-09-28 07:26'
 labels:
   - bug
   - mqtt
@@ -50,4 +50,11 @@ State:
 Next when resumed: 1) bring the bench back (RTS recovery if needed), 2) restore broker + stop sim, 3) crashlog/reboot_log, 4) analyse sub1164.log, 5) rerun AC #1-#3.
 
 2026-09-26: continuation is TASK-1165 (resume task with full state, rig and next steps). Test artefacts copied to logs/task-1164-sndbuf/.
+
+2026-09-28 bench evidence from the TASK-1166/1168 runs (.88.68, beta.7 code, scratchpad brk_syncT_*/ram_syncT_*):
+- AC#1 settings part: every otgw-pic/settings/* topic arrived, 15/15 in each of 3 housekeeping bursts, in two clean 8-minute runs (setSync true and false). mqtt_sndbuf_skips flatness was not recorded in those runs.
+- AC#2: not re-measured as a lossless comparison; integrity only: 0 corrupt/malformed/foreign-topic/invalid-JSON publishes in ~5 400.
+- AC#3 NOT met under a harsher stall: a broker that closes its receive window 5.5-9 s in the middle of a large discovery payload gives a longest REST gap of 8.3 s (setSync false 8.0 s), bound is 4.9 s, and mqtt_desync_drops rises (2-8 per 10-15 min; since TASK-1166 each ends in a clean reconnect, never a corrupt frame). The 4.9 s of TASK-1155 was measured with a broker that stops reading between publishes.
+- AC#4: build.bat and evaluate.py green for v1.7.6-beta.7.
+Shipped in v1.7.6-beta.7 on the maintainer's decision. Left In Progress: AC#3 needs a decision (accept the mid-payload case or bound the payload write too).
 <!-- SECTION:NOTES:END -->
