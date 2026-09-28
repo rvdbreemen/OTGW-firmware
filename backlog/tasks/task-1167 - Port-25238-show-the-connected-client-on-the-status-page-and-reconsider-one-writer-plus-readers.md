@@ -3,11 +3,11 @@ id: TASK-1167
 title: >-
   Port 25238: show the connected client on the status page, and reconsider one
   writer plus readers
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-26 15:04'
-updated_date: '2026-09-27 21:47'
+updated_date: '2026-09-28 04:11'
 labels:
   - feature
   - port-25238
@@ -31,11 +31,11 @@ The single-client rule exists because two writers spliced their bytes into one c
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The web status page (and /api/v2/device/info) shows whether port 25238 has a client and its IP address
+- [x] #1 The web status page (and /api/v2/device/info) shows whether port 25238 has a client and its IP address
 - [x] #2 A decision is recorded on multi-client support (for example one writer plus N read-only clients), with the command-splicing risk addressed
-- [ ] #3 iandury_ and Schelte Bron are answered in #nederlandse-ondersteuning
-- [ ] #4 Bench validation per ADR-097 Confirmation: byte transparency (all byte values 0-255, serial side captured), two concurrent writers without interleaving, idle release after 100 ms, a binary stream with CR bytes keeps the floor while the other client sends commands, HA opentherm_gw plus a second tool connected together, and heap with two streaming clients over 30 minutes
-- [ ] #5 otgwstream_* fields verified on the Device Info page and in /api/v2/device/info on hardware, including a refused third connection
+- [x] #3 iandury_ and Schelte Bron are answered in #nederlandse-ondersteuning
+- [x] #4 Bench validation per ADR-097 Confirmation: byte transparency (all byte values 0-255, serial side captured), two concurrent writers without interleaving, idle release after 100 ms, a binary stream with CR bytes keeps the floor while the other client sends commands, HA opentherm_gw plus a second tool connected together, and heap with two streaming clients over 30 minutes
+- [x] #5 otgwstream_* fields verified on the Device Info page and in /api/v2/device/info on hardware, including a refused third connection
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -103,4 +103,24 @@ If you run two tools against port 25238, we would like to hear how it behaves.
 - Heap run TWO clients (OTmonitor by the maintainer + pyotgw, same script as baseline), 1800 s: 355 samples, clients 2 throughout, no reboot (uptime 01:20 -> 01:50), pyotgw get_reports 116 ok / 0 fail, 40 warnings (baseline 22). freeheap avg 16663 vs 16890 baseline (-227 B), min 11648 vs 12960; maxblock avg 12840 vs 12884, but three dips below 11 KB (baseline none): 10944 @265 s, 6296 @720.6 s, 9728 @1330 s. otgwstream_tx_dropped 245 -> 253 @713.8 s -> 265 @720.6 s, the same moment as the 6.3 KB maxblock dip.
 - pyotgw's connection watchdog reconnected once during the run and the reconnect task died with IndexError in process_statusfields_v4 (PS=1 summary line with fewer fields than expected), "Task exception was never retrieved". Same crash as T5 with a busy second client; never seen with pyotgw alone. Plausible cause: a truncated or interleaved summary line (tx drop at ~714-720 s or OTmonitor traffic); not yet attributed. In HA this would leave the integration without a working reconnect.
 - Verdict: NOT clean. Beta held pending maintainer decision.
+
+2026-09-28: shipped in v1.7.6-beta.7 (tag on 6266b84cc, CI run 36376403096 completed success, 10 assets). Maintainer approved release with the caveats above after TASK-1169 showed the byte loss is pre-existing (identical on beta.6). Announced in #beta-testing (maintainer-approved 25238 text plus one known-limitation paragraph); iandury_ and Schelte answered in #nederlandse-ondersteuning (message 1553982356204027956).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Port 25238 accepts two clients again under a byte-transparent write floor (ADR-097), and device/info plus the Device Info page show who is connected and who was last refused. Shipped in v1.7.6-beta.7.
+
+Changes: 56301d5df (otgwstream_clients / _client_ip / _last_refused_ip + UI labels), 78b1e4553 (OTGWstream -> SimpleTelnet<2>, floor in handleOTGW(): holder read byte by byte unchanged, other slot left unread, release on 100 ms silence or 3000 ms after a non-text byte, or disconnect; SimpleTelnet e8d01df per-slot read API).
+
+Bench evidence (.88.68, PIC gateway 6.8, serial side captured read-only on COM3):
+- T1 all byte values 0-255 byte-exact; T2 4804 concurrent commands exact, 0 unexpected, 0 PIC errors; T3 100 ms release with positive control (0/40 below, 39/40 above); T4 binary floor held at 1.0/2.5 s pauses, broken at 3.5 s (positive control).
+- AC#5: refusal from a second address (NAS .88.36), same-address takeover, Device Info screenshot.
+- Heap 30 min one client vs 30 min OTmonitor + pyotgw: avg free heap 16890 vs 16663, max block avg 12884 vs 12840, no reboot.
+
+Caveats (documented, accepted by the maintainer):
+- pyotgw assumes it is the only reader/writer; next to a busy second tool its init/reconnect can fail on foreign answers (IndexError in its status parser seen once in 30 min next to OTmonitor).
+- A client that makes no progress for 1 s loses bytes and is dropped after ~9 s; pre-existing, identical on beta.6 (TASK-1169, fix proposal TASK-1170).
+- "Last Refused Address" is also set by a same-address takeover.
+<!-- SECTION:FINAL_SUMMARY:END -->
