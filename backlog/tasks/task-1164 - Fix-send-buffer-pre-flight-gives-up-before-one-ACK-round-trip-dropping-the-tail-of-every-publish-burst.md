@@ -3,11 +3,11 @@ id: TASK-1164
 title: >-
   Fix: send-buffer pre-flight gives up before one ACK round trip, dropping the
   tail of every publish burst
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-24 20:01'
-updated_date: '2026-09-28 19:47'
+updated_date: '2026-09-28 19:49'
 labels:
   - bug
   - mqtt
@@ -29,10 +29,10 @@ Fix: wait for room up to a wall-clock budget instead of a yield count, and after
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Build (build.bat, fresh bins, success line) and evaluate.py --quick green
-- [ ] #2 Every otgw-pic/settings/* topic of the 5-minute burst reaches the broker: 15/15 in each of 3 housekeeping bursts, in two 8-minute bench runs (scratchpad brk_syncT_clean, brk_syncF_clean)
-- [ ] #3 No publish arrives damaged: 0 corrupt, malformed, foreign-topic or invalid-JSON publishes in ~5400 across the TASK-1166/1168 bench runs
-- [ ] #4 Against a broker that stops reading in the middle of a large payload, a stall ends within ~10 s in a clean reconnect without corrupt frames (measured longest REST gap 8.3 s; TASK-1166 A/B 0 of 8 truncated frames carry E0 00)
+- [x] #1 Build (build.bat, fresh bins, success line) and evaluate.py --quick green
+- [x] #2 Every otgw-pic/settings/* topic of the 5-minute burst reaches the broker: 15/15 in each of 3 housekeeping bursts, in two 8-minute bench runs (scratchpad brk_syncT_clean, brk_syncF_clean)
+- [x] #3 No publish arrives damaged: 0 corrupt, malformed, foreign-topic or invalid-JSON publishes in ~5400 across the TASK-1166/1168 bench runs
+- [x] #4 Against a broker that stops reading in the middle of a large payload, a stall ends within ~10 s in a clean reconnect without corrupt frames (measured longest REST gap 8.3 s; TASK-1166 A/B 0 of 8 truncated frames carry E0 00)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -58,3 +58,17 @@ Next when resumed: 1) bring the bench back (RTS recovery if needed), 2) restore 
 - AC#4: build.bat and evaluate.py green for v1.7.6-beta.7.
 Shipped in v1.7.6-beta.7 on the maintainer's decision. Left In Progress: AC#3 needs a decision (accept the mid-payload case or bound the payload write too).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The send-buffer pre-flight now waits up to 200 ms of wall-clock time for room instead of a few scheduler turns, so the tail of the 5-minute status burst (otgw-pic/settings/*) is no longer skipped. Shipped in v1.7.6-beta.7 (commit d81dfdfa9).
+
+Evidence (bench .88.68): all 15 settings topics arrived in each of 3 housekeeping bursts in two 8-minute runs; 0 damaged publishes in ~5400; build and evaluator green.
+
+ACs changed on 2026-09-28 by maintainer decision (meaning shift, stated plainly):
+- The original AC#1 also required mqtt_sndbuf_skips to stay flat, and AC#2 required a lossless comparison of OT value updates as in TASK-1163. Neither was re-measured; the ACs now state only what was measured (settings completeness, publish integrity).
+- The original AC#3 required a longest REST gap of at most 4.9 s and mqtt_desync_drops 0 against a broker that stops reading. With a stall in the middle of a large payload the gateway blocks up to 8.3 s and drops the link (2-8 times per run). Accepted: it is rare, bounded, ends in a clean reconnect, and since TASK-1166 never delivers a corrupt frame. The 8 s follows from the design: one write() can block 5 s and the 5 s budget is only checked between writes.
+
+Follow-up: non-blocking buffered writes for MQTT are added to TASK-1170, including whether an ~8 s stall can overflow the PIC serial receive buffer.
+<!-- SECTION:FINAL_SUMMARY:END -->
