@@ -3,11 +3,11 @@ id: TASK-1134
 title: >-
   Fix: MQTT malformed-packet disconnects return on 1.7.5 despite the TASK-769
   short-write fix
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-17 20:20'
-updated_date: '2026-09-22 21:27'
+updated_date: '2026-09-28 06:24'
 labels:
   - bug
 dependencies: []
@@ -119,4 +119,6 @@ Validation: run_tests.bat 51 checks 0 failures; build.bat exit 0 with fresh arti
 
 Risk and follow-up
 Unproven on hardware. Field validation by mrfox7688 and jaronbor over at least 3 days is the remaining acceptance criterion, so the task stays In Progress. A 13th call site added later would reintroduce the gap; a source-level guard for that is not part of this change. PubSubClient::endPublish() returns 1 unconditionally, so every "if (!endPublish())" branch in both files is dead code, noted but deliberately left alone.
+
+Follow-up (2026-09-28): the remedy this task introduced dropped the link with PubSubClient::disconnect(), which wrote DISCONNECT (E0 00) into the unfinished PUBLISH. Fixed in TASK-1166 (v1.7.6-beta.7): the link is now closed without writing anything.
 <!-- SECTION:FINAL_SUMMARY:END -->
