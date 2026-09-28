@@ -1,14 +1,15 @@
 ---
 id: TASK-1170
-title: Non-blocking port-25238 writers with a per-client buffer
+title: Non-blocking buffered writers for port 25238 clients and MQTT
 status: To Do
 assignee: []
 created_date: '2026-09-28 04:06'
+updated_date: '2026-09-28 19:52'
 labels:
   - feature
   - port-25238
 dependencies:
-  - TASK-1169
+  - TASK-1164
 priority: medium
 ordinal: 239000
 ---
@@ -29,4 +30,12 @@ Goal: writes to port-25238 clients never block the loop, and a briefly slow clie
 - [ ] #4 Byte transparency and the ADR-097 floor tests (T1-T4) still pass on the bench
 - [ ] #5 Heap with two streaming clients over 30 minutes stays within the budget stated in the ADR
 - [ ] #6 Build (build.bat, fresh bins, success line) and evaluate.py --quick green
+- [ ] #7 MQTT publishes no longer block the loop on a stalled broker: longest REST gap during a mid-payload stall at idle level, measured old (8.3 s) vs new with the stall broker harness
+- [ ] #8 Measured whether a multi-second loop stall can overflow the PIC serial receive buffer (buffer size from code with file:line, PIC output rate on the bench), old vs new
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-28 scope extended (maintainer, TASK-1164 decision): the same blocking-write problem exists on the MQTT path. With a broker that stops reading mid-payload, one WiFiClient::write() blocks up to 5 s and the 5 s MQTT_WRITE_STALL_BUDGET_MS is only checked between writes, so the loop is held up to 8.3 s (measured) before the link is dropped. One design for both writers.
+<!-- SECTION:NOTES:END -->
