@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-09-29 03:56'
+updated_date: '2026-09-29 03:58'
 labels:
   - bug
   - port-25238
@@ -30,3 +31,9 @@ From code (not yet seen on the bench): when both slots are occupied and a new co
 - [ ] #2 If reproduced: the takeover evicts the stale connection (for example the slot with no traffic for longest, or a socket that fails a liveness probe), measured old vs new with the same reproduction
 - [ ] #3 iandury_ answered in #nederlandse-ondersteuning with the finding
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+ID notice: the backlog CLI reused ID 1170, which also belongs to an archived won't-do task (backlog/archive/tasks/task-1170 - Non-blocking-port-25238-writers-with-a-per-client-buffer.md). This active task is the same-address takeover fix; references to "TASK-1170" before 2026-09-29 mean the archived one.
+<!-- SECTION:NOTES:END -->
