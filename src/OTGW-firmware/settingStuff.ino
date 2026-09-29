@@ -276,6 +276,7 @@ bool writeSettings(bool show)
   ok = writeJsonIntKV(file, F("S0COUNTERinterval"), settings.s0.iInterval, true) && ok;
   ok = writeJsonBoolKV(file, F("OTGWcommandenable"), settings.otgw.bEnable, true) && ok;
   ok = writeJsonStringKV(file, F("OTGWcommands"), settings.otgw.sCommands, true) && ok;
+  ok = writeJsonBoolKV(file, F("PICtempsensor"), settings.otgw.bPicTempSensor, true) && ok;
   ok = writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settings.outputs.bEnabled, true) && ok;
   ok = writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settings.outputs.iPin, true) && ok;
   ok = writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settings.outputs.iTriggerBit, true) && ok;
@@ -658,6 +659,7 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("OTGWcommandenable"))==0)    settings.otgw.bEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTGWcommands"))==0)         strlcpy(settings.otgw.sCommands, newValue, sizeof(settings.otgw.sCommands));
+  else if (strcasecmp_P(field, PSTR("PICtempsensor"))==0)        settings.otgw.bPicTempSensor = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("GPIOOUTPUTSenabled")) == 0)
   {
     settings.outputs.bEnabled = EVALBOOLEAN(newValue);

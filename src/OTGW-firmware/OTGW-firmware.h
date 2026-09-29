@@ -392,6 +392,9 @@ struct PicSettingsSection {    // state.picSettings — settings polled from PIC
   char sResetCause[4]         = "";  // PR=Q: last reset cause ("W"=watchdog, "B"=brownout, "P"=power-on)
   char sStandaloneInterval[8] = "";  // PR=N: message interval in standalone mode (seconds)
   char sVoltageRef[4]         = "";  // PR=V: voltage reference setting (numeric)
+
+  // --- Measured value (TASK-1147, polled only when settings.otgw.bPicTempSensor) ---
+  char sTempReading[8]        = "";  // PR=E: PIC-attached temperature sensor reading in C (e.g. "19.19"); "-" = no sensor, never stored
 };
 
 
@@ -490,6 +493,7 @@ struct UISection {
 struct OTGWBootSection {            // PIC boot-time command injection
   bool bEnable        = false;
   char sCommands[129] = "";
+  bool bPicTempSensor = false;       // TASK-1147: poll PR=E (PIC-attached temperature sensor) every 3 min
 };
 
 
@@ -607,6 +611,10 @@ byte      OTGWconnstatusid   = 244;
 // dhw_water_total sensor that Home Assistant's Energy dashboard consumes.
 // Must be queued in publishNonOTDiscoveryConfigs() like the others.
 byte      OTGWdhwmeterid     = 243;
+// PIC-attached temperature sensor discovery pseudo-ID (TASK-1147): anchors the
+// otgw-pic/temperature_reading sensor. Announced on the first valid PR=E reading,
+// never at boot, so a gateway without a sensor never shows the entity.
+byte      OTGWpictempid      = 242;
 
 // Cumulative DHW water meter (TASK-1091) — see dhwWaterMeter.ino.
 extern float dhwWaterTotalL;

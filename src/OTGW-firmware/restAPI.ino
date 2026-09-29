@@ -1634,6 +1634,7 @@ void sendDeviceSettings()
   sendJsonSettingObj(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 16);
   sendJsonSettingObj(F("otgwcommandenable"), settings.otgw.bEnable, "b");
   sendJsonSettingObj(F("otgwcommands"), CSTR(settings.otgw.sCommands), "s", 128);
+  sendJsonSettingObj(F("pictempsensor"), settings.otgw.bPicTempSensor, "b");
   sendJsonSettingObj(F("webhookenable"), settings.webhook.bEnabled, "b");
   sendJsonSettingObj(F("webhookurlon"), CSTR(settings.webhook.sURLon), "s", 100);
   sendJsonSettingObj(F("webhookurloff"), CSTR(settings.webhook.sURLoff), "s", 100);
@@ -1662,7 +1663,7 @@ static const char* const PROGMEM knownSettings[] = {
   "mqttinterval", "mqttonchangepublishing", "mqttotmessage", "mqttpasswd", "mqttseparatesources",
   "mqtttoptopic", "mqttuniqueid", "mqttuser",
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
-  "otgwcommandenable", "otgwcommands",
+  "otgwcommandenable", "otgwcommands", "pictempsensor",
   "s0counterdebouncetime", "s0counterenabled", "s0counterinterval", "s0counterpin", "s0counterpulsekw",
   "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
   "ui_capture", "ui_graphtimewindow", "ui_timestamps",

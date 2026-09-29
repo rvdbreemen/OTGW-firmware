@@ -272,6 +272,10 @@ void doTaskEvery3s(){
   // Must stay ABOVE the picSettingsCycleActive early-return below.
   evaluateOTBusLiveness(false);
 
+  // TASK-1147: PR=E every 3 minutes when the PIC temperature sensor setting is on.
+  // Also above the picSettingsCycleActive early-return, which ends after boot.
+  pollPicTempSensor();
+
   if (!picSettingsCycleActive) return;
   queryNextPICsetting();
 }

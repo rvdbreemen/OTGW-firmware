@@ -8,6 +8,10 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+### Added
+
+- **The temperature sensor wired to the PIC can now reach MQTT and Home Assistant.** The PIC reports that sensor through `PR=E`, but the firmware never asked for it, so the value only showed up in the raw OpenTherm log. A new setting, PIC Temperature Sensor (off by default, in the PIC section of the settings page), makes the gateway read it every 3 minutes and publish it to `otgw-pic/temperature_reading`, with a Home Assistant temperature sensor named PIC Temperature Reading. The entity is announced on the first valid reading only: a PIC without a sensor answers `-`, and then nothing is published and no entity appears. It is separate from the existing PIC Temp Sensor diagnostic entity, which shows the sensor's configured function (`PR=D`), not a temperature. Requested by indigo_light, who has a boiler without an outdoor probe. (TASK-1147)
+
 ### Fixed
 
 - **Two tools on the same computer no longer knock each other off port 25238 when one of them reconnects.** Port 25238 lets a new connection from an address that already holds a slot replace that slot, so a tool that crashed gets its place back. With both slots held by one computer, for example Domoticz and OTmonitor, it replaced the first slot with that address, which could be the other, healthy tool. The two tools then kept replacing each other while the stale connection stayed. It now replaces the connection with the most unacknowledged data waiting, which is the one whose peer has stopped taking data; when there is no difference, it behaves as before. Measured on a bench gateway with a hung old connection: the two tools evicted each other for over 50 seconds before, 17.5 seconds after. The remaining time is how long a hung tool's own receive buffer keeps acknowledging data. Reported by iandury_. (TASK-1170)

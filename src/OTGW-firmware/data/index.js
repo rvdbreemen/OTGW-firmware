@@ -1883,7 +1883,7 @@ function applyPICAvailability(available) {
     else el.classList.add('hidden');
   });
   // Dynamic settings rows (created by refreshSettings)
-  var picSettingKeys = ['otgwcommandenable', 'otgwcommands'];
+  var picSettingKeys = ['otgwcommandenable', 'otgwcommands', 'pictempsensor'];
   picSettingKeys.forEach(function(key) {
     var row = document.getElementById('D_' + key);
     if (row) {
@@ -5713,6 +5713,7 @@ var translateFields = [
   , ["mqttseparatesources", "MQTT Separate Sources"]
   , ["legacyport25238enabled", "Legacy: enable otmonitor TCP port 25238"]
   , ["otgwcommandenable", "Run Boot Command"]
+  , ["pictempsensor", "PIC Temperature Sensor"]
   , ["otgwcommands", "Boot Command"]
   , ["thermostatconnected", "Thermostat Connected"]
   , ["boilerconnected", "Boiler Connected"]
@@ -5775,6 +5776,7 @@ var translateTooltips = [
   , ["s0counterdebouncetime", "Ignore pulses that arrive sooner than this debounce time in milliseconds."]
   , ["s0counterpulsekw", "Number of S0 pulses per kWh reported by your meter."]
   , ["otgwcommandenable", "Run the boot command automatically after the gateway starts."]
+  , ["pictempsensor", "Read the temperature sensor wired to the PIC every 3 minutes and publish it to MQTT and Home Assistant. Leave off if no sensor is connected."]
   , ["otgwcommands", "Command sent to the OTGW at startup. Use the normal OTGW serial command format."]
   , ["thermostatconnected", "Read-only status showing whether the thermostat side is currently detected."]
   , ["boilerconnected", "Read-only status showing whether the boiler side is currently detected."]

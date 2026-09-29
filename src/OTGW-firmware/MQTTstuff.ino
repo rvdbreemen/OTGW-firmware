@@ -1665,6 +1665,8 @@ void markAllMQTTConfigPending()
       // auto-heal re-announces it on a gateway whose bus never carries that id,
       // leaving a retained config for an entity that never receives state.
       if (static_cast<uint8_t>(i) == OTGWdhwmeterid && !dhwWaterMeterHasData()) continue;
+      // TASK-1147: same for the PIC temperature reading, announced on its first valid PR=E.
+      if (static_cast<uint8_t>(i) == OTGWpictempid && !picTempSensorHasData()) continue;
       setMQTTConfigPending(static_cast<uint8_t>(i));
     }
   }

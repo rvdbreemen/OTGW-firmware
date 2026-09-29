@@ -64,6 +64,7 @@ const char ha_lbl_relmodlevel[] PROGMEM = "RelModLevel";
 const char ha_lbl_chpressure[] PROGMEM = "CHPressure";
 const char ha_lbl_dhwflowrate[] PROGMEM = "DHWFlowRate";
 const char ha_lbl_dhw_water_total[] PROGMEM = "dhw_water_total";
+const char ha_lbl_pic_temperature_reading[] PROGMEM = "temperature_reading";  // TASK-1147, otgw-pic/ prefix via 0x08
 const char ha_lbl_daytime_dayofweek[] PROGMEM = "DayTime_dayofweek";
 const char ha_lbl_daytime_hour[] PROGMEM = "DayTime_hour";
 const char ha_lbl_daytime_minutes[] PROGMEM = "DayTime_minutes";
@@ -650,8 +651,9 @@ const char ha_name_solar_storage_system_type[] PROGMEM = "solar_storage_system_t
 const char ha_name_gateway_mode[] PROGMEM = "Gateway_Mode";
 const char ha_name_otgw_connected[] PROGMEM = "OTGW_Connected";
 const char ha_name_dhw_water_total[] PROGMEM = "DHW_Water_Total";
+const char ha_name_pic_temperature_reading[] PROGMEM = "PIC_Temperature_Reading";  // not "PIC_Temp_Sensor", which is the PR=D setting
 // ========== Sensor array (335 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 336;  // +5 (uptime, unsupported_msgids, ws/mqtt/http_fragskips), +1 (dhw_water_total)
+const uint16_t MQTT_HA_SENSOR_COUNT = 337;  // +5 (uptime, unsupported_msgids, ws/mqtt/http_fragskips), +1 (dhw_water_total), +1 (pic temperature_reading)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1126,6 +1128,11 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     // device_class water + state_class total_increasing is what the Home
     // Assistant Energy dashboard requires of a water meter.
     {243, 0x00, ha_lbl_dhw_water_total, ha_name_dhw_water_total, HaDeviceClass::water, HaUnit::L, HaStateClass::total_increasing, HaIcon::water, HaEntityCat::none, true},
+    // --- Pseudo-ID 242: PIC-attached temperature sensor, PR=E (TASK-1147) ---
+    // 0x08 -> otgw-pic/temperature_reading. Announced on the first valid reading
+    // (handlePRresponse) and gated in markAllMQTTConfigPending(), so a gateway
+    // without a sensor, or with the setting off, never shows the entity.
+    {242, 0x08, ha_lbl_pic_temperature_reading, ha_name_pic_temperature_reading, HaDeviceClass::temperature, HaUnit::degC, HaStateClass::measurement, HaIcon::thermometer, HaEntityCat::none, true},
 };
 
 // ========== Binary sensor array (53 entries, sorted by id) ==========
@@ -1448,7 +1455,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 239
     0xFFFF, // id 240
     0xFFFF, // id 241
-    0xFFFF, // id 242
+    336, // id 242, 1 entry (pic temperature_reading, TASK-1147)
     335, // id 243, 1 entry (dhw_water_total, TASK-1091)
     0xFFFF, // id 244
     284, // id 245, 4 entries

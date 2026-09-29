@@ -716,6 +716,31 @@ void queryNextPICsetting() {
   addOTWGcmdtoqueue(cmd, 4, true);  // forceQueue=true: bypass PR prefix dedup
 }
 
+//===================[ pollPicTempSensor ]=========================
+/*
+  TASK-1147: reads the temperature sensor wired to the PIC (PR=E) once every
+  3 minutes, only when settings.otgw.bPicTempSensor is on. The reply is handled
+  by handlePRresponse(). Same gates as queryNextPICsetting(); the due check runs
+  last, so a gated tick fires as soon as the gate clears instead of waiting for
+  the next interval.
+*/
+void pollPicTempSensor() {
+  DECLARE_TIMER_SEC(timerPicTempSensor, 180, SKIP_MISSED_TICKS);
+  if (!settings.otgw.bPicTempSensor) return;
+  if (!isPICEnabled() || !isGatewayFirmware()) return;
+  if (state.flash.bESPactive || state.flash.bPICactive) return;
+  if (isStatusBurstActive()) return;
+  if (dripDueWithinMs(500)) return;
+  if (!DUE(timerPicTempSensor)) return;
+  addOTWGcmdtoqueue("PR=E", 4, true);  // forceQueue=true: bypass PR prefix dedup
+}
+
+// True once a valid PR=E reading has arrived; gates the Home Assistant discovery
+// of the reading so a gateway without a sensor never announces it (ADR-094).
+bool picTempSensorHasData() {
+  return state.picSettings.sTempReading[0] != '\0';
+}
+
 //===================[ handlePRresponse ]==========================
 /*
   Asynchronous handler for PR: responses from the PIC.
@@ -763,6 +788,29 @@ static void handlePRresponse(const char* buf, size_t len) {
       prevGatewayKnown = true;
       OTGWDebugTf(PSTR("handlePRresponse: gateway mode = %s\r\n"), CCONOFF(isGateway));
     }
+    return;
+  }
+
+  // --- PIC-attached temperature sensor (register 'E', TASK-1147) ---
+  // "PR: E=19.19" is a reading in degrees C; "PR: E=-" means no sensor. Only a
+  // complete number is published, so a missing sensor produces no topic and no
+  // entity rather than a zero or an error string. Published on every reading,
+  // since it is only requested every 3 minutes. With the setting off the reply is
+  // ignored too, so another tool on port 25238 asking PR=E cannot announce the entity.
+  if (reg == 'E') {
+    if (!settings.otgw.bPicTempSensor) return;
+    char* end = nullptr;
+    const double reading = strtod(value, &end);
+    const bool valid = (end != value) && (*end == '\0') && reading > -60.0 && reading < 150.0;
+    if (!valid) {
+      state.picSettings.sTempReading[0] = '\0';
+      OTGWDebugTf(PSTR("handlePRresponse: PR=E no sensor reading [%s]\r\n"), value);
+      return;
+    }
+    const bool firstReading = !picTempSensorHasData();
+    strlcpy(state.picSettings.sTempReading, value, sizeof(state.picSettings.sTempReading));
+    if (firstReading) setMQTTConfigPending(OTGWpictempid);  // announce discovery on first data
+    sendMQTTDataPic(F("temperature_reading"), state.picSettings.sTempReading);
     return;
   }
 
