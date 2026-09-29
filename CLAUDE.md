@@ -54,6 +54,23 @@ backlog task edit <id> -s "In Progress" -a @claude
 
 This makes the task visible in the correct board column immediately. Skipping this step leaves the task in "To Do" while it is actually being worked on, which creates false visibility for the user and breaks board accuracy.
 
+## Task completion: Done only with evidence (project policy)
+
+A task is **Done** only when every Definition-of-Done item is satisfied: every AC checked, every DoD item checked, Final Summary added, build passes, evaluator green, no regressions. When all of them hold, set the task **Done** right away; do not leave it "In Progress" waiting for the user to flip it.
+
+Every checked AC needs evidence collected in this session: the fresh output of the build/evaluator run, a capture transcript, a curl response, a browser screenshot, a bench log. A belief that it works is not evidence, and neither is a run from before the last change. For bug fixes, the evidence is the old-vs-fix reproduction (see "Bug fixing: reproduce, then prove" below). The Final Summary names the evidence per AC, so the user can audit after the fact via the Final Summary + git log.
+
+Rationale: a well-designed AC list means "all ACs checked with evidence" already means "task objectively done". A user review as gate doubles turnaround.
+
+**Exceptions** (leave "In Progress" only if):
+- An AC is genuinely not self-verifiable (hardware-specific tester feedback, explicit user sign-off as policy, third-party integration approval). Name the blocking AC in the Final Summary.
+- A DoD item is unmet (build failed, regression, missing test).
+- The task is part of a coordinated set whose status waits on a sibling.
+
+Unsure whether an AC is self-verifiable: **attempt** the verification rather than deferring pre-emptively. A truly unverifiable AC should not be an AC.
+
+Before claiming any work done (AC checked, task Done, fix shipped, push complete), invoke `superpowers:verification-before-completion`: it forces a fresh verification run in the current message and a read of its actual output, instead of relying on earlier runs or extrapolation.
+
 ## Auto-advance to next task (project policy)
 
 After completing a task (or reaching a blocking state with no self-verifiable ACs remaining), **immediately analyse the backlog and pick up the highest-priority actionable task** without waiting for the user to prompt. Apply the following selection order:
@@ -86,6 +103,8 @@ If Discord calls start failing with "Expected token to be set" or 401, the nativ
 - **Minimal change surface**: Small, focused changes. Each change needs a concrete justification.
 - **Comments about the present only**: Avoid defensive comments about hypothetical future scenarios ("if mode X is ever added, revisit this"). They confuse future readers by implying a plan that doesn't exist. Write only about what is true now. If the future concern is real, it belongs in a backlog task, not a code comment.
 - **Fix the doc, not the identifier**: When an existing identifier's name is semantically correct but its documentation is wrong (stale docstring, mismatched comment, outdated reference), prefer fixing the documentation over renaming. A rename touching N call sites is rarely a net win when the name itself isn't the bug.
+- **Surface assumptions, don't hide confusion**: If a request is ambiguous or a simpler path exists, say so before coding. Do not silently pick between interpretations; name them and ask.
+- **Verifiable goals over vague intent**: Translate the task into a check before writing code ("add validation" → "tests for invalid inputs pass"; "fix bug" → "a test reproduces it, then passes"). For backlog work the AC checkboxes are the verification: if an AC is too vague to verify, sharpen it before implementing.
 
 ---
 
