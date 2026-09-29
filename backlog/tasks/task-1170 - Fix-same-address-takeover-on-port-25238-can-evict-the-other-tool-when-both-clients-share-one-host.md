@@ -3,11 +3,11 @@ id: TASK-1170
 title: >-
   Fix: same-address takeover on port 25238 can evict the other tool when both
   clients share one host
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-29 03:56'
-updated_date: '2026-09-29 04:20'
+updated_date: '2026-09-29 04:29'
 labels:
   - bug
   - port-25238
@@ -30,7 +30,7 @@ From code (not yet seen on the bench): when both slots are occupied and a new co
 <!-- AC:BEGIN -->
 - [x] #1 Reproduced on the bench: two clients from one host, one of them reconnects while its old socket is still considered alive; recorded which slot is evicted
 - [x] #2 If reproduced: the takeover evicts the stale connection (for example the slot with no traffic for longest, or a socket that fails a liveness probe), measured old vs new with the same reproduction
-- [ ] #3 iandury_ answered in #nederlandse-ondersteuning with the finding
+- [x] #3 iandury_ answered in #nederlandse-ondersteuning with the finding
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -48,3 +48,18 @@ ID notice: the backlog CLI reused ID 1170, which also belongs to an archived won
 - Regression: refusal from a second address, single-match takeover, 60 s two-writer run (1354 answers, 0 errors) unchanged. build.bat and evaluate --quick green.
 - 2.0.0: not affected (AsyncSimpleTelnet<1>, one slot). ADR-097 does not specify which same-address slot is replaced.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Port 25238: when a new connection comes from an address that holds more than one slot, the gateway now replaces the slot with the most unacknowledged outbound data instead of the first match, so two tools on one host (Domoticz and OTmonitor) no longer knock each other off when one reconnects over a stale socket.
+
+Change: SimpleTelnet 3e64801 (feat/per-slot-read, pushed), firmware commit 1ea57b483 (submodule bump + CHANGELOG under [Unreleased]). One comparison in _acceptNewClients(), no extra RAM. Tie (two live clients, or no traffic yet) keeps the old first-match behaviour.
+
+Evidence (bench .88.68, old = 1.7.6-beta.7, new = 1.7.7-beta.1+283f095):
+- Reproduced first: two live clients from one host, the reconnecting tool evicted the other one 5/5 (unchanged after the fix by design).
+- Hung old connection with auto-reconnecting tools: 52 s of mutual eviction before, 17.5 s after. The remainder is the time a hung tool's own OS keeps ACKing into its receive buffer; a vanished host should be picked at once (inferred, not reproducible here without admin rights).
+- Regression: refusal, single-match takeover and a 60 s two-writer run unchanged; build and evaluator green.
+
+Not affected: the 2.0.0 line (one slot). iandury_ answered in #nederlandse-ondersteuning (message 1554349448904179774). Ships with the next 1.x beta.
+<!-- SECTION:FINAL_SUMMARY:END -->
