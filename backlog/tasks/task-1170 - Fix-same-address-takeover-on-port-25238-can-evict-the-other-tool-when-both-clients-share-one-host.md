@@ -3,10 +3,11 @@ id: TASK-1170
 title: >-
   Fix: same-address takeover on port 25238 can evict the other tool when both
   clients share one host
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-29 03:56'
-updated_date: '2026-09-29 03:58'
+updated_date: '2026-09-29 04:04'
 labels:
   - bug
   - port-25238
