@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-29 03:56'
-updated_date: '2026-09-29 04:04'
+updated_date: '2026-09-29 04:06'
 labels:
   - bug
   - port-25238
@@ -28,7 +28,7 @@ From code (not yet seen on the bench): when both slots are occupied and a new co
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduced on the bench: two clients from one host, one of them reconnects while its old socket is still considered alive; recorded which slot is evicted
+- [x] #1 Reproduced on the bench: two clients from one host, one of them reconnects while its old socket is still considered alive; recorded which slot is evicted
 - [ ] #2 If reproduced: the takeover evicts the stale connection (for example the slot with no traffic for longest, or a socket that fails a liveness probe), measured old vs new with the same reproduction
 - [ ] #3 iandury_ answered in #nederlandse-ondersteuning with the finding
 <!-- AC:END -->
@@ -37,4 +37,6 @@ From code (not yet seen on the bench): when both slots are occupied and a new co
 
 <!-- SECTION:NOTES:BEGIN -->
 ID notice: the backlog CLI reused ID 1170, which also belongs to an archived won't-do task (backlog/archive/tasks/task-1170 - Non-blocking-port-25238-writers-with-a-per-client-buffer.md). This active task is the same-address takeover fix; references to "TASK-1170" before 2026-09-29 mean the archived one.
+
+2026-09-29 AC#1 reproduced on bench .88.68 (v1.7.6 code, 1.7.6-beta.7+6266b84), harness scratchpad t1170.py: A connects (slot 0), B connects (slot 1), then B opens a new connection while its old socket stays open (a crash without FIN, as seen by the gateway). Result 5 of 5 rounds: A (the other tool) was evicted, B's old socket stayed alive, B's new socket got A's slot. Cause as read from code: _acceptNewClients() takes the FIRST active slot whose IP matches (SimpleTelnet_impl.tpp:427-433).
 <!-- SECTION:NOTES:END -->
