@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-29 19:11'
+updated_date: '2026-09-29 21:22'
 labels:
   - enhancement
 dependencies: []
@@ -167,4 +167,6 @@ Recommendation: do not implement PR=E polling on current evidence. Either park t
 - AC#4: one 4-byte command per 180 s against 15 PR= reads every 3 s during the boot readout; not measured as a separate OT-disturbance run, argued by rate.
 - AC#5: build.bat and evaluate --quick 36/36.
 - AC#6 (indigo_light confirms on his gateway) needs a published build; pending.
+
+2026-09-29: shipped in v1.7.7-beta.1 (tag on a6f61b715, CI run 36632317938 success, 10 assets). Announced in #beta-testing (1554603978296135760) and asked indigo_light to test in #nederlandse-ondersteuning (1554603983593672745); indigo_light is named without a ping because his Discord user ID is not known yet (discord-mcp name lookup does not work). AC#6 waits for his confirmation.
 <!-- SECTION:NOTES:END -->
