@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-29 18:36'
+updated_date: '2026-09-29 18:41'
 labels:
   - enhancement
 dependencies: []
@@ -51,14 +51,27 @@ HISTORY. This record began as a bug report, "Dallas sensor values are read but n
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The firmware queries PR=E on an agreed cadence and parses the PR: E=<value> reply
-- [ ] #2 The reading is published to its own MQTT topic with a Home Assistant discovery entry, typed as a temperature in degrees Celsius
-- [ ] #3 A gateway with no sensor on the PIC publishes nothing rather than a zero or an error string, so an absent entity means no sensor and not a broken build
-- [ ] #4 The existing PIC Temp Sensor diagnostic entity (PR=D, settings/temp_sensor) is left alone, and the new entity is named so the two cannot be confused
-- [ ] #5 Polling PR=E does not measurably disturb OpenTherm traffic on the shared serial line
-- [ ] #6 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
-- [ ] #7 indigo_light confirms the value reaches Home Assistant on his gateway
+- [ ] #1 The reading is published to its own MQTT topic with a Home Assistant discovery entry, typed as a temperature in degrees Celsius
+- [ ] #2 A gateway with no sensor on the PIC publishes nothing rather than a zero or an error string, so an absent entity means no sensor and not a broken build
+- [ ] #3 The existing PIC Temp Sensor diagnostic entity (PR=D, settings/temp_sensor) is left alone, and the new entity is named so the two cannot be confused
+- [ ] #4 Polling PR=E does not measurably disturb OpenTherm traffic on the shared serial line
+- [ ] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [ ] #6 indigo_light confirms the value reaches Home Assistant on his gateway
+- [ ] #7 A setting 'PIC temperature sensor' (default off) enables the readout; when on, the firmware sends PR=E once every 3 minutes and parses the PR: E=<value> reply; when off, PR=E is never sent
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Maintainer decisions (2026-09-29): optional via a setting, default off; read once every 3 minutes. Exposure only (no automatic use as outside temperature; HA can already feed <top>/set/<id>/outside).
+
+1. Setting settings.otgw.bPicTempSensor (default false), JSON key PICtempsensor, REST pictempsensor (GET list + POST whitelist + updateSetting), web UI label and help text, shown in the PIC group only when a PIC is present.
+2. Poll: DECLARE_TIMER_SEC 180 s; from doTaskEvery3s (above the PIC-settings early return) queue PR=E via addOTWGcmdtoqueue when the setting is on and the PIC is a gateway PIC, not flashing, no status burst (same gates as queryNextPICsetting).
+3. Parse in handlePRresponse: case E. Value "-" (verified on bench PIC 6.8 without sensor) or anything not a strict float = no sensor: publish nothing. A valid float: store in state.picSettings.sTempReading and publish to otgw-pic/temperature_reading.
+4. HA discovery: new pseudo-id 242 (free in sensor and binary-sensor indexes), one row appended at the END of mqttHaSensors[] (temperature, degC, measurement, thermometer, PIC flag 0x08), MQTT_HA_SENSOR_COUNT +1, mqttHaSensorIndex[242]. Announced JIT on the first valid reading (setMQTTConfigPending(242) once) and gated in markAllMQTTConfigPending like the DHW meter (ADR-094), so a gateway without a sensor never announces it. Name "PIC Sensor Temperature" vs the existing diagnostic "PIC Temp Sensor" setting entity.
+5. Evidence on bench .88.68: setting off -> no PR=E on the serial side (COM3 capture); on -> PR=E every 180 s; PIC without sensor -> no topic and no discovery config; a valid reply path shown by injecting a PR: E=<value> line through the simulator if possible, else by host test of the parser.
+6. build.bat, evaluate --quick, CHANGELOG, commit, push; ask indigo_light to test (AC#7).
+<!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
 
