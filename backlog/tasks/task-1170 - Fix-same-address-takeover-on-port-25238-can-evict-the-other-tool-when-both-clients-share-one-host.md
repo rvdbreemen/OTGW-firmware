@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-29 03:56'
-updated_date: '2026-09-29 04:29'
+updated_date: '2026-09-29 21:22'
 labels:
   - bug
   - port-25238
@@ -47,6 +47,8 @@ ID notice: the backlog CLI reused ID 1170, which also belongs to an archived won
 - Why not immediate: a hung app whose OS still ACKs is invisible at TCP level until its receive buffer fills; a vanished host (no ACKs) shows queued data at the next PIC output. The vanished-host case could not be reproduced from this laptop without admin rights (no way to drop ACKs), so it is inferred, not measured.
 - Regression: refusal from a second address, single-match takeover, 60 s two-writer run (1354 answers, 0 errors) unchanged. build.bat and evaluate --quick green.
 - 2.0.0: not affected (AsyncSimpleTelnet<1>, one slot). ADR-097 does not specify which same-address slot is replaced.
+
+2026-09-29: shipped in v1.7.7-beta.1; iandury_ pinged in #beta-testing and #nederlandse-ondersteuning.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
