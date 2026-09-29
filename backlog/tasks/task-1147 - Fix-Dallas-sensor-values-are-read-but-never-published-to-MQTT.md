@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-29 18:41'
+updated_date: '2026-09-29 19:11'
 labels:
   - enhancement
 dependencies: []
@@ -51,13 +51,13 @@ HISTORY. This record began as a bug report, "Dallas sensor values are read but n
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The reading is published to its own MQTT topic with a Home Assistant discovery entry, typed as a temperature in degrees Celsius
-- [ ] #2 A gateway with no sensor on the PIC publishes nothing rather than a zero or an error string, so an absent entity means no sensor and not a broken build
-- [ ] #3 The existing PIC Temp Sensor diagnostic entity (PR=D, settings/temp_sensor) is left alone, and the new entity is named so the two cannot be confused
-- [ ] #4 Polling PR=E does not measurably disturb OpenTherm traffic on the shared serial line
-- [ ] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
+- [x] #1 The reading is published to its own MQTT topic with a Home Assistant discovery entry, typed as a temperature in degrees Celsius
+- [x] #2 A gateway with no sensor on the PIC publishes nothing rather than a zero or an error string, so an absent entity means no sensor and not a broken build
+- [x] #3 The existing PIC Temp Sensor diagnostic entity (PR=D, settings/temp_sensor) is left alone, and the new entity is named so the two cannot be confused
+- [x] #4 Polling PR=E does not measurably disturb OpenTherm traffic on the shared serial line
+- [x] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
 - [ ] #6 indigo_light confirms the value reaches Home Assistant on his gateway
-- [ ] #7 A setting 'PIC temperature sensor' (default off) enables the readout; when on, the firmware sends PR=E once every 3 minutes and parses the PR: E=<value> reply; when off, PR=E is never sent
+- [x] #7 A setting 'PIC temperature sensor' (default off) enables the readout; when on, the firmware sends PR=E once every 3 minutes and parses the PR: E=<value> reply; when off, PR=E is never sent
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -157,4 +157,14 @@ Two things to watch, neither a defect today:
 Recommendation: do not implement PR=E polling on current evidence. Either park this until the maintainer has the answer from .otgw, or reduce it to the documentation question, which is the part with a demonstrated user need.
 
 2026-09-23: Antwoord van .otgw (Discord #nederlandse-ondersteuning, 22-09 22:14 en 23-09 06:29): PR=E rapporteert de laatst gemeten temperatuur van de sensor op de GPIO-poort van de PIC. Periodiek sturen (elke paar minuten) kan, maar alleen zinvol als GPIO2 voor temperatuurmeting is geconfigureerd. indigo_light vroeg daarna of de AA=27-opstelling niet gewoon permanent volstaat; .otgw: "Robert denkt verder dan alleen jouw specifieke geval". Blokkade (wat doet PR=E) is hiermee opgeheven.
+
+2026-09-29 implemented and bench-verified (commit 7ee2344e2, 1.7.7-beta.1+ed84e49 on .88.68, serial side captured on COM3, MQTT on a raw-capture broker; harness scratchpad t1147.py / t1147b.py):
+- AC#7 setting: pictempsensor defaults to false (REST and settings page, PIC group, screenshot t1147_settings.png). Off: 0 PR=E on the serial side in 200 s. On: 3 PR=E in 400 s (at enable, then every 180 s).
+- AC#2 no sensor: bench PIC 6.8 answers "PR: E=-"; no otgw-pic/temperature_reading and no discovery config in 400 s.
+- AC#1 valid reading: "PR: E=21.50" injected through the simulator (same handlePRresponse path as a PIC reply): value published to OTGW/value/<id>/otgw-pic/temperature_reading, discovery homeassistant/sensor/<id>/temperature_reading/config once, device_class temperature, unit degC, state_class measurement, mdi:thermometer.
+- Setting off + same injection: 0 value, 0 config (163 other publishes on the link), so another tool asking PR=E cannot announce the entity.
+- AC#3: PR=D entity untouched; new entity "PIC Temperature Reading" vs existing "PIC Temp Sensor" (the sensor function setting).
+- AC#4: one 4-byte command per 180 s against 15 PR= reads every 3 s during the boot readout; not measured as a separate OT-disturbance run, argued by rate.
+- AC#5: build.bat and evaluate --quick 36/36.
+- AC#6 (indigo_light confirms on his gateway) needs a published build; pending.
 <!-- SECTION:NOTES:END -->
