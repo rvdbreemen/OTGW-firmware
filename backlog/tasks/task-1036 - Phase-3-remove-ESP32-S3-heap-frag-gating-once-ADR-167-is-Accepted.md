@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-09 21:17'
-updated_date: '2026-07-31 20:50'
+updated_date: '2026-09-30 09:41'
 labels: []
 dependencies: []
 ordinal: 245000
@@ -43,4 +43,10 @@ INCIDENTAL FIX: the first build failed on 'src/OTGW-firmware/version.h:8:1: erro
 AC#4 (re-soak) is NOT done and is not self-verifiable: it needs a clean multi-hour soak on dedicated hardware with no concurrent testing on the same unit. Left unchecked deliberately.
 
 2026-07-31 status: ACs 1-3 complete and pushed as 9c0a7e78a. AC#4 is the only thing outstanding and is BLOCKED on hardware: it needs a clean multi-hour soak on a dedicated unit with no concurrent testing on the same board (the TASK-956 10h run was already contaminated by parallel PIC-flash testing, which is what produced its 1027ms loop-gap blemish). Left In Progress rather than Done so the open field-validation is visible. UNBLOCKS WHEN: a bench unit is free for an uninterrupted soak window.
+
+2026-09-30 soak driver ready for the AC#4 re-soak (scripts/, no prerelease bump).
+scripts/heap_soak_driver.py: snapshots carry bootcount, lastreset, uptime and fwversion; a change in bootcount/lastreset/fwversion or an uptime regression is a 'reboot' anomaly (bootcount alone is not enough: updateRebootCount() returns N+1 even when the write fails). 'unreachable' = no complete snapshot for longer than --max-unreachable-sec (default 120). Telnet 's' toggles are replaced by idempotent POST /api/v2/simulate/start and /stop, and simulation.active is checked in every snapshot (sim_inactive anomaly). --republish-every-min N POSTs /api/v2/discovery/republish, logs each status and tracks disc_pending_ids back to 0 (republish_failed / republish_not_drained); disc_republish_triggered is not used because a REST republish never increments it. One SUMMARY line; exit 0 clean, 1 anomaly, 2 not started. JSON requests are spaced 0.3 s so a trailing REST-slot release cannot cause a self-inflicted 503 at cap 1 (it would inflate hd_rest_503). The docstring lists the preconditions: upload /otgw_simulation.log (not in the LittleFS image) and switch the nightly restart off.
+Evidence: python -m py_compile OK; scripts/tests/test_heap_soak_driver.py 19 tests OK (102.8 s, under build load). Workflow contrast run: the OLD driver on a stub that reboots exits 0 with no anomaly and leaves the replay ON; the new driver exits 1 with ['reboot','sim_inactive'] and stops the replay.
+Proposed sharper AC#4 wording (for the maintainer): 'Rebuilt (esp32-combo, current dev) and re-soaked >= 10 h on the OTGW32 with scripts/heap_soak_driver.py. The driver exits 0: no reboot, unreachable, sim_inactive, republish_failed or republish_not_drained anomaly. Its SUMMARY shows hd_enter_low/warning/critical_max = 0, hd_ws_drops_max = hd_mqtt_drops_max = 0, hd_min_max_block_min >= 8192 (report the floor), and hd_max_loop_gap_ms_max with no multi-second stall.'
+Known test gap: the 'no POST when fewer than N minutes remain' guard has no deterministic test yet. OPEN: AC#4 needs the bench (overnight).
 <!-- SECTION:NOTES:END -->
