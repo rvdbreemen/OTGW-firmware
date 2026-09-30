@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.378
+**  Version  : v2.0.0-alpha.379
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -98,6 +98,7 @@ bool webFileGateTryAdmit() {
   return true;
 }
 void webFileGateRelease() { if (webFileInFlight) webFileInFlight--; }
+void restSlotRelease()    { if (restInFlight) restInFlight--; }
 
 // Zero-allocation HTTP method to string (returns PROGMEM pointer).
 // Replaced an older helper that returned String, i.e. a heap allocation per
@@ -2698,9 +2699,11 @@ void processAPI(AsyncWebServerRequest *request)
   // BEFORE building any JSON, so the device can never be driven out of memory by
   // abusive concurrency (which otherwise aborts on bad_alloc in addHeader once the
   // chunked responses pile up). The server sends "Connection: close" and closes
-  // after every response (no keep-alive), so request->onDisconnect() fires exactly
-  // once per request -> the counter is balanced and cannot leak. The diagnostic
-  // logs the heap at the cap so we can tell transient concurrency from a real leak.
+  // after every response (no keep-alive), so the request's disconnect callback fires
+  // exactly once. The library keeps ONE such callback per request, so the slot is
+  // armed through webArmSlotRelease(), which also covers a file gate slot that
+  // webSendFile() takes later in the same request (TASK-1172). The diagnostic logs
+  // the heap at the cap so we can tell transient concurrency from a real leak.
   const uint8_t effectiveCap = restEffectiveInflightCap();
   if (restInFlight >= effectiveCap) {
     RESTDebugTf(PSTR("REST BUSY: %u/%u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
@@ -2711,7 +2714,8 @@ void processAPI(AsyncWebServerRequest *request)
   }
   restInFlight++;
   if (restInFlight > state.heapdiag.iRestInflightHwm) state.heapdiag.iRestInflightHwm = restInFlight;  // TASK-1017
-  request->onDisconnect([]() { if (restInFlight) restInFlight--; });
+  g_restSlotHeld = true;
+  webArmSlotRelease();
 
   // Static buffers save ~356 bytes of stack. Safe under ESPAsyncWebServer's
   // single-task (async_tcp) handler serialization — no concurrent re-entry.
@@ -2775,7 +2779,7 @@ void processAPI(AsyncWebServerRequest *request)
           if (strcmp_P(words[3], r.segment) == 0) {
             restResponseStatus = 200; // default; overwritten by sendApiError if handler fails
             // ADR-172: poll budget for the UI-driven endpoints; answers 429 itself.
-            // Placed after restInFlight++ and the onDisconnect registration above, so
+            // Placed after restInFlight++ and webArmSlotRelease() above, so
             // the in-flight counter stays balanced on this early return (same shape as
             // the 414 / 500 early returns).
             if (!checkApiRateLimit(words, wc, method)) {

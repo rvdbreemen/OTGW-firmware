@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.378
+**  Version  : v2.0.0-alpha.379
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -50,9 +50,13 @@ extern AsyncWebServer server;
 // currentRequest is set at the top of every route handler and read by the
 // compat accessors below. g_restStream is the lazily-allocated response stream
 // for the small-JSON path; g_responseSent guards the send-once invariant.
+// g_restSlotHeld / g_fileSlotHeld record which backpressure gate slots the
+// current request holds; webArmSlotRelease() releases them together (TASK-1172).
 extern AsyncWebServerRequest* currentRequest;
 extern AsyncResponseStream*   g_restStream;
 extern bool                   g_responseSent;
+extern bool                   g_restSlotHeld;
+extern bool                   g_fileSlotHeld;
 
 // Pending response headers. The sync WebServer let callers stage headers with
 // sendHeader() before send(); the async API attaches headers to the response
@@ -114,6 +118,8 @@ inline void webBeginRequest(AsyncWebServerRequest* req) {
   currentRequest          = req;
   g_restStream            = nullptr;
   g_responseSent          = false;
+  g_restSlotHeld          = false;
+  g_fileSlotHeld          = false;
   g_pendingHeaders.count  = 0;
 }
 
@@ -308,7 +314,25 @@ inline void webSendP(int code, PGM_P contentType, PGM_P body) {
 // sibling REST gate, where the platform heap shims are in scope); forward-declared here
 // so webSendFile can admit/reject before touching LittleFS. async_tcp-task-local.
 bool webFileGateTryAdmit();   // true => admitted (counter incremented); false => caller 503s
-void webFileGateRelease();    // decrement; call from request->onDisconnect
+void webFileGateRelease();    // decrement; armed by webArmSlotRelease()
+void restSlotRelease();       // REST gate counterpart (restAPI.ino), same arming
+
+// ESPAsyncWebServer keeps ONE disconnect callback per request: a second
+// onDisconnect() replaces the first (WebRequest.cpp, _onDisconnectfn = fn). So
+// every gate slot a request holds is released from one callback, re-armed here
+// each time a gate is taken. Application code does not call ->onDisconnect() for
+// gate bookkeeping itself; a REST route that streams a file otherwise leaked its
+// REST slot until reboot (TASK-1172).
+inline void webArmSlotRelease() {
+  if (!currentRequest) return;
+  if (g_restSlotHeld && g_fileSlotHeld) {
+    currentRequest->onDisconnect([]() { restSlotRelease(); webFileGateRelease(); });
+  } else if (g_restSlotHeld) {
+    currentRequest->onDisconnect([]() { restSlotRelease(); });
+  } else if (g_fileSlotHeld) {
+    currentRequest->onDisconnect([]() { webFileGateRelease(); });
+  }
+}
 
 // Stream a file from LittleFS (or the .gz sibling — Content-Encoding handled by
 // the response). Drains pending headers, sends once.
@@ -331,7 +355,8 @@ inline void webSendFile(const char* path, const char* contentType, bool gzip) {
     webSendStatus(503);
     return;
   }
-  currentRequest->onDisconnect([]() { webFileGateRelease(); });
+  g_fileSlotHeld = true;
+  webArmSlotRelease();  // also keeps a REST slot this request holds (TASK-1172)
   // Missing-file guard (ADR-139): beginResponse(LittleFS, <missing>) yields an
   // invalid-source response that send() turns into a 500 (or a hung connection on
   // some ESPAsyncWebServer forks), never a clean 404. Check first.

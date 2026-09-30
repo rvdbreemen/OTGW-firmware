@@ -4,9 +4,11 @@ title: >-
   REST in-flight slot leaks on file-streamed GETs (sensors/labels, sat/markers):
   webSendFile overwrites the onDisconnect release and /api/v2 wedges at 503
   until reboot
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-30 08:44'
+updated_date: '2026-09-30 09:06'
 labels:
   - bug
   - rest
@@ -117,7 +119,7 @@ IMPACT
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Code review against the library's single-slot setter (WebRequest.cpp:277-279) shows two properties. Every processAPI request that increments restInFlight releases exactly one REST slot on disconnect, including requests whose handler streams a file through webSendFile. Every webSendFile admission releases exactly one file-gate slot. This holds on all four paths: the REST 503 (restAPI.ino:2705-2710), the file-gate 503 (webServerCompat.h:322-332), the missing-file 404 inside webSendFile (:338-343, verified by review only because the race cannot be triggered on demand) and the normal stream (:345-349).
+- [x] #1 Code review against the library's single-slot setter (WebRequest.cpp:277-279) shows two properties. Every processAPI request that increments restInFlight releases exactly one REST slot on disconnect, including requests whose handler streams a file through webSendFile. Every webSendFile admission releases exactly one file-gate slot. This holds on all four paths: the REST 503 (restAPI.ino:2705-2710), the file-gate 503 (webServerCompat.h:322-332), the missing-file 404 inside webSendFile (:338-343, verified by review only because the race cannot be triggered on demand) and the normal stream (:345-349).
 - [ ] #2 OLD-vs-FIX bench reproduction, labels route, same board and same sequence. Flash app-only (flash_otgw.bat --update --app) so /dallas_labels.ini survives, and send strictly sequential curl requests.
 
 Setup: reboot, press telnet 'z', POST {"28D0000000000001":"bench"} to /api/v2/sensors/labels, and read internal_maxblk from GET /api/v2/device/info.
@@ -141,8 +143,8 @@ FIX: every call succeeds (200; the OPTIONS preflight gets its normal 204), hd_re
 - [ ] #6 FIX, classic UI end-to-end, with a browser devtools capture (capture-mqtt-debug.bat CDP):
 - With /dallas_labels.ini present, 10 consecutive reloads keep showing live data, and no /api/v2 request returns 503 once each load has settled.
 - With a marker present, opening the classic SAT page 5 times and adding and deleting one marker keeps /api/v2 at 200.
-- [ ] #7 The fix edits nothing under .pio/libdeps or src/libraries. A grep shows that application code calls ->onDisconnect( only through the single compat-layer helper in webServerCompat.h, apart from the existing OTA abort hook in OTGW-ModUpdateServer-esp32.h. The stale comments at restAPI.ino:2700-2702, restAPI.ino:2778 and webServerCompat.h:311 are corrected to describe the one-callback-per-request rule.
-- [ ] #8 build.bat for esp32-combo prints its SUCCESS line and produces a fresh firmware.bin. python evaluate.py --quick shows no new failures. The change lands in one commit together with its own prerelease bump (bin/bump-prerelease.sh).
+- [x] #7 The fix edits nothing under .pio/libdeps or src/libraries. A grep shows that application code calls ->onDisconnect( only through the single compat-layer helper in webServerCompat.h, apart from the existing OTA abort hook in OTGW-ModUpdateServer-esp32.h. The stale comments at restAPI.ino:2700-2702, restAPI.ino:2778 and webServerCompat.h:311 are corrected to describe the one-callback-per-request rule.
+- [x] #8 build.bat for esp32-combo prints its SUCCESS line and produces a fresh firmware.bin. python evaluate.py --quick shows no new failures. The change lands in one commit together with its own prerelease bump (bin/bump-prerelease.sh).
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -248,4 +250,16 @@ Detail disagreements, all resolved:
    - markers fetches at sat.js:1286 and v2.js:3108;
    - markers call sites at sat.js:763/1385/1402 and v2.js:3048.
 6. Verifier 3 noted, and the judge confirmed, that the missing-file 404 inside webSendFile also leaks. It is a race only.
+
+2026-09-30 implementation (alpha.379).
+Design: one compat-layer helper, webArmSlotRelease() in webServerCompat.h, arms the request's single disconnect callback for exactly the gate slots it holds (flags g_restSlotHeld / g_fileSlotHeld, both reset in webBeginRequest(), defined once in networkStuff.ino per ADR-044). processAPI() sets g_restSlotHeld after restInFlight++ and calls the helper; webSendFile() sets g_fileSlotHeld after the file gate admits and calls it again, which re-arms ONE callback releasing both. Chosen over a gate=false parameter for REST file routes because that would let the next REST route that streams a file reintroduce the leak silently.
+AC#1 review of the four paths (single-slot setter WebRequest.cpp:277-279):
+- REST 503 (restAPI.ino ~:2707): returns before restInFlight++ and before arming: nothing held, nothing to release.
+- file-gate 503 (webSendFile): returns before g_fileSlotHeld is set; the REST-only callback armed by processAPI() stays, so the REST slot is released; for a static asset nothing is held.
+- missing-file 404 inside webSendFile: after the combined callback is armed, so both slots are released on disconnect.
+- normal stream: combined callback, both released.
+webSendFile() runs at most once per request (g_responseSent guard), so a slot is never counted twice.
+AC#7: grep '->onDisconnect(' in src/OTGW-firmware: only webServerCompat.h webArmSlotRelease() (3 branches) and the OTA abort hook OTGW-ModUpdateServer-esp32.h:257. Stale comments corrected: restAPI.ino processAPI gate comment, restAPI.ino ADR-172 placement comment, webServerCompat.h gate forward declarations. Nothing under .pio/libdeps or src/libraries changed.
+AC#8: bin/bump-prerelease.sh alpha.378 -> alpha.379 in this commit; build.bat --target esp32-combo [SUCCESS] firmware (181.2 s) + filesystem, fresh firmware.bin 11:05:30 / littlefs.bin 11:06:03 (alpha.379+0976995, image saved under %LOCALAPPDATA%/OTGW-capture/img-alpha379-0976995); evaluate.py --quick 69 passed, 0 warnings, 0 failed.
+OPEN: AC#2-#6 bench (OTGW32): OLD = IMG-0 alpha.377+3621a38 (saved), FIX = alpha.379 or later; app-only flash so /dallas_labels.ini survives.
 <!-- SECTION:NOTES:END -->

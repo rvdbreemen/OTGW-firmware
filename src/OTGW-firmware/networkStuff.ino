@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.378
+**  Version  : v2.0.0-alpha.379
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -45,6 +45,8 @@ OTGWUpdateServer        httpUpdater(true);
 AsyncWebServerRequest*  currentRequest  = nullptr;
 AsyncResponseStream*    g_restStream    = nullptr;
 bool                    g_responseSent  = false;
+bool                    g_restSlotHeld  = false;
+bool                    g_fileSlotHeld  = false;
 WebPendingHeaders       g_pendingHeaders{};
 WebRequestBody          g_requestBody{};
 
