@@ -1,11 +1,11 @@
 ---
 id: TASK-1123
 title: 'feat-2.0.0: adopt the 1.x water-total parameters when implementing ADR-176'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-04 06:30'
-updated_date: '2026-09-30 18:14'
+updated_date: '2026-09-30 18:42'
 labels:
   - 2.0.0
   - parity
@@ -64,3 +64,30 @@ Open for the maintainer (does not block this task)
 
 Basis of the offline sentence in point 2: the client connects with a clean session and subscribes at QoS 0 (MQTTstuff.ino setCleanSession(true) and subscribe(topic, 0)), so a broker queues nothing for it while it is offline; the only later delivery of that reset is the retained copy, which is ignored.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Cumulative DHW water total for the Home Assistant Energy dashboard (ADR-176), shipped in 2.0.0-alpha.393 (commit 4bbceed61).
+
+What changed
+- New dhwWaterMeter.ino: MsgID 19 flow integrated over time with the 1.x rule and its 60000 ms interval cap, persisted in /dhw_water.json (10 L or 15 min, flushed on an orderly restart).
+- Write sites in print_f88() (boiler Read-Ack frames) and updatePSSummaryFloatState() (PIC PS=1 summary). Gateway-built answers do not count.
+- Discovery row for faux id 241 (dhw_water_total), announced at boot. The state is published by the 60 s task only after a MsgID 19 sample on this boot, and never retained.
+- Reset through POST /api/v2/otgw/reset_water_total and MQTT set/<node>/otgw/reset_water_total, applied by loop() to RAM and file together. A reset that arrives as a retained MQTT message is ignored.
+- Docs: MQTT.md, openapi.yaml, API README, MANUAL, the EN and NL API chapters, C4 code and component docs, CHANGELOG.
+
+Evidence per AC (all collected on the main tree this session)
+- AC#1: 1.x read at origin/otgw-1.x.x 8ba6f7ef9: dhwWaterMeter.ino:38 is DHW_METER_MAX_GAP_MS = 60000UL, and :67 adds flow * dtMs / 60000. This line uses the same constant, the same ordering (seed, move last before the gap test) and flow * dt / 60000. Harness cases U1 (time-based), U2 (60000 ms counts, 60001 ms does not) and W1/W2 (6 L/min for 60 s gives 6.0 L through both write sites) pass.
+- AC#2: the discovery row matches 1.x mqtt_configuratie.cpp:66, :653 and :1130 field for field (label, name, water, L, total_increasing, icon, entity_category, enabled). Harness D1 (row), D4/D6 (no state before a sample) and D7 (state after a sample, retain=0) pass.
+- AC#3: the divergences from 1.x (persistence, reset surface, announce timing, samples counted, flow bound, identity, arithmetic) are restated in this task's notes. ADR-176 is not edited.
+- test/host/test_dhw_water_meter.py --old-rev HEAD: RESULT PASS, 117 checks yes and 0 NO, before and again after the version bump. OLD fails W1, W2, W4, W5, W6 and R1. Every mutant fails its target case, including MR23 for the retained guard.
+- The slice audit found all 140 sliced parts verbatim in their sources and brace-complete.
+- Host suite on the main tree: 32/34. adr governance is the known TASK-1183 item. heap soak driver unit is a pre-existing timing flake (6/8 on HEAD sources, 7/8 with this change), filed as TASK-1186.
+- python evaluate.py --quick: exit 0, health score 100%.
+- build.bat --target all after the commit: firmware and filesystem SUCCESS for esp32, esp32-classic and esp32-combo, 3 images created, fresh 2.0.0-alpha.393+4bbceed artifacts; flash use 79.5%, 77.2% and 81.4%.
+
+Not done here
+- Bench validation: the OTGW32 sits in its WiFi provisioning portal.
+- Maintainer questions, listed in the notes: boot versus just-in-time announce, the PS=1 stale-repeat residual (R1, the one path that can over-count), and the stale premise in ADR-176's partial-regression answer.
+<!-- SECTION:FINAL_SUMMARY:END -->
