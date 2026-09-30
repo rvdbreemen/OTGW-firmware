@@ -86,7 +86,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Returns `true` if async initiated successfully
 
 #### `static void handleMasterResponse()`
-- **Location**: OTDirect.ino:925
+- **Location**: OTDirect.ino:1359
 - **Purpose**: Process completed async master request (called from `loopOTDirect()` when ready)
 - **Behavior**:
   - Gets response via `otMaster.getLastResponse()` and status via `otMaster.getLastResponseStatus()`
@@ -98,9 +98,20 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
     - Implements 3-strike auto-blacklist: increments 2-bit counter for UNKNOWN_DATA_ID; disables schedule entry on third strike
     - Monitors DHW push state machine (MsgID 0): transitions PENDING→STARTED→IDLE, detects timeout
     - Triggers PS=1 summary emission if in summary mode
-    - Forwards response to thermostat slave if request was from thermostat (applies response modifiers in gateway mode)
-  - On failure: Sets `state.otBus.bOnline = false` only for status request (MsgID 0)
+  - On a boiler DATA-INVALID reply (library status INVALID with even parity, message type DATA-INVALID and the Data-ID of the request): bridges it to the parser (prefix 'B'), does not cache it
+  - On any other failure: Sets `state.otBus.bOnline = false` only for status request (MsgID 0)
+  - After SUCCESS or DATA-INVALID: answers a forwarded thermostat frame through `replyToThermostat()`. A timeout or a corrupt reply gets no answer (OT spec v4.2 §4.5: the thermostat retries)
   - Clears `otMasterRequestActive` flag
+
+#### `static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentReq, unsigned long boilerResp)`
+- **Location**: OTDirect.ino:1275
+- **Purpose**: Answer a forwarded thermostat frame once, after the boiler's reply (OT spec v4.2 §4.3.2, TASK-1178). Called from `handleMasterResponse()` and from the loopback branch of `sendMasterRequestAsync()`
+- **Behavior**:
+  - `OT_DIRECT_ORIGIN_GATEWAY`: no reply
+  - `OT_DIRECT_ORIGIN_THERMOSTAT`: the boiler's reply, with the RM= response modifiers applied in gateway mode
+  - `OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN`: `buildOverriddenReply()`: WRITE-ACK with the thermostat's own Data-ID and data, whatever the boiler answered, as the PIC answers a data-only substitution (gateway.asm:2456-2472). For MsgID 56/57 one rule applies whatever the frame's parity bit: a boiler WRITE-ACK returns the boiler's echo, an UNKNOWN-DATAID the override value and a DATA-INVALID the thermostat's own value. The PIC gives these answers for a frame with parity bit 0; for parity bit 1 its `setbyte1` (gateway.asm:2672-2677) marks the frame rewritten and it answers a boiler WRITE-ACK or DATA-INVALID differently
+  - Bridges a reply that differs from the boiler's frame as 'A', once `otSlave.sendResponse()` has accepted it
+  - Host test: `test/host/build_and_run_override_reply.ps1 -OldVsFix` compares the code with and without the TASK-1178 fix
 
 #### `static void scheduleMasterRequest()`
 - **Location**: OTDirect.ino:1026
@@ -299,14 +310,16 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 ### Override Processing (Repeater Mode)
 
 #### `static unsigned long applyOverrides(unsigned long frame, bool &modified)`
-- **Location**: OTDirect.ino:390
+- **Location**: OTDirect.ino:568
 - **Purpose**: Intercept thermostat frame and replace data value if override active for that MsgID
 - **Behavior**:
+  - Passes MsgID 16 frames to the TT/TC observer `onThermostatMsgID16()` first
+  - Leaves a READ-DATA unchanged; only a WRITE-DATA is substituted
   - Searches `otOverrides[]` table for active entry matching msgId
-  - Replaces lower 16 bits (data value) while keeping message type and msgId
+  - Replaces lower 16 bits (data value) while keeping message type and msgId, when the override value differs from the thermostat's
   - Recalculates parity
-  - Sets `modified = true` if changed (triggers bridge output of original 'T' frame and modified 'R' frame)
-  - Returns modified frame
+  - Sets `modified = true` only when the data changed. The caller then sends the frame with `OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN`: it is logged as 'T' (original) and 'R' (sent), and the thermostat gets `buildOverriddenReply()` when the boiler answers
+  - Returns the frame to send
 
 #### `static void setOverride(uint8_t msgId, uint16_t value)`
 - **Location**: OTDirect.ino:295

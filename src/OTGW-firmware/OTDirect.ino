@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.388
+**  Version  : v2.0.0-alpha.389
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -494,7 +494,7 @@ static char    otTempSensor      = 'O';      // TS= temp sensor function
 static char    otForceThermostat = 'A';      // FT= thermostat detection
 static uint8_t otDHWOverride     = 0xFF;     // HW state: 0='0', 1='1', 0xFF='A' (auto)
 
-// BS= fake room setpoint — intercepts thermostat MsgID 16 READ_DATA frames
+// BS= fake room setpoint: intercepts thermostat MsgID 16 WRITE_DATA frames
 // and replaces the data bytes with the fake setpoint before forwarding to boiler.
 // 0.0 = disabled (BS=0 clears the fake). Mirrors PIC gateway.asm:3019-3024.
 static float otFakeRoomSetpoint = 0.0f;
@@ -559,9 +559,12 @@ static void clearUnknownCount(uint8_t msgId) {
   otUnknownCounters[byteIdx] &= ~(0x03 << bitShift);
 }
 
-// Apply overrides to a thermostat frame before forwarding to boiler.
-// Returns the (potentially modified) frame. If modified, also bridges the
-// original thermostat frame as 'T' and the modified frame as 'R'.
+// Apply an active override to a thermostat frame before it goes to the boiler.
+// Only a WRITE-DATA is substituted, and only when the override value differs
+// from the thermostat's own (the PIC's setbyte3/setbyte4 rule, gateway.asm:2680-2697).
+// A READ-DATA passes unchanged, so the thermostat gets the boiler's own answer
+// to its read. Returns the frame to send; modified is true when the data was
+// replaced.
 static unsigned long applyOverrides(unsigned long frame, bool &modified) {
   modified = false;
   uint8_t msgType = (frame >> 28) & 0x07;
@@ -576,8 +579,11 @@ static unsigned long applyOverrides(unsigned long frame, bool &modified) {
     onThermostatMsgID16(msgType, origData);
   }
 
+  if (msgType != 1 /* WRITE_DATA */) return frame;
+
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
     if (otOverrides[i].active && otOverrides[i].msgId == msgId) {
+      if (otOverrides[i].overrideValue == origData) break;  // already the override value
       // Replace data value (lower 16 bits) while keeping msg type + data-id
       frame = (frame & 0xFFFF0000UL) | otOverrides[i].overrideValue;
       setOTParityBit(frame);
@@ -605,6 +611,10 @@ static void updateWriteCache(uint8_t msgId, uint16_t value) {
 static bool     otMasterRequestActive = false;   // true while waiting for boiler response
 static unsigned long otLastSentRequest = 0;      // frame we sent (for bridge logging)
 static OTDirectRequestOrigin otLastRequestOrigin = OT_DIRECT_ORIGIN_GATEWAY;
+// The thermostat's own frame behind the request in flight, as it arrived before
+// applyOverrides(). otSlaveFrame can take the next thermostat frame before the
+// boiler answers, so the reply to an overridden frame is built from this copy.
+static unsigned long otLastThermostatRequest = 0;
 
 static void handleSlaveRequest(unsigned long request, OpenThermResponseStatus status) {
   if (status == OpenThermResponseStatus::SUCCESS) {
@@ -1230,12 +1240,79 @@ static unsigned long simulateLoopbackResponse(unsigned long request) {
 }
 
 // ---------------------------------------------------------------------------
+// buildOverriddenReply: the reply to a thermostat WRITE-DATA whose data an
+// override replaced. As the PIC builds it (gateway.asm:2456-2472, CreateMessage
+// :3464-3471): the acknowledgement that matches the request type, with the
+// thermostat's own Data-ID and data, whatever the boiler answered. MsgID 56/57
+// (SW=/SH=) have one rule of their own, whatever the frame's parity bit: a
+// boiler WRITE-ACK returns the value the boiler echoed, a boiler UNKNOWN-DATAID
+// the override value, and a DATA-INVALID the thermostat's own value. The PIC
+// gives these answers for a frame with parity bit 0 (gateway.asm:3128-3147,
+// :3164-3182). For parity bit 1 its setbyte1 (:2672-2677) marks the frame
+// rewritten, so a boiler WRITE-ACK gets WRITE-ACK(SW/SH) and a DATA-INVALID
+// gets WRITE-ACK with the MsgID 48/49 upper bound (:2416-2418, :2463-2473).
+// ---------------------------------------------------------------------------
+static unsigned long buildOverriddenReply(unsigned long thermostatReq, unsigned long sentReq,
+                                          unsigned long boilerResp) {
+  const uint8_t msgId = (thermostatReq >> 16) & 0xFF;
+  const uint8_t type  = ((thermostatReq >> 28) & 0x07) | 0x04;   // request type + response bit: WRITE_DATA -> WRITE_ACK
+  uint16_t data = thermostatReq & 0xFFFF;
+  if (msgId == 56 || msgId == 57) {
+    const uint8_t boilerType = (boilerResp >> 28) & 0x07;
+    if (boilerType == 5) data = boilerResp & 0xFFFF;         // WRITE_ACK: the value the boiler took
+    else if (boilerType == 7) data = sentReq & 0xFFFF;      // UNKNOWN_DATA_ID: the override value
+  }
+  return buildOTResponse(type, msgId, data);
+}
+
+// ---------------------------------------------------------------------------
+// replyToThermostat: answer a forwarded thermostat frame once the boiler has
+// replied (OT spec v4.2 section 4.3.2: the gateway forwards the next slave's
+// answer to the master, or creates its own). A gateway request gets no reply.
+// An overridden frame gets buildOverriddenReply(); an unchanged frame gets the
+// boiler's reply, with the RM= response modifiers applied in gateway mode.
+// ---------------------------------------------------------------------------
+static void replyToThermostat(OTDirectRequestOrigin origin, unsigned long sentReq,
+                              unsigned long boilerResp) {
+  if (origin == OT_DIRECT_ORIGIN_GATEWAY) return;
+  unsigned long reply = boilerResp;
+  if (origin == OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN) {
+    reply = buildOverriddenReply(otLastThermostatRequest, sentReq, boilerResp);
+  } else if (otCurrentMode == OTD_MODE_GATEWAY) {
+    reply = applyResponseModifiers(boilerResp);
+  }
+  if (!otSlave.sendResponse(reply)) {
+    OTDDebugTf(PSTR("OTD: reply to thermostat refused, slave not ready, MsgID=%u\r\n"),
+               (unsigned)((reply >> 16) & 0xFF));
+    return;
+  }
+  // A reply that differs from the boiler's frame is the gateway's own answer,
+  // logged as A so the parser keeps the boiler's B as the canonical value (ADR-096/103).
+  if (reply != boilerResp) {
+    OTDDebugTf(PSTR("OTD: reply MsgID=%u boiler=0x%04X thermostat=0x%04X\r\n"),
+               (unsigned)((reply >> 16) & 0xFF), (unsigned)(boilerResp & 0xFFFF),
+               (unsigned)(reply & 0xFFFF));
+    bridgeFrameToParser('A', reply);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// bridgeSentRequest: log a request as it goes to the boiler. An overridden
+// thermostat frame logs as T (what the thermostat sent) followed by R (what
+// the boiler gets), the pair the parser reads as a gateway substitution (ADR-096).
+// ---------------------------------------------------------------------------
+static void bridgeSentRequest(unsigned long request, OTDirectRequestOrigin origin) {
+  if (origin == OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN) bridgeFrameToParser('T', otLastThermostatRequest);
+  bridgeFrameToParser((origin == OT_DIRECT_ORIGIN_THERMOSTAT) ? 'T' : 'R', request);
+}
+
+// ---------------------------------------------------------------------------
 // sendMasterRequestAsync — initiate an async OT request (non-blocking)
 // ---------------------------------------------------------------------------
 static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin origin) {
   // Loopback mode: simulate response immediately, no bus activity
   if (IS_LOOPBACK_MODE()) {
-    bridgeFrameToParser((origin == OT_DIRECT_ORIGIN_THERMOSTAT) ? 'T' : 'R', request);
+    bridgeSentRequest(request, origin);
     unsigned long response = simulateLoopbackResponse(request);
     bridgeFrameToParser('B', response);
     state.otBus.bOnline = true;
@@ -1245,10 +1322,8 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
     otBoilerCache[cacheId] = response & 0xFFFF;
     otBoilerCacheValid[cacheId] = true;
 
-    // If forwarded thermostat frame, send simulated response back
-    if (origin == OT_DIRECT_ORIGIN_THERMOSTAT) {
-      otSlave.sendResponse(response);
-    }
+    // A forwarded thermostat frame is answered by the same rule as a real boiler reply
+    replyToThermostat(origin, request, response);
     return true;  // "completed" instantly
   }
 
@@ -1272,7 +1347,7 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
   otLastRequestOrigin = origin;
   otMasterRequestActive = otMaster.sendRequestAsync(request);
   if (otMasterRequestActive) {
-    bridgeFrameToParser((origin == OT_DIRECT_ORIGIN_THERMOSTAT) ? 'T' : 'R', request);
+    bridgeSentRequest(request, origin);
     otLastAnySendMs = millis();  // MI= gap tracking: covers thermostat-forward and gateway paths
   }
   return otMasterRequestActive;
@@ -1284,6 +1359,16 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
 static void handleMasterResponse() {
   unsigned long response = otMaster.getLastResponse();
   OpenThermResponseStatus status = otMaster.getLastResponseStatus();
+
+  // The library reports a boiler DATA-INVALID as INVALID, the status it also
+  // gives a corrupt or partial frame (OpenTherm.cpp:444, :450-453). Even parity,
+  // the DATA-INVALID type and the Data-ID of our request mark the genuine reply,
+  // which is a legal slave answer (OT spec v4.2 sections 4.4.1 and 4.4.2).
+  const bool boilerDataInvalid =
+      status == OpenThermResponseStatus::INVALID &&
+      !OpenTherm::parity(response) &&
+      OpenTherm::getMessageType(response) == OpenThermMessageType::DATA_INVALID &&
+      ((response >> 16) & 0xFF) == ((otLastSentRequest >> 16) & 0xFF);
 
   if (status == OpenThermResponseStatus::SUCCESS) {
     bridgeFrameToParser('B', response);
@@ -1377,22 +1462,9 @@ static void handleMasterResponse() {
       OTDDebugTf(PSTR("OTD: resp MsgID=%u data=0x%04X origin=%u\r\n"),
                  logMsgId, logData, (uint8_t)otLastRequestOrigin);
     }
-
-    // If this was a forwarded thermostat frame, send response back
-    if (otLastRequestOrigin == OT_DIRECT_ORIGIN_THERMOSTAT) {
-      // In gateway mode, apply response-path modifications before forwarding
-      if (otCurrentMode == OTD_MODE_GATEWAY) {
-        unsigned long origResp = response;
-        response = applyResponseModifiers(response);
-        if (response != origResp) {
-          OTDDebugTf(PSTR("OTD: resp-modify MsgID=%u orig=0x%04X new=0x%04X\r\n"),
-                     (uint8_t)((origResp >> 16) & 0xFF),
-                     (uint16_t)(origResp & 0xFFFF),
-                     (uint16_t)(response & 0xFFFF));
-        }
-      }
-      otSlave.sendResponse(response);
-    }
+  } else if (boilerDataInvalid) {
+    // Logged like any boiler reply. Not cached: its data is not a boiler value.
+    bridgeFrameToParser('B', response);
   } else {
     // Only mark offline on status request (MsgID 0) failures
     uint8_t msgId = (otLastSentRequest >> 16) & 0xFF;
@@ -1404,6 +1476,13 @@ static void handleMasterResponse() {
       }
       state.otBus.bOnline = false;
     }
+  }
+
+  // A forwarded thermostat frame gets its one reply now. A timeout or a corrupt
+  // reply gets none: the thermostat notes the incomplete conversation and
+  // retries (OT spec v4.2 section 4.5), as it does behind a PIC gateway.
+  if (status == OpenThermResponseStatus::SUCCESS || boilerDataInvalid) {
+    replyToThermostat(otLastRequestOrigin, otLastSentRequest, response);
   }
 
   otMasterRequestActive = false;
@@ -1999,15 +2078,14 @@ void loopOTDirect() {
             break;
           }
         }
-        // Normal path: apply value overrides and forward to boiler
+        // Normal path: apply value overrides and forward to boiler. The
+        // thermostat is answered when the boiler replies (replyToThermostat).
         if (!srHandled) {
           bool modified = false;
           unsigned long frameToSend = applyOverrides(otSlaveFrame, modified);
-          if (modified) {
-            bridgeFrameToParser('T', otSlaveFrame);
-          }
+          otLastThermostatRequest = otSlaveFrame;
           if (sendMasterRequestAsync(frameToSend,
-                modified ? OT_DIRECT_ORIGIN_GATEWAY : OT_DIRECT_ORIGIN_THERMOSTAT)) {
+                modified ? OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN : OT_DIRECT_ORIGIN_THERMOSTAT)) {
             otSlaveFramePending = false;
           }
         }
@@ -2706,7 +2784,7 @@ void handleOTDirectCommand(const char* buf, int len) {
     synthesizeResponse(buf, rspBuf);
   }
   // BS=xx.x — Fake boiler room setpoint (MsgID 16 frame interception).
-  // Intercepts the thermostat's own MsgID 16 READ_DATA and replaces the data bytes
+  // Intercepts the thermostat's own MsgID 16 WRITE_DATA and replaces the data bytes
   // with the fake setpoint before forwarding to the boiler. This is the same
   // mechanism as the PIC firmware (gateway.asm:3019-3024): the modified frame
   // is the thermostat's own request, not a separate WRITE_DATA from the gateway.

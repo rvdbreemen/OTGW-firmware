@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirecttypes.h
-**  Version  : v2.0.0-alpha.388
+**  Version  : v2.0.0-alpha.389
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -36,10 +36,13 @@
 //=== OT-direct runtime enums ===
 //====================================================================
 
-// Origin of a master-side OT request dispatched by OTDirect.ino.
+// Origin of a master-side OT request dispatched by OTDirect.ino. It decides how
+// the thermostat is answered once the boiler has replied.
 enum OTDirectRequestOrigin : uint8_t {
-  OT_DIRECT_ORIGIN_GATEWAY = 0,
-  OT_DIRECT_ORIGIN_THERMOSTAT
+  OT_DIRECT_ORIGIN_GATEWAY = 0,           // the gateway's own request: no reply to the thermostat
+  OT_DIRECT_ORIGIN_THERMOSTAT,            // a thermostat frame sent unchanged: the boiler's reply is relayed
+  OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN  // a thermostat WRITE-DATA whose data an override replaced:
+                                          // the reply is built from the thermostat's own frame
 };
 
 // OT-direct operating modes (gateway perspective)
