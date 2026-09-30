@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-08-03 16:58'
+updated_date: '2026-09-30 12:59'
 labels: []
 dependencies: []
 ordinal: 252000
@@ -36,3 +37,13 @@ Needs its own worktree: wt-otgw-1.x.x already exists at D:/Users/Robert/Document
 - [ ] #5 ADR on the otgw-1.x.x line records the alias-budget and re-phase decisions (own numbering, cross-references dev ADR-172/173)
 - [ ] #6 python build.py --target esp8266 green, python evaluate.py exit 0, tests/test_evaluate.py green in the wt-otgw-1.x.x worktree
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Triage 2026-09-30 (dev session): the 1.x line already fixed both defects, under its own task numbering, and shipped them in v1.7.5:
+- Defect A: 5580e223b (2026-08-25) 'Share one rate-limit budget between the otmonitor and telegraf paths (TASK-1090)'. origin/otgw-1.x.x restAPI.ino: one kRateLimitedRoutes row { otgw, otmonitor, alias telegraf, 1500 ms } with a single lastServedMs.
+- Defect B: 053ac9f58 (2026-09-04) 'fix(webui): re-phase polling after a 429 so a second dashboard is not starved'; index.js rephaseDelayMs()/rephaseOTmonitorPolling().
+AC status against origin/otgw-1.x.x 8ba6f7ef9 (code read, not run): #1 met (shared budget); #2 NOT met (the 1.x limiter is single-window, 'at most 1 request per window', no burst 2); #3 NOT met (Retry-After header only, no retry_after in the problem+json body); #4 code present, the two-tab 10-minute check is not recorded; #5 NOT met (no 1.x ADR mentions the alias budget or the re-phase; git grep telegraf docs/adr finds only ADR-042); #6 not re-run here.
+The 1.x session chose the simpler design (shared single-window budget plus client re-phase) instead of porting dev's GCRA burst 2 and the retry_after body. Maintainer decision: close this task as done differently on 1.x (accept burst 1 plus re-phase, optionally with a short 1.x ADR), or port #2, #3 and #5 in a 1.x worktree. Not changed from this session: the 1.x line may have its own active session.
+<!-- SECTION:NOTES:END -->
