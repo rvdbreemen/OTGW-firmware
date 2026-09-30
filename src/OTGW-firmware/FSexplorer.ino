@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.376
+**  Version  : v2.0.0-alpha.377
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -254,10 +254,32 @@ void startWebserver(){
   });
 
   server.begin();
+  // TASK-1130: begin() is void and fails silently when lwIP refuses the bind.
+  // After the WiFiManager config portal, its closed HTTP connections sit in
+  // TIME_WAIT on port 80 for 2*TCP_MSL (120 s); AsyncTCP binds without
+  // SOF_REUSEADDR, so tcp_bind() returns ERR_USE and no listener exists.
+  // handleWebserverListener() retries until the bind succeeds.
+  if (server.state() != LISTEN) {
+    DebugTln(F("HTTP Server: bind on port 80 failed, retrying every 5s"));
+  }
   // Set up first message as the IP address
   DebugTln(F("\nHTTP Server started\r"));
   snprintf_P(cMsg, sizeof(cMsg), PSTR("%03d.%03d.%d.%d"), WiFi.localIP()[0], WiFi.localIP()[1], WiFi.localIP()[2], WiFi.localIP()[3]);
   DebugTf(PSTR("\nAssigned IP=%s\r\n"), cMsg);
+}
+
+// TASK-1130: re-attempt the port-80 bind while the listener is missing (see
+// startWebserver()). A failed begin() leaves AsyncServer without a pcb, so a
+// later begin() starts from scratch; routes stay registered on the server.
+void handleWebserverListener(){
+  static uint16_t retries = 0;
+  if (server.state() == LISTEN) return;
+  server.begin();
+  retries++;
+  if (server.state() == LISTEN) {
+    DebugTf(PSTR("HTTP Server: listening on port 80 after %u retries\r\n"), (unsigned)retries);
+    retries = 0;
+  }
 }
 // Serve /FSexplorer.html (static file).
 static void sendFSexplorerHtml(AsyncWebServerRequest *request) {

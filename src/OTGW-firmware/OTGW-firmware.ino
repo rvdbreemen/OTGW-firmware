@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.376
+**  Version  : v2.0.0-alpha.377
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -992,6 +992,10 @@ void doBackgroundTasks()
       {
         DECLARE_TIMER_SEC(timerWsHousekeeping, 1, SKIP_MISSED_TICKS);
         if (DUE(timerWsHousekeeping)) handleWebSocket();
+      }
+      {
+        DECLARE_TIMER_SEC(timerWebListener, 5, SKIP_MISSED_TICKS);
+        if (DUE(timerWebListener)) handleWebserverListener();  // TASK-1130
       }
       // TASK-865.9: HTTP serving moved onto the AsyncTCP service task — there is
       // no longer a per-loop handleClient() drain. The sat-slider stall / XHR
