@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-30 14:32'
-updated_date: '2026-09-30 19:35'
+updated_date: '2026-09-30 19:55'
 labels:
   - otdirect
   - bug
@@ -63,4 +63,6 @@ Still open:
 - Item 4: the /otgw_simulation.log replay reaches processOT() with localAnswer=false, so replayed frames set and retract verdicts, acked bits (persisted to /ot-boiler.json) and trip the SAT edge hook. Maintainer decision: document as deliberate, or mark replayed frames.
 - AC#2: stale verdicts from older builds. Acked bits have no retraction at all, so stale acked bits from local frames persist too, not only unsupported ones.
 - Side finding: GET /api/v2/otgw/ot-support is not documented in docs/api or the manuals.
+
+Build after commit 5bc508e47: build.bat --target all, firmware and filesystem SUCCESS for esp32, esp32-classic and esp32-combo, 3 images, 18 fresh 2.0.0-alpha.394+5bc508e artifacts; flash use 79.5%, 77.2%, 81.4% (unchanged). python evaluate.py --quick: exit 0, health 100%, ESP abstraction boundary clean. Host suite on the tree: 33/34, the failure is the known adr governance item (TASK-1183). Not bench-validated: the OTGW32 is still in its WiFi provisioning portal.
 <!-- SECTION:NOTES:END -->

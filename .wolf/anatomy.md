@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-09-30T19:08:31.430Z
-> Files: 595 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-09-30T19:30:48.765Z
+> Files: 596 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -807,12 +807,12 @@
 - `OTBustypes.h` (~536 tok)
 - `OTDirect.ino` — Declares instances (~44097 tok)
 - `OTGW-Core.h` — ifndef OTGWCore_h (~14932 tok)
-- `OTGW-Core.ino` — Declares char (~84632 tok)
+- `OTGW-Core.ino` — Declares char (~85279 tok)
 - `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~12968 tok)
 - `OTGW-firmware.ino` — Declares WifiPortalResetState (~13910 tok)
 - `restAPI.ino` — include <string.h> (~60589 tok)
 - `SATble.ino` — Declares uint32_t (~15837 tok)
-- `SATcontrol.ino` — Declares float (~59619 tok)
+- `SATcontrol.ino` — Declares float (~59703 tok)
 - `SATtypes.h` — Declares declaration (~10305 tok)
 - `settingStuff.ino` — include <ctype.h> (~22166 tok)
 - `webServerCompat.h` — Declares uint8_t (~5483 tok)
@@ -829,12 +829,15 @@
 - `dhw_host_shim.h` — test/host/dhw_host_shim.h  (TASK-1123, ADR-176): host stand-ins shared by the two DHW water harnesses (~1294 tok)
 - `test_banner_board_mode.cpp` — test/host/test_banner_board_mode.cpp  (TASK-1180) (~563 tok)
 - `test_banner_board_mode.py` — TASK-1180 host harness: does processOT()'s banner recovery keep the combo (~848 tok)
+- `test_boiler_unsupported_origin.py` — TASK-1086 host harness: does an answer the gateway made itself count as (~3233 tok)
 - `test_dhw_water_discovery.cpp` — TASK-1123 driver: dhw_water_total discovery row, publish rule and the REST/MQTT reset through sliced real code (~9370 tok)
 - `test_dhw_water_meter.cpp` — TASK-1123 driver: accumulator, write sites and persistence through sliced real code (~7690 tok)
 - `test_dhw_water_meter.py` — TASK-1123 host harness runner: slices, OLD vs FIX, mutants, wiring checks (--old-rev) (~10827 tok)
 - `test_diagnose_handler.cpp` — test/host/test_diagnose_handler.cpp  (TASK-1133 AC#1) (~923 tok)
 - `test_diagnose_handler.py` — TASK-1133 AC#1 host harness: does POST /api/v2/otgw/diagnose answer 4xx and (~1551 tok)
 - `test_json_and_webhook.cpp` — Declares char (~2626 tok)
+- `test_local_frame_consumers.cpp` — TASK-1185 driver: acked bitmaps, OT log suffix, SAT edge hook and SAT gate through the sliced real frame chain, per board model (~6667 tok)
+- `test_local_frame_consumers.py` — TASK-1185 host harness: does a frame the gateway made itself still count as (~3119 tok)
 - `test_ot_reserved_range.cpp` — test/host/test_ot_reserved_range.cpp  (TASK-1174) (~743 tok)
 - `test_ot_reserved_range.py` — TASK-1174 host harness: which OpenTherm data-ids does the firmware suppress (~1371 tok)
 - `test_override_reply.cpp` — Declares __FlashStringHelper (~12902 tok)
