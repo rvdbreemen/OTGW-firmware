@@ -24,6 +24,11 @@
        and bus state) is byte-identical to FIX's.
     5. Log-only cases: OLD sends the same replies as FIX and meets the case's
        cache and bus-state checks; only the T/R/B/A log differs.
+  -Suite 1177 runs the boiler-cache cases of TASK-1177 (K1-K7) instead, with
+  -OldRev a revision without otBoilerCacheStore(). The run then passes only
+  when FIX passes every K case, OLD fails every K defect case with a dump that
+  differs from FIX's, the K control cases are byte-identical, and every
+  TASK-1178 case (run on both sides as a regression) is byte-identical too.
   A compile or slicing failure never counts as "OLD reproduced the defect".
 
   The OpenTherm library is read from -OpenThermDir (default: the submodule
@@ -42,7 +47,8 @@
 param(
   [switch]$OldVsFix,
   [string]$OldRev = 'HEAD',
-  [string]$OpenThermDir = ''
+  [string]$OpenThermDir = '',
+  [ValidateSet('1178', '1177')][string]$Suite = '1178'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -73,6 +79,8 @@ $otdAnchors = @(
      EndRegex = '^static bool otSummaryPending\b'; EndKind = 'construct' },
   @{ Name = 'otBoilerCache[]';              Kind = 'range';     Regex = '^static uint16_t otBoilerCache\[128\];';
      EndRegex = '^static bool\s+otBoilerCacheValid\[128\];'; EndKind = 'construct' },
+  @{ Name = 'otIsVentSlave, otDirectBoilerPresent'; Kind = 'range'; Regex = '^static inline bool otIsVentSlave\(\)\s*\{';
+     EndRegex = '^bool otDirectBoilerPresent\(\)\s*\{'; EndKind = 'construct' },
   @{ Name = 'otSlaveFrame(Pending)';        Kind = 'range';     Regex = '^static bool\s+otSlaveFramePending\b';
      EndRegex = '^static unsigned long otSlaveFrame\b'; EndKind = 'construct' },
   @{ Name = 'otOverrides[]';                Kind = 'range';     Regex = '^struct OTFrameOverride\b';
@@ -90,6 +98,7 @@ $otdAnchors = @(
      EndRegex = '^static void handleMasterResponse\(\)\s*\{'; EndKind = 'construct' },
   @{ Name = 'loopOTDirect';                 Kind = 'construct'; Regex = '^void loopOTDirect\(\)\s*\{' },
   @{ Name = 'buildOTResponse';              Kind = 'construct'; Regex = '^static unsigned long buildOTResponse\([^)]*\)\s*\{' },
+  @{ Name = 'handleMasterModeSlaveFrame';   Kind = 'construct'; Regex = '^static void handleMasterModeSlaveFrame\(unsigned long frame\)\s*\{' },
   @{ Name = 'applyResponseModifiers';       Kind = 'construct'; Regex = '^static unsigned long applyResponseModifiers\(unsigned long response\)\s*\{' }
 )
 $typesAnchors = @(
@@ -114,6 +123,13 @@ $defectCases    = @('C1','C2','C3','C6a','C6b','C6c','C6d','C7a','C7b','C7c','C7
                     'C8a','C8b','C10','C14','C15','C16','C20','C21','C26','C28')
 $unchangedCases = @('C4','C5','C9','C11','C12','C13a','C13b','C18','C22','C23','C24','C25','C27')
 $logOnlyCases   = @('C17','C19')
+if ($Suite -eq '1177') {
+  # TASK-1177: every TASK-1178 case runs on both sides as a byte-identical regression.
+  $regressionCases = $defectCases + $unchangedCases + $logOnlyCases
+  $defectCases     = @('K1','K2','K3','K4')
+  $unchangedCases  = @('K5','K6','K7')
+  $logOnlyCases    = @()
+}
 
 # git blob as UTF-8 text, independent of the console code page.
 function Get-GitBlobLines([string]$Spec) {
@@ -273,9 +289,9 @@ function Build-Harness([string]$Dir, [string]$Label) {
   return $exe
 }
 
-function Invoke-Harness([string]$Exe, [string]$Dir, [string]$Label) {
+function Invoke-Harness([string]$Exe, [string]$Dir, [string]$Label, [string]$CaseSuite) {
   Write-Host "== running ($Label) =="
-  $out = @(& $Exe $Dir)
+  $out = @(& $Exe $Dir $CaseSuite)
   $rc  = $LASTEXITCODE
   foreach ($l in $out) { Write-Host $l }
   $cases = @{}
@@ -291,7 +307,7 @@ function Invoke-Harness([string]$Exe, [string]$Dir, [string]$Label) {
     }
   }
   $dump = @{}
-  $dumpFile = Join-Path $Dir 'cases.txt'
+  $dumpFile = Join-Path $Dir "cases-$CaseSuite.txt"
   if (Test-Path -LiteralPath $dumpFile) {
     foreach ($l in [System.IO.File]::ReadAllLines($dumpFile)) {
       $id = ($l -split ' ', 2)[0]
@@ -319,7 +335,7 @@ $fixOtd   = [System.IO.File]::ReadAllLines((Join-Path $repo $otdRel), [System.Te
 $fixTypes = [System.IO.File]::ReadAllLines((Join-Path $repo $typesRel), [System.Text.Encoding]::UTF8)
 Export-Revision -OtdLines $fixOtd -TypesLines $fixTypes -OtdOrigin $fixOtdOrigin -TypesOrigin $fixTypesOrigin -Dir $fixDir
 $fixExe = Build-Harness -Dir $fixDir -Label 'FIX'
-$fix = Invoke-Harness -Exe $fixExe -Dir $fixDir -Label 'FIX'
+$fix = Invoke-Harness -Exe $fixExe -Dir $fixDir -Label 'FIX' -CaseSuite $Suite
 
 if (-not $OldVsFix) {
   if ($fix.Rc -eq 0) { Write-Host "RESULT: PASS" -ForegroundColor Green }
@@ -334,8 +350,11 @@ $gitlinkOld = ((& git -C $repo ls-tree $OldRev $libRel) -split '\s+')[2]
 if ($gitlinkOld -ne $gitlinkHead) { throw "OLD ($OldRev) records OpenTherm $gitlinkOld, HEAD records $gitlinkHead; this runner uses one library copy for both" }
 $oldOtd   = Get-GitBlobLines "${OldRev}:$otdRel"
 $oldTypes = Get-GitBlobLines "${OldRev}:$typesRel"
-if ((@($oldTypes | Where-Object { $_ -match 'OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN' })).Count -gt 0) {
+if ($Suite -eq '1178' -and (@($oldTypes | Where-Object { $_ -match 'OT_DIRECT_ORIGIN_THERMOSTAT_OVERRIDDEN' })).Count -gt 0) {
   throw "OLD ($OldRev, $oldSha) already contains the TASK-1178 fix; pass -OldRev <the commit before the fix>"
+}
+if ($Suite -eq '1177' -and (@($oldOtd | Where-Object { $_ -match '\botBoilerCacheStore\(' })).Count -gt 0) {
+  throw "OLD ($OldRev, $oldSha) already contains the TASK-1177 fix; pass -OldRev <the commit before the fix>"
 }
 $oldOtdOrigin   = "git $OldRev ($oldSha):$otdRel"
 $oldTypesOrigin = "git $OldRev ($oldSha):$typesRel"
@@ -343,7 +362,11 @@ $oldDir = Join-Path $gen 'old'
 Write-Host "== slicing OLD: $oldOtdOrigin =="
 Export-Revision -OtdLines $oldOtd -TypesLines $oldTypes -OtdOrigin $oldOtdOrigin -TypesOrigin $oldTypesOrigin -Dir $oldDir
 $oldExe = Build-Harness -Dir $oldDir -Label 'OLD'
-$old = Invoke-Harness -Exe $oldExe -Dir $oldDir -Label 'OLD'
+$old = Invoke-Harness -Exe $oldExe -Dir $oldDir -Label 'OLD' -CaseSuite $Suite
+if ($Suite -eq '1177') {
+  $fixReg = Invoke-Harness -Exe $fixExe -Dir $fixDir -Label 'FIX, TASK-1178 cases' -CaseSuite '1178'
+  $oldReg = Invoke-Harness -Exe $oldExe -Dir $oldDir -Label 'OLD, TASK-1178 cases' -CaseSuite '1178'
+}
 
 # --- verdict -----------------------------------------------------------------------------
 Write-Host "== old-vs-fix verdict =="
@@ -382,12 +405,31 @@ if (-not $oldRedExit) { $ok = $false }
 $bad = New-Object System.Collections.Generic.List[string]
 foreach ($id in $defectCases) {
   $o = $old.Cases[$id]; $f = $fix.Cases[$id]
-  $sig = ($null -ne $o) -and ($null -ne $f) -and (-not $o.Pass) -and ($o.Got -eq 0) -and ($f.Want -ge 1) -and ($f.Got -eq $f.Want)
+  if ($Suite -eq '1178') {
+    $sig = ($null -ne $o) -and ($null -ne $f) -and (-not $o.Pass) -and ($o.Got -eq 0) -and ($f.Want -ge 1) -and ($f.Got -eq $f.Want)
+  } else {
+    $sig = ($null -ne $o) -and ($null -ne $f) -and (-not $o.Pass) -and $f.Pass -and
+           $old.Dump.ContainsKey($id) -and $fix.Dump.ContainsKey($id) -and ($old.Dump[$id] -cne $fix.Dump[$id])
+  }
   if (-not $sig) { $bad.Add($id) }
 }
-Write-Host ("  defect cases: OLD leaves the thermostat without a reply that FIX sends ({0}/{1}; not matching: {2}): {3}" -f `
-  ($defectCases.Count - $bad.Count), $defectCases.Count, $(if ($bad.Count) { $bad -join ',' } else { 'none' }), $(if ($bad.Count -eq 0) { 'yes' } else { 'NO' }))
+$defectText = if ($Suite -eq '1178') { 'OLD leaves the thermostat without a reply that FIX sends' }
+              else { 'OLD fails them and its dump (replies, cache, flame, presence) differs from FIX' }
+Write-Host ("  defect cases: {0} ({1}/{2}; not matching: {3}): {4}" -f `
+  $defectText, ($defectCases.Count - $bad.Count), $defectCases.Count, $(if ($bad.Count) { $bad -join ',' } else { 'none' }), $(if ($bad.Count -eq 0) { 'yes' } else { 'NO' }))
 if ($bad.Count -ne 0) { $ok = $false }
+
+if ($Suite -eq '1177') {
+  $bad = New-Object System.Collections.Generic.List[string]
+  foreach ($id in $regressionCases) {
+    $same = $fixReg.Cases.ContainsKey($id) -and $fixReg.Cases[$id].Pass -and $oldReg.Dump.ContainsKey($id) -and
+            $fixReg.Dump.ContainsKey($id) -and ($oldReg.Dump[$id] -ceq $fixReg.Dump[$id])
+    if (-not $same) { $bad.Add($id) }
+  }
+  Write-Host ("  TASK-1178 cases as a regression: FIX passes them and OLD/FIX dumps are byte-identical ({0}/{1}; differing: {2}): {3}" -f `
+    ($regressionCases.Count - $bad.Count), $regressionCases.Count, $(if ($bad.Count) { $bad -join ',' } else { 'none' }), $(if ($bad.Count -eq 0) { 'yes' } else { 'NO' }))
+  if ($bad.Count -ne 0) { $ok = $false }
+}
 
 $bad = New-Object System.Collections.Generic.List[string]
 foreach ($id in $unchangedCases) {

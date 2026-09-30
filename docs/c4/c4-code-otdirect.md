@@ -93,8 +93,8 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - On SUCCESS:
     - Bridges response frame to parser (prefix 'B')
     - Sets `state.otBus.bOnline = true`
-    - Caches boiler response in `otBoilerCache[cacheId]` for master-mode slave responses
-    - Updates flame ratio state from MsgID 0 slave status (bit 3 = flame active)
+    - Caches the boiler response through `otBoilerCacheStore()` for master-mode slave responses (data-ids 0-127 only, TASK-1177)
+    - Updates flame ratio state from a MsgID 0 reply's slave status (bit 3 = flame active); a reply for MsgID 128 does not
     - Implements 3-strike auto-blacklist: increments 2-bit counter for UNKNOWN_DATA_ID; disables schedule entry on third strike
     - Monitors DHW push state machine (MsgID 0): transitions PENDING→STARTED→IDLE, detects timeout
     - Triggers PS=1 summary emission if in summary mode
@@ -148,7 +148,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Extracts msgId and msgType (bits 28-30)
   - If READ_DATA (type 0):
     - Returns cached boiler value via `buildOTResponse(4, msgId, cache)` (READ_ACK)
-    - Returns UNKNOWN_DATA_ID (type 7) if no cached value yet
+    - Returns UNKNOWN_DATA_ID (type 7) if no cached value yet, and always for an OEM data-id 128-255 (the cache holds 0-127)
   - If WRITE_DATA (type 1):
     - Echoes back as WRITE_ACK (type 5)
     - Updates write cache for MsgID 1 (TSet), 16 (room setpoint), 24 (room temp) so scheduler keeps sending to boiler
@@ -385,7 +385,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
     - MsgID 0-127: returns READ_ACK with the table value, or UNKNOWN_DATA_ID with data 0 when the entry is 0xFFFF.
   - The range guard takes the table size from `sizeof(otLoopbackData) / sizeof(otLoopbackData[0])`, so it follows the declaration.
   - Builds every response with `buildOTResponse()`, which sets the parity bit.
-  - Has no side effects. The caller, `sendMasterRequestAsync()`, bridges both frames to the parser and caches the response in `otBoilerCache[]` at index `MsgID & 0x7F` (OTDirect.ino:1237-1239).
+  - Has no side effects. The caller, `sendMasterRequestAsync()`, bridges both frames to the parser and caches the response through `otBoilerCacheStore()`, which skips data-ids 128-255 (TASK-1177).
   - Host test: `test/host/build_and_run_loopback.ps1` runs it for every MsgID and message type. Add `-OldVsFix` to compare with the code before the TASK-1072 fix.
 
 #### `static const uint16_t PROGMEM otLoopbackData[128]`
@@ -577,6 +577,7 @@ static uint8_t  otCmdQueueHighWater = 0;  // TASK-494: peak depth observed
 static uint16_t otBoilerCache[128];       // Indexed by MsgID
 static bool     otBoilerCacheValid[128];  // Validity flags
 ```
+Written only by `otBoilerCacheStore()`, which stores data-ids 0-127 and skips 128-255: masking an OEM data-id with 0x7F would put it in another id's slot (a Remeha MsgID 131 reply on MsgID 3, which `otDirectBoilerPresent()` and `otIsVentSlave()` read). TASK-1177; host proof `test/host/build_and_run_override_reply.ps1 -Suite 1177 -OldVsFix`.
 
 #### Unknown-ID 3-Strike Counter
 ```cpp

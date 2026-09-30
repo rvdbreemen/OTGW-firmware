@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.389
+**  Version  : v2.0.0-alpha.390
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1307,6 +1307,19 @@ static void bridgeSentRequest(unsigned long request, OTDirectRequestOrigin origi
 }
 
 // ---------------------------------------------------------------------------
+// otBoilerCacheStore: keep a boiler reply for the master-mode slave handler and
+// the other cache readers. The cache holds the OT spec's data-ids 0-127. A reply
+// for an OEM data-id 128-255 is not stored: masking it with 0x7F would put it
+// in another id's slot (MsgID 131 would land on MsgID 3).
+// ---------------------------------------------------------------------------
+static void otBoilerCacheStore(unsigned long response) {
+  const uint8_t id = (response >> 16) & 0xFF;
+  if (id >= sizeof(otBoilerCacheValid)) return;
+  otBoilerCache[id] = response & 0xFFFF;
+  otBoilerCacheValid[id] = true;
+}
+
+// ---------------------------------------------------------------------------
 // sendMasterRequestAsync — initiate an async OT request (non-blocking)
 // ---------------------------------------------------------------------------
 static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin origin) {
@@ -1318,9 +1331,7 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
     state.otBus.bOnline = true;
 
     // Cache response for master mode slave handler (reuses same cache)
-    uint8_t cacheId = (response >> 16) & 0x7F;
-    otBoilerCache[cacheId] = response & 0xFFFF;
-    otBoilerCacheValid[cacheId] = true;
+    otBoilerCacheStore(response);
 
     // A forwarded thermostat frame is answered by the same rule as a real boiler reply
     replyToThermostat(origin, request, response);
@@ -1336,7 +1347,7 @@ static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin 
   // captures the would-be frame for the §4.3 trace.
   {
     char otCmd[24];
-    const uint8_t  mid = (uint8_t)((request >> 16) & 0x7F);
+    const uint8_t  mid = (uint8_t)((request >> 16) & 0xFF);
     const uint16_t val = (uint16_t)(request & 0xFFFF);
     snprintf_P(otCmd, sizeof(otCmd), PSTR("MID=%u VAL=%u"), mid, val);
     if (satSimulationBlocksBusTx(otCmd, F("otdirect-tx"))) return false;
@@ -1380,11 +1391,7 @@ static void handleMasterResponse() {
     state.otBus.bOnline = true;
 
     // Cache boiler response data for master mode slave responses
-    {
-      uint8_t cacheId = (response >> 16) & 0x7F;
-      otBoilerCache[cacheId] = response & 0xFFFF;
-      otBoilerCacheValid[cacheId] = true;
-    }
+    otBoilerCacheStore(response);
 
     // TASK-795 §4.2: a real boiler answered on the OT-direct bus. If SAT
     // simulation is active, trip the edge hook (deferred auto-disable). Not in
@@ -1394,12 +1401,9 @@ static void handleMasterResponse() {
 
     // TASK-184: update flame ratio state from MsgID 0 slave status byte
     // Flame bit = bit 3 of slave status LB (bit 3 of response byte 0)
-    {
-      uint8_t cacheId0 = (response >> 16) & 0x7F;
-      if (cacheId0 == 0) {
-        bool flameOn = (otBoilerCache[0] & 0x08) != 0;  // bit 3 of LB = flame active
-        flameRatioSet(flameOn);
-      }
+    if (((response >> 16) & 0xFF) == 0) {
+      bool flameOn = (otBoilerCache[0] & 0x08) != 0;  // bit 3 of LB = flame active
+      flameRatioSet(flameOn);
     }
 
     // 3-strike auto-blacklist: if boiler responds with UNKNOWN_DATA_ID,
@@ -2604,9 +2608,10 @@ static void handleMasterModeSlaveFrame(unsigned long frame) {
   unsigned long response;
 
   if (msgType == 0) {
-    // READ_DATA — respond with cached boiler value
-    if (otBoilerCacheValid[msgId & 0x7F]) {
-      response = buildOTResponse(4, msgId, otBoilerCache[msgId & 0x7F]);  // 4 = READ_ACK
+    // READ_DATA: respond with the cached boiler value. The cache holds data-ids
+    // 0-127 only (otBoilerCacheStore), so an OEM id 128-255 is always unknown.
+    if (msgId < sizeof(otBoilerCacheValid) && otBoilerCacheValid[msgId]) {
+      response = buildOTResponse(4, msgId, otBoilerCache[msgId]);  // 4 = READ_ACK
     } else {
       response = buildOTResponse(7, msgId, 0);  // 7 = UNKNOWN_DATAID (no cached data yet)
     }

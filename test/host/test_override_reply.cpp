@@ -168,16 +168,20 @@ static void sendWebSocketJSON(const char*) {}
 static bool satSimulationBlocksBusTx(const char*, const __FlashStringHelper*) { return false; }
 static void satNotifyBoilerFrameSeen() {}
 static bool satOwnsControlSetpoint() { return false; }
-static void flameRatioSet(bool) {}
+static std::string g_flame;                       // every flameRatioSet() call: '1' flame on, '0' off
+static void flameRatioSet(bool on) { g_flame += on ? '1' : '0'; }
+static void updateWriteCache(uint8_t, uint16_t) {}   // the scheduler's write cache, fed by master mode
 
 static int      g_m16Calls = 0;   // onThermostatMsgID16() stand-in: the TT/TC observer's input
 static uint8_t  g_m16Type  = 0;
 static uint16_t g_m16Data  = 0;
 static void onThermostatMsgID16(uint8_t msgType, uint16_t data) { g_m16Calls++; g_m16Type = msgType; g_m16Data = data; }
 
-// Called by loopOTDirect() only in master mode or from its timer blocks.
-static int g_masterModeCalls = 0;
-static void handleMasterModeSlaveFrame(unsigned long) { g_masterModeCalls++; }
+// handleMasterModeSlaveFrame() is sliced after loopOTDirect(), which calls it.
+// The firmware gets this prototype from the Arduino .ino preprocessor.
+static void handleMasterModeSlaveFrame(unsigned long frame);
+
+// Called by loopOTDirect() only from its timer blocks.
 static void scheduleMasterRequest() {}
 static void emitSummaryLine() {}
 static void updateOTDirectStatus() {}
@@ -255,6 +259,11 @@ static std::string cacheText() {
   return s.empty() ? "-" : s;
 }
 
+// Optional expectations of the TASK-1177 cases, checked by verdict() and reset by resetAll().
+static const char* g_wantFlame   = nullptr;   // expected flameRatioSet() calls, "-" for none
+static int         g_wantPresent = -1;        // expected otDirectBoilerPresent(); -1: not checked
+static int         g_wantVent    = -1;        // expected otIsVentSlave(); -1: not checked
+
 static void resetAll() {
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) otOverrides[i].active = false;
   for (uint8_t i = 0; i < OT_RESPONSE_OVERRIDE_MAX; i++) otResponseOverrides[i].active = false;
@@ -277,7 +286,8 @@ static void resetAll() {
   otSlave.reset();
   g_log.clear();
   g_m16Calls = 0; g_m16Type = 0; g_m16Data = 0;
-  g_masterModeCalls = 0;
+  g_flame.clear();
+  g_wantFlame = nullptr; g_wantPresent = -1; g_wantVent = -1;
 }
 
 // A thermostat frame as the library's slave process() delivers it (OpenTherm.cpp:444-447).
@@ -304,11 +314,17 @@ static void verdict(const char* id, const char* title,
   const std::string gotLog     = logText(g_log);
   const std::string gotCache   = cacheText();
   const bool gotOnline = state.otBus.bOnline;
+  const std::string gotFlame = g_flame.empty() ? "-" : g_flame;
+  const int  gotPresent = otDirectBoilerPresent() ? 1 : 0;
+  const int  gotVent    = otIsVentSlave() ? 1 : 0;
+  const bool extraOk   = (g_wantFlame == nullptr || gotFlame == g_wantFlame) &&
+                         (g_wantPresent < 0 || gotPresent == g_wantPresent) &&
+                         (g_wantVent < 0 || gotVent == g_wantVent);
   const bool boilerOk  = gotBoiler  == framesText(wantBoiler);
   const bool repliesOk = gotReplies == framesText(wantReplies);
   const bool logOk     = gotLog     == wantLog;
-  const bool stateOk   = (wantCache == nullptr || gotCache == wantCache) && gotOnline == wantOnline;
-  const bool pass      = boilerOk && repliesOk && logOk && stateOk && g_masterModeCalls == 0;
+  const bool stateOk   = (wantCache == nullptr || gotCache == wantCache) && gotOnline == wantOnline && extraOk;
+  const bool pass      = boilerOk && repliesOk && logOk && stateOk;
 
   g_results.push_back({ id, pass, wantReplies.size(), otSlave.sent.size(), repliesOk, logOk, boilerOk, stateOk });
   printf("CASE %s %s want_replies=%u got_replies=%u replies_ok=%c log_ok=%c boiler_ok=%c state_ok=%c\n",
@@ -322,11 +338,16 @@ static void verdict(const char* id, const char* title,
   printf("     state     : cache=%s online=%d%s\n", gotCache.c_str(), gotOnline ? 1 : 0,
          stateOk ? "" : ("   WANT cache=" + std::string(wantCache ? wantCache : "(not checked)") +
                          " online=" + (wantOnline ? "1" : "0")).c_str());
-  if (g_masterModeCalls) printf("     handleMasterModeSlaveFrame() ran %d time(s); no case uses master mode\n", g_masterModeCalls);
+  if (g_wantFlame || g_wantPresent >= 0 || g_wantVent >= 0) {
+    printf("     extra     : flame=%s present=%d vent=%d%s\n", gotFlame.c_str(), gotPresent, gotVent,
+           extraOk ? "" : ("   WANT flame=" + std::string(g_wantFlame ? g_wantFlame : "(any)") +
+                           " present=" + (g_wantPresent < 0 ? "(any)" : std::to_string(g_wantPresent)) +
+                           " vent=" + (g_wantVent < 0 ? "(any)" : std::to_string(g_wantVent))).c_str());
+  }
   if (g_dump) {
-    fprintf(g_dump, "%s boiler=%s replies=%s log=%s cache=%s online=%d m16=%d:%u:%04X mm=%d\n",
+    fprintf(g_dump, "%s boiler=%s replies=%s log=%s cache=%s online=%d m16=%d:%u:%04X flame=%s present=%d vent=%d\n",
             id, gotBoiler.c_str(), gotReplies.c_str(), gotLog.c_str(), gotCache.c_str(), gotOnline ? 1 : 0,
-            g_m16Calls, (unsigned)g_m16Type, (unsigned)g_m16Data, g_masterModeCalls);
+            g_m16Calls, (unsigned)g_m16Type, (unsigned)g_m16Data, gotFlame.c_str(), gotPresent, gotVent);
   }
 }
 
@@ -342,14 +363,115 @@ static OverrideRun runOverriddenWrite(unsigned id, uint16_t own, uint16_t ovr) {
   return { tstat, otFrame(kWriteData, id, ovr) };
 }
 
+// ---- TASK-1177 suite: replies for OEM data-ids 128-255 and the boiler cache ---------
+// otBoilerCache holds data-ids 0-127. Masking a reply's data-id with 0x7F put a
+// MsgID 128+n reply in MsgID n's slot. K1-K4 pin that it no longer does; K5-K7
+// are controls that must behave the same with and without the fix.
+static void clearTraffic() { otMaster.reset(); otSlave.reset(); g_log.clear(); g_flame.clear(); }
+
+static void suite1177() {
+  const uint16_t cfgVent = 0xC012;   // Slave Config HB bits 6-7 = 11: ventilation/HRV
+  {
+    resetAll();
+    const unsigned long t = otFrame(kReadData, 131, 0), b = otFrame(kReadAck, 131, cfgVent);
+    thermostatSends(t); loopOTDirect();
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    g_wantPresent = 0; g_wantVent = 0;
+    verdict("K1", "gateway mode, READ(131) answered READ-ACK(131, C012): relayed, not cached; MsgID 3's slot, otDirectBoilerPresent() and otIsVentSlave() untouched",
+            { t }, { b }, logOf({ { 'T', t }, { 'B', b } }), "-");
+  }
+  {
+    resetAll();
+    const unsigned long q = otFrame(kReadData, 128, 0), b = otFrame(kReadAck, 128, 0x0008);
+    sendMasterRequestAsync(q, OT_DIRECT_ORIGIN_GATEWAY);
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    g_wantFlame = "-";
+    verdict("K2", "gateway command READ(128) answered with bit 3 set: not cached, flameRatioSet() not called",
+            { q }, {}, logOf({ { 'R', q }, { 'B', b } }), "-");
+  }
+  {
+    resetAll();
+    otCurrentMode = OTD_MODE_LOOPBACK;
+    const unsigned long t = otFrame(kReadData, 131, 0), b = otFrame(kUnknownId, 131, 0);
+    thermostatSends(t); loopOTDirect(); loopOTDirect();
+    verdict("K3", "loopback mode, READ(131): the simulated UNKNOWN-DATAID is relayed and not cached in MsgID 3's slot",
+            {}, { b }, logOf({ { 'T', t }, { 'B', b } }), "-");
+  }
+  {
+    resetAll();
+    const unsigned long t3 = otFrame(kReadData, 3, 0), b3 = otFrame(kReadAck, 3, 0x1234);
+    thermostatSends(t3); loopOTDirect();
+    otMaster.boilerFrame(b3); loopOTDirect(); loopOTDirect();   // a genuine MsgID 3 reply in the cache
+    clearTraffic();
+    otCurrentMode = OTD_MODE_MASTER;
+    const unsigned long t = otFrame(kReadData, 131, 0), a = otFrame(kUnknownId, 131, 0);
+    thermostatSends(t); loopOTDirect();
+    verdict("K4", "master mode with MsgID 3 cached, READ(131): answered UNKNOWN-DATAID, not READ-ACK with MsgID 3's data",
+            {}, { a }, logOf({ { 'T', t }, { 'A', a } }), "03:1234");
+  }
+  {
+    resetAll();
+    const unsigned long t = otFrame(kReadData, 3, 0), b = otFrame(kReadAck, 3, cfgVent);
+    thermostatSends(t); loopOTDirect();
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    g_wantPresent = 1; g_wantVent = 1;
+    verdict("K5", "control: a genuine READ-ACK(3, C012) is cached and drives otDirectBoilerPresent() and otIsVentSlave()",
+            { t }, { b }, logOf({ { 'T', t }, { 'B', b } }), "03:C012");
+  }
+  {
+    resetAll();
+    const unsigned long q = otFrame(kReadData, 0, 0x0300), b = otFrame(kReadAck, 0, 0x0308);
+    sendMasterRequestAsync(q, OT_DIRECT_ORIGIN_GATEWAY);
+    otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+    g_wantFlame = "1";
+    verdict("K6", "control: a genuine READ-ACK(0) with the flame bit is cached and calls flameRatioSet(true)",
+            { q }, {}, logOf({ { 'R', q }, { 'B', b } }), "00:0308");
+  }
+  {
+    resetAll();
+    const unsigned long t3 = otFrame(kReadData, 3, 0), b3 = otFrame(kReadAck, 3, 0x1234);
+    thermostatSends(t3); loopOTDirect();
+    otMaster.boilerFrame(b3); loopOTDirect(); loopOTDirect();
+    clearTraffic();
+    otCurrentMode = OTD_MODE_MASTER;
+    const unsigned long t = otFrame(kReadData, 3, 0), a = otFrame(kReadAck, 3, 0x1234);
+    thermostatSends(t); loopOTDirect();
+    verdict("K7", "control: master mode with MsgID 3 cached, READ(3): answered READ-ACK(3, 1234) from the cache",
+            {}, { a }, logOf({ { 'T', t }, { 'A', a } }), "03:1234");
+  }
+}
+
+// Close the dump and print the summary line the runner parses.
+static int finish() {
+  if (g_dump) fclose(g_dump);
+
+  unsigned passed = 0;
+  std::string failed, zeroReply;
+  for (const CaseResult& c : g_results) {
+    if (c.pass) passed++;
+    else { if (!failed.empty()) failed += ","; failed += c.id; }
+    if (c.wantReplies > 0 && c.gotReplies == 0) { if (!zeroReply.empty()) zeroReply += ","; zeroReply += c.id; }
+  }
+  printf("\nSUMMARY cases=%u passed=%u failed=%s zero_reply=%s\n", (unsigned)g_results.size(), passed,
+         failed.empty() ? "none" : failed.c_str(), zeroReply.empty() ? "none" : zeroReply.c_str());
+  const bool ok = passed == g_results.size();
+  printf("%s\n", ok ? "harness: contract holds" : "harness: contract VIOLATED");
+  return ok ? 0 : 1;
+}
+
+// argv[1]: directory for the case dump (cases-<suite>.txt); argv[2]: suite, 1178 (default) or 1177.
 int main(int argc, char** argv) {
-  printf("== OT-Direct reply to a forwarded thermostat frame (TASK-1178) ==\n");
+  const std::string suite = argc > 2 ? argv[2] : "1178";
+  if (suite != "1178" && suite != "1177") { printf("unknown suite %s\n", suite.c_str()); return 3; }
+  printf("%s\n", suite == "1177" ? "== OT-Direct boiler cache and OEM data-ids 128-255 (TASK-1177) =="
+                                 : "== OT-Direct reply to a forwarded thermostat frame (TASK-1178) ==");
   printf("slice origin: %s\n\n", OTD_SLICE_ORIGIN);
   if (argc > 1) {
-    std::string path = std::string(argv[1]) + "/cases.txt";
+    std::string path = std::string(argv[1]) + "/cases-" + suite + ".txt";
     g_dump = fopen(path.c_str(), "wb");
     if (!g_dump) { printf("cannot open %s\n", path.c_str()); return 3; }
   }
+  if (suite == "1177") { suite1177(); return finish(); }
 
   const uint16_t t30 = degC(30.0), t31 = degC(31.0), t40 = degC(40.0);
 
@@ -693,18 +815,5 @@ int main(int argc, char** argv) {
                     { 'T', r.tstat }, { 'R', r.toBoiler }, { 'B', b }, { 'A', a } }), "01:2800");
   }
 
-  if (g_dump) fclose(g_dump);
-
-  unsigned passed = 0;
-  std::string failed, zeroReply;
-  for (const CaseResult& c : g_results) {
-    if (c.pass) passed++;
-    else { if (!failed.empty()) failed += ","; failed += c.id; }
-    if (c.wantReplies > 0 && c.gotReplies == 0) { if (!zeroReply.empty()) zeroReply += ","; zeroReply += c.id; }
-  }
-  printf("\nSUMMARY cases=%u passed=%u failed=%s zero_reply=%s\n", (unsigned)g_results.size(), passed,
-         failed.empty() ? "none" : failed.c_str(), zeroReply.empty() ? "none" : zeroReply.c_str());
-  const bool ok = passed == g_results.size();
-  printf("%s\n", ok ? "harness: contract holds" : "harness: contract VIOLATED");
-  return ok ? 0 : 1;
+  return finish();
 }
