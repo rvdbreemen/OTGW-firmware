@@ -14,19 +14,23 @@
 **    H  satBoilerHardwarePresent(), SAT's availability gate: on a combo build
 **       (HAS_PIC and HAS_DIRECT_OT) it also read state.otBus.bBoilerState,
 **       which counts loopback B frames on purpose (TASK-1138)
-**  A genuine boiler B, and on the PIC path every frame (ADR-103 proxy A
-**  included), keep counting.
+**  and, per the maintainer's decision, the same consumers for a line the
+**  /otgw_simulation.log replay injects (the R cases): it is decoded and keeps
+**  boiler_connected, but it is no boiler evidence either. A genuine boiler B,
+**  and every live PIC frame (ADR-103 proxy A included), keep counting.
 **
 **  The code under test is NOT copied here. test_local_frame_consumers.py slices
 **  it by anchor, verbatim, into generated/local_frame_consumers/<model>-<old|fix>/:
 **    types.inc  OTGW-Core.h, as test_boiler_unsupported_origin.py slices it
-**    core.inc   OTGW-Core.ino: the frame queue, dispatchOTGWInputLine(), the
-**               bitmaps, evaluateOTBusLiveness() and processOT() (same slices)
+**    core.inc   OTGW-Core.ino: the frame queue, dispatchOTGWInputLine() (the
+**               replay's entry point), the bitmaps, evaluateOTBusLiveness()
+**               and processOT() (same slices)
 **    otd.inc    OTDirect.ino: otCurrentMode and the IS_*_MODE() macros,
 **               otHideReports, bridgeFrameToParser() (same slices), plus
 **               otBoilerCacheValid[]
 **    hw.inc     Hardwaretypes.h: OTGWHardwareMode
-**    gate.inc   OTGW-firmware.h: isPICEnabled(), isOTDirectEnabled().
+**    gate.inc   OTGW-Core.ino: otRealBoilerSeenRecently(), where the revision
+**               has it. OTGW-firmware.h: isPICEnabled(), isOTDirectEnabled().
 **               OTDirect.ino: otDirectBoilerPresent(). SATcontrol.ino:
 **               satDebugForceBoilerPresent, satBoilerHardwarePresent(),
 **               satNotifyBoilerFrameSeen()
@@ -40,7 +44,9 @@
 **
 **  Test doubles, for hardware, the OS and output only (as in
 **  test_boiler_unsupported_origin.cpp), except that AddLog() records the OT log
-**  text of the case so the L cases can read the suffix.
+**  text of the case so the L cases can read the suffix. Live PIC lines go to
+**  enqueueOTFrame() with source OTFRAME_SRC_PIC, as the PIC task does; replayed
+**  lines go to dispatchOTGWInputLine(), as the replay pump does.
 **
 **  Usage: test_local_frame_consumers.exe [dump-dir]
 **    With a dump-dir it writes <dump-dir>/cases.txt, one line per case.
@@ -135,6 +141,7 @@ static struct {
   struct {
     bool bPSmode; time_t tBoilerLastSeen; time_t tThermostatLastSeen;
     bool bBoilerState; bool bThermostatState; bool bOnline;
+    time_t tRealBoilerLastSeen;                    // only revisions that have it read it
   } otBus;
   struct { bool bAvailable; } pic;                 // isPICEnabled()
   struct { OTGWHardwareMode eMode; } hw;           // isOTDirectEnabled()
@@ -221,22 +228,25 @@ static unsigned long otFrame(unsigned type, unsigned id, uint16_t data) {
   return withEvenParity(((unsigned long)type << 28) | ((unsigned long)id << 16) | data);
 }
 
-// One frame, as a producer hands it to the parser.
-struct Step { bool pic; char prefix; unsigned long frame; };
-static Step otd(char prefix, unsigned long frame) { return { false, prefix, frame }; }
-static Step pic(char prefix, unsigned long frame) { return { true, prefix, frame }; }
+// One frame, as a producer hands it to the parser: OT-Direct, a live PIC line,
+// or a line the /otgw_simulation.log replay injects.
+struct Step { char src; char prefix; unsigned long frame; };
+static Step otd(char prefix, unsigned long frame) { return { 'o', prefix, frame }; }
+static Step pic(char prefix, unsigned long frame) { return { 'p', prefix, frame }; }
+static Step rpl(char prefix, unsigned long frame) { return { 'r', prefix, frame }; }
 
 static void emit(const Step& s) {
-  if (s.pic) {
-    char line[16];
-    snprintf(line, sizeof(line), "%c%08lX", s.prefix, s.frame);   // the PIC's line format
-    dispatchOTGWInputLine(line, 9);
-  } else {
+  if (s.src == 'o') {
     bridgeFrameToParser(s.prefix, s.frame);
+    return;
   }
+  char line[16];
+  snprintf(line, sizeof(line), "%c%08lX", s.prefix, s.frame);     // the PIC's line format
+  if (s.src == 'p') enqueueOTFrame(line, 9, false, OTFRAME_SRC_PIC);   // as the PIC task does
+  else dispatchOTGWInputLine(line, 9);                               // as the replay pump does
 }
 
-static void flushFrame() { dispatchOTGWInputLine("T00000000", 9); }
+static void flushFrame() { enqueueOTFrame("T00000000", 9, false, OTFRAME_SRC_PIC); }
 
 // The world a case starts from: which transport runs, in which OT-Direct mode,
 // whether a boiler has answered MsgID 3, and whether SAT simulation is on.
@@ -263,7 +273,7 @@ static void resetAll(const World& w) {
   boilerUnsupportedDirty = boilerFileDirty = thermostatFileDirty = false;
   // The liveness window runs on time(nullptr); clear it so no case inherits the
   // previous case's boiler.
-  state.otBus.tBoilerLastSeen = state.otBus.tThermostatLastSeen = 0;
+  state.otBus.tBoilerLastSeen = state.otBus.tThermostatLastSeen = state.otBus.tRealBoilerLastSeen = 0;
   state.otBus.bBoilerState = state.otBus.bThermostatState = false;
   state.sat.bBoilerDetectedFlag = false;
   memset(otBoilerCacheValid, 0, sizeof(otBoilerCacheValid));
@@ -304,18 +314,19 @@ static std::string suffixes() {
 static FILE* g_dump = nullptr;
 static int g_failures = 0;
 
-// Every case writes the same dump line: the acked bitmaps (A), the log suffixes
-// (L), the SAT edge flag (N), the SAT gate (H), and for comparison everything else
-// the frames touched, so the runner can check that a fix changes only its target.
+// Every case writes the same dump line: the acked bitmaps (A), the unsupported
+// bitmaps (U), the log suffixes (L), the SAT edge flag (N), the SAT gate (H), and
+// for comparison everything else the frames touched (boiler: bBoilerState, which a
+// replayed B keeps setting), so the runner can check a fix changes only its target.
 static void finish(const char* id, const char* title, bool ok, const char* got) {
   if (!ok) g_failures++;
   std::printf("CASE %s %s\n     %s\n     got : %s\n     queue: %s\n", id, ok ? "pass" : "FAIL", title, got,
               g_trace.c_str());
   if (g_dump) {
-    std::fprintf(g_dump, "%s A=ar:%s,aw:%s L=%s N=%d H=%d other=ur:%s,uw:%s,tr:%s,tw:%s,lw:%s,boiler:%d trace=%s\n",
-                 id, hex(boilerAckedRead).c_str(), hex(boilerAckedWrite).c_str(), suffixes().c_str(),
+    std::fprintf(g_dump, "%s A=ar:%s,aw:%s U=ur:%s,uw:%s L=%s N=%d H=%d other=tr:%s,tw:%s,lw:%s,boiler:%d trace=%s\n",
+                 id, hex(boilerAckedRead).c_str(), hex(boilerAckedWrite).c_str(),
+                 hex(boilerUnsupportedRead).c_str(), hex(boilerUnsupportedWrite).c_str(), suffixes().c_str(),
                  (int)state.sat.bBoilerDetectedFlag, (int)satBoilerHardwarePresent(),
-                 hex(boilerUnsupportedRead).c_str(), hex(boilerUnsupportedWrite).c_str(),
                  hex(thermostatSentRead).c_str(), hex(thermostatSentWrite).c_str(),
                  hex(boilerLastMasterWasWrite).c_str(), (int)state.otBus.bBoilerState, g_trace.c_str());
   }
@@ -329,6 +340,17 @@ static void caseAcked(const char* id, const char* title, const World& w, std::in
   char g[96];
   snprintf(g, sizeof g, "MsgID %d acknowledged %s: want %d, got %d", checkId, write ? "write" : "read",
            (int)want, (int)got);
+  finish(id, title, got == want, g);
+}
+
+static void caseUnsupported(const char* id, const char* title, const World& w, std::initializer_list<int> presetRead,
+                            std::initializer_list<Step> steps, int checkId, bool want) {
+  resetAll(w);
+  for (int i : presetRead) boilerUnsupportedRead[i >> 3] |= (uint8_t)(1u << (i & 7));
+  runFrames(steps);
+  const bool got = bitOf(boilerUnsupportedRead, checkId);
+  char g[96];
+  snprintf(g, sizeof g, "MsgID %d unsupported read: want %d, got %d", checkId, (int)want, (int)got);
   finish(id, title, got == want, g);
 }
 
@@ -459,6 +481,22 @@ int main(int argc, char** argv) {
            kPic, {}, false, false);
   caseGate("HC4", "control: combo in OT-Direct loopback, the TASK-802 debug override: present",
            kOtdLoopback, {}, true, true);
+
+  std::printf("== R: lines the /otgw_simulation.log replay injects (combo in PIC mode, simulation on) ==\n");
+  caseUnsupported("R1", "replay T + B UNKNOWN-DATAID READ(40) sets no verdict",
+                  kPic, {}, { rpl('T', otFrame(kReadData, 40, 0)), rpl('B', otFrame(kUnknownId, 40, 0)) }, 40, false);
+  caseUnsupported("R2", "replay T + B READ-ACK(25) does not retract an earlier real verdict on READ(25)",
+                  kPic, { 25 }, { rpl('T', otFrame(kReadData, 25, 0)), rpl('B', otFrame(kReadAck, 25, 0x2A80)) }, 25, true);
+  caseAcked("R3", "replay T + B READ-ACK(25) is not a boiler Ack",
+            kPic, { rpl('T', otFrame(kReadData, 25, 0)), rpl('B', otFrame(kReadAck, 25, 0x2A80)) }, false, 25, false);
+  caseAcked("R4", "replay T + B WRITE-ACK(24) is not a boiler Ack",
+            kPic, { rpl('T', otFrame(kWriteData, 24, 0x1433)), rpl('B', otFrame(kWriteAck, 24, 0x1433)) }, true, 24, false);
+  caseUnsupported("R5", "replay proxy answer without a B, T + A UNKNOWN-DATAID READ(70), sets no verdict",
+                  kPic, {}, { rpl('T', otFrame(kReadData, 70, 0)), rpl('A', otFrame(kUnknownId, 70, 0)) }, 70, false);
+  caseEdge("R6", "replay T + B UNKNOWN-DATAID READ(40) does not raise the SAT boiler-detected flag",
+           kPic, { rpl('T', otFrame(kReadData, 40, 0)), rpl('B', otFrame(kUnknownId, 40, 0)) }, false);
+  caseGate("R7", "combo in PIC mode: replayed B frames keep boiler_connected but are no real boiler for SAT",
+           kPic, { rpl('T', otFrame(kReadData, 25, 0)), rpl('B', otFrame(kReadAck, 25, 0x2A80)) }, false, false);
 #elif MODEL == MODEL_CLASSIC
   std::printf("== H: SAT availability gate, classic build (PIC only) ==\n");
   caseGate("K1", "control: classic, boiler B frames on the PIC: present",
@@ -470,6 +508,8 @@ int main(int argc, char** argv) {
     caseGate("K3", "control: classic, PIC not available but boiler B frames seen: present (the gate reads bBoilerState)",
              w, { pic('T', otFrame(kReadData, 25, 0)), pic('B', otFrame(kReadAck, 25, 0x2A80)) }, false, true);
   }
+  caseGate("R8", "classic: replayed B frames keep boiler_connected but are no real boiler for SAT",
+           kPic, { rpl('T', otFrame(kReadData, 25, 0)), rpl('B', otFrame(kReadAck, 25, 0x2A80)) }, false, false);
 #else
   std::printf("== H: SAT availability gate, OTGW32 build (OT-Direct only) ==\n");
   caseGate("O1", "control: OTGW32 in loopback: absent",

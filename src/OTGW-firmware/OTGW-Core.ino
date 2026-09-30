@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.394
+**  Version  : v2.0.0-alpha.395
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -562,13 +562,14 @@ void drainOTFrameQueue() {
     // whole assembled lines only, so a payload without a terminator never
     // reached the client. Port 25238 is now fed byte-for-byte by
     // drainOTRawQueue() above (TASK-1111).
-    if (msg.source == OTFRAME_SRC_PIC) {
+    if (msg.source == OTFRAME_SRC_PIC || msg.source == OTFRAME_SRC_REPLAY) {
       blinkLEDnow(LED2);
     }
     // processOT() acquires OTStateLock internally (writer side), covering all
     // five processOT call sites uniformly — not just this consumer. Do NOT wrap
     // here too: the lock is non-recursive and would self-deadlock.
-    processOT(msg.line, msg.len, msg.suppressOutput, msg.source == OTFRAME_SRC_OTDIRECT_LOCAL);
+    processOT(msg.line, msg.len, msg.suppressOutput, msg.source == OTFRAME_SRC_OTDIRECT_LOCAL,
+              msg.source == OTFRAME_SRC_REPLAY);
     feedWatchDog();                            // bound worst-case drain time
   }
 }
@@ -3860,15 +3861,15 @@ void sendPICSerial(const char* buf, int len)
 #endif
 }
 
-// dispatchOTGWInputLine — loop-side PIC-line enqueue helper. Used by the OTGW
-// replay simulation path (the live PIC reader now enqueues directly from the
-// dedicated task). Tags source=PIC; the consumer (drainOTFrameQueue) applies the
-// LED blink + ser2net 25238 mirror, so both the live and simulated PIC paths get
-// identical side-effects without the task touching the network/LED (TASK-865.6).
+// dispatchOTGWInputLine — loop-side enqueue helper for the OTGW replay simulation
+// path (the live PIC reader enqueues directly from the dedicated task). Tags
+// source=REPLAY: the consumer (drainOTFrameQueue) blinks the LED as for a live PIC
+// line and processOT() decodes and publishes the line as usual, but a replayed
+// line is no boiler evidence (TASK-1185).
 static void dispatchOTGWInputLine(const char* buf, size_t len)
 {
   if (len == 0) return;
-  enqueueOTFrame(buf, len, false, OTFRAME_SRC_PIC);
+  enqueueOTFrame(buf, len, false, OTFRAME_SRC_REPLAY);
 }
 
 static bool readOTGWSimulationLine(File& replayFile, char* buffer, size_t bufferSize, size_t& lineLen)
@@ -4920,7 +4921,16 @@ void evaluateOTBusLiveness(OTBusLivenessTrigger trigger)
   }
 }
 
-void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
+// TASK-1185: a boiler B frame that is real boiler evidence (not an OT-Direct
+// loopback answer, not a replayed line) arrived within the 30 s window
+// evaluateOTBusLiveness() uses for bBoilerState. SAT's availability gate reads
+// this instead of bBoilerState, which counts those frames too (ADR-117 section 2).
+bool otRealBoilerSeenRecently() {
+  const time_t t = state.otBus.tRealBoilerLastSeen;
+  return (t != 0) && (time(nullptr) < (t + 30));
+}
+
+void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, bool replayed){
   // TASK-865.5 (ADR-123 Phase-1): processOT() is THE writer of the decoded
   // OTGWState snapshot (OTcurrentSystemState.*, state.otBus.*). Acquire the
   // OTStateLock here — covering ALL processOT call sites uniformly: the queue
@@ -4979,10 +4989,15 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
       state.otBus.tBoilerLastSeen = now;
       OTdata.rsptype = OTGW_BOILER;
       // TASK-795 §4.2: a boiler frame arrived. If SAT simulation is active,
-      // trip the edge hook (deferred auto-disable). Not for a loopback B
-      // (localAnswer): simulation must not switch itself off on synthetic
-      // traffic, the rule otDirectBoilerPresent() applies too (TASK-1185).
-      if (!localAnswer) satNotifyBoilerFrameSeen();
+      // trip the edge hook (deferred auto-disable), and stamp the real-boiler
+      // time SAT's availability gate reads. Not for a loopback B (localAnswer)
+      // or a replayed line (replayed): simulation must not switch itself off
+      // on synthetic traffic, the rule otDirectBoilerPresent() applies too
+      // (ADR-117 section 2, TASK-1185).
+      if (!localAnswer && !replayed) {
+        state.otBus.tRealBoilerLastSeen = now;
+        satNotifyBoilerFrameSeen();
+      }
     } else if (buf[0]=='T'){
       state.otBus.tThermostatLastSeen = now;
       OTdata.rsptype = OTGW_THERMOSTAT;
@@ -5025,6 +5040,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
     OTdata.bGatewaySubstituted = false;               // default: not substituted by gateway (ADR-096)
     OTdata.bAnswerOverride = false;                   // ADR-103: default proxy A (no preceding B)
     OTdata.bLocalAnswer = localAnswer;                // TASK-1086: made by the gateway itself, not by the boiler
+    OTdata.bReplayed = replayed;                      // TASK-1185: injected by the /otgw_simulation.log replay
 
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       // Boot-time one-shot: the very first OT frame has no prior delayed frame to pair
@@ -5093,7 +5109,8 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
       // clearing a verdict, and bounds how often it can fire.
       // TASK-1086: a frame the gateway made itself (OTdata.bLocalAnswer: every
       // OTDirect A, and every B of OTDirect loopback mode) says nothing about
-      // the boiler, so it neither sets nor retracts an unsupported verdict.
+      // the boiler, so it neither sets nor retracts an unsupported verdict;
+      // nor does a replayed line (OTdata.bReplayed, TASK-1185).
       {
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
@@ -5121,12 +5138,13 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
           // boiler had just Write-Acked as "not implemented" (GH #677). A
           // proxy A with no preceding B still counts, per ADR-103 — the same
           // distinction is_value_valid_for_master_topic() already makes. A
-          // frame with bLocalAnswer set counts for none of these bitmaps: an
-          // Ack the gateway made (SR= answer, master-mode WRITE-ACK echo,
-          // loopback B) is no evidence that the boiler knows the msgid
-          // (TASK-1185), and the unsupported verdicts skip it too (TASK-1086).
+          // frame the gateway made itself (bLocalAnswer: SR= answer, master-mode
+          // WRITE-ACK echo, loopback B; TASK-1086) or a replayed line
+          // (bReplayed) counts for none of these bitmaps: it is no evidence of
+          // what the boiler on this bus implements (TASK-1185).
+          const bool boilerEvidence = !OTdata.bLocalAnswer && !OTdata.bReplayed;
           if (OTdata.type == OT_READ_ACK) {
-            if (!OTdata.bLocalAnswer && (boilerAckedRead[idx] & mask) == 0) {
+            if (boilerEvidence && (boilerAckedRead[idx] & mask) == 0) {
               boilerAckedRead[idx] |= mask;
               boilerFileDirty = true;
             }
@@ -5143,24 +5161,25 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
             // the boiler really gave. Setting stays permissive so a PIC proxy A
             // still counts as boiler evidence (ADR-103). A B is not enough
             // either when the gateway made it itself: OTDirect loopback mode
-            // answers every request with a B of its own (bLocalAnswer).
-            if (OTdata.rsptype == OTGW_BOILER && !OTdata.bLocalAnswer && (boilerUnsupportedRead[idx] & mask) != 0) {
+            // answers every request with a B of its own (bLocalAnswer), and a
+            // replayed B comes from a recording (bReplayed): boilerEvidence.
+            if (OTdata.rsptype == OTGW_BOILER && boilerEvidence && (boilerUnsupportedRead[idx] & mask) != 0) {
               boilerUnsupportedRead[idx] &= ~mask;
               boilerUnsupportedDirty = true;
               boilerFileDirty        = true;
             }
           } else if (OTdata.type == OT_WRITE_ACK) {
-            if (!OTdata.bLocalAnswer && (boilerAckedWrite[idx] & mask) == 0) {
+            if (boilerEvidence && (boilerAckedWrite[idx] & mask) == 0) {
               boilerAckedWrite[idx] |= mask;
               boilerFileDirty = true;
             }
             // Same stricter rule as the read side above: only a genuine B.
-            if (OTdata.rsptype == OTGW_BOILER && !OTdata.bLocalAnswer && (boilerUnsupportedWrite[idx] & mask) != 0) {
+            if (OTdata.rsptype == OTGW_BOILER && boilerEvidence && (boilerUnsupportedWrite[idx] & mask) != 0) {
               boilerUnsupportedWrite[idx] &= ~mask;
               boilerUnsupportedDirty = true;
               boilerFileDirty        = true;
             }
-          } else if (OTdata.type == OT_UNKNOWN_DATA_ID && !OTdata.bLocalAnswer) {
+          } else if (OTdata.type == OT_UNKNOWN_DATA_ID && boilerEvidence) {
             // Master direction is read from boilerLastMasterWasWrite (set on
             // the preceding master frame). The slave's type-7 alone doesn't
             // carry intent. An UNKNOWN-DATAID the gateway made itself (OTDirect
@@ -6280,8 +6299,16 @@ void upgradepic(AsyncWebServerRequest *request) {
 //
 // Files (LittleFS):
 //   /ot-thermo.json — {"v":1,"device":"thermostat","sent_read":[...],"sent_write":[...]}
-//   /ot-boiler.json — {"v":1,"device":"boiler","acked_read":[...],"acked_write":[...],
+//   /ot-boiler.json — {"v":2,"device":"boiler","acked_read":[...],"acked_write":[...],
 //                     "unsupported_read":[...],"unsupported_write":[...]}
+//
+// Boiler format 2 (TASK-1185): format 1 was written by builds that counted
+// answers the gateway made itself (OT-Direct SR=, master mode, loopback) and
+// replayed lines as boiler evidence, and an acknowledged bit is never retracted.
+// A format-1 file is therefore not loaded: the boiler bitmaps start empty once,
+// live traffic relearns them, and the next save writes format 2. The MQTT
+// connect handler republishes the (then empty) unsupported list, which replaces
+// the retained one.
 //
 // Read on boot (loadOtSupportFiles, called from setup() after LittleFS.begin).
 // Write every 15 min from do15minevent when the per-file dirty flag is
@@ -6387,25 +6414,30 @@ void loadOtSupportFiles() {
     f.close();
   }
   // Boiler side.
+  bool boilerMigrated = false;
   f = LittleFS.open("/ot-boiler.json", "r");
   if (f) {
     char header[16] = {0};
     int n = f.read((uint8_t*)header, sizeof(header) - 1);
     header[n > 0 ? n : 0] = '\0';
-    if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+    if (strstr_P(header, PSTR("\"v\":2")) != nullptr) {
       readBitmapArrayFromJson(f, F("\"ar\":["), boilerAckedRead);
       readBitmapArrayFromJson(f, F("\"aw\":["), boilerAckedWrite);
       readBitmapArrayFromJson(f, F("\"ur\":["), boilerUnsupportedRead);
       readBitmapArrayFromJson(f, F("\"uw\":["), boilerUnsupportedWrite);
       DebugTln(F("ot-support: boiler profile loaded from /ot-boiler.json"));
+    } else if (strstr_P(header, PSTR("\"v\":1")) != nullptr) {
+      boilerMigrated = true;              // format 1: see the header comment above
+      DebugTln(F("ot-support: /ot-boiler.json is format 1 (it counted gateway answers as boiler evidence), starting fresh"));
     } else {
       DebugTln(F("ot-support: /ot-boiler.json header missing/invalid — starting fresh"));
     }
     f.close();
   }
-  // We loaded what's on disk, so the on-disk copy matches RAM: not dirty.
+  // We loaded what's on disk, so the on-disk copy matches RAM: not dirty. A
+  // migrated format-1 file does not match, so it is rewritten as format 2.
   thermostatFileDirty = false;
-  boilerFileDirty     = false;
+  boilerFileDirty     = boilerMigrated;
 }
 
 // Atomic write: <path>.tmp -> remove canonical -> rename. A power loss between
@@ -6429,7 +6461,8 @@ static bool writeOtBoilerFile(const char* canonicalPath, const char* tmpPath) {
   File f = LittleFS.open(tmpPath, "w");
   if (!f) return false;
   // TASK-696: short keys (ar/aw/ur/uw) match the reader; saves ~100 B per write.
-  f.print(F("{\"v\":1,\"device\":\"boiler\",\"ar\":["));
+  // Format 2 since TASK-1185 (see the header comment above).
+  f.print(F("{\"v\":2,\"device\":\"boiler\",\"ar\":["));
   writeBitmapArrayToJson(f, boilerAckedRead);
   f.print(F("],\"aw\":["));
   writeBitmapArrayToJson(f, boilerAckedWrite);

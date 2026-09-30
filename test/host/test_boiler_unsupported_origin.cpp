@@ -31,7 +31,9 @@
 **                 records the prefix and source byte of every item (the queue
 **                 trace); the state mutex always locks.
 **    PIC          the harness formats the PIC's lines ("T%08lX") and hands them
-**                 to the real dispatchOTGWInputLine().
+**                 to the real enqueueOTFrame() with source OTFRAME_SRC_PIC, as
+**                 the PIC task does (dispatchOTGWInputLine() is the replay's
+**                 entry point since TASK-1185).
 **    output       MQTT, WebSocket, telnet/debug and the OT log macros (GCC
 **                 statement expressions in the firmware), the port 25238
 **                 mirror (otDirectBridgeWriteLine), the raw-byte queue, the LED
@@ -139,6 +141,7 @@ static struct {
   struct {
     bool bPSmode; time_t tBoilerLastSeen; time_t tThermostatLastSeen;
     bool bBoilerState; bool bThermostatState; bool bOnline;
+    time_t tRealBoilerLastSeen;                    // stamped by revisions that have it (TASK-1185)
   } otBus;
 } state;
 static struct { struct { bool bOTmessage; bool bEnable; } mqtt; } settings;
@@ -215,13 +218,13 @@ static void emit(const Step& s) {
   if (s.pic) {
     char line[16];
     snprintf(line, sizeof(line), "%c%08lX", s.prefix, s.frame);   // the PIC's line format
-    dispatchOTGWInputLine(line, 9);
+    enqueueOTFrame(line, 9, false, OTFRAME_SRC_PIC);   // as the PIC task does
   } else {
     bridgeFrameToParser(s.prefix, s.frame);
   }
 }
 
-static void flushFrame() { dispatchOTGWInputLine("T00000000", 9); }
+static void flushFrame() { enqueueOTFrame("T00000000", 9, false, OTFRAME_SRC_PIC); }
 
 static void resetBitmaps() {
   memset(boilerLastMasterWasWrite, 0, sizeof(boilerLastMasterWasWrite));

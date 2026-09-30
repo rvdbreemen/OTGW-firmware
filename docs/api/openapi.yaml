@@ -1166,7 +1166,11 @@ paths:
         (750 ms), and starts again at the top when the file ends. Each line is
         one frame in the PIC's text format, for example `T10010A00`. Replayed
         frames take the same decode, state and MQTT publish path as live frames,
-        on every board: PIC (OTGW Classic) and OT-Direct (OTGW32) alike.
+        on every board: PIC (OTGW Classic) and OT-Direct (OTGW32) alike. A
+        replayed frame is no evidence about the boiler on the bus, though: it
+        sets no "does not implement" verdict and no acknowledged bit in
+        `GET /v2/otgw/ot-support`, and it does not switch SAT simulation off. It
+        does keep `boiler_connected` up, as a live boiler frame would.
 
         Use the replay on a bench, not on a live heating system. What reaches
         the boiler while it runs depends on the board:

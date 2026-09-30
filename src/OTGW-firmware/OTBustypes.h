@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTBustypes.h
-**  Version  : v2.0.0-alpha.394
+**  Version  : v2.0.0-alpha.395
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -33,6 +33,11 @@ struct OTBusState {          // state.otBus — OpenTherm protocol & bus state (
   // window AND the v2 connectivity per-link recency / "degraded/stale" state (ADR-155).
   time_t tBoilerLastSeen     = 0;
   time_t tThermostatLastSeen = 0;
+  // Epoch (s) of the last B frame that is boiler evidence: not an OT-Direct
+  // loopback answer and not a replayed /otgw_simulation.log line. Only SAT's
+  // availability gate reads it (otRealBoilerSeenRecently(), ADR-117 section 2),
+  // so a simulated boiler never switches SAT simulation off (TASK-1185).
+  time_t tRealBoilerLastSeen = 0;
   // millis() of the last room temperature (MsgID 24) the THERMOSTAT wrote, from a
   // live T frame or the PS=1 summary; 0 = never. Gateway-originated MsgID 24 frames
   // (the master scheduler re-sending its write cache, TR= overrides) do not stamp

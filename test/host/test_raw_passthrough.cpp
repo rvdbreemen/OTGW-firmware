@@ -65,7 +65,7 @@ static void forwardDiagnoseChunk(const uint8_t*, uint8_t) {}
 static void feedWatchDog() {}
 static const int LED2 = 0;
 static void blinkLEDnow(int) {}
-static void processOT(const char*, int, bool = false, bool = false) {}
+static void processOT(const char*, int, bool = false, bool = false, bool = false) {}
 static void reportPendingPICRxErrors() {}
 
 // ---- code under test, sliced ------------------------------------------------------------

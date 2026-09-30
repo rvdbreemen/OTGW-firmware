@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.394
+**  Version  : v2.0.0-alpha.395
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -536,7 +536,7 @@ void confirmMQTTPublishByteSlot();         // confirm pending status-byte slot u
 // localAnswer=true marks a frame the gateway made itself (queue source
 // OTFRAME_SRC_OTDIRECT_LOCAL): it neither sets nor retracts a
 // boiler-unsupported verdict (TASK-1086).
-void processOT(const char *buf, int len, bool suppressOutput = false, bool localAnswer = false);
+void processOT(const char *buf, int len, bool suppressOutput = false, bool localAnswer = false, bool replayed = false);
 
 // ===== ADR-123 Phase-1 concurrency foundation (TASK-865.5) ================
 //
@@ -571,6 +571,7 @@ enum OTFrameSource : uint8_t {
   OTFRAME_SRC_PIC      = 0,   // PIC UART line (dispatchOTGWInputLine / PIC task)
   OTFRAME_SRC_OTDIRECT = 1,   // OTDirect bridged frame (bridgeFrameToParser)
   OTFRAME_SRC_OTDIRECT_LOCAL = 2,   // OTDirect answer made by the gateway itself (bridgeFrameToParser)
+  OTFRAME_SRC_REPLAY   = 3,   // line the /otgw_simulation.log replay injects (dispatchOTGWInputLine)
 };
 
 struct OTFrameMsg {
@@ -812,8 +813,12 @@ struct OpenthermData_t {
                             //on a proxy A (no preceding B — e.g. MaxTSet/57). Proxy A reaches _thermostat,
                             //_boiler and canonical; answer-override A reaches _thermostat only (ADR-096 invariant).
   byte bLocalAnswer;        //TASK-1086: 1 on a frame the gateway made itself (OTDirect: every A, and every B in
-                            //loopback mode), 0 on a frame from the bus. Such a frame neither sets nor retracts a
-                            //boiler-unsupported verdict. Rides the 1-frame delay with the frame, like bAnswerOverride.
+                            //loopback mode), 0 on a frame from the bus. Such a frame is no boiler evidence: it
+                            //neither sets nor retracts a boiler-unsupported verdict and marks no msgid
+                            //acknowledged (TASK-1185). Rides the 1-frame delay with the frame, like bAnswerOverride.
+  byte bReplayed;           //TASK-1185: 1 on a line the /otgw_simulation.log replay injected. Decoded and published
+                            //like a bus frame, but no boiler evidence either: no verdict, no acknowledged bit, no
+                            //SAT simulation hook. Rides the 1-frame delay with the frame.
   time_t time;
   /**
    * @return float representation of data packet value

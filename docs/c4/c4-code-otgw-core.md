@@ -36,6 +36,8 @@
     - `bAnswerOverride` — true when the current `A`-prefix frame is a gateway answer that *substitutes* a real boiler `B` frame (genuine answer-override). False on the more common case of an `A`-prefix proxy frame (no preceding `B`).
     - `bGatewaySubstituted` — true when the gateway injected the substitution itself.
     - `bLocalAnswer` (TASK-1086) - true on a frame the gateway made itself instead of receiving it from a boiler: every OT-Direct `A`, and every `B` in OT-Direct loopback mode. `bridgeFrameToParser()` tags it as `OTFRAME_SRC_OTDIRECT_LOCAL`, `drainOTFrameQueue()` passes it to `processOT()`, and it rides the one-frame delay with its frame. Such a frame is no boiler evidence anywhere: it neither sets nor retracts a boiler-unsupported verdict (`boilerUnsupportedRead`/`boilerUnsupportedWrite`), does not mark a msgid acknowledged (`boilerAckedRead`/`boilerAckedWrite`, the acknowledged column of `GET /api/v2/otgw/ot-support`, TASK-1185), and its type-7 OT log line ends in `(gateway answer)` instead of `(boiler does not implement)` or `(boiler rejected write)`. A loopback `B` still stamps `state.otBus.tBoilerLastSeen` (TASK-1138) but does not trip `satNotifyBoilerFrameSeen()`, and on a combo board in OT-Direct mode `satBoilerHardwarePresent()` ignores `bBoilerState` and asks `otDirectBoilerPresent()`, so SAT simulation cannot switch itself off on loopback traffic (ADR-117 section 2).
+    - `bReplayed` (TASK-1185) - true on a line the `/otgw_simulation.log` replay injected (`dispatchOTGWInputLine()` tags it `OTFRAME_SRC_REPLAY`). It is decoded and published like a live frame and keeps `tBoilerLastSeen` (boiler_connected), but it is no boiler evidence either: `processOT()` folds both flags into `boilerEvidence` for the four boiler bitmaps, and neither flag stamps `state.otBus.tRealBoilerLastSeen` or trips `satNotifyBoilerFrameSeen()`. SAT's availability gate reads `otRealBoilerSeenRecently()` (that stamp within 30 s) instead of `bBoilerState` on the PIC path.
+    - `/ot-boiler.json` is format 2 (`"v":2`) since TASK-1185. A format-1 file, written by builds that counted these frames, is not loaded: the boiler bitmaps start empty once and `boilerFileDirty` rewrites the file as format 2 at the next save. `/ot-thermo.json` stays format 1.
 - **Scope**: Global singleton `OTdataStruct OTcurrentSystemState`
 - **Note**: Flame status is in SlaveStatus bit 3 (NOT MasterStatus); MasterStatus bit 3 is OTC (Outside Temperature Compensation) enabled (bug fix: commit d85e668c)
 
@@ -80,13 +82,14 @@
 
 #### Message Processing
 
-##### `void processOT(const char *buf, int len, bool suppressOutput = false, bool localAnswer = false)` (OTGW-Core.ino:4910)
+##### `void processOT(const char *buf, int len, bool suppressOutput = false, bool localAnswer = false, bool replayed = false)` (OTGW-Core.ino)
 - **Purpose**: Parse incoming OpenTherm message from PIC serial, decode fields, publish to MQTT/WebSocket
 - **Parameters**:
   - `buf`: Character buffer containing raw OT message (format: "THxxddhh\r" or similar)
   - `len`: Length of buffer
   - `suppressOutput`: skip the per-frame output (OT-Direct PS=1, TASK-293)
   - `localAnswer`: the frame is an answer the gateway made itself (queue source `OTFRAME_SRC_OTDIRECT_LOCAL`); stored as `OTdata.bLocalAnswer` (TASK-1086)
+  - `replayed`: the line came from the `/otgw_simulation.log` replay (queue source `OTFRAME_SRC_REPLAY`, set by `dispatchOTGWInputLine()`); stored as `OTdata.bReplayed` (TASK-1185)
 - **Flow**:
   1. Validate message format
   2. Extract message type (READ/WRITE/ACK/etc.)

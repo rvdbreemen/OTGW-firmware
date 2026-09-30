@@ -6,7 +6,7 @@ boiler evidence in the boiler-unsupported bitmaps?
     python test/host/test_boiler_unsupported_origin.py --old-rev HEAD   # OLD vs FIX
 
 A frame reaches the bitmaps through bridgeFrameToParser() (OTDirect.ino) or
-dispatchOTGWInputLine() (the PIC path), enqueueOTFrame() and its OTFrameMsg
+the PIC task's enqueueOTFrame() call, its OTFrameMsg
 queue item, drainOTFrameQueue(), and processOT(), which parses the frame,
 holds it back one frame to pair (T,R) and (B,A), and then updates the six
 per-msgid bitmaps. This harness compiles that whole chain from the REAL
