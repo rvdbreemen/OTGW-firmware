@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.392
+**  Version  : v2.0.0-alpha.393
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -634,6 +634,8 @@ void doRestart(const char* str) {
   uint32_t t = millis();
   flushSettings();        // persist any pending settings before reboot
   DebugTf(PSTR("[reboot]   flushSettings: %lums\r\n"), (unsigned long)(millis() - t));
+
+  flushDHWWaterMeter();   // TASK-1123: an orderly restart loses no litres of the DHW water total
 
   prepareForReboot();     // graceful shutdown: MQTT LWT, WS close frames, TCP FINs
   // NOTE: prepareForReboot() called debugTelnet.stop() near its end, so every

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.392
+**  Version  : v2.0.0-alpha.393
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -2702,7 +2702,14 @@ void print_f88(float& value)
     const char* topic = messageIDToString(static_cast<OTLibMessageID>(OTdata.id));
     if (validForMaster) sendMQTTData(topic, _msg);
     publishToSourceTopic(topic, _msg, OTdata.rsptype);
-    if (validForMaster) value = _value;
+    if (validForMaster) {
+      value = _value;
+      // ADR-176: MsgID 19 also feeds the DHW water total, from a boiler Read-Ack (B)
+      // only. An A frame here is the gateway's own answer: a PIC answer, or in OT-Direct
+      // master mode handleMasterModeSlaveFrame() replaying otBoilerCache, which keeps
+      // serving the last flow after the boiler has stopped answering.
+      if (OTdata.id == 19 && OTdata.rsptype == OTGW_BOILER) updateDHWWaterMeter(_value, millis());
+    }
   }
 }
 
@@ -4258,7 +4265,13 @@ static void updatePSSummaryFloatState(uint8_t msgid, float fval)
     case 16: OTcurrentSystemState.TrSet                 = fval; break;
     case 17: OTcurrentSystemState.RelModLevel           = fval; break;
     case 18: OTcurrentSystemState.CHPressure            = fval; break;
-    case 19: OTcurrentSystemState.DHWFlowRate           = fval; break;
+    case 19:
+      OTcurrentSystemState.DHWFlowRate = fval;
+      // ADR-176: a PIC hides the frames in PS=1 mode, so its summary is the only MsgID 19
+      // source there. In OT-Direct mode the summary is emitSummaryLine() re-presenting
+      // this state after every MsgID 0 reply; print_f88() already counted the B frames.
+      if (!isOTDirectEnabled()) updateDHWWaterMeter(fval, millis());
+      break;
     case 23: OTcurrentSystemState.TrSetCH2              = fval; break;
     case 24: OTcurrentSystemState.Tr                    = fval; stampThermostatRoomTemp(); break;
     case 25: OTcurrentSystemState.Tboiler               = fval; break;

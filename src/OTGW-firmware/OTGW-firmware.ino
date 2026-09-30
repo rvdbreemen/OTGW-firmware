@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.392
+**  Version  : v2.0.0-alpha.393
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -293,6 +293,7 @@ void setup() {
   readSettings(true);
   checklittlefshash();
   loadOtSupportFiles();  // TASK-693 port: warm the in-RAM support bitmaps from prior-boot knowledge
+  loadDHWWaterMeter();   // TASK-1123: restore the DHW water total before any OT frame is decoded
 
   // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
   // previous boot lets the SDK auto-connect before startWiFi() is reached;
@@ -756,6 +757,11 @@ void doTaskEvery60s(){
 
   //== do tasks ==
 
+  // TASK-1123 (ADR-176): publish the DHW water total (a no-op until a MsgID 19 sample
+  // was taken on this boot), then persist it when the write-rate rule says so.
+  publishDHWWaterMeter();
+  saveDHWWaterMeterIfDue(millis());
+
   // Re-check FS/firmware hash match every 60s so the warning persists
   // even if other runtime status messages are set and cleared elsewhere.
   checklittlefshash();
@@ -1086,6 +1092,7 @@ void loop()
   // which re-enters via doAutoConfigure's file-reading loop and could nest the
   // OTStateLock. processOT() runs from loop() context (not a task) in Phase 1.
   handlePendingMQTTRepublish();     // TASK-1176: apply a REST-queued republish reset before these frames
+  handlePendingDHWWaterMeterReset(); // TASK-1123: apply a REST- or MQTT-queued DHW water total reset before these frames
   drainOTFrameQueue();
 
   // TASK-396: heap watermark tick + deferred-reboot gate. The watermark runs

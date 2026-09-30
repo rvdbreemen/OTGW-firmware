@@ -189,9 +189,10 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
   - `POST /api/v2/otgw/commands` — command in body (JSON or raw)
   - `POST /api/v2/otgw/command/{cmd}` (legacy, prefer /commands)
   - `POST /api/v2/otgw/discovery` or `/api/v2/otgw/autoconfigure` → triggers MQTT auto-configure
+  - `POST /api/v2/otgw/reset_water_total` → `queueDHWWaterMeterReset()`; answers 200 `{"status":"ok","dhw_water_total":0}` like `/api/v2/sat/reset_integral`, 405 for any other method (ADR-176, TASK-1123)
   - `GET /api/v2/otgw/label/{label}` → `sendOTLabel(label)`
 - **Auth**: POST/PUT require auth (via central check)
-- **Notes**: Commands queued via `addCommandToQueue()`, validated for format
+- **Notes**: Commands queued via `addCommandToQueue()`, validated for format. The water-total reset only raises a flag: this handler runs on the async_tcp task and the total is loop-task state, so `loop()` runs `handlePendingDHWWaterMeterReset()` before `drainOTFrameQueue()`, which zeroes RAM and `/dhw_water.json` and publishes 0 (the TASK-1176 pattern of `queueMQTTRepublishAll()`). The 200 goes out before that; while `isFlashing()` or LittleFS is unmounted the reset waits
 
 #### `void handleWebhook()`
 - **Location**: `restAPI.ino:507–527`
@@ -596,6 +597,7 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
 | POST/PUT | `/api/v2/otgw/command/{cmd}` | handleOtgw | Yes | Queue OTGW command (legacy) |
 | POST/PUT | `/api/v2/otgw/discovery` | handleOtgw | Yes | Trigger MQTT auto-configure |
 | POST/PUT | `/api/v2/otgw/autoconfigure` | handleOtgw | Yes | Alias for discovery |
+| POST | `/api/v2/otgw/reset_water_total` | handleOtgw | Yes | Reset the DHW water total to 0 (ADR-176) |
 | POST/PUT | `/api/v2/webhook/test?state=on\|off\|1\|0` | handleWebhook | No | Test webhook |
 | GET | `/api/v2/sat` | handleSAT | Yes | SAT status (or `?detail=full` for extended) |
 | GET | `/api/v2/sat/status` | handleSAT | Yes | Same as above |

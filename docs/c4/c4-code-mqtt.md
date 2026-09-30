@@ -97,7 +97,7 @@
     - Returns if MQTT not enabled
     - Sets PubSubClient buffer size to `MQTT_CLIENT_BUFFER_SIZE` (384 bytes) for inbound messages
     - Initializes state to `MQTT_STATE_INIT`
-    - Clears the discovery done and pending bitmaps and queues only the non-OT set via `publishNonOTDiscoveryConfigs()` (IDs 0, 27 and 242 to 255); `processOT()` queues other OT IDs JIT
+    - Clears the discovery done and pending bitmaps and queues only the non-OT set via `publishNonOTDiscoveryConfigs()` (IDs 0, 27 and 241 to 255); `processOT()` queues other OT IDs JIT
     - Builds publish/subscribe topic namespaces
     - Calls `handleMQTT()` to begin connection attempt
   - Dependencies: PubSubClient, settings, WiFi
@@ -133,6 +133,7 @@
   - Command families:
     - Standard MQTT commands: mapped via `findMQTTSetCommandIndex()` (setpoint, constant, outside temp, etc.)
     - SAT (Simple Auto Temp) commands: `sat/target`, `sat/indoor_temp`, `sat/outdoor_temp`, `sat/enabled`, `sat/control_mode`, etc.
+    - Gateway commands: `otgw/reset_water_total` (any payload) calls `queueDHWWaterMeterReset()`, the MQTT half of `POST /api/v2/otgw/reset_water_total` (ADR-176, TASK-1123). The branch sits with `sat/` and `otgw32/` before the `hasOTCommandInterface()` gate, so every board accepts it. The callback runs on the loop task (`MQTTclient.loop()` in `handleMQTT()`, inside `doBackgroundTasks()`, which re-enters through `delayms()`), so it only raises the flag; `loop()` applies the reset in `handlePendingDHWWaterMeterReset()`
     - Settings updates: forwarded to `updateSetting()`
   - Actions:
     - Validates payload fits in 128-byte msgPayload buffer
@@ -269,6 +270,17 @@
     - `otgw-firmware/hardware_mode`: Hardware mode
     - `otgw-firmware/network_mode`: Network mode (WiFi, Ethernet, etc.)
 
+- `void sendDHWWaterTotal()`
+  - Description: Publish the cumulative DHW water total (ADR-176, TASK-1123) that `dhwWaterMeter.ino` integrates from MsgID 19, now
+  - Topic: `dhw_water_total`, litres with one decimal, not retained (the 1.x line's contract). Formatted with `snprintf_P` into a 24-byte buffer, so no total can write past it. Returns at once while MQTT is disabled
+  - Called from: `publishDHWWaterMeter()` and `handlePendingDHWWaterMeterReset()` (dhwWaterMeter.ino), which publishes 0 after a reset even before the first MsgID 19 sample. The result of `sendMQTTData()` is not checked: while MQTT is disconnected or `canPublishMQTT()` is false the value is dropped, and for a reset nothing publishes the 0 again (the 60 s publish sends the total as it is then)
+
+- `void publishDHWWaterMeter()`
+  - Description: The 60 s publish of the DHW water total, so a restarted Home Assistant refills the entity within a minute
+  - Called from: `doTaskEvery60s()` (OTGW-firmware.ino), right before `saveDHWWaterMeterIfDue()`
+  - Gate: nothing is published until `dhwWaterMeterHasData()` is true, i.e. a MsgID 19 sample was taken on this boot (TASK-1123 AC#2); a total restored from `/dhw_water.json` alone does not count. Then calls `sendDHWWaterTotal()`
+  - Discovery: not touched here. `queueNonOTDiscoveryIds()` queues faux id 241 (`OTGWdhwmeterid`) at boot like the other faux ids (ADR-176), and every path that clears the done bitmap (`startMQTT()`, the broker-restart branch of `onMqttConnect()`, `markAllMQTTConfigPending()`) calls that helper again
+
 - `void sendMQTTstateinformation()`
   - Description: Publish OpenTherm bus state information
   - Location: MQTTstuff.ino:1348-1355
@@ -362,7 +374,7 @@ Discovery paths (ADR-100 JIT-by-default):
 
 **Path B (JIT, default)**: `processOT()` (OTGW-Core.ino) sets the pending bit of an OT ID when a valid frame arrives and the ID is not yet marked published. It publishes nothing itself; the drip (Path C) publishes the configs on a later tick. `ensurePSSummaryDiscovery()` (PS=1 summary fields, OTGW-Core.ino) and `pollSensors()` (Dallas pseudo-ID 246, sensors_ext.ino:238-240) queue their IDs the same way. JIT keeps the bulk publish off the boot path, unless a topology migration is pending. It does not keep configs of never-seen IDs off the broker: every call to `markAllMQTTConfigPending()` queues all table IDs, and the daily re-announce (ADR-170, Proposed) makes that call once a day by default.
 
-**Path C (Drip)**: `loopMQTTDiscovery()` publishes the configs of one pending ID per timer tick (2 s normal, 10 s under heap pressure). It is the only caller of `doAutoConfigureMsgid()` (MQTTstuff.ino:2200). It drains whatever sits in the pending bitmap: the JIT IDs of Path B; the non-OT set (IDs 0, 27 and 242 to 255) that `publishNonOTDiscoveryConfigs()` queues at MQTT start and on a reconnect after more than 5 minutes offline; and the full set from `markAllMQTTConfigPending()`, which is every ID with a discovery table entry, seen on the bus or not, plus the non-OT set. Its callers are listed under `markAllMQTTConfigPending()` below.
+**Path C (Drip)**: `loopMQTTDiscovery()` publishes the configs of one pending ID per timer tick (2 s normal, 10 s under heap pressure). It is the only caller of `doAutoConfigureMsgid()` (MQTTstuff.ino:2200). It drains whatever sits in the pending bitmap: the JIT IDs of Path B; the non-OT set (IDs 0, 27 and 241 to 255) that `publishNonOTDiscoveryConfigs()` queues at MQTT start and on a reconnect after more than 5 minutes offline; and the full set from `markAllMQTTConfigPending()`, which is every ID with a discovery table entry, seen on the bus or not, plus the non-OT set. Its callers are listed under `markAllMQTTConfigPending()` below.
 
 **Path A (Force)**: `doAutoConfigure()` no longer streams the tables inline. It calls `markAllMQTTConfigPending()` and leaves the publishing to the drip (Path C). Callers: telnet `F` and `POST /api/v2/otgw/discovery`.
 
@@ -449,7 +461,7 @@ Discovery paths (ADR-100 JIT-by-default):
   - Location: MQTTstuff.ino:2579-2743
   - Caller: only `loopMQTTDiscovery()` (MQTTstuff.ino:2200), for one pending ID per drip tick (Path C). JIT (Path B) only queues the ID.
   - Parameters:
-    - `byte OTid`: OpenTherm message ID, or a pseudo-ID from 242 to 255
+    - `byte OTid`: OpenTherm message ID, or a pseudo-ID from 241 to 255
     - `bool isFirst`: the drip passes `dripDeviceInfoPending`, so the first entity published after a queue fill carries the full device block (ADR-140)
   - Algorithm:
     - OTid = 246 (Dallas): calls `configSensors()` and returns true
@@ -508,7 +520,7 @@ Two bitmaps track discovery state: `MQTTautoConfigMap[8]` (published/done) and `
     - Arms the TASK-648 topology cleanup when the stored topology stamp differs from the current mode
     - Clears both published and pending bitmaps
     - Walks IDs 0-255 and sets the pending bit for each ID with a sensor or binary-sensor index entry
-    - Calls `queueNonOTDiscoveryIds()` for the non-OT set (0, 27 and 242 to 255), the same helper `publishNonOTDiscoveryConfigs()` uses (ADR-171, Proposed)
+    - Calls `queueNonOTDiscoveryIds()` for the non-OT set (0, 27 and 241 to 255), the same helper `publishNonOTDiscoveryConfigs()` uses (ADR-171, Proposed). 241, the DHW water total, is in that set unconditionally (ADR-176, TASK-1123): it is announced whether or not the bus carries MsgID 19, and only its state waits for a MsgID 19 sample
   - Usage: `doAutoConfigure()` (telnet `F`, `POST /api/v2/otgw/discovery`), `POST /api/v2/discovery/republish`, the daily re-announce (ADR-170), a verify run that found missing configs, an `MQTTuseLegacyOtTopics` toggle and a pending topology migration. Not called on MQTT connect or on a Home Assistant restart.
 
 - `void loopMQTTDiscovery()`
@@ -753,7 +765,7 @@ ADR-100 makes JIT the default production path. The module supports three publica
 - Called from main loop on every iteration; manages its own internal timer
 - Publishes exactly one pending ID per timer tick (2 s normal, 10 s under heap pressure); one ID can carry several configs
 - Uses `MQTTautoCfgPendingMap[8]` bitmap (8 x uint32_t = 256 bits) to track pending OT IDs and pseudo-IDs
-- `publishNonOTDiscoveryConfigs()` fills it with the non-OT set only (IDs 0, 27 and 242 to 255): at MQTT start and on a reconnect after more than 5 minutes offline
+- `publishNonOTDiscoveryConfigs()` fills it with the non-OT set only (IDs 0, 27 and 241 to 255): at MQTT start and on a reconnect after more than 5 minutes offline
 - `markAllMQTTConfigPending()` fills it with every ID that has a discovery table entry, seen on the bus or not, plus the non-OT set; its callers are listed in its Usage line under Discovery State Management
 - Spreads discovery publishes over time to avoid broker and heap pressure spikes
 - Adaptive interval: slows to 10 s when free heap is below 16384 bytes and the largest free block below 8192 bytes; restores to 2 s after two consecutive ticks with at least 18432 bytes free and a 9216-byte block
@@ -892,7 +904,7 @@ MQTT start (startMQTT) or reconnect after > 5 min offline
   ↓
   clearMQTTConfigDone() + clearMQTTConfigPending()
   ↓
-  publishNonOTDiscoveryConfigs() → queueNonOTDiscoveryIds(): IDs 0, 27, 242..255
+  publishNonOTDiscoveryConfigs() → queueNonOTDiscoveryIds(): IDs 0, 27, 241..255
   (a pending TASK-648 topology migration calls markAllMQTTConfigPending() instead)
 
 Full re-queue: doAutoConfigure() [telnet 'F', POST /api/v2/otgw/discovery],
@@ -903,7 +915,7 @@ MQTTuseLegacyOtTopics toggle
     ├─ Clears MQTTautoConfigMap (published) and pending bitmaps
     ├─ Sets the pending bit for every ID 0..255 with a sensor or binary-sensor table entry,
     │  seen on the bus or not
-    └─ queueNonOTDiscoveryIds(): IDs 0, 27, 242..255
+    └─ queueNonOTDiscoveryIds(): IDs 0, 27, 241..255
   ↓
   loopMQTTDiscovery() [called from main loop, every iteration]
     ├─ Timer check (2 s normal / 10 s under heap pressure)

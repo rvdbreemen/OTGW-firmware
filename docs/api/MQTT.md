@@ -6,7 +6,7 @@ This document describes all MQTT topics published and subscribed to by the OTGW-
 >
 > **Breaking change in 2.0.0 (binary_sensor topic labels):** 37 OT-spec-derived binary_sensor topic labels have been replaced with HA-core-style self-describing aliases (`dhw_present` → `supports_hot_water`, etc.). The two name sets are mutually exclusive; setting `mqttuselegacyottopics = true` switches back to the legacy labels. The firmware drains the retained payloads of the *other* name set on toggle (cleanup state persisted to `/mqtt_topic_cleanup.bin` to survive power loss mid-drain). Background: ADR-105 (superseded) → ADR-106.
 >
-> **Discovery in 2.0.0 is JIT by default (ADR-100).** The boot-time bulk publish is gone. At MQTT start only the non-OT set is queued: climate (ID 0), the outside-temperature number (ID 27) and pseudo-IDs 242 to 255. Any other OT MsgID is queued when a valid frame for it arrives and its config is not yet marked published; the discovery drip publishes the config on a later tick. A manual force and the daily re-announce (ADR-170, Proposed; on by default) queue every ID that has a discovery table entry, seen on the bus or not. When the gateway reconnects after more than 5 minutes offline (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`), a broker-restart heuristic clears the discovery state, re-queues the non-OT set and resets the value trackers. A Home Assistant restart (`homeassistant/status` goes `offline`, then `online`) re-publishes values, not discovery (ADR-174). See [Discovery Lifecycle](#discovery-lifecycle).
+> **Discovery in 2.0.0 is JIT by default (ADR-100).** The boot-time bulk publish is gone. At MQTT start only the non-OT set is queued: climate (ID 0), the outside-temperature number (ID 27) and pseudo-IDs 241 to 255. Any other OT MsgID is queued when a valid frame for it arrives and its config is not yet marked published; the discovery drip publishes the config on a later tick. A manual force and the daily re-announce (ADR-170, Proposed; on by default) queue every ID that has a discovery table entry, seen on the bus or not. When the gateway reconnects after more than 5 minutes offline (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`), a broker-restart heuristic clears the discovery state, re-queues the non-OT set and resets the value trackers. A Home Assistant restart (`homeassistant/status` goes `offline`, then `online`) re-publishes values, not discovery (ADR-174). See [Discovery Lifecycle](#discovery-lifecycle).
 >
 > **Flat per-value topics are policy (ADR-101).** The firmware never publishes aggregated JSON value payloads. Each value lives on its own topic with a scalar payload. HA discovery configs are the only JSON publishes, as required by the discovery protocol. Do not propose OT-Thing-style nested-JSON shims.
 
@@ -601,6 +601,52 @@ Published when S0 counter is enabled (`settings.s0.bEnabled`):
 | `s0pulsetime` | `"500"` | Last pulse duration (ms) |
 | `s0powerkw` | `"1.234"` | Calculated power in kW |
 
+### DHW Water Total (Energy Dashboard)
+
+A cumulative domestic hot water volume, integrated by the gateway from MsgID 19 (DHW flow rate, l/min), so the Home Assistant Energy dashboard can use it as a water source without a helper (ADR-176, TASK-1123). Topic, unit and discovery fields match the 1.x line.
+
+| Topic | Value | Description |
+| ----- | ----- | ----------- |
+| `dhw_water_total` | `"1234.5"` | Litres, one decimal. Published every 60 s, not retained. |
+
+**When it is published.** The Home Assistant entity is announced at boot, like the other faux ids (see [DHW Water Total (faux id 241)](#dhw-water-total-faux-id-241)). The value waits for data: nothing is published until a MsgID 19 frame has decoded on this boot, and until then Home Assistant shows the entity as unknown. MsgID 19 appears only when a master asks for it: the thermostat on a PIC gateway, and on OT-Direct also the gateway's own schedule (every 10 s). On a gateway whose bus never carries MsgID 19 the entity stays unknown. A total restored from flash does not count as a decoded frame. The one exception is a reset, which publishes `0.0` when it runs, if MQTT can publish at that moment (see **Reset** below).
+
+**What counts.** Only boiler data: the boiler's Read-Ack frames (B), and on a PIC gateway in PS=1 mode the MsgID 19 field of the PIC's summary line. Answers the gateway builds itself (A frames: PIC answers, OT-Direct SR= and RM= answers, and OT-Direct master mode replaying cached boiler values to a thermostat) do not count, and neither does the OT-Direct PS=1 summary, which repeats values the B frames already delivered. Volume is flow times elapsed time, each sample covering the interval before it; an interval longer than 60 seconds between two samples counts as a gap and adds nothing, and extra samples of the same reading only split an interval. A reading no MsgID 19 frame can carry (not a number, infinite, or above 128 L/min; the f8.8 format ends at 127.996) adds nothing either. Only a malformed PS=1 summary field can deliver one, because the summary parser accepts `nan`, `inf` and exponents.
+
+**Sampling limitation.** This is an estimate from a sparse sample stream, not a metrologically valid water meter. The boiler reports a flow rate only when asked, typically every 10 seconds or less often, and the gateway assumes that rate held for the whole preceding interval. A draw shorter than the sampling interval can be missed entirely, the start and end of each draw are placed at the nearest sample, and a pause of more than 60 seconds between samples counts nothing. Do not use it for billing or leak detection without comparing it against a real water meter.
+
+**Open point, pending a maintainer decision.** On a PIC gateway in PS=1 mode the value comes from the PIC's summary, which repeats the PIC's last stored MsgID 19 reading on every PS=1 request. If the thermostat stops asking for MsgID 19 while that stored reading is not zero, the total keeps growing at that rate for as long as a client sends PS=1 more often than once a minute.
+
+**Reset.** `POST /api/v2/otgw/reset_water_total`, or an MQTT publish to `<TopTopic>/set/<node_id>/otgw/reset_water_total` with any payload and without the retain flag (a reset that arrives as a retained message after a reconnect is ignored), sets the total to 0 (ADR-176). Both only queue the request, and the REST answer comes before the reset runs. The main loop then zeroes the total in RAM and in `/dhw_water.json` in one step and publishes `0.0`, also when no MsgID 19 frame has decoded on this boot. Home Assistant reads the drop to 0 as a meter reset (see the 90% rule below) and starts a new cycle from 0, so the long-term statistic keeps what it counted before the reset.
+
+- The reset waits while the gateway cannot write the file: during a firmware, filesystem or PIC upgrade, and while LittleFS is unavailable (a failed health probe, for example on a full filesystem). It runs as soon as the file can be written, so RAM, file and the published 0 change together. A reboot before then drops the request, and the total stays as it was.
+- The `0.0` is published only if MQTT can publish at that moment (connected, heap not critical), and nothing retries it. Home Assistant then first sees the next 60 s value, the water drawn since the reset, and compares it with the last value it received before the reset. Below 90% of that value it is a meter reset, and the statistic stays right. At 90% or more, which takes a long MQTT outage or a small total before the reset, the statistic misses that last pre-reset value: it counts only the water drawn beyond it.
+- If the file write fails without an error (on a full filesystem the read-back differs), the 60 s task and the next orderly restart write the 0 until one succeeds; a power cut before that brings the old total back after the reboot, and Home Assistant counts that jump up as consumption.
+- A reset writes the file only when the total or the file is not already 0, so repeated resets cost no flash writes.
+- The sample clock is kept: the next MsgID 19 sample adds its interval to 0 as usual, so if water was flowing at the moment of the reset, up to one sample interval of it (typically 10 s) is counted after the reset.
+- Publish the MQTT command without the retain flag: the broker delivers a retained command again on every reconnect, and each delivery resets the total.
+
+**Persistence.** The total survives a reboot. It lives in `/dhw_water.json` on LittleFS (never in `settings.ini`). The gateway writes it when at least 10 L are unsaved, or 15 minutes after the last write when any water is unsaved, and on every orderly restart. This rule allows at most one write a minute, and while writes succeed none while no water is drawn; a reset adds one write when there is something to zero (see **Reset**). A write that fails (a full filesystem) is tried again every minute until one succeeds.
+
+- An unclean reboot can make the published total drop. A power cut, or a firmware flash over USB (the chip is reset without an orderly restart), loses the water drawn since the last write: under 10 L plus up to one minute of flow. The water of that last minute was never published. The rest was, so after the reboot the published total is up to 10 L lower than the last value Home Assistant received, as long as the file writes succeed (on a full filesystem they fail and the gap grows). Home Assistant's recorder compares each new value of a `total_increasing` sensor with 0.9 times the previous one (`reset_detected()` in `homeassistant/components/sensor/recorder.py`):
+  - At 90% of the previous value or more, the drop is logged as a dip and those litres are subtracted from the statistic.
+  - Below 90%, the drop counts as a meter reset: a new cycle starts from 0 and the whole restored total is added to the statistic, so the Energy dashboard shows it as new consumption. A drop of under 10 L is more than 10% only while the total is below 100 L, so this can happen in the first days after the counter starts or after a reset, and not later.
+- Besides the reset command, flashing a filesystem image over USB (`flash_otgw.bat --fs`) erases the file together with the settings. A web filesystem OTA keeps the total: the gateway writes the file again before it reboots. Deleting the file in the file manager and then rebooting from the web UI also writes it again; only a power cycle after deleting it starts from 0.
+- A file that does not hold a number from 0 to 1e10 L is ignored at boot, and the total starts from 0. 1e10 L is more than a century of the largest flow MsgID 19 can report.
+- Test traffic counts as well. A frame replay of `/otgw_simulation.log` (`POST /api/v2/simulate/start`, on either transport) feeds its MsgID 19 frames through the same path as a live bus, and the litres they add stay in the total. OT-Direct loopback (`GW=L`) answers MsgID 19 with 0 L/min: it adds nothing, but it is a decoded MsgID 19 frame, so the restored total is published.
+
+**Differences from the 1.x line.** The entity contract (topic, name, `device_class`, unit, `state_class`) and the accumulation (flow times elapsed time, the 60 s gap cap, no value before the first MsgID 19 frame) are the same. The differences:
+
+- Persistence: 1.x keeps the total in RAM only, so it starts from 0 after every reboot. This line keeps it in `/dhw_water.json`.
+- Reset: 1.x has no reset surface; a reboot zeroes its total. This line has `POST /api/v2/otgw/reset_water_total` and `set/<node_id>/otgw/reset_water_total`.
+- Announce timing: 1.x announces the entity when its first MsgID 19 frame decodes, so a gateway without MsgID 19 traffic has no entity. This line announces it at boot (ADR-176), so such a gateway shows it as unknown.
+- A PIC gateway in PS=1 mode: 1.x does not count the PIC's summary line, so it counts nothing there. This line counts it (ADR-176), so the two lines report different totals for the same boiler in that mode.
+- Gateway answers: 1.x counts every MsgID 19 value that reaches the master topic, including a proxy A (a gateway answer with no boiler reply before it). This line counts boiler B frames only.
+- Discovery id and unique id: faux id 241 and `<node_id>-sensors_dhw_water_total` here, faux id 243 and `<node_id>-dhw_water_total` on 1.x (see [DHW Water Total (faux id 241)](#dhw-water-total-faux-id-241)).
+- Number type: this line accumulates in a `double`, 1.x in a `float`. A float's step reaches 1/32 L at 2^18 L (262,144 L), so from there on the 1.x total rounds away water this line keeps.
+- Number formatting: both publish litres with one decimal and no exponent. 1.x formats with `dtostrf()` into a 16-byte buffer, this line with `snprintf_P("%.1f")` into a 24-byte buffer, which bounds any total.
+- Flow readings: this line ignores a reading that is not a number, infinite or above 128 L/min; 1.x ignores only zero and negative flow. No MsgID 19 frame carries such a reading, so both lines count the same for every frame. Only a malformed PS=1 summary field can deliver one, and 1.x does not count PS=1 summaries at all.
+
 ### Dallas Temperature Sensors
 
 Published when GPIO sensors are enabled (`settings.sensors.bEnabled`):
@@ -991,6 +1037,19 @@ OTGW32-specific commands are nested under the `otgw32/` sub-topic. All commands 
 mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/otgw32/room_temp" -m "20.8"
 ```
 
+#### Gateway Commands (`otgw/`)
+
+Commands for the gateway's own functions are nested under the `otgw/` sub-topic: `{TopTopic}/set/{UniqueId}/otgw/<subtopic>`. They do not need an OT command interface (a PIC or OT-Direct), so every board accepts them. The sub-topic is matched case-insensitively.
+
+| Topic Suffix | Payload | Description |
+| ------------ | ------- | ----------- |
+| `otgw/reset_water_total` | (any) | Reset the DHW water total (`dhw_water_total`) to 0 in RAM and in `/dhw_water.json`, then publish `0.0` (ADR-176). The reset waits while an upgrade runs or LittleFS is unavailable, and the `0.0` goes out only while MQTT can publish (see [DHW Water Total](#dhw-water-total-energy-dashboard), **Reset**). The MQTT half of `POST /api/v2/otgw/reset_water_total`. Publish it without the retain flag. A reset that arrives as a retained message, the copy the broker hands out after every reconnect, is ignored, so it cannot zero the total again; a reset published with the retain flag while the gateway is offline therefore does nothing. |
+
+**Example** -- Reset the DHW water total:
+```bash
+mosquitto_pub -h mqtt-broker -t "OTGW/set/otgw-AABBCCDDEEFF/otgw/reset_water_total" -m "1"
+```
+
 #### Alternative Topic Names
 
 Commands can also be sent using the two-letter OTGW command codes directly as topic suffixes. For example, `TT`, `TC`, `OT`, etc.
@@ -1053,11 +1112,17 @@ Published unconditionally via the discovery drip, like the other PIC pseudo-IDs 
 - **Button** `resetgateway` → `{set}/resetgateway` (`entity_category: config`, `payload_press: "1"`, hardware PIC reset). The handler enforces the same payload (`"1"`) and adds a 5-second rate-limit so a misconfigured automation cannot storm the PIC (TASK-668).
 - **Selects** `gpioa`/`gpiob` (options `0`–`7`, state `otgw-pic/settings/gpio`, `value_template {{ value[0|1] }}`) and `leda`–`ledf` (options `B C E F H M O P R T W X`, state `otgw-pic/settings/led`, `value_template {{ value[0..5] }}`); command topics `{set}/{gpioa|…|ledf}`.
 
+#### DHW Water Total (faux id 241)
+
+One `sensor`: name "DHW Water Total", `device_class: water`, `unit_of_measurement: L`, `state_class: total_increasing`, icon `mdi:water`, state topic `<TopTopic>/value/<node_id>/dhw_water_total`, `uniq_id` `<node_id>-sensors_dhw_water_total`. Home Assistant accepts `water` with `L` and `total_increasing` as an Energy dashboard water source. Faux id 241 routes to the `sensors_` source prefix like the S0 counter, so the unique id does not change with the OT engine (`pic_` or `otd_`), which can differ between boots on a combo board in auto mode.
+
+The entity is announced at boot, like the other faux ids (ADR-176): `queueNonOTDiscoveryIds()`, the ADR-171 helper, queues 241 unconditionally, so MQTT start, the broker-restart heuristic and every `markAllMQTTConfigPending()` (which also finds 241 in its table walk) announce it again. Its state waits for data (see [DHW Water Total](#dhw-water-total-energy-dashboard)): until a MsgID 19 frame has decoded on this boot, Home Assistant shows the entity as unknown, and on a gateway whose bus never carries MsgID 19 it stays unknown. The 1.x line announces the same fields under faux id 243 with `uniq_id` `<node_id>-dhw_water_total`, and only once its first MsgID 19 frame has decoded; on this line 243 is the OTDirect flame metrics id, and every `uniq_id` carries the ADR-140 source prefix.
+
 ### Discovery Modes
 
 Since 2.0.0 (ADR-100) per-MsgID configs are JIT by default. The paths below queue IDs by setting a pending bit; the `loopMQTTDiscovery()` drip publishes the configs of one pending ID per tick.
 
-1. **MQTT start** (`startMQTT()`: boot, a saved MQTT or hostname setting, WiFi reconnect, a switch to Ethernet, or the telnet `r` key while MQTT is down): the done and pending bitmaps are cleared and only the non-OT set is queued for the drip. That set is climate (ID 0), the outside-temperature number (ID 27) and pseudo-IDs 242 to 255: hvac companions, OTDirect flame metrics, PIC controls, S0, Dallas, heap statistics, firmware info, PIC info, PIC settings, diagnostics and the four SAT groups. Other OT MsgIDs are not queued here. The one exception is a pending device-topology migration (TASK-648): then the full set is queued instead, here and in the broker-restart heuristic below. The broker retains the discovery configs already published, so a Home Assistant restart re-loads them from the broker. The firmware then re-sends values, not configs (ADR-174).
+1. **MQTT start** (`startMQTT()`: boot, a saved MQTT or hostname setting, WiFi reconnect, a switch to Ethernet, or the telnet `r` key while MQTT is down): the done and pending bitmaps are cleared and only the non-OT set is queued for the drip. That set is climate (ID 0), the outside-temperature number (ID 27) and pseudo-IDs 241 to 255: the DHW water total, hvac companions, OTDirect flame metrics, PIC controls, S0, Dallas, heap statistics, firmware info, PIC info, PIC settings, diagnostics and the four SAT groups. Other OT MsgIDs are not queued here. The one exception is a pending device-topology migration (TASK-648): then the full set is queued instead, here and in the broker-restart heuristic below. The broker retains the discovery configs already published, so a Home Assistant restart re-loads them from the broker. The firmware then re-sends values, not configs (ADR-174).
 
 2. **JIT discovery (on OT message)**: when a valid OT frame arrives and the config of its MsgID is not yet marked published, `processOT()` sets the pending bit for that MsgID. It publishes nothing itself: the drip publishes the config on a later tick and then marks it published. The PS=1 summary path and the Dallas sensor poll queue their IDs the same way. A MsgID that never appears on the bus is still queued by every call to `markAllMQTTConfigPending()`: items 4 and 5, a verify run that finds configs missing, an `MQTTuseLegacyOtTopics` toggle and a pending topology migration.
 
@@ -1231,7 +1296,7 @@ If a condition fails at that moment, that day is skipped; there is no retry befo
 
 ### Discovery Lifecycle
 
-- On MQTT start (`startMQTT()`: boot, a saved MQTT or hostname setting, WiFi reconnect, a switch to Ethernet, or the telnet `r` key while MQTT is down): the done and pending bitmaps are cleared and only the non-OT set (IDs 0, 27 and 242 to 255) is queued for the drip, unless a device-topology migration is pending. Other OT MsgIDs are queued JIT as their frames arrive.
+- On MQTT start (`startMQTT()`: boot, a saved MQTT or hostname setting, WiFi reconnect, a switch to Ethernet, or the telnet `r` key while MQTT is down): the done and pending bitmaps are cleared and only the non-OT set (IDs 0, 27 and 241 to 255) is queued for the drip, unless a device-topology migration is pending. Other OT MsgIDs are queued JIT as their frames arrive.
 - On MQTT connect after more than 5 minutes offline: the value trackers are reset (`requestMQTTRepublishAll()`), the done and pending bitmaps are cleared and the non-OT set is re-queued. After a shorter outage, and on the first connect after boot, the connect handler does nothing more; a reconnect by the firmware's WiFi state machine still goes through `startMQTT()` (previous item).
 - On Home Assistant restart (`homeassistant/status` goes `offline`, then `online`): the value trackers are reset so every OT value re-publishes when its frame next arrives. Discovery is untouched; the broker still holds the retained configs (ADR-174).
 - On manual force (`POST /api/v2/otgw/discovery`, `POST /api/v2/discovery/republish`, telnet `F`): every ID with a discovery table entry, plus the non-OT set, is re-queued.

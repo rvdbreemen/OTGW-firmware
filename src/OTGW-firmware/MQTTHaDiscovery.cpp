@@ -349,6 +349,9 @@ DECLARE_SAT_DISCOVERY_STRINGS(sat_weather_is_day,        "sat/weather/is_day",  
 // default "{{ value }}" template applies. Faux dataid OTGWhvacid (242) -> OT-Core device.
 DECLARE_SAT_DISCOVERY_STRINGS(hvac_mode,                 "hvac_mode",                        "HVAC_Mode")
 DECLARE_SAT_DISCOVERY_STRINGS(hvac_action,               "hvac_action",                      "HVAC_Action")
+// TASK-1123 (ADR-176): the cumulative DHW water total for the Energy dashboard. Faux dataid
+// OTGWdhwmeterid (241) -> Sensors device. Topic label and name are the 1.x line's.
+DECLARE_SAT_DISCOVERY_STRINGS(dhw_water_total,           "dhw_water_total",                  "DHW_Water_Total")
 static const char ha_tpl_sat_pwm_percent[]        PROGMEM = "{{ (value | float * 100) | round(0) }}";
 static const char ha_tpl_sat_ratio_percent[]      PROGMEM = "{{ (value | float * 100) | round(1) }}";
 static const char ha_tpl_sat_kmh_to_ms[]          PROGMEM = "{{ (value | float / 3.6) | round(1) }}";
@@ -817,8 +820,8 @@ const char ha_name_alias_ventilation_diagnostic[]                            PRO
 const char ha_name_alias_ventilation_system_type[]                           PROGMEM = "Ventilation_system_type";
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
-// ========== Sensor array (389 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 389;  // +2 fw uptime/unsupported_msgids (faux id 248)
+// ========== Sensor array (390 entries) ==========
+const uint16_t MQTT_HA_SENSOR_COUNT = 390;  // +1 dhw_water_total (faux id 241, TASK-1123)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1355,6 +1358,11 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     // --- Faux ID 242 (OTGWhvacid): unified-climate companion sensors, TASK-942 / GH #665 ---
     {242, 0x00, ha_lbl_hvac_mode,                  ha_name_hvac_mode,                  HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::thermostat_icon, HaEntityCat::none, true, nullptr,            nullptr},
     {242, 0x00, ha_lbl_hvac_action,                ha_name_hvac_action,                HaDeviceClass::none,        HaUnit::none,    HaStateClass::none,        HaIcon::radiator,      HaEntityCat::none, true, nullptr,              nullptr},
+    // --- Faux ID 241 (OTGWdhwmeterid): cumulative DHW water total, TASK-1123 / ADR-176 ---
+    // Integrated on the device from MsgID 19, so it has one value and no source flags.
+    // device_class water with unit L and state_class total_increasing is what the Home
+    // Assistant Energy dashboard accepts as a water source; the same fields as the 1.x line.
+    {241, 0x00, ha_lbl_dhw_water_total,            ha_name_dhw_water_total,            HaDeviceClass::water,       HaUnit::L,       HaStateClass::total_increasing, HaIcon::water,  HaEntityCat::none, true, nullptr,              nullptr},
 };
 
 // ========== Binary sensor array (60 indexed entries) ==========
@@ -1743,7 +1751,7 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 238
     0xFFFF, // id 239
     0xFFFF, // id 240
-    0xFFFF, // id 241
+    389, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
     387, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
     332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
@@ -2034,6 +2042,7 @@ PGM_P haDeviceClassStr(HaDeviceClass dc) {
         case HaDeviceClass::energy: { static const char s[] PROGMEM = "energy"; return s; }
         case HaDeviceClass::carbon_dioxide: { static const char s[] PROGMEM = "carbon_dioxide"; return s; }
         case HaDeviceClass::volume_flow_rate: { static const char s[] PROGMEM = "volume_flow_rate"; return s; }
+        case HaDeviceClass::water: { static const char s[] PROGMEM = "water"; return s; }
         default: return nullptr;
     }
 }
@@ -2060,6 +2069,7 @@ PGM_P haUnitStr(HaUnit u) {
         case HaUnit::s: { static const char s[] PROGMEM = "s"; return s; }
         case HaUnit::h: { static const char s[] PROGMEM = "h"; return s; }
         case HaUnit::bytes: { static const char s[] PROGMEM = "B"; return s; }
+        case HaUnit::L: { static const char s[] PROGMEM = "L"; return s; }
         default: return nullptr;
     }
 }
@@ -3710,6 +3720,7 @@ static const char *topoDeviceName(HaDevice d) {
 // there; this local copy exists solely to avoid cross-TU access to a static).
 static HaDevice topoDeviceForPseudoId(uint8_t otId) {
   switch (otId) {
+    case 241: return HaDevice::Sensors;     // TASK-1123 DHW water total
     case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors
     case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-140, was ADR-124)
     case 244: return HaDevice::Gateway;

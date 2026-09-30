@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.392
+**  Version  : v2.0.0-alpha.393
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -918,6 +918,22 @@ byte      OTGWsatzoneid      = 255;
 // sensors that mirror the unified climate entity's published topics. 242 is the first
 // free slot below the 243-255 faux block; routed to the OT-Core device (deviceForOTId).
 byte      OTGWhvacid         = 242;
+// TASK-1123 (ADR-176): faux dataid anchoring the dhw_water_total sensor for the Home
+// Assistant Energy dashboard; the first free slot below 242. queueNonOTDiscoveryIds()
+// queues it at boot like the other faux ids; the state waits for a MsgID 19 sample.
+byte      OTGWdhwmeterid     = 241;
+// Cumulative DHW water total (TASK-1123), see dhwWaterMeter.ino.
+extern double dhwWaterTotalL;
+void updateDHWWaterMeter(float flowLitresPerMin, uint32_t nowMs);
+bool dhwWaterMeterHasData();
+bool dhwWaterMeterSaveDue(uint32_t nowMs);
+void saveDHWWaterMeterIfDue(uint32_t nowMs);
+void flushDHWWaterMeter();
+void loadDHWWaterMeter();
+void queueDHWWaterMeterReset();          // any task: ask loop() to zero the total (REST, MQTT)
+void handlePendingDHWWaterMeterReset();  // loop(): zero RAM and file, publish 0
+void sendDHWWaterTotal();                // publish dhw_water_total now (MQTTstuff.ino)
+void publishDHWWaterMeter();             // the 60 s publish, silent until a MsgID 19 sample
 uint8_t   satGetMaxZones();
 bool      satShouldDiscoverZone(uint8_t zoneIndex);
 

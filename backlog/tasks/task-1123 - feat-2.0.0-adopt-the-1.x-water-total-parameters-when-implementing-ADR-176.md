@@ -1,9 +1,11 @@
 ---
 id: TASK-1123
 title: 'feat-2.0.0: adopt the 1.x water-total parameters when implementing ADR-176'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-04 06:30'
+updated_date: '2026-09-30 18:14'
 labels:
   - 2.0.0
   - parity
@@ -20,7 +22,45 @@ ADR-176 is Accepted on this line but nothing implements it: no source file under
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The interval cap is 60000 ms, matching dhwWaterMeter.ino:38 on the 1.x line, and accumulation is flow * elapsed / 60000 so both firmwares report the same total for the same boiler
-- [ ] #2 The entity contract matches 1.x exactly: device_class water, unit L, state_class total_increasing, published only after a MsgID 19 frame has decoded
-- [ ] #3 The divergence from 1.x on persistence and on the reset surface is restated in the implementing task or a new decision record on this line, rather than by editing the Accepted ADR-176
+- [x] #1 The interval cap is 60000 ms, matching dhwWaterMeter.ino:38 on the 1.x line, and accumulation is flow * elapsed / 60000 so both firmwares report the same total for the same boiler
+- [x] #2 The entity contract matches 1.x exactly: device_class water, unit L, state_class total_increasing, published only after a MsgID 19 frame has decoded
+- [x] #3 The divergence from 1.x on persistence and on the reset surface is restated in the implementing task or a new decision record on this line, rather than by editing the Accepted ADR-176
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Implementation (alpha.393)
+- dhwWaterMeter.ino (new): updateDHWWaterMeter() follows the 1.x rule step for step. The first sample only seeds. dt = now - last (unsigned, wraps), and last is moved before the gap test. dt > DHW_METER_MAX_GAP_MS (60000 ms, the value at 1.x dhwWaterMeter.ino:38) adds nothing, a flow <= 0 adds nothing, otherwise total += flow * dt / 60000.
+- Write sites: print_f88() for boiler Read-Ack frames that pass the validity gate, and updatePSSummaryFloatState() for the PIC PS=1 summary.
+- Persistence: /dhw_water.json, written when >= 10 L are unsaved or 15 min after the last write with something unsaved, flushed in doRestart(), loaded in setup() after the LittleFS mount. No write while flashing or while LittleFS is unmounted.
+- Discovery: faux id 241 (OTGWdhwmeterid), table row 389, queued at boot by queueNonOTDiscoveryIds() (ADR-176 Must #7). The 60 s task publishes the state only after a MsgID 19 sample on this boot.
+- Reset: POST /api/v2/otgw/reset_water_total and MQTT set/<node>/otgw/reset_water_total only queue a flag. loop() then zeroes RAM and file together and publishes 0.0. A reset that arrives as a retained MQTT message (properties.retain) is ignored.
+
+Divergences from the 1.x line (AC#3). 1.x was read at origin/otgw-1.x.x 8ba6f7ef9. These are restated here rather than in the Accepted ADR-176.
+1. Persistence. 1.x keeps the total in RAM only (dhwWaterMeter.ino:30-40, ADR-093), so a reboot zeroes it. This line persists it in /dhw_water.json (ADR-176). An orderly restart publishes the same total again. A power cut restores up to 10 L plus one minute of flow less than the last published value. At 90% of the previous value or more, Home Assistant logs a dip and subtracts those litres from the statistic. Below 90%, which a drop of under 10 L reaches only while the total is below 100 L, it counts a meter reset and adds the restored total again (docs/api/MQTT.md, DHW Water Total). ADR-176's answered question on partial regression says "The counter never decreases" and "Same answer as the 1.x peer". Neither holds any more.
+2. Reset surface. 1.x has none: a reboot is its only reset. This line has POST /api/v2/otgw/reset_water_total and set/<node>/otgw/reset_water_total (ADR-176 answered question 6). Refinement beyond ADR-176's text: a reset that arrives as a retained MQTT message is ignored. Under MQTT 3.1.1 (3.3.1.3) a broker sets the retain flag only on the copy it hands out for a new subscription, so a live publish still resets once, and a retained copy cannot zero the total again on every reconnect. A reset published with the retain flag while the gateway is offline does nothing.
+3. Announce timing. 1.x announces discovery just in time, on the first MsgID 19 decode (MQTTstuff.ino publishDHWWaterMeter(), ADR-093). This line announces at boot like its other faux ids (ADR-176 Must #7), so the entity exists, with an unknown state, on installations that never see MsgID 19. The state rule is the same on both lines: nothing is published before a MsgID 19 frame decodes on this boot.
+4. Samples counted. 1.x counts only print_f88() frames that pass validForMaster (OTGW-Core.ino:2082), so a 1.x PIC gateway in PS=1 mode counts nothing. This line also counts the PIC PS=1 summary line. On both lines, frames the gateway builds itself do not count: PIC answer overrides on both, and OT-Direct master-mode cache replays on this line only.
+5. Flow bound. This line drops a reading that is not a number, is infinite, or is above 128 L/min. Only a malformed PS=1 summary field can deliver such a value. 1.x needs no bound: its only source is the f8.8 decode, which is always finite and below 128.
+6. Identity. The faux id is 241 here and 243 on 1.x. The uniq_id is <nodeId>-sensors_dhw_water_total here (this line's device-prefixed scheme) and <nodeId>-dhw_water_total on 1.x. Moving a gateway from 1.x to 2.0.0 therefore gives Home Assistant a new entity.
+7. Arithmetic and formatting. The total is a double here and a float on 1.x. Both publish one decimal: %.1f into a 24-byte buffer here, dtostrf into 16 bytes on 1.x.
+
+Entity contract (AC#2), identical on both lines: label dhw_water_total, name DHW_Water_Total, device_class water, unit L, state_class total_increasing, icon water, entity_category none, enabled. The state is not retained. It is published only after a MsgID 19 frame has decoded on this boot. Compared: 1.x mqtt_configuratie.cpp:66, :653 and :1130 with this line's MQTTHaDiscovery.cpp:354 and :1365.
+
+Evidence (collected this session on the main tree, HEAD 7f636ff42 plus this change)
+- python test/host/test_dhw_water_meter.py --old-rev HEAD: RESULT: PASS, 117 verdict checks yes, 0 NO.
+- AC#1 cases: U1 (time-based: 3.0 L sampled every 10 s or every 5 s), U2 (a 60000 ms interval counts, 60001 ms counts nothing, the next interval counts again), W1 and W2 (6 L/min for 60 s gives 6.0 L through print_f88() and through the PS=1 summary).
+- AC#2 cases: D1 (row fields as on 1.x), D4 and D6 (no state before a sample), D7 (state after a sample, retain=0).
+- Reset cases: X1 to X7 and Q1 to Q5. Q5 is new: a retained reset leaves the total, the file and the published state unchanged.
+- OLD (HEAD sources) fails W1, W2, W4, W5, W6 and R1, and has none of the wiring. Every mutant fails its target case, including MR23 (the retained guard removed fails Q5), and the wiring check flips when the properties.retain hand-off is removed.
+- An independent slice audit checked 140 generated parts: each is verbatim in its source file (working tree or git HEAD) and brace-complete.
+- Not validated on the bench: the OTGW32 is in its WiFi provisioning portal.
+
+Open for the maintainer (does not block this task)
+- Announce timing (point 3): keep the boot announce of ADR-176 Must #7, or follow 1.x's just-in-time announce?
+- PS=1 residual (harness case R1): the PIC summary repeats its stored MsgID 19 value. If the boiler stops answering MsgID 19 while summaries keep coming, the stale flow keeps counting (80 L in 10 min at a stored 8 L/min). Accept it, or gate PS=1 counting on freshness?
+- ADR-176's answered question on partial regression has a stale premise (point 1). A superseding or amending record is the maintainer's call.
+
+Basis of the offline sentence in point 2: the client connects with a clean session and subscribes at QoS 0 (MQTTstuff.ino setCleanSession(true) and subscribe(topic, 0)), so a broker queues nothing for it while it is offline; the only later delivery of that reset is the retained copy, which is ignored.
+<!-- SECTION:NOTES:END -->

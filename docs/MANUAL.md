@@ -811,6 +811,14 @@ curl -X POST http://otgw.local/api/v2/otgw/discovery
 | Outside temperature | `outsidetemperature` | °C |
 | CH water pressure | `chwaterpressure` | bar |
 
+#### DHW Water Total (Energy Dashboard)
+
+The gateway adds up the hot water your boiler reports (OpenTherm MsgID 19, DHW flow rate) into a litre counter, **DHW Water Total** (`dhw_water_total`, unit L). Home Assistant offers it as a water source in the Energy dashboard without any helper or YAML. The entity appears in Home Assistant at boot and shows a value from the first MsgID 19 report on each boot; if your thermostat and boiler never exchange that message, it stays unknown. The counter survives a reboot.
+
+To start the counter again from 0, send `POST /api/v2/otgw/reset_water_total`, or publish any payload, without the retain flag (a reset that arrives as a retained message after a reconnect is ignored), to the MQTT topic `<TopTopic>/set/<node_id>/otgw/reset_water_total`. The gateway zeroes the counter and its saved copy together and publishes 0, and Home Assistant records that as a meter reset. During a firmware, filesystem or PIC upgrade the reset waits until the upgrade has finished. Reset while the gateway is connected to MQTT: the 0 is published only then. Otherwise Home Assistant first sees the next value, and if that is at least 90% of the last value it received, the statistic misses the litres from before the reset.
+
+Treat the number as an estimate, not as a water meter. The boiler reports its flow only when asked, usually every 10 seconds or less often, and the gateway assumes that flow held since the previous report. A short draw between two reports can be missed, and a pause of more than a minute between reports counts nothing. A power cut loses up to about 10 L plus one minute of flow, so after it the published total can be lower than before, and flashing a filesystem image over USB resets the counter to zero together with the settings. Home Assistant takes a drop below 90% of the previous value for a meter reset: while the total is still below 100 L (the first days, or the first days after a reset), it can count the whole total again as new consumption after a power cut. See `docs/api/MQTT.md` (DHW Water Total) for the exact rules.
+
 #### Binary Sensors
 
 | Entity | Description |
@@ -2556,6 +2564,23 @@ Force a full Home Assistant MQTT auto-discovery republish. Useful after a HA res
 Discovery runs asynchronously in the background. All ~200 entity configurations are republished to the `homeassistant/` MQTT prefix. This is equivalent to clicking "Rediscover" in the web UI.
 
 Alias: `POST /api/v2/otgw/autoconfigure`
+
+##### POST /api/v2/otgw/reset_water_total
+
+Reset the DHW water total (`dhw_water_total`) to 0. Authentication required. POST only; any other method answers 405.
+
+**Request:** No body required.
+
+**Response (HTTP 200 OK):**
+
+```json
+{
+  "status": "ok",
+  "dhw_water_total": 0
+}
+```
+
+The response comes before the reset runs: the request is queued, and the main loop then sets the total to 0 in RAM and in `/dhw_water.json` and publishes `0.0`, before it decodes the next OpenTherm frame. While a firmware, filesystem or PIC upgrade runs, or LittleFS is unavailable, the reset waits until the file can be written. The `0.0` is published only if MQTT can publish at that moment. The MQTT equivalent is `<TopTopic>/set/<node_id>/otgw/reset_water_total` (any payload; publish it without the retain flag). See `docs/api/MQTT.md` (DHW Water Total).
 
 ---
 

@@ -404,6 +404,7 @@ The firmware exposes a versioned HTTP REST API on port 80. All responses are JSO
 | `GET` | `/api/v2/otgw/commands` | Command queue status |
 | `POST` | `/api/v2/otgw/commands` | Inject raw OTGW command (auth required) |
 | `GET` | `/api/v2/otgw/discovery` | Trigger HA MQTT discovery re-publish |
+| `POST` | `/api/v2/otgw/reset_water_total` | Reset the DHW water total (`dhw_water_total`) to 0 in RAM and `/dhw_water.json`, publish 0 (auth required; ADR-176) |
 | `GET` | `/api/v2/pic/flash-status` | PIC firmware type and update availability |
 | `POST` | `/api/v2/pic/flash-status` | Trigger PIC firmware upgrade |
 | `GET` | `/api/v2/pic/settings` | PIC configuration registers (CR=0..14) |

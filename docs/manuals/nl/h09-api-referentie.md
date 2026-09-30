@@ -236,6 +236,21 @@ Discovery gebruikt een asynchrone bitmap-gestuurde drip publisher: alle bericht-
 
 ---
 
+#### POST /api/v2/otgw/reset_water_total
+
+Het warmwatertotaal (`dhw_water_total`, de waterteller voor het Energy-dashboard) op 0 zetten. Authenticatie vereist. Alleen POST; elke andere methode geeft 405.
+
+**Verzoek:** geen parameters
+
+**Antwoord (HTTP 200 OK):**
+```json
+{"status": "ok", "dhw_water_total": 0}
+```
+
+Het antwoord komt voordat de reset loopt: het verzoek wordt in een wachtrij gezet. De hoofdlus zet het totaal daarna op 0 in het geheugen en in `/dhw_water.json`, en publiceert `0.0`, voordat het volgende OpenTherm-bericht wordt verwerkt. Tijdens een firmware-, bestandssysteem- of PIC-update, of zolang LittleFS niet beschikbaar is, wacht de reset tot het bestand geschreven kan worden. `0.0` wordt alleen gepubliceerd als MQTT op dat moment kan publiceren. Home Assistant ziet de daling naar 0 als een meterreset. Het MQTT-equivalent is `otgw/reset_water_total` (zie "Gateway-commando's" hieronder).
+
+---
+
 #### GET /api/v2/otgw/otmonitor
 
 Alle huidige OpenTherm-waarden opvragen in gestructureerd key-value formaat. Elk veld bevat waarde, eenheid en laatste update-tijdstempel. Compatibel met Telegraf en OTmonitor.
@@ -997,6 +1012,12 @@ Meer dan 40 aanvullende SAT-instellingen zijn beschikbaar via MQTT. De volledige
 |----------------|---------|-------------|
 | `otgw32/room_temp` | `"20.5"` | Kamertemperatuur voor OT-direct verwarmingscurve |
 | `otgw32/room_setpoint` | `"21.0"` | Kamersetpoint voor OT-direct |
+
+**Gateway-commando's (elk bord)**, onder `{TopTopic}/set/{UniqueId}/otgw/`:
+
+| Onderwerpsuffix | Payload | Beschrijving |
+|----------------|---------|-------------|
+| `otgw/reset_water_total` | (willekeurig) | Warmwatertotaal op 0 zetten (gelijk aan `POST /api/v2/otgw/reset_water_total`). Publiceer zonder retain-vlag: een reset die binnenkomt als bewaard bericht, dat de broker na elke herverbinding uitdeelt, wordt genegeerd. |
 
 #### Brongescheiden onderwerpen (optioneel)
 

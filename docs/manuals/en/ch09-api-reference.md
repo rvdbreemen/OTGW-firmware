@@ -373,6 +373,23 @@ Discovery uses an async bitmap-driven drip publisher: all message IDs are marked
 
 Alias: `POST /api/v2/otgw/autoconfigure`
 
+##### POST /api/v2/otgw/reset_water_total
+
+Reset the DHW water total (`dhw_water_total`, the Energy dashboard water counter) to 0. Authentication required. POST only; any other method answers 405.
+
+**Request:** No body required.
+
+**Response (HTTP 200 OK):**
+
+```json
+{
+  "status": "ok",
+  "dhw_water_total": 0
+}
+```
+
+The response comes before the reset runs: the request is queued, and the main loop then sets the total to 0 in RAM and in `/dhw_water.json` and publishes `0.0`, before it decodes the next OpenTherm frame. While a firmware, filesystem or PIC upgrade runs, or LittleFS is unavailable, the reset waits until the file can be written. The `0.0` is published only if MQTT can publish at that moment. Home Assistant reads the drop to 0 as a meter reset. The MQTT equivalent is `otgw/reset_water_total` (see "Gateway Command Topics" below).
+
 ---
 
 #### Sensors
@@ -1208,6 +1225,14 @@ On OTGW32 builds only, the following command topics are available under `{TopTop
 |-------------|---------|-------------|
 | `otgw32/room_temp` | `"20.5"` | Set room temperature for OT-direct heating curve |
 | `otgw32/room_setpoint` | `"21.0"` | Set room setpoint for OT-direct |
+
+##### Gateway Command Topics
+
+On every board, under `{TopTopic}/set/{UniqueId}/otgw/`:
+
+| Topic suffix | Payload | Description |
+|-------------|---------|-------------|
+| `otgw/reset_water_total` | (any) | Reset the DHW water total to 0 (same as `POST /api/v2/otgw/reset_water_total`). Publish without the retain flag: a reset that arrives as a retained message, which the broker hands out after every reconnect, is ignored. |
 
 #### Home Assistant Auto-Discovery
 

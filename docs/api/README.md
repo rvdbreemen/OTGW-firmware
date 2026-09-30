@@ -55,6 +55,7 @@ Optional HTTP Basic Auth. When a password is configured in device settings, muta
 - MQTT discovery: `POST /api/v2/otgw/discovery`, `POST /api/v2/otgw/autoconfigure`
 - Discovery verify/republish: `POST /api/v2/discovery/verify`, `POST /api/v2/discovery/republish`
 - MQTT value republish: `POST /api/v2/mqtt/republish`
+- DHW water total reset: `POST /api/v2/otgw/reset_water_total`
 - Simulation: `POST /api/v2/simulate/start`, `POST /api/v2/simulate/stop`
 - Webhook test: `POST /api/v2/webhook/test`
 - Debug dump: `GET /api/v2/debug`
@@ -519,6 +520,24 @@ Forces a full OT-VALUE republish: resets MQTT publish eligibility so every obser
 **Error responses**:
 - `429` - Republish cooldown active: `{"error":{"status":429,"message":"Republish cooldown active, retry in <N>s"}}`
 - `503` - MQTT not connected
+
+---
+
+### DHW water total
+
+#### `POST /api/v2/otgw/reset_water_total`
+
+Sets the DHW water total (`dhw_water_total`, ADR-176) to 0. Answered like `POST /api/v2/sat/reset_integral`, and the answer comes before the reset runs: the request is queued, and the main loop then zeroes the total in RAM and in `/dhw_water.json` and publishes `0.0`, before it decodes the next OpenTherm frame, also when no MsgID 19 frame has decoded on this boot. While a firmware, filesystem or PIC upgrade runs, or LittleFS is unavailable, the reset waits until the file can be written. The `0.0` is published only if MQTT can publish at that moment. Home Assistant reads the drop to 0 as a meter reset. The MQTT equivalent is `<TopTopic>/set/<node_id>/otgw/reset_water_total` (see [MQTT.md](MQTT.md#dhw-water-total-energy-dashboard)).
+
+**Authentication**: Required (when password is configured)
+
+**Response** `200 OK`:
+```json
+{"status": "ok", "dhw_water_total": 0}
+```
+
+**Error responses**:
+- `405` - Any method other than POST
 
 ---
 

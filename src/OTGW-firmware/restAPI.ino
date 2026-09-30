@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.392
+**  Version  : v2.0.0-alpha.393
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -797,6 +797,16 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
     sendCorsOriginHeader();
     webSend(202, F("application/json"), F("{\"status\":\"accepted\"}"));
     doAutoConfigure();
+  } else if (strcmp_P(words[4], PSTR("reset_water_total")) == 0) {
+    // POST /api/v2/otgw/reset_water_total: zero the DHW water total (ADR-176, TASK-1123),
+    // the REST half of set/<node>/otgw/reset_water_total. Answered like
+    // /api/v2/sat/reset_integral. This handler runs on the async_tcp task and the total
+    // is loop-task state, so it only queues the reset (the TASK-1176 pattern); loop()
+    // zeroes RAM and /dhw_water.json and publishes 0 before it decodes the next frame.
+    if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
+    queueDHWWaterMeterReset();
+    sendCorsOriginHeader();
+    webSend(200, F("application/json"), F("{\"status\":\"ok\",\"dhw_water_total\":0}"));
   } else if (strcmp_P(words[4], PSTR("label")) == 0) {
     if (!isGet) { sendApiMethodNotAllowed(F("GET")); return; }
     if (wc <= 5 || words[5][0] == '\0') { sendApiError(400, F("Missing label")); return; }

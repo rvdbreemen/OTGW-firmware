@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.392
+**  Version  : v2.0.0-alpha.393
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -763,7 +763,7 @@ static bool dispatchSatMqttCmd(const char* cmd, const char* payload) {
 }
 
 // handles MQTT subscribe incoming stuff
-static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) {
+static void handleMQTTcallback(char* topic, byte* payload, unsigned int length, bool retained) {
 
   if (state.debug.bMQTT) {
     DebugT(F("Message arrived on topic [")); Debug(topic); Debug(F("] = ["));
@@ -936,6 +936,29 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) 
 #endif
           return;
         }
+        // --- Gateway commands: set/<nodeId>/otgw/<sub-command> ---
+        // reset_water_total is the MQTT half of POST /api/v2/otgw/reset_water_total
+        // (ADR-176, TASK-1123); the payload is ignored, like sat/reset_integral. It sits
+        // before the OT command interface gate below: the DHW water total needs none.
+        if (strcasecmp_P(topicToken, PSTR("otgw")) == 0) {
+          char otgwSubCmd[24];
+          static_assert(sizeof("reset_water_total") < sizeof(otgwSubCmd),
+                        "otgwSubCmd must hold reset_water_total plus one more character, so a longer token cannot truncate into it");
+          if (readMQTTTopicToken(topicCursor, otgwSubCmd, sizeof(otgwSubCmd)) &&
+              strcasecmp_P(otgwSubCmd, PSTR("reset_water_total")) == 0) {
+            // A retained reset is delivered again on every reconnect and would wipe the
+            // litres counted since, so only a live (non-retained) command resets.
+            if (retained) {
+              MQTTDebugTln(F("MQTT OTGW cmd: reset_water_total ignored, the message is retained"));
+            } else {
+              MQTTDebugTln(F("MQTT OTGW cmd: reset_water_total, queued for loop()"));
+              queueDHWWaterMeterReset();
+            }
+          } else {
+            MQTTDebugTln(F("MQTT OTGW: missing or unknown sub-command"));
+          }
+          return;
+        }
         // TASK-439: gate generic OTGW command topics on hasOTCommandInterface()
         // (true for PIC OR OTDirect) instead of isPICEnabled(). addCommandToQueue()
         // already fans out to handleOTDirectCommand() on PIC-less builds, so OTGW32/
@@ -1033,7 +1056,6 @@ static void handleMQTTcallback(char* topic, byte* payload, unsigned int length) 
 static void onMqttMessage(const espMqttClientTypes::MessageProperties& properties,
                           const char* topic, const uint8_t* payload,
                           size_t len, size_t index, size_t total) {
-  (void)properties;
   // TASK-889: deliver the topic to the discovery-verify handler on the first
   // chunk even when the PAYLOAD is chunked. handleDiscoveryVerifyMessage ignores
   // the payload and keys only on the topic name (which espMqttClient delivers in
@@ -1048,7 +1070,7 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties& propertie
   // bounded buffer so we hand it a real char* without const_cast surprises.
   char topicBuf[MQTT_TOPIC_MAX_LEN];
   strlcpy(topicBuf, topic ? topic : "", sizeof(topicBuf));
-  handleMQTTcallback(topicBuf, const_cast<byte*>(payload), (unsigned int)len);
+  handleMQTTcallback(topicBuf, const_cast<byte*>(payload), (unsigned int)len, properties.retain);
 }
 
 void sendMQTT(const char* topic, const char *json);
@@ -1595,6 +1617,33 @@ static void mqttV2MigrationTick() {
 // END TEMPORARY MIGRATION CODE (TASK-410 / ADR-084)
 // ---------------------------------------------------------------------------
 
+//===========================================================================================
+// sendDHWWaterTotal(): publishes the cumulative DHW water volume (ADR-176, TASK-1123) as
+// dhw_water_total, in litres with one decimal and not retained, like the 1.x line.
+// snprintf_P keeps any total inside the buffer. dhwWaterMeter.ino accumulates it; its
+// reset calls this directly, so a reset publishes 0 even before the first MsgID 19 sample.
+//===========================================================================================
+void sendDHWWaterTotal()
+{
+  if (!settings.mqtt.bEnable) return;
+  char msg[24];
+  snprintf_P(msg, sizeof(msg), PSTR("%.1f"), dhwWaterTotalL);
+  sendMQTTData(F("dhw_water_total"), msg, false);
+}
+
+//===========================================================================================
+// publishDHWWaterMeter(): the 60 s task's publish, so a restarted Home Assistant refills
+// the entity within a minute. Silent until a MsgID 19 sample was taken on this boot
+// (TASK-1123 AC#2): on an installation whose masters never ask for that id there is no
+// value to report, and a restored total alone does not make one. The discovery config
+// is not queued here: queueNonOTDiscoveryIds() queues it at boot (ADR-176).
+//===========================================================================================
+void publishDHWWaterMeter()
+{
+  if (!dhwWaterMeterHasData()) return;
+  sendDHWWaterTotal();
+}
+
 //===================[ Send useful information to MQTT ]======================
 
 void sendMQTTuptime(){
@@ -1976,6 +2025,7 @@ static void queueNonOTDiscoveryIds()
 {
   setMQTTConfigPending(0);                  // climate: thermostat + DHW control
   setMQTTConfigPending(27);                 // number: outside temperature override
+  setMQTTConfigPending(OTGWdhwmeterid);     // 241 TASK-1123 DHW water total (ADR-176; its state waits for MsgID 19)
   setMQTTConfigPending(OTGWhvacid);         // 242 TASK-942 hvac_mode/hvac_action companions
   setMQTTConfigPending(OTGWotdirectid);     // 243 ADR-124 OTDirect flame metrics
   setMQTTConfigPending(OTGWpiccontrolsid);  // 244 resetgateway button + GPIO/LED selects
@@ -2529,6 +2579,8 @@ void doAutoConfigure(){
 //
 // Non-OT pseudo-IDs map to a source-prefix cluster within the single HA device
 // (ADR-140 single-device topology, was ADR-124 seven-device):
+//   241 (dhwmeter)    : Sensors   - DHW water total; a meter, so its uniq_id prefix must not
+//                                   follow the OT engine (pic_/otd_), which can differ per boot
 //   243 (otdirect)    : OtCore    — OTDirect flame metrics (split out of 251; Ot-Core device)
 //   244 (piccontrols) : Gateway   — resetgateway button, GPIO/LED selects
 //   245 (s0)          : Sensors   — S0 pulse counter (physical hardware sensor)
@@ -2558,6 +2610,7 @@ static HaDevice deviceForOTId(byte OTid) {
   // logic in doAutoConfigureMsgid() runs a second pass with Thermostat.
   if (OTid <= 127) return HaDevice::Boiler;  // bilateral, see doAutoConfigureMsgid
   switch (OTid) {
+    case 241: return HaDevice::Sensors;     // TASK-1123 DHW water total: fixed "sensors_" uniq_id prefix
     case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors
     case 243: return HaDevice::OtCore;      // otdirect flame metrics (ADR-140, was ADR-124)
     case 244: return HaDevice::Gateway;  // piccontrols

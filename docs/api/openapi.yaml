@@ -1450,7 +1450,7 @@ paths:
       summary: Trigger MQTT autodiscovery
       description: |
         Marks every ID that has a discovery table entry (seen on the bus or
-        not), plus the non-OT set (IDs 0, 27 and 242 to 255), as pending and
+        not), plus the non-OT set (IDs 0, 27 and 241 to 255), as pending and
         triggers asynchronous drip-publishing of MQTT autodiscovery configs for
         Home Assistant integration.
 
@@ -1494,6 +1494,48 @@ paths:
       responses:
         '202':
           description: Discovery accepted for processing
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/otgw/reset_water_total:
+    post:
+      security:
+        - basicAuth: []
+      tags:
+        - OTGW Commands
+      summary: Reset the DHW water total
+      description: |
+        Sets the cumulative DHW water total (`dhw_water_total`, ADR-176) to 0.
+        Answered like `POST /v2/sat/reset_integral`. The handler only queues the
+        reset and answers before it runs; the main loop then zeroes the total in
+        RAM and in `/dhw_water.json` in one step and publishes `0.0` to
+        `<TopTopic>/value/<node_id>/dhw_water_total`, also before the first
+        MsgID 19 frame of this boot. While a firmware, filesystem or PIC upgrade
+        runs, or LittleFS is unavailable, the reset waits until the file can be
+        written. The `0.0` is published only if MQTT can publish at that moment;
+        nothing retries it. Home Assistant reads the drop to 0 as a meter reset.
+        A write that fails without an error is retried by the 60 s task and the
+        next orderly restart. The MQTT equivalent is
+        `<TopTopic>/set/<node_id>/otgw/reset_water_total` (any payload).
+        POST only; no request body.
+      operationId: resetDhwWaterTotal
+      responses:
+        '200':
+          description: Reset queued; the main loop applies it before the next OpenTherm frame, or once a running upgrade has finished and LittleFS can be written
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [ok]
+                  dhw_water_total:
+                    type: number
+                    enum: [0]
+              example:
+                status: "ok"
+                dhw_water_total: 0
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
