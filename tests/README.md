@@ -77,3 +77,25 @@ add `tests/*.out` and `tests/*.exe` to your local ignore list.
 
 Do not add anything that requires `millis()`, `delay()`, `Serial`, network
 stacks, or actual peripherals. Those belong on the device.
+
+## Web UI tests (`tests/webui/`)
+
+Node test files, run one at a time with `node --test tests/webui/<name>.test.mjs`.
+
+- Logic tests (`ha-discovery-golden`, `paced-poller`, `sat-area-sensor-mapping`,
+  `sat-status-pill`) need Node alone.
+- Browser tests (`sat-log-filter`, `sat-settings-layout`, `tab-restore`) serve
+  `src/OTGW-firmware/data` from a local HTTP server and drive system Chrome
+  through Playwright. They need:
+  - `OTGW_DATA_DIR` set to the absolute path of `src/OTGW-firmware/data`;
+  - Google Chrome installed (they launch `channel: 'chrome'`, so no Playwright
+    browser download is needed);
+  - the `playwright` npm package reachable from the test file. The repo has no
+    `package.json` and ES modules ignore `NODE_PATH`, so copy the test into a
+    scratch directory whose `node_modules` holds `playwright` (for example after
+    `npm install playwright` there) and run it from that directory.
+
+`index.html` loads its stylesheets and scripts one at a time after
+`DOMContentLoaded` (TASK-960). A browser test must wait for the state it
+measures, such as a stylesheet applied or an `index.js` function defined,
+before it evaluates anything.

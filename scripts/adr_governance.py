@@ -101,7 +101,8 @@ def parse_adr(path):
 
 def load_all():
     adrs = {}
-    for p in sorted(glob.glob(os.path.join(ADR_DIR, "ADR-*.md"))):
+    # Numbered ADR files only: ADR-INDEX.md shares the prefix.
+    for p in sorted(glob.glob(os.path.join(ADR_DIR, "ADR-[0-9]*.md"))):
         a = parse_adr(p)
         adrs[a["num"]] = a
     return adrs

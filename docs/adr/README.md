@@ -224,6 +224,12 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 - **[ADR-100: JIT HA Discovery with Smart Reconnect (Port of dev ADR-073)](ADR-100-jit-ha-discovery-smart-reconnect.md)** 🆕  
   Stops the bulk republish of all 256 configs at every boot/reconnect; republishes only after an offline-threshold reconnect (broker-restart heuristic).
 
+- **[ADR-174: Republish on-change gated MQTT state when Home Assistant comes back online](ADR-174-republish-on-change-gated-mqtt-state-when-home-assistant-comes-back-online.md)** *(Accepted)*  
+  When `homeassistant/status` goes `offline` and then `online`, the handler calls `requestMQTTRepublishAll()`, so a restarted Home Assistant does not sit on "unknown" until each value changes. A retained `online` replay triggers nothing, and discovery is untouched. Supersedes ADR-100.
+
+- **[ADR-176: Publish a firmware-integrated cumulative DHW water total for the Home Assistant Energy dashboard](ADR-176-publish-a-firmware-integrated-cumulative-dhw-water-total-for-the-home-assistant-energy-dashboard.md)** *(Accepted)*  
+  A firmware-integrated cumulative DHW water total (`device_class: water`, unit L, `total_increasing`) so the Home Assistant Energy dashboard works without a helper. It integrates elapsed time multiplied by the MsgID 19 flow, persists in its own file with a bounded flash write rate, and keeps the same entity contract as the 1.x line. It is not a metrologically valid water meter.
+
 - **[ADR-103: MQTT Source-Topic Worldview Routing — Proxy-Answer (no-B) Refinement](ADR-103-mqtt-source-topic-proxy-answer-routing.md)** 🆕 *(Supersedes ADR-096)*  
   Distinguishes a proxy-answer `A` (no preceding `B`) from an answer-override `A`; a proxy `A` publishes to canonical, `_boiler`, and `_thermostat`. Supersedes ADR-096.
 
@@ -285,6 +291,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-130: PIC-UART Dedicated FreeRTOS Task as Sole OTGWSerial Owner (ADR-123 Phase 1)](ADR-130-pic-uart-dedicated-task-sole-serial-owner.md)** 🆕  
   Accepted (2026-06-13). Lifts the PIC UART runtime byte I/O onto a dedicated FreeRTOS task pinned to the app core, the sole runtime owner of `OTGWSerial` read/write; deletes the four-lines-per-call bound (`kMaxLinesPerDrain`, TASK-671). RX assembles lines onto the ADR-129 frame queue; TX uses a new value-copy `otTxQueue`; RX errors are detected in the task but reported loop-side to keep `OTGWState` single-writer. Task parks during a PIC flash (ADR-012 handshake) and on an OTDirect boot (ADR-127), gating on `isOTDirectEnabled()` so ADR-060 banner recovery survives. Refines ADR-123 §model-1's "high-priority task" to equal-to-loop priority for the Phase-1 (still-synchronous-networking) environment. First consumer of ADR-129; supersedes nothing. New CI gate `check_pic_uart_task_owns_serial`.
+
+- **[ADR-177: Keep the PIC byte stream verbatim from the serial task to every consumer](ADR-177-keep-the-pic-byte-stream-verbatim-from-the-serial-task-to-every-consumer.md)** *(Accepted)*  
+  The raw PIC payload travels from the serial task to every consumer as a (pointer, length) pair and is never handed to an API that expects a NUL-terminated string. An `adr-judge` regex rule blocks staged diffs that do.
 
 - **[ADR-132: HTTP Stack on ESPAsyncWebServer with an Imperative-Push to Async-Pull Bridge (ADR-123 Phase 3)](ADR-132-async-web-server-and-imperative-push-bridge.md)** 🆕 *(Supersedes ADR-109)*  
   Accepted (2026-06-14). Moves the web stack off the cooperative `loop()` onto ESPAsyncWebServer (over AsyncTCP): one `AsyncWebServer server(80)` instantiated once (ADR-044) and exposed `extern` for WebSocket (seq10) and OTA (seq11); the four-deep `handleClient()` drain (TASK-817) and the `OTGWWebServer = WebServer` alias are deleted. Removes the sat-slider stall at the root (parallel sockets served on the AsyncTCP task, not one-per-loop-turn). New `webServerCompat.h` bridges the imperative-push JSON builders (`sendStartJsonMap` → N×`sendJsonMapEntry` → `sendEndJsonMap`) to the async pull/callback API via a file-static per-request context (safe under single-AsyncTCP-task serialization), send-exactly-once helpers, merged `argCompat()` semantics, and a body-capture hook. Bounded JSON streams via `AsyncResponseStream` (retiring ADR-109's `sTxBuf`); static files stream straight from LittleFS; the ~39 KB index streams chunked. ADR-056 auth/CSRF preserved verbatim. OTA is intentionally dark across the 865.9→865.11 seam. Supersedes ADR-109 (whose "do NOT migrate to AsyncWebServer" premise fell with ADR-128 dropping ESP8266). Proposed Phase-3 CI gate forbids `httpServer.`/`handleClient(`/`OTGWWebServer` in app files.
@@ -382,6 +391,9 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-081: Types Merge into `<Component>stuff.h` When Both Headers Exist](ADR-081-types-merge-into-stuff-when-both-exist.md)** 🆕  
   Amendment to ADR-079: when a `<Component>stuff.h` already exists, types fold into it instead of creating a separate `<Component>types.h`. Prevents file-count bloat for components that already have a stuff sibling.
+
+- **[ADR-175: Gate the OT coverage fixture on a lossless evidence source](ADR-175-gate-the-ot-coverage-fixture-on-a-lossless-evidence-source.md)** 🆕 *(Proposed)*  
+  The OT coverage fixture gates topic presence on a lossless source: the broker, not the telnet log, so presence is an observation rather than a sample. Gating is source-aware (`mqtt_source` in the fingerprint), and comparing a broker baseline with a telnet run is refused.
 
 ### Core Services
 
@@ -580,6 +592,12 @@ Counts above are advisory rather than hand-maintained; the canonical set is the 
 
 - **[ADR-117: SAT Simulation Contract — Bus Isolation, Boiler-Absence Availability, Command Trace](ADR-117-sat-simulation-contract.md)** 🆕  
   Defines the SAT simulation-mode contract: OT-bus isolation, boiler-absence availability handling, and a command trace for bench/emulator validation.
+
+- **[ADR-178: Widen the SAT area-sensor reference to accept a BLE MAC alongside a Dallas address](ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md)** 🆕 *(Proposed)*  
+  `settings.sat.sSensorArea` becomes `char[4][18]`, so a SAT area-sensor reference can be a 16-character Dallas address or a BLE MAC.
+
+- **[ADR-179: Name the owner of the OpenTherm control setpoint while SAT is enabled](ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md)** 🆕 *(Proposed)*  
+  While SAT is enabled it owns MsgID 1 (TSet). One predicate, `satOwnsControlSetpoint()`, is consulted by every TSet writer; SAT's own `CS=` goes through `satEnqueueOwnCS()`, and an external `CS=` is refused and reported. The thermostat-timeout setback stays a fail-safe exception.
 
 ### ADR Governance
 

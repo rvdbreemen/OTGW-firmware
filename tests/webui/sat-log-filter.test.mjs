@@ -14,6 +14,9 @@ const b = await chromium.launch({channel:'chrome',headless:true});
 const pg = await b.newPage();
 await pg.route('**/api/**', r=>r.fulfill({status:200,contentType:'application/json',body:'{}'}));
 await pg.goto(`http://127.0.0.1:${PORT}/index.html`,{waitUntil:'domcontentloaded'});
+// index.js loads after both stylesheets through index.html's sequential loader
+// (TASK-960), so its functions exist only some time after domcontentloaded.
+await pg.waitForFunction(() => typeof parseLogLine === 'function' && typeof updateFilteredBuffer === 'function', null, {timeout:15000});
 let ok=true; const log=(p,m)=>{console.log((p?'PASS':'FAIL')+': '+m); if(!p)ok=false;};
 
 // 1. The parser must tag an 'S'-prefixed raw WS line as a SAT event.

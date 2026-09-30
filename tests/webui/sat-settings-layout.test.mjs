@@ -81,6 +81,13 @@ await page.route('**/api/**', r => r.fulfill({ status: 200, contentType: 'applic
 
 await page.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'domcontentloaded' });
 
+// The stylesheets arrive through index.html's sequential loader (TASK-960),
+// after domcontentloaded. Measure only once components.css is applied, or the
+// computed styles below race the stylesheet.
+await page.waitForFunction(
+  () => [...document.styleSheets].some(s => (s.href || '').endsWith('/components.css') && s.cssRules.length > 0),
+  null, { timeout: 15000 });
+
 let ok = true;
 const log = (pass, msg) => {
   console.log((pass ? 'PASS' : 'FAIL') + ': ' + msg);
