@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.390
+**  Version  : v2.0.0-alpha.391
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1310,11 +1310,18 @@ static void bridgeSentRequest(unsigned long request, OTDirectRequestOrigin origi
 // otBoilerCacheStore: keep a boiler reply for the master-mode slave handler and
 // the other cache readers. The cache holds the OT spec's data-ids 0-127. A reply
 // for an OEM data-id 128-255 is not stored: masking it with 0x7F would put it
-// in another id's slot (MsgID 131 would land on MsgID 3).
+// in another id's slot (MsgID 131 would land on MsgID 3). An UNKNOWN-DATA-ID
+// reply carries no value, only "not supported", so it clears the id's slot
+// instead of filling it with the reply's data bytes (the AUTO heating curve
+// would read those as an outside temperature of 0.0 C).
 // ---------------------------------------------------------------------------
 static void otBoilerCacheStore(unsigned long response) {
   const uint8_t id = (response >> 16) & 0xFF;
   if (id >= sizeof(otBoilerCacheValid)) return;
+  if (OpenTherm::getMessageType(response) == OpenThermMessageType::UNKNOWN_DATA_ID) {
+    otBoilerCacheValid[id] = false;
+    return;
+  }
   otBoilerCache[id] = response & 0xFFFF;
   otBoilerCacheValid[id] = true;
 }
@@ -1401,7 +1408,7 @@ static void handleMasterResponse() {
 
     // TASK-184: update flame ratio state from MsgID 0 slave status byte
     // Flame bit = bit 3 of slave status LB (bit 3 of response byte 0)
-    if (((response >> 16) & 0xFF) == 0) {
+    if (((response >> 16) & 0xFF) == 0 && otBoilerCacheValid[0]) {
       bool flameOn = (otBoilerCache[0] & 0x08) != 0;  // bit 3 of LB = flame active
       flameRatioSet(flameOn);
     }

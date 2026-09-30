@@ -60,6 +60,7 @@
 #include <cstdint>
 #include <cstddef>
 #include <cstring>
+#include <cmath>
 #include <string>
 #include <vector>
 #include <initializer_list>
@@ -162,7 +163,12 @@ static FakeOpenTherm otSlave;
 
 // state / settings: only the fields the slices touch.
 static struct { struct { bool bOnline; } otBus; struct { bool bThermostatConnected; } otd; } state;
-static struct { struct { uint8_t iCHMode; } otd; } settings;
+static struct {
+  struct {
+    uint8_t iCHMode; float fFlowTemp; float fFlowMax; float fRoomSetpoint;   // types as in OTDirecttypes.h
+    float fGradient; float fExponent; float fOffset; bool bRoomCompEnabled;
+  } otd;
+} settings;
 
 static void sendWebSocketJSON(const char*) {}
 static bool satSimulationBlocksBusTx(const char*, const __FlashStringHelper*) { return false; }
@@ -189,7 +195,6 @@ static void checkThermostatTimeout() {}
 static void loopFlameRatio() {}
 static void clearWriteOverride(uint8_t) {}
 static void loopPiCtrl() {}
-static float getFlowTemp() { return 0.0f; }
 static bool enqueueWriteCommand(uint8_t, uint16_t, const char*) { return false; }
 static void loopCHHysteresis() {}
 static uint32_t otCSLastCommandMs = 0;
@@ -197,8 +202,6 @@ static uint32_t otC2LastCommandMs = 0;
 static uint32_t otSCLastCommandMs = 0;
 static constexpr uint32_t OT_CSC2_EXPIRY_MS = 60000;
 static constexpr uint32_t OT_SC_EXPIRY_MS   = 61000;
-static uint32_t otNextPiCtrl = 0;
-static constexpr uint32_t OT_PI_INTERVAL_MS = 60000UL;
 
 // Stand-in for the schedule table: handleMasterResponse() reads it only after a
 // third UNKNOWN_DATA_ID for one MsgID, and the per-case reset keeps every count below 3.
@@ -263,6 +266,8 @@ static std::string cacheText() {
 static const char* g_wantFlame   = nullptr;   // expected flameRatioSet() calls, "-" for none
 static int         g_wantPresent = -1;        // expected otDirectBoilerPresent(); -1: not checked
 static int         g_wantVent    = -1;        // expected otIsVentSlave(); -1: not checked
+static bool        g_checkFlow   = false;     // TASK-1184: check getFlowTemp() against g_wantFlow
+static float       g_wantFlow    = 0.0f;
 
 static void resetAll() {
   for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) otOverrides[i].active = false;
@@ -287,7 +292,8 @@ static void resetAll() {
   g_log.clear();
   g_m16Calls = 0; g_m16Type = 0; g_m16Data = 0;
   g_flame.clear();
-  g_wantFlame = nullptr; g_wantPresent = -1; g_wantVent = -1;
+  g_wantFlame = nullptr; g_wantPresent = -1; g_wantVent = -1; g_checkFlow = false;
+  memset(&settings, 0, sizeof(settings));
 }
 
 // A thermostat frame as the library's slave process() delivers it (OpenTherm.cpp:444-447).
@@ -317,9 +323,11 @@ static void verdict(const char* id, const char* title,
   const std::string gotFlame = g_flame.empty() ? "-" : g_flame;
   const int  gotPresent = otDirectBoilerPresent() ? 1 : 0;
   const int  gotVent    = otIsVentSlave() ? 1 : 0;
+  const float gotFlow   = getFlowTemp();
   const bool extraOk   = (g_wantFlame == nullptr || gotFlame == g_wantFlame) &&
                          (g_wantPresent < 0 || gotPresent == g_wantPresent) &&
-                         (g_wantVent < 0 || gotVent == g_wantVent);
+                         (g_wantVent < 0 || gotVent == g_wantVent) &&
+                         (!g_checkFlow || fabsf(gotFlow - g_wantFlow) < 0.01f);
   const bool boilerOk  = gotBoiler  == framesText(wantBoiler);
   const bool repliesOk = gotReplies == framesText(wantReplies);
   const bool logOk     = gotLog     == wantLog;
@@ -338,16 +346,19 @@ static void verdict(const char* id, const char* title,
   printf("     state     : cache=%s online=%d%s\n", gotCache.c_str(), gotOnline ? 1 : 0,
          stateOk ? "" : ("   WANT cache=" + std::string(wantCache ? wantCache : "(not checked)") +
                          " online=" + (wantOnline ? "1" : "0")).c_str());
-  if (g_wantFlame || g_wantPresent >= 0 || g_wantVent >= 0) {
-    printf("     extra     : flame=%s present=%d vent=%d%s\n", gotFlame.c_str(), gotPresent, gotVent,
+  if (g_wantFlame || g_wantPresent >= 0 || g_wantVent >= 0 || g_checkFlow) {
+    char flowText[16];
+    snprintf(flowText, sizeof(flowText), "%.2f", g_wantFlow);
+    printf("     extra     : flame=%s present=%d vent=%d flow=%.2f%s\n", gotFlame.c_str(), gotPresent, gotVent, gotFlow,
            extraOk ? "" : ("   WANT flame=" + std::string(g_wantFlame ? g_wantFlame : "(any)") +
                            " present=" + (g_wantPresent < 0 ? "(any)" : std::to_string(g_wantPresent)) +
-                           " vent=" + (g_wantVent < 0 ? "(any)" : std::to_string(g_wantVent))).c_str());
+                           " vent=" + (g_wantVent < 0 ? "(any)" : std::to_string(g_wantVent)) +
+                           " flow=" + (g_checkFlow ? std::string(flowText) : "(any)")).c_str());
   }
   if (g_dump) {
-    fprintf(g_dump, "%s boiler=%s replies=%s log=%s cache=%s online=%d m16=%d:%u:%04X flame=%s present=%d vent=%d\n",
+    fprintf(g_dump, "%s boiler=%s replies=%s log=%s cache=%s online=%d m16=%d:%u:%04X flame=%s present=%d vent=%d flow=%.2f\n",
             id, gotBoiler.c_str(), gotReplies.c_str(), gotLog.c_str(), gotCache.c_str(), gotOnline ? 1 : 0,
-            g_m16Calls, (unsigned)g_m16Type, (unsigned)g_m16Data, gotFlame.c_str(), gotPresent, gotVent);
+            g_m16Calls, (unsigned)g_m16Type, (unsigned)g_m16Data, gotFlame.c_str(), gotPresent, gotVent, gotFlow);
   }
 }
 
@@ -441,6 +452,72 @@ static void suite1177() {
   }
 }
 
+// ---- TASK-1184 suite: a boiler UNKNOWN-DATA-ID reply and the boiler cache --------
+// The library reports UNKNOWN-DATA-ID as SUCCESS, and the reply's data bytes
+// (0x0000) used to be cached as a valid value: the AUTO heating curve then ran
+// at 0.0 C outside and master mode answered READ-ACK(0). U1-U4 pin the fix;
+// U5 and U6 are controls that must behave the same with and without it.
+static void curveSettings() {                   // AUTO heating curve, the OTDirecttypes.h defaults
+  settings.otd.iCHMode = 2; settings.otd.fFlowTemp = 45.0f; settings.otd.fFlowMax = 75.0f;
+  settings.otd.fRoomSetpoint = 20.0f; settings.otd.fGradient = 1.5f; settings.otd.fExponent = 1.0f;
+  settings.otd.fOffset = 0.0f; settings.otd.bRoomCompEnabled = false;
+}
+static void gatewayExchange(unsigned long q, unsigned long b) {   // a scheduler request and its reply
+  sendMasterRequestAsync(q, OT_DIRECT_ORIGIN_GATEWAY);
+  otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
+}
+
+static void suite1184() {
+  const unsigned long q27 = otFrame(kReadData, 27, 0), u27 = otFrame(kUnknownId, 27, 0);
+  const unsigned long a27 = otFrame(kReadAck, 27, degC(5.0));
+  {
+    resetAll(); curveSettings(); otCurrentMode = OTD_MODE_MASTER;
+    gatewayExchange(q27, u27);
+    g_checkFlow = true; g_wantFlow = 45.0f;     // fixed flow: no outside temperature
+    verdict("U1", "master mode, AUTO curve, READ(27) answered UNKNOWN-DATAID: nothing cached, getFlowTemp() falls back to the fixed 45.0",
+            { q27 }, {}, logOf({ { 'R', q27 }, { 'B', u27 } }), "-");
+  }
+  {
+    resetAll(); curveSettings(); otCurrentMode = OTD_MODE_MASTER;
+    gatewayExchange(q27, u27);
+    clearTraffic();
+    const unsigned long t = otFrame(kReadData, 27, 0), a = otFrame(kUnknownId, 27, 0);
+    thermostatSends(t); loopOTDirect();
+    verdict("U2", "master mode after the boiler answered MsgID 27 UNKNOWN-DATAID, thermostat READ(27): answered UNKNOWN-DATAID, not READ-ACK(0)",
+            {}, { a }, logOf({ { 'T', t }, { 'A', a } }), "-");
+  }
+  {
+    resetAll(); curveSettings(); otCurrentMode = OTD_MODE_MASTER;
+    gatewayExchange(q27, a27);                  // 5.0 C cached
+    gatewayExchange(q27, u27);                  // then the boiler stops supporting MsgID 27
+    g_checkFlow = true; g_wantFlow = 45.0f;
+    verdict("U3", "master mode, AUTO curve, READ-ACK(27, 5.0) then UNKNOWN-DATAID: the slot is cleared, getFlowTemp() uses the fixed 45.0",
+            { q27, q27 }, {}, logOf({ { 'R', q27 }, { 'B', a27 }, { 'R', q27 }, { 'B', u27 } }), "-");
+  }
+  {
+    resetAll();
+    const unsigned long q = otFrame(kReadData, 0, 0x0300), b = otFrame(kUnknownId, 0, 0);
+    gatewayExchange(q, b);
+    g_wantFlame = "-";
+    verdict("U4", "READ(0) answered UNKNOWN-DATAID: nothing cached, flameRatioSet() not called",
+            { q }, {}, logOf({ { 'R', q }, { 'B', b } }), "-");
+  }
+  {
+    resetAll(); curveSettings(); otCurrentMode = OTD_MODE_MASTER;
+    gatewayExchange(q27, a27);
+    g_checkFlow = true; g_wantFlow = 42.5f;     // 20 + 1.5 * (20 - 5)
+    verdict("U5", "control: READ-ACK(27, 5.0) is cached and drives the AUTO curve to 42.5",
+            { q27 }, {}, logOf({ { 'R', q27 }, { 'B', a27 } }), "1B:0500");
+  }
+  {
+    resetAll();
+    const unsigned long q = otFrame(kWriteData, 1, degC(40.0)), b = otFrame(kWriteAck, 1, degC(40.0));
+    gatewayExchange(q, b);
+    verdict("U6", "control: a WRITE-ACK(1, 40.0) reply is cached as before",
+            { q }, {}, logOf({ { 'R', q }, { 'B', b } }), "01:2800");
+  }
+}
+
 // Close the dump and print the summary line the runner parses.
 static int finish() {
   if (g_dump) fclose(g_dump);
@@ -459,11 +536,12 @@ static int finish() {
   return ok ? 0 : 1;
 }
 
-// argv[1]: directory for the case dump (cases-<suite>.txt); argv[2]: suite, 1178 (default) or 1177.
+// argv[1]: directory for the case dump (cases-<suite>.txt); argv[2]: suite, 1178 (default), 1177 or 1184.
 int main(int argc, char** argv) {
   const std::string suite = argc > 2 ? argv[2] : "1178";
-  if (suite != "1178" && suite != "1177") { printf("unknown suite %s\n", suite.c_str()); return 3; }
+  if (suite != "1178" && suite != "1177" && suite != "1184") { printf("unknown suite %s\n", suite.c_str()); return 3; }
   printf("%s\n", suite == "1177" ? "== OT-Direct boiler cache and OEM data-ids 128-255 (TASK-1177) =="
+               : suite == "1184" ? "== OT-Direct boiler cache and UNKNOWN-DATA-ID replies (TASK-1184) =="
                                  : "== OT-Direct reply to a forwarded thermostat frame (TASK-1178) ==");
   printf("slice origin: %s\n\n", OTD_SLICE_ORIGIN);
   if (argc > 1) {
@@ -472,6 +550,7 @@ int main(int argc, char** argv) {
     if (!g_dump) { printf("cannot open %s\n", path.c_str()); return 3; }
   }
   if (suite == "1177") { suite1177(); return finish(); }
+  if (suite == "1184") { suite1184(); return finish(); }
 
   const uint16_t t30 = degC(30.0), t31 = degC(31.0), t40 = degC(40.0);
 
@@ -487,8 +566,8 @@ int main(int argc, char** argv) {
     OverrideRun r = runOverriddenWrite(1, t30, t40);
     const unsigned long b = otFrame(kUnknownId, 1, 0), a = otFrame(kWriteAck, 1, t30);
     otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
-    verdict("C2", "as C1, boiler UNKNOWN-DATAID: thermostat gets WRITE-ACK(1, own 30.0)",
-            { r.toBoiler }, { a }, logOf({ { 'T', r.tstat }, { 'R', r.toBoiler }, { 'B', b }, { 'A', a } }));
+    verdict("C2", "as C1, boiler UNKNOWN-DATAID: thermostat gets WRITE-ACK(1, own 30.0), nothing cached",
+            { r.toBoiler }, { a }, logOf({ { 'T', r.tstat }, { 'R', r.toBoiler }, { 'B', b }, { 'A', a } }), "-");
   }
   {
     OverrideRun r = runOverriddenWrite(1, t30, t40);
@@ -564,9 +643,9 @@ int main(int argc, char** argv) {
         OverrideRun r = runOverriddenWrite(c.msg, degC(c.own), degC(c.ovr));
         const unsigned long b = otFrame(kUnknownId, c.msg, 0), a = otFrame(kWriteAck, c.msg, degC(c.ovr));
         otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
-        snprintf(title, sizeof(title), "WRITE(%u, %.1f), parity bit %u, with override %.1f, boiler UNKNOWN-DATAID: WRITE-ACK(%u, override %.1f)",
+        snprintf(title, sizeof(title), "WRITE(%u, %.1f), parity bit %u, with override %.1f, boiler UNKNOWN-DATAID: WRITE-ACK(%u, override %.1f), nothing cached",
                  c.msg, c.own, (unsigned)(r.tstat >> 31), c.ovr, c.msg, c.ovr);
-        verdict(c.idUnk, title, { r.toBoiler }, { a }, logOf({ { 'T', r.tstat }, { 'R', r.toBoiler }, { 'B', b }, { 'A', a } }));
+        verdict(c.idUnk, title, { r.toBoiler }, { a }, logOf({ { 'T', r.tstat }, { 'R', r.toBoiler }, { 'B', b }, { 'A', a } }), "-");
       }
       {   // boiler DATA-INVALID: the thermostat gets its own value back
         OverrideRun r = runOverriddenWrite(c.msg, degC(c.own), degC(c.ovr));
@@ -611,8 +690,8 @@ int main(int argc, char** argv) {
     const unsigned long t = otFrame(kReadData, 100, 0), b = otFrame(kUnknownId, 100, 0);
     thermostatSends(t); loopOTDirect();
     otMaster.boilerFrame(b); loopOTDirect(); loopOTDirect();
-    verdict("C8b", "READ(100) with the TT flag override active: forwarded unmodified, boiler reply relayed",
-            { t }, { b }, logOf({ { 'T', t }, { 'B', b } }));
+    verdict("C8b", "READ(100) with the TT flag override active: forwarded unmodified, boiler reply relayed, nothing cached",
+            { t }, { b }, logOf({ { 'T', t }, { 'B', b } }), "-");
   }
 
   // ---- C9-C11: no override; a gateway command ------------------------------------

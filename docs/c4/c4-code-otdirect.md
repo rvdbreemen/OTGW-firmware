@@ -402,7 +402,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Returns 0.0 if CH is off
   - Fixed-flow mode: returns `settings.otd.fFlowTemp`
   - Auto mode (heating curve):
-    - Reads outside temp from `otBoilerCache[27]` (MsgID 27, Toutside, f8.8)
+    - Reads outside temp from `otBoilerCache[27]` (MsgID 27, Toutside, f8.8) when that slot is valid; a boiler that answers MsgID 27 with UNKNOWN-DATA-ID leaves it invalid, and the curve falls back to the fixed flow temperature (TASK-1184)
     - Applies OT-Thing curve formula: `flow = rsp + c1 * pow(rsp - outTmp, 1/exponent) + offset`
     - Parameters from settings: `fFlowMax`, `fGradient`, `fExponent`, `fOffset`, `fRoomSetpoint`
   - Adds PI correction term (`otPiDeltaT`) if room compensation enabled
@@ -577,7 +577,7 @@ static uint8_t  otCmdQueueHighWater = 0;  // TASK-494: peak depth observed
 static uint16_t otBoilerCache[128];       // Indexed by MsgID
 static bool     otBoilerCacheValid[128];  // Validity flags
 ```
-Written only by `otBoilerCacheStore()`, which stores data-ids 0-127 and skips 128-255: masking an OEM data-id with 0x7F would put it in another id's slot (a Remeha MsgID 131 reply on MsgID 3, which `otDirectBoilerPresent()` and `otIsVentSlave()` read). TASK-1177; host proof `test/host/build_and_run_override_reply.ps1 -Suite 1177 -OldVsFix`.
+Written only by `otBoilerCacheStore()`, which stores data-ids 0-127 and skips 128-255: masking an OEM data-id with 0x7F would put it in another id's slot (a Remeha MsgID 131 reply on MsgID 3, which `otDirectBoilerPresent()` and `otIsVentSlave()` read). TASK-1177; host proof `test/host/build_and_run_override_reply.ps1 -Suite 1177 -OldVsFix`. An UNKNOWN-DATA-ID reply clears the id's slot instead of storing its data bytes: the OpenTherm library reports UNKNOWN-DATA-ID as SUCCESS, and every cache reader (master-mode replies, the AUTO heating curve, the PI and CH-hysteresis paths, the flame ratio) keys on the valid flag. TASK-1184; host proof `-Suite 1184 -OldVsFix`.
 
 #### Unknown-ID 3-Strike Counter
 ```cpp
