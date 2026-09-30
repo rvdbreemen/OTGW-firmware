@@ -18,15 +18,15 @@ Both sub-systems share the same JSON formatting infrastructure (`jsonStuff.ino`)
 - **MQTT state machine**: Six-state connection lifecycle (INIT, TRY_CONNECT, CONNECTED, WAIT_ATTEMPT, WAIT_RECONNECT, ERROR) with configurable retry intervals (3s between attempts, 10 minutes after 5 failures)
 - **Chunked MQTT publishing**: Streams payloads in 128-byte RAM chunks or 63-byte PROGMEM chunks via `beginPublish()`/`endPublish()`; never copies full payload into a single buffer
 - **Home Assistant auto-discovery (streaming)**: Data-driven tables in `MQTTHaDiscovery.cpp` plus hardcoded stream functions for climate (pseudo-ID 0), number (pseudo-ID 27), SAT switches / selects, Dallas sensors, and PIC pseudo-ID 244 controls (`streamButtonDiscovery` for `resetgateway`, `streamSelectDiscovery` for GPIO/LED selects). Two-pass `MqttJsonWriter` (MEASURE then WRITE) avoids large discovery buffers. Publishes to `homeassistant/<domain>/<node_id>/<entity>/config`.
-- **Just-In-Time (JIT) MQTT discovery — default** (ADR-100): `doAutoConfigureMsgid()` publishes discovery config for an OT message ID on first arrival via `processOT()`. No discovery is published for OT IDs never seen on the bus — eliminates the 200+ ghost entities of the previous bulk approach.
-- **Drip discovery on broker restart only**: `loopMQTTDiscovery()` is seeded by `markAllMQTTConfigPending()` over OT IDs already observed this session (not the full 256-ID range) when a broker restart is detected; publishes one config per timer tick (3s normal, 30s under heap pressure).
+- **Just-In-Time (JIT) MQTT discovery, the default** (ADR-100): `processOT()` queues an OT message ID when a valid frame arrives and its config is not yet marked published; the drip publishes it on a later tick. At MQTT start only the non-OT set is queued (unless a device-topology migration is pending), so boot no longer bulk-publishes every table ID. Configs for IDs never seen on the bus still go out whenever `markAllMQTTConfigPending()` runs, for example on a manual force or the daily re-announce (ADR-170, Proposed), which is on by default.
+- **Drip discovery**: `loopMQTTDiscovery()` publishes the queued IDs, one per tick (2 s normal, 10 s under heap pressure), and is the only caller of `doAutoConfigureMsgid()`. It drains the JIT IDs, the non-OT set (IDs 0, 27 and 242 to 255) that MQTT start and a reconnect after more than 5 minutes offline queue (unless a device-topology migration is pending), and the full set that `markAllMQTTConfigPending()` queues: every ID with a discovery table entry, seen on the bus or not, plus the non-OT set.
 - **Flat per-value MQTT topics** (ADR-101): Value topics carry plain scalars, never aggregated JSON. Discovery payloads on `homeassistant/.../config` remain JSON — ADR-101 governs the value topic shape only.
 - **Self-describing topic names by default** (ADR-106): `settings.mqtt.bUseLegacyOtTopics=false` (default) publishes self-describing names (e.g. `manufacturer_code`); `=true` reverts to legacy OT-spec-derived names (e.g. `slave_member_id_code`). Mutually exclusive. Toggling arms a cleanup pass that retains-cleans the other set's 37 discovery topics on the broker.
 - **`resetgateway` hardening** (TASK-668): MQTT command only fires on payload `"1"`; cooldown rate-limit prevents accidental rapid PIC resets; both rejection reasons surface in the default debug stream.
 - **Silently-dropped MQTT set commands surface in default debug**: Integration issues are observable without enabling per-module debug flags.
 - **Source-separated MQTT topics**: Optionally publishes each OT message to three sub-topics (`/thermostat`, `/boiler`, `/gateway`) for fine-grained Home Assistant entity mapping
 - **MQTT command dispatch**: Routes incoming `{topTopic}/set/{nodeId}/{command}` payloads to PIC command queue or SAT functions via PROGMEM lookup table
-- **Home Assistant reboot detection**: Subscribes to `homeassistant/status`; re-publishes discovery on HA restart
+- **Home Assistant restart detection** (ADR-174): Subscribes to `homeassistant/status`. An `offline` followed by `online` calls `requestMQTTRepublishAll()`, so current OT values re-publish as their frames arrive. Discovery is not re-published: the broker retains it. The `mqttharebootdetection` setting is deprecated and gates nothing.
 - **REST API v2 dispatch table**: Single `processAPI()` entry point; URI tokenized and matched against `kV2Routes[]` array; adding an endpoint requires one handler function and one table entry
 - **CSRF protection and HTTP Basic Auth** (ADR-054): `checkHttpAuth()` validates credentials and origin/referer header for all POST/PUT mutations
 - **ETag-based file caching**: `index.html` served with filesystem-hash ETag; 304 Not Modified on unchanged content; versioned asset URLs (`index.js?v=<hash>`) for long-term cache headers
@@ -83,9 +83,9 @@ Both sub-systems share the same JSON formatting infrastructure (`jsonStuff.ino`)
 - **Protocol**: MQTT Discovery (HA convention)
 - **Description**: Publishes JSON discovery payloads to `homeassistant/<domain>/<node_id>/<entity>/config` for all 200+ OT entities.
 - **Operations**:
-  - `doAutoConfigure()` — bulk publish all discovery configs from `mqttha.cfg`
-  - `doAutoConfigureMsgid(OTid)` — JIT publish discovery for a single message ID
-  - `doAutoConfigureMsgid(OTid, sensorId)` — JIT publish for Dallas sensor entity
+  - `doAutoConfigure()`: manual force; calls `markAllMQTTConfigPending()` so the drip re-announces every table ID (the runtime `mqttha.cfg` file is retired)
+  - `processOT()` (OTGW-Core.ino): JIT; sets the pending bit of an OT ID when a valid frame arrives and the ID is not yet marked published
+  - `loopMQTTDiscovery()`: the drip; publishes one pending ID per tick through `doAutoConfigureMsgid(OTid, isFirst)`. Pseudo-ID 246 (Dallas) goes through `configSensors()`
 
 ### REST API v2
 
@@ -123,7 +123,7 @@ Both sub-systems share the same JSON formatting infrastructure (`jsonStuff.ino`)
 
 ### Components Used
 
-- **OpenTherm Core**: reads `OTcurrentSystemState` for OT values; calls `addCommandToQueue()` to deliver MQTT-sourced commands to PIC; calls `doAutoConfigureMsgid()` triggered by new OT message arrivals
+- **OpenTherm Core**: reads `OTcurrentSystemState` for OT values; calls `addCommandToQueue()` to deliver MQTT-sourced commands to PIC; `processOT()` sets the discovery pending bit (`setMQTTConfigPending()`) when a valid frame of a not-yet-published OT ID arrives; the drip publishes it
 - **Configuration and State**: reads all `settings.*` fields; calls `updateSetting()` for MQTT and REST settings updates; reads `state.*` for health, status, and version reporting
 - **Smart Thermostat (SAT)**: calls `satHandle*()` functions from MQTT and REST command handlers; reads `state.sat.*` for status responses
 - **Sensors and Hardware**: calls `configSensors()` for Dallas sensor discovery; reads Dallas device list and labels for REST API

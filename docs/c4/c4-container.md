@@ -109,7 +109,7 @@ All containers live on a single physical device. There is no Docker, no Kubernet
 | `/version.hash` | <0.1 KB | Firmware/filesystem version hash for mismatch detection |
 | `/otgw.replay` | varies | Optional OT message replay log for simulation mode |
 
-Note: the previous `/mqttha.cfg` LittleFS file has been retired. HA MQTT discovery is now published directly from PROGMEM data tables in `MQTTHaDiscovery.cpp` (ADR-077). Default discovery semantics: JIT on first OT message (ADR-100), flat per-value scalar topics (ADR-101), self-describing names (ADR-106).
+Note: the previous `/mqttha.cfg` LittleFS file has been retired. HA MQTT discovery is now published directly from PROGMEM data tables in `MQTTHaDiscovery.cpp` (ADR-077). Default discovery semantics: JIT (ADR-100: an OT ID is queued when a valid frame arrives and its config is not yet published, and the drip publishes it), flat per-value scalar topics (ADR-101), self-describing names (ADR-106).
 
 ---
 
@@ -561,7 +561,7 @@ Default HA prefix: `homeassistant` (configurable via `settings.mqtt.sHAprefix`).
 | `{prefix}/set/{nodeId}/sat/preset` | `comfort` / `away` / `sleep` / `frost` | SAT preset |
 | `{prefix}/set/{nodeId}/sat/window` | `ON` / `OFF` | Window detection input |
 | `{prefix}/set/{nodeId}/<setting>` | Value | Settings update (any field in `settings.*`) |
-| `homeassistant/status` | `online` / `offline` | HA reboot detection; triggers re-discovery |
+| `homeassistant/status` | `online` / `offline` | HA restart detection: `offline` then `online` re-publishes current OT values, not discovery (ADR-174) |
 
 ---
 

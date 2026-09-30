@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-26 22:06'
-updated_date: '2026-09-30 09:41'
+updated_date: '2026-09-30 09:49'
 labels: []
 dependencies: []
 ordinal: 246000
@@ -94,4 +94,6 @@ Remaining open: AC #10 (two-tab starvation, needs two browsers against a bench d
 Maintainer call (from the review): with stop() sticky, a fetch that never settles also blocks a stop()+start() restart because index.js has no fetch timeout; clearing inFlight in stop() instead brings the D3b overlap back. An AbortController timeout on the poller's fetch would remove the trade-off; not done here.
 Follow-ups (not blocking): refreshDevTime()/refreshOTmonitor() direct calls that bypass the in-flight guard at index.js ~:5002 (applyPSmodeState) and ~:9352 (after a sensor-label save); ADR-172:113-115/:121-123 and ADR-173:93-94 text is stale after D1/D2 (adr-kit); restAPI.ino:2594-2595 and components.css:2117-2118 still claim two dashboards are both served.
 OPEN: AC#10 (two tabs for 10 minutes) and AC#16 (fresh-boot discovery on a wiped broker) need the bench.
+
+2026-09-30 docs aligned with the shipped behaviour (docs-only commit, no bump): docs/api/MQTT.md, docs/api/openapi.yaml, docs/c4/c4-code-mqtt.md, c4-component-integration-layer.md, c4-container.md and docs/manuals/nl/h10-bijlagen.md. An HA restart republishes STATE (ADR-174), not discovery; the reconnect republish only runs after >300 s offline; MQTTharebootdetection gates nothing; the daily heal (ADR-170) replaced the automatic verify; drip timing; the REST republish is queued for loop() (TASK-1176). Verification (workflow wf_fe6c4173-ec6, WP4 + review + fixup): a sentence inventory maps all 166 keyword lines of the six docs to code anchors (286 anchors, 0 failures) on both the base and current dev; 17 file:line citations checked for staleness on dev (0 stale); 39 regression patterns for the previously false sentences find nothing; openapi.yaml parses with the same 66 paths.
 <!-- SECTION:NOTES:END -->

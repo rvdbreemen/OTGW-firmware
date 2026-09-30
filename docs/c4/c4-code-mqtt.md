@@ -3,7 +3,7 @@
 ## Overview
 
 - **Name**: MQTT Client and Home Assistant Auto-Discovery Module
-- **Description**: Complete MQTT client implementation for the OTGW-firmware ESP8266/ESP32 gateway. Provides MQTT publish/subscribe functionality, streaming Home Assistant auto-discovery configuration, command handling, and OpenTherm message-to-MQTT mapping. Discovery architecture is data-driven streaming with two-pass JSON writing; OT-ID discovery is published Just-In-Time on first message arrival (ADR-100). Default value topics use flat per-value scalars (ADR-101) under self-describing names (ADR-106), with a legacy compatibility toggle.
+- **Description**: Complete MQTT client implementation for the OTGW-firmware ESP8266/ESP32 gateway. Provides MQTT publish/subscribe functionality, streaming Home Assistant auto-discovery configuration, command handling, and OpenTherm message-to-MQTT mapping. Discovery architecture is data-driven streaming with two-pass JSON writing; OT-ID discovery is queued Just-In-Time when a valid frame of an unpublished ID arrives, and the drip publisher sends it (ADR-100). Default value topics use flat per-value scalars (ADR-101) under self-describing names (ADR-106), with a legacy compatibility toggle.
 - **Location**: `/src/OTGW-firmware/MQTTstuff.ino`, `/src/OTGW-firmware/MQTTstuff.h`, `/src/OTGW-firmware/MQTTHaDiscovery.cpp`, `/src/OTGW-firmware/mqtt_discovery_verify.cpp`
 - **Language**: Arduino C/C++ (with PubSubClient library integration)
 - **Purpose**: Enables MQTT-based integration with home automation systems (Home Assistant), publishes OpenTherm data to configurable topics, handles MQTT commands for controlling the OTGW gateway, and manages streaming auto-discovery of sensors, binary sensors, climate entities, and SAT controls in Home Assistant.
@@ -92,12 +92,12 @@
 
 - `void startMQTT()`
   - Description: Initialize MQTT client and kick off connection state machine
-  - Location: MQTTstuff.ino:587-604
+  - Location: MQTTstuff.ino:571-593
   - Actions:
     - Returns if MQTT not enabled
     - Sets PubSubClient buffer size to `MQTT_CLIENT_BUFFER_SIZE` (384 bytes) for inbound messages
     - Initializes state to `MQTT_STATE_INIT`
-    - Clears auto-discovery completion bitmap
+    - Clears the discovery done and pending bitmaps and queues only the non-OT set via `publishNonOTDiscoveryConfigs()` (IDs 0, 27 and 242 to 255); `processOT()` queues other OT IDs JIT
     - Builds publish/subscribe topic namespaces
     - Calls `handleMQTT()` to begin connection attempt
   - Dependencies: PubSubClient, settings, WiFi
@@ -123,13 +123,13 @@
 
 - `void handleMQTTcallback(char* topic, byte* payload, unsigned int length)`
   - Description: Incoming MQTT message handler; invoked by PubSubClient for subscribed topics
-  - Location: MQTTstuff.ino:609-967
+  - Location: MQTTstuff.ino:766-1014
   - Parameters:
     - `char* topic`: Incoming topic string
     - `byte* payload`: Raw payload bytes (not null-terminated)
     - `unsigned int length`: Payload byte count
   - Topic structure: `{topTopic}/set/{nodeId}/{command}` or special topics:
-    - `homeassistant/status`: Detects Home Assistant going offline/online for discovery re-sync
+    - `homeassistant/status`: an `offline` sets `bHAcycle`; the next `online` clears it and calls `requestMQTTRepublishAll()`, so OT values re-publish as their frames arrive (ADR-174). Discovery is not touched.
   - Command families:
     - Standard MQTT commands: mapped via `findMQTTSetCommandIndex()` (setpoint, constant, outside temp, etc.)
     - SAT (Simple Auto Temp) commands: `sat/target`, `sat/indoor_temp`, `sat/outdoor_temp`, `sat/enabled`, `sat/control_mode`, etc.
@@ -360,13 +360,13 @@ ADR-106 (self-describing topic names) splits sensor/binary-sensor rows into two 
 
 Discovery paths (ADR-100 JIT-by-default):
 
-**Path B (JIT, default)**: `doAutoConfigureMsgid(OTid)` is called from `processOT()` on the first message of an OT ID. This is the primary production path — discovery configs only appear for OT messages actually seen on the bus, eliminating the 200+ ghost entities of the old bulk publish.
+**Path B (JIT, default)**: `processOT()` (OTGW-Core.ino) sets the pending bit of an OT ID when a valid frame arrives and the ID is not yet marked published. It publishes nothing itself; the drip (Path C) publishes the configs on a later tick. `ensurePSSummaryDiscovery()` (PS=1 summary fields, OTGW-Core.ino) and `pollSensors()` (Dallas pseudo-ID 246, sensors_ext.ino:238-240) queue their IDs the same way. JIT keeps the bulk publish off the boot path, unless a topology migration is pending. It does not keep configs of never-seen IDs off the broker: every call to `markAllMQTTConfigPending()` queues all table IDs, and the daily re-announce (ADR-170, Proposed) makes that call once a day by default.
 
-**Path C (Drip, broker-restart only)**: `loopMQTTDiscovery()` publishes one pending config per timer tick (3s normal, 30s under heap pressure). Triggered only when broker restart is detected (retained discovery presumed lost); seeded by `markAllMQTTConfigPending()` over OT IDs already seen this session, not the full 256-ID range.
+**Path C (Drip)**: `loopMQTTDiscovery()` publishes the configs of one pending ID per timer tick (2 s normal, 10 s under heap pressure). It is the only caller of `doAutoConfigureMsgid()` (MQTTstuff.ino:2200). It drains whatever sits in the pending bitmap: the JIT IDs of Path B; the non-OT set (IDs 0, 27 and 242 to 255) that `publishNonOTDiscoveryConfigs()` queues at MQTT start and on a reconnect after more than 5 minutes offline; and the full set from `markAllMQTTConfigPending()`, which is every ID with a discovery table entry, seen on the bus or not, plus the non-OT set. Its callers are listed under `markAllMQTTConfigPending()` below.
 
-**Path A (Bulk)**: `doAutoConfigure()` iterates sensor/binary sensor tables and calls hardcoded stream functions. Reserved for explicit refresh (telnet 'F' shortcut, REST API `/api/v2/otgw/discovery`). ADR-106 mode-filter (legacy vs alias) is applied during the iteration so bulk publishes are mode-consistent.
+**Path A (Force)**: `doAutoConfigure()` no longer streams the tables inline. It calls `markAllMQTTConfigPending()` and leaves the publishing to the drip (Path C). Callers: telnet `F` and `POST /api/v2/otgw/discovery`.
 
-`mqtt_discovery_verify.cpp` provides build-time and runtime sanity helpers for the discovery tables (PROGMEM index integrity, no duplicate OT IDs, ADR-106 flag exclusivity).
+`mqtt_discovery_verify.cpp` runs the on-demand retained-discovery verify (ADR-062): a subscribe window of up to 15 seconds that counts retained configs. When a run that was not aborted finds some missing, it calls `markAllMQTTConfigPending()`. Since ADR-170 it has no automatic caller; only `POST /api/v2/discovery/verify` and telnet `V` start it.
 
 - `bool streamSensorDiscovery(PubSubClient &client, const MqttHaSensorCfg &cfg, HaDiscoveryContext &ctx)`
   - Description: Stream a single sensor discovery config to MQTT
@@ -436,36 +436,32 @@ Discovery paths (ADR-100 JIT-by-default):
   - Iterates 3 sources, sets source tokens in ctx, calls streamSensorDiscovery for each
 
 - `void doAutoConfigure()`
-  - Description: Force-publish all Home Assistant discovery configs
-  - Location: MQTTstuff.ino
-  - Intended use: Explicit utility (Serial 'F' command, REST API)
+  - Description: Force a re-announce of all Home Assistant discovery configs through the drip
+  - Location: MQTTstuff.ino:2511-2520
+  - Intended use: Explicit utility (telnet `F`, `POST /api/v2/otgw/discovery`)
   - Algorithm:
-    - Iterates mqttHaSensors[289] and calls streamSensorDiscovery for each
-    - Iterates mqttHaBinSensors[53] and calls streamBinarySensorDiscovery for each
-    - Calls streamClimateDiscovery for climateIdx 0, 1
-    - Calls streamNumberDiscovery
-    - Calls streamSatSwitchDiscovery for switchIdx 0-12
-    - Calls streamSatSelectDiscovery for selectIdx 0
-    - Calls configSensors() for Dallas sensors
-    - Marks all as published in MQTTautoConfigMap
-  - Dependencies: All streaming functions, configSensors
+    - Returns at once when MQTT is disabled
+    - Calls `markAllMQTTConfigPending()`; `loopMQTTDiscovery()` then publishes one pending ID per tick
+  - Dependencies: markAllMQTTConfigPending, loopMQTTDiscovery
 
-- `bool doAutoConfigureMsgid(byte OTid)`
-  - Description: Publish Home Assistant discovery config for a specific OpenTherm message ID
-  - Location: MQTTstuff.ino
-  - Usage: JIT discovery on first message arrival (Path B), also called by drip publisher (Path C)
+- `bool doAutoConfigureMsgid(byte OTid, bool isFirst)`
+  - Description: Publish every Home Assistant discovery config that belongs to one ID
+  - Location: MQTTstuff.ino:2579-2743
+  - Caller: only `loopMQTTDiscovery()` (MQTTstuff.ino:2200), for one pending ID per drip tick (Path C). JIT (Path B) only queues the ID.
   - Parameters:
-    - `byte OTid`: OpenTherm message ID (0-255), or pseudo-IDs 0 (climate), 27 (number), 245-246 (Dallas)
+    - `byte OTid`: OpenTherm message ID, or a pseudo-ID from 242 to 255
+    - `bool isFirst`: the drip passes `dripDeviceInfoPending`, so the first entity published after a queue fill carries the full device block (ADR-140)
   - Algorithm:
-    - OTid = 0: streams climate discovery (both indices 0, 1)
-    - OTid = 27: streams number discovery
-    - OTid in [0-12] when called from climate/drip: streams SAT switch discovery + select
-    - OTid in [245-256]: Dallas sensor (address from parameter)
-    - Otherwise: looks up in mqttHaSensorIndex/mqttHaBinSensorIndex, streams via streamSensorDiscovery/streamBinarySensorDiscovery
-    - Checks heap guard (MQTT_DISCOVERY_HEAP_MIN = 8000 bytes)
-    - Marks entry as configured in MQTTautoConfigMap if successful
-  - Return: true if config was published
-  - Dependencies: All streaming functions, getMQTTConfigDone, setMQTTConfigDone
+    - OTid = 246 (Dallas): calls `configSensors()` and returns true
+    - Returns false when the discovery session lock is taken, MQTT is disabled or disconnected, the broker IP is invalid, or free heap is below `MQTT_DISCOVERY_HEAP_MIN` (2048 bytes on ESP32, from `boards.h`)
+    - Streams the sensor and binary-sensor table rows of the ID via `streamSensorDiscovery()` / `streamBinarySensorDiscovery()`, with the ADR-106 mode filter; in the modern topology real OT IDs (0 to 127) get one pass per device (Boiler, Thermostat)
+    - OTid = 0: also both climate entities, the SAT switches and the SAT select
+    - OTid = 27: also the outside-temperature override number
+    - OTid = 1, 8, 9, 14, 16, 39, 56 or 57: also an override sensor (ADR-118)
+    - OTid = 244: also the PIC button and eight selects; OTid = 255: the SAT zone discovery
+  - Return: true if any config of the ID was published; the ID 244 button and selects count only when all nine were
+  - Does not set the done bit. The drip sets it when this returns true (MQTTstuff.ino:2201-2203); for ID 246, `configSensors()` sets it (sensors_ext.ino:218)
+  - Dependencies: All streaming functions, configSensors
 
 ### Discovery State Management
 
@@ -473,7 +469,7 @@ Two bitmaps track discovery state: `MQTTautoConfigMap[8]` (published/done) and `
 
 - `bool getMQTTConfigDone(const uint8_t MSGid)`
   - Description: Check if discovery config has been published for a message ID
-  - Location: MQTTstuff.ino:1499-1511
+  - Location: MQTTstuff.ino:1936-1939
   - Implementation:
     - Splits MSGid into group (bits 7-5) and index (bits 4-0)
     - Reads bit from `MQTTautoConfigMap[group]` at index position
@@ -481,54 +477,60 @@ Two bitmaps track discovery state: `MQTTautoConfigMap[8]` (published/done) and `
 
 - `void setMQTTConfigDone(const uint8_t MSGid)`
   - Description: Mark discovery config as published for a message ID
-  - Location: MQTTstuff.ino:1513-1522
+  - Location: MQTTstuff.ino:1941-1944
   - Implementation: Splits MSGid, sets bit in `MQTTautoConfigMap[group]`
 
 - `void clearMQTTConfigDone()`
-  - Description: Clear all discovery configuration flags
-  - Location: MQTTstuff.ino:1524-1527
-  - Usage: Called on MQTT connection, Home Assistant online/offline events
-  - Rationale: Triggers re-publication of discovery configs on reconnect or HA restart
+  - Description: Clear all discovery configuration flags and reset `state.discovery.iPublishedTopicCount`
+  - Location: MQTTstuff.ino:1946-1952
+  - Usage: Called from `startMQTT()`, from the connect handler after more than 5 minutes offline, and from `markAllMQTTConfigPending()`. Not called on a Home Assistant restart (ADR-174).
+  - Rationale: Lets JIT and the drip re-publish discovery configs when the broker may have lost them
 
 - `void setMQTTConfigPending(const uint8_t MSGid)`
   - Description: Mark a message ID as needing its discovery config (re-)published
-  - Location: MQTTstuff.ino:1517-1522
+  - Location: MQTTstuff.ino:2021-2026
   - Implementation: Sets bit in `MQTTautoCfgPendingMap[group]`
 
-- `bool getMQTTConfigPending(const uint8_t MSGid)`
-  - Description: Check if a message ID has a pending discovery publish
-  - Location: MQTTstuff.ino:1524-1529
+- `uint16_t countPendingDiscoveryIds()`
+  - Description: Count the IDs whose pending bit is set
+  - Location: MQTTstuff.ino:261-268
+  - Usage: `pending_ids` in `GET /api/v2/discovery`, and the "no drip pending" precondition of the verify and of the daily re-announce
 
-- `void clearMQTTConfigPending(const uint8_t MSGid)`
-  - Description: Clear pending bit for a message ID
-  - Location: MQTTstuff.ino:1531-1536
+- `void clearMQTTConfigPending()`
+  - Description: Clear the whole pending bitmap (there is no per-ID variant)
+  - Location: MQTTstuff.ino:1958-1961
+  - Usage: `startMQTT()`, the connect handler after more than 5 minutes offline, and `emergencyHeapRecovery()` (helperStuff.ino:1049)
 
 - `void markAllMQTTConfigPending()`
-  - Description: Mark every OT ID present in the PROGMEM discovery table as pending for async drip publish
-  - Location: MQTTstuff.ino:1538-1553
+  - Description: Mark every ID present in the PROGMEM discovery tables as pending for async drip publish, whether or not it was seen on the bus
+  - Location: MQTTstuff.ino:2029-2057
   - Algorithm:
+    - Arms the TASK-648 topology cleanup when the stored topology stamp differs from the current mode
     - Clears both published and pending bitmaps
-    - Iterates `mqttHaCfgIndex[256]`; for each non-0xFFFF entry, sets the pending bit
-    - Also marks the Dallas sensor pseudo-ID (`OTGWdallasdataid`)
-  - Usage: Called on MQTT connect and HA restart detection
+    - Walks IDs 0-255 and sets the pending bit for each ID with a sensor or binary-sensor index entry
+    - Calls `queueNonOTDiscoveryIds()` for the non-OT set (0, 27 and 242 to 255), the same helper `publishNonOTDiscoveryConfigs()` uses (ADR-171, Proposed)
+  - Usage: `doAutoConfigure()` (telnet `F`, `POST /api/v2/otgw/discovery`), `POST /api/v2/discovery/republish`, the daily re-announce (ADR-170), a verify run that found missing configs, an `MQTTuseLegacyOtTopics` toggle and a pending topology migration. Not called on MQTT connect or on a Home Assistant restart.
 
 - `void loopMQTTDiscovery()`
   - Description: Async drip publisher for MQTT discovery configs; called from the main loop on every iteration
-  - Location: MQTTstuff.ino:1568-1623
+  - Location: MQTTstuff.ino:2122-2217
   - Algorithm:
     - Manages its own timer internally (no external timer registration)
-    - Adaptive interval: 3s when heap is healthy, 30s under heap pressure (avoids lwIP pbuf allocations when memory-constrained)
+    - Adaptive interval: 2 s when heap is healthy, 10 s under heap pressure. Pressure means free heap below 16384 bytes and largest free block below 8192 bytes. Restore needs two consecutive ticks with free heap of at least 18432 bytes and a largest block of at least 9216 bytes. Either switch waits at least one full interval in the current mode.
+    - Returns without publishing when MQTT is disabled or disconnected, or free heap is below `MQTT_DISCOVERY_HEAP_MIN`
+    - Skips the tick during a Status-frame burst or its cooldown (counted in `drip_burst_skip` / `drip_cooldown_skip`)
     - On each timer tick, scans `MQTTautoCfgPendingMap` for the next set bit
     - Skips already-published IDs (checks `getMQTTConfigDone()`)
     - Dallas sensor pseudo-ID handled via `configSensors()` call
-    - Calls `doAutoConfigureMsgid()` for one pending ID per tick
-    - Clears pending bit regardless of success (avoids busy-looping; JIT path or next `markAllMQTTConfigPending()` will re-queue if needed)
-    - Returns after publishing one ID (spreads broker load over time)
+    - Calls `doAutoConfigureMsgid()` for one pending ID per tick; it is that function's only caller
+    - On success sets the done bit and clears the pending bit; on failure keeps the pending bit so the next tick retries (TASK-348)
+    - One attempt per tick (spreads broker load over time)
   - Constants:
-    - `DISCOVERY_INTERVAL_NORMAL`: 3 seconds
-    - `DISCOVERY_INTERVAL_SLOW`: 30 seconds
-    - `MQTT_DISCOVERY_HEAP_MIN`: 8000 bytes minimum free heap
-  - Dependencies: MQTTautoCfgPendingMap, doAutoConfigureMsgid, configSensors, getHeapHealth
+    - `DISCOVERY_INTERVAL_NORMAL`: 2 seconds
+    - `DISCOVERY_INTERVAL_SLOW`: 10 seconds
+    - `DRIP_RESTORE_K_TICKS`: 2 healthy ticks before restoring the normal interval
+    - `MQTT_DISCOVERY_HEAP_MIN`: 2048 bytes minimum free heap (`boards.h`)
+  - Dependencies: MQTTautoCfgPendingMap, doAutoConfigureMsgid, configSensors, platformFreeHeap, platformMaxFreeBlock
 
 ### Error Handling & Debugging
 
@@ -664,9 +666,10 @@ Two bitmaps track discovery state: `MQTTautoConfigMap[8]` (published/done) and `
 - `MQTT_CLIENT_BUFFER_SIZE`: 384 bytes (PubSubClient inbound buffer)
 - `MQTT_HA_SENSOR_COUNT`, `MQTT_HA_BINSENSOR_COUNT`: total entries in the two discovery tables (varies with ADR-106 alias tail; see `MQTTHaDiscovery.cpp` for the authoritative size)
 - `MQTT_HA_INDEX_NONE`: 0xFFFF (sentinel for no discovery entry in index table)
-- `DISCOVERY_INTERVAL_NORMAL`: 3 seconds (drip publisher interval, healthy heap)
-- `DISCOVERY_INTERVAL_SLOW`: 30 seconds (drip publisher interval, low heap pressure)
-- `MQTT_DISCOVERY_HEAP_MIN`: 8000 bytes (minimum free heap for discovery publish)
+- `DISCOVERY_INTERVAL_NORMAL`: 2 seconds (drip publisher interval, healthy heap)
+- `DISCOVERY_INTERVAL_SLOW`: 10 seconds (drip publisher interval under heap pressure)
+- `MQTT_DISCOVERY_HEAP_MIN`: 2048 bytes (minimum free heap for discovery publish, from `boards.h`)
+- `MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`: 300000 ms (5 minutes). A reconnect after a longer outage resets the value trackers and the discovery state. After a shorter one the connect handler does nothing more; a WiFi reconnect by `loopWifi()` (`WIFI_RECONNECTED`) still runs `startMQTT()`, which resets the discovery state.
 
 ## Dependencies
 
@@ -687,7 +690,7 @@ Two bitmaps track discovery state: `MQTTautoConfigMap[8]` (published/done) and `
   - `CSTR()`, `CBOOLEAN()`, `CCONOFF()`, `CONLINEOFFLINE()`: Macro conversions
   - `isValidIP()`: Validate IP address
   - `replaceAll()`: String replacement in buffer
-  - `requestMQTTRepublishAll()`: Request republish of all cached values
+  - `requestMQTTRepublishAll()`: Reset the OT value trackers so each value re-publishes when its frame next arrives
   - `publishAllPICsettings()`: Republish PIC settings on reconnect
 
 ### External Dependencies
@@ -739,31 +742,28 @@ Discovery configs are generated on-the-fly by streaming functions in `MQTTHaDisc
 
 ADR-100 makes JIT the default production path. The module supports three publication paths:
 
-**Path B (JIT, default)**: `doAutoConfigureMsgid(OTid)` called from `processOT()` on first message of a new type.
-- Looks up OT ID in sensor/binary sensor index tables
-- Calls corresponding stream function if entry found
-- Handles pseudo-IDs: 0 (climate), 27 (number), SAT switches via switchIdx mapping, 244 (PIC button + selects), 245/246 (S0/Dallas)
-- Only publishes if not already in `MQTTautoConfigMap` bitfield
-- Avoids flooding broker with configs for message IDs never seen in real deployments
-- Applies the ADR-106 mode filter — legacy or alias row, never both
+**Path B (JIT, default)**: `processOT()` queues an OT ID when a valid frame arrives and the ID is not yet marked published; the drip (Path C) publishes it.
+- `processOT()` (OTGW-Core.ino) only sets the pending bit; it never calls `doAutoConfigureMsgid()`
+- `ensurePSSummaryDiscovery()` (PS=1 summary) and `pollSensors()` (Dallas, pseudo-ID 246) queue the same way
+- An ID marked published is not queued again until something clears the done bitmap
+- Keeps never-seen IDs out of the boot-time queue, unless a topology migration is pending. It does not keep their configs off the broker: every `markAllMQTTConfigPending()` call, the daily re-announce included, queues all table IDs
 
-**Path C (Drip, broker-restart recovery)**: `loopMQTTDiscovery()` runs when broker restart is detected (retained discovery presumed lost).
+**Path C (Drip)**: `loopMQTTDiscovery()` publishes whatever sits in the pending bitmap.
+- Calls `doAutoConfigureMsgid()`, its only caller. That function looks up the ID in the sensor and binary-sensor index tables and streams the rows, with the ADR-106 mode filter (legacy or alias row, never both). ID 0 adds climate and the SAT switches and select, 27 the override number, 244 the PIC button and selects, 255 the SAT zone; ID 246 (Dallas) goes to `configSensors()`
 - Called from main loop on every iteration; manages its own internal timer
-- Publishes exactly one pending discovery config per timer tick (3s normal, 30s under heap pressure)
+- Publishes exactly one pending ID per timer tick (2 s normal, 10 s under heap pressure); one ID can carry several configs
 - Uses `MQTTautoCfgPendingMap[8]` bitmap (8 x uint32_t = 256 bits) to track pending OT IDs and pseudo-IDs
-- `markAllMQTTConfigPending()` seeds the pending bitmap from OT IDs already seen this session, NOT the full 256-ID range (matches the JIT-by-default policy)
+- `publishNonOTDiscoveryConfigs()` fills it with the non-OT set only (IDs 0, 27 and 242 to 255): at MQTT start and on a reconnect after more than 5 minutes offline
+- `markAllMQTTConfigPending()` fills it with every ID that has a discovery table entry, seen on the bus or not, plus the non-OT set; its callers are listed in its Usage line under Discovery State Management
 - Spreads discovery publishes over time to avoid broker and heap pressure spikes
-- Adaptive interval: slows to 30s when `getHeapHealth() >= HEAP_WARNING`, restores to 3s when healthy
-- Guards against low heap via `MQTT_DISCOVERY_HEAP_MIN` (8000 bytes) check before each publish
+- Adaptive interval: slows to 10 s when free heap is below 16384 bytes and the largest free block below 8192 bytes; restores to 2 s after two consecutive ticks with at least 18432 bytes free and a 9216-byte block
+- Guards against low heap via the `MQTT_DISCOVERY_HEAP_MIN` (2048 bytes) check before each publish
 
-**Path A (Bulk)**: `doAutoConfigure()` calls all streaming functions in sequence.
-- Reserved for explicit refresh via telnet 'F' shortcut or REST API `/api/v2/otgw/discovery`
-- Iterates sensor and binary sensor tables, calling corresponding stream functions
-- Calls hardcoded stream functions for climate, number, SAT switches/selects, PIC button/select
-- Publishes Dallas sensor discovery via separate `configSensors()` call
-- Applies the ADR-106 mode filter so the bulk pass is internally consistent
+**Path A (Force)**: `doAutoConfigure()` calls `markAllMQTTConfigPending()` and returns; the drip (Path C) does the publishing.
+- Reserved for explicit refresh via telnet `F` or `POST /api/v2/otgw/discovery`
+- The ADR-106 mode filter is applied per ID inside `doAutoConfigureMsgid()`, as on the other paths
 
-**Path B is the default** production path. Path C handles broker restart. Path A is an explicit utility.
+**Path B is the default** way OT IDs get queued. Path C publishes everything that is queued: JIT IDs, the non-OT set, broker-restart recovery, the manual force and the daily re-announce. Path A is an explicit utility that feeds Path C.
 
 ### Source-Separated Topics
 
@@ -783,9 +783,11 @@ Detection: Template lines in `mqttha.cfg` containing `%source_suffix%`, `%source
 
 The module subscribes to `homeassistant/status` topic to detect Home Assistant lifecycle events:
 
-- **Offline** → **Online**: If HA restart detected, clears `MQTTautoConfigMap` to trigger re-discovery on next message (ADR-041)
-- **Online** (without prior offline): If `bHaRebootDetect` disabled, always re-discover
-- Prevents stale discovery configs if HA broker connection is lost
+- **Offline**: sets `bHAcycle`
+- **Online** while `bHAcycle` is set: clears the flag and calls `requestMQTTRepublishAll()` (ADR-174). That resets the OT value trackers and forces the next Status and StatusVH frames, so every OT value, `hvac_mode` and `hvac_action` included, re-publishes as its frame arrives. It does not touch discovery: no `clearMQTTConfigDone()`, no pending re-queue, because the broker retains the configs.
+- **Online** without a preceding offline (for example a retained birth message replayed on reconnect): only a telnet debug line
+- `bHaRebootDetect` (`mqttharebootdetection`) is deprecated and gates nothing; it is still parsed and written so existing settings files load
+- SAT and BLE `sat/*` topics are outside this reset and wait for their own heartbeat (up to 11 minutes)
 
 ### Buffer Management (ADR-053)
 
@@ -881,81 +883,85 @@ MQTTclient.loop() (async)
 ### Home Assistant Discovery Publication (Streaming)
 
 ```
-doAutoConfigure() [manual trigger via Serial 'F' or REST API]
+OT frame arrives: processOT() (JIT, Path B) [also: PS=1 summary field, Dallas poll]
   ↓
-  Iterate mqttHaSensors[289]: for each entry, call streamSensorDiscovery()
-    ├─ MEASURE pass: MqttJsonWriter calculates payload size
-    ├─ client.beginPublish(topic, size)
-    ├─ WRITE pass: MqttJsonWriter composes JSON, delegates to writeMqttChunkExt()
-    ├─ client.endPublish()
-    └─ setMQTTConfigDone(OTid)
-  ↓
-  Iterate mqttHaBinSensors[53]: for each entry, call streamBinarySensorDiscovery()
-  ↓
-  Call streamClimateDiscovery(0) and streamClimateDiscovery(1) for climate entities
-  ↓
-  Call streamNumberDiscovery() for Toutside Override
-  ↓
-  Call streamSatSwitchDiscovery(switchIdx) for switchIdx 0..12 (13 SAT boolean controls)
-  ↓
-  Call streamSatSelectDiscovery(0) for sat_heating_system dropdown
-  ↓
-  Call configSensors() for Dallas temperature sensors
-  ↓
-  Home Assistant ingests all discovery configs, auto-creates entities
+  valid value, MQTT enabled, ID not yet marked published → setMQTTConfigPending(id)
+  (nothing is published here; the drip below publishes on a later tick)
 
-Broker restart detected (or HA restart with bHaRebootDetect enabled)
+MQTT start (startMQTT) or reconnect after > 5 min offline
+  ↓
+  clearMQTTConfigDone() + clearMQTTConfigPending()
+  ↓
+  publishNonOTDiscoveryConfigs() → queueNonOTDiscoveryIds(): IDs 0, 27, 242..255
+  (a pending TASK-648 topology migration calls markAllMQTTConfigPending() instead)
+
+Full re-queue: doAutoConfigure() [telnet 'F', POST /api/v2/otgw/discovery],
+POST /api/v2/discovery/republish, daily re-announce (ADR-170), verify found missing,
+MQTTuseLegacyOtTopics toggle
   ↓
   markAllMQTTConfigPending()
-    ├─ Clears MQTTautoConfigMap (published) bitmap
-    └─ Sets pending bit only for OT IDs already observed this session + relevant pseudo-IDs
+    ├─ Clears MQTTautoConfigMap (published) and pending bitmaps
+    ├─ Sets the pending bit for every ID 0..255 with a sensor or binary-sensor table entry,
+    │  seen on the bus or not
+    └─ queueNonOTDiscoveryIds(): IDs 0, 27, 242..255
   ↓
   loopMQTTDiscovery() [called from main loop, every iteration]
-    ├─ Timer check (3s normal / 30s under heap pressure)
-    ├─ Scan MQTTautoCfgPendingMap for next set bit
+    ├─ Timer check (2 s normal / 10 s under heap pressure)
+    ├─ Skip the tick during a Status-frame burst or its cooldown
+    ├─ Scan MQTTautoCfgPendingMap for the lowest set bit
     ├─ Skip if already published (getMQTTConfigDone)
-    ├─ Call doAutoConfigureMsgid(OTid) to publish ONE pending ID
-    ├─ Clear pending bit; return (one per timer tick)
-    └─ Adaptive interval: 30s when heap >= HEAP_WARNING, 3s when healthy
+    ├─ ID 246 (Dallas): configSensors(), clear the pending bit
+    ├─ Otherwise call doAutoConfigureMsgid(OTid, isFirst) to publish ONE pending ID
+    ├─ Success: set done bit, clear pending bit. Failure: keep pending bit, retry next tick
+    └─ Adaptive interval: 10 s when free heap < 16384 and largest block < 8192;
+       back to 2 s after 2 ticks with >= 18432 free and a >= 9216 block
   ↓
-  doAutoConfigureMsgid(OTid) [also called JIT from processOT()]
-    ├─ Check heap guard: MQTT_DISCOVERY_HEAP_MIN
-    ├─ Dispatch based on OTid:
-    │   ├─ OTid = 0: streamClimateDiscovery(0) and (1)
-    │   ├─ OTid = 27: streamNumberDiscovery()
-    │   ├─ OTid in SAT pseudo range: streamSatSwitchDiscovery() / streamSatSelectDiscovery()
-    │   ├─ OTid = 245-246 (Dallas): streamDallasSensorDiscovery(address)
-    │   ├─ OTid in sensor range: lookup mqttHaSensorIndex[OTid], call streamSensorDiscovery()
-    │   └─ OTid in binary range: lookup mqttHaBinSensorIndex[OTid], call streamBinarySensorDiscovery()
-    ├─ Each streaming function:
-    │   ├─ MEASURE pass: MqttJsonWriter accumulates byte count
-    │   ├─ beginPublish(topic, byteCount)
-    │   ├─ WRITE pass: MqttJsonWriter calls writeMqttChunkExt/writeMqttProgmemChunkExt
-    │   └─ endPublish()
+  doAutoConfigureMsgid(OTid, isFirst) [only caller: loopMQTTDiscovery()]
+    ├─ Check session lock, MQTT connected, heap guard: MQTT_DISCOVERY_HEAP_MIN
+    ├─ Sensor rows: lookup mqttHaSensorIndex[OTid], call streamSensorDiscovery()
+    ├─ Binary-sensor rows: lookup mqttHaBinSensorIndex[OTid], call streamBinarySensorDiscovery()
+    │  (ADR-106 mode filter; modern topology: one pass per device for OT IDs 0..127)
+    ├─ OTid = 0: also streamClimateDiscovery(0) and (1), streamSatSwitchDiscovery(),
+    │  streamSatSelectDiscovery(0)
+    ├─ OTid = 27: also streamNumberDiscovery()
+    ├─ OTid = 1, 8, 9, 14, 16, 39, 56, 57: also streamOverrideSensorDiscovery()
+    ├─ OTid = 244: also streamButtonDiscovery() + streamSelectDiscovery(0..7)
+    ├─ OTid = 255: streamSatZoneDiscovery()
+    ├─ The stream*Discovery() functions in MQTTHaDiscovery.cpp use measureMallocPublish():
+    │   ├─ MEASURE pass: MqttJsonWriter counts the payload bytes
+    │   ├─ malloc a buffer of exactly that size
+    │   ├─ WRITE pass: MqttJsonWriter composes the JSON into it
+    │   └─ mqttPublishRaw(topic, buf, len, retain=true), then free the buffer
     ├─ If source-separated: call expandAndStreamSensorSources() → 3 per-source variants
-    └─ Mark as published: setMQTTConfigDone(OTid)
+    └─ Return true if a config went out; the drip then calls setMQTTConfigDone(OTid)
   ↓
   Home Assistant ingests discovery configs as they arrive, auto-creates entities
 ```
 
-### Home Assistant Status → Discovery Refresh
+### Home Assistant Status → Value Republish (ADR-174)
 
 ```
 HA goes offline
   ↓
-  MQTTclient.loop() receives homeassistant/status = "offline"
+  handleMQTTcallback() receives homeassistant/status = "offline"
   ↓
-  Set bHAcycle = true (flag for re-sync)
+  Set bHAcycle = true
 
 HA goes back online
   ↓
   handleMQTTcallback() receives homeassistant/status = "online"
   ↓
-  IF bHAcycle true: clearMQTTConfigDone() → resets MQTTautoConfigMap
+  IF bHAcycle true: bHAcycle = false; requestMQTTRepublishAll()
+    ├─ resetMqttTrackedState(): every OT slot tracker, Status/StatusVH bits and bytes,
+    │  ASF/RBP/Remote Override trackers back to unseen
+    └─ requestMQTTStatusRepublish(): force the next master/slave Status and StatusVH publish
   ↓
-  Next OT message triggers JIT doAutoConfigureMsgid() for that ID
+  Each OT MsgID publishes its value as first-seen on its next frame;
+  the next MsgID 0 frame re-sends the status bits, hvac_mode and hvac_action
   ↓
-  Discovery configs re-published, HA gets fresh entity definitions
+  Discovery untouched: the broker still holds the retained configs
+
+"online" without a preceding "offline" (retained birth replay): telnet debug line only
 ```
 
 ## Notes & Important Patterns
@@ -1072,17 +1078,18 @@ classDiagram
         }
         
         class DiscoveryTables {
-            -mqttHaSensors: MqttHaSensorCfg[289]
-            -mqttHaBinSensors: MqttHaBinSensorCfg[53]
+            -mqttHaSensors: MqttHaSensorCfg[389]
+            -mqttHaBinSensors: MqttHaBinSensorCfg[97]
             -mqttHaSensorIndex: uint16_t[256]
             -mqttHaBinSensorIndex: uint16_t[256]
         }
         
         class DiscoveryOrchestration {
             +doAutoConfigure() void
-            +doAutoConfigureMsgid(OTid) bool
+            +doAutoConfigureMsgid(OTid, isFirst) bool
             +loopMQTTDiscovery() void
             +markAllMQTTConfigPending() void
+            +publishNonOTDiscoveryConfigs() void
         }
         
         class DiscoveryState {
@@ -1090,7 +1097,7 @@ classDiagram
             -MQTTautoCfgPendingMap: uint32_t[8]
             +getMQTTConfigDone(id) bool
             +setMQTTConfigDone(id) void
-            +getMQTTConfigPending(id) bool
+            +countPendingDiscoveryIds() uint16_t
             +setMQTTConfigPending(id) void
         }
     }
@@ -1151,7 +1158,7 @@ classDiagram
 - **MQTTstuff.ino**: ~2,800 lines (MQTT state machine, publishing, command dispatch, ADR-106 cleanup orchestration)
 - **MQTTstuff.h**: ~475 lines (header with enums, structs, flag constants, streaming function declarations)
 - **MQTTHaDiscovery.cpp**: ~3,500 lines (data tables, streaming discovery functions; previously `mqtt_configuratie.cpp`)
-- **mqtt_discovery_verify.cpp**: discovery table integrity helpers (PROGMEM index correctness, ADR-106 flag exclusivity)
+- **mqtt_discovery_verify.cpp**: the on-demand retained-discovery verify window (ADR-062; started only by REST and telnet `V` since ADR-170)
 - **Key Functions**: 50+ public/static functions
 - **Global Variables**: 25+ module-level globals
 - **PROGMEM Data**: Sensor/binary sensor label and name strings, discovery context strings

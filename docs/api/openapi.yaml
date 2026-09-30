@@ -1377,15 +1377,17 @@ paths:
         - OTGW Commands
       summary: Trigger MQTT autodiscovery
       description: |
-        Marks all known OT message IDs as pending and triggers asynchronous
-        drip-publishing of MQTT autodiscovery configs for Home Assistant integration.
+        Marks every ID that has a discovery table entry (seen on the bus or
+        not), plus the non-OT set (IDs 0, 27 and 242 to 255), as pending and
+        triggers asynchronous drip-publishing of MQTT autodiscovery configs for
+        Home Assistant integration.
 
         Discovery configs are composed by hand-written streaming functions in
         `MQTTHaDiscovery.cpp` (see ADR-077). The legacy runtime template file
         `data/mqttha.cfg` is archived under `docs/archive/` as historical
-        reference only. The drip publisher issues one config every 3 seconds
-        (slowed to every 30 seconds under heap pressure) to avoid MQTT burst
-        storms.
+        reference only. The drip publisher handles one pending ID every 2 seconds
+        (slowed to every 10 seconds under heap pressure) to avoid MQTT burst
+        storms. One ID can carry several configs.
 
         Produced entity categories: 289 sensors, 53 binary_sensors, 2 climate
         (Thermostat + DHW Control), 1 number (Toutside_override), 13 SAT switches
@@ -1432,12 +1434,16 @@ paths:
         Returns the current state of the retained-discovery verification mechanism
         introduced in 1.4.1 (ADR-062). This is an observational endpoint: it does
         not start a verify run or publish anything. Use it to inspect whether a
-        verify window is currently active, when the last run completed, how many
-        retained configs were missing or orphaned on the last run, and whether
-        automatic daily verification is enabled.
+        verify window is currently active, when the last run completed and how it
+        ended, how many retained configs were missing or orphaned on the last run,
+        and whether the daily discovery re-announce is enabled.
 
-        This endpoint is distinct from `/v2/otgw/discovery`, which publishes all
-        Home Assistant discovery topics unconditionally.
+        Since ADR-170 (Proposed) a verify only runs on demand (`POST /v2/discovery/verify`
+        or the telnet `V` key). The automatic daily job re-announces every discovery
+        config through the drip, without a verify readback.
+
+        This endpoint is distinct from `/v2/otgw/discovery`, which queues every
+        discovery config for the drip without checking the broker first.
       operationId: getDiscoveryStatus
       responses:
         '200':
@@ -1460,15 +1466,19 @@ paths:
                       last_epoch:
                         type: integer
                         format: uint32
-                        description: Unix-epoch timestamp of the last completed verify run (0 = never run since boot).
+                        description: Unix-epoch timestamp at which the last verify run ended, aborted runs included (0 = never run since boot).
                       last_missing:
                         type: integer
                         format: uint16
-                        description: Retained discovery topics expected but not observed on the last verify run.
+                        description: Retained discovery topics expected but not observed on the last verify run. A run that ends `aborted_disconnect` leaves this value and `last_orphan` unchanged.
                       last_orphan:
                         type: integer
                         format: uint16
                         description: Retained discovery topics observed under `<haprefix>/+/<other-nodeId>/#` that do not belong to this node. Informational only; orphans are never deleted by OTGW (see ADR-062).
+                      last_outcome:
+                        type: string
+                        enum: [unknown, clean, missing, aborted_heap, aborted_disconnect]
+                        description: How the last verify run ended. `unknown` means no run has finished since boot, or a run is in progress. Only `missing` triggers a republish; an aborted run still updates `last_epoch`.
                   counters:
                     type: object
                     properties:
@@ -1493,13 +1503,14 @@ paths:
                     properties:
                       auto_verify:
                         type: boolean
-                        description: Reflects `settings.mqtt.bDiscoveryAutoVerify`. When true, a verify run is triggered automatically once per day at the day-flip boundary.
+                        description: Reflects `settings.mqtt.bDiscoveryAutoVerify` (settings file key `MQTTdiscoveryAutoVerify`, default true). Despite the name it no longer starts a verify (ADR-170). When true, the firmware re-announces every discovery config through the drip once per day, at the first minute tick after the local day changes. That run is skipped unless MQTT is connected, NTP time is set, uptime is above one hour, no verify or drip is active and the heap passes the drip's restore check. `POST /v2/settings` does not accept this key.
               example:
                 verification:
                   active: false
                   last_epoch: 1745236800
                   last_missing: 0
                   last_orphan: 0
+                  last_outcome: clean
                 counters:
                   published_topics: 82
                   pending_ids: 0
@@ -1516,11 +1527,12 @@ paths:
         - Discovery
       summary: Start a retained-discovery verification window
       description: |
-        Opens a 15-second subscription window on `<haprefix>/+/<nodeId>/#` and
-        counts retained discovery configs seen against
-        `state.discovery.iPublishedTopicCount`. On completion the firmware
-        re-announces any missing configs via the drip. See ADR-062 for the full
-        mechanism.
+        Opens a subscription window of up to 15 seconds on `<haprefix>/+/<nodeId>/#`
+        and counts retained discovery configs seen against
+        `state.discovery.iPublishedTopicCount`. When a run that was not aborted
+        finds configs missing, the firmware calls `markAllMQTTConfigPending()`
+        and the drip re-announces every discovery config, not only the missing
+        ones. See ADR-062 for the full mechanism.
 
         The handler refuses to start the window under several conditions (see
         error responses); in that case the caller should not retry immediately.
@@ -1664,9 +1676,15 @@ paths:
       summary: Force a full OT-value republish
       description: |
         Resets MQTT publish eligibility so every observed OpenTherm value is
-        re-published as if seen for the first time (TASK-936). Use this to
-        repopulate a broker after a wipe without re-announcing Home Assistant
-        discovery configs.
+        re-published as if seen for the first time (TASK-936). Nothing is sent
+        synchronously: each value goes out when its OT frame next arrives. Use
+        this to repopulate a broker after a wipe without re-announcing Home
+        Assistant discovery configs.
+
+        The firmware runs the same reset (`requestMQTTRepublishAll()`) on its own
+        in two cases: when `homeassistant/status` goes `offline` and then `online`
+        (a Home Assistant restart, ADR-174), and when MQTT reconnects after more
+        than 5 minutes offline. The `mqttharebootdetection` setting gates neither.
 
         This is distinct from `POST /v2/discovery/republish`, which re-announces
         the HA discovery *configs* rather than the OT *values*.

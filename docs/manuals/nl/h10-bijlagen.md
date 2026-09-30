@@ -150,7 +150,7 @@ De volgende tabel toont de belangrijkste instellingen met hun standaardwaarden. 
 | `mqttinterval` | `0` | Publicatie-interval (0 = direct) |
 | `mqttotmessage` | `false` | Ruwe OT-berichten publiceren |
 | `mqttseparatesources` | `false` | Brongescheiden onderwerpen |
-| `mqttHaRebootDetect` | `true` | HA herstart detecteren en rediscovery starten |
+| `mqttharebootdetection` | `true` | Verouderd (ADR-174): wordt nog gelezen en opgeslagen, maar stuurt niets meer aan. Na een HA-herstart (`homeassistant/status` eerst `offline`, dan `online`) publiceert de firmware altijd de actuele waarden opnieuw; discovery niet. |
 
 #### NTP-instellingen
 

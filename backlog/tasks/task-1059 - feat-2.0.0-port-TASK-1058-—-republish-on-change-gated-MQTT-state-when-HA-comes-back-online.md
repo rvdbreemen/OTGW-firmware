@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-07 21:40'
-updated_date: '2026-08-07 22:04'
+updated_date: '2026-09-30 09:49'
 labels:
   - bug
   - mqtt
@@ -44,4 +44,6 @@ ADR-174 async re-entrancy condition (AC#8) resolved by inspection, no on-device 
 espMqttClient is constructed with UseInternalTask::NO (MQTTstuff.ino:206). The contract is documented at :196-204 - with NO, the engine is pumped only by the explicit MQTTclient.loop() inside handleMQTT(), so onMessage/onConnect callbacks run on the same cooperative loop as doBackgroundTasks(), NOT on async_tcp. The new call site at MQTTstuff.ino:817 is therefore in the identical task context as the already-shipped reconnect caller at :1325.
 Noted but out of scope: restAPI.ino:1993 calls requestMQTTRepublishAll() from the ESPAsyncWebServer handler, which DOES run on async_tcp while the loop task reads/writes the same trackers. Pre-existing, not introduced here.
 Build: build.bat, all three envs relinked fresh with githash dd5a701 (classic 23:59:32, otgw32 23:56:32, combo 00:02:34). Evaluator 68/76 passed, 0 failed, 1 warning (STATUS_BURST_COOLDOWN_MS bound: boards.h not found) which is pre-existing and unrelated to this diff.
+
+2026-09-30 docs aligned with the shipped behaviour (docs-only commit, no bump): docs/api/MQTT.md, docs/api/openapi.yaml, docs/c4/c4-code-mqtt.md, c4-component-integration-layer.md, c4-container.md and docs/manuals/nl/h10-bijlagen.md. An HA restart republishes STATE (ADR-174), not discovery; the reconnect republish only runs after >300 s offline; MQTTharebootdetection gates nothing; the daily heal (ADR-170) replaced the automatic verify; drip timing; the REST republish is queued for loop() (TASK-1176). Verification (workflow wf_fe6c4173-ec6, WP4 + review + fixup): a sentence inventory maps all 166 keyword lines of the six docs to code anchors (286 anchors, 0 failures) on both the base and current dev; 17 file:line citations checked for staleness on dev (0 stale); 39 regression patterns for the previously false sentences find nothing; openapi.yaml parses with the same 66 paths.
 <!-- SECTION:NOTES:END -->

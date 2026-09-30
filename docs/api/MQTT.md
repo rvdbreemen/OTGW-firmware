@@ -6,7 +6,7 @@ This document describes all MQTT topics published and subscribed to by the OTGW-
 >
 > **Breaking change in 2.0.0 (binary_sensor topic labels):** 37 OT-spec-derived binary_sensor topic labels have been replaced with HA-core-style self-describing aliases (`dhw_present` → `supports_hot_water`, etc.). The two name sets are mutually exclusive; setting `mqttuselegacyottopics = true` switches back to the legacy labels. The firmware drains the retained payloads of the *other* name set on toggle (cleanup state persisted to `/mqtt_topic_cleanup.bin` to survive power loss mid-drain). Background: ADR-105 (superseded) → ADR-106.
 >
-> **Discovery in 2.0.0 is pure JIT (ADR-100).** The boot-time and `homeassistant/status → online` bulk publishes are gone; only climate, the outside-temp number, Dallas sensors, and heap-stats are pre-published. Per-MsgID configs are published the first time the firmware sees the matching OT frame. A broker-restart heuristic still triggers a full republish when the gateway has been disconnected from MQTT for more than 5 minutes (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`).
+> **Discovery in 2.0.0 is JIT by default (ADR-100).** The boot-time bulk publish is gone. At MQTT start only the non-OT set is queued: climate (ID 0), the outside-temperature number (ID 27) and pseudo-IDs 242 to 255. Any other OT MsgID is queued when a valid frame for it arrives and its config is not yet marked published; the discovery drip publishes the config on a later tick. A manual force and the daily re-announce (ADR-170, Proposed; on by default) queue every ID that has a discovery table entry, seen on the bus or not. When the gateway reconnects after more than 5 minutes offline (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`), a broker-restart heuristic clears the discovery state, re-queues the non-OT set and resets the value trackers. A Home Assistant restart (`homeassistant/status` goes `offline`, then `online`) re-publishes values, not discovery (ADR-174). See [Discovery Lifecycle](#discovery-lifecycle).
 >
 > **Flat per-value topics are policy (ADR-101).** The firmware never publishes aggregated JSON value payloads. Each value lives on its own topic with a scalar payload. HA discovery configs are the only JSON publishes, as required by the discovery protocol. Do not propose OT-Thing-style nested-JSON shims.
 
@@ -40,7 +40,7 @@ On MQTT connect:
 
 1. **Birth message**: Publishes `"online"` to the publish namespace root (retained)
 2. **Last Will**: Configured to publish `"offline"` to the publish namespace root (retained) when the connection drops
-3. **Discovery reset**: Clears all HA discovery state so JIT discovery re-publishes
+3. **Republish after a long outage**: only when the gateway was disconnected for more than 5 minutes. It resets the value trackers (`requestMQTTRepublishAll()`), clears the discovery done and pending state, and re-queues the non-OT discovery set. The connect handler skips this step after a shorter outage and on the first connect after boot. When the firmware's WiFi state machine has to reconnect, it restarts MQTT through `startMQTT()`, which resets the discovery state whatever the outage length (see [Discovery Modes](#discovery-modes)).
 4. **Subscribes** to `{TopTopic}/set/{UniqueId}/#` for incoming commands
 5. **Subscribes** to `homeassistant/status` for Home Assistant lifecycle detection
 6. **Publishes** version info, state information, and cached PIC settings
@@ -304,7 +304,9 @@ SAT topics no longer publish on every control cycle. Each topic under `sat/*` us
 
 **Maximum observation delay:** 11 minutes in the worst case (silent value, first heartbeat not yet due). Retained topics recover immediately from broker memory on reconnect; non-retained topics re-appear within 11 minutes.
 
-**MQTT reconnect:** SAT shadows are **not** reset on reconnect. Retained topics are already present on the broker. Non-retained topics re-publish within 11 minutes via the scheduled heartbeat. This is an intentional divergence from the OT publish contract (ADR-052), which resets on reconnect.
+**MQTT reconnect:** SAT shadows are **not** reset on reconnect. Retained topics are already present on the broker. Non-retained topics re-publish within 11 minutes via the scheduled heartbeat. This is an intentional divergence from the OT publish contract (ADR-052), whose trackers are reset on a reconnect after more than 5 minutes offline.
+
+**Home Assistant restart:** the ADR-174 republish resets only the OT trackers. SAT shadows keep their last-published state, so non-retained `sat/*` topics (the BLE values included) wait for their next change or heartbeat, up to 11 minutes.
 
 **Float tolerance constants** (from `SATmqttPublish.h`):
 
@@ -997,7 +999,7 @@ Commands can also be sent using the two-letter OTGW command codes directly as to
 
 | Topic | Description |
 | ----- | ----------- |
-| `homeassistant/status` | Monitors HA lifecycle (`online`/`offline`). On `offline` then `online`, re-publishes all HA discovery configs. |
+| `homeassistant/status` | Monitors HA lifecycle (`online`/`offline`). An `offline` arms the handler; the next `online` calls `requestMQTTRepublishAll()`, so each OT value re-publishes when its frame next arrives (ADR-174). Discovery configs are not re-published: they are retained on the broker. An `online` without a preceding `offline`, such as a retained birth message replayed on reconnect, only logs a telnet debug line. The `mqttharebootdetection` setting has no effect on this. |
 
 ---
 
@@ -1053,17 +1055,19 @@ Published unconditionally via the discovery drip, like the other PIC pseudo-IDs 
 
 ### Discovery Modes
 
-Since 2.0.0 (ADR-100) the firmware uses pure JIT discovery for per-MsgID configs:
+Since 2.0.0 (ADR-100) per-MsgID configs are JIT by default. The paths below queue IDs by setting a pending bit; the `loopMQTTDiscovery()` drip publishes the configs of one pending ID per tick.
 
-1. **Boot / MQTT connect**: only the non-OT entities are queued for the drip — climate (pseudo-ID 0), the outside-temperature number (ID 27), Dallas sensors, and heap statistics. Per-OT-MsgID configs are NOT pre-published. Across HA restarts the broker retains the discovery configs already published, so HA simply re-loads them.
+1. **MQTT start** (`startMQTT()`: boot, a saved MQTT or hostname setting, WiFi reconnect, a switch to Ethernet, or the telnet `r` key while MQTT is down): the done and pending bitmaps are cleared and only the non-OT set is queued for the drip. That set is climate (ID 0), the outside-temperature number (ID 27) and pseudo-IDs 242 to 255: hvac companions, OTDirect flame metrics, PIC controls, S0, Dallas, heap statistics, firmware info, PIC info, PIC settings, diagnostics and the four SAT groups. Other OT MsgIDs are not queued here. The one exception is a pending device-topology migration (TASK-648): then the full set is queued instead, here and in the broker-restart heuristic below. The broker retains the discovery configs already published, so a Home Assistant restart re-loads them from the broker. The firmware then re-sends values, not configs (ADR-174).
 
-2. **JIT discovery (on OT message)**: when an OpenTherm message ID is observed for the first time after boot and its discovery config has not yet been published, the config is sent before the value publish. This is the only path through which OT-MsgID configs reach the broker on a fresh-broker scenario.
+2. **JIT discovery (on OT message)**: when a valid OT frame arrives and the config of its MsgID is not yet marked published, `processOT()` sets the pending bit for that MsgID. It publishes nothing itself: the drip publishes the config on a later tick and then marks it published. The PS=1 summary path and the Dallas sensor poll queue their IDs the same way. A MsgID that never appears on the bus is still queued by every call to `markAllMQTTConfigPending()`: items 4 and 5, a verify run that finds configs missing, an `MQTTuseLegacyOtTopics` toggle and a pending topology migration.
 
-3. **Broker restart heuristic**: in the MQTT connect-success branch, if the firmware was offline for more than `MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS` (5 minutes), the done-bitmap is cleared and `requestMQTTRepublishAll()` is called so the JIT path repopulates the broker. This recovers from broker reinstall / persistence loss without the boot-time storm of pre-2.0.0 builds.
+3. **Broker restart heuristic**: in the MQTT connect handler, if the firmware was offline for more than `MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS` (5 minutes), the done and pending bitmaps are cleared, the non-OT set is re-queued and `requestMQTTRepublishAll()` resets the value trackers. JIT (item 2) then queues each OT MsgID again when its next frame arrives, and the drip re-publishes it. This recovers from a broker reinstall or persistence loss without the boot-time storm of pre-2.0.0 builds. After a shorter outage the connect handler does nothing more. A reconnect by the firmware's WiFi state machine still runs `startMQTT()` (item 1), whatever the outage length.
 
-4. **Manual force**: triggered via REST API (`POST /api/v2/otgw/discovery`) or the `F` serial command. Marks all IDs as pending and the drip publisher re-publishes them over the following minutes.
+4. **Manual force**: `POST /api/v2/otgw/discovery`, `POST /api/v2/discovery/republish` (60-second cooldown) or the `F` key on the telnet debug console. All three call `markAllMQTTConfigPending()`. It marks every ID that has a discovery table entry, seen on the bus or not, plus the non-OT set. The drip re-publishes them over the following minutes.
 
-The `loopMQTTDiscovery()` drip cadence is unchanged: one config every 3 seconds, slowed to one every 30 seconds under heap pressure.
+5. **Daily re-announce** (ADR-170): once a day the firmware calls `markAllMQTTConfigPending()` on its own. See [Daily discovery re-announce](#daily-discovery-re-announce-adr-170).
+
+The `loopMQTTDiscovery()` drip publishes one pending ID per tick: every 2 seconds, or every 10 seconds under heap pressure. It takes the lowest pending ID first. One ID can carry several configs. The drip skips its tick during a Status-frame burst and the cooldown after it.
 
 ### Source-Separated Discovery
 
@@ -1187,34 +1191,53 @@ Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and take
 
 ### Retained discovery verification (v1.4.1+)
 
-Since 1.4.1 the firmware can actively verify that its retained Home Assistant discovery configs are still present on the broker. This closes the gap where the broker loses retained state while Home Assistant stays connected, such as a `mosquitto` restart without `persistence true`, a volatile-filesystem crash or a manual `mosquitto_pub -r -n` deletion. None of those events fire the `homeassistant/status` offline → online transition, so the legacy reconnect-driven republish paths cannot recover from them. See [ADR-062](../adr/ADR-062-retained-discovery-verification.md) for the mechanism and the memory trade-offs.
+Since 1.4.1 the firmware can actively verify that its retained Home Assistant discovery configs are still present on the broker. This closes the gap where the broker loses retained state while Home Assistant stays connected, such as a `mosquitto` restart without `persistence true`, a volatile-filesystem crash or a manual `mosquitto_pub -r -n` deletion. The Home Assistant restart handler does not cover this: it re-sends values, not configs (ADR-174). The broker-restart heuristic only fires after more than 5 minutes offline. See [ADR-062](../adr/ADR-062-retained-discovery-verification.md) for the verify mechanism and the memory trade-offs.
 
-**Mechanism**. The firmware subscribes to the node-scoped wildcard `<haprefix>/+/<nodeId>/#` for a 15-second window, counts retained discovery messages that arrive, and compares the total against `state.discovery.iPublishedTopicCount`. If fewer than expected arrive, it calls `markAllMQTTConfigPending()` and the drip re-announces every config. Foreign-nodeId retained configs that happen to pass through the wildcard are counted separately as "orphans" for diagnostics.
+On 2.0.0 the verify runs on demand only. The automatic daily verify is gone. A daily re-announce without any readback replaced it ([ADR-170](../adr/ADR-170-daily-drip-republish-replaces-discovery-verify-readback.md)); see [Daily discovery re-announce](#daily-discovery-re-announce-adr-170) below.
 
-**Triggers**. A verify run can start in three ways:
+**Mechanism**. The firmware subscribes to the node-scoped wildcard `<haprefix>/+/<nodeId>/#` for up to 15 seconds, counts retained discovery messages that arrive, and compares the total against `state.discovery.iPublishedTopicCount`. If fewer than expected arrive, it calls `markAllMQTTConfigPending()` and the drip re-announces every config. A run that aborts on low heap or a lost MQTT connection does not republish. Foreign-nodeId retained configs that happen to pass through the wildcard are counted separately as "orphans" for diagnostics.
 
-1. **Automatic daily** — when `settings.mqtt.bDiscoveryAutoVerify` is true (default), the ADR-086 time dispatcher triggers a verify at the day-flip boundary. Disable this if your broker is noisy on wildcard subscriptions or if multiple OTGW nodes share a prefix and you want to spread the load manually.
-2. **REST** — `POST /api/v2/discovery/verify`. See `docs/api/README.md` and `openapi.yaml` for the full contract, including the `409` / `503` error cases.
-3. **Telnet debug key** — pressing `V` on the debug console starts an immediate verify window, provided the same preconditions are met (MQTT connected, free heap above the start threshold, no verify or drip already active).
+**Triggers**. A verify run can start in two ways:
+
+1. **REST**: `POST /api/v2/discovery/verify`. See `docs/api/README.md` and `openapi.yaml` for the full contract, including the `409` / `503` error cases.
+2. **Telnet debug key**: pressing `V` on the debug console starts an immediate verify window.
+
+Both paths refuse to start unless MQTT is connected, no firmware flash (ESP or PIC) is running, NTP time is set, uptime is at least 1 hour, no drip is pending, free heap is at least 6000 bytes and no verify is already active.
 
 **Why OTGW does not delete orphans**. The `nodeId` in the subscribe wildcard is user-configurable. Two OTGW devices, or an OTGW plus a test-bench instance, can legitimately share the same `<haprefix>`. Deleting everything under another node's path would silently wipe a neighbour's entities. OTGW therefore only *counts* orphans and publishes the number in `disc_last_orphan`; cleanup is always a manual broker operation.
 
-**Disabling**. Set `settings.mqtt.bDiscoveryAutoVerify = false` via the Web UI (Settings → MQTT) or the REST settings API if the daily verify is undesirable in your environment. On-demand verify via the REST endpoint or the telnet `V` key remains available regardless of this setting.
-
 **Diagnostic interpretation**.
 
-- `disc_last_missing > 0` immediately after a run means a republish was just triggered. Wait for the drip to finish (observable via `pending_ids` on `GET /api/v2/discovery`), then start a second verify. If `last_missing` is still non-zero after two or three passes, investigate the broker: retained-message settings, persistence configuration, backup/restore gaps.
+- `disc_last_missing > 0` after a run with outcome `missing` means a republish was just triggered. An `aborted_heap` run also records its missing count, but does not republish. An `aborted_disconnect` run records no counts: `disc_last_missing` and `disc_last_orphan` keep the values of the run before it. Wait for the drip to finish (observable via `pending_ids` on `GET /api/v2/discovery`), then start a second verify. If `last_missing` is still non-zero after two or three passes, investigate the broker: retained-message settings, persistence configuration, backup/restore gaps.
 - `disc_last_orphan > 0` is purely informational. On a shared broker it is expected and does not require action.
-- If `verify_runs` increases but `disc_last_verify_epoch` does not, the verify is aborting early because the heap dropped below the abort threshold during the window. This is harmless but indicates the device is under memory pressure from another subsystem.
+- `disc_last_verify_epoch` only moves on a manual verify. The daily re-announce stamps `disc_last_daily_heal_epoch` instead.
+- An aborted run also moves `disc_last_verify_epoch`. Read `verification.last_outcome` on `GET /api/v2/discovery` to tell the runs apart: `clean`, `missing`, `aborted_heap` or `aborted_disconnect`. An `aborted_heap` run is harmless, but it shows the device is under memory pressure from another subsystem.
+
+#### Daily discovery re-announce (ADR-170)
+
+At the first minute tick after the local calendar day changes (in the configured NTP time zone), the firmware calls `markAllMQTTConfigPending()`. The drip then re-publishes the discovery configs, one ID per tick. Like a manual force, this covers every ID with a discovery table entry, including MsgIDs never seen on the bus. It subscribes to nothing and counts nothing, so a slow broker cannot produce a false "missing" and a retry storm.
+
+It runs only when all of these hold:
+
+- `MQTTdiscoveryAutoVerify` is `true` (the default).
+- MQTT is enabled and connected.
+- NTP time is set and uptime is above 1 hour.
+- No manual verify is active and no drip is pending.
+- Free heap is at least 18432 bytes and the largest free block at least 9216 bytes. This is the drip's own restore check, not a separate threshold.
+
+If a condition fails at that moment, that day is skipped; there is no retry before the next day change. Each run stamps `disc_last_daily_heal_epoch` (see [Heap diagnostic telemetry](#heap-diagnostic-telemetry)).
+
+**Disabling**. Despite its name, `MQTTdiscoveryAutoVerify` (`settings.mqtt.bDiscoveryAutoVerify`) now switches the daily re-announce. It is not on the settings page, and `POST /api/v2/settings` rejects it as an unknown setting. To turn it off, change its line in `/settings.ini` to `"MQTTdiscoveryAutoVerify": false` and reboot. `GET /api/v2/discovery` reports the current value as `settings.auto_verify`. The on-demand verify works regardless of this setting.
 
 ### Discovery Lifecycle
 
-- On firmware boot (`startMQTT()`): all discovery IDs are marked pending for drip publishing
-- On MQTT connect: OT value-change tracking is reset (all values re-published), but discovery state is NOT reset (retained messages survive a reconnect on the broker)
-- On Home Assistant restart (detected via `homeassistant/status` transitioning from `offline` to `online`): all discovery IDs are re-queued for drip publishing
-- On manual force (`POST /api/v2/otgw/discovery`): all IDs are re-queued
-- Discovery configs are published with `retain = true`
-- The drip publisher runs at 3-second intervals (or 30-second intervals when free heap is below 8KB)
+- On MQTT start (`startMQTT()`: boot, a saved MQTT or hostname setting, WiFi reconnect, a switch to Ethernet, or the telnet `r` key while MQTT is down): the done and pending bitmaps are cleared and only the non-OT set (IDs 0, 27 and 242 to 255) is queued for the drip, unless a device-topology migration is pending. Other OT MsgIDs are queued JIT as their frames arrive.
+- On MQTT connect after more than 5 minutes offline: the value trackers are reset (`requestMQTTRepublishAll()`), the done and pending bitmaps are cleared and the non-OT set is re-queued. After a shorter outage, and on the first connect after boot, the connect handler does nothing more; a reconnect by the firmware's WiFi state machine still goes through `startMQTT()` (previous item).
+- On Home Assistant restart (`homeassistant/status` goes `offline`, then `online`): the value trackers are reset so every OT value re-publishes when its frame next arrives. Discovery is untouched; the broker still holds the retained configs (ADR-174).
+- On manual force (`POST /api/v2/otgw/discovery`, `POST /api/v2/discovery/republish`, telnet `F`): every ID with a discovery table entry, plus the non-OT set, is re-queued.
+- Once a day, subject to the conditions above: the same full re-queue (ADR-170).
+- Discovery configs are published with `retain = true`.
+- The drip publishes one pending ID every 2 seconds. It slows to every 10 seconds when free heap drops below 16384 bytes and the largest free block below 8192 bytes. It returns to 2 seconds after two consecutive ticks with free heap of at least 18432 bytes and a largest block of at least 9216 bytes. It publishes nothing while free heap is below `MQTT_DISCOVERY_HEAP_MIN` (2048 bytes).
 
 ### Discovery Composition
 
@@ -1348,15 +1371,15 @@ The authoritative per-key device assignment is transcribed from HA core `openthe
 
 ## Heap diagnostic telemetry
 
-The firmware publishes heap-pressure and discovery counters as 17 individual retained topics under `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/*`. Each metric lives on its own topic (no JSON bundling) so consumers can subscribe to a single counter, expose it as a Home Assistant sensor without JSON path templating, or graph it directly in Grafana.
+The firmware publishes heap-pressure and discovery counters as 26 individual retained topics under `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/*`. Each metric lives on its own topic (no JSON bundling) so consumers can subscribe to a single counter, expose it as a Home Assistant sensor without JSON path templating, or graph it directly in Grafana.
 
 **Topic prefix**: `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/<metric>` (all retained)
 
-**Cadence**: once per hour, on the wall-clock hour boundary. Publishing is dispatched by the unified time handler introduced in ADR-086, which also drives the daily discovery-verify trigger. No publish happens while MQTT is disconnected.
+**Cadence**: once per hour, on the wall-clock hour boundary. Publishing is dispatched by the unified time handler introduced in ADR-086, which also drives the daily discovery re-announce (ADR-170). No publish happens while MQTT is disconnected.
 
 **Device identity**: to map `{UniqueId}` (e.g. `otgw-a1b2c3`) back to a human-readable device name, subscribe to `{TopTopic}/value/{UniqueId}/otgw-firmware/hostname` (retained, published on every MQTT (re)connect).
 
-**Metrics**: most topics carry *session counters* that reset to zero on reboot; a few are *live samples* measured at publish time; three are *last-known* values captured at the end of the previous discovery verify run. Payloads are plain ASCII decimal numbers.
+**Metrics**: most topics carry *session counters* that reset to zero on reboot. A few are *live samples* measured at publish time. Four are *last-known* values: three from the previous discovery verify run and one from the last daily re-announce. Three are *watermarks*: the lowest or highest value seen so far. Payloads are plain ASCII decimal numbers.
 
 | Metric topic suffix | Type | Kind | Meaning |
 | ------------------- | ---- | ---- | ------- |
@@ -1373,18 +1396,30 @@ The firmware publishes heap-pressure and discovery counters as 17 individual ret
 | `frag_pct` | uint8 | live sample | Heap fragmentation percentage at publish time (0 – 100). |
 | `disc_verify_runs` | uint32 | session counter | Lifetime count of retained-discovery verify windows started since boot. |
 | `disc_republish_triggered` | uint32 | session counter | Lifetime count of verify runs that ended with missing configs and triggered a republish. |
-| `disc_last_missing` | uint16 | last known | Retained configs missing at the end of the previous verify run. |
-| `disc_last_orphan` | uint16 | last known | Foreign-nodeId retained configs observed during the previous verify run (informational). |
+| `disc_last_missing` | uint16 | last known | Retained configs missing at the end of the previous verify run. A run that ends `aborted_disconnect` leaves it unchanged. |
+| `disc_last_orphan` | uint16 | last known | Foreign-nodeId retained configs observed during the previous verify run (informational). A run that ends `aborted_disconnect` leaves it unchanged. |
 | `disc_published_topics` | uint32 | live-ish | Running count of discovery topics successfully published since boot. Incremented inside the streaming helpers after a successful `endPublish`. |
-| `disc_last_verify_epoch` | uint32 | last known | Unix-epoch timestamp of the last completed verify run (0 = none since boot). |
+| `disc_last_verify_epoch` | uint32 | last known | Unix-epoch timestamp at which the last verify run ended, aborted runs included (0 = none since boot). Only a manual verify moves it. |
+| `disc_last_daily_heal_epoch` | uint32 | last known | Unix-epoch timestamp of the last daily discovery re-announce (ADR-170). 0 = none since boot. |
+| `min_max_block` | uint32 | watermark | Smallest `platformMaxFreeBlock()` value seen by the 1 Hz sampler since boot or the last telnet `z`, in bytes. |
+| `min_free_heap` | uint32 | watermark | Lowest free heap since boot, from the ESP32 allocator's own watermark (`platformMinFreeHeap()`), in bytes. Telnet `z` does not reset it. |
+| `max_loop_gap_ms` | uint32 | watermark | Longest gap between two `loop()` entries since boot or the last telnet `z`, in milliseconds. |
+| `maxblock_lt2k` | uint32 | session counter | 1 Hz samples in which the largest free block was below 2048 bytes. |
+| `maxblock_lt4k` | uint32 | session counter | 1 Hz samples with the largest free block from 2048 to 4095 bytes. |
+| `maxblock_lt8k` | uint32 | session counter | 1 Hz samples with the largest free block from 4096 to 8191 bytes. |
+| `maxblock_lt16k` | uint32 | session counter | 1 Hz samples with the largest free block from 8192 to 16383 bytes. |
+| `maxblock_ge16k` | uint32 | session counter | 1 Hz samples with the largest free block of 16384 bytes or more. |
 
 **Counter reset semantics**
 
 - All `session counter` topics reset to zero on reboot and increase monotonically while the firmware runs. They are *cumulative* within a session.
+- Telnet `z` zeroes `ws_drops`, `mqtt_drops`, the `enter_*` and `drip_*` counters and `max_loop_gap_ms`. It also restarts the `maxblock_*` histogram and `min_max_block` from one fresh sample. It does not touch the `disc_*` topics or `min_free_heap`.
 - `live sample` topics reflect the state at the moment of publish; do not use them to infer trends without sampling.
-- `last known` topics hold the result of the *previous* verify run. During an active verify window they are not updated until `endVerify` runs.
+- The verify `last known` topics hold the result of the *previous* verify run. They are not updated while a verify window is open. A window that closes because MQTT disconnected updates only `disc_last_verify_epoch`.
 
-Subscribing to `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/+` gives you all 17 counters as individual messages. A matching REST surface is available at `GET /api/v2/discovery` for the discovery-specific subset of these fields (see `docs/api/README.md`).
+Subscribing to `{TopTopic}/value/{UniqueId}/otgw-firmware/stats/+` gives you all 26 topics as individual messages. A matching REST surface is available at `GET /api/v2/discovery` for the discovery-specific subset of these fields (see `docs/api/README.md`).
+
+Home Assistant discovery (pseudo-ID 247) announces the first 17 topics of the table, `ws_drops` to `disc_last_verify_epoch`. The other nine have no Home Assistant entity; read them from the broker.
 
 ---
 
@@ -1408,9 +1443,17 @@ Individual status flag bits (master/slave status, Message ID 0) have per-bit pub
 
 The `canPublishMQTT()` function checks heap health before each publish. When free heap drops below critical thresholds, MQTT publishing is throttled or suspended to prevent crashes.
 
-### Republish on Reconnect
+### Republish on Reconnect and Home Assistant Restart
 
-On MQTT (re)connect, the firmware calls `requestMQTTRepublishAll()` to reset all value-change tracking, ensuring the next observed value for each message ID is published regardless of whether it matches the previously published value.
+`requestMQTTRepublishAll()` resets the value-change trackers of every OT message slot, the Status (MsgID 0) and StatusVH (MsgID 70) bit and byte trackers, and the ASF, RBP and Remote Override trackers. It also forces the next Status and StatusVH frames to publish; `hvac_mode` and `hvac_action` follow that forced Status frame. It sends nothing itself: each value goes out as first-seen when its OT frame next arrives.
+
+Three paths trigger it:
+
+1. **MQTT reconnect after more than 5 minutes offline** (`MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS`). A shorter outage skips it. So does the first connect after boot, when every tracker is still empty.
+2. **Home Assistant restart**: `homeassistant/status` goes `offline`, then `online` (ADR-174). Only an observed `offline` arms it; a replayed retained `online` cannot arm it. Once armed, the flag survives any reconnect until an `online` consumes it, so an `online` replayed after a reconnect does fire it. Only a reboot clears an armed flag without firing it.
+3. **`POST /api/v2/mqtt/republish`**, with a 60-second cooldown.
+
+SAT topics are not part of this reset; see the SAT publish semantics above.
 
 ### MQTT Gate Debug Flag
 
@@ -1436,7 +1479,7 @@ These MQTT-related settings are configurable via the REST API (`/api/v2/settings
 | `mqtttoptopic` | `"OTGW"` | Top-level topic prefix |
 | `mqtthaprefix` | `"homeassistant"` | HA discovery prefix |
 | `mqttuniqueid` | `"otgw-{MAC}"` | Unique device ID |
-| `mqttharebootdetection` | `true` | Re-publish discovery on HA restart |
+| `mqttharebootdetection` | `true` | Deprecated (ADR-174); gates nothing. Still read from and written to `/settings.ini` and still accepted by `POST /api/v2/settings`, so old configs and clients keep working. It is no longer on the settings page or in `GET /api/v2/settings`. A Home Assistant restart re-publishes values, never discovery, whatever this is set to. |
 | `mqttotmessage` | `false` | Publish raw OT messages |
 | `mqttonchangepublishing` | `true` | On-change publishing (ADR-116). When `true`, publish on change with a heartbeat every `mqttinterval` seconds. When `false`, legacy publish-every-message. Absent key (older config) loads as `true`. |
 | `mqttinterval` | `60` | Heartbeat interval (seconds) for unchanged values when `mqttonchangepublishing=true`. Default `60`; on upgrade a stored `0` is migrated once to `60`. With `mqttonchangepublishing=false` (or interval `0`) the firmware publishes every message. |
@@ -1574,7 +1617,7 @@ mosquitto_sub -h "$BROKER" -t 'OTGW/value/+/otgw-otdirect/#' -v --retained-only 
 
 ### Home Assistant consumers
 
-Home Assistant discovery is republished automatically by the firmware on reconnect. The `Boiler connected` and `Thermostat connected` binary_sensor entities keep their `unique_id`, so entity history and automations are preserved across the upgrade. After the first reconnect, their `state_topic` shows the new generic path. On OTGW32 builds without a PIC, these two entities now appear for the first time (they were previously gated behind the PIC flag).
+The firmware re-announces these discovery configs by itself after the upgrade. The `Boiler connected` and `Thermostat connected` binary_sensor entities belong to ID 0, which is in the non-OT set that every MQTT start queues, the first boot after the upgrade included. Both keep their `unique_id`, so entity history and automations are preserved across the upgrade. Once the drip has published ID 0, their `state_topic` shows the new generic path. On OTGW32 builds without a PIC, these two entities now appear for the first time (they were previously gated behind the PIC flag).
 
 ---
 
