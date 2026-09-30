@@ -30,6 +30,13 @@ harness. The run passes only when:
      both sides were fed the same sequence.
 A compile or slicing failure never counts as OLD reproducing the defect.
 Exit code: 0 PASS, 1 FAIL, 2 harness error.
+
+The old-vs-fix comparison proves the TASK-1086 change on its own: run it on a
+checkout of 331550de3 with --old-rev 331550de3^. On later trees TASK-1185 also
+keeps gateway-made frames out of the acknowledged bitmaps, so D6, D7 and S1
+differ there as well and rules 2 and 3 no longer hold against that OLD;
+test_local_frame_consumers.py carries that proof. The working-tree-only run
+stays a regression check.
 """
 import argparse
 import re

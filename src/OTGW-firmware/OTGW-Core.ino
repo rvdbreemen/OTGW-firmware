@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.393
+**  Version  : v2.0.0-alpha.394
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4978,9 +4978,11 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
       // purpose; do not "fix" one to match the other.
       state.otBus.tBoilerLastSeen = now;
       OTdata.rsptype = OTGW_BOILER;
-      // TASK-795 §4.2: a real boiler frame arrived on the PIC bus. If SAT
-      // simulation is active, trip the edge hook (deferred auto-disable).
-      satNotifyBoilerFrameSeen();
+      // TASK-795 §4.2: a boiler frame arrived. If SAT simulation is active,
+      // trip the edge hook (deferred auto-disable). Not for a loopback B
+      // (localAnswer): simulation must not switch itself off on synthetic
+      // traffic, the rule otDirectBoilerPresent() applies too (TASK-1185).
+      if (!localAnswer) satNotifyBoilerFrameSeen();
     } else if (buf[0]=='T'){
       state.otBus.tThermostatLastSeen = now;
       OTdata.rsptype = OTGW_THERMOSTAT;
@@ -5119,10 +5121,12 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
           // boiler had just Write-Acked as "not implemented" (GH #677). A
           // proxy A with no preceding B still counts, per ADR-103 — the same
           // distinction is_value_valid_for_master_topic() already makes. A
-          // frame with bLocalAnswer set is the exception for the unsupported
-          // verdicts.
+          // frame with bLocalAnswer set counts for none of these bitmaps: an
+          // Ack the gateway made (SR= answer, master-mode WRITE-ACK echo,
+          // loopback B) is no evidence that the boiler knows the msgid
+          // (TASK-1185), and the unsupported verdicts skip it too (TASK-1086).
           if (OTdata.type == OT_READ_ACK) {
-            if ((boilerAckedRead[idx] & mask) == 0) {
+            if (!OTdata.bLocalAnswer && (boilerAckedRead[idx] & mask) == 0) {
               boilerAckedRead[idx] |= mask;
               boilerFileDirty = true;
             }
@@ -5146,7 +5150,7 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
               boilerFileDirty        = true;
             }
           } else if (OTdata.type == OT_WRITE_ACK) {
-            if ((boilerAckedWrite[idx] & mask) == 0) {
+            if (!OTdata.bLocalAnswer && (boilerAckedWrite[idx] & mask) == 0) {
               boilerAckedWrite[idx] |= mask;
               boilerFileDirty = true;
             }
@@ -5253,10 +5257,17 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
       // diagnostic context. The same suffix reaches the WebSocket OT Monitor
       // via the shared ot_log_buffer.
       if (OTdata.masterslave == 1 && OTdata.type == OT_UNKNOWN_DATA_ID) {
-        const uint8_t idx  = OTdata.id >> 3;
-        const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
-        const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
-        AddLog(isWriteCtx ? " (boiler rejected write)" : " (boiler does not implement)");
+        if (OTdata.bLocalAnswer) {
+          // The gateway made this answer itself (OTDirect master mode without a
+          // cached value, its UI= table, loopback mode), so it is no boiler
+          // verdict (TASK-1185).
+          AddLog(" (gateway answer)");
+        } else {
+          const uint8_t idx  = OTdata.id >> 3;
+          const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
+          const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
+          AddLog(isWriteCtx ? " (boiler rejected write)" : " (boiler does not implement)");
+        }
       }
       AddLogln();
       OTDebugT(skipOTLogTimestamp(ot_log_buffer));

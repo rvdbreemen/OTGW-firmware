@@ -1174,10 +1174,12 @@ bool satSimulationBlocksBusTx(const char* cmd,
 // Real boiler-slave presence. Reads a DIFFERENT signal than the synthetic
 // boilerOnline that probeOTBus()/loopback raise during simulation, so
 // synthetic-online cannot feed back and self-disable sim (plan §4.2 dual-signal
-// rule). PIC path: state.otBus.bBoilerState (set from real boiler frames, 30s
-// window, OTGW-Core). OT-direct path: otDirectBoilerPresent() (boiler answered
-// MsgID 3, loopback excluded). Capability-gated via HAS_* flags per the ESP
-// abstraction rules — no raw platform ifdefs.
+// rule). PIC path: state.otBus.bBoilerState (set from boiler B frames, 30s
+// window, OTGW-Core; it counts OT-direct loopback B frames too, TASK-1138, so it
+// is read only while OT-direct is not the transport). OT-direct path:
+// otDirectBoilerPresent() (boiler answered MsgID 3, loopback excluded).
+// Capability-gated via HAS_* flags per the ESP abstraction rules — no raw
+// platform ifdefs.
 // Non-static + prototyped in OTGW-firmware.h: the REST 409 guard and the MQTT
 // enable-reject (both concatenated ahead of this file) call it cross-file.
 // TASK-802 F7 path A: test-only override so the §4.2 availability gate is
@@ -1194,7 +1196,9 @@ bool satBoilerHardwarePresent()
 {
   if (satDebugForceBoilerPresent) return true;  // TASK-802 F7-A test override
 #if HAS_PIC
-  if (state.otBus.bBoilerState) return true;
+  // On a combo board running OT-direct, bBoilerState would take a loopback B
+  // for a boiler (TASK-1185); otDirectBoilerPresent() decides there instead.
+  if (!isOTDirectEnabled() && state.otBus.bBoilerState) return true;
 #endif
 #if HAS_DIRECT_OT
   if (otDirectBoilerPresent()) return true;
