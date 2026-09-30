@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-26 22:06'
-updated_date: '2026-07-26 22:37'
+updated_date: '2026-09-30 09:41'
 labels: []
 dependencies: []
 ordinal: 246000
@@ -49,6 +49,10 @@ Granularity: maintainer chose one task / one prerelease tag. Tradeoff accepted: 
 - [x] #14 openapi.yaml documents the 429 on /v2/device/time, /v2/otgw/otmonitor and /v2/otgw/telegraf, and states in prose that the two otgw paths share one budget
 - [x] #15 ./build.sh green for esp32 target, python evaluate.py exit 0, python tests/test_evaluate.py green
 - [ ] #16 Hardware: fresh boot with wiped broker announces SAT (252-255), diag (251), OTDirect (243) and S0 (245) discovery without a manual republish
+- [x] #17 D1: rateLimitTryAdmit() admits the first GET after any idle gap, except one that ends within burst x window of a multiple of 2^32 ms, which is refused for at most one window; proven old-vs-fix with test/host/rate_limit_gcra.ps1 (idle 1, 24.8, 24.9, 30, 49 days and the wrap band)
+- [x] #18 D2: the web client honours a 429 Retry-After for at most 4 poll periods (the backoffPeriod() ceiling) plus jitter, so a huge Retry-After cannot park a poller for days; tested on otmonitor (device/time uses the same makePacedPoller)
+- [x] #19 D3: stop() is sticky: after a hidden-tab or teardown stop, a request that was in flight does not re-arm polling, and stop()+start() inside one in-flight window never has two requests of the same poller in flight
+- [x] #20 D4: after a data-stale episode an element gets its own title attribute back, or none if it had none before
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -82,4 +86,12 @@ AC #15 CLOSED via CI. All 11 checks green on e39fc65e: pio run -e esp32, -e esp3
 One real defect was found by that first compile and fixed in e39fc65e: the Arduino .ino prototype generator hoists a declaration of every .ino function to the top of the combined TU, ahead of restAPI.ino's type definitions, so rateLimitTryAdmit(ApiRateLimitBudget&, uint32_t) produced a prototype naming an undeclared type and the definition then collided with it ('redeclared as different kind of entity'). All three targets failed on it. Fixed by passing the budget INDEX (uint8_t) and resolving the reference internally; no behavioural change. Hand-verification could not have caught this - the fault is in generated code, not in the source as written, which is exactly why the unbuilt state was flagged rather than glossed.
 
 Remaining open: AC #10 (two-tab starvation, needs two browsers against a bench device) and AC #16 (fresh boot + wiped broker confirming SAT/diag/OTDirect/S0 discovery). Both need hardware. Separately, a sibling otgw-1.x.x task is still needed for the two review defects (telegraf bypass, 429 phase-lock starvation) on that line - it requires its own worktree.
+
+2026-09-30 D1-D4 fixed (alpha.381), in-session evidence.
+- D1 (AC#17) restAPI.ino rateLimitTryAdmit(): unsigned arithmetic plus one clamp (a TAT more than burst x window ahead can only lie in the past, so it restarts at now); signature, the four-field gApiRateLimitBudgets initializer, route table, headers and hook unchanged. test/host/rate_limit_gcra.ps1 slices the real function: OLD (-Rev HEAD 3e30c6e0e) 40 passed / 16 failed, all D1 (idle 2^31+1 ms refused 24.86 d, 24.9 d, 30 d, 49 d, wrap band after 2 GETs 2500/5000 ms); FIX 56 passed / 0 failed; the 600000-GET stream checksum a63e89bb22aa30b1 is identical on both, so normal operation is unchanged. A mutation of the clamp to >= makes the harness fail (workflow review).
+- D2-D4 (AC#18-#20) index.js makePacedPoller()/setRegionStale(): Retry-After capped at 4 periods plus jitter; stop() is sticky through a generation token and no longer clears inFlight; a stale episode saves and restores the element's own title. tests/webui/paced-poller.test.mjs (headless Chrome, real index.js, mocked /api/v2): OLD (HEAD index.js) 6 of 12 FAIL (D2 0 re-polls in 24 s after Retry-After 1702968 s; D3a 2 requests after the hidden-tab stop; D3b 2 in flight; D4 #heap-info title lost); FIX 12/12 PASS (re-polls at +8.2 s/+16.8 s, 0 requests after stop, max 1 in flight, title restored).
+- AC#15: build.bat --target all at alpha.381: esp32, esp32-classic, esp32-combo SUCCESS for firmware and filesystem (fresh 11:32-11:40, alpha.381+3e30c6e, images saved under %LOCALAPPDATA%/OTGW-capture/img-alpha381-3e30c6e); python evaluate.py (full) exit 0, 80 passed / 4 warnings / 0 failed; python tests/test_evaluate.py 66 tests OK.
+Maintainer call (from the review): with stop() sticky, a fetch that never settles also blocks a stop()+start() restart because index.js has no fetch timeout; clearing inFlight in stop() instead brings the D3b overlap back. An AbortController timeout on the poller's fetch would remove the trade-off; not done here.
+Follow-ups (not blocking): refreshDevTime()/refreshOTmonitor() direct calls that bypass the in-flight guard at index.js ~:5002 (applyPSmodeState) and ~:9352 (after a sensor-label save); ADR-172:113-115/:121-123 and ADR-173:93-94 text is stale after D1/D2 (adr-kit); restAPI.ino:2594-2595 and components.css:2117-2118 still claim two dashboards are both served.
+OPEN: AC#10 (two tabs for 10 minutes) and AC#16 (fresh-boot discovery on a wiped broker) need the bench.
 <!-- SECTION:NOTES:END -->

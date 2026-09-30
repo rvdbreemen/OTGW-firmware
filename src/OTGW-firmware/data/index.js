@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.380
+**  Version  : v2.0.0-alpha.381
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -314,7 +314,11 @@ const DEVTIME_POLL_MS   = 5000;  // heap / status message / PS mode / network in
 // ---------------------------------------------------------------------------
 function makePacedPoller(opts) {
   // opts: { periodMs, run() -> Promise<{status, retryAfterMs}|null>, onStale(bool) }
-  var timer = null, inFlight = false, refusals = 0, stale = false;
+  // gen counts stop() calls. A request remembers the gen it started under. When
+  // it completes under an older gen it only clears inFlight: it must not re-arm a
+  // stopped poller or count toward a later run. inFlight always mirrors the real
+  // request, so a stop() + start() cannot put a second one in flight.
+  var timer = null, inFlight = false, refusals = 0, stale = false, gen = 0;
 
   function setStale(v) {
     if (v !== stale) { stale = v; if (opts.onStale) { try { opts.onStale(v); } catch (e) {} } }
@@ -340,18 +344,25 @@ function makePacedPoller(opts) {
   function tick() {
     if (inFlight) { schedule(opts.periodMs); return; }   // slow response: never stack requests
     inFlight = true;
+    var myGen = gen;
     opts.run().then(function (info) {
       inFlight = false;
+      if (myGen !== gen) return;                          // stopped while in flight
       if (!info) { schedule(opts.periodMs); return; }     // caller opted out (hidden / flashing)
       if (info.status === 429) {
         // Jitter across a FULL period, not a fraction: the winner's phase is unknown.
-        penalise((info.retryAfterMs || 0) + Math.random() * opts.periodMs);
+        // Retry-After is trusted up to 4 periods, the backoffPeriod() ceiling. The
+        // firmware asks for at most one window, rounded up to whole seconds (2 s
+        // otmonitor, 4 s device/time); a bigger value would park this poller for as
+        // long as it says, even days.
+        penalise(Math.min(info.retryAfterMs || 0, 4 * opts.periodMs) + Math.random() * opts.periodMs);
         return;
       }
       if (info.status !== 200) { penalise(backoffPeriod()); return; }
       refusals = 0; setStale(false); schedule(opts.periodMs);
     }, function () {
       inFlight = false;
+      if (myGen !== gen) return;                          // stopped while in flight
       penalise(backoffPeriod());                          // device likely rebooting
     });
   }
@@ -359,8 +370,9 @@ function makePacedPoller(opts) {
   return {
     start: function () { if (!timer) schedule(opts.periodMs); },
     stop:  function () {
+      gen++;
       if (timer) { clearTimeout(timer); timer = null; }
-      inFlight = false; refusals = 0; setStale(false);
+      refusals = 0; setStale(false);
     }
   };
 }
@@ -384,12 +396,29 @@ function pollFailureInfo(response) {
 // Marks a UI region as showing paced/stale data. Styled in components.css.
 // Takes CSS selectors, not ids: the OT monitor table is created at runtime by
 // applyOTmonitor() and carries a class, not an id.
+// The reason replaces the element's title while stale. An element's own title
+// (the #heap-info tooltip in index.html) waits in data-stale-title and comes
+// back on clear; an element without one ends without one.
 function setRegionStale(selectors, isStale, reason) {
   selectors.forEach(function (sel) {
     var els = document.querySelectorAll(sel);
     for (var i = 0; i < els.length; i++) {
-      if (isStale) { els[i].setAttribute('data-stale', ''); els[i].setAttribute('title', reason); }
-      else { els[i].removeAttribute('data-stale'); els[i].removeAttribute('title'); }
+      var el = els[i];
+      if (isStale) {
+        if (!el.hasAttribute('data-stale') && el.hasAttribute('title')) {
+          el.setAttribute('data-stale-title', el.getAttribute('title'));
+        }
+        el.setAttribute('data-stale', '');
+        el.setAttribute('title', reason);
+      } else {
+        el.removeAttribute('data-stale');
+        if (el.hasAttribute('data-stale-title')) {
+          el.setAttribute('title', el.getAttribute('data-stale-title'));
+          el.removeAttribute('data-stale-title');
+        } else {
+          el.removeAttribute('title');
+        }
+      }
     }
   });
 }

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.380
+**  Version  : v2.0.0-alpha.381
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2645,9 +2645,18 @@ static void sendApiRateLimited(uint32_t retryAfterSec, uint32_t windowSec, uint8
 }
 
 // Returns 0 when admitted, else milliseconds until the next token.
-// Signed differences so the 49-day millis() rollover can neither open a hole nor
-// wedge the budget shut. `primed` replaces 1.x's `lastServedMs != 0` sentinel,
-// which granted one free request if a stamp ever landed on millis() == 0.
+//
+// The arithmetic is unsigned, so it runs straight through the 49-day millis()
+// rollover. An admitted request leaves tat at most burst * window ahead of now,
+// and a refusal does not move it. A larger lead therefore means tat lies in the
+// past, however long ago, and the budget is full again. A signed difference got
+// this wrong: after an idle gap over 2^31 ms (24.86 days) it read tat as far in
+// the future and refused requests for up to 24.86 more days (TASK-1037).
+// One blind spot remains. An idle gap that ends within burst * window of a
+// multiple of 2^32 ms (49.7 days) reads as a legitimate lead. It costs at most
+// one window of refusals.
+// `primed` replaces 1.x's `lastServedMs != 0` sentinel, which granted one free
+// request if a stamp ever landed on millis() == 0.
 //
 // Takes the budget INDEX, not a reference. The Arduino .ino prototype generator
 // hoists a declaration of every .ino function to the top of the combined
@@ -2657,11 +2666,14 @@ static void sendApiRateLimited(uint32_t retryAfterSec, uint32_t windowSec, uint8
 // parameter types keep the generated prototype valid.
 static uint32_t rateLimitTryAdmit(uint8_t budgetIdx, uint32_t now) {
   ApiRateLimitBudget& b = gApiRateLimitBudgets[budgetIdx];
-  if (!b.primed) { b.primed = true; b.tat = now; }
+  if (!b.primed || (uint32_t)(b.tat - now) > (uint32_t)b.burstTokens * b.windowMs) {
+    b.primed = true;
+    b.tat = now;
+  }
+  const uint32_t ahead     = b.tat - now;   // 0 .. burst * window
   const uint32_t tolerance = (uint32_t)(b.burstTokens - 1) * b.windowMs;
-  const int32_t  early     = (int32_t)((b.tat - tolerance) - now);
-  if (early > 0) return (uint32_t)early;
-  b.tat = (((int32_t)(now - b.tat) > 0) ? now : b.tat) + b.windowMs;
+  if (ahead > tolerance) return ahead - tolerance;
+  b.tat += b.windowMs;
   return 0;
 }
 
