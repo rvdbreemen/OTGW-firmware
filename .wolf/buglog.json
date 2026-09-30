@@ -3017,5 +3017,62 @@
     ],
     "occurrences": 2,
     "last_seen": "2026-09-30T20:50:00Z"
+  },
+  {
+    "id": "bug-875",
+    "timestamp": "2026-09-30T22:30:00Z",
+    "error_message": "TASK-1185: gateway-made OT-Direct answers still counted as boiler evidence outside the unsupported bitmaps (acked column, log suffix, SAT edge hook, SAT gate on combo loopback)",
+    "file": "src/OTGW-firmware/OTGW-Core.ino, SATcontrol.ino",
+    "root_cause": "TASK-1086 gated only the unsupported verdicts on bLocalAnswer; the acked bitmaps, the type-7 log suffix and satNotifyBoilerFrameSeen() did not look at it, and satBoilerHardwarePresent() read bBoilerState on combo builds, which counts loopback B frames by the TASK-1138 decision",
+    "fix": "boilerEvidence gates all four bitmaps; the log says (gateway answer); the SAT hook and a new real-boiler stamp skip local frames; the gate reads otRealBoilerSeenRecently() only while OT-Direct is not the transport. Proof: test/host/test_local_frame_consumers.py",
+    "tags": [
+      "otdirect",
+      "loopback",
+      "sat",
+      "ot-support",
+      "TASK-1185"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T22:30:00Z"
+  },
+  {
+    "id": "bug-876",
+    "timestamp": "2026-09-30T22:30:00Z",
+    "error_message": "TASK-1185: /otgw_simulation.log replay wrote the fixture boiler's verdicts into /ot-boiler.json and switched SAT simulation off",
+    "file": "src/OTGW-firmware/OTGW-Core.ino",
+    "root_cause": "dispatchOTGWInputLine() tagged replayed lines as live PIC lines, so processOT() took them for boiler evidence; skipping only the SAT edge hook would not have been enough, because the satControlLoop() backstop reads the availability gate",
+    "fix": "OTFRAME_SRC_REPLAY and OTdata.bReplayed; boilerEvidence excludes replayed frames; the gate reads the real-boiler stamp, which replayed frames do not set. boiler_connected unchanged per the maintainer decision",
+    "tags": [
+      "replay",
+      "simulation",
+      "sat",
+      "TASK-1185"
+    ],
+    "related_bugs": [
+      "bug-875"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T22:30:00Z"
+  },
+  {
+    "id": "bug-877",
+    "timestamp": "2026-09-30T22:30:00Z",
+    "error_message": "TASK-1185 AC#2: false verdicts and acknowledged bits persisted in /ot-boiler.json by older builds never go away (acked bits have no retraction path)",
+    "file": "src/OTGW-firmware/OTGW-Core.ino",
+    "root_cause": "loadOtSupportFiles() trusted every format-1 file",
+    "fix": "boiler file format 2; a format-1 file is ignored once and rewritten at the next save. Proof: test/host/test_ot_support_migration.py",
+    "tags": [
+      "persistence",
+      "migration",
+      "littlefs",
+      "TASK-1185"
+    ],
+    "related_bugs": [
+      "bug-875",
+      "bug-876"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T22:30:00Z"
   }
 ]

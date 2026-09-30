@@ -12,6 +12,11 @@
 
 ## Key Learnings
 
+### OT frame origin (TASK-1086, TASK-1185)
+- **SAT simulation has two off-switches**: the edge hook `satNotifyBoilerFrameSeen()` and the `satControlLoop()` backstop that calls `satOnBoilerDetected()` whenever `satBoilerHardwarePresent()` is true. A frame that must not switch simulation off has to stay out of both; on the PIC path the gate reads `otRealBoilerSeenRecently()`, never `bBoilerState` (which counts loopback and replayed B frames on purpose).
+- **Frame origin is carried per frame**: `OTdata.bLocalAnswer` (OT-Direct A and loopback B) and `OTdata.bReplayed` (the `/otgw_simulation.log` replay, queue source `OTFRAME_SRC_REPLAY`). `processOT()` folds both into `boilerEvidence` for the boiler bitmaps. `dispatchOTGWInputLine()` is the replay's entry point, so host harnesses feed live PIC lines via `enqueueOTFrame(..., OTFRAME_SRC_PIC)`, as the PIC task does.
+- **`/ot-boiler.json` is format 2** since TASK-1185; a format-1 file is ignored once and rewritten. `/ot-thermo.json` stays format 1.
+
 ### Build / tooling
 - **`firmware.bin` mtime+size is the only trustworthy build signal.** `build.py` exits 0 on per-env compile failure; require literal `Successfully created ESP32S3 image` / `SUCCESS`. Concurrent runs share `.pio/build` → 0xC0000142 or `OTGW-firmware.ino.cpp: No such file or directory`. Recovery: `rm -rf .pio/build/<env>`, rebuild solo. Only `buildfs` parallelizes. LTO link needs ~2GB RAM. esptool v5 cp1252 crash → prefix `PYTHONUTF8=1`. Never pipe build output through `Select-Object -First N`. `build.sh` self-bootstraps Python/pip.
 - App-only flash preserving WiFi+settings: `esptool write-flash 0x0 bootloader 0x8000 partitions 0xe000 boot_app0 0x10000 firmware` — NOT merged-full @0x0 (wipes NVS).
@@ -56,6 +61,7 @@
 - Concurrent edits to `v2.html`: `git diff -U1` to split coalesced hunks, filter foreign ones, `git apply --cached --unidiff-zero`.
 
 ## Do-Not-Repeat
+- [2026-09-30] Before presenting a consequence to the maintainer, verify its mechanism: I nearly claimed stale unsupported verdicts mark HA entities unavailable, but ADR-142 is Rejected; they only feed the retained otgw-firmware/boiler/unsupported_msgids CSV and /api/v2/otgw/ot-support.
 - [2026-09-30] A CPU-load generator built on multiprocessing must stop its workers when the parent dies: on Windows, killing or terminate()-ing the parent leaves the spawned workers running until their own deadline (20 orphans burned for 15 minutes and contaminated a "quiet host" test run). Give each worker the read end of a pipe and exit on EOF, or kill the tree with `taskkill /T /F /PID`; count `*multiprocessing-fork*` processes before trusting a quiet-host measurement.
 - [2026-09-30] From Git Bash run the build as `(cd <tree> && ./build.bat --target all)`, never `cmd //c build.bat ...`: this environment sets NoDefaultCurrentDirectoryInExePath=1, so cmd answers "'build.bat' is not recognized" and a trailing `echo` makes the background task report exit 0. Check the log's first lines before trusting any build.
 - [2026-09-30] Count line endings with Python bytes (`b.count(b"\r\n")`), never with Git Bash `grep -c $'\r...'`: grep reported doubled CRs on every line of 25 files that held plain CRLF, and the "fix" would have damaged a correct tree.

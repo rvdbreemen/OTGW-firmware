@@ -3,11 +3,11 @@ id: TASK-1185
 title: >-
   OT-Direct: gateway-made frames still count as boiler evidence outside the
   unsupported bitmaps
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-30 14:32'
-updated_date: '2026-09-30 20:34'
+updated_date: '2026-09-30 20:53'
 labels:
   - otdirect
   - bug
@@ -97,3 +97,40 @@ Evidence (this session, main tree, after the alpha.395 bump):
 - Slice audits: 225 parts (consumer harness) and 4 parts (migration harness) are verbatim in their sources and brace-complete.
 - test_boiler_unsupported_origin.py passes on the working tree; its old-vs-fix mode shows only the documented D6, D7 and S1 differences. test_raw_passthrough.py passes in both modes.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Frames that are no boiler evidence no longer count as boiler evidence anywhere. Shipped in 2.0.0-alpha.394 (5bc508e47, consumers 1-3 plus a fifth) and 2.0.0-alpha.395 (7a343905a, replay and migration, per the maintainer decisions).
+
+What changed
+- OT-Direct answers the gateway makes itself (SR= table, master-mode WRITE-ACK echo and cache replays, loopback B) no longer mark a msgid acknowledged in /api/v2/otgw/ot-support, and their type-7 OT log line reads "(gateway answer)".
+- A loopback B no longer switches SAT simulation off. On a combo board in OT-Direct loopback, the SAT availability gate no longer reports a real boiler (fifth consumer, found while tracing: satBoilerHardwarePresent() read bBoilerState under HAS_PIC).
+- /otgw_simulation.log replay lines carry their own queue source. They are decoded, published and keep boiler_connected, but set no verdict or acknowledged bit and do not switch SAT simulation off. The SAT gate reads a real-boiler stamp (otRealBoilerSeenRecently()), because the satControlLoop() backstop would otherwise still act on bBoilerState.
+- /ot-boiler.json is format 2. A format-1 file from older builds is ignored once and rewritten at the next save, so stale false verdicts and acknowledged bits disappear.
+
+Evidence per AC (this session, main tree)
+- AC#1:
+  - python test/host/test_local_frame_consumers.py --old-rev de6b13ebe: RESULT PASS, after the alpha.395 bump.
+  - 20 defect cases (A, L, N, H, R families over the combo and classic builds) fail on the pre-task tree and differ from the fix in exactly the parts their frames touch.
+  - 22 controls hold, including the ADR-103 proxy answers and live PIC frames.
+  - Eight mutants each fail exactly their own cases.
+  - Red phases were run before each change.
+  - Slice audit: 225 parts verbatim and brace-complete.
+- AC#2: the maintainer chose a one-time migration (recorded in the notes).
+  - python test/host/test_ot_support_migration.py --old-rev de6b13ebe: RESULT PASS.
+  - M1-M3 fail on the old loader and pass now.
+  - Four controls hold.
+  - Three mutants each fail exactly their cases.
+  - Slice audit: 4 parts verbatim.
+- Regressions: the host suite gives 33/34; the only failure is the known adr governance item (TASK-1183). test_boiler_unsupported_origin.py and test_raw_passthrough.py pass.
+- The web UI was read through: the classic OT Support tab now shows a neutral "-" where it showed a false R-ack/W-ack; the v2 map and the Statistics banner are unchanged.
+- python evaluate.py --quick: exit 0, health 100%.
+- build.bat --target all after commit 7a343905a: firmware and filesystem SUCCESS for esp32, esp32-classic and esp32-combo, 3 images, 18 fresh 2.0.0-alpha.395+7a34390 artifacts. Flash 79.5%, 77.2%, 81.4%.
+
+Behaviour changes to know
+- On a combo in OT-Direct mode, SAT now counts a boiler as present only once it has answered MsgID 3, as on an OTGW32 (case H2).
+- After updating, the ot-support table and the retained unsupported_msgids list start empty once and refill from live traffic.
+
+Not done: bench validation (the OTGW32 is in its WiFi provisioning portal). Side finding: GET /api/v2/otgw/ot-support is not documented in docs/api.
+<!-- SECTION:FINAL_SUMMARY:END -->
