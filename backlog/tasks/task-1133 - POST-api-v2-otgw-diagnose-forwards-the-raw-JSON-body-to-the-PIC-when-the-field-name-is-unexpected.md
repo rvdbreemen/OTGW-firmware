@@ -3,9 +3,11 @@ id: TASK-1133
 title: >-
   POST /api/v2/otgw/diagnose forwards the raw JSON body to the PIC when the
   field name is unexpected
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-06 19:18'
+updated_date: '2026-09-30 09:47'
 labels:
   - bug
   - api
@@ -28,6 +30,18 @@ Same shape as the raw-body fallback recorded in TASK-1083 for POST /api/v2/otgw/
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 A POST with an unexpected or missing field returns a 4xx and writes nothing to the PIC
-- [ ] #2 If a bare-body form is deliberately supported, it passes the same printable+CR filter as the parsed path
-- [ ] #3 The relationship to TASK-1083 is settled: either one shared fix or an explicit note that the two paths differ
+- [x] #2 If a bare-body form is deliberately supported, it passes the same printable+CR filter as the parsed path
+- [x] #3 The relationship to TASK-1083 is settled: either one shared fix or an explicit note that the two paths differ
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-30 fix (alpha.382), 1.x parity.
+- restAPI.ino /otgw/diagnose: the raw-body fallback is gone. When extractJsonField(body, "data", dataBuf[33]) returns false (field missing, or value longer than 32 characters) the handler answers 400 'Missing data, or longer than 32 characters' and returns before anything reaches enqueuePICTx(). Same message and behaviour as otgw-1.x.x restAPI.ino (TASK-1127 handler).
+- Host proof, real scanner: test/host/build_and_run.ps1 (sliced extractJsonField) section h: the web UI body {"data":"1\r"} is accepted and decodes to '1'+CR; the TASK-1133 body {"input":"\r"} is refused (the old code copied it verbatim, 13 printable bytes, to the PIC, which is what the diagnose console showed on the Classic bench); data longer than 32 characters, a bare text body and an empty body (form-urlencoded, never captured) are refused. 33 checks, 0 failures.
+- AC#2: the bare-body form is deliberately NOT supported (1.x parity; the UI always sends JSON), so every accepted byte comes from the parsed field and passes the existing printable+CR filter; the h5 check proves a bare body is refused.
+- AC#3: the two paths differ. POST /api/v2/otgw/commands on dev still falls back to the raw body when extractJsonField() returns false (restAPI.ino ~:737), which 1.x TASK-1083 refined, but that path is safe: the fallback text goes through the command-format validator (two letters and '='), so a JSON body is rejected with 400 'Invalid command format' and nothing reaches the PIC; only the message is less precise than 1.x. diagnose had no such validator, which is why it needed this fix. Porting the TASK-1083 message refinement is optional and not part of this task.
+- Build: build.bat --target esp32-combo SUCCESS (fw + fs, fresh 11:46, alpha.382+0f6d691); evaluate.py --quick 69 passed / 0 warnings / 0 failed.
+OPEN: AC#1 device confirmation needs the Classic-S3 with picfwtype=diagnose (probes with Content-Type: application/json; curl -d sends form data that never reaches the body hook).
+<!-- SECTION:NOTES:END -->

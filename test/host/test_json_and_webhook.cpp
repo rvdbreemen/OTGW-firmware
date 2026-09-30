@@ -158,6 +158,26 @@ int main() {
     checkStr(out, "real", "f2 key inside a string value is not matched");
   }
 
+  // (h) POST /api/v2/otgw/diagnose (TASK-1133). The handler answers 400 and writes
+  //     nothing to the PIC whenever extractJsonField(body, "data", dataBuf[33])
+  //     returns false; only a true return reaches the PIC. These are the body
+  //     shapes that decide it, run through the real scanner with the real buffer.
+  {
+    char dataBuf[33];
+    check(extractJsonField("{\"data\":\"1\\r\"}", F("data"), dataBuf, sizeof(dataBuf)),
+          "h1 the web UI body {\"data\":\"1\\r\"} is accepted", "returned false");
+    check(dataBuf[0] == '1' && dataBuf[1] == '\r' && dataBuf[2] == '\0',
+          "h2 its value decodes to the keystroke '1' plus CR", "value differs");
+    check(!extractJsonField("{\"input\":\"\\r\"}", F("data"), dataBuf, sizeof(dataBuf)),
+          "h3 the TASK-1133 body {\"input\":\"\\r\"} (no data field) is refused", "returned true");
+    check(!extractJsonField("{\"data\":\"123456789012345678901234567890123\"}", F("data"), dataBuf, sizeof(dataBuf)),
+          "h4 data longer than 32 characters is refused", "returned true");
+    check(!extractJsonField("1\r", F("data"), dataBuf, sizeof(dataBuf)),
+          "h5 a bare text body is refused (no raw-body fallback)", "returned true");
+    check(!extractJsonField("", F("data"), dataBuf, sizeof(dataBuf)),
+          "h6 an empty body (e.g. form-urlencoded, never captured) is refused", "returned true");
+  }
+
   printf("== expandPayload (src/OTGW-firmware/webhook.ino) ==\n");
 
   // Task B: with Tr never observed (NAN-init, OTGW-Core.h:73) the documented

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.381
+**  Version  : v2.0.0-alpha.382
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -757,8 +757,11 @@ static void handleOtgw(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
 
     const char* body = bodyCompat();
     char dataBuf[33] = "";
+    // No raw-body fallback (TASK-1133, 1.x parity): a body without a usable "data"
+    // field, such as {"input":"\r"}, was written to the PIC verbatim before.
     if (!extractJsonField(body, F("data"), dataBuf, sizeof(dataBuf))) {
-      strlcpy(dataBuf, body ? body : "", sizeof(dataBuf));
+      sendApiError(400, F("Missing data, or longer than 32 characters"));
+      return;
     }
 
     // Printable ASCII plus CR only. The menu reads a line and acts on CR; an LF
