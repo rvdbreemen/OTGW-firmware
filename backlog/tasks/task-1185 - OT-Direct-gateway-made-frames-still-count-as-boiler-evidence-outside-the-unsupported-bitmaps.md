@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-30 14:32'
-updated_date: '2026-09-30 19:55'
+updated_date: '2026-09-30 19:58'
 labels:
   - otdirect
   - bug
@@ -65,4 +65,10 @@ Still open:
 - Side finding: GET /api/v2/otgw/ot-support is not documented in docs/api or the manuals.
 
 Build after commit 5bc508e47: build.bat --target all, firmware and filesystem SUCCESS for esp32, esp32-classic and esp32-combo, 3 images, 18 fresh 2.0.0-alpha.394+5bc508e artifacts; flash use 79.5%, 77.2%, 81.4% (unchanged). python evaluate.py --quick: exit 0, health 100%, ESP abstraction boundary clean. Host suite on the tree: 33/34, the failure is the known adr governance item (TASK-1183). Not bench-validated: the OTGW32 is still in its WiFi provisioning portal.
+
+UI impact check (review finding): after this change more ids end up with thermostat-sent set and no boiler evidence (every thermostat id in loopback, master-mode writes, SR= ids). Web UI read-through:
+- Classic OT Support tab (index.js refreshOtSupport, from /api/v2/otgw/ot-support): the Boiler column lists R-ack/W-ack/'no read support'/'rejects write' and shows '-' when none apply. Such an id now shows a neutral '-' where it showed a false R-ack/W-ack; there is no boiler-blaming wording.
+- v2 support map (v2.js): 'Thermostat only' ('the boiler never answers, your boiler may not implement it') comes from the live T/R and B/A log lines in the browser, not from ot-support, so a gateway-made A still counts as an answer there; unchanged by this task.
+- Statistics banner 'Boiler does not implement these OpenTherm messages' (index.js, /api/v2/otgw/boiler-support) reads the unsupported bitmaps, which TASK-1086 already cleaned; unchanged.
+- No web asset keys on the OT log suffix strings.
 <!-- SECTION:NOTES:END -->
