@@ -602,6 +602,42 @@ def scan_esp_abstraction_violations(project_dir: Path) -> List[str]:
     return violations
 
 
+# ===== STATUS BURST COOLDOWN BOUND (ADR-088, TASK-353/368/1171) =====
+#
+# STATUS_BURST_COOLDOWN_MS is defined once per board. TASK-743 moved the values
+# out of MQTTstuff.ino into boards.h, and c880a0203 moved boards.h into the
+# Platform library, so this is the one file the gate reads.
+STATUS_BURST_COOLDOWN_SOURCE = "src/libraries/Platform/src/boards.h"
+STATUS_BURST_COOLDOWN_LIMIT_MS = 3000
+
+_STATUS_BURST_COOLDOWN_RE = re.compile(r"\bSTATUS_BURST_COOLDOWN_MS\s+(\d+)")
+
+
+def status_burst_cooldown_findings(text: str) -> List[Tuple[int, int, bool]]:
+    """Return ``(line, value, allowed)`` for every STATUS_BURST_COOLDOWN_MS
+    declaration in ``text``, one per board.
+
+    A value below STATUS_BURST_COOLDOWN_LIMIT_MS is allowed. A larger value is
+    allowed only with a ``verified tuning`` marker on one of the five lines
+    before it. Lines that are pure comments are skipped, so prose that names
+    the constant does not count as a declaration.
+    """
+    lines = text.split("\n")
+    findings: List[Tuple[int, int, bool]] = []
+    for idx, line in enumerate(lines):
+        if line.lstrip().startswith("//"):
+            continue
+        m = _STATUS_BURST_COOLDOWN_RE.search(line)
+        if not m:
+            continue
+        value = int(m.group(1))
+        allowed = value < STATUS_BURST_COOLDOWN_LIMIT_MS or (
+            "verified tuning" in "\n".join(lines[max(0, idx - 5):idx])
+        )
+        findings.append((idx + 1, value, allowed))
+    return findings
+
+
 class Colors:
     """ANSI color codes"""
     HEADER = '\033[95m'
@@ -1729,63 +1765,49 @@ class WorkspaceEvaluator:
         """
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== STATUS_BURST_COOLDOWN_MS Tuning Bound ==={Colors.ENDC}")
 
-        # TASK-743 (ESP-abstraction Tier 3): the per-board cooldown values moved
-        # from MQTTstuff.ino into boards.h as #define-per-board. The gate follows
-        # the constant to boards.h and matches the #define form (no '=').
-        mqtt_ino = config.FIRMWARE_ROOT / "boards.h"
-        if not mqtt_ino.exists():
+        # ADR-088 is binding (ADR-080), so a gate that cannot find its input
+        # FAILs: a WARN here let the bound go unchecked from c880a0203 until
+        # TASK-1171.
+        name = "STATUS_BURST_COOLDOWN_MS bound"
+        source = config.PROJECT_DIR / STATUS_BURST_COOLDOWN_SOURCE
+        label = source.name
+        if not source.exists():
             self.add_result(EvaluationResult(
-                "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "WARN",
-                "boards.h not found"
+                "Tuning", name, "FAIL",
+                f"{STATUS_BURST_COOLDOWN_SOURCE} not found: the ADR-088 bound cannot be checked"
             ))
             return
 
         try:
-            lines = mqtt_ino.read_text(encoding='utf-8', errors='ignore').split('\n')
+            text = source.read_text(encoding='utf-8', errors='ignore')
         except OSError as e:
             self.add_result(EvaluationResult(
-                "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "FAIL",
-                f"Could not read boards.h: {e}"
+                "Tuning", name, "FAIL", f"Could not read {STATUS_BURST_COOLDOWN_SOURCE}: {e}"
             ))
             return
 
-        decl_re = re.compile(r"\bSTATUS_BURST_COOLDOWN_MS\s+(\d+)")
-        found = False
-        for idx, line in enumerate(lines):
-            # Skip comments that just mention the constant in prose.
-            if line.lstrip().startswith("//"):
-                continue
-            m = decl_re.search(line)
-            if not m:
-                continue
-            found = True
-            value = int(m.group(1))
-            lineno = idx + 1
-            if value < 3000:
-                self.add_result(EvaluationResult(
-                    "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "PASS",
-                    f"STATUS_BURST_COOLDOWN_MS = {value} ms (< 3000)",
-                    f"MQTTstuff.ino:{lineno}"
-                ))
-            else:
-                window = "\n".join(lines[max(0, idx - 5):idx])
-                if "verified tuning" in window:
-                    self.add_result(EvaluationResult(
-                        "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "PASS",
-                        f"STATUS_BURST_COOLDOWN_MS = {value} ms carries 'verified tuning' marker",
-                        f"MQTTstuff.ino:{lineno}"
-                    ))
-                else:
-                    self.add_result(EvaluationResult(
-                        "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "FAIL",
-                        f"STATUS_BURST_COOLDOWN_MS = {value} ms (>= 3000) without '// verified tuning' marker",
-                        f"MQTTstuff.ino:{lineno}"
-                    ))
-            break
-        if not found:
+        findings = status_burst_cooldown_findings(text)
+        if not findings:
             self.add_result(EvaluationResult(
-                "Tuning", "STATUS_BURST_COOLDOWN_MS bound", "WARN",
-                "STATUS_BURST_COOLDOWN_MS declaration not found"
+                "Tuning", name, "FAIL",
+                f"No STATUS_BURST_COOLDOWN_MS declaration in {STATUS_BURST_COOLDOWN_SOURCE}"
+            ))
+            return
+
+        limit = STATUS_BURST_COOLDOWN_LIMIT_MS
+        bad = [(ln, v) for ln, v, ok in findings if not ok]
+        for ln, v in bad:
+            self.add_result(EvaluationResult(
+                "Tuning", name, "FAIL",
+                f"STATUS_BURST_COOLDOWN_MS = {v} ms (>= {limit}) without '// verified tuning' marker",
+                f"{label}:{ln}"
+            ))
+        if not bad:
+            values = ", ".join(f"{v} ms" for _, v, _ in findings)
+            self.add_result(EvaluationResult(
+                "Tuning", name, "PASS",
+                f"{len(findings)} per-board declaration(s) within bound: {values}",
+                ", ".join(f"{label}:{ln}" for ln, _, _ in findings)
             ))
 
     def check_status_publishers_wrap_burst(self):

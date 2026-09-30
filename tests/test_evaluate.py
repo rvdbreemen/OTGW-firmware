@@ -686,5 +686,47 @@ class TestPollWindowCoupling(unittest.TestCase):
         self.assertFalse(r["constants_found"])
 
 
+class TestStatusBurstCooldownBound(unittest.TestCase):
+    """ADR-088 gate: every per-board STATUS_BURST_COOLDOWN_MS stays below the bound."""
+
+    # Shape of src/libraries/Platform/src/boards.h: one declaration per board.
+    BOARDS = (
+        "#if defined(BOARD_NODOSHOP_ESP32)\n"
+        "// MQTT per-platform tuning (ESP-abstraction Tier 3, TASK-743).\n"
+        "#define STATUS_BURST_COOLDOWN_MS  250    // post-burst drip pause (ADR-088)\n"
+        "#elif defined(BOARD_NODOSHOP_ESP32_CLASSIC)\n"
+        "#define STATUS_BURST_COOLDOWN_MS  250\n"
+        "#endif\n"
+    )
+
+    def test_source_is_the_platform_library_boards_h(self):
+        """TASK-1171: the gate read src/OTGW-firmware/boards.h after it had moved."""
+        self.assertEqual(evaluate.STATUS_BURST_COOLDOWN_SOURCE,
+                         "src/libraries/Platform/src/boards.h")
+        self.assertTrue((REPO_ROOT / evaluate.STATUS_BURST_COOLDOWN_SOURCE).exists())
+
+    def test_passes_every_board_within_bound(self):
+        f = evaluate.status_burst_cooldown_findings(self.BOARDS)
+        self.assertEqual([(ln, v) for ln, v, _ in f], [(3, 250), (5, 250)])
+        self.assertTrue(all(ok for _, _, ok in f))
+
+    def test_detects_second_board_over_bound(self):
+        """The old gate stopped after the first declaration and never saw this one."""
+        bad = self.BOARDS.replace("#define STATUS_BURST_COOLDOWN_MS  250\n",
+                                  "#define STATUS_BURST_COOLDOWN_MS  5000\n")
+        f = evaluate.status_burst_cooldown_findings(bad)
+        self.assertEqual([(ln, v, ok) for ln, v, ok in f], [(3, 250, True), (5, 5000, False)])
+
+    def test_verified_tuning_marker_allows_a_large_value(self):
+        marked = self.BOARDS.replace("#define STATUS_BURST_COOLDOWN_MS  250\n",
+                                     "// verified tuning: bench soak 2026-09-30\n"
+                                     "#define STATUS_BURST_COOLDOWN_MS  5000\n")
+        self.assertTrue(all(ok for _, _, ok in evaluate.status_burst_cooldown_findings(marked)))
+
+    def test_prose_mention_is_not_a_declaration(self):
+        prose = "// STATUS_BURST_COOLDOWN_MS 9999 is what the old code used\n"
+        self.assertEqual(evaluate.status_burst_cooldown_findings(prose), [])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
