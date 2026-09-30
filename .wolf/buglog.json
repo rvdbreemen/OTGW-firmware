@@ -2943,5 +2943,79 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-09-30T14:35:00+02:00"
+  },
+  {
+    "id": "bug-871",
+    "timestamp": "2026-09-30T20:30:00Z",
+    "error_message": "Round-2 review of TASK-1123: a retained MQTT set/<node>/otgw/reset_water_total would zero the DHW water total on every reconnect",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "handleMQTTcallback() never saw the PUBLISH retain bit, so the copy a broker hands out for each new subscription (clean session) ran the reset again",
+    "fix": "onMqttMessage passes properties.retain; the otgw/reset_water_total branch ignores a retained message. Harness case Q5 plus mutant MR23 and a wiring check prove it",
+    "tags": [
+      "mqtt",
+      "retain",
+      "reset",
+      "dhw-water-total",
+      "TASK-1123"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T20:30:00Z"
+  },
+  {
+    "id": "bug-872",
+    "timestamp": "2026-09-30T20:30:00Z",
+    "error_message": "heap soak driver unit: test_outage_shorter_than_threshold_is_tolerated AssertionError: 0 not greater than or equal to 1 (snapshots_failed)",
+    "file": "scripts/tests/test_heap_soak_driver.py",
+    "root_cause": "Timing race: a 0.3 s stub outage against driver iterations of about 1.5 s; whether a snapshot attempt lands in the window depends on loop phase. Pre-existing: 6/8 passes on HEAD sources, 7/8 with TASK-1123",
+    "fix": "Not fixed; filed as TASK-1186 (make the window hit deterministic)",
+    "tags": [
+      "flaky",
+      "test",
+      "heap-soak",
+      "timing",
+      "TASK-1186"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T20:30:00Z"
+  },
+  {
+    "id": "bug-873",
+    "timestamp": "2026-09-30T20:30:00Z",
+    "error_message": "re.error: unterminated character set at position 11 (anatomy strip script in a Bash heredoc); Git Bash grep -c reported doubled CRs on every line of 25 CRLF files",
+    "file": ".wolf/anatomy.md (tooling only)",
+    "root_cause": "The Bash tool mangles backslash escapes inside heredocs, and Git Bash grep miscounts CR bytes",
+    "fix": "Scripts with escapes go through the Write tool; line endings are counted with Python bytes",
+    "tags": [
+      "tooling",
+      "heredoc",
+      "windows",
+      "eol",
+      "grep"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-09-30T20:30:00Z"
+  },
+  {
+    "id": "bug-874",
+    "timestamp": "2026-09-30T20:50:00Z",
+    "error_message": "'build.bat' is not recognized as an internal or external command, operable program or batch file. (background task still reported exit 0)",
+    "file": "build.bat (invocation only)",
+    "root_cause": "The environment sets NoDefaultCurrentDirectoryInExePath=1, so cmd.exe does not look in the current directory for build.bat; the quoted form cmd //c \"build.bat --target all\" failed the same way",
+    "fix": "Invoke ./build.bat from Git Bash inside a (cd <tree> && ...) subshell, and read the first log lines before waiting on the build",
+    "tags": [
+      "build",
+      "windows",
+      "cmd",
+      "tooling",
+      "exit-code"
+    ],
+    "related_bugs": [
+      "bug-873"
+    ],
+    "occurrences": 2,
+    "last_seen": "2026-09-30T20:50:00Z"
   }
 ]

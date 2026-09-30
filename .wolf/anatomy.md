@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-09-30T12:32:11.642Z
-> Files: 661 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-09-30T18:37:01.167Z
+> Files: 595 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -775,131 +775,6 @@
 - `parser.py` — Base option parser setup (~3951 tok)
 - `progress_bars.py` — SQLAlchemy model (~1345 tok)
 
-## .claude/worktrees/wf_8835435c-70a-1/docs/c4/
-
-- `c4-code-otdirect.md` — C4 Code Level: OTDirect Module (ESP32 Native OpenTherm Master/Slave) (~10386 tok)
-
-## .claude/worktrees/wf_8835435c-70a-1/src/OTGW-firmware/
-
-- `OTDirect.ino` — Declares instances (~43720 tok)
-- `OTDirecttypes.h` — Declares declaration (~2246 tok)
-
-## .claude/worktrees/wf_8835435c-70a-1/test/host/
-
-- `build_and_run_override_reply.ps1` — Declares below (~6476 tok)
-- `test_override_reply.cpp` — Declares __FlashStringHelper (~9884 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-1/docs/c4/
-
-- `c4-code-otdirect.md` — C4 Code Level: OTDirect Module (ESP32 Native OpenTherm Master/Slave) (~10323 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-1/test/host/
-
-- `build_and_run_loopback.ps1` — Declares uint16_t (~3328 tok)
-- `test_loopback_range.cpp` — Declares 0 (~3031 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-2/src/OTGW-firmware/
-
-- `OTDirect.ino` — Declares instances (~42466 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-2/test/host/
-
-- `run_unknown_counters.ps1` — Declares Get (~3543 tok)
-- `test_unknown_counters_asan.cpp` — Declares char (~998 tok)
-- `test_unknown_counters.cpp` — Declares and (~5722 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-3/docs/api/
-
-- `openapi.yaml` — Declares metadata (~51049 tok)
-- `README.md` — Project documentation (~15554 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-3/docs/c4/
-
-- `c4-component-opentherm-core.md` — C4 Component: OpenTherm Core (~2592 tok)
-- `c4-container.md` — C4 Container Diagram: OTGW-firmware (~9147 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-3/scripts/json-golden/
-
-- `_index.json` (~957 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-3/scripts/tests/
-
-- `README-coverage-gate.md` — OT decode-coverage regression gate (2.0.0) (~3059 tok)
-- `run_coverage_test.py` — Run the OT coverage fixture against a device and check it against the baseline. (~6730 tok)
-- `test_run_coverage_test.py` — Self-test for run_coverage_test.py: a short capture must fail loudly. (~3725 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-3/test/host/generated/old_runner/
-
-- `real_capture_0923.py` — The real 2026-09-23 OT-Direct capture through the OLD and the NEW runner. (~1542 tok)
-- `run_old_vs_fix.py` — Old-vs-fix: run the SAME self-test module against the old and the new runner. (~550 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-3/test/host/generated/simulate_contract/
-
-- `build_and_run.ps1` (~478 tok)
-- `simulate_contract.cpp` — Host harness for the /api/v2/simulate REST contract (TASK-1071 docs pass). (~1894 tok)
-- `slice.py` — Slice real functions/declarations out of firmware sources by anchor. (~1258 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-4/docs/api/
-
-- `MQTT.md` — OTGW-firmware MQTT Topic Documentation (~28271 tok)
-- `openapi.yaml` — Declares metadata (~50263 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-4/docs/c4/
-
-- `c4-code-mqtt.md` — C4 Code Level: MQTT Module (~16332 tok)
-- `c4-component-integration-layer.md` — C4 Component: Integration Layer (~3775 tok)
-- `c4-container.md` — C4 Container Diagram: OTGW-firmware (~9119 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-4/docs/manuals/nl/
-
-- `h10-bijlagen.md` — Hoofdstuk 10: Bijlagen (~7326 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-5/src/OTGW-firmware/
-
-- `restAPI.ino` — include <string.h> (~60329 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-5/src/OTGW-firmware/data/
-
-- `index.js` — Safely parse JSON with validation and error handling (~111160 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-5/test/host/
-
-- `rate_limit_gcra.ps1` — Declares Find (~2034 tok)
-- `test_rate_limit_gcra.cpp` — HTTPMethod: limiter (~4158 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-5/tests/webui/
-
-- `paced-poller.test.mjs` — TASK-1037 regression guard for the paced pollers in data/index.js (ADR-173). (~4305 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-6/scripts/tests/
-
-- `static_integrity.py` — TASK-1162 download integrity probe: does the OTGW32 serve whole files, and (~9149 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-6/tests/
-
-- `test_static_integrity.py` — Self-test for scripts/tests/static_integrity.py (stdlib unittest, no pytest). (~8263 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-7/scripts/tests/
-
-- `refresh_storm.py` — Request-storm and upload-abort tool for the 2.0.0 web stack (TASK-1124). (~21977 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-7/tests/
-
-- `test_refresh_storm.py` — Self-test for scripts/tests/refresh_storm.py (TASK-1124) against a local stub. (~11700 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-8/scripts/
-
-- `heap_soak_driver.py` — SoakRun: uptime_minutes, telnet_send, fetch_status, describe_http_error + 6 more (~6752 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-8/scripts/tests/
-
-- `test_heap_soak_driver.py` — FirmwareContract: c_function, c_unescape, pstr_format, api_error_message + 7 more (~7918 tok)
-
-## .claude/worktrees/wf_fe6c4173-ec6-8/test/host/generated/
-
-- `contrast_old_vs_new.py` — Old-vs-new on one reproduction: the device reboots mid-run (stub event on the (~875 tok)
-- `run_old_driver.py` — Runs the OLD heap_soak_driver.py unmodified. It hardcodes telnet port 23, so (~187 tok)
-
 ## docs/adr/
 
 - `ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md` — ADR-178 Widen the SAT area-sensor reference to accept a BLE MAC alongside a Dallas address (~2142 tok)
@@ -925,6 +800,7 @@
 
 ## src/OTGW-firmware/
 
+- `dhwWaterMeter.ino` — DHW water total (ADR-176, TASK-1123): MsgID 19 flow x time accumulator, /dhw_water.json persistence (10 L / 15 min rule), loop-side reset (~4033 tok)
 - `FSexplorer.ino` — Declares String (~11705 tok)
 - `networkStuff.ino` — Declares char (~10268 tok)
 - `OLED.ino` — Declares stack (~7113 tok)
@@ -950,14 +826,24 @@
 ## test/host/
 
 - `build_and_run_override_reply.ps1` — Declares below (~7885 tok)
+- `dhw_host_shim.h` — test/host/dhw_host_shim.h  (TASK-1123, ADR-176): host stand-ins shared by the two DHW water harnesses (~1294 tok)
 - `test_banner_board_mode.cpp` — test/host/test_banner_board_mode.cpp  (TASK-1180) (~563 tok)
 - `test_banner_board_mode.py` — TASK-1180 host harness: does processOT()'s banner recovery keep the combo (~848 tok)
+- `test_dhw_water_discovery.cpp` — TASK-1123 driver: dhw_water_total discovery row, publish rule and the REST/MQTT reset through sliced real code (~9370 tok)
+- `test_dhw_water_meter.cpp` — TASK-1123 driver: accumulator, write sites and persistence through sliced real code (~7690 tok)
+- `test_dhw_water_meter.py` — TASK-1123 host harness runner: slices, OLD vs FIX, mutants, wiring checks (--old-rev) (~10827 tok)
+- `test_diagnose_handler.cpp` — test/host/test_diagnose_handler.cpp  (TASK-1133 AC#1) (~923 tok)
+- `test_diagnose_handler.py` — TASK-1133 AC#1 host harness: does POST /api/v2/otgw/diagnose answer 4xx and (~1551 tok)
 - `test_json_and_webhook.cpp` — Declares char (~2626 tok)
 - `test_ot_reserved_range.cpp` — test/host/test_ot_reserved_range.cpp  (TASK-1174) (~743 tok)
 - `test_ot_reserved_range.py` — TASK-1174 host harness: which OpenTherm data-ids does the firmware suppress (~1371 tok)
 - `test_override_reply.cpp` — Declares __FlashStringHelper (~12902 tok)
+- `test_pic_banner_dispatch.cpp` — test/host/test_pic_banner_dispatch.cpp  (TASK-1179 AC#2) (~1636 tok)
+- `test_pic_banner_dispatch.py` — TASK-1179 AC#2 host harness: does a PR=A reply re-enable a PIC that boot (~2385 tok)
 - `test_pic_banner_recovery.cpp` — test/host/test_pic_banner_recovery.cpp  (TASK-1179) (~841 tok)
 - `test_pic_banner_recovery.py` — TASK-1179 host harness: does the loop-side banner consumer re-enable a PIC (~822 tok)
+- `test_raw_passthrough.cpp` — test/host/test_raw_passthrough.cpp  (TASK-1111 AC#1) (~1749 tok)
+- `test_raw_passthrough.py` — TASK-1111 AC#1 host harness: does every byte the PIC task reads reach (~2014 tok)
 
 ## tests/
 
