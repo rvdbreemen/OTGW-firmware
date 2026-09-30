@@ -5860,7 +5860,7 @@
           "The thermostat-timeout setback (OTDirect.ino:2470-2475) may write MsgID 1 while SAT owns it. Maintainer decision, 2026-09-22: it is a fail-safe, and if the thermostat has gone quiet and SAT is not commanding, something must still keep th..."
         ],
         "verification": [
-          "src/OTGW-firmware/SATcontrol.ino — satOwnsControlSetpoint() and satCommandInFlight().",
+          "src/OTGW-firmware/SATcontrol.ino — satOwnsControlSetpoint(), satCommandInFlight() and satEnqueueOwnCS(), the single path every SAT CS= takes, the CS=0 releases in satDisable() and the boot-safety path included. A SAT CS= sent any other w...",
           "src/OTGW-firmware/OTDirect.ino — the gated heating-curve, master-mode WRITEDATA, CS= and CS-expiry sites.",
           "Field validation on an OTGW32: with SAT enabled and a safety trip forced, TSet must not revert to the heating curve or the thermostat."
         ]
