@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-08-08 18:17'
-updated_date: '2026-09-23 19:58'
+updated_date: '2026-09-30 08:51'
 labels:
   - bug
   - tooling
@@ -79,4 +79,6 @@ AC1, AC2 and AC5 need an OTDirect board: upload the fixture, start, capture, con
 2026-09-23 evening: AC4 reopened. On alpha.375 (OT-Direct) POST /api/v2/simulate/start sets the flag and the replay runs (device/info otgwsimulation=true, thermostatconnected=true), but the response reports active=false, available=false, reason 'board is in OT-Direct mode; replay runs on the PIC serial path'. otgwSimulationUnavailableReason() still encodes the TASK-1073 premise that this task removed. Fix: the only remaining reason is an unmounted filesystem, matching the start route's 409.
 
 AC4 re-met in alpha.376: otgwSimulationUnavailableReason() now only reports an unmounted filesystem. Bench (OT-Direct): POST /simulate/start -> {active:true, available:true}; GET /simulate while running -> active:true; after /simulate/stop -> active:false, available:true. AC2 still open on its MQTT half (no broker on the bench).
+
+2026-09-30 correction (TASK-1174): the 15 CHANGED MsgID 56/57 keys in the 2026-09-23 OTGW32 coverage run were NOT 'AUTO profile works as designed'. They were a regression: isLegacyPreV42CompatibilityId() on dev returned 50..63, so once a v4.x version frame had been decoded (fixture :231, B407D0400 = slave 4.00) MsgIDs 56 (TdhwSet) and 57 (MaxTSet) were suppressed as 'Reserved', although OT spec v4.2 lists both as valid R/W ids. The fixture's 56/57 frames (:126-140) precede the version frame, so a freshly booted device decodes them in loop 1 and suppresses them afterwards, which is why the verdict depended on device state. Fixed in TASK-1174 (range 50-55 and 58-69, as 1.x).
 <!-- SECTION:NOTES:END -->

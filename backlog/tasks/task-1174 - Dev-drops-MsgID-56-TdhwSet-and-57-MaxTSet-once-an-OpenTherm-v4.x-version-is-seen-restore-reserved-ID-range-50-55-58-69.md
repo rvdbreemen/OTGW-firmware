@@ -3,9 +3,11 @@ id: TASK-1174
 title: >-
   Dev drops MsgID 56 (TdhwSet) and 57 (MaxTSet) once an OpenTherm v4.x version
   is seen: restore reserved-ID range 50-55/58-69
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-30 08:45'
+updated_date: '2026-09-30 08:56'
 labels:
   - bug
   - opentherm
@@ -83,8 +85,8 @@ DOCS ARE INCONSISTENT:
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Code: in src/OTGW-firmware/OTGW-Core.ino, isLegacyPreV42CompatibilityId() returns true for exactly MsgIDs 50-55 and 58-69 and false for 56 and 57, matching otgw-1.x.x OTGW-Core.ino:496 `return (msgid >= 50U && msgid <= 55U) || (msgid >= 58U && msgid <= 69U);`. The profile comment (currently :913-915, 'notably IDs 50-63') and the function header state that 56 (TdhwSet) and 57 (MaxTSet) are valid in OpenTherm v4.2 and not reserved. Nothing else in the reserved-ID gate changes (:924-941, :1739, :1772, :4628-4635).
-- [ ] #2 Host regression test, old vs fix, no hardware: a stdlib test under tests/ reads the real OTGW-Core.ino text and does NOT re-implement the predicate. It extracts isLegacyPreV42CompatibilityId / useV4xReservedIdRules / isMsgIdReservedInActiveProfile verbatim and either compiles them with a host C++ compiler against a stub OTcurrentSystemState, or mechanically evaluates the extracted return expression for msgid 0..255. It asserts this matrix: with both versions 0.0, no ID is reserved; with OpenThermVersionSlave = 4.0, and separately OpenThermVersionMaster = 4.2, IDs 48, 49, 56, 57, 70, 124 and 125 are NOT reserved and IDs 50-55 and 58-69 ARE reserved. The task notes include the pasted output for three inputs: `git show 3621a3830:src/OTGW-firmware/OTGW-Core.ino` FAILS (on 56, 57 and 64-69), the fixed file PASSES, and wt-otgw-1.x.x/src/OTGW-firmware/OTGW-Core.ino PASSES.
+- [x] #1 Code: in src/OTGW-firmware/OTGW-Core.ino, isLegacyPreV42CompatibilityId() returns true for exactly MsgIDs 50-55 and 58-69 and false for 56 and 57, matching otgw-1.x.x OTGW-Core.ino:496 `return (msgid >= 50U && msgid <= 55U) || (msgid >= 58U && msgid <= 69U);`. The profile comment (currently :913-915, 'notably IDs 50-63') and the function header state that 56 (TdhwSet) and 57 (MaxTSet) are valid in OpenTherm v4.2 and not reserved. Nothing else in the reserved-ID gate changes (:924-941, :1739, :1772, :4628-4635).
+- [x] #2 Host regression test, old vs fix, no hardware: a stdlib test under tests/ reads the real OTGW-Core.ino text and does NOT re-implement the predicate. It extracts isLegacyPreV42CompatibilityId / useV4xReservedIdRules / isMsgIdReservedInActiveProfile verbatim and either compiles them with a host C++ compiler against a stub OTcurrentSystemState, or mechanically evaluates the extracted return expression for msgid 0..255. It asserts this matrix: with both versions 0.0, no ID is reserved; with OpenThermVersionSlave = 4.0, and separately OpenThermVersionMaster = 4.2, IDs 48, 49, 56, 57, 70, 124 and 125 are NOT reserved and IDs 50-55 and 58-69 ARE reserved. The task notes include the pasted output for three inputs: `git show 3621a3830:src/OTGW-firmware/OTGW-Core.ino` FAILS (on 56, 57 and 64-69), the fixed file PASSES, and wt-otgw-1.x.x/src/OTGW-firmware/OTGW-Core.ino PASSES.
 - [ ] #3 Bench reproduction, old vs fix on the same rig and replay: use the bench S3 Classic + PIC, the rig that recorded scripts/tests/baseline_coverage.json. Replay scripts/tests/otgw_simulation_coverage.log with scripts/tests/run_coverage_test.py (telnet plus broker subscription). OLD is the current dev build and FIX is the same tree plus only this change; flash both app-only and start both runs the same way, right after the flash reboot. Look at the MsgID 56/57 frames decoded after the fixture's MsgID 125 = 4.00 frame (fixture :231), i.e. replay loop 2 onward. In the OLD telnet transcript they show 'Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 56 ignored)' / '... ID 57 ignored'. In the FIX transcript they show the TdhwSet/MaxTSet decode (for B Read-Ack frames, 'TdhwSet = <value>' / 'MaxTSet = <value>') and no 'Reserved' line for 56 or 57. Both transcripts are saved as transcript-<host>-<id>-<hw>-<datetime>.txt and cited in the Final Summary.
 - [ ] #4 End-to-end on FIX after the version frame has been seen, in the same bench run: the broker receives the canonical value topics TdhwSet and MaxTSet. GET /api/v2/otgw/otmonitor lists dhwsetpoint and maxchwatersetpoint, and their epoch advances between two reads taken one replay loop apart. On OLD, neither topic is published after the version frame, and the otmonitor entries are absent or their epoch is frozen. Source subtopics (_boiler/_thermostat) are NOT required: the dev baseline has none for any ID.
 - [ ] #5 The coverage-gate drift is exactly the expected set. Running run_coverage_test.py on FIX against the committed baseline reports:
@@ -94,9 +96,9 @@ DOCS ARE INCONSISTENT:
 - and nothing else.
 Any other drift is explained in the task notes before recording. The 1.x renderings in wt-otgw-1.x.x/scripts/tests/baseline_coverage.json (:1214-1223, :1852-1860, :2572-2574, :3372-3374) serve as a reference only, not as required dev strings.
 - [ ] #6 The baseline is re-recorded and deterministic. Re-record scripts/tests/baseline_coverage.json with --record on FIX, on the same bench, after the drift above has been reviewed. A later gate run on FIX then PASSES in two runs: one from a fresh boot (started right after the flash reboot) and one on a warm device that has already decoded MsgID 125. The fixture layout supports this: all 15 MsgID 56/57 frames sit at :126-140, and every 50-55/58-69 frame sits at :301-342, after the version frame at :231.
-- [ ] #7 Docs match the code: docs/BREAKING_CHANGES.md:149 and docs/fixes/opentherm-v42-mqtt-breaking-changes.md (:9, :24-25, :55, :84, :102, :128) state the suppressed legacy IDs as 50-55 and 58-69, with 56/57 valid. `grep -n "58-63"` over those two files returns nothing, and `grep -n "50-63"` over src/OTGW-firmware/OTGW-Core.ino returns nothing.
-- [ ] #8 TASK-1071 is corrected with `backlog task edit 1071 --append-notes`. The note records that the 15 CHANGED MsgID 56/57 keys in its 2026-09-23 OTGW32 run (task file line 77) were this regression, not 'AUTO profile works as designed', and references this task.
-- [ ] #9 Release hygiene:
+- [x] #7 Docs match the code: docs/BREAKING_CHANGES.md:149 and docs/fixes/opentherm-v42-mqtt-breaking-changes.md (:9, :24-25, :55, :84, :102, :128) state the suppressed legacy IDs as 50-55 and 58-69, with 56/57 valid. `grep -n "58-63"` over those two files returns nothing, and `grep -n "50-63"` over src/OTGW-firmware/OTGW-Core.ino returns nothing.
+- [x] #8 TASK-1071 is corrected with `backlog task edit 1071 --append-notes`. The note records that the 15 CHANGED MsgID 56/57 keys in its 2026-09-23 OTGW32 run (task file line 77) were this regression, not 'AUTO profile works as designed', and references this task.
+- [x] #9 Release hygiene:
 - The change ships under its own prerelease tag via bin/bump-prerelease.sh, in the same commit.
 - build.bat (esp32-combo) reports SUCCESS with fresh firmware.bin and littlefs.bin timestamps.
 - python evaluate.py --quick shows no new FAIL.
@@ -174,4 +176,16 @@ The verifiers differ only on narrowings, which are folded into the task:
 4. Docs. One verifier said no doc change is needed, but docs/BREAKING_CHANGES.md:149 and docs/fixes/opentherm-v42-mqtt-breaking-changes.md say 58-63, while the spec rule (:2523), 1.x and the dev audit report say 58-69. The doc correction is therefore included.
 5. The 64-69 half of the revert changes log text only, because those IDs are OT_UNDEF. That is 12 baseline keys, confirmed by grep.
 6. Reading 7ef9608eb as an accidental stale-tree commit is inference from its author and commit dates only.
+
+2026-09-30 implementation + host evidence (alpha.378).
+- AC#1: OTGW-Core.ino isLegacyPreV42CompatibilityId() now returns (50..55) || (58..69), identical to otgw-1.x.x OTGW-Core.ino:496; the profile comment says 50-55 and 58-69, and a function header cites OT spec v4.2 (48, 49, 56, 57, then 70). No other line of the reserved-ID gate changed.
+- AC#2: test/host/test_ot_reserved_range.py slices the enum, gOTSpecCompatMode and the three functions from OTGW-Core.ino by anchor (not re-implemented), compiles them with MSVC against a stub OTcurrentSystemState and checks all ids 0..255 for versions 3.00, slave 4.00 and master 4.20 against the spec set (so 48, 49, 56, 57, 70, 124, 125 free and 50-55/58-69 reserved under v4.x). The harness lives in test/host/ next to the existing MSVC slicing harness, not in tests/.
+  * --rev 3621a3830: FAIL (16 mismatches: 56(reserved) 57(reserved) 64-69(free) for both 4.x inputs); 'MsgID 56 TdhwSet SUPPRESSED, MsgID 57 MaxTSet SUPPRESSED'.
+  * working tree (fix): PASS (0 mismatches); 'MsgID 56 TdhwSet decoded, MsgID 57 MaxTSet decoded'.
+  * --file wt-otgw-1.x.x/src/OTGW-firmware/OTGW-Core.ino: PASS (0 mismatches).
+  Full output: %LOCALAPPDATA%/OTGW-capture/task1174-host.txt.
+- AC#7: docs/BREAKING_CHANGES.md (2x) and docs/fixes/opentherm-v42-mqtt-breaking-changes.md (7x) now say 58-69; grep '58-63' over both returns nothing, grep '50-63' over OTGW-Core.ino returns nothing.
+- AC#8: TASK-1071 note appended.
+- AC#9: bin/bump-prerelease.sh alpha.377 -> alpha.378 in the same commit; build.bat --target esp32-combo [SUCCESS] firmware (194.9 s) and filesystem, fresh .pio firmware.bin 10:55:18 / littlefs.bin 10:55:47 (alpha.378+e421570); evaluate.py --quick 69 passed, 0 warnings, 0 failed.
+OPEN: AC#3-#6 need the bench replay (S3 Classic + PIC rig per AC#3; the OTGW32 can replay too since TASK-1071, but the committed baseline was recorded on the Classic rig).
 <!-- SECTION:NOTES:END -->

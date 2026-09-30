@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.377
+**  Version  : v2.0.0-alpha.378
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -912,13 +912,16 @@ enum OTSpecCompatMode : uint8_t {
 
 // Default behavior:
 // - AUTO keeps pre-v4.2 compatibility until a 4.x OpenTherm version is detected,
-//   then applies v4.x reserved-ID rules (notably IDs 50-63).
+//   then applies v4.x reserved-ID rules (IDs 50-55 and 58-69).
 static OTSpecCompatMode gOTSpecCompatMode = OT_SPEC_COMPAT_AUTO;
 
 //===================[ OT Spec Profile Helpers ]====================
+// OT spec v4.2 lists 48, 49, 56 (TdhwSet) and 57 (MaxTSet) in this block and
+// jumps to 70, so 56/57 stay valid under v4.x rules (1.x fix for GH #538/#540,
+// TASK-1174). test/host/test_ot_reserved_range.py checks this range.
 static bool isLegacyPreV42CompatibilityId(uint8_t msgid)
 {
-  return (msgid >= 50U && msgid <= 63U);
+  return (msgid >= 50U && msgid <= 55U) || (msgid >= 58U && msgid <= 69U);
 }
 
 static bool useV4xReservedIdRules()
