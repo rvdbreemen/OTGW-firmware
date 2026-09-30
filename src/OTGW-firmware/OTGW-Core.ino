@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.386
+**  Version  : v2.0.0-alpha.387
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5311,10 +5311,12 @@ void processOT(const char *buf, int len, bool suppressOutput){
       DebugTln(F("PIC detected via banner — PIC functions re-enabled"));
 #if HAS_RUNTIME_HW_DETECT
       // ADR-127 re-detect safety net: a degraded combo boot that recovers via
-      // the banner is by definition a Classic board — persist that so the next
-      // boot skips the (previously missed) probe and starts in PIC mode.
-      if (settings.iBoardMode != 1) {
-        settings.iBoardMode = 1;
+      // the banner is by definition a Classic board. Only auto mode (0) learns
+      // that here, with the detected variant; a forced Classic mode (1, or 3
+      // for the S3 Mini Pro, ADR-158) is already persisted and must not be
+      // rewritten to the plain S3 Mini pin map (TASK-1180).
+      if (settings.iBoardMode == 0) {
+        settings.iBoardMode = state.hw.bClassicPro ? 3 : 1;
         writeSettings(false);
       }
 #endif

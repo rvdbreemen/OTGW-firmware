@@ -3,9 +3,11 @@ id: TASK-1180
 title: >-
   Combo banner recovery persists iBoardMode=1 and would turn an S3 Mini Pro
   (mode 3) into a plain Classic
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-09-30 10:32'
+updated_date: '2026-09-30 10:49'
 labels:
   - bug
   - combo
@@ -26,13 +28,25 @@ The loop-side recovery added in TASK-1179 (applyPICBannerInfo) deliberately does
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The banner recovery never writes an iBoardMode that differs from the board's detected variant: either the persist is removed (it cannot trigger from auto mode) or it writes state.hw.bClassicPro ? 3 : 1 only when iBoardMode is 0
-- [ ] #2 Old-vs-fix proof: a host harness that compiles the real banner branch (or a Classic S3 Mini Pro on the bench with iBoardMode 3 and a forced boot-probe miss) shows OLD rewriting 3 to 1 and FIX keeping 3
-- [ ] #3 The change ships in one commit with its own prerelease bump; build.bat esp32-combo SUCCESS; evaluate.py no new FAIL
+- [x] #1 The banner recovery never writes an iBoardMode that differs from the board's detected variant: either the persist is removed (it cannot trigger from auto mode) or it writes state.hw.bClassicPro ? 3 : 1 only when iBoardMode is 0
+- [x] #2 Old-vs-fix proof: a host harness that compiles the real banner branch (or a Classic S3 Mini Pro on the bench with iBoardMode 3 and a forced boot-probe miss) shows OLD rewriting 3 to 1 and FIX keeping 3
+- [x] #3 The change ships in one commit with its own prerelease bump; build.bat esp32-combo SUCCESS; evaluate.py no new FAIL
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Filed 2026-09-30 during TASK-1179. Reachability argued from OTGW-firmware.ino setup(): auto-mode detection failure closes the PIC UART and starts OT-Direct.
+
+2026-09-30 fix (alpha.387). processOT()'s banner recovery persists a board mode only from auto (iBoardMode == 0), as state.hw.bClassicPro ? 3 : 1, the same expression setup() uses; a forced Classic mode (1, or 3 for the S3 Mini Pro) is left alone.
+Host proof test/host/test_banner_board_mode.py (slices the real recovery block that follows the OTGW_BANNER test in processOT(); MSVC):
+- OLD (--rev HEAD c459331e3): FAIL 2 of 4: a forced S3 Mini Pro goes 3 -> 1 with a settings write; auto on a Pro learns 1 instead of 3.
+- FIX: PASS 4 of 4: forced Pro keeps 3 (no write), forced S3 Mini keeps 1 (no write), auto learns 3 on a Pro and 1 on an S3 Mini (one write each).
+Build: build.bat --target esp32-combo SUCCESS (fw + fs, fresh 12:48, alpha.387+c459331, images under %LOCALAPPDATA%/OTGW-capture/img-alpha387; the block is combo-only, HAS_RUNTIME_HW_DETECT); evaluate.py --quick 70 passed / 0 / 0.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+processOT()'s banner recovery on the combo board rewrote any board mode other than 1 to 1. That path only runs from a forced Classic mode (auto mode closes the PIC UART on a missed probe), so in practice it could only turn an S3 Mini Pro (mode 3) into a plain S3 Mini pin map on the next boot. It now learns the board only from auto mode (0), with the detected variant (bClassicPro ? 3 : 1). Proven on the host with test/host/test_banner_board_mode.py, which compiles the real block: the old code rewrites 3 to 1 and picks the wrong variant in auto mode; the fix keeps 3 and learns the right variant. Combo build and evaluate.py --quick are green at alpha.387.
+<!-- SECTION:FINAL_SUMMARY:END -->
