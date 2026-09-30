@@ -159,12 +159,13 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 ### Frame Bridging & Parsing
 
 #### `static void bridgeFrameToParser(char prefix, unsigned long frame)`
-- **Location**: OTDirect.ino:437
+- **Location**: OTDirect.ino:723
 - **Purpose**: Format 32-bit OT frame and feed to `processOT()` for parsing/logging
 - **Behavior**:
-  - Returns early if `otHideReports` is true (PS=1 mode suppresses individual frames)
-  - Formats as 9-char string: "P%08lX" (prefix + 8-digit hex)
-  - Calls `processOT(buf, 9)` which reuses entire existing stack (OT parser, MQTT, REST, WebSocket, HA discovery)
+  - Formats as 9-char string: "P%08lX" (prefix + 8-digit hex) and mirrors it to port 25238 (`otDirectBridgeWriteLine()`)
+  - Enqueues it with `enqueueOTFrame()`; `drainOTFrameQueue()` hands it to `processOT()` in `loop()`, which reuses entire existing stack (OT parser, MQTT, REST, WebSocket, HA discovery). In PS=1 mode `otHideReports` rides along as `suppressOutput`: the frame is still parsed, only its per-frame output is skipped (TASK-293)
+  - Tags an answer the gateway made itself (every 'A', and every 'B' in loopback mode) as `OTFRAME_SRC_OTDIRECT_LOCAL` instead of `OTFRAME_SRC_OTDIRECT`, so `processOT()` never lets it set or retract a boiler-unsupported verdict (TASK-1086)
+  - Host test: `python test/host/test_boiler_unsupported_origin.py --old-rev <commit before TASK-1086>` replays the producers' frames through this function, the frame queue and `processOT()`, and compares the bitmaps with the code before the fix
 - **Prefixes**:
   - 'T' = thermostat frame
   - 'R' = gateway request

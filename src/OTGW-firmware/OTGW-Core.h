@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.391
+**  Version  : v2.0.0-alpha.392
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -533,7 +533,10 @@ void confirmMQTTPublishByteSlot();         // confirm pending status-byte slot u
 // per-frame MQTT publish and the auto-leave-PS heuristic while still running
 // state updates, decoded value publishing, and connected-state flag writes.
 // Used by OT-direct bridgeFrameToParser() during PS=1 (TASK-293).
-void processOT(const char *buf, int len, bool suppressOutput = false);
+// localAnswer=true marks a frame the gateway made itself (queue source
+// OTFRAME_SRC_OTDIRECT_LOCAL): it neither sets nor retracts a
+// boiler-unsupported verdict (TASK-1086).
+void processOT(const char *buf, int len, bool suppressOutput = false, bool localAnswer = false);
 
 // ===== ADR-123 Phase-1 concurrency foundation (TASK-865.5) ================
 //
@@ -561,9 +564,13 @@ void processOT(const char *buf, int len, bool suppressOutput = false);
 // for PIC-sourced frames — OTDirect already mirrors producer-side via
 // otDirectBridgeWriteLine(), so mirroring it again in the consumer would
 // double-emit to 25238. (TASK-865.6: side-effects moved off the PIC task.)
+// OTFRAME_SRC_OTDIRECT_LOCAL is an OTDirect frame the gateway made itself
+// instead of receiving it from a boiler; bridgeFrameToParser() picks it and
+// processOT() does not count such a frame as boiler evidence (TASK-1086).
 enum OTFrameSource : uint8_t {
   OTFRAME_SRC_PIC      = 0,   // PIC UART line (dispatchOTGWInputLine / PIC task)
   OTFRAME_SRC_OTDIRECT = 1,   // OTDirect bridged frame (bridgeFrameToParser)
+  OTFRAME_SRC_OTDIRECT_LOCAL = 2,   // OTDirect answer made by the gateway itself (bridgeFrameToParser)
 };
 
 struct OTFrameMsg {
@@ -804,6 +811,9 @@ struct OpenthermData_t {
   byte bAnswerOverride;     //ADR-103: 1 only on an answer-override A (a (B,A) pair was detected); 0 (default)
                             //on a proxy A (no preceding B — e.g. MaxTSet/57). Proxy A reaches _thermostat,
                             //_boiler and canonical; answer-override A reaches _thermostat only (ADR-096 invariant).
+  byte bLocalAnswer;        //TASK-1086: 1 on a frame the gateway made itself (OTDirect: every A, and every B in
+                            //loopback mode), 0 on a frame from the bus. Such a frame neither sets nor retracts a
+                            //boiler-unsupported verdict. Rides the 1-frame delay with the frame, like bAnswerOverride.
   time_t time;
   /**
    * @return float representation of data packet value

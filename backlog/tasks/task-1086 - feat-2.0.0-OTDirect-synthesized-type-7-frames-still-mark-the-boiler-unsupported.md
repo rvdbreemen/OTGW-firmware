@@ -3,10 +3,11 @@ id: TASK-1086
 title: >-
   feat-2.0.0: OTDirect-synthesized type-7 frames still mark the boiler
   unsupported
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-08-24 20:32'
-updated_date: '2026-08-24 21:14'
+updated_date: '2026-09-30 14:42'
 labels:
   - bug
 dependencies: []
@@ -26,11 +27,11 @@ Why this was not fixed in the same change: the obvious discriminator does not wo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Locally synthesized OTDirect type-7 A frames do not set boilerUnsupportedRead or boilerUnsupportedWrite
-- [ ] #2 Genuine B frames from a real boiler on the OTDirect gateway path still count as boiler evidence
-- [ ] #3 Proxy A frames that legitimately stand in for a boiler answer (ADR-103) still count
+- [x] #1 Locally synthesized OTDirect type-7 A frames do not set boilerUnsupportedRead or boilerUnsupportedWrite
+- [x] #2 Genuine B frames from a real boiler on the OTDirect gateway path still count as boiler evidence
+- [x] #3 Proxy A frames that legitimately stand in for a boiler answer (ADR-103) still count
 - [ ] #4 Verified on a bench device in OTDirect master mode with no boiler attached: no msgid is reported unsupported
-- [ ] #5 Locally synthesized answers cannot RETRACT a genuine unsupported verdict either — the current rsptype == OTGW_BOILER guard blocks the (T,A) cases but NOT loopback mode, which fabricates frames labelled 'B' (OTDirect.ino:1213-1215)
+- [x] #5 Locally synthesized answers cannot RETRACT a genuine unsupported verdict either — the current rsptype == OTGW_BOILER guard blocks the (T,A) cases but NOT loopback mode, which fabricates frames labelled 'B' (OTDirect.ino:1213-1215)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -43,4 +44,24 @@ Original scope covered only the SET direction (synthesized type-7 A frames marki
 What that guard does NOT cover, and is the remaining work here: loopback mode bridges fabricated frames labelled 'B' (OTGW_BOILER) at OTDirect.ino:1213-1215, built from the PROGMEM table at :1188-1204, including type-7 for unknown ids and type-5 WRITE_ACK. Those pass a rsptype-based guard by construction, so they can both set and clear capability bits with no boiler present at all.
 
 Note OTDirect.ino:293 already carries the needed idea elsewhere in the same file: 'if (IS_LOOPBACK_MODE()) return false;   // synthetic responses are not a real boiler'. The bitmap block has no equivalent check. A loopback-mode check may be the cheap 80 percent fix, ahead of the full frame-origin plumbing.
+
+Implementation 2026-09-30 (workflow wf_33a155e0-d5c: implement, adversarial review, fixup; integrated in the main tree):
+- Design: bridgeFrameToParser() tags every 'A' and every 'B' while IS_LOOPBACK_MODE() as OTFRAME_SRC_OTDIRECT_LOCAL (new value 2); drainOTFrameQueue() passes it to processOT() as a 4th parameter (default false in the header, like suppressOutput); processOT() stores it in OTdata.bLocalAnswer, which rides the one-frame delay; '!OTdata.bLocalAnswer' gates the UNKNOWN-DATAID set and both Ack retracts. rsptype == OTGW_BOILER stays on the retracts (it still stops a PIC proxy A). Rejected: a loopback-mode check only (misses AC#1, reads the mode at drain time), the queue source byte alone (over-blocks genuine OT-Direct B, fails AC#2), per-call-site marks (fails open), full origin plumbing (reopens TASK-1138).
+- Known and accepted: a real boiler reply that arrives while the gateway is in loopback mode (boot probe, a reply in flight at GW=L) is also tagged local: an observation lost, never a fake one counted.
+- Proof, own run in the main tree: python test/host/test_boiler_unsupported_origin.py --old-rev HEAD (OLD = c39068977): FIX 22/22; OLD fails exactly D1-D7 (wrong SET on master-mode A, UI= READ and WRITE A, loopback UNKNOWN B; wrong RETRACT on loopback READ-ACK/WRITE-ACK B), only the unsupported verdict differs; 15 controls byte-identical (genuine OT-Direct B in gateway and master mode incl. the TASK-1178 CS=/RM= replies, PIC proxy A incl. P7 WRITE-ACK). Own slice audit: 58 sections, 0 mismatches. Mutants M1-M6, M10, M14 killed (fixup evidence). Transcript: %LOCALAPPDATA%/OTGW-capture/a1-patches/TASK-1086-run-oldvsfix-main-c39068977.txt
+- Regression: test_raw_passthrough.cpp's processOT double gets the 4th parameter with defaults (companion edit, it slices drainOTFrameQueue); its OLD-vs-FIX verdict stays PASS; override-reply suites 1178/1177/1184 PASS.
+- AC#4 needs the bench in OT-Direct master mode with no boiler; start it with /ot-boiler.json deleted and a prompt reboot, or verdicts persisted by older builds can fail it for a reason unrelated to this fix. Four related consumers outside these ACs: TASK-1185.
+
+Build 2026-09-30 alpha.392: build.bat --target all, esp32, esp32-classic and esp32-combo firmware and filesystem all SUCCESS, 'Build completed successfully!', fresh binaries; the 4th processOT() parameter with its header-only default compiles through the Arduino prototype generation on xtensa. evaluate.py --quick: 70 passed, 0 warnings, 0 failed. Log: %LOCALAPPDATA%/OTGW-capture/build-alpha392-task1086.log
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Locally synthesized OT-Direct frames no longer count as boiler evidence in boilerUnsupportedRead/Write, in either direction. bridgeFrameToParser() tags every 'A' (master mode, UI=/SR= tables, TASK-1178 replies) and every loopback 'B' as a local answer; the tag rides the frame queue and processOT's one-frame delay, and gates the UNKNOWN-DATAID set and both Ack retracts. Genuine OT-Direct B frames and PIC proxy A frames count as before.
+Evidence per AC:
+- AC#1, #5: test/host/test_boiler_unsupported_origin.py (real sliced bridge, queue and processOT): OLD c39068977 wrongly sets on D1-D5 and wrongly retracts on D6-D7; FIX does neither.
+- AC#2, #3: controls G1-G7 (genuine OT-Direct B) and P1-P7 (PIC proxy A) byte-identical OLD vs FIX.
+- Build: alpha.392, three targets fresh; evaluate --quick 0 FAIL.
+OPEN, blocking Done: AC#4 needs the bench in OT-Direct master mode with no boiler (delete /ot-boiler.json and reboot first). Related consumers outside these ACs: TASK-1185.
+<!-- SECTION:FINAL_SUMMARY:END -->

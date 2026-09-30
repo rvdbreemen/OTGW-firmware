@@ -35,6 +35,7 @@
   - **Routing discriminators (ADR-103)**:
     - `bAnswerOverride` — true when the current `A`-prefix frame is a gateway answer that *substitutes* a real boiler `B` frame (genuine answer-override). False on the more common case of an `A`-prefix proxy frame (no preceding `B`).
     - `bGatewaySubstituted` — true when the gateway injected the substitution itself.
+    - `bLocalAnswer` (TASK-1086) - true on a frame the gateway made itself instead of receiving it from a boiler: every OT-Direct `A`, and every `B` in OT-Direct loopback mode. `bridgeFrameToParser()` tags it as `OTFRAME_SRC_OTDIRECT_LOCAL`, `drainOTFrameQueue()` passes it to `processOT()`, and it rides the one-frame delay with its frame. Such a frame neither sets nor retracts a boiler-unsupported verdict (`boilerUnsupportedRead`/`boilerUnsupportedWrite`).
 - **Scope**: Global singleton `OTdataStruct OTcurrentSystemState`
 - **Note**: Flame status is in SlaveStatus bit 3 (NOT MasterStatus); MasterStatus bit 3 is OTC (Outside Temperature Compensation) enabled (bug fix: commit d85e668c)
 
@@ -79,11 +80,13 @@
 
 #### Message Processing
 
-##### `void processOT(const char *buf, int len)` (OTGW-Core.ino:3689)
+##### `void processOT(const char *buf, int len, bool suppressOutput = false, bool localAnswer = false)` (OTGW-Core.ino:4910)
 - **Purpose**: Parse incoming OpenTherm message from PIC serial, decode fields, publish to MQTT/WebSocket
 - **Parameters**:
   - `buf`: Character buffer containing raw OT message (format: "THxxddhh\r" or similar)
   - `len`: Length of buffer
+  - `suppressOutput`: skip the per-frame output (OT-Direct PS=1, TASK-293)
+  - `localAnswer`: the frame is an answer the gateway made itself (queue source `OTFRAME_SRC_OTDIRECT_LOCAL`); stored as `OTdata.bLocalAnswer` (TASK-1086)
 - **Flow**:
   1. Validate message format
   2. Extract message type (READ/WRITE/ACK/etc.)
@@ -93,7 +96,7 @@
   6. Log to WebSocket event stream
   7. Update global `OTcurrentSystemState`
 - **Dependencies**: decodeAndPublishOTValue(), OTPublishGate, handleOTGW()
-- **Location**: OTGW-Core.ino:3689-4038
+- **Location**: OTGW-Core.ino:4910-5377
 
 ##### `void processPSSummary(const char *buf, int len)` (OTGW-Core.ino:3428)
 - **Purpose**: Parse PS=1 diagnostic summary line from PIC (lists all message IDs seen in last minute)

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.391
+**  Version  : v2.0.0-alpha.392
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -735,7 +735,19 @@ static void bridgeFrameToParser(char prefix, unsigned long frame) {
   // mirror producer-side, so tag source=OTDIRECT: the consumer must NOT mirror
   // it again to 25238 (TASK-865.6). suppressOutput rides the queue item as
   // otHideReports (PS=1 raw-frame suppression).
-  enqueueOTFrame(buf, 9, otHideReports, OTFRAME_SRC_OTDIRECT);
+  //
+  // TASK-1086: a frame this gateway made itself goes out as
+  // OTFRAME_SRC_OTDIRECT_LOCAL, and processOT() does not count it as boiler
+  // evidence in the unsupported bitmaps. Every 'A' is one: master mode, the
+  // UI= and SR= tables and replyToThermostat() answer the thermostat
+  // themselves. In loopback mode every 'B' is taken as one
+  // (simulateLoopbackResponse). That also tags the few real boiler replies
+  // loopback mode sees (the boot probe and handshake in initOTDirect(), a
+  // reply still in flight at GW=L): an observation lost, never a fake one
+  // counted. The tag is fixed when the frame is made, so a frame still queued
+  // across a GW= mode switch keeps it.
+  const bool localAnswer = (prefix == 'A') || (prefix == 'B' && IS_LOOPBACK_MODE());
+  enqueueOTFrame(buf, 9, otHideReports, localAnswer ? OTFRAME_SRC_OTDIRECT_LOCAL : OTFRAME_SRC_OTDIRECT);
 }
 
 // ---------------------------------------------------------------------------

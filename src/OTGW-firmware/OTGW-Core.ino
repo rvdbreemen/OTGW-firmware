@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.391
+**  Version  : v2.0.0-alpha.392
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -568,7 +568,7 @@ void drainOTFrameQueue() {
     // processOT() acquires OTStateLock internally (writer side), covering all
     // five processOT call sites uniformly — not just this consumer. Do NOT wrap
     // here too: the lock is non-recursive and would self-deadlock.
-    processOT(msg.line, msg.len, msg.suppressOutput);
+    processOT(msg.line, msg.len, msg.suppressOutput, msg.source == OTFRAME_SRC_OTDIRECT_LOCAL);
     feedWatchDog();                            // bound worst-case drain time
   }
 }
@@ -4907,7 +4907,7 @@ void evaluateOTBusLiveness(OTBusLivenessTrigger trigger)
   }
 }
 
-void processOT(const char *buf, int len, bool suppressOutput){
+void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer){
   // TASK-865.5 (ADR-123 Phase-1): processOT() is THE writer of the decoded
   // OTGWState snapshot (OTcurrentSystemState.*, state.otBus.*). Acquire the
   // OTStateLock here — covering ALL processOT call sites uniformly: the queue
@@ -5009,6 +5009,7 @@ void processOT(const char *buf, int len, bool suppressOutput){
     OTdata.skipthis = false;                          // default: do not skip this message (parity errors only set this true)
     OTdata.bGatewaySubstituted = false;               // default: not substituted by gateway (ADR-096)
     OTdata.bAnswerOverride = false;                   // ADR-103: default proxy A (no preceding B)
+    OTdata.bLocalAnswer = localAnswer;                // TASK-1086: made by the gateway itself, not by the boiler
 
     if (cntOTmessagesprocessed == 1) {       //first message needs to be put in the buffer
       // Boot-time one-shot: the very first OT frame has no prior delayed frame to pair
@@ -5075,6 +5076,9 @@ void processOT(const char *buf, int len, bool suppressOutput){
       // so they are no longer monotonic. That retraction is gated on a real B
       // frame, which also stops this line's own synthesised answers from
       // clearing a verdict, and bounds how often it can fire.
+      // TASK-1086: a frame the gateway made itself (OTdata.bLocalAnswer: every
+      // OTDirect A, and every B of OTDirect loopback mode) says nothing about
+      // the boiler, so it neither sets nor retracts an unsupported verdict.
       {
         const uint8_t idx  = OTdata.id >> 3;
         const uint8_t mask = (uint8_t)(1u << (OTdata.id & 7));
@@ -5101,7 +5105,9 @@ void processOT(const char *buf, int len, bool suppressOutput){
           // a type-7 with masterslave==1, and counting it marked msgids the
           // boiler had just Write-Acked as "not implemented" (GH #677). A
           // proxy A with no preceding B still counts, per ADR-103 — the same
-          // distinction is_value_valid_for_master_topic() already makes.
+          // distinction is_value_valid_for_master_topic() already makes. A
+          // frame with bLocalAnswer set is the exception for the unsupported
+          // verdicts.
           if (OTdata.type == OT_READ_ACK) {
             if ((boilerAckedRead[idx] & mask) == 0) {
               boilerAckedRead[idx] |= mask;
@@ -5113,14 +5119,15 @@ void processOT(const char *buf, int len, bool suppressOutput){
             //
             // Retraction deliberately demands stricter evidence than the set:
             // only a genuine B frame from the boiler. bAnswerOverride alone is
-            // not enough, because it is set only when a B preceded the A. This
-            // line answers the thermostat itself in several places — the SR=
-            // response-override table (OTDirect.ino:1966) and master mode
-            // (OTDirect.ino:2503) both emit (T,A) with no B — so the flag stays
-            // false and such a frame would otherwise clear a verdict the boiler
-            // really gave. Setting stays permissive so a proxy A still counts
-            // as boiler evidence (ADR-103).
-            if (OTdata.rsptype == OTGW_BOILER && (boilerUnsupportedRead[idx] & mask) != 0) {
+            // not enough, because it is set only when a B preceded the A. A
+            // gateway that answers the thermostat itself emits (T,A) with no B
+            // (OTDirect does so from its SR= table and in master mode), so the
+            // flag stays false and such a frame would otherwise clear a verdict
+            // the boiler really gave. Setting stays permissive so a PIC proxy A
+            // still counts as boiler evidence (ADR-103). A B is not enough
+            // either when the gateway made it itself: OTDirect loopback mode
+            // answers every request with a B of its own (bLocalAnswer).
+            if (OTdata.rsptype == OTGW_BOILER && !OTdata.bLocalAnswer && (boilerUnsupportedRead[idx] & mask) != 0) {
               boilerUnsupportedRead[idx] &= ~mask;
               boilerUnsupportedDirty = true;
               boilerFileDirty        = true;
@@ -5131,15 +5138,17 @@ void processOT(const char *buf, int len, bool suppressOutput){
               boilerFileDirty = true;
             }
             // Same stricter rule as the read side above: only a genuine B.
-            if (OTdata.rsptype == OTGW_BOILER && (boilerUnsupportedWrite[idx] & mask) != 0) {
+            if (OTdata.rsptype == OTGW_BOILER && !OTdata.bLocalAnswer && (boilerUnsupportedWrite[idx] & mask) != 0) {
               boilerUnsupportedWrite[idx] &= ~mask;
               boilerUnsupportedDirty = true;
               boilerFileDirty        = true;
             }
-          } else if (OTdata.type == OT_UNKNOWN_DATA_ID) {
+          } else if (OTdata.type == OT_UNKNOWN_DATA_ID && !OTdata.bLocalAnswer) {
             // Master direction is read from boilerLastMasterWasWrite (set on
             // the preceding master frame). The slave's type-7 alone doesn't
-            // carry intent.
+            // carry intent. An UNKNOWN-DATAID the gateway made itself (OTDirect
+            // master mode without a cached value, its UI= table, loopback mode)
+            // is skipped: no boiler said it (TASK-1086).
             const bool isWriteCtx = (boilerLastMasterWasWrite[idx] & mask) != 0;
             uint8_t * const bitmap = isWriteCtx ? boilerUnsupportedWrite : boilerUnsupportedRead;
             if ((bitmap[idx] & mask) == 0) {
