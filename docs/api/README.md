@@ -752,9 +752,31 @@ Compares the firmware git hash with the filesystem git hash to detect mismatches
 
 ### Simulation
 
+The OT frame replay feeds `/otgw_simulation.log` from LittleFS to the OpenTherm
+decoder, one line every 750 ms, and starts again at the top when the file ends.
+Each line is one frame in the PIC's text format, for example `T10010A00`.
+Replayed frames take the same decode, state and MQTT publish path as live
+frames. This works on every board: PIC (OTGW Classic) and OT-Direct (OTGW32).
+
+Use the replay on a bench, not on a live heating system. What reaches the
+boiler while it runs depends on the board:
+
+- **PIC board.** Commands for the PIC are dropped, also those from a client on
+  port 25238. The one exception is a PIC reset with the MQTT `resetgateway`
+  command. The PIC keeps passing the thermostat's traffic to the boiler by
+  itself, and makes its own requests when no OpenTherm thermostat is connected.
+  The firmware discards what the PIC reports.
+- **OT-Direct board.** The boiler gets no OpenTherm frames from the gateway, so
+  a connected thermostat cannot reach it either. Loopback mode (`GW=L`) and
+  some thermostat-side frames still reach the decoder, so keep both out of a
+  replay run.
+
+The replay pauses while the network is down, during an OTA upload (firmware or
+filesystem) and during a PIC flash.
+
 #### `GET /api/v2/simulate`
 
-Returns the current OTGW simulation status.
+Returns the replay status.
 
 **Authentication**: Not required
 
@@ -763,27 +785,47 @@ Returns the current OTGW simulation status.
 {
   "simulation": {
     "active": false,
+    "available": true,
     "file": "/otgw_simulation.log",
-    "interval_ms": 1000
+    "interval_ms": 750
   }
 }
 ```
 
+| Field | Description |
+|---|---|
+| `active` | `true` while the replay is on and can run. Always `false` when `available` is `false`, even if the replay flag is still set. |
+| `available` | Whether the replay can run right now. `false` only when LittleFS is not mounted. |
+| `reason` | Only present when `available` is `false`: `"filesystem not mounted; the fixture cannot be read"`. |
+| `file` | The replay file. Fixed. |
+| `interval_ms` | Time between replayed lines. Fixed at 750. |
+
 #### `POST /api/v2/simulate/start` | `PUT /api/v2/simulate/start`
 
-Enables OTGW simulation mode. The gateway replays data from `/otgw_simulation.log` instead of reading from the PIC serial port.
+Starts the replay.
 
-**Authentication**: Not required
+**Authentication**: Required (when password is configured)
 
-**Response** `200 OK`: Same format as `GET /api/v2/simulate` with `active: true`.
+**Response** `200 OK`: Same format as `GET /api/v2/simulate`, with `active: true`.
+
+**Response** `409 Conflict` when LittleFS is not mounted. The replay stays off:
+```json
+{"error":{"status":409,"message":"Frame replay unavailable: LittleFS is not mounted, so the fixture cannot be read"}}
+```
+
+Start does not check that the file exists. When it is missing, the replay
+switches itself off on its next pass through the main loop and sends the
+WebSocket event `OTGW simulation disabled [/otgw_simulation.log missing]`.
+`GET /api/v2/simulate` then reports `active: false`.
 
 #### `POST /api/v2/simulate/stop` | `PUT /api/v2/simulate/stop`
 
-Disables OTGW simulation mode. Resumes reading from the live PIC serial port.
+Stops the replay, and live operation resumes. Stop is always allowed, also when
+`available` is `false`, so a set replay flag can always be cleared.
 
-**Authentication**: Not required
+**Authentication**: Required (when password is configured)
 
-**Response** `200 OK`: Same format as `GET /api/v2/simulate` with `active: false`.
+**Response** `200 OK`: Same format as `GET /api/v2/simulate`, with `active: false`.
 
 ---
 

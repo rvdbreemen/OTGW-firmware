@@ -24,6 +24,7 @@ The component also owns PIC lifecycle management: detecting presence, sending bo
 - **PIC firmware upgrade**: Intel HEX file validation, chunked transfer to PIC, progress reporting via MQTT and WebSocket
 - **Startup quiet period**: 15-second suppression of event logging after PIC reset to prevent burst noise
 - **OT spec compatibility**: Auto-detects v3.x vs v4.x PIC banner; applies version-appropriate reserved ID filtering
+- **OT frame replay** (TASK-1071): `handleOTReplay()` runs from the main loop on every transport and feeds `/otgw_simulation.log` to the decoder, one line every 750 ms, through `dispatchOTGWInputLine()` → `enqueueOTFrame()` → `processOT()`, the queue live frames take. While it runs, PIC commands and OT-Direct master requests are blocked (`satSimulationBlocksBusTx()`), and on a PIC board live PIC input is discarded. Controlled over REST at `/api/v2/simulate` (status), `/simulate/start` and `/simulate/stop`
 - **OTDirect (ESP32 only)**: Native ISR-driven OpenTherm master/slave using GPIO; five operating modes; 3-strike auto-blacklist for non-responsive message IDs; thermostat timeout fail-safe; PI room compensation; flame ratio tracking. Command queue uses **coalesce-by-MsgID** (TASK-494): repeated set commands for the same MsgID overwrite the pending entry instead of stacking, with a high-water diagnostic to distinguish genuine saturation from stale-value churn.
 - **TT=/TC= PIC-parity remote-override state machine** (OTDirect, TASK-466): MsgID 16 setpoint inject paired with a MsgID 100 (`RemoteOverrideFunction`) priority-bit hint to the thermostat. TT (priority 0x02) auto-clears on next thermostat broadcast; TC (priority 0x01) persists until cleared. The boiler ignores MsgID 100; it is purely a UX hint to the thermostat.
 - **ADR-103 proxy-answer vs answer-override routing**: `A`-prefix frames issued without a preceding `B` are *proxy answers* (gateway speaks for itself) and are published normally. `A` frames that substitute an intercepted `B` are *answer-overrides* (`OTdata.bAnswerOverride=true`) and are blocked by the canonical-publish gate. Tracked through the delayed-frame buffer; TASK-665 (ported from dev) documents the intentional one-shot drift on the first OT message after boot.
@@ -100,7 +101,7 @@ The component also owns PIC lifecycle management: detecting presence, sending bo
 - **OTGWSerial library**: Custom UART driver with PIC reset support (ESP8266 only)
 - **OpenTherm library** (ESP32): ISR-driven Manchester encoding/decoding for direct GPIO OT interface
 - **Wire.h / I2C**: External watchdog at address 0x26 (`FEEDWATCHDOGNOW` macro)
-- **LittleFS**: PIC hex files for firmware upgrade, replay simulation log `/otgw.replay`
+- **LittleFS**: PIC hex files for firmware upgrade, OT frame replay file `/otgw_simulation.log`
 - **ArduinoOTA**: Over-the-air ESP firmware updates
 
 ## Component Diagram

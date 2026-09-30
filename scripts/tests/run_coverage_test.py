@@ -28,6 +28,16 @@ capture cut mid-loop reports topics as MISSING purely because they had not come
 round yet, and a frame that appears once per loop gets no second chance when the
 telnet stream interleaves (2.0.0 splices SAT/BLE lines into decode output) and
 mangles its only occurrence. Both failure modes look exactly like a regression.
+
+The runner also checks that it GOT two loops, not only that it asked for them.
+The telnet stream must stay open for the whole window: the device closing it
+early (a reboot, a dropped session) is an error, not the end of the capture. And
+the capture must hold at least two loops' worth of decoded fixture frames. Either
+failure exits 2 before any comparison, so a short capture can neither pass the
+gate nor become a baseline. The 2026-09-23 OT-Direct run is the case these
+checks come from: the device closed the stream 538 s into a 694 s window, the
+capture held 702 decoded frames (1.66 loops), and the runner compared it
+without a word of warning.
 """
 from __future__ import annotations
 
@@ -50,6 +60,45 @@ FIXTURE = os.path.join(HERE, "otgw_simulation_coverage.log")
 BASELINE = os.path.join(HERE, "baseline_coverage.json")
 FRAME_INTERVAL_S = 0.75          # device default, /api/v2/simulate reports it
 TELNET_PORT = 23
+MIN_LOOPS = 2                    # a capture must hold at least this many loops
+
+
+class CaptureIncomplete(RuntimeError):
+    """The capture does not hold what the gate needs, so any verdict drawn from
+    it would mislead. Raised instead of letting a short capture reach the
+    comparison or --record."""
+
+
+def read_fixture() -> list:
+    """The fixture's frames in replay order. Blank lines are skipped, as the
+    device's replay reader skips them."""
+    with open(FIXTURE, encoding="ascii") as fh:
+        return [line.strip() for line in fh if line.strip()]
+
+
+def count_fixture_loops(lines, fixture) -> tuple:
+    """Return (loops, decoded): how many passes over the fixture the capture holds.
+
+    `decoded` counts the decode lines whose frame is a fixture frame, read with
+    the same OT_RX the fingerprint uses. `loops` is that count over the fixture
+    length. Counted rather than timed on purpose. The device stamps its lines
+    with local wall-clock time, which jumps at midnight, at a DST change and on
+    an NTP step, and it paces frames slightly slower than FRAME_INTERVAL_S (752.8
+    ms per frame measured on 2026-09-23). A frame count sees neither.
+
+    A count does see lost lines, and there is room for them. On the 2026-08-08
+    PIC bench, complete two-loop runs decoded 925 fixture frames with MQTT debug
+    off (broker mode) and 901 to 906 with it on (telnet mode), where the
+    publish lines crowd out some decode lines. Two loops need 846, so the
+    telnet-mode runs had 55 to 60 frames, about 6%, to spare.
+    """
+    frames = set(fixture)
+    decoded = 0
+    for line in lines:
+        m = coverage_baseline.OT_RX.search(line)
+        if m and m.group("frame") in frames:
+            decoded += 1
+    return decoded / len(fixture), decoded
 
 
 def http(url: str, method: str = "GET", timeout: int = 15) -> str:
@@ -232,33 +281,46 @@ def capture(host: str, seconds: int, out_path: str, want_mqtt: bool) -> int:
     vanished inside a 740 ms hole, in BOTH fixture loops, while the frame itself
     was processed normally). The MQTT output is thus simultaneously the source of
     the topic fingerprint and the reason the OT fingerprint loses frames.
+
+    Raises CaptureIncomplete when the device closes the stream before the window
+    ends. Only the runner closes a healthy capture, so an early close means the
+    device rebooted or dropped the session, and what was captured is short.
     """
     sock = socket.create_connection((host, TELNET_PORT), timeout=10)
-    sock.settimeout(1.0)
-    _drain(sock, 2.0)                            # let the banner land and settle
-    for flag in ("mqtt", "mqtt_gate"):
-        print(f"toggles  : {set_debug_flag(sock, flag, want_mqtt)}")
+    try:
+        sock.settimeout(1.0)
+        _drain(sock, 2.0)                        # let the banner land and settle
+        for flag in ("mqtt", "mqtt_gate"):
+            print(f"toggles  : {set_debug_flag(sock, flag, want_mqtt)}")
 
-    lines = 0
-    with open(out_path, "w", encoding="utf-8", errors="replace") as fh:
-        stop = time.time() + seconds
-        while time.time() < stop:
-            try:
-                data = sock.recv(4096)
+        lines = 0
+        with open(out_path, "w", encoding="utf-8", errors="replace") as fh:
+            start = time.time()
+            stop = start + seconds
+            while time.time() < stop:
+                try:
+                    data = sock.recv(4096)
+                except socket.timeout:
+                    continue
                 if not data:
-                    break
+                    ran = time.time() - start
+                    raise CaptureIncomplete(
+                        f"the device closed the telnet stream {ran:.0f}s into the "
+                        f"{seconds}s window ({seconds - ran:.0f}s early, {lines} lines "
+                        f"captured). Check uptime and bootcount in /api/v2/device/info "
+                        f"for a reboot.")
                 text = data.decode("utf-8", "replace")
                 fh.write(text)
                 fh.flush()
                 lines += text.count("\n")
-            except socket.timeout:
-                continue
-    sock.close()
-    return lines
+        return lines
+    finally:
+        sock.close()
 
 
 def main() -> int:
-    fixture_frames = sum(1 for _ in open(FIXTURE, encoding="ascii"))
+    fixture = read_fixture()
+    fixture_frames = len(fixture)
     loop_s = int(fixture_frames * FRAME_INTERVAL_S)
     default_s = loop_s * 2 + 60
 
@@ -355,6 +417,21 @@ def main() -> int:
         if collector is not None:
             collector.join(timeout=30)
             print(f"observed : {len(pairs)} publishes from the broker")
+
+        loops, decoded = count_fixture_loops(coverage_baseline.read(args.out), fixture)
+        print(f"loops    : {loops:.2f} ({decoded} fixture frames decoded, "
+              f"{MIN_LOOPS * fixture_frames} make {MIN_LOOPS} loops)")
+        if loops < MIN_LOOPS:
+            raise CaptureIncomplete(
+                f"the capture holds {loops:.2f} fixture loops ({decoded} of the "
+                f"{MIN_LOOPS * fixture_frames} decoded frames that {MIN_LOOPS} loops "
+                f"need). The replay stalled or stopped, the stream went quiet, or "
+                f"the window is too short (default {default_s}s).")
+    except CaptureIncomplete as exc:
+        print(f"\nINCOMPLETE CAPTURE: {exc}", file=sys.stderr)
+        print(f"Nothing was compared{' and no baseline was written' if args.record else ''}. "
+              f"Capture kept at {args.out} for investigation.", file=sys.stderr)
+        return 2
     except (OSError, urllib.error.URLError, RuntimeError) as exc:
         print(f"device error: {exc}", file=sys.stderr)
         return 2

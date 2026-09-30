@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-08-08 18:17'
-updated_date: '2026-09-30 08:51'
+updated_date: '2026-09-30 09:50'
 labels:
   - bug
   - tooling
@@ -81,4 +81,11 @@ AC1, AC2 and AC5 need an OTDirect board: upload the fixture, start, capture, con
 AC4 re-met in alpha.376: otgwSimulationUnavailableReason() now only reports an unmounted filesystem. Bench (OT-Direct): POST /simulate/start -> {active:true, available:true}; GET /simulate while running -> active:true; after /simulate/stop -> active:false, available:true. AC2 still open on its MQTT half (no broker on the bench).
 
 2026-09-30 correction (TASK-1174): the 15 CHANGED MsgID 56/57 keys in the 2026-09-23 OTGW32 coverage run were NOT 'AUTO profile works as designed'. They were a regression: isLegacyPreV42CompatibilityId() on dev returned 50..63, so once a v4.x version frame had been decoded (fixture :231, B407D0400 = slave 4.00) MsgIDs 56 (TdhwSet) and 57 (MaxTSet) were suppressed as 'Reserved', although OT spec v4.2 lists both as valid R/W ids. The fixture's 56/57 frames (:126-140) precede the version frame, so a freshly booted device decodes them in loop 1 and suppresses them afterwards, which is why the verdict depended on device state. Fixed in TASK-1174 (range 50-55 and 58-69, as 1.x).
+
+2026-09-30 host-side parts done (docs + tooling, no firmware, no bump).
+- Docs now match the code: docs/api/openapi.yaml SimulationStatus (adds 'available' and 'reason'), /simulate/start (the 409 and its wording) and /simulate/stop; docs/api/README.md simulation section; docs/c4/c4-component-opentherm-core.md and c4-container.md; scripts/json-golden/v2_simulate.json + _index.json carry the 'available' key.
+- scripts/tests/run_coverage_test.py now fails loudly on an early EOF of the capture stream and when fewer than 2 complete fixture loops were captured (the 2026-09-23 capture silently ended after 1.66 loops). scripts/tests/test_run_coverage_test.py: 9 tests OK (re-run in the main tree today); the workflow review ran the same tests against the OLD runner (4 failures + 3 errors) and three mutants of the new one (each caught), and ran the real count_fixture_loops() over the existing captures (complete runs count 2.13-2.19 loops).
+- Proposed AC#2 wording (maintainer decision, not applied): 'matches the 2.0.0 PIC-path baseline, every difference explained'. 'Same shape as 1.x' cannot hold on any transport for the range-affected keys; the 15 CHANGED MsgID 56/57 keys of the 2026-09-23 run were the TASK-1174 regression (fixed in alpha.378).
+- AC#3 was ticked on a code-level argument; the triage recommends one gate run on the Classic-S3 with its PIC before closing, or an explicit maintainer waiver.
+OPEN: AC#2 needs the bench replay run (OTGW32 or Classic) after the reword.
 <!-- SECTION:NOTES:END -->

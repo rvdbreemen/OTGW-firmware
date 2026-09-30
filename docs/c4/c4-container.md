@@ -107,7 +107,7 @@ All containers live on a single physical device. There is no Docker, no Kubernet
 | `/reboot_count.txt` | <1 KB | Persistent reboot counter |
 | `/reboot_log.txt` | <5 KB | Circular log of last 20 reboot events |
 | `/version.hash` | <0.1 KB | Firmware/filesystem version hash for mismatch detection |
-| `/otgw.replay` | varies | Optional OT message replay log for simulation mode |
+| `/otgw_simulation.log` | varies | Optional OT frame replay file for `/api/v2/simulate/start`, one PIC-format frame per line |
 
 Note: the previous `/mqttha.cfg` LittleFS file has been retired. HA MQTT discovery is now published directly from PROGMEM data tables in `MQTTHaDiscovery.cpp` (ADR-077). Default discovery semantics: JIT (ADR-100: an OT ID is queued when a valid frame arrives and its config is not yet published, and the drip publishes it), flat per-value scalar topics (ADR-101), self-describing names (ADR-106).
 
@@ -407,8 +407,9 @@ The firmware exposes a versioned HTTP REST API on port 80. All responses are JSO
 | `GET` | `/api/v2/pic/flash-status` | PIC firmware type and update availability |
 | `POST` | `/api/v2/pic/flash-status` | Trigger PIC firmware upgrade |
 | `GET` | `/api/v2/pic/settings` | PIC configuration registers (CR=0..14) |
-| `GET` | `/api/v2/simulate` | Simulation mode status |
-| `POST` | `/api/v2/simulate` | Enable/disable OTGW message simulation |
+| `GET` | `/api/v2/simulate` | OT frame replay status: `active`, `available`, `reason` when unavailable |
+| `POST` | `/api/v2/simulate/start` | Start the OT frame replay (auth required; 409 when LittleFS is not mounted). `PUT` is an alias |
+| `POST` | `/api/v2/simulate/stop` | Stop the OT frame replay (auth required). `PUT` is an alias |
 
 **Smart Thermostat (SAT)**
 

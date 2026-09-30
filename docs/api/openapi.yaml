@@ -1115,16 +1115,40 @@ paths:
     get:
       tags:
         - Simulation
-      summary: Get OTGW simulation status
-      description: Returns the current OTGW simulation mode status.
+      summary: Get OT frame replay status
+      description: |
+        Returns the status of the OT frame replay. `available` says whether the
+        replay can run on this device right now; when it is `false`, `reason`
+        says why and `active` is `false`. Start and stop have their own paths.
+        `POST` or `PUT` on this path answers 405 once the request passes the
+        auth check; with a password set, a request without valid credentials
+        gets 401 first.
       operationId: getSimulationStatus
       responses:
         '200':
-          description: Simulation status retrieved
+          description: Replay status retrieved
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SimulationStatus'
+              examples:
+                idle:
+                  summary: Replay can run and is off
+                  value:
+                    simulation:
+                      active: false
+                      available: true
+                      file: "/otgw_simulation.log"
+                      interval_ms: 750
+                unavailable:
+                  summary: LittleFS is not mounted
+                  value:
+                    simulation:
+                      active: false
+                      available: false
+                      reason: "filesystem not mounted; the fixture cannot be read"
+                      file: "/otgw_simulation.log"
+                      interval_ms: 750
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -1132,56 +1156,101 @@ paths:
     post:
       tags:
         - Simulation
-      summary: Start OTGW simulation
+      summary: Start the OT frame replay
       description: |
-        Enables OTGW simulation mode. The gateway replays data from
-        `/otgw_simulation.log` instead of reading from the PIC serial port.
+        Starts the OT frame replay. The gateway feeds `/otgw_simulation.log`
+        from LittleFS to its OpenTherm decoder, one line every `interval_ms`
+        (750 ms), and starts again at the top when the file ends. Each line is
+        one frame in the PIC's text format, for example `T10010A00`. Replayed
+        frames take the same decode, state and MQTT publish path as live frames,
+        on every board: PIC (OTGW Classic) and OT-Direct (OTGW32) alike.
+
+        Use the replay on a bench, not on a live heating system. What reaches
+        the boiler while it runs depends on the board:
+
+        - PIC board: commands for the PIC are dropped, also those from a
+          client on port 25238. The one exception is a PIC reset with the
+          MQTT `resetgateway` command. The PIC keeps passing the thermostat's
+          traffic to the boiler by itself, and makes its own requests when no
+          OpenTherm thermostat is connected. The firmware discards what the
+          PIC reports.
+        - OT-Direct board: the boiler gets no OpenTherm frames from the
+          gateway, so a connected thermostat cannot reach it either. Loopback
+          mode (`GW=L`) and some thermostat-side frames still reach the
+          decoder, so keep both out of a replay run.
+
+        The replay pauses while the network is down, during an OTA upload
+        (firmware or filesystem) and during a PIC flash.
+
+        Start does not check that the file exists. When it is missing, the replay
+        switches itself off on its next pass through the main loop and sends the
+        WebSocket event `OTGW simulation disabled [/otgw_simulation.log missing]`.
+        `GET /v2/simulate` then reports `active: false`.
       operationId: startSimulation
       security:
         - basicAuth: []
       responses:
         '200':
-          description: Simulation started
+          description: Replay started
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SimulationStatus'
+              example:
+                simulation:
+                  active: true
+                  available: true
+                  file: "/otgw_simulation.log"
+                  interval_ms: 750
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+        '409':
+          $ref: '#/components/responses/SimulationUnavailable'
     put:
       security:
         - basicAuth: []
       tags:
         - Simulation
-      summary: Start OTGW simulation (PUT alias)
+      summary: Start the OT frame replay (PUT alias)
       operationId: startSimulationPut
       responses:
         '200':
-          description: Simulation started
+          description: Replay started
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SimulationStatus'
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+        '409':
+          $ref: '#/components/responses/SimulationUnavailable'
 
   /v2/simulate/stop:
     post:
       tags:
         - Simulation
-      summary: Stop OTGW simulation
+      summary: Stop the OT frame replay
       description: |
-        Disables OTGW simulation mode. Resumes reading from the live PIC serial port.
+        Stops the OT frame replay, and live operation resumes: live PIC input on
+        a PIC board, bus transmission on an OT-Direct board. Stop is allowed on
+        every device, also when `available` is `false`, so a set replay flag can
+        always be cleared.
       operationId: stopSimulation
       security:
         - basicAuth: []
       responses:
         '200':
-          description: Simulation stopped
+          description: Replay stopped
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/SimulationStatus'
+              example:
+                simulation:
+                  active: false
+                  available: true
+                  file: "/otgw_simulation.log"
+                  interval_ms: 750
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
     put:
@@ -1189,11 +1258,11 @@ paths:
         - basicAuth: []
       tags:
         - Simulation
-      summary: Stop OTGW simulation (PUT alias)
+      summary: Stop the OT frame replay (PUT alias)
       operationId: stopSimulationPut
       responses:
         '200':
-          description: Simulation stopped
+          description: Replay stopped
           content:
             application/json:
               schema:
@@ -4625,21 +4694,34 @@ components:
       properties:
         simulation:
           type: object
+          required: [active, available, file, interval_ms]
           properties:
             active:
               type: boolean
-              description: Whether simulation mode is currently active
+              description: |
+                True while the replay is on and can run. Always false when
+                `available` is false, even if the replay flag is still set.
+            available:
+              type: boolean
+              description: |
+                Whether the replay can run on this device right now. False only
+                when LittleFS is not mounted, because the replay file lives there.
+            reason:
+              type: string
+              description: Present only when `available` is false. Says why the replay cannot run.
+              example: "filesystem not mounted; the fixture cannot be read"
             file:
               type: string
-              description: Path to the simulation log file
+              description: Path of the replay file on LittleFS. Fixed.
             interval_ms:
               type: integer
-              description: Replay interval in milliseconds
+              description: Time between replayed lines, in milliseconds. Fixed at 750.
       example:
         simulation:
           active: false
+          available: true
           file: "/otgw_simulation.log"
-          interval_ms: 1000
+          interval_ms: 750
 
   responses:
     RateLimited:
@@ -4767,6 +4849,19 @@ components:
             error:
               status: 500
               message: "Internal server error (low heap)"
+
+    SimulationUnavailable:
+      description: |
+        The OT frame replay cannot start: LittleFS is not mounted, so the replay
+        file cannot be read. Nothing changes; the replay stays off.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ApiError'
+          example:
+            error:
+              status: 409
+              message: "Frame replay unavailable: LittleFS is not mounted, so the fixture cannot be read"
 
     PicUnavailable:
       description: |

@@ -81,7 +81,7 @@
   },
   "/v2/simulate": {
     "status": 200,
-    "bytes": 79,
+    "bytes": 96,
     "file": "v2_simulate.json"
   },
   "/v2/otgw/otmonitor": {

@@ -7,7 +7,7 @@ is forced by 2.0.0 behaviour rather than chosen.
 
 ```
 # one command: upload, start, capture, stop, compare.
-# exit 0 = match, 1 = drift, 2 = device or broker error.
+# exit 0 = match, 1 = drift, 2 = device or broker error, or an incomplete capture.
 OTGW_MQTT_PASSWORD=... python run_coverage_test.py --host <ip> --http-password <pw>
 
 # refresh the baseline, only after reading a diff and accepting the new behaviour
@@ -24,6 +24,7 @@ OTGW_MQTT_PASSWORD=... python run_coverage_test.py --host <ip> --http-password <
 | `mqtt_topic_capture.py` | Stdlib MQTT 3.1.1 subscriber; also runs standalone to list what a device publishes. |
 | `baseline_coverage.json` | The committed baseline. |
 | `run_coverage_test.py` | The one-command runner. |
+| `test_run_coverage_test.py` | Self-test of the runner's incomplete-capture checks, against a fake telnet on 127.0.0.1. No device needed, about 20 s. |
 
 Capture logs are NOT committed. `.gitignore` allowlists the two fixture `.log`
 files by name rather than un-ignoring `scripts/tests/*.log` wholesale, so a gate
@@ -164,6 +165,22 @@ shorter. One loop is not enough for two independent reasons:
   recovered in loop 2 exactly this way.
 
 Both look identical to a real regression.
+
+Asking for two loops is not the same as getting them, so the runner checks the
+capture too. Two cases exit 2 before any comparison or `--record`:
+
+- **The device closes the telnet stream early.** Only the runner ends a healthy
+  capture. An early close means a reboot or a dropped session.
+- **The capture holds under two loops of decoded fixture frames**: fewer than
+  846, two passes over the 423-frame fixture. The frames are counted, not timed.
+  The device stamps its lines with wall-clock time, which can jump, and it paces
+  a little slower than 750 ms. Complete two-loop runs on the 2026-08-08 PIC
+  bench decoded 901 to 925.
+
+Either check alone would have stopped the 2026-09-23 OT-Direct run. The device
+closed the stream 538 s into the 694 s window, the capture held 702 decoded
+frames (1.66 loops), and the runner compared it without a warning.
+`python test_run_coverage_test.py` proves both checks fire.
 
 ## What the fingerprint keeps and strips
 
