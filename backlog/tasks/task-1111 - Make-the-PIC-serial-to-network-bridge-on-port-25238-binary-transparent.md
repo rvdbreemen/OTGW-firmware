@@ -1,11 +1,11 @@
 ---
 id: TASK-1111
 title: Make the PIC serial-to-network bridge on port 25238 binary transparent
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-02 21:44'
-updated_date: '2026-09-30 07:55'
+updated_date: '2026-09-30 13:08'
 labels: []
 dependencies: []
 ordinal: 269000
@@ -19,7 +19,7 @@ Port of TASK-1109 on otgw-1.x.x. drainOTFrameQueue() mirrors whole assembled lin
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every byte the PIC task reads from OTGWSerial reaches OTGWstream verbatim, without waiting for a line terminator
+- [x] #1 Every byte the PIC task reads from OTGWSerial reaches OTGWstream verbatim, without waiting for a line terminator
 - [x] #2 CR, LF, NUL and bytes above 0x7F are forwarded unmodified; no CRLF is synthesised on the passthrough path
 - [x] #3 The PIC task performs no network I/O and no OTGWState writes, so the ADR-123 task/loop seam is preserved
 - [x] #4 A line that overflows MAX_BUFFER_READ still reaches the network client; only the OT parser drops it
@@ -73,34 +73,19 @@ Ordering: after this change the raw queue is the ONLY feed to port 25238 on the 
 - AC#1 needs a raw port-25238 capture on a PIC board (on the OTGW32 the PIC task parks under OT-Direct, so nothing reaches otRawQueue). Expected OLD/FIX differences: the final 'Enter test number: ' prompt of the diagnose firmware arrives only on the FIX; the first PS=1 chunk arrives about 30 ms after the line starts (dev coalesces for 30 ms, so the 1.x '69 of 98 chunks' ratio does not transfer); diagnose CR-LF-LF sequences are preserved on the FIX where the old code collapsed them.
 - Comments that describe the pre-1111 behaviour and should be updated at close (re-verify line numbers): OTGW-Core.h:557-561, :693, :719-722; OTGW-Core.ino:748-749, :3798-3802; OTDirect.ino:627.
 - AC#7 needs a fresh build of all three targets at close.
+
+AC#1 closed 2026-09-30 with a host harness on the real byte path (no PIC board connected): test/host/test_raw_passthrough.py slices picSerialDrainOnce() and enqueueOTFrame() (task side) and drainOTFrameQueue() plus, where the revision has them, picSerialFlushRawChunk() and drainOTRawQueue() (loop side), with the message types from OTGW-Core.h. The UART, the value queues, the clock and OTGWstream are doubles; bytes arrive at 9600 baud, the task ticks every 2 ms and the loop drains after each tick.
+Run: python test/host/test_raw_passthrough.py --old-rev c1012f265^ -> FIX 6/6, every case byte-exact; the trailing prompt 'Enter test number: ' (no terminator) reaches OTGWstream 13 ms after its last byte. OLD fails exactly the four predicted cases: a bare-LF line gets a synthesised CR (12 bytes for 11), an empty line is swallowed (8 of 10 bytes), a 600-byte line (over MAX_BUFFER_READ) never arrives, and the prompt never arrives. Controls (CRLF lines; NUL and 0xFF inside a line) byte-exact on both. RESULT: PASS. Transcript: %LOCALAPPDATA%/OTGW-capture/a1-patches/TASK-1111-rawpassthrough-oldvsfix.txt
+Not exercised: the TCP socket behind OTGWstream and real FreeRTOS scheduling. The 25238 capture on a PIC board would add those.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Port of the otgw-1.x.x fix 9131e8a26 to the 2.0.0 async line: port 25238 now carries the PIC serial stream byte for byte instead of assembled lines.
-
-What changed and why
-
-drainOTFrameQueue() mirrored whole lines to OTGWstream and appended a synthesised CRLF. A payload without a line terminator never reached an OTmonitor client, and a CR/LF/NUL inside a payload was eaten as a terminator. The diagnose PIC firmware declares its prompt as da "Enter test number: " -  is an end-of-string sentinel that is never transmitted, so the prompt has no newline and stayed stranded while the PIC blocked in GetString. Reported by Schelte Bron.
-
-The 1.x patch writes to OTGWstream from the serial read loop, which is not possible here: the raw bytes are read by the dedicated FreeRTOS PIC-UART task, which carries a byte-I/O-only mandate (ADR-123 / TASK-865.6). The passthrough therefore crosses the task/loop seam through its own value queue, like the frame path already does.
-
-- OTGW-Core.h: OT_RAW_CHUNK_MAX 64, struct OTRawMsg {uint8_t bytes[64]; uint8_t len;} with the trivially-copyable static_assert, OT_RAW_QUEUE_DEPTH 16, OT_RAW_COALESCE_MS 30, extern otRawQueue, drainOTRawQueue() declaration.
-- OTGW-Core.ino: otRawQueue defined next to otTxQueue and created in setupOTConcurrency(); picSerialFlushRawChunk() task helper; the byte copy in picSerialDrainOnce() ahead of the line assembly; the coalescing-window flush after the RX loop; drainOTRawQueue() called from drainOTFrameQueue() before the frame-queue guard; the line mirror removed with the LED blink kept; drop reporting added to reportPendingPICRxErrors(); replayNextOTGWSimulationLine() given its own OTGWstream write.
-- OTDirect.ino untouched (version banner only): OT-Direct synthesises its lines and has no raw byte stream.
-
-One deliberate deviation from the sketched design: the chunk flushes on full OR on age >= 30 ms, not at the end of a read burst. The task ticks every 2 ms and the PIC runs at 9600 baud (~1.04 ms/byte), so an end-of-burst flush would have emitted 1-2 byte chunks - one queue slot and one TCP segment per two bytes, and ~32 bytes of buffering across depth 16 instead of the intended ~1 KB. The queue and its depth are unchanged.
-
-Verification
-
-- build.bat (all three targets, clean): esp32 [SUCCESS] 299.61s, esp32-classic [SUCCESS] 441.90s, esp32-combo [SUCCESS] 336.34s, plus the three LittleFS images; "Build completed successfully!", wrapper exit 0. Binaries confirmed fresh by mtime (2026-09-03 00:03-00:19 vs 2026-09-01 before). esp32-classic and esp32-combo are the HAS_PIC targets that actually compile the new code, and OTGW-firmware.ino.cpp.o compiled with no diagnostics on both.
-- python evaluate.py --quick: 76 checks, 68 passed, 0 failed, 1 warning. The warning (STATUS_BURST_COOLDOWN_MS bound: boards.h not found) is pre-existing and unrelated - boards.h now lives at src/libraries/Platform/src/boards.h and that gate still looks in the old location.
-- python tests/test_evaluate.py: Ran 61 tests, OK.
-
-Risks and follow-up
-
-ACs 1, 2 and 4 are behavioural claims about what an OTmonitor client receives and need one on-device session to confirm: connect to port 25238 on a PIC device and drive the diagnose prompt (no newline) plus a PS=1 dump (long lines). They are satisfied by construction - the copy is unconditional, sits before the overflow-discard branch, and nothing on the passthrough path branches on byte value or writes a terminator - but a compile does not prove delivery. Under a multi-second loop stall the queue can overflow and drop chunks; that is counted and reported, and it is the same exposure the old line mirror had through otFrameQueue.
-
-The prerelease bump is deliberately deferred to a single batch bump by the parent session: two agents share this worktree and autoinc-semver.py --update-all rewrites and stages ~43 source-file banners, including files the other agent is editing. This landed with OTGW_BUMP_HOOK_DISABLE=1, staging only OTGW-Core.ino, OTGW-Core.h and this task record. Note that the verification build therefore ran against the same code at tag alpha.360, which is also the tag the committed tree carries.
+Port 25238 now carries the PIC's bytes verbatim (c1012f265, alpha.361): the PIC task copies every byte it reads into a raw chunk before the line assembly, coalesced over 30 ms and handed to the loop through its own value queue; drainOTRawQueue() writes the chunks to OTGWstream unchanged. Before, only whole assembled lines went out, with a synthesised CRLF, so a prompt without a terminator never reached an OTmonitor client and CR/LF/NUL inside a payload were eaten.
+Evidence per AC:
+- AC#1: test/host/test_raw_passthrough.py on the real task and loop code: FIX byte-exact in all six cases, the unterminated prompt within 13 ms; OLD synthesises CR, swallows an empty line, drops an over-long line and never sends the prompt.
+- AC#2: the same harness (bare LF, NUL, 0xFF) plus the implementation notes.
+- AC#3 to AC#7: see the implementation notes (seam preserved, overflow line reaches the client, loop-side drop reporting, OT-Direct bridge unchanged, build and evaluate green).
+No 25238 capture on a PIC board this session; the harness does not exercise the TCP socket or FreeRTOS scheduling.
 <!-- SECTION:FINAL_SUMMARY:END -->
