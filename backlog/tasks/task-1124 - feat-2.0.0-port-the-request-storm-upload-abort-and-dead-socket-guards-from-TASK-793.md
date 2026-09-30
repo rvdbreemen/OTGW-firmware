@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-04 06:57'
-updated_date: '2026-09-30 10:28'
+updated_date: '2026-09-30 11:36'
 labels:
   - 2.0.0
   - port
@@ -45,4 +45,6 @@ OPEN: AC#1/#2/#4 run on the OTGW32 bench once it is back on the network.
 - docs/api/openapi.yaml states the rule in the error conventions and in the 429-vs-503 text. Additive header, no ADR (bug-fix level within ADR-035/172 conventions).
 - Build: build.bat --target esp32-combo SUCCESS (fw + fs, fresh 12:27-12:28, alpha.385+05e8c6c, images under %LOCALAPPDATA%/OTGW-capture/img-alpha385); evaluate.py --quick 70 passed / 0 / 0.
 AC#3 stays unchecked until a bench curl -i of a gated 503 (e.g. during a refresh_storm.py storm) shows 'Retry-After: 1'.
+
+Regression found 2026-09-30 by a full offline host-suite run: scripts/tests/test_heap_soak_driver.py (TASK-1036 WP8) reads sendDeviceInfoV2() for sendApiError(503, F(...)), and this task's sendApiBusy() replaced that call, so FirmwareContract failed in setUpClass and 0 tests ran (exit 5). Fixed in the test: api_error_message() also accepts sendApiBusy(F(...)) as a 503 (sendApiError(503) plus Retry-After). After the fix: 19 tests OK. The test is absent on origin/dev, so this never shipped.
 <!-- SECTION:NOTES:END -->

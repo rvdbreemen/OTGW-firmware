@@ -100,9 +100,13 @@ def pstr_format(function_text, must_contain):
 
 
 def api_error_message(function_text, status, after=""):
-    """Message of the first sendApiError(status, F("...")) after the text `after`."""
-    m = re.search(re.escape(after) + r'.*?sendApiError\(' + str(status) + r', F\("([^"]+)"\)\)',
-                  function_text, re.S)
+    """Message of the first sendApiError(status, F("...")) after the text `after`.
+    A 503 can also come from sendApiBusy(F("...")): sendApiError(503) plus a
+    Retry-After header (TASK-1124)."""
+    call = r'sendApiError\(' + str(status) + r', F\("([^"]+)"\)\)'
+    if status == 503:
+        call = r'(?:sendApiError\(503, |sendApiBusy\()F\("([^"]+)"\)\)'
+    m = re.search(re.escape(after) + r'.*?' + call, function_text, re.S)
     if not m:
         raise AssertionError(f"no sendApiError({status}, ...) found after {after!r}")
     return m.group(1)
