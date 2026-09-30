@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.384
+**  Version  : v2.0.0-alpha.385
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -146,6 +146,15 @@ static void sendApiError(int httpCode, const __FlashStringHelper* message) {
 static void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods) {
   webPushHeader(F("Allow"), allowedMethods);
   sendApiError(405, F("Method not allowed"));
+}
+
+// TASK-1124: a 503 caused by transient heap or concurrency pressure carries
+// Retry-After: 1, like the static-file gate (webServerCompat.h, TASK-960), so a
+// client backs off instead of hammering the gate. A 503 that reports missing
+// hardware or a disconnected MQTT uses sendApiError() and carries no Retry-After.
+static void sendApiBusy(const __FlashStringHelper* message) {
+  webPushHeader(F("Retry-After"), F("1"));
+  sendApiError(503, message);
 }
 
 // A: Boot-time flash & filesystem values cached once at startup.
@@ -2002,7 +2011,7 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   if (wc > 4 && strcmp_P(words[4], PSTR("verify")) == 0) {
     if (method != HTTP_POST) { sendApiMethodNotAllowed(F("POST")); return; }
     if (!state.mqtt.bConnected) { sendApiError(503, F("MQTT not connected")); return; }
-    if (platformFreeHeap() < VERIFICATION_MIN_HEAP_START) { sendApiError(503, F("Heap too low for verify")); return; }
+    if (platformFreeHeap() < VERIFICATION_MIN_HEAP_START) { sendApiBusy(F("Heap too low for verify")); return; }
     if (isDiscoveryVerificationActive()) { sendApiError(409, F("Verification already active")); return; }
     if (countPendingDiscoveryIds() > 0) { sendApiError(409, F("Discovery drip in progress")); return; }
     if (!startDiscoveryVerification()) { sendApiError(503, F("Verification start refused (see telnet log)")); return; }
@@ -2139,7 +2148,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
   // The chunked path allocates only the small fixed snapshot (no whole-response
   // cbuf), but guard the snapshot alloc itself against a fragmented heap (mirrors
   // sendDeviceInfoV2's >=8 KB block guard).
-  if (platformMaxFreeBlock() < 8192) { sendApiError(503, F("low heap")); return; }
+  if (platformMaxFreeBlock() < 8192) { sendApiBusy(F("low heap")); return; }
 
   // Freeze every volatile input ONCE (see DebugDumpSnap above); the closure owns
   // it via shared_ptr so every window re-run reads identical bytes.
@@ -2725,7 +2734,7 @@ void processAPI(AsyncWebServerRequest *request)
     RESTDebugTf(PSTR("REST BUSY: %u/%u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
                 restInFlight, REST_MAX_INFLIGHT, effectiveCap, platformFreeHeap(), platformMaxFreeBlock());
     state.heapdiag.iRest503Count++;  // TASK-1017: load-test instrumentation
-    sendApiError(503, F("Server busy: too many concurrent requests, please retry"));
+    sendApiBusy(F("Server busy: too many concurrent requests, please retry"));
     return;
   }
   restInFlight++;
@@ -3072,7 +3081,7 @@ struct DeviceInfoSnap {
 void sendDeviceInfoV2()
 {
   if (platformMaxFreeBlock() < DEVICE_INFO_MIN_HEAP_BLOCK) {
-    sendApiError(503, F("low heap"));
+    sendApiBusy(F("low heap"));
     return;
   }
   const uint32_t startMs = millis();

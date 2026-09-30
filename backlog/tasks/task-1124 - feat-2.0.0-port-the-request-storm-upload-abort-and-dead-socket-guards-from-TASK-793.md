@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-04 06:57'
-updated_date: '2026-09-30 10:17'
+updated_date: '2026-09-30 10:28'
 labels:
   - 2.0.0
   - port
@@ -39,4 +39,10 @@ Evidence: py_compile OK; tests/test_refresh_storm.py 37 tests, OK (2 /ws tests s
 Code finding to confirm on the bench: the multipart parser hands data to the upload handler at the end of every receive callback (ESPAsyncWebServer WebRequest.cpp:195, :583), not in 1460-byte pieces, so a fin/stall abort of N bytes should store all bytes received.
 Scope per the triage (planner decision, for the maintainer): option B, Retry-After only on the heap-gated 503 refusals; the three <4 KB 500s stay as they are (1.x TASK-793 precedent, no API contract change). Firmware part not implemented yet.
 OPEN: AC#1/#2/#4 run on the OTGW32 bench once it is back on the network.
+
+2026-09-30 AC#3 implemented (alpha.385), bench confirmation pending.
+- restAPI.ino sendApiBusy(): webPushHeader(Retry-After, 1) then sendApiError(503, ...), the same staging pattern sendApiMethodNotAllowed() uses for Allow. Used for every heap- or concurrency-gated REST refusal: the REST backpressure gate ('Server busy: too many concurrent requests, please retry'), 'Heap too low for verify', and the three 'low heap' refusals (debug dump, device/info, SATcontrol sat status). Semantic 503s (no PIC / no OT-direct hardware / MQTT not connected / scan during PIC flash / verification refused / PIC transmit queue full) keep sendApiError() and carry no Retry-After. Value 1 matches the static-file gate (webServerCompat.h, TASK-960); 1.x uses 2 for its file refusals.
+- docs/api/openapi.yaml states the rule in the error conventions and in the 429-vs-503 text. Additive header, no ADR (bug-fix level within ADR-035/172 conventions).
+- Build: build.bat --target esp32-combo SUCCESS (fw + fs, fresh 12:27-12:28, alpha.385+05e8c6c, images under %LOCALAPPDATA%/OTGW-capture/img-alpha385); evaluate.py --quick 70 passed / 0 / 0.
+AC#3 stays unchecked until a bench curl -i of a gated 503 (e.g. during a refresh_storm.py storm) shows 'Retry-After: 1'.
 <!-- SECTION:NOTES:END -->

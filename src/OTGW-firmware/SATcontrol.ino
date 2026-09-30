@@ -2034,7 +2034,7 @@ void satSendStatusJSON()
   // its ble_* fields into the same open root object before the final endObject().
   // The chunked path allocates only the small fixed snapshot (no whole-response
   // cbuf); guard the snapshot alloc against a fragmented heap (mirrors device/info).
-  if (platformMaxFreeBlock() < 8192) { sendApiError(503, F("low heap")); return; }
+  if (platformMaxFreeBlock() < 8192) { sendApiBusy(F("low heap")); return; }
 
   // Freeze every volatile input ONCE (see SatStatusSnap above). Helpers are called
   // in their original relative order so any side-effects (satGetOutsideTemp resolves

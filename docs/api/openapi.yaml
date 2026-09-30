@@ -20,6 +20,9 @@ info:
 
     **API Design** (ADR-035):
     - All error responses return structured JSON: `{"error":{"status":N,"message":"..."}}`
+    - A `503` caused by transient pressure (too many concurrent requests, or a heap
+      floor) carries `Retry-After: 1`. A `503` that reports missing hardware, a
+      disconnected MQTT or a running PIC flash carries no `Retry-After`.
     - Queued operations return 202 Accepted
     - RESTful resource endpoints: `/otgw/messages/{id}`, `/otgw/commands`, `/otgw/discovery`
     - Consistent CORS headers on all responses
@@ -4735,8 +4738,9 @@ components:
         of 2.
 
         Distinct from `503`: a `503` means the device as a whole is in trouble
-        (too many concurrent requests, or a heap floor), while `429` means this
-        caller exceeded a quota and the service is otherwise healthy.
+        (too many concurrent requests, or a heap floor; such a `503` carries
+        `Retry-After: 1`), while `429` means this caller exceeded a quota and the
+        service is otherwise healthy.
 
         `Retry-After` is authoritative, but it is **not a CORS-safelisted response
         header**, so cross-origin callers cannot read it. The same value is
