@@ -1,9 +1,11 @@
 ---
 id: TASK-1179
 title: The 60 s PR=A probe cannot re-enable a PIC that boot detection missed
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-30 10:12'
+updated_date: '2026-09-30 10:43'
 labels:
   - bug
   - pic
@@ -23,14 +25,21 @@ When detectPIC() misses the PIC at boot, OTGW-firmware.ino's 60 s probe sends PR
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A PIC banner seen through the firmware callback while state.pic.bAvailable is false re-enables the PIC the same way processOT()'s banner branch does (bAvailable, HW_MODE_PIC, and on the combo board the persisted board mode), from the loop-side consumer, before the version publish
-- [ ] #2 The 60 s probe comment and the TASK-1175 notes describe the new recovery path
-- [ ] #3 Old-vs-fix proof: on the Classic-S3 with the boot probe forced to miss (or a host harness that compiles the real consumer and dispatch code), OLD stays degraded after the PR=A reply and FIX re-enables the PIC and publishes otgw-pic/*
-- [ ] #4 The change ships in one commit with its own prerelease bump; build.bat (esp32-combo, esp32-classic, esp32) SUCCESS with fresh binaries; evaluate.py shows no new FAIL
+- [x] #1 The 60 s probe comment and the TASK-1175 notes describe the new recovery path
+- [ ] #2 Old-vs-fix proof: on the Classic-S3 with the boot probe forced to miss (or a host harness that compiles the real consumer and dispatch code), OLD stays degraded after the PR=A reply and FIX re-enables the PIC and publishes otgw-pic/*
+- [x] #3 The change ships in one commit with its own prerelease bump; build.bat (esp32-combo, esp32-classic, esp32) SUCCESS with fresh binaries; evaluate.py shows no new FAIL
+- [x] #4 A PIC banner seen through the firmware callback while state.pic.bAvailable is false re-enables the PIC from the loop-side consumer (bAvailable = true, state.hw.eMode = HW_MODE_PIC) before the version publish, and does not persist a board mode (see TASK-1180)
 <!-- AC:END -->
 
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 Filed 2026-09-30 from TASK-1175 follow-up #1 after confirming the PR=A reply format in the PIC source and the processOT dispatch order (buf[2]==':' branch before the OTGW_BANNER branch).
+
+2026-09-30 fix (alpha.386).
+- applyPICBannerInfo() (OTGW-Core.ino): if state.pic.bAvailable is false, set it true and state.hw.eMode = HW_MODE_PIC before the strlcpy calls and sendMQTTversioninfo(). This matches 1.x TASK-1126, which also covers the diagnose ('Opentherm gateway diagnostics') and interface firmware whose banners processOT()'s case-sensitive OTGW_BANNER match never sees. No board mode is persisted (processOT's persist is wrong for the Pro variant, TASK-1180).
+- The 60 s probe comment in OTGW-firmware.ino and the TASK-1175 notes describe the recovery path (AC#1).
+- Host proof test/host/test_pic_banner_recovery.py: slices the REAL applyPICBannerInfo() (OTGW-Core.ino) and isPICEnabled() (OTGW-firmware.h) and runs them from a DEGRADED state (bAvailable false, eMode DEGRADED, device id 'unknown'). OLD (--rev HEAD 63f22a5e1): FAIL 4 of 6: bAvailable stays false, eMode stays DEGRADED, the device id is filled (so the probe stops) and the publish sees isPICEnabled() == false (otgw-pic/* skipped). FIX: PASS 6 of 6, including the publish seeing the PIC enabled.
+- AC#2 left open on purpose: the harness compiles the consumer, not processOT()'s dispatch. The routing premise (the PIC answers PR=A with 'PR: A=OpenTherm Gateway x.x', gateway.asm:5434-5435; processOT sends buf[2]==':' lines to handlePRresponse() before its OTGW_BANNER branch) is established by reading the code, not by a compiled test or the Classic bench.
+- AC#3: bin/bump-prerelease.sh alpha.385 -> alpha.386 in this commit; build.bat --target all: esp32, esp32-classic, esp32-combo SUCCESS for firmware and filesystem (fresh 12:35-12:41, alpha.386+63f22a5, images under %LOCALAPPDATA%/OTGW-capture/img-alpha386); evaluate.py --quick 70 passed / 0 / 0.
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:45'
-updated_date: '2026-09-30 10:12'
+updated_date: '2026-09-30 10:43'
 labels:
   - bug
   - pic
@@ -264,4 +264,6 @@ CORRECTIONS TO INDIVIDUAL VERDICTS
 - AC#8: bin/bump-prerelease.sh alpha.382 -> alpha.383 in this commit; build.bat --target all: esp32 (HAS_PIC=0), esp32-classic and esp32-combo SUCCESS for firmware and filesystem (fresh 12:01-12:08, alpha.383+b2c418e, images under %LOCALAPPDATA%/OTGW-capture/img-alpha383-b2c418e); python evaluate.py (full) 81 passed / 4 warnings / 0 failed; tests/test_evaluate.py 71 OK. After the build only comments changed (verified with git diff); evaluate.py --quick afterwards 70 passed / 0 / 0.
 OPEN: AC#4-#6 need the Classic-S3 PIC bench (task-name instrumentation, triggers, stack high-water mark).
 Follow-up #1 of the description (the 60 s PR=A probe cannot set bAvailable) is filed as its own task.
+
+2026-09-30: follow-up #1 is fixed in TASK-1179 (alpha.386): applyPICBannerInfo() now re-enables a PIC that boot detection missed (bAvailable = true, eMode = HW_MODE_PIC) before its version publish, so the 60 s PR=A probe recovers the PIC and otgw-pic/* is published. The processOT banner branch's board-mode persist was NOT copied: it would rewrite an S3 Mini Pro (mode 3) to 1 (TASK-1180).
 <!-- SECTION:NOTES:END -->

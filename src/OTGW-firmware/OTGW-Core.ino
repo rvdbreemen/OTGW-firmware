@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.385
+**  Version  : v2.0.0-alpha.386
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -812,6 +812,16 @@ void picSerialDrainOnce() {
 // fields OTGWSerial already parsed and does the OTGWState write, telnet and
 // MQTT publish that fwreportinfo() used to do on the PIC task (ADR-130 seam).
 static void applyPICBannerInfo() {
+  // TASK-1179: the callback fires for every PIC firmware type, while processOT()'s
+  // banner branch only matches the gateway banner and a PR=A reply never reaches
+  // it. A PIC that detectPIC() missed at boot is therefore re-enabled here, before
+  // the publish: sendMQTTversioninfo() skips otgw-pic/* while isPICEnabled() is
+  // false. 1.x does the same in its callback (TASK-1126).
+  if (!state.pic.bAvailable) {
+    state.pic.bAvailable = true;
+    state.hw.eMode = HW_MODE_PIC;
+    DebugTln(F("PIC detected via firmware banner: PIC functions re-enabled"));
+  }
   strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
   DebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
   strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));

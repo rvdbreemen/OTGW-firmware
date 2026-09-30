@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.385
+**  Version  : v2.0.0-alpha.386
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -773,10 +773,9 @@ void doTaskEvery60s(){
   // only automatic path to re-detect a real PIC and re-enable all PIC functions.
   // Writes through the PIC task's TX queue (bypassing the guarded command queue).
   // The reply "PR: A=OpenTherm Gateway x.x" goes to handlePRresponse(), which
-  // ignores register A; the firmware callback fills state.pic.sDeviceid, which
-  // stops this probe. Nothing on that path sets state.pic.bAvailable: only the
-  // unsolicited boot banner reaches processOT()'s banner branch (TASK-1175
-  // follow-up).
+  // ignores register A. The firmware callback sees the banner, and its loop-side
+  // consumer applyPICBannerInfo() re-enables the PIC (bAvailable, HW_MODE_PIC) and
+  // fills state.pic.sDeviceid, which stops this probe (TASK-1179).
 #if HAS_PIC
   // ADR-127: on a combo running OTDirect the PIC UART is closed and the retry
   // would be pure noise forever — gate on !isOTDirectEnabled(). On the fixed
