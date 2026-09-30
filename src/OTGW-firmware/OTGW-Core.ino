@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.387
+**  Version  : v2.0.0-alpha.388
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5305,7 +5305,9 @@ void processOT(const char *buf, int len, bool suppressOutput){
   } else if (strstr(buf, OTGW_BANNER)!=NULL){
     //found a banner, so get the version of PIC
     // Re-enable PIC functions if boot-time detection missed it (transient startup failure).
-    if (!state.pic.bAvailable) {
+    // Not while OT-Direct runs: the PIC UART is closed then, so the line came from the
+    // frame replay (a user log with a boot banner), not from a PIC (TASK-1181).
+    if (!state.pic.bAvailable && !isOTDirectEnabled()) {
       state.pic.bAvailable = true;
       state.hw.eMode = HW_MODE_PIC;
       DebugTln(F("PIC detected via banner — PIC functions re-enabled"));

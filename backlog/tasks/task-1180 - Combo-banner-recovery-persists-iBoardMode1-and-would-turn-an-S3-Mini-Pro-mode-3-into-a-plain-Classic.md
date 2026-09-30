@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-30 10:32'
-updated_date: '2026-09-30 10:49'
+updated_date: '2026-09-30 10:51'
 labels:
   - bug
   - combo
@@ -43,6 +43,8 @@ Host proof test/host/test_banner_board_mode.py (slices the real recovery block t
 - OLD (--rev HEAD c459331e3): FAIL 2 of 4: a forced S3 Mini Pro goes 3 -> 1 with a settings write; auto on a Pro learns 1 instead of 3.
 - FIX: PASS 4 of 4: forced Pro keeps 3 (no write), forced S3 Mini keeps 1 (no write), auto learns 3 on a Pro and 1 on an S3 Mini (one write each).
 Build: build.bat --target esp32-combo SUCCESS (fw + fs, fresh 12:48, alpha.387+c459331, images under %LOCALAPPDATA%/OTGW-capture/img-alpha387; the block is combo-only, HAS_RUNTIME_HW_DETECT); evaluate.py --quick 70 passed / 0 / 0.
+
+2026-09-30 correction: the reachability argument above ('auto mode closes the PIC UART, so this branch only runs from a forced Classic mode') holds for real PIC banners, but not for REPLAYED lines: since TASK-1071 the replay feeds processOT() on OT-Direct boards too, so a user log containing a boot banner can reach this branch on a combo OTGW32 in auto mode. That hazard predates this task (the old code persisted 0 -> 1 as well) and is tracked and fixed in TASK-1181.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

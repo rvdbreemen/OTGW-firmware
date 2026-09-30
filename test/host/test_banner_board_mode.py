@@ -22,7 +22,7 @@ def slice_recovery_block(lines):
     start = next((i for i, l in enumerate(lines) if "strstr(buf, OTGW_BANNER)" in l), None)
     if start is None:
         raise SystemExit("anchor not found: strstr(buf, OTGW_BANNER)")
-    rx = re.compile(r"^\s*if \(!state\.pic\.bAvailable\) \{")
+    rx = re.compile(r"^\s*if \(!state\.pic\.bAvailable\b.*\{\s*$")
     begin = next((i for i in range(start, len(lines)) if rx.search(lines[i])), None)
     if begin is None:
         raise SystemExit("recovery block not found after the OTGW_BANNER test")

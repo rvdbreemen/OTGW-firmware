@@ -53,6 +53,9 @@
 - Concurrent edits to `v2.html`: `git diff -U1` to split coalesced hunks, filter foreign ones, `git apply --cached --unidiff-zero`.
 
 ## Do-Not-Repeat
+- [2026-09-30] From Python on Windows, call the backlog CLI as `[node, C:/nvm4w/nodejs/node_modules/backlog.md/cli.js, ...]`, never `backlog`/`backlog.CMD`: subprocess cannot find the .CMD shim, and going through cmd.exe would mangle `|`, `&`, `%` and newlines in multi-line -d/--ac/--notes text.
+- [2026-09-30] A commit message may not contain a TASK-NNN token for a 1.x-only task (e.g. TASK-1126): the commit-msg hook requires a staged dev task file for every token. Write "the 1.x line's banner callback" instead.
+- [2026-09-30] Host harness pattern that works: slice the REAL function by anchor from `git show <rev>:<path>` (OLD) and the working tree (FIX), compile with MSVC via vswhere/vcvars (test/host/test_ot_reserved_range.py exports reusable helpers), and run OLD red / FIX green. Add /utf-8 when a sliced string holds non-ASCII (em dashes in debug text).
 - [2026-09-30] Before committing `.wolf/anatomy.md`, drop every section whose header is outside the repo (`## ../`, `## C:/...`): OpenWolf records every file read, including the private KennisBank vault, the memory dir and `%LOCALAPPDATA%/OTGW-capture` (secrets file names). This repo is public.
 - [2026-09-30] Never script the WiFiManager provisioning step (reading a WiFi password from a secrets file and POSTing /wifisave): Claude does not enter WiFi credentials. Flash, then let the user run `bin/provision-wifi-ap.py` (or the phone portal) and monitor the LAN side. A repro that needs a provisioning boot needs one user action per run.
 - [2026-09-30] Never probe telnet :23 while a telnet reader is attached: AsyncSimpleTelnet is `<MAX_CLIENTS = 1>`, a second connect evicts the first. Use the reader's liveness as the port-23 signal.

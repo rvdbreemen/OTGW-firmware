@@ -2836,5 +2836,22 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-09-30T07:45:00"
+  },
+  {
+    "id": "bug-162",
+    "timestamp": "2026-09-30T13:05:00",
+    "error_message": "Harness edit via a Python heredoc: a regex lost its word boundary (a literal backspace byte appeared) and a C printf literal was split by a real newline",
+    "file": "test/host/test_banner_board_mode.py, test/host/test_banner_board_mode.cpp",
+    "root_cause": "Inside a bash heredoc fed to python, a backslash-b and backslash-n in a NON-raw Python string are interpreted by Python: 0x08 and a real newline were written into the files (known pitfall, memory feedback_python_heredoc_escapes)",
+    "fix": "Repaired with a script written through the Write tool (byte-level replace); edit source files with the Edit tool, or write helper scripts to a file first",
+    "tags": [
+      "tooling",
+      "heredoc",
+      "escapes",
+      "repeat"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-09-30T13:05:00"
   }
 ]
