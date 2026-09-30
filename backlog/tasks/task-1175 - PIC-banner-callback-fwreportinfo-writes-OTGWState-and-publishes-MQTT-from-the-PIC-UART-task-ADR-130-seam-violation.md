@@ -3,9 +3,11 @@ id: TASK-1175
 title: >-
   PIC banner callback fwreportinfo() writes OTGWState and publishes MQTT from
   the PIC UART task (ADR-130 seam violation)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-30 08:45'
+updated_date: '2026-09-30 10:12'
 labels:
   - bug
   - pic
@@ -105,14 +107,14 @@ FOLLOW-UPS (separate tasks; code reading, not bench-verified)
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 fwreportinfo() in src/OTGW-firmware/OTGW-Core.ino only records that a banner arrived: a volatile flag, optionally with a counter. Its body contains none of the following: a state.* write; any Debug*, OTDebug* or MQTTDebug* call; a String or *ToString() call; a sendMQTT*, WebSocket or reportOTGWEvent call; feedWatchDog(); any cmdqueue access.
-- [ ] #2 A loop-side consumer called from drainOTFrameQueue() consumes the flag. It can sit inside reportPendingPICRxErrors(), which is called at OTGW-Core.ino:549. The consumer writes state.pic.sFwversion, sDeviceid and sType, emits the debug lines and calls sendMQTTversioninfo(). It clears the flag before applying, so a banner that completes in the meantime is handled on the next pass. processOT's banner branch (OTGW-Core.ino:5247-5279) is unchanged.
-- [ ] #3 Static old-vs-fix check. evaluate.py::check_pic_uart_task_owns_serial, or a sibling gate, resolves every function passed to OTGWSerial.registerFirmwareCallback(). It FAILs when that function's comment-stripped body matches the forbidden set from AC1. The gate FAILs on dev a2a58ecf9, naming fwreportinfo (OTGW-Core.ino:5780-5791), and PASSes on the fix. It does not inspect fwupgradestep, fwupgradedone or picSerialDrainOnce. tests/test_evaluate.py gains one failing and one passing fixture, and 'python tests/test_evaluate.py' passes.
+- [x] #1 fwreportinfo() in src/OTGW-firmware/OTGW-Core.ino only records that a banner arrived: a volatile flag, optionally with a counter. Its body contains none of the following: a state.* write; any Debug*, OTDebug* or MQTTDebug* call; a String or *ToString() call; a sendMQTT*, WebSocket or reportOTGWEvent call; feedWatchDog(); any cmdqueue access.
+- [x] #2 A loop-side consumer called from drainOTFrameQueue() consumes the flag. It can sit inside reportPendingPICRxErrors(), which is called at OTGW-Core.ino:549. The consumer writes state.pic.sFwversion, sDeviceid and sType, emits the debug lines and calls sendMQTTversioninfo(). It clears the flag before applying, so a banner that completes in the meantime is handled on the next pass. processOT's banner branch (OTGW-Core.ino:5247-5279) is unchanged.
+- [x] #3 Static old-vs-fix check. evaluate.py::check_pic_uart_task_owns_serial, or a sibling gate, resolves every function passed to OTGWSerial.registerFirmwareCallback(). It FAILs when that function's comment-stripped body matches the forbidden set from AC1. The gate FAILs on dev a2a58ecf9, naming fwreportinfo (OTGW-Core.ino:5780-5791), and PASSes on the fix. It does not inspect fwupgradestep, fwupgradedone or picSerialDrainOnce. tests/test_evaluate.py gains one failing and one passing fixture, and 'python tests/test_evaluate.py' passes.
 - [ ] #4 Bench old-vs-fix check on a Classic PIC board running esp32-combo in PIC mode, with MQTT connected and the same task-name instrumentation in both builds. Triggers: 3x MQTT resetgateway=1 (at least 5 s apart) and 3x REST POST /api/v2/otgw/commands with body {'command':'PR=A'}. The OLD build (dev HEAD) logs the banner work on task picSerial; the FIX build logs it on loopTask. Both capture-mqtt-debug transcripts are attached and cited in the Final Summary.
 - [ ] #5 PR=A-only parity in the FIX build. After the REST PR=A trigger, these carry the PIC's real values: /api/v2/device/info picfwversion, picdeviceid and picfwtype, and the broker's otgw-pic/version, otgw-pic/deviceid and otgw-pic/firmwaretype. This proves the deferral keeps version detection on the path processOT does not handle.
 - [ ] #6 The picSerial task stack high-water mark is logged before and after the AC4 triggers in both builds. The OLD minimum is recorded in the task notes as the measured headroom. The FIX build shows no drop across the triggers.
-- [ ] #7 The comments at OTGW-Core.ino:1035-1036, OTGW-Core.ino:1181-1182 and OTGW-firmware.ino:775, and the evaluate.py docstring at :3262-3265, describe the actual flow: PR=A replies reach handlePRresponse, which ignores register A. The version is recorded through the banner callback and the loop consumer. The firmware callback executes inside OTGWSerial::read() on the PIC task.
-- [ ] #8 build.bat builds esp32-combo, esp32-classic and esp32 (HAS_PIC=0), each with a SUCCESS line and a fresh firmware.bin. 'python evaluate.py' reports no new FAIL. The prerelease tag is bumped with bin/bump-prerelease.sh in the same commit.
+- [x] #7 The comments at OTGW-Core.ino:1035-1036, OTGW-Core.ino:1181-1182 and OTGW-firmware.ino:775, and the evaluate.py docstring at :3262-3265, describe the actual flow: PR=A replies reach handlePRresponse, which ignores register A. The version is recorded through the banner callback and the loop consumer. The firmware callback executes inside OTGWSerial::read() on the PIC task.
+- [x] #8 build.bat builds esp32-combo, esp32-classic and esp32 (HAS_PIC=0), each with a SUCCESS line and a fresh firmware.bin. 'python evaluate.py' reports no new FAIL. The prerelease tag is bumped with bin/bump-prerelease.sh in the same commit.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -253,4 +255,13 @@ CORRECTIONS TO INDIVIDUAL VERDICTS
   - evaluate.py moved in 8874e410b: the gate is now at :3250, the docstring at :3262-3265, the regex at :3282-3283;
   - boards.h now lives at src/libraries/Platform/src/boards.h.
 - I did not re-verify Verifier 3's stack estimate (about 2432 B of 4096 B).
+
+2026-09-30 implementation (alpha.383), following the fix plan.
+- AC#1: fwreportinfo() now only does (void)fw; (void)version; and, under #if HAS_PIC (the esp32 target has HAS_PIC=0 and never registers it), g_picBannerPending = true. The flag sits in the existing PIC flag block next to g_picRawDropPending.
+- AC#2: applyPICBannerInfo() (loop-side, inside the #if HAS_PIC block) does the state.pic.sFwversion/sDeviceid/sType writes, the three debug lines and sendMQTTversioninfo(), reading the fields OTGWSerial already parsed (firmwareVersion(), processorToString(), firmwareToString()). reportPendingPICRxErrors() consumes the flag first thing, clearing it before applying. processOT's banner branch is unchanged. No OTStateLock was added: its documented contract is one writer site (processOT) over the decoded snapshot, which state.pic is not part of.
+- AC#3: evaluate.py pic_task_callback_violations() (module level, called from check_pic_uart_task_owns_serial as the new ADR-130 result) resolves every registerFirmwareCallback(<fn>) across the firmware sources and FAILs on state., Debug*(, String, *ToString(, sendMQTT*, WebSocket, reportOTGWEvent*, feedWatchDog, cmdqueue/CmdQueue* in the comment-stripped body; upgrade callbacks are out of scope. On the real sources: OLD (HEAD before the fix) -> 6 violations (DebugTf(, DebugTln(, OTDebugTf(, ToString(, sendMQTTversioninfo, state.); FIX -> 0; the gate result 'PASS: [ADR-130] PIC-task firmware callback seam'. tests/test_evaluate.py TestPicTaskCallbackSeam (5 tests: pre-1175 body fails, flag-only body passes, cross-file definition, missing definition, upgrade callbacks out of scope): 71 tests OK.
+- AC#7: comments corrected after checking the PIC source (other-projects/otgw-6.6/gateway.asm:5434-5435: PrintSettingA de 'A=' then GreetingStr 'OpenTherm Gateway '): the PR=A reply is 'PR: A=OpenTherm Gateway x.x', reaches handlePRresponse() (buf[2]==':') and is ignored as register A; the version is recorded through the firmware callback and the loop consumer; the unsolicited boot banner has no ':' at position 2 and reaches processOT()'s banner branch. Updated: getpicfwversion(), handlePRresponse() header and note, the processOT dispatch comment, OTGW-firmware.ino (the 60 s PR=A probe comment, which wrongly claimed the banner branch sets bAvailable on that path), and the evaluate.py docstring.
+- AC#8: bin/bump-prerelease.sh alpha.382 -> alpha.383 in this commit; build.bat --target all: esp32 (HAS_PIC=0), esp32-classic and esp32-combo SUCCESS for firmware and filesystem (fresh 12:01-12:08, alpha.383+b2c418e, images under %LOCALAPPDATA%/OTGW-capture/img-alpha383-b2c418e); python evaluate.py (full) 81 passed / 4 warnings / 0 failed; tests/test_evaluate.py 71 OK. After the build only comments changed (verified with git diff); evaluate.py --quick afterwards 70 passed / 0 / 0.
+OPEN: AC#4-#6 need the Classic-S3 PIC bench (task-name instrumentation, triggers, stack high-water mark).
+Follow-up #1 of the description (the 60 s PR=A probe cannot set bAvailable) is filed as its own task.
 <!-- SECTION:NOTES:END -->

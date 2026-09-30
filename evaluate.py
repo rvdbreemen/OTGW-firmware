@@ -638,6 +638,71 @@ def status_burst_cooldown_findings(text: str) -> List[Tuple[int, int, bool]]:
     return findings
 
 
+# ===== PIC-TASK FIRMWARE CALLBACK SEAM (ADR-130, TASK-1175) =====
+#
+# OTGWSerial calls the function registered with registerFirmwareCallback()
+# from inside OTGWSerial::read(), which runs on the PIC UART task
+# (picSerialDrainOnce). Task context may only raise flags; OTGWState writes,
+# telnet, MQTT/WS publishes and the command queue belong to loop(). The upgrade
+# callbacks (registerProgressCallback/registerFinishedCallback) are out of scope:
+# the upgrade state machine drives them loop-side while the task is parked.
+_FW_CALLBACK_REG_RE = re.compile(r'registerFirmwareCallback\s*\(\s*(\w+)\s*\)')
+_PIC_TASK_FORBIDDEN_RE = re.compile(
+    r'\bstate\s*\.|\bsendMQTT\w*|\b\w*Debug\w*\s*\(|\bString\b|ToString\s*\('
+    r'|\bfeedWatchDog\b|WebSocket|\breportOTGWEvent\w*|\bcmdqueue\b|\bCmdQueue\w*')
+
+
+def _strip_c_comments(text: str) -> str:
+    text = re.sub(r'/\*.*?\*/', ' ', text, flags=re.S)
+    return re.sub(r'//[^\n]*', '', text)
+
+
+def _c_function_body(text: str, name: str) -> Optional[str]:
+    """Body (braces included) of the first definition of ``name`` in ``text``."""
+    m = re.search(r'(?:static\s+)?\w[\w:*&<> ]*\b' + re.escape(name) + r'\s*\([^;{]*\)\s*\{', text)
+    if not m:
+        return None
+    i = text.index('{', m.start())
+    depth = 0
+    for j in range(i, len(text)):
+        if text[j] == '{':
+            depth += 1
+        elif text[j] == '}':
+            depth -= 1
+            if depth == 0:
+                return text[i:j + 1]
+    return text[i:]
+
+
+def pic_task_callback_violations(sources: Dict[str, str]) -> Dict[str, object]:
+    """Check every registerFirmwareCallback(<fn>) target against the ADR-130 seam.
+
+    ``sources`` maps a file name to its text. Returns ``callbacks`` (the
+    registered names), ``missing`` (names whose definition was not found) and
+    ``violations`` ('<fn>: <token>' for each forbidden reference in a body,
+    comments stripped).
+    """
+    callbacks: List[str] = []
+    for text in sources.values():
+        for m in _FW_CALLBACK_REG_RE.finditer(_strip_c_comments(text)):
+            if m.group(1) not in callbacks:
+                callbacks.append(m.group(1))
+    missing: List[str] = []
+    violations: List[str] = []
+    for fn in callbacks:
+        body = None
+        for text in sources.values():
+            body = _c_function_body(_strip_c_comments(text), fn)
+            if body is not None:
+                break
+        if body is None:
+            missing.append(fn)
+            continue
+        for tok in sorted({m.group(0).strip() for m in _PIC_TASK_FORBIDDEN_RE.finditer(body)}):
+            violations.append(f"{fn}: {tok}")
+    return {"callbacks": callbacks, "missing": missing, "violations": violations}
+
+
 class Colors:
     """ANSI color codes"""
     HEADER = '\033[95m'
@@ -3274,6 +3339,12 @@ class WorkspaceEvaluator:
             startPICSerialTask(), called once from setup().
           - the task lifecycle is gated on isOTDirectEnabled() (NOT isPICEnabled())
             so banner recovery during a boot-miss still works.
+          - (ADR-130, TASK-1175) the function registered with
+            registerFirmwareCallback() runs inside OTGWSerial::read() on the task,
+            so its body may not touch OTGWState, Debug*, String, MQTT, WebSocket,
+            reportOTGWEvent, the watchdog or the command queue; it raises a flag
+            that loop() consumes. The upgrade callbacks are out of scope: they
+            run loop-side while the task is parked.
         """
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== ADR-123 PIC-UART Task Sole-Owner ==={Colors.ENDC}")
 
@@ -3396,6 +3467,33 @@ class WorkspaceEvaluator:
                 f"handlePICSerial; task created once via platformTaskCreatePinned in "
                 f"startPICSerialTask (1 setup() call); park gates on isOTDirectEnabled"
             ))
+
+        # (5) ADR-130 seam (TASK-1175): the registerFirmwareCallback() target runs
+        #     inside OTGWSerial::read() on the PIC task and may only raise flags.
+        fw_sources: Dict[str, str] = {}
+        for pattern in ("*.ino", "*.h", "*.cpp"):
+            for f in sorted(src_dir.glob(pattern)):
+                if f.name.endswith(".ino.cpp"):
+                    continue
+                try:
+                    fw_sources[f.name] = f.read_text(encoding='utf-8', errors='ignore')
+                except OSError:
+                    pass
+        seam = pic_task_callback_violations(fw_sources)
+        if not seam["callbacks"]:
+            self.add_result(EvaluationResult(
+                "ADR-130", "PIC-task firmware callback seam", "FAIL",
+                "no registerFirmwareCallback(<fn>) found; the seam check has nothing to inspect"))
+        elif seam["missing"] or seam["violations"]:
+            self.add_result(EvaluationResult(
+                "ADR-130", "PIC-task firmware callback seam", "FAIL",
+                "firmware callback does task-context work (it runs inside OTGWSerial::read() "
+                "on the PIC task; raise a flag and apply loop-side)",
+                "; ".join((seam["violations"] + [f"definition not found: {m}" for m in seam["missing"]])[:8])))
+        else:
+            self.add_result(EvaluationResult(
+                "ADR-130", "PIC-task firmware callback seam", "PASS",
+                f"registered firmware callback(s) {seam['callbacks']} only raise flags"))
 
     def check_binary_safe_compare(self):
         """INFO: flag every strncmp_P / strstr_P call site. These MUST operate on

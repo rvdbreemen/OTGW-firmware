@@ -728,5 +728,52 @@ class TestStatusBurstCooldownBound(unittest.TestCase):
         self.assertEqual(evaluate.status_burst_cooldown_findings(prose), [])
 
 
+class TestPicTaskCallbackSeam(unittest.TestCase):
+    """ADR-130 gate (TASK-1175): the OTGWSerial firmware callback only raises a flag."""
+
+    REG = "void resetOTGW() {\n  OTGWSerial.registerFirmwareCallback(fwreportinfo);\n}\n"
+    # The pre-TASK-1175 body: OTGWState writes, Debug, String and MQTT on the PIC task.
+    OLD = (
+        "void fwreportinfo(OTGWFirmware fw, const char *version) {\n"
+        "    DebugTln(F(\"Callback: fwreportinfo\"));\n"
+        "    strlcpy(state.pic.sFwversion, version, sizeof(state.pic.sFwversion));\n"
+        "    strlcpy(state.pic.sType, OTGWSerial.firmwareToString(fw).c_str(), sizeof(state.pic.sType));\n"
+        "    sendMQTTversioninfo();\n"
+        "}\n"
+    )
+    NEW = (
+        "// Runs inside OTGWSerial::read(); state. and sendMQTT stay loop-side.\n"
+        "void fwreportinfo(OTGWFirmware fw, const char *version) {\n"
+        "  (void)fw;\n  (void)version;\n#if HAS_PIC\n  g_picBannerPending = true;\n#endif\n}\n"
+    )
+
+    def test_detects_the_pre_1175_callback(self):
+        r = evaluate.pic_task_callback_violations({"OTGW-Core.ino": self.REG + self.OLD})
+        self.assertEqual(r["callbacks"], ["fwreportinfo"])
+        joined = " ".join(r["violations"])
+        for tok in ("DebugTln(", "state.", "sendMQTTversioninfo", "ToString("):
+            self.assertIn(tok, joined)
+
+    def test_passes_the_flag_only_callback(self):
+        r = evaluate.pic_task_callback_violations({"OTGW-Core.ino": self.REG + self.NEW})
+        self.assertEqual((r["missing"], r["violations"]), ([], []))
+
+    def test_definition_in_another_file_is_found(self):
+        r = evaluate.pic_task_callback_violations({"a.ino": self.REG, "b.ino": self.OLD})
+        self.assertEqual(r["missing"], [])
+        self.assertTrue(r["violations"])
+
+    def test_missing_definition_is_reported(self):
+        r = evaluate.pic_task_callback_violations({"a.ino": self.REG})
+        self.assertEqual(r["missing"], ["fwreportinfo"])
+
+    def test_upgrade_callbacks_are_out_of_scope(self):
+        """fwupgradestep runs loop-side while the task is parked; it may write state."""
+        src = ("OTGWSerial.registerProgressCallback(fwupgradestep);\n"
+               "void fwupgradestep(int pct) { state.flash.iProgress = pct; }\n")
+        r = evaluate.pic_task_callback_violations({"OTGW-Core.ino": src})
+        self.assertEqual((r["callbacks"], r["violations"]), ([], []))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.382
+**  Version  : v2.0.0-alpha.383
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -608,6 +608,10 @@ static volatile uint32_t g_picRxOverflowPending = 0;      // line-buffer overflo
 // TASK-1111: passthrough chunks dropped on a full otRawQueue. Same contract:
 // counted in task context, reported loop-side by reportPendingPICRxErrors().
 static volatile uint32_t g_picRawDropPending    = 0;      // raw chunks dropped since last report
+// TASK-1175: the firmware-banner callback (fwreportinfo) runs inside
+// OTGWSerial::read() on the PIC task, so it only raises this flag; the banner's
+// version/type/device fields are applied loop-side by applyPICBannerInfo().
+static volatile bool     g_picBannerPending     = false;
 #endif
 
 // enqueuePICTx — producer-side. Copy the bytes verbatim and queue by value for
@@ -804,9 +808,26 @@ void picSerialDrainOnce() {
 // loop-side) + telnet + MQTT/WS publish. Read-and-clear; the tiny race with the
 // task setting a flag again is acceptable for diagnostics.
 #if HAS_PIC
+// TASK-1175: loop-side half of the firmware-banner callback. Reads the banner
+// fields OTGWSerial already parsed and does the OTGWState write, telnet and
+// MQTT publish that fwreportinfo() used to do on the PIC task (ADR-130 seam).
+static void applyPICBannerInfo() {
+  strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
+  DebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
+  strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
+  DebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
+  strlcpy(state.pic.sType, OTGWSerial.firmwareToString().c_str(), sizeof(state.pic.sType));
+  OTDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
+  sendMQTTversioninfo();
+}
+
 static uint32_t g_picRawDropTotal = 0;        // loop-side cumulative, for context
 
 static void reportPendingPICRxErrors() {
+  if (g_picBannerPending) {
+    g_picBannerPending = false;  // clear first: a banner completing meanwhile re-arms it
+    applyPICBannerInfo();
+  }
   if (g_picRxOverrunPending) {
     g_picRxOverrunPending = false;
     DebugT(F("Serial Overrun\r\n"));
@@ -1034,9 +1055,11 @@ Get the information of the pic firmware: version  number, device type and firmwa
 This is done by sending a PR=A command, requesting a banner from the PIC. This will trigger detection of version.
 */
 void getpicfwversion(){
-  // Non-blocking: queues PR=A via the command queue.
-  // The banner response is processed by handlePRresponse() which copies
-  // OTGWSerial version fields into state.pic.* and publishes MQTT.
+  // Non-blocking: queues PR=A via the command queue. The PIC answers
+  // "PR: A=OpenTherm Gateway x.x", which handlePRresponse() receives and ignores
+  // (register A). The version is recorded by the OTGWSerial firmware callback,
+  // which runs inside OTGWSerial::read() on the PIC task, and applied loop-side
+  // by applyPICBannerInfo() (TASK-1175).
   addCommandToQueue("PR=A", 4, true);
 }
 //===================[ queryOTGWgatewaymode ]======================
@@ -1172,7 +1195,7 @@ void queryNextPICsetting() {
   Special cases: 'M' (gateway mode), 'A' (firmware banner).
 */
 static void handlePRresponse(const char* buf, size_t len) {
-  // buf = "PR: X=value" or "PR: OpenTherm Gateway x.x"
+  // buf = "PR: X=value"; PR=A answers "PR: A=OpenTherm Gateway x.x"
   if (len < 4 || buf[0] != 'P' || buf[1] != 'R' || buf[2] != ':') return;
 
   // Skip "PR:" prefix and trim leading whitespace
@@ -1181,8 +1204,11 @@ static void handlePRresponse(const char* buf, size_t len) {
   size_t plen = strlen(payload);
   if (plen == 0) return;
 
-  // Note: PR=A banner ("OpenTherm Gateway x.x") never reaches here because
-  // the banner has no ":" at position 2. It is handled in processOT() directly.
+  // Note: the PR=A reply arrives here as register A and is ignored below; its
+  // version fields are recorded by the firmware callback and applied loop-side
+  // by applyPICBannerInfo() (TASK-1175). The unsolicited boot banner has no ":"
+  // at position 2, so it never reaches here: processOT()'s banner branch and the
+  // same callback handle it.
 
   // --- Register response: "X=value" ---
   if (plen < 3 || payload[1] != '=') return;  // need at least "X=v"
@@ -5221,7 +5247,7 @@ void processOT(const char *buf, int len, bool suppressOutput){
   } else if (buf[2]==':') { //seems to be a response to a command, so check to verify if it was
     checkCommandResponse(buf, len);
     if (buf[0] == 'P' && buf[1] == 'R') {
-      handlePRresponse(buf, len);  // process PR: responses (PIC settings, gateway mode, banner)
+      handlePRresponse(buf, len);  // process PR: responses (PIC settings, gateway mode; PR=A's register A is ignored)
     }
     Debugln(buf);
     reportOTGWEvent(buf, '<', true);
@@ -5799,17 +5825,15 @@ void fwupgradestep(int pct) {
 #endif
 }
 
+// Runs inside OTGWSerial::read(), i.e. on the PIC UART task (picSerialDrainOnce).
+// Task context may only raise a flag (ADR-130): reportPendingPICRxErrors() in
+// loop() applies the banner through applyPICBannerInfo() (TASK-1175).
 void fwreportinfo(OTGWFirmware fw, const char *version) {
-    DebugTln(F("Callback: fwreportinfo"));
-    strlcpy(state.pic.sFwversion, version, sizeof(state.pic.sFwversion));
-    //state.pic.sFwversion = String(OTGWSerial.firmwareVersion());
-    DebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
-    strlcpy(state.pic.sDeviceid, OTGWSerial.processorToString().c_str(), sizeof(state.pic.sDeviceid));
-    DebugTf(PSTR("Current device id: %s\r\n"), state.pic.sDeviceid);
-    //instead of using the firmware string
-    strlcpy(state.pic.sType, OTGWSerial.firmwareToString(fw).c_str(), sizeof(state.pic.sType));
-    OTDebugTf(PSTR("Current firmware type: %s\r\n"), state.pic.sType);
-    sendMQTTversioninfo();
+  (void)fw;
+  (void)version;
+#if HAS_PIC
+  g_picBannerPending = true;
+#endif
 }
 
 #ifdef OTGWSERIAL_DEBUG

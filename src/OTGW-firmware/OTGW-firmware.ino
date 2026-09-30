@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.382
+**  Version  : v2.0.0-alpha.383
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -771,8 +771,12 @@ void doTaskEvery60s(){
   // Runs regardless of isPICEnabled() so a transient boot-probe miss can recover:
   // detectPIC() relies on a single ETX check; if that fails, this 60s retry is the
   // only automatic path to re-detect a real PIC and re-enable all PIC functions.
-  // Writes directly to serial (bypassing the guarded command queue).
-  // Banner response in processOT() sets state.pic.bAvailable = true on success.
+  // Writes through the PIC task's TX queue (bypassing the guarded command queue).
+  // The reply "PR: A=OpenTherm Gateway x.x" goes to handlePRresponse(), which
+  // ignores register A; the firmware callback fills state.pic.sDeviceid, which
+  // stops this probe. Nothing on that path sets state.pic.bAvailable: only the
+  // unsolicited boot banner reaches processOT()'s banner branch (TASK-1175
+  // follow-up).
 #if HAS_PIC
   // ADR-127: on a combo running OTDirect the PIC UART is closed and the retry
   // would be pure noise forever — gate on !isOTDirectEnabled(). On the fixed
