@@ -527,7 +527,11 @@ class DriverTests(unittest.TestCase):
         self.assertGreater(r.summary["snapshots_ok"], 2, "the run must also see the device come back")
 
     def test_outage_shorter_than_threshold_is_tolerated(self):
-        r = run_soak(self.fw, dict(outage_at=4, outage_sec=0.3), duration_s=5.0)
+        # device/info request 2 is always the baseline snapshot: run() sends no load request
+        # before poll("baseline"), so the outage starts on a snapshot and that snapshot fails.
+        # A later request can be a load request, and on a busy host the next snapshot then
+        # arrives after the 0.3 s outage has ended, so no snapshot fails (TASK-1186).
+        r = run_soak(self.fw, dict(outage_at=2, outage_sec=0.3), duration_s=5.0)
         self.assertEqual(r.rc, 0, r.debug())
         self.assert_started_run(r)
         self.assertGreaterEqual(r.summary["snapshots_failed"], 1)
