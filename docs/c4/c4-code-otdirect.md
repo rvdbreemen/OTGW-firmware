@@ -71,13 +71,15 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
   - Publishes flame ratio metrics every 60s
 
 #### `static bool sendMasterRequestAsync(unsigned long request, OTDirectRequestOrigin origin)`
-- **Location**: OTDirect.ino:891
+- **Location**: OTDirect.ino:1228
 - **Purpose**: Initiate non-blocking OT master request (poll boiler or forward thermostat frame)
 - **Parameters**:
   - `request`: 32-bit OpenTherm frame
-  - `origin`: `OT_DIRECT_ORIGIN_GATEWAY` (scheduled poll) or `OT_DIRECT_ORIGIN_THERMOSTAT` (forwarded frame)
+  - `origin`: `OT_DIRECT_ORIGIN_GATEWAY` for a scheduled poll, a queued command or a thermostat frame changed by an override. `OT_DIRECT_ORIGIN_THERMOSTAT` for a thermostat frame forwarded unchanged. Callers: OTDirect.ino:1422, 1474, 1962 and 2002-2003.
 - **Behavior**:
-  - Returns `false` if master busy (collision avoidance) or loopback mode handles it instantly
+  - Loopback mode: answers at once with `simulateLoopbackResponse()`, bridges the request and the reply to the parser, sends nothing to the boiler and returns `true`. With `OT_DIRECT_ORIGIN_THERMOSTAT` it sends the simulated reply to the thermostat through `otSlave.sendResponse()` (OTDirect.ino:1242-1244). It returns before the steps below, so `otLastAnySendMs` is not updated.
+  - Returns `false` while SAT simulation (`settings.sat.bSimulation`) or the OTGW simulation (`state.debug.bOTGWSimulation`) is on: `satSimulationBlocksBusTx()` blocks the boiler-side TX (OTDirect.ino:1260, SATcontrol.ino:1148)
+  - Returns `false` if master busy (collision avoidance)
   - Calls `otMaster.sendRequestAsync(request)` to initiate non-blocking send
   - Bridges request frame to parser (prefix 'T' for thermostat, 'R' for gateway)
   - Updates `otLastAnySendMs` for MI= (message interval) gap tracking
@@ -317,7 +319,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 ### Operating Mode Management
 
 #### `static void setOTDirectMode(OTDirectMode newMode)`
-- **Location**: OTDirect.ino:1711
+- **Location**: OTDirect.ino:2395
 - **Purpose**: Switch operating mode with hardware reconfiguration
 - **Parameters**: `OTD_MODE_BYPASS`, `OTD_MODE_GATEWAY`, `OTD_MODE_MONITOR`, `OTD_MODE_MASTER`, `OTD_MODE_LOOPBACK`
 - **Behavior**:
@@ -327,7 +329,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
     - Bypass: skips slave
     - Gateway/Monitor: ensures slave running
     - Master: starts if `bEnableSlave=true`, stops otherwise
-    - Loopback: ensures slave running
+    - Loopback: does not touch the slave interface; it stays as the previous mode left it
   - Persists mode to settings via `updateSetting("OTDmode", ...)`
 
 #### `static void resetTransientState()`
@@ -361,17 +363,21 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 ### Loopback Test Mode
 
 #### `static unsigned long simulateLoopbackResponse(unsigned long request)`
-- **Location**: OTDirect.ino:869
+- **Location**: OTDirect.ino:1192
 - **Purpose**: Generate fake boiler response for loopback testing (no hardware needed)
 - **Behavior**:
-  - Reads simulated value from `otLoopbackData[]` (128 entries indexed by msgId)
-  - WRITE_DATA (type 1): accepts write, echoes as WRITE_ACK with same data
-  - READ_DATA (type 0): returns READ_ACK with simulated value or UNKNOWN_DATA_ID if 0xFFFF
-  - Returns response with correct type and parity
+  - WRITE_DATA (type 1), any MsgID 0-255: returns WRITE_ACK with the request data echoed. The table is not read.
+  - Any other request type is answered as a read:
+    - MsgID 128-255, past the end of `otLoopbackData[]`: returns UNKNOWN_DATA_ID with data 0. The table is not read (TASK-1072).
+    - MsgID 0-127: returns READ_ACK with the table value, or UNKNOWN_DATA_ID with data 0 when the entry is 0xFFFF.
+  - The range guard takes the table size from `sizeof(otLoopbackData) / sizeof(otLoopbackData[0])`, so it follows the declaration.
+  - Builds every response with `buildOTResponse()`, which sets the parity bit.
+  - Has no side effects. The caller, `sendMasterRequestAsync()`, bridges both frames to the parser and caches the response in `otBoilerCache[]` at index `MsgID & 0x7F` (OTDirect.ino:1237-1239).
+  - Host test: `test/host/build_and_run_loopback.ps1` runs it for every MsgID and message type. Add `-OldVsFix` to compare with the code before the TASK-1072 fix.
 
 #### `static const uint16_t PROGMEM otLoopbackData[128]`
-- **Location**: OTDirect.ino:747
-- **Purpose**: Simulated boiler data table for loopback mode
+- **Location**: OTDirect.ino:1070
+- **Purpose**: Simulated boiler data table for loopback mode, indexed by MsgID 0-127
 - **Values**: Realistic f8.8 temperatures, modulation levels, counters, etc.; 0xFFFF for unsupported MsgIDs
 
 ### Room Temperature Compensation (TASK-183)
@@ -661,8 +667,9 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 - **Use case**: Standalone control without thermostat
 
 ### Mode: Loopback (GW=L)
-- **Thermostat**: Simulated; responses come from `otLoopbackData[]`
-- **Master**: Simulated; requests handled instantly
+- **Boiler**: Simulated; `sendMasterRequestAsync()` answers each request with `simulateLoopbackResponse()` instead of sending it to the boiler
+- **Thermostat**: Optional; frames from a connected thermostat take the gateway-mode path. UI/SR table hits are answered directly; the other frames get the repeater overrides and go to the simulator
+- **Master**: The scheduler still runs; its requests are answered instantly
 - **Use case**: Testing full stack (parser, MQTT, WebSocket, HA) without hardware
 
 ## Key Intervals & Timing
