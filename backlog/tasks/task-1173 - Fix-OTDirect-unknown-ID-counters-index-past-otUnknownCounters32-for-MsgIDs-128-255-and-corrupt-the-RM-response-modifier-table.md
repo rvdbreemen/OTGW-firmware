@@ -3,9 +3,11 @@ id: TASK-1173
 title: >-
   Fix: OTDirect unknown-ID counters index past otUnknownCounters[32] for MsgIDs
   128-255 and corrupt the RM response-modifier table
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-30 08:44'
+updated_date: '2026-09-30 10:22'
 labels:
   - bug
   - otdirect
@@ -92,12 +94,12 @@ SEVERITY: medium.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 getUnknownCount, incUnknownCount and clearUnknownCount (src/OTGW-firmware/OTDirect.ino:535-553) each compare the computed byte index with the array size before any access, for example `if (byteIdx >= sizeof(otUnknownCounters))`. For MsgID 128-255, getUnknownCount returns 0, and incUnknownCount and clearUnknownCount return without touching memory. The bound is derived from the declaration, not a literal, so it cannot drift (the TASK-1072 idiom). The diff changes nothing else in the helpers or in their callers at :1316-1334.
-- [ ] #2 The comment at OTDirect.ino:532-533 states that the counters cover MsgIDs 0-127, the range otSchedule polls, and that 128-255 are ignored. 128-255 is the OT Test and Diagnostic area, for example Remeha 131-133.
-- [ ] #3 Old-vs-fix host reproduction (required proof). (1) The harness, for example tests/test_otdirect_unknown_counters.cpp plus a runner, compiles the :533 declaration and the three helpers. They are extracted verbatim from a given OTDirect.ino at test time by text anchors. A hand-copied mirror like tests/test_otdirect_override.cpp does not qualify. (2) It is built with bounds checking (g++ -fsanitize=bounds -fsanitize-undefined-trap-on-error, or clang -fsanitize=address,undefined) and prints each MsgID before the call. (3) OLD, from `git show HEAD:src/OTGW-firmware/OTDirect.ino`: the run stops at `id=131` with a bounds trap or an ASan report naming otUnknownCounters. A bare nonzero exit does not count. (4) FIX: every case passes and it exits 0. (5) Both transcripts are quoted in the Final Summary.
-- [ ] #4 In-range behaviour is unchanged (TASK-151 contract), shown by the same harness on the fixed source. For every MsgID 1-127, four incUnknownCount calls give getUnknownCount == 3 (saturation), and clearUnknownCount then gives 0. For MsgID 128-255, getUnknownCount returns 0 after incUnknownCount.
+- [x] #1 getUnknownCount, incUnknownCount and clearUnknownCount (src/OTGW-firmware/OTDirect.ino:535-553) each compare the computed byte index with the array size before any access, for example `if (byteIdx >= sizeof(otUnknownCounters))`. For MsgID 128-255, getUnknownCount returns 0, and incUnknownCount and clearUnknownCount return without touching memory. The bound is derived from the declaration, not a literal, so it cannot drift (the TASK-1072 idiom). The diff changes nothing else in the helpers or in their callers at :1316-1334.
+- [x] #2 The comment at OTDirect.ino:532-533 states that the counters cover MsgIDs 0-127, the range otSchedule polls, and that 128-255 are ignored. 128-255 is the OT Test and Diagnostic area, for example Remeha 131-133.
+- [x] #3 Old-vs-fix host reproduction (required proof). (1) The harness, for example tests/test_otdirect_unknown_counters.cpp plus a runner, compiles the :533 declaration and the three helpers. They are extracted verbatim from a given OTDirect.ino at test time by text anchors. A hand-copied mirror like tests/test_otdirect_override.cpp does not qualify. (2) It is built with bounds checking (g++ -fsanitize=bounds -fsanitize-undefined-trap-on-error, or clang -fsanitize=address,undefined) and prints each MsgID before the call. (3) OLD, from `git show HEAD:src/OTGW-firmware/OTDirect.ino`: the run stops at `id=131` with a bounds trap or an ASan report naming otUnknownCounters. A bare nonzero exit does not count. (4) FIX: every case passes and it exits 0. (5) Both transcripts are quoted in the Final Summary.
+- [x] #4 In-range behaviour is unchanged (TASK-151 contract), shown by the same harness on the fixed source. For every MsgID 1-127, four incUnknownCount calls give getUnknownCount == 3 (saturation), and clearUnknownCount then gives 0. For MsgID 128-255, getUnknownCount returns 0 after incUnknownCount.
 - [ ] #5 On-device old-vs-fix on the OTGW32 bench. HARDWARE-GATED: needs an OT master on the thermostat port that can emit MsgID 132, and an OT slave on the boiler port that ACKs it. If no such rig exists, leave the task In Progress and name this AC as the blocker. (1) Preconditions: `xtensa-esp32s3-elf-nm -n -S` on the OLD build's firmware.elf shows otResponseModifiers directly after otUnknownCounters. Send GW=1 first, because a mode change wipes the RM table. Then, with an empty RM table, POST /api/v2/otdirect/overrides?action=rm&msgid=5&value=1234; GET must show "modify":[{"msgid":5,"value":4660}]. (2) Stimulus: READ_DATA or WRITE_DATA 132 answered with READ_ACK or WRITE_ACK. Telnet must show `OTD: resp MsgID=132` (OTDirect.ino:1370). (3) Pass condition: on the old build the rule is gone from "modify" after the first 132 exchange; on the fixed build it is still listed after at least 10 exchanges. (4) Evidence: the telnet transcript and GET responses from both builds are attached.
-- [ ] #6 Build and process gates: (1) build.bat is green for esp32 and esp32-combo, with the per-env SUCCESS line and fresh firmware.bin and littlefs.bin. (2) python evaluate.py --quick shows no new failures. (3) The prerelease is bumped with bin/bump-prerelease.sh in the same commit. (4) dev only; no otgw-1.x.x port (1.x has no OTDirect).
+- [x] #6 Build and process gates: (1) build.bat is green for esp32 and esp32-combo, with the per-env SUCCESS line and fresh firmware.bin and littlefs.bin. (2) python evaluate.py --quick shows no new failures. (3) The prerelease is bumped with bin/bump-prerelease.sh in the same commit. (4) dev only; no otgw-1.x.x port (1.x has no OTDirect).
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -203,4 +205,16 @@ Refutation angles checked and rejected:
 - The UI/SR tables cannot intercept IDs above 127.
 - Every other helper caller is bounded (AA= :3226, KI= :3380).
 - The default mode is gateway (OTDirecttypes.h:107).
+
+2026-09-30 fix (alpha.384) and host proof, re-run in-session on HEAD cc4d4addf.
+- AC#1/#2 OTDirect.ino: getUnknownCount returns 0, incUnknownCount and clearUnknownCount return, when 'byteIdx >= sizeof(otUnknownCounters)' (directly after byteIdx is computed). The comment at the declaration says the counters cover MsgIDs 0-127 (the range otSchedule polls, max R_ENTRY(127)), that 128-255 (OT Test & Diagnostic area, e.g. Remeha 131-133) are ignored, and why a reply can still carry such an id (the pass-through relays them and nothing checks a reply's MsgID against the request).
+- AC#3 test/host/run_unknown_counters.ps1 slices the REAL declaration and the three helpers verbatim (slice audit in the workflow review: byte-identical) with a guard region behind the array:
+  * -Rev HEAD (OLD): inc and clear write past the array for 128 of 128 MsgIDs (128-255), get reads past it for 128 of 128; exit 1.
+  * FIX (-DiffAgainst HEAD): 7 of 7 checks PASS, no access past the 32-byte array.
+  * AddressSanitizer, OLD (-Asan -Rev HEAD): 'global-buffer-overflow ... located 0 bytes after global variable otUnknownCounters defined in OTDirect.ino:533:15 ... of size 32', in incUnknownCount, right after id=131; exit 1. FIX (-Asan): no report, exit 0.
+  * Workflow mutation matrix: removing any one bound, off-by-one variants, a '& 0x7F' mask and a clamp to 127 are all caught.
+- AC#4: 4 x incUnknownCount gives 3 and clearUnknownCount gives 0 for MsgIDs 0-127 on the fix; differential over 0-127: 1003072 operations, 0 differences vs HEAD.
+- Impact detail from the review: on the otgw32 and combo ELFs otUnknownCounters is directly followed by otResponseModifiers (0x20 each), so the overflow corrupted the RM= response-modifier table. esp32-classic is not affected (HAS_DIRECT_OT 0 wraps the whole of OTDirect.ino); 1.x has no OT-Direct.
+- AC#6: bin/bump-prerelease.sh alpha.383 -> alpha.384 in this commit; build.bat --target esp32 and --target esp32-combo SUCCESS for firmware and filesystem (fresh 12:17-12:21, alpha.384+cc4d4ad, images under %LOCALAPPDATA%/OTGW-capture/img-alpha384); evaluate.py --quick 70 passed / 0 / 0. docs/c4/c4-code-otdirect.md cites the new location and the 0-127 range.
+OPEN (hardware-gated, per the AC): AC#5 needs an OT master on the thermostat port that emits MsgID 132 and a slave that ACKs it; the bench has no thermostat.
 <!-- SECTION:NOTES:END -->

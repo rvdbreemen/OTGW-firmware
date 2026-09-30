@@ -603,10 +603,14 @@ static uint8_t otUnknownCounters[32];     // 128 MsgIDs × 2 bits = 32 bytes
 - **Purpose**: Validate strict 0/1 input
 
 #### 3-Strike Auto-Blacklist Helpers
-- **Location**: OTDirect.ino:367-385
+- **Location**: OTDirect.ino:532-560
 - `getUnknownCount(uint8_t msgId)` — Get 2-bit counter for MsgID
 - `incUnknownCount(uint8_t msgId)` — Increment (saturates at 3)
 - `clearUnknownCount(uint8_t msgId)` — Reset counter
+- The counters cover MsgIDs 0-127, the range otSchedule polls. Each helper ignores
+  128-255 (bound derived from sizeof(otUnknownCounters)): the thermostat pass-through
+  can relay OEM ids such as Remeha 131-133, and indexing them wrote past the array
+  (TASK-1173).
 
 #### Unknown-ID List Helpers
 - **Location**: OTDirect.ino:348-353

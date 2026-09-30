@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.383
+**  Version  : v2.0.0-alpha.384
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -529,16 +529,22 @@ struct OTResponseModify {
 static constexpr uint8_t OT_RESPONSE_MODIFY_MAX = 8;
 static OTResponseModify otResponseModifiers[OT_RESPONSE_MODIFY_MAX];
 
-// Phase 8: Unknown ID 3-strike auto-blacklist counters (2 bits per MsgID)
+// Phase 8: Unknown ID 3-strike auto-blacklist counters (2 bits per MsgID).
+// They cover MsgIDs 0-127, the range otSchedule polls. The helpers ignore
+// 128-255, the OT Test & Diagnostic area (spec v4.2 section 5.1), such as
+// Remeha 131-133. A reply can still carry one: the thermostat pass-through
+// relays them, and nothing checks a reply's MsgID against the request.
 static uint8_t otUnknownCounters[32] = {0}; // 128 MsgIDs × 2 bits = 32 bytes
 
 static uint8_t getUnknownCount(uint8_t msgId) {
   uint8_t byteIdx = msgId >> 2;
+  if (byteIdx >= sizeof(otUnknownCounters)) return 0;
   uint8_t bitShift = (msgId & 0x03) * 2;
   return (otUnknownCounters[byteIdx] >> bitShift) & 0x03;
 }
 static void incUnknownCount(uint8_t msgId) {
   uint8_t byteIdx = msgId >> 2;
+  if (byteIdx >= sizeof(otUnknownCounters)) return;
   uint8_t bitShift = (msgId & 0x03) * 2;
   uint8_t count = (otUnknownCounters[byteIdx] >> bitShift) & 0x03;
   if (count < 3) {
@@ -548,6 +554,7 @@ static void incUnknownCount(uint8_t msgId) {
 }
 static void clearUnknownCount(uint8_t msgId) {
   uint8_t byteIdx = msgId >> 2;
+  if (byteIdx >= sizeof(otUnknownCounters)) return;
   uint8_t bitShift = (msgId & 0x03) * 2;
   otUnknownCounters[byteIdx] &= ~(0x03 << bitShift);
 }
