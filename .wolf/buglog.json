@@ -2695,5 +2695,146 @@
       "TASK-1135",
       "TASK-1144"
     ]
+  },
+  {
+    "id": "bug-154",
+    "timestamp": "2026-09-23T08:40:00",
+    "error_message": "After a SAT safety trip on OT-Direct, telnet shows 'CS= refused, SAT owns the control setpoint' and the MsgID 1 override stays pinned at SAT's last setpoint",
+    "file": "src/OTGW-firmware/SATcontrol.ino",
+    "root_cause": "Ownership gate (TASK-1150) refuses unmarked CS=; only satEnqueueIfChangedCS set the in-flight marker, the three CS=0 releases called addCommandToQueue directly, and a trip leaves bEnabled true",
+    "fix": "satEnqueueOwnCS() helper; every SAT CS= goes through it (alpha.372, 29288c815). Bench A/B confirmed",
+    "tags": [
+      "sat",
+      "otdirect",
+      "tset",
+      "msgid1",
+      "safety-trip",
+      "marker",
+      "adr-179"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-23T08:40:00"
+  },
+  {
+    "id": "bug-155",
+    "timestamp": "2026-09-23T22:30:00",
+    "error_message": "POST /api/v2/sat/enable/1 without body disabled SAT (HTTP 200) right after a settings POST",
+    "file": "src/OTGW-firmware/webServerCompat.h",
+    "root_cause": "g_requestBody owned by request pointer, never cleared; body-less request at reused heap address read the stale body (ABA)",
+    "fix": "hasBodyCompat()/bodyCompat() also require contentLength()>0 (TASK-1158, alpha.373)",
+    "tags": [
+      "rest",
+      "async",
+      "aba",
+      "body"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-23T22:30:00"
+  },
+  {
+    "id": "bug-156",
+    "timestamp": "2026-09-23T22:30:00",
+    "error_message": "Toggling SAT off/on on the settings page left a safety trip set",
+    "file": "src/OTGW-firmware/settingStuff.ino",
+    "root_cause": "only satHandleEnabled() cleared the trip; updateSetting(SATenabled) did not",
+    "fix": "satClearSafetyTrip() called on false->true transition after setup (TASK-1159, alpha.374)",
+    "tags": [
+      "sat",
+      "safety-trip",
+      "settings"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-23T22:30:00"
+  },
+  {
+    "id": "bug-157",
+    "timestamp": "2026-09-23T22:30:00",
+    "error_message": "SAT kept regulating 10+ min on the last room temp after the thermostat went quiet",
+    "file": "src/OTGW-firmware/SATcontrol.ino",
+    "root_cause": "OTcurrentSystemState.Tr never expires",
+    "fix": "thermostat-sourced MsgID 24 stamps iTrThermostatMs; stale after 5 min -> NaN -> skip/trip chain (TASK-1157, alpha.375)",
+    "tags": [
+      "sat",
+      "tr",
+      "staleness",
+      "safety"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-23T22:30:00"
+  },
+  {
+    "id": "bug-158",
+    "timestamp": "2026-09-30T07:45:00",
+    "error_message": "Port 80 actively refused on the first boot after WiFiManager provisioning while telnet :23 works; a plain reset fixes it (TASK-1130, earlier TASK-961)",
+    "file": "src/OTGW-firmware/FSexplorer.ino",
+    "root_cause": "AsyncTCP AsyncServer::begin() binds without SOF_REUSEADDR; lwIP tcp_bind() returns ERR_USE while the portal's server-closed HTTP pcbs sit in TIME_WAIT (2*MSL=120 s) on port 80; begin() only log_e's and returns, AsyncWebServer::begin() is void",
+    "fix": "startWebserver() checks server.state()!=LISTEN; handleWebserverListener() retries server.begin() every 5 s until LISTEN (alpha.377). 1.x unaffected: ESP8266 WiFiServer sets SOF_REUSEADDR",
+    "tags": [
+      "webserver",
+      "lwip",
+      "time_wait",
+      "asynctcp",
+      "wifimanager",
+      "provisioning",
+      "bind"
+    ],
+    "related_bugs": [],
+    "occurrences": 3,
+    "last_seen": "2026-09-30T07:45:00"
+  },
+  {
+    "id": "bug-159",
+    "timestamp": "2026-09-30T07:45:00",
+    "error_message": "Build failed with hundreds of errors ('VerifyOutcome' has not been declared) after restoring .ino files from git",
+    "file": "src/OTGW-firmware/FSexplorer.ino",
+    "root_cause": "git show HEAD:file | Set-Content -NoNewline in PowerShell joins every pipeline line WITHOUT newlines: the whole file became one line",
+    "fix": "restore with bash redirect (git show HEAD:path > path) or git checkout; never Set-Content -NoNewline on piped lines",
+    "tags": [
+      "powershell",
+      "set-content",
+      "git-show",
+      "tooling"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T07:45:00"
+  },
+  {
+    "id": "bug-160",
+    "timestamp": "2026-09-30T07:45:00",
+    "error_message": "esptool: No such file or directory for the previous build's merged-full.bin",
+    "file": "build.py",
+    "root_cause": "build.py clears older artifacts from build/ on every build; an old image kept for an old-vs-fix comparison disappears",
+    "fix": "copy images needed for A/B tests out of build/ (e.g. %LOCALAPPDATA%/OTGW-capture/<task>-bins/) before rebuilding; abort a repro script when the flash step fails",
+    "tags": [
+      "build",
+      "artifacts",
+      "ab-test",
+      "tooling"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T07:45:00"
+  },
+  {
+    "id": "bug-161",
+    "timestamp": "2026-09-30T07:45:00",
+    "error_message": "TCP probe reported 'timeout' for a port that curl/Invoke-WebRequest reported as 'actively refused'",
+    "file": "(host test scripts)",
+    "root_cause": "Windows retries a SYN that got an RST, so a refused connect only fails after ~2 s; a 2 s probe timeout misreads refused as timeout",
+    "fix": "probe with a >=5 s timeout and classify ConnectionRefusedError / WSAECONNREFUSED 10061 explicitly",
+    "tags": [
+      "windows",
+      "tcp",
+      "probe",
+      "tooling"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T07:45:00"
   }
 ]

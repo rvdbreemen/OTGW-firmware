@@ -53,6 +53,12 @@
 - Concurrent edits to `v2.html`: `git diff -U1` to split coalesced hunks, filter foreign ones, `git apply --cached --unidiff-zero`.
 
 ## Do-Not-Repeat
+- [2026-09-30] Before committing `.wolf/anatomy.md`, drop every section whose header is outside the repo (`## ../`, `## C:/...`): OpenWolf records every file read, including the private KennisBank vault, the memory dir and `%LOCALAPPDATA%/OTGW-capture` (secrets file names). This repo is public.
+- [2026-09-30] Never script the WiFiManager provisioning step (reading a WiFi password from a secrets file and POSTing /wifisave): Claude does not enter WiFi credentials. Flash, then let the user run `bin/provision-wifi-ap.py` (or the phone portal) and monitor the LAN side. A repro that needs a provisioning boot needs one user action per run.
+- [2026-09-30] Never probe telnet :23 while a telnet reader is attached: AsyncSimpleTelnet is `<MAX_CLIENTS = 1>`, a second connect evicts the first. Use the reader's liveness as the port-23 signal.
+- [2026-09-30] Before an old-vs-fix bench comparison, copy BOTH images out of `build/` (build.py deletes older artifacts), and confirm which image a device runs by the `build:` number in the telnet `D` dump; both images of one tag share the same fwversion string.
+- [2026-09-23] Never `sed -i` a `.bat`/CRLF file from Git Bash: it stripped every CR from flash_otgw.bat and cmd failed with `'M' is not recognized`. Use the Edit tool, then check endings.
+- [2026-09-23] When a bench symptom looks nondeterministic, list what changed OUTSIDE the device between runs (build mode, contents of build/, tool args) before instrumenting firmware. TASK-1160 was flash_otgw.bat auto-adding a littlefs image, present only after full builds.
 - **2026-08-01**: Never trust a zero-refutation verify pass; never delete a `HAS_*` `#else`.
 - **2026-07-31**: Never analyse branch gaps against an unfetched tree.
 - **2026-06-24**: Never flip ADR status by replacing the first bare "Proposed" (corrupted 21 files).

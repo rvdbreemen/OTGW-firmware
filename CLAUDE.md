@@ -157,15 +157,18 @@ against raw platform symbols. **No `#if(def) ESP8266`, `#if(def) ESP32`,
 `#if(def) ARDUINO_ARCH_ESP*`, or `#if(def) BOARD_NODOSHOP_ESP*` may appear
 outside the allowlisted abstraction files.**
 
-Allowlisted files (the only place these conditionals belong):
+Allowlisted files (the only place these conditionals belong; the list in
+`evaluate.py::ESP_ABSTRACTION_ALLOWED_FILES` is authoritative). Since
+c880a0203 (2026-06-02) the abstraction is the project's own Platform
+library under `src/libraries/Platform/src/`, and dev has no ESP8266 header
+any more:
 
-- `src/OTGW-firmware/platform.h` — dispatcher
-- `src/OTGW-firmware/platform_esp8266.h` — ESP8266 includes, shims, type aliases
-- `src/OTGW-firmware/platform_esp32.h` — ESP32 includes, shims, type aliases
-- `src/OTGW-firmware/boards.h` — pin maps and `HAS_*` capability flags
-- `src/OTGW-firmware/OTGW-ModUpdateServer{.h,-esp32.h,-impl.h}` — parallel mini-abstraction for the firmware update server
+- `src/libraries/Platform/src/platform.h` — dispatcher
+- `src/libraries/Platform/src/platform_esp32.h` — ESP32 includes, shims, type aliases
+- `src/libraries/Platform/src/boards.h` — pin maps, `HAS_*` capability flags and per-board tuning constants
+- `src/OTGW-firmware/OTGW-ModUpdateServer{.h,-esp32.h}` — parallel mini-abstraction for the firmware update server
 
-**Vendored libraries under `src/libraries/**` are OUT OF SCOPE entirely.**
+**The other libraries under `src/libraries/**` are vendored upstreams and OUT OF SCOPE entirely.**
 They are independent upstreams that manage their own platform support and are
 NOT firmware application code. Do NOT pull them into the abstraction: never add
 `platformXxx()` shims into them and never strip their internal
@@ -176,12 +179,12 @@ abstraction scan. (Maintainer directive, 2026-05-30.)
 
 Application code MUST instead:
 
-1. **Call `platformXxx()` shims** from `platform_*.h` for any divergent API
+1. **Call `platformXxx()` shims** from `platform_esp32.h` for any divergent API
    (heap, hostname, MAC, reset, NTP, LED, JSON tx, WiFi, BLE, …). If a
    shim does not exist yet for a divergence you need, *add the shim first*
-   in both `platform_esp8266.h` and `platform_esp32.h` — including an
-   inline no-op stub on the platform where the feature is absent — and
-   then call it unguarded from application code.
+   in `src/libraries/Platform/src/platform_esp32.h` — with an inline no-op
+   stub where a board lacks the feature — and then call it unguarded from
+   application code.
 2. **Gate optional features with `HAS_*` flags** from `boards.h`
    (`HAS_PIC`, `HAS_DIRECT_OT`, `HAS_ETH_CAPABLE`, `HAS_OLED_CAPABLE`,
    `HAS_SAT_BLE`, `HAS_WEATHER_FORECAST`, etc.). If your feature does not
