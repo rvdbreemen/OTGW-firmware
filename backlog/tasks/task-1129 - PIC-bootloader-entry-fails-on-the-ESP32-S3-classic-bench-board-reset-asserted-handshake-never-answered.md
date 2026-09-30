@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-05 15:32'
-updated_date: '2026-09-05 19:23'
+updated_date: '2026-09-30 07:52'
 labels:
   - bug
   - pic
@@ -88,4 +88,13 @@ Het telnet-commando p vindt de PIC direct. device/info meldt hardware_type otgw-
 De PIC draait op dit moment diagnose-firmware 2.2, niet gateway 6.6 zoals in juli. Iemand heeft hem sindsdien dus wel degelijk succesvol geflasht, wat op zichzelf pleit tegen een structureel defect in het flashpad op dit bord.
 
 Status: het oorspronkelijke symptoom is niet reproduceerbaar en er is geen aanwijzing meer voor een defect. Voorstel is deze taak te sluiten en TASK-972 AC#2 opnieuw te beproeven met een echte flash vanuit de v2-UI, in plaats van hier op een spook te blijven jagen. Wel bewaren: commando p is de goedkope reproductie van de detectiestap, mocht het ooit terugkomen.
+
+2026-09-30 premise corrections + candidate cause (code verified in-session; hardware retest still needed).
+- TASK-972 is Done (not a pending dependency). The 07-08 'PR=A answered' was an RX-only banner match; ESP-to-PIC TX was broken on UART1 until ad7334846. After that the failure sat AFTER the bootloader ETX ('bootloader exits to the app within ~130ms').
+- The 2026-09-05 'does not reproduce' ran telnet 'p' = detectPIC(), i.e. resetPic() + find(ETX) only. It never exercised the upgrade handshake after the ETX, so it cannot close this task.
+- Candidate cause, every link verified in code: OTGWSerial::upgradeEvent() calls serial->SetLED(0) when the bootloader's ETX arrives (src/libraries/OTGWSerial/OTGWSerial.cpp:823-825); SetLED() does digitalWrite(_led, ...) (:1020-1023) with _led = activeLed2(); LED2 is attached to LEDC (OTGW-firmware.ino:589 ledcAttachChannel); arduino-esp32 3.x __digitalWrite() on a pin that is not a GPIO bus only calls log_e('IO %i is not set as GPIO...') (framework cores/esp32/esp32-hal-gpio.c:177-182). On the fixed esp32-classic build the IDF/Arduino console was UART0 = the PIC link until 02a3d90d6 (2026-09-06, alpha.364, TASK-1131 console mute), so that log line went INTO the PIC right after its ETX; selfprog exits to the application on the first non-STX byte. That matches the July symptom exactly. The combo build had the mute earlier.
+- Consequence: the July failure is probably fixed on esp32-classic since alpha.364, and the progress LED never toggles during a PIC flash on any S3 build (the digitalWrite is refused).
+- OLD/FIX discriminator for the Classic session (per triage): a zero-write probe (a pic16f88 hex offered to a pic16f1847, aborting on the model mismatch before any erase) on an image WITHOUT the console mute versus the current image; expected 'Too many retries' on the old image versus a device-mismatch error after a real version packet on the new one. With the mute active, the log line no longer shows on COM8, so the old image is needed to see it.
+- Proposed AC#1 wording (for the maintainer): 'the reason the bootloader leaves the handshake after its ETX is identified from evidence'.
+Status stays In Progress: needs the Classic-S3 (COM8) on its carrier and a per-instance PIC-flash authorisation.
 <!-- SECTION:NOTES:END -->

@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-07-09 18:37'
-updated_date: '2026-07-31 20:50'
+updated_date: '2026-09-30 07:53'
 labels: []
 dependencies: []
 ordinal: 244000
@@ -19,7 +19,7 @@ Maintainer goal (/goal working oled for s3 mini pro, 2026-07-09): the LOLIN S3 M
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [x] #1 TFT pinout verified against LOLIN sources and no conflict with Classic-carrier pin map (or conflicts documented + mitigated)
+- [ ] #1 TFT pinout verified against LOLIN sources and no conflict with Classic-carrier pin map (or conflicts documented + mitigated)
 - [ ] #2 Display library chosen via ADR (alternatives + RAM/flash budget documented)
 - [ ] #3 Boot splash + status pages render on the Pro's onboard LCD, gated on Pro detection; non-Pro boards unaffected
 - [ ] #4 Field validation on the maintainer's S3 Mini Pro
@@ -33,4 +33,9 @@ Maintainer goal (/goal working oled for s3 mini pro, 2026-07-09): the LOLIN S3 M
 2026-07-09 user decision: PARK. The onboard-TFT path requires a physical D5 (GPIO40/SCK, left column 4th-from-top on the S3 Mini Pro header) isolation from the carrier's PIC-reset net — a hardware mod the user is not doing now. GPIO40 soak proved the conflict is fatal (TFT SPI holds the PIC in permanent reset). No firmware work until the hardware path is chosen. External I2C-OLED on the Pro bus (11/12) remains supported today as the alternative.
 
 BLOCKED, 2026-07-31 (backlog-drain triage). Needs the S3 Mini Pro physically on the carrier board: the Pro's 0.85in TFT sits on the Classic I2C bus 11/12 and is reached via Board-Mode 3, not a compile flag, and a bare Pro board will not boot the combo firmware. No part of this is verifiable from a build. UNBLOCKS WHEN: an S3 Mini Pro is mounted on a carrier and reachable for flash + visual confirmation.
+
+2026-09-30 record correction (no status change; stays parked per the 2026-07-09 maintainer decision).
+- The 2026-07-31 BLOCKED note is wrong about the bus: the Pro's 0.85in TFT is on SPI, not on the Classic I2C bus 11/12. The 2026-07-09 soak drove SCK=40 / MOSI=38 / CS=35 / DC=36, and ADR-158:38 records that the Pro frees GPIO 33-36 for the TFT. I2C 11/12 is the EXTERNAL OLED alternative.
+- AC#1 unchecked: its text requires 'conflicts documented + mitigated'. The GPIO40 (TFT SCK = PIC MCLR net) conflict is documented and proven fatal, but none of the remediation options has been carried out.
+- Points to weigh when the hardware path is chosen (from the 2026-09-30 triage, not bench-verified): with D5 isolated, the PIC's own watchdog, the ATTiny85 watchdog and the RESET header still exist as recovery paths; bootloader entry by GW=R alone (no MCLR pulse) has not been tested for a PIC flash; a trace reroute is an alternative to lifting the pin.
 <!-- SECTION:NOTES:END -->

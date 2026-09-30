@@ -4,7 +4,7 @@ title: 'Modbus TCP client for heat pump integration (ESP32-only, experimental)'
 status: To Do
 assignee: []
 created_date: '2026-05-20 18:31'
-updated_date: '2026-07-31 20:50'
+updated_date: '2026-09-30 07:55'
 labels:
   - feature
   - esp32-only
@@ -87,4 +87,9 @@ Related: TASK-640 (narrative dependency, not blocking — feature is architectur
 2026-07-09: deferred to release 2.1.0 per maintainer — Modbus TCP heat-pump client is experimental, out of the 2.0.0 drain scope.
 
 BLOCKED ON SCOPING, 2026-07-31 (backlog-drain triage). A Modbus TCP client is new feature work of epic size (register maps per heat-pump vendor, polling model, settings surface, HA discovery shape, error/timeout semantics), not backlog drainage. Starting it from the current one-line description would mean inventing the requirements. UNBLOCKS WHEN: the maintainer scopes it, at minimum which heat pumps to target and whether it is read-only telemetry or also control.
+
+2026-09-30 record correction (status stays To Do).
+- The 2026-07-31 'BLOCKED ON SCOPING' note is wrong. It speaks of a 'one-line description', but the task has a full description and 35 ACs that already answer both of its questions: vendor-agnostic (users supply a JSON register map on LittleFS, community profiles in docs/features/modbus-profiles/, no vendor code in firmware) and polling read with a small write surface (no master mode, no scan/discovery).
+- The real gate is the schedule: milestone 2.1.0 (labels milestone-v2.1.0, deferred-from-v2.0.0), i.e. after 2.0.0 GA, plus the maintainer's go.
+- At pickup, per the 2026-09-30 triage: re-check the ACs against today's code (several predate the 2.0.0 async rework and may be stale); weigh Home Assistant core's own Modbus integration as an alternative for users; budget the TCP pcb pool (a polling client adds TIME_WAIT pcbs, 2*MSL = 120 s each).
 <!-- SECTION:NOTES:END -->

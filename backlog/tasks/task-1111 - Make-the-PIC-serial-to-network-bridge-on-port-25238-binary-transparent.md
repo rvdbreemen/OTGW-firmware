@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-02 21:44'
-updated_date: '2026-09-02 22:31'
+updated_date: '2026-09-30 07:55'
 labels: []
 dependencies: []
 ordinal: 269000
@@ -67,6 +67,12 @@ Ordering: after this change the raw queue is the ONLY feed to port 25238 on the 
 
 - Prerelease bump deliberately deferred. I had already run bin/bump-prerelease.sh and committed (alpha.360 -> alpha.361) when the parent session instructed both agents not to bump: autoinc-semver.py --update-all rewrites and stages the version banner in ~43 source files, including files the parallel agent is editing, so the bump is serialised to one batch run by the parent at the end. I unwound it - the local unpushed commits were reset, all 44 bump-touched files restored to their pre-bump content, and the banner in OTGW-Core.ino/.h put back to alpha.360. The work was re-committed with OTGW_BUMP_HOOK_DISABLE=1 as a single commit of exactly three files.
 - One residue the parent should know about: src/OTGW-firmware/data/index.js still carries the v2.0.0-alpha.361 banner that the bump run wrote into it. That file belongs to the parallel agent and had their uncommitted edits in it, so reverting the banner was not mine to do. The batch bump rewrites every banner anyway, so it normalises on the next run.
+
+2026-09-30 plan for the Classic-bench session (from the read-only triage; discriminators are predictions, not measured).
+- AC#3 scope: TASK-1111's own passthrough additions respect the ADR-130 task seams. The older violation found next to it (fwreportinfo writing OTGWState and publishing MQTT from the PIC task via OTGWSerial::read() -> matchBanner()) is a separate pre-existing bug and gets its own task; it does not block this one.
+- AC#1 needs a raw port-25238 capture on a PIC board (on the OTGW32 the PIC task parks under OT-Direct, so nothing reaches otRawQueue). Expected OLD/FIX differences: the final 'Enter test number: ' prompt of the diagnose firmware arrives only on the FIX; the first PS=1 chunk arrives about 30 ms after the line starts (dev coalesces for 30 ms, so the 1.x '69 of 98 chunks' ratio does not transfer); diagnose CR-LF-LF sequences are preserved on the FIX where the old code collapsed them.
+- Comments that describe the pre-1111 behaviour and should be updated at close (re-verify line numbers): OTGW-Core.h:557-561, :693, :719-722; OTGW-Core.ino:748-749, :3798-3802; OTDirect.ino:627.
+- AC#7 needs a fresh build of all three targets at close.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
