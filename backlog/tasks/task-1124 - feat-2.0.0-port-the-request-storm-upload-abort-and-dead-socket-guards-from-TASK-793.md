@@ -3,9 +3,11 @@ id: TASK-1124
 title: >-
   feat-2.0.0: port the request-storm upload-abort and dead-socket guards from
   TASK-793
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-04 06:57'
+updated_date: '2026-09-30 10:17'
 labels:
   - 2.0.0
   - port
@@ -27,3 +29,14 @@ Sibling of TASK-793 on the 1.x line, which is AC #6 of that task. Three changes 
 - [ ] #3 Heap-gated refusals carry Retry-After
 - [ ] #4 A scripted rapid-refresh storm is run against a real device and its outcome recorded: request outcomes, reboot count either side, and heap or pcb headroom
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-09-30 verification tooling ready (scripts only, no firmware, no bump).
+scripts/tests/refresh_storm.py: --upload-abort N with fin, rst, stall and mixed modes against the real upload endpoint; read-back with a Content-Length check; cleanup through /api/listfiles?delete= (GET /?delete deletes nothing) and a 404 check; storm arms including a /ws subscriber leg; device/info snapshots with bootcount, lastreset, uptime and hd_tcp_active_pcbs; a final gate-balance check. Readback rule: a stale_previous after a fin or stall abort is a FAIL; after an rst abort it is only a FAIL when a fin/stall iteration in the same run is also stale, otherwise INCONCLUSIVE, because an RST can drop the queued data before the upload handler opens the file (AsyncTCP.cpp:494-500). A failed control upload or a 401 stops the run as INCONCLUSIVE.
+Evidence: py_compile OK; tests/test_refresh_storm.py 37 tests, OK (2 /ws tests skipped on Python 3.12 without websocket-client; all 37 OK on 3.14 in the workflow run). The workflow ran 11 targeted tests against the pre-fixup tool: 6 failures + 2 errors, including the misdiagnosis 'stale_previous' on rst-only runs that the rule above now avoids. A stub green run proves the tool's mechanics, not the firmware.
+Code finding to confirm on the bench: the multipart parser hands data to the upload handler at the end of every receive callback (ESPAsyncWebServer WebRequest.cpp:195, :583), not in 1460-byte pieces, so a fin/stall abort of N bytes should store all bytes received.
+Scope per the triage (planner decision, for the maintainer): option B, Retry-After only on the heap-gated 503 refusals; the three <4 KB 500s stay as they are (1.x TASK-793 precedent, no API contract change). Firmware part not implemented yet.
+OPEN: AC#1/#2/#4 run on the OTGW32 bench once it is back on the network.
+<!-- SECTION:NOTES:END -->
