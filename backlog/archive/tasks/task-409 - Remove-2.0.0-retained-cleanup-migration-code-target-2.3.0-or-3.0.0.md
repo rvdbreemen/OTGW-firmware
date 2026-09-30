@@ -4,7 +4,7 @@ title: 'Remove 2.0.0 retained-cleanup migration code (target: 2.3.0 or 3.0.0)'
 status: To Do
 assignee: []
 created_date: '2026-04-24 19:57'
-updated_date: '2026-07-31 20:50'
+updated_date: '2026-09-30 07:48'
 labels:
   - migration-cleanup
   - future-work
@@ -64,4 +64,9 @@ Related: ADR-084 (generic OT-bus state topics), ADR-065 (otgw-pic MQTT subtree, 
 
 <!-- SECTION:NOTES:BEGIN -->
 NOT BLOCKED, DEFERRED BY DESIGN, 2026-07-31 (backlog-drain triage). This is a future-dated marker, not pending work: the retained-cleanup migration code must stay in place until 2.3.0 or 3.0.0, because removing it early strands users upgrading from older retained-topic layouts. Left To Do deliberately so the reminder survives; it should not be counted as backlog debt. UNBLOCKS WHEN: the 2.3.0 or 3.0.0 milestone opens.
+
+2026-09-30 archived per maintainer request.
+- On 2026-06-27 the maintainer asked to archive 409, 484 and 486 as dropped from the active backlog (commit 649d660bb, future-work target 2.3.0/3.0.0). That commit only exists on origin/feat/heap-soak-instr and never reached dev; this archive carries the request out on dev. 484 is already Done on dev.
+- New facts from the 2026-09-30 read-only triage (code and history reading, NOT re-verified at runtime): no released firmware ever published the six deprecated topics as retained, so the migration block (MQTTstuff.ino kV2DeprecatedTopics / mqttV2Migration*) has nothing to clean. It costs about 12 extra MQTT packets per reconnect plus topic compares on inbound messages for 5 s. MQTT.md, README.md:35 and the 2.0.0 release notes still describe these topics as retained and self-healing.
+- If the block should go before 2.0.0 GA after all, un-archive this task: removal needs an ADR superseding ADR-084 item 5 and a broker SUBSCRIBE/UNSUBSCRIBE log as old-vs-new proof.
 <!-- SECTION:NOTES:END -->

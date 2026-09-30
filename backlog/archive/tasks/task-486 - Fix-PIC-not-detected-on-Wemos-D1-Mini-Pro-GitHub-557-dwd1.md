@@ -4,7 +4,7 @@ title: 'Fix: PIC not detected on Wemos D1 Mini Pro (GitHub #557, dwd1)'
 status: To Do
 assignee: []
 created_date: '2026-04-29 23:49'
-updated_date: '2026-07-31 20:50'
+updated_date: '2026-09-30 07:47'
 labels:
   - bug
   - needs-info
@@ -47,4 +47,10 @@ GitHub: https://github.com/rvdbreemen/OTGW-firmware/issues/557
 2026-06-28 (issue scan): GH #557 still OPEN, awaiting reporter. dwd1 confirmed the PIC menu DOES appear when he swaps back to the original Wemos D1 board, so it is board-specific to his alternate ESP board (2026-04-29, screenshot attached). Maintainer root-caused 2026-05-05: not a missing board-profile setting -- PIC comms are hard-wired to ESP8266 UART0 (TX/GPIO1, RX/GPIO3) via OTGWSerial(UART0) and PIC reset is hard-wired to D5, so a board whose wiring differs won't see the PIC. dwd1 (2026-06-25) said he will capture the needed details 'in the following days' -- still pending. Keep needs-info until his capture arrives.
 
 BLOCKED, 2026-07-31 (backlog-drain triage). Carries the needs-info label and depends on GitHub #557 reporter dwd1 supplying a boot log from the affected Wemos D1 Mini Pro. We cannot reproduce without either that log or the same board. This is blocked on a third party, not on engineering effort. UNBLOCKS WHEN: the reporter supplies a boot/telnet log, or a D1 Mini Pro reaches the bench.
+
+2026-09-30 archived per maintainer decision.
+- GitHub #557 was closed NOT_PLANNED on 2026-07-05T16:12:03Z with the maintainer comment 'I decided to not support it on the 1.x.x branch. I'll accept a pull request by anyone fixing this. For now I will close this issue as won't do.' (gh issue view 557, re-checked today).
+- On 2026-06-27 the maintainer already asked to archive 409, 484 and 486 (commit 649d660bb 'archive dropped tasks 409, 484, 486'). That commit only exists on origin/feat/heap-soak-instr and never reached dev; this archive carries the request out on dev.
+- The 2026-07-31 BLOCKED note is superseded: the task is closed by a won't-do decision, not blocked on a reporter log. dev has no ESP8266 target (ADR-128), so there is no dev work.
+- Correction to the 2026-06-28 note: it records the maintainer's 2026-05-05 analysis (UART0 GPIO1/GPIO3 and D5 hard-wired), not a measurement on a D1 Mini Pro. AC#1 was never measured and AC#2 was not written; both stay unchecked. The 1.x README.md:507 describes the shared D1-mini pin mapping and a diagnostic path; stating 'unsupported' there would be a 1.x docs change for the maintainer to decide.
 <!-- SECTION:NOTES:END -->
