@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-09-30T18:37:01.167Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-09-30T19:08:31.430Z
 > Files: 595 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
@@ -796,7 +796,7 @@
 
 ## scripts/tests/
 
-- `test_heap_soak_driver.py` — FirmwareContract: c_function, c_unescape, pstr_format, api_error_message + 7 more (~8152 tok)
+- `test_heap_soak_driver.py` — FirmwareContract: c_function, c_unescape, pstr_format, api_error_message + 7 more (~8258 tok)
 
 ## src/OTGW-firmware/
 
