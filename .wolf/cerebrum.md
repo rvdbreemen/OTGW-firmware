@@ -32,6 +32,9 @@
 - End-of-loop ADR evaluation (TASK-928): one pass reviews `startHead..HEAD`, dedups decisions, assigns numbers from glob-max, drafts Proposed ADRs, commits docs-only. `ADR-PENDING` / `ADR-EVALUATED:` markers give process-death recovery. Acceptance stays manual.
 
 ### Firmware / code
+- The OpenTherm library's isValidResponse() accepts READ_ACK, WRITE_ACK and UNKNOWN_DATA_ID (OpenTherm.cpp:518-526), so status SUCCESS does not mean 'the reply carries a value'. Check the message type before treating the data bytes as a boiler value (TASK-1184).
+- index.html loads ds-tokens.css -> components.css -> the scripts one at a time after DOMContentLoaded (TASK-960 loader). A browser test must waitForFunction on the state it measures; waitUntil 'domcontentloaded' races it (TASK-1182).
+- test/host/build_and_run_override_reply.ps1 is the OT-Direct harness: -Suite 1178|1177|1184 with -OldVsFix -OldRev <commit before the fix>; older suites run as byte-identical regressions. A suite's verdict holds for the commit that introduced it.
 - `hd_drip_cooldown_skip` is post-status-burst pacing; the heap-pressure counter is `hd_drip_slowmode`.
 - `platformMaxFreeBlock()` on ESP32 = `ESP.getMaxAllocHeap()`.
 - **Removing a published REST/MQTT field is coupled to its frontend consumer.** Backend removal + JS rewrite must ship in ONE `build.py` (firmware + LittleFS). Dropping `picavailable` made `#tabPICflash` unreachable.
@@ -53,6 +56,9 @@
 - Concurrent edits to `v2.html`: `git diff -U1` to split coalesced hunks, filter foreign ones, `git apply --cached --unidiff-zero`.
 
 ## Do-Not-Repeat
+- [2026-09-30] One OLD-vs-FIX sample of a browser test is not evidence. sat-settings-layout passed once on origin/dev and failed once on HEAD; I reported a regression, but 4 runs per side showed 1/4 on both (a CSS-load race). Repeat a UI test at least 3x per side before calling it a regression.
+- [2026-09-30] Derive the 'changed on purpose' list of a regression suite from a byte-identical OLD-vs-FIX run, not from notes: the fixup note named C2/C7b/C7e for the UNKNOWN-caching change, and the run showed C8b too.
+- [2026-09-30] Before removing workflow worktrees (`.claude/worktrees/wf_*`), prove each one's diff is in dev: `git -C <wt> diff --binary HEAD > p; git apply --check -R --ignore-whitespace p` on dev. Files that were 3-way merged or edited after integration fail that check; for those, confirm every added line exists in the dev file and trace any missing line to the commit that replaced it (`git log -S`). Only then `git worktree remove --force` + `git branch -d`.
 - [2026-09-30] From Python on Windows, call the backlog CLI as `[node, C:/nvm4w/nodejs/node_modules/backlog.md/cli.js, ...]`, never `backlog`/`backlog.CMD`: subprocess cannot find the .CMD shim, and going through cmd.exe would mangle `|`, `&`, `%` and newlines in multi-line -d/--ac/--notes text.
 - [2026-09-30] A commit message may not contain a TASK-NNN token for a 1.x-only task (e.g. TASK-1126): the commit-msg hook requires a staged dev task file for every token. Write "the 1.x line's banner callback" instead.
 - [2026-09-30] Host harness pattern that works: slice the REAL function by anchor from `git show <rev>:<path>` (OLD) and the working tree (FIX), compile with MSVC via vswhere/vcvars (test/host/test_ot_reserved_range.py exports reusable helpers), and run OLD red / FIX green. Add /utf-8 when a sliced string holds non-ASCII (em dashes in debug text).

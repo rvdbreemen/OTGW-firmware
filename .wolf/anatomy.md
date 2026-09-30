@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-09-30T08:23:49.284Z
-> Files: 586 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-09-30T12:32:11.642Z
+> Files: 661 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -20,7 +20,7 @@
 - `CHANGELOG.md` — Change log (~8497 tok)
 - `CLAUDE.md` — OpenWolf (~12629 tok)
 - `config.py` — Base Paths (~268 tok)
-- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~48925 tok)
+- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~50286 tok)
 - `flash_esp.py` — Colors: disable, print_header, print_success, print_error + 10 more (~10963 tok)
 - `flash_otgw.bat` (~4180 tok)
 - `flash_otgw.sh` — flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware (Linux/macOS) (~3385 tok)
@@ -775,9 +775,23 @@
 - `parser.py` — Base option parser setup (~3951 tok)
 - `progress_bars.py` — SQLAlchemy model (~1345 tok)
 
+## .claude/worktrees/wf_8835435c-70a-1/docs/c4/
+
+- `c4-code-otdirect.md` — C4 Code Level: OTDirect Module (ESP32 Native OpenTherm Master/Slave) (~10386 tok)
+
+## .claude/worktrees/wf_8835435c-70a-1/src/OTGW-firmware/
+
+- `OTDirect.ino` — Declares instances (~43720 tok)
+- `OTDirecttypes.h` — Declares declaration (~2246 tok)
+
+## .claude/worktrees/wf_8835435c-70a-1/test/host/
+
+- `build_and_run_override_reply.ps1` — Declares below (~6476 tok)
+- `test_override_reply.cpp` — Declares __FlashStringHelper (~9884 tok)
+
 ## .claude/worktrees/wf_fe6c4173-ec6-1/docs/c4/
 
-- `c4-code-otdirect.md` — C4 Code Level: OTDirect Module (ESP32 Native OpenTherm Master/Slave) (~10162 tok)
+- `c4-code-otdirect.md` — C4 Code Level: OTDirect Module (ESP32 Native OpenTherm Master/Slave) (~10323 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-1/test/host/
 
@@ -786,38 +800,67 @@
 
 ## .claude/worktrees/wf_fe6c4173-ec6-2/src/OTGW-firmware/
 
-- `OTDirect.ino` — Declares instances (~42403 tok)
+- `OTDirect.ino` — Declares instances (~42466 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-2/test/host/
 
-- `run_unknown_counters.ps1` — Declares Get (~2678 tok)
-- `test_unknown_counters.cpp` — Declares and (~3987 tok)
+- `run_unknown_counters.ps1` — Declares Get (~3543 tok)
+- `test_unknown_counters_asan.cpp` — Declares char (~998 tok)
+- `test_unknown_counters.cpp` — Declares and (~5722 tok)
+
+## .claude/worktrees/wf_fe6c4173-ec6-3/docs/api/
+
+- `openapi.yaml` — Declares metadata (~51049 tok)
+- `README.md` — Project documentation (~15554 tok)
+
+## .claude/worktrees/wf_fe6c4173-ec6-3/docs/c4/
+
+- `c4-component-opentherm-core.md` — C4 Component: OpenTherm Core (~2592 tok)
+- `c4-container.md` — C4 Container Diagram: OTGW-firmware (~9147 tok)
+
+## .claude/worktrees/wf_fe6c4173-ec6-3/scripts/json-golden/
+
+- `_index.json` (~957 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-3/scripts/tests/
 
-- `README-coverage-gate.md` — OT decode-coverage regression gate (2.0.0) (~3040 tok)
-- `run_coverage_test.py` — Run the OT coverage fixture against a device and check it against the baseline. (~6726 tok)
-- `test_run_coverage_test.py` — Self-test for run_coverage_test.py: a short capture must fail loudly. (~3297 tok)
+- `README-coverage-gate.md` — OT decode-coverage regression gate (2.0.0) (~3059 tok)
+- `run_coverage_test.py` — Run the OT coverage fixture against a device and check it against the baseline. (~6730 tok)
+- `test_run_coverage_test.py` — Self-test for run_coverage_test.py: a short capture must fail loudly. (~3725 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-3/test/host/generated/old_runner/
 
 - `real_capture_0923.py` — The real 2026-09-23 OT-Direct capture through the OLD and the NEW runner. (~1542 tok)
 - `run_old_vs_fix.py` — Old-vs-fix: run the SAME self-test module against the old and the new runner. (~550 tok)
 
+## .claude/worktrees/wf_fe6c4173-ec6-3/test/host/generated/simulate_contract/
+
+- `build_and_run.ps1` (~478 tok)
+- `simulate_contract.cpp` — Host harness for the /api/v2/simulate REST contract (TASK-1071 docs pass). (~1894 tok)
+- `slice.py` — Slice real functions/declarations out of firmware sources by anchor. (~1258 tok)
+
 ## .claude/worktrees/wf_fe6c4173-ec6-4/docs/api/
 
-- `MQTT.md` — OTGW-firmware MQTT Topic Documentation (~27774 tok)
-- `openapi.yaml` — Declares metadata (~50180 tok)
+- `MQTT.md` — OTGW-firmware MQTT Topic Documentation (~28271 tok)
+- `openapi.yaml` — Declares metadata (~50263 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-4/docs/c4/
 
-- `c4-code-mqtt.md` — C4 Code Level: MQTT Module (~15516 tok)
-- `c4-component-integration-layer.md` — C4 Component: Integration Layer (~3627 tok)
-- `c4-container.md` — C4 Container Diagram: OTGW-firmware (~9097 tok)
+- `c4-code-mqtt.md` — C4 Code Level: MQTT Module (~16332 tok)
+- `c4-component-integration-layer.md` — C4 Component: Integration Layer (~3775 tok)
+- `c4-container.md` — C4 Container Diagram: OTGW-firmware (~9119 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-4/docs/manuals/nl/
 
 - `h10-bijlagen.md` — Hoofdstuk 10: Bijlagen (~7326 tok)
+
+## .claude/worktrees/wf_fe6c4173-ec6-5/src/OTGW-firmware/
+
+- `restAPI.ino` — include <string.h> (~60329 tok)
+
+## .claude/worktrees/wf_fe6c4173-ec6-5/src/OTGW-firmware/data/
+
+- `index.js` — Safely parse JSON with validation and error handling (~111160 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-5/test/host/
 
@@ -830,58 +873,102 @@
 
 ## .claude/worktrees/wf_fe6c4173-ec6-6/scripts/tests/
 
-- `static_integrity.py` — TASK-1162 download integrity probe: does the OTGW32 serve whole files, and (~8808 tok)
+- `static_integrity.py` — TASK-1162 download integrity probe: does the OTGW32 serve whole files, and (~9149 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-6/tests/
 
-- `test_static_integrity.py` — Self-test for scripts/tests/static_integrity.py (stdlib unittest, no pytest). (~7029 tok)
+- `test_static_integrity.py` — Self-test for scripts/tests/static_integrity.py (stdlib unittest, no pytest). (~8263 tok)
+
+## .claude/worktrees/wf_fe6c4173-ec6-7/scripts/tests/
+
+- `refresh_storm.py` — Request-storm and upload-abort tool for the 2.0.0 web stack (TASK-1124). (~21977 tok)
+
+## .claude/worktrees/wf_fe6c4173-ec6-7/tests/
+
+- `test_refresh_storm.py` — Self-test for scripts/tests/refresh_storm.py (TASK-1124) against a local stub. (~11700 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-8/scripts/
 
-- `heap_soak_driver.py` — SoakRun: uptime_minutes, telnet_send, fetch_status, describe_http_error + 7 more (~6652 tok)
+- `heap_soak_driver.py` — SoakRun: uptime_minutes, telnet_send, fetch_status, describe_http_error + 6 more (~6752 tok)
 
 ## .claude/worktrees/wf_fe6c4173-ec6-8/scripts/tests/
 
-- `test_heap_soak_driver.py` — FirmwareContract: c_function, c_unescape, pstr_format, api_error_message + 7 more (~7859 tok)
+- `test_heap_soak_driver.py` — FirmwareContract: c_function, c_unescape, pstr_format, api_error_message + 7 more (~7918 tok)
+
+## .claude/worktrees/wf_fe6c4173-ec6-8/test/host/generated/
+
+- `contrast_old_vs_new.py` — Old-vs-new on one reproduction: the device reboots mid-run (stub event on the (~875 tok)
+- `run_old_driver.py` — Runs the OLD heap_soak_driver.py unmodified. It hardcodes telnet port 23, so (~187 tok)
 
 ## docs/adr/
 
 - `ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md` — ADR-178 Widen the SAT area-sensor reference to accept a BLE MAC alongside a Dallas address (~2142 tok)
 - `ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md` — ADR-179 Name the owner of the OpenTherm control setpoint while SAT is enabled (~2634 tok)
 
+## docs/api/
+
+- `openapi.yaml` — Declares metadata (~51672 tok)
+
 ## docs/c4/
 
+- `c4-code-otdirect.md` — C4 Code Level: OTDirect Module (ESP32 Native OpenTherm Master/Slave) (~11143 tok)
 - `c4-code-web-assets.md` — C4 Code Level: Web Assets Module (~11150 tok)
+
+## scripts/
+
+- `adr_governance.py` — adr_governance.py - repo-local ADR governance checks for OTGW-firmware. (~2793 tok)
+- `heap_soak_driver.py` — SoakRun: uptime_minutes, telnet_send, fetch_status, describe_http_error + 5 more (~7137 tok)
+
+## scripts/tests/
+
+- `test_heap_soak_driver.py` — FirmwareContract: c_function, c_unescape, pstr_format, api_error_message + 7 more (~8152 tok)
 
 ## src/OTGW-firmware/
 
 - `FSexplorer.ino` — Declares String (~11705 tok)
+- `networkStuff.ino` — Declares char (~10268 tok)
 - `OLED.ino` — Declares stack (~7113 tok)
 - `OTBustypes.h` (~536 tok)
-- `OTDirect.ino` — Declares instances (~42342 tok)
-- `OTGW-Core.ino` — Declares char (~83771 tok)
+- `OTDirect.ino` — Declares instances (~44097 tok)
+- `OTGW-Core.h` — ifndef OTGWCore_h (~14932 tok)
+- `OTGW-Core.ino` — Declares char (~84632 tok)
 - `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~12968 tok)
-- `OTGW-firmware.ino` — Declares WifiPortalResetState (~13815 tok)
-- `restAPI.ino` — include <string.h> (~60166 tok)
+- `OTGW-firmware.ino` — Declares WifiPortalResetState (~13910 tok)
+- `restAPI.ino` — include <string.h> (~60589 tok)
 - `SATble.ino` — Declares uint32_t (~15837 tok)
 - `SATcontrol.ino` — Declares float (~59619 tok)
 - `SATtypes.h` — Declares declaration (~10305 tok)
 - `settingStuff.ino` — include <ctype.h> (~22166 tok)
-- `webServerCompat.h` — Declares uint8_t (~5138 tok)
+- `webServerCompat.h` — Declares uint8_t (~5483 tok)
 
 ## src/OTGW-firmware/data/
 
-- `index.js` — Safely parse JSON with validation and error handling (~110750 tok)
+- `index.js` — Safely parse JSON with validation and error handling (~111172 tok)
 - `sat.js` — API routes: GET (1 endpoints) (~16941 tok)
 - `v2.js` — fetchWithRetry: again, applyTheme, initTheme + 10 more (~84366 tok)
+
+## test/host/
+
+- `build_and_run_override_reply.ps1` — Declares below (~7885 tok)
+- `test_banner_board_mode.cpp` — test/host/test_banner_board_mode.cpp  (TASK-1180) (~563 tok)
+- `test_banner_board_mode.py` — TASK-1180 host harness: does processOT()'s banner recovery keep the combo (~848 tok)
+- `test_json_and_webhook.cpp` — Declares char (~2626 tok)
+- `test_ot_reserved_range.cpp` — test/host/test_ot_reserved_range.cpp  (TASK-1174) (~743 tok)
+- `test_ot_reserved_range.py` — TASK-1174 host harness: which OpenTherm data-ids does the firmware suppress (~1371 tok)
+- `test_override_reply.cpp` — Declares __FlashStringHelper (~12902 tok)
+- `test_pic_banner_recovery.cpp` — test/host/test_pic_banner_recovery.cpp  (TASK-1179) (~841 tok)
+- `test_pic_banner_recovery.py` — TASK-1179 host harness: does the loop-side banner consumer re-enable a PIC (~822 tok)
 
 ## tests/
 
 - `README.md` — Project documentation (~899 tok)
-- `test_evaluate.py` — TestIsHotPathFile: test_sat_files_are_hot, test_mqttstuff_is_hot, test_restapi_is_hot, test_otgw_cor (~10104 tok)
+- `test_evaluate.py` — TestIsHotPathFile: test_sat_files_are_hot, test_mqttstuff_is_hot, test_restapi_is_hot, test_otgw_cor (~10804 tok)
 - `test_oled_row_clear.cpp` — TASK-1151 — OLED status rows must not keep the tail of longer previous text. (~1826 tok)
+- `test_webui_asset_versioning.py` — Web UI asset caching contract (ADR-139, amended by TASK-958). (~658 tok)
 
 ## tests/webui/
 
 - `sat-area-sensor-mapping.test.mjs` — TASK-1153 — the SAT area-sensor mapping must offer BLE sensors, not DS18B20 only. (~2170 tok)
+- `sat-log-filter.test.mjs` — ', r=>r.fulfill({status:200,contentType:'application/json',body:'{}'})); (~1096 tok)
+- `sat-settings-layout.test.mjs` — ', r => r.fulfill({ status: 200, contentType: 'application/json', body: '{}' })); (~2814 tok)
 - `sat-status-pill.test.mjs` — TASK-1152 regression guard: the SAT status pill must report BURNER ACTIVITY, (~3556 tok)

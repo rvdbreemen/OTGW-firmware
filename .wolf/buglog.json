@@ -2853,5 +2853,95 @@
     "related_bugs": [],
     "occurrences": 2,
     "last_seen": "2026-09-30T13:05:00"
+  },
+  {
+    "id": "bug-866",
+    "timestamp": "2026-09-30T13:55:00+02:00",
+    "error_message": "OT-Direct gateway mode never answers a thermostat frame whose data an active override replaced",
+    "file": "src/OTGW-firmware/OTDirect.ino",
+    "root_cause": "loopOTDirect() sent an overridden thermostat WRITE with OT_DIRECT_ORIGIN_GATEWAY, and handleMasterResponse() only replied for THERMOSTAT origin; a boiler DATA-INVALID arrived as status INVALID and was dropped too",
+    "fix": "new origin THERMOSTAT_OVERRIDDEN + snapshot of the thermostat frame; replyToThermostat() answers every forwarded frame after SUCCESS or a genuine DATA-INVALID (WRITE-ACK with the thermostat's own data for overridden frames); applyOverrides substitutes WRITE-DATA only. Host harness 40 cases OLD 13 / FIX 40 (f5c9e5d22, alpha.389)",
+    "tags": [
+      "otdirect",
+      "gateway",
+      "override",
+      "opentherm",
+      "TASK-1178"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T13:55:00+02:00"
+  },
+  {
+    "id": "bug-867",
+    "timestamp": "2026-09-30T13:55:00+02:00",
+    "error_message": "four host suites red on origin/dev: sat-settings-layout flaky (1/4), sat-log-filter ReferenceError parseLogLine, test_webui_asset_versioning [] not greater than [], test_adr_governance AttributeError on ADR-INDEX.md",
+    "file": "tests/webui/*.test.mjs, tests/test_webui_asset_versioning.py, scripts/adr_governance.py",
+    "root_cause": "cce5c7433 moved CSS/JS into a sequential loader that finishes after DOMContentLoaded; TASK-958 retired ?v= rewriting; ADR-INDEX.md (dd5a70153) matched the ADR-*.md glob",
+    "fix": "tests wait for the measured state (stylesheet applied / index.js function defined); asset test checks serveVersionedAsset routes; glob ADR-[0-9]*.md; curated README entries for ADR-174..179 (83a818d0d, TASK-1182)",
+    "tags": [
+      "tests",
+      "webui",
+      "playwright",
+      "flaky",
+      "adr-governance",
+      "TASK-1182"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T13:55:00+02:00"
+  },
+  {
+    "id": "bug-868",
+    "timestamp": "2026-09-30T13:55:00+02:00",
+    "error_message": "test_heap_soak_driver setUpClass: AssertionError no sendApiError(503, ...) found after ''",
+    "file": "scripts/tests/test_heap_soak_driver.py",
+    "root_cause": "TASK-1124 replaced sendApiError(503, F(\"low heap\")) with sendApiBusy() in sendDeviceInfoV2(); the contract parser only knew sendApiError",
+    "fix": "api_error_message() also accepts sendApiBusy(F(...)) as a 503 (9c1823528)",
+    "tags": [
+      "tests",
+      "contract",
+      "retry-after",
+      "TASK-1124"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T13:55:00+02:00"
+  },
+  {
+    "id": "bug-869",
+    "timestamp": "2026-09-30T14:35:00+02:00",
+    "error_message": "OT-Direct: replies for MsgID 128-255 alias onto otBoilerCache[0-127] through '& 0x7F' (Remeha 131 overwrites MsgID 3)",
+    "file": "src/OTGW-firmware/OTDirect.ino",
+    "root_cause": "cache index and flame check masked the Data-ID with 0x7F; master-mode READ used msgId & 0x7F",
+    "fix": "otBoilerCacheStore() stores ids < sizeof(otBoilerCacheValid) only; full 8-bit id for flame and master-mode READ (fea1f537a, alpha.390)",
+    "tags": [
+      "otdirect",
+      "cache",
+      "oem-ids",
+      "remeha",
+      "TASK-1177"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T14:35:00+02:00"
+  },
+  {
+    "id": "bug-870",
+    "timestamp": "2026-09-30T14:35:00+02:00",
+    "error_message": "OT-Direct caches a boiler UNKNOWN-DATA-ID reply as a valid value; AUTO heating curve runs at 0 C outside",
+    "file": "src/OTGW-firmware/OTDirect.ino",
+    "root_cause": "OpenTherm::isValidResponse() treats UNKNOWN_DATA_ID as SUCCESS; handleMasterResponse cached every SUCCESS",
+    "fix": "otBoilerCacheStore() clears the slot on UNKNOWN-DATA-ID; flame check requires a valid MsgID 0 slot (0bcaf23a6, alpha.391)",
+    "tags": [
+      "otdirect",
+      "cache",
+      "unknown-data-id",
+      "heating-curve",
+      "TASK-1184"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-09-30T14:35:00+02:00"
   }
 ]
