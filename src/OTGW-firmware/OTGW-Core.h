@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.379
+**  Version  : v2.0.0-alpha.380
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -521,7 +521,9 @@ extern uint32_t mqttlastsent[];            // packed throttle state for OT msgid
 extern uint16_t mqttlastsentstatusbit[16]; // per-bit publish timers for OT_Statusflags (slots 0-7=master, 8-15=slave)
 extern bool     mqttPublishAllowed;        // MQTT interval gate — managed via OTPublishGate, checked in sendMQTTData
 uint16_t getMsgLastUpdated(uint8_t msgId); // rolling seconds-since-boot for REST last-updated fields (0 when unseen)
-void requestMQTTRepublishAll();            // reset MQTT publish eligibility so next observed values publish as first-seen again
+void requestMQTTRepublishAll();            // reset MQTT publish eligibility so next observed values publish as first-seen again (loop task only)
+void queueMQTTRepublishAll();              // any task: ask loop() to run requestMQTTRepublishAll() between frames (TASK-1176)
+void handlePendingMQTTRepublish();         // loop(): apply a queued republish reset
 void requestMQTTStatusRepublish();         // force the next observed master/slave status frames to republish
 void confirmMQTTPublishSlot();             // confirm pending throttle slot update after successful MQTT publish
 void confirmMQTTPublishBitSlot();          // confirm pending status-bit slot update after successful MQTT publish

@@ -3,9 +3,11 @@ id: TASK-1176
 title: >-
   POST /api/v2/mqtt/republish resets loop-owned MQTT publish state from the
   async_tcp task; queue the request and apply the reset in loop()
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-09-30 08:45'
+updated_date: '2026-09-30 09:20'
 labels:
   - bug
   - mqtt
@@ -96,12 +98,12 @@ OUT OF SCOPE: SAME CLASS, CONSEQUENCES NOT TRACED, SEPARATE TASKS
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 handleMqtt (restAPI.ino) no longer calls requestMQTTRepublishAll(). It calls queueMQTTRepublishAll(), which only raises a flag that loop() consumes. The comments at restAPI.ino:2059 and :2089 say the reset is queued for loop(). Static check: `grep -n "requestMQTTRepublishAll()" src/OTGW-firmware/*.ino` lists only the two MQTTstuff.ino callers (HA online, onMqttConnect) and the new consumer handlePendingMQTTRepublish() in OTGW-Core.ino. The consumer is called exactly once, from loop() in OTGW-firmware.ino immediately before drainOTFrameQueue(), and outside both #if HAS_PIC and the !isFlashing() block.
+- [x] #1 handleMqtt (restAPI.ino) no longer calls requestMQTTRepublishAll(). It calls queueMQTTRepublishAll(), which only raises a flag that loop() consumes. The comments at restAPI.ino:2059 and :2089 say the reset is queued for loop(). Static check: `grep -n "requestMQTTRepublishAll()" src/OTGW-firmware/*.ino` lists only the two MQTTstuff.ino callers (HA online, onMqttConnect) and the new consumer handlePendingMQTTRepublish() in OTGW-Core.ino. The consumer is called exactly once, from loop() in OTGW-firmware.ino immediately before drainOTFrameQueue(), and outside both #if HAS_PIC and the !isFlashing() block.
 - [ ] #2 A curl transcript on the bench shows the API contract is unchanged: POST /api/v2/mqtt/republish returns 200 {"status":"republish_requested"}; a second POST within 60 s returns 429 with the retry seconds; with MQTT disconnected it returns 503 'MQTT not connected'; GET returns 405.
 - [ ] #3 Old-vs-fix task-context proof. Both builds carry the same test-only log line at the entry of requestMQTTRepublishAll, which prints the calling task name (pcTaskGetName(nullptr)). A REST POST logs 'async_tcp' on OLD (dev before the fix) and 'loopTask' on FIX. Control: a homeassistant/status offline -> online cycle logs 'loopTask' on both builds and re-publishes hvac_mode at the next master status frame. Telnet transcript attached.
 - [ ] #4 Old-vs-fix lost-update reproduction, following the repro plan. Both builds carry identical test-only instrumentation: a 'RACEWIN open' telnet marker, a 2 s stretch between the force-flag read (OTGW-Core.ino:2305) and the clear (:2324), and a lost-force counter. Run at least 10 marker-synchronized POSTs per build, with the replay as frame source. OLD: the counter increments on the synchronized trials, and at the next master status frame status_master is re-published but hvac_mode is not. FIX: the counter stays 0, and status_master and hvac_mode are both re-published at the next master status frame after every POST. Exclude trials where the 300 s hvac heartbeat could fire in the observation window. Attach capture transcripts for both builds.
-- [ ] #5 The committed fix contains none of the test-only instrumentation (task-name log, marker, stretch, counter): `git show <fix commit>` shows only the queue/consume change, the declarations and the comment updates.
-- [ ] #6 build.bat builds esp32, esp32-classic and esp32-combo fresh, shown by the SUCCESS lines and fresh firmware.bin and littlefs.bin timestamps. `python evaluate.py --quick` shows no new FAIL. The prerelease tag is bumped with bin/bump-prerelease.sh in the same commit.
+- [x] #5 The committed fix contains none of the test-only instrumentation (task-name log, marker, stretch, counter): `git show <fix commit>` shows only the queue/consume change, the declarations and the comment updates.
+- [x] #6 build.bat builds esp32, esp32-classic and esp32-combo fresh, shown by the SUCCESS lines and fresh firmware.bin and littlefs.bin timestamps. `python evaluate.py --quick` shows no new FAIL. The prerelease tag is bumped with bin/bump-prerelease.sh in the same commit.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -255,4 +257,13 @@ The adjacent findings are recorded as out of scope. Their dispatch context is ve
 - the discovery/republish and discovery/verify endpoints;
 - the unbounded OTStateLock on the OTDirect REST processOT path;
 - the stale comments.
+
+2026-09-30 implementation (alpha.380), following the fix plan.
+- OTGW-Core.ino: static volatile bool g_mqttRepublishAllPending, queueMQTTRepublishAll() (raise) and handlePendingMQTTRepublish() (snapshot-and-clear, then requestMQTTRepublishAll()), next to requestMQTTRepublishAll(). OTGW-Core.h declares both and marks requestMQTTRepublishAll() loop-task only.
+- restAPI.ino handleMqtt: requestMQTTRepublishAll() -> queueMQTTRepublishAll(); cooldown stamp kept ('stamp once the request is queued'); header comment says the reset is queued for loop(). API contract unchanged (200 republish_requested / 429 / 503 / 405).
+- OTGW-firmware.ino loop(): handlePendingMQTTRepublish() immediately before drainOTFrameQueue(), after doBackgroundTasks(), outside #if HAS_PIC and outside the !isFlashing() block.
+AC#1 static check: grep 'requestMQTTRepublishAll()' src/OTGW-firmware/*.ino -> MQTTstuff.ino:817 (HA online), MQTTstuff.ino:1325 (onMqttConnect), OTGW-Core.ino:1938 (definition), OTGW-Core.ino:1960 (the consumer). handlePendingMQTTRepublish() is called once, OTGW-firmware.ino:1085.
+AC#5: the commit carries no test-only instrumentation (no task-name log, marker, stretch or counter).
+AC#6: bin/bump-prerelease.sh alpha.379 -> alpha.380 in this commit; build.bat --target all: esp32, esp32-classic and esp32-combo SUCCESS for firmware and filesystem, fresh .ino.bin/.littlefs.bin 11:12-11:19 (alpha.380+d57d9e2, images saved under %LOCALAPPDATA%/OTGW-capture/img-alpha380-d57d9e2); evaluate.py --quick 69 passed, 0 warnings, 0 failed.
+OPEN: AC#2 (curl contract on the bench), AC#3/#4 (old-vs-fix task-context and lost-update proofs, which need identical test-only instrumented builds of OLD and FIX plus the OTGW32 bench on WiFi).
 <!-- SECTION:NOTES:END -->

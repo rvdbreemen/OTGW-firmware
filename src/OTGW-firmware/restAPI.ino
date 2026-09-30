@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.379
+**  Version  : v2.0.0-alpha.380
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2057,8 +2057,9 @@ static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
 //===[ /api/v2/mqtt — force OT-value republish (TASK-936, ported from 1.x v1.6.0 handleMqtt) ]===
 // Distinct from /api/v2/discovery/republish: that re-announces HA *discovery configs*;
 // this resets OT publish eligibility so the next observed OT values publish as first-seen
-// again (requestMQTTRepublishAll, OTGW-Core.ino). Use case: force a full OT-value
-// republish after a broker wipe, without re-announcing discovery.
+// again. The reset itself is queued for loop() (queueMQTTRepublishAll, OTGW-Core.ino),
+// which owns the publish state; this handler runs on async_tcp (TASK-1176). Use case:
+// force a full OT-value republish after a broker wipe, without re-announcing discovery.
 static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI) {
   // POST /api/v2/mqtt/republish — reset publish eligibility, re-emit observed OT values
   if (wc > 4 && strcmp_P(words[4], PSTR("republish")) == 0) {
@@ -2086,8 +2087,8 @@ static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
       }
     }
 
-    requestMQTTRepublishAll();
-    lastMqttRepublishMs = millis();  // stamp only after work commits
+    queueMQTTRepublishAll();
+    lastMqttRepublishMs = millis();  // stamp once the request is queued
     sendCorsOriginHeader();
     webSend(200, F("application/json"), F("{\"status\":\"republish_requested\"}"));
     return;

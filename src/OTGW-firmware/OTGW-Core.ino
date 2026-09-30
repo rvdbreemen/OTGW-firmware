@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.379
+**  Version  : v2.0.0-alpha.380
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1939,6 +1939,25 @@ void requestMQTTRepublishAll()
 {
   resetMqttTrackedState();
   requestMQTTStatusRepublish();
+}
+
+// The REST republish handler runs on the async_tcp task, while processOT() on
+// the loop task owns the MQTT publish trackers and force flags. The handler
+// therefore only raises this flag; loop() applies the reset between frames
+// (TASK-1176). One producer and one consumer, both on core 1: a byte store
+// cannot tear and volatile keeps loop() from caching the flag.
+static volatile bool g_mqttRepublishAllPending = false;
+
+void queueMQTTRepublishAll()
+{
+  g_mqttRepublishAllPending = true;
+}
+
+void handlePendingMQTTRepublish()
+{
+  if (!g_mqttRepublishAllPending) return;
+  g_mqttRepublishAllPending = false;  // clear first; a request raised after this line is served next pass
+  requestMQTTRepublishAll();
 }
 
 void requestMQTTStatusRepublish()

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.379
+**  Version  : v2.0.0-alpha.380
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -1082,6 +1082,7 @@ void loop()
   // frames; drain them HERE (loop() proper) — never inside doBackgroundTasks(),
   // which re-enters via doAutoConfigure's file-reading loop and could nest the
   // OTStateLock. processOT() runs from loop() context (not a task) in Phase 1.
+  handlePendingMQTTRepublish();     // TASK-1176: apply a REST-queued republish reset before these frames
   drainOTFrameQueue();
 
   // TASK-396: heap watermark tick + deferred-reboot gate. The watermark runs
