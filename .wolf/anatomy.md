@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T18:15:38.398Z
-> Files: 611 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T21:30:48.229Z
+> Files: 616 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -784,7 +784,9 @@
 - `ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md` — ADR-179 Name the owner of the OpenTherm control setpoint while SAT is enabled (~2634 tok)
 - `ADR-180-keep-the-arduino-string-class-out-of-hot-path-source-files.md` — ADR-180 Keep the Arduino String class out of hot-path source files (~2213 tok)
 - `ADR-181-count-only-boiler-read-ack-frames-into-the-dhw-water-total-not-the-pic-ps-1-summary.md` — ADR-181 Count only boiler Read-Ack frames into the DHW water total, not the PIC PS=1 summary (~1878 tok)
-- `README.md` — Project documentation (~32470 tok)
+- `ADR-182-announce-the-dhw-water-total-just-in-time-after-the-first-msgid-19-sample-of-a-boot.md` — ADR-182 Announce the DHW water total just in time, after the first MsgID 19 sample of a boot (~1742 tok)
+- `ADR-183-record-what-an-unclean-reboot-does-to-the-persisted-dhw-water-total.md` — ADR-183 Record what an unclean reboot does to the persisted DHW water total (~1464 tok)
+- `README.md` — Project documentation (~32868 tok)
 
 ## docs/api/
 
@@ -817,6 +819,7 @@
 
 - `dhwWaterMeter.ino` — Declares here (~3795 tok)
 - `FSexplorer.ino` — Declares String (~11705 tok)
+- `MQTTstuff.ino` — include <espMqttClient.h>          // bertmelis async MQTT client (ADR-123 Phase 2, TASK-865.7) (~47726 tok)
 - `networkStuff.ino` — Declares char (~10268 tok)
 - `OLED.ino` — Declares stack (~7113 tok)
 - `OTBustypes.h` (~629 tok)
@@ -846,9 +849,9 @@
 - `test_banner_board_mode.py` — TASK-1180 host harness: does processOT()'s banner recovery keep the combo (~848 tok)
 - `test_boiler_unsupported_origin.cpp` — Declares char (~5656 tok)
 - `test_boiler_unsupported_origin.py` — TASK-1086 host harness: does an answer the gateway made itself count as (~3233 tok)
-- `test_dhw_water_discovery.cpp` — TASK-1123 driver: dhw_water_total discovery row, publish rule and the REST/MQTT reset through sliced real code (~9370 tok)
+- `test_dhw_water_discovery.cpp` — test/host/test_dhw_water_discovery.cpp  (TASK-1123, ADR-176) (~8995 tok)
 - `test_dhw_water_meter.cpp` — test/host/test_dhw_water_meter.cpp  (TASK-1123, ADR-176) (~7297 tok)
-- `test_dhw_water_meter.py` — TASK-1123 host harness: the DHW water total (ADR-176, ADR-181) through the real code. (~11051 tok)
+- `test_dhw_water_meter.py` — TASK-1123 host harness: the DHW water total (ADR-176, ADR-181) through the real code. (~11226 tok)
 - `test_diagnose_handler.cpp` — test/host/test_diagnose_handler.cpp  (TASK-1133 AC#1) (~923 tok)
 - `test_diagnose_handler.py` — TASK-1133 AC#1 host harness: does POST /api/v2/otgw/diagnose answer 4xx and (~1551 tok)
 - `test_json_and_webhook.cpp` — Declares char (~2626 tok)
