@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-26 22:06'
-updated_date: '2026-09-30 09:49'
+updated_date: '2026-10-01 17:03'
 labels: []
 dependencies: []
 ordinal: 246000
@@ -42,7 +42,7 @@ Granularity: maintainer chose one task / one prerelease tag. Tradeoff accepted: 
 - [x] #7 503 (device-wide) and 429 (endpoint quota) remain semantically distinct; existing POST-cooldown 429s keep their ADR-035 envelope
 - [x] #8 index.js polls otmonitor at 2000ms and device/time at 5000ms via named constants; GATEWAY_MODE_REFRESH_INTERVAL rescaled to 12 ticks to preserve the 60s wall-clock cadence
 - [x] #9 index.js ticks the device clock locally from epoch+dateTime, with a fallback that still renders dateTime when the offset cannot be learned (no stuck 00:00:00 placeholder)
-- [ ] #10 On 429 the client re-phases at a random offset inside its period so two dashboards cannot phase-lock; verified with two tabs for 10 minutes
+- [x] #10 On 429 the client re-phases at a random offset inside its period so two dashboards cannot phase-lock; verified with two tabs for 10 minutes
 - [x] #11 After >=3 consecutive refusals the affected UI region is marked data-stale with an explanatory title; the selector exists in components.css so check_design_system_drift passes
 - [x] #12 ADR-170..173 written (Proposed); ADR-062 gets a supersession note for its automatic mechanism only
 - [x] #13 evaluate.py gains gates for alias-budget coverage, poll/window coupling, non-OT single source, and auto-heal shape, each as a module-level fn with tests in tests/test_evaluate.py
@@ -96,4 +96,26 @@ Follow-ups (not blocking): refreshDevTime()/refreshOTmonitor() direct calls that
 OPEN: AC#10 (two tabs for 10 minutes) and AC#16 (fresh-boot discovery on a wiped broker) need the bench.
 
 2026-09-30 docs aligned with the shipped behaviour (docs-only commit, no bump): docs/api/MQTT.md, docs/api/openapi.yaml, docs/c4/c4-code-mqtt.md, c4-component-integration-layer.md, c4-container.md and docs/manuals/nl/h10-bijlagen.md. An HA restart republishes STATE (ADR-174), not discovery; the reconnect republish only runs after >300 s offline; MQTTharebootdetection gates nothing; the daily heal (ADR-170) replaced the automatic verify; drip timing; the REST republish is queued for loop() (TASK-1176). Verification (workflow wf_fe6c4173-ec6, WP4 + review + fixup): a sentence inventory maps all 166 keyword lines of the six docs to code anchors (286 anchors, 0 failures) on both the base and current dev; 17 file:line citations checked for staleness on dev (0 stale); 39 regression patterns for the previously false sentences find nothing; openapi.yaml parses with the same 66 paths.
+
+2026-10-01 AC#10 verified with a browser harness on the real code, not on the bench.
+
+Setup:
+- The shipped dev classic index.js (paced poller, ADR-173) runs in headless Chrome, one process per tab.
+- A host server answers /api/v2/otgw/otmonitor and /api/v2/device/time with devoracle.exe: the real checkApiRateLimit(), rateLimitTryAdmit() and sendApiRateLimited(), sliced from restAPI.ino by anchor (slices checked verbatim and brace-balanced) and compiled with MSVC. The 429 status, Retry-After and the problem+json body with retry_after are the firmware's own.
+- Tabs are told apart by a per-profile cookie. 10 minutes per run.
+- Control: a one-line mutant of index.js whose 429 branch keeps the phase: penalise(opts.periodMs) instead of Retry-After + U[0,P).
+
+Results:
+- FIX, 2 tabs: otmonitor 191 / 208 grants, longest gaps 7.6 / 8.1 s; device/time 77 / 73, longest gaps 17.6 / 21.0 s. Balanced, no phase lock.
+- FIX, 3 tabs: otmonitor 139 / 132 / 130, longest gaps 19.1 / 23.6 / 36.5 s; device/time 42 / 56 / 52, gaps 30.2-37.8 s. Balanced.
+- MUTANT, 2 tabs: otmonitor 104 / 294 and device/time 120 / 29, a locked lopsided split.
+- MUTANT, 3 tabs: otmonitor 120 / 31 / 249 (longest gap 76.5 s); device/time 109 / 22 / 19 (longest gaps 100.7 and 255.6 s).
+
+So the re-phase is what keeps service balanced. Burst 2 plus browser timing jitter kept every mutant tab above zero grants. An in-phase simulation of three clients without re-phase gives the third zero grants (300/300 runs; see dev TASK-1057 / 1.x TASK-1188).
+
+Why the harness counts: the claim is about the client logic against the limiter's decisions, and both are the real code. A bench run would add real network timing; it can be repeated on the OTGW32 once it is back on the network.
+
+v2.js does not take part: it fetches otgw/otmonitor only every 20 s and only while its WebSocket is down (v2.js:4327), and does not poll device/time.
+
+Still open: AC#16 (fresh boot with a wiped broker, hardware). It needs a broker that may be wiped; the test rig at 192.168.1.234:1883 was not reachable on 2026-10-01.
 <!-- SECTION:NOTES:END -->

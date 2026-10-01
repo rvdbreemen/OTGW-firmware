@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T16:45:07.383Z
-> Files: 605 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T16:51:15.769Z
+> Files: 608 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -774,10 +774,6 @@
 - `main.py` — Primary application entrypoint. (~897 tok)
 - `parser.py` — Base option parser setup (~3951 tok)
 - `progress_bars.py` — SQLAlchemy model (~1345 tok)
-
-## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/d09d9128-d9f5-4c9c-aee0-df934b723d02/scratchpad/
-
-- `commit1187.txt` (~325 tok)
 
 ## docs/adr/
 
