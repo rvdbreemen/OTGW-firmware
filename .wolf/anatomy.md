@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T16:51:15.769Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T17:42:17.650Z
 > Files: 608 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
@@ -783,16 +783,26 @@
 - `ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md` — ADR-178 Widen the SAT area-sensor reference to accept a BLE MAC alongside a Dallas address (~2142 tok)
 - `ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md` — ADR-179 Name the owner of the OpenTherm control setpoint while SAT is enabled (~2634 tok)
 - `ADR-180-keep-the-arduino-string-class-out-of-hot-path-source-files.md` — ADR-180 Keep the Arduino String class out of hot-path source files (~2213 tok)
-- `README.md` — Project documentation (~32261 tok)
+- `ADR-181-count-only-boiler-read-ack-frames-into-the-dhw-water-total-not-the-pic-ps-1-summary.md` — ADR-181 Count only boiler Read-Ack frames into the DHW water total, not the PIC PS=1 summary (~1878 tok)
+- `README.md` — Project documentation (~32470 tok)
 
 ## docs/api/
 
+- `MQTT.md` — OTGW-firmware MQTT Topic Documentation (~31329 tok)
 - `openapi.yaml` — Declares metadata (~51672 tok)
 
 ## docs/c4/
 
 - `c4-code-otdirect.md` — C4 Code Level: OTDirect Module (ESP32 Native OpenTherm Master/Slave) (~11143 tok)
 - `c4-code-web-assets.md` — C4 Code Level: Web Assets Module (~11150 tok)
+
+## docs/manuals/en/
+
+- `ch09-api-reference.md` — Chapter 9: API Reference (~14741 tok)
+
+## docs/manuals/nl/
+
+- `h09-api-referentie.md` — Hoofdstuk 9: API-referentie (~13184 tok)
 
 ## scripts/
 
@@ -805,14 +815,14 @@
 
 ## src/OTGW-firmware/
 
-- `dhwWaterMeter.ino` — DHW water total (ADR-176, TASK-1123): MsgID 19 flow x time accumulator, /dhw_water.json persistence (10 L / 15 min rule), loop-side reset (~4033 tok)
+- `dhwWaterMeter.ino` — Declares here (~3795 tok)
 - `FSexplorer.ino` — Declares String (~11705 tok)
 - `networkStuff.ino` — Declares char (~10268 tok)
 - `OLED.ino` — Declares stack (~7113 tok)
 - `OTBustypes.h` (~629 tok)
 - `OTDirect.ino` — Declares instances (~44097 tok)
 - `OTGW-Core.h` — ifndef OTGWCore_h (~15317 tok)
-- `OTGW-Core.ino` — Declares char (~85816 tok)
+- `OTGW-Core.ino` — Declares char (~85823 tok)
 - `OTGW-firmware.h` — ifndef OTGW_FIRMWARE_H (~13286 tok)
 - `OTGW-firmware.ino` — Declares WifiPortalResetState (~13910 tok)
 - `restAPI.ino` — include <string.h> (~60589 tok)
@@ -837,8 +847,8 @@
 - `test_boiler_unsupported_origin.cpp` — Declares char (~5656 tok)
 - `test_boiler_unsupported_origin.py` — TASK-1086 host harness: does an answer the gateway made itself count as (~3233 tok)
 - `test_dhw_water_discovery.cpp` — TASK-1123 driver: dhw_water_total discovery row, publish rule and the REST/MQTT reset through sliced real code (~9370 tok)
-- `test_dhw_water_meter.cpp` — TASK-1123 driver: accumulator, write sites and persistence through sliced real code (~7690 tok)
-- `test_dhw_water_meter.py` — TASK-1123 host harness runner: slices, OLD vs FIX, mutants, wiring checks (--old-rev) (~10827 tok)
+- `test_dhw_water_meter.cpp` — test/host/test_dhw_water_meter.cpp  (TASK-1123, ADR-176) (~7297 tok)
+- `test_dhw_water_meter.py` — TASK-1123 host harness: the DHW water total (ADR-176, ADR-181) through the real code. (~11051 tok)
 - `test_diagnose_handler.cpp` — test/host/test_diagnose_handler.cpp  (TASK-1133 AC#1) (~923 tok)
 - `test_diagnose_handler.py` — TASK-1133 AC#1 host harness: does POST /api/v2/otgw/diagnose answer 4xx and (~1551 tok)
 - `test_json_and_webhook.cpp` — Declares char (~2626 tok)

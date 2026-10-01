@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-26 22:06'
-updated_date: '2026-10-01 17:03'
+updated_date: '2026-10-01 17:07'
 labels: []
 dependencies: []
 ordinal: 246000
@@ -118,4 +118,6 @@ Why the harness counts: the claim is about the client logic against the limiter'
 v2.js does not take part: it fetches otgw/otmonitor only every 20 s and only while its WebSocket is down (v2.js:4327), and does not poll device/time.
 
 Still open: AC#16 (fresh boot with a wiped broker, hardware). It needs a broker that may be wiped; the test rig at 192.168.1.234:1883 was not reachable on 2026-10-01.
+
+2026-10-01 maintainer decision for AC#16: use a throwaway Mosquitto broker on the development PC (C:\Program Files\mosquitto), point the OTGW32's MQTT settings at it for the test, then restore them. The Home Assistant broker is not touched. Runs once the OTGW32 is back on the network.
 <!-- SECTION:NOTES:END -->

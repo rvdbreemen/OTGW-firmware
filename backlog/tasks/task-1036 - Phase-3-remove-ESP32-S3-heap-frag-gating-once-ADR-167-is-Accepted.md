@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-09 21:17'
-updated_date: '2026-09-30 09:41'
+updated_date: '2026-10-01 17:07'
 labels: []
 dependencies: []
 ordinal: 245000
@@ -22,7 +22,7 @@ Follow-up to TASK-956 (heap-frag soak investigation, complete). The soak evidenc
 - [x] #1 ADR-167 is Accepted (precondition — do not start otherwise)
 - [x] #2 Preventive drip/tier gating + delay(1) pacing removed from dev
 - [x] #3 evaluate.py gates check_heap_fragmentation_promotion/check_per_consumer_heap_gate/check_heap_tier_entry_counters/check_heap_tier_thresholds_ordered updated to match, ADR-089/121 status flipped, evaluator green
-- [ ] #4 Rebuilt + re-soaked clean (no tier escalations) to confirm no regression
+- [ ] #4 Rebuilt (esp32-combo, current dev) and re-soaked >= 10 h on the OTGW32 with scripts/heap_soak_driver.py. The driver exits 0: no reboot, unreachable, sim_inactive, republish_failed or republish_not_drained anomaly. Its SUMMARY shows hd_enter_low/warning/critical_max = 0, hd_ws_drops_max = hd_mqtt_drops_max = 0, hd_min_max_block_min >= 8192 (report the floor), and hd_max_loop_gap_ms_max with no multi-second stall.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -49,4 +49,6 @@ scripts/heap_soak_driver.py: snapshots carry bootcount, lastreset, uptime and fw
 Evidence: python -m py_compile OK; scripts/tests/test_heap_soak_driver.py 19 tests OK (102.8 s, under build load). Workflow contrast run: the OLD driver on a stub that reboots exits 0 with no anomaly and leaves the replay ON; the new driver exits 1 with ['reboot','sim_inactive'] and stops the replay.
 Proposed sharper AC#4 wording (for the maintainer): 'Rebuilt (esp32-combo, current dev) and re-soaked >= 10 h on the OTGW32 with scripts/heap_soak_driver.py. The driver exits 0: no reboot, unreachable, sim_inactive, republish_failed or republish_not_drained anomaly. Its SUMMARY shows hd_enter_low/warning/critical_max = 0, hd_ws_drops_max = hd_mqtt_drops_max = 0, hd_min_max_block_min >= 8192 (report the floor), and hd_max_loop_gap_ms_max with no multi-second stall.'
 Known test gap: the 'no POST when fewer than N minutes remain' guard has no deterministic test yet. OPEN: AC#4 needs the bench (overnight).
+
+2026-10-01: the maintainer adopted the sharper AC#4 wording proposed in the 2026-07-31 notes (it replaces 'Rebuilt + re-soaked clean (no tier escalations) to confirm no regression'). Still needs the OTGW32 back on the network and an overnight run on a dedicated unit.
 <!-- SECTION:NOTES:END -->
