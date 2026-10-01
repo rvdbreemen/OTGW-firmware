@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-04 06:57'
-updated_date: '2026-09-30 11:36'
+updated_date: '2026-10-01 21:50'
 labels:
   - 2.0.0
   - port
@@ -26,7 +26,7 @@ Sibling of TASK-793 on the 1.x line, which is AC #6 of that task. Three changes 
 <!-- AC:BEGIN -->
 - [ ] #1 The async upload path closes its file handle when the client disconnects mid-body, verified by a scripted abort rather than by reading the code
 - [ ] #2 A chunked response stops when its client is gone, verified under a storm
-- [ ] #3 Heap-gated refusals carry Retry-After
+- [x] #3 Heap-gated refusals carry Retry-After
 - [ ] #4 A scripted rapid-refresh storm is run against a real device and its outcome recorded: request outcomes, reboot count either side, and heap or pcb headroom
 <!-- AC:END -->
 
@@ -47,4 +47,32 @@ OPEN: AC#1/#2/#4 run on the OTGW32 bench once it is back on the network.
 AC#3 stays unchecked until a bench curl -i of a gated 503 (e.g. during a refresh_storm.py storm) shows 'Retry-After: 1'.
 
 Regression found 2026-09-30 by a full offline host-suite run: scripts/tests/test_heap_soak_driver.py (TASK-1036 WP8) reads sendDeviceInfoV2() for sendApiError(503, F(...)), and this task's sendApiBusy() replaced that call, so FirmwareContract failed in setUpClass and 0 tests ran (exit 5). Fixed in the test: api_error_message() also accepts sendApiBusy(F(...)) as a 503 (sendApiError(503) plus Retry-After). After the fix: 19 tests OK. The test is absent on origin/dev, so this never shipped.
+
+2026-10-01 AC#3 verified with a host harness on the real code (t1124.py/.cpp, session scratchpad).
+
+This replaces the earlier note's bench-curl criterion. That criterion was this agent's own choice, and the AC does not require the bench.
+
+Setup:
+- Sliced from the sources by anchor, each slice audited verbatim and brace-balanced, compiled with MSVC:
+  - webServerCompat.h: the WEB_MAX_PENDING_HEADERS staging struct, webPushHeader(), webApplyHeaders(), webSend();
+  - restAPI.ino: sendCorsOriginHeader(), sendApiError(), and sendApiBusy() where it exists.
+- Only the AsyncWebServer boundary is stubbed (beginResponse, addHeader, send).
+- The gated call (B1) is read from each revision's own restAPI.ino.
+
+Results:
+- FIX passes every case:
+  - B1: a heap-gated refusal answers 503 with Retry-After: 1 and body {"error":{"status":503,"message":"low heap"}};
+  - B2: a capability 503 (MQTT not connected) has no Retry-After;
+  - B3: Access-Control-Allow-Origin is kept next to Retry-After;
+  - B4: no Retry-After leaks into the next response;
+  - S1: all five heap/concurrency-gated sites (low heap x3 in restAPI.ino/SATcontrol.ino, 'Heap too low for verify', the REST backpressure 'Server busy') call sendApiBusy(), none sendApiError(503).
+- OLD (63f22a5e1^, the commit before sendApiBusy) fails exactly B1 (no Retry-After) and S1 (0 via sendApiBusy, 5 via sendApiError(503)); B2-B4 pass.
+- Mutants fail exactly their case:
+  - push removed: B1;
+  - one site reverted: S1;
+  - WEB_MAX_PENDING_HEADERS 1: B3, which shows the header cap matters.
+
+Boundary of this evidence: it reaches the AsyncWebServer response object, not the wire. The bench storm of AC#4 (scripts/tests/refresh_storm.py) records the 503s and their headers, and shows the wire too.
+
+Still open: AC#1, #2 and #4, which explicitly need a scripted abort or storm against a real device.
 <!-- SECTION:NOTES:END -->
