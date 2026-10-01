@@ -36,8 +36,9 @@ dhwWaterMeter.ino does not exist before TASK-1123, so OLD cannot show an accumul
 of its own. With --old-rev, program 1 is built a second time with OTGW-Core.ino (and
 its headers) at that revision: the same driver and the same meter module, only the
 write sites differ. OLD must fail exactly the cases that need print_f88() to feed the
-meter and pass all others. The wiring is reported for OLD as well. The round-1
-announce gating (241 queued only after a MsgID 19 sample) is replayed as mutant M15.
+meter and pass all others. The wiring is reported for OLD as well. The just-in-time
+announce of 241 (ADR-182: queued only after a MsgID 19 sample, cases D4 to D7 and D12)
+is guarded by mutants M4, M5, M15, M16 and M27.
 Two round-2 defects the round-2 review found are replayed the same way: the reset
 consumer that ran while the file could not be written (MR13, case X6), and the flow
 check that let NaN through (M25, case U7, fed to the accumulator directly).
@@ -68,13 +69,14 @@ FW_INO, HELPER, REST_INO = FW + "OTGW-firmware.ino", FW + "helperStuff.ino", FW 
 METER_CASES = ["W1", "W2", "W3", "W4", "W5", "W6", "R1", "U1", "U2", "U3", "U4", "U5", "U6", "U7",
                "P1", "P2", "P3", "P4", "P5", "P6", "P7"]
 OLD_DEFECT = ["W1", "W4", "W5"]    # need print_f88() to feed the meter
-DISC_CASES = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "D11",
+DISC_CASES = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "D11", "D12",
               "X1", "X2", "X3", "X4", "X5", "X6", "X7", "Q1", "Q2", "Q3", "Q4", "Q5"]
 
-HELPER_241 = "setMQTTConfigPending(OTGWdhwmeterid);     // 241 TASK-1123 DHW water total (ADR-176; its state waits for MsgID 19)"
-GATED_241 = "if (dhwWaterMeterHasData()) setMQTTConfigPending(OTGWdhwmeterid);     // 241"
-WALK = "      setMQTTConfigPending(static_cast<uint8_t>(i));"
-STATE_GATE = "  if (!dhwWaterMeterHasData()) return;\n  sendDHWWaterTotal();"
+# ADR-182: 241 is announced just in time. These are the lines that make it so.
+GATED_241 = "if (dhwWaterMeterHasData()) setMQTTConfigPending(OTGWdhwmeterid);     // 241 DHW water total, just in time (ADR-182)"
+WALK_SKIP = "    if (i == OTGWdhwmeterid) continue;   // 241 waits for a MsgID 19 sample: queueNonOTDiscoveryIds() decides (ADR-182)\n"
+JIT_ANNOUNCE = "  if (!getMQTTConfigDone(OTGWdhwmeterid)) setMQTTConfigPending(OTGWdhwmeterid);"
+PUBLISH_GATES = "  if (!settings.mqtt.bEnable) return;\n  if (!dhwWaterMeterHasData()) return;\n"
 SUBCMD_ASSERT = ('          static_assert(sizeof("reset_water_total") < sizeof(otgwSubCmd),\n'
                  '                        "otgwSubCmd must hold reset_water_total plus one more character, '
                  'so a longer token cannot truncate into it");\n')
@@ -137,15 +139,19 @@ METER_MUTANTS = [
      [(FLOW_CHECK, "!(flowLitresPerMin > 0.0f)")], "U7", ["U6"]),
 ]
 DISC_MUTANTS = [
-    # Item 1: 241 is queued at boot and on every full republish, unconditionally.
-    ("M4", "241 line removed from queueNonOTDiscoveryIds()", "gen_disc_mqtt.inc",
-     [("  " + HELPER_241 + "\n", "")], "D4", ["D5"]),
-    ("M5", "round-1 data gate restored in queueNonOTDiscoveryIds()", "gen_disc_mqtt.inc",
-     [(HELPER_241, GATED_241)], "D4", ["D5", "D7"]),
-    ("M15", "round-1 announce gating restored (helper data gate plus the markAll walk skip)", "gen_disc_mqtt.inc",
-     [(HELPER_241, GATED_241), (WALK, "      if (i == OTGWdhwmeterid) continue;\n" + WALK)], "D5", ["D7"]),
+    # ADR-182: 241 is announced just in time, after the first MsgID 19 sample of a boot.
+    ("M4", "boot announce restored: data gate removed from queueNonOTDiscoveryIds()", "gen_disc_mqtt.inc",
+     [(GATED_241, "setMQTTConfigPending(OTGWdhwmeterid);     // 241")], "D4", ["D7", "D8"]),
+    ("M5", "markAll walk queues 241 again (walk skip removed)", "gen_disc_mqtt.inc",
+     [(WALK_SKIP, "")], "D5", ["D4", "D7"]),
+    ("M15", "no just-in-time announce: the 60 s publish does not queue 241", "gen_disc_mqtt.inc",
+     [(JIT_ANNOUNCE + "\n", "")], "D7", ["D4", "D5"]),
+    ("M16", "the 60 s publish queues 241 again although the drip published it", "gen_disc_mqtt.inc",
+     [(JIT_ANNOUNCE, "  setMQTTConfigPending(OTGWdhwmeterid);")], "D12", ["D7"]),
     ("M17", "AC#2 state gate removed from publishDHWWaterMeter()", "gen_disc_mqtt.inc",
-     [(STATE_GATE, "  sendDHWWaterTotal();")], "D6", ["D7"]),
+     [(PUBLISH_GATES, "  if (!settings.mqtt.bEnable) return;\n")], "D6", ["D7"]),
+    ("M27", "MQTT-enabled check removed from publishDHWWaterMeter()", "gen_disc_mqtt.inc",
+     [(PUBLISH_GATES, "  if (!dhwWaterMeterHasData()) return;\n")], "D9", ["D7"]),
     ("M6", "MQTT_HA_SENSOR_COUNT left at 389", "gen_disc_table.inc",
      [("const uint16_t MQTT_HA_SENSOR_COUNT = 390;", "const uint16_t MQTT_HA_SENSOR_COUNT = 389;")], "D1", []),
     ("M11", "publisher formats with dtostrf into msg[24] (the pre-fixup code)", "gen_disc_mqtt.inc",

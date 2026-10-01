@@ -5998,6 +5998,121 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-182",
+      "title": "Announce the DHW water total just in time, after the first MsgID 19 sample of a boot",
+      "path": "ADR-182-announce-the-dhw-water-total-just-in-time-after-the-first-msgid-19-sample-of-a-boot.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-01",
+      "decision_summary": "The DHW water total is announced just in time, after the first MsgID 19 sample of a boot, as on the 1.x line:",
+      "topics": [
+        "dhw",
+        "home-assistant",
+        "mqtt-discovery",
+        "water-meter"
+      ],
+      "aliases": [
+        "dhw_water_total announce",
+        "faux id 241",
+        "just-in-time discovery",
+        "unknown water sensor"
+      ],
+      "components": [
+        "Discovery queueing of faux id 241 (queueNonOTDiscoveryIds, markAllMQTTConfigPending, publishDHWWaterMeter)"
+      ],
+      "symbols": [
+        "dhwWaterMeterHasData",
+        "markAllMQTTConfigPending",
+        "OTGWdhwmeterid",
+        "publishDHWWaterMeter",
+        "queueNonOTDiscoveryIds"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Queue faux id 241 only after a MsgID 19 sample was taken on the current boot.",
+          "Decide 241's queueing in queueNonOTDiscoveryIds() for the boot path and every full republish.",
+          "Queue 241 from the 60 s publish while its config has not been published, and only while MQTT (Message Queuing Telemetry Transport) is enabled."
+        ],
+        "must_not": [
+          "Queue 241 from the table walk in markAllMQTTConfigPending().",
+          "Queue a published 241 config again from the 60 s publish."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python test/host/testdhwwatermeter.py, discovery cases on the real code sliced from the sources: D4 (boot path without a sample: 241 not queued), D5 (markAll without a sample: not queued), D6 (a restored total alone: not queued), D7 (aft..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-183",
+      "title": "Record what an unclean reboot does to the persisted DHW water total",
+      "path": "ADR-183-record-what-an-unclean-reboot-does-to-the-persisted-dhw-water-total.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-01",
+      "decision_summary": "ADR-176's decision stands: after an unclean reboot the firmware resumes from the last persisted value and accepts the...",
+      "topics": [
+        "energy-dashboard",
+        "home-assistant",
+        "persistence",
+        "water-meter"
+      ],
+      "aliases": [
+        "partial regression",
+        "total_increasing dip",
+        "unclean reboot",
+        "water total drop"
+      ],
+      "components": [
+        "Persisted DHW water total after an unclean reboot (loadDHWWaterMeter, the write-rate rule)"
+      ],
+      "symbols": [
+        "DHW_METER_SAVE_DELTA_L",
+        "dhwWaterMeterSaveDue",
+        "loadDHWWaterMeter"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep docs/api/MQTT.md describing the drop after an unclean reboot and how Home Assistant reads it."
+        ],
+        "must_not": [
+          "State, in documentation or a decision record, that the persisted total never decreases."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "docs/api/MQTT.md, DHW Water Total, Persistence: the unclean-reboot bullet."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -10892,6 +11007,18 @@
       "resolved": true
     },
     {
+      "source": "ADR-176",
+      "target": "ADR-182",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-176",
+      "target": "ADR-183",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-177",
       "target": "ADR-095",
       "type": "related",
@@ -10947,6 +11074,30 @@
     },
     {
       "source": "ADR-181",
+      "target": "ADR-176",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-182",
+      "target": "ADR-171",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-182",
+      "target": "ADR-176",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-182",
+      "target": "ADR-181",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-183",
       "target": "ADR-176",
       "type": "related",
       "resolved": true

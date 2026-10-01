@@ -199,8 +199,8 @@ static void caseD4() {
   publishDHWWaterMeter();                          // doTaskEvery60s()
   std::snprintf(g_got, sizeof g_got, "no sample yet: pending(241)=%d pending(242)=%d, state publishes=%zu",
                 (int)pending(241), (int)pending(242), g_pubs.size());
-  verdict("D4", "boot path without a MsgID 19 sample: 241 queued like 242 (ADR-176); no state published (AC#2)",
-          pending(241) && pending(242) && g_pubs.empty(), g_got);
+  verdict("D4", "boot path without a MsgID 19 sample: 241 not queued (just in time, ADR-182), 242 is; no state published",
+          !pending(241) && pending(242) && g_pubs.empty(), g_got);
 }
 
 static void caseD5() {
@@ -208,8 +208,8 @@ static void caseD5() {
   markAllMQTTConfigPending();                      // force republish / settings save / daily heal
   std::snprintf(g_got, sizeof g_got, "no sample yet: pending(241)=%d, pending(19)=%d, pending(242)=%d",
                 (int)pending(241), (int)pending(19), (int)pending(242));
-  verdict("D5", "markAll without a MsgID 19 sample: 241 queued, like 19 and 242",
-          pending(241) && pending(19) && pending(242), g_got);
+  verdict("D5", "markAll without a MsgID 19 sample: 241 not queued (ADR-182), while 19 and 242 are",
+          !pending(241) && pending(19) && pending(242), g_got);
 }
 
 static void caseD6() {
@@ -218,24 +218,40 @@ static void caseD6() {
   publishDHWWaterMeter();
   std::snprintf(g_got, sizeof g_got, "restored %.1f L only: state publishes=%zu, pending(241)=%d",
                 dhwWaterTotalL, g_pubs.size(), (int)pending(241));
-  verdict("D6", "a restored total without a sample on this boot: the entity is announced, its state is not published",
-          near(dhwWaterTotalL, 1234.5) && g_pubs.empty() && pending(241), g_got);
+  verdict("D6", "a restored total without a sample on this boot: neither the entity nor its state is published",
+          near(dhwWaterTotalL, 1234.5) && g_pubs.empty() && !pending(241), g_got);
 }
 
 static void caseD7() {
   freshBoot();
   takeSamples();
-  publishDHWWaterMeter();                          // doTaskEvery60s()
+  publishDHWWaterMeter();                          // doTaskEvery60s(): the first one after a sample
+  const bool viaPublish = pending(241);
   const Pub p = g_pubs.empty() ? Pub{"", "", true} : g_pubs.back();
   clearMQTTConfigPending(); publishNonOTDiscoveryConfigs();
   const bool viaBoot = pending(241);
   clearMQTTConfigPending(); markAllMQTTConfigPending();
   const bool viaMarkAll = pending(241);
-  std::snprintf(g_got, sizeof g_got, "after a sample: publish %s=%s retain=%d (count %zu); pending via boot=%d markAll=%d",
-                p.topic.c_str(), p.payload.c_str(), (int)p.retain, g_pubs.size(), (int)viaBoot, (int)viaMarkAll);
-  verdict("D7", "after a MsgID 19 sample: state dhw_water_total=1.0 (not retained); 241 still queued on both paths",
-          g_pubs.size() == 1 && p.topic == "dhw_water_total" && p.payload == "1.0" && !p.retain && viaBoot && viaMarkAll,
+  std::snprintf(g_got, sizeof g_got, "after a sample: publish %s=%s retain=%d (count %zu); pending via the 60 s publish=%d boot=%d markAll=%d",
+                p.topic.c_str(), p.payload.c_str(), (int)p.retain, g_pubs.size(), (int)viaPublish, (int)viaBoot, (int)viaMarkAll);
+  verdict("D7", "after a MsgID 19 sample: the 60 s publish sends dhw_water_total=1.0 (not retained) and queues 241; both republish paths queue it too",
+          g_pubs.size() == 1 && p.topic == "dhw_water_total" && p.payload == "1.0" && !p.retain && viaPublish && viaBoot && viaMarkAll,
           g_got);
+}
+
+static void caseD12() {
+  // The drip published 241 (done set, pending cleared). Every later 60 s publish sends the
+  // state but must not queue the config again, or the gateway republishes it every minute.
+  freshBoot();
+  takeSamples();
+  publishDHWWaterMeter();
+  setMQTTConfigDone(OTGWdhwmeterid); clearMQTTConfigPending();
+  g_ms += 60000;
+  publishDHWWaterMeter();
+  std::snprintf(g_got, sizeof g_got, "after the drip published 241: next 60 s publish queued it again=%d, state publishes=%zu",
+                (int)pending(241), g_pubs.size());
+  verdict("D12", "a published config is not queued again by the 60 s publish, which keeps sending the state",
+          !pending(241) && g_pubs.size() == 2, g_got);
 }
 
 static void caseD8() {
@@ -573,7 +589,7 @@ static void caseQ5() {
 
 int main() {
   std::printf("== dhw_water_total discovery, publish and reset through the real code (TASK-1123) ==\n");
-  caseD1(); caseD2(); caseD3(); caseD4(); caseD5(); caseD6(); caseD7(); caseD8(); caseD9(); caseD10(); caseD11();
+  caseD1(); caseD2(); caseD3(); caseD4(); caseD5(); caseD6(); caseD7(); caseD8(); caseD9(); caseD10(); caseD11(); caseD12();
   caseX1(); caseX2(); caseX3(); caseX4(); caseX5(); caseX6(); caseX7();
   caseQ1(); caseQ2(); caseQ3(); caseQ4(); caseQ5();
   std::printf("%s (%d failure(s))\n", g_failures ? "FAIL" : "PASS", g_failures);

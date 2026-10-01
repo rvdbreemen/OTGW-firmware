@@ -11,6 +11,8 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-181"
+  - "ADR-182"
+  - "ADR-183"
 topics:
   - "home-assistant"
   - "mqtt-discovery"
@@ -56,6 +58,16 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: "ADR-181 amends ADR-176's clause on the two MsgID 19 write sites: the PS=1 summary no longer feeds the water total"
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-01
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "ADR-182 amends ADR-176's boot-publish clause: the water total is announced just in time"
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-01
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: ADR-183 amends ADR-176's answered question on partial regression with the actual unclean-reboot behaviour
     changed_via: adr-kit lifecycle
 ```
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.396
+**  Version  : v2.0.0-alpha.397
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1635,12 +1635,16 @@ void sendDHWWaterTotal()
 // publishDHWWaterMeter(): the 60 s task's publish, so a restarted Home Assistant refills
 // the entity within a minute. Silent until a MsgID 19 sample was taken on this boot
 // (TASK-1123 AC#2): on an installation whose masters never ask for that id there is no
-// value to report, and a restored total alone does not make one. The discovery config
-// is not queued here: queueNonOTDiscoveryIds() queues it at boot (ADR-176).
+// value to report, and a restored total alone does not make one.
+// It also announces the entity, just in time as on the 1.x line (ADR-182): the first
+// publish after a sample queues the discovery config, and once the drip has published
+// it the done bit keeps it from being queued again every minute.
 //===========================================================================================
 void publishDHWWaterMeter()
 {
+  if (!settings.mqtt.bEnable) return;
   if (!dhwWaterMeterHasData()) return;
+  if (!getMQTTConfigDone(OTGWdhwmeterid)) setMQTTConfigPending(OTGWdhwmeterid);
   sendDHWWaterTotal();
 }
 
@@ -2025,7 +2029,7 @@ static void queueNonOTDiscoveryIds()
 {
   setMQTTConfigPending(0);                  // climate: thermostat + DHW control
   setMQTTConfigPending(27);                 // number: outside temperature override
-  setMQTTConfigPending(OTGWdhwmeterid);     // 241 TASK-1123 DHW water total (ADR-176; its state waits for MsgID 19)
+  if (dhwWaterMeterHasData()) setMQTTConfigPending(OTGWdhwmeterid);     // 241 DHW water total, just in time (ADR-182)
   setMQTTConfigPending(OTGWhvacid);         // 242 TASK-942 hvac_mode/hvac_action companions
   setMQTTConfigPending(OTGWotdirectid);     // 243 ADR-124 OTDirect flame metrics
   setMQTTConfigPending(OTGWpiccontrolsid);  // 244 resetgateway button + GPIO/LED selects
@@ -2091,6 +2095,7 @@ void markAllMQTTConfigPending()
   clearMQTTConfigDone();
   memset(MQTTautoCfgPendingMap, 0, sizeof(MQTTautoCfgPendingMap));
   for (uint16_t i = 0; i < 256; i++) {
+    if (i == OTGWdhwmeterid) continue;   // 241 waits for a MsgID 19 sample: queueNonOTDiscoveryIds() decides (ADR-182)
     uint16_t sIdx = readSensorIndex(static_cast<uint8_t>(i));
     uint16_t bIdx = readBinSensorIndex(static_cast<uint8_t>(i));
     if (sIdx != MQTT_HA_INDEX_NONE || bIdx != MQTT_HA_INDEX_NONE) {

@@ -278,8 +278,8 @@
 - `void publishDHWWaterMeter()`
   - Description: The 60 s publish of the DHW water total, so a restarted Home Assistant refills the entity within a minute
   - Called from: `doTaskEvery60s()` (OTGW-firmware.ino), right before `saveDHWWaterMeterIfDue()`
-  - Gate: nothing is published until `dhwWaterMeterHasData()` is true, i.e. a MsgID 19 sample was taken on this boot (TASK-1123 AC#2); a total restored from `/dhw_water.json` alone does not count. Then calls `sendDHWWaterTotal()`
-  - Discovery: not touched here. `queueNonOTDiscoveryIds()` queues faux id 241 (`OTGWdhwmeterid`) at boot like the other faux ids (ADR-176), and every path that clears the done bitmap (`startMQTT()`, the broker-restart branch of `onMqttConnect()`, `markAllMQTTConfigPending()`) calls that helper again
+  - Gate: nothing is published until `dhwWaterMeterHasData()` is true, i.e. a MsgID 19 sample was taken on this boot (TASK-1123 AC#2); a total restored from `/dhw_water.json` alone does not count. Returns at once while MQTT is disabled. Then calls `sendDHWWaterTotal()`
+  - Discovery (ADR-182): queues faux id 241 (`OTGWdhwmeterid`) while `getMQTTConfigDone(241)` is false, so the first publish after a sample announces the entity and a published config is not queued again every minute. `queueNonOTDiscoveryIds()` queues 241 only once a sample was taken, so the paths that clear the done bitmap (`startMQTT()`, the broker-restart branch of `onMqttConnect()`, `markAllMQTTConfigPending()`) announce it again only after one
 
 - `void sendMQTTstateinformation()`
   - Description: Publish OpenTherm bus state information
@@ -520,7 +520,7 @@ Two bitmaps track discovery state: `MQTTautoConfigMap[8]` (published/done) and `
     - Arms the TASK-648 topology cleanup when the stored topology stamp differs from the current mode
     - Clears both published and pending bitmaps
     - Walks IDs 0-255 and sets the pending bit for each ID with a sensor or binary-sensor index entry
-    - Calls `queueNonOTDiscoveryIds()` for the non-OT set (0, 27 and 241 to 255), the same helper `publishNonOTDiscoveryConfigs()` uses (ADR-171, Proposed). 241, the DHW water total, is in that set unconditionally (ADR-176, TASK-1123): it is announced whether or not the bus carries MsgID 19, and only its state waits for a MsgID 19 sample
+    - Calls `queueNonOTDiscoveryIds()` for the non-OT set (0, 27 and 241 to 255), the same helper `publishNonOTDiscoveryConfigs()` uses (ADR-171, Proposed). The table walk skips 241, the DHW water total: the helper queues it only once a MsgID 19 sample was taken on this boot (ADR-182, just in time as on the 1.x line)
   - Usage: `doAutoConfigure()` (telnet `F`, `POST /api/v2/otgw/discovery`), `POST /api/v2/discovery/republish`, the daily re-announce (ADR-170), a verify run that found missing configs, an `MQTTuseLegacyOtTopics` toggle and a pending topology migration. Not called on MQTT connect or on a Home Assistant restart.
 
 - `void loopMQTTDiscovery()`
