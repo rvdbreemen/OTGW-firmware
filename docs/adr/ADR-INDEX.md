@@ -185,3 +185,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-177 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option A, because the damaging edits share a small, precise syntactic signature. |
 | ADR-178 | Proposed | `src/OTGW-firmware/**/*.h` | settings.sat.sSensorArea becomes char[4][18] and holds a sensor reference that is either a 16-character Dallas addres... |
 | ADR-179 | Proposed | - | While SAT is enabled, SAT owns MsgID 1. |
+| ADR-180 | Accepted | `evaluate.py` | New code in hot-path source files does not declare String objects. |

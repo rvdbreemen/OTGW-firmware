@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T16:25:07.513Z
-> Files: 603 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T16:45:07.383Z
+> Files: 605 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -777,7 +777,7 @@
 
 ## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/d09d9128-d9f5-4c9c-aee0-df934b723d02/scratchpad/
 
-- `commit1057.txt` (~207 tok)
+- `commit1187.txt` (~325 tok)
 
 ## docs/adr/
 
@@ -786,6 +786,8 @@
 - `ADR-172-rate-limit-ui-polled-rest-endpoints.md` — ADR-172 Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses (~2728 tok)
 - `ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md` — ADR-178 Widen the SAT area-sensor reference to accept a BLE MAC alongside a Dallas address (~2142 tok)
 - `ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md` — ADR-179 Name the owner of the OpenTherm control setpoint while SAT is enabled (~2634 tok)
+- `ADR-180-keep-the-arduino-string-class-out-of-hot-path-source-files.md` — ADR-180 Keep the Arduino String class out of hot-path source files (~2213 tok)
+- `README.md` — Project documentation (~32261 tok)
 
 ## docs/api/
 

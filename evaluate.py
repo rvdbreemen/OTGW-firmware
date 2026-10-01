@@ -40,7 +40,7 @@ import config
 
 # ===== Module-level pure helpers (testable; used by WorkspaceEvaluator) =====
 
-# Hot-path files per ADR-004: no String class allowed.
+# Hot-path files per ADR-180: no String class allowed.
 # Matched as filename-prefix tuples (e.g. 'SAT' matches SATble.ino, SATcontrol.ino, ...).
 HOT_PATH_PREFIXES: Tuple[str, ...] = (
     'SAT', 'MQTTstuff', 'restAPI', 'OTGW-Core', 'OTDirect',
@@ -221,7 +221,7 @@ def scan_design_system_workspace(data_dir: Path) -> Tuple[Dict[str, List[str]], 
 
 
 def is_hot_path_file(filename: str) -> bool:
-    """Return True when the file is a known ADR-004 hot-path source file."""
+    """Return True when the file is a known ADR-180 hot-path source file."""
     return any(filename.startswith(p) for p in HOT_PATH_PREFIXES)
 
 
@@ -2361,7 +2361,7 @@ class WorkspaceEvaluator:
                         print(f"  {file.name}:{i}: Serial.print usage")
 
             # String class detection (widened regex: catches decl, init, direct-init;
-            # skips reference forms which do not allocate). Split by ADR-004 hot path.
+            # skips reference forms which do not allocate). Split by ADR-180 hot path.
             hits = scan_string_usages_detailed(content, file.name)
             if is_hot_path_file(file.name):
                 string_hot_hits.extend(hits)
@@ -2379,17 +2379,17 @@ class WorkspaceEvaluator:
                 "No improper Serial.print() usage found"
             ))
 
-        # ADR-004 hot-path String usage: reported as WARN with concrete call sites
-        # until the existing debt is burned down. Follow-up task will flip to FAIL.
+        # ADR-180 hot-path String usage: reported as WARN with concrete call sites.
+        # The rule is guideline-level per ADR-080, so it never fails the build.
         if string_hot_hits:
             self.add_result(EvaluationResult(
-                "Coding", "String Class in Hot Path (ADR-004)", "WARN",
+                "Coding", "String Class in Hot Path (ADR-180)", "WARN",
                 f"Found {len(string_hot_hits)} String usages in hot-path files (SAT*, MQTTstuff, restAPI, OTGW-Core, OTDirect)",
                 "; ".join(string_hot_hits[:10])
             ))
         else:
             self.add_result(EvaluationResult(
-                "Coding", "String Class in Hot Path (ADR-004)", "PASS",
+                "Coding", "String Class in Hot Path (ADR-180)", "PASS",
                 "No String usages in hot-path files"
             ))
 

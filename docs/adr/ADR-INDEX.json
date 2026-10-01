@@ -5876,6 +5876,70 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-180",
+      "title": "Keep the Arduino String class out of hot-path source files",
+      "path": "ADR-180-keep-the-arduino-string-class-out-of-hot-path-source-files.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-01",
+      "decision_summary": "New code in hot-path source files does not declare String objects.",
+      "topics": [
+        "coding-standards",
+        "heap",
+        "memory",
+        "string-class"
+      ],
+      "aliases": [
+        "char buffers",
+        "heap fragmentation",
+        "no String in hot paths",
+        "String class"
+      ],
+      "components": [
+        "Hot-path String rule (HOT_PATH_PREFIXES and the String check in check_coding_standards)"
+      ],
+      "symbols": [
+        "_STRING_DECL_RE",
+        "check_coding_standards",
+        "HOT_PATH_PREFIXES",
+        "is_hot_path_file"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Use char[] buffers with strlcpy() or snprintfP() for new text handling in hot-path source files.",
+          "Keep evaluate.py reporting hot-path String declarations with their call sites.",
+          "Cite this ADR, not ADR-004, wherever the rule is stated."
+        ],
+        "must_not": [
+          "Declare a String object in a per-message path of a hot-path source file: OpenTherm message handling, MQTT publishing, or the handling of a polled REST request."
+        ],
+        "exceptions": [
+          "A library call that returns only a String, such as a request argument read through argCompat(), may be held in a short-lived local in a request handler and copied into a fixed buffer.",
+          "const String& and other reference forms do not allocate and fall outside the rule."
+        ],
+        "verification": [
+          "python evaluate.py: the \"String Class in Hot Path (ADR-180)\" result lists every String declaration in a hot-path source file, with its call site.",
+          "The Enforcement block below keeps HOTPATHPREFIXES in evaluate.py."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "evaluate.py"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": true,
+        "verified_in": [
+          "evaluate.py:HOT_PATH_PREFIXES"
+        ],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -10796,6 +10860,24 @@
     {
       "source": "ADR-179",
       "target": "ADR-162",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-180",
+      "target": "ADR-004",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-180",
+      "target": "ADR-053",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-180",
+      "target": "ADR-080",
       "type": "related",
       "resolved": true
     }

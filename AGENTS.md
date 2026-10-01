@@ -60,7 +60,7 @@ Do not add ArduinoJson. This firmware builds JSON manually with `snprintf_P()` /
 
 ### String usage
 
-Avoid Arduino `String` in hot paths, especially areas covered by ADR-004: SAT, MQTT, REST, OTGW-Core, and OTDirect. Prefer fixed buffers with `strlcpy()` and `snprintf_P()`. `String` is acceptable only in setup or one-off paths where the local pattern already allows it.
+Avoid Arduino `String` in hot paths, especially areas covered by ADR-180: SAT, MQTT, REST, OTGW-Core, and OTDirect. Prefer fixed buffers with `strlcpy()` and `snprintf_P()`. `String` is acceptable only in setup or one-off paths where the local pattern already allows it.
 
 ### File serving
 
@@ -145,8 +145,7 @@ ADRs live in `docs/adr/`. Read relevant ADRs before architecture, NFR, API contr
 - **ADR-081**: Types merge into `<Component>stuff.h` when both exist (amendment to ADR-079)
 - **ADR-090**: Re-entrancy guard pattern for shared scratch buffers (guideline-level per ADR-080: 2 instances in MQTTstuff.ino, RAII `MQTTAutoConfigSessionLock` preferred for new code)
 - **ADR-167**: Heap tier machine and per-consumer gating retired on this branch (supersedes ADR-089 and ADR-121). `getHeapHealth()` keeps ADR-030's 3072/5120/8192 ladder for emergency recovery and tier-entry telemetry only; `canSendWebSocket()` / `canPublishMQTT()` block on CRITICAL and nothing else. No CI gate: the four `evaluate.py` gates that enforced ADR-089/ADR-121 were removed with the code (TASK-1036)
-
-The 'no `String` in hot paths' rule (see Critical Coding Rules) still cites ADR-004, which is Superseded by ADR-053 and no longer in force; TASK-1187 gives the rule an Accepted home.
+- **ADR-180**: No `String` class in hot-path source files (SAT*, MQTTstuff, restAPI, OTGW-Core, OTDirect); guideline-level per ADR-080, `evaluate.py` reports WARN with call sites. Re-homes the rule from the superseded ADR-004
 
 Accepted ADRs are binding. To reverse a decision, create a superseding ADR instead of editing the accepted ADR.
 

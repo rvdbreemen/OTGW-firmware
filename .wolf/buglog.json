@@ -3108,5 +3108,41 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-01T07:00:00"
+  },
+  {
+    "id": "bug-880",
+    "timestamp": "2026-10-01T18:50:00",
+    "error_message": "adr accept left 'Accepted, 2026-10-01.' followed by a dangling half sentence; the guideline-level label was gone from the Status paragraph",
+    "file": "docs/adr/ADR-180-keep-the-arduino-string-class-out-of-hot-path-source-files.md",
+    "root_cause": "adr-kit 0.57.0 accept rewrites the entire first line of the Status paragraph; the Status line shared that line with the start of the guideline-level sentence",
+    "fix": "Restored the sentence as its own paragraph before the first commit; keep the Status line alone on its line",
+    "tags": [
+      "adr-kit",
+      "adr-accept",
+      "status-line",
+      "tooling"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-01T18:50:00"
+  },
+  {
+    "id": "bug-881",
+    "timestamp": "2026-10-01T18:55:00",
+    "error_message": "adr-lint consistency FAIL: concurrent supersession of ADR-004 claimed by ADR-070 and ADR-180",
+    "file": "docs/adr/ADR-180-keep-the-arduino-string-class-out-of-hot-path-source-files.md",
+    "root_cause": "SUPERSEDES_CLAIM_RE matches 'supersedes ADR-NNN' anywhere in an Accepted ADR's text; ADR-180 described ADR-053 as one that 'supersedes ADR-004'",
+    "fix": "Rephrased to 'the successor of ADR-004'; the gate passes",
+    "tags": [
+      "adr-kit",
+      "adr-lint",
+      "supersession",
+      "consistency"
+    ],
+    "related_bugs": [
+      "bug-880"
+    ],
+    "occurrences": 1,
+    "last_seen": "2026-10-01T18:55:00"
   }
 ]
