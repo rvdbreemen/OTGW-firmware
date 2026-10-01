@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-04 06:30'
-updated_date: '2026-10-01 18:16'
+updated_date: '2026-10-01 21:43'
 labels:
   - 2.0.0
   - parity
@@ -65,6 +65,8 @@ Open for the maintainer (does not block this task)
 Basis of the offline sentence in point 2: the client connects with a clean session and subscribes at QoS 0 (MQTTstuff.ino setCleanSession(true) and subscribe(topic, 0)), so a broker queues nothing for it while it is offline; the only later delivery of that reset is the retained copy, which is ignored.
 
 2026-10-01: the PS=1 residual (case R1) is decided. The maintainer chose not to count the PIC summary, as on 1.x. TASK-1189 implements it (commit 19ee510b0, alpha.396), and ADR-181 amends ADR-176's two-write-sites clause. R1 now expects 0 L. The other two maintainer questions listed above (boot versus just-in-time announce, and the stale premise in ADR-176's partial-regression answer) were not part of that decision.
+
+2026-10-01: the two remaining maintainer questions are decided as well. Announce timing: just in time as on 1.x, done in TASK-1190 with ADR-182 (alpha.397). ADR-176's stale partial-regression premise: corrected in the amending ADR-183 (TASK-1191). All three questions listed above are now closed.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
