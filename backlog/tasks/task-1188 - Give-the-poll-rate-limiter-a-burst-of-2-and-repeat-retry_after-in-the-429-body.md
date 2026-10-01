@@ -1,9 +1,11 @@
 ---
 id: TASK-1188
 title: Give the poll rate limiter a burst of 2 and repeat retry_after in the 429 body
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-01 05:21'
+updated_date: '2026-10-01 05:22'
 labels:
   - rest-api
   - rate-limit
