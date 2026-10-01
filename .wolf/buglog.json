@@ -3144,5 +3144,23 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-10-01T18:55:00"
+  },
+  {
+    "id": "bug-882",
+    "timestamp": "2026-10-01T19:40:00",
+    "error_message": "DHW water total kept counting a stale PIC PS=1 summary value (80 L in 10 min at a stored 8 L/min)",
+    "file": "src/OTGW-firmware/OTGW-Core.ino (updatePSSummaryFloatState, case 19)",
+    "root_cause": "The PIC builds its PS=1 summary from stored values (SummaryReport -> PrintStoredVal); after the boiler stops answering MsgID 19 the summary repeats the last flow with no age, and the meter integrated it",
+    "fix": "The summary only writes DHWFlowRate; print_f88() B frames are the only meter feed (ADR-181, TASK-1189, alpha.396)",
+    "tags": [
+      "water-meter",
+      "ps1",
+      "pic",
+      "mqtt",
+      "energy-dashboard"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-01T19:40:00"
   }
 ]
