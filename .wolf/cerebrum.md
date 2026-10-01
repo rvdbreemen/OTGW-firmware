@@ -11,6 +11,7 @@
 - ADRs: never edit an Accepted ADR; write a new Proposed "…(Amends ADR-XXX)".
 
 ## Key Learnings
+- [2026-10-01] A 'needs the bench' label in task notes is not the AC itself. Read the AC text: when it does not demand hardware, a harness on the sliced real code (OLD vs FIX plus mutants) can verify it now. That closed TASK-1037 AC#10 (browser plus limiter oracle) and TASK-1124 AC#3 (header staging up to the AsyncWebServer response). Skip it when another AC of the same task needs the same hardware run anyway (TASK-1059 AC#3 rides on AC#11's HA restart).
 
 ### OT frame origin (TASK-1086, TASK-1185)
 - **SAT simulation has two off-switches**: the edge hook `satNotifyBoilerFrameSeen()` and the `satControlLoop()` backstop that calls `satOnBoilerDetected()` whenever `satBoilerHardwarePresent()` is true. A frame that must not switch simulation off has to stay out of both; on the PIC path the gate reads `otRealBoilerSeenRecently()`, never `bBoilerState` (which counts loopback and replayed B frames on purpose).
