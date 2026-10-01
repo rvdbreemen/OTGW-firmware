@@ -377,6 +377,8 @@ Alias: `POST /api/v2/otgw/autoconfigure`
 
 Reset the DHW water total (`dhw_water_total`, the Energy dashboard water counter) to 0. Authentication required. POST only; any other method answers 405.
 
+Only the boiler's MsgID 19 replies add to the total. A PIC gateway in PS=1 mode adds no water, because the PIC's summary line repeats stored values without their age (ADR-181); see [MQTT.md](../../api/MQTT.md) for what counts.
+
 **Request:** No body required.
 
 **Response (HTTP 200 OK):**

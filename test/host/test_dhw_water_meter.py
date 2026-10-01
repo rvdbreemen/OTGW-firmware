@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""TASK-1123 host harness: the DHW water total (ADR-176) through the real code.
+"""TASK-1123 host harness: the DHW water total (ADR-176, ADR-181) through the real code.
 
-    python test/host/test_dhw_water_meter.py                  # FIX, mutants, discovery
-    python test/host/test_dhw_water_meter.py --old-rev HEAD   # plus the OLD build
+    python test/host/test_dhw_water_meter.py                       # FIX, mutants, discovery
+    python test/host/test_dhw_water_meter.py --old-rev 4bbceed61^  # plus OLD: before the meter existed
 
 Two programs are compiled from code sliced by anchor out of the sources, never copied:
 
 1. test_dhw_water_meter.cpp: dhwWaterMeter.ino (the accumulator, the write-rate rule,
    save / flush / load) and, from OTGW-Core.ino, print_f88() and
-   updatePSSummaryFloatState(), the two MsgID 19 state write sites ADR-176 names, with
-   the validity gates print_f88() calls and parseStrictFloat(), the PS=1 field parser.
+   updatePSSummaryFloatState(), the two MsgID 19 state write sites, with the validity
+   gates print_f88() calls and parseStrictFloat(), the PS=1 field parser. Only
+   print_f88() feeds the meter; ADR-181 keeps the PS=1 summary out of it (cases W2, W6
+   and R1, mutants M3 and M3b).
 2. test_dhw_water_discovery.cpp: the discovery tables and indexes from
    MQTTHaDiscovery.cpp and, from MQTTstuff.ino, the paths that queue a discovery
    config (queueNonOTDiscoveryIds() via the boot path, markAllMQTTConfigPending()),
@@ -33,12 +35,12 @@ its function by a call that queues the non-OT ids again (so a republish re-annou
 dhwWaterMeter.ino does not exist before TASK-1123, so OLD cannot show an accumulator
 of its own. With --old-rev, program 1 is built a second time with OTGW-Core.ino (and
 its headers) at that revision: the same driver and the same meter module, only the
-write sites differ. OLD must fail exactly the cases that need the write sites to feed
-the meter and pass all others. The wiring is reported for OLD as well. The round-1
+write sites differ. OLD must fail exactly the cases that need print_f88() to feed the
+meter and pass all others. The wiring is reported for OLD as well. The round-1
 announce gating (241 queued only after a MsgID 19 sample) is replayed as mutant M15.
 Two round-2 defects the round-2 review found are replayed the same way: the reset
 consumer that ran while the file could not be written (MR13, case X6), and the flow
-check that let NaN through (M25, case W6, through the real PS=1 field parser).
+check that let NaN through (M25, case U7, fed to the accumulator directly).
 
 Mutants of the FIX slices must each fail their named case. Every substitution must
 match exactly once and change the text. A mutant marked crash_ok may also end the
@@ -65,7 +67,7 @@ FW_INO, HELPER, REST_INO = FW + "OTGW-firmware.ino", FW + "helperStuff.ino", FW 
 
 METER_CASES = ["W1", "W2", "W3", "W4", "W5", "W6", "R1", "U1", "U2", "U3", "U4", "U5", "U6", "U7",
                "P1", "P2", "P3", "P4", "P5", "P6", "P7"]
-OLD_DEFECT = ["W1", "W2", "W4", "W5", "W6", "R1"]    # need the write sites to feed the meter
+OLD_DEFECT = ["W1", "W4", "W5"]    # need print_f88() to feed the meter
 DISC_CASES = ["D1", "D2", "D3", "D4", "D5", "D6", "D7", "D8", "D9", "D10", "D11",
               "X1", "X2", "X3", "X4", "X5", "X6", "X7", "Q1", "Q2", "Q3", "Q4", "Q5"]
 
@@ -77,6 +79,9 @@ SUBCMD_ASSERT = ('          static_assert(sizeof("reset_water_total") < sizeof(o
                  '                        "otgwSubCmd must hold reset_water_total plus one more character, '
                  'so a longer token cannot truncate into it");\n')
 FLOW_CHECK = "!(flowLitresPerMin > 0.0f) || flowLitresPerMin > DHW_METER_MAX_FLOW_LPM"
+SUMMARY_19 = "      OTcurrentSystemState.DHWFlowRate = fval;\n      break;"
+SUMMARY_19_FED = ("      OTcurrentSystemState.DHWFlowRate = fval;\n"
+                  "      if (!isOTDirectEnabled()) updateDHWWaterMeter(fval, millis());\n      break;")
 RESET_GATE = "  if (!LittleFSmounted || isFlashing()) return;   // the file cannot be written: the reset waits"
 RESET_ZERO = "    dhwWaterTotalL = 0.0;\n    writeDHWWaterMeterFile(millis());\n"
 SKIP_ZERO = "  if (dhwWaterTotalL != 0.0 || dhwMeterSavedL != 0.0) {   // RAM or file not at 0 yet"
@@ -87,9 +92,12 @@ METER_MUTANTS = [
      [("if (dtMs > DHW_METER_MAX_GAP_MS) return;", "")], "U2", []),
     ("M2", "boiler-only source filter removed from print_f88()", "gen_core.inc",
      [("OTdata.id == 19 && OTdata.rsptype == OTGW_BOILER", "OTdata.id == 19")], "W3", ["W4"]),
-    ("M3", "OT-Direct summary filter removed from updatePSSummaryFloatState()", "gen_core.inc",
-     [("if (!isOTDirectEnabled()) updateDHWWaterMeter(fval, millis());", "updateDHWWaterMeter(fval, millis());")],
-     "W5", ["W2"]),
+    # ADR-181: the PS=1 summary does not feed the meter. M3 puts back the feed the summary
+    # had before (outside OT-Direct mode), M3b the same feed in every mode.
+    ("M3", "the PS=1 summary feeds the meter again (outside OT-Direct mode)", "gen_core.inc",
+     [(SUMMARY_19, SUMMARY_19_FED)], "R1", ["W1", "W5"]),
+    ("M3b", "the PS=1 summary feeds the meter in every mode", "gen_core.inc",
+     [(SUMMARY_19, SUMMARY_19_FED.replace("if (!isOTDirectEnabled()) ", ""))], "W5", ["W1"]),
     ("M7", "restart flush writes only a missing file (unsaved branch removed)", "gen_meter.inc",
      [("if (unsaved || fileGone) writeDHWWaterMeterFile(millis());", "if (fileGone) writeDHWWaterMeterFile(millis());")],
      "P2", ["P3"]),
@@ -121,8 +129,10 @@ METER_MUTANTS = [
     # Round-2 fixup, review issue 2: a flow f8.8 cannot carry adds nothing.
     ("M24", "zero and negative flow counted (lower bound removed)", "gen_meter.inc",
      [(FLOW_CHECK, "flowLitresPerMin > DHW_METER_MAX_FLOW_LPM")], "U6", ["U1"]),
+    # Under ADR-181 no PS=1 field reaches the meter, so NaN is fed to the accumulator
+    # directly (U7) rather than through the summary parser (W6).
     ("M25", "NaN counted: the round-2 check (flow <= 0) replayed", "gen_meter.inc",
-     [("!(flowLitresPerMin > 0.0f)", "flowLitresPerMin <= 0.0f")], "W6", ["U6"]),
+     [("!(flowLitresPerMin > 0.0f)", "flowLitresPerMin <= 0.0f")], "U7", ["U6"]),
     ("M26", "no upper flow bound", "gen_meter.inc",
      [(FLOW_CHECK, "!(flowLitresPerMin > 0.0f)")], "U7", ["U6"]),
 ]

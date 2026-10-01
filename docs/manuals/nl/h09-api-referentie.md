@@ -240,6 +240,8 @@ Discovery gebruikt een asynchrone bitmap-gestuurde drip publisher: alle bericht-
 
 Het warmwatertotaal (`dhw_water_total`, de waterteller voor het Energy-dashboard) op 0 zetten. Authenticatie vereist. Alleen POST; elke andere methode geeft 405.
 
+Alleen de antwoorden van de ketel op MsgID 19 tellen mee. Een PIC-gateway in PS=1-modus telt geen water, omdat de samenvattingsregel van de PIC opgeslagen waarden herhaalt zonder hun leeftijd (ADR-181); zie [MQTT.md](../../api/MQTT.md) voor wat er telt.
+
 **Verzoek:** geen parameters
 
 **Antwoord (HTTP 200 OK):**

@@ -113,11 +113,12 @@ static void caseW1() {
 }
 
 static void caseW2() {
+  // ADR-181: the PS=1 summary updates the flow-rate state but never the total.
   freshBoot(HW_MODE_PIC);
   for (uint32_t s = 0; s <= 60; s += 10) { at(5000 + s * 1000); summary19(6.0f); }
-  std::snprintf(g_got, sizeof g_got, "total=%.4f L", dhwWaterTotalL);
-  verdict("W2", "PIC gateway, PS=1 summaries through updatePSSummaryFloatState(), 6 L/min every 10 s for 60 s: 6.0 L",
-          near(dhwWaterTotalL, 6.0), g_got);
+  std::snprintf(g_got, sizeof g_got, "total=%.4f L, DHWFlowRate state=%.2f", dhwWaterTotalL, OTcurrentSystemState.DHWFlowRate);
+  verdict("W2", "PIC gateway, PS=1 summaries through updatePSSummaryFloatState(), 6 L/min every 10 s for 60 s: state 6.0, total 0 L",
+          near(dhwWaterTotalL, 0.0) && near(OTcurrentSystemState.DHWFlowRate, 6.0), g_got);
 }
 
 static void caseW3() {
@@ -172,9 +173,11 @@ static void caseW6() {
   // A PIC gateway in PS=1 mode with 5000 L restored. Each MsgID 19 field goes through the
   // real parseStrictFloat() and updatePSSummaryFloatState(), 10 s apart;
   // publishPSSummaryFieldValue(), which runs between the two in the firmware, is not run
-  // here. strtod() accepts "nan", "inf" and exponents, so a malformed field reaches the
-  // meter. The values below fit that function's 12-byte print buffer; 1e30 does not and
-  // is left to U7. Then an orderly restart and a boot restore the file.
+  // here. strtod() accepts "nan", "inf" and exponents, so malformed fields parse. Under
+  // ADR-181 no summary field reaches the meter, valid or not, so the restored total must
+  // come through unchanged. The values below fit that function's 12-byte print buffer;
+  // the accumulator's own bound on such readings is case U7. Then an orderly restart and
+  // a boot restore the file.
   freshBoot(HW_MODE_PIC);
   LittleFS.files[kFile] = "{\"litres\":5000.000}";
   loadDHWWaterMeter();
@@ -191,23 +194,24 @@ static void caseW6() {
   const std::string file = LittleFS.files[kFile];
   rebootMeterRam();
   loadDHWWaterMeter();                             // setup() on the next boot
-  const double expected = 5000.0 + 2.0 * 6.5 * 10000.0 / 60000.0;   // two 10 s intervals at 6.5 L/min
+  const double expected = 5000.0;                  // nothing from the summary counts (ADR-181)
   std::snprintf(g_got, sizeof g_got, "fields parsed=%d of 7, total=%.4f L (want %.4f), file %s, after reboot %.4f L",
                 parsed, total, expected, file.c_str(), dhwWaterTotalL);
-  verdict("W6", "PIC PS=1 fields nan, inf, 999.5 and -inf through the real parser add nothing; the total, file and reboot stay at 5002.1667 L",
+  verdict("W6", "PIC PS=1 fields 6.50, nan, inf, 999.5 and -inf through the real parser add nothing; the total, file and reboot stay at 5000 L",
           parsed == 7 && near(total, expected, 1e-4) && near(dhwWaterTotalL, expected, 0.0005), g_got);
 }
 
 static void caseR1() {
-  // Residual, for the maintainer: PIC in PS=1 mode. The PIC reports its stored MsgID 19
-  // Read-Ack on every PS=1 request (gateway.asm HandleResponse -> StoreValue). If the
+  // PIC in PS=1 mode. The PIC reports its stored MsgID 19 Read-Ack on every PS=1 request
+  // (gateway.asm HandleResponse -> StoreValue, SummaryReport -> PrintStoredVal). If the
   // thermostat stopped requesting MsgID 19 while that stored value was 8 L/min, a client
   // polling PS=1 every 30 s keeps presenting 8 L/min, and each interval is under the cap.
+  // Counted, that added 80 L in 10 minutes; ADR-181 keeps the summary out of the total.
   freshBoot(HW_MODE_PIC);
   for (uint32_t s = 0; s <= 600; s += 30) { at(5000 + s * 1000); summary19(8.0f); }
   std::snprintf(g_got, sizeof g_got, "total=%.4f L after 10 min of a repeated stored 8 L/min", dhwWaterTotalL);
-  verdict("R1", "RESIDUAL (maintainer decision): a PIC summary that repeats a stale stored value keeps counting (80.0 L)",
-          near(dhwWaterTotalL, 80.0), g_got);
+  verdict("R1", "a PIC summary that repeats a stale stored value adds nothing (0 L; 80 L when the summary counted)",
+          near(dhwWaterTotalL, 0.0), g_got);
 }
 
 // ---- U: the accumulator itself ---------------------------------------------------------------

@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-181"
 topics:
   - "home-assistant"
   - "mqtt-discovery"
@@ -49,6 +51,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Accepted by the maintainer as the 2.0.0 peer of ADR-090, after all seven open questions were resolved with measured or code-verified answers.
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-01
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "ADR-181 amends ADR-176's clause on the two MsgID 19 write sites: the PS=1 summary no longer feeds the water total"
     changed_via: adr-kit lifecycle
 ```
 

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : dhwWaterMeter.ino
-**  Version  : v2.0.0-alpha.395
+**  Version  : v2.0.0-alpha.396
 **
 **  Copyright (c) 2026 Robert van den Breemen
 **
@@ -22,20 +22,22 @@
    rule). Litres are elapsed time times flow, so a second sample of the same
    exchange only splits an interval in two; it never adds a volume of its own.
 
- Only boiler data feeds the total. print_f88() calls updateDHWWaterMeter() for a
- boiler Read-Ack (B frame), updatePSSummaryFloatState() for the summary line of a
- PIC in PS=1 mode. Both call sites say which frames they leave out, and why.
+ Only boiler Read-Ack frames feed the total: print_f88() calls updateDHWWaterMeter()
+ for a boiler Read-Ack (B frame) and says which frames it leaves out, and why. The
+ summary line of a PIC in PS=1 mode does not count (ADR-181): it repeats stored
+ values without their age, so a PIC gateway in PS=1 mode reports no total, as on
+ the 1.x line.
 
  Unlike the 1.x line, this line keeps the total across a reboot: it lives in its
  own LittleFS file (DHW_METER_FILE, never settings.ini), is restored at boot by
  loadDHWWaterMeter(), and is written under the rule in dhwWaterMeterSaveDue().
  It also has a user reset (ADR-176): POST /api/v2/otgw/reset_water_total and the
  MQTT command set/<node>/otgw/reset_water_total. And it does not count a flow an
- f8.8 frame cannot carry (DHW_METER_MAX_FLOW_LPM), which only a malformed PS=1
- summary field delivers; the 1.x meter has no PS=1 source.
+ f8.8 frame cannot carry (DHW_METER_MAX_FLOW_LPM); no MsgID 19 frame carries one,
+ so that bound only guards the function's contract.
 
  The total is loop-task state. Every function here runs on the loop task, called
- from processOT() (the two call sites), the 60 s task, setup(), doRestart() or
+ from processOT() (through print_f88()), the 60 s task, setup(), doRestart() or
  loop(), except queueDHWWaterMeterReset(). The REST handler calls that one on the
  async_tcp task, the MQTT callback from inside doBackgroundTasks() (which re-enters
  through delayms()), and it only raises a flag that handlePendingDHWWaterMeterReset()
@@ -47,9 +49,9 @@
 static const uint32_t DHW_METER_MAX_GAP_MS = 60000UL;
 
 // The largest flow a MsgID 19 frame can carry: f8.8 ends at 127.996 L/min. A reading
-// above this, or one that is not a number, cannot come off the bus. Only a malformed
-// PS=1 summary field carries one (parseStrictFloat() accepts "nan", "inf" and
-// exponents), and updateDHWWaterMeter() does not count it.
+// above this, or one that is not a number, cannot come off the bus, and
+// updateDHWWaterMeter() does not count it. The PS=1 summary, where a malformed field
+// could carry one, does not feed the meter (ADR-181).
 static const float    DHW_METER_MAX_FLOW_LPM = 128.0f;
 
 // Write-rate rule (ADR-176): write once DHW_METER_SAVE_DELTA_L litres are unsaved,

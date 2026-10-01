@@ -5632,7 +5632,7 @@
       "path": "ADR-176-publish-a-firmware-integrated-cumulative-dhw-water-total-for-the-home-assistant-energy-dashboard.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-08-25",
+      "date": "2026-10-01",
       "decision_summary": "Chosen option: Option A, because the maintainer decided the Energy dashboard should work out of the box rather than r...",
       "topics": [
         "home-assistant",
@@ -5937,6 +5937,64 @@
         "verified_in": [
           "evaluate.py:HOT_PATH_PREFIXES"
         ],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-181",
+      "title": "Count only boiler Read-Ack frames into the DHW water total, not the PIC PS=1 summary",
+      "path": "ADR-181-count-only-boiler-read-ack-frames-into-the-dhw-water-total-not-the-pic-ps-1-summary.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-01",
+      "decision_summary": "Only boiler Read-Ack frames for MsgID 19, through printf88(), feed the DHW water total.",
+      "topics": [
+        "dhw",
+        "energy-dashboard",
+        "mqtt",
+        "pic-summary",
+        "water-meter"
+      ],
+      "aliases": [
+        "dhw_water_total",
+        "PS=1 water total",
+        "stale MsgID 19",
+        "water meter over-count"
+      ],
+      "components": [
+        "DHW water total feed (the MsgID 19 write sites that call updateDHWWaterMeter)"
+      ],
+      "symbols": [
+        "print_f88",
+        "updateDHWWaterMeter",
+        "updatePSSummaryFloatState"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Call updateDHWWaterMeter() only for a MsgID 19 boiler Read-Ack handled by printf88().",
+          "Keep writing the PS=1 summary's MsgID 19 field into OTcurrentSystemState.DHWFlowRate.",
+          "State in the user documentation that a PIC gateway in PS=1 mode adds no water to the total."
+        ],
+        "must_not": [
+          "Feed the water total from the PIC PS=1 summary, or from any other source that repeats a stored value without its age."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python test/host/testdhwwatermeter.py: case W2 (PS=1 summaries add 0 L while the flow-rate state follows them), case R1 (a stale repeated summary adds 0 L) and case W6 (summary fields, valid or malformed, leave a restored total unchanged..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
         "supersedes": [],
         "superseded_by": null
       }
@@ -10828,6 +10886,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-176",
+      "target": "ADR-181",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-177",
       "target": "ADR-095",
       "type": "related",
@@ -10878,6 +10942,12 @@
     {
       "source": "ADR-180",
       "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-181",
+      "target": "ADR-176",
       "type": "related",
       "resolved": true
     }

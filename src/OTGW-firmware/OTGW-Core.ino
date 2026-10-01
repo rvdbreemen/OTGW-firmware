@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.395
+**  Version  : v2.0.0-alpha.396
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4267,11 +4267,11 @@ static void updatePSSummaryFloatState(uint8_t msgid, float fval)
     case 17: OTcurrentSystemState.RelModLevel           = fval; break;
     case 18: OTcurrentSystemState.CHPressure            = fval; break;
     case 19:
+      // ADR-181: the summary updates the flow-rate state but never the water total. A PIC
+      // builds its summary from stored values, so after the boiler stops answering MsgID 19
+      // every later summary repeats the last flow with no age, and counting it would keep
+      // adding water. Only boiler Read-Ack frames through print_f88() feed the total.
       OTcurrentSystemState.DHWFlowRate = fval;
-      // ADR-176: a PIC hides the frames in PS=1 mode, so its summary is the only MsgID 19
-      // source there. In OT-Direct mode the summary is emitSummaryLine() re-presenting
-      // this state after every MsgID 0 reply; print_f88() already counted the B frames.
-      if (!isOTDirectEnabled()) updateDHWWaterMeter(fval, millis());
       break;
     case 23: OTcurrentSystemState.TrSetCH2              = fval; break;
     case 24: OTcurrentSystemState.Tr                    = fval; stampThermostatRoomTemp(); break;

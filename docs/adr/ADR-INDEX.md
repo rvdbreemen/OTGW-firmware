@@ -186,3 +186,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-178 | Proposed | `src/OTGW-firmware/**/*.h` | settings.sat.sSensorArea becomes char[4][18] and holds a sensor reference that is either a 16-character Dallas addres... |
 | ADR-179 | Proposed | - | While SAT is enabled, SAT owns MsgID 1. |
 | ADR-180 | Accepted | `evaluate.py` | New code in hot-path source files does not declare String objects. |
+| ADR-181 | Accepted | - | Only boiler Read-Ack frames for MsgID 19, through printf88(), feed the DHW water total. |
