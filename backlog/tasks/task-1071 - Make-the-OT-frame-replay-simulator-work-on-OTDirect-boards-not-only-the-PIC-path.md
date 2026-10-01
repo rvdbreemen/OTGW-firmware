@@ -7,7 +7,7 @@ status: In Review
 assignee:
   - '@claude'
 created_date: '2026-08-08 18:17'
-updated_date: '2026-09-30 09:50'
+updated_date: '2026-10-01 04:28'
 labels:
   - bug
   - tooling
@@ -27,7 +27,7 @@ The /api/v2/simulate file replay is bound to the PIC serial path and is silently
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 With simulation enabled on an OTDirect board and no PIC attached, replayed fixture lines reach processOT and appear as decoded OT frames in the debug log
-- [ ] #2 The replay drives the same decode, state and MQTT publish path as real frames, so the coverage gate produces the same shape of output as on 1.x
+- [ ] #2 The replay drives the same decode, state and MQTT publish path as real frames, and the coverage gate output matches the 2.0.0 PIC-path baseline, every difference explained
 - [x] #3 Replay still works unchanged on a board that does have a PIC; the PIC path is not regressed
 - [x] #4 /api/v2/simulate reports a state that reflects reality: enabling it on a board where replay cannot run must not report active, or must report why
 - [x] #5 The TASK-1070 coverage gate runs end to end against an OTDirect board: upload, start, capture, stop, compare
@@ -88,4 +88,10 @@ AC4 re-met in alpha.376: otgwSimulationUnavailableReason() now only reports an u
 - Proposed AC#2 wording (maintainer decision, not applied): 'matches the 2.0.0 PIC-path baseline, every difference explained'. 'Same shape as 1.x' cannot hold on any transport for the range-affected keys; the 15 CHANGED MsgID 56/57 keys of the 2026-09-23 run were the TASK-1174 regression (fixed in alpha.378).
 - AC#3 was ticked on a code-level argument; the triage recommends one gate run on the Classic-S3 with its PIC before closing, or an explicit maintainer waiver.
 OPEN: AC#2 needs the bench replay run (OTGW32 or Classic) after the reword.
+
+Maintainer decision (Robert, 2026-09-30): reword AC#2 to 'matches the 2.0.0 PIC-path baseline, every difference explained'. The bench replay run is still needed before the task can close.
+
+AC list rewritten with --acceptance-criteria to reword AC#2 per the maintainer decision; numbering unchanged. AC#1 and AC#3-#6 re-checked exactly as they were before the rewrite (their evidence is in the notes above). AC#2 stays open until the bench replay run.
+
+For the AC#2 bench comparison: since TASK-1185 (2.0.0-alpha.395) replayed lines are no boiler evidence. During a replay the retained otgw-firmware/boiler/unsupported_msgids topic and the /api/v2/otgw/ot-support verdicts no longer pick up the fixture's type-7 answers, and the replay no longer switches SAT simulation off. Decoded values, state, boiler_connected and every other MQTT topic are unchanged. A PIC-path baseline captured before alpha.395 differs from a new run in that topic only; TASK-1185 explains the difference.
 <!-- SECTION:NOTES:END -->

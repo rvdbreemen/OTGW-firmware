@@ -3,8 +3,8 @@ id: "ADR-088"
 title: "MQTT Status Burst Windowing and Post-Burst Cooldown"
 status: "Accepted"
 date: "2026-04-26"
-binding: false
-gate: null
+binding: true
+gate: "check_status_publishers_wrap_burst, check_status_burst_cooldown_bound, check_drip_consults_deferred"
 documents_shipped: false
 verified_in: []
 supersedes: []

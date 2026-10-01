@@ -55,8 +55,16 @@ def _fm_list(fm, key):
     return sorted({int(x) for x in re.findall(r"ADR-(\d+)", m.group(1))})
 
 
+def _relpath(path):
+    try:
+        return os.path.relpath(path, REPO)
+    except ValueError:  # Windows: the path is on another drive than the repo
+        return path
+
+
 def parse_adr(path):
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
     num = int(re.search(r"ADR-(\d+)", os.path.basename(path)).group(1))
     fm_match = re.match(r"^---\n(.*?)\n---\n", text, re.S)
     fm = fm_match.group(1) if fm_match else ""
@@ -80,13 +88,15 @@ def parse_adr(path):
     if not superseded_by:
         superseded_by = sorted({int(x) for x in re.findall(r"[Ss]upersed\w*\s+by\s+\[?ADR-(\d+)", scope)})
 
-    # ADR-080: a "Binding" ADR that names a check_* gate must have that gate.
+    # ADR-080: a binding ADR that names a check_* gate must have that gate. The
+    # frontmatter 'binding: true' is the authoritative source (TASK-1183,
+    # maintainer decision); an ADR without frontmatter is not binding.
     named_gates = sorted(set(re.findall(r"\b(check_[a-z0-9_]+)\b", text)))
-    is_binding = bool(re.search(r"\bBinding\b", text)) and not re.search(r"guideline-level", text, re.I)
+    is_binding = bool(re.search(r"^binding:\s*true\s*$", fm, re.M))
 
     return {
         "num": num,
-        "path": os.path.relpath(path, REPO),
+        "path": _relpath(path),
         "title": (re.search(r"^title:\s*(.+)$", fm, re.M) or [None, os.path.basename(path)])[1]
         if fm else os.path.basename(path),
         "status_raw": effective_status,
@@ -111,17 +121,20 @@ def load_all():
 def evaluate_gate_names():
     if not os.path.exists(EVALUATE):
         return set()
-    txt = open(EVALUATE, encoding="utf-8").read()
+    with open(EVALUATE, encoding="utf-8") as f:
+        txt = f.read()
     names = set(re.findall(r"^\s*def\s+(check_[a-z0-9_]+)", txt, re.M))
     # also tests/
     for tp in glob.glob(os.path.join(REPO, "tests", "*.py")):
-        names |= set(re.findall(r"\b(check_[a-z0-9_]+)\b", open(tp, encoding="utf-8").read()))
+        with open(tp, encoding="utf-8") as f:
+            names |= set(re.findall(r"\b(check_[a-z0-9_]+)\b", f.read()))
     return names
 
 
 def readme_entries(readme_path=None):
     """Return dict: adr_num -> count of link occurrences in the index."""
-    txt = open(readme_path or README, encoding="utf-8").read()
+    with open(readme_path or README, encoding="utf-8") as f:
+        txt = f.read()
     counts = {}
     for n in re.findall(r"\]\(ADR-(\d+)[^)]*\.md\)", txt):
         counts[int(n)] = counts.get(int(n), 0) + 1

@@ -2738,8 +2738,8 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
+        "binding": true,
+        "gate": "check_status_publishers_wrap_burst, check_status_burst_cooldown_bound, check_drip_consults_deferred",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -2831,8 +2831,8 @@
         "path_globs": []
       },
       "metadata": {
-        "binding": false,
-        "gate": null,
+        "binding": true,
+        "gate": "check_design_system_drift",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
