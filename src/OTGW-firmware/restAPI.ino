@@ -895,7 +895,7 @@ static const char kRouteMqtt[]       PROGMEM = "mqtt";
 //
 // The budget is per endpoint and global, not per client: capping aggregate
 // load is the whole point, and a per-client budget would let N clients each
-// poll at the full rate. Cost is one uint32_t per limited endpoint.
+// poll at the full rate. Cost is a few bytes per limited endpoint.
 //=======================================================================
 // Each window sits at ~75% of the interval the web UI actually polls at
 // (2s for otmonitor, 5s for device status, see data/index.js). setInterval is
@@ -906,12 +906,25 @@ static const char kSubOtmonitor[] PROGMEM = "otmonitor";
 static const char kSubTelegraf[]  PROGMEM = "telegraf";
 static const char kSubTime[]      PROGMEM = "time";
 
+// Each budget is a GCRA (generic cell rate algorithm: a leaky bucket kept as a
+// virtual clock). The sustained rate is exactly one request per windowMs, with
+// burstTokens - 1 requests of slack on top (ADR-098).
+//
+// Burst 2, not 1: with burst 1 a Telegraf scrape beside one open dashboard is
+// refused whenever it lands inside the 1500 ms window the dashboard's last poll
+// opened, which is 75% of the 2000 ms poll period. Telegraf's HTTP input keeps
+// a fixed phase and does not re-phase, so it settles in the refused phase: a
+// 10 s scrape modelled beside one dashboard against the burst-1 limiter got
+// 0.6% of its scrapes answered. With burst 2 both are served, and a client
+// polling flat out still gets one request per window after the burst.
 struct ApiRateLimit {
   PGM_P    resource;      // words[3]
   PGM_P    subresource;   // words[4]
   PGM_P    aliasSub;      // words[4] alias sharing this budget, or nullptr
   uint32_t windowMs;
-  uint32_t lastServedMs;
+  uint8_t  burstTokens;
+  uint32_t tat;           // GCRA theoretical arrival time of the next request
+  bool     primed;        // false until the first request: tat means nothing before
 };
 
 // TASK-1057 defect A: /otgw/telegraf and /otgw/otmonitor are the same handler
@@ -919,25 +932,29 @@ struct ApiRateLimit {
 // switched paths polled without any cap and defeated ADR-086 outright.
 //
 // The alias shares ONE budget rather than getting a row of its own. A second row
-// would carry its own lastServedMs, so a client alternating between the two paths
+// would carry its own budget, so a client alternating between the two paths
 // would still poll at twice the intended rate — capped on paper, uncapped in
 // practice, which is the failure this fixes.
 static ApiRateLimit kRateLimitedRoutes[] = {
-  { kRouteOtgw,   kSubOtmonitor, kSubTelegraf, 1500UL, 0 },
-  { kRouteDevice, kSubTime,      nullptr,      4000UL, 0 },
+  { kRouteOtgw,   kSubOtmonitor, kSubTelegraf, 1500UL, 2, 0, false },
+  { kRouteDevice, kSubTime,      nullptr,      4000UL, 2, 0, false },
 };
 
 // RFC 9457 problem+json. 429 (RFC 6585) is the right code here rather than
 // 503: the caller exceeded a quota, the service itself is fine. The heap
 // gate's existing 503s keep their meaning.
-static void sendApiRateLimited(uint32_t retryAfterSec, uint32_t windowSec) {
+//
+// retry_after repeats the Retry-After header in the body (an RFC 9457 extension
+// member). Retry-After is not a CORS-safelisted response header, so a browser
+// client on another origin, which sendCorsOriginHeader() admits, cannot read it.
+static void sendApiRateLimited(uint32_t retryAfterSec, uint32_t windowSec, uint8_t burst) {
   restResponseStatus = 429;
   char jsonBuff[320];
   snprintf_P(jsonBuff, sizeof(jsonBuff),
     PSTR("{\"type\":\"https://github.com/rvdbreemen/OTGW-firmware/problems/rate-limit-exceeded\","
-         "\"title\":\"Rate limit exceeded\",\"status\":429,"
-         "\"detail\":\"This endpoint serves at most 1 request per %lu second(s). Retry after %lu second(s).\"}"),
-    (unsigned long)windowSec, (unsigned long)retryAfterSec);
+         "\"title\":\"Rate limit exceeded\",\"status\":429,\"retry_after\":%lu,"
+         "\"detail\":\"This endpoint serves at most 1 request per %lu second(s) (burst %u). Retry after %lu second(s).\"}"),
+    (unsigned long)retryAfterSec, (unsigned long)windowSec, (unsigned)burst, (unsigned long)retryAfterSec);
 
   char hdrBuff[48];
   snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("%lu"), (unsigned long)retryAfterSec);
@@ -947,10 +964,32 @@ static void sendApiRateLimited(uint32_t retryAfterSec, uint32_t windowSec) {
   // July 2026. Sent as extra signal; Retry-After is the part clients honour.
   snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("\"default\";r=0;t=%lu"), (unsigned long)retryAfterSec);
   httpServer.sendHeader(F("RateLimit"), hdrBuff);
-  snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("\"default\";q=1;w=%lu"), (unsigned long)windowSec);
+  snprintf_P(hdrBuff, sizeof(hdrBuff), PSTR("\"default\";q=%u;w=%lu"), (unsigned)burst, (unsigned long)windowSec);
   httpServer.sendHeader(F("RateLimit-Policy"), hdrBuff);
   sendCorsOriginHeader();
   httpServer.send(429, F("application/problem+json"), jsonBuff);
+}
+
+// GCRA admission for row `idx`: returns 0 when admitted, else the milliseconds
+// until the next request would be. Unsigned arithmetic runs straight through the
+// 49-day millis() rollover: an admitted request leaves tat at most
+// burstTokens * windowMs ahead of now and a refusal does not move it, so a larger
+// lead means tat lies in the past and the budget is full again. `primed` replaces
+// the old `lastServedMs != 0` sentinel, which granted a free request whenever a
+// stamp landed on millis() == 0. It takes the row index, not a reference: the
+// .ino prototype generator hoists a declaration of every function above the
+// ApiRateLimit definition, and a builtin parameter type keeps that valid.
+static uint32_t rateLimitTryAdmit(uint8_t idx, uint32_t now) {
+  ApiRateLimit& rl = kRateLimitedRoutes[idx];
+  if (!rl.primed || (uint32_t)(rl.tat - now) > (uint32_t)rl.burstTokens * rl.windowMs) {
+    rl.primed = true;
+    rl.tat = now;
+  }
+  const uint32_t ahead     = rl.tat - now;   // 0 .. burstTokens * windowMs
+  const uint32_t tolerance = (uint32_t)(rl.burstTokens - 1) * rl.windowMs;
+  if (ahead > tolerance) return ahead - tolerance;
+  rl.tat += rl.windowMs;
+  return 0;
 }
 
 // Returns false and answers with 429 when the caller is over budget.
@@ -960,21 +999,16 @@ static bool checkApiRateLimit(const char* words[], uint8_t wc, HTTPMethod method
 
   const uint32_t now = millis();
   for (uint8_t i = 0; i < (sizeof(kRateLimitedRoutes) / sizeof(kRateLimitedRoutes[0])); i++) {
-    ApiRateLimit& rl = kRateLimitedRoutes[i];
+    const ApiRateLimit& rl = kRateLimitedRoutes[i];
     if (strcmp_P(words[3], rl.resource) != 0)    continue;
     if (strcmp_P(words[4], rl.subresource) != 0 &&
         (rl.aliasSub == nullptr || strcmp_P(words[4], rl.aliasSub) != 0)) continue;
 
-    // Unsigned subtraction handles the 49-day millis() rollover correctly.
-    const uint32_t elapsed = now - rl.lastServedMs;
-    if (rl.lastServedMs != 0 && elapsed < rl.windowMs) {
-      // Round up so Retry-After never says 0, which would invite an immediate retry.
-      const uint32_t remainMs = rl.windowMs - elapsed;
-      sendApiRateLimited((remainMs + 999UL) / 1000UL, (rl.windowMs + 999UL) / 1000UL);
-      return false;
-    }
-    rl.lastServedMs = now;
-    return true;
+    const uint32_t waitMs = rateLimitTryAdmit(i, now);
+    if (waitMs == 0) return true;
+    // Round up so Retry-After never says 0, which would invite an immediate retry.
+    sendApiRateLimited((waitMs + 999UL) / 1000UL, (rl.windowMs + 999UL) / 1000UL, rl.burstTokens);
+    return false;
   }
   return true;
 }

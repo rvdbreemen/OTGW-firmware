@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-098"
 ---
 # ADR-086: Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses
 
@@ -31,6 +33,11 @@ status_history:
     changed_by: User
     reason: Maintainer accepted after review, including the flagged global-versus-per-client scope choice; implementation verified on bench device 192.168.88.68 build 1.7.2-beta.1+ccb5014
     changed_via: adr-kit
+  - date: 2026-10-01
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: "ADR-098 amends ADR-086: the shared per-endpoint budget gains a burst of 2 and the 429 body gains retry_after"
+    changed_via: adr-kit lifecycle
 
 ## Context
 

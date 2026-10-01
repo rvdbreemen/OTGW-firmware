@@ -2681,7 +2681,7 @@
       "path": "ADR-086-rate-limit-ui-polled-rest-endpoints.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-07-20",
+      "date": "2026-10-01",
       "decision_summary": "Enforce a per-endpoint request budget in the firmware for /api/v2/otgw/otmonitor and /api/v2/device/time, and answer...",
       "topics": [],
       "aliases": [],
@@ -3370,6 +3370,81 @@
       "metadata": {
         "binding": false,
         "gate": "OTGW_NET_WRITE_FLOOR",
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-098",
+      "title": "Give the poll rate limiter a burst of 2 and repeat retry_after in the 429 body",
+      "path": "ADR-098-give-the-poll-rate-limiter-a-burst-of-2-and-repeat-retry-after-in-the-429-body.md",
+      "format": "madr",
+      "status": "Accepted",
+      "date": "2026-10-01",
+      "decision_summary": "Chosen option: Option A, because it serves the Telegraf scrape and the dashboard together (0.6% to 100% of the scrape...",
+      "topics": [
+        "http-429",
+        "polling",
+        "rate-limit",
+        "rest-api",
+        "telegraf"
+      ],
+      "aliases": [
+        "429 re-phase",
+        "burst 2",
+        "GCRA",
+        "phase lock",
+        "retry_after",
+        "telegraf rate limit"
+      ],
+      "components": [
+        "429 problem+json rate-limit response (sendApiRateLimited)",
+        "REST poll rate limiter (kRateLimitedRoutes, rateLimitTryAdmit, checkApiRateLimit)"
+      ],
+      "symbols": [
+        "aliasSub",
+        "ApiRateLimit",
+        "burstTokens",
+        "checkApiRateLimit",
+        "kRateLimitedRoutes",
+        "rateLimitTryAdmit",
+        "rephaseDelayMs",
+        "sendApiRateLimited"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Count every alias path of a limited endpoint against that endpoint's one budget (aliasSub in kRateLimitedRoutes[]).",
+          "Keep each budget global per endpoint, not per client (ADR-086).",
+          "Keep the sustained rate at one request per window, with a burst of 2.",
+          "Answer an over-budget GET with 429, a Retry-After of at least 1 second, and a problem+json body whose retryafter equals Retry-After.",
+          "Compute the GCRA clock with unsigned arithmetic, so the millis() wrap and idle gaps longer than 2^31 ms leave a full budget.",
+          "Re-arm a web UI poller after a 429 at a random offset within one poll period."
+        ],
+        "must_not": [
+          "Add an alias as a row of its own.",
+          "Raise the burst above 2 without a new decision: the cap protects the device.",
+          "Limit a mutation (non-GET) request."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "The Enforcement block below requires aliasSub, burstTokens and retryafter in src/OTGW-firmware/restAPI.ino and rephaseDelayMs in src/OTGW-firmware/data/index.js.",
+          "The host harness and simulation recorded in 1.x TASK-1188."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "src/OTGW-firmware/restAPI.ino",
+          "src/OTGW-firmware/data/index.js"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -5212,7 +5287,7 @@
       "source": "ADR-071",
       "target": "ADR-098",
       "type": "related",
-      "resolved": false
+      "resolved": true
     },
     {
       "source": "ADR-072",
@@ -5416,7 +5491,7 @@
       "source": "ADR-077",
       "target": "ADR-098",
       "type": "related",
-      "resolved": false
+      "resolved": true
     },
     {
       "source": "ADR-077",
@@ -5607,6 +5682,12 @@
     {
       "source": "ADR-086",
       "target": "ADR-050",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-086",
+      "target": "ADR-098",
       "type": "related",
       "resolved": true
     },
@@ -5891,6 +5972,24 @@
       "target": "ADR-095",
       "type": "related",
       "resolved": true
+    },
+    {
+      "source": "ADR-098",
+      "target": "ADR-086",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-098",
+      "target": "ADR-172",
+      "type": "related",
+      "resolved": false
+    },
+    {
+      "source": "ADR-098",
+      "target": "ADR-173",
+      "type": "related",
+      "resolved": false
     }
   ]
 }

@@ -102,3 +102,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-095 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option A, because the defect was never a disagreement about the right behaviour. |
 | ADR-096 | Accepted | `src/**/*.{ino,cpp,h,js}` | Chosen option: Option A, because it is what the firmware already does, the maintainer confirms it was intended, and t... |
 | ADR-097 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option D, because it is the only option that lets two command-sending tools share the port while keepi... |
+| ADR-098 | Accepted | `src/OTGW-firmware/restAPI.ino`, `src/OTGW-firmware/data/index.js` | Chosen option: Option A, because it serves the Telegraf scrape and the dashboard together (0.6% to 100% of the scrape... |

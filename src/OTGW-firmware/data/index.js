@@ -288,30 +288,33 @@ function stopOTmonitorPolling() {
 
 // TASK-1090: break a phase lock after a 429.
 //
-// The server keeps ONE lastServedMs per route, shared by every client, with a
-// window of 1500 ms for otgw/otmonitor and 4000 ms for device/time
-// (restAPI.ino kRateLimitedRoutes, ADR-086). setInterval keeps a fixed phase,
-// so two dashboards opened at the same moment poll at the same instants
-// forever: one wins every window and the other is refused every window.
-// Skipping the cycle quietly, which is what the catch handlers used to do on
-// their own, leaves that arrangement exactly as it was.
+// The server keeps ONE budget per route, shared by every client: a sustained
+// rate of one request per window (1500 ms for otgw/otmonitor, 4000 ms for
+// device/time) with a burst of 2 (restAPI.ino kRateLimitedRoutes, ADR-086,
+// ADR-098). setInterval keeps a fixed phase, so dashboards opened at the same
+// moment poll at the same instants forever, and whoever comes after the burst
+// at those instants is refused every time. Skipping the cycle quietly, which is
+// what the catch handlers used to do on their own, leaves that arrangement
+// exactly as it was.
 //
 // Note both routes have period < 2 x window (2000 < 3000, 5000 < 8000). Two
-// clients polling at the UI's own rate therefore exceed the budget at EVERY
-// phase, so this cannot make both of them succeed every cycle. What it removes
-// is the permanent loser: re-arming after a delay drawn uniformly from one
-// period gives the refused client a random phase, so the refusal rotates
+// clients polling at the UI's own rate therefore exceed the sustained budget at
+// EVERY phase, so this cannot make both of them succeed every cycle. What it
+// removes is the permanent loser: re-arming after a delay drawn uniformly from
+// one period gives the refused client a random phase, so the refusal rotates
 // between clients instead of pinning on one forever.
 //
-// Simulated against the real windows above, two clients starting in phase,
-// 300 seeds, 120 s each: without this, 300 of 300 runs left one client with
-// ZERO grants, on both routes and at three clients as well. With it, none.
-// Total throughput barely moves (60 to 64 grants on otmonitor, 24 to 25 on
-// device/time) and the split stays uneven, around 39/24. This redistributes
-// service, it does not create capacity.
+// Simulated against the real limiter (otgw/otmonitor, clients starting in
+// phase, 300 runs of 120 s): with three dashboards and no re-phase, the third
+// got ZERO grants in 300 of 300 runs; with it, none, and each was served about
+// 55% of its polls. With two, the burst alone keeps both served, one every
+// poll and the other one poll in three; the re-phase evens that out to about
+// 75% each, at the cost of a longer wait after a refusal (mean longest gap 8 s
+// instead of the second client's steady 6 s). This redistributes service, it
+// does not create capacity.
 //
 // Re-phasing on ANY 429 is deliberate, including one from an ad-hoc
-// refreshDevTime() rather than from the timer: lastServedMs is global to the
+// refreshDevTime() rather than from the timer: the budget is global to the
 // route, so a refusal anywhere means the periodic tick would have been refused
 // too.
 function rephaseDelayMs(periodMs) {

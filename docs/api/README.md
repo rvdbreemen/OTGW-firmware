@@ -895,7 +895,7 @@ See [OTGW firmware documentation](https://otgw.tclcode.com/firmware.html) for co
 ### Recommended Polling Intervals
 
 - **Health checks**: 30-60 seconds minimum -- **each call writes a probe file to LittleFS flash** (see note below)
-- **OpenTherm data**: 5-10 seconds
+- **OpenTherm data**: 10 seconds or more (the poll shares a budget with open web interface tabs, see Server-Side Limits)
 - **Flash status (during upgrade)**: 1-2 seconds
 - **Settings**: On-demand only
 - **PIC update check**: On-demand only (makes outbound HTTP request)
@@ -905,6 +905,23 @@ See [OTGW firmware documentation](https://otgw.tclcode.com/firmware.html) for co
 > This is intentional -- it confirms the flash is not just mounted but actively writeable -- but it means
 > each health request incurs a LittleFS write cycle. The designed use-case is post-OTA polling, which stops
 > immediately once `status: UP` is received. Avoid using this endpoint as a high-frequency external monitor.
+
+### Server-Side Limits
+
+The two endpoints the web interface polls are rate-limited by the gateway itself. Each has one budget, shared by every client (ADR-086, ADR-098):
+
+| Endpoint | Sustained rate | Burst |
+|----------|----------------|-------|
+| `GET /api/v2/otgw/otmonitor` and its alias `GET /api/v2/otgw/telegraf` (one budget for both) | 1 request per 1.5 s | 2 |
+| `GET /api/v2/device/time` | 1 request per 4 s | 2 |
+
+A request over the budget gets `429 Too Many Requests` with `Retry-After` (whole seconds, never 0), `Cache-Control: no-store`, the draft `RateLimit` and `RateLimit-Policy` headers, and an RFC 9457 `application/problem+json` body:
+
+```json
+{"type":"https://github.com/rvdbreemen/OTGW-firmware/problems/rate-limit-exceeded","title":"Rate limit exceeded","status":429,"retry_after":1,"detail":"This endpoint serves at most 1 request per 2 second(s) (burst 2). Retry after 1 second(s)."}
+```
+
+`retry_after` repeats `Retry-After` for browser clients on another origin, which cannot read that header. Only `GET` is limited. An open web interface tab polls the OpenTherm endpoint every 2 seconds, so an external poller shares the budget with it: a Telegraf scrape every 10 seconds is served next to one open tab, a scrape every 5 seconds about three times in four. With two or more tabs open the budget is used up and refusals are expected.
 
 ### Memory Protection
 
