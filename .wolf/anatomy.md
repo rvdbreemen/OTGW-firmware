@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-09-30T20:53:05.612Z
-> Files: 599 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T16:25:07.513Z
+> Files: 603 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -775,8 +775,15 @@
 - `parser.py` — Base option parser setup (~3951 tok)
 - `progress_bars.py` — SQLAlchemy model (~1345 tok)
 
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/d09d9128-d9f5-4c9c-aee0-df934b723d02/scratchpad/
+
+- `commit1057.txt` (~207 tok)
+
 ## docs/adr/
 
+- `ADR-088-mqtt-status-burst-windowing-and-cooldown.md` — ADR-088: MQTT Status Burst Windowing and Post-Burst Cooldown (~2885 tok)
+- `ADR-091-design-system-class-drift-gated-by-evaluate-py.md` — ADR-091 Design-System Class Drift Gated by evaluate.py (~1062 tok)
+- `ADR-172-rate-limit-ui-polled-rest-endpoints.md` — ADR-172 Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses (~2728 tok)
 - `ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md` — ADR-178 Widen the SAT area-sensor reference to accept a BLE MAC alongside a Dallas address (~2142 tok)
 - `ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md` — ADR-179 Name the owner of the OpenTherm control setpoint while SAT is enabled (~2634 tok)
 
@@ -791,7 +798,7 @@
 
 ## scripts/
 
-- `adr_governance.py` — adr_governance.py - repo-local ADR governance checks for OTGW-firmware. (~2793 tok)
+- `adr_governance.py` — adr_governance.py - repo-local ADR governance checks for OTGW-firmware. (~2898 tok)
 - `heap_soak_driver.py` — SoakRun: uptime_minutes, telnet_send, fetch_status, describe_http_error + 5 more (~7137 tok)
 
 ## scripts/tests/
@@ -854,6 +861,7 @@
 ## tests/
 
 - `README.md` — Project documentation (~899 tok)
+- `test_adr_governance.py` — Unit tests for scripts/adr_governance.py (stdlib unittest, no pytest). (~1933 tok)
 - `test_evaluate.py` — TestIsHotPathFile: test_sat_files_are_hot, test_mqttstuff_is_hot, test_restapi_is_hot, test_otgw_cor (~10804 tok)
 - `test_oled_row_clear.cpp` — TASK-1151 — OLED status rows must not keep the tail of longer previous text. (~1826 tok)
 - `test_webui_asset_versioning.py` — Web UI asset caching contract (ADR-139, amended by TASK-958). (~658 tok)

@@ -3074,5 +3074,39 @@
     ],
     "occurrences": 1,
     "last_seen": "2026-09-30T22:30:00Z"
+  },
+  {
+    "id": "bug-878",
+    "timestamp": "2026-10-01T07:45:00",
+    "error_message": "Prerelease bumped to beta.3 on the otgw-1.x.x line for an ordinary commit",
+    "file": "src/OTGW-firmware/version.h (otgw-1.x.x worktree wt-1057-adr)",
+    "root_cause": "Applied the dev line's per-commit bump rule to 1.x; the 1.x CLAUDE.md makes the bump release prep only (TASK-669) and the open beta tag collects changes",
+    "fix": "Stopped the running build, restored the 23 bump-only files plus version.h/version.hash from HEAD, reverted the banner line in the two files that also carried the change, rebuilt",
+    "tags": [
+      "versioning",
+      "otgw-1.x.x",
+      "bump",
+      "cross-line"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-01T07:45:00"
+  },
+  {
+    "id": "bug-879",
+    "timestamp": "2026-10-01T07:00:00",
+    "error_message": "Telegraf scrape refused 99.4% of the time beside one open dashboard on 1.x (burst-1 poll rate limiter)",
+    "file": "src/OTGW-firmware/restAPI.ino (otgw-1.x.x)",
+    "root_cause": "Single-window burst-1 budget shared by otmonitor/telegraf; Telegraf keeps a fixed phase and the dashboard re-phases only when refused, so the pair settles where Telegraf is always refused",
+    "fix": "GCRA budget with burst 2 and retry_after in the 429 body (1.x TASK-1188, ADR-098, dev TASK-1057)",
+    "tags": [
+      "rate-limit",
+      "telegraf",
+      "429",
+      "otgw-1.x.x"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-01T07:00:00"
   }
 ]

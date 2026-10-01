@@ -208,8 +208,12 @@ the server limit bounds it.
 - **ADR-035** — v2 error shape; this adds a second representation, scoped.
 - **ADR-050** — centralized dispatch; the check hooks into that single point.
 - **ADR-173** — the client half (poll reduction and 429 re-phasing).
-- **1.x ADR-086** — the sibling decision, whose two defects this corrects. A
-  matching 1.x task is required to fix them on that line.
+- **1.x ADR-086** — the sibling decision, whose two defects this corrects. The
+  `otgw-1.x.x` line fixed them in its own tasks: TASK-1090 there shares one budget
+  between otmonitor and telegraf and re-phases the web UI after a 429, and
+  TASK-1188 there adds the burst of 2 and `retry_after`. That line records it in
+  its ADR "Give the poll rate limiter a burst of 2 and repeat retry_after in the
+  429 body" (number 098 in its own numbering, not this tree's).
 
 ## Enforcement
 
