@@ -3,9 +3,11 @@ id: TASK-1196
 title: >-
   Bump ESPAsyncWebServer 3.11.0 to 3.11.2 for two multipart-parser security
   fixes
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-02 20:07'
+updated_date: '2026-10-02 20:15'
 labels:
   - security
   - dependency
@@ -36,3 +38,15 @@ The 3.11.1 and 3.11.2 release notes list only these parser fixes, a refactor of 
 - [ ] #3 esp32-combo build (firmware and filesystem) SUCCESS with fresh images, and evaluate.py green
 - [ ] #4 On the bench, multipart uploads still work: refresh_storm.py --upload-abort 30 gives complete readbacks and a final 303, and an FSexplorer upload reads back intact
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. platformio.ini: pin ESPAsyncWebServer @ 3.11.2 (done), AsyncTCP stays @ 3.4.10 (3.11.2 requires ^3.4.10). Comment names both advisories.
+2. Validate: build.bat --target esp32-combo with the new library, confirm SUCCESS + fresh firmware.bin/littlefs.bin.
+3. AC#2 proof: diff the resolved 3.11.2 WebResponses.cpp against the upstream v3.11.0 tag (gh api) -> identical; AsyncTCP pin unchanged.
+4. Bump prerelease (bin/bump-prerelease.sh) -> alpha.402; single commit with the pin change.
+5. Rebuild combo -> -flash.zip carries the new version. Hand the zip to the user to upload.
+6. evaluate.py --quick green (AC#3).
+7. Bench AC#4: refresh_storm.py --upload-abort 30 (complete readbacks + final 303) and one FSexplorer upload round-trip, on the bumped build.
+<!-- SECTION:PLAN:END -->

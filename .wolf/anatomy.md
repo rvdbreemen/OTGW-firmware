@@ -1,6 +1,6 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T19:49:49.078Z
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T20:13:59.777Z
 > Files: 616 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
@@ -28,7 +28,7 @@
 - `Makefile` — Make build targets (~2037 tok)
 - `partitions_otgw_esp32_combo.csv` — OTGW-firmware ESP32-S3 COMBO partition table — single app (no OTA), 4MB flash (~364 tok)
 - `partitions_otgw_esp32.csv` — OTGW-firmware ESP32-S3 partition table — single app (no OTA), 4MB flash (~275 tok)
-- `platformio.ini` — Declares used (~4646 tok)
+- `platformio.ini` — Declares used (~4871 tok)
 - `README.md` — Project documentation (~5365 tok)
 
 ## .build-python/
