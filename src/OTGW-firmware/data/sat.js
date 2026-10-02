@@ -808,6 +808,7 @@ var SAT = (function() {
       var curveContainer = el('sat-curve-chart');
       _curveChartInstance.dispose();
       _curveChartInstance = echarts.init(curveContainer, themeArg);
+      _initCurveClickHandler();
       // Force rebuild on next data update
       _lastCurveCoeff = -1;
     }
@@ -1406,21 +1407,32 @@ var SAT = (function() {
       });
   }
 
+  // A click on the empty grid adds a marker (TASK-586). ECharts emits
+  // instance-level 'click' events only for graphic elements such as series
+  // points, so the background click is read from the zrender layer, where
+  // e.target is set when a graphic element was hit (TASK-1192).
+  function _onCurveBackgroundClick(e) {
+    if (!_curveChartInstance || e.target) return;
+    var px = [e.offsetX, e.offsetY];
+    if (!_curveChartInstance.containPixel('grid', px)) return;
+    var coords = _curveChartInstance.convertFromPixel('grid', px);
+    if (!coords || coords.length < 2) return;
+    var outside_temp = Math.round(coords[0] * 10) / 10;
+    var flow_temp = Math.round(coords[1] * 10) / 10;
+    // Clamp to chart bounds
+    if (outside_temp < CURVE_X_MIN || outside_temp > CURVE_X_MAX) return;
+    if (flow_temp < CURVE_Y_MIN || flow_temp > CURVE_Y_MAX) return;
+    addMarkerAtClick(outside_temp, flow_temp);
+  }
+
+  // One handler per chart instance: echarts.init() on the same container
+  // returns the existing instance on every SAT page open, and setTheme()
+  // replaces the instance.
   function _initCurveClickHandler() {
     if (!_curveChartInstance) return;
-    _curveChartInstance.on('click', function(params) {
-      // Only add marker on background click (not on a series point)
-      if (params.componentType !== 'series') {
-        var coords = _curveChartInstance.convertFromPixel('grid', [params.offsetX, params.offsetY]);
-        if (!coords || coords.length < 2) return;
-        var outside_temp = Math.round(coords[0] * 10) / 10;
-        var flow_temp = Math.round(coords[1] * 10) / 10;
-        // Clamp to chart bounds
-        if (outside_temp < CURVE_X_MIN || outside_temp > CURVE_X_MAX) return;
-        if (flow_temp < CURVE_Y_MIN || flow_temp > CURVE_Y_MAX) return;
-        addMarkerAtClick(outside_temp, flow_temp);
-      }
-    });
+    var zr = _curveChartInstance.getZr();
+    zr.off('click', _onCurveBackgroundClick);
+    zr.on('click', _onCurveBackgroundClick);
   }
 
   return {
