@@ -4,11 +4,11 @@ title: >-
   REST in-flight slot leaks on file-streamed GETs (sensors/labels, sat/markers):
   webSendFile overwrites the onDisconnect release and /api/v2 wedges at 503
   until reboot
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:44'
-updated_date: '2026-10-02 05:52'
+updated_date: '2026-10-02 18:35'
 labels:
   - bug
   - rest
@@ -140,7 +140,7 @@ FIX: every call succeeds (200; the OPTIONS preflight gets its normal 204), hd_re
 - [x] #3 Same old-vs-fix reproduction for GET /api/v2/sat/markers, after one POST {"outside_temp":5,"flow_temp":55,"label":"bench"} to /api/v2/sat/markers, with a reboot before the OLD markers run. OLD shows the same hwm=2 / persistent-503 signature. FIX stays at 200.
 - [x] #4 FIX soak: run 20 sequential GET /api/v2/sensors/labels and 20 sequential GET /api/v2/sat/markers, then GET /api/v2/device/info. device/info returns 200 with hd_rest_inflight_hwm <= 1, hd_webfile_inflight_hwm <= 1, hd_rest_503 = 0 and hd_webfile_503 = 0.
 - [x] #5 FIX, refusal paths stay balanced. Run a mixed burst (2 concurrent GET /index.js together with 2 concurrent GET /api/v2/sensors/labels, repeated until hd_webfile_503 or hd_rest_503 is non-zero). Then press telnet 'z' and run the sequential probe: device/info, labels, device/info. All three return 200, with hd_rest_inflight_hwm = 1 and hd_webfile_inflight_hwm = 1, so no slot is left held.
-- [ ] #6 FIX, classic UI end-to-end, with a browser devtools capture (capture-mqtt-debug.bat CDP):
+- [x] #6 FIX, classic UI end-to-end, with a browser devtools capture (capture-mqtt-debug.bat CDP):
 - With /dallas_labels.ini present, 10 consecutive reloads keep showing live data, and no /api/v2 request returns 503 once each load has settled.
 - With a marker present, opening the classic SAT page 5 times and adding and deleting one marker keeps /api/v2 at 200.
 - [x] #7 The fix edits nothing under .pio/libdeps or src/libraries. A grep shows that application code calls ->onDisconnect( only through the single compat-layer helper in webServerCompat.h, apart from the existing OTA abort hook in OTGW-ModUpdateServer-esp32.h. The stale comments at restAPI.ino:2700-2702, restAPI.ino:2778 and webServerCompat.h:311 are corrected to describe the one-callback-per-request rule.
@@ -305,3 +305,37 @@ AC#6 stays open until (a) TASK-1193 and (b) TASK-1192 are fixed.
 
 Cleanup pending: /dallas_labels.ini and /sat_markers.json were created for the test. They are kept until AC#6 can be re-run, then removed.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+REST in-flight slot leak on file-streamed GETs.
+
+Cause: ESPAsyncWebServer keeps one disconnect callback per request. webSendFile()'s file-gate registration overwrote processAPI()'s REST release, so every GET of /api/v2/sensors/labels or /api/v2/sat/markers with an existing backing file leaked one REST slot. Two leaks wedged /api/v2 at 503 until reboot.
+
+Fix (alpha.379): one compat-layer helper, webArmSlotRelease(), arms a single callback that releases every gate slot the request holds.
+
+Evidence per AC. Bench runs on the OTGW32, 2026-10-02. Captures in %LOCALAPPDATA%/OTGW-capture/task1172-bench-20261002/.
+- AC#1 (review of the four paths) and AC#7 (no library edits, one onDisconnect helper): code review recorded at implementation.
+- AC#8: alpha.379 build and evaluate, recorded at implementation.
+
+AC#2 (labels) and AC#3 (markers), old vs fix, app-only flashes, strict sequential runs (t1172.py):
+- OLD = IMG-0 alpha.377+3621a38. GET route 200, then device/info 200 with hd_rest_inflight_hwm=2, then a second GET 200. After that every /api/v2 call answered 503, OPTIONS included, still after 60 s. 5 telnet 'REST BUSY: 2/2 in-flight' lines per route.
+- FIX = alpha.397: all 200, OPTIONS 204, hwm 1, 503 counters 0, no REST BUSY.
+
+AC#4: 20 labels GETs and 20 markers GETs, all 200. Then device/info 200 with hwm rest 1 / webfile 1 and 503 counters 0.
+
+AC#5:
+- The mixed burst (2x /index.js + 2x labels) refused both index.js requests on the file gate.
+- Extended with the paths that matter for the leak: (A) 2 labels requests refused by the file gate while holding a REST slot; (B) REST-gate refusals from 4 concurrent labels GETs.
+- After telnet 'z' each time, the sequential probe device/info, labels, device/info returned 200 with hwm rest 1 / webfile 1.
+
+AC#6, classic UI end to end. Playwright drives headless Edge over CDP in place of capture-mqtt-debug.bat. Final run on alpha.400 (t1172ac6-400-capture.json):
+- 11 loads with /dallas_labels.ini present: labels 200 each, 6 live otmonitor polls each, zero 503 or 429.
+- With a marker present: one marker added by clicking the heating curve (201) and deleted with its x button (200), then 5 thermostat page opens. Every /api/v2 response was 2xx and the markers GET was 200 on each open.
+- The balance probe after 'z' gave hwm rest 1 / webfile 1.
+- The first AC#6 run on alpha.397 exposed separate classic UI defects. TASK-1192 (curve click, vanishing markers) and TASK-1193 (request burst past the cap, ADR-184) were fixed and verified before this run.
+- TASK-1194 (blank charts after Home -> SAT) was found as well. It does not affect this AC, because the marker was added on a fresh open, and it is handled in its own task.
+
+The test files /dallas_labels.ini and /sat_markers.json were removed afterwards through /api/listfiles?delete=. The API answers {} and [] again.
+<!-- SECTION:FINAL_SUMMARY:END -->

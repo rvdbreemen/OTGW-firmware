@@ -3,9 +3,11 @@ id: TASK-1194
 title: >-
   Classic SAT dashboard charts render blank after navigating Home and back to
   SAT
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-02 08:55'
+updated_date: '2026-10-02 18:24'
 labels:
   - bug
   - webui
