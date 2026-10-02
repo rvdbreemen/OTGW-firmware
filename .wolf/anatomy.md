@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T05:56:08.181Z
-> Files: 620 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T08:54:49.764Z
+> Files: 615 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -838,7 +838,7 @@
 ## src/OTGW-firmware/data/
 
 - `index.js` — Safely parse JSON with validation and error handling (~111172 tok)
-- `sat.js` — API routes: GET (1 endpoints) (~17108 tok)
+- `sat.js` — API routes: GET (1 endpoints) (~17114 tok)
 - `v2.js` — fetchWithRetry: again, applyTheme, initTheme + 10 more (~84366 tok)
 
 ## test/host/

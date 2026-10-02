@@ -674,21 +674,21 @@ var SAT = (function() {
       // Re-overlay calibration markers after full curve rebuild (TASK-586)
       _renderMarkersOnChart();
     } else {
-      // Update both trailing scatter series: Curve Pos (second-to-last) and Current (last)
-      var seriesCount = _curveChartInstance.getOption().series.length;
-      var lastSeries = _curveChartInstance.getOption().series[seriesCount - 1];
-      if (lastSeries && lastSeries.type === 'scatter' && seriesCount >= 2) {
-        var update = [];
-        for (var si = 0; si < seriesCount - 2; si++) update.push({});
+      // Move only the two dots, addressed by series name: the Markers series
+      // (TASK-586) is appended after them, and an update by position wrote the
+      // current point into the markers on every status poll (TASK-1192).
+      var names = (_curveChartInstance.getOption().series || []).map(function(s) { return s.name; });
+      if (names.indexOf('Curve Pos') !== -1 && names.indexOf('Current') !== -1) {
         // Curve Pos: orange dot on active curve at current outside temp
         var curvePosUpdate = [];
         if (outside !== null && outside !== undefined && isFinite(outside)) {
           var fp = Math.round(calcHeatingCurve(outside, _lastCurveTarget, _lastCurveCoeff, _lastCurveSystem) * 10) / 10;
           curvePosUpdate = [[outside, fp]];
         }
-        update.push({ data: curvePosUpdate });
-        update.push({ data: buildCurrentPointData(outside, setpoint) });
-        _curveChartInstance.setOption({ series: update });
+        _curveChartInstance.setOption({ series: [
+          { name: 'Curve Pos', data: curvePosUpdate },
+          { name: 'Current', data: buildCurrentPointData(outside, setpoint) }
+        ] });
       }
     }
 
