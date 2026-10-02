@@ -737,6 +737,43 @@ class EvaluationResult:
         return f"{color}{icon} [{self.category}] {self.name}: {self.message}{Colors.ENDC}"
 
 
+def webserver_listener_retry(fsexplorer_text: str, firmware_text: str) -> Dict[str, bool]:
+    """TASK-1130: a refused port-80 bind is logged and retried, never silent.
+
+    On the provisioning boot the WiFiManager config portal leaves its port-80
+    connections in TIME_WAIT for 2*TCP_MSL (120 s). AsyncTCP binds without
+    SOF_REUSEADDR and AsyncWebServer::begin() is void, so a failed bind used to
+    leave the device without a web server until the next reboot, with nothing in
+    the log. Three structural facts keep that fixed:
+    - startWebserver() checks the listener state right after server.begin() and logs;
+    - handleWebserverListener() re-binds until LISTEN and leaves a listening server alone;
+    - doBackgroundTasks() fires it from its own timer.
+    test/host/test_webserver_listener_retry.py exercises the runtime behaviour.
+    """
+    def _body(text: str, name: str) -> str:
+        m = re.search(r"^void\s+" + re.escape(name) + r"\s*\(\s*\)\s*\{?\s*$", text, re.MULTILINE)
+        if not m:
+            return ""
+        end = re.search(r"^\}", text[m.end():], re.MULTILINE)
+        return text[m.start():m.end() + end.start()] if end else ""
+
+    start = _body(fsexplorer_text, "startWebserver")
+    retry = _body(fsexplorer_text, "handleWebserverListener")
+    loop = _body(firmware_text, "doBackgroundTasks")
+    after_begin = start.split("server.begin();", 1)[1] if "server.begin();" in start else ""
+    code = [l.strip() for l in after_begin.splitlines() if l.strip() and not l.strip().startswith("//")]
+    return {
+        "startwebserver_checks_listener": len(code) > 1 and code[0].startswith("if (server.state() != LISTEN)")
+                                          and code[1].startswith("Debug"),
+        "retry_defined": bool(retry),
+        "retry_leaves_listener_alone": "if (server.state() == LISTEN) return;" in retry,
+        "retry_rebinds": "server.begin();" in retry,
+        "loop_fires_retry": bool(re.search(r"DECLARE_TIMER_SEC\(\s*timerWebListener\s*,", loop))
+                            and bool(re.search(r"if\s*\(\s*DUE\(\s*timerWebListener\s*\)\s*\)\s*"
+                                               r"handleWebserverListener\(\);", loop)),
+    }
+
+
 def non_ot_discovery_single_source(mqtt_text: str) -> Dict[str, bool]:
     """ADR-171: boot and republish discovery queues must share one non-OT ID set.
 
@@ -2280,6 +2317,25 @@ class WorkspaceEvaluator:
                 "ADR", "non-OT discovery single source", "PASS",
                 "Both discovery queueing entry points delegate to queueNonOTDiscoveryIds()"))
 
+    def check_webserver_listener_retry(self):
+        """TASK-1130 gate."""
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Port-80 Listener Retry (TASK-1130) ==={Colors.ENDC}")
+        r = webserver_listener_retry(self._read_fw("FSexplorer.ino"), self._read_fw("OTGW-firmware.ino"))
+        missing = [k for k, v in r.items() if not v]
+        if missing:
+            self.add_result(EvaluationResult(
+                "Coding", "port-80 listener retry", "FAIL",
+                f"TASK-1130 regression: {', '.join(missing)}",
+                "startWebserver() must check server.state() right after server.begin() and log a "
+                "failed bind; handleWebserverListener() must re-bind until LISTEN and leave a "
+                "listening server alone; doBackgroundTasks() must fire it from timerWebListener. "
+                "Without them the provisioning boot leaves port 80 refused until the next reboot, "
+                "with nothing in the log (runtime check: test/host/test_webserver_listener_retry.py)"))
+        else:
+            self.add_result(EvaluationResult(
+                "Coding", "port-80 listener retry", "PASS",
+                "A refused port-80 bind is logged and retried from doBackgroundTasks()"))
+
     def check_discovery_autoheal_shape(self):
         """ADR-170 gate."""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Discovery Auto-Heal Shape (ADR-170) ==={Colors.ENDC}")
@@ -3705,6 +3761,7 @@ class WorkspaceEvaluator:
         self.check_discovery_autoheal_shape()         # TASK-1037, ADR-170
         self.check_api_rate_limit_alias_coverage()    # TASK-1037, ADR-172
         self.check_poll_window_coupling()             # TASK-1037, ADR-172/173
+        self.check_webserver_listener_retry()         # TASK-1130
 
         if not quick:
             # Detailed checks

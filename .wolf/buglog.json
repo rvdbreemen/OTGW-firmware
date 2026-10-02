@@ -3162,5 +3162,41 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-01T19:40:00"
+  },
+  {
+    "id": "bug-883",
+    "timestamp": "2026-10-02T06:03:00",
+    "error_message": "scripts/capture-serial.py --reset captured nothing for 40 s from the OTGW32 on COM4; the board then sat in the ROM download mode",
+    "file": "scripts/capture-serial.py",
+    "root_cause": "--reset calls esptool's USBJTAGSerialReset, the sequence that holds IO0 low through the reset (bootloader entry), not a normal boot. reset_input_buffer() right after it also discards the ROM banner that would have shown 'DOWNLOAD(USB/UART0)'",
+    "fix": "Not fixed yet; normal boot on the native USB-Serial-JTAG = DTR low (IO0 high) plus an RTS pulse, esptool's HardReset shape (scratchpad bootcap.py proved it: banner 'boot:0x29 (SPI_FAST_FLASH_BOOT)'). esptool --after hard-reset also leaves download mode",
+    "tags": [
+      "esp32s3",
+      "usb-serial-jtag",
+      "esptool",
+      "serial-capture",
+      "tooling"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-02T06:03:00"
+  },
+  {
+    "id": "bug-884",
+    "timestamp": "2026-10-02T06:55:00",
+    "error_message": "A 1 s TCP probe of port 80 on the OTGW32 reported 'timeout' during the TASK-1130 outage, while the 2026-09-30 run of the same defect reported 'actively refused'",
+    "file": "scratchpad prov1130.py (probe)",
+    "root_cause": "Windows retries the SYN after an RST, so a connect to a closed port reports ECONNREFUSED only after about 2.6 s (measured on closed port 8089: 'timeout' at a 1.0 s budget, 'refused' after 2.58 s at 5.0 s). The 1 s budget cut it off first",
+    "fix": "Read 'timeout' at short budgets as 'no listener or filtered'; probe with a 3 s or longer budget when refused versus filtered matters",
+    "tags": [
+      "windows",
+      "tcp",
+      "probe",
+      "bench",
+      "measurement-artifact"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-02T06:55:00"
   }
 ]

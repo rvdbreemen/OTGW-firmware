@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-01T21:49:35.227Z
-> Files: 615 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T05:10:14.903Z
+> Files: 614 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -20,7 +20,7 @@
 - `CHANGELOG.md` — Change log (~8497 tok)
 - `CLAUDE.md` — OpenWolf (~12629 tok)
 - `config.py` — Base Paths (~268 tok)
-- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~50286 tok)
+- `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~51305 tok)
 - `flash_esp.py` — Colors: disable, print_header, print_success, print_error + 10 more (~10963 tok)
 - `flash_otgw.bat` (~4180 tok)
 - `flash_otgw.sh` — flash_otgw.sh - Self-contained ESP flash tool for OTGW-firmware (Linux/macOS) (~3385 tok)
@@ -775,6 +775,10 @@
 - `parser.py` — Base option parser setup (~3951 tok)
 - `progress_bars.py` — SQLAlchemy model (~1345 tok)
 
+## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/d09d9128-d9f5-4c9c-aee0-df934b723d02/scratchpad/
+
+- `commit1130.txt` (~388 tok)
+
 ## docs/adr/
 
 - `ADR-088-mqtt-status-burst-windowing-and-cooldown.md` — ADR-088: MQTT Status Burst Windowing and Post-Burst Cooldown (~2885 tok)
@@ -868,12 +872,14 @@
 - `test_pic_banner_recovery.py` — TASK-1179 host harness: does the loop-side banner consumer re-enable a PIC (~822 tok)
 - `test_raw_passthrough.cpp` — test/host/test_raw_passthrough.cpp  (TASK-1111 AC#1) (~1797 tok)
 - `test_raw_passthrough.py` — TASK-1111 AC#1 host harness: does every byte the PIC task reads reach (~2014 tok)
+- `test_webserver_listener_retry.cpp` — TASK-1130 host check: the port-80 listener comes back after a refused bind. (~2073 tok)
+- `test_webserver_listener_retry.py` — TASK-1130 host harness: the port-80 listener comes back after a refused bind. (~3347 tok)
 
 ## tests/
 
 - `README.md` — Project documentation (~899 tok)
 - `test_adr_governance.py` — Unit tests for scripts/adr_governance.py (stdlib unittest, no pytest). (~1933 tok)
-- `test_evaluate.py` — TestIsHotPathFile: test_sat_files_are_hot, test_mqttstuff_is_hot, test_restapi_is_hot, test_otgw_cor (~10804 tok)
+- `test_evaluate.py` — TestIsHotPathFile: test_sat_files_are_hot, test_mqttstuff_is_hot, test_restapi_is_hot, test_otgw_cor (~11620 tok)
 - `test_oled_row_clear.cpp` — TASK-1151 — OLED status rows must not keep the tail of longer previous text. (~1826 tok)
 - `test_webui_asset_versioning.py` — Web UI asset caching contract (ADR-139, amended by TASK-958). (~658 tok)
 

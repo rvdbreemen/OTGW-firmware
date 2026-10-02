@@ -577,6 +577,66 @@ class TestNonOTDiscoverySingleSource(unittest.TestCase):
         self.assertFalse(evaluate.non_ot_discovery_single_source(bad)["markall_delegates"])
 
 
+class TestWebserverListenerRetry(unittest.TestCase):
+    """TASK-1130 gate: a refused port-80 bind is logged and retried, never silent."""
+
+    FSX = (
+        "void startWebserver(){\n"
+        "  server.on(\"/\", HTTP_GET, sendIndex);\n"
+        "  server.begin();\n"
+        "  // TASK-1130: begin() is void and fails silently when lwIP refuses the bind.\n"
+        "  if (server.state() != LISTEN) {\n"
+        "    DebugTln(F(\"HTTP Server: bind on port 80 failed, retrying every 5s\"));\n"
+        "  }\n"
+        "  DebugTln(F(\"HTTP Server started\"));\n"
+        "}\n"
+        "void handleWebserverListener(){\n"
+        "  static uint16_t retries = 0;\n"
+        "  if (server.state() == LISTEN) return;\n"
+        "  server.begin();\n"
+        "  retries++;\n"
+        "}\n"
+    )
+    FW = (
+        "void doBackgroundTasks()\n"
+        "{\n"
+        "      {\n"
+        "        DECLARE_TIMER_SEC(timerWebListener, 5, SKIP_MISSED_TICKS);\n"
+        "        if (DUE(timerWebListener)) handleWebserverListener();  // TASK-1130\n"
+        "      }\n"
+        "}\n"
+    )
+
+    def test_passes_on_the_fixed_shape(self):
+        r = evaluate.webserver_listener_retry(self.FSX, self.FW)
+        self.assertTrue(all(r.values()), r)
+
+    def test_detects_the_pre_fix_shape(self):
+        """Before TASK-1130: begin() unchecked, no retry function, nothing in the loop."""
+        fsx = self.FSX.split("void handleWebserverListener")[0].replace(
+            "  if (server.state() != LISTEN) {\n"
+            "    DebugTln(F(\"HTTP Server: bind on port 80 failed, retrying every 5s\"));\n"
+            "  }\n", "")
+        fw = self.FW.replace("        if (DUE(timerWebListener)) handleWebserverListener();  // TASK-1130\n", "")
+        r = evaluate.webserver_listener_retry(fsx, fw)
+        for key in ("startwebserver_checks_listener", "retry_defined", "loop_fires_retry"):
+            self.assertFalse(r[key], key)
+
+    def test_detects_a_retry_that_rebinds_a_listening_server(self):
+        bad = self.FSX.replace("  if (server.state() == LISTEN) return;\n", "")
+        self.assertFalse(evaluate.webserver_listener_retry(bad, self.FW)["retry_leaves_listener_alone"])
+
+    def test_detects_the_loop_no_longer_firing_the_retry(self):
+        bad = self.FW.replace("if (DUE(timerWebListener)) handleWebserverListener();", "handleWebSocket();")
+        self.assertFalse(evaluate.webserver_listener_retry(self.FSX, bad)["loop_fires_retry"])
+
+    def test_the_real_sources_pass(self):
+        fw_root = REPO_ROOT / "src" / "OTGW-firmware"
+        r = evaluate.webserver_listener_retry((fw_root / "FSexplorer.ino").read_text(encoding="utf-8"),
+                                              (fw_root / "OTGW-firmware.ino").read_text(encoding="utf-8"))
+        self.assertTrue(all(r.values()), r)
+
+
 class TestDiscoveryAutohealShape(unittest.TestCase):
     """ADR-170 gate: the daily heal is a drip republish, never a verify readback."""
 
