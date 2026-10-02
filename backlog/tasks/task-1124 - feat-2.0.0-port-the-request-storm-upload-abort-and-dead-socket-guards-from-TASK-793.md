@@ -3,11 +3,11 @@ id: TASK-1124
 title: >-
   feat-2.0.0: port the request-storm upload-abort and dead-socket guards from
   TASK-793
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-04 06:57'
-updated_date: '2026-10-02 19:53'
+updated_date: '2026-10-02 20:05'
 labels:
   - 2.0.0
   - port
@@ -25,9 +25,9 @@ Sibling of TASK-793 on the 1.x line, which is AC #6 of that task. Three changes 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The async upload path closes its file handle when the client disconnects mid-body, verified by a scripted abort rather than by reading the code
-- [ ] #2 A chunked response stops when its client is gone, verified under a storm
+- [x] #2 A chunked response stops when its client is gone, verified under a storm
 - [x] #3 Heap-gated refusals carry Retry-After
-- [ ] #4 A scripted rapid-refresh storm is run against a real device and its outcome recorded: request outcomes, reboot count either side, and heap or pcb headroom
+- [x] #4 A scripted rapid-refresh storm is run against a real device and its outcome recorded: request outcomes, reboot count either side, and heap or pcb headroom
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -111,4 +111,60 @@ Storm (--workers 2,4,6,8 --duration 45 --ws-subs 2), recorded for AC#2/AC#4; too
   - Old tool (HEAD): fails with [KeyError('total_ms')], the bench crash.
   - Fix: passes, with one refused line per probe and the loop still running.
 - Full suite: 39 tests OK. py_compile OK. evaluate.py --quick: 71 passed, 0 failed.
+
+2026-10-02 storm re-run with the fixed tool.
+- Firmware alpha.401+0d35143, same parameters: --workers 2,4,6,8 --duration 45 --ws-subs 2, seed 1124.
+- Logs in %LOCALAPPDATA%/OTGW-capture/refresh-storm/: storm-20261002-2154-stdout.txt and refresh_storm-192.168.88.61-storm-20261002-215443.ndjson.
+
+Arms:
+- 2 workers, PASS:
+  - 268 requests, 82 aborted (42 fin, 40 rst), no 503;
+  - gate balance 10/10, pcbs max 5/16, heap min 39728, maxblk min 18420.
+- 4 workers, PASS:
+  - 571 requests, 274 x 503 with Retry-After (271 file gate, 3 rest_busy), 89 aborted;
+  - gate balance 10/10, pcbs max 6/16, maxblk min 11252.
+- 6 workers, PASS:
+  - 658 requests, 464 x 503 with Retry-After (432 file gate, 19 rest_busy, 13 low_heap), 56 aborted;
+  - gate balance 10/10, pcbs max 13/16, heap min 21168, maxblk min 7668.
+- 8 workers, FAIL:
+  - 327 requests, 211 x 503 with Retry-After, 21 aborted, 34 timeouts (32 at connect, 2 at headers), 2 short 200s;
+  - the probe thread now ran through the arm (13 samples); from about +25 s new connections timed out, pcbs max 14/16;
+  - gate balance right after the arm 2/10, after the quiet period 10/10 and pair pass.
+- Bootcount 2 -> 2 over the whole run: no reboot.
+- Every 503 in the run carried Retry-After (no 503_no_retry_after).
+
+Correction to the earlier note. Both short 200s here were stalls, not closes:
+- /v2.html: 22774 of 50340 B;
+- /graph.js: 27083 of 46699 B;
+- in both cases the connection stayed open (eof false) and no byte arrived within the 10 s read timeout.
+The four short 200s of the first run had the same shape (/v2.js twice, /, /index.js). Followed up in TASK-1162.
+
+AC#2 evidence:
+- Clients aborted chunked responses mid-body 13, 25, 24 and 6 times in the four arms.
+- After arms 1-3 the sequential gate balance was 10/10 and the heap was back at its baseline (79-82 KB).
+- A response still running after its client left would keep its REST slot (REST_MAX_INFLIGHT 2), and the sequential checks would have hit rest_busy 503s. They hit none.
+- The 8-worker failure was connections not being accepted (connect timeouts). It cleared by itself.
+
+AC#4 evidence: recorded above. That covers request outcomes per arm, bootcount 2 -> 2, and heap and pcb headroom per arm, now including the 8-worker arm.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Ported the request-storm, upload-abort and dead-socket guards from TASK-793 to the 2.0.0 web stack. scripts/tests/refresh_storm.py verifies them on a real device.
+
+Evidence per AC, OTGW32 bench, alpha.401+0d35143:
+- AC#1: 30 scripted aborted uploads (10 each fin, rst, stall).
+  - Every readback held exactly the bytes sent.
+  - A full upload afterwards returned 303 with a complete readback.
+  - Heap delta -131 B per abort.
+- AC#2: storm re-run of 2026-10-02.
+  - 68 chunked responses aborted mid-body across four arms.
+  - After arms 1-3: gate balance 10/10 and heap back at baseline, so no leaked REST slot and no leaked memory.
+- AC#3: every 503 in both storms carried Retry-After (no 503_no_retry_after), including the low_heap refusals (13 and 6 in the re-run).
+- AC#4: both storm runs are recorded with request outcomes per arm, bootcount 2 -> 2 (no reboot), and heap and pcb headroom per arm.
+
+Tool fix c21e5b496: a failed probe no longer kills the probe thread. Red-green test: the old tool fails with KeyError('total_ms').
+
+Open elsewhere, TASK-1162: at 8 workers (4x the ADR-165 cap) the device stalls large static responses mid-body and stops accepting connections for about 20 s. It then recovers without a reboot.
+<!-- SECTION:FINAL_SUMMARY:END -->

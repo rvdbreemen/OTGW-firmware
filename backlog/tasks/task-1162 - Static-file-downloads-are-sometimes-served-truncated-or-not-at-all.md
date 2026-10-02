@@ -1,11 +1,13 @@
 ---
 id: TASK-1162
-title: Static file downloads are sometimes served truncated or not at all
+title: >-
+  Under request overload, large static files stall mid-body and the client is
+  left with a short 200
 status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-02 19:21'
+updated_date: '2026-10-02 20:06'
 labels:
   - web
   - bug
@@ -17,14 +19,25 @@ ordinal: 293000
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Seen 2026-09-23 on the OTGW32 bench (alpha.376): three back-to-back GETs of /settings.ini (5752 B on LittleFS) returned 4172 B with HTTP 200, then no response (curl 000), then the full 5752 B. A truncated 200 is worse than an error: it looks like a valid file. Relevant to anyone saving settings.ini before a flash, and to web UI assets. Possibly the ADR-147 file-serve gate or chunked streaming under load; not investigated yet.
+Seen 2026-09-23 on the OTGW32 bench (alpha.376): three back-to-back GETs of /settings.ini (5752 B on LittleFS):
+- the first returned 4172 B with HTTP 200;
+- the second got no response (curl 000);
+- the third returned the full 5752 B.
+A truncated 200 is worse than an error, because it looks like a valid file.
+
+Re-scoped 2026-10-02 (maintainer's choice):
+- Sequentially the symptom does not reproduce on alpha.401. Four bench cells gave 840 requests with no short 200: steady state, right after a LittleFS write, app-only reboot, and settings flush.
+- It does reproduce under request overload: the refresh_storm.py arms with 6 and 8 workers, 3-4x the ADR-165 cap of 2.
+- There, large static files (45-393 KB) stop mid-body with the connection still open. The client waits out its 10 s read timeout and is left with a 200 and part of the body.
+- In the same 8-worker arm the device also stopped accepting new connections for about 20 s, then recovered without a reboot.
+This task covers the overload behaviour.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce: repeated GETs of a multi-KB static file on the bench, record size and status per request
 - [ ] #2 Root cause identified
-- [ ] #3 A static file is either served complete or fails with an error status; never a short 200
+- [ ] #3 Under the 8-worker storm (refresh_storm.py --workers 8, seed 1124) no static response stalls mid-body: each is served complete, refused with a 503 before the body, or ends in a connection abort the client sees at once
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -54,4 +67,35 @@ Short 200s do reproduce under overload. The TASK-1124 request storm the same eve
 AC#1 done: the defect is reproduced (under overload) and every request is recorded with size and status.
 
 AC#2 and AC#3 stay open. The root cause of a mid-body close under overload is not identified. The task's scope (sequential symptom vs overload-only) needs the maintainer's call before a fix is designed.
+
+2026-10-02 correction, re-scope and hypotheses.
+
+Correction to my earlier note. It called the storm's short 200s "body shorter than its Content-Length". That is true but incomplete:
+- All six were stalls, not closes: four in the first storm, two in the re-run.
+- In each, the connection stayed open (eof false) and no byte arrived within the 10 s read timeout.
+- So the "RST instead of FIN" option I put to the maintainer does not apply.
+- Stalled paths: /v2.js twice (292022 B), / (45055 B), /index.js (392995 B), /v2.html (50340 B), /graph.js (46699 B).
+- Received before the stall: 11283 to 275513 B. Every stalled file is at least 45 KB; no smaller file stalled.
+
+Serve path: webSendFile() (webServerCompat.h) takes the file gate, then sends beginResponse(LittleFS, path), an AsyncFileResponse. The gate slot comes back on disconnect, so a stalled response holds its slot until the client leaves.
+
+Hypotheses, none confirmed:
+
+H1, ESPAsyncWebServer 3.11.0 in-flight credit (as resolved in .pio/libdeps; ASYNCWEBSERVER_USE_CHUNK_INFLIGHT defaults to 1 in ESPAsyncWebServer.h:72, _in_flight_credit starts at 2 in WebResponseImpl.h:70). In AsyncAbstractResponse::write_send_buffs() (WebResponses.cpp:346-500):
+- a credit comes back only with an ACK, never with a poll;
+- once _sentLength > CONFIG_LWIP_TCP_WND_DEFAULT, a call made with no credit returns at once;
+- every send pass takes a credit, even one that sent nothing (OOM on the 2xMSS buffer, or add() returning 0 under ERR_MEM).
+- So one empty pass, just as the last in-flight data is ACKed, leaves credit 0 and nothing in flight. No ACK can come, every poll is ignored, and the response sits until the client leaves.
+- Supporting: AsyncTCP's 5 s ack timeout only runs while data is unacked, and no server-side close came within 10 s.
+- No upstream release from 3.11.1 to 3.12.1 mentions this.
+
+H2, TCP retransmission backoff on a congested WiFi link. Weaker: the 5 s ack timeout would then normally close the connection within the 10 s window.
+
+H3, async_tcp starvation. The 8-worker arm also stopped accepting connections for about 20 s.
+
+Evidence that separates them: a client-side capture of a stalled connection. The capture needs admin rights for pktmon; Wireshark/npcap is not installed.
+- H1: last server segment ACKed, window open, then silence.
+- H2: retransmissions with growing gaps.
+- H3: the device stops ACKing the client at all.
+Then old-vs-fix with the storm. For H1 that means a build with -D ASYNCWEBSERVER_USE_CHUNK_INFLIGHT=0, which is a build flag, not a library edit.
 <!-- SECTION:NOTES:END -->
