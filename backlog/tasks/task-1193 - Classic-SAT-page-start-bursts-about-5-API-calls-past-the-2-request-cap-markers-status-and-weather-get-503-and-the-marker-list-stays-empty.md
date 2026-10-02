@@ -3,9 +3,11 @@ id: TASK-1193
 title: >-
   Classic SAT page start bursts about 5 API calls past the 2-request cap:
   markers, status and weather get 503 and the marker list stays empty
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-02 05:52'
+updated_date: '2026-10-02 08:59'
 labels:
   - bug
   - webui
@@ -28,3 +30,22 @@ Found during the TASK-1172 AC#6 bench run (2026-10-02, OTGW32, alpha.397 app + L
 - [ ] #3 No request path in the change sends more than 2 /api/ requests in flight at once, verified from the capture's request timeline
 - [ ] #4 build.bat for esp32-combo prints its SUCCESS line for firmware and filesystem; python evaluate.py --quick shows no new failures; the change lands in one commit with its own prerelease bump
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Maintainer decision 2026-10-02: one central queue (option 1 of the three in the description).
+
+1. ADR via adr-kit, accepted only after the maintainer's explicit yes: the classic bundle sends every same-origin /api/ fetch through one FIFO queue with at most 2 in flight. It is the first client-side counterpart of ADR-165's cap, which ADR-165 left undone. The ADR names the trade-offs:
+   - a slow request holds a slot;
+   - the v2 bundle is not covered;
+   - static assets are browser subresources (ADR-147 file gate) and not covered.
+2. index.js, first lines before any other code runs: wrap window.fetch for URLs containing /api/; leave other URLs untouched. On settle (resolve or reject), the slot is freed and the next queued request starts.
+   - Safety valve: a request unsettled after 20 s frees its slot without being aborted, so one stalled request cannot block the UI. Only a wedged device can then push the count past 2.
+   - Check the script order in index.html: the wrapper must be installed before sat.js, graph.js and the other bundles fetch.
+3. device/time is rate limited (ADR-172/173: burst 2 per 4 s window) and is called on every page switch plus by its poller, so Home -> SAT within 4 s gets a 429. refreshDevTime() skips the call when the previous request started less than 4 s ago and keeps the last values.
+4. Verify on the bench with a Playwright/CDP capture, old (alpha.399) vs fix:
+   - 5 SAT opens through the top navigation with no 503 or 429 and the marker list filled each time;
+   - the request timeline shows at most 2 /api/ requests in flight on the main page load and on SAT opens.
+5. Bump, build.bat esp32-combo, evaluate.py --quick, one commit.
+<!-- SECTION:PLAN:END -->
