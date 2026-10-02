@@ -123,8 +123,11 @@ var SAT = (function() {
     container.classList.add('chart-unavailable');
   }
 
+  // Only remove the placeholder text. On a re-open the container holds the
+  // ECharts DOM of the instance echarts.init() hands back; clearing it left both
+  // dashboard charts blank after Home -> SAT (TASK-1194).
   function clearChartUnavailable(container) {
-    if (!container) return;
+    if (!container || !container.classList.contains('chart-unavailable')) return;
     container.textContent = '';
     container.classList.remove('chart-unavailable');
   }

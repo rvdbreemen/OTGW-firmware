@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-02 08:55'
-updated_date: '2026-10-02 18:24'
+updated_date: '2026-10-02 18:35'
 labels:
   - bug
   - webui
@@ -25,7 +25,22 @@ Found 2026-10-02 on the bench (OTGW32, alpha.398, classic UI, Playwright on head
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Root cause identified from evidence in the browser (instance and canvas sizes before and after the re-open, or the init/resize sequence)
+- [x] #1 Root cause identified from evidence in the browser (instance and canvas sizes before and after the re-open, or the init/resize sequence)
 - [ ] #2 Old-vs-fix on the bench with a Playwright/CDP capture: after Home -> SAT five times, both SAT charts render each time and a click on the heating-curve grid reaches the canvas (elementFromPoint returns the CANVAS)
 - [ ] #3 build.bat for esp32-combo prints its SUCCESS line for firmware and filesystem; python evaluate.py --quick shows no new failures; the change lands in one commit with its own prerelease bump
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-02 root cause from the browser (blankprobe.py, alpha.399):
+- Fresh /#sat: both chart containers hold their ECharts DOM, one canvas each.
+- After Home -> SAT: both containers have 0 children and 0 canvases. The ECharts instances still exist with the same ids, not disposed, with their old sizes.
+- sat.js start() runs initChart() and initCurveChart() on every open. Both first call clearChartUnavailable(container), which set container.textContent = '' unconditionally and so removed the chart DOM. echarts.init() on the same container then returns the existing instance, which keeps painting into its now detached wrapper.
+
+Fix: clearChartUnavailable() only clears when the container shows the 'chart unavailable' placeholder (class chart-unavailable).
+
+Old vs fix through route interception (t1194.py: the patched sat.js served to the device page, firmware unchanged), fresh open plus 5 re-opens through the top navigation:
+- OLD: 0 canvases in both charts on every re-open, and elementFromPoint at the curve grid point (5, 50) found no canvas.
+- FIX: 1 canvas in each chart on every re-open, and elementFromPoint returned the CANVAS.
+<!-- SECTION:NOTES:END -->
