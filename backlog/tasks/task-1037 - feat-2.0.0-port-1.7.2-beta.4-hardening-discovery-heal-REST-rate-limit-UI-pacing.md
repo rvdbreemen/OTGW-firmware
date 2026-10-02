@@ -3,11 +3,11 @@ id: TASK-1037
 title: >-
   feat-2.0.0: port 1.7.2-beta.4 hardening (discovery heal, REST rate limit, UI
   pacing)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-26 22:06'
-updated_date: '2026-10-01 17:07'
+updated_date: '2026-10-02 18:48'
 labels: []
 dependencies: []
 ordinal: 246000
@@ -48,7 +48,7 @@ Granularity: maintainer chose one task / one prerelease tag. Tradeoff accepted: 
 - [x] #13 evaluate.py gains gates for alias-budget coverage, poll/window coupling, non-OT single source, and auto-heal shape, each as a module-level fn with tests in tests/test_evaluate.py
 - [x] #14 openapi.yaml documents the 429 on /v2/device/time, /v2/otgw/otmonitor and /v2/otgw/telegraf, and states in prose that the two otgw paths share one budget
 - [x] #15 ./build.sh green for esp32 target, python evaluate.py exit 0, python tests/test_evaluate.py green
-- [ ] #16 Hardware: fresh boot with wiped broker announces SAT (252-255), diag (251), OTDirect (243) and S0 (245) discovery without a manual republish
+- [x] #16 Hardware: fresh boot with wiped broker announces SAT (252-255), diag (251), OTDirect (243) and S0 (245) discovery without a manual republish
 - [x] #17 D1: rateLimitTryAdmit() admits the first GET after any idle gap, except one that ends within burst x window of a multiple of 2^32 ms, which is refused for at most one window; proven old-vs-fix with test/host/rate_limit_gcra.ps1 (idle 1, 24.8, 24.9, 30, 49 days and the wrap band)
 - [x] #18 D2: the web client honours a 429 Retry-After for at most 4 poll periods (the backoffPeriod() ceiling) plus jitter, so a huge Retry-After cannot park a poller for days; tested on otmonitor (device/time uses the same makePacedPoller)
 - [x] #19 D3: stop() is sticky: after a hidden-tab or teardown stop, a request that was in flight does not re-arm polling, and stop()+start() inside one in-flight window never has two requests of the same poller in flight
@@ -120,4 +120,46 @@ v2.js does not take part: it fetches otgw/otmonitor only every 20 s and only whi
 Still open: AC#16 (fresh boot with a wiped broker, hardware). It needs a broker that may be wiped; the test rig at 192.168.1.234:1883 was not reachable on 2026-10-01.
 
 2026-10-01 maintainer decision for AC#16: use a throwaway Mosquitto broker on the development PC (C:\Program Files\mosquitto), point the OTGW32's MQTT settings at it for the test, then restore them. The Home Assistant broker is not touched. Runs once the OTGW32 is back on the network.
+
+2026-10-02 AC#16 run setup: throwaway Mosquitto on this PC (second instance, port 18830 on all interfaces, anonymous, persistence false, so the broker holds no retained message at the start); the bench's own MQTT settings (disabled, broker homeassistant.local) are saved and restored afterwards, so the bench never talks to the production broker.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Port of the 1.7.2-beta.4 hardening to the 2.0.0 line: discovery heal, REST rate limit and UI pacing.
+
+Discovery:
+- One helper, queueNonOTDiscoveryIds(), queues the non-OT id set for both the boot path and markAllMQTTConfigPending() (ADR-171). This closes the 7-id boot gap.
+- The daily auto-heal is an unconditional heap-gated drip republish. startDiscoveryVerification() has no automatic caller (ADR-170).
+
+REST rate limit (ADR-172):
+- otmonitor and telegraf share one budget, with burst 2 and 1 per window.
+- A 429 carries an RFC 9457 problem body with retry_after next to the Retry-After header. 503 and 429 stay distinct.
+
+UI pacing (ADR-173):
+- index.js polls otmonitor at 2000 ms and device/time at 5000 ms.
+- It ticks the device clock locally, re-phases at random after a 429, caps a Retry-After at 4 periods, and marks a region data-stale after 3 refusals.
+
+Evidence per AC (details in the Implementation Notes):
+- AC#1-#9 and #11-#15: implementation and gates. evaluate.py gates with tests in tests/test_evaluate.py, ADR-170..173, and openapi.yaml.
+- AC#15: build.bat --target all at alpha.381, SUCCESS for esp32, esp32-classic and esp32-combo, firmware and filesystem. evaluate.py and tests/test_evaluate.py green.
+- AC#17-#20 (D1-D4): fixed in alpha.381 with old-vs-fix host evidence (test/host/rate_limit_gcra.ps1 and the browser checks).
+- AC#10 (two tabs, re-phase): verified 2026-10-01 with a browser harness on the real limiter and client code.
+
+AC#16, verified 2026-10-02 on the bench:
+- Hardware: OTGW32 on alpha.401+0d35143, against a throwaway Mosquitto on the development PC (port 18830, anonymous, persistence false), so the broker held no retained message.
+- Sequence: the bench's MQTT settings were pointed at it. Broker and capture were then restarted empty, because enabling MQTT at runtime had already published, and the bench was rebooted through /ReBoot at 20:44:18.
+- No republish was requested.
+- First config at 20:44:35; the drip was done at 20:45:08 with 188 config messages.
+- The capture was mapped to the discovery tables' labels (mq1037/analyze.py):
+  - 243 OTDirect 2/2;
+  - 245 S0 4/4;
+  - 251 diag 5/5;
+  - 252 SAT core 32/32;
+  - 253 SAT weather 16/16;
+  - 254 SAT binary 5/5;
+  - 255 SAT zone/PV boost 9 configs (zone 1 and the PV boost entities).
+- The bench's MQTT settings were restored afterwards. All 182 settings match the copy taken before the test, and the throwaway broker was stopped.
+- Captures in %LOCALAPPDATA%/OTGW-capture/task1037-ac16-20261002/.
+<!-- SECTION:FINAL_SUMMARY:END -->
