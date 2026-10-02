@@ -3,11 +3,11 @@ id: TASK-1196
 title: >-
   Bump ESPAsyncWebServer 3.11.0 to 3.11.2 for two multipart-parser security
   fixes
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-02 20:07'
-updated_date: '2026-10-02 20:15'
+updated_date: '2026-10-02 20:30'
 labels:
   - security
   - dependency
@@ -33,10 +33,10 @@ The 3.11.1 and 3.11.2 release notes list only these parser fixes, a refactor of 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 platformio.ini pins ESP32Async/ESPAsyncWebServer @ 3.11.2 and the pin comment names the two advisories
-- [ ] #2 WebResponses.cpp and the AsyncTCP pin are unchanged against 3.11.0 (diff of the resolved library), so the response path the storm measured stays the same
-- [ ] #3 esp32-combo build (firmware and filesystem) SUCCESS with fresh images, and evaluate.py green
-- [ ] #4 On the bench, multipart uploads still work: refresh_storm.py --upload-abort 30 gives complete readbacks and a final 303, and an FSexplorer upload reads back intact
+- [x] #1 platformio.ini pins ESP32Async/ESPAsyncWebServer @ 3.11.2 and the pin comment names the two advisories
+- [x] #2 WebResponses.cpp and the AsyncTCP pin are unchanged against 3.11.0 (diff of the resolved library), so the response path the storm measured stays the same
+- [x] #3 esp32-combo build (firmware and filesystem) SUCCESS with fresh images, and evaluate.py green
+- [x] #4 On the bench, multipart uploads still work: refresh_storm.py --upload-abort 30 gives complete readbacks and a final 303, and an FSexplorer upload reads back intact
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,3 +50,35 @@ The 3.11.1 and 3.11.2 release notes list only these parser fixes, a refactor of 
 6. evaluate.py --quick green (AC#3).
 7. Bench AC#4: refresh_storm.py --upload-abort 30 (complete readbacks + final 303) and one FSexplorer upload round-trip, on the bumped build.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-02 shipped as alpha.402+0b81fc4, pushed to dev (0b81fc4fa).
+
+AC#1 compile: esp32-combo firmware + filesystem [SUCCESS] with ESPAsyncWebServer 3.11.2 resolved (.pio/libdeps library.json "version": "3.11.2"). Two "Successfully created ESP32S3 image", "Build completed successfully!". Log: scratchpad build-1196-validate.log / build-1196-alpha402.log.
+
+AC#2 serve path unchanged: fetched src/WebResponses.cpp and src/WebResponseImpl.h from the upstream v3.11.0 tag and diffed against the resolved 3.11.2 copies on disk -> both IDENTICAL. AsyncTCP pin stays @ 3.4.10 (3.11.2 requires ^3.4.10). The response path TASK-1124/1162 measure is byte-for-byte the same.
+
+AC#3 evaluate.py --quick: 78 checks, 71 passed, 0 failed, 0 warnings.
+
+AC#4 bench, alpha.402 flashed app-only to the OTGW32 (.88.61, settings preserved), running 2.0.0-alpha.402+0b81fc4:
+- refresh_storm.py --upload-abort 30 --abort-mode mixed: 30 aborted multipart uploads (10 fin, 10 rst, 10 stall), every readback prefix_current 4096 B.
+- final full upload 303 with complete 16384 B readback; cleanup delete 200, GET 404.
+- bootcount 3 -> 3 (no reboot, the parser did not choke); heap -113 B per abort, below the 512 B handle threshold.
+- Capture: %LOCALAPPDATA%/OTGW-capture/task1196-upload-20261002-2228.txt.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Pinned ESPAsyncWebServer 3.11.0 -> 3.11.2 to close two high-severity multipart-parser advisories (GHSA-4phx-fcj6-46r4 DoS boundary-counter overflow, <= 3.11.0; GHSA-8m8p-vhxc-jmjw NULL-pointer write, <= 3.11.1). AsyncTCP unchanged at 3.4.10.
+
+Evidence per AC (alpha.402+0b81fc4):
+- AC#1: esp32-combo firmware + filesystem build SUCCESS with 3.11.2 resolved.
+- AC#2: WebResponses.cpp + WebResponseImpl.h byte-identical v3.11.0 vs resolved 3.11.2 on disk; AsyncTCP pin unchanged. The storm-measured serve path is untouched, so this bump is independent of TASK-1162.
+- AC#3: evaluate.py --quick 71/0.
+- AC#4: bench upload-abort 30 on the flashed alpha.402 -> all complete readbacks, final 303, no reboot, no handle leak.
+
+3.12.x deferred: it needs AsyncTCP 3.5.0 (abort() in the caller context) plus a WebSocket refactor, a larger step than this security patch.
+<!-- SECTION:FINAL_SUMMARY:END -->
