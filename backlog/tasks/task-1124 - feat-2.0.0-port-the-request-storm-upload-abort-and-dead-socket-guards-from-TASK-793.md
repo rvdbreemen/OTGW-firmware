@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-04 06:57'
-updated_date: '2026-10-02 19:05'
+updated_date: '2026-10-02 19:53'
 labels:
   - 2.0.0
   - port
@@ -104,4 +104,11 @@ Storm (--workers 2,4,6,8 --duration 45 --ws-subs 2), recorded for AC#2/AC#4; too
 - After the run the device recovered by itself (gate balance 10/10, pair pass) without a reboot: bootcount 2 -> 2.
 - Tool defect: the probe thread ended during the 8-worker arm with KeyError 'total_ms' (refresh_storm.py probe_loop reads r['total_ms'], and a timed-out exchange has none), so that arm has no probe samples after the crash.
 - The maintainer rejected my fix of that tool line on 2026-10-02 and asked me to wait. AC#2 and AC#4 stay open until the maintainer decides between a fixed tool plus a re-run, or accepting this run as recorded.
+
+2026-10-02 tool fix, after the maintainer chose 'fix the tool and re-run the storm':
+- refresh_storm.py probe_loop now builds its line through probe_record(), which reads status and total_ms with .get().
+- Evidence: tests/test_refresh_storm.py TestProbeRecord.test_probe_loop_keeps_probing_after_a_failed_connect drives the real probe_loop against a closed port.
+  - Old tool (HEAD): fails with [KeyError('total_ms')], the bench crash.
+  - Fix: passes, with one refused line per probe and the loop still running.
+- Full suite: 39 tests OK. py_compile OK. evaluate.py --quick: 71 passed, 0 failed.
 <!-- SECTION:NOTES:END -->

@@ -39,6 +39,7 @@ import sys
 import tempfile
 import threading
 import time
+import types
 import unittest
 import urllib.parse
 from pathlib import Path
@@ -607,6 +608,55 @@ class TestClassifyOnTheWire(StubCase):
         probe.close()
         r = rs.http_exchange("127.0.0.1:%d" % port, "GET", "/", connect_timeout=5.0)
         self.assertEqual(rs.classify(r), "refused")
+
+
+class TestProbeRecord(unittest.TestCase):
+    def test_probe_record_survives_a_failed_connect(self):
+        """A refused or timed-out connect returns before total_ms is set. The probe
+        read r["total_ms"] and its thread died mid-arm (2026-10-02 bench storm)."""
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+        r = rs.http_exchange("127.0.0.1:%d" % port, "GET", "/api/v2/device/info", connect_timeout=5.0)
+        self.assertNotIn("total_ms", r)
+        p = rs.probe_record("arm4_w8", time.monotonic(), r, rs.classify(r))
+        self.assertEqual(p["class"], "refused")
+        self.assertIsNone(p["status"])
+        self.assertIsNone(p["total_ms"])
+
+    def test_probe_loop_keeps_probing_after_a_failed_connect(self):
+        """Drives the real probe_loop against a closed port: it must log a probe line for
+        every failed probe and keep going. The old loop raised KeyError('total_ms') on the
+        first failed probe and its thread ended, so the rest of the arm had no probes."""
+        probe = socket.socket()
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+        probe.close()
+        opts = types.SimpleNamespace(host="127.0.0.1:%d" % port, probe_interval=0.05,
+                                     connect_timeout=5.0, read_timeout=5.0, pcb_pool=16)
+        written, failure, stop = [], [], threading.Event()
+        log = types.SimpleNamespace(write=written.append)
+        st = types.SimpleNamespace(add_probe=lambda p: None, counts=lambda: {})
+
+        def run():
+            try:
+                rs.probe_loop(opts, log, "arm4_w8", stop, st, time.monotonic())
+            except Exception as e:
+                failure.append(e)
+
+        t = threading.Thread(target=run, daemon=True)
+        with contextlib.redirect_stdout(io.StringIO()):
+            t.start()
+            deadline = time.monotonic() + 30
+            while len(written) < 2 and t.is_alive() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            stop.set()
+            t.join(15)
+        self.assertEqual(failure, [])
+        self.assertGreaterEqual(len(written), 2)
+        self.assertEqual({p["class"] for p in written}, {"refused"})
+        self.assertTrue(all(p["total_ms"] is None for p in written))
 
 
 class TestAbortOnTheWire(StubCase):

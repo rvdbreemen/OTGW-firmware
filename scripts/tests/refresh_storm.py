@@ -1130,11 +1130,18 @@ def storm_worker(opts, log, label, wid, stop, st):
             stop.wait(0.1)   # a dead device must not turn into a busy loop
 
 
+def probe_record(label, t0, r, c):
+    """One probe line. An exchange that failed to connect or send returns before
+    total_ms is set (http_exchange), so read it with .get(): r["total_ms"] raised
+    KeyError and ended the probe thread in the middle of an overloaded arm."""
+    return {"type": "probe", "arm": label, "t_rel_s": round(time.monotonic() - t0, 1),
+            "class": c, "status": r.get("status"), "total_ms": r.get("total_ms")}
+
+
 def probe_loop(opts, log, label, stop, st, t0):
     while not stop.wait(opts.probe_interval):
         r, c, doc = _get_json(opts, "/api/v2/device/info")
-        p = {"type": "probe", "arm": label, "t_rel_s": round(time.monotonic() - t0, 1),
-             "class": c, "status": r["status"], "total_ms": r["total_ms"]}
+        p = probe_record(label, t0, r, c)
         dev = doc.get("device") if isinstance(doc, dict) else None
         if isinstance(dev, dict):
             p.update({k: dev.get(k) for k in PROBE_KEYS})

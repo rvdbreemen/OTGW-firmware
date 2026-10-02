@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T18:46:12.883Z
-> Files: 615 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T19:49:49.078Z
+> Files: 616 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -814,6 +814,7 @@
 
 ## scripts/tests/
 
+- `refresh_storm.py` — Request-storm and upload-abort tool for the 2.0.0 web stack (TASK-1124). (~22545 tok)
 - `test_heap_soak_driver.py` — FirmwareContract: c_function, c_unescape, pstr_format, api_error_message + 7 more (~8258 tok)
 
 ## src/OTGW-firmware/
@@ -878,6 +879,7 @@
 - `test_adr_governance.py` — Unit tests for scripts/adr_governance.py (stdlib unittest, no pytest). (~1933 tok)
 - `test_evaluate.py` — TestIsHotPathFile: test_sat_files_are_hot, test_mqttstuff_is_hot, test_restapi_is_hot, test_otgw_cor (~11620 tok)
 - `test_oled_row_clear.cpp` — TASK-1151 — OLED status rows must not keep the tail of longer previous text. (~1826 tok)
+- `test_refresh_storm.py` — Self-test for scripts/tests/refresh_storm.py (TASK-1124) against a local stub. (~12647 tok)
 - `test_webui_asset_versioning.py` — Web UI asset caching contract (ADR-139, amended by TASK-958). (~658 tok)
 
 ## tests/webui/
