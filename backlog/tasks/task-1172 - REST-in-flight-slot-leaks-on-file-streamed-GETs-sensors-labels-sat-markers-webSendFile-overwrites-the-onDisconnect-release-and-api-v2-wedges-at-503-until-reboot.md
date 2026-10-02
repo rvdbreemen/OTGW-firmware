@@ -8,7 +8,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:44'
-updated_date: '2026-09-30 09:06'
+updated_date: '2026-10-02 05:52'
 labels:
   - bug
   - rest
@@ -120,7 +120,7 @@ IMPACT
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Code review against the library's single-slot setter (WebRequest.cpp:277-279) shows two properties. Every processAPI request that increments restInFlight releases exactly one REST slot on disconnect, including requests whose handler streams a file through webSendFile. Every webSendFile admission releases exactly one file-gate slot. This holds on all four paths: the REST 503 (restAPI.ino:2705-2710), the file-gate 503 (webServerCompat.h:322-332), the missing-file 404 inside webSendFile (:338-343, verified by review only because the race cannot be triggered on demand) and the normal stream (:345-349).
-- [ ] #2 OLD-vs-FIX bench reproduction, labels route, same board and same sequence. Flash app-only (flash_otgw.bat --update --app) so /dallas_labels.ini survives, and send strictly sequential curl requests.
+- [x] #2 OLD-vs-FIX bench reproduction, labels route, same board and same sequence. Flash app-only (flash_otgw.bat --update --app) so /dallas_labels.ini survives, and send strictly sequential curl requests.
 
 Setup: reboot, press telnet 'z', POST {"28D0000000000001":"bench"} to /api/v2/sensors/labels, and read internal_maxblk from GET /api/v2/device/info.
 
@@ -137,9 +137,9 @@ OLD at cap 2 (internal_maxblk >= 16000): the first device/info after one labels 
 OLD at cap 1: the first device/info after one labels GET already returns 503.
 
 FIX: every call succeeds (200; the OPTIONS preflight gets its normal 204), hd_rest_inflight_hwm stays 1, and hd_rest_503 stays 0.
-- [ ] #3 Same old-vs-fix reproduction for GET /api/v2/sat/markers, after one POST {"outside_temp":5,"flow_temp":55,"label":"bench"} to /api/v2/sat/markers, with a reboot before the OLD markers run. OLD shows the same hwm=2 / persistent-503 signature. FIX stays at 200.
-- [ ] #4 FIX soak: run 20 sequential GET /api/v2/sensors/labels and 20 sequential GET /api/v2/sat/markers, then GET /api/v2/device/info. device/info returns 200 with hd_rest_inflight_hwm <= 1, hd_webfile_inflight_hwm <= 1, hd_rest_503 = 0 and hd_webfile_503 = 0.
-- [ ] #5 FIX, refusal paths stay balanced. Run a mixed burst (2 concurrent GET /index.js together with 2 concurrent GET /api/v2/sensors/labels, repeated until hd_webfile_503 or hd_rest_503 is non-zero). Then press telnet 'z' and run the sequential probe: device/info, labels, device/info. All three return 200, with hd_rest_inflight_hwm = 1 and hd_webfile_inflight_hwm = 1, so no slot is left held.
+- [x] #3 Same old-vs-fix reproduction for GET /api/v2/sat/markers, after one POST {"outside_temp":5,"flow_temp":55,"label":"bench"} to /api/v2/sat/markers, with a reboot before the OLD markers run. OLD shows the same hwm=2 / persistent-503 signature. FIX stays at 200.
+- [x] #4 FIX soak: run 20 sequential GET /api/v2/sensors/labels and 20 sequential GET /api/v2/sat/markers, then GET /api/v2/device/info. device/info returns 200 with hd_rest_inflight_hwm <= 1, hd_webfile_inflight_hwm <= 1, hd_rest_503 = 0 and hd_webfile_503 = 0.
+- [x] #5 FIX, refusal paths stay balanced. Run a mixed burst (2 concurrent GET /index.js together with 2 concurrent GET /api/v2/sensors/labels, repeated until hd_webfile_503 or hd_rest_503 is non-zero). Then press telnet 'z' and run the sequential probe: device/info, labels, device/info. All three return 200, with hd_rest_inflight_hwm = 1 and hd_webfile_inflight_hwm = 1, so no slot is left held.
 - [ ] #6 FIX, classic UI end-to-end, with a browser devtools capture (capture-mqtt-debug.bat CDP):
 - With /dallas_labels.ini present, 10 consecutive reloads keep showing live data, and no /api/v2 request returns 503 once each load has settled.
 - With a marker present, opening the classic SAT page 5 times and adding and deleting one marker keeps /api/v2 at 200.
@@ -262,4 +262,46 @@ webSendFile() runs at most once per request (g_responseSent guard), so a slot is
 AC#7: grep '->onDisconnect(' in src/OTGW-firmware: only webServerCompat.h webArmSlotRelease() (3 branches) and the OTA abort hook OTGW-ModUpdateServer-esp32.h:257. Stale comments corrected: restAPI.ino processAPI gate comment, restAPI.ino ADR-172 placement comment, webServerCompat.h gate forward declarations. Nothing under .pio/libdeps or src/libraries changed.
 AC#8: bin/bump-prerelease.sh alpha.378 -> alpha.379 in this commit; build.bat --target esp32-combo [SUCCESS] firmware (181.2 s) + filesystem, fresh firmware.bin 11:05:30 / littlefs.bin 11:06:03 (alpha.379+0976995, image saved under %LOCALAPPDATA%/OTGW-capture/img-alpha379-0976995); evaluate.py --quick 69 passed, 0 warnings, 0 failed.
 OPEN: AC#2-#6 bench (OTGW32): OLD = IMG-0 alpha.377+3621a38 (saved), FIX = alpha.379 or later; app-only flash so /dallas_labels.ini survives.
+
+2026-10-02 bench run, OTGW32 (COM4, 192.168.88.61).
+
+Setup:
+- OLD = IMG-0 2.0.0-alpha.377+3621a38 (combo). FIX = 2.0.0-alpha.397+0fdb1e5 (combo). Both flashed app-only with flash_otgw.bat --update --app, version confirmed with GET /api/v2/device/info.
+- internal_maxblk 31732-40948, so the cap is 2.
+- Strictly sequential requests (t1172.py). Telnet '2' (REST debug, the echo verified 'true') and 'z' before each run.
+- Evidence in %LOCALAPPDATA%/OTGW-capture/task1172-bench-20261002/.
+
+AC#2, labels route, OLD vs FIX, same board, same sequence:
+- OLD: POST labels 200 -> device/info 200 -> GET labels 200 -> device/info 200 with hd_rest_inflight_hwm=2 -> GET labels 200 -> 3x device/info 503 'Server busy' -> OPTIONS /api/v2/health 503 -> after 60 s, device/info still 503. /api/listfiles and /index.js 200 (they bypass processAPI). 5 telnet lines 'REST BUSY: 2/2 in-flight (cap 2) => 503'.
+- FIX: every call 200, OPTIONS 204. hd_rest_inflight_hwm stays 1, hd_rest_503 0, no REST BUSY line.
+
+AC#3, markers route, after a reboot, POST {outside_temp 5, flow_temp 55, label bench} = 201:
+- OLD: the same signature. hwm=2 at step 4b, then 503 on 3x device/info, on OPTIONS and after 60 s. 5 REST BUSY lines.
+- FIX: all 200 / 201 / 204, hwm 1, 503 0, no REST BUSY.
+
+AC#4, FIX soak after 'z':
+- 20 sequential GET labels and 20 sequential GET markers all 200.
+- device/info 200 with hd_rest_inflight_hwm 1, hd_webfile_inflight_hwm 1, hd_rest_503 0, hd_webfile_503 0.
+
+AC#5, FIX refusal paths:
+- The AC's mixed burst (2x /index.js plus 2x labels) refused both index.js requests in round 1 (hd_webfile_503 2, 'WEBFILE BUSY' x2). After 'z' the probe device/info, labels, device/info returned 200, 200, 200 with hwm rest 1 and webfile 1.
+- Extended with the two paths that matter for the leak (t1172c.py), each followed by 'z' and the same probe, both with hwm 1/1:
+  - (A) file-gate 503 on a REST route: 2x index.js first, labels 150 ms later. Both labels requests got 503 from the file gate while holding a REST slot.
+  - (B) REST-gate 503: 4x labels at once, 2 REST BUSY.
+
+AC#6, FIX classic UI. Playwright on headless Edge records every response and console message (CDP), in place of capture-mqtt-debug.bat. The matching alpha.397 LittleFS was flashed first; settings were identical before and after. Labels file and one marker were re-created by POST.
+
+Part 1, initial load plus 10 reloads, all pass:
+- Every load: GET /api/v2/sensors/labels 200; 4-6 otmonitor polls 200 with otmonitor data (live data); 0 /api/v2 503s after the 5 s settle point.
+- 2-6 transient 503s inside each load's first seconds (device/info, device/time, filesystem/hash-check). The classic UI fires 6 API requests at once on load, a browser peak of 7 in flight.
+
+Part 2 does NOT pass as written, because of two defects outside this task:
+- (a) The classic SAT page start fires about 5 API calls at once. On 4 of 5 opens GET /api/v2/sat/markers itself got 503, and loadMarkers() has no retry, so the marker list stayed empty. Console: '[SAT] marker load error: Service Unavailable' x4, also sat/status and sat/weather 503 x4-5, device/time 429 x6.
+- (b) A click on the heating-curve chart never adds a marker. The chart rendered at 1368x320 with an ECharts instance, and grid point (5, 50) maps to pixel (688, 128). A real mouse click there sent no POST. The instance-level on('click') handler (sat.js _initCurveClickHandler) receives no event from a background click; only getZr() sees it. TASK-586 AC#1 was checked without that path working.
+
+No leak under the UI traffic: after the whole UI session, 'z' plus the sequential probe gave device/info hwm rest 1 / webfile 0, labels 200, device/info hwm rest 1 / webfile 1, 503 0.
+
+AC#6 stays open until (a) TASK-1193 and (b) TASK-1192 are fixed.
+
+Cleanup pending: /dallas_labels.ini and /sat_markers.json were created for the test. They are kept until AC#6 can be re-run, then removed.
 <!-- SECTION:NOTES:END -->

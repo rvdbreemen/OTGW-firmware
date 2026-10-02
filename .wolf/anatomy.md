@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T05:10:14.903Z
-> Files: 614 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T05:56:08.181Z
+> Files: 620 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -775,10 +775,6 @@
 - `parser.py` — Base option parser setup (~3951 tok)
 - `progress_bars.py` — SQLAlchemy model (~1345 tok)
 
-## C:/Users/rvdbr/AppData/Local/Temp/claude/D--Users-Robert-Documents-GitHub-RvdB-OTGW-firmware/d09d9128-d9f5-4c9c-aee0-df934b723d02/scratchpad/
-
-- `commit1130.txt` (~388 tok)
-
 ## docs/adr/
 
 - `ADR-088-mqtt-status-burst-windowing-and-cooldown.md` — ADR-088: MQTT Status Burst Windowing and Post-Burst Cooldown (~2885 tok)
@@ -842,7 +838,7 @@
 ## src/OTGW-firmware/data/
 
 - `index.js` — Safely parse JSON with validation and error handling (~111172 tok)
-- `sat.js` — API routes: GET (1 endpoints) (~16941 tok)
+- `sat.js` — API routes: GET (1 endpoints) (~17108 tok)
 - `v2.js` — fetchWithRetry: again, applyTheme, initTheme + 10 more (~84366 tok)
 
 ## test/host/
