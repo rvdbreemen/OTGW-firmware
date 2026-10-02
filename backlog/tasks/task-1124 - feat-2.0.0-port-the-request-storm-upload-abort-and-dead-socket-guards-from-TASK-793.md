@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-04 06:57'
-updated_date: '2026-10-01 21:50'
+updated_date: '2026-10-02 19:05'
 labels:
   - 2.0.0
   - port
@@ -24,7 +24,7 @@ Sibling of TASK-793 on the 1.x line, which is AC #6 of that task. Three changes 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The async upload path closes its file handle when the client disconnects mid-body, verified by a scripted abort rather than by reading the code
+- [x] #1 The async upload path closes its file handle when the client disconnects mid-body, verified by a scripted abort rather than by reading the code
 - [ ] #2 A chunked response stops when its client is gone, verified under a storm
 - [x] #3 Heap-gated refusals carry Retry-After
 - [ ] #4 A scripted rapid-refresh storm is run against a real device and its outcome recorded: request outcomes, reboot count either side, and heap or pcb headroom
@@ -75,4 +75,33 @@ Results:
 Boundary of this evidence: it reaches the AsyncWebServer response object, not the wire. The bench storm of AC#4 (scripts/tests/refresh_storm.py) records the 503s and their headers, and shows the wire too.
 
 Still open: AC#1, #2 and #4, which explicitly need a scripted abort or storm against a real device.
+
+2026-10-02 bench runs on the OTGW32, alpha.401+0d35143, scripts/tests/refresh_storm.py (unchanged), Python 3.14 venv with websocket-client. Logs in %LOCALAPPDATA%/OTGW-capture/refresh-storm/.
+
+AC#1 PASS (--upload-abort 30 --abort-mode mixed):
+- 30 aborted uploads, 10 each of fin, rst and stall, each sending 4096 B. Every readback was prefix_current 4096 B, so the file holds exactly the bytes sent: the handle is closed and flushed when the client goes.
+- On a stall the device closed by itself after 3.1-3.8 s.
+- After the 30 aborts a full upload returned 303 with a complete 16384 B readback, so no file handles were exhausted.
+- Cleanup delete 200, then GET 404.
+- bootcount 2 -> 2. Heap delta -131 B per abort, below the 512 B LittleFS cache a leaked handle holds.
+
+Storm (--workers 2,4,6,8 --duration 45 --ws-subs 2), recorded for AC#2/AC#4; tool verdict FAIL:
+- arm 2 workers, PASS:
+  - 252 requests, 77 aborted (fin/rst after 1024 body bytes), no 503;
+  - gate balance 10/10, first 200 after stop 47 ms, heap 77256 -> 77248 (min 37884), probe max 5 of 16 pcbs.
+- arm 4 workers, PASS:
+  - 493 requests, 256 x 503 with Retry-After (248 file gate, 7 rest_busy, 1 low_heap), 73 aborted;
+  - gate balance 10/10, first 200 after stop 60 ms, heap back to baseline, maxblk min 9716.
+- arm 6 workers, FAIL:
+  - 20 timeouts and 2 short 200s (body shorter than declared, the TASK-1162 shape);
+  - gate balance 5/10 sequential;
+  - probe max 11 of 16 pcbs.
+- arm 8 workers, FAIL:
+  - 21 timeouts and 2 short 200s;
+  - device/info timed out after the arm and its quiet period;
+  - gate balance 0/10;
+  - probe max 15 of 16 pcbs, heap min 31496.
+- After the run the device recovered by itself (gate balance 10/10, pair pass) without a reboot: bootcount 2 -> 2.
+- Tool defect: the probe thread ended during the 8-worker arm with KeyError 'total_ms' (refresh_storm.py probe_loop reads r['total_ms'], and a timed-out exchange has none), so that arm has no probe samples after the crash.
+- The maintainer rejected my fix of that tool line on 2026-10-02 and asked me to wait. AC#2 and AC#4 stay open until the maintainer decides between a fixed tool plus a re-run, or accepting this run as recorded.
 <!-- SECTION:NOTES:END -->
