@@ -189,3 +189,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-181 | Accepted | - | Only boiler Read-Ack frames for MsgID 19, through printf88(), feed the DHW water total. |
 | ADR-182 | Accepted | - | The DHW water total is announced just in time, after the first MsgID 19 sample of a boot, as on the 1.x line: |
 | ADR-183 | Accepted | - | ADR-176's decision stands: after an unclean reboot the firmware resumes from the last persisted value and accepts the... |
+| ADR-184 | Accepted | - | The classic bundle routes every same-origin request to /api/ through one first-in-first-out queue with at most 2 requ... |

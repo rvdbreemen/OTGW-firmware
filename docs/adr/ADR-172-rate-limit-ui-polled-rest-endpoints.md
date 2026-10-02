@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-184"
 ---
 # ADR-172 Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses
 
@@ -27,6 +29,11 @@ status_history:
     changed_by: Agent
     reason: Ports 1.x ADR-086 (TASK-1043) to the 2.0.0 async line as part of TASK-1037, incorporating two defects found by adversarial review of 1.7.2-beta.4.
     changed_via: manual
+  - date: 2026-10-02
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-184
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

@@ -651,6 +651,11 @@ All visible widgets (header, nav tabs, tables, settings fields, OT log viewer, f
 ### Cache & Backpressure Policy
 
 - **`Cache-Control: no-cache` + ETag revalidation (ADR-163, amends ADR-139)**: static assets ship with stable URLs (no `?v=` query versioning) and a `Cache-Control: no-cache` header, so the browser may store an asset but must revalidate it every load via `If-None-Match`. The ETag is derived from the filesystem hash (combined with the asset path so the two shells never collide on one validator); an unchanged filesystem returns `304`, an OTA/FS upgrade changes the hash and returns `200` with fresh content on the next load.
+- **Client-side request queue (ADR-184)**: the first lines of the classic `index.js` wrap `window.fetch`. Every same-origin `/api/` request waits in one first-in-first-out queue with at most 2 in flight, which matches the device's REST gate (`REST_MAX_INFLIGHT 2`, ADR-165).
+  - A slot frees when the response body has arrived.
+  - A request still open after 20 s frees its slot without being aborted.
+  - `refreshDevTime()` sends at most one `device/time` request per 4 s, inside that route's rate limit (ADR-172).
+  - Static assets, the WebSocket and the v2 bundle are not covered.
 - **503 backpressure gate (ADR-147)**: the LittleFS file-serve path is allocation-bounded and refuses a new file serve under heap pressure or excessive concurrency with a cheap `503`, so abusive concurrency cannot drive the ESP32-S3 out of memory. The classic UI loads its scripts sequentially with retry to survive a transient `503`.
 
 ### File Size Constraints

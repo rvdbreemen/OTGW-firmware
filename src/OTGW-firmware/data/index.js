@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : index.js, part of OTGW-firmware project
-**  Version  : v2.0.0-alpha.399
+**  Version  : v2.0.0-alpha.400
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -13,6 +13,70 @@ const APIGW = window.location.protocol + '//' + window.location.host + '/api/';
 const MOBILE_BREAKPOINT_PX = 768;
 const PS_MODE_NOTICE_TEXT = 'PS=1 mode active: showing decoded field summaries. Raw OT frames not available.';
 const WEBKIT_SCROLLBAR_STYLE_ID = 'otgw-webkit-scrollbar-style';
+
+// ============================================================================
+// ADR-184: at most 2 /api/ requests in flight from this page. The device
+// refuses a third concurrent request with a 503 (REST_MAX_INFLIGHT 2, ADR-165);
+// the page start, the polls and the panels would otherwise send up to 7 at once.
+// Every same-origin /api/ fetch waits in arrival order for a free slot; other
+// URLs go straight to the browser. A slot is freed when the response body has
+// arrived, because the device holds its slot until the last byte is sent. A
+// request still open after 20 s frees its slot without being aborted, so one
+// stalled request cannot block the page. index.js loads before every other
+// bundle (index.html), so their fetch calls go through the same queue.
+(function () {
+  if (window.__otgwApiQueue) return;
+  const nativeFetch = window.fetch.bind(window);
+  const MAX_IN_FLIGHT = 2;
+  const STALL_RELEASE_MS = 20000;
+  const waiting = [];
+  let inFlight = 0;
+
+  function isApi(input) {
+    const url = (typeof input === 'string') ? input : (input && input.url) || '';
+    try {
+      const u = new URL(url, window.location.href);
+      return u.origin === window.location.origin && u.pathname.indexOf('/api/') === 0;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function pump() {
+    while (inFlight < MAX_IN_FLIGHT && waiting.length) {
+      const job = waiting.shift();
+      inFlight++;
+      let released = false;
+      const release = function () {
+        if (released) return;
+        released = true;
+        clearTimeout(valve);
+        inFlight--;
+        pump();
+      };
+      const valve = setTimeout(release, STALL_RELEASE_MS);
+      nativeFetch(job.input, job.init).then(function (response) {
+        response.clone().arrayBuffer().then(release, release);
+        job.resolve(response);
+      }, function (err) {
+        release();
+        job.reject(err);
+      });
+    }
+  }
+
+  window.fetch = function (input, init) {
+    if (!isApi(input)) return nativeFetch(input, init);
+    return new Promise(function (resolve, reject) {
+      waiting.push({ input: input, init: init, resolve: resolve, reject: reject });
+      pump();
+    });
+  };
+  window.__otgwApiQueue = {
+    inFlight: function () { return inFlight; },
+    waiting: function () { return waiting.length; }
+  };
+})();
 
 "use strict";
 // ============================================================================
@@ -4935,7 +4999,17 @@ function stopDeviceClock() {
 //============================================================================
 // Resolves to {status, retryAfterMs}; never rejects. The paced poller reads the
 // status to tell "the gateway is pacing us" (429) from a real failure.
+// ADR-184: device/time allows a burst of 2 per 4 s window (ADR-172), and every
+// page switch calls this next to the 5 s poller, so a call within 4 s of the
+// previous request is skipped; the values that request returned stay current.
+const DEVTIME_MIN_INTERVAL_MS = 4000;
+let lastDevTimeRequestMs = -Infinity;
 function refreshDevTime() {
+  const now = performance.now();
+  if (now - lastDevTimeRequestMs < DEVTIME_MIN_INTERVAL_MS) {
+    return Promise.resolve({ status: 200 });
+  }
+  lastDevTimeRequestMs = now;
   //console.log("Refresh api/v2/device/time ..");
   return fetch(APIGW + "v2/device/time")
     .then(response => {

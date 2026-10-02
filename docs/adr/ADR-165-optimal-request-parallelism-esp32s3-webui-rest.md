@@ -1,8 +1,23 @@
 ---
-id: ADR-165
+id: "ADR-165"
 title: "Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)"
 status: "Accepted"
-date: 2026-07-06
+date: "2026-07-06"
+binding: false
+gate: null
+documents_shipped: false
+verified_in:
+  - "src/OTGW-firmware/restAPI.ino:WEB_FILE_MAX_INFLIGHT"
+supersedes: []
+superseded_by: null
+related:
+  - "ADR-089"
+  - "ADR-145"
+  - "ADR-147"
+  - "ADR-149"
+  - "ADR-184"
+deciders:
+  - "Robert van den Breemen"
 tags:
   - "esp32s3"
   - "rest-api"
@@ -14,20 +29,6 @@ tags:
   - "task1014"
   - "task884"
   - "task1017"
-supersedes: []
-superseded_by: null
-related:
-  - "ADR-149"
-  - "ADR-147"
-  - "ADR-145"
-  - "ADR-089"
-deciders:
-  - "Robert van den Breemen"
-binding: false
-gate: null
-documents_shipped: false
-verified_in:
-  - "src/OTGW-firmware/restAPI.ino:WEB_FILE_MAX_INFLIGHT"
 ---
 
 # ADR-165: Optimal request parallelism on ESP32-S3 v2 Web UI/REST: N*=2 confirmed by two-phase load test (TASK-1015)
@@ -66,6 +67,11 @@ status_history:
     changed_by: Robert van den Breemen
     reason: "Read the ADR, approved N*=2 as the new hard limit. Directed the bake-in: lower REST_MAX_INFLIGHT/WEB_FILE_MAX_INFLIGHT production defaults to 2 and update CLAUDE.md's single-flight rule to document the cap. No client-side MAX_INFLIGHT knob requested (current N=1 client discipline is already within the new N=2 ceiling)."
     changed_via: adr-kit
+  - date: 2026-10-02
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-184
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T08:57:07.498Z
-> Files: 614 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T18:21:45.918Z
+> Files: 615 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -18,7 +18,7 @@
 - `build.py` — Colors: asset_slug, disable, print_step, print_success + 7 more (~33360 tok)
 - `build.sh` (~1576 tok)
 - `CHANGELOG.md` — Change log (~8497 tok)
-- `CLAUDE.md` — OpenWolf (~12629 tok)
+- `CLAUDE.md` — OpenWolf (~12953 tok)
 - `config.py` — Base Paths (~268 tok)
 - `evaluate.py` — drift: strip_css_comments, strip_js_comments, extract_classes_from_html, extract_classes_from_js + 5 (~51305 tok)
 - `flash_esp.py` — Colors: disable, print_header, print_success, print_error + 10 more (~10963 tok)
@@ -786,7 +786,8 @@
 - `ADR-181-count-only-boiler-read-ack-frames-into-the-dhw-water-total-not-the-pic-ps-1-summary.md` — ADR-181 Count only boiler Read-Ack frames into the DHW water total, not the PIC PS=1 summary (~1878 tok)
 - `ADR-182-announce-the-dhw-water-total-just-in-time-after-the-first-msgid-19-sample-of-a-boot.md` — ADR-182 Announce the DHW water total just in time, after the first MsgID 19 sample of a boot (~1742 tok)
 - `ADR-183-record-what-an-unclean-reboot-does-to-the-persisted-dhw-water-total.md` — ADR-183 Record what an unclean reboot does to the persisted DHW water total (~1464 tok)
-- `README.md` — Project documentation (~32868 tok)
+- `ADR-184-queue-the-classic-ui-s-api-requests-at-two-in-flight.md` — ADR-184 Queue the classic UI's API requests at two in flight (~1948 tok)
+- `README.md` — Project documentation (~33064 tok)
 
 ## docs/api/
 
@@ -796,7 +797,7 @@
 ## docs/c4/
 
 - `c4-code-otdirect.md` — C4 Code Level: OTDirect Module (ESP32 Native OpenTherm Master/Slave) (~11143 tok)
-- `c4-code-web-assets.md` — C4 Code Level: Web Assets Module (~11150 tok)
+- `c4-code-web-assets.md` — C4 Code Level: Web Assets Module (~11297 tok)
 
 ## docs/manuals/en/
 
@@ -837,7 +838,7 @@
 
 ## src/OTGW-firmware/data/
 
-- `index.js` — Safely parse JSON with validation and error handling (~111172 tok)
+- `index.js` — Safely parse JSON with validation and error handling (~111996 tok)
 - `sat.js` — API routes: GET (1 endpoints) (~17114 tok)
 - `v2.js` — fetchWithRetry: again, applyTheme, initTheme + 10 more (~84366 tok)
 

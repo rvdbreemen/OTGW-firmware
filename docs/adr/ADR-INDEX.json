@@ -5206,7 +5206,7 @@
       "path": "ADR-165-optimal-request-parallelism-esp32s3-webui-rest.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-07-06",
+      "date": "2026-10-02",
       "decision_summary": "Adopt N=2 as the confirmed safe-and-robust parallelism ceiling for RESTMAXINFLIGHT and WEBFILEMAXINFLIGHT on the ESP3...",
       "topics": [],
       "aliases": [],
@@ -5435,7 +5435,7 @@
       "path": "ADR-172-rate-limit-ui-polled-rest-endpoints.md",
       "format": "nygard",
       "status": "Proposed",
-      "date": "2026-07-26",
+      "date": "2026-10-02",
       "decision_summary": "A per-endpoint, globally-shared poll budget checked in the v2 dispatcher immediately before the handler call (restAPI...",
       "topics": [],
       "aliases": [],
@@ -6100,6 +6100,67 @@
         ],
         "verification": [
           "docs/api/MQTT.md, DHW Water Total, Persistence: the unclean-reboot bullet."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-184",
+      "title": "Queue the classic UI's API requests at two in flight",
+      "path": "ADR-184-queue-the-classic-ui-s-api-requests-at-two-in-flight.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-02",
+      "decision_summary": "The classic bundle routes every same-origin request to /api/ through one first-in-first-out queue with at most 2 requ...",
+      "topics": [
+        "concurrency",
+        "rest-gate",
+        "webui"
+      ],
+      "aliases": [
+        "classic UI fetch queue",
+        "client-side in-flight cap"
+      ],
+      "components": [
+        "classic web UI request queue (index.js window.fetch wrapper)"
+      ],
+      "symbols": [
+        "refreshDevTime",
+        "window.fetch"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Wrap window.fetch once, at the top of index.js, before any other code sends a request.",
+          "Route only URLs (web addresses) whose path contains /api/ through the queue. Every other URL goes to the original fetch unchanged.",
+          "Keep at most 2 queued requests in flight. When one settles, resolved or rejected, start the oldest waiting request.",
+          "Free the slot of a request that has not settled after 20 seconds, without aborting it, so one stalled request cannot block the page.",
+          "Keep fetchWithRetry(): the device gate tightens toward 1 under heap pressure, so a 503 stays possible.",
+          "Limit refreshDevTime() to one device/time request per 4 seconds."
+        ],
+        "must_not": [
+          "Abort, prioritise or batch queued requests.",
+          "Route static assets, WebSocket traffic or non-/api/ URLs through the queue.",
+          "Allow more than the 2 requests in flight that ADR-165 set."
+        ],
+        "exceptions": [
+          "The v2 bundle (v2.html, v2.js) is out of scope. It gets its own decision if a capture shows the same burst there."
+        ],
+        "verification": [
+          "Bench capture with Playwright on headless Edge, recorded in TASK-1193 (AC#1 to AC#3):",
+          "The request timeline of a main page load and of 5 page opens through the top navigation shows at most 2 /api/ requests in flight.",
+          "No response is 503 or 429.",
+          "The marker list is filled on every open."
         ]
       },
       "scope": {
@@ -10767,6 +10828,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-165",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-166",
       "target": "ADR-126",
       "type": "related",
@@ -10947,6 +11014,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-172",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-173",
       "target": "ADR-091",
       "type": "related",
@@ -11099,6 +11172,30 @@
     {
       "source": "ADR-183",
       "target": "ADR-176",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-184",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-184",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-184",
+      "target": "ADR-172",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-184",
+      "target": "ADR-173",
       "type": "related",
       "resolved": true
     }
