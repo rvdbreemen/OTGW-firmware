@@ -95,8 +95,12 @@ LEGAL_SEVERITIES = {"always_strict", "always_advisory", "advisory_before_strict_
 ALL_GATES = ["completeness", "audit", "evidence", "clarity", "consistency", "policy", "quality"]
 DEFAULT_GATES = ["completeness", "audit", "consistency"]
 
+# One lazy .*? as in adr-kit 0.36+/0.57 (adr_catalog.py). The v0.15.0 form,
+# (?:.*?\n)*?, nests a quantifier under DOTALL and backtracks exponentially when
+# an Enforcement section holds no ```json block: ADR-116 hung the policy gate
+# for 24 h (TASK-1200). Both forms match the same block on every other ADR.
 ENFORCEMENT_BLOCK_RE = re.compile(
-    r"^##\s+Enforcement\s*$\n+(?:.*?\n)*?```json\s*\n(.*?)\n```",
+    r"^##\s+Enforcement\s*$\n+.*?```json\s*\n(.*?)\n```",
     re.IGNORECASE | re.MULTILINE | re.DOTALL,
 )
 
