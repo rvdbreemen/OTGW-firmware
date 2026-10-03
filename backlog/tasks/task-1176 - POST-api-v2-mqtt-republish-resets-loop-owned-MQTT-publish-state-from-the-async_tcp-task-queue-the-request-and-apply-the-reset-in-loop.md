@@ -3,11 +3,11 @@ id: TASK-1176
 title: >-
   POST /api/v2/mqtt/republish resets loop-owned MQTT publish state from the
   async_tcp task; queue the request and apply the reset in loop()
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:45'
-updated_date: '2026-10-03 10:06'
+updated_date: '2026-10-03 12:37'
 labels:
   - bug
   - mqtt
@@ -100,8 +100,8 @@ OUT OF SCOPE: SAME CLASS, CONSEQUENCES NOT TRACED, SEPARATE TASKS
 <!-- AC:BEGIN -->
 - [x] #1 handleMqtt (restAPI.ino) no longer calls requestMQTTRepublishAll(). It calls queueMQTTRepublishAll(), which only raises a flag that loop() consumes. The comments at restAPI.ino:2059 and :2089 say the reset is queued for loop(). Static check: `grep -n "requestMQTTRepublishAll()" src/OTGW-firmware/*.ino` lists only the two MQTTstuff.ino callers (HA online, onMqttConnect) and the new consumer handlePendingMQTTRepublish() in OTGW-Core.ino. The consumer is called exactly once, from loop() in OTGW-firmware.ino immediately before drainOTFrameQueue(), and outside both #if HAS_PIC and the !isFlashing() block.
 - [x] #2 A curl transcript on the bench shows the API contract is unchanged: POST /api/v2/mqtt/republish returns 200 {"status":"republish_requested"}; a second POST within 60 s returns 429 with the retry seconds; with MQTT disconnected it returns 503 'MQTT not connected'; GET returns 405.
-- [ ] #3 Old-vs-fix task-context proof. Both builds carry the same test-only log line at the entry of requestMQTTRepublishAll, which prints the calling task name (pcTaskGetName(nullptr)). A REST POST logs 'async_tcp' on OLD (dev before the fix) and 'loopTask' on FIX. Control: a homeassistant/status offline -> online cycle logs 'loopTask' on both builds and re-publishes hvac_mode at the next master status frame. Telnet transcript attached.
-- [ ] #4 Old-vs-fix lost-update reproduction, following the repro plan. Both builds carry identical test-only instrumentation: a 'RACEWIN open' telnet marker, a 2 s stretch between the force-flag read (OTGW-Core.ino:2305) and the clear (:2324), and a lost-force counter. Run at least 10 marker-synchronized POSTs per build, with the replay as frame source. OLD: the counter increments on the synchronized trials, and at the next master status frame status_master is re-published but hvac_mode is not. FIX: the counter stays 0, and status_master and hvac_mode are both re-published at the next master status frame after every POST. Exclude trials where the 300 s hvac heartbeat could fire in the observation window. Attach capture transcripts for both builds.
+- [x] #3 Old-vs-fix task-context proof. Both builds carry the same test-only log line at the entry of requestMQTTRepublishAll, which prints the calling task name (pcTaskGetName(nullptr)). A REST POST logs 'async_tcp' on OLD (dev before the fix) and 'loopTask' on FIX. Control: a homeassistant/status offline -> online cycle logs 'loopTask' on both builds and re-publishes hvac_mode at the next master status frame. Telnet transcript attached.
+- [x] #4 Old-vs-fix lost-update reproduction, following the repro plan. Both builds carry identical test-only instrumentation: a 'RACEWIN open' telnet marker, a 2 s stretch between the force-flag read (OTGW-Core.ino:2305) and the clear (:2324), and a lost-force counter. Run at least 10 marker-synchronized POSTs per build, with the replay as frame source. OLD: the counter increments on the synchronized trials, and at the next master status frame status_master is re-published but hvac_mode is not. FIX: the counter stays 0, and status_master and hvac_mode are both re-published at the next master status frame after every POST. Exclude trials where the 300 s hvac heartbeat could fire in the observation window. Attach capture transcripts for both builds.
 - [x] #5 The committed fix contains none of the test-only instrumentation (task-name log, marker, stretch, counter): `git show <fix commit>` shows only the queue/consume change, the declarations and the comment updates.
 - [x] #6 build.bat builds esp32, esp32-classic and esp32-combo fresh, shown by the SUCCESS lines and fresh firmware.bin and littlefs.bin timestamps. `python evaluate.py --quick` shows no new FAIL. The prerelease tag is bumped with bin/bump-prerelease.sh in the same commit.
 <!-- AC:END -->
@@ -274,4 +274,36 @@ AC#2 TRANSCRIPT, 2026-10-03 10:01-10:06Z. Bench OTGW32 192.168.88.61, 2.0.0-alph
 4. Broker stopped (docker stop mosquitto), cooldown expired, mqttconnected false -> HTTP/1.1 503 {"error":{"status":503,"message":"MQTT not connected"}}. Broker restarted; the device reconnected within 41 s.
 Order note: the cooldown check runs before the MQTT-connected check. A POST inside the cooldown with MQTT down answers 429, not 503.
 Side observation, not in scope: POST settings mqttenable=false left the MQTT connection up for at least 90 s (mqttconnected stayed true), so the 503 case needed the broker stopped.
+
+AC#3/#4 bench run 2026-10-03, OLD side. OLD = d57d9e2d9 (3b3b6c4d1^), built as 2.0.0-alpha.379+d57d9e2; FIX = 3b3b6c4d1, alpha.380+3b3b6c4. Both carry the identical test-only T1176 patch (scripts kept out of the repo: patch_1176.py, run_1176.py, analyze_1176.py): a 'T1176 REPUBLISH task=<pcTaskGetName>' line at the entry of requestMQTTRepublishAll, a 'T1176 RACEWIN open' marker plus delay(2000) right after the force-flag read in the master-status path, and a lost-force counter just before the flag is cleared. Both .ino.bin files contain all four T1176 strings. Bench: OTGW32 (COM4), app-only flash so settings were kept, rig Mosquitto broker, replay fixture of MsgID 0 master and slave frames looped from /otgw_simulation.log (the original fixture was restored after each run).
+Sync check: on the host, 'open' and its 'close' arrive 2.0 s apart on every window, so the marker reaches the host while loopTask is still inside the stretch. A POST fired on the marker lands inside the window.
+AC#3 OLD: an unsynchronized REST POST /api/v2/mqtt/republish (200 republish_requested) logs 'T1176 REPUBLISH task=async_tcp'. Control: homeassistant/status offline then online logs 'T1176 REPUBLISH task=loopTask'; the next master frame closes with force=1, and status_master, hvac_mode and hvac_action reach the broker 2.5 s later.
+AC#4 OLD: 10 marker-synchronized POSTs, all 200. 10/10 'REPUBLISH task=async_tcp' inside a window, 10/10 'close force=0', lost-force counter 1 to 10. Broker within 6 s of each POST: status_master 10/10 (1.6-2.7 s), hvac_action 10/10, hvac_mode 0/10. One hvac_mode 5.9 s after trial 10 is the 300 s heartbeat: it came 302.5 s after the previous hvac_mode, which in turn came 301.5 s after the one before. FIX side follows.
+
+AC#3/#4 bench run 2026-10-03, FIX side and verdict. FIX = 3b3b6c4d1 (alpha.380+3b3b6c4), the same T1176 patch.
+AC#3 FIX: the unsynchronized REST POST (200 republish_requested) logs 'T1176 REPUBLISH task=loopTask' 0.09 s later. The next master frame closes with force=1, and status_master, hvac_mode and hvac_action reach the broker. Control: homeassistant/status offline then online logs 'task=loopTask' and the next frame closes with force=1. The control matches OLD.
+AC#4 FIX: 10 marker-synchronized POSTs, all 200. In each trial the POST lands inside the window (+0.03-0.04 s after 'open'), but 'REPUBLISH task=loopTask' runs only after that window has closed (+2.04-2.19 s, after 'close force=0'), so the flag is set outside the read-to-clear window. Lost-force count 0 in all 10.
+Device-side gate table (telnet only, so a single clock; gate_table_1176.py), per trial within POST..POST+9 s:
+- OLD, 10 of 10: 'REPUBLISH async_tcp' inside the window, then 'status_master publish[interval]', 'LOST', 'close force=0', then at the next frame 'status_master skip[no-change]' and 'close force=0'. No hvac_mode send in 9 of 10. The 10th hvac_mode send is the 300 s heartbeat (302.5 s after the previous one). Over the 10 OLD trials, the first hvac_mode after each POST came 287.7, 222.7, 157.8, 92.9, 28.0, 265.6, 200.7, 135.8, 70.9 and 5.9 s later: that is the heartbeat sawtooth.
+- FIX, 10 of 10: window close (status_master interval or no-change, force=0), then 'REPUBLISH loopTask', then at the next frame 'status_master publish[force]', 'close force=1' and 'Sending MQTT ... hvac_mode'. hvac_mode reached the broker 5.8-6.9 s after the POST in all 10.
+Correction to the AC#4 wording: on OLD, status_master does reach the broker at the window frame, but through the interval gate (reason [interval]). FIX shows the same publish at its window frame, so on neither build is that publish caused by the republish request. The difference between the builds is the force: OLD loses it 10 of 10 (no forced status_master, no hvac_mode); FIX keeps it 10 of 10 (forced status_master plus hvac_mode at the next frame).
+Evidence (out of the repo): %LOCALAPPDATA%/OTGW-capture/task1176/{old,fix}/ holds the telnet and MQTT transcripts, events, analysis.txt, gate_table.txt and the instrumented .ino.bin and .elf; the tools are next to them.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+POST /api/v2/mqtt/republish no longer resets loop-owned MQTT publish state from the async_tcp task. handleMqtt (restAPI.ino) now calls queueMQTTRepublishAll(), which only raises a flag; loop() consumes it through handlePendingMQTTRepublish() just before drainOTFrameQueue(), so requestMQTTRepublishAll() runs in loopTask, like the HA-online and onMqttConnect paths already did (commit 3b3b6c4d1, alpha.380). The REST contract is unchanged.
+
+Evidence per AC:
+- AC#1: static grep. requestMQTTRepublishAll() is called only from the two MQTTstuff.ino callers and the new loop consumer.
+- AC#2: curl transcript. 200 republish_requested, 429 within the 60 s cooldown, 503 'MQTT not connected' with the broker stopped, 405 on GET.
+- AC#3: OTGW32 bench, OLD (d57d9e2d9) against FIX (3b3b6c4d1), identical test-only instrumentation. A REST POST logs task=async_tcp on OLD and task=loopTask on FIX. The homeassistant/status offline-to-online control logs loopTask on both and re-publishes hvac_mode at the next master frame.
+- AC#4: 10 marker-synchronized POSTs per build, each landing inside a stretched 2 s read-to-clear window. The host saw 'open' to 'close' as 2.0 s, which proves the sync. OLD lost the force 10/10 (counter 1 to 10, close force=0, no hvac_mode send except the 300 s heartbeat). FIX lost 0/10: the republish runs after the window, and the next frame closes with force=1 and sends status_master [force] and hvac_mode (broker 5.8-6.9 s after the POST).
+- AC#5: git show of the fix commit, no instrumentation.
+- AC#6: three-target build plus evaluate.py, run at fix time.
+
+Correction recorded in the notes: on OLD, status_master does reach the broker at the window frame, but through its interval gate, the same as on FIX. The lost update concerns the force, and with it hvac_mode.
+
+Transcripts, tools and the instrumented binaries are kept out of the repo under %LOCALAPPDATA%/OTGW-capture/task1176/.
+<!-- SECTION:FINAL_SUMMARY:END -->

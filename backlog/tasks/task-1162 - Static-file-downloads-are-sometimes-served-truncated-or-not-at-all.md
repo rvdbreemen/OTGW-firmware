@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-03 08:41'
+updated_date: '2026-10-03 11:20'
 labels:
   - web
   - bug
@@ -122,4 +122,28 @@ Conclusion: switching the in-flight credit off (CHUNK_INFLIGHT=0) does NOT preve
 - flag-OFF #2: 69 of 126.
 Run-to-run variance dominates, so H1 is not supported as the cause. The device-wide unresponsiveness in run #2 points to H3 (async_tcp starvation) or H2 (link congestion): stalled bodies would then be a symptom of the device going quiet.
 Next step: discriminate H2 from H3 with a capture during an episode. Device side: telnet async_tcp/loop watermarks, pcb counts, 'first 200 after stop'. Client side: pktmon (admin). One run per condition is not enough; compare stall counts over several runs per condition.
+
+LAYER PROBES, 2026-10-03, alpha.404+1d9ae71, flag ON (default), MQTT connected to the Docker test-rig broker. Scratchpad layer_probe_1162.py, run next to refresh_storm.py --workers 6,8 --seed 1124. It probes once per second: ICMP ping to the device, ICMP ping to the router (control, run 2 only), TCP connect to :80, and GET /api/v2/health.
+Run 2 (logs layers_1162_run2.jsonl and storm1162_layers_run2.txt): the 8-worker arm had 3 shorts and 43 timeouts. In the HTTP failure window, 83-204 s (120 s):
+- device ping 0/120
+- ROUTER ping 120/120
+- TCP connect 0/40
+- HTTP 0/41
+Run 1 (no control ping): windows of 9-212 s and 220-501 s with device ping 2/202 and 1/279, and connect 0/67 and 1/93.
+CONCLUSION: the device stops answering at the IP level, ICMP and the TCP handshake included, while the network is healthy. lwIP answers both without the application, so this is NOT async_tcp starvation (H3 refuted) and NOT the link (the router answered throughout). The device's own network stack goes deaf for 35-280 s.
+SMOKING GUN: afterwards /api/v2/device/info showed hd_min_free_heap = 504. The native allocator low-water mark since boot is 504 bytes free, and this boot (bootcount 5, uptime 02:24) only saw the two layer-probe storms. No reboot; free heap recovered to 80696 and maxfreeblock to 31732.
+New leading hypothesis, H4: under 6-8 parallel requests the heap runs out, the WiFi driver and lwIP cannot allocate RX buffers or pbufs, incoming frames are dropped in the driver, and the device stays network-deaf until the heap frees up. The shorts and timeouts in the storm are the symptom.
+Next step to confirm: capture COM4 during a storm. esp_wifi and lwIP ESP_LOG errors do reach USB-CDC (scripts/tests/_serialcap.py); note that opening COM4 resets the board via RTS. Then look at the heap budget per concurrent static-file serve.
+
+Run 3 (layer probes, router control ping, and a COM4 serial capture with host epoch timestamps, scratchpad serialcap_ts.py). The 8-worker arm had 2 shorts and 6 timeouts, then a stall of 289 s (112-401 s):
+- device ping 0/287
+- ROUTER ping 286/286
+- TCP connect 0/96
+- HTTP 0/97
+Three of three runs show the same signature: the device's IP stack goes deaf for 120-289 s while the network is healthy.
+Serial: 0 lines in 600 s. Nothing reached USB-CDC during the stall, so there is no direct log confirmation. Closing COM4 at the end reset the board (bootcount 5 -> 6), so run 3's heap low-water mark is lost. The device was still deaf when the probes stopped at 401 s; whether it recovered before the reset is unknown.
+Known open item, from the platformio.ini comment next to the async_tcp stack size: '16384 stops the PERMANENT wedge, not the transient conc>=6 overload; that needs an accept-layer heap guard + fewer/gzipped assets'. This task measures exactly that transient conc>=6 overload.
+Next options:
+(a) Diagnostic build that prints free heap, maxblk and pcbs every second to the USB-CDC (HWCDC) console, which does not depend on WiFi, to time the collapse against the stall.
+(b) The fix direction: an accept-layer heap guard that refuses new TCP connections below a heap floor before any request object is allocated. Optionally shrink the NimBLE host pools (TASK-1199, about 20.6 KB while BLE runs) to widen headroom.
 <!-- SECTION:NOTES:END -->
