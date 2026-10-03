@@ -1618,7 +1618,7 @@ static float satZonePidStep(uint8_t idx, float outsideTemp)
   float kp      = (coeff * curveValue) / divisor;
   float ki      = kp / 8400.0f;   // SAT_PID_AGGRESSION_V3
 
-  float error = target - roomTemp;
+  float error = satPidError(target, roomTemp);   // rounded like pid.py, so 0.1 stays inside the deadband (TASK-1195)
   float deadband = settings.sat.fDeadband;
 
   // Integral: only inside deadband (matches SAT Python convention).

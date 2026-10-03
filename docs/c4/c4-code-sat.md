@@ -84,23 +84,34 @@ PID controller with automatic gain calculation, deadband mode, temperature-based
 
 #### Key Functions
 
-- `satPidReset(): void` (line 51-71)
-  - Full PID state reset
+- `satPidError(float target, float room): float` (line 63-66)
+  - target - room rounded to 3 decimals, like pid.py's `TemperatureState.error`, so an error of exactly 0.1 is inside the 0.1 deadband (TASK-1195)
+  - Used by `satPidUpdate()` and by the zone PID (`satZonePidStep()` in SATcontrol.ino)
 
-- `satResetIntegral(): void` (line 43-48)
+- `satPidReset(): void` (line 94-114)
+  - Full PID state reset. Leaves the room-temperature change stamp alone, as pid.py's `reset()` keeps its timers
+
+- `satResetIntegral(): void` (line 86-91)
   - Resets PID integral to 0 (debug tool)
 
-- `_pidCalculateGains(float curveValue): void` (static, line 77-97)
+- `_pidCalculateGains(float curveValue): void` (static, line 120-142)
   - Auto-calculates Kp/Ki/Kd from heating curve value
   - Respects manual gains if bAutoGains=false
 
-- `_pidUpdateIntegral(float error, float curveValue, bool force): void` (static, line 104-130)
+- `_pidUpdateIntegral(float error, float curveValue, bool force): void` (static, line 149-179)
   - Updates integral term only inside deadband
   - Task #23: skips accumulation if bSolarGainActive
 
-- `_pidUpdateDerivative(float roomTemp): void` (static, line 138+)
-  - Temperature-based derivative with adaptive low-pass filter
+- `_pidUpdateDerivative(float roomTemp, float error): void` (static, line 187-247)
+  - Temperature-based derivative with adaptive low-pass filter, alpha = dt/(60+dt), ±5 cap
   - Freezes inside deadband, updates outside
+  - Timed by when the room temperature changed (`_pid_roomTempChangedMs`, stamped in `satPidUpdate()`), not by when the PID ran: pid.py times it by the sensor's `last_changed` (TASK-1195)
+  - The reference temperature (`_pid_derivRefTemp`) moves only together with the timer, so a step that the TASK-894 room EMA spreads over several control ticks counts in full; pid.py overwrites its `last_temperature` on every update and comes out low on such input
+  - Proof: `python test/host/test_sat_pid_derivative.py --old-rev <rev>`
+
+- `satPidUpdate(float roomTemp, float targetTemp, float heatingCurveValue, float boilerTemp): float` (line 251-320)
+  - Stamps the moment a new room temperature appears, before any early return
+  - Returns heatingCurveValue + P + I + D
 
 ### Module: SATpressure.ino
 

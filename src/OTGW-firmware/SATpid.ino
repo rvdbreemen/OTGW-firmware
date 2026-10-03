@@ -39,6 +39,32 @@ static uint32_t _pid_lastUpdateMs     = 0;
 static uint32_t _pid_lastDerivativeMs = 0;
 static bool   _pid_initialized        = false;
 
+// When the PID first saw the current room temperature (TASK-1195). It stands in
+// for HA's last_changed, by which pid.py times the derivative (climate.py:314).
+// satPidReset() leaves it alone: it describes the sensor, not the controller,
+// and pid.py's reset() keeps its timers as well.
+static float    _pid_roomTempSeen      = NAN;
+static uint32_t _pid_roomTempChangedMs = 0;
+
+// The room temperature at the moment _pid_lastDerivativeMs marks: the two always
+// move together, so the derivative measures one change over one time span. pid.py
+// overwrites its last_temperature on every update, also when it skips a change
+// that came within 60 s. A step that reaches the PID as several small changes
+// (the TASK-894 room EMA spreads every sensor step over about 8 control ticks)
+// then loses most of its delta while dt keeps running. On a step-wise sensor both
+// give the same result (TASK-1195).
+static float    _pid_derivRefTemp      = 0.0f;
+
+//=== PID error ===
+// target - room, rounded to 3 decimals the way pid.py rounds TemperatureState.error
+// (temperature/state.py). Unrounded, 21.0f - 20.9f is 0.1000004 and an error of 0.1
+// falls just outside the 0.1 deadband, where pid.py keeps it inside (TASK-1195).
+// The zone PID (satZonePidStep) uses it too.
+float satPidError(float target, float room)
+{
+  return roundf((target - room) * 1000.0f) / 1000.0f;
+}
+
 //=== Restore PID internal state from persistence (Task #589) ===
 // Called from satLoadPidState() after staleness validation.
 // Sets _pid_integral and _pid_rawDerivative directly so the very next
@@ -162,27 +188,35 @@ static void _pidUpdateDerivative(float roomTemp, float error)
 {
   float deadband = settings.sat.fDeadband;
 
+  // The timer runs on when the room temperature changed, not on when the PID ran:
+  // pid.py stamps every branch with the sensor's last_changed, so dt is the time
+  // between two room-temperature changes however often the PID runs (TASK-1195).
+  uint32_t changedMs = _pid_roomTempChangedMs;
+
   // Inside deadband: FREEZE derivative (keep last value), update timestamp only.
   // Uses the CURRENT error to exactly match Python pid.py:205 (abs(state.error) <= DEADBAND);
   // previously checked _pid_lastError, a 1-cycle lag at the deadband boundary. (TASK-893)
   if (fabsf(error) <= deadband) {
     // _pid_rawDerivative keeps its last value — intentional freeze
-    _pid_lastDerivativeMs = millis();
+    _pid_lastDerivativeMs = changedMs;
+    _pid_derivRefTemp     = roomTemp;
     return;
   }
 
-  uint32_t now = millis();
-  float deltaTime = (float)(now - _pid_lastDerivativeMs) / 1000.0f;
-
-  // Skip if insufficient time elapsed (prevents noise at fast sampling)
-  if (deltaTime <= SAT_PID_UPDATE_INTERVAL) return;
-
-  // No temperature change: just update timestamp
-  float tempDelta = roomTemp - _pid_lastRoomTemp;
+  // No temperature change: just update timestamp. pid.py checks this before the
+  // interval (pid.py:209-213), so an idle call cannot push the next step out.
+  float tempDelta = roomTemp - _pid_derivRefTemp;
   if (fabsf(tempDelta) < 0.001f) {
-    _pid_lastDerivativeMs = now;
+    _pid_lastDerivativeMs = changedMs;
+    _pid_derivRefTemp     = roomTemp;
     return;
   }
+
+  float deltaTime = (float)(changedMs - _pid_lastDerivativeMs) / 1000.0f;
+
+  // A change within the interval of the timer: skip it (pid.py: delta_time <= PID_UPDATE_INTERVAL).
+  // Timer and reference stay put, so the next update takes this change along.
+  if (deltaTime <= SAT_PID_UPDATE_INTERVAL) return;
 
   // Temperature-based derivative with NEGATIVE sign (SAT Python convention):
   // rising temp -> negative derivative -> reduces PID output (damping)
@@ -193,7 +227,8 @@ static void _pidUpdateDerivative(float roomTemp, float error)
     if (rawDeriv > SAT_PID_DERIVATIVE_CAP)  rawDeriv = SAT_PID_DERIVATIVE_CAP;
     if (rawDeriv < -SAT_PID_DERIVATIVE_CAP) rawDeriv = -SAT_PID_DERIVATIVE_CAP;
     _pid_rawDerivative = rawDeriv;
-    _pid_lastDerivativeMs = now;
+    _pid_lastDerivativeMs = changedMs;
+    _pid_derivRefTemp     = roomTemp;
     return;
   }
 
@@ -207,15 +242,23 @@ static void _pidUpdateDerivative(float roomTemp, float error)
   if (filtered < -SAT_PID_DERIVATIVE_CAP) filtered = -SAT_PID_DERIVATIVE_CAP;
 
   _pid_rawDerivative = filtered;
-  _pid_lastDerivativeMs = now;
+  _pid_lastDerivativeMs = changedMs;
+  _pid_derivRefTemp     = roomTemp;
 }
 
 //=== Main PID Update ===
 // Returns the PID output = heatingCurveValue + P + I + D
 float satPidUpdate(float roomTemp, float targetTemp, float heatingCurveValue, float boilerTemp)
 {
-  float error = targetTemp - roomTemp;
+  float error = satPidError(targetTemp, roomTemp);
   uint32_t now = millis();
+
+  // Stamp the moment a new room temperature shows up, before any early return.
+  // Calls that see the same temperature leave the stamp alone (TASK-1195).
+  if (!(fabsf(roomTemp - _pid_roomTempSeen) < 0.001f)) {   // true on the first call: Seen starts as NAN
+    _pid_roomTempSeen      = roomTemp;
+    _pid_roomTempChangedMs = now;
+  }
 
   // Initialize on first call
   if (!_pid_initialized) {
@@ -224,7 +267,8 @@ float satPidUpdate(float roomTemp, float targetTemp, float heatingCurveValue, fl
     _pid_lastRoomTemp     = roomTemp;
     _pid_lastCurveValue   = heatingCurveValue;
     _pid_lastUpdateMs     = now;
-    _pid_lastDerivativeMs = now;
+    _pid_lastDerivativeMs = _pid_roomTempChangedMs;   // when the current temperature appeared
+    _pid_derivRefTemp     = roomTemp;
     _pid_initialized      = true;
   }
 
