@@ -3,11 +3,11 @@ id: TASK-1052
 title: >-
   Port 1.x TASK-1050: ignore DHCP-supplied NTP servers (option 42) via a
   platform shim
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-31 19:51'
-updated_date: '2026-08-25 19:39'
+updated_date: '2026-10-03 18:02'
 labels: []
 dependencies: []
 ordinal: 247000
@@ -26,7 +26,8 @@ Port of otgw-1.x.x commit 6eceed8f7 (v1.7.2). VERIFIED APPLICABLE ON ESP32-S3: D
 - [x] #3 no raw esp_sntp/sntp symbol appears outside the platform headers
 - [x] #4 build.bat green for esp32 target
 - [x] #5 python evaluate.py --quick shows no new abstraction-boundary violations
-- [ ] #6 Field-verified on a bench S3 against a DHCP server that sends option 42: no DHCP-supplied NTP server in the SNTP config after boot AND after a forced lease renewal
+- [x] #6 Maintainer decision 2026-10-03: the binary single-writer proof is accepted as the evidence that no DHCP-supplied NTP server reaches SNTP on ESP32. In both ELFs the reject flag lives in .bss (zero at boot), its only writer is called from startWiFi with 0, and esp_netif_sntp_init (the only IDF code that writes 1) is not linked. The bench option-42 field test is dropped.
+- [x] #7 The shim is kept as insurance against a framework that flips the default, and it skips the call while the TCP/IP stack is not initialised (sys_thread_tcpip(LWIP_CORE_IS_TCPIP_INITIALIZED)). The 'leaks heap on every renewal' premise is corrected in platform_esp32.h and networkStuff.ino. build.bat is green for esp32, esp32-classic and esp32-combo (alpha.405), and evaluate.py --quick shows 0 failures.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -85,4 +86,33 @@ AC#6 STILL OPEN and unchanged. The bench board is provisioned for a 192.168.1.x 
 2026-08-25 backlog sweep: code is implemented and committed on this branch; verified by git rather than by the task file. TASK-1068 and TASK-1069 both landed in a7e06f8df; TASK-1052's shim is at platform_esp32.h:234 with the call at networkStuff.ino:92. Every AC except the on-device one is met.
 
 Left In Progress deliberately. The remaining AC needs ESP32 hardware in the loop, which no amount of code reading can substitute for, and flipping the task to Done would claim a verification that never happened.
+
+2026-10-03 read-only research plus an independent adversarial verification. Reports are kept out of the repo at %LOCALAPPDATA%/OTGW-capture/research-2026-10-03/task1052-*.md.
+
+FINDING, confirmed twice in source and in both current ELFs (esp32 and esp32-combo, alpha.404). The lwIP flag that lets DHCP option 42 replace SNTP servers, sntp_set_servers_from_dhcp, is a zero-initialised .bss byte (IDF lwip/apps/sntp/sntp.c:246-248). It is read only in dhcp_set_ntp_servers (:834) and written only by sntp_servermode_dhcp (:784-792). In the linked image the only caller of esp_sntp_servermode_dhcp is startWiFi, and it passes 0. esp_netif_sntp_init, the only IDF code that can set the flag to 1, is not linked.
+Consequences:
+- On ESP32, DHCP-supplied NTP servers are rejected with or without the shim; the shim writes 0 over 0.
+- CONFIG_LWIP_DHCP_GET_NTP_SRV=y only makes the client request option 42; it does not let option 42 in.
+- The 'leaks heap on every lease renewal' premise does not hold on this lwIP (2.2.0 development snapshot). The path copies into a static table, every timer rearm cancels first, and Kiss-of-Death exclusion is present. This is from source only, with no bench data.
+- The stale premise appears in networkStuff.ino:87-89, platform_esp32.h:212-214 and :232-233, and in this task's description.
+- AC#6 as written passes with or without the shim, so there is no OLD failure to reproduce. A real verdict needs a positive control: force the flag to 1 on a test build and show option 42 taking over slot 0.
+- No option-42 source exists today. The router's config is unknown (a zero-packet check is to read the router config). The laptop hotspot (ICS) cannot set DHCP options. A wired rig (laptop Ethernet to the bench W5500 plus a small Python DHCP responder) is possible but has unverified preconditions.
+DECISION FOR THE MAINTAINER:
+(a) accept the binary single-writer proof as AC#6 evidence and fix the stale comments; or
+(b) build the positive-control bench (test-only keys N/R/K, sntp_restart, an option-42 source).
+Separately: keep the shim as insurance against a future framework that defaults the flag to 1 (then guard it with sys_thread_tcpip(LWIP_CORE_IS_TCPIP_INITIALIZED), because it asserts if tcpip never initialised), or remove it as dead code. Its only observed runtime effect so far was the alpha.348-350 boot loop.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Port of 1.x TASK-1050 to 2.0.0. The platformIgnoreDhcpNtp() shim keeps DHCP-supplied NTP servers (option 42) out of SNTP, so only our own server from startNTP() is used. Research on 2026-10-03 (one pass plus an independent verification) showed that on this framework lwIP's reject flag already starts at 0 and nothing sets it to 1. The shim therefore pins the default instead of changing it, and the premise that the DHCP path leaks heap on every renewal does not hold on ESP32 (lwIP 2.2.0 development snapshot, from source).
+alpha.405 keeps the shim as insurance against a framework that flips the default. It now skips the call while the TCP/IP stack is not initialised, which removes the tcpip_callback assert path, and it corrects the comments.
+
+Evidence:
+- AC#1-#5: as recorded at port time.
+- AC#6: the maintainer accepted the binary proof on 2026-10-03. In both ELFs the flag is a .bss byte, the only call passes 0 (from startWiFi), and esp_netif_sntp_init is not linked.
+- AC#7: build.bat green for esp32, esp32-classic and esp32-combo (alpha.405+8fdc3b3, SUCCESS lines and fresh .ino.bin and .littlefs.bin, 19:53-20:01), and evaluate.py --quick 78 checks with 0 failures and 0 warnings.
+
+Research reports are kept out of the repo at %LOCALAPPDATA%/OTGW-capture/research-2026-10-03/task1052-*.md.
+<!-- SECTION:FINAL_SUMMARY:END -->

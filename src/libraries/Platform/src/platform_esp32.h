@@ -209,30 +209,25 @@ inline void platformNtpHostnameFix(const char *hostname) {
   (void)hostname;
 }
 
-// Refuse DHCP-supplied NTP servers (DHCP option 42). The Arduino-ESP32 esp32s3
-// sdkconfig ships CONFIG_LWIP_DHCP_GET_NTP_SRV=y, so lwIP hands every
-// DHCP-offered NTP server to the SNTP module on each lease renewal. On the
-// ESP8266 line the same setting leaked heap every renewal on routers that
-// actually send option 42 (Pi-hole, some D-Link), with a field signature of an
-// uptime-locked heap onset at the T1 renewal followed by a reboot (1.x
-// TASK-1050). We configure our own server in startNTP(), so a DHCP-supplied
-// one is unwanted regardless of whether it leaks here.
+// Keep DHCP-supplied NTP servers (DHCP option 42) out of the SNTP module; we
+// configure our own server in startNTP(). With CONFIG_LWIP_DHCP_GET_NTP_SRV=y
+// lwIP requests option 42 and passes every offered server to
+// dhcp_set_ntp_servers(), but SNTP only takes it when the flag
+// sntp_set_servers_from_dhcp is 1. On this framework that flag starts at 0 and
+// nothing in the image sets it to 1 (TASK-1052, checked in the source and in
+// the linked ELFs), so this call pins the default rather than changing it. It
+// keeps the reject in place if a future framework or library flips the default.
 //
-// ORDERING CONTRACT: the TCP/IP stack must already be up when this runs.
-// esp_sntp_servermode_dhcp() does not touch the flag directly; it hands the
-// work to the lwIP thread via tcpip_callback(), whose first statement is
-// LWIP_ASSERT("Invalid mbox", sys_mbox_valid_val(tcpip_mbox)). tcpip_mbox is
-// NULL until tcpip_init() runs, and this build keeps that assert live
-// (CONFIG_LWIP_ESP_LWIP_ASSERT=y plus assertions enabled, so lwIP's
-// port/esp32xx/include/arch/cc.h maps LWIP_PLATFORM_ASSERT to __assert_func).
-// Calling this before the stack is up therefore aborts rather than silently
-// doing nothing. Arduino's initArduino() never brings lwIP up: the first
-// esp_netif_init() in our boot path comes from WiFi.mode() ->
-// wifiLowLevelInit() -> Network.begin(). Hence the call site sits immediately
-// after WiFi.mode(WIFI_STA) in startWiFi(), which is also still ahead of the
-// leak trigger (the T1 lease renewal).
+// esp_sntp_servermode_dhcp() hands the work to the lwIP thread through
+// tcpip_callback(), which asserts when the TCP/IP stack is not up yet
+// (CONFIG_LWIP_ESP_LWIP_ASSERT=y). The guard skips the call in that case;
+// skipping is safe because the flag already holds the reject value. In our boot
+// path the stack comes up in WiFi.mode() (wifiLowLevelInit() -> Network.begin()
+// -> esp_netif_init()), so startWiFi() calls this right after WiFi.mode().
 inline void platformIgnoreDhcpNtp() {
-  esp_sntp_servermode_dhcp(0);
+  if (sys_thread_tcpip(LWIP_CORE_IS_TCPIP_INITIALIZED)) {
+    esp_sntp_servermode_dhcp(0);
+  }
 }
 
 // Heap information
