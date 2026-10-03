@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-03T09:27:49.217Z
-> Files: 625 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-03T10:48:49.952Z
+> Files: 626 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -775,6 +775,10 @@
 - `parser.py` — Base option parser setup (~3951 tok)
 - `progress_bars.py` — SQLAlchemy model (~1345 tok)
 
+## bin/
+
+- `adr-lint` — Declares PolicyError (~9534 tok)
+
 ## docs/adr/
 
 - `ADR-088-mqtt-status-burst-windowing-and-cooldown.md` — ADR-088: MQTT Status Burst Windowing and Post-Burst Cooldown (~2885 tok)
@@ -894,6 +898,7 @@
 
 - `README.md` — Project documentation (~899 tok)
 - `test_adr_governance.py` — Unit tests for scripts/adr_governance.py (stdlib unittest, no pytest). (~1933 tok)
+- `test_adr_lint_enforcement_regex.py` — TASK-1200: bin/adr-lint's ENFORCEMENT_BLOCK_RE must not backtrack exponentially. (~670 tok)
 - `test_evaluate.py` — TestIsHotPathFile: test_sat_files_are_hot, test_mqttstuff_is_hot, test_restapi_is_hot, test_otgw_cor (~11620 tok)
 - `test_oled_row_clear.cpp` — TASK-1151 — OLED status rows must not keep the tail of longer previous text. (~1826 tok)
 - `test_refresh_storm.py` — Self-test for scripts/tests/refresh_storm.py (TASK-1124) against a local stub. (~12647 tok)

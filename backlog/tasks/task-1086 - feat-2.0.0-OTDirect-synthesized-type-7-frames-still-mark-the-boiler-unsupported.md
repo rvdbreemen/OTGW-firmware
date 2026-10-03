@@ -3,11 +3,11 @@ id: TASK-1086
 title: >-
   feat-2.0.0: OTDirect-synthesized type-7 frames still mark the boiler
   unsupported
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-24 20:32'
-updated_date: '2026-09-30 14:42'
+updated_date: '2026-10-03 09:35'
 labels:
   - bug
 dependencies: []
@@ -30,7 +30,7 @@ Why this was not fixed in the same change: the obvious discriminator does not wo
 - [x] #1 Locally synthesized OTDirect type-7 A frames do not set boilerUnsupportedRead or boilerUnsupportedWrite
 - [x] #2 Genuine B frames from a real boiler on the OTDirect gateway path still count as boiler evidence
 - [x] #3 Proxy A frames that legitimately stand in for a boiler answer (ADR-103) still count
-- [ ] #4 Verified on a bench device in OTDirect master mode with no boiler attached: no msgid is reported unsupported
+- [x] #4 Verified on a bench device in OTDirect master mode with no boiler attached: no msgid is reported unsupported
 - [x] #5 Locally synthesized answers cannot RETRACT a genuine unsupported verdict either — the current rsptype == OTGW_BOILER guard blocks the (T,A) cases but NOT loopback mode, which fabricates frames labelled 'B' (OTDirect.ino:1213-1215)
 <!-- AC:END -->
 
@@ -53,15 +53,28 @@ Implementation 2026-09-30 (workflow wf_33a155e0-d5c: implement, adversarial revi
 - AC#4 needs the bench in OT-Direct master mode with no boiler; start it with /ot-boiler.json deleted and a prompt reboot, or verdicts persisted by older builds can fail it for a reason unrelated to this fix. Four related consumers outside these ACs: TASK-1185.
 
 Build 2026-09-30 alpha.392: build.bat --target all, esp32, esp32-classic and esp32-combo firmware and filesystem all SUCCESS, 'Build completed successfully!', fresh binaries; the 4th processOT() parameter with its header-only default compiles through the Arduino prototype generation on xtensa. evaluate.py --quick: 70 passed, 0 warnings, 0 failed. Log: %LOCALAPPDATA%/OTGW-capture/build-alpha392-task1086.log
+
+AC#4 BENCH, 2026-10-03, OTGW32 192.168.88.61 running 2.0.0-alpha.404+1d9ae71 (it contains this fix, alpha.392). No boiler and no thermostat on the bus; /ot-boiler.json absent (38-file listing checked).
+(1) Master mode as AC#4 words it: otdmode master, about 1 h uptime since the last flash. GET /api/v2/otgw/boiler-support gave unsupported_read [] and unsupported_write []. A 30 s /ws capture showed only keepalives, no OT frames. This case is TRUE BUT NOT DISCRIMINATING: synthesized type-7 frames need a thermostat (handleMasterModeSlaveFrame), so old and new code would both show empty lists here.
+(2) The discriminating case, loopback (GW=L), which fabricates boiler frames including type-7 for unknown ids (OTDirect.ino:1188-1215). In a 90 s /ws capture there were 357 R and 358 B frames. Type-7 UNKNOWN_DATA_ID B frames came for 67 distinct msgids (29-32, 34-39, 50-55, 58-63, 70-115); ids 29, 30, 31, 32, 35, 36 and 38 had 9 each, well past the 3-strike threshold. boiler-support afterwards was still unsupported_read [] and unsupported_write []. The old code marks exactly these unsupported (host harness test_boiler_unsupported_origin.py, D-cases).
+Bench restored: GW=2 gives runtime master and persisted otdmode 3, as before. GW=L had persisted 4.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Locally synthesized OT-Direct frames no longer count as boiler evidence in boilerUnsupportedRead/Write, in either direction. bridgeFrameToParser() tags every 'A' (master mode, UI=/SR= tables, TASK-1178 replies) and every loopback 'B' as a local answer; the tag rides the frame queue and processOT's one-frame delay, and gates the UNKNOWN-DATAID set and both Ack retracts. Genuine OT-Direct B frames and PIC proxy A frames count as before.
+Locally synthesized OT-Direct frames no longer count as boiler evidence in boilerUnsupportedRead/Write, in either direction.
+- bridgeFrameToParser() tags as a local answer every 'A' frame (master mode, UI=/SR= tables, TASK-1178 replies) and every loopback 'B' frame.
+- The tag rides the frame queue and processOT's one-frame delay, and gates the UNKNOWN-DATAID set and both Ack retracts.
+- Genuine OT-Direct B frames and PIC proxy A frames keep counting.
+
 Evidence per AC:
-- AC#1, #5: test/host/test_boiler_unsupported_origin.py (real sliced bridge, queue and processOT): OLD c39068977 wrongly sets on D1-D5 and wrongly retracts on D6-D7; FIX does neither.
-- AC#2, #3: controls G1-G7 (genuine OT-Direct B) and P1-P7 (PIC proxy A) byte-identical OLD vs FIX.
+- AC#1, #5: test/host/test_boiler_unsupported_origin.py (the real sliced bridge, queue and processOT). OLD c39068977 wrongly sets on D1-D5 and wrongly retracts on D6-D7; FIX does neither.
+- AC#2, #3: controls G1-G7 (genuine OT-Direct B) and P1-P7 (PIC proxy A) are byte-identical OLD against FIX.
+- AC#4 (bench, 2026-10-03): OTGW32 on alpha.404+1d9ae71, no boiler, no thermostat, no /ot-boiler.json.
+  - In master mode GET /api/v2/otgw/boiler-support stayed empty. Without a thermostat no frames reach the parser, so this case does not discriminate.
+  - The discriminating run was loopback (GW=L) for 90 s: 357 R and 358 fabricated B frames, type-7 for 67 msgids, ids 29-32/35/36/38 nine times each. boiler-support stayed {unsupported_read: [], unsupported_write: []}.
+  - Bench restored to master (persisted otdmode 3).
 - Build: alpha.392, three targets fresh; evaluate --quick 0 FAIL.
-OPEN, blocking Done: AC#4 needs the bench in OT-Direct master mode with no boiler (delete /ot-boiler.json and reboot first). Related consumers outside these ACs: TASK-1185.
+Related consumers outside these ACs: TASK-1185.
 <!-- SECTION:FINAL_SUMMARY:END -->

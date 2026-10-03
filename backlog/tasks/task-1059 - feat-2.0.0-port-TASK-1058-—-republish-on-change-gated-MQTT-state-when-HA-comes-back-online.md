@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-08-07 21:40'
-updated_date: '2026-09-30 09:49'
+updated_date: '2026-10-03 10:23'
 labels:
   - bug
   - mqtt
@@ -26,7 +26,7 @@ Port of otgw-1.x.x TASK-1058 / ADR-088 to the 2.0.0 line, governed by ADR-174 (A
 <!-- AC:BEGIN -->
 - [x] #1 homeassistant/status offline->online triggers requestMQTTRepublishAll()
 - [x] #2 A replayed or retained online without a preceding offline does NOT trigger a republish
-- [ ] #3 hvac_mode and hvac_action are re-sent after an HA restart without a reboot
+- [x] #3 hvac_mode and hvac_action are re-sent after an HA restart without a reboot
 - [x] #4 All other on-change gated values are re-sent (MsgID slots, status/statusVH bits+bytes, ASF/RBP/RO)
 - [x] #5 No discovery-config republish is introduced; the ADR-100 JIT discovery decision stays intact
 - [x] #6 publishHvacMode/publishHvacAction latch their cache only on a confirmed send, else fall back to the unset sentinel
@@ -46,4 +46,16 @@ Noted but out of scope: restAPI.ino:1993 calls requestMQTTRepublishAll() from th
 Build: build.bat, all three envs relinked fresh with githash dd5a701 (classic 23:59:32, otgw32 23:56:32, combo 00:02:34). Evaluator 68/76 passed, 0 failed, 1 warning (STATUS_BURST_COOLDOWN_MS bound: boards.h not found) which is pre-existing and unrelated to this diff.
 
 2026-09-30 docs aligned with the shipped behaviour (docs-only commit, no bump): docs/api/MQTT.md, docs/api/openapi.yaml, docs/c4/c4-code-mqtt.md, c4-component-integration-layer.md, c4-container.md and docs/manuals/nl/h10-bijlagen.md. An HA restart republishes STATE (ADR-174), not discovery; the reconnect republish only runs after >300 s offline; MQTTharebootdetection gates nothing; the daily heal (ADR-170) replaced the automatic verify; drip timing; the REST republish is queued for loop() (TASK-1176). Verification (workflow wf_fe6c4173-ec6, WP4 + review + fixup): a sentence inventory maps all 166 keyword lines of the six docs to code anchors (286 anchors, 0 failures) on both the base and current dev; 17 file:line citations checked for staleness on dev (0 stale); 39 regression patterns for the previously false sentences find nothing; openapi.yaml parses with the same 66 paths.
+
+AC#3 ON 2.0.0 HARDWARE, 2026-10-03. OTGW32 192.168.88.61 running 2.0.0-alpha.404+1d9ae71. MQTT to the Docker test-rig mosquitto 2.1.2 (192.168.88.32), mqtthaprefix homeassistant. OT traffic came from the shipped /otgw_simulation.log replay (750 ms per line; a master MsgID 0 frame every 22.5 s).
+HA restart signal: the rig's Home Assistant has no MQTT integration configured (core.config_entries has analytics, backup, go2rtc, google_translate, met, radio_browser, shopping_list and sun only). So the restart was replayed as the exact MQTT sequence HA produces: homeassistant/status 'offline' (will) and 10 s later 'online' (birth), both non-retained, sent with mosquitto_pub. The firmware only sees HA through these messages.
+Timeline (mosquitto_sub, OTGW/value/otgw-1020BA21B4F8/hvac_* plus homeassistant/status):
+- 10:18:51 hvac_mode heat, hvac_action heating (first publish)
+- 10:18:55 hvac_action idle (a change)
+- 10:18:55-10:20:21: nothing, 86 s with about 4 master frames. This is the control: unchanged values are not re-sent.
+- 10:20:21 homeassistant/status offline
+- 10:20:30 homeassistant/status online
+- 10:20:53 hvac_mode heat and 10:20:54 hvac_action idle: re-sent with unchanged values, about 23 s after 'online', i.e. at the next master frame.
+This is not the hvac heartbeat: HVAC_HEARTBEAT_INTERVAL_SEC is 300 (OTGW-Core.ino:2303), so the next heartbeat was due at about 10:23:51. No reboot: bootcount 5 -> 5, uptime 01:36 -> 01:39.
+AC#11 (field validation across a real HA restart) stays open. It needs a real HA with MQTT: either the MQTT integration added to the rig HA (broker 'mosquitto', port 1883, no auth; HA UI login required) or a restart of the production HA with the bench connected.
 <!-- SECTION:NOTES:END -->

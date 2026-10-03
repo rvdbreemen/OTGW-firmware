@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:45'
-updated_date: '2026-09-30 09:20'
+updated_date: '2026-10-03 10:06'
 labels:
   - bug
   - mqtt
@@ -99,7 +99,7 @@ OUT OF SCOPE: SAME CLASS, CONSEQUENCES NOT TRACED, SEPARATE TASKS
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 handleMqtt (restAPI.ino) no longer calls requestMQTTRepublishAll(). It calls queueMQTTRepublishAll(), which only raises a flag that loop() consumes. The comments at restAPI.ino:2059 and :2089 say the reset is queued for loop(). Static check: `grep -n "requestMQTTRepublishAll()" src/OTGW-firmware/*.ino` lists only the two MQTTstuff.ino callers (HA online, onMqttConnect) and the new consumer handlePendingMQTTRepublish() in OTGW-Core.ino. The consumer is called exactly once, from loop() in OTGW-firmware.ino immediately before drainOTFrameQueue(), and outside both #if HAS_PIC and the !isFlashing() block.
-- [ ] #2 A curl transcript on the bench shows the API contract is unchanged: POST /api/v2/mqtt/republish returns 200 {"status":"republish_requested"}; a second POST within 60 s returns 429 with the retry seconds; with MQTT disconnected it returns 503 'MQTT not connected'; GET returns 405.
+- [x] #2 A curl transcript on the bench shows the API contract is unchanged: POST /api/v2/mqtt/republish returns 200 {"status":"republish_requested"}; a second POST within 60 s returns 429 with the retry seconds; with MQTT disconnected it returns 503 'MQTT not connected'; GET returns 405.
 - [ ] #3 Old-vs-fix task-context proof. Both builds carry the same test-only log line at the entry of requestMQTTRepublishAll, which prints the calling task name (pcTaskGetName(nullptr)). A REST POST logs 'async_tcp' on OLD (dev before the fix) and 'loopTask' on FIX. Control: a homeassistant/status offline -> online cycle logs 'loopTask' on both builds and re-publishes hvac_mode at the next master status frame. Telnet transcript attached.
 - [ ] #4 Old-vs-fix lost-update reproduction, following the repro plan. Both builds carry identical test-only instrumentation: a 'RACEWIN open' telnet marker, a 2 s stretch between the force-flag read (OTGW-Core.ino:2305) and the clear (:2324), and a lost-force counter. Run at least 10 marker-synchronized POSTs per build, with the replay as frame source. OLD: the counter increments on the synchronized trials, and at the next master status frame status_master is re-published but hvac_mode is not. FIX: the counter stays 0, and status_master and hvac_mode are both re-published at the next master status frame after every POST. Exclude trials where the 300 s hvac heartbeat could fire in the observation window. Attach capture transcripts for both builds.
 - [x] #5 The committed fix contains none of the test-only instrumentation (task-name log, marker, stretch, counter): `git show <fix commit>` shows only the queue/consume change, the declarations and the comment updates.
@@ -266,4 +266,12 @@ AC#1 static check: grep 'requestMQTTRepublishAll()' src/OTGW-firmware/*.ino -> M
 AC#5: the commit carries no test-only instrumentation (no task-name log, marker, stretch or counter).
 AC#6: bin/bump-prerelease.sh alpha.379 -> alpha.380 in this commit; build.bat --target all: esp32, esp32-classic and esp32-combo SUCCESS for firmware and filesystem, fresh .ino.bin/.littlefs.bin 11:12-11:19 (alpha.380+d57d9e2, images saved under %LOCALAPPDATA%/OTGW-capture/img-alpha380-d57d9e2); evaluate.py --quick 69 passed, 0 warnings, 0 failed.
 OPEN: AC#2 (curl contract on the bench), AC#3/#4 (old-vs-fix task-context and lost-update proofs, which need identical test-only instrumented builds of OLD and FIX plus the OTGW32 bench on WiFi).
+
+AC#2 TRANSCRIPT, 2026-10-03 10:01-10:06Z. Bench OTGW32 192.168.88.61, 2.0.0-alpha.404+1d9ae71 (contains the fix 3b3b6c4d1). MQTT to the Docker test-rig mosquitto 2.1.2 at 192.168.88.32:1883 (anonymous). Scratchpad republish_1176.txt.
+1. POST /api/v2/mqtt/republish -> HTTP/1.1 200 OK {"status":"republish_requested"}
+2. POST again within 60 s -> HTTP/1.1 429 {"error":{"status":429,"message":"Republish cooldown active, retry in 60s"}}. The retry seconds are in the body; there is no Retry-After header.
+3. GET -> HTTP/1.1 405, Allow: POST, {"error":{"status":405,"message":"Method not allowed"}}
+4. Broker stopped (docker stop mosquitto), cooldown expired, mqttconnected false -> HTTP/1.1 503 {"error":{"status":503,"message":"MQTT not connected"}}. Broker restarted; the device reconnected within 41 s.
+Order note: the cooldown check runs before the MQTT-connected check. A POST inside the cooldown with MQTT down answers 429, not 503.
+Side observation, not in scope: POST settings mqttenable=false left the MQTT connection up for at least 90 s (mqttconnected stayed true), so the 503 case needed the broker stopped.
 <!-- SECTION:NOTES:END -->
