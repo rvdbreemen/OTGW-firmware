@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-03 11:20'
+updated_date: '2026-10-03 12:52'
 labels:
   - web
   - bug
@@ -146,4 +146,6 @@ Known open item, from the platformio.ini comment next to the async_tcp stack siz
 Next options:
 (a) Diagnostic build that prints free heap, maxblk and pcbs every second to the USB-CDC (HWCDC) console, which does not depend on WiFi, to time the collapse against the stall.
 (b) The fix direction: an accept-layer heap guard that refuses new TCP connections below a heap floor before any request object is allocated. Optionally shrink the NimBLE host pools (TASK-1199, about 20.6 KB while BLE runs) to widen headroom.
+
+Related observation, 2026-10-03 (from the TASK-1199 OLD baseline): with BLE switched on at runtime on the no-PSRAM OTGW32 (alpha.404, satbleriskack true), internal_free fell to about 15 KB, and the device went silent on REST for about 3 minutes WITHOUT any storm: 13 POSTs in a row timed out, hd_min_free_heap read 396 B, there was no reboot, and ping answered afterwards. It is the same signature as the storm episodes, reached through a different heap consumer. The TASK-1162 storm runs ran with BLE off (satbleriskack false), so BLE is not what caused those.
 <!-- SECTION:NOTES:END -->

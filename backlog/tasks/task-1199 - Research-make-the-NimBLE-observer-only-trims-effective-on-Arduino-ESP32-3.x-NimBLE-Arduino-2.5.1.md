@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-03 08:58'
-updated_date: '2026-10-03 11:09'
+updated_date: '2026-10-03 12:52'
 labels:
   - ble
   - research
@@ -62,4 +62,11 @@ Q4, options:
 Footprint, arithmetic from the pool definitions and not measured: host pools about 20.6 KB internal heap while BLE runs (ACL 6816, MSYS_2 7680, MSYS_1 3072, EVT 2736, CMD 260); controller statics 896 B; host statics about 5.4 KB. Savings per option: not measured.
 Agent recommendation: (a), host-only (observer role, MAX_CONNECTIONS 1, small ACL and MSYS pools, EVT counts unchanged), plus setScanDuplicateCacheSize. Verify with -E that the wrapper wins, then measure heap and maxblk after NimBLEDevice::init, old against new, on a no-PSRAM S3. Hold (b).
 Note: .pio/build/esp32-combo/firmware.* carry the timestamp 12:25 although the main session's last build was at 11:08. The research agent probably ran pio despite being told not to. Sizes are identical, build/ artifacts untouched.
+
+OLD baseline observation, 2026-10-03, bench OTGW32 (no PSRAM), alpha.404+220fca7, BLE consent satbleriskack set true at runtime through POST /api/v2/settings:
+- Internal heap: internal_free fell from 78668 to 15212 B within about a minute, and maxfreeblock from 40948 to 10228 B. No reboot. NimBLE with the framework host config costs about 63 KB of internal heap on this board.
+- The device reset a telnet client twice: once while BLE started, once right after a settings POST with BLE running.
+- REST: 13 consecutive POST attempts (10 s timeout each, 5 s apart) got no HTTP answer for about 3 minutes; then the 14th answered 200. hd_min_free_heap read 396 B afterwards. Ping answered again after the episode.
+- After riskack false and a reboot: internal_free 79376 B, maxfreeblock 42996 B.
+Consequences for AC#3: the bench script must tolerate minutes of REST silence on OLD with BLE on. A scan observable read over telnet is unreliable on OLD, because the session gets reset. Observables in the code: SATble.ino onResult() counts every advertisement (_bleAdCount); satBLELoop() prints 'SAT BLE: <n>s window: <ads> ads, <accepted> accepted, ...' once per iBleInterval when telnet debug key 7 is on (a toggle). GET /api/v2/sat/ble/discovery lists only parsed ATC/pvvx, BTHome v2 or MiBeacon sensors.
 <!-- SECTION:NOTES:END -->

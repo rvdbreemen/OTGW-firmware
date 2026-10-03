@@ -3,11 +3,11 @@ id: TASK-1059
 title: >-
   feat-2.0.0: port TASK-1058 — republish on-change gated MQTT state when HA
   comes back online
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-07 21:40'
-updated_date: '2026-10-03 10:23'
+updated_date: '2026-10-03 13:51'
 labels:
   - bug
   - mqtt
@@ -34,7 +34,7 @@ Port of otgw-1.x.x TASK-1058 / ADR-088 to the 2.0.0 line, governed by ADR-174 (A
 - [x] #8 The republish burst introduces no re-entrancy hazard on the async MQTT path (ADR-174 branch-local condition), confirmed by inspection or on-device test
 - [x] #9 Build green for the relevant esp32 target, verified on artifact freshness and the per-env SUCCESS line
 - [x] #10 python evaluate.py --quick shows no new failures
-- [ ] #11 Field validation on 2.0.0 hardware across a Home Assistant restart
+- [x] #11 Field validation on 2.0.0 hardware across a Home Assistant restart
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -58,4 +58,30 @@ Timeline (mosquitto_sub, OTGW/value/otgw-1020BA21B4F8/hvac_* plus homeassistant/
 - 10:20:53 hvac_mode heat and 10:20:54 hvac_action idle: re-sent with unchanged values, about 23 s after 'online', i.e. at the next master frame.
 This is not the hvac heartbeat: HVAC_HEARTBEAT_INTERVAL_SEC is 300 (OTGW-Core.ino:2303), so the next heartbeat was due at about 10:23:51. No reboot: bootcount 5 -> 5, uptime 01:36 -> 01:39.
 AC#11 (field validation across a real HA restart) stays open. It needs a real HA with MQTT: either the MQTT integration added to the rig HA (broker 'mosquitto', port 1883, no auth; HA UI login required) or a restart of the production HA with the bench connected.
+
+AC#11 field validation, 2026-10-03, OTGW32 bench on 2.0.0-alpha.404+220fca7 (current dev firmware), against the laptop test rig: Home Assistant 2026.6.3 in Docker plus Mosquitto. The maintainer authorized changes to the rig. The rig HA had no MQTT integration, so it got one: a config entry for broker mosquitto:1883 was added to its .storage, in the format the HA 2026.6.3 MQTT flow writes (VERSION 2.1, data {broker, port}, empty options). HA connected 3 s after start, and its birth and will messages are the defaults. The original file is backed up next to the evidence.
+Frame source: the onboard OT replay (/api/v2/simulate). No boiler or thermostat is attached; the replay emits a MsgID 0 master frame about every 22.6 s.
+Run t1059_sim2, a real HA restart via 'docker restart homeassistant'. Times are relative to the restart; telnet uses the device clock path and MQTT the broker clock:
+- +1.3 s: the device receives homeassistant/status = offline.
+- +14.3 s: master frame, status_master skip[no-change].
+- +26.1 s: the device receives homeassistant/status = online (HA birth).
+- +36.9 s: the next master frame gives status_master publish[force], then Sending MQTT hvac_mode [heat] (+37.0 s) and hvac_action [idle] (+37.8 s). The broker received status_master, hvac_mode and hvac_action at +37.0 to +37.7 s.
+- +59.5 and +82.1 s: skip[no-change]; +104.6 s: publish[interval] for status_master only, without hvac_mode.
+- bootcount 10 before and after; uptime kept running, so there was no reboot. PASS.
+Run t1059_sim: the same result (birth +23.0 s, then the three topics together 13 s later).
+Run t1059 (without the replay): birth seen, but no OT frames, so nothing to publish. That shows the republish rides on the next master frame; it is not an immediate burst.
+Evidence (out of the repo): %LOCALAPPDATA%/OTGW-capture/task1059/ (ha_restart_1059.py, MQTT and telnet transcripts, result.json per run).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Port of 1.x TASK-1058 to 2.0.0. When Home Assistant comes back online (homeassistant/status offline then online), the firmware re-publishes its on-change-gated MQTT state, hvac_mode and hvac_action included, without a device reboot (fix f638bbaff, ADR-174 accepted in dd5a70153, docs df0094ac0). A replayed or retained 'online' without a preceding 'offline' does not trigger it, and no discovery republish is added (ADR-100 stays intact).
+
+Evidence:
+- AC#1-#10: as recorded in the notes.
+- AC#11, field validation on 2.0.0 hardware: the OTGW32 bench on alpha.404+220fca7 and a real Home Assistant 2026.6.3 container restart on the laptop rig, with the onboard OT replay as frame source. HA's birth 'online' reached the device. At the next master frame the gate logged status_master publish[force], and hvac_mode and hvac_action were sent; the broker received all three about 11 s after the birth. bootcount was unchanged.
+- A run without OT frames shows that the republish waits for the next master frame.
+
+Transcripts are kept out of the repo under %LOCALAPPDATA%/OTGW-capture/task1059/.
+<!-- SECTION:FINAL_SUMMARY:END -->

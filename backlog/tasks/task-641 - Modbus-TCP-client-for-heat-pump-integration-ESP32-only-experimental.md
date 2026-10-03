@@ -1,10 +1,11 @@
 ---
 id: TASK-641
 title: 'Modbus TCP client for heat pump integration (ESP32-only, experimental)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-05-20 18:31'
-updated_date: '2026-10-01 17:07'
+updated_date: '2026-10-03 13:13'
 labels:
   - feature
   - esp32-only
