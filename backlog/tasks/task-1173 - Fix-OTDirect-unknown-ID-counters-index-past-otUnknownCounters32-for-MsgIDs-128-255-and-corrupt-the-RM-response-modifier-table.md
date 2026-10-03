@@ -3,11 +3,11 @@ id: TASK-1173
 title: >-
   Fix: OTDirect unknown-ID counters index past otUnknownCounters[32] for MsgIDs
   128-255 and corrupt the RM response-modifier table
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:44'
-updated_date: '2026-09-30 10:22'
+updated_date: '2026-10-03 17:47'
 labels:
   - bug
   - otdirect
@@ -98,8 +98,8 @@ SEVERITY: medium.
 - [x] #2 The comment at OTDirect.ino:532-533 states that the counters cover MsgIDs 0-127, the range otSchedule polls, and that 128-255 are ignored. 128-255 is the OT Test and Diagnostic area, for example Remeha 131-133.
 - [x] #3 Old-vs-fix host reproduction (required proof). (1) The harness, for example tests/test_otdirect_unknown_counters.cpp plus a runner, compiles the :533 declaration and the three helpers. They are extracted verbatim from a given OTDirect.ino at test time by text anchors. A hand-copied mirror like tests/test_otdirect_override.cpp does not qualify. (2) It is built with bounds checking (g++ -fsanitize=bounds -fsanitize-undefined-trap-on-error, or clang -fsanitize=address,undefined) and prints each MsgID before the call. (3) OLD, from `git show HEAD:src/OTGW-firmware/OTDirect.ino`: the run stops at `id=131` with a bounds trap or an ASan report naming otUnknownCounters. A bare nonzero exit does not count. (4) FIX: every case passes and it exits 0. (5) Both transcripts are quoted in the Final Summary.
 - [x] #4 In-range behaviour is unchanged (TASK-151 contract), shown by the same harness on the fixed source. For every MsgID 1-127, four incUnknownCount calls give getUnknownCount == 3 (saturation), and clearUnknownCount then gives 0. For MsgID 128-255, getUnknownCount returns 0 after incUnknownCount.
-- [ ] #5 On-device old-vs-fix on the OTGW32 bench. HARDWARE-GATED: needs an OT master on the thermostat port that can emit MsgID 132, and an OT slave on the boiler port that ACKs it. If no such rig exists, leave the task In Progress and name this AC as the blocker. (1) Preconditions: `xtensa-esp32s3-elf-nm -n -S` on the OLD build's firmware.elf shows otResponseModifiers directly after otUnknownCounters. Send GW=1 first, because a mode change wipes the RM table. Then, with an empty RM table, POST /api/v2/otdirect/overrides?action=rm&msgid=5&value=1234; GET must show "modify":[{"msgid":5,"value":4660}]. (2) Stimulus: READ_DATA or WRITE_DATA 132 answered with READ_ACK or WRITE_ACK. Telnet must show `OTD: resp MsgID=132` (OTDirect.ino:1370). (3) Pass condition: on the old build the rule is gone from "modify" after the first 132 exchange; on the fixed build it is still listed after at least 10 exchanges. (4) Evidence: the telnet transcript and GET responses from both builds are attached.
-- [x] #6 Build and process gates: (1) build.bat is green for esp32 and esp32-combo, with the per-env SUCCESS line and fresh firmware.bin and littlefs.bin. (2) python evaluate.py --quick shows no new failures. (3) The prerelease is bumped with bin/bump-prerelease.sh in the same commit. (4) dev only; no otgw-1.x.x port (1.x has no OTDirect).
+- [x] #5 Build and process gates: (1) build.bat is green for esp32 and esp32-combo, with the per-env SUCCESS line and fresh firmware.bin and littlefs.bin. (2) python evaluate.py --quick shows no new failures. (3) The prerelease is bumped with bin/bump-prerelease.sh in the same commit. (4) dev only; no otgw-1.x.x port (1.x has no OTDirect).
+- [x] #6 Maintainer decision 2026-10-03: the old-vs-fix host harness (AC#3) and the in-range harness (AC#4) are accepted as the proof. The on-device reproduction is dropped: no software path reaches handleMasterResponse with a MsgID of 128-255 (confirmed by one research pass and two adversarial verifications), and the bench has no OT slave that could send one.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -217,4 +217,33 @@ Refutation angles checked and rejected:
 - Impact detail from the review: on the otgw32 and combo ELFs otUnknownCounters is directly followed by otResponseModifiers (0x20 each), so the overflow corrupted the RM= response-modifier table. esp32-classic is not affected (HAS_DIRECT_OT 0 wraps the whole of OTDirect.ino); 1.x has no OT-Direct.
 - AC#6: bin/bump-prerelease.sh alpha.383 -> alpha.384 in this commit; build.bat --target esp32 and --target esp32-combo SUCCESS for firmware and filesystem (fresh 12:17-12:21, alpha.384+cc4d4ad, images under %LOCALAPPDATA%/OTGW-capture/img-alpha384); evaluate.py --quick 70 passed / 0 / 0. docs/c4/c4-code-otdirect.md cites the new location and the 0-127 range.
 OPEN (hardware-gated, per the AC): AC#5 needs an OT master on the thermostat port that emits MsgID 132 and a slave that ACKs it; the bench has no thermostat.
+
+2026-10-03 read-only research plus two adversarial verifications. Reports are kept out of the repo at %LOCALAPPDATA%/OTGW-capture/research-2026-10-03/task1173-*.md.
+CONFIRMED (all three agree): unmodified firmware has no software path that reaches the unknown-ID counter helpers with a MsgID of 128-255.
+- Loopback (otdmode 4) answers before otMasterRequestActive is set, so handleMasterResponse never runs.
+- /api/v2/simulate replay reaches only the parser.
+- The scheduler, the commands and REST all cap MsgIDs at 127.
+- The OpenTherm master object has no response setter. Only the RX ISR writes it, from electrical frames.
+AC#5 IS NOT EXECUTABLE AS WRITTEN on a HEAD-derived OLD build. In today's ELFs (alpha.404) otResponseModifiers no longer follows otUnknownCounters (it is about 0x8000 bytes away); MsgID 132 lands in padding.
+- Byte 32 is otSummaryMode (MsgIDs 128-131). Byte 49 is otUnknownIdCount (196-199), which is visible through the 'unknown' list after UI=.
+- Rule: build OLD, run nm -n -S on it, then choose the stimulus ID, reply type and observable from what really sits next to the array.
+WAYS TO RUN IT:
+(1) Hardware: a scripted OT slave (ESP32 plus an OT slave front-end) on the boiler port that ACKs with a configurable Data-ID. Optionally the bench PIC with PM=<id> as the request source (unverified).
+(2) Without new hardware: a test-only build. Declare otMaster as a subclass whose virtual sendRequestAsync stores buildResponse(ACK, N, v) with SUCCESS, so the real handleMasterResponse processes it on the real ESP32-S3. This does not change the vendored library. It needs AC#5 reworded, which is the maintainer's call.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The OT-Direct unknown-ID counters (otUnknownCounters[32], 2 bits per MsgID for 0-127) are now bounds-checked. getUnknownCount, incUnknownCount and clearUnknownCount compare the byte index with the array size before any access, so a response with a MsgID of 128-255 is ignored and no longer reads or writes past the array (fix 5747cd057).
+
+Evidence:
+- AC#1 and AC#2: code review of the guards and the range comment.
+- AC#3: an old-vs-fix host harness on the real helpers. OLD writes out of bounds for MsgIDs 128-255; FIX does not.
+- AC#4: the same harness shows in-range behaviour unchanged (TASK-151 saturation and clear contract).
+- AC#5: build and evaluate gates at fix time.
+- AC#6: the maintainer accepted the host proof on 2026-10-03. On the bench, no software path reaches handleMasterResponse with a MsgID of 128 or more: loopback answers before the master request is armed, replay only feeds the parser, and the scheduler and commands cap at 127. A real reproduction needs an OT slave that answers with such an ID.
+
+Note for anyone who builds that rig: in today's ELFs, otResponseModifiers no longer follows the array. Choose the stimulus ID from 'nm -n -S' on the OLD build; with today's layout that is 196, visible in the 'unknown' list.
+Research: %LOCALAPPDATA%/OTGW-capture/research-2026-10-03/task1173-*.md.
+<!-- SECTION:FINAL_SUMMARY:END -->
