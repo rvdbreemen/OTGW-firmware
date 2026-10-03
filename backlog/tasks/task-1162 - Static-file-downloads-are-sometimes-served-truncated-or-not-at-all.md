@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-02 20:06'
+updated_date: '2026-10-03 08:41'
 labels:
   - web
   - bug
@@ -98,4 +98,28 @@ Evidence that separates them: a client-side capture of a stalled connection. The
 - H2: retransmissions with growing gaps.
 - H3: the device stops ACKing the client at all.
 Then old-vs-fix with the storm. For H1 that means a build with -D ASYNCWEBSERVER_USE_CHUNK_INFLIGHT=0, which is a build flag, not a library edit.
+
+H1 EXPERIMENT, flag-OFF run #1 (2026-10-03 10:31 local). Bench OTGW32 192.168.88.61 running 2.0.0-alpha.402+febf7f4, the diagnostic build with -DASYNCWEBSERVER_USE_CHUNK_INFLIGHT=0 and ESPAsyncWebServer 3.11.2. SAT disabled, host idle.
+Command: .venv/Scripts/python.exe scripts/tests/refresh_storm.py --host 192.168.88.61 --workers 2,4,6,8 --seed 1124. These are the same args as the flag-ON idle rerun of 2026-10-02 22:42: 45 s per arm, abort 0.33, 15 paths, 2 /ws subscribers.
+Log: %LOCALAPPDATA%\OTGW-capture\refresh-storm\refresh_storm-192.168.88.61-storm-20261003-103124.ndjson.
+8-worker arm, flag-ON (22:42) against flag-OFF (now):
+- total 301 against 561;
+- ok 41 against 102;
+- 503 208 against 418;
+- short 2 against 0;
+- timeout 35 against 0;
+- aborted 15 against 41.
+The 2-, 4- and 6-worker arms had no shorts or timeouts in either run. Tool verdict PASS; bootcount 4->4.
+This is consistent with H1: with the in-flight credit off, no response stalls mid-body and throughput nearly doubles. Each condition has one run so far; a repeat of each is under way.
+Note: python on PATH is now /c/Tools/Codex/python 3.12, which has no websocket-client. Use the repo .venv interpreter.
+
+CORRECTION, flag-OFF run #2 (2026-10-03, same build, same args, idle host). It contradicts run #1.
+Log: refresh_storm-192.168.88.61-storm-20261003-<second run>.ndjson. Output: scratchpad storm1162_flagoff_2.txt. Tool VERDICT FAIL (exit 1).
+8-worker arm: 126 requests; ok 9, 503 39, short 2, timeout 67, aborted 9. The probe answered at 2.2 s (pcbs 10/16, maxblk 14324), then timed out at 9, 16, 23, 30, 37 and 44 s. For about 35 s the whole device stopped answering, not just single bodies. The gate balance failed (/api/v2/settings timed out 3x) and passed again after the arm. No reboot (boot 4->4); /ws errors 16.
+Conclusion: switching the in-flight credit off (CHUNK_INFLIGHT=0) does NOT prevent the stalls. Across the three 8-worker runs:
+- flag-ON 22:42: 37 of 301 stalled;
+- flag-OFF #1: 0 of 561;
+- flag-OFF #2: 69 of 126.
+Run-to-run variance dominates, so H1 is not supported as the cause. The device-wide unresponsiveness in run #2 points to H3 (async_tcp starvation) or H2 (link congestion): stalled bodies would then be a symptom of the device going quiet.
+Next step: discriminate H2 from H3 with a capture during an episode. Device side: telnet async_tcp/loop watermarks, pcb counts, 'first 200 after stop'. Client side: pktmon (admin). One run per condition is not enough; compare stall counts over several runs per condition.
 <!-- SECTION:NOTES:END -->

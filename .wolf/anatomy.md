@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-02T20:13:59.777Z
-> Files: 616 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-03T09:27:49.217Z
+> Files: 625 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -28,7 +28,7 @@
 - `Makefile` — Make build targets (~2037 tok)
 - `partitions_otgw_esp32_combo.csv` — OTGW-firmware ESP32-S3 COMBO partition table — single app (no OTA), 4MB flash (~364 tok)
 - `partitions_otgw_esp32.csv` — OTGW-firmware ESP32-S3 partition table — single app (no OTA), 4MB flash (~275 tok)
-- `platformio.ini` — Declares used (~4871 tok)
+- `platformio.ini` — Declares used (~4627 tok)
 - `README.md` — Project documentation (~5365 tok)
 
 ## .build-python/
@@ -797,7 +797,12 @@
 ## docs/c4/
 
 - `c4-code-otdirect.md` — C4 Code Level: OTDirect Module (ESP32 Native OpenTherm Master/Slave) (~11143 tok)
+- `c4-code-sat.md` — C4 Code Level: SAT (Smart Autotune Thermostat) Subsystem (~3636 tok)
 - `c4-code-web-assets.md` — C4 Code Level: Web Assets Module (~11297 tok)
+
+## docs/evidence/
+
+- `task994_ble_dram_hypotheses.md` — TASK-994: NimBLE internal-DRAM footprint on ESP32-S3 — hypotheses + proposal (~3051 tok)
 
 ## docs/manuals/en/
 
@@ -807,6 +812,10 @@
 
 - `h09-api-referentie.md` — Hoofdstuk 9: API-referentie (~13184 tok)
 
+## docs/research/
+
+- `2026-07-03-ble-memory-implementation-proposal.md` — BLE / web-stack memory — implementation proposal (TASK-994) (~1772 tok)
+
 ## scripts/
 
 - `adr_governance.py` — adr_governance.py - repo-local ADR governance checks for OTGW-firmware. (~2898 tok)
@@ -815,6 +824,7 @@
 ## scripts/tests/
 
 - `refresh_storm.py` — Request-storm and upload-abort tool for the 2.0.0 web stack (TASK-1124). (~22545 tok)
+- `sat_derivative_bench.py` — TASK-1195 bench check: does the SAT PID derivative follow a stepped room temperature? (~1219 tok)
 - `test_heap_soak_driver.py` — FirmwareContract: c_function, c_unescape, pstr_format, api_error_message + 7 more (~8258 tok)
 
 ## src/OTGW-firmware/
@@ -832,7 +842,8 @@
 - `OTGW-firmware.ino` — Declares WifiPortalResetState (~13910 tok)
 - `restAPI.ino` — include <string.h> (~60589 tok)
 - `SATble.ino` — Declares uint32_t (~15837 tok)
-- `SATcontrol.ino` — Declares float (~59740 tok)
+- `SATcontrol.ino` — Declares float (~59804 tok)
+- `SATpid.ino` — Declares float (~3533 tok)
 - `SATtypes.h` — Declares declaration (~10305 tok)
 - `settingStuff.ino` — include <ctype.h> (~22166 tok)
 - `webServerCompat.h` — Declares uint8_t (~5483 tok)
@@ -870,8 +881,14 @@
 - `test_pic_banner_recovery.py` — TASK-1179 host harness: does the loop-side banner consumer re-enable a PIC (~822 tok)
 - `test_raw_passthrough.cpp` — test/host/test_raw_passthrough.cpp  (TASK-1111 AC#1) (~1797 tok)
 - `test_raw_passthrough.py` — TASK-1111 AC#1 host harness: does every byte the PIC task reads reach (~2014 tok)
+- `test_sat_pid_derivative.cpp` — Declares float (~6928 tok)
+- `test_sat_pid_derivative.py` — TASK-1195 host harness: the SAT PID derivative timer, through the real SATpid.ino. (~2950 tok)
 - `test_webserver_listener_retry.cpp` — TASK-1130 host check: the port-80 listener comes back after a refused bind. (~2073 tok)
 - `test_webserver_listener_retry.py` — TASK-1130 host harness: the port-80 listener comes back after a refused bind. (~3347 tok)
+
+## test/host/sat_pid_shim/
+
+- `Arduino.h` — pragma once (~192 tok)
 
 ## tests/
 

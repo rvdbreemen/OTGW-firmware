@@ -3198,5 +3198,46 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-02T06:55:00"
+  },
+  {
+    "id": "bug-885",
+    "timestamp": "2026-10-02T22:20:00Z",
+    "error_message": "refresh_storm.py probe thread died mid-arm: KeyError 'total_ms'",
+    "file": "scripts/tests/refresh_storm.py",
+    "root_cause": "probe_loop read r['total_ms'], which http_exchange only sets after a connection is up; a refused or timed-out probe has no total_ms",
+    "fix": "probe_record() builds the probe line with .get() for status and total_ms; red-green test drives the real probe_loop against a closed port (c21e5b496)",
+    "tags": [
+      "tooling",
+      "storm",
+      "keyerror",
+      "task-1124"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-02T22:20:00Z"
+  },
+  {
+    "id": "bug-886",
+    "timestamp": "2026-10-03T07:00:00Z",
+    "error_message": "SAT derivative: only 9-26 of 39 room-temperature steps reached the filter, dt 60-150 s instead of 300 s; on the device path (TASK-894 room EMA) the derivative came out at 20-38% of pid.py; an error of exactly 0.1 counted as outside the deadband",
+    "file": "src/OTGW-firmware/SATpid.ino",
+    "root_cause": "_pidUpdateDerivative() timed dt by millis() at each PID update (idle updates moved the timer) and checked 60 s before the no-change branch; pid.py stamps every branch with the sensor's last_changed. With the always-on room EMA every step reaches the PID as ~8 small changes, and the literal pid.py last_temperature overwrite drops most of each one. The float error 21.0f-20.9f = 0.1000004 lands outside the 0.1 deadband; pid.py rounds TemperatureState.error to 3 decimals.",
+    "fix": "Sensor-side change stamp (_pid_roomTempChangedMs) set in satPidUpdate() before early returns; derivative runs on it in pid.py order; reference temperature (_pid_derivRefTemp) moves only with the timer (B', user decision); satPidError() rounds the error (primary + zone PID). Proof: test/host/test_sat_pid_derivative.py --old-rev febf7f4b4 --rev HEAD (edb5c5cfe, alpha.403).",
+    "tags": ["sat", "pid", "derivative", "deadband", "parity", "task-1195"],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-03T07:00:00Z"
+  },
+  {
+    "id": "bug-887",
+    "timestamp": "2026-10-03T07:25:00Z",
+    "error_message": "'build.bat' is not recognized as an internal or external command (background build reported exit 0, nothing was built)",
+    "file": "build.bat (invocation)",
+    "root_cause": "Started from Git Bash as cmd.exe //c \"build.bat ...\": cmd did not resolve build.bat in the cwd. The background task's exit code was that of the trailing echo, so the failure read as success.",
+    "fix": "Invoke from PowerShell: & .\\build.bat --target esp32-combo *> log; then check $LASTEXITCODE, the [SUCCESS] line and fresh bin mtimes before trusting the build.",
+    "tags": ["build", "tooling", "windows", "exit-code"],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-03T07:25:00Z"
   }
 ]

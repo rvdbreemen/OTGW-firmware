@@ -3,11 +3,11 @@ id: TASK-1197
 title: >-
   Fix: SAT zone PID picks its Kp divisor inverted, so radiator zones get the
   underfloor divisor
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-03 07:25'
-updated_date: '2026-10-03 07:30'
+updated_date: '2026-10-03 07:38'
 labels:
   - sat
   - bug
@@ -32,9 +32,9 @@ Context, not part of this task: the zone PID is P+I only. pid.py's area PIDs use
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 satZonePidStep() selects the divisor the same way as _pidCalculateGains() and pid.py: 4 for underfloor, 3 otherwise, with AUTO resolved through satGetEffectiveHeatingSystem()
-- [ ] #2 Old-vs-fix host proof in test/host/test_sat_pid_derivative.py, which already slices the zone step: a case derives the zone Kp from the zone output for RADIATORS, UNDERFLOOR and AUTO. The old code fails RADIATORS and UNDERFLOOR; the fix passes all three; a mutant restoring '== 1' fails the case
-- [ ] #3 Prerelease bump in the same commit; build.bat esp32-combo green with a fresh firmware.bin; python evaluate.py --quick shows no new failures
+- [x] #1 satZonePidStep() selects the divisor the same way as _pidCalculateGains() and pid.py: 4 for underfloor, 3 otherwise, with AUTO resolved through satGetEffectiveHeatingSystem()
+- [x] #2 Old-vs-fix host proof in test/host/test_sat_pid_derivative.py, which already slices the zone step: a case derives the zone Kp from the zone output for RADIATORS, UNDERFLOOR and AUTO. The old code fails RADIATORS and UNDERFLOOR; the fix passes all three; a mutant restoring '== 1' fails the case
+- [x] #3 Prerelease bump in the same commit; build.bat esp32-combo green with a fresh firmware.bin; python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -50,4 +50,22 @@ Red already run on alpha.403: Z1 FAIL, with auto kp 20 (want 20), radiators kp 1
 
 <!-- SECTION:NOTES:BEGIN -->
 REPRODUCED 2026-10-03 on alpha.403 (edb5c5cfe). Command: python test/host/test_sat_pid_derivative.py --report worktree. Case Z1, with coeff 1.5 and curve 40: auto kp 20.00 (want 20.00), radiators kp 15.00 (want 20.00), underfloor kp 20.00 (want 15.00). Every other check passes.
+
+EVIDENCE 2026-10-03, committed revisions. Command: python test/host/test_sat_pid_derivative.py --old-rev edb5c5cfe --rev HEAD --defects Z1 (HEAD = 1d9ae71ae, alpha.404). Exit 0.
+- OLD (edb5c5cfe, alpha.403): Z1 FAIL. auto kp 20.00 (want 20.00), radiators kp 15.00 (want 20.00), underfloor kp 20.00 (want 15.00). The pid.py rules (C1, C2, C2b, C3, C5a, C6, C7, H1) pass.
+- FIX (HEAD): all checks pass. Z1 radiators 20.00, underfloor 15.00, auto 20.00.
+- Mutants: MZ (iHeatingSystem == 1 restored) fails Z1. MF, MC, MA, MB, MR and MRz still fail their own cases.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+satZonePidStep() picked its Kp divisor with iHeatingSystem == 1 ? 4 : 3. Radiator zones (1) got the underfloor divisor and underfloor zones the radiator one: Kp, and Ki with it, was 25% low on radiators and 33% high on underfloor. It now uses satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR ? 4 : 3, as _pidCalculateGains() and pid.py kp() do (commit 1d9ae71ae, alpha.404, pushed to origin/dev).
+
+Evidence per AC:
+- AC#1: the divisor line in SATcontrol.ino satZonePidStep(). Harness case Z1 passes on HEAD: radiators Kp 20, underfloor 15, auto 20, with coeff 1.5 and curve 40.
+- AC#2: python test/host/test_sat_pid_derivative.py --old-rev edb5c5cfe --rev HEAD --defects Z1, exit 0. OLD fails only Z1 (radiators 15, underfloor 20) and keeps the pid.py rules. FIX passes every check. The new mutant MZ (== 1 restored) fails Z1. The runner's mutants now name their source file.
+- AC#3: bump to alpha.404 in the same commit. build.bat --target esp32-combo (PowerShell): 'Successfully created ESP32S3 image', firmware SUCCESS 2:22, filesystem SUCCESS 0:25, fresh OTGW-firmware-esp32-combo-2.0.0-alpha.404+1d9ae71 artifacts (09:36). python evaluate.py --quick: 71 passed, 0 warnings, 0 failed.
+
+Behaviour change for testers: only multi-zone SAT (zone count > 1); single-zone is unchanged. Not in scope: the zone PID has no D term, while pid.py's area PIDs do.
+<!-- SECTION:FINAL_SUMMARY:END -->
