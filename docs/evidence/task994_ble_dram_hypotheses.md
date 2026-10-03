@@ -44,7 +44,15 @@ the self-review missed.
    build. The project's existing `-DCONFIG_BT_NIMBLE_MAX_CONNECTIONS=1`-style
    flags in `platformio.ini` work because they are read by the thin
    NimBLE-Arduino C++ WRAPPER source (`libraries/BLE`, which we DO compile
-   fresh) — they do not reach into the prebuilt blob. A Kconfig-level
+   fresh) — they do not reach into the prebuilt blob.
+   > **Correction 2026-10-03 (TASK-1198):** those flags did not work at all.
+   > NimBLE-Arduino 2.5.1 `nimconfig.h` includes the framework `sdkconfig.h`
+   > first on ESP_PLATFORM, so the sdkconfig values win. Preprocessing the real
+   > compile commands of `NimBLEDevice.cpp` (the wrapper) and `ble_hs.c` gives
+   > MAX_CONNECTIONS 3, ATT MTU 256, ACL_FROM_LL 24, MSYS_1 12, and all roles
+   > on. `ble_hs.c` is in our compile database, so the NimBLE-Arduino host is
+   > compiled from source, not taken from the prebuilt blob. The flags were
+   > removed; TASK-1199 covers making the trims effective. A Kconfig-level
    allocator option like `MEM_ALLOC_MODE_EXTERNAL` (if it exists at all for
    this IDF/NimBLE version — not confirmed either way) would need to have
    been baked in when that static library was built; it is not overridable

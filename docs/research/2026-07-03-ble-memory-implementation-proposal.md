@@ -74,6 +74,10 @@ For the esp32 env (OTGW32, no PSRAM), PSRAM cannot help. Levers that free INTERN
 - **H3**: host-pool trim (ACL_FROM_LL 12→2 ~2.8K, MSYS1 12→5 ~2K, ROLE_CENTRAL_DISABLED
   ~1-2K RAM + ~26K flash). Cheap, but small vs the 64K BLE cost; won't make BLE-on
   comfortable on OTGW32 alone.
+  *Correction 2026-10-03 (TASK-1198): H3 was applied as `-D` flags in platformio.ini, but
+  it never took effect. The framework sdkconfig.h decides these values for NimBLE-Arduino
+  on ESP32, so the savings above were never realised or measured. TASK-1199 covers a
+  working approach.*
 - **H5**: BLE default OFF on no-PSRAM boards (toggle stays). Product decision (TASK-975 was
   yours). With Option B's honest deinit, "off" would actually free the memory.
 Recommendation: OTGW32 realistically = BLE default OFF (H5) until H9+H3 are proven to make
