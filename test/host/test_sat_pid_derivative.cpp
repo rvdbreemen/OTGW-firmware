@@ -362,6 +362,36 @@ static void boundaryCases() {
         "zone integral after error 0.05: %+.6f, after error 0.1: %+.6f (inside: it grows)", zInside, zEdge);
 }
 
+// ---- zone PID Kp per heating system (TASK-1197) ------------------------------------
+// pid.py kp(): 4 if UNDERFLOOR else 3 (pid.py:70), and so does _pidCalculateGains().
+// With an error of 1.0 the zone integral is 0 (outside the deadband), so the zone
+// output is curve + kp * 1.0 and gives kp directly.
+static void zoneGainCases() {
+  printf("\n== zone PID Kp per heating system\n");
+  const uint8_t saved = settings.sat.iHeatingSystem;
+  struct { uint8_t hsys; const char* name; float divisor; } cases[] = {
+    {SAT_HSYS_AUTO, "auto", 3.0f}, {SAT_HSYS_RADIATORS, "radiators", 3.0f}, {SAT_HSYS_UNDERFLOOR, "underfloor", 4.0f}};
+  bool ok = true;
+  char detail[256];
+  int  pos = 0;
+  for (const auto& k : cases) {
+    settings.sat.iHeatingSystem = k.hsys;
+    SATZoneState& z = satZones[0];
+    z = SATZoneState();
+    z.bOff = false; z.bRoomValid = true; z.bSpValid = true;
+    z.fSetpoint = 21.0f;
+    z.fRoomTemp = 20.0f;                                 // error 1.0: outside the deadband
+    g_millis = BASE_MS;
+    z.iLastUpdateMs = g_millis;
+    const float kp   = satZonePidStep(0, 5.0f) - CURVE;
+    const float want = settings.sat.fHeatingCurveCoeff * CURVE / k.divisor;
+    if (fabsf(kp - want) > 0.01f) ok = false;
+    pos += snprintf(detail + pos, sizeof(detail) - pos, "%s kp %.2f (want %.2f); ", k.name, kp, want);
+  }
+  settings.sat.iHeatingSystem = saved;
+  check("Z1", ok, "%s", detail);
+}
+
 int main() {
   printf("== TASK-1195 SAT PID derivative harness\n");
   printf("   settings.sat: fDeadband=%.3f iControlInterval=%u s bAutoGains=%d fHeatingCurveCoeff=%.2f\n",
@@ -496,6 +526,7 @@ int main() {
 
   acThreeCases();
   boundaryCases();
+  zoneGainCases();
 
   printf("\n== %s: %d check(s) failed\n", g_fail ? "FAIL" : "PASS", g_fail);
   return g_fail ? 1 : 0;

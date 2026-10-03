@@ -23,7 +23,9 @@ OLD side (--old-rev): the pid.py rules the fix keeps (C1, C2, C2b, C3, C5a, C6, 
 the harness self-check H1 must pass; the defect checks must fail: the derivative timer
 (A2_reach, A2_dt, A2_oracle), the derivative on the device path through the TASK-894
 room EMA and on a fast sensor (E1, R1), and the deadband boundary at an error of 0.1
-(B1, B1d, B2). C4, C5b and C6b are reported for OLD, not judged.
+(B1, B1d, B2). C4, C5b and C6b are reported for OLD, not judged. --defects names the
+checks OLD must fail when the old side is another fix's "before": Z1 (the zone PID Kp
+divisor per heating system) for TASK-1197, with --old-rev edb5c5cfe.
 Mutants of the FIX source must each fail their named case: without that, a pass of the
 case proves nothing. Every substitution must match exactly once and change the text.
 
@@ -53,16 +55,20 @@ DEFECT = ["A2_reach", "A2_dt", "A2_oracle", "E1", "R1", "B1", "B1d", "B2"]
 
 ROUNDED = "return roundf((target - room) * 1000.0f) / 1000.0f;"
 
-# (id, what, [(old text, new text), ...], case that must fail)
+# (id, what, source, [(old text, new text), ...], case that must fail); source "pid" is
+# SATpid.ino, "ctl" is SATcontrol.ino.
 MUTANTS = [
-    ("MF", "deadband freeze removed", [("if (fabsf(error) <= deadband) {", "if (false) {")], "C1"),
-    ("MC", "raw cap removed", [("if (fabsf(rawDeriv) >= SAT_PID_DERIVATIVE_CAP) {", "if (false) {")], "C2"),
-    ("MA", "alpha fixed at 0.5", [("float alpha = deltaTime / (SAT_PID_UPDATE_INTERVAL + deltaTime);",
-                                   "float alpha = 0.5f;")], "C3"),
-    ("MB", "derivative reference is the last temperature seen (pid.py's literal last_temperature)",
+    ("MF", "deadband freeze removed", "pid", [("if (fabsf(error) <= deadband) {", "if (false) {")], "C1"),
+    ("MC", "raw cap removed", "pid", [("if (fabsf(rawDeriv) >= SAT_PID_DERIVATIVE_CAP) {", "if (false) {")], "C2"),
+    ("MA", "alpha fixed at 0.5", "pid", [("float alpha = deltaTime / (SAT_PID_UPDATE_INTERVAL + deltaTime);",
+                                          "float alpha = 0.5f;")], "C3"),
+    ("MB", "derivative reference is the last temperature seen (pid.py's literal last_temperature)", "pid",
      [("float tempDelta = roomTemp - _pid_derivRefTemp;", "float tempDelta = roomTemp - _pid_lastRoomTemp;")], "E1"),
-    ("MR", "error rounding removed (primary PID)", [(ROUNDED, "return target - room;")], "B1"),
-    ("MRz", "error rounding removed (zone PID)", [(ROUNDED, "return target - room;")], "B2"),
+    ("MR", "error rounding removed (primary PID)", "pid", [(ROUNDED, "return target - room;")], "B1"),
+    ("MRz", "error rounding removed (zone PID)", "pid", [(ROUNDED, "return target - room;")], "B2"),
+    ("MZ", "zone Kp divisor keyed on iHeatingSystem == 1 again", "ctl",
+     [("float divisor = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? 4.0f : 3.0f;",
+       "float divisor = (settings.sat.iHeatingSystem == 1) ? 4.0f : 3.0f;")], "Z1"),
 ]
 
 
@@ -79,18 +85,19 @@ def once(lines, pattern):
         raise SystemExit(f"anchor must match once, got {len(hits)}: {pattern}")
 
 
-def prepare(side, rev, mutations=()):
+def prepare(side, rev, mutations=(), target="pid"):
     """Write the side's slices and SATtypes.h into generated/<side>/; return that directory."""
     origin = f"git {rev}" if rev else "working tree"
-    pid = read(rev, PID_INO)
+    src = {"pid": read(rev, PID_INO), "ctl": read(rev, CONTROL_INO)}
+    for old, new in mutations:
+        if src[target].count(old) != 1:
+            raise SystemExit(f"mutant text must match once, got {src[target].count(old)}: {old!r}")
+        src[target] = src[target].replace(old, new)
+    pid = src["pid"]
     pid_lines = pid.splitlines()
     for a in PID_ANCHORS:
         once(pid_lines, a)
-    for old, new in mutations:
-        if pid.count(old) != 1:
-            raise SystemExit(f"mutant text must match once, got {pid.count(old)}: {old!r}")
-        pid = pid.replace(old, new)
-    ctl_lines = read(rev, CONTROL_INO).splitlines()
+    ctl_lines = src["ctl"].splitlines()
     for a in [HSYS_ANCHOR] + ZONE_ANCHORS:
         once(ctl_lines, a)
     hsys = slice_by_anchor(ctl_lines, HSYS_ANCHOR)
@@ -134,6 +141,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--rev", help="FIX side: git revision to test (default: working tree)")
     ap.add_argument("--old-rev", help="OLD side: git revision from before the fix")
+    ap.add_argument("--defects", default=",".join(DEFECT),
+                    help="comma-separated checks OLD must fail (default: the TASK-1195 set; Z1 for TASK-1197)")
     ap.add_argument("--report", metavar="REV", help="build one revision ('worktree' for the working tree), print, judge nothing")
     args = ap.parse_args()
 
@@ -153,12 +162,13 @@ def main():
             return 2
         _, out, checks = res
         print(out, end="")
-        for cid in KEEP + DEFECT:
+        defects = [c for c in args.defects.split(",") if c]
+        for cid in KEEP + defects:
             if cid not in checks:
                 print(f"harness error: OLD printed no CHECK {cid}")
                 return 2
-        bad = [c for c in KEEP if checks[c] != "PASS"] + [c for c in DEFECT if checks[c] != "FAIL"]
-        verdict.append(("OLD keeps the pid.py rules and shows the defect", not bad, bad))
+        bad = [c for c in KEEP if checks[c] != "PASS"] + [c for c in defects if checks[c] != "FAIL"]
+        verdict.append((f"OLD keeps the pid.py rules and fails {', '.join(defects)}", not bad, bad))
 
     print(f"===== FIX: {args.rev or 'working tree'}")
     res = build_and_run("fix", prepare("fix", args.rev))
@@ -173,8 +183,8 @@ def main():
     verdict.append(("FIX passes every check", code == 0 and not failed, failed))
 
     print("===== mutants of the FIX source")
-    for mid, what, subs, case in MUTANTS:
-        res = build_and_run(f"mut_{mid}", prepare(f"mut_{mid}", args.rev, subs))
+    for mid, what, target, subs, case in MUTANTS:
+        res = build_and_run(f"mut_{mid}", prepare(f"mut_{mid}", args.rev, subs, target))
         if res is None:
             return 2
         got = res[2].get(case, "missing")

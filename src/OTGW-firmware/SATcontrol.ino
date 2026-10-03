@@ -1613,8 +1613,10 @@ static float satZonePidStep(uint8_t idx, float outsideTemp)
 
   // Gains from shared auto-gain formula (zone uses same Kp/Ki as primary).
   // Constants mirror SATpid.ino: KP_DIVISOR_FLOOR=4, KP_DIVISOR_RAD=3, AGGRESSION=8400.
+  // Underfloor takes the floor divisor, radiators and AUTO the radiator one, as in
+  // _pidCalculateGains() and pid.py kp() (TASK-1197).
   float coeff   = settings.sat.fHeatingCurveCoeff;
-  float divisor = (settings.sat.iHeatingSystem == 1) ? 4.0f : 3.0f;
+  float divisor = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? 4.0f : 3.0f;
   float kp      = (coeff * curveValue) / divisor;
   float ki      = kp / 8400.0f;   // SAT_PID_AGGRESSION_V3
 
