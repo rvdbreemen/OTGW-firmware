@@ -6,11 +6,14 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-04 19:34'
+updated_date: '2026-10-04 19:35'
 labels:
   - bug
   - needs-info
   - mqtt
 dependencies: []
+references:
+  - 'https://github.com/rvdbreemen/OTGW-firmware/issues/682'
 priority: medium
 ordinal: 241000
 ---
