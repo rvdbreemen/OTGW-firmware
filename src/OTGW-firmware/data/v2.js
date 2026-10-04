@@ -10,6 +10,75 @@
  * phases via window.OTGWv2 hooks; the static mockup values remain visible
  * until each page is wired. No external libraries.
  */
+
+// ============================================================================
+// ADR-184 for the v2 bundle (TASK-1210): at most 2 /api/ requests in flight from
+// this page. The device refuses a third concurrent request with a 503
+// (REST_MAX_INFLIGHT 2, ADR-165), and a v2 page start fires several panels at
+// once. v2.html does not load index.js, so the classic bundle's queue does not
+// cover this page; this is the same queue. Every same-origin /api/ fetch waits
+// in arrival order for a free slot; other URLs go straight to the browser. A
+// slot is freed when the response body has arrived, because the device holds
+// its slot until the last byte is sent. A request still open after 20 s frees
+// its slot without being aborted, so one stalled request cannot block the page.
+(function () {
+  'use strict';
+  if (window.__otgwApiQueue) return;
+  var nativeFetch = window.fetch.bind(window);
+  var MAX_IN_FLIGHT = 2;
+  var STALL_RELEASE_MS = 20000;
+  var waiting = [];
+  var inFlight = 0;
+
+  function isApi(input) {
+    var url = (typeof input === 'string') ? input : (input && input.url) || '';
+    try {
+      var u = new URL(url, window.location.href);
+      return u.origin === window.location.origin && u.pathname.indexOf('/api/') === 0;
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function pump() {
+    while (inFlight < MAX_IN_FLIGHT && waiting.length) {
+      startJob(waiting.shift());
+    }
+  }
+
+  function startJob(job) {
+    inFlight++;
+    var released = false;
+    var valve = setTimeout(release, STALL_RELEASE_MS);
+    function release() {
+      if (released) return;
+      released = true;
+      clearTimeout(valve);
+      inFlight--;
+      pump();
+    }
+    nativeFetch(job.input, job.init).then(function (response) {
+      response.clone().arrayBuffer().then(release, release);
+      job.resolve(response);
+    }, function (err) {
+      release();
+      job.reject(err);
+    });
+  }
+
+  window.fetch = function (input, init) {
+    if (!isApi(input)) return nativeFetch(input, init);
+    return new Promise(function (resolve, reject) {
+      waiting.push({ input: input, init: init, resolve: resolve, reject: reject });
+      pump();
+    });
+  };
+  window.__otgwApiQueue = {
+    inFlight: function () { return inFlight; },
+    waiting: function () { return waiting.length; }
+  };
+})();
+
 (function () {
   'use strict';
 
