@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-10-04 19:33'
+updated_date: '2026-10-04 19:34'
 labels:
   - enhancement
 dependencies: []
@@ -172,3 +172,9 @@ Recommendation: do not implement PR=E polling on current evidence. Either park t
 
 2026-10-04: AC#6 confirmed by indigo_light in #nederlandse-ondersteuning (12:33-12:48Z). After flashing v1.7.7-beta.1 the entity sensor.opentherm_gateway_otgw_pic_temperature_reading arrives in Home Assistant, and 'de sensor komt binnen en komt exact overeen met de GUI van de OTGW' (the value matches the web interface exactly).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The temperature sensor wired to the PIC reaches MQTT and Home Assistant. A setting 'PIC temperature sensor' (default off) makes the firmware send PR=E once every 3 minutes and parse the PR: E=<value> reply. The value is published to otgw-pic/temperature_reading with a HA discovery entry 'PIC Temperature Reading' (temperature, degrees C). Without a sensor nothing is published. The existing PR=D diagnostic entity is untouched. Evidence: bench .88.68 on 1.7.7-beta.1+ed84e49. With the setting off, 0 PR=E in 200 s; with it on, 3 PR=E in 400 s. OT traffic was not disturbed. build.bat green and evaluate --quick 36/36 (2026-09-29). Field-confirmed by indigo_light on 2026-10-04: the entity arrives in HA and matches the web interface. Shipped in v1.7.7-beta.1 (commit 7ee2344e2).
+<!-- SECTION:FINAL_SUMMARY:END -->
