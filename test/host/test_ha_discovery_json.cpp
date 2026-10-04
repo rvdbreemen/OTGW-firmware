@@ -293,6 +293,19 @@ static void partC() {
              });
 }
 
+// ---- D: the TASK-1201 one-time clear of the thermostat_ duplicates (empty retained payloads) ---
+// Built only when the code under test defines the helper (the Python side passes the define).
+static void partD() {
+#ifdef HAS_THERMOSTAT_DUP_CLEAR
+  for (int id = 0; id <= 255; id++)
+    call("clearThermostatDupDiscoveryForOTId", argsf("id=%d", id), ANY, ANY, [&] {
+      uint8_t cleared = 0;
+      return clearThermostatDupDiscoveryForOTId(static_cast<uint8_t>(id), CSTR(settings.mqtt.sHaprefix),
+                                                NodeId, &cleared);
+    });
+#endif
+}
+
 int main() {
   // startMQTT(): the node id and both namespaces from the default settings, with the unique id
   // getUniqueId() makes ("otgw-" and the 12 hex digits of the MAC).
@@ -309,6 +322,7 @@ int main() {
   partABle();
   partB();
   partC();
+  partD();
   std::printf("END calls=%d not_ok=%d\n", g_seq, g_bad);
   return g_bad ? 1 : 0;
 }

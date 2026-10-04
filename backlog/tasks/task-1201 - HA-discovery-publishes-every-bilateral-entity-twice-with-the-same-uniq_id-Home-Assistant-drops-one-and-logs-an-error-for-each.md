@@ -3,11 +3,11 @@ id: TASK-1201
 title: >-
   HA discovery publishes every bilateral entity twice with the same uniq_id;
   Home Assistant drops one and logs an error for each
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-03 14:00'
-updated_date: '2026-10-04 05:52'
+updated_date: '2026-10-04 07:49'
 labels:
   - mqtt
   - ha-discovery
@@ -34,9 +34,9 @@ Related: ADR-140 (single-device topology), ADR-077 (streaming discovery), ADR-10
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduced old-vs-fix on the laptop rig from a clean broker: the node's retained discovery configs are cleared, a full republish drains (disc_pending_ids 0), and the duplicated-uniq_id count is N>0 on current dev and 0 on the fix
-- [ ] #2 Each entity is announced on exactly one config topic in single-device mode; no uniq_id, entity name or state topic changes, so existing Home Assistant entities keep their entity_id and customisations
-- [ ] #3 A migration path for the duplicate retained configs already on users' brokers is chosen with the maintainer and verified on the rig HA: after the upgrade and an HA restart, no OTGW entity was removed or renamed, and the HA log shows no 'does not generate unique IDs' error for the node
-- [ ] #4 Build green for esp32, esp32-classic and esp32-combo (fresh artifacts); python evaluate.py --quick shows no new failures
+- [x] #2 Each entity is announced on exactly one config topic in single-device mode; no uniq_id, entity name or state topic changes, so existing Home Assistant entities keep their entity_id and customisations
+- [x] #3 A migration path for the duplicate retained configs already on users' brokers is chosen with the maintainer and verified on the rig HA: after the upgrade and an HA restart, no OTGW entity was removed or renamed, and the HA log shows no 'does not generate unique IDs' error for the node
+- [x] #4 Build green for esp32, esp32-classic and esp32-combo (fresh artifacts); python evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -58,4 +58,18 @@ AC#1 FIX side, 2026-10-04: OTGW32 flashed (app only) with the fix image 2.0.0-al
 Result: 393 config topics, 391 uniq_ids, 0 duplicated (OLD: 632 / 391 / 239). The 2 configs without a parseable uniq_id are the resetgateway button and the sat_heating_system select, whose invalid JSON is TASK-1202.
 Home Assistant logged 20 'does not generate unique IDs' errors, all at 05:45:31 UTC, while the old 632 configs (with duplicates) were still retained before the clear. There were 0 after the clear and the FIX republish.
 Evidence: %LOCALAPPDATA%/OTGW-capture/task1201/fix-alpha404-cbac50f/. AC#3 (one-time cleanup, maintainer choice 2026-10-03) is being built in wt-1201.
+
+Evidence 2026-10-04, alpha.408+ed5d17c on dev (fix plus one-time migration, maintainer choice 'eenmalig opruimen'):
+- AC#2: host harness test/host/test_ha_discovery_json.py --old-rev 8795bacc0 gives RESULT: PASS. FIX announces no uniq_id on two config topics in any of the four settings permutations; OLD had 239 duplicates (modern_pic) and 423 (modern_oldnames_sources). Apart from the removed thermostat_ duplicates and the TASK-1202 cmd_t insert, every FIX payload is byte-identical to OLD (9648 identical), so uniq_id, name and state topic are unchanged.
+- The clear (clearThermostatDupDiscoveryForOTId) empties 460 distinct topics. It covers all 460 duplicated thermostat_ configs OLD published, and none of them is a topic the dispatcher still publishes. A duplicate is identified by uniq_id: legacy thermostat_connected is a genuine entity and is left alone.
+- AC#3 rig: alpha.407 did a full republish, giving 636 retained configs with 239 thermostat_ duplicates and 392 HA entities. alpha.408 was then flashed. Telnet showed '[TASK-1201] done: 460 thermostat_ discovery configs emptied; republishing discovery' 273 s after boot. Afterwards: 397 retained configs (636-239), 0 thermostat_, 0 uniq_ids on more than one topic.
+- After docker restart homeassistant: 0 'does not generate unique IDs' errors for otgw-1020BA21B4F8, and the entity registry kept the same 392 uniq_ids with no entity removed, added or renamed. The 19 such errors left in the log belong to otgw-AC276ECE45D8, the Classic-S3 test board still on older firmware, whose retained configs remain on the rig broker.
+Evidence: %LOCALAPPDATA%/OTGW-capture/task1201/migration-alpha408/.
+- AC#4: esp32, esp32-classic and esp32-combo SUCCESS (alpha.408); evaluate.py --quick 0 failures.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Each Home Assistant entity of a real OT ID is announced once again. doAutoConfigureMsgid() no longer runs a second Thermostat pass for sensors and binary sensors; that pass reused the boiler_ uniq_id on a thermostat_<label> topic, so HA rejected one config per entity at every start (239 entities on a default modern setup). A one-time migration (settings.mqtt.bThermostatDupsCleared, internal, persisted) rides the discovery drip on idle ticks. It empties every thermostat_ config the old code could have left retained (460 topics), then queues a full republish. Evidence: harness old-vs-fix PASS (0 duplicates on the fix, the clear covers all old duplicates and never a live config); rig migration 239 to 0 duplicates with all 392 HA entities kept through an HA restart and 0 unique-ID errors for the node; builds for 3 envs green, evaluate clean.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""TASK-1202 host harness: every Home Assistant discovery payload is valid JSON.
+"""TASK-1202/1201 host harness: every Home Assistant discovery payload is valid JSON, once.
 
     python test/host/test_ha_discovery_json.py                       # FIX and the positive control
     python test/host/test_ha_discovery_json.py --old-rev 8795bacc0   # plus OLD and the old-vs-fix diff
@@ -22,7 +22,15 @@ part B) are doubled. The program runs:
      and without the full device block; an out-of-range index must publish nothing; the
      BLE sensor composer satBLEPublishHaDiscovery() and its remover satBLEUnpublishDiscovery();
   B  doAutoConfigureMsgid() for every id 0..255 under four settings permutations;
-  C  clearTopologyDiscoveryForOTId() for every id: removal publishes, which must be empty.
+  C  clearTopologyDiscoveryForOTId() for every id: removal publishes, which must be empty;
+  D  clearThermostatDupDiscoveryForOTId() for every id (TASK-1201, built only when the revision
+     defines it): removal publishes, which must be empty.
+
+TASK-1201 checks: in part B no uniq_id is announced on two config topics; the one-time clear
+empties only thermostat_ sensor/binary_sensor topics and none the dispatcher still publishes;
+with --old-rev, OLD announces uniq_ids twice in a modern permutation and the clear covers every
+duplicated thermostat_ config OLD published. A duplicate is found by uniq_id, not by name: the
+legacy topology has a genuine entity whose bare label is thermostat_connected.
 
 The BLE composer formats PROGMEM strings with "%S" through snprintf_P, which is snprintf on
 the ESP32 core. Both GCC and MSVC read "%S" as a wchar_t* string, so on the host it returns
@@ -78,7 +86,8 @@ BENCH = {("streamSatSelectDiscovery", "first=1"): 291, ("streamButtonDiscovery",
 CMD_KEY = {"button": "cmd_t", "select": "cmd_t", "switch": "cmd_t", "number": "cmd_t", "climate": "temp_cmd_t"}
 READ_ONLY = {"sensor", "binary_sensor"}
 REMOVAL = "clearTopologyDiscoveryForOTId"
-REMOVERS = {REMOVAL, "satBLEUnpublishDiscovery"}
+DUP_CLEAR = "clearThermostatDupDiscoveryForOTId"   # TASK-1201 one-time clear
+REMOVERS = {REMOVAL, "satBLEUnpublishDiscovery", DUP_CLEAR}
 # The BLE composer formats with "%S" through snprintf_P (= snprintf); what that does is up to the
 # C library (MSVC here, newlib on the device), so its result is reported apart from the gate.
 BLE_PROBE = "satBLEPublishHaDiscovery"
@@ -181,7 +190,7 @@ def entry_points(rev):
     return sorted(set(defined) | set(declared))
 
 
-def build_and_run(label, out_dir):
+def build_and_run(label, out_dir, rev=None):
     exe = out_dir / "test_ha_discovery_json.exe"
     if exe.exists():
         exe.unlink()
@@ -190,6 +199,7 @@ def build_and_run(label, out_dir):
     bat.write_text("@echo off\r\n"
                    f'call "{find_vcvars()}" >nul 2>nul\r\n'
                    "cl /nologo /EHsc /W3 /std:c++17 /utf-8 /D_CRT_SECURE_NO_WARNINGS /DBOARD_NODOSHOP_ESP32_COMBO "
+                   + ("/DHAS_THERMOSTAT_DUP_CLEAR " if DUP_CLEAR in entry_points(rev) else "") +
                    f'/Fo:"{fwd}/" /Fe:"{exe}" "{HERE / CPP}" "{out_dir / "MQTTHaDiscovery.cpp"}" '
                    f'/I"{out_dir}" /I"{SHIM}"\r\n', encoding="ascii", newline="")
     c = subprocess.run(["cmd.exe", "/c", str(bat)], capture_output=True, text=True, errors="replace")
@@ -370,6 +380,12 @@ def diff_old_fix(old, fix):
     """(ok, text): FIX equals OLD byte for byte, except each payload on a known topic, which is its
     OLD twin with '"cmd_t":"' inserted once in front of the command topic."""
     (octx, _, opubs), (fctx, _, fpubs) = old, fix
+    # TASK-1201 changes, compared apart: OLD's second (thermostat_) announcement of the real OT ids
+    # in the dispatcher is gone, and FIX adds the one-time clear's empty publishes.
+    dups = thermostat_dups(old)
+    opubs = [o for o in opubs if not (o["tag"] == DISPATCH and o["raw"] != b"" and
+                                      (o["args"].split(",")[0], o["topic"]) in dups)]
+    fpubs = [f for f in fpubs if f["tag"] != DUP_CLEAR]
     if octx != fctx or len(opubs) != len(fpubs):
         return False, f"different runs: {len(opubs)} vs {len(fpubs)} publishes"
     known, sub = known_topics(fctx), (fctx["sub"] + "/").encode()
@@ -399,6 +415,54 @@ def bench_offsets(old):
     return ok, out
 
 
+def obj_id(topic, ctx):
+    """(component, object_id) of a discovery config topic."""
+    parts = topic[len(ctx["prefix"]) + 1:].split("/")
+    return parts[0], parts[-2]
+
+
+def dispatcher_configs(run):
+    """{perm: [(topic, uniq_id)]} of the non-empty sensor/binary_sensor configs doAutoConfigureMsgid()
+    publishes per settings permutation."""
+    ctx, out = run[0], {}
+    for p in run[2]:
+        if p["tag"] != DISPATCH or p["raw"] == b"" or component(p["topic"], ctx) not in READ_ONLY:
+            continue
+        obj = strict_json(p["raw"])[0] or {}
+        perm = p["args"].split(",")[0]
+        out.setdefault(perm, []).append((p["topic"], obj.get("uniq_id")))
+    return out
+
+
+def dup_uniq_ids(run):
+    """{perm: number of uniq_ids announced on more than one config topic}."""
+    res = {}
+    for perm, cfgs in dispatcher_configs(run).items():
+        topics = {}
+        for t, u in cfgs:
+            topics.setdefault(u, set()).add(t)
+        res[perm] = sum(1 for ts in topics.values() if len(ts) > 1)
+    return res
+
+
+def thermostat_dups(run):
+    """{(perm, topic)}: the thermostat_ config topics whose uniq_id the dispatcher also announces on
+    another config topic in the same permutation. A name test alone is not enough: the legacy
+    topology has a genuine entity whose bare label is thermostat_connected."""
+    ctx, out = run[0], set()
+    for perm, cfgs in dispatcher_configs(run).items():
+        topics = {}
+        for t, u in cfgs:
+            topics.setdefault(u, set()).add(t)
+        out |= {(perm, t) for ts in topics.values() if len(ts) > 1 for t in ts
+                if obj_id(t, ctx)[1].startswith("thermostat_")}
+    return out
+
+
+def dup_clear_topics(run):
+    return {p["topic"] for p in run[2] if p["tag"] == DUP_CLEAR}
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--old-rev", help="also build the code under test from this git revision (OLD)")
@@ -414,10 +478,22 @@ def main():
     print(f"  entry points: {', '.join(entry_points(None))}")
     checks.append((f"FIX calls every public composer (missing: {', '.join(missing) or 'none'})", not missing))
     checks.append(("FIX: every call returns and publishes as expected, every payload passes the gate", not fix_fails))
+    # TASK-1201: one config topic per uniq_id, and the one-time clear never empties a live config.
+    fix_dups = dup_uniq_ids(fix)
+    checks.append((f"TASK-1201 FIX: no uniq_id on two config topics in any permutation (got {fix_dups})",
+                   not any(fix_dups.values())))
+    cleared = dup_clear_topics(fix)
+    live = {t for cfgs in dispatcher_configs(fix).values() for t, _ in cfgs}
+    print(f"  TASK-1201 clear: {len(cleared)} distinct thermostat_ topics emptied")
+    checks.append((f"TASK-1201 FIX: the clear empties only thermostat_ sensor/binary_sensor topics and none "
+                   f"the dispatcher publishes (overlap {len(cleared & live)})",
+                   bool(cleared) and not (cleared & live) and
+                   all(obj_id(t, fix[0])[0] in READ_ONLY and obj_id(t, fix[0])[1].startswith("thermostat_")
+                       for t in cleared)))
 
     if args.old_rev:
         export(args.old_rev, root / "old")
-        old = build_and_run(f"OLD (git {args.old_rev})", root / "old")
+        old = build_and_run(f"OLD (git {args.old_rev})", root / "old", args.old_rev)
         old_fails, old_topics, _ = evaluate(f"OLD (git {args.old_rev})", old)
         direct = old_fails - {DISPATCH}
         checks.append((f"OLD fails exactly {', '.join(sorted(KNOWN))} among the direct calls "
@@ -427,9 +503,17 @@ def main():
         checks.append(("OLD: every payload of those two composers is invalid JSON", every))
         checks.append((f"OLD dispatcher fails exactly the two topics (got {sorted(old_topics)})",
                        old_topics == known_topics(old[0])))
+        old_dups = dup_uniq_ids(old)
+        old_thermo = {t for _, t in thermostat_dups(old)}
+        print(f"  TASK-1201 OLD: duplicated uniq_ids per permutation {old_dups}; "
+              f"{len(old_thermo)} duplicate thermostat_ configs, {len(old_thermo - cleared)} not covered by the clear")
+        checks.append(("TASK-1201 OLD: a modern permutation announces uniq_ids twice",
+                       any(v for k, v in old_dups.items() if "modern" in k)))
+        checks.append(("TASK-1201: the clear empties every duplicate thermostat_ config OLD published",
+                       bool(old_thermo) and old_thermo <= cleared))
         ok, text = diff_old_fix(old, fix)
         print(f"== OLD vs FIX: {text} ==")
-        checks.append(("FIX changes nothing but the two payloads, and keeps their command topic", ok))
+        checks.append(("FIX changes nothing but the two payloads (TASK-1202) and the thermostat_ duplicates (TASK-1201), and keeps their command topic", ok))
         ok, lines = bench_offsets(old)
         print("== OLD parse errors against the rig's broker ==")
         print("\n".join(lines))

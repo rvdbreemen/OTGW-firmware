@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.407
+**  Version  : v2.0.0-alpha.408
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -271,6 +271,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("MQTTdiscoveryAutoVerify"), settings.mqtt.bDiscoveryAutoVerify, true);
   writeJsonBoolKV(file, F("MQTTuseLegacyOtTopics"), settings.mqtt.bUseLegacyOtTopics, true);
   writeJsonBoolKV(file, F("MQTTlastPublishedLegacy"), settings.mqtt.bLastPublishedLegacy, true);  // TASK-648 Task 6: topology stamp
+  writeJsonBoolKV(file, F("MQTTthermostatDupsCleared"), settings.mqtt.bThermostatDupsCleared, true);  // TASK-1201: one-shot thermostat_ clear done
   writeJsonBoolKV(file, F("NTPenable"), settings.ntp.bEnable, true);
   writeJsonStringKV(file, F("NTPtimezone"), settings.ntp.sTimezone, true);
   writeJsonStringKV(file, F("NTPhostname"), settings.ntp.sHostname, true);
@@ -817,6 +818,7 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("MQTTseparatesources"))==0) settings.mqtt.bSeparateSources = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("MQTTlastPublishedLegacy"))==0) settings.mqtt.bLastPublishedLegacy = EVALBOOLEAN(newValue);  // TASK-648 Task 6
+  else if (strcasecmp_P(field, PSTR("MQTTthermostatDupsCleared"))==0) settings.mqtt.bThermostatDupsCleared = EVALBOOLEAN(newValue);  // TASK-1201
   else if (strcasecmp_P(field, PSTR("LegacyPort25238Enabled"))==0) {
     settings.mqtt.bLegacyPort25238Enabled = EVALBOOLEAN(newValue);
     pendingSideEffects |= SIDE_EFFECT_OTGWSTREAM;

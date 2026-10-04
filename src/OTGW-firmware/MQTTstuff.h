@@ -84,6 +84,11 @@ struct MQTTSettingsSection {
   // erased with empty retained publishes so HA removes those entities.
   // Updated (and persisted) only after the stale-topic drain completes.
   bool    bLastPublishedLegacy = false;
+  // TASK-1201: one-shot flag. Set (and persisted) once the drip has emptied every
+  // thermostat_<label> discovery config that firmware before TASK-1201 left
+  // retained on the broker. While false, loopMQTTDiscovery() runs that clear on
+  // its idle ticks. Internal: not exposed by the REST settings API.
+  bool    bThermostatDupsCleared = false;
 };
 
 // ---------------------------------------------------------------------------
@@ -585,5 +590,15 @@ uint8_t clearTopologyDiscoveryForOTId(uint8_t otId,
                                       const char *haPrefix,
                                       const char *nodeId,
                                       bool separateSources);
+
+// TASK-1201: empties (empty retained publish) every thermostat_<label> sensor and
+// binary-sensor config topic that firmware before TASK-1201 could publish for one
+// real OT ID (0..127). Never builds a boiler_ topic. Returns false on the first
+// failed publish (the caller retries the whole ID); *cleared receives the number of
+// topics emptied. Defined in MQTTHaDiscovery.cpp.
+bool clearThermostatDupDiscoveryForOTId(uint8_t otId,
+                                        const char *haPrefix,
+                                        const char *nodeId,
+                                        uint8_t *cleared);
 
 // end of MQTTstuff.h

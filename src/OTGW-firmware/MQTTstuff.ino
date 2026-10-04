@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.407
+**  Version  : v2.0.0-alpha.408
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -44,6 +44,8 @@ void runTopicCleanupStep();
 // TASK-648 Task 6: device-topology migration cleanup
 static void armTopologyCleanup(bool staleIsLegacy);
 static void runTopologyCleanupStep();
+// TASK-1201: one-time clear of the duplicate thermostat_ discovery configs
+static void runThermostatDupCleanupStep();
 
 // Declare some variables within global scope
 
@@ -2269,6 +2271,10 @@ void loopMQTTDiscovery()
       return;  // one attempt per tick regardless of success
     }
   }
+
+  // No discovery publish pending on this tick: spend it on the one-time clear of
+  // the duplicate thermostat_ configs while that still has work (TASK-1201).
+  runThermostatDupCleanupStep();
 }
 
 
@@ -2576,11 +2582,12 @@ void doAutoConfigure(){
 //===========================================================================================
 // TASK-648 Task 4: per-OT-ID / per-category device routing.
 //
-// Bilateral rule (HA-core faithful): all real OT message IDs (0..127, i.e. DATA_*)
-// produce two entity instances in modern mode — one under Boiler, one under Thermostat.
-// This matches HA-core sensor.py / binary_sensor.py where every DATA_* entry appears
-// twice (BOILER_DEVICE_DESCRIPTION + THERMOSTAT_DEVICE_DESCRIPTION). Legacy mode
-// emits once with no device suffix (byte-identical to pre-Task-4 behaviour).
+// Real OT message IDs (0..127, i.e. DATA_*) route to Boiler and each entity is announced
+// once: config topic boiler_<label> in modern mode, the bare <label> in legacy mode.
+// The Thermostat route renders the same uniq_id (<nodeId>-<pic_|otd_><label>), name and
+// state topic, so a second announcement under thermostat_<label> is a duplicate that
+// Home Assistant rejects ("does not generate unique IDs"). The per-side readings are the
+// _thermostat / _boiler source variants (bSeparateSources), which carry their own uniq_id.
 //
 // Non-OT pseudo-IDs map to a source-prefix cluster within the single HA device
 // (ADR-140 single-device topology, was ADR-124 seven-device):
@@ -2609,11 +2616,8 @@ void doAutoConfigure(){
 // Override sensors (ADR-118, IDs 1,8,9,14,16,39,56,57): Gateway (OTGW-internal overrides).
 //
 static HaDevice deviceForOTId(byte OTid) {
-  // Real OT message IDs (DATA_*): bilateral — caller handles double-emit.
-  // This function returns the PRIMARY device for single-device entities.
-  // For bilateral IDs (0..127) the function returns Boiler; bilateral
-  // logic in doAutoConfigureMsgid() runs a second pass with Thermostat.
-  if (OTid <= 127) return HaDevice::Boiler;  // bilateral, see doAutoConfigureMsgid
+  // Real OT message IDs (DATA_*): the Boiler route, the one they are announced on.
+  if (OTid <= 127) return HaDevice::Boiler;
   switch (OTid) {
     case 241: return HaDevice::Sensors;     // TASK-1123 DHW water total: fixed "sensors_" uniq_id prefix
     case 242: return HaDevice::OtCore;      // TASK-942 hvac_mode/hvac_action companion sensors
@@ -2653,84 +2657,65 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   HaDiscoveryContext ctx = buildDiscoveryContext(isFirst);
 
   // TASK-648: two orthogonal axes.
-  //  - bLegacyMode        = device topology (single device vs five-device + bilateral).
+  //  - bLegacyMode        = config-topic shape: bare <label> (legacy) or <device>_<label>
+  //                         (modern, the default). The builders read it as ctx.legacyMode.
   //  - bUseLegacyOtTopics = OT-topic label naming (ADR-106 legacy names vs new aliases).
-  // Device topology defaults to modern (five-device) for everyone; topic naming defaults
-  // to legacy for 1.x.x upgraders (see readSettings migration) and new for fresh installs.
-  const bool useLegacy   = settings.mqtt.bLegacyMode;          // device-topology axis
+  // Topic naming defaults to legacy for 1.x.x upgraders (see readSettings migration) and
+  // to new for fresh installs.
   const bool topicLegacy = settings.mqtt.bUseLegacyOtTopics;   // ADR-106 label axis
 
-  // TASK-648 Task 4: bilateral flag — real OT IDs (0..127) emit sensors/binary_sensors
-  // twice in modern mode (Boiler then Thermostat). Legacy topology: single pass (unchanged).
-  const bool isBilateral = !useLegacy && (OTid <= 127);
-
-  // Set ctx.device for single-device non-bilateral paths.
-  // The bilateral sensor loop overrides this per pass.
+  // One announcement per entity, on the route deviceForOTId() picks: Boiler for the real
+  // OT IDs (0..127). The sensor and binary-sensor sections below keep that route.
   ctx.device = deviceForOTId(OTid);
 
-  // Sensors — bilateral: run two passes (Boiler, Thermostat) in modern mode.
+  // Sensors
   uint16_t sIdx = readSensorIndex(OTid);
   if (sIdx != MQTT_HA_INDEX_NONE) {
-    const uint8_t passes = isBilateral ? 2 : 1;
-    for (uint8_t pass = 0; pass < passes; pass++) {
-      if (isBilateral) ctx.device = (pass == 0) ? HaDevice::Boiler : HaDevice::Thermostat;
-      uint16_t i = sIdx;
-      while (i < MQTT_HA_SENSOR_COUNT) {
-        MqttHaSensorCfg cfg = readSensorCfg(i);
-        if (cfg.id != OTid) break;
-        if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
-          // Source variants (bSeparateSources): emit once per pass with current device.
-          // In bilateral mode they are emitted on both passes (Boiler + Thermostat)
-          // so users see source-qualified variants under both devices.
-          if (settings.mqtt.bSeparateSources) {
-            if (expandAndStreamSensorSources(cfg, ctx)) result = true;
-          }
-        } else {
-          // ADR-097: base entity always emitted.
-          if (streamSensorDiscovery(cfg, ctx)) result = true;
+    uint16_t i = sIdx;
+    while (i < MQTT_HA_SENSOR_COUNT) {
+      MqttHaSensorCfg cfg = readSensorCfg(i);
+      if (cfg.id != OTid) break;
+      if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
+        // Source variants (bSeparateSources): the _thermostat and _boiler entities.
+        if (settings.mqtt.bSeparateSources) {
+          if (expandAndStreamSensorSources(cfg, ctx)) result = true;
         }
-        i++;
+      } else {
+        // ADR-097: base entity always emitted.
+        if (streamSensorDiscovery(cfg, ctx)) result = true;
+      }
+      i++;
+      feedWatchDog();
+    }
+  }
+
+  // Binary sensors: indexed range. ADR-106: filter by naming mode.
+  // - new mode (default): SKIP rows flagged MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS.
+  // - legacy mode: publish all indexed rows.
+  {
+    uint16_t bIdx = readBinSensorIndex(OTid);
+    if (bIdx != MQTT_HA_INDEX_NONE) {
+      while (bIdx < MQTT_HA_BINSENSOR_INDEXED_COUNT) {
+        MqttHaBinSensorCfg cfg = readBinSensorCfg(bIdx);
+        if (cfg.id != OTid) break;
+        const bool skipReplaced = !topicLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS);
+        if (!skipReplaced) {
+          if (streamBinarySensorDiscovery(cfg, ctx)) result = true;
+        }
+        bIdx++;
+        feedWatchDog();
+      }
+    }
+    // ADR-106: alias tail (non-contiguous; not covered by index). Walked only in new topic-naming mode.
+    if (!topicLegacy) {
+      for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
+        MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
+        if (cfg.id != OTid) continue;
+        if (streamBinarySensorDiscovery(cfg, ctx)) result = true;
         feedWatchDog();
       }
     }
   }
-  // Restore device after bilateral sensor loop so subsequent sections see the right value.
-  if (isBilateral) ctx.device = HaDevice::Boiler;
-
-  // Binary sensors — indexed range. ADR-106: filter by naming mode.
-  // - new mode (default): SKIP rows flagged MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS.
-  // - legacy mode: publish all indexed rows.
-  // Bilateral: two passes (Boiler, Thermostat) in modern mode.
-  {
-    const uint8_t passes = isBilateral ? 2 : 1;
-    for (uint8_t pass = 0; pass < passes; pass++) {
-      if (isBilateral) ctx.device = (pass == 0) ? HaDevice::Boiler : HaDevice::Thermostat;
-      uint16_t bIdx = readBinSensorIndex(OTid);
-      if (bIdx != MQTT_HA_INDEX_NONE) {
-        while (bIdx < MQTT_HA_BINSENSOR_INDEXED_COUNT) {
-          MqttHaBinSensorCfg cfg = readBinSensorCfg(bIdx);
-          if (cfg.id != OTid) break;
-          const bool skipReplaced = !topicLegacy && (cfg.flags & MQTT_HA_FLAG_LEGACY_REPLACED_BY_ALIAS);
-          if (!skipReplaced) {
-            if (streamBinarySensorDiscovery(cfg, ctx)) result = true;
-          }
-          bIdx++;
-          feedWatchDog();
-        }
-      }
-      // ADR-106: alias tail (non-contiguous; not covered by index). Walked only in new topic-naming mode.
-      if (!topicLegacy) {
-        for (uint16_t aIdx = MQTT_HA_BINSENSOR_INDEXED_COUNT; aIdx < MQTT_HA_BINSENSOR_COUNT; aIdx++) {
-          MqttHaBinSensorCfg cfg = readBinSensorCfg(aIdx);
-          if (cfg.id != OTid) continue;
-          if (streamBinarySensorDiscovery(cfg, ctx)) result = true;
-          feedWatchDog();
-        }
-      }
-    }
-  }
-  // Restore device after bilateral binary sensor loop.
-  if (isBilateral) ctx.device = HaDevice::Boiler;
 
   // Climate + SAT switches/select (OT ID 0 — TASK-284 piggyback).
   // Climate: Thermostat (both climateIdx=0 thermostat and climateIdx=1 DHW control).
@@ -3455,6 +3440,71 @@ static void runTopologyCleanupStep() {
   // this is an internal skip (no-sensor match for this ID). Move on.
   g_topoCleanup.bitmap[otId >> 5] &= ~(1UL << (otId & 31));
   if (cleared > 0) feedWatchDog();
+}
+
+// ============================================================================
+// TASK-1201: one-time clear of the duplicate thermostat_ discovery configs
+// ============================================================================
+// Firmware before TASK-1201 announced each sensor and binary sensor of a real
+// OT ID (0..127) twice in the modern topology, on boiler_<label> and on
+// thermostat_<label> with one uniq_id. Home Assistant keeps the config that
+// arrives first (boiler_, which was always published first) and logs a
+// unique-ID error for the other one at every start. doAutoConfigureMsgid() now
+// announces boiler_ only; the thermostat_ configs stay retained on the broker
+// until they are emptied.
+//
+// The clear runs once per device. settings.mqtt.bThermostatDupsCleared stays
+// false until a walk over OT IDs 0..127 has emptied every thermostat_ topic the
+// old code could have published (clearThermostatDupDiscoveryForOTId() in
+// MQTTHaDiscovery.cpp); then it is set and persisted. A new settings file starts
+// with the flag false as well, because a filesystem flash resets the settings
+// but not the broker. The walk position is RAM-only: after a reboot the walk
+// starts again at ID 0, and emptying a topic twice is a no-op on the broker.
+//
+// The walk rides the discovery drip. loopMQTTDiscovery() calls this step only
+// on a tick with no discovery publish pending, after the drip's connection,
+// heap, burst and cooldown gates (ADR-088), so it runs at the drip's 2 s / 10 s
+// cadence. A step empties the topics of one OT ID; IDs without sensor or
+// binary-sensor rows are passed in the same step. A failed publish leaves the
+// walk on that ID, and the next step sends all of its topics again.
+//
+// When the walk ends it queues a full discovery republish
+// (markAllMQTTConfigPending(), the same call as the daily re-announce). It
+// re-sends the boiler_ configs with their normal payloads and empties nothing.
+// For an entity that Home Assistant bound to its boiler_ config the clear
+// changes nothing. An entity bound to its thermostat_ config instead (its first
+// boiler_ publish had failed) is removed by the clear; the republish of its
+// boiler_ config creates it again.
+// ----------------------------------------------------------------------------
+static uint8_t  g_thermostatDupNextId  = 0;  // next OT ID of the walk; 128 = walk done
+static uint16_t g_thermostatDupCleared = 0;  // topics emptied by this walk (log only)
+
+static void runThermostatDupCleanupStep() {
+  if (settings.mqtt.bThermostatDupsCleared) return;
+  if (!canPublishMQTT()) return;
+
+  while (g_thermostatDupNextId <= 127) {
+    uint8_t cleared = 0;
+    if (!clearThermostatDupDiscoveryForOTId(g_thermostatDupNextId,
+                                            CSTR(settings.mqtt.sHaprefix), NodeId,
+                                            &cleared)) {
+      return;  // a publish failed: retry this OT ID on the next tick
+    }
+    g_thermostatDupCleared += cleared;
+    g_thermostatDupNextId++;
+    if (cleared > 0) {
+      MQTTDebugTf(PSTR("[TASK-1201] OT ID %u: %u thermostat_ configs emptied\r\n"),
+                  (unsigned)(g_thermostatDupNextId - 1), (unsigned)cleared);
+      return;  // one OT ID's publishes per tick
+    }
+  }
+
+  // Walk complete: set and persist the flag, then re-announce discovery.
+  settings.mqtt.bThermostatDupsCleared = true;
+  writeSettings(false);
+  DebugTf(PSTR("[TASK-1201] done: %u thermostat_ discovery configs emptied; republishing discovery\r\n"),
+          (unsigned)g_thermostatDupCleared);
+  markAllMQTTConfigPending();
 }
 
 

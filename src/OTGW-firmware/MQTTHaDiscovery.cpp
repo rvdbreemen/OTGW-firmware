@@ -2623,9 +2623,11 @@ static const char *haDeviceShortName(const HaDiscoveryContext &ctx) {
   return "esp";
 }
 
-// TASK-648 Task 4: modern config topics prefix the objectId with
-// <deviceShortName>_ so bilateral entities never share a config topic.
-// deviceSegment is "" (or nullptr) in legacy mode — produces byte-identical topics.
+// TASK-648 Task 4: in the modern topology the objectId is <deviceShortName>_<label>,
+// the name of the route the entity is announced on (boiler_, gateway_, esp_, sat_,
+// sensors_ or the OT-Core name). Each entity is announced on one route only, so one
+// uniq_id has one config topic (TASK-1201). deviceSegment is "" (or nullptr) in
+// legacy mode, which gives the bare <label> topic.
 static bool buildSensorDiscoveryTopic(char *dest, size_t destSize,
                                       const char *haPrefix, const char *nodeId,
                                       PGM_P label, const char *sourceTopicSegment,
@@ -2693,8 +2695,8 @@ bool streamSensorDiscovery(const MqttHaSensorCfg &cfg,
 
   bool hasSrc = (ctx.sourceSuffix && ctx.sourceSuffix[0] != '\0');
 
-  // TASK-648 Task 4: modern mode config topic includes device segment so bilateral
-  // Boiler/Thermostat entities never collide on the same retained config path.
+  // TASK-648 Task 4: in modern mode the config topic carries the route's device
+  // segment (see buildSensorDiscoveryTopic).
   const char *devSeg = haDeviceShortName(ctx);  // "" in legacy mode
 
   char topic[STREAM_TOPIC_MAX];
@@ -3881,4 +3883,92 @@ uint8_t clearTopologyDiscoveryForOTId(uint8_t otId,
   }
 
   return cleared;
+}
+
+// ---------------------------------------------------------------------------
+// TASK-1201: one-time clear of the duplicate thermostat_ discovery configs
+// ---------------------------------------------------------------------------
+// Firmware before TASK-1201 announced each sensor and binary sensor of a real
+// OT ID (0..127) twice in the modern topology: on <device>_<label> with device
+// "boiler" and again with device "thermostat", both with one uniq_id. The
+// current firmware announces the boiler_ config only (doAutoConfigureMsgid in
+// MQTTstuff.ino), so the thermostat_ configs are leftovers that stay retained on
+// the broker until they are emptied. At every start Home Assistant rejects the
+// second config of each pair ("does not generate unique IDs").
+//
+// This helper empties, for one OT ID, every thermostat_ config topic the old
+// two-pass code could have published, whatever the settings were at the time:
+//   - sensors: thermostat_<label> for each base row, and both source variants
+//     thermostat_<label>_thermostat / thermostat_<label>_boiler for each
+//     source-template row (bSeparateSources on or off);
+//   - binary sensors: thermostat_<label> for every indexed row (legacy OT-topic
+//     naming published them all) and every alias-tail row (new naming).
+// The topics come from the same builders as the publish path, so they match it
+// byte for byte. The device segment is fixed to the Thermostat route; this
+// helper never builds a boiler_ topic and never a bare legacy <label> topic.
+// Emptying a topic that was never published is a no-op on the broker.
+//
+// Returns true when every empty publish was queued, false on the first one that
+// failed (MQTT down or outbox full): the caller then retries the whole OT ID,
+// which is idempotent. *cleared receives the number of topics emptied.
+// ---------------------------------------------------------------------------
+bool clearThermostatDupDiscoveryForOTId(uint8_t otId,
+                                        const char *haPrefix,
+                                        const char *nodeId,
+                                        uint8_t *cleared)
+{
+  *cleared = 0;
+  if (otId > 127) return true;   // pseudo-IDs never had a Thermostat route
+
+  const char *devSeg = topoDeviceName(HaDevice::Thermostat);  // "thermostat"
+  char topic[STREAM_TOPIC_MAX];
+
+  // Empties one built topic. A topic that does not fit the buffer is skipped:
+  // the publish path builds it with the same builder and could not publish it.
+  auto emptyTopic = [&](bool built) -> bool {
+    if (!built) return true;
+    if (!publishEmptyRetained(topic)) return false;
+    (*cleared)++;
+    return true;
+  };
+
+  // --- Sensors ---
+  const uint16_t sStart = readSensorIndex(otId);
+  if (sStart != MQTT_HA_INDEX_NONE) {
+    for (uint16_t i = sStart; i < MQTT_HA_SENSOR_COUNT; i++) {
+      MqttHaSensorCfg cfg = readSensorCfg(i);
+      if (cfg.id != otId) break;
+      if (cfg.flags & MQTT_HA_FLAG_ANY_SOURCE) {
+        if (!emptyTopic(buildSensorDiscoveryTopic(topic, sizeof(topic), haPrefix, nodeId,
+                                                  cfg.label, "thermostat", devSeg))) return false;
+        if (!emptyTopic(buildSensorDiscoveryTopic(topic, sizeof(topic), haPrefix, nodeId,
+                                                  cfg.label, "boiler", devSeg))) return false;
+      } else {
+        if (!emptyTopic(buildSensorDiscoveryTopic(topic, sizeof(topic), haPrefix, nodeId,
+                                                  cfg.label, nullptr, devSeg))) return false;
+      }
+      feedWatchDog();
+    }
+  }
+
+  // --- Binary sensors: indexed rows, then the alias tail (not covered by the index) ---
+  const uint16_t bStart = readBinSensorIndex(otId);
+  if (bStart != MQTT_HA_INDEX_NONE) {
+    for (uint16_t i = bStart; i < MQTT_HA_BINSENSOR_INDEXED_COUNT; i++) {
+      MqttHaBinSensorCfg cfg = readBinSensorCfg(i);
+      if (cfg.id != otId) break;
+      if (!emptyTopic(buildBinSensorDiscoveryTopic(topic, sizeof(topic), haPrefix, nodeId,
+                                                   cfg.label, devSeg))) return false;
+      feedWatchDog();
+    }
+  }
+  for (uint16_t a = MQTT_HA_BINSENSOR_INDEXED_COUNT; a < MQTT_HA_BINSENSOR_COUNT; a++) {
+    MqttHaBinSensorCfg cfg = readBinSensorCfg(a);
+    if (cfg.id != otId) continue;
+    if (!emptyTopic(buildBinSensorDiscoveryTopic(topic, sizeof(topic), haPrefix, nodeId,
+                                                 cfg.label, devSeg))) return false;
+    feedWatchDog();
+  }
+
+  return true;
 }
