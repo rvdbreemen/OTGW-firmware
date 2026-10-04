@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-04 06:55'
+updated_date: '2026-10-04 09:22'
 labels:
   - web
   - bug
@@ -162,4 +162,24 @@ Reading (an interpretation, not proven):
 - It ends not by memory draining but by a WiFi re-association, which drops every TCP pcb and the queued TX data.
 - The task watchdog reset that followed is a separate finding: the storm can also crash the device.
 Evidence (out of the repo): %LOCALAPPDATA%/OTGW-capture/task1162-diag/run-2026-10-04/ (timeline.csv 537x148, cdc.jsonl, probe.jsonl, summary.txt). The tool's exit code 1 was the storm's own return code (aborted requests), not a tool fault.
+
+ANALYSIS of run-2026-10-04 timeline.csv (537 rows, 1 Hz CDC plus probes). Root-cause CANDIDATE, not yet falsified.
+FACTS (from the timeline):
+(1) Before onset the storm repeatedly pushes lwIP queued TX bytes (txq) to 12-15 KB while internal free and the largest blocks collapse, and the device recovers each time (txq back to 0).
+(2) Onset t=149.8 s lies in arm 4 (8 workers, 33% of requests aborted by the client after 1024 body bytes). At onset: txq 12.7 KB, 9 ESTABLISHED pcbs, DMA largest block 4852.
+(3) Inside the 165 s window:
+  - txq is FROZEN at 23637 B (qlen 22, 9 ESTABLISHED).
+  - rxage climbs to 212 s, so no RX reaches lwIP.
+  - cpu_atcp is about 1 (async_tcp idle) while the CDC stream and tasks run normally.
+  - Failed allocations keep coming, all af_last_size=2312 with caps 0x1800 (INTERNAL|DEFAULT): af_di +444, af_dma unchanged at 72.
+  - The largest DMA/DRAM block is 1524 B, while the largest INTERNAL block (4084, the maxblk column) equals rtc_blk, i.e. it is RTC fast memory.
+(4) The window ends with a WiFi disconnect, reason 16 = WIFI_REASON_GROUP_KEY_UPDATE_TIMEOUT (esp_wifi_types). That is the AP dropping the station at a GTK rekey, not the firmware recovering. Right after it: txq 150 B, heap 75 KB.
+(5) ESP.getMaxAllocHeap() (Esp.cpp:171) is heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL), and it backs platformMaxFreeBlock(), which webFileGateTryAdmit() uses. During the window that number is the RTC block, which (fact 3) does not satisfy a 2312 B INTERNAL|DEFAULT malloc. The gate therefore sees 4-7.6 KB 'free block' while DRAM is starved. Its cap also never drops below 1.
+MECHANISM (inference that fits all facts):
+- Memory deadlock. TCP send queues of the stormed responses pin internal DRAM until the RX-path allocation fails.
+- With no RX there are no ACKs, so the queues never drain and the memory never returns. The station stays associated but deaf, until an external event (here the AP's rekey timeout) tears the pcbs down.
+NOT proven:
+- That the 2312 B allocation is the WiFi driver's RX copy. The WiFi blob is closed; this rests on the size, the 802.11 max frame body.
+- Which pcbs hold the 23.6 KB. The diag has no per-pcb breakdown.
+Next (per review): rebase the diag onto current dev (the alpha.404 diag still had the per-call /.health write, TASK-1205). Then falsify with one variable: a DRAM-headroom 503 (gate on a DEFAULT-capable largest block) and/or a no-progress abort of stalled sends. The fix design goes to the maintainer first. Window 2 (TWDT reset, rst=6) is filed separately.
 <!-- SECTION:NOTES:END -->

@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-03 17:54'
-updated_date: '2026-10-04 08:57'
+updated_date: '2026-10-04 10:47'
 labels:
   - ha-discovery
   - bug
@@ -41,6 +41,8 @@ Evidence (host harness test/host/test_ha_discovery_json.py --old-rev 8795bacc0, 
 - AC#3, decided: the uniq_id is NOT changed. It stays otgw-<mac>-pic_RFSensorStatusInformation_battery_indication_co, and so does the config topic. The existing HA entity, which received no value, keeps its entity_id and customisations and starts receiving values. Changing the uniq_id would create a second entity and leave the dead one behind with a retained config that needs a migration. The old-vs-fix diff proves it: every payload is byte-identical except the 12 RF battery-code payloads, whose only change is the completed stat_t (uniq_id bytes identical).
 
 Rig 2026-10-04, alpha.411+fc27f1a: after a republish, the retained homeassistant/sensor/otgw-1020BA21B4F8/boiler_RFSensorStatusInformation_battery_indication_co/config carries stat_t OTGW/value/otgw-1020BA21B4F8/RFSensorStatusInformation_battery_indication_code with the unchanged uniq_id otgw-1020BA21B4F8-otd_RFSensorStatusInformation_battery_indication_co. The HA entity sensor.opentherm_gateway_otgw_rf_sensor_battery_code, created 2026-10-03 13:58Z, is kept. The bench has no RF sensor (MsgID 98), so a live value cannot be shown here. AC#4: esp32, esp32-classic and esp32-combo SUCCESS (alpha.411); evaluate.py --quick 0 failures.
+
+Cross-line check 2026-10-04 (read-only review of otgw-1.x.x): the same bug exists on 1.x (mqtt_configuratie.cpp:166/:2038/:2096). Filed as TASK-1209 in the otgw-1.x.x backlog (that line's own numbering). Dev TASK-1202, 1204 and 1206 do not occur on 1.x.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

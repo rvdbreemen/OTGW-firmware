@@ -1,11 +1,11 @@
 ---
 id: TASK-1205
 title: GET /api/v2/health writes /.health to LittleFS on every call
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-03 17:55'
-updated_date: '2026-10-04 08:36'
+updated_date: '2026-10-04 10:44'
 labels:
   - rest-api
   - littlefs
@@ -24,7 +24,7 @@ Found by a TASK-1162 reviewer, confirmed in code 2026-10-03. restAPI.ino:3363 ca
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 The health endpoint checks LittleFS without writing on every call (for example a read-only check, or a cached status refreshed by at most one write per several minutes)
-- [ ] #2 Measured on the bench: 100 consecutive health calls cause no flash write (the probe file's content and the filesystem usage are unchanged), and health still reports a failed or unmounted filesystem
+- [x] #2 Measured on the bench: 100 consecutive health calls cause no flash write (the probe file's content and the filesystem usage are unchanged), and health still reports a failed or unmounted filesystem
 - [x] #3 Build green for the three targets; evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
@@ -42,3 +42,13 @@ NOT measured on the bench: health reporting a failed filesystem.
 - By code: an unmount is caught on every call, because the read-only platformFSInfo() check is the same function the old path called first. A failed write is caught by the 5-minute probe, and the else-if keeps LittleFSmounted false until the next probe.
 AC#3: esp32, esp32-classic and esp32-combo SUCCESS (alpha.410); evaluate.py --quick 0 failures.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+GET /api/v2/health no longer writes /.health to LittleFS on every call. The write probe runs at most once per 5 minutes (DECLARE_TIMER_MIN + DUE in sendHealth()); between probes only the read-only platformFSInfo() mount check runs, and a failed write probe keeps LittleFSmounted false until the next probe.
+Evidence:
+- Bench, measured: after deleting /.health, 100 health calls rewrote it on OLD alpha.409 (GET /.health 404 to 200) and left it absent on FIX alpha.410 (404 to 404). The fix's periodic probe recreated it about 270 s after the first call. Health UP 100/100 on both.
+- Accepted by the maintainer on code-path evidence, not measured: the 'still reports a failed or unmounted filesystem' clause of AC#2. The bench cannot provoke it: the upload guard keeps a 5% margin, and an unmount needs a filesystem OTA that wipes the settings. An unmount is caught on every call by the same platformFSInfo() check the old code ran first. A write failure is caught by the 5-minute probe.
+- Builds: esp32, esp32-classic and esp32-combo SUCCESS (alpha.410); evaluate.py --quick 0 failures.
+<!-- SECTION:FINAL_SUMMARY:END -->
