@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-03 14:00'
-updated_date: '2026-10-03 14:06'
+updated_date: '2026-10-04 05:52'
 labels:
   - mqtt
   - ha-discovery
@@ -33,7 +33,7 @@ Related: ADR-140 (single-device topology), ADR-077 (streaming discovery), ADR-10
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduced old-vs-fix on the laptop rig from a clean broker: the node's retained discovery configs are cleared, a full republish drains (disc_pending_ids 0), and the duplicated-uniq_id count is N>0 on current dev and 0 on the fix
+- [x] #1 Reproduced old-vs-fix on the laptop rig from a clean broker: the node's retained discovery configs are cleared, a full republish drains (disc_pending_ids 0), and the duplicated-uniq_id count is N>0 on current dev and 0 on the fix
 - [ ] #2 Each entity is announced on exactly one config topic in single-device mode; no uniq_id, entity name or state topic changes, so existing Home Assistant entities keep their entity_id and customisations
 - [ ] #3 A migration path for the duplicate retained configs already on users' brokers is chosen with the maintainer and verified on the rig HA: after the upgrade and an HA restart, no OTGW entity was removed or renamed, and the HA log shows no 'does not generate unique IDs' error for the node
 - [ ] #4 Build green for esp32, esp32-classic and esp32-combo (fresh artifacts); python evaluate.py --quick shows no new failures
@@ -49,4 +49,13 @@ AC#1 OLD side, 2026-10-03: OTGW32 on 2.0.0-alpha.404+220fca7 (current dev firmwa
 4. Wait for the drip to finish (disc_pending_ids 0 after 269 s).
 5. Dump the retained configs.
 Result: 632 config topics, 391 distinct uniq_ids, 239 uniq_ids on more than one config topic. All 239 pairs are identical apart from the device block; each is a boiler_<label> / thermostat_<label> pair, for example otd_ch2_enable, otd_vh_bypass_mode and otd_vh_fault. Home Assistant logged 320 'does not generate unique IDs' errors over the run. Evidence: %LOCALAPPDATA%/OTGW-capture/task1201/old-alpha404/ (configs_after.json, dups.json, ha_log_unique_id_errors.txt). The fix runs in lane wt-1201.
+
+AC#1 FIX side, 2026-10-04: OTGW32 flashed (app only) with the fix image 2.0.0-alpha.404+cbac50f, built in wt-1201 (the only change: doAutoConfigureMsgid announces each bilateral entity once, on boiler_). Same rig and the same disc_dup_repro.py sequence as the OLD run:
+1. Drip idle.
+2. Clear the 632 retained configs; 0 left.
+3. Republish (200 marked_pending count=130).
+4. Drip done after 268 s.
+Result: 393 config topics, 391 uniq_ids, 0 duplicated (OLD: 632 / 391 / 239). The 2 configs without a parseable uniq_id are the resetgateway button and the sat_heating_system select, whose invalid JSON is TASK-1202.
+Home Assistant logged 20 'does not generate unique IDs' errors, all at 05:45:31 UTC, while the old 632 configs (with duplicates) were still retained before the clear. There were 0 after the clear and the FIX republish.
+Evidence: %LOCALAPPDATA%/OTGW-capture/task1201/fix-alpha404-cbac50f/. AC#3 (one-time cleanup, maintainer choice 2026-10-03) is being built in wt-1201.
 <!-- SECTION:NOTES:END -->

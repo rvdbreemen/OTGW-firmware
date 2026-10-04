@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-03 12:52'
+updated_date: '2026-10-04 06:55'
 labels:
   - web
   - bug
@@ -148,4 +148,18 @@ Next options:
 (b) The fix direction: an accept-layer heap guard that refuses new TCP connections below a heap floor before any request object is allocated. Optionally shrink the NimBLE host pools (TASK-1199, about 20.6 KB while BLE runs) to widen headroom.
 
 Related observation, 2026-10-03 (from the TASK-1199 OLD baseline): with BLE switched on at runtime on the no-PSRAM OTGW32 (alpha.404, satbleriskack true), internal_free fell to about 15 KB, and the device went silent on REST for about 3 minutes WITHOUT any storm: 13 POSTs in a row timed out, hd_min_free_heap read 396 B, there was no reboot, and ping answered afterwards. It is the same signature as the storm episodes, reached through a different heap consumer. The TASK-1162 storm runs ran with BLE off (satbleriskack false), so BLE is not what caused those.
+
+DIAG RUN 2026-10-04. The test-only image T1162diag v2 (alpha.404+b6e900a plus a 1 Hz USB-CDC telemetry task, never committed) ran on the OTGW32 bench. Storm: refresh_storm.py --workers 2,4,6,8 --seed 1124, with layer probes (ping, connect and http to the device; ping to the router as control). Closing COM4 with dtr/rts held low did NOT reset the board (two listen runs, boots stayed 32).
+WINDOW 1, deaf for 165.5 s: ping 0/163 and connect 0/55 while the router answered 164/164.
+- The CDC telemetry kept flowing, 165 of 165 lines with no seq gap, so the CPU and the tasks were alive throughout.
+- At onset: free 29780, maxblk 7668, dma 22020, dma_blk 4852, failed allocations af=204, lwIP TX queue txq about 12 KB.
+- Inside: min free 11960, min maxblk 1780, min dma_blk 1524, txq up to 23.6 KB. 444 more failed allocations in the default/internal caps, but 0 more DMA-cap failures.
+- The station netif stayed up/link/ip for the whole window.
+- The window ENDED with a WiFi disconnect plus reconnect plus got-ip (reason code 16). Right after, heap was back at free 74884, maxblk 31732, txq 150.
+WINDOW 2 (40 s) was a reboot: boots 32 to 33 with reset reason 6 (task watchdog).
+Reading (an interpretation, not proven):
+- The deafness starts while the device is still associated and its heap is near exhaustion, with internal-cap allocations failing.
+- It ends not by memory draining but by a WiFi re-association, which drops every TCP pcb and the queued TX data.
+- The task watchdog reset that followed is a separate finding: the storm can also crash the device.
+Evidence (out of the repo): %LOCALAPPDATA%/OTGW-capture/task1162-diag/run-2026-10-04/ (timeline.csv 537x148, cdc.jsonl, probe.jsonl, summary.txt). The tool's exit code 1 was the storm's own return code (aborted requests), not a tool fault.
 <!-- SECTION:NOTES:END -->

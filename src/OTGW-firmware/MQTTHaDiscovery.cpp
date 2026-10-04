@@ -3464,6 +3464,7 @@ bool streamSatSelectDiscovery(uint8_t selectIdx,
     if (!w.writeProgmem(PSTR("SAT Heating System\""))) return false;
     if (!writeJsonComma(w)) return false;
 
+    if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttSubTopic)) return false;
     if (!w.writeProgmem(PSTR("/sat/heating_system\""))) return false;
     if (!writeJsonComma(w)) return false;
@@ -3531,6 +3532,7 @@ bool streamButtonDiscovery(HaDiscoveryContext &ctx)
     if (!w.writeProgmem(PSTR("Reset Gateway\""))) return false;
     if (!writeJsonComma(w)) return false;
 
+    if (!w.writeProgmem(PSTR("\"cmd_t\":\""))) return false;
     if (!w.writeRam(ctx.mqttSubTopic)) return false;
     if (!w.writeProgmem(PSTR("/resetgateway\""))) return false;
     if (!writeJsonComma(w)) return false;
