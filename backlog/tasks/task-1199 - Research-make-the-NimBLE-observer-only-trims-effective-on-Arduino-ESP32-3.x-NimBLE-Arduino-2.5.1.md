@@ -3,11 +3,11 @@ id: TASK-1199
 title: >-
   Research: make the NimBLE observer-only trims effective on Arduino-ESP32 3.x
   (NimBLE-Arduino 2.5.1)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-03 08:58'
-updated_date: '2026-10-03 12:52'
+updated_date: '2026-10-04 06:59'
 labels:
   - ble
   - research
@@ -28,7 +28,7 @@ The prebuilt BT controller (libbt) is compiled with the sdkconfig values. Any ov
 <!-- AC:BEGIN -->
 - [x] #1 Where the host-side CONFIG_BT_NIMBLE_* values come from for NimBLE-Arduino 2.x on Arduino-ESP32 3.x is documented, from upstream docs or issues plus the nimconfig.h code. So is which of them the prebuilt controller depends on
 - [x] #2 Options compared, each with a named controller/host mismatch risk: an sdkconfig wrapper via #include_next, a custom framework sdkconfig rebuild, a library or upstream option, or no change
-- [ ] #3 If an option is chosen, the S3 bench with BLE on and no PSRAM shows internal free heap and maxfreeblock before and after in the same scenario, and a BLE scan still reports an advertiser
+- [x] #3 If an option is chosen, the S3 bench with BLE on and no PSRAM shows internal free heap and maxfreeblock before and after in the same scenario, and a BLE scan still reports an advertiser
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -69,4 +69,37 @@ OLD baseline observation, 2026-10-03, bench OTGW32 (no PSRAM), alpha.404+220fca7
 - REST: 13 consecutive POST attempts (10 s timeout each, 5 s apart) got no HTTP answer for about 3 minutes; then the 14th answered 200. hd_min_free_heap read 396 B afterwards. Ping answered again after the episode.
 - After riskack false and a reboot: internal_free 79376 B, maxfreeblock 42996 B.
 Consequences for AC#3: the bench script must tolerate minutes of REST silence on OLD with BLE on. A scan observable read over telnet is unreliable on OLD, because the session gets reset. Observables in the code: SATble.ino onResult() counts every advertisement (_bleAdCount); satBLELoop() prints 'SAT BLE: <n>s window: <ads> ads, <accepted> accepted, ...' once per iBleInterval when telnet debug key 7 is on (a toggle). GET /api/v2/sat/ble/discovery lists only parsed ATC/pvvx, BTHome v2 or MiBeacon sensors.
+
+AC#3 bench measurement, 2026-10-04. OTGW32 (no PSRAM, combo image, app-only flash). Both builds use the same procedure (ble_heap_probe2.py, kept out of the repo):
+1. satbleriskack=true with satbleenable already on, then a reboot.
+2. Wait until the device has gone and come back.
+3. Take 10 samples of /api/v2/device/info at boot+60..150 s.
+4. Read /api/v2/sat/ble/discovery.
+5. Restore and reboot.
+OLD = 2.0.0-alpha.405+8fdc3b3, framework NimBLE config; it differs from NEW's base only by the TASK-1052 shim guard. NEW = 2.0.0-alpha.404+b6e900a with the include/sdkconfig.h wrapper.
+- internal_free: OLD 14896-17296 B; NEW 33524-33848 B. About +17.5 KB.
+- maxfreeblock: OLD 9716-12788 B; NEW 28660 B (stable). +16-19 KB.
+- BLE: active on both, and 4 valid sensors on both (age 2.9-25.5 s), so the passive scan still reports advertisers.
+- hd_min_free_heap since boot: OLD 7148 B; NEW 2308 B, set before the first sample and flat afterwards. Not explained: a one-off init-time dip on NEW. Watch it in the soak.
+Earlier attempts in this session: an MQTT-stats observer gave no data, because stats are published less often than every 6 min. A REST bench run on OLD hit 503 'low heap' for about 20 minutes after a runtime BLE start (consent set without a reboot) and MQTT keepalive timeouts. Those runs are kept for the record.
+Evidence: %LOCALAPPDATA%/OTGW-capture/task1199/bench-2026-10-04/.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The NimBLE observer-only host trims now take effect (ADR-185, accepted 2026-10-04). A project header include/sdkconfig.h, found before the framework's sdkconfig dir through -Iinclude in the shared [env] build_flags, does #include_next and then trims only host values:
+- peripheral and broadcaster roles off (central stays on, because the host does not link without its connection code);
+- 1 connection, 1 bond, 0 CCCDs, ATT MTU 23;
+- ACL_FROM_LL 2 and MSYS 6/6.
+The EVT pools and every CONFIG_BT_CTRL_* stay at the framework values. NimBLE-Arduino is pinned to 2.5.1, the version the trims were verified against.
+
+Evidence:
+- AC#1 and AC#2: the research notes.
+- Preprocessor: 67/67 values in 8 TUs x 3 envs.
+- scripts/check_nimble_overrides.py: PASS on alpha.406. It checks the -I order (it fails on a missing -I and on -iquote) and that the link map takes only libbt.a(bt.c.obj).
+- Two adversarial verifiers found no blocker.
+- AC#3 bench: OTGW32 without PSRAM, BLE active, 4 valid sensors on both builds. internal_free goes from 14.9-17.3 KB to 33.5-33.8 KB (about +17.5 KB), and maxfreeblock from 9.7-12.8 KB to 28.7 KB.
+- Builds: esp32, esp32-classic and esp32-combo SUCCESS (alpha.406). evaluate.py --quick: 0 failures.
+- Open observation for the soak: a one-off boot-time dip of hd_min_free_heap to 2308 B on the new build.
+<!-- SECTION:FINAL_SUMMARY:END -->

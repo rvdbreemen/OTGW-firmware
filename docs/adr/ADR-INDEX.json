@@ -6174,6 +6174,74 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-185",
+      "title": "Make the NimBLE observer-only host trims effective through a project sdkconfig.h wrapper",
+      "path": "ADR-185-make-the-nimble-observer-only-host-trims-effective-through-a-project-sdkconfig-h-wrapper.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-04",
+      "decision_summary": "User Decision: a project-owned header named sdkconfig.h sits in include/, and -Iinclude in the shared [env] buildflag...",
+      "topics": [
+        "ble",
+        "build-config",
+        "memory",
+        "nimble",
+        "sdkconfig"
+      ],
+      "aliases": [
+        "include_next sdkconfig",
+        "NimBLE host pools",
+        "NimBLE observer trims",
+        "sdkconfig wrapper"
+      ],
+      "components": [
+        "sdkconfig.h wrapper header"
+      ],
+      "symbols": [
+        "CONFIG_BT_NIMBLE_MAX_CONNECTIONS",
+        "CONFIG_BT_NIMBLE_MSYS_1_BLOCK_COUNT",
+        "CONFIG_BT_NIMBLE_MSYS_2_BLOCK_COUNT",
+        "CONFIG_BT_NIMBLE_ROLE_PERIPHERAL",
+        "CONFIG_BT_NIMBLE_TRANSPORT_ACL_FROM_LL_COUNT"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "include/sdkconfig.h does #includenext before anything else. After that it only #undefs and #defines host-side CONFIGBTNIMBLE macros, and removes the deprecated CONFIGNIMBLEROLE alias of each role it turns off.",
+          "A role that is off is defined as 0, never left undefined.",
+          "At least one of CONFIGBTNIMBLEROLECENTRAL and CONFIGBTNIMBLEROLEPERIPHERAL stays 1, so NimBLE-Arduino's own host links without objects from libbt.a.",
+          "CONFIGBTNIMBLEMAXCONNECTIONS and CONFIGBTNIMBLEMAXBONDS stay at least 1.",
+          "-Iinclude stays in the shared [env] buildflags, which esp32, esp32-classic and esp32-combo all inherit, so the wrapper's directory precedes the framework's sdkconfig directory."
+        ],
+        "must_not": [
+          "Override any CONFIGBTCTRL value, CONFIGBTNIMBLE50FEATURESUPPORT, or the EVT pool counts and size.",
+          "Put CONFIGBTNIMBLE overrides back into platformio.ini buildflags; the framework sdkconfig.h overrides them.",
+          "Edit the vendored NimBLE-Arduino library (nimconfig.h) to get there."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python scripts/checknimbleoverrides.py --env passes for esp32, esp32-classic and esp32-combo, each on a compilecommands.json made for that env. It reruns the recorded compile commands of NimBLEDevice.cpp and blehs.c with -E -dM and check...",
+          "The link map of each env lists bt.c.obj as the only libbt.a member, so no second NimBLE host is linked. The same script checks this whenever .pio/build/ /firmware.map exists.",
+          "On the no-PSRAM OTGW32 bench with BLE on, scripts/tests/bleheapbench.py measures free internal heap and largest free block from uptime 60 to 180 s, old build against new. It also confirms that a passive scan still reports advertisers, th..."
+        ]
+      },
+      "scope": {
+        "path_globs": [
+          "platformio.ini"
+        ]
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -11196,6 +11264,12 @@
     {
       "source": "ADR-184",
       "target": "ADR-173",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-185",
+      "target": "ADR-169",
       "type": "related",
       "resolved": true
     }
