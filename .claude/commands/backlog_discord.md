@@ -15,6 +15,7 @@ Monitor `#dev-sat-mqtt` for backlog-related requests, execute them via the Backl
 - **Bot channel**: `#dev-sat-mqtt` — channel ID `1105556725714649128`
 - **Timestamp file**: `.claude/discord_backlog_last_checked.txt`
 - **Maintainer user ID to ignore**: `384411356616720384`
+- **Also read**: `#alpha-testing` — channel ID `1514720723980259460` (maintainer directive, 2026-10-04). In Phase 1, fetch it alongside the bot channel with the same timestamp filter. **No backlog commands are accepted from this channel** (no list/show/move/assign/note intents). Do answer **Sergeant D** there (`sergeantd`, user ID `821036882946424852`; "George" in this channel means him): read his reports and logs, answer in the same channel with `<@821036882946424852>`, in English, answer first, tasks may be named but builds are not announced to him. Filing a task from his report is allowed; it is our own action, not a command he gives.
 
 ## Workflow
 
