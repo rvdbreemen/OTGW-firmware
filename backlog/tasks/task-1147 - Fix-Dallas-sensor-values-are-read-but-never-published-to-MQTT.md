@@ -3,7 +3,7 @@ id: TASK-1147
 title: >-
   feat: expose the PIC-attached temperature sensor (PR=E) over MQTT and HA
   discovery
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
