@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.409
+**  Version  : v2.0.0-alpha.410
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3360,7 +3360,16 @@ void sendDeviceInfoV2()
 // Returns: {"health": {"status": "UP", "uptime": "...", ...}}
 void sendHealth()
 {
-  updateLittleFSStatus(F("/.health"));
+  // TASK-1205: the write probe (a flash write of /.health) runs at most once per
+  // 5 minutes, not on every health poll. In between, the read-only mount check
+  // still catches an unmounted filesystem, and a failed write probe keeps
+  // LittleFSmounted false until the next write probe.
+  DECLARE_TIMER_MIN(healthFsWriteProbe, 5, SKIP_MISSED_TICKS);
+  if (DUE(healthFsWriteProbe)) {
+    updateLittleFSStatus(F("/.health"));
+  } else if (LittleFSmounted) {
+    LittleFSmounted = platformFSInfo(LittleFSinfo);
+  }
 
   // ADR-141 / TASK-885: streaming JsonEmit replaces the JsonDocument path.
   // Booleans emit as real JSON booleans (the old hand-rolled map quoted them
