@@ -30,6 +30,7 @@
 #include "MQTTstuff.h"    // the revision's own header (generated directory)
 
 #include <cstdarg>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -70,7 +71,9 @@ bool satShouldDiscoverZone(uint8_t zoneIndex) { return zoneIndex < 4; }   // all
 struct Pub { std::string tag, topic, payload; bool retain; };
 static std::vector<Pub> g_pubs;
 static const char *g_tag = "(none)";
+static const char *g_failTopic = nullptr;   // part E: a publish to a topic containing this fails
 bool mqttPublishRaw(const char *topic, const uint8_t *payload, size_t len, bool retain) {
+  if (g_failTopic && topic && std::strstr(topic, g_failTopic)) return false;
   g_pubs.push_back({g_tag, topic ? topic : "",
                     payload ? std::string(reinterpret_cast<const char *>(payload), len) : std::string(), retain});
   return true;
@@ -306,6 +309,19 @@ static void partD() {
 #endif
 }
 
+// ---- E: ID 244 with one failed publish (TASK-1206) ---------------------------------------------
+// doAutoConfigureMsgid(244) must return false (the drip keeps the pending bit and retries) when
+// the Reset Gateway button or a GPIO/LED select fails to publish, and true when nothing fails.
+static void partE() {
+  static const char *const kFail[] = {"none", "/resetgateway/", "/select/"};
+  for (const char *f : kFail) {
+    g_failTopic = (std::strcmp(f, "none") == 0) ? nullptr : f;
+    call("dispatch244", argsf("fail=%s", f), ANY, ANY,
+         [&] { return doAutoConfigureMsgid(static_cast<byte>(244), false); });
+  }
+  g_failTopic = nullptr;
+}
+
 int main() {
   // startMQTT(): the node id and both namespaces from the default settings, with the unique id
   // getUniqueId() makes ("otgw-" and the 12 hex digits of the MAC).
@@ -323,6 +339,7 @@ int main() {
   partB();
   partC();
   partD();
+  partE();
   std::printf("END calls=%d not_ok=%d\n", g_seq, g_bad);
   return g_bad ? 1 : 0;
 }

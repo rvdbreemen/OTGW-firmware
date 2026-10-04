@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.411
+**  Version  : v2.0.0-alpha.412
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2769,8 +2769,10 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
   //
   // All-or-nothing: clear the pending bit only when every one of the nine configs
   // published this tick. If any single publish fails (transient MQTT/heap), result
-  // stays false so loopMQTTDiscovery() retains the pending bit and retries the whole
+  // is false so loopMQTTDiscovery() retains the pending bit and retries the whole
   // set next tick (retained idempotent re-publish). Mirrors dev PR #596.
+  // result is assigned, not OR-ed: the two ID-244 binary-sensor rows above already
+  // set it true, which used to hide a failed button or select publish (TASK-1206).
   if (OTid == OTGWpiccontrolsid) {
     ctx.device = HaDevice::Gateway;
     bool allOk = streamButtonDiscovery(ctx);
@@ -2779,7 +2781,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
       if (!streamSelectDiscovery(i, ctx)) allOk = false;
       feedWatchDog();
     }
-    if (allOk) result = true;
+    result = allOk;
   }
 
   return result;

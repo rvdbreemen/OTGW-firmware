@@ -26,6 +26,10 @@ part B) are doubled. The program runs:
   D  clearThermostatDupDiscoveryForOTId() for every id (TASK-1201, built only when the revision
      defines it): removal publishes, which must be empty.
 
+TASK-1206 check (part E): doAutoConfigureMsgid(244) returns false, so the drip keeps the pending
+bit, when the Reset Gateway button or a GPIO/LED select fails to publish (with --old-rev: OLD
+returns true, because the two ID-244 binary-sensor rows already set the result).
+
 TASK-1203 checks: no table label is longer than the composers' label buffer (it feeds stat_t),
 and the RF battery-code sensor's stat_t is the full topic its value is published on (with
 --old-rev: OLD truncates it to ..._co).
@@ -472,6 +476,11 @@ def rf_batt_stat_t(run):
     return out
 
 
+def dispatch244(run):
+    """{fail: ret} of part E: doAutoConfigureMsgid(244) with one publish target failing."""
+    return {c["args"].split("=", 1)[1]: c["ret"] for c in run[1] if c["tag"] == "dispatch244"}
+
+
 def obj_id(topic, ctx):
     """(component, object_id) of a discovery config topic."""
     parts = topic[len(ctx["prefix"]) + 1:].split("/")
@@ -542,6 +551,9 @@ def main():
     got = rf_batt_stat_t(fix)
     checks.append((f"TASK-1203 FIX: the RF battery-code sensor's stat_t is the topic its value is "
                    f"published on (got {sorted(got)})", got == want))
+    e = dispatch244(fix)
+    checks.append((f"TASK-1206 FIX: ID 244 reports done only when every config published (got {e})",
+                   e == {"none": 1, "/resetgateway/": 0, "/select/": 0}))
     off = topics_off_pattern(fix)
     checks.append((f"TASK-1204 FIX: every discovery topic matches Home Assistant's pattern "
                    f"({len(off)} do not{': ' + ', '.join(off[:3]) if off else ''})", not off))
@@ -562,7 +574,7 @@ def main():
         export(args.old_rev, root / "old")
         old = build_and_run(f"OLD (git {args.old_rev})", root / "old", args.old_rev)
         old_fails, old_topics, _ = evaluate(f"OLD (git {args.old_rev})", old)
-        direct = old_fails - {DISPATCH}
+        direct = old_fails - {DISPATCH, "dispatch244"}   # part E runs the dispatcher too
         checks.append((f"OLD fails exactly {', '.join(sorted(KNOWN))} among the direct calls "
                        f"(got {', '.join(sorted(direct)) or 'none'})", direct == set(KNOWN)))
         every = all(all(r[0].startswith("invalid JSON") for r in [gate(p, old[0])])
@@ -572,6 +584,9 @@ def main():
                        old_topics == known_topics(old[0])))
         checks.append(("TASK-1204 OLD: some discovery topics fall outside Home Assistant's pattern",
                        bool(topics_off_pattern(old))))
+        e_old = dispatch244(old)
+        checks.append((f"TASK-1206 OLD: ID 244 reports done despite a failed button or select publish "
+                       f"(got {e_old})", e_old.get("/resetgateway/") == 1 or e_old.get("/select/") == 1))
         got_old = rf_batt_stat_t(old)
         checks.append((f"TASK-1203 OLD: the RF battery-code stat_t is truncated (got {sorted(got_old)})",
                        bool(got_old) and got_old != {f"{old[0]['pub']}/{RF_BATT}"}))
