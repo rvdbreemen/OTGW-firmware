@@ -2383,7 +2383,10 @@ static bool composeSensorPayload(MqttJsonWriter &w,
                                  const MqttHaSensorCfg &cfg,
                                  HaDiscoveryContext &ctx)
 {
-  char label[48];
+  // TASK-1203: label feeds stat_t and must hold the full topic name (longest table
+  // label: 49 characters). idLabel keeps its 48-byte buffer, so the uniq_id of an
+  // entity with a longer label stays truncated as before and its entity is kept.
+  char label[64];
   char idLabel[48];
   char friendlyName[80];
   strlcpy_P(label, cfg.label, sizeof(label));
@@ -2502,7 +2505,10 @@ static bool composeBinSensorPayload(MqttJsonWriter &w,
                                     const MqttHaBinSensorCfg &cfg,
                                     HaDiscoveryContext &ctx)
 {
-  char label[48];
+  // TASK-1203: label feeds stat_t and must hold the full topic name (longest table
+  // label: 49 characters). idLabel keeps its 48-byte buffer, so the uniq_id of an
+  // entity with a longer label stays truncated as before and its entity is kept.
+  char label[64];
   char idLabel[48];
   char friendlyName[80];
   strlcpy_P(label, cfg.label, sizeof(label));

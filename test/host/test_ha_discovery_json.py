@@ -26,6 +26,10 @@ part B) are doubled. The program runs:
   D  clearThermostatDupDiscoveryForOTId() for every id (TASK-1201, built only when the revision
      defines it): removal publishes, which must be empty.
 
+TASK-1203 checks: no table label is longer than the composers' label buffer (it feeds stat_t),
+and the RF battery-code sensor's stat_t is the full topic its value is published on (with
+--old-rev: OLD truncates it to ..._co).
+
 TASK-1204 check: every discovery topic matches Home Assistant's TOPIC_MATCHER (with --old-rev:
 OLD has topics that do not, the SAT binary sensors whose label holds a '/').
 
@@ -409,10 +413,15 @@ def diff_old_fix(old, fix):
     if octx != fctx or len(opubs) != len(fpubs):
         return False, f"different runs: {len(opubs)} vs {len(fpubs)} publishes"
     known, sub = known_topics(fctx), (fctx["sub"] + "/").encode()
-    same = inserted = 0
+    same = inserted = completed = 0
     for o, f in zip(opubs, fpubs):
-        if (o["tag"], sanitized_topic(o["topic"], octx), o["retain"], o["args"]) !=            (f["tag"], f["topic"], f["retain"], f["args"]):
+        if ((o["tag"], sanitized_topic(o["topic"], octx), o["retain"], o["args"]) !=
+                (f["tag"], f["topic"], f["retain"], f["args"])):
             return False, f"publish order differs at {f['tag']} [{f['args']}] {f['topic']}"
+        completed_raw = o["raw"].replace(b'/' + RF_BATT[:-2].encode() + b'"', b'/' + RF_BATT.encode() + b'"')
+        if completed_raw == f["raw"] and o["raw"] != f["raw"] and f["topic"] not in known:
+            completed += 1   # TASK-1203: the RF battery-code stat_t now carries the full label
+            continue
         if o["raw"] == f["raw"] and f["topic"] not in known:
             same += 1
             continue
@@ -421,7 +430,7 @@ def diff_old_fix(old, fix):
                 f["raw"][:i] + f["raw"][i + len(INSERT):] == o["raw"] and o["raw"][i:].startswith(sub)):
             return False, f"unexpected change: {f['tag']} [{f['args']}] {f['topic']}"
         inserted += 1
-    return True, f"{same} payloads identical, {inserted} on the two topics = OLD + '\"cmd_t\":\"' before {fctx['sub']}/"
+    return True, f"{same} payloads identical, {completed} with the completed RF battery-code stat_t, {inserted} on the two topics = OLD + '\"cmd_t\":\"' before {fctx['sub']}/"
 
 
 def bench_offsets(old):
@@ -433,6 +442,34 @@ def bench_offsets(old):
         ok &= hit
         out.append(f"  OLD {tag} ({first}): {' | '.join(got)} (rig broker: char {want})")
     return ok, out
+
+
+RF_BATT = "RFSensorStatusInformation_battery_indication_code"   # TASK-1203: the 49-character label
+
+
+def label_overflow(rev):
+    """(buffer, labels longer than buffer-1): every discovery label in the tables (ha_lbl_* and the
+    DECLARE_SAT_DISCOVERY_STRINGS labels) against the smallest char label[N] of the sensor and
+    binary-sensor composers, which copy the label into stat_t."""
+    src = read(DISC, rev)
+    bufs = [int(m.group(2)) for m in re.finditer(
+        r"static bool (composeSensorPayload|composeBinSensorPayload)\([^{]*\{[^}]*?char label\[(\d+)\]", src, re.S)]
+    labels = re.findall(r'const char ha_lbl_\w+\[\]\s+PROGMEM\s*=\s*"([^"]*)"', src)
+    labels += re.findall(r'DECLARE_SAT_DISCOVERY_STRINGS\(\s*\w+\s*,\s*"([^"]*)"', src)
+    n = min(bufs) if bufs else 0
+    return n, sorted({l for l in labels if len(l) > n - 1}, key=len)
+
+
+def rf_batt_stat_t(run):
+    """The stat_t values the dispatcher announces for the RF battery-code sensor."""
+    out = set()
+    for p in run[2]:
+        if p["tag"] != DISPATCH or not p["raw"]:
+            continue
+        obj = strict_json(p["raw"])[0] or {}
+        if "battery_indication_co" in str(obj.get("uniq_id", "")):
+            out.add(obj.get("stat_t"))
+    return out
 
 
 def obj_id(topic, ctx):
@@ -498,6 +535,13 @@ def main():
     print(f"  entry points: {', '.join(entry_points(None))}")
     checks.append((f"FIX calls every public composer (missing: {', '.join(missing) or 'none'})", not missing))
     checks.append(("FIX: every call returns and publishes as expected, every payload passes the gate", not fix_fails))
+    n, over = label_overflow(None)
+    checks.append((f"TASK-1203 FIX: no discovery label is longer than the composers' label buffer "
+                   f"(char label[{n}]; too long: {over or 'none'})", n > 0 and not over))
+    want = {f"{fix[0]['pub']}/{RF_BATT}"}
+    got = rf_batt_stat_t(fix)
+    checks.append((f"TASK-1203 FIX: the RF battery-code sensor's stat_t is the topic its value is "
+                   f"published on (got {sorted(got)})", got == want))
     off = topics_off_pattern(fix)
     checks.append((f"TASK-1204 FIX: every discovery topic matches Home Assistant's pattern "
                    f"({len(off)} do not{': ' + ', '.join(off[:3]) if off else ''})", not off))
@@ -528,6 +572,9 @@ def main():
                        old_topics == known_topics(old[0])))
         checks.append(("TASK-1204 OLD: some discovery topics fall outside Home Assistant's pattern",
                        bool(topics_off_pattern(old))))
+        got_old = rf_batt_stat_t(old)
+        checks.append((f"TASK-1203 OLD: the RF battery-code stat_t is truncated (got {sorted(got_old)})",
+                       bool(got_old) and got_old != {f"{old[0]['pub']}/{RF_BATT}"}))
         old_dups = dup_uniq_ids(old)
         old_thermo = {t for _, t in thermostat_dups(old)}
         print(f"  TASK-1201 OLD: duplicated uniq_ids per permutation {old_dups}; "
@@ -538,7 +585,7 @@ def main():
                        bool(old_thermo) and old_thermo <= cleared))
         ok, text = diff_old_fix(old, fix)
         print(f"== OLD vs FIX: {text} ==")
-        checks.append(("FIX changes nothing but the two payloads (TASK-1202) and the thermostat_ duplicates (TASK-1201), and keeps their command topic", ok))
+        checks.append(("FIX changes nothing but the two payloads (TASK-1202), the thermostat_ duplicates (TASK-1201) and the RF battery-code stat_t (TASK-1203)", ok))
         ok, lines = bench_offsets(old)
         print("== OLD parse errors against the rig's broker ==")
         print("\n".join(lines))
