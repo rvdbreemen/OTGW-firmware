@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-22 05:02'
-updated_date: '2026-09-29 21:22'
+updated_date: '2026-10-04 19:33'
 labels:
   - enhancement
 dependencies: []
@@ -56,7 +56,7 @@ HISTORY. This record began as a bug report, "Dallas sensor values are read but n
 - [x] #3 The existing PIC Temp Sensor diagnostic entity (PR=D, settings/temp_sensor) is left alone, and the new entity is named so the two cannot be confused
 - [x] #4 Polling PR=E does not measurably disturb OpenTherm traffic on the shared serial line
 - [x] #5 python build.py --firmware exits 0 and python evaluate.py --quick shows no new failures
-- [ ] #6 indigo_light confirms the value reaches Home Assistant on his gateway
+- [x] #6 indigo_light confirms the value reaches Home Assistant on his gateway
 - [x] #7 A setting 'PIC temperature sensor' (default off) enables the readout; when on, the firmware sends PR=E once every 3 minutes and parses the PR: E=<value> reply; when off, PR=E is never sent
 <!-- AC:END -->
 
@@ -169,4 +169,6 @@ Recommendation: do not implement PR=E polling on current evidence. Either park t
 - AC#6 (indigo_light confirms on his gateway) needs a published build; pending.
 
 2026-09-29: shipped in v1.7.7-beta.1 (tag on a6f61b715, CI run 36632317938 success, 10 assets). Announced in #beta-testing (1554603978296135760) and asked indigo_light to test in #nederlandse-ondersteuning (1554603983593672745); indigo_light is named without a ping because his Discord user ID is not known yet (discord-mcp name lookup does not work). AC#6 waits for his confirmation.
+
+2026-10-04: AC#6 confirmed by indigo_light in #nederlandse-ondersteuning (12:33-12:48Z). After flashing v1.7.7-beta.1 the entity sensor.opentherm_gateway_otgw_pic_temperature_reading arrives in Home Assistant, and 'de sensor komt binnen en komt exact overeen met de GUI van de OTGW' (the value matches the web interface exactly).
 <!-- SECTION:NOTES:END -->
