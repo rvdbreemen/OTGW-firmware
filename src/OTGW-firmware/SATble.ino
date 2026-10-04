@@ -44,7 +44,7 @@ static const uint32_t BLE_STALE_MS          = 300000;   // 5 min stale timeout
 // Compile-time guard: BLE_STALE_MS must comfortably exceed one scan window so
 // the staleness check cannot evict a slot the radio just refreshed. Tripwire
 // for any future re-tuning that mixes the _MS / _SEC constant suffixes.
-static_assert(BLE_STALE_MS > 60000UL, "BLE_STALE_MS must be > 60 s; see SATble.ino BLE_STALE_MS / BLE_SCAN_INTERVAL_TICKS");
+static_assert(BLE_STALE_MS > 60000UL, "BLE_STALE_MS must be > 60 s; see SATble.ino BLE_STALE_MS / BLE_SCAN_INTERVAL_MS");
 
 // ATC/pvvx custom firmware service data UUID: 0x181A (Environmental Sensing)
 static const uint16_t ATC_SERVICE_UUID_16    = 0x181A;
@@ -65,18 +65,20 @@ static const uint8_t BTHOME_OBJ_TEMPERATURE_S16 = 0x02;  // sint16, factor 0.01
 static const uint8_t BTHOME_OBJ_HUMIDITY_U16    = 0x03;  // uint16, factor 0.01
 static const uint8_t BTHOME_OBJ_BATTERY_U8      = 0x01;  // uint8, factor 1
 
-// NimBLE scan tuning. Argument unit is BLE-spec 0.625 ms ticks.
+// NimBLE scan tuning, in milliseconds: NimBLE-Arduino 2.x setInterval()/setWindow()
+// take ms and convert to 0.625 ms BLE ticks themselves (NimBLEScan.cpp, ms * 16 / 10).
 // 50 % duty (window/interval) keeps the radio active half the time without
-// starving the WiFi/BT coexistence on a single-radio ESP32-S3.
-static constexpr uint16_t BLE_SCAN_INTERVAL_TICKS = 160;  // 100 ms
-static constexpr uint16_t BLE_SCAN_WINDOW_TICKS   = 80;   //  50 ms
+// starving the WiFi/BT coexistence on a single-radio ESP32-S3. These are the values
+// the scan has run with in the field (TASK-1207); only their unit was mislabelled.
+static constexpr uint16_t BLE_SCAN_INTERVAL_MS = 160;
+static constexpr uint16_t BLE_SCAN_WINDOW_MS   = 80;
 // Magic-zero NimBLE idiom: callback-only mode, library never builds a result list.
 static constexpr uint16_t BLE_SCAN_MAX_RESULTS    = 0;
 // NimBLE rejects window > interval at runtime; catch it at compile time so
 // any future re-tune flagging the wrong constant fails the build instead of
 // silently disabling the scan.
-static_assert(BLE_SCAN_WINDOW_TICKS <= BLE_SCAN_INTERVAL_TICKS,
-              "BLE_SCAN_WINDOW_TICKS must be <= BLE_SCAN_INTERVAL_TICKS");
+static_assert(BLE_SCAN_WINDOW_MS <= BLE_SCAN_INTERVAL_MS,
+              "BLE_SCAN_WINDOW_MS must be <= BLE_SCAN_INTERVAL_MS");
 
 // TASK-508: transient runtime data, parallel to settings.sat.sBleMac[i] /
 // sBleLabel[i]. Slot is "in use" iff settings.sat.sBleMac[i][0] != '\0';
@@ -641,9 +643,9 @@ void satBLEInit()
   _pBLEScan->setScanCallbacks(&_bleScanCallbacks, true);
   _pBLEScan->setActiveScan(false);                    // Passive scan to save power
   _pBLEScan->setMaxResults(BLE_SCAN_MAX_RESULTS);     // see BLE_SCAN_MAX_RESULTS at top of file
-  // NimBLE setInterval/setWindow take BLE-spec ticks of 0.625 ms each.
-  _pBLEScan->setInterval(BLE_SCAN_INTERVAL_TICKS);    // 100 ms scan-interval
-  _pBLEScan->setWindow(BLE_SCAN_WINDOW_TICKS);        //  50 ms scan-window (50 % radio duty)
+  // NimBLE-Arduino 2.x setInterval/setWindow take milliseconds.
+  _pBLEScan->setInterval(BLE_SCAN_INTERVAL_MS);       // 160 ms scan-interval
+  _pBLEScan->setWindow(BLE_SCAN_WINDOW_MS);           //  80 ms scan-window (50 % radio duty)
 
   // TASK-494: Continuous-scan model — start the scan ONCE, run forever.
   // Args: (duration_seconds=0 means forever, is_continue=false, restart=true).
