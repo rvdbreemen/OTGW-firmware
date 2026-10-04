@@ -2665,6 +2665,7 @@ static bool buildBinSensorDiscoveryTopic(char *dest, size_t destSize,
 {
   char labelBuf[48];
   strlcpy_P(labelBuf, label, sizeof(labelBuf));
+  sanitizeHaObjectId(labelBuf);  // TASK-1204: a '/' in the label (sat/active) adds a topic level
   const bool hasDevice = (deviceSegment && deviceSegment[0] != '\0');
   int n;
   if (hasDevice) {

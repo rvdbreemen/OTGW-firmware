@@ -26,6 +26,9 @@ part B) are doubled. The program runs:
   D  clearThermostatDupDiscoveryForOTId() for every id (TASK-1201, built only when the revision
      defines it): removal publishes, which must be empty.
 
+TASK-1204 check: every discovery topic matches Home Assistant's TOPIC_MATCHER (with --old-rev:
+OLD has topics that do not, the SAT binary sensors whose label holds a '/').
+
 TASK-1201 checks: in part B no uniq_id is announced on two config topics; the one-time clear
 empties only thermostat_ sensor/binary_sensor topics and none the dispatcher still publishes;
 with --old-rev, OLD announces uniq_ids twice in a modern permutation and the clear covers every
@@ -376,6 +379,23 @@ def known_topics(ctx):
     return {f"{ctx['prefix']}/{t.format(node=ctx['node'])}" for t in KNOWN.values()}
 
 
+def sanitized_topic(topic, ctx):
+    """TASK-1204: the topic with every byte outside [a-zA-Z0-9_-] in its object_id replaced by '_'
+    (sanitizeHaObjectId()), so a label such as sat/active no longer adds a topic level."""
+    pfx, npart = ctx["prefix"] + "/", "/" + ctx["node"] + "/"
+    if not (topic.startswith(pfx) and topic.endswith("/config") and npart in topic):
+        return topic   # e.g. the BLE configs, which carry no node segment
+    head, oid = topic[:-len("/config")].split(npart, 1)
+    return head + npart + re.sub(r"[^a-zA-Z0-9_-]", "_", oid) + "/config"
+
+
+def topics_off_pattern(run):
+    """Every discovery topic Home Assistant's TOPIC_MATCHER does not match (it drops those)."""
+    pfx = run[0]["prefix"] + "/"
+    return sorted({p["topic"] for p in run[2]
+                   if not (p["topic"].startswith(pfx) and TOPIC_MATCHER.match(p["topic"][len(pfx):]))})
+
+
 def diff_old_fix(old, fix):
     """(ok, text): FIX equals OLD byte for byte, except each payload on a known topic, which is its
     OLD twin with '"cmd_t":"' inserted once in front of the command topic."""
@@ -391,7 +411,7 @@ def diff_old_fix(old, fix):
     known, sub = known_topics(fctx), (fctx["sub"] + "/").encode()
     same = inserted = 0
     for o, f in zip(opubs, fpubs):
-        if (o["tag"], o["topic"], o["retain"], o["args"]) != (f["tag"], f["topic"], f["retain"], f["args"]):
+        if (o["tag"], sanitized_topic(o["topic"], octx), o["retain"], o["args"]) !=            (f["tag"], f["topic"], f["retain"], f["args"]):
             return False, f"publish order differs at {f['tag']} [{f['args']}] {f['topic']}"
         if o["raw"] == f["raw"] and f["topic"] not in known:
             same += 1
@@ -478,6 +498,9 @@ def main():
     print(f"  entry points: {', '.join(entry_points(None))}")
     checks.append((f"FIX calls every public composer (missing: {', '.join(missing) or 'none'})", not missing))
     checks.append(("FIX: every call returns and publishes as expected, every payload passes the gate", not fix_fails))
+    off = topics_off_pattern(fix)
+    checks.append((f"TASK-1204 FIX: every discovery topic matches Home Assistant's pattern "
+                   f"({len(off)} do not{': ' + ', '.join(off[:3]) if off else ''})", not off))
     # TASK-1201: one config topic per uniq_id, and the one-time clear never empties a live config.
     fix_dups = dup_uniq_ids(fix)
     checks.append((f"TASK-1201 FIX: no uniq_id on two config topics in any permutation (got {fix_dups})",
@@ -503,6 +526,8 @@ def main():
         checks.append(("OLD: every payload of those two composers is invalid JSON", every))
         checks.append((f"OLD dispatcher fails exactly the two topics (got {sorted(old_topics)})",
                        old_topics == known_topics(old[0])))
+        checks.append(("TASK-1204 OLD: some discovery topics fall outside Home Assistant's pattern",
+                       bool(topics_off_pattern(old))))
         old_dups = dup_uniq_ids(old)
         old_thermo = {t for _, t in thermostat_dups(old)}
         print(f"  TASK-1201 OLD: duplicated uniq_ids per permutation {old_dups}; "
