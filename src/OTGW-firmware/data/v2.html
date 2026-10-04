@@ -483,6 +483,9 @@
           <button class="tbtn" id="satDetectLoc" style="margin-top:8px">Detect location</button>
           <span class="sub" id="satCoords" style="margin-left:8px"></span></div>
       </div>
+      <!-- TASK-1211: the SAT settings a user chooses (system, presets, indoor source, areas, weather, hot water, season) -->
+      <h4 class="sat-set-head">SAT settings</h4>
+      <div class="set-cards" id="satSetL2"></div>
     </div>
 
     <!-- L3 Technical — health, PID, PWM/cycle, smart features, external sensors, simulation, raw JSON -->
@@ -503,7 +506,14 @@
         <div class="card"><h4><button class="raw-toggle" id="satRawToggle" aria-expanded="false">▸ Raw data (JSON)</button></h4>
           <pre class="raw-json" id="satRawJson" style="display:none"></pre></div>
       </div>
-      <p class="sat-hint" style="margin-top:2px">Every knob behind these readouts lives in <b>Settings → SAT</b>.</p>
+      <!-- TASK-1211: the SAT tuning settings (curve, PID/PWM, offsets, boiler, thermal, sensors, PV boost) -->
+      <h4 class="sat-set-head">SAT tuning</h4>
+      <div class="set-cards" id="satSetL3"></div>
+    </div>
+    <div class="savebar" id="satSaveBar">
+      <span class="msg"><b id="satDirtyCount">0</b> unsaved change(s)</span>
+      <button class="discard" id="satBtnDiscard">Discard</button>
+      <button class="save" id="satBtnSave">Save settings</button>
     </div>
   </div>
 </div><!-- /page-sat -->

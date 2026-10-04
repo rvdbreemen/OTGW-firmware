@@ -1620,7 +1620,10 @@
     // the firmware GET exposes (presets / weather / solar / summer / comfort /
     // multi-area / PV-boost / auto-tune / simulation / BLE). These previously fell
     // back to humanizeKey under a flat SAT card (TASK-933 mockup-alignment). ---
-    satexternaltemp:     { cat: 'sat', label: 'Use external temp source' },
+    // TASK-1211: wording proposed by Sergeant D; 'help' renders under the row.
+    satexternaltemp:     { cat: 'sat', label: 'Use MQTT/REST as indoor temp source',
+                           help: 'Send the room temperature to SAT, either way. MQTT: publish to <prefix>/set/<node>/sat/indoor_temp ' +
+                                 '(payload e.g. 20.8). REST: POST it to /api/v2/sat/externaltemp. The value expires after "Sensor max age".' },
     satovershootmargin:  { cat: 'sat', label: 'Overshoot margin', hint: '°C' },
     satpwmautoswitch:    { cat: 'sat', label: 'Auto PWM switch' },
     satboilercapacity:   { cat: 'sat', label: 'Boiler capacity', hint: 'kW' },
@@ -1670,8 +1673,39 @@
     satbleenable:        { cat: 'sensors', sub: 'BLE sensors', label: 'Enable BLE sensors' },
     satblefailover:      { cat: 'sensors', sub: 'BLE sensors', label: 'BLE failover to OT' },
     satblemac:           { cat: 'sensors', sub: 'BLE sensors', label: 'BLE sensor MAC' },
-    satbleinterval:      { cat: 'sensors', sub: 'BLE sensors', label: 'BLE poll interval', hint: 'Seconds' }
+    satbleinterval:      { cat: 'sensors', sub: 'BLE sensors', label: 'BLE poll interval', hint: 'Seconds' },
+    satbleriskack:       { cat: 'sensors', sub: 'BLE sensors', label: 'BLE without PSRAM: risk accepted' }   // TASK-1211: was in SAT "Other"
   };
+  // TASK-1211: the SAT settings live on the SAT page, at the depth that fits the
+  // user: L2 Control holds what a user chooses, L3 Technical holds the tuning.
+  // satenabled is the SAT header toggle, so no form shows it. A SAT key that is not
+  // listed here lands in L3 "Other", so a new firmware setting is never hidden.
+  var SAT_L2 = [
+    ['System', ['satsystem', 'satsource', 'satheatingmode', 'sattargettemp', 'satpushsetpoint']],
+    ['Presets', ['satpresetcomfort', 'satpreseteco', 'satpresetaway', 'satpresetsleep', 'satpresetactivity',
+                 'satpresethome', 'satpresetsync', 'satpresetsynctopic']],
+    ['Indoor temperature', ['satexternaltemp', 'satsensormaxage']],
+    ['Areas', ['satsensorarea0', 'satsensorarea1', 'satsensorarea2', 'satsensorarea3', 'satmultiarea',
+               'satmultiareacount', 'satareaweight0', 'satareaweight1', 'satareaweight2', 'satareaweight3', 'satzonecount']],
+    ['Weather', ['satweatherenable', 'satweatherlat', 'satweatherlon', 'satweatherapikey', 'satweatherinterval']],
+    ['Hot water', ['satdhwenabled', 'satdhwenable', 'satdhwsetpoint']],
+    ['Season', ['satsummersimmer', 'satsummerthreshold', 'satsummerminhours', 'satwindowdetect', 'satwindowminsec']]
+  ];
+  var SAT_L3 = [
+    ['Curve', ['satcoefficient', 'satdeadband', 'sattempstep', 'satovershootmargin']],
+    ['PID / PWM', ['satforcepwm', 'satpwmautoswitch', 'satcyclesperhour', 'satautogains', 'satmaxmodulation',
+                   'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
+    ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
+    ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satboilercapacity',
+                'satminpressure', 'satmaxpressure', 'satmaxpressdrop']],
+    ['Thermal', ['satthermalcomfort', 'satcomfortadjust', 'satcomforthumidity', 'satcomfortmaxoffset', 'sathumiditytimeout',
+                 'satthermalcoeff', 'satsolargain', 'satsolarminrise', 'satsolaroffset', 'satsolarminelev']],
+    ['Sensors', ['saterrormon', 'satzonetimeout', 'satzoneheadroom']],
+    ['PV boost', ['satpvboostenabled', 'satpvboostthresholdw', 'satpvboostholds', 'satpvboostdeltac',
+                  'satpvboostmaxindoorc', 'satpvboostmaxdurationmin']],
+    ['Simulation', ['satsimulation', 'satsimheatrate', 'satsimcoolrate']]
+  ];
+  var SAT_NOT_IN_FORMS = { satenabled: 1 };
   // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
   // normal toggle — never list it as an editable setting.
   var SET_HIDE = { ui_usev2: 1 };
@@ -1785,6 +1819,7 @@
       cols.appendChild(head);
       // masonry container; cards grouped by sub-group
       var wrap = document.createElement('div'); wrap.className = 'set-cards';
+      if (id === 'sat') { wrap.appendChild(satMovedCard()); cols.appendChild(wrap); return; }   // TASK-1211
       var keys = keysForCat(id, q).filter(function (k) { return !SET_HIDE_ROW[k]; });   // TASK-1012: never render internal onboarding flags
       var bySub = {}; var subOrder = [];
       keys.forEach(function (k) { var s = subFor(k); if (!(s in bySub)) { bySub[s] = []; subOrder.push(s); } bySub[s].push(k); });
@@ -1804,7 +1839,41 @@
       cols.appendChild(wrap);
     });
     if (bleData) renderBleCard();
+    renderSatSettings();
     updateSaveBar();
+  }
+  // TASK-1211: Settings keeps a pointer card for the SAT category; the fields render on
+  // the SAT page (renderSatSettings), with the same rows, dirty state and save path.
+  function satMovedCard() {
+    var card = document.createElement('section'); card.className = 'set-group';
+    var p = document.createElement('p'); p.className = 'cat-desc';
+    p.textContent = 'The SAT settings now live on the SAT page: the choices under Control, the tuning under Technical.';
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'tbtn'; b.textContent = 'Open SAT settings';
+    b.addEventListener('click', function () { showPage('sat'); });
+    card.appendChild(p); card.appendChild(b);
+    return card;
+  }
+  function renderSatSettings() {
+    var l2 = document.getElementById('satSetL2'), l3 = document.getElementById('satSetL3');
+    if (!l2 || !l3) return;
+    l2.textContent = ''; l3.textContent = '';
+    var placed = {};
+    function fill(host, groups) {
+      groups.forEach(function (g) {
+        var keys = g[1].filter(function (k) { return setData[k] && !SET_HIDE_ROW[k]; });
+        if (!keys.length) return;
+        var card = document.createElement('section'); card.className = 'set-group';
+        var h = document.createElement('h3'); h.textContent = g[0]; card.appendChild(h);
+        keys.forEach(function (k) { placed[k] = 1; card.appendChild(settingRow(k)); });
+        host.appendChild(card);
+      });
+    }
+    fill(l2, SAT_L2);
+    fill(l3, SAT_L3);
+    var rest = Object.keys(setData).filter(function (k) {
+      return catFor(k) === 'sat' && !placed[k] && !SAT_NOT_IN_FORMS[k] && !SET_HIDE_ROW[k];
+    });
+    if (rest.length) fill(l3, [['Other', rest]]);
   }
   function settingRow(k) {
     var meta = setData[k], type = meta.type || 's';
@@ -1849,6 +1918,9 @@
       input.addEventListener('input', function () { markDirty(k, input.value, row); });
     }
     row.appendChild(input);
+    // TASK-1211: optional longer explanation under the row (SET_META.help).
+    var help = SET_META[k] && SET_META[k].help;
+    if (help) { var hd = document.createElement('div'); hd.className = 'shelp'; hd.textContent = help; row.appendChild(hd); }
     return row;
   }
   // TASK-985: Webhook "Send test call" action, appended to the Webhook settings group
@@ -1917,10 +1989,13 @@
     updateSaveBar();
   }
   function updateSaveBar() {
-    var bar = document.getElementById('saveBar'), cnt = document.getElementById('dirtyCount');
     var n = Object.keys(setDirty).length;
-    if (cnt) cnt.textContent = n;
-    if (bar) bar.classList.toggle('show', n > 0);
+    // TASK-1211: the SAT page has its own bar over the same dirty set.
+    [['saveBar', 'dirtyCount'], ['satSaveBar', 'satDirtyCount']].forEach(function (ids) {
+      var bar = document.getElementById(ids[0]), cnt = document.getElementById(ids[1]);
+      if (cnt) cnt.textContent = n;
+      if (bar) bar.classList.toggle('show', n > 0);
+    });
   }
   function saveSettings() {
     var keys = Object.keys(setDirty);
@@ -4304,6 +4379,8 @@
     var bSave = document.getElementById('btnSave'); if (bSave) bSave.addEventListener('click', saveSettings);
     var pcu = document.getElementById('picCheckUpd'); if (pcu) pcu.addEventListener('click', checkPicUpdate);   // TASK-972
     var bDisc = document.getElementById('btnDiscard'); if (bDisc) bDisc.addEventListener('click', discardSettings);
+    var sSave = document.getElementById('satBtnSave'); if (sSave) sSave.addEventListener('click', saveSettings);         // TASK-1211
+    var sDisc = document.getElementById('satBtnDiscard'); if (sDisc) sDisc.addEventListener('click', discardSettings);
 
     wireSat();   // TASK-986: bind SAT-page controls before the page is restored below
     // TASK-1128: the restore runs well before the first health poll says whether

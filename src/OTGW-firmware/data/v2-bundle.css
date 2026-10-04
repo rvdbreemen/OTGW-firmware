@@ -747,6 +747,10 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     width:46%;max-width:220px;border:1px solid var(--border);background:var(--panel-2);
     color:var(--text);border-radius:8px;padding:8px 10px;font-size:.84rem;font-family:var(--font-sans)}
   .srow.dirty .slbl::before{content:'●';color:var(--zone-warn);margin-right:6px;font-size:.7rem}
+  /* TASK-1211: help text under a settings row, and the SAT-page settings headings */
+  .srow:has(.shelp){flex-wrap:wrap}
+  .srow .shelp{flex-basis:100%;font-size:.72rem;color:var(--muted);line-height:1.4}
+  .sat-set-head{margin:18px 0 8px;font-size:.95rem}
   /* TASK-985: webhook Send-test-call action row appended to the Webhook settings group. */
   .wh-actions{display:flex;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
   .wh-status{font-size:.8rem;color:var(--muted);font-family:var(--font-mono)}
