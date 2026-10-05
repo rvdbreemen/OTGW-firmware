@@ -1,11 +1,11 @@
 ---
 id: TASK-1036
 title: 'Phase-3: remove ESP32-S3 heap-frag gating once ADR-167 is Accepted'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-07-09 21:17'
-updated_date: '2026-10-05 12:39'
+updated_date: '2026-10-05 22:55'
 labels: []
 dependencies: []
 ordinal: 245000
@@ -22,7 +22,7 @@ Follow-up to TASK-956 (heap-frag soak investigation, complete). The soak evidenc
 - [x] #1 ADR-167 is Accepted (precondition — do not start otherwise)
 - [x] #2 Preventive drip/tier gating + delay(1) pacing removed from dev
 - [x] #3 evaluate.py gates check_heap_fragmentation_promotion/check_per_consumer_heap_gate/check_heap_tier_entry_counters/check_heap_tier_thresholds_ordered updated to match, ADR-089/121 status flipped, evaluator green
-- [ ] #4 Rebuilt (esp32-combo, current dev) and re-soaked >= 10 h on the OTGW32 with scripts/heap_soak_driver.py. The driver exits 0: no reboot, unreachable, sim_inactive, republish_failed or republish_not_drained anomaly. Its SUMMARY shows hd_enter_low/warning/critical_max = 0, hd_ws_drops_max = hd_mqtt_drops_max = 0, hd_min_max_block_min >= 8192 (report the floor), and hd_max_loop_gap_ms_max with no multi-second stall.
+- [x] #4 Rebuilt (esp32-combo, current dev) and re-soaked >= 10 h on the OTGW32 with scripts/heap_soak_driver.py. The driver exits 0: no reboot, unreachable, sim_inactive, republish_failed or republish_not_drained anomaly. Its SUMMARY shows hd_enter_low/warning/critical_max = 0, hd_ws_drops_max = hd_mqtt_drops_max = 0, hd_min_max_block_min >= 8192 (report the floor), and hd_max_loop_gap_ms_max with no multi-second stall.
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -69,4 +69,12 @@ Caveats: the passive telnet logger added debug-output load from 16:57, but the 3
 The follow-up investigation is filed as a separate task. Evidence: %LOCALAPPDATA%/OTGW-capture/task1036/soak-alpha412-20261004-1254/ (driver.out, driver.err, snapshots.jsonl, telnet.txt).
 
 2026-10-05 14:38: AC#4 re-soak #2 STARTED on alpha.416+9f64919. It includes the TASK-1213 fix (ADR-186: non-blocking MQTT socket write) and TASK-1214 (vendored espMqttClient at upstream main, ADR-187). Command: heap_soak_driver.py --duration-hours 10.25 --republish-every-min 60, detached (pid 5008). First snapshot: freeheap 80124, maxblock 34804, hd_min_max_block 31732, tiers 0/0/0, drops 0/0, sim on. No other testing on this unit until it ends (about 00:55). Output: %LOCALAPPDATA%/OTGW-capture/task1036/soak-alpha416-20261005-1438/. The rig broker still runs in Docker/WSL on the laptop; with ADR-186 a slow broker should no longer stall the loop.
+
+2026-10-06 00:55: AC#4 re-soak #2 PASSED on alpha.416+9f64919 (OTGW32, esp32-combo, current dev firmware; later dev commits are docs only). heap_soak_driver.py SUMMARY: verdict=CLEAN anomalies=none duration_h=10.25, snapshots_ok=1714 failed=3, load_requests=2513, bootcount 17 throughout (no reboot), sim_inactive_snapshots=0, hd_enter_low/warning/critical_max=0/0/0, hd_ws_drops_max=0, hd_mqtt_drops_max=0, hd_min_max_block_min=19444 (floor; >= 8192 required), hd_min_free_heap_min=16800, hd_max_loop_gap_ms_max=550 (no multi-second stall; previous soak on alpha.412: 6125 ms and 532 B), republish 9 sent / 9 drained, max drain 281 s. longest_gap_s=53.7 is the driver's own snapshot gap (3 failed polls), not a device loop stall: the device loop-gap watermark stayed 550 ms. The difference from re-soak #1 is the TASK-1213 fix (ADR-186, non-blocking MQTT socket write) plus TASK-1214 (ADR-187). Output: %LOCALAPPDATA%/OTGW-capture/task1036/soak-alpha416-20261005-1438/ (driver.out, snapshots.jsonl, final_device_info.json).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Phase-3 heap-frag gating removal (ADR-167) is done and soak-proven. The preventive drip/tier gating and delay(1) pacing are gone; canSendWebSocket()/canPublishMQTT() block on CRITICAL only; the evaluate.py gates and ADR-089/121 status were updated. Evidence for AC#4: a 10.25 h soak on alpha.416 (OTGW32 combo) ended CLEAN with no reboot, no tier entries, no WS or MQTT drops, a largest-free-block floor of 19444 B (>= 8192) and a max loop gap of 550 ms. The first re-soak (alpha.412) failed on a 6.1 s loop stall caused by blocking MQTT socket writes against a slow broker; TASK-1213 (ADR-186) fixed that, and TASK-1214 (ADR-187) moved the vendored espMqttClient to upstream.
+<!-- SECTION:FINAL_SUMMARY:END -->
