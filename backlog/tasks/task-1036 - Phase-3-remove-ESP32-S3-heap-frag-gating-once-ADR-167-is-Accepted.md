@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-09 21:17'
-updated_date: '2026-10-04 21:12'
+updated_date: '2026-10-05 12:39'
 labels: []
 dependencies: []
 ordinal: 245000
@@ -67,4 +67,6 @@ FAIL:
 The telnet capture (16:57-23:09) holds 100+ [loop-stall] lines; the largest begin right after '[drip] OT ID 0 published OK' (see the earlier notes).
 Caveats: the passive telnet logger added debug-output load from 16:57, but the 3215 and 4181 ms stalls came before it. Host memory reached 98% (llama-server), and the MQTT broker runs in Docker/WSL on that host.
 The follow-up investigation is filed as a separate task. Evidence: %LOCALAPPDATA%/OTGW-capture/task1036/soak-alpha412-20261004-1254/ (driver.out, driver.err, snapshots.jsonl, telnet.txt).
+
+2026-10-05 14:38: AC#4 re-soak #2 STARTED on alpha.416+9f64919. It includes the TASK-1213 fix (ADR-186: non-blocking MQTT socket write) and TASK-1214 (vendored espMqttClient at upstream main, ADR-187). Command: heap_soak_driver.py --duration-hours 10.25 --republish-every-min 60, detached (pid 5008). First snapshot: freeheap 80124, maxblock 34804, hd_min_max_block 31732, tiers 0/0/0, drops 0/0, sim on. No other testing on this unit until it ends (about 00:55). Output: %LOCALAPPDATA%/OTGW-capture/task1036/soak-alpha416-20261005-1438/. The rig broker still runs in Docker/WSL on the laptop; with ADR-186 a slow broker should no longer stall the loop.
 <!-- SECTION:NOTES:END -->
