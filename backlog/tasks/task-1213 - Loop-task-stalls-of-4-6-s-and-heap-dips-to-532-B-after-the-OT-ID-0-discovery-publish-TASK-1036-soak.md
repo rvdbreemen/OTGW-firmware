@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-04 21:12'
-updated_date: '2026-10-05 09:32'
+updated_date: '2026-10-05 09:35'
 labels:
   - esp32
   - mqtt
@@ -116,6 +116,8 @@ Bench old vs fix, OTGW32 combo, 'tc netem delay 500ms' on the rig broker, reboot
 - FIX alpha.415: max 144 / 0 and 140 / 0.
 - Retained configs 398 in every run; MQTT connected throughout. hd_min_free_heap on FIX 15744 / 24048 B (OLD 2696-23036).
 Builds: esp32, esp32-classic and esp32-combo SUCCESS (alpha.415); evaluate.py --quick 71/0. The earlier discovery-budget attempt is discarded.
+
+Upstream contribution, 2026-10-05: the ClientSync::write() patch is offered to espMqttClient as https://github.com/bertmelis/espMqttClient/pull/191 (branch rvdbreemen:nonblocking-clientsync-write, based on upstream main de31cb2). Follow-up for the newer upstream fixes our vendored 1.7.2 lacks: see the new vendored-espMqttClient update task.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
