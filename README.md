@@ -4,9 +4,22 @@
 
 This repository contains the **ESP8266 firmware for the NodoShop OpenTherm Gateway (OTGW)**. It runs on the ESP8266 "devkit" that is part of the NodoShop OTGW and turns the gateway into a standalone network device.
 
-> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.6](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.6), a reliability release for MQTT and port 25238. If your gateway has an admin password set and still runs v1.7.4 or earlier, upgrade: those versions served `settings.ini`, which holds that password in cleartext, without authentication.
+> ⚠️ **This is the 1.x maintenance branch (`otgw-1.x.x`).** The latest stable 1.x release is [v1.7.7](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.7): the PIC temperature sensor reaches Home Assistant, and two tools on one computer share port 25238 again. If your gateway has an admin password set and still runs v1.7.4 or earlier, upgrade: those versions served `settings.ini`, which holds that password in cleartext, without authentication.
 
-## What's New in v1.7.6
+## What's New in v1.7.7
+
+v1.7.7 is a small feature and fix release for the 1.x (ESP8266) line. No breaking changes versus v1.7.6.
+
+- **New: the temperature sensor wired to the PIC reaches MQTT and Home Assistant.** Turn on PIC Temperature Sensor in the PIC section of the settings page (off by default); the gateway reads it every 3 minutes and publishes `otgw-pic/temperature_reading` with a Home Assistant sensor PIC Temperature Reading. (TASK-1147)
+- **Two tools on the same computer no longer knock each other off port 25238** when one reconnects over a stale connection. (TASK-1170)
+- **A Telegraf scrape is no longer refused while a web interface tab is open.** The poll budget allows a burst of 2 at the same sustained rate, and a 429 carries `retry_after` in its body. (TASK-1188, ADR-098)
+
+Flash **both** firmware and filesystem. Settings are preserved.
+
+Full release notes: [RELEASE_NOTES_1.7.7.md](RELEASE_NOTES_1.7.7.md)
+Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
+
+## What was new in v1.7.6
 
 v1.7.6 is a reliability release for the 1.x (ESP8266) line, driven by field reports on GH #682 and GH #685. One breaking change versus v1.7.5: port 25238 accepts two clients again, with one writer at a time.
 
@@ -169,14 +182,21 @@ v1.5.0 is the first stable release of the `1.5.x` long-term-support line on **Ar
 Full release notes: [RELEASE_NOTES_1.5.0.md](docs/releases/RELEASE_NOTES_1.5.0.md)  
 Breaking changes: [docs/BREAKING_CHANGES.md](docs/BREAKING_CHANGES.md)
 
-## Latest stable release: v1.7.6
+## Latest stable release: v1.7.7
 
-`v1.7.6` is the current stable release on `main`. It fixes a chain of MQTT defects that ended in corrupted values and "malformed packet" disconnects, lets the Home Assistant OpenTherm Gateway integration connect over port 25238 again, and brings back two clients on that port with one writer at a time. One breaking change: port 25238 accepts two clients again.
+`v1.7.7` is the current stable release on `main`. It lets the temperature sensor wired to the PIC reach MQTT and Home Assistant, stops two tools on one computer from evicting each other on port 25238, and stops a web interface tab from starving a Telegraf scrape. No breaking changes.
+
+Full release notes: [RELEASE_NOTES_1.7.7.md](RELEASE_NOTES_1.7.7.md)
+Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.7)
+
+## Previous stable release: v1.7.6
+
+`v1.7.6` fixed a chain of MQTT defects that ended in corrupted values and "malformed packet" disconnects, let the Home Assistant OpenTherm Gateway integration connect over port 25238 again, and brought back two clients on that port with one writer at a time. One breaking change: port 25238 accepted two clients again.
 
 Full release notes: [RELEASE_NOTES_1.7.6.md](RELEASE_NOTES_1.7.6.md)
 Download: [GitHub Releases](https://github.com/rvdbreemen/OTGW-firmware/releases/tag/v1.7.6)
 
-## Previous stable release: v1.7.5
+## Older stable release: v1.7.5
 
 `v1.7.5` closed a credential leak (`settings.ini`, holding the admin and MQTT passwords in cleartext, was served without authentication), made updating the PIC firmware from the web work again, and added a cumulative hot-water total for the Home Assistant Energy dashboard.
 

@@ -4,6 +4,16 @@ This document is the cumulative log of breaking changes from **v1.0.0** onwards.
 
 ---
 
+## v1.7.7
+
+**No breaking changes versus v1.7.6.** No MQTT topic renames, no REST API removals, no settings-format changes, and no migration on upgrade. The new PIC Temperature Sensor setting starts off.
+
+### Behaviour change: the two rate-limited endpoints allow a burst of 2 (ADR-098, TASK-1188)
+
+`/api/v2/otgw/otmonitor` (with its alias `/api/v2/otgw/telegraf`) and `/api/v2/device/time` were limited to one request per window. They now allow a burst of 2 at the same sustained rate, so a client that polls as fast as it can still gets one request per window, plus the burst. A 429 answer also carries `retry_after` (seconds) in its `application/problem+json` body, with the same value as the `Retry-After` header, and `RateLimit-Policy` reports a quota of 2. A client that only counted on the header is unaffected.
+
+---
+
 ## v1.7.6
 
 ### Breaking: port 25238 accepts two clients again, with one writer at a time (ADR-097, TASK-1167)

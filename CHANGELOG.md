@@ -8,6 +8,8 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+## [1.7.7] - 2026-10-04
+
 ### Added
 
 - **The temperature sensor wired to the PIC can now reach MQTT and Home Assistant.** The PIC reports that sensor through `PR=E`, but the firmware never asked for it, so the value only showed up in the raw OpenTherm log. A new setting, PIC Temperature Sensor (off by default, in the PIC section of the settings page), makes the gateway read it every 3 minutes and publish it to `otgw-pic/temperature_reading`, with a Home Assistant temperature sensor named PIC Temperature Reading. The entity is announced on the first valid reading only: a PIC without a sensor answers `-`, and then nothing is published and no entity appears. It is separate from the existing PIC Temp Sensor diagnostic entity, which shows the sensor's configured function (`PR=D`), not a temperature. Requested by indigo_light, who has a boiler without an outdoor probe. (TASK-1147)
