@@ -48,11 +48,12 @@ bool ClientSync::connect(const char* host, uint16_t port) {
 
 size_t ClientSync::write(const uint8_t* buf, size_t size) {
   #if defined(ARDUINO_ARCH_ESP32)
-  // OTGW-firmware patch (ADR-186, TASK-1213): never block the caller. NetworkClient::write()
-  // waits in select() until a slow broker takes the data, which stalled the Arduino loop task
-  // that pumps this client (UseInternalTask::NO) for seconds. Hand the socket only what it
-  // accepts now: MqttClient::_sendPacket() adds the count to _bytesSent, and _checkOutbox()
-  // stops on 0 and continues on the next loop() call.
+  // OTGW-firmware patch (ADR-186, TASK-1213), offered upstream as
+  // https://github.com/bertmelis/espMqttClient/pull/191: never block the caller.
+  // NetworkClient::write() waits in select() until a slow broker takes the data, which
+  // stalled the Arduino loop task that pumps this client (UseInternalTask::NO) for seconds.
+  // Hand the socket only what it accepts now: MqttClient::_sendPacket() adds the count to
+  // _bytesSent, and _checkOutbox() stops on 0 and continues on the next loop() call.
   int fd = client.fd();
   if (fd < 0) return 0;
   ssize_t sent = ::send(fd, buf, size, MSG_DONTWAIT);

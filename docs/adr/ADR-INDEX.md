@@ -192,3 +192,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-184 | Accepted | - | The classic bundle routes every same-origin request to /api/ through one first-in-first-out queue with at most 2 requ... |
 | ADR-185 | Accepted | `platformio.ini` | User Decision: a project-owned header named sdkconfig.h sits in include/, and -Iinclude in the shared [env] buildflag... |
 | ADR-186 | Accepted | - | Vendor espMqttClient 1.7.2 into src/libraries/espMqttClient (MIT, Massachusetts Institute of Technology, licence), dr... |
+| ADR-187 | Accepted | - | The vendored copy follows upstream: release, or upstream main when a needed fix is not yet in a release. |

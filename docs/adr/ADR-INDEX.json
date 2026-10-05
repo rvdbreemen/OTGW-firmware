@@ -6301,6 +6301,58 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-187",
+      "title": "Track upstream espMqttClient in the vendored copy instead of pinning 1.7.2",
+      "path": "ADR-187-track-upstream-espmqttclient-in-the-vendored-copy-instead-of-pinning-1-7-2.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-05",
+      "decision_summary": "The vendored copy follows upstream: release, or upstream main when a needed fix is not yet in a release.",
+      "topics": [
+        "espmqttclient",
+        "mqtt",
+        "vendored-library"
+      ],
+      "aliases": [
+        "espMqttClient upstream update",
+        "vendored espMqttClient version"
+      ],
+      "components": [
+        "vendored espMqttClient version policy"
+      ],
+      "symbols": [
+        "ClientSync::write"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "src/libraries/espMqttClient equals an upstream release or upstream main at a recorded commit, plus only the ADR-186 ClientSync::write() patch, marked in the code with a comment naming ADR-186 and upstream PR #191.",
+          "Every update repeats the TASK-1213 slow-broker bench test and builds the three targets."
+        ],
+        "must_not": [
+          "Must not carry any other local change to the library without a new ADR."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Bench, 2026-10-05, OTGW32 combo alpha.416 with upstream main de31cb2 plus the patch. tc netem delay 500ms on the rig broker, reboot, then a discovery republish (t1213netem.py). Result: max loop gap 124 ms, 0 gaps over 200 ms, 398 retaine...",
+          "Builds: esp32, esp32-classic and esp32-combo SUCCESS (alpha.416); evaluate.py --quick 0 failures."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -11335,6 +11387,18 @@
     {
       "source": "ADR-186",
       "target": "ADR-131",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-187",
+      "target": "ADR-131",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-187",
+      "target": "ADR-186",
       "type": "related",
       "resolved": true
     }
