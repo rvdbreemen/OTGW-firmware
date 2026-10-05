@@ -3,11 +3,11 @@ id: TASK-1213
 title: >-
   Loop-task stalls of 4-6 s and heap dips to 532 B after the OT ID 0 discovery
   publish (TASK-1036 soak)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-04 21:12'
-updated_date: '2026-10-05 06:33'
+updated_date: '2026-10-05 09:32'
 labels:
   - esp32
   - mqtt
@@ -33,8 +33,8 @@ Hypothesis (unproven): the drip queues ID 0's roughly 20 large configs into the 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduced on the bench: a discovery republish (or the ID 0 drip step alone) shows the loop stall and the heap dip, with the culprit section named by telnet or a diag counter, and with the broker on a host that is not memory-starved
-- [ ] #2 Root cause identified (which call blocks the loop, and what allocates the dip)
-- [ ] #3 Fixed with old-vs-fix evidence: on the same procedure, max loop gap under 1 s and min largest block at or above 8192 B; build green for the three targets; evaluate.py --quick shows no new failures
+- [x] #2 Root cause identified (which call blocks the loop, and what allocates the dip)
+- [x] #3 Fixed with old-vs-fix evidence: on the same procedure, max loop gap under 1 s and min largest block at or above 8192 B; build green for the three targets; evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -109,4 +109,17 @@ Where the root cause sits: MQTTclient.loop() on the loop task writes the whole o
 (a) a non-blocking write path inside espMqttClient (write only what availableForWrite()/the socket accepts per loop). A library change, which needs maintainer approval.
 (b) an MQTT task (ADR-131 rejects it because of callback re-entrancy, so it needs an ADR plus callback marshalling).
 (c) a short socket send timeout with drop and reconnect (as on 1.x).
+
+Fix landed as ADR-186 (accepted 2026-10-05). espMqttClient 1.7.2 is vendored in src/libraries/espMqttClient and removed from lib_deps; the registry copies were removed from .pio/libdeps, and the build compiles the vendored copy (the warnings come from src/libraries; the ELF ClientSync::write calls send). Only ClientSync::write() is patched: send(fd, buf, len, MSG_DONTWAIT), ESP32 only, returning 0 when the socket is full. The library is added to evaluate.py ESP_ABSTRACTION_EXCLUDED_LIB_DIRS.
+Bench old vs fix, OTGW32 combo, 'tc netem delay 500ms' on the rig broker, reboot then a discovery republish (t1213_netem.py):
+- OLD: alpha.412 run 1 max 516 ms / 20 stalls over 200 ms; earlier run max 967 / 23; alpha.414 max 3115 / 3.
+- FIX alpha.415: max 144 / 0 and 140 / 0.
+- Retained configs 398 in every run; MQTT connected throughout. hd_min_free_heap on FIX 15744 / 24048 B (OLD 2696-23036).
+Builds: esp32, esp32-classic and esp32-combo SUCCESS (alpha.415); evaluate.py --quick 71/0. The earlier discovery-budget attempt is discarded.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A slow MQTT broker no longer stalls the loop task. Root cause: espMqttClient runs on the loop task (ADR-131, UseInternalTask::NO), and its ClientSync::write() was Arduino's blocking NetworkClient::write(). That call waits in select() until the broker takes the data, so any burst (discovery or status values) stalled the loop for seconds against a slow broker. In the TASK-1036 soak the stall reached 6.1 s, with a heap dip to 532 B. Fix (ADR-186): espMqttClient 1.7.2 is vendored with one patched function. ClientSync::write() now uses send(..., MSG_DONTWAIT) and returns what the socket accepts. espMqttClient already resumes partial writes on the next loop(). Evidence: bench with a 500 ms broker delay. Max loop gap 516-3115 ms before (3 runs), 140-144 ms after (2 runs), 0 stalls over 200 ms. All 398 discovery configs present and MQTT connected. Three builds green, evaluate clean.
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-04 09:22'
+updated_date: '2026-10-05 07:53'
 labels:
   - web
   - bug
@@ -182,4 +182,27 @@ NOT proven:
 - That the 2312 B allocation is the WiFi driver's RX copy. The WiFi blob is closed; this rests on the size, the 802.11 max frame body.
 - Which pcbs hold the 23.6 KB. The diag has no per-pcb breakdown.
 Next (per review): rebase the diag onto current dev (the alpha.404 diag still had the per-call /.health write, TASK-1205). Then falsify with one variable: a DRAM-headroom 503 (gate on a DEFAULT-capable largest block) and/or a no-progress abort of stalled sends. The fix design goes to the maintainer first. Window 2 (TWDT reset, rst=6) is filed separately.
+
+2026-10-05 rebased diag runs (variants built on dev 1624eab34 = alpha.412 code, T1162diag test-only telemetry; storm arms 2/4/6/8 workers x 45 s, seed 1124, --require-cdc).
+- BASE (no variant): 1 deaf window of 7.0 s (t=226-233 s); no reboot (boots 7 throughout); storm exit 0; telemetry seq 43..460 with 41 device-side drops. Compare: on alpha.404 (2026-10-04) the same storm gave a 165.5 s deaf window and then a TWDT reboot. The effect is much weaker on current code; single-run variance is not yet known.
+- Variant A (headroom 503 at 8192 B INTERNAL|DEFAULT) was built and flashed, but its storm run was killed by the host memory-pressure reaper before it finished. Variants B and A+B are not built yet (also reaped).
+Evidence: %LOCALAPPDATA%/OTGW-capture/task1162-diag/variants-alpha412/ (run_base/, run_base.log, firmware_*.bin).
+
+Falsification runs complete, 2026-10-05, same storm for each, one run per variant. Deaf = ping AND connect failing for 5 s or more.
+| variant | deaf windows | headroom 503 | aborts | min DEFAULT block |
+| BASE | 7.0 s | - | - | 1268 B |
+| A (headroom 8192, INTERNAL\|DEFAULT) | 11.0 s | 426 | - | 1332 B |
+| B (abort on ack timeout) | 97.0 s (ended by WiFi reassoc, reason 2) + 273.6 s still deaf at the end | - | 4 | 1524 B |
+| A+B | 281.7 s + 6.6 s | 302 | 9 | 1204 B |
+Reading:
+- A refused 426 new requests and the DRAM still ran out. The memory is held by connections and TCP queues admitted earlier, not by new admissions.
+- B's ack-timeout abort fired only 4-9 times and did not break the deadlock.
+- Neither variant, nor both together, fixes the deafness.
+- Run-to-run spread is large: BASE gave 7 s today and 165.5 s on alpha.404 yesterday. Single runs rank nothing finely, but none of A/B/A+B shows an improvement.
+Root-cause status (AC#2): the memory-deadlock mechanism stands (TX queues pin DRAM; RX allocations fail; no ACKs arrive). The two app-level levers tested do not reach it.
+Remaining levers, all at library or framework level:
+- capping each TCP pcb's send buffer (pcb->snd_buf at accept in AsyncTCP);
+- capping the concurrent AsyncTCP connections (CONFIG_ASYNC_TCP_MAX_ACK_TIME / the accept limit);
+- lwIP/WiFi buffer sizing (TCP_SND_BUF, WiFi static RX buffers). The Arduino core ships these prebuilt, so they need a framework rebuild.
+These are maintainer decisions. Evidence: %LOCALAPPDATA%/OTGW-capture/task1162-diag/variants-alpha412/ (run_base, run_A, run_B, run_AB with cdc.jsonl, probe.jsonl and timeline.csv).
 <!-- SECTION:NOTES:END -->

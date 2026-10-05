@@ -528,6 +528,9 @@ ESP_ABSTRACTION_EXCLUDED_LIB_DIRS: Tuple[str, ...] = (
     # NOT part of the firmware platform abstraction — treat it like any third-
     # party upstream, so its internal #if defined(ESP8266/ESP32) are excluded.
     "src/libraries/OTGWSerial",
+    # espMqttClient 1.7.2, vendored with one patched function (ADR-186, TASK-1213).
+    # Third-party upstream with its own platform support, so its #if defined(ESP*) stay.
+    "src/libraries/espMqttClient",
 )
 
 # Baseline as of 2026-05-28 / commit 9be88a0d. See

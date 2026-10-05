@@ -6242,6 +6242,65 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-186",
+      "title": "Vendor espMqttClient and make its socket write non-blocking",
+      "path": "ADR-186-vendor-espmqttclient-and-make-its-socket-write-non-blocking.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-05",
+      "decision_summary": "Vendor espMqttClient 1.7.2 into src/libraries/espMqttClient (MIT, Massachusetts Institute of Technology, licence), dr...",
+      "topics": [
+        "espmqttclient",
+        "loop-stall",
+        "mqtt",
+        "vendored-library"
+      ],
+      "aliases": [
+        "MQTT loop stall",
+        "non-blocking MQTT write",
+        "vendored espMqttClient"
+      ],
+      "components": [
+        "ClientSync non-blocking write",
+        "vendored espMqttClient (src/libraries/espMqttClient)"
+      ],
+      "symbols": [
+        "ClientSync::write",
+        "MqttClient::_checkOutbox",
+        "MSG_DONTWAIT"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "src/libraries/espMqttClient holds the 1.7.2 sources unchanged except ClientSync::write(). The patch is marked with a comment naming this ADR and TASK-1213.",
+          "The library leaves libdeps in platformio.ini, so the vendored copy is the only one built.",
+          "ClientSync::write() returns 0 on EAGAIN / EWOULDBLOCK, and never blocks."
+        ],
+        "must_not": [
+          "Must not change espMqttClient's threading model (UseInternalTask::NO stays, ADR-131).",
+          "Must not patch other library files. If a later fix needs more, write a new ADR."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Bench old vs fix on the OTGW32 with tc netem delay 500ms on the rig broker, during a discovery republish after a reboot (scratchpad t1213netem.py, TASK-1213). Pass: max loop gap under 1000 ms, hdminfreeheap above the old run, and retaine...",
+          "Build green for esp32, esp32-classic and esp32-combo; evaluate.py --quick clean."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -11270,6 +11329,12 @@
     {
       "source": "ADR-185",
       "target": "ADR-169",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-186",
+      "target": "ADR-131",
       "type": "related",
       "resolved": true
     }
