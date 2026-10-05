@@ -1,11 +1,11 @@
 ---
 id: TASK-1210
 title: 'v2 web UI bursts REST calls past the 2-request cap, so pages fill with 503s'
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-04 12:53'
-updated_date: '2026-10-04 21:23'
+updated_date: '2026-10-05 06:01'
 labels:
   - webui
   - v2
@@ -26,7 +26,7 @@ Cause in code: the classic bundle wraps window.fetch in a FIFO queue with at mos
 <!-- AC:BEGIN -->
 - [x] #1 v2.js sends at most 2 same-origin /api/ requests at a time (a central queue as in ADR-184), with no Promise.all/map burst left
 - [x] #2 Reproduced old vs fix: loading each v2 page (Home, SAT, Monitor, Advanced, Settings) on the bench gives REST 503s on the old build and none on the fix, from the browser network log or hd_rest_503 in /api/v2/device/info
-- [ ] #3 Build green for the three targets; evaluate.py --quick shows no new failures
+- [x] #3 Build green for the three targets; evaluate.py --quick shows no new failures
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -45,3 +45,9 @@ Bench 2026-10-04, OTGW32 combo app alpha.412+8ad028c. Only the LittleFS image ch
 - FIX (queue): peak at most 2 on every page; browser 503s 0; device delta 0 everywhere; window.__otgwApiQueue present.
 Node unit check: 8 concurrent calls give a peak of 2 with all served.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The v2 web UI now sends at most 2 same-origin /api/ requests at a time. v2.html does not load index.js, so the ADR-184 queue of the classic bundle never covered it, and a v2 page start burst up to 5 requests into the device's 2-request REST gate. v2.js now carries the same FIFO queue: max 2 in flight, a slot freed when the body has arrived, a 20 s stall valve. Evidence: Node check with a fake fetch (8 concurrent calls give a peak of 2, all served). Bench, OTGW32 LittleFS, Playwright over start + five pages: OLD peak 5 and 8 browser 503s; FIX peak 2, 0 503s, device hd_rest_503 delta 0. Builds: esp32, esp32-classic, esp32-combo SUCCESS (alpha.414); evaluate.py --quick 0 failures. Reported by Sergeant D (#alpha-testing).
+<!-- SECTION:FINAL_SUMMARY:END -->

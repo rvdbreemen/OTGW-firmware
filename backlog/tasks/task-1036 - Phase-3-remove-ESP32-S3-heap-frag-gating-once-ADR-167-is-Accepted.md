@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-07-09 21:17'
-updated_date: '2026-10-01 17:07'
+updated_date: '2026-10-04 21:12'
 labels: []
 dependencies: []
 ordinal: 245000
@@ -51,4 +51,20 @@ Proposed sharper AC#4 wording (for the maintainer): 'Rebuilt (esp32-combo, curre
 Known test gap: the 'no POST when fewer than N minutes remain' guard has no deterministic test yet. OPEN: AC#4 needs the bench (overnight).
 
 2026-10-01: the maintainer adopted the sharper AC#4 wording proposed in the 2026-07-31 notes (it replaces 'Rebuilt + re-soaked clean (no tier escalations) to confirm no regression'). Still needs the OTGW32 back on the network and an overnight run on a dedicated unit.
+
+2026-10-04 12:54: AC#4 re-soak STARTED on the OTGW32 bench (192.168.88.61) with esp32-combo 2.0.0-alpha.412+8ad028c, which is current dev firmware (later dev commits are docs/backlog only). Command: scripts/heap_soak_driver.py --host 192.168.88.61 --duration-hours 10.25 --republish-every-min 60, detached (pid 9592). First snapshot: freeheap 79596, maxblock 34804, hd_min_max_block 31732, enter_low/warn/crit 0/0/0, drops ws/mqtt 0/0, sim on, bootcount 41. No other testing on this unit until the run ends (about 23:10). Output: %LOCALAPPDATA%/OTGW-capture/task1036/soak-alpha412-20261004-1254/ (driver.out, snapshots.jsonl).
+
+Mid-soak 2026-10-04 ~17:00 (t+2h05): no anomaly, bootcount 41, enter_low/warn/crit 0, drops 0, hd_min_max_block 31732. Watch item for AC#4 ('no multi-second stall'): hd_max_loop_gap_ms rose 313 to 3215 ms at 13:44:01 (t+49 min, nothing else changed in that snapshot) and 3215 to 4181 ms at 15:59:36 (t+185 min, during the drain of the hourly discovery republish, disc_pending_ids 5 to 0). The firmware logs every loop gap over 200 ms as '[loop-stall] N ms gap', after the debug line that names the section. A passive telnet logger was attached at 16:57 (the driver allows a passive reader after its 'z'; it adds telnet output load on the device) to capture the next stall with context: telnet.txt in the soak folder. Host memory sat at 98% from 14:34 (llama-server processes, not ours); the MQTT broker runs in Docker/WSL on that host, so broker latency is one candidate for the stalls.
+
+Soak t+~4h45 (about 19:10): still no anomaly (bootcount 41, crit 0, drops 0). hd_max_loop_gap_ms is now 5724; hd_min_max_block dropped to 14324 (floor 8192 still met). The telnet capture holds 126 '[loop-stall]' lines. The two largest (5724 ms at 17:55:13, 4361 ms at 18:55:34) start right after '[drip] OT ID 0 published OK': the loop task is silent for 4-6 s while async_tcp keeps serving REST. OT ID 0 is the heaviest discovery set (climate, SAT switches/select, full device block). The 15:59 jump (before the logger was attached) also fell in a republish drain, so the logger is not the cause. Hypothesis, NOT proven: after the drip queues ID 0's ~20 large configs, the MQTT client blocks the loop task while it writes that backlog to the broker. If AC#4's 'no multi-second stall' fails at the end, this becomes its own task.
+
+AC#4 RESULT 2026-10-04 23:09: the soak FAILED AC#4. heap_soak_driver SUMMARY verdict=ANOMALY anomalies=republish_failed:1 (one POST /api/v2/discovery/republish timed out with no response; 8 of 9 answered 200 and drained, max drain 283 s), duration 10.25 h, snapshots ok 1717, failed 2 (device/info timeouts), longest gap 51.7 s, devinfo_503 0, 2470 load requests, bootcount 41 throughout (no reboot).
+PASS: enter_low/warning/critical max 0/0/0, ws/mqtt drops 0/0, rest/webfile 503 0, drip_slowmode 0, sim never inactive.
+FAIL:
+- hd_min_max_block_min 7668 (floor 8192).
+- hd_min_free_heap_min 532 B (since-boot native minimum).
+- hd_max_loop_gap_ms_max 6125 (multi-second stalls).
+The telnet capture (16:57-23:09) holds 100+ [loop-stall] lines; the largest begin right after '[drip] OT ID 0 published OK' (see the earlier notes).
+Caveats: the passive telnet logger added debug-output load from 16:57, but the 3215 and 4181 ms stalls came before it. Host memory reached 98% (llama-server), and the MQTT broker runs in Docker/WSL on that host.
+The follow-up investigation is filed as a separate task. Evidence: %LOCALAPPDATA%/OTGW-capture/task1036/soak-alpha412-20261004-1254/ (driver.out, driver.err, snapshots.jsonl, telnet.txt).
 <!-- SECTION:NOTES:END -->
