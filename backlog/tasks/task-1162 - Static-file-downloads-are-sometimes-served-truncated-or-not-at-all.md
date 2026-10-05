@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-05 07:53'
+updated_date: '2026-10-05 12:56'
 labels:
   - web
   - bug
@@ -205,4 +205,6 @@ Remaining levers, all at library or framework level:
 - capping the concurrent AsyncTCP connections (CONFIG_ASYNC_TCP_MAX_ACK_TIME / the accept limit);
 - lwIP/WiFi buffer sizing (TCP_SND_BUF, WiFi static RX buffers). The Arduino core ships these prebuilt, so they need a framework rebuild.
 These are maintainer decisions. Evidence: %LOCALAPPDATA%/OTGW-capture/task1162-diag/variants-alpha412/ (run_base, run_A, run_B, run_AB with cdc.jsonl, probe.jsonl and timeline.csv).
+
+2026-10-05 15:00: maintainer chose 'also limit connections'. Test variants added in wt-1162 (test code, never commit): C = cap each web pcb's snd_buf at T1162_SNDBUF (2920 B, 2x MSS) in webBeginRequest under LOCK_TCPIP_CORE; D = cheap 503 through the existing REST/file gate path when more than T1162_CONNCAP (4) pcbs on port 80 are active (counted from tcp_active_pcbs; no AsyncTCP change; no abort mid-handler to avoid a use-after-free on the request). Diag line adds sndcap= and conn503=. Built: firmware_C.bin, firmware_D.bin (%LOCALAPPDATA%/OTGW-capture/task1162-diag/variants-CD/). C+D build was stopped by Claude Code under memory pressure (commit charge 91%); not restarted. Bench is busy with the TASK-1036 soak until about 00:55; storm runs (base vs C vs D vs C+D, several runs each) follow after it.
 <!-- SECTION:NOTES:END -->
