@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-04 21:12'
-updated_date: '2026-10-05 05:18'
+updated_date: '2026-10-05 06:33'
 labels:
   - esp32
   - mqtt
@@ -95,4 +95,18 @@ Implementation 2026-10-05 (working tree, not committed; build blocked on host me
   - Unbudgeted, ID 0 went out as 22714 B in one call (modern_pic).
 - evaluate.py --quick 71/0.
 Pending: build, then bench old vs fix under 'tc netem delay 500ms' (max loop gap, hd_min_free_heap, retained config count unchanged).
+
+OLD vs FIX on the bench, 2026-10-05, OTGW32, 'tc netem delay 500ms' on the rig broker, reboot then one discovery republish (t1213_netem.py):
+- OLD alpha.412: 20 stalls over 200 ms, sum 5.7 s, max 516 ms; hd_min_free_heap 29408 to 2696; min largest block 18420; 398 retained configs.
+- FIX alpha.415 (budget build): 16 stalls, sum 10.1 s, max 3107 ms; min free 1612; min largest block 17396; 398 retained; 15 resume steps.
+Verdict: the discovery budget does NOT fix the symptom.
+- The largest FIX stalls (3107, 2187 ms) did not follow a drip publish. They followed REST traffic and an ordinary value burst (otgw-firmware/* status publishes).
+- So any MQTT burst blocks the loop when the broker is slow, not only discovery.
+- One run per side is also noisy (OLD gave 967 ms under the same delay on 2026-10-04).
+- A Playwright tab was still polling the device during both runs.
+The budget code is NOT committed. It is saved in %LOCALAPPDATA%/OTGW-capture/task1213-wip.patch (complete except moving the helper above loopMQTTDiscovery, needed for the firmware build). The bench is back on alpha.414.
+Where the root cause sits: MQTTclient.loop() on the loop task writes the whole outbox with blocking NetworkClient::write() calls, whatever produced the bytes. Covering every publisher needs one of:
+(a) a non-blocking write path inside espMqttClient (write only what availableForWrite()/the socket accepts per loop). A library change, which needs maintainer approval.
+(b) an MQTT task (ADR-131 rejects it because of callback re-entrancy, so it needs an ADR plus callback marshalling).
+(c) a short socket send timeout with drop and reconnect (as on 1.x).
 <!-- SECTION:NOTES:END -->
