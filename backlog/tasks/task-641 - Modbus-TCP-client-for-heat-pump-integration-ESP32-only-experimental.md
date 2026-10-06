@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-05-20 18:31'
-updated_date: '2026-10-03 15:25'
+updated_date: '2026-10-06 12:42'
 labels:
   - feature
   - esp32-only
@@ -99,4 +99,6 @@ BLOCKED ON SCOPING, 2026-07-31 (backlog-drain triage). A Modbus TCP client is ne
 2026-10-03: picked up by mistake during a 'pick up all tasks' sweep. The 2026-10-01 note above keeps this deferred to 2.1.0 until 2.0.0 ships, so it is back to To Do. A read-only planning pass ran anyway (no code): one implementation plan plus two adversarial verifications, kept out of the repo at %LOCALAPPDATA%/OTGW-capture/research-2026-10-03/task641-*.md. Both verifiers accept the direction (an in-tree client on a persistent connection, behind an approval gate) but found 6 and 8 wrong or unproven claims; reconcile them before any ADR is drafted. Examples:
 - the TIME_WAIT arithmetic (lwIP caps pcbs at 16 including TIME_WAIT, and recycles the oldest, so a 30 s poll floor solves nothing);
 - a static 260 B frame buffer that breaks the plan's own 256 B .bss budget.
+
+2026-10-06: maintainer decision: stays parked (To Do); no plan or code until asked.
 <!-- SECTION:NOTES:END -->

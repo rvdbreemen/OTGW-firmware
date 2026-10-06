@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:45'
-updated_date: '2026-09-30 10:43'
+updated_date: '2026-10-06 12:42'
 labels:
   - bug
   - pic
@@ -266,4 +266,6 @@ OPEN: AC#4-#6 need the Classic-S3 PIC bench (task-name instrumentation, triggers
 Follow-up #1 of the description (the 60 s PR=A probe cannot set bAvailable) is filed as its own task.
 
 2026-09-30: follow-up #1 is fixed in TASK-1179 (alpha.386): applyPICBannerInfo() now re-enables a PIC that boot detection missed (bAvailable = true, eMode = HW_MODE_PIC) before its version publish, so the 60 s PR=A probe recovers the PIC and otgw-pic/* is published. The processOT banner branch's board-mode persist was NOT copied: it would rewrite an S3 Mini Pro (mode 3) to 1 (TASK-1180).
+
+2026-10-06: maintainer decision: wait for the Classic-S3 PIC rig (COM8, on its carrier); it is not attached now. Only the OTGW32 (COM4) is on the bench, which has no PIC.
 <!-- SECTION:NOTES:END -->

@@ -5,7 +5,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-07-09 18:37'
-updated_date: '2026-09-30 07:53'
+updated_date: '2026-10-06 12:42'
 labels: []
 dependencies: []
 ordinal: 244000
@@ -38,4 +38,6 @@ BLOCKED, 2026-07-31 (backlog-drain triage). Needs the S3 Mini Pro physically on 
 - The 2026-07-31 BLOCKED note is wrong about the bus: the Pro's 0.85in TFT is on SPI, not on the Classic I2C bus 11/12. The 2026-07-09 soak drove SCK=40 / MOSI=38 / CS=35 / DC=36, and ADR-158:38 records that the Pro frees GPIO 33-36 for the TFT. I2C 11/12 is the EXTERNAL OLED alternative.
 - AC#1 unchecked: its text requires 'conflicts documented + mitigated'. The GPIO40 (TFT SCK = PIC MCLR net) conflict is documented and proven fatal, but none of the remediation options has been carried out.
 - Points to weigh when the hardware path is chosen (from the 2026-09-30 triage, not bench-verified): with D5 isolated, the PIC's own watchdog, the ATTiny85 watchdog and the RESET header still exist as recovery paths; bootloader entry by GW=R alone (no MCLR pulse) has not been tested for a PIC flash; a trace reroute is an alternative to lifting the pin.
+
+2026-10-06: maintainer decision: stays parked (To Do); no plan or code until asked.
 <!-- SECTION:NOTES:END -->

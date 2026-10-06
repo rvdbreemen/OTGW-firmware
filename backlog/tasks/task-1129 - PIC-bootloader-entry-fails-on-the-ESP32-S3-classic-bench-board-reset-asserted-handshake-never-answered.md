@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-05 15:32'
-updated_date: '2026-09-30 07:52'
+updated_date: '2026-10-06 12:42'
 labels:
   - bug
   - pic
@@ -97,4 +97,6 @@ Status: het oorspronkelijke symptoom is niet reproduceerbaar en er is geen aanwi
 - OLD/FIX discriminator for the Classic session (per triage): a zero-write probe (a pic16f88 hex offered to a pic16f1847, aborting on the model mismatch before any erase) on an image WITHOUT the console mute versus the current image; expected 'Too many retries' on the old image versus a device-mismatch error after a real version packet on the new one. With the mute active, the log line no longer shows on COM8, so the old image is needed to see it.
 - Proposed AC#1 wording (for the maintainer): 'the reason the bootloader leaves the handshake after its ETX is identified from evidence'.
 Status stays In Progress: needs the Classic-S3 (COM8) on its carrier and a per-instance PIC-flash authorisation.
+
+2026-10-06: maintainer decision: wait for the Classic-S3 PIC rig (COM8, on its carrier); it is not attached now. Only the OTGW32 (COM4) is on the bench, which has no PIC.
 <!-- SECTION:NOTES:END -->
