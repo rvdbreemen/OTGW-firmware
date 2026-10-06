@@ -7,7 +7,7 @@ status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-05 15:32'
-updated_date: '2026-10-06 12:51'
+updated_date: '2026-10-06 15:43'
 labels:
   - bug
   - pic
@@ -101,4 +101,6 @@ Status stays In Progress: needs the Classic-S3 (COM8) on its carrier and a per-i
 2026-10-06: maintainer decision: wait for the Classic-S3 PIC rig (COM8, on its carrier); it is not attached now. Only the OTGW32 (COM4) is on the bench, which has no PIC.
 
 2026-10-06: maintainer: there is no Classic-S3 board; stop waiting for it. Parked in To Do: the open ACs need a PIC on an ESP32-S3 Classic carrier, which the bench does not have (only the OTGW32, no PIC). Resume only when such a rig exists.
+
+2026-10-06: a field user has the rig this task needs: GH #686 (temnyvlad), Classic V2.13 + PIC 6.8 + LOLIN S3 Mini, offers to test builds and send logs. See TASK-1215.
 <!-- SECTION:NOTES:END -->
