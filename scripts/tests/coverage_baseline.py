@@ -63,8 +63,10 @@ TOPIC_STRIP_RX = re.compile(r"^[^/]+/(value|set)/otgw-[0-9A-Fa-f]+/")
 # 1.x (the SAT BLE scanner, the async web server and the OT decoder all write).
 # Left unhandled the intruding text lands inside a decoded value and the
 # fingerprint drifts between runs for no firmware reason. Cut at the start of any
-# embedded log line: "HH:MM:SS.uuuuuu (" is the unmistakable prefix.
-SPLICE_RX = re.compile(r"\d{2}:\d{2}:\d{2}\.\d+\s*\(")
+# embedded log line: "HH:MM:SS.uuuuuu (" is the unmistakable prefix. The simulator's
+# own trace can also land without its prefix ('... 68 Read-Data OTGW-SIM trace: MID=1
+# ...', TASK-1174), so its tag cuts as well.
+SPLICE_RX = re.compile(r"\d{2}:\d{2}:\d{2}\.\d+\s*\(|OTGW-SIM trace:")
 
 
 def normalise_value(text: str) -> str:
@@ -112,6 +114,18 @@ def mqtt_section(pairs) -> dict:
     return {k: sorted(v) for k, v in sorted(mqtt.items())}
 
 
+def drop_truncated_copies(rendered) -> list:
+    """Sorted renderings without the ones that are a strict prefix of another.
+
+    Interleaved telnet output can cut a decode line mid-value ('... f8.8 [0.0').
+    When the same key also has the intact line, the cut copy is the same
+    observation, not a second rendering, and keeping it makes the key differ
+    between runs purely on stream timing (TASK-1174).
+    """
+    uniq = sorted(set(rendered))
+    return [r for r in uniq if not any(o != r and o.startswith(r) for o in uniq)]
+
+
 def fingerprint(lines, mqtt_pairs=None, mqtt_source: str = "telnet") -> dict:
     """Reduce a capture to its normalized fingerprint.
 
@@ -153,7 +167,7 @@ def fingerprint(lines, mqtt_pairs=None, mqtt_source: str = "telnet") -> dict:
 
     mqtt = mqtt_section(telnet_pairs if mqtt_pairs is None else mqtt_pairs)
     return {
-        "ot": {k: {"src": v["src"], "rendered": sorted(v["rendered"])} for k, v in sorted(ot.items())},
+        "ot": {k: {"src": v["src"], "rendered": drop_truncated_copies(v["rendered"])} for k, v in sorted(ot.items())},
         "mqtt": mqtt,
         "mqtt_source": "telnet" if mqtt_pairs is None else mqtt_source,
         "msgtypes": sorted(msgtypes),

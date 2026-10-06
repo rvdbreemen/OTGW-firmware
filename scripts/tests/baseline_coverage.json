@@ -1,6 +1,6 @@
 {
  "counts": {
-  "mqtt_topics": 225,
+  "mqtt_topics": 230,
   "msgids": 143,
   "ot_keys": 369
  },
@@ -187,6 +187,11 @@
   ],
   "MaxRelModLevelSetting": [
    "100.00"
+  ],
+  "MaxTSet": [
+   "55.00",
+   "75.00",
+   "83.00"
   ],
   "MaxTSetUBMaxTSetLB_value_hb": [
    "83"
@@ -422,6 +427,11 @@
   "Tdhw2": [
    "25.00"
   ],
+  "TdhwSet": [
+   "28.99",
+   "43.00",
+   "54.00"
+  ],
   "TdhwSetUBTdhwSetLB_value_hb": [
    "65"
   ],
@@ -523,6 +533,9 @@
   "dhw_present": [
    "ON"
   ],
+  "dhw_water_total": [
+   "0.0"
+  ],
   "diagnostic_indicator": [
    "OFF"
   ],
@@ -574,6 +587,12 @@
   "otc_active": [
    "OFF",
    "ON"
+  ],
+  "otgw32/flame_cycles_per_hour": [
+   "0.0"
+  ],
+  "otgw32/flame_duty_pct": [
+   "0"
   ],
   "otgw_connected": [
    "ON"
@@ -751,13 +770,13 @@
   },
   "A|Read-Ack|56": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 56 ignored)"
+    "TdhwSet = 28.99 C"
    ],
    "src": "Answer Thermostat"
   },
   "A|Read-Ack|57": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 57 ignored)"
+    "MaxTSet = 75.00 C"
    ],
    "src": "Answer Thermostat"
   },
@@ -919,7 +938,7 @@
   },
   "B|Data-Invalid|56": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 56 ignored)"
+    "TdhwSet"
    ],
    "src": "Boiler"
   },
@@ -1383,13 +1402,13 @@
   },
   "B|Read-Ack|56": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 56 ignored)"
+    "TdhwSet = 43.00 C"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|57": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 57 ignored)"
+    "MaxTSet = 75.00 C"
    ],
    "src": "Boiler"
   },
@@ -1437,37 +1456,37 @@
   },
   "B|Read-Ack|64": {
    "rendered": [
-    "Unknown message [64] value [40400000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 64 ignored)"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|65": {
    "rendered": [
-    "Unknown message [65] value [40410000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 65 ignored)"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|66": {
    "rendered": [
-    "Unknown message [66] value [40420000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 66 ignored)"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|67": {
    "rendered": [
-    "Unknown message [67] value [40430000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 67 ignored)"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|68": {
    "rendered": [
-    "Unknown message [68] value [40440000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 68 ignored)"
    ],
    "src": "Boiler"
   },
   "B|Read-Ack|69": {
    "rendered": [
-    "Unknown message [69] value [40450000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 69 ignored)"
    ],
    "src": "Boiler"
   },
@@ -1737,7 +1756,7 @@
   },
   "B|Unknown-Data-Id|57": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 57 ignored) (boiler rejected write)"
+    "MaxTSet (boiler rejected write)"
    ],
    "src": "Boiler"
   },
@@ -1833,13 +1852,13 @@
   },
   "B|Write-Ack|56": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 56 ignored)"
+    "TdhwSet"
    ],
    "src": "Boiler"
   },
   "B|Write-Ack|57": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 57 ignored)"
+    "MaxTSet"
    ],
    "src": "Boiler"
   },
@@ -2055,13 +2074,13 @@
   },
   "R|Read-Data|56": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 56 ignored)"
+    "TdhwSet"
    ],
    "src": "Request Boiler"
   },
   "R|Read-Data|57": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 57 ignored)"
+    "MaxTSet"
    ],
    "src": "Request Boiler"
   },
@@ -2103,7 +2122,7 @@
   },
   "R|Write-Data|57": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 57 ignored)"
+    "MaxTSet = 83.00 C"
    ],
    "src": "Request Boiler"
   },
@@ -2537,13 +2556,13 @@
   },
   "T|Read-Data|56": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 56 ignored)"
+    "TdhwSet"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|57": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 57 ignored)"
+    "MaxTSet"
    ],
    "src": "Thermostat"
   },
@@ -2591,37 +2610,37 @@
   },
   "T|Read-Data|64": {
    "rendered": [
-    "Unknown message [64] value [400000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 64 ignored)"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|65": {
    "rendered": [
-    "Unknown message [65] value [410000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 65 ignored)"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|66": {
    "rendered": [
-    "Unknown message [66] value [420000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 66 ignored)"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|67": {
    "rendered": [
-    "Unknown message [67] value [430000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 67 ignored)"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|68": {
    "rendered": [
-    "Unknown message [68] value [440000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 68 ignored)"
    ],
    "src": "Thermostat"
   },
   "T|Read-Data|69": {
    "rendered": [
-    "Unknown message [69] value [450000] f8.8 [0.00] u16 [0] s16 [0]"
+    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 69 ignored)"
    ],
    "src": "Thermostat"
   },
@@ -2903,13 +2922,13 @@
   },
   "T|Write-Data|56": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 56 ignored)"
+    "TdhwSet = 54.00 C"
    ],
    "src": "Thermostat"
   },
   "T|Write-Data|57": {
    "rendered": [
-    "Reserved in OpenTherm v4.x profile (legacy pre-v4.2 ID 57 ignored)"
+    "MaxTSet = 55.00 C"
    ],
    "src": "Thermostat"
   },

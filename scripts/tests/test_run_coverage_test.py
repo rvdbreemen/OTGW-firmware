@@ -289,5 +289,22 @@ class TooFewLoopsTest(Workdir):
         self.assertEqual(rc, 0, err)
 
 
+class TruncatedCopyTest(unittest.TestCase):
+    """A decode line cut by interleaved output must not count as its own rendering."""
+
+    def test_prefix_copy_dropped(self):
+        full = "Unknown message [43] value [2B0000] f8.8 [0.00] u16 [0] s16 [0]"
+        self.assertEqual(coverage_baseline.drop_truncated_copies([full[:40], full]), [full])
+
+    def test_distinct_renderings_kept(self):
+        got = coverage_baseline.drop_truncated_copies(["TdhwSet = 43.00 C", "TdhwSet"
+                                                       " = 28.99 C", "MaxTSet = 75.00 C"])
+        self.assertEqual(got, ["MaxTSet = 75.00 C", "TdhwSet = 28.99 C", "TdhwSet = 43.00 C"])
+
+    def test_only_cut_copy_kept_when_alone(self):
+        self.assertEqual(coverage_baseline.drop_truncated_copies(["Unknown message [43] f8"]),
+                         ["Unknown message [43] f8"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

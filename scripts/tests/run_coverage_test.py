@@ -232,10 +232,13 @@ def set_debug_flag(sock: socket.socket, name: str, want: bool) -> str:
                 continue
         if state == want:
             return f"{name} -> {want} (key '{key}')"
-        state = press(sock, key, name)
-        if state == want:
-            return f"{name} -> {want} (key '{key}')"
-        raise RuntimeError(f"{name}: pressed '{key}' twice and it reads {state}, "
+        # This key drives the flag. Keep toggling until an echo confirms `want`: a
+        # lost echo (None) leaves the state unknown, so only a read-back counts.
+        for _ in range(5):
+            state = press(sock, key, name)
+            if state == want:
+                return f"{name} -> {want} (key '{key}')"
+        raise RuntimeError(f"{name}: pressed '{key}' repeatedly and it reads {state}, "
                            f"wanted {want}")
     raise RuntimeError(f"could not drive {name}={want}: none of "
                        f"{TOGGLE_KEYS[name]} echoed a confirmation")
