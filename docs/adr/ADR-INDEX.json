@@ -6416,6 +6416,60 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-189",
+      "title": "Abort a web connection on the ack timeout instead of closing it gracefully",
+      "path": "ADR-189-abort-a-web-connection-on-the-ack-timeout-instead-of-closing-it-gracefully.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-06",
+      "decision_summary": "webBeginRequest() replaces the request's timeout callback with one that calls AsyncClient::abort() (tcpabort()).",
+      "topics": [
+        "backpressure",
+        "lwip",
+        "web-server"
+      ],
+      "aliases": [
+        "abort on ack timeout",
+        "mid-body stall"
+      ],
+      "components": [
+        "web request lifecycle (webServerCompat.h)"
+      ],
+      "symbols": [
+        "hd_weback_abort",
+        "webBeginRequest"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Every web request admitted through webBeginRequest() has an ack-timeout handler that aborts the connection.",
+          "Each such abort increments state.heapdiag.iWebAckAbortCount."
+        ],
+        "must_not": [
+          "Must not change the ack timeout value or patch AsyncTCP or ESPAsyncWebServer."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Bench, 2026-10-06, OTGW32 combo alpha.418 (ADR-188 cap plus this abort), the same storm and probe harness as ADR-188, 5 runs: deaf windows 0 in all, mid-body stalls 0, storm verdict 5 of 5 PASS, 2 aborts in total. The one incomplete exch...",
+          "Nominal load (three browser-like clients with /ws, 180 s) right after boot: hdwebconn503 stayed 0. Run right after five storms instead, the cap refused 3 of 219 requests while the ADR-165 gates refused 10; the client queue (ADR-184) retr...",
+          "Builds: esp32, esp32-classic and esp32-combo SUCCESS (alpha.418)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -11486,6 +11540,18 @@
     {
       "source": "ADR-188",
       "target": "ADR-186",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-189",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-189",
+      "target": "ADR-188",
       "type": "related",
       "resolved": true
     }

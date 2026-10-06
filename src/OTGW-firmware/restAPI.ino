@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.417
+**  Version  : v2.0.0-alpha.418
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3325,6 +3325,7 @@ void sendDeviceInfoV2()
     je.field(F("hd_rest_503"),             snap->st.heapdiag.iRest503Count);
     je.field(F("hd_webfile_503"),          snap->st.heapdiag.iWebfile503Count);
     je.field(F("hd_webconn_503"),          snap->st.heapdiag.iWebConn503Count);
+    je.field(F("hd_weback_abort"),         snap->st.heapdiag.iWebAckAbortCount);
 
     // --- Flash, sketch & filesystem storage (values cached at boot by cacheBootFlashInfo) ---
     je.field(F("sketchsize"),       sBootFlash.sketchSize);

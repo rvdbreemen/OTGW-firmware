@@ -3,11 +3,11 @@ id: TASK-1162
 title: >-
   Under request overload, large static files stall mid-body and the client is
   left with a short 200
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-06 07:45'
+updated_date: '2026-10-06 09:21'
 labels:
   - web
   - bug
@@ -37,7 +37,7 @@ This task covers the overload behaviour.
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce: repeated GETs of a multi-KB static file on the bench, record size and status per request
 - [x] #2 Root cause identified
-- [ ] #3 Under the 8-worker storm (refresh_storm.py --workers 8, seed 1124) no static response stalls mid-body: each is served complete, refused with a 503 before the body, or ends in a connection abort the client sees at once
+- [x] #3 Under the 8-worker storm (refresh_storm.py --workers 8, seed 1124) no static response stalls mid-body: each is served complete, refused with a 503 before the body, or ends in a connection abort the client sees at once
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -226,4 +226,12 @@ Conclusion: a connection-count cap at the web layer (D) removes the deafness in 
 - builds esp32, esp32-classic, esp32-combo SUCCESS; evaluate --quick 71/0.
 AC#2 (root cause): checked. The memory is held in the lwIP send queues of already-admitted connections (up to TCP_SND_BUF 5744 B each, up to 16 active); the WiFi RX alloc (~2.3 KB) then fails, no ACKs arrive, and nothing drains. Shown by the T1162diag telemetry (2026-10-04/05) and by the variant series: only limiting the number of send-holding connections removes the deafness.
 AC#3 NOT met: the cap reduces the mid-body stalls (short 200s) from about 2-3 per run to under 1 per run, not to zero. Still open: a response whose connection stalls mid-body under the storm. Data: %LOCALAPPDATA%/OTGW-capture/task1162-diag/dev-a416/, dev-a417/.
+
+2026-10-06 AC#3: alpha.418 adds ADR-189 (accepted): webBeginRequest() replaces the request's ack-timeout callback with AsyncClient::abort(), so a response with no ACK for 5 s ends in a RST the client sees at once instead of a FIN queued behind an undrainable body. Counter hd_weback_abort. Bench, 5 storm runs (run_1162_diag + refresh_storm --workers 2,4,6,8 --seed 1124): deaf 0/5, mid-body stalls (timeout during the body, counted from the storm ndjson) 0, storm verdict 5/5 PASS, 2 aborts; the one incomplete exchange the client saw ended as reset/body after 5.9 s. Comparison: no cap 17 stalls in 6 runs; cap alone 2 in 5. Nominal (3 clients with /ws, 180 s) after a fresh boot: hd_webconn_503 0. Right after 5 storms the cap refused 3 of 219 nominal requests (heap fragmented, responses slower), the ADR-165 gates 10; the ADR-184 client queue retries both. Builds esp32/classic/combo SUCCESS (alpha.418; combo on the bench built before a comment-only ADR-188 -> ADR-189 edit), evaluate --quick 71/0. Data: %LOCALAPPDATA%/OTGW-capture/task1162-diag/dev-a418/.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Under a burst of web requests the OTGW32 went deaf for minutes and some static responses stopped mid-body. Root cause: the memory sat in the lwIP send queues of already-admitted connections, so the WiFi RX allocation failed, no ACKs came in, and nothing drained; the library's graceful close then queued its FIN behind that undrainable data. Fix on dev, no library change: ADR-188 refuses a new request with the cheap 503 while more than 4 port-80 connections hold or can queue send data (/ws clients excluded; counter hd_webconn_503); ADR-189 aborts a connection on the 5 s ack timeout instead of closing it, so the client sees a RST at once (counter hd_weback_abort). Evidence, OTGW32 combo, interleaved storm runs: without the cap deaf in 4 of 6 runs (up to 292 s) with 17 mid-body stalls; with cap and abort (alpha.418) deaf 0 of 5, 0 stalls, 5/5 storm PASS. Nominal load with 3 browser-like clients and /ws after boot: no cap refusals. Builds green for the three targets, evaluate 71/0. Related: the task-watchdog reset under the same storm was TASK-1208 (ADR-186).
+<!-- SECTION:FINAL_SUMMARY:END -->

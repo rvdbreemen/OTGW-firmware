@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.417
+**  Version  : v2.0.0-alpha.418
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -464,6 +464,7 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint32_t iRest503Count           = 0; // lifetime REST 503s from the concurrency gate (processAPI)
   uint32_t iWebfile503Count        = 0; // lifetime web-file-serve 503s from the concurrency gate (webFileGateTryAdmit)
   uint32_t iWebConn503Count        = 0; // 503s from the web connection cap (restAPI.ino webConnCapExceeded, ADR-188)
+  uint32_t iWebAckAbortCount       = 0; // web connections aborted on the ack timeout (webServerCompat.h webBeginRequest, ADR-189)
   uint16_t iTcpActivePcbs          = 0; // lwIP active TCP PCB count, sampled 1 Hz from the loop task (platformTcpActivePcbCount)
 };
 

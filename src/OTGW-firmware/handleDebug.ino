@@ -203,6 +203,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("rest_503: %lu\r\n"), (unsigned long)state.heapdiag.iRest503Count);
     Debugf(PSTR("webfile_503: %lu\r\n"), (unsigned long)state.heapdiag.iWebfile503Count);
     Debugf(PSTR("webconn_503: %lu\r\n"), (unsigned long)state.heapdiag.iWebConn503Count);
+    Debugf(PSTR("weback_abort: %lu\r\n"), (unsigned long)state.heapdiag.iWebAckAbortCount);
 
     Debugln(F("[state.discovery]"));
     Debugf(PSTR("published_topics: %lu\r\n"), (unsigned long)state.discovery.iPublishedTopicCount);

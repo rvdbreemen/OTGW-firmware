@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.417
+**  Version  : v2.0.0-alpha.418
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -460,6 +460,7 @@ void resetHeapWatermark() {
   state.heapdiag.iRest503Count             = 0;
   state.heapdiag.iWebfile503Count          = 0;
   state.heapdiag.iWebConn503Count          = 0;
+  state.heapdiag.iWebAckAbortCount         = 0;
   state.heapdiag.iTcpActivePcbs            = 0;
   sampleHeapWatermark();   // re-seed iMinMaxBlock + first histogram tick (no 0xFFFFFFFF window) + tcp pcb count
 }
