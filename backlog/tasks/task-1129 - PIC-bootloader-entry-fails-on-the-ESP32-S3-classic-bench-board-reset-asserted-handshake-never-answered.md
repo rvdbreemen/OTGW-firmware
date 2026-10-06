@@ -3,11 +3,11 @@ id: TASK-1129
 title: >-
   PIC bootloader entry fails on the ESP32-S3 classic bench board: reset
   asserted, handshake never answered
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-05 15:32'
-updated_date: '2026-10-06 12:42'
+updated_date: '2026-10-06 12:51'
 labels:
   - bug
   - pic
@@ -99,4 +99,6 @@ Status: het oorspronkelijke symptoom is niet reproduceerbaar en er is geen aanwi
 Status stays In Progress: needs the Classic-S3 (COM8) on its carrier and a per-instance PIC-flash authorisation.
 
 2026-10-06: maintainer decision: wait for the Classic-S3 PIC rig (COM8, on its carrier); it is not attached now. Only the OTGW32 (COM4) is on the bench, which has no PIC.
+
+2026-10-06: maintainer: there is no Classic-S3 board; stop waiting for it. Parked in To Do: the open ACs need a PIC on an ESP32-S3 Classic carrier, which the bench does not have (only the OTGW32, no PIC). Resume only when such a rig exists.
 <!-- SECTION:NOTES:END -->

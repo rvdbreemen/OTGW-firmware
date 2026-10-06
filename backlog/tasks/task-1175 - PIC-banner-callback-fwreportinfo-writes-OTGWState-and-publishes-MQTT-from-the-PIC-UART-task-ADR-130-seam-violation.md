@@ -3,11 +3,11 @@ id: TASK-1175
 title: >-
   PIC banner callback fwreportinfo() writes OTGWState and publishes MQTT from
   the PIC UART task (ADR-130 seam violation)
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:45'
-updated_date: '2026-10-06 12:42'
+updated_date: '2026-10-06 12:51'
 labels:
   - bug
   - pic
@@ -268,4 +268,6 @@ Follow-up #1 of the description (the 60 s PR=A probe cannot set bAvailable) is f
 2026-09-30: follow-up #1 is fixed in TASK-1179 (alpha.386): applyPICBannerInfo() now re-enables a PIC that boot detection missed (bAvailable = true, eMode = HW_MODE_PIC) before its version publish, so the 60 s PR=A probe recovers the PIC and otgw-pic/* is published. The processOT banner branch's board-mode persist was NOT copied: it would rewrite an S3 Mini Pro (mode 3) to 1 (TASK-1180).
 
 2026-10-06: maintainer decision: wait for the Classic-S3 PIC rig (COM8, on its carrier); it is not attached now. Only the OTGW32 (COM4) is on the bench, which has no PIC.
+
+2026-10-06: maintainer: there is no Classic-S3 board; stop waiting for it. Parked in To Do: the open ACs need a PIC on an ESP32-S3 Classic carrier, which the bench does not have (only the OTGW32, no PIC). Resume only when such a rig exists.
 <!-- SECTION:NOTES:END -->
