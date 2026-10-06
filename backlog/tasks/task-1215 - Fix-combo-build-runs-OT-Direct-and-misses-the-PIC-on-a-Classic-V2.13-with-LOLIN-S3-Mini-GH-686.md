@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-06 15:42'
-updated_date: '2026-10-06 15:43'
+updated_date: '2026-10-06 15:47'
 labels:
   - bug
   - needs-info
@@ -33,3 +33,9 @@ Workaround and discriminator: settings boardmode=1 (Classic S3 Mini) forces the 
 - [ ] #2 Root cause identified from that data (wrong image, detection miss, or hardware), with evidence
 - [ ] #3 Fixed or answered: a combo build on a Classic V2.13 with a live PIC selects the PIC path in auto mode, or the image/flash guidance is corrected; reporter confirms
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-06: replied on GH #686 (approved by the maintainer): keep the boiler disconnected; asked for the exact firmware file/version, and for /api/v2/device/info plus the telnet boot log ('Board mode:' line) after forcing boardmode=1. Waiting for the reporter.
+<!-- SECTION:NOTES:END -->
