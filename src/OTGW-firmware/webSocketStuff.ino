@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-alpha.416
+**  Version  : v2.0.0-alpha.417
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -138,6 +138,12 @@ static void noteWebSocketBurstEvent(uint8_t eventType) {
 
 bool hasWebSocketClients() {
   return wsInitialized && (otLogWs.count() > 0);
+}
+
+// Connected /ws clients. They share port 80 with the HTTP server, so the web
+// connection cap (ADR-188) subtracts them from its port-80 count.
+uint16_t webSocketClientCount() {
+  return wsInitialized ? (uint16_t)otLogWs.count() : 0;
 }
 
 //===========================================================================================

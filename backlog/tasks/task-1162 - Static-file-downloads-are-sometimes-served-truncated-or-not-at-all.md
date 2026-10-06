@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-23 21:39'
-updated_date: '2026-10-05 12:56'
+updated_date: '2026-10-06 07:45'
 labels:
   - web
   - bug
@@ -36,7 +36,7 @@ This task covers the overload behaviour.
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Reproduce: repeated GETs of a multi-KB static file on the bench, record size and status per request
-- [ ] #2 Root cause identified
+- [x] #2 Root cause identified
 - [ ] #3 Under the 8-worker storm (refresh_storm.py --workers 8, seed 1124) no static response stalls mid-body: each is served complete, refused with a 503 before the body, or ends in a connection abort the client sees at once
 <!-- AC:END -->
 
@@ -207,4 +207,23 @@ Remaining levers, all at library or framework level:
 These are maintainer decisions. Evidence: %LOCALAPPDATA%/OTGW-capture/task1162-diag/variants-alpha412/ (run_base, run_A, run_B, run_AB with cdc.jsonl, probe.jsonl and timeline.csv).
 
 2026-10-05 15:00: maintainer chose 'also limit connections'. Test variants added in wt-1162 (test code, never commit): C = cap each web pcb's snd_buf at T1162_SNDBUF (2920 B, 2x MSS) in webBeginRequest under LOCK_TCPIP_CORE; D = cheap 503 through the existing REST/file gate path when more than T1162_CONNCAP (4) pcbs on port 80 are active (counted from tcp_active_pcbs; no AsyncTCP change; no abort mid-handler to avoid a use-after-free on the request). Diag line adds sndcap= and conn503=. Built: firmware_C.bin, firmware_D.bin (%LOCALAPPDATA%/OTGW-capture/task1162-diag/variants-CD/). C+D build was stopped by Claude Code under memory pressure (commit charge 91%); not restarted. Bench is busy with the TASK-1036 soak until about 00:55; storm runs (base vs C vs D vs C+D, several runs each) follow after it.
+
+2026-10-06 01:30-03:40: variants C and D, interleaved, 3 runs each (run_1162_diag.py, refresh_storm --workers 2,4,6,8 --seed 1124, OTGW32, all on the alpha.412 T1162diag tree; base = variants-alpha412/firmware_base.bin). Deaf windows (ping AND connect failing >= 5 s):
+- base: r1 269.2+5.5+267.0 s; r2 49.4+272.7 s; r3 149.5+225.3 s (still deaf at the last probe, recovered without reboot). Earlier base run 2026-10-05: 7.0 s.
+- C (snd_buf cap 2920 B per web pcb): r1 6.2 s; r2 176.7 s; r3 0. Cap applied 1110-1523 times per run. Helps sometimes, not reliably.
+- D (cheap 503 when > 4 port-80 pcbs active): r1 0; r2 0; r3 0. 2046 / 2543 / 2113 refusals per run.
+- C+D: r1 0; r2 0; r3 0. 2499 / 2144 / 2169 refusals, 2758 / 2401 / 2406 caps.
+No run rebooted (bootcount continuous 19..30).
+Cost of D: the storm's post-arm gate check (10 sequential requests with retries) failed in 3 of 6 D/CD runs: one lone request still got 503 (rest_busy on /api/v2/settings, or empty_body on /). Likely cause: tcp_active_pcbs also counts pcbs in FIN_WAIT/CLOSE_WAIT/LAST_ACK left by the storm's aborted clients, so the count stays above 4 for a while after the burst. Those pcbs still hold queued TX memory, so the refusal is defensible, but it is too strict for a single well-behaved client. Refinement to test: count only ESTABLISHED pcbs, or cap at a higher N, or exempt one slot.
+Conclusion: a connection-count cap at the web layer (D) removes the deafness in 6/6 runs where base was deaf in 3/3; the per-pcb send-buffer cap (C) alone does not. Next step is a maintainer decision: port D (no library change; app-layer check in the existing REST/file gates) to dev under an ADR, refine the count, and re-measure on dev (which since alpha.415 also has the non-blocking MQTT write, ADR-186). Output: %LOCALAPPDATA%/OTGW-capture/task1162-diag/variants-CD/run_r{1,2,3}-{base,C,D,CD}/. Bench is back on alpha.416+9f64919.
+
+2026-10-06: maintainer chose 'D to dev, with ADR': connection cap in the existing REST/file gates, refine the count to ESTABLISHED pcbs only, ADR (accept only on the maintainer's yes), re-measure on dev old vs fix, >= 3 runs each.
+
+2026-10-06 dev implementation, alpha.417 (ADR-188, accepted by the maintainer): web connection cap. webConnCapExceeded() in restAPI.ino runs first in the REST and static-file gates and answers the cheap 503 while more than WEB_MAX_TX_CONNECTIONS (4) port-80 connections hold or can queue send data (ESTABLISHED, or unsent/unacked non-empty; platformTcpTxHoldingOnPort() in platform_esp32.h under LOCK_TCPIP_CORE), minus the /ws clients (webSocketClientCount()). New counter hd_webconn_503. Interleaved on the same alpha.417 tree (cap off = -DWEB_MAX_TX_CONNECTIONS=1000) plus alpha.416:
+- no cap, 6 runs: deaf 0 / 0 / 270 / 292 / 21 / 253 s; storm verdict 3 PASS, 3 FAIL; short 200s >= 2 / 3 / >= 2 in the 3 cap-off runs.
+- cap 4, 5 runs: deaf 0 / 7.2 / 0 / 0 / 0 s; storm verdict 5/5 PASS; short 200s 0 / 0 / 1 / 2 / 0; 1508-4695 cap refusals per run.
+- nominal (3 browser-like clients with /ws, 180 s): hd_webconn_503 = 0 (9 other 503s came from the ADR-165 in-flight gates, 3 tabs loading at once).
+- builds esp32, esp32-classic, esp32-combo SUCCESS; evaluate --quick 71/0.
+AC#2 (root cause): checked. The memory is held in the lwIP send queues of already-admitted connections (up to TCP_SND_BUF 5744 B each, up to 16 active); the WiFi RX alloc (~2.3 KB) then fails, no ACKs arrive, and nothing drains. Shown by the T1162diag telemetry (2026-10-04/05) and by the variant series: only limiting the number of send-holding connections removes the deafness.
+AC#3 NOT met: the cap reduces the mid-body stalls (short 200s) from about 2-3 per run to under 1 per run, not to zero. Still open: a response whose connection stalls mid-body under the storm. Data: %LOCALAPPDATA%/OTGW-capture/task1162-diag/dev-a416/, dev-a417/.
 <!-- SECTION:NOTES:END -->

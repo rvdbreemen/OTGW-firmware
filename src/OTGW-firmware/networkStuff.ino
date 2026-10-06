@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.416
+**  Version  : v2.0.0-alpha.417
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -36,7 +36,7 @@ AsyncSimpleTelnet<1> debugTelnet(23);
 // ESPAsyncWebServer. The async server runs every handler on the AsyncTCP
 // service task (no loop() handleClient() polling). seq10 (WebSocket) and
 // seq11 (OTA) attach to this same instance.
-AsyncWebServer          server(80);
+AsyncWebServer          server(WEB_HTTP_PORT);
 OTGWUpdateServer        httpUpdater(true);
 
 // Per-request context for the async bridge (webServerCompat.h). Single point

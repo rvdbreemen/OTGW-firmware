@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.416
+**  Version  : v2.0.0-alpha.417
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -255,6 +255,7 @@ void loadOtSupportFiles();                 // read /ot-thermo.json and /ot-boile
 void saveOtSupportFilesIfDirty();          // 15-min debounced atomic write
 void doMqttDisconnect();                 // graceful disconnect for reboot path (MQTTclient is file-static)
 void doWebSocketClose();                 // close all WS clients before reboot (otLogWs not extern'd in any header)
+uint16_t webSocketClientCount();         // connected /ws clients (port 80); used by the web connection cap (ADR-188)
 void doRestart(const char* reason);      // canonical reboot path: flushSettings + prepareForReboot + ESP.restart
 // MQTT discovery verification (ADR-062, TASK-349): state machine lives in
 // mqtt_discovery_verify.cpp as of TASK-363; public API in that file's header.
@@ -462,6 +463,7 @@ struct HeapDiagSection {                 // state.heapdiag — cumulative heap-p
   uint8_t  iWebfileInflightHwm     = 0; // high-watermark of concurrent web-file-serve in-flight requests (restAPI.ino webFileInFlight) since boot/reset
   uint32_t iRest503Count           = 0; // lifetime REST 503s from the concurrency gate (processAPI)
   uint32_t iWebfile503Count        = 0; // lifetime web-file-serve 503s from the concurrency gate (webFileGateTryAdmit)
+  uint32_t iWebConn503Count        = 0; // 503s from the web connection cap (restAPI.ino webConnCapExceeded, ADR-188)
   uint16_t iTcpActivePcbs          = 0; // lwIP active TCP PCB count, sampled 1 Hz from the loop task (platformTcpActivePcbCount)
 };
 

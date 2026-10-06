@@ -6353,6 +6353,69 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-188",
+      "title": "Cap the web connections that hold send data, so a request storm cannot starve the receive path",
+      "path": "ADR-188-cap-the-web-connections-that-hold-send-data-so-a-request-storm-cannot-starve-the-receive-path.md",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-06",
+      "decision_summary": "Refuse a new web request with the existing cheap 503 while more than WEBMAXTXCONNECTIONS (4) connections on port 80 h...",
+      "topics": [
+        "backpressure",
+        "heap",
+        "lwip",
+        "web-server"
+      ],
+      "aliases": [
+        "request storm deafness",
+        "web connection cap"
+      ],
+      "components": [
+        "platform TCP shim (platform_esp32.h)",
+        "web admission gates (restAPI.ino)"
+      ],
+      "symbols": [
+        "hd_webconn_503",
+        "platformTcpTxHoldingOnPort",
+        "WEB_MAX_TX_CONNECTIONS",
+        "webConnCapExceeded"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "The REST and static-file admission paths call webConnCapExceeded() before their own in-flight check and answer 503 when it is true.",
+          "The count subtracts the connected /ws clients.",
+          "Every refusal increments state.heapdiag.iWebConn503Count, exposed as hdwebconn503."
+        ],
+        "must_not": [
+          "Must not count connections that hold no send data and are not ESTABLISHED.",
+          "Must not change AsyncTCP, ESPAsyncWebServer or the lwIP configuration."
+        ],
+        "exceptions": [
+          "Building with -DWEBMAXTXCONNECTIONS=1000 disables the cap for A/B measurement."
+        ],
+        "verification": [
+          "Bench, 2026-10-06, OTGW32 combo, the same storm and probe harness, interleaved on the same alpha.417 tree:",
+          "cap off (-DWEBMAXTXCONNECTIONS=1000) plus alpha.416, 6 runs: deaf 0, 0, 270, 292, 21 and 253 s; storm verdict 3 PASS, 3 FAIL.",
+          "cap 4 (alpha.417), 5 runs: deaf 0, 7.2, 0, 0 and 0 s; storm verdict 5 of 5 PASS.",
+          "No reboot in any run.",
+          "Nominal load on alpha.417: three browser-like clients, each with an open /ws and polling device/info and settings for 180 s. hdwebconn503 stayed 0. The 9 other 503s came from the existing ADR-165 in-flight gates (three tabs loading at on...",
+          "Builds: esp32, esp32-classic and esp32-combo SUCCESS (alpha.417)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -11398,6 +11461,30 @@
     },
     {
       "source": "ADR-187",
+      "target": "ADR-186",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-188",
+      "target": "ADR-147",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-188",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-188",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-188",
       "target": "ADR-186",
       "type": "related",
       "resolved": true

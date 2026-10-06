@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.416
+**  Version  : v2.0.0-alpha.417
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -81,8 +81,31 @@ static inline uint8_t restEffectiveInflightCap() {
 #ifndef WEB_FILE_MAX_INFLIGHT
 #define WEB_FILE_MAX_INFLIGHT 2
 #endif
+
+// ADR-188 (TASK-1162): web connection cap. Under a request storm the memory is held in
+// the lwIP send queues of connections already admitted, not in new ones, so the in-flight
+// gates above cannot stop it: the RX allocation then fails, no ACK comes in, and the
+// device goes deaf for minutes. Refuse a new request with the cheap 503 while more than
+// WEB_MAX_TX_CONNECTIONS port-80 connections hold or can queue send data. The /ws clients
+// share port 80 and are long-lived, so they are subtracted. The request being admitted is
+// one of the counted connections.
+#ifndef WEB_MAX_TX_CONNECTIONS
+#define WEB_MAX_TX_CONNECTIONS 4
+#endif
+static bool webConnCapExceeded() {
+  const uint16_t held = platformTcpTxHoldingOnPort(WEB_HTTP_PORT);
+  const uint16_t ws   = webSocketClientCount();
+  const uint16_t http = (held > ws) ? (uint16_t)(held - ws) : 0;
+  if (http <= WEB_MAX_TX_CONNECTIONS) return false;
+  RESTDebugTf(PSTR("WEB CONN CAP: %u connections hold TX (%u ws, cap %u) => 503\r\n"),
+              held, ws, (unsigned)WEB_MAX_TX_CONNECTIONS);
+  state.heapdiag.iWebConn503Count++;
+  return true;
+}
+
 static uint8_t webFileInFlight = 0;
 bool webFileGateTryAdmit() {
+  if (webConnCapExceeded()) return false;
   uint8_t cap = WEB_FILE_MAX_INFLIGHT;
   const uint32_t mb = platformMaxFreeBlock();
   if (mb < 16000)      cap = 1;
@@ -2739,6 +2762,10 @@ void processAPI(AsyncWebServerRequest *request)
   // armed through webArmSlotRelease(), which also covers a file gate slot that
   // webSendFile() takes later in the same request (TASK-1172). The diagnostic logs
   // the heap at the cap so we can tell transient concurrency from a real leak.
+  if (webConnCapExceeded()) {
+    sendApiBusy(F("Server busy: too many connections, please retry"));
+    return;
+  }
   const uint8_t effectiveCap = restEffectiveInflightCap();
   if (restInFlight >= effectiveCap) {
     RESTDebugTf(PSTR("REST BUSY: %u/%u in-flight (cap %u) => 503 (freeheap=%u maxblock=%u)\r\n"),
@@ -3297,6 +3324,7 @@ void sendDeviceInfoV2()
     je.field(F("hd_tcp_active_pcbs"),      (uint32_t)snap->st.heapdiag.iTcpActivePcbs);
     je.field(F("hd_rest_503"),             snap->st.heapdiag.iRest503Count);
     je.field(F("hd_webfile_503"),          snap->st.heapdiag.iWebfile503Count);
+    je.field(F("hd_webconn_503"),          snap->st.heapdiag.iWebConn503Count);
 
     // --- Flash, sketch & filesystem storage (values cached at boot by cacheBootFlashInfo) ---
     je.field(F("sketchsize"),       sBootFlash.sketchSize);

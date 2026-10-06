@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.416
+**  Version  : v2.0.0-alpha.417
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -44,6 +44,7 @@
 //=====[ Async HTTP server (port 80) ]=========================================
 // Single point of instantiation in networkStuff.ino (ADR-044). seq10 (WS) and
 // seq11 (OTA) attach to THIS instance.
+#define WEB_HTTP_PORT 80
 extern AsyncWebServer server;
 
 //=====[ Per-request context (file-static, safe under async_tcp serialization)]=

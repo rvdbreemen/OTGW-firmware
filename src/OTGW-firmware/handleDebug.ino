@@ -202,6 +202,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("tcp_active_pcbs: %u\r\n"), (unsigned)state.heapdiag.iTcpActivePcbs);
     Debugf(PSTR("rest_503: %lu\r\n"), (unsigned long)state.heapdiag.iRest503Count);
     Debugf(PSTR("webfile_503: %lu\r\n"), (unsigned long)state.heapdiag.iWebfile503Count);
+    Debugf(PSTR("webconn_503: %lu\r\n"), (unsigned long)state.heapdiag.iWebConn503Count);
 
     Debugln(F("[state.discovery]"));
     Debugf(PSTR("published_topics: %lu\r\n"), (unsigned long)state.discovery.iPublishedTopicCount);
