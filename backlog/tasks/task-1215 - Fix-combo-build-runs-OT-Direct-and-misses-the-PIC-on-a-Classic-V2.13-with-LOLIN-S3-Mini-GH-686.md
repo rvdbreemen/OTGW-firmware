@@ -3,10 +3,10 @@ id: TASK-1215
 title: >-
   Fix: combo build runs OT-Direct and misses the PIC on a Classic V2.13 with
   LOLIN S3 Mini (GH #686)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-06 15:42'
-updated_date: '2026-10-06 19:42'
+updated_date: '2026-10-11 19:33'
 labels:
   - bug
   - needs-info
@@ -31,7 +31,7 @@ Workaround and discriminator: settings boardmode=1 (Classic S3 Mini) forces the 
 <!-- AC:BEGIN -->
 - [x] #1 Reporter data collected: firmware asset name/target, /api/v2/device/info (board, hardware_type, hardwaremode, picfwversion, otdirectavailable) and the telnet boot log with the 'Board mode:' line, before and after setting boardmode=1
 - [x] #2 Root cause identified from that data (wrong image, detection miss, or hardware), with evidence
-- [ ] #3 Fixed or answered: a combo build on a Classic V2.13 with a live PIC selects the PIC path in auto mode, or the image/flash guidance is corrected; reporter confirms
+- [x] #3 Fixed or answered: a combo build on a Classic V2.13 with a live PIC selects the PIC path in auto mode, or the image/flash guidance is corrected; reporter confirms
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,4 +44,12 @@ ROOT CAUSE (AC#2): wrong image. Nodo Shop flashed the PIC-less esp32 (OTGW32, OT
 Open: there is no public 2.0.0 release, so pointing the reporter at a combo/classic image needs a maintainer decision. Also worth telling Nodo Shop which target to pre-flash on Classic boards.
 
 2026-10-06: replied on GH #686 (maintainer chose 'let the reporter build'): wrong image explained without naming the board; corrected my POST-format mistake; build instructions for the esp32-combo target from dev (submodules, build.sh/build.bat) and a full flash of the merged-full image with flash_otgw.sh/.bat (wipes WiFi and settings). Partition tables of the esp32 and combo targets are identical. AC#3 waits for the reporter's confirmation that the PIC is found.
+
+2026-10-06 21:45 reporter confirmation (GH #686, temnyvlad): flashed esp32-combo built from dev (2.0.0-alpha.418+5e66c3b) on the Classic V2.13. Device Info: hardware_type otgw-classic, hardwaremode PIC, picfwversion 6.8, picdeviceid pic16f1847; telnet banner 'PIC : gateway v6.8'; PR=A returns 'OpenTherm Gateway 6.8'. Connected between thermostat and boiler: OTbus online, GW-mode ON, thermostat and boiler connected, MQTT discovery published, heating works normally. Reporter also confirms Nodo Shop had flashed the default esp32 target (OT-Direct only). 2026-10-07/08: maintainer invited the reporter to the alpha testing team; the reporter accepted (Honeywell evohome + R8810A bridge, Intergas boiler, RAMSES RF listener; will keep a known-good image to roll back to).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+GH #686: a Classic V2.13 with PIC 6.8 and a LOLIN S3 Mini ran OT-Direct and never found the PIC. Root cause: not a firmware defect. Nodo Shop pre-flashed a local build of the PIC-less esp32 target, which never probes a PIC and has no boardmode setting. Fix: the reporter built and flashed the esp32-combo target from dev (alpha.418+5e66c3b); the combo detects the PIC at boot. Evidence (reporter, field): hardware_type otgw-classic, hardwaremode PIC, picfwversion 6.8, PR=A 'OpenTherm Gateway 6.8', and the gateway runs between thermostat and boiler with MQTT discovery published. Own mistake corrected publicly: the settings POST format is {name,value}. Follow-up outside this task: tell Nodo Shop which target to pre-flash on Classic boards.
+<!-- SECTION:FINAL_SUMMARY:END -->
