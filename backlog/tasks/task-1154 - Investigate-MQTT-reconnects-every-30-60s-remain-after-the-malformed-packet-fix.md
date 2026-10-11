@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-22 21:15'
-updated_date: '2026-09-28 06:24'
+updated_date: '2026-10-11 19:42'
 labels:
   - bug
 dependencies:
@@ -128,6 +128,8 @@ Also fixed there: writeMqttChunk could hold the loop for up to ten 5 s write tim
 
 2026-09-24: jaronbor (GH #682) on beta.5, screenshots at uptime 00:24 and 02:07 (boot ~19:54): mqtt_sndbuf_skips 71 -> 235, mqtt_desync_drops 0, hd_drip_cooldown_skip 47 -> 231, disc_pending_ids 0, WiFi 92-94%, heap stable, mqttconnected true. The two Mosquitto "disconnected" lines (19:51:27, 19:52:16) predate the 19:54 boot, so they fall in the flash window; no later disconnects posted.
 Reading: desync 0 = no half-written frame reached the link. hd_drip_cooldown_skip counts drip ticks in the post-burst cooldown BEFORE the pending check (MQTTstuff.ino:1751), so with pending 0 it counts idle ticks and is harmless. Hypothesis (unverified): sndbuf skips track Status bursts on a busy bus, not a stalling link. That contradicts the guidance given on #682 ("climbing after boot = stalling link"). Open question: a deferred value publish is a lost update; 164 in 1h43m may mean HA misses values. Needs a bench measurement with real bus traffic (simulator), which the beta.5 bench runs never had.
+
+2026-10-11: GH #682, mrfox7688 (2026-10-09) still sees frequent MQTT disconnects and 'thermostat unavailable', firmware version not stated (1.7.6 or 1.7.7). They believed the capture script stops after 10 minutes; capture-mqtt-debug.bat has no time limit (DurationSeconds empty = until Q; no duration prompt). Replied (https://github.com/rvdbreemen/OTGW-firmware/issues/682#issuecomment-6112963772): run it for days, paste the 'Capture stop reason:' line if it stops on its own (that would be a script bug), and send fwversion, device/info uptime / mqtt_desync_drops / mqtt_sndbuf_skips at start and end, and Mosquitto lines around disconnects. Open a new task only if the data shows a new cause; this task stays Done.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
