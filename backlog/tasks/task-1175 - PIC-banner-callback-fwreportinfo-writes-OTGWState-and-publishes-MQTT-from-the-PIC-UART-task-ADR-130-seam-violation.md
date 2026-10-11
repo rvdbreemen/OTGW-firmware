@@ -3,11 +3,11 @@ id: TASK-1175
 title: >-
   PIC banner callback fwreportinfo() writes OTGWState and publishes MQTT from
   the PIC UART task (ADR-130 seam violation)
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:45'
-updated_date: '2026-10-06 12:51'
+updated_date: '2026-10-11 21:55'
 labels:
   - bug
   - pic
@@ -270,4 +270,8 @@ Follow-up #1 of the description (the 60 s PR=A probe cannot set bAvailable) is f
 2026-10-06: maintainer decision: wait for the Classic-S3 PIC rig (COM8, on its carrier); it is not attached now. Only the OTGW32 (COM4) is on the bench, which has no PIC.
 
 2026-10-06: maintainer: there is no Classic-S3 board; stop waiting for it. Parked in To Do: the open ACs need a PIC on an ESP32-S3 Classic carrier, which the bench does not have (only the OTGW32, no PIC). Resume only when such a rig exists.
+
+2026-10-11: un-parked by the maintainer. The Classic-S3 rig is back on the bench (COM8, 192.168.88.63, MAC ac:27:6e:ce:45:d8, alpha.364, PIC16F1847 gateway 6.8). Bench validation plan: %LOCALAPPDATA%/OTGW-capture/classic-validation-20261011/.
+
+2026-10-11 AC#4 wording, approved by the maintainer: 'OLD build (dev HEAD)' predates the fix. OLD now means the commit before the fix, cc4d4addf^ (alpha.382); FIX = dev HEAD (alpha.418). Instrumentation identical in both (test-only, never committed).
 <!-- SECTION:NOTES:END -->

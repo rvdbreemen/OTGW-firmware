@@ -3,11 +3,11 @@ id: TASK-1129
 title: >-
   PIC bootloader entry fails on the ESP32-S3 classic bench board: reset
   asserted, handshake never answered
-status: To Do
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-05 15:32'
-updated_date: '2026-10-06 15:43'
+updated_date: '2026-10-11 23:22'
 labels:
   - bug
   - pic
@@ -25,9 +25,9 @@ TASK-972 AC#2 is blocked on this. Two authorized flash attempts on the classic-S
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The reason the PIC does not enter bootloader mode is identified, with evidence rather than inference
-- [ ] #2 A PIC firmware flash started from the v2 UI completes on the bench board
-- [ ] #3 The boot-time I2C failures on the classic bus are explained, and either fixed or recorded as expected for this unit
+- [x] #1 The reason the PIC does not enter bootloader mode is identified, with evidence rather than inference
+- [x] #2 A PIC firmware flash started from the v2 UI completes on the bench board
+- [x] #3 The boot-time I2C failures on the classic bus are explained, and either fixed or recorded as expected for this unit
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -103,4 +103,23 @@ Status stays In Progress: needs the Classic-S3 (COM8) on its carrier and a per-i
 2026-10-06: maintainer: there is no Classic-S3 board; stop waiting for it. Parked in To Do: the open ACs need a PIC on an ESP32-S3 Classic carrier, which the bench does not have (only the OTGW32, no PIC). Resume only when such a rig exists.
 
 2026-10-06: a field user has the rig this task needs: GH #686 (temnyvlad), Classic V2.13 + PIC 6.8 + LOLIN S3 Mini, offers to test builds and send logs. See TASK-1215.
+
+2026-10-11: un-parked by the maintainer. The Classic-S3 rig is back on the bench (COM8, 192.168.88.63, MAC ac:27:6e:ce:45:d8, alpha.364, PIC16F1847 gateway 6.8). Bench validation plan: %LOCALAPPDATA%/OTGW-capture/classic-validation-20261011/.
+
+2026-10-11: maintainer OK for the PIC-flash steps of this task (step 1 mismatch-hex probe, step 2 re-flash gateway 6.8 from the v2 UI), this instance only.
+
+2026-10-12 bench, Classic + LOLIN S3 Mini (COM8, 192.168.88.63), PIC16F1847 gateway 6.8. Full log: %LOCALAPPDATA%/OTGW-capture/classic-validation-20261011/EVIDENCE.md and pic-*.txt.
+AC#1 (old vs fix, zero-write probe): a pic16f88 gateway hex (5.8) uploaded as /pic16f1847/m88.hex and started with GET /pic?action=upgrade&name=m88.hex. OTGWSerial takes the target model from the hex magic words (readHexFile, OTGWSerial.cpp:250-264) and compares it with the bootloader's version packet before eraseCode (:658 vs :676), so nothing is erased or written.
+- FIX alpha.418+fa2b89d (combo, console mute present): resetPic(), 'Bootloader version 2.0' about 90 ms later, then 'Wrong PIC (16F88 <=> 16F1847)'. The handshake passes FWSTATE_RSET and FWSTATE_VERSION.
+- OLD alpha.363+959c804 (esp32-classic built from 02a3d90d6^, the commit before the TASK-1131 console mute): resetPic(), only timeouts, never a bootloader version, 'Too many retries' after about 11 s, twice. This is the July symptom.
+- Mechanism seen on the USB console during the OLD attempt: '[8198][E][esp32-hal-gpio.c:181] __digitalWrite(): IO 16 is not set as GPIO' at upgrade start (LED1 on an LEDC pin) and '[8794] ... IO 4 is not set as GPIO' about 0.6 s later (SetLED on LED2 around the bootloader ETX). On OLD the primary console is UART0 = the PIC link, so these lines went into the PIC during the handshake. FIX mutes UART0 (02a3d90d6, alpha.364). Root cause confirmed with old-vs-fix evidence.
+AC#2: GET /pic?action=upgrade&name=gateway.hex on alpha.418 (the exact request v2.js:2763 sends; flash-status polled like v2.js:2770): progress 2..94 % over 42 s, 'Result code: 0', 'Errors: 0, Retries: 0', 'PIC upgrade was successful'. Afterwards pic 6.8 pic16f1847 gateway, PR=A answered, no ESP reboot, MQTT connected. The browser click itself was not exercised; the request and the polling are identical.
+AC#3: the boot I2C errors are explained (workflow wf_337ef6e6-edd, adversarially verified): IMU WHO_AM_I probes at 0x6A/0x6B (S3 Mini Pro detection, combo only) and the 0x26 watchdog disarm, all NACKed because this unit has no QMI8658 and no 0x26 chip. 259 is the IDF i2c_master NACK result, not an uninitialised bus. Expected for this unit; follow-ups TASK-1216 (dead no-ACK guard) and TASK-1217 (console into PIC, USB mute; decision).
+Side finding: the progress LED never toggles during a PIC flash on S3 builds (digitalWrite on LEDC-attached pins is refused); filed separately.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+PIC bootloader entry on the Classic + LOLIN S3 Mini: root cause found and shown fixed. On builds before the TASK-1131 console mute (02a3d90d6, alpha.364), the IDF/Arduino console was UART0, which is the PIC link; at upgrade start and around the bootloader ETX, digitalWrite on LEDC-attached LED pins logged 'IO n is not set as GPIO' into the PIC and broke the handshake ('Too many retries' at 0 %). Evidence on the bench with a zero-write mismatched-hex probe: OLD alpha.363 fails with 'Too many retries' and the two digitalWrite lines appear on the console at the right moments; FIX alpha.418 reaches 'Bootloader version 2.0' and stops cleanly with 'Wrong PIC'. A real flash of gateway 6.8 through the UI's own request completed in 42 s with 0 errors and 0 retries. The boot-time I2C errors are expected NACKs on this unit (no IMU, no 0x26). Follow-ups: TASK-1216, TASK-1217, and the progress-LED task.
+<!-- SECTION:FINAL_SUMMARY:END -->
