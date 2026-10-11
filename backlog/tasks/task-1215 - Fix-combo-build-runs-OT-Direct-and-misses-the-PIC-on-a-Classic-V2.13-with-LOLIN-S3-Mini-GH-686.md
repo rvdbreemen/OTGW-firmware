@@ -6,7 +6,7 @@ title: >-
 status: Done
 assignee: []
 created_date: '2026-10-06 15:42'
-updated_date: '2026-10-11 19:33'
+updated_date: '2026-10-11 19:45'
 labels:
   - bug
   - needs-info
@@ -46,6 +46,8 @@ Open: there is no public 2.0.0 release, so pointing the reporter at a combo/clas
 2026-10-06: replied on GH #686 (maintainer chose 'let the reporter build'): wrong image explained without naming the board; corrected my POST-format mistake; build instructions for the esp32-combo target from dev (submodules, build.sh/build.bat) and a full flash of the merged-full image with flash_otgw.sh/.bat (wipes WiFi and settings). Partition tables of the esp32 and combo targets are identical. AC#3 waits for the reporter's confirmation that the PIC is found.
 
 2026-10-06 21:45 reporter confirmation (GH #686, temnyvlad): flashed esp32-combo built from dev (2.0.0-alpha.418+5e66c3b) on the Classic V2.13. Device Info: hardware_type otgw-classic, hardwaremode PIC, picfwversion 6.8, picdeviceid pic16f1847; telnet banner 'PIC : gateway v6.8'; PR=A returns 'OpenTherm Gateway 6.8'. Connected between thermostat and boiler: OTbus online, GW-mode ON, thermostat and boiler connected, MQTT discovery published, heating works normally. Reporter also confirms Nodo Shop had flashed the default esp32 target (OT-Direct only). 2026-10-07/08: maintainer invited the reporter to the alpha testing team; the reporter accepted (Honeywell evohome + R8810A bridge, Intergas boiler, RAMSES RF listener; will keep a known-good image to roll back to).
+
+2026-10-11 maintainer decision: Nodo Shop will NOT be informed or given flashing guidance. 2.0.0 is an unreleased alpha; vendors should simply not pre-flash it. The 'tell Nodo Shop which target to pre-flash' follow-up in the final summary is dropped.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
