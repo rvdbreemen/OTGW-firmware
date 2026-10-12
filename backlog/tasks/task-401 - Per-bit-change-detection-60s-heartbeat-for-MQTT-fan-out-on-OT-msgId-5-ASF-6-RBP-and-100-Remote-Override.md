@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-24 12:05'
-updated_date: '2026-04-24 12:15'
+updated_date: '2026-10-12 00:04'
 labels:
   - mqtt
   - heap
@@ -44,6 +44,12 @@ Scope C-min extension of TASK-400: apply the same first-seen + change-detect + 6
 <!-- SECTION:PLAN:BEGIN -->
 1. Add new file-scope tracker arrays in OTGW-Core.ino (near mqttlastsentstatusbit): mqttlastsentASFbit[8], mqttlastsentASFbyte[1], mqttlastsentRBPbit[4], mqttlastsentRBPbyte[2], mqttlastsentRObit[2], mqttlastsentRObyte[1].\n2. Extend resetMqttTrackedState() to set all new arrays to TRACKED_TIME_UNSEEN.\n3. Modify print_ASFflags: compute prevHB from value>>8, gate ASF_flags byte-topic via shouldPublishTrackedStatusByte with OTPublishGate wrap; gate each of the 6 bit-topics via shouldPublishTrackedStatusBit + publishMQTTOnOff under gate.\n4. Modify publishRBPFlagsState: gate RBP_flags_transfer_enable and RBP_flags_read_write bytes; gate rbp_dhw_setpoint, rbp_max_ch_setpoint, rbp_rw_dhw_setpoint, rbp_rw_max_ch_setpoint bits. Function signature stays the same (takes transferEnableFlags, readWriteFlags, returns combined u16) but we need prev values — add prev-param plumbing from print_RBPflags which has access to value (uint16_t& ref).\n5. Modify print_remoteoverridefunction: gate <msgid>_flag8 byte-topic and the 2 bit-topics.\n6. Build firmware, verify clean.\n7. Run evaluate.py --quick.\n8. Commit + push.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): 2026-10-12, bench evidence review against C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md (Classic carrier + LOLIN S3 Mini, PIC16F1847 gateway 6.8, firmware 2.0.0-alpha.418+fa2b89d esp32-combo, broker 192.168.88.32). AC #11 stays open. The session has no evidence for it. The OT replay coverage run (run_coverage_test.py --seconds 1000) gave these results: 3.15 loops, 369 OT keys, 143 MsgIDs, 228 broker topics. OT keys were identical between the PIC and OT-Direct paths, and only the OT-Direct-only stats flame_cycles_per_hour and flame_duty_pct were missing. That run compares topic sets, not publish timing. Nothing in it shows the ASF (msgId 5), RBP (msgId 6) or Remote Override (msgId 100) topics publishing at boot, on a change, or on the 60 s heartbeat. It also has no heap [ot] trace. The run was also on the 2.0.0 ESP32-S3 line, while TASK-401 changed the 1.x ESP8266 OTGW-Core.ino. To close AC #11, run an MQTT subscriber on the 1.x ESP8266 bench unit with replay or a live boiler. Capture the publish timestamps of ASF_flags, RBP_flags_*, &lt;msgid&gt;_flag8 and their bit topics across boot, one forced bit change and at least 3 heartbeat windows, together with the telnet heap [ot] trace. The task status is currently Done although AC #11 is unchecked. The maintainer should decide whether to reopen it or to accept the missing hardware check explicitly.
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-05-29 10:10'
-updated_date: '2026-05-29 10:47'
+updated_date: '2026-10-12 00:04'
 labels: []
 dependencies: []
 priority: medium
@@ -28,6 +28,12 @@ Per Robert: an OLED should work whenever it is physically connected, independent
 - [ ] #5 evaluate.py shows no NEW abstraction violations (button #if defined(ESP32) is pre-existing, unchanged)
 - [ ] #6 ADR-114 written documenting the runtime-detection-over-compile-gate decision
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): Bench check 2026-10-11/12 (C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md). Board: OTGW Classic carrier + LOLIN S3 Mini, MAC ac:27:6e:ce:45:d8, PIC16F1847 gateway 6.8, image esp32-combo 2.0.0-alpha.418+fa2b89d. Findings for TASK-757:
+<!-- SECTION:NOTES:END -->
 
 ## Final Summary
 

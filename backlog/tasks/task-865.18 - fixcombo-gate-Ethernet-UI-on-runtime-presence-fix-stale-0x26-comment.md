@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-14 20:11'
-updated_date: '2026-06-29 21:51'
+updated_date: '2026-10-12 00:04'
 labels:
   - async-esp32s3
 dependencies:
@@ -45,6 +45,8 @@ Landed: restAPI.ino gates the Ethernet settings/UI exposure on runtime state.hw.
 3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert.
 
 CLOSE 2026-06-29 (maintainer-directed): #2 verified in code — Ethernet UI gated on presence (index.js:413 toggles 'hidden' on !isEth; iface input type eth-only at :6200), driver stays compiled in. #3 verified — boards.h comment (235-239) states the 0x26 feed is UNCONDITIONAL (no isPICEnabled gate, harmless NACKed no-op on absent chip), matching the feed. #4 (live OTGW32 Ethernet-fields-shown) deferred — OTGW32 offline this session; combo did run on OTGW32 @.39 earlier. Closed per maintainer direction.
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): Bench evidence 2026-10-11/12 (C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md, Phase 2.1). This covers the Classic half of AC#4 only. Setup: esp32-combo 2.0.0-alpha.418+fa2b89d on an OTGW Classic carrier with a LOLIN S3 Mini (MAC ac:27:6e:ce:45:d8, 192.168.88.63, PIC16F1847 gateway 6.8). device/info reports hardware_type otgw-classic, hardwaremode PIC, otdirectavailable false. GET /api/v2/settings returns no eth* keys, so the runtime presence gate drops the Ethernet settings, and with them the index.js trigger key ethstaticip. The UI was not checked in a browser in this run. The OTGW32 half (combo on OTGW32 shows the Ethernet fields and Ethernet still works) has no evidence in this run and stays open. Leave AC#4 unchecked, or split it into a Classic part (closable at REST level) and an OTGW32 part. Note: the task is already Done (closed 2026-06-29 by maintainer direction) with AC#4 open.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

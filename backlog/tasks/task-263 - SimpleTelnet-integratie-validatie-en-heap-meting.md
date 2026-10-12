@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-12 20:07'
-updated_date: '2026-04-12 21:00'
+updated_date: '2026-10-12 00:05'
 labels:
   - telnet
   - testing
@@ -48,6 +48,8 @@ Validate the complete SimpleTelnet implementation after firmware migration. Veri
 Build completed successfully with zero warnings or errors.
 ACs #2-8 require physical device testing (heap measurement, dual client, CLI banner, OTA).
 Pre-conditions for device testing verified: firmware binary present in build/.
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): Classic-S3 bench evidence check (2026-10-12, read-only), source C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md. Platform mismatch: TASK-263 validates the 1.x ESP8266 SimpleTelnet migration (1.4.0-beta heap baseline). The bench ran 2.0.0-alpha.418 esp32-combo on an OTGW Classic + LOLIN S3 Mini (PIC 6.8), so none of the open ACs can be checked from it. AC#2: not covered, and the result contradicts the AC. A second client from the same address on port 25238 took over the slot and client A was closed, so the two never received PIC output at once. Two clients from different addresses were not tested. One client over 180 s got correct PR=A/M/V answers. AC#5: partial. Debug output reached port 23 telnet on alpha.418 (OTGWSerial model/resetPic/bootloader lines during the TASK-1129 PIC flash probe), but not while the CLI was in use, and not on ESP8266. AC#7: partial (S3 only). No reboot across 3 ADR-188/189 storm runs (bootcount 4), a 1000 s replay coverage run, a 100 s broker pause and simulator start/stop x5. AC#3, AC#4, AC#6 and AC#8: not covered. There is no port-23 banner or CLI keypress test, the S3 heap figures (min 18836..36244 B) cannot be compared with the ESP8266 baseline, and the flash was USB only (app OTA is impossible on the 4 MB S3 layout). AC#2-8 still need a 1.x ESP8266 bench run.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

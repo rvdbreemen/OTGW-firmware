@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-14 09:52'
-updated_date: '2026-06-29 21:53'
+updated_date: '2026-10-12 00:04'
 labels:
   - async-esp32s3
 dependencies:
@@ -55,6 +55,8 @@ Landed (alpha bump pending): (A) control-method park handshake — g_picResetInP
 3-target build verified GREEN at HEAD (alpha.232): esp32, esp32-classic, esp32-combo all SUCCESS (fw+fs); esp32-combo bin now FITS (no overflow). evaluate.py --quick 0-fail. Code ACs were verified by the planning pass reading the committed source. Remaining = field/hardware AC(s) for Robert.
 
 CLOSE 2026-06-29 per maintainer: the underlying issue is FIXED BY A RELEASE (the shipped firmware resolves it; same disposition as TASK-779 which 1.7.0 fixed). The open ACs here were NOT individually completed in this 2.0.0 task — they are superseded by the released fix. Maintainer decision (Robert).
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): Bench evidence 2026-10-11/12 (Classic carrier + LOLIN S3 Mini, PIC16F1847 gateway 6.8, esp32-combo 2.0.0-alpha.418+fa2b89d), file C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md. Only the Classic (PIC path) half is covered, and only in part. AC#2 partial: GW=R via port 25238 gave the banner after 0.2 s, MQTT resetgateway=1 gave it after 1.74 s, no ESP reboot (TASK-1175 run: banner work on loopTask for all 6 triggers). No concurrent race exercised and no evaluate.py sole-owner gate run recorded. AC#4 partial: simulator start/stop x5 all HTTP 200, PIC still answered PR=A, bootcount unchanged at 4. The park itself was not instrumented. AC#7 partial: one ser2net client for 180 s, PR=A/M/V every 3 s, correct answers with no NG/SE (functional, not a load soak). Real gateway.hex 6.8 flash: 2..94 % over 42 s, Result code 0, Errors 0, Retries 0, no ESP reboot, MQTT still connected. No heap figures during the flash and no WS progress capture, so the heap-churn clause stays open. AC#3 (TX requeue under backpressure), AC#5 (WS dedupe + ADR-133 note) and AC#6 (ADR amendments) are not covered by this evidence. The task is already Done (closed fixed-by-release 2026-06-29). This note adds field data and checks no ACs.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -3,11 +3,11 @@ id: TASK-1071
 title: >-
   Make the OT frame-replay simulator work on OTDirect boards, not only the PIC
   path
-status: In Review
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-08-08 18:17'
-updated_date: '2026-10-01 04:28'
+updated_date: '2026-10-12 00:06'
 labels:
   - bug
   - tooling
@@ -27,7 +27,7 @@ The /api/v2/simulate file replay is bound to the PIC serial path and is silently
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 With simulation enabled on an OTDirect board and no PIC attached, replayed fixture lines reach processOT and appear as decoded OT frames in the debug log
-- [ ] #2 The replay drives the same decode, state and MQTT publish path as real frames, and the coverage gate output matches the 2.0.0 PIC-path baseline, every difference explained
+- [x] #2 The replay drives the same decode, state and MQTT publish path as real frames, and the coverage gate output matches the 2.0.0 PIC-path baseline, every difference explained
 - [x] #3 Replay still works unchanged on a board that does have a PIC; the PIC path is not regressed
 - [x] #4 /api/v2/simulate reports a state that reflects reality: enabling it on a board where replay cannot run must not report active, or must report why
 - [x] #5 The TASK-1070 coverage gate runs end to end against an OTDirect board: upload, start, capture, stop, compare
@@ -94,4 +94,12 @@ Maintainer decision (Robert, 2026-09-30): reword AC#2 to 'matches the 2.0.0 PIC-
 AC list rewritten with --acceptance-criteria to reword AC#2 per the maintainer decision; numbering unchanged. AC#1 and AC#3-#6 re-checked exactly as they were before the rewrite (their evidence is in the notes above). AC#2 stays open until the bench replay run.
 
 For the AC#2 bench comparison: since TASK-1185 (2.0.0-alpha.395) replayed lines are no boiler evidence. During a replay the retained otgw-firmware/boiler/unsupported_msgids topic and the /api/v2/otgw/ot-support verdicts no longer pick up the fixture's type-7 answers, and the replay no longer switches SAT simulation off. Decoded values, state, boiler_connected and every other MQTT topic are unchanged. A PIC-path baseline captured before alpha.395 differs from a new run in that topic only; TASK-1185 explains the difference.
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): 2026-10-12 AC#2 closed on the Classic-S3 bench (evidence: C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md, Phase 2.3). Board: OTGW Classic + LOLIN S3 Mini, PIC16F1847 gateway 6.8, esp32-combo 2.0.0-alpha.418+fa2b89d, MQTT on rig broker 192.168.88.32:1883. run_coverage_test.py --seconds 1000 on the PIC path: 3.15 fixture loops, 369 OT keys, 143 MsgIDs, 228 broker topics. Compared with the committed OTGW32 OT-Direct baseline (scripts/tests/baseline_coverage.json, commit 7186ab16e: 369 keys, 230 topics, recorded with a broker after TASK-1174/1185): every OT key is identical. There are exactly 2 differences, both MISSING MQTT topics on the PIC path: otgw32/flame_cycles_per_hour and otgw32/flame_duty_pct. Both are OT-Direct-only stats, published only from OTDirect.ino:2008/2010. Same-path clause: the replay (OTGW-Core.ino:3872, OTFRAME_SRC_REPLAY), real PIC frames (:755) and real OT-Direct frames (OTDirect.ino:750) all go through enqueueOTFrame() -> drainOTFrameQueue() -> processOT(). Caveat: the run was a PIC-path run against an OT-Direct baseline, not the reverse. The diff is symmetric. The same run also gives on-device evidence for AC#3 (PIC path not regressed).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The /api/v2/simulate file replay works on OTDirect boards, not only on the PIC path: replayed fixture lines reach processOT and drive the same decode, state and MQTT publish path as real frames, the simulate status no longer reports a replay that cannot run, and the TASK-1070 coverage gate runs end to end on an OTDirect board. Closing evidence for AC#2 (2026-10-12): the same fixture replayed on the Classic + LOLIN S3 Mini (PIC path, alpha.418 combo) and compared with the committed OTGW32 (OT-Direct) baseline gives 369 identical OT keys over 143 MsgIDs; the only differences are the two OT-Direct-only MQTT topics otgw32/flame_cycles_per_hour and otgw32/flame_duty_pct, which are expected to be absent on the PIC path. The PIC path itself was not regressed (replay and PIC commands both work on the same board, simulator toggled 5 times with the PIC answering afterwards). Evidence file: %LOCALAPPDATA%/OTGW-capture/classic-validation-20261011/EVIDENCE.md.
+<!-- SECTION:FINAL_SUMMARY:END -->

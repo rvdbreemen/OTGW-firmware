@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-14 20:30'
-updated_date: '2026-06-20 10:55'
+updated_date: '2026-10-12 00:05'
 labels: []
 dependencies: []
 ordinal: 82000
@@ -38,6 +38,8 @@ INSTRUMENTATION LANDED (commit bc84b9b7, 2.0.0-alpha.200). Loop-stall detector a
 ROOT-CAUSE HUNT (wf_79e88a89-6f8, full detail in TASK-879 notes). Top suspect for AC#1: synchronous SimpleTelnet/WiFiClient writes on the loop task (port 23 debug + port 25238 ser2net). NetworkClient::write blocks ~10s/write on a stalled/half-open client (1s select x 10 retries, no feedWatchDog); every Debug* macro + every OT-frame mirror funnels through it on the loop task; debug-all-on + alpha auto-enable makes the stream dense. OBSERVER-COUPLED: the stall exists only while a telnet/ser2net client is connected (SimpleTelnet::write early-returns at _connectedCount==0), and our capture is taken over telnet -> the AC#2 'dispatch alive but slow' is the AsyncTCP task being starved by the loop-task socket-write block, NOT a webserver-handler fault. a-priori suspects MQTT-broker-DNS + NTP-DNS ELIMINATED by code (MQTT disabled path returns before hostByName; NTP configTime is async). KILL-TEST to close AC#1/#2: power-cycle, connect NOTHING to 23/25238, curl http://<ip>/ -> floor vanishes confirms; persists -> reopen compute/LittleFS sweep. Fix touches vendored SimpleTelnet (read-only per policy) -> maintainer decision (availableForWrite gate + drop, or FreeRTOS ring-buffer offload).
 
 OBSOLETE (audit wp0vjoo5s): diagnostic stub. Its 'core-1 starvation' conclusion was MECHANISTICALLY OVERTURNED by TASK-879 (async_tcp prio10>loopTask prio1 preempts; real cause = lock-contention + telnet RX-timeout + LittleFS-FD/heap). The fix shipped under TASK-879 (AsyncSimpleTelnet a125fbf7, bounded OTStateLock, ADR-147 static-file gate 5a92b26e) and is live on HEAD. The combo browser re-capture field gate lives on TASK-879 (In Review).
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): Classic bench cross-check (2026-10-11/12, evidence: C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md). Board: OTGW Classic with a LOLIN S3 Mini (192.168.88.63), PIC gateway 6.8, firmware esp32-combo 2.0.0-alpha.418+fa2b89d, PIC path. The no-response bug did not reproduce. API routes answered normally: device/info OK, POST /api/v2/otgw/commands returned {"status":"queued"}, otdirect/overrides returned 503 by design. Phase 2.4 refresh storm (--workers 2,4,6,8, seed 1124), 3 runs: storm verdict PASS x3, 0 deaf windows, 0 mid-body stalls, 0 incomplete exchanges, hd_weback_abort 0, hd_webconn_503 total 5634 (gate by design), no reboot (bootcount 4), loop gap max 649 ms, hd_min_free_heap 18836. This supports AC#3 only in part, for the combo image on the Classic PIC path. Not evidenced: an explicit curl / returning 200 with index.html, a browser UI load or [net] 200 browser log (AC#4), the AsyncTCP startup outcome in the USB boot log (AC#1: the console showed only I2C NACK lines), reproduction of the original hang on OTGW32 board mode 2 (AC#2), and a build exit 0 plus evaluate --quick (AC#5). The task is already Done as resolved by successor TASK-879 / ADR-147. This run adds no evidence for the OT-Direct configuration.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

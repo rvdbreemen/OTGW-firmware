@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@rvdbreemen-claude'
 created_date: '2026-05-07 07:57'
-updated_date: '2026-05-07 15:48'
+updated_date: '2026-10-12 00:04'
 labels:
   - feat-mqtt-suffix-shape
   - mqtt
@@ -110,6 +110,8 @@ AC #14 parity check vs dev TASK-552 (commit 7c33e0c9):
 - Same suppression-branch collapse and canonical-row removal.
 - Same MQTT.md migration note structure.
 - Differences are exactly: file paths (MQTTHaDiscovery.cpp vs mqtt_configuratie.cpp), line numbers (1594/1598 vs 1242/1246), ADR cite (ADR-097 vs ADR-070), supersession chain (ADR-095 vs ADR-068), refines chain (ADR-096 vs ADR-069), and 2.0.0-specific consequence note about ESP32 RAM headroom. Content-equivalent — verified by manual diff comparison.
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): 2026-10-12 bench review against C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md (Classic carrier + LOLIN S3 Mini, PIC16F1847 gateway 6.8, esp32-combo 2.0.0-alpha.418+fa2b89d, broker 192.168.88.32). AC #13 stays unchecked because the run did not cover it. No ESP8266 or OTGW32 unit was tested, no CS= override was active, and no ADR-097 sibling-suffix topics (<id>_thermostat / <id>_boiler) were observed. The run did show these PIC-path MQTT results on ESP32-S3: (a) the discovery stat_t for connected/climate/dhw entities was OTGW/value/otgw-AC276ECE45D8/<name>; (b) OT replay for 1000 s gave 369 OT keys identical to the OT-Direct baseline, with only the OT-Direct-only flame_cycles_per_hour and flame_duty_pct topics missing; (c) after the TASK-410 retained-ghost injection and an MQTT reconnect, 0 retained ghosts were left. Also note that ESP8266 was dropped on dev, so the ESP8266 half of AC #13 cannot be closed on this line. AC #13 should be rewritten as a test on the Classic-S3 (PIC) path plus the OTGW32 (OT-Direct) path, with an active CS= override and a broker check for the _thermostat/_boiler sibling topics.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

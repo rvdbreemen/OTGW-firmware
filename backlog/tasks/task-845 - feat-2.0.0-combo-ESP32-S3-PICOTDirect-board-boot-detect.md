@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-08 21:30'
-updated_date: '2026-06-10 22:32'
+updated_date: '2026-10-12 00:04'
 labels: []
 dependencies: []
 ---
@@ -50,4 +50,6 @@ Field fix (alpha.169): LOLIN S3 Mini in OTGW Classic socket booted but parked in
 Pinout docs completed: all D1-mini footprint holes confirmed from official LOLIN S3 Mini pin diagram (A0=2, D0=4, D3=18, D4=16, D8=10). Boot-critical pins unchanged. Auxiliary-hole overlaps with OTGW32 map documented (button 18=I2C SDA, LED1 16=W5500 RST, LED2 4=1-Wire); Classic LEDs/button not driven in PIC mode today.
 
 Outcome: combo experiment retired after field testing (alpha.166-172). Runtime detection never converged in the field (portal starvation, pin-map iterations, unfed 0x26 watchdog). Superseded by ADR-126 / TASK-854: fixed esp32-classic build replaces the combo.
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): Bench validation 2026-10-11/12, Classic half only. Evidence: C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md. Hardware: OTGW Classic carrier + LOLIN S3 Mini (MAC ac:27:6e:ce:45:d8, 192.168.88.63), PIC16F1847 gateway 6.8. Firmware: esp32-combo 2.0.0-alpha.418+fa2b89d, app + fs flashed. AC#8 (Classic half): device/info reports hardware_type otgw-classic, hardwaremode PIC, otcommandinterface PIC and otdirectavailable false. /bootdetect.log shows boot#1-3 all `eMode=1 pic=1 mode=1 pro=0 RST=12 RX=44 TX=43 I2C=35/36`; those boots were the fs flash plus 2 RTS resets, not a power cycle. Auto mode (0) persists boardmode=1 after a positive PIC detect; this is by design, see OTGW-firmware.ino:405-412. AC#7 (REST half only): a REST POST of boardmode, followed by a separate POST /ReBoot, gave: mode 1 -> boot 5, PIC, setting 1. Mode 2 -> boot 6, corrected back to 1 by TASK-1031 recovery, PIC found. Mode 0 -> boot 7, PIC found, setting persisted as 1. Mode 3 was skipped (wrong pin map for this board). Still open: (a) the Web-UI override control, and proof that the override reboots by itself rather than through a separate /ReBoot; (b) the OTGW32/OT-Direct half of AC#8, including mode 2 actually taking effect. Doc drift: the comment at OTGW-firmware.ino:341-346 ('auto NEVER persists its verdict', TASK-947) is stale. Task bookkeeping: TASK-845 is marked Done with the outcome 'combo retired (ADR-126/TASK-854)', but the combo build exists again and was used here. The status and the outcome text need a maintainer review.
 <!-- SECTION:NOTES:END -->

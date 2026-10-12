@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-24 19:59'
-updated_date: '2026-04-25 14:19'
+updated_date: '2026-10-12 00:05'
 labels:
   - mqtt
   - ha-discovery
@@ -90,6 +90,8 @@ REFERENCE FILES (read-only):
 
 <!-- SECTION:NOTES:BEGIN -->
 Post-merge follow-up (commit 0331c0a1, 2026-04-25): TASK-410's brief named MQTTHaDiscovery.cpp:1038-1039 as the only discovery-side change. ADR-065's original call-site inventory also listed the climate composer (now MQTTHaDiscovery.cpp:2426) which prepended kPicSubtreePrefix to thermostat_connected for the Thermostat climate's mode_stat_t. That call-site was missed in the initial implementation and surfaced when the user explicitly asked whether the climate and DHW entities had been adapted. Fixed by replacing the hardcoded otgw-pic/ prefix with PSTR("/thermostat_connected") to match composeBinSensorPayload's new flag-0x00 output. DHW Control was already generic (mode_stat_t = /dhw_enable). AC #12 added to capture the runtime verification expectation. Lesson for future ADR amendments: when an ADR's call-site inventory enumerates discovery-side touches across multiple composers, copy that enumeration verbatim into the implementation task brief.
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): Bench evidence 2026-10-11/12 (C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md, Phase 2.2). Setup: Classic carrier + LOLIN S3 Mini, esp32-combo 2.0.0-alpha.418+fa2b89d, PIC path (PIC16F1847 gateway 6.8), rig Mosquitto 192.168.88.32:1883.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

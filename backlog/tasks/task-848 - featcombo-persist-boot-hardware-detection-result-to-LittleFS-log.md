@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-06-09 21:49'
-updated_date: '2026-06-09 22:10'
+updated_date: '2026-10-12 00:04'
 labels: []
 dependencies: []
 ---
@@ -31,6 +31,8 @@ The ADR-125 combo board logs its PIC/OTDirect boot-detection result via log_e to
 
 <!-- SECTION:NOTES:BEGIN -->
 Impl: appendBootDetectLog() in OTGW-firmware.ino (HAS_RUNTIME_HW_DETECT guard), called right after the log_e detection line. Writes /bootdetect.log newest-first, temp-swap trim at 30 lines (mirrors updateRebootLog). boot# parsed from prior newest entry, no extra counter. Build: esp8266+esp32 green via build.py; esp32-combo green via penv pio (build.py does NOT target the combo env). Fixed sscanf_P->sscanf (not defined on ESP32; bug-035). evaluate.py --quick: 0 failed, 97.1%. Committed c3df1160 under alpha.170. AC7 (field power-cycle on real combo hw) remains for field validation.
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): Bench evidence 2026-10-11/12 (C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md), OTGW Classic carrier + LOLIN S3 Mini (MAC ac:27:6e:ce:45:d8), PIC16F1847 gateway 6.8, esp32-combo 2.0.0-alpha.418+fa2b89d. After the fs flash and 2 RTS resets, /bootdetect.log held boot#1 t=2636ms, boot#2 t=2950ms, boot#3 t=2623ms. Each line read `eMode=1 pic=1 mode=1 pro=0 RST=12 RX=44 TX=43 I2C=35/36`, which is the correct PIC detection and the Classic pin map. Board-mode reboots (POST boardmode + /ReBoot) went on as boot#5 (mode 1) and boot#6 (mode 2, corrected to 1 at boot), both `eMode=1 pic=1 mode=1`. The boot counter stays monotonic and survives reboots. AC#7 is partly evidenced, Classic half only. Still open: (a) a real power cycle, since every boot here was an RTS/USB-CDC chip reset or a software reboot; (b) the OT-Direct (OTGW32) half on combo, because no OTGW32 boot appears in this evidence. Side note from the same run: the console `[combo] detect` log_e line does not appear on USB-CDC because platformMuteUart0Console() also silences it (TASK-850/TASK-1217). /bootdetect.log is therefore currently the only place the detection result is recorded.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-04-21 18:41'
-updated_date: '2026-04-21 21:26'
+updated_date: '2026-10-12 00:04'
 labels:
   - code-review
   - mqtt
@@ -55,6 +55,8 @@ queryNextPICsetting(): two early returns added after flash guards:
 Deferred queries retry on next 3s tick (picSettingsQueryIdx not incremented on early return).
 Build: python build.py --firmware passed (exit 0, no new warnings).
 AC4 (field log capture) left unchecked: requires hardware observation.
+
+2026-10-12 Classic-S3 bench validation (alpha.418 combo on OTGW Classic + LOLIN S3 Mini, PIC16F1847 gw 6.8): Bench evidence review 2026-10-12 (C:/Users/rvdbr/AppData/Local/OTGW-capture/classic-validation-20261011/EVIDENCE.md, Classic carrier + LOLIN S3 Mini, PIC16F1847 gateway 6.8, esp32-combo 2.0.0-alpha.418): AC#4 is NOT covered. The run checked PIC-path MQTT (6 TASK-410 retained ghosts gone after a reconnect; discovery stat_t paths; netem max loop gap 38 ms) and manual PR=A/M/V answers (REST queued; port 25238 for 180 s with no NG/SE). It made no timestamped capture of queryNextPIC PR-readout publishes against status_master/status_slave publishes in the first 60 s after broker connect, so it gives no 20 ms proximity result. The AC also concerns the 1.x ESP8266 line (1.4.1-beta field logs), and this bench ran 2.0.0. Closing AC#4 needs a 1.x capture-mqtt-debug transcript from boot with per-publish timestamps. Note that the task's status is already Done while AC#4 is still unchecked.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
