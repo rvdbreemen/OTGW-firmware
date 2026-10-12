@@ -3,11 +3,11 @@ id: TASK-1175
 title: >-
   PIC banner callback fwreportinfo() writes OTGWState and publishes MQTT from
   the PIC UART task (ADR-130 seam violation)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-09-30 08:45'
-updated_date: '2026-10-11 21:55'
+updated_date: '2026-10-12 00:00'
 labels:
   - bug
   - pic
@@ -110,9 +110,9 @@ FOLLOW-UPS (separate tasks; code reading, not bench-verified)
 - [x] #1 fwreportinfo() in src/OTGW-firmware/OTGW-Core.ino only records that a banner arrived: a volatile flag, optionally with a counter. Its body contains none of the following: a state.* write; any Debug*, OTDebug* or MQTTDebug* call; a String or *ToString() call; a sendMQTT*, WebSocket or reportOTGWEvent call; feedWatchDog(); any cmdqueue access.
 - [x] #2 A loop-side consumer called from drainOTFrameQueue() consumes the flag. It can sit inside reportPendingPICRxErrors(), which is called at OTGW-Core.ino:549. The consumer writes state.pic.sFwversion, sDeviceid and sType, emits the debug lines and calls sendMQTTversioninfo(). It clears the flag before applying, so a banner that completes in the meantime is handled on the next pass. processOT's banner branch (OTGW-Core.ino:5247-5279) is unchanged.
 - [x] #3 Static old-vs-fix check. evaluate.py::check_pic_uart_task_owns_serial, or a sibling gate, resolves every function passed to OTGWSerial.registerFirmwareCallback(). It FAILs when that function's comment-stripped body matches the forbidden set from AC1. The gate FAILs on dev a2a58ecf9, naming fwreportinfo (OTGW-Core.ino:5780-5791), and PASSes on the fix. It does not inspect fwupgradestep, fwupgradedone or picSerialDrainOnce. tests/test_evaluate.py gains one failing and one passing fixture, and 'python tests/test_evaluate.py' passes.
-- [ ] #4 Bench old-vs-fix check on a Classic PIC board running esp32-combo in PIC mode, with MQTT connected and the same task-name instrumentation in both builds. Triggers: 3x MQTT resetgateway=1 (at least 5 s apart) and 3x REST POST /api/v2/otgw/commands with body {'command':'PR=A'}. The OLD build (dev HEAD) logs the banner work on task picSerial; the FIX build logs it on loopTask. Both capture-mqtt-debug transcripts are attached and cited in the Final Summary.
-- [ ] #5 PR=A-only parity in the FIX build. After the REST PR=A trigger, these carry the PIC's real values: /api/v2/device/info picfwversion, picdeviceid and picfwtype, and the broker's otgw-pic/version, otgw-pic/deviceid and otgw-pic/firmwaretype. This proves the deferral keeps version detection on the path processOT does not handle.
-- [ ] #6 The picSerial task stack high-water mark is logged before and after the AC4 triggers in both builds. The OLD minimum is recorded in the task notes as the measured headroom. The FIX build shows no drop across the triggers.
+- [x] #4 Bench old-vs-fix check on a Classic PIC board running esp32-combo in PIC mode, with MQTT connected and the same task-name instrumentation in both builds. Triggers: 3x MQTT resetgateway=1 (at least 5 s apart) and 3x REST POST /api/v2/otgw/commands with body {'command':'PR=A'}. The OLD build (dev HEAD) logs the banner work on task picSerial; the FIX build logs it on loopTask. Both capture-mqtt-debug transcripts are attached and cited in the Final Summary.
+- [x] #5 PR=A-only parity in the FIX build. After the REST PR=A trigger, these carry the PIC's real values: /api/v2/device/info picfwversion, picdeviceid and picfwtype, and the broker's otgw-pic/version, otgw-pic/deviceid and otgw-pic/firmwaretype. This proves the deferral keeps version detection on the path processOT does not handle.
+- [x] #6 The picSerial task stack high-water mark is logged before and after the AC4 triggers in both builds. The OLD minimum is recorded in the task notes as the measured headroom. The FIX build shows no drop across the triggers.
 - [x] #7 The comments at OTGW-Core.ino:1035-1036, OTGW-Core.ino:1181-1182 and OTGW-firmware.ino:775, and the evaluate.py docstring at :3262-3265, describe the actual flow: PR=A replies reach handlePRresponse, which ignores register A. The version is recorded through the banner callback and the loop consumer. The firmware callback executes inside OTGWSerial::read() on the PIC task.
 - [x] #8 build.bat builds esp32-combo, esp32-classic and esp32 (HAS_PIC=0), each with a SUCCESS line and a fresh firmware.bin. 'python evaluate.py' reports no new FAIL. The prerelease tag is bumped with bin/bump-prerelease.sh in the same commit.
 <!-- AC:END -->
@@ -274,4 +274,17 @@ Follow-up #1 of the description (the 60 s PR=A probe cannot set bAvailable) is f
 2026-10-11: un-parked by the maintainer. The Classic-S3 rig is back on the bench (COM8, 192.168.88.63, MAC ac:27:6e:ce:45:d8, alpha.364, PIC16F1847 gateway 6.8). Bench validation plan: %LOCALAPPDATA%/OTGW-capture/classic-validation-20261011/.
 
 2026-10-11 AC#4 wording, approved by the maintainer: 'OLD build (dev HEAD)' predates the fix. OLD now means the commit before the fix, cc4d4addf^ (alpha.382); FIX = dev HEAD (alpha.418). Instrumentation identical in both (test-only, never committed).
+
+2026-10-12 bench old-vs-fix, Classic + LOLIN S3 Mini (COM8, 192.168.88.63), PIC16F1847 gateway 6.8, esp32-combo in PIC mode, MQTT on the rig broker 192.168.88.32. Test-only instrumentation, identical in both builds and never committed (diffs: %LOCALAPPDATA%/OTGW-capture/classic-validation-20261011/t1175-instrumentation-{old,fix}.diff): a 'T1175 banner work on task=<pcTaskGetName> callbacks=<n>' line where the banner work runs (fwreportinfo on OLD, applyPICBannerInfo on FIX; on FIX the callback only bumps the counter), and every 10 s 'T1175 picSerial HWM=<uxTaskGetStackHighWaterMark(xTaskGetHandle("picSerial"))>'. Triggers in both runs: 3x MQTT OTGW/set/otgw-AC276ECE45D8/resetgateway=1 about 8 s apart, then 3x REST POST /api/v2/otgw/commands {"command":"PR=A"} about 8 s apart, during a 240 s capture-mqtt-debug.bat run.
+- OLD = cc4d4addf^ (2.0.0-alpha.382+b2c418e): all 6 triggers log 'banner work on task=picSerial' (callbacks 3..8). picSerial HWM = 884 bytes from the first tick after the first trigger to the end (the two boot banners had already run on picSerial). Transcript: t1175-old/20261012-014914*/transcript-*.txt.
+- FIX = dev HEAD 4918d4b (alpha.418) + instrumentation: all 6 triggers log 'banner work on task=loopTask' (callbacks 3..8). picSerial HWM = 2812 bytes before, during and after the triggers (01:34:01 to 01:35:41); it later dropped to 2668 at 01:35:51, more than a minute after the last trigger, unrelated to the banner path. Transcript: t1175-fix/20261012-013358/transcript-*.txt.
+- AC#5 parity on FIX: device/info picfwversion 6.8, picdeviceid pic16f1847, picfwtype gateway; broker received OTGW/value/otgw-AC276ECE45D8/otgw-pic/version 6.8, otgw-pic/deviceid pic16f1847 and otgw-pic/firmwaretype gateway (8 times each in the transcript).
+- Measured headroom: banner work on the PIC task costs about 1.9 KB of its 4096-byte stack (OLD minimum 884 B free vs FIX 2812 B).
+Bench restored to a clean alpha.418+4918d4b (image contains no T1175 string).
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+The PIC banner callback no longer does OTGWState writes, telnet output or MQTT publishes on the PIC UART task (ADR-130 seam): fwreportinfo() only raises a flag and applyPICBannerInfo() does the work on the loop (code since alpha.383, static gate in evaluate.py). Bench proof on the Classic + LOLIN S3 Mini with identical test-only instrumentation, 3x MQTT resetgateway and 3x REST PR=A per build: OLD (alpha.382) did the banner work on task picSerial with only 884 bytes of stack left; FIX (alpha.418) does it on loopTask, the picSerial high-water mark stays at 2812 bytes across the triggers, and device/info plus the broker topics otgw-pic/version|deviceid|firmwaretype carry the PIC's real values (6.8 / pic16f1847 / gateway).
+<!-- SECTION:FINAL_SUMMARY:END -->
