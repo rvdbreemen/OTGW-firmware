@@ -203,6 +203,7 @@ The `otd*` fields are only present when `otdirectavailable` is `true` (OTGW32 bu
 
 The ESP32-S3 chip/memory fields feed the Debug screen (all integers, bytes unless noted):
 - `psram_found`: `1` when PSRAM is present, `0` when absent
+- `status_pixel_gpio`: GPIO of the LOLIN on-board RGB status pixel the firmware drives (`47` on an S3 Mini, `8` on an S3 Mini Pro), `0` when none, for example on an OTGW32 (combo and Classic builds only)
 - `psram_size`: total PSRAM size (0 when absent)
 - `psram_free`: free PSRAM
 - `flash_size`: flash chip size

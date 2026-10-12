@@ -112,7 +112,7 @@ Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN
   - `GET /api/v2/device/time` → `sendDeviceTimeV2()`
   - `GET /api/v2/device/crashlog` → `sendDeviceCrashLog()`
 - **Auth**: Not required
-- **Notes**: `device/info` is extended (TASK-995) with chip-capability fields for the v2 Debug screen: `psram_found`, `psram_size`, `psram_free`, `flash_size`, `internal_free`, `internal_maxblk`, and a best-effort ESP32-S3 package part number `chip_model_est` (extrapolated from flash + PSRAM).
+- **Notes**: `device/info` is extended (TASK-995) with chip-capability fields for the v2 Debug screen: `psram_found`, `psram_size`, `psram_free`, `flash_size`, `internal_free`, `internal_maxblk`, and a best-effort ESP32-S3 package part number `chip_model_est` (extrapolated from flash + PSRAM). On combo and Classic builds it also carries `status_pixel_gpio` (TASK-1221): the GPIO of the LOLIN RGB status pixel the firmware drives, 0 when none.
 
 #### `void handleFlash()`
 - **Location**: `restAPI.ino:261–268`

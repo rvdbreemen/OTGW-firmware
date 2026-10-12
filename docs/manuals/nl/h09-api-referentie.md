@@ -371,7 +371,7 @@ Apparaatinformatie opvragen (firmware, hardware, netwerk). Geen authenticatie ve
 }
 ```
 
-De ESP32-S3 chip- en geheugenvelden voeden het Debug-scherm (alle integers, bytes tenzij anders vermeld): `psram_found` (`1` als PSRAM aanwezig is, `0` als afwezig), `psram_size` (totale PSRAM, 0 indien afwezig), `psram_free` (vrije PSRAM), `flash_size` (grootte flash-chip), `internal_free` (vrij intern, niet-PSRAM heap), `internal_maxblk` (grootste vrije interne heap-blok) en `chip_model_est` (string; best-effort ESP32-S3 package-onderdeelnummer afgeleid uit flash + PSRAM, bijvoorbeeld `"ESP32-S3FH4R2"`, of `"ESP32-S3FN8"` zonder PSRAM).
+De ESP32-S3 chip- en geheugenvelden voeden het Debug-scherm (alle integers, bytes tenzij anders vermeld): `psram_found` (`1` als PSRAM aanwezig is, `0` als afwezig), `status_pixel_gpio` (GPIO van de RGB-statuspixel op de LOLIN die de firmware aanstuurt, `47` op een S3 Mini of `8` op een S3 Mini Pro, `0` als er geen is; alleen combo- en Classic-builds), `psram_size` (totale PSRAM, 0 indien afwezig), `psram_free` (vrije PSRAM), `flash_size` (grootte flash-chip), `internal_free` (vrij intern, niet-PSRAM heap), `internal_maxblk` (grootste vrije interne heap-blok) en `chip_model_est` (string; best-effort ESP32-S3 package-onderdeelnummer afgeleid uit flash + PSRAM, bijvoorbeeld `"ESP32-S3FH4R2"`, of `"ESP32-S3FN8"` zonder PSRAM).
 
 Op OTGW32-hardware: het veld `otdirectavailable` is `true` en aanvullende `otd*`-velden zijn aanwezig (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`).
 

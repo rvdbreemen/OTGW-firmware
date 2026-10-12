@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.419
+**  Version  : v2.0.0-alpha.420
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -321,6 +321,10 @@ void setup() {
   // portal opens. I2C is already up (top of setup, before the watchdog disarm).
   initOLED();
 
+#if HAS_STATUS_PIXEL
+  startStatusPixel();  // before startWiFi(): the config portal blocks setup()
+#endif
+
   // Connect to and initialise WiFi network
   setLed(LED1, ON);
   SetupDebugln(F("Attempting to connect to WiFi network\r"));
@@ -562,6 +566,67 @@ void setup() {
   state.bSetupComplete = true; // ADR-036: allow doBackgroundTasks() to run service handlers
 }
 //=====================================================================
+
+//===[ LOLIN RGB status pixel ]===
+
+#if HAS_STATUS_PIXEL
+#include <Ticker.h>
+
+// WiFi status on the LOLIN's on-board WS2812B (TASK-1221), flashing at 1 Hz:
+// RED = not connected, PURPLE = an access point is up (config portal or AP
+// fallback), GREEN = connected. A Ticker (esp_timer task) drives it, because
+// the WiFiManager config portal blocks setup() and loop() never runs then.
+// The Ticker callback is the only writer to the pixel.
+#define STATUS_PIXEL_LEVEL     40    // channel brightness 0..255
+#define STATUS_PIXEL_HALF_MS   500   // on/off half period
+
+static Ticker  statusPixelTicker;
+static uint8_t statusPixelPin      = 0;
+static bool    statusPixelRgbOrder = false;
+static bool    statusPixelLit      = false;
+
+static void statusPixelTick() {
+  statusPixelLit = !statusPixelLit;
+  uint8_t r = 0, g = 0, b = 0;
+  if (statusPixelLit) {
+    if (WiFi.getMode() & WIFI_MODE_AP) {
+      r = STATUS_PIXEL_LEVEL;
+      b = STATUS_PIXEL_LEVEL;
+    } else if (WiFi.status() == WL_CONNECTED) {
+      g = STATUS_PIXEL_LEVEL;
+    } else {
+      r = STATUS_PIXEL_LEVEL;
+    }
+  }
+  platformPixelWrite(statusPixelPin, statusPixelRgbOrder, r, g, b);
+}
+
+// Called once from setup() before startWiFi(). Only a LOLIN has in-package
+// PSRAM; the OTGW32 module has none, so the pixel stays off there.
+void startStatusPixel() {
+  if (!psramFound()) return;
+#if HAS_RUNTIME_HW_DETECT
+  const bool pro = state.hw.bClassicPro;
+#else
+  const bool pro = false;  // the fixed Classic target maps the plain S3 Mini
+#endif
+  if (pro) {
+    pinMode(PIN_PIXEL_PRO_POWER, OUTPUT);
+    digitalWrite(PIN_PIXEL_PRO_POWER, HIGH);
+    statusPixelPin      = PIN_PIXEL_PRO;
+    statusPixelRgbOrder = false;
+  } else {
+    statusPixelPin      = PIN_PIXEL_MINI;
+    statusPixelRgbOrder = true;
+  }
+  SetupDebugf(PSTR("Status pixel: GPIO%u (%s)\r\n"), (unsigned)statusPixelPin,
+              pro ? "S3 Mini Pro" : "S3 Mini");
+  statusPixelTicker.attach_ms(STATUS_PIXEL_HALF_MS, statusPixelTick);
+}
+
+// GPIO of the driven pixel for /api/v2/device/info, 0 when none is driven.
+uint8_t statusPixelGpio() { return statusPixelPin; }
+#endif
 
 //===[ blink status led ]===
 

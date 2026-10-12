@@ -293,6 +293,16 @@ De firmware gebruikt status-LEDs om de apparaatstatus aan te geven. Op ESP32-bor
 | Beide LEDs uit (normale werking) | WiFi verbonden, OpenTherm-verkeer actief. LEDs worden alleen kort gebruikt voor verwerkingsindicatie. |
 | Snelle knipperingen tijdens opstarten | Setup-fase. Drie snelle knipperingen signaleren voltooiing van een setup-stap. |
 
+Een OTGW Classic met een LOLIN S3 Mini of S3 Mini Pro toont de WiFi-status ook met de RGB-pixel op de LOLIN. Die knippert één keer per seconde (de instelling `LED blink` heeft er geen invloed op):
+
+| Kleur pixel | Betekenis |
+|---|---|
+| Rood | WiFi niet verbonden. |
+| Paars | Er staat een accesspoint open: het WiFi-configuratieportaal, of de AP-fallback als het opgeslagen netwerk bij het opstarten onbereikbaar is. Maak daarmee verbinding om WiFi in te stellen. |
+| Groen | WiFi verbonden. |
+
+De OTGW32 heeft zo'n pixel niet. `/api/v2/device/info` meldt de aangestuurde pixel-GPIO als `status_pixel_gpio` (`0` als er geen is).
+
 De fysieke OTGW-print heeft ook indicator-LEDs die door de PIC worden aangestuurd:
 - **Groene LED**: PIC draait en communiceert.
 - **Gele LED**: Boilercommunicatie actief.

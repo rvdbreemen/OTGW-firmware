@@ -376,6 +376,12 @@ inline void platformMuteUart0Console() {
   freopen("/dev/null", "w", stderr);
 }
 
+// One WS2812-style RGB pixel through the core's RMT driver (TASK-1221).
+// rgbOrder selects the LOLIN S3 Mini's RGB wiring; false = the common GRB.
+inline void platformPixelWrite(uint8_t pin, bool rgbOrder, uint8_t r, uint8_t g, uint8_t b) {
+  rgbLedWriteOrdered(pin, rgbOrder ? LED_COLOR_ORDER_RGB : LED_COLOR_ORDER_GRB, r, g, b);
+}
+
 // Hardware random
 inline uint32_t platformHardwareRandom() {
   return esp_random();

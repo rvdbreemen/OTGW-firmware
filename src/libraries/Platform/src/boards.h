@@ -182,6 +182,11 @@ typedef uint16_t SAT_RING_IDX_T;
 #define HAS_LEDC_LED      1    // S3 ledc PWM dimming, same as OTGW32
 // LED PWM brightness (ledc, 8-bit; active-LOW LEDs use output inversion)
 #define LED_BRIGHTNESS    5
+// LOLIN on-board RGB pixel as WiFi status (TASK-1221); same pins as the combo.
+#define HAS_STATUS_PIXEL     1
+#define PIN_PIXEL_MINI       47   // S3 Mini, colour order RGB
+#define PIN_PIXEL_PRO        8    // S3 Mini Pro, colour order GRB (core default)
+#define PIN_PIXEL_PRO_POWER  7    // S3 Mini Pro pixel power enable (HIGH = on)
 
 // SAT per-platform buffer sizing — ESP32-S3 SRAM budget (same as OTGW32).
 #define SAT_WIN4H_SIZE          360
@@ -295,6 +300,17 @@ typedef uint16_t SAT_RING_IDX_T;
   #define PRO_IMU_I2C_ADDR_HI      0x6B  // QMI8658C, SA0 high
   #define PRO_IMU_WHOAMI_REG       0x00  // WHO_AM_I register
   #define PRO_IMU_WHOAMI_VALUE     0x05  // QMI8658 chip id
+
+  // ---- LOLIN on-board RGB pixel (WS2812B) as WiFi status (TASK-1221) -------
+  // Driven only on a LOLIN S3 Mini / S3 Mini Pro, never on an OTGW32. The LOLIN
+  // modules carry in-package PSRAM (ESP32-S3FH4R2); the OTGW32 module has none
+  // (ESP32-S3FN4), so psramFound() tells them apart before the WiFi portal,
+  // which runs ahead of PIC detection. Pins and colour order from the core
+  // variants lolin_s3_mini / lolin_s3_mini_pro (pins_arduino.h).
+  #define HAS_STATUS_PIXEL         1
+  #define PIN_PIXEL_MINI           47   // S3 Mini, colour order RGB
+  #define PIN_PIXEL_PRO            8    // S3 Mini Pro, colour order GRB (core default)
+  #define PIN_PIXEL_PRO_POWER      7    // S3 Mini Pro pixel power enable (HIGH = on)
 #endif
 
 // HAS_RUNTIME_HW_DETECT: 1 only on the combo board class (ADR-127); every
@@ -302,6 +318,11 @@ typedef uint16_t SAT_RING_IDX_T;
 // code can gate on it unconditionally.
 #ifndef HAS_RUNTIME_HW_DETECT
 #define HAS_RUNTIME_HW_DETECT 0
+#endif
+
+// HAS_STATUS_PIXEL: 1 only on the combo (LOLIN RGB pixel, TASK-1221).
+#ifndef HAS_STATUS_PIXEL
+#define HAS_STATUS_PIXEL 0
 #endif
 
 /***************************************************************************

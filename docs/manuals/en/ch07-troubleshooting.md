@@ -139,6 +139,16 @@ The firmware drives status LEDs to indicate the device state. On ESP32 boards (O
 | Both LEDs off (normal operation) | WiFi connected, OpenTherm traffic flowing. LEDs are only used for brief blinks during processing. |
 | Rapid blinks during boot | Setup phase. Three quick blinks signal completion of a setup step. |
 
+An OTGW Classic with a LOLIN S3 Mini or S3 Mini Pro also uses the LOLIN's on-board RGB pixel to show the WiFi state. It flashes once per second (the `LED blink` setting does not affect it):
+
+| Pixel colour | Meaning |
+|---|---|
+| Red | WiFi not connected. |
+| Purple | An access point is open: the WiFi config portal, or the AP fallback when the saved network is unreachable at boot. Connect to it to configure WiFi. |
+| Green | WiFi connected. |
+
+The OTGW32 has no such pixel. `/api/v2/device/info` reports the driven pixel GPIO as `status_pixel_gpio` (`0` when none).
+
 The physical OTGW board itself has indicator LEDs driven by the PIC:
 - **Green LED**: PIC is running and communicating.
 - **Yellow LED**: Boiler communication active.

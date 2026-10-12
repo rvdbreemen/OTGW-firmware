@@ -242,7 +242,7 @@ Returns hardware and platform information. No authentication required.
 }
 ```
 
-The ESP32-S3 chip and memory fields feed the Debug screen (all integers, bytes unless noted): `psram_found` (`1` when PSRAM is present, `0` when absent), `psram_size` (total PSRAM, 0 when absent), `psram_free` (free PSRAM), `flash_size` (flash chip size), `internal_free` (free internal, non-PSRAM heap), `internal_maxblk` (largest free internal heap block), and `chip_model_est` (string; best-effort ESP32-S3 package part number extrapolated from flash + PSRAM, for example `"ESP32-S3FH4R2"`, or `"ESP32-S3FN8"` when no PSRAM).
+The ESP32-S3 chip and memory fields feed the Debug screen (all integers, bytes unless noted): `psram_found` (`1` when PSRAM is present, `0` when absent), `status_pixel_gpio` (GPIO of the LOLIN on-board RGB status pixel the firmware drives, `47` on an S3 Mini or `8` on an S3 Mini Pro, `0` when none; combo and Classic builds only), `psram_size` (total PSRAM, 0 when absent), `psram_free` (free PSRAM), `flash_size` (flash chip size), `internal_free` (free internal, non-PSRAM heap), `internal_maxblk` (largest free internal heap block), and `chip_model_est` (string; best-effort ESP32-S3 package part number extrapolated from flash + PSRAM, for example `"ESP32-S3FH4R2"`, or `"ESP32-S3FN8"` when no PSRAM).
 
 On OTGW32 hardware: the `otdirectavailable` field is `true`, and additional `otd*` fields are included (`otdmode`, `otdbypass`, `otdmonitor`, `otdmaster`, `otdstepup`, `otdthermostat`, `otdsetback`, `otdschedtotal`, `otdschedactive`, `otdscheddisabled`, `otdoverrides`). On standard ESP8266+PIC builds, only `otdirectavailable: false` is present.
 

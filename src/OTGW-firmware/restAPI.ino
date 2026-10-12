@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.419
+**  Version  : v2.0.0-alpha.420
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3295,6 +3295,9 @@ void sendDeviceInfoV2()
     // part number extrapolated from flash+PSRAM (FH<flash>R<psram> when PSRAM is
     // present = in-package flash + quad PSRAM; FN<flash> when absent). Labeled "est".
     je.field(F("psram_found"),    (int32_t)(psramFound() ? 1 : 0));
+#if HAS_STATUS_PIXEL
+    je.field(F("status_pixel_gpio"), (int32_t)statusPixelGpio());  // TASK-1221: 0 = no LOLIN pixel driven
+#endif
     je.field(F("psram_size"),     (int32_t)ESP.getPsramSize());
     je.field(F("psram_free"),     (int32_t)ESP.getFreePsram());
     je.field(F("flash_size"),     (int32_t)ESP.getFlashChipSize());
