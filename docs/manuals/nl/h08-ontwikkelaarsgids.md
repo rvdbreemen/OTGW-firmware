@@ -218,10 +218,10 @@ Gebruik deze vlaggen in conditionele compilatie:
 
 #### W5500-runtimedetectie
 
-`HAS_ETH_CAPABLE=1` betekent dat het boardontwerp een W5500-module bevat, maar de module hoeft niet op elke unit fysiek aanwezig te zijn. Bij het opstarten leest `probeW5500()` in `Ethernet.ino` het VERSION-register van de W5500 via SPI:
+`HAS_ETH_CAPABLE=1` betekent dat het boardontwerp een W5500-module bevat, maar de module hoeft niet op elke unit fysiek aanwezig te zijn. Bij het opstarten start `initEthernet()` in `Ethernet.ino` de W5500-driver op dezelfde manier als de OT-Thing-referentie (`Ethernet.init()` + `Ethernet.begin()`). De ESP-IDF-driver reset de chip bij installatie en leest het VERSION-register tot 100 ms lang:
 
-- Als het register de verwachte waarde teruggeeft, wordt `state.hw.bEthernetPresent` op `true` gezet en wordt Ethernet geïnitialiseerd.
-- Als het lezen mislukt of een onverwachte waarde teruggeeft, wordt `state.hw.bEthernetPresent` op `false` gezet en draait de firmware in WiFi-only modus.
+- Accepteert de driver de chip, dan geeft `Ethernet.hardwareStatus()` `EthernetHardwareFound` terug, wordt `state.hw.bEthernetPresent` op `true` gezet en blijft Ethernet geïnitialiseerd, met of zonder kabel.
+- Mislukt de driverinstallatie, dan wordt `state.hw.bEthernetPresent` op `false` gezet en draait de firmware in WiFi-only modus.
 
 Er is geen gebruikersconfiguratie vereist. `loopEthernet()` bewaakt zichzelf met `if (!state.hw.bEthernetPresent) return;` en doet niets wanneer er geen hardware aanwezig is.
 

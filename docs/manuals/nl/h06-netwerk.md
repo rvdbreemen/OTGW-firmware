@@ -68,7 +68,7 @@ Wired Ethernet is beschikbaar op ESP32-boards met een W5500 SPI Ethernet-control
 
 #### 6.2.1 Hardwaredetectie
 
-De firmware leest bij het opstarten het SPI VERSION-register (adres 0x0039) van de W5500. Als het register 0x04 retourneert, wordt de chip herkend als W5500 en wordt Ethernet-ondersteuning geactiveerd. Er is geen aparte instelling nodig: als de chip aanwezig en correct bedraad is, wordt hij automatisch gebruikt.
+De firmware start bij het opstarten de W5500-driver. Die reset de chip en controleert het SPI VERSION-register (adres 0x0039, verwacht 0x04). Slaagt die controle, dan wordt de chip herkend als W5500 en wordt Ethernet-ondersteuning geactiveerd, ook zonder aangesloten kabel. Er is geen aparte instelling nodig: als de chip aanwezig en correct bedraad is, wordt hij automatisch gebruikt.
 
 #### 6.2.2 GPIO-aansluitingen
 

@@ -179,7 +179,7 @@
 - **Parameters**: None
 - **Return Type**: `void`
 - **Description**: 
-  Called once from `setup()` on ESP32 boards with W5500 hardware. Probes W5500 via SPI VERSION register, derives a locally-administered MAC from ESP32 eFuse, attempts DHCP (1-second timeout for fast boot). If successful, switches WiFi off and initializes Ethernet as primary network interface. If W5500 present but no link, remains on WiFi.
+  Called once from `setup()` on ESP32 boards with W5500 hardware. Starts the SPI bus, derives a locally-administered MAC from ESP32 eFuse, starts the W5500 driver and attempts DHCP (1-second timeout for fast boot). Sets `state.hw.bEthernetPresent` from `Ethernet.hardwareStatus() == EthernetHardwareFound`: the ESP-IDF driver install resets the chip and polls VERSIONR for up to 100 ms, so presence is known without a cable (TASK-1220; same sequence as the OT-Thing reference). If successful, switches WiFi off and initializes Ethernet as primary network interface. If W5500 present but no link, remains on WiFi.
 
 #### `void loopEthernet(void)`
 - **Location**: `Ethernet.ino` (guarded by `HAS_ETH_CAPABLE`)
@@ -187,13 +187,6 @@
 - **Return Type**: `void`
 - **Description**: 
   Automatic WiFi ↔ Ethernet failover monitor called from `doBackgroundTasks()` every 5 seconds (if W5500 present, TASK-581). Monitors cable plug/unplug via `Ethernet.linkStatus()`. On cable insertion, attempts DHCP (2-second timeout) and switches to Ethernet via `switchToEthernet()`. On cable removal, falls back to WiFi via `switchToWiFi()`. Calls `Ethernet.maintain()` to keep DHCP lease alive when on Ethernet. The mode-transition MQTT publish (announcing the new IP/MAC under `otgw-firmware/network_mode` etc.) is deferred via a pending-publish flag until the MQTT reconnect completes — `loopEthernet()` fires it on the next iteration once `MQTTclient.connected()` returns true.
-
-#### `bool probeW5500(void)` (static)
-- **Location**: `Ethernet.ino:50-78`
-- **Parameters**: None
-- **Return Type**: `bool`
-- **Description**: 
-  Hardware detection via raw SPI. Resets W5500 (pin LOW/HIGH), initializes SPI bus, reads VERSION register (address 0x0039) from Common Register block. Returns true if version register reads 0x04 (W5500 silicon). Non-invasive: works without cable present.
 
 #### `bool startEthernet(uint16_t dhcpTimeoutMs)` (static)
 - **Location**: `Ethernet.ino:85-119`
@@ -468,7 +461,7 @@ graph TB
     subgraph "Ethernet Support (ESP32+W5500)"
         T["initEthernet()"]
         U["loopEthernet()"]
-        V["probeW5500()"]
+        V["W5500 driver install (Ethernet.hardwareStatus())"]
         W["startEthernet()"]
         X["switchToEthernet() / switchToWiFi()"]
         Y["Ethernet.linkStatus()"]

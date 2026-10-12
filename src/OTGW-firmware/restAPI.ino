@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.418
+**  Version  : v2.0.0-alpha.419
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4124,12 +4124,12 @@ void sendDeviceSettings()
   addInt(F("otdventsetpoint"),      settings.otd.iVentSetpoint, "i", 0, 100);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
-  // --- Ethernet settings (only when a W5500 was actually probed) ---
+  // --- Ethernet settings (only when a W5500 was actually detected) ---
   // The driver is always compiled in on Ethernet-capable boards, but on the
   // combo running in PIC/Classic mode there is no W5500 (initEthernet() is
-  // skipped, probeW5500() never runs) so bEthernetPresent stays false. Gate the
+  // skipped, the W5500 driver never starts) so bEthernetPresent stays false. Gate the
   // EXPOSURE on that runtime fact (TASK-865.18): a Classic-mode combo then sees
-  // no dead Ethernet fields, while a real OTGW32 (probe succeeded) still does.
+  // no dead Ethernet fields, while a real OTGW32 (W5500 found) still does.
   // Omitting "ethstaticip" here keeps the whole eth UI section out of the web
   // page — index.js only renders it when that trigger key is present.
   if (state.hw.bEthernetPresent) {

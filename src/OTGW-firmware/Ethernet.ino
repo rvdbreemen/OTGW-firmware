@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : Ethernet.ino
-**  Version  : v2.0.0-alpha.418
+**  Version  : v2.0.0-alpha.419
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -47,44 +47,12 @@ static void deriveEthMAC() {
 }
 
 //=======================================================================
-// Probe the W5500 VERSION register (0x0039) via raw SPI.
-// Returns true if the chip responds with 0x04 (W5500 silicon).
-// This works without a cable — pure hardware detection in ~1ms.
-//=======================================================================
-static bool probeW5500() {
-  // Hardware reset
-  pinMode(PIN_SPI_RST, OUTPUT);
-  digitalWrite(PIN_SPI_RST, LOW);
-  delayMicroseconds(500);
-  digitalWrite(PIN_SPI_RST, HIGH);
-  delay(2);  // W5500 needs ~1ms after reset for PLL lock
-
-  // Init SPI bus
-  ethSPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
-
-  // Read VERSION register (0x0039) from Common Register block
-  // W5500 SPI frame: [addr_hi][addr_lo][control_byte][data...]
-  // Control byte for Common Register, Read, Variable-length: 0x00
-  pinMode(PIN_SPI_CS, OUTPUT);
-  ethSPI.beginTransaction(SPISettings(1000000, MSBFIRST, SPI_MODE0));
-  digitalWrite(PIN_SPI_CS, LOW);
-  ethSPI.transfer(0x00);   // address high byte
-  ethSPI.transfer(0x39);   // address low byte
-  ethSPI.transfer(0x00);   // control: Common block, Read, VDM
-  uint8_t ver = ethSPI.transfer(0x00);  // read VERSION
-  digitalWrite(PIN_SPI_CS, HIGH);
-  ethSPI.endTransaction();
-
-  DebugTf(PSTR("W5500 VERSION register: 0x%02X (%s)\r\n"),
-          ver, (ver == 0x04) ? "W5500 found" : "not found");
-
-  return (ver == 0x04);
-}
-
-//=======================================================================
 // Initialize the Ethernet library and attempt DHCP.
-// Called once at boot if probeW5500() succeeds, and again on hot-plug.
+// Called once at boot, and again on hot-plug.
 // Returns true if DHCP succeeds and a link is present.
+// The first call installs the ESP-IDF W5500 driver, which resets the chip
+// (RST pin + MR.RST) and polls VERSIONR for up to 100 ms before it accepts
+// it; Ethernet.hardwareStatus() reports the outcome, cable or not.
 //=======================================================================
 static bool startEthernet(uint16_t dhcpTimeoutMs) {
   w5500Driver.setSPI(ethSPI);
@@ -169,22 +137,25 @@ static void switchToWiFi() {
 
 //=======================================================================
 // initEthernet() — called once from setup() after I2C init.
-// 1. Probes W5500 via SPI VERSION register
-// 2. If found, derives MAC and attempts DHCP (1s timeout)
+// Same sequence as the OT-Thing reference (main.cpp setup()):
+// 1. Starts the SPI bus and derives the MAC
+// 2. Starts the W5500 driver and attempts DHCP (1s timeout); the driver
+//    install verifies the chip, so presence is known even without a cable
 // 3. If cable is in and DHCP succeeds, switches away from WiFi
 //=======================================================================
 void initEthernet() {
-  // Step 1: hardware probe
-  state.hw.bEthernetPresent = probeW5500();
-  if (!state.hw.bEthernetPresent) return;
-
-  // Step 2: derive MAC
+  ethSPI.begin(PIN_SPI_SCK, PIN_SPI_MISO, PIN_SPI_MOSI);
   deriveEthMAC();
   DebugTf(PSTR("Ethernet MAC: %02X:%02X:%02X:%02X:%02X:%02X\r\n"),
           ethMac[0], ethMac[1], ethMac[2], ethMac[3], ethMac[4], ethMac[5]);
 
-  // Step 3: try DHCP (1s timeout — fast boot)
-  if (startEthernet(1000)) {
+  bool linkReady = startEthernet(1000);
+  state.hw.bEthernetPresent = (Ethernet.hardwareStatus() == EthernetHardwareFound);
+  DebugTf(PSTR("Ethernet: W5500 %s\r\n"),
+          state.hw.bEthernetPresent ? "found" : "not found");
+  if (!state.hw.bEthernetPresent) return;
+
+  if (linkReady) {
     switchToEthernet();
   } else {
     DebugTln(F("Ethernet: W5500 present but no link/DHCP — staying on WiFi"));

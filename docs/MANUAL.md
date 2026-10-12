@@ -1658,10 +1658,10 @@ Use these flags in conditional compilation:
 
 #### W5500 Runtime Detection
 
-`HAS_ETH_CAPABLE=1` means the board design includes a W5500 module header, but the module may not be physically installed on every unit. At boot, `probeW5500()` in `Ethernet.ino` reads the W5500 VERSION register via SPI:
+`HAS_ETH_CAPABLE=1` means the board design includes a W5500 module header, but the module may not be physically installed on every unit. At boot, `initEthernet()` in `Ethernet.ino` starts the W5500 driver the same way the OT-Thing reference does (`Ethernet.init()` + `Ethernet.begin()`). The ESP-IDF driver install resets the chip and polls its VERSION register for up to 100 ms:
 
-- If the register returns the expected value, `state.hw.bEthernetPresent` is set to `true` and Ethernet is initialised.
-- If the read fails or returns an unexpected value, `state.hw.bEthernetPresent` is set to `false` and the firmware runs in WiFi-only mode.
+- If the driver accepts the chip, `Ethernet.hardwareStatus()` returns `EthernetHardwareFound`, `state.hw.bEthernetPresent` is set to `true` and Ethernet stays initialised, with or without a cable.
+- If the driver install fails, `state.hw.bEthernetPresent` is set to `false` and the firmware runs in WiFi-only mode.
 
 No user configuration is required. `loopEthernet()` guards itself with `if (!state.hw.bEthernetPresent) return;` so it is a no-op when no hardware is present.
 

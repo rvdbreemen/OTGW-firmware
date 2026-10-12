@@ -203,7 +203,7 @@ Note: the previous `/mqttha.cfg` LittleFS file has been retired. HA MQTT discove
 - **To**: Local network switch / router
 - **Protocol**: Ethernet, DHCP
 - **Connection**: SPI bus (GPIO 18/19/23/5), W5500 chip
-- **Description**: Optional wired Ethernet connection for the ESP32 board. Detected automatically via W5500 SPI VERSION register at boot. When Ethernet link is present, WiFi is disabled. Hot-plug cable detection polls every 5 seconds.
+- **Description**: Optional wired Ethernet connection for the ESP32 board. Detected automatically at boot when the W5500 driver install verifies the chip (`Ethernet.hardwareStatus()`). When Ethernet link is present, WiFi is disabled. Hot-plug cable detection polls every 5 seconds.
 
 ### Webhook HTTP Callback
 
