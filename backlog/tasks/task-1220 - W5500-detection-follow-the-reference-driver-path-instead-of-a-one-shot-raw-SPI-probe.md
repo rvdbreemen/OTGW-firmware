@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-12 16:09'
-updated_date: '2026-10-12 16:23'
+updated_date: '2026-10-12 16:50'
 labels:
   - network
   - ethernet
@@ -28,7 +28,7 @@ On the bench OTGW32 (W5500 fitted, no cable) probeW5500() reads VERSIONR 0x00 on
 - [x] #1 probeW5500() removed; initEthernet() runs the reference sequence (SPI begin, W5500Driver 10 MHz phy 0, Ethernet.init, Ethernet.begin with 1 s DHCP timeout or static IP) and sets state.hw.bEthernetPresent from Ethernet.hardwareStatus()==EthernetHardwareFound
 - [ ] #2 Old-vs-fix on the bench OTGW32 (W5500 fitted, no cable): old image reports ethernetpresent false, fix image reports ethernetpresent true in /api/v2/device/info, telnet shows the detection line; WiFi stays the active transport
 - [x] #3 build.bat --target esp32-combo green (firmware) and evaluate.py --quick shows no new FAIL
-- [ ] #4 Device restored to its as-found state afterwards (settings intact, MQTT connected, OT-Direct running)
+- [x] #4 Device restored to its as-found state afterwards (settings intact, MQTT connected, OT-Direct running)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -44,4 +44,6 @@ On the bench OTGW32 (W5500 fitted, no cable) probeW5500() reads VERSIONR 0x00 on
 
 <!-- SECTION:NOTES:BEGIN -->
 Implemented (alpha.419): probeW5500() removed, initEthernet() follows OT-Thing main.cpp setup() and sets bEthernetPresent from Ethernet.hardwareStatus(). Build esp32-combo SUCCESS, evaluate --quick 71/0/0. Bench OTGW32 (W5500 fitted, no cable), app-only flash: old alpha.418 ethernetpresent=false (boot 58), fix alpha.419 ethernetpresent=false (boots 59/61/63/64). The reference-equivalent driver path does not find the chip either, so on this unit the cause is not the one-shot read or the missing CS-HIGH; hardware is the leading suspect. No-chip path verified graceful: boots, OT-Direct + MQTT up, 0/182 settings changed. AC2 open: needs a W5500 that answers (module check by maintainer) to show ethernetpresent=true. IDF error line not observable (UART0 console muted on combo, TASK-972). Evidence: %LOCALAPPDATA%/OTGW-capture/otgw32-validation-20261012/EVIDENCE.md Phase 6.
+
+Pin-level diagnostic (temp telnet key, not committed; EVIDENCE.md Phase 7): with the module LED on, VERSIONR reads 0xFF with the ESP32 MISO pull-up and 0x00 with the pull-down at 100 kHz, 1 MHz and 8 MHz; RTR (default 0x07D0) and PHYCFGR also read nothing; RST released, CS idles high. Nothing drives MISO: no chip answers on the bus, so this bench unit cannot satisfy AC2 whatever the firmware does. Device restored to committed alpha.419+2a2e9b9, 0/182 settings changed. AC2 needs a board whose W5500 answers on SPI.
 <!-- SECTION:NOTES:END -->
