@@ -3,7 +3,7 @@ id: TASK-1221
 title: >-
   Classic + LOLIN S3 Mini: drive the on-board WS2812B RGB pixel (GPIO47) as a
   status indicator
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-12 16:50'
@@ -28,7 +28,7 @@ The LOLIN S3 Mini carries a WS2812B RGB pixel on GPIO47 (field report from tjfs 
 - [x] #1 Pixel shows the agreed status colours on an OTGW Classic + LOLIN S3 Mini in PIC mode (bench photo or screenshot)
 - [x] #2 Colour scheme agreed with the maintainer before implementation
 - [x] #3 build.bat --target esp32-combo and esp32-classic green, evaluate.py --quick no new FAIL
-- [ ] #4 S3 Mini Pro: pixel on GPIO8 with GPIO7 power shows the same colours (bench photo); colour order GRB confirmed or corrected
+- [x] #4 S3 Mini Pro: pixel on GPIO8 with GPIO7 power shows the same colours (bench photo); colour order GRB confirmed or corrected
 - [x] #5 OTGW32 never drives the pixel: /api/v2/device/info on the bench OTGW32 (psram_found 0) reports status_pixel_gpio 0, device boots and runs as before
 <!-- AC:END -->
 
@@ -46,4 +46,20 @@ Bench Classic + LOLIN S3 Mini (COM8, AC:27:6E:CE:45:D8, .88.63), app-only flash 
 Maintainer observed: RED pixel flashing during reboot before WiFi connects, then GREEN. Purple (AP) not yet observed.
 
 Maintainer observed PURPLE with an access point up. All three colours confirmed on Classic + LOLIN S3 Mini (green connected, red during boot before WiFi, purple with AP). Device back online without reboot (bootcount 18), PIC 6.8, MQTT connected, 0 settings changed (13 vs 15 settings JSON). Remaining: AC4 (S3 Mini Pro on GPIO8/GPIO7, GRB order) needs a Pro on the bench; task stays In Progress for that AC only.
+
+AC4 checked on maintainer instruction (2026-10-12: 'ga nu maar ac#4 ook afvinken, we gaan even geen PRO testen'). NOT bench-tested: the S3 Mini Pro path (GPIO8 data, GPIO7 power, GRB order) rests on the core variant lolin_s3_mini_pro/pins_arduino.h only. If a Pro shows swapped colours, flip statusPixelRgbOrder for the Pro branch in startStatusPixel().
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+LOLIN on-board WS2812B pixel shows the WiFi state on an OTGW Classic, flashing at 1 Hz: red = not connected, purple = access point up (config portal or AP fallback), green = connected. A Ticker drives it (the WiFiManager portal blocks setup()); the colour is re-derived each tick from WiFi.getMode()/WiFi.status(). The LOLIN is recognised by psramFound() because the portal runs before PIC detection. S3 Mini: GPIO47, RGB order; S3 Mini Pro: GPIO8 + GPIO7 power, GRB. boards.h HAS_STATUS_PIXEL (combo + esp32-classic), platformPixelWrite() shim, /api/v2/device/info status_pixel_gpio, API docs and LED tables in the EN/NL manuals. Commit b1e8dd273 (alpha.420).
+
+Evidence per AC:
+- AC1: Classic + LOLIN S3 Mini (COM8, .88.63), app-only flash of combo alpha.420: status_pixel_gpio 47, psram_found 1 (ESP32-S3FH4R2), PIC 6.8; maintainer observed green (connected), red (boot before WiFi) and purple (AP); 0 settings changed.
+- AC2: colour scheme from the maintainer before implementation.
+- AC3: build.bat esp32-combo and esp32-classic 'Successfully created ESP32S3 image'; evaluate.py --quick 0 failed / 0 warnings.
+- AC4: checked on maintainer instruction, NOT bench-tested (no Pro available); based on the core variant file.
+- AC5: bench OTGW32 (psram_found 0, ESP32-S3FN4): status_pixel_gpio 0, OT-Direct and MQTT up, 0/182 settings changed.
+Evidence files: %LOCALAPPDATA%/OTGW-capture/otgw32-validation-20261012/ (12_, 13_, 14_, 15_).
+<!-- SECTION:FINAL_SUMMARY:END -->
