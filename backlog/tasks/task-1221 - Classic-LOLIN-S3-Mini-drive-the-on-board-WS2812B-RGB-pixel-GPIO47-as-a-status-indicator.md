@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-12 16:50'
-updated_date: '2026-10-12 17:20'
+updated_date: '2026-10-12 17:44'
 labels:
   - ui
   - led
@@ -25,7 +25,7 @@ The LOLIN S3 Mini carries a WS2812B RGB pixel on GPIO47 (field report from tjfs 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Pixel shows the agreed status colours on an OTGW Classic + LOLIN S3 Mini in PIC mode (bench photo or screenshot)
+- [x] #1 Pixel shows the agreed status colours on an OTGW Classic + LOLIN S3 Mini in PIC mode (bench photo or screenshot)
 - [x] #2 Colour scheme agreed with the maintainer before implementation
 - [x] #3 build.bat --target esp32-combo and esp32-classic green, evaluate.py --quick no new FAIL
 - [ ] #4 S3 Mini Pro: pixel on GPIO8 with GPIO7 power shows the same colours (bench photo); colour order GRB confirmed or corrected
@@ -40,4 +40,10 @@ Colour scheme (maintainer, 2026-10-12): WiFi not connected = flash RED; WiFi cap
 Correction to the description: HAS_BYPASS_RELAY is defined nowhere in boards.h, so every #if HAS_BYPASS_RELAY block in OTDirect.ino compiles out; GPIO47 has no other driver and there is no conflict. Maintainer decisions 2026-10-12: LOLIN identified by psramFound() (LOLIN S3 Mini/Pro = ESP32-S3FH4R2 with in-package PSRAM; bench OTGW32 reports psram_found 0, chip_model_est ESP32-S3FN4), because startWiFi() and its blocking portal run before PIC detection; AP fallback = PURPLE; S3 Mini Pro included (core variant lolin_s3_mini_pro: RGB_BUILTIN GPIO8, RGB_POWER GPIO7, GPIO47 = BUTTON_OK; plain lolin_s3_mini: GPIO47, LED_COLOR_ORDER_RGB). Implementation: boards.h HAS_STATUS_PIXEL + pins (combo and esp32-classic), platformPixelWrite() shim over rgbLedWriteOrdered, OTGW-firmware.ino startStatusPixel() before startWiFi(), Ticker 500 ms half period, state derived each tick from WiFi.getMode()&AP / WiFi.status().
 
 alpha.420: build.bat esp32-combo and esp32-classic both 'Successfully created ESP32S3 image' / SUCCESS (first classic attempt failed on state.hw.bClassicPro, which only exists under HAS_RUNTIME_HW_DETECT; fixed with a local pro flag, false on the fixed Classic target). evaluate.py --quick: 0 failed, 0 warnings. Bench OTGW32, app-only flash of the combo image: device/info psram_found 0, status_pixel_gpio 0, OT-Direct, MQTT connected, 0/182 settings changed (EVIDENCE.md folder, 12_otgw32_pixel_1221.txt). Open: AC1 (Classic + S3 Mini, colours) and AC4 (S3 Mini Pro, GRB check) need those boards on the bench.
+
+Bench Classic + LOLIN S3 Mini (COM8, AC:27:6E:CE:45:D8, .88.63), app-only flash combo alpha.420: device/info psram_found 1, chip_model_est ESP32-S3FH4R2, status_pixel_gpio 47, PIC 6.8 gateway, MQTT connected (14_classic_pixel_1221.txt). Maintainer observed: GREEN pixel flashing once per second with WiFi connected; confirms GPIO47 and the RGB colour order (GRB would show red). Red (boot before WiFi) and purple (AP) still to observe.
+
+Maintainer observed: RED pixel flashing during reboot before WiFi connects, then GREEN. Purple (AP) not yet observed.
+
+Maintainer observed PURPLE with an access point up. All three colours confirmed on Classic + LOLIN S3 Mini (green connected, red during boot before WiFi, purple with AP). Device back online without reboot (bootcount 18), PIC 6.8, MQTT connected, 0 settings changed (13 vs 15 settings JSON). Remaining: AC4 (S3 Mini Pro on GPIO8/GPIO7, GRB order) needs a Pro on the bench; task stays In Progress for that AC only.
 <!-- SECTION:NOTES:END -->
