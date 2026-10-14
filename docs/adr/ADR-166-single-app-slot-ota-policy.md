@@ -1,26 +1,27 @@
 ---
-id: ADR-166
+id: "ADR-166"
 title: "Single-app-slot boards: firmware/app OTA is USB-only, filesystem OTA stays on WiFi"
 status: "Proposed"
-date: 2026-07-06
-tags:
-  - "esp32s3"
-  - "ota"
-  - "partitions"
-  - "safety"
-  - "task959"
-supersedes: []
-superseded_by: null
-related:
-  - "ADR-126"
-deciders:
-  - "Robert van den Breemen"
+date: "2026-07-06"
 binding: false
 gate: null
 documents_shipped: true
 verified_in:
   - "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h:hasSpareAppOtaSlot"
   - "src/OTGW-firmware/restAPI.ino:app_ota_available"
+supersedes: []
+superseded_by: null
+related:
+  - "ADR-126"
+  - "ADR-190"
+deciders:
+  - "Robert van den Breemen"
+tags:
+  - "esp32s3"
+  - "ota"
+  - "partitions"
+  - "safety"
+  - "task959"
 ---
 
 # ADR-166: Single-app-slot boards: firmware/app OTA is USB-only, filesystem OTA stays on WiFi
@@ -46,6 +47,11 @@ status_history:
     reason: Initial decision record documenting the single-app-slot app-OTA rejection (backend, alpha.311) and the new frontend hide added in this pass. Left Proposed pending maintainer review.
     changed_via: adr-kit
     changed_via: adr-kit
+  - date: 2026-10-14
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-190
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

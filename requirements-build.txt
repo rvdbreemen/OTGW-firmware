@@ -1,0 +1,4 @@
+# Installed by build.bat / build.sh before build.py runs.
+# TASK-1224: minifiers for the LittleFS staging copy of the web assets.
+rjsmin==1.3.0
+rcssmin==1.3.0

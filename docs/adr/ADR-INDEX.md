@@ -195,3 +195,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-187 | Accepted | - | The vendored copy follows upstream: release, or upstream main when a needed fix is not yet in a release. |
 | ADR-188 | Accepted | - | Refuse a new web request with the existing cheap 503 while more than WEBMAXTXCONNECTIONS (4) connections on port 80 h... |
 | ADR-189 | Accepted | - | webBeginRequest() replaces the request's timeout callback with one that calls AsyncClient::abort() (tcpabort()). |
+| ADR-190 | Proposed | - | build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are... |

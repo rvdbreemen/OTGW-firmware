@@ -5239,7 +5239,7 @@
       "path": "ADR-166-single-app-slot-ota-policy.md",
       "format": "canonical",
       "status": "Proposed",
-      "date": "2026-07-06",
+      "date": "2026-10-14",
       "decision_summary": "Firmware/app OTA is rejected outright on any board whose partition table has no spare app slot (single otaX == the ru...",
       "topics": [],
       "aliases": [],
@@ -6465,6 +6465,68 @@
       "metadata": {
         "binding": false,
         "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-190",
+      "title": "Build the LittleFS image from a minified staging copy of the web assets",
+      "path": "ADR-190-build-the-littlefs-image-from-a-minified-staging-copy-of-the-web-assets.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-14",
+      "decision_summary": "build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are...",
+      "topics": [
+        "build-pipeline",
+        "littlefs",
+        "minify",
+        "web-assets"
+      ],
+      "aliases": [
+        "asset minification",
+        "data staging",
+        "minified littlefs",
+        "no gzip"
+      ],
+      "components": [
+        "LittleFS staging step in build.py (stage_data_dir, prepare_filesystem_staging)"
+      ],
+      "symbols": [
+        "prepare_filesystem_staging",
+        "stage_data_dir",
+        "STAGING_DIR",
+        "STAGING_EXCLUDE"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Build every LittleFS image from the staging directory, never from data/.",
+          "Keep files the firmware reads itself, and all binaries and HTML, byte-identical.",
+          "Fail the build when minifying fails; never fall back silently to unminified files.",
+          "Keep the minifier versions pinned in requirements-build.txt."
+        ],
+        "must_not": [
+          "Write minified or otherwise transformed files into src/OTGW-firmware/data/.",
+          "Gzip or otherwise compress-encode any asset (maintainer directive).",
+          "Drop a file from the image other than those listed in STAGINGEXCLUDE."
+        ],
+        "exceptions": [
+          "--no-minify builds an unminified image for debugging; it still uses the staging copy."
+        ],
+        "verification": [
+          "python tests/testbuildstaging.py: source untouched, non-browser files byte-identical, browser assets smaller, only STAGINGEXCLUDE dropped, failures exit non-zero, and no CSS comment that closes early.",
+          "Build log line Building FS image from '.pio\\data-staging' from pio run -t buildfs."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": "tests/test_build_staging.py",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -11136,6 +11198,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-166",
+      "target": "ADR-190",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-167",
       "target": "ADR-030",
       "type": "related",
@@ -11552,6 +11620,24 @@
     {
       "source": "ADR-189",
       "target": "ADR-188",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-190",
+      "target": "ADR-139",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-190",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-190",
+      "target": "ADR-166",
       "type": "related",
       "resolved": true
     }

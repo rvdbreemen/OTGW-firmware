@@ -310,7 +310,12 @@ The `build.py` script replicates the GitHub Actions CI/CD workflow locally:
 3. **Updates version**: Runs `scripts/autoinc-semver.py` to update `version.h`
 4. **Creates build directory**: `build/`
 5. **Builds firmware**: Runs `arduino-cli compile`
-6. **Builds filesystem**: Runs `mklittlefs` to create LittleFS image
+6. **Builds filesystem**: Copies `src/OTGW-firmware/data/` to `.pio/data-staging/`,
+   leaves out `v2.css`, minifies `.js` (rjsmin) and `.css` (rcssmin) in that copy,
+   prints a size report, and builds the LittleFS image from the copy. `data/` is
+   never modified; all other files stay byte-identical. The minifiers are pinned in
+   `requirements-build.txt` and installed by `build.bat`/`build.sh`. Use
+   `--no-minify` for an unminified debug image (ADR-190, TASK-1224).
 7. **Renames artifacts**: Adds version to filenames
 8. **Lists output**: Shows all build artifacts with sizes
 

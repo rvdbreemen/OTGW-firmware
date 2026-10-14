@@ -37,6 +37,7 @@ import stat
 import subprocess
 import sys
 import tarfile
+import tempfile
 
 # Ensure stdout/stderr can handle Unicode on Windows
 if sys.platform == 'win32':
@@ -762,8 +763,131 @@ def generate_v2_css_bundle(project_dir):
                f"{bundle_path.stat().st_size} bytes)")
 
 
-def build_filesystem(project_dir, config_file, target):
-    """Build filesystem using mklittlefs for the given target"""
+# TASK-1224: the LittleFS image is built from a staging copy of data/, never from
+# data/ itself, so the readable source in git is never rewritten by a build.
+# Browser assets (.js, .css) are minified in the copy only; every other file
+# (PIC .hex, .json, .log, .ini, fonts, images, HTML) is copied byte-for-byte.
+# Everything stays plain text: no gzip (maintainer directive).
+STAGING_DIR = config.PROJECT_DIR / ".pio" / "data-staging"
+# Source files that never go into the image: v2.css is only an input to
+# v2-bundle.css, and no page loads it on its own.
+STAGING_EXCLUDE = frozenset({"v2.css"})
+MINIFY_SUFFIXES = (".js", ".css")
+
+
+def _minify_asset(path, data):
+    """Return the minified bytes of one browser asset."""
+    if path.suffix == ".js":
+        import rjsmin
+        return rjsmin.jsmin(data)
+    import rcssmin
+    return rcssmin.cssmin(data)
+
+
+def stage_data_dir(source_dir, staging_dir, minify=True):
+    """Copy source_dir to staging_dir, drop STAGING_EXCLUDE and minify the
+    browser assets in the copy. Returns [(relative path, bytes before, bytes
+    after)] for each minified file. Raises on a minify failure, so a broken
+    minifier fails the build instead of shipping unminified files."""
+    if staging_dir.exists():
+        shutil.rmtree(staging_dir)
+    shutil.copytree(source_dir, staging_dir)
+    for name in STAGING_EXCLUDE:
+        (staging_dir / name).unlink(missing_ok=True)
+    report = []
+    if not minify:
+        return report
+    for path in sorted(staging_dir.rglob("*")):
+        if not (path.is_file() and path.suffix in MINIFY_SUFFIXES):
+            continue
+        rel = path.relative_to(staging_dir).as_posix()
+        before = path.read_bytes()
+        after = _minify_asset(path, before)
+        if before.strip() and not after.strip():
+            raise RuntimeError(f"minifier returned an empty result for {rel}")
+        path.write_bytes(after)
+        report.append((rel, len(before), len(after)))
+    return report
+
+
+def find_mklittlefs(project_dir, target):
+    """Locate mklittlefs: the PlatformIO package first, then the arduino-cli core."""
+    core_dir = Path(os.environ.get("PLATFORMIO_CORE_DIR", Path.home() / ".platformio"))
+    exe = "mklittlefs.exe" if platform.system() == "Windows" else "mklittlefs"
+    candidate = core_dir / "packages" / "tool-mklittlefs" / exe
+    if candidate.is_file():
+        return candidate
+    tools_dir = project_dir / "arduino" / "packages" / TARGETS[target]["fs_tool_path"]
+    if tools_dir.exists():
+        for path in tools_dir.glob("**/mklittlefs*"):
+            if path.is_file() and path.name in ("mklittlefs", "mklittlefs.exe"):
+                return path
+    return None
+
+
+def littlefs_minimum_kib(mklittlefs, content_dir, block, page, step_kib=4):
+    """Smallest LittleFS image (KiB, step_kib steps) that holds content_dir."""
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "probe.bin"
+
+        def fits(kib):
+            result = subprocess.run(
+                [str(mklittlefs), "-c", str(content_dir), "-b", str(block), "-p", str(page),
+                 "-s", str(kib * 1024), str(out)],
+                capture_output=True,
+            )
+            return result.returncode == 0
+
+        lo, hi = 0, 4096
+        if not fits(hi):
+            return None
+        while hi - lo > step_kib:
+            mid = (lo + hi) // 2 // step_kib * step_kib
+            if fits(mid):
+                hi = mid
+            else:
+                lo = mid
+        return hi
+
+
+def prepare_filesystem_staging(project_dir, target, minify=True):
+    """Build the staging copy for the LittleFS image and print the size report."""
+    print_step("Staging web assets for the filesystem image")
+    try:
+        report = stage_data_dir(config.DATA_DIR, STAGING_DIR, minify=minify)
+    except ImportError as exc:
+        print_error(f"Minifier not installed ({exc}). Run build.bat / build.sh, which install "
+                    "requirements-build.txt, or use --no-minify.")
+        sys.exit(1)
+    except Exception as exc:
+        print_error(f"Minifying the web assets failed: {exc}")
+        sys.exit(1)
+
+    if minify:
+        for rel, before, after in report:
+            print_info(f"  minified {rel}: {before} -> {after} bytes")
+        saved = sum(b - a for _, b, a in report)
+        print_info(f"Minified {len(report)} files, {saved} bytes saved")
+    else:
+        print_warning("--no-minify: the filesystem image holds unminified web assets")
+
+    total = sum(p.stat().st_size for p in STAGING_DIR.rglob("*") if p.is_file())
+    print_info(f"Staged content: {total} bytes in {STAGING_DIR}")
+    tcfg = TARGETS[target]
+    mklittlefs = find_mklittlefs(project_dir, target)
+    if mklittlefs:
+        min_kib = littlefs_minimum_kib(mklittlefs, STAGING_DIR, tcfg["fs_block"], tcfg["fs_page"])
+        if min_kib is not None:
+            print_info(f"LittleFS minimum image size: {min_kib} KiB "
+                       f"(partition {tcfg['fs_size'] // 1024} KiB)")
+    else:
+        print_warning("mklittlefs not found yet; LittleFS minimum size not reported")
+    return STAGING_DIR
+
+
+def build_filesystem(project_dir, config_file, target, fs_dir):
+    """Build filesystem using mklittlefs for the given target from fs_dir
+    (the staging copy, see prepare_filesystem_staging)"""
     tcfg = TARGETS[target]
     print_step(f"Building filesystem [{tcfg['name']}]")
     # Web UI assets ship as plain readable files: no gzip, no .gz siblings, no
@@ -789,7 +913,6 @@ def build_filesystem(project_dir, config_file, target):
 
     print_info(f"Using mklittlefs: {mklittlefs_path}")
 
-    fs_dir = config.DATA_DIR
     output_file = config.BUILD_DIR / f"{config.PROJECT_NAME}-{asset_slug(target)}.littlefs.bin"
 
     # Ensure build dir exists
@@ -2013,8 +2136,10 @@ def build_firmware_pio(project_dir, target):
     print_success(f"Firmware build complete [{tcfg['name']}]")
 
 
-def build_filesystem_pio(project_dir, target):
-    """Build LittleFS filesystem using PlatformIO."""
+def build_filesystem_pio(project_dir, target, fs_dir):
+    """Build LittleFS filesystem using PlatformIO from fs_dir (the staging copy,
+    see prepare_filesystem_staging). PLATFORMIO_DATA_DIR overrides data_dir in
+    platformio.ini for this one run."""
     tcfg = TARGETS[target]
     env_name = PIO_ENV_MAP[target]
     print_step(f"Building filesystem [{tcfg['name']}] (PlatformIO)")
@@ -2024,6 +2149,7 @@ def build_filesystem_pio(project_dir, target):
         "MINGW_PREFIX", "MINGW_CHOST", "MINGW_PACKAGE_PREFIX",
     })
     pio_env = {k: v for k, v in os.environ.items() if k not in _MSYS_KEYS}
+    pio_env["PLATFORMIO_DATA_DIR"] = str(fs_dir)
     # `python -m platformio`, not bare `pio` (see _pio_in_path / build_firmware_pio).
     run_command([sys.executable, "-m", "platformio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir, env=pio_env)
     # TASK-337: same fail-fast pattern as build_firmware_pio. The buildfs target
@@ -2490,6 +2616,11 @@ Examples:
         help="After build, run esptool verify-flash against the given serial port"
     )
     parser.add_argument(
+        "--no-minify",
+        action="store_true",
+        help="Build the filesystem image with unminified web assets (debugging; TASK-1224)"
+    )
+    parser.add_argument(
         "--no-archive",
         action="store_true",
         help="Skip copying this build's artifacts to build-archive/<semver>/ (archiving is on by default)"
@@ -2576,6 +2707,12 @@ Examples:
     # before packing the filesystem, so it's always current with the source files.
     generate_v2_css_bundle(project_dir)
 
+    # TASK-1224: stage (and minify) the web assets once for all targets; the
+    # filesystem image is built from this copy, data/ stays untouched.
+    fs_dir = None
+    if not (args.firmware and not args.filesystem):
+        fs_dir = prepare_filesystem_staging(project_dir, target_names[0], minify=not args.no_minify)
+
     # Get semantic version
     semver = get_semver(project_dir)
     print_info(f"Building version: {semver}")
@@ -2594,22 +2731,22 @@ Examples:
                 build_firmware_pio(project_dir, target)
                 collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesystem=False, want_elf=True)
             elif args.filesystem and not args.firmware:
-                build_filesystem_pio(project_dir, target)
+                build_filesystem_pio(project_dir, target, fs_dir)
                 collect_pio_artifacts(project_dir, target, want_firmware=False, want_filesystem=True, want_elf=False)
             else:
                 build_firmware_pio(project_dir, target)
                 collect_pio_artifacts(project_dir, target, want_firmware=True, want_filesystem=False, want_elf=True)
-                build_filesystem_pio(project_dir, target)
+                build_filesystem_pio(project_dir, target, fs_dir)
                 collect_pio_artifacts(project_dir, target, want_firmware=False, want_filesystem=True, want_elf=False)
         else:
             # Arduino-CLI build path
             if args.firmware and not args.filesystem:
                 build_firmware(project_dir, config_file, target)
             elif args.filesystem and not args.firmware:
-                build_filesystem(project_dir, config_file, target)
+                build_filesystem(project_dir, config_file, target, fs_dir)
             else:
                 build_firmware(project_dir, config_file, target)
-                build_filesystem(project_dir, config_file, target)
+                build_filesystem(project_dir, config_file, target, fs_dir)
 
             consolidate_build_artifacts(project_dir, target)
 

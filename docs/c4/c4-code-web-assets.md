@@ -638,11 +638,11 @@ All visible widgets (header, nav tabs, tables, settings fields, OT log viewer, f
 ### How Files Are Served
 
 1. ESP8266 firmware (`OTGW-firmware.ino`) initializes LittleFS at startup
-2. Files in `data/` directory are embedded during build: `python build.py` packs all files into SPIFFS/LittleFS image
+2. Files in `data/` directory are embedded during build: `python build.py` packs them into the LittleFS image from a staging copy in which `.js`/`.css` are minified and `v2.css` is left out (ADR-190). The device serves the minified files; the readable source stays in git.
 3. HTTP server routes:
    - `/` → the classic or v2 shell, selected by the device-wide UI setting
    - `/index.html`, `/v2.html` → the two shell entrypoints
-   - `/ds-tokens.css`, `/components.css`, `/v2.css` → CSS files
+   - `/ds-tokens.css`, `/components.css`, `/v2-bundle.css` → CSS files
    - `/index.js`, `/graph.js`, `/sat.js`, `/sat-slider.js`, `/theme-toggle.js`, `/echarts-theme.js`, `/v2.js` → JavaScript modules
    - `/pic16f88/*`, `/pic16f1847/*` → PIC firmware binaries and version files
    - `/api/*` → REST endpoints (handled by firmware C++ code)
