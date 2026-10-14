@@ -1,8 +1,8 @@
 ---
 id: "ADR-190"
 title: "Build the LittleFS image from a minified staging copy of the web assets"
-status: "Proposed"
-date: "2026-10-14"
+status: "Accepted"
+date: "2026-10-15"
 binding: false
 gate: "tests/test_build_staging.py"
 documents_shipped: false
@@ -38,7 +38,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-10-14.
+Accepted, 2026-10-15.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer). He rejected gzip
 and asked for a minified image that keeps every file now in `data/`.
@@ -56,6 +56,11 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-166
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
     changed_via: adr-kit lifecycle
 ```
 

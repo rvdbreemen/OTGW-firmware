@@ -6476,8 +6476,8 @@
       "title": "Build the LittleFS image from a minified staging copy of the web assets",
       "path": "ADR-190-build-the-littlefs-image-from-a-minified-staging-copy-of-the-web-assets.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-10-14",
+      "status": "Accepted",
+      "date": "2026-10-15",
       "decision_summary": "build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are...",
       "topics": [
         "build-pipeline",
