@@ -1,10 +1,10 @@
 /*
  * OTGW-firmware — v2 Web UI (TASK-908)
  *
- * Coexisting redesign served as /v2.html when settings.ui.bUseV2 is set.
+ * The only Web UI on the 2.0.0 line (the classic UI was removed in
+ * TASK-1223.12), served at / and /v2.html.
  * This file is the interaction shell: page navigation, Home concept chips,
- * Monitor sub-tabs, theme toggle (shared 'otgw-theme' key with the classic
- * UI), clock, and the "back to classic UI" toggle.
+ * Monitor sub-tabs, theme toggle ('otgw-theme' localStorage key) and clock.
  *
  * Data wiring (OT-log WebSocket + /api/v2 REST) is layered on in later
  * phases via window.OTGWv2 hooks; the static mockup values remain visible
@@ -15,8 +15,7 @@
 // ADR-184 for the v2 bundle (TASK-1210): at most 2 /api/ requests in flight from
 // this page. The device refuses a third concurrent request with a 503
 // (REST_MAX_INFLIGHT 2, ADR-165), and a v2 page start fires several panels at
-// once. v2.html does not load index.js, so the classic bundle's queue does not
-// cover this page; this is the same queue. Every same-origin /api/ fetch waits
+// once. This is the same queue the former classic bundle used. Every same-origin /api/ fetch waits
 // in arrival order for a free slot; other URLs go straight to the browser. A
 // slot is freed when the response body has arrived, because the device holds
 // its slot until the last byte is sent. A request still open after 20 s frees
@@ -103,7 +102,7 @@
     );
   }
 
-  // ---------- theme (shared key with classic UI) ----------
+  // ---------- theme (localStorage key otgw-theme) ----------
   function applyTheme(dark) {
     document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
     var b = document.getElementById('themeToggle');
@@ -198,30 +197,6 @@
     else if (k === 'debug') fetchDebug();
     else if (k === 'files') fetchFsList(fsCurrentPath);
     else if (k === 'system') fetchSystemStatus();
-  }
-
-  // ---------- back to the classic UI ----------
-  function gotoClassic() {
-    // TASK-923: persist the choice device-side in settings.ini (ui_usev2=false)
-    // via the settings API, then reload so the firmware serves the classic UI.
-    // TASK-960: retry on 503/network and reload ONLY after a confirmed 200. The
-    // old handler reloaded unconditionally (.finally) without checking
-    // response.ok, so a 503 from the REST backpressure gate silently dropped the
-    // switch and reloaded back to v2.
-    var attempt = 0;
-    function trySet() {
-      fetch(APIGW + 'v2/settings', {
-        method: 'POST', mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: 'ui_usev2', value: 'false' })
-      }).then(function (r) {
-        if (r.ok) { location.href = '/'; }
-        else if (++attempt <= 8) { setTimeout(trySet, 250 * attempt); }
-      }).catch(function () {
-        if (++attempt <= 8) { setTimeout(trySet, 250 * attempt); }
-      });
-    }
-    trySet();
   }
 
   // ---------- clock ----------
@@ -1301,8 +1276,8 @@
     }).catch(function () { });
   }
   // ---------- Monitor > Connection > OT-Direct status (TASK-1223.16) ----------
-  // /api/v2/otdirect/status (restAPI.ino sendOTDirectStatus). Same rows as classic
-  // index.html:188-228 / index.js refreshOTDStatus. Called only on OT-Direct boards,
+  // /api/v2/otdirect/status (restAPI.ino sendOTDirectStatus). Same rows as the
+  // former classic UI's OT-Direct panel (commit 3aa1ef927). Called only on OT-Direct boards,
   // on the fetchConn cadence (15 s) and when Monitor > Connection opens.
   var otdMode = '';
   function setOtdMode(m) {
@@ -1526,7 +1501,6 @@
     { id: 's0',       title: 'S0 Pulse Counter',       icon: '⚡', reboot: false, desc: 'Energy pulse counting.' },
     { id: 'webhook',  title: 'Webhook',                icon: '🪝', reboot: false, desc: 'HTTP callbacks on OT state.' },
     { id: 'behavior', title: 'Behavior',               icon: '🔧', reboot: false, desc: 'LED, theme and restart behaviour.' },
-    { id: 'ui',       title: 'User Interface',         icon: '🎛', reboot: false, desc: 'Web UI preferences.' },
     { id: 'sat',      title: 'SAT — Smart Thermostat', icon: '🧠', reboot: false, desc: 'Standalone Adaptive Thermostat.' }
   ];
   // lowercase REST key -> { cat, sub?, label, hint? }. Reboot is per-category.
@@ -1587,13 +1561,6 @@
     darktheme:       { cat: 'behavior', label: 'Dark theme by default' },
     nightlyrestart:  { cat: 'behavior', label: 'Nightly restart' },
     nightlyrestarthour: { cat: 'behavior', label: 'Restart hour', hint: '0–23' },
-    ui_autoscroll:   { cat: 'ui', label: 'Log auto-scroll' },
-    ui_timestamps:   { cat: 'ui', label: 'Show timestamps' },
-    ui_capture:      { cat: 'ui', label: 'Large capture mode' },
-    ui_autodownloadlog: { cat: 'ui', label: 'Auto-download log' },
-    ui_autoexport:   { cat: 'ui', label: 'Auto-export CSV' },
-    ui_autoscreenshot:  { cat: 'ui', label: 'Auto-save graph PNG' },
-    ui_graphtimewindow: { cat: 'ui', label: 'Default graph window' },
     // Most-used SAT fields get curated labels; the long tail falls back to the
     // humanised key under the SAT category (Phase 2: port full SAT metadata).
     satenabled:      { cat: 'sat', label: 'SAT enabled' },
@@ -1764,13 +1731,10 @@
     ['Simulation', ['satsimulation', 'satsimheatrate', 'satsimcoolrate']]
   ];
   var SAT_NOT_IN_FORMS = { satenabled: 1 };
-  // ui_usev2 is the UI-switch flag (owned by the "Classic UI" control), not a
-  // normal toggle — never list it as an editable setting.
-  var SET_HIDE = { ui_usev2: 1 };
   // TASK-1012: internal onboarding-completion flags. Hidden from the settings LIST only
   // (NOT from setData — satOnbNeeded()/the ui_onboarded logic read setData). Rendering them
   // as editable "Onboarded" checkboxes would let a user tick one and permanently bypass the
-  // wizard + its enable-interception. SET_HIDE strips from setData, so it can't be used here.
+  // wizard + its enable-interception. Rows are hidden here, not dropped from setData.
   var SET_HIDE_ROW = { sat_onboarded: 1, ui_onboarded: 1 };
   function humanizeKey(k) {
     var s = k.replace(/^(sat|otd|gpiosensors|gpiooutputs|s0counter|mqtt|wifi|eth|ntp|webhook|ui_|dallas)/, '');
@@ -1790,7 +1754,6 @@
     if (/^s0/.test(k)) return 's0';
     if (/^webhook/.test(k)) return 'webhook';
     if (/^sat/.test(k)) return 'sat';
-    if (/^ui_/.test(k)) return 'ui';
     return 'system';
   }
   function labelFor(k) { return (SET_META[k] && SET_META[k].label) || humanizeKey(k); }
@@ -1810,7 +1773,7 @@
       setData = {}; setDirty = {};
       Object.keys(src).forEach(function (k) {
         var v = src[k];
-        if (v && typeof v === 'object' && 'value' in v && !SET_HIDE[k]) setData[k] = v;
+        if (v && typeof v === 'object' && 'value' in v) setData[k] = v;
       });
       renderSettings();
       fetchBle();
@@ -2378,8 +2341,6 @@
     otdchmode: [[0, 'Off'], [1, 'Fixed flow'], [2, 'Heating curve (auto)']],
     // SAT manufacturer presets — labels from the firmware satManufacturerTable[].
     satmanufacturer: [[0, 'Auto'], [1, 'Atag'], [2, 'Baxi'], [3, 'Brotje'], [4, 'De Dietrich'], [5, 'Ferroli'], [6, 'Geminox'], [7, 'Ideal'], [8, 'Immergas'], [9, 'Intergas'], [10, 'Itho'], [11, 'Nefit'], [12, 'Radiant'], [13, 'Remeha'], [14, 'Sime'], [15, 'Vaillant'], [16, 'Viessmann'], [17, 'Worcester'], [18, 'Other']],
-    // Friendly select for the default graph window (firmware stores minutes, 0-1440).
-    ui_graphtimewindow: [[10, '10 min'], [30, '30 min'], [60, '1 hour'], [240, '4 hours'], [1440, '24 hours']],
     // Webhook POST content type — standard closed set (string-valued enum; the
     // string-safe select path preserves any custom value not in this list).
     webhookcontenttype: [['application/json', 'application/json'], ['application/x-www-form-urlencoded', 'form-urlencoded'], ['text/plain', 'text/plain']]
@@ -2390,6 +2351,8 @@
   // rate budget of 1 request per 1.5 s, burst 2 (ADR-172, restAPI.ino kApiRateLimitRoutes),
   // so every caller goes through fetchOtmonitor(): at most one request in flight, and a
   // 429 pauses all callers for the retry_after the device asks for.
+  // evaluate.py::check_poll_window_coupling reads this value: the otmonitor window in
+  // restAPI.ino (gApiRateLimitBudgets) must stay at 50-90% of it.
   var OTMON_POLL_MS = 2000;
   var otmonInflight = false, otmonPauseUntil = 0, otmonData = null, otmonLastOkMs = 0;
   function retryAfterMs(r, dflt) {
@@ -2429,8 +2392,8 @@
   // fallback already call; it is the shared, guarded fetcher now.
   function fetchSeed() { fetchOtmonitor(); }
   // 2 s tick: polls only while Monitor > Values is open, or while the PIC is in PS=1
-  // mode (the socket stays open but carries no frames, so Home would freeze). Classic
-  // does the same (index.js applyPSmodeState). The tick itself costs no request.
+  // mode (the socket stays open but carries no frames, so Home would freeze). The
+  // former classic UI did the same. The tick itself costs no request.
   function otmonTick() {
     if (document.hidden) return;
     var vis = isMonitorVisible('mvalues');
@@ -2443,17 +2406,19 @@
   // own budget of 1 per 4 s, burst 2. Ask only when the open socket has been silent for
   // 15 s (measured from when it opened, not from page load), and keep asking every
   // 10 s while PS=1 is on so the exit is noticed. A silent bench bus also looks quiet;
-  // psmode decides.
+  // psmode decides. evaluate.py::check_poll_window_coupling reads DEVTIME_POLL_MS: the
+  // device/time window in restAPI.ino must stay at or below 90% of it.
+  var DEVTIME_POLL_MS = 10000;
   var psMode = false, wsOpenMs = 0, wsLastFrameMs = 0, devTimeInflight = false, devTimeLastMs = 0;
   function psCheckTick() {
     if (document.hidden || devTimeInflight || !ws || ws.readyState !== 1) return;
     var now = Date.now();
     var quietSince = Math.max(wsOpenMs, wsLastFrameMs);
     if (!psMode && now - quietSince < 15000) return;
-    if (now - devTimeLastMs < 10000) return;
+    if (now - devTimeLastMs < DEVTIME_POLL_MS) return;
     devTimeInflight = true; devTimeLastMs = now;
     fetch(APIGW + 'v2/device/time').then(function (r) {
-      if (r.status === 429) return retryAfterMs(r, 5000).then(function (ms) { devTimeLastMs = Date.now() + ms - 10000; return null; });
+      if (r.status === 429) return retryAfterMs(r, 5000).then(function (ms) { devTimeLastMs = Date.now() + ms - DEVTIME_POLL_MS; return null; });
       return r.ok ? r.json() : null;
     }).then(function (j) {
       devTimeInflight = false;
@@ -2471,7 +2436,7 @@
   // ---------- Monitor > Values (TASK-1223.14) ----------
   // Every entry of otmonitor, in firmware order, with unit and stale marking. Rows are
   // built once per key and updated in place, so an open label editor survives the 2 s
-  // refresh. Labels match classic translateFields (index.js:7471-7503, 7591-7599).
+  // refresh. Labels match the former classic translateFields (commit 3aa1ef927).
   var OTMON_LABELS = {
     flamestatus: 'Flame Status', chenable: 'Central Heating Enabled', chmodus: 'Central Heating Status',
     ch2enable: 'Central Heating 2 Enabled', ch2modus: 'Central Heating 2 Status',
@@ -2922,9 +2887,9 @@
       ]]
     ];
     // TASK-1223.18 (gap audit row 36): every device/info field the curated groups above
-    // do not show, grouped by prefix like classic's generic loop (index.js:6117-6176).
+    // do not show, grouped by prefix like the former classic UI's generic loop.
     // Raw key as the label: the hd_* counters match the MQTT stats topic names. Zero and
-    // false are kept (a zero counter is information); otgwsimulation is skipped as in classic.
+    // false are kept (a zero counter is information); otgwsimulation is skipped as classic did.
     var CURATED = ['fwversion', 'compiled', 'picfwversion', 'picfwtype', 'picdeviceid', 'board',
       'hostname', 'ipaddress', 'macaddress', 'ssid', 'wifirssi', 'wifiquality', 'wifiquality_text',
       'chip_model_est', 'chipid', 'coreversion', 'sdkversion', 'cpufreq', 'flash_size', 'flashchipsize',
@@ -3065,8 +3030,8 @@
     }).catch(function () { if (b) { b.className = 'pic-banner'; b.textContent = 'Update check failed'; } });
   }
   // Gateway settings · PR= values (TASK-1223.17, gap audit row 35). Renders every field
-  // of /api/v2/pic/settings (restAPI.ino sendPICsettings) with classic's decoding
-  // (index.js:5448-5808). Each GET returns the cache AND starts a ~45 s PR= readout cycle
+  // of /api/v2/pic/settings (restAPI.ino sendPICsettings) with the former classic
+  // UI's decoding (commit 3aa1ef927). Each GET returns the cache AND starts a ~45 s PR= readout cycle
   // on the PIC (a GET during a running cycle is ignored by triggerPICsettingsReadout).
   // So: one GET on tab open, then re-read every 5 s for at most 45 s while the PIC tab
   // stays open, stopping early once every field has arrived. One request at a time.
@@ -3229,17 +3194,16 @@
   }
 
   // ---------- Advanced > File System — in-page FSexplorer (TASK-982) ----------
-  // Mirrors the classic FSexplorer.html against /api/v2/filesystem/files. The listing
+  // Mirrors FSexplorer.html against /api/v2/filesystem/files. The listing
   // is a heterogeneous JSON array: file/dir entries {name,size,type} followed by ONE
   // trailing storage-summary {usedBytes,totalBytes,freeBytes,truncated}. All names are
   // device-sourced -> DOM-built with textContent only, never innerHTML.
   var fsCurrentPath = '/';
   // Core UI assets: deleting any of these bricks the very page you are looking at, so
-  // the Delete affordance is withheld (parity with the classic protectedFiles guard).
+  // the Delete affordance is withheld (parity with the FSexplorer.html protectedFiles guard).
   var FS_PROTECTED = [
-    'v2.html', 'v2.js', 'v2.css', 'sat.js', 'sat-slider.js', 'theme-toggle.js', 'echarts-theme.js',
-    'index.html', 'index.js', 'index_common.css', 'components.css', 'ds-tokens.css', 'graph.js',
-    'FSexplorer.html', 'FSexplorer.png', 'fsexplorer.css', 'v2-bundle.css', 'design.html', 'favicon.ico', 'settings.png',
+    'v2.html', 'v2.js', 'v2-bundle.css',
+    'FSexplorer.html', 'FSexplorer.png', 'fsexplorer.css', 'favicon.ico', 'settings.png',
     'inter-400.woff2', 'inter-700.woff2', 'jetbrains-mono-400.woff2'
   ];
   function fsFmtBytes(n) {
@@ -3589,7 +3553,7 @@
   // depth layers (Thermostat / Control / Technical) and writes back via the SAT
   // POST routes verified in restAPI.ino: /sat/enable, /sat/target, /sat/preset,
   // /sat/mode, /sat/settings/<name>. Temperature history accumulates client-side
-  // across polls (no firmware history endpoint, by design — mirrors classic sat.js).
+  // across polls (no firmware history endpoint, by design — as in the former classic SAT page).
   var satPollTimer = null;
   var satLastData = null;
   var satMarkers = [];
@@ -4777,8 +4741,6 @@
     });
     var fsUpBtn = document.getElementById('fsUpload');
     if (fsUpBtn) fsUpBtn.addEventListener('click', fsDoUpload);
-    var ut = document.getElementById('uiToggle');
-    if (ut) ut.addEventListener('click', gotoClassic);
 
     // Monitor > Log controls
     var lp = document.getElementById('logPause');

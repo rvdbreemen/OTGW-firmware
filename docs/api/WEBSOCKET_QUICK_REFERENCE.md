@@ -12,7 +12,7 @@ Browser                          ESP8266
                                  [LISTENING on port 81]
 User opens http://esp-ip/       ↓
   ↓                              ↓
-Loads index.html & index.js      ↓
+Loads v2.html & v2.js            ↓
   ↓                              ↓
 JavaScript executes              ↓
   ↓                              ↓
@@ -51,7 +51,7 @@ new WebSocket("ws://esp-ip:81/") ↓
 ## Files
 
 - **Server:** `webSocketStuff.ino` (ESP8266 code)
-- **Client:** `data/index.js` (Browser JavaScript)
+- **Client:** `data/v2.js` (Browser JavaScript, `connectWs`)
 - **Detailed docs:** `docs/WEBSOCKET_FLOW.md`
 
 ## Common Misconceptions

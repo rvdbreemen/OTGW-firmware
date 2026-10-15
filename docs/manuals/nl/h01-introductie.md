@@ -8,7 +8,7 @@ De firmware kent twee actieve lijnen. De 2.0.0-lijn (de `dev`-branch die hier be
 
 Nieuw in de 2.0.0-lijn:
 
-- Een herontworpen v2 Web UI die naast de klassieke UI bestaat, selecteerbaar is en mobielvriendelijk.
+- Een herontworpen, mobielvriendelijke v2 Web UI, de enige web-UI op de 2.0.0-lijn (de klassieke UI is verwijderd).
 - BLE-sensorondersteuning: Xiaomi MiBeacon (inclusief encrypted v4/v5 via een per-sensor bindkey), ATC/pvvx custom firmware, en BTHome v2.
 - Een first-time-setup onboarding wizard die eenmalig draait op een vers apparaat en opnieuw te starten is vanuit Instellingen.
 - Een unified Home Assistant heat/cool/off climate entity, aangestuurd door de OpenTherm-statusbits.
@@ -101,7 +101,7 @@ v2.0.0 verkeert op het moment van schrijven nog in alpha. De bestaande functiona
 - Nachtelijke herstart: configureerbare automatische reboot (tijdstip en dagkeuze) om heap-fragmentatie op te lossen bij langlopende ESP8266-apparaten
 
 **Webinterface**
-- Herontworpen v2 Web UI (`v2.html`): mobielvriendelijk, selecteerbaar en bestaat naast de klassieke UI. Bevat een first-time-setup onboarding wizard die eenmalig draait op een vers apparaat en opnieuw te starten is vanuit Instellingen.
+- Herontworpen v2 Web UI (`v2.html`): mobielvriendelijk en de enige web-UI op de 2.0.0-lijn; de klassieke UI is verwijderd zodat alles in de LittleFS-partitie van de WiFi-update-indeling past. Bevat een first-time-setup onboarding wizard die eenmalig draait op een vers apparaat en opnieuw te starten is vanuit Instellingen.
 - De webinterface is uitsluitend Engelstalig. Resterende Nederlandse strings uit de OTTHING-platformport zijn verwijderd (TASK-569). Dit handboek blijft Nederlandstalig.
 
 **Build en tooling**

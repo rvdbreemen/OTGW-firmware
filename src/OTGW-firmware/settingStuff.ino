@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.423
+**  Version  : v2.0.0-alpha.424
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -281,16 +281,8 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("nightlyrestart"), settings.bNightlyRestart, true);
   writeJsonIntKV(file, F("nightlyrestarthour"), settings.iRestartHour, true);
   writeJsonIntKV(file, F("boardmode"), settings.iBoardMode, true);  // ADR-127 combo board-mode cache/override
-  writeJsonBoolKV(file, F("ui_autoscroll"), settings.ui.bAutoScroll, true);
-  writeJsonBoolKV(file, F("ui_timestamps"), settings.ui.bShowTimestamp, true);
-  writeJsonBoolKV(file, F("ui_capture"), settings.ui.bCaptureMode, true);
-  writeJsonBoolKV(file, F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, true);
-  writeJsonBoolKV(file, F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, true);
-  writeJsonBoolKV(file, F("ui_autoexport"), settings.ui.bAutoExport, true);
-  writeJsonBoolKV(file, F("ui_usev2"), settings.ui.bUseV2, true);
   writeJsonBoolKV(file, F("ui_onboarded"), settings.ui.bOnboarded, true);
   writeJsonBoolKV(file, F("sat_onboarded"), settings.ui.bSatOnboarded, true);
-  writeJsonIntKV(file, F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, true);
   writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settings.sensors.bEnabled, true);
   writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settings.sensors.bLegacyFormat, true);
   writeJsonIntKV(file, F("GPIOSENSORSpin"), settings.sensors.iPin, true);
@@ -841,19 +833,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("nightlyrestarthour"))==0) { int h = atoi(newValue); settings.iRestartHour = (h >= 0 && h <= 23) ? h : 4; }
   else if (strcasecmp_P(field, PSTR("boardmode"))==0)          { int m = atoi(newValue); settings.iBoardMode = (m >= 0 && m <= 3) ? (uint8_t)m : 0; }  // ADR-127/157
 
-  else if (strcasecmp_P(field, PSTR("ui_autoscroll"))==0)      settings.ui.bAutoScroll = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("ui_timestamps"))==0)      settings.ui.bShowTimestamp = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("ui_capture"))==0)         settings.ui.bCaptureMode = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("ui_autoscreenshot"))==0)  settings.ui.bAutoScreenshot = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("ui_autodownloadlog"))==0) settings.ui.bAutoDownloadLog = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("ui_autoexport"))==0)      settings.ui.bAutoExport = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("ui_usev2"))==0)          settings.ui.bUseV2 = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("ui_onboarded"))==0)    { settings.ui.bOnboarded = EVALBOOLEAN(newValue); g_sawOnboardedKey = true; }  // TASK-997: key presence = existing install (see readSettings migration)
   else if (strcasecmp_P(field, PSTR("sat_onboarded"))==0)     settings.ui.bSatOnboarded = EVALBOOLEAN(newValue);  // TASK-1012: no g_sawKey migration — defaults false so existing SAT users are prompted once (client gates on satenabled)
-  else if (strcasecmp_P(field, PSTR("ui_graphtimewindow"))==0) {
-    int val = atoi(newValue);
-    settings.ui.iGraphTimeWindow = constrain(val, 1, 1440);
-  }
 
   else if (strcasecmp_P(field, PSTR("GPIOSENSORSenabled")) == 0)
   {

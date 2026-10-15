@@ -103,7 +103,7 @@ import time
 import urllib.error
 import urllib.request
 
-ASSET_PATHS = ["/v2.html", "/v2.css", "/ds-tokens.css", "/v2.js"]
+ASSET_PATHS = ["/v2.html", "/v2-bundle.css", "/v2.js"]
 API_PATHS = ["/api/v2/device/info", "/api/v2/sat/status", "/api/v2/health"]
 HTTP_TIMEOUT_SEC = 5.0
 # Pause before every JSON request. The REST gate frees a slot when the previous

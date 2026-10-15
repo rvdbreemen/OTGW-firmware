@@ -18,15 +18,15 @@ The interface provides:
 
 The interface adapts to desktop and mobile screens and supports both light and dark themes. A persistent firmware/filesystem mismatch banner appears at the top of every page when the running firmware build hash does not match the LittleFS image hash, with a direct link to the flash utility.
 
-> **Two coexisting UIs**: The 2.0.0 firmware ships two web UIs on the same device: the original **Classic UI** (documented in the sections that follow) and a newer **v2 UI** (the "New UI"). Both are served from LittleFS and can be used interchangeably. A switch button in the header (**New UI** on the classic side, **Classic UI** on the v2 side) toggles between them. The choice is stored device-wide in `settings.ini` (the `ui_usev2` flag), not per-browser, so every browser that opens the device sees the selected UI. See "The v2 Web UI" below.
+> **One UI**: The 2.0.0 firmware ships one web UI, the **v2 UI**, served at `http://<device>/` (and at `/index.html` for old bookmarks). The classic UI and its **Classic UI** / **New UI** switch were removed in TASK-1223.12 so the filesystem fits the smaller LittleFS partition of the WiFi-update layout (ADR-191). The features the classic UI had and v2 does not are listed in `docs/history/2026-10-15-retired-classic-web-ui-features.md`.
 
 ### The v2 Web UI
 
-The v2 UI is a second, fully functional web interface that coexists with the Classic UI. It targets the same firmware and the same REST/WebSocket endpoints, so both UIs stay in sync; you can move between them at any time without losing configuration.
+The v2 UI is the device's web interface. It uses the same firmware REST and WebSocket endpoints as before, so no configuration is lost when you update from a build that still had the classic UI.
 
-**Selecting the UI.** The switch is device-wide, not per-browser. Clicking **Classic UI** in the v2 header (or **New UI** in the classic header) writes the `ui_usev2` flag to `settings.ini` via the REST API, then reloads the page so the firmware serves the chosen UI. No hard reload (CTRL-R / cache clear) is needed, and the other UI keeps working unchanged. The switch retries automatically if the device is briefly busy, and only reloads after the change is confirmed.
+**Upgrading from a build with the classic UI.** Nothing to do. The old `ui_usev2` flag and the classic display preferences in `settings.ini` are ignored and disappear at the next settings save.
 
-**Header and navigation.** The v2 header is a dark strip in both light and dark themes. It shows identity chips (hostname and firmware version, plus IP address and Wi-Fi signal bars), a connectivity status pill, a live connectivity summary strip, a clock, the UI-switch and theme buttons, and a **SIMULATION** badge that appears only while OT-replay simulation is active. Main navigation is a row of underlined text tabs: **Home**, **SAT**, **Monitor**, **Settings**, and **Advanced**. Sub-navigation within a page uses the same underlined text-tab style.
+**Header and navigation.** The v2 header is a dark strip in both light and dark themes. It shows identity chips (hostname and firmware version, plus IP address and Wi-Fi signal bars), a connectivity status pill, a live connectivity summary strip, a clock, the theme button, and a **SIMULATION** badge that appears only while OT-replay simulation is active. Main navigation is a row of underlined text tabs: **Home**, **SAT**, **Monitor**, **Settings**, and **Advanced**. Sub-navigation within a page uses the same underlined text-tab style.
 
 #### Home page
 
@@ -75,7 +75,7 @@ The v2 UI is designed to be usable on a smartphone. Its assets are served with a
 
 ### Navigation
 
-The remaining sections of this chapter describe the **Classic UI**. The Classic UI is organized into main tabs, accessible from the navigation bar at the top of the page:
+The remaining sections of this chapter still describe the removed **classic UI** and have not been rewritten for v2 yet. They are kept for reference; where they differ from what you see, the v2 UI is correct. The classic UI was organized into main tabs, accessible from the navigation bar at the top of the page:
 
 | Tab | Purpose |
 |---|---|

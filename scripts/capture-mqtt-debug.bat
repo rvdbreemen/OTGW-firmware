@@ -2352,7 +2352,7 @@ finally {
             $httpProbePaths = @(
                 '/',                         # root page (chunked index emitter - the suspect)
                 '/index.html',
-                '/index.js',
+                '/v2.js',
                 '/api/v2/health',
                 '/api/v2/device/info',       # the real devinfo endpoint (NOT /api/v2/devinfo)
                 '/api/v2/device/time',

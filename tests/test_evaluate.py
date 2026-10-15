@@ -306,8 +306,8 @@ class TestDesignSystemDriftHelpers(unittest.TestCase):
 
     def test_compute_drift_set_arithmetic_and_allowlist(self):
         used = {
-            "used-missing": ["index.html:1"],
-            "allowed-hook": ["index.html:2"],
+            "used-missing": ["page.html:1"],
+            "allowed-hook": ["page.html:2"],
         }
         defined = {"defined-unused"}
         missing, dead, allowlisted = evaluate.compute_drift(
@@ -315,14 +315,14 @@ class TestDesignSystemDriftHelpers(unittest.TestCase):
             defined,
             {"allowed-hook"},
         )
-        self.assertEqual(missing, {"used-missing": ["index.html:1"]})
+        self.assertEqual(missing, {"used-missing": ["page.html:1"]})
         self.assertEqual(dead, {"defined-unused"})
-        self.assertEqual(allowlisted, {"allowed-hook": ["index.html:2"]})
+        self.assertEqual(allowlisted, {"allowed-hook": ["page.html:2"]})
 
     def test_drift_against_known_fixture(self):
         with tempfile.TemporaryDirectory() as tmp:
             data_dir = Path(tmp)
-            (data_dir / "index.html").write_text(
+            (data_dir / "page.html").write_text(
                 '<div class="present missing"></div>\n',
                 encoding="utf-8",
             )
@@ -342,7 +342,7 @@ class TestDesignSystemDriftHelpers(unittest.TestCase):
                 {"allowed-hook"},
             )
 
-        self.assertEqual(missing, {"missing": ["index.html:1"]})
+        self.assertEqual(missing, {"missing": ["page.html:1"]})
         self.assertEqual(allowlisted, {"allowed-hook": ["app.js:1"]})
 
 
@@ -724,12 +724,27 @@ class TestPollWindowCoupling(unittest.TestCase):
     """ADR-172/173 gate: server windows track the shipped client poll periods."""
 
     REST = "{ 1500UL, 0, 2, false },\n{ 4000UL, 0, 2, false },\n"
-    JS = "const OTMONITOR_POLL_MS = 2000;\nconst DEVTIME_POLL_MS   = 5000;\n"
+    # v2.js declares its poll periods with var (TASK-1223.12).
+    JS = "  var OTMON_POLL_MS = 2000;\n  var DEVTIME_POLL_MS = 10000;\n"
 
     def test_passes_at_shipped_values(self):
         r = evaluate.poll_window_coupling(self.REST, self.JS)
         self.assertTrue(r["constants_found"])
         self.assertTrue(r["ratios_ok"], r["offenders"])
+
+    def test_reads_the_real_v2_bundle(self):
+        """The constants must be found in the shipped data/v2.js, not only in a fixture."""
+        root = Path(__file__).resolve().parents[1]
+        v2_js = (root / "src" / "OTGW-firmware" / "data" / "v2.js").read_text(encoding="utf-8")
+        rest = (root / "src" / "OTGW-firmware" / "restAPI.ino").read_text(encoding="utf-8")
+        r = evaluate.poll_window_coupling(rest, v2_js)
+        self.assertTrue(r["constants_found"])
+        self.assertTrue(r["ratios_ok"], r["offenders"])
+
+    def test_accepts_const_and_let_declarations(self):
+        for kw in ("const", "let"):
+            js = f"{kw} OTMON_POLL_MS = 2000;\n{kw} DEVTIME_POLL_MS = 10000;\n"
+            self.assertTrue(evaluate.poll_window_coupling(self.REST, js)["constants_found"], kw)
 
     def test_detects_window_creeping_up_to_the_client_interval(self):
         """A window == the client period 429s a perfectly well-behaved client."""
@@ -737,9 +752,21 @@ class TestPollWindowCoupling(unittest.TestCase):
         self.assertFalse(r["ratios_ok"])
 
     def test_detects_client_speeding_up_without_the_server(self):
-        fast_js = "const OTMONITOR_POLL_MS = 1000;\nconst DEVTIME_POLL_MS   = 5000;\n"
+        fast_js = "var OTMON_POLL_MS = 1000;\nvar DEVTIME_POLL_MS = 10000;\n"
         r = evaluate.poll_window_coupling(self.REST, fast_js)
         self.assertFalse(r["ratios_ok"])
+
+    def test_devtime_window_far_below_the_client_period_passes(self):
+        """device/time is a fixed budget for third-party callers: no 50% floor."""
+        js = "var OTMON_POLL_MS = 2000;\nvar DEVTIME_POLL_MS = 60000;\n"
+        r = evaluate.poll_window_coupling(self.REST, js)
+        self.assertTrue(r["ratios_ok"], r["offenders"])
+
+    def test_detects_devtime_window_above_90_percent_of_the_client_period(self):
+        js = "var OTMON_POLL_MS = 2000;\nvar DEVTIME_POLL_MS = 4400;\n"
+        r = evaluate.poll_window_coupling(self.REST, js)
+        self.assertFalse(r["ratios_ok"])
+        self.assertTrue(any("device/time" in o for o in r["offenders"]), r["offenders"])
 
     def test_reports_missing_constants_rather_than_passing(self):
         r = evaluate.poll_window_coupling(self.REST, "// no constants here")

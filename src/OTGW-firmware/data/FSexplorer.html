@@ -1,7 +1,7 @@
 <!--
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v2.0.0-alpha.423
+**  Version  : v2.0.0-alpha.424
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -217,19 +217,11 @@
                          deleteCell.width = '10%';
                          deleteCell.setAttribute('nowrap', '');
 
-                         // Footgun guard: no Delete link next to a load-bearing asset. The v2/SAT
-                         // assets below ship in data/ and have their own routes in FSexplorer.ino,
-                         // but were never added here, so deleting v2.js left a blank page at '/'
-                         // whenever settings.ui.bUseV2 is on.
+                         // Footgun guard: no Delete link next to a load-bearing asset. Deleting
+                         // v2.js, for example, leaves a blank page at '/'.
                          const protectedFiles = ['FSexplorer.html', 'FSexplorer.png', 'fsexplorer.css',
-                                                 'index.html', 'index.js',
-                                                 'index_common.css', 'components.css',
-                                                 'ds-tokens.css', 'graph.js',
-                                                 'design.html', 'favicon.ico',
-                                                 'settings.png',
-                                                 'v2.html', 'v2.js', 'v2.css', 'v2-bundle.css',
-                                                 'sat.js', 'sat-slider.js',
-                                                 'theme-toggle.js', 'echarts-theme.js',
+                                                 'favicon.ico', 'settings.png',
+                                                 'v2.html', 'v2.js', 'v2-bundle.css',
                                                  'inter-400.woff2', 'inter-700.woff2',
                                                  'jetbrains-mono-400.woff2'];
                          if (!protectedFiles.includes(files[i].name)) {

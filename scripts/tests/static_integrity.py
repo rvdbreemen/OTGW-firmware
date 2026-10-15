@@ -78,11 +78,11 @@ compare it with the first TCP flight: 3 x 1436 B = 4308 B. The MSS is 1436
 Arduino libs) and lwIP starts cwnd at 4380 B for that MSS (tcp_in.c:69 in the
 framework-espidf package).
 
-Default targets: /settings.ini, /sat-slider.js (the control: its head plus
-1741 B fits in the first flight), /index.html, /v2-bundle.css and /index.js,
+Default targets: /settings.ini, /fsexplorer.css (the control: its head plus
+3093 B fits in the first flight), /index.html, /v2-bundle.css and /v2.js,
 plus the REST controls /api/v2/device/info and /api/v2/settings.
-"/index.html" serves /v2.html when the v2 UI is the default
-(FSexplorer.ino:160-164). Asset ETags read "<fshash>-<served path>"
+"/index.html" serves /v2.html, the only Web UI shell since TASK-1223.12
+(FSexplorer.ino sendIndex). Asset ETags read "<fshash>-<served path>"
 (FSexplorer.ino:109), so the expected size is looked up for the file actually
 served.
 
@@ -122,10 +122,10 @@ except Exception:
 
 DEFAULT_TARGETS = [
     "/settings.ini",
-    "/sat-slider.js",
+    "/fsexplorer.css",
     "/index.html",
     "/v2-bundle.css",
-    "/index.js",
+    "/v2.js",
     "/api/v2/device/info",
     "/api/v2/settings",
 ]

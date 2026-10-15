@@ -12,6 +12,7 @@ superseded_by: null
 related:
   - "ADR-166"
   - "ADR-190"
+  - "ADR-192"
 topics:
   - "ota"
   - "partitions"
@@ -65,6 +66,11 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-190
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-192
     changed_via: adr-kit lifecycle
 ```
 

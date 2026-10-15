@@ -6,7 +6,8 @@ The filesystem image is built from a staging copy of src/OTGW-firmware/data/.
 These tests check the invariants that make that safe:
 - the source directory is never modified;
 - files that are not browser assets reach the image byte-for-byte;
-- browser assets (.js/.css) get smaller, and v2.css is left out;
+- browser assets (.js/.css) get smaller, and the v2-bundle.css inputs
+  (ds-tokens.css, v2.css) are left out;
 - a minifier that returns nothing fails the step instead of shipping it.
 
 TASK-1225: a guard against CSS comments that close early. A comment text with
@@ -75,6 +76,14 @@ class TestStagingOnRealData(unittest.TestCase):
     def test_excluded_files_not_staged(self):
         for name in build.STAGING_EXCLUDE:
             self.assertNotIn(name, self.staged)
+
+    def test_bundle_inputs_excluded_but_bundle_shipped(self):
+        # TASK-1223.12: no page loads ds-tokens.css or v2.css on its own; v2.html
+        # loads v2-bundle.css, which build.py generates from both.
+        self.assertIn("ds-tokens.css", build.STAGING_EXCLUDE)
+        self.assertIn("v2.css", build.STAGING_EXCLUDE)
+        self.assertIn("ds-tokens.css", self.source_before)
+        self.assertIn("v2-bundle.css", self.staged)
 
     def test_nothing_else_dropped(self):
         expected = set(self.source_before) - set(build.STAGING_EXCLUDE)

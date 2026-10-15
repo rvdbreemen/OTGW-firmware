@@ -15,14 +15,10 @@
  *   [data-theme="dark"], body.dark, html.dark
  *     -> dark overrides
  *
- * Apply-volgorde in index.html / FSexplorer.html:
+ * Geen pagina laadt dit bestand los: build.py (generate_v2_css_bundle) plakt het
+ * met v2.css samen tot v2-bundle.css, en alleen die bundel komt in het image.
  *
- *   <link rel="stylesheet" href="ds-tokens.css">
- *   <link rel="stylesheet" href="components.css">
- *   <link rel="stylesheet" href="index.css">          <!-- legacy, optional -->
- *   <link rel="stylesheet" href="index_dark.css">     <!-- legacy, optional -->
- *
- * components.css gebruikt uitsluitend var(--*) tokens uit dit bestand.
+ * v2.css gebruikt uitsluitend var(--*) tokens uit dit bestand.
  * Wil je een token aanpassen — doe dat alleen hier.
  */
 
@@ -136,7 +132,7 @@
   --log-fg:            #d4d4d4;
   --log-scrollbar:     #555555;
 
-  /* Chart axis (ECharts via CDN — zie components.css .ds-chart) */
+  /* Chart axis */
   --chart-axis-line:   #d0d0d0;
   --chart-grid-line:   #ececec;
   --chart-axis-label:  #707070;

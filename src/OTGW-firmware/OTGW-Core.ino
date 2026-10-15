@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.423
+**  Version  : v2.0.0-alpha.424
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6289,8 +6289,8 @@ void upgradepic(AsyncWebServerRequest *request) {
       LittleFS.remove(path);
     }
   }
-  webPushHeader(F("Location"), F("index.html#tabPICflash"));
-  webSendP(303, PSTR("text/html; charset=UTF-8"), PSTR("<a href='index.html#tabPICflash'>Return</a>"));
+  webPushHeader(F("Location"), F("/"));
+  webSendP(303, PSTR("text/html; charset=UTF-8"), PSTR("<a href='/'>Return</a>"));
 }
 #endif // HAS_PIC — end of PIC firmware upgrade functions
 

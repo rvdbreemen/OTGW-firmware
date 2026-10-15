@@ -8,7 +8,7 @@ The firmware has two active lines. The 2.0.0 line (the `dev` branch documented h
 
 Highlights new in the 2.0.0 line:
 
-- A redesigned v2 Web UI that coexists with the classic UI, is selectable, and is mobile-friendly.
+- A redesigned, mobile-friendly v2 Web UI, the only web UI on the 2.0.0 line (the classic UI was removed).
 - BLE sensor support: Xiaomi MiBeacon (including encrypted v4/v5 via a per-sensor bindkey), ATC/pvvx custom firmware, and BTHome v2.
 - A first-time-setup onboarding wizard that runs once on a fresh device and is re-runnable from Settings.
 - A unified Home Assistant heat/cool/off climate entity driven by the OpenTherm status bits.
@@ -73,7 +73,7 @@ Version 2.0.0 is still in alpha at the time of writing. It is feature complete o
 - **Streaming MQTT HA discovery**: Auto-discovery payloads are now compiled into flash (PROGMEM) and published via an asynchronous, bitmap-driven drip publisher that streams each entity directly to the broker. This replaces the previous LittleFS- and RAM-staged approach, eliminating large staging buffers and improving heap stability on ESP8266. The streaming pipeline also covers SAT switches and select entities (TASK-284), runtime-discovered Dallas sensors, the climate and number entities, and HA button and select entities for PIC commands.
 - **Just-in-time MQTT discovery (ADR-100)**: Discovery configs for OpenTherm MsgIDs are now published only when the boiler or thermostat first emits that MsgID, instead of bulk-publishing all 256 IDs at every boot. This keeps the broker registry focused on the IDs your hardware actually uses and reduces start-up MQTT traffic. The handler for the `homeassistant/status` online event also no longer republishes everything; the broker retains discovery configs across HA restarts.
 - **Flat per-value MQTT topics (ADR-101)**: Each sensor or control value publishes as a plain scalar on its own topic. No aggregated JSON state topics. This is a deliberate design choice that keeps auto-discovery transparent and avoids the need for a custom HA component.
-- **Redesigned v2 Web UI**: A new, mobile-friendly web interface (`v2.html`) coexists with the classic UI and is selectable. It includes a first-time-setup onboarding wizard that runs once on a fresh device and can be re-run from Settings.
+- **Redesigned v2 Web UI**: A new, mobile-friendly web interface (`v2.html`), the only web UI on the 2.0.0 line; the classic UI was removed to fit the LittleFS partition of the WiFi-update layout. It includes a first-time-setup onboarding wizard that runs once on a fresh device and can be re-run from Settings.
 - **Unified climate entity**: The Home Assistant climate entity now supports off / heat / cool. Its mode and action are derived from the OpenTherm status bits and published on their own topics (see Chapter 4).
 - **English-only web UI**: Leftover Dutch UI strings inherited from the OTTHING platform port have been removed. The web UI is now consistently English (TASK-569).
 - **Nightly restart scheduling**: Configurable automatic reboot at a chosen time and day to recover from heap fragmentation on long-running ESP8266 devices.

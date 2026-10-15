@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.423
+**  Version  : v2.0.0-alpha.424
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -99,12 +99,10 @@ static void serveVersionedAsset(const char* path, const __FlashStringHelper* mim
   const char* fsHash = getFilesystemHash();
   if (fsHash && fsHash[0] != '\0') {
     // The ETag must identify the RESOURCE REPRESENTATION, not merely the
-    // filesystem build. The root route ("/", "/index", "/index.html") serves
-    // index.html OR v2.html depending on settings.ui.bUseV2 (sendIndex), so a
-    // bare fsHash ETag is identical for both shells. The browser then gets a
-    // false 304 when the UI toggle flips and keeps showing the stale shell until
-    // a hard reload (TASK-960: "need CTRL-R between UI switches"). Include the
-    // served path so each shell, and each asset, has a distinct validator.
+    // filesystem build. A bare fsHash ETag would be identical for every file,
+    // so a browser could get a false 304 for one path from the validator of
+    // another (TASK-960 saw this when the root route still switched between two
+    // UI shells). Include the served path so each asset has a distinct validator.
     char etag[64];
     snprintf_P(etag, sizeof(etag), PSTR("\"%s-%s\""), fsHash, path);
     if (hasHeaderCompat(F("If-None-Match")) &&
@@ -120,8 +118,8 @@ static void serveVersionedAsset(const char* path, const __FlashStringHelper* mim
   webSendFile(path, mime, /*gzip=*/false);
 }
 
-// TASK-989: fonts are large immutable binaries referenced from ds-tokens.css
-// (@font-face). Unlike the HTML/CSS/JS shell they never change between releases,
+// TASK-989: fonts are large immutable binaries that v2.html loads one at a time
+// through the FontFace() API. Unlike the HTML/CSS/JS shell they never change between releases,
 // so serve them with a long immutable max-age: after the first visit the browser
 // never asks again (not even a 304 probe), removing three parallel connections
 // from every page load. They previously fell through to the onNotFound catch-all
@@ -136,13 +134,7 @@ static void serveImmutableAsset(const char* path, const __FlashStringHelper* mim
   webSendFile(path, mime, /*gzip=*/false);
 }
 
-// Serve /FSexplorer.html for the no-index fallback routes (/, /index, /index.html).
-static void sendFSexplorerFallback(AsyncWebServerRequest *request) {
-  webBeginRequest(request);
-  webSendFile("/FSexplorer.html", F("text/html; charset=UTF-8"), /*gzip=*/false);
-}
-
-// Serve the web UI shell (index.html). ADR-139: the bespoke chunked
+// Serve the web UI shell (v2.html). ADR-139: the bespoke chunked
 // beginChunkedResponse emitter that rewrote ?v=<fsHash> into asset URLs line by
 // line is retired. The shell is now a plain static file served from flash via
 // AsyncFileResponse with ETag validation, identical to every other asset, so it
@@ -153,15 +145,14 @@ static void sendIndex(AsyncWebServerRequest *request) {
   // caches credentials before any API call is made (ADR-056), avoiding a
   // mid-session popup. checkHttpAuth() sends the 401 challenge on failure.
   if (!checkHttpAuth()) return;
-  // TASK-908: device-wide default UI selector. When settings.ui.bUseV2 is set,
-  // the root path serves the redesigned v2 shell; otherwise the classic UI.
-  // Both shells stay individually reachable at /index.html and /v2.html so the
-  // in-page toggle can always navigate explicitly regardless of the flag.
-  if (settings.ui.bUseV2 && LittleFS.exists("/v2.html")) {
-    serveVersionedAsset("/v2.html", F("text/html; charset=UTF-8"));
-  } else {
-    serveVersionedAsset("/index.html", F("text/html; charset=UTF-8"));
+  // TASK-1223.12: v2 is the only Web UI; the classic shell (index.html) is gone.
+  // Checked per request, not at boot: when v2.html is deleted or lost at runtime
+  // the root still lands on FSexplorer, the page to upload a working copy with.
+  if (!LittleFS.exists("/v2.html")) {
+    webSendFile("/FSexplorer.html", F("text/html; charset=UTF-8"), /*gzip=*/false);
+    return;
   }
+  serveVersionedAsset("/v2.html", F("text/html; charset=UTF-8"));
 }
 
 // TASK-989 NOTE: a server-level heap-guard middleware (shed/abort on low maxblock,
@@ -181,42 +172,28 @@ static void sendIndex(AsyncWebServerRequest *request) {
 void startWebserver(){
   // Versioned-asset helpers register one handler per asset; the lambda binds the
   // request context before delegating to serveVersionedAsset().
-  if (!LittleFS.exists("/index.html")) {
-    server.on("/",           HTTP_GET, sendFSexplorerFallback);
-    server.on("/index",      HTTP_GET, sendFSexplorerFallback);
-    server.on("/index.html", HTTP_GET, sendFSexplorerFallback);
-  } else {
-    // Serve index.html with ETag-based caching (ADR-139, amended TASK-958):
-    //  - Cache-Control: no-cache — browser may store but MUST revalidate via If-None-Match (ETag = fsHash) every load.
-    //  - Unchanged FS → server replies 304 Not Modified (headers only, no body re-download).
-    //  - FS upgraded/OTA → ETag changes → server replies 200 with fresh content on the very next load (no stale window).
-    //  - JS/CSS assets share the same stable-path + ETag policy (no ?v= query versioning).
-    server.on("/",           HTTP_GET, sendIndex);
-    server.on("/index",      HTTP_GET, sendIndex);
-    server.on("/index.html", HTTP_GET, sendIndex);
-  }
+  // The root paths keep /index and /index.html so old bookmarks still land on the UI.
+  // Serve v2.html with ETag-based caching (ADR-139, amended TASK-958):
+  //  - Cache-Control: no-cache — browser may store but MUST revalidate via If-None-Match (ETag = fsHash) every load.
+  //  - Unchanged FS → server replies 304 Not Modified (headers only, no body re-download).
+  //  - FS upgraded/OTA → ETag changes → server replies 200 with fresh content on the very next load (no stale window).
+  //  - JS/CSS assets share the same stable-path + ETag policy (no ?v= query versioning).
+  // sendIndex() falls back to FSexplorer when v2.html is missing.
+  server.on("/",           HTTP_GET, sendIndex);
+  server.on("/index",      HTTP_GET, sendIndex);
+  server.on("/index.html", HTTP_GET, sendIndex);
   server.serveStatic("/FSexplorer.png", LittleFS, "/FSexplorer.png");
 
   // ETag + bounded max-age caching for every static webui asset (ADR-139). Plain
   // readable files served from flash via AsyncFileResponse; no gzip, no ?v= query.
-  server.on("/index.js",         HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/index.js",         F("application/javascript")); });
-  server.on("/graph.js",         HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/graph.js",         F("application/javascript")); });
-  server.on("/sat.js",           HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/sat.js",           F("application/javascript")); });
-  server.on("/sat-slider.js",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/sat-slider.js",    F("application/javascript")); });
-  server.on("/echarts-theme.js", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/echarts-theme.js", F("application/javascript")); });
-  server.on("/theme-toggle.js",  HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/theme-toggle.js",  F("application/javascript")); });
-  server.on("/components.css",   HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/components.css",   F("text/css")); });
-  server.on("/ds-tokens.css",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/ds-tokens.css",    F("text/css")); });
   // TASK-1223.13: FSexplorer's own stylesheet, so the recovery page needs no design-system file.
   server.on("/fsexplorer.css",   HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/fsexplorer.css",   F("text/css")); });
-  // TASK-908: coexisting v2 Web UI bundle (served next to the classic assets).
+  // The v2 Web UI bundle (TASK-908; the only Web UI since TASK-1223.12).
   server.on("/v2.html",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); if (!checkHttpAuth()) return; serveVersionedAsset("/v2.html", F("text/html; charset=UTF-8")); });
   server.on("/v2.js",            HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2.js",            F("application/javascript")); });
-  server.on("/v2.css",           HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2.css",           F("text/css")); });
   // TASK-989: ds-tokens.css + v2.css concatenated at build time (build.py,
-  // generate_v2_css_bundle) -- v2.html loads this instead of the two separate
-  // files, cutting one request off its critical path. /v2.css and
-  // /ds-tokens.css stay routed above for design.html/index.html/FSexplorer.html.
+  // generate_v2_css_bundle). v2.html loads this bundle; the two source files are
+  // not shipped in the filesystem image (build.py STAGING_EXCLUDE).
   server.on("/v2-bundle.css",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2-bundle.css",    F("text/css")); });
   // TASK-989: immutable-cached font routes (see serveImmutableAsset above).
   server.on("/fonts/inter-400.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-400.woff2",          F("font/woff2")); });
@@ -593,7 +570,7 @@ bool handleFile(String&& path)
     return true;
   }
   if (!LittleFS.exists("/FSexplorer.html")) { webSendP(200, PSTR("text/html; charset=UTF-8"), (PGM_P)Helper); return true; }
-  if (path.endsWith("/")) path += F("index.html");
+  if (path.endsWith("/")) path += F("v2.html");
   // ADR-056 §1: settings.ini stores httppasswd and MQTTpasswd in cleartext, so this
   // read path sits INSIDE the protected admin boundary — it is not one of the "read
   // paths that do not expose secret values" the open carve-out covers. Every sibling

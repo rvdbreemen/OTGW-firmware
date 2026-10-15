@@ -1074,8 +1074,8 @@ paths:
                           type: boolean
                           description: True if the listing was truncated (too many entries)
               example:
-                - name: index.html
-                  size: 39791
+                - name: v2.html
+                  size: 48002
                   type: file
                 - name: fonts
                   size: 0

@@ -9,6 +9,8 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-192"
 ---
 # ADR-152: Coexisting v2 Web UI selected by a device-wide setting
 
@@ -27,6 +29,11 @@ status_history:
     changed_by: User
     reason: Initial decision record; v2 Web UI ships alongside classic, selected by settings.ui.bUseV2
     changed_via: adr-kit
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-192
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

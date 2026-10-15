@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-alpha.423
+**  Version  : v2.0.0-alpha.424
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -49,7 +49,7 @@ void doWebSocketClose() {
 // Disconnect-all wrapper for emergencyHeapRecovery() in helperStuff.ino (ADR-107
 // action #1). Same scoping rationale as doWebSocketClose() above. closeAll()
 // closes all connected WS clients, releasing their lwIP buffers (~2-4 KB each).
-// Browsers reconnect via the graph.js auto-reconnect.
+// Browsers reconnect on their own (v2.js connectWs retries after 5 s).
 void doWebSocketDisconnectAll() {
   otLogWs.closeAll();
 }
@@ -254,7 +254,7 @@ void startWebSocket() {
 //  1. cleanupClients() reaps closed/stale client slots, capped at MAX_WEBSOCKET_CLIENTS.
 //  2. A 30s application-level keepalive keeps watchdogs fed when no OT log flows and
 //     works around Safari WebSocket ping/pong quirks (ADR-025). Shape is identical to
-//     the old broadcast so index.js's keepalive handling is unchanged.
+//     the old broadcast so existing clients' keepalive handling is unchanged.
 void handleWebSocket() {
   if (!wsInitialized) return;
 

@@ -530,7 +530,7 @@ timeout = int(timeout_text)
 paths = [
     "/",
     "/index.html",
-    "/index.js",
+    "/v2.js",
     "/api/v2/health",
     "/api/v2/device/info",
     "/api/v2/device/time",

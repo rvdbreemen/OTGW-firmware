@@ -1,7 +1,8 @@
 """Web UI asset caching contract (ADR-139, amended by TASK-958).
 
-index.html loads its stylesheets and scripts through a sequential loader
-(TASK-960): loadCss('x.css', ...) calls and a SCRIPTS array. Every asset that
+v2.html, the only Web UI shell since TASK-1223.12, loads its stylesheet and
+script through a sequential loader (TASK-978/989): loadCss('x.css', ...) calls
+and a script element whose src is set in loadJs(). Every asset that
 loader requests must be served by serveVersionedAsset() in FSexplorer.ino (ETag
 = filesystem hash, Cache-Control: no-cache, so a reflash shows on the next
 load) under a stable URL: no ?v= query versioning.
@@ -20,10 +21,9 @@ MIME = {".css": "text/css", ".js": "application/javascript"}
 
 
 def loader_assets(html):
-    """Assets the index.html loader requests, in load order, without a leading './'."""
+    """Assets the v2.html loader requests, in load order, without a leading './'."""
     css = re.findall(r"loadCss\('([^']+)'", html)
-    m = re.search(r"var SCRIPTS = \[(.*?)\];", html, re.S)
-    scripts = re.findall(r"'([^']+)'", m.group(1)) if m else []
+    scripts = re.findall(r"\bs\.src\s*=\s*'([^']+)'", html)
     return [a[2:] if a.startswith("./") else a for a in css + scripts]
 
 
@@ -36,11 +36,11 @@ def route_mime(fsexplorer, asset):
 
 class TestWebUiAssetVersioning(unittest.TestCase):
     def setUp(self):
-        self.assets = loader_assets((DATA_DIR / "index.html").read_text(encoding="utf-8"))
+        self.assets = loader_assets((DATA_DIR / "v2.html").read_text(encoding="utf-8"))
         self.fsexplorer = FSEXPLORER.read_text(encoding="utf-8")
 
     def test_loader_requests_the_stylesheets_and_scripts(self):
-        for asset in ("ds-tokens.css", "components.css", "index.js"):
+        for asset in ("v2-bundle.css", "v2.js"):
             self.assertIn(asset, self.assets)
 
     def test_every_loader_asset_is_served_as_a_versioned_asset(self):

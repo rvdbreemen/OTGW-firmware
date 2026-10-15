@@ -84,7 +84,7 @@ Upload abort (AC#1)
 - Cleanup is GET /api/listfiles?delete=<path>, which answers 200 "File deleted" or
   404 "File not found" (FSexplorer.ino:301, :478-502). A final GET must then give
   404. GET /?delete=<path> deletes nothing: "/" goes to sendIndex() (:194), or to
-  sendFSexplorerFallback() when /index.html is missing (:184-185), and neither
+  sendFSexplorerFallback() when /v2.html is missing (startWebserver), and neither
   reads the argument. The only other reader is the catch-all (:585-592): any
   unrouted path with ?delete= removes the file and answers 303 whether or not it
   existed.
@@ -188,11 +188,8 @@ MAX_RETRY_AFTER_S = 5.0         # cap on honoured Retry-After during readback/sn
 PATTERN_LINE = 64
 
 DEFAULT_PATHS = [
-    # the classic shell and the assets its loader fetches (data/index.html:46-47, :93-94)
-    "/", "/ds-tokens.css", "/components.css", "/index.js", "/graph.js", "/sat.js",
-    "/echarts-theme.js", "/theme-toggle.js", "/sat-slider.js",
-    # the v2 shell
-    "/v2.html", "/v2-bundle.css", "/v2.js",
+    # the root (serves v2.html) and the v2 shell (the only Web UI since TASK-1223.12)
+    "/", "/v2.html", "/v2-bundle.css", "/v2.js",
     # chunked REST routes
     "/api/v2/settings", "/api/v2/device/info", "/api/v2/sat/status",
 ]

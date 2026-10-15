@@ -72,7 +72,7 @@ Browser Client                ESP8266 Device
 
 ### Browser Side (Client)
 
-**File:** `data/index.js`
+**File:** `data/v2.js` (`connectWs`). The code samples in this document come from the classic UI client, which TASK-1223.12 removed (last present in commit `3aa1ef927`); v2 follows the same pattern: connect on page load, reconnect 5 s after a close.
 
 1. **Client Connection Initiation**:
    ```javascript
@@ -136,8 +136,8 @@ void startWebSocket() {
 Browser Loads Web UI:
 ┌─────────────────────────────────────────┐
 │ 1. User navigates to http://esp-ip/    │
-│ 2. Browser loads index.html            │
-│ 3. Browser executes index.js           │
+│ 2. Browser loads v2.html               │
+│ 3. Browser executes v2.js              │
 │ 4. JavaScript calls initOTLogWebSocket()│
 │    - Builds URL: ws://esp-ip:81/       │
 │    - Creates WebSocket object           │
@@ -147,7 +147,7 @@ Browser Loads Web UI:
 
 **Key Code:**
 ```javascript
-// data/index.js:996
+// classic UI client (removed; commit 3aa1ef927)
 otLogWS = new WebSocket(wsURL);  // Browser connects TO ESP8266
 ```
 
@@ -245,7 +245,7 @@ void sendLogToWebSocket(const char* logMessage) {
 
 **Browser Message Handler:**
 ```javascript
-// data/index.js:1051-1087
+// classic UI client (removed; commit 3aa1ef927)
 otLogWS.onmessage = function(event) {
   resetWSWatchdog();  // Reset 30-second timeout
   
@@ -290,7 +290,7 @@ Connection Loss & Reconnection:
 
 **Browser Auto-Reconnect:**
 ```javascript
-// data/index.js:1017-1036
+// classic UI client (removed; commit 3aa1ef927)
 otLogWS.onclose = function() {
   console.log('OT Log WebSocket disconnected');
   updateWSStatus(false);
@@ -460,7 +460,7 @@ if (ESP.getFreeHeap() < HEAP_WARNING_THRESHOLD) {
 
 **Solution:**
 ```javascript
-// data/index.js:60-78
+// classic UI client (removed; commit 3aa1ef927)
 function enterFlashMode() {
   flashModeActive = true;
   
@@ -493,7 +493,7 @@ function enterFlashMode() {
 
 **Detection:**
 ```javascript
-// data/index.js:889
+// classic UI client (removed; commit 3aa1ef927)
 const isProxied = window.location.protocol === 'https:';
 if (isProxied) {
   // Disable WebSocket features
@@ -555,7 +555,7 @@ Send keepalives       ────────→ Reset watchdog
 
 ### Code Files
 - **Server:** `webSocketStuff.ino` - ESP8266 WebSocket server implementation
-- **Client:** `data/index.js` - Browser WebSocket client implementation
+- **Client:** `data/v2.js` - Browser WebSocket client implementation (`connectWs`)
 - **Main:** `OTGW-firmware.ino` - Server initialization and main loop
 - **Core:** `OTGW-Core.ino` - OpenTherm message handling and broadcasting
 

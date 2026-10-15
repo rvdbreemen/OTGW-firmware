@@ -4795,7 +4795,7 @@
       "path": "ADR-152-coexisting-v2-web-ui-device-wide-default-setting.md",
       "format": "nygard",
       "status": "Accepted",
-      "date": "2026-06-24",
+      "date": "2026-10-15",
       "decision_summary": "Two bundles, one served root.",
       "topics": [],
       "aliases": [],
@@ -6590,6 +6590,62 @@
         "verification": [
           "TASK-1223.9 bench run on the final layout: a normal update and an interrupted update on an OTDirect board and a PIC board, plus a corrupt-image update on at least one of them (capture transcripts).",
           "Build log: updater size against 960K and LittleFS minimum against 768K (TASK-1223.3, TASK-1223.6)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-192",
+      "title": "Ship only the v2 web UI on the 2.0.0 line",
+      "path": "ADR-192-ship-only-the-v2-web-ui-on-the-2-0-0-line.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-15",
+      "decision_summary": "The 2.0.0 line ships the v2 web UI as its only device web UI.",
+      "topics": [
+        "classic-ui",
+        "littlefs",
+        "v2",
+        "web-ui"
+      ],
+      "aliases": [
+        "remove classic ui",
+        "retire classic web ui",
+        "v2 only"
+      ],
+      "components": [
+        "v2 web UI as the only device web UI"
+      ],
+      "symbols": [
+        "sendIndex"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Serve v2.html at /, /index and /index.html. Serve FSexplorer when v2.html is missing.",
+          "Keep FSexplorer independent of the v2 assets (its own fsexplorer.css).",
+          "Ignore removed settings keys on read, without failing the settings load."
+        ],
+        "must_not": [
+          "Reintroduce a second web UI bundle in the 4MB filesystem image.",
+          "Remove a documented REST endpoint only because no UI calls it any more."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "The build log of the v2-only image shows the LittleFS budget gate passing (build.py enforcelittlefsbudget).",
+          "Bench: / serves v2, and an old settings.ini loads with 0 lost keys (TASK-1223.12 acceptance criteria)."
         ]
       },
       "scope": {
@@ -10939,6 +10995,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-152",
+      "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-153",
       "target": "ADR-085",
       "type": "related",
@@ -11725,6 +11787,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-190",
+      "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-191",
       "target": "ADR-003",
       "type": "related",
@@ -11751,6 +11819,36 @@
     {
       "source": "ADR-191",
       "target": "ADR-190",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-191",
+      "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-152",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-190",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-191",
       "type": "related",
       "resolved": true
     }

@@ -197,3 +197,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-189 | Accepted | - | webBeginRequest() replaces the request's timeout callback with one that calls AsyncClient::abort() (tcpabort()). |
 | ADR-190 | Accepted | - | build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are... |
 | ADR-191 | Proposed | - | The 4MB targets switch to a safeboot partition layout. |
+| ADR-192 | Proposed | - | The 2.0.0 line ships the v2 web UI as its only device web UI. |

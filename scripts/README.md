@@ -141,7 +141,7 @@ Crash-log capture is enabled by default and polls `/api/v2/device/crashlog` plus
 `/reboot_log.txt` into `crashlog.log`. This is useful for decoded ESP exception
 state during reboot loops; devices without the endpoint log the HTTP/failure
 status and the capture continues. After capture stops, HTTP probes hit `/`,
-`/index.html`, `/index.js`, and key REST endpoints with bounded timeouts and
+`/index.html`, `/v2.js`, and key REST endpoints with bounded timeouts and
 write status/timing/size details to `curl-probes.log`.
 
 All logs are merged into

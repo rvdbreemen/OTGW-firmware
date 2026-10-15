@@ -7,9 +7,8 @@
 //
 // This drives the REAL shipped assets: a local server hands the page a synthetic
 // /api/v2/sat/status body, the page's own poll parses it and calls the production
-// updateDashboard() / renderSatPage(), and we read the resulting DOM. sat.js and
-// v2.js are IIFEs, so there is no way to shortcut into their internals - which is
-// exactly why this covers the whole chain from HTTP body to rendered pill.
+// renderSatPage(), and we read the resulting DOM. v2.js is an IIFE, so there is no
+// way to shortcut into its internals - which is exactly why this covers the whole chain from HTTP body to rendered pill.
 //
 // Zero dependencies: system Chrome over the DevTools protocol, Node's built-in
 // WebSocket. No playwright install needed.
@@ -64,7 +63,7 @@ const srv = http.createServer((q, s) => {
     s.end('{}');
     return;
   }
-  if (p === '/') p = '/index.html';
+  if (p === '/') p = '/v2.html';
   const f = path.join(DATA, p);
   if (fs.existsSync(f) && fs.statSync(f).isFile()) {
     s.writeHead(200, { 'content-type': MIME[path.extname(f)] || 'application/octet-stream' });
@@ -122,9 +121,8 @@ await send('Runtime.enable');
 
 // Load a page and wait until the SAT status poll has been served at least once
 // and the pill has rendered something.
-// The SAT poll is armed by the page's own public entry point (window.SAT.start(),
-// the same call index.js makes when you navigate to #sat). Kick it explicitly so the
-// harness does not depend on tab-navigation chrome.
+// An optional starter expression runs until it returns true (for example a click
+// that opens the SAT page).
 async function loadAndSettle(url, readySelector, starter) {
   const before = statusHits;
   await send('Page.navigate', { url });
@@ -139,7 +137,7 @@ async function loadAndSettle(url, readySelector, starter) {
     const txt = await evalJs(
       `(function(){var e=document.querySelector(${JSON.stringify(readySelector)});return e?e.textContent:null;})()`
     ).catch(() => null);
-    // 'Error' is sat.js's fetch-failure text. It can appear transiently if the first
+    // 'Error' is a fetch-failure text. It can appear transiently if the first
     // poll races page init; the 5 s poll retries, so keep waiting rather than
     // asserting on a value that is about to be replaced.
     if (txt && txt !== 'Error') { await new Promise((r) => setTimeout(r, 250)); return txt; }
@@ -160,71 +158,6 @@ const BASE = {
   control_mode: 1, room_temp: 20.9, target_temp: 21.0, final_setpoint: 32.0,
   heating_curve: 30.0, pid_output: 2.0, error: 0.1, flame: false,
 };
-
-// ---------------------------------------------------------------- classic UI
-async function classicPill(extra) {
-  scenario = Object.assign({}, BASE, extra);
-  await loadAndSettle(
-    `http://127.0.0.1:${PORT}/index.html`,
-    '#sat-status-badge',
-    `(function(){
-       // Wait for index.js to finish initialising; starting the poll mid-init makes
-       // the first fetch fail and paints the pill 'Error'.
-       // Wait for index.js to finish initialising; starting the poll mid-init makes
-       // the first fetch fail and paints the pill 'Error'.
-       if (document.readyState !== 'complete') return false;
-       if (typeof SAT === 'undefined' || !SAT.start) return false;
-       SAT.start();
-       return true;
-     })()`
-  );
-  // sat.js paints 'Error' whenever a poll fails, and a poll can lose a race against
-  // page init or a navigation. Read until a real value appears; a persistent 'Error'
-  // still fails the check rather than being papered over.
-  let out = null;
-  for (let i = 0; i < 40; i++) {
-    out = await evalJs(`(function(){
-      return JSON.stringify({
-        pill: (document.getElementById('sat-status-badge')||{}).textContent,
-        mode: (document.getElementById('sat-control-mode')||{}).textContent,
-        boiler: (document.getElementById('sat-boiler-status')||{}).textContent
-      });
-    })()`).then(JSON.parse).catch(() => null);
-    if (out && out.pill && out.pill !== 'Error') return out;
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  return out || { pill: '(unreadable)', mode: '', boiler: '' };
-}
-
-// The reported case: SAT engaged, control mode Continuous, burner not firing.
-let r = await classicPill({ boiler_status: 'idle' });
-// Visual receipt of exactly the state sergeantd reported. Opt-in: set OTGW_SHOT_DIR.
-// Visual receipt is taken at the very end, in its own isolated step — see below.
-check(r.pill === 'Idle', `classic: engaged + boiler idle -> pill reads "Idle" (got "${r.pill}")`);
-check(r.pill !== 'Continuous', 'classic: pill no longer prints the control mode');
-check(r.mode === 'Continuous', `classic: Control Mode row still reads "Continuous" (got "${r.mode}")`);
-check(r.boiler === 'Idle', `classic: Boiler Status row reads "Idle" (got "${r.boiler}")`);
-
-r = await classicPill({ boiler_status: 'heating' });
-check(r.pill === 'Heating', `classic: burner firing -> pill reads "Heating" (got "${r.pill}")`);
-check(r.mode === 'Continuous', 'classic: control mode unchanged while firing');
-
-r = await classicPill({ boiler_status: 'anti_cycling' });
-check(r.pill === 'Anti-Cycling', `classic: anti_cycling shown verbatim, counted as not firing (got "${r.pill}")`);
-
-// Precedence, top to bottom.
-r = await classicPill({ boiler_status: 'heating', safety_tripped: true });
-check(r.pill === 'Safety Tripped', `classic: safety trip outranks activity (got "${r.pill}")`);
-r = await classicPill({ boiler_status: 'heating', window_open: true });
-check(r.pill === 'Window open', `classic: window open outranks activity (got "${r.pill}")`);
-r = await classicPill({ boiler_status: 'heating', summer_active: true });
-check(r.pill === 'Summer mode', `classic: summer mode outranks activity (got "${r.pill}")`);
-r = await classicPill({ boiler_status: 'heating', enabled: false });
-check(r.pill === 'Disabled', `classic: disabled outranks everything (got "${r.pill}")`);
-
-// Firmware that omits boiler_status must still render something sane.
-r = await classicPill({ active: true });
-check(r.pill === 'Active', `classic: no boiler_status -> falls back to control-loop state (got "${r.pill}")`);
 
 // --------------------------------------------------------------------- v2 UI
 async function v2Pill(extra) {
@@ -250,7 +183,7 @@ async function v2Pill(extra) {
   })()`).then(JSON.parse);
 }
 
-r = await v2Pill({ boiler_status: 'idle' });
+let r = await v2Pill({ boiler_status: 'idle' });
 check(r.pill === 'Idle', `v2: engaged + boiler idle -> pill reads "Idle" (got "${r.pill}")`);
 check(/idle/i.test(r.big || ''), `v2: headline reports idle, not "Heating to ..." (got "${r.big}")`);
 
@@ -263,30 +196,13 @@ check(/Heating to/.test(r.big || ''), `v2: headline reports the target while fir
 // burner not firing. Done last and in isolation so the page navigation cannot
 // perturb the assertions above.
 if (process.env.OTGW_SHOT_DIR) {
-  scenario = Object.assign({}, BASE, { boiler_status: 'idle' });
-  await loadAndSettle(
-    `http://127.0.0.1:${PORT}/index.html`,
-    '#sat-status-badge',
-    `(function(){
-       if (document.readyState !== 'complete') return false;
-       if (typeof SAT === 'undefined' || !SAT.start) return false;
-       SAT.start();
-       return true;
-     })()`
-  );
-  await evalJs(`(function(){ if (typeof setActivePageSection === 'function') setActivePageSection('displaySATPage'); })()`);
-  // Let the SAT page lay out and the next poll repaint the pill.
-  for (let i = 0; i < 40; i++) {
-    await new Promise((r) => setTimeout(r, 250));
-    const t = await evalJs(`(document.getElementById('sat-status-badge')||{}).textContent`).catch(() => null);
-    if (t && t !== 'Error') break;
-  }
+  await v2Pill({ boiler_status: 'idle' });
   const shot = await send('Page.captureScreenshot', { format: 'png' });
   const b64 = shot.result && shot.result.data;
   if (b64) {
     const out = path.join(process.env.OTGW_SHOT_DIR, 'task-1152-sat-pill-idle.png');
     fs.writeFileSync(out, Buffer.from(b64, 'base64'));
-    const shown = await evalJs(`(document.getElementById('sat-status-badge')||{}).textContent`).catch(() => '?');
+    const shown = await evalJs(`(document.getElementById('satPill')||{}).textContent`).catch(() => '?');
     console.log(`screenshot: ${out} (pill shows "${shown}")`);
   }
 }

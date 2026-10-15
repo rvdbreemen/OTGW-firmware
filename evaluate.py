@@ -92,25 +92,6 @@ DESIGN_SYSTEM_CLASS_ALLOWLIST_BY_REASON: Dict[str, Tuple[str, ...]] = {
         "tabSAT",
         "tabWebhook",
     ),
-    "design.html reference-only demo helpers": (
-        "dark-pane",
-        "demo",
-        "demo-label",
-        "design-grid",
-        "design-section",
-        "design-shell",
-        "design-swatch",
-        "design-toc",
-        "ds-tag",
-        "label",
-        "lede",
-        "light-pane",
-        "specbox",
-        "swatch-meta",
-        "swatch-tile",
-        "theme-pair",
-        "type-row",
-    ),
     "browser/native utility classes with deliberate no-op styling": (
         "button",
     ),
@@ -886,26 +867,34 @@ def api_rate_limit_alias_coverage(rest_text: str) -> Dict[str, object]:
     }
 
 
-def poll_window_coupling(rest_text: str, index_js_text: str) -> Dict[str, object]:
+def poll_window_coupling(rest_text: str, ui_js_text: str) -> Dict[str, object]:
     """ADR-172/173: server rate-limit windows must track the shipped client periods.
 
     A window that creeps up to the client interval hands 429s to a well-behaved
     client; one that falls far below it leaves the limiter slack. 1.x recorded this
     coupling as a prose comment only, which is what let the two drift.
+
+    The client is data/v2.js (the only Web UI since TASK-1223.12):
+    - otmonitor: OTMON_POLL_MS. The window must sit at 50-90% of it.
+    - device/time: DEVTIME_POLL_MS, the minimum gap of the PS=1 check. Only the
+      90% ceiling applies. v2 polls device/time much more slowly than the window
+      (10 s vs 4 s); the window is a fixed budget for Telegraf and scripts, sized
+      when the classic UI polled every 5 s, so a 50% floor would force the limit
+      for third-party callers to follow a UI that barely uses the endpoint.
     """
     def _js_const(name: str):
-        m = re.search(r"const\s+" + re.escape(name) + r"\s*=\s*(\d+)", index_js_text)
+        m = re.search(r"\b(?:const|let|var)\s+" + re.escape(name) + r"\s*=\s*(\d+)", ui_js_text)
         return int(m.group(1)) if m else None
 
     windows = [int(w) for w in re.findall(r"\{\s*(\d+)UL,\s*0,\s*\d+,\s*false\s*\}", rest_text)]
-    otmon, devtime = _js_const("OTMONITOR_POLL_MS"), _js_const("DEVTIME_POLL_MS")
+    otmon, devtime = _js_const("OTMON_POLL_MS"), _js_const("DEVTIME_POLL_MS")
 
-    pairs, bad = [], []
+    bad = []
     if len(windows) >= 2 and otmon and devtime:
-        pairs = [(windows[0], otmon, "otmonitor"), (windows[1], devtime, "device/time")]
-        for win, period, label in pairs:
-            if not (0.5 * period <= win <= 0.9 * period):
-                bad.append(f"{label}: window {win}ms vs client {period}ms")
+        if not (0.5 * otmon <= windows[0] <= 0.9 * otmon):
+            bad.append(f"otmonitor: window {windows[0]}ms vs client {otmon}ms (needs 50-90%)")
+        if not (windows[1] <= 0.9 * devtime):
+            bad.append(f"device/time: window {windows[1]}ms vs client {devtime}ms (needs <= 90%)")
 
     return {
         "constants_found": bool(otmon and devtime and len(windows) >= 2),
@@ -2378,20 +2367,22 @@ class WorkspaceEvaluator:
         """ADR-172/173 gate."""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Poll/Window Coupling (ADR-172/173) ==={Colors.ENDC}")
         try:
-            index_js = (config.FIRMWARE_ROOT / "data" / "index.js").read_text(encoding="utf-8", errors="ignore")
+            v2_js = (config.FIRMWARE_ROOT / "data" / "v2.js").read_text(encoding="utf-8", errors="ignore")
         except OSError:
-            index_js = ""
-        r = poll_window_coupling(self._read_fw("restAPI.ino"), index_js)
+            v2_js = ""
+        r = poll_window_coupling(self._read_fw("restAPI.ino"), v2_js)
         if not r["constants_found"]:
             self.add_result(EvaluationResult(
                 "ADR", "poll/window coupling", "WARN",
-                "Could not read both the rate-limit windows and the index.js poll constants"))
+                "Could not read both the rate-limit windows and the v2.js poll constants "
+                "(OTMON_POLL_MS, DEVTIME_POLL_MS)"))
         elif not r["ratios_ok"]:
             self.add_result(EvaluationResult(
                 "ADR", "poll/window coupling", "FAIL",
                 f"Server window drifted from the client poll period: {'; '.join(r['offenders'])}",
-                "Each window must sit between 50% and 90% of the interval the shipped UI polls at. "
-                "Too high 429s a well-behaved client; too low leaves the limiter slack"))
+                "The otmonitor window must sit at 50-90% of v2.js OTMON_POLL_MS, and the device/time "
+                "window at or below 90% of v2.js DEVTIME_POLL_MS. Too high 429s a well-behaved "
+                "client; too low leaves the limiter slack"))
         else:
             self.add_result(EvaluationResult(
                 "ADR", "poll/window coupling", "PASS",

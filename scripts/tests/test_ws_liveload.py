@@ -26,8 +26,8 @@ try:
 except Exception:
     _secrets = None
 
-ASSETS = ["/", "/index.js", "/components.css", "/ds-tokens.css", "/graph.js",
-          "/sat.js", "/sat-slider.js", "/theme-toggle.js", "/echarts-theme.js"]
+# The v2 shell and the assets its loader fetches (the only Web UI since TASK-1223.12).
+ASSETS = ["/", "/v2-bundle.css", "/v2.js"]
 APIS = ["/api/v2/device/info", "/api/v2/settings", "/api/v2/sat/status",
         "/api/v2/otdirect/status", "/api/v2/otgw/otmonitor"]
 LOADSET = ASSETS + APIS

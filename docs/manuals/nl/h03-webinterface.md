@@ -12,17 +12,17 @@ De SPA bestaat uit de bestanden `index.html`, `index.js`, `sat.js`, `graph.js`, 
 
 Een persistent banner bovenaan elke pagina waarschuwt zodra de firmware-buildhash niet overeenkomt met de hash van het geflashte LittleFS-image, met een directe link naar de flash utility.
 
-> **Twee naast elkaar bestaande UI's**: De 2.0.0-firmware levert twee web-UI's op hetzelfde apparaat: de oorspronkelijke **Classic UI** (beschreven in de secties hierna) en een nieuwere **v2 UI** (de "New UI"). Beide worden vanaf LittleFS geserveerd en zijn door elkaar te gebruiken. Een schakelknop in de header (**New UI** aan de klassieke kant, **Classic UI** aan de v2-kant) wisselt tussen beide. De keuze wordt apparaat-breed opgeslagen in `settings.ini` (de `ui_usev2`-vlag), niet per browser, zodat elke browser die het apparaat opent de gekozen UI ziet. Zie "De v2-webinterface" hieronder.
+> **Eén UI**: De 2.0.0-firmware levert één web-UI, de **v2 UI**, bereikbaar op `http://<apparaat>/` (en op `/index.html` voor oude bladwijzers). De klassieke UI en de schakelknop **Classic UI** / **New UI** zijn verwijderd in TASK-1223.12, zodat het bestandssysteem in de kleinere LittleFS-partitie van de WiFi-update-indeling past (ADR-191). Welke functies de klassieke UI had en v2 niet, staat in `docs/history/2026-10-15-retired-classic-web-ui-features.md`.
 
 ---
 
 ### De v2-webinterface
 
-De v2 UI is een tweede, volledig functionele webinterface die naast de Classic UI bestaat. Ze richt zich op dezelfde firmware en dezelfde REST/WebSocket-endpoints, zodat beide UI's synchroon blijven; u kunt op elk moment wisselen zonder configuratie te verliezen.
+De v2 UI is de webinterface van het apparaat. Ze gebruikt dezelfde REST- en WebSocket-endpoints van de firmware als voorheen, dus u verliest geen configuratie als u bijwerkt vanaf een build die nog de klassieke UI had.
 
-**De UI kiezen.** De schakelaar werkt apparaat-breed, niet per browser. Op **Classic UI** klikken in de v2-header (of **New UI** in de klassieke header) schrijft de `ui_usev2`-vlag via de REST API naar `settings.ini` en herlaadt daarna de pagina, zodat de firmware de gekozen UI serveert. Een harde herlaadactie (CTRL-R / cache wissen) is niet nodig, en de andere UI blijft ongewijzigd werken. De schakelaar probeert het automatisch opnieuw als het apparaat kort bezig is, en herlaadt pas nadat de wijziging is bevestigd.
+**Bijwerken vanaf een build met de klassieke UI.** U hoeft niets te doen. De oude `ui_usev2`-vlag en de klassieke weergave-voorkeuren in `settings.ini` worden genegeerd en verdwijnen bij de volgende keer dat de instellingen worden opgeslagen.
 
-**Header en navigatie.** De v2-header is een donkere strip in zowel het lichte als het donkere thema. Hij toont identiteits-chips (hostnaam en firmwareversie, plus IP-adres en Wi-Fi-signaalbalkjes), een connectiviteits-status pill, een live connectiviteitssamenvatting, een klok, de UI-schakel- en themaknoppen, en een **SIMULATION**-badge die alleen verschijnt zolang OT-replay-simulatie actief is. De hoofdnavigatie is een rij onderstreepte tekst-tabbladen: **Home**, **SAT**, **Monitor**, **Settings** en **Advanced**. De subnavigatie binnen een pagina gebruikt dezelfde onderstreepte tekst-tab-stijl.
+**Header en navigatie.** De v2-header is een donkere strip in zowel het lichte als het donkere thema. Hij toont identiteits-chips (hostnaam en firmwareversie, plus IP-adres en Wi-Fi-signaalbalkjes), een connectiviteits-status pill, een live connectiviteitssamenvatting, een klok, de themaknop, en een **SIMULATION**-badge die alleen verschijnt zolang OT-replay-simulatie actief is. De hoofdnavigatie is een rij onderstreepte tekst-tabbladen: **Home**, **SAT**, **Monitor**, **Settings** en **Advanced**. De subnavigatie binnen een pagina gebruikt dezelfde onderstreepte tekst-tab-stijl.
 
 #### Home-pagina
 
@@ -73,7 +73,7 @@ De v2 UI is ontworpen om bruikbaar te zijn op een smartphone. De assets worden g
 
 ### Navigatiebalk en tabbladen
 
-De overige secties van dit hoofdstuk beschrijven de **Classic UI**. De navigatiebalk bovenaan de pagina bevat de volgende tabbladen:
+De overige secties van dit hoofdstuk beschrijven nog de verwijderde **klassieke UI** en zijn nog niet herschreven voor v2. Ze blijven staan als naslag; waar ze afwijken van wat u ziet, klopt de v2 UI. De navigatiebalk van de klassieke UI bevatte de volgende tabbladen:
 
 | Tabblad | Functie |
 |---|---|

@@ -726,8 +726,9 @@ def generate_v2_css_bundle(project_dir):
     bundle. ds-tokens.css defines the CSS custom properties v2.css consumes, so
     concatenation order matters: tokens first, then v2's rules.
 
-    ds-tokens.css is NOT deleted or touched — it is still served standalone for
-    design.html, index.html, and FSexplorer.html, which don't get this bundle.
+    ds-tokens.css is NOT deleted or touched: it stays in data/ as the source of
+    the tokens. No page loads it on its own any more (TASK-1223.12), so it is
+    left out of the filesystem image (STAGING_EXCLUDE).
 
     The 3 @font-face blocks are stripped from the bundle (field bug, esp32-otgw32,
     2026-07-06): the browser fetches every @font-face src the instant the CSS
@@ -737,8 +738,7 @@ def generate_v2_css_bundle(project_dir):
     retry -- it fails permanently until a full page reload. v2.html loads the
     same 3 fonts instead via the FontFace() JS API, one at a time with retry,
     so peak concurrent font requests stays at 1. ds-tokens.css itself keeps its
-    @font-face blocks unchanged for the other three pages, which are not part of
-    this bug report.
+    @font-face blocks unchanged (it is a build input only).
     """
     import re as _re
 
@@ -769,9 +769,9 @@ def generate_v2_css_bundle(project_dir):
 # (PIC .hex, .json, .log, .ini, fonts, images, HTML) is copied byte-for-byte.
 # Everything stays plain text: no gzip (maintainer directive).
 STAGING_DIR = config.PROJECT_DIR / ".pio" / "data-staging"
-# Source files that never go into the image: v2.css is only an input to
-# v2-bundle.css, and no page loads it on its own.
-STAGING_EXCLUDE = frozenset({"v2.css"})
+# Source files that never go into the image: ds-tokens.css and v2.css are only
+# inputs to v2-bundle.css, and no page loads either on its own (TASK-1223.12).
+STAGING_EXCLUDE = frozenset({"ds-tokens.css", "v2.css"})
 MINIFY_SUFFIXES = (".js", ".css")
 
 

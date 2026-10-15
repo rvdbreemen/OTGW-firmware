@@ -6,7 +6,7 @@
 <meta name="color-scheme" content="light dark">
 <title>OTGW firmware</title>
 <script>
-  // Pre-paint theme (shared key with the classic UI) to avoid flash-of-wrong-theme.
+  // Pre-paint theme (localStorage key otgw-theme) to avoid flash-of-wrong-theme.
   (function(){
     try{
       var stored = localStorage.getItem('otgw-theme') || localStorage.getItem('theme');
@@ -20,7 +20,7 @@
   // TASK-978: load the stylesheets + v2.js with retry-on-503. A 503'd/reset
   // <link>/<script> has no native retry, so the UI would render unstyled (CSS
   // dropped) or dead (v2.js dropped) with nothing surfaced. Retry with linear
-  // backoff, mirroring the classic index.html loader (TASK-960).
+  // backoff, as the former classic UI loader did (TASK-960).
   // TASK-989: load SEQUENTIALLY (v2-bundle.css -> v2.js), one connection at a
   // time. A parallel burst of asset connections is what collapses the S3 heap
   // under concurrent serving (AsyncTCP accepts unconditionally; measured
@@ -128,7 +128,6 @@
   <!-- TASK-983: shown only while OT-replay simulation is active (polled via /api/v2/simulate). -->
   <span class="hdr-sim hidden" id="hdrSim" title="Simulation active — values may be replayed, not live from the boiler">SIMULATION</span>
   <span class="sub" id="clock">--:--:--</span>
-  <button type="button" class="theme-toggle" id="uiToggle" title="Switch back to the classic UI">↩ Classic UI</button>
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">🌙 Dark</button>
 </div>
 <div class="switcher">
@@ -414,7 +413,7 @@
      localStorage 'otgw-v2-satview'. Bound to GET /api/v2/sat/status (polled 5s
      while this page is visible only) + POST /api/v2/sat/{enable,target,preset,
      mode,settings/<name>}. History accumulates client-side (no history endpoint,
-     by design — matches the classic sat.js). -->
+     by design — as in the former classic SAT page). -->
 <div id="page-sat" class="page">
   <div class="sat-head">
     <div class="sat-title">SAT · Smart Autotune Thermostat <span class="sat-pill off" id="satPill">…</span></div>

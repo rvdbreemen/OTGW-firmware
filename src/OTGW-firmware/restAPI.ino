@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.423
+**  Version  : v2.0.0-alpha.424
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -2606,10 +2606,14 @@ static const ApiRoute kV2Routes[] PROGMEM = {
 // is the whole point, and a per-client budget would let N clients each poll at
 // the full rate.
 //
-// Windows sit at ~75% of the interval the shipped UI actually polls at
-// (OTMONITOR_POLL_MS / DEVTIME_POLL_MS in data/index.js). setInterval is not
-// exact — background throttling and GC shift ticks — so a window equal to the
-// client interval would hand 429s to a well-behaved client for no reason.
+// The otmonitor window sits at 75% of the interval the v2 UI polls at
+// (OTMON_POLL_MS in data/v2.js). setInterval is not exact — background
+// throttling and GC shift ticks — so a window equal to the client interval
+// would hand 429s to a well-behaved client for no reason. The device/time
+// window is a fixed budget for Telegraf and scripts: v2 asks for device/time
+// only for its PS=1 check, at most once per DEVTIME_POLL_MS (10 s), so the
+// window only has to stay below that. The 4000 ms value dates from the
+// removed classic UI, which polled device/time every 5 s.
 // The coupling is enforced by evaluate.py::check_poll_window_coupling.
 //=======================================================================
 static const char kSubOtmonitor[] PROGMEM = "otmonitor";
@@ -2646,8 +2650,8 @@ static const ApiRateLimitRoute kApiRateLimitRoutes[] PROGMEM = {
 // the field device), so the sustained protection is unchanged from 1.x.
 struct ApiRateLimitBudget { uint32_t windowMs; uint32_t tat; uint8_t burstTokens; bool primed; };
 static ApiRateLimitBudget gApiRateLimitBudgets[RL_BUDGET_COUNT] = {
-  { 1500UL, 0, 2, false },   // otmonitor + telegraf  (UI polls at OTMONITOR_POLL_MS = 2000)
-  { 4000UL, 0, 2, false },   // device/time           (UI polls at DEVTIME_POLL_MS  = 5000)
+  { 1500UL, 0, 2, false },   // otmonitor + telegraf  (v2 polls at OTMON_POLL_MS   = 2000)
+  { 4000UL, 0, 2, false },   // device/time           (v2 polls at most every DEVTIME_POLL_MS = 10000)
 };
 
 // RFC 9457 problem+json. 429 (RFC 6585) rather than the heap gate's 503: the
@@ -3059,9 +3063,10 @@ void sendOTmonitorV2()
 // Returns: {"device":{"author":"...","fwversion":"...",...}}
 //
 // Field ordering contract:
-// The Debug Info page (data/index.js refreshDeviceInfo) renders rows in
-// JSON insertion order via `for (key in device)`. The emit order below
-// therefore IS the on-screen order. Fields are grouped semantically
+// The Debug page (data/v2.js renderDebugGroups) shows curated groups first,
+// then every other field in JSON insertion order (Object.keys), bucketed by
+// prefix. For those fields the emit order below IS the on-screen order.
+// Fields are grouped semantically
 // (firmware, platform, network, time, connections, chip, RAM, flash,
 // drops, discovery). When adding a new field, place it inside the
 // matching group rather than appending at the end, so related metrics
@@ -3847,16 +3852,8 @@ void sendDeviceSettings()
   // (0=auto, 1=pic/S3 Mini, 2=otdirect, 3=pic/S3 Mini Pro).
   addInt(F("boardmode"), (int)settings.iBoardMode, "i", 0, 3);
 #endif
-  addBool(F("ui_autoscroll"), settings.ui.bAutoScroll, "b");
-  addBool(F("ui_timestamps"), settings.ui.bShowTimestamp, "b");
-  addBool(F("ui_capture"), settings.ui.bCaptureMode, "b");
-  addBool(F("ui_autoscreenshot"), settings.ui.bAutoScreenshot, "b");
-  addBool(F("ui_autodownloadlog"), settings.ui.bAutoDownloadLog, "b");
-  addBool(F("ui_autoexport"), settings.ui.bAutoExport, "b");
-  addBool(F("ui_usev2"), settings.ui.bUseV2, "b");
   addBool(F("ui_onboarded"), settings.ui.bOnboarded, "b");
   addBool(F("sat_onboarded"), settings.ui.bSatOnboarded, "b");   // TASK-1012: SAT onboarding wizard persist flag
-  addInt(F("ui_graphtimewindow"), settings.ui.iGraphTimeWindow, "i", 0, 1440);
   addBool(F("gpiosensorsenabled"), settings.sensors.bEnabled, "b");
   addBool(F("gpiosensorslegacyformat"), settings.sensors.bLegacyFormat, "b");
   addInt(F("gpiosensorspin"), settings.sensors.iPin, "i", 0, 16);
@@ -4137,7 +4134,7 @@ void sendDeviceSettings()
   // EXPOSURE on that runtime fact (TASK-865.18): a Classic-mode combo then sees
   // no dead Ethernet fields, while a real OTGW32 (W5500 found) still does.
   // Omitting "ethstaticip" here keeps the whole eth UI section out of the web
-  // page — index.js only renders it when that trigger key is present.
+  // page — the Web UI only renders it when that trigger key is present.
   if (state.hw.bEthernetPresent) {
     addBool(F("ethstaticip"), settings.eth.bStaticIP, "b");
     addStr(F("ethipaddress"), CSTR(settings.eth.sIPaddress), "s", 15);
@@ -4224,8 +4221,7 @@ static const char* const PROGMEM knownSettings[] = {
   "sat_onboarded",   // TASK-1012: SAT onboarding wizard persist flag (POST-writable)
   "satautogains", "satcyclesperhour", "saterrormon", "satheatingmode", "sathpcycle",
   "satmaxmodulation", "satsensormaxage", "satsolarfreezeint", "satvalveoffset", "satweatherapikey",
-  "ui_autodownloadlog", "ui_autoexport", "ui_autoscreenshot", "ui_autoscroll",
-  "ui_capture", "ui_graphtimewindow", "ui_onboarded", "ui_timestamps", "ui_usev2",
+  "ui_onboarded",
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",
   "wifidns1", "wifidns2", "wifigateway", "wifistaticip", "wifisubnet",
