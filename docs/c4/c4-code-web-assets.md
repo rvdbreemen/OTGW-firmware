@@ -21,6 +21,8 @@ The device ships two independent web UI bundles side by side on LittleFS:
 
 Which bundle the root path serves is a device-wide setting persisted in `settings.ini`; each UI exposes a switch button to flip the setting and reload into the other bundle. Both bundles are served from the same LittleFS image; confirm the current asset list with `git ls-files src/OTGW-firmware/data`.
 
+**The classic bundle is being retired on the 2.0.0 line** (maintainer decision 2026-10-15, TASK-1223.12, ADR-191). Only v2 fits the 768K LittleFS of the safeboot OTA layout. The 19 classic features v2 lacked are being ported (TASK-1223.14 to TASK-1223.18, plus follow-ups TASK-1226 to TASK-1232). The 12 features that were dropped, and how each was built, are documented in [`docs/history/2026-10-15-retired-classic-web-ui-features.md`](../history/2026-10-15-retired-classic-web-ui-features.md); the full comparison is in [`docs/research/2026-10-15-classic-vs-v2-gap-audit.md`](../research/2026-10-15-classic-vs-v2-gap-audit.md).
+
 ### Core HTML & Entrypoint
 
 | File | Size | Purpose |

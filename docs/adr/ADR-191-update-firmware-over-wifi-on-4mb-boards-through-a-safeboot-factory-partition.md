@@ -151,6 +151,14 @@ Updater rules:
 - Verify the uploaded image (ESP-IDF image check) before setting `ota_0` as the
   boot partition.
 - Keep filesystem OTA from the main firmware working as it does today.
+- Use the bootloader's app rollback, which is already enabled in the shipped bootloader:
+  - The main firmware defines `verifyRollbackLater()` returning true, and calls
+    `esp_ota_mark_app_valid_cancel_rollback()` after a short health gate, before
+    any planned restart.
+  - Safeboot checks `esp_ota_get_last_invalid_partition()` before it points the
+    boot partition back at `ota_0`, so a rolled-back image does not run again.
+  - The handover erases the whole `otadata` partition (0xE000, 0x2000).
+  - The one-time migration image writes `bootloader.bin` at 0x0.
 
 ### Must Not
 
@@ -158,6 +166,8 @@ Updater rules:
 - Write application output to UART0 from the updater.
 - Mount or write LittleFS from the updater.
 - Ship the classic web UI in the 4MB filesystem image.
+- Enable anti-rollback (`CONFIG_BOOTLOADER_APP_ANTI_ROLLBACK`). It assumes
+  there is no factory partition (`bootloader_utility.c:431`).
 
 ### Exceptions
 
@@ -208,11 +218,11 @@ Updater rules:
   good image is uploaded.
   Mitigation: safeboot stays reachable over WiFi, and the image is verified
   before it is marked bootable.
-- **A valid image that crash-loops is not caught.** The bootloader only rejects
-  invalid images.
-  Mitigation: TASK-1223.7 investigates the bootloader rollback option. If it is
-  feasible, it ships in the migration image, because the bootloader can only be
-  written over USB.
+- **A valid image that crash-loops is caught only up to the health gate.**
+  Bootloader rollback returns to safeboot when a new image fails before it marks
+  itself valid. A crash loop that starts later is not caught.
+  Mitigation: keep the health gate short. An app-level boot counter is an
+  optional add-on (`docs/research/2026-10-15-crash-loop-rollback-feasibility.md`).
 - **Every field unit needs one USB migration**, because the partition table and
   the LittleFS offset change. Settings are lost unless they are backed up.
   Mitigation: `flash_otgw.bat` gets a migration mode that saves and restores
@@ -226,7 +236,7 @@ Updater rules:
 
 ## Open Questions
 
-- [ ] Crash-loop rollback: is `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` feasible with the pioarduino precompiled bootloader (TASK-1223.7)? The answer decides what the one-time migration image contains.
+- [x] Crash-loop rollback: is `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` feasible with the pioarduino precompiled bootloader (TASK-1223.7)? The answer decides what the one-time migration image contains. — **Answered 2026-10-15 by User: Robert van den Breemen:** Yes, with the stock pioarduino bootloader: CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y is already in the shipped esp32s3 sdkconfig (libs sdkconfig:423) and bootloader. The main firmware defines verifyRollbackLater() and marks itself valid after a health gate; safeboot checks esp_ota_get_last_invalid_partition() before pointing boot back at ota_0; handover erases the whole otadata partition; the migration image writes bootloader.bin. Anti-rollback stays off. Evidence: docs/research/2026-10-15-crash-loop-rollback-feasibility.md. Bench proof in TASK-1223.9.
 - [ ] Final-layout bench proof (TASK-1223.9): the spike proved the flow on a proof layout with a 2048K ota_0 and an empty filesystem, not on this exact layout.
 
 ## Related Decisions

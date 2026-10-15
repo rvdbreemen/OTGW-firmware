@@ -6570,13 +6570,19 @@
           "Fail the build when the updater image exceeds the factory partition, or the LittleFS content plus the runtime reserve exceeds the filesystem partition.",
           "Let the main firmware hand over only through an admin-protected endpoint that erases otadata (ADR-056).",
           "Verify the uploaded image (ESP-IDF image check) before setting ota0 as the boot partition.",
-          "Keep filesystem OTA from the main firmware working as it does today."
+          "Keep filesystem OTA from the main firmware working as it does today.",
+          "Use the bootloader's app rollback, which is already enabled in the shipped bootloader:",
+          "The main firmware defines verifyRollbackLater() returning true, and calls espotamarkappvalidcancelrollback() after a short health gate, before any planned restart.",
+          "Safeboot checks espotagetlastinvalidpartition() before it points the boot partition back at ota0, so a rolled-back image does not run again.",
+          "The handover erases the whole otadata partition (0xE000, 0x2000).",
+          "The one-time migration image writes bootloader.bin at 0x0."
         ],
         "must_not": [
           "Add HTTPS, TLS or WSS to the updater (ADR-003).",
           "Write application output to UART0 from the updater.",
           "Mount or write LittleFS from the updater.",
-          "Ship the classic web UI in the 4MB filesystem image."
+          "Ship the classic web UI in the 4MB filesystem image.",
+          "Enable anti-rollback (CONFIGBOOTLOADERAPPANTIROLLBACK). It assumes there is no factory partition (bootloaderutility.c:431)."
         ],
         "exceptions": [
           "Boards with 8 MB or more of flash keep native A/B OTA through hasSpareAppOtaSlot(); this layout does not apply to them."
