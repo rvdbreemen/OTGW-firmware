@@ -33,7 +33,7 @@ static WebServer server(80);
 static String updError;
 static bool bootPointedAtApp = false;
 static bool appRolledBack = false;
-static char hostName[33] = "OTGW";
+static char hostName[41] = "OTGW";    // settings.sHostname is char[41]
 static char adminPw[41] = "";
 
 static const char PAGE_HEAD[] PROGMEM =

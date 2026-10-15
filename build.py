@@ -1201,6 +1201,12 @@ def create_distribution_zip(project_dir, semver, target):
         with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zf:
             # Factory-reset bin used by the flash scripts.
             zf.write(merged_full, arcname=merged_full.name)
+            # TASK-1223.8: migration images for the one-time move to the
+            # safeboot layout (flash_otgw --migrate), when this build made them.
+            for part in migration_slice_paths(merged_full):
+                if part.exists():
+                    zf.write(part, arcname=part.name)
+                    print_info(f"  + {part.name}  (one-time layout migration)")
 
             # Windows batch script: force CRLF line endings for cmd.exe.
             bat_text = flash_bat.read_text(encoding="utf-8")
@@ -1954,6 +1960,16 @@ def create_merged_binary(project_dir, semver, target, compress=False, include_fi
             print_error("is available, then rebuild.")
             return None
 
+    # Safeboot updater in the app/factory partition (ADR-191), when the table has one.
+    safeboot_part = read_partition_table(project_dir).get("safeboot")
+    if safeboot_part is not None:
+        safeboot_file = find_safeboot_bin(project_dir, semver)
+        if safeboot_file is None:
+            print_error("Partition table has a safeboot partition but no OTGW-safeboot-*.bin is in build/")
+            return None
+        cmd.extend([hex(safeboot_part[0]), str(safeboot_file)])
+        print_info(f"Safeboot: {safeboot_file.name}")
+
     # Firmware
     cmd.extend([tcfg["firmware_offset"], str(firmware_file)])
 
@@ -1969,6 +1985,8 @@ def create_merged_binary(project_dir, semver, target, compress=False, include_fi
         if merged_file.exists():
             size_mb = merged_file.stat().st_size / (1024 * 1024)
             print_success(f"Created merged binary: {merged_name} ({size_mb:.2f} MB)")
+            if include_filesystem and safeboot_part is not None:
+                write_migration_slices(project_dir, merged_file)
 
             if compress:
                 print_info("Compressing merged binary with gzip...")
@@ -1997,6 +2015,92 @@ def create_merged_binary(project_dir, semver, target, compress=False, include_fi
         print_error(f"Failed to create merged binary: {e}")
         print_info("Make sure esptool is installed: pip install esptool")
         return None
+
+
+PARTITIONS_CSV = "partitions_otgw_esp32.csv"
+SAFEBOOT_DIR = "safeboot"
+
+
+def read_partition_table(project_dir):
+    """Parse the 4MB partition CSV into {name: (offset, size)} (ints)."""
+    table = {}
+    csv_path = project_dir / PARTITIONS_CSV
+    if not csv_path.exists():
+        return table
+    for line in csv_path.read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if not line:
+            continue
+        cols = [c.strip() for c in line.split(",")]
+        if len(cols) >= 5 and cols[3] and cols[4]:
+            table[cols[0]] = (int(cols[3], 0), int(cols[4], 0))
+    return table
+
+
+def migration_slice_paths(merged_full):
+    """The two migration images cut from a merged-full image (TASK-1223.8)."""
+    stem = merged_full.name[:-len("-merged-full.bin")]
+    return (merged_full.with_name(f"{stem}-migrate-0x0.bin"),
+            merged_full.with_name(f"{stem}-migrate-rest.bin"))
+
+
+def write_migration_slices(project_dir, merged_full):
+    """TASK-1223.8: cut a merged-full image around the NVS partition, so the
+    one-time USB migration to the safeboot layout writes bootloader, partition
+    table, otadata, safeboot, app and LittleFS while keeping NVS (the stored
+    WiFi credentials). Slice 1 = [0x0, nvs start) written at 0x0; slice 2 =
+    [nvs end, end of image) written at nvs end. Returns (slice1, slice2,
+    rest_offset) or None when the table has no nvs/safeboot partition."""
+    table = read_partition_table(project_dir)
+    if "nvs" not in table or "safeboot" not in table:
+        return None
+    nvs_start, nvs_size = table["nvs"]
+    rest_offset = nvs_start + nvs_size
+    data = merged_full.read_bytes()
+    first, rest = migration_slice_paths(merged_full)
+    first.write_bytes(data[:nvs_start])
+    rest.write_bytes(data[rest_offset:])
+    print_success(f"Migration images: {first.name} (@0x0), {rest.name} (@{rest_offset:#x}); "
+                  f"NVS {nvs_start:#x}-{rest_offset:#x} left untouched")
+    return first, rest, rest_offset
+
+
+def find_safeboot_bin(project_dir, semver=None):
+    """The safeboot updater image in build/, newest first, or None."""
+    build_dir = project_dir / "build"
+    if semver and semver != "unknown":
+        exact = build_dir / f"OTGW-safeboot-{semver}.bin"
+        if exact.exists():
+            return exact
+    found = sorted(build_dir.glob("OTGW-safeboot-*.bin"), key=lambda p: p.stat().st_mtime, reverse=True)
+    return found[0] if found else None
+
+
+def build_safeboot(project_dir, semver):
+    """TASK-1223.3 (ADR-191): build the safeboot updater (safeboot/, its own
+    PlatformIO project) when the partition table has a "safeboot" partition,
+    fail when the image does not fit it, and copy it to build/ as
+    OTGW-safeboot-<semver>.bin. Returns the copied path, or None when the
+    table has no safeboot partition (layout before ADR-191)."""
+    part = read_partition_table(project_dir).get("safeboot")
+    if part is None:
+        print_info("Partition table has no safeboot partition: safeboot updater not built")
+        return None
+    print_step("Building the safeboot updater")
+    run_command([sys.executable, "-m", "platformio", "run", "-d", SAFEBOOT_DIR], cwd=project_dir)
+    image = project_dir / SAFEBOOT_DIR / ".pio" / "build" / "safeboot" / "firmware.bin"
+    if not image.exists():
+        print_error(f"Safeboot build produced no image ({image})")
+        sys.exit(1)
+    size, limit = image.stat().st_size, part[1]
+    if size > limit:
+        print_error(f"Safeboot image {size} B exceeds the safeboot partition ({limit} B) by {size - limit} B")
+        sys.exit(1)
+    print_success(f"Safeboot updater: {size} B of {limit} B ({limit - size} B free)")
+    create_build_directory(project_dir)
+    out = project_dir / "build" / f"OTGW-safeboot-{semver}.bin"
+    shutil.copy2(image, out)
+    return out
 
 
 def check_esptool():
@@ -2778,6 +2882,11 @@ Examples:
 
     # Create build directory
     create_build_directory(project_dir)
+
+    # TASK-1223.3: the safeboot updater is shared by every 4MB target; build it
+    # once with the firmware (a no-op while the table has no safeboot partition).
+    if use_pio and not (args.filesystem and not args.firmware):
+        build_safeboot(project_dir, semver)
 
     # Build each target
     for target in target_names:

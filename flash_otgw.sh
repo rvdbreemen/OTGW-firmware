@@ -50,6 +50,12 @@ ARG_PORT=""
 ARG_BIN=""
 ARG_BOARD=""
 ARG_BAUD=""
+ARG_MIGRATE=0
+ARG_HOST=""
+ARG_PASSWORD=""
+ARG_NOBACKUP=0
+# Migration images: slice 1 at 0x0, slice 2 right after NVS (0x9000 + 0x5000).
+MIGRATE_REST_OFFSET="0xE000"
 
 # ---- Help ------------------------------------------------------------------
 show_help() {
@@ -71,6 +77,15 @@ Targeting:
   --board esp32        Force board type (Nodoshop OTGW32 = ESP32-S3).
   --baud N             Override baud rate (default: 921600).
 
+One-time layout migration (ADR-191, TASK-1223.8):
+  --migrate            Move a unit to the new partition layout. Saves
+                       settings.ini over HTTP, writes the *-migrate-0x0.bin and
+                       *-migrate-rest.bin images around NVS (WiFi kept), waits
+                       for the unit, restores settings.ini and checks it.
+  --host <ip|name>     The unit's address (needed unless --no-backup).
+  --password <pw>      Admin password, when the unit has one set.
+  --no-backup          Migrate without saving settings (they return to defaults).
+
 Other:
   --help, -h           Show this help.
 
@@ -87,6 +102,10 @@ while [ $# -gt 0 ]; do
         --bin)      ARG_BIN="$2";   shift 2 ;;
         --board)    ARG_BOARD="$2"; shift 2 ;;
         --baud)     ARG_BAUD="$2";  shift 2 ;;
+        --migrate)  ARG_MIGRATE=1;  shift ;;
+        --host)     ARG_HOST="$2";  shift 2 ;;
+        --password) ARG_PASSWORD="$2"; shift 2 ;;
+        --no-backup) ARG_NOBACKUP=1; shift ;;
         --help|-h)  show_help; exit 0 ;;
         *) err "Unknown argument: $1"; echo "Run './flash_otgw.sh --help' for usage."; exit 2 ;;
     esac
@@ -207,6 +226,86 @@ ensure_esptool() {
 }
 
 ensure_esptool
+
+# ---- Migration (TASK-1223.8): its own path, then exit -----------------------
+migrate_flow() {
+    local first="" rest dir f
+    if [ "$ARG_NOBACKUP" != "1" ] && [ -z "$ARG_HOST" ]; then
+        err "--migrate needs --host <device ip or name>, or --no-backup."
+        exit 2
+    fi
+    for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
+        for f in "$dir"/OTGW-firmware-*-migrate-0x0.bin; do
+            [ -f "$f" ] && [ -z "$first" ] && first="$f"
+        done
+    done
+    [ -n "$first" ] || { err "No *-migrate-0x0.bin found next to this script or in build/."; exit 1; }
+    rest="${first%-migrate-0x0.bin}-migrate-rest.bin"
+    [ -f "$rest" ] || { err "Missing the matching image: $rest"; exit 1; }
+
+    local port_args baud auth=() backup=""
+    baud="${ARG_BAUD:-921600}"
+    if [ -n "$ARG_PORT" ]; then port_args="--port $ARG_PORT"
+    else port_args="--port-filter vid=0x303A --port-filter pid=0x1001"; fi
+    [ -n "$ARG_PASSWORD" ] && auth=(-u "admin:$ARG_PASSWORD")
+
+    if [ "$ARG_NOBACKUP" != "1" ]; then
+        backup="$SCRIPT_DIR/backup/${ARG_HOST}-$(date +%Y%m%d-%H%M%S)"
+        mkdir -p "$backup"
+        step "Saving settings from http://$ARG_HOST to $backup"
+        curl -sf --max-time 20 ${auth[@]+"${auth[@]}"} -o "$backup/settings.ini" "http://$ARG_HOST/settings.ini" \
+            || { err "Could not download settings.ini. Migration stopped, nothing written."; exit 1; }
+        [ -s "$backup/settings.ini" ] || { err "settings.ini downloaded empty. Migration stopped, nothing written."; exit 1; }
+        curl -sf --max-time 20 ${auth[@]+"${auth[@]}"} -o "$backup/dallas_labels.ini" "http://$ARG_HOST/dallas_labels.ini" \
+            || rm -f "$backup/dallas_labels.ini"
+        ok "Saved settings.ini ($(wc -c < "$backup/settings.ini") bytes)"
+    fi
+
+    step "Writing $(basename "$first") @0x0 and $(basename "$rest") @$MIGRATE_REST_OFFSET (NVS kept)"
+    # shellcheck disable=SC2086
+    "$ESPTOOL_BIN" --chip esp32s3 $port_args --baud "$baud" \
+        --before default_reset --after hard_reset \
+        write_flash -z 0x0 "$first" "$MIGRATE_REST_OFFSET" "$rest"
+
+    [ "$ARG_NOBACKUP" = "1" ] && { ok "Migration done. Settings are at defaults."; exit 0; }
+
+    wait_for_host() {
+        local i
+        info "Waiting for http://$ARG_HOST (up to 3 minutes)..."
+        for i in $(seq 1 60); do
+            curl -sf --max-time 3 -o /dev/null ${auth[@]+"${auth[@]}"} "http://$ARG_HOST/api/v2/device/info" && { ok "Unit is back"; return 0; }
+            sleep 3
+        done
+        err "The unit did not come back at http://$ARG_HOST/. Saved settings: $backup"
+        exit 1
+    }
+    wait_for_host
+    step "Restoring settings.ini"
+    curl -sf --max-time 30 ${auth[@]+"${auth[@]}"} -o /dev/null -F "upload=@$backup/settings.ini;filename=settings.ini" \
+        "http://$ARG_HOST/upload?path=/" \
+        || { err "Upload of settings.ini failed. Restore it by hand from $backup."; exit 1; }
+    if [ -f "$backup/dallas_labels.ini" ]; then
+        curl -sf --max-time 30 ${auth[@]+"${auth[@]}"} -o /dev/null -F "upload=@$backup/dallas_labels.ini;filename=dallas_labels.ini" \
+            "http://$ARG_HOST/upload?path=/" || warn "Upload of dallas_labels.ini failed."
+    fi
+    curl -s --max-time 10 ${auth[@]+"${auth[@]}"} -o /dev/null "http://$ARG_HOST/ReBoot" || true
+    sleep 10
+    wait_for_host
+    curl -sf --max-time 20 ${auth[@]+"${auth[@]}"} -o "$backup/settings-after.ini" "http://$ARG_HOST/settings.ini" || true
+    if cmp -s "$backup/settings.ini" "$backup/settings-after.ini"; then
+        ok "Settings restored and verified (byte-identical)"
+    else
+        err "settings.ini on the unit differs from the saved copy. Restore it by hand from $backup."
+        exit 1
+    fi
+    echo
+    echo "============================================================"
+    echo " Migration done. Firmware updates now work over WiFi through"
+    echo " the /update page. Saved settings: $backup"
+    echo "============================================================"
+    exit 0
+}
+[ "$ARG_MIGRATE" = "1" ] && migrate_flow
 
 # ---- Step 3: locate firmware bin -------------------------------------------
 find_bin() {
