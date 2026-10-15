@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-12 05:23'
+updated_date: '2026-10-15 03:52'
 labels:
   - webui
   - otdirect
@@ -29,3 +30,9 @@ Bench evidence 2026-10-12, OTGW32 192.168.88.61, alpha.418 combo (index.js ident
 - [ ] #2 On a PIC board (otdirectavailable false) the poll still never starts (0 requests to /api/v2/otdirect/status)
 - [ ] #3 build.bat esp32-combo SUCCESS and evaluate.py --quick green
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-15: the classic UI will be removed on the 2.0.0 line (TASK-1223.12). Check during the gap audit (TASK-1223.11) whether v2 shows the OT-Direct status correctly; if it does, this task can be closed as superseded.
+<!-- SECTION:NOTES:END -->

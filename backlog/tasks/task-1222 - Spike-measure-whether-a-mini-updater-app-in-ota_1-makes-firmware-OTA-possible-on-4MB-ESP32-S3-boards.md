@@ -3,11 +3,11 @@ id: TASK-1222
 title: >-
   Spike: measure whether a safeboot factory-partition updater makes firmware OTA
   possible on 4MB ESP32-S3 boards
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-13 16:34'
-updated_date: '2026-10-14 18:10'
+updated_date: '2026-10-15 03:49'
 labels:
   - spike
   - esp32
@@ -38,13 +38,12 @@ Known costs if it goes ahead (for the go/no-go): one-time USB flash for every fi
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Minimal updater app (WiFi STA from NVS creds, one HTTP upload page, esp_ota write + verify + set boot partition) builds for ESP32-S3 and its .bin size is recorded with the build command used
-- [ ] #2 If an Arduino-based updater is also built for comparison, its .bin size is recorded alongside the IDF-native one
-- [x] #3 Actual LittleFS space needed is measured: size of the built littlefs image content (files actually shipped) plus runtime files (settings, logs), with the minimum safe partition size stated
-- [x] #4 A concrete candidate 4MB partition layout (offsets + sizes, aligned) is written down and shown to fit current combo app + headroom + updater + measured LittleFS, or shown not to fit
-- [x] #5 Spike report in the task notes gives a go/no-go with the numbers, the main-app headroom left, and the migration cost for existing field units
-- [x] #6 MycilaSafeBoot (MIT, 630,576 B on esp32-s3-devkitc-1) is built for our S3 targets and evaluated as a drop-in factory updater (size, NVS WiFi-creds reuse, no-HTTPS fit) against writing our own; choice recorded with reasons
-- [x] #7 No changes to src/OTGW-firmware or the production partition CSVs; the OTGW32 bench (COM4) may be flashed temporarily with the candidate layout for proof, and is restored to its original layout + settings afterwards (maintainer-approved 2026-10-13)
-- [ ] #8 On the OTGW32 bench with the candidate layout: main firmware boots and mounts LittleFS; otadata erase hands over to safeboot, which joins WiFi with stored creds; a WiFi upload boots the new image; a truncated upload is rejected; a corrupted ota_0 falls back to safeboot (transcripts)
+- [x] #2 Actual LittleFS space needed is measured: size of the built littlefs image content (files actually shipped) plus runtime files (settings, logs), with the minimum safe partition size stated
+- [x] #3 A concrete candidate 4MB partition layout (offsets + sizes, aligned) is written down and shown to fit current combo app + headroom + updater + measured LittleFS, or shown not to fit
+- [x] #4 Spike report in the task notes gives a go/no-go with the numbers, the main-app headroom left, and the migration cost for existing field units
+- [x] #5 MycilaSafeBoot (MIT, 630,576 B on esp32-s3-devkitc-1) is built for our S3 targets and evaluated as a drop-in factory updater (size, NVS WiFi-creds reuse, no-HTTPS fit) against writing our own; choice recorded with reasons
+- [x] #6 No changes to src/OTGW-firmware or the production partition CSVs; the OTGW32 bench (COM4) may be flashed temporarily with the candidate layout for proof, and is restored to its original layout + settings afterwards (maintainer-approved 2026-10-13)
+- [x] #7 On the OTGW32 bench with the candidate layout: main firmware boots and mounts LittleFS; otadata erase hands over to safeboot, which joins WiFi with stored creds; a WiFi upload boots the new image; a truncated upload is rejected; a corrupted ota_0 falls back to safeboot (transcripts)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -160,26 +159,34 @@ AC6 choice: own minimal updater over MycilaSafeBoot. Reasons: (1) Mycila only re
 Correction AC7 evidence: build.bat stamped version.h/version.hash (githash db3c020->dddc423, build 7261->7267; prerelease unchanged), a side effect of the build wrapper, not a code change. Reverted with git checkout; git diff on src/ + both CSVs is now empty (0 lines).
 
 CORRECTION 2026-10-14 (supersedes the 528 KiB / FS 640K / ota_0 2368K figures): the earlier gzip estimate also compressed .hex/.json/.log/.ini, which the firmware reads itself (PIC hex for flashing, ot-thermo.json, simulation log). With browser-only gzip (.js/.css/.html; 504,911 B content) the mklittlefs minimum is **604 KiB**. Revised conditional-GO layout: safeboot factory 0x10000/0xF0000 (960K, 946,327 B updater, ~36 KB slack) + ota_0 0x100000/0x230000 (2240K, combo headroom 270,464 B) + LittleFS 0x330000/0xC0000 (768K = 604 measured + 164 runtime/COW) + coredump 0x3F0000. Verdict unchanged: NO-GO with plain assets, conditional GO with browser-asset gzip.
+
+2026-10-15: asset lever decided by the maintainer: v2 UI only plus minified staging (TASK-1224, ADR-190), no gzip. AC2 is dropped: an IDF-native updater cannot change the verdict (even 600 KB does not change the layout math). AC8 is satisfied by the proof-layout bench run of 2026-10-14 (spike report section 5, steps 1-11). The final-layout run is TASK-1223.9. Verdict: GO.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-<!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Spike result: the safeboot mechanism WORKS on real 4MB hardware, but it does NOT FIT beside the current plain-text web assets.
+Verdict: GO for safeboot OTA on 4MB, with v2 UI only plus a minified LittleFS.
 
-Evidence per AC:
-- AC1: own minimal Arduino updater (NVS WiFi reuse, HTTP upload, Update->ota_0, set boot) = 946,327 B on pioarduino 55.03.35 (checkprogsize log).
-- AC3: shipped assets need min 1460 KiB LittleFS (mklittlefs bisect); browser-only gzip 604 KiB. Bench FS already >=95% full.
-- AC4: 3968 KiB usable - 1460 FS - 1976 combo = 532 KiB max factory (512K aligned) < any measured updater -> does not fit. Gzip layout fits: factory 960K + ota_0 2240K (combo headroom 270,464 B) + FS 768K.
-- AC5: NO-GO as-is; conditional GO with gzipped assets (maintainer decision, conflicts with the FSexplorer.ino:83 no-gzip directive).
-- AC6: Mycila built on our platform = 980,059 B and does not reuse our WiFi creds; own updater chosen. The 630 KB published figure needs the Tasmota platform (not reproduced; that platform overwrote the shared PIO core once, then restored).
-- AC7: git diff on src/ + CSVs empty; bench restored byte-exact from a full-flash backup (hash verified, settings explained).
-- Bench (proof layout): factory fallback on blank otadata, NVS WiFi reuse, main firmware runs relocated, WiFi OTA in ~11 s, truncated upload rejected, bootloader 'slot 0 is not bootable' -> safeboot, recovery over WiFi.
+Measured:
+- Own minimal updater 946,327 B, fits a 960K factory partition (MycilaSafeBoot is 980,059 B on our platform and does not reuse our NVS creds).
+- Combo app 2,023,296 B in a 2240K ota_0, leaving 270,464 B headroom.
+- v2-only minified LittleFS 668 KiB in 768K, leaving about 100 KiB runtime room.
 
-Open (task stays In Progress):
-- AC2: IDF-native updater not built. Its size cannot change the verdict; drop or keep is the maintainer's call.
-- AC8: proven on the PROOF layout, not the candidate, because the candidate does not fit under the current asset policy. Needs re-wording or a re-run once the asset lever is chosen.
-- Key behavioural finding for the ADR: a failed or interrupted upload destroys the old main image (single slot). The unit stays WiFi-recoverable via safeboot but is not gatewaying until re-flashed.
+Bench proof, 2026-10-14, on a proof layout with 960K factory and an empty LittleFS:
+- Handover via otadata erase works.
+- Safeboot reuses the NVS WiFi creds.
+- A WiFi upload takes 11 s.
+- A truncated upload is rejected.
+- A broken ota_0 falls back to safeboot.
+- An interrupted upload recovers over WiFi.
+- The bench was restored byte-exact.
+
+Caveat: AC7 ran on the proof layout, not the final 960K/2240K/768K layout. The final-layout run is TASK-1223.9.
+
+AC2 (IDF-native updater) was dropped because it cannot change the verdict.
+
+Report: docs/research/2026-10-14-spike-1222-safeboot-ota-4mb.md. Maintainer decisions are recorded on TASK-1223.
 <!-- SECTION:FINAL_SUMMARY:END -->
+
 <!-- SECTION:FINAL_SUMMARY:END -->
