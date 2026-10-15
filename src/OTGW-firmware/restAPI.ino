@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.422
+**  Version  : v2.0.0-alpha.423
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3343,6 +3343,9 @@ void sendDeviceInfoV2()
     // before the user tries it on a single-app-slot board (app OTA would brick
     // the running partition — see hasSpareAppOtaSlot() / _handleUploadStart).
     je.field(F("app_ota_available"), hasSpareAppOtaSlot());
+    // ADR-191: on the 4MB safeboot layout the firmware update goes through the
+    // safeboot updater (POST /safeboot); the /update page offers that path.
+    je.field(F("safeboot_available"), hasSafeboot());
 
     // --- Reliability drops (heap-pressure side effects) ---
     je.field(F("hd_ws_drops"),         snap->st.heapdiag.iWsDropsTotal);

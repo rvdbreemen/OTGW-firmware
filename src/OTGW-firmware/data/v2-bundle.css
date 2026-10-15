@@ -936,7 +936,16 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .pic-progress .lbl{font-size:.76rem;color:var(--muted);margin-top:6px}
   .prtable{display:grid;grid-template-columns:1fr auto;gap:7px 14px;font-size:.82rem}
   .prtable .prk{color:var(--muted)}
-  .prtable .prv{font-family:var(--font-mono);text-align:right;font-weight:700}
+  .prtable .prv{font-family:var(--font-mono);text-align:right;font-weight:700;white-space:pre-line}
+  /* TASK-1223.17: group heading row spanning both columns of the PR= table */
+  .prtable .prg{grid-column:1/-1;margin-top:6px;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent);font-weight:700}
+  /* TASK-1223.14/.15: Monitor > Values table */
+  table.stats tr.vstale td{opacity:.55}
+  .vbool-on{color:var(--zone-ok)}
+  .vbool-alarm{color:var(--zone-alert)}
+  .vlbl-edit{border:0;background:none;color:var(--muted);cursor:pointer;padding:0 4px;font-size:.85rem}
+  .vlbl-edit:hover{color:var(--accent)}
+  .vlbl-input{font:inherit;width:12em;max-width:100%;border:1px solid var(--accent);border-radius:6px;background:var(--panel);color:var(--text);padding:2px 6px}
   .devinfo-group{margin:0 0 14px}
   .devinfo-group h4{margin:0 0 8px 2px;font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--accent)}
   .devinfo-rows{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;box-shadow:var(--shadow)}

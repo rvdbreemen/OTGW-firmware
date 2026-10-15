@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.422
+**  Version  : v2.0.0-alpha.423
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -27,6 +27,14 @@
 
 #include "version.h"
 #include "OTGW-firmware.h"
+
+// ADR-191: on the 4MB safeboot layout a new image stays PENDING_VERIFY until the
+// health gate in loop() confirms it (safebootMarkAppValid()), so an image that
+// crashes before that is rolled back to safeboot by the bootloader. Without a
+// factory partition there is nothing to roll back to, so the Arduino core marks
+// the image valid at startup as before. Overrides the weak core hook
+// (esp32-hal-misc.c, initArduino()).
+extern "C" bool verifyRollbackLater() { return safebootPartition() != nullptr; }
 
 #define SetupDebugTln(...) ({  DebugTln(__VA_ARGS__);    })
 #define SetupDebugln(...)  ({  Debugln(__VA_ARGS__);    })
@@ -1113,6 +1121,15 @@ void loop()
   DECLARE_TIMER_SEC(timer60s, 60, CATCH_UP_MISSED_TICKS);
   DECLARE_TIMER_MIN(timer5min, 5, CATCH_UP_MISSED_TICKS, 30000, 60000);  // 30-60s jitter desyncs from timer60s so the 5-min + 60s publishes don't fire together (heap spike); port of 1.x 7199e158
   DECLARE_TIMER_MIN(timer15min, 15, CATCH_UP_MISSED_TICKS);  // TASK-693 port
+
+  // ADR-191 health gate: 30 s after boot with loop() still running, the image
+  // confirms itself so the bootloader keeps it. Short on purpose: a power cut
+  // inside the window rolls back to safeboot, which is recoverable over WiFi.
+  static bool s_appConfirmed = false;
+  if (!s_appConfirmed && millis() > 30000UL) {
+    safebootMarkAppValid();
+    s_appConfirmed = true;
+  }
 
   if (!isFlashing()) {
     // Only run these tasks when NOT flashing firmware (ESP or PIC)

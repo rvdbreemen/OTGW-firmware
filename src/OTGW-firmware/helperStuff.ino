@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : helperStuff
-**  Version  : v2.0.0-alpha.422
+**  Version  : v2.0.0-alpha.423
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -632,6 +632,10 @@ void doRestart(const char* str) {
           (unsigned)platformMinFreeHeap(),
           (unsigned)platformMaxFreeBlock(),
           (unsigned)platformHeapFragmentation());
+
+  // ADR-191: a planned restart means this image ran; confirm it so the
+  // bootloader does not roll it back to safeboot at the reset below.
+  safebootMarkAppValid();
 
   uint32_t t = millis();
   flushSettings();        // persist any pending settings before reboot

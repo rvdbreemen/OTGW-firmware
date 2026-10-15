@@ -523,6 +523,7 @@
 
   <div class="subtabs">
     <button class="subtab active" data-tab="mlog">Log</button>
+    <button class="subtab" data-tab="mvalues">Values</button>
     <button class="subtab" data-tab="mstats">Statistics</button>
     <button class="subtab" data-tab="msupport">OT Support</button>
     <button class="subtab" data-tab="mgraph">Graph</button>
@@ -557,6 +558,25 @@
       <span>Rate: <b id="logRate">2.0</b>/s</span>
       <span>WS ● live</span>
     </div>
+  </div>
+
+  <!-- TASK-1223.14/.15: every decoded otmonitor value (OT, 1-Wire, S0), polled over
+       REST while visible, so it also works in PS=1 mode when the log socket is silent.
+       Rows are built by renderValues() in v2.js. -->
+  <div id="mvalues" class="mpanel">
+    <div class="toolbar">
+      <input class="tsearch" id="valSearch" placeholder="Filter values… (e.g. temperature, S0, 28FF)">
+      <span class="tchip" style="cursor:default">Values: <b id="valCount" style="margin-left:4px">0</b></span>
+      <span class="tchip" id="valPsChip" style="cursor:default;display:none" title="The PIC sends a summary (PS=1) instead of frames; values are polled">PS=1 summary mode</span>
+      <span class="tchip" id="valStatus" style="cursor:default" aria-live="polite">Loading…</span>
+    </div>
+    <div style="overflow-x:auto;border-radius:12px">
+    <table class="stats" id="valTable">
+      <thead><tr><th>Name</th><th style="text-align:right">Value</th><th>Unit</th><th>Last change</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+    <p class="ot-support-hint" style="margin-top:10px">Grey rows have no data yet or have not changed for 2 minutes. Use ✎ next to a 1-Wire sensor to give it a label (max 16 characters, empty clears it).</p>
   </div>
 
   <div id="mstats" class="mpanel">
@@ -713,6 +733,13 @@
     </div>
 
     <div id="connDetail"></div>
+
+    <!-- TASK-1223.16: OT-Direct runtime status (/api/v2/otdirect/status). Shown only
+         when /health reports the OT-Direct interface; hidden on PIC boards. -->
+    <div id="otdStatus" class="set-group" style="display:none;margin-top:14px">
+      <h3>OT-Direct status</h3>
+      <div class="devinfo-rows" id="otdStatusRows"></div>
+    </div>
 
     <!-- TASK-964: OT-Direct manual overrides. Shown only on OT-Direct hardware
          (fetchConn toggles it when the OpenTherm interface is OT-Direct). Mirrors

@@ -458,7 +458,44 @@ static const char UpdateServerIndex[] PROGMEM =
            .then(function(r) { return r.ok ? r.json() : null; })
            .then(function(d) {
              var info = (d && d.device) ? d.device : d;
-             if (info && info.app_ota_available === false) {
+             if (info && info.app_ota_available === false && info.safeboot_available === true) {
+               // ADR-191: 4MB safeboot layout. The firmware upload runs in the
+               // safeboot updater; this page hands over and then follows it.
+               var fwForm = document.getElementById('fwForm');
+               if (fwForm) {
+                 var box = document.createElement('div');
+                 box.style.cssText = 'padding:12px;border:1px solid #7aaad6;border-radius:6px;background:#eef6ff;margin:12px 0';
+                 var title = document.createElement('b');
+                 title.textContent = 'Firmware update runs in the safeboot updater';
+                 var text = document.createElement('p');
+                 text.textContent = 'The device restarts into a small updater at the same address. ' +
+                   'Upload the .ino.bin firmware file there; it then restarts into the new firmware. ' +
+                   'The gateway does not run while the updater is active.';
+                 var btn = document.createElement('button');
+                 btn.type = 'button';
+                 btn.textContent = 'Restart into the firmware updater';
+                 var msg = document.createElement('p');
+                 btn.addEventListener('click', function() {
+                   if (!confirm('Restart into the firmware updater now? The gateway stops until you upload a firmware or restart.')) return;
+                   btn.disabled = true;
+                   fetch('/safeboot', { method: 'POST' })
+                     .then(function(r) { return r.text().then(function(t) { return { ok: r.ok, t: t }; }); })
+                     .then(function(res) {
+                       msg.textContent = res.t;
+                       if (!res.ok) { btn.disabled = false; return; }
+                       var left = 20;
+                       var tick = setInterval(function() {
+                         left--;
+                         msg.textContent = 'Restarting into the updater... ' + left + 's';
+                         if (left <= 0) { clearInterval(tick); location.href = '/'; }
+                       }, 1000);
+                     })
+                     .catch(function() { msg.textContent = 'Request failed.'; btn.disabled = false; });
+                 });
+                 box.appendChild(title); box.appendChild(text); box.appendChild(btn); box.appendChild(msg);
+                 fwForm.parentNode.replaceChild(box, fwForm);
+               }
+             } else if (info && info.app_ota_available === false) {
                var fwForm = document.getElementById('fwForm');
                if (fwForm) {
                  var note = document.createElement('div');

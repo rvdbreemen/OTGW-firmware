@@ -175,6 +175,7 @@
       el.classList.toggle('active', el.id === t);
     });
     if (t === 'mlog') renderLog();
+    else if (t === 'mvalues') { renderValues(); fetchOtmonitor(); if (!dallasLabelsLoaded) loadDallasLabels(); }   // TASK-1223.14/.15
     else if (t === 'mstats') { renderStats(); fetchStatsPanels(); }
     else if (t === 'msupport') renderSupport();
     else if (t === 'mgraph') renderGraph();
@@ -191,6 +192,7 @@
       if (el) el.classList.toggle('active', x === k);
     });
     try { localStorage.setItem('otgw-v2-advtab', k); } catch (e) { }
+    stopPicSettingsPoll();   // TASK-1223.17: the PR= re-read loop runs only while the PIC tab is open
     // Fetch-on-demand: each sub-tab loads its own data when opened, not on page init.
     if (k === 'pic') { fetchPic(); fetchPicSettings(); picUpdatePoll(); }
     else if (k === 'debug') fetchDebug();
@@ -496,6 +498,7 @@
     if (d.charAt(0) === '{' || d.charAt(0) === '[') return; // JSON status, not a frame
     var raw = rawFromLine(d);
     if (raw) {
+      wsLastFrameMs = Date.now();   // TASK-1223.14: PS=1 detection measures socket silence
       applyFrame(raw);
       pushTicker(d);                // mission-control raw-frame ticker (concept C)
       pushLog(d);                   // Monitor > Log console
@@ -877,6 +880,7 @@
     try {
       ws = new WebSocket(url);
       ws.onmessage = onWsMessage;
+      ws.onopen = function () { wsOpenMs = Date.now(); };
       ws.onclose = function () { ws = null; scheduleReconnect(); fetchSeed(); };
       ws.onerror = function () { try { if (ws) ws.close(); } catch (e) { } };
     } catch (e) { scheduleReconnect(); }
@@ -1258,8 +1262,14 @@
         if (iface === 'OT-Direct') { otdOvrEl.style.display = ''; wireOtdOvrApply(); }
         else otdOvrEl.style.display = 'none';
       }
-      // Gateway MODE (PIC only). otgwmode is absent on OT-Direct -> N/A.
-      if (h.otgwmode === undefined) { CONN.mode.value = isPic ? 'detecting' : 'n/a'; }
+      // TASK-1223.16: the OT-Direct status panel lives next to the overrides and follows
+      // the same interface test; PIC boards never request otdirect/status (it 503s there).
+      var otdStEl = document.getElementById('otdStatus');
+      if (otdStEl) otdStEl.style.display = (iface === 'OT-Direct') ? '' : 'none';
+      // Gateway MODE. otgwmode is PIC-only; on OT-Direct reuse the last known OT-Direct
+      // mode (device/info otdmode at startup, then otdirect/status) so the chip does not
+      // fall back to n/a on every health poll (TASK-1223.16, gap audit row 14).
+      if (h.otgwmode === undefined) { CONN.mode.value = isPic ? 'detecting' : ((iface === 'OT-Direct' && otdMode) ? otdMode : 'n/a'); }
       else { var m = ('' + h.otgwmode).toLowerCase(); CONN.mode.value = (m === 'on') ? 'gateway' : (m === 'off') ? 'monitor' : m; }
       // Wi-Fi health from RSSI
       CONN.wifi.detail = (h.networkmode || '') + (connRssi !== null ? ' · ' + connRssi + ' dBm' : '');
@@ -1284,8 +1294,53 @@
       renderConnMap(); renderConnStrip(); renderConnDetail();
       renderHdrNet();   // TASK-983: refresh Wi-Fi bars + dBm tooltip from the live RSSI
       fetchSim();       // TASK-983: piggyback the SIMULATION-badge poll on this cadence
-      fetchOverrides(iface);   // TASK-984: refresh the injected-override count/list (source by interface)
+      // TASK-984: refresh the injected-override count/list (source by interface).
+      // TASK-1223.16: on OT-Direct, chain the status read behind it (one at a time).
+      var ovP = fetchOverrides(iface);
+      if (iface === 'OT-Direct') ovP.then(fetchOtdStatus);
     }).catch(function () { });
+  }
+  // ---------- Monitor > Connection > OT-Direct status (TASK-1223.16) ----------
+  // /api/v2/otdirect/status (restAPI.ino sendOTDirectStatus). Same rows as classic
+  // index.html:188-228 / index.js refreshOTDStatus. Called only on OT-Direct boards,
+  // on the fetchConn cadence (15 s) and when Monitor > Connection opens.
+  var otdMode = '';
+  function setOtdMode(m) {
+    if (!m) return;
+    otdMode = ('' + m).toLowerCase();
+    if (CONN.ot.detail === 'OT-Direct' || CONN.mode.value === 'n/a') {
+      CONN.mode.value = otdMode;
+      renderConnMap(); renderConnStrip();
+    }
+  }
+  function fetchOtdStatus() {
+    return fetch(APIGW + 'v2/otdirect/status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+      var s = j && j.otdirect_status; if (!s) return;
+      setOtdMode(s.mode);
+      renderOtdStatus(s);
+    }).catch(function () { });
+  }
+  function renderOtdStatus(s) {
+    var host = document.getElementById('otdStatusRows'); if (!host) return;
+    function onoff(b, yes, no) { return (b ? '● ' : '○ ') + (b ? yes : no); }
+    var rows = [
+      ['Mode', (s.mode || '—').toUpperCase(), null],
+      ['OT bus', onoff(s.ot_online, 'Online', 'Offline'), s.ot_online],
+      ['Thermostat', onoff(s.thermostat_connected, 'Connected', 'None'), s.thermostat_connected],
+      ['Boiler', onoff(s.boiler, 'Active', 'Idle'), s.boiler],
+      ['Setback', onoff(s.setback_active, 'Active', 'Off'), s.setback_active],
+      ['Step-up', onoff(s.stepup, 'On', 'Off'), s.stepup],
+      ['Schedule (active / total)', (s.schedule_active || 0) + ' / ' + (s.schedule_total || 0) + (s.schedule_disabled ? ' (' + s.schedule_disabled + ' disabled)' : ''), null],
+      ['Active overrides', '' + (s.overrides_active || 0), null]
+    ];
+    host.textContent = '';
+    rows.forEach(function (r) {
+      var row = document.createElement('div'); row.className = 'devinforow';
+      var c1 = document.createElement('div'); c1.className = 'devinfocolumn1'; c1.textContent = r[0];
+      var c2 = document.createElement('div'); c2.className = 'devinfocolumn2'; c2.textContent = r[1];
+      if (r[2] === true) c2.classList.add('vbool-on');
+      row.appendChild(c1); row.appendChild(c2); host.appendChild(row);
+    });
   }
   // ---------- Monitor > Connection > OT-Direct manual overrides (TASK-964) ----------
   function otdHex(v) { return '0x' + ('0000' + ((v >>> 0)).toString(16)).slice(-4).toUpperCase(); }
@@ -1364,7 +1419,9 @@
     var wf = document.getElementById('cnWifiSub'); if (wf) wf.textContent = connRssi !== null ? connRssi + ' dBm' : (CONN.wifi.detail || '—');
     var md = document.getElementById('cnModeTxt');
     if (md) md.textContent = CONN.mode.value === 'gateway' ? 'GATEWAY MODE' : CONN.mode.value === 'monitor' ? 'MONITOR MODE' : CONN.mode.value === 'n/a' ? 'NO PIC' : ('MODE: ' + (CONN.mode.value || '?').toUpperCase());
-    var dm = document.getElementById('dot-mode'); if (dm) dm.setAttribute('fill', (CONN.mode.value === 'gateway' || CONN.mode.value === 'monitor') ? STV['st-mode'] : STV['st-unknown']);
+    // TASK-1223.16: any known mode (incl. the OT-Direct bypass/master/loopback) gets the accent.
+    var mv2 = CONN.mode.value;
+    var dm = document.getElementById('dot-mode'); if (dm) dm.setAttribute('fill', (mv2 && mv2 !== 'n/a' && mv2 !== 'detecting') ? STV['st-mode'] : STV['st-unknown']);
     updateCnOvr();   // TASK-984: refresh the on-bus override badge from the cached rows
     renderConnDetail();
   }
@@ -1405,10 +1462,11 @@
   function fetchOverrides(iface) {
     // On OT-Direct the gateway overrides endpoint is meaningless (no PIC); read the
     // OT-Direct store instead. Both normalize into ovrRows; errors -> empty, silently.
+    // Returns the (never-rejecting) promise so callers can chain behind it.
     var otd = (iface === 'OT-Direct');
     var url = APIGW + (otd ? 'v2/otdirect/overrides' : 'v2/otgw/overrides');
     function apply() { updateCnOvr(); scheduleRender(); }   // map badge + Home A badge/marks
-    fetch(url).then(function (r) { return r.ok ? r.json() : null; })
+    return fetch(url).then(function (r) { return r.ok ? r.json() : null; })
       .then(function (j) { ovrRows = otd ? normOtdOvr(j) : normPicOvr(j); apply(); })
       .catch(function () { ovrRows = []; apply(); });
   }
@@ -2263,9 +2321,13 @@
   // They are plain settings keys, so the existing ENUM_OPTS select path renders them
   // once it has options — no new field type needed. Fetches are sequential to stay
   // within the N<=2 in-flight cap (ADR-165).
+  // TASK-1223.15: the 1-Wire label (sensors/labels) is loaded first in the same
+  // sequential chain and shown as the option text; the option value stays the raw
+  // address, because that is what the setting stores.
   function populateAreaSensorChoices() {
     var opts = [['', '-- none --']];
-    fetch(APIGW + 'v2/sensors')
+    loadDallasLabels()
+      .then(function () { return fetch(APIGW + 'v2/sensors'); })
       .then(function (r) { return r.ok ? r.json() : null; })
       .catch(function () { return null; })
       .then(function (statusJson) {
@@ -2273,7 +2335,8 @@
         if (devObj) {
           Object.keys(devObj).forEach(function (addr) {
             var up = String(addr).toUpperCase();
-            opts.push([up, up + ' [DS18B20]']);
+            var lbl = dallasLabelFor(addr);
+            opts.push([up, (lbl ? lbl + ' (' + up + ')' : up) + ' [DS18B20]']);
           });
         }
         return fetch(APIGW + 'v2/sat/ble/discovery')
@@ -2322,19 +2385,274 @@
     webhookcontenttype: [['application/json', 'application/json'], ['application/x-www-form-urlencoded', 'form-urlencoded'], ['text/plain', 'text/plain']]
   };
 
-  function fetchSeed() {
-    fetch(APIGW + 'v2/otgw/otmonitor').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      var o = j && j.otmonitor; if (!o) return;
-      function num(k) { var e = o[k]; if (!e || e.value === undefined) return null; var v = parseFloat(e.value); return isNaN(v) ? null : v; }
-      function on(k) { var e = o[k]; if (!e || e.value === undefined) return null; return /on|true|1/i.test('' + e.value); }
-      var map = { flow: 'boilertemperature', ret: 'returnwatertemperature', dhw: 'dhwtemperature', outside: 'outsidetemperature', room: 'roomtemperature', roomSet: 'roomsetpoint', chSet: 'controlsetpoint', mod: 'relmodlvl', pressure: 'chwaterpressure' };
-      var changed = false;
-      Object.keys(map).forEach(function (f) { if (f === 'outside' && model.wxValid) return; var v = num(map[f]); if (v !== null) { model[f] = v; changed = true; } });
-      var fl = on('flamestatus'); if (fl !== null) { model.flame = fl; changed = true; }
-      var ch = on('chmodus'); if (ch !== null) { model.ch = ch; changed = true; }
-      var dh = on('dhwmode'); if (dh !== null) { model.dhw_on = dh; changed = true; }
-      if (changed) { pushSample(); scheduleRender(); }
-    }).catch(function () { });
+  // ---------- otmonitor: one fetcher for the Home seed, PS=1 fallback and Monitor > Values ----------
+  // TASK-1223.14/.16 (gap audit rows 10-12, 16). /api/v2/otgw/otmonitor has a global
+  // rate budget of 1 request per 1.5 s, burst 2 (ADR-172, restAPI.ino kApiRateLimitRoutes),
+  // so every caller goes through fetchOtmonitor(): at most one request in flight, and a
+  // 429 pauses all callers for the retry_after the device asks for.
+  var OTMON_POLL_MS = 2000;
+  var otmonInflight = false, otmonPauseUntil = 0, otmonData = null, otmonLastOkMs = 0;
+  function retryAfterMs(r, dflt) {
+    // 429 body is problem+json with retry_after (s); Retry-After is not CORS-readable.
+    return r.json().then(function (j) {
+      var s = (j && typeof j.retry_after === 'number') ? j.retry_after : 0;
+      return s > 0 ? s * 1000 : dflt;
+    }, function () { return dflt; });
+  }
+  function fetchOtmonitor() {
+    if (otmonInflight || Date.now() < otmonPauseUntil) return;
+    otmonInflight = true;
+    fetch(APIGW + 'v2/otgw/otmonitor').then(function (r) {
+      if (r.status === 429) return retryAfterMs(r, 3000).then(function (ms) { otmonPauseUntil = Date.now() + ms; return null; });
+      return r.ok ? r.json() : null;
+    }).then(function (j) {
+      otmonInflight = false;
+      var o = j && j.otmonitor; if (!o || typeof o !== 'object') return;
+      otmonData = o; otmonLastOkMs = Date.now();
+      applyOtmonToModel(o);
+      if (isMonitorVisible('mvalues')) renderValues();
+    }).catch(function () { otmonInflight = false; });
+  }
+  function applyOtmonToModel(o) {
+    function num(k) { var e = o[k]; if (!e || e.value === undefined || !e.epoch) return null; var v = parseFloat(e.value); return isNaN(v) ? null : v; }
+    function on(k) { var e = o[k]; if (!e || e.value === undefined || !e.epoch) return null; return /on|true|1/i.test('' + e.value); }
+    var map = { flow: 'boilertemperature', ret: 'returnwatertemperature', dhw: 'dhwtemperature', outside: 'outsidetemperature', room: 'roomtemperature', roomSet: 'roomsetpoint', chSet: 'controlsetpoint', mod: 'relmodlvl', pressure: 'chwaterpressure' };
+    var changed = false;
+    Object.keys(map).forEach(function (f) { if (f === 'outside' && model.wxValid) return; var v = num(map[f]); if (v !== null) { model[f] = v; changed = true; } });
+    var fl = on('flamestatus'); if (fl !== null) { model.flame = fl; changed = true; }
+    var ch = on('chmodus'); if (ch !== null) { model.ch = ch; changed = true; }
+    var dh = on('dhwmode'); if (dh !== null) { model.dhw_on = dh; changed = true; }
+    var ft = on('faultindicator'); if (ft !== null) { model.fault = ft; changed = true; }
+    if (changed) { pushSample(); scheduleRender(); }
+  }
+  // Kept as the name the startup stagger, ws.onclose and the 20 s closed-socket
+  // fallback already call; it is the shared, guarded fetcher now.
+  function fetchSeed() { fetchOtmonitor(); }
+  // 2 s tick: polls only while Monitor > Values is open, or while the PIC is in PS=1
+  // mode (the socket stays open but carries no frames, so Home would freeze). Classic
+  // does the same (index.js applyPSmodeState). The tick itself costs no request.
+  function otmonTick() {
+    if (document.hidden) return;
+    var vis = isMonitorVisible('mvalues');
+    if (vis || psMode) fetchOtmonitor();
+    if (vis) renderValues();   // keeps the age column and "Updated" chip moving between answers
+  }
+
+  // ---------- PS=1 detection (TASK-1223.14, gap audit row 16) ----------
+  // psmode only rides /api/v2/device/time (restAPI.ino sendDeviceTimeV2), which has its
+  // own budget of 1 per 4 s, burst 2. Ask only when the open socket has been silent for
+  // 15 s (measured from when it opened, not from page load), and keep asking every
+  // 10 s while PS=1 is on so the exit is noticed. A silent bench bus also looks quiet;
+  // psmode decides.
+  var psMode = false, wsOpenMs = 0, wsLastFrameMs = 0, devTimeInflight = false, devTimeLastMs = 0;
+  function psCheckTick() {
+    if (document.hidden || devTimeInflight || !ws || ws.readyState !== 1) return;
+    var now = Date.now();
+    var quietSince = Math.max(wsOpenMs, wsLastFrameMs);
+    if (!psMode && now - quietSince < 15000) return;
+    if (now - devTimeLastMs < 10000) return;
+    devTimeInflight = true; devTimeLastMs = now;
+    fetch(APIGW + 'v2/device/time').then(function (r) {
+      if (r.status === 429) return retryAfterMs(r, 5000).then(function (ms) { devTimeLastMs = Date.now() + ms - 10000; return null; });
+      return r.ok ? r.json() : null;
+    }).then(function (j) {
+      devTimeInflight = false;
+      var t = j && j.devtime; if (!t || t.psmode === undefined) return;
+      setPsMode(t.psmode === true || t.psmode === 'true');
+    }).catch(function () { devTimeInflight = false; });
+  }
+  function setPsMode(on) {
+    if (on === psMode) return;
+    psMode = on;
+    var chip = document.getElementById('valPsChip'); if (chip) chip.style.display = on ? '' : 'none';
+    if (on) fetchOtmonitor();
+  }
+
+  // ---------- Monitor > Values (TASK-1223.14) ----------
+  // Every entry of otmonitor, in firmware order, with unit and stale marking. Rows are
+  // built once per key and updated in place, so an open label editor survives the 2 s
+  // refresh. Labels match classic translateFields (index.js:7471-7503, 7591-7599).
+  var OTMON_LABELS = {
+    flamestatus: 'Flame Status', chenable: 'Central Heating Enabled', chmodus: 'Central Heating Status',
+    ch2enable: 'Central Heating 2 Enabled', ch2modus: 'Central Heating 2 Status',
+    dhwenable: 'Domestic Hot Water Enabled', dhwmode: 'Domestic Hot Water Status',
+    diagnosticindicator: 'Diagnostic Indicator', faultindicator: 'Fault Indicator',
+    outsidetemperature: 'Outside Temperature', roomtemperature: 'Room Temperature',
+    roomsetpoint: 'Room Temperature Setpoint', remoteroomsetpoint: 'Remote Room Temperature Setpoint',
+    relmodlvl: 'Relative Modulation Level', maxrelmodlvl: 'Max. Rel. Modulation Level',
+    chwaterpressure: 'Central Heating Water Pressure', boilertemperature: 'Boiler Temperature',
+    returnwatertemperature: 'Return Water Temperature', controlsetpoint: 'Control Setpoint',
+    maxchwatersetpoint: 'Max. CH Water Setpoint', dhwtemperature: 'Domestic Hot Water Temperature',
+    dhwsetpoint: 'Domestic Hot Water Setpoint', oemfaultcode: 'OEM Fault Code',
+    oemdiagnosticcode: 'OEM Diagnostic Code', coolingmodus: 'Cooling Enabled', coolingactive: 'Cooling Status',
+    otcactive: 'Outside Temp Compensation', servicerequest: 'Service Request', lockoutreset: 'Lockout Reset',
+    lowwaterpressure: 'Low Water Pressure', gasflamefault: 'Gas/Flame Fault', airtemp: 'Air Temperature',
+    waterovertemperature: 'Water Over-Temperature', numberofsensors: 'Number of Temperature Sensors',
+    s0powerkw: 'S0 Actual Power', s0intervalcount: 'S0 Interval Pulses', s0totalcount: 'S0 Total Pulses'
+  };
+  var VAL_STALE_MS = 120000;
+  // OT epochs are rolling seconds-since-boot (OTGW-Core.ino getMsgLastUpdated) while
+  // 1-Wire/S0 epochs are time(nullptr), so device-side ages are not comparable. Track
+  // instead, per row, when this page last saw the epoch change.
+  var valRows = {};          // key -> { tr, nameTd, valTd, unitTd, ageTd, epoch, firstMs, changeMs }
+  var valSearch = '';
+  function isDallasEntry(k, e) { return (e && e.type === 'dallas') || /^[0-9A-Fa-f]{16}$/.test(k); }
+  function fmtOtmonValue(v) {
+    if (typeof v === 'number') return (Math.round(v * 100) / 100).toString();
+    return (v === undefined || v === null) ? '' : '' + v;
+  }
+  function fmtAge(ms) {
+    var s = Math.round(ms / 1000);
+    return s < 120 ? s + 's' : (s < 7200 ? Math.round(s / 60) + 'm' : Math.round(s / 3600) + 'h');
+  }
+  function valDisplayName(k, e) {
+    if (isDallasEntry(k, e)) return dallasLabelFor(k) || k;
+    return OTMON_LABELS[k] || k;
+  }
+  function buildValRow(k, e) {
+    var tr = document.createElement('tr'); tr.dataset.key = k;
+    var nameTd = document.createElement('td');
+    var valTd = document.createElement('td'); valTd.className = 'statval'; valTd.style.textAlign = 'right';
+    var unitTd = document.createElement('td');
+    var ageTd = document.createElement('td');
+    tr.appendChild(nameTd); tr.appendChild(valTd); tr.appendChild(unitTd); tr.appendChild(ageTd);
+    var row = { tr: tr, nameTd: nameTd, valTd: valTd, unitTd: unitTd, ageTd: ageTd, epoch: null, firstMs: Date.now(), changeMs: 0, dallas: isDallasEntry(k, e), editing: false };
+    fillValName(k, e, row);
+    return row;
+  }
+  function fillValName(k, e, row) {
+    if (row.editing) return;
+    var td = row.nameTd; td.textContent = '';
+    var nm = document.createElement('span'); nm.textContent = valDisplayName(k, e); td.appendChild(nm);
+    if (row.dallas) {
+      var lbl = dallasLabelFor(k);
+      if (lbl) { var ad = document.createElement('span'); ad.className = 'ble-mac'; ad.style.marginLeft = '6px'; ad.textContent = k; td.appendChild(ad); }
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'vlbl-edit'; b.textContent = '✎';
+      b.title = 'Edit label for ' + k; b.setAttribute('aria-label', 'Edit label for sensor ' + k);
+      b.addEventListener('click', function () { openValLabelEditor(k, row); });
+      td.appendChild(b);
+    }
+  }
+  function renderValues() {
+    var tb = document.querySelector('#valTable tbody'); if (!tb) return;
+    var st = document.getElementById('valStatus');
+    if (!otmonData) { if (st) st.textContent = 'Loading…'; return; }
+    var now = Date.now(), q = valSearch.trim().toLowerCase(), shown = 0;
+    Object.keys(otmonData).forEach(function (k) {
+      var e = otmonData[k];
+      if (!e || typeof e !== 'object' || k === 'sensorsimulation') return;   // classic hides the debug flag
+      var row = valRows[k];
+      if (!row) { row = valRows[k] = buildValRow(k, e); tb.appendChild(row.tr); }
+      var ep = (typeof e.epoch === 'number') ? e.epoch : parseInt(e.epoch, 10) || 0;
+      if (row.epoch !== null && ep !== row.epoch) row.changeMs = now;
+      row.epoch = ep;
+      // value: On/Off as a coloured word; fault/alarm/safety flags colour "On" as an alert
+      row.valTd.textContent = '';
+      if (!ep) row.valTd.textContent = '—';
+      else if (e.value === 'On' || e.value === 'Off') {
+        var sp = document.createElement('span');
+        if (e.value === 'On') sp.className = /fault|alarm|safety|lowwater|overtemp|servicereq/.test(k) ? 'vbool-alarm' : 'vbool-on';
+        sp.textContent = (e.value === 'On' ? '● ' : '○ ') + e.value;
+        row.valTd.appendChild(sp);
+      } else row.valTd.textContent = fmtOtmonValue(e.value);
+      row.unitTd.textContent = e.unit || '';
+      var age, stale;
+      if (!ep) { row.ageTd.textContent = 'no data'; stale = true; }
+      else {
+        age = row.changeMs ? (now - row.changeMs) : (now - row.firstMs);
+        row.ageTd.textContent = (row.changeMs ? '' : '≥ ') + fmtAge(age) + ' ago';
+        stale = age > VAL_STALE_MS;
+      }
+      row.tr.classList.toggle('vstale', !!stale);
+      var hay = (k + ' ' + valDisplayName(k, e)).toLowerCase();
+      var vis = !q || hay.indexOf(q) !== -1;
+      row.tr.style.display = vis ? '' : 'none';
+      if (vis) shown++;
+    });
+    // A key the firmware stopped sending (S0 or 1-Wire disabled, sensor gone) loses its row.
+    Object.keys(valRows).forEach(function (k) {
+      if (!Object.prototype.hasOwnProperty.call(otmonData, k) && !valRows[k].editing) { valRows[k].tr.remove(); delete valRows[k]; }
+    });
+    var cnt = document.getElementById('valCount'); if (cnt) cnt.textContent = shown;
+    if (st) st.textContent = 'Updated ' + fmtAge(now - otmonLastOkMs) + ' ago';
+  }
+
+  // ---------- 1-Wire (Dallas) sensor labels (TASK-1223.15) ----------
+  // GET/POST /api/v2/sensors/labels (restAPI.ino getDallasLabels / updateAllDallasLabels).
+  // The POST replaces the whole /dallas_labels.ini, so a save is read-modify-write and
+  // aborts when the fresh GET fails: falling back to {} would wipe every other label.
+  var dallasLabels = {}, dallasLabelsLoaded = false, dallasLabelsInflight = false;
+  function dallasLabelKey(addr) {
+    var up = ('' + addr).toUpperCase(), keys = Object.keys(dallasLabels);
+    for (var i = 0; i < keys.length; i++) if (keys[i].toUpperCase() === up) return keys[i];
+    return null;
+  }
+  function dallasLabelFor(addr) {
+    var k = dallasLabelKey(addr);
+    var v = k ? dallasLabels[k] : '';
+    return (typeof v === 'string' && v.trim()) ? v.trim() : '';
+  }
+  function parseLabelsResponse(r) {
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    return r.text().then(function (t) {
+      if (!t || !t.trim()) return {};
+      var o = JSON.parse(t);   // throws on a corrupt file -> caller aborts
+      if (!o || typeof o !== 'object' || Array.isArray(o)) throw new Error('labels is not an object');
+      return o;
+    });
+  }
+  // Resolves when the cache is loaded (or the attempt failed); never rejects.
+  function loadDallasLabels() {
+    if (dallasLabelsInflight) return Promise.resolve(dallasLabels);
+    dallasLabelsInflight = true;
+    return fetchWithRetry(APIGW + 'v2/sensors/labels').then(parseLabelsResponse).then(function (o) {
+      dallasLabels = o; dallasLabelsLoaded = true; dallasLabelsInflight = false;
+      refreshValNames();
+      return dallasLabels;
+    }).catch(function () { dallasLabelsInflight = false; return dallasLabels; });
+  }
+  function refreshValNames() {
+    if (!otmonData) return;
+    Object.keys(valRows).forEach(function (k) { if (valRows[k].dallas) fillValName(k, otmonData[k], valRows[k]); });
+  }
+  function openValLabelEditor(addr, row) {
+    if (row.editing) return;
+    row.editing = true;
+    var td = row.nameTd, original = dallasLabelFor(addr);
+    td.textContent = '';
+    var inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 16; inp.className = 'vlbl-input';
+    inp.value = original; inp.placeholder = addr; inp.setAttribute('aria-label', 'Label for sensor ' + addr);
+    td.appendChild(inp);
+    var done = false;
+    function close() { row.editing = false; fillValName(addr, otmonData ? otmonData[addr] : null, row); }
+    function commit() {
+      if (done) return;
+      var nv = inp.value.trim().substring(0, 16);
+      if (nv === original) { done = true; close(); return; }
+      done = true; inp.disabled = true;
+      saveDallasLabel(addr, nv).then(function () { close(); if (Object.keys(setData).length) populateAreaSensorChoices(); })
+        .catch(function (err) {
+          done = false; inp.disabled = false; inp.focus();
+          var st = document.getElementById('valStatus'); if (st) st.textContent = 'Label not saved (' + ((err && err.message) || 'error') + ')';
+        });
+    }
+    inp.addEventListener('keydown', function (ev) {
+      if (ev.key === 'Enter') { ev.preventDefault(); commit(); }
+      else if (ev.key === 'Escape') { ev.preventDefault(); done = true; close(); }
+    });
+    inp.addEventListener('blur', commit);
+    inp.focus(); inp.select();
+  }
+  // Empty label deletes the entry (the row then shows the raw address, as classic does).
+  function saveDallasLabel(addr, label) {
+    var url = APIGW + 'v2/sensors/labels';
+    return fetchWithRetry(url).then(parseLabelsResponse).then(function (cur) {
+      dallasLabels = cur;
+      var key = dallasLabelKey(addr) || addr;   // keep the stored spelling of an existing key
+      if (label) cur[key] = label; else delete cur[key];
+      return fetchWithRetry(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(cur) })
+        .then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); dallasLabels = cur; dallasLabelsLoaded = true; });
+    });
   }
 
   function fetchSatStatus() {
@@ -2603,6 +2921,33 @@
         ['MQTT Connected', yesno(d.mqttconnected)], ['MQTT Enabled', mqttEn], ['NTP Enabled', yesno(d.ntpenable)], ['NTP Timezone', d.ntptimezone]
       ]]
     ];
+    // TASK-1223.18 (gap audit row 36): every device/info field the curated groups above
+    // do not show, grouped by prefix like classic's generic loop (index.js:6117-6176).
+    // Raw key as the label: the hd_* counters match the MQTT stats topic names. Zero and
+    // false are kept (a zero counter is information); otgwsimulation is skipped as in classic.
+    var CURATED = ['fwversion', 'compiled', 'picfwversion', 'picfwtype', 'picdeviceid', 'board',
+      'hostname', 'ipaddress', 'macaddress', 'ssid', 'wifirssi', 'wifiquality', 'wifiquality_text',
+      'chip_model_est', 'chipid', 'coreversion', 'sdkversion', 'cpufreq', 'flash_size', 'flashchipsize',
+      'psram_found', 'psram_size', 'psram_free', 'LittleFSsize', 'flashchipmode',
+      'freeheap', 'maxfreeblock', 'hd_fragmentation_pct', 'uptime', 'bootcount', 'lastreset',
+      'mqttconnected', 'ntpenable', 'ntptimezone', 'otgwsimulation'];
+    var OTHER = [
+      ['OT-Direct (otd*)', /^otd/, []],
+      ['Heap diagnostics (hd_*)', /^hd_/, []],
+      ['REST performance (perf_*)', /^perf_/, []],
+      ['MQTT discovery (disc_*)', /^disc_/, []],
+      ['Ethernet (eth_current_*)', /^eth_current_/, []],
+      ['All other fields', /^/, []]
+    ];
+    Object.keys(d).forEach(function (k) {
+      if (CURATED.indexOf(k) !== -1) return;
+      var v = d[k];
+      if (v === undefined || v === null || typeof v === 'object') return;
+      for (var i = 0; i < OTHER.length; i++) {
+        if (OTHER[i][1].test(k)) { OTHER[i][2].push([k, '' + v]); break; }
+      }
+    });
+    OTHER.forEach(function (g) { if (g[2].length) groups.push([g[0], g[2]]); });
     groups.forEach(function (g) {
       var rows = g[1].filter(function (r) { return r[1] !== undefined && r[1] !== null && r[1] !== ''; });
       if (!rows.length) return;
@@ -2719,40 +3064,132 @@
       renderPicBanner(u);
     }).catch(function () { if (b) { b.className = 'pic-banner'; b.textContent = 'Update check failed'; } });
   }
-  // Gateway settings · cached PR= values. The GET returns the cache immediately AND
-  // triggers a fresh ~45s PR readout on the device — call once per tab open, no loop.
-  function prv(x) { var s = (x === undefined || x === null) ? '' : ('' + x).trim(); return s === '' ? '—' : s; }
+  // Gateway settings · PR= values (TASK-1223.17, gap audit row 35). Renders every field
+  // of /api/v2/pic/settings (restAPI.ino sendPICsettings) with classic's decoding
+  // (index.js:5448-5808). Each GET returns the cache AND starts a ~45 s PR= readout cycle
+  // on the PIC (a GET during a running cycle is ignored by triggerPICsettingsReadout).
+  // So: one GET on tab open, then re-read every 5 s for at most 45 s while the PIC tab
+  // stays open, stopping early once every field has arrived. One request at a time.
+  // Empty or '--' means "not read yet / not supported": that row is hidden.
+  var picSetTimer = null, picSetIter = 0, PICSET_MAX_ITER = 9, PICSET_POLL_MS = 5000;
   function picModeText(m) {
-    if (m === undefined || m === null || m === '') return '—';
+    if (m === undefined || m === null || m === '') return '';
     var s = ('' + m).toLowerCase();
     return s === 'on' ? 'Gateway' : s === 'off' ? 'Monitor' : s === 'detecting' ? 'Detecting…' : ('' + m);
   }
+  function picCode(v, table) { return Object.prototype.hasOwnProperty.call(table, v) ? table[v] : v; }
+  function picLetters(v, labels, fn) {
+    var out = [];
+    for (var i = 0; i < v.length && i < labels.length; i++) out.push(labels[i] + ': ' + fn(v.charAt(i)));
+    return out.length ? out.join('\n') : v;
+  }
+  var PIC_GPIO = { '0': 'Input', '1': 'Ground', '2': 'Vcc', '3': 'LED E', '4': 'LED F', '5': 'Home', '6': 'Away', '7': 'DS18x20 sensor', '8': 'DHW block' };
+  var PIC_LED = { R: 'Receive', X: 'Transmit', T: 'Master traffic', B: 'Slave traffic', O: 'Remote override active', F: 'Flame', H: 'Central heating', W: 'Hot water', C: 'Comfort mode', E: 'Transmission error', M: 'Maintenance required', P: 'Raised power mode' };
+  var PIC_VREF_F88 = [0.625, 0.833, 1.042, 1.250, 1.458, 1.667, 1.875, 2.083, 2.292, 2.500];
+  var PIC_VREF_F1847 = [0.832, 0.960, 1.088, 1.216, 1.344, 1.472, 1.600, 1.728, 1.856, 1.984];
+  function fmtPicSetting(key, v) {
+    var t, lv;
+    switch (key) {
+      case 'setpoint_override':
+        if (v === 'N' || v === '0') return 'No override';
+        if (v.length > 1 && v.charAt(0) === 'T') return 'Temporary override to ' + v.slice(1) + ' °C';
+        if (v.length > 1 && v.charAt(0) === 'C') return 'Constant override to ' + v.slice(1) + ' °C';
+        return v;
+      case 'dhw_override': return picCode(v, { '0': 'Off', '1': 'On', A: 'Auto', P: 'Push once' });
+      case 'gpio': return picLetters(v, ['A', 'B'], function (c) { return picCode(c, PIC_GPIO); });
+      case 'gpio_states': return picLetters(v, ['A', 'B'], function (c) { return c === '1' ? 'High' : 'Low'; });
+      case 'led': return picLetters(v, ['A', 'B', 'C', 'D', 'E', 'F'], function (c) { return picCode(c, PIC_LED); });
+      case 'tweaks':
+        t = [];
+        if (v.length >= 1) t.push('Ignore transitions: ' + (v.charAt(0) === '1' ? 'On' : 'Off'));
+        if (v.length >= 2) t.push('Override in high byte: ' + (v.charAt(1) === '1' ? 'On' : 'Off'));
+        return t.length ? t.join('\n') : v;
+      case 'temp_sensor': return picCode(v, { O: 'Outside temperature', R: 'Return water temperature' });
+      case 'smart_power': return picCode(v, { L: 'Low power', M: 'Medium power', H: 'High power', N: 'Normal power' });
+      case 'thermostat_detect': return picCode(v, { C: 'Forced: Remeha Celcia 20', I: 'Forced: Remeha iSense', S: 'Forced: Standard thermostat', D: 'Auto-detect (default)', A: 'Auto-detect' });
+      case 'reset_cause': return picCode(v, { B: 'Brownout', C: 'By command (GW=R)', E: 'External reset', L: 'Stuck in loop', O: 'Stack overflow', P: 'Power-on', S: 'Serial BREAK', U: 'Stack underflow', W: 'Watchdog timer' });
+      case 'voltage_ref':
+        lv = parseInt(v, 10);
+        if (isNaN(lv) || lv < 0 || lv > 9) return 'Level ' + v;
+        return 'Level ' + lv + ' (F88: ' + PIC_VREF_F88[lv].toFixed(3) + ' V / F1847: ' + PIC_VREF_F1847[lv].toFixed(3) + ' V)';
+      default: return v;
+    }
+  }
+  // [title, [[label, key, unit]]]; a 'dev:<field>' key reads the device/info snapshot.
+  var PIC_SET_GROUPS = [
+    ['Firmware', [['PIC firmware version', 'dev:picfwversion', ''], ['Gateway/Monitor mode', 'dev:otgwmode', '']]],
+    ['Active state', [['Setpoint override', 'setpoint_override', ''], ['Setback temperature', 'setback', '°C'], ['DHW override', 'dhw_override', '']]],
+    ['Hardware config', [['GPIO functions', 'gpio', ''], ['GPIO states', 'gpio_states', ''], ['LED functions', 'led', ''], ['Tweaks', 'tweaks', ''],
+      ['Temp sensor', 'temp_sensor', ''], ['Smart power', 'smart_power', ''], ['Thermostat detect', 'thermostat_detect', '']]],
+    ['Diagnostics', [['Build date', 'builddate', ''], ['Clock speed', 'clock_mhz', ''], ['Reset cause', 'reset_cause', ''],
+      ['Standalone interval', 'standalone_interval', 's'], ['Voltage reference', 'voltage_ref', '']]]
+  ];
+  function picSetPresent(v) { return typeof v === 'string' && v.trim() !== '' && v.trim() !== '--'; }
+  // Renders and returns how many PR= fields are still missing.
+  function renderPicSettings(s, d) {
+    var el = document.getElementById('picPrTable'); if (!el) return 0;
+    el.textContent = '';
+    var missing = 0, shown = 0;
+    PIC_SET_GROUPS.forEach(function (g) {
+      var rows = [];
+      g[1].forEach(function (r) {
+        var key = r[1], raw, val;
+        if (key.indexOf('dev:') === 0) {
+          raw = d[key.slice(4)];
+          val = (key === 'dev:otgwmode') ? picModeText(raw) : ((raw === undefined || raw === null) ? '' : ('' + raw).trim());
+        } else {
+          raw = s[key];
+          if (!picSetPresent(raw)) { missing++; return; }
+          val = fmtPicSetting(key, ('' + raw).trim());
+        }
+        if (val === '') return;
+        rows.push([r[0], val + (r[2] ? ' ' + r[2] : '')]);
+      });
+      if (!rows.length) return;
+      var h = document.createElement('span'); h.className = 'prg'; h.textContent = g[0]; el.appendChild(h);
+      rows.forEach(function (r) {
+        var k = document.createElement('span'); k.className = 'prk'; k.textContent = r[0];
+        var v = document.createElement('span'); v.className = 'prv'; v.textContent = r[1];
+        el.appendChild(k); el.appendChild(v); shown++;
+      });
+    });
+    if (missing) {
+      var note = document.createElement('span'); note.className = 'prk'; note.style.gridColumn = '1/-1';
+      note.textContent = missing + ' setting(s) not read yet or not supported by this PIC firmware (a full PR= readout takes about 45 s).';
+      el.appendChild(note);
+    } else if (!shown) {
+      var e = document.createElement('span'); e.className = 'prk'; e.textContent = 'No PIC settings available'; el.appendChild(e);
+    }
+    return missing;
+  }
+  function isAdvVisible(k) {
+    var p = document.getElementById('page-advanced'), el = document.getElementById('adv-' + k);
+    return !!(p && el && p.classList.contains('active') && el.classList.contains('active'));
+  }
+  function stopPicSettingsPoll() { if (picSetTimer) { clearTimeout(picSetTimer); picSetTimer = null; } }
   function fetchPicSettings() {
+    stopPicSettingsPoll();
+    picSetIter = 0;
     var el = document.getElementById('picPrTable'); if (!el) return;
     el.textContent = '';
     var ld = document.createElement('span'); ld.className = 'prk'; ld.textContent = 'Reading PR= values…'; el.appendChild(ld);
-    fetch(APIGW + 'v2/pic/settings').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      var s = (j && j.pic_settings) || {};
-      withDeviceInfo(function (d) {
-        d = d || {};
-        el.textContent = '';
-        var rows = [
-          ['PIC firmware version', prv(d.picfwversion)],
-          ['Build date', prv(s.builddate)],
-          ['Clock speed', prv(s.clock_mhz)],
-          ['Reset cause', prv(s.reset_cause)],
-          ['Thermostat detected', prv(s.thermostat_detect)],
-          ['Voltage reference', prv(s.voltage_ref)],
-          ['Standalone interval', prv(s.standalone_interval)],
-          ['Gateway/Monitor mode', picModeText(d.otgwmode)]
-        ];
-        rows.forEach(function (r) {
-          var k = document.createElement('span'); k.className = 'prk'; k.textContent = r[0];
-          var v = document.createElement('span'); v.className = 'prv'; v.textContent = r[1];
-          el.appendChild(k); el.appendChild(v);
-        });
-      });
-    }).catch(function () { el.textContent = ''; var e = document.createElement('span'); e.className = 'prk'; e.textContent = 'Failed to read PIC settings'; el.appendChild(e); });
+    // device/info once per tab open (cached 8 s); the re-reads below reuse this snapshot.
+    withDeviceInfo(function (d) { readPicSettings(d || {}); });
+  }
+  function readPicSettings(d) {
+    picSetTimer = null;
+    // Plain fetch, no 503 retry: a board without a PIC answers 503 by design.
+    fetch(APIGW + 'v2/pic/settings').then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
+      if (!isAdvVisible('pic')) return;
+      var missing = renderPicSettings((j && j.pic_settings) || {}, d);
+      picSetIter++;
+      if (missing && picSetIter < PICSET_MAX_ITER && !document.hidden) {
+        picSetTimer = setTimeout(function () { picSetTimer = null; if (isAdvVisible('pic')) readPicSettings(d); }, PICSET_POLL_MS);
+      }
+    }).catch(function () {
+      var el = document.getElementById('picPrTable'); if (!el) return;
+      el.textContent = ''; var e = document.createElement('span'); e.className = 'prk'; e.textContent = 'Failed to read PIC settings'; el.appendChild(e);
+    });
   }
   function startPicFlash(name) {
     picBusy = true;
@@ -4370,6 +4807,8 @@
     document.querySelectorAll('#mlog .tbtn').forEach(function (b) {
       if (/clear/i.test(b.textContent)) b.addEventListener('click', function () { logBuf = []; renderLog(); });
     });
+    var vs = document.getElementById('valSearch');   // TASK-1223.14
+    if (vs) vs.addEventListener('input', function () { valSearch = vs.value; if (isMonitorVisible('mvalues')) renderValues(); });
     var ss = document.getElementById('statsSearch');
     if (ss) ss.addEventListener('input', function () { statsSearch = ss.value; if (isMonitorVisible('mstats')) renderStats(); });
 
@@ -4415,7 +4854,9 @@
     startDiscoveryPolling();
     // TASK-983/992: one delayed device/info fetch feeds BOTH the header identity
     // chips and the PIC-tab visibility (withDeviceInfo dedups + caches 8s).
-    setTimeout(function () { applyPicTabVisibility(); withDeviceInfo(function (d) { if (d) fillHeaderIdentity(d); }); }, 1200);
+    // TASK-1223.16: the same snapshot seeds the OT-Direct mode chip (otdmode) before the
+    // first otdirect/status read.
+    setTimeout(function () { applyPicTabVisibility(); withDeviceInfo(function (d) { if (d) { fillHeaderIdentity(d); if (d.otdmode) setOtdMode(d.otdmode); } }); }, 1200);
     // TASK-991: on a bench setup (no boiler/thermostat on the bus, PIC board), offer
     // simulation mode once. Delayed past the boot burst so the bus state has settled.
     setTimeout(maybePromptSimulation, 12000);
@@ -4471,6 +4912,10 @@
     // trail the first-paint fetches one at a time instead of bursting together.
     setTimeout(fetchSeed, 2000); setTimeout(fetchSatStatus, 2800); setTimeout(fetchWeather, 3600);
     setInterval(function () { if (!ws || ws.readyState !== 1) fetchSeed(); }, 20000);
+    // TASK-1223.14: Monitor > Values / PS=1 otmonitor poll (no request unless needed),
+    // and the PS=1 check (asks device/time only after 15 s of socket silence).
+    setInterval(otmonTick, OTMON_POLL_MS);
+    setInterval(psCheckTick, 5000);
     setInterval(fetchSatStatus, 30000);
     setInterval(fetchWeather, 60000);   // TASK-954: refresh weather-API OUTSIDE
 

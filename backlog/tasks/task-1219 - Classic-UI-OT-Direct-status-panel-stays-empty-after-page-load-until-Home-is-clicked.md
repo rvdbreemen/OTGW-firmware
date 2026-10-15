@@ -3,10 +3,10 @@ id: TASK-1219
 title: >-
   Classic UI: OT-Direct status panel stays empty after page load until Home is
   clicked
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-12 05:23'
-updated_date: '2026-10-15 03:52'
+updated_date: '2026-10-15 05:44'
 labels:
   - webui
   - otdirect
@@ -35,4 +35,12 @@ Bench evidence 2026-10-12, OTGW32 192.168.88.61, alpha.418 combo (index.js ident
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-15: the classic UI will be removed on the 2.0.0 line (TASK-1223.12). Check during the gap audit (TASK-1223.11) whether v2 shows the OT-Direct status correctly; if it does, this task can be closed as superseded.
+
+2026-10-15: superseded by TASK-1223.16. The classic UI is being removed (TASK-1223.12), and v2 now has its own OT-Direct status panel, verified on the OTGW32 bench.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Superseded: the classic UI is removed on the 2.0.0 line; v2 shows OT-Direct status (TASK-1223.16).
+<!-- SECTION:FINAL_SUMMARY:END -->

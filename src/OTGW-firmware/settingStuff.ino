@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.422
+**  Version  : v2.0.0-alpha.423
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -489,6 +489,7 @@ void writeSettings(bool show)
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
   file.close();  // Close write handle before any subsequent read
   DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);
+  safebootSyncNvs(settings.sHostname, settings.sHTTPpasswd);  // ADR-191: safeboot reads these from NVS
 
   if (show) {
     DebugTln(F("\r\n[Settings] JSON content:"));
@@ -687,6 +688,7 @@ void readSettings(bool show)
 
   Debugln(F("-\r\n"));
 
+  safebootSyncNvs(settings.sHostname, settings.sHTTPpasswd);  // ADR-191: safeboot reads these from NVS
 } // readSettings()
 
 

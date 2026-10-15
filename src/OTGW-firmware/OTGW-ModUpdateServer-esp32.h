@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.422
+**  Version  : v2.0.0-alpha.423
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -44,6 +44,7 @@
 #include <esp_partition.h>     // esp_partition_find_first — full LittleFS partition size
 #include <StreamString.h>
 #include <LittleFS.h>
+#include <Preferences.h>       // ADR-191: hostname/password mirror for the safeboot updater
 #include "Wire.h"
 #include "webServerCompat.h"   // webBeginRequest / webSendP / webSend / g_responseSent
 
@@ -55,6 +56,8 @@ extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 extern void writeSettings(bool show);
 extern void settingsMarkClean();
 extern void blinkLEDnow(uint8_t);
+extern bool checkHttpAuth();
+extern void requestDeferredReboot(const char *reason);
 
 #ifndef Debug
   #define Debug(...)      ({ OTGWSerial.print(__VA_ARGS__); })
@@ -71,6 +74,69 @@ inline bool hasSpareAppOtaSlot() {
   const esp_partition_t *running  = esp_ota_get_running_partition();
   const esp_partition_t *nextSlot = esp_ota_get_next_update_partition(nullptr);
   return nextSlot != nullptr && nextSlot != running;
+}
+
+// ---------------------------------------------------------------------------
+// ADR-191: firmware updates over WiFi on 4MB boards through the safeboot
+// updater in the app/factory partition (safeboot/src/main.cpp).
+// ---------------------------------------------------------------------------
+
+// NVS namespace shared with the safeboot updater.
+static const char SAFEBOOT_NVS_NS[] = "otgw-sb";
+
+inline const esp_partition_t *safebootPartition() {
+  return esp_partition_find_first(ESP_PARTITION_TYPE_APP, ESP_PARTITION_SUBTYPE_APP_FACTORY, nullptr);
+}
+
+// True when a factory partition holds a safeboot app and we are not running
+// from it. Checks the app descriptor (magic word), so the handover never sends
+// the bootloader to an empty factory partition.
+inline bool hasSafeboot() {
+  const esp_partition_t *sb = safebootPartition();
+  if (sb == nullptr || sb == esp_ota_get_running_partition()) return false;
+  esp_app_desc_t desc;
+  return esp_ota_get_partition_description(sb, &desc) == ESP_OK;
+}
+
+// Mirror the hostname and the admin password into NVS for safeboot, which
+// cannot read settings.ini (LittleFS). Writes only on change, so calling it on
+// every settings write costs no flash wear. NVS is not encrypted; the password
+// is already stored as plain text in settings.ini, so exposure does not grow.
+inline void safebootSyncNvs(const char *host, const char *pw) {
+  if (safebootPartition() == nullptr) return;   // old layout: nothing to mirror for
+  Preferences prefs;
+  if (!prefs.begin(SAFEBOOT_NVS_NS, false)) return;
+  char cur[41];
+  prefs.getString("host", cur, sizeof(cur));
+  if (strcmp(cur, host) != 0) prefs.putString("host", host);
+  cur[0] = '\0';
+  prefs.getString("pw", cur, sizeof(cur));
+  if (strcmp(cur, pw) != 0) prefs.putString("pw", pw);
+  prefs.end();
+}
+
+// Hand over to safeboot: erase the WHOLE otadata partition, so the bootloader
+// starts the factory app at the next boot. Erasing one sector is not enough:
+// with a single OTA slot a leftover valid entry would point back at ota_0.
+inline bool safebootHandover() {
+  if (!hasSafeboot()) return false;
+  const esp_partition_t *otadata = esp_partition_find_first(
+      ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_OTA, nullptr);
+  if (otadata == nullptr) return false;
+  return esp_partition_erase_range(otadata, 0, otadata->size) == ESP_OK;
+}
+
+// Bootloader app rollback (ADR-191): a new image starts as PENDING_VERIFY
+// (verifyRollbackLater() in OTGW-firmware.ino) and must confirm itself, or the
+// next reset rolls back to safeboot. Called after the health gate and before any
+// planned restart. A no-op when the image is already valid.
+inline void safebootMarkAppValid() {
+  esp_ota_img_states_t st;
+  const esp_partition_t *running = esp_ota_get_running_partition();
+  if (running && esp_ota_get_state_partition(running, &st) == ESP_OK &&
+      st == ESP_OTA_IMG_PENDING_VERIFY) {
+    esp_ota_mark_app_valid_cancel_rollback();
+  }
 }
 
 class OTGWUpdateServer {
@@ -164,6 +230,21 @@ public:
              size_t index, uint8_t *data, size_t len, bool final) {
         _handleUpload(request, filename, index, data, len, final);
       });
+
+    // ADR-191: POST /safeboot hands over to the safeboot updater, which then
+    // serves the firmware upload page at the same address. Not under /update:
+    // the /update handlers also match /update/... by prefix. Admin-protected
+    // like every other side-effect route (ADR-056).
+    srv.on("/safeboot", HTTP_POST, [](AsyncWebServerRequest *request) {
+      webBeginRequest(request);
+      if (!checkHttpAuth()) return;
+      if (!safebootHandover()) {
+        webSendP(409, PSTR("text/plain"), PSTR("No safeboot updater on this board"));
+        return;
+      }
+      webSendP(200, PSTR("text/plain"), PSTR("Restarting into the firmware updater..."));
+      requestDeferredReboot("[OTA] handover to safeboot");
+    });
   }
 
   void updateCredentials(const String& username, const String& password) {
@@ -298,7 +379,9 @@ private:
       // a plain firmware.bin app image is the only firmware upload we handle.
       if (!hasSpareAppOtaSlot()) {
         strlcpy(_updaterError,
-                "app update is USB-only on this board (single app slot); use flash_otgw.bat over USB",
+                hasSafeboot()
+                  ? "app update runs in the safeboot updater on this board; use 'Restart into the firmware updater' on /update"
+                  : "app update is USB-only on this board (single app slot); use flash_otgw.bat over USB",
                 sizeof(_updaterError));
         if (_serial_output) {
           DebugTln(F("[OTA] Firmware OTA rejected: single app slot (no ota_1) — app flash is USB-only"));
