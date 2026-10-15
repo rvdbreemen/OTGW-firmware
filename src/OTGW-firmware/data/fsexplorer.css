@@ -1,0 +1,62 @@
+/*
+ * FSexplorer stylesheet (TASK-1223.13).
+ * FSexplorer is the recovery page when the main web UI is broken, so it loads
+ * only this file and depends on no other stylesheet. Colours match ds-tokens.css.
+ * Dark mode: data-theme="dark" on <html> (set by the inline script) or body.dark.
+ */
+:root {
+  --fx-bg: #f1f7f8; --fx-surface: #fff; --fx-zebra: #f5f7f8; --fx-muted: #e3e5e7;
+  --fx-border: #d8dcde; --fx-fg: #2a2d2f; --fx-fg2: #4a4d50;
+  --fx-accent: #0288a0; --fx-accent-hover: #015a70;
+  --fx-danger: #dc3545; --fx-danger-hover: #c62828; --fx-warn: #ff9800;
+  --fx-shadow: 0 4px 6px rgba(0,0,0,.10); --fx-shadow-sm: 0 2px 4px rgba(0,0,0,.10);
+}
+[data-theme="dark"], body.dark {
+  --fx-bg: #1a1a1a; --fx-surface: #2c2c2e; --fx-zebra: #3a3a3c; --fx-muted: #3a3a3c;
+  --fx-border: #444; --fx-fg: #fff; --fx-fg2: #e0e0e0;
+  --fx-accent: #4a90e2; --fx-accent-hover: #6ab0ff;
+  --fx-danger: #e57373; --fx-danger-hover: #7f0000; --fx-warn: #ffa726;
+  --fx-shadow: 0 4px 6px rgba(0,0,0,.30); --fx-shadow-sm: 0 2px 4px rgba(0,0,0,.30);
+}
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 15px; line-height: 1.5;
+  color: var(--fx-fg); background: var(--fx-bg);
+  padding: 0 16px 16px;
+}
+h2 { text-align: center; }
+a { color: var(--fx-accent); text-decoration: none; }
+a:hover { color: var(--fx-accent-hover); text-decoration: underline; }
+.fs-main, .fs-action-card, .upload-box {
+  max-width: 800px; margin: 16px auto;
+  background: var(--fx-surface); color: var(--fx-fg2);
+}
+.fs-main, .fs-action-card { border-radius: 8px; box-shadow: var(--fx-shadow); }
+.fs-main { width: 100%; padding: 10px; overflow-x: auto; }
+.fs-main table { width: 100%; border-collapse: collapse; }
+.fs-main tr:nth-child(odd) { background: var(--fx-surface); }
+.fs-main tr:nth-child(even) { background: var(--fx-zebra); }
+.fs-main td { padding: 10px 8px; white-space: nowrap; border: 0; font-size: 14px; }
+.fs-main a.delete-link { color: var(--fx-danger); }
+.fs-main a.delete-link:hover { color: var(--fx-danger-hover); }
+.upload-box { padding: 12px; border: 1px solid var(--fx-border); border-radius: 4px; }
+.fs-action-card { padding: 22px; text-align: center; }
+.fs-action-card h3 {
+  color: var(--fx-accent); border-bottom: 2px solid var(--fx-zebra);
+  padding-bottom: 14px; margin: 0 0 18px;
+}
+.button-row { display: flex; justify-content: center; gap: 14px; flex-wrap: wrap; }
+.button-row form { margin: 0; }
+.fs-btn {
+  background: var(--fx-accent); color: #fff; border: 0; padding: 10px 20px;
+  font-family: inherit; font-size: 14px; font-weight: 500; border-radius: 6px; cursor: pointer;
+  min-width: 140px; box-shadow: var(--fx-shadow-sm);
+}
+.fs-btn:hover { opacity: .9; }
+.fs-btn.secondary { background: var(--fx-muted); color: var(--fx-fg); }
+.fs-btn.wifi { background: var(--fx-warn); color: #000; }
+.fs-btn.danger { background: var(--fx-danger); }
+.desktop-only { display: block; }
+@media (max-width: 720px) { .desktop-only { display: none; } }

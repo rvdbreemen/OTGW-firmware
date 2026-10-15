@@ -2802,7 +2802,7 @@
   var FS_PROTECTED = [
     'v2.html', 'v2.js', 'v2.css', 'sat.js', 'sat-slider.js', 'theme-toggle.js', 'echarts-theme.js',
     'index.html', 'index.js', 'index_common.css', 'components.css', 'ds-tokens.css', 'graph.js',
-    'FSexplorer.html', 'FSexplorer.png', 'design.html', 'favicon.ico', 'settings.png',
+    'FSexplorer.html', 'FSexplorer.png', 'fsexplorer.css', 'v2-bundle.css', 'design.html', 'favicon.ico', 'settings.png',
     'inter-400.woff2', 'inter-700.woff2', 'jetbrains-mono-400.woff2'
   ];
   function fsFmtBytes(n) {

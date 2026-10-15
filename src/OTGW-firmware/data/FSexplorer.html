@@ -1,7 +1,7 @@
 <!--
 ***************************************************************************  
 **  Program  : FSexplorer.html
-**  Version  : v2.0.0-alpha.421
+**  Version  : v2.0.0-alpha.422
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -14,11 +14,10 @@
       <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
       <meta name="viewport" content="width=device-width, initial-scale=1">
       <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
-      <link rel="stylesheet" type="text/css" href="ds-tokens.css">
-      <!-- TASK-435 follow-up A: same theme model as index.html. Pre-paint
-           data-theme on <html> for the first frame; components.css carries
-           both light baseline and body.dark / [data-theme="dark"] overrides
-           so no stylesheet swap is needed. -->
+      <!-- TASK-1223.13: FSexplorer is the recovery page when the main UI is
+           broken, so it loads only its own stylesheet (fsexplorer.css). Pre-paint
+           data-theme on <html> for the first frame; fsexplorer.css carries both
+           the light baseline and the [data-theme="dark"] / body.dark overrides. -->
       <script>
         (function() {
           try {
@@ -30,7 +29,7 @@
           } catch (e) { /* ignore */ }
         })();
       </script>
-      <link rel="stylesheet" type="text/css" href="components.css">
+      <link rel="stylesheet" type="text/css" href="fsexplorer.css">
       <title>FSexplorer ESP</title>
       <script>
          let currentPath = '/';
@@ -222,7 +221,7 @@
                          // assets below ship in data/ and have their own routes in FSexplorer.ino,
                          // but were never added here, so deleting v2.js left a blank page at '/'
                          // whenever settings.ui.bUseV2 is on.
-                         const protectedFiles = ['FSexplorer.html', 'FSexplorer.png',
+                         const protectedFiles = ['FSexplorer.html', 'FSexplorer.png', 'fsexplorer.css',
                                                  'index.html', 'index.js',
                                                  'index_common.css', 'components.css',
                                                  'ds-tokens.css', 'graph.js',
