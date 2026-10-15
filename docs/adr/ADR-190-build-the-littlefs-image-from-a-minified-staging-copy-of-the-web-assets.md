@@ -11,6 +11,7 @@ supersedes: []
 superseded_by: null
 related:
   - "ADR-166"
+  - "ADR-191"
 topics:
   - "littlefs"
   - "web-assets"
@@ -61,6 +62,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-191
     changed_via: adr-kit lifecycle
 ```
 

@@ -14,6 +14,7 @@ superseded_by: null
 related:
   - "ADR-126"
   - "ADR-190"
+  - "ADR-191"
 deciders:
   - "Robert van den Breemen"
 tags:
@@ -51,6 +52,11 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-190
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-191
     changed_via: adr-kit lifecycle
 ```
 

@@ -3,10 +3,11 @@ id: TASK-1223
 title: >-
   Epic: WiFi firmware OTA on 4MB ESP32-S3 boards via a safeboot factory
   partition
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-13 19:45'
-updated_date: '2026-10-15 03:49'
+updated_date: '2026-10-15 04:11'
 labels:
   - epic
   - esp32

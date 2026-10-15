@@ -5239,7 +5239,7 @@
       "path": "ADR-166-single-app-slot-ota-policy.md",
       "format": "canonical",
       "status": "Proposed",
-      "date": "2026-10-14",
+      "date": "2026-10-15",
       "decision_summary": "Firmware/app OTA is rejected outright on any board whose partition table has no spare app slot (single otaX == the ru...",
       "topics": [],
       "aliases": [],
@@ -6527,6 +6527,71 @@
       "metadata": {
         "binding": false,
         "gate": "tests/test_build_staging.py",
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-191",
+      "title": "Update firmware over WiFi on 4MB boards through a safeboot factory partition",
+      "path": "ADR-191-update-firmware-over-wifi-on-4mb-boards-through-a-safeboot-factory-partition.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-15",
+      "decision_summary": "The 4MB targets switch to a safeboot partition layout.",
+      "topics": [
+        "esp32s3",
+        "firmware-update",
+        "ota",
+        "partitions",
+        "safeboot"
+      ],
+      "aliases": [
+        "4mb wifi ota",
+        "factory updater",
+        "recovery partition",
+        "safeboot ota"
+      ],
+      "components": [
+        "4MB partition table with a safeboot factory partition",
+        "main-firmware handover to safeboot",
+        "safeboot updater app"
+      ],
+      "symbols": [
+        "app_ota_available",
+        "hasSpareAppOtaSlot"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Use the layout above for every 4MB target, with all offsets taken from the partition CSV and kept in sync in build.py, flashotgw.bat and flashesp.py.",
+          "Fail the build when the updater image exceeds the factory partition, or the LittleFS content plus the runtime reserve exceeds the filesystem partition.",
+          "Let the main firmware hand over only through an admin-protected endpoint that erases otadata (ADR-056).",
+          "Verify the uploaded image (ESP-IDF image check) before setting ota0 as the boot partition.",
+          "Keep filesystem OTA from the main firmware working as it does today."
+        ],
+        "must_not": [
+          "Add HTTPS, TLS or WSS to the updater (ADR-003).",
+          "Write application output to UART0 from the updater.",
+          "Mount or write LittleFS from the updater.",
+          "Ship the classic web UI in the 4MB filesystem image."
+        ],
+        "exceptions": [
+          "Boards with 8 MB or more of flash keep native A/B OTA through hasSpareAppOtaSlot(); this layout does not apply to them."
+        ],
+        "verification": [
+          "TASK-1223.9 bench run on the final layout: a normal update and an interrupted update on an OTDirect board and a PIC board, plus a corrupt-image update on at least one of them (capture transcripts).",
+          "Build log: updater size against 960K and LittleFS minimum against 768K (TASK-1223.3, TASK-1223.6)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -11204,6 +11269,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-166",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-167",
       "target": "ADR-030",
       "type": "related",
@@ -11638,6 +11709,42 @@
     {
       "source": "ADR-190",
       "target": "ADR-166",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-190",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-191",
+      "target": "ADR-003",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-191",
+      "target": "ADR-056",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-191",
+      "target": "ADR-152",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-191",
+      "target": "ADR-166",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-191",
+      "target": "ADR-190",
       "type": "related",
       "resolved": true
     }
