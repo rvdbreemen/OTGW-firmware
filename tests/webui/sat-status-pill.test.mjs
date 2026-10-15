@@ -178,7 +178,8 @@ async function v2Pill(extra) {
   return await evalJs(`(function(){
     return JSON.stringify({
       pill: (document.getElementById('satPill')||{}).textContent,
-      big:  (document.getElementById('satStatusBig')||{}).textContent
+      big:  (document.getElementById('satStatusBig')||{}).textContent,
+      en:   (document.getElementById('satEnableLbl')||{}).textContent
     });
   })()`).then(JSON.parse);
 }
@@ -190,6 +191,31 @@ check(/idle/i.test(r.big || ''), `v2: headline reports idle, not "Heating to ...
 r = await v2Pill({ boiler_status: 'heating' });
 check(r.pill === 'Heating', `v2: burner firing -> pill reads "Heating" (got "${r.pill}")`);
 check(/Heating to/.test(r.big || ''), `v2: headline reports the target while firing (got "${r.big}")`);
+
+// TASK-1234: the precedence cases that used to run against classic only. In v2 the
+// pill reports burner activity alone (Off / Heating / Idle); safety, window and summer
+// are reported by the headline (#satStatusBig), in that order of precedence.
+r = await v2Pill({ boiler_status: 'heating', safety_tripped: true, window_open: true, summer_active: true });
+check(r.big === 'Safety tripped!', `v2: safety trip outranks window, summer and activity in the headline (got "${r.big}")`);
+check(r.pill === 'Heating', `v2: pill keeps reporting burner activity during a safety trip (got "${r.pill}")`);
+
+r = await v2Pill({ boiler_status: 'heating', window_open: true, summer_active: true });
+check(r.big === 'Window open', `v2: window open outranks summer and activity in the headline (got "${r.big}")`);
+
+r = await v2Pill({ boiler_status: 'heating', summer_active: true });
+check(r.big === 'Summer mode', `v2: summer mode outranks activity in the headline (got "${r.big}")`);
+
+r = await v2Pill({ boiler_status: 'heating', enabled: false, safety_tripped: true });
+check(r.pill === 'Off', `v2: disabled -> pill reads "Off" even with the burner firing (got "${r.pill}")`);
+check(r.big === 'SAT is off', `v2: disabled outranks everything in the headline, safety included (got "${r.big}")`);
+check(r.en === 'Disabled', `v2: enable switch label reads "Disabled" (got "${r.en}")`);
+
+// Firmware that omits boiler_status: satBurnerIsFiring() falls back to `active`.
+r = await v2Pill({ active: true });
+check(r.pill === 'Heating', `v2: no boiler_status + active -> falls back to control-loop state "Heating" (got "${r.pill}")`);
+r = await v2Pill({ active: false });
+check(r.pill === 'Idle', `v2: no boiler_status + inactive -> "Idle" (got "${r.pill}")`);
+check(r.big === 'At target · idle', `v2: no boiler_status + inactive -> idle headline (got "${r.big}")`);
 
 // ------------------------------------------------- visual receipt (opt-in)
 // Exactly the state sergeantd reported: SAT engaged, control mode Continuous,

@@ -5798,7 +5798,7 @@
           "None."
         ],
         "verification": [
-          "tests/webui/sat-area-sensor-mapping.test.mjs — drives the shipped UI against both sensor sources and asserts a selected BLE MAC reaches PATCH /api/v2/sat/sensor-areas intact.",
+          "tests/webui/sat-area-sensor-mapping.test.mjs — drives the shipped v2 UI (v2.js, populateAreaSensorChoices()) against both sensor sources and asserts a selected BLE MAC reaches POST /api/v2/settings (satsensorarea0) intact. Rebuilt for v2...",
           "src/OTGW-firmware/SATtypes.h — field declaration and its width.",
           "src/OTGW-firmware/restAPI.ino — the sensor-areas validation branch."
         ]

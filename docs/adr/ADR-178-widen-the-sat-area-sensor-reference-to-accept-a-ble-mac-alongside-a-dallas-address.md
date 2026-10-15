@@ -114,9 +114,10 @@ reference, the two paths cannot both write the same area.
 
 ### Verification
 
-- `tests/webui/sat-area-sensor-mapping.test.mjs` — drives the shipped UI against both
-  sensor sources and asserts a selected BLE MAC reaches
-  `PATCH /api/v2/sat/sensor-areas` intact.
+- `tests/webui/sat-area-sensor-mapping.test.mjs` — drives the shipped v2 UI (`v2.js`,
+  `populateAreaSensorChoices()`) against both sensor sources and asserts a selected BLE
+  MAC reaches `POST /api/v2/settings` (`satsensorarea0`) intact. Rebuilt for v2 in
+  TASK-1234 after the classic UI and its test were removed (ADR-192).
 - `src/OTGW-firmware/SATtypes.h` — field declaration and its width.
 - `src/OTGW-firmware/restAPI.ino` — the `sensor-areas` validation branch.
 
@@ -188,7 +189,7 @@ reference, the two paths cannot both write the same area.
   `satsensorarea*` settings entries.
 - `src/OTGW-firmware/SATble.ino` — area fan-out in `satBLEUpdateState()`.
 - `src/OTGW-firmware/sensors_ext.ino:298` — the Dallas side of the same fan-out.
-- `tests/webui/sat-area-sensor-mapping.test.mjs` — behavioural guard.
+- `tests/webui/sat-area-sensor-mapping.test.mjs` — behavioural guard (v2 UI, TASK-1234).
 
 ## Enforcement
 

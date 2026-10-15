@@ -82,8 +82,17 @@ stacks, or actual peripherals. Those belong on the device.
 
 Node test files, run one at a time with `node --test tests/webui/<name>.test.mjs`.
 
-- Logic tests (`ha-discovery-golden`, `sat-status-pill`) need Node alone.
-- The classic-UI tests (`paced-poller`, `sat-area-sensor-mapping`,
-  `sat-log-filter`, `sat-settings-layout`, `tab-restore`, `webui_label_coverage`,
-  `webui_settings_layout`) were removed with the classic UI (ADR-192,
-  TASK-1223.12). The coverage that still matters for v2 is rebuilt in TASK-1234.
+- `ha-discovery-golden` needs Node alone.
+- `sat-status-pill` and `sat-area-sensor-mapping` drive the shipped `v2.html`/`v2.js`
+  in headless system Chrome or Edge over the DevTools protocol, against a local fake
+  device. No npm install; they print SKIP and pass when no browser is found.
+  `OTGW_DATA_DIR=<dir>` serves another data dir (used for old-vs-fix runs).
+  - `sat-status-pill`: the pill reports burner activity, not control mode (TASK-1152),
+    plus the headline precedence disabled > safety > window > summer and the
+    missing-`boiler_status` fallback (TASK-1234).
+  - `sat-area-sensor-mapping`: ADR-178 guard. The area pickers offer both Dallas
+    addresses and BLE MACs, each tagged by source, and a chosen MAC is saved intact
+    via `POST /api/v2/settings` (TASK-1234).
+- The other classic-UI tests (`paced-poller`, `sat-log-filter`, `sat-settings-layout`,
+  `tab-restore`, `webui_label_coverage`, `webui_settings_layout`) were removed with
+  the classic UI (ADR-192, TASK-1223.12).
