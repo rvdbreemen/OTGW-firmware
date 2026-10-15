@@ -361,6 +361,24 @@ static bool satEnqueueIfChangedCS(float setpoint) {
   return true;
 }
 
+// TASK-1236: the PIC drops a CS= of 8 C or more when no new CS= arrived within its
+// expiry period (gateway.asm CommandExpiry, ~63 to ~126 s after the last CS=). SAT's
+// own cadence is far slower (SAT_CMD_REFRESH_MS, and a control interval of up to 300 s),
+// so on PIC boards the last CS is re-sent every SAT_PIC_CS_KEEPALIVE_MS. OT-Direct does
+// not need this: it skips its own CS expiry while SAT owns MsgID 1 (OTDirect.ino).
+static const uint32_t SAT_PIC_CS_KEEPALIVE_MS = 30000UL;
+
+static void satPicCSKeepalive() {
+  if (!isPICEnabled() || !state.sat.bLastSentValid) return;
+  if (state.sat.fLastSentCS < 8.0f) return;  // the PIC never expires a CS below 8 C
+  uint32_t now = millis();
+  if ((now - state.sat.iLastSentCSMs) < SAT_PIC_CS_KEEPALIVE_MS) return;
+  char buf[16];
+  snprintf_P(buf, sizeof(buf), PSTR("CS=%.1f"), state.sat.fLastSentCS);
+  satEnqueueOwnCS(buf);
+  state.sat.iLastSentCSMs = now;
+}
+
 static bool satEnqueueIfChangedMM(uint8_t mm) {
   uint32_t now = millis();
   bool stale = (now - state.sat.iLastSentMMMs) >= SAT_CMD_REFRESH_MS;
@@ -4275,6 +4293,9 @@ void satControlLoop()
     satGetWindow4hStats();
     satGetWindow24hStats();
   }
+
+  // Keep the PIC's CS override alive between control ticks (TASK-1236)
+  satPicCSKeepalive();
 
   // Main control loop on timer
   if (!DUE(timerSATControl)) return;

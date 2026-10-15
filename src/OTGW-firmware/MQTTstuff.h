@@ -59,7 +59,7 @@ struct MQTTSettingsSection {
   char    sPasswd[41]      = "";
   char    sHaprefix[41]    = HOME_ASSISTANT_DISCOVERY_PREFIX;
   bool    bHaRebootDetect  = true;
-  bool    bDiscoveryAutoVerify = true;  // ADR-062/TASK-349/351: daily automatic retained-discovery verification
+  bool    bDiscoveryAutoVerify = true;  // ADR-062/TASK-349/351: daily discovery heal (re-announce all configs once a day)
   char    sTopTopic[41]    = "OTGW";
   // Format budget: "otgw-" (5) + up to 32-char device id + optional suffix.
   // The streaming HA discovery composer may prepend/append short fragments,

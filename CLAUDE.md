@@ -217,7 +217,7 @@ Done.**
 ### Architecture rules
 
 - PIC commands: always `addOTWGcmdtoqueue()`, never direct serial write
-- SAT's own `CS=` (the `CS=0` releases included) goes through `satEnqueueOwnCS()`. While SAT is enabled it owns MsgID 1, and the OTDirect handler refuses any unmarked `CS=` as external (ADR-179), SAT's own included
+- SAT's own `CS=` (the `CS=0` releases included) goes through `satEnqueueOwnCS()`. While SAT is enabled it owns MsgID 1, and both the OTDirect handler (ADR-179) and the PIC command queue (`addCommandToQueue()`, TASK-1236) refuse any unmarked `CS=` as external, SAT's own included. On PIC boards `satPicCSKeepalive()` re-sends SAT's CS every 30 s, because the PIC drops a CS= after ~63-126 s without a new one
 - Timers: `DECLARE_TIMER_SEC()` / `DECLARE_TIMER_MS()` + `DUE()` (see `safeTimers.h`)
 - `doBackgroundTasks()` can re-enter (called from inside `doAutoConfigure()`'s file-reading loop). Shared scratch state must declare an acquisition contract: see ADR-090 for the pattern (RAII or inUse-flag, both with fail-safe on contention)
 - Typed control flow: `enum class` or numeric IDs, never string tokens as discriminators

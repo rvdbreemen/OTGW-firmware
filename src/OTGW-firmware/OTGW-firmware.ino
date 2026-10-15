@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.426
+**  Version  : v2.0.0-alpha.427
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -316,7 +316,7 @@ void setup() {
   Wire.end();
   Wire.begin(activeI2cSda(), activeI2cScl());
 
-  // Tear down UART1 (opened by the OTGWSerial global ctor) BEFORE the WiFi
+  // Tear down UART0 (opened by the OTGWSerial global ctor) BEFORE the WiFi
   // portal: on an OTGW32 the PIC-RX pin floats and an RX interrupt storm can
   // starve the cooperative portal web server (ADR-125 field finding). The
   // hardware-mode block below re-opens it for the PIC probe.
@@ -379,7 +379,7 @@ void setup() {
       SetupDebugf(PSTR("Board mode: forced OT-Direct but a live PIC was found -> correcting to Classic %s (iBoardMode=%d) -- TASK-1031 recovery\r\n"),
                   state.hw.bClassicPro ? "S3 Mini Pro" : "S3 Mini", (int)settings.iBoardMode);
     } else {
-      OTGWSerial.end();          // tear down UART1 before OT-Direct (ADR-125)
+      OTGWSerial.end();          // tear down UART0 before OT-Direct (ADR-125)
       initOTDirect();
       SetupDebugln(F("Board mode: forced OT-Direct (no PIC found, OT-Direct confirmed)"));
     }
@@ -423,7 +423,7 @@ void setup() {
         SetupDebugf(PSTR("Board mode: auto -> Classic %s (persisting iBoardMode=%d)\r\n"),
                     state.hw.bClassicPro ? "S3 Mini Pro" : "S3 Mini", (int)settings.iBoardMode);
       } else {
-        // No live PIC after retries: tear down UART1 BEFORE OT-direct so a floating
+        // No live PIC after retries: tear down UART0 BEFORE OT-direct so a floating
         // PIC-RX pin can't drive an RX interrupt storm (ADR-125). Run as OTGW32/
         // OT-Direct for THIS boot, but do NOT persist the negative verdict
         // (TASK-1031): the forced OT-Direct path (iBoardMode==2) skips detectPIC()

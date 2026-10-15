@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.426
+**  Version  : v2.0.0-alpha.427
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3644,6 +3644,15 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   if (len > kMaxCmdLen) {
     OTDebugTf(PSTR("CmdQueue: Error: command too long (%d > %d)\r\n"), len, kMaxCmdLen);
     OTDebugFlush();
+    return;
+  }
+  // TASK-1236 / ADR-179: same rule as the OT-Direct CS= handler. While SAT owns the
+  // control setpoint an external CS= is refused; SAT's own CS= carries the in-flight
+  // marker. Bytes written straight to the PIC over the serial bridge (port 25238)
+  // do not pass this queue and stay unfiltered (ADR-177).
+  if (toupper((unsigned char)buf[0]) == 'C' && toupper((unsigned char)buf[1]) == 'S' &&
+      satOwnsControlSetpoint() && !satCommandInFlight()) {
+    DebugTln(F("CmdQueue: CS= refused, SAT owns the control setpoint (disable SAT to override)"));
     return;
   }
 
