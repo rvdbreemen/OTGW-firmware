@@ -1,20 +1,22 @@
 ---
 id: "ADR-171"
 title: "Boot and Republish Discovery Queues Share One Non-OT ID Set"
-status: "Proposed"
-date: "2026-07-26"
+status: "Accepted"
+date: "2026-10-15"
 binding: false
-gate: null
+gate: "check_non_ot_discovery_single_source"
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
+related:
+  - "ADR-182"
 ---
 # ADR-171 Boot and Republish Discovery Queues Share One Non-OT ID Set
 
 ## Status
 
-Proposed. Date: 2026-07-26.
+Accepted, 2026-10-15.
 
 ## Status History
 
@@ -25,11 +27,21 @@ status_history:
     changed_by: Agent
     reason: Records the single-helper fix for a boot/republish discovery asymmetry found while mapping the 1.7.2-beta.4 port (TASK-1037). 2.0.0-only; no 1.x sibling.
     changed_via: manual
+  - date: 2026-10-15
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-182
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted 2026-10-15 after the code-vs-ADR verification and refresh (TASK-1237)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-MQTT HA discovery configs reach the broker by two routes:
+MQTT (Message Queuing Telemetry Transport) HA discovery configs reach the broker by two routes:
 
 - **JIT (ADR-100/112)** — an OT MsgID publishes its config the first time that ID
   is seen on the bus.
@@ -51,9 +63,9 @@ list, and that list was missing seven IDs:
 |---|---|---|
 | 243 | `OTGWotdirectid` | OTDirect flame metrics (ADR-124) |
 | 245 | `OTGWs0dataid` | S0 pulse counters |
-| 251 | `OTGWdiag200id` | SAT / flame diagnostics |
-| 252 | `OTGWsatcoreid` | SAT control / PID / cycle / statistics |
-| 253 | `OTGWsatweatherid` | SAT BLE / pressure / weather |
+| 251 | `OTGWdiag200id` | SAT (smart thermostat) / flame diagnostics |
+| 252 | `OTGWsatcoreid` | SAT control / PID (proportional-integral-derivative) / cycle / statistics |
+| 253 | `OTGWsatweatherid` | SAT BLE (Bluetooth Low Energy) / pressure / weather |
 | 254 | `OTGWsatbinaryid` | SAT binaries + flame status |
 | 255 | `OTGWsatzoneid` | dynamic SAT zone discovery |
 
@@ -78,7 +90,7 @@ Both `publishNonOTDiscoveryConfigs()` and `markAllMQTTConfigPending()` call it.
 Placement details that matter:
 
 - In `markAllMQTTConfigPending()` the helper runs **after** the
-  `memset(MQTTautoCfgPendingMap, ...)` and after the LUT walk.
+  `memset(MQTTautoCfgPendingMap, ...)` and after the LUT (lookup table) walk.
   `setMQTTConfigPending()` is an idempotent `bitSet`, so the overlap between the
   helper's list and the walk's output is a no-op.
 - `dripDeviceInfoPending = true` (ADR-140: the first drip entity carries the full
@@ -138,10 +150,37 @@ is the part that keeps this list correct.
   only the IDs JIT structurally cannot reach.
 - **ADR-140** — single-device topology; `dripDeviceInfoPending`.
 - **ADR-170** — the daily heal, which republishes this same set.
+- **ADR-182** (Accepted): amends the helper: ID 241 (`OTGWdhwmeterid`, the DHW (domestic hot water)
+  water total) is queued from `queueNonOTDiscoveryIds()` only when
+  `dhwWaterMeterHasData()` is true (`MQTTstuff.ino:2034`), and the LUT walk in
+  `markAllMQTTConfigPending()` skips 241 so the helper alone decides
+  (`MQTTstuff.ino:2100`). The helper stays the single owner of the non-OT set;
+  one of its entries is now conditional.
 - **1.x TASK-1035** — the sibling-line fix whose mapping surfaced this.
 
 ## Enforcement
 
-`evaluate.py::check_non_ot_discovery_single_source` asserts that both queueing
-entry points call `queueNonOTDiscoveryIds()`, and that `setMQTTConfigPending(` does
-not appear directly in either of them.
+`evaluate.py::check_non_ot_discovery_single_source` (`evaluate.py:2290`, helper
+`non_ot_discovery_single_source()` at `evaluate.py:761`, run from
+`evaluate.py:3754`) asserts that the helper is defined, that both queueing entry
+points call `queueNonOTDiscoveryIds()`, and that the boot path
+`publishNonOTDiscoveryConfigs()` contains no direct `setMQTTConfigPending(` call
+(`boot_no_direct_calls`). The republish path is not checked for direct calls and
+does call `setMQTTConfigPending()` itself: the 0..255 LUT walk in
+`markAllMQTTConfigPending()` marks every ID the discovery tables index
+(`MQTTstuff.ino:2099-2106`). That is by design (see Alternative B); the rule is
+that neither entry point hand-maintains its own list of non-bus-seen IDs.
+
+## References
+
+- Tasks: TASK-1037 (where the asymmetry was found and fixed); 1.x TASK-1035 (the
+  sibling fix); TASK-543 (SAT discovery unconditional); TASK-648 (topology
+  migration early return); TASK-1123 (DHW water total, ADR-182).
+- `src/OTGW-firmware/MQTTstuff.ino:2030-2050`: `queueNonOTDiscoveryIds()`.
+- `src/OTGW-firmware/MQTTstuff.ino:2056-2075`: `publishNonOTDiscoveryConfigs()`
+  (boot path; calls the helper at `:2073`).
+- `src/OTGW-firmware/MQTTstuff.ino:2085-2114`: `markAllMQTTConfigPending()`
+  (republish path; calls the helper at `:2112`).
+- Commits: 24be052f2 (introduced the helper, TASK-1037), 4bbceed61 (ID 241 added
+  conditionally, TASK-1123 / ADR-182), c456570ac (TASK-1037 closed with the
+  fresh-boot discovery run on a wiped broker).

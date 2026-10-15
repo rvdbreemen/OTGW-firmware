@@ -1,8 +1,8 @@
 ---
 id: "ADR-175"
 title: "Gate the OT coverage fixture on a lossless evidence source"
-status: "Proposed"
-date: "2026-08-09"
+status: "Accepted"
+date: "2026-10-15"
 binding: false
 gate: null
 documents_shipped: false
@@ -36,7 +36,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-08-09.
+Accepted, 2026-10-15.
 
 ## Status History
 
@@ -47,6 +47,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted 2026-10-15 after the code-vs-ADR verification and reference refresh (TASK-1237)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -54,7 +59,7 @@ status_history:
 The OT coverage gate reduces a replay-fixture run to a normalized fingerprint and
 diffs it against a committed baseline, so a decode or publish regression fails
 one command instead of needing an eyeball. It has two halves: the decoded OT
-frames, and the MQTT topics with their payloads.
+frames, and the MQTT (Message Queuing Telemetry Transport) topics with their payloads.
 
 Ported from `otgw-1.x.x` unchanged (TASK-1070), the gate failed on healthy
 firmware. The debug telnet on this branch drops output when it is outrun. A
@@ -122,17 +127,26 @@ regression.
 ### Confirmation
 
 `python scripts/tests/run_coverage_test.py --host <ip> --http-password <pw>`
-exits 0 against the committed baseline. Verified on the bench S3 (Classic + PIC
-6.6, `alpha.354+a7e06f8`): baseline of 369 OT keys, 143 distinct MsgIDs and 225
-MQTT topics, with an independent run reporting PASS and zero differences.
-`python scripts/tests/coverage_baseline.py selftest <capture>` reports 0 unstable
-keys across 369.
+exits 0 against the committed baseline. First verified on the bench S3 (Classic +
+PIC (gateway microcontroller) 6.6, `alpha.354+a7e06f8`): baseline of 369 OT keys, 143 distinct MsgIDs and
+225 MQTT topics, with an independent run reporting PASS and zero differences.
+`python scripts/tests/coverage_baseline.py selftest <capture>` reported 0 unstable
+keys across 369. TASK-1174 (commit `7186ab16e`) then moved the baseline to the
+OT-Direct bench unit (`alpha.418+fa2b89d`): 369 OT keys, 143 MsgIDs and 230
+broker topics in `scripts/tests/baseline_coverage.json`, with a fresh-boot and a
+warm gate run both reporting PASS.
+
+The baseline is recorded as the **union** of two `--record` captures on the OT
+half (plus host-side filters that drop truncated duplicate lines and simulator
+trace splices), with the `mqtt` half taken from the broker-observed record run.
+The union is consistent with the Must Not below: an intersection erodes with
+every run, while a union only adds frames a lossy single capture missed.
 
 ## Decision Contract
 
 ### Must
 
-* The `ot`, `msgtypes` and `sources` sections gate on MISSING, NEW and CHANGED.
+* The `ot`, `msgtypes` and `sources` sections gate on `MISSING`, `NEW` and `CHANGED`.
 * The `mqtt` section gates on CHANGED always, and on MISSING and NEW only when
   `mqtt_presence_gated()` holds, that is when baseline and run both carry
   `mqtt_source: "broker"`.
@@ -168,29 +182,33 @@ keys across 369.
 
 ### Positive
 
-* Topic presence became a real gate rather than a source of noise: an independent
-  run matched the baseline exactly on all 225 topics.
-* The broker observes one topic more than the best telnet run ever managed (225
-  against 224, with a low of 215), so the gate now covers publishes the log
-  silently dropped.
+* Topic presence became a real gate rather than a source of noise: on the Classic
+  bench an independent run matched the baseline exactly on all 225 topics, and
+  the current OT-Direct baseline (230 topics) passed a fresh-boot and a warm run.
+* On the Classic bench the broker observed one topic more than the best telnet
+  run ever managed (225 against 224, with a low of 215), so the gate now covers
+  publishes the log silently dropped.
 * One window instead of two halves the run to about 12 minutes.
-* The OT half is exactly reproducible: 369 keys and 143 MsgIDs across independent
-  runs.
+* The OT half reproduces well but not exactly: telnet stays a lossy source, so a
+  single capture can still miss a whole frame. The baseline is therefore the
+  union of two captures, and independent gate runs reproduce its 369 keys and
+  143 MsgIDs.
 
 ### Negative
 
 * The gate now needs broker credentials, from `MqttPassword` in the out-of-repo
-  `capture-settings.json` or `$OTGW_MQTT_PASSWORD`. A bench without them falls
-  back to telnet and loses presence gating. Mitigation: the fallback is explicit,
-  labelled in the output, and reflected in `mqtt_source` so a baseline can never
-  silently mix sources.
+  `capture-settings.json` or `$OTGW_MQTT_PASSWORD`. A bench without them does
+  not fall back silently: the runner exits 2 and tells the user to pass
+  `--topics telnet`, which then loses presence gating. Mitigation: telnet is an
+  explicit opt-in, labelled in the output, and reflected in `mqtt_source` so a
+  baseline can never silently mix sources.
 * A hand-rolled MQTT 3.1.1 client is code this project now maintains. Mitigation:
   it is subscribe-only and needs four packet types; the alternative was a
   dependency in a rig that is otherwise standard-library only.
 * Collection must be scoped to the device under test, because the broker carries
   the maintainer's production gateway too and `normalise_topic()` strips exactly
   the id that distinguishes them. Mitigation: the scope is derived from the
-  device's own MAC and is not optional in the runner.
+  device's own MAC (media access control) address and is not optional in the runner.
 * A 25 s preflight is added to every run. Mitigation: it replaces a failure mode
   that cost a full 12-minute window plus, under `--record`, a baseline reflecting
   30 of 376 frames.

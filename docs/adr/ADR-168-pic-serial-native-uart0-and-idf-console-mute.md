@@ -1,8 +1,8 @@
 ---
 id: "ADR-168"
 title: "PIC Serial Link Binds Native UART0 on GPIO43/44; IDF Console Muted on the PIC Path"
-status: "Proposed"
-date: "2026-07-09"
+status: "Accepted"
+date: "2026-10-15"
 binding: false
 gate: null
 documents_shipped: false
@@ -14,12 +14,12 @@ superseded_by: null
 
 ## Status
 
-Proposed. Date: 2026-07-09.
+Accepted, 2026-10-15.
 
 This ADR documents a diagnosis-driven decision already implemented and
 verified on-device (commits ad7334846 / alpha.336 and 8118d29c /
-alpha.337, TASK-972). It does NOT flip to Accepted here: acceptance is
-the maintainer's own determination, made later, per project rule.
+alpha.337, TASK-972). The maintainer accepted it on 2026-10-15 after a
+code-versus-record check (TASK-1237).
 
 ## Status History
 
@@ -30,18 +30,23 @@ status_history:
     changed_by: Agent (adr-generator, diagnosis-driven)
     reason: Documents the UART0 rebind and IDF console mute that restored the ESP-to-PIC command channel on esp32-classic, verified on the bench device 2026-07-08/09 (TASK-972). Maintainer acceptance pending.
     changed_via: adr-kit
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted 2026-10-15 after the code-vs-ADR verification and reference refresh (TASK-1237)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-On the OTGW Classic carrier board, the physical socket wires the PIC's
-UART lines to GPIO43 (ESP TX to PIC RX) and GPIO44 (ESP RX from PIC TX)
-of the ESP32-S3 (`src/libraries/Platform/src/boards.h:166-167`,
+On the OpenTherm Gateway (OTGW) Classic carrier board, the physical socket wires the PIC's
+UART (universal asynchronous receiver-transmitter) lines to GPIO43 (ESP TX to PIC RX) and GPIO44 (ESP RX from PIC TX)
+of the ESP32-S3 (`src/libraries/Platform/src/boards.h:165-166`,
 `PIN_PIC_TX=43` / `PIN_PIC_RX=44`). These two pins are the ESP32-S3's
 native UART0 IO_MUX pins.
 
 Before this decision, the vendored `OTGWSerial` driver bound **UART1**
-on those pins, routed through the GPIO matrix. On the esp32-classic
+on those pins, routed through the GPIO (general-purpose input/output) matrix. On the esp32-classic
 bench device this produced an asymmetric failure, verified on-device
 2026-07-08/09 (TASK-972):
 
@@ -64,7 +69,7 @@ only redirects Arduino's `Serial` object; `esp_log` / `ets_printf` /
 WiFi-driver output still transmits physically out of UART0, straight
 into the PIC. The PIC answered stray log lines with `SE` (syntax
 error) responses, and any log byte landing inside the PIC-flash
-bootloader's STX window fatally aborts that handshake.
+bootloader's STX (start of text) window fatally aborts that handshake.
 
 Terminology: IO_MUX is the ESP32-S3's direct pin-to-peripheral mux
 (native routing); the GPIO matrix is the flexible any-signal-to-any-pin
@@ -82,19 +87,26 @@ Concretely:
 
 1. `OTGWSerial`'s ESP32 constructor branch derives from
    `HardwareSerial(0)` instead of `HardwareSerial(1)`
-   (`src/libraries/OTGWSerial/OTGWSerial.cpp:855`; commit ad7334846,
+   (`src/libraries/OTGWSerial/OTGWSerial.cpp:877`; commit ad7334846,
    alpha.336). Verified on-device: `PR=A` answers in under 50 ms and
    `GW=R` resets the PIC (reset banner observed +57 ms).
 2. A new `platformMuteUart0Console()` shim
-   (`src/libraries/Platform/src/platform_esp32.h:327`) installs a null
-   vprintf via `esp_log_set_vprintf()` and a no-op putc via
-   `ets_install_putc1()`. It is called in `setup()` on the PIC path
-   (`src/OTGW-firmware/OTGW-firmware.ino:359`) before
-   `OTGWSerial.begin()` (commit 8118d29c, alpha.337).
+   (`src/libraries/Platform/src/platform_esp32.h:368-377`) closes three
+   leak paths: a null vprintf via `esp_log_set_vprintf()`, a no-op putc
+   via `ets_install_putc1()`, and `freopen("/dev/null")` on `stdout` and
+   `stderr`, because closed-source components (the WiFi libraries) partly
+   use plain newlib `printf`, which reaches UART0 through the VFS (virtual file system) console
+   and bypasses both hooks. It is called in `setup()` before the PIC
+   link starts (commit 8118d29c, alpha.337) at three call sites in
+   `src/OTGW-firmware/OTGW-firmware.ino`: `:371` (combo, forced
+   OT-Direct recovery probe) and `:392` (combo, auto/PIC probe), both in
+   the `HAS_RUNTIME_HW_DETECT` arm, and `:468` (the fixed esp32-classic
+   target, under `#if HAS_PIC`, added by TASK-1131, commit 02a3d90d6,
+   because the two combo-only sites never ran there).
 
-Scope: this decision covers the runtime command channel only. It does
-NOT claim the PIC-flash bootloader handshake works; see the open issue
-in Consequences.
+Scope: this decision covers the UART binding and the console mute. The
+PIC-flash bootloader handshake depends on both and is resolved; see
+Consequences.
 
 ## Alternatives Considered
 
@@ -155,19 +167,25 @@ is talking to the PIC.
 
 **Risks and mitigations**
 
-- *Risk (accepted residual)*: the ROM first-stage boot log at ESP reset
+- *Risk (accepted residual)*: the ROM (read-only memory) first-stage boot log at ESP reset
   still reaches the PIC at 115200 baud. This is eFuse-level behaviour
   that runtime hooks cannot suppress. *Mitigation*: harmless in
   practice, because `detectPIC()` resets the PIC after ESP boot, so any
   PIC-side confusion from ROM boot bytes is cleared before the link is
   used.
-- *Risk / known open issue (disclosed honestly)*: the PIC-flash
-  bootloader handshake STILL fails after both fixes. A deterministic
-  non-STX byte appears on the PIC RX line less than 130 ms after the
-  bootloader ETX, even with a verified-silent TX line; a hardware
-  measurement is pending. *Mitigation*: tracked under TASK-972; this
-  ADR fixes the command channel and does not claim the flash path
-  works.
+- *Resolved (formerly an open issue)*: the PIC-flash bootloader
+  handshake initially still failed on the esp32-classic bench unit after
+  both fixes. TASK-972 is Done: a field tester flashed gateway.hex to
+  100% on alpha.337 (S3 Mini Pro combo) with the PIC healthy afterwards.
+  TASK-1129 (Done) traced the bench failure to the missing console mute
+  on the fixed esp32-classic target ('IO n is not set as GPIO' log lines
+  reaching the PIC around the bootloader's ETX (end of text) byte); after the TASK-1131 call
+  site (`:468`) the bench reaches the bootloader and a real flash of
+  gateway 6.8 completed with 0 errors and 0 retries (alpha.418).
+- *Scope note*: the safeboot updater (ADR-191) never opens UART0 and
+  sets IDF logging to none (`safeboot/src/main.cpp:15`, `:176`). It does
+  not install the putc1/stdout mute; this is acceptable because safeboot
+  never drives the PIC.
 - *Risk*: a future contributor reverts `OTGWSerial` to
   `HardwareSerial(1)` (for example during an upstream sync of the
   vendored driver), silently re-breaking TX. *Mitigation*: the
@@ -176,14 +194,14 @@ is talking to the PIC.
 ## Related Decisions
 
 - **ADR-130 (PIC-UART Dedicated FreeRTOS Task as Sole OTGWSerial
-  Owner)**: complements. This ADR changes WHICH UART peripheral the
+  Owner)**: complements. This ADR changes which UART peripheral the
   sole owner drives; the ownership/park contract of ADR-130 is
   untouched.
 - **ADR-138 (PIC-UART Control-Method Park Handshake, TX
   Requeue-to-Front Ordering, and Progress-Path Heap-Gate Decision)**:
   complements. The park handshake and TX ordering invariants apply
   unchanged on UART0.
-- **ADR-158 (Combo board: LOLIN S3 Mini Pro as a third boot-detected
+- **ADR-158 (Combo board: Wemos `LOLIN` S3 Mini Pro as a third boot-detected
   Classic variant)**: depends on. The combo pin map fixes the PIC lines
   to GPIO43/44, which is the physical constraint that rules out
   Alternative B.
@@ -194,15 +212,19 @@ is talking to the PIC.
   findings) and TASK-850 (`ARDUINO_USB_CDC_ON_BOOT=1`, which moves only
   Arduino's `Serial`, not the IDF console).
 - Commit ad7334846 (alpha.336): UART0 rebind,
-  `src/libraries/OTGWSerial/OTGWSerial.cpp:855`.
+  `src/libraries/OTGWSerial/OTGWSerial.cpp:877`.
 - Commit 8118d29c (alpha.337): console mute,
-  `src/libraries/Platform/src/platform_esp32.h:327` and
-  `src/OTGW-firmware/OTGW-firmware.ino:359`.
-- Pin map: `src/libraries/Platform/src/boards.h:166-167` (Classic) and
-  `:262-263` (combo variant).
+  `src/libraries/Platform/src/platform_esp32.h:368-377` and
+  `src/OTGW-firmware/OTGW-firmware.ino:371`, `:392`.
+- Commit 02a3d90d6 (TASK-1131, alpha.364): the fixed esp32-classic call
+  site, `src/OTGW-firmware/OTGW-firmware.ino:468`.
+- TASK-1129 (bench bootloader-entry diagnosis) and ADR-191 (safeboot
+  updater, `safeboot/src/main.cpp:15`, `:176`).
+- Pin map: `src/libraries/Platform/src/boards.h:165-166` (Classic) and
+  `:265-266` (combo variant).
 - Framework sdkconfig facts: `CONFIG_ESP_CONSOLE_UART_NUM=0` (primary,
-  115200), `CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=1` (USB is
-  secondary only), from the prebuilt Arduino-ESP32 core sdkconfig.
+  115200), `CONFIG_ESP_CONSOLE_SECONDARY_USB_SERIAL_JTAG=1` (the USB (Universal Serial Bus)
+  console is secondary only), from the prebuilt Arduino-ESP32 core sdkconfig.
 - On-device verification 2026-07-08/09, esp32-classic bench device.
 
 ## Enforcement

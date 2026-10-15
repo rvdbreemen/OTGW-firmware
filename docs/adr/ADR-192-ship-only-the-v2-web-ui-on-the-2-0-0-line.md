@@ -12,6 +12,8 @@ supersedes:
 superseded_by: null
 related:
   - "ADR-152"
+  - "ADR-172"
+  - "ADR-173"
   - "ADR-190"
   - "ADR-191"
 topics:
@@ -77,6 +79,16 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: The 2.0.0 line ships only the v2 web UI
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-172
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-173
     changed_via: adr-kit lifecycle
 ```
 

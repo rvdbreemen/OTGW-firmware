@@ -1,8 +1,8 @@
 ---
 id: "ADR-166"
 title: "Single-app-slot boards: firmware/app OTA is USB-only, filesystem OTA stays on WiFi"
-status: "Proposed"
-date: "2026-07-06"
+status: "Superseded"
+date: "2026-10-15"
 binding: false
 gate: null
 documents_shipped: true
@@ -10,9 +10,8 @@ verified_in:
   - "src/OTGW-firmware/OTGW-ModUpdateServer-esp32.h:hasSpareAppOtaSlot"
   - "src/OTGW-firmware/restAPI.ino:app_ota_available"
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-191"
 related:
-  - "ADR-126"
   - "ADR-190"
   - "ADR-191"
 deciders:
@@ -29,14 +28,15 @@ tags:
 
 ## Status
 
-Proposed. Date: 2026-07-06.
+Superseded by ADR-191, 2026-10-15.
 
 This records an already-shipped, empirically-forced safety decision (the
 backend has rejected single-slot app OTA since alpha.311/TASK-959 AC#1; the
-frontend hide added alongside this ADR is new). Left `Proposed` rather than
-self-accepted per the adr-kit rule ("never self-approve") — the underlying
-behavior is live and field-verified, but the maintainer has not reviewed this
-specific record yet.
+frontend hide added alongside this ADR is new). The maintainer accepted it on
+2026-10-15 as the record of the policy that held from alpha.311 to alpha.424.
+From alpha.425 ADR-191 replaces it on the 4MB boards: firmware OTA runs through
+the safeboot updater. One part still holds there: the main firmware itself
+refuses an app image, because it would overwrite the running slot (TASK-959).
 
 ## Status History
 
@@ -47,7 +47,6 @@ status_history:
     changed_by: Agent (TASK-959)
     reason: Initial decision record documenting the single-app-slot app-OTA rejection (backend, alpha.311) and the new frontend hide added in this pass. Left Proposed pending maintainer review.
     changed_via: adr-kit
-    changed_via: adr-kit
   - date: 2026-10-14
     status: Proposed
     changed_by: "User: Robert van den Breemen"
@@ -57,6 +56,16 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-191
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "Maintainer accepted 2026-10-15 (TASK-1237): records the USB-only app OTA policy that shipped from alpha.311 (TASK-959) until alpha.425"
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Superseded
+    changed_by: Robert van den Breemen
+    reason: ADR-191 (safeboot updater) brings firmware OTA over WiFi to the 4MB boards from alpha.425 (TASK-1223/TASK-1237)
     changed_via: adr-kit lifecycle
 ```
 
@@ -144,7 +153,7 @@ but ships too small a filesystem for this project's web UI.
 ### Alternative B: Allow the write but warn the user first
 
 Rejected outright as unsafe. Once `Update.write()` starts streaming into the
-running partition, the device WILL fault mid-write on any interruption
+running partition, the device will fault mid-write on any interruption
 (browser tab closed, WiFi hiccup, upload taking too long) — a warning dialog
 does not change the outcome, it only delays when the user finds out. The
 brick already happened in testing with no warning; adding one does not fix
@@ -181,7 +190,7 @@ mode is understood and easily prevented at zero cost to legitimate use
   a real operational constraint for field-deployed 4MB units, not just a
   bench limitation.
 - True dual-slot app OTA with automatic rollback needs an 8MB S3-WROOM-1-N8
-  module (pin-compatible BOM swap) on a future PCB revision — not a firmware
+  module (a pin-compatible BOM (bill of materials) swap) on a future PCB (printed circuit board) revision — not a firmware
   fix, a hardware one.
 
 **Risks and mitigations**

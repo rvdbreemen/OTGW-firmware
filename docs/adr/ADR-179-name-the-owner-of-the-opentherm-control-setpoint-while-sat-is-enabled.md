@@ -1,15 +1,14 @@
 ---
 id: "ADR-179"
 title: "Name the owner of the OpenTherm control setpoint while SAT is enabled"
-status: "Proposed"
-date: "2026-09-22"
+status: "Accepted"
+date: "2026-10-15"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "control setpoint ownership"
   - "msgid 1 tset"
@@ -26,6 +25,7 @@ symbols:
   - "satOwnsControlSetpoint"
   - "satCommandInFlight"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -34,7 +34,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-09-22.
+Accepted, 2026-10-15.
 
 ## Status History
 
@@ -45,6 +45,11 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted 2026-10-15 after the code-vs-ADR verification; open questions answered in place (TASK-1237)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -56,39 +61,47 @@ it independently.
 Reported on Discord (#dev-sat-mqtt, 2026-05-29) by sergeantd: *"When SAT is enabled,
 ONLY SAT should drive TSet. Otherwise a conflict will occur."* The visible symptom was a
 45 <-> 10 flip-flop every 60 seconds. TASK-761 fixed that same day by gating OTDirect's
-heating-curve writer on `state.sat.bActive` (`OTDirect.ino:2072-2085`). The symptom went
-away; the rule did not exist.
+heating-curve writer on `state.sat.bActive` (the TASK-183 PI / heating-curve block in
+`OTDirect.ino`, now at about 2181-2203). The symptom went away; the rule did not exist.
+
+Line numbers in this section are refreshed to the `dev` branch head on 2026-10-15 and will drift; the
+symbol names are the stable reference.
 
 A verification pass over dev HEAD (2026-09-22), including an adversarial completeness
 check that grepped every `setOverride(1` / `updateWriteCache(1` / `enqueueWriteCommand(1`
 site, found the writer set is exactly five and that four remained ungated. In order of
 how easily they fire:
 
-1. **Thermostat-timeout setback** (`OTDirect.ino:2470-2475`). `settings.otd.bFailSafe`
-   defaults true and `iSetbackTimeout` defaults 30 s (`OTDirecttypes.h:110,113`), and
+1. **Thermostat-timeout setback** (the fail-safe setback in `OTDirect.ino`, about
+   2586-2595, `setOverride(1, ...)` / `updateWriteCache(1, ...)`). `settings.otd.bFailSafe`
+   defaults true and `iSetbackTimeout` defaults 30 s (`OTDirecttypes.h:116,113`), and
    gateway is the default mode. A quiet thermostat hands TSet to a 16 C setback with no
    external actor involved.
-2. **`CS=` has no gate** (`OTDirect.ino:2620-2641`), reachable from MQTT `ctrlsetpt` and
-   the raw `command` topic, `POST /api/v2/otgw/commands`, the port-25238 bridge and
-   telnet. `addCommandToQueue()` (`OTGW-Core.ino:3550-3561`) arbitrates nothing, so the
-   last writer wins.
+2. **`CS=` has no gate** (the `CS=` branch of `handleOTDirectCommand()` in
+   `OTDirect.ino`, now about 2742-2775), reachable from MQTT (Message Queuing Telemetry Transport) `ctrlsetpt` and the raw
+   `command` topic, `POST /api/v2/otgw/commands`, the port-25238 bridge and telnet.
+   `addCommandToQueue()` (`OTGW-Core.ino`, about 3616) arbitrates nothing, so the last
+   writer wins.
 3. **Refresh versus expiry.** SAT re-sends CS on change or every `SAT_CMD_REFRESH_MS`
-   (300 s, `SATcontrol.ino:312`); OTDirect expires the override after
-   `OT_CSC2_EXPIRY_MS` (60 s, `OTDirect.ino:456`). `otCSLastCommandMs` is never stamped
-   by the scheduler, so the expiry really fires while SAT is deliberately holding a
-   stable setpoint — during the ADR-150 cold cutoff and while DHW is active.
-4. **Silent handover on a safety trip.** `satDisable()` clears `state.sat.bActive` and
-   leaves `settings.sat.bEnabled` true (`SATcontrol.ino:1853-1873`), so a gate keyed on
-   `bActive` re-arms the heating curve while the user still believes SAT is in charge.
-5. **Master-mode thermostat WRITE_DATA** (`OTDirect.ino:2523-2527`), ungated.
+   (300 s, `SATcontrol.ino`, about 317); OTDirect expires the override after
+   `OT_CSC2_EXPIRY_MS` (60 s, `OTDirect.ino`, about 456; the expiry check is at about
+   2148). `otCSLastCommandMs` is never stamped by the scheduler, so the expiry really
+   fires while SAT is deliberately holding a stable setpoint: during the ADR-150 cold
+   cutoff and while DHW (domestic hot water) is active.
+4. **Silent handover on a safety trip.** `satDisable()` (`SATcontrol.ino`, about 1916)
+   clears `state.sat.bActive` and leaves `settings.sat.bEnabled` true, so a gate keyed
+   on `bActive` re-arms the heating curve while the user still believes SAT is in
+   charge.
+5. **Master-mode thermostat WRITE_DATA** (`OTDirect.ino`, about 2646), ungated.
 
 One question had to be answered before any fix, because it decides whether MsgID 1
 arbitration is even sufficient: does SAT's `CH=` reach the boiler on pass-through
 thermostat frames? It does not, and the real answer is worse. `otMasterStatusFlags` is
-read at exactly one bus-facing site, `buildStatusRequest()` (`OTDirect.ino:733`), and
-there is no `setOverride(0, ...)` anywhere, so a thermostat's own MsgID 0 is relayed
-unmodified. But `scheduleMasterRequest()` runs in gateway mode too — only monitor mode
-is excluded (`OTDirect.ino:2015`) — so the boiler receives the thermostat's MsgID 0 and
+read at exactly one bus-facing site, `buildStatusRequest()` (`OTDirect.ino`, about
+756), and there is no `setOverride(0, ...)` anywhere, so a thermostat's own MsgID 0 is
+relayed unmodified. But `scheduleMasterRequest()` runs in gateway mode too: only monitor
+mode is excluded (the `timerOTSchedule` / `IS_MONITOR_MODE()` gate in `OTDirect.ino`,
+about 2121), so the boiler receives the thermostat's MsgID 0 and
 the gateway's MsgID 0 interleaved, each carrying a different CH-enable bit. Whose bit
 applies depends on which frame arrived last.
 
@@ -110,6 +123,15 @@ telnet line, rather than silently winning by being the last writer. SAT submits 
 around SAT's own enqueue and read synchronously by the OTDirect handler) distinguishes
 the two without introducing a second command path.
 
+**Scope: OT-Direct boards.** This decision, and the refusal of an external `CS=` in
+particular, applies where OTDirect drives the bus: the `esp32` target (OTGW32) and the
+`esp32-combo` image when it boots in OT-Direct mode. On boards with a PIC (the gateway's OpenTherm microcontroller), that is
+`esp32-classic` and `esp32-combo` in PIC mode, `addCommandToQueue()` (`OTGW-Core.ino`, about 3616-3623)
+reaches `handleOTDirectCommand()` only when no PIC is enabled, so there an external `CS=`
+goes to the PIC and is not refused. Port 25238 cannot be gated on those boards either,
+because the PIC byte stream is kept verbatim in both directions (ADR-177). How SAT keeps
+its setpoint on PIC boards is follow-up work in TASK-1236.
+
 ## Decision Contract
 
 ### Must
@@ -130,10 +152,13 @@ the two without introducing a second command path.
 
 ### Exceptions
 
-- **The thermostat-timeout setback** (`OTDirect.ino:2470-2475`) may write MsgID 1 while
+- **The thermostat-timeout setback** (fail-safe setback in `OTDirect.ino`, about
+  2586-2595) may write MsgID 1 while
   SAT owns it. Maintainer decision, 2026-09-22: it is a fail-safe, and if the thermostat
   has gone quiet *and* SAT is not commanding, something must still keep the building from
   freezing. Strict single-writer would remove that net precisely when it is needed.
+- **PIC boards are out of scope** (see Scope under Decision). On a PIC board an external
+  `CS=` reaches the PIC and is not refused; that gap is tracked in TASK-1236.
 
 ### Verification
 
@@ -144,7 +169,8 @@ the two without introducing a second command path.
 - `src/OTGW-firmware/OTDirect.ino` — the gated heating-curve, master-mode WRITE_DATA,
   `CS=` and CS-expiry sites.
 - Field validation on an OTGW32: with SAT enabled and a safety trip forced, TSet must not
-  revert to the heating curve or the thermostat.
+  revert to the heating curve. (Handing TSet back to the thermostat is deliberate: the
+  trip calls `satDisable()`, which sends `CS=0` and releases the override.)
 
 ## Alternatives Considered
 
@@ -176,9 +202,9 @@ the two without introducing a second command path.
 **Negative:**
 
 - **Breaking change for existing automations.** Anything that sets `CS=` over MQTT, REST,
-  telnet or port 25238 while SAT is enabled now gets `NG`. That is deliberate — those
-  writes were previously winning silently — but it will surface as "my automation stopped
-  working". *Mitigation:* the refusal names the reason and the remedy (disable SAT); the
+  telnet or port 25238 while SAT is enabled now gets `NG` on an OT-Direct board. That is
+  deliberate (those writes were previously winning silently), but it will surface as
+  "my automation stopped working". *Mitigation:* the refusal names the reason and the remedy (disable SAT); the
   behaviour is documented here and in the telnet output.
 - **SAT is not an absolute owner.** The setback exception means a reader cannot assume
   "SAT enabled" implies "SAT is the only writer". *Mitigation:* the exception is stated in
@@ -189,19 +215,41 @@ the two without introducing a second command path.
   at the definition site.
 - **MsgID 0 remains unresolved.** Two masters still publish conflicting CH-enable bits in
   gateway mode. This ADR scopes to MsgID 1; the status-bit conflict needs its own
-  decision.
+  decision, tracked in TASK-1238.
+- **PIC boards are not covered.** On `esp32-classic` and `esp32-combo` in PIC mode an
+  external `CS=` is not refused, and the PIC expires a `CS` setpoint of 8 C or more that
+  has not been refreshed within its one-minute heartbeat window (see the answered Open
+  Question below). SAT re-sends an unchanged setpoint only every `SAT_CMD_REFRESH_MS`
+  (300 s, `SATcontrol.ino`, about 317), so on PIC boards SAT's setpoint likely lapses
+  between refreshes. This is a single-source reading of the PIC assembly and has not
+  been reproduced on the bench; it is tracked in TASK-1236.
 
 ## Open Questions
 
-- [ ] MsgID 0 in gateway mode: the gateway emits its own status frames alongside the
+- [x] MsgID 0 in gateway mode: the gateway emits its own status frames alongside the
       thermostat's, each with a different CH-enable bit, so SAT's `CH=0` is not reliably
       honoured. Should the gateway suppress its own MsgID 0 while a live thermostat is
       present, or should SAT's CH intent be applied to the relayed frame? Needs a decision
       and probably its own ADR.
-- [ ] `other-projects/otgw-6.6/gateway.asm:1619-1630` suggests the PIC keeps a setpoint
+  **Answered 2026-10-15 by User: Robert van den Breemen:** moved out of scope of this
+  ADR, which decides MsgID 1 only. The MsgID 0 decision is tracked in TASK-1238 and will
+  get its own ADR if one is needed.
+- [x] `other-projects/otgw-6.6/gateway.asm:1619-1630` suggests the PIC keeps a setpoint
       above 8 C alive past 60 s, which would make the expiry divergence OTDirect-specific.
       This is a single-source reading of assembly and is not verified on hardware; confirm
       before relying on it.
+  **Answered 2026-10-15 by User: Robert van den Breemen:** the premise is inverted.
+  `CommandExpiry` (`gateway.asm:1619-1630`) loads `controlsetpt1`, masks it with
+  `0xF8`, and then: if `HeartbeatCS` is set (a `CS` arrived in the past minute) it keeps
+  the setpoint; otherwise it keeps it only when the masked value is zero (setpoint below
+  8 C), and for any setpoint of 8 C or more it sets `SysCtrlSetpoint` (line 1629),
+  dropping the override. So the PIC also expires `CS` after about a minute, which
+  matches the `OT_CSC2_EXPIRY_MS` comment in `OTDirect.ino` ("matches PIC heartbeat
+  window", about 456); the expiry is not OTDirect-specific. Consequence: SAT refreshes
+  an unchanged setpoint only every `SAT_CMD_REFRESH_MS` (300 s), so on PIC boards SAT's
+  setpoint likely lapses between refreshes. Still a single-source reading of assembly,
+  not yet reproduced on the bench; tracked in TASK-1236 and recorded under
+  Consequences.
 
 ## Related Decisions
 
@@ -213,8 +261,18 @@ the two without introducing a second command path.
 ## References
 
 - TASK-1150 (backlog); reported on Discord #dev-sat-mqtt 2026-05-29 by sergeantd.
-- TASK-761 — the earlier, narrower fix this decision generalises.
-- `src/OTGW-firmware/OTDirect.ino` — writers at 2080, 2473-2474, 2525-2526, 2631; expiry
-  at 2033-2037; scheduler gating at 2015; status frame at 733.
-- `src/OTGW-firmware/SATcontrol.ino` — `satDisable()` at 1853, refresh window at 312-345.
-- `src/OTGW-firmware/OTGW-Core.ino:3550-3561` — the unarbitrated shared command queue.
+- TASK-761: the earlier, narrower fix this decision generalises.
+- TASK-1236: SAT on PIC boards, the setpoint lapsing between 300 s refreshes.
+- TASK-1238: how SAT's CH-enable reaches the boiler in OT-Direct gateway mode (MsgID 0).
+- `src/OTGW-firmware/OTDirect.ino` (line numbers as of 2026-10-15, symbols are the
+  stable reference): MsgID 1 writers in the heating-curve block (about 2181-2203), the
+  fail-safe setback (about 2586-2595), the master-mode WRITE_DATA path (about 2646) and
+  the `CS=` branch of `handleOTDirectCommand()` (about 2742-2775); CS expiry check at
+  about 2148 (`OT_CSC2_EXPIRY_MS` at 456); scheduler gating at about 2121;
+  `buildStatusRequest()` at about 756.
+- `src/OTGW-firmware/SATcontrol.ino`: `satOwnsControlSetpoint()` (about 1906-1913),
+  `satDisable()` (about 1916), `SAT_CMD_REFRESH_MS` (about 317) and the refresh helpers
+  after it.
+- `src/OTGW-firmware/OTGW-Core.ino`: `addCommandToQueue()` (about 3616-3623), the
+  unarbitrated shared command queue and its PIC / OT-Direct dispatch.
+- `other-projects/otgw-6.6/gateway.asm:1619-1630`: the PIC's `CommandExpiry` routine.

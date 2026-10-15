@@ -171,20 +171,20 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-163 | Accepted | - | Serve Web UI static assets with Cache-Control: no-cache (the browser may store but MUST revalidate via If-None-Match... |
 | ADR-164 | Accepted | - | On the combo board, AUTO board detection (iBoardMode == 0) detects once on first boot and persists its verdict once i... |
 | ADR-165 | Accepted | - | Adopt N=2 as the confirmed safe-and-robust parallelism ceiling for RESTMAXINFLIGHT and WEBFILEMAXINFLIGHT on the ESP3... |
-| ADR-166 | Proposed | - | Firmware/app OTA is rejected outright on any board whose partition table has no spare app slot (single otaX == the ru... |
+| ADR-166 | Superseded | - | Firmware/app OTA is rejected outright on any board whose partition table has no spare app slot (single otaX == the ru... |
 | ADR-167 | Accepted | - | On the dev branch, retire the ADR-089 heap tier machine and the ADR-121 per-consumer gating in a separate Phase-3 imp... |
-| ADR-168 | Proposed | `src/libraries/OTGWSerial/OTGWSerial.cpp` | On the PIC path (esp32-classic and combo-with-PIC), the PIC serial link binds the ESP32-S3's native UART0 on GPIO43/4... |
+| ADR-168 | Accepted | `src/libraries/OTGWSerial/OTGWSerial.cpp` | On the PIC path (esp32-classic and combo-with-PIC), the PIC serial link binds the ESP32-S3's native UART0 on GPIO43/4... |
 | ADR-169 | Accepted | `src/OTGW-firmware/SATble.ino` | BLE runs by default only on boards where psramFound() is true; on no-PSRAM boards it stays dormant behind a persisted... |
-| ADR-170 | Proposed | - | Remove the automatic discovery-verify readback. |
-| ADR-171 | Proposed | - | Introduce one private helper, queueNonOTDiscoveryIds() in MQTTstuff.ino, as the single definition of "which non-bus-s... |
-| ADR-172 | Proposed | - | A per-endpoint, globally-shared poll budget checked in the v2 dispatcher immediately before the handler call (restAPI... |
-| ADR-173 | Proposed | - | OTMONITORPOLLMS = 2000 and DEVTIMEPOLLMS = 5000, as named constants rather than inline literals, because checkpollwin... |
+| ADR-170 | Accepted | - | Remove the automatic discovery-verify readback. |
+| ADR-171 | Accepted | - | Introduce one private helper, queueNonOTDiscoveryIds() in MQTTstuff.ino, as the single definition of "which non-bus-s... |
+| ADR-172 | Accepted | - | A per-endpoint, globally-shared poll budget checked in the v2 dispatcher immediately before the handler call (restAPI... |
+| ADR-173 | Accepted | - | The v2 client paces itself with the following mechanisms. |
 | ADR-174 | Accepted | - | Chosen option: Option A, because homeassistant/status is a Home Assistant side contract and the two firmware lines mu... |
-| ADR-175 | Proposed | `scripts/tests/coverage_baseline.py` | Chosen option: Option A, because it is the only one that makes topic presence an observation rather than a sample, an... |
+| ADR-175 | Accepted | `scripts/tests/coverage_baseline.py` | Chosen option: Option A, because it is the only one that makes topic presence an observation rather than a sample, an... |
 | ADR-176 | Accepted | - | Chosen option: Option A, because the maintainer decided the Energy dashboard should work out of the box rather than r... |
 | ADR-177 | Accepted | `src/OTGW-firmware/OTGW-Core.ino` | Chosen option: Option A, because the damaging edits share a small, precise syntactic signature. |
-| ADR-178 | Proposed | `src/OTGW-firmware/**/*.h` | settings.sat.sSensorArea becomes char[4][18] and holds a sensor reference that is either a 16-character Dallas addres... |
-| ADR-179 | Proposed | - | While SAT is enabled, SAT owns MsgID 1. |
+| ADR-178 | Accepted | `src/OTGW-firmware/**/*.h` | settings.sat.sSensorArea becomes char[4][18] and holds a sensor reference that is either a 16-character Dallas addres... |
+| ADR-179 | Accepted | - | While SAT is enabled, SAT owns MsgID 1. |
 | ADR-180 | Accepted | `evaluate.py` | New code in hot-path source files does not declare String objects. |
 | ADR-181 | Accepted | - | Only boiler Read-Ack frames for MsgID 19, through printf88(), feed the DHW water total. |
 | ADR-182 | Accepted | - | The DHW water total is announced just in time, after the first MsgID 19 sample of a boot, as on the 1.x line: |

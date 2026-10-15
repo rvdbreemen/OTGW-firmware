@@ -7,7 +7,8 @@ binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-166"
 superseded_by: null
 related:
   - "ADR-166"
@@ -76,6 +77,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: ADR-191 (safeboot updater) brings firmware OTA over WiFi to the 4MB boards from alpha.425 (TASK-1223/TASK-1237)
     changed_via: adr-kit lifecycle
 ```
 

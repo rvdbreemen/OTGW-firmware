@@ -1,22 +1,23 @@
 ---
 id: "ADR-172"
 title: "Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses"
-status: "Proposed"
-date: "2026-07-26"
+status: "Accepted"
+date: "2026-10-15"
 binding: false
-gate: null
+gate: "check_api_rate_limit_alias_coverage, check_poll_window_coupling"
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
 related:
   - "ADR-184"
+  - "ADR-192"
 ---
 # ADR-172 Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses
 
 ## Status
 
-Proposed. Date: 2026-07-26.
+Accepted, 2026-10-15.
 
 Port of `otgw-1.x.x` ADR-086, with four deliberate divergences (below).
 
@@ -34,13 +35,29 @@ status_history:
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-184
     changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-192
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted 2026-10-15 after the code-vs-ADR verification and refresh (TASK-1237)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
 
-The classic web UI refreshes from two REST endpoints on independent timers:
-`refreshOTmonitor()` against `/api/v2/otgw/otmonitor` and `refreshDevTime()`
-against `/api/v2/device/time`. Both run for as long as the page is loaded.
+When this ADR was written, the classic web UI (`data/index.js`) refreshed from two
+REST endpoints on independent timers: `refreshOTmonitor()` against
+`/api/v2/otgw/otmonitor` and `refreshDevTime()` against `/api/v2/device/time`, both
+running for as long as the page was loaded. The classic UI was removed in
+alpha.425 (ADR-192). The polling client on this line is now `data/v2.js`:
+`fetchOtmonitor()` (`v2.js:2594`) for otmonitor, and `psCheckTick()`
+(`v2.js:2642`) plus `devClockTick()` (`v2.js:226`) for device/time. ADR-173
+describes their cadence. The server-side budget below does not depend on which UI
+is the client.
 
 A 60-minute field capture on the 1.x line (device `otgw-48E72958B013`, reporter
 martreides, 2026-07-19) recorded 14 500 REST requests in the hour: 7192 on
@@ -55,8 +72,9 @@ exceed 2 concurrent and never trip either gate, while still costing the device
 4 req/s indefinitely.
 
 Lowering client poll rates (ADR-173) reduces pressure but cannot be the whole
-answer: a browser holding a cached older `index.js`, a user script, or a
-third-party poller is not bound by whatever intervals the shipped UI ships with.
+answer: a browser holding a cached copy of an older UI (at the time, an older
+`index.js`), a user script, or a third-party poller is not bound by whatever
+intervals the shipped UI ships with.
 
 ### Two defects in the 1.x implementation
 
@@ -91,7 +109,7 @@ goal, and a per-client budget would let N clients each poll at full rate.
 ### Divergence 1 — aliases share one budget (fixes defect a)
 
 The table is split into a const PROGMEM route list carrying a **budget index**,
-and a separate RAM array of budget state:
+and a separate RAM (random-access memory) array of budget state:
 
 ```cpp
 static const ApiRateLimitRoute kApiRateLimitRoutes[] PROGMEM = {
@@ -107,7 +125,7 @@ its own window (half the protection). Note the split is **not** required by
 `check_dispatch_tables_progmem` — that gate matches only `static const` tables and
 PROGMEM is a no-op on ESP32; it is required by the shared-budget semantics.
 
-### Divergence 2 — GCRA with burst 2, not one-per-window
+### Divergence 2: GCRA (generic cell rate algorithm) with burst 2, not one-per-window
 
 Sustained rate is unchanged from 1.x (1 per window: 40 req/min on otmonitor,
 15 on device/time, against the 242 req/min that killed the field device). The
@@ -119,15 +137,24 @@ slack matters for three reasons:
   alias only by making it unusable has not fixed defect (a), it has moved it.
 - **It is the server half of the fix for defect (b).** With two tokens, two
   dashboards at the shipped interval are both served, so the phase-lock never arms
-  in the common case. Client re-phasing (ADR-173) then covers N ≥ 3 and stale
-  cached clients.
+  in the common case. The client half (ADR-173) honours `retry_after` and polls
+  otmonitor only while it is needed; the v2 client does not jitter its phase, so
+  N ≥ 3 dashboards on the polling page remain an accepted gap (see ADR-173).
 - **It matches this branch's own concurrency story.** ADR-165 already says the
   device is sized for two concurrent consumers; burst 2 says the same thing in the
   time domain.
 
-Implemented as GCRA (leaky bucket as a virtual clock) using signed differences
-against a theoretical arrival time, so the 49-day `millis()` rollover can neither
-open a hole nor wedge a budget shut.
+Implemented as GCRA (leaky bucket as a virtual clock) in `rateLimitTryAdmit()`
+(`restAPI.ino:2716`), using **unsigned** arithmetic against a theoretical arrival
+time (`tat`). An admitted request leaves `tat` at most burst × window ahead of
+`now`; a larger unsigned lead therefore means `tat` lies in the past and the
+budget is full again, which runs straight through the 49-day `millis()` rollover.
+The first port used a signed difference, which got this wrong: after an idle gap
+over 2^31 ms (24.86 days) it read `tat` as far in the future and refused requests
+for up to 24.86 more days. TASK-1037 defect D1 replaced it (commit 97ad7217c; the
+reasoning is recorded at `restAPI.ino:2696-2706`). One blind spot remains: an idle
+gap ending within burst × window of a multiple of 2^32 ms reads as a legitimate
+lead and costs at most one window of refusals.
 
 ### Divergence 3 — `retry_after` in the body as well as the header
 
@@ -150,16 +177,17 @@ the route; moving the limiter above it would require parsing before admission
 control, defeating a cheap pre-parse rejection. Under concurrent load a
 rate-limited request therefore receives 503, not 429 — which is correct, because
 503 genuinely dominates. The 429 early-return sits after `restInFlight++` and the
-`onDisconnect` registration, so the counter stays balanced.
+slot-release registration (`webArmSlotRelease()`, `restAPI.ino:2781-2784`), so the
+counter stays balanced.
 
 The two codes stay semantically distinct, and this is the contract:
 
 - **503** — device-wide: too many concurrent requests, heap floor. Retry shortly.
 - **429** — this endpoint's quota; the device is otherwise healthy. Carries
-  `Retry-After`; a well-behaved client re-phases.
+  `Retry-After`; a well-behaved client waits that long before asking again.
 
-The two existing hand-rolled 429s (discovery and MQTT republish cooldowns) keep
-ADR-035's `{"error":{...}}` envelope and `application/json`: they are POST
+The two existing hand-rolled 429s (discovery and MQTT (Message Queuing Telemetry Transport) republish cooldowns) keep
+ADR-035's `{"error":{...}}` envelope and `application/json`: they are `POST`
 cooldowns, not poll budgets, and their shapes are documented in `openapi.yaml`
 with published examples. `application/problem+json` is scoped to the poll limiter
 only. 1.x's `forbid_pattern: sendApiError\(429` is deliberately **not** ported — it
@@ -178,7 +206,7 @@ gateway is running out of memory" from "a browser is polling too fast", and thos
 call for opposite responses.
 
 ### C: Fix only the client (ADR-173 alone)
-Rejected as a complete answer: a cached older `index.js`, a user script, or an HA
+Rejected as a complete answer: a cached older UI bundle, a user script, or an HA
 REST sensor are all outside the shipped UI's reach. The client fix reduces load;
 the server limit bounds it.
 
@@ -192,11 +220,11 @@ the server limit bounds it.
 
 **Trade-offs**
 - The budget is global, so a well-behaved client can still receive 429 because
-  another client is polling. Burst 2 plus client re-phasing makes this rare rather
+  another client is polling. Burst 2 plus a client that polls only when needed makes this rare rather
   than permanent, but it is not eliminated.
 - Two endpoints now behave differently from the rest of the v2 surface. A future
   reader adding an endpoint must decide consciously whether it belongs in the table.
-- `RateLimit` / `RateLimit-Policy` are an IETF Internet-Draft, not a standard, as
+- `RateLimit` / `RateLimit-Policy` are an IETF (Internet Engineering Task Force) Internet-Draft, not a standard, as
   of July 2026. Emitted as extra signal only.
 - The 429 path stages 5 of `WEB_MAX_PENDING_HEADERS` (6). `webPushHeader()` drops
   silently past the cap, so a `static_assert` guards a cap *reduction*; it cannot
@@ -214,7 +242,9 @@ the server limit bounds it.
 - **ADR-165** — N*=2 request parallelism; the source of the burst-2 symmetry.
 - **ADR-035** — v2 error shape; this adds a second representation, scoped.
 - **ADR-050** — centralized dispatch; the check hooks into that single point.
-- **ADR-173** — the client half (poll reduction and 429 re-phasing).
+- **ADR-173**: the client half (poll pacing and 429 handling in `v2.js`).
+- **ADR-192** (Accepted): removed the classic UI; `v2.js` is the only client
+  this branch ships.
 - **1.x ADR-086** — the sibling decision, whose two defects this corrects. The
   `otgw-1.x.x` line fixed them in its own tasks: TASK-1090 there shares one budget
   between otmonitor and telegraf and re-phases the web UI after a 429, and
@@ -224,9 +254,41 @@ the server limit bounds it.
 
 ## Enforcement
 
-- `evaluate.py::check_api_rate_limit_alias_coverage` — the dispatcher calls
-  `checkApiRateLimit()` before the handler; every member of an alias disjunction in
-  a handler is in the table with the *same* budget id; `sendApiRateLimited` emits
-  problem+json with all four headers.
-- `evaluate.py::check_poll_window_coupling` — each `windowMs` sits between 50 % and
-  90 % of the corresponding `data/index.js` poll constant.
+- `evaluate.py::check_api_rate_limit_alias_coverage` (`evaluate.py:2348`, helper at
+  `evaluate.py:822`): the dispatcher calls `checkApiRateLimit()` before the
+  handler; every member of an alias disjunction in a handler is in the table with
+  the *same* budget id; `sendApiRateLimited` emits problem+json with all four
+  headers.
+- `evaluate.py::check_poll_window_coupling` (`evaluate.py:2366`, helper
+  `poll_window_coupling()` at `evaluate.py:870`): reads the windows from
+  `restAPI.ino` and the poll constants from `data/v2.js`. The otmonitor window
+  (1500 ms) must sit between 50 % and 90 % of `OTMON_POLL_MS` (2000). The
+  device/time window (4000 ms) has only the 90 % ceiling against `DEVTIME_POLL_MS`
+  (10000): v2 asks device/time far less often than the window allows, and the
+  window stays a fixed budget for Telegraf and scripts rather than following a UI
+  that barely uses the endpoint.
+
+Both gates are wired into the evaluator run at `evaluate.py:3756-3757`.
+
+## References
+
+- Tasks: TASK-1037 (the 2.0.0 port, including defect fixes D1-D4); 1.x TASK-1043
+  (the 1.x limiter), TASK-1090 and TASK-1188 on the 1.x line (the defect fixes
+  there); TASK-1223.12 (classic UI removal), TASK-1223.14 (v2 otmonitor and PS=1
+  polling).
+- `src/OTGW-firmware/restAPI.ino:2619-2635`: route table `kApiRateLimitRoutes`
+  with the shared otmonitor/telegraf budget.
+- `src/OTGW-firmware/restAPI.ino:2651-2655`: `gApiRateLimitBudgets` (1500 ms and
+  4000 ms windows, burst 2, `primed`).
+- `src/OTGW-firmware/restAPI.ino:2663-2694`: `static_assert` on the header cap and
+  `sendApiRateLimited()` (problem+json, `retry_after`, four headers).
+- `src/OTGW-firmware/restAPI.ino:2696-2727`: `rateLimitTryAdmit()` (unsigned GCRA).
+- `src/OTGW-firmware/restAPI.ino:2731-2751`: `checkApiRateLimit()`;
+  `restAPI.ino:2851`: the call in the v2 dispatcher.
+- `src/OTGW-firmware/data/v2.js:2585-2607` (`OTMON_POLL_MS`, `fetchOtmonitor()`),
+  `v2.js:2640-2657` (`DEVTIME_POLL_MS`, `psCheckTick()`), `v2.js:226`
+  (`devClockTick()`).
+- Commits: 24be052f2 (port, TASK-1037), e39fc65e2 (builtin parameter types in the
+  limiter's `.ino` signatures), 97ad7217c (D1-D4, including the unsigned GCRA),
+  92cfcc2b7 (AC#10 verified with two and three UI tabs against the real limiter),
+  a74a23a1f (classic UI removed; the coupling gate moved to `v2.js`).

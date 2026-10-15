@@ -5238,7 +5238,7 @@
       "title": "Single-app-slot boards: firmware/app OTA is USB-only, filesystem OTA stays on WiFi",
       "path": "ADR-166-single-app-slot-ota-policy.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Superseded",
       "date": "2026-10-15",
       "decision_summary": "Firmware/app OTA is rejected outright on any board whose partition table has no spare app slot (single otaX == the ru...",
       "topics": [],
@@ -5264,7 +5264,7 @@
           "src/OTGW-firmware/restAPI.ino:app_ota_available"
         ],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-191"
       }
     },
     {
@@ -5306,8 +5306,8 @@
       "title": "PIC Serial Link Binds Native UART0 on GPIO43/44; IDF Console Muted on the PIC Path",
       "path": "ADR-168-pic-serial-native-uart0-and-idf-console-mute.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-07-09",
+      "status": "Accepted",
+      "date": "2026-10-15",
       "decision_summary": "On the PIC path (esp32-classic and combo-with-PIC), the PIC serial link binds the ESP32-S3's native UART0 on GPIO43/4...",
       "topics": [],
       "aliases": [],
@@ -5371,9 +5371,9 @@
       "id": "ADR-170",
       "title": "Unconditional Daily Drip Republish Replaces the Automatic Discovery-Verify Readback",
       "path": "ADR-170-daily-drip-republish-replaces-discovery-verify-readback.md",
-      "format": "nygard",
-      "status": "Proposed",
-      "date": "2026-07-26",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-15",
       "decision_summary": "Remove the automatic discovery-verify readback.",
       "topics": [],
       "aliases": [],
@@ -5391,7 +5391,7 @@
       },
       "metadata": {
         "binding": false,
-        "gate": null,
+        "gate": "check_discovery_autoheal_shape",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -5402,9 +5402,9 @@
       "id": "ADR-171",
       "title": "Boot and Republish Discovery Queues Share One Non-OT ID Set",
       "path": "ADR-171-non-ot-discovery-single-source.md",
-      "format": "nygard",
-      "status": "Proposed",
-      "date": "2026-07-26",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-15",
       "decision_summary": "Introduce one private helper, queueNonOTDiscoveryIds() in MQTTstuff.ino, as the single definition of \"which non-bus-s...",
       "topics": [],
       "aliases": [],
@@ -5422,7 +5422,7 @@
       },
       "metadata": {
         "binding": false,
-        "gate": null,
+        "gate": "check_non_ot_discovery_single_source",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -5433,9 +5433,9 @@
       "id": "ADR-172",
       "title": "Rate-Limit the UI-Polled REST Endpoints with RFC 9457 429 Responses",
       "path": "ADR-172-rate-limit-ui-polled-rest-endpoints.md",
-      "format": "nygard",
-      "status": "Proposed",
-      "date": "2026-10-02",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-15",
       "decision_summary": "A per-endpoint, globally-shared poll budget checked in the v2 dispatcher immediately before the handler call (restAPI...",
       "topics": [],
       "aliases": [],
@@ -5453,7 +5453,7 @@
       },
       "metadata": {
         "binding": false,
-        "gate": null,
+        "gate": "check_api_rate_limit_alias_coverage, check_poll_window_coupling",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -5462,12 +5462,12 @@
     },
     {
       "id": "ADR-173",
-      "title": "Client Poll Pacing, Locally-Ticked Device Clock, and 429 Re-Phasing",
+      "title": "Client Poll Pacing, Locally-Ticked Device Clock, and 429 Pause in the v2 Web UI",
       "path": "ADR-173-client-poll-pacing-local-clock-429-rephase.md",
-      "format": "nygard",
-      "status": "Proposed",
-      "date": "2026-07-26",
-      "decision_summary": "OTMONITORPOLLMS = 2000 and DEVTIMEPOLLMS = 5000, as named constants rather than inline literals, because checkpollwin...",
+      "format": "canonical",
+      "status": "Accepted",
+      "date": "2026-10-15",
+      "decision_summary": "The v2 client paces itself with the following mechanisms.",
       "topics": [],
       "aliases": [],
       "components": [],
@@ -5484,7 +5484,7 @@
       },
       "metadata": {
         "binding": false,
-        "gate": null,
+        "gate": "check_poll_window_coupling",
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
@@ -5564,8 +5564,8 @@
       "title": "Gate the OT coverage fixture on a lossless evidence source",
       "path": "ADR-175-gate-the-ot-coverage-fixture-on-a-lossless-evidence-source.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-08-09",
+      "status": "Accepted",
+      "date": "2026-10-15",
       "decision_summary": "Chosen option: Option A, because it is the only one that makes topic presence an observation rather than a sample, an...",
       "topics": [
         "mqtt",
@@ -5757,11 +5757,11 @@
     },
     {
       "id": "ADR-178",
-      "title": "Widen the SAT area-sensor reference to accept a BLE MAC alongside a Dallas address",
+      "title": "Widen the SAT area-sensor reference to accept a Bluetooth sensor address alongside a Dallas address",
       "path": "ADR-178-widen-the-sat-area-sensor-reference-to-accept-a-ble-mac-alongside-a-dallas-address.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-09-22",
+      "status": "Accepted",
+      "date": "2026-10-15",
       "decision_summary": "settings.sat.sSensorArea becomes char[4][18] and holds a sensor reference that is either a 16-character Dallas addres...",
       "topics": [
         "ble sensors",
@@ -5822,8 +5822,8 @@
       "title": "Name the owner of the OpenTherm control setpoint while SAT is enabled",
       "path": "ADR-179-name-the-owner-of-the-opentherm-control-setpoint-while-sat-is-enabled.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-09-22",
+      "status": "Accepted",
+      "date": "2026-10-15",
       "decision_summary": "While SAT is enabled, SAT owns MsgID 1.",
       "topics": [
         "control setpoint ownership",
@@ -5857,12 +5857,13 @@
           "Do not gate SAT's own CS= on ownership, or SAT refuses itself."
         ],
         "exceptions": [
-          "The thermostat-timeout setback (OTDirect.ino:2470-2475) may write MsgID 1 while SAT owns it. Maintainer decision, 2026-09-22: it is a fail-safe, and if the thermostat has gone quiet and SAT is not commanding, something must still keep th..."
+          "The thermostat-timeout setback (fail-safe setback in OTDirect.ino, about 2586-2595) may write MsgID 1 while SAT owns it. Maintainer decision, 2026-09-22: it is a fail-safe, and if the thermostat has gone quiet and SAT is not commanding,...",
+          "PIC boards are out of scope (see Scope under Decision). On a PIC board an external CS= reaches the PIC and is not refused; that gap is tracked in TASK-1236."
         ],
         "verification": [
           "src/OTGW-firmware/SATcontrol.ino — satOwnsControlSetpoint(), satCommandInFlight() and satEnqueueOwnCS(), the single path every SAT CS= takes, the CS=0 releases in satDisable() and the boot-safety path included. A SAT CS= sent any other w...",
           "src/OTGW-firmware/OTDirect.ino — the gated heating-curve, master-mode WRITEDATA, CS= and CS-expiry sites.",
-          "Field validation on an OTGW32: with SAT enabled and a safety trip forced, TSet must not revert to the heating curve or the thermostat."
+          "Field validation on an OTGW32: with SAT enabled and a safety trip forced, TSet must not revert to the heating curve. (Handing TSet back to the thermostat is deliberate: the trip calls satDisable(), which sends CS=0 and releases the overr..."
         ]
       },
       "scope": {
@@ -6005,7 +6006,7 @@
       "path": "ADR-182-announce-the-dhw-water-total-just-in-time-after-the-first-msgid-19-sample-of-a-boot.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-01",
+      "date": "2026-10-15",
       "decision_summary": "The DHW water total is announced just in time, after the first MsgID 19 sample of a boot, as on the 1.x line:",
       "topics": [
         "dhw",
@@ -6600,7 +6601,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-166"
+        ],
         "superseded_by": null
       }
     },
@@ -11351,6 +11354,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-166",
+      "target": "ADR-191",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-167",
       "target": "ADR-030",
       "type": "related",
@@ -11495,6 +11504,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-171",
+      "target": "ADR-182",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-172",
       "target": "ADR-035",
       "type": "related",
@@ -11531,8 +11546,8 @@
       "resolved": true
     },
     {
-      "source": "ADR-173",
-      "target": "ADR-091",
+      "source": "ADR-172",
+      "target": "ADR-192",
       "type": "related",
       "resolved": true
     },
@@ -11545,6 +11560,18 @@
     {
       "source": "ADR-173",
       "target": "ADR-172",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-173",
+      "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-173",
+      "target": "ADR-192",
       "type": "related",
       "resolved": true
     },
@@ -11826,6 +11853,12 @@
     },
     {
       "source": "ADR-191",
+      "target": "ADR-166",
+      "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-191",
       "target": "ADR-190",
       "type": "related",
       "resolved": true
@@ -11846,6 +11879,18 @@
       "source": "ADR-192",
       "target": "ADR-152",
       "type": "supersedes",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-172",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-173",
+      "type": "related",
       "resolved": true
     },
     {

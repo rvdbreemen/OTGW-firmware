@@ -10,6 +10,7 @@ verified_in: []
 supersedes: []
 superseded_by: null
 related:
+  - "ADR-171"
   - "ADR-176"
 topics:
   - "water-meter"
@@ -62,6 +63,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Maintainer accepted in session 2026-10-01 after the acceptance packet
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-171
     changed_via: adr-kit lifecycle
 ```
 

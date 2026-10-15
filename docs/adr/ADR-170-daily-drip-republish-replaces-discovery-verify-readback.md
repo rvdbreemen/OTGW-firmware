@@ -1,20 +1,20 @@
 ---
 id: "ADR-170"
 title: "Unconditional Daily Drip Republish Replaces the Automatic Discovery-Verify Readback"
-status: "Proposed"
-date: "2026-07-26"
+status: "Accepted"
+date: "2026-10-15"
 binding: false
-gate: null
+gate: "check_discovery_autoheal_shape"
 documents_shipped: false
 verified_in: []
-superseded_by: null
 supersedes: []
+superseded_by: null
 ---
 # ADR-170 Unconditional Daily Drip Republish Replaces the Automatic Discovery-Verify Readback
 
 ## Status
 
-Proposed. Date: 2026-07-26.
+Accepted, 2026-10-15.
 
 Port of `otgw-1.x.x` ADR-087 onto the 2.0.0 line. Acceptance is the
 maintainer's determination; see "Evidence limitations" below, which are
@@ -29,6 +29,11 @@ status_history:
     changed_by: Agent
     reason: Ports the 1.x ADR-087 decision (TASK-1048) to the 2.0.0 line as part of TASK-1037. Maintainer directed porting the removal regardless of whether the 1.x root cause reproduces here.
     changed_via: manual
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted 2026-10-15 after the code-vs-ADR verification and refresh (TASK-1237)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -60,13 +65,13 @@ as a trigger for expensive corrective work.
 The 1.x failure is **not known to reproduce on this branch**, and several of its
 preconditions are absent here:
 
-- The MQTT engine is espMqttClient (ADR-131), not PubSubClient. The
+- The MQTT (Message Queuing Telemetry Transport) engine is espMqttClient (ADR-131), not PubSubClient. The
   `setBufferSize`/restore dance and the max-block preflight that 1.x blamed were
   already deleted in TASK-865.8.
 - Inbound is chunk-aware: `handleDiscoveryVerifyMessage()` is called from the
   chunked path (`MQTTstuff.ino`, `index == 0 && ... total`), so a large retained
   message is not silently truncated.
-- The ESP32-S3 has roughly an order of magnitude more DRAM than the ESP8266.
+- The ESP32-S3 has roughly an order of magnitude more DRAM (data RAM) than the ESP8266.
 - **There is no hourly first-run retry block on this line.** The daily trigger was
   the only automatic caller, so the specific runaway feedback loop that produced
   the 82-minute death cannot arm here in the same shape.
@@ -118,8 +123,21 @@ mandated shim is `platformMaxFreeBlock()`), and 8000 encodes an ESP8266
 ~300 KB DRAM. Instead `discoveryDripHeapHealthy()` forwards to the drip's own
 `discoveryDripIsHeapHealthyForRestore()`. The question the guard wants answered
 is "would the drainer run this job at full speed right now?", and that question
-already has an implementation. It also means ADR-167, if accepted, cannot leave a
-stale literal behind in this path.
+already has an implementation (`MQTTstuff.ino:2163-2168`, free heap >= 18432 and
+largest block >= 9216 today). A later change to the drip's heap policy therefore
+cannot leave a stale literal behind in this path. ADR-167 (Accepted) retired the
+heap tier machine and its per-consumer gating; the drip's own restore predicate
+was not part of that machine and still applies.
+
+**The on/off switch keeps its old name.** `settings.mqtt.bDiscoveryAutoVerify`
+(`MQTTstuff.h:62`) is the first condition of the daily block
+(`OTGW-firmware.ino:957`), so it now switches the daily heal on or off. Its code
+comment still reads "daily automatic retained-discovery verification". The name is
+kept on purpose ("fix the doc, not the identifier"). The verify name also lives in
+the persisted settings key `MQTTdiscoveryAutoVerify` (`settingStuff.ino:271`,
+`:785`), which existing devices already store, and in the REST field
+`settings.mqtt.disc_verify` (`restAPI.ino:2251`). A rename would churn all three
+for no behavioural gain. Correcting that comment is a separate source change.
 
 **Telemetry gains a field.** Under automatic operation `iLastVerifyEpoch` now only
 moves on a *manual* verify, so the retained `disc_last_verify_epoch` topic would
@@ -168,7 +186,7 @@ unreliable primitive and diverges from 1.x without removing the underlying flaw.
   Cost is one drip pass per day; retain-overwrite of an identical config is a
   broker no-op.
 - **Automatic detection of broker-side retained loss is gone.** Recovery is now
-  time-based (next daily pass, ≤24 h) rather than verified. For a home HVAC
+  time-based (next daily pass, ≤24 h) rather than verified. For a home HVAC (heating, ventilation and air conditioning)
   gateway that latency is acceptable; for anyone who was relying on the verify
   statistics as a health signal, it is a real regression.
 - `disc_verify_runs` / `disc_last_missing` / `outcome` stay at their last values
@@ -188,12 +206,35 @@ unreliable primitive and diverges from 1.x without removing the underlying flaw.
   survive.
 - **ADR-171** — the non-OT queueing set this heal now republishes.
 - **ADR-088** — status-burst windowing; the drip gates on it.
-- **ADR-167** (Proposed) — if accepted, changes what
-  `discoveryDripIsHeapHealthyForRestore()` resolves to, automatically.
+- **ADR-167** (Accepted): retired the heap tier machine and per-consumer gating.
+  This guard delegates to the drip's own `discoveryDripIsHeapHealthyForRestore()`,
+  so any later change to that predicate applies here automatically.
 - **1.x ADR-087** — the sibling decision this ports.
 
 ## Enforcement
 
-`evaluate.py::check_discovery_autoheal_shape` asserts that
-`startDiscoveryVerification` has no call site in `OTGW-firmware.ino` and that the
-daily block calls `markAllMQTTConfigPending()` behind `discoveryDripHeapHealthy()`.
+`evaluate.py::check_discovery_autoheal_shape` (`evaluate.py:2331`, helper
+`discovery_autoheal_shape()` at `evaluate.py:800`, run from `evaluate.py:3755`)
+asserts that `startDiscoveryVerification()` has no call site in
+`OTGW-firmware.ino`, that the daily block calls `markAllMQTTConfigPending()`
+behind `discoveryDripHeapHealthy()`, and that the wrapper only forwards to
+`discoveryDripIsHeapHealthyForRestore()` instead of declaring its own threshold.
+
+## References
+
+- Tasks: TASK-1037 (2.0.0 port of the 1.7.2-beta.4 hardening); 1.x TASK-1048
+  (the sibling removal recorded in 1.x ADR-087).
+- `src/OTGW-firmware/OTGW-firmware.ino:957-968`: the daily heal block in
+  `doTaskMinuteChanged()`.
+- `src/OTGW-firmware/MQTTstuff.h:62`: `bDiscoveryAutoVerify`, the on/off switch.
+- `src/OTGW-firmware/MQTTstuff.ino:2163-2168`:
+  `discoveryDripIsHeapHealthyForRestore()`; `MQTTstuff.ino:2177`: the
+  `discoveryDripHeapHealthy()` wrapper.
+- `src/OTGW-firmware/MQTTstuff.ino:1774`: `disc_last_daily_heal_epoch` publish;
+  `src/OTGW-firmware/OTGW-firmware.h:424`: `iLastDailyHealEpoch`.
+- `src/OTGW-firmware/mqtt_discovery_verify.cpp:105`:
+  `startDiscoveryVerification()`, now reached only from the manual path.
+- Commits: 24be052f2 (the port, TASK-1037), df0094ac0 (MQTT docs describe the
+  heal as shipped), c456570ac (TASK-1037 closed with the fresh-boot run on a wiped
+  broker).
+- Field transcript `transcript-20260721-225026-1.7.2-onset.1+bc067cc` (1.x line).
