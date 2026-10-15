@@ -4794,7 +4794,7 @@
       "title": "Coexisting v2 Web UI selected by a device-wide setting",
       "path": "ADR-152-coexisting-v2-web-ui-device-wide-default-setting.md",
       "format": "nygard",
-      "status": "Accepted",
+      "status": "Superseded",
       "date": "2026-10-15",
       "decision_summary": "Two bundles, one served root.",
       "topics": [],
@@ -4817,7 +4817,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-192"
       }
     },
     {
@@ -6538,7 +6538,7 @@
       "title": "Update firmware over WiFi on 4MB boards through a safeboot factory partition",
       "path": "ADR-191-update-firmware-over-wifi-on-4mb-boards-through-a-safeboot-factory-partition.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-10-15",
       "decision_summary": "The 4MB targets switch to a safeboot partition layout.",
       "topics": [
@@ -6566,19 +6566,19 @@
       "context_scope": "selective",
       "decision_contract": {
         "must": [
-          "Use the layout above for every 4MB target, with all offsets taken from the partition CSV and kept in sync in build.py, flashotgw.bat and flashesp.py.",
+          "Use the layout above for every 4MB target, with all offsets taken from the partition CSV (comma-separated values) file and kept in sync in build.py, flashotgw.bat and flashesp.py.",
           "Fail the build when the updater image exceeds the factory partition, or the LittleFS content plus the runtime reserve exceeds the filesystem partition.",
           "Let the main firmware hand over only through an admin-protected endpoint that erases otadata (ADR-056).",
           "Verify the uploaded image (ESP-IDF image check) before setting ota0 as the boot partition.",
           "Keep filesystem OTA from the main firmware working as it does today.",
           "Use the bootloader's app rollback, which is already enabled in the shipped bootloader:",
           "The main firmware defines verifyRollbackLater() returning true, and calls espotamarkappvalidcancelrollback() after a short health gate, before any planned restart.",
-          "Safeboot checks espotagetlastinvalidpartition() before it points the boot partition back at ota0, so a rolled-back image does not run again.",
+          "Safeboot reads the ota0 state (espotagetstatepartition()) and stays when it is ABORTED or INVALID, instead of pointing the boot partition back at ota0, so a rolled-back image does not run again (safeboot/src/main.cpp).",
           "The handover erases the whole otadata partition (0xE000, 0x2000).",
           "The one-time migration image writes bootloader.bin at 0x0."
         ],
         "must_not": [
-          "Add HTTPS, TLS or WSS to the updater (ADR-003).",
+          "Add HTTPS, TLS or WSS (secure WebSocket) to the updater (ADR-003).",
           "Write application output to UART0 from the updater.",
           "Mount or write LittleFS from the updater.",
           "Ship the classic web UI in the 4MB filesystem image.",
@@ -6609,7 +6609,7 @@
       "title": "Ship only the v2 web UI on the 2.0.0 line",
       "path": "ADR-192-ship-only-the-v2-web-ui-on-the-2-0-0-line.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-10-15",
       "decision_summary": "The 2.0.0 line ships the v2 web UI as its only device web UI.",
       "topics": [
@@ -6656,7 +6656,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-152"
+        ],
         "superseded_by": null
       }
     }
@@ -11001,6 +11003,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-152",
+      "target": "ADR-192",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-153",
       "target": "ADR-085",
       "type": "related",
@@ -11832,6 +11840,12 @@
       "source": "ADR-192",
       "target": "ADR-152",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-192",
+      "target": "ADR-152",
+      "type": "supersedes",
       "resolved": true
     },
     {

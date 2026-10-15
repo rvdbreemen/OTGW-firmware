@@ -1,7 +1,7 @@
 ---
 id: "ADR-191"
 title: "Update firmware over WiFi on 4MB boards through a safeboot factory partition"
-status: "Proposed"
+status: "Accepted"
 date: "2026-10-15"
 binding: false
 gate: null
@@ -41,7 +41,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-10-15.
+Accepted, 2026-10-15.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer). On 2026-10-15 he
 chose the v2-only web UI, the 960K factory size, updater authentication on par
@@ -71,6 +71,11 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-192
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
     changed_via: adr-kit lifecycle
 ```
 
@@ -134,22 +139,23 @@ bootloader     --(ota_0 invalid at any boot)-->         boot safeboot again
 
 Updater rules:
 
-1. The updater joins WiFi with the credentials the main firmware stored in NVS
-   (non-volatile storage). It falls back to an access point when there are
+1. The updater joins WiFi with the credentials the main firmware stored in
+   NVS (non-volatile storage). It falls back to an access point when there are
    none, and does not include W5500 Ethernet.
 2. It serves one HTTP upload page; no HTTPS (ADR-003).
 3. Authentication matches the main firmware (ADR-056). The main firmware mirrors
    the admin password into NVS. Safeboot requires HTTP Basic Auth when one is
    set and is open when none is set.
-4. It writes nothing to UART0 beyond unavoidable ROM/bootloader output, because
-   on Classic boards UART0 is the PIC link.
+4. It writes nothing to UART0 beyond unavoidable ROM (read-only memory) and bootloader output,
+   because on Classic boards UART0 is the link to the PIC (the OpenTherm
+   gateway microcontroller).
 
 ## Decision Contract
 
 ### Must
 
 - Use the layout above for every 4MB target, with all offsets taken from the
-  partition CSV and kept in sync in `build.py`, `flash_otgw.bat` and `flash_esp.py`.
+  partition CSV (comma-separated values) file and kept in sync in `build.py`, `flash_otgw.bat` and `flash_esp.py`.
 - Fail the build when the updater image exceeds the factory partition, or the
   LittleFS content plus the runtime reserve exceeds the filesystem partition.
 - Let the main firmware hand over only through an admin-protected endpoint that
@@ -161,14 +167,15 @@ Updater rules:
   - The main firmware defines `verifyRollbackLater()` returning true, and calls
     `esp_ota_mark_app_valid_cancel_rollback()` after a short health gate, before
     any planned restart.
-  - Safeboot checks `esp_ota_get_last_invalid_partition()` before it points the
-    boot partition back at `ota_0`, so a rolled-back image does not run again.
+  - Safeboot reads the `ota_0` state (`esp_ota_get_state_partition()`) and stays
+    when it is `ABORTED` or `INVALID`, instead of pointing the boot partition back at
+    `ota_0`, so a rolled-back image does not run again (`safeboot/src/main.cpp`).
   - The handover erases the whole `otadata` partition (0xE000, 0x2000).
   - The one-time migration image writes `bootloader.bin` at 0x0.
 
 ### Must Not
 
-- Add HTTPS, TLS or WSS to the updater (ADR-003).
+- Add HTTPS, TLS or WSS (secure WebSocket) to the updater (ADR-003).
 - Write application output to UART0 from the updater.
 - Mount or write LittleFS from the updater.
 - Ship the classic web UI in the 4MB filesystem image.
@@ -229,7 +236,7 @@ Updater rules:
   itself valid. A crash loop that starts later is not caught.
   Mitigation: keep the health gate short. An app-level boot counter is an
   optional add-on (`docs/research/2026-10-15-crash-loop-rollback-feasibility.md`).
-- **Every field unit needs one USB migration**, because the partition table and
+- **Every field unit needs one USB (Universal Serial Bus) migration**, because the partition table and
   the LittleFS offset change. Settings are lost unless they are backed up.
   Mitigation: `flash_otgw.bat` gets a migration mode that saves and restores
   settings (TASK-1223.8).
@@ -242,17 +249,8 @@ Updater rules:
 
 ## Open Questions
 
-- [x] Crash-loop rollback: is `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` feasible with the pioarduino precompiled bootloader (TASK-1223.7)? The answer decides what the one-time migration image contains. — **Answered 2026-10-15 by User: Robert van den Breemen:** Yes, with the stock pioarduino bootloader: CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y is already in the shipped esp32s3 sdkconfig (libs sdkconfig:423) and bootloader. The main firmware defines verifyRollbackLater() and marks itself valid after a health gate; safeboot checks esp_ota_get_last_invalid_partition() before pointing boot back at ota_0; handover erases the whole otadata partition; the migration image writes bootloader.bin. Anti-rollback stays off. Evidence: docs/research/2026-10-15-crash-loop-rollback-feasibility.md. Bench proof in TASK-1223.9.
-- [x] Final-layout bench proof (TASK-1223.9): the spike proved the flow on a proof layout with a 2048K ota_0 and an empty filesystem, not on this exact layout. — **Answered 2026-10-15 by User: Robert van den Breemen:** Proven on the final layout on 2026-10-15 on the PIC board (Classic-S3, .tmp/bench-migrate/ota.log):
-- the USB migration kept WiFi and settings (0 of 174 differ);
-- handover to safeboot took 5 s, at the same IP;
-- a crash-test image was rolled back to safeboot and was not rerun after a reboot;
-- a truncated upload was refused;
-- an interrupted upload plus reset was recovered over WiFi;
-- a 2 MB OTA took 14 s and survives a hard reset after the health gate;
-- auth parity: 401 without credentials, 403 for a cross-origin upload;
-- filesystem OTA works.
-The same run on the OT-Direct board is pending (TASK-1223.9) because that unit was offline.
+- [x] Crash-loop rollback: is `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` feasible with the pioarduino precompiled bootloader (TASK-1223.7)? The answer decides what the one-time migration image contains. — **Answered 2026-10-15 by User: Robert van den Breemen:** Yes, with the stock pioarduino bootloader: CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y is already in the shipped esp32s3 sdkconfig (libs sdkconfig:423) and bootloader. The main firmware defines verifyRollbackLater() and marks itself valid after a health gate; safeboot reads the ota_0 state with esp_ota_get_state_partition() and stays when it is `ABORTED` or `INVALID`, instead of pointing boot back at ota_0; handover erases the whole otadata partition; the migration image writes bootloader.bin. Anti-rollback stays off. Evidence: docs/research/2026-10-15-crash-loop-rollback-feasibility.md. Bench proof in TASK-1223.9.
+- [x] Final-layout bench proof (TASK-1223.9): the spike proved the flow on a proof layout with a 2048K ota_0 and an empty filesystem, not on this exact layout. — **Answered 2026-10-15 by User: Robert van den Breemen:** Proven on the final layout on 2026-10-15 on the PIC board (Classic-S3, .tmp/bench-migrate/ota.log): the USB migration kept WiFi and settings (0 of 174 differ); handover to safeboot took 5 s, at the same IP; a crash-test image was rolled back to safeboot and was not rerun after a reboot; a truncated upload was refused; an interrupted upload plus reset was recovered over WiFi; a 2 MB OTA took 14 s and survives a hard reset after the health gate; auth parity: 401 without credentials, 403 for a cross-origin upload; filesystem OTA works. The same run on the OT-Direct board is pending (TASK-1223.9) because that unit was offline.
 
 ## Related Decisions
 

@@ -1,14 +1,14 @@
 ---
 id: "ADR-152"
 title: "Coexisting v2 Web UI selected by a device-wide setting"
-status: "Accepted"
-date: "2026-06-24"
+status: "Superseded"
+date: "2026-10-15"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-192"
 related:
   - "ADR-192"
 ---
@@ -16,7 +16,7 @@ related:
 
 ## Status
 
-Accepted. Date: 2026-06-24 (maintainer approval).
+Superseded by ADR-192, 2026-10-15.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer). Type: Structural (no automated CI gate; reviewed at PR per ADR-080).
 
@@ -33,6 +33,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-192
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: The 2.0.0 line ships only the v2 web UI
     changed_via: adr-kit lifecycle
 ```
 

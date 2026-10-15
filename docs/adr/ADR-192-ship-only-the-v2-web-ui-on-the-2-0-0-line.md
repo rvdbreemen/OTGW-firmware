@@ -1,13 +1,14 @@
 ---
 id: "ADR-192"
 title: "Ship only the v2 web UI on the 2.0.0 line"
-status: "Proposed"
+status: "Accepted"
 date: "2026-10-15"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-152"
 superseded_by: null
 related:
   - "ADR-152"
@@ -36,7 +37,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-10-15.
+Accepted, 2026-10-15.
 
 **Decision Maker:** User: Robert van den Breemen (maintainer). On 2026-10-15
 he chose "v2 interface only" with the safeboot OTA layout. He approved the 12
@@ -66,6 +67,16 @@ status_history:
     status: Proposed
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-152
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-15
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: The 2.0.0 line ships only the v2 web UI
     changed_via: adr-kit lifecycle
 ```
 

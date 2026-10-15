@@ -157,7 +157,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-149 | Accepted | - | Keep the existing application-level connection mitigations in force and accept that the device cannot survive an adve... |
 | ADR-150 | Accepted | - | When SAT is the active controller and the requested setpoint falls below a per-heating-system COLDSETPOINT, SAT comma... |
 | ADR-151 | Accepted | - | Keep the scan passive and continuous (ADR-092 baseline, OT-Thing parity). |
-| ADR-152 | Accepted | - | Two bundles, one served root. |
+| ADR-152 | Superseded | - | Two bundles, one served root. |
 | ADR-153 | Accepted | - | MiBeacon is the third pluggable parser branch. |
 | ADR-154 | Accepted | - | Crypto dependency: mbedtls AES-CCM. |
 | ADR-155 | Accepted | - | The v2 Web UI models the OT bus as two independent links (thermostat and boiler), renders the gateway MODE as a separ... |
@@ -196,5 +196,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-188 | Accepted | - | Refuse a new web request with the existing cheap 503 while more than WEBMAXTXCONNECTIONS (4) connections on port 80 h... |
 | ADR-189 | Accepted | - | webBeginRequest() replaces the request's timeout callback with one that calls AsyncClient::abort() (tcpabort()). |
 | ADR-190 | Accepted | - | build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are... |
-| ADR-191 | Proposed | - | The 4MB targets switch to a safeboot partition layout. |
-| ADR-192 | Proposed | - | The 2.0.0 line ships the v2 web UI as its only device web UI. |
+| ADR-191 | Accepted | - | The 4MB targets switch to a safeboot partition layout. |
+| ADR-192 | Accepted | - | The 2.0.0 line ships the v2 web UI as its only device web UI. |
