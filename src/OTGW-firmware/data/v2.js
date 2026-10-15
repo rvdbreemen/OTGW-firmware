@@ -176,7 +176,7 @@
     if (t === 'mlog') renderLog();
     else if (t === 'mvalues') { renderValues(); fetchOtmonitor(); if (!dallasLabelsLoaded) loadDallasLabels(); }   // TASK-1223.14/.15
     else if (t === 'mstats') { renderStats(); fetchStatsPanels(); }
-    else if (t === 'msupport') renderSupport();
+    else if (t === 'msupport') { renderSupport(); fetchOtSupport(); }
     else if (t === 'mgraph') renderGraph();
     else if (t === 'mconn') { fetchConn(); fetchOtdOvr(); }
   }
@@ -199,13 +199,51 @@
     else if (k === 'system') fetchSystemStatus();
   }
 
-  // ---------- clock ----------
+  // ---------- clock (TASK-1229) ----------
+  // Shows the DEVICE clock, so a wrong NTP server or timezone is visible. device/time
+  // gives devtime.dateTime "YYYY-MM-DD HH:MM:SS" in the device timezone
+  // (restAPI.ino sendDeviceTimeV2); it is read at start and every 10 min, and ticks
+  // locally in between. Until the first answer the browser clock shows, marked '~'.
+  var devClockBase = 0, devClockAt = 0, devClockLastMs = 0, DEVCLOCK_SYNC_MS = 600000;
+  function applyDevTime(t) {
+    var m = t && typeof t.dateTime === 'string' && t.dateTime.match(/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)/);
+    if (!m) return false;
+    devClockBase = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);
+    devClockAt = Date.now();
+    return true;
+  }
   function tick() {
     var el = document.getElementById('clock');
     if (!el) return;
-    var d = new Date();
+    var dev = devClockBase > 0, d = new Date(dev ? devClockBase + (Date.now() - devClockAt) : Date.now());
     function p(n) { return (n < 10 ? '0' : '') + n; }
-    el.textContent = p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds());
+    el.textContent = (dev ? '' : '~') + (dev ? p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ':' + p(d.getUTCSeconds())
+      : p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()));
+    el.title = dev ? 'Device time ' + d.toISOString().substring(0, 10) + ' (device timezone)' : 'Browser time (device time not read yet)';
+  }
+  // Shares devTimeInflight/devTimeLastMs with psCheckTick, so the two never overlap and
+  // together stay inside the device/time budget.
+  function devClockTick() {
+    if (document.hidden || devTimeInflight) return;
+    var now = Date.now();
+    if (devClockLastMs && now - devClockLastMs < DEVCLOCK_SYNC_MS) return;
+    if (now - devTimeLastMs < 5000) return;
+    devTimeInflight = true; devTimeLastMs = now; devClockLastMs = now;
+    fetch(APIGW + 'v2/device/time').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) { devTimeInflight = false; if (!applyDevTime(j && j.devtime)) devClockLastMs = 0; })
+      .catch(function () { devTimeInflight = false; devClockLastMs = 0; });
+  }
+  // Firmware/filesystem mismatch banner (classic checkFSMismatch, index.js:3674 at 3aa1ef927).
+  // filesystem/hash-check -> {filesystem_check:{match,fw_hash,fs_hash}} (restAPI.ino sendFilesystemHashCheck).
+  function checkFsMismatch() {
+    fetch(APIGW + 'v2/filesystem/hash-check').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var fc = j && j.filesystem_check, b = document.getElementById('fsMismatch');
+        if (!fc || !b || fc.match !== false) return;
+        b.textContent = '⚠ Firmware/filesystem mismatch (firmware ' + fc.fw_hash + ', filesystem ' + (fc.fs_hash || 'unknown') + '). ';
+        var a = document.createElement('a'); a.href = '/update'; a.textContent = 'Flash the matching LittleFS image';
+        b.appendChild(a); b.hidden = false;
+      }).catch(function () { });
   }
 
   // ---------- connectivity model + always-visible strip (live; fed by fetchConn) ----------
@@ -495,6 +533,7 @@
   function pushSample() {
     samples.push({ t: Date.now(), flow: model.flow, ret: model.ret, sp: model.chSet, mod: model.mod });
     if (samples.length > SAMPLES_MAX) samples.shift();
+    pushGraphSlot();   // TASK-1226: Monitor > Graph history
   }
   function pushTicker(line) {
     // store parsed {ts,dir,body} so renderTicker can colour timestamp/request/answer
@@ -736,25 +775,47 @@
     }
     var seen = 0;
     for (var id = 0; id < 128; id++) {
-      var cell = grid.children[id], s = stats[id];
-      cell.className = 'mcellq' + (s ? (s.dirT && s.dirB ? ' both' : (s.dirT ? ' tonly' : ' bonly')) : '') + (id === supPinned ? ' sel' : '');
-      if (s) seen++;
+      var cell = grid.children[id], cls = supState(id).cls;
+      cell.className = 'mcellq' + (cls === 'off' ? '' : ' ' + cls) + (id === supPinned ? ' sel' : '');
+      if (cls !== 'off') seen++;
     }
     var sc = document.getElementById('supCount'); if (sc) sc.textContent = seen;
     // refresh the pinned panel so observed value/count track the live bus
     if (supPinned != null) showSupportDetail(supPinned);
   }
-  // Support state of a msgID: who uses it on THIS bus (colours the badge + panel).
-  function supState(id) {
-    var s = stats[id];
-    if (!s) return { cls: 'off', label: 'Not seen', sv: 'var(--tile-off)' };
-    if (s.dirT && s.dirB) return { cls: 'both', label: 'Both sides', sv: 'var(--zone-ok)' };
-    if (s.dirT) return { cls: 'tonly', label: 'Thermostat only', sv: 'var(--accent)' };
-    return { cls: 'bonly', label: 'Boiler only', sv: 'var(--zone-warn)' };
+  // TASK-1228: persisted support bitmaps from GET /api/v2/otgw/ot-support
+  // ({msgids:[{id,label,tsR,tsW,blAR,blAW,blUR,blUW}]}, compact: only set rows;
+  // restAPI.ino otgw/ot-support). Survives reboots, so the map is filled before the
+  // bus has shown anything this session. Read on tab open, at most once per 60 s.
+  var otSup = {}, otSupLastMs = 0, otSupInflight = false;
+  function fetchOtSupport() {
+    if (otSupInflight || (otSupLastMs && Date.now() - otSupLastMs < 60000)) return;
+    otSupInflight = true; otSupLastMs = Date.now();
+    fetch(APIGW + 'v2/otgw/ot-support').then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        otSupInflight = false;
+        if (!j || !Array.isArray(j.msgids)) { otSupLastMs = 0; return; }
+        var o = {};
+        j.msgids.forEach(function (r) { if (r && r.id >= 0 && r.id < 128) o[r.id] = r; });
+        otSup = o;
+        if (isMonitorVisible('msupport')) renderSupport();
+      }).catch(function () { otSupInflight = false; otSupLastMs = 0; });
   }
-  var SUP_BADGE = { both: '✓', tonly: '↑', bonly: '↓', off: '○' };
+  // Support state of a msgID: live traffic this session OR the persisted bitmaps.
+  // A boiler that rejected the ID (Unknown-DataId) and never acked it is 'unsup'.
+  function supState(id) {
+    var s = stats[id], p = otSup[id];
+    var t = (s && s.dirT) || (p && (p.tsR || p.tsW)), b = (s && s.dirB) || (p && (p.blAR || p.blAW));
+    if (p && (p.blUR || p.blUW) && !p.blAR && !p.blAW) return { cls: 'unsup', label: 'Boiler: not supported', sv: 'var(--zone-alert)' };
+    if (t && b) return { cls: 'both', label: 'Both sides', sv: 'var(--zone-ok)' };
+    if (t) return { cls: 'tonly', label: 'Thermostat only', sv: 'var(--accent)' };
+    if (b) return { cls: 'bonly', label: 'Boiler only', sv: 'var(--zone-warn)' };
+    return { cls: 'off', label: 'Not seen', sv: 'var(--tile-off)' };
+  }
+  var SUP_BADGE = { both: '✓', tonly: '↑', bonly: '↓', unsup: '⚠', off: '○' };
   function supConcl(id, st) {
     var m = (typeof OTMSG !== 'undefined' && OTMSG[id]) ? OTMSG[id] : null;
+    if (st.cls === 'unsup') return 'The thermostat asks for this, and the boiler answers that it does not support it.';
     if (st.cls === 'both') return 'Both the thermostat and the boiler use this message.';
     if (st.cls === 'tonly') return 'The thermostat asks for this, but the boiler never answers — your boiler may not implement it.';
     if (st.cls === 'bonly') return 'The boiler reports this, but the thermostat never asks for it.';
@@ -787,16 +848,29 @@
       rows.push(['Value', s.value || '—']);
       rows.push(['Seen', s.count + '×' + (s.interval ? ' · ~' + (s.interval / 1000).toFixed(1) + 's' : '')]);
     }
+    var p = otSup[id];   // TASK-1228: the classic two-column view (index.js:9008-9017 at 3aa1ef927)
+    if (p) {
+      var tp = [], bp = [];
+      if (p.tsR) tp.push('Read'); if (p.tsW) tp.push('Write');
+      if (p.blAR) bp.push('Read ack'); if (p.blAW) bp.push('Write ack');
+      if (p.blUR) bp.push('no read support'); if (p.blUW) bp.push('rejects write');
+      rows.push(['Thermostat', tp.join(', ') || '—']);
+      rows.push(['Boiler', bp.join(', ') || '—']);
+    }
     rows.forEach(function (kv) { var dt = document.createElement('dt'); dt.textContent = kv[0]; var dd = document.createElement('dd'); dd.textContent = kv[1]; dl.appendChild(dt); dl.appendChild(dd); });
     el.appendChild(dl);
     // plain-language conclusion
     var concl = document.createElement('div'); concl.className = 'sd-concl'; concl.textContent = supConcl(id, st); el.appendChild(concl);
     // provenance footnote — mockup closes every detail render with this
-    var hint = document.createElement('div'); hint.className = 'sd-hint'; hint.textContent = 'From the OpenTherm spec table + your bus traffic this session.'; el.appendChild(hint);
+    var hint = document.createElement('div'); hint.className = 'sd-hint'; hint.textContent = 'From the OpenTherm spec table, your bus traffic this session and the support history the gateway keeps across reboots.'; el.appendChild(hint);
   }
 
   // ---------- Monitor > Log ----------
-  var LOG_MAX = 600, logBuf = [], logRecvTimes = [];
+  // TASK-1227: keep 2000 lines (classic default); Capture mode keeps up to 200k (about a
+  // day at 2 frames/s, a few tens of MB) for Download. The console only ever renders the
+  // newest LOG_SHOW matching lines, so a deep buffer does not slow the page.
+  var LOG_DEF = 2000, LOG_CAPTURE = 200000, LOG_SHOW = 2000;
+  var LOG_MAX = LOG_DEF, logBuf = [], logRecvTimes = [];
   var logPaused = false, logSearch = '', logShowTs = true, logAutoScroll = true;
   // TASK-970: SAT-only filter, auto-download timer, stream-to-file writer
   var logSatOnly = false, logAutoDlTimer = null, logStreamWriter = null;
@@ -813,9 +887,14 @@
     if (logStreamWriter) { try { logStreamWriter.write(line + '\n'); } catch (e) { } }
     if (logPaused) return;
     logBuf.push(line);
-    if (logBuf.length > LOG_MAX) logBuf.shift();
-    if (isMonitorLogVisible()) renderLog();
+    // Trim in batches: shift() on a 200k array per frame is O(n).
+    if (logBuf.length > LOG_MAX + (LOG_MAX >> 4)) logBuf = logBuf.slice(-LOG_MAX);
+    if (isMonitorLogVisible() && !logRenderPending) {   // one render per animation frame
+      logRenderPending = true;
+      requestAnimationFrame(function () { logRenderPending = false; renderLog(); });
+    }
   }
+  var logRenderPending = false;
   function isMonitorLogVisible() {
     var p = document.getElementById('page-monitor');
     var l = document.getElementById('mlog');
@@ -824,9 +903,15 @@
   function renderLog() {
     var el = document.getElementById('monLog'); if (!el) return;
     var q = logSearch.trim().toLowerCase();
-    var lines = logBuf;
-    if (q) lines = lines.filter(function (l) { return l.toLowerCase().indexOf(q) !== -1; });
-    if (logSatOnly) lines = lines.filter(function (l) { return SAT_LINE_RE.test(l); });   // TASK-970
+    // Newest LOG_SHOW lines that pass the filters (TASK-970 SAT-only), walking back from the end.
+    var lines = [];
+    for (var k = logBuf.length - 1; k >= 0 && lines.length < LOG_SHOW; k--) {
+      var ln = logBuf[k];
+      if (q && ln.toLowerCase().indexOf(q) === -1) continue;
+      if (logSatOnly && !SAT_LINE_RE.test(ln)) continue;
+      lines.push(ln);
+    }
+    lines.reverse();
     if (!logShowTs) lines = lines.map(function (l) { return l.replace(/^\d{2}:\d{2}:\d{2}\.\d{3,6}\s+/, ''); });
     // TASK-981: per-line DOM so command-echo lines can be coloured (.cmd/.rsp/.err)
     // without ever feeding device text to innerHTML. .console is white-space:pre-wrap,
@@ -1153,39 +1238,110 @@
     t.scrollTop = t.scrollHeight;
   }
 
-  // ---------- Monitor > Graph (same strip chart, g-prefixed ids) ----------
-  function windowedSamples() {
-    if (!graphWindowMs) return samples;
-    var cutoff = Date.now() - graphWindowMs;
-    return samples.filter(function (s) { return !s.t || s.t >= cutoff; });
-  }
-  function winSeries(arr, key) {
-    if (arr.length < 2) return '';
-    var span = C_X1 - C_X0, pts = [];
-    for (var i = 0; i < arr.length; i++) {
-      var v = arr[i][key]; if (v === null || v === undefined || isNaN(v)) continue;
-      pts.push((C_X0 + (i / (arr.length - 1)) * span).toFixed(1) + ',' + tempY(v).toFixed(1));
+  // ---------- Monitor > Graph (TASK-1226) ----------
+  // Own history, separate from the Home strip's samples[]: one record per 5 s slot,
+  // 24 h max = 17,280 records (a few MB), whatever the bus rate. Analog fields keep the
+  // slot's last value; flame/DHW/CH are ORed so a short burner pulse survives. Dallas
+  // temps come from the 25 s sensors poll (pollDallasDiscovery); no extra request.
+  var GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, gHist = [], gDallas = null, gLastRender = 0;
+  // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
+  var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
+    ['roomSet', 'room setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'],
+    ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'CH mode', '#e5534b', 'l']];
+  var GDCOL = ['#56d4dd', '#db61a2', '#7ee787', '#f0883e', '#79c0ff', '#bc8cff'];
+  var GLANE_Y = { flame: 196, dhw_on: 218, ch: 240 };
+  var gOff = {};
+  try { gOff = JSON.parse(localStorage.getItem('otgw-v2-goff') || '{}') || {}; } catch (e) { gOff = {}; }
+  function pushGraphSlot() {
+    var now = Date.now(), t = now - now % GSLOT, r = gHist[gHist.length - 1];
+    if (!r || r.t !== t) {
+      r = { t: t, flame: 0, dhw_on: 0, ch: 0 }; gHist.push(r);
+      if (gHist.length > GHIST_MAX + 256) gHist = gHist.slice(-GHIST_MAX);   // trim in batches
     }
-    return pts.join(' ');
+    ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside', 'mod'].forEach(function (k) { r[k] = model[k]; });
+    ['flame', 'dhw_on', 'ch'].forEach(function (k) { if (model[k]) r[k] = 1; });
+    r.d = gDallas;   // shared object, replaced (never mutated) on each sensors poll
+    if (now - gLastRender > 2000 && isMonitorVisible('mgraph')) renderGraph();
+  }
+  function windowedSamples() {
+    var cutoff = Date.now() - (graphWindowMs || 3600000);
+    return gHist.filter(function (s) { return s.t >= cutoff; });
+  }
+  // Series present in arr: the fixed set plus every Dallas address seen ('d:<addr>').
+  function graphKeys(arr) {
+    var keys = GSER.map(function (x) { return x[0]; }), seen = {};
+    arr.forEach(function (r) { if (r.d) Object.keys(r.d).forEach(function (a) { if (!seen[a]) { seen[a] = 1; keys.push('d:' + a); } }); });
+    return keys;
+  }
+  function gVal(r, k) { return k.charAt(1) === ':' ? (r.d ? r.d[k.substring(2)] : null) : r[k]; }
+  function gMeta(k, i) {
+    for (var j = 0; j < GSER.length; j++) if (GSER[j][0] === k) return GSER[j];
+    var a = k.substring(2);
+    return [k, dallasLabelFor(a) || a, GDCOL[i % GDCOL.length], 't'];
   }
   function renderGraph() {
-    var arr = windowedSamples();
-    var ef = document.getElementById('gFlow2'); if (ef) ef.setAttribute('points', winSeries(arr, 'flow'));
-    var er = document.getElementById('gRet2'); if (er) er.setAttribute('points', winSeries(arr, 'ret'));
-    var sp = document.getElementById('gSpLine');
-    if (sp) { var y = model.chSet === null ? -10 : tempY(model.chSet); sp.setAttribute('y1', y); sp.setAttribute('y2', y); }
-    var mod = document.getElementById('gMod2');
-    if (mod) {
-      if (arr.length < 2) mod.setAttribute('points', '');
-      else {
-        var span = C_X1 - C_X0, p = [C_X0 + ',170'];
-        for (var i = 0; i < arr.length; i++) {
-          var m = arr[i].mod; if (m === null || m === undefined || isNaN(m)) m = 0;
-          p.push((C_X0 + (i / (arr.length - 1)) * span).toFixed(1) + ',' + (170 - Math.max(0, Math.min(100, m)) * 0.4).toFixed(1));
-        }
-        p.push(C_X1 + ',170'); mod.setAttribute('points', p.join(' '));
+    var g = document.getElementById('gSer'); if (!g) return;
+    gLastRender = Date.now();
+    var win = graphWindowMs || 3600000, t0 = gLastRender - win, span = C_X1 - C_X0;
+    var arr = windowedSamples(), keys = graphKeys(arr), metas = keys.map(gMeta), cols = {}, lo = Infinity, hi = -Infinity;
+    // One value per pixel column (last value; max for lanes) keeps each polyline ~740 points.
+    arr.forEach(function (r) {
+      var x = Math.round(C_X0 + (r.t - t0) / win * span);
+      keys.forEach(function (k, i) {
+        var v = gVal(r, k); if (v === null || v === undefined || isNaN(v)) return;
+        var c = cols[k] || (cols[k] = []), p = c[c.length - 1], kind = metas[i][3];
+        if (p && p[0] === x) p[1] = kind === 'l' ? Math.max(p[1], v) : v; else c.push([x, v]);
+        if (kind === 't' && !gOff[k]) { if (v < lo) lo = v; if (v > hi) hi = v; }
+      });
+    });
+    if (lo > hi) { lo = 10; hi = 90; }
+    lo = Math.floor(lo / 10) * 10; hi = Math.max(Math.ceil(hi / 10) * 10, lo + 20);
+    function y(v) { return 170 - (v - lo) / (hi - lo) * 160; }
+    [['gAxHi', hi], ['gAxMid', (lo + hi) / 2], ['gAxLo', lo]].forEach(function (a) {
+      var e = document.getElementById(a[0]); if (e) e.textContent = Math.round(a[1]) + '°';
+    });
+    keys.forEach(function (k, i) {
+      var m = metas[i], kind = m[3], c = cols[k] || [], pts = [];
+      var el = g.querySelector('[data-k="' + k + '"]');
+      if (!el) {
+        el = document.createElementNS('http://www.w3.org/2000/svg', kind === 'm' ? 'polygon' : 'polyline');
+        el.setAttribute('data-k', k); el.setAttribute('stroke', m[2]); el.setAttribute('stroke-width', kind === 't' ? '1.8' : '1.2');
+        el.setAttribute('fill', kind === 'm' ? 'rgba(0,191,254,.18)' : 'none');
+        if (k === 'chSet' || k === 'roomSet') el.setAttribute('stroke-dasharray', '5 4');
+        g.appendChild(el);
       }
-    }
+      if (!gOff[k] && c.length) {
+        if (kind === 'm') {
+          pts.push(c[0][0] + ',170');
+          c.forEach(function (p) { pts.push(p[0] + ',' + (170 - Math.max(0, Math.min(100, p[1])) * 0.4).toFixed(1)); });
+          pts.push(c[c.length - 1][0] + ',170');
+        } else if (kind === 'l') {
+          var b = GLANE_Y[k], py = null;
+          c.forEach(function (p) { var yy = b - (p[1] ? 14 : 0); if (py !== null) pts.push(p[0] + ',' + py); pts.push(p[0] + ',' + yy); py = yy; });
+        } else c.forEach(function (p) { pts.push(p[0] + ',' + y(p[1]).toFixed(1)); });
+      }
+      el.setAttribute('points', pts.join(' '));
+    });
+    renderGraphLegend(keys, metas);
+  }
+  // Clickable legend: each series can be hidden (remembered per browser).
+  var gLegendSig = '';
+  function renderGraphLegend(keys, metas) {
+    var lg = document.getElementById('gLegend'); if (!lg) return;
+    var sig = keys.join('|') + '#' + Object.keys(gOff).join('|') + '#' + metas.map(function (m) { return m[1]; }).join('|');
+    if (sig === gLegendSig) return;
+    gLegendSig = sig; lg.textContent = '';
+    keys.forEach(function (k, i) {
+      var m = metas[i], sp = document.createElement('span'), sw = document.createElement('i');
+      sw.style.background = m[2]; sp.appendChild(sw); sp.appendChild(document.createTextNode(m[1]));
+      sp.style.cursor = 'pointer'; sp.style.opacity = gOff[k] ? '.4' : '1'; sp.title = 'Show / hide';
+      sp.addEventListener('click', function () {
+        if (gOff[k]) delete gOff[k]; else gOff[k] = 1;
+        try { localStorage.setItem('otgw-v2-goff', JSON.stringify(gOff)); } catch (e) { }
+        renderGraph();
+      });
+      lg.appendChild(sp);
+    });
   }
 
   // ---------- Monitor > Connection map + detail (live; from /health + settings) ----------
@@ -1699,7 +1855,10 @@
     satblefailover:      { cat: 'sensors', sub: 'BLE sensors', label: 'BLE failover to OT' },
     satblemac:           { cat: 'sensors', sub: 'BLE sensors', label: 'BLE sensor MAC' },
     satbleinterval:      { cat: 'sensors', sub: 'BLE sensors', label: 'BLE poll interval', hint: 'Seconds' },
-    satbleriskack:       { cat: 'sensors', sub: 'BLE sensors', label: 'BLE without PSRAM: risk accepted' }   // TASK-1211: was in SAT "Other"
+    satbleriskack:       { cat: 'sensors', sub: 'BLE sensors', label: 'BLE without PSRAM: risk accepted' },   // TASK-1211: was in SAT "Other"
+    // TASK-1231: name-prefix filter (restAPI.ino:4087-4088). Saving either one rescans.
+    satblenameprefix:    { cat: 'sensors', sub: 'BLE sensors', label: 'Name prefix filter', hint: 'e.g. ATC_ (empty = all)' },
+    satblenamefilteringest: { cat: 'sensors', sub: 'BLE sensors', label: 'Only ingest sensors whose name matches' }
   };
   // TASK-1211: the SAT settings live on the SAT page, at the depth that fits the
   // user: L2 Control holds what a user chooses, L3 Technical holds the tuning.
@@ -1909,7 +2068,10 @@
     if (type === 'b') {
       input = document.createElement('input'); input.type = 'checkbox'; input.className = 'sw';
       input.checked = curVal(k) === 'true' || curVal(k) === '1';
-      input.addEventListener('change', function () { markDirty(k, input.checked ? 'true' : 'false', row); });
+      input.addEventListener('change', function () {
+        markDirty(k, input.checked ? 'true' : 'false', row);
+        if (k === 'ethstaticip' && input.checked) ipPrefill(true);   // TASK-1230: DHCP -> static
+      });
     } else if (type === 'r') {
       input = document.createElement('input'); input.type = 'text'; input.value = curVal(k); input.disabled = true;
     } else if (ENUM_OPTS[k]) {
@@ -1930,13 +2092,32 @@
         var cur = document.createElement('option'); cur.value = cv; cur.textContent = cv + ' (current)'; input.appendChild(cur);
       }
       input.value = hasRaw ? cv : hasInt ? cvInt : cv;
-      input.addEventListener('change', function () { markDirty(k, input.value, row); });
+      var prevSel = input.value;
+      input.addEventListener('change', function () {
+        // TASK-1230: board mode is the one select whose wrong value bricks the gateway.
+        if (k === 'boardmode' && input.value !== '' + setData[k].value &&
+            !confirm('Board mode takes effect after a reboot. Forcing the wrong mode leaves the gateway non-functional until you set it back (or to Auto-detect). Continue?')) {
+          input.value = prevSel; return;
+        }
+        prevSel = input.value;
+        markDirty(k, input.value, row);
+      });
     } else {
       input = document.createElement('input');
       input.type = (type === 'p') ? 'password' : (type === 'i') ? 'number' : 'text';
       input.value = curVal(k);
       if (type === 'p') input.placeholder = '••••••••';
-      input.addEventListener('input', function () { markDirty(k, input.value, row); });
+      if (meta.maxlen > 0) input.maxLength = meta.maxlen;
+      var isIp = IP_KEY_RE.test(k), wasEmpty = input.value.trim() === '';
+      input.addEventListener('input', function () {
+        markDirty(k, input.value, row);
+        if (!isIp) return;
+        // TASK-1230: flag a bad octet while typing; the save gate blocks it.
+        var e = input.value.trim() && ipv4Err(input.value);
+        input.style.borderColor = e ? 'var(--hot,#c33)' : ''; input.title = e || '';
+        // Typing into an empty Wi-Fi static IP is the switch to static: fill the rest once.
+        if (k === 'wifistaticip' && wasEmpty && input.value.trim()) { wasEmpty = false; ipPrefill(false); }
+      });
     }
     row.appendChild(input);
     // TASK-1211: optional longer explanation under the row (SET_META.help).
@@ -1944,62 +2125,102 @@
     if (help) { var hd = document.createElement('div'); hd.className = 'shelp'; hd.textContent = help; row.appendChild(hd); }
     return row;
   }
-  // TASK-985: Webhook "Send test call" action, appended to the Webhook settings group
-  // by renderSettings(). Fires the REAL POST /api/v2/webhook/test?state=on. The endpoint
-  // is fire-and-forget: it returns {"status":"ok"} immediately and sends the SAVED ON
-  // URL/payload from its own FreeRTOS task. The target server's HTTP result is not
-  // exposed by the firmware, so the success line reports the endpoint's own ack + a
-  // local timestamp, not the remote status.
+  // TASK-985/1230: Webhook test actions, appended to the Webhook settings group by
+  // renderSettings(). POST /api/v2/webhook/test?state=on|off (restAPI.ino:966-984) is
+  // fire-and-forget: it returns {"status":"ok"} at once and sends the SAVED ON or OFF
+  // URL/payload from its own FreeRTOS task. The remote server's HTTP result is not
+  // exposed, so the status line reports the endpoint's ack + a local timestamp.
   function webhookTestRow() {
     var wrap = document.createElement('div'); wrap.className = 'wh-actions';
-    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'tbtn';
-    btn.textContent = 'Send test call';
-    btn.title = 'Fires the saved ON webhook (POST /api/v2/webhook/test)';
     var status = document.createElement('span'); status.className = 'wh-status';
     status.textContent = 'Not fired yet';
-    wrap.appendChild(btn); wrap.appendChild(status);
-    btn.addEventListener('click', function () {
-      // Disabled-guard: mirror the mockup — block only when the enable checkbox is
-      // present and unchecked. (The firmware itself fires regardless of bEnabled; this
-      // is a UX gate, so an absent checkbox — e.g. filtered out by search — proceeds.)
+    var btns = ['on', 'off'].map(function (st) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'tbtn';
+      b.textContent = 'Send ' + st.toUpperCase() + ' test';
+      b.title = 'Fires the saved ' + st.toUpperCase() + ' webhook (POST /api/v2/webhook/test)';
+      b.addEventListener('click', function () { fire(st); });
+      wrap.appendChild(b);
+      return b;
+    });
+    wrap.appendChild(status);
+    function done(cls, msg) {
+      btns.forEach(function (b) { b.disabled = false; });
+      status.className = 'wh-status' + cls; status.textContent = msg;
+    }
+    function fire(st) {
+      // UX gate only (the firmware fires regardless of bEnabled): block when the enable
+      // checkbox is present and unchecked; an absent one (search filter) proceeds.
       var en = document.querySelector('#setCols .srow[data-key="webhookenable"] input.sw');
-      if (en && !en.checked) {
-        status.className = 'wh-status';
-        status.textContent = 'Webhook disabled — enable it above first';
-        return;
-      }
-      status.className = 'wh-status'; status.textContent = 'Sending…';
-      btn.disabled = true;
+      if (en && !en.checked) { done('', 'Webhook disabled — enable it above first'); return; }
+      btns.forEach(function (b) { b.disabled = true; });   // one test call in flight at a time
+      status.className = 'wh-status'; status.textContent = 'Sending ' + st.toUpperCase() + '…';
       // credentials:'same-origin' so HTTP Basic-Auth + CSRF same-origin (ADR-056) hold.
-      fetch(APIGW + 'v2/webhook/test?state=on', { method: 'POST', credentials: 'same-origin' })
+      fetch(APIGW + 'v2/webhook/test?state=' + st, { method: 'POST', credentials: 'same-origin' })
         .then(function (r) {
-          btn.disabled = false;
-          if (r.status === 401 || r.status === 403) {
-            status.className = 'wh-status';
-            status.textContent = 'Auth required — sign in first (HTTP ' + r.status + ')';
-            return;
-          }
-          if (!r.ok) {
-            status.className = 'wh-status';
-            status.textContent = 'Error: HTTP ' + r.status;
-            return;
-          }
+          if (r.status === 401 || r.status === 403) { done('', 'Auth required — sign in first (HTTP ' + r.status + ')'); return; }
+          if (!r.ok) { done('', 'Error: HTTP ' + r.status); return; }
           return r.text().then(function (body) {
-            var st = 'ok';
-            try { var j = JSON.parse(body); if (j && j.status) st = j.status; }
+            var ack = 'ok';
+            try { var j = JSON.parse(body); if (j && j.status) ack = j.status; }
             catch (e) { /* non-JSON ack still counts as sent */ }
-            var ts = new Date().toTimeString().slice(0, 8);
-            status.className = 'wh-status ok';
-            status.textContent = '✓ ' + st + ' · ' + ts;
+            done(' ok', '✓ ' + st.toUpperCase() + ' ' + ack + ' · ' + new Date().toTimeString().slice(0, 8));
           });
         })
-        .catch(function (e) {
-          btn.disabled = false;
-          status.className = 'wh-status';
-          status.textContent = 'Error: ' + ((e && e.message) ? e.message : 'network');
-        });
-    });
+        .catch(function (e) { done('', 'Error: ' + ((e && e.message) ? e.message : 'network')); });
+    }
     return wrap;
+  }
+  // TASK-1230: static-IP safety. A typo in a static IP locks the user out until an AP
+  // reset, so every octet is checked before the save posts anything.
+  var IP_KEY_RE = /^(wifistaticip|wifisubnet|wifigateway|wifidns[12]|ethipaddress|ethsubnet|ethgateway|ethdns)$/;
+  // '' when s is a dotted quad of four 0-255 numbers, else the reason.
+  function ipv4Err(s) {
+    var p = ('' + s).trim().split('.');
+    if (p.length !== 4) return 'needs four numbers separated by dots';
+    for (var i = 0; i < 4; i++) {
+      if (!/^\d{1,3}$/.test(p[i]) || +p[i] > 255) return 'octet ' + (i + 1) + ' ("' + p[i] + '") is not a number from 0 to 255';
+    }
+    return '';
+  }
+  // Checks each interface that is set to static: IP, mask and gateway are required, DNS
+  // is optional but must be valid when filled. get(k) returns the effective value, or
+  // undefined for a key the device does not expose (eth keys need Ethernet hardware).
+  // Wi-Fi is static when wifistaticip is non-empty, Ethernet when ethstaticip is true.
+  function ipGroupsErr(get) {
+    var G = [['Wi-Fi', 'wifistaticip', { wifistaticip: 'IP address', wifisubnet: 'subnet mask', wifigateway: 'gateway', wifidns1: '', wifidns2: '' }],
+             ['Ethernet', 'ethstaticip', { ethipaddress: 'IP address', ethsubnet: 'subnet mask', ethgateway: 'gateway', ethdns: '' }]];
+    for (var i = 0; i < G.length; i++) {
+      var on = get(G[i][1]);
+      if (on === undefined || on === false || ('' + on).trim() === '' || on === 'false' || on === '0') continue;   // DHCP
+      for (var k in G[i][2]) {
+        var v = get(k), req = G[i][2][k];
+        if (v === undefined) continue;
+        v = ('' + v).trim();
+        if (v === '' && !req) continue;
+        var e = v === '' ? 'is required for a static IP' : ipv4Err(v);
+        if (e) return G[i][0] + ' ' + (req || 'DNS') + ': ' + e;
+      }
+    }
+    return '';
+  }
+  // Switching to static fills the still-empty fields from the current lease (device/info
+  // wifi_current_* / eth_current_*, restAPI.ino:3227-3240). ipaddress is the ACTIVE
+  // transport's IP, so it only seeds the IP of the interface that is active now.
+  function ipPrefill(eth) {
+    withDeviceInfo(function (d) {
+      if (!d) return;
+      var map = eth ? { ethsubnet: 'eth_current_subnet', ethgateway: 'eth_current_gateway', ethdns: 'eth_current_dns' }
+                    : { wifisubnet: 'wifi_current_subnet', wifigateway: 'wifi_current_gateway', wifidns1: 'wifi_current_dns1', wifidns2: 'wifi_current_dns2' };
+      if (eth && d.networkmode === 'Ethernet') map.ethipaddress = 'ipaddress';
+      Object.keys(map).forEach(function (k) {
+        var v = d[map[k]];
+        if (!setData[k] || curVal(k).trim() !== '' || typeof v !== 'string' || v === '0.0.0.0' || ipv4Err(v)) return;
+        var row = document.querySelector('#setCols .srow[data-key="' + k + '"]');
+        var inp = row && row.querySelector('input');
+        if (inp) inp.value = v;
+        markDirty(k, v, row);
+      });
+    });
   }
   function markDirty(k, val, row) {
     // Password fields show empty; an empty value means "leave unchanged", so it is
@@ -2021,11 +2242,18 @@
   function saveSettings() {
     var keys = Object.keys(setDirty);
     if (!keys.length) return;
+    // TASK-1230: refuse the whole save (post nothing) when an edited IP field has a bad
+    // octet (any mode; stored values are not re-checked) or a static group is incomplete.
+    var ipErr = '';
+    keys.forEach(function (k) { var v = ('' + setDirty[k]).trim(); if (!ipErr && IP_KEY_RE.test(k) && v && ipv4Err(v)) ipErr = subFor(k) + ' ' + labelFor(k) + ': ' + ipv4Err(v); });
+    ipErr = ipErr || ipGroupsErr(function (k) { return setData[k] ? curVal(k) : undefined; });
+    if (ipErr) { bleToast(ipErr); return; }
     // TASK-1012: intercept satenabled false->on for a not-yet-onboarded SAT. Do NOT
     // enable now — run the wizard, which enables at Finish. Strip the key from this save.
     var satEnabling = ('satenabled' in setDirty) && ('' + setDirty.satenabled) === 'true' &&
       !(setData.satenabled && ('' + setData.satenabled.value) === 'true') && satOnbNeeded();
     if (satEnabling) { delete setDirty.satenabled; keys = Object.keys(setDirty); }
+    var bleName = ('satblenameprefix' in setDirty) || ('satblenamefilteringest' in setDirty);
     var chain = Promise.resolve();
     keys.forEach(function (k) {
       chain = chain.then(function () {
@@ -2044,6 +2272,7 @@
       setDirty = {};
       var t = document.getElementById('toast'); if (t) { t.textContent = 'Settings saved'; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2000); }
       renderSettings();
+      if (bleName) bleAction('rescan');   // TASK-1231: re-apply the name filter (classic parity)
       if (satEnabling) startSatOnboarding('enable');   // TASK-1012: wizard owns the actual enable
     }).catch(function () {
       var t = document.getElementById('toast'); if (t) { t.textContent = 'Save failed'; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2500); }
@@ -2422,7 +2651,7 @@
       return r.ok ? r.json() : null;
     }).then(function (j) {
       devTimeInflight = false;
-      var t = j && j.devtime; if (!t || t.psmode === undefined) return;
+      var t = j && j.devtime; applyDevTime(t); if (!t || t.psmode === undefined) return;
       setPsMode(t.psmode === true || t.psmode === 'true');
     }).catch(function () { devTimeInflight = false; });
   }
@@ -2728,9 +2957,9 @@
   }
   function ts() { var d = new Date(); function p(n) { return (n < 10 ? '0' : '') + n; } return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()); }
   function exportCsv() {
-    var arr = windowedSamples();
-    var lines = ['epoch_ms,flow,return,setpoint,modulation'];
-    arr.forEach(function (s) { lines.push([s.t || '', s.flow, s.ret, s.sp, s.mod].map(function (x) { return x === null || x === undefined ? '' : x; }).join(',')); });
+    var arr = windowedSamples(), keys = graphKeys(arr);
+    var lines = ['epoch_ms,' + keys.map(function (k) { return k.replace(':', '_'); }).join(',')];
+    arr.forEach(function (s) { lines.push(s.t + ',' + keys.map(function (k) { var x = gVal(s, k); return x === null || x === undefined ? '' : x; }).join(',')); });
     downloadBlob(new Blob([lines.join('\n')], { type: 'text/csv' }), 'otgw-graph-' + ts() + '.csv');
   }
   function exportPng() {
@@ -2738,8 +2967,8 @@
     var xml = new XMLSerializer().serializeToString(svg);
     var img = new Image();
     img.onload = function () {
-      var c = document.createElement('canvas'); c.width = 780; c.height = 210;
-      var ctx = c.getContext('2d'); ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, 780, 210); ctx.drawImage(img, 0, 0);
+      var c = document.createElement('canvas'); c.width = 780; c.height = 250;
+      var ctx = c.getContext('2d'); ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, 780, 250); ctx.drawImage(img, 0, 0);
       c.toBlob(function (blob) { if (blob) downloadBlob(blob, 'otgw-graph-' + ts() + '.png'); });
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
@@ -2758,6 +2987,12 @@
   // ---------- Monitor > Log power-features (TASK-970) ----------
   function downloadLog() {
     downloadBlob(new Blob([logBuf.join('\n')], { type: 'text/plain' }), 'otgw-log-' + ts() + '.txt');
+  }
+  function toggleCapture(chip) {   // TASK-1227
+    // Leaving Capture trims to 2000 lines on the next frame: save the capture first.
+    if (LOG_MAX === LOG_CAPTURE && logBuf.length > LOG_DEF) downloadLog();
+    LOG_MAX = LOG_MAX === LOG_DEF ? LOG_CAPTURE : LOG_DEF;
+    chip.classList.toggle('on', LOG_MAX === LOG_CAPTURE);
   }
   function toggleAutoDl(chip) {
     if (logAutoDlTimer) { clearInterval(logAutoDlTimer); logAutoDlTimer = null; chip.classList.remove('on'); }
@@ -3590,7 +3825,10 @@
 
   function satPageStart() {
     fetchSatPage();
-    if (!satMarkersLoaded) { satMarkersLoaded = true; fetchSatMarkers(); }
+    // Markers once, then the DHW bounds on every visit, one after the other (no burst).
+    var mk = satMarkersLoaded ? Promise.resolve() : fetchSatMarkers();
+    satMarkersLoaded = true;
+    mk.then(fetchDhwBounds);
     if (satPollTimer) clearInterval(satPollTimer);
     satPollTimer = setInterval(fetchSatPage, 5000);
     // TASK-1012: existing SAT users see the wizard once on first SAT-page visit.
@@ -3649,8 +3887,58 @@
       .catch(function () { });
   }
 
+  // TASK-1232: DHW slider bounds from boiler MsgID 48. GET otgw/messages/48 answers
+  // {label,value,unit} with value = UB<<8 | LB, 0 = never reported (restAPI.ino:753-760,
+  // 2879-2906); without a valid range the slider keeps 40-65. The setpoint itself
+  // stays the persistent sat/settings/dhw_setpoint (maintainer decision, not SW=).
+  function fetchDhwBounds() {
+    return fetch(APIGW + 'v2/otgw/messages/48')
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (j) {
+        var s = document.getElementById('satDhwSlider'); if (!s || !j) return;
+        var raw = parseInt(j.value, 10) || 0, ub = (raw >> 8) & 0xFF, lb = raw & 0xFF;
+        var ok = raw > 0 && ub > lb && ub <= 100;
+        s.min = ok ? lb : 40; s.max = ok ? ub : 65;
+        s.title = ok ? 'Boiler DHW range ' + lb + '–' + ub + ' °C (MsgID 48)' : 'Default range 40–65 °C (no MsgID 48 from the boiler)';
+        if (satLastData) satRenderDhw(satLastData);
+      })
+      .catch(function () { });
+  }
+
+  // TASK-1232: a click on the curve plot adds a calibration marker; the list deletes
+  // them. POST sat/markers {outside_temp,flow_temp,label} -> 201 {status,id}, 400 out of
+  // range (-15..25 / 10..90), 409 at 20; DELETE sat/markers/<id> -> 200, 404 unknown id
+  // (restAPI.ino:1806-1920). One marker request at a time; the list refetches after it.
+  var satMarkerBusy = false;
+  function satMarkerReq(url, opts, okMsg) {
+    if (satMarkerBusy) return;
+    satMarkerBusy = true;
+    fetch(url, opts)
+      .then(function (r) {
+        if (r.status === 409) throw new Error('20 markers is the maximum; delete one first');
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        bleToast(okMsg);
+        return fetchSatMarkers();
+      })
+      .catch(function (e) { bleToast('Marker: ' + e.message); })
+      .then(function () { satMarkerBusy = false; });
+  }
+  function satCurveClick(ev) {
+    var svg = ev.currentTarget, m = svg.getScreenCTM && svg.getScreenCTM();
+    if (!m) return;
+    var pt = svg.createSVGPoint(); pt.x = ev.clientX; pt.y = ev.clientY;
+    pt = pt.matrixTransform(m.inverse());
+    if (pt.x < 50 || pt.x > 580 || pt.y < 30 || pt.y > 270) return;   // plot area of satDrawCurve
+    var o = Math.round((-15 + (pt.x - 50) / 530 * 40) * 10) / 10;
+    var f = Math.round((20 + (270 - pt.y) / 240 * 65) * 10) / 10;
+    satMarkerReq(APIGW + 'v2/sat/markers', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ outside_temp: o, flow_temp: f, label: 'Marker ' + new Date().toTimeString().slice(0, 5) })
+    }, 'Marker added: ' + o + '° out, ' + f + '° flow');
+  }
+
   function fetchSatMarkers() {
-    fetch(APIGW + 'v2/sat/markers')
+    return fetch(APIGW + 'v2/sat/markers')
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         satMarkers = Array.isArray(data) ? data : (data && Array.isArray(data.markers) ? data.markers : []);
@@ -3960,7 +4248,15 @@
       var li = document.createElement('li');
       var s = document.createElement('span'); s.textContent = satFmt(m.outside_temp, 0, '° out');
       var b = document.createElement('b'); b.textContent = satFmt(m.flow_temp, 0, '° flow');
-      li.appendChild(s); li.appendChild(b); list.appendChild(li);
+      li.appendChild(s); li.appendChild(b);
+      if (m.label) li.title = m.label;
+      if ((m.id | 0) > 0) {
+        var x = document.createElement('button'); x.type = 'button'; x.className = 'tbtn'; x.textContent = '✕';
+        x.title = 'Delete this marker'; x.style.padding = '0 6px';
+        x.addEventListener('click', function () { satMarkerReq(APIGW + 'v2/sat/markers/' + (m.id | 0), { method: 'DELETE' }, 'Marker deleted'); });
+        li.appendChild(x);
+      }
+      list.appendChild(li);
     });
   }
 
@@ -4032,6 +4328,9 @@
         satPost('mode', b.dataset.mode).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
       });
     });
+
+    var cv = document.getElementById('satCurveBig');   // TASK-1232: bound on the <svg>, survives innerHTML redraws
+    if (cv) { cv.style.cursor = 'crosshair'; cv.addEventListener('click', satCurveClick); }
 
     var ds = document.getElementById('satDhwSlider');
     if (ds) {
@@ -4202,16 +4501,20 @@
         if ((retriesLeft | 0) > 0) setTimeout(function () { pollDiscovery(retriesLeft - 1); }, 4000);
       });
   }
-  // 1-Wire/Dallas discovery: /api/v2/sensors (sensors.dallas[] with addr + temp).
+  // 1-Wire/Dallas discovery: /api/v2/sensors returns sensors.devices as an object
+  // keyed by address: {"<addr>":{"temp":..,"epoch":..}} (restAPI.ino sendSensorStatus).
   // Each detected address surfaces once (seen-tracked, shared with BLE).
   function pollDallasDiscovery(retriesLeft) {
     fetch(APIGW + 'v2/sensors', { cache: 'no-store' })
       .then(function (r) { if (!r.ok) throw 0; return r.json(); })
       .then(function (j) {
-        var d = j && j.sensors; if (!d || !Array.isArray(d.dallas)) return;
+        var d = j && j.sensors && j.sensors.devices; if (!d || typeof d !== 'object') return;
+        var dt = {};   // TASK-1226: Dallas temps for the graph
+        Object.keys(d).forEach(function (a) { if (d[a] && typeof d[a].temp === 'number') dt[a] = d[a].temp; });
+        gDallas = dt; pushGraphSlot();
         var seen = discoverSeenSet();
-        d.dallas.forEach(function (s) {
-          var addr = s && s.addr; if (!addr || seen[addr]) return;
+        Object.keys(d).forEach(function (addr) {
+          var s = d[addr] || {}; if (!addr || seen[addr]) return;
           var sub = 'DS18B20 · ' + addr;
           if (typeof s.temp === 'number') sub += ' · ' + s.temp.toFixed(1) + '°C';
           showDiscoverCard({ id: addr, bus: 'dallas', title: 'New 1-Wire sensor detected', sub: sub });
@@ -4758,6 +5061,8 @@
     if (ldl) ldl.addEventListener('click', downloadLog);
     var cso = document.getElementById('chipSatOnly');
     if (cso) cso.addEventListener('click', function () { logSatOnly = !logSatOnly; cso.classList.toggle('on', logSatOnly); if (isMonitorLogVisible()) renderLog(); });
+    var ccp = document.getElementById('chipCapture');
+    if (ccp) ccp.addEventListener('click', function () { toggleCapture(ccp); });
     var cad = document.getElementById('chipAutoDl');
     if (cad) cad.addEventListener('click', function () { toggleAutoDl(cad); });
     var cst = document.getElementById('chipStream');
@@ -4766,9 +5071,6 @@
     if (cs) cs.addEventListener('click', function () { logAutoScroll = !logAutoScroll; cs.classList.toggle('on', logAutoScroll); });
     var ct = document.getElementById('chipTs');
     if (ct) ct.addEventListener('click', function () { logShowTs = !logShowTs; ct.classList.toggle('on', logShowTs); if (isMonitorLogVisible()) renderLog(); });
-    document.querySelectorAll('#mlog .tbtn').forEach(function (b) {
-      if (/clear/i.test(b.textContent)) b.addEventListener('click', function () { logBuf = []; renderLog(); });
-    });
     var vs = document.getElementById('valSearch');   // TASK-1223.14
     if (vs) vs.addEventListener('input', function () { valSearch = vs.value; if (isMonitorVisible('mvalues')) renderValues(); });
     var ss = document.getElementById('statsSearch');
@@ -4846,11 +5148,6 @@
         if (isMonitorVisible('mstats')) renderStats();
       });
     });
-    document.querySelectorAll('#mlog .tbtn').forEach(function (b) {
-      if (/download/i.test(b.textContent)) b.addEventListener('click', function () {
-        downloadBlob(new Blob([logBuf.join('\n')], { type: 'text/plain' }), 'otgw-log-' + ts() + '.txt');
-      });
-    });
     document.querySelectorAll('#mgraph .tchip:not([id])').forEach(function (ch) {
       ch.addEventListener('click', function () {
         // Parse the leading number + unit. indexOf('4') used to match the '4' in
@@ -4878,6 +5175,8 @@
     // and the PS=1 check (asks device/time only after 15 s of socket silence).
     setInterval(otmonTick, OTMON_POLL_MS);
     setInterval(psCheckTick, 5000);
+    setTimeout(devClockTick, 4400); setInterval(devClockTick, 30000);   // TASK-1229
+    setTimeout(checkFsMismatch, 5200);
     setInterval(fetchSatStatus, 30000);
     setInterval(fetchWeather, 60000);   // TASK-954: refresh weather-API OUTSIDE
 

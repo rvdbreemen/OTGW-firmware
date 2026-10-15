@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.425
+**  Version  : v2.0.0-alpha.426
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4084,6 +4084,8 @@ void sendDeviceSettings()
   addBool(F("satbleriskack"), settings.sat.bBleRiskAck, "b");
   addBool(F("satblefailover"), settings.sat.bBleFailover, "b");
   addStr(F("satblemac"), CSTR(settings.sat.sBleMAC), "s", 17);
+  addStr(F("satblenameprefix"), CSTR(settings.sat.sBleNamePrefix), "s", 23);   // TASK-1231
+  addBool(F("satblenamefilteringest"), settings.sat.bBleNameFilterIngest, "b");  // TASK-1231
   addInt(F("satbleinterval"), settings.sat.iBleInterval, "i", 10, 300);
 #endif
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
@@ -4198,6 +4200,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satareaweight0", "satareaweight1", "satareaweight2", "satareaweight3",
   "satautotune", "satautotunerate",
   "satbleenable", "satbleriskack", "satblefailover", "satbleinterval", "satblemac",
+  "satblenamefilteringest", "satblenameprefix",  // TASK-895 filter; TASK-1231 made them settable
   "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
   "satdeadband", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
   "satflameoffset", "satflowoffset", "satflushtreshold", "satforcepwm", "sathumiditytimeout",

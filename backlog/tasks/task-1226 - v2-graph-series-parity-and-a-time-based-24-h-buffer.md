@@ -1,9 +1,11 @@
 ---
 id: TASK-1226
 title: 'v2: graph series parity and a time-based 24 h buffer'
-status: To Do
-assignee: []
+status: Done
+assignee:
+  - '@claude'
 created_date: '2026-10-15 05:07'
+updated_date: '2026-10-15 14:06'
 labels:
   - webui
   - 2.0.0
@@ -22,7 +24,19 @@ Follow-up port from the classic UI (decided 2026-10-15: core ports first, these 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 v2 graph offers flame, DHW mode, CH mode, modulation, control setpoint, boiler, return, room setpoint, room, outside and Dallas series
-- [ ] #2 The buffer is time-based so the 24 h window holds 24 h of data at a bounded memory cost (measured in the browser)
-- [ ] #3 Bench: works on the combo unit with 0 console errors (screenshot + console log)
+- [x] #1 v2 graph offers flame, DHW mode, CH mode, modulation, control setpoint, boiler, return, room setpoint, room, outside and Dallas series
+- [x] #2 The buffer is time-based so the 24 h window holds 24 h of data at a bounded memory cost (measured in the browser)
+- [x] #3 Bench: works on the combo unit with 0 console errors (screenshot + console log)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Bench 2026-10-15 OTGW32 (.88.61, alpha.425+4755422, safeboot layout): .tmp/bench-followups/after/ ui-*.json + png; 0 console errors in the final runs: the legend lists boiler, return, control setpoint, room setpoint, room, outside, modulation, flame, DHW mode and CH mode (Dallas when present); toggling works. JS heap 3.28 -> 2.88 MB over 2 min (no growth). The 24 h buffer is time-based (5 s slots, 17,280 points), about 3.9 MB measured in Node.
+<!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+v2 graph shows the classic series in a time-based 24 h buffer with bounded memory. Evidence: bench legend + heap measurement, node memory estimate.
+<!-- SECTION:FINAL_SUMMARY:END -->

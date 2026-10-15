@@ -130,6 +130,7 @@
   <span class="sub" id="clock">--:--:--</span>
   <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" aria-pressed="false">🌙 Dark</button>
 </div>
+<div class="fs-banner" id="fsMismatch" role="alert" hidden></div>
 <div class="switcher">
   <button class="seg active" data-page="home"><b>Home</b><small>opening page</small></button>
   <button class="seg" data-page="sat"><b>SAT</b><small>thermostat · control · technical</small></button>
@@ -471,7 +472,7 @@
           <svg viewBox="0 0 600 300" id="satCurveBig"></svg>
           <div class="curve-side">
             <div class="curve-legend" id="satCurveLegend"></div>
-            <div class="marker-head">Calibration markers <span class="sub">learned points</span></div>
+            <div class="marker-head">Calibration markers <span class="sub">click the curve to add</span></div>
             <ul class="marker-list" id="satMarkerList"></ul>
           </div>
         </div>
@@ -539,6 +540,7 @@
       <span class="tchip on" id="chipTs">Timestamps</span>
       <!-- TASK-970: Log power-features (SAT-only filter, auto-download, stream-to-file). -->
       <span class="tchip" id="chipSatOnly" title="Show only SAT narration lines">SAT only</span>
+      <span class="tchip" id="chipCapture" title="Capture: keep up to 200,000 lines (about a day) for Download instead of the last 2,000">Capture</span>
       <span class="tchip" id="chipAutoDl" title="Download the log automatically every 15 minutes">Auto-download</span>
       <span class="tchip" id="chipStream" title="Stream frames straight to a local file (Chrome/Edge)">Stream to file</span>
     </div>
@@ -605,6 +607,7 @@
       <span class="lb"><i></i>Thermostat + boiler</span>
       <span class="lt"><i></i>Thermostat only</span>
       <span class="lo"><i></i>Boiler only</span>
+      <span class="lu"><i></i>Boiler: not supported</span>
       <span><i></i>Never seen</span>
       <span style="margin-left:auto">Observed: <b id="supCount">0</b> / 128 msgIDs</span>
     </div>
@@ -627,22 +630,17 @@
       <span class="tchip" id="chipAutoCsv" title="Auto-save a CSV every 5 minutes">Auto-CSV</span>
     </div>
     <div class="graphcard">
-      <div class="legend">
-        <span><i style="background:var(--hot)"></i>flow</span>
-        <span><i style="background:var(--cold)"></i>return</span>
-        <span><i style="background:#8b949e"></i>setpoint</span>
-        <span><i style="background:rgba(0,191,254,.5)"></i>modulation</span>
-      </div>
-      <svg viewBox="0 0 780 210" id="gstrip" role="img" aria-label="Flow/return/setpoint/modulation graph">
-        <line x1="34" y1="10" x2="34" y2="170" stroke="var(--border)"/>
-        <line x1="34" y1="170" x2="772" y2="170" stroke="var(--border)"/>
-        <text class="axis-txt" x="8" y="16">90°</text>
-        <text class="axis-txt" x="8" y="92">50°</text>
-        <text class="axis-txt" x="8" y="172">10°</text>
-        <line class="ser-sp" id="gSpLine" x1="34" y1="0" x2="772" y2="0"/>
-        <polygon class="ser-mod" id="gMod2" points=""/>
-        <polyline class="ser-flow" id="gFlow2" points=""/>
-        <polyline class="ser-ret" id="gRet2" points=""/>
+      <div class="legend" id="gLegend"></div>
+      <svg viewBox="0 0 780 250" id="gstrip" role="img" aria-label="Temperatures, modulation and flame/DHW/CH graph">
+        <line x1="34" y1="10" x2="34" y2="170" stroke="#8b949e"/>
+        <line x1="34" y1="170" x2="772" y2="170" stroke="#8b949e"/>
+        <text class="axis-txt" x="2" y="16" id="gAxHi">90°</text>
+        <text class="axis-txt" x="2" y="94" id="gAxMid">50°</text>
+        <text class="axis-txt" x="2" y="172" id="gAxLo">10°</text>
+        <text class="axis-txt" x="2" y="194">flame</text>
+        <text class="axis-txt" x="2" y="216">DHW</text>
+        <text class="axis-txt" x="2" y="238">CH</text>
+        <g id="gSer"></g>
       </svg>
     </div>
   </div>

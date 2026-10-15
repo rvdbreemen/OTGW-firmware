@@ -63,6 +63,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     line-height:1;display:inline-flex;align-items:center;letter-spacing:.03em;
     background:color-mix(in srgb,var(--zone-warn) 82%,#000);color:#fff}
   .hdr-sim.hidden{display:none}
+  .fs-banner{margin:6px 12px;padding:8px 12px;border-radius:10px;font-size:.8rem;border:1px solid var(--zone-warn);
+    background:color-mix(in srgb,var(--zone-warn) 16%,var(--panel));color:var(--text)}
+  .fs-banner[hidden]{display:none} .fs-banner a{color:var(--accent);font-weight:600}
   /* Narrow phones: the mono hostname·version chip is wide and would push the header
      to a third row — drop the identity chips, keep the status pill + clock + toggles. */
   @media(max-width:480px){.hdr-net{display:none}}
@@ -374,7 +377,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .mlegend{display:flex;gap:14px;font-size:.76rem;color:var(--muted);margin:10px 2px;flex-wrap:wrap}
   .mlegend i{display:inline-block;width:13px;height:13px;border-radius:4px;margin-right:5px;vertical-align:-2px;background:var(--gauge-track)}
   .mlegend .lb i{background:var(--zone-ok)} .mlegend .lt i{background:var(--accent)}
-  .mlegend .lo i{background:var(--zone-warn)}
+  .mlegend .lo i{background:var(--zone-warn)} .mlegend .lu i,.mcellq.unsup{background:var(--zone-alert)}
   .graphcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;
     padding:10px;box-shadow:var(--shadow)}
   .graphcard svg{width:100%;height:auto;display:block}

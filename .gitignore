@@ -126,3 +126,6 @@ tests/*.pdb
 
 # adr-kit transient lock
 docs/adr/.adr-kit-state.json.lock
+
+# flash_otgw --migrate saves settings.ini (with MQTT/HTTP passwords) here: never commit
+/backup/
