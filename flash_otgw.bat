@@ -27,8 +27,8 @@ REM                        settings.ini over HTTP (--host), writes the two
 REM                        *-migrate-*.bin images around NVS (WiFi kept), waits
 REM                        for the unit, restores settings.ini and checks it.
 REM
-REM  Partition offsets (all 2.0.0 ESP32-S3 targets share partitions_otgw_esp32*.csv):
-REM    app0 (firmware) = 0x10000    spiffs (LittleFS) = 0x270000    nvs = 0x9000
+REM  Partition offsets (all 2.0.0 ESP32-S3 targets share partitions_otgw_esp32.csv, ADR-191):
+REM    safeboot = 0x10000   app0 (firmware) = 0x100000   spiffs (LittleFS) = 0x330000   nvs = 0x9000
 REM  --update refuses when the unit's partition table is not the TOOL_LAYOUT
 REM  below; such a unit needs --migrate first.
 REM
@@ -50,13 +50,13 @@ set "TOOLS_DIR=%SCRIPT_DIR%tools\esptool"
 set "ESPTOOL_EXE=%TOOLS_DIR%\esptool.exe"
 set "DOWNLOAD_URL=https://github.com/espressif/esptool/releases/download/%ESPTOOL_VERSION%/esptool-%ESPTOOL_VERSION%-win64.zip"
 
-REM Partition offsets (see partitions_otgw_esp32*.csv). app0=0x10000, spiffs=0x270000.
-set "APP_OFFSET=0x10000"
-set "FS_OFFSET=0x270000"
+REM Partition offsets (see partitions_otgw_esp32.csv). app0=0x100000, spiffs=0x330000.
+set "APP_OFFSET=0x100000"
+set "FS_OFFSET=0x330000"
 REM Layout the images of this release are built for: "legacy" (app0 @0x10000)
 REM or "safeboot" (ADR-191: safeboot factory @0x10000, app0 @0x100000).
 REM The unit's layout is recognised by a "safeboot" label in its partition table.
-set "TOOL_LAYOUT=legacy"
+set "TOOL_LAYOUT=safeboot"
 REM Migration images: slice 1 at 0x0, slice 2 right after NVS (0x9000 + 0x5000).
 set "MIGRATE_REST_OFFSET=0xE000"
 
@@ -556,6 +556,6 @@ echo   --board esp32        Force board type (all 2.0.0 S3 targets).
 echo   --baud N             Override baud rate (default: 921600).
 echo   --factory / --update Select mode explicitly (default is factory).
 echo.
-echo Offsets: app0=0x10000, spiffs/LittleFS=0x270000 (partitions_otgw_esp32*.csv).
+echo Offsets: safeboot=0x10000, app0=0x100000, spiffs/LittleFS=0x330000 (partitions_otgw_esp32.csv).
 echo Downloads esptool %ESPTOOL_VERSION% to .\tools\esptool\ on first run. No Python required.
 exit /b 0

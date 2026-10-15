@@ -243,7 +243,16 @@ Updater rules:
 ## Open Questions
 
 - [x] Crash-loop rollback: is `CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE` feasible with the pioarduino precompiled bootloader (TASK-1223.7)? The answer decides what the one-time migration image contains. — **Answered 2026-10-15 by User: Robert van den Breemen:** Yes, with the stock pioarduino bootloader: CONFIG_BOOTLOADER_APP_ROLLBACK_ENABLE=y is already in the shipped esp32s3 sdkconfig (libs sdkconfig:423) and bootloader. The main firmware defines verifyRollbackLater() and marks itself valid after a health gate; safeboot checks esp_ota_get_last_invalid_partition() before pointing boot back at ota_0; handover erases the whole otadata partition; the migration image writes bootloader.bin. Anti-rollback stays off. Evidence: docs/research/2026-10-15-crash-loop-rollback-feasibility.md. Bench proof in TASK-1223.9.
-- [ ] Final-layout bench proof (TASK-1223.9): the spike proved the flow on a proof layout with a 2048K ota_0 and an empty filesystem, not on this exact layout.
+- [x] Final-layout bench proof (TASK-1223.9): the spike proved the flow on a proof layout with a 2048K ota_0 and an empty filesystem, not on this exact layout. — **Answered 2026-10-15 by User: Robert van den Breemen:** Proven on the final layout on 2026-10-15 on the PIC board (Classic-S3, .tmp/bench-migrate/ota.log):
+- the USB migration kept WiFi and settings (0 of 174 differ);
+- handover to safeboot took 5 s, at the same IP;
+- a crash-test image was rolled back to safeboot and was not rerun after a reboot;
+- a truncated upload was refused;
+- an interrupted upload plus reset was recovered over WiFi;
+- a 2 MB OTA took 14 s and survives a hard reset after the health gate;
+- auth parity: 401 without credentials, 403 for a cross-origin upload;
+- filesystem OTA works.
+The same run on the OT-Direct board is pending (TASK-1223.9) because that unit was offline.
 
 ## Related Decisions
 

@@ -47,8 +47,10 @@ FLASH_MAP = [
     ("0x0", "bootloader.bin"),
     ("0x8000", "partitions.bin"),
     ("0xe000", None),            # boot_app0 (packages path)
-    ("0x10000", "firmware.bin"),
-    ("0x270000", "littlefs.bin"),   # TASK-867: LittleFS moved up after the +0.5 MB app grow
+    # ADR-191 safeboot layout (partitions_otgw_esp32.csv). The safeboot updater at
+    # 0x10000 is not written here; without it firmware updates stay USB-only.
+    ("0x100000", "firmware.bin"),
+    ("0x330000", "littlefs.bin"),
 ]
 
 

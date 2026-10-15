@@ -38,7 +38,7 @@ Characteristics:
 - W5500 SPI Ethernet header for wired networking
 - I2C header for SSD1306 OLED display
 - Bluetooth LE radio for BLE temperature sensors (Xiaomi LYWSD03MMC)
-- 4 MB SPI flash with a single-app partition layout (no dual-OTA in 4 MB, see Partition Table below)
+- 4 MB SPI flash with a safeboot partition layout: one firmware slot plus an updater for firmware updates over WiFi (see Partition Table below)
 - USB-C connector
 - Two buttons: boot button (GPIO 0) and config button (GPIO 9)
 - Three LEDs: OT red (GPIO 2), status (GPIO 8), and OT green (GPIO 48)
@@ -125,17 +125,18 @@ The OTGW derives operating power from the OpenTherm bus itself when wired to a b
 
 ### ESP32-S3 Partition Table
 
-The OTGW32 uses a custom partition layout for 4 MB flash. Because the full ESP32-S3 build (Wi-Fi + Ethernet + OTDirect) exceeds 2 MB, a dual-OTA layout does not fit. The 4 MB flash is laid out as follows:
+The ESP32-S3 boards use a custom partition layout for 4 MB flash (ADR-191). The firmware does not fit twice, so instead of two firmware slots there is one firmware slot plus a small updater (safeboot) that installs a new firmware over WiFi:
 
 | Partition | Offset | Size | Purpose |
 |---|---|---|---|
-| nvs | 0x9000 | 20 KB | Non-volatile storage |
+| nvs | 0x9000 | 20 KB | Non-volatile storage (WiFi credentials) |
 | otadata | 0xE000 | 8 KB | OTA state |
-| app0 | 0x10000 | 2.875 MB | Application firmware |
-| spiffs | 0x2F0000 | 1 MB | LittleFS filesystem (web assets, config, PIC firmware) |
+| safeboot | 0x10000 | 960 KB | Updater for firmware updates over WiFi |
+| app0 | 0x100000 | 2240 KB | Application firmware |
+| spiffs | 0x330000 | 768 KB | LittleFS filesystem (web UI, settings, PIC firmware) |
 | coredump | 0x3F0000 | 64 KB | Core dump storage |
 
-> **Note**: With only one app partition, OTA updates on 4 MB flash are not possible. To enable OTA on ESP32, an 8 MB flash module with a custom partition table is required. For routine updates, reflash via USB using `flash_esp.py`.
+> **Note**: Units on the earlier layout need one USB migration (`flash_otgw --migrate`); after that, firmware updates work over WiFi. See [WiFi firmware updates](../../guides/WIFI_FIRMWARE_UPDATE.md).
 
 ### Optional Hardware
 
@@ -332,7 +333,7 @@ From v1.3.0 onwards, the web interface provides a one-click OTA updater:
 5. The web interface polls the device until it responds, then confirms success.
 6. Update the filesystem image using the same page to ensure web assets match the new firmware version.
 
-> **ESP32-S3 on 4 MB flash**: OTA is not available with the standard 4 MB partition layout (only one app partition fits). Update via USB using `flash_esp.py` instead.
+> **ESP32-S3 on 4 MB flash**: firmware OTA runs through the safeboot updater: on `/update` choose "Restart into the firmware updater". A unit on the earlier layout needs one USB migration first (`flash_otgw --migrate`).
 
 #### Manual OTA Upload
 

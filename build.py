@@ -77,18 +77,14 @@ TARGETS = {
                                   # uses --flash_mode dio.
         "flash_freq": "80m",
         "flash_size": "4MB",
-        "firmware_offset": "0x10000",
-        "fs_offset": "0x270000",   # from partitions_otgw_esp32.csv ("spiffs" label = LittleFS for begin() compat); moved up after the +0.5 MB app grow (TASK-867)
+        "firmware_offset": "0x100000",  # app0/ota_0 in partitions_otgw_esp32.csv; safeboot (factory) sits at 0x10000 (ADR-191)
+        "fs_offset": "0x330000",   # "spiffs" label = LittleFS (begin() compat); 768K after the 2240K app slot (ADR-191)
         "fs_tool_path": "esp32/tools/mklittlefs",
         "fs_block": 4096,
         "fs_page": 256,
-        "fs_size": 1572864,       # 0x180000 = 1.5 MB — matches partitions_otgw_esp32.csv (TASK-867)
-        "app_size": 2490368,      # 0x260000 = 2.375 MB — matches factory app slot in
-                                  # partitions_otgw_esp32.csv. Overrides PartitionScheme=custom
-                                  # default of 16 MB so the size check reflects reality (TASK-288).
-                                  # Grown +0.5 MB from 0x1E0000 (1.875 MB) in TASK-867 to fit the
-                                  # ArduinoJson v7 footprint; the LittleFS partition shrank 2.0->1.5 MB
-                                  # to free the space (web assets use ~0.95 MB).
+        "fs_size": 786432,        # 0xC0000 = 768K, matches partitions_otgw_esp32.csv (ADR-191)
+        "app_size": 2293760,      # 0x230000 = 2240K, the app0/ota_0 slot in partitions_otgw_esp32.csv
+                                  # (ADR-191 safeboot layout; was 2.375 MB before the safeboot partition).
         "bootloader_offset": "0x0",  # ESP32-S3 bootloader is at 0x0 (not 0x1000)
     },
 }
@@ -120,13 +116,8 @@ TARGETS["esp32-combo"] = {
     "name": "ESP32-S3 Combo",
     "slug": "esp32-combo",
     "build_flags": "-DNO_GLOBAL_HTTPUPDATE -DBOARD_NODOSHOP_ESP32_COMBO",
-    # The combo links BOTH OT engines (PIC + OTDirect) so its binary overflowed
-    # the shared 1.875 MB app slot. It uses its OWN partition table
-    # (partitions_otgw_esp32_combo.csv): 2.0 MB app / 1.875 MB LittleFS. These
-    # override the esp32 tcfg so the merge step + size check match (TASK-865.16).
-    "app_size": 2490368,       # 0x260000 = 2.375 MB — combo app0 slot (TASK-867: +0.375 MB)
-    "fs_offset": "0x270000",   # LittleFS starts after the enlarged 2.375 MB app
-    "fs_size": 1572864,        # 0x180000 = 1.5 MB — combo "spiffs" partition (TASK-867)
+    # Same shared 4MB safeboot table and offsets as esp32 (ADR-191); the 2240K
+    # app slot holds both engines.
 }
 
 def asset_slug(target):
@@ -1875,37 +1866,41 @@ def create_merged_binary(project_dir, semver, target, compress=False, include_fi
         search_dirs = [d for d in [temp_build_dir, pio_build_dir, build_dir] if d.exists()]
 
         # Find bootloader
-        bootloader = None
-        for sd in search_dirs:
-            for bl in sd.glob("**/bootloader.bin"):
-                bootloader = bl
-                break
-            if bootloader:
-                break
-        if bootloader:
-            cmd.extend([tcfg["bootloader_offset"], str(bootloader)])
-            print_info(f"Bootloader: {bootloader.name}")
-        else:
-            print_warning("Bootloader not found in build output — merged image may not be bootable")
-
-        # Find partition table
-        partitions = None
-        for sd in search_dirs:
-            for pt in sd.glob("**/partitions.bin"):
-                partitions = pt
-                break
-            if partitions:
-                break
-        if not partitions:
+        # Exact locations first: PlatformIO's env dir, then the copies that
+        # collect_pio_artifacts() leaves in build/ as <target>-bootloader.bin and
+        # <target>-partitions.bin (the env dir may be cleaned by buildfs). Then
+        # the legacy globs for the arduino-cli backend.
+        def _first(exact, globs):
+            for cand in exact:
+                if cand.exists():
+                    return cand
             for sd in search_dirs:
-                for pt in sd.glob("**/*.partitions.bin"):
-                    partitions = pt
-                    break
-                if partitions:
-                    break
-        if partitions:
-            cmd.extend(["0x8000", str(partitions)])
-            print_info(f"Partitions: {partitions.name}")
+                for pattern in globs:
+                    for hit in sd.glob(pattern):
+                        return hit
+            return None
+
+        bootloader = _first([pio_build_dir / "bootloader.bin", build_dir / f"{target}-bootloader.bin"],
+                            ["**/bootloader.bin"])
+        partitions = _first([pio_build_dir / "partitions.bin", build_dir / f"{target}-partitions.bin"],
+                            ["**/partitions.bin", "**/*.partitions.bin"])
+        # A merged image without a bootloader or partition table does not boot,
+        # and a one-time migration written from it would leave the unit dead.
+        if bootloader is None or partitions is None:
+            print_error("Bootloader and/or partition table not found in the build output; "
+                        "refusing to create a merged image that cannot boot.")
+            return None
+        # The partition table must be the one built from the current CSV.
+        has_safeboot_csv = "safeboot" in read_partition_table(project_dir)
+        has_safeboot_bin = b"safeboot" in partitions.read_bytes()
+        if has_safeboot_csv != has_safeboot_bin:
+            print_error(f"{partitions.name} does not match {PARTITIONS_CSV} "
+                        "(safeboot partition present in one, absent in the other); rebuild.")
+            return None
+        cmd.extend([tcfg["bootloader_offset"], str(bootloader)])
+        print_info(f"Bootloader: {bootloader.name}")
+        cmd.extend(["0x8000", str(partitions)])
+        print_info(f"Partitions: {partitions.name}")
 
         # Find boot_app0.bin. WITHOUT this entry at offset 0xe000 the otadata
         # partition keeps whatever was there before the flash. On a board that
@@ -2057,6 +2052,12 @@ def write_migration_slices(project_dir, merged_full):
     nvs_start, nvs_size = table["nvs"]
     rest_offset = nvs_start + nvs_size
     data = merged_full.read_bytes()
+    # The first slice replaces the bootloader and the partition table, which can
+    # only be rewritten over USB: never cut it from an image that lacks them.
+    if data[:1] != b"\xe9" or data[0x8000:0x8002] != b"\xaa\x50":
+        print_error(f"{merged_full.name} has no bootloader at 0x0 or no partition table at 0x8000; "
+                    "no migration images written")
+        return None
     first, rest = migration_slice_paths(merged_full)
     first.write_bytes(data[:nvs_start])
     rest.write_bytes(data[rest_offset:])

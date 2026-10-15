@@ -1,18 +1,23 @@
-# OTGW-firmware ESP32-S3 partition table — single app (no OTA), 4MB flash
-# Layout mirrors the ESP8266 4M2M scheme: a generously sized filesystem so
-# the web UI assets (fonts, ECharts custom bundle, JS/CSS) can grow without
-# nibbling at the firmware budget. To enable proper OTA (two app slots) a
-# board with 8MB flash is required.
+# OTGW-firmware ESP32-S3 partition table, 4MB flash, safeboot layout (ADR-191).
+# Used by every 4MB target (esp32, esp32-classic, esp32-combo) and the safeboot
+# updater project (safeboot/platformio.ini).
 #
-# 4MB flash layout (TASK-867: app grown +0.5 MB for the ArduinoJson v7 footprint):
-#   2.375 MB app (ota_0) + 1.5 MB LittleFS (label "spiffs") + 64 KB coredump
-#   The web UI assets use ~0.95 MB, so 1.5 MB still leaves ample filesystem room
-#   while the firmware (with ArduinoJson + async stack) gets real headroom again.
+#   safeboot  app/factory  960K   updater (safeboot/), firmware OTA over WiFi
+#   app0      app/ota_0    2240K  main firmware
+#   spiffs    LittleFS     768K   v2 web UI + runtime files (label "spiffs" for begin() compat)
+#   coredump               64K
 #
-# Bootloader: 0x0 (ESP32-S3 specific — differs from original ESP32 which uses 0x1000)
-# Name,   Type, SubType, Offset,  Size,    Flags
-nvs,      data, nvs,     0x9000,  0x5000,
-otadata,  data, ota,     0xE000,  0x2000,
-app0,     app,  ota_0,   0x10000, 0x260000,
-spiffs,   data, spiffs,  0x270000,0x180000,
-coredump, data, coredump,0x3F0000,0x10000,
+# The bootloader boots "safeboot" when otadata is blank (main firmware erased it
+# to hand over) or when app0 fails validation or was rolled back. App offsets
+# must be 64K-aligned. The offsets are mirrored in build.py, flash_otgw.bat and
+# flash_esp.py; change them together. Migrating a unit from the old table
+# (app0 @0x10000, spiffs @0x270000) needs one full USB flash (TASK-1223.8).
+#
+# Bootloader: 0x0 (ESP32-S3). Partition table: 0x8000.
+# Name,   Type, SubType, Offset,   Size,     Flags
+nvs,      data, nvs,     0x9000,   0x5000,
+otadata,  data, ota,     0xE000,   0x2000,
+safeboot, app,  factory, 0x10000,  0xF0000,
+app0,     app,  ota_0,   0x100000, 0x230000,
+spiffs,   data, spiffs,  0x330000, 0xC0000,
+coredump, data, coredump,0x3F0000, 0x10000,

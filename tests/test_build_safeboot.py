@@ -59,6 +59,40 @@ class TestPartitionTable(unittest.TestCase):
         self.assertEqual(self.table["spiffs"], (0x330000, 0xC0000))
 
 
+class TestOffsetsMatchCsv(unittest.TestCase):
+    """build.py, flash_otgw.bat and flash_esp.py repeat the CSV offsets. A
+    stale copy writes an image where the unit does not look for it (a stale
+    LittleFS offset once caused a boot loop, TASK-890)."""
+
+    def setUp(self):
+        self.table = build.read_partition_table(REPO_ROOT)
+
+    def test_build_targets(self):
+        app_off, app_size = self.table["app0"]
+        fs_off, fs_size = self.table["spiffs"]
+        for name, tcfg in build.TARGETS.items():
+            self.assertEqual(int(tcfg["firmware_offset"], 16), app_off, name)
+            self.assertEqual(int(tcfg["fs_offset"], 16), fs_off, name)
+            self.assertEqual(tcfg["fs_size"], fs_size, name)
+            self.assertEqual(tcfg["app_size"], app_size, name)
+
+    def test_flash_scripts(self):
+        app_off = self.table["app0"][0]
+        fs_off = self.table["spiffs"][0]
+        nvs_off, nvs_size = self.table["nvs"]
+        bat = (REPO_ROOT / "flash_otgw.bat").read_text(encoding="utf-8")
+        self.assertIn(f'set "APP_OFFSET={app_off:#x}"', bat)
+        self.assertIn(f'set "FS_OFFSET={fs_off:#x}"', bat)
+        self.assertIn(f'set "MIGRATE_REST_OFFSET={nvs_off + nvs_size:#X}"'.replace("0X", "0x"), bat)
+        layout = "safeboot" if "safeboot" in self.table else "legacy"
+        self.assertIn(f'set "TOOL_LAYOUT={layout}"', bat)
+        sh = (REPO_ROOT / "flash_otgw.sh").read_text(encoding="utf-8")
+        self.assertIn(f'MIGRATE_REST_OFFSET="{nvs_off + nvs_size:#X}"'.replace("0X", "0x"), sh)
+        esp = (REPO_ROOT / "flash_esp.py").read_text(encoding="utf-8")
+        self.assertIn(f'"firmware_address": "{app_off:#x}"', esp)
+        self.assertIn(f'"filesystem_address": "{fs_off:#x}"', esp)
+
+
 class TestParseCsv(unittest.TestCase):
     def test_parses_comments_and_hex(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -97,7 +131,10 @@ class TestMigrationSlices(unittest.TestCase):
     def test_slices_skip_nvs(self):
         with tempfile.TemporaryDirectory() as tmp:
             merged = Path(tmp) / "OTGW-firmware-esp32-combo-1.0.0-merged-full.bin"
-            data = bytes(i % 251 for i in range(0x20000))
+            data = bytearray(i % 251 for i in range(0x20000))
+            data[0] = 0xE9                    # ESP image magic (bootloader)
+            data[0x8000:0x8002] = b"\xaa\x50"  # partition table magic
+            data = bytes(data)
             merged.write_bytes(data)
             table = {"nvs": (0x9000, 0x5000), "safeboot": (0x10000, 0xF0000)}
             with mock.patch.object(build, "read_partition_table", return_value=table):
@@ -107,6 +144,15 @@ class TestMigrationSlices(unittest.TestCase):
             self.assertEqual(rest.name, "OTGW-firmware-esp32-combo-1.0.0-migrate-rest.bin")
             self.assertEqual(first.read_bytes(), data[:0x9000])
             self.assertEqual(rest.read_bytes(), data[0xE000:])
+
+    def test_image_without_bootloader_gets_no_slices(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            merged = Path(tmp) / "x-merged-full.bin"
+            merged.write_bytes(b"\xff" * 0x20000)   # what a merge without bootloader produced
+            table = {"nvs": (0x9000, 0x5000), "safeboot": (0x10000, 0xF0000)}
+            with mock.patch.object(build, "read_partition_table", return_value=table):
+                self.assertIsNone(build.write_migration_slices(Path(tmp), merged))
+            self.assertFalse(Path(tmp, "x-migrate-0x0.bin").exists())
 
     def test_no_safeboot_no_slices(self):
         with tempfile.TemporaryDirectory() as tmp:

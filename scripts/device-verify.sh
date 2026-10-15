@@ -69,8 +69,9 @@ fi
 
 # --- flash (suppress esptool progress; keep only the verify count) ----------
 FLASH_ARGS=()
-[ "$BUILD_FW" = 1 ] && FLASH_ARGS+=(0x10000 .pio/build/esp32/firmware.bin)
-[ "$FW_ONLY" = 0 ]  && FLASH_ARGS+=(0x270000 "$LOG.fs")
+# Offsets from partitions_otgw_esp32.csv (ADR-191 safeboot layout).
+[ "$BUILD_FW" = 1 ] && FLASH_ARGS+=(0x100000 .pio/build/esp32/firmware.bin)
+[ "$FW_ONLY" = 0 ]  && FLASH_ARGS+=(0x330000 "$LOG.fs")
 echo -n "flash ($PORT) : "
 "$PY" -m esptool --chip esp32s3 --port "$PORT" --baud 921600 \
   --before default-reset --after hard-reset write-flash "${FLASH_ARGS[@]}" >"$LOG" 2>&1 || fail

@@ -38,7 +38,7 @@ Kenmerken:
 - W5500 SPI Ethernet-header voor bekabeld netwerk
 - I2C-header voor SSD1306 OLED-display
 - Bluetooth LE radio voor BLE-temperatuursensoren (Xiaomi LYWSD03MMC)
-- 4 MB SPI-flash met een single-app partitielayout (geen dual-OTA in 4 MB, zie Partitietabel hieronder)
+- 4 MB SPI-flash met een safeboot-partitielayout: een firmwareslot plus een updater voor firmware-updates via WiFi (zie Partitietabel hieronder)
 - USB-C aansluiting
 - Twee knoppen: boot button (GPIO 0) en config button (GPIO 9)
 - Drie LEDs: OT rood (GPIO 2), status (GPIO 8) en OT groen (GPIO 48)
@@ -143,17 +143,18 @@ De USB-aansluiting is ook de primaire manier om de firmware voor het eerst te fl
 
 ### ESP32-S3 partitietabel
 
-De OTGW32 gebruikt een aangepaste partitielayout voor 4 MB flash. Omdat de volledige ESP32-S3 build (Wi-Fi + Ethernet + OTDirect) groter is dan 2 MB, past een dual-OTA layout niet. De 4 MB flash is als volgt ingedeeld:
+De ESP32-S3-boards gebruiken een aangepaste partitielayout voor 4 MB flash (ADR-191). De firmware past er geen twee keer in. Daarom is er in plaats van twee firmwaresloten een enkel firmwareslot, plus een kleine updater (safeboot) die nieuwe firmware via WiFi installeert:
 
 | Partitie | Offset | Grootte | Doel |
 |---|---|---|---|
-| nvs | 0x9000 | 20 KB | Non-volatile storage |
+| nvs | 0x9000 | 20 KB | Non-volatile storage (WiFi-gegevens) |
 | otadata | 0xE000 | 8 KB | OTA state |
-| app0 | 0x10000 | 2,875 MB | Applicatiefirmware |
-| spiffs | 0x2F0000 | 1 MB | LittleFS filesystem (webbestanden, configuratie, PIC-firmware) |
+| safeboot | 0x10000 | 960 KB | Updater voor firmware-updates via WiFi |
+| app0 | 0x100000 | 2240 KB | Applicatiefirmware |
+| spiffs | 0x330000 | 768 KB | LittleFS filesystem (webinterface, instellingen, PIC-firmware) |
 | coredump | 0x3F0000 | 64 KB | Core dump opslag |
 
-> **Let op**: Met slechts een app-partitie zijn OTA-updates op 4 MB flash niet mogelijk. Om OTA op ESP32 in te schakelen is een 8 MB flashmodule met een aangepaste partitietabel vereist. Gebruik voor reguliere updates USB-flashen via `flash_esp.py`.
+> **Let op**: Een unit met de eerdere layout moet eenmalig via USB gemigreerd worden (`flash_otgw --migrate`). Daarna werken firmware-updates via WiFi. Zie [Firmware-updates via WiFi](../../guides/WIFI_FIRMWARE_UPDATE.md) (Engels).
 
 ---
 
@@ -358,7 +359,7 @@ Vanaf v1.3.0 biedt de webinterface een OTA-updater met een druk op de knop:
 6. De webinterface pollt het apparaat totdat het weer reageert en bevestigt succes.
 7. Update daarna het filesystemimage via dezelfde pagina om te zorgen dat de webbestanden overeenkomen met de nieuwe firmwareversie.
 
-> **ESP32-S3 op 4 MB flash**: OTA is niet beschikbaar met de standaard 4 MB partitielayout (er past slechts een app-partitie). Gebruik in plaats daarvan USB-flashen via `flash_esp.py`.
+> **ESP32-S3 op 4 MB flash**: firmware-OTA loopt via de safeboot-updater: op `/update` kiest u "Restart into the firmware updater". Een unit met de eerdere layout moet eerst eenmalig via USB gemigreerd worden (`flash_otgw --migrate`).
 
 #### Handmatige OTA via bestandsupload
 

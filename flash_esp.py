@@ -49,8 +49,8 @@ BOARD_CONFIGS = {
         "name": "Nodoshop OTGW32 (ESP32-S3)",
         "chip": "esp32s3",
         "default_baud": 921600,
-        "firmware_address": "0x10000",
-        "filesystem_address": "0x270000",  # spiffs offset from partitions_otgw_esp32.csv (TASK-867: 2.375M app @0x10000 + 1.5M LittleFS @0x270000). Stale 0x1F0000 caused a boot loop (TASK-890).
+        "firmware_address": "0x100000",    # app0/ota_0 in partitions_otgw_esp32.csv (ADR-191 safeboot layout; safeboot factory app at 0x10000)
+        "filesystem_address": "0x330000",  # spiffs offset from partitions_otgw_esp32.csv (ADR-191: 768K LittleFS). A stale offset caused a boot loop once (TASK-890).
         "bootloader_address": "0x0",       # ESP32-S3 bootloader is at 0x0, not 0x1000
         "partitions_address": "0x8000",
         # ESP32-S3 built-in USB-Serial/JTAG (same VID/PID as OT-Thing)
@@ -562,7 +562,7 @@ def erase_flash(port, chip):
         return False
 
 
-def _read_fs_offset_from_csv(default="0x270000"):
+def _read_fs_offset_from_csv(default="0x330000"):
     """Read the LittleFS ('spiffs') offset from the ESP32 partition CSV so the flash
     offset can never drift from the firmware build (TASK-890 AC#1: never hardcoded)."""
     csv = os.path.join(os.path.dirname(os.path.abspath(__file__)), "partitions_otgw_esp32.csv")
