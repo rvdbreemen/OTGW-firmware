@@ -78,7 +78,24 @@ static void loadNvs() {
   if (hostName[0] == '\0') strlcpy(hostName, "OTGW", sizeof(hostName));
 }
 
-// ADR-056 parity: Basic Auth (user "admin") and a same-origin check, both only
+// Same rule as isSameOriginRequest() in the main firmware (restAPI.ino): the host
+// part of Origin (else Referer) must equal the Host header exactly. No Origin and
+// no Referer means a non-browser client (curl), which is allowed.
+static bool sameOrigin() {
+  String origin = server.header("Origin");
+  if (origin.length() == 0) origin = server.header("Referer");
+  if (origin.length() == 0) return true;
+  String host = server.hostHeader();
+  if (host.length() == 0) return true;
+  int sep = origin.indexOf("://");
+  if (sep < 0) return false;
+  int start = sep + 3;
+  int slash = origin.indexOf('/', start);
+  String originHost = origin.substring(start, slash < 0 ? origin.length() : slash);
+  return originHost.equalsIgnoreCase(host);
+}
+
+// ADR-056 parity: Basic Auth (user "admin") and the same-origin check, both only
 // when the main firmware has an admin password set.
 static bool authorized() {
   if (adminPw[0] == '\0') return true;
@@ -86,13 +103,9 @@ static bool authorized() {
     server.requestAuthentication();
     return false;
   }
-  if (server.method() == HTTP_POST && server.hasHeader("Origin")) {
-    String origin = server.header("Origin");
-    String host = server.hostHeader();
-    if (!(origin.endsWith("//" + host))) {
-      server.send(403, "text/plain", "CSRF protection: invalid origin");
-      return false;
-    }
+  if (server.method() == HTTP_POST && !sameOrigin()) {
+    server.send(403, "text/plain", "CSRF protection: invalid origin");
+    return false;
   }
   return true;
 }
@@ -141,8 +154,10 @@ static void handleUpload() {
   HTTPUpload& up = server.upload();
   if (up.status == UPLOAD_FILE_START) {
     updError = "";
-    // Basic Auth headers arrive with the request, before the body is parsed.
+    // Auth and origin are checked here, before Update.begin(), so an unauthorised
+    // or cross-origin upload never touches ota_0. The headers arrive before the body.
     if (adminPw[0] && !server.authenticate("admin", adminPw)) { updError = "unauthorized"; return; }
+    if (adminPw[0] && !sameOrigin()) { updError = "invalid origin"; return; }
     Serial.printf("[safeboot] upload start %s\n", up.filename.c_str());
     if (!Update.begin(UPDATE_SIZE_UNKNOWN, U_FLASH)) updError = Update.errorString();
   } else if (up.status == UPLOAD_FILE_WRITE && !updError.length()) {
@@ -194,8 +209,8 @@ void setup() {
     Serial.printf("[safeboot] no WiFi, AP %s ip %s\n", ap, WiFi.softAPIP().toString().c_str());
   }
 
-  static const char* hdrs[] = {"Origin"};
-  server.collectHeaders(hdrs, 1);
+  static const char* hdrs[] = {"Origin", "Referer"};
+  server.collectHeaders(hdrs, 2);
   server.on("/", HTTP_GET, handleRoot);
   server.on("/update", HTTP_GET, handleRoot);
   server.on("/info", HTTP_GET, handleInfo);
