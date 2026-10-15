@@ -31,6 +31,16 @@ Found during the ADR-179 acceptance check (2026-10-15). other-projects/otgw-6.6/
 - [ ] #4 Decide and record whether an external CS= is refused while SAT owns MsgID 1 on PIC boards (ADR-179 scope)
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Bench first (AC#1): run scripts/pic_cs_expiry_probe.py on the Classic-S3 on the current build: (a) SAT off, --send-cs 45 --duration 240; (b) SAT on, --duration 900. Old-code evidence.
+2. Fix (AC#2), smallest change: in satEnqueueIfChangedCS() (SATcontrol.ino:348) use a CS-only refresh window of 30 s when the board runs in PIC mode (runtime check, so esp32-combo picks it per boot), keep SAT_CMD_REFRESH_MS = 300 s for MM/CH/TC and for OT-Direct. Only CS needs it: gateway.asm expires SC, CS and C2 only. Cost: one 'CS=x.x' line on the PIC serial link per 30 s. Check that the SAT loop calls the CS path at least every 30 s; if not, the window does not help and the plan needs a timer instead.
+3. Same probe on the fix (AC#3): override held >= 10 min.
+4. AC#4 is a policy question for the maintainer: refuse external CS= on PIC boards while SAT owns MsgID 1 (parity with OT-Direct, ADR-179) or leave it open. Recommendation: refuse, same rule on both board types.
+Waiting for the Classic-S3 and the maintainer's go on step 2 and the AC#4 choice.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
