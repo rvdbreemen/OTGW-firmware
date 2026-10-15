@@ -392,14 +392,29 @@ exit /b 0
 :select_migrate_images
 REM MIGRATE mode: a matching *-migrate-0x0.bin + *-migrate-rest.bin pair (build.py
 REM cuts both from the merged-full image around NVS). Release folder first, then build\.
+REM --bin <...-migrate-0x0.bin> picks one explicitly. Without it exactly one
+REM candidate must exist: the images are board-specific, so with several targets
+REM in build\ the tool refuses to guess.
 set "MIG_FIRST="
 set "MIG_REST="
-for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-migrate-0x0.bin") do if not defined MIG_FIRST set "MIG_FIRST=%%F"
-if not defined MIG_FIRST for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-migrate-0x0.bin") do if not defined MIG_FIRST set "MIG_FIRST=%%F"
-if not defined MIG_FIRST (
+set "MIG_COUNT=0"
+if not "%ARG_BIN%"=="" (
+    if not exist "%ARG_BIN%" ( echo [ERROR] --bin file not found: %ARG_BIN% & exit /b 1 )
+    set "MIG_FIRST=%ARG_BIN%"
+    goto :migrate_have_first
+)
+for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-migrate-0x0.bin") do ( set /a MIG_COUNT+=1 & set "MIG_FIRST=%%F" )
+if !MIG_COUNT! EQU 0 for %%F in ("%SCRIPT_DIR%build\OTGW-firmware-*-migrate-0x0.bin") do ( set /a MIG_COUNT+=1 & set "MIG_FIRST=%%F" )
+if !MIG_COUNT! EQU 0 (
     echo [ERROR] No *-migrate-0x0.bin found next to this script or in build\.
     exit /b 1
 )
+if !MIG_COUNT! GTR 1 (
+    echo [ERROR] Several migration images found; they are board-specific. Pick one with --bin:
+    for %%F in ("%SCRIPT_DIR%OTGW-firmware-*-migrate-0x0.bin" "%SCRIPT_DIR%build\OTGW-firmware-*-migrate-0x0.bin") do echo           %%~nxF
+    exit /b 1
+)
+:migrate_have_first
 set "MIG_REST=!MIG_FIRST:-migrate-0x0.bin=-migrate-rest.bin!"
 if not exist "!MIG_REST!" (
     echo [ERROR] Missing the matching image: !MIG_REST!
@@ -546,6 +561,7 @@ echo                                            settings.ini, writes the *-migra
 echo                                            (WiFi kept), then restores and checks settings.ini.
 echo     --password ^<pw^>   admin password, when the unit has one set
 echo     --no-backup         migrate without saving settings (they return to defaults)
+echo     --bin ^<x-migrate-0x0.bin^>  pick the board's migration image when several are present
 echo.
 echo   --update checks the unit's partition table first and refuses when it needs --migrate.
 echo.

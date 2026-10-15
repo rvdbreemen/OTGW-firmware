@@ -85,6 +85,8 @@ One-time layout migration (ADR-191, TASK-1223.8):
   --host <ip|name>     The unit's address (needed unless --no-backup).
   --password <pw>      Admin password, when the unit has one set.
   --no-backup          Migrate without saving settings (they return to defaults).
+  --bin <x-migrate-0x0.bin>  With --migrate: pick the board's migration image
+                       when several are present (they are board-specific).
 
 Other:
   --help, -h           Show this help.
@@ -234,12 +236,27 @@ migrate_flow() {
         err "--migrate needs --host <device ip or name>, or --no-backup."
         exit 2
     fi
-    for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
-        for f in "$dir"/OTGW-firmware-*-migrate-0x0.bin; do
-            [ -f "$f" ] && [ -z "$first" ] && first="$f"
+    # --bin <...-migrate-0x0.bin> picks one explicitly. Without it exactly one
+    # candidate must exist: the images are board-specific.
+    local cands=()
+    if [ -n "$ARG_BIN" ]; then
+        [ -f "$ARG_BIN" ] || { err "--bin file not found: $ARG_BIN"; exit 1; }
+        cands=("$ARG_BIN")
+    else
+        for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/build"; do
+            for f in "$dir"/OTGW-firmware-*-migrate-0x0.bin; do
+                [ -f "$f" ] && cands+=("$f")
+            done
+            [ ${#cands[@]} -gt 0 ] && break
         done
-    done
-    [ -n "$first" ] || { err "No *-migrate-0x0.bin found next to this script or in build/."; exit 1; }
+    fi
+    [ ${#cands[@]} -gt 0 ] || { err "No *-migrate-0x0.bin found next to this script or in build/."; exit 1; }
+    if [ ${#cands[@]} -gt 1 ]; then
+        err "Several migration images found; they are board-specific. Pick one with --bin:"
+        for f in "${cands[@]}"; do echo "          $(basename "$f")" >&2; done
+        exit 1
+    fi
+    first="${cands[0]}"
     rest="${first%-migrate-0x0.bin}-migrate-rest.bin"
     [ -f "$rest" ] || { err "Missing the matching image: $rest"; exit 1; }
 
