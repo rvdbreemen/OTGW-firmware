@@ -3,11 +3,11 @@ id: TASK-1237
 title: >-
   Bring the nine Proposed ADRs (166, 168, 170-173, 175, 178, 179) up to date and
   accept them
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-15 15:46'
-updated_date: '2026-10-15 16:01'
+updated_date: '2026-10-15 16:02'
 labels:
   - adr
   - docs
@@ -27,7 +27,7 @@ Acceptance sweep 2026-10-15. Code-vs-ADR verification by three read-only agents;
 - [x] #2 adr-lint --strict docs/adr reports no FAIL for these nine ADRs
 - [x] #3 168, 170, 171, 172, 173, 175, 178, 179 Accepted via adr accept --confirm
 - [x] #4 166 Accepted then Superseded by ADR-191 (bidirectional)
-- [ ] #5 Docs-only commit pushed to origin/dev
+- [x] #5 Docs-only commit pushed to origin/dev
 <!-- AC:END -->
 
 ## Final Summary
