@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-15 15:35'
-updated_date: '2026-10-15 18:27'
+updated_date: '2026-10-15 18:45'
 labels:
   - sat
   - pic
@@ -47,4 +47,6 @@ Waiting for the Classic-S3 and the maintainer's go on step 2 and the AC#4 choice
 2026-10-15: expiry window computed from gateway.asm. Timer1 = Fosc/4 (4 MHz internal osc, OSCCON b'01101010') with 1:8 prescale, 16-bit overflow = 0.524 s; StartTimer loads minutetimer=120 and clears the heartbeat flags; Expired = bit 7 after 121 ticks = ~63 s. A CS= starts the timer; at the first expiry the heartbeat is set, so the timer restarts with cleared flags; at the second expiry (~126 s) without a new CS= the PIC sets SysCtrlSetpoint. So SAT's 300 s cadence leaves the override off for roughly 174-237 s of every 300 s. Refresh must be < 63 s to be safe in all phases (AC#2 says <= 50 s). Added scripts/pic_cs_expiry_probe.py: reads the PIC stream on port 25238, follows MsgID 1 T/R frames and 'CS: x' acks, reports override ON/OFF transitions with time since the last ack. Smoke-tested on synthetic lines; bench run waits for the Classic-S3 (not connected today). Bench recipe: (1) --send-cs 45 --duration 240 with SAT off: expect override OFF ~63-126 s after the ack; (2) SAT on, --duration 900: expect OFF phases between SAT's 300 s acks.
 
 2026-10-15: maintainer approved the plan and chose to REFUSE external CS= on PIC boards while SAT owns MsgID 1 (AC#4). Implemented in alpha.427: (1) satPicCSKeepalive() in SATcontrol.ino re-sends the last SAT CS every 30 s on PIC boards (isPICEnabled, last CS >= 8 C), called from satLoop every pass before the control-timer gate, so it does not depend on the control interval (10-300 s, default 30). OT-Direct untouched. (2) addCommandToQueue() (OTGW-Core.ino, PIC path only) refuses CS= while satOwnsControlSetpoint() unless satCommandInFlight(), same rule as the OT-Direct handler. Raw bytes on port 25238 bypass the queue and stay unfiltered (ADR-177). All internal CS= producers already use satEnqueueOwnCS (checked by grep). AC#1/#3 still need the Classic-S3 bench run with scripts/pic_cs_expiry_probe.py on alpha.426 (old) and alpha.427 (fix).
+
+Evidence alpha.427 (8815ddb0d): build.bat --firmware --target all SUCCESS for esp32 (20:32), esp32-classic (20:38), esp32-combo (20:43; flash 88.2%); evaluate.py --quick 71 pass / 0 warn / 0 fail. OTGW32 bench (OT-Direct, .88.61) flashed with the combo app: boots alpha.427, otdirectavailable=true, /api/v2/sat/status answers with SAT enabled (keepalive is a no-op without PIC). Remaining: AC#1 and AC#3 on the Classic-S3.
 <!-- SECTION:NOTES:END -->
