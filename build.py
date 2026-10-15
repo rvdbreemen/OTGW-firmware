@@ -850,6 +850,65 @@ def littlefs_minimum_kib(mklittlefs, content_dir, block, page, step_kib=4):
         return hi
 
 
+# TASK-1223.6: LittleFS room the firmware needs at runtime, on top of the shipped
+# assets. Every file takes at least one 4 KiB block. The runtime files are:
+# - 14 persistent files (settings.ini takes 2 blocks), 60 KiB: settings.ini,
+#   reboot_count.txt, reboot_log.txt, bootdetect.log, dallas_labels.ini,
+#   dhw_water.json, ot-boiler.json, ot-thermo.json, sat_energy.json,
+#   sat_energy_estimate.json, sat_hcr.json, sat_markers.json, sat_pid_state.json,
+#   topic_cleanup.bin;
+# - 2 short-lived .tmp copies during atomic writes, 8 KiB;
+# - growth of a PIC hex download over the shipped copy (it overwrites the same
+#   name; the firmware expects 30-60 KB against the 27 KB shipped gateway.hex),
+#   up to 33 KiB.
+# 101 KiB in total. The gate allows 96 KiB because the .tmp copies never all
+# exist at once. Files a user uploads through FSexplorer are not counted.
+FS_RUNTIME_RESERVE_KIB = 96
+
+
+def littlefs_budget_error(min_kib, fs_size_bytes, reserve_kib=FS_RUNTIME_RESERVE_KIB):
+    """Return an error message when the shipped content plus the runtime reserve
+    does not fit the LittleFS partition, else None."""
+    partition_kib = fs_size_bytes // 1024
+    need_kib = min_kib + reserve_kib
+    if need_kib <= partition_kib:
+        return None
+    return (f"LittleFS budget exceeded: assets need {min_kib} KiB + {reserve_kib} KiB runtime "
+            f"reserve = {need_kib} KiB, partition is {partition_kib} KiB "
+            f"({need_kib - partition_kib} KiB over). Shrink the assets in "
+            f"src/OTGW-firmware/data/ or change the partition table.")
+
+
+_littlefs_min_cache = {}
+
+
+def enforce_littlefs_budget(project_dir, target, fs_dir, required=False):
+    """Fail the build when fs_dir does not fit the target's LittleFS partition with
+    the runtime reserve. Returns True when the check ran. Without mklittlefs the
+    check cannot run: that returns False, or fails the build when required."""
+    tcfg = TARGETS[target]
+    mklittlefs = find_mklittlefs(project_dir, target)
+    if not mklittlefs:
+        if required:
+            print_error("mklittlefs not found: cannot check the LittleFS budget")
+            sys.exit(1)
+        return False
+    key = (str(fs_dir), tcfg["fs_block"], tcfg["fs_page"])
+    if key not in _littlefs_min_cache:
+        _littlefs_min_cache[key] = littlefs_minimum_kib(mklittlefs, fs_dir, tcfg["fs_block"], tcfg["fs_page"])
+    min_kib = _littlefs_min_cache[key]
+    if min_kib is None:
+        print_error(f"LittleFS budget: the staged content does not fit even a 4 MiB image ({fs_dir})")
+        sys.exit(1)
+    error = littlefs_budget_error(min_kib, tcfg["fs_size"])
+    if error:
+        print_error(error)
+        sys.exit(1)
+    print_success(f"LittleFS budget OK: {min_kib} KiB assets + {FS_RUNTIME_RESERVE_KIB} KiB reserve "
+                  f"<= {tcfg['fs_size'] // 1024} KiB partition")
+    return True
+
+
 def prepare_filesystem_staging(project_dir, target, minify=True):
     """Build the staging copy for the LittleFS image and print the size report."""
     print_step("Staging web assets for the filesystem image")
@@ -2725,6 +2784,11 @@ Examples:
         tcfg = TARGETS[target]
         print(f"\n{Colors.HEADER}{Colors.BOLD}--- Building for {tcfg['name']} ---{Colors.ENDC}\n")
 
+        # TASK-1223.6: check the LittleFS budget before building the image. On a
+        # first build mklittlefs may not be installed yet; then the check runs
+        # right after the filesystem build, which installs it.
+        budget_checked = fs_dir is None or enforce_littlefs_budget(project_dir, target, fs_dir)
+
         if use_pio:
             # PlatformIO build path
             if args.firmware and not args.filesystem:
@@ -2749,6 +2813,9 @@ Examples:
                 build_filesystem(project_dir, config_file, target, fs_dir)
 
             consolidate_build_artifacts(project_dir, target)
+
+        if not budget_checked:
+            enforce_littlefs_budget(project_dir, target, fs_dir, required=True)
 
         # Rename artifacts with version
         rename_build_artifacts(project_dir, semver, target)

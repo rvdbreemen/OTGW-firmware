@@ -19,6 +19,7 @@ requirements-build.txt; the minify tests are skipped without them).
 
 import hashlib
 import io
+import os
 import re
 import sys
 import tempfile
@@ -132,6 +133,43 @@ class TestStagingFailsLoud(unittest.TestCase):
             with self.assertRaises(SystemExit) as ctx:
                 build.prepare_filesystem_staging(REPO_ROOT, "esp32-combo", minify=True)
             self.assertEqual(ctx.exception.code, 1)
+
+
+class TestLittleFsBudget(unittest.TestCase):
+    """TASK-1223.6: the shipped assets plus the runtime reserve must fit the
+    LittleFS partition, or the build stops."""
+
+    def test_budget_math(self):
+        reserve = build.FS_RUNTIME_RESERVE_KIB
+        self.assertIsNone(build.littlefs_budget_error(768 - reserve, 768 * 1024))
+        error = build.littlefs_budget_error(768 - reserve + 4, 768 * 1024)
+        self.assertIsNotNone(error)
+        self.assertIn("4 KiB over", error)
+
+    @unittest.skipUnless(build.find_mklittlefs(REPO_ROOT, "esp32-combo"), "mklittlefs not installed")
+    def test_oversize_dummy_fails_and_real_assets_pass(self):
+        target = "esp32-combo"
+        partition = build.TARGETS[target]["fs_size"]
+        with tempfile.TemporaryDirectory() as tmp:
+            big = Path(tmp) / "big"
+            big.mkdir()
+            # Random bytes so nothing can shrink them; sized to the full partition.
+            (big / "dummy.bin").write_bytes(os.urandom(partition))
+            build._littlefs_min_cache.clear()
+            with self.assertRaises(SystemExit) as ctx:
+                build.enforce_littlefs_budget(REPO_ROOT, target, big)
+            self.assertEqual(ctx.exception.code, 1)
+
+            staging = Path(tmp) / "staging"
+            build.stage_data_dir(DATA_DIR, staging, minify=HAVE_MINIFIERS)
+            build._littlefs_min_cache.clear()
+            self.assertTrue(build.enforce_littlefs_budget(REPO_ROOT, target, staging))
+
+    def test_missing_mklittlefs_required_fails(self):
+        with mock.patch.object(build, "find_mklittlefs", return_value=None):
+            self.assertFalse(build.enforce_littlefs_budget(REPO_ROOT, "esp32-combo", DATA_DIR))
+            with self.assertRaises(SystemExit):
+                build.enforce_littlefs_budget(REPO_ROOT, "esp32-combo", DATA_DIR, required=True)
 
 
 class TestCssCommentsCloseCleanly(unittest.TestCase):
