@@ -2,17 +2,17 @@
 
 ## System Components
 
-The OTGW-firmware synthesizes 10 code-level modules into 6 logical components. The grouping follows domain boundaries: protocol, transport, integration, configuration, thermostat control, and physical I/O plus UI infrastructure.
+The OTGW-firmware (2.0.0 line, ESP32-S3 only) synthesizes 10 code-level modules into 7 logical components. The grouping follows domain boundaries: protocol, transport, integration, configuration, thermostat control, physical I/O, and UI infrastructure.
 
 | Component | Type | Description | Documentation |
 |-----------|------|-------------|---------------|
-| OpenTherm Core | Application Component | Protocol decoding, PIC serial comm, command queue, MQTT throttle, watchdog management, OTDirect GPIO stack (ESP32) | [c4-component-opentherm-core.md](./c4-component-opentherm-core.md) |
-| Network and Connectivity | Application Component | WiFi, NTP, mDNS/LLMNR, runtime WiFi↔Ethernet failover (ESP32+W5500, TASK-581), platform abstraction | [c4-component-network.md](./c4-component-network.md) |
-| Integration Layer | Application Component | MQTT client + HA auto-discovery (JIT-by-default per ADR-100, flat per-value topics per ADR-101, self-describing names per ADR-106), REST API v2, JSON streaming, file serving, auth/CSRF | [c4-component-integration-layer.md](./c4-component-integration-layer.md) |
-| Configuration and State | Application Component | Persistent settings (OTGWSettings), runtime state (OTGWState), LittleFS JSON, deferred write, side-effect coordination | [c4-component-configuration-state.md](./c4-component-configuration-state.md) |
-| Smart Thermostat (SAT) | Application Component | Heating curve, PID v3 with deadband, anti-cycling, OPV calibration, boiler state machine, Open-Meteo weather, NimBLE-Arduino 2.x BLE roster (ADR-092), multi-area DS18B20 mapping, calibration markers | [c4-component-smart-thermostat.md](./c4-component-smart-thermostat.md) |
-| Sensors and Hardware | Application Component | Dallas DS18B20 (1-Wire), S0 pulse energy meter, GPIO relay, OLED display, sensor simulation | [c4-component-sensors-hardware.md](./c4-component-sensors-hardware.md) |
-| Web Interface | Application Component | WebSocket OT stream, telnet debug, heap health, safe timers, webhook, browser SPA (HTML/CSS/JS + ECharts) | [c4-component-web-interface.md](./c4-component-web-interface.md) |
+| OpenTherm Core | Application Component | PIC serial task and frame queues, byte-transparent PIC stream (ADR-177), command queue with SAT setpoint ownership (ADR-179), OT decoding, OTDirect GPIO stack for boards without a PIC, combo board selection at boot (ADR-127) | [c4-component-opentherm-core.md](./c4-component-opentherm-core.md) |
+| Network and Connectivity | Application Component | WiFi with portal and static IP, NTP, mDNS, WiFi/Ethernet failover (W5500), platform abstraction, firmware OTA through the safeboot updater (ADR-191) | [c4-component-network.md](./c4-component-network.md) |
+| Integration Layer | Application Component | MQTT client (espMqttClient) with HA discovery from PROGMEM tables (ADR-077, JIT per ADR-100, flat per-value topics per ADR-101), daily discovery heal, REST API v2 with in-flight gates and 429 rate limiting (ADR-165, ADR-172), JsonEmit streaming JSON (ADR-146), file serving, auth/CSRF | [c4-component-integration-layer.md](./c4-component-integration-layer.md) |
+| Configuration and State | Application Component | Persistent settings (OTGWSettings), runtime state (OTGWState), LittleFS JSON, deferred write, side-effect coordination, NVS mirror for the safeboot updater | [c4-component-configuration-state.md](./c4-component-configuration-state.md) |
+| Smart Thermostat (SAT) | Application Component | Heating curve, PID with deadband, multi-zone, anti-cycling, 16-state boiler status machine, write-on-change commands with a 30 s CS keepalive on PIC boards (TASK-1236), simulation mode, weather (Open-Meteo or OpenWeatherMap), BLE room sensors and area sensors (ADR-178) | [c4-component-smart-thermostat.md](./c4-component-smart-thermostat.md) |
+| Sensors and Hardware | Application Component | Dallas DS18B20 (1-Wire, up to 16), S0 pulse counter, GPIO output relay, OLED status pages, board and hardware detection (ADR-127, ADR-158) | [c4-component-sensors-hardware.md](./c4-component-sensors-hardware.md) |
+| Web Interface | Application Component | v2 single-page UI (ADR-192) plus FSexplorer recovery page, WebSocket `/ws`, telnet debug menu, heap health (ADR-167), safe timers, webhook task | [c4-component-web-interface.md](./c4-component-web-interface.md) |
 
 ## Code Module to Component Mapping
 
@@ -33,20 +33,20 @@ The OTGW-firmware synthesizes 10 code-level modules into 6 logical components. T
 
 ### Design Rationale
 
-**OpenTherm Core + OTDirect as one component**: OTDirect is the ESP32-native replacement for the PIC gateway. From the rest of the firmware's perspective, both paths produce identical output: decoded OT frames passed to `processOT()`. Grouping them reflects their functional equivalence — one decodes serial from a PIC, the other decodes GPIO signals directly. The Integration Layer, SAT, and REST API components are unaware of which path is active.
+**OpenTherm Core + OTDirect as one component**: OTDirect is the ESP32-native replacement for the PIC gateway. From the rest of the firmware's perspective, both paths produce the same output: decoded OT frames passed to `processOT()`. One path decodes serial lines from a PIC, the other drives the OpenTherm bus from GPIO directly. On the combo build the board picks one of the two at boot (ADR-127). The Integration Layer, SAT and REST API do not need to know which path is active, with one shared rule: while SAT is enabled it owns MsgID 1, and both paths refuse an external `CS=` (ADR-179, TASK-1236).
 
-**Integration Layer combining MQTT + REST API**: Both sub-systems consume the same data sources (OpenTherm state, settings, SAT state), share the same JSON formatting infrastructure (`jsonStuff.ino`), and expose overlapping functionality (SAT can be controlled via either MQTT topics or REST endpoints). Separating them would require documenting the shared JSON layer twice without adding clarity.
+**Integration Layer combining MQTT + REST API**: Both sub-systems consume the same data sources (OpenTherm state, settings, SAT state), share the same JSON infrastructure (JsonEmit and `jsonStuff.ino`), and expose overlapping functionality (SAT can be controlled through MQTT topics or REST endpoints). Separating them would document the shared JSON layer twice without adding clarity.
 
-**Web Interface combining Utilities + Web Assets**: The Utilities code (WebSocket server, heap backpressure, safe timers, telnet) exists primarily to support the browser SPA. There is no meaningful architectural boundary between "the WebSocket server" and "the JavaScript that connects to it" — they are co-designed and co-evolve. Server-side infrastructure for the UI lives in one component.
+**Web Interface combining Utilities + Web Assets**: The Utilities code (WebSocket server, heap health, safe timers, telnet, webhook) exists mainly to support the browser UI. There is no useful boundary between the WebSocket server and the JavaScript that connects to it: they are co-designed and evolve together.
 
-**Configuration and State as a standalone component**: `OTGWSettings` and `OTGWState` are accessed by every other component. Making Configuration and State a named, first-class component makes this central role explicit and prevents the common mistake of treating settings as a detail of whichever module first touches them.
+**Configuration and State as a standalone component**: `OTGWSettings` and `OTGWState` are accessed by every other component. Making them a first-class component keeps that central role explicit and prevents settings from being treated as a detail of whichever module touches them first.
 
 ### Component Dependency Rules
 
-- **No circular dependencies at component level**: Configuration and State has no dependencies on other firmware components (only on LittleFS). It is the stable base.
-- **OpenTherm Core does not depend on SAT**: SAT reads from Core's published state; Core does not call SAT. Data flows one way.
-- **Integration Layer is the only component that reaches external systems** (broker, HA): Other components push to Integration Layer; they do not independently open TCP connections.
-- **Web Interface is infrastructure**: All other components call into Web Interface (WebSocket events, timers, heap gates) but Web Interface does not depend on SAT, Sensors, or Integration Layer at the server level.
+- **Configuration and State is the stable base**: it depends on LittleFS (and NVS for the safeboot mirror), not on other firmware components.
+- **OpenTherm Core asks SAT only who owns MsgID 1**: Core calls `satOwnsControlSetpoint()` and `satCommandInFlight()` to refuse an external `CS=`. Otherwise SAT reads Core's state and Core does not call into SAT logic.
+- **Integration Layer reaches the home automation systems** (broker, HA). Two other outbound paths exist: the webhook task (local HTTP only) and SAT's weather fetch.
+- **Web Interface is infrastructure**: other components call into it (WebSocket events, timers, heap gates); it does not depend on SAT, Sensors or the Integration Layer on the server side.
 
 ## Component Relationships Diagram
 
@@ -54,96 +54,91 @@ The OTGW-firmware synthesizes 10 code-level modules into 6 logical components. T
 C4Component
     title OTGW-Firmware: All Components and Relationships
 
-    Container_Boundary(fw, "OTGW-Firmware (ESP8266 / ESP32)") {
-        Component(otcore, "OpenTherm Core", "Arduino C++", "OT protocol, PIC serial, command queue, OTDirect GPIO (ESP32)")
-        Component(network, "Network & Connectivity", "Arduino C++", "WiFi, NTP, mDNS, Ethernet failover, platform abstraction")
-        Component(integlayer, "Integration Layer", "Arduino C++", "MQTT client + HA discovery (PROGMEM drip), REST API v2, JSON streaming, file serving")
+    Container_Boundary(fw, "OTGW-Firmware (ESP32-S3)") {
+        Component(otcore, "OpenTherm Core", "Arduino C++, FreeRTOS task", "PIC serial task, frame queues, command queue, OTDirect GPIO")
+        Component(network, "Network & Connectivity", "Arduino C++", "WiFi, NTP, mDNS, Ethernet failover, safeboot OTA")
+        Component(integlayer, "Integration Layer", "Arduino C++", "MQTT + HA discovery, REST API v2, JsonEmit, file serving")
         Component(cfgstate, "Configuration & State", "Arduino C++", "OTGWSettings, OTGWState, LittleFS JSON, deferred write")
-        Component(sat, "Smart Thermostat (SAT)", "Arduino C++", "Heating curve, PID v3, anti-cycling, OPV calibration, boiler state machine")
-        Component(sensors, "Sensors & Hardware", "Arduino C++", "Dallas DS18B20, S0 pulse counter, GPIO relay, OLED")
-        Component(webui, "Web Interface", "Arduino C++ + HTML/CSS/JS", "WebSocket stream, telnet, heap health, safe timers, webhook, browser SPA")
+        Component(sat, "Smart Thermostat (SAT)", "Arduino C++", "Heating curve, PID, boiler state machine, CS keepalive")
+        Component(sensors, "Sensors & Hardware", "Arduino C++", "Dallas DS18B20, S0 pulse counter, GPIO relay, OLED, board detection")
+        Component(webui, "Web Interface", "Arduino C++ + HTML/CSS/JS", "v2 UI, WebSocket /ws, telnet, heap health, timers, webhook")
     }
 
-    System_Ext(pic, "PIC Gateway", "OpenTherm PIC on NodoShop OTGW board")
-    System_Ext(boiler, "Boiler", "OpenTherm slave (CV-ketel)")
-    System_Ext(thermostat, "Thermostat", "OpenTherm master device")
+    System_Ext(pic, "PIC Gateway", "OpenTherm PIC on the Classic board")
+    System_Ext(boiler, "Boiler", "OpenTherm slave")
+    System_Ext(thermostat, "Thermostat", "OpenTherm master")
     System_Ext(broker, "MQTT Broker", "Mosquitto / Home Assistant MQTT")
     System_Ext(ha, "Home Assistant", "Consumes MQTT telemetry and discovery")
     System_Ext(browser, "Web Browser", "Chrome / Firefox / Safari")
     System_Ext(router, "WiFi / Network", "Home LAN, DHCP, NTP server")
-    SystemDb_Ext(lfs, "LittleFS", "Settings, web assets, sensor labels, PIC firmware")
+    SystemDb_Ext(lfs, "LittleFS", "Settings, web assets, sensor labels, SAT state")
 
-    Rel(otcore, pic, "UART serial 9600 baud", "TX/RX OpenTherm frames")
-    Rel(pic, boiler, "OpenTherm bus", "1-wire Manchester")
-    Rel(thermostat, pic, "OpenTherm bus", "1-wire Manchester")
-    Rel(otcore, boiler, "OpenTherm GPIO (ESP32)", "ISR Manchester, OTDirect")
-    Rel(thermostat, otcore, "OpenTherm GPIO (ESP32)", "ISR Manchester, OTDirect")
+    Rel(otcore, pic, "UART0 serial 9600 baud", "commands out, OT lines in")
+    Rel(pic, boiler, "OpenTherm bus", "Manchester")
+    Rel(thermostat, pic, "OpenTherm bus", "Manchester")
+    Rel(otcore, boiler, "OpenTherm GPIO (OTDirect)", "Manchester")
+    Rel(thermostat, otcore, "OpenTherm GPIO (OTDirect)", "Manchester")
 
-    Rel(network, router, "WiFi / DHCP / NTP", "802.11 + SNTP")
+    Rel(network, router, "WiFi / Ethernet, DHCP, NTP", "802.11 / W5500 + SNTP")
 
     Rel(integlayer, broker, "MQTT 3.1.1", "publish + subscribe")
     Rel(ha, broker, "MQTT", "consume telemetry and discovery")
     Rel(browser, integlayer, "HTTP REST + file serving", "port 80")
     Rel(browser, webui, "WebSocket OT stream", "ws:// port 80 /ws")
 
-    Rel(otcore, cfgstate, "Read settings, write state", "settings.otgw.*, state.pic.*")
-    Rel(network, cfgstate, "Read settings, write state", "settings.ntp.*, state.net.*")
+    Rel(otcore, cfgstate, "Read settings, write state", "settings.*, state.pic.*")
+    Rel(network, cfgstate, "Read settings, write state", "settings.ntp.*, settings.wifi.*")
     Rel(integlayer, cfgstate, "Read/write settings and state", "updateSetting(), settings.mqtt.*")
     Rel(sat, cfgstate, "Read/write SAT settings and state", "settings.sat.*, state.sat.*")
-    Rel(sensors, cfgstate, "Read sensor settings", "settings.sensors.*, settings.s0.*")
+    Rel(sensors, cfgstate, "Read sensor settings, write hardware state", "settings.sensors.*, state.hw.*")
     Rel(webui, cfgstate, "Read debug/uptime state", "state.debug.*, state.uptime.*")
 
     Rel(otcore, integlayer, "Decoded OT values", "sendMQTTData(), publishToSourceTopic()")
-    Rel(otcore, webui, "OT frame events", "sendEventToWebSocket()")
-    Rel(integlayer, sat, "SAT commands in/out", "satHandle*(), state.sat.*")
-    Rel(integlayer, sensors, "Sensor label REST API", "getDallasLabels()")
-    Rel(sensors, integlayer, "Sensor MQTT publish", "sendMQTTData(), sensorAutoConfigure()")
-    Rel(sat, otcore, "Inject setpoints", "addCommandToQueue(TT=, CS=, MM=)")
+    Rel(otcore, webui, "OT frame events", "WebSocket log")
+    Rel(otcore, sat, "Setpoint ownership check", "satOwnsControlSetpoint(), satCommandInFlight()")
+    Rel(integlayer, sat, "SAT commands in/out", "REST /api/v2/sat, MQTT set/<node>/sat/*")
+    Rel(integlayer, sensors, "Sensor label REST API", "dallas labels")
+    Rel(sensors, integlayer, "Sensor MQTT publish", "sendMQTTData(), discovery drip")
+    Rel(sensors, sat, "Area temperatures", "satSetAreaTemp()")
+    Rel(sat, otcore, "Send setpoints", "satEnqueueOwnCS(), addCommandToQueue(CS=, MM=, CH=)")
     Rel(network, integlayer, "Restarts MQTT on reconnect", "startMQTT()")
     Rel(network, webui, "Restarts services on reconnect", "startTelnet(), startWebSocket()")
     Rel(cfgstate, network, "Side-effects: MDNS, NTP", "startMDNS(), startNTP()")
     Rel(cfgstate, integlayer, "Side-effect: MQTT restart", "startMQTT()")
-    Rel(webui, otcore, "Heap backpressure gate", "canSendWebSocket()")
-    Rel(integlayer, webui, "Heap backpressure gate", "canPublishMQTT()")
+    Rel(integlayer, webui, "Heap gate", "canPublishMQTT()")
 
     Rel(cfgstate, lfs, "Read/write settings.ini", "JSON file I/O")
-    Rel(integlayer, lfs, "Serve web assets, read sensor labels", "HTTP streaming")
+    Rel(integlayer, lfs, "Serve v2 assets", "HTTP streaming")
     Rel(sensors, lfs, "Persist sensor labels", "/dallas_labels.ini")
-    Rel(sat, lfs, "Persist PID state", "/pid_state.json")
-    Rel(webui, lfs, "Crash log, reboot count, version hash", "/reboot_log.txt, /version.hash")
+    Rel(sat, lfs, "Persist PID, energy and cycle state", "/sat_pid_state.json, /sat/*")
 ```
 
 ## Key Data Flows
 
-### OpenTherm Message to MQTT
+### OpenTherm Message to MQTT (PIC board)
 
-1. Boiler sends OT frame to PIC over 1-wire bus
-2. PIC forwards frame over UART to ESP8266 (e.g., `BA000001\r`)
-3. **OpenTherm Core** `handlePICSerial()` accumulates line, dispatches to `processOT()`
-4. `processOT()` decodes frame type and message ID, extracts typed value (f8.8, s16, etc.)
-5. Updates `OTcurrentSystemState` (Configuration and State global)
-6. Checks `mqttlastsent[msgId]` throttle timestamp
-7. Calls **Integration Layer** `sendMQTTData("Tboiler", "65.50", true)`
-8. Integration Layer streams payload to MQTT broker in 128-byte chunks
-9. MQTT broker delivers to **Home Assistant** and any other subscribers
+1. The thermostat and boiler exchange an OT frame; the PIC prints it as an ASCII line over UART0 (for example `B40190A00`).
+2. **OpenTherm Core** `picSerialTaskBody()` (a FreeRTOS task) reads the bytes, sends them verbatim to the raw stream consumers (port 25238 when enabled, ADR-177) and posts complete lines to `otFrameQueue`.
+3. The main loop drains the queue and calls `processOT()`, which decodes the frame type, message ID and typed value (f8.8, s16, flags).
+4. `processOT()` updates `OTcurrentSystemState` and checks the per-ID `mqttlastsent` throttle.
+5. **Integration Layer** publishes the value to `<top>/value/<nodeId>/<label>` (plus source-specific `_thermostat`/`_boiler` leaves where ADR-097 applies). Every publish goes through `mqttPublishRaw()`.
+6. The broker delivers to **Home Assistant** and other subscribers.
 
-### SAT Setpoint Injection
+On an OTDirect board step 2 is replaced by the GPIO OpenTherm stack, which hands decoded frames to `processOT()` through the same queue path.
 
-1. **SAT** control loop fires every 60 seconds
-2. Reads `OTcurrentSystemState.Tboiler`, `.Tr`, `.RelModLevel` from **OpenTherm Core**
-3. Reads outdoor temperature from **Configuration and State** `state.sat.fOutdoorTemp`
-4. Computes heating curve setpoint + PID correction
-5. Calls `addCommandToQueue("TT=21.50")` in **OpenTherm Core**
-6. OpenTherm Core sends `TT=21.50\r` over UART to PIC
-7. PIC intercepts next thermostat READ_DATA MsgID 1 frame and substitutes setpoint
-8. Boiler receives modified setpoint, adjusts burner modulation
+### SAT Setpoint Control
+
+1. **SAT** control loop runs every `settings.sat.iControlInterval` seconds (default 30, range 10 to 300).
+2. It reads room temperature (simulation, BLE, area sensors, external, or OT MsgID 24, in that priority), outdoor temperature and boiler state.
+3. It computes the heating curve plus PID correction.
+4. It sends `CS=<setpoint>`, `MM=` and `CH=` through `satEnqueueIfChanged*()` (write-on-change, refreshed every 300 s). SAT's own `CS=` goes through `satEnqueueOwnCS()`, so the ownership gate lets it pass.
+5. On a PIC board `satPicCSKeepalive()` re-sends the last CS every 30 s, because the PIC drops a CS 63 to 126 s after the last one (gateway.asm CommandExpiry, TASK-1236).
+6. The PIC (or OTDirect) writes the setpoint into MsgID 1 towards the boiler; the boiler modulates.
 
 ### Settings Update via Web UI
 
-1. Browser `POST /api/v2/settings` with JSON body `{"mqttbroker": "192.168.1.10"}`
-2. **Integration Layer** REST API `handleSettings()` extracts field/value pairs
-3. Calls `updateSetting("mqttbroker", "192.168.1.10")` in **Configuration and State**
-4. `updateSetting()` validates broker string, sets `settings.mqtt.sBroker`, marks `settingsDirty=true`, sets `SIDE_EFFECT_MQTT` bit
-5. `timerFlushSettings` (2-second debounce) fires in main loop
-6. `flushSettings()` calls `writeSettings()` to persist `/settings.ini` to LittleFS
-7. Applies side-effect: calls **Integration Layer** `startMQTT()` to reconnect with new broker
+1. Browser `POST /api/v2/settings` with `{"name":"mqttbroker","value":"192.168.1.10"}`.
+2. **Integration Layer** `handleSettings()` checks the name against the known-settings list.
+3. It calls `updateSetting()` in **Configuration and State**, which validates the value, stores it in `settings.mqtt.sBroker`, marks `settingsDirty` and sets the `SIDE_EFFECT_MQTT` bit.
+4. `timerFlushSettings` fires in the main loop and `flushSettings()` writes `/settings.ini` to LittleFS.
+5. The side effect calls **Integration Layer** `startMQTT()` to reconnect with the new broker.

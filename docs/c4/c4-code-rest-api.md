@@ -3,798 +3,275 @@
 ## Overview
 
 - **Name**: REST API & File Server Module
-- **Description**: ESP8266 Arduino firmware module providing versioned REST API (v2) and file serving from LittleFS with comprehensive JSON response handling, ETag-based caching, CSRF protection, and multi-domain API resource handlers.
-- **Location**: `/src/OTGW-firmware/restAPI.ino` (2103 lines), `/src/OTGW-firmware/FSexplorer.ino` (661 lines), `/src/OTGW-firmware/jsonStuff.ino` (793 lines)
-- **Language**: Arduino C++ (ESP8266)
-- **Purpose**: Provides the REST API surface for the OTGW firmware, enabling web UI and external clients to query/control OpenTherm Gateway state, settings, sensors, and SAT (Smart Ambient Temperature) control; handles file serving with browser caching optimization and firmware/PIC update orchestration.
+- **Description**: ESP32-S3 Arduino module providing the versioned REST API (v2) and LittleFS file serving on the shared `AsyncWebServer`. Handlers run on the AsyncTCP task. JSON is emitted by the streaming `JsonEmit` writer (no ArduinoJson, ADR-146); REST concurrency is capped at 2 in flight (ADR-165); the polled endpoints are rate limited with 429 (ADR-172).
+- **Location**: `/src/OTGW-firmware/restAPI.ino`, `/src/OTGW-firmware/FSexplorer.ino`, `/src/OTGW-firmware/jsonStuff.ino`, `/src/OTGW-firmware/webServerCompat.h`, `/src/OTGW-firmware/jsonEmit.h`, `/src/OTGW-firmware/jsonChunked.h`
+- **Language**: Arduino C++ (ESP32-S3; ESP8266 dropped, ADR-128)
+- **Purpose**: Gives the web UI and external clients access to OpenTherm Gateway state, settings, sensors and SAT control; serves the v2 web UI assets with ETag validation; orchestrates PIC and firmware update helpers.
 
 ## Key Architecture
 
 ### API Design Pattern (ADR-050)
 
-The REST API v2 uses a **centralized route dispatch table** pattern:
+The REST API v2 uses a **central route dispatch table**:
 
-1. **Single entry point**: `processAPI()` at line 1100
-2. **URL parsing**: URI split into tokens (max 8 words, 32 chars each)
-3. **Route matching**: Dispatch table `kV2Routes[]` at line 1080 maps resource names to handler functions
-4. **Handler isolation**: Each resource (health, settings, sensors, device, otgw, sat, etc.) has its own handler
+1. **Single entry point**: `processAPI(AsyncWebServerRequest*)` in `restAPI.ino`, reached from the explicit `/api` route and from the `onNotFound` catch-all for `/api/*`
+2. **URL parsing**: URI split into tokens (`API_MAX_WORDS` 8 words of `API_WORD_LEN` 32 chars; URI limit 50 chars, longer gets 414)
+3. **Route matching**: `kV2Routes[]` (PROGMEM, `{segment, handler}` rows plus a `{nullptr, nullptr}` sentinel) maps `words[3]` to a handler
+4. **Handler isolation**: every resource has one handler `void handleXxx(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)`
 
-This design allows adding new endpoints by simply:
-1. Adding a handler function
-2. Adding one entry to `kV2Routes[]`
+Adding an endpoint takes one handler and one `kV2Routes[]` row.
 
-No changes needed to the router itself.
+Current `kV2Routes[]` segments: `health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (only `HAS_DIRECT_OT`), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`, `discovery`, `debug`, `network`, `mqtt`.
 
-### Security Model
+### Concurrency Gates and Backpressure (ADR-165, ADR-147, ADR-188)
 
-- **CORS preflight**: OPTIONS method always allowed (RFC 7231)
-- **HTTP Basic Auth** (ADR-054): All POST/PUT mutations require auth
-- **CSRF protection** (ADR-054): Same-origin validation via Origin/Referer headers
-- **Rate limiting**: Via global `checkHttpAuth()` — only one auth check per request
-- **Error format**: Consistent JSON: `{"error":{"status":N,"message":"..."}}`
+- **REST in-flight cap**: `REST_MAX_INFLIGHT` = 2 (`restInFlight`). `restEffectiveInflightCap()` tightens it to 1 when `platformMaxFreeBlock()` is below 16000 and keeps 2 below 24000. Excess requests get a cheap 503 with `Retry-After: 1` from `sendApiBusy()`. `REST_MAX_INFLIGHT` of 255 disables the gate (A/B arm).
+- **File-serve cap**: `WEB_FILE_MAX_INFLIGHT` = 2, same heap clamp, `webFileGateTryAdmit()` / `webFileGateRelease()`; the REST and file slots are released through `webArmSlotRelease()` on request disconnect.
+- **Connection cap** (ADR-188): `webConnCapExceeded()` refuses a request with 503 while more than `WEB_MAX_TX_CONNECTIONS` (4) port-80 connections hold send data (WebSocket clients are subtracted).
+- Counters in `state.heapdiag`: `iRest503Count`, `iWebfile503Count`, `iWebConn503Count`, `iRestInflightHwm`, `iWebfileInflightHwm`.
+- Frontend side: at most 2 calls in flight; the v2 bundle enforces this with a FIFO queue around `window.fetch` (ADR-184).
 
-### File Serving & Caching Strategy
+### Rate Limiting (ADR-172)
 
-1. **ETag-based conditional GET** (HTTP 304 Not Modified)
-   - `index.html` uses filesystem hash as ETag
-   - Browser caches and revalidates via `If-None-Match` header
-   - Unchanged FS → 304 (no re-download)
-   - Updated FS → ETag changes → 200 (fresh content)
+`checkApiRateLimit()` runs after route match and before the handler, for GET only. A GCRA budget (`ApiRateLimitBudget`, burst 2) applies per endpoint and globally, not per client:
 
-2. **Versioned asset URLs** (cache-busting)
-   - JS assets: `index.js?v=<fsHash>`, `graph.js?v=<fsHash>`
-   - Versioned requests get long-term cache (1 day)
-   - Bare requests get no-cache header
+| Budget | Routes | Window |
+|--------|--------|--------|
+| `RL_BUDGET_OTMONITOR` | `GET /api/v2/otgw/otmonitor` and its alias `/otgw/telegraf` (shared budget) | 1500 ms |
+| `RL_BUDGET_DEVICE_TIME` | `GET /api/v2/device/time` | 4000 ms |
 
-3. **Chunked streaming** (no full buffering)
-   - Large files streamed via `httpServer.streamFile()`
-   - Line-by-line injection of `?v=<hash>` into HTML
-   - Avoids heap fragmentation
+Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after` repeated in the body), `Retry-After`, `Cache-Control: no-store`, `RateLimit` and `RateLimit-Policy`. `evaluate.py` gates the coupling to the UI poll intervals (`check_poll_window_coupling`) and the alias coverage (`check_api_rate_limit_alias_coverage`). Separate 60 s cooldowns (429 JSON error) guard `POST /api/v2/discovery/republish` and `POST /api/v2/mqtt/republish` (CWE-770).
+
+### Security Model (ADR-056)
+
+- **HTTP Basic Auth**: user `admin`, password `settings.sHTTPpasswd`; empty password disables auth.
+- **Central mutation gate**: `processAPI()` calls `checkHttpAuth()` for POST, PUT, PATCH and DELETE on `/api/v2/*`. `handleSettings()` and `handleSAT()` also authenticate GET.
+- **CSRF**: `isSameOriginRequest()` compares the Origin (else Referer) host with the Host header; no Origin and no Referer is allowed (curl, Home Assistant). The check only engages when a password is set.
+- **OPTIONS**: CORS preflight is answered upstream with 204 by `sendApiOptions()` before any handler; `checkHttpAuth()` does not short-circuit OPTIONS.
+- **CORS**: `sendCorsOriginHeader()` echoes the request Origin instead of a wildcard.
+- **Error format**: `{"error":{"status":N,"message":"..."}}` via `sendApiError()`; `sendApiMethodNotAllowed()` adds the `Allow` header; v0/v1 paths return 410.
+
+### File Serving & Caching Strategy (ADR-139)
+
+- **Stable URLs, ETag revalidation**: `serveVersionedAsset()` sends `ETag: "<fsHash>-<path>"` (filesystem hash plus served path) and `Cache-Control: no-cache`. A matching `If-None-Match` gets 304; a reflash or filesystem OTA changes the hash. Missing files return a no-cache 404 without validator. There is no `?v=` query versioning and no HTML rewriting.
+- **Immutable fonts**: `serveImmutableAsset()` serves the three `.woff2` fonts with `max-age=31536000, immutable`.
+- **Streaming**: `webSendFile()` serves from flash through `AsyncFileResponse`; files are never loaded into RAM.
+- **Shell**: only the v2 UI ships (`v2.html`, `v2.js`, `v2-bundle.css`, ADR-192). `sendIndex()` falls back to `/FSexplorer.html` when `/v2.html` is missing.
 
 ## Code Elements
 
 ### Main API Handler
 
-#### `void processAPI()`
-- **Location**: `restAPI.ino:1100–1176`
-- **Purpose**: Central dispatcher for all `/api/v2/*` requests with handler timing and access logging
-- **Signature**: `void processAPI()`
-- **Behavior**:
-  - Records `startMs = millis()` at entry for timing measurement
-  - Parses URI into tokens via `strtok_r()`
-  - Validates heap (>4KB) and URI length (<50 chars)
-  - Routes to resource handlers via `kV2Routes[]` dispatch table
-  - Forwards deprecated v0/v1 with 410 Gone error
-  - Sends 404 for unknown routes
-  - Logs one-line access log to telnet debug: method, URI, response status code, handler elapsed time via `RESTDebugTf()` (v1.3.5+, commit 583dd59c). Example: `REST GET /api/v2/sensors/status => 200 v2/sensors 42ms`
-- **Dependencies**: `httpServer`, `kV2Routes[]`, per-resource handlers
-- **Notes**: Uses static buffers (URI[50], words[8][32], originalURI) totaling ~356 bytes to save stack; cooperative scheduler — not re-entrant with yield()
+#### `void processAPI(AsyncWebServerRequest *request)`
+- **Location**: `restAPI.ino`
+- **Behavior** (in order):
+  - `webBeginRequest(request)` binds the per-request context
+  - `webConnCapExceeded()` then the in-flight cap, both answering 503 via `sendApiBusy()`
+  - Rejects URIs of 50 chars or more (414) and `platformFreeHeap() < 4096` (500)
+  - Tokenizes the URI with `strtok_r()` into static buffers
+  - `/api/v2/*`: OPTIONS gets 204; mutating methods go through `checkHttpAuth()`; `kV2Routes[]` lookup; `checkApiRateLimit()`; handler call
+  - `/api/v0` and `/api/v1` get 410; anything else gets `sendApiNotFound()`
+  - One access-log line per request when `state.debug.bRestAPI` is set (telnet key `2`): `REST <METHOD> <URI> => <status> v2/<segment> <ms>ms`
+- **Notes**: static buffers are safe because all handlers serialize on the AsyncTCP task
 
 ### Resource Handlers (Route Dispatch)
 
-Each handler function signature: `void handleXXX(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)`
+#### `handleHealth`
+- `GET /api/v2/health` via `sendHealth()` (status, uptime, heap, network mode, RSSI, MQTT/OTGW/thermostat/boiler connectivity, `otcommandinterface`, `otgwmode`, `picfwtype`, `ntpenable`). Not authenticated.
 
-#### `void handleHealth()`
-- **Location**: `restAPI.ino:216–219`
-- **Purpose**: GET-only endpoint for system health metrics
-- **HTTP Method**: GET only
-- **Route**: `/api/v2/health`
-- **Response**: JSON health object via `sendHealth()`
-- **Auth**: Not required
+#### `handleSettings`
+- `GET` (`sendDeviceSettings()`) and `POST`/`PUT` (`postSettings()`); auth required for all methods.
+- `postSettings()` takes one setting per call: body `{"name":"<setting>","value":<v>}`, parsed with `extractJsonField()`; unknown names get 400 (`isKnownSetting()`). Booleans must be unquoted JSON `true`/`false`. The write is debounced (2 s flush timer), not synchronous.
+- Each setting is emitted as a typed object: `{"value":..,"type":"s|i|f|b",...,"maxlen"|"min"/"max"}`. `ssid` is read-only (type `r`).
 
-#### `void handleSettings()`
-- **Location**: `restAPI.ino:242–252`
-- **Purpose**: Read device settings (GET) or update settings (POST/PUT)
-- **HTTP Methods**: GET, POST, PUT
-- **Routes**:
-  - `GET /api/v2/settings` → `sendDeviceSettings()` (sensitive data, auth required)
-  - `POST/PUT /api/v2/settings` → `postSettings()` (auth required)
-- **Auth**: Required for all methods
-- **Notable read-only field**: `ssid` (type `"r"`) — returns the connected WiFi SSID via `WiFi.SSID()`. Not writable; exposed so the Settings page can display the current network without additional API calls. When on Ethernet, the device info endpoint returns `"ssid": "Wired"` via `sendDeviceInfoV2()`. Line 1730 shows SSID metadata: `sendJsonSettingObj(F("ssid"), ssidBuf, "r", 32)` where `"r"` marks it read-only.
-- **Nightly restart settings** (v1.3.5+, commit 06c62770): Endpoints expose `nightlyrestart` (bool) and `nightlyrestarthour` (int 0-23) for scheduling automatic device restart; frontend Settings page now provides Reset WiFi button alongside settings; lines 1754-1755 in sendDeviceSettings
+#### `handleSensors`
+- `GET /api/v2/sensors` or `/sensors/status` (Dallas and S0 readings), `GET|POST|PUT /sensors/labels` (`getDallasLabels()` / `updateAllDallasLabels()`).
 
-#### `void handleSensors()`
-- **Location**: `restAPI.ino:254–317` (implemented via `sendSensorStatus()` starting at line 254)
-- **Purpose**: Read current sensor readings and manage Dallas temperature sensor labels
-- **HTTP Methods**: GET, POST, PUT
-- **Routes**:
-  - `GET /api/v2/sensors` or `GET /api/v2/sensors/status` → `sendSensorStatus()` at line 254 (current Dallas + S0 readings; new endpoint added commit 583dd59c)
-  - `GET /api/v2/sensors/labels` → `getDallasLabels()`
-  - `POST/PUT /api/v2/sensors/labels` → `updateAllDallasLabels()`
-- **Auth**: Not specified (defaults to no auth for GET)
+#### `handleDevice`
+- `GET /api/v2/device/info` (`sendDeviceInfoV2()`), `/device/time` (`sendDeviceTimeV2()`, rate limited), `/device/crashlog` (`sendDeviceCrashLog()`).
+- `device/info` carries chip fields for the Debug screen (`psram_found`, `psram_size`, `psram_free`, `flash_size`, `internal_free`, `internal_maxblk`, `chip_model_est`), `status_pixel_gpio` (TASK-1221), `ssid` = `Wired` on Ethernet, and the OTA capability flags `app_ota_available` (`hasSpareAppOtaSlot()`) and `safeboot_available` (`hasSafeboot()`, ADR-191) that the `/update` page uses to choose between direct upload and `POST /safeboot`.
 
-#### `void handleDevice()`
-- **Location**: `restAPI.ino:247–259`
-- **Purpose**: Device metadata endpoints
-- **HTTP Method**: GET only
-- **Routes**:
-  - `GET /api/v2/device/info` → `sendDeviceInfoV2()`
-  - `GET /api/v2/device/time` → `sendDeviceTimeV2()`
-  - `GET /api/v2/device/crashlog` → `sendDeviceCrashLog()`
-- **Auth**: Not required
-- **Notes**: `device/info` is extended (TASK-995) with chip-capability fields for the v2 Debug screen: `psram_found`, `psram_size`, `psram_free`, `flash_size`, `internal_free`, `internal_maxblk`, and a best-effort ESP32-S3 package part number `chip_model_est` (extrapolated from flash + PSRAM). On combo and Classic builds it also carries `status_pixel_gpio` (TASK-1221): the GPIO of the LOLIN RGB status pixel the firmware drives, 0 when none.
+#### `handleFlash`, `handlePic`, `handleFirmware`, `handleFilesystem`
+- `GET /api/v2/flash/status` (`sendFlashStatus()`).
+- `GET /api/v2/pic/flash-status|update-check|settings`; answers 503 when `isPICEnabled()` is false.
+- `GET /api/v2/firmware/files` (`apifirmwarefilelist()`).
+- `GET /api/v2/filesystem/files` (`apilistfiles()`) and `/filesystem/hash-check` (`sendFilesystemHashCheck()`).
 
-#### `void handleFlash()`
-- **Location**: `restAPI.ino:261–268`
-- **Purpose**: ESP8266 flash memory status
-- **HTTP Method**: GET only
-- **Route**: `GET /api/v2/flash/status` → `sendFlashStatus()`
-- **Auth**: Not required
+#### `handleOTDirect` (`HAS_DIRECT_OT` only; 503 unless `isOTDirectEnabled()`)
+- `GET /api/v2/otdirect/status`
+- `POST|PUT /otdirect/mode?mode=gateway|monitor|bypass|master|loopback` (queues `GW=1|0|P|S|L`)
+- `GET|POST|PUT /otdirect/settings` (read returns the `otdirect_settings` object; write takes query args that map to `OTD*` settings)
+- `GET /otdirect/overrides`; `POST|PUT /otdirect/overrides?action=sr|cr|rm|cm|ui|ki&msgid=0..127[&value=HHHH]` (queues `SR=`/`CR=`/`RM=`/`CM=`/`UI=`/`KI=`)
 
-#### `void handlePic()`
-- **Location**: `restAPI.ino:270–282`
-- **Purpose**: PIC (Programmable Interface Controller) firmware metadata
-- **HTTP Method**: GET only
-- **Routes**:
-  - `GET /api/v2/pic/flash-status`
-  - `GET /api/v2/pic/update-check`
-  - `GET /api/v2/pic/settings`
-- **Precondition**: PIC must be detected (`isPICEnabled()`)
-- **Auth**: Not required
+#### `handleSimulate`
+- `GET /api/v2/simulate`, `POST|PUT /simulate/start` (409 when LittleFS is not mounted), `POST|PUT /simulate/stop`. Controls `state.debug.bOTGWSimulation` (frame replay of `/otgw_simulation.log`).
 
-#### `void handleOTDirect()` (ESP32 / OTGW32 only)
-- **Location**: `restAPI.ino:285–410` (guarded by `#if HAS_DIRECT_OT`)
-- **Purpose**: Direct OpenTherm control (OTGW32 hardware feature)
-- **HTTP Methods**: GET, POST, PUT
-- **Routes**:
-  - `GET /api/v2/otdirect/status`
-  - `POST /api/v2/otdirect/mode?mode=gateway|monitor|bypass|master|loopback`
-  - `GET /api/v2/otdirect/settings`
-  - `POST /api/v2/otdirect/settings?key=value...`
-  - `GET /api/v2/otdirect/overrides` — list all active overrides
-  - `POST /api/v2/otdirect/overrides?action=sr&msgid=X&value=HHHH` (set stored response)
-  - `POST /api/v2/otdirect/overrides?action=cr&msgid=X` (clear stored response)
-  - `POST /api/v2/otdirect/overrides?action=rm&msgid=X&value=HHHH` (set response modifier)
-  - `POST /api/v2/otdirect/overrides?action=cm&msgid=X` (clear response modifier)
-  - `POST /api/v2/otdirect/overrides?action=ui|ki&msgid=X` (mark unknown/known ID)
-- **Auth**: Not explicitly required, but POST/PUT get auth via central check
-- **Precondition**: OTGW32 hardware must be present
-- **Notes**: Settings mapping includes room compensation, heating curve, PID parameters
+#### `handleOtgw`
+- `GET /otgw/otmonitor` and `/otgw/telegraf` (aliases, `sendOTmonitorV2()`, rate limited)
+- `GET /otgw/messages/{id}` and `/otgw/id/{id}` (`sendOTValue()`), `GET /otgw/label/{label}` (`sendOTLabel()`)
+- `POST|PUT /otgw/commands` (body `{"command":"LL=value"}` or raw) and `/otgw/command/{cmd}` (legacy): `handleCommandSubmit()` validates `LL=value`, answers 202 `{"status":"queued"}`, 503 without an OT command interface
+- `POST|PUT /otgw/diagnose`: raw keystrokes (field `data`, max 32 printable chars plus CR) straight to the PIC TX queue, only when the PIC runs diagnostic firmware (409 otherwise, 503 without PIC)
+- `POST|PUT /otgw/discovery` and `/otgw/autoconfigure`: 202, then `doAutoConfigure()`
+- `POST /otgw/reset_water_total`: `queueDHWWaterMeterReset()`, 200 `{"status":"ok","dhw_water_total":0}` (ADR-176)
+- `GET /otgw/boiler-support` (unsupported read/write MsgID lists), `GET /otgw/ot-support` (bilateral support map), `GET /otgw/overrides` (active gateway overrides, ADR-118)
 
-#### `void handleFirmware()`
-- **Location**: `restAPI.ino:413–420`
-- **Purpose**: Firmware file inventory for OTA updates
-- **HTTP Method**: GET only
-- **Route**: `GET /api/v2/firmware/files` → `apifirmwarefilelist()`
-- **Auth**: Not required
+#### `handleWebhook`
+- `POST|PUT /api/v2/webhook/test?state=on|off|1|0` (`testWebhook()`).
 
-#### `void handleFilesystem()`
-- **Location**: `restAPI.ino:422–431`
-- **Purpose**: LittleFS file listing and hash validation
-- **HTTP Method**: GET only
-- **Routes**:
-  - `GET /api/v2/filesystem/files`
-  - `GET /api/v2/filesystem/hash-check`
-- **Auth**: Not required
+#### `handleSAT` (`checkHttpAuth()` first; all methods authenticated)
+- `GET /sat` and `/sat/status` (`?detail=full` for health diagnostics, `satSendHealthJSON()`)
+- `POST|PUT` setters: `/sat/target`, `/externaltemp`, `/externaloutdoor`, `/humidity`, `/pvsurplus` (TASK-640), `/window`, `/preset`, `/enable`, `/mode` (continuous/pwm), `/area/<0-3>`, `/flush`, `/reset_integral`, `/settings/<name>`
+- `POST|PUT /sat/force-boiler` (test-only transient override); `POST /sat/sim/event` (bench scenario injection, 409 unless simulation is active)
+- `GET|POST|DELETE /sat/markers[/<id>]` (calibration markers in `/sat_markers.json`, max 20)
+- `GET|PATCH|POST|PUT /sat/sensor-areas` (area to DS18B20 mapping)
+- `GET /sat/weather/needs-setup` (onboarding gate)
+- BLE (`HAS_SAT_BLE`): `GET /sat/ble/discovery`; `POST /sat/ble/select|label|bindkey|forget|rescan`; `GET|PUT|POST|DELETE /sat/ble/roster` (8 slots, bindkeys write-only)
 
-#### `void handleSimulate()`
-- **Location**: `restAPI.ino:433–458`
-- **Purpose**: OTGW message simulation control (debug feature)
-- **HTTP Methods**: GET, POST, PUT
-- **Routes**:
-  - `GET /api/v2/simulate` → `sendSimulationStatus()`
-  - `POST /api/v2/simulate/start`
-  - `POST /api/v2/simulate/stop`
-- **Auth**: Not required
-- **State**: Controls `state.debug.bOTGWSimulation`
+#### `handleDiscovery`
+- `GET /api/v2/discovery` (verification status, counters, `auto_verify`)
+- `POST /discovery/verify`: starts the 15 s verification window (503 without MQTT or on low heap, 409 when active or while the drip is pending; 202)
+- `POST /discovery/republish`: `markAllMQTTConfigPending()`; 60 s cooldown (429)
 
-#### `void handleOtgw()`
-- **Location**: `restAPI.ino:460–505`
-- **Purpose**: OpenTherm Gateway state and command submission
-- **HTTP Methods**: GET, POST, PUT
-- **Routes**:
-  - `GET /api/v2/otgw/otmonitor` or `/api/v2/otgw/telegraf` → `sendOTmonitorV2()` (Telegraf-compatible output)
-  - `GET /api/v2/otgw/messages/{id}` → `sendOTValue(id)` (get by message ID)
-  - `GET /api/v2/otgw/id/{id}` (alias for messages)
-  - `POST /api/v2/otgw/commands` — command in body (JSON or raw)
-  - `POST /api/v2/otgw/command/{cmd}` (legacy, prefer /commands)
-  - `POST /api/v2/otgw/discovery` or `/api/v2/otgw/autoconfigure` → triggers MQTT auto-configure
-  - `POST /api/v2/otgw/reset_water_total` → `queueDHWWaterMeterReset()`; answers 200 `{"status":"ok","dhw_water_total":0}` like `/api/v2/sat/reset_integral`, 405 for any other method (ADR-176, TASK-1123)
-  - `GET /api/v2/otgw/label/{label}` → `sendOTLabel(label)`
-- **Auth**: POST/PUT require auth (via central check)
-- **Notes**: Commands queued via `addCommandToQueue()`, validated for format. The water-total reset only raises a flag: this handler runs on the async_tcp task and the total is loop-task state, so `loop()` runs `handlePendingDHWWaterMeterReset()` before `drainOTFrameQueue()`, which zeroes RAM and `/dhw_water.json` and publishes 0 (the TASK-1176 pattern of `queueMQTTRepublishAll()`). The 200 goes out before that; while `isFlashing()` or LittleFS is unmounted the reset waits
+#### `handleMqtt`
+- `POST /api/v2/mqtt/republish`: `queueMQTTRepublishAll()` (re-emits observed OT values); 503 without MQTT; 60 s cooldown (429). Distinct from `discovery/republish`, which re-announces HA discovery configs.
 
-#### `void handleWebhook()`
-- **Location**: `restAPI.ino:507–527`
-- **Purpose**: Webhook testing/validation
-- **HTTP Methods**: POST, PUT
-- **Route**: `POST /api/v2/webhook/test?state=on|off|1|0` → `testWebhook(bool)`
-- **Auth**: Not required
+#### `handleDebugDump`
+- `GET /api/v2/debug`: every `state.debug.*` flag plus telemetry snapshot and local IP, sent through `restSendChunked()` from a frozen `DebugDumpSnap`.
 
-#### `void handleDebugDump()`
-- **Purpose**: Snapshot of every debug-related flag (state.debug.b*, settings.bMyDEBUG) plus current local IP — single endpoint for support / bug reports.
-- **HTTP Method**: GET only
-- **Route**: `GET /api/v2/debug` → JSON map with `settings.mydebug`, all `state.debug.*` booleans, and `ip`.
-- **Auth**: Not required.
+#### `handleNetwork`
+- `GET /api/v2/network/scan`: asynchronous. The first call starts `WiFi.scanNetworks(true)` and returns `{"status":"scanning"}`; later calls return `{"status":"ready","count":N,"networks":[{ssid,rssi,channel,secured,connected}]}`. 503 during PIC flash.
 
-#### `void handleNetwork()` (TASK-585)
-- **Purpose**: WiFi scan for the Settings page network picker.
-- **HTTP Method**: GET only.
-- **Route**: `GET /api/v2/network/scan` → JSON array of `{ssid, rssi, encryption, channel}` for visible networks.
-- **Auth**: Not required.
-- **Notes**: Single-shot active scan; cooperative-scheduler-friendly (results buffered, no blocking wait).
+### JSON Response Layer
 
-#### `void handleMqtt()` (TASK-936)
-- **Purpose**: Force a full OT-value republish.
-- **HTTP Method**: POST only.
-- **Route**: `POST /api/v2/mqtt/republish` → resets OT publish eligibility (`requestMQTTRepublishAll()`) so the next observed OT values publish as first-seen again.
-- **Auth**: Required (POST mutation).
-- **Notes**: Requires an active MQTT connection (503 otherwise) and is rate-limited by a 60 s cooldown (CWE-770). **Distinct from `POST /api/v2/discovery/republish`** (handled by `handleDiscovery`), which re-announces the HA *discovery configs* rather than the OT values.
+#### `JsonEmit` (`jsonEmit.h`, ADR-146)
+- Streaming, non-throwing writer over an Arduino `Print` sink: `beginObject()`, `beginArray()`, `field(name, value)`, `endObject()`, `endArray()`, `fieldRaw()`. NaN and Inf serialize as `null`. No document tree, no `new`.
+- Pattern: `AsyncResponseStream* strm = restBeginStream("application/json"); JsonEmit je(*strm); ... restFinalize();` (`webServerCompat.h`).
 
-#### `void handleSAT()`
-- **Location**: `restAPI.ino:644–821`
-- **Purpose**: Smart Ambient Temperature (SAT) control and diagnostics
-- **HTTP Methods**: GET, POST, PUT
-- **Routes**:
-  - `GET /api/v2/sat` or `/api/v2/sat/status` — full state (or with `?detail=full` for extended health)
-  - `POST /api/v2/sat/target` — set target temperature (body: "21.0" or `{"value":"21.0"}`)
-  - `POST /api/v2/sat/externaltemp` — push indoor temperature
-  - `POST /api/v2/sat/externaloutdoor` — push outdoor temperature
-  - `POST /api/v2/sat/humidity` — push indoor humidity (0–100%)
-  - `POST /api/v2/sat/area/<0-3>` — push area temperature (multi-area)
-  - `POST /api/v2/sat/flush` — flush short-lived data (PID integral + cycle window)
-  - `POST /api/v2/sat/window` — set window open/closed state
-  - `POST /api/v2/sat/preset` — apply preset
-  - `POST /api/v2/sat/settings/<name>` — update SAT settings (mirrors MQTT sat/* commands)
-  - `POST /api/v2/sat/reset_integral` — reset PID integral
-  - `GET /api/v2/sat/markers` / `POST` (add) / `DELETE /api/v2/sat/markers/<id>` — heating-curve calibration markers persisted to `/sat_markers.json` (TASK-586); max 20 markers; body `{"outside_temp":..,"flow_temp":..,"label":"..."}`
-  - `GET /api/v2/sat/sensor-areas` / `PATCH /api/v2/sat/sensor-areas` — multi-area DS18B20 mapping (Task #25); body `{"area":0..3,"sensor":"AABBCCDD11223344"}` (empty sensor clears)
-  - `GET /api/v2/sat/weather/needs-setup` — true when SAT weather is enabled but coordinates/source are unconfigured (frontend onboarding gate)
-  - `GET /api/v2/sat/ble/discovery` — stream the BLE roster as JSON (TASK-508)
-  - `POST /api/v2/sat/ble/select` — `{mac}`: promote roster MAC to active sensor
-  - `POST /api/v2/sat/ble/label` — `{mac,label}`: set persistent label for a roster slot
-  - `POST /api/v2/sat/ble/bindkey` — `{mac,key}`: provision the encrypted-MiBeacon bindkey for a slot (32 hex chars, empty clears). The key is a write-only secret: validated but never logged or echoed back
-  - `POST/DELETE /api/v2/sat/ble/forget` — `{mac}`: drop slot and clean up its HA discovery
-  - `GET/PUT/POST/DELETE /api/v2/sat/ble/roster` — dedicated 8-slot roster (TASK-935). GET streams the structured roster; PUT/POST write a single slot (flat `idx` plus optional `mac`/`label`/`bindkey`, parser-free per ADR-146); DELETE clears a slot. Bindkeys are **write-only** — GET emits only `has_bindkey`, never the secret
-  - All BLE sub-routes gated on `HAS_SAT_BLE` (ESP32-S3 only); ESP8266 returns 404
-- **Test-only override**: `POST/PUT /api/v2/sat/force-boiler` — `0|1|true|false` boiler-present override so the availability gate is verifiable on the bench without a physical boiler. Transient (cleared on reboot), auth-gated, trusted-LAN only
-- **Auth**: Required (`checkHttpAuth()` at start)
-- **Extended diagnostics** (`?detail=full`):
-  - Sync diagnostics (setpoint, modulation, CH mismatch)
-  - Pressure metrics (smoothed pressure, drop rate, alarm)
-  - Cycle diagnostics (kind, duration, count, fraction CH/DHW)
-  - Error statistics (mean, stddev, sample count)
-  - Health booleans (flame, device, cycle health)
-  - Auto-tune & OVP calibration metrics
+#### `restSendChunked(contentType, emitFn)` (`jsonChunked.h`, TASK-883)
+- Pull-based `AsyncChunkedResponse`: the emit closure is re-run per TCP window into a windowing sink, so no whole-response buffer exists. The closure must be deterministic, so volatile values (heap, uptime, live telemetry) are frozen in a per-response snapshot (`DeviceInfoSnap`, `DebugDumpSnap`). Used by `device/info`, `debug`, `GET /settings` (the largest response, about 8.6 KB, reading only request-stable state so it needs no snapshot) and the SAT status in `SATcontrol.ino`.
 
-### JSON Response Helpers
-
-#### `void sendStartJsonMap(const char *objName)`
-- **Location**: `jsonStuff.ino:221–236`
-- **Purpose**: Begin chunked JSON map response with optional object wrapper
-- **Signature**: `void sendStartJsonMap(const char *objName)`
-- **Behavior**:
-  - Sets `CONTENT_LENGTH_UNKNOWN` for chunked transfer
-  - Sends 200 OK with `application/json` mime type
-  - Outputs `{` or `{"objName":{` based on parameter
-  - Initializes `iIdentlevel = 1`, `bFirst = true`
-- **Notes**: Entry and exit are paired; must call `sendEndJsonMap()` to close
-
-#### `void sendEndJsonMap(const char *objName)`
-- **Location**: `jsonStuff.ino:326–334`
-- **Purpose**: Close JSON map response and end chunked transfer
-- **Signature**: `void sendEndJsonMap(const char *objName)`
-- **Behavior**: Outputs `}` or `}}` and empty chunk (end marker)
-
-#### `void sendJsonMapEntry(const char *cName, T value)`
-- **Location**: `jsonStuff.ino:241–325` (overloaded for bool, int32_t, uint32_t, float, const char*, String)
-- **Purpose**: Stream one key-value pair into JSON map
-- **Signature**: Multiple overloads:
-  - `void sendJsonMapEntry(const char *cName, bool bValue)`
-  - `void sendJsonMapEntry(const char *cName, int32_t iValue)`
-  - `void sendJsonMapEntry(const char *cName, uint32_t uValue)`
-  - `void sendJsonMapEntry(const char *cName, float fValue)` (3 decimal places)
-  - `void sendJsonMapEntry(const char *cName, const char *cValue)` (with JSON escaping)
-  - `void sendJsonMapEntry(const char *cName, String sValue)`
-- **Behavior**:
-  - Handles comma separator (via `sendBeforenext()`)
-  - Adds indentation (via `sendIdent()`)
-  - Streams value chunk by chunk (no intermediate buffering)
-- **Notes**: String values auto-escaped; overloads for `__FlashStringHelper*` (PROGMEM) available
-
-#### `void sendJsonOTmonMapEntry(const char *cName, T value, const char *cUnit, time_t epoch)`
-- **Location**: `jsonStuff.ino:336–414`
-- **Purpose**: Stream OT monitor map entry with value, unit, and timestamp
-- **Signature**: Overloaded for const char*, int32_t, uint32_t, float, bool
-- **Format**: `"name": {"value": V, "unit": "U", "epoch": T}`
-- **Notes**: Supports Dallas temperature sensor format via `sendJsonOTmonMapEntryDallasTemp()`
-
-#### `void sendJsonSettingObj(const char *cName, T value, const char *sType, ...)`
-- **Location**: `jsonStuff.ino:446–513`
-- **Purpose**: Stream a settings object with type metadata
-- **Overloads**:
-  - Integer: `(const char *cName, int iValue, const char *iType, int minValue, int maxValue)`
-  - String: `(const char *cName, const char *cValue, const char *sType, int maxLen)`
-  - Float: `(const char *cName, const char *cValue, const char *sType, int minValue, int maxValue)` (value as pre-formatted string)
-  - Boolean: `(const char *cName, bool bValue, const char *sType)`
-- **Format**: `"name": {"value": V, "type": "T", "min": M, "max": M}` or similar
-- **Notes**: Used for `/api/v2/settings` endpoint
+#### `jsonStuff.ino`
+- Escaping and parsing: `escapeJsonStringTo()`, `extractJsonField(json, key, result, size)` (flat-object field extraction), `readJsonStringPair()` / `writeJsonStringPair()` (streaming `dallas_labels.ini` I/O).
+- Legacy chunked emitters that remain: `sendStartJsonMap()` / `sendEndJsonMap()`, `sendJsonMapEntry()` overloads, `sendJsonOTmonMapEntry()`, `sendJsonOTmonMapEntryDallasTemp()` and `sendJsonSettingObj()` overloads. `sendOTmonitorV2()` and the settings writer now use `JsonEmit`.
 
 ### Security & Validation Helpers
 
 #### `bool checkHttpAuth()`
-- **Location**: `restAPI.ino:89–105`
-- **Purpose**: Validate HTTP Basic Auth credentials and CSRF origin
-- **Signature**: `bool checkHttpAuth()`
-- **Behavior**:
-  - Returns true if auth disabled (empty password)
-  - Allows HTTP_OPTIONS (CORS preflight)
-  - Calls `httpServer.authenticate("admin", settings.sHTTPpasswd)`
-  - Validates CSRF via `isSameOriginRequest()`
-  - Sends 401 or 403 if validation fails
-- **Dependencies**: `settings.sHTTPpasswd[]`
+- Returns true when no password is set. Otherwise `authenticateCompat("admin", settings.sHTTPpasswd)` (401 via `webRequestAuth()`), then `isSameOriginRequest()` (403 "CSRF protection: invalid origin").
 
 #### `static bool isSameOriginRequest()`
-- **Location**: `restAPI.ino:54–83`
-- **Purpose**: Validate CSRF by checking Origin/Referer against Host header
-- **Signature**: `static bool isSameOriginRequest()`
-- **Behavior**:
-  - Extracts host from Origin or Referer header
-  - Compares against request Host header
-  - Permissive: no header → allow (non-browser clients)
-- **Notes**: Prevents cross-origin POST/PUT mutations (ADR-054)
+- Host part of Origin (else Referer) must equal the Host header; malformed origin is rejected; no header is allowed.
 
-#### `void sendApiError(int httpCode, const __FlashStringHelper* message)`
-- **Location**: `restAPI.ino:35–42`
-- **Purpose**: Send standardized error JSON response (ADR-035)
-- **Signature**: `void sendApiError(int httpCode, const __FlashStringHelper* message)`
-- **Format**: `{"error":{"status":N,"message":"..."}}`
-- **Behavior**: Adds CORS Origin header, sends with appropriate HTTP status
+#### `sendApiError(int httpCode, const __FlashStringHelper* message)`, `sendApiMethodNotAllowed(allowed)`, `sendApiBusy(message)`, `sendApiRateLimited(...)`, `sendApiNotFound(URI)`
+- Standard error responses; `sendApiBusy` adds `Retry-After: 1` for transient pressure (TASK-1124).
 
-#### `void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods)`
-- **Location**: `restAPI.ino:45–48`
-- **Purpose**: 405 Method Not Allowed with RFC 7231 Allow header
-- **Signature**: `void sendApiMethodNotAllowed(const __FlashStringHelper* allowedMethods)`
-- **Example**: `sendApiMethodNotAllowed(F("GET, POST"))`
-
-### Command Submission
-
-#### `static void handleCommandSubmit(const char* cmdStr)`
-- **Location**: `restAPI.ino:164–190`
-- **Purpose**: Validate and queue OpenTherm Gateway command
-- **Signature**: `static void handleCommandSubmit(const char* cmdStr)`
-- **Validation**:
-  - Checks command interface available
-  - Validates format: `LL=value` (two alphabetic letters, equals sign, value)
-  - Max length: `kMaxCmdLen` (command queue slot limit)
-  - Rejects non-alphabetic prefixes (prevent injection)
-- **Response**: 202 Accepted (async): `{"status":"queued"}`
-- **Queuing**: Via `addCommandToQueue()`
-
-#### `static const char* satExtractPostValue(const char* body, char* buf, size_t bufSize)`
-- **Location**: `restAPI.ino:531–552`
-- **Purpose**: Extract numeric value from POST body (raw or JSON)
-- **Signature**: `static const char* satExtractPostValue(const char* body, char* buf, size_t bufSize)`
-- **Behavior**:
-  - Tries to parse JSON `"value": <number>` first
-  - Falls back to treating body as raw value
-  - Copies result to caller-supplied buffer
-  - Returns pointer into buffer (null-terminated)
-- **Usage**: SAT endpoints (target, externaltemp, etc.)
-
-### File Serving (FSexplorer)
+### File Serving (FSexplorer.ino)
 
 #### `void startWebserver()`
-- **Location**: `FSexplorer.ino:67–232`
-- **Purpose**: Configure HTTP server routes and file serving
-- **Behavior**:
-  - Checks for `/index.html`; if missing, serves FSexplorer UI
-  - Configures ETag-based conditional GET for index.html
-  - Injects `?v=<fsHash>` into script URLs (cache-busting)
-  - Sets up CSS/JS caching headers (1 day for versioned, no-cache for bare)
-  - Registers `/api` catch-all → `processAPI()`
-  - Enables CORS header collection (If-None-Match)
-- **Key Feature**: Line-by-line HTML streaming with on-the-fly URL injection (avoids buffer overflow)
+- Registers `/`, `/index`, `/index.html` (`sendIndex`, behind `checkHttpAuth()`), `/FSexplorer.png` (`serveStatic`), `/fsexplorer.css`, `/v2.html`, `/v2.js`, `/v2-bundle.css`, the three font routes, `/pic` (`upgradepic`, `HAS_PIC`), and the `/api` route (`processAPI` with body capture via `webCaptureBody`). Calls `server.begin()`. A failed port-80 bind is retried every 5 s by `handleWebserverListener()` (TASK-1130).
 
 #### `void setupFSexplorer()`
-- **Location**: `FSexplorer.ino:234–288`
-- **Purpose**: Register LittleFS file explorer handlers and deprecate old API endpoints
-- **Behavior**:
-  - Serves `FSexplorer.html` if found (fallback to helper form)
-  - Registers deprecated endpoints (v0/v1 API):
-    - `/api/firmwarefilelist` → `apifirmwarefilelist()`
-    - `/api/listfiles` → `apilistfiles()`
-  - Registers file upload: `POST /upload` → `handleFileUpload()`
-  - Registers reboot: `GET /ReBoot` → `reBootESP()`
-  - Registers WiFi reset: `GET /ResetWireless` → `resetWirelessButton()`
-  - Sets up `onNotFound()` handler for `/api/*` and file routing
-- **Notes**: Old endpoints were scheduled for removal in v1.3.0 (ADR-035) but remain in v1.4.0 for backward compatibility
+- Registers `/FSexplorer.html` and `/FSexplorer`, the deprecated unversioned `/api/firmwarefilelist` and `/api/listfiles`, `POST /upload`, `/ReBoot` and `/ResetWireless` (both `checkHttpAuth()`), the OTA handler (`httpUpdater.setup(&server)`, which also registers `POST /safeboot`), and the `onNotFound` catch-all (routes `/api/*` to `processAPI`, anything else to `handleFile()`, else 404).
 
-#### `void apifirmwarefilelist()`
-- **Location**: `FSexplorer.ino:291–379`
-- **Purpose**: Stream firmware file inventory as chunked JSON array
-- **Signature**: `void apifirmwarefilelist()`
-- **Response**: `[{"name":"file.hex","version":"X.Y.Z","size":1234},...]`
-- **Behavior**:
-  - Iterates directory `/` + device ID
-  - Extracts `.hex` files, reads `.ver` companion files
-  - Calls `GetVersion(hexfile)` to extract version from hex
-  - Streams entries incrementally (150-byte buffer per entry)
-  - Respects 40-file limit (`MAX_FILES_IN_LIST`)
-  - Feeds watchdog during iteration
-- **Notes**: Uses chunked transfer (streaming response without pre-buffering entire array)
-
-#### `void apilistfiles()`
-- **Location**: `FSexplorer.ino:398–483`
-- **Purpose**: Stream LittleFS file listing with delete support
-- **Signature**: `void apilistfiles()`
-- **Query Parameters**:
-  - `path=<dir>` — directory to list (default "/")
-  - `delete=<path>` — delete file (requires auth)
-- **Response**: `[{"name":"file.ext","size":1234,"type":"file|dir"},...,{"usedBytes":X,"totalBytes":Y,"freeBytes":Z,"truncated":false}]`
-- **Behavior**:
-  - Streams file entries (max 40 files)
-  - Skips hidden files (names starting with '.')
-  - Adds storage info as final entry (raw bytes — frontend formats)
-  - Feeds watchdog per iteration
-  - Delete requires `checkHttpAuth()`
-- **Notes**: Sorting and size formatting delegated to frontend
+#### `apifirmwarefilelist()` / `apilistfiles()`
+- Streaming JSON listings (max `MAX_FILES_IN_LIST` = 40; hidden files skipped; `apilistfiles` adds a final storage entry and supports `?delete=<path>` behind auth). Both replicate the `platformFreeHeap() < 4096` guard because they bypass `processAPI()`.
 
 #### `bool handleFile(String&& path)`
-- **Location**: `FSexplorer.ino:487–501`
-- **Purpose**: Serve static file from LittleFS with MIME type detection
-- **Signature**: `bool handleFile(String&& path)`
-- **Behavior**:
-  - Handles delete query parameter (requires auth)
-  - Appends `index.html` for directory paths
-  - Streams file via `httpServer.streamFile()`
-  - Auto-detects MIME type via `contentType(path)`
-  - Returns true if successful, false if file not found
-- **Notes**: Rvalue reference prevents dangling pointer
+- Serves a LittleFS file with MIME detection via `contentType()`; `/settings.ini` is behind `checkHttpAuth()` because it holds the passwords in cleartext (ADR-056). Shows the helper form when `FSexplorer.html` is absent.
 
-#### `void handleFileUpload()`
-- **Location**: `FSexplorer.ino:505–548`
-- **Purpose**: Handle multipart file uploads to LittleFS
-- **Signature**: `void handleFileUpload()`
-- **State Machine**:
-  - `UPLOAD_FILE_START`: Auth check, open file for writing
-  - `UPLOAD_FILE_WRITE`: Write chunks to file
-  - `UPLOAD_FILE_END`: Close file, send 303 redirect (if auth passed)
-- **Auth**: Checked at START; if fails, file is never opened (write prevented)
-- **Notes**: Uses static `fsUploadFile` handle; max filename 30 chars; auto-truncates long names
+#### `void handleFileUpload(request, filename, index, data, len, final)`
+- Async per-chunk upload to LittleFS. Auth and same-origin are decided at `index == 0`, before the file is opened; the `POST /upload` completion handler owns the response (303 redirect, 401/403, or 507 when nothing was stored). State lives on `request->_tempFile`, filenames are trimmed to 30 chars.
 
-#### `const String &contentType(String& filename)`
-- **Location**: `FSexplorer.ino:569–586`
-- **Purpose**: Map file extension to MIME type
-- **Signature**: `const String &contentType(String& filename)`
-- **Supported Types**:
-  - `.html`, `.htm` → `text/html; charset=UTF-8`
-  - `.css` → `text/css`
-  - `.js` → `application/javascript`
-  - `.json` → `application/json`
-  - `.png`, `.gif`, `.jpg`, `.ico` → appropriate `image/*`
-  - `.xml` → `text/xml`
-  - `.pdf`, `.zip`, `.gz` → appropriate types
-  - Default: `text/plain`
-- **Notes**: Modifies string in-place; returns reference to modified string
-
-### JSON Parsing & Serialization
-
-#### `bool extractJsonField(const char* json, const __FlashStringHelper* key, char* result, size_t resultSize)`
-- **Location**: `jsonStuff.ino:650–700`
-- **Purpose**: Minimal streaming JSON field extraction for flat objects
-- **Signature**: `bool extractJsonField(const char* json, const __FlashStringHelper* key, char* result, size_t resultSize)`
-- **Supports**:
-  - Quoted strings: `{"key":"value"}` → extracts "value"
-  - Unquoted literals: `{"key":true}` or `{"key":42}` → extracts "true" or "42"
-- **Behavior**:
-  - Builds search pattern `"keyname"` using `cMsg` scratch buffer
-  - Finds colon, skips whitespace, extracts value until quote/comma/brace
-  - Handles backslash-escaped characters (via `unescapeJsonChar()`)
-  - Returns true if field found and populated
-- **Notes**: Uses `cMsg` as scratch; safe because `String::indexOf()` doesn't yield
-
-#### `bool readJsonStringPair(File& f, char* key, size_t keySize, char* val, size_t valSize)`
-- **Location**: `jsonStuff.ino:710–752`
-- **Purpose**: Stream-read one "key":"value" pair from flat JSON file
-- **Signature**: `bool readJsonStringPair(File& f, char* key, size_t keySize, char* val, size_t valSize)`
-- **Behavior**:
-  - Skips whitespace, commas, opening brace
-  - Reads key until unescaped quote
-  - Skips colon and value marker quote
-  - Reads value until unescaped quote
-  - Returns false at `}` (end of object) or on read error
-- **Usage**: `ensureSensorDefaultLabels()` streams `dallas_labels.ini` without full file load
-- **Escaping**: Handles `\"`, `\\`, etc. via `unescapeJsonChar()`
-
-#### `void writeJsonStringPair(File& f, const char* key, const char* val, bool addComma)`
-- **Location**: `jsonStuff.ino:759–768`
-- **Purpose**: Write one "key":"value" pair to JSON file
-- **Signature**: `void writeJsonStringPair(File& f, const char* key, const char* val, bool addComma)`
-- **Behavior**:
-  - Optionally prepends comma (for all but first pair)
-  - Escapes key and value via `writeEscapedJsonStringContent()`
-  - Outputs `"key":"value"`
-- **Usage**: Rebuild `dallas_labels.ini` after updates
-
-### Chunked JSON Streaming Helpers
-
-#### `void escapeJsonStringTo(const char* src, char* dest, size_t destSize)`
-- **Location**: `jsonStuff.ino:14–53`
-- **Purpose**: In-place buffer escaping of JSON special characters
-- **Signature**: `void escapeJsonStringTo(const char* src, char* dest, size_t destSize)`
-- **Escapes**: `"`, `\`, `\b`, `\f`, `\n`, `\r`, `\t`, control chars (as `\uXXXX`)
-- **Notes**: Outputs to caller-supplied buffer; returns early if buffer exhausted
-
-#### `static void sendEscapedJsonStringContent(const char* src)`
-- **Location**: `jsonStuff.ino:55–104`
-- **Purpose**: Stream escaped JSON string without surrounding quotes
-- **Signature**: `static void sendEscapedJsonStringContent(const char* src)`
-- **Behavior**: Chunks output (24-byte buffer) to avoid large intermediate allocations
-- **Usage**: String values in `sendJsonMapEntry()` and `sendJsonSettingObj()`
-
-#### `static void writeEscapedJsonStringContent(File& f, const char* src)`
-- **Location**: `jsonStuff.ino:106–155`
-- **Purpose**: Write escaped JSON string to file
-- **Signature**: `static void writeEscapedJsonStringContent(File& f, const char* src)`
-- **Behavior**: Same as `sendEscapedJsonStringContent()` but writes to file handle
-- **Usage**: `writeJsonStringPair()` for LittleFS file updates
-
-### Data Structures
-
-#### `struct ApiRoute`
-- **Location**: `restAPI.ino` (defined before dispatch table)
-- **Definition**:
-  ```cpp
-  struct ApiRoute {
-    PGM_P              segment;     // Route name in PROGMEM (e.g., "health", "settings")
-    ApiResourceHandler handler;     // Function pointer to handler
-  };
-  ```
-- **Dispatch Table**: `kV2Routes[]` at line 1080-1097 maps resource names to handlers. Authoritative endpoint list: add new endpoints by adding one entry to this table and implementing the handler function. Sentinel entry `{ nullptr, nullptr }` marks table end.
-- **Purpose**: Dispatch table entry mapping route to handler
-- **Notes**: Sentinel entry has `segment = nullptr`; no changes needed to `processAPI()` router when adding endpoints
-
-#### `struct FSInfo`
-- **Location**: ESP8266 platform header
-- **Used in**: `apilistfiles()` (line 467)
-- **Fields**: `totalBytes`, `usedBytes`
-- **Purpose**: Filesystem statistics for storage info endpoint
+#### `contentType()`, `formatBytes()`, `freeSpace()`, `reBootESP()`, `resetWirelessButton()`, `doRedirect()`
+- Helpers; `doRedirect(..., reboot=true)` defers the restart to the main loop so the response can drain.
 
 ## API Endpoints Reference
 
-### v2 API Routes (Complete)
+### v2 API Routes
 
 | Method | Endpoint | Handler | Auth | Purpose |
 |--------|----------|---------|------|---------|
-| GET | `/api/v2/health` | handleHealth | No | System health metrics |
-| GET | `/api/v2/settings` | handleSettings | Yes | Read device settings (sensitive data; includes WiFi SSID, nightly restart time) |
-| POST/PUT | `/api/v2/settings` | handleSettings | Yes | Update device settings (supports all setting keys; nightly restart settings exposed v1.3.5+) |
-| GET | `/api/v2/sensors` | handleSensors | No | Current sensor readings (Dallas + S0) |
-| GET | `/api/v2/sensors/status` | handleSensors | No | Alias for /sensors |
-| GET | `/api/v2/sensors/labels` | handleSensors | No | Dallas temperature labels |
-| POST/PUT | `/api/v2/sensors/labels` | handleSensors | No | Update labels |
-| GET | `/api/v2/device/info` | handleDevice | No | Device metadata |
-| GET | `/api/v2/device/time` | handleDevice | No | Device clock state |
-| GET | `/api/v2/device/crashlog` | handleDevice | No | Crash log (if available) |
-| GET | `/api/v2/flash/status` | handleFlash | No | ESP8266 flash info |
-| GET | `/api/v2/pic/flash-status` | handlePic | No | PIC flash status |
-| GET | `/api/v2/pic/update-check` | handlePic | No | PIC firmware update check |
-| GET | `/api/v2/pic/settings` | handlePic | No | PIC settings |
-| GET | `/api/v2/otdirect/status` | handleOTDirect | No | OT-direct mode/status (OTGW32) |
-| POST/PUT | `/api/v2/otdirect/mode?mode=...` | handleOTDirect | Yes | Set OT-direct mode |
-| GET | `/api/v2/otdirect/settings` | handleOTDirect | No | OT-direct settings |
-| POST/PUT | `/api/v2/otdirect/settings?...` | handleOTDirect | Yes | Update OT-direct settings |
-| GET | `/api/v2/otdirect/overrides` | handleOTDirect | No | List OT message overrides |
-| POST/PUT | `/api/v2/otdirect/overrides?action=sr&msgid=X&value=HHHH` | handleOTDirect | Yes | Set stored response |
-| POST/PUT | `/api/v2/otdirect/overrides?action=cr&msgid=X` | handleOTDirect | Yes | Clear stored response |
-| POST/PUT | `/api/v2/otdirect/overrides?action=rm&msgid=X&value=HHHH` | handleOTDirect | Yes | Set response modifier |
-| POST/PUT | `/api/v2/otdirect/overrides?action=cm&msgid=X` | handleOTDirect | Yes | Clear response modifier |
-| POST/PUT | `/api/v2/otdirect/overrides?action=ui&msgid=X` | handleOTDirect | Yes | Mark ID unknown |
-| POST/PUT | `/api/v2/otdirect/overrides?action=ki&msgid=X` | handleOTDirect | Yes | Mark ID known |
+| GET | `/api/v2/health` | handleHealth | No | System health |
+| GET | `/api/v2/settings` | handleSettings | Yes | All settings with type metadata |
+| POST/PUT | `/api/v2/settings` | handleSettings | Yes | Update one setting (`{"name","value"}`) |
+| GET | `/api/v2/sensors`, `/sensors/status` | handleSensors | No | Dallas and S0 readings |
+| GET/POST/PUT | `/api/v2/sensors/labels` | handleSensors | POST/PUT | Dallas labels |
+| GET | `/api/v2/device/info` | handleDevice | No | Device metadata, OTA capability flags |
+| GET | `/api/v2/device/time` | handleDevice | No | Clock state (rate limited) |
+| GET | `/api/v2/device/crashlog` | handleDevice | No | Crash log |
+| GET | `/api/v2/flash/status` | handleFlash | No | Flash info |
+| GET | `/api/v2/pic/flash-status`, `/pic/update-check`, `/pic/settings` | handlePic | No | PIC info (503 without PIC) |
+| GET | `/api/v2/otdirect/status`, `/settings`, `/overrides` | handleOTDirect | No | OT-direct state (`HAS_DIRECT_OT`) |
+| POST/PUT | `/api/v2/otdirect/mode`, `/settings`, `/overrides` | handleOTDirect | Yes | OT-direct control |
 | GET | `/api/v2/firmware/files` | handleFirmware | No | Firmware file inventory |
-| GET | `/api/v2/filesystem/files` | handleFilesystem | No | LittleFS directory listing |
-| GET | `/api/v2/filesystem/hash-check` | handleFilesystem | No | Filesystem hash (for ETag) |
-| GET | `/api/v2/simulate` | handleSimulate | No | OTGW simulation status |
-| POST/PUT | `/api/v2/simulate/start` | handleSimulate | No | Enable simulation |
-| POST/PUT | `/api/v2/simulate/stop` | handleSimulate | No | Disable simulation |
-| GET | `/api/v2/otgw/otmonitor` | handleOtgw | No | OT monitor values (Telegraf format) |
-| GET | `/api/v2/otgw/telegraf` | handleOtgw | No | Telegraf-compatible OT values |
-| GET | `/api/v2/otgw/messages/{id}` | handleOtgw | No | Get OT message value by ID |
-| GET | `/api/v2/otgw/id/{id}` | handleOtgw | No | Alias for messages |
-| GET | `/api/v2/otgw/label/{label}` | handleOtgw | No | Get OT message by label |
-| POST/PUT | `/api/v2/otgw/commands` | handleOtgw | Yes | Queue OTGW command (body) |
-| POST/PUT | `/api/v2/otgw/command/{cmd}` | handleOtgw | Yes | Queue OTGW command (legacy) |
-| POST/PUT | `/api/v2/otgw/discovery` | handleOtgw | Yes | Trigger MQTT auto-configure |
-| POST/PUT | `/api/v2/otgw/autoconfigure` | handleOtgw | Yes | Alias for discovery |
-| POST | `/api/v2/otgw/reset_water_total` | handleOtgw | Yes | Reset the DHW water total to 0 (ADR-176) |
-| POST/PUT | `/api/v2/webhook/test?state=on\|off\|1\|0` | handleWebhook | No | Test webhook |
-| GET | `/api/v2/sat` | handleSAT | Yes | SAT status (or `?detail=full` for extended) |
-| GET | `/api/v2/sat/status` | handleSAT | Yes | Same as above |
-| POST/PUT | `/api/v2/sat/target` | handleSAT | Yes | Set target temperature |
-| POST/PUT | `/api/v2/sat/externaltemp` | handleSAT | Yes | Push indoor temperature |
-| POST/PUT | `/api/v2/sat/externaloutdoor` | handleSAT | Yes | Push outdoor temperature |
-| POST/PUT | `/api/v2/sat/humidity` | handleSAT | Yes | Push humidity (0–100%) |
-| POST/PUT | `/api/v2/sat/area/<0-3>` | handleSAT | Yes | Push area temperature |
-| POST/PUT | `/api/v2/sat/flush` | handleSAT | Yes | Flush short-lived SAT data |
-| POST/PUT | `/api/v2/sat/window` | handleSAT | Yes | Set window open/closed |
-| POST/PUT | `/api/v2/sat/preset` | handleSAT | Yes | Apply preset |
-| POST/PUT | `/api/v2/sat/settings/<name>` | handleSAT | Yes | Update SAT setting |
-| POST | `/api/v2/sat/reset_integral` | handleSAT | Yes | Reset PID integral |
-| GET | `/api/v2/sat/markers` | handleSAT | Yes | List calibration markers (heating curve) |
-| POST | `/api/v2/sat/markers` | handleSAT | Yes | Add calibration marker (max 20, TASK-586) |
-| DELETE | `/api/v2/sat/markers/<id>` | handleSAT | Yes | Delete calibration marker by id |
-| GET | `/api/v2/sat/sensor-areas` | handleSAT | Yes | Multi-area DS18B20 mapping |
-| PATCH | `/api/v2/sat/sensor-areas` | handleSAT | Yes | Update one area→sensor mapping |
+| GET | `/api/v2/filesystem/files`, `/filesystem/hash-check` | handleFilesystem | No | LittleFS listing, hash |
+| GET | `/api/v2/simulate` | handleSimulate | No | Simulation status |
+| POST/PUT | `/api/v2/simulate/start`, `/simulate/stop` | handleSimulate | Yes | Frame replay control |
+| GET | `/api/v2/otgw/otmonitor`, `/otgw/telegraf` | handleOtgw | No | OT values (rate limited, shared budget) |
+| GET | `/api/v2/otgw/messages/{id}`, `/otgw/id/{id}`, `/otgw/label/{label}` | handleOtgw | No | Single OT value |
+| GET | `/api/v2/otgw/boiler-support`, `/otgw/ot-support`, `/otgw/overrides` | handleOtgw | No | Support maps, active overrides |
+| POST/PUT | `/api/v2/otgw/commands`, `/otgw/command/{cmd}` | handleOtgw | Yes | Queue a command (202) |
+| POST/PUT | `/api/v2/otgw/diagnose` | handleOtgw | Yes | PIC diagnostic menu keystrokes |
+| POST/PUT | `/api/v2/otgw/discovery`, `/otgw/autoconfigure` | handleOtgw | Yes | Re-announce discovery |
+| POST | `/api/v2/otgw/reset_water_total` | handleOtgw | Yes | Reset DHW water total |
+| POST/PUT | `/api/v2/webhook/test?state=` | handleWebhook | Yes | Test webhook |
+| GET | `/api/v2/sat`, `/sat/status` | handleSAT | Yes | SAT status (`?detail=full`) |
+| POST/PUT | `/api/v2/sat/{target,externaltemp,externaloutdoor,humidity,pvsurplus,window,preset,enable,mode,flush,reset_integral,force-boiler}` | handleSAT | Yes | SAT inputs and control |
+| POST/PUT | `/api/v2/sat/area/<0-3>`, `/sat/settings/<name>` | handleSAT | Yes | Area temperature, SAT setting |
+| POST | `/api/v2/sat/sim/event` | handleSAT | Yes | Bench event injection |
+| GET/POST/DELETE | `/api/v2/sat/markers[/<id>]` | handleSAT | Yes | Calibration markers |
+| GET/PATCH/POST/PUT | `/api/v2/sat/sensor-areas` | handleSAT | Yes | Area sensor mapping |
 | GET | `/api/v2/sat/weather/needs-setup` | handleSAT | Yes | Weather onboarding gate |
-| GET | `/api/v2/sat/ble/discovery` | handleSAT | Yes | BLE sensor roster (ESP32-S3 only) |
-| POST | `/api/v2/sat/ble/select` | handleSAT | Yes | Promote roster slot to active BLE sensor |
-| POST | `/api/v2/sat/ble/label` | handleSAT | Yes | Set persistent label for roster slot |
-| POST/PUT | `/api/v2/sat/ble/bindkey` | handleSAT | Yes | Provision encrypted-MiBeacon bindkey (write-only secret) |
-| POST/DELETE | `/api/v2/sat/ble/forget` | handleSAT | Yes | Drop roster slot + HA discovery cleanup |
-| GET/PUT/POST/DELETE | `/api/v2/sat/ble/roster` | handleSAT | Yes | 8-slot BLE roster; write-only bindkeys (TASK-935) |
-| POST/PUT | `/api/v2/sat/force-boiler` | handleSAT | Yes | Test-only transient boiler-present override |
-| POST | `/api/v2/discovery/republish` | handleDiscovery | Yes | Force full HA discovery-config re-announce |
-| POST | `/api/v2/mqtt/republish` | handleMqtt | Yes | Force full OT-value republish (TASK-936) |
-| GET | `/api/v2/debug` | handleDebugDump | No | Snapshot of all debug flags + local IP |
-| GET | `/api/v2/network/scan` | handleNetwork | No | WiFi scan for Settings page (TASK-585) |
-| OPTIONS | `/api/v2/*` | sendApiOptions | N/A | CORS preflight |
+| GET/POST/PUT/DELETE | `/api/v2/sat/ble/{discovery,select,label,bindkey,forget,rescan,roster}` | handleSAT | Yes | BLE sensors (`HAS_SAT_BLE`) |
+| GET | `/api/v2/discovery` | handleDiscovery | No | Discovery verification status |
+| POST | `/api/v2/discovery/verify` | handleDiscovery | Yes | Start verification window |
+| POST | `/api/v2/discovery/republish` | handleDiscovery | Yes | Re-announce all discovery configs (60 s cooldown) |
+| POST | `/api/v2/mqtt/republish` | handleMqtt | Yes | Re-publish OT values (60 s cooldown) |
+| GET | `/api/v2/debug` | handleDebugDump | No | Debug flags and telemetry |
+| GET | `/api/v2/network/scan` | handleNetwork | No | Async WiFi scan |
+| OPTIONS | `/api/v2/*` | sendApiOptions | N/A | CORS preflight (204) |
 
-### File Serving Routes
+### File Serving and Admin Routes
 
 | Method | Path | Handler | Purpose |
 |--------|------|---------|---------|
-| GET | `/` | sendIndex | Serve index.html with ETag caching |
-| GET | `/index` | sendIndex | Alias for / |
-| GET | `/index.html` | sendIndex | Alias for / |
-| GET | `/index.css` | (lambda) | Serve CSS (1-day cache) |
-| GET | `/index.js` | (lambda) | Serve JS (versioned or no-cache) |
-| GET | `/graph.js` | (lambda) | Serve graph library |
-| GET | `/FSexplorer.png` | serveStatic | Serve icon |
-| POST | `/upload` | handleFileUpload | File upload to LittleFS (multipart) |
-| GET | `/ReBoot` | reBootESP | Reboot device |
-| GET | `/ResetWireless` | resetWirelessButton | Reset WiFi settings |
-| GET | `/FSexplorer.html` | (lambda) | Fallback file explorer |
-| GET | `/FSexplorer` | (lambda) | Alias for FSexplorer.html |
+| GET | `/`, `/index`, `/index.html` | sendIndex | v2 UI shell (auth, ETag); falls back to FSexplorer |
+| GET | `/v2.html`, `/v2.js`, `/v2-bundle.css`, `/fsexplorer.css` | serveVersionedAsset | ETag + `no-cache` assets |
+| GET | `/fonts/*.woff2` (inter-400, inter-700, jetbrains-mono-400) | serveImmutableAsset | One-year immutable cache |
+| GET | `/FSexplorer.png` | serveStatic | Icon |
+| GET | `/FSexplorer.html`, `/FSexplorer` | sendFSexplorerHtml | Recovery file explorer |
+| POST | `/upload` | handleFileUpload | Upload to LittleFS |
+| ANY | `/ReBoot`, `/ResetWireless` | reBootESP, resetWirelessButton | Reboot, reset WiFi (auth) |
+| ANY | `/pic` | upgradepic | PIC firmware flash (`HAS_PIC`) |
+| POST | `/update`, `/safeboot` | httpUpdater | Filesystem OTA, safeboot handover (see network component) |
+| GET | `/api/firmwarefilelist`, `/api/listfiles` | FSexplorer | Deprecated unversioned listings (ADR-035) |
+| GET | any other path | onNotFound / handleFile | LittleFS file or 404 |
 
 ## Dependencies
 
 ### Internal Dependencies
 
-- **Core modules**:
-  - `OTGW-firmware.h` — main header, global state definitions
-  - `OTGW-Core.ino` — OpenTherm message processing, `doAutoConfigure()`
-  - `settingStuff.ino` — settings persistence, `updateSetting()`
-  - `SATcontrol.ino` — SAT state machine, `satSendStatusJSON()`, `satSendHealthJSON()`
-  - `OTmonitor.ino` — OT message history, `getMsgLastUpdated()`, `getOTGWValue()`
-  - `MQTTstuff.ino` — MQTT integration, `doAutoConfigure()`
-  - `DallasStuff.ino` — Dallas sensor management, `getDallasLabels()`, `ensureSensorDefaultLabels()`
-
-- **Global functions**:
-  - `sendHealth()` — health metrics endpoint
-  - `sendDeviceSettings()` — settings in v2 format
-  - `postSettings()` — settings update handler
-  - `sendDeviceInfoV2()` — device metadata
-  - `sendDeviceTimeV2()` — NTP/clock state
-  - `sendDeviceCrashLog()` — crash dump if available
-  - `sendFlashStatus()` — flash memory info
-  - `sendPICFlashStatus()`, `sendPICUpdateCheck()`, `sendPICsettings()` — PIC info
-  - `sendOTDirectStatus()` — OT-direct status
-  - `addCommandToQueue()` — command queuing
-  - `testWebhook()` — webhook validation
-  - `satHandleTargetTemp()`, `satHandleExternalTemp()`, etc. — SAT input handlers
-  - `satFlushShortLivedData()` — SAT flush operation
-  - `getDallasLabels()`, `updateAllDallasLabels()` — sensor label management
-  - `reBootESP()` — system reboot
-  - `resetWiFiSettings()` — WiFi reset
-  - `doRedirect()` — HTML redirect with countdown
+- `OTGW-firmware.h` (settings/state), `OTGW-Core.ino` (`addCommandToQueue()`, OT state), `settingStuff.ino` (`updateSetting()`), `SATcontrol.ino` (`satHandle*()`, `satSendStatusJSON()`), `MQTTstuff.ino` (`markAllMQTTConfigPending()`, `queueMQTTRepublishAll()`, discovery verification), `sensors_ext.ino` (Dallas labels), `webServerCompat.h` (request bridge), `OTGW-ModUpdateServer-esp32.h` (`hasSpareAppOtaSlot()`, `hasSafeboot()`)
 
 ### External Dependencies
 
-- **ESP8266 Core**:
-  - `ESP8266WebServer` (via `httpServer` global) — HTTP server, routing, auth, streaming
-  - `LittleFS` (via `LittleFS` global) — filesystem operations
-  - `time.h` — `time_t`, `time()` for timestamps
-  - `string.h` — C string utilities (`strtok_r`, `strstr`, `strcmp_P`, etc.)
-  - `ctype.h` — character classification (`isdigit`, `isxdigit`, `isalpha`)
-
-- **Macros & Helpers**:
-  - `PROGMEM`, `PSTR()`, `F()` — Flash memory string management
-  - `snprintf_P()`, `strlcpy()`, `strcmp_P()` — Safe formatted output and comparisons
-  - `CBOOLEAN()`, `CONOFF()` — Boolean-to-string conversion
-  - `CSTR()` — Null-safe C string macro
-  - `DebugTf()`, `DebugTln()` — Telnet debug output
-  - `feedWatchDog()` — Watchdog timer reset
+- **ESPAsyncWebServer** 3.11.2 / **AsyncTCP** 3.4.10 (request, `AsyncResponseStream`, `AsyncFileResponse`, `AsyncChunkedResponse`), **LittleFS**, **WiFi** (scan)
+- No ArduinoJson (ADR-146)
 
 ## Key Behaviors
 
-### ETag Caching Strategy
-
-1. **Index.html caching**:
-   - Browser requests `/index.html`
-   - Server computes `fsHash` (filesystem version marker)
-   - Sends ETag header: `"<fsHash>"`
-   - Browser stores in cache and sends `If-None-Match: "<fsHash>"` on next visit
-   - Server compares: if unchanged → `304 Not Modified` (zero-byte response)
-   - If FS upgraded → ETag changes → server sends `200 + full HTML`
-
-2. **JS asset versioning**:
-   - HTML contains `<script src="./index.js?v=<fsHash>"></script>`
-   - Injection happens line-by-line during HTML stream (avoids buffering full file)
-   - Versioned requests (matching fsHash) get long-term cache (1 day)
-   - Unversioned requests get no-cache (force revalidation)
-
-### Chunked JSON Streaming
-
-All JSON responses (maps, arrays, OT monitor) are sent via chunked transfer encoding to avoid buffering entire responses:
-
-1. `httpServer.setContentLength(CONTENT_LENGTH_UNKNOWN)` — enable chunked mode
-2. `httpServer.send(200, "application/json", "")` — start response
-3. `httpServer.sendContent()` — stream chunks as data is generated
-4. `httpServer.sendContent("")` — empty chunk marks end of transfer
-
-This allows streaming 10KB+ responses without allocating 10KB buffer.
-
-### CSRF & Origin Validation
-
-- **Permissive for non-browser clients**: No Origin/Referer header → allow
-- **Strict for browsers**: Origin/Referer must match request Host header
-- **Allow CORS preflight**: OPTIONS method always allowed (no auth)
-- **Centralized POST/PUT auth**: All mutations checked in `processAPI()` before dispatch
-
-### Command Queuing & Validation
-
-Commands are validated before queuing:
-
-1. **Format validation**: Must be `LL=value` (two letters, equals, value)
-2. **Alphabetic prefix check**: Prevents injection of non-command bytes
-3. **Length check**: Must fit in command queue slot
-4. **Async response**: 202 Accepted with `{"status":"queued"}`
-5. **Queuing**: Via `addCommandToQueue()`, executed in background
-
-### Handler Timing & Access Logging (v1.3.5+)
-
-Each request generates a one-line telnet debug log when `state.debug.bRestAPI` flag is set (key 7):
-
-- **Format**: `REST <METHOD> <URI> => <STATUS> <HANDLER_NAME> <ELAPSED_MS>ms`
-- **Example**: `REST GET /api/v2/sensors => 200 v2/sensors 15ms`
-- **Timing**: Measured from `processAPI()` entry to handler exit (includes routing overhead)
-- **Non-API routes**: Logged with suffix `non-api`, deprecated v0/v1 with `deprecated`, routing failures with `not found`
-- **Low-level errors**: Heap check and URI length errors logged separately before routing
-- **Purpose**: One-line access log for performance diagnostics and request auditing without full request body logging
-
-### SAT Extended Diagnostics
-
-`GET /api/v2/sat/status?detail=full` returns:
-
-- **Synchronization health**: setpoint mismatch, modulation reliability, CH sync
-- **Pressure diagnostics**: smoothed pressure, drop rate, low-water alarm
-- **Cycle analysis**: cycle kind, duration, count, CH/DHW fraction
-- **Error statistics**: mean error, standard deviation, sample count, heating curve recommendation
-- **Flame & device health**: boolean indicators (flame on, device ready, cycle health)
-- **Auto-tune metrics**: score, cycles completed, OVP calibration phase
-
-## Stack & Memory Considerations
-
-- **processAPI() stack usage**: ~356 bytes (static buffers to save stack)
-- **Static buffer sizes**:
-  - `URI[50]` — max 50-char API path
-  - `words[8][32]` — max 8 tokens, 32 chars each
-  - `iIdentlevel`, `bFirst` — JSON state (global)
-- **Chunked streaming**: No 10KB+ intermediate buffers
-- **PROGMEM strings**: All string literals in PROGMEM to save RAM (OTGW principle)
+- **Async request bridge** (`webServerCompat.h`): `webBeginRequest()`, `webPushHeader()` (max `WEB_MAX_PENDING_HEADERS` = 6, silently dropped past the cap), `webSend()`, `webSendFile()`, `argCompat()`, `bodyCompat()` (request body capped at `WEB_BODY_MAX_LEN` 2560, captured by `webCaptureBody()` on both the `/api` handler and the catch-all).
+- **Command queuing**: `LL=value` validated (two letters, `=`), length-limited, queued with `addCommandToQueue()`, 202 `{"status":"queued"}`.
+- **Access log**: one line per request behind the REST debug flag; low-level rejections log separately.
 
 ## Notes
 
-- **No ArduinoJson library** (ADR-146, reverting ADR-141): JSON output is a hand-rolled streaming writer, `JsonEmit` (`jsonEmit.h`), used field-by-field over an `AsyncResponseStream` via `restBeginStream()` / `restFinalize()` (and `restSendChunked()`). It serialises NaN/Inf as `null` natively and never buffers a whole response. Legacy helpers still build small responses with `snprintf_P`.
-- **Backward compatibility**: v0/v1 endpoints return 410 Gone; unversioned legacy endpoints (`/api/firmwarefilelist`, `/api/listfiles`) remain in v1.4.0 for backward compatibility (scheduled removal per ADR-035)
-- **OTGW32 hardware detection**: OTDirect endpoints guarded by `#if HAS_DIRECT_OT` (OTGW32 exclusive)
-- **Cooperative scheduling**: Static buffers in `processAPI()` avoid re-entrancy issues with `feedWatchDog()` yields
-- **File upload security**: Auth check prevents file write if credentials invalid (no partial uploads)
-- **Tornado-safe**: No `String` class in hot paths; `strlcpy()` and `snprintf_P()` prevent buffer overflows
-- **Adding endpoints**: Modify `kV2Routes[]` dispatch table (line 1080-1097) only; implement handler function using pattern of existing handlers; no router changes needed
-- **Handler timing**: All requests logged with response code and elapsed milliseconds when REST debug flag enabled (telnet debug key 7), supporting performance diagnostics and request auditing
-- **Nightly restart settings** (v1.3.5+): `nightlyrestart` and `nightlyrestarthour` exposed via `/api/v2/settings` (lines 1754-1755); WiFi SSID and Reset WiFi button added to Settings API
+- Strings in PROGMEM (`F()`, `PSTR()`), `char[]` buffers with `strlcpy`/`snprintf_P` in hot paths (ADR-180).
+- Admin routes registered with `HTTP_ANY` must reach `checkHttpAuth()` themselves; there is no blanket gate for them.
+- `handleOTDirect` and BLE sub-routes compile out on boards without `HAS_DIRECT_OT` / `HAS_SAT_BLE`.
 
 ## References
 
-- **ADR-035**: API versioning policy; v0/v1 removal roadmap
-- **ADR-050**: v2 API route dispatch table design
-- **ADR-054**: CSRF protection and auth integration
-- **ADR-146**: Streaming `JsonEmit` REST writer (no ArduinoJson) on ESP32-S3
-- **ADR-147**: ESP32-S3 platform limits and concurrent Web UI static serving (503 backpressure)
-- **Related code**: 
-  - `/src/OTGW-firmware/OTGW-firmware.h` (settings, state structures)
-  - `/src/OTGW-firmware/OTGW-Core.ino` (command execution)
-  - `/src/OTGW-firmware/SATcontrol.ino` (SAT state machine)
-  - `/src/OTGW-firmware/MQTTstuff.ino` (auto-configure)
+- **ADR-035**: API versioning policy; **ADR-050**: route dispatch table; **ADR-056**: admin auth and CSRF (supersedes ADR-054); **ADR-118**: gateway override surface; **ADR-139**: ETag asset caching
+- **ADR-146**: `JsonEmit`, no ArduinoJson; **ADR-147 / ADR-165 / ADR-184 / ADR-188**: concurrency and connection limits; **ADR-172**: poll rate limit; **ADR-176**: DHW water total reset; **ADR-180**: no `String` in hot paths; **ADR-191**: safeboot OTA
+- Related code: `OTGW-firmware.h`, `OTGW-Core.ino`, `SATcontrol.ino`, `MQTTstuff.ino`

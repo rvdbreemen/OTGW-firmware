@@ -3,29 +3,30 @@
 ## Overview
 
 - **Name**: Sensors and Hardware
-- **Description**: Hardware input/output abstraction layer managing all physical peripherals attached to the ESP8266/ESP32 GPIO: Dallas DS18B20 temperature sensors (1-Wire bus), S0 pulse energy meter, GPIO relay output, and optional OLED display. Publishes sensor data via MQTT with Home Assistant auto-discovery and provides a REST API for label management.
+- **Description**: Hardware input/output layer managing the physical peripherals attached to the ESP32-S3 GPIO and I2C buses: Dallas DS18B20 temperature sensors (1-Wire bus), S0 pulse energy meter, a GPIO relay output driven by an OpenTherm status bit, and an optional SSD1306 OLED display. Publishes sensor data via MQTT with Home Assistant auto-discovery and provides a REST API for sensor status and label management. Board-level hardware facts (pin maps, `HAS_*` flags, S3 Mini Pro detection, combo boot detection) are described under "Board and Hardware Detection".
 - **Type**: Application Component
-- **Technology**: Arduino C/C++, OneWire library, DallasTemperature library (Miles Burton), I2C OLED (SSD1306)
+- **Technology**: Arduino C/C++ on ESP32-S3, OneWire library, DallasTemperature library (Miles Burton), SSD1306Ascii (I2C OLED)
 
 ## Purpose
 
-This component bridges the physical world to the firmware's data model. Dallas DS18B20 sensors (up to 16 devices, identified by unique ROM address) measure temperatures at arbitrary points in the heating system: flow, return, DHW tank, outside. The S0 pulse counter provides kWh energy metering from any S0-compatible electricity meter. The GPIO relay output enables an external bypass valve or auxiliary switch controlled by a configurable OpenTherm status bit trigger. The optional OLED display provides a local status readout without requiring a browser.
+This component bridges the physical world to the firmware's data model. Dallas DS18B20 sensors (up to 16 devices, identified by unique ROM address) measure temperatures at arbitrary points in the heating system: flow, return, DHW tank, outside. The S0 pulse counter provides energy metering from any S0-compatible electricity meter. The GPIO relay output switches an external device based on a configurable OpenTherm status bit. The optional OLED display provides a local status readout without requiring a browser.
 
-Auto-discovery for Dallas sensors integrates with the MQTT auto-discovery system used by the Integration Layer, publishing per-sensor Home Assistant discovery payloads with unique sensor IDs derived from the 8-byte ROM address. Labels (user-friendly names like "Boiler flow" instead of raw hex addresses) are persisted in `/dallas_labels.ini` on LittleFS.
+Auto-discovery for Dallas sensors integrates with the MQTT discovery system of the Integration Layer, publishing per-sensor Home Assistant discovery payloads with unique sensor IDs derived from the 8-byte ROM address. Labels (user-friendly names like "Boiler flow" instead of raw hex addresses) are persisted in `/dallas_labels.ini` on LittleFS. A Dallas reading can also be mapped to one of the four SAT areas (`settings.sat.sSensorArea[]`), in which case `pollSensors()` feeds it to the thermostat controller.
 
-A simulation mode (`state.debug.bSensorSim`) allows testing without physical hardware by generating synthetic sensor readings at configurable intervals.
+A simulation mode (`state.debug.bSensorSim`, telnet key `d`) allows testing without physical hardware by generating synthetic sensor readings.
 
 ## Software Features
 
-- **Dallas DS18B20 1-Wire bus**: Auto-discovers up to 16 sensors; async non-blocking temperature conversion (`setWaitForConversion(false)`); enforces `MAXDALLASDEVICES` limit gracefully; supports GPIO pin configured at runtime (not compile time, per ADR-020)
+- **Dallas DS18B20 1-Wire bus**: Auto-discovers up to 16 sensors; async non-blocking temperature conversion (`setWaitForConversion(false)`); enforces `MAXDALLASDEVICES` gracefully; the GPIO pin is a runtime setting bound after settings load (ADR-020); pin and enable changes need a reboot
 - **Sensor label persistence**: Two-pass algorithm reads existing `/dallas_labels.ini`, appends auto-generated defaults ("Sensor N") for newly discovered addresses, writes back only on change
-- **Legacy address format**: `settings.sensors.bLegacyFormat` flag reproduces v0.10.x address formatting bug for HA automation backward compatibility
-- **Disconnected sensor handling**: If `getTempC()` returns `DEVICE_DISCONNECTED_C`, last known value is preserved; no error thrown; disconnect logged
-- **S0 pulse counter**: Interrupt-driven pulse counting on configurable GPIO; configurable debounce (0–1000ms); `pulseskWh` conversion factor; publishes cumulative kWh and instantaneous power to MQTT
-- **GPIO relay output**: Monitors a configurable OpenTherm status bit; drives GPIO HIGH/LOW accordingly; supports active-high or active-low configuration
-- **OLED display**: I2C SSD1306 display for local status readout (hostname, IP, OT bus status, temperatures); updates on each sensor poll cycle
-- **Sensor simulation mode**: Generates 3 synthetic DS18B20 readings (30°C, 35°C, 40°C) with configurable update interval; enables full UI/MQTT testing without hardware
-- **MQTT auto-discovery for sensors**: Calls `sensorAutoConfigure()` per detected device, publishing HA discovery payload with device address as unique sensor ID; marks complete with `setMQTTConfigDone()`
+- **Legacy address format**: `settings.sensors.bLegacyFormat` reproduces the v0.10.x address formatting bug for Home Assistant automation backward compatibility
+- **Disconnected sensor handling**: If `getTempC()` returns `DEVICE_DISCONNECTED_C`, the last known value is preserved and the sensor is skipped
+- **SAT area routing**: A Dallas address configured in `settings.sat.sSensorArea[0..3]` is passed to `satSetAreaTemp()` on every poll (TASK-587)
+- **S0 pulse counter**: Interrupt-driven pulse counting on a configurable GPIO; configurable debounce (0..1000 ms); `iPulsekw` pulses-per-kW calibration; publishes interval pulse count, lifetime count, last pulse time and instantaneous power (kW) when pulses were seen
+- **GPIO relay output**: Follows one OpenTherm status bit (`iTriggerBit`, 0..15) of `OTcurrentSystemState.Statusflags`; drives the GPIO HIGH when the bit is set (active-HIGH only)
+- **OLED display**: SSD1306 128x64 over I2C at 0x3C, runtime-detected. Five pages cycled by the board button (Network, OT Status, Device, Dashboard, Heating), 5 s refresh, 30 s auto-off, boot splash, plus the WiFi config-portal and (prerelease) AP-fallback "how to connect" screens
+- **Sensor simulation mode**: Three synthetic DS18B20 sensors (starting at 30, 35 and 40 degC, random walk within 20..60 degC, update every 10 s)
+- **MQTT auto-discovery for sensors**: Dallas discovery is drained by the discovery loop (`loopMQTTDiscovery()`) calling `configSensors()`, which calls `sensorAutoConfigure()` per detected device; the S0 entries (id 245) are published by the generic discovery drip
 
 ## Code Modules
 
@@ -38,63 +39,86 @@ A simulation mode (`state.debug.bSensorSim`) allows testing without physical har
 ### Dallas Sensor Read API
 
 - **Protocol**: In-process C++ API
-- **Description**: Functions called from main loop and Integration Layer.
+- **Description**: Functions called from `setup()`, `loop()`, the discovery loop and the REST layer.
 - **Operations**:
-  - `initSensors()` — probe 1-Wire bus, store ROM addresses, initialize labels file
-  - `pollSensors()` — non-blocking async conversion cycle; publishes via `sendMQTTData()`; triggers auto-discovery if pending
-  - `configSensors()` — trigger HA MQTT auto-discovery for all detected sensors
-  - `getDallasAddress(DeviceAddress)` — convert 8-byte ROM to hex string (standard or legacy format)
-  - `initSimulatedDallasSensors()` — initialize 3 synthetic sensors for simulation mode
+  - `initSensors()` - probe the 1-Wire bus, store ROM addresses, initialize the labels file
+  - `pollSensors()` - non-blocking conversion cycle every `settings.sensors.iInterval` seconds; publishes via `sendMQTTData()`; routes mapped sensors to SAT; queues discovery if pending
+  - `configSensors()` - publish HA discovery for all detected sensors
+  - `getDallasAddress(DeviceAddress)` - convert an 8-byte ROM to a hex string (standard or legacy format; shared static buffer)
+  - `initSimulatedDallasSensors()` - initialize 3 synthetic sensors for simulation mode
 
-### Sensor Label REST API
+### Sensor Status and Label REST API
 
-- **Protocol**: HTTP REST (via Integration Layer REST API component)
-- **Description**: Manage human-readable names for detected sensors.
-- **Endpoints** (handled by `handleSensors()` in REST API):
-  - `GET /api/v2/sensors/labels` — returns list of `{address, label}` pairs
-  - `POST|PUT /api/v2/sensors/labels` — update all sensor labels (body: JSON array)
+- **Protocol**: HTTP REST (via the Integration Layer REST API component, `handleSensors()` in `restAPI.ino`)
+- **Endpoints**:
+  - `GET /api/v2/sensors` (or `/api/v2/sensors/status`) - Dallas state (`dallas_enabled`, `dallas_detected`, `dallas_count`, `dallas_gpio`, `dallas_poll_sec`, `simulated`, per-address `temp` and `epoch`) and S0 state (`enabled`, `gpio`, `poll_sec`, `pulses`, `total`, `power_kw`, `epoch`)
+  - `GET /api/v2/sensors/labels` - returns the `/dallas_labels.ini` JSON object (address to label)
+  - `POST|PUT /api/v2/sensors/labels` - replace all sensor labels (body: JSON object)
 
 ### MQTT Sensor Data Topics
 
-- **Protocol**: MQTT (published via Integration Layer MQTT component)
-- **Description**: Publishes temperature readings per sensor identified by ROM address.
+- **Protocol**: MQTT (published through `sendMQTTData()` of the Integration Layer MQTT component, which prefixes `{topTopic}/value/{nodeId}/`)
 - **Topics published**:
-  - `{topTopic}/<hex_address>` — temperature in °C for each DS18B20 sensor (e.g., `OTGW/28D0000000000001`)
-  - HA discovery: `homeassistant/sensor/{nodeId}/{hex_address}/config` — per sensor discovery payload
+  - `{topTopic}/value/{nodeId}/<hex_address>` - temperature in degC for each DS18B20 (e.g. `.../28D0000000000001`)
+  - `{topTopic}/value/{nodeId}/s0pulsecount`, `s0pulsecounttot`, `s0pulsetime`, `s0powerkw`
+  - HA discovery: Dallas via `streamDallasSensorDiscovery()` (device group Sensors), S0 via the id-245 table entries in `MQTTHaDiscovery.cpp`
 
 ### GPIO Relay Output
 
-- **Protocol**: GPIO (direct register access)
-- **Description**: Monitors a configurable OpenTherm status bit and drives a relay output GPIO.
-- **Configuration**:
-  - `settings.gpioout.bEnabled` — enable relay output
-  - `settings.gpioout.iPin` — GPIO pin number (0–16)
-  - `settings.gpioout.iTriggerBit` — OT status bit to monitor (e.g., CH mode active)
+- **Protocol**: GPIO (`digitalWrite`)
+- **Description**: Follows one OpenTherm status bit with a relay GPIO. (The OTGW32 bypass relay, `PIN_BYPASS_RELAY`, is a different output owned by OTDirect.)
+- **Configuration** (`settings.outputs`, persisted as `GPIOOUTPUTSenabled`, `GPIOOUTPUTSpin`, `GPIOOUTPUTStriggerBit`):
+  - `bEnabled` - enable the relay output
+  - `iPin` - GPIO number (0..16, default 16)
+  - `iTriggerBit` - status bit index 0..15 (default 0)
 
 ### S0 Pulse Counter
 
-- **Protocol**: GPIO interrupt, MQTT publish
-- **Description**: Counts S0 pulses from energy meter, publishes kWh and power.
-- **Configuration**:
-  - `settings.s0.bEnabled`, `settings.s0.iPin`, `settings.s0.iDebounce`, `settings.s0.iPulseskWh`, `settings.s0.iInterval`
-- **Topics published**:
-  - `{topTopic}/s0/energy` — cumulative kWh
-  - `{topTopic}/s0/power` — instantaneous power (W)
+- **Protocol**: GPIO interrupt (FALLING edge), MQTT publish
+- **Description**: Counts S0 pulses from an energy meter and publishes counts and power.
+- **Configuration** (`settings.s0`, persisted as `S0COUNTER*`):
+  - `bEnabled`, `iPin` (default 12), `iDebounceTime` (default 80 ms), `iPulsekw` (default 1000 pulses per kW), `iInterval` (default 60 s)
+
+### OLED Display
+
+- **Protocol**: I2C (SSD1306 at 0x3C), board button polled with a 300 ms debounce
+- **Operations**: `initOLED()` (from `setup()` before WiFi start, and again after combo pin resolution), `loopOLED()` (from `loop()`), `oledShowConfigMode(ssid, pw, url)` (from `configModeCallback()` in `networkStuff.ino`)
+- **State exposed**: `state.hw.bOLEDPresent` (reported as `oledpresent` in device info)
+
+## Board and Hardware Detection
+
+Board definitions live in the Platform library (`src/libraries/Platform/src/boards.h`); the `HAS_*` flags decide which subsystems exist and application code never reads raw board macros.
+
+| Target | Flags (from `boards.h`) | Notes |
+|--------|-------------------------|-------|
+| `esp32` (OTGW32 / OT-Thing PCB) | `HAS_PIC=0`, `HAS_DIRECT_OT=1`, `HAS_ETH_CAPABLE=1` | OTDirect owns the OT bus; I2C SDA 18 / SCL 17; boot button GPIO 0; W5500 on SPI; bypass relay GPIO 47 |
+| `esp32-classic` (OTGW Classic + LOLIN S3 Mini) | `HAS_PIC=1`, `HAS_PIC_WATCHDOG=1`, `HAS_STATUS_PIXEL=1` | I2C SDA 35 / SCL 36 (0x26 watchdog and OLED); button GPIO 18 |
+| `esp32-combo` (one binary for both, ADR-127) | all of the above plus `HAS_RUNTIME_HW_DETECT=1` | PIC vs OTDirect decided at boot; pins resolved at runtime by `activeI2cSda()`, `activeI2cScl()`, `activeButton()`, `activeLed1()`, `activeLed2()`, `activePicRst()` from `settings.iBoardMode` and `state.hw` |
+
+Common flags on all targets: `HAS_OLED_CAPABLE=1` (defined but not referenced by `OLED.ino`; OLED presence is a runtime I2C probe, ADR-114), `HAS_SAT`, `HAS_SAT_BLE`, `HAS_WEATHER_FORECAST`, `HAS_LEDC_LED`.
+
+- **Hardware mode** (`state.hw.eMode`, `Hardwaretypes.h`): `HW_MODE_UNKNOWN`, `HW_MODE_PIC`, `HW_MODE_OT_DIRECT`, `HW_MODE_DEGRADED`. `settings.iBoardMode` persists the combo choice: 0 auto, 1 force PIC (S3 Mini), 2 force OTDirect, 3 force PIC (S3 Mini Pro).
+- **S3 Mini Pro detection** (ADR-158, `HAS_RUNTIME_HW_DETECT` only): `probeProImu()` in `OTGW-firmware.ino` checks for the on-board QMI8658C IMU (I2C 0x6A or 0x6B, WHO_AM_I register 0x00 returning 0x05) on the Pro's I2C pair (SDA 12 / SCL 11) at the start of `setup()`, before the 0x26 watchdog disarm; the result is `state.hw.bClassicPro`. The Pro uses a different Classic pin map (`PIN_CLASSIC_PRO_*`: button 13, LED1 14, LED2 41, PIC reset 40).
+- **Status pixel** (`HAS_STATUS_PIXEL`): `startStatusPixel()` drives the LOLIN RGB pixel as WiFi status (GPIO 47 on the Mini, GPIO 8 with power enable GPIO 7 on the Mini Pro); it is skipped when no PSRAM is found, which excludes the OTGW32.
+- **BLE room sensors** are handled by the Smart Thermostat component (`SATble.ino`, `HAS_SAT_BLE`), not by this component.
 
 ## Dependencies
 
 ### Components Used
 
-- **Configuration and State**: reads `settings.sensors.*`, `settings.s0.*`, `settings.gpioout.*`; reads `state.debug.bSensorSim` for simulation mode
-- **Integration Layer (MQTT)**: calls `sendMQTTData()` to publish temperature readings; calls `sensorAutoConfigure()` and `setMQTTConfigDone()` for HA discovery
+- **Configuration and State**: reads `settings.sensors.*`, `settings.s0.*`, `settings.outputs.*`, `settings.sat.sSensorArea[]`; reads `state.debug.bSensors` / `bSensorSim` and `state.hw`
+- **Integration Layer (MQTT)**: `sendMQTTData()`, `sensorAutoConfigure()`, `setMQTTConfigDone()` / `setMQTTConfigPending()`, `streamDallasSensorDiscovery()`
+- **Smart Thermostat (SAT)**: `satSetAreaTemp()` receives mapped Dallas readings
+- **OpenTherm Core**: `OTcurrentSystemState` (status flags and temperatures read by the relay logic and the OLED pages)
+- **Network**: `isNetworkUp()`, `getActiveIP()`, `networkModeName()` for the OLED Network page
 
 ### External Systems
 
-- **OneWire library**: 1-Wire bus protocol implementation
-- **DallasTemperature library** (Miles Burton): DS18B20-specific layer over OneWire; async conversion management
-- **LittleFS**: `/dallas_labels.ini` — sensor address-to-label mapping persistence
-- **I2C / SSD1306**: Optional OLED display (I2C bus, address 0x3C)
-- **GPIO hardware**: DS18B20 data pin, S0 counter pin, relay output pin — all configurable at runtime
+- **OneWire library**: 1-Wire bus protocol
+- **DallasTemperature library** (Miles Burton): DS18B20 layer, async conversion
+- **LittleFS**: `/dallas_labels.ini` sensor label persistence
+- **SSD1306Ascii / Wire**: optional OLED over I2C (address 0x3C)
+- **GPIO hardware**: DS18B20 data pin, S0 counter pin and relay output pin are runtime settings; I2C, button and LEDs come from the board pin map
 
 ## Component Diagram
 
@@ -102,15 +126,16 @@ A simulation mode (`state.debug.bSensorSim`) allows testing without physical har
 C4Component
     title Component Diagram: Sensors and Hardware
 
-    Container_Boundary(fw, "OTGW Firmware (ESP8266/ESP32)") {
+    Container_Boundary(fw, "OTGW Firmware (ESP32-S3)") {
         Component(sensors, "Sensors & Hardware", "Arduino C++", "Dallas DS18B20, S0 pulse counter, GPIO relay, OLED display, sensor simulation")
         Component(integlayer, "Integration Layer", "Arduino C++", "MQTT publish, REST API, HA discovery")
-        Component(cfgstate, "Configuration & State", "Arduino C++", "settings.sensors.*, settings.s0.*, settings.gpioout.*")
+        Component(cfgstate, "Configuration & State", "Arduino C++", "settings.sensors.*, settings.s0.*, settings.outputs.*, state.hw")
+        Component(sat, "Smart Thermostat (SAT)", "Arduino C++", "Area temperatures")
     }
 
     System_Ext(ds18b20, "Dallas DS18B20", "1-Wire temperature sensors (up to 16)")
     System_Ext(s0meter, "S0 Energy Meter", "Pulse-output electricity meter")
-    System_Ext(relay, "GPIO Relay", "Bypass valve or auxiliary switch")
+    System_Ext(relay, "GPIO Relay", "Auxiliary switch")
     System_Ext(oled, "OLED Display", "SSD1306 I2C display (optional)")
     SystemDb_Ext(lfs, "LittleFS", "/dallas_labels.ini")
 
@@ -118,8 +143,9 @@ C4Component
     Rel(sensors, s0meter, "GPIO interrupt", "pulse counting")
     Rel(sensors, relay, "GPIO output", "status bit driven relay")
     Rel(sensors, oled, "I2C", "local status display")
-    Rel(sensors, integlayer, "Publish readings, trigger discovery", "sendMQTTData(), sensorAutoConfigure()")
-    Rel(integlayer, sensors, "Label management", "getDallasLabels(), updateAllDallasLabels()")
-    Rel(sensors, cfgstate, "Reads sensor configuration", "settings.sensors.*, settings.s0.*")
+    Rel(sensors, integlayer, "Publish readings, discovery", "sendMQTTData(), sensorAutoConfigure()")
+    Rel(integlayer, sensors, "Sensor status and labels", "sendSensorStatus(), getDallasLabels(), updateAllDallasLabels()")
+    Rel(sensors, sat, "Mapped Dallas temperature", "satSetAreaTemp()")
+    Rel(sensors, cfgstate, "Reads configuration", "settings.sensors.*, settings.s0.*, settings.outputs.*")
     Rel(sensors, lfs, "Persist sensor labels", "/dallas_labels.ini")
 ```

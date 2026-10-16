@@ -3,416 +3,268 @@
 ## Overview
 
 - **Name**: Network & WiFi Management Module (OTGW-firmware)
-- **Description**: Unified network connectivity layer providing WiFi with non-blocking reconnection (ADR-047), NTP time synchronization with timezone support, mDNS/LLMNR hostname resolution, SimpleTelnet 1.0.0 debug server, and runtime WiFi↔Ethernet failover (ESP32 + W5500, TASK-581). Updated for Arduino Core 3.1.2 (ESP8266) with lwIP2 Low Memory variant (TCP_MSS=536). WiFiClient sync mode enabled to reduce TCP buffer copy overhead. Per-component types are isolated in `Networktypes.h` (ADR-079 / ADR-081).
-- **Location**: `/src/OTGW-firmware/` (primary files: `networkStuff.ino`, `networkStuff.h`, `Ethernet.ino`, `Networktypes.h`, `platform.h`, `platform_esp8266.h`, `platform_esp32.h`); `src/libraries/SimpleTelnet/src/SimpleTelnet.h`
-- **Language**: Arduino C/C++ (ESP8266/ESP32), templated C++ (SimpleTelnet library)
-- **Purpose**: Abstracts WiFi/Ethernet connectivity, NTP time sync, hostname management, platform-specific features, and debug telnet interface behind a unified API. Ensures reliable network connectivity with automatic failover, proper DHCP hostname negotiation, and responsive debug terminal.
+- **Description**: Network connectivity layer for the ESP32-S3 firmware: WiFi with non-blocking reconnection (ADR-047), NTP time synchronization with timezone support, mDNS hostname resolution, an AsyncTCP-based telnet debug server (`AsyncSimpleTelnet`), the shared `AsyncWebServer` instance, and runtime WiFi<->Ethernet failover (W5500, TASK-581). Per-component types are isolated in `Networktypes.h` (ADR-079 / ADR-081). The 2.0.0 line is ESP32-S3 only (ADR-128); the ESP8266 code paths are gone.
+- **Location**: `/src/OTGW-firmware/` (primary files: `networkStuff.ino`, `networkStuff.h`, `Ethernet.ino`, `Networktypes.h`, `webServerCompat.h`, `OTGW-ModUpdateServer-esp32.h`); platform layer in `src/libraries/Platform/src/` (`platform.h`, `platform_esp32.h`, `boards.h`); telnet library in `src/libraries/SimpleTelnet/src/` (`AsyncSimpleTelnet.h`)
+- **Language**: Arduino C/C++ (ESP32 Arduino core under the pinned pioarduino platform), templated C++ (SimpleTelnet library)
+- **Purpose**: Abstracts WiFi/Ethernet connectivity, NTP time sync, hostname management and the debug telnet interface. Ensures reliable connectivity with automatic failover and a correct DHCP hostname.
 
 ## Code Elements
 
 ### WiFi Management
 
-#### `void startWiFi(const char* hostname, int timeOut, bool forcePortal = false)` 
-- **Location**: `networkStuff.ino:50-190`
+#### `void startWiFi(const char* hostname, int timeOut, bool forcePortal = false)`
+- **Location**: `networkStuff.ino`
 - **Parameters**:
-  - `hostname`: Target hostname for device (e.g., "otgw")
-  - `timeOut`: Timeout in seconds for WiFi connection attempts (e.g., 240 for 4 minutes)
-  - `forcePortal`: Force WiFi configuration portal (triple-reset detection)
+  - `hostname`: Target hostname for the device (e.g., "otgw")
+  - `timeOut`: Timeout in seconds for the config portal and the final connect wait (`setup()` passes 240)
+  - `forcePortal`: Force the WiFi configuration portal (triple-reset detection); also wipes the stored credentials (ADR-043 / TASK-760)
 - **Return Type**: `void`
-- **Description**: 
-  Main WiFi initialization function called from `setup()`. Attempts to connect to previously saved WiFi credentials. If connection fails, starts captive portal. Configures WiFiManager with custom SSID (`<hostname>-<MAC>`), disables Info/Erase buttons for security, and enables auto-reconnect. Handles hostname synchronization across multiple connection paths (SDK auto-connect, direct connect, portal, catch-all DHCP re-announce). Sets up HTTP updater with Basic Auth if password is configured.
-  
+- **Description**:
+  Called from `setup()`. Sets `WIFI_STA`, calls `platformIgnoreDhcpNtp()` (TASK-1052), applies a static WiFi IP from `settings.wifi.*` when `sStaticIp` is set (TASK-725), then connects with the saved credentials. If the direct connect fails it opens the WiFiManager captive portal. The portal SSID is `<hostname>-<AA:BB:CC:DD:EE:FF>` (eFuse MAC with colons); the portal menu is reduced to `wifi` and `exit`. Blocks until connected (feeding the watchdog). Sets `WiFi.setAutoReconnect(true)`, `WiFi.persistent(true)` and `platformWifiDisableSleep()` (TASK-817), then re-applies the hostname and keeps the HTTP update credentials current via `httpUpdater.updateCredentials("admin", settings.sHTTPpasswd)`.
+
   **Key behaviors**:
-  - Sets WiFi to STA mode explicitly
-  - Attempts direct connection if credentials saved (30-second timeout)
-  - Falls back to config portal if direct connect fails
-  - Performs DHCP re-announce if hostname mismatches after connect
-  - Blocks until WiFi is connected (with watchdog feeding)
-  - Sets `WiFi.setAutoReconnect(true)` and `WiFi.persistent(true)` for SDK auto-recovery
+  - Direct connect timeout is `timeOut / 2` (minimum 5 s) when credentials are saved
+  - If WiFi is already connected with another hostname, only the hostname is updated; the connection is kept
+  - A portal timeout restarts the device through `platformRestart()` (the one documented direct restart outside `doRestart()`)
+  - Prerelease builds (`_VERSION_PRERELEASE`): with saved credentials but no WiFi at boot, `startAPFallback()` runs instead of blocking in the portal
+  - No SDK DHCP stop/start calls anywhere (TASK-432): the SDK owns DHCP, only the hostname is re-applied
 
 #### `void resetWiFiSettings(void)`
-- **Location**: `networkStuff.ino:42-47`
-- **Parameters**: None
+- **Location**: `networkStuff.ino`
 - **Return Type**: `void`
-- **Description**: Resets all saved WiFi credentials using WiFiManager, forcing the next boot to show config portal.
+- **Description**: Resets the saved WiFi credentials through a local `WiFiManager` instance, forcing the portal on the next boot.
 
 #### `void loopWifi(void)`
-- **Location**: `networkStuff.ino:203-260`
-- **Parameters**: None
+- **Location**: `networkStuff.ino`
 - **Return Type**: `void`
-- **Description**: 
-  Non-blocking WiFi reconnection state machine called from `doBackgroundTasks()` on every loop iteration. Implements ADR-047 fallback for WiFi outages longer than the SDK auto-reconnect timeout (typically ~30 seconds). Uses cooperative state transitions (IDLE → DISCONNECTED → CONNECTING → RECONNECTED → IDLE, or FAILED on 10 retry limit).
+- **Description**:
+  Non-blocking WiFi reconnection state machine, called from `doBackgroundTasks()` (skipped while `isFlashing()`). Implements ADR-047 for outages longer than the SDK auto-reconnect covers. Returns immediately when `state.net.eMode == NET_ETHERNET` (HAS_ETH_CAPABLE builds) so the reconnect logic does not fight the wired link.
 
-  **States**:
-  - `WIFI_IDLE`: Connected, monitoring for disconnection
-  - `WIFI_DISCONNECTED`: Just detected disconnection, starting async reconnect
-  - `WIFI_CONNECTING`: Waiting non-blocking for connection (30-second retry window)
-  - `WIFI_RECONNECTED`: Connection restored, restarting services (Telnet, MQTT, WebSocket)
-  - `WIFI_FAILED`: Too many retries (>= 10), triggers reboot
-  
-  **Service restart on reconnection**: Calls `startTelnet()`, `startMQTT()`, and `startWebSocket()` to resume data streams after temporary WiFi loss.
+  **States** (`WifiState_t`):
+  - `WIFI_IDLE`: connected, monitoring for disconnection
+  - `WIFI_DISCONNECTED`: just dropped; re-applies the hostname and calls `WiFi.begin()`
+  - `WIFI_CONNECTING`: waits non-blocking, 30-second retry window (`timerWifiRetry`)
+  - `WIFI_RECONNECTED`: restarts services (`startTelnet()`, `startMQTT()`, `startWebSocket()`), re-asserts `platformWifiDisableSleep()`
+  - `WIFI_FAILED`: after 10 failed attempts calls `doRestart("WiFi: too many reconnect failures")`
+  - Prerelease only: `WIFI_AP_FALLBACK` / `WIFI_AP_RETRY`. After 2 failed attempts (about 60 s) the device starts a SoftAP (`OTGW-<last 3 MAC bytes>`, passphrase `otgw1234`, `192.168.4.1`) and retries WiFi every 5 minutes with a 30 s connect wait
 
-#### `void configModeCallback(WiFiManager *myWiFiManager)` (static)
-- **Location**: `networkStuff.ino:32-40`
-- **Parameters**: 
-  - `myWiFiManager`: WiFiManager instance that triggered callback
-- **Return Type**: `void`
-- **Description**: Callback invoked when WiFiManager enters configuration (captive portal) mode. Logs portal SSID and soft AP IP address to debug output.
+#### `static void configModeCallback(WiFiManager *myWiFiManager)`
+- **Location**: `networkStuff.ino`
+- **Description**: Invoked when WiFiManager enters the captive portal. Logs the portal SSID and soft AP IP, and paints the "how to connect" screen on the OLED through `oledShowConfigMode()` (TASK-750; no-op without an OLED).
 
 ### DNS & mDNS
 
 #### `void startMDNS(const char *hostname)`
-- **Location**: `networkStuff.ino:274-286`
-- **Parameters**:
-  - `hostname`: Hostname for mDNS responder (e.g., "otgw")
-- **Return Type**: `void`
-- **Description**: Initializes mDNS (Bonjour) responder, advertising the device as `<hostname>.local` and registering HTTP service on port 80. Enables discovery by `.local` hostname on macOS, Windows (with Bonjour), and Linux.
+- **Location**: `networkStuff.ino`
+- **Description**: Starts the mDNS responder as `<hostname>.local` and registers the `http` service on TCP port 80. Called from `setup()` and again from `switchToEthernet()`. On ESP32 mDNS runs on a background task, so `MDNS_NEEDS_UPDATE` is 0 and the `MDNS.update()` calls in the loop compile away.
 
 #### `void startLLMNR(const char *hostname)`
-- **Location**: `networkStuff.ino:288-303`
-- **Parameters**:
-  - `hostname`: Hostname for LLMNR responder
-- **Return Type**: `void`
-- **Description**: Initializes LLMNR (Windows name resolution) for the device. Only available on ESP8266 (guarded by `HAS_LLMNR` flag, which is 0 on ESP32). Responds to `<hostname>` broadcasts on the local network.
+- **Location**: `networkStuff.ino`
+- **Description**: LLMNR responder, compiled only when `HAS_LLMNR` is 1. `platform_esp32.h` sets it to 0, so on this firmware the function is an empty stub kept for the shared call site.
 
 ### NTP & Time Synchronization
 
 #### `void startNTP(void)`
-- **Location**: `networkStuff.ino:307-338`
-- **Parameters**: None
-- **Return Type**: `void`
-- **Description**: 
-  Initializes NTP (SNTP) time synchronization if enabled in settings. Configures `configTime()` with timezone and NTP server. On ESP8266, works around SDK bug where `configTime()` resets the WiFi hostname to "ESP-XXXXXX" by saving/restoring the hostname before/after the call. Performs DHCP re-announce on first NTP sync if hostname was reset by SDK (guards against repeated re-announces with `sDhcpHostnameFixed` flag).
-
-  **Guards**: Exits early if NTP is disabled (`settings.ntp.bEnable == false`).
+- **Location**: `networkStuff.ino`
+- **Description**: Returns early when `settings.ntp.bEnable` is false. Fills an empty timezone/hostname with `NTP_DEFAULT_TIMEZONE` ("Europe/Amsterdam") and `NTP_HOST_DEFAULT` ("pool.ntp.org"), calls `configTime(0, 0, settings.ntp.sHostname, nullptr, nullptr)` wrapped in `platformNtpHostnameFix()` (a no-op on ESP32), and sets `NtpStatus = TIME_WAITFORSYNC`. `setup()` skips it while the prerelease AP fallback is active.
 
 #### `void loopNTP(void)`
-- **Location**: `networkStuff.ino:341-389`
-- **Parameters**: None
-- **Return Type**: `void`
-- **Description**: 
-  NTP synchronization state machine called periodically from main loop. Manages NTP_STATUS transitions through three states:
-  - `TIME_NOTSET` / `TIME_NEEDSYNC`: Calls `startNTP()`, guards against ESP8266 SDK bogus initial value (0xFFFFFFFF = year 2106) by checking time is in range [EPOCH_2000_01_01, EPOCH_2038_01_19] before storing as baseline
-  - `TIME_WAITFORSYNC`: Polls `time()` until it exceeds baseline, validates timezone, transitions to TIME_SYNC on success
-  - `TIME_SYNC`: Monitors for time drift (resync if > NTP_RESYNC_TIME), transitions to TIME_NEEDSYNC when needed
-  
-  **Safety**: Uses dual-check guards to prevent SDK bogus initial timestamp from poisoning `NtpLastSync`. On first sync, converts Unix time to localized time and displays local date/time to debug output.
+- **Location**: `networkStuff.ino`
+- **Description**:
+  NTP state machine, called from the main loop while WiFi is up. Optional telemetry (debug key `n`, `state.debug.bNTP`) every 60 s unsynced and 300 s synced.
+  - `TIME_NOTSET` / `TIME_NEEDSYNC`: stores a baseline in `NtpLastSync` only if `time()` lies inside `[EPOCH_2000_01_01, EPOCH_2038_01_19]` (else 0), then calls `startNTP()`
+  - `TIME_WAITFORSYNC`: when `time()` passes both bounds and is `>= NtpLastSync`, validates the timezone via `timezoneManager.createForZoneName()` (falls back to the default on an invalid zone) and a `ZonedDateTime`, then moves to `TIME_SYNC`
+  - `TIME_SYNC`: after `NTP_RESYNC_TIME` (86400 s, once per day) moves to `TIME_NEEDSYNC`
 
 #### `bool isNTPtimeSet(void)`
-- **Location**: `networkStuff.ino:391-394`
-- **Parameters**: None
-- **Return Type**: `bool`
-- **Description**: Returns true if NTP has successfully synchronized (`NtpStatus == TIME_SYNC`).
+- **Location**: `networkStuff.ino`
+- **Description**: Returns `NtpStatus == TIME_SYNC`.
 
-#### `void sendtimecommand(void)`
-- **Location**: `networkStuff.ino:396-428`
-- **Parameters**: None
-- **Return Type**: `void`
-- **Description**: 
-  Sends OpenTherm Gateway time and date commands to the PIC via command queue. Only executes if:
-  - NTP is enabled and synced
-  - PIC is available
-  - Gateway firmware is active (not diagnostic/interface mode)
-  - Not in Print Summary mode (PS=1)
-  
-  Sends three command types:
-  - `SC=<hour>:<minute>/<day_of_week>` — Time command (daily)
-  - `SR=21:<month>,<day>` — Date command (on day change, via `dayChanged()`)
-  - `SR=22:<year_hi>,<year_lo>` — Year command (on year change, via `yearChanged()`)
-  
-  Uses UTC time converted to configured timezone. Day-of-week calculation: `(ZonedDateTime.dayOfWeek() + 6) % 7 + 1` to match OpenTherm convention.
+#### `void sendtimecommand(bool dayFlag, bool yearFlag)`
+- **Location**: `networkStuff.ino`
+- **Description**:
+  Sends time and date to the gateway through `addCommandToQueue()`. The flags come pre-computed from the single dispatcher in `doTaskMinuteChanged` (ADR-086, TASK-350). It returns early unless: not in Print Summary mode, `settings.ntp.bEnable`, `settings.ntp.bSendtime`, `NtpStatus == TIME_SYNC`, `hasOTCommandInterface()` (PIC or OTDirect ready, TASK-441) and `isGatewayFirmware()`.
+  - `SC=<hour>:<minute>/<day_of_week>` every call (day of week `(dayOfWeek()+6)%7+1`)
+  - `SR=21:<month>,<day>` when `dayFlag`
+  - `SR=22:<year_hi>,<year_lo>` when `yearFlag`
 
 ### Hostname Management
 
-#### `void platformSetHostname(const char *hostname)` (inline)
-- **Location**: `platform_esp8266.h:54-56` / `platform_esp32.h:54-56`
-- **Parameters**:
-  - `hostname`: Desired hostname
-- **Return Type**: `void`
-- **Description**: Platform-specific hostname setter. On ESP8266: `WiFi.hostname(hostname)`. On ESP32: `WiFi.setHostname(hostname)`.
+#### `void platformSetHostname(const char *hostname)` / `const char* platformGetHostname(void)` (inline)
+- **Location**: `platform_esp32.h`
+- **Description**: `WiFi.setHostname()` / `WiFi.getHostname()`. Called before `WiFi.begin()` so the DHCP request carries the configured name.
 
-#### `const char* platformGetHostname(void)` (inline)
-- **Location**: `platform_esp8266.h:58-62` / `platform_esp32.h:58-60`
-- **Parameters**: None
-- **Return Type**: `const char*` (pointer to static buffer on ESP8266, direct on ESP32)
-- **Description**: Platform-specific hostname getter. On ESP8266: copies WiFi hostname to static buffer (to handle String return). On ESP32: returns directly.
-
-#### `void platformRestartDHCP(void)` (inline)
-- **Location**: `platform_esp8266.h:199-202`
-- **Parameters**: None
-- **Return Type**: `void`
-- **Description**: (ESP8266 only) Forces DHCP client to re-announce lease. Calls `wifi_station_dhcpc_stop()` then `wifi_station_dhcpc_start()`. Not defined on ESP32 (DHCP renewal is automatic).
+There is no `platformRestartDHCP()` any more: the call sites were removed in TASK-432 because stopping and starting the SDK DHCP client while connected broke DHCP on later auto-reconnects.
 
 ### MAC Address & Device Identity
 
 #### `const char* getMacAddress(void)`
-- **Location**: `networkStuff.ino:432-440`
-- **Parameters**: None
-- **Return Type**: `const char*` (pointer to static buffer)
-- **Description**: Returns MAC address as hex string (e.g., "00112233AABB"). Calls `platformGetMacAddress()` to fetch raw bytes, then formats via `snprintf_P()` into static buffer.
+- **Location**: `networkStuff.ino`
+- **Description**: MAC as 12 uppercase hex characters (e.g., "00112233AABB") in a static buffer, from `platformGetMacAddress()`.
 
 #### `const char* getUniqueId(void)`
-- **Location**: `networkStuff.ino:442-447`
-- **Parameters**: None
-- **Return Type**: `const char*` (pointer to static buffer)
-- **Description**: Returns unique device ID in format `otgw-<MAC_HEX>` (e.g., "otgw-00112233AABB"). Used for MQTT device identification and Home Assistant discovery.
+- **Location**: `networkStuff.ino`
+- **Description**: `otgw-<MAC_HEX>`; used for MQTT and Home Assistant device identity.
 
 #### `void platformGetMacAddress(uint8_t *mac)` (inline)
-- **Location**: `platform_esp8266.h:77-79` / `platform_esp32.h:89-91`
-- **Parameters**:
-  - `mac`: Output buffer (6 bytes)
-- **Return Type**: `void`
-- **Description**: Platform-specific MAC address retrieval. On ESP8266: `WiFi.macAddress(mac)`. On ESP32: `esp_efuse_mac_get_default(mac)`.
+- **Location**: `platform_esp32.h`
+- **Description**: Reads the eFuse MAC (`esp_efuse_mac_get_default`), valid before `WiFi.begin()`.
 
 ### Per-Component Types Header (Networktypes.h, ADR-079 / ADR-081)
 
-`Networktypes.h` bundles the network transport types as a single component header (included after `boards.h`):
+`Networktypes.h` bundles the network transport types (included after `boards.h`):
 
-- `enum OTGWNetworkMode`: `NET_WIFI`, `NET_ETHERNET`, plus prerelease-only `NET_AP_FALLBACK` (guarded by `_VERSION_PRERELEASE` so production builds physically cannot enter AP fallback).
-- `struct NetworkSection` (`state.net`): runtime transport state. Always carries the prerelease AP-fallback fields under guard; Ethernet fields (`eMode`, `bEthernetLink`) are present only on `HAS_ETH_CAPABLE` builds.
-- `struct EthernetSection` (`settings.eth`, `HAS_ETH_CAPABLE` only): persisted static-IP configuration — `bStaticIP`, `sIPaddress`, `sGateway`, `sSubnet`, `sDNS`.
+- `enum OTGWNetworkMode`: `NET_WIFI`, `NET_ETHERNET`, plus prerelease-only `NET_AP_FALLBACK` (guarded by `_VERSION_PRERELEASE`, so production builds cannot enter AP fallback).
+- `struct NetworkSection` (`state.net`): always present. `eMode` and `bEthernetLink` exist only on `HAS_ETH_CAPABLE` builds; `bAPFallback` and `sAPSSID[32]` exist only in prerelease builds.
+- `struct EthernetSection` (`settings.eth`, `HAS_ETH_CAPABLE` only): `bStaticIP`, `sIPaddress`, `sGateway`, `sSubnet`, `sDNS` (0.0.0.0 means "use the gateway").
+- `struct WifiSection` (`settings.wifi`): `sStaticIp`, `sSubnet`, `sGateway`, `sDns1`, `sDns2`; empty `sStaticIp` means DHCP.
 
-### Ethernet Support (ESP32 + W5500 only)
+### Ethernet Support (W5500, `HAS_ETH_CAPABLE` only)
 
 #### `void initEthernet(void)`
-- **Location**: `Ethernet.ino:151-167` (guarded by `HAS_ETH_CAPABLE`)
-- **Parameters**: None
-- **Return Type**: `void`
-- **Description**: 
-  Called once from `setup()` on ESP32 boards with W5500 hardware. Starts the SPI bus, derives a locally-administered MAC from ESP32 eFuse, starts the W5500 driver and attempts DHCP (1-second timeout for fast boot). Sets `state.hw.bEthernetPresent` from `Ethernet.hardwareStatus() == EthernetHardwareFound`: the ESP-IDF driver install resets the chip and polls VERSIONR for up to 100 ms, so presence is known without a cable (TASK-1220; same sequence as the OT-Thing reference). If successful, switches WiFi off and initializes Ethernet as primary network interface. If W5500 present but no link, remains on WiFi.
+- **Location**: `Ethernet.ino`
+- **Description**:
+  Called once from `setup()` after `startMQTT()`, and skipped when `isPICEnabled()` (ADR-127: in combo PIC mode the SPI probe would clock GPIO12, the PIC reset hole on a Classic PCB). Starts the SPI bus, derives the MAC, runs `startEthernet(1000)` and sets `state.hw.bEthernetPresent` from `Ethernet.hardwareStatus() == EthernetHardwareFound`. The driver install resets the chip and polls VERSIONR for up to 100 ms, so presence is known without a cable (TASK-1220). With link and DHCP it calls `switchToEthernet()`; otherwise it stays on WiFi.
 
 #### `void loopEthernet(void)`
-- **Location**: `Ethernet.ino` (guarded by `HAS_ETH_CAPABLE`)
-- **Parameters**: None
-- **Return Type**: `void`
-- **Description**: 
-  Automatic WiFi ↔ Ethernet failover monitor called from `doBackgroundTasks()` every 5 seconds (if W5500 present, TASK-581). Monitors cable plug/unplug via `Ethernet.linkStatus()`. On cable insertion, attempts DHCP (2-second timeout) and switches to Ethernet via `switchToEthernet()`. On cable removal, falls back to WiFi via `switchToWiFi()`. Calls `Ethernet.maintain()` to keep DHCP lease alive when on Ethernet. The mode-transition MQTT publish (announcing the new IP/MAC under `otgw-firmware/network_mode` etc.) is deferred via a pending-publish flag until the MQTT reconnect completes — `loopEthernet()` fires it on the next iteration once `MQTTclient.connected()` returns true.
+- **Location**: `Ethernet.ino`
+- **Description**:
+  Failover monitor called from `doBackgroundTasks()` (skipped while flashing), self-throttled to every 5 s and a no-op without a W5500. Drains the pending mode publish (`otgw-firmware/network/mode` = `ethernet`, retained) once `state.mqtt.bConnected`. On cable insert it tries `startEthernet(2000)` and `switchToEthernet()`; on cable removal it publishes `wifi` while MQTT is still up, then calls `switchToWiFi()`. Calls `Ethernet.maintain()` while on Ethernet.
 
-#### `bool startEthernet(uint16_t dhcpTimeoutMs)` (static)
-- **Location**: `Ethernet.ino:85-119`
-- **Parameters**:
-  - `dhcpTimeoutMs`: DHCP timeout in milliseconds
-- **Return Type**: `bool`
-- **Description**: 
-  Initializes Ethernet library and attempts DHCP (or uses static IP if configured in settings). Returns true if DHCP succeeds and link is present (`Ethernet.linkStatus() == LinkON`). Falls back to static IP configuration if `settings.eth.bStaticIP` is set.
+#### `static bool startEthernet(uint16_t dhcpTimeoutMs)`
+- **Location**: `Ethernet.ino`
+- **Description**: `Ethernet.init(w5500Driver)` at 10 MHz SPI, then static IP from `settings.eth.*` when `bStaticIP` (DNS falls back to the gateway) or DHCP with the given timeout. Returns true only when an address was obtained and `Ethernet.linkStatus() == LinkON`.
 
-#### `void switchToEthernet(void)` / `void switchToWiFi(void)` (static)
-- **Location**: `Ethernet.ino:124-143`
-- **Parameters**: None
-- **Return Type**: `void`
-- **Description**: 
-  Transitions between network modes. `switchToEthernet()` disconnects WiFi, updates `state.net.eMode` to `NET_ETHERNET`, re-registers mDNS on new interface. `switchToWiFi()` re-enables WiFi, updates state. Both preserve transient state (`ethInitialized`, link flags).
+#### `static void switchToEthernet()` / `static void switchToWiFi()`
+- **Location**: `Ethernet.ino`
+- **Description**: `switchToEthernet()` sets `state.net.eMode = NET_ETHERNET` first (so `loopWifi()` stops), then `WiFi.disconnect()` and `WiFi.mode(WIFI_OFF)`, re-registers mDNS, restarts MQTT and WebSocket, and arms the deferred mode publish. `switchToWiFi()` sets `NET_WIFI`, powers the station back up (`WIFI_STA`, auto-reconnect, `WiFi.begin()`); services restart in `loopWifi()` `WIFI_RECONNECTED`.
 
-#### `String getEthernetIPString(void)` / `String getEthernetMACString(void)` (static)
-- **Location**: `Ethernet.ino:205-214`
-- **Parameters**: None
-- **Return Type**: `String`
-- **Description**: 
-  Helper functions called by REST API to display correct IP/MAC address when on Ethernet. `getEthernetIPString()` returns `Ethernet.localIP().toString()`. `getEthernetMACString()` formats locally-administered MAC to colon-separated hex string.
+#### `String getEthernetIPString(void)` / `String getEthernetMACString(void)`
+- **Location**: `Ethernet.ino`
+- **Description**: IP and colon-separated MAC for the REST API and `getActiveIP()` when on Ethernet.
 
-#### `void deriveEthMAC(void)` (static)
-- **Location**: `Ethernet.ino:37-43`
-- **Parameters**: None
-- **Return Type**: `void`
-- **Description**: 
-  Derives a unique locally-administered MAC address from ESP32 eFuse MAC. Extracts 6 bytes from `ESP.getEfuseMac()`, sets bit 1 of first octet to mark as locally-administered (0x02), ensuring Ethernet MAC differs from WiFi MAC while remaining unique per device.
+#### `static void deriveEthMAC(void)`
+- **Location**: `Ethernet.ino`
+- **Description**: Builds the Ethernet MAC from `ESP.getEfuseMac()` with the locally-administered bit (0x02) set, so it differs from the WiFi MAC and stays unique per device.
 
-### Telnet Debug Server (SimpleTelnet 1.0.0)
+### Telnet Debug Server (AsyncSimpleTelnet)
+
+#### `AsyncSimpleTelnet<1> debugTelnet(23)`
+- **Location**: `networkStuff.ino` (library: `src/libraries/SimpleTelnet/src/AsyncSimpleTelnet.h`, rvdbreemen/SimpleTelnet)
+- **Description**: Single-client telnet instance on port 23 over AsyncTCP: non-blocking writes with TX backpressure (TASK-866 / TASK-879). The port is fixed in the constructor.
 
 #### `void startTelnet(void)`
-- **Location**: `networkStuff.ino:405-414`
-- **Parameters**: None
-- **Return Type**: `void`
-- **Description**: Initializes SimpleTelnet 1.0.0 debug server on port 23 (single-client instance `debugTelnet`). Registers `sendTelnetBanner()` as onConnect callback and `onTelnetInput()` as onInputReceived callback. Uses char-by-char input mode (no line buffering) for responsive debug menu. Replaces ESPTelnet/TelnetStream with callback-based architecture and no heap fragmentation (callbacks receive const char*, never String).
+- **Location**: `networkStuff.ino`
+- **Description**: Registers `sendTelnetBanner()` (onConnect) and `onTelnetInput()` (onInputReceived), turns line mode off (one character per keypress) and calls `debugTelnet.begin(false)`. Called from `setup()` and from `WIFI_RECONNECTED`.
 
-#### `void sendTelnetBanner(const char* ip)` (SimpleTelnet onConnect callback)
-- **Location**: `networkStuff.ino:369-393`
-- **Parameters**: `ip` (const char*) - Client IP address (passed by SimpleTelnet)
-- **Return Type**: `void`
-- **Description**: Sends welcome banner with firmware version, IP, WiFi SSID, OTGW online status, MQTT connection state, free heap bytes, and debug flag status. Lists debug flag toggle keys (1-6 for OT messages, REST API, MQTT, MQTT gating, sensors, NTP; 'h' for full menu). Sent once per client connection.
+#### `static void sendTelnetBanner(const char* ip)`
+- **Description**: Per-connection triage snapshot: firmware version/build and LittleFS hash check, reset reason, host/uptime/reboots, network mode (`networkModeName()`), SSID/RSSI/IP or Ethernet IP, heap and drop counters, PIC, OT bus, MQTT, NTP, SAT state, BLE status (`HAS_SAT_BLE`) and the live state of every debug toggle. Toggle keys: `1` OTmsg, `2` REST API, `3` MQTT, `4` Sensors, `5` SAT, `6` OTDirect, `7` SATBLE (HAS_SAT_BLE), `g` MQTTGate, `n` NTP, `d` simulators; `h` shows the full menu.
 
-#### `void onTelnetInput(const char* s)` (SimpleTelnet onInputReceived callback)
-- **Location**: `networkStuff.ino:399-402`
-- **Parameters**: `s` (const char*) - Single character input (char-by-char mode)
-- **Return Type**: `void`
-- **Description**: Routes telnet input to `handleDebugChar()` in handleDebug.ino. SimpleTelnet passes one character at a time in char-by-char mode; onTelnetInput extracts the character and forwards to the debug handler.
+#### `static void onTelnetInput(const char* s)`
+- **Description**: Forwards the first character to `handleDebugChar()` in `handleDebug.ino`.
+
+### Web Server and OTA Instances
+
+- `AsyncWebServer server(WEB_HTTP_PORT)` (port 80, `webServerCompat.h`) is defined in `networkStuff.ino`. All handlers run on the AsyncTCP task (ADR-123 Phase 3, TASK-865.9); there is no `handleClient()` pump. WebSocket and OTA attach to the same instance. The per-request bridge state (`currentRequest`, `g_restStream`, `g_responseSent`, `g_restSlotHeld`, `g_fileSlotHeld`, `g_pendingHeaders`, `g_requestBody`) is defined here once (ADR-044).
+- `OTGWUpdateServer httpUpdater(true)` (`OTGW-ModUpdateServer-esp32.h`) serves `/update` with HTTP Basic Auth (user `admin`) and `POST /safeboot`. See [c4-component-network.md](./c4-component-network.md) for the OTA flow.
+- `bool checkHttpAuth()` is declared in `networkStuff.h`.
 
 ### Platform Abstraction (Unified API)
 
-#### Platform Functions (Core)
-
-All inline functions defined in `platform_esp8266.h` and `platform_esp32.h`, providing unified API:
+All functions are inline in `src/libraries/Platform/src/platform_esp32.h` (dispatched by `platform.h`); the only target is the ESP32-S3.
 
 | Function | Signature | Purpose |
 |----------|-----------|---------|
-| `platformSetHostname` | `void (const char*)` | Set WiFi hostname (propagates to DHCP) |
-| `platformGetHostname` | `const char* (void)` | Get current WiFi hostname |
-| `platformRestartDHCP` | `void (void)` | Force DHCP lease re-announce (ESP8266 only) |
-| `platformFSInfo` | `bool (FSInfo&)` | Get LittleFS statistics |
-| `platformCoreVersion` | `const char* (void)` | Return Arduino core version string |
-| `platformSdkVersion` | `const char* (void)` | Return SDK version string |
-| `platformCpuFreqMHz` | `uint32_t (void)` | Return CPU frequency in MHz |
-| `platformChipId` | `uint32_t (void)` | Return unique chip identifier |
-| `platformGetMacAddress` | `void (uint8_t*)` | Get MAC address (6-byte buffer) |
-| `platformResetReason` | `void (char*, size_t)` | Get human-readable reset reason |
-| `platformFreeHeap` | `uint32_t (void)` | Return free heap in bytes |
-| `platformMaxFreeBlock` | `uint32_t (void)` | Return largest contiguous free block |
-| `platformFlashChipRealSize` | `uint32_t (void)` | Return actual flash size |
-| `platformFlashChipSize` | `uint32_t (void)` | Return configured flash size |
-| `platformFlashChipSpeed` | `uint32_t (void)` | Return flash speed in Hz |
-| `platformFlashChipId` | `uint32_t (void)` | Return flash chip ID |
-| `platformFlashChipMode` | `uint8_t (void)` | Return flash SPI mode (QIO/DIO/etc) |
-| `platformSketchSize` | `uint32_t (void)` | Return compiled sketch size |
-| `platformFreeSketchSpace` | `uint32_t (void)` | Return available OTA space |
-| `platformRestart` | `void (void)` | Reboot the device |
-| `platformHardwareRandom` | `uint32_t (void)` | Get hardware RNG value |
-| `platformRtcRead` / `platformRtcWrite` | `bool (uint32_t, uint32_t*, size_t)` | RTC user memory access |
-| `platformIsExternalReset` | `bool (void)` | Check if reset was external (not internal WDT) |
-| `platformResetCode` | `uint32_t (void)` | Get numeric reset code |
-| `platformResetRegisterDump` | `void (char*, size_t)` | Get register dump on crash |
-| `platformResetExceptionInfo` | `void (char*, size_t)` | Get exception cause description |
-| `platformSerialHasOverrun` / `platformSerialHasRxError` | `bool (HardwareSerial&)` | Check serial error flags (ESP8266 only) |
+| `platformSetHostname` / `platformGetHostname` | `void (const char*)` / `const char* ()` | WiFi hostname (propagates to DHCP) |
+| `platformWifiDisableSleep` | `void ()` | `WiFi.setSleep(false)` (TASK-817) |
+| `platformNtpHostnameFix` | `void (const char*)` | No-op on ESP32 (keeps `startNTP()` platform-neutral) |
+| `platformIgnoreDhcpNtp` | `void ()` | Pins DHCP option 42 SNTP servers off (TASK-1052) |
+| `platformWiFiIsEncrypted` / `platformWiFiClientSetSync` | | WiFi scan encryption flag; sync-mode no-op |
+| `platformFSInfo` | `bool (FSInfo&)` | LittleFS totals (`FSInfo` is defined here for ESP32) |
+| `platformCoreVersion` / `platformSdkVersion` / `platformCpuFreqMHz` / `platformChipId` | | Build/chip identity |
+| `platformGetMacAddress` | `void (uint8_t*)` | eFuse MAC |
+| `platformResetReason` / `platformGetResetReasonChar` / `platformResetCode` / `platformIsExternalReset` / `platformResetRegisterDump` / `platformResetExceptionInfo` / `platformExccause` | | Reset cause for crash logging |
+| `platformFreeHeap` / `platformMinFreeHeap` / `platformMaxFreeBlock` / `platformHeapFragmentation` / `platformUpdateMinFreeHeap` | | Heap metrics |
+| `platformTcpActivePcbCount` / `platformTcpTxHoldingOnPort` | | lwIP PCB diagnostics |
+| `platformFlashChipRealSize` / `Size` / `Speed` / `Id` / `Mode`, `platformSketchSize`, `platformFreeSketchSpace` | | Flash and sketch info |
+| `platformRestart` | `void ()` | Reboot |
+| `platformHardwareRandom` | `uint32_t ()` | Hardware RNG |
+| `platformRtcRead` / `platformRtcWrite` | `bool (uint32_t, uint32_t*, size_t)` | Emulated RTC user memory |
+| `platformSerialHasOverrun` / `platformSerialHasRxError` | `bool (HardwareSerial&)` | Stubs returning false on ESP32 |
+| `platformMutex*` / `platformQueue*` / `platformTaskCreatePinned` / `platformTaskDelay` | | FreeRTOS wrappers (`PlatformMutex`, `PlatformQueue`, `PlatformTask`) |
+| `platformMuteUart0Console`, `platformPixelWrite` | | UART0 console mute (PIC link), status pixel |
 
-#### Platform Abstraction Class
+**`class PlatformDir`** (`platform.h`) wraps LittleFS directory iteration: `PlatformDir(path)`, `valid()`, `next()`, `fileName()` (basename), `fileSize()`, `isDirectory()`; the destructor closes both file handles.
 
-**`class PlatformDir`** (wraps directory iteration)
-- **Location**: `platform.h:36-106`
-- **Methods**:
-  - `PlatformDir(const char* path)` — Constructor, opens directory
-  - `~PlatformDir()` — Destructor, closes handles (ESP32 only)
-  - `bool valid()` — Returns true if directory opened successfully
-  - `bool next()` — Advance to next file (returns false at end)
-  - `String fileName()` — Get current filename (basename on ESP32)
-  - `size_t fileSize()` — Get current file size
-  - `bool isDirectory()` — Check if current entry is a subdirectory
-- **Description**: Unified directory iteration hiding differences between ESP8266 `Dir` and ESP32 `File` APIs. Used by firmware update and configuration code.
-
-#### Type Aliases
-
-- **Location**: `platform_esp8266.h:49` / `platform_esp32.h:38`
-- **`using OTGWWebServer = ESP8266WebServer;`** (ESP8266) or `WebServer` (ESP32)
-  - Unified web server type for application code
+Feature flags in `platform_esp32.h`: `HAS_LLMNR` = 0, `MDNS_NEEDS_UPDATE` = 0, `PLATFORM_INT_DISTINCT_FROM_INT32` = 1. `OTGWWebServer` is gone (TASK-865.9).
 
 ## Global Variables & State
 
-### Declared in `networkStuff.ino`
+### Defined in `networkStuff.ino`
 
 | Variable | Type | Purpose |
 |----------|------|---------|
-| `NtpStatus` | `NtpStatus_t` | Current NTP synchronization state (TIME_NOTSET, TIME_WAITFORSYNC, TIME_SYNC, TIME_NEEDSYNC) |
-| `NtpLastSync` | `time_t` | Timestamp of last successful NTP sync (used to detect SDK bogus initial value) |
-| `sDhcpHostnameFixed` | `static bool` | Tracks whether DHCP re-announce has been done (prevents repeated re-announces) |
-| `httpServer` | `OTGWWebServer` | HTTP server instance on port 80 |
-| `httpUpdater` | `OTGWUpdateServer` | OTA firmware update server |
-| `LittleFSinfo` | `FSInfo` | File system statistics (size, used bytes) |
-| `LittleFSmounted` | `bool` | Whether LittleFS initialized successfully |
-| `wifiState` | `static WifiState_t` | Current WiFi reconnection state (IDLE, DISCONNECTED, CONNECTING, RECONNECTED, FAILED) |
-| `wifiRetryCount` | `static int` | Number of failed reconnection attempts (resets on success, triggers reboot at 10) |
+| `NtpStatus` | `NtpStatus_t` | NTP state (`TIME_NOTSET`, `TIME_SYNC`, `TIME_WAITFORSYNC`, `TIME_NEEDSYNC`) |
+| `NtpLastSync` | `time_t` | Time of the last accepted sync / baseline for the sync check |
+| `debugTelnet` | `AsyncSimpleTelnet<1>` | Debug telnet server, port 23 |
+| `server` | `AsyncWebServer` | HTTP server on port 80 |
+| `httpUpdater` | `OTGWUpdateServer` | OTA / safeboot handover handler |
+| `LittleFSinfo` | `FSInfo` | LittleFS statistics |
+| `LittleFSmounted` | `bool` | LittleFS mounted successfully |
+| `wifiState` | `static WifiState_t` | `loopWifi()` state |
+| `wifiRetryCount` | `static int` | Failed reconnect attempts (reboot at 10) |
 
-### Declared in `Ethernet.ino` (ESP32 + W5500 only)
+### Defined in `Ethernet.ino` (`HAS_ETH_CAPABLE` only)
 
 | Variable | Type | Purpose |
 |----------|------|---------|
-| `ethSPI` | `static SPIClass` | SPI bus instance for W5500 (FSPI on ESP32-S3) |
-| `w5500Driver` | `static W5500Driver` | W5500 Ethernet controller driver |
-| `ethMac` | `static uint8_t[6]` | Derived Ethernet MAC address (locally-administered) |
-| `ethInitialized` | `static bool` | Whether Ethernet has been successfully initialized |
+| `ethSPI` | `static SPIClass` | SPI bus for the W5500 (FSPI) |
+| `w5500Driver` | `static W5500Driver` | Driver, pins `PIN_SPI_CS/INT/RST` from `boards.h` |
+| `ethMac` | `static uint8_t[6]` | Derived locally-administered MAC |
+| `ethInitialized` | `static bool` | Ethernet is the active transport |
+| `ethModePubPending` | `static bool` | Mode publish waits for the MQTT reconnect |
 
 ## Dependencies
 
 ### Internal Dependencies
 
-- **`safeTimers.h`**: Timer management macros (`DECLARE_TIMER_SEC`, `DUE`, `RESTART_TIMER`, `CATCH_UP_MISSED_TICKS`)
-- **`OTGW-firmware.h`**: Settings structures (`settings.sHostname`, `settings.ntp.*`, `settings.eth.*`, `settings.sHTTPpasswd`), state structs (`state.net.*`, `state.pic.*`, `state.hw.*`, `state.otBus.*`)
-- **`OTGW-ModUpdateServer.h`**: OTA update server implementation
-- **`updateServerHtml.h`**: Web UI HTML/CSS for OTA updates
-- **`Telnet.h` (implied)**: `TelnetStream` for debug output (via `WM_DEBUG_PORT` define)
-- **`OTGW-Core.ino`**: `feedWatchDog()` function (for watchdog feeding during blocking operations)
-- **`MQTTstuff.ino`**: `startMQTT()` function (called on WiFi reconnect)
-- **`WebSocketserver integration (implied)**: `startWebSocket()` function (called on WiFi reconnect)
-- **Timezone/time functions**: `dayChanged()`, `yearChanged()` (determine date transitions for NTP commands)
-- **`addCommandToQueue()`**: Sends OpenTherm commands to PIC
+- **`safeTimers.h`**: `DECLARE_TIMER_SEC`, `DUE`, `RESTART_TIMER`, `CATCH_UP_MISSED_TICKS`
+- **`OTGW-firmware.h`**: `settings.sHostname`, `settings.sHTTPpasswd`, `settings.ntp.*`, `settings.wifi.*`, `settings.eth.*`, `state.net.*`, `state.hw.bEthernetPresent`, `state.pic.*`, `state.otBus.*`; `networkModeName()` and `getActiveIP()` (inline)
+- **`webServerCompat.h`**: ESPAsyncWebServer bridge (`server`, `WEB_HTTP_PORT`)
+- **`OTGW-ModUpdateServer.h`** (dispatches to `-esp32.h`) and **`updateServerHtml.h`**: OTA server and its HTML
+- **`OTGW-Core.ino`** / main loop: `feedWatchDog()`, `addCommandToQueue()`, `hasOTCommandInterface()`, `isGatewayFirmware()`
+- **`MQTTstuff.ino`** / **`webSocketStuff.ino`**: `startMQTT()`, `startWebSocket()` on reconnect or transport switch
+- **`OLED.ino`**: `oledShowConfigMode()`
 
 ### External Dependencies
 
-#### ESP8266 (networkStuff.h, platform_esp8266.h)
-- **`WiFiManager.h`** v2.0.4-beta: Captive portal for WiFi configuration
-- **`ESP8266WiFi.h`**: WiFi client/AP mode, SSID/hostname management
-- **`ESP8266WebServer.h`**: HTTP server on port 80
-- **`ESP8266mDNS.h`**: mDNS (Bonjour) responder
-- **`ESP8266LLMNR.h`**: LLMNR responder
-- **`ESP8266HTTPClient.h`**: HTTP client (for firmware checks, external APIs)
-- **`LittleFS.h`**: File system for configuration, HTML assets
-- **`WebSocketsServer.h`**: WebSocket server for live OT log streaming (reduced to 256-byte buffer per client)
-- **`user_interface.h`** (from Arduino core): `wifi_station_dhcpc_stop/start`, `system_get_rst_info`
-- **SimpleTelnet** (v1.0.0, custom library in src/libraries/): Multi-client telnet server with streaming and CLI modes, per-client line buffering
-- **AZ Timelib** (external): `timezoneManager`, `ZonedDateTime` for timezone-aware time conversion
-- **Arduino Core ESP8266** (v3.1.2): lwIP2 Low Memory variant (TCP_MSS=536 via platformio.ini build_flags); SNTP client via `configTime()`
-
-#### ESP32 (Ethernet.ino, platform_esp32.h)
-- **`WiFi.h`**: WiFi management (similar to ESP8266 but different API)
-- **`WebServer.h`**: HTTP server implementation
-- **`ESPmDNS.h`**: mDNS support
-- **`HTTPClient.h`**: HTTP client
-- **`LittleFS.h`**: File system
-- **`Preferences.h`**: RTC memory emulation (not used in network module)
-- **`Update.h`**: OTA update support
-- **`SPI.h`**: SPI bus communication for W5500
-- **`EthernetESP32.h`**: Ethernet library for ESP32
-- **`esp_system.h`, `esp_mac.h`, `esp_netif.h`**: ESP32 HAL for MAC, reset info, networking
+- **WiFiManager** 2.0.17 (`WM_NODEBUG` defined before the include in `networkStuff.h`)
+- **ESP32 Arduino core** (pioarduino platform 55.03.35): `WiFi`, `ESPmDNS`, `LittleFS`, `Update`, `Preferences`, `esp_ota_ops`, lwIP SNTP
+- **ESPAsyncWebServer** 3.11.2 and **AsyncTCP** 3.4.10 (ESP32Async)
+- **AsyncSimpleTelnet** (`src/libraries/SimpleTelnet`)
+- **AceTime** 2.0.1: `timezoneManager`, `ZonedDateTime`
+- **EthernetESP32** 1.0.2 / `W5500Driver` (SPI Ethernet)
 
 ## Key Behaviors & Patterns
 
-### WiFi Auto-Reconnect Architecture (ADR-047 Non-Blocking Reconnection)
+### WiFi Auto-Reconnect Architecture (ADR-047)
 
-The firmware implements two-tier WiFi recovery (v1.3.5+ update: SDK DHCP calls removed while connected to fix issue #525 router unreachability after reboot):
+1. **SDK auto-reconnect** (`WiFi.setAutoReconnect(true)`): handles brief drops transparently.
+2. **`loopWifi()`** (fallback): 30-second retry windows, up to 10 attempts, then `doRestart()`. On success it re-applies the hostname and restarts Telnet, MQTT and WebSocket. In prerelease builds the AP fallback replaces the reboot after 2 attempts.
 
-1. **SDK Auto-Reconnect** (fast, transparent):
-   - ESP8266/32 firmware automatically retries connection on SSID if disconnected
-   - Typical recovery time: < 1 second
-   - No application visibility — transparent radio-level reconnect
-   - Note: SDK DHCP renew/check calls removed (was causing timeouts and unreachability after router reboot per issue #525)
+No application code stops or starts the SDK DHCP client (TASK-432).
 
-2. **loopWifi() State Machine** (fallback for extended outages):
-   - Detects disconnections that exceed SDK auto-reconnect timeout (typically 30 seconds)
-   - Non-blocking state machine with 30-second retry windows (max 10 attempts)
-   - Performs hostname re-apply and DHCP re-announce on reconnection to ensure router sees updated name
-   - Restarts services (Telnet, MQTT, WebSocket) on successful reconnection
-   - Triggers reboot if >= 10 consecutive failures (indicates unrecoverable hardware issue)
-   - Beta (_VERSION_PRERELEASE): After 2 failures (60s), enters AP fallback mode with 5-minute WiFi retry interval (allows OTA recovery without physical access)
+### Hostname
 
-**Why two-tier?** SDK handles momentary blips (channel hops, interference). Application layer catches prolonged outages or misconfiguration.
+The hostname reaches DHCP through `platformSetHostname()` before `WiFi.begin()` in `startWiFi()` and in `loopWifi()` `WIFI_DISCONNECTED`, and again after a successful connect. On ESP32 `configTime()` does not reset the hostname, so `platformNtpHostnameFix()` does nothing.
 
-### Hostname Management: Multi-Path Synchronization
+### NTP Bounds Guard
 
-WiFi hostname must reach DHCP server to appear in router device list and enable DNS lookups (`<hostname>.local`). The firmware tries four paths:
+`time()` is accepted only inside `[EPOCH_2000_01_01 (946684800), EPOCH_2038_01_19 (2147483647)]`. The upper bound was introduced for the ESP8266 SDK's 0xFFFFFFFF initial value; it is kept as a plain sanity check. Resync interval is `NTP_RESYNC_TIME` = 86400 s. DHCP-supplied NTP servers are ignored (`platformIgnoreDhcpNtp()`).
 
-1. **Pre-connection** (`startWiFi()`): `platformSetHostname()` before `WiFi.begin()`
-2. **On already-connected WiFi**: Update hostname without reconnect (preserves existing connection)
-3. **Post-SDK-auto-connect**: Hostname may reset on ESP8266 (SDK bug); detect and re-apply
-4. **Post-DHCP re-announce**: Force DHCP re-announce if hostname still mismatched (catch-all)
+### Port 25238 Is Not Part of This Module
 
-Guard: `sDhcpHostnameFixed` prevents re-announce spam on every NTP resync (which also calls `startNTP()` on ESP8266).
-
-### NTP Time Synchronization with SDK Bogus Value Guard
-
-ESP8266 SDK initializes `time()` to **0xFFFFFFFF** (year 2106) before SNTP first sync. This breaks naive "time() > baseline" checks. The firmware validates with dual bounds:
-- Lower: `EPOCH_2000_01_01` (946684800) = January 1, 2000
-- Upper: `EPOCH_2038_01_19` (2147483647) = January 19, 2038 (INT32_MAX)
-
-Only values in `[EPOCH_2000_01_01, EPOCH_2038_01_19]` are considered valid. This safely rejects both the 0xFFFFFFFF bogus value and pre-epoch uninitialized timestamps.
-
-### TCP Serial Bridge (Implicit)
-
-The `Ethernet.ino` module provides W5500 hardware detection and DHCP, but the actual TCP serial bridge on port 25238 is handled elsewhere (likely `Ethernet.ino` or a separate module). The network module sets up the transport layer; application code uses it.
-
-### WebSocket Configuration (Buffer Optimization)
-
-Default WebSocket per-client buffer: 512 bytes. This project reduces it to 256 bytes via `#define WEBSOCKETS_MAX_DATA_SIZE 256` (defined before `#include <WebSocketsServer.h>`). Saves ~256 bytes per client. For 3 clients: 768 bytes of RAM freed — significant on ESP8266's 40KB heap.
-
-**WiFiClient Sync Mode** (v1.3.5+): WiFiClient sync mode enabled to reduce TCP buffer copy overhead. This trades a small amount of latency for lower RAM usage (approximately 1KB TCP buffer copy saved per client).
-
-**Security note**: WebSocket stream intended for LOCAL NETWORK ONLY. No authentication on WebSocket endpoint. Do NOT expose to internet without reverse proxy + HTTPS.
+The raw OT serial bridge on TCP 25238 (`OTGW_SERIAL_PORT`, `OTGWstream` in `OTGW-Core`) is gated by `settings.mqtt.bLegacyPort25238Enabled` (JSON key `LegacyPort25238Enabled`, applied through `applyLegacyPort25238Setting()`). It is documented in the OpenTherm Core component.
 
 ## Relationships & Call Graph
 
@@ -426,70 +278,57 @@ graph TB
         B["resetWiFiSettings()"]
         C["configModeCallback()"]
     end
-    
+
     subgraph "WiFi Loop (loopWifi state machine)"
         D["loopWifi()"]
         E["WiFi.status()"]
         F["startTelnet() / startMQTT() / startWebSocket()"]
     end
-    
+
     subgraph "NTP Time Sync"
         G["startNTP()"]
         H["loopNTP()"]
-        I["sendtimecommand()"]
+        I["sendtimecommand(dayFlag, yearFlag)"]
         J["configTime()"]
     end
-    
+
     subgraph "Hostname Management"
         K["platformSetHostname()"]
         L["platformGetHostname()"]
-        M["platformRestartDHCP()"]
     end
-    
-    subgraph "Discovery (mDNS/LLMNR)"
+
+    subgraph "Discovery (mDNS)"
         N["startMDNS(hostname)"]
-        O["startLLMNR(hostname)"]
-        P["MDNS.begin() / LLMNR.begin()"]
+        O["startLLMNR(hostname) - stub, HAS_LLMNR=0"]
+        P["MDNS.begin()"]
     end
-    
+
     subgraph "Device Identity"
         Q["getMacAddress()"]
         R["getUniqueId()"]
         S["platformGetMacAddress()"]
     end
-    
-    subgraph "Ethernet Support (ESP32+W5500)"
+
+    subgraph "Ethernet Support (W5500)"
         T["initEthernet()"]
         U["loopEthernet()"]
-        V["W5500 driver install (Ethernet.hardwareStatus())"]
         W["startEthernet()"]
         X["switchToEthernet() / switchToWiFi()"]
         Y["Ethernet.linkStatus()"]
     end
-    
-    subgraph "Platform Abstraction"
-        Z1["platformFSInfo()"]
-        Z2["platformCoreVersion()"]
-        Z3["platformResetReason()"]
-        Z4["platformFreeHeap()"]
-    end
-    
+
     A --> K
-    A --> N
-    A --> M
+    A --> C
     D --> E
     D --> F
     G --> J
-    G --> M
     H --> G
     H --> I
     I --> addCommandToQueue
-    T --> V
     T --> W
     U --> Y
     U --> X
-    V --> SPI
-    W --> DHCP
+    X --> N
     Q --> S
     R --> Q
     N --> P
@@ -499,124 +338,56 @@ graph TB
 ## Related Files & Integration Points
 
 ### Called From
-- **`setup()` or `OTGW-firmware.ino`**: 
-  - `startWiFi(HOSTNAME, WIFI_TIMEOUT, isForcePortal)`
-  - `startMDNS(HOSTNAME)`
-  - `startLLMNS(HOSTNAME)`
-  - `startNTP()`
-  - `initEthernet()` (ESP32+W5500)
-  - `startTelnet()`
-  - `httpServer.begin()`
-
-- **`loop()` / `doBackgroundTasks()` (main loop)**:
-  - `loopWifi()`
-  - `loopNTP()`
-  - `loopEthernet()` (if W5500 present)
-  - `MDNS.update()` (if `MDNS_NEEDS_UPDATE == 1`)
-  - `httpServer.handleClient()`
-  - `TelnetStream.handle()` (debug telnet)
+- **`setup()` in `OTGW-firmware.ino`**, in this order: `startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal)`, `startNTP()`, `startTelnet()`, `startMDNS()`, `startLLMNR()`, `setupFSexplorer()`, `startWebserver()`, `startWebSocket()`, `startMQTT()`, `initEthernet()` (when `HAS_ETH_CAPABLE` and not `isPICEnabled()`)
+- **`doBackgroundTasks()` / `loop()`**: `loopWifi()` and `loopEthernet()` (both only when `!isFlashing()`), `loopNTP()`, `sendtimecommand()` from the minute-changed dispatcher, `MDNS.update()` only if `MDNS_NEEDS_UPDATE` (0 on ESP32)
+- No `handleClient()` and no telnet pump: HTTP and telnet run on the AsyncTCP task
 
 ### Calls Out To
-- **WiFiManager API**: `setAPCallback()`, `setConfigPortalTimeout()`, `setShowInfoUpdate()`, `startConfigPortal()`, `getWiFiIsSaved()`
-- **WiFi stack**: `WiFi.mode()`, `WiFi.begin()`, `WiFi.status()`, `WiFi.SSID()`, `WiFi.localIP()`, `WiFi.setAutoReconnect()`, `WiFi.persistent()`
-- **mDNS/LLMNR**: `MDNS.begin()`, `MDNS.addService()`, `LLMNR.begin()`
-- **NTP**: `configTime()` (SDK call), `time()` (POSIX), `timezoneManager.createForZoneName()`, `ZonedDateTime::forUnixSeconds64()`
-- **Telnet**: `TelnetStream.begin()`, `TelnetStream.flush()`
-- **Ethernet** (W5500): `Ethernet.init()`, `Ethernet.begin()`, `Ethernet.linkStatus()`, `Ethernet.localIP()`, `Ethernet.maintain()`
-- **Debug**: `DebugTln()`, `DebugTf()` (custom debug macros)
-- **Watchdog**: `feedWatchDog()` (prevent timeout during blocking operations)
-- **OT commands**: `addCommandToQueue()` (send NTP time commands to PIC)
-- **Settings**: Read from `settings.sHostname`, `settings.ntp.*`, `settings.eth.*`, `settings.sHTTPpasswd`
-- **State**: Write to `state.net.eMode`, `state.net.bEthernetLink`, `state.hw.bEthernetPresent`, `state.pic.bAvailable`, `state.otBus.bPSmode`
+- **WiFiManager**: `setAPCallback()`, `setConfigPortalTimeout()`, `setShowInfoUpdate()`, `setShowInfoErase()`, `setMenu()`, `getWiFiIsSaved()`, `startConfigPortal()`, `resetSettings()`
+- **WiFi stack**: `WiFi.mode()`, `WiFi.config()`, `WiFi.begin()`, `WiFi.status()`, `WiFi.setAutoReconnect()`, `WiFi.persistent()`
+- **mDNS**: `MDNS.begin()`, `MDNS.addService()`
+- **NTP**: `configTime()`, `time()`, `timezoneManager.createForZoneName()`, `ZonedDateTime::forUnixSeconds64()`
+- **Ethernet**: `Ethernet.init()`, `begin()`, `linkStatus()`, `hardwareStatus()`, `localIP()`, `maintain()`
+- **Watchdog / commands / debug**: `feedWatchDog()`, `addCommandToQueue()`, `DebugTln()`, `DebugTf()`
 
 ### Data Contracts
 
-**Global Variables Exported**:
-- `NtpStatus`: Exported `extern` in `networkStuff.h` (used by main loop to check if time is synced before displaying)
-- `NtpLastSync`: Exported, read-only (used for timestamp calculations)
-- `httpServer`: Web server instance (HTTP handlers register here)
-- `httpUpdater`: OTA update handler (initialized by `startWiFi()`)
+**Exported (`extern` in `networkStuff.h`)**: `NtpStatus`, `NtpLastSync`, `httpUpdater`, `LittleFSinfo`, `LittleFSmounted`; `server` is declared in `webServerCompat.h`.
 
-**Settings Read**:
-- `settings.sHostname`: Configured device hostname (max length varies)
-- `settings.ntp.bEnable`: Whether NTP sync is enabled
-- `settings.ntp.sTimezone`: Timezone string (e.g., "Europe/Amsterdam")
-- `settings.ntp.sHostname`: NTP server hostname
-- `settings.ntp.bSendtime`: Whether to send time commands to OTGW
-- `settings.sHTTPpasswd`: Basic auth password for OTA updates
-- `settings.eth.bStaticIP`: Whether Ethernet uses static IP (ESP32+W5500)
-- `settings.eth.sIPaddress`, `settings.eth.sGateway`, `settings.eth.sSubnet`, `settings.eth.sDNS`: Ethernet static config
+**Settings read**: `settings.sHostname`, `settings.sHTTPpasswd`, `settings.ntp.bEnable`, `.sTimezone`, `.sHostname`, `.bSendtime`, `settings.wifi.*`, `settings.eth.*`.
 
-**State Written**:
-- `state.net.eMode`: NET_WIFI or NET_ETHERNET (WiFi/Ethernet selection)
-- `state.net.bEthernetLink`: Whether Ethernet cable is plugged in
-- `state.hw.bEthernetPresent`: Whether W5500 chip detected
-- `state.pic.bAvailable`: Whether PIC responded to initialization
-- `state.otBus.bPSmode`: Whether Print Summary mode is active (checked by NTP time command sender)
+**State written**: `state.net.eMode`, `state.net.bEthernetLink`, `state.net.bAPFallback` and `sAPSSID` (prerelease), `state.hw.bEthernetPresent`. Read: `state.otBus.bPSmode`, `state.mqtt.bConnected`, `state.debug.bNTP`.
 
 ## Technical Constraints & Considerations
 
-### Memory Constraints (ESP8266 ~40KB DRAM)
+### Memory
 
-- Static buffers used strategically: `baseMacChr[13]`, `uniqueId[32]`, `_hn[64]` in platform functions
-- WebSocket buffer reduced from 512 to 256 bytes per client (via `WEBSOCKETS_MAX_DATA_SIZE`)
-- SimpleTelnet 1.0.0 replaces ESPTelnet/TelnetStream (no String objects in callbacks, const char* only to avoid heap fragmentation)
-- WiFiManager debug output disabled via `#define WM_NODEBUG` (before the WiFiManager include in `networkStuff.h`): on ESP8266 Core 3.x, the `handleWifiSave()` debug block builds `String` objects from raw string literals stored in flash at potentially misaligned addresses; `strlen()` then generates an unaligned word-load resulting in Exception 3 (LoadStoreAlignmentCause). `WM_NODEBUG` undefines `WM_DEBUG_LEVEL` so those `#ifdef WM_DEBUG_LEVEL` blocks are excluded at compile time.
-- HTTP server streams large files (e.g., `index.html` ~11KB) rather than loading into RAM
-- WiFiClient sync mode enabled to reduce TCP buffer copy overhead (~1KB per connection saved)
+- Static buffers: `baseMacChr[13]`, `uniqueId[32]`
+- Telnet callbacks receive `const char*`, never `String` (no heap churn)
+- WiFiManager debug output disabled via `WM_NODEBUG`
+- Files are streamed, never loaded whole (`v2.html` is about 50 KB)
 
-### Platform Differences
+### Ethernet Failover (W5500)
 
-| Feature | ESP8266 | ESP32 | Handling |
-|---------|---------|-------|----------|
-| mDNS | Native | Native | Both use MDNS library, but ESP8266 needs `MDNS.update()` in loop |
-| LLMNR | Yes (HAS_LLMNR=1) | No (HAS_LLMNR=0) | Guard with compile-time flag |
-| Hostname setter | `WiFi.hostname()` | `WiFi.setHostname()` | Unified in `platformSetHostname()` |
-| SDK hostname reset bug | Yes (configTime resets it) | No | Guard in `startNTP()` with `#if defined(ESP8266)` |
-| RTC memory | Yes (native) | No (use Preferences) | Separate inline implementations |
-| Reset info | `system_get_rst_info()` | `esp_reset_reason()` | Different APIs, unified output format |
-| Ethernet | Not available | Yes (W5500 via SPI) | Guard with `HAS_ETH_CAPABLE` |
+- Cable detection polled every 5 s; DHCP timeout 1 s at boot, 2 s on hot-plug
+- WiFi is powered down (`WIFI_OFF`) while on Ethernet so SDK auto-reconnect cannot revive the station
+- mDNS, MQTT and WebSocket are re-bound on each transition
 
-### WiFi Credentials Persistence
+### WiFi Credentials
 
-- `WiFi.persistent(true)`: Credentials saved to EEPROM/NVS by SDK
-- Next boot: `WiFi.begin()` without args uses stored credentials
-- Reset: `resetWiFiSettings()` wipes credentials, forces portal on next boot
-- Security: Portal SSID includes MAC address to prevent confusion with other APs
-
-### NTP & Time Management
-
-- Time is maintained by SDK via SNTP (Simple NTP, part of `lwip`)
-- Firmware initializes `configTime(timezone, dst_offset, ntp_server, ...)`
-- `time()` returns Unix timestamp; application code converts to local time via `timezoneManager` + `ZonedDateTime`
-- Timezone database loaded at runtime (requires flash space, managed by AZ Timelib library)
-- NTP resync interval: `NTP_RESYNC_TIME` (typically 12 or 24 hours)
-
-### Ethernet Failover (ESP32 + W5500 only)
-
-- Hot-plug detection: Monitors cable insertion/removal every 5 seconds
-- On cable insert: Attempts DHCP with 2-second timeout (longer than boot, allows for slow switches)
-- On cable remove: Immediately falls back to WiFi
-- Re-registers mDNS on transition to avoid stale entries
-- Derived MAC address is locally-administered (0x02 bit set) to distinguish from WiFi MAC
-
-## Notes on v1.3.5+ Changes
-
-- **Arduino Core 3.1.2 (ESP8266)**: Upgraded from 2.7.4; lwIP2 Low Memory variant enables TCP_MSS=536 via platformio.ini build_flags
-- **SimpleTelnet 1.0.0**: Custom library replacing ESPTelnet/TelnetStream; per-client line buffering; printf/printf_P PROGMEM helpers; separate debug and CLI instances if needed
-- **Non-blocking WiFi reconnect (ADR-047)**: Fully implemented; SDK DHCP calls removed while connected (fixes issue #525 unreachability after router reboot)
-- **WiFiClient sync mode**: Enabled to save ~1KB TCP buffer copy per connection
-- **AP Fallback (beta, _VERSION_PRERELEASE)**: After 2 reconnect failures (60s), enters SoftAP mode with 5-minute WiFi retry interval for OTA recovery
-- **NTP Telemetry**: Optional debug flag (key '6') for periodic NTP sync diagnostics (every 60s unsynced, every 300s synced)
+- `WiFi.persistent(true)`: the SDK stores credentials in NVS; `WiFi.begin()` without arguments reuses them
+- `resetWiFiSettings()` and the triple-reset gesture wipe them and force the portal
 
 ## References & ADRs
 
-- **ADR-047**: WiFi non-blocking auto-reconnect (loopWifi state machine for extended outages)
-- **ADR-051**: Settings & state architecture (ntp.*, eth.* settings structures)
-- **ADR-079 / ADR-081**: Per-component types headers; network types live in `Networktypes.h`
-- **TASK-581**: Runtime WiFi↔Ethernet failover (cable hot-plug detection drives loopEthernet)
-- **Issue #525**: SDK DHCP calls removed while connected (was causing timeouts and unreachability after router reboot)
-- **OTGW-firmware.h**: Settings definitions and state structures
-- **safeTimers.h**: Timer macro definitions
-- **SimpleTelnet.h**: Multi-client telnet library (1.0.0)
-- **Timezone/time includes**: AZ Timelib for timezone support
+- **ADR-043**: triple-reset clears WiFi credentials and forces the portal
+- **ADR-044**: single point of instantiation for globals
+- **ADR-047**: non-blocking WiFi reconnect (`loopWifi`)
+- **ADR-051**: settings and state architecture
+- **ADR-079 / ADR-081**: per-component types headers (`Networktypes.h`)
+- **ADR-086**: single dispatcher for the date/year time commands
+- **ADR-123 / ADR-128**: async 2.0.0 line; ESP8266 dropped
+- **ADR-127**: combo board, W5500 probe skipped in PIC mode
+- **ADR-191**: safeboot OTA (see the network component doc)
+- **TASK-432**: SDK DHCP calls removed; **TASK-581**: runtime Ethernet failover; **TASK-725**: WiFi static IP; **TASK-1052**: ignore DHCP option 42 NTP; **TASK-1220**: W5500 detection without a cable
+- **safeTimers.h**, **webServerCompat.h**, **AsyncSimpleTelnet.h**

@@ -216,7 +216,7 @@ Done.**
 
 ### Architecture rules
 
-- PIC commands: always `addOTWGcmdtoqueue()`, never direct serial write
+- PIC commands: always `addCommandToQueue()`, never direct serial write
 - SAT's own `CS=` (the `CS=0` releases included) goes through `satEnqueueOwnCS()`. While SAT is enabled it owns MsgID 1, and both the OTDirect handler (ADR-179) and the PIC command queue (`addCommandToQueue()`, TASK-1236) refuse any unmarked `CS=` as external, SAT's own included. On PIC boards `satPicCSKeepalive()` re-sends SAT's CS every 30 s, because the PIC drops a CS= after ~63-126 s without a new one
 - Timers: `DECLARE_TIMER_SEC()` / `DECLARE_TIMER_MS()` + `DUE()` (see `safeTimers.h`)
 - `doBackgroundTasks()` can re-enter (called from inside `doAutoConfigure()`'s file-reading loop). Shared scratch state must declare an acquisition contract: see ADR-090 for the pattern (RAII or inUse-flag, both with fail-safe on contention)
@@ -392,7 +392,7 @@ heap-frag soak, TASK-934):
 - Never flash PIC firmware over WiFi using OTmonitor (bricks the PIC)
 - **Firmware OTA on 4MB boards goes through the safeboot updater (ADR-191).** The 4MB table has a safeboot app/factory partition (0x10000, 960K), one app slot app0/ota_0 (0x100000, 2240K) and LittleFS (0x330000, 768K). The main firmware never writes ota_0 itself: `_handleUploadStart` (`OTGW-ModUpdateServer-esp32.h`) still refuses an app image (it would overwrite the running app, TASK-959). Instead POST /safeboot (admin-protected) erases otadata and restarts into safeboot (`safeboot/src/main.cpp`), which writes ota_0 and restarts into it. Bootloader app rollback is on: a new image stays pending until 30 s of healthy loop() or a planned restart (`safebootMarkAppValid()`), so an early crash returns to safeboot. Filesystem OTA works from the main firmware as before. Units on the old layout (app0 @0x10000) need one USB `flash_otgw --migrate`; `flash_otgw --update` reads the unit's partition table and refuses a layout mismatch. The offsets live in `partitions_otgw_esp32.csv` and are mirrored in build.py, flash_otgw.bat/.sh and flash_esp.py; `tests/test_build_safeboot.py` fails when they drift. Dual-slot app OTA on an 8MB module still works through `hasSpareAppOtaSlot()`.
 - Never add HTTPS/WSS
-- Always `addOTWGcmdtoqueue()` for OTGW commands
+- Always `addCommandToQueue()` for OTGW commands
 - Always validate buffer sizes before string operations
 - Always `feedWatchDog()` in long-running loops
 

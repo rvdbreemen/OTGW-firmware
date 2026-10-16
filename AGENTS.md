@@ -87,7 +87,7 @@ When adding a feature that diverges per platform, write the shim or the `HAS_*` 
 
 ### Architecture rules
 
-- PIC commands must go through `addOTWGcmdtoqueue()`. Do not write command bytes directly to the PIC serial path.
+- PIC commands must go through `addCommandToQueue()`. Do not write command bytes directly to the PIC serial path.
 - Timers should use `DECLARE_TIMER_SEC()` / `DECLARE_TIMER_MS()` plus `DUE()` from `safeTimers.h`.
 - `doBackgroundTasks()` can re-enter, including while `doAutoConfigure()` is reading files. Shared scratch state needs an explicit acquisition contract, such as the ADR-090 RAII or in-use flag pattern.
 - Prefer typed control flow with `enum class` or numeric IDs. Do not use string tokens as discriminators.
@@ -178,7 +178,7 @@ Run the smallest verification that proves the change, then broaden when the chan
 - Never write to `Serial` after OTGW init; it is the PIC serial link.
 - Never flash PIC firmware over WiFi using OTmonitor; that can brick the PIC.
 - Never add HTTPS or WSS support.
-- Always use `addOTWGcmdtoqueue()` for OTGW/PIC commands.
+- Always use `addCommandToQueue()` for OTGW/PIC commands.
 - Always validate buffer sizes before string operations.
 - Always call `feedWatchDog()` in long-running loops.
 

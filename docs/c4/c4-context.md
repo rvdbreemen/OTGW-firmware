@@ -10,15 +10,15 @@ OTGW-firmware turns the NodoShop OpenTherm Gateway into a networked smart heatin
 
 Central heating systems in homes across Europe use a protocol called OpenTherm to let room thermostats talk to boilers. The NodoShop OpenTherm Gateway (OTGW) is a small hardware device that sits on that communication wire and lets you intercept and modify those messages. On its own, the gateway is a clever piece of hardware but hard to use from a home automation perspective. OTGW-firmware is the software that makes it useful.
 
-The firmware runs on the small ESP8266 or ESP32 Wi-Fi microcontroller that is part of the OTGW device. Once installed, it connects the gateway to your home network and gives you a complete set of integration points:
+The firmware runs on the ESP32-S3 Wi-Fi microcontroller of the OTGW device (the 2.0.0 line; the 1.x line keeps ESP8266 support). One combo image serves both the Classic board, where a PIC co-processor handles the OpenTherm bus, and boards that drive the bus directly from the ESP32 (OTDirect); the board type is detected at boot. Once installed, it connects the gateway to your home network and gives you a complete set of integration points:
 
 - A **web browser interface** for live monitoring, configuration, and firmware updates.
 - An **MQTT integration** that publishes every boiler measurement to your home automation platform and accepts commands in return.
 - **Home Assistant auto-discovery** that creates 200+ ready-to-use entities without any manual YAML configuration.
 - A **REST API** for scripts, dashboards, and tools that want to query or control the system programmatically.
-- A **TCP serial bridge** that lets specialist tools like OTmonitor connect over the network.
+- An optional **TCP serial bridge** (off by default) that lets specialist tools like OTmonitor connect over the network.
 - A **Smart Adaptive Thermostat (SAT)** that can take over from the room thermostat entirely: it reads outdoor temperature, learns your boiler's characteristics over time, and controls the flow temperature automatically.
-- **Sensor integration** for additional DS18B20 temperature sensors, an S0 pulse energy meter, and (on ESP32) Bluetooth room temperature sensors.
+- **Sensor integration** for additional DS18B20 temperature sensors, an S0 pulse energy meter, and Bluetooth room temperature sensors.
 
 The firmware is designed for a trusted home network. It is not a cloud service and requires no internet connection beyond optional NTP time synchronization. Its target users range from technically curious homeowners to experienced home automation enthusiasts and developers building on its API.
 
@@ -45,7 +45,7 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 - **Type**: Human User (technical contributor)
 - **Description**: A developer or experienced community tester who builds or validates new firmware versions. They may contribute code, file bug reports, or test pre-release builds on real hardware. They understand the codebase at a level where they need raw protocol visibility.
 - **Goals**: Debug firmware behaviour by watching raw OpenTherm frames. Verify MQTT topics and REST API responses match documentation. Identify crashes, memory issues, and edge cases. Flash and test new firmware images quickly.
-- **Key features used**: Telnet debug log, TCP serial bridge, OTA firmware update, web UI live OT log viewer, REST API, browser debug console (`otgwDebug`).
+- **Key features used**: Telnet debug menu, TCP serial bridge, OTA firmware update, web UI live OT log viewer, REST API, FSexplorer recovery page.
 
 ### Home Assistant
 
@@ -93,37 +93,37 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 
 ### Web-Based Monitoring and Configuration
 
-- **Description**: A browser-accessible control panel served by the device itself. No app installation or cloud account required. The web interface shows a live log of OpenTherm messages, real-time temperature graphs, boiler status, and all device settings. It also provides file management and firmware update capabilities. The interface adapts to both desktop and mobile browsers and supports light and dark themes.
+- **Description**: A browser-accessible control panel served by the device itself. No app installation or cloud account required. The web interface shows a live log of OpenTherm messages, real-time temperature graphs, boiler status, and all device settings. It also provides file management and firmware update capabilities. It is a single-page app (the v2 UI, ADR-192) that adapts to desktop and mobile browsers and supports light and dark themes. When the UI files are missing, the device serves the FSexplorer page so the files can be restored.
 - **Users**: Home Automation Enthusiast, Family Member, Developer.
 
 ### MQTT Integration and Home Assistant Auto-Discovery
 
-- **Description**: The firmware publishes all OpenTherm measurements to a configurable MQTT broker using a structured topic hierarchy. Value topics carry plain scalars (ADR-101). Home Assistant MQTT discovery is published Just-In-Time on the first arrival of each OT message ID (ADR-100), so only entities for messages actually seen on the bus are created — over 200 are possible but the device starts clean. Entity names default to self-describing form (ADR-106), with a legacy compatibility toggle. Data is published when values change and periodically as a heartbeat.
+- **Description**: The firmware publishes all OpenTherm measurements to a configurable MQTT broker using a structured topic hierarchy. Value topics carry plain scalars (ADR-101). Home Assistant MQTT discovery is published Just-In-Time on the first arrival of each OT message ID (ADR-100), so only entities for messages actually seen on the bus are created: over 200 are possible but the device starts clean. A daily heal re-announces the discovery configs once a day (setting `MQTTdiscoveryAutoVerify`). Entity names default to self-describing form (ADR-106), with a legacy compatibility toggle. Data is published when values change and periodically as a heartbeat.
 - **Users**: Home Assistant, MQTT Automation Scripts, Home Automation Enthusiast.
 
 ### REST API for Programmatic Access
 
-- **Description**: A versioned REST API (all endpoints under `/api/v2/`) that exposes the same data and control capabilities as MQTT in a request-response model. Clients can query current OpenTherm values by message ID or label, submit gateway commands, read and update device settings, manage sensor labels, and control SAT. Responses are consistent JSON with proper HTTP status codes.
+- **Description**: A versioned REST API (all endpoints under `/api/v2/`) that exposes the same data and control capabilities as MQTT in a request-response model. Clients can query current OpenTherm values by message ID or label, submit gateway commands, read and update device settings, manage sensor labels, and control SAT. Responses are consistent JSON with proper HTTP status codes. The device serves at most 2 API requests at a time and answers a burst with a short 503 or a 429 (ADR-165, ADR-172).
 - **Users**: Home Automation Enthusiast, Developer, Home Assistant (optional direct polling), MQTT Automation Scripts.
 
 ### Smart Adaptive Thermostat (SAT)
 
-- **Description**: An embedded heating controller that runs entirely on the device and can replace the room thermostat's role in controlling the boiler. SAT calculates an optimal boiler flow temperature using a weather-compensated heating curve combined with a PID control loop that adjusts based on room temperature error. It learns the heating system's behaviour over time through automatic gain tuning. SAT supports radiator and underfloor heating, six named comfort presets, solar gain compensation, summer suppression, and multi-zone room temperature averaging. On ESP32 hardware, it can also read room temperature from a Bluetooth LE sensor.
+- **Description**: An embedded heating controller that runs entirely on the device and can replace the room thermostat's role in controlling the boiler. SAT calculates an optimal boiler flow temperature using a weather-compensated heating curve combined with a PID control loop that adjusts based on room temperature error. It learns the heating system's behaviour over time through automatic gain tuning. SAT supports radiator and underfloor heating, six named comfort presets, solar gain compensation, summer suppression, PV-surplus boost, and multi-zone room temperature averaging. It can read room temperature from Bluetooth LE sensors or from area sensors (Dallas or BLE, ADR-178), and it has a simulation mode for a bench without a boiler. While SAT is enabled it owns the boiler control setpoint (ADR-179).
 - **Users**: Home Automation Enthusiast, Home Assistant.
 
 ### TCP Serial Bridge
 
-- **Description**: A network socket that exposes the raw OpenTherm serial stream from the gateway PIC to the local network, exactly as if connecting a serial cable. Tools like OTmonitor can connect to this socket and interact with the gateway as if they had direct serial access, enabling advanced diagnostics and manual command entry.
+- **Description**: A network socket (TCP port 25238, off by default, setting `LegacyPort25238Enabled`) that exposes the raw OpenTherm serial stream from the gateway PIC to the local network byte for byte (ADR-177), exactly as if connecting a serial cable. On an OTDirect board the same port carries an emulated PIC-style stream. Tools like OTmonitor can connect to this socket and interact with the gateway as if they had direct serial access, enabling advanced diagnostics and manual command entry.
 - **Users**: Developer, Home Automation Enthusiast (advanced use).
 
 ### Sensor Integration
 
-- **Description**: The firmware supports additional temperature sensors (DS18B20 on the 1-Wire bus, up to 16 units), an S0 pulse-counting electricity meter, and on ESP32 a Bluetooth LE room temperature sensor. All sensors are published to MQTT and included in Home Assistant auto-discovery. DS18B20 sensors can be given custom labels through the web interface.
+- **Description**: The firmware supports additional temperature sensors (DS18B20 on the 1-Wire bus, up to 16 units), an S0 pulse-counting electricity meter, and Bluetooth LE room temperature sensors. All sensors are published to MQTT and included in Home Assistant auto-discovery. DS18B20 sensors can be given custom labels through the web interface.
 - **Users**: Home Automation Enthusiast, Home Assistant.
 
 ### OTA Firmware Updates
 
-- **Description**: The firmware and the web assets can be updated over Wi-Fi without a USB cable. The web interface provides a one-click installer that lists available GitHub releases and compares them to the installed version. Alternatively, a firmware binary can be uploaded directly. After update, the device reboots and verifies it has come back online before declaring success. The PIC microcontroller's firmware can also be upgraded through this mechanism.
+- **Description**: The firmware and the web assets can be updated over Wi-Fi without a USB cable by uploading the files on the device's update page. On 4MB boards the firmware image is written by a small safeboot updater app: the device restarts into it, it writes the new image, and the bootloader returns to the updater if the new firmware crashes before it has run healthy for 30 seconds (ADR-191). Units on the old partition layout need one USB migration first. The PIC microcontroller's firmware can be upgraded from the web interface as well.
 - **Users**: Home Automation Enthusiast, Developer.
 
 ---
@@ -132,7 +132,7 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 
 ### Initial Setup: Home Automation Enthusiast Connects the Device
 
-1. The enthusiast flashes the firmware to the ESP8266/ESP32 using the included `flash_esp.py` script or PlatformIO.
+1. The enthusiast flashes the firmware over USB with the included `flash_otgw.bat` / `flash_otgw.sh` script.
 2. The device powers on and, finding no saved Wi-Fi credentials, broadcasts a temporary Wi-Fi access point named `<hostname>-<mac>`.
 3. The enthusiast connects their phone or laptop to that access point. A captive portal opens automatically.
 4. The enthusiast enters their home Wi-Fi network name and password.
@@ -163,11 +163,11 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 ### Remote Setpoint Change: MQTT Automation Adjusts the Thermostat
 
 1. A Home Assistant automation triggers (e.g., occupancy sensor detects the family has arrived home).
-2. Home Assistant calls the `mqtt.publish` service, publishing the payload `21.5` to the topic `OTGW/set/otgw/setpoint`.
+2. Home Assistant calls the `mqtt.publish` service, publishing the payload `21.5` to the topic `<top>/set/<nodeId>/setpoint` (top topic `OTGW` by default).
 3. OTGW-firmware's MQTT client receives the message on the subscribed command topic.
 4. The firmware validates the value and forwards a `TT=21.50` command to the PIC over the serial link.
-5. The PIC intercepts the next READ_DATA message on the OpenTherm bus and substitutes the setpoint.
-6. The boiler receives the new target temperature and modulates accordingly.
+5. The PIC overrides the room setpoint the thermostat sees (the remote override, MsgID 9), so the thermostat adjusts its own demand.
+6. The thermostat asks the boiler for more or less heat, and the boiler modulates accordingly.
 7. OTGW-firmware publishes the updated setpoint back to MQTT so Home Assistant reflects the change.
 
 ### SAT Activation: Enthusiast Enables the Smart Thermostat
@@ -182,17 +182,17 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 
 ### Firmware OTA Update: Enthusiast Updates to a New Release
 
-1. The enthusiast opens the web interface and navigates to **Update**.
-2. The page fetches the list of available GitHub releases and shows Installed / Update / Rollback badges next to each.
-3. The enthusiast clicks **Update** next to the latest release.
-4. The firmware downloads the new binary from GitHub and flashes it to the inactive OTA partition.
-5. The device reboots. The web interface polls `/api/v2/health` until the device responds, then confirms success.
-6. The version number displayed in the web interface changes to confirm the update.
+1. The enthusiast downloads the release files from GitHub to their computer.
+2. They open the device's update page and choose the firmware image.
+3. On a 4MB board the device restarts into the safeboot updater, which accepts the upload and writes the image to the app slot.
+4. The device restarts into the new firmware. If it crashes before 30 s of healthy running, the bootloader returns to the safeboot updater.
+5. The web interface polls `/api/v2/health` until the device responds, then shows the new version.
+6. If the web assets changed, the enthusiast uploads the filesystem image the same way; this resets the settings, so they save them first.
 
 ### Debugging Boiler Issues: Developer Uses TCP Serial Bridge
 
 1. A developer suspects the boiler is reporting fault codes that are not being decoded correctly.
-2. They open a terminal and connect to the device: `nc <device-ip> 25238`.
+2. They enable the TCP serial bridge in the settings, open a terminal and connect to the device: `nc <device-ip> 25238`.
 3. They see a stream of raw ASCII OpenTherm frames from the PIC in real time, such as `T10000100` and `B4001FF04`.
 4. They decode the hex values manually or with OTmonitor to identify the exact message IDs and values being exchanged.
 5. They enable the telnet debug log on port 23 in a second terminal to cross-reference what the firmware is decoding.
@@ -204,7 +204,7 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 
 | System | Type | Protocol | Required | Purpose |
 |--------|------|----------|----------|---------|
-| OpenTherm Gateway PIC (PIC16F88 / PIC16F1847) | Hardware co-processor (on-device) | UART 9600 baud ASCII | Yes (ESP8266), Optional (ESP32) | Handles the OpenTherm electrical bus, delivers decoded frames to the firmware, executes override commands |
+| OpenTherm Gateway PIC (PIC16F88 / PIC16F1847) | Hardware co-processor (on-device) | UART 9600 baud ASCII | Yes on the Classic board, absent on OTDirect boards | Handles the OpenTherm electrical bus, delivers decoded frames to the firmware, executes override commands |
 | Room Thermostat | OpenTherm hardware device | OpenTherm 1-wire bus (via PIC) | Yes | Requests heat from the boiler; firmware monitors and can override its messages |
 | Central Heating Boiler | OpenTherm hardware device | OpenTherm 1-wire bus (via PIC) | Yes | Controls heating output; firmware reads all measurements and can inject setpoint overrides |
 | MQTT Broker | Software service (local network) | MQTT 3.1.1, TCP port 1883 | No | Message bus for home automation integration; receives telemetry, discovery payloads, and forwards commands |
@@ -212,12 +212,12 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 | NTP Server (`pool.ntp.org` or local) | Internet / LAN time service | SNTP UDP port 123 | No | Provides accurate wall-clock time for boiler clock sync, log timestamps, and SAT sun calculations |
 | DS18B20 Temperature Sensors | 1-Wire hardware sensors (on GPIO) | 1-Wire (Dallas protocol) | No | Supplemental temperature measurement at points not covered by OpenTherm (up to 16 sensors) |
 | S0 Pulse Energy Meter | Hardware meter (GPIO input) | GPIO interrupt (S0 standard) | No | Counts electricity pulses to report cumulative kWh and instantaneous power to MQTT |
-| BLE Temperature Sensor (ESP32 only) | Bluetooth LE hardware sensor | Bluetooth LE passive scan | No | Provides room temperature to the SAT PID controller when no OpenTherm or MQTT source is available |
-| W5500 Ethernet Module (ESP32 only) | SPI network chip (on-device) | Ethernet, DHCP | No | Wired Ethernet fallback for ESP32; disables Wi-Fi when a cable is connected |
-| GitHub Releases | Cloud software repository | HTTPS | No | Source of firmware binaries for one-click OTA update from the web interface |
-| Open-Meteo API (`api.open-meteo.com`) | Internet HTTP service | HTTP GET | No | Optional outdoor temperature and 24-hour forecast source for SAT heating curve; free, no API key required |
-| Webhook Target (Node-RED, HA, etc.) | HTTP server (local or remote) | HTTP POST | No | Receives outbound callbacks when configured OpenTherm status bits change (flame on, fault, etc.) |
-| OTmonitor / TCP Serial Client | Desktop software | Raw TCP port 25238 | No | Connects to the TCP serial bridge for advanced diagnostics and manual PIC command entry |
+| BLE Temperature Sensor | Bluetooth LE hardware sensor | Bluetooth LE passive scan | No | Provides room temperature to the SAT PID controller when no OpenTherm or MQTT source is available |
+| W5500 Ethernet Module | SPI network chip (on-device, OTDirect board) | Ethernet, DHCP | No | Wired Ethernet with runtime WiFi/Ethernet failover |
+| GitHub Releases | Cloud software repository | Manual download by the user | No | Source of the release files the user uploads through the update page; the device itself makes no HTTPS calls |
+| Open-Meteo / OpenWeatherMap | Internet HTTP service | HTTP GET | No | Optional outdoor temperature and forecast for the SAT heating curve; Open-Meteo needs no key, OpenWeatherMap is used when an API key is set |
+| Webhook Target (Node-RED, HA, etc.) | HTTP server on the local network | HTTP POST or GET | No | Receives outbound callbacks when configured OpenTherm status bits change (flame on, fault, etc.) |
+| OTmonitor / TCP Serial Client | Desktop software | Raw TCP port 25238 (off by default) | No | Connects to the TCP serial bridge for advanced diagnostics and manual PIC command entry |
 | Web Browser | Client software | HTTP port 80, WebSocket ws:// | Yes (for web UI) | Renders the browser SPA served by the device; requires Chrome, Firefox, or Safari |
 
 ---
@@ -240,8 +240,8 @@ C4Context
     System_Ext(ha, "Home Assistant", "Consumes MQTT auto-discovery to create 200+ heating entities; sends setpoint commands via MQTT")
     System_Ext(nodered, "MQTT Clients (Node-RED, scripts)", "Subscribe to heating data topics; publish control commands; feed data into databases and dashboards")
     System_Ext(ntp, "NTP Server", "Provides accurate time for boiler clock sync and log timestamps")
-    System_Ext(github, "GitHub Releases", "Provides firmware update binaries for one-click OTA from the web interface")
-    System_Ext(weather, "Open-Meteo API", "Free outdoor temperature and 24-hour forecast API; used by SAT when OT MsgID 27 and MQTT outdoor temp are absent")
+    System_Ext(github, "GitHub Releases", "Release files the user downloads and uploads through the update page")
+    System_Ext(weather, "Open-Meteo / OpenWeatherMap", "Outdoor temperature and forecast; used by SAT when the boiler reports no outside temperature")
     System_Ext(sensors, "DS18B20 / S0 / BLE Sensors", "Physical temperature sensors and energy meter attached to the device")
     System_Ext(otmonitor, "OTmonitor / TCP Client", "Desktop tool connecting via TCP serial bridge for raw OpenTherm diagnostics")
 
@@ -258,18 +258,18 @@ C4Context
     Rel(ha, otgw, "Polls device status and sends commands directly", "REST API (optional)")
 
     Rel(otgw, ntp, "Synchronises device clock", "SNTP")
-    Rel(otgw, github, "Downloads firmware update binaries", "HTTPS")
+    Rel(enthusiast, github, "Downloads release files", "HTTPS (browser)")
     Rel(otgw, weather, "Fetches outdoor temperature for SAT", "HTTP (optional)")
     Rel(otgw, sensors, "Reads temperature and energy measurements", "1-Wire / GPIO / Bluetooth LE")
-    Rel(otmonitor, otgw, "Sends manual PIC commands; reads raw OT stream", "TCP port 25238")
+    Rel(otmonitor, otgw, "Sends manual PIC commands; reads raw OT stream", "TCP port 25238 (optional)")
 ```
 
 ---
 
 ## Related Documentation
 
-- [Container Documentation](./c4-container.md) — deployment units, all network interfaces, and external dependency details
-- [Component Documentation](./c4-component.md) — master component index with architecture rationale and relationship diagram
+- [Container Documentation](./c4-container.md): deployment units, all network interfaces, and external dependency details
+- [Component Documentation](./c4-component.md): master component index with architecture rationale and relationship diagram
 - [Component: OpenTherm Core](./c4-component-opentherm-core.md)
 - [Component: Network and Connectivity](./c4-component-network.md)
 - [Component: Integration Layer](./c4-component-integration-layer.md)

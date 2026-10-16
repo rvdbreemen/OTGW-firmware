@@ -16,7 +16,7 @@
 
 The 2.0.0 line ships one web UI: the v2 bundle (`v2.html`, `v2.js`, `v2-bundle.css`). The root path (`/`, plus `/index` and `/index.html` so old bookmarks keep working) always serves `v2.html`. If `/v2.html` is missing from the filesystem, those paths serve `FSexplorer.html` as a recovery page (`FSexplorer.ino`, `startWebserver`).
 
-**The classic UI was removed on 2026-10-15** (maintainer decision, TASK-1223.12, ADR-191). Only v2 fits the 768K LittleFS of the safeboot OTA layout. Removed with it: `index.html`, `index.js`, `graph.js`, `sat.js`, `sat-slider.js`, `theme-toggle.js`, `echarts-theme.js`, `components.css`, `design.html`, `update.png`, `system_update.png`, `download-to-storage-drive.png`, `refresh-page-option.png`, the device-wide UI switch (`settings.ui.bUseV2`, key `ui_usev2`) and the seven classic display preferences (`ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`). An old `settings.ini` that still holds those keys loads without error; `updateSetting()` ignores unknown keys and the next settings write drops them. The 19 classic features v2 lacked are being ported (TASK-1223.14 to TASK-1223.18, plus follow-ups TASK-1226 to TASK-1232). The 12 features that were dropped, and how each was built, are documented in [`docs/history/2026-10-15-retired-classic-web-ui-features.md`](../history/2026-10-15-retired-classic-web-ui-features.md); the last commit with the classic UI is `3aa1ef927`. The full comparison is in [`docs/research/2026-10-15-classic-vs-v2-gap-audit.md`](../research/2026-10-15-classic-vs-v2-gap-audit.md).
+**The classic UI was removed on 2026-10-15** (maintainer decision, TASK-1223.12, ADR-192). Only v2 fits the 768K LittleFS of the safeboot OTA layout (ADR-191). Removed with it: `index.html`, `index.js`, `graph.js`, `sat.js`, `sat-slider.js`, `theme-toggle.js`, `echarts-theme.js`, `components.css`, `design.html`, `update.png`, `system_update.png`, `download-to-storage-drive.png`, `refresh-page-option.png`, the device-wide UI switch (`settings.ui.bUseV2`, key `ui_usev2`) and the seven classic display preferences (`ui_autoscroll`, `ui_timestamps`, `ui_capture`, `ui_autoscreenshot`, `ui_autodownloadlog`, `ui_autoexport`, `ui_graphtimewindow`). An old `settings.ini` that still holds those keys loads without error; `updateSetting()` ignores unknown keys and the next settings write drops them. The 19 classic features v2 lacked are being ported (TASK-1223.14 to TASK-1223.18, plus follow-ups TASK-1226 to TASK-1232). The 12 features that were dropped, and how each was built, are documented in [`docs/history/2026-10-15-retired-classic-web-ui-features.md`](../history/2026-10-15-retired-classic-web-ui-features.md); the last commit with the classic UI is `3aa1ef927`. The full comparison is in [`docs/research/2026-10-15-classic-vs-v2-gap-audit.md`](../research/2026-10-15-classic-vs-v2-gap-audit.md).
 
 Confirm the current asset list with `git ls-files src/OTGW-firmware/data`.
 
@@ -209,7 +209,7 @@ Formatted display (example):
 
 ## Dependencies
 
-### Internal Dependencies (ESP8266 Firmware)
+### Internal Dependencies (ESP32-S3 Firmware)
 
 - **REST API v2**: `/api/v2/` endpoints (see below)
 - **WebSocket endpoint**: `/ws` (plain HTTP, port 80)
@@ -229,29 +229,25 @@ None. v2 loads no script or stylesheet from a CDN; fonts are served from LittleF
 
 ### REST API Endpoints (Web UI calls)
 
+From the `APIGW + 'v2/...'` calls in `v2.js`; the full route table is in [c4-code-rest-api.md](./c4-code-rest-api.md).
+
 This table predates the removal of the classic UI and has not been re-derived from `v2.js`; `docs/api/openapi.yaml` is authoritative.
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
-| `/api/v2/device/info` | GET | Hostname, IP, WiFi SSID, Ethernet state, uptime, heap, crash info, PIC presence, SAT enabled |
-| `/api/v2/device/fw` | GET | Firmware version, build date, PS=1 mode, OTA update availability |
-| `/api/v2/device/time` | GET | ESP system time, NTP sync status |
-| `/api/v2/device/settings` | GET / POST | Persistent settings (WiFi, MQTT, NTP, LED, OTGW commands) |
-| `/api/v2/device/fw/upload` | POST | Upload firmware binary (ESP or PIC) |
-| `/api/v2/device/fw/status` | GET | Flash progress (0-100%) and status |
-| `/api/v1/otgw/command` | POST | Send OTGW command (GW=1, TT=21.5, etc.) |
-| `/api/v2/otgw/monitor` | GET | Current OT state snapshot (temperatures, flame, mode, etc.) |
-| `/api/v2/otgw/mode` | GET | Gateway vs. Monitor mode |
-| `/api/v2/pic/settings` | GET | PIC settings (GPIO, LED, temp sensor, Smart Power, Thermostat, etc.) |
-| `/api/v2/ot-direct/status` | GET | OT-Direct panel state (mode, bus, thermostat, boiler, overrides count) — OTGW32 only |
-| `/api/v2/ot-direct/overrides` | GET | List of active OT-Direct overrides |
-| `/api/v2/ot-direct/override` | POST / DELETE | Add or clear OT-Direct override (SR, CR, RM, CM, UI, KI) |
-| `/api/v2/sat/status` | GET | SAT dashboard state (enabled, active, temps, PID, setpoint, mode, etc.) |
-| `/api/v2/sat/settings` | GET / POST | SAT advanced tuning parameters |
-| `/api/v2/sat/preset` | POST | Activate SAT preset (Away, Eco, Comfort, Sleep, Activity, Home) |
-| `/api/v2/sat/mode` | POST | Set SAT control mode (Off, Continuous, PWM) |
-| `/api/v2/sensors/labels` | GET / POST | Dallas temperature sensor user-defined names |
-| `/webhook` | POST | Test webhook endpoint (user-configured URL) |
+| `/api/v2/health`, `/api/v2/device/info`, `/api/v2/device/time`, `/api/v2/device/crashlog` | GET | Liveness, device and network state, clock, crash log |
+| `/api/v2/settings` | GET / POST | All persistent settings, one `{name, value}` per POST |
+| `/api/v2/otgw/otmonitor`, `/api/v2/otgw/messages/{id}` | GET | OT monitor snapshot (polled every 2 s), single message by ID |
+| `/api/v2/otgw/commands` | POST | Send a gateway command (`GW=1`, `TT=21.5`, ...) |
+| `/api/v2/otgw/overrides`, `/api/v2/otgw/boiler-support`, `/api/v2/otgw/ot-support`, `/api/v2/otgw/diagnose` | GET / POST | Active overrides, supported MsgIDs, PIC diagnose keystrokes |
+| `/api/v2/pic/settings`, `/api/v2/pic/flash-status`, `/api/v2/pic/update-check` | GET | PIC settings readout, PIC flash progress, PIC firmware update check |
+| `/api/v2/firmware/files` | GET | PIC firmware images available on LittleFS |
+| `/api/v2/otdirect/status`, `/api/v2/otdirect/overrides` | GET / POST | OT-Direct panel state and overrides (only with `HAS_DIRECT_OT`) |
+| `/api/v2/sat/status`, `/api/v2/sat/target`, `/api/v2/sat/weather`, `/api/v2/sat/markers`, `/api/v2/sat/ble/*` | GET / POST | SAT dashboard (polled every 5 s while visible), target temperature, weather, calibration markers, BLE roster and discovery |
+| `/api/v2/sensors`, `/api/v2/sensors/labels` | GET / POST | Sensor status and Dallas sensor labels |
+| `/api/v2/filesystem/files`, `/api/v2/filesystem/hash-check` | GET | File list, delete (`?delete=`), filesystem version check |
+| `/api/v2/simulate`, `/api/v2/debug` | GET / POST | OT replay simulation, debug state |
+| `/api/v2/webhook/test?state=` | POST | Fire a test webhook |
 
 ### MQTT Integration
 
@@ -294,7 +290,7 @@ This table predates the removal of the classic UI and has not been re-derived fr
 
 ### Token Layer (ds-tokens.css)
 
-Light and dark palettes are defined as CSS custom properties on `:root` and on `[data-theme="dark"]`. Tokens cover surface/background colours, text levels, accent (header / focus), borders, table rows, and graph palette. Themes are pure variable swaps — no separate stylesheet per theme. `ds-tokens.css` is a build input: it reaches the browser only inside `v2-bundle.css`.
+Light and dark palettes are defined as CSS custom properties on `:root` and on `[data-theme="dark"]`. Tokens cover surface/background colours, text levels, accent (header / focus), borders, table rows, and graph palette. Themes are pure variable swaps: no separate stylesheet per theme. `ds-tokens.css` is a build input: it reaches the browser only inside `v2-bundle.css`.
 
 ### Component Layer (v2.css)
 
@@ -327,16 +323,16 @@ All v2 widgets are styled in `v2.css`, which consumes the token variables. It to
 
 - **ESP32-S3 4MB boards**: LittleFS partition 768 KB in the safeboot OTA layout (ADR-191); the v2-only image is what makes it fit.
 - **UI assets**: `v2.html`, `v2.js`, `v2-bundle.css` (minified in the image) plus three fonts.
-- **PIC binaries**: ~100 KB total (multiple versions for 2 PIC types)
+- **PIC binaries**: about 140 KB on disk in `pic16f1847/` and `pic16f88/` (gateway, interface and diagnose images for both PIC types)
 
 ### Build Process
 
 ```bash
-python build.py              # Packs data/ into LittleFS image
-python build.py --clean      # Clean build
+build.bat                    # Windows: firmware + LittleFS image (build.sh on macOS/Linux)
+build.bat --clean            # Clean build
 ```
 
-Resulting files uploaded to ESP8266 via OTA or serial.
+The LittleFS image is built from a minified staging copy of `data/` (ADR-190). It is flashed over USB (`flash_otgw --update --fs`) or uploaded on the update page; a filesystem image resets the settings.
 
 ---
 
@@ -370,17 +366,16 @@ Resulting files uploaded to ESP8266 via OTA or serial.
 
 ## Performance Considerations
 
-### Memory Usage (ESP8266)
+### Memory Usage (browser)
 
-- **Circular log buffer**: Default 100K lines, max 1M lines in capture mode
-- **Estimated RAM**: ~20 MB for 100K lines (too large for ESP8266 RAM, must use file storage)
-- **Mitigation**: OT log persisted to `/logs/otgw_YYYYMMDD.log` on LittleFS
-- **In-Memory**: Only active window (last 1000 lines) rendered to DOM at once
+- **Log buffer**: `LOG_DEF` = 2000 lines by default, `LOG_CAPTURE` = 200000 lines in capture mode, kept in browser memory (`logBuf`); the device stores no OT log file
+- **Rendered window**: `LOG_SHOW` = 2000 lines in the DOM
+- **Graph**: `SAMPLES_MAX` = 1800 samples
 
 ### CPU & Bandwidth
 
 - **WebSocket**: Continuous stream (1-10 msg/sec typical, up to 100+ msg/sec during busy periods)
-- **REST polling**: 3-5 second intervals (device time, settings, gateway mode)
+- **REST polling**: OT monitor every 2 s (`OTMON_POLL_MS`), device time every 10 s (`DEVTIME_POLL_MS`), SAT status every 5 s while the SAT page is visible; all through the 2-in-flight fetch queue (ADR-184)
 - **Frontend**: Debounced UI updates (200-500ms) to avoid excessive reflows
 
 ### Optimization Techniques
@@ -396,9 +391,9 @@ Resulting files uploaded to ESP8266 via OTA or serial.
 
 The SAT module is a complete subsystem for thermostat autotune:
 
-- **Visualization-only dashboard**: All logic runs on ESP8266 (SATcontrol.ino), web UI is read-only except for settings
-- **Real-time feedback**: Dashboard updates every 5 seconds via `/api/v2/sat/status`
-- **Heating curve formula**: `setpoint = HC_BASE_OFFSET + (HC_REF_TEMP - outsideTemp) * curve_coeff`
+- **Visualization-only dashboard**: All logic runs on the device (`SATcontrol.ino`); the web UI shows state and edits settings
+- **Real-time feedback**: Dashboard updates every 5 seconds via `/api/v2/sat/status`, only while the SAT page is visible (TASK-986)
+- **Heating curve**: computed on the device from `SAT_HC_BASE_OFFSET_RAD` (27.2) or `SAT_HC_BASE_OFFSET_FLOOR` (20.0), `SAT_HC_REF_TEMP` (20.0) and the curve coefficient (see c4-code-sat.md)
 - **PID tuning**: Interactive adjustment of Kp, Ki, Kd coefficients via settings form
 - **Presets**: Quick activation of predefined temperature profiles (Away=18°C, Sleep=17°C, Comfort=21°C, etc.)
 

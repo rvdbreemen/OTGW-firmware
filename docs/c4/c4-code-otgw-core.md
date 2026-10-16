@@ -3,20 +3,33 @@
 ## Overview
 
 - **Name**: OTGW-Core Module
-- **Description**: Core OpenTherm Gateway message processing, PIC (Programmable Intelligent Controller) communication, and OpenTherm data decoding for the OTGW firmware. Handles all OpenTherm protocol parsing, PIC serial communication, MQTT throttling, command queuing, and real-time message publishing.
+- **Description**: Core OpenTherm Gateway message processing, PIC (Programmable Intelligent Controller) communication, and OpenTherm data decoding for the OTGW firmware. Handles OpenTherm frame parsing, the dedicated PIC serial task and its queues, the PIC command queue, MQTT throttling, and real-time publishing.
 - **Location**: `src/OTGW-firmware/` (OTGW-Core.ino, OTGW-Core.h, OTGW-firmware.h, OTGW-firmware.ino, dhwWaterMeter.ino)
-- **Language**: Arduino C/C++ (ESP8266)
-- **Purpose**: Bridges communication between the ESP8266 host and the OTGW PIC (gateway firmware), decodes OpenTherm messages, maintains message state, publishes to MQTT and WebSocket, handles command queuing, and manages PIC firmware upgrades.
+- **Language**: Arduino C/C++ (ESP32-S3, 2.0.0 line; single translation unit)
+- **Purpose**: Bridges the ESP32-S3 host and the OTGW PIC (gateway firmware), decodes OpenTherm frames from the PIC or from OT-Direct, maintains message state, publishes to MQTT and WebSocket, handles command queuing, and manages PIC firmware upgrades. Line numbers are deliberately not quoted: find a symbol with `grep`.
 
 ## Core Responsibilities
 
-1. **OpenTherm Message Processing**: Decode/encode OpenTherm protocol messages, extract data fields, publish to MQTT with throttling
-2. **PIC Serial Communication**: Send/receive data over serial to PIC, handle responses, detect device presence
-3. **Command Queuing**: Queue commands to PIC, retry on failure, maintain order
-4. **MQTT Publishing**: Throttle high-frequency messages, manage discovery, publish state changes
-5. **WebSocket Event Streaming**: Stream OT messages and system events to WebSocket clients in real-time
-6. **PIC Firmware Management**: Query firmware version, manage upgrades, detect gateway mode
-7. **Settings Discovery**: Cycle through PIC settings (CR command) and publish to MQTT
+1. **OpenTherm Message Processing**: Decode OpenTherm frames, extract data fields, publish to MQTT with throttling
+2. **PIC Serial Communication**: A dedicated FreeRTOS task owns the UART; the loop side feeds it through queues (ADR-123)
+3. **Command Queuing**: Queue commands to the PIC, retry on timeout, drop after the retry limit
+4. **MQTT Publishing**: Per-message throttle, status-bit and status-byte fan-out, republish on request
+5. **WebSocket Event Streaming**: Stream OT lines and system events to `/ws` clients
+6. **PIC Firmware Management**: Banner/version detection, hex validation, upgrade state machine
+7. **Settings Discovery**: Cycle through PIC settings (`PR=` queries) and publish them to MQTT
+8. **Transport selection**: On the combo image the PIC or OT-Direct path is chosen at boot (ADR-127); the same `processOT()` serves both
+
+## Transport Architecture (ADR-123, ADR-127, ADR-177)
+
+- **UART**: `OTGWSerial` (vendored library, subclass of `HardwareSerial(0)`, so UART0 on GPIO44/43) at 9600 baud, 8N1. Opened with `OTGWSerial.begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX)`; the IDF console on UART0 is muted first (`platformMuteUart0Console()`) so log output never reaches the PIC.
+- **Boot selection (combo image, ADR-127)**: `setup()` resolves `settings.iBoardMode` (0 auto, 1 PIC, 2 OT-Direct, 3 PIC on the S3 Mini Pro). Auto runs `detectPIC()` up to 3 times; a live PIC persists a Classic verdict, no PIC runs `initOTDirect()` for that boot without persisting. A forced OT-Direct setting still probes once and corrects itself when a live PIC answers (TASK-1031). Fixed targets compile one path.
+- **PIC serial task**: `startPICSerialTask()` creates the `picSerial` task (4096-byte stack). `picSerialDrainOnce()` is the sole runtime owner of `OTGWSerial` read/write: it assembles CR/LF lines into `enqueueOTFrame(..., OTFRAME_SRC_PIC)` and drains `otTxQueue` out to the UART. `picSerialTaskShouldPark()` makes it release the UART during OT-Direct, a flash, the replay simulation, and a direct `resetOTGW()`/`detectPIC()`; `waitForPICTaskParked()` is the handshake.
+- **Frame queue**: `otFrameQueue` (`OT_FRAME_QUEUE_DEPTH` 16, `OTFrameMsg` with line, `suppressOutput`, `source`) carries lines from the producers (PIC task, `dispatchOTGWInputLine()` for replay, OT-Direct `bridgeFrameToParser()`) to `drainOTFrameQueue()`, called in `loop()` after `doBackgroundTasks()`. `source` is `OTFRAME_SRC_PIC`, `OTFRAME_SRC_OTDIRECT`, `OTFRAME_SRC_OTDIRECT_LOCAL` or `OTFRAME_SRC_REPLAY`.
+- **TX queue**: `otTxQueue` (`OT_TX_QUEUE_DEPTH` 32); `enqueuePICTx()` is the loop-side producer, used by `sendPICSerial()` and the port 25238 relay. A chunk the UART cannot take is re-queued to the front so command bytes never interleave.
+- **Raw passthrough (ADR-177)**: `picSerialDrainOnce()` copies every PIC byte, before line assembly, into `OT_RAW_CHUNK_MAX` (64) byte chunks coalesced over `OT_RAW_COALESCE_MS` (30 ms) onto `otRawQueue` (`OT_RAW_QUEUE_DEPTH` 16). `drainOTRawQueue()` forwards them verbatim to `OTGWstream` (port 25238) when `settings.mqtt.bLegacyPort25238Enabled` is on, and to the WebSocket as a `\x02DIAG`-prefixed frame (printable bytes only, `forwardDiagnoseChunk()`) while the PIC runs diagnose firmware. The chunk is produced when the port is enabled or the PIC is a diagnose build.
+- **Port 25238 bridge**: `OTGWstream` is `AsyncSimpleTelnet<1>(25238)` with telnet negotiation off (raw bytes). It is off by default (`bLegacyPort25238Enabled = false`, settings key `LegacyPort25238Enabled`); `applyLegacyPort25238Setting()` starts or stops it, and a single client at a time is accepted. Bytes from the client reach the PIC through `enqueuePICTx()` in `handlePICSerial()`, which also notices `GW=R`, `PS=1` and `PS=0` to keep the firmware's own state in step and suspends the command queue for `SER2NET_QUIET_MS` after a client command.
+- **Loop-side error reporting**: the task only sets volatile flags (UART overrun, framing error, line overflow, raw-queue drops, banner ready); `reportPendingPICRxErrors()` publishes them from `drainOTFrameQueue()`, and `applyPICBannerInfo()` applies the firmware banner fields (TASK-1175).
+- **State lock**: `processOT()` takes `OTStateLock` (the writer side of `otStateMutex`); the lock is not recursive.
 
 ## Code Elements
 
@@ -24,7 +37,7 @@
 
 #### `OTdataStruct` (OTGW-Core.h)
 - **Purpose**: Central repository for all OpenTherm state from the boiler/thermostat
-- **Members**: 
+- **Members**:
   - Status flags (master/slave) and configuration
   - Temperature readings: TSet, Tboiler, Tdhw, Tr, Toutside, Tret, etc.
   - Modulation and pressure: RelModLevel, CHPressure
@@ -33,276 +46,197 @@
   - Extended features: Solar storage, ventilation/heat recovery, RF sensors, vendor-specific, brand identification
   - Error tracking: error01-04, errorBufferOverflow
   - **Routing discriminators (ADR-103)**:
-    - `bAnswerOverride` — true when the current `A`-prefix frame is a gateway answer that *substitutes* a real boiler `B` frame (genuine answer-override). False on the more common case of an `A`-prefix proxy frame (no preceding `B`).
-    - `bGatewaySubstituted` — true when the gateway injected the substitution itself.
+    - `bAnswerOverride` - true when the current `A`-prefix frame is a gateway answer that *substitutes* a real boiler `B` frame (genuine answer-override). False on the more common case of an `A`-prefix proxy frame (no preceding `B`).
+    - `bGatewaySubstituted` - true when the gateway injected the substitution itself.
     - `bLocalAnswer` (TASK-1086) - true on a frame the gateway made itself instead of receiving it from a boiler: every OT-Direct `A`, and every `B` in OT-Direct loopback mode. `bridgeFrameToParser()` tags it as `OTFRAME_SRC_OTDIRECT_LOCAL`, `drainOTFrameQueue()` passes it to `processOT()`, and it rides the one-frame delay with its frame. Such a frame is no boiler evidence anywhere: it neither sets nor retracts a boiler-unsupported verdict (`boilerUnsupportedRead`/`boilerUnsupportedWrite`), does not mark a msgid acknowledged (`boilerAckedRead`/`boilerAckedWrite`, the acknowledged column of `GET /api/v2/otgw/ot-support`, TASK-1185), and its type-7 OT log line ends in `(gateway answer)` instead of `(boiler does not implement)` or `(boiler rejected write)`. A loopback `B` still stamps `state.otBus.tBoilerLastSeen` (TASK-1138) but does not trip `satNotifyBoilerFrameSeen()`, and on a combo board in OT-Direct mode `satBoilerHardwarePresent()` ignores `bBoilerState` and asks `otDirectBoilerPresent()`, so SAT simulation cannot switch itself off on loopback traffic (ADR-117 section 2).
     - `bReplayed` (TASK-1185) - true on a line the `/otgw_simulation.log` replay injected (`dispatchOTGWInputLine()` tags it `OTFRAME_SRC_REPLAY`). It is decoded and published like a live frame and keeps `tBoilerLastSeen` (boiler_connected), but it is no boiler evidence either: `processOT()` folds both flags into `boilerEvidence` for the four boiler bitmaps, and neither flag stamps `state.otBus.tRealBoilerLastSeen` or trips `satNotifyBoilerFrameSeen()`. SAT's availability gate reads `otRealBoilerSeenRecently()` (that stamp within 30 s) instead of `bBoilerState` on the PIC path.
-    - `/ot-boiler.json` is format 2 (`"v":2`) since TASK-1185. A format-1 file, written by builds that counted these frames, is not loaded: the boiler bitmaps start empty once and `boilerFileDirty` rewrites the file as format 2 at the next save. `/ot-thermo.json` stays format 1.
+    - `/ot-boiler.json` is format 2 (`"v":2`) since TASK-1185. A format-1 file, written by builds that counted these frames, is not loaded: the boiler bitmaps start empty once and `boilerFileDirty` rewrites the file as format 2 at the next save. `/ot-thermo.json` stays format 1. `loadOtSupportFiles()` restores the files at boot and `saveOtSupportFilesIfDirty()` flushes them from the 15-minute task.
 - **Scope**: Global singleton `OTdataStruct OTcurrentSystemState`
-- **Note**: Flame status is in SlaveStatus bit 3 (NOT MasterStatus); MasterStatus bit 3 is OTC (Outside Temperature Compensation) enabled (bug fix: commit d85e668c)
+- **Note**: Flame status is in SlaveStatus bit 3 (NOT MasterStatus); MasterStatus bit 3 is OTC (Outside Temperature Compensation) enabled
 
 #### `OpenthermData_t` (OTGW-Core.h, embedded)
 - **Purpose**: Typed wrapper for 16-bit OpenTherm data values
-- **Methods**:
-  - `f88()`: Read as f8.8 float (OTGW-Core.ino:1015)
-  - `f88(float value)`: Write as f8.8 float (OTGW-Core.ino:1020)
-  - `u16()`: Read as unsigned 16-bit (OTGW-Core.ino:1027)
-  - `u16(uint16_t value)`: Write as unsigned 16-bit (OTGW-Core.ino:1032)
-  - `s16()`: Read as signed 16-bit (OTGW-Core.ino:1037)
-  - `s16(int16_t value)`: Write as signed 16-bit (OTGW-Core.ino:1042)
+- **Methods**: `f88()` / `f88(float)` (f8.8), `u16()` / `u16(uint16_t)`, `s16()` / `s16(int16_t)`; getter and setter share a name
+- **Other fields**: `id`, `rsptype` (`OTGW_BOILER`, `OTGW_ANSWER_THERMOSTAT`, ...), `time`, plus the routing discriminators above
 
-#### `OTLibMessageID` (OTGW-Core.h:209-326)
-- **Purpose**: Enum mapping OpenTherm message IDs (0-255) to semantic names
-- **Range**: OT_Statusflags (0), OT_TSet (1), OT_TrSet (16), OT_Tr (24), OT_Tboiler (25), OT_Tdhw (26), etc. (up to OT_RemehaDetectionConnectedSCU: 133)
-- **Extended**: Solar storage (OT_Tsolarstorage, OT_SolarStorageStatus), ventilation/heat recovery (OT_StatusVH, OT_ControlSetpointVH), RF sensors (OT_RFstrengthbatterylevel), brand identification (OT_Brand, OT_BrandVersion, OT_BrandSerialNumber)
-- **Reserved ranges** (v4.x): IDs 40-47, 64-69 (gaps in OpenTherm v4.2 spec; v3.x treats as undefined)
+#### `OTLibMessageID` (OTGW-Core.h)
+- **Purpose**: Enum mapping OpenTherm message IDs to semantic names
+- **Range**: OT_Statusflags (0), OT_TSet (1), OT_TrSet (16), OT_Tr (24), OT_Tboiler (25), OT_Tdhw (26), etc., up to OT_RemehaDetectionConnectedSCU (133)
+- **Extended**: Solar storage, ventilation/heat recovery (`OT_StatusVH`, `OT_ControlSetpointVH`), RF sensors (`OT_RFstrengthbatterylevel`), brand identification (`OT_Brand`, `OT_BrandVersion`, `OT_BrandSerialNumber`)
+- **Reserved ranges**: under the v4.x profile IDs 50-55 and 58-69 are reserved (56 and 57 stay valid, 1.x fix GH #538/#540); see `isLegacyPreV42CompatibilityId()`
 
-#### `OTLibMessageType` (OTGW-Core.h:191-202)
+#### `OTLibMessageType` (OTGW-Core.h)
 - **Purpose**: OpenTherm frame type classification
 - **Values**:
-  - Master→Slave: OT_READ_DATA (0b000), OT_WRITE_DATA (0b001), OT_INVALID_DATA (0b010)
+  - Master→Slave: OT_READ_DATA (0b000), OT_WRITE_DATA (0b001), OT_INVALID_DATA (0b010), OT_RESERVED (0b011)
   - Slave→Master: OT_READ_ACK (0b100), OT_WRITE_ACK (0b101), OT_DATA_INVALID (0b110), OT_UNKNOWN_DATA_ID (0b111)
 
-#### `OTValueType` (OTGW-Core.h:177-189)
+#### `OTValueType` (OTGW-Core.h)
 - **Purpose**: Data type classifier for formatting OpenTherm values
-- **Values**: OT_VALTYPE_F88, OT_VALTYPE_S16, OT_VALTYPE_U16, OT_VALTYPE_U8U8, OT_VALTYPE_FLAG8, OT_VALTYPE_STATUS, OT_VALTYPE_DATETIME, etc.
+- **Values**: OT_VALTYPE_NONE, F88, S16, U16, U8U8, S8S8, FLAG8, FLAG8FLAG8, STATUS, DATETIME, SPECIAL
 
-#### Global MQTT Throttle State (OTGW-Core.ino:234-243)
-- `uint32_t mqttlastsent[]`: Per-msgid throttle tracking for all 256 OpenTherm messages
-- `uint16_t mqttlastsentstatusbit[]`: Per-bit throttle for status flags (master slots 0-7, slave 8-15)
-- `uint16_t mqttlastsentstatusbyte[]`: Combined status_master/status_slave throttle timers
-- `bool mqttPublishAllowed`: Global gate for MQTT publishing (managed by OTPublishGate)
+#### Global MQTT Throttle State (OTGW-Core.ino)
+- `uint32_t mqttlastsent[MQTT_TRACKED_SLOT_COUNT]`: packed per-msgid throttle (high 16 bits the last published value, low 16 bits seconds since boot), a response view and a request view
+- `uint16_t mqttlastsentstatusbit[16]` / `mqttlastsentstatusvhbit[16]`: per-bit timers for Statusflags and StatusVH (slots 0-7 master, 8-15 slave)
+- `mqttlastsentstatusbyte[2]` / `mqttlastsentstatusvhbyte[2]`: combined status byte timers; further trackers cover ASF, RBP and Remote Override fan-out
+- `TRACKED_TIME_UNSEEN` (0xFFFF) marks a slot that was never published
+- `bool mqttPublishAllowed`: gate set per frame by `OTPublishGate` and checked in `sendMQTTData()`
 
-#### Static OT Log Buffer (OTGW-Core.ino:98-105)
-- `char ot_log_buffer[OT_LOG_BUFFER_SIZE]` (512 bytes)
-- **Purpose**: Safe, reentrant logging for WebSocket streaming (no dynamic allocation)
+#### Static OT Log Buffer (OTGW-Core.ino)
+- `char ot_log_buffer[OT_LOG_BUFFER_SIZE]` with a tracked write position `ot_log_pos`
+- **Purpose**: Build one log line without dynamic allocation for the WebSocket
 - **Macros**: ClrLog(), AddLogf(), AddLogf_P(), AddLog(), AddLogln()
+
+#### Command queue (OTGW-Core.h)
+- `struct OT_cmd_t cmdqueue[CMDQUEUE_MAX]` (20 entries: `cmd`, `cmdlen`, `retrycnt`, `due`); `int cmdQueueSize` is the fill pointer
 
 ### Primary Functions
 
 #### Message Processing
 
 ##### `void processOT(const char *buf, int len, bool suppressOutput = false, bool localAnswer = false, bool replayed = false)` (OTGW-Core.ino)
-- **Purpose**: Parse incoming OpenTherm message from PIC serial, decode fields, publish to MQTT/WebSocket
+- **Purpose**: Parse one line from the PIC or OT-Direct, decode fields, publish to MQTT and WebSocket
 - **Parameters**:
-  - `buf`: Character buffer containing raw OT message (format: "THxxddhh\r" or similar)
-  - `len`: Length of buffer
+  - `buf`, `len`: raw line (a 9-character frame such as `T80190000`, a command response such as `PR: A=...`, a PS=1 summary, or a status token)
   - `suppressOutput`: skip the per-frame output (OT-Direct PS=1, TASK-293)
   - `localAnswer`: the frame is an answer the gateway made itself (queue source `OTFRAME_SRC_OTDIRECT_LOCAL`); stored as `OTdata.bLocalAnswer` (TASK-1086)
-  - `replayed`: the line came from the `/otgw_simulation.log` replay (queue source `OTFRAME_SRC_REPLAY`, set by `dispatchOTGWInputLine()`); stored as `OTdata.bReplayed` (TASK-1185)
+  - `replayed`: the line came from the `/otgw_simulation.log` replay (queue source `OTFRAME_SRC_REPLAY`); stored as `OTdata.bReplayed` (TASK-1185)
 - **Flow**:
-  1. Validate message format
-  2. Extract message type (READ/WRITE/ACK/etc.)
-  3. Extract message ID and data value
-  4. Decode data according to message type (temperature, status flags, counters)
-  5. Publish to MQTT with throttling
-  6. Log to WebSocket event stream
-  7. Update global `OTcurrentSystemState`
-- **Dependencies**: decodeAndPublishOTValue(), OTPublishGate, handleOTGW()
-- **Location**: OTGW-Core.ino:4910-5377
+  1. Take `OTStateLock`
+  2. `isvalidotmsg()` frames: leave PS mode if raw frames resume, stamp the source (`B` boiler, `T` thermostat, `R`/`A` gateway), run the one-frame delay buffer that pairs a `B` with an `A` (ADR-103), then `decodeAndPublishOTValue()` under an `OTPublishGate` driven by `shouldPublishMQTTForID()`
+  3. Update `OTcurrentSystemState`, the boiler-support bitmaps and the liveness stamps; `evaluateOTBusLiveness()` derives the boiler, thermostat and bus connected flags
+  4. Build the OT log line and send it with `sendLogToWebSocket()`
+  5. Other lines: `PR:` and `XX:` command responses go to `checkCommandResponse()` and `handlePRresponse()`, comma-separated summaries to `processPSSummary()`, known PIC status tokens to `handlePICStatusToken()`
+- **Dependencies**: decodeAndPublishOTValue(), OTPublishGate, evaluateOTBusLiveness()
 
-##### `void processPSSummary(const char *buf, int len)` (OTGW-Core.ino:3428)
-- **Purpose**: Parse PS=1 diagnostic summary line from PIC (lists all message IDs seen in last minute)
-- **Parameters**:
-  - `buf`: PS=1 summary output line
-  - `len`: Buffer length
+##### `void processPSSummary(const char *buf, int len)`
+- **Purpose**: Parse the PS=1 summary line (25 fields below firmware v5, 34 from v5; picked by comma count: 24 or 33)
 - **Flow**:
-  1. Enter PS mode (suppress individual message throttling during summary parse)
-  2. Extract hex msgid pairs from PS output
-  3. Decode & publish each as if it were received individually
-  4. Update msgLastUpdated[] timestamps
-  5. Leave PS mode, re-enable throttling
-- **Related**: PSSUMMARY_MSGIDS_OLD[], PSSUMMARY_MSGIDS_NEW[], enterPSMode(), leavePSMode()
-- **Location**: OTGW-Core.ino:3428-3481
+  1. Enter PS mode (`enterPSMode()`)
+  2. Map each field to a MsgID through `PSSUMMARY_MSGIDS_OLD[]` or `PSSUMMARY_MSGIDS_NEW[]`
+  3. Parse strictly (`parseStrictFloat()`, `parsePSSummaryU8U8()`, ...) and publish through `publishPSSummaryFieldValue()` / `updatePSSummaryFloatState()` / `updatePSSummaryU16State()`
+  4. `shouldPublishMQTTForPSField()` applies the throttle
+- **Related**: `enterPSMode()`, `leavePSMode()`, `ensurePSSummaryDiscovery()`
 
 #### PIC Communication
 
-##### `void handlePICSerial()` (OTGW-Core.ino:4039)
-- **Purpose**: Non-blocking serial handler for PIC communication, dispatches incoming lines to processors
-- **Flow**:
-  1. Read available bytes from OTGWSerial
-  2. Accumulate into line buffer (newline-terminated)
-  3. Dispatch complete lines:
-     - PR responses → handlePRresponse()
-     - OT messages (TH, TB, etc.) → processOT()
-     - PS=1 summary → processPSSummary()
-     - Generic responses → checkCommandResponse()
-  4. Manage simulation mode (if `/otgw.replay` file exists, replay logged messages)
-- **Static Locals**: sRead[256], sWrite[256] (guarded by `inUse` flag; protected against re-entrancy from doBackgroundTasks)
-- **Location**: OTGW-Core.ino:4039-4314
+##### `void handlePICSerial()`
+- **Purpose**: Loop-side half of the PIC path. The UART read loop moved to the PIC task; this function only runs the port 25238 relay (network to PIC, via `enqueuePICTx()`).
+- **Guards**: returns at once when `isOTDirectEnabled()`; the relay runs only with a PIC and `bLegacyPort25238Enabled`; with the replay simulation on, relayed bytes are blocked and reported with `!` events
+- **Static locals**: `sWrite[MAX_BUFFER_WRITE]` (128)
 
-##### `void sendPICSerial(const char* buf, int len)` (OTGW-Core.ino:2845)
-- **Purpose**: Send bytes to PIC serial port (bypasses queue; used for immediate probes)
-- **Parameters**:
-  - `buf`: Data to send
-  - `len`: Byte count
-- **Safety**: Guarded by `!isPICEnabled()` check; no-op if PIC unavailable
-- **Location**: OTGW-Core.ino:2845-2880
+##### `void handleOTReplay()`
+- **Purpose**: Feed `/otgw_simulation.log` to the decoder one line per 750 ms through `dispatchOTGWInputLine()`, independent of transport (TASK-1071); flushes the live PIC RX while it runs
 
-##### `void startPICStream()` (OTGW-Core.ino:4315)
-- **Purpose**: Start OTGW PIC stream on port 25238 (OTmonitor compatibility)
-- **Uses**: TelnetStreamClass OTGWstream (OTGW-Core.h:20)
-- **Location**: OTGW-Core.ino:4315-4321
+##### `void sendPICSerial(const char* buf, int len)`
+- **Purpose**: Queue a command for the PIC (appends CR/LF, `enqueuePICTx()`), echo it as a `>` event
+- **Guards**: with no PIC it routes to `handleOTDirectCommand()` when OT-Direct is active; `satSimulationBlocksBusTx()` blocks it while a simulation runs
+
+##### `void startPICStream()` / `stopPICStream()` / `applyLegacyPort25238Setting()`
+- **Purpose**: Start or stop the raw TCP bridge on port 25238 (OTmonitor compatibility). `startPICStream()` leaves it stopped when the setting is off
 
 #### Command Queue
 
-##### `void addCommandToQueue(const char* buf, int len, bool forceQueue, int16_t delay)` (OTGW-Core.ino:2687)
-- **Purpose**: Queue command for delivery to PIC (e.g., "CS=1", "GW=1", "TT=20.0"; renamed from `addOTWGcmdtoqueue` in v1.3.5)
+##### `void addCommandToQueue(const char* buf, const int len, const bool forceQueue, const int16_t delay)`
+- **Purpose**: Queue a command for the PIC (for example `GW=1`, `TT=20.0`). With no PIC it hands the command to `handleOTDirectCommand()` when OT-Direct is active (the combo OT-Direct path), otherwise it ignores it.
 - **Parameters**:
-  - `buf`: Command string (null-terminated)
-  - `len`: Command length
-  - `forceQueue`: If true, queue even if already queued; used by PR/CR queries to bypass deduplication
-  - `delay`: Retry delay in ms (default 1000ms: OTGW_DELAY_SEND_MS)
-- **Queue Size**: `int cmdQueueSize` (OTGW-Core.ino:404) tracks fill-pointer (0..CMDQUEUE_MAX-1, default 20 entries)
-- **Retry Logic**: Failed commands re-queued with exponential backoff (timeout tracking via `due` field in OT_cmd_t)
-- **Related**: handleCommandQueue(), checkCommandResponse(), OT_cmd_t struct (OTGW-Core.h:510-515)
-- **Location**: OTGW-Core.ino:2687-2762
+  - `buf`, `len`: command text, at least `XX=`, shorter than the entry size
+  - `forceQueue`: when false, a queued command with the same two-letter prefix is overwritten instead of appended; when true it always takes a new slot (the `PR=` queries use this)
+  - `delay`: ms until first send (default `OTGW_DELAY_SEND_MS` 1000)
+- **CS= refusal (TASK-1236, ADR-179)**: a `CS=` is refused while `satOwnsControlSetpoint()` is true unless `satCommandInFlight()` marks it as SAT's own. SAT sends its own through `satEnqueueOwnCS()`. Bytes written straight to the PIC over port 25238 do not pass this queue and stay unfiltered (ADR-177).
+- **Settings re-read**: commands that change a readable PIC setting (`GW`, `GA`, `GB`, `SB`, `VR`, `TS`, `IT`, `OH`, `LA`-`LF`) call `triggerPICsettingsReadout()`
+- **Queue size**: `CMDQUEUE_MAX` 20
+- **Related**: `handleCommandQueue()`, `checkCommandResponse()`, `removeFromCmdQueue()`, `OT_cmd_t`
 
-##### `void handleCommandQueue()` (OTGW-Core.ino:2763)
-- **Purpose**: Drain command queue, retry failed commands (called every 1 second from doTaskEvery1s)
+##### `void handleCommandQueue()`
+- **Purpose**: Send due commands and drop exhausted ones (called every second from `doTaskEvery1s()`)
 - **Flow**:
-  1. Check throttle window (SER2NET_QUIET_MS)
-  2. Send first command in queue
-  3. Wait for response (checked in handlePICSerial → checkCommandResponse)
-  4. On success, remove from queue
-  5. On timeout, re-queue with incremented retry count
-- **Location**: OTGW-Core.ino:2763-2795
+  1. Skip while a port 25238 client command is recent (`SER2NET_QUIET_MS` 2000)
+  2. For each due entry: `sendPICSerial()`, count a retry, reschedule `OTGW_CMD_INTERVAL_MS` (5000) ahead
+  3. After `OTGW_CMD_RETRY` (5) tries remove the entry and emit `<cmd> [dropped]` as a `!` event
 
-##### `void checkCommandResponse(const char *buf, unsigned int len)` (OTGW-Core.ino:2796)
-- **Purpose**: Match incoming PIC response to queued command, mark success or log error
-- **Location**: OTGW-Core.ino:2796-2844
+##### `void checkCommandResponse(const char *buf, unsigned int len)`
+- **Purpose**: Match a `XX: value` response from the PIC to a queued command (for `PR` also the register letter) and remove it from the queue
 
 #### PIC Settings Discovery
 
-##### `void triggerPICsettingsReadout()` (OTGW-Core.ino:552)
-- **Purpose**: Initiate cycle through PIC configuration settings (CR command)
-- **Flow**: Sets `picSettingsCycleActive = true`, resets `picSettingsQueryIdx = 0`
-- **Effect**: Calls queryNextPICsetting() every 3 seconds from doTaskEvery3s()
-- **Location**: OTGW-Core.ino:552-590
+##### `void triggerPICsettingsReadout()`
+- **Purpose**: Start a cycle over the 15 `PR=` registers (O, S, W, G, I, L, T, D, P, R, B, C, Q, N, V). Ignored while a cycle runs or without a PIC
+- **Triggered**: at boot, by `GET /api/v2/pic/settings`, and after setting-changing commands
 
-##### `void queryNextPICsetting()` (OTGW-Core.ino:591)
-- **Purpose**: Issue CR=[index] query to PIC, collect all 15 setting lines
-- **Queries**: Configuration (CR), LED blink, DHW (de)prioritize, max modulation, max CHWSetpoint, GW mode, boiler inactivity timeout, dT for CH, min burner duty, etc.
-- **Completion**: After all queries collected, publishes to MQTT via publishAllPICsettings()
-- **Location**: OTGW-Core.ino:591-635
+##### `void queryNextPICsetting()`
+- **Purpose**: Queue the next `PR=<letter>` (forced). Called every 3 s from `doTaskEvery3s()` during a cycle, so a full cycle takes about 45 s
+- **Deferral**: skipped on non-gateway firmware, during a flash, during an MQTT status burst, or when a drip tick is within 500 ms; the query retries on the next tick
+- **Responses**: `handlePRresponse()` stores them in `state.picSettings` and publishes changes
 
-##### `void publishAllPICsettings()` (OTGW-Core.ino:755)
-- **Purpose**: Publish cached PIC settings to MQTT (called at boot and every 5 minutes)
-- **Topics**: otgw/gatewaymode, otgw/settings/* (for each setting)
-- **Location**: OTGW-Core.ino:755-776
+##### `void publishAllPICsettings()`
+- **Purpose**: Publish the cached PIC settings to `otgw-pic/settings/*` (setpoint_override, setback, dhw_override, gpio, gpio_states, led, tweaks, temp_sensor, smart_power, thermostat_detect, builddate, clock_mhz, reset_cause, standalone_interval, voltage_ref). Called from `do5minevent()`
 
-#### Gateway Mode Detection
+#### Gateway Mode and Firmware Version
 
-##### `void queryOTGWgatewaymode()` (OTGW-Core.ino:515)
-- **Purpose**: Query PIC for gateway mode (PR=M command, only gateway firmware)
-- **Parameter Encoding**: Bit 0=CH enable, Bit 1=DHW enable, Bit 2=cooling enable, Bit 3=OTC enabled
-- **Response Handler**: handlePRresponse() at OTGW-Core.ino:636-754
-- **Location**: OTGW-Core.ino:515-547
+##### `void queryOTGWgatewaymode()`
+- **Purpose**: Queue `PR=M` (gateway firmware only), at most once a minute once the mode is known; `handlePRresponse()` updates `state.otBus` and publishes
 
-##### `void getpicfwversion()` (OTGW-Core.ino:503)
-- **Purpose**: Query PIC firmware version (PR=A command)
-- **Uses**: OTGWSerial.write() directly (bypasses queue)
-- **Response**: Banner string parsed in processOT() to set `state.pic.sDeviceid`
-- **Location**: OTGW-Core.ino:503-514
+##### `void getpicfwversion()`
+- **Purpose**: Queue `PR=A`. The reply's register A is ignored by `handlePRresponse()`; the banner reaches `OTGWSerial`'s firmware callback (`fwreportinfo`) on the PIC task, and `applyPICBannerInfo()` applies version, type and device id loop-side and re-enables a PIC that `detectPIC()` missed
+- **Retry**: `doTaskEvery60s()` repeats the probe while the version is unknown and OT-Direct is not active
 
 #### Watchdog Management
 
-##### `void feedWatchDog()` (OTGW-Core.ino:955)
-- **Purpose**: Feed external I2C watchdog to prevent PIC reset
-- **Macro**: FEEDWATCHDOGNOW (wire I2C write to address 0x26)
-- **Called From**: doBackgroundTasks() at every loop iteration
-- **Note**: No `yield()` call (commented out in source)
-- **Location**: OTGW-Core.ino:955-981
+Two shapes, selected at compile time (ADR-135):
+- **`HAS_PIC_WATCHDOG` (esp32-classic and combo)**: the ESP32 Task Watchdog (30 s, panic on trigger, loop task only) is the primary safety net. The external I2C watchdog at `EXT_WD_I2C_ADDRESS` (0x26) is an optional secondary layer, probed up to 3 times in `initWatchDog()` into `s_extWdPresent`; arm and feed are both gated on that flag.
+- **OTGW32 (no external chip)**: TWDT only; `WatchDogEnabled()` is a no-op.
 
-##### `void initWatchDog(char* reasonBuf, size_t reasonSize)` (OTGW-Core.ino:915)
-- **Purpose**: Initialize external watchdog, query reset reason
-- **Output**: Reset reason string written to reasonBuf
-- **Location**: OTGW-Core.ino:915-946
-
-##### `void WatchDogEnabled(byte stateWatchdog)` (OTGW-Core.ino:947)
-- **Purpose**: Enable/disable watchdog
-- **Parameter**: stateWatchdog (1=enable, 0=disable)
-- **Location**: OTGW-Core.ino:947-954
+##### `void feedWatchDog()`
+- **Purpose**: Reset the TWDT (and feed 0x26 when present), at most every 100 ms, and blink LED1 once a second. A call from a task other than the loop task is a silent no-op (TASK-1131)
+##### `void initWatchDog(char* reasonBuf, size_t reasonSize)` / `void WatchDogEnabled(byte stateWatchdog)`
+- **Purpose**: Arm the TWDT, probe 0x26 and report "Reset by External WD" when its status flag is set; enable or disable the external chip
 
 #### PIC Reset & Detection
 
-##### `void resetOTGW()` (OTGW-Core.ino:469)
-- **Purpose**: Reset OTGW PIC via GPIO pin (HAS_PIC platforms only)
-- **Flow**:
-  1. Pull PIC reset pin low
-  2. Hold for ~100ms
-  3. Release, wait for PIC to boot (~1.5s)
-  4. Clear command queue
-  5. Schedule startup quiet period (suppress event logging for 15s)
-- **Called From**: setup() at OTGW-firmware.ino:180
-- **Location**: OTGW-Core.ino:469-502
+##### `void resetOTGW()` (HAS_PIC only; empty on OTGW32)
+- **Purpose**: Reset the PIC through `OTGWSerial.resetPic()` (GPIO pulse and `GW=R`), parked against the PIC task, and start the 15 s startup quiet period
+- **Called from**: `setup()` (then `startPICStream()` and `startPICSerialTask()`), the `GW=R` relay and the MQTT reset command
 
-##### `void detectPIC()` (OTGW-Core.ino:479)
-- **Purpose**: Probe for PIC presence at startup, extract device ID
-- **Flow**:
-  1. Issue PR=A command (firmware version query)
-  2. Read response from serial
-  3. Parse banner to extract device ID (e.g., "OpenTherm Gateway 6.13" or "OpenTherm v2.2")
-  4. Set `state.pic.bAvailable = true/false`
-- **Timeout**: 500ms wait
-- **Called From**: setup() at OTGW-firmware.ino:130
-- **Location**: OTGW-Core.ino:479-502 (HAS_PIC) or no-op (OTGW32 direct OT)
+##### `void detectPIC()` (HAS_PIC only)
+- **Purpose**: Register the firmware callback, reset the PIC and look for ETX (the bootloader's answer, within 1 s). Sets `state.pic.bAvailable` and `state.hw.eMode` (`HW_MODE_PIC` or `HW_MODE_DEGRADED`)
+- **Called from**: `setup()`, also up to 3 times in combo auto mode, and from the telnet `p` key
+
+#### Boot Commands
+
+##### `void sendPICBootCommands()`
+- **Purpose**: When `settings.picBoot.bEnable`, split `settings.picBoot.sCommands` on `;` and queue each valid `XX=value` command with `addCommandToQueue(..., true)`. The commands are user-configured; there is no fixed default list
 
 #### MQTT Publishing Throttle
 
-##### `uint16_t getMsgLastUpdated(uint8_t msgId)` (OTGW-Core.ino:341)
-- **Purpose**: Get tracked seconds since message was last published to MQTT
-- **Return**: Seconds since last publish (wraps at 65535), or TRACKED_TIME_UNSEEN if never published
-- **Location**: OTGW-Core.ino:341-348
+##### `uint16_t getMsgLastUpdated(uint8_t msgId)`
+- **Purpose**: Seconds since a message was last published, or `TRACKED_TIME_UNSEEN`
+- Helpers: `currentTrackedSeconds()`, `elapsedTrackedSeconds()`, `setMsgLastUpdated()`, `clearMsgLastUpdated()`
 
-##### `static uint16_t currentTrackedSeconds()` (OTGW-Core.ino:299)
-- **Purpose**: Get current time in tracked seconds (modulo 65535)
-- **Used By**: MQTT throttle logic to minimize per-message state
-- **Location**: OTGW-Core.ino:299-310
+##### `bool shouldPublishMQTTForID(byte id, byte masterslave, uint16_t rawValue)`
+- **Purpose**: Decide per frame whether a value is published (interval and change gate); `OTPublishGate` sets `mqttPublishAllowed` from it for the duration of the decode
+- **Related**: `requestMQTTRepublishAll()`, `queueMQTTRepublishAll()`, `handlePendingMQTTRepublish()` (runs in `loop()`, TASK-1176), `requestMQTTStatusRepublish()`
 
-##### `bool canPublishMQTT()` (helperStuff.ino, forward decl at OTGW-firmware.h:119)
-- **Purpose**: Global gate for MQTT publishing (heap health check)
-- **Returns**: true if heap is healthy and MQTT buffer available
+##### `bool canPublishMQTT()` (helperStuff.ino)
+- **Purpose**: Heap gate; false only at CRITICAL heap (ADR-167)
 
 #### Status Bit Publishing
 
-##### `static void publishMasterStatusState(uint8_t valueHB, const char *statusText)` (OTGW-Core.ino:1565)
-- **Purpose**: Publish individual status flag bits for master (e.g., CH enabled, DHW enabled, flame on)
-- **Topics**: otgw/status_master_CH_enable, otgw/status_master_DHW_enable, etc.
-- **Throttle**: Per-bit timer (mqttlastsentstatusbit[0-7])
-- **Location**: OTGW-Core.ino:1565-1595
-
-##### `static void publishSlaveStatusState(uint8_t valueLB, const char *statusText)` (OTGW-Core.ino:1596)
-- **Purpose**: Publish individual status flag bits for slave
-- **Topics**: otgw/status_slave_fault_indication, otgw/status_slave_CH_mode, etc.
-- **Throttle**: Per-bit timer (mqttlastsentstatusbit[8-15])
-- **Location**: OTGW-Core.ino:1596-1627
-
-##### `static uint16_t publishCombinedStatusState(uint8_t valueHB, uint8_t valueLB)` (OTGW-Core.ino:1628)
-- **Purpose**: Publish combined status_master and status_slave values as colon-separated string
-- **Topic**: otgw/status (e.g., "1:255")
-- **Throttle**: Per-byte timer (mqttlastsentstatusbyte[])
-- **Location**: OTGW-Core.ino:1628-1638
+##### `publishMasterStatusState()`, `publishSlaveStatusState()`, `publishCombinedStatusState()` (and the `...StatusVH...` set)
+- **Purpose**: Publish individual status bits and the combined status byte, each with its own tracked timer (`shouldPublishStatusBit()`, `shouldPublishStatusByte()`)
+- **Topics**: `status_master_*`, `status_slave_*`, `status` (combined, for example `1:255`); the HVAC mode and action are published by `publishHvacMode()` / `publishHvacAction()`
 
 #### Data Type Formatters (Print Functions)
 
 These functions decode OpenTherm data and emit to MQTT/WebSocket:
 
-- `void print_f88(float& value)` (OTGW-Core.ino:1755): f8.8 float with ±2 decimal places
-- `void print_s16(int16_t& value)` (OTGW-Core.ino:1775): Signed 16-bit integer
-- `void print_s8s8(uint16_t& value)` (OTGW-Core.ino:1793): Two signed 8-bit values
-- `void print_u16(uint16_t& value)` (OTGW-Core.ino:1821): Unsigned 16-bit integer
-- `void print_status(uint16_t& value)` (OTGW-Core.ino:1839): Master/slave status flags
-- `void print_statusVH(uint16_t& value)` (OTGW-Core.ino:1946): Ventilation/heat recovery status
-- `void print_ASFflags(uint16_t& value)` (OTGW-Core.ino:2013): Application-specific fault flags
-- `void print_RBPflags(uint16_t& value)` (OTGW-Core.ino:2045): Remote boiler parameter flags
-- `void print_daytime(uint16_t& value)` (OTGW-Core.ino:2584): Day of week + time HH:MM:SS
-- `void print_date(uint16_t& value)` (OTGW-Core.ino:2560): Month-Day format
-- `void print_command(uint16_t& value)` (OTGW-Core.ino:2261): Remote command decode
-- `void print_rf_sensor_status_information(uint16_t& value)` (OTGW-Core.ino:2474): RF sensor type, battery, signal strength
-- `void print_remote_override_operating_mode(uint16_t& value)` (OTGW-Core.ino:2516): Heating/DHW override modes
-- `void print_u8_hb(uint16_t& value)` (OTGW-Core.ino:2370): High byte only
-- `void print_u8_lb(uint16_t& value)` (OTGW-Core.ino:2375): Low byte only
+- `print_f88(float&)`, `print_s16(int16_t&)`, `print_s8s8(uint16_t&)`, `print_u16(uint16_t&)`, `print_u8u8(uint16_t&)`, `print_flag8u8(uint16_t&)`
+- `print_status`, `print_statusVH`, `print_solar_storage_status`, `print_ASFflags`, `print_RBPflags`
+- `print_slavememberid`, `print_mastermemberid`, `print_vh_configmemberid`, `print_solarstorage_slavememberid`
+- `print_remoteoverridefunction`, `print_vh_remoteparametersetting`, `print_command`
+- `print_daytime`, `print_date`
+- `print_u8_hb`, `print_u8_lb`, `print_rf_sensor_status_information`, `print_remote_override_operating_mode`
+- `print_f88()` also feeds the DHW water total (next section)
 
 #### DHW Water Total (dhwWaterMeter.ino, ADR-176, TASK-1123)
 
@@ -327,229 +261,129 @@ A cumulative DHW water volume in litres, integrated from MsgID 19 (DHWFlowRate, 
 
 #### Validation Helpers
 
-##### `bool isvalidotmsg(const char *buf, int len)` (OTGW-Core.ino:3483)
-- **Purpose**: Check if buffer contains valid OpenTherm message format
-- **Format**: "THxxddhh\r" (T/B prefix, type byte, msgid, high byte, low byte)
+##### `bool isvalidotmsg(const char *buf, int len)`
+- **Purpose**: Check that a line is a 9-character OpenTherm frame (source letter `T`, `B`, `R` or `A`, then 8 hex digits)
 - **Returns**: true if valid, false if malformed
-- **Location**: OTGW-Core.ino:3483-3490
 
 #### PIC Firmware Upgrade
 
-##### `void fwupgradestart(const char *hexfile)` (OTGW-Core.ino:4472)
-- **Purpose**: Start PIC firmware upgrade via hex file
-- **Parameters**: hexfile path (e.g., "/gateway.hex")
-- **Flow**:
-  1. Validate Intel HEX format
-  2. Read hex file from LittleFS
-  3. Transfer to PIC in chunks
-  4. Poll for completion
-  5. Report result to MQTT/WebSocket
-- **Callbacks**: fwupgradestep(), fwupgradedone(), fwreportinfo()
-- **Location**: OTGW-Core.ino:4472-4517
+The REST handler `upgradepic(AsyncWebServerRequest*)` (`/pic`) validates the request and defers the work; `handlePendingUpgrade()` (called from `loop()` when not flashing) starts it. The upgrade state machine runs inside `OTGWSerial` and is ticked by `picSerialPumpUpgrade()` from the loop while the PIC task is parked.
 
-##### `void handlePendingUpgrade()` (OTGW-firmware.ino:409)
-- **Purpose**: Check for pending PIC firmware upgrade, initiate if needed
-- **Called From**: main loop() when not flashing
-- **Location**: OTGW-firmware.ino:409, defined in OTGW-Core.ino:4655-4668
+##### `void upgradepicnow(const char *filename)`
+- **Purpose**: Refuse when no PIC is present or an upgrade is already running, otherwise call `fwupgradestart()`
 
-##### `void upgradepic()` (OTGW-Core.ino:4670)
-- **Purpose**: Initiate PIC firmware upgrade using OTmonitor-compatible flow
-- **Location**: OTGW-Core.ino:4670-4684
+##### `void fwupgradestart(const char *hexfile)`
+- **Purpose**: Record the file name in `state.flash`, set `bPICactive`, wait for the PIC task to park (`waitForPICTaskParked()`), start the `OTGWSerial` upgrade
+- **Callbacks**: `fwupgradestep(int pct)`, `fwupgradedone(OTGWError, short errors, short retries)` and `fwreportinfo(OTGWFirmware, const char *version)` report progress to the WebSocket (`sendWebSocketJSON()`) and MQTT
 
-##### `bool validateIntelHex(const char *filepath)` (OTGW-Core.ino:4518)
-- **Purpose**: Validate Intel HEX file format before upgrade
-- **Checks**: Line format, checksum, address continuity
-- **Returns**: true if valid, false if corrupted
-- **Location**: OTGW-Core.ino:4518-4606
+##### `bool validateIntelHex(const char *filepath)`
+- **Purpose**: Validate Intel HEX format before an upgrade (line format, checksums, end-of-file record)
 
-### Initialization & Boot Commands
-
-##### `void sendPICBootCommands()` (OTGW-Core.ino:778)
-- **Purpose**: Send initial configuration to PIC after reset
-- **Commands**:
-  - CS=1 (Comfortmode Schedule support)
-  - GW=1 (Gateway mode, if applicable)
-  - PS=1 (Periodic summary mode)
-  - SB=<boiler address> (Solar boiler inactivity)
-  - SR=<heating override> (Solar return enable)
-  - SE=<solar temp> (Solar excitation on/off)
-- **Location**: OTGW-Core.ino:778-806
-
-##### `void resetOTGW()` (continuation, OTGW-firmware.ino)
-- **Purpose**: Call resetOTGW(), then start serial stream (called from setup)
-- **Location**: OTGW-firmware.ino:180-181
+##### `checkforupdatepic()` / `refreshpic()` / `queuePicUpdateCheck()` / `queuePicRefresh()` / `handlePendingPicHttp()`
+- **Purpose**: Check the remote PIC firmware version and download a fresh hex file; the HTTP work is deferred to `loop()` (`PIC_HTTP_TIMEOUT_MS` 5 s, `PIC_HTTP_DOWNLOAD_TIMEOUT_MS` 15 s, under the 30 s TWDT)
 
 ### Logging & Event Streaming
 
-##### `static void sendEventToWebSocket(char prefix, const char *msg, int len)` (OTGW-Core.ino:119)
-- **Purpose**: Stream single-line event to WebSocket with prefix (>, <, !, *)
-- **Prefixes**:
-  - '>' = command sent
-  - '<' = response received
-  - '!' = error/warning
-  - '*' = system event
-- **Uses**: ot_log_buffer (512 bytes, OTGW-Core.ino:99) for safe reentrant logging
-- **Macros**: ClrLog(), AddLogf(), AddLogf_P(), AddLog(), AddLogln() for safe buffer management
-- **Location**: OTGW-Core.ino:119-134
+##### `static void sendEventToWebSocket(char prefix, const char *msg, int len = -1)`
+- **Purpose**: Stream a single timestamped line to the WebSocket with a prefix character
+- **Prefixes**: `>` command sent, `<` command response, `!` error/warning, `*` system event
+- **Uses**: `ot_log_buffer` and `sendLogToWebSocket()`; `_P` variant takes a PROGMEM message
 
-##### `static void sendEventToWebSocket_P(char prefix, PGM_P msg_P)` (OTGW-Core.ino:136)
-- **Purpose**: Stream event with PROGMEM message
-- **Location**: OTGW-Core.ino:136-148
+##### `static void reportOTGWEvent(const char *eventMsg, char prefix, bool suppressDuringStartup = false)`
+- **Purpose**: Fan an event out to MQTT and the WebSocket (`canFanOutOTGWEvent()`); `reportOTGWEvent_P` is the PROGMEM variant
+- **Suppression**: during the 15 s startup quiet period (`scheduleOTGWStartupQuietPeriod()`, `isOTGWStartupQuietPeriodActive()`, set by `resetOTGW()` and `detectPIC()`) to keep the PIC's boot chatter out of the log
 
-##### `static void reportOTGWEvent(const char *eventMsg, char prefix, bool suppressDuringStartup)` (OTGW-Core.ino:171)
-- **Purpose**: Fan-out event to MQTT (via sendMQTTData) and WebSocket (via sendEventToWebSocket)
-- **Suppression**: Can suppress during 15s startup quiet period
-- **Location**: OTGW-Core.ino:171-183
-
-#### Startup Quiet Period
-
-##### `static void scheduleOTGWStartupQuietPeriod()` (OTGW-Core.ino:150)
-- **Purpose**: Start 15-second window where event logging is suppressed after PIC reset to allow stabilization
-- **Called From**: resetOTGW() after GPIO reset pulse
-- **Location**: OTGW-Core.ino:150-154
-
-##### `static bool isOTGWStartupQuietPeriodActive()` (OTGW-Core.ino:156)
-- **Purpose**: Check if startup quiet period (15s after PIC reset) is still active
-- **Used By**: reportOTGWEvent() to gate event publishing during PIC bootup
-- **Location**: OTGW-Core.ino:156-164
-
-#### Connected State Publishers (v1.3.5+)
-
-##### `void publishBoilerConnectedState()` (defined in MQTTstuff.ino, called from OTGW-Core.ino:3768)
-- **Purpose**: Publish MQTT message when boiler connection state changes (seen for 30s vs timeout)
-- **Topic**: otgw/boiler_connected (true/false)
-- **Called From**: processOT() main loop, after checking message timeout
-- **Related**: state.otBus.bBoilerState, epochBoilerlastseen, bOTGWboilerpreviousstate
-
-##### `void publishThermostatConnectedState()` (defined in MQTTstuff.ino, called from OTGW-Core.ino:3775)
-- **Purpose**: Publish MQTT message when thermostat connection state changes
-- **Topic**: otgw/thermostat_connected (true/false)
-- **Called From**: processOT() main loop, after checking message timeout
-- **Related**: state.otBus.bThermostatState, epochThermostatlastseen, bOTGWthermostatpreviousstate
-
-##### `void publishOTGWConnectedState()` (defined in MQTTstuff.ino, called from OTGW-Core.ino:3782)
-- **Purpose**: Publish MQTT message when overall OpenTherm bus state changes (boiler OR thermostat online)
-- **Topic**: otgw/otgw_online (true/false)
-- **Called From**: processOT() main loop after boiler/thermostat state changes
-- **Related**: state.otBus.bOnline (computed from boilerState OR thermostatState)
+##### Connected state publishers
+- `publishBoilerConnectedState()`, `publishThermostatConnectedState()`, `publishOTGWConnectedState()` (defined in MQTTstuff.ino) are called from `evaluateOTBusLiveness()`, which derives the flags from the last-seen stamps with a 30 s window. It runs from `processOT()` and from a periodic tick, and never raises a flag without a frame; during a flash it leaves the last state standing.
 
 ### OpenTherm Status Helpers
 
-##### `bool isCentralHeatingEnabled()` (OTGW-Core.ino:1108)
-- **Purpose**: Extract CH enabled bit from master status flags
-- **Returns**: true if bit 0 of master Statusflags is set
-- **Location**: OTGW-Core.ino:1108-1111
-
-##### `bool isDomesticHotWaterEnabled()` (OTGW-Core.ino:1112)
-- **Purpose**: Extract DHW enabled bit from master status
-- **Returns**: true if bit 1 of master Statusflags is set
-- **Location**: OTGW-Core.ino:1112-1115
-
-##### `bool isCoolingEnabled()` (OTGW-Core.ino:1116)
-- **Purpose**: Extract cooling enabled bit from master status
-- **Returns**: true if bit 2 of master Statusflags is set
-- **Location**: OTGW-Core.ino:1116-1119
-
-##### `bool isOutsideTemperatureCompensationActive()` (OTGW-Core.ino:1120)
-- **Purpose**: Extract OTC bit from master status (MasterStatus bit 3; commit d85e668c fixed flame detection bug)
-- **Returns**: true if outside temp compensation is active (NOT flame status)
-- **Location**: OTGW-Core.ino:1120-1123
-
-##### `bool isFlameStatus()` (OTGW-Core.ino:1151)
-- **Purpose**: Extract flame on/off status from slave status flags (bug fix: v1.3.5 corrected source from MasterStatus)
-- **Returns**: true if bit 3 of slave Statusflags is set
-- **Location**: OTGW-Core.ino:1151-1153
+- `isCentralHeatingEnabled()` (MasterStatus bit 0), `isDomesticHotWaterEnabled()` (bit 1), `isCoolingEnabled()` (bit 2), `isOutsideTemperatureCompensationActive()` (bit 3), `isCentralHeating2enabled()` (bit 4)
+- Slave side: `isFaultIndicator()` (SlaveStatus bit 0), `isCentralHeatingActive()` (1), `isDomesticHotWaterActive()` (2), `isFlameStatus()` (bit 3), `isCoolingActive()` (4), `isCentralHeating2Active()`, `isDiagnosticIndicator()`
+- Flame status is SlaveStatus bit 3, not MasterStatus bit 3 (OTC enabled)
 
 ### OT Spec Profile Helpers
 
-##### `static OTSpecCompatMode gOTSpecCompatMode` (OTGW-Core.ino:406)
-- **Purpose**: Global OpenTherm spec version tracker (v3.x, v4.x, auto-detect)
-- **Values**: OT_SPEC_COMPAT_AUTO (auto-detect), OT_SPEC_COMPAT_V3, OT_SPEC_COMPAT_V4
-
-##### `static bool useV4xReservedIdRules()` (OTGW-Core.ino:418)
-- **Purpose**: Check if v4.x-reserved message IDs should be respected
-- **Used By**: Message filtering, reserved ID detection
-
-##### `static PGM_P activeOTSpecProfileName_P()` (OTGW-Core.ino:437)
-- **Purpose**: Get human-readable name of active OT spec version
-- **Returns**: PROGMEM pointer to "OpenTherm 3.x" or "OpenTherm 4.x"
-- **Location**: OTGW-Core.ino:437-442
+##### `static OTSpecCompatMode gOTSpecCompatMode`
+- **Purpose**: OpenTherm spec profile. Values: `OT_SPEC_COMPAT_AUTO` (default), `OT_SPEC_COMPAT_V4X_STRICT`, `OT_SPEC_COMPAT_PRE_V42_LEGACY`
+- **AUTO**: keeps pre-v4.2 compatibility until a master or slave OpenTherm version of 4.0 or higher is seen (`useV4xReservedIdRules()`), then applies the v4.x reserved-ID rules (`isMsgIdReservedInActiveProfile()`); `activeOTSpecProfileName_P()` returns "OpenTherm v4.x" or "pre-v4.2 legacy"
 
 ## Dependencies
 
 ### Internal Dependencies (OTGW-firmware)
 
-- **OTGW-firmware.ino**: Arduino sketch setup/loop, task scheduling, background task orchestration
-- **OTGW-firmware.h**: Master header, settings/state structs, global declarations
-- **MQTTstuff.ino**: MQTT client integration, `sendMQTTData()`, auto-discovery
-- **webserverStuff.ino**: REST API handlers, JSON response formatting
-- **TelnetStream.ino**: Debug telnet server (DebugTln, DebugTf macros)
-- **helperStuff.ino**: `canPublishMQTT()`, heap monitoring, emergency recovery
-- **settingStuff.ino**: Settings load/save, configuration retrieval
-- **PICfirmware.ino**: PIC firmware upgrade orchestration
-- **weatherStuff.ino**: Weather data fetch (triggered by processOT for outside temp)
+- **OTGW-firmware.ino**: `setup()`, `loop()`, `doBackgroundTasks()` and the timed tasks
+- **OTGW-firmware.h**: master header, settings/state structs, `OTGWSerial` instance
+- **OTDirect.ino**: `handleOTDirectCommand()` for commands when no PIC is present, `bridgeFrameToParser()` as a frame producer (see c4-code-otdirect.md)
+- **MQTTstuff.ino / MQTTHaDiscovery.cpp**: `sendMQTTData()`, `sendMQTTDataPic()`, connected-state publishers, discovery
+- **restAPI.ino**: REST handlers (`/pic`, `/api/v2/otgw/*`) and the web server
+- **webSocketStuff.ino**: `sendLogToWebSocket()`, `sendWebSocketJSON()`, `hasWebSocketClients()`
+- **helperStuff.ino**: `canPublishMQTT()`, `canSendWebSocket()`, heap monitoring, `prepareForReboot()`
+- **settingStuff.ino**: settings load/save, `applyLegacyPort25238Setting()` call site
+- **SATcontrol.ino**: `satOwnsControlSetpoint()`, `satCommandInFlight()`, `satSimulationBlocksBusTx()`, `satNotifyBoilerFrameSeen()`
+- **dhwWaterMeter.ino**: DHW water total (above)
 
 ### External Libraries
 
-- **Arduino Core (ESP8266)**: Serial, Wire (I2C), GPIO, timing
-- **OTGWSerial.h**: Custom serial class with PIC reset support, baud rate mgt (HAS_PIC platforms)
-- **TelnetStream.h**: Telnet debug server (port 23)
-- **Wire.h** (I2C): External watchdog at 0x26 (FEEDWATCHDOGNOW macro)
-- **LittleFS**: Settings, hex files, replay simulation files
-- **ArduinoOTA**: Over-the-air ESP firmware updates (NOT used for PIC)
+- **OTGWSerial** (vendored, `src/libraries/OTGWSerial`): `HardwareSerial(0)` subclass with PIC reset, bootloader upgrade state machine and firmware banner callback
+- **SimpleTelnet** (vendored): `AsyncSimpleTelnet<1>` for `OTGWstream` on port 25238
+- **Wire.h**: I2C for the optional external watchdog at 0x26
+- **esp_task_wdt**: ESP32 Task Watchdog
+- **LittleFS**: PIC hex files, `/otgw_simulation.log`, `/ot-boiler.json`, `/ot-thermo.json`, `/dhw_water.json`
+- **FreeRTOS** via the Platform shims (`platformQueue*`, `platformMutex*`, `platformTaskCreatePinned`)
 
 ### Message IDs & OT Spec
 
-- OTGW-Core.h defines complete OpenTherm message ID enum (OT_Statusflags → 0, OT_Tboiler → 25, etc.)
-- Supports v3.x and v4.x specs with compatibility layer
-- Message type classification: 3-bit type in OpenTherm frame
+- OTGW-Core.h defines the OpenTherm message ID enum (`OT_Statusflags` 0, `OT_Tboiler` 25, ...)
+- Message type is the 3-bit field in the frame
 
 ## Key Architectural Patterns
 
 ### Throttled MQTT Publishing
 
-All OpenTherm messages (256 IDs) track last-published timestamp in `mqttlastsent[]` array. Throttle delay configured per message via MQTT auto-discovery metadata. Prevents overload of home automation systems while retaining real-time updates for critical values (temperatures, status flags).
+Message IDs track their last publish in `mqttlastsent[]` (packed value and time). `shouldPublishMQTTForID()` combines the interval setting with change detection; `OTPublishGate` carries the verdict into the decode so the `print_*` functions publish or stay silent. Status bits and bytes have their own trackers so a single flag change publishes without republishing the rest.
 
-### Reentrant Serial Buffer Management
+### Producer/Consumer Frame Flow (ADR-123)
 
-`handlePICSerial()` uses static local buffers (`sRead[256]`, `sWrite[256]`) with `inUse` flag. Since `doBackgroundTasks()` can be re-entered via `feedWatchDog()` → `yield()`, these static buffers are protected against concurrent writes. All complete lines are dispatched synchronously before returning.
+Producers (PIC task, replay, OT-Direct) only enqueue copies of lines; `drainOTFrameQueue()` is the single consumer and the only place `processOT()` runs for queued frames. Network, MQTT and `OTcurrentSystemState` writes stay on the loop task. The consumer runs after `doBackgroundTasks()` so it never nests with the re-entrant `doAutoConfigure()` path.
+
+### Byte-Transparent PIC Stream (ADR-177)
+
+The PIC byte stream reaches every consumer verbatim: the line assembler, port 25238 (`drainOTRawQueue()`) and the diagnose WebSocket mirror. The only transformation is the printable filter on the WebSocket copy, named in ADR-177. Nothing on the raw path rewrites, drops or synthesises line terminators.
 
 ### Command Queue with Retry
 
-Commands queued via `addCommandToQueue()` are sent to PIC one-at-a-time. On timeout, command is re-queued with incremented retry count. Prevents command loss due to serial corruption or PIC overload.
+Commands queued via `addCommandToQueue()` are sent when due, re-sent every 5 s until the PIC answers (`checkCommandResponse()` removes the entry), and dropped after 5 tries. A command with the same two-letter prefix overwrites its queue slot unless `forceQueue` is set.
 
 ### Message Spec Compatibility
 
-OpenTherm v3.x and v4.x have different reserved message ID ranges. The module auto-detects via PIC banner and applies version-specific filtering to avoid publishing invalid message combinations.
+OpenTherm v3.x and v4.x differ in reserved message ID ranges. In AUTO mode the profile follows the OpenTherm version the master or slave reports (MsgID 124/125) and filters publishing accordingly.
 
 ### PIC Settings Discovery Cycle
 
-Instead of querying all PIC settings at once (risks overwhelming serial), settings are queried one per 3 seconds (CR=0 through CR=14). Responses collected and published as a batch every 5 minutes.
+Settings are queried one per 3 seconds (15 `PR=` registers, about 45 s per cycle) and published as changes arrive; `publishAllPICsettings()` republishes the whole cache every 5 minutes.
 
 ### Startup Quiet Period
 
-After PIC reset, event logging is suppressed for 15 seconds to allow PIC to stabilize and collect initial messages. Prevents burst of "command response" noise in WebSocket logs.
+After a PIC reset, event reporting is suppressed for 15 seconds to keep boot chatter out of the WebSocket log.
 
-### Connection State Tracking (v1.3.5+)
+### Connection State Tracking
 
-Three independent state publishers track OpenTherm bus connectivity: boiler (30s inactivity timeout), thermostat (30s), and combined bus (OR logic). Published separately to MQTT topics otgw/boiler_connected, otgw/thermostat_connected, otgw/otgw_online to enable Home Assistant automations when devices disconnect.
+Three connected-state publishers track the bus: boiler, thermostat (30 s window each) and the combined bus (OR). They publish `boiler_connected`, `thermostat_connected` and `otgw_online` for Home Assistant. `evaluateOTBusLiveness()` only lowers flags between frames; OT-Direct also writes `bOnline` itself.
 
 ### Answer-Override vs Proxy-Answer Routing (ADR-103)
 
 The gateway emits two flavours of `A`-prefix (gateway-answer) frames on the OT bus:
 
-1. **Proxy answer (default)**: An `A` frame issued without any preceding `B` (boiler response). The boiler has nothing canonical to say about this MsgID — the gateway speaks for itself. Routes to MQTT and discovery exactly like a normal frame.
+1. **Proxy answer (default)**: An `A` frame issued without any preceding `B` (boiler response). The boiler has nothing canonical to say about this MsgID - the gateway speaks for itself. Routes to MQTT and discovery exactly like a normal frame.
 2. **Answer-override (substitution)**: An `A` frame issued *because* a `B` frame for that MsgID was intercepted and the gateway is replacing the canonical value. Carries `bAnswerOverride=true`.
 
-The canonical-publish gate (ADR-096/ADR-103) blocks only answer-overrides — proxy answers are forwarded normally to preserve gateway-originated values that have no boiler-side equivalent. The pairing is tracked across the delayed-frame buffer: when an `A` arrives, the previous `B` (if any) is examined; if the `A` replaces it, `delayedOTdata.bAnswerOverride` is set during routing. TASK-665 (ported from dev) added a one-shot first-OT-message handling note in `processOT()` to document the intentional drift during the first frame after boot.
-
-### Flame Detection Bug Fix (v1.3.5, commit d85e668c)
-
-MasterStatus bit 3 is Outside Temperature Compensation enabled, NOT flame status. Flame status is correctly in SlaveStatus bit 3. Helper function `isFlameStatus()` now reads from SlaveStatus. All flame-dependent logic (e.g., burner active, safety interlocks) must read SlaveStatus, not MasterStatus.
+The canonical-publish gate (ADR-096/ADR-103) blocks only answer-overrides - proxy answers are forwarded normally to preserve gateway-originated values that have no boiler-side equivalent. The pairing is tracked across the delayed-frame buffer: when an `A` arrives, the previous `B` (if any) is examined; if the `A` replaces it, `delayedOTdata.bAnswerOverride` is set during routing. TASK-665 (ported from dev) added a one-shot first-OT-message handling note in `processOT()` to document the intentional drift during the first frame after boot.
 
 ### PS=1 Summary Mode
 
 PS=1 makes the PIC stop reporting individual frames and print one comma-separated line of its stored values each time it receives the command (gateway.asm: the PS=1 help text, `PrintSummary`, `SummaryReport`); a client that wants a steady stream sends PS=1 repeatedly. `processPSSummary()` parses the line (25 fields for firmware below v5, 34 from v5) and writes state through `updatePSSummaryFloatState()` and its siblings. OT-Direct emulates the mode: while PS=1 is on, `emitSummaryLine()` builds the same line from `OTcurrentSystemState` after every MsgID 0 reply and feeds it to `processOT()`, and the raw frames keep being decoded with `suppressOutput` set. The DHW water total counts neither the PIC's summary nor the OT-Direct echo (ADR-181, see DHW Water Total above).
+
 
 ## Data Flow Diagram
 
@@ -558,114 +392,92 @@ PS=1 makes the PIC stop reporting individual frames and print one comma-separate
 title: OTGW-Core Message Processing Flow
 ---
 flowchart TB
-    subgraph PIC["PIC Serial Communication"]
-        A["OTGWSerial.read<br/>(incoming bytes)"]
-        B["handlePICSerial<br/>(line accumulator)"]
-        C["Dispatch complete line<br/>(by prefix)"]
+    subgraph Task["picSerial task (parks for OT-Direct, flash, replay, reset)"]
+        A["OTGWSerial.read<br/>(UART0, 9600 baud)"]
+        B["line assembler<br/>(CR/LF)"]
+        R["raw chunk<br/>(64 B, 30 ms coalesce)"]
+        TX["drain otTxQueue<br/>-> OTGWSerial.write"]
     end
 
-    subgraph Decode["Message Decoding"]
-        D1["processOT<br/>(TH/TB frames)"]
-        D2["processPSSummary<br/>(PS=1 list)"]
-        D3["handlePRresponse<br/>(PR response)"]
-        D4["checkCommandResponse<br/>(cmd response)"]
+    subgraph Loop["loop task"]
+        Q["drainOTFrameQueue"]
+        RQ["drainOTRawQueue"]
+        P["processOT"]
+        PS["processPSSummary"]
+        CR["checkCommandResponse<br/>handlePRresponse"]
+        DEC["decodeAndPublishOTValue<br/>(print_* via OTPublishGate)"]
+        MQ["sendMQTTData"]
+        WS["sendLogToWebSocket"]
+        CQ["addCommandToQueue<br/>handleCommandQueue (1s)"]
+        SP["sendPICSerial<br/>enqueuePICTx"]
+        RELAY["handlePICSerial<br/>(port 25238 relay)"]
     end
 
-    subgraph Publish["Publishing"]
-        E1["Update OTcurrentSystemState"]
-        E2["Extract typed value<br/>(print_f88, print_status, etc)"]
-        E3["Check MQTT throttle<br/>(msgLastUpdated)"]
-        E4["sendMQTTData<br/>(publish to broker)"]
-        E5["sendLogToWebSocket<br/>(stream to clients)"]
-    end
+    OD["OTDirect<br/>bridgeFrameToParser"]
+    RP["handleOTReplay<br/>(/otgw_simulation.log)"]
+    NET["port 25238 client"]
 
-    subgraph Queue["Command Handling"]
-        F1["addCommandToQueue<br/>(queue cmd)"]
-        F2["handleCommandQueue<br/>(1s ticker)"]
-        F3["sendPICSerial<br/>(send to PIC)"]
-        F4["checkCommandResponse<br/>(match response)"]
-    end
-
-    A -->|byte-by-byte| B
-    B -->|"\r\n" detected| C
-    C -->|"TH/TB"| D1
-    C -->|"PS="| D2
-    C -->|"PR="| D3
-    C -->|other| D4
-
-    D1 --> E1
-    D2 --> E1
-    D3 --> E1
-    
-    E1 --> E2
-    E2 --> E3
-    E3 -->|throttle OK| E4
-    E3 -->|throttle skip| E5
-    E4 --> E5
-
-    F1 -.->|queued| F2
-    F2 --> F3
-    F3 -->|response| B
-    B --> F4
-    F4 -->|success| F1
-    F4 -->|retry| F2
+    A --> B
+    A --> R
+    B -->|"enqueueOTFrame (PIC)"| Q
+    OD -->|"enqueueOTFrame (OTDIRECT*)"| Q
+    RP -->|"enqueueOTFrame (REPLAY)"| Q
+    R --> RQ
+    RQ -->|"verbatim"| NET
+    RQ -->|"diagnose only"| WS
+    Q --> P
+    P -->|"OT frame"| DEC
+    P -->|"summary"| PS
+    P -->|"XX: / PR:"| CR
+    PS --> DEC
+    DEC --> MQ
+    P --> WS
+    CQ --> SP
+    NET --> RELAY
+    RELAY --> SP
+    SP --> TX
+    CR -->|"match removes entry"| CQ
 ```
 
 ## State Management
 
 ### Global State Variables
 
-| Variable | Type | Purpose | Thread-Safe |
+| Variable | Type | Purpose | Concurrency |
 |----------|------|---------|-------------|
-| `OTcurrentSystemState` | OTdataStruct | All OT message values from boiler/thermostat | Yes (updates serialized by processOT) |
-| `picSettingsCycleActive` | bool | Indicates PIC settings discovery in progress | Yes (atomic bool) |
-| `cmdQueueSize` | int | Count of queued commands pending delivery | Mostly safe (incremented/decremented in handleCommandQueue) |
-| `mqttPublishAllowed` | bool | Global gate for MQTT (heap health check) | Yes (checked before every publish) |
-| `gOTGWStartupQuietActive` | bool | Startup quiet period active flag | Yes (set once at boot) |
-| `ot_log_buffer[512]` | static char[] | WebSocket log buffer | Yes (reentrant: ClrLog() before use) |
+| `OTcurrentSystemState` | OTdataStruct | All OT values from boiler/thermostat | Written by `processOT()` under `OTStateLock`; readers use the same lock |
+| `otFrameQueue`, `otTxQueue`, `otRawQueue` | PlatformQueue | Frame, TX and raw passthrough queues | FreeRTOS queues, copy by value |
+| `otStateMutex` | PlatformMutex | Guards the decoded state snapshot | Non-recursive |
+| `picSettingsCycleActive` | bool | PIC settings discovery in progress | Loop task |
+| `cmdqueue[]`, `cmdQueueSize` | OT_cmd_t[20], int | Pending PIC commands | Loop task |
+| `mqttPublishAllowed` | bool | Per-frame MQTT gate set by `OTPublishGate` | Loop task |
+| `gOTGWStartupQuietActive` | bool | Startup quiet period active | Loop task |
+| `ot_log_buffer` | static char[] | One WebSocket log line at a time | Loop task; `ClrLog()` before use |
+| `g_pic*Pending` | volatile flags/counters | RX error signals from the PIC task | Task sets, loop reads and clears |
 
 ## Error Handling
 
-- **Serial Corruption**: Command queue retries failed commands up to N times (configurable backoff)
-- **PIC Disconnect**: `isPICEnabled()` checks availability; sends heartbeat (PR=A) every 60s
-- **Watchdog Timeout**: External I2C watchdog resets PIC if no feedWatchDog() within ~1.5s
-- **Heap Pressure**: `canPublishMQTT()` gates publishing when heap < threshold; `emergencyHeapRecovery()` clears buffers
-- **Malformed Messages**: `isvalidotmsg()` validates format; invalid messages logged but not processed
+- **Serial corruption**: the command queue retries a command up to 5 times, 5 s apart, then drops it with a `!` event
+- **UART faults**: overrun, framing error and line-buffer overflow are flagged in the PIC task and published loop-side (`Serial Overrun`, `Serial Rx Error`, `Error_BufferOverflow`)
+- **PIC disconnect**: `isPICEnabled()` gates PIC paths; `doTaskEvery60s()` retries the `PR=A` probe while the version is unknown
+- **Watchdog**: the ESP32 TWDT (30 s) resets a stuck loop task; the optional 0x26 chip resets the ESP when armed and not fed
+- **Heap pressure**: `canPublishMQTT()` and `canSendWebSocket()` block only at CRITICAL (ADR-167); `emergencyHeapRecovery()` clears buffers
+- **Full queues**: a full frame, TX or raw queue drops the item and counts it (`otFrameQueueDrops`, `otTxQueueDrops`, raw drops reported loop-side)
+- **Malformed lines**: `isvalidotmsg()` rejects bad frames; other unknown lines are logged
 
-## File Locations & Line References
+## Implementation Notes
 
-| Component | File | Lines |
-|-----------|------|-------|
-| Core data structures | OTGW-Core.h | 25-172 (OTdataStruct), 191-202 (OTLibMessageType), 204-240+ (OTLibMessageID) |
-| Message processing | OTGW-Core.ino | 3689-4038 (processOT) |
-| PIC serial handling | OTGW-Core.ino | 4039-4314 (handlePICSerial) |
-| Command queue | OTGW-Core.ino | 2652-2795 (addCommandToQueue, handleCommandQueue) |
-| Throttle tracking | OTGW-Core.ino | 234-239 (global arrays), 299-348 (helpers) |
-| Watchdog | OTGW-Core.ino | 915-981 (watchdog functions) |
-| Firmware upgrade | OTGW-Core.ino | 4472-4684 (upgrade functions), 4518-4606 (validation) |
-| Settings discovery | OTGW-Core.ino | 552-776 (trigger, query, publish) |
-| Gateway mode | OTGW-Core.ino | 515-754 (query, handle response) |
-| Print functions | OTGW-Core.ino | 1755-2516+ (data formatters) |
-| Bootstrap | OTGW-firmware.ino | 119-202 (setup), 385-413 (loop) |
-| Timers & tasks | OTGW-firmware.ino | 247-315 (scheduled tasks) |
+- **No ArduinoJson**: JSON is built manually with `snprintf_P()`
+- **Serial reserved**: after boot the UART is for the PIC; debug goes to Telnet (port 23) and the IDF console on UART0 is muted
+- **No HTTPS/WSS**: HTTP/WS only; trusted LAN
+- **Throttle-driven publishing**: publish rate follows the throttle, not the event rate
+- **Flame detection**: flame status is SlaveStatus bit 3; MasterStatus bit 3 is OTC enabled
+- **MaxTSet/TdhwSet under v4.x**: IDs 56 and 57 stay valid under the v4.x profile
+- **`addOTWGcmdtoqueue()`** is the pre-1.3.5 name of `addCommandToQueue()`
 
 ## PROGMEM & Memory Notes
 
-- All format strings use PROGMEM via `PSTR()` and `snprintf_P()`
-- OT log buffer (512 bytes) allocated statically, reused across all WebSocket logging
-- MQTT scratch buffers in `mqttAutoCfgScratch` for auto-discovery (~1200 bytes)
-- Command queue array size configurable; default ~20 entries
-- Status flag tracking uses bit-level throttle to avoid redundant publishes
-- Binary data comparisons use `memcmp_P()` (NOT `strncmp_P()` to avoid exception crashes)
-
-## Notes
-
-- **No ArduinoJson**: JSON is built manually via `snprintf_P()` for efficiency on ESP8266
-- **Serial Reserved**: After OTGW reset, Serial port is exclusively for PIC; all debug goes to Telnet (port 23)
-- **No HTTPS/WSS**: HTTP/WS only; target environment is trusted LAN
-- **Cooperative Scheduling**: `feedWatchDog()` is cooperative (commented out `yield()` in v1.3.5); loops must yield regularly
-- **Throttle Driven by MQTT**: Publish rate is throttle-driven, not event-driven, to reduce upstream load on MQTT brokers
-- **OpenTherm v3.x vs v4.x**: Reserved ID ranges differ; code auto-detects via PIC banner and applies version-specific filtering (e.g., IDs 40-47, 64-69 reserved in v4.x)
-- **MaxTSet/TdhwSet in v4.x Mode**: Fixed in v1.3.5 (commit 818d1181) to correctly suppress/publish based on OT spec version; HA previously showed 0°C in v4.x mode
-- **Command Queue Renamed**: `addOTWGcmdtoqueue()` renamed to `addCommandToQueue()` in v1.3.5 for clarity
-- **Flame Detection**: CRITICAL: flame status is SlaveStatus bit 3, NOT MasterStatus bit 3 (which is OTC enabled); bug fixed in commit d85e668c
+- Format strings use `PSTR()` and `snprintf_P()`
+- OT log buffer is static and reused for every WebSocket line
+- Command queue: 20 entries; frame queue 16, TX queue 32, raw queue 16
+- Binary data comparisons use `memcmp_P()` (not `strncmp_P()`, which crashes on binary data)
