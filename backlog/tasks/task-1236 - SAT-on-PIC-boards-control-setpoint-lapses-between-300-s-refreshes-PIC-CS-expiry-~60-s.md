@@ -3,11 +3,11 @@ id: TASK-1236
 title: >-
   SAT on PIC boards: control setpoint lapses between 300 s refreshes (PIC CS
   expiry ~60 s)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-15 15:35'
-updated_date: '2026-10-15 18:45'
+updated_date: '2026-10-16 03:54'
 labels:
   - sat
   - pic
@@ -25,9 +25,9 @@ Found during the ADR-179 acceptance check (2026-10-15). other-projects/otgw-6.6/
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Bench reproduction on the Classic-S3 (PIC): capture shows TSet returning to the thermostat value within ~2 min after a SAT CS= while SAT holds a steady setpoint (old code)
+- [x] #1 Bench reproduction on the Classic-S3 (PIC): capture shows TSet returning to the thermostat value within ~2 min after a SAT CS= while SAT holds a steady setpoint (old code)
 - [x] #2 Fix: SAT re-sends its CS= on PIC boards within the PIC expiry window (<= 50 s), without raising the OTDirect cadence
-- [ ] #3 Same capture on the fix shows TSet held at the SAT value for >= 10 min
+- [x] #3 Same capture on the fix shows TSet held at the SAT value for >= 10 min
 - [x] #4 Decide and record whether an external CS= is refused while SAT owns MsgID 1 on PIC boards (ADR-179 scope)
 <!-- AC:END -->
 
@@ -49,4 +49,12 @@ Waiting for the Classic-S3 and the maintainer's go on step 2 and the AC#4 choice
 2026-10-15: maintainer approved the plan and chose to REFUSE external CS= on PIC boards while SAT owns MsgID 1 (AC#4). Implemented in alpha.427: (1) satPicCSKeepalive() in SATcontrol.ino re-sends the last SAT CS every 30 s on PIC boards (isPICEnabled, last CS >= 8 C), called from satLoop every pass before the control-timer gate, so it does not depend on the control interval (10-300 s, default 30). OT-Direct untouched. (2) addCommandToQueue() (OTGW-Core.ino, PIC path only) refuses CS= while satOwnsControlSetpoint() unless satCommandInFlight(), same rule as the OT-Direct handler. Raw bytes on port 25238 bypass the queue and stay unfiltered (ADR-177). All internal CS= producers already use satEnqueueOwnCS (checked by grep). AC#1/#3 still need the Classic-S3 bench run with scripts/pic_cs_expiry_probe.py on alpha.426 (old) and alpha.427 (fix).
 
 Evidence alpha.427 (8815ddb0d): build.bat --firmware --target all SUCCESS for esp32 (20:32), esp32-classic (20:38), esp32-combo (20:43; flash 88.2%); evaluate.py --quick 71 pass / 0 warn / 0 fail. OTGW32 bench (OT-Direct, .88.61) flashed with the combo app: boots alpha.427, otdirectavailable=true, /api/v2/sat/status answers with SAT enabled (keepalive is a no-op without PIC). Remaining: AC#1 and AC#3 on the Classic-S3.
+
+Bench 2026-10-15/16, Classic-S3 (COM8, .88.63, PIC 6.8 gateway, no boiler/thermostat: the stand-alone PIC polls MsgID 0, whose HB bit 0 (CH enable) is set while a user CS is active and CH mode is on). Logs in .tmp/bench-1236/. OLD: (a) alpha.424, CS=45 once: CH bit set at 2.7 s, dropped at 67.0 s, 65 s after the ack; (b) alpha.424 SAT on: one 'CS: 10.00' in 400 s (300 s cadence); (c) alpha.426 (pre-fix, built from 543dc4e) harness T2 FAIL 1 ack in 330 s, longest gap 261 s; T3 FAIL external CS=45 acked while SAT on. FIX alpha.427: harness T1a PASS CH bit held over 170 status frames with CS every 30 s; T1b PASS dropped 102.6 s after the last ack (window 63-126 s); T2 PASS 22 acks in 660 s, longest gap 33.0 s; T3 PASS external CS=45 not acked; T4a PASS SAT release CS=0 acked; T4b PASS no CS acks in 70 s after disable; T5 PASS external CS=45 accepted with SAT off. AC#3 method note: with no boiler TSet itself is not visible; the proof is T1 (a CS refreshed within 30 s holds the PIC override) plus T2 (SAT refreshes within 33 s for 11 min). Harness gotchas found and fixed in the script: SAT's CH=0 persists in the PIC and masks the CH bit (send CH=1 first); the status bits are in the high byte. Bench restored: alpha.427, SAT off, port 25238 off.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT on PIC boards now keeps its control setpoint: satPicCSKeepalive() re-sends the last CS every 30 s (the PIC drops a CS 63-126 s after the last one, gateway.asm CommandExpiry), and addCommandToQueue() refuses an external CS= on the PIC path while SAT owns MsgID 1, matching the OT-Direct rule (ADR-179, maintainer decision). Shipped in alpha.427 (8815ddb0d). Evidence per AC: AC#1 old-code bench runs on alpha.424/426 (override lapses 65 s after a CS, SAT acks 300 s apart, T2/T3 FAIL); AC#2 build.bat all three targets SUCCESS, evaluate --quick 0 fail; AC#3 harness T1+T2 PASS on alpha.427 (11 min, max gap 33 s); AC#4 T3/T4/T5 PASS (external refused, own release passes, external accepted again with SAT off). Tools: scripts/pic_cs_expiry_probe.py, scripts/verify_pic_cs_keepalive.py. Limitation: bytes written straight to port 25238 bypass the queue and are not filtered (ADR-177).
+<!-- SECTION:FINAL_SUMMARY:END -->
