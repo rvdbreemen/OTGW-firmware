@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-15 15:47'
+updated_date: '2026-10-17 20:34'
 labels:
   - sat
   - otdirect
@@ -25,3 +26,9 @@ Moved out of ADR-179's open questions (TASK-1237). In gateway mode the gateway s
 - [ ] #1 Bench capture in OT-Direct gateway mode with a live thermostat shows which CH-enable bit the boiler acts on
 - [ ] #2 Maintainer decision A or B (or neither) recorded in an ADR
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-17: maintainer decision: measure first (AC1 bench capture with a live thermostat), then choose A/B. Blocked until the OTGW32 is reachable.
+<!-- SECTION:NOTES:END -->

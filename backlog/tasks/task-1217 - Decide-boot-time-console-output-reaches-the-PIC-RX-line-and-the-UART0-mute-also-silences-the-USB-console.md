@@ -3,9 +3,11 @@ id: TASK-1217
 title: >-
   Decide: boot-time console output reaches the PIC RX line, and the UART0 mute
   also silences the USB console
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-11 22:25'
+updated_date: '2026-10-17 20:34'
 labels:
   - esp32
   - pic
@@ -27,7 +29,13 @@ Options for the maintainer: (a) mute as the first statement of setup() on PIC-ca
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Maintainer decision recorded (a, b or c)
+- [x] #1 Maintainer decision recorded (a, b or c)
 - [ ] #2 If a or b: bench evidence on the Classic + S3 Mini that no console text reaches the PIC after the change (e.g. no SE/syntax-error replies from the PIC at boot in the telnet/OT log), and for b that the [combo] detect line appears on the USB console
 - [ ] #3 Comments at OTGW-firmware.ino:379 and :454-455 match the real behaviour
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-17: maintainer decision (b): keep the order, mute only the UART0 channel so the USB-Serial-JTAG console keeps logging. Since TASK-1216 one early line (~80 B, 0x26 disarm) still reaches the PIC.
+<!-- SECTION:NOTES:END -->
