@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.429
+**  Version  : v2.0.0-alpha.430
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -224,9 +224,13 @@ static bool probeProImu()
   bool found = false;
   const uint8_t addrs[2] = { PRO_IMU_I2C_ADDR_LO, PRO_IMU_I2C_ADDR_HI };
   for (uint8_t i = 0; i < 2 && !found; i++) {
+    // Zero-length presence probe first (i2c_master_probe, silent on NACK). endTransmission(false)
+    // only marks a repeated start and returns 0 without touching the bus, so it cannot test the ACK (TASK-1216).
+    Wire.beginTransmission(addrs[i]);
+    if (Wire.endTransmission() != 0) continue;      // no ACK at this address
     Wire.beginTransmission(addrs[i]);
     Wire.write((uint8_t)PRO_IMU_WHOAMI_REG);
-    if (Wire.endTransmission(false) != 0) continue; // no ACK at this address
+    if (Wire.endTransmission(false) != 0) continue;
     if (Wire.requestFrom((int)addrs[i], 1) != 1) continue;
     if (Wire.read() == PRO_IMU_WHOAMI_VALUE) found = true;
   }
