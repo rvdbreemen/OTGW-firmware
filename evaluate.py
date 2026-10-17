@@ -2351,6 +2351,12 @@ class WorkspaceEvaluator:
                 problems.append(f"{len(flagged)} call(s) pass a comma flag, e.g. {flagged[0]}")
             if "settingsJsonFirstEntry = true" not in body:
                 problems.append("writeSettings() does not reset settingsJsonFirstEntry")
+            # Only the braces may bypass the helpers; any other direct write misses the separator.
+            direct = [m.group(0) for m in re.finditer(r'file\.(?:printf_P|printf|print|println|write)\s*\(([^;]*)\)\s*;', body)
+                      if m.group(1).strip() not in ('F("{\\n")', 'F("\\n}\\n")')]
+            if direct:
+                problems.append(f"{len(direct)} direct file write(s) in writeSettings() bypass the separator, "
+                                f"e.g. {direct[0][:60]}")
         if problems:
             self.add_result(EvaluationResult(
                 "Coding", "settings.ini JSON separators", "FAIL",

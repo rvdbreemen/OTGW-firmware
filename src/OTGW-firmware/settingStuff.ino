@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.432
+**  Version  : v2.0.0-alpha.433
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -248,6 +248,17 @@ static void writeJsonFloatKV(File& file, const __FlashStringHelper* key, float v
                 valBuf);
 }
 
+// Indexed key such as SATblemac3 (keyBase in PROGMEM, index appended).
+static void writeJsonIndexedStringKV(File& file, PGM_P keyBase, unsigned index, const char* value)
+{
+  escapeJsonStringTo(value, cMsg, sizeof(cMsg));
+  file.printf_P(PSTR("%s  \"%S%u\": \"%s\""),
+                settingsJsonSeparator(),
+                keyBase,
+                index,
+                cMsg);
+}
+
 //=======================================================================
 void writeSettings(bool show)
 {
@@ -424,21 +435,16 @@ void writeSettings(bool show)
   escapeJsonStringTo(settings.sat.sBleNamePrefix, cMsg, sizeof(cMsg));
   writeJsonStringKV(file, F("SATblenameprefix"), cMsg);
   writeJsonBoolKV(file, F("SATblenamefilteringest"), settings.sat.bBleNameFilterIngest);
-  // TASK-508: BLE roster — 8 × {mac, label} + count. Indexed-key pattern
+  // TASK-508: BLE roster — 8 × {mac, label, bindkey} + count. Indexed-key pattern
   // mirrors fAreaWeight precedent. Empty slots serialise as "" — readers
-  // treat that as unused. cMsg is the writeSettings()-scoped escape buffer
-  // (no yield in this loop, so no clobber risk).
+  // treat that as unused.
   for (uint8_t i = 0; i < SAT_BLE_MAX_ROSTER; i++) {
-    file.printf_P(PSTR("  \"SATblemac%u\": \"%s\",\n"),
-                  (unsigned)i, settings.sat.sBleMac[i]);
-    escapeJsonStringTo(settings.sat.sBleLabel[i], cMsg, sizeof(cMsg));
-    file.printf_P(PSTR("  \"SATblelabel%u\": \"%s\",\n"),
-                  (unsigned)i, cMsg);
-    // TASK-930 Phase 2: per-slot MiBeacon bindkey (32 hex, no escaping needed).
+    writeJsonIndexedStringKV(file, PSTR("SATblemac"), i, settings.sat.sBleMac[i]);
+    writeJsonIndexedStringKV(file, PSTR("SATblelabel"), i, settings.sat.sBleLabel[i]);
+    // TASK-930 Phase 2: per-slot MiBeacon bindkey (32 hex).
     // Persisted plaintext to settings.ini under the trusted-LAN model, like the
     // MQTT/HTTP passwords; it is masked on the REST read path and in logs.
-    file.printf_P(PSTR("  \"SATblebindkey%u\": \"%s\",\n"),
-                  (unsigned)i, settings.sat.sBleBindkey[i]);
+    writeJsonIndexedStringKV(file, PSTR("SATblebindkey"), i, settings.sat.sBleBindkey[i]);
   }
   writeJsonIntKV(file, F("SATblerostercount"), settings.sat.iBleRosterCount);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
