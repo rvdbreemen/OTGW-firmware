@@ -178,7 +178,11 @@
     else if (t === 'mstats') { renderStats(); fetchStatsPanels(); }
     else if (t === 'msupport') { renderSupport(); fetchOtSupport(); }
     else if (t === 'mgraph') renderGraph();
-    else if (t === 'mconn') { fetchConn(); fetchOtdOvr(); }
+    else if (t === 'mconn') {
+      fetchConn();
+      // TASK-1241: otdirect/overrides 503s on a PIC board; skip it only on an explicit non-OT-Direct snapshot.
+      withDeviceInfo(function (d) { if (!d || d.otcommandinterface === 'OT-Direct') fetchOtdOvr(); });
+    }
   }
 
   // ---------- Advanced sub-tabs (TASK-982): PIC / Debug / File System / System ----------
