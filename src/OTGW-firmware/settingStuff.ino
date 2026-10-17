@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.431
+**  Version  : v2.0.0-alpha.432
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -198,41 +198,54 @@ static bool parseJsonKVLine(const char* line, char* keyOut, size_t keyOutSize, c
   return true;
 }
 
-static void writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value, bool withComma)
+// settings.ini is written one key per line. The helpers put the separator before
+// every entry but the first, so appending a key or leaving one out under #if can
+// never drop a comma (TASK-1244). writeSettings() resets the flag and holds no
+// yield() between calls.
+static bool settingsJsonFirstEntry = true;
+
+static const char* settingsJsonSeparator()
+{
+  const char* sep = settingsJsonFirstEntry ? "" : ",\n";
+  settingsJsonFirstEntry = false;
+  return sep;
+}
+
+static void writeJsonStringKV(File& file, const __FlashStringHelper* key, const char* value)
 {
   // Use global cMsg as escape scratch — no heap allocation.
   // writeSettings() holds no yield() between calls, so cMsg cannot be clobbered mid-write.
   escapeJsonStringTo(value, cMsg, sizeof(cMsg));
-  file.printf_P(PSTR("  \"%S\": \"%s\"%s\n"),
+  file.printf_P(PSTR("%s  \"%S\": \"%s\""),
+                settingsJsonSeparator(),
                 reinterpret_cast<PGM_P>(key),
-                cMsg,
-                withComma ? "," : "");
+                cMsg);
 }
 
-static void writeJsonBoolKV(File& file, const __FlashStringHelper* key, bool value, bool withComma)
+static void writeJsonBoolKV(File& file, const __FlashStringHelper* key, bool value)
 {
-  file.printf_P(PSTR("  \"%S\": %s%s\n"),
+  file.printf_P(PSTR("%s  \"%S\": %s"),
+                settingsJsonSeparator(),
                 reinterpret_cast<PGM_P>(key),
-                value ? "true" : "false",
-                withComma ? "," : "");
+                value ? "true" : "false");
 }
 
-static void writeJsonIntKV(File& file, const __FlashStringHelper* key, int value, bool withComma)
+static void writeJsonIntKV(File& file, const __FlashStringHelper* key, int value)
 {
-  file.printf_P(PSTR("  \"%S\": %d%s\n"),
+  file.printf_P(PSTR("%s  \"%S\": %d"),
+                settingsJsonSeparator(),
                 reinterpret_cast<PGM_P>(key),
-                value,
-                withComma ? "," : "");
+                value);
 }
 
-static void writeJsonFloatKV(File& file, const __FlashStringHelper* key, float value, bool withComma)
+static void writeJsonFloatKV(File& file, const __FlashStringHelper* key, float value)
 {
   char valBuf[16];
   dtostrf(value, 1, 2, valBuf);
-  file.printf_P(PSTR("  \"%S\": %s%s\n"),
+  file.printf_P(PSTR("%s  \"%S\": %s"),
+                settingsJsonSeparator(),
                 reinterpret_cast<PGM_P>(key),
-                valBuf,
-                withComma ? "," : "");
+                valBuf);
 }
 
 //=======================================================================
@@ -249,167 +262,168 @@ void writeSettings(bool show)
   }
 
   DebugT(F("[Settings] State: Writing JSON settings... "));
+  settingsJsonFirstEntry = true;
   file.print(F("{\n"));
-  writeJsonStringKV(file, F("hostname"), settings.sHostname, true);
-  writeJsonStringKV(file, F("httppasswd"), settings.sHTTPpasswd, true);
-  writeJsonStringKV(file, F("DeviceManufacturer"), settings.device.sManufacturer, true);
-  writeJsonStringKV(file, F("DeviceModel"), settings.device.sModel, true);
-  writeJsonBoolKV(file, F("MQTTenable"), settings.mqtt.bEnable, true);
-  writeJsonStringKV(file, F("MQTTbroker"), settings.mqtt.sBroker, true);
-  writeJsonIntKV(file, F("MQTTbrokerPort"), settings.mqtt.iBrokerPort, true);
-  writeJsonStringKV(file, F("MQTTuser"), settings.mqtt.sUser, true);
-  writeJsonStringKV(file, F("MQTTpasswd"), settings.mqtt.sPasswd, true);
-  writeJsonStringKV(file, F("MQTTtoptopic"), settings.mqtt.sTopTopic, true);
-  writeJsonStringKV(file, F("MQTThaprefix"), settings.mqtt.sHaprefix, true);
-  writeJsonStringKV(file, F("MQTTuniqueid"), settings.mqtt.sUniqueid, true);
-  writeJsonBoolKV(file, F("MQTTOTmessage"), settings.mqtt.bOTmessage, true);
-  writeJsonBoolKV(file, F("MQTTonChangePublishing"), settings.mqtt.bOnChangePublishing, true);
-  writeJsonIntKV(file, F("MQTTinterval"), settings.mqtt.iInterval, true);
-  writeJsonBoolKV(file, F("MQTTseparatesources"), settings.mqtt.bSeparateSources, true);
-  writeJsonBoolKV(file, F("LegacyPort25238Enabled"), settings.mqtt.bLegacyPort25238Enabled, true);
-  writeJsonBoolKV(file, F("MQTTharebootdetection"), settings.mqtt.bHaRebootDetect, true);
-  writeJsonBoolKV(file, F("MQTTdiscoveryAutoVerify"), settings.mqtt.bDiscoveryAutoVerify, true);
-  writeJsonBoolKV(file, F("MQTTuseLegacyOtTopics"), settings.mqtt.bUseLegacyOtTopics, true);
-  writeJsonBoolKV(file, F("MQTTlastPublishedLegacy"), settings.mqtt.bLastPublishedLegacy, true);  // TASK-648 Task 6: topology stamp
-  writeJsonBoolKV(file, F("MQTTthermostatDupsCleared"), settings.mqtt.bThermostatDupsCleared, true);  // TASK-1201: one-shot thermostat_ clear done
-  writeJsonBoolKV(file, F("NTPenable"), settings.ntp.bEnable, true);
-  writeJsonStringKV(file, F("NTPtimezone"), settings.ntp.sTimezone, true);
-  writeJsonStringKV(file, F("NTPhostname"), settings.ntp.sHostname, true);
-  writeJsonBoolKV(file, F("NTPsendtime"), settings.ntp.bSendtime, true);
-  writeJsonBoolKV(file, F("LEDblink"), settings.bLEDblink, true);
-  writeJsonBoolKV(file, F("darktheme"), settings.bDarkTheme, true);
-  writeJsonBoolKV(file, F("nightlyrestart"), settings.bNightlyRestart, true);
-  writeJsonIntKV(file, F("nightlyrestarthour"), settings.iRestartHour, true);
-  writeJsonIntKV(file, F("boardmode"), settings.iBoardMode, true);  // ADR-127 combo board-mode cache/override
-  writeJsonBoolKV(file, F("ui_onboarded"), settings.ui.bOnboarded, true);
-  writeJsonBoolKV(file, F("sat_onboarded"), settings.ui.bSatOnboarded, true);
-  writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settings.sensors.bEnabled, true);
-  writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settings.sensors.bLegacyFormat, true);
-  writeJsonIntKV(file, F("GPIOSENSORSpin"), settings.sensors.iPin, true);
-  writeJsonIntKV(file, F("GPIOSENSORSinterval"), settings.sensors.iInterval, true);
-  writeJsonBoolKV(file, F("S0COUNTERenabled"), settings.s0.bEnabled, true);
-  writeJsonIntKV(file, F("S0COUNTERpin"), settings.s0.iPin, true);
-  writeJsonIntKV(file, F("S0COUNTERdebouncetime"), settings.s0.iDebounceTime, true);
-  writeJsonIntKV(file, F("S0COUNTERpulsekw"), settings.s0.iPulsekw, true);
-  writeJsonIntKV(file, F("S0COUNTERinterval"), settings.s0.iInterval, true);
-  writeJsonBoolKV(file, F("OTGWcommandenable"), settings.picBoot.bEnable, true);
-  writeJsonStringKV(file, F("OTGWcommands"), settings.picBoot.sCommands, true);
-  writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settings.outputs.bEnabled, true);
-  writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settings.outputs.iPin, true);
-  writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settings.outputs.iTriggerBit, true);
-  writeJsonBoolKV(file, F("WebhookEnabled"), settings.webhook.bEnabled, true);
-  writeJsonStringKV(file, F("WebhookURLon"), settings.webhook.sURLon, true);
-  writeJsonStringKV(file, F("WebhookURLoff"), settings.webhook.sURLoff, true);
-  writeJsonIntKV(file, F("WebhookTriggerBit"), settings.webhook.iTriggerBit, true);
-  writeJsonStringKV(file, F("WebhookPayload"), settings.webhook.sPayload, true);
-  writeJsonStringKV(file, F("WebhookContentType"), settings.webhook.sContentType, true);
+  writeJsonStringKV(file, F("hostname"), settings.sHostname);
+  writeJsonStringKV(file, F("httppasswd"), settings.sHTTPpasswd);
+  writeJsonStringKV(file, F("DeviceManufacturer"), settings.device.sManufacturer);
+  writeJsonStringKV(file, F("DeviceModel"), settings.device.sModel);
+  writeJsonBoolKV(file, F("MQTTenable"), settings.mqtt.bEnable);
+  writeJsonStringKV(file, F("MQTTbroker"), settings.mqtt.sBroker);
+  writeJsonIntKV(file, F("MQTTbrokerPort"), settings.mqtt.iBrokerPort);
+  writeJsonStringKV(file, F("MQTTuser"), settings.mqtt.sUser);
+  writeJsonStringKV(file, F("MQTTpasswd"), settings.mqtt.sPasswd);
+  writeJsonStringKV(file, F("MQTTtoptopic"), settings.mqtt.sTopTopic);
+  writeJsonStringKV(file, F("MQTThaprefix"), settings.mqtt.sHaprefix);
+  writeJsonStringKV(file, F("MQTTuniqueid"), settings.mqtt.sUniqueid);
+  writeJsonBoolKV(file, F("MQTTOTmessage"), settings.mqtt.bOTmessage);
+  writeJsonBoolKV(file, F("MQTTonChangePublishing"), settings.mqtt.bOnChangePublishing);
+  writeJsonIntKV(file, F("MQTTinterval"), settings.mqtt.iInterval);
+  writeJsonBoolKV(file, F("MQTTseparatesources"), settings.mqtt.bSeparateSources);
+  writeJsonBoolKV(file, F("LegacyPort25238Enabled"), settings.mqtt.bLegacyPort25238Enabled);
+  writeJsonBoolKV(file, F("MQTTharebootdetection"), settings.mqtt.bHaRebootDetect);
+  writeJsonBoolKV(file, F("MQTTdiscoveryAutoVerify"), settings.mqtt.bDiscoveryAutoVerify);
+  writeJsonBoolKV(file, F("MQTTuseLegacyOtTopics"), settings.mqtt.bUseLegacyOtTopics);
+  writeJsonBoolKV(file, F("MQTTlastPublishedLegacy"), settings.mqtt.bLastPublishedLegacy);  // TASK-648 Task 6: topology stamp
+  writeJsonBoolKV(file, F("MQTTthermostatDupsCleared"), settings.mqtt.bThermostatDupsCleared);  // TASK-1201: one-shot thermostat_ clear done
+  writeJsonBoolKV(file, F("NTPenable"), settings.ntp.bEnable);
+  writeJsonStringKV(file, F("NTPtimezone"), settings.ntp.sTimezone);
+  writeJsonStringKV(file, F("NTPhostname"), settings.ntp.sHostname);
+  writeJsonBoolKV(file, F("NTPsendtime"), settings.ntp.bSendtime);
+  writeJsonBoolKV(file, F("LEDblink"), settings.bLEDblink);
+  writeJsonBoolKV(file, F("darktheme"), settings.bDarkTheme);
+  writeJsonBoolKV(file, F("nightlyrestart"), settings.bNightlyRestart);
+  writeJsonIntKV(file, F("nightlyrestarthour"), settings.iRestartHour);
+  writeJsonIntKV(file, F("boardmode"), settings.iBoardMode);  // ADR-127 combo board-mode cache/override
+  writeJsonBoolKV(file, F("ui_onboarded"), settings.ui.bOnboarded);
+  writeJsonBoolKV(file, F("sat_onboarded"), settings.ui.bSatOnboarded);
+  writeJsonBoolKV(file, F("GPIOSENSORSenabled"), settings.sensors.bEnabled);
+  writeJsonBoolKV(file, F("GPIOSENSORSlegacyformat"), settings.sensors.bLegacyFormat);
+  writeJsonIntKV(file, F("GPIOSENSORSpin"), settings.sensors.iPin);
+  writeJsonIntKV(file, F("GPIOSENSORSinterval"), settings.sensors.iInterval);
+  writeJsonBoolKV(file, F("S0COUNTERenabled"), settings.s0.bEnabled);
+  writeJsonIntKV(file, F("S0COUNTERpin"), settings.s0.iPin);
+  writeJsonIntKV(file, F("S0COUNTERdebouncetime"), settings.s0.iDebounceTime);
+  writeJsonIntKV(file, F("S0COUNTERpulsekw"), settings.s0.iPulsekw);
+  writeJsonIntKV(file, F("S0COUNTERinterval"), settings.s0.iInterval);
+  writeJsonBoolKV(file, F("OTGWcommandenable"), settings.picBoot.bEnable);
+  writeJsonStringKV(file, F("OTGWcommands"), settings.picBoot.sCommands);
+  writeJsonBoolKV(file, F("GPIOOUTPUTSenabled"), settings.outputs.bEnabled);
+  writeJsonIntKV(file, F("GPIOOUTPUTSpin"), settings.outputs.iPin);
+  writeJsonIntKV(file, F("GPIOOUTPUTStriggerBit"), settings.outputs.iTriggerBit);
+  writeJsonBoolKV(file, F("WebhookEnabled"), settings.webhook.bEnabled);
+  writeJsonStringKV(file, F("WebhookURLon"), settings.webhook.sURLon);
+  writeJsonStringKV(file, F("WebhookURLoff"), settings.webhook.sURLoff);
+  writeJsonIntKV(file, F("WebhookTriggerBit"), settings.webhook.iTriggerBit);
+  writeJsonStringKV(file, F("WebhookPayload"), settings.webhook.sPayload);
+  writeJsonStringKV(file, F("WebhookContentType"), settings.webhook.sContentType);
   // --- SAT settings ---
-  writeJsonBoolKV(file, F("SATenabled"), settings.sat.bEnabled, true);
-  writeJsonIntKV(file, F("SATsystem"), settings.sat.iHeatingSystem, true);
-  writeJsonIntKV(file, F("SATsource"), settings.sat.iHeatingSource, true);
-  writeJsonIntKV(file, F("SAThpcycle"), settings.sat.iHpCycleSeconds, true);
-  writeJsonFloatKV(file, F("SATtargettemp"), settings.sat.fTargetTemp, true);
-  writeJsonFloatKV(file, F("SATcoefficient"), settings.sat.fHeatingCurveCoeff, true);
-  writeJsonFloatKV(file, F("SATdeadband"), settings.sat.fDeadband, true);
-  writeJsonIntKV(file, F("SATinterval"), settings.sat.iControlInterval, true);
-  writeJsonBoolKV(file, F("SATexternaltemp"), settings.sat.bUseExternalTemp, true);
-  writeJsonFloatKV(file, F("SATpresetcomfort"), settings.sat.fPresetComfort, true);
-  writeJsonFloatKV(file, F("SATpreseteco"), settings.sat.fPresetEco, true);
-  writeJsonFloatKV(file, F("SATpresetaway"), settings.sat.fPresetAway, true);
-  writeJsonFloatKV(file, F("SATpresetsleep"), settings.sat.fPresetSleep, true);
-  writeJsonFloatKV(file, F("SATpresetactivity"), settings.sat.fPresetActivity, true);
-  writeJsonFloatKV(file, F("SATpresethome"), settings.sat.fPresetHome, true);
-  writeJsonBoolKV(file, F("SATpwmautoswitch"), settings.sat.bPwmAutoSwitch, true);
-  writeJsonIntKV(file, F("SATmaxmodulation"), settings.sat.iMaxRelModulation, true);
-  writeJsonFloatKV(file, F("SATovershootmargin"), settings.sat.fOvershootMargin, true);
-  writeJsonFloatKV(file, F("SATmodsupdelay"), settings.sat.fModSupDelay, true);
-  writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset, true);
-  writeJsonFloatKV(file, F("SATdhwsetpoint"), settings.sat.fDhwSetpoint, true);
-  writeJsonBoolKV(file, F("SATdhwenabled"), settings.sat.bDhwEnabled, true);
-  writeJsonBoolKV(file, F("SATdhwenable"), settings.sat.bDhwEnable, true);
-  writeJsonBoolKV(file, F("SATpushsetpoint"), settings.sat.bPushSetpoint, true);
-  writeJsonFloatKV(file, F("SATflameoffset"), settings.sat.fFlameOffOffset, true);
-  writeJsonBoolKV(file, F("SATwindowdetect"), settings.sat.bWindowDetection, true);
-  writeJsonIntKV(file, F("SATwindowminsec"), settings.sat.iWindowMinOpenSec, true);
-  writeJsonFloatKV(file, F("SATtempstep"), settings.sat.fTargetTempStep, true);
-  writeJsonBoolKV(file, F("SATforcepwm"), settings.sat.bForcePWM, true);
-  writeJsonFloatKV(file, F("SATflowoffset"), settings.sat.fFlowOffset, true);
-  writeJsonFloatKV(file, F("SATminpressure"), settings.sat.fMinPressure, true);
-  writeJsonFloatKV(file, F("SATmaxpressure"), settings.sat.fMaxPressure, true);
-  writeJsonFloatKV(file, F("SATmaxpressdrop"), settings.sat.fMaxPressureDrop, true);
-  writeJsonIntKV(file, F("SATmanufacturer"), settings.sat.iManufacturer, true);
-  writeJsonBoolKV(file, F("SATweatherenable"), settings.sat.bWeatherEnable, true);
-  writeJsonFloatKV(file, F("SATweatherlat"), settings.sat.fWeatherLat, true);
-  writeJsonFloatKV(file, F("SATweatherlon"), settings.sat.fWeatherLon, true);
-  writeJsonIntKV(file, F("SATweatherinterval"), settings.sat.iWeatherInterval, true);
-  writeJsonStringKV(file, F("SATweatherapikey"), settings.sat.sWeatherApiKey, true);
-  writeJsonFloatKV(file, F("SATboilercapacity"), settings.sat.fBoilerCapacity, true);
-  writeJsonFloatKV(file, F("SATboilerratedkw"), settings.sat.fBoilerRatedKW, true);
-  writeJsonFloatKV(file, F("SATboilerefficiency"), settings.sat.fBoilerEfficiency, true);
-  writeJsonBoolKV(file, F("SATpresetsync"), settings.sat.bPresetSync, true);
-  writeJsonStringKV(file, F("SATpresetsynctopic"), settings.sat.sPresetSyncTopic, true);
-  writeJsonBoolKV(file, F("SATsimulation"), settings.sat.bSimulation, true);
-  writeJsonFloatKV(file, F("SATsimheatrate"), settings.sat.fSimHeatRate, true);
-  writeJsonFloatKV(file, F("SATsimcoolrate"), settings.sat.fSimCoolRate, true);
-  writeJsonFloatKV(file, F("SATthermalcoeff"), settings.sat.fThermalCoeff, true);
-  writeJsonBoolKV(file, F("SATsolargain"), settings.sat.bSolarGainEnable, true);
-  writeJsonFloatKV(file, F("SATsolarminrise"), settings.sat.fSolarMinRiseRate, true);
-  writeJsonFloatKV(file, F("SATsolaroffset"), settings.sat.fSolarSetpointOffset, true);
-  writeJsonFloatKV(file, F("SATsolarminelev"), settings.sat.fSolarMinElevation, true);
-  writeJsonBoolKV(file, F("SATsummersimmer"), settings.sat.bSummerSimmer, true);
-  writeJsonFloatKV(file, F("SATsummerthreshold"), settings.sat.fSummerThreshold, true);
-  writeJsonIntKV(file, F("SATsummerminhours"), settings.sat.iSummerMinHours, true);
-  writeJsonBoolKV(file, F("SATcomfortadjust"), settings.sat.bComfortAdjust, true);
-  writeJsonFloatKV(file, F("SATcomforthumidity"), settings.sat.fComfortHumidity, true);
-  writeJsonFloatKV(file, F("SATcomfortmaxoffset"), settings.sat.fComfortMaxOffset, true);
-  writeJsonBoolKV(file, F("SATmultiarea"), settings.sat.bMultiArea, true);
-  writeJsonIntKV(file, F("SATmultiareacount"), settings.sat.iMultiAreaCount, true);
-  writeJsonFloatKV(file, F("SATareaweight0"), settings.sat.fAreaWeight[0], true);
-  writeJsonFloatKV(file, F("SATareaweight1"), settings.sat.fAreaWeight[1], true);
-  writeJsonFloatKV(file, F("SATareaweight2"), settings.sat.fAreaWeight[2], true);
-  writeJsonFloatKV(file, F("SATareaweight3"), settings.sat.fAreaWeight[3], true);
-  writeJsonBoolKV(file, F("SATautotune"), settings.sat.bAutoTune, true);
-  writeJsonFloatKV(file, F("SATautotunerate"), settings.sat.fAutoTuneRate, true);
+  writeJsonBoolKV(file, F("SATenabled"), settings.sat.bEnabled);
+  writeJsonIntKV(file, F("SATsystem"), settings.sat.iHeatingSystem);
+  writeJsonIntKV(file, F("SATsource"), settings.sat.iHeatingSource);
+  writeJsonIntKV(file, F("SAThpcycle"), settings.sat.iHpCycleSeconds);
+  writeJsonFloatKV(file, F("SATtargettemp"), settings.sat.fTargetTemp);
+  writeJsonFloatKV(file, F("SATcoefficient"), settings.sat.fHeatingCurveCoeff);
+  writeJsonFloatKV(file, F("SATdeadband"), settings.sat.fDeadband);
+  writeJsonIntKV(file, F("SATinterval"), settings.sat.iControlInterval);
+  writeJsonBoolKV(file, F("SATexternaltemp"), settings.sat.bUseExternalTemp);
+  writeJsonFloatKV(file, F("SATpresetcomfort"), settings.sat.fPresetComfort);
+  writeJsonFloatKV(file, F("SATpreseteco"), settings.sat.fPresetEco);
+  writeJsonFloatKV(file, F("SATpresetaway"), settings.sat.fPresetAway);
+  writeJsonFloatKV(file, F("SATpresetsleep"), settings.sat.fPresetSleep);
+  writeJsonFloatKV(file, F("SATpresetactivity"), settings.sat.fPresetActivity);
+  writeJsonFloatKV(file, F("SATpresethome"), settings.sat.fPresetHome);
+  writeJsonBoolKV(file, F("SATpwmautoswitch"), settings.sat.bPwmAutoSwitch);
+  writeJsonIntKV(file, F("SATmaxmodulation"), settings.sat.iMaxRelModulation);
+  writeJsonFloatKV(file, F("SATovershootmargin"), settings.sat.fOvershootMargin);
+  writeJsonFloatKV(file, F("SATmodsupdelay"), settings.sat.fModSupDelay);
+  writeJsonFloatKV(file, F("SATmodsupoffset"), settings.sat.fModSupOffset);
+  writeJsonFloatKV(file, F("SATdhwsetpoint"), settings.sat.fDhwSetpoint);
+  writeJsonBoolKV(file, F("SATdhwenabled"), settings.sat.bDhwEnabled);
+  writeJsonBoolKV(file, F("SATdhwenable"), settings.sat.bDhwEnable);
+  writeJsonBoolKV(file, F("SATpushsetpoint"), settings.sat.bPushSetpoint);
+  writeJsonFloatKV(file, F("SATflameoffset"), settings.sat.fFlameOffOffset);
+  writeJsonBoolKV(file, F("SATwindowdetect"), settings.sat.bWindowDetection);
+  writeJsonIntKV(file, F("SATwindowminsec"), settings.sat.iWindowMinOpenSec);
+  writeJsonFloatKV(file, F("SATtempstep"), settings.sat.fTargetTempStep);
+  writeJsonBoolKV(file, F("SATforcepwm"), settings.sat.bForcePWM);
+  writeJsonFloatKV(file, F("SATflowoffset"), settings.sat.fFlowOffset);
+  writeJsonFloatKV(file, F("SATminpressure"), settings.sat.fMinPressure);
+  writeJsonFloatKV(file, F("SATmaxpressure"), settings.sat.fMaxPressure);
+  writeJsonFloatKV(file, F("SATmaxpressdrop"), settings.sat.fMaxPressureDrop);
+  writeJsonIntKV(file, F("SATmanufacturer"), settings.sat.iManufacturer);
+  writeJsonBoolKV(file, F("SATweatherenable"), settings.sat.bWeatherEnable);
+  writeJsonFloatKV(file, F("SATweatherlat"), settings.sat.fWeatherLat);
+  writeJsonFloatKV(file, F("SATweatherlon"), settings.sat.fWeatherLon);
+  writeJsonIntKV(file, F("SATweatherinterval"), settings.sat.iWeatherInterval);
+  writeJsonStringKV(file, F("SATweatherapikey"), settings.sat.sWeatherApiKey);
+  writeJsonFloatKV(file, F("SATboilercapacity"), settings.sat.fBoilerCapacity);
+  writeJsonFloatKV(file, F("SATboilerratedkw"), settings.sat.fBoilerRatedKW);
+  writeJsonFloatKV(file, F("SATboilerefficiency"), settings.sat.fBoilerEfficiency);
+  writeJsonBoolKV(file, F("SATpresetsync"), settings.sat.bPresetSync);
+  writeJsonStringKV(file, F("SATpresetsynctopic"), settings.sat.sPresetSyncTopic);
+  writeJsonBoolKV(file, F("SATsimulation"), settings.sat.bSimulation);
+  writeJsonFloatKV(file, F("SATsimheatrate"), settings.sat.fSimHeatRate);
+  writeJsonFloatKV(file, F("SATsimcoolrate"), settings.sat.fSimCoolRate);
+  writeJsonFloatKV(file, F("SATthermalcoeff"), settings.sat.fThermalCoeff);
+  writeJsonBoolKV(file, F("SATsolargain"), settings.sat.bSolarGainEnable);
+  writeJsonFloatKV(file, F("SATsolarminrise"), settings.sat.fSolarMinRiseRate);
+  writeJsonFloatKV(file, F("SATsolaroffset"), settings.sat.fSolarSetpointOffset);
+  writeJsonFloatKV(file, F("SATsolarminelev"), settings.sat.fSolarMinElevation);
+  writeJsonBoolKV(file, F("SATsummersimmer"), settings.sat.bSummerSimmer);
+  writeJsonFloatKV(file, F("SATsummerthreshold"), settings.sat.fSummerThreshold);
+  writeJsonIntKV(file, F("SATsummerminhours"), settings.sat.iSummerMinHours);
+  writeJsonBoolKV(file, F("SATcomfortadjust"), settings.sat.bComfortAdjust);
+  writeJsonFloatKV(file, F("SATcomforthumidity"), settings.sat.fComfortHumidity);
+  writeJsonFloatKV(file, F("SATcomfortmaxoffset"), settings.sat.fComfortMaxOffset);
+  writeJsonBoolKV(file, F("SATmultiarea"), settings.sat.bMultiArea);
+  writeJsonIntKV(file, F("SATmultiareacount"), settings.sat.iMultiAreaCount);
+  writeJsonFloatKV(file, F("SATareaweight0"), settings.sat.fAreaWeight[0]);
+  writeJsonFloatKV(file, F("SATareaweight1"), settings.sat.fAreaWeight[1]);
+  writeJsonFloatKV(file, F("SATareaweight2"), settings.sat.fAreaWeight[2]);
+  writeJsonFloatKV(file, F("SATareaweight3"), settings.sat.fAreaWeight[3]);
+  writeJsonBoolKV(file, F("SATautotune"), settings.sat.bAutoTune);
+  writeJsonFloatKV(file, F("SATautotunerate"), settings.sat.fAutoTuneRate);
   // SAT Python parity settings (Task #82)
-  writeJsonIntKV(file, F("SATsensormaxage"), settings.sat.iSensorMaxAgeS, true);
-  writeJsonBoolKV(file, F("SATerrormon"), settings.sat.bErrorMonitoring, true);
-  writeJsonFloatKV(file, F("SATautogains"), settings.sat.fAutoGainsValue, true);
-  writeJsonIntKV(file, F("SATheatingmode"), settings.sat.iHeatingMode, true);
-  writeJsonIntKV(file, F("SATcyclesperhour"), settings.sat.iCyclesPerHour, true);
-  writeJsonFloatKV(file, F("SATvalveoffset"), settings.sat.fValveOffset, true);
-  writeJsonBoolKV(file, F("SATthermalcomfort"), settings.sat.bThermalComfort, true);
-  writeJsonIntKV(file, F("SAThumiditytimeout"), settings.sat.iHumidityTimeoutS, true);
-  writeJsonBoolKV(file, F("SATsolarfreezeint"), settings.sat.bSolarFreezeIntegral, true);
-  writeJsonIntKV(file, F("SATflushtreshold"), settings.sat.iSatFlushThresholdH, true);
+  writeJsonIntKV(file, F("SATsensormaxage"), settings.sat.iSensorMaxAgeS);
+  writeJsonBoolKV(file, F("SATerrormon"), settings.sat.bErrorMonitoring);
+  writeJsonFloatKV(file, F("SATautogains"), settings.sat.fAutoGainsValue);
+  writeJsonIntKV(file, F("SATheatingmode"), settings.sat.iHeatingMode);
+  writeJsonIntKV(file, F("SATcyclesperhour"), settings.sat.iCyclesPerHour);
+  writeJsonFloatKV(file, F("SATvalveoffset"), settings.sat.fValveOffset);
+  writeJsonBoolKV(file, F("SATthermalcomfort"), settings.sat.bThermalComfort);
+  writeJsonIntKV(file, F("SAThumiditytimeout"), settings.sat.iHumidityTimeoutS);
+  writeJsonBoolKV(file, F("SATsolarfreezeint"), settings.sat.bSolarFreezeIntegral);
+  writeJsonIntKV(file, F("SATflushtreshold"), settings.sat.iSatFlushThresholdH);
   // Multi-zone PID (Task #233)
-  writeJsonIntKV(file, F("SATzonecount"), settings.sat.iZoneCount, true);
-  writeJsonIntKV(file, F("SATzonetimeout"), settings.sat.iZoneTimeoutS, true);
-  writeJsonFloatKV(file, F("SATzoneheadroom"), settings.sat.fZoneAggregationHeadroom, true);
+  writeJsonIntKV(file, F("SATzonecount"), settings.sat.iZoneCount);
+  writeJsonIntKV(file, F("SATzonetimeout"), settings.sat.iZoneTimeoutS);
+  writeJsonFloatKV(file, F("SATzoneheadroom"), settings.sat.fZoneAggregationHeadroom);
   // TASK-587: DS18B20 sensor-to-SAT-area mapping (area 0..3)
-  writeJsonStringKV(file, F("SATsensorarea0"), settings.sat.sSensorArea[0], true);
-  writeJsonStringKV(file, F("SATsensorarea1"), settings.sat.sSensorArea[1], true);
-  writeJsonStringKV(file, F("SATsensorarea2"), settings.sat.sSensorArea[2], true);
-  writeJsonStringKV(file, F("SATsensorarea3"), settings.sat.sSensorArea[3], true);
+  writeJsonStringKV(file, F("SATsensorarea0"), settings.sat.sSensorArea[0]);
+  writeJsonStringKV(file, F("SATsensorarea1"), settings.sat.sSensorArea[1]);
+  writeJsonStringKV(file, F("SATsensorarea2"), settings.sat.sSensorArea[2]);
+  writeJsonStringKV(file, F("SATsensorarea3"), settings.sat.sSensorArea[3]);
   // PV-surplus setpoint boost (TASK-640)
-  writeJsonBoolKV (file, F("SATpvboostenabled"),        settings.sat.bPvBoostEnabled,        true);
-  writeJsonIntKV  (file, F("SATpvboostthresholdw"),     settings.sat.iPvBoostThresholdW,     true);
-  writeJsonIntKV  (file, F("SATpvboostholds"),          settings.sat.iPvBoostHoldS,          true);
-  writeJsonFloatKV(file, F("SATpvboostdeltac"),         settings.sat.fPvBoostDeltaC,         true);
-  writeJsonFloatKV(file, F("SATpvboostmaxindoorc"),     settings.sat.fPvBoostMaxIndoorC,     true);
-  writeJsonIntKV  (file, F("SATpvboostmaxdurationmin"), settings.sat.iPvBoostMaxDurationMin, true);
+  writeJsonBoolKV (file, F("SATpvboostenabled"),        settings.sat.bPvBoostEnabled);
+  writeJsonIntKV  (file, F("SATpvboostthresholdw"),     settings.sat.iPvBoostThresholdW);
+  writeJsonIntKV  (file, F("SATpvboostholds"),          settings.sat.iPvBoostHoldS);
+  writeJsonFloatKV(file, F("SATpvboostdeltac"),         settings.sat.fPvBoostDeltaC);
+  writeJsonFloatKV(file, F("SATpvboostmaxindoorc"),     settings.sat.fPvBoostMaxIndoorC);
+  writeJsonIntKV  (file, F("SATpvboostmaxdurationmin"), settings.sat.iPvBoostMaxDurationMin);
   // BLE temperature sensor (Task #20). ESP-abstraction Tier 2 (TASK-742):
   // serialised unconditionally (fields exist on both platforms) so settings.json
   // round-trips between ESP8266 and ESP32; on ESP8266 these write zero/empty.
-  writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable, true);
-  writeJsonBoolKV(file, F("SATbleriskack"), settings.sat.bBleRiskAck, true);
-  writeJsonBoolKV(file, F("SATblefailover"), settings.sat.bBleFailover, true);
-  writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC, true);
-  writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval, true);
+  writeJsonBoolKV(file, F("SATbleenable"), settings.sat.bBleEnable);
+  writeJsonBoolKV(file, F("SATbleriskack"), settings.sat.bBleRiskAck);
+  writeJsonBoolKV(file, F("SATblefailover"), settings.sat.bBleFailover);
+  writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC);
+  writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval);
   // TASK-895: name-prefix filter + ingestion toggle. Prefix is user text →
   // escape before serialising; the bool is a plain key.
   escapeJsonStringTo(settings.sat.sBleNamePrefix, cMsg, sizeof(cMsg));
-  writeJsonStringKV(file, F("SATblenameprefix"), cMsg, true);
-  writeJsonBoolKV(file, F("SATblenamefilteringest"), settings.sat.bBleNameFilterIngest, true);
+  writeJsonStringKV(file, F("SATblenameprefix"), cMsg);
+  writeJsonBoolKV(file, F("SATblenamefilteringest"), settings.sat.bBleNameFilterIngest);
   // TASK-508: BLE roster — 8 × {mac, label} + count. Indexed-key pattern
   // mirrors fAreaWeight precedent. Empty slots serialise as "" — readers
   // treat that as unused. cMsg is the writeSettings()-scoped escape buffer
@@ -426,58 +440,58 @@ void writeSettings(bool show)
     file.printf_P(PSTR("  \"SATblebindkey%u\": \"%s\",\n"),
                   (unsigned)i, settings.sat.sBleBindkey[i]);
   }
-  writeJsonIntKV(file, F("SATblerostercount"), settings.sat.iBleRosterCount, true);
+  writeJsonIntKV(file, F("SATblerostercount"), settings.sat.iBleRosterCount);
 #if defined(HAS_DIRECT_OT) && HAS_DIRECT_OT
   // --- OT-direct settings (OTGW32/OT-Thing only) ---
-  writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode, true);
-  writeJsonBoolKV(file, F("OTDautodetect"), settings.otd.bAutoDetect, true);
-  writeJsonFloatKV(file, F("OTDsetbacktemp"), settings.otd.fSetbackTemp, true);
-  writeJsonIntKV(file, F("OTDsetbacktimeout"), settings.otd.iSetbackTimeout, true);
-  writeJsonBoolKV(file, F("OTDenableslave"), settings.otd.bEnableSlave, true);
-  writeJsonBoolKV(file, F("OTDsummermode"), settings.otd.bSummerMode, true);
-  writeJsonBoolKV(file, F("OTDfailsafe"), settings.otd.bFailSafe, true);
-  writeJsonIntKV(file, F("OTDmsginterval"), settings.otd.iMsgInterval, true);
+  writeJsonIntKV(file, F("OTDmode"), settings.otd.iMode);
+  writeJsonBoolKV(file, F("OTDautodetect"), settings.otd.bAutoDetect);
+  writeJsonFloatKV(file, F("OTDsetbacktemp"), settings.otd.fSetbackTemp);
+  writeJsonIntKV(file, F("OTDsetbacktimeout"), settings.otd.iSetbackTimeout);
+  writeJsonBoolKV(file, F("OTDenableslave"), settings.otd.bEnableSlave);
+  writeJsonBoolKV(file, F("OTDsummermode"), settings.otd.bSummerMode);
+  writeJsonBoolKV(file, F("OTDfailsafe"), settings.otd.bFailSafe);
+  writeJsonIntKV(file, F("OTDmsginterval"), settings.otd.iMsgInterval);
   // TASK-933 P2: persist the user-declared bypass-relay-fitted flag so it survives
   // a reboot (the POST dispatch + GET emit already existed; without this line the
   // flag reset to false every boot and the bypass-mode logic could never stay on).
-  writeJsonBoolKV(file, F("OTDhasbypassrelay"), settings.otd.bHasBypassRelay, true);
+  writeJsonBoolKV(file, F("OTDhasbypassrelay"), settings.otd.bHasBypassRelay);
   // --- TASK-183: PI room compensation + heating curve ---
-  writeJsonIntKV(file, F("OTDchmode"), settings.otd.iCHMode, true);
-  writeJsonFloatKV(file, F("OTDflowtemp"), settings.otd.fFlowTemp, true);
-  writeJsonFloatKV(file, F("OTDflowmax"), settings.otd.fFlowMax, true);
-  writeJsonFloatKV(file, F("OTDroomsetpoint"), settings.otd.fRoomSetpoint, true);
-  writeJsonFloatKV(file, F("OTDgradient"), settings.otd.fGradient, true);
-  writeJsonFloatKV(file, F("OTDexponent"), settings.otd.fExponent, true);
-  writeJsonFloatKV(file, F("OTDoffset"), settings.otd.fOffset, true);
-  writeJsonBoolKV(file, F("OTDroomcomp"), settings.otd.bRoomCompEnabled, true);
-  writeJsonFloatKV(file, F("OTDkp"), settings.otd.fKp, true);
-  writeJsonFloatKV(file, F("OTDki"), settings.otd.fKi, true);
-  writeJsonFloatKV(file, F("OTDkboost"), settings.otd.fKboost, true);
+  writeJsonIntKV(file, F("OTDchmode"), settings.otd.iCHMode);
+  writeJsonFloatKV(file, F("OTDflowtemp"), settings.otd.fFlowTemp);
+  writeJsonFloatKV(file, F("OTDflowmax"), settings.otd.fFlowMax);
+  writeJsonFloatKV(file, F("OTDroomsetpoint"), settings.otd.fRoomSetpoint);
+  writeJsonFloatKV(file, F("OTDgradient"), settings.otd.fGradient);
+  writeJsonFloatKV(file, F("OTDexponent"), settings.otd.fExponent);
+  writeJsonFloatKV(file, F("OTDoffset"), settings.otd.fOffset);
+  writeJsonBoolKV(file, F("OTDroomcomp"), settings.otd.bRoomCompEnabled);
+  writeJsonFloatKV(file, F("OTDkp"), settings.otd.fKp);
+  writeJsonFloatKV(file, F("OTDki"), settings.otd.fKi);
+  writeJsonFloatKV(file, F("OTDkboost"), settings.otd.fKboost);
   // --- TASK-582: CH hysteresis deadband ---
-  writeJsonBoolKV(file, F("OTDhysteresisenable"), settings.otd.bHysteresisEnable, true);
-  writeJsonFloatKV(file, F("OTDhysteresis"), settings.otd.fHysteresis, true);
+  writeJsonBoolKV(file, F("OTDhysteresisenable"), settings.otd.bHysteresisEnable);
+  writeJsonFloatKV(file, F("OTDhysteresis"), settings.otd.fHysteresis);
   // --- TASK-584: ventilation override persistence ---
-  writeJsonBoolKV(file, F("OTDventenable"), settings.otd.bVentEnable, true);
-  writeJsonBoolKV(file, F("OTDopenbypass"), settings.otd.bOpenBypass, true);
-  writeJsonBoolKV(file, F("OTDautobypass"), settings.otd.bAutoBypass, true);
-  writeJsonBoolKV(file, F("OTDfreeventenable"), settings.otd.bFreeVentEnable, true);
-  writeJsonIntKV(file, F("OTDventsetpoint"), settings.otd.iVentSetpoint, true);
+  writeJsonBoolKV(file, F("OTDventenable"), settings.otd.bVentEnable);
+  writeJsonBoolKV(file, F("OTDopenbypass"), settings.otd.bOpenBypass);
+  writeJsonBoolKV(file, F("OTDautobypass"), settings.otd.bAutoBypass);
+  writeJsonBoolKV(file, F("OTDfreeventenable"), settings.otd.bFreeVentEnable);
+  writeJsonIntKV(file, F("OTDventsetpoint"), settings.otd.iVentSetpoint);
 #endif
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // Ethernet static IP (OTGW32 only)
-  writeJsonBoolKV(file, F("ETHstaticip"), settings.eth.bStaticIP, true);
-  writeJsonStringKV(file, F("ETHipaddress"), settings.eth.sIPaddress, true);
-  writeJsonStringKV(file, F("ETHgateway"), settings.eth.sGateway, true);
-  writeJsonStringKV(file, F("ETHsubnet"), settings.eth.sSubnet, true);
-  writeJsonStringKV(file, F("ETHdns"), settings.eth.sDNS, true);
+  writeJsonBoolKV(file, F("ETHstaticip"), settings.eth.bStaticIP);
+  writeJsonStringKV(file, F("ETHipaddress"), settings.eth.sIPaddress);
+  writeJsonStringKV(file, F("ETHgateway"), settings.eth.sGateway);
+  writeJsonStringKV(file, F("ETHsubnet"), settings.eth.sSubnet);
+  writeJsonStringKV(file, F("ETHdns"), settings.eth.sDNS);
 #endif
   // WiFi static IP (empty sStaticIp = DHCP)
-  writeJsonStringKV(file, F("WifiStaticIP"), settings.wifi.sStaticIp, true);
-  writeJsonStringKV(file, F("WifiSubnet"),   settings.wifi.sSubnet,   true);
-  writeJsonStringKV(file, F("WifiGateway"),  settings.wifi.sGateway,  true);
-  writeJsonStringKV(file, F("WifiDns1"),     settings.wifi.sDns1,     true);
-  writeJsonStringKV(file, F("WifiDns2"),     settings.wifi.sDns2,     false);
-  file.print(F("}\n"));
+  writeJsonStringKV(file, F("WifiStaticIP"), settings.wifi.sStaticIp);
+  writeJsonStringKV(file, F("WifiSubnet"),   settings.wifi.sSubnet);
+  writeJsonStringKV(file, F("WifiGateway"),  settings.wifi.sGateway);
+  writeJsonStringKV(file, F("WifiDns1"),     settings.wifi.sDns1);
+  writeJsonStringKV(file, F("WifiDns2"),     settings.wifi.sDns2);
+  file.print(F("\n}\n"));
   Debugln(F("\r\n[Settings] State: File write complete, closing file"));
   file.close();  // Close write handle before any subsequent read
   DebugTf(PSTR("[Settings] State: Settings saved successfully to %s\r\n"), SETTINGS_FILE);

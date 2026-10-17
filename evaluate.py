@@ -2328,6 +2328,40 @@ class WorkspaceEvaluator:
                 "Coding", "port-80 listener retry", "PASS",
                 "A refused port-80 bind is logged and retried from doBackgroundTasks()"))
 
+    def check_settings_writer_separator(self):
+        """TASK-1242/1244 gate: settings.ini stays valid JSON.
+
+        The firmware reader is line-based and ignores commas, so a missing comma never
+        shows on the device. The writeJson*KV helpers must own the separator; a per-call
+        withComma flag let an appended (or #if-ed) key drop a comma (TASK-1242).
+        """
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== settings.ini JSON separators (TASK-1244) ==={Colors.ENDC}")
+        src = self._read_fw("settingStuff.ino")
+        problems = []
+        if re.search(r"\bwithComma\b", src):
+            problems.append("a writeJson*KV helper still takes withComma")
+        start = src.find("void writeSettings(bool show)")
+        end = src.find("} // writeSettings()", start)
+        if start < 0 or end < 0:
+            problems.append("writeSettings() not found")
+        else:
+            body = src[start:end]
+            flagged = re.findall(r'writeJson\w+KV\s*\(\s*file\s*,\s*F\("(\w+)"\)[^;]*,\s*(?:true|false)\s*\)\s*;', body)
+            if flagged:
+                problems.append(f"{len(flagged)} call(s) pass a comma flag, e.g. {flagged[0]}")
+            if "settingsJsonFirstEntry = true" not in body:
+                problems.append("writeSettings() does not reset settingsJsonFirstEntry")
+        if problems:
+            self.add_result(EvaluationResult(
+                "Coding", "settings.ini JSON separators", "FAIL",
+                "; ".join(problems),
+                "The writeJson*KV helpers write ',\\n' before every entry but the first "
+                "(settingsJsonFirstEntry, reset by writeSettings()); callers pass no comma flag."))
+        else:
+            self.add_result(EvaluationResult(
+                "Coding", "settings.ini JSON separators", "PASS",
+                "writeJson*KV helpers own the separator; no per-call comma flags"))
+
     def check_discovery_autoheal_shape(self):
         """ADR-170 gate."""
         print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== Discovery Auto-Heal Shape (ADR-170) ==={Colors.ENDC}")
@@ -3756,6 +3790,7 @@ class WorkspaceEvaluator:
         self.check_api_rate_limit_alias_coverage()    # TASK-1037, ADR-172
         self.check_poll_window_coupling()             # TASK-1037, ADR-172/173
         self.check_webserver_listener_retry()         # TASK-1130
+        self.check_settings_writer_separator()        # TASK-1242/1244
 
         if not quick:
             # Detailed checks
