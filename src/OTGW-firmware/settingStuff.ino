@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.430
+**  Version  : v2.0.0-alpha.431
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -396,7 +396,7 @@ void writeSettings(bool show)
   writeJsonIntKV  (file, F("SATpvboostholds"),          settings.sat.iPvBoostHoldS,          true);
   writeJsonFloatKV(file, F("SATpvboostdeltac"),         settings.sat.fPvBoostDeltaC,         true);
   writeJsonFloatKV(file, F("SATpvboostmaxindoorc"),     settings.sat.fPvBoostMaxIndoorC,     true);
-  writeJsonIntKV  (file, F("SATpvboostmaxdurationmin"), settings.sat.iPvBoostMaxDurationMin, false);
+  writeJsonIntKV  (file, F("SATpvboostmaxdurationmin"), settings.sat.iPvBoostMaxDurationMin, true);
   // BLE temperature sensor (Task #20). ESP-abstraction Tier 2 (TASK-742):
   // serialised unconditionally (fields exist on both platforms) so settings.json
   // round-trips between ESP8266 and ESP32; on ESP8266 these write zero/empty.
