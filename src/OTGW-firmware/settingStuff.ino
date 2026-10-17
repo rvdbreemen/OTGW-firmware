@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.428
+**  Version  : v2.0.0-alpha.429
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1238,7 +1238,8 @@ void updateSetting(const char *field, const char *newValue)
   }
 
   // Side-effect checks — independent if's, multiple can fire
-  if (strstr_P(field, PSTR("mqtt")) != NULL)        pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
+  // Every MQTT key starts with "MQTT"; case-insensitive, because REST passes the name as sent (TASK-1240)
+  if (strncasecmp_P(field, PSTR("mqtt"), 4) == 0)   pendingSideEffects |= SIDE_EFFECT_MQTT; // defer MQTT restart to flushSettings()
 
   // TASK-564: no-op detection. If the cascade above produced no change to the
   // OTGWSettings struct, this update is identical to the current state — skip

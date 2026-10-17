@@ -1,7 +1,7 @@
 /* 
  ***************************************************************************  
  **  Program  : s0PulseCount
- **  Version  : v2.0.0-alpha.428
+ **  Version  : v2.0.0-alpha.429
  **
  **  Copyright (c) 2021-2024 Rob Roos / Robert van Breemen
  **     based on Framework ESP8266 from Willem Aandewiel
@@ -68,7 +68,6 @@
      if (state.debug.bSensors) DebugTf(PSTR("*** S0LastPulsetime(%d) S0Pulsekw:(%4.3f) \r\n"), last_pulse_duration, OTGWs0powerkw) ;
      OTGWs0lasttime = now ;
      if (settings.mqtt.bEnable ) {
-       sensorAutoConfigure(OTGWs0dataid, true , "" ) ;     // Configure S0 sensor with the  
        s0sendMQ() ; 
      }  
    }
