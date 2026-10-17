@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-15 11:20'
+updated_date: '2026-10-17 09:25'
 labels:
   - bug
   - webui
@@ -28,3 +29,9 @@ Seen on the Classic-S3 bench (.88.63, alpha.423, v2-only image, 2026-10-15): in 
 - [ ] #2 Root cause named with evidence (frame bytes or server-side log)
 - [ ] #3 Fixed or explicitly accepted with a reason; if fixed, old-vs-fix capture shows the error gone
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-17 rerun on the Classic-S3, alpha.427+543dc4e (LittleFS from a74a23a): 5 fresh Monitor loads, 'Invalid frame header' 0 of 5, every load 1 socket with handshake 101 and valid Sec-WebSocket-Accept, first message after 1.7-3.4 s, 0 reconnects. On alpha.423 it was 3 of 3. Not reproduced, cause unknown: firmware changed between the runs, and this was a single sequential client. Evidence .tmp/bench-classic/after427/ui_I.json. Keep open until it is seen again or a cause is found.
+<!-- SECTION:NOTES:END -->

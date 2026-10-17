@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-15 15:35'
-updated_date: '2026-10-16 03:54'
+updated_date: '2026-10-17 09:13'
 labels:
   - sat
   - pic
@@ -51,6 +51,8 @@ Waiting for the Classic-S3 and the maintainer's go on step 2 and the AC#4 choice
 Evidence alpha.427 (8815ddb0d): build.bat --firmware --target all SUCCESS for esp32 (20:32), esp32-classic (20:38), esp32-combo (20:43; flash 88.2%); evaluate.py --quick 71 pass / 0 warn / 0 fail. OTGW32 bench (OT-Direct, .88.61) flashed with the combo app: boots alpha.427, otdirectavailable=true, /api/v2/sat/status answers with SAT enabled (keepalive is a no-op without PIC). Remaining: AC#1 and AC#3 on the Classic-S3.
 
 Bench 2026-10-15/16, Classic-S3 (COM8, .88.63, PIC 6.8 gateway, no boiler/thermostat: the stand-alone PIC polls MsgID 0, whose HB bit 0 (CH enable) is set while a user CS is active and CH mode is on). Logs in .tmp/bench-1236/. OLD: (a) alpha.424, CS=45 once: CH bit set at 2.7 s, dropped at 67.0 s, 65 s after the ack; (b) alpha.424 SAT on: one 'CS: 10.00' in 400 s (300 s cadence); (c) alpha.426 (pre-fix, built from 543dc4e) harness T2 FAIL 1 ack in 330 s, longest gap 261 s; T3 FAIL external CS=45 acked while SAT on. FIX alpha.427: harness T1a PASS CH bit held over 170 status frames with CS every 30 s; T1b PASS dropped 102.6 s after the last ack (window 63-126 s); T2 PASS 22 acks in 660 s, longest gap 33.0 s; T3 PASS external CS=45 not acked; T4a PASS SAT release CS=0 acked; T4b PASS no CS acks in 70 s after disable; T5 PASS external CS=45 accepted with SAT off. AC#3 method note: with no boiler TSet itself is not visible; the proof is T1 (a CS refreshed within 30 s holds the PIC override) plus T2 (SAT refreshes within 33 s for 11 min). Harness gotchas found and fixed in the script: SAT's CH=0 persists in the PIC and masks the CH bit (send CH=1 first); the status bits are in the high byte. Bench restored: alpha.427, SAT off, port 25238 off.
+
+2026-10-17 end-to-end rerun of the corrected harness on the Classic-S3 (alpha.427+543dc4e), one run T1-T5: T1a PASS (172 status frames, all CH bit set), T1b PASS (CH dropped 102.8 s after last ack), T2 PASS (22 acks in 660 s, longest gap 34.0 s), T3 PASS (HTTP 202, 0 CS: 45 acks), T4a PASS, T4b PASS (0 acks in 70 s after disable), T5 PASS. Log: .tmp/bench-1236/fix-a427-full-t1-t5.txt. Closes the gap 'corrected harness never ran end to end'.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
