@@ -7,6 +7,15 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **Firmware updates over WiFi on ESP32-S3 boards with 4 MB flash** (TASK-1223, ADR-191). A small updater ("safeboot") now lives next to the firmware. On `/update`, "Restart into the firmware updater" restarts the unit into it, at the same address with the stored WiFi credentials. Upload the `.ino.bin` there; the unit then restarts into the new firmware (about 15 s for 2 MB). If an upload is incomplete or interrupted, or a new firmware crashes during its first 30 seconds, the unit returns to safeboot and stays reachable over WiFi. The bootloader's app rollback handles the crash case. Safeboot asks for the admin password when one is set.
+- **One-time USB migration** (`flash_otgw.bat` / `flash_otgw.sh --migrate --host <ip>`). It saves `settings.ini`, writes the new flash layout while keeping the WiFi credentials, then restores and checks the settings. See `docs/guides/WIFI_FIRMWARE_UPDATE.md`.
+- v2 web UI (TASK-1223.14 to .18), ported from the classic UI:
+  - a live value table with every OpenTherm, 1-Wire and S0 value, which keeps updating in PS=1 mode;
+  - Dallas sensor label editing;
+  - an OT-Direct status panel;
+  - all 15 PIC gateway settings;
+  - every device-info field on the Debug page.
+
 - **Cumulative DHW water total for the Home Assistant Energy dashboard** (TASK-1123, TASK-1189, TASK-1190, ADR-176, ADR-181, ADR-182; GH #675). The gateway integrates MsgID 19 (DHW flow rate) into `dhw_water_total`, an auto-discovered sensor with `device_class: water`, unit `L` and `state_class: total_increasing`: the same topic and fields as the 1.x line, under faux discovery id 241. Only boiler Read-Ack frames count. The summary line a PIC sends in PS=1 mode does not (ADR-181): the PIC builds it from stored values without their age, so a stale flow would keep counting; a PIC gateway in PS=1 mode adds no water, as on the 1.x line. Answers the gateway builds itself, including OT-Direct master mode replaying cached boiler values to a thermostat, do not count, and neither does the OT-Direct PS=1 summary echo. An interval longer than 60 s between two samples adds nothing, and so does a reading no MsgID 19 frame can carry (not a number, infinite, above 128 L/min). The entity is announced just in time, as on the 1.x line: the first 60 s publish after a MsgID 19 frame has decoded on the current boot queues its discovery config and sends its value (ADR-182), so a gateway without MsgID 19 traffic shows no water entity. `POST /api/v2/otgw/reset_water_total`, or the MQTT command `set/<node_id>/otgw/reset_water_total` (a copy that arrives as a retained message after a reconnect is ignored), sets the total to 0 in RAM and in its file together and publishes 0 while MQTT can publish; during a firmware, filesystem or PIC upgrade, or while LittleFS is unavailable, the reset waits until the file can be written. Unlike the 1.x line the total survives a reboot: it is kept in `/dhw_water.json`, written when 10 L are unsaved or 15 minutes after the last write, and on every orderly restart; a power cut loses under 10 L plus up to one minute of flow, and while the total is below 100 L Home Assistant can take that drop for a meter reset and count the restored total again. The number is an estimate from sparse samples, not a metrologically valid water meter (`docs/api/MQTT.md`, DHW Water Total).
 
 - **OTDirect TT=/TC= PIC-style remote-override semantics** (TASK-466). TT (temporary) and TC (constant) commands now write both MsgID 16 (TrSet) and MsgID 100 (RemoteOverrideFunction) flag bits, distinguishing program-priority from manual-priority overrides. TT carries an auto-clear honour-state machine that releases the override once the thermostat program resumes; TC persists indefinitely. Behaviour matches the legacy PIC firmware. User-visible: TT and TC are no longer functionally identical. Fixture rows added in `tests/otdirect_pic_parity_fixture.md`.
@@ -15,12 +24,37 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Changed
 
+- **New flash layout on 4 MB ESP32-S3 boards** (ADR-191): safeboot 960 KB, firmware 2240 KB, filesystem 768 KB. **Every unit needs one USB migration** (see above). `flash_otgw --update` refuses a unit that has not been migrated yet.
+- **The classic web UI is removed; v2 is the only web UI** (ADR-192). The UI switch and the classic-only `ui_*` settings are gone; older settings files still load. The File Explorer has its own small stylesheet and is shown at `/` when the web UI file is missing, so a broken UI can be repaired over WiFi.
+- **Web files are minified at build time** (ADR-190), still as plain text (no gzip). The web UI files now need 620 KiB of filesystem space instead of 1460 KiB.
+
 - **Project relicensed from MIT to GNU GPLv3.** Applies to the project's own code (Robert van den Breemen, sole copyright holder), including the root LICENSE and every source file that previously carried an MIT header/footer. Third-party vendored libraries (`src/libraries/OpenTherm` — (c) Ihor Melnyk, `src/libraries/OTGWSerial` — (c) Schelte Bron) and the LGPL-2.1-licensed portions of `FSexplorer.ino` (c) Jens Fleischer keep their original licenses and copyright notices unchanged.
 - **MQTT on-change publishing is now the default** (TASK-791, ADR-116). New setting `MQTTonChangePublishing` defaults to `true`, and the publish interval defaults to `60` seconds: changed OpenTherm values publish immediately, unchanged values refresh once per minute. On upgrade, a config that still has `MQTTinterval=0` is migrated once to `60` (persisted via the deferred settings write, no boot-time rewrite). Untick "MQTT Publish On-Change" (or set `MQTTonChangePublishing=false`) to restore legacy publish-every-message behaviour. The TASK-400 status-bit heartbeat is independent and unchanged.
 - **`settings.sat.iBleInterval` semantics** (TASK-494). Repurposed from "BLE scan rate" to "publish/state-update cadence". The BLE radio scans continuously on ESP32 since this release; existing user configs continue to load and round-trip cleanly. WebUI tooltip updated.
 - **MQTT `resetgateway` command** now requires payload `"1"` (matching the HA-discovery `payload_press` value already shipped) and is rate-limited to one PIC reset per 5 seconds. Non-matching payloads are logged and ignored; rapid retries inside the cooldown window are silently dropped with a log line. Closes the unauthenticated-LAN reset-storm path raised by the dev review (TASK-668, port of dev TASK-661).
 
+### Removed
+
+These classic web UI features are not in v2 (details in `docs/history/2026-10-15-retired-classic-web-ui-features.md`):
+- the UI switch button;
+- the heap footer;
+- log persistence across page reloads;
+- resizable table columns;
+- the 8-option graph window list;
+- graph disconnect markers;
+- auto-hiding the log on small screens;
+- the `otgwDebug` console helper;
+- the design showcase page;
+- WiFi network scan;
+- the classic display preferences;
+- weather location auto-fill and the OpenWeatherMap key wizard.
+
 ### Fixed
+
+- **SAT on Classic (PIC) boards: the boiler setpoint no longer lapses between SAT updates** (TASK-1236). The PIC drops a `CS=` override about 63 to 126 seconds after the last one, while SAT only sent a new setpoint every few minutes, so the boiler fell back to the thermostat's setpoint in between. SAT now re-sends its setpoint every 30 seconds on PIC boards. While SAT is enabled it owns the control setpoint: a `CS=` from MQTT, REST or the serial bridge is refused, as on OT-Direct boards. Bench: 22 acknowledgements in 660 s with the longest gap 34 s (before: one in 330 to 400 s).
+- **The v2 heating colour was missing** (TASK-1225). A CSS comment closed early and dropped the `--hot` colour token.
+- **The File Explorer fallback now also works when the web UI file is lost at runtime.** Before, `/` only fell back when the file was missing at boot.
+- **`flash_otgw.bat` returned exit code 0 on some errors** inside a block.
 
 - **Answers the gateway made itself counted as boiler evidence** (TASK-1185, follow-up of TASK-1086). An OT-Direct answer the gateway built (SR= table, master-mode WRITE-ACK echo or cache replay, loopback mode) no longer marks a message id as acknowledged in `GET /api/v2/otgw/ot-support`, and its type-7 OT log line reads `(gateway answer)` instead of `(boiler does not implement)` or `(boiler rejected write)`. A loopback B frame no longer switches SAT simulation off, and on a combo board running OT-Direct in loopback the SAT availability gate no longer reports a real boiler, so the simulation enable is not refused with HTTP 409 (ADR-117 section 2). PIC frames, the PIC's proxy answers (ADR-103) and genuine boiler frames count as before. Lines the `/otgw_simulation.log` replay injects are no boiler evidence either: they are decoded and published and keep `boiler_connected` up, but set no verdict or acknowledged bit and no longer switch SAT simulation off. `/ot-boiler.json` moves to format 2: the first boot on this version ignores a format-1 file once, so false verdicts and acknowledged bits from older builds disappear, and live OpenTherm traffic relearns the real ones within minutes.
 - **Telnet and ser2net discarded client payload at accept, teardown and slot release** (TASK-1145, SimpleTelnet `260aca5`). The vendored SimpleTelnet submodule moves off the diverged `123106f` (GPLv3 relicense, no fixes) onto upstream `main`, which carries the relicense *and* the fixes. Two are behavioural. `_flushTx(idx)` now runs before `_tx` is cleared on slot release, so bytes that `write()` already reported as accepted get one bounded chance to leave instead of being destroyed along with our own ring buffer ahead of lwIP. The unconditional inbound-discard loop at accept and teardown is gone: it could not tell an IAC sequence from payload, so a client that pipelined a command with `connect()` lost it, and on the raw ser2net/OTmonitor bridge (ADR-143) — where there is no negotiation to strip at all — it could only destroy user data. Telnet negotiation remains handled per byte by `_filterByte()` on the read path. The third change replaces the deprecated `AsyncClient::close(bool)` with `close()` (the parameter is documented "ignored" and the overload forwards to `close()`), removing ~27 deprecation-warning instances per build.

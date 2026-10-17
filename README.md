@@ -150,19 +150,14 @@ Commands via MQTT or the REST API (`/api/v2/sat/*`) control all SAT parameters a
 
 ### 1. Flash the firmware
 
-**Recommended** (downloads and flashes the latest release):
+Unpack the release zip (`OTGW-firmware-<board>-<version>-flash.zip`), connect the unit over USB and run the flash tool from it:
 
 ```bash
-python3 flash_esp.py
+flash_otgw.bat            # Windows
+./flash_otgw.sh           # Linux/macOS
 ```
 
-Build from source and flash:
-
-```bash
-pio run -e esp32 --target upload    # ESP32
-```
-
-See [docs/FLASH_GUIDE.md](docs/FLASH_GUIDE.md) for full instructions including filesystem flashing.
+Without options this is a factory install: it erases the flash and writes firmware and filesystem. Units that already run 2.0.0 are updated over WiFi; units on an older flash layout need one USB migration first. See [docs/guides/WIFI_FIRMWARE_UPDATE.md](docs/guides/WIFI_FIRMWARE_UPDATE.md). To build from source, see [docs/guides/BUILD.md](docs/guides/BUILD.md).
 
 ### 2. Connect to Wi-Fi
 
@@ -299,8 +294,9 @@ Live monitoring, sensor values, and the WebSocket stream remain open without aut
 | Topic | Link |
 |---|---|
 | Wiki (recommended starting point) | <https://github.com/rvdbreemen/OTGW-firmware/wiki> |
-| Flash guide | [docs/FLASH_GUIDE.md](docs/FLASH_GUIDE.md) |
-| Local build guide | [docs/BUILD.md](docs/BUILD.md) |
+| Flash guide (ESP8266, 1.x) | [docs/guides/FLASH_GUIDE.md](docs/guides/FLASH_GUIDE.md) |
+| Firmware updates over WiFi (ESP32-S3) | [docs/guides/WIFI_FIRMWARE_UPDATE.md](docs/guides/WIFI_FIRMWARE_UPDATE.md) |
+| Local build guide | [docs/guides/BUILD.md](docs/guides/BUILD.md) |
 | REST API reference | [docs/api/README.md](docs/api/README.md) |
 | OpenAPI specification | [docs/api/openapi.yaml](docs/api/openapi.yaml) |
 | MQTT topic reference | [docs/api/MQTT.md](docs/api/MQTT.md) |
@@ -310,7 +306,7 @@ Live monitoring, sensor values, and the WebSocket stream remain open without aut
 | Dallas sensor documentation | [docs/features/dallas-temperature-sensors.md](docs/features/dallas-temperature-sensors.md) |
 | Architecture Decision Records | [docs/adr/README.md](docs/adr/README.md) |
 | C4 architecture context | [docs/c4/c4-context.md](docs/c4/c4-context.md) |
-| Code quality checker | [docs/EVALUATION.md](docs/EVALUATION.md) |
+| Code quality checker | [docs/process/EVALUATION.md](docs/process/EVALUATION.md) |
 | Upgrading from 0.x | [docs/upgrade-from-0.x.md](docs/upgrade-from-0.x.md) |
 | Release notes | [docs/releases/](docs/releases/) |
 

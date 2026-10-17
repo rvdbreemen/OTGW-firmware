@@ -35,6 +35,8 @@ If you cannot reach the unit over the network, `--no-backup` migrates without sa
 
 Settings and WiFi are kept. The filesystem (web UI) is updated separately, on the same `/update` page, without safeboot.
 
+A filesystem update **resets your settings**: `settings.ini` lives on the same filesystem as the web UI. WiFi is kept, because the credentials are stored elsewhere. Download `settings.ini` (File Explorer, or `http://<unit>/settings.ini`) before you upload a `.littlefs.bin`, then upload it again and restart the unit. A firmware update through safeboot does not touch the settings.
+
 When an admin password is set, safeboot asks for it too (user `admin`).
 
 ## 3. When something goes wrong
@@ -51,6 +53,12 @@ Unlike phones and PCs, the unit has room for only one firmware, so there is no a
 ## 4. Order when you update without migrating
 
 On a unit that is still on the old layout, update the firmware first and the filesystem second. Older firmware looks for the classic `index.html` at `/`. A new filesystem on old firmware therefore shows the File Explorer there; the web UI is still at `/v2.html`.
+
+## 5. Boards with 8 MB flash
+
+The release images use the 4 MB layout on every board, also on a module with 8 MB flash. Such a unit updates through safeboot like any other, and the extra flash stays unused.
+
+Only a unit flashed with a custom build that has two firmware slots (`ota_0` and `ota_1`) takes the `.ino.bin` directly on `/update`, without safeboot. The firmware detects this at runtime. No release image ships that layout.
 
 ## Background
 
