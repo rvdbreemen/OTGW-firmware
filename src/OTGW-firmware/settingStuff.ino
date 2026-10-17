@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.433
+**  Version  : v2.0.0-alpha.434
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -430,10 +430,9 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATblefailover"), settings.sat.bBleFailover);
   writeJsonStringKV(file, F("SATblemac"), settings.sat.sBleMAC);
   writeJsonIntKV(file, F("SATbleinterval"), settings.sat.iBleInterval);
-  // TASK-895: name-prefix filter + ingestion toggle. Prefix is user text →
-  // escape before serialising; the bool is a plain key.
-  escapeJsonStringTo(settings.sat.sBleNamePrefix, cMsg, sizeof(cMsg));
-  writeJsonStringKV(file, F("SATblenameprefix"), cMsg);
+  // TASK-895: name-prefix filter + ingestion toggle. The prefix is user text;
+  // writeJsonStringKV escapes it (pre-escaping into cMsg ran away in place, TASK-1245).
+  writeJsonStringKV(file, F("SATblenameprefix"), settings.sat.sBleNamePrefix);
   writeJsonBoolKV(file, F("SATblenamefilteringest"), settings.sat.bBleNameFilterIngest);
   // TASK-508: BLE roster — 8 × {mac, label, bindkey} + count. Indexed-key pattern
   // mirrors fAreaWeight precedent. Empty slots serialise as "" — readers

@@ -1,9 +1,11 @@
 ---
 id: TASK-1245
 title: 'settings.ini: SATblenameprefix is escaped twice, in place in cMsg'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-17 21:53'
+updated_date: '2026-10-17 21:57'
 labels:
   - bug
   - settings

@@ -2357,6 +2357,9 @@ class WorkspaceEvaluator:
             if direct:
                 problems.append(f"{len(direct)} direct file write(s) in writeSettings() bypass the separator, "
                                 f"e.g. {direct[0][:60]}")
+            # The helpers escape into cMsg; pre-escaping into cMsg escapes in place and runs away (TASK-1245).
+            if "escapeJsonStringTo" in body:
+                problems.append("writeSettings() escapes a value itself; pass it raw, the helpers escape")
         if problems:
             self.add_result(EvaluationResult(
                 "Coding", "settings.ini JSON separators", "FAIL",
