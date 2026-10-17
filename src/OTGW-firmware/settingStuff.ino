@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.434
+**  Version  : v2.0.0-alpha.435
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -704,6 +704,20 @@ void readSettings(bool show)
 
 
 //=======================================================================
+// Parse a float setting and clamp it to [lo, hi]. A non-finite input ("nan",
+// "inf") keeps the current value: constrain() passes NaN through, and a NaN
+// would be written as 'nan' into settings.ini and the REST JSON (TASK-1243).
+static float clampSettingFloat(const char* newValue, float current, float lo, float hi)
+{
+  float v = strtof(newValue, nullptr);
+  if (!isfinite(v)) {
+    DebugTf(PSTR("[Settings] Ignoring non-finite value [%s], keeping %.2f\r\n"), newValue, current);
+    return current;
+  }
+  return constrain(v, lo, hi);
+}
+
+//=======================================================================
 void updateSetting(const char *field, const char *newValue)
 { //do not just trust the caller to do the right thing, server side validation is here!
   // Mask password fields in debug log to avoid leaking credentials
@@ -981,26 +995,26 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATsystem")) == 0)          settings.sat.iHeatingSystem = constrain(atoi(newValue), 0, 2);  // 0=auto,1=radiators,2=underfloor
   else if (strcasecmp_P(field, PSTR("SATsource")) == 0)          settings.sat.iHeatingSource = constrain(atoi(newValue), 0, 3);  // 0=auto,1=gas_boiler,2=heat_pump,3=hybrid (TASK-891.8)
   else if (strcasecmp_P(field, PSTR("SAThpcycle")) == 0)         settings.sat.iHpCycleSeconds = constrain(atoi(newValue), 1800, 2400);  // heat-pump cycle: 1800=2/hr, 2400=1.5/hr
-  else if (strcasecmp_P(field, PSTR("SATtargettemp")) == 0)      settings.sat.fTargetTemp = constrain(atof(newValue), 5.0f, 30.0f);
-  else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0)     settings.sat.fHeatingCurveCoeff = constrain(atof(newValue), 0.1f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("SATdeadband")) == 0)        settings.sat.fDeadband = constrain(atof(newValue), 0.05f, 2.0f);
+  else if (strcasecmp_P(field, PSTR("SATtargettemp")) == 0)      settings.sat.fTargetTemp = clampSettingFloat(newValue, settings.sat.fTargetTemp, 5.0f, 30.0f);
+  else if (strcasecmp_P(field, PSTR("SATcoefficient")) == 0)     settings.sat.fHeatingCurveCoeff = clampSettingFloat(newValue, settings.sat.fHeatingCurveCoeff, 0.1f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATdeadband")) == 0)        settings.sat.fDeadband = clampSettingFloat(newValue, settings.sat.fDeadband, 0.05f, 2.0f);
   else if (strcasecmp_P(field, PSTR("SATinterval")) == 0) {
     settings.sat.iControlInterval = constrain(atoi(newValue), 10, 300);
     CHANGE_INTERVAL_SEC(timerSATControl, settings.sat.iControlInterval);
   }
   else if (strcasecmp_P(field, PSTR("SATexternaltemp")) == 0)    settings.sat.bUseExternalTemp = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATpresetcomfort")) == 0)   settings.sat.fPresetComfort = constrain(atof(newValue), 15.0f, 28.0f);
-  else if (strcasecmp_P(field, PSTR("SATpreseteco")) == 0)       settings.sat.fPresetEco = constrain(atof(newValue), 10.0f, 22.0f);
-  else if (strcasecmp_P(field, PSTR("SATpresetaway")) == 0)      settings.sat.fPresetAway = constrain(atof(newValue), 5.0f, 18.0f);
-  else if (strcasecmp_P(field, PSTR("SATpresetsleep")) == 0)     settings.sat.fPresetSleep = constrain(atof(newValue), 5.0f, 25.0f);
-  else if (strcasecmp_P(field, PSTR("SATpresetactivity")) == 0)  settings.sat.fPresetActivity = constrain(atof(newValue), 5.0f, 20.0f);
-  else if (strcasecmp_P(field, PSTR("SATpresethome")) == 0)      settings.sat.fPresetHome = constrain(atof(newValue), 10.0f, 25.0f);
+  else if (strcasecmp_P(field, PSTR("SATpresetcomfort")) == 0)   settings.sat.fPresetComfort = clampSettingFloat(newValue, settings.sat.fPresetComfort, 15.0f, 28.0f);
+  else if (strcasecmp_P(field, PSTR("SATpreseteco")) == 0)       settings.sat.fPresetEco = clampSettingFloat(newValue, settings.sat.fPresetEco, 10.0f, 22.0f);
+  else if (strcasecmp_P(field, PSTR("SATpresetaway")) == 0)      settings.sat.fPresetAway = clampSettingFloat(newValue, settings.sat.fPresetAway, 5.0f, 18.0f);
+  else if (strcasecmp_P(field, PSTR("SATpresetsleep")) == 0)     settings.sat.fPresetSleep = clampSettingFloat(newValue, settings.sat.fPresetSleep, 5.0f, 25.0f);
+  else if (strcasecmp_P(field, PSTR("SATpresetactivity")) == 0)  settings.sat.fPresetActivity = clampSettingFloat(newValue, settings.sat.fPresetActivity, 5.0f, 20.0f);
+  else if (strcasecmp_P(field, PSTR("SATpresethome")) == 0)      settings.sat.fPresetHome = clampSettingFloat(newValue, settings.sat.fPresetHome, 10.0f, 25.0f);
   else if (strcasecmp_P(field, PSTR("SATpwmautoswitch")) == 0)   settings.sat.bPwmAutoSwitch = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATmaxmodulation")) == 0)   settings.sat.iMaxRelModulation = constrain(atoi(newValue), 0, 100);
-  else if (strcasecmp_P(field, PSTR("SATovershootmargin")) == 0) settings.sat.fOvershootMargin = constrain(atof(newValue), 0.5f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = constrain(atof(newValue), 0.0f, 120.0f);
-  else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = constrain(atof(newValue), 0.0f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = constrain(atof(newValue), 0.0f, 60.0f);
+  else if (strcasecmp_P(field, PSTR("SATovershootmargin")) == 0) settings.sat.fOvershootMargin = clampSettingFloat(newValue, settings.sat.fOvershootMargin, 0.5f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = clampSettingFloat(newValue, settings.sat.fModSupDelay, 0.0f, 120.0f);
+  else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = clampSettingFloat(newValue, settings.sat.fModSupOffset, 0.0f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = clampSettingFloat(newValue, settings.sat.fDhwSetpoint, 0.0f, 60.0f);
   else if (strcasecmp_P(field, PSTR("SATdhwenabled")) == 0)     settings.sat.bDhwEnabled = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATdhwenable")) == 0) {
     // TASK-516: master DHW enable. Persist always; only emit HW= when boiler
@@ -1017,19 +1031,19 @@ void updateSetting(const char *field, const char *newValue)
     }
   }
   else if (strcasecmp_P(field, PSTR("SATpushsetpoint")) == 0)   settings.sat.bPushSetpoint = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATflameoffset")) == 0)    settings.sat.fFlameOffOffset = constrain(atof(newValue), 0.0f, 30.0f);
+  else if (strcasecmp_P(field, PSTR("SATflameoffset")) == 0)    settings.sat.fFlameOffOffset = clampSettingFloat(newValue, settings.sat.fFlameOffOffset, 0.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("SATwindowdetect")) == 0)  settings.sat.bWindowDetection = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATwindowminsec")) == 0)  settings.sat.iWindowMinOpenSec = constrain(atoi(newValue), 10, 600);
-  else if (strcasecmp_P(field, PSTR("SATtempstep")) == 0)     settings.sat.fTargetTempStep = constrain(atof(newValue), 0.1f, 1.0f);
+  else if (strcasecmp_P(field, PSTR("SATtempstep")) == 0)     settings.sat.fTargetTempStep = clampSettingFloat(newValue, settings.sat.fTargetTempStep, 0.1f, 1.0f);
   else if (strcasecmp_P(field, PSTR("SATforcepwm")) == 0)     settings.sat.bForcePWM = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATflowoffset")) == 0)   settings.sat.fFlowOffset = constrain(atof(newValue), 0.5f, 10.0f);
-  else if (strcasecmp_P(field, PSTR("SATminpressure")) == 0)  settings.sat.fMinPressure = constrain(atof(newValue), 0.0f, 3.0f);
-  else if (strcasecmp_P(field, PSTR("SATmaxpressure")) == 0)  settings.sat.fMaxPressure = constrain(atof(newValue), 1.0f, 4.0f);
-  else if (strcasecmp_P(field, PSTR("SATmaxpressdrop")) == 0) settings.sat.fMaxPressureDrop = constrain(atof(newValue), 0.05f, 2.0f);
+  else if (strcasecmp_P(field, PSTR("SATflowoffset")) == 0)   settings.sat.fFlowOffset = clampSettingFloat(newValue, settings.sat.fFlowOffset, 0.5f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATminpressure")) == 0)  settings.sat.fMinPressure = clampSettingFloat(newValue, settings.sat.fMinPressure, 0.0f, 3.0f);
+  else if (strcasecmp_P(field, PSTR("SATmaxpressure")) == 0)  settings.sat.fMaxPressure = clampSettingFloat(newValue, settings.sat.fMaxPressure, 1.0f, 4.0f);
+  else if (strcasecmp_P(field, PSTR("SATmaxpressdrop")) == 0) settings.sat.fMaxPressureDrop = clampSettingFloat(newValue, settings.sat.fMaxPressureDrop, 0.05f, 2.0f);
   else if (strcasecmp_P(field, PSTR("SATmanufacturer")) == 0) settings.sat.iManufacturer = constrain(atoi(newValue), 0, SAT_MFR_COUNT - 1);
   else if (strcasecmp_P(field, PSTR("SATweatherenable")) == 0) settings.sat.bWeatherEnable = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATweatherlat")) == 0)    settings.sat.fWeatherLat = constrain(atof(newValue), -90.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("SATweatherlon")) == 0)    settings.sat.fWeatherLon = constrain(atof(newValue), -180.0f, 180.0f);
+  else if (strcasecmp_P(field, PSTR("SATweatherlat")) == 0)    settings.sat.fWeatherLat = clampSettingFloat(newValue, settings.sat.fWeatherLat, -90.0f, 90.0f);
+  else if (strcasecmp_P(field, PSTR("SATweatherlon")) == 0)    settings.sat.fWeatherLon = clampSettingFloat(newValue, settings.sat.fWeatherLon, -180.0f, 180.0f);
   else if (strcasecmp_P(field, PSTR("SATweatherinterval")) == 0) {
     // TASK-511 (TASK-004 from OWM onboarding plan): hard floor at 900 s
     // (15 min) to honour the OWM free-tier rate-limit promise. Both
@@ -1044,9 +1058,9 @@ void updateSetting(const char *field, const char *newValue)
       strlcpy(settings.sat.sWeatherApiKey, newValue, sizeof(settings.sat.sWeatherApiKey));
     }
   }
-  else if (strcasecmp_P(field, PSTR("SATboilercapacity")) == 0) settings.sat.fBoilerCapacity = constrain(atof(newValue), 1.0f, 100.0f);
-  else if (strcasecmp_P(field, PSTR("SATboilerratedkw")) == 0)   settings.sat.fBoilerRatedKW = constrain(atof(newValue), 0.0f, 200.0f);
-  else if (strcasecmp_P(field, PSTR("SATboilerefficiency")) == 0) settings.sat.fBoilerEfficiency = constrain(atof(newValue), 0.5f, 1.0f);
+  else if (strcasecmp_P(field, PSTR("SATboilercapacity")) == 0) settings.sat.fBoilerCapacity = clampSettingFloat(newValue, settings.sat.fBoilerCapacity, 1.0f, 100.0f);
+  else if (strcasecmp_P(field, PSTR("SATboilerratedkw")) == 0)   settings.sat.fBoilerRatedKW = clampSettingFloat(newValue, settings.sat.fBoilerRatedKW, 0.0f, 200.0f);
+  else if (strcasecmp_P(field, PSTR("SATboilerefficiency")) == 0) settings.sat.fBoilerEfficiency = clampSettingFloat(newValue, settings.sat.fBoilerEfficiency, 0.5f, 1.0f);
   else if (strcasecmp_P(field, PSTR("SATpresetsync")) == 0) settings.sat.bPresetSync = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATpresetsynctopic")) == 0) strlcpy(settings.sat.sPresetSyncTopic, newValue, sizeof(settings.sat.sPresetSyncTopic));
   else if (strcasecmp_P(field, PSTR("SATsimulation")) == 0) {
@@ -1068,34 +1082,34 @@ void updateSetting(const char *field, const char *newValue)
       }
     }
   }
-  else if (strcasecmp_P(field, PSTR("SATsimheatrate")) == 0) settings.sat.fSimHeatRate = constrain(atof(newValue), 0.01f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("SATsimcoolrate")) == 0) settings.sat.fSimCoolRate = constrain(atof(newValue), 0.01f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("SATthermalcoeff")) == 0) settings.sat.fThermalCoeff = constrain(atof(newValue), 0.005f, 0.3f);
+  else if (strcasecmp_P(field, PSTR("SATsimheatrate")) == 0) settings.sat.fSimHeatRate = clampSettingFloat(newValue, settings.sat.fSimHeatRate, 0.01f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATsimcoolrate")) == 0) settings.sat.fSimCoolRate = clampSettingFloat(newValue, settings.sat.fSimCoolRate, 0.01f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATthermalcoeff")) == 0) settings.sat.fThermalCoeff = clampSettingFloat(newValue, settings.sat.fThermalCoeff, 0.005f, 0.3f);
   else if (strcasecmp_P(field, PSTR("SATsolargain")) == 0) settings.sat.bSolarGainEnable = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATsolarminrise")) == 0) settings.sat.fSolarMinRiseRate = constrain(atof(newValue), 0.1f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("SATsolaroffset")) == 0) settings.sat.fSolarSetpointOffset = constrain(atof(newValue), 0.5f, 10.0f);
-  else if (strcasecmp_P(field, PSTR("SATsolarminelev")) == 0) settings.sat.fSolarMinElevation = constrain(atof(newValue), -10.0f, 45.0f);
+  else if (strcasecmp_P(field, PSTR("SATsolarminrise")) == 0) settings.sat.fSolarMinRiseRate = clampSettingFloat(newValue, settings.sat.fSolarMinRiseRate, 0.1f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATsolaroffset")) == 0) settings.sat.fSolarSetpointOffset = clampSettingFloat(newValue, settings.sat.fSolarSetpointOffset, 0.5f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATsolarminelev")) == 0) settings.sat.fSolarMinElevation = clampSettingFloat(newValue, settings.sat.fSolarMinElevation, -10.0f, 45.0f);
   else if (strcasecmp_P(field, PSTR("SATsummersimmer")) == 0) settings.sat.bSummerSimmer = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATsummerthreshold")) == 0) settings.sat.fSummerThreshold = constrain(atof(newValue), 5.0f, 35.0f);
+  else if (strcasecmp_P(field, PSTR("SATsummerthreshold")) == 0) settings.sat.fSummerThreshold = clampSettingFloat(newValue, settings.sat.fSummerThreshold, 5.0f, 35.0f);
   else if (strcasecmp_P(field, PSTR("SATsummerminhours")) == 0) settings.sat.iSummerMinHours = constrain(atoi(newValue), 1, 48);
   else if (strcasecmp_P(field, PSTR("SATcomfortadjust")) == 0) settings.sat.bComfortAdjust = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATcomforthumidity")) == 0) settings.sat.fComfortHumidity = constrain(atof(newValue), 10.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("SATcomfortmaxoffset")) == 0) settings.sat.fComfortMaxOffset = constrain(atof(newValue), 0.0f, 3.0f);
+  else if (strcasecmp_P(field, PSTR("SATcomforthumidity")) == 0) settings.sat.fComfortHumidity = clampSettingFloat(newValue, settings.sat.fComfortHumidity, 10.0f, 90.0f);
+  else if (strcasecmp_P(field, PSTR("SATcomfortmaxoffset")) == 0) settings.sat.fComfortMaxOffset = clampSettingFloat(newValue, settings.sat.fComfortMaxOffset, 0.0f, 3.0f);
   else if (strcasecmp_P(field, PSTR("SATmultiarea")) == 0) settings.sat.bMultiArea = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATmultiareacount")) == 0) settings.sat.iMultiAreaCount = constrain(atoi(newValue), 0, 4);
-  else if (strcasecmp_P(field, PSTR("SATareaweight0")) == 0) settings.sat.fAreaWeight[0] = constrain(atof(newValue), 0.0f, 10.0f);
-  else if (strcasecmp_P(field, PSTR("SATareaweight1")) == 0) settings.sat.fAreaWeight[1] = constrain(atof(newValue), 0.0f, 10.0f);
-  else if (strcasecmp_P(field, PSTR("SATareaweight2")) == 0) settings.sat.fAreaWeight[2] = constrain(atof(newValue), 0.0f, 10.0f);
-  else if (strcasecmp_P(field, PSTR("SATareaweight3")) == 0) settings.sat.fAreaWeight[3] = constrain(atof(newValue), 0.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATareaweight0")) == 0) settings.sat.fAreaWeight[0] = clampSettingFloat(newValue, settings.sat.fAreaWeight[0], 0.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATareaweight1")) == 0) settings.sat.fAreaWeight[1] = clampSettingFloat(newValue, settings.sat.fAreaWeight[1], 0.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATareaweight2")) == 0) settings.sat.fAreaWeight[2] = clampSettingFloat(newValue, settings.sat.fAreaWeight[2], 0.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATareaweight3")) == 0) settings.sat.fAreaWeight[3] = clampSettingFloat(newValue, settings.sat.fAreaWeight[3], 0.0f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATautotune")) == 0) settings.sat.bAutoTune = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATautotunerate")) == 0) settings.sat.fAutoTuneRate = constrain(atof(newValue), 0.005f, 0.1f);
+  else if (strcasecmp_P(field, PSTR("SATautotunerate")) == 0) settings.sat.fAutoTuneRate = clampSettingFloat(newValue, settings.sat.fAutoTuneRate, 0.005f, 0.1f);
   // SAT Python parity settings (Task #82)
   else if (strcasecmp_P(field, PSTR("SATsensormaxage")) == 0)  settings.sat.iSensorMaxAgeS = constrain((uint32_t)atol(newValue), 60UL, 86400UL);
   else if (strcasecmp_P(field, PSTR("SATerrormon")) == 0)      settings.sat.bErrorMonitoring = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("SATautogains")) == 0)     settings.sat.fAutoGainsValue = constrain(atof(newValue), 0.1f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("SATautogains")) == 0)     settings.sat.fAutoGainsValue = clampSettingFloat(newValue, settings.sat.fAutoGainsValue, 0.1f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATheatingmode")) == 0)   settings.sat.iHeatingMode = constrain(atoi(newValue), 0, 1);
   else if (strcasecmp_P(field, PSTR("SATcyclesperhour")) == 0) settings.sat.iCyclesPerHour = constrain(atoi(newValue), 2, 6);
-  else if (strcasecmp_P(field, PSTR("SATvalveoffset")) == 0)   settings.sat.fValveOffset = constrain(atof(newValue), -1.0f, 1.0f);
+  else if (strcasecmp_P(field, PSTR("SATvalveoffset")) == 0)   settings.sat.fValveOffset = clampSettingFloat(newValue, settings.sat.fValveOffset, -1.0f, 1.0f);
   else if (strcasecmp_P(field, PSTR("SATthermalcomfort")) == 0) settings.sat.bThermalComfort = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SAThumiditytimeout")) == 0) settings.sat.iHumidityTimeoutS = (uint16_t)constrain(atoi(newValue), 60, 65535);
   else if (strcasecmp_P(field, PSTR("SATsolarfreezeint")) == 0) settings.sat.bSolarFreezeIntegral = EVALBOOLEAN(newValue);
@@ -1103,7 +1117,7 @@ void updateSetting(const char *field, const char *newValue)
   // Multi-zone PID (Task #233)
   else if (strcasecmp_P(field, PSTR("SATzonecount")) == 0)    settings.sat.iZoneCount = (uint8_t)constrain(atoi(newValue), 1, 4);
   else if (strcasecmp_P(field, PSTR("SATzonetimeout")) == 0)  settings.sat.iZoneTimeoutS = (uint16_t)constrain(atoi(newValue), 30, 3600);
-  else if (strcasecmp_P(field, PSTR("SATzoneheadroom")) == 0) settings.sat.fZoneAggregationHeadroom = constrain(atof(newValue), 0.0f, 15.0f);
+  else if (strcasecmp_P(field, PSTR("SATzoneheadroom")) == 0) settings.sat.fZoneAggregationHeadroom = clampSettingFloat(newValue, settings.sat.fZoneAggregationHeadroom, 0.0f, 15.0f);
   // TASK-587: DS18B20 sensor-to-SAT-area mapping
   else if (strcasecmp_P(field, PSTR("SATsensorarea0")) == 0) strlcpy(settings.sat.sSensorArea[0], newValue, sizeof(settings.sat.sSensorArea[0]));
   else if (strcasecmp_P(field, PSTR("SATsensorarea1")) == 0) strlcpy(settings.sat.sSensorArea[1], newValue, sizeof(settings.sat.sSensorArea[1]));
@@ -1120,8 +1134,8 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("SATpvboostthresholdw")) == 0)     settings.sat.iPvBoostThresholdW = (uint16_t)constrain(atoi(newValue), 100, 10000);
   else if (strcasecmp_P(field, PSTR("SATpvboostholds")) == 0)          settings.sat.iPvBoostHoldS = (uint16_t)constrain(atoi(newValue), 30, 600);
-  else if (strcasecmp_P(field, PSTR("SATpvboostdeltac")) == 0)         settings.sat.fPvBoostDeltaC = constrain(strtof(newValue, nullptr), 0.5f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("SATpvboostmaxindoorc")) == 0)     settings.sat.fPvBoostMaxIndoorC = constrain(strtof(newValue, nullptr), 18.0f, 28.0f);
+  else if (strcasecmp_P(field, PSTR("SATpvboostdeltac")) == 0)         settings.sat.fPvBoostDeltaC = clampSettingFloat(newValue, settings.sat.fPvBoostDeltaC, 0.5f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("SATpvboostmaxindoorc")) == 0)     settings.sat.fPvBoostMaxIndoorC = clampSettingFloat(newValue, settings.sat.fPvBoostMaxIndoorC, 18.0f, 28.0f);
   else if (strcasecmp_P(field, PSTR("SATpvboostmaxdurationmin")) == 0) settings.sat.iPvBoostMaxDurationMin = (uint16_t)constrain(atoi(newValue), 30, 1440);
   // --- BLE temperature sensor settings (Task #20) ---
   // ESP-abstraction Tier 2 (TASK-742): parsed unconditionally so a settings.json
@@ -1197,7 +1211,7 @@ void updateSetting(const char *field, const char *newValue)
   // --- OT-direct settings ---
   else if (strcasecmp_P(field, PSTR("OTDmode")) == 0)           settings.otd.iMode = constrain(atoi(newValue), 0, 4);
   else if (strcasecmp_P(field, PSTR("OTDautodetect")) == 0)    settings.otd.bAutoDetect = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = constrain(atof(newValue), 1.0f, 30.0f);
+  else if (strcasecmp_P(field, PSTR("OTDsetbacktemp")) == 0)    settings.otd.fSetbackTemp = clampSettingFloat(newValue, settings.otd.fSetbackTemp, 1.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("OTDsetbacktimeout")) == 0) settings.otd.iSetbackTimeout = constrain(atoi(newValue), 5, 255);
   else if (strcasecmp_P(field, PSTR("OTDenableslave")) == 0)   settings.otd.bEnableSlave = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDsummermode")) == 0)    settings.otd.bSummerMode = EVALBOOLEAN(newValue);
@@ -1206,19 +1220,19 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("OTDhasbypassrelay")) == 0) settings.otd.bHasBypassRelay = EVALBOOLEAN(newValue);
   // --- TASK-183: PI room compensation + heating curve ---
   else if (strcasecmp_P(field, PSTR("OTDchmode")) == 0)         settings.otd.iCHMode = constrain(atoi(newValue), 0, 2);
-  else if (strcasecmp_P(field, PSTR("OTDflowtemp")) == 0)       settings.otd.fFlowTemp = constrain(atof(newValue), 5.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("OTDflowmax")) == 0)        settings.otd.fFlowMax = constrain(atof(newValue), 20.0f, 90.0f);
-  else if (strcasecmp_P(field, PSTR("OTDroomsetpoint")) == 0)   settings.otd.fRoomSetpoint = constrain(atof(newValue), 5.0f, 30.0f);
-  else if (strcasecmp_P(field, PSTR("OTDgradient")) == 0)       settings.otd.fGradient = constrain(atof(newValue), 0.1f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("OTDexponent")) == 0)       settings.otd.fExponent = constrain(atof(newValue), 0.5f, 2.0f);
-  else if (strcasecmp_P(field, PSTR("OTDoffset")) == 0)         settings.otd.fOffset = constrain(atof(newValue), -10.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("OTDflowtemp")) == 0)       settings.otd.fFlowTemp = clampSettingFloat(newValue, settings.otd.fFlowTemp, 5.0f, 90.0f);
+  else if (strcasecmp_P(field, PSTR("OTDflowmax")) == 0)        settings.otd.fFlowMax = clampSettingFloat(newValue, settings.otd.fFlowMax, 20.0f, 90.0f);
+  else if (strcasecmp_P(field, PSTR("OTDroomsetpoint")) == 0)   settings.otd.fRoomSetpoint = clampSettingFloat(newValue, settings.otd.fRoomSetpoint, 5.0f, 30.0f);
+  else if (strcasecmp_P(field, PSTR("OTDgradient")) == 0)       settings.otd.fGradient = clampSettingFloat(newValue, settings.otd.fGradient, 0.1f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("OTDexponent")) == 0)       settings.otd.fExponent = clampSettingFloat(newValue, settings.otd.fExponent, 0.5f, 2.0f);
+  else if (strcasecmp_P(field, PSTR("OTDoffset")) == 0)         settings.otd.fOffset = clampSettingFloat(newValue, settings.otd.fOffset, -10.0f, 10.0f);
   else if (strcasecmp_P(field, PSTR("OTDroomcomp")) == 0)       settings.otd.bRoomCompEnabled = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("OTDkp")) == 0)             settings.otd.fKp = constrain(atof(newValue), 0.0f, 20.0f);
-  else if (strcasecmp_P(field, PSTR("OTDki")) == 0)             settings.otd.fKi = constrain(atof(newValue), 0.0f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("OTDkboost")) == 0)         settings.otd.fKboost = constrain(atof(newValue), 0.0f, 10.0f);
+  else if (strcasecmp_P(field, PSTR("OTDkp")) == 0)             settings.otd.fKp = clampSettingFloat(newValue, settings.otd.fKp, 0.0f, 20.0f);
+  else if (strcasecmp_P(field, PSTR("OTDki")) == 0)             settings.otd.fKi = clampSettingFloat(newValue, settings.otd.fKi, 0.0f, 5.0f);
+  else if (strcasecmp_P(field, PSTR("OTDkboost")) == 0)         settings.otd.fKboost = clampSettingFloat(newValue, settings.otd.fKboost, 0.0f, 10.0f);
   // --- TASK-582: CH hysteresis deadband ---
   else if (strcasecmp_P(field, PSTR("OTDhysteresisenable")) == 0) settings.otd.bHysteresisEnable = EVALBOOLEAN(newValue);
-  else if (strcasecmp_P(field, PSTR("OTDhysteresis")) == 0)       settings.otd.fHysteresis = constrain(atof(newValue), 0.0f, 2.0f);
+  else if (strcasecmp_P(field, PSTR("OTDhysteresis")) == 0)       settings.otd.fHysteresis = clampSettingFloat(newValue, settings.otd.fHysteresis, 0.0f, 2.0f);
   // --- TASK-584: ventilation override persistence ---
   else if (strcasecmp_P(field, PSTR("OTDventenable")) == 0)      settings.otd.bVentEnable = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("OTDopenbypass")) == 0)      settings.otd.bOpenBypass = EVALBOOLEAN(newValue);

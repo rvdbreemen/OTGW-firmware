@@ -2335,7 +2335,7 @@ class WorkspaceEvaluator:
         shows on the device. The writeJson*KV helpers must own the separator; a per-call
         withComma flag let an appended (or #if-ed) key drop a comma (TASK-1242).
         """
-        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== settings.ini JSON separators (TASK-1244) ==={Colors.ENDC}")
+        print(f"\n{Colors.BOLD}{Colors.OKBLUE}=== settings.ini stays valid JSON (TASK-1242/1243/1244/1245) ==={Colors.ENDC}")
         src = self._read_fw("settingStuff.ino")
         problems = []
         if re.search(r"\bwithComma\b", src):
@@ -2360,15 +2360,21 @@ class WorkspaceEvaluator:
             # The helpers escape into cMsg; pre-escaping into cMsg escapes in place and runs away (TASK-1245).
             if "escapeJsonStringTo" in body:
                 problems.append("writeSettings() escapes a value itself; pass it raw, the helpers escape")
+        # A non-finite float is written as 'nan'/'inf', which is not JSON (TASK-1243).
+        outside_helper = re.sub(r"static float clampSettingFloat\(.*?\n\}", "", src, flags=re.S)
+        raw_floats = re.findall(r"\b(?:atof|strtof)\s*\(\s*newValue", outside_helper)
+        if raw_floats:
+            problems.append(f"{len(raw_floats)} float setting(s) parse newValue without clampSettingFloat() "
+                            f"(NaN/inf would reach settings.ini and REST)")
         if problems:
             self.add_result(EvaluationResult(
-                "Coding", "settings.ini JSON separators", "FAIL",
+                "Coding", "settings.ini valid JSON", "FAIL",
                 "; ".join(problems),
                 "The writeJson*KV helpers write ',\\n' before every entry but the first "
                 "(settingsJsonFirstEntry, reset by writeSettings()); callers pass no comma flag."))
         else:
             self.add_result(EvaluationResult(
-                "Coding", "settings.ini JSON separators", "PASS",
+                "Coding", "settings.ini valid JSON", "PASS",
                 "writeJson*KV helpers own the separator; no per-call comma flags"))
 
     def check_discovery_autoheal_shape(self):

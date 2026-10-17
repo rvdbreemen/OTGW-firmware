@@ -1,9 +1,11 @@
 ---
 id: TASK-1243
 title: settings.ini can hold 'nan' for a float setting (invalid JSON)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-17 20:54'
+updated_date: '2026-10-17 22:07'
 labels:
   - bug
   - settings
