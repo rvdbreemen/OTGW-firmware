@@ -3,11 +3,11 @@ id: TASK-1250
 title: >-
   Fix MQTT staying down for the rest of the boot when the broker DNS lookup
   fails after a reconnect
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-18 14:26'
-updated_date: '2026-10-18 20:42'
+updated_date: '2026-10-18 23:29'
 labels:
   - bug
   - mqtt
@@ -68,16 +68,14 @@ AC evidence and deviations:
 - v1 = committed fix 2cefb70: recover scenario (otgwtest-c): connected, but only 220 s after the name became resolvable; rename c->d while connected: 13 publishes reached the PREVIOUS broker session in the 75 s after the rename (60 in the earlier 4.5 min window), 0 session drops. While publishing over that old session each discovery drip took 10 s to 2 min (telnet: '[drip] publishing discovery for OT ID 0' 22:23:09, next line 22:25:24), the loop starved (HTTP timeouts, uptime counter lost ~5.5 of 7.5 min, uptime is counted in doTaskEvery1s with SKIP_MISSED_TICKS, no reboot: reboot_log/bootcount unchanged), which is why the re-lookup came so late.
 - v2 = 93549213d (doMqttDisconnect when the name has no usable address): recover (otgwtest-e): mqttconnected=false while unresolvable, connected 42 s after the name became resolvable (one wait cycle); rename e->f: old session closed 7 s after the rename (mosq.log 22:34:19 disconnected), 0 publishes to the previous broker in 75 s, 0 HTTP failures in 98 polls; f connected 32 s after it became resolvable (a first attempt failed because my advertiser for f never started, a rig fault, re-run). On the fresh session every drip publish took 9-200 ms.
 - Rig faults owned: taskkill on MSYS PIDs left 3 pollers and 2 telnet loggers running during part of the v1/v2 runs (same conditions for both); cleaned up at 22:40 by command line.
+
+2026-10-19 final hardware evidence (v2 = 93549213d, built as 1.7.8-beta.3+9354921, 773776 B, evaluate --quick 37/37):
+AC3 on hardware: name made unresolvable (advertiser stopped) while the unit held 192.168.88.32 for that same name; forcing MQTT_STATE_INIT gave 23:16:49 'MQTT: lookup of [otgwtest-f.local] failed, using the last known address 192.168.88.32' and a new session at 23:16:50 (mosq.log). The old code wrote 255.255.255.255 in the same situation (21:43:00 'IP[255.255.255.255]').
+AC1/AC2 via a WiFi reconnect: in the TASK-1248 PIC run the forced WiFi reconnect at 23:26:58 happened while mDNS from the unit was blocked; 23:29:06 'lookup of [otgwtest-f.local] failed, using the last known address' followed. The rest of the AC1/AC2 evidence used a settings save, which runs the same startMQTT() -> INIT path.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-MQTT now recovers by itself after a failed broker name lookup (1.x, otgw-1.x.x, not yet in a beta).
-
-Cause: MQTT_STATE_INIT was the only state that looked the broker name up, and it wrote a failed result (INADDR_NONE) over the broker address and the text PubSubClient points to before checking it; the state machine then never returned to INIT. One failed lookup (DNS not answering after a router reboot, at boot or after a WiFi reconnect) kept MQTT down until a WiFi reconnect, a settings save or a restart. Brokers set by IP address were not affected.
-
-Fix: a failed lookup keeps the last good address for the same name (MQTTbrokerResolvedFor ties address and name, so a renamed broker never falls back to the old one); after every 42 s reconnect wait the name is looked up again, which also finds a broker that moved; the lookup keeps the core's 10 s timeout; the '10 minutes' texts now say 42 seconds.
-
-Evidence: host test test/host/test_mqttBrokerAddress.cpp against the real mqttBrokerAddress.h, red then green (7/13 failing on the old decision, 3/15 on the name-blind variant of the first fix, 15/15 on the final code); firmware build green; evaluate.py --quick 37/37; all six host suites green. Deviation on AC1/AC2: the state transitions around the decision, including the re-resolve after the wait, are modelled in the test rather than compiled from handleMQTT(). Not tested on hardware. Commits 41608bb07, 01025ea68, 07ffbebd0, 4b3e950d2.
+MQTT broker lookup (MQTTstuff.ino + mqttBrokerAddress.h): a failed lookup keeps the last good address for the same name, the name is looked up again after every 42 s wait, a renamed broker never falls back to the previous broker's address, and (93549213d, found on the bench) a renamed broker that cannot be looked up gets its old session closed. Hardware evidence on the 1.x bench unit (own Mosquitto + mDNS names advertised from the PC): AC1 old 1.7.7 stayed disconnected 6.5 min after the name became resolvable; AC2 fix connected 42 s and 32 s after the name became resolvable; AC3 failed lookup used the last known address and reconnected; regression v1 vs v2: 13 publishes to the previous broker in 75 s and a starved loop on v1, 0 publishes and session closed in 7 s on v2. Host test 16/16 (red 2/16 on the v1 transitions). Build 773776 B, evaluate 37/37. Evidence: %LOCALAPPDATA%/OTGW-capture/bench-20261018/rig-1250 and rig-final. Deviation: the state transitions are modelled in the host test, the real ones were exercised on hardware.
 <!-- SECTION:FINAL_SUMMARY:END -->
