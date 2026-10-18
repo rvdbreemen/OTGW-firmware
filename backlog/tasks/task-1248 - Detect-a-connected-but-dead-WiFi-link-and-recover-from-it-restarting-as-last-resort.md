@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 09:50'
-updated_date: '2026-10-18 14:26'
+updated_date: '2026-10-18 15:04'
 labels:
   - bug
   - wifi
@@ -98,4 +98,6 @@ Released in v1.7.8-beta.2 (release commit 403636dc8, tag pushed, CI run 39131556
 - [minor 2/2] a broker blip after a witness proved the LAN alive can still trigger the fast path.
 - [minor 2/2, pre-existing] after a WiFi reconnect, a failed broker DNS lookup leaves MQTT down for the rest of the boot; the '10 minute' waits are 42 s. Filed separately.
 Decision needed from the maintainer: revert the fast path, or keep a narrowed variant (reconnect step only, MQTT required connected at the start of the streak, disabled once a witness blocked action). beta.3 not released.
+
+2026-10-18: maintainer chose to revert the fast path (revert commit on otgw-1.x.x, firmware build green at 773568 B, same size as the beta.2 build) and wait for field input on v1.7.8-beta.2 before changing thresholds.
 <!-- SECTION:NOTES:END -->
