@@ -316,6 +316,44 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
   return false;
 }
 
+// TASK-1247: the doRestart() reason survives the restart in RTC user memory, so
+// the next boot can write it into reboot_log.txt. Without it every planned
+// restart is the same "Software/System restart (4)". RTC user slots (4-byte
+// units): 64..95 hold the eboot OTA command, 96..97 the WiFi portal reset
+// counter (OTGW-firmware.ino); this record uses 100..112.
+#define REBOOT_REASON_RTC_SLOT  100
+#define REBOOT_REASON_MAGIC     0x4F545252UL  // "OTRR"
+
+struct RebootReasonRtc {
+  uint32_t magic;
+  char     reason[48];
+};
+
+static void storeRebootReason(const char *reason)
+{
+  RebootReasonRtc rec;
+  rec.magic = REBOOT_REASON_MAGIC;
+  strlcpy(rec.reason, reason ? reason : "?", sizeof(rec.reason));
+  ESP.rtcUserMemoryWrite(REBOOT_REASON_RTC_SLOT, reinterpret_cast<uint32_t*>(&rec), sizeof(rec));
+}
+
+// Copies the stored reason into out and clears the record. Returns false when
+// no valid record is present (power-on, or a reset that did not pass through
+// doRestart()). Called once per boot, so a reason is never reported twice.
+static bool takeRebootReason(char *out, size_t outSize)
+{
+  RebootReasonRtc rec;
+  if (!ESP.rtcUserMemoryRead(REBOOT_REASON_RTC_SLOT, reinterpret_cast<uint32_t*>(&rec), sizeof(rec))) return false;
+  const bool valid = (rec.magic == REBOOT_REASON_MAGIC);
+  if (valid) {
+    rec.reason[sizeof(rec.reason) - 1] = '\0';
+    strlcpy(out, rec.reason, outSize);
+  }
+  rec.magic = 0;
+  ESP.rtcUserMemoryWrite(REBOOT_REASON_RTC_SLOT, reinterpret_cast<uint32_t*>(&rec), sizeof(rec));
+  return valid;
+}
+
 bool updateRebootLog(String text)
 {
   #define REBOOTLOG_FILE "/reboot_log.txt"
@@ -391,6 +429,12 @@ bool updateRebootLog(String text)
 
       Debugf(PSTR("Fatal exception (%d): %s\r\n"),	rtc_info->exccause, log_line_excpt);
     }
+  }
+
+  char restartReason[48] = {0};
+  if (takeRebootReason(restartReason, sizeof(restartReason)) && errorCode == REASON_SOFT_RESTART) {
+    snprintf_P(log_line_excpt, sizeof(log_line_excpt), PSTR("- %s"), restartReason);
+    DebugTf(PSTR("restart reason: %s\r\n"), restartReason);
   }
 
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
@@ -637,6 +681,7 @@ void doRestart(const char* str) {
           (unsigned)getMinFreeHeap(),
           (unsigned)ESP.getMaxFreeBlockSize(),
           (unsigned)ESP.getHeapFragmentation());
+  storeRebootReason(str);  // TASK-1247: reported in reboot_log.txt after the restart
 
   uint32_t t = millis();
   flushSettings();        // persist any pending settings before reboot
