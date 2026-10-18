@@ -1,0 +1,37 @@
+---
+id: TASK-1251
+title: >-
+  Update the flash-zip README.txt / README_NL.txt for safeboot OTA and the
+  --migrate/--update modes
+status: In Progress
+assignee:
+  - '@claude'
+created_date: '2026-10-18 20:11'
+updated_date: '2026-10-18 20:15'
+labels:
+  - docs
+  - build
+dependencies: []
+priority: low
+ordinal: 384000
+---
+
+## Description
+
+<!-- SECTION:DESCRIPTION:BEGIN -->
+The README.txt and README_NL.txt that build.py writes into every *-flash.zip (_build_readme_en/_build_readme_nl) still describe the pre-ADR-191 flow: drag-drop .ino.bin + .littlefs.bin on /update, 'the flash scripts expose one path: factory reset', no word on the *-migrate-*.bin images in the zip. They also name the OTGW32 board in hardcoded text, which public-facing artifacts avoid. Source of truth: docs/guides/WIFI_FIRMWARE_UPDATE.md.
+<!-- SECTION:DESCRIPTION:END -->
+
+## Acceptance Criteria
+<!-- AC:BEGIN -->
+- [x] #1 Both READMEs describe the safeboot firmware update (Restart into the firmware updater, upload .ino.bin) and that a filesystem upload resets settings
+- [x] #2 Both READMEs list the migrate images and the --migrate and --update modes next to the factory default
+- [x] #3 No hardcoded OTGW32 board name remains in the README text of build.py
+- [ ] #4 A regenerated README from build.py shows the new text (evidence: generated output)
+<!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Source of truth: docs/guides/WIFI_FIRMWARE_UPDATE.md; safeboot AP name '<hostname>-safeboot' checked in safeboot/src/main.cpp:206. Generated both READMEs through build._build_readme_en/_nl: OTGW32 absent, drag-drop gone, 'firmware updater' present, --migrate 3x, filesystem-reset warning present. Remaining OTGW32 strings in build.py are code comments/CLI help only, not zip content. tests/test_build.py 9 OK, tests/test_build_safeboot.py 11 OK; tests/test_build_staging.py has 1 error (test_oversize_dummy_fails_and_real_assets_pass, SystemExit in enforce_littlefs_budget) that also fails on HEAD without this change: pre-existing, not caused here.
+<!-- SECTION:NOTES:END -->
