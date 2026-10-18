@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 14:26'
-updated_date: '2026-10-18 19:52'
+updated_date: '2026-10-18 20:42'
 labels:
   - bug
   - mqtt
@@ -63,6 +63,11 @@ AC evidence and deviations:
 - Positive control: the unit resolved otgwtest-a.local from the PC responder and connected (mosq.log 21:29:49).
 - OLD (1.7.7-beta.1+ed84e49, same lookup code as before 41608bb07): broker set to otgwtest-b.local while unadvertised at 21:30:48, advertised from 21:31:55 (PC control lookup resolves it). After a broker restart at 21:34:11 dropped the leftover session, the unit stayed disconnected until the end of the observation at 21:40:42 (6.5 min, about 9 wait cycles): no new connection in mosq.log, mqttconnected=False in every 15 s poll, telnet 'MQTT server is [otgwtest-b.local], IP[255.255.255.255]'. Defect reproduced.
 - REOPENED: a regression in the committed fix found while setting this up. startMQTT() never closes an open session, and when the lookup for a renamed broker fails the fix keeps MQTTbrokerIP (the previous broker's address) instead of writing INADDR_NONE over it, so both publish guards in sendMQTTData() pass and the unit keeps publishing to the PREVIOUS broker over the old session while it shows as connected. The old code refused those publishes ('MQTT broker IP not valid'). The host test missed it because its model closed the session in startMQTT(). Fix planned: doMqttDisconnect() when the name has no usable address; model corrected. To be shown on hardware: committed fix (v1) publishes to the old broker after the rename, v2 does not.
+
+2026-10-18 hardware results, same rig (evidence: %LOCALAPPDATA%/OTGW-capture/bench-20261018/rig-1250/, events.log has every step):
+- v1 = committed fix 2cefb70: recover scenario (otgwtest-c): connected, but only 220 s after the name became resolvable; rename c->d while connected: 13 publishes reached the PREVIOUS broker session in the 75 s after the rename (60 in the earlier 4.5 min window), 0 session drops. While publishing over that old session each discovery drip took 10 s to 2 min (telnet: '[drip] publishing discovery for OT ID 0' 22:23:09, next line 22:25:24), the loop starved (HTTP timeouts, uptime counter lost ~5.5 of 7.5 min, uptime is counted in doTaskEvery1s with SKIP_MISSED_TICKS, no reboot: reboot_log/bootcount unchanged), which is why the re-lookup came so late.
+- v2 = 93549213d (doMqttDisconnect when the name has no usable address): recover (otgwtest-e): mqttconnected=false while unresolvable, connected 42 s after the name became resolvable (one wait cycle); rename e->f: old session closed 7 s after the rename (mosq.log 22:34:19 disconnected), 0 publishes to the previous broker in 75 s, 0 HTTP failures in 98 polls; f connected 32 s after it became resolvable (a first attempt failed because my advertiser for f never started, a rig fault, re-run). On the fresh session every drip publish took 9-200 ms.
+- Rig faults owned: taskkill on MSYS PIDs left 3 pollers and 2 telnet loggers running during part of the v1/v2 runs (same conditions for both); cleaned up at 22:40 by command line.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
