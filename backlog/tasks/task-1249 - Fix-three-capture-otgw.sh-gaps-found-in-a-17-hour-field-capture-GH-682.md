@@ -1,9 +1,11 @@
 ---
 id: TASK-1249
 title: 'Fix three capture-otgw.sh gaps found in a 17-hour field capture (GH #682)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-18 12:49'
+updated_date: '2026-10-18 19:24'
 labels:
   - tooling
   - capture
@@ -29,3 +31,14 @@ Check capture-mqtt-debug.bat for the same three gaps (parity, TASK-1161).
 - [ ] #3 After a default run the debug toggles the script switched on are switched back off, and the summary says so
 - [ ] #4 The same three behaviours hold in capture-mqtt-debug.bat, or the gap there is recorded
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Approved by the maintainer 2026-10-18 (AskUserQuestion):
+1. Telnet idle watchdog in capture-otgw.sh: no telnet bytes for more than 120 s while the HTTP probe fails, or while the device answers HTTP again after being silent -> close the telnet helper and reconnect; count idle reconnects and report them in the summary.
+2. -BrokerHost optional: without a broker address or without mosquitto_sub the capture starts, captures telnet/probe/crashlog and states 'MQTT capture skipped'.
+3. Default debug-toggle policy records which toggles it switched on and switches exactly those back off at teardown; the summary says which.
+4. Same three in capture-mqtt-debug.bat, or the gap recorded.
+Test on the COM3 bench unit .88.68: AC1 with the same MikroTik fault rule as TASK-1248 (old script during the old-firmware fault shows the gap, new script recovers); AC2 run without -BrokerHost; AC3 default run, read the toggles back over telnet.
+<!-- SECTION:PLAN:END -->
