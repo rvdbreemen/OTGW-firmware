@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 08:18'
-updated_date: '2026-10-18 08:43'
+updated_date: '2026-10-18 12:13'
 labels:
   - diagnostics
   - reboot
@@ -32,4 +32,6 @@ Approach: doRestart() writes its reason (magic + up to 47 chars) to RTC user mem
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-18: implemented in 29c9f0834, shipped in v1.7.8-beta.1 (CI run 39112450682 completed success, 10 assets). Evidence AC3: build.bat full build fresh 1.7.8-beta.1+29c9f08 ino.bin + littlefs.bin with 'Build completed successfully!'; evaluate.py --quick 36/36, 0 warnings. AC1/AC2 NOT verified on hardware: no 1.x ESP8266 unit on the bench (maintainer, 2026-10-18); AC2 only checked by reading code (magic cleared on every boot in takeRebootReason). Field confirmation expected from mrfox7688 (GH #682). Known label quirk, out of scope: a reboot via the web interface logs the existing text 'Reboot after upgrade' (FSexplorer.ino:757).
+
+2026-10-18 correction from the TASK-1248 review: in 29c9f0834 / v1.7.8-beta.1 the record was taken in updateRebootLog(), after startWiFi(). A config-portal timeout restart (bare ESP.restart(), networkStuff.ino:164) in between left the record in place, and the next connected boot attributed the old reason to that restart; 'cleared on every boot' was therefore not true for that path. Fixed in the TASK-1248 working tree (captureRebootReason() at the top of setup(), portal timeout stores its own reason), not yet built. The RTC comment also named the wrong eboot range (user offsets 0..31, not 64..95); no overlap. Field impact for #682: misattribution needs a portal-timeout boot in between; in the 16 Oct capture the gateway came back within about a minute after each restart, so no public correction needed.
 <!-- SECTION:NOTES:END -->
