@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-18 08:09'
+updated_date: '2026-10-18 08:13'
 labels:
   - bug
   - needs-info
@@ -32,3 +33,15 @@ Capture-script findings (separate tasks if confirmed): telnet stays half-open fo
 - [ ] #2 If firmware-caused: a reproduction on the 1.x bench (ESP8266 .88.68) shows the hang on the old build and not on the fix
 - [ ] #3 Reporter replies on GH #682 answer the three questions in the 16 Oct comment
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-18 first analysis (from transcript + 1.x code, not yet proven):
+- Loop most likely kept running: the 0x26 external watchdog is fed from loop on a 100 ms millis timer (OTGW-Core.ino:1011-1016); a blocked loop would have logged 'External System (6)', but both recoveries log 'Software/System restart (4)' = ESP.restart().
+- Network dead, not the app: telnet ends mid-stream with no error, HTTP probes fail fast (curl (7) after ~1460 ms, not a timeout), MQTT 'exceeded timeout' 90 s after the last packet.
+- The WiFi state machine (networkStuff.ino:240-301) restarts 10 x 30 s after WiFi.status() != WL_CONNECTED, so for most of each hang the SDK must have reported the station as connected (inferred).
+- Duration matches 2^32 us = 4294.97 s = 71.58 min: last packet 13:13:24 + 71.58 min = 14:24:59 (MQTT back 14:25:54); 15:17:02 + 71.58 min = 16:28:37 (MQTT back 16:30:36). Two events only. No micros()-based wait exists in 1.x app code or vendored libs (only the unused OpenTherm lib); core micros() = system_get_time(). If causal, it lives in the closed SDK/lwIP (speculation).
+- Which ESP.restart() fired is unknown: reboot_log stores only the rst reason, not the doRestart() reason text (helperStuff.ino:398). Candidate without operator action: doRestart('WiFi: too many reconnect failures').
+Next: persist the doRestart reason in reboot_log; ask the reporter for an ICMP ping log, the router's station/association log and RSSI around a hang.
+<!-- SECTION:NOTES:END -->
