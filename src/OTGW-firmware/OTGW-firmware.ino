@@ -125,6 +125,11 @@ void setup() {
   // while (!Serial) {} //Wait for OK
   WatchDogEnabled(0); // turn off watchdog
 
+  // Take the RTC records left by the previous restart before anything in this
+  // boot can restart again (startWiFi's config-portal timeout does).
+  captureRebootReason();        // TASK-1247
+  captureWifiDeadRestarts();    // TASK-1248
+
   // Ignore DHCP-supplied NTP servers (option 42). lwIP2 is built with
   // LWIP_DHCP_GET_NTP_SRV=1, so every DHCP renewal would push the router's
   // NTP server into the SDK SNTP module - leaking heap on routers that send

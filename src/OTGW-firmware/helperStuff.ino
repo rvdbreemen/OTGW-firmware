@@ -318,9 +318,10 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
 
 // TASK-1247: the doRestart() reason survives the restart in RTC user memory, so
 // the next boot can write it into reboot_log.txt. Without it every planned
-// restart is the same "Software/System restart (4)". RTC user slots (4-byte
-// units): 64..95 hold the eboot OTA command, 96..97 the WiFi portal reset
-// counter (OTGW-firmware.ino); this record uses 100..112.
+// restart is the same "Software/System restart (4)". ESP.rtcUserMemory offsets
+// (4-byte units, 0..127): 0..31 hold the eboot OTA command (SDK blocks 64..95),
+// 96..97 the WiFi portal reset counter (OTGW-firmware.ino), 100..112 this
+// record, 113..114 the TASK-1248 dead-link restart count (networkStuff.ino).
 #define REBOOT_REASON_RTC_SLOT  100
 #define REBOOT_REASON_MAGIC     0x4F545252UL  // "OTRR"
 
@@ -329,7 +330,7 @@ struct RebootReasonRtc {
   char     reason[48];
 };
 
-static void storeRebootReason(const char *reason)
+void storeRebootReason(const char *reason)
 {
   RebootReasonRtc rec;
   rec.magic = REBOOT_REASON_MAGIC;
@@ -338,8 +339,7 @@ static void storeRebootReason(const char *reason)
 }
 
 // Copies the stored reason into out and clears the record. Returns false when
-// no valid record is present (power-on, or a reset that did not pass through
-// doRestart()). Called once per boot, so a reason is never reported twice.
+// no valid record is present (power-on, or a reset that did not store one).
 static bool takeRebootReason(char *out, size_t outSize)
 {
   RebootReasonRtc rec;
@@ -352,6 +352,16 @@ static bool takeRebootReason(char *out, size_t outSize)
   rec.magic = 0;
   ESP.rtcUserMemoryWrite(REBOOT_REASON_RTC_SLOT, reinterpret_cast<uint32_t*>(&rec), sizeof(rec));
   return valid;
+}
+
+// Taken at the top of setup(), before startWiFi() can restart the board (the
+// config-portal timeout), so each record belongs to the restart that wrote it.
+static char g_bootRestartReason[48] = {0};
+static bool g_bootRestartReasonValid = false;
+
+void captureRebootReason()
+{
+  g_bootRestartReasonValid = takeRebootReason(g_bootRestartReason, sizeof(g_bootRestartReason));
 }
 
 bool updateRebootLog(String text)
@@ -431,10 +441,9 @@ bool updateRebootLog(String text)
     }
   }
 
-  char restartReason[48] = {0};
-  if (takeRebootReason(restartReason, sizeof(restartReason)) && errorCode == REASON_SOFT_RESTART) {
-    snprintf_P(log_line_excpt, sizeof(log_line_excpt), PSTR("- %s"), restartReason);
-    DebugTf(PSTR("restart reason: %s\r\n"), restartReason);
+  if (g_bootRestartReasonValid && errorCode == REASON_SOFT_RESTART) {
+    snprintf_P(log_line_excpt, sizeof(log_line_excpt), PSTR("- %s"), g_bootRestartReason);
+    DebugTf(PSTR("restart reason: %s\r\n"), g_bootRestartReason);
   }
 
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));

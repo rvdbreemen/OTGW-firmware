@@ -4764,6 +4764,13 @@ static uint8_t  netFloorLastHolder = OTGW_NET_SLOTS - 1;
 static bool     netFloorBinary     = false;  // holder has sent a non-text byte
 static uint32_t netFloorLastByteMs = 0;
 
+// TASK-1248: bytes from a port 25238 client prove that the LAN carries
+// traffic, so the WiFi dead-link check takes no action while they arrive.
+bool otgwStreamRxWithin(uint32_t ms)
+{
+  return netFloorLastByteMs != 0 && (uint32_t)(millis() - netFloorLastByteMs) < ms;
+}
+
 void handleOTGW()
 {
   //handle serial communication and line processing
