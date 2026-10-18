@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-18 08:09'
-updated_date: '2026-10-18 12:50'
+updated_date: '2026-10-18 12:51'
 labels:
   - bug
   - needs-info
@@ -55,3 +55,22 @@ Next: persist the doRestart reason in reboot_log; ask the reporter for an ICMP p
 AC2 deviation (docs/guides/backlog-cli.md protocol): the cause was not shown to be firmware. Leading explanation from the capture plus code: the station stayed associated with an IP (WL_CONNECTED = STATION_GOT_IP) while no traffic passed, and loopWifi only acts on a drop, so the firmware never stepped in. The 2^32 us duration match (2 events) stays an unproven hypothesis about the SDK. No old-vs-fix bench reproduction was possible (no ESP8266 on the bench); that proof now lives in TASK-1248 AC5, which carries the mitigation. AC2 is checked on that written transfer, not on a reproduction.
 Capture-script remarks from the reporter: all three confirmed in scripts/capture-otgw.sh and filed as TASK-1249.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Investigation of the ~72 min full-device network hangs on 1.7.7 (GH #682, mrfox7688, 17 h NAS capture of 16 Oct 2026).
+
+Findings (from the transcript plus 1.x code, cited in the notes):
+- The whole device dropped off the network while the firmware kept running: telnet ended mid-stream with a healthy heap, HTTP probes failed fast, Mosquitto timed out 90 s after the last packet, and both recoveries logged Software/System restart (4), not the external watchdog (6) a hung loop would cause.
+- loopWifi only acts on WiFi.status() != WL_CONNECTED, which means 'associated with an IP'; a station that stays associated while no traffic passes is never acted on. This is the most likely reason nothing recovered for an hour.
+- Both silences last 2^32 us (71.6 min) to within about a minute of the restart; no micros()-based wait exists in the 1.x app, vendored libraries, core or lwIP glue (sys_now = millis), so if causal it lies in the closed SDK. Two events only: hypothesis, not proven.
+- The restart that ended each hang could not be identified, because reboot_log.txt stored only the reset reason.
+
+Outcome per AC:
+- AC1: root cause not proven; missing data requested on GH #682 (issuecomment-6247770652): reboot_log.txt after the next hang, a 30 s ping log, the router's association log for the gateway MAC, RSSI and channel, and a day with -QuietDebugToggles.
+- AC2: deviation, see notes: cause not shown to be firmware; the old-vs-fix proof moved to TASK-1248 AC5 (hardware).
+- AC3: the same comment answers the reporter's three questions (no 72 min timer; debug toggles unlikely, run with -QuietDebugToggles to rule out; 'session taken over' then 'exceeded timeout' = a reconnect while the broker still held a dead session, then that link died too).
+
+Follow-ups shipped or filed: TASK-1247 (restart reason in reboot_log.txt, in v1.7.8-beta.1; portal-chain fix in 19a9d444c), TASK-1248 (connected-but-dead detection and recovery, a8c79fbf6 and 19a9d444c, not yet on hardware), TASK-1249 (three capture-otgw.sh gaps the reporter found).
+<!-- SECTION:FINAL_SUMMARY:END -->
