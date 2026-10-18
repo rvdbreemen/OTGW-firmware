@@ -3,11 +3,11 @@ id: TASK-1250
 title: >-
   Fix MQTT staying down for the rest of the boot when the broker DNS lookup
   fails after a reconnect
-status: Done
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 14:26'
-updated_date: '2026-10-18 15:59'
+updated_date: '2026-10-18 19:52'
 labels:
   - bug
   - mqtt
@@ -58,6 +58,11 @@ AC evidence and deviations:
 - AC3: decideMqttBrokerLookup never takes a failed result (unit checks + 'last good address survives' scenario, 15/15).
 - AC4: the four '10 minutes' texts say 42 seconds (01025ea68).
 - AC5: build.bat --firmware fresh 773760 B with 'Build completed successfully!' (logs/build_1250d.log), evaluate.py --quick 37/37, host tests 6/6 suites.
+
+2026-10-18 hardware run on the COM3 unit .88.68 (ESP8266 + PIC 6.8), rig: own Mosquitto 2.1.2 on the PC :1885, broker names advertised over mDNS by python-zeroconf (host_ttl 10 s), router MikroTik.
+- Positive control: the unit resolved otgwtest-a.local from the PC responder and connected (mosq.log 21:29:49).
+- OLD (1.7.7-beta.1+ed84e49, same lookup code as before 41608bb07): broker set to otgwtest-b.local while unadvertised at 21:30:48, advertised from 21:31:55 (PC control lookup resolves it). After a broker restart at 21:34:11 dropped the leftover session, the unit stayed disconnected until the end of the observation at 21:40:42 (6.5 min, about 9 wait cycles): no new connection in mosq.log, mqttconnected=False in every 15 s poll, telnet 'MQTT server is [otgwtest-b.local], IP[255.255.255.255]'. Defect reproduced.
+- REOPENED: a regression in the committed fix found while setting this up. startMQTT() never closes an open session, and when the lookup for a renamed broker fails the fix keeps MQTTbrokerIP (the previous broker's address) instead of writing INADDR_NONE over it, so both publish guards in sendMQTTData() pass and the unit keeps publishing to the PREVIOUS broker over the old session while it shows as connected. The old code refused those publishes ('MQTT broker IP not valid'). The host test missed it because its model closed the session in startMQTT(). Fix planned: doMqttDisconnect() when the name has no usable address; model corrected. To be shown on hardware: committed fix (v1) publishes to the old broker after the rename, v2 does not.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
