@@ -3,11 +3,11 @@ id: TASK-1248
 title: >-
   Detect a connected-but-dead WiFi link and recover from it, restarting as last
   resort
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-18 09:50'
-updated_date: '2026-10-18 21:50'
+updated_date: '2026-10-18 23:29'
 labels:
   - bug
   - wifi
@@ -31,11 +31,11 @@ Cross-line: decide whether 2.0.0 (ESP32-S3, different WiFi stack) needs the same
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 A link that stays associated with an IP while the LAN is unreachable is detected within the agreed time, logged on telnet, and recovered by a WiFi reconnect
-- [ ] #2 If the reconnect does not restore traffic, the gateway restarts via doRestart() and reboot_log.txt shows the connected-but-no-traffic reason
-- [ ] #3 A broker that is down or unreachable while the LAN works does not trigger a reconnect or restart
-- [ ] #4 No restart during a firmware or PIC flash, and a persistently dead AP does not cause a reboot loop (rate limit holds)
-- [ ] #5 Old-vs-fix reproduction on an ESP8266 test unit (e.g. AP keeps the station associated but drops its traffic, or a firewall rule on the AP): old build stays dead, fix recovers
+- [x] #1 A link that stays associated with an IP while the LAN is unreachable is detected within the agreed time, logged on telnet, and recovered by a WiFi reconnect
+- [x] #2 If the reconnect does not restore traffic, the gateway restarts via doRestart() and reboot_log.txt shows the connected-but-no-traffic reason
+- [x] #3 A broker that is down or unreachable while the LAN works does not trigger a reconnect or restart
+- [x] #4 No restart during a firmware or PIC flash, and a persistently dead AP does not cause a reboot loop (rate limit holds)
+- [x] #5 Old-vs-fix reproduction on an ESP8266 test unit (e.g. AP keeps the station associated but drops its traffic, or a firewall rule on the AP): old build stays dead, fix recovers
 - [x] #6 esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
 
@@ -106,4 +106,17 @@ OLD (AC5), 1.7.7-beta.1+ed84e49: full fault 21:43:03-22:08:05 (25 min). Router a
 FIX v2 = 1.7.8-beta.3+9354921 (dead-link code identical to beta.2/a3f82891d..0d9381c0a), run A (AC1): telnet-variant fault 23:04:21; dead probes (1/8)..(8/8) one per minute from 23:04:42; 23:11:44 'WiFi: connected but no traffic, forcing a reconnect'; router: new association at ~23:11:47 (assoc uptime 3m46s at 23:15:33), lease renewed; rule lifted 23:12:13 (simulating 'reassociation clears the fault'); MQTT back 23:13:03, no restart (banner 'Reboots: 1', uptime continuous). Detected and acted on 7 min after the first dead probe. The reconnect lines themselves were missed by my 75 s telnet logger (fixed to 10 s afterwards).
 AC4 PIC flash (maintainer's explicit order: re-flash the same gateway 6.8): ICMP-to-router-only fault 23:19:07 (LAN up), broker stopped and no REST poller so no witness. Forced reconnect 23:26:58 (probe count back to 1/8 at 23:27:54). After (7/8) at 23:33:55 the flash started 23:34:40 (GET /pic?action=upgrade&name=gateway.hex&version=6.8, bundled gateway.ver 6.8); the 8th probe was due ~23:34:54; 0 probe lines during the flash; 23:35:07 'Upgrade finished: Errorcode = 0 - PIC upgrade was successful - 0 retries, 0 errors'; only then 23:35:21 (8/8) and doRestart("WiFi: connected but no traffic"); reboot_log.txt: 'Software/System restart (4) - WiFi: connected but no traffic'; PIC still gateway 6.8, bootcount 1->2. The ESP firmware OTA path shares the same isFlashing() guard in loop() (not run during a dead verdict; code reading).
 Observation, rig: the telnet line printed just before wifi_station_disconnect() is not always delivered (lost in cap cycle 2), so reconnects are now also detected on the router (router.log, association uptime every 15 s).
+
+2026-10-19 remaining hardware runs on .88.68 (v2, dead-link code unchanged since beta.2), router.log = association uptime every 15 s from the RB4011:
+AC2 (full fault, telnet variant): cap cycle 2 fault 23:38:10, forced reconnect ~23:45:47 (router), restart 23:53:43 doRestart("WiFi: connected but no traffic"); cap cycle 3 fault 00:32:07, router reassociation 00:40:30, restart 00:48:15. reboot_log.txt ends up with 3 x 'Software/System restart (4) - WiFi: connected but no traffic' (PIC test, cycle 2, cycle 3), file kept as rig-final/reboot_log-final.txt.
+AC4 rate limit: after restart #2 the fault was kept on for 4 min after boot: armed=0, dead-probe lines=0, no action (a network dead from boot cannot loop). Cycle 4 with the count at 3: 00:57:34 '(8/8)' + 'WiFi: no traffic, restart cap (3) reached, reconnecting only', router reassociation 00:57:39; 01:05:34 '(8/8)' again with no action (< 15 min); 01:13:44 second capped reconnect (16 min later); doRestart lines 0, boot banners 0, bootcount 4 before and after.
+AC3: test broker stopped 01:16:39-01:26:43 with the LAN fine: 26 failed MQTT connect attempts, mqttconnected=false in 41/41 polls, dead-probe lines 0, reconnect/restart lines 0, router reassociations 0, bootcount 4.
+Rig faults owned (no wrong conclusion drawn from them): cap cycle 3 had to be run three times. The first time rule.sh telnet silently left 0 rules; the second time a 'stopped' earlier test script (Git Bash ps shows no script args, so the kill missed it) fired its safety bail and removed the rules at 00:28:11, after the router had already logged the forced reconnect (00:28:03 'disconnected, received disassoc: sending station leaving (8)', 00:28:05 connected + DHCP). rule.sh now verifies the rule count and retries; scripts are stopped by Windows command line.
+AC deviations: AC1 'recovered by a WiFi reconnect' was shown by lifting the MAC rule 25 s after the reconnect, standing in for 'reassociation clears the fault' (a MAC filter does not clear by itself). AC4 'no restart during a firmware flash' was shown for a PIC flash on hardware; the ESP OTA path uses the same isFlashing() guard in loop() (code reading, not run during a dead verdict). Side finding (pre-existing since the bootlog was added, also on 1.7.7): reboot_log.txt older lines end with a bare CR and boot entries read 2106-02-07, filed as TASK-1253.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Dead-link check (networkStuff.ino, beta.2 code, released in v1.7.8-beta.2): own lwIP raw ICMP probe of the default gateway, 3 echoes every 60 s; after 8 silent probes with no witness (MQTT connected, REST request or port-25238 bytes in the last 60 s) a forced WiFi reconnect (wifi_station_disconnect, credentials kept), after 8 more a doRestart('WiFi: connected but no traffic'); arms only after the gateway answered once per gateway address; at most 3 such restarts (RTC-backed) then at most one forced reconnect per 15 min, cleared after an hour alive. Hardware evidence on the 1.x bench unit with a MikroTik MAC filter (unit stays associated with its lease): AC1 forced reconnect 7.4 min after the first dead probe, telnet line + router reassociation, recovered without restart; AC2 restart with the reason in reboot_log.txt (3 times); AC3 broker down 10 min, no action; AC4 a PIC re-flash of gateway 6.8 deferred the deciding probe until the flash finished (Errorcode 0), dead-from-boot did not arm, and with the count at 3 only capped reconnects 16 min apart, no 4th restart; AC5 1.7.7 stayed dead the full 25 min with no reconnect or restart; AC6 build/evaluate green (beta.3 v2 build 773776 B, evaluate 37/37). Evidence: %LOCALAPPDATA%/OTGW-capture/bench-20261018/rig-final (events.log, telnet.log, router.log, poll.log, reboot_log-final.txt). Deviations: AC1 fault lifted by hand after the reconnect; AC4 ESP OTA guard by code reading. Follow-up TASK-1253 (reboot log formatting, pre-existing).
+<!-- SECTION:FINAL_SUMMARY:END -->
