@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 09:50'
-updated_date: '2026-10-18 13:28'
+updated_date: '2026-10-18 14:26'
 labels:
   - bug
   - wifi
@@ -91,4 +91,11 @@ Still open, hardware needed (no ESP8266 on the bench): AC1-AC5. Also not re-veri
 
 2026-10-18 focused review of the raw ICMP probe (a3f82891d, workflow wf_80f85563-06c, 3 lenses + 2 refuters): lwIP contract verified against the disassembled core 2.7.4 objects (liblwip2-536.a ip4.o/raw.o) and the built ELF: callback sees p->payload at the IP header, return 1 = eaten and freed by us, 0 = untouched and passed on to icmp_input (so the gateway answers pings during a probe), raw_sendto with a PBUF_IP pbuf adds the IP header and leaves the ICMP checksum to us, raw_remove from loop context is safe. One upheld finding (2/2): any raw_sendto error voided the probe; fixed in 0d9381c0a (only a failed buffer allocation voids it, a refused send counts as unanswered).
 Released in v1.7.8-beta.2 (release commit 403636dc8, tag pushed, CI run 39131556855 completed success, prerelease, not draft, 10 assets). Full build before the tag: fresh 1.7.8-beta.2 ino.bin + littlefs.bin with 'Build completed successfully!' (logs/build_beta2.log); evaluate.py --quick 36/36. Tree moved to beta.3 (d61157fea). Maintainer chose to ship without waiting for a beta.1 hang capture (option C), accepting that the 72-minute wrap observation can no longer be repeated on beta.2. AC1-AC5 still need hardware.
+
+2026-10-18 fast path (1e2531f7e, NOT released) reviewed (workflow wf_4dc93850-258, 2 lenses + 2 refuters each). Upheld:
+- [major 2/2] MQTT loss is not an independent signal when the broker's path crosses the router: with the OTGW on a mesh node or separate AP that stays up and HA/Mosquitto cabled to the router, a router reboot silences the gateway and drops MQTT together, so the fast path acts at ~3 min, the case the 8-probe threshold exists for. The commit message claim 'errs only when the broker runs on the router or outside the LAN' is wrong.
+- [minor 2/2] wifiMqttSeenUp is sticky for the boot; an MQTT outage that began before the silent streak also enables the fast path.
+- [minor 2/2] a broker blip after a witness proved the LAN alive can still trigger the fast path.
+- [minor 2/2, pre-existing] after a WiFi reconnect, a failed broker DNS lookup leaves MQTT down for the rest of the boot; the '10 minute' waits are 42 s. Filed separately.
+Decision needed from the maintainer: revert the fast path, or keep a narrowed variant (reconnect step only, MQTT required connected at the start of the streak, disabled once a witness blocked action). beta.3 not released.
 <!-- SECTION:NOTES:END -->
