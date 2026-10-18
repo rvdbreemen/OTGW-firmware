@@ -209,6 +209,7 @@ void logBootSignature(const char *phase); // one-line boot/runtime signature for
 void requestDeferredReboot(const char *reason); // mark reboot pending; actual reset fires from loop() on next tick
 void storeRebootReason(const char *reason);     // TASK-1247: reason for reboot_log.txt, survives the restart in RTC memory
 void captureRebootReason();                     // TASK-1247: take the stored reason, once, at the top of setup()
+void storeRebootReasonUnlessPending(const char *reason); // TASK-1247: keep a taken but unlogged reason instead
 void captureWifiDeadRestarts();                 // TASK-1248: take the dead-link restart count, once, at the top of setup()
 bool otgwStreamRxWithin(uint32_t ms);           // TASK-1248: a port 25238 client sent a byte within the last ms
 void performDeferredReboot();                   // called by loop() when g_rebootPending && !isFlashing()

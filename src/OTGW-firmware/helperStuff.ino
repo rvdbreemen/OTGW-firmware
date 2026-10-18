@@ -361,7 +361,21 @@ static bool g_bootRestartReasonValid = false;
 
 void captureRebootReason()
 {
-  g_bootRestartReasonValid = takeRebootReason(g_bootRestartReason, sizeof(g_bootRestartReason));
+  // Always take (and so clear) the record; it applies only to a software
+  // restart, not to a crash or watchdog reset during doRestart()'s shutdown.
+  const bool taken = takeRebootReason(g_bootRestartReason, sizeof(g_bootRestartReason));
+  rst_info *resetInfo = ESP.getResetInfoPtr();
+  g_bootRestartReasonValid = taken && (resetInfo != nullptr) && (resetInfo->reason == REASON_SOFT_RESTART);
+}
+
+// For a restart that can happen before updateRebootLog() has run (the
+// config-portal timeout in startWiFi()). If this boot took over a reason it has
+// not logged yet, pass that one on: the restart that started the chain is the
+// one worth knowing, and overwriting it would lose it. The intermediate
+// restart itself is not logged, because its boot never reaches the log.
+void storeRebootReasonUnlessPending(const char *reason)
+{
+  storeRebootReason(g_bootRestartReasonValid ? g_bootRestartReason : reason);
 }
 
 bool updateRebootLog(String text)
@@ -445,6 +459,7 @@ bool updateRebootLog(String text)
     snprintf_P(log_line_excpt, sizeof(log_line_excpt), PSTR("- %s"), g_bootRestartReason);
     DebugTf(PSTR("restart reason: %s\r\n"), g_bootRestartReason);
   }
+  g_bootRestartReasonValid = false;   // logged (or not applicable): never pass it on again
 
   TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
   ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);

@@ -160,7 +160,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     if (!manageWiFi.startConfigPortal(thisAP))
     {
       DebugTln(F("failed to connect and hit timeout"));
-      storeRebootReason("WiFi: config portal timeout");   // TASK-1247: name it in reboot_log.txt
+      storeRebootReasonUnlessPending("WiFi: config portal timeout");   // TASK-1247
       delay(2000);  // Enough time for messages to be sent.
       ESP.restart();
       delay(5000);  // Enough time to ensure we don't return.
