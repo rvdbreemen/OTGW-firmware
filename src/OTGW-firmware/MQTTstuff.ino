@@ -203,11 +203,6 @@ static            PubSubClient MQTTclient(wifiClient);
 int8_t            reconnectAttempts = 0;
 char              lastMQTTtimestamp[15] = "";
 
-// Broker name lookup timeout. The core default is 10 s, during which the loop
-// is blocked; a LAN or mDNS answer takes well under a second, and a failed
-// lookup keeps the last good address (TASK-1250).
-#define MQTT_BROKER_LOOKUP_TIMEOUT_MS 3000
-
 enum states_of_MQTT { MQTT_STATE_INIT, MQTT_STATE_TRY_TO_CONNECT, MQTT_STATE_IS_CONNECTED, MQTT_STATE_WAIT_CONNECTION_ATTEMPT, MQTT_STATE_WAIT_FOR_RECONNECT, MQTT_STATE_ERROR };
 enum states_of_MQTT stateMQTT = MQTT_STATE_INIT;
 
@@ -912,7 +907,11 @@ void handleMQTT()
       // Static, not on the stack: a DNS answer that arrives after the timeout
       // while another lookup is pending is written into this address.
       static IPAddress lookedUp;
-      WiFi.hostByName(CSTR(settings.mqtt.sBroker), lookedUp, MQTT_BROKER_LOOKUP_TIMEOUT_MS);
+      // Core default timeout (10 s, the loop is blocked meanwhile). Shorter would
+      // turn a slow but working DNS into a permanent failure, and lwIP keeps
+      // retrying for about 15 s per server, so a late answer could wake a later
+      // lookup with the wrong address.
+      WiFi.hostByName(CSTR(settings.mqtt.sBroker), lookedUp);
       const MqttBrokerLookup lookup = decideMqttBrokerLookup(isValidIP(lookedUp), isValidIP(MQTTbrokerIP),
                                                              MQTTbrokerResolvedFor, CSTR(settings.mqtt.sBroker));
       if (lookup.bUseResult) {
