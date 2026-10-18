@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-18 08:09'
-updated_date: '2026-10-18 09:11'
+updated_date: '2026-10-18 12:50'
 labels:
   - bug
   - needs-info
@@ -29,9 +29,9 @@ Capture-script findings (separate tasks if confirmed): telnet stays half-open fo
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Root cause of the ~72 min silent period and the restart that ends it is identified from code plus the reporter's capture, or the missing data is requested on GH #682 with a concrete capture recipe
-- [ ] #2 If firmware-caused: a reproduction on the 1.x bench (ESP8266 .88.68) shows the hang on the old build and not on the fix
-- [ ] #3 Reporter replies on GH #682 answer the three questions in the 16 Oct comment
+- [x] #1 Root cause of the ~72 min silent period and the restart that ends it is identified from code plus the reporter's capture, or the missing data is requested on GH #682 with a concrete capture recipe
+- [x] #2 If firmware-caused: a reproduction on the 1.x bench (ESP8266 .88.68) shows the hang on the old build and not on the fix
+- [x] #3 Reporter replies on GH #682 answer the three questions in the 16 Oct comment
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -51,4 +51,7 @@ Next: persist the doRestart reason in reboot_log; ask the reporter for an ICMP p
 - No micros() in the path. loopWifi (networkStuff.ino:239-302) uses safeTimers (millis, rollover-safe signed compare, safeTimers.h:186-235). lwIP sys_now = millis (tools/sdk/lwip2/include/arch/cc.h:87). WiFiClient timeouts use millis; PolledTimeout fast variants use CPU cycles with range compensation. core millis() is wrap-safe as long as micros_overflow_tick (os_timer, 60 s) runs at least once per 71.58 min (core_esp8266_wiring.cpp:61-67,173-196,216). Only closed SDK code (system_get_time, 32-bit us) remains as a place where a 2^32 us wrap could matter: unverifiable.
 - Ways loopWifi stays idle without micros: (1) recovery keys only on WiFi.status()!=WL_CONNECTED; WL_CONNECTED means STATION_GOT_IP, so an associated station with dead traffic is never acted on, and failed MQTT reconnects do not escalate; (2) isFlashing() stuck true skips loopWifi (OTGW-firmware.ino:460); (3) the safeTimers spiral guard (>10 intervals late) re-arms instead of firing, which only delays.
 - Timing conflict: the WiFi supervisor restarts >= 5 min after the status flips (10 x 30 s). The restart lands about 71.6 min after the last packet, so the status would have to flip at about 66.6 min in both hangs. If beta.1's reboot_log shows no reason text, the restart did not come through doRestart().
+
+AC2 deviation (docs/guides/backlog-cli.md protocol): the cause was not shown to be firmware. Leading explanation from the capture plus code: the station stayed associated with an IP (WL_CONNECTED = STATION_GOT_IP) while no traffic passed, and loopWifi only acts on a drop, so the firmware never stepped in. The 2^32 us duration match (2 events) stays an unproven hypothesis about the SDK. No old-vs-fix bench reproduction was possible (no ESP8266 on the bench); that proof now lives in TASK-1248 AC5, which carries the mitigation. AC2 is checked on that written transfer, not on a reproduction.
+Capture-script remarks from the reporter: all three confirmed in scripts/capture-otgw.sh and filed as TASK-1249.
 <!-- SECTION:NOTES:END -->
