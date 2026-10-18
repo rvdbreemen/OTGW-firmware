@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 09:50'
-updated_date: '2026-10-18 13:06'
+updated_date: '2026-10-18 13:28'
 labels:
   - bug
   - wifi
@@ -88,4 +88,7 @@ Still open, hardware needed (no ESP8266 on the bench): AC1-AC5. Also not re-veri
 - [minor, accepted residual] a forced reconnect releases the DHCP lease (lwip-git.c dhcp_release_and_stop on netif down); if the silent gateway is also the DHCP server, the gateway stays offline until it returns. Mitigated by the 8-probe threshold and three witnesses (MQTT, REST, port 25238): it only happens when no LAN client is talking to the gateway, so nobody loses access they had.
 - Seed walk notes: at the cap a failed forced reconnect keeps retrying instead of restarting, so the config portal is not offered again until a power cycle (per spec). Seeds 1-5 acceptable or not reachable.
 - [note, inferred, not verified] core 2.7.4 restarts after panic/abort() through the SDK (core_esp8266_postmortem.cpp:113-124, 215), so such a crash probably reads as REASON_SOFT_RESTART: it keeps a pending reason/count, and on 1.7.x a '(4)' entry without a reason may also be a panic. Stated in the code comment; not in public text.
+
+2026-10-18 focused review of the raw ICMP probe (a3f82891d, workflow wf_80f85563-06c, 3 lenses + 2 refuters): lwIP contract verified against the disassembled core 2.7.4 objects (liblwip2-536.a ip4.o/raw.o) and the built ELF: callback sees p->payload at the IP header, return 1 = eaten and freed by us, 0 = untouched and passed on to icmp_input (so the gateway answers pings during a probe), raw_sendto with a PBUF_IP pbuf adds the IP header and leaves the ICMP checksum to us, raw_remove from loop context is safe. One upheld finding (2/2): any raw_sendto error voided the probe; fixed in 0d9381c0a (only a failed buffer allocation voids it, a refused send counts as unanswered).
+Released in v1.7.8-beta.2 (release commit 403636dc8, tag pushed, CI run 39131556855 completed success, prerelease, not draft, 10 assets). Full build before the tag: fresh 1.7.8-beta.2 ino.bin + littlefs.bin with 'Build completed successfully!' (logs/build_beta2.log); evaluate.py --quick 36/36. Tree moved to beta.3 (d61157fea). Maintainer chose to ship without waiting for a beta.1 hang capture (option C), accepting that the 72-minute wrap observation can no longer be repeated on beta.2. AC1-AC5 still need hardware.
 <!-- SECTION:NOTES:END -->
