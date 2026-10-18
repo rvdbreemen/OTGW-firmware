@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-18 08:09'
-updated_date: '2026-10-18 08:43'
+updated_date: '2026-10-18 09:11'
 labels:
   - bug
   - needs-info
@@ -46,4 +46,9 @@ Capture-script findings (separate tasks if confirmed): telnet stays half-open fo
 Next: persist the doRestart reason in reboot_log; ask the reporter for an ICMP ping log, the router's station/association log and RSSI around a hang.
 
 2026-10-18: v1.7.8-beta.1 published with the restart reason in reboot_log.txt (TASK-1247). Reply on GH #682 (issuecomment-6247770652) shares the analysis (72 min = 2^32 us, loop alive, network dead), answers the three questions and asks for: reboot_log.txt after the next hang on beta.1, a 30 s ping log, router association log for the gateway MAC, RSSI and channel. Waiting on reporter.
+
+2026-10-18 micros() review of the WiFi reconnect path (1.x, core 2.7.4):
+- No micros() in the path. loopWifi (networkStuff.ino:239-302) uses safeTimers (millis, rollover-safe signed compare, safeTimers.h:186-235). lwIP sys_now = millis (tools/sdk/lwip2/include/arch/cc.h:87). WiFiClient timeouts use millis; PolledTimeout fast variants use CPU cycles with range compensation. core millis() is wrap-safe as long as micros_overflow_tick (os_timer, 60 s) runs at least once per 71.58 min (core_esp8266_wiring.cpp:61-67,173-196,216). Only closed SDK code (system_get_time, 32-bit us) remains as a place where a 2^32 us wrap could matter: unverifiable.
+- Ways loopWifi stays idle without micros: (1) recovery keys only on WiFi.status()!=WL_CONNECTED; WL_CONNECTED means STATION_GOT_IP, so an associated station with dead traffic is never acted on, and failed MQTT reconnects do not escalate; (2) isFlashing() stuck true skips loopWifi (OTGW-firmware.ino:460); (3) the safeTimers spiral guard (>10 intervals late) re-arms instead of firing, which only delays.
+- Timing conflict: the WiFi supervisor restarts >= 5 min after the status flips (10 x 30 s). The restart lands about 71.6 min after the last packet, so the status would have to flip at about 66.6 min in both hangs. If beta.1's reboot_log shows no reason text, the restart did not come through doRestart().
 <!-- SECTION:NOTES:END -->
