@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 09:50'
-updated_date: '2026-10-18 12:22'
+updated_date: '2026-10-18 13:06'
 labels:
   - bug
   - wifi
@@ -79,4 +79,13 @@ AC deviations (protocol in docs/guides/backlog-cli.md): AC1 'logged on telnet' c
 2026-10-18: review fixes committed in a8c79fbf6 (pushed). Maintainer chose the threshold: WIFI_PROBE_FAILS_TO_ACT = 8 (router reboots of a few minutes pass unharmed; #682 recovers in ~8 min by reconnect, ~17 min if a restart is needed).
 Evidence AC6 (re-run on the final code): build.bat --firmware fresh OTGW-firmware-1.7.8-beta.2+032f42f.ino.bin (774528 B, 14:21) with one 'Build completed successfully!' line and no warnings/errors in the changed files (logs/build_1248e.log); evaluate.py --quick exit 0, 36 passed, 0 warnings, 0 failed (logs/eval_1248e.txt). Commit hook: adr-judge 0 violations.
 Still open, hardware needed (no ESP8266 on the bench): AC1-AC5. Also not re-verified after the fixes: the review itself ran on the pre-fix code; a small delta review of a8c79fbf6 is still worth doing when the session limit allows.
+
+2026-10-18 delta review of 19a9d444c (workflow wf_57f0d502-b10, 3 lenses + 2 refuters each, 21 agents, all upheld findings 2/2):
+- [major] SDK ping_start breaks inbound ICMP: the linked core 2.7.4 glue (tools/sdk/lwip2/builder/glue-lwip/esp-ping.c:142) shifts p->payload by PBUF_IP_HLEN and returns 0 for packets it does not eat, so lwIP strips the IP header twice and drops echo requests to the gateway for ~6 s of every minute. Fixed in a3f82891d: own lwIP raw ICMP probe, payload never touched, pcb only during the probe, loop-driven timing (no lwIP timers, no stuck probe).
+- [minor] stale state.mqtt.bConnected after a runtime MQTT disable kept the witness true for good. Fixed in a3f82891d (gated on settings.mqtt.bEnable).
+- [minor] at the cap the first forced reconnect of a streak bypassed the 15 min limit. Fixed in a3f82891d.
+- [minor] web UI reboot and WiFi reset logged as 'Reboot after upgrade'. Fixed in a3f82891d (doRedirect takes the reason).
+- [minor, accepted residual] a forced reconnect releases the DHCP lease (lwip-git.c dhcp_release_and_stop on netif down); if the silent gateway is also the DHCP server, the gateway stays offline until it returns. Mitigated by the 8-probe threshold and three witnesses (MQTT, REST, port 25238): it only happens when no LAN client is talking to the gateway, so nobody loses access they had.
+- Seed walk notes: at the cap a failed forced reconnect keeps retrying instead of restarting, so the config portal is not offered again until a power cycle (per spec). Seeds 1-5 acceptable or not reachable.
+- [note, inferred, not verified] core 2.7.4 restarts after panic/abort() through the SDK (core_esp8266_postmortem.cpp:113-124, 215), so such a crash probably reads as REASON_SOFT_RESTART: it keeps a pending reason/count, and on 1.7.x a '(4)' entry without a reason may also be a panic. Stated in the code comment; not in public text.
 <!-- SECTION:NOTES:END -->
