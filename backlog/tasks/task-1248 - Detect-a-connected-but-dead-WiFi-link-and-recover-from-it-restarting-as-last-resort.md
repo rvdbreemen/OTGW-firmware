@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 09:50'
-updated_date: '2026-10-18 10:02'
+updated_date: '2026-10-18 10:09'
 labels:
   - bug
   - wifi
@@ -36,7 +36,7 @@ Cross-line: decide whether 2.0.0 (ESP32-S3, different WiFi stack) needs the same
 - [ ] #3 A broker that is down or unreachable while the LAN works does not trigger a reconnect or restart
 - [ ] #4 No restart during a firmware or PIC flash, and a persistently dead AP does not cause a reboot loop (rate limit holds)
 - [ ] #5 Old-vs-fix reproduction on an ESP8266 test unit (e.g. AP keeps the station associated but drops its traffic, or a firewall rule on the AP): old build stays dead, fix recovers
-- [ ] #6 esp8266 build and evaluate.py --quick green
+- [x] #6 esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -54,3 +54,12 @@ Design (networkStuff.ino only):
 5. Any reply resets the counters. Probe results that started before a reconnect are discarded. loopWifi already skips during isFlashing(). Broker state is never consulted.
 Expected worst case: reconnect after ~3 min, restart after ~7 min, instead of ~72 min.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-18: implemented in d70247152 (networkStuff.ino/.h). Review fixes before commit: reconnect generation counter instead of a millis timestamp pair (the pair disarmed after 24.8 days without a reconnect); a probe whose SDK callback never arrives counts as dead each interval (20 s deadline) instead of disarming the check; ping_option/ping_resp verified identical between tools/sdk/include/ping.h and the lwip2 glue header the library was built with.
+Evidence AC6: build.bat --firmware fresh OTGW-firmware-1.7.8-beta.2+0ebeb55.ino.bin (12:08) with 'Build completed successfully!', no networkStuff warnings (logs/build_1248b.log); evaluate.py --quick 36/36, 0 warnings.
+NOT verified: AC1-AC5 need an ESP8266 unit (none on the bench, maintainer 2026-10-18). Open decision on AC4: arm-after-first-reply prevents a loop when the network is dead from boot, but a link that works a few minutes after each boot and then dies would restart about every 7 min; AC4's 'rate limit' needs either a cap or a reworded AC (maintainer to decide).
+Residual: if the gateway still answers ping while the rest of the LAN cannot reach the device, this probe does not catch it.
+<!-- SECTION:NOTES:END -->
