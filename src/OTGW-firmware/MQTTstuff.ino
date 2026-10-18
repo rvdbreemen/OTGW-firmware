@@ -16,6 +16,7 @@
 #include "OTGW-Core.h"              // Core OpenTherm data structures and functions
 #include "MQTTstuff.h"              // Structured discovery data layer (enums, structs, streaming API)
 #include "mqtt_discovery_verify.h"  // Discovery-verify state machine (TASK-363: separate TU)
+#include "mqttBrokerAddress.h"      // broker lookup decisions, host-testable (TASK-1250)
 
 // MQTT Streaming Mode - ALWAYS ENABLED
 // Large auto-discovery messages are sent in 128-byte chunks instead of
@@ -899,9 +900,19 @@ void handleMQTT()
   {
     case MQTT_STATE_INIT:  
       MQTTDebugTln(F("MQTT State: MQTT Initializing")); 
-      WiFi.hostByName(CSTR(settings.mqtt.sBroker), MQTTbrokerIP);  // lookup the MQTTbroker convert to IP
-      snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
-      if (isValidIP(MQTTbrokerIP))  
+    {
+      // PubSubClient keeps a pointer to MQTTbrokerIPchar (setServer), so the
+      // text is only rewritten when the broker address itself changes.
+      IPAddress lookedUp;
+      WiFi.hostByName(CSTR(settings.mqtt.sBroker), lookedUp);  // lookup the MQTTbroker convert to IP
+      const MqttBrokerLookup lookup = decideMqttBrokerLookup(isValidIP(lookedUp), isValidIP(MQTTbrokerIP));
+      if (lookup.bUseResult) {
+        MQTTbrokerIP = lookedUp;
+        snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
+      } else if (lookup.bUsable) {
+        MQTTDebugTf(PSTR("MQTT: lookup of [%s] failed, using the last known address %s\r\n"), CSTR(settings.mqtt.sBroker), MQTTbrokerIPchar);
+      }
+      if (lookup.bUsable)  
       {
         MQTTDebugTf(PSTR("[%s] => setServer(%s, %d)\r\n"), CSTR(settings.mqtt.sBroker), MQTTbrokerIPchar, settings.mqtt.iBrokerPort);
         MQTTclient.disconnect();
@@ -927,6 +938,7 @@ void handleMQTT()
         stateMQTT = MQTT_STATE_ERROR;
         //DebugTln(F("Next State: MQTT_STATE_ERROR"));
       }    
+    }
       RESTART_TIMER(timerMQTTwaitforconnect); 
     break;
 
@@ -1074,11 +1086,20 @@ void handleMQTT()
       if DUE(timerMQTTdebugwaitforreconnect) MQTTDebugTln(F("MQTT State: MQTT wait for reconnect"));
       if (DUE(timerMQTTwaitforconnect))
       {
-        //remember when you tried last time to reconnect
-        RESTART_TIMER(timerMQTTwaitforretry);
-        reconnectAttempts = 0; 
-        stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
-        MQTTDebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
+        if (mqttResolveAfterWait(isValidIP(MQTTbrokerIP)))
+        {
+          // No usable broker address: look the name up again (TASK-1250).
+          stateMQTT = MQTT_STATE_INIT;
+          MQTTDebugTln(F("Next State: MQTT_STATE_INIT"));
+        }
+        else
+        {
+          //remember when you tried last time to reconnect
+          RESTART_TIMER(timerMQTTwaitforretry);
+          reconnectAttempts = 0;
+          stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
+          MQTTDebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
+        }
       }
     break;
 
