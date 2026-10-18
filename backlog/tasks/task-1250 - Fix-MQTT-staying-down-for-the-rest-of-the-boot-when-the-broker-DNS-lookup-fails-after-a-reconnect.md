@@ -3,9 +3,11 @@ id: TASK-1250
 title: >-
   Fix MQTT staying down for the rest of the boot when the broker DNS lookup
   fails after a reconnect
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-18 14:26'
+updated_date: '2026-10-18 15:05'
 labels:
   - bug
   - mqtt
