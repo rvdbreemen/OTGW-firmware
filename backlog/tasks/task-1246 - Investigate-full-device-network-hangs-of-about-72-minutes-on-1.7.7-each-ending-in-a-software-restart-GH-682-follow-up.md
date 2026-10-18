@@ -3,7 +3,7 @@ id: TASK-1246
 title: >-
   Investigate full-device network hangs of about 72 minutes on 1.7.7, each
   ending in a software restart (GH-682 follow-up)
-status: To Do
+status: Done
 assignee: []
 created_date: '2026-10-18 08:09'
 updated_date: '2026-10-18 12:51'
