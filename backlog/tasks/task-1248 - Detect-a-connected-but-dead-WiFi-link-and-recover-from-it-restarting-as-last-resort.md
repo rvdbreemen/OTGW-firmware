@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 09:50'
-updated_date: '2026-10-18 12:13'
+updated_date: '2026-10-18 12:22'
 labels:
   - bug
   - wifi
@@ -75,4 +75,8 @@ Residual: if the gateway still answers ping while the rest of the LAN cannot rea
 - [notes] 20 s deadline was effectively one interval: constant removed, comment says so. SDK scores replies > 1 s as timeouts: documented.
 Scenario walk (a)-(k) against the fixed code: (a) healthy: armed, counters stay 0; (b)+(c) death then recovery: 3 dead probes (worst case 3 more if MQTT still within its 120 s keepalive), forced reconnect, reset on first answer; (d) reconnect OK but dead: 3 more dead probes, restart 'connected but no traffic'; (e) reconnect cannot associate: WIFI_FAILED counted restart, then the pre-existing portal loop (ADR-047, uncapped, now with its own reason); (f) flapping: 3 restarts, then capped reconnects every 15 min, clear after an hour alive; (g) ICMP-silent router: never armed; (h) partial loss: any reply counts alive; (i) stuck probe: dead each interval, witness suppresses, else reconnect then restart (fresh SDK); at the cap the check is effectively off until reboot; (j) millis rollover: unsigned diffs and a generation counter, no timestamp compare left; (k) gateway change: disarm and re-arm on the new address.
 AC deviations (protocol in docs/guides/backlog-cli.md): AC1 'logged on telnet' cannot be observed during the fault (the link is dead and stopAll closes telnet); observable evidence is the capture's HTTP/MQTT gap, the AP station log and reboot_log.txt. AC2 holds for the counted path; a forced reconnect that cannot reassociate restarts with 'too many reconnect failures' (also counted). AC4: the cap covers dead-link and forced-reconnect restarts; the config-portal timeout loop when the network is dead at boot is pre-existing (ADR-047) and out of scope. Open for the maintainer: WIFI_PROBE_FAILS_TO_ACT (3). Without a live local broker as witness, a router reboot > 3 min now forces a disconnect; if the router is also the DHCP server the lease is lost and the WIFI_FAILED restart follows 5 min later (resets the PIC). 8-10 keeps typical router reboots harmless, #682 recovers in ~10-15 min instead of ~7.
+
+2026-10-18: review fixes committed in a8c79fbf6 (pushed). Maintainer chose the threshold: WIFI_PROBE_FAILS_TO_ACT = 8 (router reboots of a few minutes pass unharmed; #682 recovers in ~8 min by reconnect, ~17 min if a restart is needed).
+Evidence AC6 (re-run on the final code): build.bat --firmware fresh OTGW-firmware-1.7.8-beta.2+032f42f.ino.bin (774528 B, 14:21) with one 'Build completed successfully!' line and no warnings/errors in the changed files (logs/build_1248e.log); evaluate.py --quick exit 0, 36 passed, 0 warnings, 0 failed (logs/eval_1248e.txt). Commit hook: adr-judge 0 violations.
+Still open, hardware needed (no ESP8266 on the bench): AC1-AC5. Also not re-verified after the fixes: the review itself ran on the pre-fix code; a small delta review of a8c79fbf6 is still worth doing when the session limit allows.
 <!-- SECTION:NOTES:END -->
