@@ -41,6 +41,7 @@ static HaDiscoveryContext buildDiscoveryContext(bool isFirst);  // ADR-082: used
 // Declare some variables within global scope
 
 static IPAddress  MQTTbrokerIP;
+static char       MQTTbrokerResolvedFor[sizeof(settings.mqtt.sBroker)];  // broker name MQTTbrokerIP was looked up for (TASK-1250)
 static char       MQTTbrokerIPchar[16];   // max IPv4 "255.255.255.255"=15+nul; snprintf_P(sizeof) bounds (was 20)
 constexpr size_t  MQTT_ID_MAX_LEN = 48;   // NodeId 'otgw-<chipid>' ~20, clientId/topicToken < 48 (was 96)
 constexpr size_t  MQTT_NAMESPACE_MAX_LEN = 96;   // <topTopic(<=41)>/value|set/<NodeId(~20)> ~67 chars; 96 ample (was 192)
@@ -201,6 +202,11 @@ static            PubSubClient MQTTclient(wifiClient);
 
 int8_t            reconnectAttempts = 0;
 char              lastMQTTtimestamp[15] = "";
+
+// Broker name lookup timeout. The core default is 10 s, during which the loop
+// is blocked; a LAN or mDNS answer takes well under a second, and a failed
+// lookup keeps the last good address (TASK-1250).
+#define MQTT_BROKER_LOOKUP_TIMEOUT_MS 3000
 
 enum states_of_MQTT { MQTT_STATE_INIT, MQTT_STATE_TRY_TO_CONNECT, MQTT_STATE_IS_CONNECTED, MQTT_STATE_WAIT_CONNECTION_ATTEMPT, MQTT_STATE_WAIT_FOR_RECONNECT, MQTT_STATE_ERROR };
 enum states_of_MQTT stateMQTT = MQTT_STATE_INIT;
@@ -903,11 +909,15 @@ void handleMQTT()
     {
       // PubSubClient keeps a pointer to MQTTbrokerIPchar (setServer), so the
       // text is only rewritten when the broker address itself changes.
-      IPAddress lookedUp;
-      WiFi.hostByName(CSTR(settings.mqtt.sBroker), lookedUp);  // lookup the MQTTbroker convert to IP
-      const MqttBrokerLookup lookup = decideMqttBrokerLookup(isValidIP(lookedUp), isValidIP(MQTTbrokerIP));
+      // Static, not on the stack: a DNS answer that arrives after the timeout
+      // while another lookup is pending is written into this address.
+      static IPAddress lookedUp;
+      WiFi.hostByName(CSTR(settings.mqtt.sBroker), lookedUp, MQTT_BROKER_LOOKUP_TIMEOUT_MS);
+      const MqttBrokerLookup lookup = decideMqttBrokerLookup(isValidIP(lookedUp), isValidIP(MQTTbrokerIP),
+                                                             MQTTbrokerResolvedFor, CSTR(settings.mqtt.sBroker));
       if (lookup.bUseResult) {
         MQTTbrokerIP = lookedUp;
+        strlcpy(MQTTbrokerResolvedFor, CSTR(settings.mqtt.sBroker), sizeof(MQTTbrokerResolvedFor));
         snprintf_P(MQTTbrokerIPchar, sizeof(MQTTbrokerIPchar), PSTR("%d.%d.%d.%d"), MQTTbrokerIP[0], MQTTbrokerIP[1], MQTTbrokerIP[2], MQTTbrokerIP[3]);
       } else if (lookup.bUsable) {
         MQTTDebugTf(PSTR("MQTT: lookup of [%s] failed, using the last known address %s\r\n"), CSTR(settings.mqtt.sBroker), MQTTbrokerIPchar);
@@ -1082,24 +1092,16 @@ void handleMQTT()
     break;
     
     case MQTT_STATE_WAIT_FOR_RECONNECT:
-      //do non-blocking wait for 42 seconds, then try to connect again (or look the broker name up again). 
+      //do non-blocking wait for 42 seconds, then look the broker name up again and try to connect. 
       if DUE(timerMQTTdebugwaitforreconnect) MQTTDebugTln(F("MQTT State: MQTT wait for reconnect"));
       if (DUE(timerMQTTwaitforconnect))
       {
-        if (mqttResolveAfterWait(isValidIP(MQTTbrokerIP)))
-        {
-          // No usable broker address: look the name up again (TASK-1250).
-          stateMQTT = MQTT_STATE_INIT;
-          MQTTDebugTln(F("Next State: MQTT_STATE_INIT"));
-        }
-        else
-        {
-          //remember when you tried last time to reconnect
-          RESTART_TIMER(timerMQTTwaitforretry);
-          reconnectAttempts = 0;
-          stateMQTT = MQTT_STATE_TRY_TO_CONNECT;
-          MQTTDebugTln(F("Next State: MQTT_STATE_TRY_TO_CONNECT"));
-        }
+        // MQTT is down whenever this wait runs out, so look the broker name up
+        // again before the next attempts (TASK-1250): it may have failed
+        // before, or the broker may have moved. INIT keeps the last good
+        // address for this name when the lookup fails.
+        stateMQTT = MQTT_STATE_INIT;
+        MQTTDebugTln(F("Next State: MQTT_STATE_INIT"));
       }
     break;
 
