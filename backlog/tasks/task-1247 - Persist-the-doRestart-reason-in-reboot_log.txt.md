@@ -1,9 +1,11 @@
 ---
 id: TASK-1247
 title: Persist the doRestart() reason in reboot_log.txt
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-18 08:18'
+updated_date: '2026-10-18 08:20'
 labels:
   - diagnostics
   - reboot
