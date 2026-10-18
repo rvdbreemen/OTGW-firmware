@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.435
+**  Version  : v2.0.0-alpha.436
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -259,6 +259,17 @@ void setup() {
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
   // while (!Serial) {} //Wait for OK
 
+#if HAS_PIC || HAS_RUNTIME_HW_DETECT
+  // TASK-1217: the primary IDF console is UART0, the same UART that the
+  // OTGWSerial global constructor has already opened at 9600 baud on the PIC
+  // pins. Mute it before the first log line of setup() (the I2C/IMU probes
+  // below log errors), so no console text reaches the PIC RX line. The console
+  // keeps logging on USB-Serial-JTAG (see platformMuteUart0Console). The ROM
+  // boot banner and anything logged by global constructors still go out on
+  // UART0, because they run before setup().
+  platformMuteUart0Console();
+#endif
+
 #if HAS_RUNTIME_HW_DETECT
   // ADR-158: decide S3 Mini vs S3 Mini Pro BEFORE the 0x26 watchdog disarm,
   // because the Pro's watchdog (and its IMU) live on a different Classic I2C bus
@@ -372,7 +383,6 @@ void setup() {
     // PIC and stays OT-Direct. Same UART-open/probe/close shape as the auto path
     // below, so the ADR-125 floating-PIC-RX concern is handled identically (the
     // UART is torn down before initOTDirect when no PIC is found).
-    platformMuteUart0Console();
     OTGWSerial.begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX);
     OTGWSerial.setResetPin(activePicRst());
     OTGWSerial.setProgressLed(activeLed2());
@@ -388,12 +398,6 @@ void setup() {
       SetupDebugln(F("Board mode: forced OT-Direct (no PIC found, OT-Direct confirmed)"));
     }
   } else {
-    // TASK-972: silence the IDF/ROM console before touching the PIC UART.
-    // The primary IDF console is UART0 on GPIO43 = the PIC RX line; WiFi
-    // driver/error-log output would otherwise be transmitted into the PIC
-    // (SE responses at runtime, aborted bootloader handshake during a PIC
-    // firmware flash). The USB-Serial-JTAG console remains available.
-    platformMuteUart0Console();
     // The PIC UART was closed before the WiFi portal; re-open it for the probe.
     OTGWSerial.begin(9600, SERIAL_8N1, PIN_PIC_RX, PIN_PIC_TX);
     // ADR-158: bind the PIC reset / firmware-progress-LED to the live Classic
@@ -449,8 +453,9 @@ void setup() {
   // default (Classic): re-pin I2C, re-attach the ledc LEDs and re-init the
   // OLED (incl. its button pinMode) on the live pins.
   applyResolvedComboPins();
-  // Boot-time detection result to the ESP-IDF/USB console (ERROR level = always
-  // printed, regardless of CORE_DEBUG_LEVEL; appears next to any task_wdt lines).
+  // Boot-time detection result to the USB-Serial-JTAG console (ERROR level =
+  // always printed, regardless of CORE_DEBUG_LEVEL; appears next to any
+  // task_wdt lines). UART0 is muted, so it does not reach the PIC.
   // This is the ground-truth probe: did detection find the PIC, on which pins?
   log_e("[combo] detect: eMode=%d picEnabled=%d boardMode=%d pro=%d (RST=%d RX=%d TX=%d I2C=%d/%d)",
         (int)state.hw.eMode, isPICEnabled() ? 1 : 0, (int)settings.iBoardMode, (int)state.hw.bClassicPro,
@@ -459,18 +464,7 @@ void setup() {
   // readable via FSexplorer after a power cycle when no console is attached.
   appendBootDetectLog();
 #else
-  #if HAS_PIC
-  // TASK-1131: the primary IDF console is UART0, and on a fixed PIC board that
-  // is the same peripheral on the same pins as the PIC link (HardwareSerial(0),
-  // GPIO44/43). Every esp_log line was therefore transmitted INTO the PIC.
-  // ADR-168 already decided this must be muted on the PIC path, but both of the
-  // existing call sites sit in the HAS_RUNTIME_HW_DETECT arm above, which is
-  // combo-only, so the fixed Classic target never got it. ARDUINO_USB_CDC_ON_BOOT
-  // does not help: it remaps the Arduino Serial object, not the IDF console.
-  // This cannot cover the ROM boot banner or the OTGWSerial global constructor,
-  // both of which run before setup().
-  platformMuteUart0Console();
-  #endif
+  // UART0 was muted at the top of setup() (TASK-1131, TASK-1217).
   detectPIC();
   #if HAS_DIRECT_OT
   initOTDirect();         // initialize OT-direct GPIO (OTGW32 only)

@@ -192,7 +192,7 @@ All functions are inline in `src/libraries/Platform/src/platform_esp32.h` (dispa
 | `platformRtcRead` / `platformRtcWrite` | `bool (uint32_t, uint32_t*, size_t)` | Emulated RTC user memory |
 | `platformSerialHasOverrun` / `platformSerialHasRxError` | `bool (HardwareSerial&)` | Stubs returning false on ESP32 |
 | `platformMutex*` / `platformQueue*` / `platformTaskCreatePinned` / `platformTaskDelay` | | FreeRTOS wrappers (`PlatformMutex`, `PlatformQueue`, `PlatformTask`) |
-| `platformMuteUart0Console`, `platformPixelWrite` | | UART0 console mute (PIC link), status pixel |
+| `platformMuteUart0Console`, `platformPixelWrite` | | UART0 console mute (PIC link; console stays on USB-Serial-JTAG), status pixel |
 
 **`class PlatformDir`** (`platform.h`) wraps LittleFS directory iteration: `PlatformDir(path)`, `valid()`, `next()`, `fileName()` (basename), `fileSize()`, `isDirectory()`; the destructor closes both file handles.
 

@@ -27,6 +27,7 @@
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_flash.h>
+#include <hal/usb_serial_jtag_ll.h>  // platformUsbJtagPutc (TASK-1217)
 #include <esp_sntp.h>            // esp_sntp_servermode_dhcp() (platformIgnoreDhcpNtp)
 #include <lwip/priv/tcp_priv.h>  // tcp_active_pcbs (platformTcpActivePcbCount)
 #include <lwip/tcpip.h>          // LOCK_TCPIP_CORE/UNLOCK_TCPIP_CORE (platformTcpActivePcbCount)
@@ -354,24 +355,58 @@ inline void platformRestart() {
   ESP.restart();
 }
 
-// Mute the IDF/ROM console on UART0 (TASK-972). On PIC-carrying boards the
-// primary IDF console (CONFIG_ESP_CONSOLE_UART_NUM=0, GPIO43) is physically
-// the PIC RX line: any esp_log/ets_printf output (WiFi driver bcn_timeout,
-// AsyncTCP warnings, error logs) is transmitted INTO the PIC. A single such
-// byte during the PIC bootloader's STX window aborts a PIC firmware flash,
-// and the PIC application answers stray log lines with SE (syntax error).
-// The USB-Serial-JTAG secondary console is unaffected; call this once on
-// boards where UART0 is bound to the PIC.
+// Mute the IDF/ROM console on UART0 and keep it on USB (TASK-972, TASK-1217).
+// On PIC-carrying boards the primary IDF console (CONFIG_ESP_CONSOLE_UART_NUM=0)
+// is the same UART0 that OTGWSerial drives into the PIC RX line (GPIO43), at
+// the PIC's 9600 baud. Any console text sent there reaches the PIC: the PIC
+// application answers stray lines with SE, and a single byte during the PIC
+// bootloader's STX window aborts a PIC firmware flash.
+//
+// Console output takes three paths, each redirected here:
+//  - ets_printf, Arduino log_e and the Arduino ESP_LOGx macros go through the
+//    ROM putc channels: putc1 (UART0) is silenced, putc2 writes to the
+//    USB-Serial-JTAG FIFO.
+//  - IDF component logs (esp_log, e.g. the WiFi driver) go through the esp_log
+//    vprintf hook, pointed at the same USB writer.
+//  - plain printf goes through the VFS console, which writes UART0 and USB
+//    together and cannot be split; stdout/stderr go to /dev/null, so printf
+//    output is lost on USB as well. This build registers no /dev/usbserjtag.
+//
+// uartSetDebug(NULL) comes first. Arduino resets both putc channels to NULL
+// whenever the UART that owns the log output is closed (uartEnd(0) ->
+// uartSetDebug -> ets_install_putc2(NULL)), and OTGWSerial.end() closes UART0.
+// With no UART owning the log, a later OTGWSerial.end() leaves putc2 alone.
 extern "C" void ets_install_putc1(void (*p)(char c));
-inline int platformNullLogVprintf(const char *, va_list) { return 0; }
+extern "C" void ets_install_putc2(void (*p)(char c));
 inline void platformNullRomPutc(char) {}
+// Non-blocking write to the USB-Serial-JTAG TX FIFO (64 bytes, sent per USB
+// frame while a host reads the port). With no host, or a host that does not
+// read, the FIFO stays full: the first character then waits at most 2 ms, and
+// later characters are dropped without waiting until the FIFO drains again.
+inline void platformUsbJtagPutc(char c) {
+  static bool stalled = false;
+  if (!usb_serial_jtag_ll_txfifo_writable()) {
+    if (stalled) return;
+    uint32_t t0 = micros();
+    while (!usb_serial_jtag_ll_txfifo_writable()) {
+      if (micros() - t0 > 2000) { stalled = true; return; }
+    }
+  }
+  stalled = false;
+  usb_serial_jtag_ll_write_txfifo(reinterpret_cast<const uint8_t *>(&c), 1);
+  if (c == '\n') usb_serial_jtag_ll_txfifo_flush();
+}
+inline int platformUsbJtagLogVprintf(const char *fmt, va_list args) {
+  char buf[256];
+  int n = vsnprintf(buf, sizeof(buf), fmt, args);
+  for (const char *p = buf; *p; p++) platformUsbJtagPutc(*p);
+  return n;
+}
 inline void platformMuteUart0Console() {
-  esp_log_set_vprintf(platformNullLogVprintf);
+  uartSetDebug(NULL);
   ets_install_putc1(platformNullRomPutc);
-  // Third leak path: closed-source components (WiFi libs) partly use plain
-  // newlib printf, which reaches UART0 through the VFS console — bypassing
-  // BOTH hooks above (see esp32.com/viewtopic.php?t=299: "some closed source
-  // parts still use ets_printf and printf"). Point stdout/stderr at /dev/null.
+  ets_install_putc2(platformUsbJtagPutc);
+  esp_log_set_vprintf(platformUsbJtagLogVprintf);
   freopen("/dev/null", "w", stdout);
   freopen("/dev/null", "w", stderr);
 }
