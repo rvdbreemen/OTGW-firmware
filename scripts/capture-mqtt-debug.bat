@@ -71,6 +71,8 @@ param(
     [int]$TelnetReconnectDelayMilliseconds = 500,
     [ValidateRange(250, 60000)]
     [int]$TelnetPostDisconnectDelayMilliseconds = 1000,
+    [ValidateScript({ $_ -eq 0 -or ($_ -ge 30 -and $_ -le 3600) })]
+    [int]$TelnetIdleSeconds = 120,
     [switch]$SkipDebugToggles,
     [switch]$QuietDebugToggles,
     [string]$KeepDebugToggles,
@@ -133,9 +135,13 @@ if ($KeepDebugToggles) {
     $script:KeepToggleLabels = @($KeepDebugToggles -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 }
 
-# Keys this run flipped, in either direction. A toggle is a flip, so re-sending
-# the same key restores it whichever way it was moved.
-$script:ToggledKeys = @()
+# Toggle states per label: as found on the first connect (what the teardown
+# restores) and after this script's last actions. Comparing the two instead of
+# replaying the keys sent on the last connect also covers a reconnect without a
+# reboot (half-open socket, idle watchdog), where the banner shows the toggles
+# this script switched on as already on.
+$script:ToggleOriginal = $null
+$script:ToggleCurrent = @{}
 
 function Show-Help {
     Write-Host "OTGW MQTT diagnostic capture"
@@ -150,6 +156,8 @@ function Show-Help {
     Write-Host "  on are left as-is. Simulator toggles (SensorSim, OTGW-Sim) are never touched. Toggle keys"
     Write-Host "  are parsed from the banner, so 1.x and 2.0.0/OTGW32 layouts both work."
     Write-Host "  It then sends 'q' (read settings) and 'D' (dump settings/state) so they land in telnet.log."
+    Write-Host "  When the capture stops, every toggle is switched back to the state it had when the"
+    Write-Host "  capture first connected, and the summary lists what was switched back."
     Write-Host "  -SkipDebugToggles             Leave every toggle as the device has it. Does NOT guarantee a"
     Write-Host "                                quiet capture: a device left verbose by an earlier run stays"
     Write-Host "                                verbose."
@@ -167,7 +175,9 @@ function Show-Help {
     Write-Host ""
     Write-Host "Interactive mode:"
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
-    Write-Host "  It then prompts for an optional MQTT username. Leave it blank for anonymous brokers."
+    Write-Host "  The broker host may be left blank: the capture then runs without the MQTT stream and says so."
+    Write-Host "  A non-interactive run (input redirected) does not prompt for the broker."
+    Write-Host "  With a broker host it prompts for an optional MQTT username. Leave it blank for anonymous brokers."
     Write-Host "  If a username is supplied without -Password, the script prompts securely for the MQTT password."
     Write-Host "  Host/broker/username answers are remembered and pre-filled next run ([default]; Enter accepts)."
     Write-Host "  The MQTT password is never saved."
@@ -195,6 +205,13 @@ function Show-Help {
     Write-Host "  -SkipCrashlogCapture          Disable the crash-log poll entirely."
     Write-Host "  -CrashlogUrl <url>           Crash-log endpoint (default http://<DeviceHost>/api/v2/device/crashlog)."
     Write-Host "  -CrashlogPollSeconds <n>     Poll interval in seconds (default 30, range 5-3600)."
+    Write-Host ""
+    Write-Host "Telnet:"
+    Write-Host "  -TelnetIdleSeconds <n>        Reconnect telnet when it has been silent this long while the device"
+    Write-Host "                                answers HTTP: the connection is half-open (default 120, range 30-3600,"
+    Write-Host "                                0 = off). The firmware prints heap stats every minute, so a longer"
+    Write-Host "                                silence is not normal. While the device does not answer either, the"
+    Write-Host "                                script waits and reconnects once it does."
     Write-Host ""
     Write-Host "Stopping capture:"
     Write-Host "  Press Q in the console to stop cleanly. The script closes the logs and leaves"
@@ -1206,6 +1223,21 @@ function Read-InitialTelnetBanner {
     return $banner
 }
 
+function Get-TelnetToggleStates {
+    param([AllowEmptyString()][AllowNull()][string]$Banner)
+
+    # label -> @{ Key; State } for every "<key> <Label> [<0|1>]" triplet in the banner.
+    $states = @{}
+    if ([string]::IsNullOrEmpty($Banner)) { return $states }
+    $pattern = '(?:^|\s)(?<key>\S)\s+(?<label>[A-Za-z][A-Za-z0-9 /]*?)\s*\[(?<state>[01])\]'
+    foreach ($m in [regex]::Matches($Banner, $pattern, [System.Text.RegularExpressions.RegexOptions]::Multiline)) {
+        $label = $m.Groups['label'].Value.Trim()
+        if ([string]::IsNullOrWhiteSpace($label) -or $states.ContainsKey($label)) { continue }
+        $states[$label] = @{ Key = $m.Groups['key'].Value; State = $m.Groups['state'].Value }
+    }
+    return $states
+}
+
 function Enable-AllTelnetDebugIfNeeded {
     param(
         [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream,
@@ -1244,6 +1276,7 @@ function Enable-AllTelnetDebugIfNeeded {
         else {
             $results.Add("$label=already-on") | Out-Null
         }
+        $script:ToggleCurrent[$label] = @{ Key = $key; State = "1" }
     }
 
     if ($results.Count -eq 0) {
@@ -1261,11 +1294,10 @@ function Disable-AllTelnetDebugIfNeeded {
 
     # Mirror image of Enable-AllTelnetDebugIfNeeded: same banner parsing, but
     # drives every toggle to its wanted state. Labels in -KeepDebugToggles are
-    # driven ON, everything else OFF. Records the keys it flipped in
-    # $script:ToggledKeys so the teardown can put them back exactly as found.
+    # driven ON, everything else OFF. Records the resulting states in
+    # $script:ToggleCurrent so the teardown can put them back as found.
     # Simulator toggles are never touched, same as the enable path.
     $results = New-Object System.Collections.Generic.List[string]
-    $flipped = New-Object System.Collections.Generic.List[string]
     $pattern = '(?:^|\s)(?<key>\S)\s+(?<label>[A-Za-z][A-Za-z0-9 /]*?)\s*\[(?<state>[01])\]'
     $seen = New-Object System.Collections.Generic.HashSet[string]
 
@@ -1291,15 +1323,13 @@ function Disable-AllTelnetDebugIfNeeded {
             $Stream.Flush()
             Start-Sleep -Milliseconds 300
             [void](Read-TelnetAvailable -Stream $Stream -Writer $Writer)
-            $flipped.Add($key) | Out-Null
             $results.Add("$label=$(if ($keep) { 'on (kept)' } else { 'off' }) (sent '$key')") | Out-Null
         }
         else {
             $results.Add("$label=already-$(if ($keep) { 'on (kept)' } else { 'off' })") | Out-Null
         }
+        $script:ToggleCurrent[$label] = @{ Key = $key; State = $wanted }
     }
-
-    $script:ToggledKeys = @($flipped)
 
     if ($results.Count -eq 0) {
         return "no debug toggles found in banner"
@@ -1309,31 +1339,70 @@ function Disable-AllTelnetDebugIfNeeded {
 
 function Restore-TelnetDebugToggles {
     param(
-        [Parameter(Mandatory = $true)][System.Net.Sockets.NetworkStream]$Stream
+        [AllowNull()][System.Net.Sockets.NetworkStream]$Stream
     )
 
-    # Put back every toggle this run moved, in either direction. Best-effort by
-    # design: when the device crashed or rebooted the stream is dead, and a failed
-    # restore must not mask the real outcome of the capture.
-    if (-not $script:ToggledKeys -or $script:ToggledKeys.Count -eq 0) {
+    # Switch every toggle back to the state it had when the capture first
+    # connected. Best-effort by design: when the device crashed or rebooted the
+    # stream is dead, and a failed restore must not mask the real outcome.
+    if ($null -eq $script:ToggleOriginal -or $script:ToggleCurrent.Count -eq 0) {
         return $null
     }
+    $plan = @()
+    foreach ($label in @($script:ToggleCurrent.Keys | Sort-Object)) {
+        if (-not $script:ToggleOriginal.ContainsKey($label)) { continue }
+        $original = $script:ToggleOriginal[$label].State
+        if ($original -ne $script:ToggleCurrent[$label].State) {
+            $plan += @{ Label = $label; Key = $script:ToggleCurrent[$label].Key; State = $original }
+        }
+    }
+    if ($plan.Count -eq 0) {
+        return "Debug toggles: as found at capture start, nothing to restore."
+    }
+    if ($null -eq $Stream) {
+        return "Debug toggles restore failed (device likely gone): telnet connection is closed"
+    }
 
-    $restored = 0
-    foreach ($key in $script:ToggledKeys) {
+    $restored = New-Object System.Collections.Generic.List[string]
+    foreach ($item in $plan) {
         try {
-            $bytes = [System.Text.Encoding]::ASCII.GetBytes($key)
+            $bytes = [System.Text.Encoding]::ASCII.GetBytes($item.Key)
             $Stream.Write($bytes, 0, $bytes.Length)
             $Stream.Flush()
             Start-Sleep -Milliseconds 200
-            $restored++
+            $restored.Add("$($item.Label) $(if ($item.State -eq '1') { 'on' } else { 'off' })") | Out-Null
         }
         catch {
-            return "Debug toggles restore: partial ($restored of $($script:ToggledKeys.Count)) - $($_.Exception.Message)"
+            return "Debug toggles restore: partial ($($restored.Count) of $($plan.Count)): $($restored -join ', ') - $($_.Exception.Message)"
         }
     }
-    $script:ToggledKeys = @()
-    return "Debug toggles restored: $restored toggle(s) switched back on."
+    return "Debug toggles restored to their state at capture start: $($restored -join ', ')"
+}
+
+function Get-DeviceHttpStatus {
+    param([string]$Url, [int]$TimeoutMilliseconds = 5000)
+
+    # HTTP status of one GET, 0 when the device does not answer at all. Any
+    # status, 404 included, proves the device is reachable again.
+    try {
+        $req = [System.Net.HttpWebRequest]::Create($Url)
+        $req.Method = "GET"
+        $req.Timeout = $TimeoutMilliseconds
+        $req.ReadWriteTimeout = $TimeoutMilliseconds
+        $req.KeepAlive = $false
+        $resp = $req.GetResponse()
+        try { return [int]$resp.StatusCode } finally { $resp.Dispose() }
+    }
+    catch [System.Net.WebException] {
+        if ($_.Exception.Response) {
+            try { return [int]([System.Net.HttpWebResponse]$_.Exception.Response).StatusCode }
+            finally { $_.Exception.Response.Dispose() }
+        }
+        return 0
+    }
+    catch {
+        return 0
+    }
 }
 
 function Send-TelnetKeyAndDrain {
@@ -1402,6 +1471,11 @@ function Connect-TelnetCapture {
         Add-SummaryLine "Telnet connected: $((Get-Date).ToString('o'))"
 
         $banner = Read-InitialTelnetBanner -Stream $stream -Writer $Writer
+        # The first banner that lists toggles holds the states to restore at the end.
+        if ($null -eq $script:ToggleOriginal) {
+            $found = Get-TelnetToggleStates -Banner $banner
+            if ($found.Count -gt 0) { $script:ToggleOriginal = $found }
+        }
         $toggleAction = if ($script:QuietDebugToggles) {
             Disable-AllTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
         } elseif ($script:SkipDebugToggles) {
@@ -2076,7 +2150,7 @@ if ([string]::IsNullOrWhiteSpace($DeviceHost)) {
     $DeviceHost = Read-HostWithDefault -Prompt "OTGW device host" -Default $(if ($savedSettings) { [string]$savedSettings.DeviceHost } else { "" })
 }
 
-if ([string]::IsNullOrWhiteSpace($BrokerHost)) {
+if ([string]::IsNullOrWhiteSpace($BrokerHost) -and -not [Console]::IsInputRedirected) {
     $BrokerHost = Read-HostWithDefault -Prompt "MQTT broker host" -Default $(if ($savedSettings) { [string]$savedSettings.BrokerHost } else { "" })
 }
 
@@ -2084,11 +2158,10 @@ if ([string]::IsNullOrWhiteSpace($DeviceHost)) {
     throw "DeviceHost is required."
 }
 
-if ([string]::IsNullOrWhiteSpace($BrokerHost)) {
-    throw "BrokerHost is required."
-}
+# No broker is fine: the telnet log is the reason this script exists, and the
+# MQTT section below says that the broker stream is skipped.
 
-if (-not $usernameWasBound -and (-not $deviceHostWasBound -or -not $brokerHostWasBound)) {
+if (-not [string]::IsNullOrWhiteSpace($BrokerHost) -and -not $usernameWasBound -and (-not $deviceHostWasBound -or -not $brokerHostWasBound)) {
     $Username = Read-HostWithDefault -Prompt "MQTT username (blank for anonymous)" -Default $(if ($savedSettings) { [string]$savedSettings.Username } else { "" })
 }
 
@@ -2129,6 +2202,7 @@ Add-SummaryLine "TelnetPort: $telnetPort"
 Add-SummaryLine "TelnetConnectTimeoutSeconds: $telnetConnectTimeoutSeconds"
 Add-SummaryLine "TelnetPostDisconnectDelayMilliseconds: $telnetPostDisconnectDelayMilliseconds"
 Add-SummaryLine "TelnetReconnectDelayMilliseconds: $telnetReconnectDelayMilliseconds"
+Add-SummaryLine "TelnetIdleSeconds: $(if ($TelnetIdleSeconds -gt 0) { $TelnetIdleSeconds } else { 'off' })"
 Add-SummaryLine "BrokerHost: $BrokerHost"
 Add-SummaryLine "BrokerPort: $BrokerPort"
 Add-SummaryLine "Topic: $Topic"
@@ -2150,7 +2224,7 @@ Add-SummaryLine ("Debug toggle policy: " + $(
         }
     }
     elseif ($script:SkipDebugToggles) { "leave as-is (-SkipDebugToggles)" }
-    else { "enable all that are off" }))
+    else { "enable all that are off, restore on exit" }))
 
 $telnetClient = $null
 $stream = $null
@@ -2162,6 +2236,10 @@ $telnetReconnectAttempts = 0
 $telnetReconnectReason = $null
 $nextTelnetConnectUtc = [DateTime]::MinValue
 $telnetRebootScanBuffer = ""
+$telnetLastByteUtc = [DateTime]::UtcNow
+$telnetIdleReconnects = 0
+$telnetUnreachableSince = $null
+$nextIdleCheckUtc = [DateTime]::MinValue
 $browserHandle = $null
 $crashlogHandle = $null
 
@@ -2241,7 +2319,10 @@ try {
     # An explicit -MosquittoSubPath that does not exist stays fatal, because a
     # wrong path the user typed themselves should not be silently ignored.
     $mosquitto = $null
-    if (-not [string]::IsNullOrWhiteSpace($MosquittoSubPath)) {
+    if ([string]::IsNullOrWhiteSpace($BrokerHost)) {
+        Write-CaptureStatus "MQTT capture skipped: no BrokerHost given (telnet and crash log still run)."
+    }
+    elseif (-not [string]::IsNullOrWhiteSpace($MosquittoSubPath)) {
         $mosquitto = Resolve-MosquittoSub -ExplicitPath $MosquittoSubPath -SkipInstall:$SkipToolInstall
     }
     else {
@@ -2351,6 +2432,9 @@ try {
                 $telnetReconnectAttempts = 0
                 $telnetReconnectReason = $null
                 $nextTelnetConnectUtc = [DateTime]::MinValue
+                $telnetLastByteUtc = [DateTime]::UtcNow
+                $telnetUnreachableSince = $null
+                $nextIdleCheckUtc = [DateTime]::MinValue
             }
             catch {
                 $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetReconnectDelayMilliseconds)
@@ -2362,6 +2446,7 @@ try {
         try {
             $telnetText = Read-TelnetAvailable -Stream $stream -Writer $telnetWriter
             if (-not [string]::IsNullOrEmpty($telnetText)) {
+                $telnetLastByteUtc = [DateTime]::UtcNow
                 $telnetRebootScanBuffer += $telnetText
                 if ($telnetRebootScanBuffer.Length -gt 512) {
                     $telnetRebootScanBuffer = $telnetRebootScanBuffer.Substring($telnetRebootScanBuffer.Length - 512)
@@ -2391,6 +2476,35 @@ try {
             continue
         }
 
+        # Idle watchdog. A device that drops off the network without a reboot
+        # marker leaves the socket half-open: no close ever arrives and the read
+        # waits forever (GH #682). The firmware prints heap stats every minute,
+        # so a long silence means either the device is unreachable (wait for it)
+        # or it answers HTTP while our socket stays silent (half-open: reconnect).
+        if ($TelnetIdleSeconds -gt 0 -and $telnetClient -and [DateTime]::UtcNow -ge $nextIdleCheckUtc -and
+            ([DateTime]::UtcNow - $telnetLastByteUtc).TotalSeconds -ge $TelnetIdleSeconds) {
+            $idleSeconds = [int]([DateTime]::UtcNow - $telnetLastByteUtc).TotalSeconds
+            $idleHttp = Get-DeviceHttpStatus -Url "http://$DeviceHost/api/v2/device/info"
+            if ($idleHttp -gt 0) {
+                $telnetIdleReconnects++
+                $unreachableNote = if ($telnetUnreachableSince) { ", device unreachable from $telnetUnreachableSince" } else { "" }
+                Write-CaptureStatus "Telnet idle reconnect #${telnetIdleReconnects}: no telnet bytes for ${idleSeconds}s while the device answers HTTP ($idleHttp)$unreachableNote; reconnecting the half-open socket."
+                Close-TelnetClient -Client $telnetClient
+                $telnetClient = $null
+                $stream = $null
+                $telnetReconnectReason = "telnet silent for ${idleSeconds}s while the device answers HTTP"
+                $telnetReconnectAttempts = 0
+                $telnetUnreachableSince = $null
+                $nextTelnetConnectUtc = [DateTime]::MinValue
+                continue
+            }
+            if (-not $telnetUnreachableSince) {
+                $telnetUnreachableSince = (Get-Date).ToString('o')
+                Write-CaptureStatus "Telnet silent for ${idleSeconds}s and the device does not answer HTTP: waiting for it to come back, then reconnecting."
+            }
+            $nextIdleCheckUtc = [DateTime]::UtcNow.AddSeconds(15)
+        }
+
         Wait-CaptureDelay -Milliseconds 100
     }
 
@@ -2417,11 +2531,16 @@ finally {
         Add-SummaryLine "mosquitto_sub exit code: $($mqttProcess.ExitCode)"
     }
 
+    if ($TelnetIdleSeconds -gt 0) {
+        Add-SummaryLine "Telnet idle reconnects: $telnetIdleReconnects (watchdog ${TelnetIdleSeconds}s)"
+    }
+
     # Restore toggles BEFORE the writer and client go away. Best-effort: a crashed
     # or rebooted device leaves a dead stream, and that must not derail shutdown.
-    if ($telnetClient -and $script:ToggledKeys -and $script:ToggledKeys.Count -gt 0) {
+    if ($script:ToggleCurrent.Count -gt 0) {
         try {
-            $restoreMsg = Restore-TelnetDebugToggles -Stream $telnetClient.GetStream()
+            $restoreStream = if ($telnetClient) { $telnetClient.GetStream() } else { $null }
+            $restoreMsg = Restore-TelnetDebugToggles -Stream $restoreStream
             if ($restoreMsg) { Add-SummaryLine $restoreMsg }
         }
         catch {

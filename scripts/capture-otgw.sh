@@ -58,6 +58,9 @@ SKIP_TOOL_INSTALL="0"
 TELNET_CONNECT_TIMEOUT_SECONDS="6"
 TELNET_RECONNECT_DELAY_MS="500"
 TELNET_POST_DISCONNECT_DELAY_MS="1000"
+# The firmware prints heap stats every minute, so a stream silent for twice
+# that is a half-open socket or an unreachable device. 0 switches the check off.
+TELNET_IDLE_SECONDS="120"
 SKIP_DEBUG_TOGGLES="0"
 QUIET_DEBUG_TOGGLES="0"
 KEEP_DEBUG_TOGGLES=""
@@ -103,6 +106,8 @@ Debug logging:
   toggles that are off: OTmsg, REST API, MQTT, MQTTGate, Sensors, NTP. Toggles already
   on are left as-is. Simulator toggles (SensorSim, OTGW-Sim) are never touched. Toggle keys
   are parsed from the banner, so 1.x and 2.0.0/OTGW32 layouts both work.
+  When the capture stops, every toggle is switched back to the state it had when the
+  capture first connected, and the summary lists what was switched back.
   It then sends 'q' (read settings) and 'D' (dump settings/state) so they land in telnet.log.
   -SkipDebugToggles             Leave every toggle as the device has it. Does NOT guarantee a
                                 quiet capture: a device left verbose by an earlier run stays
@@ -121,7 +126,9 @@ Debug logging:
 
 Interactive mode:
   If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host.
-  It then prompts for an optional MQTT username. Leave it blank for anonymous brokers.
+  The broker host may be left blank: the capture then runs without the MQTT stream and says so.
+  A non-interactive run (no terminal on stdin) does not prompt for the broker.
+  With a broker host it prompts for an optional MQTT username. Leave it blank for anonymous brokers.
   If a username is supplied without -Password, the script prompts (without echo) for the MQTT password.
   Host/broker/username answers are remembered and pre-filled next run ([default]; Enter accepts),
   in \${XDG_CONFIG_HOME:-~/.config}/otgw-capture/capture-settings.json. The MQTT password is never saved.
@@ -159,6 +166,10 @@ Telnet:
   -TelnetConnectTimeoutSeconds <n>           Base connect timeout (default 6, range 2-60; grows on retries, max 20).
   -TelnetReconnectDelayMilliseconds <n>      Wait after a failed connect (default 500, range 250-60000).
   -TelnetPostDisconnectDelayMilliseconds <n> Wait after a disconnect or reboot (default 1000, range 250-60000).
+  -TelnetIdleSeconds <n>                     Reconnect telnet when it has been silent this long while the
+                                             device answers HTTP: the connection is half-open (default 120,
+                                             range 30-3600, 0 = off). While the device does not answer
+                                             either, the script waits and reconnects once it does.
 
 Other:
   -OutputRoot <dir>             Where run folders go (default logs/mqtt-diagnostics).
@@ -256,6 +267,7 @@ while [ $# -gt 0 ]; do
         telnetreconnectdelaymilliseconds)      need_value "$@"; TELNET_RECONNECT_DELAY_MS="$2"; shift 2 ;;
         telnetpostdisconnectdelaymilliseconds) need_value "$@"; TELNET_POST_DISCONNECT_DELAY_MS="$2"; shift 2 ;;
         telnetport)                   need_value "$@"; TELNET_PORT="$2"; shift 2 ;;
+        telnetidleseconds)            need_value "$@"; TELNET_IDLE_SECONDS="$2"; shift 2 ;;
         skipdebugtoggles)             SKIP_DEBUG_TOGGLES="1"; shift ;;
         quietdebugtoggles)            QUIET_DEBUG_TOGGLES="1"; shift ;;
         keepdebugtoggles)             need_value "$@"; KEEP_DEBUG_TOGGLES="$2"; shift 2 ;;
@@ -289,6 +301,10 @@ int_opt "-TelnetPostDisconnectDelayMilliseconds" "$TELNET_POST_DISCONNECT_DELAY_
 int_opt "-BrowserDebugPort" "$BROWSER_DEBUG_PORT" 1 65535
 int_opt "-CrashlogPollSeconds" "$CRASHLOG_POLL_SECONDS" 5 3600
 int_opt "-TelnetPort" "$TELNET_PORT" 1 65535
+int_opt "-TelnetIdleSeconds" "$TELNET_IDLE_SECONDS" 0 3600
+if [ "$TELNET_IDLE_SECONDS" -gt 0 ] && [ "$TELNET_IDLE_SECONDS" -lt 30 ]; then
+    die "-TelnetIdleSeconds must be 0 (off) or 30-3600."
+fi
 int_opt "-ProbeSeconds" "$PROBE_SECONDS"
 int_opt "-Baud" "$SERIAL_BAUD"
 
@@ -354,11 +370,17 @@ read_with_default() {
 # come up on WiFi, so there the network addresses are optional.
 if [ "$SERIAL_MODE" != "1" ]; then
     [ -n "$DEVICE_HOST" ] || DEVICE_HOST="$(read_with_default "OTGW device host" "$(saved_setting DeviceHost)")"
-    [ -n "$BROKER_HOST" ] || BROKER_HOST="$(read_with_default "MQTT broker host" "$(saved_setting BrokerHost)")"
+    # A non-interactive run (no terminal on stdin) is not asked for a broker,
+    # so it never picks up a remembered one without anybody seeing it.
+    if [ -z "$BROKER_HOST" ] && [ -t 0 ]; then
+        BROKER_HOST="$(read_with_default "MQTT broker host" "$(saved_setting BrokerHost)")"
+    fi
     [ -n "$DEVICE_HOST" ] || die "DeviceHost is required."
-    [ -n "$BROKER_HOST" ] || die "BrokerHost is required."
+    # No broker is fine: the telnet log is the reason this script exists, and
+    # the MQTT section below says that the broker stream is skipped.
 
-    if [ "$BOUND_USERNAME" != "1" ] && { [ "$BOUND_DEVICE_HOST" != "1" ] || [ "$BOUND_BROKER_HOST" != "1" ]; }; then
+    if [ -n "$BROKER_HOST" ] && [ "$BOUND_USERNAME" != "1" ] \
+       && { [ "$BOUND_DEVICE_HOST" != "1" ] || [ "$BOUND_BROKER_HOST" != "1" ]; }; then
         USERNAME="$(read_with_default "MQTT username (blank for anonymous)" "$(saved_setting Username)")"
     fi
 fi
@@ -430,6 +452,8 @@ add_summary_line "TelnetPort: $TELNET_PORT"
 add_summary_line "TelnetConnectTimeoutSeconds: $TELNET_CONNECT_TIMEOUT_SECONDS"
 add_summary_line "TelnetPostDisconnectDelayMilliseconds: $TELNET_POST_DISCONNECT_DELAY_MS"
 add_summary_line "TelnetReconnectDelayMilliseconds: $TELNET_RECONNECT_DELAY_MS"
+if [ "$TELNET_IDLE_SECONDS" -gt 0 ]; then add_summary_line "TelnetIdleSeconds: $TELNET_IDLE_SECONDS"
+else add_summary_line "TelnetIdleSeconds: off"; fi
 add_summary_line "BrokerHost: ${BROKER_HOST:-(none)}"
 add_summary_line "BrokerPort: $BROKER_PORT"
 add_summary_line "Topic: $TOPIC"
@@ -450,7 +474,7 @@ if [ "$QUIET_DEBUG_TOGGLES" = "1" ]; then
 elif [ "$SKIP_DEBUG_TOGGLES" = "1" ]; then
     add_summary_line "Debug toggle policy: leave as-is (-SkipDebugToggles)"
 else
-    add_summary_line "Debug toggle policy: enable all that are off"
+    add_summary_line "Debug toggle policy: enable all that are off, restore on exit"
 fi
 add_summary_line "Platform: $(uname -srm 2>/dev/null || echo unknown); bash ${BASH_VERSION:-unknown}; script $SCRIPT_NAME $SCRIPT_VERSION"
 
@@ -504,8 +528,12 @@ TELNET_PID=""
 TELNET_FIFO=""
 TELNET_CONN_SEQ=0
 TELNET_CONNECTED_FLAG=""
-TOGGLED_KEYS=""       # keys this run flipped, in either direction
 CONNECT_OFFSET=0
+# Toggle bookkeeping, as "key<TAB>label<TAB>state" lines in files because the
+# toggle functions run inside $(...): the states at the first connect (what the
+# teardown restores) and the states after this script's last actions.
+TOGGLES_ORIGINAL="$STATE_DIR/toggles-original"
+TOGGLES_CURRENT="$STATE_DIR/toggles-current"
 
 log_size() { if [ -f "$1" ]; then wc -c < "$1" | tr -d ' '; else echo 0; fi; }
 
@@ -599,74 +627,97 @@ parse_toggles() {
 
 is_simulator() { case "|$DEBUG_TOGGLE_SIMULATORS|" in *"|$1|"*) return 0 ;; esac; return 1; }
 
-# Enable every toggle that is off (default policy).
+# Enable every toggle that is off (default policy). Writes the resulting states
+# to $TOGGLES_CURRENT for the teardown.
 enable_all_debug_if_needed() {
-    local key label state results=""
-    while IFS="$(printf '\t')" read -r key label state; do
+    local key label state results="" tab
+    tab="$(printf '\t')"
+    : > "$TOGGLES_CURRENT.new"
+    while IFS="$tab" read -r key label state; do
         [ -n "$label" ] || continue
         if is_simulator "$label"; then
             results="$results; $label=skipped (simulator)"
         elif [ "$state" = "0" ]; then
             send_key "$key"; sleep 0.3
+            state="1"
             results="$results; $label=on (sent '$key')"
         else
             results="$results; $label=already-on"
         fi
+        printf '%s\t%s\t%s\n' "$key" "$label" "$state" >> "$TOGGLES_CURRENT.new"
     done <<EOF
 $(printf '%s' "$1" | parse_toggles)
 EOF
+    mv -f "$TOGGLES_CURRENT.new" "$TOGGLES_CURRENT"
     results="${results#; }"
     printf '%s' "${results:-no debug toggles found in banner}"
 }
 
 # Drive every toggle to its wanted state: ON for the keep list, OFF otherwise.
-# Records what it flipped so the teardown can restore exactly that.
+# Writes the resulting states to $TOGGLES_CURRENT for the teardown.
 disable_all_debug_if_needed() {
-    local key label state wanted results="" flipped=""
-    while IFS="$(printf '\t')" read -r key label state; do
+    local key label state wanted results="" tab
+    tab="$(printf '\t')"
+    : > "$TOGGLES_CURRENT.new"
+    while IFS="$tab" read -r key label state; do
         [ -n "$label" ] || continue
         if is_simulator "$label"; then
-            results="$results; $label=skipped (simulator)"; continue
+            results="$results; $label=skipped (simulator)"
+            printf '%s\t%s\t%s\n' "$key" "$label" "$state" >> "$TOGGLES_CURRENT.new"
+            continue
         fi
         if keep_list_has "$label"; then wanted="1"; else wanted="0"; fi
         if [ "$state" != "$wanted" ]; then
             send_key "$key"; sleep 0.3
-            flipped="$flipped$key"
             if [ "$wanted" = "1" ]; then results="$results; $label=on (kept) (sent '$key')"
             else results="$results; $label=off (sent '$key')"; fi
         else
             if [ "$wanted" = "1" ]; then results="$results; $label=already-on (kept)"
             else results="$results; $label=already-off"; fi
         fi
+        printf '%s\t%s\t%s\n' "$key" "$label" "$wanted" >> "$TOGGLES_CURRENT.new"
     done <<EOF
 $(printf '%s' "$1" | parse_toggles)
 EOF
-    # Runs inside $(...), so the flipped keys go through a file, not a variable.
-    printf '%s' "$flipped" > "$STATE_DIR/toggled"
+    mv -f "$TOGGLES_CURRENT.new" "$TOGGLES_CURRENT"
     results="${results#; }"
     printf '%s' "${results:-no debug toggles found in banner}"
 }
 
+# Switch every toggle back to the state it had when the capture first connected.
+# Comparing states instead of replaying the keys sent on the last connect also
+# covers a reconnect without a reboot (half-open socket, idle watchdog): the
+# banner then shows the toggles this script switched on as already on.
+# Best-effort: a crashed or rebooted device leaves a dead socket, and a failed
+# restore must not mask the real outcome of the capture.
 restore_debug_toggles() {
-    # Best-effort: a crashed or rebooted device leaves a dead socket, and a
-    # failed restore must not mask the real outcome of the capture.
-    local i n key restored=0
-    n=${#TOGGLED_KEYS}
-    [ "$n" -gt 0 ] || return 0
-    telnet_alive || { add_summary_line "Debug toggles restore failed (device likely gone): telnet connection is closed"; return 0; }
-    i=0
-    while [ "$i" -lt "$n" ]; do
-        key="${TOGGLED_KEYS:$i:1}"
-        if send_key "$key"; then restored=$(( restored + 1 )); fi
-        sleep 0.2
-        i=$(( i + 1 ))
-    done
-    if [ "$restored" -eq "$n" ]; then
-        add_summary_line "Debug toggles restored: $restored toggle(s) switched back on."
-    else
-        add_summary_line "Debug toggles restore: partial ($restored of $n)"
+    local key label state plan n=0 sent=0 changed="" tab
+    tab="$(printf '\t')"
+    [ -s "$TOGGLES_ORIGINAL" ] && [ -s "$TOGGLES_CURRENT" ] || return 0
+    plan="$(awk -F "$tab" 'NR == FNR { orig[$2] = $3; next }
+                           ($2 in orig) && orig[$2] != $3 { printf "%s\t%s\t%s\n", $1, $2, orig[$2] }' \
+            "$TOGGLES_ORIGINAL" "$TOGGLES_CURRENT")"
+    if [ -z "$plan" ]; then
+        add_summary_line "Debug toggles: as found at capture start, nothing to restore."
+        return 0
     fi
-    TOGGLED_KEYS=""
+    telnet_alive || { add_summary_line "Debug toggles restore failed (device likely gone): telnet connection is closed"; return 0; }
+    while IFS="$tab" read -r key label state; do
+        [ -n "$key" ] || continue
+        n=$(( n + 1 ))
+        if send_key "$key"; then
+            sent=$(( sent + 1 ))
+            if [ "$state" = "1" ]; then changed="$changed, $label on"; else changed="$changed, $label off"; fi
+        fi
+        sleep 0.2
+    done <<EOF
+$plan
+EOF
+    if [ "$sent" -eq "$n" ]; then
+        add_summary_line "Debug toggles restored to their state at capture start: ${changed#, }"
+    else
+        add_summary_line "Debug toggles restore: partial ($sent of $n): ${changed#, }"
+    fi
 }
 
 # connect_telnet TIMEOUT_S: 0 on success, 1 on failure (reason in TELNET_ERROR).
@@ -701,9 +752,12 @@ connect_telnet() {
     add_summary_line "Telnet connected: $(iso_now)"
 
     banner="$(read_initial_banner)"
+    # The first banner that lists toggles holds the states to restore at the end.
+    if [ ! -s "$TOGGLES_ORIGINAL" ]; then
+        printf '%s' "$banner" | parse_toggles > "$TOGGLES_ORIGINAL"
+    fi
     if [ "$QUIET_DEBUG_TOGGLES" = "1" ]; then
         toggle_action="$(disable_all_debug_if_needed "$banner")"
-        TOGGLED_KEYS="$(cat "$STATE_DIR/toggled" 2>/dev/null)"
     elif [ "$SKIP_DEBUG_TOGGLES" = "1" ]; then
         toggle_action="skipped (-SkipDebugToggles): toggles left as the device had them"
     else
@@ -1424,7 +1478,7 @@ fi
 # The MQTT stream is a bonus; the telnet log is the reason this script exists.
 # A missing mosquitto_sub degrades the run, it never aborts it.
 if [ -z "$BROKER_HOST" ]; then
-    add_summary_line "MQTT capture disabled: no BrokerHost given."
+    write_capture_status "MQTT capture skipped: no BrokerHost given (telnet, probe and crash log still run)."
 elif resolve_mosquitto_sub; then
     add_summary_line "mosquitto_sub: $MOSQUITTO"
     add_summary_line "mosquitto_sub source: $MOSQUITTO_SOURCE"
@@ -1527,6 +1581,10 @@ printf 'Ctrl+C also stops the capture cleanly.\n'
 
 : > "$TELNET_LOG"
 TELNET_HAS_CONNECTED="0"
+TELNET_LAST_BYTE_MS=0
+TELNET_IDLE_RECONNECTS=0
+TELNET_UNREACHABLE_SINCE=""
+NEXT_IDLE_CHECK_MS=0
 TELNET_RECONNECT_ATTEMPTS=0
 TELNET_RECONNECT_REASON=""
 NEXT_CONNECT_MS=0
@@ -1573,6 +1631,9 @@ while :; do
             TELNET_HAS_CONNECTED="1"
             TELNET_RECONNECT_ATTEMPTS=0
             TELNET_RECONNECT_REASON=""
+            TELNET_LAST_BYTE_MS="$(now_ms)"
+            TELNET_UNREACHABLE_SINCE=""
+            NEXT_IDLE_CHECK_MS=0
             SCAN_OFFSET="$CONNECT_OFFSET"
         else
             stop_requested && break
@@ -1597,6 +1658,36 @@ while :; do
             write_capture_status "Telnet captured ESP.restart(); waiting $(awk -v m="$TELNET_POST_DISCONNECT_DELAY_MS" 'BEGIN{print m/1000}')s before reconnect attempts."
         fi
         SCAN_OFFSET="$SIZE_NOW"
+        TELNET_LAST_BYTE_MS="$(now_ms)"
+    fi
+
+    # Idle watchdog. A device that drops off the network without a reboot
+    # marker leaves the socket half-open: no close ever arrives and cat waits
+    # forever (GH #682). The firmware prints heap stats every minute, so a long
+    # silence means either the device is unreachable (wait for it) or it answers
+    # HTTP while our socket stays silent (half-open: reconnect).
+    if [ "$TELNET_IDLE_SECONDS" -gt 0 ] && telnet_alive; then
+        NOW_MS="$(now_ms)"
+        if [ $(( NOW_MS - TELNET_LAST_BYTE_MS )) -ge $(( TELNET_IDLE_SECONDS * 1000 )) ] \
+           && [ "$NOW_MS" -ge "$NEXT_IDLE_CHECK_MS" ]; then
+            IDLE_S=$(( (NOW_MS - TELNET_LAST_BYTE_MS) / 1000 ))
+            IDLE_HTTP="$(curl -s -o /dev/null -m 5 -w '%{http_code}' "http://$DEVICE_HOST/api/v2/device/info" 2>/dev/null)"
+            if [ -n "$IDLE_HTTP" ] && [ "$IDLE_HTTP" != "000" ]; then
+                TELNET_IDLE_RECONNECTS=$(( TELNET_IDLE_RECONNECTS + 1 ))
+                write_capture_status "Telnet idle reconnect #$TELNET_IDLE_RECONNECTS: no telnet bytes for ${IDLE_S}s while the device answers HTTP ($IDLE_HTTP)${TELNET_UNREACHABLE_SINCE:+, device unreachable from $TELNET_UNREACHABLE_SINCE}; reconnecting the half-open socket."
+                close_telnet
+                TELNET_RECONNECT_REASON="telnet silent for ${IDLE_S}s while the device answers HTTP"
+                TELNET_RECONNECT_ATTEMPTS=0
+                TELNET_UNREACHABLE_SINCE=""
+                NEXT_CONNECT_MS=0
+            else
+                if [ -z "$TELNET_UNREACHABLE_SINCE" ]; then
+                    TELNET_UNREACHABLE_SINCE="$(iso_now)"
+                    write_capture_status "Telnet silent for ${IDLE_S}s and the device does not answer HTTP: waiting for it to come back, then reconnecting."
+                fi
+                NEXT_IDLE_CHECK_MS=$(( NOW_MS + 15000 ))
+            fi
+        fi
     fi
 done
 
@@ -1622,8 +1713,12 @@ if [ -n "$MQTT_PID" ]; then
     fi
 fi
 
+if [ "$TELNET_IDLE_SECONDS" -gt 0 ] && [ "$DO_TELNET" = "1" ]; then
+    add_summary_line "Telnet idle reconnects: $TELNET_IDLE_RECONNECTS (watchdog ${TELNET_IDLE_SECONDS}s)"
+fi
+
 # Restore toggles BEFORE the connection goes away.
-if [ -n "$TOGGLED_KEYS" ]; then
+if [ -s "$TOGGLES_CURRENT" ]; then
     restore_debug_toggles
     sleep 0.3
 fi
