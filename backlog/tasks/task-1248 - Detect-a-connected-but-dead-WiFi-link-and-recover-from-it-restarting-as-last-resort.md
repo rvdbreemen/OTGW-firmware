@@ -3,9 +3,11 @@ id: TASK-1248
 title: >-
   Detect a connected-but-dead WiFi link and recover from it, restarting as last
   resort
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-18 09:50'
+updated_date: '2026-10-18 09:59'
 labels:
   - bug
   - wifi
