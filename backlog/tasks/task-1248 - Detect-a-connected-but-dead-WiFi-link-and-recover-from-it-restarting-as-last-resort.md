@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 09:50'
-updated_date: '2026-10-18 15:04'
+updated_date: '2026-10-18 21:50'
 labels:
   - bug
   - wifi
@@ -100,4 +100,10 @@ Released in v1.7.8-beta.2 (release commit 403636dc8, tag pushed, CI run 39131556
 Decision needed from the maintainer: revert the fast path, or keep a narrowed variant (reconnect step only, MQTT required connected at the start of the streak, disabled once a witness blocked action). beta.3 not released.
 
 2026-10-18: maintainer chose to revert the fast path (revert commit on otgw-1.x.x, firmware build green at 773568 B, same size as the beta.2 build) and wait for field input on v1.7.8-beta.2 before changing thresholds.
+
+2026-10-18 hardware runs on the COM3 unit .88.68 (ESP8266, PIC gateway 6.8), maintainer's go. Fault injection on the MikroTik RB4011 (unit on its local wlan2): bridge filter on the unit's MAC, DHCP (udp 67) and ARP to the router allowed, everything else dropped; the unit stays associated with its IP and DHCP lease, as on GH #682. Variant 'telnet' also lets telnet PC<->unit through as a log channel (telnet is not a witness). Evidence: %LOCALAPPDATA%/OTGW-capture/bench-20261018 (rig-1250/events.log + telnet.log + router.log + poll.log, old-capture/ transcript).
+OLD (AC5), 1.7.7-beta.1+ed84e49: full fault 21:43:03-22:08:05 (25 min). Router association uptime ran on unbroken (51m43s at 22:08:03, no reassociation), lease bound, no restart (uptime 44 min, bootcount 3, lastreset External System). Reachable again at 22:08:13 when the rule was lifted. The old firmware never acted.
+FIX v2 = 1.7.8-beta.3+9354921 (dead-link code identical to beta.2/a3f82891d..0d9381c0a), run A (AC1): telnet-variant fault 23:04:21; dead probes (1/8)..(8/8) one per minute from 23:04:42; 23:11:44 'WiFi: connected but no traffic, forcing a reconnect'; router: new association at ~23:11:47 (assoc uptime 3m46s at 23:15:33), lease renewed; rule lifted 23:12:13 (simulating 'reassociation clears the fault'); MQTT back 23:13:03, no restart (banner 'Reboots: 1', uptime continuous). Detected and acted on 7 min after the first dead probe. The reconnect lines themselves were missed by my 75 s telnet logger (fixed to 10 s afterwards).
+AC4 PIC flash (maintainer's explicit order: re-flash the same gateway 6.8): ICMP-to-router-only fault 23:19:07 (LAN up), broker stopped and no REST poller so no witness. Forced reconnect 23:26:58 (probe count back to 1/8 at 23:27:54). After (7/8) at 23:33:55 the flash started 23:34:40 (GET /pic?action=upgrade&name=gateway.hex&version=6.8, bundled gateway.ver 6.8); the 8th probe was due ~23:34:54; 0 probe lines during the flash; 23:35:07 'Upgrade finished: Errorcode = 0 - PIC upgrade was successful - 0 retries, 0 errors'; only then 23:35:21 (8/8) and doRestart("WiFi: connected but no traffic"); reboot_log.txt: 'Software/System restart (4) - WiFi: connected but no traffic'; PIC still gateway 6.8, bootcount 1->2. The ESP firmware OTA path shares the same isFlashing() guard in loop() (not run during a dead verdict; code reading).
+Observation, rig: the telnet line printed just before wifi_station_disconnect() is not always delivered (lost in cap cycle 2), so reconnects are now also detected on the router (router.log, association uptime every 15 s).
 <!-- SECTION:NOTES:END -->
