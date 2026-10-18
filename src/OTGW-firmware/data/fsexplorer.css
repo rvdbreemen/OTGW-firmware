@@ -58,5 +58,3 @@ a:hover { color: var(--fx-accent-hover); text-decoration: underline; }
 .fs-btn.secondary { background: var(--fx-muted); color: var(--fx-fg); }
 .fs-btn.wifi { background: var(--fx-warn); color: #000; }
 .fs-btn.danger { background: var(--fx-danger); }
-.desktop-only { display: block; }
-@media (max-width: 720px) { .desktop-only { display: none; } }
