@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 09:50'
-updated_date: '2026-10-18 10:09'
+updated_date: '2026-10-18 12:13'
 labels:
   - bug
   - wifi
@@ -62,4 +62,17 @@ Expected worst case: reconnect after ~3 min, restart after ~7 min, instead of ~7
 Evidence AC6: build.bat --firmware fresh OTGW-firmware-1.7.8-beta.2+0ebeb55.ino.bin (12:08) with 'Build completed successfully!', no networkStuff warnings (logs/build_1248b.log); evaluate.py --quick 36/36, 0 warnings.
 NOT verified: AC1-AC5 need an ESP8266 unit (none on the bench, maintainer 2026-10-18). Open decision on AC4: arm-after-first-reply prevents a loop when the network is dead from boot, but a link that works a few minutes after each boot and then dies would restart about every 7 min; AC4's 'rate limit' needs either a cap or a reworded AC (maintainer to decide).
 Residual: if the gateway still answers ping while the rest of the LAN cannot reach the device, this probe does not catch it.
+
+2026-10-18 adversarial review (workflow wf_dac64536-9e0: 5 lenses, 3 refuters per finding; synthesis and 11 note-level verifies lost to the session limit). Upheld and fixed in the working tree (NOT yet built or committed: the build was stopped by Claude Code for low system memory):
+- [major, 3/3] Gateway-only verdict cut working LAN sessions (stopAll on disconnect, ESP8266WiFiGeneric.cpp:233), incl. an OTmonitor PIC upgrade on 25238 that isFlashing() misses. Fix: second witness, no action while state.mqtt.bConnected (PubSubClient drops a dead link within 2 keepalives, PubSubClient.cpp:373-377) or a 25238 client sent a byte within 60 s (new otgwStreamRxWithin(), OTGW-Core.ino).
+- [2/3] Cap bypassed via WIFI_FAILED after a forced reconnect. Fix: WIFI_FAILED counts toward the cap when wifiDeadReconnectDone; at the cap it keeps retrying instead of restarting.
+- [3/3] Stuck probe at the cap reconnected every 3 min forever; the related 'cap reconnect loop' finding was refuted 1/3 but the mechanism is real on a false verdict. Fix: at the cap at most one forced reconnect per 15 min.
+- [3/3 + 2/3] NULL raw pcb in ping_start under heap exhaustion (esp-ping.c:277-281, LWIP_NOASSERT cc.h:81). Fix: no probe unless getHeapHealth()==HEAP_HEALTHY (skipped, not counted).
+- [3/3] Arming per boot, not per gateway. Fix: armed gateway address stored; a changed gateway disarms.
+- [3/3] Alive window not restarted by a reconnect. Fix: wifiLinkAliveSinceMs = millis() in WIFI_RECONNECTED.
+- [3/3] Dead-link count and TASK-1247 reason read too late (after startWiFi, whose portal timeout restarts bare). Fix: captureRebootReason() and captureWifiDeadRestarts() at the top of setup(); the count survives software restarts (no zeroing at boot), clears on power-on/crash/watchdog and after 60 min alive; the portal timeout stores 'WiFi: config portal timeout'.
+- [6/6] RTC comment wrong: eboot uses user offsets 0..31 (SDK blocks 64..95), not 64..95. No overlap with 96..97/100..112/113..114. Comments corrected.
+- [notes] 20 s deadline was effectively one interval: constant removed, comment says so. SDK scores replies > 1 s as timeouts: documented.
+Scenario walk (a)-(k) against the fixed code: (a) healthy: armed, counters stay 0; (b)+(c) death then recovery: 3 dead probes (worst case 3 more if MQTT still within its 120 s keepalive), forced reconnect, reset on first answer; (d) reconnect OK but dead: 3 more dead probes, restart 'connected but no traffic'; (e) reconnect cannot associate: WIFI_FAILED counted restart, then the pre-existing portal loop (ADR-047, uncapped, now with its own reason); (f) flapping: 3 restarts, then capped reconnects every 15 min, clear after an hour alive; (g) ICMP-silent router: never armed; (h) partial loss: any reply counts alive; (i) stuck probe: dead each interval, witness suppresses, else reconnect then restart (fresh SDK); at the cap the check is effectively off until reboot; (j) millis rollover: unsigned diffs and a generation counter, no timestamp compare left; (k) gateway change: disarm and re-arm on the new address.
+AC deviations (protocol in docs/guides/backlog-cli.md): AC1 'logged on telnet' cannot be observed during the fault (the link is dead and stopAll closes telnet); observable evidence is the capture's HTTP/MQTT gap, the AP station log and reboot_log.txt. AC2 holds for the counted path; a forced reconnect that cannot reassociate restarts with 'too many reconnect failures' (also counted). AC4: the cap covers dead-link and forced-reconnect restarts; the config-portal timeout loop when the network is dead at boot is pre-existing (ADR-047) and out of scope. Open for the maintainer: WIFI_PROBE_FAILS_TO_ACT (3). Without a live local broker as witness, a router reboot > 3 min now forces a disconnect; if the router is also the DHCP server the lease is lost and the WIFI_FAILED restart follows 5 min later (resets the PIC). 8-10 keeps typical router reboots harmless, #682 recovers in ~10-15 min instead of ~7.
 <!-- SECTION:NOTES:END -->
