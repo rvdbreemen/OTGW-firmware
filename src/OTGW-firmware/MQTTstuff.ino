@@ -944,6 +944,11 @@ void handleMQTT()
       else
       { // invalid IP, then goto error state
         MQTTDebugTf(PSTR("ERROR: [%s] => is not a valid URL\r\n"), CSTR(settings.mqtt.sBroker));
+        // No usable address for this name. startMQTT() leaves an open session
+        // alone, and MQTTbrokerIP still holds the previous broker's address,
+        // so without this a renamed broker kept receiving publishes over the
+        // old session (TASK-1250).
+        doMqttDisconnect();
         stateMQTT = MQTT_STATE_ERROR;
         //DebugTln(F("Next State: MQTT_STATE_ERROR"));
       }    

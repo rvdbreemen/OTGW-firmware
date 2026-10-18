@@ -19,7 +19,9 @@
 // its 5-attempt limit, startMQTT() resetting to INIT). Those transitions are
 // written out below so a reader can compare them with MQTTstuff.ino; the
 // test does not compile handleMQTT() itself. The address validity check
-// mirrors isValidIP() for the addresses used here.
+// mirrors isValidIP() for the addresses used here. startMQTT() does not close
+// an open session (the real one does not either); INIT closes it before it
+// connects to a usable address, and also when the name has no usable address.
 //=======================================================================
 
 #include "../../src/OTGW-firmware/mqttBrokerAddress.h"
@@ -79,7 +81,11 @@ struct Device {
   int         lookups = 0;
   uint32_t    connectedTo = ADDR_UNSET;
 
-  void startMQTT() { state = INIT; connectedTo = ADDR_UNSET; }
+  void startMQTT() { state = INIT; }   // an open session stays open
+
+  // Where a publish goes: the open session, while the held address is valid
+  // (the two guards of sendMQTTData()).
+  uint32_t publishTarget() const { return validAddr(brokerIP) ? connectedTo : ADDR_UNSET; }
 
   void step(const Net& net) {
     switch (state) {
@@ -89,6 +95,7 @@ struct Device {
         const MqttBrokerLookup d = decideMqttBrokerLookup(validAddr(lookedUp), validAddr(brokerIP),
                                                           heldFor.c_str(), name.c_str());
         if (d.bUseResult) { brokerIP = lookedUp; heldFor = name; }
+        connectedTo = ADDR_UNSET;   // disconnect before setServer(), or doMqttDisconnect()
         if (d.bUsable) { attempts = 0; state = TRY; } else { state = ERR; }
         break;
       }
@@ -178,6 +185,9 @@ int main() {
     net.dnsAnswers = false;
     dev.name = "broker-b";               // settings save, startMQTT()
     dev.startMQTT();
+    dev.step(net);                       // INIT: the lookup of broker-b fails
+    check(dev.publishTarget() != ADDR_A,
+          "the open session to the previous broker is closed, nothing is published there");
     dev.runUntilConnected(40, net);
     check(dev.connectedTo != ADDR_A, "never connects to the previous broker after a rename");
     net.dnsAnswers = true;
