@@ -212,6 +212,7 @@ void captureRebootReason();                     // TASK-1247: take the stored re
 void storeRebootReasonUnlessPending(const char *reason); // TASK-1247: keep a taken but unlogged reason instead
 void captureWifiDeadRestarts();                 // TASK-1248: take the dead-link restart count, once, at the top of setup()
 bool otgwStreamRxWithin(uint32_t ms);           // TASK-1248: a port 25238 client sent a byte within the last ms
+bool restRequestWithin(uint32_t ms);            // TASK-1248: a REST request arrived within the last ms
 void performDeferredReboot();                   // called by loop() when g_rebootPending && !isFlashing()
 bool isRebootPending();                         // true when a deferred reboot is queued
 void rebootHeapWatermarkTick();                 // update g_minFreeHeap; called from loop()

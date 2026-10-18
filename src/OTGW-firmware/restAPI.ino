@@ -1032,8 +1032,18 @@ static const ApiRoute kV2Routes[] = {
 };
 
 //=======================================================================
+// TASK-1248: a REST request proves that the LAN carries traffic, so the WiFi
+// dead-link check takes no action while requests arrive.
+static uint32_t g_lastRestRequestMs = 0;
+
+bool restRequestWithin(uint32_t ms)
+{
+  return g_lastRestRequestMs != 0 && (uint32_t)(millis() - g_lastRestRequestMs) < ms;
+}
+
 void processAPI()
 {
+  g_lastRestRequestMs = millis();
   // Static buffers save ~356 bytes of stack (not re-entrant in cooperative scheduler)
   static char URI[50];
   static const char* words[API_MAX_WORDS];   // point into URI (tokenized in-place); URI is static + not overwritten mid-dispatch, so it outlives every words[] read (TASK-903)

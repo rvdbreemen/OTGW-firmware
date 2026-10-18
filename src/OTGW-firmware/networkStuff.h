@@ -40,7 +40,9 @@
 // See networkStuff.ino loopWifi() WIFI_DISCONNECTED for the rationale.
 
 #include <WiFiUdp.h>            // part of ESP8266 Core
-#include <ping.h>               // SDK ICMP echo API, gateway liveness probe (TASK-1248)
+#include <lwip/raw.h>          // raw ICMP pcb for the gateway liveness probe (TASK-1248)
+#include <lwip/icmp.h>
+#include <lwip/inet_chksum.h>
 #include <LittleFS.h>
 #include "OTGW-ModUpdateServer.h"   // <<special version for Nodoshop Watchdog needed>>
 #include "updateServerHtml.h"

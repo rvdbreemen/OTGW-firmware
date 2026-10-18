@@ -701,7 +701,7 @@ void reBootESP()
 {
   if (!checkHttpAuth()) return;
   DebugTln(F("Redirect and ReBoot .."));
-  doRedirect("Reboot OTGW firmware ..", 120, "/", true);   
+  doRedirect("Reboot OTGW firmware ..", 120, "/", "Web UI: reboot request");
 } // reBootESP()
 
 void resetWirelessButton()
@@ -709,10 +709,11 @@ void resetWirelessButton()
   if (!checkHttpAuth()) return;
   DebugTln(F("Reset Wireless settings.."));
   resetWiFiSettings();
-  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "/", true);   
+  doRedirect("Reboot OTGW firmware with reset wireless settings..", 120, "/", "Web UI: WiFi settings reset");
 }
 //=====================================================================================
-void doRedirect(String msg, int wait, const char* URL, bool reboot)
+// rebootReason: restart afterwards with this reason (shown in reboot_log.txt), or nullptr.
+void doRedirect(String msg, int wait, const char* URL, const char* rebootReason)
 {
   // clamp wait to sane bounds
   int safeWait = max(0, min(wait, 3600)); // 1 hour max
@@ -754,6 +755,6 @@ void doRedirect(String msg, int wait, const char* URL, bool reboot)
   httpServer.sendContent(safeURL);
   httpServer.sendContent_P(PSTR("');}},1000);</script></body></html>\r\n"));
   httpServer.sendContent(F(""));
-  if (reboot) doRestart("Reboot after upgrade");
+  if (rebootReason != nullptr) doRestart(rebootReason);
   
 } // doRedirect()

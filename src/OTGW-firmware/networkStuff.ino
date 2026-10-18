@@ -244,29 +244,32 @@ void refreshServicesAfterWifiReconnect() {
 // IP", so such a link was never acted on (GH #682: two ~72 min hangs).
 //
 // Detection: while the link is up, the default gateway gets WIFI_PROBE_PINGS
-// ICMP echo requests every WIFI_PROBE_INTERVAL_SEC through the SDK ping API,
-// which reports asynchronously, so the loop never waits. The SDK scores a
-// reply later than 1 s as a timeout (PING_TIMEOUT_MS in esp-ping.c).
+// ICMP echo requests every WIFI_PROBE_INTERVAL_SEC, sent from the loop on a
+// lwIP raw ICMP pcb that exists only during the probe (about 6 s). The SDK's
+// ping_start() is not used: its receive callback moves the payload of every
+// ICMP packet it does not eat (esp-ping.c in the core 2.7.4 lwip2 glue), so
+// echo requests to the gateway were dropped while a probe ran. The callback
+// below reads with pbuf_copy_partial() and never touches the payload.
 // - Armed per gateway: a gateway counts only after it has answered once. A
 //   router that drops ICMP never arms the check, a network that is dead from
 //   boot cannot trigger it, and a new gateway address disarms it again.
-// - Second witness: a silent gateway alone does not prove a dead link. While
-//   MQTT is connected (PubSubClient drops a dead connection within two
-//   keepalives, 120 s) or a port 25238 client sent a byte recently, no action
-//   is taken. A router reboot with a local broker therefore leaves the link
-//   alone. The broker is used only as proof of traffic, never as a trigger.
-// - No probe while the heap is not HEALTHY: the SDK does not check its raw pcb
-//   allocation (lwIP asserts are compiled out), and a failed echo allocation
-//   would read as a dead link.
+// - Witnesses: a silent gateway alone does not prove a dead link. While MQTT
+//   is connected (PubSubClient drops a dead connection within two keepalives,
+//   120 s), a REST request arrived, or a port 25238 client sent a byte within
+//   WIFI_WITNESS_WINDOW_MS, no action is taken. A router reboot therefore
+//   leaves a gateway with any LAN client alone. The broker is used only as
+//   proof of traffic, never as a trigger.
+// - No probe while the heap is not HEALTHY, and a probe whose pcb or echo
+//   buffer could not be allocated does not count.
 //
 // Escalation after WIFI_PROBE_FAILS_TO_ACT dead probes in a row:
 // 1. a forced reconnect with wifi_station_disconnect(), which keeps the stored
 //    credentials (WiFi.disconnect() would erase them while persistent(true) is
-//    set); loopWifi then reconnects as for any other drop;
+//    set); loopWifi then reconnects as for any other drop. The DHCP lease is
+//    released by the disconnect, which is why the witnesses come first;
 // 2. if the link is still dead after that reconnect, doRestart(). A forced
 //    reconnect that cannot get the link back within loopWifi's 10 x 30 s ends
 //    in its WIFI_FAILED restart, which then counts toward the same cap.
-// A probe that never finishes (the SDK has no cancel) counts as a dead probe.
 //
 // Restart cap: a link that works for a few minutes after every boot and then
 // dies would otherwise restart the gateway endlessly. Dead-link restarts are
@@ -275,35 +278,40 @@ void refreshServicesAfterWifiReconnect() {
 // WIFI_DEAD_RESTART_CAP the gateway stops restarting and forces at most one
 // reconnect per WIFI_CAPPED_RECONNECT_MIN. The count clears after the link has
 // stayed alive for WIFI_DEAD_RESTART_CLEAR_MIN, and on a power-on, crash or
-// watchdog reset.
+// watchdog reset. Core 2.7.4 restarts after a panic or abort() through the
+// SDK as well, so such a crash probably also reads as a software restart and
+// keeps the count (inferred from core_esp8266_postmortem.cpp, not verified).
 #define WIFI_PROBE_INTERVAL_SEC       60  // one probe per minute while connected
 #define WIFI_PROBE_PINGS               3  // echo requests per probe
-#define WIFI_PROBE_SPACING_SEC         2  // >= 2: at 1 s the SDK's per-echo timeout and
-                                          // completion timer expire together (esp-ping.c)
+#define WIFI_PROBE_SPACING_MS       2000  // between echoes, and the wait after the last one
 #define WIFI_PROBE_FAILS_TO_ACT        8  // dead probes in a row before acting: long enough that a
                                           // typical router reboot (a few minutes) passes unharmed
-#define WIFI_WITNESS_RX_WINDOW_MS  60000  // port 25238 bytes this recent prove LAN traffic
+#define WIFI_WITNESS_WINDOW_MS     60000  // REST or port 25238 traffic this recent proves the LAN works
 #define WIFI_DEAD_RESTART_CAP          3
 #define WIFI_DEAD_RESTART_CLEAR_MIN   60
 #define WIFI_CAPPED_RECONNECT_MIN     15
 #define WIFI_DEAD_RESTART_RTC_SLOT   113  // offsets 113..114
 #define WIFI_DEAD_RESTART_MAGIC      0x4F544452UL  // "OTDR"
+#define WIFI_ECHO_ID              0x4F54  // "OT", distinct from the SDK ping's 0xAFAF
+#define WIFI_ECHO_DATA                16  // payload bytes per echo request
 
-static struct ping_option wifiProbeOpt;   // the SDK keeps this pointer until the probe ends
-static volatile bool     wifiProbeBusy    = false;
-static volatile bool     wifiProbeDone    = false;
-static volatile uint8_t  wifiProbeReplies = 0;
-static uint32_t wifiProbeTarget           = 0;   // gateway address of the running probe
-static uint8_t  wifiReconnectGen          = 0;   // bumped on every reconnect
-static uint8_t  wifiProbeGen              = 0;   // wifiReconnectGen when the probe started
-static uint32_t wifiArmedGateway          = 0;   // gateway that answered; 0 = not armed
-static uint8_t  wifiDeadProbes            = 0;
-static bool     wifiDeadReconnectDone     = false;  // a forced reconnect ran in this dead streak
-static uint8_t  wifiDeadRestarts          = 0;   // dead-link restarts, mirrored in RTC
-static bool     wifiDeadRestartsLogged    = false;
-static uint32_t wifiLinkAliveSinceMs      = 0;
-static uint32_t wifiCappedReconnectMs     = 0;
-static bool     wifiCappedReconnectDone   = false;
+static struct raw_pcb   *wifiProbePcb      = nullptr;  // only set while a probe runs
+static volatile uint8_t  wifiEchoReplyMask = 0;        // bit n: echo (seq base + n) answered
+static uint16_t wifiEchoSeqBase            = 0;
+static uint8_t  wifiEchoSent               = 0;
+static bool     wifiEchoSendFailed         = false;
+static uint32_t wifiEchoNextMs             = 0;
+static uint32_t wifiProbeTarget            = 0;   // gateway address of the running probe
+static uint8_t  wifiReconnectGen           = 0;   // bumped on every reconnect
+static uint8_t  wifiProbeGen               = 0;   // wifiReconnectGen when the probe started
+static uint32_t wifiArmedGateway           = 0;   // gateway that answered; 0 = not armed
+static uint8_t  wifiDeadProbes             = 0;
+static bool     wifiDeadReconnectDone      = false;  // a forced reconnect ran in this dead streak
+static uint8_t  wifiDeadRestarts           = 0;   // dead-link restarts, mirrored in RTC
+static bool     wifiDeadRestartsLogged     = false;
+static uint32_t wifiLinkAliveSinceMs       = 0;
+static uint32_t wifiCappedReconnectMs      = 0;
+static bool     wifiCappedReconnectDone    = false;
 
 struct WifiDeadRestartRtc {
   uint32_t magic;
@@ -335,18 +343,49 @@ void captureWifiDeadRestarts()
 // Proof that the LAN still carries traffic while the gateway is silent.
 static bool wifiLanTrafficSeen()
 {
-  if (state.mqtt.bConnected) return true;
-  return otgwStreamRxWithin(WIFI_WITNESS_RX_WINDOW_MS);
+  if (settings.mqtt.bEnable && state.mqtt.bConnected) return true;
+  if (restRequestWithin(WIFI_WITNESS_WINDOW_MS)) return true;
+  return otgwStreamRxWithin(WIFI_WITNESS_WINDOW_MS);
 }
 
-// Runs in the SDK/lwIP context: only set flags here.
-static void wifiProbeFinished(void *arg, void *pdata)
+// lwIP receive callback, runs in the SDK/lwIP context: only set flags here.
+// p->payload points at the IP header and must stay where it is for every
+// packet that is not eaten, or lwIP's own ICMP handling misreads it.
+static u8_t wifiEchoRecv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const ip_addr_t *addr)
 {
   (void)arg;
-  const struct ping_resp *resp = static_cast<const struct ping_resp *>(pdata);
-  wifiProbeReplies = (resp->timeout_count < resp->total_count)
-                       ? (uint8_t)(resp->total_count - resp->timeout_count) : 0;
-  wifiProbeDone = true;
+  (void)pcb;
+  if (p == nullptr || p->tot_len < 1 || addr == nullptr) return 0;
+  const uint16_t hlen = (uint16_t)((pbuf_get_at(p, 0) & 0x0F) * 4);
+  struct icmp_echo_hdr hdr;
+  if (pbuf_copy_partial(p, &hdr, sizeof(hdr), hlen) != sizeof(hdr)) return 0;
+  if (ICMPH_TYPE(&hdr) != ICMP_ER || hdr.id != PP_HTONS(WIFI_ECHO_ID)) return 0;
+  if (ip_addr_get_ip4_u32(addr) != wifiProbeTarget) return 0;
+  const uint16_t n = (uint16_t)(lwip_ntohs(hdr.seqno) - wifiEchoSeqBase);
+  if (n < WIFI_PROBE_PINGS) wifiEchoReplyMask |= (uint8_t)(1u << n);
+  pbuf_free(p);   // our own echo reply (current or late): eat it
+  return 1;
+}
+
+static bool sendWifiEcho(uint16_t seq)
+{
+  const uint16_t len = (uint16_t)(sizeof(struct icmp_echo_hdr) + WIFI_ECHO_DATA);
+  struct pbuf *p = pbuf_alloc(PBUF_IP, len, PBUF_RAM);
+  if (p == nullptr) return false;
+  struct icmp_echo_hdr *echo = static_cast<struct icmp_echo_hdr *>(p->payload);
+  ICMPH_TYPE_SET(echo, ICMP_ECHO);
+  ICMPH_CODE_SET(echo, 0);
+  echo->id     = PP_HTONS(WIFI_ECHO_ID);
+  echo->seqno  = lwip_htons(seq);
+  echo->chksum = 0;
+  uint8_t *data = reinterpret_cast<uint8_t *>(echo) + sizeof(struct icmp_echo_hdr);
+  for (uint16_t i = 0; i < WIFI_ECHO_DATA; i++) data[i] = (uint8_t)i;
+  echo->chksum = inet_chksum(echo, len);
+  ip_addr_t dst;
+  ip_addr_set_ip4_u32(&dst, wifiProbeTarget);
+  const err_t err = raw_sendto(wifiProbePcb, p, &dst);
+  pbuf_free(p);
+  return err == ERR_OK;
 }
 
 static void handleWifiProbeVerdict(bool gatewayAnswered)
@@ -362,13 +401,13 @@ static void handleWifiProbeVerdict(bool gatewayAnswered)
       DebugTln(F("WiFi: gateway answers again, dead-link check reset"));
       wifiLinkAliveSinceMs = millis();
     }
-    wifiDeadProbes          = 0;
-    wifiDeadReconnectDone   = false;
-    wifiCappedReconnectDone = false;
+    wifiDeadProbes        = 0;
+    wifiDeadReconnectDone = false;
     if (wifiDeadRestarts > 0
         && (uint32_t)(millis() - wifiLinkAliveSinceMs) >= WIFI_DEAD_RESTART_CLEAR_MIN * 60000UL) {
       DebugTln(F("WiFi: link alive for an hour, dead-link restart count cleared"));
-      wifiDeadRestarts = 0;
+      wifiDeadRestarts        = 0;
+      wifiCappedReconnectDone = false;
       writeWifiDeadRestarts(0);
     }
     return;
@@ -382,7 +421,20 @@ static void handleWifiProbeVerdict(bool gatewayAnswered)
   wifiDeadProbes = 0;
 
   if (wifiLanTrafficSeen()) {
-    DebugTln(F("WiFi: gateway silent but MQTT or port 25238 traffic flows, no action"));
+    DebugTln(F("WiFi: gateway silent but MQTT, REST or port 25238 traffic flows, no action"));
+    return;
+  }
+  if (wifiDeadRestarts >= WIFI_DEAD_RESTART_CAP) {
+    // Cap reached: no more restarts, and at most one forced reconnect per
+    // WIFI_CAPPED_RECONNECT_MIN so a false verdict cannot bounce every session.
+    if (wifiCappedReconnectDone
+        && (uint32_t)(millis() - wifiCappedReconnectMs) < WIFI_CAPPED_RECONNECT_MIN * 60000UL) return;
+    DebugTf(PSTR("WiFi: no traffic, restart cap (%u) reached, reconnecting only\r\n"),
+            WIFI_DEAD_RESTART_CAP);
+    wifiCappedReconnectDone = true;
+    wifiCappedReconnectMs   = millis();
+    wifiDeadReconnectDone   = true;
+    wifi_station_disconnect();
     return;
   }
   if (!wifiDeadReconnectDone) {
@@ -391,30 +443,22 @@ static void handleWifiProbeVerdict(bool gatewayAnswered)
     wifi_station_disconnect();   // loopWifi sees the drop and reconnects
     return;
   }
-  if (wifiDeadRestarts >= WIFI_DEAD_RESTART_CAP) {
-    // Cap reached: no more restarts, and at most one forced reconnect per
-    // WIFI_CAPPED_RECONNECT_MIN so a false verdict cannot bounce every session.
-    if (wifiCappedReconnectDone
-        && (uint32_t)(millis() - wifiCappedReconnectMs) < WIFI_CAPPED_RECONNECT_MIN * 60000UL) return;
-    DebugTf(PSTR("WiFi: still no traffic, restart cap (%u) reached, reconnecting only\r\n"),
-            WIFI_DEAD_RESTART_CAP);
-    wifiCappedReconnectDone = true;
-    wifiCappedReconnectMs   = millis();
-    wifi_station_disconnect();
-    return;
-  }
   wifiDeadRestarts++;
   writeWifiDeadRestarts(wifiDeadRestarts);
   doRestart("WiFi: connected but no traffic");
 }
 
-static void handleWifiProbeResult()
+// Ends the running probe: removes the pcb and hands the verdict on.
+static void finishWifiProbe()
 {
-  wifiProbeDone = false;
-  wifiProbeBusy = false;
-  // A probe that started before a reconnect says nothing about the new link.
+  raw_remove(wifiProbePcb);
+  wifiProbePcb = nullptr;
+  const uint8_t replies = wifiEchoReplyMask;
+  // A probe that started before a reconnect says nothing about the new link,
+  // and one that could not send an echo and heard nothing proves nothing.
   if (wifiProbeGen != wifiReconnectGen) return;
-  handleWifiProbeVerdict(wifiProbeReplies > 0);
+  if (replies == 0 && wifiEchoSendFailed) return;
+  handleWifiProbeVerdict(replies != 0);
 }
 
 // Called from loopWifi() while the link is up and the state machine is idle.
@@ -429,18 +473,19 @@ static void wifiLinkProbeTick()
               wifiDeadRestarts, WIFI_DEAD_RESTART_CAP);
     }
   }
-  if (wifiProbeDone) handleWifiProbeResult();
-  if (!DUE(timerWifiProbe)) return;
 
-  if (wifiProbeBusy) {
-    // Still running one full interval after it started (a probe takes about
-    // 6 s), so the SDK lost its completion timer. The SDK still owns
-    // wifiProbeOpt and has no cancel, so no new probe may start: count each
-    // interval as a dead probe; the escalation ends in a restart.
-    DebugTln(F("WiFi: gateway probe did not finish"));
-    handleWifiProbeVerdict(false);
+  if (wifiProbePcb != nullptr) {   // a probe is running
+    if ((int32_t)(millis() - wifiEchoNextMs) < 0) return;
+    if (wifiEchoSent < WIFI_PROBE_PINGS) {
+      if (!sendWifiEcho((uint16_t)(wifiEchoSeqBase + wifiEchoSent))) wifiEchoSendFailed = true;
+      wifiEchoSent++;
+      wifiEchoNextMs = millis() + WIFI_PROBE_SPACING_MS;
+      return;
+    }
+    finishWifiProbe();
     return;
   }
+  if (!DUE(timerWifiProbe)) return;
 
   IPAddress gateway = WiFi.gatewayIP();
   if (!gateway.isSet()) return;   // static IP without a gateway: nothing to probe
@@ -452,14 +497,16 @@ static void wifiLinkProbeTick()
   }
   if (getHeapHealth() != HEAP_HEALTHY) return;   // skipped, not counted
 
-  memset(&wifiProbeOpt, 0, sizeof(wifiProbeOpt));
-  wifiProbeOpt.count       = WIFI_PROBE_PINGS;
-  wifiProbeOpt.ip          = (uint32_t)gateway;
-  wifiProbeOpt.coarse_time = WIFI_PROBE_SPACING_SEC;
-  ping_regist_sent(&wifiProbeOpt, wifiProbeFinished);
-  wifiProbeTarget = (uint32_t)gateway;
-  wifiProbeGen    = wifiReconnectGen;
-  wifiProbeBusy   = ping_start(&wifiProbeOpt);
+  wifiProbePcb = raw_new(IP_PROTO_ICMP);
+  if (wifiProbePcb == nullptr) return;           // skipped, not counted
+  wifiProbeTarget     = (uint32_t)gateway;
+  wifiProbeGen        = wifiReconnectGen;
+  wifiEchoSeqBase     = (uint16_t)(wifiEchoSeqBase + WIFI_PROBE_PINGS);
+  wifiEchoReplyMask   = 0;
+  wifiEchoSent        = 0;
+  wifiEchoSendFailed  = false;
+  wifiEchoNextMs      = millis();
+  raw_recv(wifiProbePcb, wifiEchoRecv, nullptr);
 }
 
 void loopWifi() {
