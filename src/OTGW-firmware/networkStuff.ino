@@ -262,7 +262,16 @@ void refreshServicesAfterWifiReconnect() {
 // - No probe while the heap is not HEALTHY, and a probe whose pcb or echo
 //   buffer could not be allocated does not count.
 //
-// Escalation after WIFI_PROBE_FAILS_TO_ACT dead probes in a row:
+// - Fast path: when MQTT was connected earlier in this boot and has dropped
+//   too while the gateway is silent, two independent signals agree, and the
+//   check acts after WIFI_PROBE_FAILS_FAST dead probes instead of
+//   WIFI_PROBE_FAILS_TO_ACT. A silent gateway with no other evidence still
+//   waits the full count, so a router reboot passes unharmed. The fast path
+//   errs only when the broker runs on the router itself or outside the LAN
+//   and the router reboots for longer than WIFI_PROBE_FAILS_FAST minutes.
+//
+// Escalation after WIFI_PROBE_FAILS_TO_ACT (or WIFI_PROBE_FAILS_FAST) dead
+// probes in a row:
 // 1. a forced reconnect with wifi_station_disconnect(), which keeps the stored
 //    credentials (WiFi.disconnect() would erase them while persistent(true) is
 //    set); loopWifi then reconnects as for any other drop. The DHCP lease is
@@ -286,6 +295,7 @@ void refreshServicesAfterWifiReconnect() {
 #define WIFI_PROBE_SPACING_MS       2000  // between echoes, and the wait after the last one
 #define WIFI_PROBE_FAILS_TO_ACT        8  // dead probes in a row before acting: long enough that a
                                           // typical router reboot (a few minutes) passes unharmed
+#define WIFI_PROBE_FAILS_FAST          3  // the same when MQTT has dropped too (fast path)
 #define WIFI_WITNESS_WINDOW_MS     60000  // REST or port 25238 traffic this recent proves the LAN works
 #define WIFI_DEAD_RESTART_CAP          3
 #define WIFI_DEAD_RESTART_CLEAR_MIN   60
@@ -299,7 +309,7 @@ static struct raw_pcb   *wifiProbePcb      = nullptr;  // only set while a probe
 static volatile uint8_t  wifiEchoReplyMask = 0;        // bit n: echo (seq base + n) answered
 static uint16_t wifiEchoSeqBase            = 0;
 static uint8_t  wifiEchoSent               = 0;
-static bool     wifiEchoAllocFailed         = false;
+static bool     wifiEchoAllocFailed        = false;
 static uint32_t wifiEchoNextMs             = 0;
 static uint32_t wifiProbeTarget            = 0;   // gateway address of the running probe
 static uint8_t  wifiReconnectGen           = 0;   // bumped on every reconnect
@@ -312,6 +322,7 @@ static bool     wifiDeadRestartsLogged     = false;
 static uint32_t wifiLinkAliveSinceMs       = 0;
 static uint32_t wifiCappedReconnectMs      = 0;
 static bool     wifiCappedReconnectDone    = false;
+static bool     wifiMqttSeenUp             = false;  // MQTT was connected at some point this boot
 
 struct WifiDeadRestartRtc {
   uint32_t magic;
@@ -346,6 +357,13 @@ static bool wifiLanTrafficSeen()
   if (settings.mqtt.bEnable && state.mqtt.bConnected) return true;
   if (restRequestWithin(WIFI_WITNESS_WINDOW_MS)) return true;
   return otgwStreamRxWithin(WIFI_WITNESS_WINDOW_MS);
+}
+
+// Second signal for the fast path: MQTT worked earlier in this boot and is
+// down now. PubSubClient notices a dead connection within two keepalives.
+static bool wifiMqttLost()
+{
+  return settings.mqtt.bEnable && wifiMqttSeenUp && !state.mqtt.bConnected;
 }
 
 // lwIP receive callback, runs in the SDK/lwIP context: only set flags here.
@@ -419,9 +437,12 @@ static void handleWifiProbeVerdict(bool gatewayAnswered)
   if (wifiArmedGateway == 0) return;   // no gateway answered yet: check stays off
 
   if (wifiDeadProbes < 255) wifiDeadProbes++;
-  DebugTf(PSTR("WiFi: no ping reply from gateway %s (%u/%u)\r\n"),
-          IPAddress(wifiArmedGateway).toString().c_str(), wifiDeadProbes, WIFI_PROBE_FAILS_TO_ACT);
-  if (wifiDeadProbes < WIFI_PROBE_FAILS_TO_ACT) return;
+  const bool mqttLost = wifiMqttLost();
+  const uint8_t failsToAct = mqttLost ? WIFI_PROBE_FAILS_FAST : WIFI_PROBE_FAILS_TO_ACT;
+  DebugTf(PSTR("WiFi: no ping reply from gateway %s (%u/%u%S)\r\n"),
+          IPAddress(wifiArmedGateway).toString().c_str(), wifiDeadProbes, failsToAct,
+          mqttLost ? PSTR(", MQTT down too") : PSTR(""));
+  if (wifiDeadProbes < failsToAct) return;
   wifiDeadProbes = 0;
 
   if (wifiLanTrafficSeen()) {
@@ -477,6 +498,8 @@ static void wifiLinkProbeTick()
               wifiDeadRestarts, WIFI_DEAD_RESTART_CAP);
     }
   }
+
+  if (settings.mqtt.bEnable && state.mqtt.bConnected) wifiMqttSeenUp = true;
 
   if (wifiProbePcb != nullptr) {   // a probe is running
     if ((int32_t)(millis() - wifiEchoNextMs) < 0) return;
