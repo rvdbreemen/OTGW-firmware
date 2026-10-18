@@ -8,6 +8,10 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 ## [Unreleased]
 
+### Added
+
+- **`reboot_log.txt` now says why the gateway restarted itself.** Every planned restart (the WiFi supervisor after 10 failed reconnects, the nightly restart, a firmware update, a reboot from telnet or the web interface) was logged as the same `Software/System restart (4)`, so a log from the field could not tell them apart. The reason now follows on the same line, for example `- WiFi: too many reconnect failures`. A power-on, crash or watchdog reset shows no reason, as before. Added to diagnose the hourlong network hangs reported on GH #682. (TASK-1247)
+
 ## [1.7.7] - 2026-10-04
 
 ### Added
