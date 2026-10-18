@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 14:26'
-updated_date: '2026-10-18 15:58'
+updated_date: '2026-10-18 15:59'
 labels:
   - bug
   - mqtt
@@ -59,3 +59,15 @@ AC evidence and deviations:
 - AC4: the four '10 minutes' texts say 42 seconds (01025ea68).
 - AC5: build.bat --firmware fresh 773760 B with 'Build completed successfully!' (logs/build_1250d.log), evaluate.py --quick 37/37, host tests 6/6 suites.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+MQTT now recovers by itself after a failed broker name lookup (1.x, otgw-1.x.x, not yet in a beta).
+
+Cause: MQTT_STATE_INIT was the only state that looked the broker name up, and it wrote a failed result (INADDR_NONE) over the broker address and the text PubSubClient points to before checking it; the state machine then never returned to INIT. One failed lookup (DNS not answering after a router reboot, at boot or after a WiFi reconnect) kept MQTT down until a WiFi reconnect, a settings save or a restart. Brokers set by IP address were not affected.
+
+Fix: a failed lookup keeps the last good address for the same name (MQTTbrokerResolvedFor ties address and name, so a renamed broker never falls back to the old one); after every 42 s reconnect wait the name is looked up again, which also finds a broker that moved; the lookup keeps the core's 10 s timeout; the '10 minutes' texts now say 42 seconds.
+
+Evidence: host test test/host/test_mqttBrokerAddress.cpp against the real mqttBrokerAddress.h, red then green (7/13 failing on the old decision, 3/15 on the name-blind variant of the first fix, 15/15 on the final code); firmware build green; evaluate.py --quick 37/37; all six host suites green. Deviation on AC1/AC2: the state transitions around the decision, including the re-resolve after the wait, are modelled in the test rather than compiled from handleMQTT(). Not tested on hardware. Commits 41608bb07, 01025ea68, 07ffbebd0, 4b3e950d2.
+<!-- SECTION:FINAL_SUMMARY:END -->
