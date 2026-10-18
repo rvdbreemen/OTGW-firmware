@@ -32,12 +32,14 @@ struct MqttBrokerLookup {
 // resultValid:  the lookup returned a valid address.
 // currentValid: the broker address held before the lookup is valid.
 //===========================================================================================
+// A failed lookup (core 2.7.4 returns INADDR_NONE, 255.255.255.255) never
+// overwrites the held address: PubSubClient keeps a pointer to its text, and a
+// good address from before is better than none while DNS does not answer.
 inline MqttBrokerLookup decideMqttBrokerLookup(bool resultValid, bool currentValid)
 {
-  (void)currentValid;
   MqttBrokerLookup d;
-  d.bUseResult = true;
-  d.bUsable    = resultValid;
+  d.bUseResult = resultValid;
+  d.bUsable    = resultValid || currentValid;
   return d;
 }
 
@@ -47,8 +49,9 @@ inline MqttBrokerLookup decideMqttBrokerLookup(bool resultValid, bool currentVal
 //
 // currentValid: the broker address held now is valid.
 //===========================================================================================
+// Only without a usable address: a lookup can block the loop for up to 10 s
+// (hostByName), and that is acceptable only while MQTT cannot connect anyway.
 inline bool mqttResolveAfterWait(bool currentValid)
 {
-  (void)currentValid;
-  return false;
+  return !currentValid;
 }
