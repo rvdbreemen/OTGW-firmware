@@ -3,7 +3,7 @@ id: TASK-1250
 title: >-
   Fix MQTT staying down for the rest of the boot when the broker DNS lookup
   fails after a reconnect
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-18 14:26'
