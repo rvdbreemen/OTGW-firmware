@@ -236,6 +236,125 @@ void refreshServicesAfterWifiReconnect() {
   doWebSocketDisconnectAll();
 }
 
+//===========================================================================================
+// TASK-1248: detect a WiFi link that stays associated with an IP while no
+// traffic passes, and recover from it. loopWifi() only acts on
+// WiFi.status() != WL_CONNECTED, and WL_CONNECTED means "associated and got an
+// IP", so such a link was never acted on (GH #682: two ~72 min hangs).
+//
+// The probe sends ICMP echo requests to the default gateway through the SDK
+// ping API, which reports asynchronously, so the loop never waits. It tests
+// the local link only: the MQTT broker is never consulted, so a broker outage
+// cannot trigger it. It acts only after the gateway has answered at least once
+// since boot, so a router that drops ICMP never arms it and a network that is
+// dead from boot cannot cause a reboot loop.
+//
+// Escalation: WIFI_PROBE_FAILS_TO_ACT dead probes in a row force a reconnect
+// with wifi_station_disconnect(), which keeps the stored credentials
+// (WiFi.disconnect() would erase them while persistent(true) is set); loopWifi
+// then reconnects as for any other drop. If the link is still dead after that
+// reconnect, doRestart() follows.
+#define WIFI_PROBE_INTERVAL_SEC   60  // one probe per minute while connected
+#define WIFI_PROBE_PINGS           3  // echo requests per probe
+#define WIFI_PROBE_SPACING_SEC     2  // >= 2: at 1 s the SDK's per-echo timeout and
+                                      // completion timer expire together (esp-ping.c)
+#define WIFI_PROBE_FAILS_TO_ACT    3  // dead probes in a row before acting
+#define WIFI_PROBE_DEADLINE_MS 20000  // a probe normally ends after PINGS x SPACING s
+
+static struct ping_option wifiProbeOpt;   // the SDK keeps this pointer until the probe ends
+static volatile bool     wifiProbeBusy    = false;
+static volatile bool     wifiProbeDone    = false;
+static volatile uint8_t  wifiProbeReplies = 0;
+static uint32_t wifiProbeStartMs      = 0;
+static uint8_t  wifiReconnectGen      = 0;   // bumped on every reconnect
+static uint8_t  wifiProbeGen          = 0;   // wifiReconnectGen when the probe started
+static bool     wifiGatewayAnswered   = false;
+static uint8_t  wifiDeadProbes        = 0;
+static bool     wifiDeadReconnectDone = false;
+
+// Runs in the SDK/lwIP context: only set flags here.
+static void wifiProbeFinished(void *arg, void *pdata)
+{
+  (void)arg;
+  const struct ping_resp *resp = static_cast<const struct ping_resp *>(pdata);
+  wifiProbeReplies = (resp->timeout_count < resp->total_count)
+                       ? (uint8_t)(resp->total_count - resp->timeout_count) : 0;
+  wifiProbeDone = true;
+}
+
+static void handleWifiProbeVerdict(bool gatewayAnswered)
+{
+  if (gatewayAnswered) {
+    if (!wifiGatewayAnswered) {
+      DebugTf(PSTR("WiFi: gateway %s answers ping, dead-link check armed\r\n"),
+              WiFi.gatewayIP().toString().c_str());
+    }
+    if (wifiDeadProbes > 0 || wifiDeadReconnectDone) {
+      DebugTln(F("WiFi: gateway answers again, dead-link check reset"));
+    }
+    wifiGatewayAnswered   = true;
+    wifiDeadProbes        = 0;
+    wifiDeadReconnectDone = false;
+    return;
+  }
+  if (!wifiGatewayAnswered) return;   // gateway never answered ping: check stays off
+
+  wifiDeadProbes++;
+  DebugTf(PSTR("WiFi: no ping reply from gateway %s (%u/%u)\r\n"),
+          WiFi.gatewayIP().toString().c_str(), wifiDeadProbes, WIFI_PROBE_FAILS_TO_ACT);
+  if (wifiDeadProbes < WIFI_PROBE_FAILS_TO_ACT) return;
+  wifiDeadProbes = 0;
+
+  if (!wifiDeadReconnectDone) {
+    wifiDeadReconnectDone = true;
+    DebugTln(F("WiFi: connected but no traffic, forcing a reconnect"));
+    wifi_station_disconnect();   // loopWifi sees the drop and reconnects
+    return;
+  }
+  doRestart("WiFi: connected but no traffic");
+}
+
+static void handleWifiProbeResult()
+{
+  wifiProbeDone = false;
+  wifiProbeBusy = false;
+  // A probe that started before a reconnect says nothing about the new link.
+  if (wifiProbeGen != wifiReconnectGen) return;
+  handleWifiProbeVerdict(wifiProbeReplies > 0);
+}
+
+// Called from loopWifi() while the link is up and the state machine is idle.
+static void wifiLinkProbeTick()
+{
+  DECLARE_TIMER_SEC(timerWifiProbe, WIFI_PROBE_INTERVAL_SEC, SKIP_MISSED_TICKS);
+
+  if (wifiProbeDone) handleWifiProbeResult();
+  if (!DUE(timerWifiProbe)) return;
+
+  if (wifiProbeBusy) {
+    // The SDK still owns wifiProbeOpt, so no new probe may start. A probe that
+    // never finishes means the stack itself is stuck: count each interval as
+    // a dead probe, so the check cannot disarm itself this way.
+    if ((uint32_t)(millis() - wifiProbeStartMs) > WIFI_PROBE_DEADLINE_MS) {
+      DebugTln(F("WiFi: gateway probe did not finish"));
+      handleWifiProbeVerdict(false);
+    }
+    return;
+  }
+
+  IPAddress gateway = WiFi.gatewayIP();
+  if (!gateway.isSet()) return;   // static IP without a gateway: nothing to probe
+
+  memset(&wifiProbeOpt, 0, sizeof(wifiProbeOpt));
+  wifiProbeOpt.count       = WIFI_PROBE_PINGS;
+  wifiProbeOpt.ip          = (uint32_t)gateway;
+  wifiProbeOpt.coarse_time = WIFI_PROBE_SPACING_SEC;
+  ping_regist_sent(&wifiProbeOpt, wifiProbeFinished);
+  wifiProbeStartMs = millis();
+  wifiProbeGen     = wifiReconnectGen;
+  wifiProbeBusy    = ping_start(&wifiProbeOpt);
+}
+
 void loopWifi() {
   DECLARE_TIMER_SEC(timerWifiRetry, 30, CATCH_UP_MISSED_TICKS);
 
@@ -245,6 +364,8 @@ void loopWifi() {
         DebugTln(F("WiFi: connection lost, starting non-blocking reconnect"));
         wifiRetryCount = 0;
         wifiState = WIFI_DISCONNECTED;
+      } else {
+        wifiLinkProbeTick();
       }
       break;
 
@@ -291,6 +412,8 @@ void loopWifi() {
       // name. See TASK-432 for the rationale (v1.2.0 baseline approach).
       WiFi.hostname(CSTR(settings.sHostname));
       refreshServicesAfterWifiReconnect();
+      wifiReconnectGen++;   // TASK-1248: probe results from before this are stale
+      wifiDeadProbes = 0;
       wifiState = WIFI_IDLE;
       DebugTf(PSTR("WiFi: reconnected, services refreshed; IP=%s\r\n"),
               WiFi.localIP().toString().c_str());
