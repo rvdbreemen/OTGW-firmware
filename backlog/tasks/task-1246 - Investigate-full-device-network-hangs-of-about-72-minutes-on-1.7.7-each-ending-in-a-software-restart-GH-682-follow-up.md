@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-18 08:09'
-updated_date: '2026-10-18 08:13'
+updated_date: '2026-10-18 08:43'
 labels:
   - bug
   - needs-info
@@ -44,4 +44,6 @@ Capture-script findings (separate tasks if confirmed): telnet stays half-open fo
 - Duration matches 2^32 us = 4294.97 s = 71.58 min: last packet 13:13:24 + 71.58 min = 14:24:59 (MQTT back 14:25:54); 15:17:02 + 71.58 min = 16:28:37 (MQTT back 16:30:36). Two events only. No micros()-based wait exists in 1.x app code or vendored libs (only the unused OpenTherm lib); core micros() = system_get_time(). If causal, it lives in the closed SDK/lwIP (speculation).
 - Which ESP.restart() fired is unknown: reboot_log stores only the rst reason, not the doRestart() reason text (helperStuff.ino:398). Candidate without operator action: doRestart('WiFi: too many reconnect failures').
 Next: persist the doRestart reason in reboot_log; ask the reporter for an ICMP ping log, the router's station/association log and RSSI around a hang.
+
+2026-10-18: v1.7.8-beta.1 published with the restart reason in reboot_log.txt (TASK-1247). Reply on GH #682 (issuecomment-6247770652) shares the analysis (72 min = 2^32 us, loop alive, network dead), answers the three questions and asks for: reboot_log.txt after the next hang on beta.1, a 30 s ping log, router association log for the gateway MAC, RSSI and channel. Waiting on reporter.
 <!-- SECTION:NOTES:END -->
