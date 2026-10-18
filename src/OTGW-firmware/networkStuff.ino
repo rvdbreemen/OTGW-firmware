@@ -299,7 +299,7 @@ static struct raw_pcb   *wifiProbePcb      = nullptr;  // only set while a probe
 static volatile uint8_t  wifiEchoReplyMask = 0;        // bit n: echo (seq base + n) answered
 static uint16_t wifiEchoSeqBase            = 0;
 static uint8_t  wifiEchoSent               = 0;
-static bool     wifiEchoSendFailed         = false;
+static bool     wifiEchoAllocFailed         = false;
 static uint32_t wifiEchoNextMs             = 0;
 static uint32_t wifiProbeTarget            = 0;   // gateway address of the running probe
 static uint8_t  wifiReconnectGen           = 0;   // bumped on every reconnect
@@ -367,6 +367,10 @@ static u8_t wifiEchoRecv(void *arg, struct raw_pcb *pcb, struct pbuf *p, const i
   return 1;
 }
 
+// Returns false only when the echo buffer could not be allocated. A send that
+// the stack or the WiFi driver refuses counts as an echo that went unanswered:
+// a link that refuses every frame while the station stays associated is
+// exactly the dead link this check is for.
 static bool sendWifiEcho(uint16_t seq)
 {
   const uint16_t len = (uint16_t)(sizeof(struct icmp_echo_hdr) + WIFI_ECHO_DATA);
@@ -383,9 +387,9 @@ static bool sendWifiEcho(uint16_t seq)
   echo->chksum = inet_chksum(echo, len);
   ip_addr_t dst;
   ip_addr_set_ip4_u32(&dst, wifiProbeTarget);
-  const err_t err = raw_sendto(wifiProbePcb, p, &dst);
+  raw_sendto(wifiProbePcb, p, &dst);
   pbuf_free(p);
-  return err == ERR_OK;
+  return true;
 }
 
 static void handleWifiProbeVerdict(bool gatewayAnswered)
@@ -455,9 +459,9 @@ static void finishWifiProbe()
   wifiProbePcb = nullptr;
   const uint8_t replies = wifiEchoReplyMask;
   // A probe that started before a reconnect says nothing about the new link,
-  // and one that could not send an echo and heard nothing proves nothing.
+  // and one whose echo buffer could not be allocated and heard nothing proves nothing.
   if (wifiProbeGen != wifiReconnectGen) return;
-  if (replies == 0 && wifiEchoSendFailed) return;
+  if (replies == 0 && wifiEchoAllocFailed) return;
   handleWifiProbeVerdict(replies != 0);
 }
 
@@ -477,7 +481,7 @@ static void wifiLinkProbeTick()
   if (wifiProbePcb != nullptr) {   // a probe is running
     if ((int32_t)(millis() - wifiEchoNextMs) < 0) return;
     if (wifiEchoSent < WIFI_PROBE_PINGS) {
-      if (!sendWifiEcho((uint16_t)(wifiEchoSeqBase + wifiEchoSent))) wifiEchoSendFailed = true;
+      if (!sendWifiEcho((uint16_t)(wifiEchoSeqBase + wifiEchoSent))) wifiEchoAllocFailed = true;
       wifiEchoSent++;
       wifiEchoNextMs = millis() + WIFI_PROBE_SPACING_MS;
       return;
@@ -504,7 +508,7 @@ static void wifiLinkProbeTick()
   wifiEchoSeqBase     = (uint16_t)(wifiEchoSeqBase + WIFI_PROBE_PINGS);
   wifiEchoReplyMask   = 0;
   wifiEchoSent        = 0;
-  wifiEchoSendFailed  = false;
+  wifiEchoAllocFailed  = false;
   wifiEchoNextMs      = millis();
   raw_recv(wifiProbePcb, wifiEchoRecv, nullptr);
 }
