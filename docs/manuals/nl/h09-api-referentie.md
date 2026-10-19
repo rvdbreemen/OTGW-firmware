@@ -1026,15 +1026,13 @@ Meer dan 40 aanvullende SAT-instellingen zijn beschikbaar via MQTT. De volledige
 Wanneer `settings.mqtt.bSeparateSources = true`, worden OpenTherm-waarden aanvullend gepubliceerd met een sibling-suffix-shape (ADR-097):
 
 ```
-{TopTopic}/value/{UniqueId}/{label}_thermostat   (T-frame)
-{TopTopic}/value/{UniqueId}/{label}_boiler        (B-frame)
-{TopTopic}/value/{UniqueId}/{label}_gateway       (R-frame)
-{TopTopic}/value/{UniqueId}/{label}_answer        (A-frame, proxy-antwoord)
+{TopTopic}/value/{UniqueId}/{label}_thermostat   (wat de thermostaat stuurde of ontving)
+{TopTopic}/value/{UniqueId}/{label}_boiler        (wat de ketel ontving of stuurde)
 ```
 
-Sibling-suffix-namen (`<label>_<source>`) vervangen de oudere subtopic-shape zodat het HA-discovery `state_topic`-regex aan een enkel segment blijft gebonden. Proxy-antwoorden (A-prefix) worden geleid naar `_answer`, niet gecollapst op `_thermostat`, conform ADR-103.
+Sibling-suffix-namen (`<label>_<source>`) vervangen de oudere subtopic-shape zodat het HA-discovery `state_topic`-regex aan een enkel segment blijft gebonden. Er bestaat geen `_gateway`- of `_answer`-topic. Een door de gateway vervangen schrijfbericht (R-prefix) gaat naar `_boiler`; een gateway-antwoord (A-prefix) gaat naar `_thermostat`, en ook naar `_boiler` als het een proxy-antwoord is zonder ketelantwoord erachter (ADR-103). Een gateway-override zie je dus als verschil tussen `_thermostat` en `_boiler`.
 
-Dit maakt het mogelijk om te onderscheiden of een waarde afkomstig is van de thermostaat, de ketel, de gateway of een proxy-antwoord.
+Dit maakt het mogelijk om te onderscheiden wat de thermostaat vroeg en wat de ketel ontving.
 
 #### Zelfbeschrijvende onderwerpnamen (ADR-106, standaard in 2.0.0)
 

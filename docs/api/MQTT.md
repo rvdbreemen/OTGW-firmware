@@ -692,7 +692,7 @@ Without override, all three publish the same value. `_thermostat` and `_boiler` 
 | `T` (thermostat-write) | M→S | yes | yes (when no R follows) | yes (when no R follows) |
 | `R` (gateway-substituted write) | M→S | no | yes | yes |
 | `B` (boiler-response) | S→M | yes (when no A follows) | yes | yes |
-| `A` (gateway-faked answer) | S→M | yes | no | no |
+| `A` (gateway-faked answer) | S→M | yes | yes for a proxy A (no B behind it, e.g. MaxTSet/57); no for an answer override, where the genuine B owns it (ADR-103) | same as `_boiler` |
 
 There is no `_gateway` topic — override is visible by comparing `_thermostat` and `_boiler`.
 

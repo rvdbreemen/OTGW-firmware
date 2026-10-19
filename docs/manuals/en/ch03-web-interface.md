@@ -261,7 +261,7 @@ The Settings page also includes a Wi-Fi scan panel that lists nearby networks (T
 | HA Discovery | Enable/disable Home Assistant MQTT auto-discovery payloads |
 | HA Prefix | Discovery topic prefix (default: `homeassistant`) |
 | Publish Interval | Heartbeat interval in seconds (0 = publish every message as received) |
-| Separate Sources | Publish per-source sub-topics (`/thermostat`, `/boiler`, `/gateway`) |
+| Separate Sources | Also publish per-source sibling topics (`<label>_thermostat`, `<label>_boiler`) next to the canonical topic |
 
 #### NTP and Time
 

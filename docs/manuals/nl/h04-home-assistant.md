@@ -396,7 +396,7 @@ Wanneer SAT is ingeschakeld, worden ook diagnostische sensor-entiteiten automati
 | Topic-suffix | Geaccepteerde waarden | Omschrijving |
 |---|---|---|
 | `sat/target` | Getal, bijv. `21.0` | Stel doelruimtetemperatuur in |
-| `sat/control_mode` | `off`, `continuous`, `pwm`, `auto` | Stel bedrijfsmodus in |
+| `sat/control_mode` | `continuous`, `pwm`, `auto` | Stel bedrijfsmodus in (zet SAT uit met `sat/enabled`) |
 | `sat/enabled` | `true` / `false` | SAT in- of uitschakelen |
 | `sat/indoor_temp` | Getal, bijv. `20.5` | Stuur binnentemperatuur van externe sensor |
 | `sat/outdoor_temp` | Getal, bijv. `5.2` | Stuur buitentemperatuur van externe bron |

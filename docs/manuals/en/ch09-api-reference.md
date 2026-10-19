@@ -1078,15 +1078,13 @@ The exact set of published topics depends on which message IDs your boiler and t
 When `mqttseparatesources` is enabled, OpenTherm values are additionally published with a sibling-suffix shape (ADR-097):
 
 ```
-{TopTopic}/value/{UniqueId}/{label}_thermostat   <-- thermostat-side value (T-prefix frame)
-{TopTopic}/value/{UniqueId}/{label}_boiler       <-- boiler-side value (B-prefix frame)
-{TopTopic}/value/{UniqueId}/{label}_gateway      <-- gateway-injected value (R-prefix frame)
-{TopTopic}/value/{UniqueId}/{label}_answer       <-- proxy/answer (A-prefix frame)
+{TopTopic}/value/{UniqueId}/{label}_thermostat   <-- what the thermostat sent or received
+{TopTopic}/value/{UniqueId}/{label}_boiler       <-- what the boiler received or sent
 ```
 
-Sibling-suffix names (`<label>_<source>`) replace the older subtopic shape so HA-discovery `state_topic` regex stays anchored to a single segment. Proxy answers (A-prefix) are routed to `_answer`, not collapsed onto `_thermostat`, per ADR-103.
+Sibling-suffix names (`<label>_<source>`) replace the older subtopic shape so HA-discovery `state_topic` regex stays anchored to a single segment. There is no `_gateway` or `_answer` topic. A gateway-substituted write (R-prefix) goes to `_boiler`; a gateway answer (A-prefix) goes to `_thermostat`, and also to `_boiler` when it is a proxy answer with no boiler response behind it (ADR-103). A gateway override therefore shows as a difference between `_thermostat` and `_boiler`.
 
-This allows Home Assistant automations to distinguish between what the thermostat requested, what the boiler confirmed, and what the gateway injected.
+This allows Home Assistant automations to distinguish between what the thermostat requested and what the boiler received.
 
 ##### Self-Describing Topic Names (ADR-106, default in 2.0.0)
 
