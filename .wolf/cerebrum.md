@@ -11,6 +11,8 @@
 - ADRs: never edit an Accepted ADR; write a new Proposed "…(Amends ADR-XXX)".
 
 ## Key Learnings
+- **1.x `uptime` is not a reboot indicator** (2026-10-19): it counts doTaskEvery1s() calls with SKIP_MISSED_TICKS, so a blocked loop makes it lag (7.5 min real showed as 2 min). Use bootcount, reboot_log.txt or the telnet boot banner to prove a restart.
+- **Bench fault injection for 1.x WiFi tests** (2026-10-19): MikroTik bridge filter on the unit's MAC (allow udp 67 + ARP to the router) keeps it associated with its lease while traffic dies, the GH #682 situation; detect reconnects on the router (registration-table uptime, wireless log 'sending station leaving'), because the telnet line printed just before wifi_station_disconnect() is often lost.
 - SAT already takes a room temperature from HA: MQTT set/<node>/sat/indoor_temp or POST /api/v2/sat/externaltemp, enabled by SATexternaltemp; it expires after SATsensormaxage (6 h). The TASK-1157 5-minute check covers only thermostat-sourced Tr, stamped on every MsgID 24 frame.
 - ESPAsyncWebServer 3.11.0 write_send_buffs (ASYNCWEBSERVER_USE_CHUNK_INFLIGHT=1): a credit returns only with an ACK, and every send pass takes one even when it sent nothing; past TCP_WND a credit-less call returns at once. Candidate cause of the overload stalls (TASK-1162), unconfirmed.
 - ESPAsyncWebServer 3.11.0 (our pin) is hit by GHSA-4phx-fcj6-46r4 and GHSA-8m8p-vhxc-jmjw (multipart parser); 3.11.2 fixes both (TASK-1196).

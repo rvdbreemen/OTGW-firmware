@@ -91,7 +91,7 @@ So the number only ever goes down. To see the current live count:
 3. Never call `ESP.getXxx()` directly when a `platformXxx()` shim exists
    (`platformFreeHeap`, `platformRestart`, `platformChipId`, …) — skipping the
    shim is a quieter form of the same leak.
-4. Build **both** targets (`python build.py`, check per-env SUCCESS lines) and
+4. Build **every** target (`python build.py --target all`, check per-env SUCCESS lines) and
    run `python evaluate.py --quick` — the gate must not regress.
 
 ## Related

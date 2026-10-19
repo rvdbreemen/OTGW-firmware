@@ -43,7 +43,7 @@ See `CLAUDE.md` for ADR creation criteria and format.
 Before starting the release, ensure `dev` is in a releasable state.
 
 1. Commit all open/uncommitted changes on `dev` and push to remote.
-2. Run `python build.py` to verify the build succeeds.
+2. Run `python build.py --target all` to verify the build succeeds (a plain `python build.py` builds only esp32-combo).
 3. Commit version.h changes from build.py and push to remote.
 4. If the build fails, fix the issue, commit, push, and retry. Repeat until green.
 
@@ -220,7 +220,7 @@ Run through every item below before creating the GitHub release.
 ### Code quality
 
 - [ ] `python evaluate.py` passes without errors
-- [ ] `python build.py` builds cleanly (firmware + filesystem)
+- [ ] `python build.py --target all` builds cleanly (firmware + filesystem, every target)
 
 ### Git state
 
@@ -247,7 +247,7 @@ Once the checklist is complete:
 
 3. **Remove pre-release from `version.h`** — Comment out `_VERSION_PRERELEASE` (or remove the `beta`/`rc` suffix) so the firmware version string is a clean `v<version>` without any pre-release tag. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
 
-4. **Run `python build.py`** — This runs `autoinc-semver.py` internally (increments build number, updates version strings across all files) and builds firmware + filesystem. Verify the build succeeds.
+4. **Run `python build.py --target all`** — This runs `autoinc-semver.py` internally (increments build number, updates version strings across all files) and builds firmware + filesystem. Verify the build succeeds.
 
 5. **Commit the release build** on `main` and push to remote.
 

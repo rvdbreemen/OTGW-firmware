@@ -64,7 +64,7 @@ Check whether any architectural changes since the previous release require new o
 2. Run the build and filter output:
    ```bash
    mkdir -p .tmp
-   python build.py 2>&1 | tee .tmp/build_release.log | tail -10
+   python build.py --target all 2>&1 | tee .tmp/build_release.log | tail -10
    echo "Exit: $?"
    ```
    If exit code != 0: read `.tmp/build_release.log` for diagnosis, fix, retry. If exit code == 0: proceed — do NOT read the full log.
@@ -118,7 +118,7 @@ Proceed directly after Phase 4 approval. No additional confirmation needed.
 2. **Remove pre-release from `version.h`**: Comment out `_VERSION_PRERELEASE` so the build produces a clean `v<version>` without `-beta`. Verify: `grep -n "PRERELEASE" src/OTGW-firmware/version.h`
 3. **Run the release build**:
    ```bash
-   python build.py 2>&1 | tee .tmp/build_release_final.log | tail -10
+   python build.py --target all 2>&1 | tee .tmp/build_release_final.log | tail -10
    echo "Exit: $?"
    ```
    Fix any issues. Read `.tmp/build_release_final.log` only on failure.
@@ -165,7 +165,7 @@ Skipping step 3 leaves the repo and the GitHub release page out of sync. Skippin
 - **Never use em dashes** in any generated text (release notes, Discord messages, commit messages, README, conversation). Use colons, periods, commas, or parentheses.
 - **Always push to remote after every commit**: keep local and remote in sync throughout the release
 - **Always create releases as draft first**: upload artifacts, verify, then publish. Once published, releases are immutable.
-- **No CI workflows for releases**: builds are done locally via `python build.py`, artifacts uploaded via `gh release upload`
+- **No CI workflows for releases**: builds are done locally via `python build.py --target all`, artifacts uploaded via `gh release upload`
 - **Only 2 mandatory checkpoints**: Phase 4 (content review) and Phase 6 (Discord messages). Do not add unnecessary confirmation prompts.
 - **Conditional stops**: only pause for merge conflicts, missing ADRs, build failures, or zero code changes.
 - **Never force-push**: all pushes are normal pushes

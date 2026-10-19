@@ -10,10 +10,11 @@ Requirements:
 - arduino-cli (installed automatically if not found) [legacy backend]
 
 Usage:
-    build                                # Full build on Windows Command Prompt
-    ./build.sh                           # Full build on Linux/macOS shells
+    build                                # Full build of esp32-combo on Windows Command Prompt
+    ./build.sh                           # Full build of esp32-combo on Linux/macOS shells
     build --target esp32                 # Build for OTGW32 (OTDirect) only
     build --target esp32-classic         # Build for S3-in-Classic-socket (PIC) only
+    build --target all                   # Build all three targets
     build --firmware                     # Build firmware only
     build --filesystem                   # Build filesystem only
     build --clean                        # Clean build artifacts
@@ -2713,17 +2714,18 @@ def write_build_manifest(project_dir, semver):
     return manifest_path
 
 
-def main():
-    """Main build script entry point"""
+def build_arg_parser():
+    """Command-line parser for build.py (separate from main() so tests can parse argument lists)."""
     parser = argparse.ArgumentParser(
         description="Local build script for OTGW-firmware",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  build                                      # Full build on Windows Command Prompt
-  ./build.sh                                 # Full build on Linux/macOS shells
+  build                                      # Full build of esp32-combo on Windows Command Prompt
+  ./build.sh                                 # Full build of esp32-combo on Linux/macOS shells
   build --target esp32                       # OTGW32 (OTDirect) only
   build --target esp32-classic               # S3-in-Classic-socket (PIC) only
+  build --target all                         # All three targets
   build --firmware                           # Build firmware only
   build --filesystem                         # Build filesystem only
   build                                      # Default: full build, merged bins, distribution zip
@@ -2819,8 +2821,8 @@ Examples:
     parser.add_argument(
         "--target",
         choices=["esp32", "esp32-classic", "esp32-combo", "all"],
-        default="all",
-        help="Target platform: esp32, esp32-classic, esp32-combo, or all (default = all three)"
+        default="esp32-combo",
+        help="Target platform: esp32, esp32-classic, esp32-combo, or all (default = esp32-combo)"
     )
     parser.add_argument(
         "--no-install-cli",
@@ -2867,8 +2869,12 @@ Examples:
         action="store_true",
         help="Skip copying this build's artifacts to build-archive/<semver>/ (archiving is on by default)"
     )
+    return parser
 
-    args = parser.parse_args()
+
+def main():
+    """Main build script entry point"""
+    args = build_arg_parser().parse_args()
     
     # Disable colors if requested or on Windows (unless ANSICON is present)
     if args.no_color or (platform.system() == "Windows" and not os.environ.get("ANSICON")):

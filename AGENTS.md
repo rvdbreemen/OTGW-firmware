@@ -162,7 +162,8 @@ This project also uses adr-kit. Use the repository's adr-kit workflow when autho
 Use `build.py` rather than calling PlatformIO directly:
 
 ```bash
-python build.py
+python build.py             # firmware + filesystem, esp32-combo only (default)
+python build.py --target all  # every target: esp32, esp32-classic, esp32-combo
 python build.py --firmware
 python build.py --clean
 python evaluate.py

@@ -244,7 +244,7 @@ Het board wordt gekozen tijdens de compilatie. Er is geen runtime hardwaredetect
 Bouw met de wrapper of `build.py`:
 
 ```bash
-./build.sh                             # firmware + filesystem, alle drie de targets
+./build.sh                             # firmware + filesystem, esp32-combo (standaard); --target all voor alle drie
 python build.py --target esp32         # alleen OTGW32 (OTDirect)
 python build.py --target esp32-classic # alleen S3-in-Classic-socket (PIC)
 python build.py --target esp32-combo   # alleen combo (boot-gedetecteerd)

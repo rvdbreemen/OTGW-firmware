@@ -66,6 +66,24 @@ class TestBuildHelpFlags(unittest.TestCase):
         )
 
 
+class TestDefaultTarget(unittest.TestCase):
+    """A plain build makes only the esp32-combo target; the others need --target (TASK-1252)."""
+
+    @classmethod
+    def setUpClass(cls):
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))
+        import build  # noqa: E402 - intentional late import after sys.path mutation
+        cls.parser = build.build_arg_parser()
+
+    def test_default_target_is_combo(self):
+        self.assertEqual(self.parser.parse_args([]).target, "esp32-combo")
+
+    def test_other_targets_still_selectable(self):
+        for target in ("esp32", "esp32-classic", "esp32-combo", "all"):
+            self.assertEqual(self.parser.parse_args(["--target", target]).target, target)
+
+
 class TestBuildImportable(unittest.TestCase):
     """Catch syntax errors and top-level import failures early."""
 
