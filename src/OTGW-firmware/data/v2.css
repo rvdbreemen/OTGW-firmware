@@ -457,6 +457,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     color:#fff;font-weight:700;border-radius:12px;padding:11px 22px;opacity:0;transition:opacity .3s;
     pointer-events:none;z-index:9}
   .toast.show{opacity:1}
+  /* TASK-1254: failure variant; success keeps the green base. --status-critical keeps white text
+     readable in both themes (#c62828 light, #7f0000 dark); --status-danger is too pale in dark. */
+  .toast.err{background:var(--status-critical)}
   @media(max-width:899px){
     /* .set-cards is CSS multi-column (columns:300px); a grid-template-columns
        rule here is a no-op — removed (TASK-932). The 300px column already

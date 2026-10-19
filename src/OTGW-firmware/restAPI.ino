@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.436
+**  Version  : v2.0.0-alpha.437
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4187,7 +4187,7 @@ static const char* const PROGMEM knownSettings[] = {
   "hostname", "httppasswd", "ledblink", "nightlyrestart", "nightlyrestarthour",
   "mqttbroker", "mqttbrokerport", "mqttenable", "mqtthaprefix", "mqttharebootdetection",
   "mqttinterval", "mqttonchangepublishing", "mqttotmessage", "mqttpasswd", "mqttseparatesources", "legacyport25238enabled",
-  "mqtttoptopic", "mqttuniqueid", "mqttuser",
+  "mqtttoptopic", "mqttuniqueid", "mqttuselegacyottopics", "mqttuser",  // TASK-1254: + mqttuselegacyottopics
   "ntpenable", "ntphostname", "ntpsendtime", "ntptimezone",
   "otdautobypass", "otdautodetect", "otdchmode", "otdenableslave", "otdexponent",
   "otdfailsafe", "otdflowmax", "otdflowtemp", "otdfreeventenable", "otdgradient",
@@ -4206,7 +4206,8 @@ static const char* const PROGMEM knownSettings[] = {
   "satflameoffset", "satflowoffset", "satflushtreshold", "satforcepwm", "sathumiditytimeout",
   "satinterval", "satmanufacturer", "satmaxpressdrop", "satmaxpressure", "satminpressure",
   "satmodsupdelay", "satmodsupoffset", "satmultiarea", "satmultiareacount",
-  "satovershootmargin", "satpresetaway", "satpresetcomfort", "satpreseteco",
+  "satovershootmargin", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",
+  "satpresethome", "satpresetsleep",  // TASK-1254: activity/home/sleep had GET + dispatch but were POST-blocked
   "satpresetsync", "satpresetsynctopic", "satpushsetpoint",
   // TASK-640: PV-surplus setpoint boost settings
   "satpvboostdeltac", "satpvboostenabled", "satpvboostholds",

@@ -2251,7 +2251,7 @@
     var ipErr = '';
     keys.forEach(function (k) { var v = ('' + setDirty[k]).trim(); if (!ipErr && IP_KEY_RE.test(k) && v && ipv4Err(v)) ipErr = subFor(k) + ' ' + labelFor(k) + ': ' + ipv4Err(v); });
     ipErr = ipErr || ipGroupsErr(function (k) { return setData[k] ? curVal(k) : undefined; });
-    if (ipErr) { bleToast(ipErr); return; }
+    if (ipErr) { bleToast(ipErr, true); return; }
     // TASK-1012: intercept satenabled false->on for a not-yet-onboarded SAT. Do NOT
     // enable now — run the wizard, which enables at Finish. Strip the key from this save.
     var satEnabling = ('satenabled' in setDirty) && ('' + setDirty.satenabled) === 'true' &&
@@ -2274,21 +2274,27 @@
     });
     chain.then(function () {
       setDirty = {};
-      var t = document.getElementById('toast'); if (t) { t.textContent = 'Settings saved'; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2000); }
+      bleToast('Settings saved');
       renderSettings();
       if (bleName) bleAction('rescan');   // TASK-1231: re-apply the name filter (classic parity)
       if (satEnabling) startSatOnboarding('enable');   // TASK-1012: wizard owns the actual enable
     }).catch(function () {
-      var t = document.getElementById('toast'); if (t) { t.textContent = 'Save failed'; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2500); }
+      bleToast('Save failed', true, 2500);   // TASK-1254: red error variant
     });
   }
   function discardSettings() { setDirty = {}; renderSettings(); }
 
   // ---------- Settings > BLE sensor roster (GET/POST /api/v2/sat/ble/*) ----------
   var bleData = null, blePollTimer = null;
-  function bleToast(msg) {
+  // TASK-1254: err=true shows the red .toast.err variant; success/info stays green.
+  // The hide timer lives on the element so a new toast cancels the previous one's
+  // hide (otherwise an older 2 s timer cuts a newer 'Save failed' short).
+  function bleToast(msg, err, ms) {
     var t = document.getElementById('toast');
-    if (t) { t.textContent = msg; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2000); }
+    if (!t) return;
+    t.textContent = msg; t.classList.toggle('err', !!err); t.classList.add('show');
+    clearTimeout(t._hideTimer);
+    t._hideTimer = setTimeout(function () { t.classList.remove('show'); }, ms || 2000);
   }
   function fetchBle() {
     fetch(APIGW + 'v2/sat/ble/discovery').then(function (r) { return r.ok ? r.json() : null; })
@@ -3561,14 +3567,14 @@
     fetch(APIGW + 'v2/filesystem/files?delete=' + encodeURIComponent(fullPath), { credentials: 'same-origin' })
       .then(function (r) {
         if (r.ok) { bleToast('Deleted ' + name); fetchFsList(); return; }
-        if (r.status === 401 || r.status === 403) bleToast('Not authorized — open classic /FSexplorer to sign in first');
-        else bleToast('Delete failed: ' + r.status);
+        if (r.status === 401 || r.status === 403) bleToast('Not authorized — open classic /FSexplorer to sign in first', true);
+        else bleToast('Delete failed: ' + r.status, true);
       })
-      .catch(function () { bleToast('Delete failed'); });
+      .catch(function () { bleToast('Delete failed', true); });
   }
   function fsDoUpload() {
     var inp = document.getElementById('fsFile'), btn = document.getElementById('fsUpload');
-    if (!inp || !inp.files || !inp.files.length) { bleToast('Choose a file to upload first'); return; }
+    if (!inp || !inp.files || !inp.files.length) { bleToast('Choose a file to upload first', true); return; }
     var fd = new FormData(); fd.append('file', inp.files[0], inp.files[0].name);
     if (btn) btn.disabled = true;
     // /upload replies 303 -> FSexplorer.html; redirect:'manual' keeps us here and we
@@ -3578,12 +3584,12 @@
     }).then(function (r) {
       // An opaqueredirect (type 'opaqueredirect', status 0) is the success path here.
       if (r.type === 'opaqueredirect' || r.ok || r.status === 0) { bleToast('Uploaded ' + inp.files[0].name); }
-      else if (r.status === 401 || r.status === 403) { bleToast('Not authorized — open classic /FSexplorer to sign in first'); }
-      else { bleToast('Upload failed: ' + r.status); }
+      else if (r.status === 401 || r.status === 403) { bleToast('Not authorized — open classic /FSexplorer to sign in first', true); }
+      else { bleToast('Upload failed: ' + r.status, true); }
       inp.value = ''; if (btn) btn.disabled = true;
       setTimeout(fetchFsList, 400);
     }).catch(function () {
-      bleToast('Upload failed'); if (btn) btn.disabled = false;
+      bleToast('Upload failed', true); if (btn) btn.disabled = false;
     });
   }
 
@@ -3604,7 +3610,7 @@
       if (!window.confirm('Reboot the OTGW device now? The Web UI will be unavailable for a few seconds.')) return;
       bleToast('Device is rebooting…');
       fetch('/ReBoot', { credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) bleToast('Reboot failed: ' + r.status); })
+        .then(function (r) { if (!r.ok) bleToast('Reboot failed: ' + r.status, true); })
         .catch(function () { });   // socket drops as the device restarts — expected
       return;
     }
@@ -3612,7 +3618,7 @@
       if (!window.confirm('Reset Wireless settings?\n\nThis CLEARS the stored Wi-Fi network and reboots the device into AP-mode setup. You will have to reconnect it to your network afterwards.')) return;
       bleToast('Wi-Fi cleared — rebooting into AP-mode setup…');
       fetch('/ResetWireless', { credentials: 'same-origin' })
-        .then(function (r) { if (!r.ok) bleToast('Reset failed: ' + r.status); })
+        .then(function (r) { if (!r.ok) bleToast('Reset failed: ' + r.status, true); })
         .catch(function () { });   // socket drops as the device restarts — expected
     }
   }
@@ -3924,7 +3930,7 @@
         bleToast(okMsg);
         return fetchSatMarkers();
       })
-      .catch(function (e) { bleToast('Marker: ' + e.message); })
+      .catch(function (e) { bleToast('Marker: ' + e.message, true); })
       .then(function () { satMarkerBusy = false; });
   }
   function satCurveClick(ev) {

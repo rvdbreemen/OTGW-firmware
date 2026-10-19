@@ -93,6 +93,20 @@ Node test files, run one at a time with `node --test tests/webui/<name>.test.mjs
   - `sat-area-sensor-mapping`: ADR-178 guard. The area pickers offer both Dallas
     addresses and BLE MACs, each tagged by source, and a chosen MAC is saved intact
     via `POST /api/v2/settings` (TASK-1234).
+- `settings-error-toast` needs Node alone. It runs the shipped `bleToast()` and
+  `saveSettings()` against a stub fetch: a rejected save shows the red `.toast.err`
+  variant, a good save the green toast (TASK-1254). `OTGW_V2_JS` / `OTGW_V2_CSS`
+  point it at older copies for old-vs-fix runs.
 - The other classic-UI tests (`paced-poller`, `sat-log-filter`, `sat-settings-layout`,
   `tab-restore`, `webui_label_coverage`, `webui_settings_layout`) were removed with
   the classic UI (ADR-192, TASK-1223.12).
+
+## Python source guards
+
+Stdlib `unittest`, run with `python tests/<name>.py`.
+
+- `test_settings_whitelist.py`: every key `GET /api/v2/settings` emits in
+  `restAPI.ino` must be in `knownSettings[]` (else `POST` answers 400 "Unknown
+  setting name"), except the commented read-only allowlist (type `"r"`, e.g.
+  `ssid`). `OTGW_RESTAPI_INO=<file>` checks another copy for old-vs-fix runs
+  (TASK-1254).
