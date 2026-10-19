@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-19 18:02'
-updated_date: '2026-10-19 18:15'
+updated_date: '2026-10-19 18:47'
 labels:
   - bug
 dependencies: []
@@ -25,10 +25,10 @@ Verified in code: the 1.x source and vendored libraries never call WiFi.setSleep
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 1.x calls WiFi.setSleepMode(WIFI_NONE_SLEEP) after every successful WiFi connect, including reconnects, verified on the bench unit via telnet log or WiFi.getSleepMode()
+- [x] #1 1.x calls WiFi.setSleepMode(WIFI_NONE_SLEEP) after every successful WiFi connect, including reconnects, verified on the bench unit via telnet log or WiFi.getSleepMode()
 - [ ] #2 Bench gateway current/heap impact noted (free heap before/after, no new instability over 24 h)
 - [ ] #3 theaprilhare reports AP inactivity disassociations with router scb_activity_time back at 5 s, on a beta carrying the change
-- [ ] #4 esp8266 build and evaluate.py --quick green
+- [x] #4 esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -41,3 +41,14 @@ Verified in code: the 1.x source and vendored libraries never call WiFi.setSleep
 5. Bench .88.68 OTA: old build logs mode 1, new logs mode 0, also after a forced reconnect; free heap before/after.
 Approved by Robert 2026-10-19. No push (check_otgw_issues rule).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-19 commit 328e8638c (local, not pushed: check_otgw_issues rule).
+- Bench .88.68, Core 2.7.4, readout via telnet r: readout-only build on old WiFi logic = sleep mode 2 (WIFI_MODEM_SLEEP); fix = 0 (WIFI_NONE_SLEEP), also after two AP kicks via MikroTik registration-table remove (reassoc 4 s, no reboot, uptime continuous).
+- Not shown: which path kept it at 0 after reassoc (SDK persistence or the WIFI_IDLE re-check); telnet drops during the kick and lines without a client are lost.
+- Heap: 16608-17296 before, 16760-18072 after, no measurable change. 24 h stability (AC #2) not yet run. Ping RTT did not discriminate (old max 81 ms, new max 106 ms, network noise).
+- Side finding, not touched: reboot_log.txt entries after OTA are dated 2106-02-07 (clock not yet synced when written).
+- Plan correction: MODEM_SLEEP is 2 in the core enum, not 1.
+<!-- SECTION:NOTES:END -->
