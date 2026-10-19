@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-19 18:02'
-updated_date: '2026-10-19 18:47'
+updated_date: '2026-10-19 20:17'
 labels:
   - bug
 dependencies: []
@@ -51,4 +51,6 @@ Approved by Robert 2026-10-19. No push (check_otgw_issues rule).
 - Heap: 16608-17296 before, 16760-18072 after, no measurable change. 24 h stability (AC #2) not yet run. Ping RTT did not discriminate (old max 81 ms, new max 106 ms, network noise).
 - Side finding, not touched: reboot_log.txt entries after OTA are dated 2106-02-07 (clock not yet synced when written).
 - Plan correction: MODEM_SLEEP is 2 in the core enum, not 1.
+
+2026-10-19: shipped in v1.7.8-beta.4 (release commit c686e9310, CI run 39317735107 completed success, 10 assets). Discord #beta-testing msg 1561835525084549191; GH #681 issuecomment-6276392696 asks theaprilhare to test (AC #3). AC #2 24h bench run still not started (curl to .88.68 blocked by auto mode).
 <!-- SECTION:NOTES:END -->
