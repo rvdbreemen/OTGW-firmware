@@ -182,5 +182,78 @@ class TestArtifactVerificationFailFast(unittest.TestCase):
             )
 
 
+class TestDistributionZipComplete(unittest.TestCase):
+    """TASK-1263: the flash zip is a complete package. Testers who only got
+    the zip could not update over WiFi or run 'flash_otgw --update', because
+    the loose .ino.bin / .littlefs.bin were not in it."""
+
+    @classmethod
+    def setUpClass(cls):
+        if str(REPO_ROOT) not in sys.path:
+            sys.path.insert(0, str(REPO_ROOT))
+        import build  # noqa: E402
+        cls.build = build
+
+    def _make_zip(self, tmp):
+        import shutil
+        proj = Path(tmp)
+        (proj / "build").mkdir()
+        (proj / "scripts").mkdir()
+        for name in ("flash_otgw.bat", "flash_otgw.sh"):
+            shutil.copy(REPO_ROOT / name, proj / name)
+        for name in ("capture-mqtt-debug.bat", "capture-mqtt-debug.sh", "capture-mqtt-debug-macos.sh"):
+            shutil.copy(REPO_ROOT / "scripts" / name, proj / "scripts" / name)
+        semver = "2.0.0-alpha.1+abc1234"
+        stem = f"OTGW-firmware-{self.build.asset_slug('esp32-combo')}-{semver}"
+        images = {
+            f"{stem}-merged-full.bin": b"\xe9merged",
+            f"{stem}-migrate-0x0.bin": b"\xe9first",
+            f"{stem}-migrate-rest.bin": b"rest",
+            f"{stem}.ino.bin": b"\xe9app",
+            f"{stem}.littlefs.bin": b"fs",
+        }
+        for name, data in images.items():
+            (proj / "build" / name).write_bytes(data)
+        with mock.patch("builtins.print"):
+            zip_path = self.build.create_distribution_zip(proj, semver, "esp32-combo")
+        self.assertIsNotNone(zip_path, "create_distribution_zip returned None")
+        return zip_path, images
+
+    def test_zip_holds_images_tools_and_capture_scripts(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as tmp:
+            zip_path, images = self._make_zip(tmp)
+            with zipfile.ZipFile(zip_path) as zf:
+                names = set(zf.namelist())
+                for name, data in images.items():
+                    self.assertIn(name, names)
+                    self.assertEqual(zf.read(name), data, f"{name} differs from build/")
+                for name in ("flash_otgw.bat", "flash_otgw.sh", "capture-mqtt-debug.bat",
+                             "capture-mqtt-debug.sh", "capture-mqtt-debug-macos.sh",
+                             "README.txt", "README_NL.txt"):
+                    self.assertIn(name, names)
+                for bat in ("flash_otgw.bat", "capture-mqtt-debug.bat"):
+                    body = zf.read(bat)
+                    self.assertNotIn(b"\n", body.replace(b"\r\n", b""), f"{bat} must be CRLF only")
+                for sh in ("flash_otgw.sh", "capture-mqtt-debug.sh", "capture-mqtt-debug-macos.sh"):
+                    self.assertNotIn(b"\r\n", zf.read(sh), f"{sh} must be LF only")
+                    mode = (zf.getinfo(sh).external_attr >> 16) & 0o777
+                    self.assertEqual(mode & 0o111, 0o111, f"{sh} must be executable")
+
+    def test_readme_no_longer_points_elsewhere_for_loose_bins(self):
+        import zipfile
+        with tempfile.TemporaryDirectory() as tmp:
+            zip_path, _ = self._make_zip(tmp)
+            with zipfile.ZipFile(zip_path) as zf:
+                en = zf.read("README.txt").decode("utf-8")
+                nl = zf.read("README_NL.txt").decode("utf-8")
+        self.assertNotIn("release page publishes the loose", en)
+        self.assertNotIn("publiceert de losse", nl)
+        for text in (en, nl):
+            self.assertIn("*.ino.bin", text)
+            self.assertIn("*.littlefs.bin", text)
+            self.assertIn("capture-mqtt-debug.bat", text)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

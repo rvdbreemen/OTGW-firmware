@@ -1130,17 +1130,19 @@ def copy_flash_scripts(project_dir):
 
 
 def create_distribution_zip(project_dir, semver, target):
-    """Create a per-target distribution zip with the merged-full bin and the
-    cross-platform flash helper scripts.
+    """Create a per-target distribution zip: one complete package for USB
+    flashing, the one-time migration, WiFi updates and capture logs.
 
     Output: build/OTGW-firmware-<target>-<semver>-flash.zip containing
         OTGW-firmware-<target>-<semver>-merged-full.bin
-        flash_otgw.bat
-        flash_otgw.sh
-        README.txt
+        OTGW-firmware-<target>-<semver>-migrate-0x0.bin / -migrate-rest.bin
+        OTGW-firmware-<target>-<semver>.ino.bin / .littlefs.bin
+        flash_otgw.bat, flash_otgw.sh
+        capture-mqtt-debug.bat, capture-mqtt-debug.sh, capture-mqtt-debug-macos.sh
+        README.txt, README_NL.txt
 
-    The flash helpers perform one user-facing flow: erase flash, then write
-    firmware and filesystem from the merged-full image.
+    The loose .ino.bin / .littlefs.bin are what /update takes over WiFi, and
+    what 'flash_otgw --update' picks up from its own folder (TASK-1263).
     """
     tcfg = TARGETS[target]
     build_dir = project_dir / "build"
@@ -1174,6 +1176,31 @@ def create_distribution_zip(project_dir, semver, target):
         )
         return None
 
+    # The loose app and filesystem images of the same build sit next to the
+    # merged-full image and share its name stem.
+    stem = merged_full.name[:-len("-merged-full.bin")]
+    app_bin = build_dir / f"{stem}.ino.bin"
+    fs_bin = build_dir / f"{stem}.littlefs.bin"
+    missing = [p.name for p in (app_bin, fs_bin) if not p.exists()]
+    if missing:
+        print_warning(
+            f"Skipping distribution zip for {tcfg['name']}: missing image(s): "
+            f"{', '.join(missing)}"
+        )
+        return None
+
+    # Capture scripts for log reports (Windows .bat, Linux and macOS .sh).
+    scripts_dir = project_dir / "scripts"
+    capture_bat = scripts_dir / "capture-mqtt-debug.bat"
+    capture_shs = [scripts_dir / "capture-mqtt-debug.sh", scripts_dir / "capture-mqtt-debug-macos.sh"]
+    missing = [p.name for p in [capture_bat, *capture_shs] if not p.exists()]
+    if missing:
+        print_warning(
+            f"Skipping distribution zip for {tcfg['name']}: missing capture script(s): "
+            f"{', '.join(missing)}"
+        )
+        return None
+
     zip_name = f"OTGW-firmware-{asset_slug(target)}-{semver}-flash.zip" if semver and semver != "unknown" \
                else f"OTGW-firmware-{asset_slug(target)}-flash.zip"
     zip_path = build_dir / zip_name
@@ -1181,8 +1208,11 @@ def create_distribution_zip(project_dir, semver, target):
     print_step(f"Creating distribution zip [{tcfg['name']}]")
     print_info(f"Zip: {zip_name}")
     print_info(f"  + {merged_full.name}  (factory reset flash)")
+    print_info(f"  + {app_bin.name}  (firmware, WiFi update / --update)")
+    print_info(f"  + {fs_bin.name}  (filesystem, WiFi update / --update)")
     print_info(f"  + flash_otgw.bat")
     print_info(f"  + flash_otgw.sh")
+    print_info(f"  + capture-mqtt-debug.bat / .sh / -macos.sh")
     print_info(f"  + README.txt      (English)")
     print_info(f"  + README_NL.txt   (Nederlands)")
 
@@ -1199,21 +1229,24 @@ def create_distribution_zip(project_dir, semver, target):
                 if part.exists():
                     zf.write(part, arcname=part.name)
                     print_info(f"  + {part.name}  (one-time layout migration)")
+            zf.write(app_bin, arcname=app_bin.name)
+            zf.write(fs_bin, arcname=fs_bin.name)
 
-            # Windows batch script: force CRLF line endings for cmd.exe.
-            bat_text = flash_bat.read_text(encoding="utf-8")
-            bat_text = bat_text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
-            bat_bytes = bat_text.encode("utf-8")
-            zf.writestr("flash_otgw.bat", bat_bytes)
+            # Windows batch scripts: force CRLF line endings for cmd.exe.
+            for bat in (flash_bat, capture_bat):
+                bat_text = bat.read_text(encoding="utf-8")
+                bat_text = bat_text.replace("\r\n", "\n").replace("\r", "\n").replace("\n", "\r\n")
+                zf.writestr(bat.name, bat_text.encode("utf-8"))
 
-            # Unix shell script: force LF endings and set the executable bit
+            # Unix shell scripts: force LF endings and set the executable bit
             # on the zip entry so unpacking on POSIX preserves +x.
-            with open(flash_sh, "rb") as f:
-                sh_bytes = f.read().replace(b"\r\n", b"\n")
-            sh_info = zipfile.ZipInfo("flash_otgw.sh")
-            sh_info.compress_type = zipfile.ZIP_DEFLATED
-            sh_info.external_attr = (0o100755 << 16)
-            zf.writestr(sh_info, sh_bytes)
+            for sh in (flash_sh, *capture_shs):
+                with open(sh, "rb") as f:
+                    sh_bytes = f.read().replace(b"\r\n", b"\n")
+                sh_info = zipfile.ZipInfo(sh.name)
+                sh_info.compress_type = zipfile.ZIP_DEFLATED
+                sh_info.external_attr = (0o100755 << 16)
+                zf.writestr(sh_info, sh_bytes)
 
             zf.writestr("README.txt", readme_en)
             zf.writestr("README_NL.txt", readme_nl)
@@ -1358,6 +1391,15 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      by 'flash_otgw.* --migrate'. Together they hold the same\n"
         f"      image, minus the area that stores the WiFi credentials.\n"
         f"\n"
+        f"  *.ino.bin\n"
+        f"      Firmware only. Upload it over WiFi on /update (see Routine\n"
+        f"      use), or let 'flash_otgw.* --update' write it over USB.\n"
+        f"\n"
+        f"  *.littlefs.bin\n"
+        f"      Filesystem only (web UI files). Upload it over WiFi on\n"
+        f"      /update after the firmware, or write it with\n"
+        f"      'flash_otgw.* --update'.\n"
+        f"\n"
         f"  flash_otgw.bat\n"
         f"      Windows flash tool. Double-click or run from cmd.exe.\n"
         f"      Downloads Espressif's standalone esptool on first run.\n"
@@ -1367,6 +1409,13 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      terminal. Downloads esptool on first run via curl or wget.\n"
         f"      On Linux it auto-escalates with sudo when the user is not\n"
         f"      in the dialout group.\n"
+        f"\n"
+        f"  capture-mqtt-debug.bat (Windows)\n"
+        f"  capture-mqtt-debug.sh (Linux), capture-mqtt-debug-macos.sh (macOS)\n"
+        f"      Record a debug log for a bug report: the telnet debug log,\n"
+        f"      the MQTT stream and device info in one transcript. Run with\n"
+        f"      --help for the options, and attach the transcript to your\n"
+        f"      report on Discord or GitHub.\n"
         f"\n"
         f"  README.txt        This file (English).\n"
         f"  README_NL.txt     Dutch translation of this file.\n"
@@ -1385,6 +1434,8 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"        settings.ini. A copy stays in the 'backup' folder.\n"
         f"    --update\n"
         f"        Writes firmware and/or filesystem over USB and keeps WiFi.\n"
+        f"        Without --app/--fs it uses the .ino.bin and .littlefs.bin\n"
+        f"        from this folder.\n"
         f"        Writing the filesystem resets the settings. Refuses a\n"
         f"        unit that still has the old layout; migrate it first.\n"
         f"\n"
@@ -1428,13 +1479,15 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"  reachable over WiFi. The gateway does not run meanwhile.\n"
         f"\n"
         f"The filesystem (.littlefs.bin) is uploaded on the same /update\n"
-        f"page. This RESETS your settings: download settings.ini first\n"
-        f"(File Explorer) and upload it again afterwards. Update the\n"
-        f"firmware first, then the filesystem.\n"
+        f"page, after the firmware. The running firmware writes its\n"
+        f"settings back to settings.ini after the upload. Download\n"
+        f"settings.ini first anyway (File Explorer) as a safety net.\n"
+        f"Dallas sensor labels and heating-curve markers are not kept.\n"
         f"\n"
         f"Full guide: docs/guides/WIFI_FIRMWARE_UPDATE.md in the repo.\n"
-        f"Use this archive for the initial USB flash, the one-time\n"
-        f"migration, and recovery.\n"
+        f"This archive holds everything: the USB images for the first\n"
+        f"flash, the one-time migration and recovery, plus the .ino.bin\n"
+        f"and .littlefs.bin for WiFi updates.\n"
         f"\n"
         f"Troubleshooting\n"
         f"---------------\n"
@@ -1509,11 +1562,10 @@ def _build_readme_en(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"\n"
         f"  Q: Can I update over WiFi once the board is on WiFi?\n"
         f"  A: Yes, once the unit is on the current flash layout (after\n"
-        f"     this factory flash, or after one '--migrate'). The GitHub\n"
-        f"     release page publishes the loose .ino.bin (firmware) and\n"
-        f"     .littlefs.bin (filesystem). Firmware goes through the\n"
-        f"     updater, see Routine use above. This archive is for the\n"
-        f"     initial USB flash, the migration, and recovery.\n"
+        f"     this factory flash, or after one '--migrate'). Use the\n"
+        f"     .ino.bin (firmware) and .littlefs.bin (filesystem) from\n"
+        f"     this archive. Firmware goes through the updater, see\n"
+        f"     Routine use above.\n"
         f"\n"
         f"  Q: I lost my WiFi credentials. How do I get back into the\n"
         f"     access point?\n"
@@ -1619,6 +1671,16 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      bevatten ze dezelfde image, zonder het deel waarin de\n"
         f"      WiFi-gegevens staan.\n"
         f"\n"
+        f"  *.ino.bin\n"
+        f"      Alleen de firmware. Upload via WiFi op /update (zie\n"
+        f"      Dagelijks gebruik), of laat 'flash_otgw.* --update' hem\n"
+        f"      via USB schrijven.\n"
+        f"\n"
+        f"  *.littlefs.bin\n"
+        f"      Alleen het bestandssysteem (de web-UI-bestanden). Upload\n"
+        f"      via WiFi op /update na de firmware, of schrijf hem met\n"
+        f"      'flash_otgw.* --update'.\n"
+        f"\n"
         f"  flash_otgw.bat\n"
         f"      Windows flash-tool. Dubbelklik of draai vanuit cmd.exe.\n"
         f"      Downloadt Espressif's standalone esptool bij de\n"
@@ -1629,6 +1691,13 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"      een terminal. Downloadt esptool bij eerste keer via\n"
         f"      curl of wget. Op Linux escaleert hij automatisch naar\n"
         f"      sudo als je niet in de dialout-groep zit.\n"
+        f"\n"
+        f"  capture-mqtt-debug.bat (Windows)\n"
+        f"  capture-mqtt-debug.sh (Linux), capture-mqtt-debug-macos.sh (macOS)\n"
+        f"      Leggen een debuglog vast voor een foutmelding: de telnet-\n"
+        f"      debuglog, de MQTT-stroom en de device-info in een\n"
+        f"      transcript. Draai met --help voor de opties en voeg het\n"
+        f"      transcript toe aan je melding op Discord of GitHub.\n"
         f"\n"
         f"  README.txt        Engelse versie van dit bestand.\n"
         f"  README_NL.txt     Dit bestand (Nederlands).\n"
@@ -1649,7 +1718,9 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"        blijft in de map 'backup'.\n"
         f"    --update\n"
         f"        Schrijft firmware en/of bestandssysteem via USB en houdt\n"
-        f"        WiFi. Het bestandssysteem schrijven zet de instellingen\n"
+        f"        WiFi. Zonder --app/--fs neemt hij de .ino.bin en\n"
+        f"        .littlefs.bin uit deze map. Het bestandssysteem\n"
+        f"        schrijven zet de instellingen\n"
         f"        terug. Weigert een unit die nog de oude indeling heeft;\n"
         f"        migreer die eerst.\n"
         f"\n"
@@ -1695,13 +1766,16 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"  WiFi bereikbaar blijft. De gateway draait dan niet.\n"
         f"\n"
         f"Het bestandssysteem (.littlefs.bin) upload je op dezelfde\n"
-        f"/update-pagina. Dat ZET JE INSTELLINGEN TERUG: download eerst\n"
-        f"settings.ini (File Explorer) en upload die daarna opnieuw.\n"
-        f"Update eerst de firmware, daarna het bestandssysteem.\n"
+        f"/update-pagina, na de firmware. De draaiende firmware schrijft\n"
+        f"zijn instellingen na de upload terug naar settings.ini.\n"
+        f"Download settings.ini toch eerst (File Explorer) als vangnet.\n"
+        f"Dallas-sensorlabels en markers in de stooklijn blijven niet\n"
+        f"bewaard.\n"
         f"\n"
         f"Volledige handleiding: docs/guides/WIFI_FIRMWARE_UPDATE.md in\n"
-        f"de repo. Gebruik dit archief voor de eerste USB-flash, de\n"
-        f"eenmalige migratie en herstel.\n"
+        f"de repo. Dit archief bevat alles: de USB-images voor de eerste\n"
+        f"flash, de eenmalige migratie en herstel, plus de .ino.bin en\n"
+        f".littlefs.bin voor updates via WiFi.\n"
         f"\n"
         f"Probleemoplossing\n"
         f"-----------------\n"
@@ -1782,11 +1856,10 @@ def _build_readme_nl(target, tcfg, merged_full_name, upgrade_bin_name, semver):
         f"\n"
         f"  V: Kan ik via WiFi updaten zodra het bord op WiFi zit?\n"
         f"  A: Ja, zodra de unit op de huidige flash-indeling staat (na\n"
-        f"     deze factory flash, of na een keer '--migrate'). De GitHub\n"
-        f"     release-pagina publiceert de losse .ino.bin (firmware) en\n"
-        f"     .littlefs.bin (bestandssysteem). Firmware gaat via de\n"
-        f"     updater, zie Dagelijks gebruik hierboven. Dit archief is\n"
-        f"     voor de eerste USB-flash, de migratie en herstel.\n"
+        f"     deze factory flash, of na een keer '--migrate'). Gebruik de\n"
+        f"     .ino.bin (firmware) en .littlefs.bin (bestandssysteem) uit\n"
+        f"     dit archief. Firmware gaat via de updater, zie Dagelijks\n"
+        f"     gebruik hierboven.\n"
         f"\n"
         f"  V: Ik ben mijn WiFi-credentials kwijt. Hoe kom ik weer in\n"
         f"     het access point?\n"
