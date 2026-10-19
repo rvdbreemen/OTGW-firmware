@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-19 17:33'
+updated_date: '2026-10-19 17:51'
 labels:
   - feature
   - sat
@@ -26,3 +27,9 @@ Feature request by gruijter 2026-10-19, endorsed by Sergeant D. Today SAT only p
 - [ ] #1 Design agreed (option name, loop guard, CH-enable arbitration)
 - [ ] #2 Thermostat setpoint change is adopted as SAT target within one TrSet cycle, and a SAT target change pushed via TC= does not bounce back (bench or simulator evidence)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-19 Sergeant D (#alpha-testing): adopt the thermostat setpoint only on a room setpoint CHANGE (edge-triggered), not by periodic sync. CH-enable arbitration question still open.
+<!-- SECTION:NOTES:END -->
