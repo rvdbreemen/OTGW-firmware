@@ -135,7 +135,7 @@ The heating curve coefficient and offset are configurable per system type (under
 
 - OpenTherm MsgID 27 (if the boiler provides it),
 - an MQTT push (`set/{nodeId}/sat/outdoor_temp`),
-- or the Open-Meteo weather API fetched over HTTP (no API key required, uses browser geolocation or configurable coordinates).
+- or the Open-Meteo weather API fetched over HTTP (no API key required, uses configurable coordinates, or browser geolocation when the UI is opened over HTTPS).
 
 Solar gain compensation subtracts an estimated solar contribution from the flow setpoint based on sun elevation angle. Sun elevation can be pushed via MQTT or computed internally from GPS coordinates.
 

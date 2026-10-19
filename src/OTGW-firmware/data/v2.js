@@ -4369,8 +4369,15 @@
   // Detect location for the weather card. Sets SATweatherlat/lon (string settings —
   // not the boolean SATweatherenable, which the /api/v2/settings typed-bool path
   // would silently no-op on a "1" string; enabling weather stays a Settings action).
+  // Browsers only allow geolocation in a secure context (HTTPS or localhost). The
+  // device serves plain HTTP, so there the button cannot work; behind an HTTPS
+  // reverse proxy it can (TASK-1257).
+  function satGeoUsable() {
+    return window.isSecureContext !== false && !!navigator.geolocation;
+  }
+  var SAT_GEO_ERR = { 1: 'Location denied: the browser blocked access', 2: 'Location unavailable', 3: 'Location timed out' };
   function satDetectLocation() {
-    if (!navigator.geolocation) { txt('satCoords', 'Geolocation not supported'); return; }
+    if (!satGeoUsable()) { txt('satCoords', 'Location detection needs HTTPS'); return; }
     txt('satCoords', 'Detecting…');
     navigator.geolocation.getCurrentPosition(function (pos) {
       var lat = pos.coords.latitude.toFixed(4), lon = pos.coords.longitude.toFixed(4);
@@ -4382,7 +4389,9 @@
             .then(function (r) { if (!r.ok) throw new Error(r.status); return r; });
         });
       }, Promise.resolve()).then(function () { txt('satCoords', lat + ', ' + lon); setTimeout(fetchSatPageWeather, 1500); }).catch(function () { txt('satCoords', 'Save failed'); });
-    }, function () { txt('satCoords', 'Location error'); }, { timeout: 10000 });
+    }, function (err) {
+      txt('satCoords', (err && SAT_GEO_ERR[err.code]) || 'Location error');
+    }, { timeout: 10000 });
   }
 
   // Wire the SAT page controls once (elements exist at load; the page is just hidden).
@@ -4454,8 +4463,21 @@
       if (open && satLastData) pre.textContent = JSON.stringify(satLastData, null, 2);
     });
 
+    satWireDetectLocation();
+  }
+
+  // On plain HTTP the Detect location button always fails, so hide it and point
+  // to the manual Latitude/Longitude fields instead (TASK-1257).
+  function satWireDetectLocation() {
     var dl = document.getElementById('satDetectLoc');
-    if (dl) dl.addEventListener('click', satDetectLocation);
+    if (!dl) return;
+    if (satGeoUsable()) { dl.addEventListener('click', satDetectLocation); return; }
+    dl.hidden = true;
+    var lh = document.getElementById('satLocHint');
+    if (lh) {
+      lh.textContent = 'Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather.';
+      lh.hidden = false;
+    }
   }
 
   // ---------- TASK-990: sensor-discovery toast (PR-649 "OTGW Patterns and Tokens") ----------

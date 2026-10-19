@@ -284,11 +284,11 @@ Weather data provides:
 | Setting | Default | Range | Description |
 |---|---|---|---|
 | `satweatherenable` | false | bool | Enable weather data fetching |
-| `satweatherlat` | 0.0 | -90 to 90 | Latitude (from browser geolocation or manual entry) |
+| `satweatherlat` | 0.0 | -90 to 90 | Latitude (manual entry, or browser geolocation over HTTPS) |
 | `satweatherlon` | 0.0 | -180 to 180 | Longitude |
 | `satweatherinterval` | 900 | 300-3600 s | Poll interval (default 15 min, minimum 5 min) |
 
-The web UI can auto-detect your location using browser geolocation. Weather data is fetched via plain HTTP (no HTTPS). The first fetch is gated 5 minutes after boot so DHCP, NTP, and MQTT have time to settle before the first HTTPS-free Open-Meteo call. The streaming JSON parser is allocation-free (no malloc inside the SAT loop). For debugging, the telnet console accepts `w` to force an immediate fetch + dump (TASK-513).
+Browsers only allow geolocation over HTTPS or on localhost. When you open the web UI over HTTPS (behind a reverse proxy), the SAT page shows a **Detect location** button. On plain `http://<device-ip>` the button is hidden; enter Latitude and Longitude under SAT settings > Weather instead. Weather data is fetched via plain HTTP (no HTTPS). The first fetch is gated 5 minutes after boot so DHCP, NTP, and MQTT have time to settle before the first HTTPS-free Open-Meteo call. The streaming JSON parser is allocation-free (no malloc inside the SAT loop). For debugging, the telnet console accepts `w` to force an immediate fetch + dump (TASK-513).
 
 ---
 
