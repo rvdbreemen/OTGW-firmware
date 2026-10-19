@@ -245,7 +245,7 @@ The board is chosen at compile time. There is no runtime hardware detection on t
 Build with the wrapper or `build.py`:
 
 ```bash
-./build.sh                             # firmware + filesystem, all three targets
+./build.sh                             # firmware + filesystem, esp32-combo (default); --target all for all three
 python build.py --target esp32         # OTGW32 (OTDirect) only
 python build.py --target esp32-classic # S3-in-Classic-socket (PIC) only
 python build.py --target esp32-combo   # combo (boot-detected) only

@@ -292,8 +292,8 @@ Per **ADR-080**, a new pattern-level ADR MUST either reference its CI gate (in `
 
 ```bash
 ./build.sh                   # Preferred — firmware + filesystem (handles venv)
-python build.py              # Build firmware + filesystem, all targets
-python build.py --target esp32-combo     # One target: esp32 | esp32-classic | esp32-combo | all
+python build.py              # Build firmware + filesystem, esp32-combo only (default)
+python build.py --target all             # On request only: --target esp32 | esp32-classic | all
 python build.py --firmware   # Firmware only (also the push-policy gate)
 python build.py --clean      # Clean build
 python evaluate.py           # Code quality check (PROGMEM, unsafe patterns)
@@ -340,9 +340,9 @@ close the gap on the bench.
 End-to-end loop for firmware changes that need on-device validation (e.g. the
 heap-frag soak, TASK-934):
 
-- **Build (canonical):** `python build.py --target esp32` (or `./build.sh` /
-  `build.bat`) — builds firmware + filesystem and bootstraps its own venv, so it
-  is immune to the host Python version.
+- **Build (canonical):** `build.bat --target esp32` / `./build.sh --target esp32`
+  (a bare wrapper builds esp32-combo only) — builds firmware + filesystem and
+  bootstraps its own venv, so it is immune to the host Python version.
 - **Build (direct pio) gotcha:** `python -m platformio run -e esp32` fails if the
   host Python is 3.14+ (the espressif32 platform requires 3.10–3.13: *"Python
   version must be between 3.10 and 3.13"*). Invoke pio via its own penv instead:
@@ -465,7 +465,7 @@ The default Claude Code instruction is "do not push without explicit user permis
 
 Concrete rules that override the default "ask first":
 
-- **`origin/dev`** push: allowed once a task is committed locally AND the build verifies (`python build.py` returns exit 0 for the relevant ESP32 target — `dev` is 2.0.0 ESP32-S3, no esp8266 target here) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
+- **`origin/dev`** push: allowed once a task is committed locally AND the build verifies (`python build.py` returns exit 0 for the relevant ESP32 target — `dev` is 2.0.0 ESP32-S3, no esp8266 target here; a plain build makes esp32-combo only, so add `--target all` when the change touches `HAS_*`-gated code, `boards.h`/platform headers or `platformio.ini`) AND the evaluator is green (`python evaluate.py --quick` shows no new failures). Mention the push in the user-facing summary. **Docs-only commits** (`*.md`, `docs/**`, `backlog/**`, `.claude/**`) may skip both gates — they cannot affect firmware compilation.
 - **`origin/otgw-1.x.x`** push: allowed under the same conditions as `origin/dev` (task committed locally, build green for the esp8266 target, evaluator green; docs-only commits skip both gates). This is the 1.5.x/1.6.x maintenance/LTS line (the former `dev`).
 - **`origin/main`** push: **`main` is ALWAYS the latest public release.** Never auto-pushed; every push requires explicit per-instance confirmation and is part of the release flow only.
 - **Force-push** to any branch: still requires explicit per-instance confirmation. Force-push to main is forbidden regardless.

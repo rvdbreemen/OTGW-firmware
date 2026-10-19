@@ -153,7 +153,7 @@ The `boards.h` header defines compile-time capability flags that control which c
 | `HAS_DIRECT_OT` | 0 | 1 | Direct GPIO OpenTherm bus interface present. Includes OTDirect.ino, the opentherm_library, step-up converter control, and GPIO OT pins. |
 | `HAS_ETH_CAPABLE` | 0 | 1 | W5500 SPI Ethernet hardware present. Includes Ethernet.ino and the EthernetESP32 library. |
 
-These flags are mutually exclusive between the two build targets: a single firmware binary is not possible because the GPIO pin assignments for OT-direct and I2C conflict at the electrical level. The `python build.py` command (or `pio run`) builds both binaries from the same source tree.
+These flags are mutually exclusive between the two build targets: a single firmware binary is not possible because the GPIO pin assignments for OT-direct and I2C conflict at the electrical level. `python build.py --target all` (or `pio run`) builds every binary from the same source tree; a plain `python build.py` builds only the esp32-combo image.
 
 Application code guards platform-specific blocks with `#if HAS_PIC`, `#if HAS_DIRECT_OT`, and `#if HAS_ETH_CAPABLE`. User-facing runtime checks use the helper functions `isPICEnabled()` and `isOTDirectEnabled()`, which add a runtime detection layer on top of the compile-time flag.
 
