@@ -1,9 +1,11 @@
 ---
 id: TASK-1261
 title: 'Fix: ESP8266 stays in modem-sleep, AP drops it for inactivity (GH #681)'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-19 18:02'
+updated_date: '2026-10-19 18:15'
 labels:
   - bug
 dependencies: []
