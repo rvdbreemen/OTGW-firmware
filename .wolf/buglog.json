@@ -3223,7 +3223,14 @@
     "file": "src/OTGW-firmware/SATpid.ino",
     "root_cause": "_pidUpdateDerivative() timed dt by millis() at each PID update (idle updates moved the timer) and checked 60 s before the no-change branch; pid.py stamps every branch with the sensor's last_changed. With the always-on room EMA every step reaches the PID as ~8 small changes, and the literal pid.py last_temperature overwrite drops most of each one. The float error 21.0f-20.9f = 0.1000004 lands outside the 0.1 deadband; pid.py rounds TemperatureState.error to 3 decimals.",
     "fix": "Sensor-side change stamp (_pid_roomTempChangedMs) set in satPidUpdate() before early returns; derivative runs on it in pid.py order; reference temperature (_pid_derivRefTemp) moves only with the timer (B', user decision); satPidError() rounds the error (primary + zone PID). Proof: test/host/test_sat_pid_derivative.py --old-rev febf7f4b4 --rev HEAD (edb5c5cfe, alpha.403).",
-    "tags": ["sat", "pid", "derivative", "deadband", "parity", "task-1195"],
+    "tags": [
+      "sat",
+      "pid",
+      "derivative",
+      "deadband",
+      "parity",
+      "task-1195"
+    ],
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-03T07:00:00Z"
@@ -3235,9 +3242,295 @@
     "file": "build.bat (invocation)",
     "root_cause": "Started from Git Bash as cmd.exe //c \"build.bat ...\": cmd did not resolve build.bat in the cwd. The background task's exit code was that of the trailing echo, so the failure read as success.",
     "fix": "Invoke from PowerShell: & .\\build.bat --target esp32-combo *> log; then check $LASTEXITCODE, the [SUCCESS] line and fresh bin mtimes before trusting the build.",
-    "tags": ["build", "tooling", "windows", "exit-code"],
+    "tags": [
+      "build",
+      "tooling",
+      "windows",
+      "exit-code"
+    ],
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-03T07:25:00Z"
+  },
+  {
+    "id": "bug-888",
+    "timestamp": "2026-10-04T12:00:00Z",
+    "error_message": "HA rejects ~239 OTGW entities at every start: 'does not generate unique IDs'",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "doAutoConfigureMsgid() ran a second Thermostat pass for real OT IDs that reused the boiler_ uniq_id on a thermostat_<label> topic",
+    "fix": "Announce once on the Boiler route; one-time drip migration empties the old thermostat_ configs (bThermostatDupsCleared), then republishes (TASK-1201)",
+    "tags": [
+      "mqtt",
+      "ha-discovery",
+      "uniq_id",
+      "migration"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-04T12:00:00Z"
+  },
+  {
+    "id": "bug-889",
+    "timestamp": "2026-10-04T12:00:00Z",
+    "error_message": "Unable to parse JSON for Reset Gateway button and SAT Heating System select",
+    "file": "src/OTGW-firmware/MQTTHaDiscovery.cpp",
+    "root_cause": "streamButtonDiscovery/streamSatSelectDiscovery wrote the cmd_t value without its \"cmd_t\":\" key prefix",
+    "fix": "Write the key prefix; host harness test/host/test_ha_discovery_json.py parses every payload (TASK-1202)",
+    "tags": [
+      "mqtt",
+      "ha-discovery",
+      "json"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-04T12:00:00Z"
+  },
+  {
+    "id": "bug-890",
+    "timestamp": "2026-10-04T12:00:00Z",
+    "error_message": "RF battery-code HA entity never gets a value",
+    "file": "src/OTGW-firmware/MQTTHaDiscovery.cpp",
+    "root_cause": "49-char label copied into char label[48] that feeds stat_t; value published under the full name",
+    "fix": "label buffer 64 for stat_t only; uniq_id/topic keep 48-byte truncation so the existing entity is kept (TASK-1203)",
+    "tags": [
+      "mqtt",
+      "ha-discovery",
+      "buffer",
+      "truncation"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-04T12:00:00Z"
+  },
+  {
+    "id": "bug-891",
+    "timestamp": "2026-10-04T12:00:00Z",
+    "error_message": "Five SAT binary sensors never appear in HA",
+    "file": "src/OTGW-firmware/MQTTHaDiscovery.cpp",
+    "root_cause": "buildBinSensorDiscoveryTopic() did not sanitize '/' in labels, adding a topic level HA's pattern rejects",
+    "fix": "sanitizeHaObjectId() on the binary label like the sensor builder (TASK-1204)",
+    "tags": [
+      "mqtt",
+      "ha-discovery",
+      "topic"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-04T12:00:00Z"
+  },
+  {
+    "id": "bug-892",
+    "timestamp": "2026-10-04T12:00:00Z",
+    "error_message": "GET /api/v2/health writes flash on every call",
+    "file": "src/OTGW-firmware/restAPI.ino",
+    "root_cause": "sendHealth() called updateLittleFSStatus() which writes /.health each request",
+    "fix": "Write probe at most once per 5 min (DECLARE_TIMER_MIN); read-only mount check otherwise (TASK-1205)",
+    "tags": [
+      "littlefs",
+      "flash-wear",
+      "rest"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-04T12:00:00Z"
+  },
+  {
+    "id": "bug-893",
+    "timestamp": "2026-10-04T12:00:00Z",
+    "error_message": "Failed ID-244 button/select discovery publish never retried",
+    "file": "src/OTGW-firmware/MQTTstuff.ino",
+    "root_cause": "ID-244 block OR-ed allOk into result already set true by the binary-sensor rows",
+    "fix": "Assign result = allOk (TASK-1206); harness part E injects a publish failure",
+    "tags": [
+      "mqtt",
+      "ha-discovery",
+      "retry"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-04T12:00:00Z"
+  },
+  {
+    "id": "bug-894",
+    "timestamp": "2026-10-05T08:40:00Z",
+    "error_message": "flash_otgw.bat --update --app <missing file> exits 0 after '[ERROR] --app file not found'",
+    "file": "flash_otgw.bat",
+    "root_cause": "the error path prints but does not propagate a non-zero exit to the PowerShell caller",
+    "fix": "not fixed; callers must check the log for 'Wrote ... Hash of data verified' and the device fwversion after boot",
+    "tags": [
+      "flash",
+      "exit-code",
+      "tooling"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-05T08:40:00Z"
+  },
+  {
+    "id": "bug-895",
+    "timestamp": "2026-10-12T19:30:00",
+    "error_message": "esp32-classic build: 'struct HardwareSection' has no member named 'bClassicPro'",
+    "file": "src/OTGW-firmware/OTGW-firmware.ino",
+    "root_cause": "state.hw.bClassicPro only exists under HAS_RUNTIME_HW_DETECT (combo); new startStatusPixel() read it unguarded and HAS_STATUS_PIXEL is also on for the fixed esp32-classic target",
+    "fix": "local const bool pro = state.hw.bClassicPro under #if HAS_RUNTIME_HW_DETECT, else false (fixed Classic = plain S3 Mini)",
+    "tags": [
+      "build",
+      "combo",
+      "classic",
+      "HAS_RUNTIME_HW_DETECT",
+      "TASK-1221"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-12T19:30:00"
+  },
+  {
+    "id": "bug-896",
+    "timestamp": "2026-10-12T19:30:00",
+    "error_message": "bin/bump-prerelease.sh: tag does not match ^[a-zA-Z]+\\.[0-9]+$",
+    "file": "src/OTGW-firmware/version.h",
+    "root_cause": "a build stamped version.h with CRLF line endings; the trailing \r on _VERSION_PRERELEASE breaks the bump regex",
+    "fix": "git checkout -- version.h version.hash (stamp churn only) before bumping",
+    "tags": [
+      "bump",
+      "version.h",
+      "crlf"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-12T19:30:00"
+  },
+  {
+    "id": "bug-897",
+    "timestamp": "2026-10-14T00:05:00Z",
+    "error_message": "Building MycilaSafeBoot with the Tasmota platform-espressif32 overwrote shared PlatformIO core packages (framework-arduinoespressif32 3.3.5 -> 3.3.4 tasmota, toolchain-xtensa-esp-elf stub 14.2 -> 15.1); spike builds failed with \"'xtensa-esp32s3-elf-gcc' is not recognized\"",
+    "file": ".tmp/spike-1222 (spike builds), D:/DevData/platformio/packages",
+    "root_cause": "Two espressif32 platform forks (pioarduino 55.03.35 and tasmota 2025.11.30) share package names in one PLATFORMIO_CORE_DIR; the last one built replaces the packages. pioarduino also keeps the real toolchain under tools/, which custom pre-scripts calling bare gcc/objcopy do not find on PATH.",
+    "fix": "Run foreign-platform builds with an isolated PLATFORMIO_CORE_DIR; restore the main core by running build.bat --target esp32 (pio reinstalled framework 3.3.5, toolchain 14.2 verified). Put D:/DevData/platformio/tools/toolchain-xtensa-esp-elf/bin on PATH for projects whose extra_scripts call the compiler by bare name.",
+    "tags": [
+      "platformio",
+      "toolchain",
+      "tasmota",
+      "pioarduino",
+      "shared-core",
+      "spike"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-14T00:05:00Z"
+  },
+  {
+    "id": "bug-898",
+    "timestamp": "2026-10-14T10:00:00Z",
+    "error_message": "v2 heating colour token --hot empty: getComputedStyle --hot == '' in headless Edge, --cold/--dhw set",
+    "file": "src/OTGW-firmware/data/ds-tokens.css",
+    "root_cause": "Comment text at lines 122-123 contained a literal star-slash twice (\"zone-*/tile-*\" and \"*/\"), closing the comment early; the leftover text plus '--hot: #ff5a3c;' parsed as one invalid declaration. A minifier joining the lines turned the broken string into a real one that also swallowed --cold/--dhw/--gauge-track (211 -> 60 declarations).",
+    "fix": "Reworded the comment with no star-slash (TASK-1225); tests/test_build_staging.py fails on any CSS line with an odd quote count after comment stripping.",
+    "tags": [
+      "css",
+      "comment",
+      "ds-tokens",
+      "v2-ui",
+      "minify",
+      "TASK-1225",
+      "TASK-1224"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-14T10:00:00Z"
+  },
+  {
+    "id": "bug-899",
+    "timestamp": "2026-10-15T13:30:00Z",
+    "error_message": "With v2.html deleted at runtime, GET / returned 404 'File not found' instead of the FSexplorer recovery page",
+    "file": "src/OTGW-firmware/FSexplorer.ino",
+    "root_cause": "startWebserver() decided between sendIndex and the FSexplorer fallback once at boot (LittleFS.exists at route registration); a file deleted or lost later kept the sendIndex route, which 404s. The classic index.html had the same flaw.",
+    "fix": "sendIndex() checks LittleFS.exists(\"/v2.html\") per request and serves FSexplorer.html when it is missing; the boot-time branch and the separate fallback handler are gone.",
+    "tags": [
+      "webui",
+      "fsexplorer",
+      "recovery",
+      "fallback",
+      "v2",
+      "TASK-1223.12"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-15T13:30:00Z"
+  },
+  {
+    "id": "bug-900",
+    "timestamp": "2026-10-15T14:00:00Z",
+    "error_message": "WARNING: Bootloader not found in build output - merged image may not be bootable (merged-full and migrate-0x0.bin built without bootloader and partition table)",
+    "file": "build.py",
+    "root_cause": "create_merged_binary() only globbed **/bootloader.bin and **/partitions.bin. collect_pio_artifacts() copies them to build/ as <target>-bootloader.bin / <target>-partitions.bin, and the PlatformIO env dir no longer held them after buildfs, so the merge silently left 0x0 and 0x8000 empty (0xFF). A --migrate flash from that image would have erased the bootloader.",
+    "fix": "Exact lookups first (env dir, then build/<target>-*.bin), hard error when either is missing, a check that partitions.bin matches the CSV (safeboot label), and write_migration_slices() refuses an image without 0xE9 at 0x0 or 0xAA50 at 0x8000. Host tests added.",
+    "tags": [
+      "build",
+      "merged-bin",
+      "bootloader",
+      "migration",
+      "brick-risk",
+      "TASK-1223.3",
+      "TASK-1223.8"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-15T14:00:00Z"
+  },
+  {
+    "id": "bug-901",
+    "timestamp": "2026-10-18T23:55:00Z",
+    "error_message": "TASK-1250 fix (1.x): after renaming the MQTT broker to a name that cannot be looked up, the gateway kept publishing to the PREVIOUS broker over the old session and showed MQTT connected; loop starved while doing so",
+    "file": "src/OTGW-firmware/MQTTstuff.ino (otgw-1.x.x)",
+    "root_cause": "startMQTT() never closes an open session; the fix kept MQTTbrokerIP (old broker) on a failed lookup instead of INADDR_NONE, so both publish guards in sendMQTTData() passed. The host test modelled startMQTT() as disconnecting, which hid it.",
+    "fix": "doMqttDisconnect() in MQTT_STATE_INIT when the name has no usable address (93549213d); host model corrected (red 2/16 on the old transitions, green 16/16). Hardware: v1 13 publishes to the old broker in 75 s, v2 0 and session closed in 7 s.",
+    "tags": [
+      "mqtt",
+      "dns",
+      "regression",
+      "host-test-model",
+      "1.x",
+      "TASK-1250"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-18T23:55:00Z"
+  },
+  {
+    "id": "bug-902",
+    "timestamp": "2026-10-18T23:55:00Z",
+    "error_message": "'build.bat' is not recognized as an internal or external command (exit 1, nothing built)",
+    "file": "build.bat (invocation)",
+    "root_cause": "Claude Code shells set NoDefaultCurrentDirectoryInExePath=1, so cmd.exe does not search the current directory",
+    "fix": "call build.bat by its full path (cmd /c \"cd /d <tree> && <tree>\build.bat\"); memory reference_cmd_nodefaultcurrentdir",
+    "tags": [
+      "build",
+      "windows",
+      "cmd",
+      "tooling"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-10-18T23:55:00Z"
+  },
+  {
+    "id": "bug-903",
+    "timestamp": "2026-10-18T23:55:00Z",
+    "error_message": "bench rig: telnet reconnect storm every 2 s and 3 REST pollers running at once (cap of 2 concurrent API calls at risk)",
+    "file": "bench rig scripts (scratchpad)",
+    "root_cause": "taskkill //PID on PIDs from Git Bash nohup ($!) = MSYS PIDs, not Windows PIDs, so old loggers kept running; 1.x telnet is SimpleTelnet<1>, two loggers kick each other; Git Bash ps shows no script arguments, so 'ps | awk /script/' kills nothing: two stopped test scripts kept running and their safety bails removed the MikroTik fault rules mid-cycle (cap cycles 3a and 3b void)",
+    "fix": "stop rig processes by command line (Get-CimInstance Win32_Process ... CommandLine -match), one logger per kind; never two telnet clients on a 1.x unit; stop bash scripts by Windows command line too; fault scripts verify the router rule count after every change",
+    "tags": [
+      "bench",
+      "rig",
+      "windows",
+      "msys",
+      "telnet",
+      "api-cap"
+    ],
+    "related_bugs": [],
+    "occurrences": 2,
+    "last_seen": "2026-10-18T23:55:00Z"
   }
 ]
