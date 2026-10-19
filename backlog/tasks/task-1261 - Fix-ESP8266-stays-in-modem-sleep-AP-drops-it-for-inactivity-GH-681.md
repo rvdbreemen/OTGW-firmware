@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-19 18:02'
-updated_date: '2026-10-19 20:17'
+updated_date: '2026-10-19 20:20'
 labels:
   - bug
 dependencies: []
@@ -53,4 +53,6 @@ Approved by Robert 2026-10-19. No push (check_otgw_issues rule).
 - Plan correction: MODEM_SLEEP is 2 in the core enum, not 1.
 
 2026-10-19: shipped in v1.7.8-beta.4 (release commit c686e9310, CI run 39317735107 completed success, 10 assets). Discord #beta-testing msg 1561835525084549191; GH #681 issuecomment-6276392696 asks theaprilhare to test (AC #3). AC #2 24h bench run still not started (curl to .88.68 blocked by auto mode).
+
+2026-10-19 22:19 AC #2 baseline (bench .88.68, fix build 1.7.8-beta.4+0ba8e65 + TASK-1261): bootcount=3, device uptime 1h48m, lastreset "Software/System restart" (OTA), freeheap 17720, RSSI -64. MikroTik wlan2 registration uptime=1h45m (signal -70 dBm). Pass rule at >= 2026-10-20 22:19: bootcount still 3 AND registration uptime >= 25h45m (no reboot, no disassociation).
 <!-- SECTION:NOTES:END -->
