@@ -49,6 +49,19 @@ void resetWiFiSettings(void)
   manageWiFi.resetSettings();
 }
 
+// Keep the radio awake (TASK-1261, GH #681). In the core's default modem-sleep
+// the station dozes between beacons; an AP with a short inactivity check
+// (Broadcom: 5 s) then sees the power-save flag, misses frames and
+// disassociates the gateway for inactivity. Called after every connect and
+// re-checked while idle, because an SDK auto-reconnect bypasses loopWifi().
+static void wifiKeepRadioAwake()
+{
+  if (WiFi.getSleepMode() == WIFI_NONE_SLEEP) return;
+  DebugTf(PSTR("WiFi: sleep mode %d, switching modem-sleep off\r\n"), (int)WiFi.getSleepMode());
+  WiFi.setSleepMode(WIFI_NONE_SLEEP);
+  DebugTf(PSTR("WiFi: sleep mode now %d\r\n"), (int)WiFi.getSleepMode());
+}
+
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
@@ -173,6 +186,7 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   // loopWifi() (ADR-047) is the fallback for longer outages.
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
+  wifiKeepRadioAwake();
 
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   if (WiFi.status() != WL_CONNECTED)
@@ -523,6 +537,7 @@ void loopWifi() {
         wifiRetryCount = 0;
         wifiState = WIFI_DISCONNECTED;
       } else {
+        wifiKeepRadioAwake();
         wifiLinkProbeTick();
       }
       break;
@@ -569,13 +584,14 @@ void loopWifi() {
       // the next DHCP exchange (renewal or reconnect) using the configured
       // name. See TASK-432 for the rationale (v1.2.0 baseline approach).
       WiFi.hostname(CSTR(settings.sHostname));
+      wifiKeepRadioAwake();
       refreshServicesAfterWifiReconnect();
       wifiReconnectGen++;   // TASK-1248: probe results from before this are stale
       wifiDeadProbes = 0;
       wifiLinkAliveSinceMs = millis();   // the alive window starts again after any drop
       wifiState = WIFI_IDLE;
-      DebugTf(PSTR("WiFi: reconnected, services refreshed; IP=%s\r\n"),
-              WiFi.localIP().toString().c_str());
+      DebugTf(PSTR("WiFi: reconnected, services refreshed; IP=%s sleep mode %d\r\n"),
+              WiFi.localIP().toString().c_str(), (int)WiFi.getSleepMode());
       break;
 
     case WIFI_FAILED:

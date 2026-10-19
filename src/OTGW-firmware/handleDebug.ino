@@ -183,7 +183,7 @@ void handleDebugChar(char c){
                     DebugTln(F("Reconnecting to wifi"));
                     startWiFi(CSTR(settings.sHostname), 240);
                     refreshServicesAfterWifiReconnect();
-                } else DebugTln(F("Wifi is connected"));
+                } else DebugTf(PSTR("Wifi is connected, sleep mode %d (0 = none, 2 = modem)\r\n"), (int)WiFi.getSleepMode());
 
                 if (!state.mqtt.bConnected) {
                     DebugTln(F("Reconnecting MQTT"));
