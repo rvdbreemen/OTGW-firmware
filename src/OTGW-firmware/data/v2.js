@@ -3179,7 +3179,10 @@
   var picPollTimer = null, picBusy = false, picDevVer = '';
   var PIC_NONE_MSG = 'No PIC detected — PIC firmware flashing is unavailable on this board (OT-Direct / OTGW32).';
   var picGateRetries = 0;
-  function fetchPic() {
+  // done (optional) runs once the header and file list are refreshed, so a caller
+  // can chain the next request instead of firing it alongside (TASK-1255).
+  function fetchPic(done) {
+    var fin = function () { if (typeof done === 'function') done(); };
     var wrap = document.getElementById('picFlash'), none = document.getElementById('picNone');
     withDeviceInfo(function (d) {
       if (!d || d.otcommandinterface === undefined) {
@@ -3188,7 +3191,8 @@
         // and re-poll a few times; only a successful snapshot decides the card.
         if (wrap) wrap.style.display = 'none';
         if (none) { none.style.display = ''; none.textContent = 'Checking device capabilities…'; }
-        if (picGateRetries < 5) { picGateRetries++; setTimeout(fetchPic, 2000); }
+        if (picGateRetries < 5) { picGateRetries++; setTimeout(function () { fetchPic(done); }, 2000); }
+        else fin();
         return;
       }
       picGateRetries = 0;
@@ -3196,18 +3200,20 @@
       if (wrap) wrap.style.display = isPic ? '' : 'none';      // hidden on OTGW32 / OT-Direct
       if (none) { none.style.display = isPic ? 'none' : ''; if (!isPic) none.textContent = PIC_NONE_MSG; }
       var ssim = document.getElementById('sysSim'); if (ssim) ssim.classList.toggle('hidden', !simActive);
-      if (!isPic) return;
+      if (!isPic) { fin(); return; }
       picDevVer = ('' + (d.picfwversion || '')).trim();        // for the .newer highlight
       txt('picHeadDev', d.picdeviceid || '?');
       txt('picHeadType', d.picfwtype || '?');
       txt('picHeadVer', d.picfwversion || '?');
-      fetchPicFiles();
+      fetchPicFiles(fin);
     });
   }
-  function fetchPicFiles() {
+  function fetchPicFiles(done) {
+    var fin = function () { if (typeof done === 'function') done(); };
     fetch(APIGW + 'v2/firmware/files').then(function (r) { return r.ok ? r.json() : null; }).then(function (files) {
       renderPicFiles(Array.isArray(files) ? files : ((files && files.files) || []));   // firmware/files is a bare array
-    }).catch(function () { });
+      fin();
+    }).catch(function () { fin(); });
   }
   function picIcon(sym, title, cls) {
     var b = document.createElement('span'); b.className = 'picbtn' + (cls ? ' ' + cls : '');
@@ -3259,12 +3265,15 @@
     else if (u.status === 'ready' || u.current) { b.style.display = ''; b.classList.add('ok'); b.textContent = '✓ PIC firmware up to date (' + (u.current || '?') + ')'; }
     else { b.style.display = 'none'; b.textContent = ''; }
   }
-  function picUpdatePoll() {
-    fetch(APIGW + 'v2/pic/update-check').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
+  // recheck: drop the cached latest version first (after a flash the PIC type can differ).
+  function picUpdatePoll(done, recheck) {
+    var fin = function () { if (typeof done === 'function') done(); };
+    fetch(APIGW + 'v2/pic/update-check' + (recheck ? '?recheck=1' : '')).then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       var u = (j && j.pic_update) || {};
-      if (u.status === 'checking') { setTimeout(picUpdatePoll, 2500); renderPicBanner(u); return; }
+      if (u.status === 'checking') { setTimeout(function () { picUpdatePoll(done); }, 2500); renderPicBanner(u); return; }
       renderPicBanner(u);
-    }).catch(function () { });
+      fin();
+    }).catch(function () { fin(); });
   }
   function checkPicUpdate() {
     var b = document.getElementById('picBanner'); if (b) { b.className = 'pic-banner'; b.style.display = ''; b.textContent = 'Checking for updates…'; }
@@ -3377,32 +3386,69 @@
     return !!(p && el && p.classList.contains('active') && el.classList.contains('active'));
   }
   function stopPicSettingsPoll() { if (picSetTimer) { clearTimeout(picSetTimer); picSetTimer = null; } }
-  function fetchPicSettings() {
+  // full: after a PIC flash (TASK-1255). The firmware restarts the PR= cycle then, but
+  // the cache still holds the old firmware's values, so nothing reads as missing. Keep
+  // re-reading for the whole window, plus 3 reads (15 s) of margin for PR= ticks the
+  // firmware defers (status bursts, drip), instead of stopping. Registers that still
+  // arrive after the last read show on the next tab open.
+  function fetchPicSettings(full) {
+    full = (full === true);
     stopPicSettingsPoll();
     picSetIter = 0;
     var el = document.getElementById('picPrTable'); if (!el) return;
     el.textContent = '';
     var ld = document.createElement('span'); ld.className = 'prk'; ld.textContent = 'Reading PR= values…'; el.appendChild(ld);
     // device/info once per tab open (cached 8 s); the re-reads below reuse this snapshot.
-    withDeviceInfo(function (d) { readPicSettings(d || {}); });
+    withDeviceInfo(function (d) { readPicSettings(d || {}, full); });
   }
-  function readPicSettings(d) {
+  function readPicSettings(d, full) {
     picSetTimer = null;
     // Plain fetch, no 503 retry: a board without a PIC answers 503 by design.
     fetch(APIGW + 'v2/pic/settings').then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }).then(function (j) {
       if (!isAdvVisible('pic')) return;
       var missing = renderPicSettings((j && j.pic_settings) || {}, d);
       picSetIter++;
-      if (missing && picSetIter < PICSET_MAX_ITER && !document.hidden) {
-        picSetTimer = setTimeout(function () { picSetTimer = null; if (isAdvVisible('pic')) readPicSettings(d); }, PICSET_POLL_MS);
+      if ((missing || full) && picSetIter < (full ? PICSET_MAX_ITER + 3 : PICSET_MAX_ITER) && !document.hidden) {
+        picSetTimer = setTimeout(function () { picSetTimer = null; if (isAdvVisible('pic')) readPicSettings(d, full); }, PICSET_POLL_MS);
       }
     }).catch(function () {
       var el = document.getElementById('picPrTable'); if (!el) return;
       el.textContent = ''; var e = document.createElement('span'); e.className = 'prk'; e.textContent = 'Failed to read PIC settings'; el.appendChild(e);
     });
   }
+  // Outcome of one /api/v2/pic/flash-status answer (TASK-1255): 'running', 'success',
+  // 'error' or 'pending' (not started yet: the firmware starts the flash from loop()
+  // after the /pic request has answered). The firmware sets progress 100 on success
+  // and -1 on failure, and fills error on failure only. Firmware before TASK-1255 also
+  // put PIC_FLASH_LEGACY_OK in error on success and did not clear it when the next
+  // flash was requested, so that text counts as success only once this flash was seen
+  // running (sawRunning), and as 'pending' before that.
+  var PIC_FLASH_LEGACY_OK = 'PIC upgrade was successful';
+  function picFlashOutcome(s, sawRunning) {
+    s = s || {};
+    if (s.flashing) return 'running';
+    var err = (s.error === undefined || s.error === null) ? '' : ('' + s.error).trim();
+    if (err === PIC_FLASH_LEGACY_OK) return sawRunning ? 'success' : 'pending';
+    if (err) return 'error';
+    if (s.progress === 100) return 'success';
+    if (s.progress === -1) return 'error';
+    return 'pending';
+  }
+  // After a good flash: drop the cached device/info (it still holds the old
+  // picfwversion), then refresh header + file list, update banner and PR= table
+  // one after another, never side by side (max-2 API rule).
+  function picAfterFlash() {
+    devInfoTs = 0;
+    fetchPic(function () { picUpdatePoll(function () { fetchPicSettings(true); }, true); });
+  }
+  // picPendingPolls counts valid "not started" answers (cap 10 s). picNoStatusPolls
+  // counts polls without a usable answer (a non-OK reply such as a 503 from the REST
+  // gate) under their own, longer cap, so a gated burst during a real flash does not
+  // end as "the flash did not start".
+  var picPendingPolls = 0, PIC_PENDING_MAX = 10, picNoStatusPolls = 0, PIC_NOSTATUS_MAX = 60, picSawRunning = false;
   function startPicFlash(name) {
     picBusy = true;
+    picPendingPolls = 0; picNoStatusPolls = 0; picSawRunning = false;
     var prog = document.getElementById('picProg'), txt = document.getElementById('picProgTxt'), bar = document.getElementById('picProgBar');
     if (prog) prog.style.display = '';
     if (bar) { bar.style.width = '0%'; bar.style.background = 'var(--accent)'; }
@@ -3415,17 +3461,48 @@
   function pollPicFlash() {
     if (picPollTimer) clearTimeout(picPollTimer);
     fetch(APIGW + 'v2/pic/flash-status').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
-      var s = (j && j.flashstatus) || {};
       var bar = document.getElementById('picProgBar'), txt = document.getElementById('picProgTxt');
+      if (!j || !j.flashstatus) {
+        if (picNoStatusPolls < PIC_NOSTATUS_MAX) {
+          picNoStatusPolls++;
+          if (txt) txt.textContent = 'No status from the device yet, still polling…';
+          picPollTimer = setTimeout(pollPicFlash, 1000);
+          return;
+        }
+        picNoStatusPolls = 0; picSawRunning = false; picBusy = false;
+        if (txt) txt.textContent = 'No flash status from the device; check the PIC version once it settles';
+        setTimeout(fetchPic, 2500);
+        return;
+      }
+      picNoStatusPolls = 0;
+      var s = j.flashstatus;
       var p = (typeof s.progress === 'number') ? s.progress : 0;
-      if (bar) bar.style.width = Math.max(0, Math.min(100, p)) + '%';
-      if (s.flashing) {
+      var o = picFlashOutcome(s, picSawRunning);
+      if (o === 'running') {
+        picPendingPolls = 0; picSawRunning = true;
+        if (bar) bar.style.width = Math.max(0, Math.min(100, p)) + '%';
         if (txt) txt.textContent = 'Flashing ' + (s.filename || '') + ' — ' + p + '%';
         picPollTimer = setTimeout(pollPicFlash, 1000);
+        return;
+      }
+      if (o === 'pending' && picPendingPolls < PIC_PENDING_MAX) {
+        picPendingPolls++;
+        if (txt) txt.textContent = 'Waiting for the flash to start…';
+        picPollTimer = setTimeout(pollPicFlash, 1000);
+        return;
+      }
+      picPendingPolls = 0; picSawRunning = false;
+      picBusy = false;
+      if (o === 'success') {
+        if (bar) { bar.style.width = '100%'; bar.style.background = 'var(--accent)'; }
+        if (txt) txt.textContent = 'Flash complete' + (s.filename ? ': ' + s.filename : '');
+        // The PIC restarts after the flash; give its banner time to report the new version.
+        setTimeout(picAfterFlash, 2500);
       } else {
-        picBusy = false;
-        if (s.error && ('' + s.error).length) { if (txt) txt.textContent = 'Error: ' + s.error; if (bar) bar.style.background = 'var(--hot,#c33)'; }
-        else { if (bar) bar.style.width = '100%'; if (txt) txt.textContent = 'Flash complete'; }
+        var err = (s.error === undefined || s.error === null) ? '' : ('' + s.error).trim();
+        if (err === PIC_FLASH_LEGACY_OK) err = '';   // a previous flash's result, never this one's error
+        if (bar) { bar.style.width = '100%'; bar.style.background = 'var(--hot,#c33)'; }   // progress is -1 on failure
+        if (txt) txt.textContent = 'Error: ' + (err || (o === 'pending' ? 'the flash did not start' : 'the flash failed'));
         setTimeout(fetchPic, 2500);
       }
     }).catch(function () { picBusy = false; var txt = document.getElementById('picProgTxt'); if (txt) txt.textContent = 'Lost contact during flash (device may be rebooting)'; });

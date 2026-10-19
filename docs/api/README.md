@@ -646,6 +646,8 @@ Returns the PIC microcontroller flash status. Used for polling during PIC firmwa
 }
 ```
 
+When `flashing` turns false, `progress` is `100` on success and `-1` on failure. `error` holds the failure reason and is empty on success (TASK-1255; earlier builds put `PIC upgrade was successful` there). The same holds for `pic_progress` / `pic_error` in `/api/v2/flash/status`.
+
 #### `GET /api/v2/pic/update-check`
 
 Checks for available PIC firmware updates by making an outbound HTTP request to `otgw.tclcode.com`. Only call on-demand (e.g., when user opens a firmware tab).

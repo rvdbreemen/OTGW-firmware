@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.437
+**  Version  : v2.0.0-alpha.438
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5816,6 +5816,14 @@ void fwupgradedone(OTGWError result, short errors = 0, short retries = 0) {
   state.flash.iPICprogress = (result == OTGWError::OTGW_ERROR_NONE) ? 100 : -1; // -1 indicates error
   if (result == OTGWError::OTGW_ERROR_NONE) {
     DebugTln(F("*** UPGRADE SUCCESSFUL ***"));
+    // TASK-1255: sError carries failures only. REST (flash-status "error",
+    // flash/status "pic_error") and the WS "end" message read it, and the Web UI
+    // shows any non-empty value as a failure. The success text is logged above.
+    state.flash.sError[0] = '\0';
+    // Re-read every PR= value from the new PIC firmware. Restart the cycle at the
+    // first index, also when the flash paused a cycle part-way through.
+    picSettingsCycleActive = false;
+    triggerPICsettingsReadout();
   } else {
     DebugTln(F("*** UPGRADE FAILED ***"));
   }
@@ -6263,6 +6271,12 @@ void upgradepic(AsyncWebServerRequest *request) {
 
   if (strcmp_P(action, PSTR("upgrade")) == 0) {
     DebugTf(PSTR("Upgrade requested for /%s/%s\r\n"), state.pic.sDeviceid, filename);
+    // TASK-1255: drop the previous flash's result now, so a status poll that lands
+    // before handlePendingUpgrade() starts this flash does not report it again.
+    if (!state.flash.bPICactive) {
+      state.flash.iPICprogress = 0;
+      state.flash.sError[0] = '\0';
+    }
     // The async response is queued here; the actual upgrade is deferred to the
     // main loop so lwIP can drain the response before the PIC flash begins.
     webSendP(200, PSTR("application/json"), PSTR("{\"status\":\"started\"}"));

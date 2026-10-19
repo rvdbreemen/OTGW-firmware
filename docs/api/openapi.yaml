@@ -831,12 +831,14 @@ paths:
                         description: PIC flash specifically in progress
                       pic_progress:
                         type: integer
-                        minimum: 0
+                        minimum: -1
                         maximum: 100
+                        description: 0-100 while flashing, 100 on success, -1 on failure
                       pic_filename:
                         type: string
                       pic_error:
                         type: string
+                        description: Empty on success, the failure reason otherwise. Builds before TASK-1255 sent "PIC upgrade was successful" on success.
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
 
@@ -862,12 +864,14 @@ paths:
                         type: boolean
                       progress:
                         type: integer
-                        minimum: 0
+                        minimum: -1
                         maximum: 100
+                        description: 0-100 while flashing, 100 on success, -1 on failure
                       filename:
                         type: string
                       error:
                         type: string
+                        description: Empty on success, the failure reason otherwise. Builds before TASK-1255 sent "PIC upgrade was successful" on success.
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
         '503':
