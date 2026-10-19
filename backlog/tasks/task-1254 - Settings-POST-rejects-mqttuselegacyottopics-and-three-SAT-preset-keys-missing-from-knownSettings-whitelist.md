@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-19 17:31'
-updated_date: '2026-10-19 18:17'
+updated_date: '2026-10-19 19:11'
 labels:
   - bug
   - webui
@@ -46,6 +46,8 @@ Implementation (2026-10-19):
 Review round: (1) bleToast hide-timer race fixed: timer id kept on the #toast element, clearTimeout before re-arm; new node test 'a new toast cancels the previous toast's pending hide timer' fails on the pre-fix bleToast (3/4) and passes on the fix (4/4). (2) On-device POST/GET/reboot round-trip of the four keys is NOT yet verified (no build/flash in the review step); the static guard tests/test_settings_whitelist.py only parses restAPI.ino. Final Summary must either carry a bench curl round-trip or state this as unverified.
 
 Finalize (2026-10-19): build.bat (esp32-combo) SUCCESS: firmware 00:06:19, buildfs 00:00:26, 'Build completed successfully!'; fresh artifacts build/OTGW-firmware-esp32-combo-2.0.0-alpha.436+8422465.{ino.bin 20:14:30, elf 20:14:27, littlefs.bin 20:15:00} (pre-bump version string); Flash 88.1% (2020483/2293760), RAM 35.4%; LittleFS budget OK 632 KiB + 96 KiB <= 768 KiB; staged v2-bundle.css in .pio/data-staging contains toast.err. evaluate.py --quick: 79 checks, 72 passed, 0 warn, 0 fail, 7 info, exit 0. tests/test_settings_whitelist.py: 3 tests OK exit 0. node --test settings-error-toast.test.mjs: pass 4 / fail 0. All 7 tests/webui/*.mjs exit 0. node --check v2.js OK. Bumped alpha.436 -> alpha.437. AC1 (on-device POST/GET/reboot round-trip) still NOT verified: no flash allowed in this step.
+
+2026-10-19 bench verify blocked: bench S3 absent from USB and network (no 303A:1001, .61 no ARP reply). Fix rebased onto origin/dev (PR #687), rebuilt alpha.439+31001d4: build.bat exit 0, firmware+littlefs SUCCESS, evaluate --quick 0 FAIL, all tests/webui pass; pushed to origin/dev. Remaining AC needs on-device evidence.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

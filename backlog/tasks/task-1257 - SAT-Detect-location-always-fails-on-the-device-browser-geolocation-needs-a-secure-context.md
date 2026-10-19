@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-19 17:33'
-updated_date: '2026-10-19 18:57'
+updated_date: '2026-10-19 19:11'
 labels:
   - bug
   - webui
@@ -42,6 +42,8 @@ Implementation (uncommitted, awaiting commit stage):
 - AC#1 screenshot still open: needs the bench (plain HTTP device).
 
 Finalize run 2026-10-19 (alpha.439): build.bat esp32-combo SUCCESS (firmware 238 s + buildfs 17 s), fresh build/OTGW-firmware-esp32-combo-2.0.0-alpha.438+a99fd95.ino.bin 20:55:09, .littlefs.bin 20:55:29, .elf kept; .pio/data-staging/v2.js contains satWireDetectLocation. evaluate.py --quick: 79 checks, 72 passed, 0 warn, 0 failed, exit 0. node --test tests/webui/*.test.mjs 35/35. tests/test_static_integrity.py 33 OK. sat-detect-location.test.mjs: fix 7/7; against HEAD v2.js 6/7 fail on assertions (HTTPS happy path passes on both, never broken). old-repro.mjs: OLD button visible, click -> 'Location error', no hint; FIX button hidden, hint 'Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather.' Docs: ch05-sat-thermostat.md and RELEASE_NOTES_2.0.0.md say geolocation needs HTTPS. AC#1 left unchecked: it asks for a screenshot of the real UI on a plain-HTTP device; no device flashed in this run (flashing not permitted here).
+
+2026-10-19 bench verify blocked: bench S3 absent from USB and network (no 303A:1001, .61 no ARP reply). Fix rebased onto origin/dev (PR #687), rebuilt alpha.439+31001d4: build.bat exit 0, firmware+littlefs SUCCESS, evaluate --quick 0 FAIL, all tests/webui pass; pushed to origin/dev. Remaining AC needs on-device evidence.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
