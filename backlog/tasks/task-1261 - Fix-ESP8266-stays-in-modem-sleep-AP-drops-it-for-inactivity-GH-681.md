@@ -30,3 +30,14 @@ Verified in code: the 1.x source and vendored libraries never call WiFi.setSleep
 - [ ] #3 theaprilhare reports AP inactivity disassociations with router scb_activity_time back at 5 s, on a beta carrying the change
 - [ ] #4 esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. networkStuff.ino ~174: WiFi.setSleepMode(WIFI_NONE_SLEEP) after initial connect, log the mode.
+2. WIFI_RECONNECTED: same call after a supervisor reconnect.
+3. WIFI_IDLE: if WiFi.getSleepMode() != WIFI_NONE_SLEEP, re-assert and log (covers SDK auto-reconnect).
+4. build.bat + evaluate.py --quick.
+5. Bench .88.68 OTA: old build logs mode 1, new logs mode 0, also after a forced reconnect; free heap before/after.
+Approved by Robert 2026-10-19. No push (check_otgw_issues rule).
+<!-- SECTION:PLAN:END -->
