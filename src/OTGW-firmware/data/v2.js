@@ -432,7 +432,7 @@
   var ws = null, wsTimer = null;
   var model = {
     flow: null, ret: null, dhw: null, outside: null, room: null,
-    roomSet: null, chSet: null, mod: null, pressure: null,
+    roomSet: null, chSet: null, mod: null, pressure: null, tsetGatewayMs: 0,
     flame: false, ch: false, dhw_on: false, fault: false, fresh: false,
     wxValid: false   // TASK-954: weather API drives OUTSIDE when its last fetch is valid
   };
@@ -461,8 +461,20 @@
           changed = true;
         }
         break;
-      case 1:  if (isWrite) { model.chSet = f88(u16); changed = true; } break;   // TSet (CH setpoint)
-      case 16: if (isWrite) { model.roomSet = f88(u16); changed = true; } break;  // TrSet (room setpoint)
+      case 1:  // TSet (CH setpoint): Write-Data only (T thermostat, R gateway to boiler), the same rule as
+               // is_value_valid_for_master_topic() in the firmware. In a PIC exchange R follows T within
+               // milliseconds and overwrites it. The Write-Ack data (B, A) is undefined: some boilers
+               // answer 0, and the A echo to the thermostat showed its own value (TASK-1271).
+               // A T frame counts only when no R frame for MsgID 1 came in the last 30 s, so a
+               // dropped R frame cannot bring back the thermostat's own value.
+               if (type === 1) {
+                 var nowSp = Date.now();
+                 if (raw.charAt(0).toUpperCase() === 'R') model.tsetGatewayMs = nowSp;
+                 else if (nowSp - (model.tsetGatewayMs || 0) < 30000) break;
+                 model.chSet = f88(u16); changed = true;
+               }
+               break;
+      case 16: if (type === 1) { model.roomSet = f88(u16); changed = true; } break;  // TrSet (thermostat setpoint); Write-Ack data is undefined too
       case 17: if (isAck) { model.mod = f88(u16); changed = true; } break;        // RelModLevel
       case 18: if (isAck) { model.pressure = f88(u16); changed = true; } break;   // CH water pressure
       case 24: if (isAck || isWrite) { model.room = f88(u16); changed = true; } break; // Troom
@@ -1250,7 +1262,7 @@
   var GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, gHist = [], gDallas = null, gLastRender = 0;
   // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
   var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
-    ['roomSet', 'room setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'],
+    ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'],
     ['mod', 'modulation', '#00bffe', 'm'], ['flame', 'flame', '#ff7b00', 'l'], ['dhw_on', 'DHW mode', '#2f81f7', 'l'], ['ch', 'CH mode', '#e5534b', 'l']];
   var GDCOL = ['#56d4dd', '#db61a2', '#7ee787', '#f0883e', '#79c0ff', '#bc8cff'];
   var GLANE_Y = { flame: 196, dhw_on: 218, ch: 240 };
