@@ -461,9 +461,17 @@ bool updateRebootLog(String text)
   }
   g_bootRestartReasonValid = false;   // logged (or not applicable): never pass it on again
 
-  TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
-  ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(time(nullptr), myTz);
-  snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
+  // Before NTP has synced the clock holds seconds since boot, which used to be
+  // logged as 2106-02-07 (TASK-1253). Say so instead of printing a date.
+  const int64_t now = (int64_t)time(nullptr);
+  if (now >= 1577836800LL && now < 4102444800LL) {   // 2020-01-01 .. 2100-01-01
+    TimeZone myTz =  timezoneManager.createForZoneName(CSTR(settings.ntp.sTimezone));
+    ZonedDateTime myTime = ZonedDateTime::forUnixSeconds64(now, myTz);
+    snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("%d-%02d-%02d %02d:%02d:%02d - reboot cause: %s (%x) %s\r\n"), myTime.year(),  myTime.month(), myTime.day(), myTime.hour(), myTime.minute(), myTime.second(), CSTR(text), errorCode, log_line_excpt);
+  } else {
+    DebugTf(PSTR("reboot log: clock not set (time=%ld)\r\n"), (long)now);
+    snprintf_P(log_line, LOG_LINE_LENGTH, PSTR("time not set - reboot cause: %s (%x) %s\r\n"), CSTR(text), errorCode, log_line_excpt);
+  }
 
   if (LittleFS.begin()) {
     //start with opening the file
@@ -485,11 +493,17 @@ bool updateRebootLog(String text)
         while (infh.available() && (i < LOG_LINES)){
           //read the next line — char buffer avoids heap allocation (ADR-004)
           char line[LOG_LINE_LENGTH] = {0};
-          int n = infh.readBytesUntil('\n', line, sizeof(line) - 1);
+          // Split on CR and swallow the LF after it: lines end in CRLF, and files
+          // written before TASK-1253 hold CR-only records, which this repairs.
+          int n = infh.readBytesUntil('\r', line, sizeof(line) - 1);
+          if (infh.peek() == '\n') infh.read();
           line[n] = '\0';
+          char *start = line;
+          while (*start == '\n') start++;
           // Filter out empty or very short lines (< 3 chars) to keep log file clean
-          if (n > 3) {
-            outfh.print(line);
+          if (strlen(start) > 3) {
+            outfh.print(start);
+            outfh.print(F("\r\n"));
           }
           i++;
         }
