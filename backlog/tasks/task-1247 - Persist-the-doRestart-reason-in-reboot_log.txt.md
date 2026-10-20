@@ -1,11 +1,11 @@
 ---
 id: TASK-1247
 title: Persist the doRestart() reason in reboot_log.txt
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-18 08:18'
-updated_date: '2026-10-20 02:23'
+updated_date: '2026-10-20 02:33'
 labels:
   - diagnostics
   - reboot
@@ -24,7 +24,7 @@ Approach: doRestart() writes its reason (magic + up to 47 chars) to RTC user mem
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 After a doRestart() the next reboot_log.txt entry ends with the restart reason text (bench: trigger via the telnet operator reboot and read /reboot_log.txt; old build shows no reason)
-- [ ] #2 A power-on or external/watchdog reset shows no stale reason (magic checked and cleared on every boot)
+- [x] #2 A power-on or external/watchdog reset shows no stale reason (magic checked and cleared on every boot)
 - [x] #3 esp8266 build passes and evaluate.py --quick is green
 <!-- AC:END -->
 
@@ -36,4 +36,16 @@ Approach: doRestart() writes its reason (magic + up to 47 chars) to RTC user mem
 2026-10-18 correction from the TASK-1248 review: in 29c9f0834 / v1.7.8-beta.1 the record was taken in updateRebootLog(), after startWiFi(). A config-portal timeout restart (bare ESP.restart(), networkStuff.ino:164) in between left the record in place, and the next connected boot attributed the old reason to that restart; 'cleared on every boot' was therefore not true for that path. Fixed in the TASK-1248 working tree (captureRebootReason() at the top of setup(), portal timeout stores its own reason), not yet built. The RTC comment also named the wrong eboot range (user offsets 0..31, not 64..95); no overlap. Field impact for #682: misattribution needs a portal-timeout boot in between; in the 16 Oct capture the gateway came back within about a minute after each restart, so no public correction needed.
 
 2026-10-20 bench .88.68 (1.x unit available again), build 1.7.8-beta.5+84be30d: reboot_log.txt entries after doRestart() carry the reason: "Software/System restart (4) - [OTA] Rebooting..." after a web OTA and "... - telnet operator request" after two telnet R reboots (old build line format had no reason). AC #1 met. AC #2 (no stale reason after a power-on/external reset) still open.
+
+2026-10-20 AC #2: external reset by an RTS pulse on COM3 (bench .88.68, build 1.7.8-beta.5+d92c03f, bootcount 7->8, lastreset "External System"). New reboot_log.txt entry: "time not set - reboot cause: External System (6) " with no reason suffix; the previous boot (OTA) had consumed its record. Limitation: this shows an external reset after a normal boot carries no reason; a reset that hits DURING doRestart()'s 2 s shutdown (record written, not yet consumed) was not provoked; captureRebootReason() only applies the record when the reset reason is REASON_SOFT_RESTART (helperStuff.ino:368), checked by reading code.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+reboot_log.txt now says which planned restart fired.
+
+doRestart() stores its reason in RTC user memory (slot 100, magic "OTRR"), which survives ESP.restart(). captureRebootReason() at the top of setup() takes and clears it on every boot and keeps it only when the reset reason is a software restart; updateRebootLog() appends it to the reboot-cause line. The config-portal timeout passes a pending reason on instead of overwriting it.
+
+Evidence (bench .88.68): after a web OTA the entry ends in "- [OTA] Rebooting...", after two telnet R reboots in "- telnet operator request"; after an external RTS reset the entry is "External System (6)" with no suffix. Shipped in v1.7.8-beta.1 (29c9f0834), corrected in the TASK-1248 work. Not provoked: a reset during doRestart()'s shutdown window (covered by the REASON_SOFT_RESTART check, code reading only).
+<!-- SECTION:FINAL_SUMMARY:END -->
