@@ -2035,7 +2035,10 @@ static bool composeSensorPayload(MqttJsonWriter &w,
                                  const MqttHaSensorCfg &cfg,
                                  const HaDiscoveryContext &ctx)
 {
-  char label[48];
+  // label feeds stat_t and must hold the longest label in full (49 chars,
+  // RFSensorStatusInformation_battery_indication_code); idLabel stays 48 so
+  // the uniq_id of existing entities does not change (TASK-1209).
+  char label[64];
   char idLabel[48];
   char friendlyName[80];
   strlcpy_P(label, cfg.label, sizeof(label));
