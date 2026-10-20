@@ -1991,6 +1991,12 @@ void satHandleHeatingMode(const char* value)
 void satHandleControlMode(const char* value)
 {
   if (!value || !*value) return;
+  // TASK-1265: "off" switches SAT off, the same as sat/enabled 0. Without this,
+  // atoi("off") == 0 selected auto below and SAT kept running.
+  if (strcasecmp_P(value, PSTR("off")) == 0) {
+    satHandleEnabled("0");
+    return;
+  }
   // TASK-205: avoid strcmp() with bare string literals -- use atoi() for numeric
   // forms and strcmp_P(..., PSTR(...)) for named forms. No bare string compares.
   int prevMode = (int)state.sat.eControlMode;

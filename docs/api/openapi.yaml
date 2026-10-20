@@ -3007,7 +3007,8 @@ paths:
       summary: Set SAT control mode
       description: |
         Sets the SAT control mode. Valid values: `"continuous"`, `"pwm"`, `"auto"`,
-        or the numeric equivalents `"0"`, `"1"`, `"2"`.
+        or the numeric equivalents `"0"` (auto), `"1"`, `"2"`. `"off"` switches SAT
+        off, the same as setting `enabled` to false.
       operationId: setSatMode
       requestBody:
         required: true
@@ -3015,7 +3016,7 @@ paths:
           text/plain:
             schema:
               type: string
-              enum: [continuous, pwm, auto, "0", "1", "2"]
+              enum: [continuous, pwm, auto, "off", "0", "1", "2"]
               example: "continuous"
       responses:
         '200':

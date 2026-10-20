@@ -382,7 +382,7 @@ When SAT is enabled, the firmware also auto-discovers diagnostic sensor entities
 | Topic suffix | Accepted values | Description |
 |---|---|---|
 | `sat/target` | Float, e.g. `21.0` | Set target room temperature |
-| `sat/control_mode` | `continuous`, `pwm`, `auto` | Set control mode (use `sat/enabled` to switch SAT off) |
+| `sat/control_mode` | `continuous`, `pwm`, `auto`, `off` | Set control mode; `off` switches SAT off (same as `sat/enabled` 0) |
 | `sat/enabled` | `true` / `false` | Enable or disable SAT |
 | `sat/indoor_temp` | Float, e.g. `20.5` | Push indoor temperature from external sensor |
 | `sat/outdoor_temp` | Float, e.g. `5.2` | Push outdoor temperature from external source |

@@ -1200,7 +1200,7 @@ Note: Commands are only processed when an OT command interface (PIC or OTDirect)
 |-------------|---------|-------------|
 | `sat/target` | `"21.0"` | Set target room temperature |
 | `sat/enabled` | `"true"` / `"false"` | Enable / disable SAT |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` | Set control mode |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` / `"off"` | Set control mode; `"off"` switches SAT off |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` | Apply comfort preset |
 | `sat/indoor_temp` | `"20.8"` | Push external room temperature |
 | `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature |

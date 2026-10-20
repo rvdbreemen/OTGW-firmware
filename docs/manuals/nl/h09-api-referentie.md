@@ -991,7 +991,7 @@ Let op: Commando's worden alleen verwerkt wanneer een OT-interface (PIC of OTDir
 |----------------|---------|-------------|
 | `sat/target` | `"21.0"` | SAT doeltemperatuur |
 | `sat/enabled` | `"true"` / `"false"` | SAT in-/uitschakelen |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` | Bedrijfsmodus |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` / `"off"` | Bedrijfsmodus; `"off"` zet SAT uit |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` | Voorinstelling activeren |
 | `sat/indoor_temp` | `"20.8"` | Externe kamertemperatuur |
 | `sat/outdoor_temp` | `"7.5"` | Externe buitentemperatuur |

@@ -869,7 +869,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 | `sat/indoor_temp` | `"20.8"` | Push external indoor temperature (expires after sensor max age) |
 | `sat/outdoor_temp` | `"8.0"` | Push external outdoor temperature (expires after sensor max age) |
 | `sat/enabled` | `"true"` / `"false"` | Enable or disable SAT controller |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` or `"0"` / `"1"` / `"2"` | Set control mode |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` or `"0"` / `"1"` / `"2"`, or `"off"` | Set control mode; `"off"` switches SAT off (same as `sat/enabled` 0) |
 | `sat/preset` | `"away"` / `"eco"` / `"comfort"` / `"sleep"` / `"activity"` / `"home"` | Activate a named preset |
 
 **Window and Humidity Commands:**

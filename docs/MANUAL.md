@@ -860,7 +860,7 @@ When SAT is enabled, the firmware auto-discovers additional diagnostic entities.
 | Topic suffix | Accepted values | Description |
 |---|---|---|
 | `sat/target` | Float, e.g. `21.0` | Set target room temperature |
-| `sat/control_mode` | `continuous`, `pwm`, `auto` | Set control mode (use `sat/enabled` to switch SAT off) |
+| `sat/control_mode` | `continuous`, `pwm`, `auto`, `off` | Set control mode; `off` switches SAT off (same as `sat/enabled` 0) |
 | `sat/enabled` | `true` / `false` | Enable or disable SAT |
 | `sat/indoor_temp` | Float, e.g. `20.5` | Push indoor temperature from external sensor |
 | `sat/outdoor_temp` | Float, e.g. `5.2` | Push outdoor temperature from external source |
@@ -3166,7 +3166,7 @@ Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case
 | `sat/pv_surplus_w` | `"1500"` (0 to 50000) | Push PV surplus power (W) for PV boost |
 | `sat/pv_boost_enabled` | `"1"` / `"0"` / `"true"` | Enable / disable PV boost |
 | `sat/enabled` | `"true"` / `"false"` (also `"on"` / `"off"`, `"1"` / `"0"`) | Enable / disable SAT |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) | Set control mode. Any other non-numeric value, `"off"` included, is treated as `"auto"`; use `sat/enabled` to switch SAT off |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) / `"off"` | Set control mode. `"off"` switches SAT off, the same as `sat/enabled` 0. Any other non-numeric value is treated as `"auto"` |
 | `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Apply a preset; `"none"` clears it |
 | `sat/humidity` | `"58"` (0 to 100) | Push indoor humidity (%) |
 | `sat/heating_mode` | `"comfort"` / `"eco"` | Set heating mode |
