@@ -21,6 +21,7 @@ backlog search "<topic>" --plain           # 1. Find existing task
 backlog task create "Title" -d "..." --ac "..."  # 2. Create if none
 backlog task edit <id> -s "In Progress" -a @claude  # 3. Start it
 backlog task edit <id> --plan "..."        # 4. Write plan, share with user, WAIT for approval
+                                           #    (in the /implement-next-task cycle: self-review + #alpha-testing notice instead, see Auto-advance)
 
 # During implementation:
 backlog task edit <id> --check-ac 1        # Mark ACs done as you go
@@ -82,6 +83,8 @@ Exceptions — do NOT auto-advance:
 - User has explicitly asked you to stop or wait.
 - The next task requires a plan approval checkpoint (per KISS principle: share choices so user decides on complexity).
 - The next task is a cross-worktree master-plan task (requires the one-plan-then-two-agents protocol).
+
+**Continuous cycle (`/implement-next-task`, maintainer decision 2026-10-20).** Inside the cycle defined by `.claude/skills/implement-next-task/SKILL.md`, the plan-approval wait (Task Management step 4 and the plan-approval exception above) is replaced by a critical self-review with the advisor plus a notice in #alpha-testing: implement directly after the self-review and keep advancing. Actions that always need explicit permission (PIC flash, release, push to `main`, force-push) still stop the cycle.
 
 ---
 
