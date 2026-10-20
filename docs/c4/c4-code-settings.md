@@ -417,7 +417,7 @@ Controls autonomous heating/cooling via OpenTherm. Includes:
 - **Presets**: comfort (21°C), eco (18°C), away (15°C), sleep (16°C), activity (10°C), home (18°C)
 - **Modulation**: PWM auto-switch, max relative modulation, overshoot protection, modulation suppression
 - **PID**: manual/auto gains (Kp, Ki, Kd), auto-tune rate
-- **Weather**: enable, latitude, longitude, poll interval, boiler capacity/efficiency
+- **Weather**: enable, latitude, longitude, poll interval, boiler capacity, DHW capacity (`SATdhwcapacity`, 0 = boiler capacity, TASK-1258), efficiency, rated input
 - **Simulation**: enable, heat/cool rates, thermal coefficient
 - **Solar gain**: enable, min rise rate, setpoint offset, min elevation angle
 - **Summer simmer**: enable, outdoor threshold, min hours to trigger
