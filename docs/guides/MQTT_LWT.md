@@ -93,6 +93,14 @@ After the birth message (`"online"`) is published, the firmware decides whether 
 
 The threshold is defined in `MQTTstuff.ino` as `MQTT_REPUBLISH_OFFLINE_THRESHOLD_MS = 300000` (5 minutes). The offline duration is measured from the last confirmed-live MQTT tick stored in `state.mqtt.iLastConnectedMs`.
 
+### Commands sent while the gateway is reconnecting are lost
+
+The firmware connects with a clean session and subscribes to its command topics at QoS 0 (`MQTTstuff.ino`, `MQTTclient.connect(...)` and `MQTTclient.subscribe(...)`). The broker therefore keeps nothing for the gateway while it is disconnected. A command that Home Assistant publishes to a `set/` topic during a reconnect, even one of a few seconds, is dropped by the broker and never reaches the boiler.
+
+You can see this in Home Assistant: the entity keeps showing the value the gateway reports, not the value you asked for. Send the command again once the gateway is `online`.
+
+This is a deliberate choice (TASK-1212, GH #682). A persistent session with QoS 1 would keep commands, but Mosquitto queues them without an expiry time, also during an outage of hours. After such an outage the gateway would apply every queued command at once, including a setpoint that is hours old.
+
 ## How Home Assistant Uses This
 
 In the HA auto-discovery configuration (`data/mqttha.cfg`), every entity includes an `avty_t` (availability topic):
