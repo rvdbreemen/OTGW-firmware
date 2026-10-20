@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-20 18:16'
+updated_date: '2026-10-20 19:30'
 labels:
   - bug
   - sat
@@ -25,3 +26,9 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 <!-- AC:BEGIN -->
 - [ ] #1 First control tick after enable sends a computed setpoint (host test or telnet transcript, red on old code)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 cycle: skipped for now; changes SAT behaviour (control/classifier), so it needs Sergeant D's OK per the step 4 rule.
+<!-- SECTION:NOTES:END -->

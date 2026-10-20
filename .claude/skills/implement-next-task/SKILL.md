@@ -64,6 +64,8 @@ the normal selection below.
      decision that is not recorded in the task notes, input from a tester, or an
      action that needs explicit maintainer permission (PIC flash, release, push to
      `main`, force-push). Record in the task notes why it was skipped.
+   - A task waiting for Sergeant D's OK (see step 4) is resumed first once his answer
+     is recorded; until then it is skipped.
    - Check memory and the task notes for decisions already taken.
    - `backlog task list` can return empty (known CLI bug): read the frontmatter of
      `backlog/tasks/task-*.md` (status, priority, milestone, assignee) instead.
@@ -104,6 +106,15 @@ contract change also gets a Proposed ADR via adr-kit (never self-accepted).
 
 Post to #alpha-testing: task id, what you will change and how you will prove it. One
 short message. It is a notice; do not wait for a reply.
+
+**Exception: SAT control behaviour (maintainer decision 2026-10-20).** When the task
+changes how SAT controls the boiler (setpoint, PWM, PID, cutoffs, modulation, defaults
+of SAT control settings), post the plan to Sergeant D (`<@821036882946424852>`) asking
+for his advice and his OK, name the open points, and do **not** implement until he
+agrees. Record the wait in the task notes, leave the task `In Progress`, and continue
+the cycle with the next task that does not change SAT behaviour. When his answer
+arrives (via `/backlog_discord`), record it and resume the task. SAT changes without a
+behaviour choice (logging, UI, graphs, docs) do not wait.
 
 ## Step 5: implement, verify, collect evidence
 

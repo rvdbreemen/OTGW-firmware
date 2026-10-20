@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-20 18:16'
+updated_date: '2026-10-20 19:30'
 labels:
   - bug
   - sat
@@ -26,3 +27,9 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 - [ ] #1 Sampling runs at a fixed cadence (e.g. 1 Hz) so the ring covers the intended window; the debug line is rate-limited (telnet line count over 5 min before vs after)
 - [ ] #2 Cycle classifier p90/p10 still computed (test)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 cycle: skipped for now; changes SAT behaviour (control/classifier), so it needs Sergeant D's OK per the step 4 rule.
+<!-- SECTION:NOTES:END -->

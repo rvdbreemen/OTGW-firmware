@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-20 19:04'
-updated_date: '2026-10-20 19:16'
+updated_date: '2026-10-20 19:29'
 labels:
   - tooling
   - skill
@@ -36,6 +36,8 @@ Maintainer request 2026-10-20: a reusable workflow that keeps picking the next a
 2026-10-20 dry run of step 1 on the live backlog. Connected: OTGW32 (COM4, 303A:1001) and the 1.x CH340 unit (COM3); no Classic-S3, no DS18B20. In Progress @claude: TASK-1217 (needs Classic + decision) blocked; TASK-1223 epic (AC1 waits on 1223.4/1223.15) blocked; TASK-1223.4 #4 (Classic board) blocked; TASK-1223.15 (needs DS18B20) blocked; TASK-1255 #2 (real PIC flash on Classic) blocked; TASK-1241 #2 'overrides panel still loads on an OT-Direct board (browser capture on the OTGW32)' -> verifiable NOW. To Do 2.0.0 (11): high TASK-1268, TASK-1269; medium 1259, 1270, 1271, 1273; low 1258, 1260, 1267, 1272, 1274. Selection result: resume TASK-1241 first (only open AC verifiable now on the connected OTGW32), then TASK-1268 (high, lowest number, design decisions recorded: thermo-nova parity incl. overshoot_protection gate per Sergeant D). The dry run exposed a gap (6 In Progress tasks, most blocked), fixed in SKILL.md step 1.1: resume only when the remaining ACs are verifiable now, ordered by priority then number; plus fallback to task-file frontmatter when 'backlog task list' is empty and a connected-board check.
 
 Advisor review before commit: fixed (1) plan-approval contradiction: SKILL.md names the exception and CLAUDE.md Task Management + Auto-advance point to it; (2) step 7 carries the one-line/no-sub-branch rule that CLAUDE.md:529 cites; (3) cerebrum entry replaced, no unresolved ADR-PENDING notes found (grep); (5) description shortened so the trigger phrases are visible in the skill listing; (6) TASK-1241 pick confirmed: device/info on .88.61 reports otcommandinterface OT-Direct; (7) opus review agent as advisor fallback. tests/test_adr_governance.py OK.
+
+2026-10-20 maintainer: tasks that change SAT control behaviour wait for Sergeant D's advice and OK after the self-review (skill step 4 exception); meanwhile the cycle continues with tasks that do not change SAT behaviour.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
