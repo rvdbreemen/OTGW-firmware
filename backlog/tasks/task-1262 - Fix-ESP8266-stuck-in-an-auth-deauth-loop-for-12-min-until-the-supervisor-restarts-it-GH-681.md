@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-19 18:03'
-updated_date: '2026-10-20 04:42'
+updated_date: '2026-10-20 19:29'
 labels:
   - bug
   - needs-info
@@ -38,4 +38,6 @@ Missing: an ESP-side telnet log of the loop (what the supervisor does on each at
 2026-10-20 code reading (1.7.7 and current otgw-1.x.x identical here): loopWifi() retries WiFi.begin() every 30 s and restarts after 10 failed attempts, so a link that never comes up restarts after about 5 min, not 12. A 12-min loop therefore needs the retry counter to reset, which happens whenever WiFi.status() reaches WL_CONNECTED even briefly (WIFI_CONNECTING -> WIFI_RECONNECTED sets wifiRetryCount = 0, networkStuff.ino:566-568), so a flapping link (associate + IP, then drop) can loop without bound until something else restarts it. Hypothesis, unproven. Second hypothesis for the reason-3 deauths: WiFi.begin() every 30 s while the SDK auto-reconnect (setAutoReconnect(true)) is mid-association makes the station leave (deauth reason 3 is sent by the station). Both need the ESP-side telnet log the task already asks for.
 
 2026-10-20 maintainer decision: run the MikroTik access-list bench test (deny 84:F3:EB:22:B8:E1, time to doRestart, remove rule) only after 2026-10-21 04:34, so the TASK-1261 24 h window (bootcount 8) finishes first.
+
+2026-10-20: answered mrfox7688 on GH #682 (issuecomment-6299472236): ~2 min self-healing losses are intentionally below the 8-probe threshold; NAS-side ping loss points at the radio link; suggested beta.4 (modem-sleep off) as the next single change after his channel 6->1 test.
 <!-- SECTION:NOTES:END -->
