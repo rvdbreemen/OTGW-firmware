@@ -3,9 +3,11 @@ id: TASK-1253
 title: >-
   Fix reboot_log.txt: older lines lose their line feed, and boot-time entries
   show 2106-02-07
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-18 23:16'
+updated_date: '2026-10-20 02:00'
 labels:
   - bug
   - diagnostics
