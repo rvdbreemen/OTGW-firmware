@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.440
+**  Version  : v2.0.0-alpha.441
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -356,6 +356,7 @@ private:
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
       }
+      _keepLabelsFile();   // TASK-1266: the image has no dallas_labels.ini; restore it after
       LittleFS.end();
       if (uploadTotal > 0 && uploadTotal > fsSize) {
         strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
@@ -453,6 +454,7 @@ private:
           if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
           writeSettings(false);
           settingsMarkClean();
+          _restoreLabelsFile();
         } else {
           LittleFSmounted = false;
           if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));
@@ -465,6 +467,7 @@ private:
     } else {
       _setUpdaterError();
     }
+    _dropLabelsFile();         // no-op after a restore; frees the copy on every other path
     _updateFinalized = true;   // suppress the onDisconnect abort cleanup on the clean close
     ::state.flash.bESPactive = false;
     _authenticated = false;  // force re-authentication on next upload
@@ -479,6 +482,7 @@ private:
     if (!::state.flash.bESPactive) return;  // never started / already cleaned up
 
     Update.end();
+    _dropLabelsFile();
     if (_serial_output) {
       DebugTf(PSTR("[OTA] Abort: after %u bytes\r\n"), static_cast<unsigned>(_uploadWrittenBytes));
     }
@@ -508,6 +512,56 @@ private:
     Update.printError(str);
     strlcpy(_updaterError, str.c_str(), sizeof(_updaterError));
   }
+
+  // TASK-1266: dallas_labels.ini holds the user's Dallas sensor names and is not
+  // part of the filesystem image. Like settings.ini (kept in RAM and rewritten by
+  // writeSettings()), it is copied to the heap before the image is written and
+  // written back after the remount. A missing file, an oversized one, or a failed
+  // allocation only skips the restore; the filesystem update itself goes on.
+  static constexpr size_t LABELS_KEEP_MAX = 2048;
+
+  void _keepLabelsFile() {
+    _dropLabelsFile();
+    if (!LittleFSmounted) return;
+    File f = LittleFS.open(LABELS_FILE, "r");
+    if (!f) return;
+    size_t len = f.size();
+    if (len == 0 || len > LABELS_KEEP_MAX) {
+      if (_serial_output && len > LABELS_KEEP_MAX) {
+        DebugTf(PSTR("[OTA] dallas_labels.ini too large to keep (%u bytes)\r\n"), static_cast<unsigned>(len));
+      }
+      f.close();
+      return;
+    }
+    _labelsCopy = static_cast<uint8_t *>(malloc(len));
+    if (_labelsCopy != nullptr) {
+      _labelsCopyLen = f.read(_labelsCopy, len);
+      if (_labelsCopyLen != len) _dropLabelsFile();
+    }
+    f.close();
+  }
+
+  void _restoreLabelsFile() {
+    if (_labelsCopy == nullptr) return;
+    File f = LittleFS.open(LABELS_FILE, "w");
+    bool ok = f && f.write(_labelsCopy, _labelsCopyLen) == _labelsCopyLen;
+    if (f) f.close();
+    if (_serial_output) {
+      DebugTf(PSTR("[OTA] Restoring dallas_labels.ini (%u bytes): %s\r\n"),
+              static_cast<unsigned>(_labelsCopyLen), ok ? "OK" : "FAILED");
+    }
+    _dropLabelsFile();
+  }
+
+  void _dropLabelsFile() {
+    free(_labelsCopy);
+    _labelsCopy = nullptr;
+    _labelsCopyLen = 0;
+  }
+
+  static constexpr const char *LABELS_FILE = "/dallas_labels.ini";
+  uint8_t *_labelsCopy = nullptr;
+  size_t _labelsCopyLen = 0;
 
   bool _serial_output;
   AsyncWebServer *_server;

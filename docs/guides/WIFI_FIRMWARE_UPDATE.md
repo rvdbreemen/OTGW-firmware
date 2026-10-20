@@ -37,7 +37,7 @@ Settings and WiFi are kept. The filesystem (web UI) is updated separately, on th
 
 A filesystem update on `/update` keeps your settings. `settings.ini` lives on the same filesystem as the web UI, so the upload replaces it with the default copy, but the running firmware still holds your settings in memory and writes them back to `settings.ini` right after the upload. WiFi is kept as well, because the credentials are stored elsewhere. Measured on alpha.439: 0 of 567 settings changed across a WiFi filesystem update (TASK-1264). Download `settings.ini` (File Explorer, or `http://<unit>/settings.ini`) first anyway, as a safety net.
 
-Other files you created on the filesystem are not kept: Dallas sensor labels (`dallas_labels.ini`) and heating-curve calibration markers. Download them before the upload and put them back afterwards. A firmware update through safeboot does not touch the filesystem at all.
+The Dallas sensor labels (`dallas_labels.ini`, up to 2 KB) are kept the same way (TASK-1266). Other files you created on the filesystem are not kept, such as the heating-curve calibration markers: download them before the upload and put them back afterwards. A firmware update through safeboot does not touch the filesystem at all.
 
 This applies to `/update` only. Writing the filesystem over USB (`flash_otgw --update`) does reset the settings, because no firmware runs during a USB flash to write them back.
 
