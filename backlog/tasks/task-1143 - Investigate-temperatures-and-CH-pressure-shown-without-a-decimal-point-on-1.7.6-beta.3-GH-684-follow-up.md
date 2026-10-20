@@ -3,11 +3,11 @@ id: TASK-1143
 title: >-
   Investigate: temperatures and CH pressure shown without a decimal point on
   1.7.6-beta.3 (GH #684 follow-up)
-status: In Progress
+status: To Do
 assignee:
   - '@claude'
 created_date: '2026-09-20 11:35'
-updated_date: '2026-10-20 01:59'
+updated_date: '2026-10-20 02:00'
 labels:
   - bug
   - web-ui
@@ -46,4 +46,6 @@ mrfox7688 and jaronbor run beta.3 for the MQTT fix (#682) and have not reported 
 - Bench (.88.68, beta.7, simulator with Toutside 5.13 / Tret 41.8 / Tdhw 50.25 / CHPressure 1.008 as f8.8): API 5.13 / 41.8 / 50.25 / 1.01; dashboard in headless Edge shows the same in both nl-NL and en-US locale. NOT reproduced.
 - The reported numbers equal the JS number strings with the dot removed (5.13 -> 513, 41.8 -> 418, 1.008 -> 1008), which points at something between the JSON and the screen on the reporter's side (browser, translation or extension); unproven.
 - Asked the reporter on GH #684 (issuecomment-5877663741) for a dashboard screenshot plus the raw /api/v2/otgw/otmonitor output at the same moment, and browser/device/extension details, on beta.7. Waiting on that evidence (needs-info).
+
+2026-10-20: re-checked GH #684. Issue CLOSED; no reply from Appiejs since the 2026-09-28 evidence request (issuecomment-5877663741), 3 weeks. Bench reproduction already failed (see above), so AC #2 cannot move without the reporter's screenshot + raw /api/v2/otgw/otmonitor output. Back to To Do, needs-info kept. Unproven hypothesis worth asking about: browser page translation (e.g. Chrome translate to Dutch) rewriting "5.13" as a thousands-grouped number.
 <!-- SECTION:NOTES:END -->
