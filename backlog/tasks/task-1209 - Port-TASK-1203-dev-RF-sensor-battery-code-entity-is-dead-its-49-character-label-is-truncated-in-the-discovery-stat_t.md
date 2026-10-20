@@ -3,9 +3,11 @@ id: TASK-1209
 title: >-
   Port TASK-1203 (dev): RF sensor battery-code entity is dead, its 49-character
   label is truncated in the discovery stat_t
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-04 10:46'
+updated_date: '2026-10-20 02:19'
 labels:
   - mqtt
   - ha-discovery
