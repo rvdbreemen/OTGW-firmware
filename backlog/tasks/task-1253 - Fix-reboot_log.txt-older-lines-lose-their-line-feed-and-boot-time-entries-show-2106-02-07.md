@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-18 23:16'
-updated_date: '2026-10-20 02:00'
+updated_date: '2026-10-20 02:01'
 labels:
   - bug
   - diagnostics
@@ -30,3 +30,15 @@ Found on the 1.x bench unit .88.68 on 2026-10-18 while verifying TASK-1247/1248,
 - [ ] #2 An entry written before NTP sync does not show a 2106 date; it states that the time is not set
 - [ ] #3 Old-vs-fix shown on the 1.x bench unit; esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Line endings (helperStuff.ino updateRebootLog ~485-493): read each old line up to '' instead of '
+', swallow a following '
+', and write it back with an explicit "
+". Splitting on CR also repairs existing files where earlier builds left CR-only records, on the first boot of the fixed build.
+2. Time not set (~464-466): take time(nullptr) once; if it is outside 2020..2100 (NTP not synced), write "time not set" instead of the date. Line keeps " - reboot cause: " so readLatestCrashLog() still finds it.
+3. Bench old-vs-fix on .88.68: before = current build (downloaded 2026-10-20: 256 bytes, 3 CR / 1 LF, all dates 2106-02-07). Fix: OTA, then 3 reboots (telnet operator reboot + REST), download /reboot_log.txt, od -c: every line CRLF, no 2106. Same reboots double as TASK-1247 AC #1/#2 evidence (reason suffix present after doRestart, absent after a power cycle if I can trigger one; otherwise stated as not verified).
+4. build.bat full + evaluate.py --quick; CHANGELOG [Unreleased] Fixed bullet.
+<!-- SECTION:PLAN:END -->
