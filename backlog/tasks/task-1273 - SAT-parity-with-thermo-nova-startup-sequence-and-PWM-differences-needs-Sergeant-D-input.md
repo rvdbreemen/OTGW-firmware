@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-20 18:17'
+updated_date: '2026-10-20 18:53'
 labels:
   - sat
   - parity
@@ -23,6 +24,12 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Sergeant D answered the open design questions (recorded in notes)
+- [x] #1 Sergeant D answered the open design questions (recorded in notes)
 - [ ] #2 Each agreed difference has its own task or is fixed here with a simulator or host test
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 Sergeant D answers (#alpha-testing 18:26 UTC): a) PWM CS override behaviour must be identical to thermo-nova, i.e. gated by overshoot_protection (Python default off). b) Keep cold cutoff 28.2 C (radiators); change the heating-curve coefficient default from 1.5 to 2.0. Note: a default change only affects units without a saved value; existing settings.ini keep 1.5 unless migrated (decide with maintainer).
+<!-- SECTION:NOTES:END -->

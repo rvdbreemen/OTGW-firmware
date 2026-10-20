@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-20 18:15'
+updated_date: '2026-10-20 18:53'
 labels:
   - bug
   - sat
@@ -26,3 +27,9 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 - [ ] #1 PWM-OFF sends CS=10 and CH=0, continuous mode sends the PID setpoint without +18, the PWM flame-off hold still uses return+offset (host test or simulator, red on old code)
 - [ ] #2 Bench or simulator run shows no relight at CS=28 during PWM OFF
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-20 Sergeant D: PWM override behaviour must match thermo-nova exactly (gated by overshoot_protection, default off); see TASK-1273.
+<!-- SECTION:NOTES:END -->
