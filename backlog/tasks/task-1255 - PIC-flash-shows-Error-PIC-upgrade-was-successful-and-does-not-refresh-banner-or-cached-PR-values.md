@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-19 17:32'
-updated_date: '2026-10-19 19:11'
+updated_date: '2026-10-20 01:59'
 labels:
   - bug
   - webui
@@ -54,6 +54,8 @@ Not verified: banner timing vs the 2.5 s refresh delay and the PR=O first-query 
 Finalize (2026-10-19): build.bat (esp32-combo) SUCCESS, firmware 2,020,944 B (88.1% of 2,293,760) + littlefs.bin fresh at 20:42, .elf kept as build/OTGW-firmware-esp32-combo-2.0.0-alpha.437+147a717.elf (built before the bump, so the binary banner reads alpha.437). evaluate.py --quick: 72 pass, 0 warn, 0 fail, exit 0. node --test tests/webui/*.test.mjs: 28 pass, 0 fail. pic-flash-status.test.mjs: 12/12 pass. test_static_integrity OK (33), test_webui_asset_versioning OK (2). Bumped alpha.437 -> alpha.438. AC#2 left open: the UI refresh chain is proven in the harness, but the actual banner and PR= values after a real PIC flash need a Classic-S3 bench flash (not done: PIC flashing is not allowed in this step).
 
 2026-10-19 bench verify blocked: bench S3 absent from USB and network (no 303A:1001, .61 no ARP reply). Fix rebased onto origin/dev (PR #687), rebuilt alpha.439+31001d4: build.bat exit 0, firmware+littlefs SUCCESS, evaluate --quick 0 FAIL, all tests/webui pass; pushed to origin/dev. Remaining AC needs on-device evidence.
+
+2026-10-20 bench OTGW32 (no PIC) on alpha.439: GET /api/v2/pic/flash-status -> 503 'No PIC detected - PIC functions disabled' (expected gate); v2 Advanced page renders with 0 page errors, 2 console 503 resource loads (likely the no-PIC gate, URLs not identified). AC2 still needs a real PIC flash on a Classic board.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

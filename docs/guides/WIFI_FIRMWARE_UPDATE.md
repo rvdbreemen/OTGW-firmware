@@ -35,7 +35,11 @@ If you cannot reach the unit over the network, `--no-backup` migrates without sa
 
 Settings and WiFi are kept. The filesystem (web UI) is updated separately, on the same `/update` page, without safeboot.
 
-A filesystem update **resets your settings**: `settings.ini` lives on the same filesystem as the web UI. WiFi is kept, because the credentials are stored elsewhere. Download `settings.ini` (File Explorer, or `http://<unit>/settings.ini`) before you upload a `.littlefs.bin`, then upload it again and restart the unit. A firmware update through safeboot does not touch the settings.
+A filesystem update on `/update` keeps your settings. `settings.ini` lives on the same filesystem as the web UI, so the upload replaces it with the default copy, but the running firmware still holds your settings in memory and writes them back to `settings.ini` right after the upload. WiFi is kept as well, because the credentials are stored elsewhere. Measured on alpha.439: 0 of 567 settings changed across a WiFi filesystem update (TASK-1264). Download `settings.ini` (File Explorer, or `http://<unit>/settings.ini`) first anyway, as a safety net.
+
+Other files you created on the filesystem are not kept: Dallas sensor labels (`dallas_labels.ini`) and heating-curve calibration markers. Download them before the upload and put them back afterwards. A firmware update through safeboot does not touch the filesystem at all.
+
+This applies to `/update` only. Writing the filesystem over USB (`flash_otgw --update`) does reset the settings, because no firmware runs during a USB flash to write them back.
 
 When an admin password is set, safeboot asks for it too (user `admin`).
 

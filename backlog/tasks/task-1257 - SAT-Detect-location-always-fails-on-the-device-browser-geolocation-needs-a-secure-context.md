@@ -3,11 +3,11 @@ id: TASK-1257
 title: >-
   SAT 'Detect location' always fails on the device: browser geolocation needs a
   secure context
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-19 17:33'
-updated_date: '2026-10-19 19:11'
+updated_date: '2026-10-20 01:59'
 labels:
   - bug
   - webui
@@ -26,7 +26,7 @@ Reported by gruijter 2026-10-19 (screenshot: Weather Open-Meteo, Detect location
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On a non-secure context the button is hidden or replaced by a hint pointing to the manual latitude/longitude fields (screenshot)
+- [x] #1 On a non-secure context the button is hidden or replaced by a hint pointing to the manual latitude/longitude fields (screenshot)
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -44,10 +44,12 @@ Implementation (uncommitted, awaiting commit stage):
 Finalize run 2026-10-19 (alpha.439): build.bat esp32-combo SUCCESS (firmware 238 s + buildfs 17 s), fresh build/OTGW-firmware-esp32-combo-2.0.0-alpha.438+a99fd95.ino.bin 20:55:09, .littlefs.bin 20:55:29, .elf kept; .pio/data-staging/v2.js contains satWireDetectLocation. evaluate.py --quick: 79 checks, 72 passed, 0 warn, 0 failed, exit 0. node --test tests/webui/*.test.mjs 35/35. tests/test_static_integrity.py 33 OK. sat-detect-location.test.mjs: fix 7/7; against HEAD v2.js 6/7 fail on assertions (HTTPS happy path passes on both, never broken). old-repro.mjs: OLD button visible, click -> 'Location error', no hint; FIX button hidden, hint 'Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather.' Docs: ch05-sat-thermostat.md and RELEASE_NOTES_2.0.0.md say geolocation needs HTTPS. AC#1 left unchecked: it asks for a screenshot of the real UI on a plain-HTTP device; no device flashed in this run (flashing not permitted here).
 
 2026-10-19 bench verify blocked: bench S3 absent from USB and network (no 303A:1001, .61 no ARP reply). Fix rebased onto origin/dev (PR #687), rebuilt alpha.439+31001d4: build.bat exit 0, firmware+littlefs SUCCESS, evaluate --quick 0 FAIL, all tests/webui pass; pushed to origin/dev. Remaining AC needs on-device evidence.
+
+2026-10-20 bench OTGW32 on alpha.439 over plain http://192.168.88.61/: SAT page Control tab, Weather card: #satDetectLoc hidden=true, #satLocHint visible 'Location detection needs HTTPS. Enter Latitude and Longitude under SAT settings > Weather.'; 0 page errors. Screenshot %TEMP%\bench-alpha439\task1257-sat-weather.png (checked). Before: tester screenshot 2026-10-19 showing 'Detect location' + 'Location error'.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-Cause: navigator.geolocation only works in a secure context (HTTPS or localhost). The device serves plain HTTP by design, so 'Detect location' always failed with 'Location error'. Fix (v2.js/v2.html): satGeoUsable() checks isSecureContext and the API; satWireDetectLocation() hides #satDetectLoc on an insecure context and shows #satLocHint pointing at SAT settings > Weather > Latitude/Longitude; behind an HTTPS proxy the button works as before, and geolocation error codes 1/2/3 now give specific messages. Docs updated (manual ch05, release notes). Evidence AC#1: logic proven by tests/webui/sat-detect-location.test.mjs (fix 7/7, HEAD 6/7 fail on assertions) and the old-vs-fix repro (OLD button visible + 'Location error'; FIX button hidden + hint). Build (esp32-combo) SUCCESS, evaluate --quick 0 failed, webui 35/35, static integrity 33 OK. Open: AC#1 screenshot on a plain-HTTP device after flashing alpha.439 (bench), so the task stays In Progress.
+Detect location used navigator.geolocation, which browsers refuse outside a secure context, so it always failed on the device's plain HTTP. On a non-secure context the button is now hidden and a hint points to the Latitude/Longitude fields; behind HTTPS it still works, with clearer error texts. Evidence: unit test 7/7 (6/7 fail on the old v2.js), and a device screenshot on alpha.439 over plain HTTP showing the hidden button and the hint (%TEMP%\bench-alpha439\task1257-sat-weather.png).
 <!-- SECTION:FINAL_SUMMARY:END -->
