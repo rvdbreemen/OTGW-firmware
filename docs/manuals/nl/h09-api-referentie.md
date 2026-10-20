@@ -1005,6 +1005,7 @@ Let op: Commando's worden alleen verwerkt wanneer een OT-interface (PIC of OTDir
 | `sat/heating_curve` | `"1.5"` | Verwarmingscurve-coefficient bijwerken |
 | `sat/deadband` | `"0.25"` | PID deadband bijwerken |
 | `sat/boiler_capacity` | `"24.0"` | Ketelcapaciteit (kW) bijwerken |
+| `sat/dhw_capacity` | `"0.0"` | DHW-capaciteit (kW) bijwerken, 0 = ketelcapaciteit |
 
 Meer dan 40 aanvullende SAT-instellingen zijn beschikbaar via MQTT. De volledige lijst is gedocumenteerd in `backlog/docs/doc-1 - sat-mqtt-topics.md`.
 

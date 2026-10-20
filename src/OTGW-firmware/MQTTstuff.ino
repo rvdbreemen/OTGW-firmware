@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.442
+**  Version  : v2.0.0-alpha.443
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -709,6 +709,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "mod_sup_delay",          "SATmodsupdelay",       nullptr },
   { "mod_sup_offset",         "SATmodsupoffset",      nullptr },
   { "boiler_capacity",        "SATboilercapacity",    nullptr },
+  { "dhw_capacity",           "SATdhwcapacity",       nullptr },
   { "target_temp_step",       "SATtempstep",          nullptr },
   { "min_pressure",           "SATminpressure",       nullptr },
   { "max_pressure",           "SATmaxpressure",       nullptr },

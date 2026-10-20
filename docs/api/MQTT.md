@@ -442,6 +442,7 @@ The following topics are published (retained) when SAT settings change. They ech
 | `sat/flame_off_offset` | `"0.0"` | Setpoint offset when flame is off (°C) |
 | `sat/flow_offset` | `"2.0"` | Continuous mode max setpoint drop (°C) |
 | `sat/boiler_capacity` | `"24.0"` | Boiler capacity (kW) |
+| `sat/dhw_capacity` | `"0.0"` | Capacity (kW) while the boiler reports DHW active (0 = use boiler capacity) |
 | `sat/summer_threshold` | `"18.0"` | Summer simmer outdoor temperature threshold (°C) |
 | `sat/ovp_value` | `"52.5"` | OPV calibrated maximum flow temperature (°C) |
 | `sat/ovp_enabled` | `"false"` | Whether OPV is enabled |
@@ -979,6 +980,7 @@ These topics update the matching SAT setting directly. Payloads are numeric stri
 | `sat/mod_sup_delay` | `SATmodsupdelay` | Modulation suppression delay |
 | `sat/mod_sup_offset` | `SATmodsupoffset` | Modulation suppression offset |
 | `sat/boiler_capacity` | `SATboilercapacity` | Rated boiler capacity (kW) |
+| `sat/dhw_capacity` | `SATdhwcapacity` | DHW capacity (kW), 0 = use boiler capacity |
 | `sat/target_temp_step` | `SATtempstep` | Target temperature step (°C) |
 | `sat/min_pressure` | `SATminpressure` | Min pressure alarm threshold (bar) |
 | `sat/max_pressure` | `SATmaxpressure` | Max pressure alarm threshold (bar) |

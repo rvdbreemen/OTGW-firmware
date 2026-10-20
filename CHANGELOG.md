@@ -7,6 +7,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ### Added
 
+- **SAT `DHW capacity` setting** (TASK-1258). `sat/power` uses it while the boiler reports DHW active (0 = boiler capacity). The estimated gas input is now `sat/power` / efficiency; `Boiler rated input` only enables and caps it. Both values change magnitude during DHW; existing energy totals are not reset.
 - **Firmware updates over WiFi on ESP32-S3 boards with 4 MB flash** (TASK-1223, ADR-191). A small updater ("safeboot") now lives next to the firmware. On `/update`, "Restart into the firmware updater" restarts the unit into it, at the same address with the stored WiFi credentials. Upload the `.ino.bin` there; the unit then restarts into the new firmware (about 15 s for 2 MB). If an upload is incomplete or interrupted, or a new firmware crashes during its first 30 seconds, the unit returns to safeboot and stays reachable over WiFi. The bootloader's app rollback handles the crash case. Safeboot asks for the admin password when one is set.
 - **One-time USB migration** (`flash_otgw.bat` / `flash_otgw.sh --migrate --host <ip>`). It saves `settings.ini`, writes the new flash layout while keeping the WiFi credentials, then restores and checks the settings. See `docs/guides/WIFI_FIRMWARE_UPDATE.md`.
 - v2 web UI (TASK-1223.14 to .18), ported from the classic UI:

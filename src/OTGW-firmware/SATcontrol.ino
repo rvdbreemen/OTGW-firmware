@@ -2206,6 +2206,7 @@ void satSendStatusJSON()
     je.field(F("power_kw"),             snap->st.sat.fCurrentPower);
     je.field(F("energy_kwh"),           snap->st.sat.fEnergyTotal);
     je.field(F("boiler_capacity"),      settings.sat.fBoilerCapacity);
+    je.field(F("dhw_capacity"),         settings.sat.fDhwCapacity);
     // Gas consumption estimation (Task #232)
     je.field(F("boiler_rated_kw"),      settings.sat.fBoilerRatedKW);
     je.field(F("boiler_efficiency"),    settings.sat.fBoilerEfficiency);
@@ -2394,7 +2395,7 @@ void satPublishMQTT()
   static SATShadowF s_dhw_setpoint, s_max_setpoint, s_requested_setpoint, s_consumption;
   static SATShadowF s_heating_curve_coeff, s_deadband;
   static SATShadowF s_flame_off_offset, s_flow_offset, s_mod_sup_delay, s_mod_sup_offset;
-  static SATShadowF s_boiler_capacity, s_boiler_rated_kw, s_boiler_efficiency;
+  static SATShadowF s_boiler_capacity, s_dhw_capacity, s_boiler_rated_kw, s_boiler_efficiency;
   static SATShadowF s_comfort_humidity, s_comfort_max_offset;
   static SATShadowF s_summer_threshold, s_target_temp_step;
   static SATShadowF s_min_pressure, s_max_pressure, s_max_pressure_drop;
@@ -2851,6 +2852,7 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/mod_sup_delay"),       settings.sat.fModSupDelay,       s_mod_sup_delay,       SAT_EPS_TEMP_COARSE, 1, true);
   publishIfChangedF(F("sat/mod_sup_offset"),      settings.sat.fModSupOffset,      s_mod_sup_offset,      SAT_EPS_TEMP_COARSE, 1, true);
   publishIfChangedF(F("sat/boiler_capacity"),     settings.sat.fBoilerCapacity,    s_boiler_capacity,     SAT_EPS_POWER,       1, true);
+  publishIfChangedF(F("sat/dhw_capacity"),        settings.sat.fDhwCapacity,       s_dhw_capacity,        SAT_EPS_POWER,       1, true);
   publishIfChangedF(F("sat/boiler_rated_kw"),     settings.sat.fBoilerRatedKW,     s_boiler_rated_kw,     SAT_EPS_POWER,       1, true);
   publishIfChangedF(F("sat/boiler_efficiency"),   settings.sat.fBoilerEfficiency,  s_boiler_efficiency,   SAT_EPS_FRACTION,    2, true);
   publishIfChangedF(F("sat/comfort_humidity"),    settings.sat.fComfortHumidity,   s_comfort_humidity,    SAT_EPS_DURATION,    0, true);
@@ -2964,22 +2966,45 @@ static void satUpdateComfort()
 //=====================================================================
 //=== Power & Energy Tracking (Task #45) ===
 //=====================================================================
+// Persist the energy totals when due. Called right after satUpdatePowerEnergy(), before
+// the DHW and summer-simmer early returns, so energy counted on those paths is saved too
+// (TASK-1258).
+static void satPersistEnergyIfDue()
+{
+  // Energy total: every hour (Task #196)
+  if ((millis() - _energyLastSaveMs) >= SAT_ENERGY_SAVE_INTERVAL_MS) {
+    satSaveEnergyState();
+  }
+  // Estimated gas energy: on every 0.1 kWh boundary crossed (Task #232)
+  if (settings.sat.fBoilerRatedKW > 0.0f &&
+      floorf(state.sat.fEnergyEstimatedKWh * 10.0f) != floorf(state.sat.fEstEnergyLastSavedKWh * 10.0f)) {
+    satSaveEstimatedEnergy();
+  }
+}
+
 static void satUpdatePowerEnergy()
 {
   float modulation = OTcurrentSystemState.RelModLevel;
   bool flame = satIsFlameOn();
 
-  // Power = modulation% * capacity (only when flame is on)
+  // Many boilers report modulation relative to the limit that is active (CH limit
+  // vs DHW limit), so the capacity follows the boiler's own DHW status bit.
+  // fDhwCapacity 0 = use the boiler capacity.
+  float activeCapacity = settings.sat.fBoilerCapacity;
+  if (state.sat.bDhwActive && settings.sat.fDhwCapacity > 0.0f)
+    activeCapacity = settings.sat.fDhwCapacity;
+
+  // Power = modulation% * active capacity (only when flame is on)
   if (flame && modulation > 0.0f) {
-    state.sat.fCurrentPower = (modulation / 100.0f) * settings.sat.fBoilerCapacity;
+    state.sat.fCurrentPower = (modulation / 100.0f) * activeCapacity;
   } else {
     state.sat.fCurrentPower = 0.0f;
   }
 
   // Clamp to reasonable bounds
   if (state.sat.fCurrentPower < 0.0f) state.sat.fCurrentPower = 0.0f;
-  if (state.sat.fCurrentPower > settings.sat.fBoilerCapacity * 1.1f)
-    state.sat.fCurrentPower = settings.sat.fBoilerCapacity;
+  if (state.sat.fCurrentPower > activeCapacity * 1.1f)
+    state.sat.fCurrentPower = activeCapacity;
 
   // Integrate energy (kWh = kW * hours)
   uint32_t now = millis();
@@ -2991,28 +3016,15 @@ static void satUpdatePowerEnergy()
   }
   state.sat.iEnergyLastMs = now;
 
-  // --- Gas consumption estimation (Task #232) ---
-  // Only accumulate when rated power is configured (> 0) and flame is on.
-  if (settings.sat.fBoilerRatedKW > 0.0f && flame) {
-    float estPowerKW = 0.0f;
+  // --- Gas consumption estimation (Task #232, TASK-1258) ---
+  // Gas input = heat output / efficiency. fBoilerRatedKW > 0 switches the estimate
+  // on and is the upper limit of the gas input; it is not the multiplier.
+  if (settings.sat.fBoilerRatedKW > 0.0f && flame && settings.sat.fBoilerEfficiency > 0.0f) {
+    float estPowerKW = state.sat.fCurrentPower / settings.sat.fBoilerEfficiency;
 
-    // Prefer thermal power from flow rate (MsgID 19, DHW circuit) if available.
-    // DHWFlowRate is in L/min; convert to L/s for P = m_dot * Cp * dT.
-    float flowLmin = OTcurrentSystemState.DHWFlowRate;
-    float tFlow    = satGetFlowTemp(); // flow water temp (MsgID 25)
-    float tRet     = satGetReturnTemp();    // return water temp (MsgID 28)
-    if (flowLmin > 0.1f && tFlow > 0.0f && tRet > 0.0f && (tFlow - tRet) > 0.5f) {
-      // P_thermal (kW) = (L/min / 60) * 4186 J/(kg·K) * dT / 1000
-      float flowLs = flowLmin / 60.0f;
-      estPowerKW = flowLs * 4186.0f * (tFlow - tRet) / 1000.0f;
-    } else {
-      // Fallback: modulation-based estimate
-      estPowerKW = (modulation / 100.0f) * settings.sat.fBoilerRatedKW * settings.sat.fBoilerEfficiency;
-    }
-
-    // Clamp to rated power (with 10% headroom for measurement noise)
+    // The gas input never exceeds the rated input.
     if (estPowerKW < 0.0f)  estPowerKW = 0.0f;
-    if (estPowerKW > settings.sat.fBoilerRatedKW * 1.1f) estPowerKW = settings.sat.fBoilerRatedKW;
+    if (estPowerKW > settings.sat.fBoilerRatedKW) estPowerKW = settings.sat.fBoilerRatedKW;
 
     if (state.sat.iEstEnergyLastMs > 0) {
       float dtHours = (float)(now - state.sat.iEstEnergyLastMs) / 3600000.0f;
@@ -4320,6 +4332,11 @@ void satControlLoop()
   } else {
     state.sat.bDhwActive = (OTcurrentSystemState.SlaveStatus & 0x04) != 0; // Bit 2 = DHW active
   }
+  // --- Power & energy tracking (Task #45): before any early return, so the DHW
+  // phase (which returns right below) is counted with the DHW capacity (TASK-1258) ---
+  satUpdatePowerEnergy();
+  satPersistEnergyIfDue();
+
   if (state.sat.bDhwActive) {
     // DHW has priority - don't adjust CH setpoint, boiler manages itself.
     // TASK-437: On transition into DHW mode, send SW= (DHW setpoint, MsgID 56).
@@ -4334,6 +4351,7 @@ void satControlLoop()
       SATDebugTf(PSTR("SAT: DHW active, sent %s\r\n"), swCmd);
     }
     _sat_prevDhwActive = true;
+    satPublishMQTT();   // sat/power carries the DHW-capacity value while DHW runs (TASK-1258)
     return;
   }
   _sat_prevDhwActive = false;
@@ -4455,6 +4473,7 @@ void satControlLoop()
       satEnqueueIfChangedMM(settings.sat.iMaxRelModulation);
       satEnqueueIfChangedCH(0);
     }
+    satPublishMQTT();   // power/energy keep moving here (DHW in summer), so publish them (TASK-1258)
     return; // Skip rest of control loop
   }
 
@@ -4471,9 +4490,6 @@ void satControlLoop()
     satPublishMQTT();
     return;
   }
-
-  // --- Power & energy tracking (Task #45) ---
-  satUpdatePowerEnergy();
 
   // --- PID auto-tuning (Task #27) ---
   satAutoTuneUpdate();
@@ -4730,16 +4746,6 @@ void satControlLoop()
   if ((millis() - _pidLastSaveMs) >= 300000UL) {
     satSavePidState();
   }
-  // Periodically save energy total to LittleFS (every hour, Task #196)
-  if ((millis() - _energyLastSaveMs) >= SAT_ENERGY_SAVE_INTERVAL_MS) {
-    satSaveEnergyState();
-  }
-  // Save estimated gas energy on every 0.1 kWh boundary crossed (Task #232)
-  if (settings.sat.fBoilerRatedKW > 0.0f &&
-      floorf(state.sat.fEnergyEstimatedKWh * 10.0f) != floorf(state.sat.fEstEnergyLastSavedKWh * 10.0f)) {
-    satSaveEstimatedEnergy();
-  }
-
   SATDebugTf(PSTR("SAT: room=%.1f target=%.1f outside=%.1f curve=%.1f pid=%.1f final=%.1f mode=%d\r\n"),
           roomTemp, targetTemp, outsideTemp, curveValue, pidOutput, finalSetpoint,
           (int)state.sat.eControlMode);

@@ -1214,6 +1214,7 @@ Note: Commands are only processed when an OT command interface (PIC or OTDirect)
 | `sat/heating_curve` | `"1.5"` | Update heating curve coefficient |
 | `sat/deadband` | `"0.25"` | Update PID deadband |
 | `sat/boiler_capacity` | `"24.0"` | Update boiler capacity (kW) |
+| `sat/dhw_capacity` | `"0.0"` | Update DHW capacity (kW), 0 = use boiler capacity |
 
 Many more SAT settings can be updated via MQTT. The full list of 40+ setting commands is documented in `backlog/docs/doc-1 - sat-mqtt-topics.md`.
 

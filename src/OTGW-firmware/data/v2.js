@@ -1801,7 +1801,7 @@
     satmaxpressure:      { cat: 'sat', label: 'Max pressure', hint: 'bar' },
     satmaxpressdrop:     { cat: 'sat', label: 'Max pressure drop', hint: 'bar/hr' },
     satsolarminelev:     { cat: 'sat', label: 'Solar min elevation', hint: '°' },
-    satboilerratedkw:    { cat: 'sat', label: 'Boiler rated output', hint: 'kW (0 = off)' },
+    satboilerratedkw:    { cat: 'sat', label: 'Boiler rated input', hint: 'kW gas input. Enables the gas estimate and caps it (0 = off)' },
     satboilerefficiency: { cat: 'sat', label: 'Boiler efficiency', hint: 'fraction 0.5–1.0' },
     // TASK-933 P2: keys that already had GET + dispatch but lacked a whitelist token
     // (now POST-able) plus the masked weather API key.
@@ -1824,6 +1824,7 @@
     satovershootmargin:  { cat: 'sat', label: 'Overshoot margin', hint: '°C' },
     satpwmautoswitch:    { cat: 'sat', label: 'Auto PWM switch' },
     satboilercapacity:   { cat: 'sat', label: 'Boiler capacity', hint: 'kW' },
+    satdhwcapacity:      { cat: 'sat', label: 'DHW capacity', hint: 'kW (0 = boiler capacity)' },
     satthermalcoeff:     { cat: 'sat', label: 'Thermal-drop coefficient' },
     satpresetcomfort:    { cat: 'sat', sub: 'Presets', label: 'Comfort preset', hint: '°C' },
     satpreseteco:        { cat: 'sat', sub: 'Presets', label: 'Eco preset', hint: '°C' },
@@ -1896,7 +1897,7 @@
     ['PID / PWM', ['satforcepwm', 'satpwmautoswitch', 'satcyclesperhour', 'satautogains', 'satmaxmodulation',
                    'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
-    ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satboilercapacity',
+    ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satboilercapacity', 'satdhwcapacity',
                 'satminpressure', 'satmaxpressure', 'satmaxpressdrop']],
     ['Thermal', ['satthermalcomfort', 'satcomfortadjust', 'satcomforthumidity', 'satcomfortmaxoffset', 'sathumiditytimeout',
                  'satthermalcoeff', 'satsolargain', 'satsolarminrise', 'satsolaroffset', 'satsolarminelev']],

@@ -550,11 +550,12 @@ SAT estimates boiler power output and tracks cumulative energy consumption.
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satboilercapacity` | 24.0 | 1-100 kW | Boiler thermal capacity for power calculation |
-| `satboilerratedkw` | 0.0 | 0-100 kW | Rated boiler input power (0 = disabled) |
-| `satboilerefficiency` | 0.92 | 0-1.0 | Boiler efficiency |
+| `satboilercapacity` | 24.0 | 1-100 kW | Boiler thermal capacity (heat output). `sat/power` = modulation % x capacity |
+| `satdhwcapacity` | 0.0 | 0-100 kW | Capacity used instead of `satboilercapacity` while the boiler reports DHW active. Set it when your boiler reports modulation relative to a separate DHW limit. 0 = use the boiler capacity |
+| `satboilerratedkw` | 0.0 | 0-200 kW | Rated boiler gas input. Enables the estimated gas input (> 0) and is its upper limit; it is not the multiplier. 0 = estimate off |
+| `satboilerefficiency` | 0.92 | 0.5-1.0 | Boiler efficiency. Estimated gas input (`energy_estimated_kwh`) = `sat/power` / efficiency |
 
-Published to MQTT as `sat/power` (W) and `sat/energy_total` (kWh).
+Published to MQTT as `sat/power` (kW) and `sat/energy_total` (kWh).
 
 ---
 
@@ -598,7 +599,7 @@ Each entity writes to its matching `%mqtt_sub_topic%/sat/<parameter>` command to
 | `sensor.otgw_sat_outside_temp` | `sat/outside_temp` | Outdoor temperature used by heating curve (C) |
 | `sensor.otgw_sat_boiler_status` | `sat/boiler_status` | Current boiler status (text label) |
 | `sensor.otgw_sat_pwm_duty` | `sat/pwm_duty` | PWM duty cycle (0-1) |
-| `sensor.otgw_sat_power` | `sat/power` | Estimated boiler power output (W) |
+| `sensor.otgw_sat_power` | `sat/power` | Estimated boiler power output (kW) |
 | `sensor.otgw_sat_energy_total` | `sat/energy_total` | Accumulated energy estimate (kWh) |
 | `sensor.otgw_sat_ch_pressure` | `sat/ch_pressure` | CH water pressure (bar) |
 | `sensor.otgw_sat_ch_pressure_status` | `sat/ch_pressure_status` | Pressure status: ok, low, or high |

@@ -584,11 +584,12 @@ SAT schat het ketelvermogen en houdt het cumulatieve energieverbruik bij.
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
-| `satboilercapacity` | `24.0` | 1-100 kW | Ketel thermisch vermogen voor vermogensberekening |
-| `satboilerratedkw` | `0.0` | 0-100 kW | Nominaal ingangsvermogen ketel (0 = uitgeschakeld) |
-| `satboilerefficiency` | `0.92` | 0-1.0 | Ketelrendement |
+| `satboilercapacity` | `24.0` | 1-100 kW | Thermisch vermogen van de ketel (warmte-uitgang). `sat/power` = modulatie % x capaciteit |
+| `satdhwcapacity` | `0.0` | 0-100 kW | Capaciteit die in plaats van `satboilercapacity` geldt zolang de ketel DHW actief meldt. Stel dit in als uw ketel modulatie meldt ten opzichte van een aparte DHW-limiet. 0 = ketelcapaciteit gebruiken |
+| `satboilerratedkw` | `0.0` | 0-200 kW | Nominaal gasingangsvermogen van de ketel. Schakelt de geschatte gasinput in (> 0) en is de bovengrens ervan; het is niet de vermenigvuldiger. 0 = schatting uit |
+| `satboilerefficiency` | `0.92` | 0.5-1.0 | Ketelrendement. Geschatte gasinput (`energy_estimated_kwh`) = `sat/power` / rendement |
 
-Gepubliceerd via MQTT als `sat/power` (W) en `sat/energy_total` (kWh).
+Gepubliceerd via MQTT als `sat/power` (kW) en `sat/energy_total` (kWh).
 
 ---
 
@@ -643,7 +644,7 @@ SAT publiceert ook afzonderlijke diagnostische entiteiten via auto-discovery:
 | `sensor.otgw_sat_room_temp` | `sat/room_temp` | Ruimtetemperatuur gebruikt door PID (C) |
 | `sensor.otgw_sat_outside_temp` | `sat/outside_temp` | Buitentemperatuur gebruikt door de verwarmingscurve (C) |
 | `sensor.otgw_sat_pwm_duty` | `sat/pwm_duty` | PWM-duty-cycle (0-1) |
-| `sensor.otgw_sat_power` | `sat/power` | Geschat ketelvermogen (W) |
+| `sensor.otgw_sat_power` | `sat/power` | Geschat ketelvermogen (kW) |
 | `sensor.otgw_sat_energy_total` | `sat/energy_total` | Gecumuleerde energieschatting (kWh) |
 | `sensor.otgw_sat_ch_pressure` | `sat/ch_pressure` | CV-waterdruk (bar) |
 | `sensor.otgw_sat_ch_pressure_status` | `sat/ch_pressure_status` | Drukstatus: ok, low of high |

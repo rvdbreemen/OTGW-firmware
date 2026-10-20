@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.442
+**  Version  : v2.0.0-alpha.443
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -369,6 +369,7 @@ void writeSettings(bool show)
   writeJsonIntKV(file, F("SATweatherinterval"), settings.sat.iWeatherInterval);
   writeJsonStringKV(file, F("SATweatherapikey"), settings.sat.sWeatherApiKey);
   writeJsonFloatKV(file, F("SATboilercapacity"), settings.sat.fBoilerCapacity);
+  writeJsonFloatKV(file, F("SATdhwcapacity"), settings.sat.fDhwCapacity);
   writeJsonFloatKV(file, F("SATboilerratedkw"), settings.sat.fBoilerRatedKW);
   writeJsonFloatKV(file, F("SATboilerefficiency"), settings.sat.fBoilerEfficiency);
   writeJsonBoolKV(file, F("SATpresetsync"), settings.sat.bPresetSync);
@@ -1059,6 +1060,7 @@ void updateSetting(const char *field, const char *newValue)
     }
   }
   else if (strcasecmp_P(field, PSTR("SATboilercapacity")) == 0) settings.sat.fBoilerCapacity = clampSettingFloat(newValue, settings.sat.fBoilerCapacity, 1.0f, 100.0f);
+  else if (strcasecmp_P(field, PSTR("SATdhwcapacity")) == 0) settings.sat.fDhwCapacity = clampSettingFloat(newValue, settings.sat.fDhwCapacity, 0.0f, 100.0f);
   else if (strcasecmp_P(field, PSTR("SATboilerratedkw")) == 0)   settings.sat.fBoilerRatedKW = clampSettingFloat(newValue, settings.sat.fBoilerRatedKW, 0.0f, 200.0f);
   else if (strcasecmp_P(field, PSTR("SATboilerefficiency")) == 0) settings.sat.fBoilerEfficiency = clampSettingFloat(newValue, settings.sat.fBoilerEfficiency, 0.5f, 1.0f);
   else if (strcasecmp_P(field, PSTR("SATpresetsync")) == 0) settings.sat.bPresetSync = EVALBOOLEAN(newValue);

@@ -3219,6 +3219,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/mod_sup_delay` | `SATmodsupdelay` |
 | `sat/mod_sup_offset` | `SATmodsupoffset` |
 | `sat/boiler_capacity` | `SATboilercapacity` |
+| `sat/dhw_capacity` | `SATdhwcapacity` |
 | `sat/target_temp_step` | `SATtempstep` |
 | `sat/min_pressure` | `SATminpressure` |
 | `sat/max_pressure` | `SATmaxpressure` |
@@ -3504,6 +3505,7 @@ These are the factory defaults. All settings are configurable via the web UI Set
 | `sattarget` | `20.0` | Target room temperature (°C) |
 | `satheatingcurvecoeff` | `1.5` | Heating curve slope coefficient |
 | `satboilercapacity` | `24.0` | Boiler nominal capacity (kW) |
+| `satdhwcapacity` | `0.0` | Capacity (kW) used while the boiler reports DHW active; 0 = use `satboilercapacity` |
 | `satsumthreshold` | `18.0` | Summer simmer outdoor temperature threshold (°C) |
 | `satdeadband` | `0.25` | PID deadband (°C) |
 | `satcontrolinterval` | `30` | Control loop interval (seconds) |

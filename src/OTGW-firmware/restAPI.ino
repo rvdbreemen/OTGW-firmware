@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.442
+**  Version  : v2.0.0-alpha.443
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1722,6 +1722,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATmodsupoffset", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("boiler_capacity")) == 0) {
       updateSetting("SATboilercapacity", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("dhw_capacity")) == 0) {
+      updateSetting("SATdhwcapacity", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("target_temp_step")) == 0) {
       updateSetting("SATtempstep", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("min_pressure")) == 0) {
@@ -2291,6 +2293,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.weather_enable"), settings.sat.bWeatherEnable);
     je.field(F("settings.sat.weather_key"), settings.sat.sWeatherApiKey[0] ? "***" : "(not set)");
     je.field(F("settings.sat.boiler_capacity"), settings.sat.fBoilerCapacity);
+    je.field(F("settings.sat.dhw_capacity"), settings.sat.fDhwCapacity);
     je.field(F("settings.sat.simulation"), settings.sat.bSimulation);
     je.field(F("settings.sat.solar_gain_enable"), settings.sat.bSolarGainEnable);
     je.field(F("settings.sat.summer_simmer"), settings.sat.bSummerSimmer);
@@ -3933,6 +3936,8 @@ void sendDeviceSettings()
     char tmpBuf[8];
     dtostrf(settings.sat.fBoilerCapacity, 1, 1, tmpBuf);
     addNum(F("satboilercapacity"), tmpBuf, "f", 1, 100);
+    dtostrf(settings.sat.fDhwCapacity, 1, 1, tmpBuf);
+    addNum(F("satdhwcapacity"), tmpBuf, "f", 0, 100);
   }
   // --- SAT Preset Sync settings (Task #46) ---
   addBool(F("satpresetsync"), settings.sat.bPresetSync, "b");
@@ -4202,7 +4207,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satbleenable", "satbleriskack", "satblefailover", "satbleinterval", "satblemac",
   "satblenamefilteringest", "satblenameprefix",  // TASK-895 filter; TASK-1231 made them settable
   "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
-  "satdeadband", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
+  "satdeadband", "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
   "satflameoffset", "satflowoffset", "satflushtreshold", "satforcepwm", "sathumiditytimeout",
   "satinterval", "satmanufacturer", "satmaxpressdrop", "satmaxpressure", "satminpressure",
   "satmodsupdelay", "satmodsupoffset", "satmultiarea", "satmultiareacount",

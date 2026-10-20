@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.442
+**  Version  : v2.0.0-alpha.443
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -464,8 +464,9 @@ struct SATSection {
   char     sWeatherApiKey[65] = "";     // OpenWeatherMap API key (empty = Open-Meteo only)
   // Power/energy (Task #45)
   float    fBoilerCapacity    = 24.0f;  // Boiler capacity in kW (for power calculation)
+  float    fDhwCapacity       = 0.0f;   // Capacity in kW while the boiler reports DHW active (0 = use fBoilerCapacity)
   // Gas consumption estimation (Task #232)
-  float    fBoilerRatedKW     = 0.0f;   // Rated boiler input power in kW (0=disabled)
+  float    fBoilerRatedKW     = 0.0f;   // Rated boiler input in kW: enables the gas estimate (>0) and caps it (0=disabled)
   float    fBoilerEfficiency  = 0.92f;  // Boiler efficiency (0.0-1.0, default 0.92)
   // Preset sync (Task #46) — broadcast preset changes to secondary entities
   bool     bPresetSync        = false;         // Sync preset to secondary entities via MQTT

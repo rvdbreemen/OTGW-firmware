@@ -104,6 +104,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("weather_enable: %s\r\n"), settings.sat.bWeatherEnable ? "true" : "false");
     Debugf(PSTR("weather_key: %s\r\n"), settings.sat.sWeatherApiKey[0] ? "***" : "(not set)");
     Debugf(PSTR("boiler_capacity: %.1f\r\n"), settings.sat.fBoilerCapacity);
+    Debugf(PSTR("dhw_capacity: %.1f\r\n"), settings.sat.fDhwCapacity);
     Debugf(PSTR("simulation: %s\r\n"), settings.sat.bSimulation ? "true" : "false");
     Debugf(PSTR("solar_gain_enable: %s\r\n"), settings.sat.bSolarGainEnable ? "true" : "false");
     Debugf(PSTR("summer_simmer: %s\r\n"), settings.sat.bSummerSimmer ? "true" : "false");

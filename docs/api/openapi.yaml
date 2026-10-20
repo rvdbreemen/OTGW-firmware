@@ -4289,15 +4289,18 @@ components:
         boiler_capacity:
           type: number
           description: "Configured boiler capacity (kW)"
+        dhw_capacity:
+          type: number
+          description: "Capacity (kW) used while the boiler reports DHW active; 0 = use boiler_capacity"
         boiler_rated_kw:
           type: number
-          description: "Rated boiler power (kW)"
+          description: "Rated boiler gas input (kW). Enables the gas estimate when > 0 and caps it"
         boiler_efficiency:
           type: number
           description: "Assumed boiler efficiency (0.0-1.0)"
         energy_estimated_kwh:
           type: number
-          description: "Model-estimated energy (kWh)"
+          description: "Estimated gas input energy (kWh): power_kw / boiler_efficiency, integrated while the flame is on"
         preset_sync:
           type: boolean
           description: "Preset synchronised with thermostat"
@@ -4518,6 +4521,7 @@ components:
         power_kw: 0.0
         energy_kwh: 0.0
         boiler_capacity: 24.0
+        dhw_capacity: 0.0
         boiler_rated_kw: 0.0
         boiler_efficiency: 0.92
         energy_estimated_kwh: 0.0

@@ -469,6 +469,10 @@ The SAT Diagnostics view referenced `.sat-grid` and `.sat-row` CSS classes that 
 4. On first boot, configure WiFi via the captive portal. Ethernet auto-negotiates if a cable is connected.
 5. GPIO pin assignments in `boards.h` are defaults for the Nodoshop OTGW32. Verify against your actual hardware before deploying.
 
+### SAT power and gas estimate (TASK-1258)
+
+`sat/power` is now modulation x the active capacity: the new `DHW capacity` setting (`sat/dhw_capacity`, 0 = use the boiler capacity) applies while the boiler reports DHW active. The estimated gas input (`energy_estimated_kwh`) is now `sat/power` / `boiler_efficiency`. `Boiler rated input` (`boiler_rated_kw`) only switches the estimate on and caps it, and the tap-water flow branch is gone. Both values therefore change magnitude during DHW and wherever the old estimate multiplied rated input by efficiency. Existing energy totals are not reset.
+
 ### Breaking changes
 
 There are no breaking changes relative to v1.3.5.
