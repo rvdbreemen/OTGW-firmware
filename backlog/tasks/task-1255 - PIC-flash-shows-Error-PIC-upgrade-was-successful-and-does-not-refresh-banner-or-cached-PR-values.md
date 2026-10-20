@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-19 17:32'
-updated_date: '2026-10-20 01:59'
+updated_date: '2026-10-20 02:17'
 labels:
   - bug
   - webui
@@ -56,6 +56,8 @@ Finalize (2026-10-19): build.bat (esp32-combo) SUCCESS, firmware 2,020,944 B (88
 2026-10-19 bench verify blocked: bench S3 absent from USB and network (no 303A:1001, .61 no ARP reply). Fix rebased onto origin/dev (PR #687), rebuilt alpha.439+31001d4: build.bat exit 0, firmware+littlefs SUCCESS, evaluate --quick 0 FAIL, all tests/webui pass; pushed to origin/dev. Remaining AC needs on-device evidence.
 
 2026-10-20 bench OTGW32 (no PIC) on alpha.439: GET /api/v2/pic/flash-status -> 503 'No PIC detected - PIC functions disabled' (expected gate); v2 Advanced page renders with 0 page errors, 2 console 503 resource loads (likely the no-PIC gate, URLs not identified). AC2 still needs a real PIC flash on a Classic board.
+
+2026-10-20 maintainer decision: allowed to re-flash gateway.hex 6.8 (same version) on the Classic-S3 bench to prove AC2.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

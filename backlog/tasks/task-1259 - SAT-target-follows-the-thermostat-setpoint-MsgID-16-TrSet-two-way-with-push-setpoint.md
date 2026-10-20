@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-19 17:33'
-updated_date: '2026-10-19 17:51'
+updated_date: '2026-10-20 02:17'
 labels:
   - feature
   - sat
@@ -32,4 +32,6 @@ Feature request by gruijter 2026-10-19, endorsed by Sergeant D. Today SAT only p
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-19 Sergeant D (#alpha-testing): adopt the thermostat setpoint only on a room setpoint CHANGE (edge-triggered), not by periodic sync. CH-enable arbitration question still open.
+
+2026-10-20 maintainer decision: CH enable from the thermostat is ignored while SAT is active and healthy (SAT wins); when SAT is off or faulted the thermostat applies again.
 <!-- SECTION:NOTES:END -->

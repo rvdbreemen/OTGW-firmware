@@ -4,7 +4,7 @@ title: 'SAT power/energy: optional DHW capacity and correct ''rated input'' sema
 status: To Do
 assignee: []
 created_date: '2026-10-19 17:33'
-updated_date: '2026-10-19 18:05'
+updated_date: '2026-10-20 02:18'
 labels:
   - feature
   - sat
@@ -30,4 +30,6 @@ Feature request by gruijter 2026-10-19 (Intergas HReco 30). sat/power = RelModLe
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-19 Sergeant D (#alpha-testing): Intergas boilers ignore the max-modulation command (MM=); output is limited through the boiler's own parameters (CH limit param 3, DHW limit param 4). So modulation % is relative to whichever limit is active, which supports a separate DHW capacity setting rather than deriving it from MM.
+
+2026-10-20 maintainer decision (full package): a) optional setting 'DHW capacity' (0 = use boiler capacity) used while the DHW-active status bit is set, for sat/power and the gas estimate; b) UI label 'Boiler rated output' -> 'Boiler rated input', setting key unchanged; c) drop the DHWFlowRate (MsgID 19) branch from the gas estimate, keep modulation x rated input.
 <!-- SECTION:NOTES:END -->
