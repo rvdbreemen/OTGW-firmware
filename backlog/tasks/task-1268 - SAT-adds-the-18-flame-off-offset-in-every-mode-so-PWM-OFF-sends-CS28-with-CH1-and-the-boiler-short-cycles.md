@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-20 18:15'
-updated_date: '2026-10-20 19:28'
+updated_date: '2026-10-20 20:31'
 labels:
   - bug
   - sat
@@ -49,4 +49,22 @@ Verification: SAT simulation mode + Force PWM on the OTGW32 bench (OT-Direct), p
 2026-10-20 Sergeant D: PWM override behaviour must match thermo-nova exactly (gated by overshoot_protection, default off); see TASK-1273.
 
 2026-10-20 maintainer: present the plan to Sergeant D for advice and approval before implementing. Posted in #alpha-testing (two open points: force_pwm fallback to the PID setpoint when no valid previous CS; MM-ignoring boilers such as Intergas with overshoot_protection off). Waiting for his reply; no code written yet.
+
+2026-10-20 19:27 UTC Sergeant D: 'when SAT detects the flame ON it keeps return+18 for 18 seconds and then falls back slowly by reducing the CS gradually and clamps to boiler temperature - 1'. Conflicts with our thermo-nova snapshot (SAT 5.0.0, 2026-06-11): modulation_suppression_delay_seconds default 20 (const.py:152), then CS = flow - offset(1.0) immediately, recomputed each 5 s tick (heating_control.py:435-448); no step-down found. Our fModSupDelay=20 / fModSupOffset=1 already match the snapshot. Asked him whether he describes a newer version (file/lines/release) or observed behaviour. Still waiting on points a) force_pwm fallback and b) MM-ignoring boilers.
+
+2026-10-20 19:36-19:38 UTC Sergeant D: hold time is a slider in the original (ours: satmodsupdelay setting, default 20 s, already exposed); after the hold flow-1 straight away is fine; a) never used force PWM, follow thermo-nova (no special fallback); b) Intergas and Ideal ignore MM so they should always use the suppression; a brand that stops on MM=0 uses a floor (he thought 9). Code check (5.0.0): no manufacturer forcing of overshoot_protection in thermo-nova; Ideal/Intergas/Geminox/Nefit only have supports_relative_modulation=False (coordinator/__init__.py:310); the MM floor brand is Geminox with max(10, value) (heating_control.py:522), already in our quirk table (SAT_QUIRK_MIN_MOD_10). Proposed to him: overshoot_protection default ON for Intergas and Ideal (our own rule on top of Python), OFF otherwise; asked whether Nefit belongs on that list. Waiting for that confirmation.
+
+2026-10-20 19:45 UTC Sergeant D: Nefit also on the list. 19:46 maintainer (number3nl): 'Ideal, Intergas, Geminox, Nefit' = exactly the brands with SAT_QUIRK_NO_REL_MOD in satManufacturerTable. Decision: the PWM CS override runs when overshoot_protection is on OR the manufacturer has SAT_QUIRK_NO_REL_MOD (always on for those four, our own rule on top of thermo-nova); default off for other brands. Plan approved; resume after TASK-1271.
+
+2026-10-20 19:56-19:58 UTC Sergeant D: (1) heat pumps must never get MM=0 (Elga Ace stops the heat pump on MM=0): for any heat pump keep MM at 100% or the user's max modulation limit, generic rule because behaviour at MM=0 is unknown; (2) Geminox must get MM=10 instead of MM=0 (existing SAT_QUIRK_MIN_MOD_10, check it covers both PWM phases of the new MM=0 path); (3) Geminox on the always-suppress list confirmed ('otherwise Robert is correct'). Asked whether 'hybrid' counts as heat pump for the MM rule.
+
+2026-10-20 20:01 UTC Sergeant D: 'So in this list add all heat pumps also' -> heat pumps (iHeatingSource = heat pump) join the always-suppress list (PWM CS override always on), with MM never 0 for them (kept at the user's max modulation). Hybrid still unanswered; proposal: treat as heat pump.
+
+2026-10-20 20:04 UTC Sergeant D: thinks thermo-nova suppresses on all boilers. Re-checked 5.0.0: gate default False (const.py:122, heating_control.py:385); config_flow system_configuration (config_flow.py:678+) no longer exposes overshoot_protection (translation leftover only); True only for entries migrated from version < 5 that had it on (__init__.py:160-162). So long-running installs have it on, fresh 5.0.0 installs off. Asked him: A) default on for all boilers with an off switch (recommended), or B) always on, no setting. Heat-pump MM rule and Geminox MM=10 apply either way.
+
+2026-10-20 20:09-20:14 UTC Sergeant D: (1) watch graphs for a CS that follows the start-up + suppression logic; apart from start-up RelMod should be as close to 0 as possible (OpenTherm workaround). Screenshot: OpenTherm application text 2.1.1.2.5 'Control during the ON period (without ID14)': raise CS until the flame is on (or start at max CS), then CS = actual boiler temp or dT 1 K lower to keep the burner on lowest level, updated every 2-3 s. (2) TRVs can change the flow temperature, so start-up + suppression should be the option for all heating systems -> option A (overshoot_protection default ON for all, user can switch off). (3) hybrid treated as heat pump. Consequence: the flow-1 step must refresh every ~3 s during the PWM ON phase, not on the 30 s control tick (pulled from TASK-1273).
+
+2026-10-20 20:27 UTC Sergeant D approved the final plan ('This looks ok' after the point-4 detail). He also described the thermo-nova cold start: continuous first (CH=1, CS = curve+PID, MM=100), when BT - CS >= ~2 for ~60 s switch to PWM. Python: flow >= REQUESTED + 3.0 (cycles/const.py OVERSHOOT_MARGIN_CELSIUS) sustained 60 s (const.py OVERSHOOT_SUSTAIN_SECONDS) -> enable PWM (heating_control.py ~262-305). Ours compares flow with fFinalSetpoint (SATcycles.ino ~949), which the continuous clamp keeps within 2 C of flow, so the switch practically never fires (TASK-1273 item). Pulled into TASK-1268: compare with the requested (PID) setpoint, so the cold start actually reaches the PWM suppression.
+
+2026-10-20 20:30 UTC Sergeant D: overshoot margin default 3.0 -> 2.0 (settings.sat.fOvershootMargin, SATtypes.h:442; used by the continuous->PWM switch and the cycle classifier SATcycles.ino:671). Stored values on existing units stay as they are (his rule 'leave existing settings alone'). In scope of TASK-1268.
 <!-- SECTION:NOTES:END -->
