@@ -3,11 +3,11 @@ id: TASK-1143
 title: >-
   Investigate: temperatures and CH pressure shown without a decimal point on
   1.7.6-beta.3 (GH #684 follow-up)
-status: To Do
+status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-09-20 11:35'
-updated_date: '2026-09-28 20:13'
+updated_date: '2026-10-20 01:59'
 labels:
   - bug
   - web-ui
