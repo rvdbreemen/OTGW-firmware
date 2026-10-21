@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-21 05:30'
-updated_date: '2026-10-21 17:54'
+updated_date: '2026-10-21 17:55'
 labels:
   - enhancement
   - wifi
@@ -30,3 +30,28 @@ Requested by mrfox7688 on GH #682 (2026-10-20): daytime WiFi losses of ~2 min wi
 - [ ] #2 On every connect the log shows the BSSID and channel joined
 - [ ] #3 Shown on the bench: a MikroTik-forced disconnect and a reconnect produce the expected lines; no heap regression; esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Facts (core 2.7.4, Arduino15/.../esp8266/2.7.4/libraries/ESP8266WiFi):
+- WiFi.onStationModeDisconnected gives ssid, bssid[6], reason (no channel). onStationModeConnected gives ssid, bssid[6], channel.
+- Handlers run from the SDK event callback (_eventCallback), not from loop(). That callback calls WiFiClient::stopAll() on every disconnect first, so the telnet session is already gone when the drop happens.
+- The SDK auto-reconnects. A short drop can pass before loopWifi() polls WiFi.status(), so loopWifi misses it today.
+
+Design (networkStuff.ino only, about 60 lines):
+1. Two static WiFiEventHandler objects, registered once in startWiFi().
+2. Handlers only copy into a small static record: reason, bssid, channel of the AP left (taken from the last connect event), millis(), and a drop counter. No logging, no String, no TCP in the handler.
+3. Repeat events while reconnecting (201 NO_AP_FOUND every few s) only bump a counter; the first reason is kept, the last reason is updated.
+4. loopWifi() prints from loop context, once per change: on reconnect one line with BSSID and channel joined, plus the drop that came before (first and last reason with short name, BSSID and channel left, duration, number of disconnect events).
+5. Reason names: PROGMEM switch for the codes in ESP8266WiFiType.h (1-24, 200-204); unknown codes print the number only.
+
+No ADR (feature inside the existing pattern). No OSS search needed: core API plus about 60 lines of glue.
+
+Verification (AC3): bench .88.68, build + flash via OTA.
+- MikroTik registration-table remove for 84:F3:EB:22:B8:E1 forces a deauth: expect a reason line plus a reconnect line.
+- Access-list deny for 2 min: expect one summary with a counted repeat, no log flood.
+- Heap before/after from device/info; build.bat + evaluate.py --quick green.
+- Old-vs-fix: the same forced disconnect on the current build shows no reason in the log.
+- Can be combined with the TASK-1262 bench test (same access-list deny).
+<!-- SECTION:PLAN:END -->
