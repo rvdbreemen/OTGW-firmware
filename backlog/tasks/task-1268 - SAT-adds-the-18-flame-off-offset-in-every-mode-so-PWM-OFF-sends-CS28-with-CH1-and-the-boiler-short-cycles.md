@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-20 18:15'
-updated_date: '2026-10-21 04:35'
+updated_date: '2026-10-21 05:35'
 labels:
   - bug
   - sat
@@ -26,7 +26,7 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 No flame-off offset outside the PWM ON flame-off hold: continuous mode sends the PID/clamp setpoint while the flame is off (bench/sim run, red on alpha.441: pid+18)
-- [ ] #2 New setting overshoot_protection (default off), end to end: settings.ini, REST GET/POST + whitelist, SAT REST route, MQTT sat/overshoot_protection, status JSON, MQTT state, HA switch, v2 UI, docs
+- [x] #2 New setting overshoot_protection (default off), end to end: settings.ini, REST GET/POST + whitelist, SAT REST route, MQTT sat/overshoot_protection, status JSON, MQTT state, HA switch, v2 UI, docs
 - [ ] #3 PWM with overshoot_protection off: no CS override (CS keeps its previous value) and MM=0 in both PWM phases, identical to thermo-nova (sim run)
 - [x] #4 PWM with overshoot_protection on: OFF phase sends CS=10 and CH=0 (no relight at 28), ON phase keeps the return+offset hold then flow-1 (sim run, red on alpha.441: CS=28 CH=1 in OFF)
 <!-- AC:END -->
@@ -75,4 +75,8 @@ AC #2 wording 'default off' is superseded by Sergeant D's decision 2026-10-20 (d
 Round 1 fixes done (underheat ON-only, range-5 tick==refresh, solar ratchet via _sat_lastControlCS, thermal-safe guard, satPwmReset/satSetControlMode, hold only while flame off with pending-until-delay, refresh writes fFinalSetpoint first; docs counts 13->14, ch04/ch09/gen_sat_props, TASK-1271 changelog). Host test tests/test_sat_pwm_override.py 25 OK, against HEAD 19 FAIL. Round 2 (opus): all 7 fixes verified real, nothing blocking. Accepted as-is: protection off freezes CS (thermo-nova parity, documented); keep-previous-CS falls back to the PID setpoint when the previous CS was 10 (at most fModSupDelay, avoids CH off in the ON phase); pre-existing ON-phase timing flap and force-PWM-at-max reset moved to TASK-1273.
 
 2026-10-21 bench OTGW32 .88.61, fw+fs alpha.443+e07a33c (this diff) via safeboot/OTA, SAT simulation. AC4 red/green: alpha.442 OFF phase final_setpoint 28 (10+18) while PID 21-25 was below cold (relight); new OFF phase final 10, CH off. ON phase with flame off: hold return+18 (37.3, rising to the 45 max); the 20 s hold -> flow-1 step and the 3 s refresh are not reachable in the SAT simulation (DHW draws fire the flame for <20 s), covered by tests/test_sat_pwm_override.py (25 OK, 19 FAIL on HEAD). AC1 green: continuous, flame off, radiators (max 62): final_setpoint == pid_output (55.3), not pid+18 (73.3 -> 62). AC2: setting defaults true after OTA (stored margin 3.0 kept); REST sat/settings/overshoot_protection 0 -> status false; MQTT OTGW/set/<id>/sat/overshoot_protection 1 -> status true and persisted in settings; HA discovery homeassistant/switch/<id>/sat_overshoot_protection_enable/config present (14 switch configs) with stat_t .../sat/overshoot_protection_enable and cmd_t .../sat/overshoot_protection. NOT yet observed: the state topic payload itself (two captures were killed by host memory pressure). AC3 (protection off, sim run) only by host test + REST toggle. Settings restored, diff vs baseline only the new key. Evidence %TEMP%\bench-1268\red-alpha442.json, green-1268*.json, mqtt-op.txt.
+
+2026-10-21 AC2 state topic verified on alpha.444 (a7bbaccb6): with SAT active (simulation on, room temp pushed) OTGW/value/<id>/sat/overshoot_protection_enable gave 'true' (retained) and, after MQTT OTGW/set/<id>/sat/overshoot_protection 0, a live 'false' (REST status false too). Earlier empty captures: SAT was safety-tripped (no boiler, simulation off), and an inactive SAT publishes no sat/ topics at all. Bench restored (protection on, simulation off, external temp off). Open: AC3 and the flow-1 suppression + 3 s refresh outside the host tests.
+
+2026-10-21 suppression + 3 s refresh now bench-proven via TASK-1277 replay: new firmware CS = flow-1 refreshed with every flow frame (~6 s), old firmware PID / 10 / 45 on the 30 s tick only. Still open: AC3 (protection off, sim or field run).
 <!-- SECTION:NOTES:END -->
