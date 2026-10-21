@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-19 18:03
-updated_date: '2026-10-21T21:50:00Z'
+updated_date: '2026-10-21T23:31:00Z'
 labels:
   - bug
   - needs-info
@@ -29,7 +29,7 @@ Missing: an ESP-side telnet log of the loop (what the supervisor does on each at
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduced or explained from an ESP-side log: which code path issues the deauth (reason 3) and why reconnects keep failing
-- [ ] #2 Time from first failed reconnect to recovery is bounded and shorter than 12 min, shown on the bench by forcing the loop
+- [x] #2 Time from first failed reconnect to recovery is bounded and shorter than 12 min, shown on the bench by forcing the loop
 - [x] #3 esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
 
@@ -60,4 +60,16 @@ Bench evidence (scanner forcing a laptop WiFi scan every 20 s, deny on router wl
 Still open:
 - AC1: the ~40 auth-then-deauth (reason 3) cycles are not explained. One data point: the router logged "received deauth: sending station leaving (3)" plus an immediate reconnect at 22:44:09, the second of an Exception (2) reboot (TASK-1285), so a crash-reboot looks like reason 3 at the AP.
 - Supervisor restart came 7.3 to 11.5 min after the AP disappeared, not the 5 min (10 x 30 s) the code suggests; cause not found yet (network handlers are skipped while disconnected, see doBackgroundTasks).
+
+2026-10-22 RTC timing diagnosis (temporary build 1.7.8-beta.6+1ccde89 + breadcrumbs in RTC 116..126, not committed; ultracode workflow wf_389f129d-052 ranked the hypotheses first: 20 found, 9 survived adversarial checks).
+Test: deny on router wlan2 + CAPsMAN 23:21:18Z-23:29:51Z (rules removed, 0 left). Banner after reconnect:
+  WDiag prev: loss 23:21:19Z (boot+96 s)  decision 23:26:19Z = loss+300.0 s  attempts 10  lastStatus 6  maxGap 20 ms
+  WDiag tries(s after loss): 0.0 30.0 60.0 90.0 120.0 150.0 180.0 210.0 240.0 270.0
+  WDiag boot: 23:26:22Z  startWiFi 343 ms  direct 120445 ms (no)  final 212595 ms (conn)  firstLoopWifi 214620 ms  skipPortal 1  uptimeSec 26
+Conclusions:
+- The supervisor is exactly on spec: loss seen 1 s after the block, 10 attempts at 30.0 s spacing, restart decision at loss+300.0 s, loop never stalled (max gap between loopWifi calls 20 ms). Hypotheses "detection latency", "slow loop" and "counter reset" are refuted by measurement.
+- The earlier "7.3 and 11.5 min to restart" were a measurement error of mine: I derived the restart time from the uptime field. state.uptime.iSeconds is a 1 s tick counter in doTaskEvery1s (OTGW-firmware.ino:236, SKIP_MISSED_TICKS) that starts only when loop() runs. setup() blocks in startWiFi() for 120 s (direct connect) plus up to 240 s (timeoutWifiConnectFinal) while the AP is away, so uptime misses up to ~6 min. Here: real time since boot ~228 s at the banner, uptimeSec 26. Baseline boot also showed it: uptimeSec 53 vs ~86 s real.
+- Recovery after the AP came back: 3.6 s (connected during the final wait, 212.6 s after boot; allow at 209 s).
+- Restart-to-restart cycle while the AP stays away is ~11 min (300 s loopWifi + up to 360 s blocked in setup), which matches "only one restart in 14 min". The station stays on in both setup waits, so this does not delay recovery.
+AC2 met: from the loss to the restart decision is a fixed 300 s, and recovery follows the AP within seconds (ADR-099 build).
 <!-- SECTION:NOTES:END -->
