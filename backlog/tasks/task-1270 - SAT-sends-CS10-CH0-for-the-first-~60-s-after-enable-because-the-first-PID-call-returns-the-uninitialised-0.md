@@ -3,10 +3,11 @@ id: TASK-1270
 title: >-
   SAT sends CS=10/CH=0 for the first ~60 s after enable because the first PID
   call returns the uninitialised 0
-status: To Do
-assignee: []
-created_date: '2026-10-20 18:16'
-updated_date: '2026-10-20 19:30'
+status: In Progress
+assignee:
+  - '@claude'
+created_date: 2026-10-20 18:16
+updated_date: '2026-10-21T20:07:00Z'
 labels:
   - bug
   - sat
@@ -27,8 +28,18 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 - [ ] #1 First control tick after enable sends a computed setpoint (host test or telnet transcript, red on old code)
 <!-- AC:END -->
 
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+Parity with thermo-nova pid.py: there 'output' is a property, always round(heating_curve + P + I + D, 1), so a valid setpoint exists from the first call (pid.py ~127-131); update() only moves the terms. Ours (SATpid.ino ~262-285) returns the stored state.sat.fPidOutput while elapsed < SAT_PID_SAMPLE_TIME_LIMIT or the error is unchanged, and that value is 0 until the first real update ~60 s after enable, so SAT sends CS=10 / CH=0 twice (field log gruijter 11:38:49 and 11:39:19).
+Change: when the PID has not produced an output yet (first call after init/enable/restore, or fPidOutput == 0 with a valid curve), return the output computed from the current terms: curve + Kp*error + I (restored integral or 0) + D (0, no slope yet), without advancing the integral/derivative state or the sample timer. The sample-time and unchanged-error gates stay as they are for later calls.
+Verification: host test compiling the real satPidUpdate() path (first call returns curve + Kp*error, red on HEAD = 0); bench SAT simulation or replay: telnet 'SAT:' line of the first control tick after enable shows pid = computed value, not 10; CS on the first tick > 10 when heat is needed.
+<!-- SECTION:PLAN:END -->
+
 ## Implementation Notes
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-20 cycle: skipped for now; changes SAT behaviour (control/classifier), so it needs Sergeant D's OK per the step 4 rule.
+
+2026-10-21 plan posted to Sergeant D (#alpha-testing msg 1562557877732905114), open point: D = 0 and I = restored integral on the first tick. Waiting for his OK; cycle continues.
 <!-- SECTION:NOTES:END -->

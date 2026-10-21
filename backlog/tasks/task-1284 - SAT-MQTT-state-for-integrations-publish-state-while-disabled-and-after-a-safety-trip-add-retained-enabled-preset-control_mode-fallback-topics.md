@@ -3,9 +3,11 @@ id: TASK-1284
 title: >-
   SAT MQTT state for integrations: publish state while disabled and after a
   safety trip, add retained enabled/preset/control_mode/fallback topics
-status: To Do
-assignee: []
-created_date: '2026-10-21 18:11'
+status: In Progress
+assignee:
+  - '@claude'
+created_date: 2026-10-21 18:11
+updated_date: '2026-10-21T20:10:00Z'
 labels:
   - sat
   - mqtt
@@ -31,3 +33,9 @@ Feedback gruijter 2026-10-21 (#alpha-testing, Homey app author), checked against
 - [ ] #5 HA PV-boost entities use the topics the firmware publishes (discovery capture)
 - [ ] #6 docs/api/MQTT.md and the manual list the new topics
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-21 RED broker capture (alpha.447+1f111ee, OTGW32 .88.61, broker 192.168.88.32): SAT active (simulation): retained sat/active true, sat/mode continuous; no sat/enabled, sat/preset, sat/control_mode, sat/fallback_active, sat/safety_tripped retained. After POST sat/enable/0 (REST: enabled false, active false) the broker still holds sat/active true and sat/mode continuous 40 s later. Evidence %TEMP%\bench-1284\red-after-disable.txt.
+<!-- SECTION:NOTES:END -->
