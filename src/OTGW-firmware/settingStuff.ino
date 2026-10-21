@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.446
+**  Version  : v2.0.0-alpha.447
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -336,6 +336,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATdhwenabled"), settings.sat.bDhwEnabled);
   writeJsonBoolKV(file, F("SATdhwenable"), settings.sat.bDhwEnable);
   writeJsonBoolKV(file, F("SATpushsetpoint"), settings.sat.bPushSetpoint);
+  writeJsonBoolKV(file, F("SATfollowthermostat"), settings.sat.bFollowThermostat);
   writeJsonFloatKV(file, F("SATflameoffset"), settings.sat.fFlameOffOffset);
   writeJsonBoolKV(file, F("SATwindowdetect"), settings.sat.bWindowDetection);
   writeJsonIntKV(file, F("SATwindowminsec"), settings.sat.iWindowMinOpenSec);
@@ -502,6 +503,7 @@ void writeSettings(bool show)
 // TASK-648: set true while parsing if the file carries the MQTTuseLegacyOtTopics key.
 // Absent on a 1.x.x config (predates ADR-106) -> readSettings defaults to legacy topics.
 static bool g_sawLegacyTopicsKey = false;
+static bool g_sawSatFollowKey = false;   // TASK-1259: set when SATfollowthermostat is parsed; its absence means "default to the push-setpoint value"
 static bool g_sawOnboardedKey = false;   // TASK-997: set when ui_onboarded is parsed; its absence marks a pre-feature (existing) install
 
 void readSettings(bool show)
@@ -509,6 +511,7 @@ void readSettings(bool show)
   DebugTf(PSTR(" %s ..\r\n"), SETTINGS_FILE);
   g_sawLegacyTopicsKey = false;  // reset per parse; updateSetting() sets it when the key is seen
   g_sawOnboardedKey = false;     // TASK-997: same sentinel pattern for the first-time-setup flag
+  g_sawSatFollowKey = false;     // TASK-1259: same sentinel pattern for SATfollowthermostat
   if (!LittleFS.exists(SETTINGS_FILE))
   {  //create settings file if it does not exist yet.
     DebugTln(F(" .. file not found! --> created file!"));
@@ -595,6 +598,16 @@ void readSettings(bool show)
     settings.ui.bOnboarded = true;
     settingsDirty = true;              // persist the key so this migration runs once
     DebugTln(F("[Settings] existing install (no ui_onboarded key): marking as already onboarded."));
+  }
+  // TASK-1259: a unit that has no stored SATfollowthermostat yet follows the thermostat exactly when it
+  // pushes the SAT target to it (Sergeant D: on when push-setpoint is on). Applied here, after the whole
+  // file is read, because SATpushsetpoint may come later in the file than the follow key would. The
+  // derived value is persisted by the deferred flush, so from then on the stored value wins and a later
+  // change of push-setpoint does not move it.
+  if (!g_sawSatFollowKey) {
+    settings.sat.bFollowThermostat = settings.sat.bPushSetpoint;
+    settingsDirty = true;
+    DebugTf(PSTR("[Settings] no SATfollowthermostat key: default %s (= push-setpoint)\r\n"), CBOOLEAN(settings.sat.bFollowThermostat));
   }
   // TASK-648 Task 6: NO stamp seeding here. bLastPublishedLegacy=false on a
   // legacy upgrade boot means "stamp says modern, but mode is now legacy" —
@@ -1017,6 +1030,7 @@ void updateSetting(const char *field, const char *newValue)
     }
   }
   else if (strcasecmp_P(field, PSTR("SATpushsetpoint")) == 0)   settings.sat.bPushSetpoint = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATfollowthermostat")) == 0) { settings.sat.bFollowThermostat = EVALBOOLEAN(newValue); g_sawSatFollowKey = true; }  // TASK-1259: key presence = stored value (see readSettings default)
   else if (strcasecmp_P(field, PSTR("SATflameoffset")) == 0)    settings.sat.fFlameOffOffset = clampSettingFloat(newValue, settings.sat.fFlameOffOffset, 0.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("SATwindowdetect")) == 0)  settings.sat.bWindowDetection = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATwindowminsec")) == 0)  settings.sat.iWindowMinOpenSec = constrain(atoi(newValue), 10, 600);

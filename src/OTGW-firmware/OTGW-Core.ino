@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.446
+**  Version  : v2.0.0-alpha.447
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5203,6 +5203,16 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
             }
           }
         }
+      }
+
+      // TASK-1259: the thermostat's own room setpoint feeds SAT's follow-thermostat. Taken from the T
+      // frame itself, also when the gateway replaced it on the way to the boiler (bGatewaySubstituted):
+      // OTcurrentSystemState.TrSet then holds the R frame, i.e. SAT's own TC= value, and a change on
+      // the thermostat would never show up there. Same on the PIC and the OT-Direct path, both send
+      // the T frame through here.
+      if (OTdata.id == OT_TrSet && OTdata.rsptype == OTGW_THERMOSTAT && OTdata.type == OT_WRITE_DATA
+          && !OTdata.skipthis) {
+        satOnThermostatSetpoint(roundf(OTdata.f88() * 100.0f) / 100.0f);
       }
 
       //keep track of last update time — only for valid responses

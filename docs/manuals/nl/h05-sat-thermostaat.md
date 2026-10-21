@@ -61,7 +61,7 @@ Onderwerp: OTGW/set/otgw-AABBCCDDEEFF/sat/enabled
 Waarde:    true
 ```
 
-Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `overshoot_protection`, `pwm_auto_switch`, `push_setpoint`, `ovp_enabled`, `ovp_value`, `ovp_start`, `ovp_stop`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `overshoot_protection`, `pwm_auto_switch`, `push_setpoint`, `follow_thermostat`, `ovp_enabled`, `ovp_value`, `ovp_start`, `ovp_stop`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Voor booleaanse topics werken `ON` / `OFF` / `true` / `false` / `1` / `0`. Numerieke topics accepteren de gebruikelijke decimale notatie.
 
@@ -142,6 +142,7 @@ De integraalterm gebruikt een **symmetrische clamp** `[-curveValue, +curveValue]
 | `satflowoffset` | `2.0` | 0-10 C | Continue modus: maximale setpoint-daling t.o.v. keteltemperatuur |
 | `satcyclesperhour` | `3` | 2-6 | Doelcycli per uur |
 | `satpushsetpoint` | `false` | bool | SAT-doel naar thermostaatdisplay sturen (TC= commando) |
+| `satfollowthermostat` | aan als `satpushsetpoint` aan staat, anders uit | bool | Een setpointwijziging op de thermostaat wordt het SAT-doel (zie 5.21). Een unit zonder opgeslagen waarde krijgt eenmalig de waarde van `satpushsetpoint`; een opgeslagen waarde wint altijd |
 
 #### Coefficient kiezen
 
@@ -613,6 +614,20 @@ De HA-zichtbare modi zijn `off` en `heat`. De mode-status volgt de `thermostat_c
 
 De klimaatentiteit publiceert ook `sat/climate_attributes` (een JSON-blob) als `json_attributes_topic` (TASK-594). HA toont de SAT-bedrijfstoestand zo als attributen van de klimaat-kaart (modus, PID-uitvoer, fout, curve-aanbeveling enz.) zonder dat template-sensors nodig zijn.
 
+#### Thermostaatsetpoint volgen (TASK-1259)
+
+Met `satfollowthermostat` aan en SAT ingeschakeld wordt een wijziging van het kamersetpoint op de thermostaat het SAT-doel. De thermostaat werkt dan als bediening naast de SAT-UI en Home Assistant. Regels:
+
+- Alleen een wijziging wordt overgenomen (op de flank), nooit een periodieke sync. Een verschil van 0,1 C of meer telt; er is geen minimumtijd tussen twee wijzigingen. Het eerste setpoint na een herstart, en het eerste na het aanzetten van SAT of de optie, wordt alleen onthouden.
+- Debounce: de nieuwe waarde moet in twee opeenvolgende MsgID 16-frames van de thermostaat staan (binnen 0,05 C van elkaar). Een andere waarde ertussen start de controle opnieuw, zodat een flits van een enkel frame, een clear-before-set van de PIC (Remeha iSense) of een reset-glitch niets overneemt.
+- De bron is de eigen MsgID 16 Write-Data van de thermostaat (het T-frame), geldig bereik 5-30 C. Dat is de waarde van de thermostaat, ook als SAT een TC=-override pusht, en het werkt hetzelfde op een PIC-gateway en op OT-Direct. De PS=1-samenvatting bevat geen thermostaatframe, dus in PS=1-modus wordt niets overgenomen.
+- Een wijziging op de thermostaat zet ook een actieve preset op geen (en werkt het preset-synctopic bij). De temperatuur van voor de preset wordt niet teruggezet, zodat de zojuist gekozen waarde blijft staan.
+- Met `satpushsetpoint` aan wordt een wijziging alleen overgenomen als de vorige thermostaatwaarde synchroon liep met SAT: er is sinds de start een TC= verstuurd en de vorige waarde ligt binnen 0,25 C daarvan. Anders (start vóór de eerste push, een PIC-reset die de override liet vallen, een late reactie na een nieuwere push, een thermostaat op zijn eigen schema) wordt de waarde alleen onthouden.
+- Echobeveiliging: met `satpushsetpoint` aan is een nieuwe waarde binnen 0,25 C van de laatste door SAT gepushte TC= de echo van SAT zelf en wordt niet overgenomen. De 0,25 C dekt thermostaten die TC= afronden op hun stap van 0,5 C (TC=20.3 getoond als 20.5). Met `satpushsetpoint` uit wordt elke bevestigde wijziging overgenomen.
+- Bekende beperking: als raamdetectie het raam weer sluit, herstelt die de preset van vóór het raam; dat kan een intussen overgenomen thermostaatwijziging ongedaan maken. Herspeelde thermostaatframes (de `/simulate`-bench-replay) worden net als live frames geaccepteerd.
+- De CH-enable verandert niet: zolang SAT is ingeschakeld stuurt SAT de ketel aan met eigen CS en CH, en de CH-enable van de thermostaat beslist niet. Bij SAT uit, of na een veiligheidstrip, stuurt de thermostaat de ketel weer aan.
+- Een unit zonder opgeslagen `satfollowthermostat` krijgt bij de eerste start de waarde van `satpushsetpoint`; die waarde wordt dan opgeslagen en een latere wijziging van `satpushsetpoint` verandert hem niet. Thermostaten die TC= afwijzen vallen buiten de scope (TASK-1272).
+
 #### TT= en TC= remote-override semantiek (TASK-466)
 
 Wanneer `satpushsetpoint` aan staat, duwt SAT zijn doel naar het thermostaatdisplay met PIC-pariteits-remote-override semantiek op OpenTherm MsgID 16 + MsgID 100 (`RemoteOverrideFunction`). De twee commando's hebben verschillende prioriteiten:
@@ -629,7 +644,7 @@ Sinds 2.0.0 worden alle bestuurbare SAT-parameters als aparte HA-entiteiten gepu
 | HA-component | Aantal | Voorbeelden |
 |---|---|---|
 | `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, comfort-vochtigheid, zomerdrempel, auto-tune rate, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
-| `switch` | 14 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `overshoot_protection`, `push_setpoint`, `ovp_enabled`, `preset_sync`, `dhw_enabled`, `pwm_auto_switch` |
+| `switch` | 15 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `ovp_enabled`, `preset_sync`, `dhw_enabled`, `pwm_auto_switch` |
 | `select` | 1 | `sat_heating_system` met opties `0` (auto), `1` (radiatoren), `2` (warmtepomp), `3` (vloerverwarming) |
 
 Elke entiteit schrijft naar het bijbehorende `%mqtt_sub_topic%/sat/<parameter>` commandotopic en leest uit het bijbehorende state-topic. Alle wijzigingen lopen via `updateSetting()` en worden dus naar flash gepersisteerd en binnen veilige grenzen geklemd.

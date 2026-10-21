@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.446
+**  Version  : v2.0.0-alpha.447
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1669,6 +1669,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATforcepwm", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("overshoot_protection")) == 0) {
       updateSetting("SATovershootprotection", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("follow_thermostat")) == 0) {
+      updateSetting("SATfollowthermostat", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("flow_offset")) == 0) {
       updateSetting("SATflowoffset", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("summer_simmer")) == 0) {
@@ -2288,6 +2290,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
     je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
     je.field(F("settings.sat.overshoot_protection"), settings.sat.bOvershootProtection);
+    je.field(F("settings.sat.follow_thermostat"), settings.sat.bFollowThermostat);
     je.field(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
     je.field(F("settings.sat.dhw_enabled"), settings.sat.bDhwEnabled);
     je.field(F("settings.sat.dhw_enable"), settings.sat.bDhwEnable);
@@ -4042,6 +4045,7 @@ void sendDeviceSettings()
   addBool(F("satforcepwm"),       settings.sat.bForcePWM, "b");
   addBool(F("satovershootprotection"), settings.sat.bOvershootProtection, "b");
   addBool(F("satpushsetpoint"),   settings.sat.bPushSetpoint, "b");
+  addBool(F("satfollowthermostat"), settings.sat.bFollowThermostat, "b");
   addBool(F("satwindowdetect"),   settings.sat.bWindowDetection, "b");
   addInt (F("satwindowminsec"),   settings.sat.iWindowMinOpenSec, "i", 10, 600);
   addBool(F("satthermalcomfort"), settings.sat.bThermalComfort, "b");
@@ -4199,7 +4203,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satblenamefilteringest", "satblenameprefix",  // TASK-895 filter; TASK-1231 made them settable
   "satboilercapacity", "satboilerefficiency", "satboilerratedkw", "satcoefficient", "satcomfortadjust", "satcomforthumidity", "satcomfortmaxoffset",
   "satdeadband", "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
-  "satflameoffset", "satflowoffset", "satflushtreshold", "satforcepwm", "sathumiditytimeout",
+  "satflameoffset", "satflowoffset", "satflushtreshold", "satfollowthermostat", "satforcepwm", "sathumiditytimeout",
   "satinterval", "satmanufacturer", "satmaxpressdrop", "satmaxpressure", "satminpressure",
   "satmodsupdelay", "satmodsupoffset", "satmultiarea", "satmultiareacount",
   "satovershootmargin", "satovershootprotection", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",

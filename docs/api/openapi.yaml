@@ -4237,6 +4237,9 @@ components:
         push_setpoint:
           type: boolean
           description: "Setpoint pushed to boiler this cycle"
+        follow_thermostat:
+          type: boolean
+          description: "A room setpoint change on the thermostat (MsgID 16 Write-Data) becomes the SAT target and clears an active preset. A value within 0.25 C of the last TC= SAT pushed is the SAT echo and is ignored while push_setpoint is on; with push on a change is adopted only when the previous thermostat value was within 0.25 C of it. Units with no stored value get the push_setpoint value. Settable through POST /api/v2/sat/follow_thermostat."
         flame_off_offset:
           type: number
           description: "Flame-off setpoint offset (C)"
@@ -4504,6 +4507,7 @@ components:
         window_open: false
         window_detection: false
         push_setpoint: false
+        follow_thermostat: false
         flame_off_offset: 0.0
         force_pwm: false
         overshoot_protection: true

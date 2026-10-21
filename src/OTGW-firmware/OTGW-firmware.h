@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.446
+**  Version  : v2.0.0-alpha.447
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -363,6 +363,7 @@ bool satOwnsControlSetpoint();
 // command queue, so the CS= handler can refuse an EXTERNAL setpoint without refusing
 // SAT's own.
 bool satCommandInFlight();
+void satOnThermostatSetpoint(float tr);  // TASK-1259: thermostat MsgID 16 Write-Data (T frame), edge detector for follow-thermostat
 void satClearSafetyTrip();  // TASK-1159: the one place a SAT safety trip is cleared
 void satPublishMQTT();
 bool satHandleExternalTemp(const char* value);

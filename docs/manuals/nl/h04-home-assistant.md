@@ -231,7 +231,7 @@ Bij opstart worden alleen de niet-OT-entiteiten in de queue gezet (climate + DHW
 
 Twee pseudo-ID's worden gebruikt om niet-OT-entiteiten aan de bitmap op te hangen:
 
-- ID `0` bevat de twee climate-entiteiten (thermostaat en DHW-control), de 14 SAT-switches en de SAT-select.
+- ID `0` bevat de twee climate-entiteiten (thermostaat en DHW-control), de 15 SAT-switches en de SAT-select.
 - ID `27` bevat de number-entiteit voor buitentemperatuur-override.
 
 Dallas-sensoren hebben een eigen pad (`streamDallasSensorDiscovery`) omdat hun discovery afhankelijk is van het 1-Wire-adres dat pas tijdens runtime bekend wordt; ze worden via `configSensors()` gepubliceerd zodra die adressen beschikbaar zijn.
@@ -358,6 +358,7 @@ Switches:
 | `SAT_Force_PWM` | PWM-modus afdwingen, ongeacht ketelmodulatie |
 | `SAT_Overshoot_Protection` | PWM-start en modulatie-onderdrukking (CS-override in de PWM-fasen) |
 | `SAT_Push_Setpoint` | Control-setpoint via TC= naar de ketel pushen |
+| `SAT_Follow_Thermostat` | Een setpointwijziging op de thermostaat wordt het SAT-doel |
 | `SAT_OVP_Enabled` | Overshoot prevention-kalibratie inschakelen |
 | `SAT_Preset_Sync` | Climate-preset synchroniseren naar secondaire entiteiten |
 | `SAT_DHW_Enabled` | DHW-regeling binnen SAT inschakelen |

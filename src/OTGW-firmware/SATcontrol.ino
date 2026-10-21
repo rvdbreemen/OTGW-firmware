@@ -961,6 +961,18 @@ static const char* satGetPresetName(SATPreset p)
   }
 }
 
+// Sync the preset name to the secondary entity topic (Task #46)
+static void satSyncPresetTopic(SATPreset p)
+{
+  if (settings.sat.bPresetSync && settings.sat.sPresetSyncTopic[0] != '\0') {
+    const char* presetName = satGetPresetName(p);
+    if (presetName && state.mqtt.bConnected) {
+      sendMQTTData(settings.sat.sPresetSyncTopic, presetName, true);
+      SATDebugTf(PSTR("SAT: Preset synced to %s: %s\r\n"), settings.sat.sPresetSyncTopic, presetName);
+    }
+  }
+}
+
 void satHandlePreset(const char* value)
 {
   SATPreset newPreset = SAT_PRESET_NONE;
@@ -1008,13 +1020,75 @@ void satHandlePreset(const char* value)
     state.sat.fPreCustomTemp = 0.0f;
   }
 
-  // Sync preset to secondary entities (Task #46)
-  if (settings.sat.bPresetSync && settings.sat.sPresetSyncTopic[0] != '\0') {
-    const char* presetName = satGetPresetName(newPreset);
-    if (presetName && state.mqtt.bConnected) {
-      sendMQTTData(settings.sat.sPresetSyncTopic, presetName, true);
-      SATDebugTf(PSTR("SAT: Preset synced to %s: %s\r\n"), settings.sat.sPresetSyncTopic, presetName);
-    }
+  satSyncPresetTopic(newPreset);
+}
+
+// A thermostat setpoint change becomes SAT's target (TASK-1259). Called by satOnThermostatSetpoint()
+// only. The thermostat change overrides any active preset ("the override happens for a reason",
+// Sergeant D), so the preset becomes NONE WITHOUT the satHandlePreset("none") restore of
+// fPreCustomTemp: that restore would put the old pre-preset temperature back over the value the
+// user just chose. fPreCustomTemp is cleared so a later preset-none does not restore a stale value.
+// The target itself goes through updateSetting("SATtargettemp"), the same code a REST/MQTT target
+// change ends in (5-30 C clamp, deferred persist). satHandleTargetTemp() is not used here because
+// it maps a target that equals a preset value back onto that preset, which would undo the clear.
+static void satAdoptThermostatSetpoint(float tr)
+{
+  char valBuf[12];
+  dtostrf(tr, 1, 1, valBuf);
+  const bool hadPreset = (state.sat.eActivePreset != SAT_PRESET_NONE);
+  state.sat.eActivePreset  = SAT_PRESET_NONE;
+  state.sat.fPreCustomTemp = 0.0f;
+  updateSetting("SATtargettemp", valBuf);
+  SATDebugTf(PSTR("SAT: follow thermostat: target %.1f from thermostat setpoint%s\r\n"),
+             settings.sat.fTargetTemp, hadPreset ? ", preset cleared" : "");
+  if (hadPreset) satSyncPresetTopic(SAT_PRESET_NONE);
+}
+
+// Edge detector for "SAT target follows the thermostat setpoint" (TASK-1259). Pure: every input is an
+// argument, so tests/test_sat_follow_thermostat.py compiles this function as it is. Returns true when
+// `seen` (the thermostat's own room setpoint, 5-30 C) must become SAT's target.
+//  - not active (SAT disabled or option off): forget the last value and the candidate, adopt nothing.
+//    The first value after SAT/the option is switched on therefore only records, as does the first
+//    one after boot.
+//  - a change below 0.1 C is ignored (0.095 absorbs the 2-digit rounding of f8.8 values) and cancels
+//    a pending candidate; the baseline stays, so slow drift never adds up.
+//  - debounce: a new value must be seen in two consecutive frames (within 0.05 C) before it counts. A
+//    different value in between restarts the candidate. This covers a PIC clear-before-set (Remeha
+//    iSense) and reset glitches.
+//  - push-setpoint on: the confirmed edge is adopted only when the PREVIOUS thermostat value was synced
+//    to SAT (a TC= was sent since boot and |prev - lastSentTC| <= 0.25 C). Otherwise (boot before the
+//    first push, a PIC reset that dropped the override, a late reply after a newer push, a thermostat
+//    still on its schedule) it only records. A new value within 0.25 C of the last TC= is SAT's own
+//    echo, also when the thermostat rounds TC= to its 0.5 C step; it is recorded, not adopted.
+//  - push-setpoint off: every confirmed edge is adopted.
+static bool satFollowThermostatDecide(float seen, bool active, bool pushOn, float lastSentTC,
+                                      float &lastSeen, bool &haveLast, float &cand, bool &haveCand)
+{
+  if (!active) { haveLast = false; haveCand = false; return false; }
+  if (seen < 5.0f || seen > 30.0f) return false;           // 0 = "no setpoint", not a usable value
+  if (!haveLast) { lastSeen = seen; haveLast = true; haveCand = false; return false; }
+  if (fabsf(seen - lastSeen) < 0.095f) { haveCand = false; return false; }
+  if (!haveCand || fabsf(seen - cand) > 0.051f) { cand = seen; haveCand = true; return false; }
+  const float prev = lastSeen;                             // confirmed: second frame with the same new value
+  lastSeen = seen;
+  haveCand = false;
+  if (!pushOn) return true;
+  const bool synced = lastSentTC > 0.0f && fabsf(prev - lastSentTC) <= 0.25f;
+  const bool echo   = fabsf(seen - lastSentTC) <= 0.25f;
+  return synced && !echo;
+}
+
+// Called from processOT() for every MsgID 16 Write-Data frame the thermostat sent (T frame), also when
+// the gateway replaced it on the way to the boiler. OTcurrentSystemState.TrSet is not used: with a TC=
+// override active it holds the R frame, i.e. SAT's own pushed value, so a thermostat change would
+// never show up there. The PS=1 summary carries no T frame and is not a source.
+void satOnThermostatSetpoint(float tr)
+{
+  const bool active = settings.sat.bEnabled && settings.sat.bFollowThermostat;
+  if (satFollowThermostatDecide(tr, active, settings.sat.bPushSetpoint, state.sat.fLastSentTC,
+                                state.sat.fThermostatTrSet, state.sat.bThermostatTrSetValid,
+                                state.sat.fThermostatTrSetCand, state.sat.bThermostatTrSetCandValid)) {
+    satAdoptThermostatSetpoint(tr);
   }
 }
 
@@ -2317,6 +2391,7 @@ void satSendStatusJSON()
     je.field(F("flame_off_offset"),     settings.sat.fFlameOffOffset);
     je.field(F("force_pwm"),            settings.sat.bForcePWM);
     je.field(F("overshoot_protection"),  settings.sat.bOvershootProtection);
+    je.field(F("follow_thermostat"),    settings.sat.bFollowThermostat);
     je.field(F("flow_offset"),          settings.sat.fFlowOffset);
     je.field(F("pressure"),             snap->st.sat.fSmoothedPressure);
     je.field(F("pressure_drop_rate"),   snap->st.sat.fPressureDropRate);
@@ -2549,7 +2624,7 @@ void satPublishMQTT()
   static SATShadowB s_setpoint_sync, s_modulation_sync, s_ch_sync;
   static SATShadowB s_solar_gain_enable, s_summer_simmer_enable, s_comfort_adjust_enable;
   static SATShadowB s_thermal_comfort, s_multi_area_enable, s_auto_tune_enable;
-  static SATShadowB s_simulation_enable, s_window_detection_enable, s_force_pwm_enable, s_overshoot_protection_enable;
+  static SATShadowB s_simulation_enable, s_window_detection_enable, s_force_pwm_enable, s_overshoot_protection_enable, s_follow_thermostat_enable;
   static SATShadowB s_push_setpoint_enable, s_preset_sync_enable;
   static SATShadowB s_dhw_enabled, s_dhw_enable, s_pwm_auto_switch_enable;
   // JSON-blob heartbeat counters (BSS zero-init == first-seen sentinel).
@@ -3011,6 +3086,7 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/force_pwm_enable"),        settings.sat.bForcePWM,         s_force_pwm_enable,        true);
   publishIfChangedB(F("sat/overshoot_protection_enable"), settings.sat.bOvershootProtection, s_overshoot_protection_enable, true);
   publishIfChangedB(F("sat/push_setpoint_enable"),    settings.sat.bPushSetpoint,     s_push_setpoint_enable,    true);
+  publishIfChangedB(F("sat/follow_thermostat_enable"), settings.sat.bFollowThermostat, s_follow_thermostat_enable, true);
   publishIfChangedB(F("sat/preset_sync_enable"),      settings.sat.bPresetSync,       s_preset_sync_enable,      true);
   publishIfChangedB(F("sat/dhw_enabled"),             settings.sat.bDhwEnabled,       s_dhw_enabled,             true);
   publishIfChangedB(F("sat/dhw_enable"),              settings.sat.bDhwEnable,        s_dhw_enable,              true);

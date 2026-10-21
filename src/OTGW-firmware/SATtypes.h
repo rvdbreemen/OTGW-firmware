@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.446
+**  Version  : v2.0.0-alpha.447
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -394,6 +394,10 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint8_t  iLastSentMM            = 0;      // MM=<uint> last emitted
   uint8_t  iLastSentCH            = 0;      // CH=<0|1> last emitted
   float    fLastSentTC            = 0.0f;   // TC=<float> last emitted (rounded to .1)
+  float    fThermostatTrSet       = 0.0f;   // last thermostat room setpoint seen for follow-thermostat (TASK-1259)
+  float    fThermostatTrSetCand   = 0.0f;   // debounce: new thermostat setpoint seen once, waiting for its second frame
+  bool     bThermostatTrSetCandValid = false;
+  bool     bThermostatTrSetValid  = false;  // false until the first setpoint after boot / after SAT or the option was switched on
   uint32_t iLastSentCSMs          = 0;
   uint32_t iLastSentMMMs          = 0;
   uint32_t iLastSentCHMs          = 0;
@@ -446,6 +450,7 @@ struct SATSection {
   bool     bDhwEnabled        = false;  // Enable DHW control in standalone/fallback mode
   bool     bDhwEnable         = true;   // TASK-516: master DHW enable (HW= command). Only acted on when boiler reports MsgID 3 HB3=1 (storage tank). Default true keeps boiler-default DHW enabled.
   bool     bPushSetpoint      = false;  // Push SAT target to thermostat display (TC= command)
+  bool     bFollowThermostat  = false;  // A thermostat room setpoint change (MsgID 16) becomes the SAT target (TASK-1259). Units with no stored SATfollowthermostat get bPushSetpoint (readSettings); a stored value wins
   float    fFlameOffOffset    = 18.0f;  // Flame-off hold offset above return temp during PWM (Python flame_off_setpoint_offset_celsius=18.0): primes the boiler for fast, clean re-ignition
   bool     bWindowDetection   = false;  // Enable window open detection via MQTT
   uint16_t iWindowMinOpenSec  = 60;     // Minimum seconds window must stay open before action

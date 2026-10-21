@@ -73,6 +73,7 @@ DESC = {
  "flame_off_offset": "Flame-off setpoint offset (C)",
  "force_pwm": "Force PWM mode regardless of conditions",
  "overshoot_protection": "PWM overshoot protection: CS override in the PWM phases",
+ "follow_thermostat": "SAT target follows the thermostat room setpoint",
  "flow_offset": "Flow-temperature offset applied (C)",
  "pressure": "System water pressure (bar)",
  "pressure_drop_rate": "Pressure drop rate (bar/min)",

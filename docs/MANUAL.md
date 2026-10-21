@@ -3192,6 +3192,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/dhw_enable` | `SATdhwenable` |
 | `sat/interval` | `SATinterval` |
 | `sat/push_setpoint` | `SATpushsetpoint` |
+| `sat/follow_thermostat` | `SATfollowthermostat` |
 | `sat/flame_off_offset` | `SATflameoffset` |
 | `sat/force_pwm` | `SATforcepwm` |
 | `sat/overshoot_protection` | `SATovershootprotection` |

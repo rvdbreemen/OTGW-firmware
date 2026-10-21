@@ -558,7 +558,7 @@ bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
                                    uint8_t otid,
                                    const char* label);
 
-// SAT enable/disable switches (boolean settings). switchIdx = 0..12, see implementation.
+// SAT enable/disable switches (boolean settings). switchIdx = 0..14, see implementation.
 bool streamSatSwitchDiscovery(uint8_t switchIdx,
                               HaDiscoveryContext &ctx);
 

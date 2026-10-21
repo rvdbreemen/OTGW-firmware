@@ -478,7 +478,7 @@ Settings echo topics are retained. More settings echo topics exist; the full lis
 
 #### SAT Switch State Topics (TASK-284)
 
-State topics for the 14 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
+State topics for the 15 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
 
 | Topic | Description |
 | ----- | ----------- |
@@ -492,6 +492,7 @@ State topics for the 14 SAT boolean switches. Payloads are `"true"` / `"false"`.
 | `sat/force_pwm_enable` | Force-PWM override enable state |
 | `sat/overshoot_protection_enable` | PWM overshoot protection (start-up and modulation suppression) enable state |
 | `sat/push_setpoint_enable` | Push-setpoint enable state |
+| `sat/follow_thermostat_enable` | Follow-thermostat enable state: a setpoint change on the thermostat becomes the SAT target |
 | `sat/ovp_enabled` | OPV (overshoot-protection value) enabled state |
 | `sat/preset_sync_enable` | Preset-sync enable state |
 | `sat/dhw_enabled` | DHW heating enable state |
@@ -940,6 +941,7 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 13 auto-
 | `sat/force_pwm` | `SATforcepwm` | Force PWM mode override |
 | `sat/overshoot_protection` | `SATovershootprotection` | PWM overshoot protection: CS override in the PWM phases (default on) |
 | `sat/push_setpoint` | `SATpushsetpoint` | Enable pushing setpoint changes to boiler |
+| `sat/follow_thermostat` | `SATfollowthermostat` | A room setpoint change on the thermostat (MsgID 16) becomes the SAT target and clears an active preset. Defaults to the push-setpoint value on units with no stored value |
 | `sat/ovp_enabled` | `SATovpenabled` | Enable OPV (overshoot-protection value) |
 | `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
 | `sat/dhw_enabled` | `SATdhwenabled` | Enable DHW heating |
@@ -1228,7 +1230,7 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 |-------------|-----------|------|-------------|
 | `number` | `sat_dhw_setpoint` | °C | DHW setpoint slider (30-60 °C, 0.5 step) |
 
-**Switch Entities (TASK-284, 14 switches):**
+**Switch Entities (TASK-284, 15 switches):**
 
 Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and takes commands on `%mqtt_sub_topic%/sat/<command>`. Payloads are literal `"true"` / `"false"` (`pl_on` / `pl_off`).
 
@@ -1244,6 +1246,7 @@ Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and take
 | `sat_force_pwm_enable` | `sat/force_pwm` | `sat/force_pwm_enable` | `mdi:pulse` |
 | `sat_overshoot_protection_enable` | `sat/overshoot_protection` | `sat/overshoot_protection_enable` | `mdi:shield-check` |
 | `sat_push_setpoint_enable` | `sat/push_setpoint` | `sat/push_setpoint_enable` | `mdi:upload` |
+| `sat_follow_thermostat_enable` | `sat/follow_thermostat` | `sat/follow_thermostat_enable` | `mdi:thermostat` |
 | `sat_ovp_enabled` | `sat/ovp_enabled` | `sat/ovp_enabled` | `mdi:shield-check` |
 | `sat_preset_sync_enable` | `sat/preset_sync` | `sat/preset_sync_enable` | `mdi:sync` |
 | `sat_dhw_enabled` | `sat/dhw_enabled` | `sat/dhw_enabled` | `mdi:water-boiler` |

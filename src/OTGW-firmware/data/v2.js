@@ -1779,6 +1779,7 @@
     satforcepwm:         { cat: 'sat', label: 'Force PWM' },
     satovershootprotection: { cat: 'sat', label: 'PWM overshoot protection' },
     satpushsetpoint:     { cat: 'sat', label: 'Push setpoint to thermostat' },
+    satfollowthermostat: { cat: 'sat', label: 'Follow thermostat setpoint' },
     satwindowdetect:     { cat: 'sat', label: 'Window detection' },
     satwindowminsec:     { cat: 'sat', label: 'Window min open time', hint: 'Seconds' },
     satthermalcomfort:   { cat: 'sat', label: 'Thermal comfort model' },
@@ -1882,7 +1883,7 @@
   // satenabled is the SAT header toggle, so no form shows it. A SAT key that is not
   // listed here lands in L3 "Other", so a new firmware setting is never hidden.
   var SAT_L2 = [
-    ['System', ['satsystem', 'satsource', 'satheatingmode', 'sattargettemp', 'satpushsetpoint']],
+    ['System', ['satsystem', 'satsource', 'satheatingmode', 'sattargettemp', 'satpushsetpoint', 'satfollowthermostat']],
     ['Presets', ['satpresetcomfort', 'satpreseteco', 'satpresetaway', 'satpresetsleep', 'satpresetactivity',
                  'satpresethome', 'satpresetsync', 'satpresetsynctopic']],
     ['Indoor temperature', ['satexternaltemp', 'satsensormaxage']],

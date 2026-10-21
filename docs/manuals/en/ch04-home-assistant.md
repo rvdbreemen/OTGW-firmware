@@ -220,7 +220,7 @@ At boot the firmware queues only the non-OT entities (climate + DHW, outside-tem
 
 Two pseudo-IDs are used to hang non-OT entities off the bitmap:
 
-- ID `0` carries the two climate entities (thermostat and DHW control), the 14 SAT switches, and the SAT select.
+- ID `0` carries the two climate entities (thermostat and DHW control), the 15 SAT switches, and the SAT select.
 - ID `27` carries the "outside temperature override" number entity.
 
 Dallas sensors have their own path (`streamDallasSensorDiscovery`) because their discovery depends on the actual 1-Wire address read at runtime, and they are published via `configSensors()` once those addresses are known.
@@ -344,6 +344,7 @@ Switches:
 | `SAT_Force_PWM` | Force PWM mode regardless of boiler modulation |
 | `SAT_Overshoot_Protection` | PWM start-up and modulation suppression (CS override in the PWM phases) |
 | `SAT_Push_Setpoint` | Push control setpoint to boiler via TC= |
+| `SAT_Follow_Thermostat` | A setpoint change on the thermostat becomes the SAT target |
 | `SAT_OVP_Enabled` | Enable overshoot prevention calibration |
 | `SAT_Preset_Sync` | Sync climate preset to secondary entities |
 | `SAT_DHW_Enabled` | Enable DHW control interaction with SAT |
