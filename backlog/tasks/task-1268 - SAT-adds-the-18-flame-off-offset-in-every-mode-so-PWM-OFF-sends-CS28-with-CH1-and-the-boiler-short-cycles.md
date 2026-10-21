@@ -3,11 +3,11 @@ id: TASK-1268
 title: >-
   SAT adds the +18 flame-off offset in every mode, so PWM-OFF sends CS=28 with
   CH=1 and the boiler short-cycles
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-20 18:15'
-updated_date: '2026-10-21 05:35'
+updated_date: '2026-10-21 09:41'
 labels:
   - bug
   - sat
@@ -27,7 +27,7 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 <!-- AC:BEGIN -->
 - [x] #1 No flame-off offset outside the PWM ON flame-off hold: continuous mode sends the PID/clamp setpoint while the flame is off (bench/sim run, red on alpha.441: pid+18)
 - [x] #2 New setting overshoot_protection (default off), end to end: settings.ini, REST GET/POST + whitelist, SAT REST route, MQTT sat/overshoot_protection, status JSON, MQTT state, HA switch, v2 UI, docs
-- [ ] #3 PWM with overshoot_protection off: no CS override (CS keeps its previous value) and MM=0 in both PWM phases, identical to thermo-nova (sim run)
+- [x] #3 PWM with overshoot_protection off: no CS override (CS keeps its previous value) and MM=0 in both PWM phases, identical to thermo-nova (sim run)
 - [x] #4 PWM with overshoot_protection on: OFF phase sends CS=10 and CH=0 (no relight at 28), ON phase keeps the return+offset hold then flow-1 (sim run, red on alpha.441: CS=28 CH=1 in OFF)
 <!-- AC:END -->
 
@@ -79,4 +79,12 @@ Round 1 fixes done (underheat ON-only, range-5 tick==refresh, solar ratchet via 
 2026-10-21 AC2 state topic verified on alpha.444 (a7bbaccb6): with SAT active (simulation on, room temp pushed) OTGW/value/<id>/sat/overshoot_protection_enable gave 'true' (retained) and, after MQTT OTGW/set/<id>/sat/overshoot_protection 0, a live 'false' (REST status false too). Earlier empty captures: SAT was safety-tripped (no boiler, simulation off), and an inactive SAT publishes no sat/ topics at all. Bench restored (protection on, simulation off, external temp off). Open: AC3 and the flow-1 suppression + 3 s refresh outside the host tests.
 
 2026-10-21 suppression + 3 s refresh now bench-proven via TASK-1277 replay: new firmware CS = flow-1 refreshed with every flow frame (~6 s), old firmware PID / 10 / 45 on the 30 s tick only. Still open: AC3 (protection off, sim or field run).
+
+2026-10-21 AC3 bench (alpha.444+a7bbacc, TASK-1277 replay, protection OFF, force PWM): 259 ON-phase samples with the flame burning and the flow rising 44.5 -> 57.1 C, CS stayed 37.36 throughout (the previous control setpoint, first taken from the PID setpoint because the previous CS was 10), no flow-1 and no CS 10: no override, thermo-nova parity. Compare protection ON on the same replay: CS = flow-1 every ~6 s. MM=0 in PWM is not visible in the replay (bus MaxRelMod empty), evidenced by tests/test_sat_pwm_override.py (real satComputeMM). Bench restored, settings diff 0. Evidence %TEMP%\bench-1277\green-protoff.json.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT no longer adds the +18 C flame-off offset outside the PWM ON hold, and PWM modulation suppression follows thermo-nova behind a new overshoot_protection setting (default on, Sergeant D). Commits a7bbaccb6 (alpha.444) and c19a7b6da (bench replay, TASK-1277). AC1: continuous, flame off, final = PID 55.3 (not 73.3/62) on the bench; old firmware adds 18. AC2: setting default true after OTA, REST and MQTT set work and persist, HA switch discovery (14 switches, stat_t/cmd_t), MQTT state live true -> false. AC3: protection off, replayed burn: CS stays at its previous value (37.36) while the flow rises 44.5 -> 57.1, no flow-1, no 10; MM=0 by host test. AC4: PWM OFF CS 10 / CH off (old 28 with CH on); ON phase hold return+18 while the flame is off (SAT simulation), then flow-1 refreshed with every flow frame (~6 s) on the replay, old firmware PID / 10 / 45 on the 30 s tick only. Host test tests/test_sat_pwm_override.py 25 OK, 19 fail on the previous code; evaluate --quick 72/0; webui 45/0. Not verified: a real boiler (field test by Sergeant D / gruijter); MM=0 on the bus; the hold-before-ignition on a real ignition delay. Follow-ups: ON-phase timing flap and force-PWM-at-max reset (pre-existing) in TASK-1273.
+<!-- SECTION:FINAL_SUMMARY:END -->
