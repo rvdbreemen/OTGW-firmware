@@ -92,6 +92,7 @@ static uint16_t _cycle_deltasamples   = 0;
 static float    _flow_samples[SAT_FLOW_SAMPLE_SIZE];
 static SAT_RING_IDX_T _flow_sampleHead  = 0;  // next write position (ring)
 static SAT_RING_IDX_T _flow_sampleCount = 0;  // valid sample count (0..SAT_FLOW_SAMPLE_SIZE)
+static uint8_t  _flow_logTick = 0;            // rate limit of the 'SAT sample' debug line
 
 // --- Tail ring buffer for end-of-cycle 180s classification window ---
 // Sampled at 1Hz for a true time-based window, independent of loop rate.
@@ -474,8 +475,9 @@ void satGetWindow24hStats()
 }
 
 //=== Per-cycle flow temperature p-percentile (Task #225) ===
-// Compute approximate percentile from the current flow sample buffer.
-// Uses insertion-sort on a local copy (max 64 floats = 256 bytes stack — acceptable).
+// Compute approximate percentile from the current flow sample buffer: 1 Hz samples, so
+// the last SAT_FLOW_SAMPLE_SIZE seconds of the cycle (TASK-1269).
+// Uses insertion-sort on a local copy (SAT_FLOW_SAMPLE_SIZE floats on the stack).
 static float _flowPercentile(uint8_t pct)
 {
   if (_flow_sampleCount == 0) return 0.0f;
@@ -600,8 +602,8 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 }
 
 //=== Classify a completed cycle (Task #225: uses p90/p10 flow temp, not max) ===
-// p90FlowTemp: 90th percentile of flow temp samples this cycle (robust overshoot indicator)
-// p10FlowTemp: 10th percentile of flow temp samples this cycle (robust underheat indicator)
+// p90FlowTemp: 90th percentile of the flow samples (last SAT_FLOW_SAMPLE_SIZE s of the cycle)
+// p10FlowTemp: 10th percentile of the same samples
 // maxFlowTemp is still recorded for diagnostics but not used for classification.
 //
 // Verified scenarios (Python CycleClassifier.classify() parity — Task #225 AC#5):
@@ -860,22 +862,25 @@ void satCycleSample()
     _cycle_deltasamples++;
   }
 
-  // Collect flow temperature sample for p90/p10 classifier (Task #225)
-  _flow_samples[_flow_sampleHead] = flowTemp;
-  _flow_sampleHead = (_flow_sampleHead + 1) % SAT_FLOW_SAMPLE_SIZE;
-  if (_flow_sampleCount < SAT_FLOW_SAMPLE_SIZE) _flow_sampleCount++;
-  if ((_flow_sampleCount & 0x0F) == 0) { // log every 16th sample to avoid flood
-    SATDebugTf(PSTR("SAT sample: flow=%.1f n=%u sp=%.1f os=%.0fs\r\n"),
-               flowTemp, (unsigned)_flow_sampleCount, _cycle_setpointAtStart, _cycle_overshootSec);
-  }
-
-  // Tail ring buffer: 1Hz-gated for time-accurate window (Task #590)
+  // Flow sample rings, both 1Hz-gated so they span time, not loop iterations:
+  // the per-cycle p90/p10 ring (Task #225) covers the last SAT_FLOW_SAMPLE_SIZE s of the
+  // cycle, the tail ring (Task #590) the last SAT_TAIL_SAMPLE_SIZE s (TASK-1269).
   uint32_t nowMs = millis();
   if (nowMs - _tail_lastSampleMs >= 1000UL) {
+    _flow_samples[_flow_sampleHead] = flowTemp;
+    _flow_sampleHead = (_flow_sampleHead + 1) % SAT_FLOW_SAMPLE_SIZE;
+    if (_flow_sampleCount < SAT_FLOW_SAMPLE_SIZE) _flow_sampleCount++;
+
     _tail_samples[_tail_sampleHead] = flowTemp;
     _tail_sampleHead = (_tail_sampleHead + 1) % SAT_TAIL_SAMPLE_SIZE;
     if (_tail_sampleCount < SAT_TAIL_SAMPLE_SIZE) _tail_sampleCount++;
     _tail_lastSampleMs = nowMs;
+
+    if (++_flow_logTick >= 30) {   // one debug line per 30 samples (30 s)
+      _flow_logTick = 0;
+      SATDebugTf(PSTR("SAT sample: flow=%.1f n=%u sp=%.1f os=%.0fs\r\n"),
+                 flowTemp, (unsigned)_flow_sampleCount, _cycle_setpointAtStart, _cycle_overshootSec);
+    }
   }
 
   // Track overshoot seconds: time flow temp is above setpoint + margin
