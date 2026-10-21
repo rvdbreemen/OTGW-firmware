@@ -3,16 +3,17 @@ id: TASK-1262
 title: >-
   Fix: ESP8266 stuck in an auth/deauth loop for 12+ min until the supervisor
   restarts it (GH #681)
-status: To Do
-assignee: []
-created_date: '2026-10-19 18:03'
-updated_date: '2026-10-20 19:29'
+status: In Progress
+assignee:
+  - '@claude'
+created_date: 2026-10-19 18:03
+updated_date: '2026-10-21T19:49:00Z'
 labels:
   - bug
   - needs-info
 dependencies: []
 references:
-  - 'https://github.com/rvdbreemen/OTGW-firmware/issues/681'
+  - https://github.com/rvdbreemen/OTGW-firmware/issues/681
 priority: medium
 ordinal: 249000
 ---
