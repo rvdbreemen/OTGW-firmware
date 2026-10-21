@@ -1443,7 +1443,7 @@
       "path": "ADR-047-nonblocking-wifi-reconnect.md",
       "format": "canonical",
       "status": "Superseded",
-      "date": "2026-03-01",
+      "date": "2026-10-21",
       "decision_summary": "Replace the blocking restartWifi() with a non-blocking state machine loopWifi() that runs cooperatively in the main l...",
       "topics": [],
       "aliases": [],
@@ -1885,7 +1885,7 @@
       "path": "ADR-061-wifi-reconnect-timeout-tuning.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-04-03",
+      "date": "2026-10-21",
       "decision_summary": "Increase the per-attempt timeout from 5 seconds to 30 seconds and reduce max retries from 15 to 10.",
       "topics": [],
       "aliases": [],
@@ -3450,6 +3450,68 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-099",
+      "title": "Skip the WiFi config portal after a WiFi supervisor restart",
+      "path": "ADR-099-skip-the-wifi-config-portal-after-a-wifi-supervisor-restart.md",
+      "format": "madr",
+      "status": "Accepted",
+      "date": "2026-10-21",
+      "decision_summary": "Chosen option: Option A, because it removes the portal from exactly the path where it does harm (a configured gateway...",
+      "topics": [
+        "config-portal",
+        "restart",
+        "wifi",
+        "wifi-recovery",
+        "wifimanager"
+      ],
+      "aliases": [
+        "12 minute outage",
+        "access point outage recovery",
+        "portal after supervisor restart",
+        "skip portal"
+      ],
+      "components": [
+        "Boot-time WiFi connect policy in startWiFi() (portal or no portal)",
+        "Skip-portal marker in RTC user memory, written before a WiFi supervisor restart"
+      ],
+      "symbols": [
+        "loopWifi",
+        "startWiFi",
+        "WIFI_SKIP_PORTAL_RTC_SLOT"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Write the marker only on the WiFi supervisor's restart paths in networkStuff.ino: the WIFIFAILED restart in loopWifi() and the dead-link restart.",
+          "Read and clear the marker once per boot, before the portal decision in startWiFi().",
+          "Keep the portal for the triple-reset request, for a boot without saved credentials, and for a boot without the marker.",
+          "Log one line when the portal is skipped."
+        ],
+        "must_not": [
+          "Must not modify the vendored WiFiManager library.",
+          "Must not keep the marker across more than one boot."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "startWiFi() and the two restart sites in src/OTGW-firmware/networkStuff.ino.",
+          "The bench test named under Confirmation, recorded in TASK-1262."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -4612,6 +4674,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-047",
+      "target": "ADR-099",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-048",
       "target": "ADR-003",
       "type": "related",
@@ -5020,6 +5088,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-061",
+      "target": "ADR-099",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-062",
       "target": "ADR-004",
       "type": "related",
@@ -5305,7 +5379,7 @@
       "source": "ADR-072",
       "target": "ADR-099",
       "type": "related",
-      "resolved": false
+      "resolved": true
     },
     {
       "source": "ADR-073",
@@ -5990,6 +6064,24 @@
       "target": "ADR-173",
       "type": "related",
       "resolved": false
+    },
+    {
+      "source": "ADR-099",
+      "target": "ADR-017",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-099",
+      "target": "ADR-047",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-099",
+      "target": "ADR-061",
+      "type": "related",
+      "resolved": true
     }
   ]
 }

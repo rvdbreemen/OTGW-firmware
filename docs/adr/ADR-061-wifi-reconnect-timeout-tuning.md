@@ -10,12 +10,30 @@ verified_in: []
 supersedes:
   - "ADR-047"
 superseded_by: null
+related:
+  - "ADR-099"
 ---
 # ADR-061: WiFi Reconnect Timeout Tuning
 
 ## Status
 
 Accepted, 2026-04-03. Supersedes: ADR-047 (timeout and retry parameters only; state machine design unchanged).
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-04-03
+    status: Accepted
+    changed_by: unknown
+    reason: "Recovered from the record as it stood before this transition; this ADR predates the status_history convention. The actor was never recorded and is not guessed here. The Status line read: Accepted, 2026-04-03. Supersedes: ADR-047 (timeout and retry parameters only; state machine design unchanged)."
+    changed_via: unrecorded
+  - date: 2026-10-21
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-099
+    changed_via: adr-kit lifecycle
+```
+
 
 ## Context
 

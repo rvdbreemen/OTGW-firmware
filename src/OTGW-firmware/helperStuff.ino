@@ -321,7 +321,8 @@ bool readLatestCrashLog(char* summary, size_t summarySize, char* details, size_t
 // restart is the same "Software/System restart (4)". ESP.rtcUserMemory offsets
 // (4-byte units, 0..127): 0..31 hold the eboot OTA command (SDK blocks 64..95),
 // 96..97 the WiFi portal reset counter (OTGW-firmware.ino), 100..112 this
-// record, 113..114 the TASK-1248 dead-link restart count (networkStuff.ino).
+// record, 113..114 the TASK-1248 dead-link restart count, 115 the ADR-099
+// skip-portal mark (both networkStuff.ino).
 #define REBOOT_REASON_RTC_SLOT  100
 #define REBOOT_REASON_MAGIC     0x4F545252UL  // "OTRR"
 

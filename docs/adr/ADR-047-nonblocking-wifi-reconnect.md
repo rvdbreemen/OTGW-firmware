@@ -9,12 +9,30 @@ documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: "ADR-061"
+related:
+  - "ADR-099"
 ---
 # ADR-047: Non-Blocking WiFi Reconnect State Machine
 
 ## Status
 
 Superseded by ADR-061 (timeout and retry parameters only; state machine design unchanged), 2026-03-01. Relates to: ADR-007 (Timer-Based Task Scheduling), ADR-001 (ESP8266 Platform).
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-03-01
+    status: Superseded
+    changed_by: unknown
+    reason: "Recovered from the record as it stood before this transition; this ADR predates the status_history convention. The actor was never recorded and is not guessed here. The Status line read: Superseded by ADR-061 (timeout and retry parameters only; state machine design unchanged), 2026-03-01. Relates to: ADR-007 (Timer-Based Task Scheduling), ADR-001 (ESP8266 Platform)."
+    changed_via: unrecorded
+  - date: 2026-10-21
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: Related to ADR-099
+    changed_via: adr-kit lifecycle
+```
+
 
 ## Context
 

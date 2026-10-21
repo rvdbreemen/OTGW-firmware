@@ -223,9 +223,35 @@ static void printWifiDropBanner()
     wifiDropSelf ? PSTR(", self: dead-link check") : PSTR(""));
 }
 
+// ADR-099: a WiFi supervisor restart marks the next boot, which then skips the
+// config portal when the saved network is not back yet. While the portal runs,
+// WiFiManager switches the station off, so the gateway could not rejoin an
+// access point that returned (TASK-1262). RTC user memory survives a software
+// restart but not a power cycle, so a power-cycled gateway still gets the portal.
+#define WIFI_SKIP_PORTAL_RTC_SLOT  115
+#define WIFI_SKIP_PORTAL_MAGIC     0x4F545350UL  // "OTSP"
+
+static void wifiMarkSkipPortal()
+{
+  uint32_t magic = WIFI_SKIP_PORTAL_MAGIC;
+  ESP.rtcUserMemoryWrite(WIFI_SKIP_PORTAL_RTC_SLOT, &magic, sizeof(magic));
+}
+
+// Reads and clears the mark, so it applies to one boot only.
+static bool wifiTakeSkipPortal()
+{
+  uint32_t magic = 0;
+  const bool marked = ESP.rtcUserMemoryRead(WIFI_SKIP_PORTAL_RTC_SLOT, &magic, sizeof(magic))
+                      && magic == WIFI_SKIP_PORTAL_MAGIC;
+  magic = 0;
+  ESP.rtcUserMemoryWrite(WIFI_SKIP_PORTAL_RTC_SLOT, &magic, sizeof(magic));
+  return marked;
+}
+
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
+  const bool skipPortal = wifiTakeSkipPortal();
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
   wifiLinkEventsBegin();
 
@@ -328,7 +354,11 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     DebugTln(F("No saved WiFi, starting config portal."));
   }
 
-  if (!wifiConnected)
+  if (!wifiConnected && skipPortal && wifiSaved && !forcePortal)
+  {
+    DebugTln(F("WiFi: not connected after a WiFi supervisor restart, skipping the config portal; loopWifi keeps retrying"));
+  }
+  else if (!wifiConnected)
   {
     DebugTf(PSTR("Starting config portal (heap: %u free, %u fragmented, %u max block)...\r\n"),
             ESP.getFreeHeap(), ESP.getHeapFragmentation(), ESP.getMaxFreeBlockSize());
@@ -627,6 +657,7 @@ static void handleWifiProbeVerdict(bool gatewayAnswered)
   }
   wifiDeadRestarts++;
   writeWifiDeadRestarts(wifiDeadRestarts);
+  wifiMarkSkipPortal();
   doRestart("WiFi: connected but no traffic");
 }
 
@@ -773,6 +804,7 @@ void loopWifi() {
         wifiDeadRestarts++;
         writeWifiDeadRestarts(wifiDeadRestarts);
       }
+      wifiMarkSkipPortal();
       doRestart("WiFi: too many reconnect failures");
       break;
   }
