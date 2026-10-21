@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-19 18:03
-updated_date: '2026-10-21T19:49:00Z'
+updated_date: '2026-10-21T20:04:00Z'
 labels:
   - bug
   - needs-info
@@ -41,4 +41,13 @@ Missing: an ESP-side telnet log of the loop (what the supervisor does on each at
 2026-10-20 maintainer decision: run the MikroTik access-list bench test (deny 84:F3:EB:22:B8:E1, time to doRestart, remove rule) only after 2026-10-21 04:34, so the TASK-1261 24 h window (bootcount 8) finishes first.
 
 2026-10-20: answered mrfox7688 on GH #682 (issuecomment-6299472236): ~2 min self-healing losses are intentionally below the 8-probe threshold; NAS-side ping loss points at the radio link; suggested beta.4 (modem-sleep off) as the next single change after his channel 6->1 test.
+
+2026-10-21 bench (.88.68, 1.7.8-beta.5+09436d6): MikroTik access-list deny 21:50:17-21:58:19 (rule removed, count 0).
+- Gateway back only at 22:01:27, 3 min AFTER the AP allowed it again; total outage 11 min 10 s.
+- reboot_log: one new line "WiFi: too many reconnect failures"; bootcount 1 -> 2.
+- Timeline that fits to the second: loopWifi 10 x 30 s -> restart ~21:55:20; boot direct connect timeOut/2 = 120 s fails (still denied) -> ~21:57:20 WiFiManager config portal, 240 s; portal timeout restart ~22:01:20; connected 22:01:27.
+- Code confirms the portal blocks recovery: WiFiManager 2.0.15-rc.1 startConfigPortal() disables STA when not connected (_disableSTAConn = true default, WiFiManager.cpp:719-725), so the gateway cannot rejoin while the portal runs, even when the AP is back.
+- The portal-timeout restart is invisible in the logs: bootcount and updateRebootLog() run after startWiFi() (OTGW-firmware.ino:187-188), so a boot that ends in the portal timeout never counts, and storeRebootReasonUnlessPending() drops its reason because the supervisor reason is still pending.
+- Fits theaprilhare 12+ min outages ending in a "Software/System restart". Single bench run; the portal phase is inferred from timing + code, not observed directly (no AP scan during the window).
+- Reason 3 deauth loop (AC1) not explained yet: WiFi_Disconnect() at portal start sends one deauth per boot, not ~40 in 12 min.
 <!-- SECTION:NOTES:END -->
