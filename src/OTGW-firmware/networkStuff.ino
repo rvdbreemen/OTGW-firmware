@@ -62,10 +62,172 @@ static void wifiKeepRadioAwake()
   DebugTf(PSTR("WiFi: sleep mode now %d\r\n"), (int)WiFi.getSleepMode());
 }
 
+// Station link record (TASK-1278, GH #682). The core calls these handlers from
+// the SDK event task, after it has already closed every TCP client, telnet
+// included. So the handlers only record; loopWifi() logs and the telnet banner
+// shows the last drop to whoever connects next. One outage is the stretch from
+// the first disconnect event after a connect to the next connect; the SDK
+// repeats the event (e.g. 201 NO_AP_FOUND) while it retries.
+static WiFiEventHandler wifiConnectedHandler;
+static WiFiEventHandler wifiDisconnectedHandler;
+static bool     wifiLinkUp             = false;
+static uint8_t  wifiJoinedBssid[6]     = {0};
+static uint8_t  wifiJoinedChannel      = 0;
+static uint32_t wifiDisconnectEvents   = 0;   // every disconnect event since boot
+static uint32_t wifiOutages            = 0;   // outages since boot
+static uint8_t  wifiDropFirstReason    = 0;
+static uint8_t  wifiDropLastReason     = 0;
+static uint8_t  wifiDropBssid[6]       = {0}; // AP that was left
+static uint8_t  wifiDropChannel        = 0;
+static uint32_t wifiDropEvents         = 0;   // disconnect events in the last outage
+static uint32_t wifiDropStartMs        = 0;
+static uint32_t wifiDropDurationMs     = 0;   // 0 while the outage lasts
+static bool     wifiDropSelf           = false;
+static bool     wifiSelfDisconnect     = false;  // set just before our own wifi_station_disconnect()
+static bool     wifiDropLogPending     = false;
+static bool     wifiJoinLogPending     = false;
+
+// A switch over these sparse codes (1..204) compiles to a jump table in .rodata,
+// which the ESP8266 keeps in RAM; this table stays in flash.
+struct WifiReasonName { uint8_t code; char name[25]; };
+static const WifiReasonName wifiReasonNames[] PROGMEM = {
+  { WIFI_DISCONNECT_REASON_UNSPECIFIED, "UNSPECIFIED" },
+  { WIFI_DISCONNECT_REASON_AUTH_EXPIRE, "AUTH_EXPIRE" },
+  { WIFI_DISCONNECT_REASON_AUTH_LEAVE, "AUTH_LEAVE" },
+  { WIFI_DISCONNECT_REASON_ASSOC_EXPIRE, "ASSOC_EXPIRE" },
+  { WIFI_DISCONNECT_REASON_ASSOC_TOOMANY, "ASSOC_TOOMANY" },
+  { WIFI_DISCONNECT_REASON_NOT_AUTHED, "NOT_AUTHED" },
+  { WIFI_DISCONNECT_REASON_NOT_ASSOCED, "NOT_ASSOCED" },
+  { WIFI_DISCONNECT_REASON_ASSOC_LEAVE, "ASSOC_LEAVE" },
+  { WIFI_DISCONNECT_REASON_ASSOC_NOT_AUTHED, "ASSOC_NOT_AUTHED" },
+  { WIFI_DISCONNECT_REASON_DISASSOC_PWRCAP_BAD, "DISASSOC_PWRCAP_BAD" },
+  { WIFI_DISCONNECT_REASON_DISASSOC_SUPCHAN_BAD, "DISASSOC_SUPCHAN_BAD" },
+  { WIFI_DISCONNECT_REASON_IE_INVALID, "IE_INVALID" },
+  { WIFI_DISCONNECT_REASON_MIC_FAILURE, "MIC_FAILURE" },
+  { WIFI_DISCONNECT_REASON_4WAY_HANDSHAKE_TIMEOUT, "4WAY_HANDSHAKE_TIMEOUT" },
+  { WIFI_DISCONNECT_REASON_GROUP_KEY_UPDATE_TIMEOUT, "GROUP_KEY_UPDATE_TIMEOUT" },
+  { WIFI_DISCONNECT_REASON_IE_IN_4WAY_DIFFERS, "IE_IN_4WAY_DIFFERS" },
+  { WIFI_DISCONNECT_REASON_GROUP_CIPHER_INVALID, "GROUP_CIPHER_INVALID" },
+  { WIFI_DISCONNECT_REASON_PAIRWISE_CIPHER_INVALID, "PAIRWISE_CIPHER_INVALID" },
+  { WIFI_DISCONNECT_REASON_AKMP_INVALID, "AKMP_INVALID" },
+  { WIFI_DISCONNECT_REASON_UNSUPP_RSN_IE_VERSION, "UNSUPP_RSN_IE_VERSION" },
+  { WIFI_DISCONNECT_REASON_INVALID_RSN_IE_CAP, "INVALID_RSN_IE_CAP" },
+  { WIFI_DISCONNECT_REASON_802_1X_AUTH_FAILED, "802_1X_AUTH_FAILED" },
+  { WIFI_DISCONNECT_REASON_CIPHER_SUITE_REJECTED, "CIPHER_SUITE_REJECTED" },
+  { WIFI_DISCONNECT_REASON_BEACON_TIMEOUT, "BEACON_TIMEOUT" },
+  { WIFI_DISCONNECT_REASON_NO_AP_FOUND, "NO_AP_FOUND" },
+  { WIFI_DISCONNECT_REASON_AUTH_FAIL, "AUTH_FAIL" },
+  { WIFI_DISCONNECT_REASON_ASSOC_FAIL, "ASSOC_FAIL" },
+  { WIFI_DISCONNECT_REASON_HANDSHAKE_TIMEOUT, "HANDSHAKE_TIMEOUT" },
+};
+
+static PGM_P wifiReasonName(uint8_t reason)
+{
+  for (size_t i = 0; i < sizeof(wifiReasonNames) / sizeof(wifiReasonNames[0]); i++) {
+    if (pgm_read_byte(&wifiReasonNames[i].code) == reason) return wifiReasonNames[i].name;
+  }
+  return PSTR("?");
+}
+
+static void formatBssid(char* buf, size_t size, const uint8_t* b)
+{
+  snprintf_P(buf, size, PSTR("%02X:%02X:%02X:%02X:%02X:%02X"), b[0], b[1], b[2], b[3], b[4], b[5]);
+}
+
+static void onWifiConnected(const WiFiEventStationModeConnected& e)
+{
+  memcpy(wifiJoinedBssid, e.bssid, sizeof(wifiJoinedBssid));
+  wifiJoinedChannel = e.channel;
+  if (!wifiLinkUp && wifiOutages > 0) wifiDropDurationMs = millis() - wifiDropStartMs;
+  wifiLinkUp = true;
+  wifiJoinLogPending = true;
+}
+
+static void onWifiDisconnected(const WiFiEventStationModeDisconnected& e)
+{
+  wifiDisconnectEvents++;
+  if (wifiLinkUp) {   // first event after a connect: a new outage starts
+    wifiLinkUp          = false;
+    wifiOutages++;
+    wifiDropFirstReason = e.reason;
+    memcpy(wifiDropBssid, e.bssid, sizeof(wifiDropBssid));
+    wifiDropChannel     = wifiJoinedChannel;
+    wifiDropEvents      = 0;
+    wifiDropStartMs     = millis();
+    wifiDropDurationMs  = 0;
+    wifiDropSelf        = wifiSelfDisconnect;
+    wifiSelfDisconnect  = false;
+    wifiDropLogPending  = true;
+  }
+  if (wifiOutages > 0) {
+    wifiDropEvents++;
+    wifiDropLastReason = e.reason;
+  }
+}
+
+static void wifiLinkEventsBegin()
+{
+  if (wifiDisconnectedHandler) return;
+  wifiConnectedHandler    = WiFi.onStationModeConnected(onWifiConnected);
+  wifiDisconnectedHandler = WiFi.onStationModeDisconnected(onWifiDisconnected);
+}
+
+// Called from loopWifi() in every state: a short drop that the SDK repairs on
+// its own never leaves WIFI_IDLE.
+static void wifiLinkEventsLog()
+{
+  char bssid[18];
+  if (wifiDropLogPending) {
+    wifiDropLogPending = false;
+    formatBssid(bssid, sizeof(bssid), wifiDropBssid);
+    DebugTf(PSTR("WiFi: link lost, reason %u %S, AP %s ch %u%S\r\n"),
+            wifiDropFirstReason, wifiReasonName(wifiDropFirstReason), bssid, wifiDropChannel,
+            wifiDropSelf ? PSTR(" (self: dead-link check)") : PSTR(""));
+  }
+  if (wifiJoinLogPending) {
+    wifiJoinLogPending = false;
+    formatBssid(bssid, sizeof(bssid), wifiJoinedBssid);
+    if (wifiOutages == 0) {
+      DebugTf(PSTR("WiFi: joined AP %s ch %u\r\n"), bssid, wifiJoinedChannel);
+    } else {
+      DebugTf(PSTR("WiFi: joined AP %s ch %u after %lu s, %lu disconnect event(s), last reason %u %S\r\n"),
+              bssid, wifiJoinedChannel, (unsigned long)(wifiDropDurationMs / 1000),
+              (unsigned long)wifiDropEvents, wifiDropLastReason, wifiReasonName(wifiDropLastReason));
+    }
+  }
+  // The boot association can finish before startWiFi() registers the handlers.
+  if (!wifiLinkUp && wifiOutages == 0 && WiFi.status() == WL_CONNECTED) {
+    memcpy(wifiJoinedBssid, WiFi.BSSID(), sizeof(wifiJoinedBssid));
+    wifiJoinedChannel = WiFi.channel();
+    wifiLinkUp = true;
+  }
+}
+
+static void printWifiDropBanner()
+{
+  char bssid[18];
+  formatBssid(bssid, sizeof(bssid), wifiJoinedBssid);
+  _debugPrintf_P(PSTR("  Link : AP %s ch %u   outages %lu   disconnect events %lu\r\n"),
+    bssid, wifiJoinedChannel, (unsigned long)wifiOutages, (unsigned long)wifiDisconnectEvents);
+  if (wifiOutages == 0) {
+    debugTelnet.println(F("  Drop : none since boot"));
+    return;
+  }
+  formatBssid(bssid, sizeof(bssid), wifiDropBssid);
+  _debugPrintf_P(PSTR("  Drop : %lu s ago, down %lu s, reason %u %S (last %u %S, %lu events), AP %s ch %u%S\r\n"),
+    (unsigned long)((millis() - wifiDropStartMs) / 1000),
+    (unsigned long)(wifiDropDurationMs / 1000),
+    wifiDropFirstReason, wifiReasonName(wifiDropFirstReason),
+    wifiDropLastReason, wifiReasonName(wifiDropLastReason),
+    (unsigned long)wifiDropEvents, bssid, wifiDropChannel,
+    wifiDropSelf ? PSTR(", self: dead-link check") : PSTR(""));
+}
+
 //===========================================================================================
 void startWiFi(const char* hostname, int timeOut, bool forcePortal)
 {
   WiFi.mode(WIFI_STA); // explicitly set mode, esp defaults to STA+AP
+  wifiLinkEventsBegin();
 
   // TASK-548: apply static IP before any connect attempt.
   // All fields empty (default) → let the OS keep DHCP mode unchanged.
@@ -452,12 +614,14 @@ static void handleWifiProbeVerdict(bool gatewayAnswered)
     wifiCappedReconnectDone = true;
     wifiCappedReconnectMs   = millis();
     wifiDeadReconnectDone   = true;
+    wifiSelfDisconnect      = true;
     wifi_station_disconnect();
     return;
   }
   if (!wifiDeadReconnectDone) {
     wifiDeadReconnectDone = true;
     DebugTln(F("WiFi: connected but no traffic, forcing a reconnect"));
+    wifiSelfDisconnect = true;
     wifi_station_disconnect();   // loopWifi sees the drop and reconnects
     return;
   }
@@ -529,6 +693,8 @@ static void wifiLinkProbeTick()
 
 void loopWifi() {
   DECLARE_TIMER_SEC(timerWifiRetry, 30, CATCH_UP_MISSED_TICKS);
+
+  wifiLinkEventsLog();
 
   switch (wifiState) {
     case WIFI_IDLE:
@@ -639,6 +805,7 @@ static void sendTelnetBanner(const char* ip)
     signal_quality_perc_quad(wifiRssi),
     (PGM_P)dBmtoQuality(wifiRssi),
     WiFi.localIP().toString().c_str());
+  printWifiDropBanner();
   _debugPrintf_P(PSTR("  Heap : free %u  frag %u%%  minFree %u  maxBlk %u\r\n"),
     (unsigned)ESP.getFreeHeap(),
     (unsigned)ESP.getHeapFragmentation(),
