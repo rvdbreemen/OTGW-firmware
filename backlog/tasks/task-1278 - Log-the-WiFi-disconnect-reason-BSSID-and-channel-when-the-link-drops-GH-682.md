@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-21 05:30'
-updated_date: '2026-10-21 17:55'
+updated_date: '2026-10-21 17:59'
 labels:
   - enhancement
   - wifi
@@ -26,9 +26,9 @@ Requested by mrfox7688 on GH #682 (2026-10-20): daytime WiFi losses of ~2 min wi
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On every station disconnect the telnet debug log shows the 802.11 reason code (number and short name), the BSSID and the channel of the AP that was left
-- [ ] #2 On every connect the log shows the BSSID and channel joined
-- [ ] #3 Shown on the bench: a MikroTik-forced disconnect and a reconnect produce the expected lines; no heap regression; esp8266 build and evaluate.py --quick green
+- [ ] #1 On every connect the log shows the BSSID and channel joined
+- [ ] #2 Shown on the bench: a MikroTik-forced disconnect and a reconnect produce the expected lines; no heap regression; esp8266 build and evaluate.py --quick green
+- [ ] #3 Per outage the firmware keeps one record: station disconnect count since boot, first and last 802.11 reason (number and short name), BSSID and channel left, outage duration, and whether the firmware caused it (dead-link check); the record is shown in the telnet banner on every telnet connect
 <!-- AC:END -->
 
 ## Implementation Plan
