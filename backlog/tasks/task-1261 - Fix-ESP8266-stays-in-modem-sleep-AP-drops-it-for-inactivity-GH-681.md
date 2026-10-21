@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-19 18:02'
-updated_date: '2026-10-20 02:34'
+updated_date: '2026-10-21 05:30'
 labels:
   - bug
 dependencies: []
@@ -26,7 +26,7 @@ Verified in code: the 1.x source and vendored libraries never call WiFi.setSleep
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 1.x calls WiFi.setSleepMode(WIFI_NONE_SLEEP) after every successful WiFi connect, including reconnects, verified on the bench unit via telnet log or WiFi.getSleepMode()
-- [ ] #2 Bench gateway current/heap impact noted (free heap before/after, no new instability over 24 h)
+- [x] #2 Bench gateway current/heap impact noted (free heap before/after, no new instability over 24 h)
 - [ ] #3 theaprilhare reports AP inactivity disassociations with router scb_activity_time back at 5 s, on a beta carrying the change
 - [x] #4 esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
@@ -57,4 +57,6 @@ Approved by Robert 2026-10-19. No push (check_otgw_issues rule).
 2026-10-19 22:19 AC #2 baseline (bench .88.68, fix build 1.7.8-beta.4+0ba8e65 + TASK-1261): bootcount=3, device uptime 1h48m, lastreset "Software/System restart" (OTA), freeheap 17720, RSSI -64. MikroTik wlan2 registration uptime=1h45m (signal -70 dBm). Pass rule at >= 2026-10-20 22:19: bootcount still 3 AND registration uptime >= 25h45m (no reboot, no disassociation).
 
 2026-10-20 04:07 interim: before the TASK-1253 OTA the bench had run 7h33m with bootcount 3 unchanged (no reboot). The 24 h window restarted twice for other bench work (OTA 04:05, OTA ~04:25, RTS reset 04:32). New AC #2 baseline 2026-10-20 04:33:50: build 1.7.8-beta.5+d92c03f (carries the TASK-1261 fix), bootcount 8, MikroTik registration uptime 57s, freeheap 17608, RSSI -64. Pass at >= 2026-10-21 04:34: bootcount 8 and registration uptime >= 24h.
+
+2026-10-21 07:3x AC #2 PASS (bench .88.68, 1.7.8-beta.5+d92c03f): bootcount 8 (unchanged since baseline 2026-10-20 04:33:50), device uptime 1d02:54, MikroTik wlan2 registration uptime 1d02:56:31 (>= 24h; last disconnect in /log is the 04:32:54 RTS reset, deauth reason 3), freeheap 16800 (baseline 17608, range seen 16608-18072), RSSI -72. Remaining open: AC #3 (theaprilhare field report, not self-verifiable).
 <!-- SECTION:NOTES:END -->
