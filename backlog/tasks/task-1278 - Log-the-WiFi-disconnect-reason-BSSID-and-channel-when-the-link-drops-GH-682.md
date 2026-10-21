@@ -3,9 +3,11 @@ id: TASK-1278
 title: >-
   Log the WiFi disconnect reason, BSSID and channel when the link drops (GH
   #682)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-21 05:30'
+updated_date: '2026-10-21 17:54'
 labels:
   - enhancement
   - wifi
