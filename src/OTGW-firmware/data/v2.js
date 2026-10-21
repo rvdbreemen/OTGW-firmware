@@ -1805,7 +1805,7 @@
     satboilerratedkw:    { cat: 'sat', label: 'Boiler rated input', hint: 'kW gas input. Enables the gas estimate and caps it (0 = off)' },
     satboilerefficiency: { cat: 'sat', label: 'Boiler efficiency', hint: 'fraction 0.5–1.0' },
     // TASK-933 P2: keys that already had GET + dispatch but lacked a whitelist token
-    // (now POST-able) plus the masked weather API key.
+    // (now POST-able).
     satcyclesperhour:    { cat: 'sat', label: 'Cycles per hour' },
     satvalveoffset:      { cat: 'sat', label: 'Valve offset', hint: '°C' },
     satsensormaxage:     { cat: 'sat', label: 'Sensor max age', hint: 'Seconds' },
@@ -1813,7 +1813,6 @@
     satautogains:        { cat: 'sat', label: 'Auto-gain factor' },
     satsolarfreezeint:   { cat: 'sat', label: 'Solar freeze integral' },
     satmaxmodulation:    { cat: 'sat', label: 'Max modulation', hint: '%' },
-    satweatherapikey:    { cat: 'sat', label: 'OWM API key' },
     // --- SAT long-tail: curated labels + hints + sub-groups for the older SAT keys
     // the firmware GET exposes (presets / weather / solar / summer / comfort /
     // multi-area / PV-boost / auto-tune / simulation / BLE). These previously fell
@@ -1889,7 +1888,7 @@
     ['Indoor temperature', ['satexternaltemp', 'satsensormaxage']],
     ['Areas', ['satsensorarea0', 'satsensorarea1', 'satsensorarea2', 'satsensorarea3', 'satmultiarea',
                'satmultiareacount', 'satareaweight0', 'satareaweight1', 'satareaweight2', 'satareaweight3', 'satzonecount']],
-    ['Weather', ['satweatherenable', 'satweatherlat', 'satweatherlon', 'satweatherapikey', 'satweatherinterval']],
+    ['Weather', ['satweatherenable', 'satweatherlat', 'satweatherlon', 'satweatherinterval']],
     ['Hot water', ['satdhwenabled', 'satdhwenable', 'satdhwsetpoint']],
     ['Season', ['satsummersimmer', 'satsummerthreshold', 'satsummerminhours', 'satwindowdetect', 'satwindowminsec']]
   ];
@@ -2885,7 +2884,7 @@
   }
 
   // TASK-954: wire the OUTSIDE reading to the actual weather-data API. When
-  // weather compensation is enabled and the last OpenWeatherMap fetch is valid,
+  // weather compensation is enabled and the last Open-Meteo fetch is valid,
   // its temperature drives OUTSIDE; otherwise OUTSIDE falls back to the OT-bus
   // Toutside (MsgID 27) / otmonitor value (the OT case 27 + fetchSeed both yield
   // to model.wxValid). Polled slowly — weather changes on the minute scale.

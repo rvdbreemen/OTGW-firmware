@@ -27,7 +27,7 @@ External inputs arrive via MQTT set commands (`sat/target`, `sat/indoor_temp`, `
 - **Command emission**: write-on-change for CS/MM/CH/TC (TASK-565), refreshed every `SAT_CMD_REFRESH_MS` (300 s) or after an OT-bus offline-to-online edge
 - **Boiler status state machine**: 16 status values tracking flame on/off transitions, ignition surges, pump starts, and modulation ramp-up; cycle classification (good/overshoot/underheat etc.) and rolling 4 h and 24 h cycle statistics
 - **Multi-source temperature**: Room temperature priority is simulation, BLE, multi-area weighted average, MQTT/REST external, OT MsgID 24; staleness tracking per source; thermal estimation fallback for up to 2 h then a fixed safe flow
-- **Weather compensation**: Outdoor temperature from OT MsgID 27, MQTT push, or the weather fetcher (Open-Meteo, or OpenWeatherMap when an API key is set); 24-hour forecast; solar gain compensation from sun elevation
+- **Weather compensation**: Outdoor temperature from OT MsgID 27, MQTT push, or the weather fetcher (Open-Meteo); 24-hour forecast; solar gain compensation from sun elevation
 - **Preset management**: away, eco, comfort, sleep, activity, home (temperatures in `settings.sat.fPreset*`), applied via MQTT or REST; setting a target equal to a preset temperature activates that preset
 - **Window detection**: Pause heating on open-window signal; auto-resume after configurable timeout
 - **CH pressure monitoring**: Exponential moving average smoothing, drop-rate detection, alarm confirmation with hysteresis; `ok`/`low`/`high` status
@@ -127,7 +127,7 @@ External inputs arrive via MQTT set commands (`sat/target`, `sat/indoor_temp`, `
 ### External Systems
 
 - **LittleFS**: `/sat_pid_state.json`, `/sat_energy.json`, `/sat_energy_estimate.json`, `/sat/sat_cycles.json`, `/sat/sat_hcr.json`, `/sat_markers.json` (calibration markers, TASK-586)
-- **Open-Meteo API** (`SATweather.ino`): Free HTTP weather service (no API key); fetched for outdoor temperature + 24-hour forecast when not provided via MQTT or OT MsgID 27. **OpenWeatherMap** replaces it when an API key is configured
+- **Open-Meteo API** (`SATweather.ino`): Free HTTP weather service (no API key); fetched for outdoor temperature + 24-hour forecast when not provided via MQTT or OT MsgID 27.
 - **NimBLE-Arduino 2.x** (`SATble.ino`, ADR-092): Continuous passive BLE scanning, callback-only mode, roster-backed by settings
 
 ## Component Diagram
@@ -145,7 +145,7 @@ C4Component
     }
 
     System_Ext(boiler, "Boiler", "OpenTherm slave")
-    System_Ext(weatherapi, "Weather API", "Open-Meteo or OpenWeatherMap")
+    System_Ext(weatherapi, "Weather API", "Open-Meteo")
     System_Ext(blesensor, "BLE Sensor", "Bluetooth temperature sensor")
     SystemDb_Ext(lfs, "LittleFS", "/sat_pid_state.json, /sat/*.json, /sat_markers.json")
 

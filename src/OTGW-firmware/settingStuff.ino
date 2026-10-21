@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.445
+**  Version  : v2.0.0-alpha.446
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -44,23 +44,6 @@ static bool isHttpPasswordPlaceholder(const char* value)
     lengthPart++;
   }
 
-  return true;
-}
-
-// TASK-933 P2: the OpenWeatherMap API key is a credential and is masked in GET as
-// "apikey=<len>" (mirrors the httppasswd/mqttpasswd "password=<len>" pattern). A
-// POST echoing that mask must be ignored so the real key is not overwritten.
-static bool isWeatherApiKeyPlaceholder(const char* value)
-{
-  if (!value) return false;
-  const size_t prefixLen = sizeof("apikey=") - 1;
-  if (strncasecmp_P(value, PSTR("apikey="), prefixLen) != 0) return false;
-  const char* lengthPart = value + prefixLen;
-  if (*lengthPart == '\0') return false;
-  while (*lengthPart) {
-    if (!isdigit(static_cast<unsigned char>(*lengthPart))) return false;
-    lengthPart++;
-  }
   return true;
 }
 
@@ -368,7 +351,6 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATweatherlat"), settings.sat.fWeatherLat);
   writeJsonFloatKV(file, F("SATweatherlon"), settings.sat.fWeatherLon);
   writeJsonIntKV(file, F("SATweatherinterval"), settings.sat.iWeatherInterval);
-  writeJsonStringKV(file, F("SATweatherapikey"), settings.sat.sWeatherApiKey);
   writeJsonFloatKV(file, F("SATboilercapacity"), settings.sat.fBoilerCapacity);
   writeJsonFloatKV(file, F("SATdhwcapacity"), settings.sat.fDhwCapacity);
   writeJsonFloatKV(file, F("SATboilerratedkw"), settings.sat.fBoilerRatedKW);
@@ -724,6 +706,8 @@ void updateSetting(const char *field, const char *newValue)
 { //do not just trust the caller to do the right thing, server side validation is here!
   // Mask password fields in debug log to avoid leaking credentials
   // (TASK-930: + per-slot MiBeacon bindkey secret, SATblebindkeyN)
+  // SATweatherapikey is no longer a setting (TASK-1280), but an older settings.ini
+  // still carries the OpenWeatherMap key; it is ignored on load and stays masked here.
   if (strcasecmp_P(field, PSTR("httppasswd")) == 0 ||
       strcasecmp_P(field, PSTR("MQTTpasswd")) == 0 ||
       strcasecmp_P(field, PSTR("SATweatherapikey")) == 0 ||
@@ -1048,18 +1032,10 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATweatherlat")) == 0)    settings.sat.fWeatherLat = clampSettingFloat(newValue, settings.sat.fWeatherLat, -90.0f, 90.0f);
   else if (strcasecmp_P(field, PSTR("SATweatherlon")) == 0)    settings.sat.fWeatherLon = clampSettingFloat(newValue, settings.sat.fWeatherLon, -180.0f, 180.0f);
   else if (strcasecmp_P(field, PSTR("SATweatherinterval")) == 0) {
-    // TASK-511 (TASK-004 from OWM onboarding plan): hard floor at 900 s
-    // (15 min) to honour the OWM free-tier rate-limit promise. Both
-    // Open-Meteo and OWM share this floor.
+    // Hard floor at 900 s (15 min) to stay well inside the Open-Meteo
+    // free-tier rate limit.
     settings.sat.iWeatherInterval = constrain(atoi(newValue), 900, 3600);
     CHANGE_INTERVAL_SEC(timerWeatherPoll, settings.sat.iWeatherInterval);
-  }
-  else if (strcasecmp_P(field, PSTR("SATweatherapikey")) == 0) {
-    // TASK-933 P2: ignore the masked "apikey=<len>" echo so re-saving the form
-    // without retyping the key does not overwrite it with the placeholder.
-    if (newValue && !isWeatherApiKeyPlaceholder(newValue)) {
-      strlcpy(settings.sat.sWeatherApiKey, newValue, sizeof(settings.sat.sWeatherApiKey));
-    }
   }
   else if (strcasecmp_P(field, PSTR("SATboilercapacity")) == 0) settings.sat.fBoilerCapacity = clampSettingFloat(newValue, settings.sat.fBoilerCapacity, 1.0f, 100.0f);
   else if (strcasecmp_P(field, PSTR("SATdhwcapacity")) == 0) settings.sat.fDhwCapacity = clampSettingFloat(newValue, settings.sat.fDhwCapacity, 0.0f, 100.0f);

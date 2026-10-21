@@ -27,9 +27,6 @@
 static const uint16_t WEATHER_POLL_DEFAULT_SEC = 900;  // 15 min default
 static const uint16_t WEATHER_POLL_MIN_SEC     = 300;  // 5 min minimum
 
-// OpenWeatherMap hard floor (must match plan/req): 15 minutes.
-static const uint16_t WEATHER_OWM_MIN_SEC      = 900;
-
 // Hourly forecast arrays — ESP32 only.
 // ESP8266 does not request hourly data; omitting saves ~240 bytes of BSS.
 #if HAS_WEATHER_FORECAST
@@ -47,19 +44,16 @@ static uint8_t  _weather_forecastCount = 0;
 
 // Timer — fires every 15 min.  SKIP_MISSED_TICKS: if the loop was busy and a
 // tick was missed, fire once then restart the full 15-min window.  Never
-// fire multiple times in a row to "catch up" — that would burn through the
-// OWM free-tier quota (1 000 calls/day) on a backlogged loop.
+// fire multiple times in a row to "catch up" — that would hammer the
+// Open-Meteo API on a backlogged loop.
 DECLARE_TIMER_SEC(timerWeatherPoll, WEATHER_POLL_DEFAULT_SEC, SKIP_MISSED_TICKS);
 
 //=====================================================================
 //=== API URL format strings (PROGMEM) ===
 //=====================================================================
 
-// TASK-511: Open-Meteo URL format differs per platform (ESP8266 minimal 5
-// fields, ESP32 full data set), so the Open-Meteo constant is per-platform.
-// OpenWeatherMap is platform-agnostic (same URL, same response shape) so the
-// OWM constant lives outside the platform split. PR #559 originally defined
-// kWeatherOwmUrlFmt only in the ESP8266 branch, breaking the ESP32 build.
+// The Open-Meteo URL format differs per platform (ESP8266 minimal 5
+// fields, ESP32 full data set), so the constant is per-platform.
 #if !HAS_WEATHER_FORECAST
 // Minimal current-conditions request: only the 5 fields SAT actually uses.
 // Produces ~450-byte response — stream-parsed with no heap allocation.
@@ -79,11 +73,6 @@ static const char kWeatherUrlFmt[] PROGMEM =
   "&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,apparent_temperature"
   ",precipitation_probability,cloud_cover,cloud_cover_low,cloud_cover_mid";
 #endif  // !HAS_WEATHER_FORECAST
-
-// OpenWeatherMap Current Weather API (HTTP, firmware-side). Key required.
-// Same URL on both platforms; ~400-byte response.
-static const char kWeatherOwmUrlFmt[] PROGMEM =
-  "http://api.openweathermap.org/data/2.5/weather?lat=%.4f&lon=%.4f&appid=%s&units=metric";
 
 //=====================================================================
 //=== Streaming JSON parser — no heap allocation ===
@@ -294,12 +283,6 @@ static void weatherParseStream(WiFiClient* stream, HTTPClient* http)
 //=====================================================================
 //=== HTTP Fetch ===
 //=====================================================================
-static bool weatherShouldUseOwm()
-{
-  // Use OWM only when a key is configured.
-  return (settings.sat.sWeatherApiKey[0] != '\0');
-}
-
 // Forward declaration so the public debug wrapper below can call the
 // file-static implementation that is defined further down.
 static void weatherFetchOpenMeteo();
@@ -420,110 +403,9 @@ static void weatherFetchOpenMeteo()
   feedWatchDog();
 }
 
-// Extract main.temp from OWM current-weather response.
-// Minimal streaming parse: find "main":{..."temp":<num>}.
-static bool weatherParseOwmTemp(WiFiClient* stream, HTTPClient* http, float* outTemp)
-{
-  static const char kNeedleMain[] PROGMEM = "\"main\":";
-  static const char kNeedleTemp[] PROGMEM = "\"temp\":";
-
-  const size_t mainLen = sizeof(kNeedleMain) - 1;
-  const size_t tempLen = sizeof(kNeedleTemp) - 1;
-
-  uint8_t mainPos = 0;
-  bool inMain = false;
-  uint8_t tempPos = 0;
-
-  int ci;
-  while ((ci = wstreamGet(stream, http)) >= 0) {
-    char c = (char)ci;
-
-    if (!inMain) {
-      if (c == (char)pgm_read_byte(&kNeedleMain[mainPos])) {
-        if (++mainPos >= mainLen) { inMain = true; }
-      } else {
-        mainPos = (c == (char)pgm_read_byte(&kNeedleMain[0])) ? 1 : 0;
-      }
-      continue;
-    }
-
-    if (c == (char)pgm_read_byte(&kNeedleTemp[tempPos])) {
-      if (++tempPos >= tempLen) {
-        // Skip whitespace after ':'
-        while ((ci = wstreamGet(stream, http)) >= 0) {
-          c = (char)ci;
-          if (!(c == ' ' || c == '\t' || c == '\n' || c == '\r')) break;
-        }
-        if (ci < 0) return false;
-        if (!((c >= '0' && c <= '9') || c == '-' || c == '+')) return false;
-        *outTemp = wstreamReadNumber(stream, http, c);
-        return true;
-      }
-    } else {
-      tempPos = (c == (char)pgm_read_byte(&kNeedleTemp[0])) ? 1 : 0;
-    }
-  }
-
-  return false;
-}
-
-static void weatherFetchOwm()
-{
-  if (!settings.sat.bWeatherEnable) return;
-  if (!weatherShouldUseOwm()) return;
-  if (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f) {
-    DebugTln(F("Weather(OWM): skipping fetch, no coordinates configured"));
-    return;
-  }
-
-  char url[512];
-  snprintf_P(url, sizeof(url), kWeatherOwmUrlFmt,
-             settings.sat.fWeatherLat,
-             settings.sat.fWeatherLon,
-             settings.sat.sWeatherApiKey);
-
-  DebugTf(PSTR("Weather(OWM): fetching %s\r\n"), url);
-
-  WiFiClient client;
-  HTTPClient http;
-  http.setTimeout(5000);
-
-  if (!http.begin(client, url)) {
-    DebugTln(F("Weather(OWM): http.begin() failed"));
-    state.sat.weather.iFetchErrors++;
-    return;
-  }
-
-  yield();
-  int httpCode = http.GET();
-  yield();
-
-  if (httpCode == 200) {
-    WiFiClient* stream = http.getStreamPtr();
-    float temp;
-    if (weatherParseOwmTemp(stream, &http, &temp)) {
-      state.sat.weather.fTemperature  = temp;
-      state.sat.weather.bValid        = true;
-      state.sat.weather.iLastUpdateMs = millis();
-      DebugTf(PSTR("Weather(OWM): %.1fC\r\n"), state.sat.weather.fTemperature);
-    } else {
-      DebugTln(F("Weather(OWM): parse failed"));
-      state.sat.weather.iFetchErrors++;
-    }
-  } else {
-    DebugTf(PSTR("Weather(OWM): HTTP %d\r\n"), httpCode);
-    state.sat.weather.iFetchErrors++;
-  }
-
-  http.end();
-  feedWatchDog();
-}
-
 void weatherFetch()
 {
-  // Prefer OWM when key is present; otherwise default to Open-Meteo.
-  if (weatherShouldUseOwm()) weatherFetchOwm();
-  else                       weatherFetchOpenMeteo();
+  weatherFetchOpenMeteo();
 }
 
 //=====================================================================
@@ -543,14 +425,6 @@ void weatherLoop()
   if (OTcurrentSystemState.Toutside != 0.0f) return;
   if (!DUE(timerWeatherPoll)) return;
 
-  // If we're using OWM, enforce a hard 15-min guard regardless of
-  // user-configured interval.
-  static uint32_t lastOwmFetchMs = 0;
-  if (weatherShouldUseOwm()) {
-    uint32_t now = millis();
-    if (lastOwmFetchMs != 0 && (uint32_t)(now - lastOwmFetchMs) < (WEATHER_OWM_MIN_SEC * 1000UL)) return;
-    lastOwmFetchMs = now;
-  }
   weatherFetch();
 }
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.445
+**  Version  : v2.0.0-alpha.446
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1577,7 +1577,6 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
           JsonEmit je(*strm);
           je.beginObject();             // root {
           je.field(F("needs_setup"), needs);
-          je.field(F("has_key"),     (settings.sat.sWeatherApiKey[0] != '\0'));
           je.endObject();               // close root
         }
         restFinalize();
@@ -2294,7 +2293,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.dhw_enable"), settings.sat.bDhwEnable);
     je.field(F("settings.sat.window_detection"), settings.sat.bWindowDetection);
     je.field(F("settings.sat.weather_enable"), settings.sat.bWeatherEnable);
-    je.field(F("settings.sat.weather_key"), settings.sat.sWeatherApiKey[0] ? "***" : "(not set)");
     je.field(F("settings.sat.boiler_capacity"), settings.sat.fBoilerCapacity);
     je.field(F("settings.sat.dhw_capacity"), settings.sat.fDhwCapacity);
     je.field(F("settings.sat.simulation"), settings.sat.bSimulation);
@@ -4076,17 +4074,6 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fBoilerRatedKW,           1, 1, tmpBuf); addNum(F("satboilerratedkw"),    tmpBuf, "f", 0, 200);
     dtostrf(settings.sat.fBoilerEfficiency,        1, 2, tmpBuf); addNum(F("satboilerefficiency"), tmpBuf, "f", 0, 1);
   }
-  // satweatherapikey is a credential: emit a masked "apikey=<len>" placeholder
-  // (mirrors httppasswd/mqttpasswd). The dispatch guard ignores the echo so a
-  // form re-save without retyping keeps the real key (TASK-933 P2).
-  {
-    char weatherApiKeyPlaceholder[sizeof("apikey=64")];
-    snprintf_P(weatherApiKeyPlaceholder, sizeof(weatherApiKeyPlaceholder),
-               PSTR("apikey=%u"),
-               static_cast<unsigned>(strnlen(settings.sat.sWeatherApiKey,
-                                              sizeof(settings.sat.sWeatherApiKey))));
-    addStr(F("satweatherapikey"), weatherApiKeyPlaceholder, "p", 64);
-  }
 #if HAS_SAT_BLE
   // --- SAT BLE Sensor settings (Task #20). TASK-742: gated on HAS_SAT_BLE. ---
   addBool(F("satbleenable"), settings.sat.bBleEnable, "b");
@@ -4229,11 +4216,11 @@ static const char* const PROGMEM knownSettings[] = {
   "satweatherenable", "satweatherinterval", "satweatherlat", "satweatherlon",
   "satwindowdetect", "satwindowminsec", "satzonecount", "satzoneheadroom", "satzonetimeout",
   // TASK-933 P2: SAT keys that already had GET + dispatch but were missing from the
-  // whitelist (POST-blocked), plus the masked weather API key. isKnownSetting is a
+  // whitelist (POST-blocked). isKnownSetting is a
   // linear scan so position is cosmetic; grouped here for traceability.
   "sat_onboarded",   // TASK-1012: SAT onboarding wizard persist flag (POST-writable)
   "satautogains", "satcyclesperhour", "saterrormon", "satheatingmode", "sathpcycle",
-  "satmaxmodulation", "satsensormaxage", "satsolarfreezeint", "satvalveoffset", "satweatherapikey",
+  "satmaxmodulation", "satsensormaxage", "satsolarfreezeint", "satvalveoffset",
   "ui_onboarded",
   "webhookcontenttype", "webhookenable", "webhookenabled",
   "webhookpayload", "webhooktriggerbit", "webhookurloff", "webhookurlon",

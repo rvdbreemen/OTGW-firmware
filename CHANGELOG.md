@@ -50,6 +50,8 @@ These classic web UI features are not in v2 (details in `docs/history/2026-10-15
 - the classic display preferences;
 - weather location auto-fill and the OpenWeatherMap key wizard.
 
+- **OpenWeatherMap option and the `SATweatherapikey` setting** (TASK-1280). Open-Meteo is now the only weather source. OpenWeatherMap replaced Open-Meteo whenever a key was set instead of backing it up, parsed only the temperature, and the web UI kept showing Open-Meteo as the source. Open-Meteo needs no key and returns humidity, wind and the 24-hour forecast. A stored `SATweatherapikey` in an older `settings.ini` is ignored and dropped on the next settings save; `GET /api/v2/settings` no longer lists it, and `GET /api/v2/sat/weather/needs-setup` no longer returns `has_key`.
+
 ### Fixed
 
 - **SAT log flood during a burn** (TASK-1269). Once the per-cycle flow ring was full, the 'SAT sample' debug line fired on every loop (about 3300 lines a minute, 94 % of a field capture), and the ring filled at loop rate so it covered only about 0.5 s (p90 = p10). The ring now samples at 1 Hz like the tail ring (last 256 s of a cycle) and the line is written once every 30 s. The cycle classifier keeps using the 180 s tail; the 4 h average flow (`sat/4h_avg_flow_temp`) now reflects the last 256 s of each cycle instead of its last half second.

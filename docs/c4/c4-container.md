@@ -212,7 +212,7 @@ Note: the `/mqttha.cfg` LittleFS file is retired; HA MQTT discovery is published
 ### Weather API (SAT, outbound)
 
 - **From**: ESP32-S3 Firmware (SAT component)
-- **To**: Open-Meteo API (`http://api.open-meteo.com/v1/forecast`) or OpenWeatherMap (`http://api.openweathermap.org/data/2.5/weather`, API key required)
+- **To**: Open-Meteo API (`http://api.open-meteo.com/v1/forecast`, no API key)
 - **Protocol**: HTTP GET (plain HTTP, no TLS)
 - **Description**: Optional outdoor temperature and (with `HAS_WEATHER_FORECAST`) 24-hour forecast for the SAT heating curve. Latitude/longitude and source are configurable in SAT settings. The response is stream-parsed without heap allocation.
 
@@ -352,7 +352,7 @@ C4Container
 
 ### Weather Services
 
-- **Type**: Web services (internet): Open-Meteo (`api.open-meteo.com`, no key) or OpenWeatherMap (key required)
+- **Type**: Web services (internet): Open-Meteo (`api.open-meteo.com`, no key)
 - **Protocol**: HTTP GET (plain HTTP only)
 - **Purpose**: Outdoor temperature (and forecast) source for the SAT heating curve.
 - **Required**: No (SAT falls back to MQTT/REST-pushed outdoor temperature or the OT outdoor value)

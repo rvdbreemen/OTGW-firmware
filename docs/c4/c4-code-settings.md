@@ -69,7 +69,7 @@
 - **Purpose**: Server-side validation dispatcher. Routes field updates to appropriate struct member with range checks, type conversion, GPIO conflict detection, and deferred service restart coordination. Called by `readSettings()` during load, the REST `postSettings()` handler (`POST|PUT /api/v2/settings`, body `{"name":..., "value":...}`, gated by the `isKnownSetting()` whitelist), the MQTT set-command dispatch (`MQTTstuff.ino`, SAT table entries with a `settingKey`), `OTDirect.ino` (`OTDmode`), `SATble.ino` (`SATblemac`, `SATblerostercount`) and the legacy OT-direct REST arguments.
 - **Key Behaviors**:
   - Case-insensitive field matching via `strcasecmp_P()`
-  - Masks password fields in debug output (`httppasswd`, `MQTTpasswd`, `SATweatherapikey`, `SATblebindkey*`)
+  - Masks password fields in debug output (`httppasswd`, `MQTTpasswd`, `SATblebindkey*`)
   - Type-specific validation:
     - **Hostname**: auto-generates unique ID if empty, strips domain suffix, triggers MDNS+MQTT restart
     - **HTTP password**: placeholder detection (rejects "notthepassword", "password=N"), trims whitespace, updates the OTA update server credentials (`httpUpdater.updateCredentials("admin", ...)`)
@@ -159,12 +159,6 @@
   - Returns false for null, empty, or non-matching values
   - Used by `updateSetting()` for both HTTP and MQTT passwords
 - **Dependencies**: None (pure validation)
-
-#### `isWeatherApiKeyPlaceholder(const char* value): static bool`
-- **File**: `settingStuff.ino:53`
-- **Signature**: `static bool isWeatherApiKeyPlaceholder(const char* value)`
-- **Returns**: bool - true if value matches `apikey=N` (N decimal digits)
-- **Purpose**: The OpenWeatherMap API key (`SATweatherapikey`) is masked on GET as `apikey=<len>`; a POST echoing that mask must not overwrite the real key (TASK-933 P2). Mirrors the `password=<len>` pattern of `isHttpPasswordPlaceholder()`.
 
 ### JSON Serialization Helpers
 
@@ -624,7 +618,7 @@ Direct call (e.g., OTA window)
   ├─ *types.h headers (one per sub-section, see above), MQTTstuff.h (MQTT sections), debugStuff.h (DebugSection)
   └─ settingStuff.ino (1281 lines)
      ├─ SIDE_EFFECT_* constants (lines 18-21), settingsDirty / pendingSideEffects (lines 22-23)
-     ├─ isHttpPasswordPlaceholder() (line 25), isWeatherApiKeyPlaceholder() (line 53)
+     ├─ isHttpPasswordPlaceholder() (line 25)
      ├─ settingsMarkClean() (line 71), flushSettings() (line 77)
      ├─ checkGPIOConflict() (line 110)
      ├─ parseJsonKVLine() (line 132)

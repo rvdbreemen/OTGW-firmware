@@ -183,7 +183,7 @@ CH water pressure monitoring, health status, drop-rate detection (Task #226). Th
 
 ### Module: SATweather.ino
 
-Outdoor temperature, humidity, wind and (when `HAS_WEATHER_FORECAST`, set on every ESP32 board in boards.h) a 24-hour forecast. Default source is Open-Meteo (no API key); when `settings.sat.sWeatherApiKey` is set, OpenWeatherMap is used instead (`weatherShouldUseOwm()`, minimum 15 min between fetches, `WEATHER_OWM_MIN_SEC`). Single-pass streaming JSON parse of the response stream (`wstreamGet`, `weatherParseStream`), no full buffer materialisation, no ArduinoJson. A 5-minute startup gate (`WEATHER_POLL_MIN_SEC`, TASK-511) delays the first request, and `weatherLoop()` skips fetching while the OT bus already reports a non-zero `Toutside`. Telnet shortcut `w` triggers an immediate fetch and dumps the parsed state (`weatherDumpStateToTelnet()`, TASK-513).
+Outdoor temperature, humidity, wind and (when `HAS_WEATHER_FORECAST`, set on every ESP32 board in boards.h) a 24-hour forecast. Open-Meteo is the only source (no API key; TASK-1280 removed the OpenWeatherMap option). Single-pass streaming JSON parse of the response stream (`wstreamGet`, `weatherParseStream`), no full buffer materialisation, no ArduinoJson. A 5-minute startup gate (`WEATHER_POLL_MIN_SEC`, TASK-511) delays the first request, and `weatherLoop()` skips fetching while the OT bus already reports a non-zero `Toutside`. Telnet shortcut `w` triggers an immediate fetch and dumps the parsed state (`weatherDumpStateToTelnet()`, TASK-513).
 
 Source comments still mention an ESP8266 minimal URL; the `#if !HAS_WEATHER_FORECAST` branch is the only remnant and no dev board takes it.
 
@@ -192,7 +192,7 @@ Source comments still mention an ESP8266 minimal URL; the `#if !HAS_WEATHER_FORE
 - `weatherLoop(): void`
   - Timer-guarded poll, called from the main loop
 - `weatherFetch(): void`
-  - Picks `weatherFetchOwm()` or `weatherFetchOpenMeteo()`
+  - Calls `weatherFetchOpenMeteo()`
 - `weatherFetchOpenMeteoNow(): void`
   - Public wrapper for the telnet `w` shortcut
 - `weatherSendStatusJSON(): void`
@@ -255,7 +255,7 @@ Up to 4 weighted areas (`fAreaWeight[4]`, `iMultiAreaCount`). Each area is fed b
 
 - Arduino-ESP32 core (millis, PROGMEM helpers, mbedtls)
 - NimBLEDevice.h (NimBLE-Arduino 2.x per ADR-092, continuous scan in callback-only mode, TASK-494)
-- Open-Meteo API (HTTP GET, free, no API key) and optionally OpenWeatherMap (API key)
+- Open-Meteo API (HTTP GET, free, no API key)
 
 ## Settings (Persistent Configuration)
 
@@ -265,7 +265,7 @@ All SAT settings are stored in `settings.sat` (`SATSection` in SATtypes.h, 100+ 
 - Presets: `fPresetComfort/Eco/Away/Sleep/Activity/Home`, `bPresetSync`, `sPresetSyncTopic`
 - PID: `bAutoGains`, `fKpManual/fKiManual/fKdManual`, `fAutoGainsValue`, `bAutoTune`, `fAutoTuneRate`
 - Output: `bPwmAutoSwitch`, `bForcePWM`, `bOvershootProtection` (default on), `fOvershootMargin` (default 2.0), `iMaxRelModulation`, `fFlameOffOffset`, `fFlowOffset`, `fModSupDelay/Offset`, `bPushSetpoint` (TC=), `iCyclesPerHour`, DHW (`bDhwEnabled`, `bDhwEnable`, `fDhwSetpoint`)
-- Environment: weather (`bWeatherEnable`, `fWeatherLat/Lon`, `iWeatherInterval`, `sWeatherApiKey`), solar gain, summer simmer, comfort adjust, window detection, pressure limits
+- Environment: weather (`bWeatherEnable`, `fWeatherLat/Lon`, `iWeatherInterval`), solar gain, summer simmer, comfort adjust, window detection, pressure limits
 - Inputs: `bMultiArea`, `iMultiAreaCount`, `fAreaWeight[4]`, `sSensorArea[4][18]` (Dallas address or BLE MAC), `iZoneCount`, `iZoneTimeoutS`, `fZoneAggregationHeadroom`, PV boost (`bPvBoostEnabled`, `iPvBoostThresholdW`, `iPvBoostHoldS`, `fPvBoostDeltaC`, `fPvBoostMaxIndoorC`, `iPvBoostMaxDurationMin`)
 - Simulation: `bSimulation`, `fSimHeatRate`, `fSimCoolRate`
 - BLE: `bBleEnable`, `bBleRiskAck`, `bBleFailover`, `sBleMAC`, `iBleInterval`, `sBleNamePrefix`, `bBleNameFilterIngest`, roster `sBleMac[8]/sBleLabel[8]/sBleBindkey[8]`

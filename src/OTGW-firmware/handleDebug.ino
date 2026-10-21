@@ -102,7 +102,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("dhw_enable: %s\r\n"), settings.sat.bDhwEnable ? "true" : "false");
     Debugf(PSTR("window_detection: %s\r\n"), settings.sat.bWindowDetection ? "true" : "false");
     Debugf(PSTR("weather_enable: %s\r\n"), settings.sat.bWeatherEnable ? "true" : "false");
-    Debugf(PSTR("weather_key: %s\r\n"), settings.sat.sWeatherApiKey[0] ? "***" : "(not set)");
     Debugf(PSTR("boiler_capacity: %.1f\r\n"), settings.sat.fBoilerCapacity);
     Debugf(PSTR("dhw_capacity: %.1f\r\n"), settings.sat.fDhwCapacity);
     Debugf(PSTR("simulation: %s\r\n"), settings.sat.bSimulation ? "true" : "false");

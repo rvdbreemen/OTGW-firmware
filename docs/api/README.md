@@ -886,7 +886,7 @@ Returns a flat JSON map of build identifiers, runtime counters, every persistent
 
 **Authentication**: Required (when password is configured)
 
-Sensitive values (HTTP password, MQTT password, weather API key) are emitted as `"***"` when present and `"(not set)"` when empty.
+Sensitive values (HTTP password, MQTT password) are emitted as `"***"` when present and `"(not set)"` when empty.
 
 **Response** `200 OK`:
 ```json
@@ -1092,7 +1092,7 @@ Reports whether the browser-side weather setup wizard should be shown (TASK-511)
 
 **Response** `200 OK`:
 ```json
-{"needs_setup": false, "has_key": true}
+{"needs_setup": false}
 ```
 
 #### `GET /api/v2/sat/markers`
