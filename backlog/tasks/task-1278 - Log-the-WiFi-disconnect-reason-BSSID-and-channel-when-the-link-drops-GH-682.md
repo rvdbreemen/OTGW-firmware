@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-21 05:30'
-updated_date: '2026-10-21 17:59'
+updated_date: '2026-10-21 18:00'
 labels:
   - enhancement
   - wifi
@@ -55,3 +55,14 @@ Verification (AC3): bench .88.68, build + flash via OTA.
 - Old-vs-fix: the same forced disconnect on the current build shows no reason in the log.
 - Can be combined with the TASK-1262 bench test (same access-list deny).
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-21 plan revision (advisor review + mrfox log analysis):
+- Printing at reconnect alone is lost: stopAll() kills telnet at the drop and the reconnect line fires before the capture reconnects. The record goes into sendTelnetBanner (shown on every telnet connect), set via a pending flag checked by loopWifi in every state (short drops never leave WIFI_IDLE).
+- Self-caused drops: set a flag before both wifi_station_disconnect() calls of the TASK-1248 dead-link path, so those show as self-initiated, not as an AP kick.
+- Register both handlers at the top of startWiFi(), before WiFiManager autoconnect; fall back to WiFi.channel() when no connect event was seen.
+- AC3 heap check: compare max free block too (core builds a String ssid per event, repeated 201/202 during an access-list deny).
+- mrfox capture 19/20-10 (beta.2+403636d): 0 station disconnects in 21 h (no loopWifi lost/reconnected lines; telnet session stayed up 10:16-11:28 through 5 MQTT reconnects; bootcount 4 unchanged). So for GH #682 this task will mostly show "0 disconnects", which is itself the proof that the loss happens while associated.
+<!-- SECTION:NOTES:END -->
