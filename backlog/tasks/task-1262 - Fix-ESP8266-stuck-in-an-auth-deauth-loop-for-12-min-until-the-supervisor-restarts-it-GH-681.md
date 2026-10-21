@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-19 18:03
-updated_date: '2026-10-21T20:04:00Z'
+updated_date: '2026-10-21T21:50:00Z'
 labels:
   - bug
   - needs-info
@@ -30,7 +30,7 @@ Missing: an ESP-side telnet log of the loop (what the supervisor does on each at
 <!-- AC:BEGIN -->
 - [ ] #1 Reproduced or explained from an ESP-side log: which code path issues the deauth (reason 3) and why reconnects keep failing
 - [ ] #2 Time from first failed reconnect to recovery is bounded and shorter than 12 min, shown on the bench by forcing the loop
-- [ ] #3 esp8266 build and evaluate.py --quick green
+- [x] #3 esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -50,4 +50,14 @@ Missing: an ESP-side telnet log of the loop (what the supervisor does on each at
 - The portal-timeout restart is invisible in the logs: bootcount and updateRebootLog() run after startWiFi() (OTGW-firmware.ino:187-188), so a boot that ends in the portal timeout never counts, and storeRebootReasonUnlessPending() drops its reason because the supervisor reason is still pending.
 - Fits theaprilhare 12+ min outages ending in a "Software/System restart". Single bench run; the portal phase is inferred from timing + code, not observed directly (no AP scan during the window).
 - Reason 3 deauth loop (AC1) not explained yet: WiFi_Disconnect() at portal start sends one deauth per boot, not ~40 in 12 min.
+
+2026-10-21 ADR-099 (Accepted by maintainer) implemented: a WiFi supervisor restart (loopWifi WIFI_FAILED and the dead-link restart) writes an RTC mark (slot 115); the next boot reads and clears it and skips the WiFiManager portal when the saved network is not reachable in the 120 s direct-connect window. WiFiManager v2.0.17 and master have the same _disableSTAConn behaviour (no setter); upstream #706 open since 2018, maintainer on #1752 advises handling it in user code.
+Bench evidence (scanner forcing a laptop WiFi scan every 20 s, deny on router wlan2 AND CAPsMAN access-list; the first try only blocked wlan2 and the gateway escaped to CAPsMAN AP "1e verdieping" at 22:51:26, so it did not count):
+- beta.5 release (old): deny 23:22:47-23:36:49, portal AP OTGW-84:F3:EB:22:B8:E1 seen 13/41 scans (23:30:06-23:33:56 and again from 23:36:20), back 194 s after the allow; bootcount 1 -> 2 although at least two restarts happened.
+- fix 1.7.8-beta.6+9fbafad: deny 23:05:23-23:19:27, portal seen 0/41, back 7 s after the allow.
+- fix, no mark (RTS hardware reset while denied, 23:43:23): portal opened 23:45:38 (8/14 scans), so the power-cycle/first-install path still gets the portal.
+- build.bat green (globals 53368, unchanged), evaluate.py --quick 37/0.
+Still open:
+- AC1: the ~40 auth-then-deauth (reason 3) cycles are not explained. One data point: the router logged "received deauth: sending station leaving (3)" plus an immediate reconnect at 22:44:09, the second of an Exception (2) reboot (TASK-1285), so a crash-reboot looks like reason 3 at the AP.
+- Supervisor restart came 7.3 to 11.5 min after the AP disappeared, not the 5 min (10 x 30 s) the code suggests; cause not found yet (network handlers are skipped while disconnected, see doBackgroundTasks).
 <!-- SECTION:NOTES:END -->
