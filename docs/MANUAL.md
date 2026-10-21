@@ -3194,6 +3194,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/push_setpoint` | `SATpushsetpoint` |
 | `sat/flame_off_offset` | `SATflameoffset` |
 | `sat/force_pwm` | `SATforcepwm` |
+| `sat/overshoot_protection` | `SATovershootprotection` |
 | `sat/flow_offset` | `SATflowoffset` |
 | `sat/summer_simmer` | `SATsummersimmer` |
 | `sat/summer_threshold` | `SATsummerthreshold` |

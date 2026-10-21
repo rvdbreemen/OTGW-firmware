@@ -439,7 +439,7 @@ The following topics are published (retained) when SAT settings change. They ech
 | `sat/deadband` | `"0.25"` | PID deadband (°C) |
 | `sat/control_interval` | `"30"` | Control loop interval (seconds) |
 | `sat/max_modulation` | `"100"` | Max relative modulation % |
-| `sat/flame_off_offset` | `"0.0"` | Setpoint offset when flame is off (°C) |
+| `sat/flame_off_offset` | `"18.0"` | PWM ON phase only: hold offset above the return temperature while waiting for the flame (°C) |
 | `sat/flow_offset` | `"2.0"` | Continuous mode max setpoint drop (°C) |
 | `sat/boiler_capacity` | `"24.0"` | Boiler capacity (kW) |
 | `sat/dhw_capacity` | `"0.0"` | Capacity (kW) while the boiler reports DHW active (0 = use boiler capacity) |
@@ -478,7 +478,7 @@ Settings echo topics are retained. More settings echo topics exist; the full lis
 
 #### SAT Switch State Topics (TASK-284)
 
-State topics for the 13 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
+State topics for the 14 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
 
 | Topic | Description |
 | ----- | ----------- |
@@ -490,6 +490,7 @@ State topics for the 13 SAT boolean switches. Payloads are `"true"` / `"false"`.
 | `sat/simulation_enable` | Simulation mode enable state |
 | `sat/window_detection_enable` | Window detection enable state |
 | `sat/force_pwm_enable` | Force-PWM override enable state |
+| `sat/overshoot_protection_enable` | PWM overshoot protection (start-up and modulation suppression) enable state |
 | `sat/push_setpoint_enable` | Push-setpoint enable state |
 | `sat/ovp_enabled` | OPV (overshoot-protection value) enabled state |
 | `sat/preset_sync_enable` | Preset-sync enable state |
@@ -937,6 +938,7 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 13 auto-
 | `sat/simulation` | `SATsimulation` | Enable simulation mode |
 | `sat/window_detection` | `SATwindowdetect` | Enable automatic window detection |
 | `sat/force_pwm` | `SATforcepwm` | Force PWM mode override |
+| `sat/overshoot_protection` | `SATovershootprotection` | PWM overshoot protection: CS override in the PWM phases (default on) |
 | `sat/push_setpoint` | `SATpushsetpoint` | Enable pushing setpoint changes to boiler |
 | `sat/ovp_enabled` | `SATovpenabled` | Enable OPV (overshoot-protection value) |
 | `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
@@ -1226,7 +1228,7 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 |-------------|-----------|------|-------------|
 | `number` | `sat_dhw_setpoint` | °C | DHW setpoint slider (30-60 °C, 0.5 step) |
 
-**Switch Entities (TASK-284, 13 switches):**
+**Switch Entities (TASK-284, 14 switches):**
 
 Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and takes commands on `%mqtt_sub_topic%/sat/<command>`. Payloads are literal `"true"` / `"false"` (`pl_on` / `pl_off`).
 
@@ -1240,6 +1242,7 @@ Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and take
 | `sat_simulation_enable` | `sat/simulation` | `sat/simulation_enable` | `mdi:flask` |
 | `sat_window_detection_enable` | `sat/window_detection` | `sat/window_detection_enable` | `mdi:window-open-variant` |
 | `sat_force_pwm_enable` | `sat/force_pwm` | `sat/force_pwm_enable` | `mdi:pulse` |
+| `sat_overshoot_protection_enable` | `sat/overshoot_protection` | `sat/overshoot_protection_enable` | `mdi:shield-check` |
 | `sat_push_setpoint_enable` | `sat/push_setpoint` | `sat/push_setpoint_enable` | `mdi:upload` |
 | `sat_ovp_enabled` | `sat/ovp_enabled` | `sat/ovp_enabled` | `mdi:shield-check` |
 | `sat_preset_sync_enable` | `sat/preset_sync` | `sat/preset_sync_enable` | `mdi:sync` |

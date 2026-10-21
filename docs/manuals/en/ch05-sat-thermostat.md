@@ -55,7 +55,7 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "tru
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0"
 ```
 
-Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `pwm_auto_switch`, `push_setpoint`, `ovp_enabled`, `ovp_value`, `ovp_start`, `ovp_stop`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `overshoot_protection`, `pwm_auto_switch`, `push_setpoint`, `ovp_enabled`, `ovp_value`, `ovp_start`, `ovp_stop`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Sending `ON` / `OFF` / `true` / `false` / `1` / `0` works for boolean topics. Numeric topics accept the usual decimal representation.
 
@@ -84,6 +84,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satexternaltemp` | false | bool | Use external indoor sensor via MQTT |
 | `satpwmautoswitch` | true | bool | Automatically switch between continuous and PWM modes |
 | `satforcepwm` | false | bool | Force PWM mode regardless of boiler modulation |
+| `satovershootprotection` | true | bool | PWM start-up and modulation suppression (see 5.6). Applies to every heating source |
 | `satmaxrelmod` | 100 | 0-100 % | Maximum relative modulation sent to boiler (MM= command) |
 | `satmanufacturer` | 0 | 0-18 | Boiler manufacturer (0 = auto-detect) |
 
@@ -128,8 +129,8 @@ The integral term uses a **symmetric clamp** `[-curveValue, +curveValue]` with a
 | Setting | Default | Range | Description |
 |---|---|---|---|
 | `satmaxsetpoint` | 65.0 | 30-80 C | Global safety ceiling for flow setpoint |
-| `satflameoffoffset` | 0.0 | 0-5 C | Setpoint offset when flame off (anti-cycling hysteresis) |
-| `satovershootmargin` | 2.0 | 0-10 C | Overshoot margin for cycle classification |
+| `satflameoffoffset` | 18.0 | 0-30 C | PWM ON phase only: while waiting for the flame, the setpoint is return temperature + this offset. Not applied in continuous mode or in the PWM OFF phase |
+| `satovershootmargin` | 2.0 | 0.5-5 C | Overshoot margin: continuous-to-PWM auto-switch (flow above the requested PID setpoint + margin for 60 s) and cycle classification. Units that stored another value keep it |
 | `satmodsupdelay` | 20.0 | 0-60 s | Modulation suppression delay |
 | `satmodsupoffset` | 1.0 | 0-5 C | Modulation suppression offset below setpoint |
 | `satflowoffset` | 2.0 | 0-10 C | Continuous mode: max setpoint drop from boiler temp |
@@ -182,9 +183,13 @@ Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the 
 
 **Force PWM**: Setting `satforcepwm` to true forces PWM mode regardless of boiler behavior.
 
+**Overshoot protection** (`satovershootprotection`, default on, every heating source): in PWM mode SAT drives the control setpoint (CS) itself. OFF phase: CS = 10 C and CH off, so the boiler is not relit. ON phase, waiting for the flame: CS = return temperature + `satflameoffoffset`, held for `satmodsupdelay` seconds after ignition. After that: CS = flow temperature - `satmodsupoffset`, refreshed about every 3 seconds (not on the 30 s control tick) so the burner stays at its lowest level. If the flame was already on when the ON phase began, CS keeps its previous value until `satmodsupdelay` has passed since the real flame-on time. With the setting off, PWM sends no CS override: CS keeps its previous value, CH stays on (CH follows CS above 10 C, as in thermo-nova) and only MM=0 acts.
+
+**Modulation (MM=) in PWM mode**: MM=0 in both phases while PWM is enabled. Heat pumps and hybrid systems never get MM=0: they keep the configured maximum modulation (`satmaxrelmod`), in PWM as well. Geminox boilers get MM=10 instead of 0. The flame-off offset is no longer added outside the PWM ON hold, so continuous mode sends the PID setpoint while the flame is off.
+
 **Auto-switch**: When `satpwmautoswitch` is enabled (default), SAT monitors boiler behavior using cycle classification (see section 5.11) and switches modes automatically:
 
-- Continuous to PWM: when flow temperature stays more than the overshoot margin above setpoint for 60 seconds (sustained overshoot, indicating the boiler cannot modulate low enough).
+- Continuous to PWM: when flow temperature stays more than the overshoot margin above the requested (PID) setpoint for 60 seconds (sustained overshoot, indicating the boiler cannot modulate low enough).
 - PWM to continuous: when flow temperature stays more than 2 C below setpoint for 180 seconds (sustained underheat) or after 300 seconds of saturation (boiler at max but room still cold).
 
 | Situation | Recommended mode |
@@ -581,7 +586,7 @@ Inbound thermostat MsgID 16 frames are observed by the OTDirect state machine; t
 | HA component | Count | Examples |
 |---|---|---|
 | `number` | ~25 | heating curve coefficient, deadband, overshoot margin, control interval, max modulation, flame-off offset, flow offset, modulation-suppression delay/offset, boiler capacity, comfort humidity, summer threshold, auto-tune rate, preset temperatures (comfort/eco/away/sleep/activity/home), min/max pressure, max pressure drop, target temp step |
-| `switch` | 13 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `push_setpoint`, `ovp_enabled`, `preset_sync`, `dhw_enabled`, `pwm_auto_switch` |
+| `switch` | 14 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `overshoot_protection`, `push_setpoint`, `ovp_enabled`, `preset_sync`, `dhw_enabled`, `pwm_auto_switch` |
 | `select` | 1 | `sat_heating_system` with options `0` (auto), `1` (radiators), `2` (heat pump), `3` (underfloor) |
 
 Each entity writes to its matching `%mqtt_sub_topic%/sat/<parameter>` command topic and reads from the corresponding state topic. All changes go through `updateSetting()` so they are persisted to flash and clamped to safe bounds.

@@ -151,7 +151,7 @@ Streaming functions (`MQTTHaDiscovery.cpp`; none takes a client parameter any mo
 - `bool streamClimateDiscovery(uint8_t climateIdx, ctx)`: 0 = Thermostat, 1 = DHW Control
 - `bool streamNumberDiscovery(ctx)`: Toutside override number (ID 27)
 - `bool streamOverrideSensorDiscovery(ctx, otid, label)`: active gateway override sensor for IDs 1, 8, 9, 14, 16, 39, 56, 57 (ADR-118)
-- `bool streamSatSwitchDiscovery(uint8_t switchIdx, ctx)` (13 switches, index 0 to 12 via `streamSatBoolSwitch()`), `bool streamSatSelectDiscovery(uint8_t selectIdx, ctx)` (`sat_heating_system`), `bool streamSatZoneDiscovery(ctx)` (ID 255, in `MQTTstuff.ino`)
+- `bool streamSatSwitchDiscovery(uint8_t switchIdx, ctx)` (14 switches, index 0 to 13 via `streamSatBoolSwitch()`), `bool streamSatSelectDiscovery(uint8_t selectIdx, ctx)` (`sat_heating_system`), `bool streamSatZoneDiscovery(ctx)` (ID 255, in `MQTTstuff.ino`)
 - `bool streamButtonDiscovery(ctx)` (PIC `resetgateway`), `bool streamSelectDiscovery(uint8_t selectIdx, ctx)` (0 = gpioa, 1 = gpiob, 2 to 7 = leda to ledf)
 - `bool streamDallasSensorDiscovery(const char *sensorAddress, ctx)`: runtime address-based, reached through `configSensors()` / `sensorAutoConfigure()`
 - `clearTopologyDiscoveryForOTId()`, `clearThermostatDupDiscoveryForOTId()`: empty retained publishes for the cleanup passes

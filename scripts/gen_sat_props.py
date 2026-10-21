@@ -72,6 +72,7 @@ DESC = {
  "push_setpoint": "Setpoint pushed to boiler this cycle",
  "flame_off_offset": "Flame-off setpoint offset (C)",
  "force_pwm": "Force PWM mode regardless of conditions",
+ "overshoot_protection": "PWM overshoot protection: CS override in the PWM phases",
  "flow_offset": "Flow-temperature offset applied (C)",
  "pressure": "System water pressure (bar)",
  "pressure_drop_rate": "Pressure drop rate (bar/min)",

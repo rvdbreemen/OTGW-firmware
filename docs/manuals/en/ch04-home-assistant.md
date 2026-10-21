@@ -220,7 +220,7 @@ At boot the firmware queues only the non-OT entities (climate + DHW, outside-tem
 
 Two pseudo-IDs are used to hang non-OT entities off the bitmap:
 
-- ID `0` carries the two climate entities (thermostat and DHW control), the 13 SAT switches, and the SAT select.
+- ID `0` carries the two climate entities (thermostat and DHW control), the 14 SAT switches, and the SAT select.
 - ID `27` carries the "outside temperature override" number entity.
 
 Dallas sensors have their own path (`streamDallasSensorDiscovery`) because their discovery depends on the actual 1-Wire address read at runtime, and they are published via `configSensors()` once those addresses are known.
@@ -328,7 +328,7 @@ Each BLE probe appears as a separate Home Assistant child-device, linked back to
 
 #### SAT Switches and Select (new in 2.0.0)
 
-When SAT is enabled, the streaming pipeline publishes 13 boolean switches and 1 select, giving Home Assistant direct control over the SAT feature flags. All entity names are prefixed with the hostname.
+When SAT is enabled, the streaming pipeline publishes 14 boolean switches and 1 select, giving Home Assistant direct control over the SAT feature flags. All entity names are prefixed with the hostname.
 
 Switches:
 
@@ -342,6 +342,7 @@ Switches:
 | `SAT_Simulation` | Run SAT in simulation mode (no real boiler control) |
 | `SAT_Window_Detection` | Enable window-open detection |
 | `SAT_Force_PWM` | Force PWM mode regardless of boiler modulation |
+| `SAT_Overshoot_Protection` | PWM start-up and modulation suppression (CS override in the PWM phases) |
 | `SAT_Push_Setpoint` | Push control setpoint to boiler via TC= |
 | `SAT_OVP_Enabled` | Enable overshoot prevention calibration |
 | `SAT_Preset_Sync` | Sync climate preset to secondary entities |

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.443
+**  Version  : v2.0.0-alpha.444
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1668,6 +1668,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATflameoffset", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("force_pwm")) == 0) {
       updateSetting("SATforcepwm", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("overshoot_protection")) == 0) {
+      updateSetting("SATovershootprotection", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("flow_offset")) == 0) {
       updateSetting("SATflowoffset", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("summer_simmer")) == 0) {
@@ -2286,6 +2288,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.pwm_auto_switch"), settings.sat.bPwmAutoSwitch);
     je.field(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
     je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
+    je.field(F("settings.sat.overshoot_protection"), settings.sat.bOvershootProtection);
     je.field(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
     je.field(F("settings.sat.dhw_enabled"), settings.sat.bDhwEnabled);
     je.field(F("settings.sat.dhw_enable"), settings.sat.bDhwEnable);
@@ -4039,6 +4042,7 @@ void sendDeviceSettings()
   // updateSetting() dispatch + writeSettings persistence already exist for all of
   // these; these GET lines + the knownSettings[] tokens complete the round-trip.
   addBool(F("satforcepwm"),       settings.sat.bForcePWM, "b");
+  addBool(F("satovershootprotection"), settings.sat.bOvershootProtection, "b");
   addBool(F("satpushsetpoint"),   settings.sat.bPushSetpoint, "b");
   addBool(F("satwindowdetect"),   settings.sat.bWindowDetection, "b");
   addInt (F("satwindowminsec"),   settings.sat.iWindowMinOpenSec, "i", 10, 600);
@@ -4211,7 +4215,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satflameoffset", "satflowoffset", "satflushtreshold", "satforcepwm", "sathumiditytimeout",
   "satinterval", "satmanufacturer", "satmaxpressdrop", "satmaxpressure", "satminpressure",
   "satmodsupdelay", "satmodsupoffset", "satmultiarea", "satmultiareacount",
-  "satovershootmargin", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",
+  "satovershootmargin", "satovershootprotection", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpresethome", "satpresetsleep",  // TASK-1254: activity/home/sleep had GET + dispatch but were POST-blocked
   "satpresetsync", "satpresetsynctopic", "satpushsetpoint",
   // TASK-640: PV-surplus setpoint boost settings

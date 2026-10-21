@@ -1777,6 +1777,7 @@
     otdmsginterval:      { cat: 'otd', label: 'Message interval', hint: 'ms' },
     // SAT: full metadata (TASK-933 Phase 2)
     satforcepwm:         { cat: 'sat', label: 'Force PWM' },
+    satovershootprotection: { cat: 'sat', label: 'PWM overshoot protection' },
     satpushsetpoint:     { cat: 'sat', label: 'Push setpoint to thermostat' },
     satwindowdetect:     { cat: 'sat', label: 'Window detection' },
     satwindowminsec:     { cat: 'sat', label: 'Window min open time', hint: 'Seconds' },
@@ -1894,7 +1895,7 @@
   ];
   var SAT_L3 = [
     ['Curve', ['satcoefficient', 'satdeadband', 'sattempstep', 'satovershootmargin']],
-    ['PID / PWM', ['satforcepwm', 'satpwmautoswitch', 'satcyclesperhour', 'satautogains', 'satmaxmodulation',
+    ['PID / PWM', ['satforcepwm', 'satovershootprotection', 'satpwmautoswitch', 'satcyclesperhour', 'satautogains', 'satmaxmodulation',
                    'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
     ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satboilercapacity', 'satdhwcapacity',

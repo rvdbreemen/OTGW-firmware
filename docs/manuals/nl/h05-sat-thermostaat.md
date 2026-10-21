@@ -61,7 +61,7 @@ Onderwerp: OTGW/set/otgw-AABBCCDDEEFF/sat/enabled
 Waarde:    true
 ```
 
-Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `pwm_auto_switch`, `push_setpoint`, `ovp_enabled`, `ovp_value`, `ovp_start`, `ovp_stop`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `overshoot_protection`, `pwm_auto_switch`, `push_setpoint`, `ovp_enabled`, `ovp_value`, `ovp_start`, `ovp_stop`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Voor booleaanse topics werken `ON` / `OFF` / `true` / `false` / `1` / `0`. Numerieke topics accepteren de gebruikelijke decimale notatie.
 
@@ -90,6 +90,7 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satexternaltemp` | `false` | bool | Externe ruimtetemperatuurbron gebruiken |
 | `satpwmautoswitch` | `true` | bool | Automatisch wisselen tussen PWM en continu |
 | `satforcepwm` | `false` | bool | PWM-modus forceren ongeacht ketelmodulatie |
+| `satovershootprotection` | `true` | bool | PWM-start en modulatie-onderdrukking (zie 5.6). Geldt voor elke warmtebron |
 | `satmaxrelmod` | `100` | 0-100 % | Maximale relatieve modulatie naar ketel (MM= commando) |
 | `satmanufacturer` | `0` | 0-18 | Ketelmerkt (0 = auto-detect) |
 
@@ -135,7 +136,7 @@ De integraalterm gebruikt een **symmetrische clamp** `[-curveValue, +curveValue]
 |---|---|---|---|
 | `satmaxsetpoint` | `65.0` | 30-80 C | Maximaal toegestaan setpoint (veiligheidsplafond) |
 | `satflameoffoffset` | `0.0` | 0-5 C | Setpoint-offset bij vlam uit (anti-cycling hysterese) |
-| `satovershootmargin` | `2.0` | 0-10 C | Overshoot-marge voor cyclusclassificatie |
+| `satovershootmargin` | `2.0` | 0.5-5 C | Overshoot-marge: automatisch wisselen van continu naar PWM (aanvoer boven het gevraagde PID-setpoint + marge gedurende 60 s) en cyclusclassificatie. Opgeslagen waarden blijven staan |
 | `satmodsupdelay` | `20.0` | 0-60 s | Modulatie-onderdrukkingsvertraging |
 | `satmodsupoffset` | `1.0` | 0-5 C | Modulatie-onderdrukkingsoffset onder setpoint |
 | `satflowoffset` | `2.0` | 0-10 C | Continue modus: maximale setpoint-daling t.o.v. keteltemperatuur |
@@ -206,6 +207,10 @@ De continue modus bevat klemlogica: als het PID-setpoint snel daalt maar het ket
 Bij ketels met een hoge minimale modulatie (bijv. 30-40% minimum) kan de continue modus resulteren in te veel warmteafgifte bij mild weer. PWM-modus lost dit op door de vlam aan/uit te schakelen met een berekende duty cycle. Minimale vlam-AAN-tijd: 180 seconden (om te korte brandercycli te voorkomen).
 
 **PWM forceren**: Met `satforcepwm = true` wordt PWM-modus geforceerd ongeacht het ketelgedrag.
+
+**Overshoot-beveiliging** (`satovershootprotection`, standaard aan, elke warmtebron): in PWM-modus stuurt SAT zelf het regelsetpoint (CS). UIT-fase: CS = 10 C en CH uit, zodat de ketel niet opnieuw ontsteekt. AAN-fase, wachten op de vlam: CS = retourtemperatuur + `satflameoffoffset`, vastgehouden tot `satmodsupdelay` seconden na ontsteking. Daarna: CS = aanvoertemperatuur - `satmodsupoffset`, ongeveer elke 3 seconden ververst (niet op de 30 s regeltik), zodat de brander op de laagste stand blijft. Stond de vlam al aan toen de AAN-fase begon, dan houdt CS de vorige waarde tot `satmodsupdelay` is verstreken sinds de echte vlam-aan-tijd. Staat de instelling uit, dan stuurt PWM geen CS-override: CS houdt de vorige waarde, CH blijft aan (CH volgt CS boven 10 C, zoals in thermo-nova) en alleen MM=0 werkt.
+
+**Modulatie (MM=) in PWM-modus**: MM=0 in beide fasen zolang PWM aan staat. Warmtepompen en hybride systemen krijgen nooit MM=0: zij houden de ingestelde maximale modulatie (`satmaxrelmod`). Geminox-ketels krijgen MM=10 in plaats van 0. De flame-off offset wordt niet meer opgeteld buiten de PWM-AAN-fase, dus de continue modus stuurt het PID-setpoint ook als de vlam uit is.
 
 #### Automatisch wisselen
 
@@ -624,7 +629,7 @@ Sinds 2.0.0 worden alle bestuurbare SAT-parameters als aparte HA-entiteiten gepu
 | HA-component | Aantal | Voorbeelden |
 |---|---|---|
 | `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, comfort-vochtigheid, zomerdrempel, auto-tune rate, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
-| `switch` | 13 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `push_setpoint`, `ovp_enabled`, `preset_sync`, `dhw_enabled`, `pwm_auto_switch` |
+| `switch` | 14 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `overshoot_protection`, `push_setpoint`, `ovp_enabled`, `preset_sync`, `dhw_enabled`, `pwm_auto_switch` |
 | `select` | 1 | `sat_heating_system` met opties `0` (auto), `1` (radiatoren), `2` (warmtepomp), `3` (vloerverwarming) |
 
 Elke entiteit schrijft naar het bijbehorende `%mqtt_sub_topic%/sat/<parameter>` commandotopic en leest uit het bijbehorende state-topic. Alle wijzigingen lopen via `updateSetting()` en worden dus naar flash gepersisteerd en binnen veilige grenzen geklemd.

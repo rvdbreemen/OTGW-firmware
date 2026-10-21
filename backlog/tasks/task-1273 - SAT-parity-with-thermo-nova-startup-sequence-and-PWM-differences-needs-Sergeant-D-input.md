@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-20 18:17'
-updated_date: '2026-10-20 19:17'
+updated_date: '2026-10-20 21:37'
 labels:
   - sat
   - parity
@@ -34,4 +34,6 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 2026-10-20 Sergeant D answers (#alpha-testing 18:26 UTC): a) PWM CS override behaviour must be identical to thermo-nova, i.e. gated by overshoot_protection (Python default off). b) Keep cold cutoff 28.2 C (radiators); change the heating-curve coefficient default from 1.5 to 2.0. Note: a default change only affects units without a saved value; existing settings.ini keep 1.5 unless migrated (decide with maintainer).
 
 2026-10-20 18:54 UTC Sergeant D: leave existing settings alone; the coefficient default 2.0 applies only to units without a stored value, no migration of stored 1.5.
+
+From the TASK-1268 round-2 review (opus, by reading, pre-existing): (a) PWM ON-phase expiry is measured from the previous cycle's flame-on (SATcontrol.ino ~813-817), not from the ON-phase start as thermo-nova pwm.py (_last_update): when ignition takes longer than one 30 s tick the phase flips ON/OFF every tick (CS hold <-> 10) and the 180 s ignition timeout is never reached. (b) force PWM with the PID at the system maximum switches PWM->CONTINUOUS->PWM in the same tick (~4753-4761), so PWM state is reset every tick and the ignition timeout never runs. Both belong to the PWM ON timing scope of this task.
 <!-- SECTION:NOTES:END -->

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.443
+**  Version  : v2.0.0-alpha.444
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -439,7 +439,7 @@ struct SATSection {
   float    fPresetHome        = 18.0f;  // Preset: Home (standard at-home temperature)
   bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
-  float    fOvershootMargin   = 3.0f;   // Overshoot margin °C (Python OVERSHOOT_MARGIN_CELSIUS=3.0; cycle classification + auto-switch)
+  float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + continuous->PWM auto-switch; TASK-1268 lowered it from Python's 3.0)
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)
   float    fModSupOffset      = 1.0f;   // Modulation suppression offset (°C below setpoint)
   float    fDhwSetpoint       = 0.0f;   // DHW setpoint (0=inactive, 30-60°C)
@@ -450,6 +450,7 @@ struct SATSection {
   bool     bWindowDetection   = false;  // Enable window open detection via MQTT
   uint16_t iWindowMinOpenSec  = 60;     // Minimum seconds window must stay open before action
   bool     bForcePWM          = false;  // Force PWM mode regardless of boiler modulation
+  bool     bOvershootProtection = true; // PWM CS override: OFF phase CS=10, ON phase return+offset hold then flow-offset (thermo-nova overshoot_protection; TASK-1268)
   float    fFlowOffset        = 2.0f;   // Continuous mode: max setpoint drop from boiler temp
   float    fTargetTempStep    = 0.5f;   // Target temperature UI step size (0.1-1.0)
   float    fMinPressure       = 0.8f;   // Pressure alarm: minimum bar

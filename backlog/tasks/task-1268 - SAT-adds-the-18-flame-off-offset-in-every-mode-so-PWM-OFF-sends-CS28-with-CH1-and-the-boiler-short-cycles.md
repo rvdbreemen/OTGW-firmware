@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-20 18:15'
-updated_date: '2026-10-20 20:31'
+updated_date: '2026-10-21 04:35'
 labels:
   - bug
   - sat
@@ -25,22 +25,24 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 No flame-off offset outside the PWM ON flame-off hold: continuous mode sends the PID/clamp setpoint while the flame is off (bench/sim run, red on alpha.441: pid+18)
+- [x] #1 No flame-off offset outside the PWM ON flame-off hold: continuous mode sends the PID/clamp setpoint while the flame is off (bench/sim run, red on alpha.441: pid+18)
 - [ ] #2 New setting overshoot_protection (default off), end to end: settings.ini, REST GET/POST + whitelist, SAT REST route, MQTT sat/overshoot_protection, status JSON, MQTT state, HA switch, v2 UI, docs
 - [ ] #3 PWM with overshoot_protection off: no CS override (CS keeps its previous value) and MM=0 in both PWM phases, identical to thermo-nova (sim run)
-- [ ] #4 PWM with overshoot_protection on: OFF phase sends CS=10 and CH=0 (no relight at 28), ON phase keeps the return+offset hold then flow-1 (sim run, red on alpha.441: CS=28 CH=1 in OFF)
+- [x] #4 PWM with overshoot_protection on: OFF phase sends CS=10 and CH=0 (no relight at 28), ON phase keeps the return+offset hold then flow-1 (sim run, red on alpha.441: CS=28 CH=1 in OFF)
 <!-- AC:END -->
 
 ## Implementation Plan
 
 <!-- SECTION:PLAN:BEGIN -->
-Goal: PWM setpoint behaviour identical to thermo-nova (heating_control.py update() 197-240, _compute_pwm_control_setpoint 380-448, relative_modulation_state 134-145), per Sergeant D 2026-10-20.
-1. SATcontrol.ino ~4679-4687: delete the generic flame-off offset block (adds fFlameOffOffset whenever the flame is off, any mode). The PWM ON flame-off hold at ~770 already uses return+offset as a replacement value.
-2. satApplyPWM(): keep the PWM timing/state machine as is (bPwmFlameRequested, ignition wait, cycle limit), but gate the CS override like Python: when !bOvershootProtection (or DHW active, or pidOutput <= cold setpoint) return the previous control setpoint (state.sat.fFinalSetpoint at entry, i.e. no override) instead of 10 / hold / flow-1. With the flag on, unchanged sequence.
-3. MM in PWM: 0 in both phases while PWM is enabled (Python RelativeModulationState.OFF), max otherwise (DHW keeps max). Today ours is 0 in ON and max in OFF (~4662-4664).
-4. New setting SATovershootprotection / settings.sat.bOvershootProtection (default false), same layers as SATforcepwm: SATtypes.h, settingStuff.ino write+updateSetting, restAPI.ino GET addBool + knownSettings + SAT REST route 'overshoot_protection', MQTTstuff.ino kSatMqttCmds passthrough, SATcontrol status JSON + publishIfChangedB sat/overshoot_protection_enable, MQTTHaDiscovery.cpp switch next to force_pwm, v2.js label in the PID / PWM group, docs (MANUAL SAT command + passthrough tables, ch05/h05 settings table, docs/api/MQTT.md if it lists SAT switches).
-Out of scope (TASK-1273): continuous previous-CS term, PWM timing/start gate/EMA, auto-switch input, CH threshold 22, PM=25, 5 s loop; coefficient default 2.0.
-Verification: SAT simulation mode + Force PWM on the OTGW32 bench (OT-Direct), poll /api/v2/sat/status (final_setpoint, pwm_flame_req, control_mode, modulation) every 5 s plus telnet SAT lines; red run on alpha.441 (expect CS=28 with CH on in PWM OFF, pid+18 in continuous with flame off), green runs on the fix with the flag off and on. Settings saved before, restored after. tests/test_settings_whitelist.py must stay green (it enforces the whitelist for the new key). Cross-line: SAT is 2.0.0-only, no port.
+Approved by Sergeant D 2026-10-20 (20:27 'This looks ok'), consolidated:
+1. Delete the generic flame-off offset block (SATcontrol.ino, '--- Flame-off setpoint offset' before the COLD_SETPOINT cutoff). The +18 stays only in the PWM ON wait-for-flame hold.
+2. New setting SATovershootprotection / settings.sat.bOvershootProtection, default TRUE (all heating systems; user can switch it off), same layers as SATforcepwm: SATtypes.h, settingStuff write+updateSetting, restAPI GET addBool + knownSettings + SAT REST route 'overshoot_protection', MQTTstuff kSatMqttCmds passthrough, status JSON, publishIfChangedB sat/overshoot_protection_enable, HA switch next to force_pwm, v2.js (PID / PWM group), docs.
+3. satApplyPWM: CS override only when overshoot protection is on, DHW is not active and the PID setpoint is above the cold setpoint (thermo-nova heating_control.py:385); otherwise return the previous control setpoint (no override, state.sat.fFinalSetpoint at entry). With it on: OFF -> 10 (CH off); ON waiting for flame -> return + fFlameOffOffset clamped cold..max (hold); ON after fModSupDelay -> flow - fModSupOffset.
+4. Suppression refresh ~every 3 s during PWM ON after the hold (OpenTherm text 2.1.1.2.5 from Sergeant D: update CS with the latest boiler temperature every 2-3 s), independent of the 30 s control tick, through the normal SAT CS enqueue path (ADR-179 ownership).
+5. MM: 0 in both PWM phases while PWM is enabled (thermo-nova RelativeModulationState.OFF); heat pump and hybrid (iHeatingSource) never 0, always iMaxRelModulation; Geminox floor max(10, value) including MM=0 (today only 1..9 are lifted).
+6. Continuous -> PWM auto-switch compares flow with the requested/PID setpoint, not fFinalSetpoint (SATcycles.ino ~949), as thermo-nova (flow >= requested + margin for 60 s); overshoot margin default 3.0 -> 2.0 (SATtypes.h:442; also the classifier threshold). Stored values stay.
+Out of scope (TASK-1273): continuous previous-CS term, PWM ON timing/start gate/EMA seeding, cycle-end mode switch, CH threshold 22, PM=25, PM/MI on runtime enable, curve coefficient default 2.0.
+Verification: SAT simulation + force PWM on the OTGW32 bench, sample /api/v2/sat/status (final_setpoint, pwm_flame_req, control_mode, modulation/MM, flow) every 2 s over several PWM cycles: old (alpha.443) vs new, with overshoot_protection on and off, heating source gas vs heat pump; continuous with flame off (no +18). Plus telnet CS= lines for the 3 s refresh.
 <!-- SECTION:PLAN:END -->
 
 ## Implementation Notes
@@ -67,4 +69,10 @@ Verification: SAT simulation mode + Force PWM on the OTGW32 bench (OT-Direct), p
 2026-10-20 20:27 UTC Sergeant D approved the final plan ('This looks ok' after the point-4 detail). He also described the thermo-nova cold start: continuous first (CH=1, CS = curve+PID, MM=100), when BT - CS >= ~2 for ~60 s switch to PWM. Python: flow >= REQUESTED + 3.0 (cycles/const.py OVERSHOOT_MARGIN_CELSIUS) sustained 60 s (const.py OVERSHOOT_SUSTAIN_SECONDS) -> enable PWM (heating_control.py ~262-305). Ours compares flow with fFinalSetpoint (SATcycles.ino ~949), which the continuous clamp keeps within 2 C of flow, so the switch practically never fires (TASK-1273 item). Pulled into TASK-1268: compare with the requested (PID) setpoint, so the cold start actually reaches the PWM suppression.
 
 2026-10-20 20:30 UTC Sergeant D: overshoot margin default 3.0 -> 2.0 (settings.sat.fOvershootMargin, SATtypes.h:442; used by the continuous->PWM switch and the cycle classifier SATcycles.ino:671). Stored values on existing units stay as they are (his rule 'leave existing settings alone'). In scope of TASK-1268.
+
+AC #2 wording 'default off' is superseded by Sergeant D's decision 2026-10-20 (default ON for all heating systems, switchable); implementation follows the decision. Red bench run alpha.442 (OTGW32 .88.61, SAT simulation + force PWM, 6 min, 2 s samples): OFF phase pwm_flame_req=false with final_setpoint 28 (= 10 + 18 flame-off offset), CH enable on throughout, MM 100. Evidence %TEMP%\bench-1268\red-alpha442.json. Review round 1 (opus correctness + sonnet rules/tests): underheat in OFF phase, range-5 tick vs refresh sawtooth, solar ratchet, thermal-safe vs refresh, stale PWM state, hold on lit boiler, refresh vs simulation, doc counts 13->14; sent back for fixes.
+
+Round 1 fixes done (underheat ON-only, range-5 tick==refresh, solar ratchet via _sat_lastControlCS, thermal-safe guard, satPwmReset/satSetControlMode, hold only while flame off with pending-until-delay, refresh writes fFinalSetpoint first; docs counts 13->14, ch04/ch09/gen_sat_props, TASK-1271 changelog). Host test tests/test_sat_pwm_override.py 25 OK, against HEAD 19 FAIL. Round 2 (opus): all 7 fixes verified real, nothing blocking. Accepted as-is: protection off freezes CS (thermo-nova parity, documented); keep-previous-CS falls back to the PID setpoint when the previous CS was 10 (at most fModSupDelay, avoids CH off in the ON phase); pre-existing ON-phase timing flap and force-PWM-at-max reset moved to TASK-1273.
+
+2026-10-21 bench OTGW32 .88.61, fw+fs alpha.443+e07a33c (this diff) via safeboot/OTA, SAT simulation. AC4 red/green: alpha.442 OFF phase final_setpoint 28 (10+18) while PID 21-25 was below cold (relight); new OFF phase final 10, CH off. ON phase with flame off: hold return+18 (37.3, rising to the 45 max); the 20 s hold -> flow-1 step and the 3 s refresh are not reachable in the SAT simulation (DHW draws fire the flame for <20 s), covered by tests/test_sat_pwm_override.py (25 OK, 19 FAIL on HEAD). AC1 green: continuous, flame off, radiators (max 62): final_setpoint == pid_output (55.3), not pid+18 (73.3 -> 62). AC2: setting defaults true after OTA (stored margin 3.0 kept); REST sat/settings/overshoot_protection 0 -> status false; MQTT OTGW/set/<id>/sat/overshoot_protection 1 -> status true and persisted in settings; HA discovery homeassistant/switch/<id>/sat_overshoot_protection_enable/config present (14 switch configs) with stat_t .../sat/overshoot_protection_enable and cmd_t .../sat/overshoot_protection. NOT yet observed: the state topic payload itself (two captures were killed by host memory pressure). AC3 (protection off, sim run) only by host test + REST toggle. Settings restored, diff vs baseline only the new key. Evidence %TEMP%\bench-1268\red-alpha442.json, green-1268*.json, mqtt-op.txt.
 <!-- SECTION:NOTES:END -->

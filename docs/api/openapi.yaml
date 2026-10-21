@@ -1473,7 +1473,7 @@ paths:
         storms. One ID can carry several configs.
 
         Produced entity categories: 289 sensors, 53 binary_sensors, 2 climate
-        (Thermostat + DHW Control), 1 number (Toutside_override), 13 SAT switches
+        (Thermostat + DHW Control), 1 number (Toutside_override), 14 SAT switches
         and 1 SAT select (TASK-284), plus runtime Dallas sensor entries.
 
         Returns 202 Accepted.
@@ -4247,6 +4247,9 @@ components:
         force_pwm:
           type: boolean
           description: "Force PWM mode regardless of conditions"
+        overshoot_protection:
+          type: boolean
+          description: "PWM overshoot protection (default true): OFF phase CS=10 and CH off, ON phase return+offset hold then flow-offset refreshed every ~3 s; MM=0 in PWM except heat pump/hybrid. When false, PWM sends no CS override (CS keeps its previous value, CH stays on)."
         flow_offset:
           type: number
           description: "Flow-temperature offset applied (C)"
@@ -4507,6 +4510,7 @@ components:
         push_setpoint: false
         flame_off_offset: 0.0
         force_pwm: false
+        overshoot_protection: true
         flow_offset: 2.0
         pressure: 0.0
         pressure_drop_rate: 0.0

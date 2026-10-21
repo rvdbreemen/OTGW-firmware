@@ -3432,6 +3432,12 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("/sat/dhw_enable"),              PSTR("/sat/dhw_enable"),
         PSTR("mdi:water-boiler"));
       break;
+    case 13:
+      published = streamSatBoolSwitch(ctx,
+        PSTR("-sat-overshoot-protection-enable"), PSTR("_SAT_Overshoot_Protection"),
+        PSTR("/sat/overshoot_protection"),    PSTR("/sat/overshoot_protection_enable"),
+        PSTR("mdi:shield-check"));
+      break;
     default:
       return false;
   }

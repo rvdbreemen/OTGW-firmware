@@ -17,7 +17,7 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
 #### Key Functions
 
 - `satControlLoop(): void`
-  - Main control loop entry point. Order of work: deferred PID restore (needs NTP), boiler-detected teardown for simulation, command-cache reset on an OT-bus offline-to-online edge, fallback detection (MQTT lost >5 min), early bail when SAT is disabled or a flash is running, `satUpdateSimulation()`, `satUpdateThermalLearning()`, flame edge detection, `satCycleSample()`, once-a-minute 4 h and 24 h window stats, `satPicCSKeepalive()`, then (on the `timerSATControl` tick) DHW detection, power/energy update and save (also during DHW, TASK-1258), the DHW branch, room/outside inputs, 45 s room-temperature EMA (TASK-894), pressure, solar gain, summer simmer, TRV valves, auto-tune, curve recommendation, boiler status, comfort, PV boost, heating curve, PID, optional multi-zone P75 aggregation, clamping, PWM or continuous mode, modulation value, COLD_SETPOINT cutoff, and finally the write-on-change CS/MM/CH/TC enqueues and `satPublishMQTT()`
+  - Main control loop entry point. Order of work: deferred PID restore (needs NTP), boiler-detected teardown for simulation, command-cache reset on an OT-bus offline-to-online edge, fallback detection (MQTT lost >5 min), early bail when SAT is disabled or a flash is running, `satUpdateSimulation()`, `satUpdateThermalLearning()`, flame edge detection, `satCycleSample()`, once-a-minute 4 h and 24 h window stats, `satPicCSKeepalive()`, `satPwmSuppressionRefresh()` (3 s, TASK-1268), then (on the `timerSATControl` tick) DHW detection, power/energy update and save (also during DHW, TASK-1258), the DHW branch, room/outside inputs, 45 s room-temperature EMA (TASK-894), pressure, solar gain, summer simmer, TRV valves, auto-tune, curve recommendation, boiler status, comfort, PV boost, heating curve, PID, optional multi-zone P75 aggregation, clamping, PWM or continuous mode, modulation value, COLD_SETPOINT cutoff, and finally the write-on-change CS/MM/CH/TC enqueues and `satPublishMQTT()`
   - Safety trips (`bSafetyTripped`, then `satDisable()`) after `SAT_MAX_SKIP_COUNT` (10) consecutive invalid room readings or `SAT_MAX_PIC_FAILS` (5) control ticks without an OT command interface
 
 - `initSAT(): void`
@@ -79,13 +79,19 @@ Central control loop, heating curve calculation, setpoint management, SAT-owned 
   - Per-tick analysis steps called from `satControlLoop()`
 
 - `satApplyPWM(float)` and `satApplyContinuous(float)` (static)
-  - Control-mode output stages; PWM applies the modulation-suppression CS sequence
+  - Control-mode output stages. `satPwmSchedule()` only moves the PWM ON/OFF state; `satApplyPWM()` derives CS from it (TASK-1268). With `bOvershootProtection` on, no DHW and a requested setpoint above the cold setpoint: OFF phase CS=10 (CH off); ON phase with the flame off: `satPwmFlameOffHold()` = return + `fFlameOffOffset` (kept for `fModSupDelay` after ignition); flame on without a recorded hold and inside the delay since the real flame-on time: previous control setpoint; after the delay: `satPwmSuppressionSetpoint()` = flow - `fModSupOffset`. Otherwise no override: CS keeps `_sat_lastControlCS` (the previous control setpoint before the solar adjustment). The flame-off offset is used nowhere else
+- `satPwmSuppressionRefresh()` (static, 3 s `timerSATSuppress`)
+  - Recomputes the suppression CS between control ticks (OpenTherm text 2.1.1.2.5) through `satEnqueueIfChangedCS()` and updates `fFinalSetpoint`. Idle unless SAT is active, PWM ON phase, past the hold, protection on, no DHW/fault, valves open and the thermal safe fallback (`_sat_thermalSafeActive`) not active
+- `satPwmReset()`, `satSetControlMode()`
+  - Entering or leaving PWM (and `satDisable()`) clears the PWM state so a new stint starts idle
+- `satComputeMM(...)` (static, pure)
+  - MM per mode: 0 in PWM, `iMaxRelModulation` otherwise; heat pump and hybrid never 0 (heat pump 100 outside PWM); Geminox floor 10 (0 included); Immergas cap 80
 
 #### Constants and tables
 
 - `satManufacturerTable[]` (PROGMEM): MemberID to name and quirk flags (18 entries, index matches `SATManufacturer`, AUTO=0 is skipped). Quirks: `SAT_QUIRK_MIN_MOD_10`, `SAT_QUIRK_IMMERGAS_TP`, `SAT_QUIRK_NO_REL_MOD`, `SAT_QUIRK_MI_500_BOOT`
 - `SAT_CMD_REFRESH_MS` (300 s), `SAT_PIC_CS_KEEPALIVE_MS` (30 s), `SAT_MIN_SETPOINT` (10 C), `SAT_GLOBAL_MAX_SETPOINT` (65 C), `SAT_HARD_MAX_FLOOR` (50 C), `SAT_HARD_MAX_RAD` (80 C), `SAT_COLD_SETPOINT_RAD` (28.2 C) and `SAT_COLD_SETPOINT_FLOOR` (21 C, below which the boiler is commanded off, TASK-891.2)
-- Heating system (`SAT_HSYS_AUTO/RADIATORS/UNDERFLOOR`) and heating source (`SAT_SRC_AUTO/GAS_BOILER/HEAT_PUMP/HYBRID`, TASK-891.8) are separate settings. Heat-pump source forces MM=100, 2 cycles/hour and a user-selectable cycle time (`iHpCycleSeconds`)
+- Heating system (`SAT_HSYS_AUTO/RADIATORS/UNDERFLOOR`) and heating source (`SAT_SRC_AUTO/GAS_BOILER/HEAT_PUMP/HYBRID`, TASK-891.8) are separate settings. Heat-pump source forces MM=100 outside PWM (the configured maximum in PWM), 2 cycles/hour and a user-selectable cycle time (`iHpCycleSeconds`)
 
 #### State machines
 
@@ -258,7 +264,7 @@ All SAT settings are stored in `settings.sat` (`SATSection` in SATtypes.h, 100+ 
 - Core: `bEnabled`, `iHeatingSystem` (auto/radiators/underfloor), `iHeatingSource` (auto/gas_boiler/heat_pump/hybrid), `iHpCycleSeconds`, `fTargetTemp`, `fHeatingCurveCoeff`, `fDeadband`, `iControlInterval`, `bUseExternalTemp`, `iSensorMaxAgeS`, `fMaxSetpoint`
 - Presets: `fPresetComfort/Eco/Away/Sleep/Activity/Home`, `bPresetSync`, `sPresetSyncTopic`
 - PID: `bAutoGains`, `fKpManual/fKiManual/fKdManual`, `fAutoGainsValue`, `bAutoTune`, `fAutoTuneRate`
-- Output: `bPwmAutoSwitch`, `bForcePWM`, `iMaxRelModulation`, `fFlameOffOffset`, `fFlowOffset`, `fModSupDelay/Offset`, `bPushSetpoint` (TC=), `iCyclesPerHour`, DHW (`bDhwEnabled`, `bDhwEnable`, `fDhwSetpoint`)
+- Output: `bPwmAutoSwitch`, `bForcePWM`, `bOvershootProtection` (default on), `fOvershootMargin` (default 2.0), `iMaxRelModulation`, `fFlameOffOffset`, `fFlowOffset`, `fModSupDelay/Offset`, `bPushSetpoint` (TC=), `iCyclesPerHour`, DHW (`bDhwEnabled`, `bDhwEnable`, `fDhwSetpoint`)
 - Environment: weather (`bWeatherEnable`, `fWeatherLat/Lon`, `iWeatherInterval`, `sWeatherApiKey`), solar gain, summer simmer, comfort adjust, window detection, pressure limits
 - Inputs: `bMultiArea`, `iMultiAreaCount`, `fAreaWeight[4]`, `sSensorArea[4][18]` (Dallas address or BLE MAC), `iZoneCount`, `iZoneTimeoutS`, `fZoneAggregationHeadroom`, PV boost (`bPvBoostEnabled`, `iPvBoostThresholdW`, `iPvBoostHoldS`, `fPvBoostDeltaC`, `fPvBoostMaxIndoorC`, `iPvBoostMaxDurationMin`)
 - Simulation: `bSimulation`, `fSimHeatRate`, `fSimCoolRate`

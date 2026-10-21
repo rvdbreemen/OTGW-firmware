@@ -231,7 +231,7 @@ Bij opstart worden alleen de niet-OT-entiteiten in de queue gezet (climate + DHW
 
 Twee pseudo-ID's worden gebruikt om niet-OT-entiteiten aan de bitmap op te hangen:
 
-- ID `0` bevat de twee climate-entiteiten (thermostaat en DHW-control), de 13 SAT-switches en de SAT-select.
+- ID `0` bevat de twee climate-entiteiten (thermostaat en DHW-control), de 14 SAT-switches en de SAT-select.
 - ID `27` bevat de number-entiteit voor buitentemperatuur-override.
 
 Dallas-sensoren hebben een eigen pad (`streamDallasSensorDiscovery`) omdat hun discovery afhankelijk is van het 1-Wire-adres dat pas tijdens runtime bekend wordt; ze worden via `configSensors()` gepubliceerd zodra die adressen beschikbaar zijn.
@@ -342,7 +342,7 @@ Elke BLE-probe verschijnt als een apart Home Assistant child-device, gekoppeld a
 
 #### SAT-switches en -select (nieuw in 2.0.0)
 
-Wanneer SAT is ingeschakeld, publiceert de streaming-pipeline 13 boolean switches en 1 select, waarmee Home Assistant direct de SAT-feature-vlaggen kan aansturen. Alle entiteitsnamen worden voorafgegaan door de hostname.
+Wanneer SAT is ingeschakeld, publiceert de streaming-pipeline 14 boolean switches en 1 select, waarmee Home Assistant direct de SAT-feature-vlaggen kan aansturen. Alle entiteitsnamen worden voorafgegaan door de hostname.
 
 Switches:
 
@@ -356,6 +356,7 @@ Switches:
 | `SAT_Simulation` | SAT draaien in simulatiemodus (geen echte ketelregeling) |
 | `SAT_Window_Detection` | Openraamdetectie inschakelen |
 | `SAT_Force_PWM` | PWM-modus afdwingen, ongeacht ketelmodulatie |
+| `SAT_Overshoot_Protection` | PWM-start en modulatie-onderdrukking (CS-override in de PWM-fasen) |
 | `SAT_Push_Setpoint` | Control-setpoint via TC= naar de ketel pushen |
 | `SAT_OVP_Enabled` | Overshoot prevention-kalibratie inschakelen |
 | `SAT_Preset_Sync` | Climate-preset synchroniseren naar secondaire entiteiten |

@@ -25,7 +25,7 @@
 // --- Cycle Constants ---
 static const uint8_t  SAT_CYCLE_HISTORY_SIZE       = 16;
 static const float    SAT_CYCLE_SHORT_DURATION_SEC  = 60.0f;   // Cycles shorter than this = SHORT_CYCLING
-// Overshoot margin now read from settings.sat.fOvershootMargin (default 3.0C, Python OVERSHOOT_MARGIN_CELSIUS)
+// Overshoot margin now read from settings.sat.fOvershootMargin (default 2.0C; Python OVERSHOOT_MARGIN_CELSIUS is 3.0)
 static const float    SAT_OVERSHOOT_SUSTAIN_SEC     = 60.0f;   // Sustained overshoot before PWM switch
 static const float    SAT_UNDERSHOOT_MARGIN_C       = 3.0f;    // Below-setpoint margin for underheat (Python UNDERSHOOT_MARGIN_CELSIUS=-3.0)
 static const float    SAT_UNDERHEAT_SUSTAIN_SEC     = 180.0f;  // Sustained underheat before continuous switch
@@ -936,7 +936,7 @@ void satCycleSample()
 
 //=== Check if auto-switch between PWM and continuous is needed ===
 // Called from the control loop. Returns true if mode was switched.
-bool satCycleCheckAutoSwitch()
+bool satCycleCheckAutoSwitch(float requestedSetpoint)
 {
   if (!settings.sat.bPwmAutoSwitch) return false;
 
@@ -946,7 +946,10 @@ bool satCycleCheckAutoSwitch()
   if (dt <= 0.0f || dt > 60.0f) return false; // Skip on first call or large gaps
 
   float flowTemp = satGetFlowTemp();
-  float setpoint = state.sat.fFinalSetpoint;
+  // The requested (PID) setpoint, not the final one: the continuous clamp keeps the final setpoint within
+  // a few degrees of the flow, so comparing against it would almost never see an overshoot (thermo-nova
+  // compares flow with the requested setpoint, heating_control.py _maybe_enable_pwm_on_sustained_overshoot).
+  float setpoint = requestedSetpoint;
 
   SATDebugTf(PSTR("SAT autoswitch: mode=%d flow=%.1f sp=%.1f os=%.0fs uh=%.0fs\r\n"),
              (int)state.sat.eControlMode, flowTemp, setpoint,
@@ -969,14 +972,20 @@ bool satCycleCheckAutoSwitch()
     }
     if (_sustain_overshootSec >= SAT_OVERSHOOT_SUSTAIN_SEC) {
       SATDebugTln(F("SAT: sustained overshoot detected, switching to PWM mode"));
-      state.sat.eControlMode = SAT_MODE_PWM;
+      satSetControlMode(SAT_MODE_PWM);
       _sustain_overshootSec = 0.0f;
       return true;
     }
   }
 
   // --- Underheat detection (PWM → continuous) ---
-  if (state.sat.eControlMode == SAT_MODE_PWM) {
+  // Both checks only run in the PWM ON phase (thermo-nova _maybe_disable_pwm_runtime returns and resets
+  // the guards while the PWM status is not ON): in the OFF phase the flow is low by design.
+  if (state.sat.eControlMode == SAT_MODE_PWM && !state.sat.bPwmFlameRequested) {
+    _sustain_underheatSec  = 0.0f;
+    _sustain_saturationSec = 0.0f;
+  }
+  if (state.sat.eControlMode == SAT_MODE_PWM && state.sat.bPwmFlameRequested) {
     if (flowTemp < setpoint - SAT_UNDERSHOOT_MARGIN_C) {
       _sustain_underheatSec += dt;
     } else {
@@ -984,7 +993,7 @@ bool satCycleCheckAutoSwitch()
     }
     if (_sustain_underheatSec >= SAT_UNDERHEAT_SUSTAIN_SEC) {
       SATDebugTln(F("SAT: sustained underheat detected, switching to continuous mode"));
-      state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+      satSetControlMode(SAT_MODE_CONTINUOUS);
       _sustain_underheatSec = 0.0f;
       return true;
     }
@@ -1000,7 +1009,7 @@ bool satCycleCheckAutoSwitch()
     }
     if (_sustain_saturationSec >= SAT_SATURATION_SUSTAIN_SEC) {
       SATDebugTln(F("SAT: PWM saturation (off_time=0 sustained), switching to continuous mode"));
-      state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+      satSetControlMode(SAT_MODE_CONTINUOUS);
       _sustain_saturationSec = 0.0f;
       return true;
     }

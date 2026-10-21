@@ -234,6 +234,23 @@ static float satGetMaxSetpoint()
   return cap;
 }
 
+// Effective ceiling for the CS= the boiler is sent: the boiler's own MaxTSet, the system / source cap,
+// the hard safety ceiling and the global cap (Python MAXIMUM_SETPOINT). Shared by the control tick and
+// the 3 s PWM suppression refresh so both clamp identically.
+static float satEffectiveMaxSetpoint()
+{
+  float maxSetpoint = OTcurrentSystemState.MaxTSet;
+  if (maxSetpoint < 30.0f) maxSetpoint = SAT_MAX_SETPOINT_DEFAULT;
+  float sysMax = satGetMaxSetpoint();
+  float hardMax = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_HARD_MAX_FLOOR : SAT_HARD_MAX_RAD;
+  if (maxSetpoint > sysMax) maxSetpoint = sysMax;
+  if (maxSetpoint > hardMax) maxSetpoint = hardMax;
+  float globalMax = settings.sat.fMaxSetpoint;
+  if (globalMax < 30.0f || globalMax > SAT_HARD_MAX_RAD) globalMax = SAT_GLOBAL_MAX_SETPOINT; // sanity
+  if (maxSetpoint > globalMax) maxSetpoint = globalMax;
+  return maxSetpoint;
+}
+
 // Returns heating curve base offset for the current heating system
 static float satGetBaseOffset()
 {
@@ -277,6 +294,23 @@ static bool satAlwaysMaxModulation()
 {
   // Heat pumps must always run at MM=100% (never 0%), even under PWM suppression. TASK-891.8
   return (satGetEffectiveHeatingSource() == SAT_SRC_HEAT_PUMP);
+}
+
+// MM= value for the current mode (TASK-1268). Pure function of its arguments.
+//  - PWM: 0 in both phases (thermo-nova RelativeModulationState.OFF); otherwise the configured maximum.
+//  - Heat pump: 100 outside PWM (always max). Heat pump and hybrid never get 0 (a heat pump may stop
+//    on MM=0): they keep the configured maximum, or 100 when that is 0.
+//  - Geminox (SAT_QUIRK_MIN_MOD_10): floor of 10, MM=0 included. Immergas: cap of 80.
+static uint8_t satComputeMM(bool pwmMode, bool heatPump, bool heatPumpOrHybrid, uint8_t maxRelMod, uint8_t quirks)
+{
+  uint8_t mm;
+  if (heatPump && !pwmMode)  mm = 100;
+  else if (pwmMode)          mm = heatPumpOrHybrid ? maxRelMod : 0;
+  else                       mm = maxRelMod;
+  if (heatPumpOrHybrid && mm == 0) mm = 100;
+  if ((quirks & SAT_QUIRK_MIN_MOD_10) && mm < 10) mm = 10;
+  if ((quirks & SAT_QUIRK_IMMERGAS_TP) && mm > 80) mm = 80;
+  return mm;
 }
 
 // Returns the name string for the current heating system.
@@ -442,6 +476,8 @@ static bool     _sat_prevFlameState = false;
 DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInterval, CATCH_UP_MISSED_TICKS);
 // --- Timer for 4-hour window stats (Task #227): update once per minute ---
 DECLARE_TIMER_SEC(timerSAT4hStats, 60, SKIP_MISSED_TICKS);
+// --- Timer for the PWM suppression CS refresh (TASK-1268): every 3 s, between control ticks ---
+DECLARE_TIMER_SEC(timerSATSuppress, 3, SKIP_MISSED_TICKS);
 
 //=====================================================================
 //=== Heating Curve Calculation ===
@@ -654,10 +690,41 @@ static uint32_t _pwm_waitForFlameStartMs   = 0;    // Timestamp when flame wait 
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
 static uint32_t _pwm_lastOffTimeMs         = 1;    // Last PWM off-phase duration (ms); 0 = saturation (duty wants continuous ON). Read by the off_time==0 saturation guard.
 static uint32_t _pwm_lastOnTimeMs          = 0;    // Last PWM on-phase duration (ms) = Python pwm_state.on_time_seconds. Read by the cycle classifier's SHORT_CYCLING threshold (TASK-891.4 AC#3).
+static float    _sat_lastControlCS          = 0.0f;  // Control setpoint of the last control tick or refresh, before the solar adjustment (the "previous CS" PWM keeps without an override)
+static bool     _sat_thermalSafeActive      = false; // The thermal safe fallback owns CS: the 3 s PWM refresh stays out
 // Python HEATER_STARTUP_TIMEFRAME: max wait for ignition before giving up
 static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeout
 
-static float satApplyPWM(float pidOutput)
+// Flame-off hold setpoint of the PWM ON phase (thermo-nova flame_off_hold_setpoint): return
+// temperature + fFlameOffOffset, clamped to COLD_SETPOINT..max. The only place the flame-off
+// offset is used (TASK-1268).
+static float satPwmFlameOffHold(float maxSetpoint)
+{
+  float cs = satGetReturnTemp() + settings.sat.fFlameOffOffset;
+  if (cs < satGetColdSetpoint()) cs = satGetColdSetpoint();  // flame-off hold clamped to COLD_SETPOINT (TASK-891.2, per Python heating_control.py)
+  if (cs > maxSetpoint) cs = maxSetpoint;
+  return cs;
+}
+
+// Modulation-suppression setpoint of the PWM ON phase after the hold: flow temperature minus
+// fModSupOffset, clamped to MINIMUM..max. Used by the 30 s control tick and the 3 s refresh.
+static float satPwmSuppressionSetpoint(float maxSetpoint)
+{
+  float cs = satGetFlowTemp() - settings.sat.fModSupOffset;
+  if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
+  if (cs > maxSetpoint) cs = maxSetpoint;
+  return cs;
+}
+
+// True once fModSupDelay has passed since the real flame-on time (thermo-nova elapsed_since_flame_on).
+static bool satPwmHoldElapsed()
+{
+  return (millis() - satCycleGetFlameOnStartMs()) >= (uint32_t)(settings.sat.fModSupDelay * 1000.0f);
+}
+
+// PWM schedule: duty cycle and the ON/OFF phase state machine. It only moves state
+// (bPwmFlameRequested, ignition wait, durations); satApplyPWM() derives the control setpoint from it.
+static void satPwmSchedule(float pidOutput)
 {
   // --- Duty cycle calculation per SAT Python: (setpoint - base) / (effective_temp - base) ---
   float baseOffset = satGetBaseOffset();
@@ -706,14 +773,12 @@ static float satApplyPWM(float pidOutput)
   // --- 5-range duty cycle mapper (SAT Python parity) ---
   uint32_t onTimeMs, offTimeMs;
 
-  float maxSetpoint = satGetMaxSetpoint();
-
   if (duty >= dutyMax) {
     // Range 5: Over-max - continuous ON (no CS startup sequence needed)
     state.sat.bPwmFlameRequested = true;
     _pwm_lastOffTimeMs = 0;   // off_time==0: duty wants continuous ON (saturation signal)
     _pwm_lastOnTimeMs  = maxMs; // continuous ON: report the full period as on-time (TASK-891.4)
-    return pidOutput;
+    return;
   } else if (duty < dutyMin) {
     // Range 1: Ultra-low - keep off or let existing flame finish min-on
     if (flame && !state.sat.bDhwActive) {
@@ -744,47 +809,26 @@ static float satApplyPWM(float pidOutput)
   _pwm_lastOffTimeMs = offTimeMs;   // record for the off_time==0 saturation guard (Python pwm off_time)
   _pwm_lastOnTimeMs  = onTimeMs;    // record for the cycle-classifier SHORT threshold (Python pwm on_time, TASK-891.4)
 
-  // --- PWM state machine with 4-step CS startup sequence ---
+  // --- PWM state machine (ON/OFF phase, ignition timeout, cycle limit) ---
   uint32_t sinceFlameStart = millis() - satCycleGetFlameOnStartMs();
   if (state.sat.bPwmFlameRequested) {
-    // ON phase: 4-step CS sequence (SAT Python _compute_pwm_control_setpoint)
+    // ON phase
     if (sinceFlameStart >= onTimeMs && sinceFlameStart >= minOnMs) {
       // ON time expired: switch to OFF
       state.sat.bPwmFlameRequested = false;
       _pwm_flameOffHoldSetpoint = 0.0f;
-      return SAT_MIN_SETPOINT;
+      return;
     }
-    // Step 2: waiting for flame - send low CS to avoid overshoot on ignition
-    if (_pwm_waitingForFlame) {
-      // 180s ignition timeout (Python HEATER_STARTUP_TIMEFRAME): if boiler fails to ignite,
-      // give up and switch to OFF phase, matching Python pwm.py:194-202 behavior.
-      if (_pwm_waitForFlameStartMs > 0 &&
-          (millis() - _pwm_waitForFlameStartMs) >= PWM_IGNITION_TIMEOUT_MS) {
-        SATDebugTln(F("SAT PWM: ignition timeout (180s), aborting ON phase"));
-        _pwm_waitingForFlame = false;
-        _pwm_waitForFlameStartMs = 0;
-        state.sat.bPwmFlameRequested = false;
-        _pwm_flameOffHoldSetpoint = 0.0f;
-        return SAT_MIN_SETPOINT;
-      }
-      float cs = satGetReturnTemp() + settings.sat.fFlameOffOffset;
-      if (cs < satGetColdSetpoint()) cs = satGetColdSetpoint();  // flame-off hold clamped to COLD_SETPOINT (TASK-891.2, per Python heating_control.py)
-      if (cs > maxSetpoint) cs = maxSetpoint;
-      _pwm_flameOffHoldSetpoint = cs;
-      return cs;
-    }
-    // Step 3: flame just lit, within fModSupDelay - hold the ignition setpoint
-    uint32_t sinceFlameOn = millis() - _pwm_flameOnMs;
-    if (sinceFlameOn < (uint32_t)(settings.sat.fModSupDelay * 1000.0f)) {
-      return _pwm_flameOffHoldSetpoint;
-    }
-    // Step 4: flame stable, after fModSupDelay - apply modulation suppression setpoint
-    {
-      float cs = satGetFlowTemp() - settings.sat.fModSupOffset;
-      if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
-      if (cs > maxSetpoint) cs = maxSetpoint;
+    // Waiting for flame: 180s ignition timeout (Python HEATER_STARTUP_TIMEFRAME): if boiler fails to
+    // ignite, give up and switch to OFF phase, matching Python pwm.py:194-202 behavior.
+    if (_pwm_waitingForFlame &&
+        _pwm_waitForFlameStartMs > 0 &&
+        (millis() - _pwm_waitForFlameStartMs) >= PWM_IGNITION_TIMEOUT_MS) {
+      SATDebugTln(F("SAT PWM: ignition timeout (180s), aborting ON phase"));
+      _pwm_waitingForFlame = false;
+      _pwm_waitForFlameStartMs = 0;
+      state.sat.bPwmFlameRequested = false;
       _pwm_flameOffHoldSetpoint = 0.0f;
-      return cs;
     }
   } else {
     // OFF phase: clear hold setpoint, wait for off duration then restart
@@ -801,16 +845,96 @@ static float satApplyPWM(float pidOutput)
                   (unsigned)satGetMaxCyclesPerHour());
           _hourLimitLogged = true;
         }
-        return SAT_MIN_SETPOINT;
+        return;
       }
       _hourLimitLogged = false;  // reset latch when limit clears
       state.sat.bPwmFlameRequested = true;
       _pwm_waitingForFlame = true;
       _pwm_waitForFlameStartMs = millis();  // Start ignition timeout timer (180s, Task #208)
-      return pidOutput;
     }
-    return SAT_MIN_SETPOINT;
   }
+}
+
+// PWM control setpoint, gated like thermo-nova _compute_pwm_control_setpoint (heating_control.py:385):
+// the CS override runs only with overshoot protection on, no DHW and a requested setpoint above the
+// cold setpoint. Otherwise there is no override and CS keeps its previous control setpoint (the value
+// before the solar-gain adjustment; the requested setpoint when there is no heating CS to keep, so CH
+// can still start).
+// Override on: OFF phase -> 10 (CH off). ON phase (also duty range 5, status ON in thermo-nova):
+//  - flame off -> return + offset (the hold, kept for fModSupDelay after ignition),
+//  - flame on, no hold recorded and fModSupDelay not yet passed since the real flame-on time ->
+//    pending, the previous control setpoint stays,
+//  - after fModSupDelay -> flow - fModSupOffset (refreshed every 3 s by satPwmSuppressionRefresh()).
+static float satApplyPWM(float pidOutput)
+{
+  const float prevCS = (_sat_lastControlCS > SAT_MIN_SETPOINT) ? _sat_lastControlCS : pidOutput;
+  satPwmSchedule(pidOutput);
+  if (!settings.sat.bOvershootProtection || state.sat.bDhwActive || pidOutput <= satGetColdSetpoint()) {
+    return prevCS;
+  }
+  if (!state.sat.bPwmFlameRequested) {
+    _pwm_flameOffHoldSetpoint = 0.0f;
+    return SAT_MIN_SETPOINT;                                      // OFF phase: no relight
+  }
+  const float maxSetpoint = satGetMaxSetpoint();
+  if (!satIsFlameOn()) {                                          // waiting for ignition (also the ON-start tick)
+    _pwm_flameOffHoldSetpoint = satPwmFlameOffHold(maxSetpoint);
+    return _pwm_flameOffHoldSetpoint;
+  }
+  if (!satPwmHoldElapsed()) {                                     // flame lit, inside the fModSupDelay hold
+    return (_pwm_flameOffHoldSetpoint > 0.0f) ? _pwm_flameOffHoldSetpoint : prevCS;
+  }
+  _pwm_flameOffHoldSetpoint = 0.0f;
+  return satPwmSuppressionSetpoint(maxSetpoint);
+}
+
+// 3 s refresh of the suppression CS during the PWM ON phase after the hold (OpenTherm application
+// text 2.1.1.2.5: CS = actual boiler temperature, or 1 K lower, updated every 2-3 s). Same formula and
+// same write-on-change CS helper as satApplyPWM(), so it cannot fight the 30 s control tick.
+static void satPwmSuppressionRefresh()
+{
+  if (!DUE(timerSATSuppress)) return;
+  if (!settings.sat.bEnabled || !state.sat.bActive || state.sat.bSafetyTripped) return;
+  if (_sat_thermalSafeActive) return;                             // the thermal safe fallback owns CS
+  if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return;
+  if (!settings.sat.bOvershootProtection || state.sat.bDhwActive) return;
+  if (OTcurrentSystemState.SlaveStatus & 0x05) return;          // fault flag / DHW active: the control tick skips these too
+  if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return;
+  if (!satIsFlameOn() || !satPwmHoldElapsed()) return;
+  if (state.sat.fPidOutput <= satGetColdSetpoint()) return;
+  if (state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return;       // last tick commanded heating off
+
+  float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());
+  float maxSetpoint = satEffectiveMaxSetpoint();
+  if (cs > maxSetpoint) cs = maxSetpoint;
+  _sat_lastControlCS = cs;                                        // control setpoint before the solar adjustment
+  if (state.sat.bSolarGainActive && settings.sat.bSolarGainEnable) {   // same adjustment as the control tick
+    cs -= settings.sat.fSolarSetpointOffset;
+    if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
+  }
+  state.sat.fFinalSetpoint = cs;                                  // before the command check: SAT simulation reads it too
+  if (!hasOTCommandInterface()) return;
+  satEnqueueIfChangedCS(cs);
+}
+
+// Start every PWM stint idle (thermo-nova pwm.enable()): clear the ON/OFF phase, the ignition wait and
+// the hold. Called when the control mode changes and when SAT is disabled, so stale state of an earlier
+// stint cannot drive the first ticks of the next one.
+void satPwmReset()
+{
+  state.sat.bPwmFlameRequested = false;
+  _pwm_waitingForFlame        = false;
+  _pwm_waitForFlameStartMs    = 0;
+  _pwm_flameOnMs              = 0;
+  _pwm_flameOffHoldSetpoint   = 0.0f;
+  _pwm_lastOffTimeMs          = 1;
+}
+
+// Change the control mode; entering or leaving PWM resets the PWM state.
+static void satSetControlMode(SATControlMode m)
+{
+  if (m != state.sat.eControlMode) satPwmReset();
+  state.sat.eControlMode = m;
 }
 
 // Last PWM off-phase duration in ms (0 = saturation: duty calc wants continuous ON).
@@ -1935,7 +2059,10 @@ void satDisable()
 {
   SATDebugTf(PSTR("SAT: satDisable called (safety=%d fallback=%d)\r\n"),
              (int)state.sat.bSafetyTripped, (int)state.sat.bFallbackActive);
-  state.sat.eControlMode = SAT_MODE_OFF;
+  satSetControlMode(SAT_MODE_OFF);
+  satPwmReset();                       // also when the mode was not PWM: a safety trip must leave no stale PWM state
+  _sat_lastControlCS = 0.0f;
+  _sat_thermalSafeActive = false;
   state.sat.bActive = false;
   state.sat.fFinalSetpoint = 0.0f;
   satPidReset();
@@ -2002,11 +2129,11 @@ void satHandleControlMode(const char* value)
   int prevMode = (int)state.sat.eControlMode;
   int numericVal = atoi(value);
   if (strcasecmp_P(value, PSTR("continuous")) == 0 || numericVal == 1) {
-    state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+    satSetControlMode(SAT_MODE_CONTINUOUS);
   } else if (strcasecmp_P(value, PSTR("pwm")) == 0 || numericVal == 2) {
-    state.sat.eControlMode = SAT_MODE_PWM;
+    satSetControlMode(SAT_MODE_PWM);
   } else if (strcasecmp_P(value, PSTR("auto")) == 0 || numericVal == 0) {
-    state.sat.eControlMode = SAT_MODE_CONTINUOUS; // Start in continuous, auto-switch
+    satSetControlMode(SAT_MODE_CONTINUOUS); // Start in continuous, auto-switch
   }
   SATDebugTf(PSTR("SAT: control mode %d -> %d (value='%s')\r\n"),
              prevMode, (int)state.sat.eControlMode, value);
@@ -2189,6 +2316,7 @@ void satSendStatusJSON()
     je.field(F("push_setpoint"),        settings.sat.bPushSetpoint);
     je.field(F("flame_off_offset"),     settings.sat.fFlameOffOffset);
     je.field(F("force_pwm"),            settings.sat.bForcePWM);
+    je.field(F("overshoot_protection"),  settings.sat.bOvershootProtection);
     je.field(F("flow_offset"),          settings.sat.fFlowOffset);
     je.field(F("pressure"),             snap->st.sat.fSmoothedPressure);
     je.field(F("pressure_drop_rate"),   snap->st.sat.fPressureDropRate);
@@ -2421,7 +2549,7 @@ void satPublishMQTT()
   static SATShadowB s_setpoint_sync, s_modulation_sync, s_ch_sync;
   static SATShadowB s_solar_gain_enable, s_summer_simmer_enable, s_comfort_adjust_enable;
   static SATShadowB s_thermal_comfort, s_multi_area_enable, s_auto_tune_enable;
-  static SATShadowB s_simulation_enable, s_window_detection_enable, s_force_pwm_enable;
+  static SATShadowB s_simulation_enable, s_window_detection_enable, s_force_pwm_enable, s_overshoot_protection_enable;
   static SATShadowB s_push_setpoint_enable, s_preset_sync_enable;
   static SATShadowB s_dhw_enabled, s_dhw_enable, s_pwm_auto_switch_enable;
   // JSON-blob heartbeat counters (BSS zero-init == first-seen sentinel).
@@ -2881,6 +3009,7 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/simulation_enable"),       settings.sat.bSimulation,       s_simulation_enable,       true);
   publishIfChangedB(F("sat/window_detection_enable"), settings.sat.bWindowDetection,  s_window_detection_enable, true);
   publishIfChangedB(F("sat/force_pwm_enable"),        settings.sat.bForcePWM,         s_force_pwm_enable,        true);
+  publishIfChangedB(F("sat/overshoot_protection_enable"), settings.sat.bOvershootProtection, s_overshoot_protection_enable, true);
   publishIfChangedB(F("sat/push_setpoint_enable"),    settings.sat.bPushSetpoint,     s_push_setpoint_enable,    true);
   publishIfChangedB(F("sat/preset_sync_enable"),      settings.sat.bPresetSync,       s_preset_sync_enable,      true);
   publishIfChangedB(F("sat/dhw_enabled"),             settings.sat.bDhwEnabled,       s_dhw_enabled,             true);
@@ -3404,6 +3533,7 @@ void initSAT()
   satLoadEstimatedEnergy();  // Restore estimated gas energy from LittleFS (Task #232)
   satHCRLoadState();         // Restore daily-median recommendation ring from LittleFS (Task #228)
   satCycleInit();
+  satPwmReset();
   state.sat.bActive = false;
   state.sat.eControlMode = SAT_MODE_OFF;
   state.sat.bSafetyTripped = false;
@@ -4315,6 +4445,9 @@ void satControlLoop()
   // Keep the PIC's CS override alive between control ticks (TASK-1236)
   satPicCSKeepalive();
 
+  // Refresh the PWM suppression CS between control ticks (TASK-1268)
+  satPwmSuppressionRefresh();
+
   // Main control loop on timer
   if (!DUE(timerSATControl)) return;
 
@@ -4430,9 +4563,11 @@ void satControlLoop()
   // AC#5: After 2+ hours of estimation without real data, switch to fixed safe setpoint
   float savedDeadband = settings.sat.fDeadband;
   bool thermalDeadbandWidened = false;
+  _sat_thermalSafeActive = false;
   if (state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0) {
     uint32_t estElapsed = millis() - state.sat.iLastKnownRoomMs;
     if (estElapsed >= SAT_THERMAL_MAX_EST_MS) {
+      _sat_thermalSafeActive = true;     // the 3 s PWM refresh must not overwrite this safe CS
       // Too long without real data -- use fixed safe flow setpoint
       state.sat.fFinalSetpoint = SAT_THERMAL_SAFE_FLOW;
       float sysMax = satGetMaxSetpoint();
@@ -4606,20 +4741,9 @@ void satControlLoop()
   }
 
   // --- Clamp to valid range ---
-  float maxSetpoint = OTcurrentSystemState.MaxTSet;
-  if (maxSetpoint < 30.0f) maxSetpoint = SAT_MAX_SETPOINT_DEFAULT;
-
-  // Hard safety ceiling based on heating system type -- never exceeded
+  // Ceiling: MaxTSet, system/source cap, hard safety ceiling, global cap (satEffectiveMaxSetpoint).
+  float maxSetpoint = satEffectiveMaxSetpoint();
   float sysMax = satGetMaxSetpoint();
-  float hardMax = (satGetEffectiveHeatingSystem() == SAT_HSYS_UNDERFLOOR) ? SAT_HARD_MAX_FLOOR : SAT_HARD_MAX_RAD;
-  if (maxSetpoint > sysMax) maxSetpoint = sysMax;
-  if (maxSetpoint > hardMax) maxSetpoint = hardMax;
-
-  // Global safety cap (Python MAXIMUM_SETPOINT = 65C): applies to ALL heating systems.
-  // settings.sat.fMaxSetpoint defaults to 65C and is the universal ceiling before system limits.
-  float globalMax = settings.sat.fMaxSetpoint;
-  if (globalMax < 30.0f || globalMax > SAT_HARD_MAX_RAD) globalMax = SAT_GLOBAL_MAX_SETPOINT; // sanity
-  if (maxSetpoint > globalMax) maxSetpoint = globalMax;
 
   if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;
   if (pidOutput > maxSetpoint) pidOutput = maxSetpoint;
@@ -4628,13 +4752,13 @@ void satControlLoop()
   // instead of PWM — matches Python behavior where requested_setpoint >= maximum_setpoint
   // disables PWM (full power needed, no duty cycling required).
   if (pidOutput >= sysMax && state.sat.eControlMode == SAT_MODE_PWM) {
-    state.sat.eControlMode = SAT_MODE_CONTINUOUS;
+    satSetControlMode(SAT_MODE_CONTINUOUS);
     SATDebugTln(F("SAT: PID at system max, switching to continuous mode"));
   }
 
   // --- Force PWM if configured (Task #41) ---
   if (settings.sat.bForcePWM && state.sat.eControlMode != SAT_MODE_PWM) {
-    state.sat.eControlMode = SAT_MODE_PWM;
+    satSetControlMode(SAT_MODE_PWM);
   }
 
   // --- Apply control mode ---
@@ -4649,6 +4773,8 @@ void satControlLoop()
   if (finalSetpoint < SAT_MIN_SETPOINT) finalSetpoint = SAT_MIN_SETPOINT;
   if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;
 
+  _sat_lastControlCS = finalSetpoint;   // the "previous CS" a PWM tick without override keeps, before the solar adjustment
+
   // --- Solar gain compensation: reduce setpoint (Task #23) ---
   if (state.sat.bSolarGainActive && settings.sat.bSolarGainEnable) {
     finalSetpoint -= settings.sat.fSolarSetpointOffset;
@@ -4660,7 +4786,7 @@ void satControlLoop()
   // Delegated to satCycleCheckAutoSwitch() in SATcycles.ino which uses correct
   // thresholds (3.0C overshoot margin, 60s sustain, 300s DHW post-overshoot guard).
   if (!satAlwaysMaxModulation() && pidOutput > satGetColdSetpoint()) {
-    satCycleCheckAutoSwitch();
+    satCycleCheckAutoSwitch(pidOutput);
   }
 
   // Modulation suppression is handled via CS sequence in satApplyPWM() (PWM ON only)
@@ -4669,37 +4795,12 @@ void satControlLoop()
 
   // --- Compute modulation value based on mode, heating system, suppression, and quirks ---
   {
-    uint8_t mmValue;
-    uint8_t quirks = satGetManufacturerQuirks();
-    if (satAlwaysMaxModulation()) {
-      mmValue = 100;
-    } else if (state.sat.bModSuppressed) {
-      mmValue = 0;
-    } else if (state.sat.eControlMode == SAT_MODE_PWM) {
-      // ON phase: suppress modulation (MM=0); OFF phase: send floor so boiler behaves correctly
-      mmValue = state.sat.bPwmFlameRequested ? 0 : settings.sat.iMaxRelModulation;
-    } else {
-      mmValue = settings.sat.iMaxRelModulation;
-    }
-    // Geminox quirk: minimum modulation 10% (never send MM=0 when flame requested)
-    if ((quirks & SAT_QUIRK_MIN_MOD_10) && mmValue > 0 && mmValue < 10) {
-      mmValue = 10;
-    }
-    // Immergas quirk: cap modulation at 80%
-    if ((quirks & SAT_QUIRK_IMMERGAS_TP) && mmValue > 80) {
-      mmValue = 80;
-    }
-    state.sat.iCurrentModulation = mmValue;
-  }
-
-  // --- Flame-off setpoint offset (anti-cycling hysteresis, Task #32) ---
-  if (settings.sat.fFlameOffOffset > 0.001f) {
-    bool flame = satIsFlameOn();
-    if (!flame) {
-      finalSetpoint += settings.sat.fFlameOffOffset;
-      if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;
-      state.sat.fFinalSetpoint = finalSetpoint;
-    }
+    const uint8_t src = satGetEffectiveHeatingSource();
+    state.sat.iCurrentModulation = satComputeMM(state.sat.eControlMode == SAT_MODE_PWM,
+                                                src == SAT_SRC_HEAT_PUMP,
+                                                src == SAT_SRC_HEAT_PUMP || src == SAT_SRC_HYBRID,
+                                                settings.sat.iMaxRelModulation,
+                                                satGetManufacturerQuirks());
   }
 
   // --- COLD_SETPOINT cutoff (TASK-891.2, George): requested setpoint below the per-heating-system

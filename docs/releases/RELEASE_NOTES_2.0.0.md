@@ -406,6 +406,14 @@ The dual-platform merge introduced several compilation errors: missing `collectH
 
 `satMigrateFile()` passed a PROGMEM pointer directly to LittleFS open/rename calls. PROGMEM pointers are in flash address space; passing them to APIs that expect RAM pointers causes Exception 3. Fixed to copy the PROGMEM string to a RAM buffer first.
 
+### Monitor graph plots the control setpoint the boiler was sent (TASK-1271)
+
+MsgID 1 is taken only from Write-Data frames, because the boiler's Write-Ack echo carries no data under the spec. The gateway's R frame wins over the thermostat's T frame for 30 s. With SAT or a `CS=` override the graph shows what the boiler got, not the thermostat's own request.
+
+### SAT flame-off offset, PWM overshoot protection and modulation rules (TASK-1268)
+
+The +18 C flame-off offset is no longer added in every mode while the flame is off. It applies only to the PWM ON phase while SAT waits for the flame (return temperature + offset). PWM OFF used to send CS=28 with CH=1, which relit the boiler; continuous start-up used to jump to PID+18. New setting `overshoot_protection` (default on for all heating sources; off means no CS override: CS keeps its previous value, CH stays on and only MM=0 acts): OFF phase CS=10 and CH=0; ON phase return + offset hold, then flow - suppression offset refreshed about every 3 s. MM is 0 in both PWM phases, except heat pumps and hybrid (in PWM they now get the configured maximum modulation instead of 100) and Geminox (MM=10). The continuous-to-PWM auto-switch compares flow with the requested (PID) setpoint; the overshoot margin default is now 2.0 C. Stored values are kept.
+
 ### SAT PID deadband and manual gains
 
 The PID deadband default was incorrectly initialized to 0.0, disabling the deadband entirely. Reset to 0.1°C as designed. Manual gains mode (user-specified Kp/Ki/Kd) was not being applied when auto-gains were disabled; now correctly respected.

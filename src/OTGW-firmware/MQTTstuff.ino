@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.443
+**  Version  : v2.0.0-alpha.444
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -684,6 +684,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "push_setpoint",          "SATpushsetpoint",      nullptr },
   { "flame_off_offset",       "SATflameoffset",       nullptr },
   { "force_pwm",              "SATforcepwm",          nullptr },
+  { "overshoot_protection",   "SATovershootprotection", nullptr },
   { "flow_offset",            "SATflowoffset",        nullptr },
   { "summer_simmer",          "SATsummersimmer",      nullptr },
   { "summer_threshold",       "SATsummerthreshold",   nullptr },
@@ -2729,7 +2730,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     // TASK-516: idx 12 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
     const bool dhwEnableSwitchAllowed =
         (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
-    for (uint8_t swIdx = 0; swIdx < 13; swIdx++) {
+    for (uint8_t swIdx = 0; swIdx < 14; swIdx++) {
       if (swIdx == 12 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
       if (streamSatSwitchDiscovery(swIdx, ctx)) result = true;

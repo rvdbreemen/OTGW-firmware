@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.443
+**  Version  : v2.0.0-alpha.444
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -358,6 +358,7 @@ void writeSettings(bool show)
   writeJsonIntKV(file, F("SATwindowminsec"), settings.sat.iWindowMinOpenSec);
   writeJsonFloatKV(file, F("SATtempstep"), settings.sat.fTargetTempStep);
   writeJsonBoolKV(file, F("SATforcepwm"), settings.sat.bForcePWM);
+  writeJsonBoolKV(file, F("SATovershootprotection"), settings.sat.bOvershootProtection);
   writeJsonFloatKV(file, F("SATflowoffset"), settings.sat.fFlowOffset);
   writeJsonFloatKV(file, F("SATminpressure"), settings.sat.fMinPressure);
   writeJsonFloatKV(file, F("SATmaxpressure"), settings.sat.fMaxPressure);
@@ -1037,6 +1038,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATwindowminsec")) == 0)  settings.sat.iWindowMinOpenSec = constrain(atoi(newValue), 10, 600);
   else if (strcasecmp_P(field, PSTR("SATtempstep")) == 0)     settings.sat.fTargetTempStep = clampSettingFloat(newValue, settings.sat.fTargetTempStep, 0.1f, 1.0f);
   else if (strcasecmp_P(field, PSTR("SATforcepwm")) == 0)     settings.sat.bForcePWM = EVALBOOLEAN(newValue);
+  else if (strcasecmp_P(field, PSTR("SATovershootprotection")) == 0) settings.sat.bOvershootProtection = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATflowoffset")) == 0)   settings.sat.fFlowOffset = clampSettingFloat(newValue, settings.sat.fFlowOffset, 0.5f, 10.0f);
   else if (strcasecmp_P(field, PSTR("SATminpressure")) == 0)  settings.sat.fMinPressure = clampSettingFloat(newValue, settings.sat.fMinPressure, 0.0f, 3.0f);
   else if (strcasecmp_P(field, PSTR("SATmaxpressure")) == 0)  settings.sat.fMaxPressure = clampSettingFloat(newValue, settings.sat.fMaxPressure, 1.0f, 4.0f);
