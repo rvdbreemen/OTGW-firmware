@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.447
+**  Version  : v2.0.0-alpha.448
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -686,6 +686,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "force_pwm",              "SATforcepwm",          nullptr },
   { "overshoot_protection",   "SATovershootprotection", nullptr },
   { "follow_thermostat",      "SATfollowthermostat",  nullptr },
+  { "external_temp",          "SATexternaltemp",      nullptr },  // TASK-1284: use the MQTT/REST indoor temp (indoor_temp) as the room source
   { "flow_offset",            "SATflowoffset",        nullptr },
   { "summer_simmer",          "SATsummersimmer",      nullptr },
   { "summer_threshold",       "SATsummerthreshold",   nullptr },
@@ -2510,7 +2511,7 @@ static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx)
                               ctx.haPrefix, ctx.nodeId, metric);
     if (topicLen <= 0 || static_cast<size_t>(topicLen) >= sizeof(topic)) return false;
     int payloadLen = snprintf_P(payload, sizeof(payload),
-                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/%s\",\"cmd_t\":\"%s/sat/%s\",\"pl_on\":\"1\",\"pl_off\":\"0\",\"stat_on\":\"1\",\"stat_off\":\"0\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
+                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/pv_%s\",\"cmd_t\":\"%s/sat/pv_%s\",\"pl_on\":\"1\",\"pl_off\":\"0\",\"stat_on\":\"1\",\"stat_off\":\"0\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
                                 ctx.mqttPubTopic, deviceBlock, idPrefix, metric,  // TASK-648: idPrefix
                                 ctx.hostname, friendlySuffix,
                                 ctx.mqttPubTopic, metric,
@@ -2537,7 +2538,7 @@ static bool streamSatPvBoostDiscovery(HaDiscoveryContext &ctx)
     dtostrf(maxVal, 1, 2, maxBuf);
     dtostrf(step,   1, 2, stepBuf);
     int payloadLen = snprintf_P(payload, sizeof(payload),
-                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/%s\",\"cmd_t\":\"%s/sat/%s\",\"min\":%s,\"max\":%s,\"step\":%s,\"unit_of_measurement\":\"%s\",\"mode\":\"box\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
+                                PSTR("{\"avty_t\":\"%s\",%s,\"uniq_id\":\"%s-sat_pv_%s\",\"name\":\"%s_SAT_PV_%s\",\"stat_t\":\"%s/sat/pv_%s\",\"cmd_t\":\"%s/sat/pv_%s\",\"min\":%s,\"max\":%s,\"step\":%s,\"unit_of_measurement\":\"%s\",\"mode\":\"box\",\"icon\":\"mdi:%s\",\"origin\":{\"name\":\"OTGW-firmware\",\"sw\":\"%s\",\"url\":\"https://github.com/rvdbreemen/OTGW-firmware\"}}"),
                                 ctx.mqttPubTopic, deviceBlock, idPrefix, metric,  // TASK-648: idPrefix
                                 ctx.hostname, friendlySuffix,
                                 ctx.mqttPubTopic, metric,
@@ -2731,7 +2732,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     // TASK-516: idx 12 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
     const bool dhwEnableSwitchAllowed =
         (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
-    for (uint8_t swIdx = 0; swIdx < 15; swIdx++) {
+    for (uint8_t swIdx = 0; swIdx < 16; swIdx++) {
       if (swIdx == 12 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
       if (streamSatSwitchDiscovery(swIdx, ctx)) result = true;

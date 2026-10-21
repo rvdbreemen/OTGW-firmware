@@ -3248,7 +3248,7 @@ bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
 // SAT switch (boolean) and select discovery (TASK-284).
 // Matches the switch/select entries at the bottom of the archived 2.0.0
 // mqttha.cfg. Hardcoded per index (like climate/number) to avoid PROGMEM
-// arrays for a small fixed set. The 15 switches share the same JSON shape,
+// arrays for a small fixed set. The 16 switches share the same JSON shape,
 // so they route through a single streamSatBoolSwitch() helper.
 // ---------------------------------------------------------------------------
 
@@ -3443,6 +3443,12 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("-sat-follow-thermostat-enable"), PSTR("_SAT_Follow_Thermostat"),
         PSTR("/sat/follow_thermostat"),       PSTR("/sat/follow_thermostat_enable"),
         PSTR("mdi:thermostat"));
+      break;
+    case 15:
+      published = streamSatBoolSwitch(ctx,
+        PSTR("-sat-external-temp-enable"),    PSTR("_SAT_External_Temp"),
+        PSTR("/sat/external_temp"),           PSTR("/sat/external_temp_enable"),
+        PSTR("mdi:home-thermometer"));
       break;
     default:
       return false;

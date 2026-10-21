@@ -334,8 +334,12 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
-| `sat/mode` | `"off"` / `"continuous"` / `"pwm"` | yes | Current control mode |
-| `sat/active` | `"true"` / `"false"` | yes | Whether SAT controller is actively controlling |
+| `sat/enabled` | `"true"` / `"false"` | yes | SAT enabled setting (matches the `sat/enabled` command). Published while SAT is disabled too |
+| `sat/mode` | `"off"` / `"continuous"` / `"pwm"` | yes | ACTUAL control mode; always `"off"` while SAT is disabled or tripped. A `sat/control_mode` command in that state only changes `sat/control_mode` |
+| `sat/control_mode` | `"auto"` / `"continuous"` / `"pwm"` | yes | Control mode REQUESTED with the `sat/control_mode` command (`"auto"` after boot until a command arrives). `sat/mode` is the mode in use |
+| `sat/preset` | `"none"` / `"away"` / `"eco"` / `"comfort"` / `"sleep"` / `"activity"` / `"home"` | yes | Active preset, same names as the `sat/preset` command (`"none"` = no preset) |
+| `sat/fallback_active` | `"true"` / `"false"` | yes | SAT was switched on by the MQTT-loss fallback. In practice it reads `"false"` over MQTT: the fallback only runs while MQTT is down and is lifted before the first publish after reconnect. REST `GET /api/v2/sat/status` (`fallback_active`) shows it live |
+| `sat/active` | `"true"` / `"false"` | yes | Whether SAT controller is actively controlling; `"false"` while disabled or tripped |
 | `sat/setpoint` | `"43.1"` | yes | Final flow temperature setpoint sent to boiler (°C) |
 | `sat/target` | `"21.0"` | yes | Target room temperature (°C) |
 | `sat/heating_curve` | `"42.3"` | yes | Heating curve calculated value (°C) |
@@ -387,7 +391,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
-| `sat/safety_tripped` | `"false"` | no | Safety shutdown active |
+| `sat/safety_tripped` | `"true"` / `"false"` | yes | Safety shutdown active. Published `"true"` when a safety trip disables SAT (with `sat/active` false and `sat/mode` off), `"false"` again when SAT is re-enabled |
 | `sat/valves_open` | `"true"` / `"false"` | no | Whether TRV valves are reported open |
 | `sat/window_open` | `"false"` | no | Window-open detection state |
 | `sat/ch_sync` | `"ON"` / `"OFF"` | yes | CH sync health (ON = OK) |
@@ -478,7 +482,7 @@ Settings echo topics are retained. More settings echo topics exist; the full lis
 
 #### SAT Switch State Topics (TASK-284)
 
-State topics for the 15 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
+State topics for the 16 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
 
 | Topic | Description |
 | ----- | ----------- |
@@ -493,6 +497,7 @@ State topics for the 15 SAT boolean switches. Payloads are `"true"` / `"false"`.
 | `sat/overshoot_protection_enable` | PWM overshoot protection (start-up and modulation suppression) enable state |
 | `sat/push_setpoint_enable` | Push-setpoint enable state |
 | `sat/follow_thermostat_enable` | Follow-thermostat enable state: a setpoint change on the thermostat becomes the SAT target |
+| `sat/external_temp_enable` | Use the MQTT/REST indoor temperature (`sat/indoor_temp`) as the room source (`SATexternaltemp`) |
 | `sat/ovp_enabled` | OPV (overshoot-protection value) enabled state |
 | `sat/preset_sync_enable` | Preset-sync enable state |
 | `sat/dhw_enabled` | DHW heating enable state |
@@ -941,6 +946,7 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 13 auto-
 | `sat/force_pwm` | `SATforcepwm` | Force PWM mode override |
 | `sat/overshoot_protection` | `SATovershootprotection` | PWM overshoot protection: CS override in the PWM phases (default on) |
 | `sat/push_setpoint` | `SATpushsetpoint` | Enable pushing setpoint changes to boiler |
+| `sat/external_temp` | `SATexternaltemp` | Prefer the MQTT/REST indoor temperature (`sat/indoor_temp`) over the thermostat room temperature. State: `sat/external_temp_enable` |
 | `sat/follow_thermostat` | `SATfollowthermostat` | A room setpoint change on the thermostat (MsgID 16) becomes the SAT target and clears an active preset. Defaults to the push-setpoint value on units with no stored value |
 | `sat/ovp_enabled` | `SATovpenabled` | Enable OPV (overshoot-protection value) |
 | `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
@@ -1230,7 +1236,7 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 |-------------|-----------|------|-------------|
 | `number` | `sat_dhw_setpoint` | °C | DHW setpoint slider (30-60 °C, 0.5 step) |
 
-**Switch Entities (TASK-284, 15 switches):**
+**Switch Entities (TASK-284, 16 switches):**
 
 Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and takes commands on `%mqtt_sub_topic%/sat/<command>`. Payloads are literal `"true"` / `"false"` (`pl_on` / `pl_off`).
 
@@ -1247,6 +1253,7 @@ Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and take
 | `sat_overshoot_protection_enable` | `sat/overshoot_protection` | `sat/overshoot_protection_enable` | `mdi:shield-check` |
 | `sat_push_setpoint_enable` | `sat/push_setpoint` | `sat/push_setpoint_enable` | `mdi:upload` |
 | `sat_follow_thermostat_enable` | `sat/follow_thermostat` | `sat/follow_thermostat_enable` | `mdi:thermostat` |
+| `sat_external_temp_enable` | `sat/external_temp` | `sat/external_temp_enable` | `mdi:home-thermometer` |
 | `sat_ovp_enabled` | `sat/ovp_enabled` | `sat/ovp_enabled` | `mdi:shield-check` |
 | `sat_preset_sync_enable` | `sat/preset_sync` | `sat/preset_sync_enable` | `mdi:sync` |
 | `sat_dhw_enabled` | `sat/dhw_enabled` | `sat/dhw_enabled` | `mdi:water-boiler` |

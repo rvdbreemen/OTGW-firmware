@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.447
+**  Version  : v2.0.0-alpha.448
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -366,6 +366,7 @@ bool satCommandInFlight();
 void satOnThermostatSetpoint(float tr);  // TASK-1259: thermostat MsgID 16 Write-Data (T frame), edge detector for follow-thermostat
 void satClearSafetyTrip();  // TASK-1159: the one place a SAT safety trip is cleared
 void satPublishMQTT();
+void satRepublishCoreState();  // TASK-1284: re-arm the enabled/active/mode/... shadows so the next pass re-publishes (ADR-174)
 bool satHandleExternalTemp(const char* value);
 bool satHandleExternalOutdoor(const char* value);
 bool satHandleTargetTemp(const char* value);

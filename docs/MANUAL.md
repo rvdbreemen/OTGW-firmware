@@ -3091,8 +3091,12 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 
 | Topic suffix | Retained | Description |
 |-------------|---------|-------------|
-| `sat/mode` | yes | `"off"`, `"continuous"`, `"pwm"` |
-| `sat/active` | yes | `"true"` when SAT is actively controlling |
+| `sat/enabled` | yes | `"true"` / `"false"`, the SAT enabled setting; also published while SAT is disabled |
+| `sat/mode` | yes | Actual control mode: `"off"`, `"continuous"`, `"pwm"` |
+| `sat/control_mode` | yes | Requested control mode: `"auto"`, `"continuous"`, `"pwm"` |
+| `sat/preset` | yes | Active preset (`"none"`, `"away"`, `"eco"`, `"comfort"`, `"sleep"`, `"activity"`, `"home"`) |
+| `sat/fallback_active` | yes | `"true"` when the MQTT-loss fallback switched SAT on. It reads `"false"` over MQTT: the fallback only runs while MQTT is down and is lifted before the first publish after reconnect. REST `GET /api/v2/sat/status` (`fallback_active`) shows it live |
+| `sat/active` | yes | `"true"` when SAT is actively controlling (`"false"` while disabled or tripped) |
 | `sat/setpoint` | yes | Final flow temperature setpoint sent to boiler (°C) |
 | `sat/target` | yes | Target room temperature (°C) |
 | `sat/heating_curve` | yes | Heating curve calculated value (°C) |
@@ -3106,7 +3110,7 @@ Published every SAT control loop interval (default 30 seconds) when SAT is enabl
 | `sat/boiler_status` | no | Boiler state code (0=Off ... 14=Cooling) |
 | `sat/flame_status` | no | `"healthy"`, `"stuck_on"`, `"short_cycling"`, etc. |
 | `sat/cycle_class` | no | `"good"`, `"overshoot"`, `"underheat"`, `"short"` |
-| `sat/safety_tripped` | no | `"true"` when safety shutdown is active |
+| `sat/safety_tripped` | yes | `"true"` when safety shutdown is active; `"false"` again after SAT is re-enabled |
 | `sat/pressure` | no | Smoothed system water pressure (bar) |
 | `sat/pressure_alarm` | no | `"true"` when pressure alarm is active |
 | `sat/power` | no | Estimated boiler power (kW) |
@@ -3193,6 +3197,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/interval` | `SATinterval` |
 | `sat/push_setpoint` | `SATpushsetpoint` |
 | `sat/follow_thermostat` | `SATfollowthermostat` |
+| `sat/external_temp` | `SATexternaltemp` |
 | `sat/flame_off_offset` | `SATflameoffset` |
 | `sat/force_pwm` | `SATforcepwm` |
 | `sat/overshoot_protection` | `SATovershootprotection` |

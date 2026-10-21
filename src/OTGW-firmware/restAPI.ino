@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.447
+**  Version  : v2.0.0-alpha.448
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1671,6 +1671,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATovershootprotection", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("follow_thermostat")) == 0) {
       updateSetting("SATfollowthermostat", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("external_temp")) == 0) {
+      updateSetting("SATexternaltemp", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("flow_offset")) == 0) {
       updateSetting("SATflowoffset", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("summer_simmer")) == 0) {

@@ -231,7 +231,7 @@ Bij opstart worden alleen de niet-OT-entiteiten in de queue gezet (climate + DHW
 
 Twee pseudo-ID's worden gebruikt om niet-OT-entiteiten aan de bitmap op te hangen:
 
-- ID `0` bevat de twee climate-entiteiten (thermostaat en DHW-control), de 15 SAT-switches en de SAT-select.
+- ID `0` bevat de twee climate-entiteiten (thermostaat en DHW-control), de 16 SAT-switches en de SAT-select.
 - ID `27` bevat de number-entiteit voor buitentemperatuur-override.
 
 Dallas-sensoren hebben een eigen pad (`streamDallasSensorDiscovery`) omdat hun discovery afhankelijk is van het 1-Wire-adres dat pas tijdens runtime bekend wordt; ze worden via `configSensors()` gepubliceerd zodra die adressen beschikbaar zijn.
@@ -359,6 +359,7 @@ Switches:
 | `SAT_Overshoot_Protection` | PWM-start en modulatie-onderdrukking (CS-override in de PWM-fasen) |
 | `SAT_Push_Setpoint` | Control-setpoint via TC= naar de ketel pushen |
 | `SAT_Follow_Thermostat` | Een setpointwijziging op de thermostaat wordt het SAT-doel |
+| `SAT_External_Temp` | De MQTT/REST-binnentemperatuur (`sat/indoor_temp`) als ruimtebron gebruiken |
 | `SAT_OVP_Enabled` | Overshoot prevention-kalibratie inschakelen |
 | `SAT_Preset_Sync` | Climate-preset synchroniseren naar secondaire entiteiten |
 | `SAT_DHW_Enabled` | DHW-regeling binnen SAT inschakelen |
@@ -391,7 +392,16 @@ Wanneer SAT is ingeschakeld, worden ook diagnostische sensor-entiteiten automati
 | `sat/boiler_status` | Actuele ketelstatus (tekstlabel) | - |
 | `sat/active` | Of SAT actief is | bool |
 | `sat/safety_tripped` | Of een veiligheidslaag is geactiveerd | bool |
-| `sat/simulation` | Simulatiemodus aan/uit | - |
+
+Topics zonder Home Assistant-entiteit (wel gepubliceerd en retained; te gebruiken vanuit Node-RED, Homey of een andere MQTT-client):
+
+| Topic-suffix | Omschrijving |
+|---|---|
+| `sat/enabled` | SAT-instelling (`true`/`false`), ook gepubliceerd terwijl SAT uit staat |
+| `sat/control_mode` | Gevraagde bedrijfsmodus: `auto`, `continuous` of `pwm` (`sat/mode` is de gebruikte modus) |
+| `sat/preset` | Actief preset (`none`, `away`, `eco`, ...) |
+| `sat/fallback_active` | De MQTT-verlies-terugval heeft SAT ingeschakeld. Staat via MQTT altijd op `false`, omdat de terugval alleen draait zolang MQTT weg is; REST `/api/v2/sat/status` toont de live waarde |
+| `sat/simulation` | Simulatiemodus `ON`/`OFF` |
 
 **SAT-commando-topics (firmware abonneert hierop):**
 

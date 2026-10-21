@@ -220,7 +220,7 @@ At boot the firmware queues only the non-OT entities (climate + DHW, outside-tem
 
 Two pseudo-IDs are used to hang non-OT entities off the bitmap:
 
-- ID `0` carries the two climate entities (thermostat and DHW control), the 15 SAT switches, and the SAT select.
+- ID `0` carries the two climate entities (thermostat and DHW control), the 16 SAT switches, and the SAT select.
 - ID `27` carries the "outside temperature override" number entity.
 
 Dallas sensors have their own path (`streamDallasSensorDiscovery`) because their discovery depends on the actual 1-Wire address read at runtime, and they are published via `configSensors()` once those addresses are known.
@@ -345,6 +345,7 @@ Switches:
 | `SAT_Overshoot_Protection` | PWM start-up and modulation suppression (CS override in the PWM phases) |
 | `SAT_Push_Setpoint` | Push control setpoint to boiler via TC= |
 | `SAT_Follow_Thermostat` | A setpoint change on the thermostat becomes the SAT target |
+| `SAT_External_Temp` | Use the MQTT/REST indoor temperature (`sat/indoor_temp`) as the room source |
 | `SAT_OVP_Enabled` | Enable overshoot prevention calibration |
 | `SAT_Preset_Sync` | Sync climate preset to secondary entities |
 | `SAT_DHW_Enabled` | Enable DHW control interaction with SAT |
@@ -377,7 +378,16 @@ When SAT is enabled, the firmware also auto-discovers diagnostic sensor entities
 | `sat/boiler_status` | Current boiler status (text label) | - |
 | `sat/active` | Whether SAT is actively controlling | bool |
 | `sat/safety_tripped` | Whether a safety layer has tripped | bool |
-| `sat/simulation` | Simulation mode on/off | - |
+
+State-only topics (published and retained, but without a Home Assistant entity; use them from Node-RED, Homey or another MQTT client):
+
+| Topic suffix | Description |
+|---|---|
+| `sat/enabled` | SAT enabled setting (`true`/`false`), also published while SAT is disabled |
+| `sat/control_mode` | Requested control mode: `auto`, `continuous`, or `pwm` (`sat/mode` is the mode in use) |
+| `sat/preset` | Active preset (`none`, `away`, `eco`, ...) |
+| `sat/fallback_active` | MQTT-loss fallback switched SAT on. Reads `false` over MQTT, because the fallback only runs while MQTT is down; REST `/api/v2/sat/status` shows it live |
+| `sat/simulation` | Simulation mode `ON`/`OFF` |
 
 **SAT command topics (gateway subscribes to these):**
 

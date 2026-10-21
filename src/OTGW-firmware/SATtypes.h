@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.447
+**  Version  : v2.0.0-alpha.448
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -203,6 +203,9 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool  bPwmFlameRequested       = false;
   // Preset
   SATPreset eActivePreset        = SAT_PRESET_NONE;
+  // Control mode as REQUESTED by the control_mode command: 0=auto, 1=continuous, 2=pwm.
+  // eControlMode is the actual mode (auto-switch moves it); sat/control_mode reads this back.
+  uint8_t iRequestedControlMode  = 0;
   // Modulation control
   uint8_t iCurrentModulation     = 100;   // Last MM= value sent to boiler (0-100)
   // DHW state

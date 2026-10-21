@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.447
+**  Version  : v2.0.0-alpha.448
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -1976,6 +1976,7 @@ void requestMQTTRepublishAll()
 {
   resetMqttTrackedState();
   requestMQTTStatusRepublish();
+  satRepublishCoreState();  // TASK-1284: SAT enabled/active/mode/... re-published too (retained, but the broker may have lost them)
 }
 
 // The REST republish handler runs on the async_tcp task, while processOT() on

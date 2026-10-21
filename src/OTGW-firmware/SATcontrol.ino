@@ -2153,6 +2153,9 @@ void satDisable()
   // (re-enable, fallback, or recommissioning) re-emits all four SAT commands.
   satResetCmdCache();
   SATDebugTln(F("SAT: disabled, sent CS=0 to release boiler control"));
+  // No MQTT publish here: satDisable() and satClearSafetyTrip() are also reached from the
+  // async_tcp task (REST, settings POST) and the loop task owns the MQTT publish state
+  // (TASK-1176). satControlLoop() publishes the new state on its next pass (TASK-1284).
 }
 
 //=== Flush short-lived SAT data (Task #237) ===
@@ -2202,12 +2205,18 @@ void satHandleControlMode(const char* value)
   // forms and strcmp_P(..., PSTR(...)) for named forms. No bare string compares.
   int prevMode = (int)state.sat.eControlMode;
   int numericVal = atoi(value);
+  // While SAT is disabled or tripped the actual mode stays off (sat/mode): the command only
+  // records what was requested (sat/control_mode). The control loop starts continuous on enable.
+  const bool live = settings.sat.bEnabled && !state.sat.bSafetyTripped;
   if (strcasecmp_P(value, PSTR("continuous")) == 0 || numericVal == 1) {
-    satSetControlMode(SAT_MODE_CONTINUOUS);
+    state.sat.iRequestedControlMode = 1;
+    if (live) satSetControlMode(SAT_MODE_CONTINUOUS);
   } else if (strcasecmp_P(value, PSTR("pwm")) == 0 || numericVal == 2) {
-    satSetControlMode(SAT_MODE_PWM);
+    state.sat.iRequestedControlMode = 2;
+    if (live) satSetControlMode(SAT_MODE_PWM);
   } else if (strcasecmp_P(value, PSTR("auto")) == 0 || numericVal == 0) {
-    satSetControlMode(SAT_MODE_CONTINUOUS); // Start in continuous, auto-switch
+    state.sat.iRequestedControlMode = 0;
+    if (live) satSetControlMode(SAT_MODE_CONTINUOUS); // Start in continuous, auto-switch
   }
   SATDebugTf(PSTR("SAT: control mode %d -> %d (value='%s')\r\n"),
              prevMode, (int)state.sat.eControlMode, value);
@@ -2558,6 +2567,53 @@ static const char* satSimmerPerception(float indexC) {
 //=====================================================================
 //=== MQTT Publishing ===
 //=====================================================================
+// TASK-1284: the always-on SAT state set. Published whether SAT is enabled or not, so an
+// integration that reads the retained topics after a reboot sees "disabled" or "tripped"
+// instead of the last value from before the disable. Called once per satControlLoop() pass
+// (loop task only, enabled, disabled and tripped alike); the on-change shadows keep it cheap and
+// the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
+// reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
+// can reset them.
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_external_temp_enable;
+static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
+
+static void satPublishCoreState()
+{
+  if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
+
+  publishIfChangedB(F("sat/enabled"),          settings.sat.bEnabled,       s_core_enabled,          true);
+  publishIfChangedB(F("sat/active"),           state.sat.bActive,           s_core_active,           true);
+  publishIfChangedB(F("sat/safety_tripped"),   state.sat.bSafetyTripped,    s_core_safety_tripped,   true);
+  publishIfChangedB(F("sat/fallback_active"),  state.sat.bFallbackActive,   s_core_fallback_active,  true);
+  publishIfChangedB(F("sat/external_temp_enable"), settings.sat.bUseExternalTemp, s_core_external_temp_enable, true);
+
+  // sat/mode is the ACTUAL control mode; sat/control_mode is the one the control_mode command
+  // REQUESTED (auto/continuous/pwm). "auto" is not a mode of its own: it starts continuous and
+  // lets the auto-switch move eControlMode, so it is kept as a separate requested value.
+  static const char* const modeNames[] = { "off", "continuous", "pwm" };
+  uint8_t modeIdx = (uint8_t)state.sat.eControlMode;
+  if (!settings.sat.bEnabled || state.sat.bSafetyTripped) modeIdx = 0;   // disabled or tripped: off, whatever a late command did
+  publishIfChangedS(F("sat/mode"), modeNames[modeIdx < 3 ? modeIdx : 0], s_core_mode, true);
+  static const char* const reqNames[] = { "auto", "continuous", "pwm" };
+  uint8_t reqIdx = state.sat.iRequestedControlMode;
+  publishIfChangedS(F("sat/control_mode"), reqNames[reqIdx < 3 ? reqIdx : 0], s_core_control_mode, true);
+  publishIfChangedS(F("sat/preset"), satGetPresetName(state.sat.eActivePreset), s_core_preset, true);
+}
+
+// requestMQTTRepublishAll() (MQTT reconnect after a long outage, Home Assistant back online,
+// ADR-174) calls this: zeroed shadows read as first-seen, so the next pass re-publishes.
+void satRepublishCoreState()
+{
+  memset(&s_core_enabled, 0, sizeof(s_core_enabled));
+  memset(&s_core_active, 0, sizeof(s_core_active));
+  memset(&s_core_safety_tripped, 0, sizeof(s_core_safety_tripped));
+  memset(&s_core_fallback_active, 0, sizeof(s_core_fallback_active));
+  memset(&s_core_external_temp_enable, 0, sizeof(s_core_external_temp_enable));
+  memset(&s_core_mode, 0, sizeof(s_core_mode));
+  memset(&s_core_control_mode, 0, sizeof(s_core_control_mode));
+  memset(&s_core_preset, 0, sizeof(s_core_preset));
+}
+
 void satPublishMQTT()
 {
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
@@ -2571,7 +2627,7 @@ void satPublishMQTT()
   // helpers publish on first-seen, on change (with per-field tolerance), or
   // when the per-topic heartbeat (uniform random 7-11 min) is due.
   // ---------------------------------------------------------------------------
-  static SATShadowS s_mode, s_boiler_status, s_cycle_class, s_cycle_phase;
+  static SATShadowS s_boiler_status, s_cycle_class, s_cycle_phase;
   static SATShadowS s_flame_status, s_manufacturer, s_heating_curve_rec;
   static SATShadowS s_curve_recommendation, s_modulation_state, s_pwm_state;
   static SATShadowS s_summer_simmer_perception, s_heating_mode;
@@ -2609,7 +2665,7 @@ void satPublishMQTT()
   static SATShadowI s_sensor_max_age, s_cycles_per_hour, s_humidity_timeout_s;
   static SATShadowI s_control_interval, s_max_modulation;
   static SATShadowI s_heating_system, s_manufacturer_id;
-  static SATShadowB s_active, s_safety_tripped, s_flame_health, s_valves_open;
+  static SATShadowB s_flame_health, s_valves_open;
   static SATShadowB s_window_open;
   static SATShadowB s_pv_surplus_valid, s_pv_boost_active, s_pv_boost_enabled;
   static SATShadowB s_pressure_alarm, s_pressure_health;
@@ -2636,14 +2692,8 @@ void satPublishMQTT()
   // finished, which is the natural trigger for cycle_attributes republish.
   static uint32_t s_last_cycle_count    = 0;
 
-  // ---------------------------------------------------------------------------
-  // Control mode
-  // ---------------------------------------------------------------------------
-  static const char* const modeNames[] = { "off", "continuous", "pwm" };
-  {
-    uint8_t modeIdx = (uint8_t)state.sat.eControlMode;
-    publishIfChangedS(F("sat/mode"), modeNames[modeIdx < 3 ? modeIdx : 0], s_mode, true);
-  }
+  // enabled / active / mode / control_mode / preset / safety_tripped / fallback_active /
+  // external_temp_enable: published once per satControlLoop() pass by the core-state publisher.
 
   // ---------------------------------------------------------------------------
   // Key temperatures + PID state
@@ -2735,7 +2785,6 @@ void satPublishMQTT()
   // Overshoot margin, active, temps, gains, safety, flame
   // ---------------------------------------------------------------------------
   publishIfChangedF(F("sat/overshoot_margin"), settings.sat.fOvershootMargin, s_overshoot_margin, SAT_EPS_TEMP_COARSE, 1, true);
-  publishIfChangedB(F("sat/active"),           state.sat.bActive,             s_active,           true);
 
   publishIfChangedF(F("sat/room_temp"),    satGetRoomTemp(),    s_room_temp,    SAT_EPS_TEMP, 1, false);
   publishIfChangedF(F("sat/outside_temp"), satGetOutsideTemp(), s_outside_temp, SAT_EPS_TEMP, 1, false);
@@ -2743,8 +2792,6 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/kp"), state.sat.fKp, s_kp, SAT_EPS_KP, 4, false);
   publishIfChangedF(F("sat/ki"), state.sat.fKi, s_ki, SAT_EPS_KI, 6, false);
   publishIfChangedF(F("sat/kd"), state.sat.fKd, s_kd, SAT_EPS_KD, 2, false);
-
-  publishIfChangedB(F("sat/safety_tripped"), state.sat.bSafetyTripped, s_safety_tripped, false);
 
   // Flame Status (Task #70)
   {
@@ -4421,7 +4468,16 @@ static void satAutoTuneUpdate()
 //=====================================================================
 //=== Main Control Loop (called from doBackgroundTasks) ===
 //=====================================================================
+// TASK-1284: every return path of the pass (enabled, disabled, tripped, fallback lift) ends in
+// the one core-state publish, on the loop task.
+static void satControlLoopRun();
 void satControlLoop()
+{
+  satControlLoopRun();
+  satPublishCoreState();
+}
+
+static void satControlLoopRun()
 {
   // Deferred PID state restore (Task #222): satLoadPidState() is called at initSAT()
   // but NTP may not yet be synced at that point, so the restore is skipped there.
