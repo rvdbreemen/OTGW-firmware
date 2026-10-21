@@ -3,10 +3,11 @@ id: TASK-1280
 title: >-
   SAT weather: an OpenWeatherMap key replaces Open-Meteo, parses only
   temperature, and the UI still says Open-Meteo
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-21 09:31'
-updated_date: '2026-10-21 09:33'
+updated_date: '2026-10-21 17:49'
 labels:
   - sat
   - weather
@@ -24,8 +25,14 @@ Report gruijter 2026-10-21 (#alpha-testing), fw 2.0.0-alpha.443+067b478. With a 
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Maintainer decision recorded: remove OWM or keep it as a real failover
+- [x] #1 Maintainer decision recorded: remove OWM or keep it as a real failover
 - [ ] #2 With the chosen design, no weather field is reported as valid 0 when the source does not provide it
 - [ ] #3 The Weather card shows the active source
 - [ ] #4 Bench or host test shows old vs new /api/v2/sat/weather output
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-21 maintainer decision: remove the OpenWeatherMap option; Open-Meteo is the only weather source. A stored OWM key is ignored and the setting disappears.
+<!-- SECTION:NOTES:END -->
