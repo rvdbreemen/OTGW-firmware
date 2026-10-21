@@ -26,6 +26,10 @@ For full release notes per version, see the matching `RELEASE_NOTES_<version>.md
 
 - **The capture scripts keep capturing when the gateway drops off the network, run without a broker, and leave the debug toggles as they found them.** `capture-otgw.sh` and `capture-mqtt-debug.bat` reconnected telnet only when the connection closed or a reboot marker came by, so after a network outage without a reboot the telnet stream stayed silent for the rest of the capture (on GH #682 about 4 hours of the device log were lost this way). Telnet is now reconnected when it has been silent for 2 minutes while the gateway answers HTTP again (`-TelnetIdleSeconds`, 0 switches it off), and the summary counts these reconnects. `-BrokerHost` is optional: without it the capture runs without the MQTT stream and says so, and a non-interactive run no longer asks for a broker. The debug toggles the script switches on are switched back off when the capture stops, also after a reconnect without a reboot, and the summary lists them; before, only `-QuietDebugToggles` restored anything. (TASK-1249)
 
+### Documentation
+
+- **The MQTT guide now says that a command sent while the gateway reconnects is lost.** The gateway connects with a clean session and subscribes at QoS 0, so the broker keeps nothing for it while it is away: a setpoint sent from Home Assistant during a reconnect of even a few seconds never reaches the boiler, and Home Assistant keeps showing the value the gateway reports. This stays as it is on purpose: a persistent session would make the broker queue commands without expiry during an outage of hours and replay a stale setpoint afterwards. See `docs/guides/MQTT_LWT.md`. Raised on GH #682. (TASK-1212)
+
 ## [1.7.7] - 2026-10-04
 
 ### Added
