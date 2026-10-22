@@ -156,7 +156,7 @@ class TestLittleFsBudget(unittest.TestCase):
         self.assertIn("4 KiB over", error)
 
     @unittest.skipUnless(build.find_mklittlefs(REPO_ROOT, "esp32-combo"), "mklittlefs not installed")
-    def test_oversize_dummy_fails_and_real_assets_pass(self):
+    def test_oversize_dummy_fails(self):
         target = "esp32-combo"
         partition = build.TARGETS[target]["fs_size"]
         with tempfile.TemporaryDirectory() as tmp:
@@ -169,8 +169,17 @@ class TestLittleFsBudget(unittest.TestCase):
                 build.enforce_littlefs_budget(REPO_ROOT, target, big)
             self.assertEqual(ctx.exception.code, 1)
 
+    # TASK-1288: the shipped image is built from MINIFIED assets (ADR-190). Unminified they
+    # legitimately exceed the partition, so without the minifiers this half would fail for
+    # the wrong reason; it skips instead, like TestStagingOnRealData.
+    @unittest.skipUnless(build.find_mklittlefs(REPO_ROOT, "esp32-combo"), "mklittlefs not installed")
+    @unittest.skipUnless(HAVE_MINIFIERS, "rjsmin/rcssmin not installed (requirements-build.txt): "
+                         "the budget only holds for minified assets, run from .build-venv")
+    def test_real_assets_pass_the_budget(self):
+        target = "esp32-combo"
+        with tempfile.TemporaryDirectory() as tmp:
             staging = Path(tmp) / "staging"
-            build.stage_data_dir(DATA_DIR, staging, minify=HAVE_MINIFIERS)
+            build.stage_data_dir(DATA_DIR, staging, minify=True)
             build._littlefs_min_cache.clear()
             self.assertTrue(build.enforce_littlefs_budget(REPO_ROOT, target, staging))
 
