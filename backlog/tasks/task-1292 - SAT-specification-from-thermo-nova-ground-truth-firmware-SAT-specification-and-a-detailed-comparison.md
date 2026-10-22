@@ -3,11 +3,11 @@ id: TASK-1292
 title: >-
   SAT specification from thermo-nova (ground truth), firmware SAT specification
   and a detailed comparison
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-22T05:18:00Z'
-updated_date: '2026-10-22T06:54:00Z'
+updated_date: '2026-10-22T18:22:00Z'
 labels:
   - sat
   - docs
@@ -44,4 +44,12 @@ Ground truth pinned: Alexwijn/SAT releases/thermo-nova @ 7beaaf5 (local copy ver
 2026-10-22 workflow done (44 agents, 8 areas x writer/auditor/firmware writer/comparer/verifier + completeness critic + 3 assemblers): thermo-nova-spec.md 3378 lines / 1845 citations, firmware-sat-spec.md 3809 / 2037, sat-comparison.md 1002 lines, 443 rows: match 79, differs 281, missing in firmware 31, firmware-only 52; 434 rows (verified), 1 corrected, 8 match rows in area 8 unmarked. Main-session spot check: 16 random citations (10 py, 6 firmware) opened by hand, all hold. Firmware citations read at 2c194a329; SATcontrol/SATpid/SATcycles/safeTimers unchanged since 51df6b486. Not verified: the full citation set by hand (only the auditors' pass + the sample), the 'derived/computed' results (not run on a device).
 
 2026-10-22 08:56 posted the three GitHub links in #alpha-testing for Sergeant D (message 1562696953316515853 thread); TASK-1270/1272/1273/1282 notes reference the spec. AC4 done; the task stays In Progress until his validation is recorded in docs/sat/ (his corrections rank above the code per the CLAUDE.md block).
+
+2026-10-22 18:01 Sergeant D (#alpha-testing 1562888583004688629): 'I checked the files and everything looks good so far. Good job.' Recorded as entry 4 in docs/sat/sergeant-d-corrections.md. His earlier answers (duty formula, 180 s window, thermo-nova after-window behaviour, base temperature) are entries 1 and 3; the follow/push question he deferred to the maintainer is entry 2.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Three cited documents on dev: docs/sat/thermo-nova-spec.md (the design as Alexwijn/SAT releases/thermo-nova @ 7beaaf5 implements it, 1845 file:line citations, each reopened by an audit pass, 16 spot-checked by hand), docs/sat/firmware-sat-spec.md (what the firmware does today, same structure) and docs/sat/sat-comparison.md (443 points, 434 verified adversarially, executive summary). AC1-3: the documents; AC4: posted in #alpha-testing, and Sergeant D validated them on first reading (entry 4 of docs/sat/sergeant-d-corrections.md), with his decisions on the duty-cycle BT recorded as entry 1. CLAUDE.md/AGENTS.md carry the ground-truth block with the pinned commit, guarded by tests/test_sat_ground_truth_block.py. Not verified: the 'derived/computed' results were not run on a device; the pin check of the local copy is recorded in UPSTREAM_COMMIT and the diff -rq of 2026-10-22.
+<!-- SECTION:FINAL_SUMMARY:END -->

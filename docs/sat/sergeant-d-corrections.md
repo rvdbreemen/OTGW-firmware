@@ -69,6 +69,16 @@ echo of SAT's own push (within 0.25 °C). The earlier precondition that the ther
 value matched the last push is dropped, because thermostats such as the Honeywell Round never
 mirror an accepted override in their own setpoint (MsgID 16).
 
+## 4. Validation of the three SAT documents (2026-10-22)
+
+**Source:** 18:01 UTC, message 1562888583004688629.
+
+> I checked the files and everything looks good so far. Good job.
+
+**Meaning:** `thermo-nova-spec.md`, `firmware-sat-spec.md` and `sat-comparison.md` passed his
+first reading without a correction. Later corrections land here as numbered entries; the
+documents are not rewritten silently.
+
 ## 3. Base temperature (2026-10-22)
 
 **Source:** 14:15 UTC, message 1562831881341505670.
