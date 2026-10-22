@@ -48,6 +48,7 @@ Run before requesting review:
 
 ### MQTT / Home Assistant discovery changes
 
+- [ ] `python test/host/test_ha_discovery_json.py` prints `RESULT: PASS`. It compiles the real `MQTTHaDiscovery.cpp` on the host and checks every discovery payload, including each SAT switch up to `SAT_HA_SWITCH_COUNT`. Run `python test/host/test_dhw_water_meter.py` too when the sensor table changes.
 - [ ] Run the procedure in `docs/api/MQTT_DISCOVERY_CHECK.md` against a real broker.
 - [ ] `mosquitto_sub -t 'homeassistant/#'` after a post-change reboot: every msgid in the baseline table still publishes. Disappearing topics are release blockers.
 - [ ] `docs/api/MQTT.md` updated if any topic or payload shape changed.

@@ -558,7 +558,10 @@ bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
                                    uint8_t otid,
                                    const char* label);
 
-// SAT enable/disable switches (boolean settings). switchIdx = 0..14, see implementation.
+// SAT enable/disable switches (boolean settings). switchIdx = 0..SAT_HA_SWITCH_COUNT-1,
+// one case per switch in streamSatSwitchDiscovery(); the discovery loop and the host
+// test (test/host/test_ha_discovery_json.cpp) both use this count (TASK-1287).
+constexpr uint8_t SAT_HA_SWITCH_COUNT = 16;
 bool streamSatSwitchDiscovery(uint8_t switchIdx,
                               HaDiscoveryContext &ctx);
 

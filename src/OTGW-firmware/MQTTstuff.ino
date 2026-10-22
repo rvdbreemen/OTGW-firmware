@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.451
+**  Version  : v2.0.0-alpha.452
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -2732,7 +2732,7 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     // TASK-516: idx 12 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
     const bool dhwEnableSwitchAllowed =
         (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
-    for (uint8_t swIdx = 0; swIdx < 16; swIdx++) {
+    for (uint8_t swIdx = 0; swIdx < SAT_HA_SWITCH_COUNT; swIdx++) {
       if (swIdx == 12 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
       if (streamSatSwitchDiscovery(swIdx, ctx)) result = true;
