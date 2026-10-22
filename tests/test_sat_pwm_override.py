@@ -61,6 +61,8 @@ static int g_csSent = 0; static float g_csLast = 0;
 static uint32_t millis() { return g_ms; }
 static bool satIsFlameOn() { return g_flame; }
 static float satGetFlowTemp() { return g_flow; }
+static float satApplyContinuous(float p) { return 1000.0f + p; }   // marker value: "the continuous setpoint was sent"
+void satPwmReset();                                                 // defined later in the cut block (the .ino gets Arduino prototypes)
 static float satGetReturnTemp() { return g_ret; }
 static float satGetBaseOffset() { return 27.2f; }
 static float satGetColdSetpoint() { return 28.2f; }
@@ -97,6 +99,7 @@ int main(int argc, char** argv) {
   }
   reset();
   settings.sat.bOvershootProtection = atoi(argv[2]) != 0;
+  _pwm_effectiveBoilerTemp = 47.2f;        // a BT learned in an earlier cycle (TASK-1273: no placeholder any more); keeps the legacy scenarios at duty 0.39
   const float pid = 35.0f;                 // duty (35-27.2)/20 = 0.39: range 3, on 351 s, off 549 s
   state.sat.fPidOutput = pid;
   setPrev(28.0f);                          // previous CS (what the old +18 path produced)
@@ -107,12 +110,52 @@ int main(int argc, char** argv) {
     printf("mode=%d req=%d\n", state.sat.eControlMode, (int)state.sat.bPwmFlameRequested);
     return 0;
   }
+  if (!strcmp(sc, "duty")) {               // TASK-1273: duty BT. argv[3]=flame argv[4]=flow argv[5]=pid argv[6]=seed(0/1) argv[7]=ms since flame-on (EMA window)
+    state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true;
+    g_flame = atoi(argv[3]) != 0; g_flow = (float)atof(argv[4]); const float p = (float)atof(argv[5]);
+    _pwm_effectiveBoilerTemp = atoi(argv[6]) ? 50.0f : 0.0f;       // seeded by an earlier cycle, or nothing learned yet
+    uint32_t onAgo = (argc > 7) ? (uint32_t)atoi(argv[7]) : 5000UL;
+    _pwm_flameOnMs = g_ms - onAgo; g_flameOnStart = g_ms - onAgo; _pwm_waitingForFlame = false;
+    float cs = satApplyPWM(p);
+    printf("duty=%.2f bt=%.1f req=%d cs=%.1f\n", state.sat.fPwmDutyCycle, _pwm_effectiveBoilerTemp,
+           (int)state.sat.bPwmFlameRequested, cs);
+    return 0;
+  }
+  if (!strcmp(sc, "sync")) {               // TASK-1273: ON phase waiting for ignition, flame appears at flow argv[3]
+    state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true;
+    _pwm_waitingForFlame = true; _pwm_waitForFlameStartMs = g_ms - 5000UL; _pwm_flameOnMs = 0;
+    _pwm_effectiveBoilerTemp = 50.0f; g_flame = true; g_flow = (float)atof(argv[3]); g_flameOnStart = g_ms;
+    satApplyPWM(pid);
+    printf("bt=%.1f wait=%d onago=%u\n", _pwm_effectiveBoilerTemp, (int)_pwm_waitingForFlame, (unsigned)(g_ms - _pwm_flameOnMs));
+    return 0;
+  }
+  if (!strcmp(sc, "timeout")) {            // TASK-1273: flame-out mid-phase, no relight, ignition timeout aborts the ON phase
+    state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true;
+    _pwm_waitingForFlame = true; _pwm_waitForFlameStartMs = g_ms - 181000UL; _pwm_flameOnMs = g_ms - 400000UL;
+    _pwm_effectiveBoilerTemp = 46.0f; g_flame = false; g_flameOnStart = g_ms - 10000UL;
+    satApplyPWM(pid);
+    printf("req=%d wait=%d anchor=%u bt=%.1f\n", (int)state.sat.bPwmFlameRequested, (int)_pwm_waitingForFlame,
+           (unsigned)_pwm_flameOnMs, _pwm_effectiveBoilerTemp);
+    return 0;
+  }
+  if (!strcmp(sc, "relight")) {            // TASK-1273: flame-out and relight inside one ON phase, window already over
+    state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true;
+    _pwm_waitingForFlame = false; _pwm_flameOnMs = g_ms - 200000UL; g_flameOnStart = g_ms - 10000UL;
+    _pwm_effectiveBoilerTemp = 46.0f; g_flame = true; g_flow = 50.0f;
+    satApplyPWM(pid);                                                   // window over: BT stays 46
+    g_ms += 30000UL; g_flame = false; satApplyPWM(pid);                 // flame out mid-phase: wait re-armed
+    int rearmed = (int)_pwm_waitingForFlame;
+    g_ms += 30000UL; g_flame = true; g_flow = 58.0f; satApplyPWM(pid);  // relight at a hotter flow
+    printf("bt=%.1f rearmed=%d wait=%d onago=%u req=%d\n", _pwm_effectiveBoilerTemp, rearmed, (int)_pwm_waitingForFlame,
+           (unsigned)(g_ms - _pwm_flameOnMs), (int)state.sat.bPwmFlameRequested);
+    return 0;
+  }
   if (!strcmp(sc, "reset")) {              // dirty state -> satPwmReset()/satSetControlMode()
     state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = true; _pwm_waitingForFlame = true;
-    _pwm_flameOffHoldSetpoint = 48; _pwm_flameOnMs = 123; _pwm_waitForFlameStartMs = 456;
+    _pwm_flameOffHoldSetpoint = 48; _pwm_flameOnMs = 123; _pwm_waitForFlameStartMs = 456; _pwm_effectiveBoilerTemp = 55;
     if (argc > 3 && !strcmp(argv[3], "mode")) satSetControlMode(SAT_MODE_CONTINUOUS); else satPwmReset();
-    printf("req=%d wait=%d hold=%.1f onms=%u mode=%d\n", (int)state.sat.bPwmFlameRequested, (int)_pwm_waitingForFlame,
-           _pwm_flameOffHoldSetpoint, (unsigned)_pwm_flameOnMs, state.sat.eControlMode);
+    printf("req=%d wait=%d hold=%.1f onms=%u mode=%d bt=%.1f\n", (int)state.sat.bPwmFlameRequested, (int)_pwm_waitingForFlame,
+           _pwm_flameOffHoldSetpoint, (unsigned)_pwm_flameOnMs, state.sat.eControlMode, _pwm_effectiveBoilerTemp);
     return 0;
   }
   if (!strcmp(sc, "solar")) {              // three ticks, no override (protection off), solar offset subtracted after each
@@ -135,7 +178,8 @@ int main(int argc, char** argv) {
     state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 600000UL;
     g_flame = true; g_flameOnStart = g_ms - (uint32_t)atoi(argv[3]); _pwm_flameOnMs = g_flameOnStart;
     float cs = satApplyPWM(pid);
-    printf("cs=%.1f req=%d\n", cs, (int)state.sat.bPwmFlameRequested);
+    printf("cs=%.1f req=%d wait=%d bt=%.1f onago=%u\n", cs, (int)state.sat.bPwmFlameRequested, (int)_pwm_waitingForFlame,
+           _pwm_effectiveBoilerTemp, (unsigned)(g_ms - _pwm_flameOnMs));
     return 0;
   }
   if (!strcmp(sc, "off")) {
@@ -253,6 +297,63 @@ class SatPwmOverride(unittest.TestCase):
         out = subprocess.run([str(self.exe), *map(str, args)], capture_output=True, text=True, check=True).stdout
         return dict(kv.split("=") for kv in out.split())
 
+
+    # --- TASK-1273: duty-cycle BT (Sergeant D 2026-10-22, docs/sat/sergeant-d-corrections.md entry 1) ---
+    def test_duty_uses_the_live_flow_at_the_first_flame_not_a_placeholder(self):
+        # requested 40, boiler at 60, nothing learned yet: (40-27.2)/(60-27.2) = 0.39; the old
+        # base+20 placeholder gave (40-27.2)/(47.2-27.2) = 0.64 and burned much longer per cycle
+        r = self.run_sc("duty", 1, 1, 60.0, 40.0, 0)
+        self.assertEqual(r["duty"], "0.39")
+        self.assertEqual(r["bt"], "60.0")
+
+    def test_duty_before_any_flame_uses_the_live_flow(self):
+        # pwm.py:232 `_effective_on_temperature or device_state.flow_temperature`
+        r = self.run_sc("duty", 1, 0, 60.0, 40.0, 0)
+        self.assertEqual(r["duty"], "0.39")
+
+    def test_duty_floor_is_base_plus_one_only_against_division_by_zero(self):
+        r = self.run_sc("duty", 1, 1, 20.0, 40.0, 0)         # boiler colder than base: BT floored to 28.2
+        self.assertEqual(r["duty"], "1.00")
+        r = self.run_sc("duty", 1, 1, 20.0, 28.0, 0)         # pins the +1: (28-27.2)/(28.2-27.2) = 0.80 (a +5 floor gives 0.16)
+        self.assertEqual(r["duty"], "0.80")
+
+    def test_no_flow_temperature_idles_pwm_and_sends_the_continuous_setpoint(self):
+        # pwm.py:122-128 (PWM IDLE) and heating_control.py:149-150 (control mode reads continuous)
+        r = self.run_sc("duty", 1, 1, 0.0, 40.0, 1)
+        self.assertEqual((r["duty"], r["bt"], r["req"], r["cs"]), ("0.00", "0.0", "0", "1040.0"))
+
+    def test_first_ignition_of_the_on_phase_reseeds_bt_and_anchors_the_window(self):
+        # pwm.py:186-191
+        r = self.run_sc("sync", 1, 35.0)
+        self.assertEqual((r["bt"], r["wait"], r["onago"]), ("35.0", "0", "0"))
+
+    def test_ignition_timeout_abort_clears_the_anchor_and_keeps_bt(self):
+        r = self.run_sc("timeout", 1)
+        self.assertEqual((r["req"], r["wait"], r["anchor"], r["bt"]), ("0", "0", "0", "46.0"))
+
+    def test_relight_inside_the_on_phase_keeps_bt_and_the_closed_window(self):
+        # pwm.py:145-146 and 206: _flame_on_at survives a mid-phase flame-out, so no reseed and no new window
+        r = self.run_sc("relight", 1)
+        self.assertEqual((r["bt"], r["rearmed"], r["wait"], r["onago"], r["req"]), ("46.0", "1", "0", "260000", "1"))
+
+    def test_learned_bt_is_still_filtered_between_30_and_180_s_after_ignition(self):
+        # seeded 50, flow 60, 100 s after flame-on: EMA 0.3*60+0.7*50 = 53.0 (the old 30 s window froze it at 50)
+        r = self.run_sc("duty", 1, 1, 60.0, 40.0, 1, 100000)
+        self.assertEqual(r["bt"], "53.0")
+
+    def test_learned_bt_is_held_after_the_180_s_window(self):
+        r = self.run_sc("duty", 1, 1, 60.0, 40.0, 1, 200000)
+        self.assertEqual(r["bt"], "50.0")
+
+    def test_on_start_with_the_flame_already_burning_reseeds_bt_at_once(self):
+        # pwm.py:164-167: no ignition wait, BT = the live flow (33) instead of the value learned earlier (47.2)
+        r = self.run_sc("pending", 1, 5000)
+        self.assertEqual((r["wait"], r["bt"], r["onago"]), ("0", "33.0", "0"))   # window counts from the ON start (pwm.py:164)
+
+    def test_pwm_reset_clears_the_learned_bt(self):
+        r = self.run_sc("reset", 1)
+        self.assertEqual(r["bt"], "0.0")
+
     # --- satApplyPWM override gate -------------------------------------------------
     def test_off_phase_with_protection_sends_minimum_not_28(self):
         self.assertEqual(float(self.run_sc("off", 1)["cs"]), 10.0)
@@ -316,7 +417,7 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(float(self.run_sc("pending", 1, 60000)["cs"]), 32.0)
 
     def test_pwm_reset_clears_stale_state(self):
-        self.assertEqual(self.run_sc("reset", 1), {"req": "0", "wait": "0", "hold": "0.0", "onms": "0", "mode": "2"})
+        self.assertEqual(self.run_sc("reset", 1), {"req": "0", "wait": "0", "hold": "0.0", "onms": "0", "mode": "2", "bt": "0.0"})
 
     def test_mode_switch_resets_pwm_state(self):
         r = self.run_sc("reset", 1, "mode")

@@ -24,7 +24,7 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156282760183
 **Settled by this statement:**
 
 - The duty cycle is `(requested setpoint - base) / (BT - base)` with base 27.2 °C for radiators
-  (thermo-nova `pwm.py:237`, firmware `SATcontrol.ino:734`). Both match.
+  (thermo-nova `pwm.py:238`, firmware `SATcontrol.ino:734` at that time). Both match.
 - The floor `base + 1` (28.2 °C) on BT exists only to avoid division by zero or a negative value
   (`pwm.py:235`). It is not a placeholder for an unknown BT.
 - BT is a real boiler (flow) temperature from the first ON cycle on. The firmware's fixed

@@ -1186,7 +1186,7 @@ Differences visible in the code itself: the order of checks is flame first, then
 
 #### Cross-reference: PWM override (summary only)
 
-`satApplyPWM(pidOutput)` (SATcontrol.ino:868-889). It first runs the PWM schedule, whose duty cycle is `(pidOutput - baseOffset) / (effectiveTemp - baseOffset)` with the heating-system base offset (SATcontrol.ino:727-737). It returns the previous control setpoint without an override when overshoot protection is off, DHW is active, or `pidOutput` ≤ the cold setpoint (SATcontrol.ino:872-874). The previous control setpoint is `_sat_lastControlCS` when that is above 10 °C, otherwise `pidOutput` (SATcontrol.ino:870). With the override: 10 °C in the OFF phase (SATcontrol.ino:875-878); flame off in the ON phase gives `return temperature + fFlameOffOffset` clamped to [cold setpoint, system cap] (SATcontrol.ino:880-883, SATcontrol.ino:701-707); during the hold delay the hold value or the previous setpoint (SATcontrol.ino:884-886); after the delay `flow - fModSupOffset` clamped to [10, system cap] (SATcontrol.ino:887-888, SATcontrol.ino:711-717), refreshed every 3 s (SATcontrol.ino:894-918). Details belong to the PWM section.
+`satApplyPWM(pidOutput)` (SATcontrol.ino:901-925; working tree numbering). It first runs the PWM schedule, whose duty cycle is `(pidOutput - baseOffset) / (effectiveTemp - baseOffset)` with the heating-system base offset (SATcontrol.ino:727-756). If the flow temperature is unknown (`satGetFlowTemp() <= 0`) the schedule has reset the PWM state and `satApplyPWM()` returns the continuous setpoint `satApplyContinuous(pidOutput)` (SATcontrol.ino:741-748, SATcontrol.ino:905-907). Otherwise it returns the previous control setpoint without an override when overshoot protection is off, DHW is active, or `pidOutput` ≤ the cold setpoint (SATcontrol.ino:908-910). The previous control setpoint is `_sat_lastControlCS` when that is above 10 °C, otherwise `pidOutput` (SATcontrol.ino:903). With the override: 10 °C in the OFF phase (SATcontrol.ino:911-914); flame off in the ON phase gives `return temperature + fFlameOffOffset` clamped to [cold setpoint, system cap] (SATcontrol.ino:916-919, SATcontrol.ino:701-707); during the hold delay the hold value or the previous setpoint (SATcontrol.ino:920-922); after the delay `flow - fModSupOffset` clamped to [10, system cap] (SATcontrol.ino:923-924, SATcontrol.ino:711-717), refreshed every 3 s (SATcontrol.ino:930-954). Details belong to the PWM section.
 
 <a id="s3-formulas"></a>
 
@@ -1505,7 +1505,7 @@ Configuration inputs (defaults in the constants table below): `bOvershootProtect
 #### 1. Start-up of the firmware (what PWM-related state exists before the first tick)
 
 1. `initSAT()` runs once at boot (OTGW-firmware.ino:567, search result). It calls `satCycleInit()`, which sets the last flame-on time to 0, the last flame-off time to "now", and clears the sustain timers and the per-hour cycle ring (SATcontrol.ino:3688, SATcycles.ino:188-207).
-2. It then calls `satPwmReset()`: phase = OFF (`bPwmFlameRequested = false`), no ignition wait, `_pwm_flameOnMs = 0`, stored flame-off hold = 0, last off-time = 1 ms (SATcontrol.ino:3689, SATcontrol.ino:923-931). The learned effective boiler temperature `_pwm_effectiveBoilerTemp` starts at 0 from its static initialiser and is not touched by the reset (SATcontrol.ino:686, SATcontrol.ino:923-931).
+2. It then calls `satPwmReset()`: phase = OFF (`bPwmFlameRequested = false`), no ignition wait, `_pwm_flameOnMs = 0`, stored flame-off hold = 0, last off-time = 1 ms, and the effective boiler temperature `_pwm_effectiveBoilerTemp` back to 0, as thermo-nova's `pwm.reset()` does (SATcontrol.ino:3728, SATcontrol.ino:959-968; pwm.py:100). The variable also starts at 0 from its static initialiser (SATcontrol.ino:686).
 3. The mode is set to OFF, then to CONTINUOUS if SAT is enabled (SATcontrol.ino:3691, SATcontrol.ino:3721-3723). PWM is never restored after a restart. The requested control mode (`iRequestedControlMode`) lives in the transient state struct and starts at 0 = "auto" (SATtypes.h:206-208).
 4. If an OpenTherm command interface exists, `CS=0` is sent to release any old PIC override (SATcontrol.ino:3702-3710); otherwise it is sent on the first loop pass where one exists (SATcontrol.ino:4583-4589). With SAT enabled, `PM=3`, `PM=15`, `PM=48` and, for some manufacturers, `MI=500` are queued (SATcontrol.ino:3724-3733).
 5. The control timer is set to `iControlInterval` (default 30 s) (SATcontrol.ino:3719, SATtypes.h:444).
@@ -1591,24 +1591,27 @@ How cycles are classified. A cycle runs from a flame-on edge to the next flame-o
 
 #### 4. The PWM state machine (`satPwmSchedule`, once per tick in PWM mode)
 
-`satPwmSchedule(pidOutput)` is called only from `satApplyPWM()` (SATcontrol.ino:871), which is called only from the tick in PWM mode (SATcontrol.ino:4929-4930). So the state machine does not run on ticks that return early (DHW, fault, thermal safe, summer simmer, valves closed, invalid room temperature) (SATcontrol.ino:4635-4790). Phases: ON (`bPwmFlameRequested` true) and OFF (false) (SATcontrol.ino:814-855).
+**Citation exception (TASK-1273).** The passages in this section about the boiler temperature BT of the duty formula (the effective boiler temperature) cite `SATcontrol.ino` as changed by TASK-1273: the working tree, not commit `51df6b486`. Lines above 729 are the same in both. From line 729 on the numbering differs by up to 38 lines. The step list of `satPwmSchedule` and the passages about BT use the working tree; the other passages of this section, such as the CS override in step 5, still use the numbering of `51df6b486`.
 
-Per call, in order (SATcontrol.ino:727-856):
+`satPwmSchedule(pidOutput)` is called only from `satApplyPWM()` (SATcontrol.ino:903), which is called only from the tick in PWM mode (SATcontrol.ino:4929-4930). So the state machine does not run on ticks that return early (DHW, fault, thermal safe, summer simmer, valves closed, invalid room temperature) (SATcontrol.ino:4635-4790). Phases: ON (`bPwmFlameRequested` true) and OFF (false) (SATcontrol.ino:835-887).
 
-1. **Duty cycle** from the current `pidOutput` and the learned temperature, clamped to [0, 1], published as `fPwmDutyCycle` (SATcontrol.ino:729-737; formulas below).
-2. **Time thresholds**: minimum on-time (180 s, or `iHpCycleSeconds` for a heat pump), cycles per hour, `upperMs = 3600000 / cyclesHr`, `maxMs = 2 x upperMs` (SATcontrol.ino:739-743, SATcontrol.ino:284-290, SATcontrol.ino:271-281).
-3. **Effective temperature learning**: if the flame is on and not waiting for ignition, and less than 30 000 ms have passed since `_pwm_flameOnMs`, `_pwm_effectiveBoilerTemp = 0.3 x flow + 0.7 x _pwm_effectiveBoilerTemp` (SATcontrol.ino:745-754).
-4. **Flame sync**: if the flame is on and the code was waiting for ignition, `_pwm_flameOnMs = now`, waiting ends, the ignition timer is cleared (SATcontrol.ino:756-761). If the flame is off, the code is not waiting and the phase is ON, waiting starts and the ignition timer starts now (SATcontrol.ino:762-765). Note that item 3 comes before item 4 in the code, so the tick that first sees the flame does not update the learned temperature.
-5. **Duty thresholds**: `dutyLower = minOn / upper`, `dutyUpper = 1 - dutyLower`, `dutyMin = dutyLower / 2`, `dutyMax = 1 - dutyMin` (SATcontrol.ino:767-771).
-6. **On/off times** from the duty (SATcontrol.ino:773-810; table below). **Range 5** (`duty >= dutyMax`) is special: phase = ON, last off-time = 0, last on-time = `maxMs`, and the function **returns** before the state machine (SATcontrol.ino:776-781). In range 5 there is no on-time expiry, no ignition timeout and no OFF phase.
-7. Store the off-time and on-time for the saturation check and the cycle classifier (SATcontrol.ino:809-810).
-8. **ON phase** (SATcontrol.ino:812-832):
-   - `sinceFlameStart = now - (last real flame-on time from the cycle tracker)` (SATcontrol.ino:813).
-   - **ON to OFF**: if `sinceFlameStart >= onTimeMs` and `sinceFlameStart >= minOnMs`: phase OFF, stored hold cleared, return (SATcontrol.ino:816-821).
-   - **Ignition timeout**: else, if waiting for ignition and 180 s have passed since the ignition timer started: log, waiting ends, phase OFF, stored hold cleared (SATcontrol.ino:822-832, SATcontrol.ino:696).
-9. **OFF phase** (SATcontrol.ino:833-855): stored hold cleared; `sinceFlameOff = now - (last real flame-off time)`. If `sinceFlameOff >= offTimeMs`: if the rolling-hour cycle limit is reached, log once and stay OFF (SATcontrol.ino:838-849); otherwise phase ON, waiting for ignition, ignition timer started (SATcontrol.ino:850-853).
+Per call, in order (SATcontrol.ino:727-889):
 
-The on-time and the off-time are recomputed on every tick, so the phase ends at the first tick where the newly computed time has passed (SATcontrol.ino:773-810, SATcontrol.ino:816, SATcontrol.ino:837). Phase changes happen only on ticks, so an ON or OFF phase can run up to one control interval longer than its computed time (derived from SATcontrol.ino:4614 and SATcontrol.ino:871).
+0. **Unknown flow temperature**: if `satGetFlowTemp() <= 0` (MsgID 25 not seen), the function calls `satPwmReset()`, sets `fPwmDutyCycle` to 0 and returns, so none of the items below run (SATcontrol.ino:741-748). `satApplyPWM()` then returns the continuous setpoint `satApplyContinuous(pidOutput)` instead of any PWM setpoint (SATcontrol.ino:905-907). thermo-nova sets PWM to IDLE when the flow temperature is missing (pwm.py:122-128), and its control mode then reads continuous (heating_control.py:148-152).
+1. **Duty cycle** from the current `pidOutput` and the boiler temperature BT (`effectiveTemp`), clamped to [0, 1], published as `fPwmDutyCycle` (SATcontrol.ino:729-756; formulas below). BT is the filtered `_pwm_effectiveBoilerTemp`, or the live flow temperature while that value is still 0, and never below base + 1 (SATcontrol.ino:749-751).
+2. **Time thresholds**: minimum on-time (180 s, or `iHpCycleSeconds` for a heat pump), cycles per hour, `upperMs = 3600000 / cyclesHr`, `maxMs = 2 x upperMs` (SATcontrol.ino:759-762, SATcontrol.ino:284-290, SATcontrol.ino:271-281).
+3. **Effective temperature filter**: if the flame is on, the code is not waiting for ignition, `_pwm_flameOnMs` is not 0 and less than 180 000 ms (`PWM_IGNITION_TIMEOUT_MS`, thermo-nova `HEATER_STARTUP_TIMEFRAME`) have passed since it, `_pwm_effectiveBoilerTemp = 0.3 x flow + 0.7 x _pwm_effectiveBoilerTemp` (SATcontrol.ino:764-771, SATcontrol.ino:696; pwm.py:144-149). `_pwm_flameOnMs == 0` means "no ignition in this ON phase", as `_flame_on_at is None` does in thermo-nova, so nothing is filtered in the OFF phase or before the first ignition (pwm.py:144-146). After the window the value is held, not replaced by the raw flow, until the next ON phase seeds it again (SATcontrol.ino:780, SATcontrol.ino:881). Sergeant D confirmed the 180 s window on 2026-10-22 (`docs/sat/sergeant-d-corrections.md` entry 1).
+4. **Flame sync**: if the flame is on and the code was waiting for ignition, waiting ends and the ignition timer is cleared; only when `_pwm_flameOnMs` is 0 are `_pwm_flameOnMs = now` and `_pwm_effectiveBoilerTemp` set to the live flow temperature (SATcontrol.ino:773-782; pwm.py:189-191). In thermo-nova the wait exists only from an ON start without a flame (pwm.py:163), so a relight after a mid-phase flame-out has no sync and `_flame_on_at` stays (pwm.py:145-146). The firmware does set the wait after a flame loss inside the ON phase (see the end of this item), and the zero test keeps such a relight from reseeding BT or reopening the window. If the flame is off, the code is not waiting and the phase is ON, waiting starts and the ignition timer starts now (SATcontrol.ino:783-786). Item 3 comes before item 4 in the code, so the call that first sees the flame takes no filter sample; the reseed sets the value anyway.
+5. **Duty thresholds**: `dutyLower = minOn / upper`, `dutyUpper = 1 - dutyLower`, `dutyMin = dutyLower / 2`, `dutyMax = 1 - dutyMin` (SATcontrol.ino:789-792).
+6. **On/off times** from the duty (SATcontrol.ino:794-829; table below). **Range 5** (`duty >= dutyMax`) is special: phase = ON, last off-time = 0, last on-time = `maxMs`, and the function **returns** before the state machine (SATcontrol.ino:797-802). In range 5 there is no on-time expiry, no ignition timeout, no OFF phase and none of the ON-start steps of item 9, so BT is not reseeded and `_pwm_flameOnMs` is not set when a range-5 stint begins with a burning flame (derived from reading the code, not run).
+7. Store the off-time and on-time for the saturation check and the cycle classifier (SATcontrol.ino:830-831).
+8. **ON phase** (SATcontrol.ino:835-855):
+   - `sinceFlameStart = now - (last real flame-on time from the cycle tracker)` (SATcontrol.ino:834).
+   - **ON to OFF**: if `sinceFlameStart >= onTimeMs` and `sinceFlameStart >= minOnMs`: phase OFF, stored hold cleared, `_pwm_flameOnMs` cleared as thermo-nova clears `_flame_on_at` (pwm.py:206), return (SATcontrol.ino:837-842).
+   - **Ignition timeout**: else, if waiting for ignition and 180 s have passed since the ignition timer started: log, waiting ends, phase OFF, stored hold cleared, `_pwm_flameOnMs` cleared as at any ON to OFF (SATcontrol.ino:844-855, SATcontrol.ino:696). thermo-nova does not abort here: it ends the wait and keeps the ON phase running (pwm.py:197-199).
+9. **OFF phase** (SATcontrol.ino:856-888): stored hold cleared; `sinceFlameOff = now - (last real flame-off time)`. If `sinceFlameOff >= offTimeMs`: if the rolling-hour cycle limit is reached, log once and stay OFF (SATcontrol.ino:861-872); otherwise phase ON (SATcontrol.ino:874). With the flame already burning there is no wait, `_pwm_flameOnMs` is set to now and BT is reseeded (SATcontrol.ino:875-881; pwm.py:164-167). With the flame off, waiting for ignition starts, the ignition timer starts and `_pwm_flameOnMs` is set to 0 (SATcontrol.ino:882-886; pwm.py:163-164).
+
+The on-time and the off-time are recomputed on every tick, so the phase ends at the first tick where the newly computed time has passed (SATcontrol.ino:794-829, SATcontrol.ino:837, SATcontrol.ino:860). Phase changes happen only on ticks, so an ON or OFF phase can run up to one control interval longer than its computed time (derived from SATcontrol.ino:4653 and SATcontrol.ino:904).
 
 **Timer reference.** Both phases are timed from the cycle tracker's real flame edges, not from the moment the phase started (SATcontrol.ino:813, SATcontrol.ino:836, SATcycles.ino:1039-1040). Consequences, read directly from the code:
 
@@ -1616,11 +1619,11 @@ The on-time and the off-time are recomputed on every tick, so the phase ends at 
 - A flame loss and relight inside an ON phase restart the ON timing from the relight (SATcycles.ino:714, SATcontrol.ino:813).
 - The per-hour limit counts every real flame-on in the last 3600 s, also DHW ignitions and ignitions outside PWM: the ring is filled in the flame-on edge handler (SATcycles.ino:262-292, SATcycles.ino:722-724). It holds at most 6 entries (SATcycles.ino:37). The limit is `satGetMaxCyclesPerHour()` (SATcycles.ino:291).
 
-**Effective temperature, as coded.** The learned value starts at 0 (SATcontrol.ino:686), is never seeded from the flow temperature and is not cleared by `satPwmReset()` (SATcontrol.ino:923-931). The duty formula replaces it by `baseOffset + 20` whenever it is below `baseOffset + 5` (SATcontrol.ino:731-732). Learning needs a tick where the flame is on, the code is no longer waiting, and less than 30 000 ms passed since `_pwm_flameOnMs`, which is the time of the tick that first saw the flame (SATcontrol.ino:748-760). With the default 30 s interval the next tick comes about 30 s after that tick, so whether a learning sample ever lands depends on tick timing (see "Not found / unclear"). If one lands, the first update from 0 gives `0.3 x flow`, which stays below `baseOffset + 5` for flows below 107 °C (radiators) or 83 °C (underfloor), so the fallback still applies (arithmetic from SATcontrol.ino:732 and SATcontrol.ino:752).
+**Effective temperature, as coded (TASK-1273).** BT in the duty formula is `_pwm_effectiveBoilerTemp`. It starts at 0 (SATcontrol.ino:686) and `satPwmReset()` clears it to 0, as thermo-nova's `pwm.reset()` does (SATcontrol.ino:967; pwm.py:100). Without a flow temperature (`satGetFlowTemp() <= 0`) `satPwmSchedule()` resets the PWM state and returns before it touches BT, and `satApplyPWM()` returns the continuous setpoint (SATcontrol.ino:741-748, SATcontrol.ino:905-907; pwm.py:122-128). `_pwm_flameOnMs` is the ignition anchor of the current ON phase. The value 0 means "no ignition in this ON phase", as `_flame_on_at is None` does in thermo-nova (pwm.py:145-146, pwm.py:164, pwm.py:206). It is cleared at an ON-to-OFF switch, which includes the ignition-timeout abort, and at an ON start without a flame (SATcontrol.ino:841, SATcontrol.ino:854, SATcontrol.ino:885), and set to now at the first ignition of the phase and at an ON start with a burning flame (SATcontrol.ino:779, SATcontrol.ino:880). BT is seeded with the live flow temperature at three moments: the first PWM call that sees the flame while the value is still 0 (SATcontrol.ino:749; pwm.py:130-131), the first ignition of an ON phase, which is the flame sync with the anchor at 0 (SATcontrol.ino:775-781; pwm.py:189-191), and an OFF-to-ON start while the flame is already burning (SATcontrol.ino:875-881; pwm.py:164-167). A relight after a mid-phase flame-out keeps BT and does not reopen the window, because the anchor is not 0 and the sync leaves it alone (SATcontrol.ino:778; pwm.py:145-146). Before any seed the duty formula uses the live flow temperature itself (SATcontrol.ino:750; pwm.py:232). It floors BT at `baseOffset + 1`, which only guards against a division by zero or a negative value (SATcontrol.ino:751; pwm.py:235; Sergeant D, `docs/sat/sergeant-d-corrections.md` entry 1). The earlier fixed `baseOffset + 20` replacement and the `baseOffset + 5` threshold no longer exist. The filter (item 3 above) runs on every call where the flame is on, the code is not waiting, the anchor is not 0 and less than 180 000 ms passed since it (SATcontrol.ino:764-771; pwm.py:144-149). Because of the anchor nothing is filtered in the OFF phase (pwm.py:144). The calls are the control ticks, 30 s apart by default, so the window holds about five samples (derived from the interval, not run). Each sample has weight 0.3, so about 17 % of the seed is still in the value when the window closes (0.7 to the power 5; arithmetic, not run). After the window the filtered value is held until the next ON phase seeds it, at its first ignition or at an ON start with the flame already burning (SATcontrol.ino:780, SATcontrol.ino:881). With a control interval of 180 s or more no sample lands and BT stays at the seed (derived from SATcontrol.ino:768). In duty range 5 the ON phase is set without the ON-start step, so a range-5 stint that begins with a lit flame is not reseeded and sets no anchor (SATcontrol.ino:797-802; derived from reading the code, not run).
 
 #### 5. The CS override in PWM mode: flame-off setpoint and modulation suppression
 
-This runs on a tick in PWM mode, right after `satPwmSchedule()` (SATcontrol.ino:868-889). First the "previous CS" is fixed: `prevCS = _sat_lastControlCS` if that is above 10 °C, else `pidOutput` (SATcontrol.ino:870). `_sat_lastControlCS` is the CS of the last tick or refresh before the solar adjustment (SATcontrol.ino:693, SATcontrol.ino:910, SATcontrol.ino:4939), and is set to 0 by `satDisable()` (SATcontrol.ino:2166). Branches, in this order:
+This runs on a tick in PWM mode, right after `satPwmSchedule()` (SATcontrol.ino:868-889). First the "previous CS" is fixed: `prevCS = _sat_lastControlCS` if that is above 10 °C, else `pidOutput` (SATcontrol.ino:870). `_sat_lastControlCS` is the CS of the last tick or refresh before the solar adjustment (SATcontrol.ino:693, SATcontrol.ino:910, SATcontrol.ino:4939), and is set to 0 by `satDisable()` (SATcontrol.ino:2166). Before branch 0: if the flow temperature is unknown (`satGetFlowTemp() <= 0`), `satPwmSchedule()` has reset the PWM state and `satApplyPWM()` returns the continuous setpoint `satApplyContinuous(pidOutput)` instead of any branch below (SATcontrol.ino:741-748, SATcontrol.ino:905-907, working tree numbering; pwm.py:122-128, heating_control.py:148-152). Branches, in this order:
 
 | # | Condition | CS result | Citation |
 |---|---|---|---|
@@ -1648,7 +1651,7 @@ The stored hold is cleared at: ON expiry (SATcontrol.ino:819), ignition timeout 
 
 Interaction with the flame: a flame loss in the ON phase switches the next tick's CS to `return + 18 °C` (default) and stores it (SATcontrol.ino:880-882); the schedule starts a new 180 s ignition wait (SATcontrol.ino:762-765). At relight, the new flame-on edge starts a new 20 s hold of the stored value, then suppression (SATcontrol.ino:884-888, SATcycles.ino:714), and also restarts the ON-phase timing (step 4).
 
-Interaction with the PWM minimum times: the minimum on-time (180 s gas) and the suppression delay (20 s) both count from the same cycle-tracker flame-on time (SATcontrol.ino:813-816, SATcontrol.ino:722). `_pwm_flameOnMs` is a separate variable, used only for the 30 s learning window (SATcontrol.ino:687, SATcontrol.ino:749-758).
+Interaction with the PWM minimum times: the minimum on-time (180 s gas) and the suppression delay (20 s) both count from the same cycle-tracker flame-on time (SATcontrol.ino:834-837, SATcontrol.ino:722). `_pwm_flameOnMs` is a separate variable, the ignition anchor used only for the 180 s filter window of the effective boiler temperature (SATcontrol.ino:687, SATcontrol.ino:768, SATcontrol.ino:779, SATcontrol.ino:880).
 
 #### 6. Maximum relative modulation (MM)
 
@@ -1679,16 +1682,16 @@ There is no dependence on the previous CS in this function (SATcontrol.ino:1148-
 
 #### 8. Timeline example (firmware defaults, radiators, gas boiler, `bOvershootProtection` on)
 
-Assumptions for the arithmetic only: `iCyclesPerHour = 3` (default), base offset 27.2 °C, requested `pidOutput` 40 °C constant, the learned temperature still at its start value (so the fallback 27.2 + 20 = 47.2 °C applies), return 30 °C, the flame has been off longer than the off-time when PWM starts, fewer than 3 ignitions in the last hour, control interval 30 s. Constants: SATtypes.h:525, SATcontrol.ino:50, SATcontrol.ino:731-732, SATtypes.h:444.
+Assumptions for the arithmetic only: `iCyclesPerHour = 3` (default), base offset 27.2 °C, requested `pidOutput` 40 °C constant, the boiler flow temperature constant at 47.2 °C, so BT = 47.2 °C whether it is live, seeded or filtered (an assumed value, chosen so that the numbers stay as in earlier versions of this example), return 30 °C, the flame has been off longer than the off-time when PWM starts, fewer than 3 ignitions in the last hour, control interval 30 s. Constants: SATtypes.h:525, SATcontrol.ino:50, SATcontrol.ino:749-751, SATtypes.h:444.
 
-Duty: (40 - 27.2) / (47.2 - 27.2) = 0.64. Thresholds: upper = 1200 s, max = 2400 s, `dutyLower` = 0.15, `dutyUpper` = 0.85, `dutyMin` = 0.075, `dutyMax` = 0.925. 0.64 is in range 3: on = 0.64 x 1200 = 768 s, off = 432 s (SATcontrol.ino:734, SATcontrol.ino:740-743, SATcontrol.ino:767-771, SATcontrol.ino:798-802).
+Duty: (40 - 27.2) / (47.2 - 27.2) = 0.64. Thresholds: upper = 1200 s, max = 2400 s, `dutyLower` = 0.15, `dutyUpper` = 0.85, `dutyMin` = 0.075, `dutyMax` = 0.925. 0.64 is in range 3: on = 0.64 x 1200 = 768 s, off = 432 s (SATcontrol.ino:753, SATcontrol.ino:759-762, SATcontrol.ino:789-792, SATcontrol.ino:819-823). With a flow temperature of 40 °C or less the same request gives a duty of 1 and range 5 applies (arithmetic from SATcontrol.ino:753-755; thermo-nova gives the same, formula at pwm.py:238), so the first stint after boot, when BT is still the live flow of a cold boiler, can run in range 5.
 
 | Time | Event | PWM state | CS sent | MM | CH |
 |---|---|---|---|---|---|
 | tick N | Auto-switch fires at the end of the tick | Mode PWM, reset to OFF phase | Continuous value of this tick | 0 | 1 if CS > 10 |
 | tick N+1 (+30 s) | OFF branch: time since last flame-off >= 432 s, hour limit not reached | OFF to ON, waiting for ignition, 180 s timer | Flame off: 30 + 18 = 48 °C, stored | 0 | 1 |
 | t1 (between ticks) | Flame on edge | Cycle tracker flame-on = t1 | 48 °C stays (no new CS between ticks) | 0 | 1 |
-| next tick | Flame sync: `_pwm_flameOnMs` = this tick | ON | Hold 48 °C if less than 20 s since t1, else flow - 1 | 0 | 1 |
+| next tick | Flame sync: `_pwm_flameOnMs` = this tick, BT reseeded with the live flow (47.2 °C by assumption) | ON | Hold 48 °C if less than 20 s since t1, else flow - 1 | 0 | 1 |
 | t1 + 20 s, then every 3 s | Refresh conditions hold | ON | flow - 1 °C (write-on-change) | 0 (not re-sent by the refresh) | 1 (not re-sent) |
 | first tick at or after t1 + 768 s | ON expiry (768 >= 180) | ON to OFF, hold cleared | 10 °C | 0 | 0 |
 | t2 | Boiler flame off | Cycle tracker flame-off = t2 | 10 °C | 0 | 0 |
@@ -1700,17 +1703,18 @@ Citations for the rows: SATcycles.ino:976-983, SATcontrol.ino:4962, SATcontrol.i
 
 ### Formulas
 
-Duty cycle (SATcontrol.ino:729-737):
+Duty cycle (SATcontrol.ino:729-756; thermo-nova pwm.py:229-239, formula at pwm.py:238):
 
 ```
+if flow temperature <= 0: satPwmReset(); duty = 0; return (continuous setpoint is used)  (SATcontrol.ino:741-748, SATcontrol.ino:905-907)
 baseOffset    = 20.0 if heating system == UNDERFLOOR else 27.2          (SATcontrol.ino:255-260, SATcontrol.ino:49-50)
-effectiveTemp = _pwm_effectiveBoilerTemp
-if effectiveTemp < baseOffset + 5: effectiveTemp = baseOffset + 20
-duty = (pidOutput - baseOffset) / (effectiveTemp - baseOffset)
+effectiveTemp = _pwm_effectiveBoilerTemp if it is > 0, else the live flow temperature   (SATcontrol.ino:750)
+if effectiveTemp < baseOffset + 1: effectiveTemp = baseOffset + 1                        (SATcontrol.ino:751)
+duty = (pidOutput - baseOffset) / (effectiveTemp - baseOffset)                           (SATcontrol.ino:753)
 duty = min(max(duty, 0), 1)
 ```
 
-Thresholds, recomputed on every call (SATcontrol.ino:740-743, SATcontrol.ino:767-771):
+Thresholds, recomputed on every call (SATcontrol.ino:759-762, SATcontrol.ino:789-792):
 
 ```
 minOnMs   = 180 000 ms (gas boiler, hybrid) or iHpCycleSeconds x 1000 (heat pump)   (SATcontrol.ino:284-290)
@@ -1723,26 +1727,39 @@ dutyMin   = dutyLower / 2
 dutyMax   = 1 - dutyMin
 ```
 
-On and off times, first matching row wins, values cast to whole milliseconds (SATcontrol.ino:773-810):
+On and off times, first matching row wins, values cast to whole milliseconds (SATcontrol.ino:794-829):
 
 | Range of duty | onTimeMs | offTimeMs | Citation |
 |---|---|---|---|
-| duty >= dutyMax (range 5) | phase forced ON; last on-time = maxMs; last off-time = 0; no state machine | | SATcontrol.ino:776-781 |
-| duty < dutyMin, flame on and no DHW | minOnMs | maxMs - minOnMs | SATcontrol.ino:782-787 |
-| duty < dutyMin, otherwise | 0 | maxMs | SATcontrol.ino:788-792 |
-| duty <= dutyLower | minOnMs | minOnMs x (1 - duty) / duty, capped at maxMs - minOnMs | SATcontrol.ino:793-797 |
-| duty <= dutyUpper | duty x upperMs, at least minOnMs | upperMs - (duty x upperMs) | SATcontrol.ino:798-802 |
-| otherwise (range 4) | minOnMs / (1 - duty) - minOnMs, at least minOnMs | minOnMs | SATcontrol.ino:803-808 |
+| duty >= dutyMax (range 5) | phase forced ON; last on-time = maxMs; last off-time = 0; no state machine | | SATcontrol.ino:797-802 |
+| duty < dutyMin, flame on and no DHW | minOnMs | maxMs - minOnMs | SATcontrol.ino:803-808 |
+| duty < dutyMin, otherwise | 0 | maxMs | SATcontrol.ino:809-813 |
+| duty <= dutyLower | minOnMs | minOnMs x (1 - duty) / duty, capped at maxMs - minOnMs | SATcontrol.ino:814-818 |
+| duty <= dutyUpper | duty x upperMs, at least minOnMs | upperMs - (duty x upperMs) | SATcontrol.ino:819-823 |
+| otherwise (range 4) | minOnMs / (1 - duty) - minOnMs, at least minOnMs | minOnMs | SATcontrol.ino:824-829 |
 
-In range 3 the off-time is computed before the floor on the on-time is applied (SATcontrol.ino:800-802). In range 1 without flame the on-time is 0, so the ON phase ends at the first tick where at least 180 s passed since the last ignition (SATcontrol.ino:816).
+In range 3 the off-time is computed before the floor on the on-time is applied (SATcontrol.ino:821-823). In range 1 without flame the on-time is 0, so the ON phase ends at the first tick where at least 180 s passed since the last ignition (SATcontrol.ino:837).
 
 With the default 3 cycles per hour: upper = 1200 s, max = 2400 s, `dutyLower` = 0.15, `dutyUpper` = 0.85, `dutyMin` = 0.075, `dutyMax` = 0.925 (arithmetic from SATtypes.h:525 and the formulas above). With a heat pump (180 s replaced by 1800 s, 2 cycles per hour): upper = 1800 s, so `dutyLower` = 1.0, `dutyMin` = `dutyMax` = 0.5; only range 5 (duty >= 0.5) and range 1 (duty < 0.5) can be reached (arithmetic from SATcontrol.ino:275, SATcontrol.ino:288, SATtypes.h:440).
 
-Effective boiler temperature filter (SATcontrol.ino:748-754):
+Effective boiler temperature seeds, filter, anchor and reset (SATcontrol.ino:749, SATcontrol.ino:764-782, SATcontrol.ino:841, SATcontrol.ino:875-886, SATcontrol.ino:967), in code order. `_pwm_flameOnMs == 0` means "no ignition in this ON phase":
 
 ```
-if flame on and not waiting for ignition and (now - _pwm_flameOnMs) < 30 000 ms:
-    _pwm_effectiveBoilerTemp = 0.3 x flow + 0.7 x _pwm_effectiveBoilerTemp
+if _pwm_effectiveBoilerTemp <= 0 and flame on:
+    _pwm_effectiveBoilerTemp = flow                                           (SATcontrol.ino:749)
+if flame on and not waiting for ignition and _pwm_flameOnMs != 0
+        and (now - _pwm_flameOnMs) < 180 000 ms:
+    _pwm_effectiveBoilerTemp = 0.3 x flow + 0.7 x _pwm_effectiveBoilerTemp   (SATcontrol.ino:766-771)
+if flame on and waiting for ignition (flame sync):
+    waiting ends; if _pwm_flameOnMs == 0:
+        _pwm_flameOnMs = now; _pwm_effectiveBoilerTemp = flow                 (SATcontrol.ino:775-781)
+ON phase ends (ON to OFF, expiry or ignition-timeout abort):
+    _pwm_flameOnMs = 0                                                        (SATcontrol.ino:841, SATcontrol.ino:854)
+OFF-to-ON start (not range 5):
+    flame on:  no ignition wait; _pwm_flameOnMs = now; _pwm_effectiveBoilerTemp = flow   (SATcontrol.ino:875-881)
+    flame off: ignition wait; _pwm_flameOnMs = 0                              (SATcontrol.ino:882-886)
+satPwmReset():
+    _pwm_effectiveBoilerTemp = 0; _pwm_flameOnMs = 0                          (SATcontrol.ino:964, SATcontrol.ino:967)
 ```
 
 Flame-off hold (SATcontrol.ino:701-707):
@@ -1778,9 +1795,9 @@ CH command (SATcontrol.ino:4982-4983): `CH = 1 if finalSetpoint > 10 else 0`.
 | Minimum on-time, gas boiler or hybrid | 180 | s | SATcontrol.ino:284-290 |
 | `iHpCycleSeconds` (heat pump minimum on-time), default / allowed | 1800 / 1800 to 2400 | s | SATtypes.h:440, settingStuff.ino:996 (search result) |
 | `PWM_IGNITION_TIMEOUT_MS` | 180 000 | ms | SATcontrol.ino:696 |
-| Effective temperature learning window | 30 000 | ms | SATcontrol.ino:750 |
-| Learning weight on the new sample | 0.3 | - | SATcontrol.ino:752 |
-| Effective temperature fallback | base + 20 when below base + 5 | °C | SATcontrol.ino:732 |
+| Effective temperature filter window (the same constant as the ignition timeout) | 180 000 | ms | SATcontrol.ino:696, SATcontrol.ino:768 |
+| Filter weight on the new sample | 0.3 | - | SATcontrol.ino:769 |
+| Effective temperature floor | base + 1 | °C | SATcontrol.ino:751 |
 | `iCyclesPerHour` default / allowed | 3 / 2 to 6 | per hour | SATtypes.h:525, settingStuff.ino:1105 (search result) |
 | Cycles per hour, heat pump | 2 | per hour | SATcontrol.ino:275 |
 | Cycles per hour when `iCyclesPerHour` is outside 2..6 | 3 underfloor / 4 radiators | per hour | SATcontrol.ino:280 |
@@ -1833,8 +1850,8 @@ PWM state (SATcontrol.ino:685-696, SATtypes.h:201-203):
 | `state.sat.eControlMode` | OFF / CONTINUOUS / PWM | SATcontrol.ino:933-938 |
 | `state.sat.bPwmFlameRequested` | Phase: true = ON, false = OFF | SATtypes.h:203, SATcontrol.ino:778, SATcontrol.ino:818, SATcontrol.ino:830, SATcontrol.ino:851 |
 | `state.sat.fPwmDutyCycle` | Last duty value | SATcontrol.ino:737 |
-| `_pwm_effectiveBoilerTemp` | Learned boiler temperature; never reset | SATcontrol.ino:686, SATcontrol.ino:752 |
-| `_pwm_flameOnMs` | Tick time at which the PWM code first saw the flame (learning window only) | SATcontrol.ino:687, SATcontrol.ino:758 |
+| `_pwm_effectiveBoilerTemp` | Boiler temperature BT of the duty formula: seeded with the live flow at the first flame, at the first ignition of an ON phase and at an OFF-to-ON start with the flame already burning; filtered during the 180 s after that anchor; held until the next ON phase seeds it; cleared by `satPwmReset()` | SATcontrol.ino:686, SATcontrol.ino:749, SATcontrol.ino:769, SATcontrol.ino:780, SATcontrol.ino:881, SATcontrol.ino:967 |
+| `_pwm_flameOnMs` | Ignition anchor of the current ON phase, filter window only. 0 = no ignition in this ON phase (thermo-nova `_flame_on_at is None`). Set at the first ignition of the phase and at an ON start with a burning flame; cleared at ON to OFF (expiry and ignition-timeout abort), at an ON start without a flame and by `satPwmReset()` | SATcontrol.ino:687, SATcontrol.ino:779, SATcontrol.ino:880, SATcontrol.ino:841, SATcontrol.ino:854, SATcontrol.ino:885, SATcontrol.ino:964; pwm.py:164, pwm.py:206 |
 | `_pwm_waitingForFlame`, `_pwm_waitForFlameStartMs` | Ignition wait and its 180 s timer | SATcontrol.ino:688-689, SATcontrol.ino:757-765, SATcontrol.ino:852-853 |
 | `_pwm_flameOffHoldSetpoint` | Stored flame-off hold | SATcontrol.ino:690, SATcontrol.ino:881 |
 | `_pwm_lastOffTimeMs`, `_pwm_lastOnTimeMs` | Last computed off-time and on-time (saturation check, classifier) | SATcontrol.ino:691-692, SATcontrol.ino:809-810 |
@@ -1886,7 +1903,7 @@ To entities (MQTT, published only when changed): `sat/mode` (actual mode, "off" 
 
 ### Not found in the code / unclear
 
-1. **Whether the effective-temperature learning ever runs with the default 30 s interval.** The window is `< 30 000 ms` after the tick that first saw the flame, and the next tick is due about 30 s later (SATcontrol.ino:750, SATcontrol.ino:758, SATtypes.h:444). Whether that tick lands just under or just over 30 000 ms depends on the timer's catch-up behaviour and loop timing, which were not traced (safeTimers.h was only seen in a search result, lines 96-98). With a shorter interval the learning runs; with a longer one it never does.
+1. **Resolved by TASK-1273: whether the effective-temperature filter ever runs with the default 30 s interval.** The question was whether a tick lands inside a 30 000 ms window after the sync tick. The window is now 180 000 ms (Sergeant D, 2026-10-22, `docs/sat/sergeant-d-corrections.md` entry 1), so the default 30 s tick gives about five samples per ON phase (SATcontrol.ino:768, SATtypes.h:444; derived from the interval, not run). Exactly how many land still depends on timer jitter at the window edge, which was not traced. Only a control interval of 180 s or more gets no sample, and BT then stays at the seed of the ON phase.
 2. **DHW post-overshoot guard**: as written it cannot become active (see step 3). Whether that is intended is not stated in the code.
 3. **The `iRequestedControlMode` "pwm" request** is not enforced after the auto-switch moves the mode away (see step 3). Whether that is intended is not stated.
 4. **`bModSuppressed` and `iModSuppressionSinceMs`** are declared, reset every tick and published, but never set (SATcontrol.ino:4956-4957, SATtypes.h:213-215). Their purpose is not visible in the code.
@@ -2157,7 +2174,7 @@ This was not checked on a running device.
   - PWM ON phase: flow < requested - 3 for 180 s -> continuous (SATcycles.ino:993-1004); PWM off-time 0 for 300 s -> continuous (SATcycles.ino:1010-1020).
   The full mode logic belongs to the PWM section of this spec.
 - **Hot water guard, as built.** The guard refreshes `_sustain_dhwEndMs` only while `bDhwActive` (SATcycles.ino:964-966). This function runs after the DHW early return (SATcontrol.ino:4635-4652, SATcontrol.ino:4952), so `bDhwActive` is false whenever it runs, and `_sustain_dhwEndMs` keeps its boot value `0 - 300000` (SATcycles.ino:136). The 300 s guard (SATcycles.ino:971-972) is then never active (derived from the order of the code).
-- **Flame-on time for the PWM schedule.** The PWM hold ends `fModSupDelay` (default 20 s, SATtypes.h:455) after the cycle tracker's flame-on time (SATcontrol.ino:720-723, SATcontrol.ino:884-888). The PWM ON phase ends when the time since that flame-on is >= on-time and >= minimum on-time (SATcontrol.ino:813-820). That test does not check whether the flame is on, and it runs before the 180 s ignition timeout (SATcontrol.ino:824-832). While a new ON phase waits for ignition, the cycle tracker's flame-on time still belongs to the previous cycle, so the ON phase can end on the next control tick before the flame lights (derived from the order of the code; see Edge cases). The PWM controller also keeps its own `_pwm_flameOnMs` for the effective temperature EMA (SATcontrol.ino:748-760).
+- **Flame-on time for the PWM schedule.** The PWM hold ends `fModSupDelay` (default 20 s, SATtypes.h:455) after the cycle tracker's flame-on time (SATcontrol.ino:720-723, SATcontrol.ino:884-888). The PWM ON phase ends when the time since that flame-on is >= on-time and >= minimum on-time (SATcontrol.ino:813-820). That test does not check whether the flame is on, and it runs before the 180 s ignition timeout (SATcontrol.ino:824-832). While a new ON phase waits for ignition, the cycle tracker's flame-on time still belongs to the previous cycle, so the ON phase can end on the next control tick before the flame lights (derived from the order of the code; see Edge cases). The PWM controller also keeps its own `_pwm_flameOnMs` for the effective temperature EMA (SATcontrol.ino:764-782).
 - **Flame-off time and per-hour count for the PWM schedule.** The OFF phase ends when the time since the cycle tracker's flame-off is >= off-time, unless the rolling-hour count of flame-on events has reached `satGetMaxCyclesPerHour()` (SATcontrol.ino:836-854, SATcycles.ino:286-292). The maximum is 2 for a heat pump, the configured value when it is 2 to 6, else 3 (underfloor) or 4 (SATcontrol.ino:271-281).
 - **PWM on-time into the classifier**: the short threshold (SATcycles.ino:660-666, SATcycles.ino:791).
 - **Last cycle duration into the boiler status**: stall threshold (SATcontrol.ino:571-575).

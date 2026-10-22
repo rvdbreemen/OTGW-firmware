@@ -726,10 +726,29 @@ static bool satPwmHoldElapsed()
 // (bPwmFlameRequested, ignition wait, durations); satApplyPWM() derives the control setpoint from it.
 static void satPwmSchedule(float pidOutput)
 {
-  // --- Duty cycle calculation per SAT Python: (setpoint - base) / (effective_temp - base) ---
+  // --- Duty cycle, thermo-nova pwm.py:229-239: (setpoint - base) / (BT - base) ---
+  // BT is the filtered boiler (flow) temperature, seeded from the live flow at the first flame
+  // (pwm.py:130-131), at an ON start with the flame already burning (pwm.py:164-167) and at the
+  // first ignition of an ON phase (pwm.py:189-191), filtered for the start-up window after that
+  // flame-on (pwm.py:148-149) and then held until the next ON phase reseeds it. A relight inside
+  // the same ON phase keeps BT and does not reopen the window (pwm.py:145-146, 206). Before any
+  // seed the live flow is used (pwm.py:232). The floor base + 1 exists only against a division by
+  // zero or a negative value (pwm.py:235; Sergeant D, docs/sat/sergeant-d-corrections.md entry 1).
+  // `_pwm_flameOnMs == 0` means "no ignition in this ON phase" (thermo-nova `_flame_on_at is None`).
   float baseOffset = satGetBaseOffset();
-  float effectiveTemp = _pwm_effectiveBoilerTemp;
-  if (effectiveTemp < baseOffset + 5.0f) effectiveTemp = baseOffset + 20.0f; // Fallback
+  bool flame = satIsFlameOn();
+  float boilerTemp = satGetFlowTemp();
+  if (boilerTemp <= 0.0f) {
+    // No flow temperature (MsgID 25 not seen yet, or never): thermo-nova sets PWM to IDLE and the
+    // control mode reads as continuous (pwm.py:122-128, heating_control.py:149-150). Same here:
+    // idle PWM state, no duty; satApplyPWM() then sends the continuous setpoint.
+    satPwmReset();
+    state.sat.fPwmDutyCycle = 0.0f;
+    return;
+  }
+  if (_pwm_effectiveBoilerTemp <= 0.0f && flame) _pwm_effectiveBoilerTemp = boilerTemp;
+  float effectiveTemp = (_pwm_effectiveBoilerTemp > 0.0f) ? _pwm_effectiveBoilerTemp : boilerTemp;
+  if (effectiveTemp < baseOffset + 1.0f) effectiveTemp = baseOffset + 1.0f;
 
   float duty = (pidOutput - baseOffset) / (effectiveTemp - baseOffset);
   if (duty < 0.0f) duty = 0.0f;
@@ -742,22 +761,24 @@ static void satPwmSchedule(float pidOutput)
   uint32_t upperMs   = (3600000UL / cyclesHr);          // e.g. 900s at 4 cycles/hr
   uint32_t maxMs     = upperMs * 2;                      // Max cycle time
 
-  // --- Effective temperature tracking (EMA during first 30s of flame-on) ---
-  bool flame = satIsFlameOn();
-  float boilerTemp = satGetFlowTemp();
-  if (flame && !_pwm_waitingForFlame) {
+  // --- Effective temperature: EMA 0.3/0.7 for HEATER_STARTUP_TIMEFRAME (180 s) after flame-on
+  // (pwm.py:148-149; Sergeant D confirmed 180 s on 2026-10-22). After the window the value is held.
+  if (flame && !_pwm_waitingForFlame && _pwm_flameOnMs != 0) {
     uint32_t sinceFlamOn = millis() - _pwm_flameOnMs;
-    if (sinceFlamOn < 30000UL) {
-      // EMA smoothing during first 30s (alpha=0.3)
+    if (sinceFlamOn < PWM_IGNITION_TIMEOUT_MS) {
       _pwm_effectiveBoilerTemp = 0.3f * boilerTemp + 0.7f * _pwm_effectiveBoilerTemp;
     }
   }
 
-  // --- Flame sync: track flame-on moment ---
+  // --- Flame sync (pwm.py:186-193): the first ignition of this ON phase anchors the start-up
+  // window and reseeds BT from the live flow; a relight after a mid-phase flame-out does neither ---
   if (flame && _pwm_waitingForFlame) {
-    _pwm_flameOnMs = millis();
     _pwm_waitingForFlame = false;
     _pwm_waitForFlameStartMs = 0;  // Clear ignition timeout on successful ignition
+    if (_pwm_flameOnMs == 0) {
+      _pwm_flameOnMs = millis();
+      _pwm_effectiveBoilerTemp = boilerTemp;
+    }
   }
   if (!flame && !_pwm_waitingForFlame && state.sat.bPwmFlameRequested) {
     _pwm_waitingForFlame = true;
@@ -814,9 +835,10 @@ static void satPwmSchedule(float pidOutput)
   if (state.sat.bPwmFlameRequested) {
     // ON phase
     if (sinceFlameStart >= onTimeMs && sinceFlameStart >= minOnMs) {
-      // ON time expired: switch to OFF
+      // ON time expired: switch to OFF; the ignition anchor is cleared (pwm.py:206)
       state.sat.bPwmFlameRequested = false;
       _pwm_flameOffHoldSetpoint = 0.0f;
+      _pwm_flameOnMs = 0;
       return;
     }
     // Waiting for flame: 180s ignition timeout (Python HEATER_STARTUP_TIMEFRAME): if boiler fails to
@@ -829,6 +851,7 @@ static void satPwmSchedule(float pidOutput)
       _pwm_waitForFlameStartMs = 0;
       state.sat.bPwmFlameRequested = false;
       _pwm_flameOffHoldSetpoint = 0.0f;
+      _pwm_flameOnMs = 0;                   // ON->OFF: the ignition anchor goes with the phase (pwm.py:206)
     }
   } else {
     // OFF phase: clear hold setpoint, wait for off duration then restart
@@ -849,8 +872,18 @@ static void satPwmSchedule(float pidOutput)
       }
       _hourLimitLogged = false;  // reset latch when limit clears
       state.sat.bPwmFlameRequested = true;
-      _pwm_waitingForFlame = true;
-      _pwm_waitForFlameStartMs = millis();  // Start ignition timeout timer (180s, Task #208)
+      if (flame) {
+        // Flame already burning at the ON start (pwm.py:164-167): no ignition wait, the start-up
+        // window counts from now and BT is reseeded from the live flow (TASK-1273)
+        _pwm_waitingForFlame = false;
+        _pwm_waitForFlameStartMs = 0;
+        _pwm_flameOnMs = millis();
+        _pwm_effectiveBoilerTemp = boilerTemp;
+      } else {
+        _pwm_waitingForFlame = true;
+        _pwm_waitForFlameStartMs = millis();  // Start ignition timeout timer (180s, Task #208)
+        _pwm_flameOnMs = 0;                   // no ignition yet in this ON phase (pwm.py:164)
+      }
     }
   }
 }
@@ -869,6 +902,9 @@ static float satApplyPWM(float pidOutput)
 {
   const float prevCS = (_sat_lastControlCS > SAT_MIN_SETPOINT) ? _sat_lastControlCS : pidOutput;
   satPwmSchedule(pidOutput);
+  if (satGetFlowTemp() <= 0.0f) {
+    return satApplyContinuous(pidOutput);   // PWM idle without a flow temperature (heating_control.py:149-150)
+  }
   if (!settings.sat.bOvershootProtection || state.sat.bDhwActive || pidOutput <= satGetColdSetpoint()) {
     return prevCS;
   }
@@ -928,6 +964,7 @@ void satPwmReset()
   _pwm_flameOnMs              = 0;
   _pwm_flameOffHoldSetpoint   = 0.0f;
   _pwm_lastOffTimeMs          = 1;
+  _pwm_effectiveBoilerTemp    = 0.0f;   // thermo-nova pwm.reset(): _effective_on_temperature = None (pwm.py:100)
 }
 
 // Change the control mode; entering or leaving PWM resets the PWM state.
