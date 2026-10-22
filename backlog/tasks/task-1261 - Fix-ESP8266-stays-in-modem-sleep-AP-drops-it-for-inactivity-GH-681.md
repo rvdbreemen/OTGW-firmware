@@ -4,13 +4,13 @@ title: 'Fix: ESP8266 stays in modem-sleep, AP drops it for inactivity (GH #681)'
 status: In Progress
 assignee:
   - '@claude'
-created_date: '2026-10-19 18:02'
-updated_date: '2026-10-21 05:30'
+created_date: 2026-10-19 18:02
+updated_date: '2026-10-22T04:25:00Z'
 labels:
   - bug
 dependencies: []
 references:
-  - 'https://github.com/rvdbreemen/OTGW-firmware/issues/681'
+  - https://github.com/rvdbreemen/OTGW-firmware/issues/681
 priority: high
 ordinal: 248000
 ---
@@ -59,4 +59,6 @@ Approved by Robert 2026-10-19. No push (check_otgw_issues rule).
 2026-10-20 04:07 interim: before the TASK-1253 OTA the bench had run 7h33m with bootcount 3 unchanged (no reboot). The 24 h window restarted twice for other bench work (OTA 04:05, OTA ~04:25, RTS reset 04:32). New AC #2 baseline 2026-10-20 04:33:50: build 1.7.8-beta.5+d92c03f (carries the TASK-1261 fix), bootcount 8, MikroTik registration uptime 57s, freeheap 17608, RSSI -64. Pass at >= 2026-10-21 04:34: bootcount 8 and registration uptime >= 24h.
 
 2026-10-21 07:3x AC #2 PASS (bench .88.68, 1.7.8-beta.5+d92c03f): bootcount 8 (unchanged since baseline 2026-10-20 04:33:50), device uptime 1d02:54, MikroTik wlan2 registration uptime 1d02:56:31 (>= 24h; last disconnect in /log is the 04:32:54 RTS reset, deauth reason 3), freeheap 16800 (baseline 17608, range seen 16608-18072), RSSI -72. Remaining open: AC #3 (theaprilhare field report, not self-verifiable).
+
+2026-10-22: theaprilhare (#681, 2026-10-21 12:02Z) ran beta.4 25 h with router scb_activity_time still at 60 (not 5, so AC#3 stays open): sleep mode 0 confirmed via telnet r; 7 AP episodes in 25 h (4 during a disturbed-laptop window) vs ~2-4/day on 1.7.7; MQTT disconnects 0.84/h -> 0.44/h; no stuck WiFi ending in a self-reboot (was twice in 3 days). Episodes still start with 'Disassociated due to inactivity (4)' + '(8)' in the same second, then a few '(2)' handshake failures, now recovering in 20-100 s. Separate 20-min ARP-expiry stalls split off to TASK-1290.
 <!-- SECTION:NOTES:END -->
