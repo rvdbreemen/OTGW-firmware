@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-22T14:49:00Z'
-updated_date: '2026-10-22T16:06:00Z'
+updated_date: '2026-10-22T16:53:00Z'
 labels:
   - bug
 dependencies: []
@@ -30,3 +30,19 @@ Diag patch with corrected markers (ev36, ev37, ev42-ev46 incl. around hostByName
 - [ ] #2 With the fix no boot in a series of at least 100 RTS resets blocks setup() for more than 10 s after WiFi is up, old build vs fix on the same rig
 - [ ] #3 esp8266 build and evaluate.py --quick green
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Diag build = HEAD (1301 + 1290) + stage markers (diag patch applied 3-way, not committed), OTA to .68, MQTT auth still failing as in both slow boots.
+2. RTS reset series until a slow boot is captured; the ring names the blocking stage.
+3. Fix that stage, then 100+ resets old build vs fix on the same rig.
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- 2026-10-22 18:10-18:52: diag build 1.7.8-beta.6+c7b20e5 (scratchpad t1262/diag1302.ino.bin/.elf) on .68. 100 RTS resets (diag1302_a..e.out): all web up in 4-8 s, lease OTGW, 0 slow. Earlier rate 2/110, so 0/100 is not yet meaningful (P about 0.16 at that rate).
+- Code read: startMQTT() only runs INIT (hostByName, core timeout 10 s), so it cannot explain 48 s alone; initWatchDog() is one 100 ms delay plus two I2C transfers; updateRebootLog() on reason 6 (RTS reset) calls initWatchDog() again, plus loopNTP() and LittleFS rewrite. FS 43% used.
+- Running: up to 150 more resets, stop at first slow (diag1302_f.out).
+<!-- SECTION:NOTES:END -->
