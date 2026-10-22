@@ -388,6 +388,12 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   WiFi.setAutoReconnect(true);
   WiFi.persistent(true);
   wifiKeepRadioAwake();
+  // Announce our IP/MAC every minute (TASK-1290, GH #681). A router whose ARP
+  // entry for the gateway expires asks for it again, and an answer that comes
+  // late stalls all traffic to the gateway meanwhile (15-90 s seen on an
+  // OPNsense router every 20 min). The announcement keeps that entry fresh.
+  // Sent only while the station has an IP; one core timer, armed once.
+  experimental::ESP8266WiFiGratuitous::stationKeepAliveSetIntervalMs(WIFI_GARP_INTERVAL_MS);
 
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
   // A boot that skipped the portal continues without WiFi (ADR-099).

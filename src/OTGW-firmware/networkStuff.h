@@ -29,6 +29,8 @@
 #define NETWORKSTUFF_H
 
 #include <ESP8266WiFi.h>        // ESP8266 Core WiFi Library
+#include <ESP8266WiFiGratuitous.h>  // periodic gratuitous ARP (TASK-1290)
+#define WIFI_GARP_INTERVAL_MS 60000UL
 #include <ESP8266WebServer.h>   // Version 1.0.0 - part of ESP8266 Core
 #include <ESP8266mDNS.h>        // part of ESP8266 Core
 #include <ESP8266HTTPClient.h>
