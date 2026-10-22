@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.453
+**  Version  : v2.0.0-alpha.454
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -5282,7 +5282,14 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
         decodeAndPublishOTValue();
         if (mqttPendingSlot.pending) {
           if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
-          else                                        mqttPendingSlot.pending = false;
+          else {
+            // The gate let the frame through but it published nothing (a Read-Data request, a
+            // Write-Ack without an echo value, Data-Invalid): the slot stays unseen, so the next
+            // such frame logs first=true again (TASK-1274).
+            mqttPendingSlot.pending = false;
+            CoreMQTTDebugTf(PSTR("MQTT gate id=%u src=%c => nothing published, slot stays unseen\r\n"),
+                            OTdata.id, mqttPublishSourceTag(OTdata.masterslave));
+          }
         }
       }
       if (OTdata.id == 24 && OTdata.rsptype == OTGW_THERMOSTAT && OTdata.type == OT_WRITE_DATA) {
