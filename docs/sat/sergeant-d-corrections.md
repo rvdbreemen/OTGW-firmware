@@ -69,6 +69,15 @@ echo of SAT's own push (within 0.25 °C). The earlier precondition that the ther
 value matched the last push is dropped, because thermostats such as the Honeywell Round never
 mirror an accepted override in their own setpoint (MsgID 16).
 
+## 3. Base temperature (2026-10-22)
+
+**Source:** 14:15 UTC, message 1562831881341505670.
+
+> The base temperature is everywhere in the code because it is the basis value of SAT.
+
+**Meaning:** the base offset (27.2 °C radiators, 20.0 °C underfloor; `heating_curve.py:39`,
+`SATcontrol.ino:49-50`) is a design constant that every SAT formula refers to, not a tunable.
+
 ## 4. Validation of the three SAT documents (2026-10-22)
 
 **Source:** 18:01 UTC, message 1562888583004688629.
@@ -78,12 +87,3 @@ mirror an accepted override in their own setpoint (MsgID 16).
 **Meaning:** `thermo-nova-spec.md`, `firmware-sat-spec.md` and `sat-comparison.md` passed his
 first reading without a correction. Later corrections land here as numbered entries; the
 documents are not rewritten silently.
-
-## 3. Base temperature (2026-10-22)
-
-**Source:** 14:15 UTC, message 1562831881341505670.
-
-> The base temperature is everywhere in the code because it is the basis value of SAT.
-
-**Meaning:** the base offset (27.2 °C radiators, 20.0 °C underfloor; `heating_curve.py:39`,
-`SATcontrol.ino:49-50`) is a design constant that every SAT formula refers to, not a tunable.
