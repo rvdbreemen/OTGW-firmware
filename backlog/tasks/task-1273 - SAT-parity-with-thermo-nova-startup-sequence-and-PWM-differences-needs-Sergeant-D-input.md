@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: 2026-10-20 18:17
-updated_date: '2026-10-22T12:46:00Z'
+updated_date: '2026-10-22T16:11:00Z'
 labels:
   - sat
   - parity
@@ -40,4 +40,6 @@ From the TASK-1268 round-2 review (opus, by reading, pre-existing): (a) PWM ON-p
 2026-10-22: TASK-1292 ground-truth spec is on dev: docs/sat/thermo-nova-spec.md (cited, Alexwijn/SAT releases/thermo-nova @ 7beaaf5), docs/sat/firmware-sat-spec.md and docs/sat/sat-comparison.md (443 rows, 434 verified). This task waits for Sergeant D's validation of the thermo-nova spec; the plan must quote the thermo-nova code for its area with file:line citations (CLAUDE.md 'SAT ground truth' block) before it is resumed.
 
 2026-10-22 12:5x: Sergeant D asked whether the firmware uses (setpoint - 27.2) / (BT - 27.2) for the duty cycle. Answered on #alpha-testing with citations: same formula (SATcontrol.ino:734 vs pwm.py:237); BT differs: thermo-nova seeds _effective_on_temperature from the live flow temperature at the first flame (pwm.py:130-131), EMA 0.3 in the start-up window (148-149), floor base+1 (235); the firmware's _pwm_effectiveBoilerTemp starts at 0 every boot, is never seeded, and a fixed base+20 (47.2) is used while it is below base+5 (SATcontrol.ino:731-732, 752). Asked him to confirm the intent (BT = real smoothed flow from the first cycle, no placeholder). When confirmed, that is the first PWM change to implement under this task, with a replay old-vs-fix on the bench (gen_sat_pwm_replay.py fixture).
+
+2026-10-22 13:58 Sergeant D confirmed the duty formula and the BT rule (docs/sat/sergeant-d-corrections.md entry 1): 28.2 floor only against divide-by-zero; BT filtered at the start of each ON cycle, then raw. Settled: no 47.2 placeholder, seed BT from the live flow at flame-on. Open, asked 2026-10-22: window 30 s (his words, firmware) vs 180 s (thermo-nova HEATER_STARTUP_TIMEFRAME), and after the window raw (his words) vs frozen filtered until the next ON phase (thermo-nova pwm.py:166-167, 191). Implement the duty BT change once answered; replay old-vs-fix on the bench.
 <!-- SECTION:NOTES:END -->
