@@ -1,9 +1,11 @@
 ---
 id: TASK-1289
 title: Uptime counts from boot instead of from the first loop tick
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-22T04:09:00Z'
+updated_date: '2026-10-22T04:10:00Z'
 labels:
   - bug
   - wifi
