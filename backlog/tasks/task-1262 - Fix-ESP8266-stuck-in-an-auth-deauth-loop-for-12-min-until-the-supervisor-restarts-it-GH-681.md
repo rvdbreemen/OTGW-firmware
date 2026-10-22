@@ -3,11 +3,11 @@ id: TASK-1262
 title: >-
   Fix: ESP8266 stuck in an auth/deauth loop for 12+ min until the supervisor
   restarts it (GH #681)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-19 18:03
-updated_date: '2026-10-22T12:48:00Z'
+updated_date: '2026-10-22T14:48:00Z'
 labels:
   - bug
   - needs-info
@@ -28,7 +28,7 @@ Missing: an ESP-side telnet log of the loop (what the supervisor does on each at
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Reproduced or explained from an ESP-side log: which code path issues the deauth (reason 3) and why reconnects keep failing
+- [x] #1 Reproduced or explained from an ESP-side log: which code path issues the deauth (reason 3) and why reconnects keep failing
 - [x] #2 Time from first failed reconnect to recovery is bounded and shorter than 12 min, shown on the bench by forcing the loop
 - [x] #3 esp8266 build and evaluate.py --quick green
 - [x] #4 A boot after a WiFi supervisor restart that misses the direct-connect window continues setup() without the final WiFi wait (ADR-099), and after the access point returns MQTT, telnet, the web UI, NTP and mDNS come up without a crash; shown on the bench before and after the service fixes
@@ -102,4 +102,21 @@ Race indicator on every boot = DHCP lease name in the router log:
   So on ~75 % of resets the router lease carries the SDK default name ESP-22B8E1 instead of the configured hostname: a separate, user-visible defect of the same race.
 Rates on the old/diag build: WiFi wedge 1/20 (08:27) + 0/15 (14:35) + 1/10 (08:12 loop, reset_loop.out) + 06:17 single = 3 wedges in ~47 resets.
 Separate finding, NOT WiFi: 14:35:21 reset took 54 s to web, but WiFi connected at 1204 ms (ev20), GotIP .68 at 1237 ms, direct connect result WL_CONNECTED at 1310 ms; first loopWifi only at 52143 ms. So setup() blocked ~50 s after WiFi was up (first reset after ~6 h uptime; MQTT broker password missing on the bench). Stage unknown; needs a per-stage marker or a telnet boot capture. Track separately.
+
+2026-10-22 AC#1 answered from ESP-side logs (diag ring) plus AP logs:
+- Who sends the reason-3 deauth: the ESP itself, at the start of a new connect, when the AP still holds the station's previous association. Every RTS reset showed it in the same second as the new 'connected', on the old build AND with the TASK-1301 fix (so not the firmware's begin()-over-SDK race). A clean restart (OTA, 15:44:56 and 16:04:37) shows 'disassoc: sending station leaving (8)' before the reboot and NO reason 3 afterwards. So reason 3 at the AP marks an unclean reboot or a fresh connect start, consistent with the earlier Exception (2) data point (22:44:09).
+- Why reconnects kept failing on the bench: the boot connect raced the SDK auto-connect; about 1 in 20 boots wedged in STATION_CONNECTING for the whole 120 s direct-connect window with no station events while the AP showed the station associated without DHCP, then the portal took 240 s more. Fixed and proven old vs fix in TASK-1301 (a1d756077): 3 wedges in ~47 resets before, 0 in 60 after.
+- Field (theaprilhare, ~40 reason-3 cycles in 12 min at -55 dBm on 1.7.7): not reproduced as such. Inference, not proven: each cycle is a fresh connect start while the AP kept the old association; the 1.7.7 boot path (portal, restarts not counted, see above) and the race explain the long recovery. The reporter has not seen the loop on beta.4 in 25 h.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+WiFi recovery after a lost access point is bounded and fast, and the boot connect no longer wedges.
+
+- ADR-099 (508af3c7c): after a WiFi supervisor restart the next boot skips the config portal and the final 240 s wait, and services (telnet, mDNS) come up when WiFi returns. Bench: old build back 194 s after the block, fix 7 s; with the service fixes 4.7 s, all services up.
+- Supervisor timing measured exactly on spec: loss to restart decision 300.0 s; the earlier 7-11 min readings were an uptime counter error, fixed in TASK-1289.
+- AC#1: the reason-3 deauth is the ESP's own fresh connect while the AP still holds the old association (every hard reset, with and without the fix; a clean restart shows disassoc 8 instead). The failing reconnects on the bench came from the boot connect racing the SDK auto-connect (1 in ~20 boots stuck 120 s + 240 s portal); fixed in TASK-1301 (a1d756077), 0 of 60 after vs 3 of ~47 before.
+
+Not verified: the field 40-cycle loop on 1.7.7 itself (not reproduced; the reporter has not seen it again on beta.4).
+<!-- SECTION:FINAL_SUMMARY:END -->
