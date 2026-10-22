@@ -314,6 +314,7 @@ def patch_lea_mdns_oom(project_dir):
     content = target.read_text(encoding="utf-8")
     if "std::nothrow" in content:
         print_info("LEAmDNS OOM patch already applied.")
+        patch_lea_mdns_txt_oom(target)
         return
 
     patched = content.replace(
@@ -335,6 +336,27 @@ def patch_lea_mdns_oom(project_dir):
 
     target.write_text(patched, encoding="utf-8")
     print_info("LEAmDNS OOM patch applied (6 allocation sites null-safe).")
+    patch_lea_mdns_txt_oom(target)
+
+
+def patch_lea_mdns_txt_oom(target):
+    """Same failure in _readRRAnswerTXT(): 'new stcMDNSServiceTxt' for each TXT
+    item of a received answer ran its constructor on NULL under low heap,
+    Exception (2) epc1=0x4023576b excvaddr=0x00000000 during a filesystem OTA
+    (TASK-1285). With nothrow the expression is false and the answer is dropped.
+    Applied after the RRAnswer patch, which adds the <new> include; idempotent.
+    """
+    content = target.read_text(encoding="utf-8")
+    old = "bResult = (((pTxt = new stcMDNSServiceTxt)) &&"
+    new = "bResult = (((pTxt = new (std::nothrow) stcMDNSServiceTxt)) &&"
+    if new in content:
+        print_info("LEAmDNS TXT OOM patch already applied.")
+        return
+    if content.count(old) != 1:
+        print_warning("LEAmDNS TXT OOM patch: allocation site not found once; core layout changed? Not writing.")
+        return
+    target.write_text(content.replace(old, new, 1), encoding="utf-8")
+    print_info("LEAmDNS TXT OOM patch applied (_readRRAnswerTXT null-safe).")
 
 
 def install_arduino_cli(system):
