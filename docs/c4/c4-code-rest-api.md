@@ -104,7 +104,7 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 - `GET /otdirect/overrides`; `POST|PUT /otdirect/overrides?action=sr|cr|rm|cm|ui|ki&msgid=0..127[&value=HHHH]` (queues `SR=`/`CR=`/`RM=`/`CM=`/`UI=`/`KI=`)
 
 #### `handleSimulate`
-- `GET /api/v2/simulate`, `POST|PUT /simulate/start` (409 when LittleFS is not mounted), `POST|PUT /simulate/stop`. Controls `state.debug.bOTGWSimulation` (frame replay of `/otgw_simulation.log`).
+- `GET /api/v2/simulate`, `POST|PUT /simulate/start`, `POST|PUT /simulate/stop`. Controls `state.debug.bOTGWSimulation` (frame replay of `/otgw_simulation.log` when that file is on LittleFS, else of the fixture built into the firmware; `source` in the JSON says which; a start re-picks the source, TASK-1294).
 
 #### `handleOtgw`
 - `GET /otgw/otmonitor` and `/otgw/telegraf` (aliases, `sendOTmonitorV2()`, rate limited)

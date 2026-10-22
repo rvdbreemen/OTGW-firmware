@@ -774,8 +774,9 @@ Compares the firmware git hash with the filesystem git hash to detect mismatches
 
 ### Simulation
 
-The OT frame replay feeds `/otgw_simulation.log` from LittleFS to the OpenTherm
-decoder, one line every 750 ms, and starts again at the top when the file ends.
+The OT frame replay feeds `/otgw_simulation.log` from LittleFS when that file exists,
+otherwise the fixture built into the firmware (TASK-1294), to the OpenTherm
+decoder, one line every 750 ms, and starts again at the top when the source ends.
 Each line is one frame in the PIC's text format, for example `T10010A00`.
 Replayed frames take the same decode, state and MQTT publish path as live
 frames. This works on every board: PIC (OTGW Classic) and OT-Direct (OTGW32).
@@ -812,6 +813,7 @@ Returns the replay status.
   "simulation": {
     "active": false,
     "available": true,
+    "source": "builtin",
     "file": "/otgw_simulation.log",
     "interval_ms": 750
   }
@@ -820,10 +822,10 @@ Returns the replay status.
 
 | Field | Description |
 |---|---|
-| `active` | `true` while the replay is on and can run. Always `false` when `available` is `false`, even if the replay flag is still set. |
-| `available` | Whether the replay can run right now. `false` only when LittleFS is not mounted. |
-| `reason` | Only present when `available` is `false`: `"filesystem not mounted; the fixture cannot be read"`. |
-| `file` | The replay file. Fixed. |
+| `active` | `true` while the replay is on. |
+| `available` | Always `true`. Without a `/otgw_simulation.log` on LittleFS the replay reads the fixture built into the firmware. |
+| `source` | Where the next replay reads from: `"file"` when `/otgw_simulation.log` exists on LittleFS (it takes precedence), otherwise `"builtin"`. |
+| `file` | The optional replay file on LittleFS. Fixed. |
 | `interval_ms` | Time between replayed lines. Fixed at 750. |
 
 #### `POST /api/v2/simulate/start` | `PUT /api/v2/simulate/start`
@@ -834,15 +836,9 @@ Starts the replay.
 
 **Response** `200 OK`: Same format as `GET /api/v2/simulate`, with `active: true`.
 
-**Response** `409 Conflict` when LittleFS is not mounted. The replay stays off:
-```json
-{"error":{"status":409,"message":"Frame replay unavailable: LittleFS is not mounted, so the fixture cannot be read"}}
-```
-
-Start does not check that the file exists. When it is missing, the replay
-switches itself off on its next pass through the main loop and sends the
-WebSocket event `OTGW simulation disabled [/otgw_simulation.log missing]`.
-`GET /api/v2/simulate` then reports `active: false`.
+A missing `/otgw_simulation.log` is not an error: the replay uses the fixture
+built into the firmware. It also runs when LittleFS is not mounted. The source
+is chosen again each time the replay starts and each time it wraps around.
 
 #### `POST /api/v2/simulate/stop` | `PUT /api/v2/simulate/stop`
 

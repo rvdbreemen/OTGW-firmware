@@ -2,9 +2,12 @@
 // accessible info icon.
 //
 // Two parts:
-//  1. Content: settings-help.json is valid JSON, at most 18 KB (LittleFS budget), has a text of
+//  1. Content: the help JSON is valid JSON, at most 18 KB, has a text of
 //     20..300 characters for EVERY key of SET_META and no key that SET_META does not know.
 //     SET_META is cut out of the real data/v2.js, so a new setting without help fails here.
+//     TASK-1294: the JSON lives in the firmware header src/OTGW-firmware/settingsHelp.h (a
+//     PROGMEM raw string, served by FSexplorer.ino), no longer as data/settings-help.json;
+//     the test extracts the raw-string body and fails when the data file comes back.
 //  2. Behaviour: the REAL settingRow(), helpFor(), loadSettingsHelp(), showHelp(), hideHelp(),
 //     helpPlace(), helpPopover() and addHelpIcon() are cut out of data/v2.js by brace matching and
 //     run against a small DOM stub. The stub records what the real code does (attributes,
@@ -12,7 +15,8 @@
 //
 // Red runs (point at older copies, see the task notes):
 //   OTGW_V2_JS=<git show HEAD:...v2.js>      -> the behaviour tests fail (no icon, no helpFor)
-//   OTGW_SETTINGS_HELP=<missing file>        -> the content tests fail
+//   OTGW_SETTINGS_HELP=<missing file>        -> the content tests fail (a .json path is read as
+//                                               plain JSON, anything else as a header)
 //
 // Not covered: real hover/tap/focus behaviour, layout and the 390 px fit in a real browser
 // (needs the bench / Playwright), and the LittleFS image size (needs build.bat).
@@ -28,7 +32,8 @@ const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DATA = path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'data');
 const V2JS = process.env.OTGW_V2_JS || path.join(DATA, 'v2.js');
 const V2CSS = process.env.OTGW_V2_CSS || path.join(DATA, 'v2.css');
-const HELP_JSON = process.env.OTGW_SETTINGS_HELP || path.join(DATA, 'settings-help.json');
+const HELP_HEADER = process.env.OTGW_SETTINGS_HELP || path.join(HERE, '..', '..', 'src', 'OTGW-firmware', 'settingsHelp.h');
+const HELP_DATA_FILE = path.join(DATA, 'settings-help.json');
 const SRC = fs.readFileSync(V2JS, 'utf8');
 const MAX_BYTES = 18 * 1024;
 
@@ -60,10 +65,24 @@ const SET_META_SRC = SRC.slice(setMetaStart, closingBrace(SRC.indexOf('{', setMe
 const metaKeys = Object.keys(new Function(SET_META_SRC + '\nreturn SET_META;')());
 
 // ---------------------------------------------------------------- content tests
+// The JSON text is the body of the raw string R"json(...)json" in settingsHelp.h. CR bytes from a
+// CRLF checkout are dropped before measuring, so the size is that of the LF source of truth.
 function readHelp() {
-  const raw = fs.readFileSync(HELP_JSON);
+  let raw = fs.readFileSync(HELP_HEADER);
+  if (!HELP_HEADER.endsWith('.json')) {
+    const text = raw.toString('utf8');
+    const start = text.indexOf('R"json(');
+    const end = text.lastIndexOf(')json"');
+    if (start < 0 || end < start) throw new Error('no R"json(...)json" raw string in ' + HELP_HEADER);
+    raw = Buffer.from(text.slice(start + 7, end), 'utf8');
+  }
+  raw = Buffer.from(raw.toString('latin1').replace(/\r/g, ''), 'latin1');
   return { raw, obj: JSON.parse(raw.toString('utf8')) };
 }
+
+test('the help texts ship in the firmware image: data/settings-help.json must not exist (TASK-1294)', () => {
+  assert.ok(!fs.existsSync(HELP_DATA_FILE), HELP_DATA_FILE + ' must not exist; settingsHelp.h is the source of truth');
+});
 
 test('settings-help.json is valid JSON, an object of strings, and at most 18 KB', () => {
   const { raw, obj } = readHelp();

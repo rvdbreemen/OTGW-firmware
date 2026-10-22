@@ -9,6 +9,7 @@ package-lock.json
 # allowlist of the two fixtures needs no maintenance.
 !scripts/tests/otgw_simulation.log
 !scripts/tests/otgw_simulation_coverage.log
+!tests/fixtures/otgw_simulation.builtin.log
 *.bin
 *.elf
 .vscode/*

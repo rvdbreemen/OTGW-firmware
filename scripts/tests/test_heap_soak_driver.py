@@ -9,7 +9,7 @@ drain. A clean run must exit 0.
 
 The stub is tied to the firmware, not written from memory. Its response
 formats (uptime string, /api/v2/simulate status, republish 200 and 429,
-sendApiError, the 503 and 409 messages) are read out of
+sendApiError, the 503 messages) are read out of
 src/OTGW-firmware/*.ino by anchor when the test starts. Every device/info key
 that the stub serves or the driver reads must appear as je.field(F("<key>")
 inside sendDeviceInfoV2(). If that contract drifts, these tests fail instead
@@ -138,7 +138,6 @@ class FirmwareContract:
         self.api_error_fmt = pstr_format(self.api_error_fn, '"error":{"status":%d')
         self.low_heap_msg = api_error_message(self.device_info_fn, 503)
         self.no_mqtt_msg = api_error_message(self.discovery_fn, 503, after='PSTR("republish")')
-        self.no_fs_msg = api_error_message(self.simulate_fn, 409)
         cooldown = re.search(r"REPUBLISH_COOLDOWN_MS\s*=\s*(\d+)UL", self.discovery_fn)
         if not cooldown:
             raise AssertionError("REPUBLISH_COOLDOWN_MS not found in handleDiscovery")
@@ -164,7 +163,7 @@ DEFAULT_SCENARIO = dict(
     low_heap_at=None,        # device/info request number from which device/info answers 503
     low_heap_sec=0.0,
     sim_off_at=None,         # device/info request number at which the replay flag drops
-    start_refused=False,     # simulate/start answers 409 (LittleFS not mounted)
+    start_refused=False,     # simulate/start answers 503 (TASK-1294: the 409 for a missing file is gone)
     dark_from_start=False,   # nothing answers at all
     mqtt_connected=True,
     pending_ids=30,          # count marked pending by a republish
@@ -302,7 +301,7 @@ class StubDevice:
         if method == "POST" and path == "/api/v2/simulate/start":
             self.posts.append("start")
             if self.sc["start_refused"]:
-                return self.api_error(409, self.fw.no_fs_msg)
+                return self.api_error(503, self.fw.low_heap_msg)   # TASK-1294: no 409 any more; a refusal is a transient 503
             self.sim = True
             return 200, self.sim_status(), JSON
         if method == "POST" and path == "/api/v2/simulate/stop":
@@ -336,7 +335,7 @@ class StubDevice:
         return status, self.fw.api_error_fmt % (status, message), JSON
 
     def sim_status(self):
-        return self.fw.sim_status_fmt % ("true" if self.sim else "false", "/otgw_simulation.log", 1000)
+        return self.fw.sim_status_fmt % ("true" if self.sim else "false", "builtin", "/otgw_simulation.log", 1000)
 
     def pending(self, now):
         if self.pending_mark is None:
@@ -598,7 +597,7 @@ class DriverTests(unittest.TestCase):
         self.assertEqual(r.rc, 2, r.debug())
         self.assertEqual(len(r.stdout_lines), 1, r.debug())
         self.assertTrue(r.stdout_lines[0].startswith("SUMMARY verdict=NOT_STARTED"), r.debug())
-        self.assertIn("409", r.stdout_lines[0])
+        self.assertIn("503", r.stdout_lines[0])
         self.assertEqual(r.stub.posts, ["start"])
 
     def test_unreachable_device_does_not_run(self):

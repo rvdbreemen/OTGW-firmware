@@ -39,10 +39,10 @@ WHAT IT DOES
      record goes to --snapshot-log (ndjson).
 
 BEFORE A SOAK
-  - /otgw_simulation.log must be on the device's LittleFS. It is not part of
-    the filesystem image: upload it the way scripts/tests/run_coverage_test.py
-    does. A filesystem flash removes it, and without it the replay switches
-    itself off, which shows here as sim_inactive.
+  - The replay has a built-in fixture since TASK-1294, so it runs without any
+    file on LittleFS. To replay your own frames, upload /otgw_simulation.log
+    the way scripts/tests/run_coverage_test.py does; it takes precedence until
+    a filesystem flash removes it again (the built-in fixture then resumes).
   - Turn the nightly restart off (settings: nightly restart). A run across its
     hour otherwise ends with a correct but unwanted 'reboot' anomaly.
 

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.458
+**  Version  : v2.0.0-alpha.459
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3882,13 +3882,37 @@ static void dispatchOTGWInputLine(const char* buf, size_t len)
   enqueueOTFrame(buf, len, false, OTFRAME_SRC_REPLAY);
 }
 
+// TASK-1294: where the replay reads its lines from. An /otgw_simulation.log on LittleFS
+// wins (the bench uploads its own fixtures); without one the replay falls back to the
+// built-in fixture in flash (OTGW_SIM_FIXTURE), so the image ships no fixture file. The
+// choice is made at every (re)open: the start of a replay and each wrap-around.
+// Builtin reads go through pgm_read_byte(); the lines are synthesised either way, so
+// the PIC byte stream (ADR-177) is not involved.
+#include "otgwSimulationFixture.h"
+
+enum class OTGWReplaySource : uint8_t { None, File, Builtin };
+static const size_t OTGW_SIM_FIXTURE_LEN = sizeof(OTGW_SIM_FIXTURE) - 1;
+static OTGWReplaySource otgwReplaySource = OTGWReplaySource::None;
+static size_t           otgwReplayBuiltinPos = 0;
+
+// Next byte of the active replay source, or -1 at its end.
+static int nextOTGWSimulationByte(File& replayFile)
+{
+  if (otgwReplaySource == OTGWReplaySource::Builtin) {
+    if (otgwReplayBuiltinPos >= OTGW_SIM_FIXTURE_LEN) return -1;
+    return pgm_read_byte(OTGW_SIM_FIXTURE + otgwReplayBuiltinPos++);
+  }
+  if (!replayFile.available()) return -1;
+  return replayFile.read();
+}
+
 static bool readOTGWSimulationLine(File& replayFile, char* buffer, size_t bufferSize, size_t& lineLen)
 {
   lineLen = 0;
   bool discardCurrentLine = false;
 
-  while (replayFile.available()) {
-    int inByte = replayFile.read();
+  for (;;) {
+    int inByte = nextOTGWSimulationByte(replayFile);
     if (inByte < 0) break;
 
     char inChar = static_cast<char>(inByte);
@@ -3932,11 +3956,34 @@ static void resetOTGWLineBuffers(size_t& bytesRead, size_t& bytesWrite, bool& di
   discardCurrentReadLine = false;
 }
 
-static bool reopenOTGWSimulationFile(File& otgwSimulationFile)
+static void closeOTGWSimulationSource(File& otgwSimulationFile)
 {
   if (otgwSimulationFile) otgwSimulationFile.close();
-  otgwSimulationFile = LittleFS.open(F("/otgw_simulation.log"), "r");
-  return static_cast<bool>(otgwSimulationFile);
+  otgwReplaySource = OTGWReplaySource::None;
+  otgwReplayBuiltinPos = 0;
+}
+
+// POST /simulate/start runs on the async_tcp task while the replay state belongs to the
+// loop task, so the handler only raises this flag; the pump re-selects the source on its
+// next pass (same pattern as queueMQTTRepublishAll, TASK-1176). Without it a start while
+// the built-in fixture is playing kept that fixture until its wrap, although the status
+// already reported an uploaded file (TASK-1294 review).
+static volatile bool g_otgwReplayReselect = false;
+void requestOTGWReplayReselect() { g_otgwReplayReselect = true; }
+
+// (Re)open the replay source: the LittleFS file when it exists, else the built-in
+// fixture from its first line. Always leaves a readable source.
+static void reopenOTGWSimulationFile(File& otgwSimulationFile)
+{
+  closeOTGWSimulationSource(otgwSimulationFile);
+  if (LittleFSmounted && LittleFS.exists(F("/otgw_simulation.log"))) {
+    otgwSimulationFile = LittleFS.open(F("/otgw_simulation.log"), "r");
+    if (otgwSimulationFile) {
+      otgwReplaySource = OTGWReplaySource::File;
+      return;
+    }
+  }
+  otgwReplaySource = OTGWReplaySource::Builtin;
 }
 
 static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay, size_t replaySize)
@@ -3950,7 +3997,18 @@ static bool replayNextOTGWSimulationLine(File& otgwSimulationFile, char* sReplay
     if (haveReplayLine) break;
 
     replayPass++;
-    if (!reopenOTGWSimulationFile(otgwSimulationFile)) break;
+    reopenOTGWSimulationFile(otgwSimulationFile);
+  }
+
+  if (!haveReplayLine) {
+    // An uploaded file that holds no usable line (empty, blank, or over-long lines) must not
+    // hide the built-in fixture or spin the reopen every loop pass: fall back and wait a tick.
+    if (otgwReplaySource == OTGWReplaySource::File) {
+      closeOTGWSimulationSource(otgwSimulationFile);
+      otgwReplaySource = OTGWReplaySource::Builtin;
+    }
+    state.debug.iOTGWSimulationNextDueMs = millis() + state.debug.iOTGWSimulationIntervalMs;
+    return false;
   }
 
   if (haveReplayLine) {
@@ -3980,7 +4038,7 @@ static bool handlePICSerialSimulation(File& otgwSimulationFile,
                                  size_t replaySize)
 {
   if (!state.debug.bOTGWSimulation && otgwSimulationWasEnabled) {
-    if (otgwSimulationFile) otgwSimulationFile.close();
+    closeOTGWSimulationSource(otgwSimulationFile);
     otgwSimulationWasEnabled = false;
     resetOTGWLineBuffers(bytesRead, bytesWrite, discardCurrentReadLine);
   }
@@ -3988,7 +4046,7 @@ static bool handlePICSerialSimulation(File& otgwSimulationFile,
   if (!state.debug.bOTGWSimulation) return false;
 
   if (!otgwSimulationWasEnabled) {
-    if (otgwSimulationFile) otgwSimulationFile.close();
+    closeOTGWSimulationSource(otgwSimulationFile);
     otgwSimulationWasEnabled = true;
     resetOTGWLineBuffers(bytesRead, bytesWrite, discardCurrentReadLine);
     state.debug.iOTGWSimulationNextDueMs = 0;
@@ -4007,31 +4065,20 @@ static bool handlePICSerialSimulation(File& otgwSimulationFile,
   picSerialFlushRx();
   #endif
 
-  if (!LittleFSmounted) {
-    DebugTln(F("OTGW simulation disabled: LittleFS not mounted"));
-    sendEventToWebSocket_P('!', PSTR("OTGW simulation disabled [LittleFS unavailable]"));
-    state.debug.bOTGWSimulation = false;
-    if (otgwSimulationFile) otgwSimulationFile.close();
-    otgwSimulationWasEnabled = false;
-    return true;
+  if (g_otgwReplayReselect) {
+    g_otgwReplayReselect = false;             // clear first; a request raised after this is served next pass
+    closeOTGWSimulationSource(otgwSimulationFile);
+    state.debug.iOTGWSimulationNextDueMs = 0;
   }
 
-  if (!otgwSimulationFile && !reopenOTGWSimulationFile(otgwSimulationFile)) {
-    DebugTln(F("OTGW simulation disabled: /otgw_simulation.log not found"));
-    sendEventToWebSocket_P('!', PSTR("OTGW simulation disabled [/otgw_simulation.log missing]"));
-    state.debug.bOTGWSimulation = false;
-    otgwSimulationWasEnabled = false;
-    return true;
+  // TASK-1294: no source can be missing any more. Without a LittleFS file (or without
+  // LittleFS at all) the built-in fixture is replayed, so replay never disables itself.
+  if (otgwReplaySource == OTGWReplaySource::None) {
+    reopenOTGWSimulationFile(otgwSimulationFile);
   }
 
   if ((state.debug.iOTGWSimulationNextDueMs == 0) || (static_cast<int32_t>(millis() - state.debug.iOTGWSimulationNextDueMs) >= 0)) {
-    if (!replayNextOTGWSimulationLine(otgwSimulationFile, sReplay, replaySize) && !otgwSimulationFile) {
-      DebugTln(F("OTGW simulation disabled: replay file reopen failed"));
-      sendEventToWebSocket_P('!', PSTR("OTGW simulation disabled [replay file reopen failed]"));
-      state.debug.bOTGWSimulation = false;
-      otgwSimulationWasEnabled = false;
-      return true;
-    }
+    replayNextOTGWSimulationLine(otgwSimulationFile, sReplay, replaySize);
   }
 
   return false;

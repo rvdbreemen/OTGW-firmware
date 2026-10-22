@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.458
+**  Version  : v2.0.0-alpha.459
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -118,6 +118,28 @@ static void serveVersionedAsset(const char* path, const __FlashStringHelper* mim
   webSendFile(path, mime, /*gzip=*/false);
 }
 
+// TASK-1294: static text that lives in the firmware image instead of on LittleFS, so
+// the 4 MB boards keep their LittleFS headroom. Same cache contract as
+// serveVersionedAsset(): Cache-Control no-cache plus an ETag, 304 on a matching
+// If-None-Match. The validator is the FIRMWARE git hash plus the path, because the
+// body changes only with the firmware image, not with the LittleFS image: a
+// filesystem-only update leaves it alone, a firmware update changes it. The body
+// streams straight from flash (webSendPStream, no heap copy). The path is a
+// compile-time constant of the caller, always a plain ASCII URL.
+#include "settingsHelp.h"
+static void serveProgmemAsset(const char* path, PGM_P mime, PGM_P body) {
+  char etag[64];
+  snprintf_P(etag, sizeof(etag), PSTR("\"%s-%s\""), _VERSION_GITHASH, path);
+  webPushHeader(F("Cache-Control"), F("no-cache"));
+  webPushHeader(F("ETag"), etag);
+  if (hasHeaderCompat(F("If-None-Match")) &&
+      strcmp(headerCompat(F("If-None-Match")), etag) == 0) {
+    webSendStatus(304);
+    return;
+  }
+  webSendPStream(200, mime, body);
+}
+
 // TASK-989: fonts are large immutable binaries that v2.html loads one at a time
 // through the FontFace() API. Unlike the HTML/CSS/JS shell they never change between releases,
 // so serve them with a long immutable max-age: after the first visit the browser
@@ -196,7 +218,8 @@ void startWebserver(){
   // not shipped in the filesystem image (build.py STAGING_EXCLUDE).
   server.on("/v2-bundle.css",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2-bundle.css",    F("text/css")); });
   // TASK-1281: the settings help texts, fetched by v2.js the first time an info icon is used.
-  server.on("/settings-help.json", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/settings-help.json", F("application/json")); });
+  // TASK-1294: served from the firmware image (settingsHelp.h), not from LittleFS.
+  server.on("/settings-help.json", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveProgmemAsset("/settings-help.json", PSTR("application/json"), SETTINGS_HELP_JSON); });
   // TASK-989: immutable-cached font routes (see serveImmutableAsset above).
   server.on("/fonts/inter-400.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-400.woff2",          F("font/woff2")); });
   server.on("/fonts/inter-700.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-700.woff2",          F("font/woff2")); });

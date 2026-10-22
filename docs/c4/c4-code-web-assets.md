@@ -50,7 +50,7 @@ Web fonts live under `data/fonts/` (`inter-400.woff2`, `inter-700.woff2`, `jetbr
 |------|------|---------|
 | `settings.ini` | JSON | Default device settings template (hostname, MQTT broker/port, NTP timezone, OTGWcommands startup). Seed data for first-time setup. |
 | `version.hash` | <0.1 KB | Firmware/filesystem version hash for mismatch detection. |
-| `otgw_simulation.log` | ~13 KB | OT frames replayed by the simulation mode. |
+| `otgw_simulation.log` | optional | OT frames replayed by the simulation mode when uploaded; since TASK-1294 the default fixture is built into the firmware (`otgwSimulationFixture.h`) and this file is not in the image. |
 
 Note: `mqttha.cfg` and the file-based discovery template approach have been retired. Discovery is now driven by the PROGMEM data tables and streaming functions in `MQTTHaDiscovery.cpp` (ADR-077). `docs/archive/mqttha.cfg` is kept as historical reference only.
 

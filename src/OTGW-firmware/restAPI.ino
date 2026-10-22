@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.458
+**  Version  : v2.0.0-alpha.459
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -363,36 +363,20 @@ static void handleCommandSubmit(const char* cmdStr) {
   webSend(202, F("application/json"), F("{\"status\":\"queued\"}"));
 }
 
-// TASK-1073: why replay cannot run on this board, or nullptr when it can. Since
-// TASK-1071 the replay runs loop-side on every board and transport, so the only
-// thing it needs is the filesystem that holds the fixture.
-static PGM_P otgwSimulationUnavailableReason() {
-  if (!LittleFSmounted) {
-    static const char rNoFs[] PROGMEM = "filesystem not mounted; the fixture cannot be read";
-    return rNoFs;
-  }
-  return nullptr;
-}
-
 static void sendSimulationStatus() {
   static const char kOTGWSimulationFile[] PROGMEM = "/otgw_simulation.log";
-  // active must reflect what actually happens, not merely what the flag says.
-  // On a board where the pump cannot run, echoing the flag is a lie (TASK-1073).
-  PGM_P reason = otgwSimulationUnavailableReason();
+  // TASK-1294: replay is always available. Since TASK-1071 it runs loop-side on every
+  // board and transport, and without a /otgw_simulation.log on LittleFS it replays the
+  // fixture built into the firmware. "source" says which one the next replay reads:
+  // "file" when the LittleFS file exists, else "builtin".
+  const bool haveFile = LittleFSmounted && LittleFS.exists(F("/otgw_simulation.log"));
   char jsonBuf[240];
-  if (reason != nullptr) {
-    snprintf_P(jsonBuf, sizeof(jsonBuf),
-               PSTR("{\"simulation\":{\"active\":false,\"available\":false,\"reason\":\"%S\",\"file\":\"%S\",\"interval_ms\":%lu}}"),
-               reason,
-               reinterpret_cast<PGM_P>(kOTGWSimulationFile),
-               static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
-  } else {
-    snprintf_P(jsonBuf, sizeof(jsonBuf),
-               PSTR("{\"simulation\":{\"active\":%s,\"available\":true,\"file\":\"%S\",\"interval_ms\":%lu}}"),
-               state.debug.bOTGWSimulation ? "true" : "false",
-               reinterpret_cast<PGM_P>(kOTGWSimulationFile),
-               static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
-  }
+  snprintf_P(jsonBuf, sizeof(jsonBuf),
+             PSTR("{\"simulation\":{\"active\":%s,\"available\":true,\"source\":\"%s\",\"file\":\"%S\",\"interval_ms\":%lu}}"),
+             state.debug.bOTGWSimulation ? "true" : "false",
+             haveFile ? "file" : "builtin",
+             reinterpret_cast<PGM_P>(kOTGWSimulationFile),
+             static_cast<unsigned long>(state.debug.iOTGWSimulationIntervalMs));
   sendCorsOriginHeader();
   webSend(200, F("application/json"), jsonBuf);
 }
@@ -400,6 +384,7 @@ static void sendSimulationStatus() {
 static void setOTGWSimulationEnabled(bool enabled) {
   state.debug.bOTGWSimulation = enabled;
   state.debug.iOTGWSimulationNextDueMs = 0;
+  if (enabled) requestOTGWReplayReselect();   // TASK-1294: a start re-picks file vs built-in, as the status says
   if (enabled) {
     sendEventToWebSocket_P('*', PSTR("OTGW simulation enabled [replay active]"));
   } else {
@@ -712,20 +697,12 @@ static void handleSimulate(const char words[][API_WORD_LEN], uint8_t wc, HTTPMet
 
   if (wc > 4 && strcmp_P(words[4], PSTR("start")) == 0) {
     if (!isPostOrPut) { sendApiMethodNotAllowed(F("POST, PUT")); return; }
-    // TASK-1073: refuse rather than report a replay that cannot happen. Enabling
-    // the flag used to answer active:true while the pump never ran; the failure was
-    // silent and cost a capture cycle to diagnose. Stopping stays allowed
-    // everywhere, so a board that somehow has the flag set can always clear it.
-    //
-    // TASK-1071 removed the OT-Direct half of that refusal: replay is now driven by
-    // handleOTReplay() from the loop instead of from inside the PIC-gated
-    // handlePICSerial(), and the fixture reaches processOT() through the same
-    // dispatchOTGWInputLine() a real frame takes. So OT-Direct boards can replay,
-    // and refusing them here would now block the very case this endpoint exists for.
-    if (!LittleFSmounted) {
-      sendApiError(409, F("Frame replay unavailable: LittleFS is not mounted, so the fixture cannot be read"));
-      return;
-    }
+    // TASK-1071: replay is driven by handleOTReplay() from the loop on every board and
+    // transport, and the fixture reaches processOT() through the same
+    // dispatchOTGWInputLine() a real frame takes, so OT-Direct boards can replay too.
+    // TASK-1294: the replay can no longer be unavailable. Without a LittleFS fixture
+    // (or without LittleFS) it replays the fixture built into the firmware, so the
+    // earlier 409 for an unmounted filesystem is gone.
     setOTGWSimulationEnabled(true);
     sendSimulationStatus();
     return;
