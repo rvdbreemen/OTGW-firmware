@@ -1972,6 +1972,14 @@ static void satMigrateFile(PGM_P oldPath, PGM_P newPath)
   strncpy_P(newBuf, newPath, sizeof(newBuf) - 1); newBuf[sizeof(newBuf) - 1] = '\0';
   if (!LittleFS.exists(oldBuf)) return;
   if (LittleFS.exists(newBuf)) { LittleFS.remove(oldBuf); return; } // new already present
+  // rename() does not create the target folder (TASK-1286); a fresh image has no /sat.
+  char dirBuf[32];
+  strlcpy(dirBuf, newBuf, sizeof(dirBuf));
+  char* slash = strrchr(dirBuf, '/');
+  if (slash != nullptr && slash != dirBuf) {
+    *slash = '\0';
+    if (!LittleFS.exists(dirBuf)) LittleFS.mkdir(dirBuf);
+  }
   LittleFS.rename(oldBuf, newBuf);
   SATDebugTf(PSTR("SAT: migrated %s -> %s\r\n"), oldBuf, newBuf);
 }
@@ -2105,6 +2113,26 @@ static void satLoadEstimatedEnergy()
     state.sat.fEstEnergyLastSavedKWh = kwh;
     SATDebugTf(PSTR("SAT: estimated energy restored (%.3f kWh)\r\n"), kwh);
   }
+}
+
+//=== Write the SAT learned state to LittleFS from RAM (TASK-1286) ===
+// A filesystem update writes a fresh image over the whole partition, so every file
+// below is gone afterwards. The update server calls this right after the remount
+// (next to writeSettings()), on the AsyncTCP task while the update flag keeps the
+// control loop idle. It calls the regular savers directly: their "due" guards (the
+// hourly energy timer, the 0.1 kWh estimate boundary, the 5 min PID timer) live in
+// the callers, so nothing here can skip a write. RAM is fresher than the files
+// were: energy is only saved hourly.
+// What it does not cover: /sat_markers.json has no RAM copy (the update server
+// keeps it on the heap) and /sat/sat_cycles.json is never written by the firmware.
+void satPersistAllToFs()
+{
+  if (!LittleFSmounted) return;
+  satSavePidState();
+  satSaveEnergyState();
+  satSaveEstimatedEnergy();
+  satHCRSaveState();
+  SATDebugTln(F("SAT: learned state written to the filesystem"));
 }
 
 //=== Does SAT own the control setpoint (MsgID 1)? — TASK-1150 / ADR-179 ===

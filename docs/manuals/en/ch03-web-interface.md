@@ -375,7 +375,7 @@ The flash utility at `http://<ip>/update` installs firmware and web files in one
 2. Choose the release zip, or the `.ino.bin` and `.littlefs.bin` files. The page checks the files by content and refuses USB images, the updater itself and mismatched pairs.
 3. Press **Update** and keep the tab open until it says Done (2 to 3 minutes). The unit restarts twice. The page switches to the safeboot updater, installs the firmware, waits for the new firmware, installs the web files and verifies both.
 
-Settings and sensor names are kept. SAT learned state (energy totals, heating-curve data, controller state), learned OpenTherm profiles, the reboot log and files uploaded in the File Explorer start fresh. **Download a settings backup** is a separate link on the page and not part of the update. The forms under **Advanced** keep the old one-upload-at-a-time flow. Recovery steps and the full list: [WiFi firmware updates](../../guides/WIFI_FIRMWARE_UPDATE.md).
+Settings and sensor names are kept, and so are the SAT learned state (energy totals, heating-curve data and markers, controller state), the learned OpenTherm profiles, the reboot log and the hot-water meter total. A file that has grown past its size limit (2 to 3 KB) is left out. Files uploaded in the File Explorer, the boot detection log and the MQTT topic cleanup state start fresh. **Download a settings backup** is a separate link on the page and not part of the update. The forms under **Advanced** keep the old one-upload-at-a-time flow. Recovery steps and the full list: [WiFi firmware updates](../../guides/WIFI_FIRMWARE_UPDATE.md).
 
 #### Manual Binary Upload
 

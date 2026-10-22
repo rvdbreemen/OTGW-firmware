@@ -88,8 +88,8 @@ static const char UpdateServerIndex[] PROGMEM =
     <div id='oneIntro'>
     <p>Choose the release zip (or its two <b>.bin</b> files) and press <b>Update</b>. This page installs the firmware, waits for the unit to restart, installs the matching web files and checks the result. It takes about 2 to 3 minutes. <b>Keep this tab open until it says Done.</b></p>
     <ul>
-      <li><b>Kept:</b> your settings and your sensor names. WiFi is kept too.</li>
-      <li><b>Starts fresh:</b> what the web-files update replaces and the firmware does not write back: SAT learned values (energy totals, heating-curve data, controller state), learned OpenTherm profiles, the reboot log and files you uploaded in the File Explorer.</li>
+      <li><b>Kept:</b> your settings and your sensor names, the SAT learned values (energy totals, heating-curve data and markers, controller state), the learned OpenTherm profiles, the reboot log and the hot-water meter total. WiFi is kept too. A file that has grown past its size limit (2 to 3 KB) is left out.</li>
+      <li><b>Starts fresh:</b> files you uploaded in the File Explorer, the boot detection log and the MQTT topic cleanup state.</li>
     </ul>
     <p class='note'>While the updater runs (about 1 to 2 minutes) the unit does not control heating. On an OTGW32 the link between thermostat and boiler is interrupted and the boiler runs on its own settings. On a board with the PIC gateway the PIC keeps passing OpenTherm traffic.<br>If an admin password is set, your browser asks for it again when the updater starts. The updater always uses WiFi with an address from DHCP: a unit on Ethernet or with a fixed IP address can show up at another address.</p>
     <div id='unitInfo' class='note'>Reading the unit...</div>

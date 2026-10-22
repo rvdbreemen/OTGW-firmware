@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.449
+**  Version  : v2.0.0-alpha.450
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -6527,6 +6527,15 @@ void saveOtSupportFilesIfDirty() {
       DebugTln(F("ot-support: /ot-boiler.json write FAILED — will retry"));
     }
   }
+}
+
+// TASK-1286: after a filesystem update both files are gone and RAM holds the profile
+// (loaded at boot, plus what was learned since), so write both regardless of the
+// dirty flags.
+void saveOtSupportFilesForced() {
+  thermostatFileDirty = true;
+  boilerFileDirty     = true;
+  saveOtSupportFilesIfDirty();
 }
 
 /***************************************************************************

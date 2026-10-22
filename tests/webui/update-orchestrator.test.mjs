@@ -621,11 +621,34 @@ for (const [label, from, to, scenario] of MUTANTS) {
 }
 
 // ---------- 4. what a filesystem update keeps and loses ----------
-// The image replaces the whole LittleFS partition. The firmware writes back only
-// settings.ini and dallas_labels.ini (OTGW-ModUpdateServer-esp32.h) and the DHW
-// water total (flushDHWWaterMeter() in doRestart). Every other runtime file must
-// therefore be absent from the image, which is what the page text says is lost.
-test('filesystem image: the runtime files the page lists as "starts fresh" are not in it', { skip }, () => {
+// The image replaces the whole LittleFS partition, so no runtime file is in it.
+// The firmware puts these back (OTGW-ModUpdateServer-esp32.h, TASK-1286):
+//  - from RAM: settings.ini, the SAT learned state (satPersistAllToFs), the OT
+//    profiles (saveOtSupportFilesForced) and the DHW water total
+//    (flushDHWWaterMeter() in doRestart);
+//  - from a heap copy (KEEP_LIST): dallas_labels.ini, sat_markers.json,
+//    reboot_count.txt, reboot_log.txt.
+// The page's Kept / Starts fresh lines must say the same; tests/test_fs_update_keep.py
+// pins the firmware side.
+test('page: the Kept and Starts fresh lines match what the firmware writes back', () => {
+  const li = (label) => {
+    const m = header.match(new RegExp('<li><b>' + label + ':</b>([^<]*)</li>'));
+    assert.ok(m, 'the page has no "' + label + '" line');
+    return m[1].toLowerCase();
+  };
+  const kept = li('Kept');
+  const fresh = li('Starts fresh');
+  for (const w of ['settings', 'sensor names', 'sat learned values', 'energy totals', 'heating-curve', 'markers',
+    'controller state', 'opentherm profiles', 'reboot log', 'hot-water meter', 'wifi']) {
+    assert.ok(kept.includes(w), 'Kept does not mention "' + w + '"');
+    assert.ok(!fresh.includes(w), 'Starts fresh must not mention "' + w + '"');
+  }
+  for (const w of ['file explorer', 'boot detection log', 'topic cleanup']) {
+    assert.ok(fresh.includes(w), 'Starts fresh does not mention "' + w + '"');
+  }
+});
+
+test('filesystem image: the runtime files the firmware writes back are not in it', { skip }, () => {
   const img = fs.readFileSync(A.fsimg);
   const runtime = ['sat_pid_state.json', 'sat_energy.json', 'sat_energy_estimate.json', 'sat_hcr.json', 'sat_markers.json',
     'ot-boiler.json', 'ot-thermo.json', 'reboot_count.txt', 'reboot_log.txt', 'bootdetect.log', 'topic_cleanup.bin'];

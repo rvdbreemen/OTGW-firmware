@@ -50,16 +50,30 @@ When an admin password is set, the browser asks for it again when the updater st
 
 ### What a filesystem update keeps and loses
 
-The image replaces the whole filesystem partition (768 KB). It is built from the web assets plus a default `settings.ini`, and nothing else.
+The image replaces the whole filesystem partition (768 KB). It is built from the web assets plus a default `settings.ini`, and nothing else. The running firmware puts the runtime files back after the remount (`OTGW-ModUpdateServer-esp32.h`), in two ways.
 
-Kept:
+Kept, written back from RAM (the firmware holds the value, so it is current even when the file was older):
 
-- **Settings.** The running firmware holds them in memory and writes `settings.ini` back right after the upload (`OTGW-ModUpdateServer-esp32.h`, `writeSettings(false)`). Measured on alpha.439: 0 of 567 settings changed across a WiFi filesystem update (TASK-1264).
-- **Dallas sensor labels**, up to 2 KB (`dallas_labels.ini`, TASK-1266). For a larger label file the page also keeps a copy in the browser and sends it back after the update.
-- **WiFi credentials**: they live in NVS, which neither update touches.
+- **Settings.** `settings.ini` is written back right after the upload (`writeSettings(false)`). Measured on alpha.439: 0 of 567 settings changed across a WiFi filesystem update (TASK-1264).
+- **SAT learned state** (TASK-1286), through `satPersistAllToFs()`, which calls the regular savers: `sat_energy.json` (energy total) and `sat_energy_estimate.json` (estimated gas energy), which are otherwise saved hourly and on each 0.1 kWh, so the energy counted since the last save is kept too; `sat_pid_state.json` (controller state; the firmware restores it only if it is less than 30 minutes old and the clock is synced, which a normal update meets); `sat/sat_hcr.json` (heating-curve data).
+- **Learned OpenTherm profiles** (`ot-boiler.json`, `ot-thermo.json`): `saveOtSupportFilesForced()` writes both from RAM, which holds what was loaded at boot plus everything learned since the last 15-minute save.
 - **The DHW water total** (`dhw_water.json`): the restart that follows the upload flushes it to the new filesystem (`flushDHWWaterMeter()` in `doRestart`). This follows from the code and has not been measured on the bench.
+- **WiFi credentials**: they live in NVS, which neither update touches.
 
-Lost (start fresh), because they are not in the image and the firmware does not write them back: SAT learned state (`sat_pid_state.json`, `sat_energy.json`, `sat_energy_estimate.json`, `sat/sat_hcr.json`, `sat_markers.json`: energy totals, heating-curve data, controller state), the learned OpenTherm profiles (`ot-boiler.json`, `ot-thermo.json`), the reboot log and counter, `bootdetect.log`, `topic_cleanup.bin`, and files you uploaded in the File Explorer. `tests/webui/update-orchestrator.test.mjs` checks that none of these names is in the shipped image. That a unit really starts these from zero has been read from the code, not measured on a device yet.
+Kept, copied to the heap before the image is written and written back after the remount (files without a RAM copy; a file over its cap, a total over 8 KB or a low heap only skips that file, the update goes on):
+
+| File | Holds | Cap |
+|---|---|---|
+| `dallas_labels.ini` (TASK-1266) | Dallas sensor names. For a larger file the page also keeps a copy in the browser and sends it back after the update | 2 KB |
+| `sat_markers.json` | heating-curve markers (at most 20) | 2.5 KB |
+| `reboot_count.txt` | reboot counter | 16 B |
+| `reboot_log.txt` | the last reboot causes (20 lines) | 3 KB |
+
+Worst case on the heap during the upload: 7.7 KB (2 + 2.5 + 0.016 + 3 KB) in at most four blocks, and only when the largest free block is at least 8 KB above the copy being made. The copies are freed when the update ends, fails or is aborted. The log says why a file was skipped: over its cap, over the 8 KB total, or low heap.
+
+The SAT heating-curve file lives in the `/sat` folder, which a fresh image does not contain. The firmware creates the folder when it writes or migrates the file. Before TASK-1286 it did not, so the heating-curve recommendation was lost at every restart of a unit that started from a fresh image.
+
+Lost (start fresh), because they are not in the image and the firmware does not write them back: `bootdetect.log`, `topic_cleanup.bin` (the MQTT topic cleanup state) and files you uploaded in the File Explorer. `tests/webui/update-orchestrator.test.mjs` checks that none of the runtime names is in the shipped image and that the page text matches; `tests/test_fs_update_keep.py` pins the firmware side (keep list, caps, order of the write-back, every SAT saver called). That a unit really keeps the SAT values across a real update is still to be measured on the bench.
 
 Download `settings.ini` first anyway if you want a safety net: the page has a separate **Download a settings backup** link. It is not part of the update.
 

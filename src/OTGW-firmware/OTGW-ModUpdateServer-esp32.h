@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.449
+**  Version  : v2.0.0-alpha.450
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -55,6 +55,8 @@ extern bool updateLittleFSStatus(const char *probePath);
 extern bool updateLittleFSStatus(const __FlashStringHelper *probePath);
 extern void writeSettings(bool show);
 extern void settingsMarkClean();
+extern void satPersistAllToFs();           // TASK-1286: SAT learned state, RAM -> LittleFS
+extern void saveOtSupportFilesForced();    // TASK-1286: OT profile files, RAM -> LittleFS
 extern void blinkLEDnow(uint8_t);
 extern bool checkHttpAuth();
 extern void requestDeferredReboot(const char *reason);
@@ -204,6 +206,7 @@ public:
         }
         if (Update.hasError() || _updaterError[0] != '\0') {
           ::state.flash.bESPactive = false;
+          _dropKeptFiles();   // clearing bESPactive disables the abort cleanup, so free the copies here
           if (!LittleFSmounted && _uploadTarget == UploadTarget::Filesystem) {
             LittleFSmounted = LittleFS.begin();
           }
@@ -356,12 +359,14 @@ private:
       if (_serial_output) {
         DebugTf(PSTR("[OTA] Target: filesystem (%u bytes)\r\n"), static_cast<unsigned>(fsSize));
       }
-      _keepLabelsFile();   // TASK-1266: the image has no dallas_labels.ini; restore it after
+      _keepFiles();   // TASK-1266/1286: the image lacks these files; copy them to the heap, restore after the remount
       LittleFS.end();
       if (uploadTotal > 0 && uploadTotal > fsSize) {
         strlcpy(_updaterError, "filesystem image too large", sizeof(_updaterError));
+        _dropKeptFiles();   // the old filesystem is untouched; the copies are not needed
       } else if (!Update.begin(fsSize, U_SPIFFS)) {  // U_SPIFFS covers LittleFS on ESP32
         _setUpdaterError();
+        _dropKeptFiles();
       }
     } else {
       _uploadTarget = UploadTarget::Firmware;
@@ -416,6 +421,7 @@ private:
     size_t written = Update.write(data, len);
     if (written != len) {
       _setUpdaterError();
+      _dropKeptFiles();   // the end handler does not run after a write error
       return;
     }
     _uploadBlockIndex++;
@@ -454,7 +460,9 @@ private:
           if (_serial_output) DebugTln(F("[OTA] Restoring settings to filesystem"));
           writeSettings(false);
           settingsMarkClean();
-          _restoreLabelsFile();
+          _restoreKeptFiles();           // TASK-1266/1286: files without a RAM copy, from the heap
+          saveOtSupportFilesForced();    // TASK-1286: the OT profiles live in RAM, so no heap copy is needed
+          satPersistAllToFs();           // TASK-1286: SAT learned state from RAM, even when it was saved less than an hour ago
         } else {
           LittleFSmounted = false;
           if (_serial_output) DebugTln(F("[OTA] Error: LittleFS mount failed"));
@@ -467,7 +475,7 @@ private:
     } else {
       _setUpdaterError();
     }
-    _dropLabelsFile();         // no-op after a restore; frees the copy on every other path
+    _dropKeptFiles();          // no-op after a restore; frees the copies on every other path
     _updateFinalized = true;   // suppress the onDisconnect abort cleanup on the clean close
     ::state.flash.bESPactive = false;
     _authenticated = false;  // force re-authentication on next upload
@@ -482,7 +490,7 @@ private:
     if (!::state.flash.bESPactive) return;  // never started / already cleaned up
 
     Update.end();
-    _dropLabelsFile();
+    _dropKeptFiles();
     if (_serial_output) {
       DebugTf(PSTR("[OTA] Abort: after %u bytes\r\n"), static_cast<unsigned>(_uploadWrittenBytes));
     }
@@ -513,55 +521,107 @@ private:
     strlcpy(_updaterError, str.c_str(), sizeof(_updaterError));
   }
 
-  // TASK-1266: dallas_labels.ini holds the user's Dallas sensor names and is not
-  // part of the filesystem image. Like settings.ini (kept in RAM and rewritten by
-  // writeSettings()), it is copied to the heap before the image is written and
-  // written back after the remount. A missing file, an oversized one, or a failed
-  // allocation only skips the restore; the filesystem update itself goes on.
-  static constexpr size_t LABELS_KEEP_MAX = 2048;
+  // A filesystem update writes a fresh image over the whole partition. Two kinds
+  // of runtime file survive it:
+  //  - files with a RAM model are written back from RAM after the remount:
+  //    settings.ini (writeSettings), the SAT learned state (satPersistAllToFs,
+  //    TASK-1286), the OpenTherm profiles (saveOtSupportFilesForced) and the DHW
+  //    water total (flushDHWWaterMeter() in doRestart);
+  //  - files without one are copied to the heap before the image is written and
+  //    written back after the remount (KEEP_LIST below). dallas_labels.ini
+  //    (TASK-1266) was the first; TASK-1286 added the rest.
+  // A missing file, an oversized one, a low heap or a failed allocation only
+  // skips that file's restore; the filesystem update itself goes on. The copy
+  // is made and restored on the AsyncTCP task (the upload callbacks), which
+  // serializes the uploads, so the per-instance buffers need no further guard.
+  struct KeepEntry { const char *path; uint16_t maxLen; };
+  static constexpr KeepEntry KEEP_LIST[] = {
+    {"/dallas_labels.ini", 2048},   // the user's Dallas sensor names
+    {"/sat_markers.json",  2560},   // at most 20 heating-curve markers of at most 110 B
+    {"/reboot_count.txt",    16},   // one decimal number
+    {"/reboot_log.txt",    3072},   // 20 lines of at most 140 B
+  };
+  static constexpr size_t   KEEP_COUNT        = sizeof(KEEP_LIST) / sizeof(KEEP_LIST[0]);
+  static constexpr size_t   KEEP_TOTAL_MAX    = 8192;   // all copies together
+  static constexpr uint32_t KEEP_HEAP_RESERVE = 8192;   // largest free block must stay this far above a copy
 
-  void _keepLabelsFile() {
-    _dropLabelsFile();
+  void _keepFiles() {
+    _dropKeptFiles();
     if (!LittleFSmounted) return;
-    File f = LittleFS.open(LABELS_FILE, "r");
-    if (!f) return;
-    size_t len = f.size();
-    if (len == 0 || len > LABELS_KEEP_MAX) {
-      if (_serial_output && len > LABELS_KEEP_MAX) {
-        DebugTf(PSTR("[OTA] dallas_labels.ini too large to keep (%u bytes)\r\n"), static_cast<unsigned>(len));
+    size_t total = 0;
+    for (size_t i = 0; i < KEEP_COUNT; i++) {
+      File f = LittleFS.open(KEEP_LIST[i].path, "r");
+      if (!f) continue;
+      const size_t len = f.size();
+      if (len == 0) {
+        f.close();
+        continue;
+      }
+      if (len > KEEP_LIST[i].maxLen) {
+        if (_serial_output) {
+          DebugTf(PSTR("[OTA] %s too large to keep (%u bytes, cap %u)\r\n"),
+                  KEEP_LIST[i].path, static_cast<unsigned>(len), static_cast<unsigned>(KEEP_LIST[i].maxLen));
+        }
+        f.close();
+        continue;
+      }
+      if (total + len > KEEP_TOTAL_MAX) {
+        if (_serial_output) {
+          DebugTf(PSTR("[OTA] %s not kept: total cap %u reached (%u kept, file %u)\r\n"),
+                  KEEP_LIST[i].path, static_cast<unsigned>(KEEP_TOTAL_MAX), static_cast<unsigned>(total), static_cast<unsigned>(len));
+        }
+        f.close();
+        continue;
+      }
+      if (platformMaxFreeBlock() < len + KEEP_HEAP_RESERVE) {
+        if (_serial_output) {
+          DebugTf(PSTR("[OTA] %s not kept: low heap (largest block %u)\r\n"),
+                  KEEP_LIST[i].path, static_cast<unsigned>(platformMaxFreeBlock()));
+        }
+        f.close();
+        continue;
+      }
+      uint8_t *buf = static_cast<uint8_t *>(malloc(len));
+      if (buf != nullptr) {
+        if (f.read(buf, len) == len) {
+          _keepBuf[i] = buf;
+          _keepLen[i] = static_cast<uint16_t>(len);
+          total += len;
+        } else {
+          free(buf);
+        }
       }
       f.close();
-      return;
     }
-    _labelsCopy = static_cast<uint8_t *>(malloc(len));
-    if (_labelsCopy != nullptr) {
-      _labelsCopyLen = f.read(_labelsCopy, len);
-      if (_labelsCopyLen != len) _dropLabelsFile();
-    }
-    f.close();
-  }
-
-  void _restoreLabelsFile() {
-    if (_labelsCopy == nullptr) return;
-    File f = LittleFS.open(LABELS_FILE, "w");
-    bool ok = f && f.write(_labelsCopy, _labelsCopyLen) == _labelsCopyLen;
-    if (f) f.close();
     if (_serial_output) {
-      DebugTf(PSTR("[OTA] Restoring dallas_labels.ini (%u bytes): %s\r\n"),
-              static_cast<unsigned>(_labelsCopyLen), ok ? "OK" : "FAILED");
+      DebugTf(PSTR("[OTA] kept %u bytes of runtime files on the heap\r\n"), static_cast<unsigned>(total));
     }
-    _dropLabelsFile();
   }
 
-  void _dropLabelsFile() {
-    free(_labelsCopy);
-    _labelsCopy = nullptr;
-    _labelsCopyLen = 0;
+  void _restoreKeptFiles() {
+    for (size_t i = 0; i < KEEP_COUNT; i++) {
+      if (_keepBuf[i] == nullptr) continue;
+      File f = LittleFS.open(KEEP_LIST[i].path, "w");
+      const bool ok = f && f.write(_keepBuf[i], _keepLen[i]) == _keepLen[i];
+      if (f) f.close();
+      if (_serial_output) {
+        DebugTf(PSTR("[OTA] Restoring %s (%u bytes): %s\r\n"),
+                KEEP_LIST[i].path, static_cast<unsigned>(_keepLen[i]), ok ? "OK" : "FAILED");
+      }
+    }
+    _dropKeptFiles();
   }
 
-  static constexpr const char *LABELS_FILE = "/dallas_labels.ini";
-  uint8_t *_labelsCopy = nullptr;
-  size_t _labelsCopyLen = 0;
+  void _dropKeptFiles() {
+    for (size_t i = 0; i < KEEP_COUNT; i++) {
+      free(_keepBuf[i]);
+      _keepBuf[i] = nullptr;
+      _keepLen[i] = 0;
+    }
+  }
+
+  uint8_t *_keepBuf[KEEP_COUNT] = {};
+  uint16_t _keepLen[KEEP_COUNT] = {};
 
   bool _serial_output;
   AsyncWebServer *_server;

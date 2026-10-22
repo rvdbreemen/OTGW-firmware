@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.449
+**  Version  : v2.0.0-alpha.450
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -253,6 +253,7 @@ void clearBoilerUnsupportedDirty();
 void publishBoilerUnsupportedMsgids();    // MQTT retained CSV ("14W,16W,24R,...")
 void loadOtSupportFiles();                 // read /ot-thermo.json and /ot-boiler.json at boot
 void saveOtSupportFilesIfDirty();          // 15-min debounced atomic write
+void saveOtSupportFilesForced();           // TASK-1286: write both now (filesystem update write-back)
 void doMqttDisconnect();                 // graceful disconnect for reboot path (MQTTclient is file-static)
 void doWebSocketClose();                 // close all WS clients before reboot (otLogWs not extern'd in any header)
 uint16_t webSocketClientCount();         // connected /ws clients (port 80); used by the web connection cap (ADR-188)
@@ -400,6 +401,7 @@ const char* satHeatingCurveRecommendation();
 // Cycle window persistence and flush (Task #237, defined in SATcycles.ino / SATcontrol.ino)
 void satFlushCycleWindow();
 void satFlushShortLivedData();
+void satPersistAllToFs();                  // TASK-1286: write the SAT learned state from RAM (filesystem update write-back)
 
 // HardwareSection + NetworkSection + enums moved to Hardwaretypes.h / Networktypes.h (ADR-079/TASK-326 AC3)
 

@@ -1096,7 +1096,9 @@ static float _hcrIntraMedian()
 //--- Save HCR state to LittleFS (called on day-commit) ---
 void satHCRSaveState()
 {
-  File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "w");
+  // create=true makes the /sat folder: a fresh filesystem image has none, and without
+  // it this open fails and the recommendation never survives a restart (TASK-1286).
+  File f = LittleFS.open(FPSTR(SAT_HCR_FILE), "w", true);
   if (!f) return;
   // Format: {"ts":T,"n":N,"h":H,"d":[v0,...,vN-1],"sn":SC,"s":[s0,...,sSC-1]}
   // Written chunk-by-chunk to avoid a large stack buffer.
