@@ -3,9 +3,11 @@ id: TASK-1260
 title: >-
   Manual chapters: drop removed OVP MQTT commands (ch05/h05) and sync the SAT
   command table into ch09/h09
-status: To Do
-assignee: []
-created_date: '2026-10-19 17:52'
+status: Done
+assignee:
+  - '@claude'
+created_date: 2026-10-19 17:52
+updated_date: '2026-10-22T01:39:00Z'
 labels:
   - docs
   - mqtt
@@ -24,6 +26,12 @@ Found in the TASK-1256 review. (1) docs/manuals/en/ch05-sat-thermostat.md:58,583
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 ch05 and h05 no longer list or describe ovp_* MQTT commands or OVP settings; the switch count in the HA entity table matches the remaining list
-- [ ] #2 ch09 and h09 SAT command tables match the MANUAL.md table (checked by parsing against kSatMqttCmds[])
+- [x] #1 ch05 and h05 no longer list or describe ovp_* MQTT commands or OVP settings; the switch count in the HA entity table matches the remaining list
+- [x] #2 ch09 and h09 SAT command tables match the MANUAL.md table (checked by parsing against kSatMqttCmds[])
 <!-- AC:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Docs: ch05/h05 no longer document the removed OVP calibration (ovp_enabled/value/start/stop, SATovp*); the HA switch row lists the real 16 switches (ovp_enabled replaced by the missing dhw_enable; count matches MQTTHaDiscovery.cpp cases 0-15). ch09/h09 SAT command tables now match docs/MANUAL.md and kSatMqttCmds[] (typed commands, area/zone sub-tokens, 62-row passthrough table). Evidence: new tests/test_manual_sat_commands.py parses kSatMqttCmds[] and checks ch09, h09 and MANUAL.md, the switch row and the absence of OVP text: 6 OK on the working tree, 4 FAIL with OTGW_DOCS_REV=HEAD; grep -ci ovp in ch05/h05 = 0. Not verified: the payload descriptions (copied from MANUAL.md, not re-checked against the handlers) and the rendered Markdown.
+<!-- SECTION:FINAL_SUMMARY:END -->

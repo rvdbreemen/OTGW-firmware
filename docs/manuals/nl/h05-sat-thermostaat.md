@@ -61,7 +61,7 @@ Onderwerp: OTGW/set/otgw-AABBCCDDEEFF/sat/enabled
 Waarde:    true
 ```
 
-Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `overshoot_protection`, `pwm_auto_switch`, `push_setpoint`, `follow_thermostat`, `external_temp`, `ovp_enabled`, `ovp_value`, `ovp_start`, `ovp_stop`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `overshoot_protection`, `pwm_auto_switch`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Voor booleaanse topics werken `ON` / `OFF` / `true` / `false` / `1` / `0`. Numerieke topics accepteren de gebruikelijke decimale notatie.
 
@@ -274,7 +274,7 @@ verwarmingshardware. In simulatiemodus:
 Anders dan de vroege experimentele versie (die alleen de ruimtetemperatuur modelleerde)
 modelleert de simulator nu ook de **ketelzijde**, zodat de cyclusclassificatie, de
 vlam-toestandsmachine, de 4-uurs-statistieken, de dagelijkse verwarmingscurve-aanbeveling
-en OPV-kalibratie allemaal onder simulatie draaien:
+allemaal onder simulatie draaien:
 
 - **Vlam-toestandsmachine** — de gesimuleerde vlam ontsteekt en dooft op basis van
   aanvoer versus setpoint, met realistische minimale aan/uit-tijden.
@@ -644,7 +644,7 @@ Sinds 2.0.0 worden alle bestuurbare SAT-parameters als aparte HA-entiteiten gepu
 | HA-component | Aantal | Voorbeelden |
 |---|---|---|
 | `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, comfort-vochtigheid, zomerdrempel, auto-tune rate, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
-| `switch` | 16 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `ovp_enabled`, `preset_sync`, `dhw_enabled`, `pwm_auto_switch` |
+| `switch` | 16 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable`, `pwm_auto_switch` |
 | `select` | 1 | `sat_heating_system` met opties `0` (auto), `1` (radiatoren), `2` (warmtepomp), `3` (vloerverwarming) |
 
 Elke entiteit schrijft naar het bijbehorende `%mqtt_sub_topic%/sat/<parameter>` commandotopic en leest uit het bijbehorende state-topic. Alle wijzigingen lopen via `updateSetting()` en worden dus naar flash gepersisteerd en binnen veilige grenzen geklemd.
@@ -747,17 +747,9 @@ De externe temperatuurwaarden vervallen automatisch na respectievelijk 5 minuten
 
 ---
 
-### 5.23 Debuggen en kalibratie
+### 5.23 Debuggen
 
 **Telnet debug-trace.** SAT heeft zijn eigen conditionele debugkanaal. Verbind met de OTGW via TCP-poort 23 en druk op `5` om SAT control-/cycle-/HCR-tracing om te schakelen (standaard aan in 2.0.0), op `6` voor OTDirect-tracing (standaard aan), en op `7` voor de SAT-BLE-scan-debugstroom (per-advertisement samenvatting). De telnet-shortcut `w` forceert direct een Open-Meteo-fetch + dump. Alle togglekeys worden getoond in de telnet-welkomstbanner.
-
-**OPV-kalibratie (Overshoot Protection Value).** SAT kan het minimale stabiele ketelsetpoint meten (het punt waarop de vlam blijft branden zonder kort-cycleren) en dit als ondergrens toepassen. Start een kalibratieronde met:
-
-```bash
-mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/ovp_start" -m ""
-```
-
-De kalibratie verzamelt minimaal 40 monsters voordat een resultaat wordt geaccepteerd. Stop vroegtijdig (en verwerp) met `sat/ovp_stop`. De gemeten waarde wordt opgeslagen in `SATovpvalue` en wordt alleen toegepast wanneer `SATovpenabled` aanstaat.
 
 **Kortlevende toestand wissen.** `sat/flush` wist tijdelijke runtime-state (cyclusvenster, HCR-monsters, recente drukhistorie) zonder de permanente instellingen te verwijderen. Handig na grote wijzigingen aan het verwarmingssysteem of de sensoren.
 

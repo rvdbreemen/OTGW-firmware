@@ -585,9 +585,9 @@ Update a named SAT setting. Authentication required.
 
 **Parameters:** `{name}` is the setting name. The handler accepts the full SAT setting vocabulary, including:
 
-`heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `ovp_value`, `ovp_enabled`, `ovp_start`, `ovp_stop`, `push_setpoint`, `follow_thermostat`, `flame_off_offset`, `force_pwm`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `auto_tune`, `auto_tune_rate`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `pwm_auto_switch`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`.
+`heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `flame_off_offset`, `force_pwm`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `auto_tune`, `auto_tune_rate`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `pwm_auto_switch`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`.
 
-**Request body:** New value as plain string or JSON `{"value": "..."}`. The `ovp_start`, `ovp_stop`, and `reset_integral` setting names take no value (the action is implicit).
+**Request body:** New value as plain string or JSON `{"value": "..."}`. The `reset_integral` setting name takes no value (the action is implicit).
 
 **Response (HTTP 200):**
 
@@ -1196,27 +1196,101 @@ Note: Commands are only processed when an OT command interface (PIC or OTDirect)
 
 ##### SAT Command Topics
 
+Topic: `{TopTopic}/set/{UniqueId}/sat/<command>`. Command names are matched case-insensitively; an unknown command is ignored.
+
 | Topic suffix | Payload | Description |
 |-------------|---------|-------------|
-| `sat/target` | `"21.0"` | Set target room temperature |
-| `sat/enabled` | `"true"` / `"false"` | Enable / disable SAT |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` / `"off"` | Set control mode; `"off"` switches SAT off |
-| `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` | Apply comfort preset |
-| `sat/indoor_temp` | `"20.8"` | Push external room temperature |
-| `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature |
-| `sat/humidity` | `"58"` | Push indoor humidity (%) |
-| `sat/window` | `"open"` / `"closed"` / `"1"` / `"0"` | Set window open / closed state |
-| `sat/valves_open` | `"true"` / `"false"` | Report TRV valves open state |
-| `sat/flush` | (any) | Flush short-lived data (PID integral + cycle window) |
-| `sat/reset_integral` | (any) | Reset PID integral accumulator |
-| `sat/area/{0-3}` | `"20.5"` | Push area temperature (multi-area mode) |
-| `sat/sun_elevation` | `"32.5"` | Push sun elevation from HA |
-| `sat/heating_curve` | `"1.5"` | Update heating curve coefficient |
-| `sat/deadband` | `"0.25"` | Update PID deadband |
-| `sat/boiler_capacity` | `"24.0"` | Update boiler capacity (kW) |
-| `sat/dhw_capacity` | `"0.0"` | Update DHW capacity (kW), 0 = use boiler capacity |
+| `sat/target` | `"21.0"` (5 to 30) | Set target room temperature (°C) |
+| `sat/indoor_temp` | `"20.8"` | Push external room temperature (°C) |
+| `sat/outdoor_temp` | `"7.5"` | Push external outdoor temperature (°C) |
+| `sat/pv_surplus_w` | `"1500"` (0 to 50000) | Push PV surplus power (W) for PV boost |
+| `sat/pv_boost_enabled` | `"1"` / `"0"` / `"true"` | Enable / disable PV boost |
+| `sat/enabled` | `"true"` / `"false"` (also `"on"` / `"off"`, `"1"` / `"0"`) | Enable / disable SAT |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (or `"1"` / `"2"` / `"0"`) / `"off"` | Set control mode. `"off"` switches SAT off, the same as `sat/enabled` 0. Any other non-numeric value is treated as `"auto"` |
+| `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Apply a preset; `"none"` clears it |
+| `sat/humidity` | `"58"` (0 to 100) | Push indoor humidity (%) |
+| `sat/heating_mode` | `"comfort"` / `"eco"` | Set heating mode |
+| `sat/sun_elevation` | `"32.5"` (-90 to 90) | Push sun elevation (degrees) |
+| `sat/window` | `"open"` / `"on"` / `"1"` = open, anything else = closed | Set window state (only acted on when window detection is enabled) |
+| `sat/valves_open` | `"true"` / `"1"` / `"open"` = open, anything else = closed | Report the TRV valves open state |
+| `sat/reset_integral` | (ignored) | Reset the PID integral |
+| `sat/flush` | (ignored) | Flush short-lived data (PID integral and cycle window) |
+| `sat/area/{0-3}` | `"20.5"` | Push an area temperature (multi-area mode) |
+| `sat/zone/{1-4}/room_temp` | `"20.5"` (-10 to 50) | Push a zone room temperature |
+| `sat/zone/{1-4}/setpoint` | `"21.0"` (5 to 30) | Set a zone setpoint |
 
-Many more SAT settings can be updated via MQTT. The full list of 40+ setting commands is documented in `backlog/docs/doc-1 - sat-mqtt-topics.md`.
+The commands below pass the payload unchanged to the named setting, the same setting that `POST /api/v2/settings` writes. The change is saved to flash:
+
+| Topic suffix | Setting |
+|-------------|---------|
+| `sat/overshoot_margin` | `SATovershootmargin` |
+| `sat/heating_system` | `SATsystem` |
+| `sat/manufacturer` | `SATmanufacturer` |
+| `sat/max_modulation` | `SATmaxmodulation` |
+| `sat/dhw_setpoint` | `SATdhwsetpoint` |
+| `sat/dhw_enabled` | `SATdhwenabled` |
+| `sat/dhw_enable` | `SATdhwenable` |
+| `sat/interval` | `SATinterval` |
+| `sat/push_setpoint` | `SATpushsetpoint` |
+| `sat/follow_thermostat` | `SATfollowthermostat` |
+| `sat/external_temp` | `SATexternaltemp` |
+| `sat/flame_off_offset` | `SATflameoffset` |
+| `sat/force_pwm` | `SATforcepwm` |
+| `sat/overshoot_protection` | `SATovershootprotection` |
+| `sat/flow_offset` | `SATflowoffset` |
+| `sat/summer_simmer` | `SATsummersimmer` |
+| `sat/summer_threshold` | `SATsummerthreshold` |
+| `sat/summer_min_hours` | `SATsummerminhours` |
+| `sat/thermal_comfort` | `SATthermalcomfort` |
+| `sat/humidity_timeout_s` | `SAThumiditytimeout` |
+| `sat/comfort_adjust` | `SATcomfortadjust` |
+| `sat/comfort_humidity` | `SATcomforthumidity` |
+| `sat/comfort_max_offset` | `SATcomfortmaxoffset` |
+| `sat/simulation` | `SATsimulation` |
+| `sat/ble_enable` | `SATbleenable` |
+| `sat/ble_failover` | `SATblefailover` |
+| `sat/ble_mac` | `SATblemac` |
+| `sat/ble_interval` | `SATbleinterval` |
+| `sat/preset_sync` | `SATpresetsync` |
+| `sat/preset_sync_topic` | `SATpresetsynctopic` |
+| `sat/multi_area` | `SATmultiarea` |
+| `sat/multi_area_count` | `SATmultiareacount` |
+| `sat/auto_tune` | `SATautotune` |
+| `sat/auto_tune_rate` | `SATautotunerate` |
+| `sat/heating_curve` | `SATcoefficient` |
+| `sat/deadband` | `SATdeadband` |
+| `sat/mod_sup_delay` | `SATmodsupdelay` |
+| `sat/mod_sup_offset` | `SATmodsupoffset` |
+| `sat/boiler_capacity` | `SATboilercapacity` |
+| `sat/dhw_capacity` | `SATdhwcapacity` |
+| `sat/target_temp_step` | `SATtempstep` |
+| `sat/min_pressure` | `SATminpressure` |
+| `sat/max_pressure` | `SATmaxpressure` |
+| `sat/max_pressure_drop` | `SATmaxpressdrop` |
+| `sat/preset_comfort` | `SATpresetcomfort` |
+| `sat/preset_eco` | `SATpreseteco` |
+| `sat/preset_away` | `SATpresetaway` |
+| `sat/preset_sleep` | `SATpresetsleep` |
+| `sat/preset_activity` | `SATpresetactivity` |
+| `sat/preset_home` | `SATpresethome` |
+| `sat/solar_gain` | `SATsolargain` |
+| `sat/window_detection` | `SATwindowdetect` |
+| `sat/pwm_auto_switch` | `SATpwmautoswitch` |
+| `sat/sensor_max_age` | `SATsensormaxage` |
+| `sat/error_monitoring` | `SATerrormon` |
+| `sat/auto_gains_value` | `SATautogains` |
+| `sat/cycles_per_hour` | `SATcyclesperhour` |
+| `sat/valve_offset` | `SATvalveoffset` |
+| `sat/solar_freeze_integral` | `SATsolarfreezeint` |
+| `sat/zone_count` | `SATzonecount` |
+| `sat/zone_timeout_s` | `SATzonetimeout` |
+| `sat/solar_min_elevation` | `SATsolarminelev` |
+| `sat/flush_threshold_h` | `SATflushtreshold` |
+| `sat/pv_boost_threshold_w` | `SATpvboostthresholdw` |
+| `sat/pv_boost_hold_s` | `SATpvboostholds` |
+| `sat/pv_boost_delta_c` | `SATpvboostdeltac` |
+| `sat/pv_boost_max_indoor_c` | `SATpvboostmaxindoorc` |
+| `sat/pv_boost_max_duration_min` | `SATpvboostmaxdurationmin` |
 
 ##### OTGW32 Command Topics
 

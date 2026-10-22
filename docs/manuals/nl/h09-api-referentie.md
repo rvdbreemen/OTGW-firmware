@@ -502,7 +502,7 @@ Buitentemperatuur aanleveren vanuit een externe bron. Overschrijft de OT MsgID 2
 
 ##### POST /api/v2/sat/settings/{naam}
 
-Het volledige instellingenvocabulaire bevat onder andere: `heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `ovp_value`, `ovp_enabled`, `ovp_start`, `ovp_stop`, `push_setpoint`, `follow_thermostat`, `flame_off_offset`, `force_pwm`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `auto_tune`, `auto_tune_rate`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `pwm_auto_switch`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`. De namen `ovp_start`, `ovp_stop` en `reset_integral` accepteren geen waarde. Onbekende namen retourneren HTTP 404.
+Het volledige instellingenvocabulaire bevat onder andere: `heating_curve`, `boiler_capacity`, `deadband`, `max_modulation`, `dhw_setpoint`, `dhw_enabled`, `dhw_enable`, `interval`, `push_setpoint`, `follow_thermostat`, `flame_off_offset`, `force_pwm`, `overshoot_protection`, `flow_offset`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `simulation`, `ble_enable`, `ble_mac`, `ble_interval`, `preset_sync`, `preset_sync_topic`, `multi_area`, `multi_area_count`, `auto_tune`, `auto_tune_rate`, `mod_sup_delay`, `mod_sup_offset`, `target_temp_step`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `preset_comfort`, `preset_eco`, `preset_away`, `preset_sleep`, `preset_activity`, `preset_home`, `solar_gain`, `solar_freeze_integral`, `window_detection`, `pwm_auto_switch`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `cycles_per_hour`, `valve_offset`, `heating_mode`, `heating_system`, `manufacturer`, `control_mode`, `preset`, `reset_integral`. De naam `reset_integral` accepteert geen waarde. Onbekende namen retourneren HTTP 404.
 
 ##### GET / POST / DELETE /api/v2/sat/markers
 
@@ -987,27 +987,101 @@ Let op: Commando's worden alleen verwerkt wanneer een OT-interface (PIC of OTDir
 
 **SAT-commando's:**
 
+Onderwerp: `{TopTopic}/set/{UniqueId}/sat/<commando>`. Commandonamen zijn niet hoofdlettergevoelig; een onbekend commando wordt genegeerd.
+
 | Onderwerpsuffix | Payload | Beschrijving |
 |----------------|---------|-------------|
-| `sat/target` | `"21.0"` | SAT doeltemperatuur |
-| `sat/enabled` | `"true"` / `"false"` | SAT in-/uitschakelen |
-| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` / `"off"` | Bedrijfsmodus; `"off"` zet SAT uit |
-| `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` | Voorinstelling activeren |
-| `sat/indoor_temp` | `"20.8"` | Externe kamertemperatuur |
-| `sat/outdoor_temp` | `"7.5"` | Externe buitentemperatuur |
-| `sat/humidity` | `"58"` | Luchtvochtigheid (%) |
-| `sat/window` | `"open"` / `"closed"` / `"1"` / `"0"` | Raamsignaal |
-| `sat/valves_open` | `"true"` / `"false"` | TRV-kleppen open |
-| `sat/flush` | (willekeurig) | Kortstondige data wissen (PID-integraal + cyclusvenster) |
-| `sat/reset_integral` | (willekeurig) | PID-integraal resetten |
-| `sat/area/{0-3}` | `"20.5"` | Gebiedstemperatuur (multi-area modus) |
-| `sat/sun_elevation` | `"32.5"` | Zonhoogte vanuit HA |
-| `sat/heating_curve` | `"1.5"` | Verwarmingscurve-coefficient bijwerken |
-| `sat/deadband` | `"0.25"` | PID deadband bijwerken |
-| `sat/boiler_capacity` | `"24.0"` | Ketelcapaciteit (kW) bijwerken |
-| `sat/dhw_capacity` | `"0.0"` | DHW-capaciteit (kW) bijwerken, 0 = ketelcapaciteit |
+| `sat/target` | `"21.0"` (5 tot 30) | Doeltemperatuur van de kamer instellen (°C) |
+| `sat/indoor_temp` | `"20.8"` | Externe kamertemperatuur doorgeven (°C) |
+| `sat/outdoor_temp` | `"7.5"` | Externe buitentemperatuur doorgeven (°C) |
+| `sat/pv_surplus_w` | `"1500"` (0 tot 50000) | PV-overschot (W) doorgeven voor PV-boost |
+| `sat/pv_boost_enabled` | `"1"` / `"0"` / `"true"` | PV-boost in- of uitschakelen |
+| `sat/enabled` | `"true"` / `"false"` (ook `"on"` / `"off"`, `"1"` / `"0"`) | SAT in- of uitschakelen |
+| `sat/control_mode` | `"continuous"` / `"pwm"` / `"auto"` (of `"1"` / `"2"` / `"0"`) / `"off"` | Bedrijfsmodus instellen. `"off"` zet SAT uit, net als `sat/enabled` 0. Elke andere niet-numerieke waarde geldt als `"auto"` |
+| `sat/preset` | `"comfort"` / `"eco"` / `"away"` / `"sleep"` / `"activity"` / `"home"` / `"none"` | Voorinstelling activeren; `"none"` wist de voorinstelling |
+| `sat/humidity` | `"58"` (0 tot 100) | Luchtvochtigheid binnen (%) doorgeven |
+| `sat/heating_mode` | `"comfort"` / `"eco"` | Verwarmingsmodus instellen |
+| `sat/sun_elevation` | `"32.5"` (-90 tot 90) | Zonhoogte (graden) doorgeven |
+| `sat/window` | `"open"` / `"on"` / `"1"` = open, al het andere = dicht | Raamstand instellen (alleen gebruikt als raamdetectie aanstaat) |
+| `sat/valves_open` | `"true"` / `"1"` / `"open"` = open, al het andere = dicht | Doorgeven of de TRV-kleppen open staan |
+| `sat/reset_integral` | (genegeerd) | PID-integraal resetten |
+| `sat/flush` | (genegeerd) | Kortstondige data wissen (PID-integraal en cyclusvenster) |
+| `sat/area/{0-3}` | `"20.5"` | Gebiedstemperatuur doorgeven (multi-area modus) |
+| `sat/zone/{1-4}/room_temp` | `"20.5"` (-10 tot 50) | Kamertemperatuur van een zone doorgeven |
+| `sat/zone/{1-4}/setpoint` | `"21.0"` (5 tot 30) | Setpoint van een zone instellen |
 
-Meer dan 40 aanvullende SAT-instellingen zijn beschikbaar via MQTT. De volledige lijst is gedocumenteerd in `backlog/docs/doc-1 - sat-mqtt-topics.md`.
+De onderstaande commando's geven de payload ongewijzigd door aan de genoemde instelling, dezelfde instelling die `POST /api/v2/settings` schrijft. De wijziging wordt in flash opgeslagen:
+
+| Onderwerpsuffix | Instelling |
+|----------------|-----------|
+| `sat/overshoot_margin` | `SATovershootmargin` |
+| `sat/heating_system` | `SATsystem` |
+| `sat/manufacturer` | `SATmanufacturer` |
+| `sat/max_modulation` | `SATmaxmodulation` |
+| `sat/dhw_setpoint` | `SATdhwsetpoint` |
+| `sat/dhw_enabled` | `SATdhwenabled` |
+| `sat/dhw_enable` | `SATdhwenable` |
+| `sat/interval` | `SATinterval` |
+| `sat/push_setpoint` | `SATpushsetpoint` |
+| `sat/follow_thermostat` | `SATfollowthermostat` |
+| `sat/external_temp` | `SATexternaltemp` |
+| `sat/flame_off_offset` | `SATflameoffset` |
+| `sat/force_pwm` | `SATforcepwm` |
+| `sat/overshoot_protection` | `SATovershootprotection` |
+| `sat/flow_offset` | `SATflowoffset` |
+| `sat/summer_simmer` | `SATsummersimmer` |
+| `sat/summer_threshold` | `SATsummerthreshold` |
+| `sat/summer_min_hours` | `SATsummerminhours` |
+| `sat/thermal_comfort` | `SATthermalcomfort` |
+| `sat/humidity_timeout_s` | `SAThumiditytimeout` |
+| `sat/comfort_adjust` | `SATcomfortadjust` |
+| `sat/comfort_humidity` | `SATcomforthumidity` |
+| `sat/comfort_max_offset` | `SATcomfortmaxoffset` |
+| `sat/simulation` | `SATsimulation` |
+| `sat/ble_enable` | `SATbleenable` |
+| `sat/ble_failover` | `SATblefailover` |
+| `sat/ble_mac` | `SATblemac` |
+| `sat/ble_interval` | `SATbleinterval` |
+| `sat/preset_sync` | `SATpresetsync` |
+| `sat/preset_sync_topic` | `SATpresetsynctopic` |
+| `sat/multi_area` | `SATmultiarea` |
+| `sat/multi_area_count` | `SATmultiareacount` |
+| `sat/auto_tune` | `SATautotune` |
+| `sat/auto_tune_rate` | `SATautotunerate` |
+| `sat/heating_curve` | `SATcoefficient` |
+| `sat/deadband` | `SATdeadband` |
+| `sat/mod_sup_delay` | `SATmodsupdelay` |
+| `sat/mod_sup_offset` | `SATmodsupoffset` |
+| `sat/boiler_capacity` | `SATboilercapacity` |
+| `sat/dhw_capacity` | `SATdhwcapacity` |
+| `sat/target_temp_step` | `SATtempstep` |
+| `sat/min_pressure` | `SATminpressure` |
+| `sat/max_pressure` | `SATmaxpressure` |
+| `sat/max_pressure_drop` | `SATmaxpressdrop` |
+| `sat/preset_comfort` | `SATpresetcomfort` |
+| `sat/preset_eco` | `SATpreseteco` |
+| `sat/preset_away` | `SATpresetaway` |
+| `sat/preset_sleep` | `SATpresetsleep` |
+| `sat/preset_activity` | `SATpresetactivity` |
+| `sat/preset_home` | `SATpresethome` |
+| `sat/solar_gain` | `SATsolargain` |
+| `sat/window_detection` | `SATwindowdetect` |
+| `sat/pwm_auto_switch` | `SATpwmautoswitch` |
+| `sat/sensor_max_age` | `SATsensormaxage` |
+| `sat/error_monitoring` | `SATerrormon` |
+| `sat/auto_gains_value` | `SATautogains` |
+| `sat/cycles_per_hour` | `SATcyclesperhour` |
+| `sat/valve_offset` | `SATvalveoffset` |
+| `sat/solar_freeze_integral` | `SATsolarfreezeint` |
+| `sat/zone_count` | `SATzonecount` |
+| `sat/zone_timeout_s` | `SATzonetimeout` |
+| `sat/solar_min_elevation` | `SATsolarminelev` |
+| `sat/flush_threshold_h` | `SATflushtreshold` |
+| `sat/pv_boost_threshold_w` | `SATpvboostthresholdw` |
+| `sat/pv_boost_hold_s` | `SATpvboostholds` |
+| `sat/pv_boost_delta_c` | `SATpvboostdeltac` |
+| `sat/pv_boost_max_indoor_c` | `SATpvboostmaxindoorc` |
+| `sat/pv_boost_max_duration_min` | `SATpvboostmaxdurationmin` |
 
 **OTGW32-commando's (alleen OTGW32)**:
 
