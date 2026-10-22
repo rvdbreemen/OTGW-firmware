@@ -3,10 +3,11 @@ id: TASK-1290
 title: >-
   Fix: router ARP refresh stalls the gateway 15-90 s every 20 min while it stays
   associated (GH #681)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-22T04:23:00Z'
-updated_date: '2026-10-22T04:24:00Z'
+updated_date: '2026-10-22T06:12:00Z'
 labels:
   - bug
   - wifi
