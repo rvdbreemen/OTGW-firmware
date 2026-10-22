@@ -1338,6 +1338,7 @@
       }
       el.setAttribute('points', pts.join(' '));
     });
+    renderGraphTime(t0, win);
     renderGraphLegend(keys, metas);
   }
   // Clickable legend: each series can be hidden (remembered per browser).
@@ -1357,6 +1358,54 @@
         renderGraph();
       });
       lg.appendChild(sp);
+    });
+  }
+
+  // TASK-1267: time (X) axis. Tick step: the smallest of 1, 2, 5, 10, 15, 30 min, 1, 2, 3, 6, 12,
+  // 24 h that gives the window at most 8 intervals (step chosen from the window alone, so it does
+  // not flip while the graph scrolls). Ticks sit on local wall-clock multiples of the step; ticks
+  // closer than a label half-width to the plot edge are skipped. Returns [{t, x, label}].
+  // The candidates are real instants on a UTC grid (step, or 30 min for hour steps), so they only
+  // ever increase: a DST change cannot repeat or reorder ticks. Up to 30 min the UTC grid is the
+  // local grid (offsets are whole half-hours); hour steps keep the instants whose local hour fits.
+  function graphTimeTicks(t0, win) {
+    var steps = [60000, 120000, 300000, 600000, 900000, 1800000, 3600000, 7200000, 10800000, 21600000, 43200000, 86400000];
+    var step = steps[steps.length - 1], out = [], i;
+    for (i = 0; i < steps.length; i++) if (win / steps[i] <= 8) { step = steps[i]; break; }
+    function p2(n) { return (n < 10 ? '0' : '') + n; }
+    var grid = Math.min(step, 1800000), stepH = step / 3600000;
+    for (var t = Math.ceil(t0 / grid) * grid; t <= t0 + win; t += grid) {
+      if (step >= 3600000) {
+        var dl = new Date(t);
+        if (dl.getMinutes() !== 0 || dl.getHours() % stepH !== 0) continue;
+      }
+      var x = C_X0 + (t - t0) / win * (C_X1 - C_X0);
+      if (x < C_X0 + 16 || x > C_X1 - 7) continue;
+      var d = new Date(t);
+      out.push({ t: t, x: x, label: (step >= 10800000 && d.getHours() === 0 && d.getMinutes() === 0)
+        ? p2(d.getDate()) + '-' + p2(d.getMonth() + 1) : p2(d.getHours()) + ':' + p2(d.getMinutes()) });
+    }
+    return out;
+  }
+  // Rebuild #gTime only when the set of tick times changes; every pass just moves the x positions.
+  var gTimeSig = '';
+  function renderGraphTime(t0, win) {
+    var g = document.getElementById('gTime'); if (!g) return;
+    var ticks = graphTimeTicks(t0, win), sig = ticks.map(function (k) { return k.t; }).join('|');
+    var NS = 'http://www.w3.org/2000/svg';
+    if (sig !== gTimeSig || g.childNodes.length !== ticks.length * 2) {
+      gTimeSig = sig; g.textContent = '';
+      ticks.forEach(function (k) {
+        var ln = document.createElementNS(NS, 'line'), tx = document.createElementNS(NS, 'text');
+        ln.setAttribute('y1', '10'); ln.setAttribute('y2', '244'); ln.setAttribute('stroke', '#8b949e'); ln.setAttribute('stroke-opacity', '.15');
+        tx.setAttribute('class', 'axis-txt'); tx.setAttribute('y', '257'); tx.setAttribute('text-anchor', 'middle'); tx.textContent = k.label;
+        g.appendChild(ln); g.appendChild(tx);
+      });
+    }
+    var kids = g.childNodes;
+    ticks.forEach(function (k, i) {
+      var x = k.x.toFixed(1);
+      kids[2 * i].setAttribute('x1', x); kids[2 * i].setAttribute('x2', x); kids[2 * i + 1].setAttribute('x', x);
     });
   }
 
@@ -2986,13 +3035,71 @@
     arr.forEach(function (s) { lines.push(s.t + ',' + keys.map(function (k) { var x = gVal(s, k); return x === null || x === undefined ? '' : x; }).join(',')); });
     downloadBlob(new Blob([lines.join('\n')], { type: 'text/csv' }), 'otgw-graph-' + ts() + '.csv');
   }
+  // TASK-1267: an SVG drawn as an image cannot load v2-bundle.css, so .axis-txt text rendered
+  // black on the dark canvas. Copy the computed paint and font of every <text> onto the clone.
+  // A computed colour, or the fallback when it is empty or transparent.
+  function paintOr(v, fb) { return v && v !== 'transparent' && !/^rgba\(.*,\s*0\)$/.test(v) ? v : fb; }
+  function inlineSvgTextStyles(src, clone) {
+    var a = src.querySelectorAll('text'), b = clone.querySelectorAll('text');
+    for (var i = 0; i < a.length && i < b.length; i++) {
+      var cs = getComputedStyle(a[i]), fill = cs.fill;
+      b[i].setAttribute('fill', paintOr(fill !== 'none' ? fill : '', '#8b949e'));
+      b[i].setAttribute('font-size', cs.fontSize || '10px');
+      b[i].setAttribute('font-family', cs.fontFamily || 'monospace');
+    }
+  }
+  // Visible legend entries ([{color, label}]); a series hidden with a click (opacity .4) is left out.
+  function legendEntries() {
+    var lg = document.getElementById('gLegend'), out = [];
+    if (!lg) return out;
+    for (var i = 0; i < lg.children.length; i++) {
+      var sp = lg.children[i], sw = sp.firstChild;
+      if (parseFloat(sp.style.opacity) < 1) continue;   // the browser reads '.4' back as '0.4'
+      out.push({ color: (sw && sw.style && sw.style.background) || '#8b949e', label: sp.textContent });
+    }
+    return out;
+  }
+  // Flow the entries left to right, wrapping at width w. measure(label) gives the text width.
+  // Swatch 14 px + 5 px gap, 14 px between entries, 16 px per row, 5 px padding top and bottom.
+  function layoutLegend(entries, w, measure) {
+    var x = 6, row = 0, items = [];
+    entries.forEach(function (e) {
+      var need = 14 + 5 + measure(e.label);
+      if (x > 6 && x + need > w - 6) { x = 6; row++; }
+      items.push({ x: x, row: row, color: e.color, label: e.label });
+      x += need + 14;
+    });
+    return { items: items, height: entries.length ? row * 16 + 26 : 0 };
+  }
   function exportPng() {
     var svg = document.getElementById('gstrip'); if (!svg) return;
-    var xml = new XMLSerializer().serializeToString(svg);
+    var vb = svg.viewBox && svg.viewBox.baseVal, W = (vb && vb.width) || 780, H = (vb && vb.height) || 262, SC = 2;
+    var clone = svg.cloneNode(true);
+    inlineSvgTextStyles(svg, clone);
+    clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    clone.setAttribute('width', W); clone.setAttribute('height', H);
+    var xml = new XMLSerializer().serializeToString(clone);
+    // Same theme as on screen: card background and legend label colour are the computed values.
+    var card = (svg.closest && svg.closest('.graphcard')) || svg.parentNode;
+    var bg = paintOr(card ? getComputedStyle(card).backgroundColor : '', '#0d1117');
+    var lgEl = document.getElementById('gLegend'), lcs = lgEl ? getComputedStyle(lgEl.firstChild || lgEl) : null;
+    var lcol = paintOr(lcs && lcs.color, '#c9d1d9'), lfont = '11px ' + ((lcs && lcs.fontFamily) || 'monospace');
+    var entries = legendEntries();
     var img = new Image();
     img.onload = function () {
-      var c = document.createElement('canvas'); c.width = 780; c.height = 250;
-      var ctx = c.getContext('2d'); ctx.fillStyle = '#0d1117'; ctx.fillRect(0, 0, 780, 250); ctx.drawImage(img, 0, 0);
+      var c = document.createElement('canvas'), ctx = c.getContext('2d');
+      ctx.font = lfont;
+      var lay = layoutLegend(entries, W, function (t) { return ctx.measureText(t).width; });
+      c.width = W * SC; c.height = (lay.height + H) * SC;
+      ctx.scale(SC, SC);
+      ctx.fillStyle = bg; ctx.fillRect(0, 0, W, lay.height + H);
+      ctx.font = lfont; ctx.textBaseline = 'middle';
+      lay.items.forEach(function (it) {
+        var cy = 5 + it.row * 16 + 8;
+        ctx.fillStyle = it.color; ctx.fillRect(it.x, cy - 1.5, 14, 3);
+        ctx.fillStyle = lcol; ctx.fillText(it.label, it.x + 19, cy);
+      });
+      ctx.drawImage(img, 0, lay.height, W, H);
       c.toBlob(function (blob) { if (blob) downloadBlob(blob, 'otgw-graph-' + ts() + '.png'); });
     };
     img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(xml)));
