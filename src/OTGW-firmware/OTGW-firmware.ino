@@ -233,7 +233,11 @@ void setup() {
 void doTaskEvery1s(){
   //== do tasks ==
   handleOTGWqueue(); //just check if there are commands to retry
-  state.uptime.iSeconds++;
+  // Seconds since boot from the clock. A tick counter here missed the time
+  // setup() spends waiting for WiFi and every skipped tick (TASK-1289).
+  state.uptime.iSeconds = (uint32_t)(micros64() / 1000000ULL);
+  static uint8_t loopSeconds = 0;   // seconds of loop time, for the gate below
+  if (loopSeconds < 255) loopSeconds++;
 
   // Configured boot commands, sent once, deferred out of setup() (TASK-1121).
   // sendOTGWbootcmd() skips a diagnose PIC, whose menu reads GW=1 as the five
@@ -242,10 +246,11 @@ void doTaskEvery1s(){
   // application banner, and nothing reads the port again until this loop runs,
   // so firmwareType() there is still FIRMWARE_UNKNOWN. handleOTGW() drains the
   // banner from the receive buffer within the first ticks. The three-second cap
-  // keeps a PIC that never sends a banner from losing its boot commands.
+  // keeps a PIC that never sends a banner from losing its boot commands. It
+  // counts loop time, not uptime: setup() alone takes longer than three seconds.
   static bool bBootCommandsSent = false;
   if (!bBootCommandsSent
-      && (OTGWSerial.firmwareType() != FIRMWARE_UNKNOWN || state.uptime.iSeconds >= 3)) {
+      && (OTGWSerial.firmwareType() != FIRMWARE_UNKNOWN || loopSeconds >= 3)) {
     bBootCommandsSent = true;
     sendOTGWbootcmd();
   }
