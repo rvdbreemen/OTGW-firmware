@@ -1,9 +1,11 @@
 ---
 id: TASK-1285
 title: 'Fix: Exception (2) in LEAmDNS stcMDNSServiceTxt during a filesystem OTA upload'
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-21T20:55:00Z'
+updated_date: '2026-10-22T04:47:00Z'
 labels:
   - bug
 dependencies: []
