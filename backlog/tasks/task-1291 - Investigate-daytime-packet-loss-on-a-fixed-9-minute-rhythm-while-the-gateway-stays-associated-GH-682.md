@@ -28,5 +28,15 @@ mrfox7688 (GH #682, 2026-10-21 20:24Z, 1.7.8-beta.2, ASUS RT-AX88U Broadcom, ch 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 beta.5 Link/Drop banner data from the reporter classifies the 9-minute losses as associated-but-silent or as real disassociations
-- [ ] #2 Every firmware, SDK and lwIP periodic timer near 9 min (including DHCP renewal) is listed with its period, and each is ruled in or out against the reporter's timestamps
+- [x] #2 Every firmware, SDK and lwIP periodic timer near 9 min (including DHCP renewal) is listed with its period, and each is ruled in or out against the reporter's timestamps
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-22 AC#2: periodic timers on the 1.x line (1.7.8-beta.6 source + core 2.7.4 lwip2 headers), none has a ~9 min (540-546 s) period:
+- Firmware (DECLARE_TIMER in src/OTGW-firmware): 1 s, 3 s, 60 s task ticks; dead-link probe 60 s (3 pings over ~6 s, the "(1/8)" events are quantised to it, which is why they land on :13 s); MQTT keepalive 60 s (MQTTstuff.ino:936), MQTT retry wait 42 s; webhook retry 30 s; PIC temperature read 180 s (only when enabled); 5 min status burst (timer5min, MQTT publish of all settings topics); 15 min persist of /ot-thermo.json + /ot-boiler.json to LittleFS (timer15min); nightly-restart check hourly; discovery drip and sensor/S0 intervals from settings.
+- lwIP: ARP_MAXAGE 300 s (the ESP re-ARPs its router every 5 min), DHCP coarse timer 60 s with renewal at T1 = lease/2 (router-dependent: an 18 min lease would give exactly 9 min), SNTP 3600 s, DNS 1 s, IGMP reports only in answer to router queries (router interval, often 125 s).
+- SDK/AP side, not in firmware: beacon/DTIM, WPA group-key rotation (AP setting), AP band-steering/roaming assistant.
+- Not a firmware period. Ruled in/out per item needs the reporter's DHCP lease time and group-key interval; the strict daytime window (09:25-17:38, none at night) argues for something external that runs by day. AC#1 waits for the beta.5 Link/Drop data.
+<!-- SECTION:NOTES:END -->
