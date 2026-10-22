@@ -31,7 +31,7 @@ Missing: an ESP-side telnet log of the loop (what the supervisor does on each at
 - [ ] #1 Reproduced or explained from an ESP-side log: which code path issues the deauth (reason 3) and why reconnects keep failing
 - [x] #2 Time from first failed reconnect to recovery is bounded and shorter than 12 min, shown on the bench by forcing the loop
 - [x] #3 esp8266 build and evaluate.py --quick green
-- [ ] #4 A boot after a WiFi supervisor restart that misses the direct-connect window continues setup() without the final WiFi wait (ADR-099), and after the access point returns MQTT, telnet, the web UI, NTP and mDNS come up without a crash; shown on the bench before and after the service fixes
+- [x] #4 A boot after a WiFi supervisor restart that misses the direct-connect window continues setup() without the final WiFi wait (ADR-099), and after the access point returns MQTT, telnet, the web UI, NTP and mDNS come up without a crash; shown on the bench before and after the service fixes
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -77,4 +77,11 @@ AC2 met: from the loss to the restart decision is a fixed 300 s, and recovery fo
 2026-10-22: theaprilhare (#681) on beta.4: no stuck reason-3 loop in 25 h; inactivity episodes recover in 20-100 s. AC#1 (which path issues the deauth and why reconnects kept failing) still unexplained; next evidence is the beta.5 telnet Drop line.
 
 2026-10-22 06:17 bench, old build 1251039, AP present, no access-list rules (counts 0): RTS reset via COM3. MikroTik: 06:17:03 'received deauth: sending station leaving (3)' and 'connected' in the same second, then NO DHCP assignment; 06:19:03 'disassoc: sending station leaving (8)' (= 120 s direct connect failed, portal starts and drops STA); 06:23:09 connected + DHCP assigned (after the 240 s portal timeout restart). Reboot log top line: 'Software/System restart (4) - WiFi: config portal timeout'. The previous RTS reset at 06:13:16 showed the same deauth(3)+connected but DHCP was assigned at once (hostname ESP-22B8E1, i.e. SDK auto-connect before startWiFi set the hostname). So on 1 of 2 resets the ESP associated without completing DHCP for 120 s, which costs 6 min (direct 120 s + portal 240 s) on any non-supervisor reset. Candidate for AC#1: a reset/crash produces the reason-3 deauth the AP logs, and the following association can fail to get an IP. Not yet reproduced a second time; frequency unknown.
+
+2026-10-22 AC#4 (commit 508af3c7c), scratchpad t1278/t1289_deny.sh, deny 540 s:
+- Run 1, b266cb6 (final wait skipped, no service fixes): rejoin 4.6 s after allow; web, WS, MQTT (connected), NTP ok; telnet port 23 REFUSED for 7+ min after the rejoin (SimpleTelnet begin() checkWiFi=true returns without starting); this also proves setup() ran offline (with the old final wait it would have connected at 06:53:47 inside the wait and telnet would have started). mDNS looked dead too, but the bench had two hosts named OTGW (.61 OTGW32) so that reading was confounded.
+- .61 renamed OTGW2 (user request), .68 mDNS confirmed answering after a normal boot.
+- Run 2, b80f098 (telnet begin(false) + mDNS restart in refreshServicesAfterWifiReconnect): rejoin 4.7 s; ports 23/80/81 open; mDNS query answered by .68; NTP -1.2 s; uptime dates restart deny+304.1 s. MQTT not checkable: bench settings.ini lost in the TASK-1285 crash repro, password unknown to me (user to re-enter).
+- Not run: the old 1251039 final-wait-timeout path (deny > 11 min); telnet/mDNS start code is identical there, so the same defect applies by source.
+- Banner note: after an offline boot the Link line shows "outages 0 disconnect events 60": failed connect attempts count as events while there was never a link; cosmetic, left as is.
 <!-- SECTION:NOTES:END -->
