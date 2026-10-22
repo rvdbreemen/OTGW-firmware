@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.454
+**  Version  : v2.0.0-alpha.455
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -427,6 +427,11 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
 // 8 slots: typical setup is 1 active sensor + ~7 visible neighbours. See
 // SATSection sBleMac/sBleLabel below and SATble.ino _bleRuntime[].
 #define SAT_BLE_MAX_ROSTER 8
+
+// TASK-1279: SAT DHW setpoint range. A setpoint below SAT_DHW_SETPOINT_MIN means
+// inactive (SAT sends no SW=); the settings clamp caps it at SAT_DHW_SETPOINT_MAX.
+#define SAT_DHW_SETPOINT_MIN 30
+#define SAT_DHW_SETPOINT_MAX 60
 
 struct SATSection {
   bool     bEnabled           = false;

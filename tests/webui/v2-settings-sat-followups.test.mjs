@@ -9,7 +9,7 @@
 //   1230c  the Webhook card has an OFF test that POSTs webhook/test?state=off
 //   1231   BLE name prefix + ingest toggle render in Sensors > BLE, save, then rescan
 //   1232a  a real mouse click on the heating curve POSTs a marker; the list delete DELETEs it
-//   1232b  the DHW slider takes 35-60 from MsgID 48, and 40-65 when MsgID 48 is 0
+//   1232b  the DHW slider takes 35-60 from MsgID 48, and 30-60 when MsgID 48 is 0
 // It also fails on any uncaught page exception and records the peak number of /api/
 // requests in flight at the fake device.
 //
@@ -229,7 +229,7 @@ check(iRescan > 0 && after.slice(0, iRescan).every((l) => l.startsWith('POST /ap
 // ---- 1232 SAT: DHW bounds + markers ----
 await evalJs(`document.querySelector('.seg[data-page="sat"]').click()`);
 await evalJs(`(function(){ var b = document.querySelector('.satview-btn[data-sv="technical"]'); if (b) b.click(); })()`);
-const dhw = await until(`(function(){ var s = document.getElementById('satDhwSlider'); return s && s.max === '60' ? s.min + '-' + s.max : null; })()`);
+const dhw = await until(`(function(){ var s = document.getElementById('satDhwSlider'); return s && /MsgID 48/.test(s.title) ? s.min + '-' + s.max : null; })()`);
 check(dhw === '35-60', `DHW slider takes MsgID 48 bounds 35-60 (got ${dhw})`);
 const pt = await until(`(function(){ var svg = document.getElementById('satCurveBig'); if (!svg || !svg.querySelector('polyline')) return null;
   svg.scrollIntoView({ block: 'center' }); var p = svg.createSVGPoint(); p.x = 315; p.y = 270 - (50 - 20) / 65 * 240;
@@ -253,8 +253,8 @@ msg48 = 0;
 await evalJs(`document.querySelector('.seg[data-page="settings"]').click()`);
 await sleep(300);
 await evalJs(`document.querySelector('.seg[data-page="sat"]').click()`);
-const dhw2 = await until(`(function(){ var s = document.getElementById('satDhwSlider'); return s && s.max === '65' ? s.min + '-' + s.max : null; })()`);
-check(dhw2 === '40-65', `with MsgID 48 = 0 the slider falls back to 40-65 (got ${dhw2})`);
+const dhw2 = await until(`(function(){ var s = document.getElementById('satDhwSlider'); return s && /^Default range/.test(s.title) ? s.min + '-' + s.max : null; })()`);
+check(dhw2 === '30-60', `with MsgID 48 = 0 the slider falls back to 30-60 (got ${dhw2})`);
 
 check(exceptions.length === 0, `no uncaught page exceptions (${exceptions.join(' ; ')})`);
 console.log('peak /api/ requests in flight at the fake device: ' + peak);

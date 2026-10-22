@@ -83,6 +83,7 @@
 - **NimBLE TU include order (TASK-1199, 2026-10-03)**: IDF component includes arrive via `-iprefix`/`-iwithprefix`, which are searched after every `-I`. A NimBLE-Arduino TU gets only four `-I` dirs: the lib's src, the sdkconfig dir (`esp32s3/qio_qspi/include`), cores, variants. Every sdkconfig.h includer seen uses quotes, and the framework sdkconfig.h is `#pragma once`.
 
 ## Do-Not-Repeat
+- [2026-10-22] After changing a literal in firmware source, grep tests/ for it AND run every tests/test_*.py before committing: many tests parse the source text (regex on literals), so a pure refactor (16 -> SAT_HA_SWITCH_COUNT, TASK-1287) broke test_sat_mqtt_state.py unnoticed.
 - (2026-10-15) Byte-string escapes (`b"\xe9"`) written through a bash heredoc into a Python edit script become real bytes and break the file (SyntaxError, non-ASCII bytes literal). Write such edit scripts with the Write tool, never a heredoc. Already in memory as feedback_python_heredoc_escapes; repeated anyway.
 - (2026-10-15) Never trust a merged/migration image without checking its first bytes: 0xE9 at 0x0 (bootloader) and 0xAA50 at 0x8000 (partition table). build.py merged without a bootloader and only warned; a --migrate from that image would have bricked the unit (bug-900, now a hard error).
 - (2026-10-15) A bulk-staging script (bin/bump-prerelease.sh) stages WHOLE files with version banners, including unrelated work-in-progress in them. Commit or stash other src edits before bumping, or check `git show --stat HEAD` after.

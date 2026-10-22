@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.454
+**  Version  : v2.0.0-alpha.455
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1013,7 +1013,7 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATovershootmargin")) == 0) settings.sat.fOvershootMargin = clampSettingFloat(newValue, settings.sat.fOvershootMargin, 0.5f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = clampSettingFloat(newValue, settings.sat.fModSupDelay, 0.0f, 120.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupoffset")) == 0)   settings.sat.fModSupOffset = clampSettingFloat(newValue, settings.sat.fModSupOffset, 0.0f, 5.0f);
-  else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = clampSettingFloat(newValue, settings.sat.fDhwSetpoint, 0.0f, 60.0f);
+  else if (strcasecmp_P(field, PSTR("SATdhwsetpoint")) == 0)    settings.sat.fDhwSetpoint = clampSettingFloat(newValue, settings.sat.fDhwSetpoint, 0.0f, (float)SAT_DHW_SETPOINT_MAX);
   else if (strcasecmp_P(field, PSTR("SATdhwenabled")) == 0)     settings.sat.bDhwEnabled = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATdhwenable")) == 0) {
     // TASK-516: master DHW enable. Persist always; only emit HW= when boiler

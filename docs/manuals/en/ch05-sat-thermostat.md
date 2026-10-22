@@ -545,8 +545,8 @@ SAT can control domestic hot water setpoint in standalone or fallback mode.
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
-| `satdhwenabled` | false | bool | Enable DHW control |
-| `satdhwsetpoint` | 0.0 | 30-60 C | DHW setpoint (0 = inactive) |
+| `satdhwenabled` | false | bool | Standalone DHW control. SAT sends the DHW setpoint to the boiler only while this is on. The SAT page has a toggle for it |
+| `satdhwsetpoint` | 0.0 | 30-60 C | DHW setpoint. A value below 30 means inactive (shown as "off"); the slider on the SAT page is disabled while standalone DHW control is off |
 
 ---
 

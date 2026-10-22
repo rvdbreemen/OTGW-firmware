@@ -2393,6 +2393,8 @@ void satSendStatusJSON()
     je.field(F("mod_suppressed"),       snap->st.sat.bModSuppressed);
     je.field(F("dhw_active"),           snap->st.sat.bDhwActive);
     je.field(F("dhw_setpoint"),         settings.sat.fDhwSetpoint);
+    // TASK-1279: standalone DHW control switch; SAT sends dhw_setpoint (SW=) only while it is on.
+    je.field(F("dhw_enabled"),          settings.sat.bDhwEnabled);
     // TASK-516: boiler-gated master DHW enable. dhw_config_tank is derived from
     // MsgID 3 HB3 (bit 11 of the uint16 SlaveConfigMemberIDcode); the UI uses it to
     // decide whether to render the toggle. dhw_enable mirrors the user setting; only
@@ -3808,7 +3810,7 @@ static void satUpdateSimulation()
   const bool dhwDraw = (state.sat.iSimDhwExpiryMs != 0);
   float sp = state.sat.fFinalSetpoint;
   if (dhwDraw) {
-    sp = (settings.sat.fDhwSetpoint >= 30.0f && settings.sat.fDhwSetpoint <= 70.0f)
+    sp = (settings.sat.fDhwSetpoint >= (float)SAT_DHW_SETPOINT_MIN && settings.sat.fDhwSetpoint <= (float)SAT_DHW_SETPOINT_MAX)
            ? settings.sat.fDhwSetpoint : 55.0f;
   }
 
@@ -4636,7 +4638,8 @@ static void satControlLoopRun()
     // Was TW=, which is not a PIC command (gateway.asm) and is not implemented
     // by OTDirect, so the command was rejected as NG on every DHW transition.
     if (!_sat_prevDhwActive && settings.sat.bDhwEnabled &&
-        settings.sat.fDhwSetpoint >= 30.0f && settings.sat.fDhwSetpoint <= 70.0f &&
+        settings.sat.fDhwSetpoint >= (float)SAT_DHW_SETPOINT_MIN &&
+        settings.sat.fDhwSetpoint <= (float)SAT_DHW_SETPOINT_MAX &&
         hasOTCommandInterface()) {
       char swCmd[16];
       snprintf_P(swCmd, sizeof(swCmd), PSTR("SW=%d"), (int)settings.sat.fDhwSetpoint);

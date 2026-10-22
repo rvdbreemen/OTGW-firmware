@@ -3532,5 +3532,23 @@
     "related_bugs": [],
     "occurrences": 2,
     "last_seen": "2026-10-18T23:55:00Z"
+  },
+  {
+    "id": "bug-904",
+    "timestamp": "2026-10-22T06:00:00Z",
+    "error_message": "tests/test_sat_mqtt_state.py ExternalTempSetting.test_wired FAIL: regex 'swIdx < 16' not found in MQTTstuff.ino",
+    "file": "tests/test_sat_mqtt_state.py",
+    "root_cause": "TASK-1287 replaced the literal loop bound 16 with SAT_HA_SWITCH_COUNT; a source-parsing test pinned the literal and was not run before the commit (only the directly related host test was run)",
+    "fix": "Test now checks the loop uses SAT_HA_SWITCH_COUNT and that the constant is >= 16; run the whole tests/test_*.py suite after any source change",
+    "tags": [
+      "test-regression",
+      "source-parsing-test",
+      "mqtt",
+      "ha-discovery",
+      "TASK-1287"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-22T06:00:00Z"
   }
 ]

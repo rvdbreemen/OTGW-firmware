@@ -579,8 +579,8 @@ SAT kan het warmwater-setpoint regelen in standalone of fallback mode.
 
 | Parameter | Standaard | Bereik | Omschrijving |
 |---|---|---|---|
-| `satdhwenabled` | `false` | bool | Warmwaterregeling inschakelen |
-| `satdhwsetpoint` | `0.0` | 30-60 C | Warmwater-setpoint (0 = inactief) |
+| `satdhwenabled` | `false` | bool | Standalone warmwaterregeling. SAT stuurt het warmwater-setpoint alleen naar de ketel zolang dit aan staat. De SAT-pagina heeft hiervoor een schakelaar |
+| `satdhwsetpoint` | `0.0` | 30-60 C | Warmwater-setpoint. Een waarde onder 30 betekent inactief (getoond als "uit"); de schuifregelaar op de SAT-pagina is uitgeschakeld zolang de standalone warmwaterregeling uit staat |
 
 ---
 

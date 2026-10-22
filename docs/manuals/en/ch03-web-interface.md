@@ -212,7 +212,7 @@ Two extra panels appear above the generic settings groups on ESP32 builds:
 
 #### DHW Controls
 
-A DHW (Domestic Hot Water) section is visible on all SAT views. It provides a slider to set the hot water setpoint temperature (40-60 degrees C) and an optional force switch to manually trigger hot water heating.
+The **Hot water** card sits in the SAT **Control** view. **Standalone DHW control** switches SAT's own hot-water handling on or off: SAT sends the DHW setpoint to the boiler only while it is on, and the setpoint slider is greyed out while it is off. The slider covers 30-60 °C, narrowed to the boiler's own DHW range when the boiler reports one (MsgID 48); a setpoint below 30 °C shows as **off**. On a boiler with a hot-water tank the card also shows **DHW enable (HW=)**, which sends the gateway's hot-water enable command.
 
 ### Network Status Indicator
 

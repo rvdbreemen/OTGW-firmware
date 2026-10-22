@@ -1843,7 +1843,7 @@
     satsensorarea1:      { cat: 'sat', label: 'Area 1 sensor' },
     satsensorarea2:      { cat: 'sat', label: 'Area 2 sensor' },
     satsensorarea3:      { cat: 'sat', label: 'Area 3 sensor' },
-    satdhwsetpoint:      { cat: 'sat', label: 'DHW setpoint', hint: '°C (0 = inactive)' },
+    satdhwsetpoint:      { cat: 'sat', label: 'DHW setpoint', hint: '°C (below 30 = off, 30-60)' },
     satflameoffset:      { cat: 'sat', label: 'Flame-off offset', hint: '°C' },
     satflowoffset:       { cat: 'sat', label: 'Flow offset', hint: '°C' },
     satmodsupdelay:      { cat: 'sat', label: 'Modulation suppression delay', hint: 'Seconds' },
@@ -4004,7 +4004,8 @@
   var satHist = { set: [], flow: [], room: [], out: [], pid: [] };
   var SAT_HIST_MAX = 720;               // ~1 h at the 5 s poll cadence
   var satDhwDirty = false;              // user dragging the DHW slider — defer status echo
-  var satEnPending = false, satDhwEnPending = false, satSimPending = false;  // in-flight POST guards
+  var satEnPending = false, satDhwEnPending = false, satDhwEnabledPending = false, satSimPending = false;  // in-flight POST guards
+  var SAT_DHW_SETPOINT_MIN = 30, SAT_DHW_SETPOINT_MAX = 60;   // = SAT_DHW_SETPOINT_MIN/MAX in SATtypes.h (below MIN = off)
   var SAT_MODE_LABELS = ['Off', 'Continuous', 'PWM'];      // control_mode enum
   var SAT_CYCLE_LABELS = ['None', 'Good', 'Overshoot', 'Underheat', 'Short', 'Uncertain', 'Underheat (PWM)', 'Insufficient'];  // last_cycle_class (6/7 added TASK-891.4)
   var SAT_PRESET_NAMES = ['None', 'Away', 'Eco', 'Comfort', 'Sleep', 'Activity', 'Home'];   // active_preset enum
@@ -4097,7 +4098,7 @@
 
   // TASK-1232: DHW slider bounds from boiler MsgID 48. GET otgw/messages/48 answers
   // {label,value,unit} with value = UB<<8 | LB, 0 = never reported (restAPI.ino:753-760,
-  // 2879-2906); without a valid range the slider keeps 40-65. The setpoint itself
+  // 2879-2906); without a valid range the slider keeps 30-60 (TASK-1279). The setpoint itself
   // stays the persistent sat/settings/dhw_setpoint (maintainer decision, not SW=).
   function fetchDhwBounds() {
     return fetch(APIGW + 'v2/otgw/messages/48')
@@ -4106,8 +4107,13 @@
         var s = document.getElementById('satDhwSlider'); if (!s || !j) return;
         var raw = parseInt(j.value, 10) || 0, ub = (raw >> 8) & 0xFF, lb = raw & 0xFF;
         var ok = raw > 0 && ub > lb && ub <= 100;
-        s.min = ok ? lb : 40; s.max = ok ? ub : 65;
-        s.title = ok ? 'Boiler DHW range ' + lb + '–' + ub + ' °C (MsgID 48)' : 'Default range 40–65 °C (no MsgID 48 from the boiler)';
+        // TASK-1279: intersect the boiler range with what SAT can send (30-60); an empty intersection falls back to 30-60.
+        var lo = ok ? Math.max(lb, SAT_DHW_SETPOINT_MIN) : SAT_DHW_SETPOINT_MIN;
+        var hi = ok ? Math.min(ub, SAT_DHW_SETPOINT_MAX) : SAT_DHW_SETPOINT_MAX;
+        if (lo > hi) { lo = SAT_DHW_SETPOINT_MIN; hi = SAT_DHW_SETPOINT_MAX; }
+        s.min = lo; s.max = hi;
+        s.title = ok ? 'Boiler DHW range ' + lb + '–' + ub + ' °C (MsgID 48), usable ' + lo + '–' + hi + ' °C'
+                     : 'Default range ' + SAT_DHW_SETPOINT_MIN + '–' + SAT_DHW_SETPOINT_MAX + ' °C (no MsgID 48 from the boiler)';
         if (satLastData) satRenderDhw(satLastData);
       })
       .catch(function () { });
@@ -4327,9 +4333,16 @@
   function satRenderDhw(d) {
     var slider = document.getElementById('satDhwSlider');
     var sp = satNum(d.dhw_setpoint);
+    // TASK-1279: SAT sends dhw_setpoint only while standalone DHW control is on; below the minimum it is inactive.
+    // A firmware without the dhw_enabled field (older than this UI) leaves the slider usable.
+    var known = d.dhw_enabled !== undefined, dhwOn = !!d.dhw_enabled;
+    var cbOn = document.getElementById('satDhwEnabled');
+    if (cbOn && !satDhwEnabledPending && known) cbOn.checked = dhwOn;
+    if (slider) slider.disabled = known && !dhwOn;
     if (slider && !satDhwDirty) {
-      if (sp !== null) { slider.value = Math.round(sp); txt('satDhwR', Math.round(sp) + '°C'); }
-      else txt('satDhwR', '—');
+      if (sp === null) txt('satDhwR', '—');
+      else if (sp < SAT_DHW_SETPOINT_MIN) { slider.value = slider.min; txt('satDhwR', 'off'); }
+      else { slider.value = Math.round(sp); txt('satDhwR', Math.round(sp) + '°C'); }
     }
     var row = document.getElementById('satDhwEnableRow');
     if (row) row.style.display = d.dhw_config_tank ? '' : 'none';
@@ -4557,6 +4570,14 @@
         satPost('settings/dhw_setpoint', ds.value).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
       });
     }
+
+    var dsOn = document.getElementById('satDhwEnabled');
+    if (dsOn) dsOn.addEventListener('change', function () {
+      satDhwEnabledPending = true;
+      satPost('settings/dhw_enabled', dsOn.checked ? 'true' : 'false')
+        .then(function () { satDhwEnabledPending = false; setTimeout(fetchSatPage, 300); })
+        .catch(function () { satDhwEnabledPending = false; if (satLastData) dsOn.checked = !!satLastData.dhw_enabled; });
+    });
 
     var de = document.getElementById('satDhwEnable');
     if (de) de.addEventListener('change', function () {

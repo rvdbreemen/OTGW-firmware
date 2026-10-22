@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.454
+**  Version  : v2.0.0-alpha.455
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -4067,7 +4067,7 @@ void sendDeviceSettings()
   addStr (F("satsensorarea3"),    CSTR(settings.sat.sSensorArea[3]), "s", 17);
   {
     char tmpBuf[8];
-    dtostrf(settings.sat.fDhwSetpoint,             1, 1, tmpBuf); addNum(F("satdhwsetpoint"),      tmpBuf, "f", 0, 60);
+    dtostrf(settings.sat.fDhwSetpoint,             1, 1, tmpBuf); addNum(F("satdhwsetpoint"),      tmpBuf, "f", 0, SAT_DHW_SETPOINT_MAX);
     dtostrf(settings.sat.fFlameOffOffset,          1, 1, tmpBuf); addNum(F("satflameoffset"),      tmpBuf, "f", 0, 30);
     dtostrf(settings.sat.fFlowOffset,              1, 1, tmpBuf); addNum(F("satflowoffset"),       tmpBuf, "f", 0, 10);
     dtostrf(settings.sat.fModSupDelay,             1, 1, tmpBuf); addNum(F("satmodsupdelay"),      tmpBuf, "f", 0, 120);

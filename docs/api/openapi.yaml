@@ -4150,6 +4150,9 @@ components:
         dhw_enable:
           type: boolean
           description: "DHW enabled"
+        dhw_enabled:
+          type: boolean
+          description: "Standalone DHW control; SAT sends dhw_setpoint to the boiler only while true"
         control_interval_sec:
           type: integer
           description: "Control loop interval (s)"
@@ -4478,6 +4481,7 @@ components:
         dhw_setpoint: 0.0
         dhw_config_tank: false
         dhw_enable: true
+        dhw_enabled: false
         control_interval_sec: 30
         fallback_active: false
         fallback_reason: 0

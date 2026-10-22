@@ -239,7 +239,7 @@ Boven de algemene groepen verschijnen twee extra panelen op ESP32-builds:
 
 #### DHW-bediening
 
-Een DHW-sectie (Domestic Hot Water) is zichtbaar op alle SAT-weergaven. Deze biedt een schuifregelaar om de warmwatertemperatuur in te stellen (40-60 graden C) en een optionele forceerknop om handmatig warmwaterverwarming te activeren.
+De kaart **Hot water** staat in de SAT-weergave **Control**. Met **Standalone DHW control** zet je SAT's eigen warmwaterregeling aan of uit: SAT stuurt de warmwatertemperatuur alleen naar de ketel als die aan staat, en zolang hij uit staat is de schuifregelaar grijs. De schuifregelaar loopt van 30 tot 60 °C, ingeperkt tot het warmwaterbereik van de ketel als de ketel dat doorgeeft (MsgID 48); een instelling onder 30 °C staat als **off**. Bij een ketel met een warmwatervoorraadvat toont de kaart ook **DHW enable (HW=)**, dat het warmwater-aan-commando van de gateway stuurt.
 
 ---
 

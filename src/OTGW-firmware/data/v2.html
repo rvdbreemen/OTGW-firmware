@@ -456,9 +456,11 @@
       <div class="sat-row2 sat-row-2up">
         <div class="card sat-mini"><h4>Hot water</h4>
           <div class="kv">
-            <div class="kv-row"><span class="kv-k">DHW setpoint</span><span class="kv-v"><input type="range" min="40" max="65" value="50" id="satDhwSlider" class="sat-slider" aria-label="DHW setpoint"> <b id="satDhwR">—</b></span></div>
+            <div class="kv-row"><span class="kv-k">Standalone DHW control</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnabled" aria-label="Standalone DHW control"></span></div>
+            <div class="kv-row"><span class="kv-k">DHW setpoint</span><span class="kv-v"><input type="range" min="30" max="60" value="50" id="satDhwSlider" class="sat-slider" aria-label="DHW setpoint" disabled> <b id="satDhwR">—</b></span></div>
             <div class="kv-row" id="satDhwEnableRow" style="display:none"><span class="kv-k">DHW enable (HW=)</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnable" aria-label="DHW enable"></span></div>
-          </div></div>
+          </div>
+          <div class="sat-hint" id="satDhwHint">SAT sends this setpoint to the boiler only while standalone DHW control is on.</div></div>
         <div class="card sat-mini"><h4>Burner cycle mode</h4><div class="ds-seg-row" id="satCycleRow"><button class="ds-seg" data-mode="continuous">Continuous</button><button class="ds-seg" data-mode="pwm">PWM</button></div><div class="sub" id="satCycleSub">—</div></div>
       </div>
       <div class="sat-tiles4">
