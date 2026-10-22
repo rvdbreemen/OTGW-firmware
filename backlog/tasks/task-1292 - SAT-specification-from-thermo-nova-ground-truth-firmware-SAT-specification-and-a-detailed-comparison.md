@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-22T05:18:00Z'
-updated_date: '2026-10-22T05:21:00Z'
+updated_date: '2026-10-22T06:54:00Z'
 labels:
   - sat
   - docs
@@ -26,10 +26,10 @@ Maintainer request (#alpha-testing 2026-10-22 05:07, confirmed in session): deep
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 docs/sat/thermo-nova-spec.md: the thermo-nova control design (start-up sequence, PID, heating curve, PWM incl. suppression, cycles, setpoint selection, safety/limits, DHW, areas, presets, solar/summer features, coordinator I/O) with formulas, constants, timings and file:line citations to the pinned commit
-- [ ] #2 docs/sat/firmware-sat-spec.md: the same structure for the firmware's SAT with file:line citations to the source at the commit it describes
-- [ ] #3 docs/sat/sat-comparison.md: per area match / differs / missing / firmware-only, each difference with both citations, impact and a proposed action; differences adversarially verified against the code
-- [ ] #4 Published on origin/dev and linked in #alpha-testing for Sergeant D to validate; the open SAT behaviour tasks reference the spec
+- [x] #1 docs/sat/thermo-nova-spec.md: the thermo-nova control design (start-up sequence, PID, heating curve, PWM incl. suppression, cycles, setpoint selection, safety/limits, DHW, areas, presets, solar/summer features, coordinator I/O) with formulas, constants, timings and file:line citations to the pinned commit
+- [x] #2 docs/sat/firmware-sat-spec.md: the same structure for the firmware's SAT with file:line citations to the source at the commit it describes
+- [x] #3 docs/sat/sat-comparison.md: per area match / differs / missing / firmware-only, each difference with both citations, impact and a proposed action; differences adversarially verified against the code
+- [x] #4 Published on origin/dev and linked in #alpha-testing for Sergeant D to validate; the open SAT behaviour tasks reference the spec
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -37,3 +37,11 @@ Maintainer request (#alpha-testing 2026-10-22 05:07, confirmed in session): deep
 <!-- SECTION:PLAN:BEGIN -->
 Ground truth pinned: Alexwijn/SAT releases/thermo-nova @ 7beaaf5 (local copy verified identical). Workflow (45 agents): 8 areas (a1 start-up + loop timing, a2 PID, a3 heating curve + setpoint, a4 PWM/modulation/suppression, a5 boiler state + cycles, a6 areas/presets/window/sync, a7 solar/summer simmer/temperature history/health, a8 boiler I/O + DHW + safety + defaults); per area: thermo-nova spec writer (opus) -> citation auditor (opus, opens every file:line) -> firmware spec writer with the same headings -> comparison table -> adversarial verifier of every differs/missing/firmware-only row. Then a completeness critic (uncited control code in thermo-nova) and three assemblers: docs/sat/thermo-nova-spec.md, docs/sat/firmware-sat-spec.md, docs/sat/sat-comparison.md. Main session then spot-checks citations itself, commits docs-only, posts GitHub links for Sergeant D, and links TASK-1270/1272/1273/1282 to the spec.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-22 workflow done (44 agents, 8 areas x writer/auditor/firmware writer/comparer/verifier + completeness critic + 3 assemblers): thermo-nova-spec.md 3378 lines / 1845 citations, firmware-sat-spec.md 3809 / 2037, sat-comparison.md 1002 lines, 443 rows: match 79, differs 281, missing in firmware 31, firmware-only 52; 434 rows (verified), 1 corrected, 8 match rows in area 8 unmarked. Main-session spot check: 16 random citations (10 py, 6 firmware) opened by hand, all hold. Firmware citations read at 2c194a329; SATcontrol/SATpid/SATcycles/safeTimers unchanged since 51df6b486. Not verified: the full citation set by hand (only the auditors' pass + the sample), the 'derived/computed' results (not run on a device).
+
+2026-10-22 08:56 posted the three GitHub links in #alpha-testing for Sergeant D (message 1562696953316515853 thread); TASK-1270/1272/1273/1282 notes reference the spec. AC4 done; the task stays In Progress until his validation is recorded in docs/sat/ (his corrections rank above the code per the CLAUDE.md block).
+<!-- SECTION:NOTES:END -->
