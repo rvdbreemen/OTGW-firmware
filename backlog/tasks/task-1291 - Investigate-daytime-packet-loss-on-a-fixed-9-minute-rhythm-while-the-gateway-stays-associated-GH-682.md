@@ -3,9 +3,11 @@ id: TASK-1291
 title: >-
   Investigate: daytime packet loss on a fixed 9-minute rhythm while the gateway
   stays associated (GH #682)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-22T04:25:00Z'
+updated_date: '2026-10-22T06:16:00Z'
 labels:
   - bug
   - wifi
