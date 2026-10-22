@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-21 09:32
-updated_date: '2026-10-21T20:10:00Z'
+updated_date: '2026-10-22T06:54:00Z'
 labels:
   - sat
   - humidity
@@ -42,4 +42,6 @@ Plan: 1) indoor sources only: MQTT/REST push (existing), and BLE humidity from t
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-21 plan posted to Sergeant D (#alpha-testing msg 1562558755898523739); open points: comfort adjust outside summer, pushed value vs BLE priority. Waiting for his OK; cycle continues.
+
+2026-10-22: TASK-1292 ground-truth spec is on dev: docs/sat/thermo-nova-spec.md (cited, Alexwijn/SAT releases/thermo-nova @ 7beaaf5), docs/sat/firmware-sat-spec.md and docs/sat/sat-comparison.md (443 rows, 434 verified). This task waits for Sergeant D's validation of the thermo-nova spec; the plan must quote the thermo-nova code for its area with file:line citations (CLAUDE.md 'SAT ground truth' block) before it is resumed.
 <!-- SECTION:NOTES:END -->

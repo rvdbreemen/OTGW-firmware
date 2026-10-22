@@ -1,11 +1,11 @@
 ---
 id: TASK-641
-title: 'Modbus TCP client for heat pump integration (ESP32-only, experimental)'
+title: Modbus TCP client for heat pump integration (ESP32-only, experimental)
 status: To Do
 assignee:
   - '@claude'
-created_date: '2026-05-20 18:31'
-updated_date: '2026-10-06 12:42'
+created_date: 2026-05-20 18:31
+updated_date: '2026-10-22T07:57:00Z'
 labels:
   - feature
   - esp32-only
@@ -101,4 +101,6 @@ BLOCKED ON SCOPING, 2026-07-31 (backlog-drain triage). A Modbus TCP client is ne
 - a static 260 B frame buffer that breaks the plan's own 256 B .bss budget.
 
 2026-10-06: maintainer decision: stays parked (To Do); no plan or code until asked.
+
+2026-10-22 cycle: skipped. AC14 (new Modbus web page) cannot fit the LittleFS image until TASK-1294 restores headroom (664 of 768 KiB used after TASK-1281); AC5/AC18 add a new library and an ADR (~50 KB flash, FreeRTOS task) for an experimental feature no tester has asked for, which is a maintainer scope decision; verification needs a Modbus TCP heat pump or a simulator on the bench. Resume after TASK-1294 and an explicit go.
 <!-- SECTION:NOTES:END -->

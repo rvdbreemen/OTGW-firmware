@@ -5,7 +5,8 @@ title: >-
   override
 status: To Do
 assignee: []
-created_date: '2026-10-20 18:17'
+created_date: 2026-10-20 18:17
+updated_date: '2026-10-22T06:54:00Z'
 labels:
   - sat
   - ux
@@ -26,3 +27,9 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 - [ ] #1 SAT detects that the override was not adopted (MsgID 9 back to 0 while TrSet != target), stops re-pushing and shows a status note in the UI
 - [ ] #2 Docs: TC= push only works on thermostats that accept a remote room-setpoint override
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-22: TASK-1292 ground-truth spec is on dev: docs/sat/thermo-nova-spec.md (cited, Alexwijn/SAT releases/thermo-nova @ 7beaaf5), docs/sat/firmware-sat-spec.md and docs/sat/sat-comparison.md (443 rows, 434 verified). This task waits for Sergeant D's validation of the thermo-nova spec; the plan must quote the thermo-nova code for its area with file:line citations (CLAUDE.md 'SAT ground truth' block) before it is resumed.
+<!-- SECTION:NOTES:END -->
