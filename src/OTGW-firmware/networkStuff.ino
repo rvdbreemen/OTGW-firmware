@@ -354,7 +354,8 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     DebugTln(F("No saved WiFi, starting config portal."));
   }
 
-  if (!wifiConnected && skipPortal && wifiSaved && !forcePortal)
+  const bool portalSkipped = !wifiConnected && skipPortal && wifiSaved && !forcePortal;
+  if (portalSkipped)
   {
     DebugTln(F("WiFi: not connected after a WiFi supervisor restart, skipping the config portal; loopWifi keeps retrying"));
   }
@@ -381,7 +382,8 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
   wifiKeepRadioAwake();
 
   DebugTf(PSTR("Wifi status: %s\r\n"), WiFi.status() == WL_CONNECTED ? "Connected" : "Not connected");
-  if (WiFi.status() != WL_CONNECTED)
+  // A boot that skipped the portal continues without WiFi (ADR-099).
+  if (WiFi.status() != WL_CONNECTED && !portalSkipped)
   {
     DECLARE_TIMER_SEC(timeoutWifiConnectFinal, timeOut, CATCH_UP_MISSED_TICKS);
     while ((WiFi.status() != WL_CONNECTED))
@@ -434,6 +436,10 @@ void refreshServicesAfterWifiReconnect() {
   // Force MQTT state machine back into a clean reconnect cycle.
   doMqttDisconnect();
   startMQTT();
+
+  // MDNS.begin() fails without an IP address and LEAmDNS does not retry, so a
+  // boot that ran setup() without WiFi (ADR-099) had no mDNS until a restart.
+  if (!MDNS.isRunning()) startMDNS(CSTR(settings.sHostname));
 
   // Drop stale WS clients from before the WiFi outage; server keeps listening.
   // Must be disconnect(), not close(): WebSocketsServer::close() also calls
@@ -901,7 +907,9 @@ void startTelnet()
   debugTelnet.onConnect(sendTelnetBanner);
   debugTelnet.setLineMode(false);
   debugTelnet.onInputReceived(onTelnetInput);
-  debugTelnet.begin();             // port was fixed in the constructor (23)
+  // false = bind without WiFi: begin() otherwise returns without starting the
+  // server, and a boot that skipped the portal (ADR-099) had no telnet at all.
+  debugTelnet.begin(false);        // port was fixed in the constructor (23)
   DebugT(F("\r\nTelnet debug server started on "));
   DebugT(WiFi.localIP());
   DebugTln(F(":23"));
