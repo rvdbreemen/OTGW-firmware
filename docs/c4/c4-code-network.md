@@ -15,7 +15,7 @@
 #### `void startWiFi(const char* hostname, int timeOut, bool forcePortal = false)`
 - **Location**: `networkStuff.ino`
 - **Parameters**:
-  - `hostname`: Target hostname for the device (e.g., "otgw")
+  - `hostname`: Target hostname for the device (e.g., "OTGW2")
   - `timeOut`: Timeout in seconds for the config portal and the final connect wait (`setup()` passes 240)
   - `forcePortal`: Force the WiFi configuration portal (triple-reset detection); also wipes the stored credentials (ADR-043 / TASK-760)
 - **Return Type**: `void`

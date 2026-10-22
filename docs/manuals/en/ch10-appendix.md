@@ -86,8 +86,8 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **HEAP_WARNING** | Heap level 3–5 KB. WebSocket sends blocked; MQTT aggressively throttled. |
 | **JIT discovery** | Just-in-time Home Assistant discovery. Rather than publishing all 200+ HA discovery payloads at once on connect, the firmware publishes a discovery payload for a given message ID the first time it receives data for that ID. This spreads the load over the first few minutes of operation. |
 | **LittleFS** | The flash filesystem used by the firmware for storing settings, web assets, discovery configs, sensor labels, SAT state, and crash logs. Mounted on the ESP8266/ESP32 SPI flash. |
-| **LLMNR** | Link-Local Multicast Name Resolution. Used for Windows name resolution of `otgw.local` without a DNS server. |
-| **mDNS** | Multicast DNS. Allows the device to be reached as `otgw.local` (or custom hostname + `.local`) on the local network without a DNS server. |
+| **LLMNR** | Link-Local Multicast Name Resolution. Used for Windows name resolution of `otgw2.local` without a DNS server. |
+| **mDNS** | Multicast DNS. Allows the device to be reached as `otgw2.local` (or custom hostname + `.local`) on the local network without a DNS server. |
 | **MQTT** | Message Queuing Telemetry Transport. The lightweight publish-subscribe protocol used for integration with Home Assistant and other automation platforms. The firmware supports MQTT 3.1.1 via the PubSubClient library. |
 | **NTP** | Network Time Protocol. Used by the firmware for accurate wall-clock time (boiler clock sync, SAT calculations, log timestamps). Default server: `pool.ntp.org`. |
 | **NodeMCU** | An ESP8266 development board. Functionally equivalent to Wemos D1 mini for this firmware. |
@@ -120,7 +120,7 @@ These are the factory defaults. All settings are configurable via the web UI Set
 
 | Setting key | Default | Description |
 |-------------|---------|-------------|
-| `hostname` | `OTGW` | mDNS hostname (device accessible at `otgw.local`) |
+| `hostname` | `OTGW2` | mDNS hostname (device accessible at `otgw2.local`; 1.x default is `OTGW`) |
 | `httppassword` | (empty) | HTTP Basic Auth password. Empty = no authentication. |
 | `ledblink` | `true` | LED heartbeat blink enabled |
 | `darktheme` | `false` | Web UI dark theme |

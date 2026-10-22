@@ -30,7 +30,7 @@ If you cannot reach the unit over the network, `--no-backup` migrates without sa
 
 From the release that contains the new `/update` page (TASK-1283), one action installs the firmware and the web files.
 
-1. Open `http://<ip-of-unit>/update`. Use the IP address, not `otgw.local`: the updater has no mDNS name. The page tells you when you opened it by name.
+1. Open `http://<ip-of-unit>/update`. Use the IP address, not `otgw2.local`: the updater has no mDNS name. The page tells you when you opened it by name.
 2. Choose the release zip (`OTGW-firmware-<board>-<version>-flash.zip`), or its two files `*.ino.bin` and `*.littlefs.bin`. You can drop them on the page. The page recognises the files by their content and refuses USB images (merged, migrate), the updater itself, a single file and files from different builds.
 3. Press **Update** and keep the tab open until it says Done. The page runs these steps, one request at a time:
    1. `POST /safeboot`: the unit restarts into the updater, at the same address.

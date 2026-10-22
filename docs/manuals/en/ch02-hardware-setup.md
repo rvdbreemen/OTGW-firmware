@@ -294,7 +294,7 @@ On the first boot after flashing, the device has no saved Wi-Fi credentials. It 
 
 **AP name format**: `<hostname>-<MAC suffix>`
 
-The default hostname is `otgw`, so the AP will typically be named something like `otgw-A1B2C3`.
+The default hostname on 2.0.0 is `OTGW2`, so the AP will typically be named something like `OTGW2-A4:CF:12:21:B4:F8`.
 
 **Steps:**
 
@@ -304,9 +304,9 @@ The default hostname is `otgw`, so the AP will typically be named something like
 
 3. Select your home Wi-Fi network from the list, enter the password, and tap Save.
 
-4. The device connects to your home network, obtains a DHCP address, and announces itself as `otgw.local` via mDNS.
+4. The device connects to your home network, obtains a DHCP address, and announces itself as `otgw2.local` via mDNS.
 
-5. Navigate to `http://otgw.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw/` via LLMNR.
+5. Navigate to `http://otgw2.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw2/` via LLMNR.
 
 > **ESP32-S3 with Ethernet**: If you have a W5500 Ethernet module and a network cable connected, the device obtains an IP address via DHCP on the wired interface at boot and does not open an AP. No Wi-Fi setup is needed.
 

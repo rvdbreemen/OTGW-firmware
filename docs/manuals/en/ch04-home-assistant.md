@@ -245,7 +245,7 @@ Home Assistant restart (`homeassistant/status → online`) no longer triggers a 
 From the telnet debug console, press `F` (uppercase). This clears the done bitmap and re-sends discovery for every entity. The same effect is available via the REST API:
 
 ```bash
-curl -X POST http://otgw.local/api/v2/otgw/discovery
+curl -X POST http://otgw2.local/api/v2/otgw/discovery
 ```
 
 ---

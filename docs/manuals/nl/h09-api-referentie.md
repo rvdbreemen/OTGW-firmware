@@ -20,7 +20,7 @@ Wanneer dit hoofdstuk en de OpenAPI-specificatie elkaar tegenspreken, wint OpenA
 http://<hostname>/api/v2/
 ```
 
-Vervang `<hostname>` door het IP-adres of de mDNS-naam van het apparaat (standaard: `OTGW.local`).
+Vervang `<hostname>` door het IP-adres of de mDNS-naam van het apparaat (standaard: `OTGW2.local`).
 
 #### Versioning
 
@@ -133,7 +133,7 @@ Huidige instellingen opvragen. Authenticatie vereist.
 ```json
 {
   "settings": {
-    "hostname": "OTGW",
+    "hostname": "OTGW2",
     "mqttbroker": "192.168.1.10",
     "mqttport": "1883",
     "mqtttoptopic": "OTGW",
@@ -349,7 +349,7 @@ Apparaatinformatie opvragen (firmware, hardware, netwerk). Geen authenticatie ve
   "device": {
     "author": "Robert van den Breemen",
     "fwversion": "2.0.0",
-    "hostname": "OTGW",
+    "hostname": "OTGW2",
     "board": "esp8266",
     "hardwaremode": "pic",
     "networkmode": "wifi",
@@ -1225,7 +1225,7 @@ De UART is na initialisatie exclusief in gebruik voor PIC-communicatie. `Serial.
 Een apart TCP-socket op poort 25238 biedt toegang tot de ruwe OTGW-seriestream. Dit is bedoeld voor tools als OTmonitor die directe protocoltoegang nodig hebben:
 
 ```bash
-nc otgw.local 25238
+nc otgw2.local 25238
 ```
 
 De uitvoer bestaat uit onverwerkte ASCII-regels van de PIC: regels als `T80000200`, `B4001FF04`, `R4001FF04`. Via deze poort kunnen ook ruwe PIC-commando's worden verstuurd.
@@ -1242,5 +1242,5 @@ De uitvoer bestaat uit onverwerkte ASCII-regels van de PIC: regels als `T8000020
 | 25238 | TCP (raw) | TCP-seriebrug naar OTGW PIC |
 | 1883 | TCP (MQTT) | MQTT-brokerverbinding (uitgaand) |
 | 123 | UDP (SNTP) | NTP-tijdsynchronisatie (uitgaand) |
-| 5353 | UDP (mDNS) | `otgw.local` naamresolutie |
+| 5353 | UDP (mDNS) | `otgw2.local` naamresolutie |
 | 5355 | UDP (LLMNR) | Windows naamresolutie |

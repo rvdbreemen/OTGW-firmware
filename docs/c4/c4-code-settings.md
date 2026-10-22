@@ -269,7 +269,7 @@ Hungarian prefixes: **b** = bool, **s** = char[], **i** = int/uint, **f** = floa
 ```cpp
 struct OTGWSettings {
   // Device-level fields (universal device identity)
-  char sHostname[41];           // Device hostname (default _HOSTNAME = "OTGW")
+  char sHostname[41];           // Device hostname (default _HOSTNAME = "OTGW2")
   char sHTTPpasswd[41];         // HTTP Basic Auth password (empty = no authentication)
   bool bLEDblink;               // LED blink enable (default true)
   bool bDarkTheme;              // UI dark theme

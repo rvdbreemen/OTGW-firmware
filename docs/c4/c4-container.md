@@ -192,7 +192,7 @@ Note: the `/mqttha.cfg` LittleFS file is retired; HA MQTT discovery is published
 - **From**: ESP32-S3 Firmware
 - **To**: Local network name resolution
 - **Protocol**: mDNS (UDP/5353); LLMNR is compiled out (`HAS_LLMNR` = 0)
-- **Description**: Registers `<hostname>.local` and the HTTP service on port 80 so browsers can reach the device by name (e.g., `http://otgw.local`).
+- **Description**: Registers `<hostname>.local` and the HTTP service on port 80 so browsers can reach the device by name (e.g., `http://otgw2.local`).
 
 ### Ethernet (W5500, `HAS_ETH_CAPABLE` boards)
 

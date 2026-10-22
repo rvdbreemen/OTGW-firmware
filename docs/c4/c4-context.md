@@ -136,8 +136,8 @@ The firmware is designed for a trusted home network. It is not a cloud service a
 2. The device powers on and, finding no saved Wi-Fi credentials, broadcasts a temporary Wi-Fi access point named `<hostname>-<mac>`.
 3. The enthusiast connects their phone or laptop to that access point. A captive portal opens automatically.
 4. The enthusiast enters their home Wi-Fi network name and password.
-5. The device connects to the home network and announces itself as `otgw.local` on the local network.
-6. The enthusiast opens `http://otgw.local/` in a browser. The web interface loads.
+5. The device connects to the home network and announces itself as `otgw2.local` on the local network.
+6. The enthusiast opens `http://otgw2.local/` in a browser. The web interface loads.
 7. The enthusiast navigates to **Settings**, enters the IP address of their MQTT broker, a username, and password, and checks the **HA Discovery** option.
 8. After clicking **Save**, the device connects to the MQTT broker and publishes discovery payloads.
 9. The enthusiast checks Home Assistant: under **Settings > Devices and Services > MQTT**, a new OTGW device appears with all entities already created.

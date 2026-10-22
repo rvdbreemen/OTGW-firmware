@@ -356,7 +356,7 @@ var OTGWUpd = (function () {
   function run(io, ui, c, from) {
     var order = ['handover', 'upload', 'boot', 'settle', 'fs', 'verify'], t = c.t || {}, cur = from;
     var tSb = t.sb || 60000, tBoot = t.boot || 120000, tSettle = t.settle === undefined ? 35000 : t.settle;
-    var host = c.host || 'OTGW', pw = ' Check the admin password and press Try again.';
+    var host = c.host || 'OTGW2', pw = ' Check the admin password and press Try again.';
     var recSb = 'The updater may be at another address (a unit on Ethernet or with a fixed IP address gets an address by DHCP over WiFi), or it opened its own WiFi network "' + host + '-safeboot" (join it and open http://192.168.4.1/). Upload the .ino.bin in the updater, then open this page again and choose the same files to finish the web files. Or switch the unit off and on: it returns to the old firmware.';
     var recBoot = 'Wait a minute and reload this page. If the unit does not come back, find it in your router, or join its WiFi network "' + host + '-safeboot" and open http://192.168.4.1/ to upload the .ino.bin again.';
     var recFs = 'Press Try again now and do not switch the unit off: a half-written filesystem loses the settings when the unit restarts. The new firmware is already installed.';

@@ -165,10 +165,10 @@ The firmware streams a real-time debug log over Telnet on port 23. In addition t
 #### Connecting
 
 ```
-telnet otgw.local 23
+telnet otgw2.local 23
 ```
 
-Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw.local`, port 23.
+Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw2.local`, port 23.
 
 #### Debug Menu Keys (v2.0.0)
 
@@ -298,7 +298,7 @@ The OTGW32 board supports a W5500 Ethernet module as an alternative to WiFi:
 ### 7.13 Factory Reset
 
 **Method 1: Web UI**
-1. Open `http://otgw.local/fsexplorer`.
+1. Open `http://otgw2.local/fsexplorer`.
 2. Delete the file `/settings.json`.
 3. Reboot the device.
 

@@ -41,7 +41,7 @@ servers:
     description: Local OTGW device
     variables:
       device-ip:
-        default: otgw.local
+        default: otgw2.local
         description: IP address or hostname of the OTGW device
 
 tags:

@@ -2,7 +2,7 @@
 
 ### Overview
 
-The OTGW web interface is a single-page application (SPA) served directly by the device itself, with no cloud service or external server required. Open it in any modern browser by navigating to `http://otgw.local/` or to the device's IP address: `http://<device-ip>/`.
+The OTGW web interface is a single-page application (SPA) served directly by the device itself, with no cloud service or external server required. Open it in any modern browser by navigating to `http://otgw2.local/` or to the device's IP address: `http://<device-ip>/`.
 
 The supported browsers are the current and previous two major versions of Chrome, Firefox, and Safari. The UI is English-only on the 2.0.0 line: localised Dutch strings that used to appear in the OTTHING-platform port have been removed (TASK-569).
 
@@ -238,7 +238,7 @@ The Settings tab contains all device configuration, organized into sections. Aft
 
 | Setting | Description |
 |---|---|
-| Hostname | mDNS and DHCP hostname for the device (default: `otgw`) |
+| Hostname | mDNS and DHCP hostname for the device (default: `OTGW2`; 1.x uses `OTGW`) |
 | Wi-Fi Network (SSID) | Read-only display of the currently connected Wi-Fi network |
 | Reset WiFi | Button next to the SSID field. Clears the stored Wi-Fi credentials and reboots the device in Access Point (AP) mode |
 
@@ -371,7 +371,7 @@ The **Update** section (accessible from the Advanced tab or the update icon in t
 
 The flash utility at `http://<ip>/update` installs firmware and web files in one action:
 
-1. Open the page by IP address (not `otgw.local`: the updater has no mDNS name).
+1. Open the page by IP address (not `otgw2.local`: the updater has no mDNS name).
 2. Choose the release zip, or the `.ino.bin` and `.littlefs.bin` files. The page checks the files by content and refuses USB images, the updater itself and mismatched pairs.
 3. Press **Update** and keep the tab open until it says Done (2 to 3 minutes). The unit restarts twice. The page switches to the safeboot updater, installs the firmware, waits for the new firmware, installs the web files and verifies both.
 
@@ -387,7 +387,7 @@ Settings and sensor names are kept, and so are the SAT learned state (energy tot
 
 ### File Manager (FSexplorer)
 
-The **FSexplorer** is accessible from the Advanced tab dropdown under **File system contents**, or directly at `http://otgw.local/FSexplorer.html`. It provides a browser-based view of the LittleFS filesystem on the device.
+The **FSexplorer** is accessible from the Advanced tab dropdown under **File system contents**, or directly at `http://otgw2.local/FSexplorer.html`. It provides a browser-based view of the LittleFS filesystem on the device.
 
 Features:
 

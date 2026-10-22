@@ -186,7 +186,7 @@ def main():
         log(f"WARNING: could not auto-rejoin {home}. Run manually: netsh wlan connect name=\"{home}\"")
         return 1
 
-    log("done. Give the OTGW ~20s to join, then find it (otgw.local or your DHCP table) and verify /api/v2/health.")
+    log("done. Give the OTGW ~20s to join, then find it (otgw2.local or your DHCP table) and verify /api/v2/health.")
     log("If it did not connect, the creds may be wrong, or re-run with the device freshly in AP mode.")
     return 0
 

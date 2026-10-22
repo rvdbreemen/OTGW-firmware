@@ -164,7 +164,7 @@ On first boot the device creates an access point named `<hostname>-<mac>`. Conne
 
 ### 3. Open the Web UI
 
-Navigate to `http://<device-ip>/` or `http://otgw.local/`. The dashboard shows the live OpenTherm log, temperatures, and boiler status.
+Navigate to `http://<device-ip>/` or `http://otgw2.local/`. The dashboard shows the live OpenTherm log, temperatures, and boiler status.
 
 ### 4. Configure MQTT
 

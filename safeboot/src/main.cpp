@@ -33,7 +33,7 @@ static WebServer server(80);
 static String updError;
 static bool bootPointedAtApp = false;
 static bool appRolledBack = false;
-static char hostName[41] = "OTGW";    // settings.sHostname is char[41]
+static char hostName[41] = "OTGW2";    // settings.sHostname is char[41]
 static char adminPw[41] = "";
 
 static const char PAGE_HEAD[] PROGMEM =
@@ -75,7 +75,7 @@ static void loadNvs() {
   prefs.getString("host", hostName, sizeof(hostName));
   prefs.getString("pw", adminPw, sizeof(adminPw));
   prefs.end();
-  if (hostName[0] == '\0') strlcpy(hostName, "OTGW", sizeof(hostName));
+  if (hostName[0] == '\0') strlcpy(hostName, "OTGW2", sizeof(hostName));
 }
 
 // Same rule as isSameOriginRequest() in the main firmware (restAPI.ino): the host

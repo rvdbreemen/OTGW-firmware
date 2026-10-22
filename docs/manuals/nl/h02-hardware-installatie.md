@@ -319,13 +319,13 @@ Bij de allereerste start, of na het wissen van de Wi-Fi-instellingen, opent de O
 
 **AP-naamformaat**: `<hostname>-<MAC suffix>`
 
-De standaard hostname is `otgw`, dus het AP heet doorgaans iets als `otgw-A1B2C3`.
+De standaard hostname op 2.0.0 is `OTGW2`, dus het AP heet doorgaans iets als `OTGW2-A4:CF:12:21:B4:F8`.
 
 **Stappen voor de eerste configuratie:**
 
 1. Zet de OTGW aan. Wacht 10-15 seconden.
 
-2. Zoek op uw telefoon of laptop naar Wi-Fi-netwerken. U ziet een netwerk met de naam `otgw-XXXXXXXXXXXX` (waarbij de suffix het MAC-adres is).
+2. Zoek op uw telefoon of laptop naar Wi-Fi-netwerken. U ziet een netwerk met de naam `OTGW2-XX:XX:XX:XX:XX:XX` (waarbij de suffix het MAC-adres is).
 
 3. Verbinding maken met dit netwerk. Er is geen wachtwoord vereist.
 
@@ -335,9 +335,9 @@ De standaard hostname is `otgw`, dus het AP heet doorgaans iets als `otgw-A1B2C3
 
 6. Klik op **Opslaan** (of **Save**). De OTGW verbindt met uw thuisnetwerk en herstart.
 
-7. Zoek het IP-adres van de OTGW in uw router, of gebruik de mDNS-hostnaam `http://otgw.local/` in uw browser.
+7. Zoek het IP-adres van de OTGW in uw router, of gebruik de mDNS-hostnaam `http://otgw2.local/` in uw browser.
 
-**mDNS-opmerking:** De hostnaam `otgw.local` werkt op de meeste thuisnetwerken. Op sommige Windows-systemen werkt mDNS alleen als de Bonjour-service actief is. Gebruik bij twijfel het IP-adres van uw router.
+**mDNS-opmerking:** De hostnaam `otgw2.local` werkt op de meeste thuisnetwerken. Op sommige Windows-systemen werkt mDNS alleen als de Bonjour-service actief is. Gebruik bij twijfel het IP-adres van uw router.
 
 > **ESP32-S3 met Ethernet**: Als u een W5500 Ethernet-module en een netwerkkabel hebt aangesloten, verkrijgt het apparaat bij het opstarten automatisch een IP-adres via DHCP op de bekabelde interface en opent het geen AP. Wi-Fi-configuratie is niet nodig.
 
@@ -351,7 +351,7 @@ De standaard hostname is `otgw`, dus het AP heet doorgaans iets als `otgw-A1B2C3
 
 Vanaf v1.3.0 biedt de webinterface een OTA-updater met een druk op de knop:
 
-1. Open de webinterface (`http://otgw.local/`).
+1. Open de webinterface (`http://otgw2.local/`).
 2. Navigeer naar **Update** (of het update-icoontje in de header).
 3. De pagina haalt de lijst met beschikbare GitHub-releases op en toont Installed, Update en Rollback badges per versie.
 4. Klik op **Update** naast de gewenste versie.

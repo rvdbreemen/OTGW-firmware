@@ -30,7 +30,7 @@ New code must always use `/api/v2/`:
 http://{device-ip}/api/v2/
 ```
 
-The device hostname defaults to `otgw.local` (mDNS / LLMNR). Alternatively, use the IP address assigned by your DHCP server.
+The device hostname defaults to `otgw2.local` (mDNS / LLMNR). Alternatively, use the IP address assigned by your DHCP server.
 
 #### Route Dispatch (ADR-050)
 
@@ -148,7 +148,7 @@ Returns all device settings. Authentication required.
 
 ```json
 {
-  "hostname": "otgw",
+  "hostname": "OTGW2",
   "httppassword": "****",
   "mqttenable": true,
   "mqttbroker": "192.168.1.10",
@@ -212,7 +212,7 @@ Returns hardware and platform information. No authentication required.
   "device": {
     "author": "Robert van den Breemen",
     "fwversion": "2.0.0",
-    "hostname": "OTGW",
+    "hostname": "OTGW2",
     "board": "esp8266",
     "hardwaremode": "pic",
     "networkmode": "wifi",
@@ -856,7 +856,7 @@ The WebSocket server listens on **port 81** (separate from the HTTP server on po
 From JavaScript:
 
 ```javascript
-const ws = new WebSocket("ws://otgw.local:81/");
+const ws = new WebSocket("ws://otgw2.local:81/");
 ws.onopen  = () => console.log("connected");
 ws.onclose = () => setTimeout(reconnect, 3000);  // auto-reconnect
 ws.onmessage = (event) => handleFrame(event.data);
@@ -1351,7 +1351,7 @@ The firmware streams diagnostic output to a Telnet server on port 23.
 #### Connecting
 
 ```bash
-telnet otgw.local 23
+telnet otgw2.local 23
 # or by IP
 telnet 192.168.1.50 23
 ```
@@ -1407,9 +1407,9 @@ Debug flags can be toggled at runtime via the REST API settings endpoint or via 
 A separate TCP socket on port 25238 exposes the raw OTGW serial stream. This is for tools like OTmonitor that need raw protocol access:
 
 ```bash
-nc otgw.local 25238
+nc otgw2.local 25238
 # or
-telnet otgw.local 25238
+telnet otgw2.local 25238
 ```
 
 The output is the unprocessed ASCII stream from the PIC: lines like `T80000200`, `B4001FF04`, `R4001FF04`. You can also send raw PIC commands by typing them followed by a newline. This port is separate from the debug Telnet console.
@@ -1426,5 +1426,5 @@ The output is the unprocessed ASCII stream from the PIC: lines like `T80000200`,
 | 25238 | TCP (raw) | TCP serial bridge to OTGW PIC |
 | 1883 | TCP (MQTT) | MQTT broker connection (outbound) |
 | 123 | UDP (SNTP) | NTP time synchronization (outbound) |
-| 5353 | UDP (mDNS) | `otgw.local` name resolution |
+| 5353 | UDP (mDNS) | `otgw2.local` name resolution |
 | 5355 | UDP (LLMNR) | Windows name resolution |

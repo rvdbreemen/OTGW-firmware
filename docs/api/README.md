@@ -133,7 +133,7 @@ Returns comprehensive device information as a flat JSON map. Boolean values are 
     "picdeviceid": "gateway",
     "picfwtype": "gateway",
     "compiled": "Mar 26 2026 10:30:00",
-    "hostname": "OTGW",
+    "hostname": "OTGW2",
     "ipaddress": "192.168.1.100",
     "macaddress": "AA:BB:CC:DD:EE:FF",
     "freeheap": 25600,
@@ -1555,19 +1555,19 @@ This prevents crashes and ensures stable operation.
 ### Get Device Health
 
 ```bash
-curl http://otgw.local/api/v2/health
+curl http://otgw2.local/api/v2/health
 ```
 
 ### Get Device Information
 
 ```bash
-curl http://otgw.local/api/v2/device/info
+curl http://otgw2.local/api/v2/device/info
 ```
 
 ### Get Boiler Temperature
 
 ```bash
-curl http://otgw.local/api/v2/otgw/messages/25
+curl http://otgw2.local/api/v2/otgw/messages/25
 ```
 
 ### Send Temperature Override
@@ -1575,49 +1575,49 @@ curl http://otgw.local/api/v2/otgw/messages/25
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"command":"TT=21.5"}' \
-  http://otgw.local/api/v2/otgw/commands
+  http://otgw2.local/api/v2/otgw/commands
 ```
 
 ### Get All OpenTherm Data
 
 ```bash
-curl http://otgw.local/api/v2/otgw/otmonitor
+curl http://otgw2.local/api/v2/otgw/otmonitor
 ```
 
 ### Trigger MQTT Autodiscovery
 
 ```bash
-curl -X POST http://otgw.local/api/v2/otgw/discovery
+curl -X POST http://otgw2.local/api/v2/otgw/discovery
 ```
 
 ### Get PIC Gateway Settings
 
 ```bash
-curl http://otgw.local/api/v2/pic/settings
+curl http://otgw2.local/api/v2/pic/settings
 ```
 
 ### Check Simulation Status
 
 ```bash
-curl http://otgw.local/api/v2/simulate
+curl http://otgw2.local/api/v2/simulate
 ```
 
 ### Start Simulation
 
 ```bash
-curl -X POST http://otgw.local/api/v2/simulate/start
+curl -X POST http://otgw2.local/api/v2/simulate/start
 ```
 
 ### Test Webhook
 
 ```bash
-curl -X POST "http://otgw.local/api/v2/webhook/test?state=on"
+curl -X POST "http://otgw2.local/api/v2/webhook/test?state=on"
 ```
 
 ### Get SAT Status
 
 ```bash
-curl http://otgw.local/api/v2/sat/status
+curl http://otgw2.local/api/v2/sat/status
 ```
 
 ### Set SAT Target Temperature
@@ -1625,7 +1625,7 @@ curl http://otgw.local/api/v2/sat/status
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"value":"21.5"}' \
-  http://otgw.local/api/v2/sat/target
+  http://otgw2.local/api/v2/sat/target
 ```
 
 ### Push External Room Temperature to SAT
@@ -1633,13 +1633,13 @@ curl -X POST -H "Content-Type: application/json" \
 ```bash
 curl -X POST -H "Content-Type: application/json" \
   -d '{"value":"20.8"}' \
-  http://otgw.local/api/v2/sat/externaltemp
+  http://otgw2.local/api/v2/sat/externaltemp
 ```
 
 ### Push External Outdoor Temperature to SAT
 
 ```bash
-curl -X POST -d "8.5" http://otgw.local/api/v2/sat/externaloutdoor
+curl -X POST -d "8.5" http://otgw2.local/api/v2/sat/externaloutdoor
 ```
 
 ## Integration Examples
@@ -1650,7 +1650,7 @@ curl -X POST -d "8.5" http://otgw.local/api/v2/sat/externaloutdoor
 sensor:
   - platform: rest
     name: "OTGW Boiler Temperature"
-    resource: "http://otgw.local/api/v2/otgw/messages/25"
+    resource: "http://otgw2.local/api/v2/otgw/messages/25"
     value_template: "{{ value_json.value }}"
     unit_of_measurement: "\u00b0C"
     scan_interval: 10
@@ -1662,22 +1662,22 @@ sensor:
 import requests
 
 # Get health status
-response = requests.get('http://otgw.local/api/v2/health')
+response = requests.get('http://otgw2.local/api/v2/health')
 health = response.json()['health']
 print(f"Status: {health['status']}, Heap: {health['heap']} bytes")
 
 # Get device info
-response = requests.get('http://otgw.local/api/v2/device/info')
+response = requests.get('http://otgw2.local/api/v2/device/info')
 device = response.json()['device']
 print(f"Firmware: {device['fwversion']}, Gateway: {device['otgwmode']}")
 
 # Set temperature override (JSON body, returns 202)
-cmd = requests.post('http://otgw.local/api/v2/otgw/commands',
+cmd = requests.post('http://otgw2.local/api/v2/otgw/commands',
                      json={"command": "TT=21.5"})
 print(cmd.json())  # {"status": "queued"}
 
 # Get PIC settings
-response = requests.get('http://otgw.local/api/v2/pic/settings')
+response = requests.get('http://otgw2.local/api/v2/pic/settings')
 pic = response.json()['pic_settings']
 print(f"Setpoint override: {pic['setpoint_override']}")
 ```
@@ -1686,7 +1686,7 @@ print(f"Setpoint override: {pic['setpoint_override']}")
 
 ```javascript
 // Get OpenTherm data
-fetch('http://otgw.local/api/v2/otgw/otmonitor')
+fetch('http://otgw2.local/api/v2/otgw/otmonitor')
   .then(response => {
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
@@ -1695,7 +1695,7 @@ fetch('http://otgw.local/api/v2/otgw/otmonitor')
   .catch(error => console.error('Error:', error));
 
 // Send command (JSON body)
-fetch('http://otgw.local/api/v2/otgw/commands', {
+fetch('http://otgw2.local/api/v2/otgw/commands', {
   method: 'POST',
   headers: {'Content-Type': 'application/json'},
   body: JSON.stringify({command: 'TT=21.5'})

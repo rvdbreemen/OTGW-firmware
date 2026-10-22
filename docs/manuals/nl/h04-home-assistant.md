@@ -41,7 +41,7 @@ Als u al een zelfstandige Mosquitto-installatie, EMQX, HiveMQ of een andere brok
 
 ### Firmware configureren voor MQTT
 
-1. Open de webinterface van de OTGW (`http://otgw.local/`).
+1. Open de webinterface van de OTGW (`http://otgw2.local/`).
 2. Ga naar **Instellingen > MQTT**.
 3. Vul de volgende velden in:
 
@@ -256,7 +256,7 @@ Een Home Assistant-herstart (`homeassistant/status → online`) triggert niet la
 Druk in de telnet-debugconsole op `F` (hoofdletter). Dit wist de done-bitmap en verstuurt discovery voor elke entiteit opnieuw. Hetzelfde is te bereiken via de REST API:
 
 ```bash
-curl -X POST http://otgw.local/api/v2/otgw/discovery
+curl -X POST http://otgw2.local/api/v2/otgw/discovery
 ```
 
 ---

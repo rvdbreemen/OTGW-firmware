@@ -8,7 +8,7 @@ On first boot the firmware has no saved WiFi credentials. It opens a captive por
 
 #### 6.1.1 Initial Configuration via Captive Portal
 
-When no credentials are stored, the device starts a WiFi access point named after its hostname and MAC address, for example `otgw-AABBCCDD`. Connect to that SSID from a phone or laptop and a configuration page opens automatically (or navigate to `192.168.4.1` manually). Enter your SSID and password and click Save. The device reboots, connects to your network, and the AP disappears.
+When no credentials are stored, the device starts a WiFi access point named after its hostname and MAC address, for example `OTGW2-A4:CF:12:21:B4:F8`. Connect to that SSID from a phone or laptop and a configuration page opens automatically (or navigate to `192.168.4.1` manually). Enter your SSID and password and click Save. The device reboots, connects to your network, and the AP disappears.
 
 #### 6.1.2 Reconnection Behavior
 
@@ -106,11 +106,13 @@ Leave all fields empty to revert to DHCP.
 
 ### 6.4 mDNS and Hostname
 
-The default hostname is `otgw`. After connecting to your network the device is reachable as `otgw.local` from any mDNS-capable client (macOS, iOS, Linux with Avahi, Windows 10+ with Bonjour).
+The default hostname on 2.0.0 is `OTGW2`. After connecting to your network the device is reachable as `otgw2.local` from any mDNS-capable client (macOS, iOS, Linux with Avahi, Windows 10+ with Bonjour).
+
+The 1.x firmware keeps the default `OTGW` (`otgw.local`), so a 1.x and a 2.0.0 gateway on the same network no longer claim the same name. A unit upgraded from 1.x keeps the hostname saved in its settings, usually `OTGW`; only a new install or a reset that discards `settings.ini` starts with `OTGW2`.
 
 mDNS works on both ESP8266 and ESP32. When the network interface changes (for example, switching from WiFi to Ethernet), the firmware re-registers the mDNS hostname on the new interface automatically.
 
-The firmware also registers an LLMNR responder on ESP8266, which allows Windows machines to resolve `otgw` (without the `.local` suffix). LLMNR is not available on ESP32.
+The firmware also registers an LLMNR responder on ESP8266, which allows Windows machines to resolve `otgw2` (without the `.local` suffix). LLMNR is not available on ESP32.
 
 Set the hostname in Settings. The new hostname propagates to the DHCP request, mDNS advertisement, MQTT client ID, and web UI title.
 
@@ -169,7 +171,7 @@ The OTA update endpoint is at `/update`. It sits behind the protected-admin boun
 Browser requests to protected admin endpoints (including `/update`, `/upload`, `/ReBoot`, `/ResetWireless`, and `POST /api/v2/settings`) are additionally checked for `Origin`/`Referer` matching `Host`. This is a lightweight CSRF mitigation, not a full session framework: requests without `Origin` or `Referer` (curl, OTmonitor, scripts) are allowed for backward compatibility; mismatched origins are rejected with HTTP 403.
 
 **Steps (ESP32-S3, 4 MB flash):**
-1. Open `http://<ip>/update` in your browser (the IP address, not `otgw.local`).
+1. Open `http://<ip>/update` in your browser (the IP address, not `otgw2.local`).
 2. Choose the release zip, or the `.ino.bin` and `.littlefs.bin` files.
 3. Press **Update** and keep the tab open until it says Done. The page runs the safeboot handover, the firmware upload, a 35 s settle and the filesystem upload, and verifies the result.
 
@@ -215,7 +217,7 @@ On the MQTT publish path the firmware also enables WiFiClient sync mode (`setSyn
 
 The firmware is designed for a local, trusted network. No inbound ports need to be forwarded through your router.
 
-mDNS (`otgw.local`) only works within a single Layer 2 broadcast domain. If Home Assistant is on a different VLAN, use the device's static IP or a DNS entry instead of `.local`.
+mDNS (`otgw2.local`) only works within a single Layer 2 broadcast domain. If Home Assistant is on a different VLAN, use the device's static IP or a DNS entry instead of `.local`.
 
 ---
 

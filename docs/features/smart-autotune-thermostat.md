@@ -573,14 +573,14 @@ POST endpoints accept both raw values (`21.5`) and JSON bodies (`{"value":"21.5"
 ```bash
 # Enable SAT
 curl -X POST -d '{"name":"satenabled","value":"true"}' \
-  http://otgw.local/api/v2/settings
+  http://otgw2.local/api/v2/settings
 
 # Set target temperature
 curl -X POST -d '{"value":"21.0"}' \
-  http://otgw.local/api/v2/sat/target
+  http://otgw2.local/api/v2/sat/target
 
 # Check status
-curl http://otgw.local/api/v2/sat/status
+curl http://otgw2.local/api/v2/sat/status
 ```
 
 ### MQTT

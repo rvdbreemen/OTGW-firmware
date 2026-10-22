@@ -10,7 +10,7 @@ Dit hoofdstuk beschrijft alle netwerkaspecten van OTGW-firmware: hoe het apparaa
 
 Bij de eerste opstart beschikt het apparaat nog over geen opgeslagen WiFi-instellingen. De firmware start dan automatisch de WiFiManager captive portal:
 
-1. Het apparaat start als WiFi-accesspoint met de SSID `<hostname>-<MAC>`, standaard iets als `otgw-AABBCCDD`.
+1. Het apparaat start als WiFi-accesspoint met de SSID `<hostname>-<MAC>`, standaard iets als `OTGW2-A4:CF:12:21:B4:F8`.
 2. Verbind uw telefoon of laptop met dit netwerk.
 3. Er opent automatisch een captiveportalpagina (of navigeer handmatig naar `192.168.4.1`).
 4. Kies uw thuisnetwerk uit de lijst, vul het wachtwoord in en sla op.
@@ -121,7 +121,9 @@ Laat alle velden leeg om terug te keren naar DHCP.
 
 ### 6.4 mDNS en hostnaam
 
-De standaard hostnaam is `otgw`. Het apparaat is hiermee bereikbaar als `otgw.local` in browsers en andere mDNS-compatibele clients (macOS, iOS, Linux met Avahi, Windows 10+ met Bonjour).
+De standaard hostnaam op 2.0.0 is `OTGW2`. Het apparaat is hiermee bereikbaar als `otgw2.local` in browsers en andere mDNS-compatibele clients (macOS, iOS, Linux met Avahi, Windows 10+ met Bonjour).
+
+De 1.x-firmware houdt de standaardnaam `OTGW` (`otgw.local`). Een 1.x- en een 2.0.0-gateway in hetzelfde netwerk gebruiken dus niet meer dezelfde naam. Een apparaat dat van 1.x is bijgewerkt, houdt de hostnaam uit zijn instellingen, meestal `OTGW`. Alleen een nieuwe installatie of een reset waarbij `settings.ini` verloren gaat, begint met `OTGW2`.
 
 mDNS werkt op zowel ESP8266 als ESP32. Wanneer het netwerkinterface wisselt (bijvoorbeeld van WiFi naar Ethernet), registreert de firmware de mDNS-hostnaam automatisch opnieuw op het nieuwe interface.
 
@@ -190,7 +192,7 @@ Het OTA-update-endpoint is `/update`. Het valt onder de beschermde-admin-grens u
 Browserverzoeken naar beschermde admin-endpoints (waaronder `/update`, `/upload`, `/ReBoot`, `/ResetWireless` en `POST /api/v2/settings`) worden bovendien gecontroleerd op overeenkomst van `Origin`/`Referer` met `Host`. Dit is een lichte CSRF-mitigatie, geen volledig sessieframework: verzoeken zonder `Origin` of `Referer` (curl, OTmonitor, scripts) worden toegestaan voor achterwaartse compatibiliteit; afwijkende origins worden afgewezen met HTTP 403.
 
 **Stappen (ESP32-S3, 4 MB flash):**
-1. Open `http://<ip>/update` in uw browser (het IP-adres, niet `otgw.local`).
+1. Open `http://<ip>/update` in uw browser (het IP-adres, niet `otgw2.local`).
 2. Kies de release-zip, of de bestanden `.ino.bin` en `.littlefs.bin`.
 3. Druk op **Update** en laat het tabblad open tot er Done staat. De pagina doet de overdracht naar safeboot, de firmware-upload, 35 s wachttijd en de filesystem-upload, en controleert het resultaat.
 
@@ -236,7 +238,7 @@ Op het MQTT-publicatiepad activeert de firmware bovendien WiFiClient sync-mode (
 
 OTGW-firmware is uitsluitend bedoeld voor gebruik op een vertrouwd lokaal netwerk. Er hoeven geen poorten te worden doorgestuurd op uw router.
 
-mDNS (`otgw.local`) werkt alleen binnen een enkel Layer 2 broadcast-domein. Als Home Assistant op een ander VLAN staat, gebruik dan het statische IP-adres of een DNS-vermelding in plaats van `.local`.
+mDNS (`otgw2.local`) werkt alleen binnen een enkel Layer 2 broadcast-domein. Als Home Assistant op een ander VLAN staat, gebruik dan het statische IP-adres of een DNS-vermelding in plaats van `.local`.
 
 ---
 

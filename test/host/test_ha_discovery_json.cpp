@@ -39,7 +39,7 @@
 // ---- firmware globals the slices read ---------------------------------------------------
 #define _VERSION "2.0.0-alpha.405+8fdc3b3 (03-10-2026)"   // version.h at 8795bacc0
 struct {
-  char                sHostname[41] = "OTGW";            // _HOSTNAME
+  char                sHostname[41] = "OTGW2";           // _HOSTNAME
   DeviceSection       device;
   MQTTSettingsSection mqtt;
   SensorsSection      sensors;

@@ -47,7 +47,7 @@ SAT heeft een ruimtetemperatuurmeting nodig. Mogelijke bronnen (in prioriteitsvo
 
 De v2-webinterface toont SAT als een enkele pagina met drie diepteniveaus, zodat u alleen ziet wat u nodig heeft: een eenvoudige thermostaatweergave (draaiknop, presets, actuele status), een control-weergave (bedrijfsmodus, ketelstatus, coefficient, deadband, PID-uitvoer) en een technische weergave (health, ruwe PID-termen, PWM-/cyclusdetail, simulatie, ruwe JSON). Alle drie delen de UI-schil die in hoofdstuk 3 wordt beschreven.
 
-1. Open de webinterface (`http://otgw.local/`).
+1. Open de webinterface (`http://otgw2.local/`).
 2. Ga naar het tabblad **SAT** of **Instellingen > SAT**.
 3. Zet de schakelaar **SAT inschakelen** op aan.
 4. Stel het verwarmingssysteem in (auto, radiatoren of vloerverwarming) en de warmtebron (auto, gasketel, warmtepomp of hybride). Systeem en bron zijn aparte instellingen (zie hieronder).
@@ -69,7 +69,7 @@ Voor booleaanse topics werken `ON` / `OFF` / `true` / `false` / `1` / `0`. Numer
 
 ```bash
 curl -X POST -d '{"name":"satenabled","value":"true"}' \
-  http://otgw.local/api/v2/settings
+  http://otgw2.local/api/v2/settings
 ```
 
 ---
@@ -304,7 +304,7 @@ Het volledige contract staat in [ADR-117](../../adr/ADR-117-sat-simulation-contr
 Activeren via instellingen (`satsimulation = true`) of REST API:
 ```bash
 curl -X POST -d '{"name":"satsimulation","value":"true"}' \
-  http://otgw.local/api/v2/settings
+  http://otgw2.local/api/v2/settings
 ```
 
 ---

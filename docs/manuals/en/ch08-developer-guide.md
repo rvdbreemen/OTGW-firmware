@@ -659,7 +659,7 @@ For a text field:
 The firmware streams diagnostic output to Telnet port 23 via the SimpleTelnet library (`SimpleTelnet<1> debugTelnet`, declared extern in `OTGW-firmware.h` and defined in `networkStuff.ino`). SimpleTelnet replaces the older TelnetStream and ESPTelnet libraries and provides a unified API on both ESP8266 and ESP32. Connect with any Telnet client:
 
 ```bash
-telnet otgw.local 23
+telnet otgw2.local 23
 # or by IP:
 telnet 192.168.1.x 23
 ```

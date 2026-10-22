@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.455
+**  Version  : v2.0.0-alpha.456
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1132,7 +1132,7 @@ void handleMQTT()
 
         uint8_t mac[6]{0};
         WiFi.macAddress(mac);
-        snprintf_P(MQTTclientId, sizeof(MQTTclientId), PSTR("%s%02X%02X%02X%02X%02X%02X"), _HOSTNAME, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+        snprintf_P(MQTTclientId, sizeof(MQTTclientId), PSTR("%s%02X%02X%02X%02X%02X%02X"), MQTT_NAME_DEFAULT, mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
         // POINTER-LIFETIME CONTRACT (espMqttClient stores pointers, never copies
         // them until connect() builds the CONNECT packet):
         //  - setClientId(MQTTclientId): MQTTclientId is the file-static buffer at

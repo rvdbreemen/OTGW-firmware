@@ -2,7 +2,7 @@
 
 ### Overzicht
 
-De webinterface van OTGW-firmware is een single-page application (SPA) die door het apparaat zelf wordt geserveerd. U heeft geen app, geen cloud en geen account nodig. Open een browser en navigeer naar `http://otgw.local/` of het IP-adres van uw apparaat.
+De webinterface van OTGW-firmware is een single-page application (SPA) die door het apparaat zelf wordt geserveerd. U heeft geen app, geen cloud en geen account nodig. Open een browser en navigeer naar `http://otgw2.local/` of het IP-adres van uw apparaat.
 
 De interface werkt in de huidige plus twee voorgaande major-versies van Google Chrome, Mozilla Firefox en Apple Safari. Andere browsers worden niet officieel ondersteund.
 
@@ -275,7 +275,7 @@ Klik op **Opslaan** onderaan een sectie om de wijzigingen toe te passen. De mees
 
 | Instelling | Omschrijving | Standaard |
 |---|---|---|
-| Hostname | mDNS- en DHCP-hostnaam, bereikbaar als `<hostname>.local` | `otgw` |
+| Hostname | mDNS- en DHCP-hostnaam, bereikbaar als `<hostname>.local` | `OTGW2` (1.x: `OTGW`) |
 | Wi-Fi Network (SSID) | Alleen-lezen weergave van het huidig verbonden Wi-Fi-netwerk | (huidige SSID) |
 | Reset WiFi | Knop naast het SSID-veld. Wist de opgeslagen Wi-Fi-gegevens en herstart het apparaat in Access Point (AP) modus | n.v.t. |
 
@@ -394,7 +394,7 @@ Klik op **Update** om de geselecteerde versie te installeren. De firmware:
 
 De flash utility op `http://<ip>/update` installeert firmware en webbestanden in een keer:
 
-1. Open de pagina met het IP-adres (niet met `otgw.local`: de updater heeft geen mDNS-naam).
+1. Open de pagina met het IP-adres (niet met `otgw2.local`: de updater heeft geen mDNS-naam).
 2. Kies de release-zip, of de bestanden `.ino.bin` en `.littlefs.bin`. De pagina controleert de bestanden op inhoud en weigert USB-images, de updater zelf en bestanden uit verschillende builds.
 3. Druk op **Update** en laat het tabblad open tot er Done staat (2 tot 3 minuten). De unit herstart twee keer. De pagina schakelt over naar de safeboot-updater, installeert de firmware, wacht op de nieuwe firmware, installeert de webbestanden en controleert beide.
 
@@ -426,7 +426,7 @@ Op dezelfde pagina kunt u ook de PIC co-processor firmware updaten. Selecteer he
 
 ### Bestandsbeheer (FSexplorer)
 
-De FSexplorer is bereikbaar via de Geavanceerd-tab onder **File system contents**, of rechtstreeks op `http://otgw.local/FSexplorer.html`. De pagina geeft toegang tot het LittleFS-bestandssysteem van het apparaat.
+De FSexplorer is bereikbaar via de Geavanceerd-tab onder **File system contents**, of rechtstreeks op `http://otgw2.local/FSexplorer.html`. De pagina geeft toegang tot het LittleFS-bestandssysteem van het apparaat.
 
 Mogelijkheden:
 

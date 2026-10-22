@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.455
+**  Version  : v2.0.0-alpha.456
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -122,7 +122,8 @@ void blinkLEDnow(uint8_t);
 void setLed(uint8_t, uint8_t);
 
 //Defaults and macro definitions
-#define _HOSTNAME       "OTGW"
+#define _HOSTNAME       "OTGW2"  // default hostname of the 2.0.0 line; 1.x keeps "OTGW" (TASK-1293)
+#define MQTT_NAME_DEFAULT "OTGW"  // MQTT top-topic fallback and client-id prefix, independent of the hostname default
 #define SETTINGS_FILE         "/settings.ini"
 #define NTP_DEFAULT_TIMEZONE "Europe/Amsterdam"
 #define NTP_HOST_DEFAULT "pool.ntp.org"

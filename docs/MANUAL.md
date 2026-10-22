@@ -320,7 +320,7 @@ On the first boot after flashing, the device has no saved Wi-Fi credentials. It 
 
 **AP name format**: `<hostname>-<MAC suffix>`
 
-The default hostname is `otgw`, so the AP will typically be named something like `otgw-A1B2C3`.
+The default hostname on 2.0.0 is `OTGW2`, so the AP will typically be named something like `OTGW2-A4:CF:12:21:B4:F8`.
 
 **Steps:**
 
@@ -330,9 +330,9 @@ The default hostname is `otgw`, so the AP will typically be named something like
 
 3. Select your home Wi-Fi network from the list, enter the password, and tap Save.
 
-4. The device connects to your home network, obtains a DHCP address, and announces itself as `otgw.local` via mDNS.
+4. The device connects to your home network, obtains a DHCP address, and announces itself as `otgw2.local` via mDNS.
 
-5. Navigate to `http://otgw.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw/` via LLMNR.
+5. Navigate to `http://otgw2.local/` in your browser to open the web interface. On Windows, the device also responds to `http://otgw2/` via LLMNR.
 
 > **ESP32 with Ethernet**: If you have a W5500 Ethernet module and a network cable connected, the device obtains an IP address via DHCP on the wired interface at boot and does not open an AP. No Wi-Fi setup is needed.
 
@@ -385,7 +385,7 @@ If you have a firmware binary file and want to upload it directly:
 
 ### Overview
 
-The OTGW web interface is a single-page application (SPA) served directly by the device itself, with no cloud service or external server required. Open it in any modern browser (Chrome, Firefox, or Safari) by navigating to `http://otgw.local/` or to the device's IP address: `http://<device-ip>/`.
+The OTGW web interface is a single-page application (SPA) served directly by the device itself, with no cloud service or external server required. Open it in any modern browser (Chrome, Firefox, or Safari) by navigating to `http://otgw2.local/` or to the device's IP address: `http://<device-ip>/`.
 
 The interface provides:
 
@@ -473,7 +473,7 @@ The Settings tab contains all device configuration, organized into sections. Aft
 
 | Setting | Description |
 |---|---|
-| Hostname | mDNS and DHCP hostname for the device (default: `otgw`) |
+| Hostname | mDNS and DHCP hostname for the device (default: `OTGW2`; 1.x uses `OTGW`) |
 | Connected SSID | Displays the currently connected Wi-Fi network (read-only) |
 | Reset WiFi | Clears saved credentials and reopens the captive portal on next boot |
 
@@ -788,7 +788,7 @@ If you restart Home Assistant, the firmware detects this by monitoring `homeassi
 #### Triggering a full rediscovery manually
 
 ```bash
-curl -X POST http://otgw.local/api/v2/otgw/discovery
+curl -X POST http://otgw2.local/api/v2/otgw/discovery
 ```
 
 ---
@@ -1201,7 +1201,7 @@ On first boot the firmware has no saved WiFi credentials. It opens a captive por
 
 #### 6.1.1 Initial Configuration via Captive Portal
 
-When no credentials are stored, the device starts a WiFi access point named after its hostname and MAC address, for example `otgw-AABBCCDD`. Connect to that SSID from a phone or laptop and a configuration page opens automatically (or navigate to `192.168.4.1` manually). Enter your SSID and password and click Save. The device reboots, connects to your network, and the AP disappears.
+When no credentials are stored, the device starts a WiFi access point named after its hostname and MAC address, for example `OTGW2-A4:CF:12:21:B4:F8`. Connect to that SSID from a phone or laptop and a configuration page opens automatically (or navigate to `192.168.4.1` manually). Enter your SSID and password and click Save. The device reboots, connects to your network, and the AP disappears.
 
 #### 6.1.2 Reconnection Behavior
 
@@ -1277,9 +1277,11 @@ Leave all fields empty to revert to DHCP.
 
 ### 6.4 mDNS and Hostname
 
-The default hostname is `otgw`. After connecting to your network the device is reachable as `otgw.local` from any mDNS-capable client (macOS, iOS, Linux with Avahi, Windows 10+ with Bonjour).
+The default hostname on 2.0.0 is `OTGW2`. After connecting to your network the device is reachable as `otgw2.local` from any mDNS-capable client (macOS, iOS, Linux with Avahi, Windows 10+ with Bonjour).
 
-The firmware also registers an LLMNR responder on ESP8266, which allows Windows machines to resolve `otgw` (without the `.local` suffix).
+The 1.x firmware keeps the default `OTGW` (`otgw.local`), so a 1.x and a 2.0.0 gateway on the same network no longer claim the same name. A unit upgraded from 1.x keeps the hostname saved in its settings, usually `OTGW`; only a new install or a reset that discards `settings.ini` starts with `OTGW2`.
+
+The firmware also registers an LLMNR responder on ESP8266, which allows Windows machines to resolve `otgw2` (without the `.local` suffix).
 
 Set the hostname in Settings. The new hostname propagates to the DHCP request, mDNS advertisement, MQTT client ID, and web UI title.
 
@@ -1302,7 +1304,7 @@ The firmware re-checks the time every 30 minutes. After each successful NTP sync
 The OTA update endpoint is at `/update`. Authentication uses HTTP Basic Auth when a password is configured.
 
 **Steps:**
-1. Open `http://otgw.local/update` in your browser.
+1. Open `http://otgw2.local/update` in your browser.
 2. Select the `.bin` firmware file.
 3. Click Upload.
 4. The device flashes the firmware, verifies the image, and reboots.
@@ -1330,7 +1332,7 @@ OTA is available from AP fallback mode as well, so you can recover a device stuc
 
 The firmware is designed for a local, trusted network. No inbound ports need to be forwarded through your router.
 
-mDNS (`otgw.local`) only works within a single Layer 2 broadcast domain. If Home Assistant is on a different VLAN, use the device's static IP or a DNS entry instead of `.local`.
+mDNS (`otgw2.local`) only works within a single Layer 2 broadcast domain. If Home Assistant is on a different VLAN, use the device's static IP or a DNS entry instead of `.local`.
 
 ---
 
@@ -1451,10 +1453,10 @@ The firmware streams a real-time debug log over Telnet on port 23.
 #### Connecting
 
 ```
-telnet otgw.local 23
+telnet otgw2.local 23
 ```
 
-Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw.local`, port 23.
+Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw2.local`, port 23.
 
 #### Reading Common Error Patterns
 
@@ -1474,7 +1476,7 @@ Or use PuTTY: connection type "Other", protocol "Telnet", host `otgw.local`, por
 ### 7.10 Factory Reset
 
 **Method 1: Web UI**
-1. Open `http://otgw.local/fsexplorer`.
+1. Open `http://otgw2.local/fsexplorer`.
 2. Delete the file `/settings.json`.
 3. Reboot the device.
 
@@ -2017,7 +2019,7 @@ For a text field:
 The firmware streams diagnostic output to Telnet port 23 via the SimpleTelnet library (`SimpleTelnet<1> debugTelnet`, declared extern in `OTGW-firmware.h` and defined in `networkStuff.ino`). SimpleTelnet replaces the older TelnetStream and ESPTelnet libraries and provides a unified API on both ESP8266 and ESP32. Connect with any Telnet client:
 
 ```bash
-telnet otgw.local 23
+telnet otgw2.local 23
 # or by IP:
 telnet 192.168.1.x 23
 ```
@@ -2259,7 +2261,7 @@ http://{device-ip}/api/v2/
 
 Older versions return HTTP 410 Gone. Never use `/api/v0/` or `/api/v1/` in new code.
 
-The device hostname defaults to `otgw.local` (mDNS / LLMNR). Alternatively, use the IP address assigned by your DHCP server.
+The device hostname defaults to `otgw2.local` (mDNS / LLMNR). Alternatively, use the IP address assigned by your DHCP server.
 
 #### Transport
 
@@ -2357,7 +2359,7 @@ Returns all device settings. Authentication required.
 
 ```json
 {
-  "hostname": "otgw",
+  "hostname": "OTGW2",
   "httppassword": "****",
   "mqttenable": true,
   "mqttbroker": "192.168.1.10",
@@ -2413,7 +2415,7 @@ Returns hardware and platform information. No authentication required.
 
 ```json
 {
-  "hostname": "otgw",
+  "hostname": "OTGW2",
   "firmware_version": "2.0.0",
   "platform": "ESP8266",
   "board": "NODOSHOP_ESP8266",
@@ -2862,7 +2864,7 @@ The WebSocket server listens on **port 81** (separate from the HTTP server on po
 From JavaScript:
 
 ```javascript
-const ws = new WebSocket("ws://otgw.local:81/");
+const ws = new WebSocket("ws://otgw2.local:81/");
 ws.onopen  = () => console.log("connected");
 ws.onclose = () => setTimeout(reconnect, 3000);  // auto-reconnect
 ws.onmessage = (event) => handleFrame(event.data);
@@ -3276,7 +3278,7 @@ The firmware streams diagnostic output to a Telnet server on port 23.
 #### Connecting
 
 ```bash
-telnet otgw.local 23
+telnet otgw2.local 23
 # or by IP
 telnet 192.168.1.50 23
 ```
@@ -3326,9 +3328,9 @@ Debug flags can be toggled at runtime via the REST API settings endpoint or via 
 A separate TCP socket on port 25238 exposes the raw OTGW serial stream. This is for tools like OTmonitor that need raw protocol access:
 
 ```bash
-nc otgw.local 25238
+nc otgw2.local 25238
 # or
-telnet otgw.local 25238
+telnet otgw2.local 25238
 ```
 
 The output is the unprocessed ASCII stream from the PIC: lines like `T80000200`, `B4001FF04`, `R4001FF04`. You can also send raw PIC commands by typing them followed by a newline. This port is separate from the debug Telnet console.
@@ -3345,7 +3347,7 @@ The output is the unprocessed ASCII stream from the PIC: lines like `T80000200`,
 | 25238 | TCP (raw) | TCP serial bridge to OTGW PIC |
 | 1883 | TCP (MQTT) | MQTT broker connection (outbound) |
 | 123 | UDP (SNTP) | NTP time synchronization (outbound) |
-| 5353 | UDP (mDNS) | `otgw.local` name resolution |
+| 5353 | UDP (mDNS) | `otgw2.local` name resolution |
 | 5355 | UDP (LLMNR) | Windows name resolution |
 ## Chapter 10: Appendix
 
@@ -3433,8 +3435,8 @@ The full list of all 128 message IDs, including solar storage (IDs 101-103), ven
 | **HEAP_WARNING** | Heap level 3–5 KB. WebSocket sends blocked; MQTT aggressively throttled. |
 | **JIT discovery** | Just-in-time Home Assistant discovery. Rather than publishing all 200+ HA discovery payloads at once on connect, the firmware publishes a discovery payload for a given message ID the first time it receives data for that ID. This spreads the load over the first few minutes of operation. |
 | **LittleFS** | The flash filesystem used by the firmware for storing settings, web assets, discovery configs, sensor labels, SAT state, and crash logs. Mounted on the ESP8266/ESP32 SPI flash. |
-| **LLMNR** | Link-Local Multicast Name Resolution. Used for Windows name resolution of `otgw.local` without a DNS server. |
-| **mDNS** | Multicast DNS. Allows the device to be reached as `otgw.local` (or custom hostname + `.local`) on the local network without a DNS server. |
+| **LLMNR** | Link-Local Multicast Name Resolution. Used for Windows name resolution of `otgw2.local` without a DNS server. |
+| **mDNS** | Multicast DNS. Allows the device to be reached as `otgw2.local` (or custom hostname + `.local`) on the local network without a DNS server. |
 | **MQTT** | Message Queuing Telemetry Transport. The lightweight publish-subscribe protocol used for integration with Home Assistant and other automation platforms. The firmware supports MQTT 3.1.1 via the PubSubClient library. |
 | **NTP** | Network Time Protocol. Used by the firmware for accurate wall-clock time (boiler clock sync, SAT calculations, log timestamps). Default server: `pool.ntp.org`. |
 | **NodeMCU** | An ESP8266 development board. Functionally equivalent to Wemos D1 mini for this firmware. |
@@ -3464,7 +3466,7 @@ These are the factory defaults. All settings are configurable via the web UI Set
 
 | Setting key | Default | Description |
 |-------------|---------|-------------|
-| `hostname` | `OTGW` | mDNS hostname (device accessible at `otgw.local`) |
+| `hostname` | `OTGW2` | mDNS hostname (device accessible at `otgw2.local`; 1.x default is `OTGW`) |
 | `httppassword` | (empty) | HTTP Basic Auth password. Empty = no authentication. |
 | `ledblink` | `true` | LED heartbeat blink enabled |
 | `darktheme` | `false` | Web UI dark theme |

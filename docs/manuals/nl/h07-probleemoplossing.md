@@ -193,18 +193,18 @@ Als de firmware niet meer reageert na een mislukte update:
 
 #### Symptomen
 
-- `http://otgw.local` geeft geen reactie of een foutpagina.
+- `http://otgw2.local` geeft geen reactie of een foutpagina.
 - De pagina laadt deels maar toont lege secties.
 
 #### Stap 1: Controleer netwerkbereikbaarheid
 
 ```bash
-ping otgw.local
+ping otgw2.local
 ```
 
 Reageert de ping niet, controleer dan:
 - Is het apparaat verbonden met WiFi? Controleer de router voor verbonden apparaten.
-- Is mDNS beschikbaar? Probeer het IP-adres rechtstreeks in plaats van `otgw.local`.
+- Is mDNS beschikbaar? Probeer het IP-adres rechtstreeks in plaats van `otgw2.local`.
 
 #### Stap 2: Controleer de HTTP-server
 
@@ -484,7 +484,7 @@ Het OTGW32-bord ondersteunt een W5500 Ethernet-module als alternatief voor WiFi:
 Via de REST API:
 
 ```
-GET http://otgw.local/api/v2/device/settings/reset
+GET http://otgw2.local/api/v2/device/settings/reset
 ```
 
 Dit wist alle instellingen en herstart het apparaat met standaardwaarden.
@@ -549,7 +549,7 @@ Reconnecting... (attempt 1/10)
 Het apparaat heeft de WiFi-verbinding verloren en probeert opnieuw te verbinden. Na 10 pogingen volgt een herstart. Controleer het WiFi-signaal.
 
 ```
-Entered config mode SSID: otgw-XXXXXXXXXXXX
+Entered config mode SSID: OTGW2-XX:XX:XX:XX:XX:XX
 ```
 
 De AP-fallbackmodus is actief. Verbind met dit SSID om de WiFi-instellingen opnieuw te configureren.

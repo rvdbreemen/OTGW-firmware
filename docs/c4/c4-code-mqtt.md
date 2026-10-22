@@ -62,7 +62,7 @@
 
 - `void handleMQTT()`
   - Main state machine, called from `doBackgroundTasks()`. It pumps `MQTTclient.loop()` on every tick (the client is created with `UseInternalTask::NO`, so this loop is the only driver of the connection handshake and outbox), then `tickDiscoveryVerification()` and `mqttV2MigrationTick()`.
-  - `MQTT_STATE_INIT`: `WiFi.hostByName()` for the broker; valid IP leads to `setServer()`, `setKeepAlive(60)`, `setCleanSession(true)`, client id `<_HOSTNAME><MAC>`, last will on `MQTTPubNamespace` ("offline", retained), credentials (anonymous when `sUser` is empty); invalid IP leads to `MQTT_STATE_ERROR`
+  - `MQTT_STATE_INIT`: `WiFi.hostByName()` for the broker; valid IP leads to `setServer()`, `setKeepAlive(60)`, `setCleanSession(true)`, client id `<MQTT_NAME_DEFAULT><MAC>` (`OTGW<MAC>`), last will on `MQTTPubNamespace` ("offline", retained), credentials (anonymous when `sUser` is empty); invalid IP leads to `MQTT_STATE_ERROR`
   - `MQTT_STATE_TRY_TO_CONNECT`: `MQTTclient.connect()` is asynchronous (queues the work and returns). The per-attempt wait is `3 s x attempt`; after 5 attempts the state becomes `MQTT_STATE_WAIT_FOR_RECONNECT`
   - `MQTT_STATE_WAIT_CONNECTION_ATTEMPT`: non-blocking wait; retries when `timerMQTTwaitforretry` is due
   - `MQTT_STATE_IS_CONNECTED`: stamps `state.mqtt.iLastConnectedMs`; every 60 s `publishActiveOverrides()` (ADR-118); every 300 s `publishBirthOnline()` re-assert (TASK-874)
