@@ -3,9 +3,11 @@ id: TASK-1302
 title: >-
   Fix: setup() blocks ~48 s after WiFi is up on about 1 in 50 boots (web down 54
   s)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-22T14:49:00Z'
+updated_date: '2026-10-22T16:06:00Z'
 labels:
   - bug
 dependencies: []
