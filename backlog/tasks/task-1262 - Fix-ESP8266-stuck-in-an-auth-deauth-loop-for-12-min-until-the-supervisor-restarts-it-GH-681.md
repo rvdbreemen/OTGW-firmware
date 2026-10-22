@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-19 18:03
-updated_date: '2026-10-22T04:25:00Z'
+updated_date: '2026-10-22T04:27:00Z'
 labels:
   - bug
   - needs-info
@@ -75,4 +75,6 @@ Conclusions:
 AC2 met: from the loss to the restart decision is a fixed 300 s, and recovery follows the AP within seconds (ADR-099 build).
 
 2026-10-22: theaprilhare (#681) on beta.4: no stuck reason-3 loop in 25 h; inactivity episodes recover in 20-100 s. AC#1 (which path issues the deauth and why reconnects kept failing) still unexplained; next evidence is the beta.5 telnet Drop line.
+
+2026-10-22 06:17 bench, old build 1251039, AP present, no access-list rules (counts 0): RTS reset via COM3. MikroTik: 06:17:03 'received deauth: sending station leaving (3)' and 'connected' in the same second, then NO DHCP assignment; 06:19:03 'disassoc: sending station leaving (8)' (= 120 s direct connect failed, portal starts and drops STA); 06:23:09 connected + DHCP assigned (after the 240 s portal timeout restart). Reboot log top line: 'Software/System restart (4) - WiFi: config portal timeout'. The previous RTS reset at 06:13:16 showed the same deauth(3)+connected but DHCP was assigned at once (hostname ESP-22B8E1, i.e. SDK auto-connect before startWiFi set the hostname). So on 1 of 2 resets the ESP associated without completing DHCP for 120 s, which costs 6 min (direct 120 s + portal 240 s) on any non-supervisor reset. Candidate for AC#1: a reset/crash produces the reason-3 deauth the AP logs, and the following association can fail to get an IP. Not yet reproduced a second time; frequency unknown.
 <!-- SECTION:NOTES:END -->
