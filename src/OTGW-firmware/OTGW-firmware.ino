@@ -156,9 +156,8 @@ void setup() {
   checklittlefshash();
   loadOtSupportFiles();  // TASK-688: warm the in-RAM support bitmaps from prior-boot knowledge
 
-  // Set hostname ASAP after loading settings.  WiFi.persistent(true) from a
-  // previous boot lets the SDK auto-connect before startWiFi() is reached;
-  // without this early call the DHCP request carries the default "ESP-XXXXXX".
+  // Set hostname ASAP after loading settings. startWiFi() sets it again before
+  // it connects, and turns the SDK auto-connect off (TASK-1301).
   WiFi.hostname(CSTR(settings.sHostname));
 
   // Connect to and initialise WiFi network

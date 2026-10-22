@@ -337,6 +337,14 @@ void startWiFi(const char* hostname, int timeOut, bool forcePortal)
     int directConnectTimeout = timeOut / 2;
     if (directConnectTimeout < 5) directConnectTimeout = 5;
     DebugTf(PSTR("Direct connect timeout: %d sec\r\n"), directConnectTimeout);
+    // With the SDK auto-connect flag on, the SDK is already connecting before
+    // setup() runs, and begin() on top of that attempt races it: most resets
+    // leased the default name "ESP-XXXXXX", and about 1 in 20 left the station
+    // stuck connecting for the whole direct-connect window (TASK-1301). Turn
+    // the flag off (the SDK writes flash only when it changes), stop an attempt
+    // still in progress, then set the hostname and connect once. Like ESPHome.
+    if (WiFi.getAutoConnect()) WiFi.setAutoConnect(false);
+    if (wifi_station_get_connect_status() != STATION_IDLE) wifi_station_disconnect();  // keeps the saved credentials
     WiFi.hostname(hostname);  // set before begin() so DHCP sends the correct hostname
     WiFi.begin(); // use stored credentials
     DECLARE_TIMER_SEC(timeoutWifiConnectInitial, directConnectTimeout, CATCH_UP_MISSED_TICKS);
