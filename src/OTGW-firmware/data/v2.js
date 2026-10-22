@@ -1724,7 +1724,9 @@
     { id: 'behavior', title: 'Behavior',               icon: '🔧', reboot: false, desc: 'LED, theme and restart behaviour.' },
     { id: 'sat',      title: 'SAT — Smart Thermostat', icon: '🧠', reboot: false, desc: 'Standalone Adaptive Thermostat.' }
   ];
-  // lowercase REST key -> { cat, sub?, label, hint? }. Reboot is per-category.
+  // lowercase REST key -> { cat, sub?, label, hint?, help? }. Reboot is per-category.
+  // hint = short unit line under the label. help = optional longer text that wins over
+  // settings-help.json (TASK-1281); the JSON holds the text of every curated key.
   var SET_META = {
     hostname:        { cat: 'system', label: 'Hostname', hint: 'mDNS name on your network' },
     ssid:            { cat: 'system', label: 'Wi-Fi network', hint: 'Connected SSID (read-only)' },
@@ -1819,7 +1821,7 @@
     // TASK-935: remaining OT-Direct config keys (were falling back to humanizeKey)
     otdautodetect:       { cat: 'otd', label: 'Auto-detect OTGW32 mode' },
     otdsetbacktemp:      { cat: 'otd', label: 'Setback temperature', hint: '°C' },
-    otdsetbacktimeout:   { cat: 'otd', label: 'Setback timeout', hint: 'Minutes' },
+    otdsetbacktimeout:   { cat: 'otd', label: 'Setback timeout', hint: 'Seconds' },   // OTDirect.ino multiplies by 1000 (TASK-1281)
     otdenableslave:      { cat: 'otd', label: 'Enable slave (thermostat) passthrough' },
     otdsummermode:       { cat: 'otd', label: 'Summer mode (CH off)' },
     otdfailsafe:         { cat: 'otd', label: 'Fail-safe on OT bus loss' },
@@ -1867,10 +1869,8 @@
     // the firmware GET exposes (presets / weather / solar / summer / comfort /
     // multi-area / PV-boost / auto-tune / simulation / BLE). These previously fell
     // back to humanizeKey under a flat SAT card (TASK-933 mockup-alignment). ---
-    // TASK-1211: wording proposed by Sergeant D; 'help' renders under the row.
-    satexternaltemp:     { cat: 'sat', label: 'Use MQTT/REST as indoor temp source',
-                           help: 'Send the room temperature to SAT, either way. MQTT: publish to <prefix>/set/<node>/sat/indoor_temp ' +
-                                 '(payload e.g. 20.8). REST: POST it to /api/v2/sat/externaltemp. The value expires after "Sensor max age".' },
+    // TASK-1281: the explanation of this setting (formerly an inline 'help' block) lives in settings-help.json.
+    satexternaltemp:     { cat: 'sat', label: 'Use MQTT/REST as indoor temp source' },
     satovershootmargin:  { cat: 'sat', label: 'Overshoot margin', hint: '°C' },
     satpwmautoswitch:    { cat: 'sat', label: 'Auto PWM switch' },
     satboilercapacity:   { cat: 'sat', label: 'Boiler capacity', hint: 'kW' },
@@ -1985,6 +1985,137 @@
   function labelFor(k) { return (SET_META[k] && SET_META[k].label) || humanizeKey(k); }
   function hintFor(k) { return SET_META[k] && SET_META[k].hint; }
   function subFor(k) { return (SET_META[k] && SET_META[k].sub) || ''; }
+  // TASK-1281: help text of a setting. SET_META[k].help wins; otherwise settings-help.json
+  // ({key: text}, loaded on the first interaction with an info icon). '' = not known (yet).
+  var SETTINGS_HELP = null, helpPromise = null;
+  function helpFor(k) {
+    var m = SET_META[k];
+    if (m && m.help) return m.help;
+    return (SETTINGS_HELP && typeof SETTINGS_HELP[k] === 'string') ? SETTINGS_HELP[k] : '';
+  }
+  // One GET for the whole file. The promise is kept after a success; after a failure
+  // (for example a 503 from the file-serve gate) it is dropped so the next open retries.
+  function loadSettingsHelp() {
+    if (SETTINGS_HELP) return Promise.resolve(SETTINGS_HELP);
+    if (helpPromise) return helpPromise;
+    helpPromise = fetch('settings-help.json', { cache: 'no-cache' }).then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.text();
+    }).then(function (t) {
+      var j = null;
+      try { j = JSON.parse(t); } catch (e) { j = null; }
+      if (!j || typeof j !== 'object') throw new Error('settings-help.json is not valid');
+      SETTINGS_HELP = j;
+      return j;
+    }).catch(function (e) { helpPromise = null; throw e; });
+    return helpPromise;
+  }
+  // One shared popover (#shelp, role=tooltip) for all info icons. Hover or focus shows it,
+  // leaving hides it unless it is pinned. A click or tap pins it (aria-expanded=true);
+  // Escape, a second click or a click elsewhere unpins and hides it. Text via textContent only.
+  var helpPop = null, helpBtn = null, helpPinned = false, helpRefocus = false, helpOverPop = false;
+  function helpPlace() {
+    if (!helpPop || !helpBtn) return;
+    if (!helpBtn.isConnected) { hideHelp(); return; }   // the settings list was re-rendered
+    var r = helpBtn.getBoundingClientRect(), de = document.documentElement;
+    var vw = de.clientWidth, vh = de.clientHeight, m = 8;
+    // The icon scrolled out of view: a popover parked at the viewport edge has lost its anchor.
+    if (r.bottom < 0 || r.top > vh || r.right < 0 || r.left > vw) { hideHelp(); return; }
+    // Measure at left 0: a fixed box with only `left` set shrinks to fit the space right of it,
+    // so measuring at the previous left squeezed the popover on a phone (review finding).
+    helpPop.style.left = '0px';
+    var w = helpPop.offsetWidth, h = helpPop.offsetHeight;
+    var top = r.bottom + 6;
+    if (top + h > vh - m && r.top - 6 - h >= m) top = r.top - 6 - h;   // no room below: open above
+    helpPop.style.left = Math.max(m, Math.min(r.left, vw - w - m)) + 'px';
+    helpPop.style.top = Math.max(m, top) + 'px';
+  }
+  function hideHelp() {
+    helpPinned = false; helpOverPop = false;
+    if (helpBtn) { helpBtn.setAttribute('aria-expanded', 'false'); helpBtn.removeAttribute('aria-describedby'); helpBtn = null; }
+    if (helpPop) helpPop.classList.remove('show');
+  }
+  // Keyboard focus keeps a hovered popover open; the focus a mouse click leaves behind must not,
+  // or the next hover never closes (review finding). :focus-visible tells the two apart.
+  function helpKbFocus(b) {
+    try { return b.matches(':focus-visible'); } catch (e) { return document.activeElement === b; }
+  }
+  function helpPopover() {
+    if (helpPop) return helpPop;
+    helpPop = document.createElement('div');
+    helpPop.id = 'shelp';
+    helpPop.setAttribute('role', 'tooltip');
+    helpPop.setAttribute('aria-live', 'polite');   // the text that replaces "Loading" is announced too
+    // Hoverable (WCAG 1.4.13): moving the pointer onto the popover keeps it open.
+    helpPop.addEventListener('mouseenter', function () { helpOverPop = true; });
+    helpPop.addEventListener('mouseleave', function () {
+      helpOverPop = false;
+      if (!helpPinned && helpBtn && !helpKbFocus(helpBtn)) hideHelp();
+    });
+    document.body.appendChild(helpPop);
+    document.addEventListener('keydown', function (ev) {
+      if (ev.key !== 'Escape' || !helpBtn) return;
+      var b = helpBtn, pinned = helpPinned;
+      hideHelp();
+      // Only a pinned popover owns the focus; a hovered one leaves the field being edited alone.
+      if (pinned && b.isConnected && document.activeElement !== b) { helpRefocus = true; b.focus(); helpRefocus = false; }
+    });
+    document.addEventListener('click', function (ev) {
+      if (!helpPinned || !helpBtn) return;
+      if (helpBtn.contains(ev.target) || helpPop.contains(ev.target)) return;
+      hideHelp();
+    });
+    window.addEventListener('scroll', helpPlace, true);
+    window.addEventListener('resize', helpPlace);
+    return helpPop;
+  }
+  function showHelp(btn, k, pin) {
+    var pop = helpPopover();
+    if (helpBtn && helpBtn !== btn) { helpBtn.setAttribute('aria-expanded', 'false'); helpBtn.removeAttribute('aria-describedby'); helpPinned = false; }
+    helpBtn = btn;
+    if (pin) helpPinned = true;
+    btn.setAttribute('aria-expanded', helpPinned ? 'true' : 'false');   // expanded means pinned open, not hovered
+    btn.setAttribute('aria-describedby', 'shelp');
+    var t = helpFor(k);
+    pop.textContent = t || (SETTINGS_HELP ? 'No help text for this setting.' : 'Loading…');
+    pop.classList.add('show');
+    helpPlace();
+    if (t || SETTINGS_HELP) return;
+    loadSettingsHelp().then(function () {
+      if (helpBtn !== btn) return;
+      pop.textContent = helpFor(k) || 'No help text for this setting.';
+      helpPlace();
+    }, function () {
+      if (helpBtn !== btn) return;
+      pop.textContent = 'Help not available.';
+      helpPlace();
+    });
+  }
+  // The info icon after a curated setting's label. A real button: Tab reaches it, Enter and
+  // Space click it. No icon for keys outside SET_META (they have no help text).
+  function addHelpIcon(lbl, k) {
+    if (!SET_META[k]) return;
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'sinfo';
+    b.setAttribute('aria-label', 'Help: ' + labelFor(k));
+    b.setAttribute('aria-expanded', 'false');
+    b.setAttribute('aria-controls', 'shelp');
+    b.addEventListener('mouseenter', function () { if (!(helpPinned && helpBtn !== b)) showHelp(b, k); });
+    b.addEventListener('mouseleave', function () {
+      // A short grace period lets the pointer cross the gap onto the popover.
+      setTimeout(function () {
+        if (!helpPinned && helpBtn === b && !helpOverPop && !helpKbFocus(b)) hideHelp();
+      }, 120);
+    });
+    b.addEventListener('focus', function () { if (!helpRefocus) showHelp(b, k); });
+    b.addEventListener('blur', function () { if (!helpPinned && helpBtn === b && !helpOverPop) hideHelp(); });
+    b.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      if (helpBtn === b && helpPinned) { hideHelp(); return; }
+      showHelp(b, k, true);
+    });
+    lbl.appendChild(b);
+  }
   function catById(id) { for (var i = 0; i < SET_CATS.length; i++) if (SET_CATS[i].id === id) return SET_CATS[i]; return null; }
 
   var setData = {};   // key -> {value,type,...} as fetched
@@ -2027,6 +2158,7 @@
   function renderSettings() {
     var rail = document.getElementById('setRail'), cols = document.getElementById('setCols');
     if (!rail || !cols) return;
+    hideHelp();   // TASK-1281: the rows are rebuilt below, so a popover on an old icon would point at nothing
     var q = setSearch.trim().toLowerCase();
     rail.textContent = ''; cols.textContent = '';
     // Build the rail (one item per category that has at least one field), with
@@ -2103,6 +2235,7 @@
   function renderSatSettings() {
     var l2 = document.getElementById('satSetL2'), l3 = document.getElementById('satSetL3');
     if (!l2 || !l3) return;
+    hideHelp();   // TASK-1281
     l2.textContent = ''; l3.textContent = '';
     var placed = {};
     function fill(host, groups) {
@@ -2128,6 +2261,7 @@
     row.dataset.key = k;
     var lbl = document.createElement('div'); lbl.className = 'slbl';
     lbl.appendChild(document.createTextNode(labelFor(k)));
+    addHelpIcon(lbl, k);   // TASK-1281
     var hint = hintFor(k);
     if (hint) { var hs = document.createElement('span'); hs.className = 'shint'; hs.textContent = hint; lbl.appendChild(hs); }
     row.appendChild(lbl);
@@ -2187,9 +2321,6 @@
       });
     }
     row.appendChild(input);
-    // TASK-1211: optional longer explanation under the row (SET_META.help).
-    var help = SET_META[k] && SET_META[k].help;
-    if (help) { var hd = document.createElement('div'); hd.className = 'shelp'; hd.textContent = help; row.appendChild(hd); }
     return row;
   }
   // TASK-985/1230: Webhook test actions, appended to the Webhook settings group by

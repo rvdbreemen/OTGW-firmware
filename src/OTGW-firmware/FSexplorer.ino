@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program : FSexplorer
-**  Version  : v2.0.0-alpha.456
+**  Version  : v2.0.0-alpha.457
 **
 **  Mostly stolen from https://www.arduinoforum.de/User-Fips
 **  For more information visit: https://fipsok.de
@@ -195,6 +195,8 @@ void startWebserver(){
   // generate_v2_css_bundle). v2.html loads this bundle; the two source files are
   // not shipped in the filesystem image (build.py STAGING_EXCLUDE).
   server.on("/v2-bundle.css",    HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/v2-bundle.css",    F("text/css")); });
+  // TASK-1281: the settings help texts, fetched by v2.js the first time an info icon is used.
+  server.on("/settings-help.json", HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveVersionedAsset("/settings-help.json", F("application/json")); });
   // TASK-989: immutable-cached font routes (see serveImmutableAsset above).
   server.on("/fonts/inter-400.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-400.woff2",          F("font/woff2")); });
   server.on("/fonts/inter-700.woff2",          HTTP_GET, [](AsyncWebServerRequest *r){ webBeginRequest(r); serveImmutableAsset("/fonts/inter-700.woff2",          F("font/woff2")); });

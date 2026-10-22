@@ -234,6 +234,8 @@ The header bar shows a heap memory indicator displaying the current free heap an
 
 The Settings tab contains all device configuration, organized into sections. After changing any settings, click **Save** at the bottom of the section to apply and persist the changes.
 
+Next to each setting label is an **i** button. Hover it, focus it with the keyboard or tap it to read a one- or two-sentence explanation of the setting. A click or tap keeps the text open and **Esc** closes it. The texts are read from `settings-help.json` on the device.
+
 #### Wi-Fi
 
 | Setting | Description |

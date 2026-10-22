@@ -269,6 +269,8 @@ De headerbalk toont een heap-geheugenindicator met het huidige vrije heap-geheug
 
 De instellingenpagina is ingedeeld in secties. Alle instellingen worden opgeslagen in `/settings.ini` op de LittleFS-flash en overleven een herstart.
 
+Naast het label van elke instelling staat een **i**-knop. Beweeg de muis erheen, selecteer hem met het toetsenbord of tik erop voor een uitleg van een of twee zinnen over die instelling. Een klik of tik houdt de tekst open en **Esc** sluit hem. De teksten worden gelezen uit `settings-help.json` op het apparaat.
+
 Klik op **Opslaan** onderaan een sectie om de wijzigingen toe te passen. De meeste instellingen zijn onmiddellijk actief; voor sommige (zoals Wi-Fi-instellingen) is een herstart vereist.
 
 #### Wi-Fi sectie
