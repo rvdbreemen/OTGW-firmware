@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-22T04:23:00Z'
-updated_date: '2026-10-22T15:03:00Z'
+updated_date: '2026-10-22T16:05:00Z'
 labels:
   - bug
   - wifi
@@ -43,4 +43,6 @@ theaprilhare (GH #681, 2026-10-21, 1.7.8-beta.4, 25 h capture): besides the AP-s
 AC#1 (bounded): the late ARP reply does not occur on the bench; the ESP answers the router's ARP request within 1-7 ms on both builds at RSSI ~-76. So the field delay is not the ESP being slow to process ARP while it hears the request. Unproven field candidates: a broadcast ARP request (what FreeBSD sends after the entry expired; the MikroTik probes unicast) is sent without 802.11 ACK/retry and can be lost on air, and FreeBSD retries once per second (arpt_rexmit) up to arp_maxtries before marking the host down for arpt_down. The gratuitous ARP avoids the expiry, so it sidesteps whichever of these it is.
 AC#2 reworded (was: 'router ARP entry expiry no longer stalls traffic > 2 s on the bench'): the bench never stalls on expiry with either build, so the old wording could not separate old from fix. New AC#2 checks the mechanism; new AC#4 needs the reporter.
 Primary source for AC#2: FreeBSD sys/netinet/if_ether.c in_arpinput(): for a received ARP whose sender has an existing llentry, la = lla_lookup(...); arp_check_update_lle(...) always calls arp_mark_lle_reachable(), which sets la_expire = time_uptime + V_arpt_keep and reschedules arptimer (non-static entries). The packet is then dropped at the reply stage (not our target), after the cache update. OPNsense is FreeBSD-based. Linux-based routers (MikroTik bench) only mark the entry STALE on an unsolicited ARP, so there the GARP does not prevent their own unicast probes (seen on the bench: probes continued).
+
+- 2026-10-22: committed as 001e81e05 (CHANGELOG + networkStuff.h/.ino). adr-judge declarative pass: 72 ADRs checked, 0 violations, 56 advisory; LLM pass skipped (ADR_KIT_NO_LLM=1, maintainer approved, after the full-hook run was killed for low memory). Stays In Progress for AC#4 (reporter confirmation on OPNsense, GH #681).
 <!-- SECTION:NOTES:END -->
