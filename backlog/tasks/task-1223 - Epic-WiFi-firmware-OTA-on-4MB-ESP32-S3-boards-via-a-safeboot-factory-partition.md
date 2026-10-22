@@ -6,8 +6,8 @@ title: >-
 status: In Progress
 assignee:
   - '@claude'
-created_date: '2026-10-13 19:45'
-updated_date: '2026-10-15 04:11'
+created_date: 2026-10-13 19:45
+updated_date: '2026-10-22T07:01:00Z'
 labels:
   - epic
   - esp32
@@ -52,4 +52,6 @@ Maintainer decisions 2026-10-15:
 (4) Safeboot is WiFi plus a fallback AP only. W5500 Ethernet stays out of the updater; Ethernet-only units recover through the AP.
 (5) Crash-loop rollback: investigate whether the pioarduino bootloader can do APP_ROLLBACK, and ship it in the migration image if it can. Otherwise record why not.
 (6) The updater is our own minimal Arduino build (spike section 4.1), not MycilaSafeBoot.
+
+2026-10-22 cycle: 17 of 18 children Done; 1223.4 AC4 (safeboot silent on the PIC UART0 line) needs a serial capture on the Classic-S3, not connected. AC2 of this epic is covered by today's bench runs (firmware via POST /safeboot + upload, settings diff empty afterwards: TASK-1286/1279 evidence); AC3 by the 2026-10-15 truncated-upload transcript in 1223.4. Epic stays open until 1223.4 AC4 is captured.
 <!-- SECTION:NOTES:END -->

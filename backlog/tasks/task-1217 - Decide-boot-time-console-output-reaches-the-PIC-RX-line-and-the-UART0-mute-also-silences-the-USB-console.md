@@ -6,8 +6,8 @@ title: >-
 status: In Progress
 assignee:
   - '@claude'
-created_date: '2026-10-11 22:25'
-updated_date: '2026-10-18 20:04'
+created_date: 2026-10-11 22:25
+updated_date: '2026-10-22T07:00:00Z'
 labels:
   - esp32
   - pic
@@ -60,4 +60,6 @@ Deviation from plan step 2 (fallback taken): putc2 and the esp_log vprintf write
 ADR-168 (Accepted) stays valid: the decision is unchanged, only the mechanism and call sites moved; no ADR edit. Open-source check: trivial glue over the IDF LL API, no library search needed.
 
 2026-10-18: committed and shipped in esp32-combo alpha.436 (posted to #alpha-testing). evaluate.py --quick: 72 passed, 0 warn, 0 fail. AC2 bench evidence (no SE at boot on the Classic + S3 Mini, [combo] detect line on USB) still open.
+
+2026-10-22 cycle: skipped, AC2 needs the Classic + S3 Mini bench board, which is not connected (no COM8, .88.63 silent).
 <!-- SECTION:NOTES:END -->

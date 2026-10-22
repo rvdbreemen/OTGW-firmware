@@ -1,11 +1,11 @@
 ---
 id: TASK-1151
-title: 'OLED status rows keep the tail of the previous, longer text'
+title: OLED status rows keep the tail of the previous, longer text
 status: In Review
 assignee:
   - '@claude'
-created_date: '2026-09-22 06:37'
-updated_date: '2026-09-22 09:50'
+created_date: 2026-09-22 06:37
+updated_date: '2026-10-22T07:00:00Z'
 labels: []
 dependencies: []
 ordinal: 286000
@@ -56,4 +56,6 @@ build.bat green on esp32, esp32-classic and esp32-combo with zero warnings from 
 AC7 correction: the 'manual-padding workaround' the verification pass flagged at OLED.ino:311-314 is not a stale-tail workaround. F("on  ") vs F("off ") is column alignment that keeps 'DHW:' at a fixed column; removing it would render 'CH:onDHW:on'. Kept and documented in place rather than removed.
 
 AC2, AC3, AC6 and AC10 need an OLED on a 2.0.0 board. None was reachable this session: the OTGW32 (192.168.88.61) is in ARP but does not answer, the S3 Mini Pro is not on the network, and 192.168.88.68 is the 1.x ESP8266 unit.
+
+2026-10-22 cycle: skipped, AC2/3/6/10 need an Ethernet cable plugged into and pulled from the bench OTGW32, a physical action the session cannot do.
 <!-- SECTION:NOTES:END -->

@@ -5,8 +5,8 @@ title: >-
   0)
 status: To Do
 assignee: []
-created_date: '2026-10-15 15:47'
-updated_date: '2026-10-17 20:34'
+created_date: 2026-10-15 15:47
+updated_date: '2026-10-22T07:00:00Z'
 labels:
   - sat
   - otdirect
@@ -31,4 +31,6 @@ Moved out of ADR-179's open questions (TASK-1237). In gateway mode the gateway s
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-17: maintainer decision: measure first (AC1 bench capture with a live thermostat), then choose A/B. Blocked until the OTGW32 is reachable.
+
+2026-10-22 cycle: skipped, AC1 needs a live thermostat on the OT-Direct bench (none attached) and the decision touches SAT control behaviour, which now goes through docs/sat/thermo-nova-spec.md and Sergeant D (TASK-1292).
 <!-- SECTION:NOTES:END -->
