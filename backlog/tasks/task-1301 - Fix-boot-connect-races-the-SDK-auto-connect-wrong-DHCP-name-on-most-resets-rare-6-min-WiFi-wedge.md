@@ -3,9 +3,11 @@ id: TASK-1301
 title: >-
   Fix: boot connect races the SDK auto-connect (wrong DHCP name on most resets,
   rare 6-min WiFi wedge)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-22T12:50:00Z'
+updated_date: '2026-10-22T12:51:00Z'
 labels:
   - bug
   - wifi
