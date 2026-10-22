@@ -2764,8 +2764,9 @@
     // boardmode is the real 3-value hardware override (ADR-127); the mockup's
     // 4-option ESP8266/OTGW32/LOLIN list was semantically wrong.
     boardmode: [[0, 'Auto-detect'], [1, 'PIC (Classic)'], [2, 'OT-Direct (OTGW32)']],
-    gpiooutputstriggerbit: [[0, 'Flame'], [1, 'CH active'], [2, 'DHW active'], [3, 'Fault']],
-    webhooktriggerbit: [[0, 'Flame'], [1, 'CH active'], [2, 'DHW active'], [3, 'Fault']],
+    // Bit numbers of the boiler status byte (OT MsgID 0 LB): the firmware tests Statusflags & (1 << n).
+    gpiooutputstriggerbit: [[0, 'Fault'], [1, 'CH active'], [2, 'DHW active'], [3, 'Flame']],
+    webhooktriggerbit: [[0, 'Fault'], [1, 'CH active'], [2, 'DHW active'], [3, 'Flame']],
     satheatingmode: [[0, 'Comfort'], [1, 'Eco']],
     // OT-Direct gateway mode — labels from OTDirecttypes.h (NOT the mockup's
     // Off/On-Off/PID list, which was a different, wrong concept).

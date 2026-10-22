@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.460
+**  Version  : v2.0.0-alpha.461
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -3851,7 +3851,7 @@ void sendDeviceSettings()
   addInt(F("s0counterinterval"), settings.s0.iInterval, "i", 5, 65535);
   addBool(F("gpiooutputsenabled"), settings.outputs.bEnabled, "b");
   addInt(F("gpiooutputspin"), settings.outputs.iPin, "i", 0, 16);
-  addInt(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 16);
+  addInt(F("gpiooutputstriggerbit"), settings.outputs.iTriggerBit, "i", 0, 15);
   addBool(F("otgwcommandenable"), settings.picBoot.bEnable, "b");
   addStr(F("otgwcommands"), CSTR(settings.picBoot.sCommands), "s", 128);
   addBool(F("webhookenable"), settings.webhook.bEnabled, "b");

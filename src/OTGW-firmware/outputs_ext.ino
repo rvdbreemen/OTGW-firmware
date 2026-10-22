@@ -1,6 +1,6 @@
 /*********
 **  Program  : output_ext.ino
-**  Version  : v2.0.0-alpha.460
+**  Version  : v2.0.0-alpha.461
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Contributed by Sjorsjuhmaniac
@@ -62,7 +62,9 @@ void setOutputState(bool set_HIGH = true){
 void evalOutputs(){
   if(!settings.outputs.bEnabled) return;
   if (!validateGPIOOutputsConfig()) return;
-  // master HB
+  // iTriggerBit indexes OTcurrentSystemState.Statusflags = (MasterStatus << 8) | SlaveStatus
+  // (OTGW-Core.ino): the slave (boiler) bits below are 0-7, the master (thermostat) bits 8-15.
+  // master HB (bits 8-15 of Statusflags)
   // bit: [clear/0, set/1]
   //  0: CH enable [ CH is disabled, CH is enabled]
   //  1: DHW enable [ DHW is disabled, DHW is enabled]

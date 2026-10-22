@@ -229,7 +229,7 @@
 - `void evalOutputs(void)`
   - **Location**: `outputs_ext.ino:62`
   - **Description**: Returns if disabled or invalid. Reads bit `settings.outputs.iTriggerBit` of `OTcurrentSystemState.Statusflags` and passes it to `setOutputState()`. When `settings.bMyDEBUG` is set it logs once and clears the flag (telnet `l` key). Called from `loop()` (`OTGW-firmware.ino`, every pass).
-  - **OT Status Bit Reference** (bit index into `Statusflags`, see source comment for the full list): master bits 0 CH enable, 1 DHW enable, 2 cooling enable, 3 OTC active, 4 CH2 enable; slave bits 0 fault, 1 CH mode, 2 DHW mode, 3 flame, 4 cooling, 5 CH2 mode, 6 diagnostic.
+  - **OT Status Bit Reference** (bit index into `Statusflags = (MasterStatus << 8) | SlaveStatus`, see source comment for the full list): slave (boiler) bits 0 fault, 1 CH active, 2 DHW active, 3 flame, 4 cooling, 5 CH2 active, 6 diagnostic; master (thermostat) bits 8 CH enable, 9 DHW enable, 10 cooling enable, 11 OTC active, 12 CH2 enable. The v2 settings select offers 0 to 3 under these names (TASK-1295); the REST API accepts 0 to 15.
   - **Dependencies**:
     - `OTcurrentSystemState.Statusflags`
     - `settings.outputs.iTriggerBit`, `settings.outputs.bEnabled`, `settings.bMyDEBUG`
