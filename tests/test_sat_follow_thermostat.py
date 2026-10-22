@@ -231,8 +231,36 @@ class SatFollowThermostat(unittest.TestCase):
         r = self.run_sc(21.0, "tc=22.0", 21.0, 22.0, 22.0, push=1, last_tc=21.0, target=22.0)
         self.assertEqual((r["target"], r["adopted"]), ("22.0", "0"))
 
-    def test_scenario3b_previous_value_not_synced_only_records(self):
+    def test_scenario3b_previous_value_not_synced_is_adopted_since_task_1298(self):
+        # TASK-1298: the thermostat never mirrored the push (prev 22.0 vs TC 23.0); a real dial change
+        # to 21.0 is neither echo of 23.0 nor of the push before it (22.0 is 1.0 away), so it is adopted.
         r = self.run_sc(22.0, "tc=23.0", 21.0, 21.0, push=1, last_tc=22.0, target=23.0)
+        self.assertEqual((r["target"], r["adopted"]), ("21.0", "1"))
+
+    def test_gruijter_log_honeywell_round_never_mirrors_the_override(self):
+        # mqtt.log 2026-10-22 (TASK-1298): TC=20.5 pushed; dial 15 -> 19.5 -> 20.0 -> 19.5, each seen twice;
+        # the Round keeps reporting its own setpoint and never the override. The control loop pushes every
+        # adopted value as the next TC= (SATcontrol.ino satControlLoop), so the tc= tokens model that.
+        # HEAD adopts nothing; the review of the first fix showed a previous-push echo guard swallowing
+        # the final 19.5, so the pushes must be in the replay.
+        r = self.run_sc(15.0, 15.0, "tc=20.5", 19.5, 19.5, "tc=19.5", 20.0, 20.0, "tc=20.0", 19.5, 19.5,
+                        push=1, last_tc=0.0, target=20.5)
+        self.assertEqual((r["target"], r["adopted"]), ("19.5", "3"))
+        # then the user sets 20.0 in the SAT GUI (TC=20.0) and the dial shows 20.0: that is an echo
+        r = self.run_sc(19.5, 19.5, "tc=20.0", 20.0, 20.0, push=1, last_tc=19.5, target=20.0)
+        self.assertEqual((r["target"], r["adopted"]), ("20.0", "0"))
+
+    def test_dial_back_to_the_previous_value_is_adopted(self):
+        # A -> B -> A on any thermostat, with the loop's push after each adoption: the return to A is a
+        # real change and must not be mistaken for an echo of the push before the last one.
+        r = self.run_sc(21.0, 21.0, "tc=21.0", 22.0, 22.0, "tc=22.0", 21.0, 21.0, push=1, last_tc=0.0, target=21.0)
+        self.assertEqual((r["target"], r["adopted"]), ("21.0", "2"))
+
+    def test_mirroring_thermostat_late_reply_is_no_edge(self):
+        # Remeha iSense style: the thermostat mirrored TC=22 (echo, recorded). SAT then pushes 23; the
+        # thermostat still reports 22 for a moment, which is the recorded value and no edge, then mirrors 23
+        # (echo). Nothing is adopted and the target stays 23.
+        r = self.run_sc(21.0, 21.0, "tc=22.0", 22.0, 22.0, "tc=23.0", 22.0, 22.0, 23.0, 23.0, push=1, last_tc=21.0, target=23.0)
         self.assertEqual((r["target"], r["adopted"]), ("23.0", "0"))
 
     def test_scenario4_thermostat_rounds_tc_to_half_degree(self):

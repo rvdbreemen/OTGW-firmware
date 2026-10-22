@@ -1055,11 +1055,14 @@ static void satAdoptThermostatSetpoint(float tr)
 //  - debounce: a new value must be seen in two consecutive frames (within 0.05 C) before it counts. A
 //    different value in between restarts the candidate. This covers a PIC clear-before-set (Remeha
 //    iSense) and reset glitches.
-//  - push-setpoint on: the confirmed edge is adopted only when the PREVIOUS thermostat value was synced
-//    to SAT (a TC= was sent since boot and |prev - lastSentTC| <= 0.25 C). Otherwise (boot before the
-//    first push, a PIC reset that dropped the override, a late reply after a newer push, a thermostat
-//    still on its schedule) it only records. A new value within 0.25 C of the last TC= is SAT's own
-//    echo, also when the thermostat rounds TC= to its 0.5 C step; it is recorded, not adopted.
+//  - push-setpoint on: a confirmed edge is adopted once a TC= was sent since boot, unless it is SAT's
+//    own echo: a value within 0.25 C of the last TC= (also when the thermostat rounds TC= to its 0.5 C
+//    step). Echoes are recorded, not adopted. Before the first push (boot) it only records. A
+//    thermostat that mirrors the override and still reports the older push after a newer one is no
+//    edge: that older value is already the recorded one. TASK-1298 dropped the earlier rule that the
+//    PREVIOUS thermostat value had to match the last TC=: thermostats such as the Honeywell Round never
+//    mirror an accepted override in MsgID 16, so that rule blocked every dial change on them
+//    (maintainer decision 2026-10-22, docs/sat/sergeant-d-corrections.md entry 2).
 //  - push-setpoint off: every confirmed edge is adopted.
 static bool satFollowThermostatDecide(float seen, bool active, bool pushOn, float lastSentTC,
                                       float &lastSeen, bool &haveLast, float &cand, bool &haveCand)
@@ -1069,13 +1072,12 @@ static bool satFollowThermostatDecide(float seen, bool active, bool pushOn, floa
   if (!haveLast) { lastSeen = seen; haveLast = true; haveCand = false; return false; }
   if (fabsf(seen - lastSeen) < 0.095f) { haveCand = false; return false; }
   if (!haveCand || fabsf(seen - cand) > 0.051f) { cand = seen; haveCand = true; return false; }
-  const float prev = lastSeen;                             // confirmed: second frame with the same new value
-  lastSeen = seen;
+  lastSeen = seen;                                         // confirmed: second frame with the same new value
   haveCand = false;
   if (!pushOn) return true;
-  const bool synced = lastSentTC > 0.0f && fabsf(prev - lastSentTC) <= 0.25f;
+  const bool pushed = lastSentTC > 0.0f;                    // nothing sent since boot: the thermostat is on its own
   const bool echo   = fabsf(seen - lastSentTC) <= 0.25f;
-  return synced && !echo;
+  return pushed && !echo;
 }
 
 // Called from processOT() for every MsgID 16 Write-Data frame the thermostat sent (T frame), also when

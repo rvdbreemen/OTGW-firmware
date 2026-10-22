@@ -54,6 +54,12 @@ the settled part above is agreed by both his statement and the code.
 **Meaning:** the interaction of "follow thermostat" with "push setpoint" (TASK-1298, firmware-only
 feature) is the maintainer's decision, not a thermo-nova question.
 
+**Maintainer decision (Robert, 2026-10-22, in session):** with push on, a confirmed thermostat
+setpoint change is adopted when SAT has pushed at least once since boot and the change is not an
+echo of SAT's own push (within 0.25 °C). The earlier precondition that the thermostat's previous
+value matched the last push is dropped, because thermostats such as the Honeywell Round never
+mirror an accepted override in their own setpoint (MsgID 16).
+
 ## 3. Base temperature (2026-10-22)
 
 **Source:** 14:15 UTC, message 1562831881341505670.
