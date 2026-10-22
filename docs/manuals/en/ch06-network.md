@@ -164,21 +164,22 @@ The ESP8266 SDK initializes `time()` to `0xFFFFFFFF` (year 2106) before the firs
 
 ### 6.6 OTA Firmware Updates
 
-The OTA update endpoint is at `/update`. It sits behind the protected-admin boundary defined in ADR-056 (which supersedes ADR-054). When `settingHTTPpasswd` is empty, the endpoint is open. When a password is set, the endpoint requires HTTP Basic Auth with username `admin`. The same password is propagated to the OTA update server at WiFi or Ethernet startup, so a settings change takes effect on the next reboot without re-flashing.
+The OTA update endpoint is at `/update`. It sits behind the protected-admin boundary defined in ADR-056 (which supersedes ADR-054). When `settingHTTPpasswd` is empty, the endpoint is open. When a password is set, the endpoint requires HTTP authentication with username `admin` (the main firmware challenges with Digest, the safeboot updater with Basic). The same password is propagated to the OTA update server at WiFi or Ethernet startup, so a settings change takes effect on the next reboot without re-flashing.
 
 Browser requests to protected admin endpoints (including `/update`, `/upload`, `/ReBoot`, `/ResetWireless`, and `POST /api/v2/settings`) are additionally checked for `Origin`/`Referer` matching `Host`. This is a lightweight CSRF mitigation, not a full session framework: requests without `Origin` or `Referer` (curl, OTmonitor, scripts) are allowed for backward compatibility; mismatched origins are rejected with HTTP 403.
 
-**Steps:**
-1. Open `http://otgw.local/update` in your browser.
-2. Select the firmware file.
-3. Click Upload.
-4. The device flashes the firmware, verifies the image, and reboots.
+**Steps (ESP32-S3, 4 MB flash):**
+1. Open `http://<ip>/update` in your browser (the IP address, not `otgw.local`).
+2. Choose the release zip, or the `.ino.bin` and `.littlefs.bin` files.
+3. Press **Update** and keep the tab open until it says Done. The page runs the safeboot handover, the firmware upload, a 35 s settle and the filesystem upload, and verifies the result.
+
+The forms under **Advanced** upload one file at a time. See [WiFi firmware updates](../../guides/WIFI_FIRMWARE_UPDATE.md) for what is kept, what starts fresh and what to do when a step fails.
 
 OTA is available from AP fallback mode as well, so you can recover a device stuck on a bad firmware image without serial access.
 
-#### 6.6.1 ESP32: Merged Binary Support
+#### 6.6.1 ESP32: Merged Binaries Are USB-Only
 
-On ESP32, the OTA update page accepts a merged binary (firmware + filesystem combined in a single `.bin` file). The update server detects the merged format automatically and writes each part to the correct partition. You do not need to upload firmware and filesystem separately.
+The OTA update page does not accept merged binaries (`*-merged*.bin`, `*-migrate-*.bin`): they are USB images for `flash_otgw`, and the page refuses them. Use the release zip or the `.ino.bin` and `.littlefs.bin` files.
 
 #### 6.6.2 Limitations
 

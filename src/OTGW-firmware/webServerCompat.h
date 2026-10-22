@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : webServerCompat.h
-**  Version  : v2.0.0-alpha.448
+**  Version  : v2.0.0-alpha.449
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -317,6 +317,19 @@ inline void webSendP(int code, PGM_P contentType, PGM_P body) {
   if (!currentRequest || g_responseSent) return;
   AsyncWebServerResponse* resp =
       currentRequest->beginResponse(code, String(FPSTR(contentType)), String(FPSTR(body)));
+  webApplyHeaders(resp);
+  currentRequest->send(resp);
+  g_responseSent = true;
+}
+// PROGMEM body send without a heap copy. webSendP() builds a String of the body and the
+// basic response keeps a second one, so a 47 KB page needs about 94 KB of contiguous heap.
+// This overload streams the body straight from flash (AsyncProgmemResponse). For large
+// static pages such as the /update page.
+inline void webSendPStream(int code, PGM_P contentType, PGM_P body) {
+  if (!currentRequest || g_responseSent) return;
+  AsyncWebServerResponse* resp =
+      currentRequest->beginResponse(code, String(FPSTR(contentType)),
+                                    reinterpret_cast<const uint8_t*>(body), strlen_P(body));
   webApplyHeaders(resp);
   currentRequest->send(resp);
   g_responseSent = true;

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTGW-ModUpdateServer-esp32.h
-**  Version  : v2.0.0-alpha.448
+**  Version  : v2.0.0-alpha.449
 **
 **  ESP32 OTA update server — functional equivalent of the ESP8266
 **  OTGW-ModUpdateServer with Nodoshop hardware watchdog feeding.
@@ -187,7 +187,7 @@ public:
         webRequestAuth();
         return;
       }
-      webSendP(200, PSTR("text/html"), _serverIndex);
+      webSendPStream(200, PSTR("text/html"), _serverIndex);   // 47 KB page: stream from flash, no heap copy
     });
 
     // POST /update — completion handler (runs after the upload finished) + the

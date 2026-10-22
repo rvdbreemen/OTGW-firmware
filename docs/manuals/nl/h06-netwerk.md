@@ -185,21 +185,22 @@ De ESP8266 SDK initialiseert `time()` met de waarde `0xFFFFFFFF` (jaar 2106) voo
 
 OTA (Over-The-Air) staat voor draadloze firmware-updates. Hiermee kunt u de firmware bijwerken zonder USB-kabel.
 
-Het OTA-update-endpoint is `/update`. Het valt onder de beschermde-admin-grens uit ADR-056 (vervangt ADR-054). Wanneer `settingHTTPpasswd` leeg is, is het endpoint open. Wanneer een wachtwoord is ingesteld, vereist het endpoint HTTP Basic Auth met gebruikersnaam `admin`. Hetzelfde wachtwoord wordt bij WiFi- of Ethernet-startup doorgegeven aan de OTA-updateserver, zodat een wijziging zonder her-flash actief wordt na de eerstvolgende reboot.
+Het OTA-update-endpoint is `/update`. Het valt onder de beschermde-admin-grens uit ADR-056 (vervangt ADR-054). Wanneer `settingHTTPpasswd` leeg is, is het endpoint open. Wanneer een wachtwoord is ingesteld, vereist het endpoint HTTP-authenticatie met gebruikersnaam `admin` (de hoofdfirmware vraagt Digest, de safeboot-updater Basic). Hetzelfde wachtwoord wordt bij WiFi- of Ethernet-startup doorgegeven aan de OTA-updateserver, zodat een wijziging zonder her-flash actief wordt na de eerstvolgende reboot.
 
 Browserverzoeken naar beschermde admin-endpoints (waaronder `/update`, `/upload`, `/ReBoot`, `/ResetWireless` en `POST /api/v2/settings`) worden bovendien gecontroleerd op overeenkomst van `Origin`/`Referer` met `Host`. Dit is een lichte CSRF-mitigatie, geen volledig sessieframework: verzoeken zonder `Origin` of `Referer` (curl, OTmonitor, scripts) worden toegestaan voor achterwaartse compatibiliteit; afwijkende origins worden afgewezen met HTTP 403.
 
-**Stappen:**
-1. Navigeer naar `http://otgw.local/update` in uw browser.
-2. Selecteer het firmwarebestand.
-3. Klik op Upload.
-4. Het apparaat flashed de firmware, verifieert de image en herstart.
+**Stappen (ESP32-S3, 4 MB flash):**
+1. Open `http://<ip>/update` in uw browser (het IP-adres, niet `otgw.local`).
+2. Kies de release-zip, of de bestanden `.ino.bin` en `.littlefs.bin`.
+3. Druk op **Update** en laat het tabblad open tot er Done staat. De pagina doet de overdracht naar safeboot, de firmware-upload, 35 s wachttijd en de filesystem-upload, en controleert het resultaat.
+
+De formulieren onder **Advanced** uploaden een bestand per keer. Zie [Firmware-updates via WiFi](../../guides/WIFI_FIRMWARE_UPDATE.md) (Engels) voor wat behouden blijft, wat opnieuw begint en wat u doet als een stap mislukt.
 
 OTA is ook beschikbaar vanuit de AP-fallbackmodus, zodat u een apparaat dat vastzit op een slechte firmware kunt herstellen zonder serieel toegang.
 
-#### 6.6.1 ESP32: Merged binary-ondersteuning
+#### 6.6.1 ESP32: Merged binaries alleen via USB
 
-Op ESP32 accepteert de OTA-updatepagina een merged binary (firmware + bestandssysteem gecombineerd in een enkel `.bin`-bestand). De updateserver detecteert het merged formaat automatisch en schrijft elk onderdeel naar de juiste partitie. U hoeft firmware en bestandssysteem niet apart te uploaden.
+De OTA-updatepagina accepteert geen merged binaries (`*-merged*.bin`, `*-migrate-*.bin`): dat zijn USB-images voor `flash_otgw` en de pagina weigert ze. Gebruik de release-zip of de bestanden `.ino.bin` en `.littlefs.bin`.
 
 #### 6.6.2 Beperkingen
 

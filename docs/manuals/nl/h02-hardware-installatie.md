@@ -359,7 +359,7 @@ Vanaf v1.3.0 biedt de webinterface een OTA-updater met een druk op de knop:
 6. De webinterface pollt het apparaat totdat het weer reageert en bevestigt succes.
 7. Update daarna het filesystemimage via dezelfde pagina om te zorgen dat de webbestanden overeenkomen met de nieuwe firmwareversie.
 
-> **ESP32-S3 op 4 MB flash**: firmware-OTA loopt via de safeboot-updater: op `/update` kiest u "Restart into the firmware updater". Een unit met de eerdere layout moet eerst eenmalig via USB gemigreerd worden (`flash_otgw --migrate`).
+> **ESP32-S3 op 4 MB flash**: open `http://<ip>/update`, kies de release-zip (of de bestanden `.ino.bin` en `.littlefs.bin`) en druk op **Update**. De pagina schakelt over naar de safeboot-updater, installeert de firmware, wacht op de herstart en installeert daarna de webbestanden. Uw instellingen en sensornamen blijven behouden. Laat het tabblad 2 tot 3 minuten open. Een unit met de eerdere layout moet eerst eenmalig via USB gemigreerd worden (`flash_otgw --migrate`). Details: [Firmware-updates via WiFi](../../guides/WIFI_FIRMWARE_UPDATE.md) (Engels).
 
 #### Handmatige OTA via bestandsupload
 

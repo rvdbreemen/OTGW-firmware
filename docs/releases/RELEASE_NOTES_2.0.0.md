@@ -477,6 +477,12 @@ The SAT Diagnostics view referenced `.sat-grid` and `.sat-row` CSS classes that 
 4. On first boot, configure WiFi via the captive portal. Ethernet auto-negotiates if a cable is connected.
 5. GPIO pin assignments in `boards.h` are defaults for the Nodoshop OTGW32. Verify against your actual hardware before deploying.
 
+### Updating over WiFi on ESP32-S3 (TASK-1283)
+
+On a 4 MB ESP32-S3 the `/update` page installs the firmware and the web files in one action: open `http://<ip>/update` (by IP address), choose the release zip, press **Update** and keep the tab open for 2 to 3 minutes. Settings and sensor names are kept; SAT learned state, learned OpenTherm profiles, the reboot log and files you uploaded in the File Explorer start fresh. See `docs/guides/WIFI_FIRMWARE_UPDATE.md`.
+
+**The first install of this release is still two steps.** The page that runs the one-action update is the one your unit serves before the update, so a unit that runs an earlier alpha updates the old way: **Restart into the firmware updater**, upload the `.ino.bin` there, then upload the `.littlefs.bin` on `/update`. The one-action flow works from the update after that.
+
 ### SAT power and gas estimate (TASK-1258)
 
 `sat/power` is now modulation x the active capacity: the new `DHW capacity` setting (`sat/dhw_capacity`, 0 = use the boiler capacity) applies while the boiler reports DHW active. The estimated gas input (`energy_estimated_kwh`) is now `sat/power` / `boiler_efficiency`. `Boiler rated input` (`boiler_rated_kw`) only switches the estimate on and caps it, and the tap-water flow branch is gone. Both values therefore change magnitude during DHW and wherever the old estimate multiplied rated input by efficiency. Existing energy totals are not reset.

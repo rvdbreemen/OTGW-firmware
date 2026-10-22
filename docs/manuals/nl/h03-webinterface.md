@@ -390,6 +390,16 @@ Klik op **Update** om de geselecteerde versie te installeren. De firmware:
 
 **Internetverbinding vereist:** De download van GitHub vereist dat het apparaat internettoegang heeft. Als uw netwerk geen directe internettoegang biedt, gebruik dan handmatig uploaden.
 
+#### Update in een keer op ESP32-S3 (4 MB flash)
+
+De flash utility op `http://<ip>/update` installeert firmware en webbestanden in een keer:
+
+1. Open de pagina met het IP-adres (niet met `otgw.local`: de updater heeft geen mDNS-naam).
+2. Kies de release-zip, of de bestanden `.ino.bin` en `.littlefs.bin`. De pagina controleert de bestanden op inhoud en weigert USB-images, de updater zelf en bestanden uit verschillende builds.
+3. Druk op **Update** en laat het tabblad open tot er Done staat (2 tot 3 minuten). De unit herstart twee keer. De pagina schakelt over naar de safeboot-updater, installeert de firmware, wacht op de nieuwe firmware, installeert de webbestanden en controleert beide.
+
+Instellingen en sensornamen blijven behouden. SAT-geleerde waarden (energietotalen, stooklijngegevens, regelaarstoestand), geleerde OpenTherm-profielen, het herstartlogboek en bestanden die u in de File Explorer uploadde beginnen opnieuw. **Download a settings backup** is een aparte link op de pagina en geen onderdeel van de update. De formulieren onder **Advanced** houden de oude werkwijze met een upload per keer. Herstelstappen en de volledige lijst: [Firmware-updates via WiFi](../../guides/WIFI_FIRMWARE_UPDATE.md) (Engels).
+
 #### Handmatig uploaden
 
 Als alternatief kunt u een firmwarebinary handmatig uploaden:

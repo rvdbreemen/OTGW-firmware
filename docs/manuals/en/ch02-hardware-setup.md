@@ -318,7 +318,7 @@ The web assets (HTML, CSS, JavaScript, OLED icons, PIC firmware files, and the H
 
 When using `flash_esp.py`, the filesystem is flashed automatically (either as part of a merged binary on ESP32-S3 or as a separate image on ESP8266). When using PlatformIO, run `pio run -e <env> --target uploadfs` after the firmware upload.
 
-> **After a firmware update via OTA**: The web assets in LittleFS are updated separately. Use the web UI's Update page to update both firmware and filesystem, or upload a new filesystem image manually via the File Manager.
+> **After a firmware update via OTA**: The web assets in LittleFS must match the firmware. On an ESP32-S3 with 4 MB flash the **Update** page installs both in one action (choose the release zip, press Update). Otherwise update the filesystem on the same page, or upload a new filesystem image manually via the File Manager.
 
 ### Upgrading from a Previous Version
 
@@ -333,7 +333,7 @@ From v1.3.0 onwards, the web interface provides a one-click OTA updater:
 5. The web interface polls the device until it responds, then confirms success.
 6. Update the filesystem image using the same page to ensure web assets match the new firmware version.
 
-> **ESP32-S3 on 4 MB flash**: firmware OTA runs through the safeboot updater: on `/update` choose "Restart into the firmware updater". A unit on the earlier layout needs one USB migration first (`flash_otgw --migrate`).
+> **ESP32-S3 on 4 MB flash**: open `http://<ip>/update`, choose the release zip (or the `.ino.bin` and `.littlefs.bin` files) and press **Update**. The page hands over to the safeboot updater, installs the firmware, waits for the restart and then installs the web files; your settings and sensor names are kept. Keep the tab open for 2 to 3 minutes. A unit on the earlier layout needs one USB migration first (`flash_otgw --migrate`). Details: [WiFi firmware updates](../../guides/WIFI_FIRMWARE_UPDATE.md).
 
 #### Manual OTA Upload
 
