@@ -393,6 +393,16 @@ Wanneer SAT is ingeschakeld, worden ook diagnostische sensor-entiteiten automati
 | `sat/active` | Of SAT actief is | bool |
 | `sat/safety_tripped` | Of een veiligheidslaag is geactiveerd | bool |
 
+**Vermogen- en energiesensoren (3 entiteiten, bruikbaar in het Energy-dashboard van Home Assistant):**
+
+| Topic-suffix | Home Assistant-entiteit | Omschrijving | Eenheid | Device class / state class |
+|---|---|---|---|---|
+| `sat/power` | `SAT Power` | Geschat warmtevermogen van de ketel: modulatie x ketelcapaciteit (`satboilercapacity`, of `satdhwcapacity` zolang warm tapwater loopt). Niet retained | kW | `power` / `measurement` |
+| `sat/energy_total` | `SAT Energy Total` | Opgetelde warmteafgifte sinds de teller startte. Retained, blijft bewaard na een herstart | kWh | `energy` / `total_increasing` |
+| `sat/energy_estimated_kwh` | `SAT Estimated Gas Input` | Geschatte gasinput: `sat/power` gedeeld door `satboilerefficiency`, begrensd door `satboilerratedkw`. Retained. Alleen gepubliceerd als `satboilerratedkw` groter is dan 0; tot die tijd staat de entiteit op `unknown` | kWh | `energy` / `total_increasing` |
+
+De entiteit-id's volgen de naamgeving van de andere SAT-sensoren, bijvoorbeeld `sensor.<apparaatnaam>_sat_power`. De instellingen staan in paragraaf 5.20.
+
 Topics zonder Home Assistant-entiteit (wel gepubliceerd en retained; te gebruiken vanuit Node-RED, Homey of een andere MQTT-client):
 
 | Topic-suffix | Omschrijving |

@@ -414,6 +414,7 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 | ----- | ----- | -------- | ----------- |
 | `sat/power` | `"12.5"` | no | Current boiler power (kW, modulation × capacity) |
 | `sat/energy_total` | `"234.5"` | yes | Cumulative energy (kWh, retained for HA energy dashboard) |
+| `sat/energy_estimated_kwh` | `"256.1"` | yes | Estimated gas input (kWh, `sat/power` / `satboilerefficiency`, capped by `satboilerratedkw`). Published only when `satboilerratedkw` > 0 |
 
 #### Heating Curve Recommendation
 
@@ -1181,8 +1182,9 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 | `sensor` | `sat_current_modulation` | % | Current boiler modulation (from `sat/current_modulation`) |
 | `sensor` | `sat_pressure` | bar | Smoothed system pressure |
 | `sensor` | `sat_pressure_drop_rate` | bar/h | Pressure drop rate |
-| `sensor` | `sat_power` | kW | Current boiler power |
-| `sensor` | `sat_energy_total` | kWh | Cumulative energy (total_increasing state class for HA energy dashboard) |
+| `sensor` | `sat_power` | kW | Current boiler power; `device_class` `power`, `state_class` `measurement` (TASK-1276) |
+| `sensor` | `sat_energy_total` | kWh | Cumulative energy; `device_class` `energy`, `state_class` `total_increasing` for the HA Energy dashboard (TASK-1276) |
+| `sensor` | `sat_energy_estimated_kwh` | kWh | Estimated gas input (name "SAT Estimated Gas Input"); `device_class` `energy`, `state_class` `total_increasing`. The topic is published only when `satboilerratedkw` > 0, so the entity reads `unknown` until then (TASK-1276) |
 | `sensor` | `sat_duty_ratio` | - | EMA duty ratio (flame-on fraction) |
 | `sensor` | `sat_manufacturer` | - | Detected/configured boiler manufacturer |
 | `sensor` | `sat_pid_p` | °C | Proportional PID term |

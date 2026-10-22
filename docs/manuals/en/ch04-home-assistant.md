@@ -379,6 +379,16 @@ When SAT is enabled, the firmware also auto-discovers diagnostic sensor entities
 | `sat/active` | Whether SAT is actively controlling | bool |
 | `sat/safety_tripped` | Whether a safety layer has tripped | bool |
 
+**Power and energy sensors (3 entities, usable in the Home Assistant Energy dashboard):**
+
+| Topic suffix | Home Assistant entity | Description | Unit | Device class / state class |
+|---|---|---|---|---|
+| `sat/power` | `SAT Power` | Estimated boiler heat output: modulation x boiler capacity (`satboilercapacity`, or `satdhwcapacity` while hot water runs). Not retained | kW | `power` / `measurement` |
+| `sat/energy_total` | `SAT Energy Total` | Cumulative heat output since the counter started. Retained, survives a reboot | kWh | `energy` / `total_increasing` |
+| `sat/energy_estimated_kwh` | `SAT Estimated Gas Input` | Estimated gas input: `sat/power` divided by `satboilerefficiency`, capped by `satboilerratedkw`. Retained. Published only when `satboilerratedkw` is above 0; until then the entity reads `unknown` | kWh | `energy` / `total_increasing` |
+
+The entity ids follow the naming of the other SAT sensors, for example `sensor.<device name>_sat_power`. See section 5.20 for the settings.
+
 State-only topics (published and retained, but without a Home Assistant entity; use them from Node-RED, Homey or another MQTT client):
 
 | Topic suffix | Description |

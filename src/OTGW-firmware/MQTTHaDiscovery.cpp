@@ -323,6 +323,11 @@ DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_overshoot_fraction, "sat/4h_overshoot_fract
 DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_underheat_fraction, "sat/4h_underheat_fraction",        "SAT_4H_Underheat_Fraction")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_flow_ret_delta_p50, "sat/4h_flow_ret_delta_p50",        "SAT_4H_Flow_Ret_Delta_P50")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_4h_flow_ret_delta_p90, "sat/4h_flow_ret_delta_p90",        "SAT_4H_Flow_Ret_Delta_P90")
+// TASK-1276: boiler power (kW) and the energy totals for the Home Assistant Energy dashboard.
+// sat/energy_estimated_kwh is the estimated gas input (power / efficiency, TASK-1258).
+DECLARE_SAT_DISCOVERY_STRINGS(sat_power,                 "sat/power",                        "SAT_Power")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_energy_total,          "sat/energy_total",                 "SAT_Energy_Total")
+DECLARE_SAT_DISCOVERY_STRINGS(sat_energy_estimated_kwh,  "sat/energy_estimated_kwh",         "SAT_Estimated_Gas_Input")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_ble_temp,              "sat/ble_temp",                     "SAT_BLE_Temp")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_ble_humidity,          "sat/ble_humidity",                 "SAT_BLE_Humidity")
 DECLARE_SAT_DISCOVERY_STRINGS(sat_ch_pressure,           "sat/ch_pressure",                  "SAT_CH_Pressure")
@@ -820,8 +825,8 @@ const char ha_name_alias_ventilation_diagnostic[]                            PRO
 const char ha_name_alias_ventilation_system_type[]                           PROGMEM = "Ventilation_system_type";
 const char ha_name_alias_ventilation_speed_control_type[]                    PROGMEM = "Ventilation_speed_control_type";
 const char ha_name_alias_solar_storage_fault[]                               PROGMEM = "Solar_storage_fault";
-// ========== Sensor array (390 entries) ==========
-const uint16_t MQTT_HA_SENSOR_COUNT = 390;  // +1 dhw_water_total (faux id 241, TASK-1123)
+// ========== Sensor array (393 entries) ==========
+const uint16_t MQTT_HA_SENSOR_COUNT = 393;  // +1 dhw_water_total (faux id 241, TASK-1123), +3 SAT power/energy (id 252, TASK-1276)
 
 const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
 //  {id, flags, label, friendlyName, deviceClass, unit, stateClass, icon, entityCat, enabledByDefault}
@@ -1337,6 +1342,10 @@ const MqttHaSensorCfg PROGMEM mqttHaSensors[] = {
     {252, 0x00, ha_lbl_sat_4h_underheat_fraction,  ha_name_sat_4h_underheat_fraction,  HaDeviceClass::none,        HaUnit::percent, HaStateClass::measurement,      HaIcon::percent_outline, HaEntityCat::none, true, ha_tpl_sat_ratio_percent, nullptr},
     {252, 0x00, ha_lbl_sat_4h_flow_ret_delta_p50,  ha_name_sat_4h_flow_ret_delta_p50,  HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
     {252, 0x00, ha_lbl_sat_4h_flow_ret_delta_p90,  ha_name_sat_4h_flow_ret_delta_p90,  HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement,      HaIcon::thermometer,     HaEntityCat::none, true, nullptr,                 nullptr},
+    // TASK-1276: power in kW, energy totals in kWh (total_increasing, so the HA Energy dashboard accepts them).
+    {252, 0x00, ha_lbl_sat_power,                  ha_name_sat_power,                  HaDeviceClass::power,       HaUnit::kW,      HaStateClass::measurement,      HaIcon::flash,           HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_energy_total,           ha_name_sat_energy_total,           HaDeviceClass::energy,      HaUnit::kWh,     HaStateClass::total_increasing, HaIcon::lightning_bolt,  HaEntityCat::none, true, nullptr,                 nullptr},
+    {252, 0x00, ha_lbl_sat_energy_estimated_kwh,   ha_name_sat_energy_estimated_kwh,   HaDeviceClass::energy,      HaUnit::kWh,     HaStateClass::total_increasing, HaIcon::fire,            HaEntityCat::none, true, nullptr,                 nullptr},
     // --- Pseudo-ID 253: TASK-543 SAT BLE + pressure + weather primaries ---
     {253, 0x00, ha_lbl_sat_ble_temp,               ha_name_sat_ble_temp,               HaDeviceClass::temperature, HaUnit::degC,    HaStateClass::measurement, HaIcon::thermometer,   HaEntityCat::none, true, nullptr,              nullptr},
     {253, 0x00, ha_lbl_sat_ble_humidity,           ha_name_sat_ble_humidity,           HaDeviceClass::humidity,    HaUnit::percent, HaStateClass::measurement, HaIcon::water_percent, HaEntityCat::none, true, nullptr,              nullptr},
@@ -1751,8 +1760,8 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     0xFFFF, // id 238
     0xFFFF, // id 239
     0xFFFF, // id 240
-    389, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
-    387, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
+    392, // id 241, 1 entry (TASK-1123: OTGWdhwmeterid dhw_water_total)
+    390, // id 242, 2 entries (TASK-942: OTGWhvacid hvac_mode/hvac_action companion sensors)
     332, // id 243, 2 entries (ADR-124: OTDirect flame metrics, split out of 251)
     0xFFFF, // id 244
     284, // id 245, 4 entries
@@ -1762,9 +1771,9 @@ const uint16_t PROGMEM mqttHaSensorIndex[256] = {
     313, // id 249, 4 entries (TASK-541 PIC info; ADR-113 stage 2 removed picavailable)
     317, // id 250, 15 entries (TASK-541 PIC settings)
     334, // id 251, 5 entries (TASK-541 SAT diagnostics; flame metrics moved to 243 per ADR-124)
-    339, // id 252, 32 entries (TASK-543 SAT control/PID/cycle/stats)
-    371, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
-    386, // id 254, 1 entry  (TASK-543 SAT flame status)
+    339, // id 252, 35 entries (TASK-543 SAT control/PID/cycle/stats; TASK-1276 power/energy)
+    374, // id 253, 15 entries (TASK-543 SAT BLE/pressure/weather)
+    389, // id 254, 1 entry  (TASK-543 SAT flame status)
     0xFFFF // id 255
 };
 
