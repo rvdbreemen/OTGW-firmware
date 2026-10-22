@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-22T14:49:00Z'
-updated_date: '2026-10-22T18:00:00Z'
+updated_date: '2026-10-22T18:17:00Z'
 labels:
   - bug
 dependencies: []
@@ -48,4 +48,6 @@ Diag patch with corrected markers (ev36, ev37, ev42-ev46 incl. around hostByName
 
 - 2026-10-22 18:58-19:54: 150 more resets on the same diag build (diag1302_f.out): 0 slow. Total 250 resets on HEAD (1301 + 1290) + markers, web up in 4-9 s every time (4 s: 59, 5 s: 67, 6-9 s: 24 of the last 150). At the earlier rate of 2/110 that is about 1% likely, so something changed since the two slow boots.
 - Both slow boots ran builds WITHOUT TASK-1290 (GARP). A/B started 20:00: same diag build with only the stationKeepAliveSetIntervalMs() call commented out (1.7.8-beta.6+12975b4, scratchpad t1262/diag1302_nogarp.*), up to 200 resets, stop at first slow (diag1302_nogarp.out). Not committed; the comment-out is a temporary bench change.
+
+- 2026-10-22 20:17: no-GARP A/B stopped by Claude Code after 40 resets (system low on memory, commit charge 89%), not by the test. 40/40 normal (web 4-8 s), 0 slow. Bench .68 left on the no-GARP diag build 1.7.8-beta.6+12975b4. Resume only on maintainer request.
 <!-- SECTION:NOTES:END -->
