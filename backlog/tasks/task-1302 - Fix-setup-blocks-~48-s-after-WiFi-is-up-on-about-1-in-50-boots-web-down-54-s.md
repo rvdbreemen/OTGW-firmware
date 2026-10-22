@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-22T14:49:00Z'
-updated_date: '2026-10-22T16:53:00Z'
+updated_date: '2026-10-22T18:00:00Z'
 labels:
   - bug
 dependencies: []
@@ -45,4 +45,7 @@ Diag patch with corrected markers (ev36, ev37, ev42-ev46 incl. around hostByName
 - 2026-10-22 18:10-18:52: diag build 1.7.8-beta.6+c7b20e5 (scratchpad t1262/diag1302.ino.bin/.elf) on .68. 100 RTS resets (diag1302_a..e.out): all web up in 4-8 s, lease OTGW, 0 slow. Earlier rate 2/110, so 0/100 is not yet meaningful (P about 0.16 at that rate).
 - Code read: startMQTT() only runs INIT (hostByName, core timeout 10 s), so it cannot explain 48 s alone; initWatchDog() is one 100 ms delay plus two I2C transfers; updateRebootLog() on reason 6 (RTS reset) calls initWatchDog() again, plus loopNTP() and LittleFS rewrite. FS 43% used.
 - Running: up to 150 more resets, stop at first slow (diag1302_f.out).
+
+- 2026-10-22 18:58-19:54: 150 more resets on the same diag build (diag1302_f.out): 0 slow. Total 250 resets on HEAD (1301 + 1290) + markers, web up in 4-9 s every time (4 s: 59, 5 s: 67, 6-9 s: 24 of the last 150). At the earlier rate of 2/110 that is about 1% likely, so something changed since the two slow boots.
+- Both slow boots ran builds WITHOUT TASK-1290 (GARP). A/B started 20:00: same diag build with only the stationKeepAliveSetIntervalMs() call commented out (1.7.8-beta.6+12975b4, scratchpad t1262/diag1302_nogarp.*), up to 200 resets, stop at first slow (diag1302_nogarp.out). Not committed; the comment-out is a temporary bench change.
 <!-- SECTION:NOTES:END -->
