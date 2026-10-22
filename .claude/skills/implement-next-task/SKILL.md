@@ -111,7 +111,9 @@ short message. It is a notice; do not wait for a reply.
 changes how SAT controls the boiler (setpoint, PWM, PID, cutoffs, modulation, defaults
 of SAT control settings), post the plan to Sergeant D (`<@821036882946424852>`) asking
 for his advice and his OK, name the open points, and do **not** implement until he
-agrees. Record the wait in the task notes, leave the task `In Progress`, and continue
+agrees. The plan quotes the thermo-nova code for that area with `file:line` citations at the
+pinned commit, as the "SAT ground truth" block in CLAUDE.md requires; a plan without them is
+not ready to post. Record the wait in the task notes, leave the task `In Progress`, and continue
 the cycle with the next task that does not change SAT behaviour. When his answer
 arrives (via `/backlog_discord`), record it and resume the task. SAT changes without a
 behaviour choice (logging, UI, graphs, docs) do not wait.

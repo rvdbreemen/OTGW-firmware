@@ -200,7 +200,7 @@ Read these before touching specific areas:
 | New MQTT topic | `docs/api/MQTT.md`, `docs/c4/c4-code-mqtt.md`, relevant ADRs |
 | Settings/config change | `docs/c4/c4-component-configuration-state.md`, ADR-051, `docs/c4/c4-code-settings.md` |
 | Network/WiFi/OTA change | `docs/c4/c4-component-network.md`, `docs/c4/c4-code-network.md` |
-| SAT/BLE feature | `docs/c4/c4-component-smart-thermostat.md`, `other-projects/SAT-releases-thermo-nova/` |
+| SAT/BLE feature | `docs/c4/c4-component-smart-thermostat.md`, `other-projects/SAT-releases-thermo-nova/`, `docs/sat/thermo-nova-spec.md` (see "SAT ground truth" below) |
 | ESP32 port/feature | `docs/c4/c4-container.md`, `other-projects/OT-Thing-OTGW32/`, relevant ADRs |
 | OpenTherm protocol/message IDs | `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md` |
 | MQTT/REST/WebSocket API change | `docs/api/MQTT.md`, `docs/api/WEBSOCKET_FLOW.md` |
@@ -231,6 +231,29 @@ Reference implementations in `other-projects/` are read-only references. Do not 
 | `other-projects/otmonitor-6.6/` | How a mature client drives the PIC |
 
 If you cannot name the C4 component that owns the code you are about to change, stop and read `docs/c4/c4-context.md` first.
+
+---
+
+<!-- SAT-GROUND-TRUTH START (identical in CLAUDE.md and AGENTS.md; tests/test_sat_ground_truth_block.py) -->
+## SAT ground truth and anti-drift rules (maintainer directive, 2026-10-22)
+
+SAT (Smart Autotune Thermostat) was designed on paper by Sergeant D and turned into code by Alex (Alexwijn). There is no written design document. The firmware's SAT is a port, so the firmware is never a source of truth for SAT behaviour. Earlier AI work described the start-up sequence and the PWM/modulation suppression from memory and got them wrong more than once; these rules exist so that cannot happen again.
+
+**Ground truth, in this order:**
+1. Sergeant D's recorded corrections (kept in `docs/sat/`, each with its date and Discord link).
+2. The thermo-nova code: `https://github.com/Alexwijn/SAT/tree/releases/thermo-nova`, pinned at commit `7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb` (2026-03-18). The local copy `other-projects/SAT-releases-thermo-nova/` is identical to that commit (verified 2026-10-22) and read-only.
+3. `docs/sat/thermo-nova-spec.md`, the cited specification written from that code (TASK-1292).
+4. Our firmware (`src/OTGW-firmware/SAT*.ino`, `SATtypes.h`), `docs/sat/firmware-sat-spec.md` and `docs/sat/sat-comparison.md`: they describe what the port does today, not what SAT should do.
+
+**Rules for every statement about SAT behaviour** (in a plan, task note, ADR, spec, Discord post or review):
+- Cite the thermo-nova source as `file:line` relative to `custom_components/sat` at the pinned commit, and open that location in the current session before citing it. No citation, no claim.
+- Never fill a gap with plausible behaviour. If the code does not show it, write "not found in the code" and ask Sergeant D.
+- Describe behaviour in time order from the code (what happens first, what triggers the next step, which timers run). The start-up sequence and the suppression mechanism are the known hallucination hot spots: for those, trace every path and write a timeline.
+- When Sergeant D's description and the code disagree, report both with the citation and let him decide. Do not pick one silently; record the outcome under item 1.
+- Before changing how SAT controls the boiler, the plan quotes the thermo-nova implementation of that area, names the difference with both citations, and waits for Sergeant D's OK (see `.claude/skills/implement-next-task/SKILL.md`, step 4). Arguments from memory or from the firmware do not count.
+- A claimed difference between thermo-nova and the firmware is published only after a second reader has opened both citations and tried to refute it.
+- Move the pinned commit only on purpose: one commit that updates this block, re-diffs `docs/sat/thermo-nova-spec.md` against the new upstream and says what changed. Never update the local copy silently.
+<!-- SAT-GROUND-TRUTH END -->
 
 ---
 
