@@ -41,9 +41,18 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156282760183
 | Seed at flame-on | (implied: the raw flow) | raw flow at first flame (`pwm.py:130-131`), at ON start with flame (`166-167`), at ignition sync (`191`) | none |
 | Filter | "smoothed" | EMA 0.3 new / 0.7 old (`pwm.py:149`) | EMA 0.3 / 0.7 (`SATcontrol.ino:752`) |
 
-**Status:** asked on 2026-10-22 whether 30 s or 180 s is intended, and whether BT after the window
-is the raw flow or the frozen filtered value. Implementation under TASK-1273 waits for that answer;
-the settled part above is agreed by both his statement and the code.
+**Resolved 2026-10-22 16:12-16:14 UTC** (messages 1562861280308625409 and 1562861690322817025):
+
+> Correct the startup time frame is 180 seconds
+
+> Ok, keep the `thermo-nova` solution
+
+So: filter window 180 s (`HEATER_STARTUP_TIMEFRAME`), EMA 0.3 new / 0.7 old during that window
+after flame-on, BT seeded from the live flow temperature at the first flame, at an ON-phase start
+with the flame already on, and at the ignition sync; after the window the filtered value is held
+until the next ON phase or ignition resets it to the live flow (`pwm.py:130-131`, `148-149`,
+`166-167`, `191`); floor `base + 1`. The firmware's 30 s window, its unseeded start value and its
+`base + 20` placeholder all change to this. Implementation: TASK-1273, first PWM item.
 
 ## 2. Follow thermostat and push setpoint (2026-10-22)
 
