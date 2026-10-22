@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-19 18:03
-updated_date: '2026-10-21T23:31:00Z'
+updated_date: '2026-10-22T04:10:00Z'
 labels:
   - bug
   - needs-info
@@ -31,6 +31,7 @@ Missing: an ESP-side telnet log of the loop (what the supervisor does on each at
 - [ ] #1 Reproduced or explained from an ESP-side log: which code path issues the deauth (reason 3) and why reconnects keep failing
 - [x] #2 Time from first failed reconnect to recovery is bounded and shorter than 12 min, shown on the bench by forcing the loop
 - [x] #3 esp8266 build and evaluate.py --quick green
+- [ ] #4 A boot after a WiFi supervisor restart that misses the direct-connect window continues setup() without the final WiFi wait (ADR-099 Decision: continues without WiFi), and after the access point returns MQTT, telnet, the web UI, NTP and mDNS come up without a crash; shown on the old build (final wait times out) and on the new build
 <!-- AC:END -->
 
 ## Implementation Notes
