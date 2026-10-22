@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-19 18:03
-updated_date: '2026-10-22T06:11:00Z'
+updated_date: '2026-10-22T12:48:00Z'
 labels:
   - bug
   - needs-info
@@ -84,4 +84,22 @@ AC2 met: from the loss to the restart decision is a fixed 300 s, and recovery fo
 - Run 2, b80f098 (telnet begin(false) + mDNS restart in refreshServicesAfterWifiReconnect): rejoin 4.7 s; ports 23/80/81 open; mDNS query answered by .68; NTP -1.2 s; uptime dates restart deny+304.1 s. MQTT not checkable: bench settings.ini lost in the TASK-1285 crash repro, password unknown to me (user to re-enter).
 - Not run: the old 1251039 final-wait-timeout path (deny > 11 min); telnet/mDNS start code is identical there, so the same defect applies by source.
 - Banner note: after an offline boot the Link line shows "outages 0 disconnect events 60": failed connect attempts count as events while there was never a link; cosmetic, left as is.
+
+2026-10-22 AC#1 reset series with the temporary boot-diag build (2eb0fd5 + RAM event ring flushed to /wdiag.txt; not committed). AP present, no access-list rules. Scripts: scratchpad t1262/reset_until_slow.sh, outputs reset_until_slow.out (08:27-08:41) and reset_until_slow2.out (14:35-14:42).
+Correction: the 08:27 series was NOT empty as I first reported; reset 20 (08:35:14) was slow (371 s) and was captured before the series ended.
+Event codes: ev1 wdBegin, ev2/ev3 around the early WiFi.hostname() in setup, ev4 startWiFi entry, ev5 wifiConnected, ev6/ev7 around direct-connect hostname()+begin(), ev8 direct-connect result, ev9 portal timeout, ev10 first loopWifi with WL_CONNECTED, ev20 StationConnected, ev21 Disconnected(reason), ev22 GotIP(last octet). a = WiFi.status(), b = wifi_station_get_connect_status().
+Slow boot 08:35:14 (RSSI -79..-81):
+  382 ms ev1 status 6 / cs 1 (STATION_CONNECTING: SDK auto-connect already running before any firmware WiFi call)
+  384-387 ms ev2..ev7: hostname(), mode(STA), hostname()+begin() all issued while cs = 1
+  120458 ms ev8 status 6 / cs 1: still CONNECTING after 120 s, and NO station event at all in between (no Connected, no reason-coded Disconnected, no GotIP)
+  120465 ms ev21 reason 8 (ASSOC_LEAVE, portal start drops STA), cs 255
+  361469 ms ev9 portal timeout -> restart
+  AP side: 08:35:15 'received deauth: sending station leaving (3)' + 'connected' in the same second, no DHCP; 08:37:15 disassoc (8); 08:41:22 connected + DHCP OTGW.
+  Reading: a wedged SDK connect state machine (zero events for 120 s while the AP keeps the station associated), not RF loss (that gives reason-coded disconnects and retries). Causation by the begin()-during-CONNECTING race is NOT proven: every fast boot also calls begin() while cs = 1.
+Race indicator on every boot = DHCP lease name in the router log:
+  08:27 series: 14 x ESP-22B8E1 (SDK auto-connect finished first, mean 5.0 s to web), 5 x OTGW (firmware begin() restarted the connect, 4-8 s, mean 6.6 s), 1 x none (the wedge).
+  14:35 series: 14 x ESP-22B8E1, 1 x OTGW. RSSI -74..-80 (better than the morning run, a confound).
+  So on ~75 % of resets the router lease carries the SDK default name ESP-22B8E1 instead of the configured hostname: a separate, user-visible defect of the same race.
+Rates on the old/diag build: WiFi wedge 1/20 (08:27) + 0/15 (14:35) + 1/10 (08:12 loop, reset_loop.out) + 06:17 single = 3 wedges in ~47 resets.
+Separate finding, NOT WiFi: 14:35:21 reset took 54 s to web, but WiFi connected at 1204 ms (ev20), GotIP .68 at 1237 ms, direct connect result WL_CONNECTED at 1310 ms; first loopWifi only at 52143 ms. So setup() blocked ~50 s after WiFi was up (first reset after ~6 h uptime; MQTT broker password missing on the bench). Stage unknown; needs a per-stage marker or a telnet boot capture. Track separately.
 <!-- SECTION:NOTES:END -->
