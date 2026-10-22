@@ -6,10 +6,10 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-22T04:23:00Z'
+updated_date: '2026-10-22T04:24:00Z'
 labels:
   - bug
   - wifi
-  - needs-info
 dependencies: []
 references:
   - https://github.com/rvdbreemen/OTGW-firmware/issues/681
