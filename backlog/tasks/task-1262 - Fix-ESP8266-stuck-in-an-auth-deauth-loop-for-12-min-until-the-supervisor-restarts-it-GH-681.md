@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-19 18:03
-updated_date: '2026-10-22T04:10:00Z'
+updated_date: '2026-10-22T04:25:00Z'
 labels:
   - bug
   - needs-info
@@ -73,4 +73,6 @@ Conclusions:
 - Recovery after the AP came back: 3.6 s (connected during the final wait, 212.6 s after boot; allow at 209 s).
 - Restart-to-restart cycle while the AP stays away is ~11 min (300 s loopWifi + up to 360 s blocked in setup), which matches "only one restart in 14 min". The station stays on in both setup waits, so this does not delay recovery.
 AC2 met: from the loss to the restart decision is a fixed 300 s, and recovery follows the AP within seconds (ADR-099 build).
+
+2026-10-22: theaprilhare (#681) on beta.4: no stuck reason-3 loop in 25 h; inactivity episodes recover in 20-100 s. AC#1 (which path issues the deauth and why reconnects kept failing) still unexplained; next evidence is the beta.5 telnet Drop line.
 <!-- SECTION:NOTES:END -->
