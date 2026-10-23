@@ -23,6 +23,7 @@ SKIP_TOOL_INSTALL=0
 TELNET_CONNECT_TIMEOUT_SECONDS=6
 TELNET_RECONNECT_DELAY_MILLISECONDS=500
 TELNET_POST_DISCONNECT_DELAY_MILLISECONDS=1000
+TELNET_IDLE_CHECK_SECONDS=60
 SKIP_BROWSER_CAPTURE=0
 BROWSER_URL=""
 BROWSER_DEBUG_PORT=9222
@@ -80,6 +81,13 @@ Telnet options:
   --telnet-connect-timeout-seconds <n>    Base connect timeout, default 6, range 2-60
   --telnet-reconnect-delay-ms <n>         Delay after failed connect, default 500
   --telnet-post-disconnect-delay-ms <n>   Delay after disconnect/reboot marker, default 1000
+  --telnet-idle-check-seconds <n>         After n seconds without telnet data, probe
+                                          http://<device>/api/v2/health and reconnect only
+                                          when the probe fails or the uptime went down;
+                                          default 60, range 15-3600, 0 disables
+  TCP keepalive (idle 10 s, interval 5 s, 3 probes) is always set on the telnet socket,
+  so a device that rebooted without closing the connection is detected and reconnected.
+  summary.txt lists every telnet gap (start, end, length, failed connect attempts, reason).
 
 Browser DevTools capture:
   Enabled by default when Chrome or Edge can be found. It records console output,
@@ -645,7 +653,7 @@ cleanup() {
   write_summary "Stopping: $(timestamp)"
 
   stop_child "mosquitto_sub" "${MQTT_PID:-}"
-  stop_child "Telnet capture worker" "${TELNET_PID:-}" 20
+  stop_child "Telnet capture worker" "${TELNET_PID:-}" 40
   stop_child "Browser capture worker" "${BROWSER_PID:-}" 20
   stop_child "Crash-log capture worker" "${CRASHLOG_PID:-}" 20
 
@@ -745,13 +753,17 @@ start_telnet_capture() {
   "$python" - "$DEVICE_HOST" 23 "$TELNET_LOG" "$SUMMARY_LOG" "$STOP_FILE" \
     "$TELNET_CONNECT_TIMEOUT_SECONDS" \
     "$TELNET_RECONNECT_DELAY_MILLISECONDS" \
-    "$TELNET_POST_DISCONNECT_DELAY_MILLISECONDS" <<'PY' &
+    "$TELNET_POST_DISCONNECT_DELAY_MILLISECONDS" \
+    "$TELNET_IDLE_CHECK_SECONDS" <<'PY' &
 import os
 import re
 import select
 import socket
 import sys
+import signal
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 
 host = sys.argv[1]
@@ -762,6 +774,7 @@ stop_file = sys.argv[5]
 base_timeout = int(sys.argv[6])
 reconnect_delay = int(sys.argv[7]) / 1000.0
 post_disconnect_delay = int(sys.argv[8]) / 1000.0
+idle_check = int(sys.argv[9])
 reboot_marker = re.compile(r"ESP\.restart\(\)")
 banner_footer = re.compile(r"Press 'h' for command menu|\bOTGW-Sim\b", re.MULTILINE)
 debug_toggle = re.compile(
@@ -787,7 +800,11 @@ def wait_delay(seconds):
     while not stopped() and time.monotonic() < end:
         time.sleep(min(0.1, max(0.0, end - time.monotonic())))
 
+last_byte_mono = time.monotonic()
+last_byte_wall = datetime.now(timezone.utc).astimezone()
+
 def read_available(sock, writer):
+    global last_byte_mono, last_byte_wall
     chunks = []
     while not stopped():
         ready, _, _ = select.select([sock], [], [], 0)
@@ -796,6 +813,8 @@ def read_available(sock, writer):
         data = sock.recv(4096)
         if not data:
             raise ConnectionError("remote closed connection")
+        last_byte_mono = time.monotonic()
+        last_byte_wall = datetime.now(timezone.utc).astimezone()
         text = data.decode("ascii", "replace")
         writer.write(text)
         writer.flush()
@@ -866,17 +885,139 @@ def request_settings_dump(sock, writer):
 def effective_timeout(attempt):
     return min(base_timeout + min(max(attempt - 1, 0), 6), 20)
 
+KEEPALIVE_IDLE = 10
+KEEPALIVE_INTERVAL = 5
+KEEPALIVE_COUNT = 3
+keepalive_reported = False
+
+def apply_keepalive(sock):
+    """Probe an idle connection so a device that rebooted without a FIN is noticed."""
+    applied = []
+    try:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+        applied.append("SO_KEEPALIVE")
+    except Exception as exc:
+        return f"not applied: {exc}"
+    opts = (
+        ("TCP_KEEPIDLE", KEEPALIVE_IDLE),
+        ("TCP_KEEPINTVL", KEEPALIVE_INTERVAL),
+        ("TCP_KEEPCNT", KEEPALIVE_COUNT),
+    )
+    have_idle = False
+    for name, value in opts:
+        if hasattr(socket, name):
+            try:
+                sock.setsockopt(socket.IPPROTO_TCP, getattr(socket, name), value)
+                applied.append(name)
+                if name == "TCP_KEEPIDLE":
+                    have_idle = True
+            except Exception:
+                pass
+    if not have_idle and hasattr(socket, "TCP_KEEPALIVE"):
+        try:
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_KEEPALIVE, KEEPALIVE_IDLE)
+            applied.append("TCP_KEEPALIVE")
+        except Exception:
+            pass
+    return ", ".join(applied)
+
+def fmt_iso(dt):
+    return dt.isoformat(timespec="seconds")
+
+# gap bookkeeping: gap is None while connected, otherwise a dict
+gap = None
+gap_count = 0
+gap_total = 0.0
+
+def open_gap(why, start=None):
+    global gap
+    if gap is None:
+        gap = {"start_wall": start or last_byte_wall, "reason": why, "tries": 0, "failed": 0}
+
+def parse_uptime_minutes(text):
+    m = re.search(r"(\d+)\(d\)-(\d+):(\d+)\(H:m\)", text)
+    if not m:
+        return None
+    return int(m.group(1)) * 1440 + int(m.group(2)) * 60 + int(m.group(3))
+
+def health_probe():
+    """Returns (alive, uptime_minutes_or_None). Any HTTP answer (503 from the
+    request gate, 429) means the device is alive; only connection errors and
+    timeouts count as a failed probe."""
+    try:
+        with urllib.request.urlopen(f"http://{host}/api/v2/health", timeout=5) as resp:
+            body = resp.read(4096).decode("utf-8", "replace")
+        return True, parse_uptime_minutes(body)
+    except urllib.error.HTTPError:
+        return True, None
+    except Exception:
+        return False, None
+
 def connect_capture(writer, attempt):
+    global keepalive_reported
     timeout = effective_timeout(attempt)
-    add_summary(f"Telnet connect started: {host}:{port} (timeout {timeout}s)")
+    quiet = gap is not None and gap["tries"] > 1
+    if not quiet:
+        add_summary(f"Telnet connect started: {host}:{port} (timeout {timeout}s)")
     sock = socket.create_connection((host, port), timeout=timeout)
+    ka = apply_keepalive(sock)
     sock.setblocking(False)
     add_summary(f"Telnet connected: {now()}")
+    if not keepalive_reported:
+        keepalive_reported = True
+        add_summary(f"Telnet keepalive: idle {KEEPALIVE_IDLE}s interval {KEEPALIVE_INTERVAL}s count {KEEPALIVE_COUNT} (applied: {ka})")
+    if gap is not None:
+        gap["end_wall"] = datetime.now(timezone.utc).astimezone()
+        secs = int(round(gap["end_wall"].timestamp() - gap["start_wall"].timestamp()))
+        gap["secs"] = secs
+        writer.write(f"\n### capture: telnet reconnected after {secs} s gap ({gap['reason']})\n")
+        writer.flush()
 
     banner = read_initial_banner(sock, writer)
     add_summary(f"Debug toggle actions: {enable_debug_toggles(sock, writer, banner)}")
     add_summary(f"Settings dump: {request_settings_dump(sock, writer)}")
     return sock
+
+totals_written = False
+
+def write_totals():
+    """Write the gap totals exactly once (normal exit or SIGTERM)."""
+    global totals_written, gap_count, gap_total
+    if totals_written:
+        return
+    totals_written = True
+    if gap is not None:
+        gap_count += 1
+        gap_total += int(round(time.time() - gap["start_wall"].timestamp()))
+    add_summary(f"Telnet gaps: {gap_count}, total {int(round(gap_total))} s")
+    if gap is not None:
+        add_summary(f"Telnet gap still open at stop: since {fmt_iso(gap['start_wall'])} ({gap['reason']})")
+
+def on_sigterm(signum, frame):
+    # The shell stops this worker with SIGTERM when it does not finish after the
+    # stop file appeared (blocked in a connect or a health probe): keep the totals.
+    write_totals()
+    os._exit(0)
+
+try:
+    signal.signal(signal.SIGTERM, on_sigterm)
+except Exception:
+    pass
+
+def drop(why, summary_line, start=None):
+    """Common disconnect handling: remember the reason, open a gap, close the socket."""
+    global sock, reason, attempts, next_connect, scan
+    reason = why
+    attempts = 0
+    next_connect = time.monotonic() + post_disconnect_delay
+    open_gap(why, start)
+    add_summary(summary_line)
+    try:
+        sock.close()
+    except Exception:
+        pass
+    sock = None
+    scan = ""
 
 sock = None
 has_connected = False
@@ -884,6 +1025,9 @@ attempts = 0
 next_connect = 0.0
 reason = None
 scan = ""
+last_probe_mono = time.monotonic()
+last_uptime_min = None
+last_ok_probe_wall = last_byte_wall
 
 with open(telnet_log, "a", encoding="utf-8", errors="replace") as writer:
     while not stopped():
@@ -893,21 +1037,33 @@ with open(telnet_log, "a", encoding="utf-8", errors="replace") as writer:
                 continue
             try:
                 attempts += 1
-                if has_connected:
+                if gap is not None:
+                    gap["tries"] += 1
+                if has_connected and (gap is None or gap["tries"] == 1):
                     suffix = f" after {reason}" if reason else ""
                     add_summary(f"Telnet reconnect attempt #{attempts} started{suffix} (timeout {effective_timeout(attempts)}s).")
                 sock = connect_capture(writer, attempts)
                 scan = ""
                 if has_connected:
                     add_summary(f"Telnet reconnected after {attempts} attempt(s): {now()}")
-                else:
-                    add_summary(f"Telnet connected: {now()}")
+                if gap is not None:
+                    end_wall = gap["end_wall"]
+                    secs = gap["secs"]
+                    add_summary(f"Telnet gap: {fmt_iso(gap['start_wall'])} -> {fmt_iso(end_wall)} ({secs} s, {gap['failed']} failed connect attempts, {gap['reason']})")
+                    gap_count += 1
+                    gap_total += secs
+                    gap = None
                 has_connected = True
                 attempts = 0
                 reason = None
+                last_probe_mono = time.monotonic()
+                last_uptime_min = None
             except Exception as exc:
                 next_connect = time.monotonic() + reconnect_delay
-                add_summary(f"Telnet connect attempt #{attempts} failed (timeout {effective_timeout(attempts)}s): {exc} Retrying in {reconnect_delay:g}s.")
+                if gap is not None:
+                    gap["failed"] += 1
+                if gap is None or gap["failed"] == 1:
+                    add_summary(f"Telnet connect attempt #{attempts} failed (timeout {effective_timeout(attempts)}s): {exc} Retrying in {reconnect_delay:g}s (further failed attempts of this gap are counted, not listed).")
                 try:
                     if sock:
                         sock.close()
@@ -920,39 +1076,46 @@ with open(telnet_log, "a", encoding="utf-8", errors="replace") as writer:
             if text:
                 scan = (scan + text)[-512:]
                 if reboot_marker.search(scan):
-                    reason = "ESP.restart() marker captured"
-                    attempts = 0
-                    next_connect = time.monotonic() + post_disconnect_delay
-                    add_summary(f"Telnet captured ESP.restart(); waiting {post_disconnect_delay:g}s before reconnect attempts.")
-                    sock.close()
-                    sock = None
-                    scan = ""
+                    drop("ESP.restart() marker captured",
+                         f"Telnet captured ESP.restart(); waiting {post_disconnect_delay:g}s before reconnect attempts.")
                     continue
 
             ready, _, _ = select.select([sock], [], [], 0)
             if ready:
                 data = sock.recv(1, socket.MSG_PEEK)
                 if not data:
-                    reason = "connection closed"
-                    attempts = 0
-                    next_connect = time.monotonic() + post_disconnect_delay
-                    add_summary(f"Telnet disconnected; waiting {post_disconnect_delay:g}s before reconnect attempts.")
-                    sock.close()
-                    sock = None
+                    drop("connection closed",
+                         f"Telnet disconnected; waiting {post_disconnect_delay:g}s before reconnect attempts.")
                     continue
         except BlockingIOError:
             pass
         except Exception as exc:
-            reason = "read failed"
-            attempts = 0
-            next_connect = time.monotonic() + post_disconnect_delay
-            add_summary(f"Telnet read failed: {exc}; waiting {post_disconnect_delay:g}s before reconnect attempts.")
-            try:
-                sock.close()
-            except Exception:
-                pass
-            sock = None
+            drop("read failed", f"Telnet read failed: {exc}; waiting {post_disconnect_delay:g}s before reconnect attempts.")
             continue
+
+        # Silence watchdog: a quiet device is only disconnected when it fails the
+        # health probe or its uptime went down (it rebooted).
+        if idle_check > 0 and sock is not None:
+            quiet_for = time.monotonic() - max(last_byte_mono, last_probe_mono)
+            if quiet_for >= idle_check:
+                ok, up = health_probe()
+                last_probe_mono = time.monotonic()
+                # The device was last known alive at the later of the last telnet
+                # byte and the last successful probe: a watchdog gap starts there.
+                known_alive = max(last_byte_wall, last_ok_probe_wall)
+                if not ok:
+                    drop("health probe failed",
+                         f"Telnet silent for {idle_check}s and the health probe failed; reconnecting.",
+                         known_alive)
+                    continue
+                if up is not None and last_uptime_min is not None and up < last_uptime_min:
+                    drop("device rebooted (uptime reset)",
+                         f"Telnet silent for {idle_check}s and the uptime went down ({last_uptime_min} -> {up} min); reconnecting.",
+                         known_alive)
+                    continue
+                last_ok_probe_wall = datetime.now(timezone.utc).astimezone()
+                if up is not None:
+                    last_uptime_min = up
 
         wait_delay(0.1)
 
@@ -961,6 +1124,8 @@ if sock:
         sock.close()
     except Exception:
         pass
+
+write_totals()
 PY
   TELNET_PID=$!
 }
@@ -1366,6 +1531,8 @@ while [[ $# -gt 0 ]]; do
       require_option_value "$1" "${2-}"; TELNET_RECONNECT_DELAY_MILLISECONDS="$2"; shift 2 ;;
     --telnet-post-disconnect-delay-ms|--telnet-post-disconnect-delay-milliseconds|-TelnetPostDisconnectDelayMilliseconds)
       require_option_value "$1" "${2-}"; TELNET_POST_DISCONNECT_DELAY_MILLISECONDS="$2"; shift 2 ;;
+    --telnet-idle-check-seconds|-TelnetIdleCheckSeconds)
+      require_option_value "$1" "${2-}"; TELNET_IDLE_CHECK_SECONDS="$2"; shift 2 ;;
     --skip-browser-capture|-SkipBrowserCapture)
       SKIP_BROWSER_CAPTURE=1; shift ;;
     --browser-url|-BrowserUrl)
@@ -1402,6 +1569,9 @@ fi
 validate_range "--telnet-connect-timeout-seconds" "$TELNET_CONNECT_TIMEOUT_SECONDS" 2 60
 validate_range "--telnet-reconnect-delay-ms" "$TELNET_RECONNECT_DELAY_MILLISECONDS" 250 60000
 validate_range "--telnet-post-disconnect-delay-ms" "$TELNET_POST_DISCONNECT_DELAY_MILLISECONDS" 250 60000
+if [[ "$TELNET_IDLE_CHECK_SECONDS" != "0" ]]; then
+  validate_range "--telnet-idle-check-seconds" "$TELNET_IDLE_CHECK_SECONDS" 15 3600
+fi
 validate_range "--browser-debug-port" "$BROWSER_DEBUG_PORT" 1 65535
 validate_range "--http-probe-timeout-seconds" "$HTTP_PROBE_TIMEOUT_SECONDS" 1 60
 validate_range "--crashlog-poll-seconds" "$CRASHLOG_POLL_SECONDS" 5 3600
@@ -1478,6 +1648,7 @@ write_summary "TelnetPort: 23"
 write_summary "TelnetConnectTimeoutSeconds: $TELNET_CONNECT_TIMEOUT_SECONDS"
 write_summary "TelnetPostDisconnectDelayMilliseconds: $TELNET_POST_DISCONNECT_DELAY_MILLISECONDS"
 write_summary "TelnetReconnectDelayMilliseconds: $TELNET_RECONNECT_DELAY_MILLISECONDS"
+write_summary "TelnetIdleCheckSeconds: $TELNET_IDLE_CHECK_SECONDS"
 write_summary "BrokerHost: $BROKER_HOST"
 write_summary "BrokerPort: $BROKER_PORT"
 write_summary "Topic: $TOPIC"
@@ -1491,6 +1662,11 @@ write_summary "HttpProbeTimeoutSeconds: $HTTP_PROBE_TIMEOUT_SECONDS"
 write_summary "CrashlogPollSeconds: $CRASHLOG_POLL_SECONDS"
 write_summary "Tool stderr log: $TOOL_ERROR_LOG"
 write_summary "Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)"
+if [[ "$TELNET_IDLE_CHECK_SECONDS" == "0" ]]; then
+  write_summary "Telnet idle check: disabled"
+else
+  write_summary "Telnet idle check: ${TELNET_IDLE_CHECK_SECONDS}s (health probe gated)"
+fi
 write_summary "python3: $PYTHON"
 write_summary "bash: ${BASH_VERSION:-unknown}"
 if command -v sw_vers >/dev/null 2>&1; then

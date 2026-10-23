@@ -72,6 +72,8 @@ param(
     [int]$TelnetReconnectDelayMilliseconds = 500,
     [ValidateRange(250, 60000)]
     [int]$TelnetPostDisconnectDelayMilliseconds = 1000,
+    [ValidateScript({ $_ -eq 0 -or ($_ -ge 15 -and $_ -le 3600) })]
+    [int]$TelnetIdleCheckSeconds = 60,
     [switch]$SkipBrowserCapture,
     [string]$BrowserUrl,
     [int]$BrowserDebugPort = 9222,
@@ -95,6 +97,13 @@ $telnetPort = 23
 $telnetConnectTimeoutSeconds = $TelnetConnectTimeoutSeconds
 $telnetPostDisconnectDelayMilliseconds = $TelnetPostDisconnectDelayMilliseconds
 $telnetReconnectDelayMilliseconds = $TelnetReconnectDelayMilliseconds
+$telnetIdleCheckSeconds = $TelnetIdleCheckSeconds
+$script:TelnetLastByteUtc = [DateTime]::UtcNow
+$script:TelnetGap = $null
+$script:TelnetGapCount = 0
+$script:TelnetGapTotalSeconds = 0
+$script:TelnetKeepAliveStatus = $null
+$script:TelnetKeepAliveReported = $false
 
 # Telnet debug toggles are parsed dynamically from the banner "Debug toggles"
 # block, so the same code works across firmware families. 1.x and 2.0.0/OTGW32
@@ -117,6 +126,15 @@ function Show-Help {
     Write-Host "  on are left as-is. Simulator toggles (SensorSim, OTGW-Sim) are never touched. Toggle keys"
     Write-Host "  are parsed from the banner, so 1.x and 2.0.0/OTGW32 layouts both work."
     Write-Host "  It then sends 'q' (read settings) and 'D' (dump settings/state) so they land in telnet.log."
+    Write-Host ""
+    Write-Host "Telnet reconnect:"
+    Write-Host "  A TCP keepalive (idle 10s, interval 5s; Windows fixes the probe count at 10) is set on the telnet"
+    Write-Host "  socket, so a device that rebooted without closing the connection is detected and reconnected."
+    Write-Host "  -TelnetIdleCheckSeconds <n>  After n seconds without telnet data, probe http://<DeviceHost>/api/v2/health"
+    Write-Host "                               and reconnect only when the probe fails or the uptime went down"
+    Write-Host "                               (default 60, range 15-3600, 0 disables). A quiet healthy device stays connected."
+    Write-Host "  summary.txt lists every telnet gap (start, end, length, failed connect attempts, reason) and"
+    Write-Host "  telnet.log gets a '### capture: telnet reconnected' marker line at each reconnect."
     Write-Host ""
     Write-Host "Interactive mode:"
     Write-Host "  If DeviceHost or BrokerHost is omitted, the script prompts for the OTGW device host and MQTT broker host."
@@ -1039,6 +1057,36 @@ function Remove-IntermediateCaptureFiles {
     return $removed
 }
 
+function Set-TelnetKeepAlive {
+    param([Parameter(Mandatory = $true)][System.Net.Sockets.TcpClient]$Client)
+
+    # Probe an idle connection (idle 10 s, interval 5 s) so a device that rebooted
+    # without sending a FIN is noticed: the OS faults the socket and
+    # Test-TelnetDisconnected sees it. Windows fixes the probe count itself.
+    $applied = New-Object System.Collections.Generic.List[string]
+    try {
+        $Client.Client.SetSocketOption([System.Net.Sockets.SocketOptionLevel]::Socket, [System.Net.Sockets.SocketOptionName]::KeepAlive, $true)
+        $applied.Add("SO_KEEPALIVE") | Out-Null
+    }
+    catch {
+        return "not applied: $($_.Exception.Message)"
+    }
+
+    try {
+        $values = New-Object byte[] 12
+        [BitConverter]::GetBytes([uint32]1).CopyTo($values, 0)
+        [BitConverter]::GetBytes([uint32]10000).CopyTo($values, 4)
+        [BitConverter]::GetBytes([uint32]5000).CopyTo($values, 8)
+        [void]$Client.Client.IOControl([System.Net.Sockets.IOControlCode]::KeepAliveValues, $values, $null)
+        $applied.Add("SIO_KEEPALIVE_VALS idle 10000ms interval 5000ms") | Out-Null
+    }
+    catch {
+        $applied.Add("SIO_KEEPALIVE_VALS failed: $($_.Exception.Message)") | Out-Null
+    }
+
+    return ($applied -join ", ")
+}
+
 function New-TelnetClient {
     param(
         [Parameter(Mandatory = $true)][string]$HostName,
@@ -1056,6 +1104,7 @@ function New-TelnetClient {
         }
 
         $client.EndConnect($asyncResult)
+        $script:TelnetKeepAliveStatus = Set-TelnetKeepAlive -Client $client
         return $client
     }
     catch {
@@ -1098,6 +1147,12 @@ function Test-TelnetDisconnected {
             return $true
         }
 
+        # A pending socket error (non-blocking connect failure) shows up here. A reset or a
+        # keepalive timeout on a connected socket does not: Poll(SelectRead) with Available 0 below sees it.
+        if ($socket.Poll(0, [System.Net.Sockets.SelectMode]::SelectError)) {
+            return $true
+        }
+
         return ($socket.Poll(0, [System.Net.Sockets.SelectMode]::SelectRead) -and $socket.Available -eq 0)
     }
     catch {
@@ -1130,6 +1185,7 @@ function Read-TelnetAvailable {
             break
         }
 
+        $script:TelnetLastByteUtc = [DateTime]::UtcNow
         $chunk = [System.Text.Encoding]::ASCII.GetString($buffer, 0, $read)
         $Writer.Write($chunk)
         $Writer.Flush()
@@ -1268,15 +1324,29 @@ function Connect-TelnetCapture {
         [Parameter(Mandatory = $true)][string]$HostName,
         [Parameter(Mandatory = $true)][int]$Port,
         [Parameter(Mandatory = $true)][System.IO.StreamWriter]$Writer,
-        [Parameter(Mandatory = $true)][int]$ConnectTimeoutSeconds
+        [Parameter(Mandatory = $true)][int]$ConnectTimeoutSeconds,
+        [switch]$Quiet
     )
 
-    Add-SummaryLine "Telnet connect started: $HostName`:$Port (timeout ${ConnectTimeoutSeconds}s)"
+    if (-not $Quiet) {
+        Add-SummaryLine "Telnet connect started: $HostName`:$Port (timeout ${ConnectTimeoutSeconds}s)"
+    }
     $client = New-TelnetClient -HostName $HostName -Port $Port -TimeoutSeconds $ConnectTimeoutSeconds
 
     try {
         $stream = $client.GetStream()
         Add-SummaryLine "Telnet connected: $((Get-Date).ToString('o'))"
+        if (-not $script:TelnetKeepAliveReported) {
+            $script:TelnetKeepAliveReported = $true
+            Add-SummaryLine "Telnet keepalive: idle 10s interval 5s count fixed by Windows (10) (applied: $($script:TelnetKeepAliveStatus))"
+        }
+        if ($script:TelnetGap) {
+            $script:TelnetGap.EndUtc = [DateTime]::UtcNow
+            $gapSeconds = [int][Math]::Round(($script:TelnetGap.EndUtc - $script:TelnetGap.StartUtc).TotalSeconds)
+            $script:TelnetGap.Seconds = $gapSeconds
+            $Writer.Write("`n### capture: telnet reconnected after $gapSeconds s gap ($($script:TelnetGap.Reason))`n")
+            $Writer.Flush()
+        }
 
         $banner = Read-InitialTelnetBanner -Stream $stream -Writer $Writer
         $toggleAction = Enable-AllTelnetDebugIfNeeded -Stream $stream -Writer $Writer -Banner $banner
@@ -1294,6 +1364,73 @@ function Connect-TelnetCapture {
         Close-TelnetClient -Client $client
         throw
     }
+}
+
+function Open-TelnetGap {
+    param(
+        [Parameter(Mandatory = $true)][string]$Reason,
+        [DateTime]$StartUtc = [DateTime]::MinValue
+    )
+
+    if (-not $script:TelnetGap) {
+        if ($StartUtc -eq [DateTime]::MinValue) { $StartUtc = $script:TelnetLastByteUtc }
+        $script:TelnetGap = [PSCustomObject]@{
+            StartUtc      = $StartUtc
+            EndUtc        = [DateTime]::MinValue
+            Seconds       = 0
+            Reason        = $Reason
+            Tries         = 0
+            Failed        = 0
+            LastStatusUtc = [DateTime]::MinValue
+        }
+    }
+}
+
+function Close-TelnetGap {
+    if ($script:TelnetGap) {
+        $endUtc = $script:TelnetGap.EndUtc
+        $seconds = $script:TelnetGap.Seconds
+        Add-SummaryLine "Telnet gap: $($script:TelnetGap.StartUtc.ToLocalTime().ToString('yyyy-MM-ddTHH:mm:sszzz')) -> $($endUtc.ToLocalTime().ToString('yyyy-MM-ddTHH:mm:sszzz')) ($seconds s, $($script:TelnetGap.Failed) failed connect attempts, $($script:TelnetGap.Reason))"
+        $script:TelnetGapCount++
+        $script:TelnetGapTotalSeconds += $seconds
+        $script:TelnetGap = $null
+    }
+}
+
+function Add-TelnetGapTotals {
+    if ($script:TelnetGap) {
+        $script:TelnetGapCount++
+        $script:TelnetGapTotalSeconds += [int][Math]::Round(([DateTime]::UtcNow - $script:TelnetGap.StartUtc).TotalSeconds)
+    }
+    Add-SummaryLine "Telnet gaps: $($script:TelnetGapCount), total $($script:TelnetGapTotalSeconds) s"
+    if ($script:TelnetGap) {
+        Add-SummaryLine "Telnet gap still open at stop: since $($script:TelnetGap.StartUtc.ToLocalTime().ToString('yyyy-MM-ddTHH:mm:sszzz')) ($($script:TelnetGap.Reason))"
+    }
+}
+
+function Test-DeviceHealth {
+    param([Parameter(Mandatory = $true)][string]$HostName)
+
+    # Returns Ok plus the uptime in minutes ("0(d)-00:42(H:m)") when the health endpoint answers.
+    $result = [PSCustomObject]@{ Ok = $false; UptimeMinutes = $null }
+    try {
+        $response = Invoke-WebRequest -Uri "http://$HostName/api/v2/health" -UseBasicParsing -TimeoutSec 5 -ErrorAction Stop
+        if ([int]$response.StatusCode -eq 200) {
+            $result.Ok = $true
+            if ([string]$response.Content -match '(\d+)\(d\)-(\d+):(\d+)\(H:m\)') {
+                $result.UptimeMinutes = [int]$Matches[1] * 1440 + [int]$Matches[2] * 60 + [int]$Matches[3]
+            }
+        }
+    }
+    catch {
+        # Any HTTP answer (503 from the request gate, 429) means the device is alive;
+        # only connection errors and timeouts leave Ok false.
+        if ($_.Exception.Response) {
+            $result.Ok = $true
+        }
+    }
+
+    return $result
 }
 
 function Get-TelnetEffectiveConnectTimeoutSeconds {
@@ -2045,6 +2182,7 @@ Add-SummaryLine "TelnetPort: $telnetPort"
 Add-SummaryLine "TelnetConnectTimeoutSeconds: $telnetConnectTimeoutSeconds"
 Add-SummaryLine "TelnetPostDisconnectDelayMilliseconds: $telnetPostDisconnectDelayMilliseconds"
 Add-SummaryLine "TelnetReconnectDelayMilliseconds: $telnetReconnectDelayMilliseconds"
+Add-SummaryLine "TelnetIdleCheckSeconds: $telnetIdleCheckSeconds"
 Add-SummaryLine "BrokerHost: $BrokerHost"
 Add-SummaryLine "BrokerPort: $BrokerPort"
 Add-SummaryLine "Topic: $Topic"
@@ -2054,6 +2192,7 @@ Add-SummaryLine "SkipToolInstall: $([bool]$SkipToolInstall)"
 Add-SummaryLine "Tool stderr log: $toolErrorLog"
 if ($savedSettingsPath) { Add-SummaryLine "Settings prefill saved: $savedSettingsPath" }
 Add-SummaryLine "Telnet timeout strategy: adaptive (base + retry backoff, capped at 20s)"
+Add-SummaryLine "Telnet idle check: $(if ($telnetIdleCheckSeconds -gt 0) { "${telnetIdleCheckSeconds}s (health probe gated)" } else { 'disabled' })"
 
 $telnetClient = $null
 $stream = $null
@@ -2065,6 +2204,9 @@ $telnetReconnectAttempts = 0
 $telnetReconnectReason = $null
 $nextTelnetConnectUtc = [DateTime]::MinValue
 $telnetRebootScanBuffer = ""
+$telnetLastProbeUtc = [DateTime]::UtcNow
+$telnetLastUptimeMinutes = $null
+$telnetLastOkProbeUtc = $script:TelnetLastByteUtc
 $browserHandle = $null
 $crashlogHandle = $null
 
@@ -2209,6 +2351,7 @@ try {
         if (Test-TelnetDisconnected -Client $telnetClient) {
             if ($telnetClient) {
                 $telnetReconnectReason = "connection closed"
+                Open-TelnetGap -Reason $telnetReconnectReason
                 $telnetReconnectAttempts = 0
                 $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
                 Write-CaptureStatus "Telnet disconnected; waiting $($telnetPostDisconnectDelayMilliseconds / 1000)s before reconnect attempts."
@@ -2225,8 +2368,10 @@ try {
 
             try {
                 $telnetReconnectAttempts++
+                if ($script:TelnetGap) { $script:TelnetGap.Tries++ }
+                $quietAttempt = ($script:TelnetGap -and $script:TelnetGap.Tries -gt 1)
                 $effectiveConnectTimeoutSeconds = Get-TelnetEffectiveConnectTimeoutSeconds -BaseTimeoutSeconds $telnetConnectTimeoutSeconds -ReconnectAttempts $telnetReconnectAttempts
-                if ($telnetHasConnected) {
+                if ($telnetHasConnected -and -not $quietAttempt) {
                     $reasonSuffix = ""
                     if ($telnetReconnectReason) {
                         $reasonSuffix = " after $telnetReconnectReason"
@@ -2238,7 +2383,8 @@ try {
                     -HostName $DeviceHost `
                     -Port $telnetPort `
                     -Writer $telnetWriter `
-                    -ConnectTimeoutSeconds $effectiveConnectTimeoutSeconds
+                    -ConnectTimeoutSeconds $effectiveConnectTimeoutSeconds `
+                    -Quiet:$quietAttempt
                 $telnetClient = $connection.Client
                 $stream = $connection.Stream
                 $telnetRebootScanBuffer = ""
@@ -2246,18 +2392,33 @@ try {
                 if ($telnetHasConnected) {
                     Write-CaptureStatus "Telnet reconnected after $telnetReconnectAttempts attempt(s): $((Get-Date).ToString('o'))"
                 }
-                else {
-                    Write-CaptureStatus "Telnet connected: $((Get-Date).ToString('o'))"
-                }
+                # The first connect is already logged by Connect-TelnetCapture ('Telnet connected: ...').
 
+                Close-TelnetGap
                 $telnetHasConnected = $true
                 $telnetReconnectAttempts = 0
                 $telnetReconnectReason = $null
+                $telnetLastProbeUtc = [DateTime]::UtcNow
+                $telnetLastUptimeMinutes = $null
                 $nextTelnetConnectUtc = [DateTime]::MinValue
             }
             catch {
                 $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetReconnectDelayMilliseconds)
-                Write-CaptureStatus "Telnet connect attempt #$telnetReconnectAttempts failed (timeout ${effectiveConnectTimeoutSeconds}s): $($_.Exception.Message) Retrying in $($telnetReconnectDelayMilliseconds / 1000)s."
+                $failureLine = "Telnet connect attempt #$telnetReconnectAttempts failed (timeout ${effectiveConnectTimeoutSeconds}s): $($_.Exception.Message) Retrying in $($telnetReconnectDelayMilliseconds / 1000)s"
+                if (-not $script:TelnetGap) {
+                    Write-CaptureStatus "$failureLine."
+                }
+                else {
+                    $script:TelnetGap.Failed++
+                    if ($script:TelnetGap.Failed -eq 1) {
+                        Write-CaptureStatus "$failureLine (further failed attempts of this gap are counted, not listed)."
+                        $script:TelnetGap.LastStatusUtc = [DateTime]::UtcNow
+                    }
+                    elseif (([DateTime]::UtcNow - $script:TelnetGap.LastStatusUtc).TotalSeconds -ge 10) {
+                        Write-Host "$failureLine."
+                        $script:TelnetGap.LastStatusUtc = [DateTime]::UtcNow
+                    }
+                }
                 continue
             }
         }
@@ -2272,6 +2433,7 @@ try {
 
                 if (Test-TelnetRebootMarker -Text $telnetRebootScanBuffer) {
                     $telnetReconnectReason = "ESP.restart() marker captured"
+                    Open-TelnetGap -Reason $telnetReconnectReason
                     $telnetReconnectAttempts = 0
                     $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
                     Write-CaptureStatus "Telnet captured ESP.restart(); waiting $($telnetPostDisconnectDelayMilliseconds / 1000)s before reconnect attempts."
@@ -2285,6 +2447,7 @@ try {
         }
         catch {
             $telnetReconnectReason = "read failed"
+            Open-TelnetGap -Reason $telnetReconnectReason
             $telnetReconnectAttempts = 0
             $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
             Write-CaptureStatus "Telnet read failed: $($_.Exception.Message); waiting $($telnetPostDisconnectDelayMilliseconds / 1000)s before reconnect attempts."
@@ -2292,6 +2455,46 @@ try {
             $telnetClient = $null
             $stream = $null
             continue
+        }
+
+        # Silence watchdog: a quiet device is only disconnected when it fails the
+        # health probe or its uptime went down (it rebooted).
+        if ($telnetIdleCheckSeconds -gt 0 -and $telnetClient) {
+            $lastActivityUtc = if ($script:TelnetLastByteUtc -gt $telnetLastProbeUtc) { $script:TelnetLastByteUtc } else { $telnetLastProbeUtc }
+            if (([DateTime]::UtcNow - $lastActivityUtc).TotalSeconds -ge $telnetIdleCheckSeconds) {
+                $probe = Test-DeviceHealth -HostName $DeviceHost
+                $telnetLastProbeUtc = [DateTime]::UtcNow
+                $idleReason = $null
+                # A watchdog gap starts at the later of the last telnet byte and the last successful probe.
+                $knownAliveUtc = if ($script:TelnetLastByteUtc -gt $telnetLastOkProbeUtc) { $script:TelnetLastByteUtc } else { $telnetLastOkProbeUtc }
+                if (-not $probe.Ok) {
+                    $idleReason = "health probe failed"
+                    $idleLine = "Telnet silent for ${telnetIdleCheckSeconds}s and the health probe failed; reconnecting."
+                }
+                elseif ($null -ne $probe.UptimeMinutes -and $null -ne $telnetLastUptimeMinutes -and $probe.UptimeMinutes -lt $telnetLastUptimeMinutes) {
+                    $idleReason = "device rebooted (uptime reset)"
+                    $idleLine = "Telnet silent for ${telnetIdleCheckSeconds}s and the uptime went down ($telnetLastUptimeMinutes -> $($probe.UptimeMinutes) min); reconnecting."
+                }
+                else {
+                    $telnetLastOkProbeUtc = [DateTime]::UtcNow
+                    if ($null -ne $probe.UptimeMinutes) {
+                        $telnetLastUptimeMinutes = $probe.UptimeMinutes
+                    }
+                }
+
+                if ($idleReason) {
+                    $telnetReconnectReason = $idleReason
+                    Open-TelnetGap -Reason $idleReason -StartUtc $knownAliveUtc
+                    $telnetReconnectAttempts = 0
+                    $nextTelnetConnectUtc = [DateTime]::UtcNow.AddMilliseconds($telnetPostDisconnectDelayMilliseconds)
+                    Write-CaptureStatus $idleLine
+                    Close-TelnetClient -Client $telnetClient
+                    $telnetClient = $null
+                    $stream = $null
+                    $telnetRebootScanBuffer = ""
+                    continue
+                }
+            }
         }
 
         Wait-CaptureDelay -Milliseconds 100
@@ -2305,6 +2508,7 @@ catch {
     throw
 }
 finally {
+    Add-TelnetGapTotals
     Add-SummaryLine "Stopping: $((Get-Date).ToString('o'))"
 
     if ($mqttProcess -and -not $mqttProcess.HasExited) {
