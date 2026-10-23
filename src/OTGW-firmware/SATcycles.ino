@@ -142,6 +142,15 @@ static float _ema_underheatFrac   = 0.0f;  // fraction of cycles with underheat
 static float _ema_longCycleFrac   = 0.0f;  // fraction of cycles > 600s
 static const float EMA_ALPHA      = 0.15f; // decay factor per cycle
 
+// thermo-nova _reset_pwm_disable_guards() (heating_control.py:525-528): clear the sustained overshoot,
+// underheat and saturation timers.
+void satCycleResetSustainGuards()
+{
+  _sustain_overshootSec = 0.0f;
+  _sustain_underheatSec = 0.0f;
+  _sustain_saturationSec = 0.0f;
+}
+
 // --- Cycle History ---
 struct SATCycleRecord {
   SATCycleClass eClass;
@@ -193,9 +202,7 @@ void satCycleInit()
   _cycle_maxFlowTemp = 0.0f;
   _cycle_minFlowTemp = 999.0f;
   _cycle_overshootSec = 0.0f;
-  _sustain_overshootSec = 0.0f;
-  _sustain_underheatSec = 0.0f;
-  _sustain_saturationSec = 0.0f;
+  satCycleResetSustainGuards();
   _sustain_lastCheckMs = millis();
   _cycleHistoryIdx = 0;
   _cycleHistoryCount = 0;

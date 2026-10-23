@@ -18,7 +18,10 @@ The "tick" scenario also cuts the real requested-setpoint -> PWM/continuous step
 segment out of satControlLoopRun() (TASK-1323: solar offset on the requested setpoint). The
 PID integral freeze (TASK-1323) is compiled from the real _pidUpdateIntegral() in SATpid.ino
 (OTGW_SATPID_INO for old-vs-fix). Not reachable from here: the rest of satControlLoopRun()
-(cold cutoff, CH queueing), covered by tests/test_sat_ch_enable.cpp plus source-level checks.
+(CH queueing), covered by tests/test_sat_ch_enable.cpp plus source-level checks. The cold cutoff
+reaction (TASK-1327) is the real satPwmDisableOnHeaterOff(), cut out with the PWM block and called by the
+"cutoff" scenario under the same condition as the loop (satColdCutoff from SATchEnable.h); that the loop
+calls it inside `if (coldCutoff)` is a source-level check (ColdCutoffSource).
 
 Run: python tests/test_sat_pwm_override.py
 """
@@ -51,9 +54,9 @@ STUBS = r"""
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
 struct SatSettings { bool bForcePWM=false; bool bPwmAutoSwitch=true; float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false;
-                     float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2; };
+                     int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2; };
 struct Settings { SatSettings sat; };
-struct SatState { float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bPwmFlameRequested=false, bDhwActive=false,
+struct SatState { int iCurrentModulation=0; float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bPwmFlameRequested=false, bDhwActive=false,
                   bActive=true, bSafetyTripped=false, bValvesOpen=true, bSummerActive=false, bSolarGainActive=false;
                   int eControlMode=SAT_MODE_PWM; };
 struct State { SatState sat; };
@@ -81,8 +84,10 @@ static bool satCycleIsHourLimitReached() { return g_hourLimit; }
 static bool g_hasOT = true;
 static bool hasOTCommandInterface() { return g_hasOT; }
 static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return true; }
+void satCycleResetSustainGuards();                                    // defined in the cut SATcycles block
 #define DUE(t) (g_due)
 #define timerSATSuppress 0
+#include "@CHENABLE@"
 """
 
 MAIN = r"""
@@ -173,6 +178,39 @@ int main(int argc, char** argv) {
     state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 600000UL;
     const float cs = tickRun((float)atof(argv[4]));
     printf("cs=%.1f req=%d\n", cs, (int)state.sat.bPwmFlameRequested);
+    return 0;
+  }
+  if (!strcmp(sc, "cutoff")) {             // TASK-1327: held CS 45 (protection off), heater OFF, recovery. argv[3]=force PWM argv[4]=cut|valves
+    settings.sat.bOvershootProtection = false; settings.sat.bForcePWM = atoi(argv[3]) != 0;
+    const bool valves = argc > 4 && !strcmp(argv[4], "valves");
+    state.sat.eControlMode = SAT_MODE_PWM;
+    state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 600000UL;
+    setPrev(45.0f);
+    auto tick = [&](float req, bool dirty) {   // tickRun + the lines of satControlLoopRun() after the cut segment
+      SETREQ(req);
+      if (dirty) { state.sat.bPwmFlameRequested = true; _pwm_flameOffHoldSetpoint = 48.0f; }   // dirty PWM phase
+      float cs = tickRun(req);
+      _sat_lastControlCS = cs;
+      return cs;
+    };
+    const float held = tick(40.0f, true);  // above cold: PWM without override keeps prevCS 45
+    _sustain_overshootSec = 45.0f; _sustain_underheatSec = 12.0f; _sustain_saturationSec = 7.0f;
+    state.sat.iCurrentModulation = 55;
+    float cutoff = 0;
+    if (valves) {                          // valves-closed early return of satControlLoopRun()
+      state.sat.bValvesOpen = false; satPwmDisableOnHeaterOff();
+    } else {                               // cold cutoff block
+      cutoff = tick(20.0f, true);
+      if (satColdCutoff(20.0f, satGetColdSetpoint())) satPwmDisableOnHeaterOff();
+    }
+    const int reqAfter = (int)state.sat.bPwmFlameRequested; const float holdAfter = _pwm_flameOffHoldSetpoint;
+    const int modeAfter = state.sat.eControlMode; const float lastAfter = _sat_lastControlCS;
+    const int mmAfter = state.sat.iCurrentModulation;
+    const float sus = _sustain_overshootSec + _sustain_underheatSec + _sustain_saturationSec;
+    state.sat.bValvesOpen = true;
+    const float rec = tick(30.0f, false);  // solar clears / valves reopen: a clean phase, so the result shows the reset
+    printf("held=%.1f cutoff=%.1f req=%d hold=%.1f mode=%d last=%.1f mm=%d sustain=%.1f recovery=%.1f\n", held, cutoff, reqAfter,
+           holdAfter, modeAfter, lastAfter, mmAfter, sus, rec);
     return 0;
   }
   if (!strcmp(sc, "solar")) {              // three ticks, no override (protection off), solar offset subtracted after each
@@ -275,7 +313,9 @@ def extract_cycles() -> str:
     fn = m.group(0)
     call = "satCycleCheckAutoSwitch(sp)" if re.search(r"satCycleCheckAutoSwitch\(float", fn) else \
         "(state.sat.fFinalSetpoint = (sp), satCycleCheckAutoSwitch())"
-    return "\n".join(consts) + "\n" + fn + f"\n#define CALL_AUTOSWITCH(sp) {call}\n"
+    g = re.search(r"^void satCycleResetSustainGuards\(\)\s*\{.*?^\}\s*$", src, re.S | re.M)
+    guards = g.group(0) if g else "void satCycleResetSustainGuards() { }"   # HEAD: no guard reset
+    return "\n".join(consts) + "\n" + guards + "\n" + fn + f"\n#define CALL_AUTOSWITCH(sp) {call}\n"
 
 
 def compile_cpp(cpp: Path, exe: Path):
@@ -303,13 +343,15 @@ def build(workdir: Path):
         ("satSetControlMode", "static void satSetControlMode(int m){ state.sat.eControlMode = m; }"),
         ("_sat_lastControlCS", "static float _sat_lastControlCS = 0;"),
         ("_sat_thermalSafeActive", "static bool _sat_thermalSafeActive = false;"),
+        ("satPwmDisableOnHeaterOff", "static void satPwmDisableOnHeaterOff(){ }"),   # HEAD: no cutoff reaction
     ):
         if name not in body:   # HEAD lacks these: keep the harness compiling so the cases fail, not the build
             pre += stub + "\n"
     cycles = "static uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }\n" + extract_cycles()
     cpp = workdir / "t.cpp"
     flag = "#define HAS_REQSP 1\n" if "_sat_requestedSetpoint" in body else ""
-    cpp.write_text(flag + STUBS + pre + body + cycles + MAIN, encoding="utf-8")
+    chenable = (REPO / "src" / "OTGW-firmware" / "SATchEnable.h").as_posix()
+    cpp.write_text(flag + STUBS.replace("@CHENABLE@", chenable) + pre + body + cycles + MAIN, encoding="utf-8")
     return compile_cpp(cpp, workdir / "t.exe")
 
 
@@ -521,6 +563,38 @@ class SatPwmOverride(unittest.TestCase):
         r = self.run_sc("reset", 1, "mode")
         self.assertEqual((r["req"], r["wait"], r["mode"]), ("0", "0", "1"))
 
+    # --- TASK-1327: cold cutoff disables PWM and drops the held CS (Sergeant D 2026-10-23, entry 12) ---
+    def test_cutoff_then_recovery_does_not_return_the_stale_held_cs_forced_pwm(self):
+        r = self.run_sc("cutoff", 0, 1)
+        self.assertEqual(float(r["held"]), 45.0)          # sanity: PWM without override keeps prevCS
+        self.assertEqual(float(r["recovery"]), 30.0)      # prevCS fell back to the PID output, not 45
+        self.assertEqual(r["mode"], "2")                  # bForcePWM keeps PWM as the mode
+
+    def test_cutoff_resets_the_pwm_phase_and_the_held_cs(self):
+        r = self.run_sc("cutoff", 0, 1)
+        self.assertEqual((r["req"], float(r["hold"]), float(r["last"])), ("0", 0.0, 10.0))
+
+    def test_cutoff_leaves_pwm_mode_when_not_forced(self):
+        r = self.run_sc("cutoff", 0, 0)
+        self.assertEqual(r["mode"], "1")                  # thermo-nova control_mode is CONTINUOUS while PWM is not enabled
+        self.assertEqual((r["req"], float(r["hold"]), float(r["last"])), ("0", 0.0, 10.0))
+        self.assertEqual(float(r["recovery"]), 62.0)      # satApplyContinuous marker (1030) after the final clamp, not the stale 45
+
+    def test_cutoff_clears_the_sustain_guards(self):
+        # heating_control.py:231 -> _reset_pwm_disable_guards (:525-528): overshoot 45 s, underheat 12 s, saturation 7 s -> 0
+        self.assertEqual(float(self.run_sc("cutoff", 0, 1)["sustain"]), 0.0)
+
+    def test_cutoff_sets_the_max_relative_modulation(self):
+        # heating_control.py:234; the MM= of the cutoff tick is state.sat.iCurrentModulation (satEnqueueIfChangedMM)
+        self.assertEqual(self.run_sc("cutoff", 0, 1)["mm"], "80")
+
+    def test_closed_valves_reset_pwm_like_the_cold_cutoff(self):
+        # heating_control.py:69-70: valves closed -> heater OFF -> same else branch (:229-234)
+        r = self.run_sc("cutoff", 0, 1, "valves")
+        self.assertEqual(float(r["held"]), 45.0)
+        self.assertEqual((r["req"], float(r["hold"]), float(r["last"]), r["mm"], float(r["sustain"])), ("0", 0.0, 10.0, "80", 0.0))
+        self.assertEqual(float(r["recovery"]), 30.0)      # not the stale 45 after the valves reopen
+
     def test_refresh_idle_while_thermal_safe_fallback_active(self):
         self.assertEqual(self.run_sc("refresh", 1, "thermal")["sent"], "0")
 
@@ -612,6 +686,23 @@ class SolarSource(unittest.TestCase):
     def test_pid_freeze_follows_the_setting(self):
         pid = PID_INO.read_text(encoding="utf-8")
         self.assertIn("state.sat.bSolarGainActive && settings.sat.bSolarFreezeIntegral", pid)
+
+
+class ColdCutoffSource(unittest.TestCase):
+    def test_loop_calls_the_pwm_disable_inside_the_cold_cutoff_block(self):
+        src = SAT_INO.read_text(encoding="utf-8")
+        loop = src[src.index("void satControlLoop"):]
+        block = loop[loop.index("if (coldCutoff) {"):]
+        block = block[:block.index("\n  }\n")]
+        self.assertIn("satPwmDisableOnHeaterOff();", block)
+        self.assertNotIn("iCurrentModulation = 100", block)   # the helper sets the max relative modulation
+
+    def test_loop_calls_the_pwm_disable_in_the_valves_closed_path(self):
+        src = SAT_INO.read_text(encoding="utf-8")
+        loop = src[src.index("void satControlLoop"):]
+        block = loop[loop.index("if (!state.sat.bValvesOpen) {"):]
+        block = block[:block.index("return;")]
+        self.assertIn("satPwmDisableOnHeaterOff();", block)
 
 
 class SourceLevel(unittest.TestCase):

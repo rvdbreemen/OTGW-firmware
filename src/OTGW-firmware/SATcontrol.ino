@@ -981,6 +981,30 @@ static void satSetControlMode(SATControlMode m)
   state.sat.eControlMode = m;
 }
 
+// Heater state OFF (thermo-nova heating_control.py:66-72: requested setpoint <= COLD_SETPOINT, or the valves
+// closed): the else branch of update() switches PWM off and resets the control state (heating_control.py:229-234):
+//   pwm.disable()                    = reset() plus enabled = False (pwm.py:106-109)
+//   _reset_pwm_disable_guards()      clears the overshoot/underheat/saturation timers (:231, :525-528)
+//   _control_setpoint = MINIMUM_SETPOINT, relative modulation = maximum_relative_modulation (:233-234).
+// thermo-nova's control_mode is CONTINUOUS while PWM is not enabled (heating_control.py:148-152). The firmware
+// mirrors that by leaving PWM mode unless bForcePWM is on. thermo-nova never reads its
+// force_pulse_width_modulation option (entry_data.py:223 is its only use), so the forced mode keeps PWM and only
+// the PWM state is reset. PWM comes back through the overshoot auto-switch: the sustained-overshoot re-enable
+// (heating_control.py:280-304) is mirrored by satCycleCheckAutoSwitch(); the second re-enable, on_cycle_end() after
+// a continuous cycle classified OVERSHOOT (pwm.py:219-223), is not ported. The summer simmer path is a firmware
+// feature without a thermo-nova counterpart and does not call this.
+// Sergeant D 2026-10-23, docs/sat/sergeant-d-corrections.md entry 12.
+static void satPwmDisableOnHeaterOff()
+{
+  if (!settings.sat.bForcePWM && state.sat.eControlMode == SAT_MODE_PWM) {
+    satSetControlMode(SAT_MODE_CONTINUOUS);
+  }
+  satPwmReset();                              // phase, ignition wait, hold (also when the mode stays PWM)
+  satCycleResetSustainGuards();
+  _sat_lastControlCS = SAT_MIN_SETPOINT;      // so a later PWM tick without an override cannot return a stale held CS
+  state.sat.iCurrentModulation = settings.sat.iMaxRelModulation;   // heating_control.py:234
+}
+
 // Last PWM off-phase duration in ms (0 = saturation: duty calc wants continuous ON).
 // Read by satCycleCheckAutoSwitch() for the off_time==0 saturation guard (Python pwm off_time).
 uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }
@@ -4825,6 +4849,7 @@ static void satControlLoopRun()
   // --- TRV valve detection (Task #29): skip heating when all valves closed ---
   if (!state.sat.bValvesOpen) {
     state.sat.fFinalSetpoint = SAT_MIN_SETPOINT;
+    satPwmDisableOnHeaterOff();   // heater state OFF in thermo-nova too (heating_control.py:69-70)
     if (hasOTCommandInterface()) {
       // TASK-565: write-on-change. Valves-closed path.
       satEnqueueIfChangedCS(10.0f);
@@ -5030,8 +5055,8 @@ static void satControlLoopRun()
   const bool coldCutoff = satColdCutoff(pidOutput, satGetColdSetpoint());
   if (coldCutoff) {
     finalSetpoint = SAT_MIN_SETPOINT;
-    state.sat.iCurrentModulation = 100;
     state.sat.fFinalSetpoint = finalSetpoint;
+    satPwmDisableOnHeaterOff();   // thermo-nova pwm.disable(), guards, MINIMUM_SETPOINT, max modulation (Sergeant D 2026-10-23, entry 12)
   }
 
   // --- Send CS= and MM= commands to boiler when an OT command interface is available ---
