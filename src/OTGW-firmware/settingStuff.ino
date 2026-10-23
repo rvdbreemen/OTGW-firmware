@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.482
+**  Version  : v2.0.0-alpha.483
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1066,7 +1066,7 @@ void updateSetting(const char *field, const char *newValue)
     // chokepoint that every writer funnels through.
     if (wantSim && satBoilerHardwarePresent()) {
       DebugTln(F("SAT-SIM: enable rejected — boiler hardware present"));
-      sendEventToWebSocket_P('!', PSTR("SAT-SIM: enable rejected, boiler present"));
+      satPostWsEvent_P('!', PSTR("SAT-SIM: enable rejected, boiler present"));   // TASK-1337: async_tcp posts, the loop task sends
       settings.sat.bSimulation = false;
     } else {
       settings.sat.bSimulation = wantSim;

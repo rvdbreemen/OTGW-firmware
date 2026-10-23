@@ -25,14 +25,80 @@
 // Emits one plain-language line to BOTH sinks so Telnet and the Web UI live-log
 // never drift. Always-on (NOT gated by state.debug.bSAT) but transition-only at
 // the call sites, so volume stays low. Web UI lines carry prefix 'S'.
-// sendEventToWebSocket() is a file-static in OTGW-Core.ino, visible across the TU.
 #define SAT_NARRATE_BUF 96
+
+// TASK-1337: ot_log_buffer has one writer, the loop task. satNarrate*() is also reached from
+// REST handlers and the settings POST (async_tcp task), so it never sends: it posts the line to
+// a small ring and satWsEventDrain(), called from satControlLoop() on the loop task, sends it.
+// The ring holds SAT_WS_RING_N lines; the producer side is a few memcpy under a portMUX spinlock
+// (no heap, no String). When the ring is full the OLDEST line is dropped (the newest state
+// matters most) and counted; the drain then logs one "dropped" line.
+// SAT_WS_RING_BEGIN
+#define SAT_WS_RING_N 4
+struct SatWsEvent { char prefix; char msg[SAT_NARRATE_BUF]; };
+static SatWsEvent g_satWsRing[SAT_WS_RING_N];
+static uint8_t g_satWsHead = 0;     // oldest entry
+static uint8_t g_satWsCount = 0;
+static uint16_t g_satWsDropped = 0;
+static portMUX_TYPE g_satWsMux = portMUX_INITIALIZER_UNLOCKED;
+
+// Any task. msg is a DRAM string; it is truncated to SAT_NARRATE_BUF - 1.
+static void satWsEventPost(char prefix, const char *msg) {
+  if (!msg) return;
+  portENTER_CRITICAL(&g_satWsMux);
+  if (g_satWsCount == SAT_WS_RING_N) {              // full: drop the oldest
+    g_satWsHead = (uint8_t)((g_satWsHead + 1) % SAT_WS_RING_N);
+    g_satWsCount--;
+    if (g_satWsDropped < 0xFFFF) g_satWsDropped++;
+  }
+  SatWsEvent &e = g_satWsRing[(g_satWsHead + g_satWsCount) % SAT_WS_RING_N];
+  e.prefix = prefix;
+  strlcpy(e.msg, msg, sizeof(e.msg));
+  g_satWsCount++;
+  portEXIT_CRITICAL(&g_satWsMux);
+}
+
+// Take the oldest entry; false when empty. Any task, normally the loop task.
+static bool satWsEventTake(char &prefix, char *msg, size_t msgLen, uint16_t &dropped) {
+  bool got = false;
+  portENTER_CRITICAL(&g_satWsMux);
+  dropped = g_satWsDropped;
+  g_satWsDropped = 0;
+  if (g_satWsCount > 0) {
+    prefix = g_satWsRing[g_satWsHead].prefix;
+    strlcpy(msg, g_satWsRing[g_satWsHead].msg, msgLen);
+    g_satWsHead = (uint8_t)((g_satWsHead + 1) % SAT_WS_RING_N);
+    g_satWsCount--;
+    got = true;
+  }
+  portEXIT_CRITICAL(&g_satWsMux);
+  return got;
+}
+// SAT_WS_RING_END
+
+// Loop task only: the single writer of ot_log_buffer for SAT events.
+static void satWsEventDrain() {
+  // No struct type in the signature: the Arduino prototype generator would place its
+  // prototype above the struct definition.
+  char prefix;
+  char msg[SAT_NARRATE_BUF];
+  uint16_t dropped;
+  while (satWsEventTake(prefix, msg, sizeof(msg), dropped)) {
+    if (dropped) {
+      char note[SAT_NARRATE_BUF];
+      snprintf_P(note, sizeof(note), PSTR("SAT: %u log lines dropped"), (unsigned)dropped);
+      sendEventToWebSocket('!', note);
+    }
+    sendEventToWebSocket(prefix, msg);
+  }
+}
+
 void satNarrate_P(PGM_P msg_P) {
   if (!msg_P) return;
   char buf[SAT_NARRATE_BUF];
   snprintf_P(buf, sizeof(buf), PSTR("%s"), msg_P);
   DebugTf(PSTR("SAT: %s\r\n"), buf);          // Telnet sink
-  sendEventToWebSocket('S', buf);             // Web UI live-log sink (prefix 'S')
+  satWsEventPost('S', buf);                   // Web UI live-log sink (prefix 'S'), sent by the loop task
 }
 void satNarratef_P(PGM_P fmt_P, ...) {
   if (!fmt_P) return;
@@ -42,7 +108,14 @@ void satNarratef_P(PGM_P fmt_P, ...) {
   vsnprintf_P(buf, sizeof(buf), fmt_P, args);
   va_end(args);
   DebugTf(PSTR("SAT: %s\r\n"), buf);          // Telnet sink
-  sendEventToWebSocket('S', buf);             // Web UI live-log sink (prefix 'S')
+  satWsEventPost('S', buf);                   // Web UI live-log sink (prefix 'S'), sent by the loop task
+}
+// Called from settingStuff.ino (async_tcp task): the WS line of a rejected SATsimulation enable.
+void satPostWsEvent_P(char prefix, PGM_P msg_P) {
+  if (!msg_P) return;
+  char buf[SAT_NARRATE_BUF];
+  snprintf_P(buf, sizeof(buf), PSTR("%s"), msg_P);
+  satWsEventPost(prefix, buf);
 }
 
 #include "SATchEnable.h"
@@ -4577,6 +4650,7 @@ static void satAutoTuneUpdate()
 static void satControlLoopRun();
 void satControlLoop()
 {
+  satWsEventDrain();              // TASK-1337: SAT lines posted from any task, sent here (loop task)
   satControlLoopRun();
   satPublishCoreState();
 }
