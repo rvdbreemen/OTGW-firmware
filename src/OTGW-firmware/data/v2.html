@@ -772,16 +772,11 @@
 
   <input class="set-search" id="setSearch" placeholder="Search settings… (e.g. broker, ntp, pin)">
 
-  <div class="set-layout">
-    <nav class="set-rail" id="setRail"></nav>
-    <div>
-      <div class="set-cols" id="setCols"></div>
-      <div class="savebar" id="saveBar">
-        <span class="msg"><b id="dirtyCount">0</b> unsaved change(s)</span>
-        <button class="discard" id="btnDiscard">Discard</button>
-        <button class="save" id="btnSave">Save settings</button>
-      </div>
-    </div>
+  <div class="set-cols" id="setCols"></div>
+  <div class="savebar" id="saveBar">
+    <span class="msg"><b id="dirtyCount">0</b> unsaved change(s)</span>
+    <button class="discard" id="btnDiscard">Discard</button>
+    <button class="save" id="btnSave">Save settings</button>
   </div>
 </div><!-- /page-settings -->
 
@@ -829,9 +824,9 @@
     <div id="dbgCrashOk" class="crashlog-ok" style="display:none">✓ No crash logs recorded since last boot.</div>
     <pre id="dbgCrash" class="console" style="display:none;max-height:320px;white-space:pre-wrap">—</pre>
     <div id="dbgGroups"></div>
-    <details style="margin-top:6px">
-      <summary style="cursor:pointer;color:var(--muted);font-size:.8rem">Raw debug dump (/api/v2/debug)</summary>
-      <pre id="dbgInfo" class="console" style="max-height:340px;white-space:pre-wrap;margin-top:8px">Loading…</pre>
+    <details class="grp">
+      <summary>Raw debug dump (/api/v2/debug)</summary>
+      <div class="grp-body"><pre id="dbgInfo" class="console" style="max-height:340px;white-space:pre-wrap">Loading…</pre></div>
     </details>
   </div>
 

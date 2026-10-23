@@ -42,7 +42,7 @@ With SAT, every control loop cycle (default 30 seconds):
 The v2 web UI presents SAT as a single page with three depth levels, so you see only as much as you need: a simple thermostat view (dial, presets, current status), a control view (control mode, boiler status, coefficient, deadband, PID output), and a technical view (health, raw PID terms, PWM/cycle detail, simulation, raw JSON). All three share the same UI shell described in chapter 3.
 
 1. Open the web interface (`http://otgw2.local/`).
-2. Go to the SAT tab or Settings > SAT.
+2. Go to the SAT page.
 3. Set "SAT Enabled" to on.
 4. Choose your heating system (auto, radiators, or underfloor) and your heating source (auto, gas boiler, heat pump, or hybrid). System and source are separate settings (see below).
 5. Set the target room temperature and heating curve coefficient.

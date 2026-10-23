@@ -215,7 +215,7 @@ Up to four Xiaomi LYWSD03MMC Bluetooth LE sensors are supported on the ESP32. Th
 
 **Trust model and MAC filtering.** BLE advertisements are unauthenticated broadcasts: any device in radio range can publish a BTHome v2 or ATC/pvvx packet that the firmware will parse and accept. The firmware applies the following filter:
 
-- If a sensor MAC is configured (Settings → SAT → BLE sensors), the firmware accepts only advertisements from that exact MAC.
+- If a sensor MAC is configured (Settings → Sensors → BLE sensors), the firmware accepts only advertisements from that exact MAC.
 - If the configured-MAC list is empty, **the firmware accepts any parseable BTHome v2 / ATC sensor in range** and assigns it to a free slot until all four slots are filled. Once a slot is taken, only advertisements from that slot's MAC continue to update it (slot stickiness).
 - The firmware never writes to or queries BLE devices — reception only. There is no risk of leaking secrets or commands to a hostile sensor.
 

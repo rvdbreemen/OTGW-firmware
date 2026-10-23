@@ -54,7 +54,7 @@ A dedicated Smart Autotune Thermostat page provides the thermostat control surfa
 
 #### Settings page
 
-The Settings page is driven by the REST API and presents settings with human-readable labels, categories, and hints, plus a search box and a rail of category links. A save bar tracks unsaved changes with **Discard** and **Save settings** actions. Additional panels include a **BLE sensor** roster (discovered Bluetooth Low Energy sensors) and, in the Webhook group, a **Send test call** action that fires the real saved ON webhook. Advanced OT-Direct and SAT settings are exposed here as well.
+The Settings page is driven by the REST API and presents settings with human-readable labels, categories, and hints, plus a search box. The categories are collapsible groups, closed by default, each showing a count of its settings; the groups you open are remembered in the browser, and a search opens every group with a match. A save bar tracks unsaved changes with **Discard** and **Save settings** actions. Additional panels include a **BLE sensor** roster (discovered Bluetooth Low Energy sensors) and, in the Webhook group, a **Send test call** action that fires the real saved ON webhook. Advanced OT-Direct and SAT settings are exposed here as well.
 
 #### Advanced page
 

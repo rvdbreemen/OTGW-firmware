@@ -119,7 +119,8 @@
   }
 
   // ---------- page navigation ----------
-  function showPage(p) {
+  // opts.tab: the caller picks the Monitor tab itself (shown, not stored, no stored-tab restore).
+  function showPage(p, opts) {
     document.querySelectorAll('.seg').forEach(function (s) {
       s.classList.toggle('active', s.dataset.page === p);
     });
@@ -131,7 +132,17 @@
     // TASK-986: the SAT page polls /api/v2/sat/status only while it is visible.
     // Stop the poll on every navigation, then (re)arm it when entering the page.
     satPageStop();
-    if (p === 'monitor' && isMonitorLogVisible()) renderLog();
+    if (p !== 'settings') { setPeek = {}; pendingReveal = ''; }   // TASK-1312: links open a group for one visit
+    if (p === 'monitor') {
+      // TASK-1312: re-assert the tab the user last clicked (validated against the tabs that exist),
+      // unless the caller names the tab itself.
+      var want = opts && opts.tab ? opts.tab : null;
+      var mt = null; if (!want) { try { mt = localStorage.getItem('otgw-v2-montab'); } catch (e) { } }
+      var mtab = null;
+      document.querySelectorAll('#page-monitor .subtab').forEach(function (s) { if ((want || mt) && s.dataset.tab === (want || mt)) mtab = s; });
+      if (mtab) showTab(mtab.dataset.tab);
+      else if (isMonitorLogVisible()) renderLog();
+    }
     if (p === 'settings') fetchSettings();
     if (p === 'sat') satPageStart();
     if (p === 'diagnose') diagnosePageEnter();
@@ -166,10 +177,12 @@
   // ---------- Monitor sub-tabs ----------
   // Scoped to #page-monitor so the Advanced page's own .subtab/.mpanel elements
   // (TASK-982) are never toggled by this switcher, and vice-versa.
-  function showTab(t) {
+  function showTab(t, fromUser) {
     document.querySelectorAll('#page-monitor .subtab').forEach(function (s) {
       s.classList.toggle('active', s.dataset.tab === t);
     });
+    // TASK-1312: only a tab the user clicked is remembered; one opened from code is shown, not stored.
+    if (fromUser) { try { localStorage.setItem('otgw-v2-montab', t); } catch (e) { } }
     document.querySelectorAll('#page-monitor .mpanel').forEach(function (el) {
       el.classList.toggle('active', el.id === t);
     });
@@ -310,7 +323,7 @@
     var btn = document.createElement('button');
     btn.className = 'connsum' + (cls ? ' ' + cls : '');
     btn.title = 'Connectivity health — open the Connection map';
-    btn.addEventListener('click', function () { showPage('monitor'); showTab('mconn'); });
+    btn.addEventListener('click', function () { showPage('monitor', { tab: 'mconn' }); });
     var dot = document.createElement('span'); dot.className = 'd';
     var lbl = document.createElement('span'); lbl.textContent = label;
     var go = document.createElement('span'); go.className = 'go'; go.textContent = '· Connection ›';
@@ -2306,7 +2319,6 @@
   var setData = {};   // key -> {value,type,...} as fetched
   var setDirty = {};  // key -> new value (string)
   var setSearch = '';
-  var setActiveCat = '';  // id of the currently-shown category (empty => first non-empty)
   function fetchSettings() {
     fetch(APIGW + 'v2/settings').then(function (r) { return r.ok ? r.json() : null; }).then(function (j) {
       if (!j) return;
@@ -2340,51 +2352,95 @@
       return labelFor(k).toLowerCase().indexOf(q) !== -1 || k.toLowerCase().indexOf(q) !== -1;
     });
   }
+  // TASK-1312: every category is a collapsible <details class="grp"> on one page. setOpen
+  // (a Set of category ids) is the source of truth for which groups are open; each render
+  // applies it, and localStorage only persists it. It changes ONLY from a user click on a
+  // summary (wireSettingsGroups), never from the 'toggle' event, which also fires for
+  // programmatic opens. Search and links into Settings open groups for that moment only.
+  var SETOPEN_KEY = 'otgw-v2-setopen';
+  var setOpen = (function () {
+    var st = new Set();
+    try {
+      var a = JSON.parse(localStorage.getItem(SETOPEN_KEY));
+      if (Array.isArray(a)) a.forEach(function (x) { if (typeof x === 'string') st.add(x); });
+    } catch (e) { }
+    return st;
+  })();
+  var setPeek = {};   // category id -> true: opened by a link, shown open but never stored
+  function saveSetOpen() {
+    try { localStorage.setItem(SETOPEN_KEY, JSON.stringify(Array.from(setOpen))); } catch (e) { }
+  }
+  function sensorsGroup() { return document.querySelector('#setCols details.grp[data-grp="sensors"]'); }
+  function wireSettingsGroups() {
+    var cols = document.getElementById('setCols'); if (!cols) return;
+    cols.addEventListener('click', function (ev) {
+      var sum = ev.target && ev.target.closest ? ev.target.closest('summary') : null;
+      if (!sum || sum.parentNode.parentNode !== cols) return;
+      var det = sum.parentNode, id = det.dataset.grp; if (!id) return;
+      var willOpen = !det.open;   // the click handler runs before the native toggle
+      delete setPeek[id];
+      if (!setSearch.trim()) {    // while searching every group is open transiently: store nothing
+        if (willOpen) setOpen.add(id); else setOpen.delete(id);
+        saveSetOpen();
+      }
+      if (id === 'sensors' && willOpen) startBlePoll();
+    });
+  }
+  // A link from elsewhere (BLE discovery card): show Settings with that group open and in view.
+  // The group stays open for this visit to Settings (setPeek is cleared by showPage when
+  // you leave); the scroll happens at the end of the render in which the group exists, so a
+  // slow settings fetch cannot make it miss.
+  var pendingReveal = '';
+  function openSettingsGroup(id) {
+    setPeek[id] = true;
+    pendingReveal = id;
+    showPage('settings');
+    renderSettings();
+  }
+  function consumeReveal() {
+    if (!pendingReveal) return;
+    var d = document.querySelector('#setCols details.grp[data-grp="' + pendingReveal + '"]');
+    if (!d) return;   // settings not loaded yet: the fetch's render comes back here
+    d.open = true;
+    var card = pendingReveal === 'sensors' ? document.getElementById('setcard-ble') : null;
+    if (card) {
+      card.scrollIntoView({ block: 'center' });
+      pendingReveal = '';
+    } else {
+      d.scrollIntoView({ block: 'start' });
+      // Sensors: keep waiting for the roster card (renderBleCard calls back here).
+      if (pendingReveal !== 'sensors' || bleData) pendingReveal = '';
+    }
+  }
+  // Opens (for this visit only) and shows the group that holds a refused field.
+  function revealSettingsGroup(id) {
+    var pg = document.getElementById('page-settings');
+    if (!pg || !pg.classList.contains('active')) return;
+    setPeek[id] = true; pendingReveal = id;
+    renderSettings();
+  }
   function renderSettings() {
-    var rail = document.getElementById('setRail'), cols = document.getElementById('setCols');
-    if (!rail || !cols) return;
+    var cols = document.getElementById('setCols');
+    if (!cols) return;
     hideHelp();   // TASK-1281: the rows are rebuilt below, so a popover on an old icon would point at nothing
     var q = setSearch.trim().toLowerCase();
-    rail.textContent = ''; cols.textContent = '';
-    // Build the rail (one item per category that has at least one field), with
-    // per-category counts and a REBOOT badge on reboot-sensitive categories.
-    var firstNonEmpty = '';
+    cols.textContent = '';
     SET_CATS.forEach(function (c) {
-      var n = keysForCat(c.id, q).length;
-      if (!n) return;
-      if (!firstNonEmpty) firstNonEmpty = c.id;
-      var ri = document.createElement('div'); ri.className = 'rail-item';
-      ri.appendChild(document.createTextNode(c.icon + ' ' + c.title + ' '));
-      if (c.reboot) { var rb = document.createElement('span'); rb.className = 'badge-reboot'; rb.textContent = 'REBOOT'; ri.appendChild(rb); }
-      var cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = n; ri.appendChild(cnt);
-      ri.addEventListener('click', function () { setActiveCat = c.id; renderSettings(); });
-      ri.dataset.cat = c.id;
-      rail.appendChild(ri);
-    });
-    // When searching, show every matching category at once; otherwise show the one
-    // active category (mockup's show-one-at-a-time behaviour).
-    var showCats;
-    if (q) { showCats = SET_CATS.filter(function (c) { return keysForCat(c.id, q).length; }).map(function (c) { return c.id; }); }
-    else {
-      var active = setActiveCat && keysForCat(setActiveCat, '').length ? setActiveCat : firstNonEmpty;
-      setActiveCat = active;
-      showCats = active ? [active] : [];
-      var act = rail.querySelector('.rail-item[data-cat="' + active + '"]'); if (act) act.classList.add('active');
-    }
-    showCats.forEach(function (id) {
-      var c = catById(id); if (!c) return;
-      // category header (title + REBOOT + description)
-      var head = document.createElement('div');
-      var title = document.createElement('div'); title.className = 'set-cat-title';
-      title.appendChild(document.createTextNode(c.icon + ' ' + c.title + ' '));
-      if (c.reboot) { var rb2 = document.createElement('span'); rb2.className = 'badge-reboot'; rb2.textContent = 'REBOOT'; title.appendChild(rb2); }
-      head.appendChild(title);
-      if (c.desc) { var d = document.createElement('div'); d.className = 'cat-desc'; d.textContent = c.desc; head.appendChild(d); }
-      cols.appendChild(head);
+      var id = c.id;
+      var keys = keysForCat(id, q).filter(function (k) { return !SET_HIDE_ROW[k]; });   // TASK-1012: never render internal onboarding flags
+      if (id === 'sat' ? !keysForCat(id, q).length : !keys.length) return;
+      var det = document.createElement('details'); det.className = 'grp'; det.dataset.grp = id;
+      if (q || setOpen.has(id) || setPeek[id]) det.open = true;
+      var sum = document.createElement('summary');
+      sum.appendChild(document.createTextNode(c.icon + ' ' + c.title + ' '));
+      if (c.reboot) { var rb = document.createElement('span'); rb.className = 'badge-reboot'; rb.textContent = 'REBOOT'; sum.appendChild(rb); }
+      if (id !== 'sat') { var cnt = document.createElement('span'); cnt.className = 'cnt'; cnt.textContent = keys.length; sum.appendChild(cnt); }
+      det.appendChild(sum);
+      var body = document.createElement('div'); body.className = 'grp-body';
+      if (c.desc) { var d = document.createElement('div'); d.className = 'cat-desc'; d.textContent = c.desc; body.appendChild(d); }
       // masonry container; cards grouped by sub-group
       var wrap = document.createElement('div'); wrap.className = 'set-cards';
-      if (id === 'sat') { wrap.appendChild(satMovedCard()); cols.appendChild(wrap); return; }   // TASK-1211
-      var keys = keysForCat(id, q).filter(function (k) { return !SET_HIDE_ROW[k]; });   // TASK-1012: never render internal onboarding flags
+      if (id === 'sat') { wrap.appendChild(satMovedCard()); body.appendChild(wrap); det.appendChild(body); cols.appendChild(det); return; }   // TASK-1211
       var bySub = {}; var subOrder = [];
       keys.forEach(function (k) { var s = subFor(k); if (!(s in bySub)) { bySub[s] = []; subOrder.push(s); } bySub[s].push(k); });
       subOrder.forEach(function (s) {
@@ -2400,11 +2456,12 @@
         var whCard = wrap.querySelector('.set-group');
         if (whCard) whCard.appendChild(webhookTestRow());
       }
-      cols.appendChild(wrap);
+      body.appendChild(wrap); det.appendChild(body); cols.appendChild(det);
     });
     if (bleData) renderBleCard();
     renderSatSettings();
     updateSaveBar();
+    consumeReveal();
   }
   // TASK-1211: Settings keeps a pointer card for the SAT category; the fields render on
   // the SAT page (renderSatSettings), with the same rows, dirty state and save path.
@@ -2627,10 +2684,10 @@
     if (!keys.length) return;
     // TASK-1230: refuse the whole save (post nothing) when an edited IP field has a bad
     // octet (any mode; stored values are not re-checked) or a static group is incomplete.
-    var ipErr = '';
-    keys.forEach(function (k) { var v = ('' + setDirty[k]).trim(); if (!ipErr && IP_KEY_RE.test(k) && v && ipv4Err(v)) ipErr = subFor(k) + ' ' + labelFor(k) + ': ' + ipv4Err(v); });
-    ipErr = ipErr || ipGroupsErr(function (k) { return setData[k] ? curVal(k) : undefined; });
-    if (ipErr) { bleToast(ipErr, true); return; }
+    var ipErr = '', ipCat = '';
+    keys.forEach(function (k) { var v = ('' + setDirty[k]).trim(); if (!ipErr && IP_KEY_RE.test(k) && v && ipv4Err(v)) { ipErr = subFor(k) + ' ' + labelFor(k) + ': ' + ipv4Err(v); ipCat = catFor(k); } });
+    if (!ipErr) { ipErr = ipGroupsErr(function (k) { return setData[k] ? curVal(k) : undefined; }); ipCat = 'network'; }
+    if (ipErr) { bleToast(ipErr, true); revealSettingsGroup(ipCat); return; }
     // TASK-1012: intercept satenabled false->on for a not-yet-onboarded SAT. Do NOT
     // enable now — run the wizard, which enables at Finish. Strip the key from this save.
     var satEnabling = ('satenabled' in setDirty) && ('' + setDirty.satenabled) === 'true' &&
@@ -2726,7 +2783,8 @@
   function startBlePoll() {
     if (blePollTimer) return;
     blePollTimer = setInterval(function () {
-      if (setActiveCat !== 'sensors' || !document.getElementById('setcard-ble')) { stopBlePoll(); return; }
+      var pg = document.getElementById('page-settings'), sg = sensorsGroup();
+      if (!document.getElementById('setcard-ble') || !sg || !sg.open || !pg || !pg.classList.contains('active')) { stopBlePoll(); return; }
       fetchBle();
     }, 4000);
   }
@@ -2750,12 +2808,13 @@
     })(0);
   }
   function renderBleCard() {
-    var cols = document.getElementById('setCols'); if (!cols || !bleData) return;
+    if (!bleData) return;
     var old = document.getElementById('setcard-ble'); if (old) old.remove();
-    // TASK-963: the BLE roster belongs to the Sensors category ONLY. The old code
-    // appended unconditionally (called here AND from the async fetchBle()), so the
-    // card leaked onto every category. Bail (and stop the poll) when not on Sensors.
-    if (setActiveCat !== 'sensors') { stopBlePoll(); return; }
+    // TASK-963: the BLE roster belongs to the Sensors group ONLY. It is appended to that
+    // group's body (called from renderSettings AND the async fetchBle()); without the
+    // group (no Sensors field matches the search) there is no card and no poll.
+    var sg = sensorsGroup(), host = sg && sg.querySelector('.grp-body');
+    if (!host) { stopBlePoll(); return; }
     var card = document.createElement('div'); card.className = 'set-group'; card.id = 'setcard-ble';
     var h = document.createElement('h3'); h.textContent = 'BLE sensors'; card.appendChild(h);
     var desc = document.createElement('div'); desc.className = 'ble-desc';
@@ -2874,8 +2933,9 @@
     });
     addCtr.appendChild(macIn); addCtr.appendChild(bkIn); addCtr.appendChild(addBtn);
     add.appendChild(addCtr); card.appendChild(add);
-    cols.appendChild(card);
-    startBlePoll();   // TASK-963: continuous roster polling while the Sensors category is open
+    host.appendChild(card);
+    if (pendingReveal === 'sensors') consumeReveal();   // a link wanted the roster: scroll to it now it exists
+    if (sg.open) startBlePoll();   // TASK-963: continuous roster polling while the Sensors group is open
   }
 
   // ============================================================
@@ -4984,8 +5044,7 @@
     var assign = document.createElement('button'); assign.className = 'primary'; assign.textContent = 'Assign';
     assign.addEventListener('click', function () {
       dropDiscoverCard(card, id);
-      setActiveCat = 'sensors'; showPage('settings'); renderSettings();
-      setTimeout(function () { var el = document.querySelector('[class*="ble-row"]'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 350);
+      openSettingsGroup('sensors');
     });
     var ign = document.createElement('button'); ign.textContent = 'Ignore';
     ign.addEventListener('click', function () { dropDiscoverCard(card, id); });
@@ -5011,8 +5070,7 @@
     if (card && card.parentNode) card.parentNode.removeChild(card);
   }
   function goToSensorRoster() {
-    setActiveCat = 'sensors'; showPage('settings'); renderSettings();
-    setTimeout(function () { var el = document.querySelector('[class*="ble-row"]'); if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 350);
+    openSettingsGroup('sensors');
   }
   function showBleDiscoverGroup() {
     var macs = Object.keys(bleDiscoverPending);
@@ -5596,7 +5654,7 @@
     })();
     // Monitor sub-tabs only (scoped so Advanced's own .subtab elements are wired separately).
     document.querySelectorAll('#page-monitor .subtab').forEach(function (s) {
-      s.addEventListener('click', function () { showTab(s.dataset.tab); });
+      s.addEventListener('click', function () { showTab(s.dataset.tab, true); });
     });
     // TASK-982: Advanced sub-tabs (PIC / Debug / File System / System).
     document.querySelectorAll('#advTabs .subtab').forEach(function (s) {
@@ -5648,6 +5706,7 @@
     // Settings controls
     var setS = document.getElementById('setSearch');
     if (setS) setS.addEventListener('input', function () { setSearch = setS.value; renderSettings(); });
+    wireSettingsGroups();   // TASK-1312
     var bSave = document.getElementById('btnSave'); if (bSave) bSave.addEventListener('click', saveSettings);
     var pcu = document.getElementById('picCheckUpd'); if (pcu) pcu.addEventListener('click', checkPicUpdate);   // TASK-972
     var bDisc = document.getElementById('btnDiscard'); if (bDisc) bDisc.addEventListener('click', discardSettings);
