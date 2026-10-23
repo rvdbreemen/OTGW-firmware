@@ -4346,9 +4346,6 @@ components:
         flame_off_offset:
           type: number
           description: "Flame-off setpoint offset (C)"
-        force_pwm:
-          type: boolean
-          description: "Force PWM mode regardless of conditions"
         overshoot_protection:
           type: boolean
           description: "PWM overshoot protection (default true): OFF phase CS=10 and CH off, ON phase return+offset hold then flow-offset refreshed every ~3 s; MM=0 in PWM except heat pump/hybrid. When false, PWM sends no CS override (CS keeps its previous value, CH stays on)."
@@ -4613,7 +4610,6 @@ components:
         push_setpoint: false
         follow_thermostat: false
         flame_off_offset: 0.0
-        force_pwm: false
         overshoot_protection: true
         flow_offset: 2.0
         pressure: 0.0

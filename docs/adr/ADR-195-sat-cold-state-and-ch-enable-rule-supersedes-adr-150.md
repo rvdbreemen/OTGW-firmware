@@ -99,7 +99,7 @@ The terms used: CS (Control Setpoint) is the gateway command for the CH water ta
 
 **1. Cutoff.** When the requested setpoint is at or below the cold setpoint (`satColdCutoff`, `<=` as thermo-nova `heating_control.py:72` and `:385`), SAT sends CS=10, CH=0 and MM at the configured maximum relative modulation (`settings.sat.iMaxRelModulation`, default 100), switches PWM off, and resets the PWM state and the PWM disable guards, as `heating_control.py:229-234` and `pwm.py:106-109` do (entry 12). HEAD (`c3aa767a0`, TASK-1327) does this in `satControlLoopRun()` (`SATcontrol.ino:5052-5060`): on `satColdCutoff` it sets the final setpoint to `SAT_MIN_SETPOINT` (10) and calls `satPwmDisableOnHeaterOff()` (`SATcontrol.ino:997-1006`), which:
 
-- leaves PWM mode for continuous unless `bForcePWM` is on (`satSetControlMode(SAT_MODE_CONTINUOUS)`, which also resets the PWM state);
+- always leaves PWM mode for continuous (`satSetControlMode(SAT_MODE_CONTINUOUS)`, which also resets the PWM state). The Force PWM option that used to keep PWM here was removed (TASK-1332, Sergeant D entry 13, 2026-10-23);
 - calls `satPwmReset()` (`SATcontrol.ino:966-975`) in every case: PWM phase, ignition wait, hold and effective boiler temperature;
 - calls `satCycleResetSustainGuards()` (`SATcycles.ino:147-152`), which clears the sustained overshoot, underheat and saturation timers, as thermo-nova `_reset_pwm_disable_guards()` (`heating_control.py:525-528`);
 - sets the held CS `_sat_lastControlCS` to `SAT_MIN_SETPOINT`, so a later PWM tick cannot return a stale pre-cutoff CS;
@@ -130,7 +130,7 @@ This departs deliberately from thermo-nova `heating_control.py:238` in two ways:
 
 - Use `satGetColdSetpoint()` (28.2 radiators, 21.0 underfloor) at every site where thermo-nova uses `COLD_SETPOINT`: the cutoff, the PWM enable and disable guard gates, the PWM gate, the flame-off hold floor and the CH bit.
 - Compare with `<=` for the cutoff (`satColdCutoff`), and `>` for "warm", as thermo-nova does.
-- On the cutoff: send CS=10, CH=0 and MM at the configured maximum relative modulation; switch PWM off; reset the PWM state, the held CS and the sustained overshoot, underheat and saturation guard timers (`satPwmDisableOnHeaterOff()`). The force-PWM case is an open question.
+- On the cutoff: send CS=10, CH=0 and MM at the configured maximum relative modulation; switch PWM off; reset the PWM state, the held CS and the sustained overshoot, underheat and saturation guard timers (`satPwmDisableOnHeaterOff()`).
 - Decide the CH bit only in `satChEnableDecide`, from the requested setpoint and the PWM phase.
 - Send SAT's CS through `satEnqueueOwnCS` (ADR-179).
 
@@ -143,7 +143,7 @@ This departs deliberately from thermo-nova `heating_control.py:238` in two ways:
 
 ### Exceptions
 
-- None settled. HEAD (TASK-1327, `c3aa767a0`) keeps PWM as the mode on the cutoff when `bForcePWM` (the firmware's own force-PWM option, which thermo-nova stores at `entry_data.py:58` and `:223` but never reads in `custom_components/sat`) is on, and then only resets the PWM state, the guards and the held CS. thermo-nova calls `pwm.disable()` unconditionally (`heating_control.py:230`). That exception is our proposal, shipped but not confirmed by Sergeant D; see Open Questions.
+- None. The heater-off branch always leaves PWM mode, as thermo-nova's `pwm.disable()` does unconditionally (`heating_control.py:230`). The earlier exception, keeping PWM on the cutoff when the firmware's own `bForcePWM` option was on (TASK-1327, `c3aa767a0`), is gone: Sergeant D entry 13 (2026-10-23) removed the Force PWM option completely (TASK-1332). thermo-nova stored that option at `entry_data.py:58` and `:223` but never read it in `custom_components/sat`.
 
 ### Verification
 
@@ -184,7 +184,7 @@ This departs deliberately from thermo-nova `heating_control.py:238` in two ways:
 - [ ] Sergeant D confirms CH=1 during the PWM ON phase whatever CS keeps the flame on (entry 9 point 1), on his own setup (TASK-1316 AC3).
 - [x] TASK-1327 lands, including the reset of the PWM disable guard timers on the cutoff. Done in commit `c3aa767a0` (`satPwmDisableOnHeaterOff()`, `satCycleResetSustainGuards()`).
 - [ ] TASK-1238 decides how SAT's CH=0 reaches the boiler in OT-Direct gateway mode (MsgID 0, see ADR-179 Open Questions); until then the cutoff's CH=0 is not reliably honoured there.
-- [ ] Sergeant D decides whether a user-forced PWM mode (`bForcePWM`) stays PWM through a cold cutoff, or PWM is switched off as thermo-nova does unconditionally (`heating_control.py:230`).
+- [x] Whether a user-forced PWM mode (`bForcePWM`) stays PWM through a cold cutoff: resolved by Sergeant D entry 13 (2026-10-23), who removed the Force PWM option completely (TASK-1332). PWM is switched off on the cutoff unconditionally, as thermo-nova does (`heating_control.py:230`).
 
 ## Related Decisions
 

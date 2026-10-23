@@ -987,19 +987,18 @@ static void satSetControlMode(SATControlMode m)
 //   _reset_pwm_disable_guards()      clears the overshoot/underheat/saturation timers (:231, :525-528)
 //   _control_setpoint = MINIMUM_SETPOINT, relative modulation = maximum_relative_modulation (:233-234).
 // thermo-nova's control_mode is CONTINUOUS while PWM is not enabled (heating_control.py:148-152). The firmware
-// mirrors that by leaving PWM mode unless bForcePWM is on. thermo-nova never reads its
-// force_pulse_width_modulation option (entry_data.py:223 is its only use), so the forced mode keeps PWM and only
-// the PWM state is reset. PWM comes back through the overshoot auto-switch: the sustained-overshoot re-enable
+// mirrors that by always leaving PWM mode here (the Force PWM option was removed, Sergeant D 2026-10-23,
+// entry 13). PWM comes back through the overshoot auto-switch: the sustained-overshoot re-enable
 // (heating_control.py:280-304) is mirrored by satCycleCheckAutoSwitch(); the second re-enable, on_cycle_end() after
 // a continuous cycle classified OVERSHOOT (pwm.py:219-223), is not ported. The summer simmer path is a firmware
 // feature without a thermo-nova counterpart and does not call this.
 // Sergeant D 2026-10-23, docs/sat/sergeant-d-corrections.md entry 12.
 static void satPwmDisableOnHeaterOff()
 {
-  if (!settings.sat.bForcePWM && state.sat.eControlMode == SAT_MODE_PWM) {
+  if (state.sat.eControlMode == SAT_MODE_PWM) {
     satSetControlMode(SAT_MODE_CONTINUOUS);
   }
-  satPwmReset();                              // phase, ignition wait, hold (also when the mode stays PWM)
+  satPwmReset();                              // phase, ignition wait, hold
   satCycleResetSustainGuards();
   _sat_lastControlCS = SAT_MIN_SETPOINT;      // so a later PWM tick without an override cannot return a stale held CS
   state.sat.iCurrentModulation = settings.sat.iMaxRelModulation;   // heating_control.py:234
@@ -2499,7 +2498,6 @@ void satSendStatusJSON()
     je.field(F("window_detection"),     settings.sat.bWindowDetection);
     je.field(F("push_setpoint"),        settings.sat.bPushSetpoint);
     je.field(F("flame_off_offset"),     settings.sat.fFlameOffOffset);
-    je.field(F("force_pwm"),            settings.sat.bForcePWM);
     je.field(F("overshoot_protection"),  settings.sat.bOvershootProtection);
     je.field(F("follow_thermostat"),    settings.sat.bFollowThermostat);
     je.field(F("flow_offset"),          settings.sat.fFlowOffset);
@@ -2781,7 +2779,7 @@ void satPublishMQTT()
   static SATShadowB s_setpoint_sync, s_modulation_sync, s_ch_sync;
   static SATShadowB s_solar_gain_enable, s_summer_simmer_enable, s_comfort_adjust_enable;
   static SATShadowB s_thermal_comfort, s_multi_area_enable, s_auto_tune_enable;
-  static SATShadowB s_simulation_enable, s_window_detection_enable, s_force_pwm_enable, s_overshoot_protection_enable, s_follow_thermostat_enable;
+  static SATShadowB s_simulation_enable, s_window_detection_enable, s_overshoot_protection_enable, s_follow_thermostat_enable;
   static SATShadowB s_push_setpoint_enable, s_preset_sync_enable;
   static SATShadowB s_dhw_enabled, s_dhw_enable, s_pwm_auto_switch_enable;
   // JSON-blob heartbeat counters (BSS zero-init == first-seen sentinel).
@@ -3231,7 +3229,6 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/auto_tune_enable"),        settings.sat.bAutoTune,         s_auto_tune_enable,        true);
   publishIfChangedB(F("sat/simulation_enable"),       settings.sat.bSimulation,       s_simulation_enable,       true);
   publishIfChangedB(F("sat/window_detection_enable"), settings.sat.bWindowDetection,  s_window_detection_enable, true);
-  publishIfChangedB(F("sat/force_pwm_enable"),        settings.sat.bForcePWM,         s_force_pwm_enable,        true);
   publishIfChangedB(F("sat/overshoot_protection_enable"), settings.sat.bOvershootProtection, s_overshoot_protection_enable, true);
   publishIfChangedB(F("sat/push_setpoint_enable"),    settings.sat.bPushSetpoint,     s_push_setpoint_enable,    true);
   publishIfChangedB(F("sat/follow_thermostat_enable"), settings.sat.bFollowThermostat, s_follow_thermostat_enable, true);
@@ -4998,11 +4995,6 @@ static void satControlLoopRun()
   if (pidOutput >= sysMax && state.sat.eControlMode == SAT_MODE_PWM) {
     satSetControlMode(SAT_MODE_CONTINUOUS);
     SATDebugTln(F("SAT: PID at system max, switching to continuous mode"));
-  }
-
-  // --- Force PWM if configured (Task #41) ---
-  if (settings.sat.bForcePWM && state.sat.eControlMode != SAT_MODE_PWM) {
-    satSetControlMode(SAT_MODE_PWM);
   }
 
   // --- Apply control mode ---

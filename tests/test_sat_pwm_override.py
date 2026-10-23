@@ -53,7 +53,7 @@ STUBS = r"""
 #define SAT_QUIRK_IMMERGAS_TP 0x02
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { bool bForcePWM=false; bool bPwmAutoSwitch=true; float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false;
+struct SatSettings { @FORCEFIELD@ bool bPwmAutoSwitch=true; float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false;
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2; };
 struct Settings { SatSettings sat; };
 struct SatState { int iCurrentModulation=0; float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bPwmFlameRequested=false, bDhwActive=false,
@@ -180,9 +180,12 @@ int main(int argc, char** argv) {
     printf("cs=%.1f req=%d\n", cs, (int)state.sat.bPwmFlameRequested);
     return 0;
   }
-  if (!strcmp(sc, "cutoff")) {             // TASK-1327: held CS 45 (protection off), heater OFF, recovery. argv[3]=force PWM argv[4]=cut|valves
-    settings.sat.bOvershootProtection = false; settings.sat.bForcePWM = atoi(argv[3]) != 0;
-    const bool valves = argc > 4 && !strcmp(argv[4], "valves");
+  if (!strcmp(sc, "cutoff")) {             // TASK-1327: held CS 45 (protection off), heater OFF, recovery. argv[3]=cut|valves
+    settings.sat.bOvershootProtection = false;
+#ifdef HAS_FORCE_PWM
+    settings.sat.bForcePWM = true;           // HEAD only: the removed option, on, must no longer keep PWM
+#endif
+    const bool valves = argc > 3 && !strcmp(argv[3], "valves");
     state.sat.eControlMode = SAT_MODE_PWM;
     state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 600000UL;
     setPrev(45.0f);
@@ -350,8 +353,12 @@ def build(workdir: Path):
     cycles = "static uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }\n" + extract_cycles()
     cpp = workdir / "t.cpp"
     flag = "#define HAS_REQSP 1\n" if "_sat_requestedSetpoint" in body else ""
+    # HEAD still has the Force PWM setting: the stub carries the field so HEAD compiles and the forced case shows the old behaviour
+    has_force = "bForcePWM" in body
+    if has_force:
+        flag += "#define HAS_FORCE_PWM 1\n"
     chenable = (REPO / "src" / "OTGW-firmware" / "SATchEnable.h").as_posix()
-    cpp.write_text(flag + STUBS.replace("@CHENABLE@", chenable) + pre + body + cycles + MAIN, encoding="utf-8")
+    cpp.write_text(flag + STUBS.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "").replace("@CHENABLE@", chenable) + pre + body + cycles + MAIN, encoding="utf-8")
     return compile_cpp(cpp, workdir / "t.exe")
 
 
@@ -564,36 +571,36 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual((r["req"], r["wait"], r["mode"]), ("0", "0", "1"))
 
     # --- TASK-1327: cold cutoff disables PWM and drops the held CS (Sergeant D 2026-10-23, entry 12) ---
-    def test_cutoff_then_recovery_does_not_return_the_stale_held_cs_forced_pwm(self):
-        r = self.run_sc("cutoff", 0, 1)
+    def test_cutoff_then_recovery_does_not_return_the_stale_held_cs(self):
+        r = self.run_sc("cutoff", 0)
         self.assertEqual(float(r["held"]), 45.0)          # sanity: PWM without override keeps prevCS
-        self.assertEqual(float(r["recovery"]), 30.0)      # prevCS fell back to the PID output, not 45
-        self.assertEqual(r["mode"], "2")                  # bForcePWM keeps PWM as the mode
+        self.assertEqual(r["mode"], "1")                  # TASK-1332: no Force PWM option, the cutoff always leaves PWM
 
     def test_cutoff_resets_the_pwm_phase_and_the_held_cs(self):
-        r = self.run_sc("cutoff", 0, 1)
+        r = self.run_sc("cutoff", 0)
         self.assertEqual((r["req"], float(r["hold"]), float(r["last"])), ("0", 0.0, 10.0))
 
-    def test_cutoff_leaves_pwm_mode_when_not_forced(self):
-        r = self.run_sc("cutoff", 0, 0)
+    def test_cutoff_leaves_pwm_mode(self):
+        r = self.run_sc("cutoff", 0)
         self.assertEqual(r["mode"], "1")                  # thermo-nova control_mode is CONTINUOUS while PWM is not enabled
         self.assertEqual((r["req"], float(r["hold"]), float(r["last"])), ("0", 0.0, 10.0))
         self.assertEqual(float(r["recovery"]), 62.0)      # satApplyContinuous marker (1030) after the final clamp, not the stale 45
 
     def test_cutoff_clears_the_sustain_guards(self):
         # heating_control.py:231 -> _reset_pwm_disable_guards (:525-528): overshoot 45 s, underheat 12 s, saturation 7 s -> 0
-        self.assertEqual(float(self.run_sc("cutoff", 0, 1)["sustain"]), 0.0)
+        self.assertEqual(float(self.run_sc("cutoff", 0)["sustain"]), 0.0)
 
     def test_cutoff_sets_the_max_relative_modulation(self):
         # heating_control.py:234; the MM= of the cutoff tick is state.sat.iCurrentModulation (satEnqueueIfChangedMM)
-        self.assertEqual(self.run_sc("cutoff", 0, 1)["mm"], "80")
+        self.assertEqual(self.run_sc("cutoff", 0)["mm"], "80")
 
     def test_closed_valves_reset_pwm_like_the_cold_cutoff(self):
         # heating_control.py:69-70: valves closed -> heater OFF -> same else branch (:229-234)
-        r = self.run_sc("cutoff", 0, 1, "valves")
+        r = self.run_sc("cutoff", 0, "valves")
         self.assertEqual(float(r["held"]), 45.0)
         self.assertEqual((r["req"], float(r["hold"]), float(r["last"]), r["mm"], float(r["sustain"])), ("0", 0.0, 10.0, "80", 0.0))
-        self.assertEqual(float(r["recovery"]), 30.0)      # not the stale 45 after the valves reopen
+        self.assertEqual(r["mode"], "1")
+        self.assertEqual(float(r["recovery"]), 62.0)      # continuous marker, not the stale 45, after the valves reopen
 
     def test_refresh_idle_while_thermal_safe_fallback_active(self):
         self.assertEqual(self.run_sc("refresh", 1, "thermal")["sent"], "0")
@@ -703,6 +710,36 @@ class ColdCutoffSource(unittest.TestCase):
         block = loop[loop.index("if (!state.sat.bValvesOpen) {"):]
         block = block[:block.index("return;")]
         self.assertIn("satPwmDisableOnHeaterOff();", block)
+
+
+class ForcePwmRemoved(unittest.TestCase):
+    """TASK-1332: the Force PWM option is gone from the firmware sources (Sergeant D 2026-10-23, entry 13)."""
+    NAMES = re.compile(r"bForcePWM|satforcepwm|force_pwm", re.I)
+
+    def test_no_force_pwm_name_left_in_firmware_sources(self):
+        left = []
+        for f in (REPO / "src" / "OTGW-firmware").rglob("*"):
+            if f.suffix not in (".ino", ".cpp", ".h", ".js", ".html", ".css", ".ini") or not f.is_file():
+                continue
+            for n, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                # the retired-entity table row is the one place that must keep the old topic names
+                if self.NAMES.search(line) and "RETIRED-SAT-ENTITY" not in line:
+                    left.append(f"{f.relative_to(REPO).as_posix()}:{n}")
+        self.assertEqual(left, [])
+
+    def test_retired_entity_table_clears_the_old_discovery_and_state_topic(self):
+        src = (REPO / "src" / "OTGW-firmware" / "MQTTHaDiscovery.cpp").read_text(encoding="utf-8")
+        rows = [l for l in src.splitlines() if "RETIRED-SAT-ENTITY" in l and "{" in l]
+        self.assertEqual(len(rows), 1)
+        self.assertIn('"switch", "sat_force_pwm_enable", "/sat/force_pwm_enable"', rows[0])
+        self.assertIn("clearRetiredSatEntities(ctx);", (REPO / "src" / "OTGW-firmware" / "MQTTstuff.ino").read_text(encoding="utf-8"))
+
+    def test_old_settings_key_is_ignored_silently(self):
+        # updateSetting() has no catch-all: an unknown key (SATforcepwm in an old file) falls through the
+        # else-if chain and leaves the struct unchanged (ADR-192: removed keys are ignored)
+        src = (REPO / "src" / "OTGW-firmware" / "settingStuff.ino").read_text(encoding="utf-8")
+        body = src[src.index("void updateSetting("):src.index("} // updateSetting()")]
+        self.assertNotRegex(body, r"(?i)unknown (setting|key|field)")
 
 
 class SourceLevel(unittest.TestCase):

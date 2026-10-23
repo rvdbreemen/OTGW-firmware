@@ -2040,7 +2040,6 @@
     otdfailsafe:         { cat: 'otd', label: 'Fail-safe on OT bus loss' },
     otdmsginterval:      { cat: 'otd', label: 'Message interval', hint: 'ms' },
     // SAT: full metadata (TASK-933 Phase 2)
-    satforcepwm:         { cat: 'sat', label: 'Force PWM' },
     satovershootprotection: { cat: 'sat', label: 'PWM overshoot protection' },
     satpushsetpoint:     { cat: 'sat', label: 'Push setpoint to thermostat' },
     satfollowthermostat: { cat: 'sat', label: 'Follow thermostat setpoint' },
@@ -2157,7 +2156,7 @@
   ];
   var SAT_L3 = [
     ['Curve', ['satcoefficient', 'satdeadband', 'sattempstep', 'satovershootmargin']],
-    ['PID / PWM', ['satforcepwm', 'satovershootprotection', 'satpwmautoswitch', 'satcyclesperhour', 'satautogains', 'satmaxmodulation',
+    ['PID / PWM', ['satovershootprotection', 'satpwmautoswitch', 'satcyclesperhour', 'satautogains', 'satmaxmodulation',
                    'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
     ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satboilercapacity', 'satdhwcapacity',
@@ -4742,7 +4741,7 @@
   function satRenderCycle(d) {
     var cm = d.control_mode | 0;
     txt('satCycleMode', cm === 2 ? 'PWM' : (cm === 1 ? 'Continuous' : 'Off'));
-    txt('satCycleSub', (cm === 2 ? 'PID modulates the burner in PWM bursts. ' : (cm === 1 ? 'PID drives the burner continuously. ' : 'SAT is not actively controlling. ')) + 'SAT chooses the mode itself; forcing PWM is a setting under SAT tuning.');
+    txt('satCycleSub', (cm === 2 ? 'PID modulates the burner in PWM bursts. ' : (cm === 1 ? 'PID drives the burner continuously. ' : 'SAT is not actively controlling. ')) + 'SAT chooses the mode itself.');
   }
 
   function satRenderHealth(d) {

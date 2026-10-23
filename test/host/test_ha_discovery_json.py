@@ -283,10 +283,16 @@ def component(topic, ctx):
     return topic[len(ctx["prefix"]) + 1:].split("/")[0]
 
 
+RETIRED_SAT_TOPIC_TAILS = ("/sat_force_pwm_enable/config", "/sat/force_pwm_enable")
+
+
 def gate(p, ctx):
     """Why this publish fails the gate; an empty list passes."""
     if p["tag"] in REMOVERS:
         return [] if p["raw"] == b"" and p["retain"] else ["removal publish is not an empty retained payload"]
+    # TASK-1332: the SAT discovery pass empties the retained topics of the removed Force PWM switch
+    if p["raw"] == b"" and p["retain"] and p["topic"].endswith(RETIRED_SAT_TOPIC_TAILS):
+        return []
     bad = [] if p["retain"] else ["not retained"]
     obj, err, _ = strict_json(p["raw"])
     if err:
@@ -400,8 +406,11 @@ def sanitized_topic(topic, ctx):
 def topics_off_pattern(run):
     """Every discovery topic Home Assistant's TOPIC_MATCHER does not match (it drops those)."""
     pfx = run[0]["prefix"] + "/"
+    # TASK-1332: the empty publish that clears a retired state topic is not a discovery topic
     return sorted({p["topic"] for p in run[2]
-                   if not (p["topic"].startswith(pfx) and TOPIC_MATCHER.match(p["topic"][len(pfx):]))})
+                   if not (p["raw"] == b"" and not p["topic"].startswith(pfx)
+                           and p["topic"].endswith(RETIRED_SAT_TOPIC_TAILS))
+                   and not (p["topic"].startswith(pfx) and TOPIC_MATCHER.match(p["topic"][len(pfx):]))})
 
 
 def diff_old_fix(old, fix):
@@ -557,6 +566,12 @@ def main():
     off = topics_off_pattern(fix)
     checks.append((f"TASK-1204 FIX: every discovery topic matches Home Assistant's pattern "
                    f"({len(off)} do not{': ' + ', '.join(off[:3]) if off else ''})", not off))
+    # TASK-1332: the SAT discovery pass empties the retained Force PWM switch config and state topic
+    cfg_topic = f"{fix[0]['prefix']}/switch/{fix[0]['node']}/sat_force_pwm_enable/config"
+    state_topic = f"{fix[0]['pub']}/sat/force_pwm_enable"
+    emitted = {p["topic"] for p in fix[2] if p["raw"] == b"" and p["retain"]}
+    checks.append((f"TASK-1332 FIX: the run emits the empty retained publish to {cfg_topic} and {state_topic}",
+                   cfg_topic in emitted and state_topic in emitted))
     # TASK-1201: one config topic per uniq_id, and the one-time clear never empties a live config.
     fix_dups = dup_uniq_ids(fix)
     checks.append((f"TASK-1201 FIX: no uniq_id on two config topics in any permutation (got {fix_dups})",
@@ -610,7 +625,7 @@ def main():
     mutate(root / "m1", "MQTTHaDiscovery.cpp", M1)
     m1 = build_and_run("M1 (number cmd_t key renamed)", root / "m1")
     m1_fails, m1_topics, _ = evaluate("M1: the number entity's cmd_t key renamed in a FIX copy", m1)
-    m1_json = all(strict_json(p["raw"])[1] is None for p in m1[2] if p["tag"] not in REMOVERS)
+    m1_json = all(strict_json(p["raw"])[1] is None for p in m1[2] if p["tag"] not in REMOVERS and not p["topic"].endswith(RETIRED_SAT_TOPIC_TAILS))
     checks.append((f"M1: the gate flags exactly streamNumberDiscovery, all payloads still valid JSON "
                    f"(got {', '.join(sorted(m1_fails)) or 'none'})",
                    m1_fails == {"streamNumberDiscovery", DISPATCH} and m1_json and

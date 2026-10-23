@@ -696,7 +696,7 @@ Remember to enable `satexternaltemp` in settings for indoor readings, and to pus
 |---------|-------------|-----|
 | Room never reaches target | Coefficient too low | Increase by 0.2-0.3 |
 | Room overshoots target | Coefficient too high | Decrease by 0.2-0.3 |
-| Frequent boiler cycling | Boiler can't modulate low enough | Enable PWM auto-switch or force PWM mode |
+| Frequent boiler cycling | Boiler can't modulate low enough | Enable PWM auto-switch |
 | Safety trips on startup | PIC not ready when SAT initializes | Normal — deferred CS=0 handles this, re-enable SAT |
 | "External temp stale" in logs | Sensor push stopped | Check HA automation / MQTT connectivity |
 | High I term (>5°C) | Sustained offset, possible sensor issue | Check room temp accuracy, verify coefficient |

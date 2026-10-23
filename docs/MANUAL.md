@@ -3201,7 +3201,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/follow_thermostat` | `SATfollowthermostat` |
 | `sat/external_temp` | `SATexternaltemp` |
 | `sat/flame_off_offset` | `SATflameoffset` |
-| `sat/force_pwm` | `SATforcepwm` |
 | `sat/overshoot_protection` | `SATovershootprotection` |
 | `sat/flow_offset` | `SATflowoffset` |
 | `sat/summer_simmer` | `SATsummersimmer` |

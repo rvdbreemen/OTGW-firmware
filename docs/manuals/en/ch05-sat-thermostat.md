@@ -55,7 +55,7 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/enabled" -m "tru
 mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0"
 ```
 
-Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `force_pwm`, `overshoot_protection`, `pwm_auto_switch`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Every configurable SAT parameter has a matching MQTT command topic of the form `%mqtt_sub_topic%/sat/<name>`. The full set is declared in `MQTTstuff.ino` (`handleMQTTcallback`) and covers: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `overshoot_protection`, `pwm_auto_switch`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Sending `ON` / `OFF` / `true` / `false` / `1` / `0` works for boolean topics. Numeric topics accept the usual decimal representation.
 
@@ -83,7 +83,6 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satinterval` | 30 | 10-300 s | Control loop interval |
 | `satexternaltemp` | false | bool | Use external indoor sensor via MQTT |
 | `satpwmautoswitch` | true | bool | Automatically switch between continuous and PWM modes |
-| `satforcepwm` | false | bool | Force PWM mode regardless of boiler modulation |
 | `satovershootprotection` | true | bool | PWM start-up and modulation suppression (see 5.6). Applies to every heating source |
 | `satmaxrelmod` | 100 | 0-100 % | Maximum relative modulation sent to boiler (MM= command) |
 | `satmanufacturer` | 0 | 0-18 | Boiler manufacturer (0 = auto-detect) |
@@ -181,8 +180,6 @@ Worked examples for a radiator system, coefficient 1.5:
 Continuous mode includes clamp logic: if the PID setpoint drops rapidly but the boiler water is still hot, the minimum setpoint is clamped to `boiler_temp - flow_offset` (default 2 C). This prevents the boiler from stopping and immediately restarting (short cycling).
 
 **PWM mode**: For boilers that cannot modulate below 30-40%, SAT cycles the flame on and off at a calculated duty cycle. Minimum flame-on time is 180 seconds to prevent excessively short burner cycles.
-
-**Force PWM**: Setting `satforcepwm` to true forces PWM mode regardless of boiler behavior.
 
 **Overshoot protection** (`satovershootprotection`, default on, every heating source): in PWM mode SAT drives the control setpoint (CS) itself. OFF phase: CS = 10 C and CH off, so the boiler is not relit. ON phase, waiting for the flame: CS = return temperature + `satflameoffoffset`, held for `satmodsupdelay` seconds after ignition. After that: CS = flow temperature - `satmodsupoffset`, refreshed about every 3 seconds (not on the 30 s control tick) so the burner stays at its lowest level. If the flame was already on when the ON phase began, CS keeps its previous value until `satmodsupdelay` has passed since the real flame-on time. With the setting off, PWM sends no CS override: CS keeps its previous value, CH stays on (CH follows CS above 10 C, as in thermo-nova) and only MM=0 acts.
 
@@ -599,7 +596,7 @@ Inbound thermostat MsgID 16 frames are observed by the OTDirect state machine; t
 | HA component | Count | Examples |
 |---|---|---|
 | `number` | ~25 | heating curve coefficient, deadband, overshoot margin, control interval, max modulation, flame-off offset, flow offset, modulation-suppression delay/offset, boiler capacity, comfort humidity, summer threshold, auto-tune rate, preset temperatures (comfort/eco/away/sleep/activity/home), min/max pressure, max pressure drop, target temp step |
-| `switch` | 16 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `force_pwm`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable`, `pwm_auto_switch` |
+| `switch` | 15 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable`, `pwm_auto_switch` |
 | `select` | 1 | `sat_heating_system` with options `0` (auto), `1` (radiators), `2` (heat pump), `3` (underfloor) |
 
 Each entity writes to its matching `%mqtt_sub_topic%/sat/<parameter>` command topic and reads from the corresponding state topic. All changes go through `updateSetting()` so they are persisted to flash and clamped to safe bounds.
@@ -682,7 +679,7 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 |---|---|---|
 | Room never reaches target temperature | Coefficient too low | Increase by 0.2-0.3. Check `sat/curve_recommendation`. |
 | Room consistently overshoots target | Coefficient too high | Decrease by 0.2-0.3. Check `sat/curve_recommendation`. |
-| Frequent short boiler cycles | Boiler minimum modulation too high | Enable PWM auto-switch, or force PWM mode. Reduce `satcyclesperhour`. |
+| Frequent short boiler cycles | Boiler minimum modulation too high | Enable PWM auto-switch. Reduce `satcyclesperhour`. |
 | Safety tripped on startup | PIC not ready at SAT init | Normal behavior. Re-enable SAT. |
 | "External temp stale" in logs | MQTT push stopped | Check HA automation and broker connectivity. |
 | SAT sends no setpoints | PIC not reachable | Check serial connection. Check `otgw-pic/picavailable` via MQTT. |

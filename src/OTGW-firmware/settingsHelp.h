@@ -103,7 +103,6 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "otdsummermode":"Set the summer-mode bit in the master status (SM=). The boiler decides what it does with it.",
 "otdfailsafe":"When the thermostat disconnects, switch to the setback temperature. Default on.",
 "otdmsginterval":"Minimum gap between OpenTherm messages in ms, 100 to 1275. Default 100.",
-"satforcepwm":"Always use PWM (flame cycling on and off), whatever the boiler does. Default off.",
 "satovershootprotection":"In PWM, SAT overrides the control setpoint (CS) to keep the burner at its lowest level. Default on.",
 "satpushsetpoint":"Send the SAT target to the thermostat display (TC= override). Default off.",
 "satfollowthermostat":"A setpoint change on the wall thermostat becomes the SAT target. Needs SAT enabled.",

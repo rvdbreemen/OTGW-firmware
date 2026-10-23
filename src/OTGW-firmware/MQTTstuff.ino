@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.476
+**  Version  : v2.0.0-alpha.477
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -683,7 +683,6 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "interval",               "SATinterval",          nullptr },
   { "push_setpoint",          "SATpushsetpoint",      nullptr },
   { "flame_off_offset",       "SATflameoffset",       nullptr },
-  { "force_pwm",              "SATforcepwm",          nullptr },
   { "overshoot_protection",   "SATovershootprotection", nullptr },
   { "follow_thermostat",      "SATfollowthermostat",  nullptr },
   { "external_temp",          "SATexternaltemp",      nullptr },  // TASK-1284: use the MQTT/REST indoor temp (indoor_temp) as the room source
@@ -2729,16 +2728,17 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     if (streamClimateDiscovery(0, ctx)) result = true;
     if (streamClimateDiscovery(1, ctx)) result = true;
     ctx.device = HaDevice::Sat;
-    // TASK-516: idx 12 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
+    // TASK-516: idx 11 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
     const bool dhwEnableSwitchAllowed =
         (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
     for (uint8_t swIdx = 0; swIdx < SAT_HA_SWITCH_COUNT; swIdx++) {
-      if (swIdx == 12 && !dhwEnableSwitchAllowed) continue;
+      if (swIdx == 11 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
       if (streamSatSwitchDiscovery(swIdx, ctx)) result = true;
     }
     feedWatchDog();
     if (streamSatSelectDiscovery(0, ctx)) result = true;
+    clearRetiredSatEntities(ctx);
   }
   // Number (OT ID 27): Thermostat (room temperature outside override is thermostat-side).
   if (OTid == 27) {

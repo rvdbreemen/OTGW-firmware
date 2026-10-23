@@ -561,9 +561,13 @@ bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
 // SAT enable/disable switches (boolean settings). switchIdx = 0..SAT_HA_SWITCH_COUNT-1,
 // one case per switch in streamSatSwitchDiscovery(); the discovery loop and the host
 // test (test/host/test_ha_discovery_json.cpp) both use this count (TASK-1287).
-constexpr uint8_t SAT_HA_SWITCH_COUNT = 16;
+constexpr uint8_t SAT_HA_SWITCH_COUNT = 15;
 bool streamSatSwitchDiscovery(uint8_t switchIdx,
                               HaDiscoveryContext &ctx);
+
+// Empties the retained discovery configs and state topics of removed SAT entities
+// (TASK-1332), so Home Assistant drops them. Called once per SAT discovery pass.
+void clearRetiredSatEntities(const HaDiscoveryContext &ctx);
 
 // SAT select entities (dropdowns). selectIdx = 0 (sat_heating_system) for now.
 bool streamSatSelectDiscovery(uint8_t selectIdx,

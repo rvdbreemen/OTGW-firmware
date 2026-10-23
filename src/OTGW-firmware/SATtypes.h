@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.476
+**  Version  : v2.0.0-alpha.477
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -462,7 +462,6 @@ struct SATSection {
   float    fFlameOffOffset    = 18.0f;  // Flame-off hold offset above return temp during PWM (Python flame_off_setpoint_offset_celsius=18.0): primes the boiler for fast, clean re-ignition
   bool     bWindowDetection   = false;  // Enable window open detection via MQTT
   uint16_t iWindowMinOpenSec  = 60;     // Minimum seconds window must stay open before action
-  bool     bForcePWM          = false;  // Force PWM mode regardless of boiler modulation
   bool     bOvershootProtection = true; // PWM CS override: OFF phase CS=10, ON phase return+offset hold then flow-offset (thermo-nova overshoot_protection; TASK-1268)
   float    fFlowOffset        = 2.0f;   // Continuous mode: max setpoint drop from boiler temp
   float    fTargetTempStep    = 0.5f;   // Target temperature UI step size (0.1-1.0)

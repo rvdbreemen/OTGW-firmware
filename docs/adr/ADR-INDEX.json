@@ -6839,7 +6839,7 @@
         "must": [
           "Use satGetColdSetpoint() (28.2 radiators, 21.0 underfloor) at every site where thermo-nova uses COLDSETPOINT: the cutoff, the PWM enable and disable guard gates, the PWM gate, the flame-off hold floor and the CH bit.",
           "Compare with for \"warm\", as thermo-nova does.",
-          "On the cutoff: send CS=10, CH=0 and MM at the configured maximum relative modulation; switch PWM off; reset the PWM state, the held CS and the sustained overshoot, underheat and saturation guard timers (satPwmDisableOnHeaterOff()). The f...",
+          "On the cutoff: send CS=10, CH=0 and MM at the configured maximum relative modulation; switch PWM off; reset the PWM state, the held CS and the sustained overshoot, underheat and saturation guard timers (satPwmDisableOnHeaterOff()).",
           "Decide the CH bit only in satChEnableDecide, from the requested setpoint and the PWM phase.",
           "Send SAT's CS through satEnqueueOwnCS (ADR-179)."
         ],
@@ -6850,7 +6850,7 @@
           "Change the SAT-disabled release path (CS=0 to the thermostat)."
         ],
         "exceptions": [
-          "None settled. HEAD (TASK-1327, c3aa767a0) keeps PWM as the mode on the cutoff when bForcePWM (the firmware's own force-PWM option, which thermo-nova stores at entrydata.py:58 and :223 but never reads in customcomponents/sat) is on, and t..."
+          "None. The heater-off branch always leaves PWM mode, as thermo-nova's pwm.disable() does unconditionally (heatingcontrol.py:230). The earlier exception, keeping PWM on the cutoff when the firmware's own bForcePWM option was on (TASK-1327,..."
         ],
         "verification": [
           "tests/testsatchenable.cpp compiles the real SATchEnable.h and checks the boundary at exactly 28.2 and 21.0, the PWM OFF and ON phases, and continuous mode, printing the strict TASK-1316 rule as \"old\".",

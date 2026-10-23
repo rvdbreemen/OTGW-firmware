@@ -3257,7 +3257,7 @@ bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
 // SAT switch (boolean) and select discovery (TASK-284).
 // Matches the switch/select entries at the bottom of the archived 2.0.0
 // mqttha.cfg. Hardcoded per index (like climate/number) to avoid PROGMEM
-// arrays for a small fixed set. The 16 switches share the same JSON shape,
+// arrays for a small fixed set. The 15 switches share the same JSON shape,
 // so they route through a single streamSatBoolSwitch() helper.
 // ---------------------------------------------------------------------------
 
@@ -3405,35 +3405,29 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
       break;
     case 7:
       published = streamSatBoolSwitch(ctx,
-        PSTR("-sat-force-pwm-enable"),        PSTR("_SAT_Force_PWM"),
-        PSTR("/sat/force_pwm"),               PSTR("/sat/force_pwm_enable"),
-        PSTR("mdi:pulse"));
-      break;
-    case 8:
-      published = streamSatBoolSwitch(ctx,
         PSTR("-sat-push-setpoint-enable"),    PSTR("_SAT_Push_Setpoint"),
         PSTR("/sat/push_setpoint"),           PSTR("/sat/push_setpoint_enable"),
         PSTR("mdi:upload"));
       break;
-    case 9:
+    case 8:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-preset-sync-enable"),      PSTR("_SAT_Preset_Sync"),
         PSTR("/sat/preset_sync"),             PSTR("/sat/preset_sync_enable"),
         PSTR("mdi:sync"));
       break;
-    case 10:
+    case 9:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-dhw-enabled"),             PSTR("_SAT_DHW_Enabled"),
         PSTR("/sat/dhw_enabled"),             PSTR("/sat/dhw_enabled"),
         PSTR("mdi:water-boiler"));
       break;
-    case 11:
+    case 10:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-pwm-auto-switch-enable"),  PSTR("_SAT_PWM_Auto_Switch"),
         PSTR("/sat/pwm_auto_switch"),         PSTR("/sat/pwm_auto_switch_enable"),
         PSTR("mdi:swap-horizontal"));
       break;
-    case 12:
+    case 11:
       // TASK-516: master DHW enable (HW= command). Only emitted by the caller
       // when MsgID 3 HB3=1 (storage tank); combi boilers get no inert entity.
       published = streamSatBoolSwitch(ctx,
@@ -3441,19 +3435,19 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("/sat/dhw_enable"),              PSTR("/sat/dhw_enable"),
         PSTR("mdi:water-boiler"));
       break;
-    case 13:
+    case 12:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-overshoot-protection-enable"), PSTR("_SAT_Overshoot_Protection"),
         PSTR("/sat/overshoot_protection"),    PSTR("/sat/overshoot_protection_enable"),
         PSTR("mdi:shield-check"));
       break;
-    case 14:
+    case 13:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-follow-thermostat-enable"), PSTR("_SAT_Follow_Thermostat"),
         PSTR("/sat/follow_thermostat"),       PSTR("/sat/follow_thermostat_enable"),
         PSTR("mdi:thermostat"));
       break;
-    case 15:
+    case 14:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-external-temp-enable"),    PSTR("_SAT_External_Temp"),
         PSTR("/sat/external_temp"),           PSTR("/sat/external_temp_enable"),
@@ -3733,6 +3727,34 @@ bool streamSelectDiscovery(uint8_t selectIdx, HaDiscoveryContext &ctx)
 static bool publishEmptyRetained(const char *topic) {
   if (!mqttIsConnected()) return false;
   return mqttPublishRaw(topic, nullptr, 0, /*retain=*/true);
+}
+
+// Retired SAT entities. Home Assistant keeps the retained discovery config of an
+// entity that the firmware stops announcing, so each removed SAT entity is listed
+// here and its retained topics are emptied on every SAT discovery pass. Lines
+// marked RETIRED-SAT-ENTITY are the only places the removed names may remain.
+struct RetiredSatEntity {
+  const char *component;     // HA component type: the discovery topic is <prefix>/<component>/<node>/<objectId>/config
+  const char *objectId;
+  const char *stateSub;      // retained state topic below mqttPubTopic, or nullptr
+};
+static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
+  { "switch", "sat_force_pwm_enable", "/sat/force_pwm_enable" },   // RETIRED-SAT-ENTITY TASK-1332
+};
+
+void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {
+  char topic[STREAM_TOPIC_MAX];
+  for (size_t i = 0; i < sizeof(kRetiredSatEntities) / sizeof(kRetiredSatEntities[0]); i++) {
+    RetiredSatEntity e;
+    memcpy_P(&e, &kRetiredSatEntities[i], sizeof(e));
+    snprintf_P(topic, sizeof(topic), PSTR("%s/%s/%s/%s/config"), ctx.haPrefix, e.component, ctx.nodeId, e.objectId);
+    publishEmptyRetained(topic);
+    if (e.stateSub) {
+      snprintf_P(topic, sizeof(topic), PSTR("%s%s"), ctx.mqttPubTopic, e.stateSub);
+      publishEmptyRetained(topic);
+    }
+    feedWatchDog();
+  }
 }
 
 // Local helper: device short name for topology clearing (mirrors haDeviceShortName

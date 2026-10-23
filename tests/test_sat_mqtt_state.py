@@ -146,13 +146,13 @@ class ExternalTempSetting(unittest.TestCase):
         self.assertRegex(read("MQTTstuff.ino"), r'\{\s*"external_temp",\s*"SATexternaltemp",\s*nullptr\s*\}')
         self.assertIn('PSTR("external_temp")', read("restAPI.ino"))
         ha = read("MQTTHaDiscovery.cpp")
-        self.assertIn("case 15:", ha)
+        self.assertIn("case 14:", ha)
         self.assertIn('PSTR("/sat/external_temp"),           PSTR("/sat/external_temp_enable")', ha)
-        # The discovery loop must reach switch 15 (TASK-1287: the bound is SAT_HA_SWITCH_COUNT).
+        # The discovery loop must reach switch 14 (TASK-1287: the bound is SAT_HA_SWITCH_COUNT).
         self.assertRegex(read("MQTTstuff.ino"), r"swIdx < SAT_HA_SWITCH_COUNT")
         count = re.search(r"constexpr uint8_t SAT_HA_SWITCH_COUNT = (\d+);", read("MQTTstuff.h"))
         self.assertIsNotNone(count)
-        self.assertGreaterEqual(int(count.group(1)), 16)
+        self.assertGreaterEqual(int(count.group(1)), 15)
 
 
 class PvBoostDiscoveryMatchesFirmware(unittest.TestCase):

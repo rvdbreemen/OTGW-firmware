@@ -193,6 +193,9 @@ for (let i = 0; i < 40 && (await facts()).cycleText !== 'PWM'; i++) await sleep(
 f = await facts();
 check(f.cycleText === 'PWM', `Control view: the card shows PWM after control_mode 2 (text=${JSON.stringify(f.cycleText)})`);
 check(/PWM/.test(f.cycleSub || '') && /chooses the mode itself/.test(f.cycleSub || ''), `the hint says SAT chooses the mode itself (sub=${JSON.stringify(f.cycleSub)})`);
+// TASK-1332: the Force PWM option is gone, so the hint no longer points at a setting and v2.js has no such field
+check(!/setting/i.test(f.cycleSub || ''), `the hint no longer mentions a Force PWM setting (sub=${JSON.stringify(f.cycleSub)})`);
+check(!/satforcepwm|force_pwm|Force PWM/.test(fs.readFileSync(path.join(DATA, 'v2.js'), 'utf8')), 'v2.js has no satforcepwm / Force PWM field');
 STATUS.control_mode = 1;
 
 // ------------------------------------------------ (c) same REST calls
