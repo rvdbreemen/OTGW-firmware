@@ -115,7 +115,10 @@ agrees. The plan quotes the thermo-nova code for that area with `file:line` cita
 pinned commit, as the "SAT ground truth" block in CLAUDE.md requires; a plan without them is
 not ready to post. Record the wait in the task notes, leave the task `In Progress`, and continue
 the cycle with the next task that does not change SAT behaviour. When his answer
-arrives (via `/backlog_discord`), record it and resume the task. SAT changes without a
+arrives (via `/backlog_discord`), record it as a numbered entry in
+`docs/sat/sergeant-d-corrections.md` (quote, Discord link, thermo-nova and firmware
+comparison, task id; CLAUDE.md SAT ground truth block) and in the task notes, then resume
+the task. The same applies to any correction he makes outside a pending question. SAT changes without a
 behaviour choice (logging, UI, graphs, docs) do not wait.
 
 ## Step 5: implement, verify, collect evidence

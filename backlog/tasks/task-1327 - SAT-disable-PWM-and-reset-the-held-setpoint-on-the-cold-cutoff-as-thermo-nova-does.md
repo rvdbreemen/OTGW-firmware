@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T17:53:00Z'
+updated_date: '2026-10-23T18:59:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -25,3 +26,9 @@ From the TASK-1323 review (opus), pre-existing, now hit more often because the s
 - [ ] #1 Sergeant D's choice recorded (mirror pwm.disable() and/or reset the held CS on the cutoff), with thermo-nova citations
 - [ ] #2 Host test: cutoff then recovery no longer returns the stale held CS (red before, green after)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-23 18:13Z Sergeant D (msg 1563254104346730600): 'yes keep the thermo-nova solution' -> approved: on the cold cutoff disable PWM (pwm.disable(), pwm.py:106-109) and reset the control setpoint to MINIMUM (heating_control.py:229-234).
+<!-- SECTION:NOTES:END -->

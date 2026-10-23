@@ -44,6 +44,15 @@ class SatGroundTruthBlock(unittest.TestCase):
                      "Sergeant D", "second reader", "pinned commit only on purpose"):
             self.assertIn(rule, b, "rule missing from the block: " + rule)
 
+    def test_block_requires_recording_sergeant_d_decisions(self):
+        # Maintainer directive 2026-10-23 (TASK-1329): every correction or decision by
+        # Sergeant D goes into one named file, in the same session, before implementing.
+        b = block("CLAUDE.md")
+        self.assertIn("docs/sat/sergeant-d-corrections.md", b)
+        self.assertIn("in the same session and before the change it leads to is implemented", b)
+        self.assertTrue(os.path.exists(os.path.join(REPO, "docs", "sat", "sergeant-d-corrections.md")),
+                        "docs/sat/sergeant-d-corrections.md is missing")
+
     def test_pinned_commit_matches_the_local_copy_when_it_is_a_git_repo(self):
         # The local copy is a snapshot (no upstream history), so only check the marker file
         # that records which commit it mirrors, when present.
