@@ -13,6 +13,7 @@ related:
   - "ADR-166"
   - "ADR-191"
   - "ADR-192"
+  - "ADR-194"
 topics:
   - "littlefs"
   - "web-assets"
@@ -73,6 +74,11 @@ status_history:
     status: Accepted
     changed_by: "User: Robert van den Breemen"
     reason: Related to ADR-192
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-23
+    status: Accepted
+    changed_by: "Agent: Claude (adr-generator, TASK-1303)"
+    reason: Related to ADR-194 (narrowing, Proposed)
     changed_via: adr-kit lifecycle
 ```
 

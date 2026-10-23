@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T06:27:00Z'
+updated_date: '2026-10-23T10:33:00Z'
 labels:
   - webui
   - graph
@@ -29,3 +30,9 @@ Follow-up of TASK-1296. Boards with PSRAM keep a 726 x 120 s ring and serve ~24 
 - [ ] #2 On a PSRAM board (LOLIN S3 Mini/Pro): /api/v2/graph/history reports interval_s 120, PSRAM free size before/after boot recorded, 24 h window filled after the run time allows
 - [ ] #3 Decision on the reboot-while-page-open history drop recorded (accept or fix)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-23 cycle: skipped for now, needs a firmware build and the PC is low on memory (a build was stopped by Claude Code); resume after the maintainer's go.
+<!-- SECTION:NOTES:END -->

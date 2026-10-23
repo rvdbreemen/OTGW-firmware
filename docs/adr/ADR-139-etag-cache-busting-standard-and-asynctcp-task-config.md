@@ -10,6 +10,8 @@ verified_in: []
 supersedes:
   - "ADR-026"
 superseded_by: null
+related:
+  - "ADR-194"
 ---
 # ADR-139 ETag + Bounded max-age as the Project-Wide Cache-Busting Standard for Web UI Static Assets (Retire ?v= Query Versioning and the Chunked Index Rewriter); Align AsyncTCP Task Config with the EMS-ESP32 Blueprint
 
@@ -69,6 +71,11 @@ status_history:
     changed_by: Robert van den Breemen
     reason: Maintainer accepted ADR-139 by name in session after the agent reverted the loop's premature self-acceptance and presented the decision. ETag + bounded max-age=60 adopted as the project-wide web-asset cache-busting standard; the chunked index rewriter retired in favour of library-managed AsyncFileResponse streaming. The out-of-scope REST_STREAM_BUFFER_SIZE change was pulled out of this ADR's code surface as a separate decision. Back-references applied to ADR-132 (Amended by) and ADR-026 (Superseded by). Hardware confirmation of the /-hang fix remains field-validation (TASK-866).
     changed_via: manual
+  - date: 2026-10-23
+    status: Accepted
+    changed_by: "Agent: Claude (adr-generator, TASK-1303)"
+    reason: Related to ADR-194 (narrowing, Proposed)
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

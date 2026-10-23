@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-22T12:01:00Z'
+updated_date: '2026-10-23T10:33:00Z'
 labels:
   - websocket
   - webui
@@ -28,3 +29,9 @@ browser.log 2026-10-22 11:19:05.567: 'WebSocket connection to ws://10.0.40.73/ws
 - [ ] #2 A replay with a non-UTF-8 byte no longer closes the browser WS connection (bench, browser console)
 - [ ] #3 ADR-177 (verbatim PIC stream) stays intact on the serial/log path
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-23 cycle: skipped for now, needs a firmware build and the PC is low on memory (a build was stopped by Claude Code); resume after the maintainer's go.
+<!-- SECTION:NOTES:END -->

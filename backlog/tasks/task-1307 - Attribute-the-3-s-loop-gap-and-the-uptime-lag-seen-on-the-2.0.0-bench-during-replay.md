@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T06:28:00Z'
-updated_date: '2026-10-23T08:26:00Z'
+updated_date: '2026-10-23T10:33:00Z'
 labels:
   - heap
   - bench
@@ -33,4 +33,6 @@ Seen during TASK-1296 bench runs (OTGW32 no PSRAM, alpha.461 working tree, repla
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-23 10:25 related observation (alpha.463, OTGW32 bench, ping avg 85 ms): with the builtin replay running, static files served slowly (index 53 KB in 3-16 s, v2.js 250 KB 7.5 s, one 30 s stall); replay stopped: index 0.5 s, v2.js 1.4 s after warm-up. hd_max_loop_gap_ms 3048 at 11 min uptime. Include file-serve timing with/without replay in the A/B.
+
+2026-10-23 cycle: skipped for now, needs a firmware build and the PC is low on memory (a build was stopped by Claude Code); resume after the maintainer's go.
 <!-- SECTION:NOTES:END -->

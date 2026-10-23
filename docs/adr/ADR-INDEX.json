@@ -4373,7 +4373,7 @@
       "path": "ADR-139-etag-cache-busting-standard-and-asynctcp-task-config.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-06-15",
+      "date": "2026-10-23",
       "decision_summary": "PRIMARY: ETag + bounded max-age is the project-wide cache-busting standard for ALL web UI static assets, served as pl...",
       "topics": [],
       "aliases": [],
@@ -6478,7 +6478,7 @@
       "path": "ADR-190-build-the-littlefs-image-from-a-minified-staging-copy-of-the-web-assets.md",
       "format": "canonical",
       "status": "Accepted",
-      "date": "2026-10-15",
+      "date": "2026-10-23",
       "decision_summary": "build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are...",
       "topics": [
         "build-pipeline",
@@ -6721,6 +6721,70 @@
           "Host test tests/testgraphhistory.cpp runs both ring sizes: wrap, gap fill, JSON shape and chunk-window reassembly with the margin pinned.",
           "Bench: on a no-PSRAM unit, free heap and max block after a reboot at 5 min uptime, BLE off and on, against the build without the history. Measured 2026-10-23 (alpha.461 working tree): combo static RAM +1792 B; BLE off free 82116 -> 80232...",
           "Browser: after a reload, the 1 h window (and on PSRAM boards the 4 h and 24 h windows) show data from before the reload, and the CSV contains it. Measured 2026-10-23 on the no-PSRAM unit: the 1 h window and CSV held 123 rows reaching bac..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-194",
+      "title": "Serve static text assets without an upload role from firmware flash",
+      "path": "ADR-194-serve-static-text-assets-without-an-upload-role-from-firmware-flash.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-23",
+      "decision_summary": "Static text assets that users never need to upload may be compiled into the firmware image and served or read from PR...",
+      "topics": [
+        "etag",
+        "flash-budget",
+        "littlefs",
+        "progmem",
+        "web-assets"
+      ],
+      "aliases": [
+        "assets in firmware flash",
+        "built-in replay fixture",
+        "littlefs margin",
+        "progmem assets",
+        "settings help json"
+      ],
+      "components": [
+        "built-in replay fixture fallback (OTGW_SIM_FIXTURE)",
+        "serveProgmemAsset (firmware-flash asset route with a firmware-hash ETag)"
+      ],
+      "symbols": [
+        "OTGW_SIM_FIXTURE",
+        "reopenOTGWSimulationFile",
+        "serveProgmemAsset",
+        "SETTINGS_HELP_JSON"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Move an asset into firmware flash only when all three hold: (a) users have no upload role for it; a built-in default is allowed when a user override lives on LittleFS and takes precedence over it; (b) it is text whose content changes wit...",
+          "Keep the PROGMEM copy as the single source of truth and remove the file from data/ in the same change."
+        ],
+        "must_not": [
+          "Move the web UI shell, v2.js, v2-bundle.css, FSexplorer or the fonts into firmware flash: they stay on LittleFS (ADR-139, ADR-192).",
+          "Gzip or otherwise compress-encode an asset, in firmware or on LittleFS (ADR-190 directive, unchanged).",
+          "Copy a PROGMEM asset to the heap to serve it."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "PR review against the three-part rule above; no automated gate.",
+          "Bench evidence recorded in TASK-1294: /settings-help.json 200 with ETag \"7064e18-/settings-help.json\", then 304 with 0 B on If-None-Match.",
+          "tests/webui/settings-help.test.mjs parses the JSON out of settingsHelp.h; tests/testsimfixturebuiltin.py fails when the fixture header drifts from tests/fixtures/otgwsimulation.builtin.log (source-level checks)."
         ]
       },
       "scope": {
@@ -10578,6 +10642,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-139",
+      "target": "ADR-194",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-140",
       "target": "ADR-077",
       "type": "related",
@@ -11898,6 +11968,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-190",
+      "target": "ADR-194",
+      "type": "related",
+      "resolved": true
+    },
+    {
       "source": "ADR-191",
       "target": "ADR-003",
       "type": "related",
@@ -12032,6 +12108,42 @@
     {
       "source": "ADR-193",
       "target": "ADR-184",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-194",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-194",
+      "target": "ADR-139",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-194",
+      "target": "ADR-163",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-194",
+      "target": "ADR-190",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-194",
+      "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-194",
+      "target": "ADR-192",
       "type": "related",
       "resolved": true
     }
