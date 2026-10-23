@@ -2,7 +2,8 @@
 // status, temperature history) and keeps the edge-case controls out of the way:
 //   - Hot water (standalone DHW + DHW setpoint) sits in a collapsed <details class="grp"> below
 //     the history; its open state is stored only on a click on the summary (concept rule 4);
-//   - Burner cycle mode shows at Control level and up, never on the Thermostat view;
+//   - Burner cycle mode shows at Control level and up, never on the Thermostat view (TASK-1322:
+//     read-only, no Continuous/PWM buttons, nothing POSTs /api/v2/sat/mode);
 //   - every moved control still makes the same REST call (endpoint + body).
 //
 // Drives the REAL shipped v2.html/v2.js in headless system Chrome/Edge over the DevTools
@@ -44,6 +45,7 @@ const STATUS = {
 };
 let statusHits = 0;
 const posts = [];
+const allPosts = [];   // never cleared, for the whole-run assertion
 
 const srv = http.createServer((q, s) => {
   const url = new URL(q.url, `http://127.0.0.1:${PORT}`);
@@ -54,6 +56,7 @@ const srv = http.createServer((q, s) => {
       q.on('data', (c) => { body += c; });
       q.on('end', () => {
         posts.push(p + ' ' + body);
+        allPosts.push(p + ' ' + body);
         s.writeHead(200, { 'content-type': 'application/json' });
         s.end('{}');
       });
@@ -142,7 +145,7 @@ const FACTS = `(function(){
   // checkVisibility also sees the content-visibility:hidden of a closed <details>, which offsetParent does not
   function vis(e){return !!e && e.checkVisibility() && e.offsetParent !== null;}
   var g = document.querySelector('#satBody details.grp[data-grp="sat-dhw"]');
-  var dial = el('satDial'), hist = el('satHistChart'), cyc = el('satCycleRow');
+  var dial = el('satDial'), hist = el('satHistChart'), cyc = el('satCycleMode');
   var sum = g ? g.querySelector('summary') : null;
   var f = Node.DOCUMENT_POSITION_FOLLOWING;
   return JSON.stringify({
@@ -150,7 +153,7 @@ const FACTS = `(function(){
     dialBeforeHist: !!(dial && hist && (dial.compareDocumentPosition(hist) & f)),
     histBeforeGroup: !!(hist && g && (hist.compareDocumentPosition(g) & f)),
     histVisible: vis(hist), dialVisible: vis(dial),
-    cycleVisible: vis(cyc), sliderVisible: vis(el('satDhwSlider')),
+    cycleVisible: vis(cyc), cycleText: cyc ? cyc.textContent : null, cycleButtons: cyc ? !!cyc.closest('.card').querySelector('button') : null, cycleSub: el('satCycleSub') ? el('satCycleSub').textContent : null, sliderVisible: vis(el('satDhwSlider')),
     stored: (function(){try{return localStorage.getItem('otgw-v2-satopen');}catch(e){return 'ERR';}})()
   });
 })()`;
@@ -183,6 +186,14 @@ await evalJs(`document.querySelector('.satview-btn[data-sv="control"]').click()`
 await sleep(300);
 f = await facts();
 check(f.cycleVisible, `Control view: Burner cycle mode card is visible (cycleVisible=${f.cycleVisible})`);
+check(f.cycleText === 'Continuous', `Control view: the card shows the mode read-only for control_mode 1 (text=${JSON.stringify(f.cycleText)})`);
+check(f.cycleButtons === false, `Control view: the card has no buttons (hasButton=${f.cycleButtons})`);
+STATUS.control_mode = 2;
+for (let i = 0; i < 40 && (await facts()).cycleText !== 'PWM'; i++) await sleep(250);
+f = await facts();
+check(f.cycleText === 'PWM', `Control view: the card shows PWM after control_mode 2 (text=${JSON.stringify(f.cycleText)})`);
+check(/PWM/.test(f.cycleSub || '') && /chooses the mode itself/.test(f.cycleSub || ''), `the hint says SAT chooses the mode itself (sub=${JSON.stringify(f.cycleSub)})`);
+STATUS.control_mode = 1;
 
 // ------------------------------------------------ (c) same REST calls
 // The Hot water group is opened with a real click on its summary where it exists.
@@ -199,15 +210,13 @@ await evalJs(`(function(){
 await sleep(600);
 await evalJs(`document.getElementById('satDhwEnabled').click()`);
 await sleep(600);
-await evalJs(`document.querySelector('#satCycleRow .ds-seg[data-mode="pwm"]').click()`);
-await sleep(600);
 const want = [
   '/api/v2/sat/settings/dhw_setpoint 45',
   '/api/v2/sat/settings/dhw_enabled false',
-  '/api/v2/sat/mode pwm',
 ];
 console.log('recorded POSTs: ' + JSON.stringify(posts));
-check(JSON.stringify(posts) === JSON.stringify(want), 'DHW setpoint, standalone DHW and burner cycle POST the same endpoint + body as before');
+check(JSON.stringify(posts) === JSON.stringify(want), 'DHW setpoint and standalone DHW POST the same endpoint + body as before');
+check(!allPosts.some((p) => p.indexOf('/api/v2/sat/mode') !== -1), `no POST to /api/v2/sat/mode during the whole test (${allPosts.filter((p) => p.indexOf('/sat/mode') !== -1).length} seen)`);
 if (hasSummary) {
   f = await facts();
   check(f.groupOpen === true && f.sliderVisible, `after the summary click the group is open and the DHW slider is usable (open=${f.groupOpen}, slider=${f.sliderVisible})`);

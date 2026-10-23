@@ -4745,11 +4745,8 @@
 
   function satRenderCycle(d) {
     var cm = d.control_mode | 0;
-    document.querySelectorAll('#satCycleRow .ds-seg').forEach(function (b) {
-      var on = (b.dataset.mode === 'continuous' && cm === 1) || (b.dataset.mode === 'pwm' && cm === 2);
-      b.classList.toggle('active', on);
-    });
-    txt('satCycleSub', cm === 2 ? 'PID modulates the burner in PWM bursts' : (cm === 1 ? 'PID drives the burner continuously' : 'SAT is not actively controlling'));
+    txt('satCycleMode', cm === 2 ? 'PWM' : (cm === 1 ? 'Continuous' : 'Off'));
+    txt('satCycleSub', (cm === 2 ? 'PID modulates the burner in PWM bursts. ' : (cm === 1 ? 'PID drives the burner continuously. ' : 'SAT is not actively controlling. ')) + 'SAT chooses the mode itself; forcing PWM is a setting under SAT tuning.');
   }
 
   function satRenderHealth(d) {
@@ -4966,12 +4963,6 @@
     var up = document.getElementById('satUp'), dn = document.getElementById('satDown');
     if (up) up.addEventListener('click', function () { satStep(0.5); });
     if (dn) dn.addEventListener('click', function () { satStep(-0.5); });
-
-    document.querySelectorAll('#satCycleRow .ds-seg').forEach(function (b) {
-      b.addEventListener('click', function () {
-        satPost('mode', b.dataset.mode).then(function () { setTimeout(fetchSatPage, 300); }).catch(function () { });
-      });
-    });
 
     var cv = document.getElementById('satCurveBig');   // TASK-1232: bound on the <svg>, survives innerHTML redraws
     if (cv) { cv.style.cursor = 'crosshair'; cv.addEventListener('click', satCurveClick); }

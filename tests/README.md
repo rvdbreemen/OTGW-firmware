@@ -109,9 +109,10 @@ Node test files, run one at a time with `node --test tests/webui/<name>.test.mjs
     as above (8148/9340). `v2-settings-sat-followups` runs on the same harness.
   - `sat-page-order`: TASK-1310. On the SAT Thermostat view the DOM order is dial < history <
     Hot water group, the group is closed by default and its open state is stored only on a summary
-    click (survives reload); Burner cycle mode shows at Control level and up only. A request log
-    asserts the DHW setpoint, standalone DHW and burner cycle controls POST the same endpoint and
-    body as before. Ports 8152/9352. Old-vs-fix needs a COMPLETE data dir (copy `data/`, then
+    click (survives reload); Burner cycle mode shows at Control level and up only, read-only
+    (TASK-1322: shows Continuous/PWM from `control_mode`, no buttons, no POST to `/api/v2/sat/mode`
+    in the whole run). A request log asserts the DHW setpoint and standalone DHW controls POST the
+    same endpoint and body as before. Ports 8152/9352. Old-vs-fix needs a COMPLETE data dir (copy `data/`, then
     overwrite `v2.html v2.js v2.css v2-bundle.css ds-tokens.css` with `git show HEAD:` copies).
   - `tret-pr-events`: TASK-1314. A stub WebSocket feeds `< PR: D=R` / `< PR: E=41.20` log lines
     through the page's own `onmessage`; the Home return readout takes the E value only while the
