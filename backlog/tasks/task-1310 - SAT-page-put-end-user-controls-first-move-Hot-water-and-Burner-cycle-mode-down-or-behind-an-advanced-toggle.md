@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T07:51:00Z'
+updated_date: '2026-10-23T08:18:00Z'
 labels:
   - webui
   - sat
@@ -27,3 +28,9 @@ gruijter 2026-10-23 07:40 (#alpha-testing, screenshot of the SAT Thermostat tab)
 - [ ] #1 On the SAT Thermostat (simple) tab the dial, presets and the user-facing status come first; Hot water and Burner cycle mode move below the history or into a collapsed 'Advanced' section (or to the Control tab), decision recorded in the task (before/after screenshot)
 - [ ] #2 No control behaviour or setting changes: the same REST calls are made by the moved controls (tests/webui or bench check)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-23: depends on the navigation concept decision in TASK-1312 (maintainer); skipped by the cycle until that decision is recorded, to avoid moving the SAT controls twice.
+<!-- SECTION:NOTES:END -->
