@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T06:28:00Z'
+updated_date: '2026-10-23T08:26:00Z'
 labels:
   - heap
   - bench
@@ -27,3 +28,9 @@ Seen during TASK-1296 bench runs (OTGW32 no PSRAM, alpha.461 working tree, repla
 - [ ] #1 A/B on the same bench unit with the same replay, about 15 min each, telnet z to zero the watermark first: hd_max_loop_gap_ms and uptime drift recorded on alpha.461 (before TASK-1296) and alpha.462
 - [ ] #2 The source of the >1 s loop stall is named with evidence (telnet timing or a capture), or recorded as pre-existing with a follow-up task
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-23 10:25 related observation (alpha.463, OTGW32 bench, ping avg 85 ms): with the builtin replay running, static files served slowly (index 53 KB in 3-16 s, v2.js 250 KB 7.5 s, one 30 s stall); replay stopped: index 0.5 s, v2.js 1.4 s after warm-up. hd_max_loop_gap_ms 3048 at 11 min uptime. Include file-serve timing with/without replay in the A/B.
+<!-- SECTION:NOTES:END -->

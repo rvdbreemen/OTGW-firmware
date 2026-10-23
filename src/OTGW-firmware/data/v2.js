@@ -177,7 +177,7 @@
     else if (t === 'mvalues') { renderValues(); fetchOtmonitor(); if (!dallasLabelsLoaded) loadDallasLabels(); }   // TASK-1223.14/.15
     else if (t === 'mstats') { renderStats(); fetchStatsPanels(); }
     else if (t === 'msupport') { renderSupport(); fetchOtSupport(); }
-    else if (t === 'mgraph') { renderGraph(); loadGraphHistory(); }   // TASK-1296
+    else if (t === 'mgraph') { graphReadoutHide(); renderGraph(); loadGraphHistory(); }   // TASK-1296, TASK-1297
     else if (t === 'mconn') {
       fetchConn();
       // TASK-1241: otdirect/overrides 503s on a PIC board; skip it only on an explicit non-OT-Direct snapshot.
@@ -1370,6 +1370,29 @@
     var a = k.substring(2);
     return [k, dallasLabelFor(a) || a, GDCOL[i % GDCOL.length], 't'];
   }
+  // TASK-1297: values of the visible series at time t. arr is ascending by t. Returns null when no
+  // record covers t (before the first record, or more than GBREAK_MS past the record's data end).
+  function graphReadout(arr, keys, metas, off, t) {
+    var lo = 0, hi = arr.length - 1, at = -1;
+    while (lo <= hi) {
+      var mid = (lo + hi) >> 1;
+      if (arr[mid].t <= t) { at = mid; lo = mid + 1; } else hi = mid - 1;
+    }
+    if (at < 0) return null;
+    var rec = arr[at];
+    if (t > rec.t + (rec.span || 0) + GBREAK_MS) return null;
+    var rows = [];
+    keys.forEach(function (k, i) {
+      if (off[k]) return;
+      var m = metas[i], v = gVal(rec, k), kind = m[3], txt;
+      if (v === null || v === undefined || isNaN(v)) txt = '–';
+      else if (kind === 'm') txt = Math.round(v) + ' %';
+      else if (kind === 'l') txt = v ? 'on' : 'off';
+      else txt = Number(v).toFixed(1) + ' °C';
+      rows.push([m[1], txt, m[2]]);
+    });
+    return { t: rec.t, rows: rows };
+  }
   // SVG path data for one series. `c` is [[x, value, t, span], ...] ascending; span is how long
   // after t the point's data reaches (a device history slot: its interval; a live record: 0).
   // The line breaks (a new subpath starts) where the next point starts more than GBREAK_MS after
@@ -1438,6 +1461,70 @@
     });
     renderGraphTime(t0, win);
     renderGraphLegend(keys, metas);
+    gRArr = arr; gRKeys = keys; gRMetas = metas;   // the readout reads what was drawn
+    bindGraphReadout();
+    if (gTip && gTip.style.display === 'block' && gLastEv) graphReadoutAt(gLastEv, true);   // follow the shifted window
+  }
+  // TASK-1297: hover / touch readout on #gstrip. Same x -> time mapping as renderGraph; no re-render.
+  var gReadBound = false, gCursor = null, gTip = null, gTipTimer = 0, gLastEv = null, gRArr = [], gRKeys = [], gRMetas = [];
+  function gp2(n) { return (n < 10 ? '0' : '') + n; }
+  function graphReadoutHide() {
+    if (gTipTimer) { clearTimeout(gTipTimer); gTipTimer = 0; }
+    if (gCursor) gCursor.setAttribute('visibility', 'hidden');
+    if (gTip) gTip.style.display = 'none';
+  }
+  // A touch tap ends with pointerleave right after pointerup: keep the readout for a few
+  // seconds there instead of hiding it at once. A mouse leaving the graph hides it at once.
+  function graphReadoutLeave(ev) {
+    if (ev && ev.pointerType === 'touch') {
+      if (gTipTimer) clearTimeout(gTipTimer);
+      gTipTimer = setTimeout(graphReadoutHide, 4000);
+    } else graphReadoutHide();
+  }
+  // `refresh`: called after a re-render with the last pointer position; keeps a pending
+  // touch hide timer running.
+  function graphReadoutAt(ev, refresh) {
+    if (!refresh && gTipTimer) { clearTimeout(gTipTimer); gTipTimer = 0; }
+    gLastEv = { clientX: ev.clientX, clientY: ev.clientY, pointerType: ev.pointerType };
+    var svg = document.getElementById('gstrip'), card = svg && svg.parentNode;
+    if (!svg || !card || !gLastRender) return;
+    var rect = svg.getBoundingClientRect(); if (!rect.width) return;
+    // Screen -> viewBox through the SVG's own transform: with preserveAspectRatio the drawing
+    // is scaled and centred, so a plain rect.width ratio is off when the aspect differs (phones).
+    var x = (ev.clientX - rect.left) / rect.width * 780, m = svg.getScreenCTM && svg.getScreenCTM();
+    if (m && svg.createSVGPoint) { var sp = svg.createSVGPoint(); sp.x = ev.clientX; sp.y = ev.clientY || 0; x = sp.matrixTransform(m.inverse()).x; }
+    x = Math.max(C_X0, Math.min(C_X1, x));
+    var win = graphWindowMs || 3600000, t = (gLastRender - win) + (x - C_X0) / (C_X1 - C_X0) * win;
+    var res = graphReadout(gRArr, gRKeys, gRMetas, gOff, t), d = new Date(res ? res.t : t);
+    if (!gCursor) {
+      gCursor = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      gCursor.setAttribute('class', 'gcursor'); gCursor.setAttribute('y1', '10'); gCursor.setAttribute('y2', '244');
+      svg.appendChild(gCursor);
+    }
+    gCursor.setAttribute('x1', x.toFixed(1)); gCursor.setAttribute('x2', x.toFixed(1)); gCursor.setAttribute('visibility', 'visible');
+    if (!gTip) { gTip = document.createElement('div'); gTip.className = 'gtip'; card.appendChild(gTip); }
+    gTip.textContent = '';
+    var hd = document.createElement('div'); hd.className = 'gtip-t';
+    hd.textContent = gp2(d.getHours()) + ':' + gp2(d.getMinutes()) + ':' + gp2(d.getSeconds()) + (res ? '' : '  no data');
+    gTip.appendChild(hd);
+    if (res) res.rows.forEach(function (r) {
+      var ln = document.createElement('div'), sw = document.createElement('i'), v = document.createElement('b');
+      sw.style.background = r[2]; v.textContent = r[1];
+      ln.appendChild(sw); ln.appendChild(document.createTextNode(r[0] + ' ')); ln.appendChild(v);
+      gTip.appendChild(ln);
+    });
+    gTip.style.display = 'block';
+    var cr = card.getBoundingClientRect(), px = ev.clientX - cr.left, w = gTip.offsetWidth;
+    gTip.style.left = (px + 14 + w > card.clientWidth ? Math.max(0, px - 14 - w) : px + 14) + 'px';
+    gTip.style.top = Math.max(0, Math.min(40, card.clientHeight - gTip.offsetHeight - 4)) + 'px';   // stay inside the card
+  }
+  function bindGraphReadout() {
+    var svg = document.getElementById('gstrip'); if (!svg || gReadBound) return;
+    gReadBound = true;
+    svg.addEventListener('pointermove', graphReadoutAt);
+    svg.addEventListener('pointerdown', graphReadoutAt);
+    svg.addEventListener('pointerleave', graphReadoutLeave);
+    svg.addEventListener('pointercancel', graphReadoutHide);   // the browser took over to scroll
   }
   // Clickable legend: each series can be hidden (remembered per browser).
   var gLegendSig = '';
@@ -3305,6 +3392,7 @@
     var svg = document.getElementById('gstrip'); if (!svg) return;
     var vb = svg.viewBox && svg.viewBox.baseVal, W = (vb && vb.width) || 780, H = (vb && vb.height) || 262, SC = 2;
     var clone = svg.cloneNode(true);
+    var gc = clone.querySelector && clone.querySelector('.gcursor'); if (gc && gc.parentNode) gc.parentNode.removeChild(gc);   // TASK-1297: no readout cursor in the PNG
     inlineSvgTextStyles(svg, clone);
     clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
     clone.setAttribute('width', W); clone.setAttribute('height', H);

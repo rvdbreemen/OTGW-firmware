@@ -381,6 +381,16 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .graphcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;
     padding:10px;box-shadow:var(--shadow)}
   .graphcard svg{width:100%;height:auto;display:block}
+  .graphcard{position:relative}
+  #gstrip{touch-action:pan-y}
+  #gstrip .gcursor{stroke:var(--muted);stroke-width:1;pointer-events:none}
+  .gtip{position:absolute;display:none;pointer-events:none;z-index:5;background:var(--panel);color:var(--text);
+    border:1px solid var(--border);border-radius:8px;box-shadow:var(--shadow);padding:6px 9px;font-size:.76rem;white-space:nowrap}
+  .gtip .gtip-t{font-weight:600;margin-bottom:3px}
+  .gtip i{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:6px}
+  .gtip b{margin-left:4px;font-weight:600}
+  @media (max-width:600px){.gtip{font-size:.68rem;line-height:1.25;padding:4px 6px;column-count:2;column-gap:10px}
+    .gtip .gtip-t{column-span:all}}
 
   /* ================= SETTINGS page ================= */
   .set-layout{display:grid;grid-template-columns:215px 1fr;gap:16px;align-items:start}
