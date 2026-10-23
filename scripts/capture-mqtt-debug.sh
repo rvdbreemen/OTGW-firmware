@@ -742,7 +742,7 @@ cleanup() {
 }
 
 on_signal() {
-  CAPTURE_STOP_REASON="Ctrl+C/Ctrl+Break"
+  CAPTURE_STOP_REASON="${1:-Ctrl+C/Ctrl+Break}"
   cleanup
   exit 130
 }
@@ -754,7 +754,7 @@ start_telnet_capture() {
     "$TELNET_CONNECT_TIMEOUT_SECONDS" \
     "$TELNET_RECONNECT_DELAY_MILLISECONDS" \
     "$TELNET_POST_DISCONNECT_DELAY_MILLISECONDS" \
-    "$TELNET_IDLE_CHECK_SECONDS" <<'PY' &
+    "$TELNET_IDLE_CHECK_SECONDS" "$PARENT_PID" <<'PY' &
 import os
 import re
 import select
@@ -775,6 +775,45 @@ base_timeout = int(sys.argv[6])
 reconnect_delay = int(sys.argv[7]) / 1000.0
 post_disconnect_delay = int(sys.argv[8]) / 1000.0
 idle_check = int(sys.argv[9])
+# argv "<posix pid>:<windows pid>" (TASK-1320): native Windows Python checks the
+# Windows PID, any other Python (Linux, macOS, an MSYS build) the POSIX one.
+_posix_pid, _, _win_pid = sys.argv[10].partition(":")
+parent_pid = int(_win_pid) if (os.name == "nt" and _win_pid) else int(_posix_pid)
+import signal
+if hasattr(signal, "SIGHUP"):
+    # A closed terminal sends SIGHUP to the whole group; the parent's HUP trap stops
+    # this worker through the stop file, so its cleanup (e.g. closing the browser) runs.
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+run_dir = os.path.dirname(os.path.abspath(summary_log))
+
+def parent_alive():
+    """False once the capture script that started this worker is gone (killed, or
+    its terminal closed): such a worker is an orphan and must not outlive it."""
+    if parent_pid <= 0:
+        return True
+    if os.name == "nt":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, 0, parent_pid)
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel32.CloseHandle(handle)
+        return bool(ok) and code.value == 259
+    try:
+        os.kill(parent_pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+def orphaned():
+    return not parent_alive() or not os.path.isdir(run_dir)
+
+def stopped():
+    return os.path.exists(stop_file) or orphaned()
 reboot_marker = re.compile(r"ESP\.restart\(\)")
 banner_footer = re.compile(r"Press 'h' for command menu|\bOTGW-Sim\b", re.MULTILINE)
 debug_toggle = re.compile(
@@ -788,12 +827,13 @@ simulator_labels = {"SensorSim", "OTGW-Sim"}
 def now():
     return datetime.now(timezone.utc).astimezone().isoformat()
 
-def stopped():
-    return os.path.exists(stop_file)
-
 def add_summary(line):
-    with open(summary_log, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    try:
+        with open(summary_log, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except FileNotFoundError:
+        # The run folder is gone: this worker belongs to an earlier run. Leave quietly.
+        os._exit(0)
 
 def wait_delay(seconds):
     end = time.monotonic() + seconds
@@ -1135,7 +1175,7 @@ start_browser_capture() {
   local resolved_browser="$2"
   local chosen_port="$3"
 
-  "$python" - "$resolved_browser" "$BROWSER_URL" "$chosen_port" "$BROWSER_PROFILE" "$BROWSER_LOG" "$BROWSER_ERR_LOG" "$SUMMARY_LOG" "$STOP_FILE" <<'PY' &
+  "$python" - "$resolved_browser" "$BROWSER_URL" "$chosen_port" "$BROWSER_PROFILE" "$BROWSER_LOG" "$BROWSER_ERR_LOG" "$SUMMARY_LOG" "$STOP_FILE" "$PARENT_PID" <<'PY' &
 import base64
 import json
 import os
@@ -1149,17 +1189,56 @@ from datetime import datetime
 
 browser_path, device_url, debug_port, temp_profile, browser_log, browser_error_log, summary_log, stop_file = sys.argv[1:9]
 debug_port = int(debug_port)
+# argv "<posix pid>:<windows pid>" (TASK-1320): native Windows Python checks the
+# Windows PID, any other Python (Linux, macOS, an MSYS build) the POSIX one.
+_posix_pid, _, _win_pid = sys.argv[9].partition(":")
+parent_pid = int(_win_pid) if (os.name == "nt" and _win_pid) else int(_posix_pid)
+import signal
+if hasattr(signal, "SIGHUP"):
+    # A closed terminal sends SIGHUP to the whole group; the parent's HUP trap stops
+    # this worker through the stop file, so its cleanup (e.g. closing the browser) runs.
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+run_dir = os.path.dirname(os.path.abspath(summary_log))
+
+def parent_alive():
+    """False once the capture script that started this worker is gone (killed, or
+    its terminal closed): such a worker is an orphan and must not outlive it."""
+    if parent_pid <= 0:
+        return True
+    if os.name == "nt":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, 0, parent_pid)
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel32.CloseHandle(handle)
+        return bool(ok) and code.value == 259
+    try:
+        os.kill(parent_pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+def orphaned():
+    return not parent_alive() or not os.path.isdir(run_dir)
 
 def stopped():
-    return os.path.exists(stop_file)
+    return os.path.exists(stop_file) or orphaned()
 
 def log(line):
     with open(browser_log, "a", encoding="utf-8") as f:
         f.write(datetime.now().strftime("%H:%M:%S.%f")[:-3] + "  " + line + "\n")
 
 def summary(line):
-    with open(summary_log, "a", encoding="utf-8") as f:
-        f.write(line + "\n")
+    try:
+        with open(summary_log, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except FileNotFoundError:
+        pass
 
 class WebSocket:
     def __init__(self, url):
@@ -1401,7 +1480,7 @@ PY
 start_crashlog_capture() {
   local python="$1"
 
-  "$python" - "$CRASHLOG_URL" "http://$DEVICE_HOST/reboot_log.txt" "$CRASHLOG_POLL_SECONDS" "$CRASHLOG_LOG" "$SUMMARY_LOG" "$STOP_FILE" <<'PY' &
+  "$python" - "$CRASHLOG_URL" "http://$DEVICE_HOST/reboot_log.txt" "$CRASHLOG_POLL_SECONDS" "$CRASHLOG_LOG" "$SUMMARY_LOG" "$STOP_FILE" "$PARENT_PID" <<'PY' &
 import os
 import sys
 import time
@@ -1411,17 +1490,56 @@ from datetime import datetime
 
 crashlog_url, reboot_log_url, poll_seconds, crashlog_log, summary_log, stop_file = sys.argv[1:7]
 poll_seconds = int(poll_seconds)
+# argv "<posix pid>:<windows pid>" (TASK-1320): native Windows Python checks the
+# Windows PID, any other Python (Linux, macOS, an MSYS build) the POSIX one.
+_posix_pid, _, _win_pid = sys.argv[7].partition(":")
+parent_pid = int(_win_pid) if (os.name == "nt" and _win_pid) else int(_posix_pid)
+import signal
+if hasattr(signal, "SIGHUP"):
+    # A closed terminal sends SIGHUP to the whole group; the parent's HUP trap stops
+    # this worker through the stop file, so its cleanup (e.g. closing the browser) runs.
+    signal.signal(signal.SIGHUP, signal.SIG_IGN)
+run_dir = os.path.dirname(os.path.abspath(summary_log))
+
+def parent_alive():
+    """False once the capture script that started this worker is gone (killed, or
+    its terminal closed): such a worker is an orphan and must not outlive it."""
+    if parent_pid <= 0:
+        return True
+    if os.name == "nt":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        handle = kernel32.OpenProcess(0x1000, 0, parent_pid)
+        if not handle:
+            return False
+        code = ctypes.c_ulong()
+        ok = kernel32.GetExitCodeProcess(handle, ctypes.byref(code))
+        kernel32.CloseHandle(handle)
+        return bool(ok) and code.value == 259
+    try:
+        os.kill(parent_pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+def orphaned():
+    return not parent_alive() or not os.path.isdir(run_dir)
 
 def stopped():
-    return os.path.exists(stop_file)
+    return os.path.exists(stop_file) or orphaned()
 
 def log(line):
     with open(crashlog_log, "a", encoding="utf-8") as handle:
         handle.write(datetime.now().strftime("%H:%M:%S.%f")[:-3] + "  " + line + "\n")
 
 def summary(line):
-    with open(summary_log, "a", encoding="utf-8") as handle:
-        handle.write(line + "\n")
+    try:
+        with open(summary_log, "a", encoding="utf-8") as handle:
+            handle.write(line + "\n")
+    except FileNotFoundError:
+        pass
 
 def http_get(url, timeout=10):
     try:
@@ -1616,6 +1734,10 @@ RUN_PATH="$OUTPUT_ROOT/$RUN_NAME"
 mkdir -p "$RUN_PATH"
 
 SUMMARY_LOG="$RUN_PATH/summary.txt"
+# Workers exit when this process is gone (TASK-1320). Under Git Bash $$ is an MSYS PID
+# that native Windows Python cannot see, so the Windows PID from /proc/$$/winpid is
+# passed as well; each worker picks the one its Python can check.
+PARENT_PID="$$:$(cat /proc/$$/winpid 2>/dev/null)"
 TELNET_LOG="$RUN_PATH/telnet.log"
 MQTT_LOG="$RUN_PATH/mqtt.log"
 MQTT_ERR_LOG="$RUN_PATH/mqtt.stderr.log"
@@ -1638,7 +1760,9 @@ STOP_FILE="$RUN_PATH/.stop"
 : > "$SCRIPT_ERROR_LOG"
 
 trap cleanup EXIT
-trap on_signal INT TERM
+trap 'on_signal "Ctrl+C/Ctrl+Break"' INT
+trap 'on_signal "terminated (SIGTERM)"' TERM
+trap 'on_signal "terminal closed (SIGHUP)"' HUP
 
 write_summary "OTGW MQTT diagnostic capture"
 write_summary "Run folder: $RUN_PATH"

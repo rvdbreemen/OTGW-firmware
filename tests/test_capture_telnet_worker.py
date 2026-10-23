@@ -168,7 +168,7 @@ class WorkerCase(unittest.TestCase):
         self.proc = subprocess.Popen(
             [sys.executable, str(self.worker_py), "127.0.0.1", str(self.dev.telnet_port),
              str(self.telnet_log), str(self.summary), str(self.stop_file),
-             "2", "250", "250", str(idle)],
+             "2", "250", "250", str(idle), str(os.getpid())],
             stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         self.addCleanup(self._kill)
         self.assertTrue(wait_for(lambda: "Settings dump" in self.text(), 10), "worker never connected:\n" + self.text())

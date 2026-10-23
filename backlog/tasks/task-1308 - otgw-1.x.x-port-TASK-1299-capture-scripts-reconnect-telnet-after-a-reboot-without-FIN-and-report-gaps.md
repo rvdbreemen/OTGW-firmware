@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T07:10:00Z'
+updated_date: '2026-10-23T14:05:00Z'
 labels:
   - scripts
   - capture
@@ -26,3 +27,9 @@ Sibling of TASK-1299 (2.0.0 dev). The otgw-1.x.x line carries its own, different
 - [ ] #1 The 1.x capture scripts are checked for the half-open gap with a reproduction on the 1.x bench unit (USB or power reset during a capture), old vs fix
 - [ ] #2 If affected: keepalive, the gated watchdog and the gap report are ported and the reproduction shows the reconnect and the gap line
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-23 (from TASK-1320 on dev): the 2.0.0 capture script got an orphan-worker fix: background Python workers exit when the parent script is gone (posix pid / Windows pid from /proc/$$/winpid) or their run dir disappears, ignore SIGHUP so the parent's HUP trap can clean up, and add_summary exits quietly on a missing dir. When porting TASK-1299's reconnect loop to 1.x, port this fix with it; test tests/test_capture_orphan_worker.py.
+<!-- SECTION:NOTES:END -->
