@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T06:27:00Z'
-updated_date: '2026-10-23T10:33:00Z'
+updated_date: '2026-10-23T16:14:00Z'
 labels:
   - webui
   - graph
@@ -35,4 +35,6 @@ Follow-up of TASK-1296. Boards with PSRAM keep a 726 x 120 s ring and serve ~24 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-23 cycle: skipped for now, needs a firmware build and the PC is low on memory (a build was stopped by Claude Code); resume after the maintainer's go.
+
+2026-10-23 cycle: skipped, AC2 needs a PSRAM board (LOLIN S3 Mini/Pro); USB shows only COM4 (OTGW32, no PSRAM) and COM3 (1.x ESP8266). AC1/AC3 could be done on the OTGW32 but the task cannot close without AC2.
 <!-- SECTION:NOTES:END -->
