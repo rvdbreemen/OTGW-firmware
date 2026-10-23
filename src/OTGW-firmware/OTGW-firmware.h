@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.464
+**  Version  : v2.0.0-alpha.465
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -239,6 +239,7 @@ void setMQTTConfigPending(const uint8_t MSGid);
 void markAllMQTTConfigPending();
 const char *messageIDToString(OTLibMessageID message_id);
 void addCommandToQueue(const char* ,  int , const bool = false, const int16_t = 1000);
+void triggerPICsettingsReadout();
 void sendMQTTheapdiag();
 // TASK-692 / TASK-693 port (dev TASK-686 / TASK-688): OT-bus support-map
 // accessors. State lives at file scope in OTGW-Core.ino; MQTT publisher

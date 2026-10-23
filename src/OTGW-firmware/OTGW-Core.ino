@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.464
+**  Version  : v2.0.0-alpha.465
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -40,6 +40,8 @@
 **  Upgrade PIC firmware             ~ line 3537
 ***************************************************************************
 */
+
+#include "PICreturnSensor.h"
 
 #define OTDebugTln(...) ({ if (state.debug.bOTmsg) DebugTln(__VA_ARGS__);    })
 #define OTDebugln(...)  ({ if (state.debug.bOTmsg) Debugln(__VA_ARGS__);    })
@@ -822,6 +824,7 @@ static void applyPICBannerInfo() {
     state.pic.bAvailable = true;
     state.hw.eMode = HW_MODE_PIC;
     DebugTln(F("PIC detected via firmware banner: PIC functions re-enabled"));
+    triggerPICsettingsReadout();  // the settings (sensor function D, ...) were never read
   }
   strlcpy(state.pic.sFwversion, OTGWSerial.firmwareVersion(), sizeof(state.pic.sFwversion));
   DebugTf(PSTR("Current firmware version: %s\r\n"), state.pic.sFwversion);
@@ -1098,6 +1101,57 @@ void queryOTGWgatewaymode(){
   addCommandToQueue("PR=M", 4, true);  // forceQueue=true; response handled by handlePRresponse()
 }
 
+//===================[ Return water refresh (TASK-1314) ]=========
+/*
+  A boiler that sends no MsgID 28 gets its return water temperature from a sensor
+  wired to the PIC (PR=D answers "R"). The thermostat polls MsgID 28 only every few
+  minutes, so on a PIC with firmware 6.6 or later the register is read once a minute
+  with PR=E (no OpenTherm traffic) and fed to the Tret state through the summary route
+  (applyFramelessTret). Boards without that sensor send nothing.
+*/
+static void applyFramelessTret(float value);  // defined after the PS=1 summary code
+
+static bool picSensorTretPollActive()
+{
+#if HAS_PIC
+  return picTretPollGate(isPICEnabled() && !isOTDirectEnabled() && isGatewayFirmware(),
+                         isFlashing(), state.otBus.bPSmode,
+                         state.pic.sFwversion, state.picSettings.sTempSensor[0]);
+#else
+  return false;
+#endif
+}
+
+// True when a PR=<reg> command is already waiting in the command queue.
+static bool cmdQueueHasPR(char reg)
+{
+  for (int i = 0; i < cmdQueueSize; i++) {
+    if (cmdqueue[i].cmdlen >= 4 && cmdqueue[i].cmd[0] == 'P' && cmdqueue[i].cmd[1] == 'R' &&
+        cmdqueue[i].cmd[3] == reg) return true;
+  }
+  return false;
+}
+
+// Called every 60 s from doTaskEvery60s(). forceQueue=true: without it the queue
+// would replace any other queued PR= command, because it matches on the first two
+// characters. The duplicate checks keep at most one PR=D and one PR=E in the queue.
+void pollPicReturnSensor()
+{
+  static bool wasActive = false;
+  const bool active = picSensorTretPollActive();
+  if (active != wasActive) {
+    wasActive = active;
+    if (active) DebugTf(PSTR("Return water: PR=E every 60 s (PIC %s, sensor function R)\r\n"), state.pic.sFwversion);
+    else        DebugTln(F("Return water: PR=E polling stopped"));
+  }
+  if (!active) return;
+  // PR=E prints the outside value when the function is O, and the cached D can be
+  // stale (a TS= typed on port 25238 is not always followed by a readout in time).
+  // PR=D goes first in the queue, so its reply refreshes the cache before E is handled.
+  if (!cmdQueueHasPR('D')) addCommandToQueue("PR=D", 4, true);
+  if (!cmdQueueHasPR('E')) addCommandToQueue("PR=E", 4, true);
+}
+
 //===================[ PIC settings readout control ]=============
 /*
   On-demand PIC settings readout.
@@ -1248,6 +1302,25 @@ static void handlePRresponse(const char* buf, size_t len) {
       prevGatewayKnown = true;
       OTDebugTf(PSTR("handlePRresponse: gateway mode = %s\r\n"), CCONOFF(isGateway));
     }
+    return;
+  }
+
+  // --- External sensor value (register 'E', PIC 6.6+): "E=34.56" or "E=-" ---
+  // Not a PIC setting: it never reaches the settings storage below, so it creates
+  // no otgw-pic/settings topic. Only the return water sensor ('R') is used; the
+  // value goes to Tret through the summary route. "-" or garbage is no reading.
+  if (reg == 'E') {
+    static PicSensorEResult prevE = PIC_SENSOR_E_VALID;
+    static bool prevEKnown = false;
+    float tret = 0.0f;
+    const PicSensorEResult res = picParseSensorE(value, tret);
+    if (!prevEKnown || res != prevE) {
+      prevE = res;
+      prevEKnown = true;
+      DebugTf(PSTR("Return water: PR=E %s\r\n"),
+              res == PIC_SENSOR_E_VALID ? "valid" : (res == PIC_SENSOR_E_NO_READING ? "no reading (-)" : "unreadable"));
+    }
+    if (res == PIC_SENSOR_E_VALID && state.picSettings.sTempSensor[0] == 'R') applyFramelessTret(tret);
     return;
   }
 
@@ -3607,6 +3680,17 @@ static void removeFromCmdQueue(int index) {
   cmdqueue[cmdQueueSize].due = 0;
 }
 
+// Trigger PIC settings re-read only for commands that modify readable PIC settings (PR=).
+// GW→PR=M, SB→PR=S, VR→PR=V, TS→PR=D, IT/OH→PR=T, GA/GB→PR=G, LA-LF→PR=L
+// Used for commands from the queue and for commands typed on the ser2net port (25238).
+static void triggerReadoutForSettingsCmd(const char* buf) {
+  char cmd[3] = { (char)toupper((unsigned char)buf[0]), (char)toupper((unsigned char)buf[1]), '\0' };
+  static const char kSettingsCmds[] = "GW GA GB SB VR TS IT OH LA LB LC LD LE LF";
+  if (strstr(kSettingsCmds, cmd)) {
+    triggerPICsettingsReadout();
+  }
+}
+
 /*
   addCommandToQueue adds a command to the queue.
   First it checks the queue, if the command is in the queue, it's updated.
@@ -3716,15 +3800,7 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
     }
   } else OTDebugTf(PSTR("CmdQueue: Found command at: [%d] - [%d]\r\n"), insertptr, cmdQueueSize);
 
-  // Trigger PIC settings re-read only for commands that modify readable PIC settings (PR=).
-  // GW→PR=M, SB→PR=S, VR→PR=V, TS→PR=D, IT/OH→PR=T, GA/GB→PR=G, LA-LF→PR=L
-  if (len >= 2) {
-    char cmd[3] = { buf[0], buf[1], '\0' };
-    static const char kSettingsCmds[] = "GW GA GB SB VR TS IT OH LA LB LC LD LE LF";
-    if (strstr(kSettingsCmds, cmd)) {
-      triggerPICsettingsReadout();
-    }
-  }
+  if (len >= 2) triggerReadoutForSettingsCmd(buf);
 
   OTDebugFlush();
 }
@@ -4572,6 +4648,26 @@ void processPSSummary(const char *buf, int len) {
   }
 
   OTDebugTf(PSTR("PS=1 summary parsed: %d fields (%s firmware)\r\n"), idx + 1, bFW5 ? "v5+" : "<v5");
+}
+
+// TASK-1314: a return water temperature that arrives without an OpenTherm frame
+// (PR=E on a PIC board with the sensor function R). It takes the route of a PS=1
+// summary field for MsgID 28: master-topic gate, MQTT publish under the interval
+// gate, the Tret state, the MsgID 28 last-updated stamp and the discovery check.
+static void applyFramelessTret(float value)
+{
+  PROGMEM_readAnything(&OTmap[OT_Tret], OTlookupitem);
+  char raw[16];
+  dtostrf(value, 1, 2, raw);
+  const uint32_t preSuccessCount = mqttSendSuccessCount;
+  OTPublishGate gate(shouldPublishMQTTForPSField(OT_Tret));
+  if (publishPSSummaryFieldValue(OT_Tret, OTlookupitem.type, OTlookupitem.label, raw)) {
+    ensurePSSummaryDiscovery(OT_Tret);
+  }
+  if (mqttPendingSlot.pending) {
+    if (mqttSendSuccessCount > preSuccessCount) confirmMQTTPublishSlot();
+    else                                        mqttPendingSlot.pending = false;
+  }
 }
 
 //===================[ OT Message Processing ]===============
@@ -5598,6 +5694,7 @@ void handlePICSerial()
           // Track ser2net activity and remove conflicting queue entries
           if (bytes_write >= 3 && sWrite[2] == '=') {
             lastSer2netCmdMs = millis();
+            triggerReadoutForSettingsCmd(sWrite);
             // Remove matching command from queue to prevent override
             for (int qi = 0; qi < cmdQueueSize; qi++) {
               if (cmdqueue[qi].cmd[0] == sWrite[0] && cmdqueue[qi].cmd[1] == sWrite[1]) {

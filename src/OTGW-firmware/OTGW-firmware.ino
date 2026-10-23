@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.464
+**  Version  : v2.0.0-alpha.465
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -845,6 +845,9 @@ void doTaskEvery60s(){
   if (isPICEnabled() && isGatewayFirmware()) {
     queryOTGWgatewaymode();
   }
+
+  // TASK-1314: return water from a wired sensor (PIC 6.6+, function R), one PR=E a minute.
+  pollPicReturnSensor();
 
   // Probe PIC firmware version if still unknown.
   // Runs regardless of isPICEnabled() so a transient boot-probe miss can recover:
