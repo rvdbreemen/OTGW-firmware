@@ -4926,6 +4926,9 @@
     document.querySelectorAll('.satview-btn').forEach(function (b) {
       b.addEventListener('click', function () { satShowView(b.dataset.sv); });
     });
+    // TASK-1311: the SAT chart shows the loop (target, PID); the boiler history lives on Monitor > Graph.
+    var histLink = document.getElementById('satHistMonitorLink');
+    if (histLink) histLink.addEventListener('click', function () { showPage('monitor', { tab: 'mgraph' }); });
     var sv = 'simple'; try { sv = localStorage.getItem('otgw-v2-satview') || 'simple'; } catch (e) { }
     satShowView(sv);
 

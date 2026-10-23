@@ -447,9 +447,10 @@
           <div class="sat-hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
         </div>
       </div>
-      <div class="card"><h4>Temperature history <span class="sub">live</span></h4>
+      <div class="card"><h4>SAT control loop <span class="sub">live</span></h4>
         <svg viewBox="0 0 600 200" id="satHistChart" preserveAspectRatio="none" style="height:200px"></svg>
-        <div class="legend" id="satHistLegend"></div></div>
+        <div class="legend" id="satHistLegend"></div>
+        <div class="sat-hint">SAT target and PID output since this page was opened. Full boiler history: <button type="button" class="sat-link" id="satHistMonitorLink">Monitor &rsaquo; Graph</button></div></div>
       <!-- Closed by default; the open state is stored only on a click on the summary (wireSat, concept rule 4) -->
       <details class="grp" data-grp="sat-dhw" id="satDhwGrp">
         <summary>Hot water</summary>

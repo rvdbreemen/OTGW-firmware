@@ -50,3 +50,5 @@ used a tab row and the SAT settings were one flat page. "Less is more."
 - **A restored Graph tab** fetches its history at page load. The v2 fetch queue
   keeps this at two requests in flight (ADR-184 pattern, TASK-1210), so the cost is
   a short delay of the other start-up requests, not a 503.
+
+- **SAT chart and Monitor graph (TASK-1311, decided).** The SAT chart stays as 'SAT control loop' (SAT target, PID output, flow, room, outside since the page opened) with a link to Monitor > Graph; merging would make Monitor poll SAT data and the SAT values are not in the stored history (ADR-193).

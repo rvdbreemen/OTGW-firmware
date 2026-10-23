@@ -228,6 +228,31 @@ if (hasSummary) {
   check(false, 'no Hot water group to open or persist');
 }
 
+// ------------------------------------------------ (f) TASK-1311: SAT chart role + Monitor link
+await openSat('simple');
+const h = await evalJs(`(function(){
+  var card = document.getElementById('satHistChart'); card = card && card.closest('.card');
+  var lg = document.getElementById('satHistLegend');
+  return { title: card ? card.querySelector('h4').textContent : '', legend: lg ? lg.textContent : '',
+           link: !!document.getElementById('satHistMonitorLink') };
+})()`);
+check(/^SAT control loop/.test(h.title), `SAT chart is titled 'SAT control loop' (got "${h.title}")`);
+check(['Setpoint', 'Flow', 'Room', 'Outside', 'PID'].every((k) => h.legend.indexOf(k) !== -1),
+  `no series lost: legend keeps Setpoint, Flow, Room, Outside, PID (got "${h.legend}")`);
+if (h.link) {
+  await evalJs(`localStorage.removeItem('otgw-v2-montab'); document.getElementById('satHistMonitorLink').click()`);
+  await sleep(300);
+  const m = await evalJs(`(function(){
+    var pg = document.getElementById('page-monitor'), tab = document.querySelector('#page-monitor .subtab.active');
+    return { monitor: !!(pg && pg.classList.contains('active')), tab: tab ? tab.dataset.tab : '',
+             stored: (function(){try{return localStorage.getItem('otgw-v2-montab');}catch(e){return 'ERR';}})() };
+  })()`);
+  check(m.monitor && m.tab === 'mgraph', `the link opens Monitor > Graph (monitor=${m.monitor}, tab=${m.tab})`);
+  check(m.stored === null, `the link does not store the Monitor tab (otgw-v2-montab=${m.stored})`);
+} else {
+  check(false, 'no Monitor > Graph link on the SAT chart');
+}
+
 // ------------------------------------------------ (e) no exceptions
 check(exceptions.length === 0, `no page exception (${exceptions.length}${exceptions[0] ? ': ' + exceptions[0].split('\n')[0] : ''})`);
 
