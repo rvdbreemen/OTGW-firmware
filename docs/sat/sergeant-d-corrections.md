@@ -479,3 +479,41 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156325410434
 
 **Still open:** TASK-1327 is not implemented yet (To Do). The cutoff uses 28.2 / 21 instead of 22
 (entry 11, answer 2).
+
+## 13. Force PWM: remove it completely (2026-10-23)
+
+**Source:** #alpha-testing, 2026-10-23 19:44 and 19:45 UTC, reply to our question of 19:43 UTC
+(message 1563276791723073720: with Force PWM on, should the cold cutoff keep the mode on PWM, or
+switch to Continuous like thermo-nova?):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563277074553376889
+https://discord.com/channels/812969634638725140/1514720723980259460/1563277188630061057
+
+**Quoted:**
+
+> @BlueFlame Bot  Honestly, I don’t even know why we still have it in the code
+
+> It is better to be removed completely
+
+**Settled by this statement:**
+
+- The Force PWM option goes, as a setting and as code. SAT picks PWM or Continuous itself
+  (entries 8 and 10).
+- thermo-nova only stores the option and never reads it: it is defined (`const.py:80`, default
+  `False` at `const.py:149`), offered in the options flow (`config_flow.py:728`) and copied into
+  the entry data (`entry_data.py:58`, `entry_data.py:223`); nothing in the package reads
+  `force_pulse_width_modulation` afterwards. Removing it matches thermo-nova's behaviour.
+- In the firmware it is live today: `settings.sat.bForcePWM` (`SATtypes.h`) forces
+  `SAT_MODE_PWM` on every control tick (`satControlLoopRun`), keeps PWM mode on the cold cutoff
+  (`satPwmDisableOnHeaterOff`, TASK-1327), and is exposed as the setting `satforcepwm` (REST
+  GET/POST, settings file key `SATforcepwm`, the v2 SAT settings 'PID / PWM' group), the MQTT
+  command `force_pwm` and the Home Assistant entity `sat/force_pwm_enable`.
+
+**Changes an earlier entry:** entry 10 kept Force PWM as a setting under SAT tuning (our reading
+of "follow the thermo-nova" at 16:16 UTC). This entry replaces that part of entry 10.
+
+**Task:** TASK-1332 (removal). TASK-1327's Force PWM branch goes with it: on the cold cutoff SAT
+always leaves PWM mode, as thermo-nova does.
+
+**Open:** none from him. On our side: a settings file that still holds `SATforcepwm` must load
+without error (removed keys are ignored, ADR-192), and the retained Home Assistant discovery
+config of the entity must be removed so it does not linger.
