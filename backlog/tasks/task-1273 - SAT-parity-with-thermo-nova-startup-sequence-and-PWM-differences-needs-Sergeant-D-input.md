@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:17
-updated_date: '2026-10-22T19:55:00Z'
+updated_date: '2026-10-23T10:32:00Z'
 labels:
   - sat
   - parity
@@ -63,4 +63,6 @@ From the TASK-1268 round-2 review (opus, by reading, pre-existing): (a) PWM ON-p
 2026-10-22 bench GREEN 2 on the build with the review fixes (21:42 .ino.bin, relight anchor + no-flow idle), same replay and settings: first duty tick t=61 s duty 0.3086 at pid 26.45 -> implied BT 40.9 with the flow at 42.1 (seed from the first-flame tick), old build 40.0 fixed. Evidence %TEMP%\bench-1273\green2-alpha459.json (111 rows, 0 errors). Bench restored, settings diff vs baseline {}. The last one-line change (anchor cleared in the ignition-timeout abort) is covered by the host test test_ignition_timeout_abort_clears_the_anchor_and_keeps_bt (36 OK on the fix, 11 FAIL on HEAD) and is flashed to the bench without a further replay.
 
 2026-10-22 PWM item 1 (duty-cycle BT) shipped: see the commit 'SAT PWM: take the duty-cycle boiler temperature from the real flow' (alpha.460). Remaining items of this task, each needing Sergeant D's OK before implementation: continuous previous-CS term; PWM ON expiry timed from the ignition sync; on_time >= 180 s start gate; cycle-end OVERSHOOT/UNDERHEAT switch; CH threshold 22; PM=25 after CS; PM/MI on runtime enable; 28.2 cold cutoff and curve coefficient; ignition timeout abort vs thermo-nova continuing the phase (pwm.py:197-199); range 5 without reseed; 30 s tick vs 5 s cadence.
+
+2026-10-23 Sergeant D (#alpha-testing msg 1563135315991072789, 10:21 UTC): 'the CS is following the BT correctly now! Great job' (the duty-cycle BT change, alpha.460). Same message raised CH=0 on PWM OFF: filed separately.
 <!-- SECTION:NOTES:END -->

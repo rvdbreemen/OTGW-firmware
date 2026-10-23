@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-22T11:57:00Z'
-updated_date: '2026-10-23T09:17:00Z'
+updated_date: '2026-10-23T10:00:00Z'
 labels:
   - webui
   - monitor
@@ -41,6 +41,8 @@ Client-side only (v2.js/v2.html/v2.css). Pure top-level function graphReadout(ar
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-23 11:20 evidence (bench OTGW32, %TEMP%/bench-1297): before: hovering does nothing (before-hover-desktop.png). After: desktop hover readout with time, values of visible series, '–' for missing, cursor line (after-hover-desktop.png / final-hover-desktop.png); 390 px touch: tap shows the readout for 4 s (the first version hid it at once because a tap ends with pointerleave: fixed), two-column compact tooltip clamped inside the card (final-tap-phone.png); cursor under the finger: taps at 30/50/70 % gave cursor x = tap x (diff 0.0 px) after switching the screen->viewBox mapping to getScreenCTM().inverse() (the rect-ratio mapping was off on phones because preserveAspectRatio centres the drawing); touch-action pan-y computed on #gstrip. Review fixes: readout reuses the arrays of the last render (no O(n) work per pointermove), readout refreshes after each re-render, cursor line removed from the PNG export clone, readout hidden when the Graph tab opens. tests/webui/graph-readout.test.mjs 6/6 (red on HEAD: graphReadout missing), all web UI tests 185/185, evaluate --quick 0 fail. Not verified: an actual vertical swipe scrolling the page on a real phone (only the computed touch-action). Observed during the bench work: WiFi link to the bench degraded (RSSI -75, ping up to 1 s) and hd_min_free_heap had dipped to 8296 B during repeated page loads/uploads; noted for TASK-1307.
+
+2026-10-23 gruijter confirmed on a real phone (#alpha-testing msg 1563122020613627936, 09:28 UTC, build 466): 'Monitor graphs metrics show well on phone in 466. Also works on web ui.' with a phone screenshot; this closes the 'real phone' item listed as not verified.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
