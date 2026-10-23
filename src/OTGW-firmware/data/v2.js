@@ -445,7 +445,7 @@
   var ws = null, wsTimer = null;
   var model = {
     flow: null, ret: null, dhw: null, outside: null, room: null,
-    roomSet: null, chSet: null, mod: null, pressure: null, tsetGatewayMs: 0,
+    roomSet: null, chSet: null, mod: null, pressure: null, tsetGatewayMs: 0, picTempSensor: '',
     flame: false, ch: false, dhw_on: false, fault: false, fresh: false,
     wxValid: false   // TASK-954: weather API drives OUTSIDE when its last fetch is valid
   };
@@ -548,7 +548,22 @@
       if (activeDesign() === 'c') scheduleRender();
     } else if (eventLineClass(d)) {
       pushLog(d);                   // TASK-981: sent-command echo / PIC ack / NG into the log
+      if (eventLineClass(d) === 'rsp') applyPicReply(d);
     }
+  }
+
+  // TASK-1314: a PIC gateway with a wired return-water sensor refreshes it every minute
+  // with PR=D / PR=E; the PIC answers 'PR: D=R' (sensor function) and 'PR: E=29.38'
+  // ('PR: E=-' when it has no reading). Only function R is the return temperature.
+  function applyPicReply(line) {
+    var m = line.match(/PR:\s*D=([A-Z])/);
+    if (m) { model.picTempSensor = m[1]; return; }
+    m = line.match(/PR:\s*E=(-?\d+(?:\.\d+)?)\b/);
+    if (!m || model.picTempSensor !== 'R') return;
+    var v = parseFloat(m[1]);
+    if (!isFinite(v) || v < -40 || v > 130) return;
+    model.ret = v;
+    model.fresh = true; pushSample(); scheduleRender();
   }
 
   function activeDesign() {

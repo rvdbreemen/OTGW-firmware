@@ -6,7 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T09:37:00Z'
-updated_date: '2026-10-23T10:43:00Z'
+updated_date: '2026-10-23T13:14:00Z'
 labels:
   - pic
   - sat
@@ -32,4 +32,6 @@ Side finding of the TASK-1314 research (2026-10-23): src/OTGW-firmware/SATcontro
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-23 cycle: gruijter's 1 h capture (20261023-094059.zip, alpha.461, SAT active) contains no PM= command at all, so it cannot show the effect; needs a PIC board on the bench (Classic-S3 not connected) or a capture from an enable/refresh moment that issues the PM= burst. Skipped for now.
+
+2026-10-23 data point (TASK-1314 investigation): on a real PIC 6.8 (1.x unit, port 25238) three PR= reads sent back to back in one TCP write were all answered (3/3 runs). So the PIC does not drop back-to-back PR= commands; whether PM= behaves differently (it queues a request for a later OT slot) is still open.
 <!-- SECTION:NOTES:END -->

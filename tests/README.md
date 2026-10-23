@@ -104,6 +104,10 @@ Node test files, run one at a time with `node --test tests/webui/<name>.test.mjs
     search opens matching groups only; the BLE discovery link opens Sensors without storing it;
     Monitor remembers the clicked tab but not one opened from code. Same harness and ports
     as above (8148/9340). `v2-settings-sat-followups` runs on the same harness.
+  - `tret-pr-events`: TASK-1314. A stub WebSocket feeds `< PR: D=R` / `< PR: E=41.20` log lines
+    through the page's own `onmessage`; the Home return readout takes the E value only while the
+    sensor function is R (not for `E=-`, out-of-range values or function O), and an OT MsgID 28
+    Read-Ack still sets it. Ports 8151/9351.
 - `settings-error-toast` needs Node alone. It runs the shipped `bleToast()` and
   `saveSettings()` against a stub fetch: a rejected save shows the red `.toast.err`
   variant, a good save the green toast (TASK-1254). `OTGW_V2_JS` / `OTGW_V2_CSS`

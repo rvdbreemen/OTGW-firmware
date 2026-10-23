@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T09:26:00Z'
-updated_date: '2026-10-23T11:59:00Z'
+updated_date: '2026-10-23T13:35:00Z'
 labels:
   - pic
   - opentherm
@@ -68,6 +68,12 @@ Open: the live loop on a PIC board with the sensor (PR=E sent and answered every
 2026-10-23 Sergeant D (#alpha-testing 10:28 UTC): 'the Tret is only needed from SAT during the PWM start up phase, SAT doesn't monitor it all the time'. So the faster Tret mainly serves the graph/MQTT; for SAT it only matters in the PWM start-up phase (flame-off hold setpoint).
 
 2026-10-23 13:55 final evidence (review fixes included): build.bat --target all SUCCESS for esp32, esp32-classic, esp32-combo (firmware + filesystem, combo 13:49); flashed (compiled 13:48:07); replay with the corrected fixture: 35 -> 41.20 (+20 s) -> 41.70 (+88 s) -> holds over 'E=-' -> 42.30 (+232 s) (replay-new2.log), all four E lines applied; no extra traffic on the OT-Direct unit over 75 s: cmd[PR=E] 0, cmd[PR=D] 0; host test 33 PASS 'ALL TESTS PASSED' exit 0; evaluate --quick 0 fail. AC2 stays open for the live PIC loop on a board with the wired sensor (reporter).
+
+2026-10-23 13:15 field report gruijter (alpha.465, captures 20261023-144036/-145421 + graph CSV): 'Tret polled frequently for a few minutes, then back to every 5 min'. Analysis: (1) firmware sends PR=D/PR=E every 60 s (telnet); (2) the lossless MQTT log has 6 Tret publishes in ~6 min (29.38, 28.88, 28.38, 27.94, 28.00, 28.31): firmware path works; (3) telnet log is lossy (line 837 truncated mid-line), so missing 'PR: E=' log lines are not evidence of missing replies; PR=D/E were not retried after 5 s, so the queue matched their replies; (4) graph CSV: ret changes only at thermostat frames after 14:49, per-minute changes only in the early part (device history ring). Root cause: v2.js sets model.ret only from WS OT frames MsgID 28 Read-Ack (v2.js:497); applyFramelessTret updates OTcurrentSystemState/MQTT/history ring but emits no frame, so the live graph + Home readouts lag. A fabricated OT frame is not allowed (ADR-177). Fix direction: browser reads Tret via REST while the minute refresh is active. Hypothesis 'PIC drops back-to-back commands' REFUTED on hardware: PIC 6.8 (1.x unit .88.68, port 25238 enabled temporarily then restored to false) answered PR=M,PR=D,PR=E sent in one burst 3/3 times, same as paced 300 ms.
+
+2026-10-23 13:30 fix plan (UI follow-up, AC2 field failure): v2.js reads the PIC reply events that already reach the WebSocket ('<' prefix, reportOTGWEvent(buf,'<') in processOT, OTGW-Core.ino:5484): '< PR: D=<x>' stores the sensor function, '< PR: E=<v>' sets model.ret (live graph, Home readouts) only when the last D was 'R' and -40<=v<=130; 'E=-' keeps the value. No new requests, no firmware change, PIC lines consumed verbatim (ADR-177). Test: tests/webui (fake WS feeds D=R then E lines; red on HEAD: ret unchanged). Bench: OTGW32 replay tests/webui/fixtures/tret-pr-e-replay.txt with the real v2 page open: the Home return readout follows 41.20/41.70/hold/42.30.
+
+2026-10-23 15:35 UI fix evidence: v2.js applyPicReply() (16 lines). tests/webui/tret-pr-events.test.mjs: fix 0 failures of 7; HEAD v2.js 5 failures of 7 (readout stays '—' on E lines; frame path passes on both). Regression: sat-status-pill 14, v2-navigation 50, evaluate --quick 0 fail. build.bat combo SUCCESS (littlefs 15:28), bench fs flash with settings round trip 178/178 differing 0; real browser on the device (headless Chrome, #aRet) during the tret-pr-e-replay fixture: '—' -> 35.0 (frame) -> 41.2 -> 41.7 -> holds over E=- -> 42.3, matching the firmware state (35 -> 41.20 -> 41.70 -> 42.30). Old v2.js not re-run on the device (old-vs-fix is the webui test). /otgw_simulation.log deleted from the bench. AC2 still needs the reporter: the graph/Home readout changing about every minute.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
