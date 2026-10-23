@@ -51,6 +51,15 @@ case "$head_full" in
   *) refuse "zip githash $hash is not HEAD ${head_full:0:9}; rebuild from HEAD" ;;
 esac
 
+# version.h is excluded from the dirty check (build stamps), so compare the tag with HEAD's
+pre=$(git -C "$REPO" show HEAD:src/OTGW-firmware/version.h 2>/dev/null \
+  | sed -n 's/^#define _VERSION_PRERELEASE[[:space:]]*//p' | tr -d ' "\r')
+[ -n "$pre" ] || refuse "no _VERSION_PRERELEASE in HEAD:src/OTGW-firmware/version.h"
+case "$version" in
+  *-"$pre") ;;
+  *) refuse "zip version $version does not carry HEAD's prerelease $pre (uncommitted bump?)" ;;
+esac
+
 dirty=$(git -C "$REPO" status --porcelain -- src \
   ':(exclude)src/OTGW-firmware/version.h' ':(exclude)src/OTGW-firmware/data/version.hash')
 if [ -n "$dirty" ]; then
@@ -63,12 +72,13 @@ size=$(wc -c < "$zip" | tr -d ' ')
 
 content="Build ready: \`$version+$hash\` (esp32-combo, flash package attached)."
 [ -n "$extra" ] && content="$content $extra"
-esc=$(printf '%s' "$content" | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
+# JSON string: drop control characters (newlines, tabs), escape backslash and quote
+esc=$(printf '%s' "$content" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
 payload="{\"content\":\"$esc\",\"allowed_mentions\":{\"parse\":[]}}"
 
 if [ "$dry_run" -eq 1 ]; then
   echo "DRY RUN OK: would post $name ($size bytes)"
-  echo "message: $content"
+  echo "payload: $payload"
   exit 0
 fi
 
@@ -82,7 +92,7 @@ esac
 resp=$(mktemp)
 trap 'rm -f "$resp"' EXIT
 code=$(curl -sS -o "$resp" -w '%{http_code}' --max-time 120 -H "User-Agent: $UA" \
-  -F "payload_json=$payload" \
+  --form-string "payload_json=$payload" \
   -F "files[0]=@$zip;type=application/zip" \
   "$url?wait=true") || { echo "FAILED: curl error" >&2; exit 1; }
 
@@ -94,4 +104,5 @@ esac
 grep -q "\"size\": *$size[,}]" "$resp" \
   || { echo "FAILED: http $code but no attachment of $size bytes in the reply" >&2; exit 1; }
 
-echo "POSTED: $name ($size bytes), http $code"
+msg_id=$(python -I -c 'import json,sys; print(json.load(open(sys.argv[1])).get("id",""))' "$resp" 2>/dev/null || true)
+echo "POSTED: $name ($size bytes), http $code, message ${msg_id:-unknown}"

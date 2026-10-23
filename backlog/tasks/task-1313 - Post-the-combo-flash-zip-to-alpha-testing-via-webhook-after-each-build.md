@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T08:54:00Z'
-updated_date: '2026-10-23T11:28:00Z'
+updated_date: '2026-10-23T11:32:00Z'
 labels: []
 dependencies: []
 ordinal: 436000
@@ -33,4 +33,6 @@ Experiments 2026-10-23: webhook GET -> BlueFlame Build Bot, channel 151472072398
 Script scripts/discord-post-build.sh + tests/test_discord_post_build.py: 8/8 OK on the real script; mutant without the dirty and hash refusals: 3 FAIL (dirty, untracked, hash-not-HEAD). Live dry-run on the real tree (another session's uncommitted TASK-1314 work under src/): REFUSED exit 2, listing the 5 files.
 SKILL.md step 9 now calls the script.
 OPEN: the script's real post path was denied by the auto-mode classifier ('judged dangerous'). The automated cycle needs a maintainer allow rule for 'bash scripts/discord-post-build.sh*' before AC1/AC5 can be evidenced. Not added by Claude: permission config is the maintainer's call.
+
+Advisor round: payload now via --form-string (a ';' or '@' in -m no longer reaches curl's form parser), control characters stripped, dry-run prints the payload, POSTED line prints the message id, zip prerelease must equal HEAD's _VERSION_PRERELEASE (version.h is outside the dirty check). Tests 10/10 OK; mutant without the bump check: 1 FAIL (test_uncommitted_bump_refused). evaluate.py --quick exit 0, 0 FAIL. Scope: release and beta-prerelease skills untouched on purpose: 1.x public channels and #beta-testing (assets via CI/GitHub release), this webhook reaches #alpha-testing only.
 <!-- SECTION:NOTES:END -->

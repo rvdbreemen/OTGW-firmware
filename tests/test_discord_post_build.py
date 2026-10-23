@@ -6,6 +6,7 @@ path, which must refuse before any network call.
 
 Run: python tests/test_discord_post_build.py
 """
+import json
 import os
 import shutil
 import subprocess
@@ -46,7 +47,8 @@ class DiscordPostBuildRefusals(unittest.TestCase):
         git(self.tmp, "config", "core.autocrlf", "false")
         src = self.tmp / "src" / "OTGW-firmware" / "data"
         src.mkdir(parents=True)
-        (self.tmp / "src" / "OTGW-firmware" / "version.h").write_text("v1\n")
+        (self.tmp / "src" / "OTGW-firmware" / "version.h").write_text(
+            '#define _SEMVER_CORE "2.0.0"\n#define _VERSION_PRERELEASE alpha.1\n')
         (src / "version.hash").write_text("h1\n")
         (src / "v2.js").write_text("js1\n")
         git(self.tmp, "add", "-A")
@@ -54,8 +56,8 @@ class DiscordPostBuildRefusals(unittest.TestCase):
         self.head = git(self.tmp, "rev-parse", "--short=7", "HEAD")
         (self.tmp / "build").mkdir()
 
-    def make_zip(self, hash_, size=1000):
-        z = self.tmp / "build" / f"OTGW-firmware-esp32-combo-2.0.0-alpha.1+{hash_}-flash.zip"
+    def make_zip(self, hash_, size=1000, pre="alpha.1"):
+        z = self.tmp / "build" / f"OTGW-firmware-esp32-combo-2.0.0-{pre}+{hash_}-flash.zip"
         with open(z, "wb") as f:
             f.truncate(size)
         return z
@@ -97,6 +99,25 @@ class DiscordPostBuildRefusals(unittest.TestCase):
         (self.tmp / "src" / "OTGW-firmware" / "data" / "version.hash").write_text("h2\n")
         r = self.run_script("--dry-run")
         self.assertEqual(r.returncode, 0, r.stderr)
+
+    def test_uncommitted_bump_refused(self):
+        # version.h is outside the dirty check, so a zip from an uncommitted bump
+        # must be caught by comparing its tag with HEAD's _VERSION_PRERELEASE
+        self.make_zip(self.head, pre="alpha.2")
+        r = self.run_script("--dry-run")
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("uncommitted bump", r.stderr)
+
+    def test_message_payload_is_valid_json(self):
+        self.make_zip(self.head)
+        text = 'TASK-1; type=x @/etc/passwd <file "q" \\ back\nline2\tend'
+        r = self.run_script("--dry-run", "-m", text)
+        self.assertEqual(r.returncode, 0, r.stderr)
+        line = next(l for l in r.stdout.splitlines() if l.startswith("payload: "))
+        payload = json.loads(line[len("payload: "):])
+        self.assertIn('TASK-1; type=x @/etc/passwd <file "q" \\ back', payload["content"])
+        self.assertNotIn("\n", payload["content"])
+        self.assertEqual(payload["allowed_mentions"], {"parse": []})
 
     def test_oversize_refused(self):
         self.make_zip(self.head, size=10_000_001)

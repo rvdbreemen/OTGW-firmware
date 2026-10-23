@@ -192,7 +192,8 @@ give its full path to the maintainer in the session. Then post it to #alpha-test
 
     bash scripts/discord-post-build.sh -m "TASK-NNN: <one-line change>"
 
-The script posts through the webhook in
+Run it through the Bash tool (Git Bash); a bare `bash` from PowerShell can resolve to
+WSL, where `LOCALAPPDATA` is unset and the script refuses. It posts through the webhook in
 `%LOCALAPPDATA%\OTGW-capture\discord-alpha-webhook.url` (never print or commit that
 URL) and refuses (exit 2) when the zip githash is not HEAD, when `src/` has
 uncommitted changes, or when the zip is above 10 MB. A refusal or a failed post is
