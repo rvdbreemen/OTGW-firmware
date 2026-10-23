@@ -2238,7 +2238,8 @@ def build_safeboot(project_dir, semver):
         print_info("Partition table has no safeboot partition: safeboot updater not built")
         return None
     print_step("Building the safeboot updater")
-    run_command([sys.executable, "-m", "platformio", "run", "-d", SAFEBOOT_DIR], cwd=project_dir)
+    run_command([sys.executable, "-m", "platformio", "run", "-d", SAFEBOOT_DIR,
+                 "--jobs", str(pio_jobs())], cwd=project_dir)
     image = project_dir / SAFEBOOT_DIR / ".pio" / "build" / "safeboot" / "firmware.bin"
     if not image.exists():
         print_error(f"Safeboot build produced no image ({image})")
@@ -2424,6 +2425,26 @@ def check_platformio():
     sys.exit(1)
 
 
+PIO_MAX_JOBS = 8
+
+
+def pio_jobs():
+    """Compiler jobs for `platformio run` (TASK-1335). scons defaults to one per
+    logical core, which saturates a machine that also runs agent sessions.
+    Default min(8, cpu_count); OTGW_BUILD_JOBS=<n> overrides it."""
+    default = min(PIO_MAX_JOBS, os.cpu_count() or 1)
+    raw = os.environ.get("OTGW_BUILD_JOBS", "").strip()
+    if raw:
+        try:
+            n = int(raw)
+            if n >= 1:
+                return n
+        except ValueError:
+            pass
+        print_info(f"Ignoring OTGW_BUILD_JOBS={raw!r}: not a positive integer")
+    return default
+
+
 def build_firmware_pio(project_dir, target):
     """Build firmware using PlatformIO."""
     tcfg = TARGETS[target]
@@ -2439,7 +2460,8 @@ def build_firmware_pio(project_dir, target):
     pio_env = {k: v for k, v in os.environ.items() if k not in _MSYS_KEYS}
     # `python -m platformio`, not bare `pio`: a portable embed Python has the
     # package but no pio.exe wrapper (see _pio_in_path).
-    run_command([sys.executable, "-m", "platformio", "run", "-e", env_name], cwd=project_dir, env=pio_env)
+    run_command([sys.executable, "-m", "platformio", "run", "-e", env_name,
+                 "--jobs", str(pio_jobs())], cwd=project_dir, env=pio_env)
     # TASK-337: pio's pre-flight Python version rejection prints "Python version
     # must be between 3.10 and 3.13" but exits 0, leaving no firmware.bin behind.
     # Verify the artifact exists rather than trusting the subprocess exit code.
@@ -2465,7 +2487,8 @@ def build_filesystem_pio(project_dir, target, fs_dir):
     pio_env = {k: v for k, v in os.environ.items() if k not in _MSYS_KEYS}
     pio_env["PLATFORMIO_DATA_DIR"] = str(fs_dir)
     # `python -m platformio`, not bare `pio` (see _pio_in_path / build_firmware_pio).
-    run_command([sys.executable, "-m", "platformio", "run", "-e", env_name, "-t", "buildfs"], cwd=project_dir, env=pio_env)
+    run_command([sys.executable, "-m", "platformio", "run", "-e", env_name, "-t", "buildfs",
+                 "--jobs", str(pio_jobs())], cwd=project_dir, env=pio_env)
     # TASK-337: same fail-fast pattern as build_firmware_pio. The buildfs target
     # can also be silently skipped on toolchain misconfiguration.
     verify_artifact_exists(
