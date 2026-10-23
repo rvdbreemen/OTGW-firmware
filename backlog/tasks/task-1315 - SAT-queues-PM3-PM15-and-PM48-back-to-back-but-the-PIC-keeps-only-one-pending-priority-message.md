@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T09:37:00Z'
+updated_date: '2026-10-23T10:43:00Z'
 labels:
   - pic
   - sat
@@ -26,3 +27,9 @@ Side finding of the TASK-1314 research (2026-10-23): src/OTGW-firmware/SATcontro
 - [ ] #1 Bench or capture evidence of which of MsgID 3/15/48 are actually requested after the three PM= commands (old)
 - [ ] #2 All needed IDs are requested (spacing on response) with evidence, or the unneeded PM= removed with the reason recorded
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-23 cycle: gruijter's 1 h capture (20261023-094059.zip, alpha.461, SAT active) contains no PM= command at all, so it cannot show the effect; needs a PIC board on the bench (Classic-S3 not connected) or a capture from an enable/refresh moment that issues the PM= burst. Skipped for now.
+<!-- SECTION:NOTES:END -->
