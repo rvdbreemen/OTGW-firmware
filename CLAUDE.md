@@ -358,10 +358,15 @@ heap-frag soak, TASK-934):
 - **Static gates:** `python evaluate.py` (full) / `--quick`. Exit 0 = pass, 1 =
   FAIL, 2 = WARN>5. NOT run by build.py — run it separately. Gate unit tests:
   `python tests/test_evaluate.py` (stdlib unittest, no pytest).
-- **Flash:** `flash_otgw.bat --board esp32` (auto-detects the S3 over USB
-  VID/PID 303A:1001; `--port COMx` to force). esptool-only — works on any Python.
-  `--update --app <bin>` writes the app only; add `--fs <bin>` only when the
-  LittleFS assets changed.
+- **Flash over WiFi OTA first** (maintainer directive, 2026-10-24): the app through
+  `POST /safeboot` and the safeboot updater's `/update` upload, the filesystem through
+  `POST /update?cmd=100&size=<n>` on the main firmware. The filesystem OTA keeps
+  `settings.ini` and the other kept files by itself, and it is the route users take.
+  Flash app and filesystem together when the web assets changed, so the hashes match.
+- **USB only when OTA cannot work** (unit does not boot, no network, no safeboot), and
+  then always `flash_otgw.bat --board esp32 --migrate --host <ip>`, which saves and
+  restores `settings.ini` (auto-detects the S3 over USB VID/PID 303A:1001; `--port COMx`
+  to force; esptool-only, works on any Python). Never `--update --fs` over USB.
 - **Settings live on LittleFS:** any flash that writes a filesystem image (`--fs`,
   or bare `--update`, which auto-picks app + fs) resets every setting (mode reverts
   to `gateway`). `--update --app <bin>` writes the app only and keeps them (before

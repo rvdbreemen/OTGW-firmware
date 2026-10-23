@@ -138,7 +138,7 @@ behaviour choice (logging, UI, graphs, docs) do not wait.
    - `python evaluate.py --quick` (no new FAIL) and the relevant tests in `tests/`.
 4. Prove the behaviour: the same reproduction red on the old code and green on the
    fix. Use the boiler emulator, frame replay or host tests as simulation; use the
-   bench when it is available (OTGW32 test unit, WiFi OTA through safeboot; save
+   bench when it is available (OTGW32 test unit, WiFi OTA through safeboot for the app and `/update?cmd=100` for the filesystem; USB only when OTA cannot work, and then `flash_otgw --migrate --host`; save
    `/api/v2/settings` first; never flash or reset a PIC without an explicit order).
    For UI changes take screenshots before and after.
 5. Append evidence to the task notes as you go and tick each AC only with evidence
