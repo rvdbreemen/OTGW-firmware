@@ -83,7 +83,9 @@ the normal selection below.
 
 1. Read the task, its notes and the code it touches (follow the CLAUDE.md "what to
    read" table and the C4 docs for the owning component).
-2. Run `/adr-kit:context <topic>` and honour the Accepted ADRs it returns.
+2. Run `/adr-kit:context <topic>` and honour the Accepted ADRs it returns. For anything that
+   touches SAT, also read `docs/sat/sergeant-d-corrections.md` and list in the plan the entries
+   the change relies on or conflicts with (CLAUDE.md SAT ground truth block).
 3. Non-trivial new functionality: look for an open-source solution first and record
    what was considered (project rule).
 4. For a bug: decide how you will **reproduce** it (host test, frame replay,
@@ -96,7 +98,8 @@ the normal selection below.
 
 Review the design as if someone else wrote it: missed callers and readers, other
 platforms and boards (`HAS_*`), old-firmware/new-UI mixes, settings migration, the
-2-concurrent-API rule, PROGMEM/no-String/no-ArduinoJson, MQTT/REST/HA contracts. Then
+2-concurrent-API rule, PROGMEM/no-String/no-ArduinoJson, MQTT/REST/HA contracts, and for SAT
+every entry in `docs/sat/sergeant-d-corrections.md` (a conflict goes to Sergeant D). Then
 call the **advisor** with the plan (no advisor tool in this session: run one `opus`
 review agent on the plan instead). Adapt the plan to findings that hold; if you
 reject one, write down why. An architectural change, a new dependency or an API/MQTT
@@ -150,7 +153,9 @@ diff, each with its own lens and told to refute, not to approve:
   that must change (`sonnet`);
 - tests and evidence: does the test call the real code, is red-then-green genuine
   (`sonnet`);
-- add a lens when the change needs it (security for auth/OTA, UI for web changes).
+- add a lens when the change needs it (security for auth/OTA, UI for web changes);
+- for SAT changes, one reviewer checks the diff against every entry in
+  `docs/sat/sergeant-d-corrections.md` and reports any conflict that the plan did not name.
 
 Verify every finding yourself against the code. Fix the ones that hold (implementation
 agent), re-run the affected gates and tests, and note why you rejected the others. A

@@ -50,6 +50,9 @@ class SatGroundTruthBlock(unittest.TestCase):
         b = block("CLAUDE.md")
         self.assertIn("docs/sat/sergeant-d-corrections.md", b)
         self.assertIn("in the same session and before the change it leads to is implemented", b)
+        # TASK-1330: decisions are checked against the recorded entries, conflicts go to him.
+        self.assertIn("checked against Sergeant D's recorded decisions before it is taken", b)
+        self.assertIn("never resolved silently", b)
         self.assertTrue(os.path.exists(os.path.join(REPO, "docs", "sat", "sergeant-d-corrections.md")),
                         "docs/sat/sergeant-d-corrections.md is missing")
 
