@@ -76,8 +76,12 @@ content="Build ready: \`$version+$hash\` (esp32-combo, flash package attached)."
 esc=$(printf '%s' "$content" | tr -d '\000-\037' | sed -e 's/\\/\\\\/g' -e 's/"/\\"/g')
 payload="{\"content\":\"$esc\",\"allowed_mentions\":{\"parse\":[]}}"
 
+# Discord drops '+' from attachment names (alpha.465+5cf2758 showed as alpha.4655cf2758),
+# so upload under a name with '_'; the local zip keeps its name.
+upload_name=$(printf '%s' "$name" | tr '+' '_')
+
 if [ "$dry_run" -eq 1 ]; then
-  echo "DRY RUN OK: would post $name ($size bytes)"
+  echo "DRY RUN OK: would post $name ($size bytes) as $upload_name"
   echo "payload: $payload"
   exit 0
 fi
@@ -98,7 +102,7 @@ resp=$(mktemp)
 trap 'rm -f "$resp"' EXIT
 code=$(curl -sS -o "$resp" -w '%{http_code}' --max-time 120 -H "User-Agent: $UA" \
   --form-string "payload_json=$payload" \
-  -F "files[0]=@$curl_zip;type=application/zip" \
+  -F "files[0]=@$curl_zip;type=application/zip;filename=$upload_name" \
   "$url?wait=true") || { echo "FAILED: curl error" >&2; exit 1; }
 
 case "$code" in
