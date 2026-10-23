@@ -89,11 +89,16 @@ case "$url" in
   *) refuse "webhook file does not hold a discord.com webhook URL" ;;
 esac
 
+# Native Windows curl (Git Bash/MSYS) cannot open an MSYS path such as /d/...
+# inside a -F argument: MSYS does not convert it there. Hand it a Windows path.
+curl_zip="$zip"
+if command -v cygpath >/dev/null 2>&1; then curl_zip=$(cygpath -w "$zip"); fi
+
 resp=$(mktemp)
 trap 'rm -f "$resp"' EXIT
 code=$(curl -sS -o "$resp" -w '%{http_code}' --max-time 120 -H "User-Agent: $UA" \
   --form-string "payload_json=$payload" \
-  -F "files[0]=@$zip;type=application/zip" \
+  -F "files[0]=@$curl_zip;type=application/zip" \
   "$url?wait=true") || { echo "FAILED: curl error" >&2; exit 1; }
 
 case "$code" in
