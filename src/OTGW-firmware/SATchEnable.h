@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATchEnable.h
-**  Version  : v2.0.0-alpha.478
+**  Version  : v2.0.0-alpha.479
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

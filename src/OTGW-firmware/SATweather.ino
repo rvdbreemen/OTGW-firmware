@@ -26,6 +26,7 @@
 // --- Constants ---
 static const uint16_t WEATHER_POLL_DEFAULT_SEC = 900;  // 15 min default
 static const uint16_t WEATHER_POLL_MIN_SEC     = 300;  // 5 min minimum
+static const uint32_t WEATHER_FIRST_RETRY_MS   = 60000UL;  // first retry until the first fetch succeeds, doubling (TASK-1319)
 
 // Hourly forecast arrays — ESP32 only.
 // ESP8266 does not request hourly data; omitting saves ~240 bytes of BSS.
@@ -423,6 +424,32 @@ void weatherLoop()
   // where OT message ID 27 populates this field). PR #559 originally referenced
   // a non-existent state.sat.Toutside and would not compile.
   if (OTcurrentSystemState.Toutside != 0.0f) return;
+
+  // TASK-1319: until the first fetch succeeds, try right after the start-up gate
+  // instead of waiting for the first poll tick (the poll timer runs from boot, so
+  // that tick comes ~15 min after boot). A failed try waits 60 s, then doubles,
+  // capped at the poll interval: a fetch blocks the loop for its DNS, connect and
+  // read timeouts, so a unit without internet must not retry every minute forever.
+  // Without coordinates there is nothing to fetch and no try is counted, so the
+  // first fetch follows right after the coordinates are entered.
+  // Once valid, the normal interval takes over, counted from that fetch.
+  if (!state.sat.weather.bValid) {
+    if (settings.sat.fWeatherLat == 0.0f && settings.sat.fWeatherLon == 0.0f) return;
+    static uint32_t s_lastFirstTryMs = 0;
+    static uint32_t s_firstRetryMs   = 0;   // 0 = no try yet
+    if (s_firstRetryMs != 0 && (millis() - s_lastFirstTryMs) < s_firstRetryMs) return;
+    s_lastFirstTryMs = millis();
+    weatherFetch();
+    if (state.sat.weather.bValid) {
+      s_firstRetryMs = 0;
+      RESTART_TIMER(timerWeatherPoll);
+    } else {
+      const uint32_t capMs = (uint32_t)settings.sat.iWeatherInterval * 1000UL;
+      s_firstRetryMs = (s_firstRetryMs == 0) ? WEATHER_FIRST_RETRY_MS : s_firstRetryMs * 2;
+      if (capMs >= WEATHER_FIRST_RETRY_MS && s_firstRetryMs > capMs) s_firstRetryMs = capMs;
+    }
+    return;
+  }
   if (!DUE(timerWeatherPoll)) return;
 
   weatherFetch();
