@@ -4929,6 +4929,24 @@
     var sv = 'simple'; try { sv = localStorage.getItem('otgw-v2-satview') || 'simple'; } catch (e) { }
     satShowView(sv);
 
+    // TASK-1310: SAT groups (<details class="grp">) are closed by default. satOpen (a Set of
+    // group ids) is the source of truth, applied once here; localStorage only persists it and
+    // it changes ONLY on a user click on a summary, never from the 'toggle' event (concept rule 4).
+    var satOpen = new Set();
+    try {
+      var sa = JSON.parse(localStorage.getItem('otgw-v2-satopen'));
+      if (Array.isArray(sa)) sa.forEach(function (x) { if (typeof x === 'string') satOpen.add(x); });
+    } catch (e) { }
+    document.querySelectorAll('#satBody details.grp[data-grp]').forEach(function (det) {
+      if (satOpen.has(det.dataset.grp)) det.open = true;
+      var sum = det.querySelector('summary');
+      if (sum) sum.addEventListener('click', function () {
+        var willOpen = !det.open;   // the click handler runs before the native toggle
+        if (willOpen) satOpen.add(det.dataset.grp); else satOpen.delete(det.dataset.grp);
+        try { localStorage.setItem('otgw-v2-satopen', JSON.stringify(Array.from(satOpen))); } catch (e) { }
+      });
+    });
+
     var en = document.getElementById('satEnable');
     if (en) en.addEventListener('change', function () {
       // TASK-1012: intercept enabling a not-yet-onboarded SAT — run the wizard instead

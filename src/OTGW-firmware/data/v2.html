@@ -432,7 +432,8 @@
   <div class="card" id="satNoData" style="display:none;text-align:center;color:var(--muted)">SAT status is unavailable on this device.</div>
 
   <div id="satBody" class="sv-simple">
-    <!-- L1 Thermostat — dial + presets + hint (the header toggle already carries enable/disable) -->
+    <!-- L1 Thermostat: dial + presets + hint (the header toggle already carries enable/disable),
+         then the temperature history, then the collapsed Hot water group (TASK-1310) -->
     <div class="sat-l1">
       <div class="sat-thermo-wrap">
         <div class="sat-dial-card">
@@ -446,21 +447,26 @@
           <div class="sat-hint">Pick a preset or set the temperature — SAT works out the boiler.</div>
         </div>
       </div>
-    </div>
-
-    <!-- L2 Control — history, hot water, burner cycle, live tiles, heating curve, control status, weather -->
-    <div class="sat-l2">
       <div class="card"><h4>Temperature history <span class="sub">live</span></h4>
         <svg viewBox="0 0 600 200" id="satHistChart" preserveAspectRatio="none" style="height:200px"></svg>
         <div class="legend" id="satHistLegend"></div></div>
-      <div class="sat-row2 sat-row-2up">
-        <div class="card sat-mini"><h4>Hot water</h4>
+      <!-- Closed by default; the open state is stored only on a click on the summary (wireSat, concept rule 4) -->
+      <details class="grp" data-grp="sat-dhw" id="satDhwGrp">
+        <summary>Hot water</summary>
+        <div class="grp-body">
           <div class="kv">
             <div class="kv-row"><span class="kv-k">Standalone DHW control</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnabled" aria-label="Standalone DHW control"></span></div>
             <div class="kv-row"><span class="kv-k">DHW setpoint</span><span class="kv-v"><input type="range" min="30" max="60" value="50" id="satDhwSlider" class="sat-slider" aria-label="DHW setpoint" disabled> <b id="satDhwR">—</b></span></div>
             <div class="kv-row" id="satDhwEnableRow" style="display:none"><span class="kv-k">DHW enable (HW=)</span><span class="kv-v"><input type="checkbox" class="sw" id="satDhwEnable" aria-label="DHW enable"></span></div>
           </div>
-          <div class="sat-hint" id="satDhwHint">SAT sends this setpoint to the boiler only while standalone DHW control is on.</div></div>
+          <div class="sat-hint" id="satDhwHint">SAT sends this setpoint to the boiler only while standalone DHW control is on.</div>
+        </div>
+      </details>
+    </div>
+
+    <!-- L2 Control: burner cycle mode, live tiles, heating curve, control status, weather -->
+    <div class="sat-l2">
+      <div class="sat-row2 sat-row-1up">
         <div class="card sat-mini"><h4>Burner cycle mode</h4><div class="ds-seg-row" id="satCycleRow"><button class="ds-seg" data-mode="continuous">Continuous</button><button class="ds-seg" data-mode="pwm">PWM</button></div><div class="sub" id="satCycleSub">—</div></div>
       </div>
       <div class="sat-tiles4">

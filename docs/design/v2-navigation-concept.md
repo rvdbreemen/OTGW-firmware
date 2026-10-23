@@ -36,16 +36,17 @@ used a tab row and the SAT settings were one flat page. "Less is more."
 | Settings | Vertical rail, one category visible at a time | One page of collapsible groups in `SET_CATS` order, all closed by default, count and REBOOT badge in the summary; the SAT pointer card stays | TASK-1312 |
 | Monitor | Tab row, tab not remembered | Tab row, tab remembered | TASK-1312 |
 | Advanced | Tab row, tab remembered; one inline-styled `<details>` (raw debug dump) | Unchanged tabs; the `<details>` uses the `.grp` style | TASK-1312 |
-| SAT | Three view buttons (Thermostat / Control / Technical); settings as flat lists | Groups for the SAT settings; page order per TASK-1310; graph overlap per TASK-1311 | TASK-1310, TASK-1311 |
+| SAT | Three view buttons (Thermostat / Control / Technical); settings as flat lists; Hot water and Burner cycle mode cards in the Control level | The view buttons stay a cumulative level selector. Thermostat: dial and presets, status, temperature history, then a collapsed `grp` "Hot water" (open state in `otgw-v2-satopen`, stored on a summary click only). Burner cycle mode moves to the Control level and up. Groups for the SAT settings; graph overlap per TASK-1311 | TASK-1310, TASK-1311 |
 | Home | View picker (System view / At a glance / Mission control) | Unchanged: it picks a layout of the same data, it is not navigation | none |
 | Diagnose | No sub-navigation | Unchanged | none |
 
 ## Open points
 
-- **SAT views are cumulative.** Technical shows everything Control shows, and
-  Control everything Thermostat shows. Styling them as `.subtabs` would make a
-  level selector look like exclusive tabs. TASK-1310 decides whether they stay a
-  level selector with its own style or become real tabs with separate content.
+- **SAT views are cumulative** (resolved in TASK-1310). They stay a level selector:
+  Technical shows everything Control shows, and Control everything Thermostat shows.
+  They keep their own style (`.satview-btn`, with a small level hint) and are not
+  `.subtabs`, because exclusive-looking tabs would mislead. Inside a level, edge-case
+  controls sit in `grp` groups (Hot water on the Thermostat view).
 - **A restored Graph tab** fetches its history at page load. The v2 fetch queue
   keeps this at two requests in flight (ADR-184 pattern, TASK-1210), so the cost is
   a short delay of the other start-up requests, not a 503.
