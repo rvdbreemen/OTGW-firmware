@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T08:17:00Z'
+updated_date: '2026-10-23T11:32:00Z'
 labels:
   - webui
   - ux
@@ -25,7 +26,13 @@ gruijter 2026-10-23 08:02 (#alpha-testing, 3 screenshots): the v2 web UI bundles
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Maintainer decision on the navigation concept recorded (options with consequences presented first)
+- [x] #1 Maintainer decision on the navigation concept recorded (options with consequences presented first)
 - [ ] #2 Concept written down as a design note or ADR, with a per-page migration list
 - [ ] #3 Pages migrated or follow-up tasks filed per page; before/after screenshots per migrated page
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-23 maintainer decision (session): option A, top-level pages with tabs at the top everywhere and grouped, collapsible sections inside a page; Settings loses the vertical rail and becomes one page with collapsed groups; 'less is more'. Next: write the concept down (design note or ADR) with the per-page migration list, then TASK-1310 (SAT page order) and TASK-1311 (SAT graph overlap) follow it.
+<!-- SECTION:NOTES:END -->

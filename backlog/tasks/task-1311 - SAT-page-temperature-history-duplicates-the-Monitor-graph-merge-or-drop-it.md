@@ -4,7 +4,7 @@ title: 'SAT page temperature history duplicates the Monitor graph: merge or drop
 status: To Do
 assignee: []
 created_date: '2026-10-23T07:52:00Z'
-updated_date: '2026-10-23T08:18:00Z'
+updated_date: '2026-10-23T11:33:00Z'
 labels:
   - webui
   - sat
@@ -32,4 +32,6 @@ gruijter 2026-10-23 07:47 (#alpha-testing): the SAT 'Temperature history' chart 
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-23: depends on the navigation concept decision in TASK-1312 (maintainer); skipped by the cycle until that decision is recorded, to avoid moving the SAT controls twice.
+
+2026-10-23: navigation concept decided in TASK-1312 (option A: top tabs everywhere, collapsible grouped sections inside a page); this task is unblocked and follows that concept.
 <!-- SECTION:NOTES:END -->

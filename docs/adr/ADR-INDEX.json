@@ -6670,8 +6670,8 @@
       "title": "Keep a bounded 24 h Monitor graph history on the device",
       "path": "ADR-193-keep-a-bounded-24-h-monitor-graph-history-on-the-device.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-10-22",
+      "status": "Accepted",
+      "date": "2026-10-23",
       "decision_summary": "The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on...",
       "topics": [
         "graph",
@@ -6740,7 +6740,7 @@
       "title": "Serve static text assets without an upload role from firmware flash",
       "path": "ADR-194-serve-static-text-assets-without-an-upload-role-from-firmware-flash.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-10-23",
       "decision_summary": "Static text assets that users never need to upload may be compiled into the firmware image and served or read from PR...",
       "topics": [

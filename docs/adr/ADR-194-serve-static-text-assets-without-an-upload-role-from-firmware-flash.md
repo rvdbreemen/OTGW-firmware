@@ -1,7 +1,7 @@
 ---
 id: "ADR-194"
 title: "Serve static text assets without an upload role from firmware flash"
-status: "Proposed"
+status: "Accepted"
 date: "2026-10-23"
 binding: false
 gate: null
@@ -42,7 +42,7 @@ format: "canonical"
 
 ## Status
 
-Proposed, 2026-10-23. Guideline-level per ADR-080: this ADR claims no CI
+Accepted, 2026-10-23.
 (continuous integration) gate in `evaluate.py` or `tests/`; the decision rule is
 applied at PR (pull request) review. It narrows ADR-190 and ADR-139 for two text
 assets; it does not reverse either of them. The image stays minified, nothing is
@@ -70,6 +70,11 @@ status_history:
     status: Proposed
     changed_by: "Agent: Claude (adr-generator, TASK-1303)"
     reason: Related to ADR-139 (narrowed by this ADR)
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-23
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "Maintainer decision 2026-10-23 (session): accepted"
     changed_via: adr-kit lifecycle
 ```
 
@@ -204,8 +209,9 @@ from `data/`:
 
 ## Open Questions
 
-- [ ] Does the maintainer accept the three-part rule as the standing criterion for
+- [x] Does the maintainer accept the three-part rule as the standing criterion for
   future moves into firmware flash?
+  — **Answered 2026-10-23 by Robert van den Breemen:** Yes: the three-part rule (no upload role, changes with the firmware, PROGMEM path with a firmware-hash ETag or a PROGMEM reader) is the standing criterion for moving an asset into firmware flash. Maintainer decision 2026-10-23.
 
 ## Related Decisions
 

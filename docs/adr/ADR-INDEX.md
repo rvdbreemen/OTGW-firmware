@@ -198,5 +198,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-190 | Accepted | - | build.py builds the LittleFS image from a staging copy of src/OTGW-firmware/data/ in which the .js and .css files are... |
 | ADR-191 | Accepted | - | The 4MB targets switch to a safeboot partition layout. |
 | ADR-192 | Accepted | - | The 2.0.0 line ships the v2 web UI as its only device web UI. |
-| ADR-193 | Proposed | - | The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on... |
-| ADR-194 | Proposed | - | Static text assets that users never need to upload may be compiled into the firmware image and served or read from PR... |
+| ADR-193 | Accepted | - | The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on... |
+| ADR-194 | Accepted | - | Static text assets that users never need to upload may be compiled into the firmware image and served or read from PR... |

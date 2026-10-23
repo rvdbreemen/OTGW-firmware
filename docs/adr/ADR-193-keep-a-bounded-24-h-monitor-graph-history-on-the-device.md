@@ -1,15 +1,14 @@
 ---
 id: "ADR-193"
 title: "Keep a bounded 24 h Monitor graph history on the device"
-status: "Proposed"
-date: "2026-10-22"
+status: "Accepted"
+date: "2026-10-23"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "web-ui"
   - "v2"
@@ -31,6 +30,7 @@ symbols:
   - "restSendChunked"
   - "pushGraphSlot"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -39,7 +39,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-10-22; revised 2026-10-23 (two ring sizes). Guideline-level per ADR-080: this ADR claims no CI (continuous
+Accepted, 2026-10-23.
 integration) gate in `evaluate.py` or `tests/`. The ring sizes, slot layout and REST
 contract are checked at PR review and by the TASK-1296 acceptance criteria.
 
@@ -52,6 +52,11 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-10-23
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: "Maintainer decision 2026-10-23 (session): accepted"
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -251,8 +256,9 @@ history; they stay live-only. The change is not ported to `otgw-1.x.x`.
 
 ## Open Questions
 
-- None. The maintainer chose 30 s / 1 h for boards without PSRAM and
+- [x] None. The maintainer chose 30 s / 1 h for boards without PSRAM and
   120 s / 24 h for boards with PSRAM on 2026-10-23.
+  — **Answered 2026-10-23 by Robert van den Breemen:** Resolved 2026-10-23 by the maintainer: boards without PSRAM keep 1 h at 30 s slots (static 126-slot ring), boards with PSRAM keep 24 h at 120 s slots in a PSRAM block.
 
 ## Related Decisions
 
