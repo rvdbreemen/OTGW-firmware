@@ -45,6 +45,8 @@ void satNarratef_P(PGM_P fmt_P, ...) {
   sendEventToWebSocket('S', buf);             // Web UI live-log sink (prefix 'S')
 }
 
+#include "SATchEnable.h"
+
 // --- Heating Curve Constants ---
 static const float SAT_HC_BASE_OFFSET_FLOOR  = 20.0f;   // Underfloor base offset
 static const float SAT_HC_BASE_OFFSET_RAD    = 27.2f;   // Radiator base offset
@@ -701,7 +703,7 @@ static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeo
 static float satPwmFlameOffHold(float maxSetpoint)
 {
   float cs = satGetReturnTemp() + settings.sat.fFlameOffOffset;
-  if (cs < satGetColdSetpoint()) cs = satGetColdSetpoint();  // flame-off hold clamped to COLD_SETPOINT (TASK-891.2, per Python heating_control.py)
+  if (cs < satGetColdSetpoint()) cs = satGetColdSetpoint();  // floor at the cold setpoint (28.2 rad / 21 floor): a cold start never sends a setpoint below it (TASK-891.2; Sergeant D 2026-10-23)
   if (cs > maxSetpoint) cs = maxSetpoint;
   return cs;
 }
@@ -898,6 +900,14 @@ static void satPwmSchedule(float pidOutput)
 //  - flame on, no hold recorded and fModSupDelay not yet passed since the real flame-on time ->
 //    pending, the previous control setpoint stays,
 //  - after fModSupDelay -> flow - fModSupOffset (refreshed every 3 s by satPwmSuppressionRefresh()).
+// True when satApplyPWM() returns its PWM ON/OFF setpoint, false when it returns prevCS or the
+// continuous setpoint. Mirrors the early returns of satApplyPWM() exactly (TASK-1316, CH rule).
+static bool satPwmDrivesSetpoint(float pidOutput)
+{
+  return satGetFlowTemp() > 0.0f && settings.sat.bOvershootProtection && !state.sat.bDhwActive
+         && pidOutput > satGetColdSetpoint();
+}
+
 static float satApplyPWM(float pidOutput)
 {
   const float prevCS = (_sat_lastControlCS > SAT_MIN_SETPOINT) ? _sat_lastControlCS : pidOutput;
@@ -4965,8 +4975,16 @@ static void satControlLoopRun()
 
   // --- Apply control mode ---
   float finalSetpoint;
-  if (state.sat.eControlMode == SAT_MODE_PWM) {
+  const bool pwmMode = (state.sat.eControlMode == SAT_MODE_PWM);
+  bool pwmDrivesSetpoint = false;
+  bool pwmOn = false;
+  if (pwmMode) {
     finalSetpoint = satApplyPWM(pidOutput);
+    pwmDrivesSetpoint = satPwmDrivesSetpoint(pidOutput);
+    // The phase that produced this tick's CS. Read here: satCycleCheckAutoSwitch() below
+    // can switch to continuous and satPwmReset() clears bPwmFlameRequested, which would
+    // send CH=0 with the ON-phase CS on the switch tick.
+    pwmOn = state.sat.bPwmFlameRequested;
   } else {
     finalSetpoint = satApplyContinuous(pidOutput);
   }
@@ -4975,6 +4993,7 @@ static void satControlLoopRun()
   if (finalSetpoint < SAT_MIN_SETPOINT) finalSetpoint = SAT_MIN_SETPOINT;
   if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;
 
+  const float preSolarSetpoint = finalSetpoint;   // CH is decided on this value (TASK-1316)
   _sat_lastControlCS = finalSetpoint;   // the "previous CS" a PWM tick without override keeps, before the solar adjustment
 
   // --- Solar gain compensation: reduce setpoint (Task #23) ---
@@ -5007,7 +5026,8 @@ static void satControlLoopRun()
 
   // --- COLD_SETPOINT cutoff (TASK-891.2, George): requested setpoint below the per-heating-system
   // cold setpoint => no heating needed; command the boiler OFF (CS=MINIMUM => CH=0, MM=100 restore).
-  if (pidOutput < satGetColdSetpoint()) {
+  const bool coldCutoff = (pidOutput < satGetColdSetpoint());
+  if (coldCutoff) {
     finalSetpoint = SAT_MIN_SETPOINT;
     state.sat.iCurrentModulation = 100;
     state.sat.fFinalSetpoint = finalSetpoint;
@@ -5018,8 +5038,10 @@ static void satControlLoopRun()
     // TASK-565: write-on-change. Main control block.
     satEnqueueIfChangedCS(finalSetpoint);
     satEnqueueIfChangedMM(state.sat.iCurrentModulation);
-    bool wantHeating = (finalSetpoint > SAT_MIN_SETPOINT);
-    satEnqueueIfChangedCH(wantHeating ? 1 : 0);
+    // CH rule of Sergeant D 2026-10-23 (see satChEnableDecide in SATchEnable.h): PWM ON keeps CH on,
+    // PWM OFF gives CH=0, otherwise CH off below the per-system cold setpoint, decided before the solar offset.
+    satEnqueueIfChangedCH(satChEnableDecide(preSolarSetpoint, satGetColdSetpoint(), pwmDrivesSetpoint,
+                                            pwmOn, coldCutoff));
     // Immergas quirk: send TP=11:12=<setpoint> alongside MM=. Kept on
     // unconditional enqueue per TASK-565: rare quirk path, not steady loop.
     if (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) {

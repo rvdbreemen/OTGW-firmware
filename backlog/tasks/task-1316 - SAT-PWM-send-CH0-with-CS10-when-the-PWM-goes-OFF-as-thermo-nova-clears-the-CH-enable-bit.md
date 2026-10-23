@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T10:32:00Z'
-updated_date: '2026-10-23T15:00:00Z'
+updated_date: '2026-10-23T16:06:00Z'
 labels:
   - sat
   - pwm
@@ -28,8 +28,8 @@ Firmware today: the main control block sends CH from finalSetpoint > SAT_MIN_SET
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 Every path that sends CS for SAT also sends the CH state thermo-nova would send (CH=0 when the control setpoint <= COLD_SETPOINT, CH=1 above), with file:line citations of both; the threshold choice (22 vs 10) confirmed by Sergeant D and recorded
-- [ ] #2 Replay or host test old vs fix: a PWM ON->OFF transition sends CS=10 and CH=0 (old: CS=10 only), and ON again sends CH=1
+- [x] #1 Every path that sends CS for SAT also sends the CH state thermo-nova would send (CH=0 when the control setpoint <= COLD_SETPOINT, CH=1 above), with file:line citations of both; the threshold choice (22 vs 10) confirmed by Sergeant D and recorded
+- [x] #2 Replay or host test old vs fix: a PWM ON->OFF transition sends CS=10 and CH=0 (old: CS=10 only), and ON again sends CH=1
 - [ ] #3 Sergeant D confirms on his setup
 <!-- AC:END -->
 
@@ -53,4 +53,14 @@ Implement per Sergeant D 2026-10-23: (1) pure helper SATchEnable.h satChEnableFo
 Parked in git stash on dev: 'TASK-1316 CH threshold (waiting for Sergeant D)' (tracked edits) and 'TASK-1316 new files (SATchEnable.h, test_sat_ch_enable.cpp)'. Restore both with git stash pop (newest first) when resuming.
 
 2026-10-23 14:51-14:54Z Sergeant D (msgs 1563203205633020027, ...729652457585, ...4066262130719): 'The CS we send to the boiler is decoupled to the duty cycle calculation. The CS that we send during PWM just keeps the flame on at the minimum modulation level. The hard job of the cycle duration is in the pwm.py file'; heating starts if (requested setpoint - base temperature) / (BT - base temperature) is suitable; duty percentage translated to seconds on/off. Not an explicit answer to the two questions. Proposed rule sent for a yes/no (msg 1563205445781422121): PWM ON -> CH=1 regardless of CS; PWM OFF -> CS=10 + CH=0; continuous -> CH from the sent setpoint vs the cold setpoint; CH decided before the solar offset. Waiting.
+
+2026-10-23 15:08Z Sergeant D (msg 1563207530275152037), reply to the 4-point CH proposal: 'great understanding! As you understand the continuous and pwm buttons should never be present in the SAT dashboard. Because the software decides when every mode will be in charge.' Read as YES to the proposal (interpretation recorded): PWM ON -> CH=1; PWM OFF -> CS=10 + CH=0; continuous -> CH from the setpoint vs the cold setpoint; CH decided on the setpoint before the solar offset. The buttons remark is filed separately.
+
+2026-10-23 18:05 implementation of the confirmed rule: SATchEnable.h satChEnableDecide(preSolar, cold, pwmDrivesSetpoint, pwmOn, coldCutoff) + satChEnableFor; SATcontrol.ino main block: satPwmDrivesSetpoint() mirrors satApplyPWM's early returns (flow<=0, protection off, DHW, pid<=cold), preSolarSetpoint captured before the solar offset, pwmOn captured right after satApplyPWM (opus review HIGH: reading bPwmFlameRequested after satCycleCheckAutoSwitch would send CH=0 mid-burn on a PWM->continuous switch tick, because satPwmReset clears it). Evidence: test_sat_ch_enable.cpp 0 failures, 22 PASS, per case old rule vs new (continuous 25 rad old 1 new 0; underfloor 20.9 old 1 new 0; cold cutoff with pwmOn old 1 new 0; PWM not driving CS + pre 25 old 1 new 0); test_sat_pwm_override.py fix 'Ran 39 OK', HEAD 'FAILED (failures=1)' (source check incl. the pwmOn-before-auto-switch order guard); evaluate 0 fail; build.bat combo SUCCESS 18:02; bench app flash: boots, SAT active, no panic in 120 s (no CS/CH traffic because the bench has no room temperature, so the CH path itself is host-tested only). Follow-ups: TASK-1323 (sticky prevCS + solar during ignition, needs Sergeant D), TASK-1324 (write-on-change resend gap, pre-existing). AC3 open: Sergeant D on his setup.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT now sets the CH enable bit per Sergeant D's confirmed rule (2026-10-23): PWM ON keeps CH on whatever CS, PWM OFF sends CS=10 + CH=0, otherwise CH is off below the per-system cold setpoint (28.2 radiators / 21 underfloor, quantized like the CS command), decided on the setpoint before the solar offset; the cold cutoff forces CH=0. Before, CH followed 'setpoint > 10'. AC1: rule recorded with thermo-nova citations and Sergeant D's answers; AC2: host test old vs new per case + source check red on HEAD (the PWM OFF path already sent CH=0 at HEAD; the red/green is the threshold and the PWM ON rule). Open (AC3): Sergeant D confirming on his setup. Not verified on a device (bench has no room temperature, SAT returns before the CH step).
+<!-- SECTION:FINAL_SUMMARY:END -->

@@ -65,7 +65,8 @@ static float satApplyContinuous(float p) { return 1000.0f + p; }   // marker val
 void satPwmReset();                                                 // defined later in the cut block (the .ino gets Arduino prototypes)
 static float satGetReturnTemp() { return g_ret; }
 static float satGetBaseOffset() { return 27.2f; }
-static float satGetColdSetpoint() { return 28.2f; }
+static float g_cold = 28.2f;
+static float satGetColdSetpoint() { return g_cold; }
 static float satGetMaxSetpoint() { return 62.0f; }
 static float satEffectiveMaxSetpoint() { return 62.0f; }
 static uint32_t satGetMinOnTimeSec() { return 180; }
@@ -83,7 +84,7 @@ static bool satEnqueueIfChangedCS(float cs) { g_csSent++; g_csLast = cs; return 
 MAIN = r"""
 static void reset() {
   settings = Settings(); state = State(); OTcurrentSystemState = OTSys();
-  g_flame = false; g_flow = 33; g_ret = 30; g_due = true; g_hourLimit = false; g_csSent = 0; g_csLast = 0; g_hasOT = true;
+  g_flame = false; g_flow = 33; g_ret = 30; g_due = true; g_hourLimit = false; g_csSent = 0; g_csLast = 0; g_hasOT = true; g_cold = 28.2f;
   _pwm_waitingForFlame = false; _pwm_flameOffHoldSetpoint = 0; _pwm_flameOnMs = 0; _pwm_lastOffTimeMs = 1;
   _pwm_effectiveBoilerTemp = 0; _pwm_waitForFlameStartMs = 0; _sat_lastControlCS = 0; _sat_thermalSafeActive = false;
 }
@@ -185,6 +186,7 @@ int main(int argc, char** argv) {
   if (!strcmp(sc, "off")) {
     state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 100000UL;
   } else if (!strcmp(sc, "start")) {
+    if (argc > 4) { g_cold = (float)atof(argv[3]); g_ret = (float)atof(argv[4]); }   // cold start: cold setpoint, return temperature
     state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 600000UL;
   } else {                                  // hold, suppress, refresh
     setPrev(48.0f);
@@ -366,6 +368,15 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(float(r["cs"]), 48.0)       # return 30 + 18
         self.assertEqual(r["req"], "1")
 
+    def test_cold_start_hold_is_floored_at_the_cold_setpoint(self):
+        # TASK-1316 (Sergeant D 2026-10-23): return 5 + offset 18 = 23 < 28.2, so the hold is 28.2
+        # (underfloor: return 2 + 18 = 20 < 21, hold 21) and CH stays on during ignition
+        self.assertEqual(float(self.run_sc("start", 1, 28.2, 5.0)["cs"]), 28.2)
+        self.assertEqual(float(self.run_sc("start", 1, 21.0, 2.0)["cs"]), 21.0)
+
+    def test_hold_above_the_cold_setpoint_is_unchanged(self):
+        self.assertEqual(float(self.run_sc("start", 1, 28.2, 20.0)["cs"]), 38.0)   # 20 + 18
+
     def test_start_tick_protection_off_keeps_previous_cs(self):
         self.assertEqual(float(self.run_sc("start", 0)["cs"]), 28.0)
 
@@ -458,6 +469,20 @@ class SourceLevel(unittest.TestCase):
         src = SAT_INO.read_text(encoding="utf-8")
         loop = src[src.index("void satControlLoop"):]
         self.assertFalse("fFlameOffOffset" in loop, "satControlLoop still uses fFlameOffOffset")
+
+
+class ChEnableSource(unittest.TestCase):
+    def test_main_block_sends_ch_through_the_cold_setpoint_helper(self):
+        # TASK-1316: CH is decided by satChEnableDecide() on the pre-solar setpoint, not by `> SAT_MIN_SETPOINT`
+        src = SAT_INO.read_text(encoding="utf-8")
+        loop = src[src.index("void satControlLoop"):]
+        self.assertIn("satEnqueueIfChangedCH(satChEnableDecide(preSolarSetpoint, satGetColdSetpoint(), pwmDrivesSetpoint,", loop)
+        self.assertIn("pwmOn, coldCutoff))", loop)
+        # The PWM phase must be read before satCycleCheckAutoSwitch(): a switch to continuous
+        # runs satPwmReset(), which clears bPwmFlameRequested and would send CH=0 mid-burn.
+        self.assertLess(loop.index("pwmOn = state.sat.bPwmFlameRequested;"),
+                        loop.index("satCycleCheckAutoSwitch(pidOutput);"))
+        self.assertNotIn("finalSetpoint > SAT_MIN_SETPOINT", loop)
 
 
 if __name__ == "__main__":
