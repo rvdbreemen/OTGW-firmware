@@ -786,7 +786,7 @@ void satCycleOnFlameChange(bool flameOn)
     // TASK-891.4: mode-aware classification. Snapshot the PID requested setpoint at flame-off
     // (it drifts across a multi-minute cycle) and pick the SHORT threshold from the configured
     // PWM on-time. isPwm follows the active control mode (Python pwm_state.enabled).
-    float requestedSp = state.sat.fPidOutput;
+    float requestedSp = _sat_requestedSetpoint;   // includes the solar offset, as thermo-nova requested_setpoint (TASK-1323)
     bool  isPwm       = (state.sat.eControlMode == SAT_MODE_PWM);
     float onTimeSec   = (float)satPwmLastOnTimeMs() / 1000.0f;
     SATCycleClass cls = _cycleClassify(durationSec, tailP90, tailP50,

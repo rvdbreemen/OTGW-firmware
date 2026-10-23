@@ -150,6 +150,12 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
 {
   float deadband = settings.sat.fDeadband;
 
+  // Solar gain freeze (Task #23, TASK-1323): while solar gain is active and the freeze setting is on,
+  // the whole integral update is skipped, including the reset outside the deadband. thermo-nova:
+  // freeze_integral = solar_gain_snapshot.active and solar_gain.freeze_integral (climate.py:499-502),
+  // pid.py:167-168 skips _update_integral(), whose reset is pid.py:187-189 (7beaaf5).
+  if (state.sat.bSolarGainActive && settings.sat.bSolarFreezeIntegral) return;
+
   // Outside deadband: heating curve takes over, reset integral
   if (fabsf(error) > deadband) {
     _pid_integral = 0.0f;
@@ -158,9 +164,6 @@ static void _pidUpdateIntegral(float error, float curveValue, bool force)
 
   // Inside deadband: integral acts as compensator
   if (state.sat.fKi < 1e-9f) return;
-
-  // Solar gain freeze: skip integral accumulation to prevent windup (Task #23)
-  if (state.sat.bSolarGainActive) return;
 
   // Accumulate: Ki * error * PID_UPDATE_INTERVAL (fixed 60s per SAT Python)
   _pid_integral += state.sat.fKi * error * SAT_PID_UPDATE_INTERVAL;

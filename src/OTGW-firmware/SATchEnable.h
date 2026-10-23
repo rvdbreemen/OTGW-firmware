@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATchEnable.h
-**  Version  : v2.0.0-alpha.473
+**  Version  : v2.0.0-alpha.474
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -15,40 +15,38 @@
 
 #pragma once
 
-#include <math.h>
 #include <stdint.h>
 
-// CH enable bit for the control setpoint SAT sends: 1 at or above the per-system cold setpoint
-// (28.2 radiators, 21.0 underfloor), 0 below it. Sergeant D, 2026-10-23: CH off below the cold
-// setpoint instead of thermo-nova's COLD_SETPOINT 22 (custom_components/sat/const.py:34 at
-// 7beaaf5; heating_control.py:238 sends HeaterState.ON when control_setpoint > COLD_SETPOINT).
-// Both values are quantized to 0.1 C like the CS=%.1f command, so the decision follows the
-// setpoint the boiler actually receives.
-static inline uint8_t satChEnableFor(float setpoint, float coldSetpoint)
+// Cold cutoff: the requested setpoint (PID output after the solar offset) at or below the per-system
+// cold setpoint (28.2 radiators, 21.0 underfloor) means no heating. thermo-nova uses the same
+// semantics: the heater state is ON only when requested_setpoint > COLD_SETPOINT
+// (custom_components/sat/heating_control.py:72) and the PWM override returns when
+// requested_setpoint <= COLD_SETPOINT (heating_control.py:385) at 7beaaf5. The per-system cold value
+// instead of COLD_SETPOINT 22 is Sergeant D's decision of 2026-10-23.
+static inline bool satColdCutoff(float requestedSetpoint, float coldSetpoint)
 {
-  return (lroundf(setpoint * 10.0f) >= lroundf(coldSetpoint * 10.0f)) ? 1 : 0;
+  return requestedSetpoint <= coldSetpoint;
 }
 
-// CH enable bit for the main SAT control block (TASK-1316). Rule confirmed by Sergeant D, 2026-10-23:
-//  1. PWM ON phase -> CH=1 whatever CS is sent: the low flame-keeping CS never turns CH off.
-//  2. PWM OFF phase -> CS=10 and CH=0.
-//  3. Continuous mode, and any PWM tick whose CS the PWM step does not drive -> CH from the setpoint
-//     against the per-system cold setpoint (satChEnableFor).
-//  4. CH is decided on the setpoint BEFORE the solar offset is subtracted, and the cold cutoff
-//     (requested setpoint below the cold setpoint, CS=10) still forces CH=0.
-// Source: thermo-nova sends CH after every control step from control_setpoint > COLD_SETPOINT 22
-// (custom_components/sat/climate/heating_control.py:236-238, coordinator/serial/__init__.py:210-212,
-// const.py:34 at 7beaaf5); the cold setpoint per heating system, the PWM ON exception and the
-// pre-solar decision are Sergeant D's decisions of 2026-10-23.
-//   preSolarSetpoint  control setpoint before the solar adjustment
-//   pwmDrivesSetpoint the PWM step returned its ON/OFF setpoint (false when it returned prevCS:
-//                     overshoot protection off, DHW active, requested setpoint <= cold, no flow temp)
-//   pwmOn             PWM mode and bPwmFlameRequested
-//   coldCutoff        requested setpoint below the cold setpoint
-static inline uint8_t satChEnableDecide(float preSolarSetpoint, float coldSetpoint,
-                                        bool pwmDrivesSetpoint, bool pwmOn, bool coldCutoff)
+// CH enable bit of the main SAT control block (TASK-1323, simplified from TASK-1316). Sergeant D,
+// 2026-10-23: "If the requested setpoint is lower than the thresholds then we send CH=0 CS=10".
+//  1. Requested setpoint at or below the cold setpoint -> CS=10, CH=0 (the cold cutoff).
+//  2. PWM drives the CS and the PWM phase is OFF -> CS=10, CH=0.
+//  3. Everything else -> CH=1: PWM ON whatever low CS keeps the flame, continuous mode, and a PWM tick
+//     that keeps the previous CS (overshoot protection off, DHW, no flow temperature) while the
+//     requested setpoint is above the cold setpoint.
+// The CH bit no longer depends on the sent CS value, so a held CS such as 24 never turns CH off.
+// Source: thermo-nova heating_control.py:72 (ON only above the cold setpoint), :236-238 (CH after every
+// control step), coordinator/serial/__init__.py:210-214, at 7beaaf5.
+//   requestedSetpoint PID output after the multi-zone block and the solar offset, clamped
+//   pwmDrivesSetpoint the PWM step returned its ON/OFF setpoint (false when it returned prevCS or the
+//                     continuous setpoint: overshoot protection off, DHW active, requested at or
+//                     below cold, no flow temperature)
+//   pwmOn             PWM mode and bPwmFlameRequested, captured right after the PWM step
+static inline uint8_t satChEnableDecide(float requestedSetpoint, float coldSetpoint,
+                                        bool pwmDrivesSetpoint, bool pwmOn)
 {
-  if (coldCutoff) return 0;
-  if (pwmDrivesSetpoint) return pwmOn ? 1 : 0;
-  return satChEnableFor(preSolarSetpoint, coldSetpoint);
+  if (satColdCutoff(requestedSetpoint, coldSetpoint)) return 0;
+  if (pwmDrivesSetpoint && !pwmOn) return 0;
+  return 1;
 }

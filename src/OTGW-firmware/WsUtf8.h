@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : WsUtf8.h
-**  Version  : v2.0.0-alpha.473
+**  Version  : v2.0.0-alpha.474
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **

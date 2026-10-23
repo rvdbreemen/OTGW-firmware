@@ -692,7 +692,8 @@ static uint32_t _pwm_waitForFlameStartMs   = 0;    // Timestamp when flame wait 
 static float    _pwm_flameOffHoldSetpoint  = 0.0f;
 static uint32_t _pwm_lastOffTimeMs         = 1;    // Last PWM off-phase duration (ms); 0 = saturation (duty wants continuous ON). Read by the off_time==0 saturation guard.
 static uint32_t _pwm_lastOnTimeMs          = 0;    // Last PWM on-phase duration (ms) = Python pwm_state.on_time_seconds. Read by the cycle classifier's SHORT_CYCLING threshold (TASK-891.4 AC#3).
-static float    _sat_lastControlCS          = 0.0f;  // Control setpoint of the last control tick or refresh, before the solar adjustment (the "previous CS" PWM keeps without an override)
+static float    _sat_requestedSetpoint      = 0.0f;  // Requested setpoint of the last control tick: PID output after the multi-zone block and the solar offset, clamped (thermo-nova requested_setpoint, climate.py:370-394). state.sat.fPidOutput stays the raw PID output.
+static float    _sat_lastControlCS          = 0.0f;  // Control setpoint of the last control tick or refresh (the "previous CS" PWM keeps without an override)
 static bool     _sat_thermalSafeActive      = false; // The thermal safe fallback owns CS: the 3 s PWM refresh stays out
 // Python HEATER_STARTUP_TIMEFRAME: max wait for ignition before giving up
 static const uint32_t PWM_IGNITION_TIMEOUT_MS = 180000UL; // 180s ignition timeout
@@ -892,9 +893,9 @@ static void satPwmSchedule(float pidOutput)
 
 // PWM control setpoint, gated like thermo-nova _compute_pwm_control_setpoint (heating_control.py:385):
 // the CS override runs only with overshoot protection on, no DHW and a requested setpoint above the
-// cold setpoint. Otherwise there is no override and CS keeps its previous control setpoint (the value
-// before the solar-gain adjustment; the requested setpoint when there is no heating CS to keep, so CH
-// can still start).
+// cold setpoint. Otherwise there is no override and CS keeps its previous control setpoint (the
+// requested setpoint, which already includes the solar offset, when there is no heating CS to keep,
+// so CH can still start).
 // Override on: OFF phase -> 10 (CH off). ON phase (also duty range 5, status ON in thermo-nova):
 //  - flame off -> return + offset (the hold, kept for fModSupDelay after ignition),
 //  - flame on, no hold recorded and fModSupDelay not yet passed since the real flame-on time ->
@@ -947,17 +948,13 @@ static void satPwmSuppressionRefresh()
   if (OTcurrentSystemState.SlaveStatus & 0x05) return;          // fault flag / DHW active: the control tick skips these too
   if (!state.sat.bValvesOpen || (state.sat.bSummerActive && settings.sat.bSummerSimmer)) return;
   if (!satIsFlameOn() || !satPwmHoldElapsed()) return;
-  if (state.sat.fPidOutput <= satGetColdSetpoint()) return;
+  if (_sat_requestedSetpoint <= satGetColdSetpoint()) return;
   if (state.sat.fFinalSetpoint <= SAT_MIN_SETPOINT) return;       // last tick commanded heating off
 
   float cs = satPwmSuppressionSetpoint(satGetMaxSetpoint());
   float maxSetpoint = satEffectiveMaxSetpoint();
   if (cs > maxSetpoint) cs = maxSetpoint;
-  _sat_lastControlCS = cs;                                        // control setpoint before the solar adjustment
-  if (state.sat.bSolarGainActive && settings.sat.bSolarGainEnable) {   // same adjustment as the control tick
-    cs -= settings.sat.fSolarSetpointOffset;
-    if (cs < SAT_MIN_SETPOINT) cs = SAT_MIN_SETPOINT;
-  }
+  _sat_lastControlCS = cs;                                        // the "previous CS" the next tick keeps
   state.sat.fFinalSetpoint = cs;                                  // before the command check: SAT simulation reads it too
   if (!hasOTCommandInterface()) return;
   satEnqueueIfChangedCS(cs);
@@ -2213,6 +2210,7 @@ void satDisable()
   satSetControlMode(SAT_MODE_OFF);
   satPwmReset();                       // also when the mode was not PWM: a safety trip must leave no stale PWM state
   _sat_lastControlCS = 0.0f;
+  _sat_requestedSetpoint = 0.0f;
   _sat_thermalSafeActive = false;
   state.sat.bActive = false;
   state.sat.fFinalSetpoint = 0.0f;
@@ -3100,7 +3098,7 @@ void satPublishMQTT()
   publishIfChangedF(F("sat/max_setpoint"), satGetMaxSetpoint(),       s_max_setpoint, SAT_EPS_TEMP_COARSE, 1, true);
 
   {
-    float reqSp = state.sat.fPidOutput;
+    float reqSp = _sat_requestedSetpoint;   // includes the solar offset, as thermo-nova requested_setpoint
     float sysMax = satGetMaxSetpoint();
     if (reqSp < SAT_MIN_SETPOINT) reqSp = SAT_MIN_SETPOINT;
     if (reqSp > sysMax)           reqSp = sysMax;
@@ -4952,6 +4950,14 @@ static void satControlLoopRun()
     settings.sat.fDeadband = savedDeadband;
   }
 
+  // --- Solar gain compensation on the requested setpoint (thermo-nova climate.py:391-392) ---
+  // The offset lowers the requested setpoint BEFORE the PWM/continuous step, the cold cutoff and the CH
+  // rule, so every one of them sees the same value. The hold (heating_control.py:398) and the
+  // suppression flow offset (:441) have no solar term.
+  if (state.sat.bSolarGainActive && settings.sat.bSolarGainEnable) {
+    pidOutput -= settings.sat.fSolarSetpointOffset;
+  }
+
   // --- Clamp to valid range ---
   // Ceiling: MaxTSet, system/source cap, hard safety ceiling, global cap (satEffectiveMaxSetpoint).
   float maxSetpoint = satEffectiveMaxSetpoint();
@@ -4959,6 +4965,7 @@ static void satControlLoopRun()
 
   if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;
   if (pidOutput > maxSetpoint) pidOutput = maxSetpoint;
+  _sat_requestedSetpoint = pidOutput;   // thermo-nova requested_setpoint (climate.py:394), read by the 3 s refresh and the MQTT publish
 
   // AC#2: When PID output reaches the system maximum setpoint, use continuous mode
   // instead of PWM — matches Python behavior where requested_setpoint >= maximum_setpoint
@@ -4993,14 +5000,7 @@ static void satControlLoopRun()
   if (finalSetpoint < SAT_MIN_SETPOINT) finalSetpoint = SAT_MIN_SETPOINT;
   if (finalSetpoint > maxSetpoint) finalSetpoint = maxSetpoint;
 
-  const float preSolarSetpoint = finalSetpoint;   // CH is decided on this value (TASK-1316)
-  _sat_lastControlCS = finalSetpoint;   // the "previous CS" a PWM tick without override keeps, before the solar adjustment
-
-  // --- Solar gain compensation: reduce setpoint (Task #23) ---
-  if (state.sat.bSolarGainActive && settings.sat.bSolarGainEnable) {
-    finalSetpoint -= settings.sat.fSolarSetpointOffset;
-    if (finalSetpoint < SAT_MIN_SETPOINT) finalSetpoint = SAT_MIN_SETPOINT;
-  }
+  _sat_lastControlCS = finalSetpoint;   // the "previous CS" a PWM tick without override keeps
   state.sat.fFinalSetpoint = finalSetpoint;
 
   // --- Auto-switch between continuous and PWM modes (Tasks #42/#43) ---
@@ -5026,7 +5026,8 @@ static void satControlLoopRun()
 
   // --- COLD_SETPOINT cutoff (TASK-891.2, George): requested setpoint below the per-heating-system
   // cold setpoint => no heating needed; command the boiler OFF (CS=MINIMUM => CH=0, MM=100 restore).
-  const bool coldCutoff = (pidOutput < satGetColdSetpoint());
+  // At or below, like thermo-nova (heating_control.py:72, :385) and the satApplyPWM gate.
+  const bool coldCutoff = satColdCutoff(pidOutput, satGetColdSetpoint());
   if (coldCutoff) {
     finalSetpoint = SAT_MIN_SETPOINT;
     state.sat.iCurrentModulation = 100;
@@ -5038,10 +5039,9 @@ static void satControlLoopRun()
     // TASK-565: write-on-change. Main control block.
     satEnqueueIfChangedCS(finalSetpoint);
     satEnqueueIfChangedMM(state.sat.iCurrentModulation);
-    // CH rule of Sergeant D 2026-10-23 (see satChEnableDecide in SATchEnable.h): PWM ON keeps CH on,
-    // PWM OFF gives CH=0, otherwise CH off below the per-system cold setpoint, decided before the solar offset.
-    satEnqueueIfChangedCH(satChEnableDecide(preSolarSetpoint, satGetColdSetpoint(), pwmDrivesSetpoint,
-                                            pwmOn, coldCutoff));
+    // CH rule of Sergeant D 2026-10-23 (see satChEnableDecide in SATchEnable.h): CH=0 with CS=10 when the
+    // requested setpoint is at or below the cold setpoint or the PWM OFF phase drives the CS, else CH=1.
+    satEnqueueIfChangedCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn));
     // Immergas quirk: send TP=11:12=<setpoint> alongside MM=. Kept on
     // unconditional enqueue per TASK-565: rare quirk path, not steady loop.
     if (satGetManufacturerQuirks() & SAT_QUIRK_IMMERGAS_TP) {

@@ -14,8 +14,11 @@ OTGW_SAT_INO and OTGW_SATCYCLES_INO point at other copies, e.g. the output of
 no overshoot_protection gate, no satComputeMM(), no 3 s refresh and no PWM reset, so those
 cases fail.
 
-Not reachable from here: the satControlLoop() block that used to add the flame-off
-offset to every setpoint. It is covered by a source-level check plus the bench run.
+The "tick" scenario also cuts the real requested-setpoint -> PWM/continuous step -> final clamp
+segment out of satControlLoopRun() (TASK-1323: solar offset on the requested setpoint). The
+PID integral freeze (TASK-1323) is compiled from the real _pidUpdateIntegral() in SATpid.ino
+(OTGW_SATPID_INO for old-vs-fix). Not reachable from here: the rest of satControlLoopRun()
+(cold cutoff, CH queueing), covered by tests/test_sat_ch_enable.cpp plus source-level checks.
 
 Run: python tests/test_sat_pwm_override.py
 """
@@ -29,6 +32,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 SAT_INO = Path(os.environ.get("OTGW_SAT_INO", REPO / "src" / "OTGW-firmware" / "SATcontrol.ino"))
+PID_INO = Path(os.environ.get("OTGW_SATPID_INO", REPO / "src" / "OTGW-firmware" / "SATpid.ino"))
 CYCLES_INO = Path(os.environ.get("OTGW_SATCYCLES_INO", REPO / "src" / "OTGW-firmware" / "SATcycles.ino"))
 
 STUBS = r"""
@@ -46,7 +50,7 @@ STUBS = r"""
 #define SAT_QUIRK_IMMERGAS_TP 0x02
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { bool bPwmAutoSwitch=true; float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false;
+struct SatSettings { bool bForcePWM=false; bool bPwmAutoSwitch=true; float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false;
                      float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2; };
 struct Settings { SatSettings sat; };
 struct SatState { float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bPwmFlameRequested=false, bDhwActive=false,
@@ -88,6 +92,11 @@ static void reset() {
   _pwm_waitingForFlame = false; _pwm_flameOffHoldSetpoint = 0; _pwm_flameOnMs = 0; _pwm_lastOffTimeMs = 1;
   _pwm_effectiveBoilerTemp = 0; _pwm_waitForFlameStartMs = 0; _sat_lastControlCS = 0; _sat_thermalSafeActive = false;
 }
+#ifdef HAS_REQSP
+#define SETREQ(v) (_sat_requestedSetpoint = (v))
+#else
+#define SETREQ(v) (state.sat.fPidOutput = (v))
+#endif
 static void setPrev(float cs) { _sat_lastControlCS = cs; state.sat.fFinalSetpoint = cs; }
 int main(int argc, char** argv) {
   if (argc < 3) return 2;
@@ -102,7 +111,7 @@ int main(int argc, char** argv) {
   settings.sat.bOvershootProtection = atoi(argv[2]) != 0;
   _pwm_effectiveBoilerTemp = 47.2f;        // a BT learned in an earlier cycle (TASK-1273: no placeholder any more); keeps the legacy scenarios at duty 0.39
   const float pid = 35.0f;                 // duty (35-27.2)/20 = 0.39: range 3, on 351 s, off 549 s
-  state.sat.fPidOutput = pid;
+  state.sat.fPidOutput = pid; SETREQ(pid);
   setPrev(28.0f);                          // previous CS (what the old +18 path produced)
   if (!strcmp(sc, "uh")) {                 // uh protection pwmFlameRequested: 200 s of low flow, 1 s calls
     state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = atoi(argv[3]) != 0;
@@ -159,6 +168,13 @@ int main(int argc, char** argv) {
            _pwm_flameOffHoldSetpoint, (unsigned)_pwm_flameOnMs, state.sat.eControlMode, _pwm_effectiveBoilerTemp);
     return 0;
   }
+  if (!strcmp(sc, "tick")) {               // tick prot solar pid: first ON tick (ignition) through the real requested-setpoint segment
+    state.sat.bSolarGainActive = atoi(argv[3]) != 0; settings.sat.bSolarGainEnable = atoi(argv[3]) != 0;
+    state.sat.bPwmFlameRequested = false; g_flameOffStart = g_ms - 600000UL;
+    const float cs = tickRun((float)atof(argv[4]));
+    printf("cs=%.1f req=%d\n", cs, (int)state.sat.bPwmFlameRequested);
+    return 0;
+  }
   if (!strcmp(sc, "solar")) {              // three ticks, no override (protection off), solar offset subtracted after each
     setPrev(48.0f); state.sat.fFinalSetpoint = 46.0f;
     float cs = 0;
@@ -168,7 +184,7 @@ int main(int argc, char** argv) {
   }
   if (!strcmp(sc, "range5")) {             // duty >= 0.9: the tick and the 3 s refresh must send the same CS
     const float hi = 46.0f;
-    setPrev(48.0f); state.sat.fPidOutput = hi; g_flame = true; g_flameOnStart = g_ms - 60000UL; _pwm_flameOnMs = g_ms - 60000UL;
+    setPrev(48.0f); state.sat.fPidOutput = hi; SETREQ(hi); g_flame = true; g_flameOnStart = g_ms - 60000UL; _pwm_flameOnMs = g_ms - 60000UL;
     float tick = satApplyPWM(hi);
     state.sat.fFinalSetpoint = tick;
     satPwmSuppressionRefresh();
@@ -199,7 +215,8 @@ int main(int argc, char** argv) {
     if (argc > 3) {
       if (!strcmp(argv[3], "dhw")) state.sat.bDhwActive = true;
       if (!strcmp(argv[3], "cont")) state.sat.eControlMode = SAT_MODE_CONTINUOUS;
-      if (!strcmp(argv[3], "cold")) state.sat.fPidOutput = 20.0f;
+      if (!strcmp(argv[3], "cold")) { state.sat.fPidOutput = 20.0f; SETREQ(20.0f); }
+      if (!strcmp(argv[3], "solar")) { state.sat.bSolarGainActive = true; settings.sat.bSolarGainEnable = true; }
       if (!strcmp(argv[3], "closed")) state.sat.bValvesOpen = false;
       if (!strcmp(argv[3], "thermal")) _sat_thermalSafeActive = true;
       if (!strcmp(argv[3], "noot")) g_hasOT = false;
@@ -216,13 +233,23 @@ int main(int argc, char** argv) {
 """
 
 
+def extract_tick(src: str) -> str:
+    """The real segment of satControlLoopRun(): solar offset (fix only) + clamp + mode step + final clamp."""
+    loop = src[src.index("void satControlLoopRun"):] if "void satControlLoopRun" in src else src[src.index("void satControlLoop"):]
+    solar = loop.find("  // --- Solar gain compensation on the requested setpoint")
+    a = solar if solar >= 0 else loop.index("  // --- Clamp to valid range ---")
+    b = loop.index("  // --- Auto-switch between continuous and PWM modes")
+    return ("\nstatic float tickRun(float pidOutput) {\n" + loop[a:b] +
+            "\n  return state.sat.fFinalSetpoint;\n}\n")
+
+
 def extract(src: str) -> str:
     a = src.index("static float    _pwm_effectiveBoilerTemp")
     b = src.index("// Last PWM off-phase duration in ms")
     block = src[a:b]
     m = re.search(r"^static uint8_t satComputeMM\(.*?^\}\s*$", src, re.S | re.M)
     mm = m.group(0) if m else ""
-    return block + "\n" + mm
+    return block + "\n" + mm + "\n" + extract_tick(src)
 
 
 def _vcvars():
@@ -251,8 +278,24 @@ def extract_cycles() -> str:
     return "\n".join(consts) + "\n" + fn + f"\n#define CALL_AUTOSWITCH(sp) {call}\n"
 
 
+def compile_cpp(cpp: Path, exe: Path):
+    for cc in ("g++", "clang++"):
+        if shutil.which(cc):
+            subprocess.run([cc, "-std=c++17", "-o", str(exe), str(cpp)], check=True)
+            return exe
+    bat = _vcvars()
+    if bat:
+        cmd = f'call "{bat}" >nul && cl /nologo /std:c++17 /EHsc /Fe:"{exe}" /Fo:"{cpp.parent}\\\\" "{cpp}"'
+        r = subprocess.run(cmd, shell=True, cwd=cpp.parent, capture_output=True, text=True)
+        if r.returncode:
+            raise AssertionError("host compile failed:\n" + r.stdout[-3000:] + r.stderr[-1000:])
+        return exe
+    return None
+
+
 def build(workdir: Path):
     body = extract(SAT_INO.read_text(encoding="utf-8"))
+    pre = ""
     for name, stub in (
         ("satComputeMM", "static uint8_t satComputeMM(bool,bool,bool,uint8_t,uint8_t){ return 255; }"),
         ("satPwmSuppressionRefresh", "static void satPwmSuppressionRefresh(){ }"),
@@ -262,23 +305,45 @@ def build(workdir: Path):
         ("_sat_thermalSafeActive", "static bool _sat_thermalSafeActive = false;"),
     ):
         if name not in body:   # HEAD lacks these: keep the harness compiling so the cases fail, not the build
-            body += "\n" + stub + "\n"
+            pre += stub + "\n"
     cycles = "static uint32_t satPwmLastOffTimeMs() { return _pwm_lastOffTimeMs; }\n" + extract_cycles()
     cpp = workdir / "t.cpp"
-    cpp.write_text(STUBS + body + cycles + MAIN, encoding="utf-8")
-    exe = workdir / "t.exe"
-    for cc in ("g++", "clang++"):
-        if shutil.which(cc):
-            subprocess.run([cc, "-std=c++17", "-o", str(exe), str(cpp)], check=True)
-            return exe
-    bat = _vcvars()
-    if bat:
-        cmd = f'call "{bat}" >nul && cl /nologo /std:c++17 /EHsc /Fe:"{exe}" /Fo:"{workdir}\\\\" "{cpp}"'
-        r = subprocess.run(cmd, shell=True, cwd=workdir, capture_output=True, text=True)
-        if r.returncode:
-            raise AssertionError("host compile failed:\n" + r.stdout[-3000:] + r.stderr[-1000:])
-        return exe
-    return None
+    flag = "#define HAS_REQSP 1\n" if "_sat_requestedSetpoint" in body else ""
+    cpp.write_text(flag + STUBS + pre + body + cycles + MAIN, encoding="utf-8")
+    return compile_cpp(cpp, workdir / "t.exe")
+
+
+PID_HARNESS = r"""
+#include <cstdio>
+#include <cstdlib>
+#include <cmath>
+#define SAT_PID_UPDATE_INTERVAL 60.0f
+struct SatSettings { float fDeadband = 0.1f; bool bSolarFreezeIntegral = true; };
+struct Settings { SatSettings sat; };
+struct SatState { float fKi = 0.01f; bool bSolarGainActive = false; };
+struct State { SatState sat; };
+static Settings settings; static State state;
+static float _pid_integral = 0;
+"""
+PID_MAIN = r"""
+int main(int argc, char** argv) {   // active freezeSetting error integral
+  state.sat.bSolarGainActive = atoi(argv[1]) != 0; settings.sat.bSolarFreezeIntegral = atoi(argv[2]) != 0;
+  _pid_integral = (float)atof(argv[4]);
+  _pidUpdateIntegral((float)atof(argv[3]), 20.0f, true);
+  printf("integral=%.2f\n", _pid_integral);
+  return 0;
+}
+"""
+
+
+def build_pid(workdir: Path):
+    src = PID_INO.read_text(encoding="utf-8")
+    m = re.search(r"^static void _pidUpdateIntegral\(.*?^\}\s*$", src, re.S | re.M)
+    if not m:
+        raise AssertionError("_pidUpdateIntegral() not found in SATpid.ino")
+    cpp = workdir / "pid.cpp"
+    cpp.write_text(PID_HARNESS + m.group(0) + PID_MAIN, encoding="utf-8")
+    return compile_cpp(cpp, workdir / "pid.exe")
 
 
 class SatPwmOverride(unittest.TestCase):
@@ -294,6 +359,8 @@ class SatPwmOverride(unittest.TestCase):
     def setUp(self):
         if not self.exe:
             self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
+
+    has_reqsp = "_sat_requestedSetpoint" in SAT_INO.read_text(encoding="utf-8")
 
     def run_sc(self, *args):
         out = subprocess.run([str(self.exe), *map(str, args)], capture_output=True, text=True, check=True).stdout
@@ -417,6 +484,26 @@ class SatPwmOverride(unittest.TestCase):
         r = self.run_sc("range5", 1)
         self.assertEqual((float(r["tick"]), r["sent"], float(r["refresh"])), (32.0, "1", 32.0))   # flow 33 - 1
 
+    # --- TASK-1323: solar offset on the requested setpoint ------------------------------
+    def test_solar_ignition_tick_sends_the_hold_not_hold_minus_solar(self):
+        # PWM ON start tick (ignition): hold = return 30 + 18 = 48. Solar lowers the REQUESTED setpoint
+        # (45 -> 43) before the PWM step, never the hold (thermo-nova heating_control.py:398 has no solar term).
+        r = self.run_sc("tick", 1, 1, 45)
+        self.assertEqual((float(r["cs"]), r["req"]), (48.0, "1"))
+
+    def test_ignition_tick_without_solar_is_the_hold(self):
+        self.assertEqual(float(self.run_sc("tick", 1, 0, 45)["cs"]), 48.0)
+
+    def test_solar_offset_lowers_the_requested_setpoint_before_the_mode_step(self):
+        # protection off: PWM keeps the previous CS (28); the continuous marker shows what the step received
+        if not self.has_reqsp:
+            self.skipTest("HEAD has no requested-setpoint segment")
+        self.assertEqual(float(self.run_sc("tick", 0, 1, 35)["cs"]), 28.0)
+
+    def test_refresh_after_hold_has_no_solar_term(self):
+        r = self.run_sc("refresh", 1, "solar")
+        self.assertEqual((r["sent"], float(r["cs"]), float(r["final"])), ("1", 40.0, 40.0))   # flow 41 - 1, no - 2
+
     def test_no_solar_ratchet_without_override(self):
         self.assertEqual(float(self.run_sc("solar", 0)["cs"]), 48.0)
 
@@ -464,6 +551,69 @@ class SatPwmOverride(unittest.TestCase):
         self.assertEqual(self.mm(False, False, False, 100, 0x02), 80)
 
 
+class PidIntegralFreeze(unittest.TestCase):
+    """TASK-1323: the real _pidUpdateIntegral() from SATpid.ino (thermo-nova pid.py:167-168, :187-189)."""
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        cls.exe = build_pid(Path(cls.tmp.name))
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def setUp(self):
+        if not self.exe:
+            self.skipTest("no host C++ compiler (g++, clang++ or MSVC)")
+
+    def integral(self, active, setting, error, start):
+        out = subprocess.run([str(self.exe), str(int(active)), str(int(setting)), str(error), str(start)],
+                             capture_output=True, text=True, check=True).stdout
+        return float(out.split("=")[1])
+
+    def test_frozen_keeps_the_integral_outside_the_deadband(self):
+        self.assertEqual(self.integral(True, True, 1.0, 3.0), 3.0)      # HEAD: reset to 0
+
+    def test_frozen_keeps_the_integral_inside_the_deadband(self):
+        self.assertEqual(self.integral(True, True, 0.05, 3.0), 3.0)
+
+    def test_freeze_setting_off_still_accumulates_during_solar(self):
+        self.assertGreater(self.integral(True, False, 0.05, 3.0), 3.0)  # HEAD: frozen whatever the setting
+
+    def test_freeze_setting_off_still_resets_outside_the_deadband(self):
+        self.assertEqual(self.integral(True, False, 1.0, 3.0), 0.0)
+
+    def test_no_solar_resets_outside_and_accumulates_inside(self):
+        self.assertEqual(self.integral(False, True, 1.0, 3.0), 0.0)
+        self.assertGreater(self.integral(False, True, 0.05, 3.0), 3.0)
+
+
+class SolarSource(unittest.TestCase):
+    def test_solar_offset_is_applied_to_the_requested_setpoint_before_the_clamp(self):
+        src = SAT_INO.read_text(encoding="utf-8")
+        loop = src[src.index("static void satControlLoopRun() {") if "static void satControlLoopRun() {" in src else src.index("static void satControlLoopRun()\n"):]
+        solar = loop.index("pidOutput -= settings.sat.fSolarSetpointOffset;")
+        self.assertLess(solar, loop.index("if (pidOutput < SAT_MIN_SETPOINT) pidOutput = SAT_MIN_SETPOINT;"))
+        self.assertLess(solar, loop.index("finalSetpoint = satApplyPWM(pidOutput);"))
+        self.assertNotIn("finalSetpoint -= settings.sat.fSolarSetpointOffset", loop)
+
+    def test_refresh_has_no_solar_term_and_reads_the_requested_setpoint(self):
+        src = SAT_INO.read_text(encoding="utf-8")
+        refresh = src[src.index("static void satPwmSuppressionRefresh()"):src.index("void satPwmReset()")]
+        self.assertNotIn("fSolarSetpointOffset", refresh)
+        self.assertIn("_sat_requestedSetpoint <= satGetColdSetpoint()", refresh)
+
+    def test_cold_cutoff_is_at_or_below_like_the_pwm_gate(self):
+        src = SAT_INO.read_text(encoding="utf-8")
+        self.assertIn("coldCutoff = satColdCutoff(pidOutput, satGetColdSetpoint())", src)
+        self.assertIn("pidOutput <= satGetColdSetpoint()", src[src.index("static float satApplyPWM"):])
+        self.assertNotIn("(pidOutput < satGetColdSetpoint())", src)
+
+    def test_pid_freeze_follows_the_setting(self):
+        pid = PID_INO.read_text(encoding="utf-8")
+        self.assertIn("state.sat.bSolarGainActive && settings.sat.bSolarFreezeIntegral", pid)
+
+
 class SourceLevel(unittest.TestCase):
     def test_no_generic_flame_off_offset_in_control_loop(self):
         src = SAT_INO.read_text(encoding="utf-8")
@@ -472,12 +622,11 @@ class SourceLevel(unittest.TestCase):
 
 
 class ChEnableSource(unittest.TestCase):
-    def test_main_block_sends_ch_through_the_cold_setpoint_helper(self):
-        # TASK-1316: CH is decided by satChEnableDecide() on the pre-solar setpoint, not by `> SAT_MIN_SETPOINT`
+    def test_main_block_sends_ch_through_the_decide_helper(self):
+        # TASK-1323: CH = 0 on the cold cutoff or the PWM OFF phase driving the CS, else 1
         src = SAT_INO.read_text(encoding="utf-8")
         loop = src[src.index("void satControlLoop"):]
-        self.assertIn("satEnqueueIfChangedCH(satChEnableDecide(preSolarSetpoint, satGetColdSetpoint(), pwmDrivesSetpoint,", loop)
-        self.assertIn("pwmOn, coldCutoff))", loop)
+        self.assertIn("satEnqueueIfChangedCH(satChEnableDecide(pidOutput, satGetColdSetpoint(), pwmDrivesSetpoint, pwmOn))", loop)
         # The PWM phase must be read before satCycleCheckAutoSwitch(): a switch to continuous
         # runs satPwmReset(), which clears bPwmFlameRequested and would send CH=0 mid-burn.
         self.assertLess(loop.index("pwmOn = state.sat.bPwmFlameRequested;"),
