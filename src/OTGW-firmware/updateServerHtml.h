@@ -86,19 +86,24 @@ static const char UpdateServerIndex[] PROGMEM =
   <div id='oneBox'>
     <h2>Update to a new release</h2>
     <div id='oneIntro'>
-    <p>Choose the release zip (or its two <b>.bin</b> files) and press <b>Update</b>. This page installs the firmware, waits for the unit to restart, installs the matching web files and checks the result. It takes about 2 to 3 minutes. <b>Keep this tab open until it says Done.</b></p>
-    <ul>
-      <li><b>Kept:</b> your settings and your sensor names, the SAT learned values (energy totals, heating-curve data and markers, controller state), the learned OpenTherm profiles, the reboot log and the hot-water meter total. WiFi is kept too. A file that has grown past its size limit (2 to 3 KB) is left out.</li>
-      <li><b>Starts fresh:</b> files you uploaded in the File Explorer, the boot detection log and the MQTT topic cleanup state.</li>
-    </ul>
-    <p class='note'>While the updater runs (about 1 to 2 minutes) the unit does not control heating. On an OTGW32 the link between thermostat and boiler is interrupted and the boiler runs on its own settings. On a board with the PIC gateway the PIC keeps passing OpenTherm traffic.<br>If an admin password is set, your browser asks for it again when the updater starts. The updater always uses WiFi with an address from DHCP: a unit on Ethernet or with a fixed IP address can show up at another address.</p>
+    <p>Choose the release zip and press <b>Update</b>. The update takes 2 to 3 minutes. <b>Keep this tab open until it says Done.</b></p>
+    <p class='note'>The unit does not control heating while the updater runs (1 to 2 minutes); on an OTGW32 the boiler then runs on its own settings.</p>
     <div id='unitInfo' class='note'>Reading the unit...</div>
+    <details id='oneDetails'>
+      <summary>Details: what is kept, what to expect</summary>
+      <ul>
+        <li><b>Kept:</b> your settings and your sensor names, the SAT learned values (energy totals, heating-curve data and markers, controller state), the learned OpenTherm profiles, the reboot log and the hot-water meter total. WiFi is kept too. A file that has grown past its size limit (2 to 3 KB) is left out.</li>
+        <li><b>Starts fresh:</b> files you uploaded in the File Explorer, the boot detection log and the MQTT topic cleanup state.</li>
+        <li>A board with the PIC gateway keeps passing OpenTherm traffic during the update.</li>
+        <li>With an admin password set, the browser asks for it again. The updater uses WiFi with an address from DHCP, so a unit on Ethernet or with a fixed IP address can show up at another address.</li>
+      </ul>
+    </details>
     </div>
     <div id='oneWarn'></div>
     <div id='oneIntake'>
       <div id='dropZone'>
         <input type='file' id='oneFiles' multiple accept='.zip,.bin'>
-        <div>Release zip, or the <b>.ino.bin</b> and the <b>.littlefs.bin</b> file. You can drop the files here.</div>
+        <div>Release zip (or the <b>.ino.bin</b> and <b>.littlefs.bin</b>). You can drop files here.</div>
       </div>
       <div id='oneFilesInfo'></div>
       <input id='oneStart' type='button' value='Update' disabled>
