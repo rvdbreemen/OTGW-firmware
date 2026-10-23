@@ -2339,12 +2339,21 @@
       if (!j) return;
       // settings come as { key: {value, type, ...}, ... } possibly nested under a root
       var src = j.settings || j;
+      var keepDirty = setDirty;   // TASK-1318: unsaved edits survive a refetch (BLE Assign / roster links)
       setData = {}; setDirty = {};
       Object.keys(src).forEach(function (k) {
         var v = src[k];
         if (v && typeof v === 'object' && 'value' in v) setData[k] = v;
       });
+      // Re-apply the unsaved edits; drop one only when the device now already holds that value
+      // (it was saved meanwhile) or the key no longer exists. A save or Discard clears setDirty itself.
+      Object.keys(keepDirty).forEach(function (k) {
+        if (!setData[k]) return;
+        if (!isPwd(k) && ('' + setData[k].value) === keepDirty[k]) return;
+        setDirty[k] = keepDirty[k];
+      });
       renderSettings();
+      updateSaveBar();
       fetchBle();
       populateAreaSensorChoices();  // TASK-1153: turn the four area fields into pickers
       maybeShowOnboarding();   // TASK-997: first-time wizard, once settings (ui_onboarded) are known
@@ -5342,7 +5351,8 @@
       else if (a === 'toggle-mqtt') { syncInputs(); st.mqtt = !st.mqtt; st.test = 'idle'; render(); }
       else if (a === 'test') { testConn(); }
       else if (a === 'finish') { syncInputs(); commit(function () { st.screen = 'done'; render(); }); }
-      else if (a === 'go') { close(); fetchSettings(); showPage('home'); }
+      // TASK-1318: the keys this wizard just saved win over older unsaved edits of them.
+      else if (a === 'go') { ['satsource', 'mqttenable', 'mqttbroker', 'mqttbrokerport', 'mqttuser', 'mqtttoptopic', 'mqttpasswd', 'ui_onboarded'].forEach(function (k) { delete setDirty[k]; }); close(); fetchSettings(); showPage('home'); }
     });
     render();
   }
@@ -5598,7 +5608,8 @@
         commit(function (ok) { st.finishing = false; if (ok) { st.screen = 'done'; } else { st.finishErr = true; } render(); });
       }
       else if (a === 'restart') { st.screen = 'welcome'; st.system = 'radiators'; st.mfr = '0'; st.tuning = 'auto'; st.slope = SAT_SYS.radiators.slope; st.gains = '1.0'; render(); }
-      else if (a === 'go') { close(); fetchSettings(); showPage('sat'); }
+      // TASK-1318: the keys this wizard just saved win over older unsaved edits of them.
+      else if (a === 'go') { ['satsystem', 'satmanufacturer', 'satcoefficient', 'satsource', 'satautogains', 'satenabled', 'sat_onboarded'].forEach(function (k) { delete setDirty[k]; }); close(); fetchSettings(); showPage('sat'); }
     });
     render();
   }
