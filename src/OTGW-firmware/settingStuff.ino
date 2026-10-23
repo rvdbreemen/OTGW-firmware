@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.481
+**  Version  : v2.0.0-alpha.482
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -221,10 +221,12 @@ static void writeJsonIntKV(File& file, const __FlashStringHelper* key, int value
                 value);
 }
 
-static void writeJsonFloatKV(File& file, const __FlashStringHelper* key, float value)
+// decimals: 2 for every ordinary setting; coordinates need 5 (~1 m) and the
+// learned thermal coefficient / auto-tune rate need 4 (TASK-1336).
+static void writeJsonFloatKV(File& file, const __FlashStringHelper* key, float value, uint8_t decimals = 2)
 {
-  char valBuf[16];
-  dtostrf(value, 1, 2, valBuf);
+  char valBuf[20];
+  dtostrf(value, 1, decimals, valBuf);
   file.printf_P(PSTR("%s  \"%S\": %s"),
                 settingsJsonSeparator(),
                 reinterpret_cast<PGM_P>(key),
@@ -348,8 +350,8 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATmaxpressdrop"), settings.sat.fMaxPressureDrop);
   writeJsonIntKV(file, F("SATmanufacturer"), settings.sat.iManufacturer);
   writeJsonBoolKV(file, F("SATweatherenable"), settings.sat.bWeatherEnable);
-  writeJsonFloatKV(file, F("SATweatherlat"), settings.sat.fWeatherLat);
-  writeJsonFloatKV(file, F("SATweatherlon"), settings.sat.fWeatherLon);
+  writeJsonFloatKV(file, F("SATweatherlat"), settings.sat.fWeatherLat, 5);
+  writeJsonFloatKV(file, F("SATweatherlon"), settings.sat.fWeatherLon, 5);
   writeJsonIntKV(file, F("SATweatherinterval"), settings.sat.iWeatherInterval);
   writeJsonFloatKV(file, F("SATboilercapacity"), settings.sat.fBoilerCapacity);
   writeJsonFloatKV(file, F("SATdhwcapacity"), settings.sat.fDhwCapacity);
@@ -360,7 +362,7 @@ void writeSettings(bool show)
   writeJsonBoolKV(file, F("SATsimulation"), settings.sat.bSimulation);
   writeJsonFloatKV(file, F("SATsimheatrate"), settings.sat.fSimHeatRate);
   writeJsonFloatKV(file, F("SATsimcoolrate"), settings.sat.fSimCoolRate);
-  writeJsonFloatKV(file, F("SATthermalcoeff"), settings.sat.fThermalCoeff);
+  writeJsonFloatKV(file, F("SATthermalcoeff"), settings.sat.fThermalCoeff, 4);
   writeJsonBoolKV(file, F("SATsolargain"), settings.sat.bSolarGainEnable);
   writeJsonFloatKV(file, F("SATsolarminrise"), settings.sat.fSolarMinRiseRate);
   writeJsonFloatKV(file, F("SATsolaroffset"), settings.sat.fSolarSetpointOffset);
@@ -378,7 +380,7 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATareaweight2"), settings.sat.fAreaWeight[2]);
   writeJsonFloatKV(file, F("SATareaweight3"), settings.sat.fAreaWeight[3]);
   writeJsonBoolKV(file, F("SATautotune"), settings.sat.bAutoTune);
-  writeJsonFloatKV(file, F("SATautotunerate"), settings.sat.fAutoTuneRate);
+  writeJsonFloatKV(file, F("SATautotunerate"), settings.sat.fAutoTuneRate, 4);
   // SAT Python parity settings (Task #82)
   writeJsonIntKV(file, F("SATsensormaxage"), settings.sat.iSensorMaxAgeS);
   writeJsonBoolKV(file, F("SATerrormon"), settings.sat.bErrorMonitoring);
