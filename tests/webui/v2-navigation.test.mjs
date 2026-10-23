@@ -1,15 +1,18 @@
-// TASK-1312 browser check of the v2 navigation concept (docs/design/v2-navigation-concept.md).
+// TASK-1312 / TASK-1326 browser check of the v2 navigation concept (docs/design/v2-navigation-concept.md).
 //
 // Drives the REAL shipped v2.html/v2.js in headless system Chrome over CDP against a
 // fake device (same harness as v2-settings-sat-followups.test.mjs) and checks:
-//   a  Settings has no rail: one details.grp per non-empty category in SET_CATS order, all closed
-//   b  clicking a summary opens its group; the open set survives a re-render (search typed,
-//      then cleared) and a page reload (localStorage otgw-v2-setopen)
-//   c  searching shows only matching groups, all open; clearing restores the stored open set
-//   d  the "View" link of the BLE discovery card opens the Sensors group without storing it
+//   a  Settings keeps its rail (TASK-1326, maintainer decision 2026-10-23): one .rail-item per
+//      non-empty category in SET_CATS order, the first one active, no collapsible groups
+//   b  clicking a rail item shows that category's card panels only
+//   c  search filters the categories in the rail and shows every matching one
+//   d  the "View" link of the BLE discovery card selects Sensors and shows the roster, also
+//      with a slow settings GET (800 ms) in a small viewport (roster card in view)
 //   e  Monitor remembers the tab the user clicked (otgw-v2-montab) across a reload; a tab opened
 //      from code (the connection-health button) is shown but not stored
 //   f  the Advanced raw-debug dump is a details.grp without inline styling
+//   g  edits in two categories share one save bar; a refused IP save selects the category of
+//      the refused row and scrolls to it
 //
 // Run: node --test tests/webui/v2-navigation.test.mjs
 import http from 'node:http';
@@ -111,73 +114,56 @@ async function load(page) {
   await until(`document.readyState === 'complete' && !!document.querySelector('.seg[data-page="settings"]')`);
   if (page) await evalJs(`document.querySelector('.seg[data-page="${page}"]').click()`);
 }
-const groups = () => evalJs(`Array.prototype.map.call(document.querySelectorAll('#setCols details.grp'), function (d) { return d.dataset.grp + (d.open ? '+' : '-'); }).join(',')`);
+const railItems = () => evalJs(`Array.prototype.map.call(document.querySelectorAll('#setRail .rail-item'), function (r) { return r.dataset.cat + (r.classList.contains('active') ? '*' : ''); }).join(',')`);
+const rowKeys = () => evalJs(`Array.prototype.map.call(document.querySelectorAll('#setCols .srow'), function (r) { return r.dataset.key; }).sort().join(',')`);
 const stored = (k) => evalJs(`localStorage.getItem('${k}')`);
-const storedSet = async () => JSON.parse((await stored('otgw-v2-setopen')) || '[]').sort().join();
 const setSearch = (v) => evalJs(`(function(){ var i = document.getElementById('setSearch'); i.value = ${JSON.stringify(v)}; i.dispatchEvent(new Event('input')); })()`);
 const click = (sel) => evalJs(`document.querySelector(${JSON.stringify(sel)}).click()`);
-const settle = async () => { await until(`document.querySelectorAll('#setCols details.grp').length >= 5`); await sleep(400); };
+const settle = async () => { await until(`document.querySelectorAll('#setRail .rail-item').length >= 5`); await sleep(400); };
 
 await load();
 await evalJs(`localStorage.clear()`);
 await load('settings');
 await settle();
 
-// ---- a: no rail, one closed group per non-empty category, SET_CATS order ----
+// ---- a: the rail, one item per non-empty category in SET_CATS order, first category shown ----
 const ORDER = ['system', 'network', 'mqtt', 'ntp', 'otgw', 'otd', 'sensors', 'outputs', 's0', 'webhook', 'behavior', 'sat'];
-const g0 = (await groups()).split(',');
-const ids0 = g0.map((x) => x.slice(0, -1));
-check(await evalJs(`!document.getElementById('setRail') && !document.querySelector('.rail-item,.set-rail')`), 'no #setRail / .rail-item in the Settings page');
-check(['system', 'network', 'mqtt', 'ntp', 'sensors', 'webhook', 'sat'].every((c) => ids0.includes(c)) && ids0.length === 7, `one group per non-empty category (${ids0.join(',')})`);
-check(JSON.stringify(ids0) === JSON.stringify(ORDER.filter((c) => ids0.includes(c))), 'groups follow the SET_CATS order');
-check(g0.every((x) => x.endsWith('-')), `all groups are closed by default (${g0.join(',')})`);
-check(await evalJs(`Array.prototype.every.call(document.querySelectorAll('#setCols details.grp > summary'), function (s) { return !!s.querySelector('.cnt') || s.parentNode.dataset.grp === 'sat'; })`), 'each summary carries a count (the SAT pointer group has none)');
+const r0 = (await railItems()).split(',');
+const ids0 = r0.map((x) => x.replace('*', ''));
+check(await evalJs(`!!document.querySelector('.set-layout > nav#setRail.set-rail')`), 'Settings has the #setRail nav inside .set-layout');
+check(['system', 'network', 'mqtt', 'ntp', 'sensors', 'webhook', 'sat'].every((c) => ids0.includes(c)) && ids0.length === 7, `one rail item per non-empty category (${ids0.join(',')})`);
+check(JSON.stringify(ids0) === JSON.stringify(ORDER.filter((c) => ids0.includes(c))), 'rail items follow the SET_CATS order');
+check(r0[0] === 'system*' && r0.filter((x) => x.endsWith('*')).length === 1, `the first category is active (${r0.join(',')})`);
+check(await evalJs(`!document.querySelector('#setCols details')`), 'the content has no collapsible groups');
+check(await evalJs(`Array.prototype.every.call(document.querySelectorAll('#setRail .rail-item'), function (r) { return !!r.querySelector('.cnt'); })`), 'each rail item carries a count');
+check((await rowKeys()) === 'boardmode' && (await evalJs(`document.querySelectorAll('#setCols .set-cat-title').length`)) === 1, `only the first category's cards are shown (${await rowKeys()})`);
 
-// ---- b: click opens; survives re-render and reload ----
-await click('#setCols details.grp[data-grp="network"] > summary');
-await click('#setCols details.grp[data-grp="mqtt"] > summary');
-let g = await groups();
-check(g.includes('network+') && g.includes('mqtt+'), `clicking a summary opens its group (${g})`);
-check((await storedSet()) === 'mqtt,network', `open set stored (${await stored('otgw-v2-setopen')})`);
-await setSearch('zzz'); await sleep(100); await setSearch(''); await sleep(100);
-g = await groups();
-check(g.includes('network+') && g.includes('mqtt+') && g.includes('ntp-'), `open state survives a re-render (${g})`);
-await click('#setCols details.grp[data-grp="mqtt"] > summary');   // close again
-check((await storedSet()) === 'network', `closing removes it from the stored set (${await stored('otgw-v2-setopen')})`);
-await click('#setCols details.grp[data-grp="mqtt"] > summary');   // reopen
-await load('settings'); await settle();
-g = await groups();
-check(g.includes('network+') && g.includes('mqtt+') && g.includes('system-'), `open state survives a reload (${g})`);
-await evalJs(`localStorage.setItem('otgw-v2-setopen', '{garbage')`);
-await load('settings'); await settle();
-check((await groups()).split(',').every((x) => x.endsWith('-')) && exceptions.length === 0, 'a garbage stored value is tolerated (all closed, no exception)');
-await evalJs(`localStorage.setItem('otgw-v2-setopen', JSON.stringify(['network','mqtt']))`);
-await load('settings'); await settle();
+// ---- b: clicking a rail item shows that category only ----
+await click('#setRail .rail-item[data-cat="mqtt"]');
+check((await rowKeys()) === 'mqttbroker,mqttport' && (await railItems()).includes('mqtt*') && (await evalJs(`document.querySelectorAll('#setCols .set-cat-title').length`)) === 1, `clicking MQTT shows the MQTT cards only (${await rowKeys()}, ${await railItems()})`);
+await click('#setRail .rail-item[data-cat="network"]');
+check((await rowKeys()) === 'ethstaticip,wifistaticip,wifisubnet' && (await railItems()).includes('network*') && !(await railItems()).includes('mqtt*'), `clicking Network switches to the Network cards (${await rowKeys()})`);
+await setSearch('zzz'); await sleep(100);
+check((await railItems()) === '' && (await rowKeys()) === '', 'a search without a match empties the rail and the cards');
+await setSearch(''); await sleep(100);
+check((await railItems()).includes('network*') && (await rowKeys()).includes('wifistaticip'), `clearing the search returns to the selected category (${await railItems()})`);
 
-// ---- c: search shows only matching groups, open; clearing restores ----
-const before = await groups();
+// ---- c: search filters the categories ----
 await setSearch('mqttbroker'); await sleep(150);
-check((await groups()) === 'mqtt+', `search for a key shows only its group, open (${await groups()})`);
-check((await storedSet()) === 'mqtt,network', 'searching does not touch the stored open set');
-await setSearch('webhook'); await sleep(150);
-check((await groups()) === 'webhook+', `a second search shows only the webhook group (${await groups()})`);
+check((await railItems()) === 'mqtt' && (await rowKeys()) === 'mqttbroker', `search for a key leaves its category in the rail and its row (${await railItems()}, ${await rowKeys()})`);
+await setSearch('enable'); await sleep(150);
+check((await railItems()) === 'sensors,webhook' && (await evalJs(`document.querySelectorAll('#setCols .set-cat-title').length`)) === 2, `a term matching two categories shows both (${await railItems()})`);
 await setSearch(''); await sleep(150);
-check((await groups()) === before, `clearing the search restores the previous open set (${before} vs ${await groups()})`);
 
-// ---- d: the BLE discovery "View" link opens Sensors transiently ----
+// ---- d: the BLE discovery "View" link selects Sensors and scrolls to the roster ----
+await click('#setRail .rail-item[data-cat="ntp"]');
 const view = await until(`(function(){ var b = document.querySelector('[data-ble-group] button'); return b ? b.textContent : null; })()`, 25000);
 check(!!view, `the grouped BLE discovery card appears (button "${view}")`);
 await evalJs(`(function(){ var bs = document.querySelectorAll('[data-ble-group] button'); for (var i = 0; i < bs.length; i++) if (/view/i.test(bs[i].textContent)) { bs[i].click(); return; } bs[0].click(); })()`);
-await until(`(document.querySelector('#setCols details.grp[data-grp="sensors"]') || {}).open === true`);
-g = await groups();
-check(g.includes('sensors+') && g.includes('network+') && g.includes('system-'), `the link opens Sensors next to the stored groups (${g})`);
-check(await evalJs(`document.getElementById('page-settings').classList.contains('active')`), 'the link switched to the Settings page');
-check((await storedSet()) === 'mqtt,network', `the link does not store the Sensors group (${await stored('otgw-v2-setopen')})`);
-await sleep(600);   // the 350 ms follow-up and any settings re-render must keep it open
-check((await groups()).includes('sensors+'), 'Sensors stays open across the re-render after the link');
-check(await evalJs(`!!document.querySelector('#setCols details.grp[data-grp="sensors"] #setcard-ble')`), 'the BLE roster card sits inside the Sensors group');
-await click('#setCols details.grp[data-grp="sensors"] > summary');   // the user closes it
-check(!(await groups()).includes('sensors+') && (await storedSet()) === 'mqtt,network', 'closing a link-opened group stores nothing');
+await until(`!!document.getElementById('setcard-ble')`);
+check((await railItems()).includes('sensors*') && await evalJs(`document.getElementById('page-settings').classList.contains('active')`), `the link switched to Settings with Sensors selected (${await railItems()})`);
+await sleep(600);   // the settings re-render after the link must keep the selection
+check((await railItems()).includes('sensors*') && await evalJs(`!!document.getElementById('setcard-ble')`), 'Sensors stays selected and the BLE roster card is shown');
 
 // ---- e: Monitor tab memory ----
 await evalJs(`localStorage.removeItem('otgw-v2-montab')`);
@@ -203,76 +189,43 @@ if (hb) {
   check(conn === 'mconn' && (await stored('otgw-v2-montab')) === 'mstats', `a tab opened from code (Connection) is shown but not stored (stored: ${await stored('otgw-v2-montab')})`);
 } else check(false, 'the connection-health button never appeared, programmatic showTab not exercised');
 
-// ---- g: search interplay, multi-match, script-set open ----
-const ALL_BUT_SENSORS = ['system', 'network', 'mqtt', 'ntp', 'webhook', 'sat'];
-const preset = async (arr) => { await evalJs(`localStorage.setItem('otgw-v2-setopen', ${JSON.stringify(JSON.stringify(arr))})`); await load('settings'); await settle(); };
-await preset(['mqtt']);
-await setSearch('ntpserver'); await sleep(150);
-await click('#setCols details.grp[data-grp="ntp"] > summary');   // click while searching: closes it visibly
-check((await groups()) === 'ntp-' && (await storedSet()) === 'mqtt', `a click during search toggles the group but stores nothing (${await groups()}, stored ${await stored('otgw-v2-setopen')})`);
-await setSearch(''); await sleep(150);
-check((await groups()) === 'system-,network-,mqtt+,ntp-,sensors-,webhook-,sat-', `clearing restores the pre-search set (mqtt only) (${await groups()})`);
-await setSearch('enable'); await sleep(150);
-check((await groups()) === 'sensors+,webhook+', `a term matching two groups opens both (${await groups()})`);
-await setSearch(''); await sleep(100);
-await evalJs(`document.querySelector('#setCols details.grp[data-grp="sensors"]').open = true`);   // set by script, not by the user
-await sleep(300);
-check((await storedSet()) === 'mqtt', `a script-set details.open is not stored (${await stored('otgw-v2-setopen')})`);
-await setSearch('zzz'); await sleep(100); await setSearch(''); await sleep(100);
-check((await groups()).includes('sensors-'), 'a script-opened group is closed again by the next render (setOpen is the truth)');
-
-// ---- rule 6: edits in two groups, one save bar, one save posts both ----
-await evalJs(`(function(){ var a = document.querySelector('.srow[data-key="ntpserver"] input'); a.value = 'ntp.example'; a.dispatchEvent(new Event('input'));
-  var b = document.querySelector('.srow[data-key="mqttbroker"] input'); b.value = 'mq.example'; b.dispatchEvent(new Event('input')); })()`);
-check(await evalJs(`document.getElementById('dirtyCount').textContent === '2' && document.getElementById('saveBar').classList.contains('show') && document.querySelectorAll('#page-settings .savebar').length === 1`), 'two edits in two groups show one save bar with count 2');
+// ---- rule 6: edits in two categories, one save bar, one save posts both ----
+await click('#setRail .rail-item[data-cat="ntp"]');
+await evalJs(`(function(){ var a = document.querySelector('.srow[data-key="ntpserver"] input'); a.value = 'ntp.example'; a.dispatchEvent(new Event('input')); })()`);
+await click('#setRail .rail-item[data-cat="mqtt"]');
+await evalJs(`(function(){ var b = document.querySelector('.srow[data-key="mqttbroker"] input'); b.value = 'mq.example'; b.dispatchEvent(new Event('input')); })()`);
+check(await evalJs(`document.getElementById('dirtyCount').textContent === '2' && document.getElementById('saveBar').classList.contains('show') && document.querySelectorAll('#page-settings .savebar').length === 1`), 'two edits in two categories show one save bar with count 2');
 const nReq = reqLog.length;
 await click('#btnSave');
 await sleep(800);
 const posts = reqLog.slice(nReq).filter((l) => l.startsWith('POST /api/v2/settings')).join('|');
-check(/"name":"ntpserver","value":"ntp.example"/.test(posts) && /"name":"mqttbroker","value":"mq.example"/.test(posts), `one save POSTs the keys of both groups (${posts})`);
+check(/"name":"ntpserver","value":"ntp.example"/.test(posts) && /"name":"mqttbroker","value":"mq.example"/.test(posts), `one save POSTs the keys of both categories (${posts})`);
 
-// ---- keyboard: Enter on a focused summary toggles and stores ----
-await preset(['mqtt']);
-await evalJs(`document.querySelector('#setCols details.grp[data-grp="ntp"] > summary').focus()`);
-for (const type of ['keyDown', 'keyUp']) {
-  await send('Input.dispatchKeyEvent', Object.assign({ type, key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }, type === 'keyDown' ? { text: '\r' } : {}));
-}
-await sleep(200);
-check((await groups()).includes('ntp+') && (await storedSet()) === 'mqtt,ntp', `Enter on a focused summary opens the group and stores it (${await groups()}, stored ${await stored('otgw-v2-setopen')})`);
-
-// ---- refused IP save: the group opens for this visit, scrolls into view, is not stored ----
-await preset(['mqtt']);
+// ---- refused IP save: the category of the refused row is selected and the row scrolled into view ----
+await load('settings'); await settle();
+await click('#setRail .rail-item[data-cat="network"]');
 await send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 500, deviceScaleFactor: 1, mobile: false });
-await evalJs(`(function(){ var i = document.querySelector('.srow[data-key="wifistaticip"] input'); i.value = '1.2.3'; i.dispatchEvent(new Event('input')); window.scrollTo(0, 0); })()`);
+await evalJs(`(function(){ var i = document.querySelector('.srow[data-key="wifistaticip"] input'); i.value = '1.2.3'; i.dispatchEvent(new Event('input')); })()`);
+await click('#setRail .rail-item[data-cat="mqtt"]');   // leave the network category: the refusal must bring it back
+await evalJs(`window.scrollTo(0, 0)`);
 await click('#btnSave');
 await sleep(500);
-check((await groups()).includes('network+') && (await storedSet()) === 'mqtt', `a refused IP save opens its group, not stored (${await groups()})`);
-check(await evalJs(`(function(){ var r = document.querySelector('#setCols details.grp[data-grp="network"]').getBoundingClientRect(); return r.top >= -1 && r.top < innerHeight; })()`), 'the refused IP group is scrolled into view');
+check((await railItems()).includes('network*') && (await rowKeys()).includes('wifistaticip'), `a refused IP save selects the network category (${await railItems()})`);
+check(await evalJs(`(function(){ var r = document.querySelector('.srow[data-key="wifistaticip"]').getBoundingClientRect(); return r.top >= -1 && r.bottom <= innerHeight + 1; })()`), 'the refused IP row is scrolled into view');
 await send('Emulation.clearDeviceMetricsOverride');
-await setSearch('zzz'); await sleep(100); await setSearch(''); await sleep(100);
-check((await groups()).includes('network+'), 'a refusal-opened group stays open for the visit (search + clear keeps it)');
-await evalJs(`document.querySelector('.seg[data-page="home"]').click()`);
-await evalJs(`document.querySelector('.seg[data-page="settings"]').click()`);
-await sleep(500);
-check((await groups()) === 'system-,network-,mqtt+,ntp-,sensors-,webhook-,sat-' && (await storedSet()) === 'mqtt', `leaving Settings ends the visit: back to the stored set (${await groups()})`);
 
-// ---- d2: the link with a slow settings GET, long page, small viewport ----
+// ---- d2: the link with a slow settings GET, small viewport ----
 settingsDelay = 800;
-await evalJs(`localStorage.removeItem('otgw-ble-seen'); localStorage.setItem('otgw-v2-setopen', ${JSON.stringify(JSON.stringify(ALL_BUT_SENSORS))})`);
+await evalJs(`localStorage.removeItem('otgw-ble-seen')`);
 await send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 500, deviceScaleFactor: 1, mobile: false });
 await load('home');
 const view2 = await until(`(function(){ var b = document.querySelector('[data-ble-group] button'); return b ? b.textContent : null; })()`, 25000);
 check(!!view2, 'the BLE discovery card appears again for the slow-device run');
 await evalJs(`(function(){ var bs = document.querySelectorAll('[data-ble-group] button'); for (var i = 0; i < bs.length; i++) if (/view/i.test(bs[i].textContent)) { bs[i].click(); return; } bs[0].click(); })()`);
-const inView = await until(`(function(){ var c = document.getElementById('setcard-ble'); if (!c) return null; var r = c.getBoundingClientRect(); return r.top >= -1 && r.top < innerHeight && window.scrollY > 0 ? 'y' + Math.round(window.scrollY) : null; })()`, 8000);
-check(!!inView && (await groups()).includes('sensors+'), `with a slow GET settings (800 ms) the link still ends with Sensors open and the roster card in view (${inView})`);
-check((await storedSet()) === ALL_BUT_SENSORS.slice().sort().join(), 'the link left the stored set unchanged');
+const inView = await until(`(function(){ var c = document.getElementById('setcard-ble'); if (!c) return null; var r = c.getBoundingClientRect(); return r.top >= -1 && r.top < innerHeight ? 'y' + Math.round(r.top) : null; })()`, 8000);
+check(!!inView && (await railItems()).includes('sensors*'), `with a slow GET settings (800 ms) the link still ends on Sensors with the roster card in view (${inView})`);
 settingsDelay = 0;
 await send('Emulation.clearDeviceMetricsOverride');
-await evalJs(`document.querySelector('.seg[data-page="home"]').click()`);
-await evalJs(`document.querySelector('.seg[data-page="settings"]').click()`);
-await until(`(document.querySelector('#setCols details.grp[data-grp="sensors"]') || {}).open === false`, 6000);
-check((await groups()).includes('sensors-') && (await storedSet()) === ALL_BUT_SENSORS.slice().sort().join(), `after Home and back Sensors is closed again, stored set unchanged (${await groups()})`);
 
 // ---- Monitor: a caller-chosen tab does not restore or fetch the stored tab ----
 await evalJs(`localStorage.setItem('otgw-v2-montab', 'mvalues')`);

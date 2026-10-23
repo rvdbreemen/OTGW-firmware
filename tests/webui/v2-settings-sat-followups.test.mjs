@@ -135,8 +135,7 @@ await evalJs(`document.querySelector('.seg[data-page="settings"]').click()`);
 // edits (setDirty = {}), so wait for both before editing.
 for (let i = 0; i < 50 && log.filter((l) => l.startsWith('GET /api/v2/settings')).length < 2; i++) await sleep(100);
 await sleep(300);
-// TASK-1312: Settings is one page of collapsible groups; open the group by clicking its summary.
-const rail = (cat) => until(`(function(){ var d = document.querySelector('#setCols details.grp[data-grp="${cat}"]'); if (!d) return false; if (!d.open) d.querySelector('summary').click(); return true; })()`);
+const rail = (cat) => until(`(function(){ var r = document.querySelector('.rail-item[data-cat="${cat}"]'); if (!r) return false; r.click(); return true; })()`);
 
 // ---- 1230b board-mode confirm ----
 await rail('system');

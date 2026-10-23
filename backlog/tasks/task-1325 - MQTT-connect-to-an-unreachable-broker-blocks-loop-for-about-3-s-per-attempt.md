@@ -4,6 +4,7 @@ title: MQTT connect to an unreachable broker blocks loop() for about 3 s per att
 status: To Do
 assignee: []
 created_date: '2026-10-23T16:23:00Z'
+updated_date: '2026-10-23T16:24:00Z'
 labels:
   - mqtt
   - performance
@@ -24,3 +25,9 @@ Found in TASK-1307 (bench .88.61, alpha.471, broker 192.168.88.32:1883 unreachab
 - [ ] #1 Reproduction: unreachable broker -> loop-stall lines ~3 s per attempt on the current build (red)
 - [ ] #2 Fix: with an unreachable broker the max loop gap stays below 500 ms over 5 min, MQTT still connects when the broker comes back (green, bench)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Also check while fixing: whether OT frames get lost during a 3 s stall (the serial task reads PIC bytes, but processOT runs on the loop task; is the hand-off queue deep enough for 3 s of frames?). Not checked in TASK-1307.
+<!-- SECTION:NOTES:END -->

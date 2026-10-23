@@ -102,10 +102,12 @@ Node test files, run one at a time with `node --test tests/webui/<name>.test.mjs
   - `sat-area-sensor-mapping`: ADR-178 guard. The area pickers offer both Dallas
     addresses and BLE MACs, each tagged by source, and a chosen MAC is saved intact
     via `POST /api/v2/settings` (TASK-1234).
-  - `v2-navigation`: the navigation concept (TASK-1312). Settings is one page of collapsible
-    `details.grp` groups with no rail; the open set survives re-render, search and reload;
-    search opens matching groups only; the BLE discovery link opens Sensors without storing it;
-    Monitor remembers the clicked tab but not one opened from code. Same harness and ports
+  - `v2-navigation`: the navigation concept (TASK-1312, Settings rail restored by TASK-1326).
+    Settings has a `#setRail` with one `.rail-item` per non-empty category in `SET_CATS` order;
+    a click shows that category's cards only; search filters the categories; the BLE discovery
+    link selects Sensors and shows the roster card, also with an 800 ms settings GET; a refused IP
+    save selects the network category and scrolls to the row; Monitor remembers the clicked tab
+    but not one opened from code. Same harness and ports
     as above (8148/9340). `v2-settings-sat-followups` runs on the same harness.
   - `sat-page-order`: TASK-1310. On the SAT Thermostat view the DOM order is dial < history <
     Hot water group, the group is closed by default and its open state is stored only on a summary

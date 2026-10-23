@@ -393,7 +393,19 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     .gtip .gtip-t{column-span:all}}
 
   /* ================= SETTINGS page ================= */
-  /* TASK-1312: the one collapsible-group component (native <details>), used by Settings and
+  /* TASK-1326: Settings is a rail of categories (desktop) with one category's card panels at a time. */
+  .set-layout{display:grid;grid-template-columns:215px 1fr;gap:16px;align-items:start}
+  .set-rail{position:sticky;top:12px;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;box-shadow:var(--shadow);padding:8px;display:flex;flex-direction:column;gap:2px}
+  .rail-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:9px;
+    cursor:pointer;font-size:.86rem;color:var(--text)}
+  .rail-item:hover{background:var(--panel-2)}
+  .rail-item.active{background:color-mix(in srgb,var(--accent) 14%,transparent);
+    color:var(--accent);font-weight:700}
+  .rail-item .cnt{margin-left:auto;font-size:.68rem;color:var(--muted);background:var(--panel-2);
+    border-radius:9px;padding:2px 7px}
+  .set-cat-title{font-size:1.08rem;font-weight:700;display:flex;align-items:center;gap:8px;margin:2px 2px 4px}
+  /* TASK-1312: the one collapsible-group component (native <details>), used by the SAT page and
      the Advanced raw-debug dump. The summary is a 44px row: name, count/badge, chevron. */
   .grp{background:var(--panel);border:1px solid var(--border);border-radius:14px;
     box-shadow:var(--shadow);margin:0 0 12px}
@@ -486,6 +498,10 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
     /* .set-cards is CSS multi-column (columns:300px); a grid-template-columns
        rule here is a no-op — removed (TASK-932). The 300px column already
        collapses to one column on a phone. */
+    .set-layout{grid-template-columns:1fr}
+    .set-rail{position:static;flex-direction:row;overflow-x:auto;gap:6px}
+    .rail-item{white-space:nowrap;padding:9px 13px}
+    .rail-item .cnt{display:none}
     /* iOS Safari auto-zooms the page when a focused input renders <16px.
        Pin form fields to 16px on narrow screens (TASK-932 mobile review). */
     .srow input[type=text],.srow input[type=number],.srow input[type=password],

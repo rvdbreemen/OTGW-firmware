@@ -14,7 +14,8 @@ used a tab row and the SAT settings were one flat page. "Less is more."
    (`otgw-v2-montab` for Monitor, `otgw-v2-advtab` for Advanced; every access wrapped in try/catch). Only a tab the user
    clicks is stored; a tab opened from code (for example the link to Monitor >
    Connection) is shown but not stored.
-3. **Groups.** Inside a page or tab, related fields and cards sit in collapsible
+3. **Groups.** (Settings is the exception: it keeps its rail of categories with card
+   panels, see the table below.) Inside a page or tab, related fields and cards sit in collapsible
    groups: a native `<details class="grp">` with a `<summary>` that carries the
    group name and, where useful, a count or badge. Native `<details>` gives
    keyboard and screen-reader support without extra JavaScript.
@@ -26,14 +27,14 @@ used a tab row and the SAT settings were one flat page. "Less is more."
    restores the groups the user had open before.
 6. **Save.** One save bar per page, as before. It saves every changed field,
    whatever group it is in.
-7. **Links into a page** open the target group and scroll it into view; they do
-   not switch a hidden "active category".
+7. **Links into a page** open the target group and scroll it into view. On
+   Settings (rail) the link selects the category and scrolls to the target card.
 
 ## Per-page migration list
 
 | Page | Before | After | Where |
 |---|---|---|---|
-| Settings | Vertical rail, one category visible at a time | One page of collapsible groups in `SET_CATS` order, all closed by default, count and REBOOT badge in the summary; the SAT pointer card stays | TASK-1312 |
+| Settings | Vertical rail, one category visible at a time | **Exception to rule 3, by maintainer decision 2026-10-23 (TASK-1326):** TASK-1312 turned it into collapsible groups; Robert (number3nl) asked for his original design back, which is optimized for desktop and mobile. Settings keeps the rail of categories (a horizontally scrolling row below 900 px) with the selected category's card panels, one category at a time, the search across all categories, and one save bar. Links into Settings (BLE Assign, the sensor roster) and a refused IP save select the category and scroll to the target, also when the settings GET is slow | TASK-1312, TASK-1326 |
 | Monitor | Tab row, tab not remembered | Tab row, tab remembered | TASK-1312 |
 | Advanced | Tab row, tab remembered; one inline-styled `<details>` (raw debug dump) | Unchanged tabs; the `<details>` uses the `.grp` style | TASK-1312 |
 | SAT | Three view buttons (Thermostat / Control / Technical); settings as flat lists; Hot water and Burner cycle mode cards in the Control level | The view buttons stay a cumulative level selector. Thermostat: dial and presets, status, temperature history, then a collapsed `grp` "Hot water" (open state in `otgw-v2-satopen`, stored on a summary click only). Burner cycle mode moves to the Control level and up. Groups for the SAT settings; graph overlap per TASK-1311 | TASK-1310, TASK-1311 |
