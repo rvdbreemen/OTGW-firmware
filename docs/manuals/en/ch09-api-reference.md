@@ -825,6 +825,12 @@ Returns a single flat JSON object summarising build identity, runtime state, set
 
 This is the primary diagnostic snapshot used when filing issues; the field set is intentionally broad and not part of the public contract — fields may be added in any release. Sensitive values (`http_passwd`, `mqtt.passwd`, `sat.weather_key`) are masked to `"***"` when set.
 
+#### Monitor graph history
+
+##### GET /api/v2/graph/history
+
+Returns the device-side history of the Monitor > Graph series (TASK-1296): oldest first, as JSON columns `flow`, `ret`, `chSet`, `roomSet`, `room`, `outside`, `mod`, `flame`, `dhw_on` and `ch`, plus `interval_s`, `newest_age_ms`, `count` and `scale`. A board without PSRAM keeps up to 120 slots of 30 s (1 hour); a board with PSRAM keeps up to 720 slots of 120 s (24 hours), and `interval_s` says which. Temperatures are integers, the value times `scale` (10); `null` means there is no sample for that slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000`. The web UI loads it when the Graph tab opens (again after 10 minutes) and merges it by time into the samples it collects itself, stamping each slot with its start. Dallas sensors are not recorded. The history is held in RAM (1.8 KB internal RAM without PSRAM, 10 KB PSRAM with PSRAM) and starts empty after a reboot. No authentication is needed. HTTP 503 with `Retry-After: 1` when the heap is low.
+
 #### Network
 
 ##### GET /api/v2/network/scan

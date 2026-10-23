@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-11 22:25
-updated_date: '2026-10-22T07:00:00Z'
+updated_date: '2026-10-22T21:30:00Z'
 labels:
   - esp32
   - pic
@@ -62,4 +62,6 @@ ADR-168 (Accepted) stays valid: the decision is unchanged, only the mechanism an
 2026-10-18: committed and shipped in esp32-combo alpha.436 (posted to #alpha-testing). evaluate.py --quick: 72 passed, 0 warn, 0 fail. AC2 bench evidence (no SE at boot on the Classic + S3 Mini, [combo] detect line on USB) still open.
 
 2026-10-22 cycle: skipped, AC2 needs the Classic + S3 Mini bench board, which is not connected (no COM8, .88.63 silent).
+
+2026-10-22 23:15 cycle: skipped, needs the Classic + S3 Mini bench board (not connected; only OTGW32 COM4 and the 1.x ESP8266 COM3).
 <!-- SECTION:NOTES:END -->

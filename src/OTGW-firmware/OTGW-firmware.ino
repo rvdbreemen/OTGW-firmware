@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.461
+**  Version  : v2.0.0-alpha.462
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -305,6 +305,7 @@ void setup() {
   // on bSetupComplete, so nothing parses OT before setup() finishes, but the
   // queue/mutex must exist so the very first drain in loop() has its handles.
   setupOTConcurrency();
+  graphHistoryInit();   // TASK-1296: Monitor graph history ring + mutex
 
   //setup the status LED
   setLed(LED1, ON);
@@ -758,6 +759,7 @@ void doTaskEvery1s(){
   handleCommandQueue(); //just check if there are commands to retry
   state.uptime.iSeconds++;
   sampleHeapWatermark();   // TASK-934: 1 Hz maxBlock min-watermark + histogram
+  graphHistoryTick();      // TASK-1296: Monitor graph history slot (30 s, or 120 s with PSRAM)
 
   // LED status indicators (evaluated every 1s):
   //   No WiFi          → LED2 blinks 1x/s, LED1 off

@@ -24,6 +24,7 @@
 #include <Preferences.h>
 #include <LittleFS.h>
 #include <esp_system.h>
+#include <esp_heap_caps.h>      // heap_caps_malloc (platformPsramAllocOnce)
 #include <esp_mac.h>
 #include <esp_netif.h>
 #include <esp_flash.h>
@@ -255,6 +256,14 @@ inline uint8_t platformHeapFragmentation() {
 // watermark needed.
 inline uint32_t platformMinFreeHeap() {
   return ESP.getMinFreeHeap();
+}
+
+// One block from PSRAM for a buffer that is allocated once at boot and never freed
+// (TASK-1296 graph history). Returns nullptr on a board without PSRAM or when the
+// allocation fails; internal DRAM is never used, so the caller must have a fallback.
+inline void* platformPsramAllocOnce(size_t bytes) {
+  if (!psramFound()) return nullptr;
+  return heap_caps_malloc(bytes, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
 }
 
 // No-op on ESP32: the heap allocator tracks min-free internally.

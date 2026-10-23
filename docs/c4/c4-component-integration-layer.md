@@ -111,6 +111,7 @@ Both sub-systems avoid whole-document allocations on a heap-constrained device: 
   - `GET /api/v2/discovery`, `POST /api/v2/discovery/verify|republish` - discovery status, verify window, full re-announce (60 s cooldown)
   - `POST /api/v2/mqtt/republish` - re-publish OT values (60 s cooldown)
   - `GET /api/v2/debug` - snapshot of debug flags and telemetry
+  - `GET /api/v2/graph/history` - Monitor graph history (1 h at 30 s in a static ring, or 24 h at 120 s in PSRAM; chunked JSON; TASK-1296)
   - `GET /api/v2/network/scan` - asynchronous WiFi scan for the Settings page
 - **Error format**: `{"error":{"status":N,"message":"..."}}`; rate-limit responses are `application/problem+json` with `retry_after`
 

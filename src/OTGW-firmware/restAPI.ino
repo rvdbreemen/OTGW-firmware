@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.461
+**  Version  : v2.0.0-alpha.462
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -316,6 +316,7 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
 static void handleDiscovery(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
+static void handleGraph(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);  // TASK-1296
 // TASK-585: WiFi network scan
 static void handleNetwork(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI);
 
@@ -2126,6 +2127,20 @@ static void handleMqtt(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod 
   sendApiNotFound(originalURI);
 }
 
+// TASK-1296: GET /api/v2/graph/history. Loaded once when the Monitor graph tab
+// opens, so it is not in kApiRateLimitRoutes.
+static void handleGraph(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod method, const char* originalURI)
+{
+  (void)originalURI;
+  if (wc > 4 && strcmp_P(words[4], PSTR("history")) == 0) {
+    if (method != HTTP_GET) { sendApiMethodNotAllowed(F("GET")); return; }
+    sendCorsOriginHeader();
+    sendGraphHistory();
+    return;
+  }
+  sendApiError(404, F("Unknown graph resource"));
+}
+
 static void debugFormatLocalIp(char* buf, size_t bufSize)
 {
   IPAddress ip = WiFi.localIP();
@@ -2549,6 +2564,7 @@ static const char kRouteOtdirect[]   PROGMEM = "otdirect";
 static const char kRouteSat[]        PROGMEM = "sat";
 static const char kRouteDiscovery[]  PROGMEM = "discovery";
 static const char kRouteDebugDump[]  PROGMEM = "debug";
+static const char kRouteGraph[]      PROGMEM = "graph";    // TASK-1296: Monitor graph history
 static const char kRouteNetwork[]    PROGMEM = "network";  // TASK-585
 static const char kRouteMqtt[]       PROGMEM = "mqtt";     // TASK-936: OT-value republish
 
@@ -2575,6 +2591,7 @@ static const ApiRoute kV2Routes[] PROGMEM = {
   { kRouteSat,        handleSAT },
   { kRouteDiscovery,  handleDiscovery },
   { kRouteDebugDump,  handleDebugDump },
+  { kRouteGraph,      handleGraph },    // TASK-1296: GET /api/v2/graph/history
   { kRouteNetwork,    handleNetwork },  // TASK-585: WiFi scan
   { kRouteMqtt,       handleMqtt },     // TASK-936: POST /api/v2/mqtt/republish
   { nullptr,          nullptr }  // sentinel

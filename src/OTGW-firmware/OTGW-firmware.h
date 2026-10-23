@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.461
+**  Version  : v2.0.0-alpha.462
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -967,6 +967,7 @@ void maybeWarnFlashMismatch();                     // one-shot flash-config sani
 #include "debugStuff.h"
 #include "networkStuff.h"
 #include "helperStuff.h"
+#include "graphHistoryStuff.h"   // TASK-1296: device-side Monitor graph history (ADR-081 stuff.h)
 
 
     // That's all folks...

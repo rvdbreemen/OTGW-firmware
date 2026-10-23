@@ -380,6 +380,7 @@ The firmware exposes a versioned HTTP REST API on port 80. All responses are JSO
 | `GET` | `/api/v2/device/crashlog` | Reboot / crash log |
 | `GET` | `/api/v2/flash/status` | Flash and filesystem metrics |
 | `GET` | `/api/v2/debug` | Debug flags and telemetry snapshot |
+| `GET` | `/api/v2/graph/history` | Monitor graph history: 1 h at 30 s, or 24 h at 120 s with PSRAM (TASK-1296) |
 | `GET` | `/api/v2/network/scan` | Asynchronous WiFi scan |
 
 **Settings**

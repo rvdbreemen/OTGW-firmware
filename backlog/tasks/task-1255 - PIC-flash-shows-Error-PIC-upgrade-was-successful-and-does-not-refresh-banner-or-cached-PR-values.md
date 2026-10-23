@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-19 17:32
-updated_date: '2026-10-22T02:36:00Z'
+updated_date: '2026-10-22T21:31:00Z'
 labels:
   - bug
   - webui
@@ -60,6 +60,8 @@ Finalize (2026-10-19): build.bat (esp32-combo) SUCCESS, firmware 2,020,944 B (88
 2026-10-20 maintainer decision: allowed to re-flash gateway.hex 6.8 (same version) on the Classic-S3 bench to prove AC2.
 
 2026-10-22 cycle check: Classic-S3 still not connected (no COM8, 192.168.88.63 no HTTP answer); stays blocked.
+
+2026-10-22 23:15 cycle: skipped, AC2 needs a real PIC flash (explicit maintainer order required).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary

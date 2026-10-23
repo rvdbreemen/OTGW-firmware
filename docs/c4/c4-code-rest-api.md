@@ -21,7 +21,7 @@ The REST API v2 uses a **central route dispatch table**:
 
 Adding an endpoint takes one handler and one `kV2Routes[]` row.
 
-Current `kV2Routes[]` segments: `health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (only `HAS_DIRECT_OT`), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`, `discovery`, `debug`, `network`, `mqtt`.
+Current `kV2Routes[]` segments: `health`, `settings`, `sensors`, `device`, `flash`, `pic`, `otdirect` (only `HAS_DIRECT_OT`), `firmware`, `filesystem`, `simulate`, `otgw`, `webhook`, `sat`, `discovery`, `debug`, `graph`, `network`, `mqtt`.
 
 ### Concurrency Gates and Backpressure (ADR-165, ADR-147, ADR-188)
 
@@ -138,6 +138,9 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 #### `handleDebugDump`
 - `GET /api/v2/debug`: every `state.debug.*` flag plus telemetry snapshot and local IP, sent through `restSendChunked()` from a frozen `DebugDumpSnap`.
 
+#### `handleGraph`
+- `GET /api/v2/graph/history` (TASK-1296): the Monitor graph history in columns: 120 slots of 30 s (static array, no PSRAM) or 720 slots of 120 s (one PSRAM block, 24 h). `sendGraphHistory()` (`graphHistoryStuff.ino`) freezes head, count and the newest-slot age once under a mutex (100 ms bound, else 503) into a `GraphHistSnapshot`, then streams through `restSendChunked()`; the closure reads only the snapshot and the ring (`graphHistoryStuff.h`). Not in `kApiRateLimitRoutes` (loaded once per page). Any other sub-resource: 404.
+
 #### `handleNetwork`
 - `GET /api/v2/network/scan`: asynchronous. The first call starts `WiFi.scanNetworks(true)` and returns `{"status":"scanning"}`; later calls return `{"status":"ready","count":N,"networks":[{ssid,rssi,channel,secured,connected}]}`. 503 during PIC flash.
 
@@ -228,6 +231,7 @@ Over budget gives `429` with `application/problem+json` (RFC 9457; `retry_after`
 | POST | `/api/v2/discovery/republish` | handleDiscovery | Yes | Re-announce all discovery configs (60 s cooldown) |
 | POST | `/api/v2/mqtt/republish` | handleMqtt | Yes | Re-publish OT values (60 s cooldown) |
 | GET | `/api/v2/debug` | handleDebugDump | No | Debug flags and telemetry |
+| GET | `/api/v2/graph/history` | handleGraph | No | Monitor graph history (1 h, or 24 h with PSRAM) |
 | GET | `/api/v2/network/scan` | handleNetwork | No | Async WiFi scan |
 | OPTIONS | `/api/v2/*` | sendApiOptions | N/A | CORS preflight (204) |
 

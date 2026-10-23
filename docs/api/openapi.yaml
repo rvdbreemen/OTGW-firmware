@@ -71,6 +71,8 @@ tags:
     description: Flat key/value diagnostic dump of build, runtime, settings and state
   - name: Network
     description: WiFi scan and network diagnostics
+  - name: Monitor
+    description: History for the Monitor > Graph tab of the web UI
   - name: SAT
     description: |
       SAT (Smart Autotune Thermostat) is an embedded heating controller that runs entirely
@@ -186,6 +188,103 @@ paths:
           description: Authentication required
         '405':
           $ref: '#/components/responses/MethodNotAllowedJson'
+
+  /v2/graph/history:
+    get:
+      tags:
+        - Monitor
+      summary: Monitor graph history (1 hour, or 24 hours with PSRAM)
+      description: |
+        Returns the device-side history of the Monitor > Graph series (TASK-1296):
+        oldest first, in columns. A board without PSRAM serves up to 120 slots of
+        30 s (1 hour); a board with PSRAM serves up to 720 slots of 120 s (24 hours).
+        The web UI loads it when the Graph tab opens and merges it into the live
+        samples it collects itself. Dallas sensors are not recorded.
+
+        Temperatures are integers, the value times `scale` (10), so `655` is 65.5 C.
+        `mod` is the relative modulation in percent (0..100). `flame`, `dhw_on` and
+        `ch` are 0/1; a slot is 1 when the state was active at any moment of its
+        slot. `null` means there is no sample for that slot: the boiler had not
+        reported the value, or the loop was stalled (for example during a PIC
+        flash). `newest_age_ms` is the age of the END of the newest slot. Slot `i`
+        of `count` starts at
+        `now - newest_age_ms - (count - i) * interval_s * 1000` and ends
+        `interval_s` later, where `now` is the moment the response was produced.
+        The web UI stamps a slot with its start, like its own 5-second records.
+
+        The history lives in RAM and starts empty after a reboot, so `count` grows
+        by one slot per `interval_s` until it reaches 120 (no PSRAM, about 1.8 KB
+        of internal RAM, body about 4 KB) or 720 (PSRAM, about 10 KB of PSRAM, body
+        about 25 KB). The body is sent in chunks. Returns 503 with `Retry-After`
+        when the heap is low.
+      operationId: getGraphHistory
+      responses:
+        '200':
+          description: History retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [interval_s, newest_age_ms, count, scale, flow, ret, chSet, roomSet, room, outside, mod, flame, dhw_on, ch]
+                properties:
+                  interval_s:
+                    type: integer
+                    description: Seconds between two slots (30 without PSRAM, 120 with PSRAM)
+                  newest_age_ms:
+                    type: integer
+                    description: Age in milliseconds of the END of the newest slot when the response was produced; 0 when there is no slot yet
+                  count:
+                    type: integer
+                    minimum: 0
+                    maximum: 720
+                    description: Number of slots, at most 120 (interval 30 s) or 720 (interval 120 s); every array below has this length
+                  scale:
+                    type: integer
+                    description: Divisor for the temperature columns (10)
+                  flow:
+                    type: array
+                    description: Boiler flow temperature (MsgID 25), value times scale
+                    items: {type: integer, nullable: true}
+                  ret:
+                    type: array
+                    description: Return temperature (MsgID 28), value times scale
+                    items: {type: integer, nullable: true}
+                  chSet:
+                    type: array
+                    description: Control setpoint (MsgID 1), value times scale
+                    items: {type: integer, nullable: true}
+                  roomSet:
+                    type: array
+                    description: Thermostat setpoint (MsgID 16), value times scale
+                    items: {type: integer, nullable: true}
+                  room:
+                    type: array
+                    description: Room temperature (MsgID 24), value times scale
+                    items: {type: integer, nullable: true}
+                  outside:
+                    type: array
+                    description: Outside temperature (weather API when valid, else MsgID 27), value times scale
+                    items: {type: integer, nullable: true}
+                  mod:
+                    type: array
+                    description: Relative modulation level (MsgID 17), percent
+                    items: {type: integer, nullable: true}
+                  flame:
+                    type: array
+                    description: Flame on at any moment of the slot
+                    items: {type: integer, enum: [0, 1]}
+                  dhw_on:
+                    type: array
+                    description: DHW mode active at any moment of the slot
+                    items: {type: integer, enum: [0, 1]}
+                  ch:
+                    type: array
+                    description: CH mode active at any moment of the slot
+                    items: {type: integer, enum: [0, 1]}
+        '405':
+          $ref: '#/components/responses/MethodNotAllowedJson'
+        '503':
+          description: Heap too low, or the history was busy; retry after one second
 
   /v2/network/scan:
     get:

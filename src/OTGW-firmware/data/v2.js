@@ -177,7 +177,7 @@
     else if (t === 'mvalues') { renderValues(); fetchOtmonitor(); if (!dallasLabelsLoaded) loadDallasLabels(); }   // TASK-1223.14/.15
     else if (t === 'mstats') { renderStats(); fetchStatsPanels(); }
     else if (t === 'msupport') { renderSupport(); fetchOtSupport(); }
-    else if (t === 'mgraph') renderGraph();
+    else if (t === 'mgraph') { renderGraph(); loadGraphHistory(); }   // TASK-1296
     else if (t === 'mconn') {
       fetchConn();
       // TASK-1241: otdirect/overrides 503s on a PIC board; skip it only on an explicit non-OT-Direct snapshot.
@@ -1259,7 +1259,13 @@
   // 24 h max = 17,280 records (a few MB), whatever the bus rate. Analog fields keep the
   // slot's last value; flame/DHW/CH are ORed so a short burner pulse survives. Dallas
   // temps come from the 25 s sensors poll (pollDallasDiscovery); no extra request.
-  var GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, gHist = [], gDallas = null, gLastRender = 0;
+  // TASK-1296: the live slots start at page load. When the Monitor > Graph tab opens,
+  // loadGraphHistory() merges the device's own history (30 s slots for 1 h without PSRAM, 2-minute slots for 24 h with PSRAM, GET
+  // /api/v2/graph/history) into them by slot time, so holes in the live range (laptop
+  // asleep, WebSocket down) are filled too. Like a live record, a history record is
+  // stamped at the START of its slot (the device reports the age of the slot END).
+  // The device does not record Dallas sensors, so those lines still start at page load.
+  var GSLOT = 5000, GHIST_MAX = 86400000 / GSLOT, GBREAK_MS = 150000, gHist = [], gDallas = null, gLastRender = 0;
   // [key, label, colour, kind]: t = temperature line (auto-scaled), m = modulation area, l = on/off lane
   var GSER = [['flow', 'boiler', '#f85149', 't'], ['ret', 'return', '#58a6ff', 't'], ['chSet', 'control setpoint', '#8b949e', 't'],
     ['roomSet', 'thermostat setpoint', '#d29922', 't'], ['room', 'room', '#3fb950', 't'], ['outside', 'outside', '#a371f7', 't'],
@@ -1279,6 +1285,75 @@
     r.d = gDallas;   // shared object, replaced (never mutated) on each sensors poll
     if (now - gLastRender > 2000 && isMonitorVisible('mgraph')) renderGraph();
   }
+  // TASK-1296: merge the device history `j` (GET /api/v2/graph/history) into the history
+  // `hist` by slot time. Pure: returns a new array, or `hist` itself when `j` is unusable.
+  // Device slot i of n covers [x, x + interval) with x = now - newest_age_ms - (n - i) * interval
+  // (newest_age_ms is the age of the newest slot END); x is snapped to GSLOT and used as the
+  // record's t, the same "start of the slot" stamp live records carry; `span` (the interval in
+  // ms) says the record stands for data up to t + span, which renderGraph uses for its gap test.
+  // A device slot is kept only when no live record falls inside its interval. A slot with no
+  // data at all (every value null, no flag) is dropped: it only marks a hole, which renderGraph
+  // shows as a break.
+  // Records from an earlier load (h: 1) are replaced, so a reload never duplicates. The result
+  // is sorted ascending with one record per t (a live record wins).
+  function mergeGraphHistory(hist, j, nowMs) {
+    var TCOLS = ['flow', 'ret', 'chSet', 'roomSet', 'room', 'outside'], ALL = TCOLS.concat(['mod', 'flame', 'dhw_on', 'ch']);
+    if (!j || typeof j !== 'object') return hist;
+    var n = j.count, iv = j.interval_s, age = j.newest_age_ms, sc = j.scale;
+    if (typeof n !== 'number' || typeof iv !== 'number' || typeof age !== 'number' || typeof sc !== 'number') return hist;
+    if (!(n > 0) || !(iv > 0) || !(sc > 0) || !(age >= 0)) return hist;
+    for (var c = 0; c < ALL.length; c++) if (!Array.isArray(j[ALL[c]]) || j[ALL[c]].length !== n) return hist;
+    var live = hist.filter(function (r) { return !r.h; }), ivMs = iv * 1000, out = [], li = 0;
+    for (var i = 0; i < n; i++) {
+      var x = nowMs - age - (n - i) * ivMs, t = x - x % GSLOT;
+      while (li < live.length && live[li].t < t) li++;
+      if (li < live.length && live[li].t < t + ivMs) continue;   // a live record covers this slot
+      var r = { t: t, d: null, h: 1, span: ivMs }, any = false;
+      for (var k = 0; k < TCOLS.length; k++) {
+        var v = j[TCOLS[k]][i];
+        r[TCOLS[k]] = (typeof v === 'number') ? v / sc : null;
+        if (r[TCOLS[k]] !== null) any = true;
+      }
+      var m = j.mod[i];
+      r.mod = (typeof m === 'number') ? m : null;
+      r.flame = j.flame[i] ? 1 : 0; r.dhw_on = j.dhw_on[i] ? 1 : 0; r.ch = j.ch[i] ? 1 : 0;
+      if (!any && r.mod === null && !r.flame && !r.dhw_on && !r.ch) continue;   // pure gap slot
+      if (out.length && out[out.length - 1].t === t) out[out.length - 1] = r; else out.push(r);
+    }
+    var merged = [], a = 0, b = 0;
+    while (a < out.length || b < live.length) {
+      if (b >= live.length || (a < out.length && out[a].t < live[b].t)) merged.push(out[a++]);
+      else if (a < out.length && out[a].t === live[b].t) { a++; }
+      else merged.push(live[b++]);
+    }
+    return merged.length > GHIST_MAX ? merged.slice(-GHIST_MAX) : merged;
+  }
+  // 'idle' -> 'loading' -> 'done' | 'unavailable' (404 on older firmware, permanent for the page).
+  // A failed, empty or unusable load goes back to 'idle'; a 'done' load is repeated when the tab
+  // opens and the last one is older than GHIST_RELOAD_MS (the time-based merge makes that safe).
+  var gHistState = 'idle', gHistLoadedAt = 0, GHIST_RELOAD_MS = 600000, GHIST_TIMEOUT_MS = 20000;
+  function loadGraphHistory() {
+    if (gHistState === 'unavailable' || gHistState === 'loading') return;
+    if (gHistState === 'done' && Date.now() - gHistLoadedAt < GHIST_RELOAD_MS) return;
+    gHistState = 'loading';
+    var tHead = 0, ac = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = ac ? setTimeout(function () { ac.abort(); }, GHIST_TIMEOUT_MS) : 0;
+    function finish() { if (timer) clearTimeout(timer); }
+    fetchWithRetry(APIGW + 'v2/graph/history', ac ? { signal: ac.signal } : undefined).then(function (r) {
+      tHead = Date.now();   // the device computed newest_age_ms when it handled the request
+      if (r.status === 404) { gHistState = 'unavailable'; return null; }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    }).then(function (j) {
+      finish();
+      if (!j) return;
+      var merged = mergeGraphHistory(gHist, j, tHead);
+      if (merged === gHist || !merged.some(function (r) { return r.h; })) { gHistState = 'idle'; return; }
+      gHist = merged;
+      gHistState = 'done'; gHistLoadedAt = Date.now();
+      renderGraph();
+    }).catch(function () { finish(); gHistState = 'idle'; });
+  }
   function windowedSamples() {
     var cutoff = Date.now() - (graphWindowMs || 3600000);
     return gHist.filter(function (s) { return s.t >= cutoff; });
@@ -1295,6 +1370,38 @@
     var a = k.substring(2);
     return [k, dallasLabelFor(a) || a, GDCOL[i % GDCOL.length], 't'];
   }
+  // SVG path data for one series. `c` is [[x, value, t, span], ...] ascending; span is how long
+  // after t the point's data reaches (a device history slot: its interval; a live record: 0).
+  // The line breaks (a new subpath starts) where the next point starts more than GBREAK_MS after
+  // the previous point's data ends (t + span), so a
+  // hole in the data is drawn as a hole: no line across it, and a lane (kind 'l', base `laneY`)
+  // does not hold its value over it. kind 't' = temperature line, 'm' = modulation area
+  // (closed at the 170 baseline), 'l' = on/off lane. `y` maps a temperature to a y coordinate.
+  function graphPath(c, kind, y, laneY) {
+    var d = '', seg = [], i;
+    function flush() {
+      if (!seg.length) return;
+      var pts = [], py = null, q;
+      if (kind === 'm') {
+        pts.push(seg[0][0] + ',170');
+        for (q = 0; q < seg.length; q++) pts.push(seg[q][0] + ',' + (170 - Math.max(0, Math.min(100, seg[q][1])) * 0.4).toFixed(1));
+        pts.push(seg[seg.length - 1][0] + ',170');
+      } else if (kind === 'l') {
+        for (q = 0; q < seg.length; q++) { var yy = laneY - (seg[q][1] ? 14 : 0); if (py !== null) pts.push(seg[q][0] + ',' + py); pts.push(seg[q][0] + ',' + yy); py = yy; }
+      } else {
+        for (q = 0; q < seg.length; q++) pts.push(seg[q][0] + ',' + y(seg[q][1]).toFixed(1));
+      }
+      d += (d ? ' ' : '') + 'M' + pts.join(' L') + (kind === 'm' ? ' Z' : '');
+      seg = [];
+    }
+    for (i = 0; i < c.length; i++) {
+      var prev = seg[seg.length - 1];
+      if (prev && c[i][2] - (prev[2] + (prev[3] || 0)) > GBREAK_MS) flush();
+      seg.push(c[i]);
+    }
+    flush();
+    return d;
+  }
   function renderGraph() {
     var g = document.getElementById('gSer'); if (!g) return;
     gLastRender = Date.now();
@@ -1306,7 +1413,7 @@
       keys.forEach(function (k, i) {
         var v = gVal(r, k); if (v === null || v === undefined || isNaN(v)) return;
         var c = cols[k] || (cols[k] = []), p = c[c.length - 1], kind = metas[i][3];
-        if (p && p[0] === x) p[1] = kind === 'l' ? Math.max(p[1], v) : v; else c.push([x, v]);
+        if (p && p[0] === x) { p[1] = kind === 'l' ? Math.max(p[1], v) : v; p[2] = r.t; p[3] = r.span || 0; } else c.push([x, v, r.t, r.span || 0]);
         if (kind === 't' && !gOff[k]) { if (v < lo) lo = v; if (v > hi) hi = v; }
       });
     });
@@ -1317,26 +1424,17 @@
       var e = document.getElementById(a[0]); if (e) e.textContent = Math.round(a[1]) + '°';
     });
     keys.forEach(function (k, i) {
-      var m = metas[i], kind = m[3], c = cols[k] || [], pts = [];
+      var m = metas[i], kind = m[3], c = cols[k] || [], d = '';
       var el = g.querySelector('[data-k="' + k + '"]');
       if (!el) {
-        el = document.createElementNS('http://www.w3.org/2000/svg', kind === 'm' ? 'polygon' : 'polyline');
+        el = document.createElementNS('http://www.w3.org/2000/svg', 'path');
         el.setAttribute('data-k', k); el.setAttribute('stroke', m[2]); el.setAttribute('stroke-width', kind === 't' ? '1.8' : '1.2');
         el.setAttribute('fill', kind === 'm' ? 'rgba(0,191,254,.18)' : 'none');
         if (k === 'chSet' || k === 'roomSet') el.setAttribute('stroke-dasharray', '5 4');
         g.appendChild(el);
       }
-      if (!gOff[k] && c.length) {
-        if (kind === 'm') {
-          pts.push(c[0][0] + ',170');
-          c.forEach(function (p) { pts.push(p[0] + ',' + (170 - Math.max(0, Math.min(100, p[1])) * 0.4).toFixed(1)); });
-          pts.push(c[c.length - 1][0] + ',170');
-        } else if (kind === 'l') {
-          var b = GLANE_Y[k], py = null;
-          c.forEach(function (p) { var yy = b - (p[1] ? 14 : 0); if (py !== null) pts.push(p[0] + ',' + py); pts.push(p[0] + ',' + yy); py = yy; });
-        } else c.forEach(function (p) { pts.push(p[0] + ',' + y(p[1]).toFixed(1)); });
-      }
-      el.setAttribute('points', pts.join(' '));
+      if (!gOff[k] && c.length) d = graphPath(c, kind, y, GLANE_Y[k]);
+      el.setAttribute('d', d);
     });
     renderGraphTime(t0, win);
     renderGraphLegend(keys, metas);

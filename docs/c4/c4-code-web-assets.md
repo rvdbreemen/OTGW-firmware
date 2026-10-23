@@ -113,7 +113,7 @@ Note: `mqttha.cfg` and the file-based discovery template approach have been reti
 - **WebSocket** (`connectWs`): opens `/ws`, reconnects 5 s after a close. Text frames feed the log buffer and the live model; JSON frames are dropped.
 - **otmonitor fetcher** (`fetchOtmonitor`, `OTMON_POLL_MS = 2000`): one guarded fetcher for the Home seed, the Monitor > Values table and the PS=1 fallback. A `429` pauses all callers for the `retry_after` the device sends (ADR-172).
 - **PS=1 check** (`psCheckTick`, `DEVTIME_POLL_MS = 10000`): asks `device/time` only after 15 s of socket silence, then at most every 10 s while PS=1 is on. `OTMON_POLL_MS` and `DEVTIME_POLL_MS` are read by `evaluate.py::check_poll_window_coupling` against the rate-limit windows in `restAPI.ino`.
-- **Graph** (`renderGraph`): inline SVG polylines over a sample buffer (`SAMPLES_MAX = 1800`). The control-setpoint series (`chSet`) takes MsgID 1 only from Write-Data frames, and an `R` frame (the value the gateway sent the boiler) wins over a `T` frame for 30 s (`tsetGatewayMs`), so the graph shows the setpoint the boiler got, not the thermostat's own request (TASK-1271).
+- **Graph** (`renderGraph`, `graphPath`): inline SVG `<path>` elements over the Monitor history `gHist` (5 s slots, up to 24 h). When the Graph tab opens, `loadGraphHistory()` fetches `/api/v2/graph/history` (again after 10 minutes) and `mergeGraphHistory()` merges the device's slots (30 s or 120 s, see `interval_s`) into `gHist` by slot time, so the selected window and the CSV export are filled at once (Dallas lines stay live-only). A line breaks where two points are more than `GBREAK_MS` (150 s) apart. The Home strip keeps its own sample buffer (`SAMPLES_MAX = 1800`). The control-setpoint series (`chSet`) takes MsgID 1 only from Write-Data frames, and an `R` frame (the value the gateway sent the boiler) wins over a `T` frame for 30 s (`tsetGatewayMs`), so the graph shows the setpoint the boiler got, not the thermostat's own request (TASK-1271).
 - **Settings catalogue** (`SET_CATS`, `SET_META`, enum tables): curated categories and labels; any key the firmware sends that is not curated still shows, under a category picked by prefix. `SET_HIDE_ROW` keeps the onboarding flags (`ui_onboarded`, `sat_onboarded`) off the list.
 - **Onboarding wizards** (`maybeShowOnboarding`, `satOnbNeeded`): first-time setup and SAT onboarding, gated on `ui_onboarded` / `sat_onboarded`.
 - **File browser** (Advanced > File System): mirrors `FSexplorer.html` against `/api/v2/filesystem/files`; `FS_PROTECTED` withholds Delete on the files the UI needs to load.
@@ -247,6 +247,7 @@ This table predates the removal of the classic UI and has not been re-derived fr
 | `/api/v2/sensors`, `/api/v2/sensors/labels` | GET / POST | Sensor status and Dallas sensor labels |
 | `/api/v2/filesystem/files`, `/api/v2/filesystem/hash-check` | GET | File list, delete (`?delete=`), filesystem version check |
 | `/api/v2/simulate`, `/api/v2/debug` | GET / POST | OT replay simulation, debug state |
+| `/api/v2/graph/history` | GET | Monitor > Graph: device history (1 h, or 24 h with PSRAM), loaded when the tab opens (TASK-1296) |
 | `/api/v2/webhook/test?state=` | POST | Fire a test webhook |
 
 ### MQTT Integration

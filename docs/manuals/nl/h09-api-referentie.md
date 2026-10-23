@@ -699,6 +699,12 @@ Retourneert een enkel plat JSON-object met build-identiteit, runtime-state, inst
 
 Dit is de primaire diagnostische snapshot bij issue-rapportage; de veldenset is bewust breed en valt niet onder het stabiele contract. Gevoelige waarden (`http_passwd`, `mqtt.passwd`, `sat.weather_key`) zijn gemaskeerd als `"***"` wanneer ze zijn ingesteld.
 
+#### Monitor-grafiekgeschiedenis
+
+##### GET /api/v2/graph/history
+
+Retourneert de geschiedenis die het apparaat zelf bijhoudt voor de Monitor > Graph-reeksen (TASK-1296): oudste eerst, als JSON-kolommen `flow`, `ret`, `chSet`, `roomSet`, `room`, `outside`, `mod`, `flame`, `dhw_on` en `ch`, plus `interval_s`, `newest_age_ms`, `count` en `scale`. Een bord zonder PSRAM bewaart maximaal 120 slots van 30 s (1 uur); een bord met PSRAM bewaart maximaal 720 slots van 120 s (24 uur), en `interval_s` geeft aan welke van de twee het is. Temperaturen zijn gehele getallen, de waarde maal `scale` (10); `null` betekent dat er voor dat slot geen meting is. `newest_age_ms` is de leeftijd van het EINDE van het nieuwste slot; slot `i` begint op `now - newest_age_ms - (count - i) * interval_s * 1000`. De webinterface laadt de geschiedenis als het Graph-tabblad opent (na 10 minuten opnieuw) en voegt haar op tijd samen met de samples die de browser zelf verzamelt, waarbij elk slot zijn begintijd krijgt. Dallas-sensoren worden niet bijgehouden. De geschiedenis staat in het RAM (1,8 KB intern RAM zonder PSRAM, 10 KB PSRAM met PSRAM) en is na een herstart leeg. Authenticatie is niet nodig. HTTP 503 met `Retry-After: 1` bij te weinig heap.
+
 #### Netwerk
 
 ##### GET /api/v2/network/scan

@@ -66,6 +66,7 @@ Optional HTTP Basic Auth. When a password is configured in device settings, muta
 
 - Health, device info/time/crashlog, OpenTherm data, sensor labels, PIC settings, firmware/filesystem info
 - Network scan: `GET /api/v2/network/scan`
+- Monitor graph history: `GET /api/v2/graph/history`
 
 CSRF same-origin validation is enforced for authenticated requests from browsers (Origin/Referer header must match the Host header).
 
@@ -928,6 +929,38 @@ Triggers and reports a non-blocking WiFi network scan (TASK-585). First call sta
 ```
 
 Quotes and backslashes in SSIDs are replaced with `_` to keep the JSON valid without escaping. A PIC flash in progress causes the endpoint to return `503` (`Scan unavailable during PIC flash`).
+
+---
+
+### Monitor graph history
+
+#### `GET /api/v2/graph/history`
+
+The device-side history of the Monitor > Graph series (TASK-1296): oldest first, in columns: up to 120 slots of 30 s (1 hour) on a board without PSRAM, up to 720 slots of 120 s (24 hours) on a board with PSRAM. The v2 UI loads it when the Graph tab opens and merges it into the samples it collects itself, so the chart windows and the CSV export are filled right away. Dallas sensors are not recorded.
+
+**Authentication**: Not required
+
+**Response** `200 OK` (arrays shortened):
+```json
+{
+  "interval_s": 120,
+  "newest_age_ms": 45210,
+  "count": 3,
+  "scale": 10,
+  "flow": [655, 658, null],
+  "ret": [301, 305, null],
+  "chSet": [700, 700, null],
+  "roomSet": [205, 205, 205],
+  "room": [198, 199, 199],
+  "outside": [-35, -35, -34],
+  "mod": [42, 40, null],
+  "flame": [1, 1, 0],
+  "dhw_on": [0, 0, 0],
+  "ch": [1, 1, 1]
+}
+```
+
+Temperatures are integers: the value times `scale` (655 is 65.5 C). `null` means there is no sample for that slot (the boiler had not reported the value, or the loop was stalled). `flame`, `dhw_on` and `ch` are 1 when the state was active at any moment of the slot. `newest_age_ms` is the age of the END of the newest slot; slot `i` starts at `now - newest_age_ms - (count - i) * interval_s * 1000` and the web UI stamps it with that start, like its own 5-second records. `interval_s` is 30 or 120 accordingly. The history is held in RAM (1.8 KB internal RAM without PSRAM, 10 KB PSRAM with PSRAM) and starts empty after a reboot. The body is about 4 KB (no PSRAM) or 25 KB (PSRAM) when full and is sent in chunks; the endpoint answers `503` with `Retry-After: 1` when the heap is low. Firmware without this endpoint answers `404`.
 
 ---
 

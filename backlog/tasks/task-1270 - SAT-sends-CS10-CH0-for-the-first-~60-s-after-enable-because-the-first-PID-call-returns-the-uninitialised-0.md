@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:16
-updated_date: '2026-10-22T06:54:00Z'
+updated_date: '2026-10-22T21:31:00Z'
 labels:
   - bug
   - sat
@@ -44,4 +44,6 @@ Verification: host test compiling the real satPidUpdate() path (first call retur
 2026-10-21 plan posted to Sergeant D (#alpha-testing msg 1562557877732905114), open point: D = 0 and I = restored integral on the first tick. Waiting for his OK; cycle continues.
 
 2026-10-22: TASK-1292 ground-truth spec is on dev: docs/sat/thermo-nova-spec.md (cited, Alexwijn/SAT releases/thermo-nova @ 7beaaf5), docs/sat/firmware-sat-spec.md and docs/sat/sat-comparison.md (443 rows, 434 verified). This task waits for Sergeant D's validation of the thermo-nova spec; the plan must quote the thermo-nova code for its area with file:line citations (CLAUDE.md 'SAT ground truth' block) before it is resumed.
+
+2026-10-22 23:15 cycle: skipped, still waiting for Sergeant D's OK on the plan (SAT control behaviour).
 <!-- SECTION:NOTES:END -->

@@ -35,7 +35,7 @@ ENDPOINTS = [
  "/v2/firmware/files", "/v2/filesystem/files",
  "/v2/otgw/otmonitor", "/v2/discovery", "/v2/otdirect/status",
  "/v2/otdirect/settings", "/v2/otdirect/overrides", "/v2/sat/status",
- "/v2/sat/status?detail=full", "/v2/sat/weather",
+ "/v2/sat/status?detail=full", "/v2/sat/weather", "/v2/graph/history",
 ]
 
 

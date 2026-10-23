@@ -6664,6 +6664,76 @@
         ],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-193",
+      "title": "Keep a bounded 24 h Monitor graph history on the device",
+      "path": "ADR-193-keep-a-bounded-24-h-monitor-graph-history-on-the-device.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-22",
+      "decision_summary": "The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on...",
+      "topics": [
+        "graph",
+        "history",
+        "rest-api",
+        "static-ram",
+        "v2",
+        "web-ui"
+      ],
+      "aliases": [
+        "24h graph",
+        "device-side graph buffer",
+        "graph history",
+        "graph history endpoint",
+        "monitor graph history"
+      ],
+      "components": [
+        "GET /api/v2/graph/history",
+        "graph history ring buffer"
+      ],
+      "symbols": [
+        "doTaskEvery1s",
+        "pushGraphSlot",
+        "restSendChunked"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Use the static 126-slot array on boards without PSRAM, and keep the PSRAM block to one allocation at boot that is never freed.",
+          "Allocate PSRAM only through platformPsramAllocOnce(); never fall back to internal DRAM for the large ring.",
+          "Emit at most cap - 6 slots per response.",
+          "Write slots only from the loop task, under the platform mutex.",
+          "Freeze head, count and age per response so every restSendChunked() pass is byte-identical.",
+          "Write \"no value\" slots for missed slot boundaries.",
+          "Document GET /api/v2/graph/history in docs/api/openapi.yaml."
+        ],
+        "must_not": [
+          "Allocate the ring from the internal-DRAM heap, or grow or free it at run time.",
+          "Read live OpenTherm state inside the emit closure.",
+          "Use ArduinoJson or floats in the response body."
+        ],
+        "exceptions": [
+          "The single never-freed PSRAM block described above (ADR-053)."
+        ],
+        "verification": [
+          "Build map or size output shows the small ring in .bss at 1764 B (TASK-1296).",
+          "Host test tests/testgraphhistory.cpp runs both ring sizes: wrap, gap fill, JSON shape and chunk-window reassembly with the margin pinned.",
+          "Bench: on a no-PSRAM unit, free heap and max block after a reboot at 5 min uptime, BLE off and on, against the build without the history. Measured 2026-10-23 (alpha.461 working tree): combo static RAM +1792 B; BLE off free 82116 -> 80232...",
+          "Browser: after a reload, the 1 h window (and on PSRAM boards the 4 h and 24 h windows) show data from before the reload, and the CSV contains it. Measured 2026-10-23 on the no-PSRAM unit: the 1 h window and CSV held 123 rows reaching bac..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -11908,6 +11978,60 @@
     {
       "source": "ADR-192",
       "target": "ADR-191",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-193",
+      "target": "ADR-039",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-193",
+      "target": "ADR-053",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-193",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-193",
+      "target": "ADR-132",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-193",
+      "target": "ADR-137",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-193",
+      "target": "ADR-146",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-193",
+      "target": "ADR-165",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-193",
+      "target": "ADR-169",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-193",
+      "target": "ADR-184",
       "type": "related",
       "resolved": true
     }
