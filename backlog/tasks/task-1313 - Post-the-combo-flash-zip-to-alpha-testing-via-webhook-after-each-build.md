@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T08:54:00Z'
-updated_date: '2026-10-23T11:38:00Z'
+updated_date: '2026-10-23T12:08:00Z'
 labels: []
 dependencies: []
 ordinal: 436000
@@ -37,6 +37,8 @@ OPEN: the script's real post path was denied by the auto-mode classifier ('judge
 Advisor round: payload now via --form-string (a ';' or '@' in -m no longer reaches curl's form parser), control characters stripped, dry-run prints the payload, POSTED line prints the message id, zip prerelease must equal HEAD's _VERSION_PRERELEASE (version.h is outside the dirty check). Tests 10/10 OK; mutant without the bump check: 1 FAIL (test_uncommitted_bump_refused). evaluate.py --quick exit 0, 0 FAIL. Scope: release and beta-prerelease skills untouched on purpose: 1.x public channels and #beta-testing (assets via CI/GitHub release), this webhook reaches #alpha-testing only.
 
 AC1 evidence: maintainer ran scratchpad pipeline-test.sh (real script, clean throwaway repo, 2 KB dummy zip): 'POSTED: OTGW-firmware-esp32-combo-0.0.0-pipelinetest.1+b510706-flash.zip (2048 bytes), http 200, message 1563153944753217537', exit 0. Test message deleted via webhook: http 204. Allow rule 'Bash(bash scripts/discord-post-build.sh:*)' added to .claude/settings.local.json on the maintainer's request. Note: settings.local.json already held 'Bash(*)' when the classifier denied the earlier run, so whether the narrow rule lets an auto-mode cycle post is unverified until the first real step 9. AC5 still open.
+
+2026-10-23 14:20 field failure (session 2cc0fd9b, Git Bash via the Bash tool, alpha.465+7f4e9a4 zip): 'curl: (26) Failed to open/read local data from file/application' -> 'FAILED: curl error'. Cause: curl here is the native mingw build (/ucrt64/bin/curl 8.22.0); Git Bash does not convert the MSYS path inside the -F argument 'files[0]=@/d/...', and mingw curl cannot open '/d/...'. Verified: the same -F with $(cygpath -w "$zip") opens the file (curl then fails only on the test host). Fix: on MSYS/Git Bash pass the zip as $(cygpath -w "$zip") (guard with 'command -v cygpath'). Not worked around (no manual/MCP upload); the alpha.465 zip was not posted.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
