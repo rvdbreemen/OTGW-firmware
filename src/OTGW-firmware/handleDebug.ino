@@ -449,11 +449,7 @@ void handleDebugChar(char c){
                 state.debug.bOTGWSimulation = !state.debug.bOTGWSimulation;
                 state.debug.iOTGWSimulationNextDueMs = 0;
                 DebugTf(PSTR("\r\nDebug OTGW serial simulation: %s\r\n"), CBOOLEAN(state.debug.bOTGWSimulation));
-                if (state.debug.bOTGWSimulation) {
-                    sendEventToWebSocket_P('*', PSTR("OTGW simulation enabled [replay active]"));
-                } else {
-                    sendEventToWebSocket_P('*', PSTR("OTGW simulation disabled [live serial resumed]"));
-                }
+                requestOTGWSimulationEvent(state.debug.bOTGWSimulation);   // TASK-1321: telnet runs on async_tcp
                 break;
             case 'b':
                 DebugTln(F("Blink led 1"));

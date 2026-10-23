@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.479
+**  Version  : v2.0.0-alpha.480
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -4047,6 +4047,13 @@ static void closeOTGWSimulationSource(File& otgwSimulationFile)
 static volatile bool g_otgwReplayReselect = false;
 void requestOTGWReplayReselect() { g_otgwReplayReselect = true; }
 
+// TASK-1321: the OTGW simulation start/stop event is written to ot_log_buffer on the loop task
+// only. setOTGWSimulationEnabled() (REST) and the telnet 's' key run on the async_tcp task, so
+// they post the event here (0 none, 1 started, 2 stopped; the newest wins) and handleOTReplay()
+// on the loop task sends it. Other async writers of ot_log_buffer remain (TASK-1337).
+static volatile uint8_t g_otgwSimEventPending = 0;
+void requestOTGWSimulationEvent(bool enabled) { g_otgwSimEventPending = enabled ? 1 : 2; }
+
 // (Re)open the replay source: the LittleFS file when it exists, else the built-in
 // fixture from its first line. Always leaves a readable source.
 static void reopenOTGWSimulationFile(File& otgwSimulationFile)
@@ -5635,6 +5642,14 @@ void handleOTReplay()
   static File   otgwSimulationFile;
   static bool   otgwSimulationWasEnabled = false;
   static char   sReplay[MAX_BUFFER_READ];
+
+  // Take and clear in one atomic step: a post from the other core between a separate read and
+  // clear would be lost.
+  const uint8_t simEvent = __atomic_exchange_n(&g_otgwSimEventPending, (uint8_t)0, __ATOMIC_ACQ_REL);
+  if (simEvent != 0) {
+    if (simEvent == 1) sendEventToWebSocket_P('*', PSTR("OTGW simulation enabled [replay active]"));
+    else               sendEventToWebSocket_P('*', PSTR("OTGW simulation disabled [live serial resumed]"));
+  }
 
   handlePICSerialSimulation(otgwSimulationFile,
                             otgwSimulationWasEnabled,

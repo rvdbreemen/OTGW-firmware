@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.479
+**  Version  : v2.0.0-alpha.480
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -386,11 +386,7 @@ static void setOTGWSimulationEnabled(bool enabled) {
   state.debug.bOTGWSimulation = enabled;
   state.debug.iOTGWSimulationNextDueMs = 0;
   if (enabled) requestOTGWReplayReselect();   // TASK-1294: a start re-picks file vs built-in, as the status says
-  if (enabled) {
-    sendEventToWebSocket_P('*', PSTR("OTGW simulation enabled [replay active]"));
-  } else {
-    sendEventToWebSocket_P('*', PSTR("OTGW simulation disabled [live serial resumed]"));
-  }
+  requestOTGWSimulationEvent(enabled);   // TASK-1321: the loop task sends the WS event (the log buffer has one writer)
 }
 
 //=== Resource handler functions ===
