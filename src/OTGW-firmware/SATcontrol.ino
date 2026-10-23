@@ -355,12 +355,18 @@ static const uint32_t SAT_CMD_REFRESH_MS = 300000UL; // 5 min
 // Reset the SAT last-sent OT command cache so the next call to
 // satEnqueueIfChanged*() always enqueues. Used on offline->online edges,
 // safety/disable paths, and at boot.
+// bLastSentValid is shared by CS/MM/CH/TC and the first helper to send sets it, so it
+// cannot force the later ones. The per-command timestamps are therefore set one refresh
+// window in the past: every command is stale (uint32_t arithmetic, also right when
+// millis() < SAT_CMD_REFRESH_MS shortly after boot or across the 49-day wrap) and the
+// next satEnqueueIfChanged*() call resends even an unchanged value (TASK-1324).
 static inline void satResetCmdCache() {
+  const uint32_t stale = millis() - SAT_CMD_REFRESH_MS;
   state.sat.bLastSentValid = false;
-  state.sat.iLastSentCSMs  = 0;
-  state.sat.iLastSentMMMs  = 0;
-  state.sat.iLastSentCHMs  = 0;
-  state.sat.iLastSentTCMs  = 0;
+  state.sat.iLastSentCSMs  = stale;
+  state.sat.iLastSentMMMs  = stale;
+  state.sat.iLastSentCHMs  = stale;
+  state.sat.iLastSentTCMs  = stale;
 }
 
 // TASK-1150: true only while SAT itself is submitting a command through the shared
