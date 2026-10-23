@@ -3,11 +3,11 @@ id: TASK-1298
 title: >-
   SAT follow-thermostat adopts a thermostat setpoint change late and misses the
   next one (Honeywell Round, alpha.454)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-22T12:00:00Z'
-updated_date: '2026-10-22T16:51:00Z'
+updated_date: '2026-10-23T09:25:00Z'
 labels:
   - sat
   - bug
@@ -28,7 +28,7 @@ Report gruijter 2026-10-22 08:03 + log bundle 09:25 (#alpha-testing; %TEMP%\disc
 <!-- AC:BEGIN -->
 - [x] #1 A host test replays the logged MsgID 16/9 sequence through the real decide function and shows which changes are adopted and why (red = the 19.50 is missed)
 - [x] #2 Behaviour agreed with Sergeant D and recorded in the task notes, with the spec citation if thermo-nova has an equivalent
-- [ ] #3 Bench or replay evidence old vs fix; gruijter confirms on the Honeywell Round
+- [x] #3 Bench or replay evidence old vs fix; gruijter confirms on the Honeywell Round
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -53,10 +53,12 @@ Report gruijter 2026-10-22 08:03 + log bundle 09:25 (#alpha-testing; %TEMP%\disc
 2026-10-22 bench, first fix (alpha.457+a0e0936 with the fPrevSentTC guard), same replay: sat/target 20.5 -> 19.5 -> 20.0 -> (19.5 missed) -> 15.0 (%TEMP%\bench-1298\green-mqtt.txt renamed firstfix): the review finding reproduced on the device. The 'pushed since boot' guard was met (adoptions happened), so SAT did push TC= on enable; the 45 s telnet capture after enable shows no new TC= because the refresh is 300 s.
 
 2026-10-22 GREEN (final build alpha.457+a0e0936 without fPrevSentTC, safeboot OTA, same replay fixture %TEMP%\bench-1298\trset_replay.log: TrSet 15 -> 19.5 -> 20.0 -> 19.5 -> 15 held 12 quads each, push on, follow on, satsimulation on, target 20.5): sat/target 20.5 -> 19.5 -> 20.0 -> 19.5 -> 15.0, every change followed (%TEMP%\bench-1298\green-mqtt.txt). RED (alpha.456, old rule): sat/target stayed 20.5 (red-mqtt.txt). First fix: 19.5 missed (firstfix-mqtt.txt). Host test: 35/35 on the fix, HEAD copy fails the gruijter replay + scenario 3b. Gates: evaluate 72/0, 11 python suites OK, build SUCCESS. Bench restored, settings diff vs baseline empty, original simulation log back. AC3: the old-vs-fix half is done; gruijter's confirmation on the real Honeywell Round is still open, so the task stays In Progress after the push.
+
+2026-10-23 gruijter confirmed on his Honeywell Round (#alpha-testing msg 1563110042952007690, 08:41 UTC, alpha.461, 1 h SAT capture 20261023-094059.zip + graph CSV): 'Around 9:42 I started setting the target temp from my Honeywell to 19.5. SAT target temp followed, so that works now!'. The bench/replay old-vs-fix evidence was recorded earlier (alpha.458). Same report: a target set in the SAT web GUI (20.0 at ~10:10) was not pushed to the Round, which kept showing 19.5: that is the push direction (TC=), tracked in TASK-1272 (thermostats that reject the remote override), not this task.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-With push setpoint on, SAT now follows a thermostat setpoint change once it has pushed at least once since boot, unless the change echoes SAT's own last push (0.25 C). The earlier precondition that the thermostat's previous value matched the last push is gone: thermostats such as the Honeywell Round never mirror an accepted override in MsgID 16, so it blocked every dial change (gruijter's log: 15 -> 19.5 -> 20 -> 19.5 -> 20 adopted nothing). Decision: Robert, option A, after Sergeant D deferred; recorded in docs/sat/sergeant-d-corrections.md entry 2. Evidence: host test on the compiled function (35/35, HEAD red on the replay of gruijter's sequence), bench replay old (target stuck at 20.5) vs fix (20.5 -> 19.5 -> 20.0 -> 19.5 -> 15.0). The review caught my first fix adding a previous-push guard that swallowed the return to 19.5 (reproduced on the bench too); removed. Open: AC3 second half, gruijter confirming on his Honeywell Round.
+SAT follow-thermostat now adopts a thermostat setpoint change once SAT has pushed since boot, unless the change echoes SAT's own push (within 0.25 C); the extra requirement that the previous thermostat value matched SAT's last push was removed because the Honeywell Round never shows the override as its own setpoint. Evidence: AC1 host test on the real decide function (the logged 15 -> 19.5 -> 20 -> 19.5 sequence, red on the old code); AC2 behaviour agreed with Sergeant D (notes); AC3 replay on PC and bench old vs fix (old: target stuck at 20.5; new: follows every change) and gruijter's confirmation on his Round on alpha.461 (2026-10-23 08:41 UTC). The push direction (web GUI target to the Round) is TASK-1272.
 <!-- SECTION:FINAL_SUMMARY:END -->
