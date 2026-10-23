@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T10:32:00Z'
-updated_date: '2026-10-23T13:48:00Z'
+updated_date: '2026-10-23T15:00:00Z'
 labels:
   - sat
   - pwm
@@ -51,4 +51,6 @@ Implement per Sergeant D 2026-10-23: (1) pure helper SATchEnable.h satChEnableFo
 2026-10-23 15:55 implementation (uncommitted, stashed while waiting): SATchEnable.h satChEnableFor() (quantized); main block uses it with satGetColdSetpoint(). Hold floor at the cold setpoint already existed at HEAD (satPwmFlameOffHold, TASK-891.2, 73295292b) -> comment only. Evidence this session: test_sat_ch_enable.cpp 0 failures (old rule CH=1 for 22/25/28.1 and underfloor 20.9, new CH=0); test_sat_pwm_override.py fix 'Ran 39 OK', HEAD 'FAILED (failures=1)' = the source check (cold-start hold test passes on both: regression guard). evaluate --quick 0 fail. Open, asked Sergeant D (msg 1563187099484557367): (1) solar offset after the hold can push the sent setpoint below the cold setpoint -> CH=0 during ignition; decide CH before the solar offset? (2) PWM ON suppression flow-offset below the cold setpoint -> CH=0 mid-burn on the next control step (thermo-nova same mechanism, heating_control.py:236-238, but with 22 rarely hit): skip the CH rule in PWM ON, or floor the suppression setpoint too?
 
 Parked in git stash on dev: 'TASK-1316 CH threshold (waiting for Sergeant D)' (tracked edits) and 'TASK-1316 new files (SATchEnable.h, test_sat_ch_enable.cpp)'. Restore both with git stash pop (newest first) when resuming.
+
+2026-10-23 14:51-14:54Z Sergeant D (msgs 1563203205633020027, ...729652457585, ...4066262130719): 'The CS we send to the boiler is decoupled to the duty cycle calculation. The CS that we send during PWM just keeps the flame on at the minimum modulation level. The hard job of the cycle duration is in the pwm.py file'; heating starts if (requested setpoint - base temperature) / (BT - base temperature) is suitable; duty percentage translated to seconds on/off. Not an explicit answer to the two questions. Proposed rule sent for a yes/no (msg 1563205445781422121): PWM ON -> CH=1 regardless of CS; PWM OFF -> CS=10 + CH=0; continuous -> CH from the sent setpoint vs the cold setpoint; CH decided before the solar offset. Waiting.
 <!-- SECTION:NOTES:END -->

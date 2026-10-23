@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : webSocketStuff.ino
-**  Version  : v2.0.0-alpha.469
+**  Version  : v2.0.0-alpha.470
 **
 **  Copyright (c) 2021-2025 Robert van den Breemen
 **
@@ -276,9 +276,31 @@ void handleWebSocket() {
 // under heap pressure instead of broadcasting every OT frame unconditionally.
 // (Restores parity with dev, where this gate is wired; it had never been ported to 2.0.0.)
 //===========================================================================================
+#include "WsUtf8.h"
+// Sanitised copy of an OT-log line that is not valid UTF-8 (TASK-1300). A named
+// global per ADR-053; owned by sendLogToWebSocket() and only used during that call
+// (textAll copies the data).
+char wsSafeBuf[OT_LOG_BUFFER_SIZE];
+// ADR-090 in-use flag: the loop task and an async REST handler can both reach
+// sendLogToWebSocket(). On contention the frame is dropped rather than sent with
+// bytes of two lines mixed in one buffer.
+static volatile bool wsSafeBufBusy = false;
+
 void sendLogToWebSocket(const char* logMessage) {
   if (hasWebSocketClients() && logMessage != nullptr && canSendWebSocket()) {
-    otLogWs.textAll(logMessage);
+    // Chrome closes the socket on a text frame that is not valid UTF-8 (TASK-1300):
+    // raw PIC bytes in an unparsed line, or a log line cut inside a multi-byte
+    // character. Sanitise a copy at this transport boundary, so the PIC bytes stay
+    // verbatim on serial, telnet, port 25238 and the raw diagnose path (ADR-177).
+    if (wsUtf8Valid(logMessage)) {
+      otLogWs.textAll(logMessage);
+    } else {
+      if (wsSafeBufBusy) return;
+      wsSafeBufBusy = true;
+      wsUtf8Sanitize(logMessage, wsSafeBuf, sizeof(wsSafeBuf));
+      otLogWs.textAll(wsSafeBuf);
+      wsSafeBufBusy = false;
+    }
   }
 }
 
