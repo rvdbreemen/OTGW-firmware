@@ -1,6 +1,6 @@
 ---
 name: implement-next-task
-description: Use for "pak de volgende taak", "implement next task" or working the 2.0.0 backlog autonomously. Continuous cycle: pick the next actionable task, announce it in #alpha-testing, design, self-review with the advisor, implement with old-vs-fix evidence, reviewer team, Done only with evidence, report the build, leave the combo zip ready, repeat.
+description: Use for "pak de volgende taak", "implement next task" or working the 2.0.0 backlog autonomously. Continuous cycle: pick the next actionable task, announce it in #alpha-testing, design, self-review with the advisor, implement with old-vs-fix evidence, reviewer team, Done only with evidence, report the build, post the combo zip to #alpha-testing, repeat.
 ---
 
 # implement-next-task: the continuous backlog cycle
@@ -187,9 +187,18 @@ After the push, build once more from the pushed HEAD with `build.bat` so the git
 in the file names matches the code. Leave
 `build/OTGW-firmware-esp32-combo-<version>+<hash>-flash.zip` (the complete package:
 `.ino.bin`, `.littlefs.bin`, USB images, flash tools, capture scripts, READMEs) and
-give its full path to the maintainer in the session. Uploading it to Discord is the
-maintainer's call. Restore `version.h` / `data/version.hash` build-stamp churn
-afterwards (`git checkout --`), it is not a bump.
+give its full path to the maintainer in the session. Then post it to #alpha-testing
+(maintainer decision 2026-10-23, TASK-1313):
+
+    bash scripts/discord-post-build.sh -m "TASK-NNN: <one-line change>"
+
+The script posts through the webhook in
+`%LOCALAPPDATA%\OTGW-capture\discord-alpha-webhook.url` (never print or commit that
+URL) and refuses (exit 2) when the zip githash is not HEAD, when `src/` has
+uncommitted changes, or when the zip is above 10 MB. A refusal or a failed post is
+reported in the session; never work around it (no hand-renamed zip, no MCP upload).
+Restore `version.h` / `data/version.hash` build-stamp churn afterwards
+(`git checkout --`), it is not a bump.
 
 ## Then: the next task
 
