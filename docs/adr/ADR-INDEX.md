@@ -200,3 +200,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-192 | Accepted | - | The 2.0.0 line ships the v2 web UI as its only device web UI. |
 | ADR-193 | Accepted | - | The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on... |
 | ADR-194 | Accepted | - | Static text assets that users never need to upload may be compiled into the firmware image and served or read from PR... |
+| ADR-195 | Proposed | - | While SAT is the active controller, one per-heating-system cold setpoint stands in for thermo-nova's COLDSETPOINT 22... |
+| ADR-196 | Proposed | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |

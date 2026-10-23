@@ -6798,6 +6798,147 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-195",
+      "title": "SAT cold state and CH-enable rule (proposed successor to ADR-150)",
+      "path": "ADR-195-sat-cold-state-and-ch-enable-rule-supersedes-adr-150.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-23",
+      "decision_summary": "While SAT is the active controller, one per-heating-system cold setpoint stands in for thermo-nova's COLDSETPOINT 22...",
+      "topics": [
+        "ch-enable",
+        "cold-setpoint",
+        "opentherm",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "CH enable bit",
+        "CH rule during PWM",
+        "cold cutoff",
+        "COLD_SETPOINT",
+        "per-system cold setpoint"
+      ],
+      "components": [
+        "SAT CH enable rule",
+        "SAT cold cutoff"
+      ],
+      "symbols": [
+        "satChEnableDecide",
+        "satColdCutoff",
+        "satCycleResetSustainGuards",
+        "satEnqueueIfChangedCH",
+        "satGetColdSetpoint",
+        "satPwmDisableOnHeaterOff",
+        "satPwmFlameOffHold"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Use satGetColdSetpoint() (28.2 radiators, 21.0 underfloor) at every site where thermo-nova uses COLDSETPOINT: the cutoff, the PWM enable and disable guard gates, the PWM gate, the flame-off hold floor and the CH bit.",
+          "Compare with for \"warm\", as thermo-nova does.",
+          "On the cutoff: send CS=10, CH=0 and MM at the configured maximum relative modulation; switch PWM off; reset the PWM state, the held CS and the sustained overshoot, underheat and saturation guard timers (satPwmDisableOnHeaterOff()). The f...",
+          "Decide the CH bit only in satChEnableDecide, from the requested setpoint and the PWM phase.",
+          "Send SAT's CS through satEnqueueOwnCS (ADR-179)."
+        ],
+        "must_not": [
+          "Turn the cold setpoints into user settings, or reintroduce the global 22.",
+          "Clear CH during the PWM ON phase because the flame-keeping CS is low.",
+          "Derive CH from the sent CS.",
+          "Change the SAT-disabled release path (CS=0 to the thermostat)."
+        ],
+        "exceptions": [
+          "None settled. HEAD (TASK-1327, c3aa767a0) keeps PWM as the mode on the cutoff when bForcePWM (the firmware's own force-PWM option, which thermo-nova stores at entrydata.py:58 and :223 but never reads in customcomponents/sat) is on, and t..."
+        ],
+        "verification": [
+          "tests/testsatchenable.cpp compiles the real SATchEnable.h and checks the boundary at exactly 28.2 and 21.0, the PWM OFF and ON phases, and continuous mode, printing the strict TASK-1316 rule as \"old\".",
+          "python tests/testsatpwmoverride.py compiles the real PWM block of SATcontrol.ino (including satPwmReset() and satPwmDisableOnHeaterOff()), satCycleCheckAutoSwitch() of SATcycles.ino and the requested-setpoint segment of satControlLoopRun...",
+          "Neither test runs in CI: a grep of .github/, evaluate.py and build.py for both names found nothing (2026-10-23). This ADR claims no gate until they do.",
+          "Field: Sergeant D's confirmation on his own setup (TASK-1316 AC3). The bench unit has no room temperature, so SAT never reaches the CH step there (entry 11, still open)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-196",
+      "title": "SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware",
+      "path": "ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-23",
+      "decision_summary": "For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low...",
+      "topics": [
+        "documentation-process",
+        "governance",
+        "ground-truth",
+        "sat",
+        "thermo-nova"
+      ],
+      "aliases": [
+        "George",
+        "pinned thermo-nova commit",
+        "SAT anti-drift rules",
+        "SAT ground truth",
+        "Sergeant D",
+        "Sergeant D corrections",
+        "sergeant-d-corrections",
+        "sergeantd",
+        "source precedence",
+        "thermo-nova",
+        "thermo-nova-spec"
+      ],
+      "components": [
+        "docs/sat/sergeant-d-corrections.md",
+        "SAT source precedence rule"
+      ],
+      "symbols": [],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Read docs/sat/sergeant-d-corrections.md before writing a SAT ADR, plan, review or SAT-control change, and cite the matching entry numbers or state \"no entry covers this topic\".",
+          "Cite thermo-nova as file:line at commit 7beaaf531ee99dc74a19ac74f3c06ce7f2922cfb, opened in the current session.",
+          "Record a new correction or decision by Sergeant D as a new numbered entry (date, verbatim quote, Discord link, thermo-nova and firmware comparison, task, what stays open), marking a short reply that we interpreted as an interpretation.",
+          "Report a conflict between an entry and the thermo-nova code to Sergeant D with both citations.",
+          "Move the pinned commit only in a dedicated commit that re-diffs docs/sat/thermo-nova-spec.md."
+        ],
+        "must_not": [
+          "Treat the firmware, firmware-sat-spec.md or sat-comparison.md as the authority for SAT behaviour.",
+          "Rewrite an existing corrections entry or the spec documents silently.",
+          "Fill a gap with plausible behaviour; write \"not found in the code\" and ask Sergeant D.",
+          "Update the local thermo-nova copy without moving the pin as above."
+        ],
+        "exceptions": [
+          "Firmware-only features with no thermo-nova counterpart, where Sergeant D defers to the maintainer (entry 2, follow-thermostat with push setpoint), are decided by the maintainer and recorded in the same corrections entry."
+        ],
+        "verification": [
+          "python tests/testsatgroundtruthblock.py: keeps the SAT ground-truth block identical in CLAUDE.md and AGENTS.md, pins the commit, and requires the corrections file to exist. It guards the rule's text, not compliance.",
+          "Review: the reviewer reads the corrections file and treats an unmentioned conflict with an entry as a finding (CLAUDE.md block; .claude/skills/implement-next-task/SKILL.md lines 87, 102 and 158).",
+          "/adr-kit:context \"SAT ground truth\" surfaces this ADR."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -12144,6 +12285,90 @@
     {
       "source": "ADR-194",
       "target": "ADR-192",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-195",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-195",
+      "target": "ADR-085",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-195",
+      "target": "ADR-110",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-195",
+      "target": "ADR-150",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-195",
+      "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-196",
+      "target": "ADR-069",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-196",
+      "target": "ADR-071",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-196",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-196",
+      "target": "ADR-085",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-196",
+      "target": "ADR-150",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-196",
+      "target": "ADR-157",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-196",
+      "target": "ADR-178",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-196",
+      "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-196",
+      "target": "ADR-195",
       "type": "related",
       "resolved": true
     }
