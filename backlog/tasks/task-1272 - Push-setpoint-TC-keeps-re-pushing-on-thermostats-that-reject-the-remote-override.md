@@ -3,11 +3,11 @@ id: TASK-1272
 title: >-
   Push setpoint (TC=) keeps re-pushing on thermostats that reject the remote
   override
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:17
-updated_date: '2026-10-24T08:21:00Z'
+updated_date: '2026-10-24T08:34:00Z'
 labels:
   - sat
   - ux
@@ -25,8 +25,8 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 SAT detects that the override was not adopted (MsgID 9 back to 0 while TrSet != target), stops re-pushing and shows a status note in the UI
-- [ ] #2 Docs: TC= push only works on thermostats that accept a remote room-setpoint override
+- [x] #1 Docs: TC= push only works on thermostats that accept a remote room-setpoint override
+- [x] #2 Option D (Robert 2026-10-24, Sergeant D entries 14 and 16): SAT pushes TC= only when the target changes (thermo-nova climate.py:641-657), never on a timer and never re-pushes on MsgID 9; an adopted thermostat setpoint is not pushed back (climate.py:765); host test red on HEAD, green on the fix
 <!-- AC:END -->
 
 ## Implementation Notes
@@ -51,4 +51,12 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 2026-10-24 Robert decided option D (exactly thermo-nova) after the BLOCKED review; Sergeant D informed 07:27 UTC (msg 1563453986630008849) and asked for an explicit OK in the consolidated question list (question 2). This drops entry 14's MsgID 9 re-push bullet; when he answers, record entry 15 naming entry 14 before committing. Re-review (opus) of option D: no correctness bug; R1 process (this note + entry 15 + AC1 rewrite), R2 a cache reset after an adopt sends the adopted value once (harmless, firmware-only), R3 docs drift (sat-comparison rows, manuals wording, spec citations), R4 fTCAccounted == fLastSentTC and iLastSentTCMs now write-only, R5 test docstring + else-branch coverage. Implementation is uncommitted in the dev tree, waiting.
 
 2026-10-24 Sergeant D answered 'Yes' to option D (https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840), entry 16 names entry 14. Implementation in git stash 'TASK-1272 option D' can be committed.
+
+2026-10-24 evidence: tests/test_sat_push_setpoint.py (real helpers + satFollowThermostatDecide cut from SATcontrol.ino): HEAD 'FAILED (failures=7)' - a/g: TC= at 100, 400, 700 s with an unchanged target; d/h: adopted value pushed back (110:TC=21.5); x: dial-back case; e: no resend after push off/on; fix 9/9 OK (one TC= per target change, no push back, dial-back adopted). test_sat_follow_thermostat 35 OK, test_sat_cmd_cache 4 OK, test_sat_pwm_override 63 OK, hosttest_ch 0 failures, evaluate 0 fail; build.bat combo SUCCESS; bench OTA app: SAT active, no crashlog (no thermostat on the bench, so TC= behaviour is host-tested only). Review rounds: hybrid blocked (F1-F3), option D re-review no correctness bug; R1 (records) via entries 14/16 + this AC rewrite, R3 docs fixed (sat-comparison rows, manuals EN/NL, spec), R4 iLastSentTCMs removed and fTCAccounted merged into fLastSentTC, R5 test docstring + else-branch wiring + scenario x. AC1 docs: manuals and spec say TC= push works only on thermostats that accept a remote override and SAT does not re-push.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+Push setpoint now matches thermo-nova (option D, Sergeant D entries 14 and 16): TC= only on a target change, no 5-minute re-push, no MsgID 9 re-push, and an adopted thermostat setpoint is never pushed back; a dial-back after an adopt is followed. Evidence: host test of the real helpers red on HEAD (7 fails: periodic re-push, push-back) and green (9/9); regressions green; build + bench boot OK. Not verified on a real thermostat (gruijter's Honeywell Round is the field check).
+<!-- SECTION:FINAL_SUMMARY:END -->

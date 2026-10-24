@@ -419,16 +419,17 @@ static bool    _sat_prevDhwActive     = false;  // Track DHW transition to send 
 static bool    _sat_prevOTOnline      = false;  // Track OT-bus online edge for cache reset (TASK-565)
 
 // --- Write-on-change refresh window for SAT-emitted OT commands (TASK-565) ---
-// Even when CS/MM/CH/TC values are unchanged, re-emit at this cadence so a
+// Even when CS/MM/CH values are unchanged, re-emit at this cadence so a
 // rebooted PIC or a boiler whose internal state has drifted from our last
 // command resyncs to the current SAT intent. 5 min keeps tester-visible
 // latency on PIC reboot bounded while cutting steady-state OT traffic ~20x.
+// TC= is not in this list: it is event-driven (TASK-1272, see satEnqueueIfChangedTC).
 static const uint32_t SAT_CMD_REFRESH_MS = 300000UL; // 5 min
 
 // Reset the SAT last-sent OT command cache so the next call to
 // satEnqueueIfChanged*() always enqueues. Used on offline->online edges,
 // safety/disable paths, and at boot.
-// bLastSentValid is shared by CS/MM/CH/TC and the first helper to send sets it, so it
+// bLastSentValid is shared by CS/MM/CH and the first helper to send sets it, so it
 // cannot force the later ones. The per-command timestamps are therefore set one refresh
 // window in the past: every command is stale (uint32_t arithmetic, also right when
 // millis() < SAT_CMD_REFRESH_MS shortly after boot or across the 49-day wrap) and the
@@ -439,7 +440,7 @@ static inline void satResetCmdCache() {
   state.sat.iLastSentCSMs  = stale;
   state.sat.iLastSentMMMs  = stale;
   state.sat.iLastSentCHMs  = stale;
-  state.sat.iLastSentTCMs  = stale;
+  state.sat.bTCAccountedValid = false;   // TC= is event-driven (TASK-1272): force the resend explicitly
 }
 
 // TASK-1150: true only while SAT itself is submitting a command through the shared
@@ -519,19 +520,37 @@ static bool satEnqueueIfChangedCH(uint8_t ch) {
   return true;
 }
 
+// TASK-1272, Sergeant D entry 14 and the maintainer decision of 2026-10-24: TC= is pushed when the
+// target changes and not on a timer, exactly as thermo-nova (climate.py:641-657, command TC={value}
+// in coordinator/mqtt/opentherm.py:206-209). There is no refresh and no re-push: a thermostat that
+// refuses the remote override keeps its own setpoint and SAT does not keep asking. TC= also goes out
+// once after satResetCmdCache() (boot, SAT enabled, OT bus back online) and when push setpoint is
+// switched off and on again.
+//
+// A target taken over from the thermostat (follow thermostat) is already on the thermostat: no TC=
+// goes back (climate.py:765, cascade=False). fLastSentTC is set to it too, so the follow-thermostat
+// echo guard (satFollowThermostatDecide, entry 2) compares against what the thermostat shows now:
+// dialling back to an earlier value is a change and is adopted. Called by satAdoptThermostatSetpoint().
+static void satTCNoteAdopted(float target) {
+  state.sat.fLastSentTC       = target;
+  state.sat.bTCAccountedValid = true;
+}
+
 static bool satEnqueueIfChangedTC(float tc) {
-  uint32_t now = millis();
   int16_t newQ = (int16_t)lroundf(tc * 10.0f);
   int16_t oldQ = (int16_t)lroundf(state.sat.fLastSentTC * 10.0f);
-  bool stale = (now - state.sat.iLastSentTCMs) >= SAT_CMD_REFRESH_MS;
-  if (state.sat.bLastSentValid && newQ == oldQ && !stale) return false;
+  if (state.sat.bTCAccountedValid && newQ == oldQ) return false;
   char buf[16];
   snprintf_P(buf, sizeof(buf), PSTR("TC=%.1f"), tc);
   addCommandToQueue(buf, strlen(buf), false, 0);
-  state.sat.fLastSentTC     = (float)newQ / 10.0f;
-  state.sat.iLastSentTCMs   = now;
-  state.sat.bLastSentValid  = true;
+  state.sat.fLastSentTC       = (float)newQ / 10.0f;
+  state.sat.bTCAccountedValid = true;
   return true;
+}
+
+// Push setpoint switched off: forget the push, so switching it on again sends the current target.
+static void satTCPushOff() {
+  state.sat.bTCAccountedValid = false;
 }
 
 // --- Thermal Drop Learning State (Task #21) ---
@@ -1185,6 +1204,7 @@ static void satAdoptThermostatSetpoint(float tr)
   state.sat.eActivePreset  = SAT_PRESET_NONE;
   state.sat.fPreCustomTemp = 0.0f;
   updateSetting("SATtargettemp", valBuf);
+  satTCNoteAdopted(settings.sat.fTargetTemp);   // the thermostat already has it: no TC= back (TASK-1272)
   SATDebugTf(PSTR("SAT: follow thermostat: target %.1f from thermostat setpoint%s\r\n"),
              settings.sat.fTargetTemp, hadPreset ? ", preset cleared" : "");
   if (hadPreset) satSyncPresetTopic(SAT_PRESET_NONE);
@@ -4673,7 +4693,7 @@ static void satControlLoopRun()
 
   // TASK-565: detect OT-bus offline->online edge and reset write-on-change
   // cache so a recovering boiler immediately receives the current SAT state
-  // (CS/MM/CH/TC) instead of waiting for the staleness window to expire.
+  // (CS/MM/CH and TC) instead of waiting for the staleness window to expire.
   bool otOnline = state.otBus.bOnline;
   if (otOnline && !_sat_prevOTOnline) {
     satResetCmdCache();
@@ -5147,6 +5167,8 @@ static void satControlLoopRun()
     // Push SAT target to thermostat display via TC= command (Task #31)
     if (settings.sat.bPushSetpoint) {
       satEnqueueIfChangedTC(settings.sat.fTargetTemp);
+    } else {
+      satTCPushOff();
     }
     _sat_picFailCount = 0;
   } else {

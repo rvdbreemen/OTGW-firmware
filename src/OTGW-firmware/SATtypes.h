@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.486
+**  Version  : v2.0.0-alpha.487
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -396,7 +396,8 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float    fLastSentCS            = 0.0f;   // CS=<float> last emitted (rounded to .1)
   uint8_t  iLastSentMM            = 0;      // MM=<uint> last emitted
   uint8_t  iLastSentCH            = 0;      // CH=<0|1> last emitted
-  float    fLastSentTC            = 0.0f;   // TC=<float> last emitted (rounded to .1)
+  float    fLastSentTC            = 0.0f;   // TC=<float> last emitted (rounded to .1), or the thermostat value SAT adopted (TASK-1272)
+  bool     bTCAccountedValid      = false;  // fLastSentTC is the value the thermostat push has dealt with; false after boot, a cache reset or push off: the next tick sends TC= (TASK-1272)
   float    fThermostatTrSet       = 0.0f;   // last thermostat room setpoint seen for follow-thermostat (TASK-1259)
   float    fThermostatTrSetCand   = 0.0f;   // debounce: new thermostat setpoint seen once, waiting for its second frame
   bool     bThermostatTrSetCandValid = false;
@@ -404,7 +405,6 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint32_t iLastSentCSMs          = 0;
   uint32_t iLastSentMMMs          = 0;
   uint32_t iLastSentCHMs          = 0;
-  uint32_t iLastSentTCMs          = 0;
   // BLE temperature sensor (Task #20). ESP-abstraction Tier 2 (TASK-742):
   // fields are unconditional so settings/state round-trip across platforms and
   // downstream code reads them without #ifdef. On ESP8266 they stay zero/false

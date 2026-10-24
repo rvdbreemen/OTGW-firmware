@@ -53,6 +53,7 @@ static void updateSetting(const char* field, const char* value) {
   if (!strcmp(field, "SATtargettemp")) { float v = (float)atof(value); settings.sat.fTargetTemp = v < 5 ? 5 : (v > 30 ? 30 : v); g_adopt++; }
 }
 static void satSyncPresetTopic(SATPreset) { g_syncCalls++; }
+static void satTCNoteAdopted(float) { }
 """
 
 MAIN = r"""

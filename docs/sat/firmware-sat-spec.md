@@ -562,7 +562,7 @@ else: control = max(pidOutput, Tboiler - fFlowOffset)        (fFlowOffset defaul
 | First enabled pass with an interface, if boot `CS=0` was missed | `CS=0` | `SATcontrol.ino:4585-4589` |
 | Each tick on the main path | `CS=<setpoint>`, `MM=<value>`, `CH=0/1`, write-on-change | `SATcontrol.ino:4978-4983` |
 | Same tick, Immergas | `TP=11:12=<setpoint>`, every tick | `SATcontrol.ino:4986-4990` |
-| Same tick, push setpoint on | `TC=<target>`, write-on-change | `SATcontrol.ino:4992-4994` |
+| Same tick, push setpoint on | `TC=<target>`, on target change only, no re-push (TASK-1272) | `SATcontrol.ino:5172-5176`, `SATcontrol.ino:540-553` |
 | Tick in summer simmer or with all valves closed | `CS=10.0`, `MM=<max>`, `CH=0` | `SATcontrol.ino:4766-4773`, `SATcontrol.ino:4779-4786` |
 | Tick in the thermal safe fallback (2 h of estimation) | `CS=45` (capped at the system max), `MM=<max>`, `CH=1` | `SATcontrol.ino:4732-4743` |
 | Tick entering DHW with DHW control on | `SW=<DHW setpoint>`, once per DHW entry | `SATcontrol.ino:4640-4648` |
@@ -1387,7 +1387,7 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 | Max relative modulation | `state.sat.iCurrentModulation` | `MM=<n>`, same write-on-change rule | SATcontrol.ino:4981, SATcontrol.ino:416-427 |
 | CH enable | 1 if `finalSetpoint` > 10 °C, else 0 | `CH=1` / `CH=0`, same rule | SATcontrol.ino:4982-4983, SATcontrol.ino:430-439 |
 | Immergas extra | the final setpoint, no decimals | `TP=11:12=<value>`, every tick | SATcontrol.ino:4986-4990 |
-| Thermostat display | `settings.sat.fTargetTemp` when `bPushSetpoint` is on | `TC=%.1f`, same write-on-change rule | SATcontrol.ino:4992-4994, SATcontrol.ino:441-454 |
+| Thermostat display | `settings.sat.fTargetTemp` when `bPushSetpoint` is on | `TC=%.1f`, on target change; no 5-min refresh (TASK-1272) | SATcontrol.ino:5172-5176, SATcontrol.ino:540-553 |
 
 On PIC boards the last `CS=` (when ≥ 8 °C) is re-sent every 30 s (SATcontrol.ino:403-414). The command cache is cleared when the OpenTherm bus comes back online, so the next tick re-sends everything (SATcontrol.ino:4531-4535). A grep for `CS=` over `SAT*.ino` shows every SAT `CS=` send going through `satEnqueueOwnCS()` (SATcontrol.ino:375-379, SATcontrol.ino:391, SATcontrol.ino:412, SATcontrol.ino:2179, SATcontrol.ino:3707, SATcontrol.ino:4586). No `PM=25` after `CS=` and no `SH=` command was found (grep over all `*.ino` for `PM=25` and `SH=`).
 
@@ -2547,7 +2547,7 @@ There is no restore of the active preset, of the pre-custom temperature or of th
 | Main PID minimum time between updates | 10 s | SATpid.ino:21, SATpid.ino:274-279 |
 | Zone PID update | every control tick (no own timer) | SATcontrol.ino:4846-4854 |
 | Window minimum open time | checked once per control tick | SATcontrol.ino:4755, SATcontrol.ino:1126-1143 |
-| Re-send of an unchanged `TC=` | on the first control tick once 5 min have passed since the last send | SATcontrol.ino:351, SATcontrol.ino:439-453 |
+| Re-send of an unchanged `TC=` | never (TASK-1272); only after a cache reset or push off and on | SATcontrol.ino:540-553 |
 | Area value staleness | 5 min | SATcontrol.ino:87, SATcontrol.ino:1706-1711 |
 | Zone value staleness | `iZoneTimeoutS`, default 300 s, range 30 to 3600 s | SATtypes.h:532, settingStuff.ino:1113, SATcontrol.ino:1818 |
 
@@ -2806,7 +2806,7 @@ switch when (millis() - iWindowOpenSinceMs) / 1000 >= iWindowMinOpenSec
 | Follow-thermostat minimum change | 0.095 | °C | SATcontrol.ino:1070 |
 | Follow-thermostat debounce match | 0.051, two consecutive frames | °C | SATcontrol.ino:1071 |
 | Follow-thermostat echo window | 0.25 | °C | SATcontrol.ino:1076-1077 |
-| `SAT_CMD_REFRESH_MS` (unchanged `TC=` re-send) | 300000 (5 min) | ms | SATcontrol.ino:351 |
+| `SAT_CMD_REFRESH_MS` (unchanged CS/MM/CH re-send; not TC= since TASK-1272) | 300000 (5 min) | ms | SATcontrol.ino:427 |
 | `bPresetSync` default | false | | SATtypes.h:485 |
 | `sPresetSyncTopic` | empty, max 64 characters | | SATtypes.h:486 |
 | `iHeatingMode` default / range | 0 (comfort) / 0 to 1, no effect on control | | SATtypes.h:524, settingStuff.ino:1104 |
@@ -2849,7 +2849,7 @@ To the boiler, through the command queue, on each control tick that reaches the 
 
 Thermostat setpoint push (only when `bPushSetpoint` is true and an OT command interface exists) (SATcontrol.ino:4991-4994, SATcontrol.ino:439-453):
 
-- `TC=<fTargetTemp>` with one decimal, sent when the value rounded to 0.1 changed or the last send is 5 min old.
+- `TC=<fTargetTemp>` with one decimal, sent when the target rounded to 0.1 changed (TASK-1272, Sergeant D entries 14 and 16; as thermo-nova, `climate.py:641-657`). There is no periodic refresh. A target adopted from the thermostat (follow thermostat) is not sent back (`climate.py:765`, `cascade=False`). There is no re-push, no MsgID 9 check and no 5-minute refresh (maintainer decision 2026-10-24, option D: exactly thermo-nova). A thermostat that refuses the remote override keeps its own setpoint and SAT does not keep asking. A cache reset (OT bus back online) and switching push off and on again also send the current target once. `TC=` push works only on thermostats that accept a remote override; SAT pushes on a target change. An adopted thermostat value also becomes `fLastSentTC`, so the echo guard compares against it and a later dial-back is adopted too. Code: `SATcontrol.ino:529-559` (`satTCNoteAdopted`, `satEnqueueIfChangedTC`, `satTCPushOff`), call site `SATcontrol.ino:5172-5176`.
 - It is skipped on every tick that returns before line 4977: DHW active, invalid room temperature, boiler fault, thermal safe fallback, summer mode, valves closed (SATcontrol.ino:4635-4652, SATcontrol.ino:4669-4683, SATcontrol.ino:4716-4719, SATcontrol.ino:4730-4746, SATcontrol.ino:4766-4790).
 - It is sent on the same path for PIC and OT-Direct boards; the code does not branch on the board here (SATcontrol.ino:4978-4994).
 
