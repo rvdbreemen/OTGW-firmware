@@ -3,9 +3,11 @@ id: TASK-1304
 title: >-
   ADR-022 lists the GPIO output trigger bits as master bits 0-7; the code tests
   the slave byte at 0-7 (erratum or superseding ADR)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-22T20:27:00Z'
+updated_date: '2026-10-24T18:18:00Z'
 labels:
   - docs
   - adr
@@ -22,6 +24,12 @@ Found by the TASK-1295 review (2026-10-22). docs/adr/ADR-022-gpio-output-bit-fla
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 An ADR (erratum or superseding) states the real bit layout with citations to OTGW-Core.ino and the OT spec MsgID 0
+- [x] #1 An ADR (erratum or superseding) states the real bit layout with citations to OTGW-Core.ino and the OT spec MsgID 0
 - [ ] #2 ADR-022 is marked Superseded or carries the erratum reference per adr-kit rules
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-24: ADR-200 (Proposed) supersedes ADR-022 on acceptance: the trigger bit indexes Statusflags = (MasterStatus<<8)|SlaveStatus; bits 0-7 = boiler (slave) byte, 8-15 = thermostat (master) byte (CH enable = bit 8, DHW blocking = bit 14). Citations: outputs_ext.ino:87 (test), OTGW-Core.ino:2943/:2534/:4665/:4792 (writers), spec v4.2 5.3.1 lines 1431-1452 and 5.4 line 2341. Second reader: 3 corrections, fixed. adr-lint: ADR-200 no FAIL (ADVISORY only). AC2 (ADR-022 marked Superseded) waits for acceptance = Robert's explicit OK.
+<!-- SECTION:NOTES:END -->

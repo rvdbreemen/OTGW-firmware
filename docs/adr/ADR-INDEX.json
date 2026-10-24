@@ -7155,6 +7155,71 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-200",
+      "title": "GPIO output trigger bit indexes the MsgID 0 status word (proposed successor to ADR-022)",
+      "path": "ADR-200-gpio-output-trigger-bit-indexes-the-msgid-0-status-word-supersedes-adr-022.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-24",
+      "decision_summary": "The GPIO output follows one bit of the 16-bit MsgID 0 status word Statusflags = (MasterStatus << 8) | SlaveStatus (OT...",
+      "topics": [
+        "gpio",
+        "opentherm",
+        "outputs",
+        "relay",
+        "status-flags"
+      ],
+      "aliases": [
+        "GPIO outputs",
+        "GPIO relay output",
+        "GPIOOUTPUTStriggerBit",
+        "Statusflags",
+        "trigger bit"
+      ],
+      "components": [
+        "GPIO outputs"
+      ],
+      "symbols": [
+        "evalOutputs",
+        "initOutputs",
+        "OutputsSection",
+        "setOutputState",
+        "Statusflags",
+        "validateGPIOOutputsConfig"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Index the trigger bit into Statusflags = (MasterStatus << 8) | SlaveStatus: bits 0-7 slave, bits 8-15 master.",
+          "Accept trigger bits 0-15 in the validator, the settings parser and the REST schema.",
+          "Label trigger bits by the table above in any UI, document or support answer.",
+          "Keep the output stateless: recompute the pin from the stored bit on each evaluation."
+        ],
+        "must_not": [
+          "Describe trigger bit 0 as CH enable, or bits 0-6 as the master flags.",
+          "Change the bit order of Statusflags without superseding this ADR; the GPIO output, the webhook, isFlameOn() and SAT all read it."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "Every file:line in this ADR was opened at HEAD 057535397 in this session, and every spec line in OpenTherm-Protocol-Specification-v4.2.md.",
+          "No host test drives evalOutputs(). The layout claim rests on reading the two writers and the test; it is not covered by an automated test. This ADR claims no gate."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -12729,6 +12794,24 @@
     {
       "source": "ADR-199",
       "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-200",
+      "target": "ADR-022",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-200",
+      "target": "ADR-051",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-200",
+      "target": "ADR-080",
       "type": "related",
       "resolved": true
     }
