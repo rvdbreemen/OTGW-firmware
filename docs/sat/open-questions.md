@@ -2,9 +2,9 @@
 
 This is the queue of SAT questions that the firmware port cannot answer by itself.
 Sergeant D (George) designed SAT, so his answer decides. We ask **one question at a
-time** in #alpha-testing, in plain English, with concrete proposals to choose from.
+time** in #alpha-testing, in plain English, with the possible answers and our recommendation.
 Each answer is recorded in [`sergeant-d-corrections.md`](sergeant-d-corrections.md)
-before anything is built on it.
+and then becomes a backlog task.
 
 George: if a question below is unclear or wrongly put, just say so. A correction of
 the question is as useful as an answer.
@@ -14,7 +14,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 
 | # | Status | Topic | Blocks |
 |---|---|---|---|
-| Q1 | asked (2026-10-24 08:43 UTC, as a "no rush" follow-up) | Keep the firmware's "PWM auto switch" setting at all? | nothing |
+| Q1 | asked (2026-10-24, re-asked with answers and advice) | Keep the firmware's "PWM auto switch" setting at all? | nothing |
 | Q2 | queued | End-of-cycle switch: compare the tail flow with the control setpoint per sample, as thermo-nova | TASK-1331 |
 | Q3 | queued | Overshoot margin 2.0 equals the flow offset 2.0 | TASK-1331 |
 | Q4 | queued | Classifier steps the firmware keeps that classifier.py does not have | TASK-1331 |
