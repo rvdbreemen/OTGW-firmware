@@ -127,12 +127,12 @@ class DisabledStateIsPublished(unittest.TestCase):
     # --- A: sat/mode is off while disabled or tripped ---------------------------------------
     def test_mode_topic_is_off_while_disabled_or_tripped(self):
         core = body(self.sat, "static void satPublishCoreState()")
-        guard = core.index("if (!settings.sat.bEnabled || state.sat.bSafetyTripped) modeIdx = 0;")
+        guard = core.index("if (!satIsEnabled() || state.sat.bSafetyTripped) modeIdx = 0;")
         self.assertLess(guard, core.index('F("sat/mode")'))
 
     def test_control_mode_command_keeps_the_actual_mode_while_disabled_or_tripped(self):
         h = body(self.sat, "void satHandleControlMode(const char* value)")
-        self.assertIn("const bool live = settings.sat.bEnabled && !state.sat.bSafetyTripped;", h)
+        self.assertIn("const bool live = satIsEnabled() && !state.sat.bSafetyTripped;", h)
         calls = re.findall(r"^\s*(if \(live\) )?satSetControlMode\(", h, re.M)
         self.assertEqual(len(calls), 3)
         self.assertTrue(all(calls), "an unguarded satSetControlMode() call changes eControlMode while disabled")

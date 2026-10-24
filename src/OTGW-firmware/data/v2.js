@@ -2043,6 +2043,7 @@
     satovershootprotection: { cat: 'sat', label: 'PWM overshoot protection' },
     satpushsetpoint:     { cat: 'sat', label: 'Push setpoint to thermostat' },
     satfollowthermostat: { cat: 'sat', label: 'Follow thermostat setpoint' },
+    satmqttfallback:     { cat: 'sat', label: 'Take over when MQTT is lost' },
     satwindowdetect:     { cat: 'sat', label: 'Window detection' },
     satwindowminsec:     { cat: 'sat', label: 'Window min open time', hint: 'Seconds' },
     satthermalcomfort:   { cat: 'sat', label: 'Thermal comfort model' },
@@ -2144,7 +2145,7 @@
   // satenabled is the SAT header toggle, so no form shows it. A SAT key that is not
   // listed here lands in L3 "Other", so a new firmware setting is never hidden.
   var SAT_L2 = [
-    ['System', ['satsystem', 'satsource', 'satheatingmode', 'sattargettemp', 'satpushsetpoint', 'satfollowthermostat']],
+    ['System', ['satsystem', 'satsource', 'satheatingmode', 'sattargettemp', 'satpushsetpoint', 'satfollowthermostat', 'satmqttfallback']],
     ['Presets', ['satpresetcomfort', 'satpreseteco', 'satpresetaway', 'satpresetsleep', 'satpresetactivity',
                  'satpresethome', 'satpresetsync', 'satpresetsynctopic']],
     ['Indoor temperature', ['satexternaltemp', 'satsensormaxage']],
@@ -4575,21 +4576,23 @@
   function renderSatPage(d) {
     // `active` means the SAT control loop is engaged; it does NOT mean the burner is
     // running. Deriving "heating" from it made the pill read Heating with a cold boiler.
-    var enabled = !!d.enabled, active = !!d.active, heating = enabled && satBurnerIsFiring(d);
+    var userEnabled = !!d.enabled, takeover = !userEnabled && !!d.fallback_active;
+    var enabled = userEnabled || takeover, active = !!d.active, heating = enabled && satBurnerIsFiring(d);
 
     var pill = document.getElementById('satPill');
     if (pill) {
-      pill.textContent = !enabled ? 'Off' : (heating ? 'Heating' : 'Idle');
+      pill.textContent = !enabled ? 'Off' : (takeover ? 'Takeover (MQTT lost)' : (heating ? 'Heating' : 'Idle'));
       pill.className = 'sat-pill' + (!enabled ? ' off' : (heating ? '' : ' idle'));
     }
-    txt('satEnableLbl', enabled ? 'Enabled' : 'Disabled');
-    var enCb = document.getElementById('satEnable'); if (enCb && !satEnPending) enCb.checked = enabled;
+    txt('satEnableLbl', userEnabled ? 'Enabled' : 'Disabled');
+    var enCb = document.getElementById('satEnable'); if (enCb && !satEnPending) enCb.checked = userEnabled;
 
     // L1 — dial + status + presets
     satDialDraw(d);
     var big;
     if (!enabled) big = 'SAT is off';
     else if (d.safety_tripped) big = 'Safety tripped!';
+    else if (takeover) big = 'Takeover (MQTT lost)';
     else if (d.window_open) big = 'Window open';
     else if (d.summer_active) big = 'Summer mode';
     else if (heating) big = 'Heating to ' + satFmt(d.target_temp, 1, '°');

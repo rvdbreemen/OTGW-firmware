@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.487
+**  Version  : v2.0.0-alpha.488
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1643,6 +1643,8 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATovershootprotection", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("follow_thermostat")) == 0) {
       updateSetting("SATfollowthermostat", val); handled = true;
+    } else if (strcasecmp_P(settingName, PSTR("mqtt_fallback")) == 0) {
+      updateSetting("SATmqttfallback", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("external_temp")) == 0) {
       updateSetting("SATexternaltemp", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("flow_offset")) == 0) {
@@ -2279,6 +2281,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
     je.field(F("settings.sat.overshoot_protection"), settings.sat.bOvershootProtection);
     je.field(F("settings.sat.follow_thermostat"), settings.sat.bFollowThermostat);
+    je.field(F("settings.sat.mqtt_fallback"), settings.sat.bMqttFallback);
     je.field(F("settings.sat.dhw_setpoint"), settings.sat.fDhwSetpoint);
     je.field(F("settings.sat.dhw_enabled"), settings.sat.bDhwEnabled);
     je.field(F("settings.sat.dhw_enable"), settings.sat.bDhwEnable);
@@ -4035,6 +4038,7 @@ void sendDeviceSettings()
   addBool(F("satovershootprotection"), settings.sat.bOvershootProtection, "b");
   addBool(F("satpushsetpoint"),   settings.sat.bPushSetpoint, "b");
   addBool(F("satfollowthermostat"), settings.sat.bFollowThermostat, "b");
+  addBool(F("satmqttfallback"), settings.sat.bMqttFallback, "b");
   addBool(F("satwindowdetect"),   settings.sat.bWindowDetection, "b");
   addInt (F("satwindowminsec"),   settings.sat.iWindowMinOpenSec, "i", 10, 600);
   addBool(F("satthermalcomfort"), settings.sat.bThermalComfort, "b");
@@ -4194,7 +4198,7 @@ static const char* const PROGMEM knownSettings[] = {
   "satdeadband", "satdhwcapacity", "satdhwenable", "satdhwenabled", "satdhwsetpoint", "satenabled", "satexternaltemp",
   "satflameoffset", "satflowoffset", "satflushtreshold", "satfollowthermostat", "sathumiditytimeout",
   "satinterval", "satmanufacturer", "satmaxpressdrop", "satmaxpressure", "satminpressure",
-  "satmodsupdelay", "satmodsupoffset", "satmultiarea", "satmultiareacount",
+  "satmodsupdelay", "satmodsupoffset", "satmqttfallback", "satmultiarea", "satmultiareacount",
   "satovershootmargin", "satovershootprotection", "satpresetactivity", "satpresetaway", "satpresetcomfort", "satpreseteco",
   "satpresethome", "satpresetsleep",  // TASK-1254: activity/home/sleep had GET + dispatch but were POST-blocked
   "satpresetsync", "satpresetsynctopic", "satpushsetpoint",

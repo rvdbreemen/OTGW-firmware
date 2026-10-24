@@ -106,6 +106,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satovershootprotection":"In PWM, SAT overrides the control setpoint (CS) to keep the burner at its lowest level. Default on.",
 "satpushsetpoint":"Send the SAT target to the thermostat display (TC= override). Default off.",
 "satfollowthermostat":"A setpoint change on the wall thermostat becomes the SAT target. Needs SAT enabled.",
+"satmqttfallback":"When MQTT has been lost for more than 5 minutes, SAT controls the boiler until MQTT is back. Needs MQTT to have been connected once since boot. Off: the thermostat keeps control.",
 "satwindowdetect":"Lower the target to the Activity preset while a window is reported open (MQTT sat/window).",
 "satwindowminsec":"Seconds a window must stay open before SAT reacts, 10 to 600. Default 60.",
 "satthermalcomfort":"Replace the OpenTherm room temperature with the Summer Simmer comfort index. Not used with a BLE, multi-area or pushed indoor value.",

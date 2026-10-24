@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.487
+**  Version  : v2.0.0-alpha.488
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -685,6 +685,7 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "flame_off_offset",       "SATflameoffset",       nullptr },
   { "overshoot_protection",   "SATovershootprotection", nullptr },
   { "follow_thermostat",      "SATfollowthermostat",  nullptr },
+  { "mqtt_fallback",          "SATmqttfallback",      nullptr },  // TASK-1345
   { "external_temp",          "SATexternaltemp",      nullptr },  // TASK-1284: use the MQTT/REST indoor temp (indoor_temp) as the room source
   { "flow_offset",            "SATflowoffset",        nullptr },
   { "summer_simmer",          "SATsummersimmer",      nullptr },

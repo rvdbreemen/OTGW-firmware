@@ -47,6 +47,7 @@ struct SatState { float fLastSentTC=0.0f, fThermostatTrSet=0.0f, fThermostatTrSe
                   SATPreset eActivePreset=SAT_PRESET_NONE; };
 struct State { SatState sat; };
 static Settings settings; static State state;
+static bool satIsEnabled() { return settings.sat.bEnabled; }   // TASK-1345: the real one adds the MQTT-loss takeover flag
 static int g_syncCalls = 0, g_adopt = 0;
 static void dtostrf(float v, int, int prec, char* out) { snprintf(out, 12, "%.*f", prec, v); }
 static void updateSetting(const char* field, const char* value) {

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.487
+**  Version  : v2.0.0-alpha.488
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -233,6 +233,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   bool     bSafetyTripped        = false; // true if safety forced satDisable()
   // Fallback mode
   bool     bFallbackActive       = false;
+  bool     bFallbackSuppressed   = false; // TASK-1345: the user switched SAT off; no MQTT-loss takeover for the rest of this outage (cleared when MQTT is back)
   SATFallbackReason eFallbackReason = SAT_FB_NONE;
   // Heating system detection
   uint8_t  iDetectedHeatingSource  = SAT_SRC_GAS_BOILER; // NON-CONTROL hint from OT MsgID 3 HB bit2 (cooling-capable => heat pump). Telemetry only; control uses manual satsource (TASK-943).
@@ -459,6 +460,7 @@ struct SATSection {
   bool     bDhwEnable         = true;   // TASK-516: master DHW enable (HW= command). Only acted on when boiler reports MsgID 3 HB3=1 (storage tank). Default true keeps boiler-default DHW enabled.
   bool     bPushSetpoint      = false;  // Push SAT target to thermostat display (TC= command)
   bool     bFollowThermostat  = false;  // A thermostat room setpoint change (MsgID 16) becomes the SAT target (TASK-1259). Units with no stored SATfollowthermostat get bPushSetpoint (readSettings); a stored value wins
+  bool     bMqttFallback      = false;  // Opt-in (TASK-1345): SAT takes over (state.sat.bFallbackActive, never settings.sat.bEnabled) once MQTT has been lost for more than 5 minutes. Default off
   float    fFlameOffOffset    = 18.0f;  // Flame-off hold offset above return temp during PWM (Python flame_off_setpoint_offset_celsius=18.0): primes the boiler for fast, clean re-ignition
   bool     bWindowDetection   = false;  // Enable window open detection via MQTT
   uint16_t iWindowMinOpenSec  = 60;     // Minimum seconds window must stay open before action

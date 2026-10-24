@@ -1030,6 +1030,7 @@ De onderstaande commando's geven de payload ongewijzigd door aan de genoemde ins
 | `sat/interval` | `SATinterval` |
 | `sat/push_setpoint` | `SATpushsetpoint` |
 | `sat/follow_thermostat` | `SATfollowthermostat` |
+| `sat/mqtt_fallback` | `SATmqttfallback` |
 | `sat/external_temp` | `SATexternaltemp` |
 | `sat/flame_off_offset` | `SATflameoffset` |
 | `sat/overshoot_protection` | `SATovershootprotection` |

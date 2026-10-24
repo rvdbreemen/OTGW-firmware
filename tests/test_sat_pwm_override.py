@@ -62,6 +62,7 @@ struct SatState { int iCurrentModulation=0; float fFinalSetpoint=0, fPwmDutyCycl
 struct State { SatState sat; };
 struct OTSys { int SlaveStatus = 0; };
 static Settings settings; static State state; static OTSys OTcurrentSystemState;
+static bool satIsEnabled() { return settings.sat.bEnabled; }   // TASK-1345
 static uint32_t g_ms = 1000000; static bool g_flame = false; static float g_flow = 33, g_ret = 30;
 static uint32_t g_flameOnStart = 0, g_flameOffStart = 0; static bool g_due = true; static bool g_hourLimit = false;
 static int g_csSent = 0; static float g_csLast = 0;

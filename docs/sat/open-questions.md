@@ -22,7 +22,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q2 | asked 2026-10-24 09:25 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563483620444999771)) | End-of-cycle switch: compare the tail flow with the control setpoint per sample, as thermo-nova | TASK-1331 |
 | Q3 | queued | Overshoot margin 2.0 equals the flow offset 2.0 | TASK-1331 |
 | Q4 | queued | Classifier steps the firmware keeps that classifier.py does not have | TASK-1331 |
-| Q5 | queued | Fallback after an MQTT outage: which units may SAT take over, and for how long? (audit #2) | TASK-1345 |
+| Q5 | dropped: decided by the maintainer 2026-10-24 (opt-in setting, default off; the fallback lives in state only) -> TASK-1345 | Fallback after an MQTT outage: which units may SAT take over? (audit #2) | - |
 | Q6 | queued | Room temperature lost or missing: stop SAT, or keep heating on curve + P as thermo-nova? Which stale time? (audit #4, entry 27, conflict C8) | - |
 | Q7 | queued | Outside temperature missing or old: what should SAT use? (audit #5) | - |
 | Q8 | queued | Heat pumps in PWM: minimum on-time and cycles per hour (audit #9, conflicts C3/C4) | - |

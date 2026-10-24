@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.487
+**  Version  : v2.0.0-alpha.488
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -315,6 +315,7 @@ void writeSettings(bool show)
   writeJsonStringKV(file, F("WebhookContentType"), settings.webhook.sContentType);
   // --- SAT settings ---
   writeJsonBoolKV(file, F("SATenabled"), settings.sat.bEnabled);
+  writeJsonBoolKV(file, F("SATmqttfallback"), settings.sat.bMqttFallback);  // TASK-1345
   writeJsonIntKV(file, F("SATsystem"), settings.sat.iHeatingSystem);
   writeJsonIntKV(file, F("SATsource"), settings.sat.iHeatingSource);
   writeJsonIntKV(file, F("SAThpcycle"), settings.sat.iHpCycleSeconds);
@@ -982,6 +983,8 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATenabled")) == 0) {
     bool wasEnabled = settings.sat.bEnabled;
     settings.sat.bEnabled = EVALBOOLEAN(newValue);
+    // TASK-1345: a user switch-off also ends and blocks an MQTT-loss takeover, even when the setting was already off
+    if (!settings.sat.bEnabled && state.bSetupComplete) state.sat.bFallbackSuppressed = true;
     // Only disable on actual enabled→disabled transition, and not during boot
     if (wasEnabled && !settings.sat.bEnabled && state.bSetupComplete) {
       satDisable();
@@ -1032,6 +1035,7 @@ void updateSetting(const char *field, const char *newValue)
   }
   else if (strcasecmp_P(field, PSTR("SATpushsetpoint")) == 0)   settings.sat.bPushSetpoint = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATfollowthermostat")) == 0) { settings.sat.bFollowThermostat = EVALBOOLEAN(newValue); g_sawSatFollowKey = true; }  // TASK-1259: key presence = stored value (see readSettings default)
+  else if (strcasecmp_P(field, PSTR("SATmqttfallback")) == 0)  settings.sat.bMqttFallback = EVALBOOLEAN(newValue);  // TASK-1345
   else if (strcasecmp_P(field, PSTR("SATflameoffset")) == 0)    settings.sat.fFlameOffOffset = clampSettingFloat(newValue, settings.sat.fFlameOffOffset, 0.0f, 30.0f);
   else if (strcasecmp_P(field, PSTR("SATwindowdetect")) == 0)  settings.sat.bWindowDetection = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATwindowminsec")) == 0)  settings.sat.iWindowMinOpenSec = constrain(atoi(newValue), 10, 600);

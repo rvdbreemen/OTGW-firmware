@@ -334,11 +334,11 @@ These thresholds are tunable; they are guideline-level under ADR-111 and may be 
 
 | Topic | Value | Retained | Description |
 | ----- | ----- | -------- | ----------- |
-| `sat/enabled` | `"true"` / `"false"` | yes | SAT enabled setting (matches the `sat/enabled` command). Published while SAT is disabled too |
+| `sat/enabled` | `"true"` / `"false"` | yes | SAT enabled setting, i.e. the user's choice (matches the `sat/enabled` command). Published while SAT is disabled too. It stays `"false"` during an MQTT-loss takeover; `sat/fallback_active` shows that |
 | `sat/mode` | `"off"` / `"continuous"` / `"pwm"` | yes | ACTUAL control mode; always `"off"` while SAT is disabled or tripped. A `sat/control_mode` command in that state only changes `sat/control_mode` |
 | `sat/control_mode` | `"auto"` / `"continuous"` / `"pwm"` | yes | Control mode REQUESTED with the `sat/control_mode` command (`"auto"` after boot until a command arrives). `sat/mode` is the mode in use |
 | `sat/preset` | `"none"` / `"away"` / `"eco"` / `"comfort"` / `"sleep"` / `"activity"` / `"home"` | yes | Active preset, same names as the `sat/preset` command (`"none"` = no preset) |
-| `sat/fallback_active` | `"true"` / `"false"` | yes | SAT was switched on by the MQTT-loss fallback. In practice it reads `"false"` over MQTT: the fallback only runs while MQTT is down and is lifted before the first publish after reconnect. REST `GET /api/v2/sat/status` (`fallback_active`) shows it live |
+| `sat/fallback_active` | `"true"` / `"false"` | yes | SAT has taken over because MQTT was lost for more than 5 minutes (opt-in setting `SATmqttfallback`, default off; the takeover lives in state and never changes `sat/enabled` or the saved settings). In practice it reads `"false"` over MQTT: the takeover only runs while MQTT is down and is lifted before the first publish after reconnect. REST `GET /api/v2/sat/status` (`fallback_active`) shows it live |
 | `sat/active` | `"true"` / `"false"` | yes | Whether SAT controller is actively controlling; `"false"` while disabled or tripped |
 | `sat/setpoint` | `"43.1"` | yes | Final flow temperature setpoint sent to boiler (°C) |
 | `sat/target` | `"21.0"` | yes | Target room temperature (°C) |
@@ -951,6 +951,8 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 15 auto-
 | `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
 | `sat/dhw_enabled` | `SATdhwenabled` | Enable DHW heating |
 | `sat/pwm_auto_switch` | `SATpwmautoswitch` | Auto-switch between PWM and continuous |
+
+`sat/mqtt_fallback` (key `SATmqttfallback`) is a settings command, not an auto-discovered switch, and has no Home Assistant entity. "Take over when MQTT is lost": after more than 5 minutes without MQTT, SAT controls the boiler until MQTT is back; off (default): the thermostat keeps control. It only starts after MQTT was connected at least once since boot, so a simultaneous power cut of broker and OTGW does not trigger it. Switching SAT off yourself during the outage ends the takeover and it does not restart until MQTT has been back. Also settable through `POST /api/v2/settings` (`satmqttfallback`).
 
 **Heating System Select (TASK-284):**
 

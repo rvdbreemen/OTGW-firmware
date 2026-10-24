@@ -1239,6 +1239,7 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/interval` | `SATinterval` |
 | `sat/push_setpoint` | `SATpushsetpoint` |
 | `sat/follow_thermostat` | `SATfollowthermostat` |
+| `sat/mqtt_fallback` | `SATmqttfallback` |
 | `sat/external_temp` | `SATexternaltemp` |
 | `sat/flame_off_offset` | `SATflameoffset` |
 | `sat/overshoot_protection` | `SATovershootprotection` |

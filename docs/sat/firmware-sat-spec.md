@@ -229,7 +229,7 @@ What is *not* restored: the last error used for P, the last room temperature and
 1. The one-time deferred PID restore, once NTP is synced (`SATcontrol.ino:4515-4519`).
 2. Boiler-detected handling for simulation mode (`SATcontrol.ino:4525-4526`).
 3. On an OT-bus offline-to-online edge, invalidate the command cache (`SATcontrol.ino:4531-4535`).
-4. MQTT fallback check and fallback lift (`SATcontrol.ino:4540-4563`, see Phase F).
+4. MQTT fallback check and fallback lift (`satMqttFallbackStep()`, `SATcontrol.ino:4677-4707`, see Phase F).
 5. **If SAT is disabled or a flash is running:** call `satDisable()` if SAT was active, and stop (`SATcontrol.ino:4568-4573`).
 6. Simulation model and thermal-drop learning (`SATcontrol.ino:4576-4578`).
 7. **If the safety trip is set: stop** (`SATcontrol.ino:4581`).
@@ -337,7 +337,7 @@ All SAT commands go through the shared command queue (`addCommandToQueue`). SAT'
 - **Enable at runtime:** the flag is set and a trip is cleared (`settingStuff.ino:990-992`, `SATcontrol.ino:1941-1948`). `initSAT()` is not called again, so no `PM=` commands are sent. The next tick sets the mode from OFF to CONTINUOUS (`SATcontrol.ino:4617-4619`). The PID was reset by the last disable, so the first-call behaviour of E2 applies again. The control timer was not checked while SAT was disabled, so its due time is in the past: the first enabled pass fires the tick at once, or, if the due time is more than 10 intervals old, the tick comes one interval later (`safeTimers.h:181-189`).
 - **Control mode command** (`SATcontrol.ino:2223-2248`): `off` disables SAT; `continuous`, `pwm` and `auto` record the request and, only while SAT is enabled and not tripped, set the mode (`auto` starts continuous). A mode change resets PWM (`SATcontrol.ino:934-938`).
 
-**MQTT fallback** (`SATcontrol.ino:4540-4563`): when SAT is disabled, MQTT is enabled, MQTT was connected before and has been disconnected for more than 300 s, SAT sets `bEnabled` true in memory and marks the fallback active. When MQTT reconnects, it sets `bEnabled` false and calls `satDisable()`.
+**MQTT fallback** (`satMqttFallbackStep()`, `SATcontrol.ino:4677-4707`, called at `SATcontrol.ino:4749`): opt-in since TASK-1345 (`settings.sat.bMqttFallback`, key `SATmqttfallback`, default off). When it is on, SAT is disabled by the user, MQTT is enabled, MQTT was connected before and has been disconnected for more than 300 s, `satMqttFallbackStep()` sets `state.sat.bFallbackActive` (state only: `settings.sat.bEnabled` is never written, so a settings save cannot persist it). Every control gate asks `satIsEnabled()` (`bEnabled || bFallbackActive`). The fallback is lifted when MQTT reconnects, when MQTT is switched off, when the opt-in is switched off, or when the user enables or disables SAT; `satDisable()` is called unless the user enabled SAT. A user switch-off during the outage sets `state.sat.bFallbackSuppressed`, which blocks a new takeover until MQTT is connected again.
 
 #### Phase G: boiler data updates (not a control tick)
 
@@ -603,7 +603,7 @@ else: control = max(pidOutput, Tboiler - fFlowOffset)        (fFlowOffset defaul
 4. **Whether `hasOTCommandInterface()` is already true at `initSAT()`** on each board type. It depends on `state.pic.bAvailable` and `state.hw.eMode` (`OTGW-firmware.h:527-538`), which I did not trace.
 5. **Meaning of `PM=3`, `PM=15`, `PM=48` and `MI=500`.** The firmware comment says they follow SAT Python and that `MI=500` is for faster OT polling (`SATcontrol.ino:3724`, `SATcontrol.ino:3729`). What the PIC or OT-Direct does with them is outside the SAT code.
 6. **Loop pass rate.** How often the main loop runs is not fixed by the code, so the exact tick and keepalive times can be later than the nominal values.
-7. **Persistence of the fallback enable.** The MQTT fallback sets `settings.sat.bEnabled` directly in memory (`SATcontrol.ino:4551`). Whether a later settings write can persist that value was not traced.
+7. **Persistence of the fallback enable.** Closed by TASK-1345: the MQTT fallback no longer writes `settings.sat.bEnabled`; it sets only `state.sat.bFallbackActive` (see the MQTT fallback paragraph).
 8. **Multi-zone start-up.** With more than one zone, the zone PIDs can replace the main PID output (`SATcontrol.ino:4846-4899`). I did not trace the start-up of the zone PID (`SATcontrol.ino:1806`).
 9. **PWM first cycle after boot.** The PWM OFF phase compares against the flame-off start time set at boot (`SATcontrol.ino:836-837`, `SATcycles.ino:192`). I did not work out the first PWM ON timing for each duty range.
 10. **Outside temperature NAN.** The -40 to 50 °C check (`SATcontrol.ino:4721`) does not catch NAN. I did not check whether any outside source can deliver NAN.
@@ -3518,7 +3518,7 @@ Steps 1 to 9 run on every pass. Steps 10 onward run only when the control timer 
 
 1. **Boiler-detected teardown of simulation** (`SATcontrol.ino:4525-4526`). See Behaviour E.
 2. **OT bus back online.** On an offline-to-online edge of the OT bus, the write-on-change cache is invalidated, so the next tick re-sends everything (`SATcontrol.ino:4531-4535`).
-3. **MQTT fallback (auto-enable).** If SAT is disabled, MQTT is enabled, MQTT was connected before and has now been disconnected for more than 300 s, SAT sets `bFallbackActive` and turns `bEnabled` on in RAM only (`SATcontrol.ino:4540-4554`). When MQTT is connected again, the fallback is lifted, `bEnabled` is set back to false and `satDisable()` runs, which sends `CS=0` (`SATcontrol.ino:4556-4563`, `SATcontrol.ino:2179`).
+3. **MQTT fallback (auto-enable).** If SAT is disabled, MQTT is enabled, MQTT was connected before and has now been disconnected for more than 300 s, and the opt-in `SATmqttfallback` is on, SAT sets `state.sat.bFallbackActive` only; `bEnabled` is never written (`satMqttFallbackStep()`, `SATcontrol.ino:4677-4707`). It does not start after the user switched SAT off during the same outage (`bFallbackSuppressed`, cleared when MQTT is back). The fallback is lifted when MQTT is connected again or switched off, when the opt-in is switched off, or when the user switches SAT on or off; `satDisable()` runs unless the user enabled SAT, which sends `CS=0` (`SATcontrol.ino:2179`).
 4. **Disabled or flashing.** If SAT is not enabled, or a flash update runs, and SAT was active, `satDisable()` runs; then the pass returns (`SATcontrol.ino:4568-4573`).
 5. Simulation model and thermal learning update (`SATcontrol.ino:4576-4578`).
 6. **Safety trip.** If tripped, the pass returns. Nothing more is written until the trip is cleared (`SATcontrol.ino:4581`).

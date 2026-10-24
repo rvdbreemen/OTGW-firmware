@@ -1039,7 +1039,7 @@ static float satApplyPWM(float pidOutput)
 static void satPwmSuppressionRefresh()
 {
   if (!DUE(timerSATSuppress)) return;
-  if (!settings.sat.bEnabled || !state.sat.bActive || state.sat.bSafetyTripped) return;
+  if (!satIsEnabled() || !state.sat.bActive || state.sat.bSafetyTripped) return;
   if (_sat_thermalSafeActive) return;                             // the thermal safe fallback owns CS
   if (state.sat.eControlMode != SAT_MODE_PWM || !state.sat.bPwmFlameRequested) return;
   if (!settings.sat.bOvershootProtection || state.sat.bDhwActive) return;
@@ -1252,7 +1252,7 @@ static bool satFollowThermostatDecide(float seen, bool active, bool pushOn, floa
 // never show up there. The PS=1 summary carries no T frame and is not a source.
 void satOnThermostatSetpoint(float tr)
 {
-  const bool active = settings.sat.bEnabled && settings.sat.bFollowThermostat;
+  const bool active = satIsEnabled() && settings.sat.bFollowThermostat;
   if (satFollowThermostatDecide(tr, active, settings.sat.bPushSetpoint, state.sat.fLastSentTC,
                                 state.sat.fThermostatTrSet, state.sat.bThermostatTrSetValid,
                                 state.sat.fThermostatTrSetCand, state.sat.bThermostatTrSetCandValid)) {
@@ -2315,10 +2315,21 @@ void satPersistAllToFs()
 // setback (OTDirect.ino) is a fail-safe and deliberately outranks this ownership. If the
 // thermostat goes quiet AND SAT is not commanding, something must still keep the house
 // from freezing.
+// satIsEnabled(): does SAT control the boiler right now? The user's setting, or the MQTT-loss
+// takeover (state.sat.bFallbackActive, TASK-1345), which never touches the setting.
+bool satIsEnabled()
+{
+#if defined(HAS_SAT) && HAS_SAT
+  return settings.sat.bEnabled || state.sat.bFallbackActive;
+#else
+  return false;
+#endif
+}
+
 bool satOwnsControlSetpoint()
 {
 #if defined(HAS_SAT) && HAS_SAT
-  return settings.sat.bEnabled;
+  return satIsEnabled();
 #else
   return false;
 #endif
@@ -2404,7 +2415,7 @@ void satHandleControlMode(const char* value)
   int numericVal = atoi(value);
   // While SAT is disabled or tripped the actual mode stays off (sat/mode): the command only
   // records what was requested (sat/control_mode). The control loop starts continuous on enable.
-  const bool live = settings.sat.bEnabled && !state.sat.bSafetyTripped;
+  const bool live = satIsEnabled() && !state.sat.bSafetyTripped;
   if (strcasecmp_P(value, PSTR("continuous")) == 0 || numericVal == 1) {
     state.sat.iRequestedControlMode = 1;
     if (live) satSetControlMode(SAT_MODE_CONTINUOUS);
@@ -2790,7 +2801,7 @@ static void satPublishCoreState()
   // lets the auto-switch move eControlMode, so it is kept as a separate requested value.
   static const char* const modeNames[] = { "off", "continuous", "pwm" };
   uint8_t modeIdx = (uint8_t)state.sat.eControlMode;
-  if (!settings.sat.bEnabled || state.sat.bSafetyTripped) modeIdx = 0;   // disabled or tripped: off, whatever a late command did
+  if (!satIsEnabled() || state.sat.bSafetyTripped) modeIdx = 0;   // disabled or tripped: off, whatever a late command did
   publishIfChangedS(F("sat/mode"), modeNames[modeIdx < 3 ? modeIdx : 0], s_core_mode, true);
   static const char* const reqNames[] = { "auto", "continuous", "pwm" };
   uint8_t reqIdx = state.sat.iRequestedControlMode;
@@ -2815,7 +2826,7 @@ void satRepublishCoreState()
 void satPublishMQTT()
 {
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
-  if (!settings.sat.bEnabled) return;
+  if (!satIsEnabled()) return;
 
   SATDebugTln(F("SAT: publishing MQTT state (ADR-111 on-change + heartbeat)"));
 
@@ -4263,7 +4274,7 @@ bool satSimInjectEvent(const char* event, float value, int32_t durationS)
 //=====================================================================
 static void satUpdateThermalLearning()
 {
-  if (!settings.sat.bEnabled && !state.sat.bFallbackActive) return;
+  if (!satIsEnabled()) return;
 
   uint32_t now = millis();
   bool flame = satIsFlameOn();
@@ -4660,6 +4671,41 @@ static void satAutoTuneUpdate()
   _at_lastTuneMs       = now;
 }
 
+// MQTT-loss takeover (Task #19, opt-in since TASK-1345). Lives in state only: it sets
+// state.sat.bFallbackActive and never writes settings.sat.bEnabled, so a settings save during an
+// outage cannot persist it. Returns true when the control loop must stop for this tick.
+bool satMqttFallbackStep()
+{
+  // --- Fallback detection (Task #19): SAT takes over when external control is lost
+  const bool mqttLost = settings.mqtt.bEnable &&
+                        state.mqtt.iLastConnectedMs > 0 &&
+                        !state.mqtt.bConnected &&
+                        (millis() - state.mqtt.iLastConnectedMs > 300000UL); // 5 min MQTT loss
+  // iLastConnectedMs == 0 means never connected (fresh boot or MQTT not configured): not a loss.
+  if (state.mqtt.bConnected) state.sat.bFallbackSuppressed = false;   // a user switch-off holds for the rest of the outage only
+  if (settings.sat.bMqttFallback && !settings.sat.bEnabled && !state.sat.bFallbackActive &&
+      !state.sat.bFallbackSuppressed && mqttLost) {
+    state.sat.bFallbackActive = true;
+    state.sat.eFallbackReason = SAT_FB_MQTT_LOST;
+    DebugTln(F("SAT FALLBACK: MQTT lost >5min, SAT takes over"));
+  }
+  // Lift when MQTT is back or switched off, the opt-in was switched off, the user enabled SAT
+  // themselves, or the user switched SAT off during the takeover (bFallbackSuppressed).
+  if (state.sat.bFallbackActive &&
+      (state.mqtt.bConnected || !settings.mqtt.bEnable || !settings.sat.bMqttFallback ||
+       settings.sat.bEnabled || state.sat.bFallbackSuppressed)) {
+    state.sat.bFallbackActive = false;
+    state.sat.eFallbackReason = SAT_FB_NONE;
+    DebugTln(F("SAT FALLBACK: lifted"));
+    if (!settings.sat.bEnabled) {
+      satDisable();
+      return true;
+    }
+  }
+  return false;
+  // --- end fallback detection
+}
+
 //=====================================================================
 //=== Main Control Loop (called from doBackgroundTasks) ===
 //=====================================================================
@@ -4700,38 +4746,12 @@ static void satControlLoopRun()
   }
   _sat_prevOTOnline = otOnline;
 
-  // --- Fallback detection (Task #19): auto-enable SAT when external control lost ---
-  // Runs BEFORE the bEnabled gate because it is the entry path that flips
-  // bEnabled from false to true when the boiler controller loses MQTT.
-  if (!settings.sat.bEnabled && !state.sat.bFallbackActive) {
-    // Only fall back if MQTT is enabled AND was previously connected but has now been
-    // lost for >5 minutes. iLastConnectedMs == 0 means never connected (fresh boot or
-    // MQTT not configured) — do not treat that as a loss.
-    bool mqttLost = settings.mqtt.bEnable &&
-                    state.mqtt.iLastConnectedMs > 0 &&
-                    !state.mqtt.bConnected &&
-                    (millis() - state.mqtt.iLastConnectedMs > 300000UL); // 5 min MQTT loss
-    if (mqttLost) {
-      state.sat.bFallbackActive = true;
-      state.sat.eFallbackReason = SAT_FB_MQTT_LOST;
-      settings.sat.bEnabled = true; // Temporarily enable SAT
-      DebugTln(F("SAT FALLBACK: MQTT lost >5min, auto-enabling SAT"));
-    }
-  }
-  // Check if fallback should be lifted
-  if (state.sat.bFallbackActive && state.mqtt.bConnected) {
-    state.sat.bFallbackActive = false;
-    state.sat.eFallbackReason = SAT_FB_NONE;
-    settings.sat.bEnabled = false; // Restore disabled state
-    DebugTln(F("SAT FALLBACK: connectivity restored, disabling fallback"));
-    satDisable();
-    return;
-  }
+  if (satMqttFallbackStep()) return;
 
   // Early bail when SAT is disabled or a flash update is in progress.
   // Simulation and thermal-learning are SAT-internal (their consumers all
   // live in SAT code paths) and only run past this gate. PERF-L2 2026-04-18.
-  if (!settings.sat.bEnabled || isFlashing()) {
+  if (!satIsEnabled() || isFlashing()) {
     if (state.sat.bActive) {
       satDisable();
     }
@@ -4824,7 +4844,7 @@ static void satControlLoopRun()
   float targetTemp = settings.sat.fTargetTemp;
 
   SATDebugTf(PSTR("SAT loop: room=%.1f target=%.1f mode=%d enabled=%d\r\n"),
-             roomTemp, targetTemp, (int)state.sat.eControlMode, (int)settings.sat.bEnabled);
+             roomTemp, targetTemp, (int)state.sat.eControlMode, (int)satIsEnabled());
 
   // Validate room temp — count consecutive failures.
   // TASK-521: NaN means satGetRoomTemp() found no valid source (no BLE, no MQTT external,
