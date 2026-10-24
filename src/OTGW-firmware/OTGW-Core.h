@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : Header file: OTGW-Core.h
-**  Version  : v2.0.0-alpha.484
+**  Version  : v2.0.0-alpha.485
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -772,6 +772,9 @@ struct OT_cmd_t { // see all possible commands for PIC here: https://otgw.tclcod
 #define CMDQUEUE_MAX 20
 extern struct OT_cmd_t cmdqueue[CMDQUEUE_MAX];
 extern int cmdQueueSize;  // fill-pointer: number of active entries (0..CMDQUEUE_MAX)
+void pmChainStart();   // SAT: PM=3/15/48, one at a time on a PIC (TASK-1315)
+void pmChainOnBoilerResponse(uint8_t id);
+void pmChainTick();
 
 /**
  * Structure to hold Opentherm data packet content.

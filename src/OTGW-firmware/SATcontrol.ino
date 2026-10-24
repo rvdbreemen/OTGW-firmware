@@ -3870,9 +3870,7 @@ void initSAT()
     DebugTln(F("SAT: initialized and enabled (continuous mode)"));
     // Boot sequence: send priority messages PM=3,15,48 per SAT Python
     if (hasOTCommandInterface()) {
-      addCommandToQueue("PM=3", 4, false, 0);
-      addCommandToQueue("PM=15", 5, false, 0);
-      addCommandToQueue("PM=48", 5, false, 0);
+      pmChainStart();   // PIC: PM=3, then 15 and 48 as the boiler answers; OT-Direct: all three directly (TASK-1315)
       // Manufacturer boot quirk: MI=500 for faster OT polling
       if (satGetManufacturerQuirks() & SAT_QUIRK_MI_500_BOOT) {
         addCommandToQueue("MI=500", 6, false, 0);

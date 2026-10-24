@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-Core.ino
-**  Version  : v2.0.0-alpha.484
+**  Version  : v2.0.0-alpha.485
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **  Borrowed from OpenTherm library from: 
@@ -3811,6 +3811,7 @@ void addCommandToQueue(const char* buf, const int len, const bool forceQueue, co
   If retry max is reached the cmd is delete from the queue
 */
 void handleCommandQueue(){
+  pmChainTick();
   // Pause queue processing briefly after ser2net activity to avoid collisions
   if ((millis() - lastSer2netCmdMs) < SER2NET_QUIET_MS) return;
   const uint32_t now = millis();
@@ -3874,6 +3875,12 @@ void checkCommandResponse(const char *buf, unsigned int len){
         while (*reg == ' ') reg++;
         if (cmdqueue[i].cmd[3] != *reg) continue;
       }
+      // PM= keeps one pending message in the PIC: "PM: 15" must not remove a queued "PM=3"
+      if (cmd[0] == 'P' && cmd[1] == 'M' && cmdqueue[i].cmdlen >= 4) {
+        const char* id = value;
+        while (*id == ' ') id++;
+        if (atoi(id) != atoi(cmdqueue[i].cmd + 3)) continue;
+      }
       //command found
       OTDebugTf(PSTR("CmdQueue: Found cmd [%2s]==>[%d]:[%s]\r\n"), cmd, i, cmdqueue[i].cmd);
         OTDebugTf(PSTR("CmdQueue: Found value [%s]==>[%d]:[%s]\r\n"), value, i, cmdqueue[i].cmd);
@@ -3884,6 +3891,93 @@ void checkCommandResponse(const char *buf, unsigned int len){
     }
   }
   OTDebugFlush();
+}
+
+
+/*
+  SAT priority-message chain (TASK-1315), PIC boards only.
+  The PIC keeps ONE pending priority message: every PM= overwrites the previous one until the
+  matching boiler response arrives, and the PIC only sends it in a slot the thermostat gives up
+  (it never times out). SAT wants MsgID 3, 15 and 48 (thermo-nova boot() asks all three), so they
+  are queued one at a time: the next PM= goes out when the boiler answered the pending ID, or after
+  PM_CHAIN_TIMEOUT_MS. An ID that timed out is asked once more after the last one, then the chain stops.
+  The hook only records the answer: processOT() holds the OTStateLock and must not queue commands,
+  pmChainTick() (handleCommandQueue, loop task) does the advancing.
+  OT-Direct boards have no single pending slot: handleOTDirectCommand() answers each PM= on its own,
+  so there the three PM= go out directly.
+*/
+#define PM_CHAIN_TIMEOUT_MS 60000
+#define PM_CHAIN_NONE 0xFF
+static const uint8_t kPmChainIds[] = {3, 15, 48};
+#define PM_CHAIN_COUNT ((int)sizeof(kPmChainIds))
+static int8_t   pmChainIdx = -1;                 // step of the pending PM=, -1 = idle
+static uint32_t pmChainDeadline = 0;
+static uint8_t  pmChainTodo = 0;                 // bit per step still to ask in this pass
+static uint8_t  pmChainMissed = 0;               // bit per step that timed out in this pass
+static bool     pmChainRetry = false;            // second pass (re-ask of the missed steps)
+static uint8_t  pmChainLastId = PM_CHAIN_NONE;   // id of the PM= the chain queued last
+static volatile uint8_t pmChainAnswered = PM_CHAIN_NONE;   // set by the hook, consumed by the tick
+
+static void pmChainSend() {
+  char cmd[8];
+  const int n = snprintf_P(cmd, sizeof(cmd), PSTR("PM=%u"), (unsigned)kPmChainIds[pmChainIdx]);
+  // drop only the chain's own previous PM=, never one a user queued (REST, MQTT)
+  if (pmChainLastId != PM_CHAIN_NONE) {
+    char prev[8];
+    const int pn = snprintf_P(prev, sizeof(prev), PSTR("PM=%u"), (unsigned)pmChainLastId);
+    for (int qi = 0; qi < cmdQueueSize; qi++) {
+      if (cmdqueue[qi].cmdlen == pn && memcmp(cmdqueue[qi].cmd, prev, pn) == 0) { removeFromCmdQueue(qi); break; }
+    }
+  }
+  pmChainLastId = kPmChainIds[pmChainIdx];
+  addCommandToQueue(cmd, n, true, 0);   // forceQueue: no prefix dedup
+  pmChainDeadline = millis() + PM_CHAIN_TIMEOUT_MS;
+}
+
+static void pmChainAdvance() {
+  for (;;) {
+    pmChainIdx++;
+    if (pmChainIdx >= PM_CHAIN_COUNT) {
+      if (pmChainRetry || pmChainMissed == 0) { pmChainIdx = -1; return; }   // last PM= stays queued until its echo
+      pmChainRetry = true; pmChainTodo = pmChainMissed; pmChainMissed = 0; pmChainIdx = -1;
+      continue;
+    }
+    if (pmChainTodo & (1u << pmChainIdx)) break;
+  }
+  pmChainSend();
+}
+
+void pmChainStart() {
+  if (!isPICEnabled()) {   // OT-Direct: no single-slot limit, ask all three directly
+    for (int i = 0; i < PM_CHAIN_COUNT; i++) {
+      char cmd[8];
+      const int n = snprintf_P(cmd, sizeof(cmd), PSTR("PM=%u"), (unsigned)kPmChainIds[i]);
+      addCommandToQueue(cmd, n, false, 0);
+    }
+    return;
+  }
+  pmChainTodo = (1u << PM_CHAIN_COUNT) - 1;
+  pmChainMissed = 0;
+  pmChainRetry = false;
+  pmChainAnswered = PM_CHAIN_NONE;
+  pmChainIdx = -1;
+  pmChainAdvance();
+}
+
+// Called from processOT() for every boiler frame. Only records: no queueing under the OTStateLock.
+void pmChainOnBoilerResponse(uint8_t id) {
+  const int8_t idx = pmChainIdx;
+  if (idx >= 0 && id == kPmChainIds[idx]) pmChainAnswered = id;
+}
+
+// Called from handleCommandQueue().
+void pmChainTick() {
+  if (pmChainIdx < 0) return;
+  const bool answered = (pmChainAnswered == kPmChainIds[pmChainIdx]);
+  if (!answered && (int32_t)(millis() - pmChainDeadline) < 0) return;
+  if (!answered) pmChainMissed |= (1u << pmChainIdx);
+  pmChainAnswered = PM_CHAIN_NONE;
+  pmChainAdvance();
 }
 
 
@@ -5365,6 +5459,8 @@ void processOT(const char *buf, int len, bool suppressOutput, bool localAnswer, 
           && !OTdata.skipthis) {
         satOnThermostatSetpoint(roundf(OTdata.f88() * 100.0f) / 100.0f);
       }
+
+      if (OTdata.rsptype == OTGW_BOILER && !OTdata.skipthis && !OTdata.bLocalAnswer && !OTdata.bReplayed) pmChainOnBoilerResponse(OTdata.id);   // TASK-1315
 
       //keep track of last update time — only for valid responses
       if (is_value_valid(OTdata, OTlookupitem)) {
