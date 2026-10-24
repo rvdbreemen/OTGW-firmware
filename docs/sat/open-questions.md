@@ -9,9 +9,9 @@ and then becomes a backlog task.
 George: if a question below is unclear or wrongly put, just say so. A correction of
 the question is as useful as an answer.
 
-We check for an answer every 4 hours. When a question has waited 12 hours and the chat
-has moved on (10 or more other messages since), we repeat it once, with a link to the
-original.
+We check for an answer every hour and stay quiet while there is none. When a question
+has waited 12 hours and 3 or more other messages have pushed it out of view, we repeat
+it once, with a link to the original.
 
 Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 **answered** (recorded as an entry), **dropped** (no longer needed, with the reason).
