@@ -622,3 +622,28 @@ PWM OFF phase sends CS=10 with CH=0, as implemented in TASK-1316. This confirms 
 during PWM) and entry 5 (PWM OFF: CH=0 together with CS=10) on real hardware.
 
 **Task:** TASK-1316 (acceptance criterion 3). **Open:** none.
+
+## 18. The end-of-cycle PWM switch ignores the PWM auto switch setting (2026-10-24)
+
+**Source:** #alpha-testing, 2026-10-24 08:26 UTC, reply to our explanation of question 1c
+(message 1563467698837389343, 08:22 UTC: should the firmware's "PWM auto switch" setting also block
+the new end-of-cycle switch (A), or should it run anyway like thermo-nova (B)?):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563468667210170383
+
+**Quoted:**
+
+> @BlueFlame Bot It should follow the thermo-nova solution
+
+**Interpretation (ours):** option B. thermo-nova has no auto-switch setting (a grep of
+`custom_components/sat` for auto_switch/autoswitch finds nothing), and `pwm.py:on_cycle_end`
+(`pwm.py:219-227`) always acts. So the ported end-of-cycle switch runs whatever the firmware's
+`settings.sat.bPwmAutoSwitch` says.
+
+**Settled by this statement:** the end-of-cycle switch of entry 15 is not gated on
+`bPwmAutoSwitch`. Completes entry 15 (question 1c).
+
+**Task:** TASK-1331.
+
+**Open:** whether the "PWM auto switch" setting should remain at all (it still gates the existing
+60 s sustained-overshoot switch, `SATcycles.ino` `satCycleCheckAutoSwitch`; thermo-nova has no such
+setting). Asked as a follow-up; it does not block TASK-1331.

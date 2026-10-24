@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-10-24T08:21:00Z'
+updated_date: '2026-10-24T08:44:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -36,4 +36,6 @@ From the TASK-1327 review: thermo-nova re-enables PWM in two ways after a disabl
 2026-10-24 consolidated open questions re-posted to Sergeant D in #alpha-testing (Robert asked to make the wait explicit); waiting for his answer.
 
 2026-10-24 Sergeant D answered (https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840), entry 15: 1a follow thermo-nova (port both on_cycle_end branches, interpretation recorded), 1b margin 2.0, 1d align the classifier first in the same change; 1c (PWM auto switch gate) he asked to expand - explained and asked again. Implementation waits for 1c.
+
+2026-10-24 08:26 UTC Sergeant D on 1c: 'It should follow the thermo-nova solution' -> entry 18: the end-of-cycle switch is NOT gated on bPwmAutoSwitch (option B, interpretation recorded). All decisions for TASK-1331 are in (entries 15 and 18): port both on_cycle_end branches, margin 2.0, align the classifier first, ungated. Implementing.
 <!-- SECTION:NOTES:END -->
