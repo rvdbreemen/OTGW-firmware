@@ -3,11 +3,11 @@ id: TASK-1333
 title: >-
   Telnet debug bursts drain ~40 KB heap: coalesce AsyncSimpleTelnet sends (needs
   maintainer OK, vendored lib)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-23T21:30:00Z'
-updated_date: '2026-10-24T07:45:00Z'
+updated_date: '2026-10-24T08:22:00Z'
 labels:
   - heap
   - telnet
@@ -28,7 +28,7 @@ Found in TASK-1328. A burst of telnet debug output (the capture script turns on 
 <!-- AC:BEGIN -->
 - [x] #1 The layer that holds the heap is named (lwIP pbufs, WiFi TX buffers or AsyncTCP events) with a bench measurement
 - [x] #2 A fix chosen by the maintainer lowers the watermark in the same bench scenario (all toggles on, q+D, emulator, MQTT): before 776 B, after measured
-- [ ] #3 Whether the device can wedge under this burst is settled (Sergeant D's answer or a bench run of 10+ minutes)
+- [x] #3 Whether the device can wedge under this burst is settled (Sergeant D's answer or a bench run of 10+ minutes)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -49,4 +49,12 @@ Option A (maintainer 2026-10-24): coalesce telnet sends inside AsyncSimpleTelnet
 2026-10-24 field evidence (Sergeant D capture on alpha.486, 06:41 UTC, transcript-20261024-093559): during his telnet session with all toggles on and the settings dump, the lowest heap in the trace was 59792 B (before TASK-1333 his dump dropped it to 50276 and our bench to 13-32 KB), so the telnet fix holds in the field. His low watermark (banner minFree 1524 at uptime 0 min) happened before the telnet session: a separate boot-time dip, filed as its own task.
 
 2026-10-24 consolidated open questions re-posted to Sergeant D in #alpha-testing (Robert asked to make the wait explicit); waiting for his answer.
+
+2026-10-24 AC3 settled by Sergeant D (https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840, answer 4): 'My PC went to energy saving mode. Maybe it stopped capturing logs for that period' - the 70 s silence and the later 'Power on' were not a firmware wedge (the capture PC slept). No wedge to investigate.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+A telnet debug burst no longer drains the heap: SimpleTelnet gets setNoDelay() (PR rvdbreemen/SimpleTelnet#8, branch commit a1067d4) and only the debug console turns Nagle on; port 25238 keeps NoDelay. Evidence: AC1/AC2 bench reproduction min_free_heap 1064 B -> 24348 B, trace minimum 13452 -> 70252 B; field: Sergeant D's alpha.486 capture kept >= 59792 B during a full debug dump. AC3: the earlier 70 s silence was his capture PC sleeping, not a wedge. Pending outside this task: merge of the SimpleTelnet PR, then the submodule pointer to the merge commit.
+<!-- SECTION:FINAL_SUMMARY:END -->

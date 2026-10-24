@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T07:29:00Z'
-updated_date: '2026-10-24T07:45:00Z'
+updated_date: '2026-10-24T08:21:00Z'
 labels:
   - heap
   - mqtt
@@ -36,4 +36,6 @@ Sergeant D capture 2026-10-24 06:41 UTC (alpha.486, transcript-20261024-093559-.
 2026-10-24 consolidated open questions re-posted to Sergeant D in #alpha-testing (Robert asked to make the wait explicit); waiting for his answer.
 
 2026-10-24 bench (OTGW32 alpha.486, OT-Direct, no boiler, SAT on, BLE off, local mosquitto; reboot, read hd_min_free_heap after ~90 s, no telnet): broker by IP: 23036, 26036, 21280 B; broker by IP with the router throttling the unit to 64 kbit/s: 24572 B (slow-broker hypothesis not supported); broker by mDNS name Laptop-Robert.local: 14188, 25732, 12772 B. mDNS runs are lower in 2 of 3, so name resolution may add a ~9-11 KB transient, but the spread is too large to call it; none reached his 1.5 KB. Asked Sergeant D (question 5) for entity count, broker location and one capture with the broker set by IP.
+
+2026-10-24 Sergeant D (https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840, answers 5a-5c): 405 entities in the MQTT integration; broker is the Mosquitto add-on on the HA machine; he will send a capture with the broker set by IP. 405 entities is far more than the bench publishes: the discovery burst size is the next suspect to reproduce.
 <!-- SECTION:NOTES:END -->

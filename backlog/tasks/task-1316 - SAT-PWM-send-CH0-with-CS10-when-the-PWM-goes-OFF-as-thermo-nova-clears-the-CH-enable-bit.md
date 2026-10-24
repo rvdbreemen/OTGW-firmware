@@ -3,11 +3,11 @@ id: TASK-1316
 title: >-
   SAT PWM: send CH=0 with CS=10 when the PWM goes OFF, as thermo-nova clears the
   CH enable bit
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-23T10:32:00Z'
-updated_date: '2026-10-24T07:45:00Z'
+updated_date: '2026-10-24T08:22:00Z'
 labels:
   - sat
   - pwm
@@ -30,7 +30,7 @@ Firmware today: the main control block sends CH from finalSetpoint > SAT_MIN_SET
 <!-- AC:BEGIN -->
 - [x] #1 Every path that sends CS for SAT also sends the CH state thermo-nova would send (CH=0 when the control setpoint <= COLD_SETPOINT, CH=1 above), with file:line citations of both; the threshold choice (22 vs 10) confirmed by Sergeant D and recorded
 - [x] #2 Replay or host test old vs fix: a PWM ON->OFF transition sends CS=10 and CH=0 (old: CS=10 only), and ON again sends CH=1
-- [ ] #3 Sergeant D confirms on his setup
+- [x] #3 Sergeant D confirms on his setup
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -59,10 +59,12 @@ Parked in git stash on dev: 'TASK-1316 CH threshold (waiting for Sergeant D)' (t
 2026-10-23 18:05 implementation of the confirmed rule: SATchEnable.h satChEnableDecide(preSolar, cold, pwmDrivesSetpoint, pwmOn, coldCutoff) + satChEnableFor; SATcontrol.ino main block: satPwmDrivesSetpoint() mirrors satApplyPWM's early returns (flow<=0, protection off, DHW, pid<=cold), preSolarSetpoint captured before the solar offset, pwmOn captured right after satApplyPWM (opus review HIGH: reading bPwmFlameRequested after satCycleCheckAutoSwitch would send CH=0 mid-burn on a PWM->continuous switch tick, because satPwmReset clears it). Evidence: test_sat_ch_enable.cpp 0 failures, 22 PASS, per case old rule vs new (continuous 25 rad old 1 new 0; underfloor 20.9 old 1 new 0; cold cutoff with pwmOn old 1 new 0; PWM not driving CS + pre 25 old 1 new 0); test_sat_pwm_override.py fix 'Ran 39 OK', HEAD 'FAILED (failures=1)' (source check incl. the pwmOn-before-auto-switch order guard); evaluate 0 fail; build.bat combo SUCCESS 18:02; bench app flash: boots, SAT active, no panic in 120 s (no CS/CH traffic because the bench has no room temperature, so the CH path itself is host-tested only). Follow-ups: TASK-1323 (sticky prevCS + solar during ignition, needs Sergeant D), TASK-1324 (write-on-change resend gap, pre-existing). AC3 open: Sergeant D on his setup.
 
 2026-10-24 consolidated open questions re-posted to Sergeant D in #alpha-testing (Robert asked to make the wait explicit); waiting for his answer.
+
+2026-10-24 AC3: Sergeant D confirmed on his own installation (https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840, entry 17): 'Yes this is how it works. When we are in PWM OFF m, CS=10 CH=0'.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-SAT now sets the CH enable bit per Sergeant D's confirmed rule (2026-10-23): PWM ON keeps CH on whatever CS, PWM OFF sends CS=10 + CH=0, otherwise CH is off below the per-system cold setpoint (28.2 radiators / 21 underfloor, quantized like the CS command), decided on the setpoint before the solar offset; the cold cutoff forces CH=0. Before, CH followed 'setpoint > 10'. AC1: rule recorded with thermo-nova citations and Sergeant D's answers; AC2: host test old vs new per case + source check red on HEAD (the PWM OFF path already sent CH=0 at HEAD; the red/green is the threshold and the PWM ON rule). Open (AC3): Sergeant D confirming on his setup. Not verified on a device (bench has no room temperature, SAT returns before the CH step).
+SAT sends CH=0 together with CS=10 when the PWM goes off, as thermo-nova clears the CH enable bit (TASK-1316). Evidence: host tests (earlier in the task notes) and AC3 confirmed by Sergeant D on his own installation on 2026-10-24 (entry 17): CH stays 1 during the PWM ON phase, PWM OFF sends CS=10 with CH=0.
 <!-- SECTION:FINAL_SUMMARY:END -->

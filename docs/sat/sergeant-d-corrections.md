@@ -552,3 +552,73 @@ follow-thermostat adopt rule is unchanged.
 
 **Open:** none from him. On our side: OT-Direct boards never cancel a TC= override by themselves
 (OTDirect.ino), so the MsgID 9 re-push condition matters mainly on PIC boards.
+
+## 15. PWM re-enable at the end of a cycle: port thermo-nova's on_cycle_end, margin 2 (2026-10-24)
+
+**Source:** #alpha-testing, 2026-10-24 08:10 UTC, answers 1a-1d to our consolidated question list
+(message 1563458366712578159, 07:45 UTC; the details were in message 1563337168548536433 of
+2026-10-23 23:43 UTC):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840
+
+**Quoted:**
+
+> 1a. Follow the thermo-nova solution
+> 1b. Yes margin should be 2
+> 1c. Can you expand on this?
+> 1d. Yes
+
+**Interpretation (ours):** "Follow the thermo-nova solution" to the question "only OVERSHOOT -> PWM,
+or also UNDERHEAT -> continuous?" reads as: port both branches of `pwm.py:on_cycle_end`, as in
+thermo-nova. A continuous cycle classified OVERSHOOT enables PWM (`pwm.py:219-223`), a PWM cycle
+classified UNDERHEAT disables it (`pwm.py:225-227`).
+
+**Settled by this statement:**
+
+- Port both on_cycle_end branches (1a, as interpreted above).
+- The overshoot margin for this trigger is 2.0, not thermo-nova's 3.0
+  (`cycles/const.py:10`, `OVERSHOOT_MARGIN_CELSIUS`): a deliberate deviation he chose (1b). It
+  matches the 2.0 he approved for the TASK-1268 plan on 2026-10-20.
+- Align our cycle classifier with `cycles/classifier.py` first, in the same change (1d): hot water
+  in the tail makes a cycle UNCERTAIN, OVERSHOOT only for continuous cycles and tested before the
+  short-cycle test.
+
+**Open:** 1c (should the firmware's "PWM auto switch" setting also block this path?). He asked us to
+expand; we explained and asked again. Until he answers, the port is not implemented.
+
+**Task:** TASK-1331. Prerequisite done: the tail percentile sort fix (TASK-1338).
+
+## 16. Push setpoint: exactly thermo-nova, no re-push on MsgID 9 (2026-10-24)
+
+**Source:** same message, answer 2:
+https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840
+
+**Quoted:**
+
+> 2. Yes
+
+**Settled by this statement:** to our question "push on a target change only
+(`climate.py:641-657`), never push back what the thermostat set (`climate.py:765`), without the
+MsgID 9 re-push. Is that OK?": yes.
+
+**Changes an earlier entry:** entry 14 approved, as a firmware addition, a re-push when MsgID 9
+reads 0 while a push is active. That bullet is dropped: on PIC boards a gateway reset and a
+thermostat that refuses the override give the same signal (MsgID 9 reads 0 after the PIC clears the
+override, `gateway.asm` ~3022-3036), so the re-push would flap more (review of TASK-1272). The rest
+of entry 14 stands: push on a target change, no 5-minute re-push.
+
+**Task:** TASK-1272. **Open:** none.
+
+## 17. CH during PWM confirmed on his installation (2026-10-24)
+
+**Source:** same message, answer 3:
+https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840
+
+**Quoted:**
+
+> 3. Yes this is how it works. When we are in PWM OFF m, CS=10 CH=0
+
+**Settled by this statement:** on his own installation CH stays 1 during the PWM ON phase and the
+PWM OFF phase sends CS=10 with CH=0, as implemented in TASK-1316. This confirms entry 9 (CH rule
+during PWM) and entry 5 (PWM OFF: CH=0 together with CS=10) on real hardware.
+
+**Task:** TASK-1316 (acceptance criterion 3). **Open:** none.
