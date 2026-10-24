@@ -170,6 +170,8 @@ Telnet:
                                              device answers HTTP: the connection is half-open (default 120,
                                              range 30-3600, 0 = off). While the device does not answer
                                              either, the script waits and reconnects once it does.
+  summary.txt lists every telnet gap (start, end, length, failed connect attempts, reason) and
+  telnet.log gets a '### capture: telnet reconnected' marker line at each reconnect.
 
 Other:
   -OutputRoot <dir>             Where run folders go (default logs/mqtt-diagnostics).
@@ -571,6 +573,47 @@ close_telnet() {
     TELNET_FIFO=""
 }
 
+# Telnet gaps. A gap starts at the last telnet byte and ends when the next
+# connect succeeds; it is reported in summary.txt, with a marker line in
+# telnet.log at the reconnect.
+GAP_ACTIVE=0
+GAP_START_MS=0
+GAP_REASON=""
+GAP_FAILED=0
+GAP_END_MS=0
+GAP_COUNT=0
+GAP_TOTAL_S=0
+
+iso_from_ms() {
+    local s=$(( $1 / 1000 ))
+    date -d "@$s" '+%Y-%m-%dT%H:%M:%S%z' 2>/dev/null || date -r "$s" '+%Y-%m-%dT%H:%M:%S%z' 2>/dev/null || printf '%s' "$s"
+}
+
+open_telnet_gap() {
+    # $1 reason, $2 start in epoch ms
+    [ "$GAP_ACTIVE" = "1" ] && return 0
+    GAP_ACTIVE=1; GAP_START_MS="$2"; GAP_REASON="$1"; GAP_FAILED=0
+}
+
+close_telnet_gap() {
+    [ "$GAP_ACTIVE" = "1" ] || return 0
+    local end_ms secs
+    end_ms="$GAP_END_MS"
+    secs=$(( (end_ms - GAP_START_MS + 500) / 1000 ))
+    add_summary_line "Telnet gap: $(iso_from_ms "$GAP_START_MS") -> $(iso_from_ms "$end_ms") ($secs s, $GAP_FAILED failed connect attempts, $GAP_REASON)"
+    GAP_COUNT=$(( GAP_COUNT + 1 )); GAP_TOTAL_S=$(( GAP_TOTAL_S + secs ))
+    GAP_ACTIVE=0
+}
+
+telnet_gap_totals() {
+    if [ "$GAP_ACTIVE" = "1" ]; then
+        GAP_COUNT=$(( GAP_COUNT + 1 )); GAP_TOTAL_S=$(( GAP_TOTAL_S + ( $(now_ms) - GAP_START_MS + 500 ) / 1000 ))
+    fi
+    add_summary_line "Telnet gaps: $GAP_COUNT, total $GAP_TOTAL_S s"
+    [ "$GAP_ACTIVE" = "1" ] && add_summary_line "Telnet gap still open at stop: since $(iso_from_ms "$GAP_START_MS") ($GAP_REASON)"
+    return 0
+}
+
 send_key() { printf '%s' "$1" >&5 2>/dev/null; }
 
 # Bytes the device sent since this connection opened.
@@ -750,6 +793,10 @@ connect_telnet() {
     # Read-write open never blocks on a FIFO, and keeps it open for writes.
     exec 5<>"$TELNET_FIFO"
     add_summary_line "Telnet connected: $(iso_now)"
+    if [ "$GAP_ACTIVE" = "1" ]; then
+        GAP_END_MS="$(now_ms)"
+        printf '\n### capture: telnet reconnected after %s s gap (%s)\n' "$(( ( GAP_END_MS - GAP_START_MS + 500 ) / 1000 ))" "$GAP_REASON" >> "$TELNET_LOG"
+    fi
 
     banner="$(read_initial_banner)"
     # The first banner that lists toggles holds the states to restore at the end.
@@ -1611,6 +1658,7 @@ while :; do
         if [ -n "$TELNET_PID" ]; then
             close_telnet
             TELNET_RECONNECT_REASON="connection closed"
+            open_telnet_gap "$TELNET_RECONNECT_REASON" "$TELNET_LAST_BYTE_MS"
             TELNET_RECONNECT_ATTEMPTS=0
             NEXT_CONNECT_MS=$(( $(now_ms) + TELNET_POST_DISCONNECT_DELAY_MS ))
             write_capture_status "Telnet disconnected; waiting $(awk -v m="$TELNET_POST_DISCONNECT_DELAY_MS" 'BEGIN{print m/1000}')s before reconnect attempts."
@@ -1628,6 +1676,7 @@ while :; do
             else
                 write_capture_status "Telnet connected: $(iso_now)"
             fi
+            close_telnet_gap
             TELNET_HAS_CONNECTED="1"
             TELNET_RECONNECT_ATTEMPTS=0
             TELNET_RECONNECT_REASON=""
@@ -1638,6 +1687,7 @@ while :; do
         else
             stop_requested && break
             NEXT_CONNECT_MS=$(( $(now_ms) + TELNET_RECONNECT_DELAY_MS ))
+            [ "$GAP_ACTIVE" = "1" ] && GAP_FAILED=$(( GAP_FAILED + 1 ))
             write_capture_status "Telnet connect attempt #$TELNET_RECONNECT_ATTEMPTS failed (timeout ${EFFECTIVE_TIMEOUT}s): $TELNET_ERROR Retrying in $(awk -v m="$TELNET_RECONNECT_DELAY_MS" 'BEGIN{print m/1000}')s."
         fi
         continue
@@ -1653,6 +1703,7 @@ while :; do
         if tail -c +"$(( FROM + 1 ))" "$TELNET_LOG" 2>/dev/null | head -c $(( SIZE_NOW - FROM )) | grep -q 'ESP\.restart()'; then
             close_telnet
             TELNET_RECONNECT_REASON="ESP.restart() marker captured"
+            open_telnet_gap "$TELNET_RECONNECT_REASON" "$TELNET_LAST_BYTE_MS"
             TELNET_RECONNECT_ATTEMPTS=0
             NEXT_CONNECT_MS=$(( $(now_ms) + TELNET_POST_DISCONNECT_DELAY_MS ))
             write_capture_status "Telnet captured ESP.restart(); waiting $(awk -v m="$TELNET_POST_DISCONNECT_DELAY_MS" 'BEGIN{print m/1000}')s before reconnect attempts."
@@ -1677,6 +1728,7 @@ while :; do
                 write_capture_status "Telnet idle reconnect #$TELNET_IDLE_RECONNECTS: no telnet bytes for ${IDLE_S}s while the device answers HTTP ($IDLE_HTTP)${TELNET_UNREACHABLE_SINCE:+, device unreachable from $TELNET_UNREACHABLE_SINCE}; reconnecting the half-open socket."
                 close_telnet
                 TELNET_RECONNECT_REASON="telnet silent for ${IDLE_S}s while the device answers HTTP"
+                open_telnet_gap "$TELNET_RECONNECT_REASON" "$TELNET_LAST_BYTE_MS"
                 TELNET_RECONNECT_ATTEMPTS=0
                 TELNET_UNREACHABLE_SINCE=""
                 NEXT_CONNECT_MS=0
@@ -1716,6 +1768,7 @@ fi
 if [ "$TELNET_IDLE_SECONDS" -gt 0 ] && [ "$DO_TELNET" = "1" ]; then
     add_summary_line "Telnet idle reconnects: $TELNET_IDLE_RECONNECTS (watchdog ${TELNET_IDLE_SECONDS}s)"
 fi
+[ "$DO_TELNET" = "1" ] && telnet_gap_totals
 
 # Restore toggles BEFORE the connection goes away.
 if [ -s "$TOGGLES_CURRENT" ]; then
