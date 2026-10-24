@@ -1,20 +1,41 @@
 ---
 id: "ADR-022"
 title: "GPIO Output Control (Bit-Flag Triggered Relays)"
-status: "Accepted"
-date: null
+status: "Superseded"
+date: "2026-10-24"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-200"
 ---
+
+## Status
+
+Superseded by ADR-200, 2026-10-24.
+
 # ADR-022: GPIO Output Control (Bit-Flag Triggered Relays)
 
 **Status:** Accepted  
 **Date:** 2020-06-01 (Estimated)  
 **Updated:** 2026-01-28 (Documentation)
+
+## Status History
+
+```yaml
+status_history:
+  - date: 2026-01-28
+    status: Accepted
+    changed_by: "Robert van den Breemen"
+    reason: Recorded as Accepted when the existing GPIO output feature (in the code since about 2020-06-01, estimated) was documented (commit 44ddefc42, #388); history block added 2026-10-24 so adr-kit can record the supersession by ADR-200
+    changed_via: manual
+  - date: 2026-10-24
+    status: Superseded
+    changed_by: Robert van den Breemen
+    reason: Superseded by ADR-200
+    changed_via: adr-kit lifecycle
+```
 
 ## Context
 

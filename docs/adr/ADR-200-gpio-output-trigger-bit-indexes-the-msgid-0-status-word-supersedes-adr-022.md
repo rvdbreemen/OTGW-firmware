@@ -1,13 +1,14 @@
 ---
 id: "ADR-200"
 title: "GPIO output trigger bit indexes the MsgID 0 status word (proposed successor to ADR-022)"
-status: "Proposed"
+status: "Accepted"
 date: "2026-10-24"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-022"
 superseded_by: null
 topics:
   - "gpio"
@@ -36,11 +37,11 @@ format: "canonical"
 
 <!-- markdownlint-disable MD025 -->
 
-# ADR-200 GPIO output trigger bit indexes the MsgID 0 status word (proposed successor to ADR-022)
+# ADR-200 GPIO (general-purpose input/output) output trigger bit indexes the MsgID 0 status word (proposed successor to ADR-022)
 
 ## Status
 
-Proposed, 2026-10-24.
+Accepted, 2026-10-24.
 
 This ADR (architecture decision record) is the proposed successor to ADR-022 (GPIO (general-purpose input/output) Output Control (Bit-Flag Triggered Relays), Accepted). ADR-022 stays Accepted and its file is untouched while this ADR is Proposed. The `supersedes` list in the front matter is therefore empty: adr-kit writes both sides of a supersession at once (`adr supersede ADR-022 --by ADR-200`), and running it now would retire ADR-022 before this decision is accepted; `adr lint --strict` also rejects a one-sided link. That command runs on acceptance, which needs the maintainer's explicit OK (TASK-1304).
 
@@ -57,6 +58,16 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal; proposed successor to ADR-022, which lists the master status bits as trigger bits 0-7 while the code tests the slave byte there (TASK-1295 review, TASK-1304)
     changed_via: adr-kit
+  - date: 2026-10-24
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Maintainer accepted in session 2026-10-24 after both open questions were answered
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-24
+    status: Accepted
+    changed_by: Robert van den Breemen
+    reason: Supersedes ADR-022
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -68,9 +79,9 @@ The GPIO outputs feature drives one relay pin from one OpenTherm status bit: the
 - Live OT bus path: `print_status()` stores `value = (OTcurrentSystemState.MasterStatus<<8) | OTcurrentSystemState.SlaveStatus` (`OTGW-Core.ino:2943`) into its reference parameter, which the caller binds to `OTcurrentSystemState.Statusflags` (`case OT_Statusflags: print_status(OTcurrentSystemState.Statusflags)`, `OTGW-Core.ino:4792`), after `publishMasterStatusState()` set `MasterStatus = valueHB` (`OTGW-Core.ino:2456`) and `publishSlaveStatusState()` set `SlaveStatus = valueLB` (`OTGW-Core.ino:2500`).
 - PS=1 summary path: `publishCombinedStatusState()` returns `(OTcurrentSystemState.MasterStatus << 8) | OTcurrentSystemState.SlaveStatus` (`OTGW-Core.ino:2534`), assigned to `Statusflags` at `OTGW-Core.ino:4665`.
 
-So bits 0-7 of `Statusflags` are the slave (boiler) status byte and bits 8-15 are the master (thermostat) status byte. Other readers of `Statusflags` in the firmware use the same layout: `isFlameOn()` tests `0x08` as "Slave bit 3" (`OTGW-Core.h:203`), SAT tests `0x08` as flame (`SATcontrol.ino:1537`), `0x02` as CH active (`SATcycles.ino:717`) and `0x04` as DHW active (`SATcycles.ino:926`), and the webhook header states "Bits 0-7: Slave status ... Bits 8-15: Master status (bit 8 = CH enable)" (`webhook.ino:9-11`) for the same test at `webhook.ino:391`.
+So bits 0-7 of `Statusflags` are the slave (boiler) status byte and bits 8-15 are the master (thermostat) status byte. Other readers of `Statusflags` in the firmware use the same layout: `isFlameOn()` tests `0x08` as "Slave bit 3" (`OTGW-Core.h:203`), SAT (Smart Autotune Thermostat) tests `0x08` as flame (`SATcontrol.ino:1537`), `0x02` as CH active (`SATcycles.ino:717`) and `0x04` as DHW (domestic hot water) active (`SATcycles.ino:926`), and the webhook header states "Bits 0-7: Slave status ... Bits 8-15: Master status (bit 8 = CH enable)" (`webhook.ino:9-11`) for the same test at `webhook.ino:391`.
 
-**What the OpenTherm specification says.** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md`, section 5.3.1 (Class 1: Control and Status Information), lines 1431-1452: MsgID 0 "HB: Master status flag8" with bit 0 CH enable, 1 DHW enable, 2 cooling enable, 3 OTC active, 4 CH2 enable, 5 summer/winter mode, 6 DHW blocking, 7 reserved; "LB: Slave status flag8" with bit 0 fault indication, 1 CH mode, 2 DHW mode, 3 flame status, 4 cooling status, 5 CH2 mode, 6 diagnostic/service indication, 7 electricity production. Section 5.4 (Data-Id Overview Map), line 2341, lists MsgID 0 as "Status flag8 / flag8 Master and Slave Status flags". The spec defines the 16-bit DATA-VALUE as two 8-bit items DATA-BYTE1 and DATA-BYTE2 (section 4.2.5, lines 1083-1086); it does not number them as bits 0-15 of one word (v4.2 removed the MSB-LSB note, line 146). The packing of HB into bits 8-15 is therefore the firmware's, taken from the two code paths above; the meaning of each HB and LB bit is the spec's.
+**What the OpenTherm specification says.** `docs/opentherm specification/OpenTherm-Protocol-Specification-v4.2.md`, section 5.3.1 (Class 1: Control and Status Information), lines 1431-1452: MsgID 0 "HB: Master status flag8" with bit 0 CH enable, 1 DHW enable, 2 cooling enable, 3 OTC (outside temperature compensation) active, 4 CH2 enable, 5 summer/winter mode, 6 DHW blocking, 7 reserved; "LB: Slave status flag8" with bit 0 fault indication, 1 CH mode, 2 DHW mode, 3 flame status, 4 cooling status, 5 CH2 mode, 6 diagnostic/service indication, 7 electricity production. Section 5.4 (Data-Id Overview Map), line 2341, lists MsgID 0 as "Status flag8 / flag8 Master and Slave Status flags". The spec defines the 16-bit DATA-VALUE as two 8-bit items DATA-BYTE1 and DATA-BYTE2 (section 4.2.5, lines 1083-1086); it does not number them as bits 0-15 of one word (v4.2 removed the MSB-LSB note, line 146). The packing of HB into bits 8-15 is therefore the firmware's, taken from the two code paths above; the meaning of each HB and LB bit is the spec's.
 
 **What ADR-022 gets wrong**, checked against the above:
 
@@ -109,7 +120,7 @@ The GPIO output follows one bit of the 16-bit MsgID 0 status word `Statusflags =
 
 **Typical configurations**, replacing ADR-022's: a circulation pump on central heating uses 1 (boiler reports CH active) or 8 (thermostat requests CH); a DHW valve uses 2 (DHW active) or 9 (DHW enable); a second-zone valve uses 5 (CH2 mode) or 12 (CH2 enable); a fault lamp uses 0.
 
-**Kept from ADR-022** (still true in the code): one output pin; stateless, the pin is recomputed from the stored bit every time (`outputs_ext.ino:62-97`); binary on/off; no inversion and no combination of bits; pin and bit validated before every write (`outputs_ext.ino:18-28`, called at `:34`, `:53`, `:64`); the reasons ADR-022 gives for rejecting temperature thresholds, multiple outputs, PWM, MQTT-driven control and scripting; and its relay safety notes (drive a relay module, never mains voltage on a GPIO pin), which apply to the ESP32-S3 as they did to the ESP8266.
+**Kept from ADR-022** (still true in the code): one output pin; stateless, the pin is recomputed from the stored bit every time (`outputs_ext.ino:62-97`); binary on/off; no inversion and no combination of bits; pin and bit validated before every write (`outputs_ext.ino:18-28`, called at `:34`, `:53`, `:64`); the reasons ADR-022 gives for rejecting temperature thresholds, multiple outputs, PWM (pulse-width modulation), MQTT-driven control and scripting; and its relay safety notes (drive a relay module, never mains voltage on a GPIO pin), which apply to the ESP32-S3 as they did to the ESP8266.
 
 The webhook trigger bit uses the same layout and the same test (`webhook.ino:9-11`, `:391`); this table applies to it too.
 
@@ -160,8 +171,8 @@ The webhook trigger bit uses the same layout and the same test (`webhook.ino:9-1
 
 ## Open Questions
 
-- [ ] **Default trigger bit.** The default 0 (`Outputstypes.h:23`) is the fault indication. Whether the default should stay 0 or become 1 (CH active) is a product choice for the maintainer; changing it touches saved settings only where none was saved.
-- [ ] **v2 UI range.** The UI lists bits 0-3 (`data/v2.js:3036-3037`) while the firmware accepts 0-15. Whether to offer 4-15 in the UI is open.
+- [x] **Default trigger bit.** The default 0 (`Outputstypes.h:23`) is the fault indication. Whether the default should stay 0 or become 1 (CH active) is a product choice for the maintainer; changing it touches saved settings only where none was saved. — **Answered 2026-10-24 by Robert van den Breemen:** Keep 0 (boiler fault). Robert 2026-10-24: existing installations keep their behaviour; the documentation now states correctly that bit 0 is the boiler fault flag.
+- [x] **v2 UI range.** The UI lists bits 0-3 (`data/v2.js:3036-3037`) while the firmware accepts 0-15. Whether to offer 4-15 in the UI is open. — **Answered 2026-10-24 by Robert van den Breemen:** Offer all 16 bits (0-15) with their OpenTherm names in the v2 UI. Robert 2026-10-24; implemented in TASK-1358.
 
 ## Related Decisions
 

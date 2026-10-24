@@ -27,7 +27,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-019 | Accepted | - | Adopt URL path-based API versioning with indefinite version support (no deprecation). |
 | ADR-020 | Accepted | - | Integrate Dallas DS18B20 sensors via OneWire protocol with dynamic discovery and MQTT publishing. |
 | ADR-021 | Accepted | - | Use hardware interrupt-driven pulse counting with ISR-safe debounce logic. |
-| ADR-022 | Accepted | - | Implement stateless GPIO output control triggered by configurable OpenTherm status bit. |
+| ADR-022 | Superseded | - | Implement stateless GPIO output control triggered by configurable OpenTherm status bit. |
 | ADR-023 | Accepted | - | Implement HTTP-based file system explorer with streaming upload/download and integrated firmware update capability. |
 | ADR-024 | Accepted | - | Implement character-driven telnet command console using TelnetStream library with menu-based command system. |
 | ADR-025 | Accepted | - | Proactively close WebSocket before upload starts, rely entirely on HTTP polling during flash operations. |
@@ -205,4 +205,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-197 | Proposed | - | The SAT PID follows thermo-nova pid.py at 7beaaf5 term by term (entry 28), implemented in src/OTGW-firmware/SATpid.in... |
 | ADR-198 | Proposed | - | SAT keeps thermo-nova's convex heating curve with one user coefficient, default 2.0, and a base offset chosen by the... |
 | ADR-199 | Proposed | - | While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev... |
-| ADR-200 | Proposed | - | The GPIO output follows one bit of the 16-bit MsgID 0 status word Statusflags = (MasterStatus << 8) \| SlaveStatus (OT... |
+| ADR-200 | Accepted | - | The GPIO output follows one bit of the 16-bit MsgID 0 status word Statusflags = (MasterStatus << 8) \| SlaveStatus (OT... |

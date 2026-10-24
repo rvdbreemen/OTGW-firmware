@@ -657,9 +657,9 @@
       "id": "ADR-022",
       "title": "GPIO Output Control (Bit-Flag Triggered Relays)",
       "path": "ADR-022-gpio-output-bit-flag-control.md",
-      "format": "unknown",
-      "status": "Accepted",
-      "date": null,
+      "format": "canonical",
+      "status": "Superseded",
+      "date": "2026-10-24",
       "decision_summary": "Implement stateless GPIO output control triggered by configurable OpenTherm status bit.",
       "topics": [],
       "aliases": [],
@@ -681,7 +681,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-200"
       }
     },
     {
@@ -7161,7 +7161,7 @@
       "title": "GPIO output trigger bit indexes the MsgID 0 status word (proposed successor to ADR-022)",
       "path": "ADR-200-gpio-output-trigger-bit-indexes-the-msgid-0-status-word-supersedes-adr-022.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-10-24",
       "decision_summary": "The GPIO output follows one bit of the 16-bit MsgID 0 status word Statusflags = (MasterStatus << 8) | SlaveStatus (OT...",
       "topics": [
@@ -7217,7 +7217,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-022"
+        ],
         "superseded_by": null
       }
     }
@@ -7683,6 +7685,12 @@
       "source": "ADR-022",
       "target": "ADR-007",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-022",
+      "target": "ADR-200",
+      "type": "superseded-by",
       "resolved": true
     },
     {
@@ -12801,6 +12809,12 @@
       "source": "ADR-200",
       "target": "ADR-022",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-200",
+      "target": "ADR-022",
+      "type": "supersedes",
       "resolved": true
     },
     {
