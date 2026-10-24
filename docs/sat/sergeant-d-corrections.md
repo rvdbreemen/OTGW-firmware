@@ -2435,3 +2435,81 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156366305608
 - Whether `PM=25` with every CS should be ported. Not asked.
 - Whether the PIC CS keepalive (TASK-1236) is still needed once CS goes out every 5 s. That is our call. The 3 s suppression refresh stays, per entry 23, unless he says otherwise.
 - The effect on the OT command queue and PIC traffic: about 3 commands every 5 s, against roughly 20x less today (the TASK-565 rationale, `SATcontrol.ino:421-425`). This needs a bench check before the change ships.
+
+## 45. PWM ignition without a return temperature: skip the flame-off hold, flood CS and PM=25 for 20 s, MI=500 (2026-10-24)
+
+**Source:** #alpha-testing, 2026-10-24 21:34 UTC, answer to Q14 of our overview of all open SAT
+questions (20:53 UTC, messages 1563656700118958262 and 1563656702086221987; Q14: "PWM ignition hold
+when the boiler has no return temperature sensor?", audit finding #27):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563667007692603523
+With an attached screenshot of the OTGW firmware page, section `MI=milliseconds`
+(https://otgw.tclcode.com/firmware.html#configuration).
+
+**Quoted:**
+
+> Q14: Great question. While return water temperature gives us stability. Boiler flow water
+> temperature gives us responsiveness. That means we can skip the start up phase ( 20 seconds of
+> Return temperature +20 ) and go directly to suppression phase. In order to achieve a light off and
+> not a stalled ignition we need to flood the boiler with frequent CS updates during the ignition. We
+> need to repeat PM=25 commands and CS commands. We need a new pattern of the commands for the first
+> 20 seconds.
+> Every 2 seconds we are sending the new CS commands and every 2 seconds + 1 second we ask for the
+> boiler temperature ( PM=25). So we alternate the CS and PM=25 commands every second for the first 20
+> seconds ( ignition ). Also we need to send the MI=500 command to the PIC for boilers that do not
+> report return water temperature. I attach a screenshot from OTGW website where describes how the MI
+> command works.
+
+**Interpretation (ours):** this is a new design for boilers without a return water temperature, not
+the thermo-nova behaviour. In the PWM ON phase, when no return temperature is available:
+
+1. Skip the flame-off hold (the "start up phase": the return temperature plus the flame-off offset,
+   held for the suppression delay) and go straight to the suppression phase: CS = boiler flow
+   temperature minus the suppression offset.
+2. During the first 20 s of the ignition, alternate one command per second: a new CS at t = 0, 2, 4 …
+   and `PM=25` (ask the boiler flow temperature, MsgID 25) at t = 1, 3, 5 …, so the CS follows the
+   rising flow temperature closely and the boiler lights off instead of stalling.
+3. Send `MI=500` to the PIC for boilers that do not report a return water temperature.
+
+We read "Return temperature +20" as his short form of the hold; thermo-nova's default flame-off
+offset is 18.0 °C (`const.py:150`) and its default suppression delay is 20 s (`const.py:151`).
+
+**Settled by this statement:**
+
+- Without a return temperature, the PWM ON phase uses flow-based suppression from the start of the
+  ignition; no flame-off hold.
+- During the first 20 s of ignition the firmware sends CS and `PM=25` alternately, one per second
+  (CS every 2 s, `PM=25` every 2 s offset by 1 s).
+- `MI=500` is sent to the PIC for boilers that do not report a return temperature.
+
+**Compared with thermo-nova and the firmware:**
+
+- thermo-nova (`heating_control.py:392-395`): with the flame off and no return temperature it logs a
+  warning and returns, so the previous control setpoint stays; there is no flow-based start and no
+  command flood. With a return temperature it holds `return + 18.0` (clamped,
+  `heating_control.py:397-405`) for 20 s after flame-on (`:414-433`), then suppresses to
+  `flow - 1.0` (`:439-448`). So this entry is a deliberate deviation from thermo-nova, decided by
+  Sergeant D.
+- Firmware today: `satPwmFlameOffHold()` (`SATcontrol.ino:808-814`) uses `satGetReturnTemp()` plus
+  `fFlameOffOffset`, floored at the cold setpoint, also when there is no return temperature, so a
+  boiler without Tret gets the 28.2 / 21 floor with CH=1 (audit finding #27). `MI=500` is sent only
+  at `initSAT()` as a manufacturer boot quirk (`SATcontrol.ino:3950-3953`), and audit finding #45
+  found it is effectively never sent (manufacturer AUTO, detection not yet run). No `PM=25` is sent
+  by SAT (audit finding #53).
+- The OTGW documentation in his screenshot says `MI` sets the message interval "in stand-alone
+  mode" (the PIC talking to the boiler without a thermostat), valid 100-1275 ms. Whether `MI=500`
+  has any effect with a thermostat connected (gateway mode) is not stated there and not checked.
+
+**Changes an earlier entry:** none. It answers Q14 and gives the reason for `MI=500` that audit
+finding #45 asked for.
+
+**Task:** TASK-1371.
+
+**Open:**
+
+- How "no return temperature" is detected (never reported, Data-Invalid, or stale) is not stated.
+- Whether `MI=500` matters in gateway mode with a thermostat (the documentation describes
+  stand-alone mode) and whether it should be reset (`MI=1000`) later.
+- On OT-Direct boards there is no PIC: `PM=25` and `MI` map to the board's own polling; how the
+  flood is done there is our design choice, to be shown to him in the plan.
+- Whether the flood also applies to boilers that do report a return temperature: his text ties it
+  to the case without one.
