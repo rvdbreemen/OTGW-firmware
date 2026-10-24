@@ -27,10 +27,10 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q7 | queued | Outside temperature missing or old: what should SAT use? (audit #5) | - |
 | Q8 | queued | Heat pumps in PWM: minimum on-time and cycles per hour (audit #9, conflicts C3/C4) | - |
 | Q9 | queued | Continuous to PWM: 60 s or 3 minutes of overshoot? (audit #12, conflict C1) | - |
-| Q10 | queued | PID update rate: fixed 60 s as thermo-nova, or the control tick? (audit #14) | - |
+| Q10 | queued | PID update rate: fixed 60 s as thermo-nova, or the control tick? (audit #14) | ADR-197 |
 | Q11 | queued | First PWM phase after PWM starts: ON at once (thermo-nova) or OFF? (audit #17) | - |
 | Q12 | queued | Hourly start cap: count hot-water ignitions or not? (audit #18) | - |
-| Q13 | queued | CS/MM/CH refresh: every 5 s as thermo-nova, or on change + 300 s? (audit #24) | - |
+| Q13 | queued | CS/MM/CH refresh: every 5 s as thermo-nova, or on change + 300 s? (audit #24) | ADR-199 |
 | Q14 | queued | PWM ignition hold without a return temperature sensor (audit #27) | - |
 | Q15 | queued | Maximum flow setpoint: a user setting, and which defaults? (audit #29) | - |
 | Q16 | queued | Cycles per hour default and range (audit #30) | - |
@@ -40,6 +40,12 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q20 | queued | Cold cutoff boundary: is a requested setpoint exactly equal to the cold setpoint (28.2 / 21) cold (`<=`, as thermo-nova heating_control.py:72 and :385) or not (`<`)? Entries 7 and 11 left it open (TASK-1355) | ADR-199 |
 | Q21 | queued | Heating curve coefficient upper bound: is 5.0 enough, or should it go to 12 as thermo-nova config_flow.py:616-618? (ADR-198, TASK-1359) | ADR-198 |
 | Q22 | queued | The firmware auto-tunes the coefficient hourly (SATcontrol.ino:4664-4705), thermo-nova does not: keep or remove? (ADR-198, audit #39) | ADR-198 |
+| Q23 | queued | PID resets: reset integral and derivative on every target, HVAC-mode and window change as thermo-nova, or keep the firmware's narrower resets? (ADR-197, audit #15) | ADR-197 |
+| Q24 | queued | PID persistence: save and restore integral, last error, raw derivative, last temperature and the derivative time as thermo-nova, or only integral and derivative after a 30 min age check? (ADR-197, audit #42) | ADR-197 |
+| Q25 | queued | Firmware-only integral cap of plus/minus 20 and 10 s minimum between PID updates: keep or remove? (ADR-197, entry 28 asked 2026-06-21, no answer) | ADR-197 |
+| Q26 | queued | Deadband as a user setting (0.05-2.0) and its widening during room-temperature estimation: keep, or a constant 0.1 as thermo-nova const.py:16? (ADR-197, audit #38) | ADR-197 |
+| Q27 | queued | Derivative details: 'no change' threshold 0.001 vs exactly 0, and the reference temperature that moves only with the derivative time (thermo-nova pid.py:171, :211): match thermo-nova? (ADR-197, audit #38/#40) | ADR-197 |
+| Q28 | queued | Integral with Ki near 0 skips the clamp (SATpid.ino:166) and no rounding of gains/terms/output (pid.py:71-132): match thermo-nova? (ADR-197, audit #38) | ADR-197 |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its
