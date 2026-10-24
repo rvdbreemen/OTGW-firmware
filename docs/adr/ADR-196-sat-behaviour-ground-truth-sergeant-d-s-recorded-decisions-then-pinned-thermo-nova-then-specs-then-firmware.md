@@ -1,15 +1,14 @@
 ---
 id: "ADR-196"
 title: "SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware"
-status: "Proposed"
-date: "2026-10-23"
+status: "Accepted"
+date: "2026-10-24"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
 superseded_by: null
-format: "canonical"
 topics:
   - "sat"
   - "governance"
@@ -33,6 +32,7 @@ components:
   - "docs/sat/sergeant-d-corrections.md"
 symbols: []
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -41,7 +41,7 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-10-23.
+Accepted, 2026-10-24.
 
 Guideline-level per ADR-080: no CI (continuous integration) gate checks
 whether a SAT decision followed this rule. `tests/test_sat_ground_truth_block.py`
@@ -56,6 +56,11 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-10-24
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -243,11 +248,12 @@ architectural decision so that ADR authors and `/adr-kit:context` find it.
 
 ## Open Questions
 
-- [ ] Robert: should acceptance of this ADR wait until Sergeant D has confirmed
+- [x] Robert: should acceptance of this ADR wait until Sergeant D has confirmed
   that his recorded entries rank above the thermo-nova code for SAT, or is your
   directive of 2026-10-22 (the SAT ground-truth block) enough to accept it? The
   ranking follows from his role as designer and from entries 7 and 11; he has not
   been asked to confirm the ranking itself.
+  — **Answered 2026-10-24 by User: Robert van den Breemen:** Settled by the maintainer (2026-10-24): the maintainer directive in the CLAUDE.md SAT ground-truth block (2026-10-22/23) is the basis; Sergeant D's confirmation is welcome but not a condition.
 
 ## Related Decisions
 

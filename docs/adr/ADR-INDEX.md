@@ -155,7 +155,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-147 | Accepted | - | D1 -- Root cause. |
 | ADR-148 | Accepted | - | BLE probe sensors are emitted as separate Home Assistant child-devices, each with a viadevice key pointing at the mai... |
 | ADR-149 | Accepted | - | Keep the existing application-level connection mitigations in force and accept that the device cannot survive an adve... |
-| ADR-150 | Accepted | - | When SAT is the active controller and the requested setpoint falls below a per-heating-system COLDSETPOINT, SAT comma... |
+| ADR-150 | Superseded | - | When SAT is the active controller and the requested setpoint falls below a per-heating-system COLDSETPOINT, SAT comma... |
 | ADR-151 | Accepted | - | Keep the scan passive and continuous (ADR-092 baseline, OT-Thing parity). |
 | ADR-152 | Superseded | - | Two bundles, one served root. |
 | ADR-153 | Accepted | - | MiBeacon is the third pluggable parser branch. |
@@ -200,5 +200,5 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-192 | Accepted | - | The 2.0.0 line ships the v2 web UI as its only device web UI. |
 | ADR-193 | Accepted | - | The firmware keeps a ring of 14-byte slots and serves it through an HTTP (Hypertext Transfer Protocol) GET request on... |
 | ADR-194 | Accepted | - | Static text assets that users never need to upload may be compiled into the firmware image and served or read from PR... |
-| ADR-195 | Proposed | - | While SAT is the active controller, one per-heating-system cold setpoint stands in for thermo-nova's COLDSETPOINT 22... |
-| ADR-196 | Proposed | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
+| ADR-195 | Accepted | - | While SAT is the active controller, one per-heating-system cold setpoint stands in for thermo-nova's COLDSETPOINT 22... |
+| ADR-196 | Accepted | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |

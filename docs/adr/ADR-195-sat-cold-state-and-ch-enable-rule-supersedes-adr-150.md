@@ -1,15 +1,15 @@
 ---
 id: "ADR-195"
 title: "SAT cold state and CH-enable rule (proposed successor to ADR-150)"
-status: "Proposed"
-date: "2026-10-23"
+status: "Accepted"
+date: "2026-10-24"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
-supersedes: []
+supersedes:
+  - "ADR-150"
 superseded_by: null
-format: "canonical"
 topics:
   - "sat"
   - "cold-setpoint"
@@ -34,6 +34,7 @@ symbols:
   - "satPwmDisableOnHeaterOff"
   - "satCycleResetSustainGuards"
 context_scope: "selective"
+format: "canonical"
 ---
 
 <!-- markdownlint-disable MD025 -->
@@ -42,11 +43,11 @@ context_scope: "selective"
 
 ## Status
 
-Proposed, 2026-10-23. Guideline-level per ADR-080: no CI gate; the host tests named under Verification are evidence and drift guards, not a gate.
+Accepted, 2026-10-24.
 
 This ADR is the proposed successor to ADR-150. ADR-150 stays Accepted and its front matter is untouched while this ADR is Proposed, so the `supersedes` list here is empty: adr-kit writes both sides of a supersession at once (`adr supersede`), and running it now would retire ADR-150 before this decision is accepted.
 
-Acceptance waits on Sergeant D confirming the `<=` boundary and CH=1 during the PWM ON phase on his own setup (TASK-1316 AC3, entries 7 and 9 of `docs/sat/sergeant-d-corrections.md`). On acceptance, run `adr supersede ADR-150 --by ADR-195` before or together with `adr accept ADR-195`: it sets ADR-150 to "Superseded by ADR-195" and adds ADR-150 to this ADR's `supersedes` list in one step.
+The maintainer accepted this decision on 2026-10-24. The `<=` boundary is settled by entry 12; the remaining confirmations (CH=1 during the PWM (pulse-width modulation) ON phase on Sergeant D's own setup, TASK-1316; the OT-Direct gateway path, TASK-1238) are recorded under Open Questions as deferred.
 
 ## Status History
 
@@ -57,6 +58,16 @@ status_history:
     changed_by: "Agent: Claude"
     reason: Initial proposal
     changed_via: adr-kit
+  - date: 2026-10-24
+    status: Proposed
+    changed_by: "User: Robert van den Breemen"
+    reason: Supersedes ADR-150
+    changed_via: adr-kit lifecycle
+  - date: 2026-10-24
+    status: Accepted
+    changed_by: "User: Robert van den Breemen"
+    reason: Accepted decision after all four verification gates passed
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
@@ -72,7 +83,7 @@ thermo-nova has one global cold threshold, `COLD_SETPOINT = 22` (`const.py:34`),
 - flame-off hold floor: `clamp(return + offset, COLD_SETPOINT, maximum_setpoint)` (`heating_control.py:398`);
 - and the CH (central heating) enable bit after every control step: ON only when `_control_setpoint > COLD_SETPOINT` (`heating_control.py:238`), which the serial OTGW (OpenTherm Gateway) coordinator turns into the CH enable bit (`coordinator/serial/__init__.py:212-214`).
 
-When the heater state is OFF, `update()` takes the else branch: `self._pwm.disable()` (`heating_control.py:230`), which is `reset()` plus `_enabled = False` (`pwm.py:106-109`), then `_reset_pwm_disable_guards()` (`:231`), `_control_setpoint = MINIMUM_SETPOINT` (`:233`) and the maximum relative modulation (`:234`).
+When the heater state is off (OFF), `update()` takes the else branch: `self._pwm.disable()` (`heating_control.py:230`), which is `reset()` plus `_enabled = False` (`pwm.py:106-109`), then `_reset_pwm_disable_guards()` (`:231`), `_control_setpoint = MINIMUM_SETPOINT` (`:233`) and the maximum relative modulation (`:234`).
 
 ADR-150 (Accepted 2026-06-24) brought a per-heating-system cold setpoint into the firmware. Its Decision text no longer describes HEAD (`c3aa767a0`):
 
@@ -85,7 +96,7 @@ ADR-150 names the SAT designer George; his Discord name is Sergeant D (handle se
 
 The decisions this ADR records, all from 2026-10-23, in `docs/sat/sergeant-d-corrections.md`:
 
-- **Entry 5** (PWM OFF: CH=0 together with CS=10), #alpha-testing 10:21 UTC (Coordinated Universal Time), https://discord.com/channels/812969634638725140/1514720723980259460/1563135315991072789: "When the PMW goes to OFF, correctly you send the CS=10 command, but you should also send the command CH=0." (His PMW means PWM.)
+- **Entry 5** (PWM off: CH=0 together with CS=10), #alpha-testing 10:21 UTC (Coordinated Universal Time), https://discord.com/channels/812969634638725140/1514720723980259460/1563135315991072789: "When the PMW goes to OFF, correctly you send the CS=10 command, but you should also send the command CH=0." (His PMW means PWM.)
 - **Entry 7** (CH threshold and cold-start hold), 12:49 UTC, https://discord.com/channels/812969634638725140/1514720723980259460/1563172561162862714 ("below 28.2 not 22. Other than that follow the thermo-nova exactly") and 13:31 UTC, https://discord.com/channels/812969634638725140/1514720723980259460/1563182969345282071 ("You are correct"; "We can limit the cold start value to 28.2 and 21 for underfloor").
 - **Entry 9** (CH rule during PWM), 15:08 UTC, https://discord.com/channels/812969634638725140/1514720723980259460/1563207530275152037: "great understanding!" in reply to our four-point proposal. **Interpretation (ours):** not an explicit yes; read as yes to all four points.
 - **Entry 11** (28.2/21 at every thermo-nova `COLD_SETPOINT` site), 16:47 UTC, https://discord.com/channels/812969634638725140/1514720723980259460/1563232315969249376: "The switch thresholds are 28.2/ 21. If the requested setpoint is lower than the thresholds then we send CH=0 CS=10" and "Yes we use 28.2/21".
@@ -172,7 +183,7 @@ This departs deliberately from thermo-nova `heating_control.py:238` in two ways:
 
 - **Two departures rest on interpretation.** CH=1 during PWM ON rests on "great understanding!" (entry 9), and CH from the requested setpoint on our reading of entry 11. Mitigation: acceptance waits on TASK-1316 AC3.
 - **One PWM re-enable path is missing.** thermo-nova also re-enables PWM in `on_cycle_end()` after a continuous cycle classified OVERSHOOT (`pwm.py:219-223`); the firmware only has the sustained-overshoot auto-switch. Mitigation: TASK-1331 tracks the port.
-- **CH=0 may not reach the boiler in OT-Direct gateway mode.** Accepted ADR-179 (Open Questions) records that on OT-Direct boards in gateway mode the gateway emits its own MsgID 0 status frames alongside the thermostat's, each with a different CH-enable bit, so SAT's `CH=0` is not reliably honoured. ADR-179 moved that MsgID 0 question out of its own scope (it decides MsgID 1 only) to TASK-1238. This ADR decides when SAT wants CH=0, not how the bit reaches the boiler; until TASK-1238 is decided, the cutoff's CH=0 on those boards is an intent, not a verified boiler state. Mitigation: open question below. This finding is recorded for OT-Direct gateway mode only; PIC boards are outside it.
+- **CH=0 may not reach the boiler in OT-Direct gateway mode.** Accepted ADR-179 (Open Questions) records that on OT-Direct boards, which have no PIC (gateway microcontroller), in gateway mode the gateway emits its own MsgID 0 status frames alongside the thermostat's, each with a different CH-enable bit, so SAT's `CH=0` is not reliably honoured. ADR-179 moved that MsgID 0 question out of its own scope (it decides MsgID 1 only) to TASK-1238. This ADR decides when SAT wants CH=0, not how the bit reaches the boiler; until TASK-1238 is decided, the cutoff's CH=0 on those boards is an intent, not a verified boiler state. Mitigation: open question below. This finding is recorded for OT-Direct gateway mode only; PIC boards are outside it.
 - **The `<=` boundary is unconfirmed** by Sergeant D. Mitigation: open question below.
 - **CH cadence differs from thermo-nova** (on change plus a refresh every 300 s, `SAT_CMD_REFRESH_MS`, instead of every control step, whose interval `iControlInterval` defaults to 30 s), kept without his explicit OK. Mitigation: the 5-minute refresh resyncs a rebooted PIC (the gateway's microcontroller) or a drifted boiler; TASK-1324 covers the boot-time resend gap.
 - **Fixed constants.** An installation with atypical radiators or underfloor cannot retune them without a firmware change (carried over from ADR-150, Alternative C).
@@ -180,10 +191,10 @@ This departs deliberately from thermo-nova `heating_control.py:238` in two ways:
 
 ## Open Questions
 
-- [ ] Sergeant D confirms the cutoff boundary: at or below (`<=`, thermo-nova) or strictly below (`<`, his wording)?
-- [ ] Sergeant D confirms CH=1 during the PWM ON phase whatever CS keeps the flame on (entry 9 point 1), on his own setup (TASK-1316 AC3).
+- [x] Sergeant D confirms the cutoff boundary: at or below (`<=`, thermo-nova) or strictly below (`<`, his wording)? — **Answered 2026-10-24 by User: Robert van den Breemen:** Settled: at or below (<=), as thermo-nova. Sergeant D answered 'keep the thermo-nova solution' on the cutoff (docs/sat/sergeant-d-corrections.md entry 12, 2026-10-23); the firmware uses <= since TASK-1323.
+- [x] Sergeant D confirms CH=1 during the PWM ON phase whatever CS keeps the flame on (entry 9 point 1), on his own setup (TASK-1316 AC3). — **Answered 2026-10-24 by User: Robert van den Breemen:** Deferred: the rule is decided (entry 9); the remaining item is Sergeant D's confirmation on his own installation, tracked as TASK-1316 AC3. It does not change this decision.
 - [x] TASK-1327 lands, including the reset of the PWM disable guard timers on the cutoff. Done in commit `c3aa767a0` (`satPwmDisableOnHeaterOff()`, `satCycleResetSustainGuards()`).
-- [ ] TASK-1238 decides how SAT's CH=0 reaches the boiler in OT-Direct gateway mode (MsgID 0, see ADR-179 Open Questions); until then the cutoff's CH=0 is not reliably honoured there.
+- [x] TASK-1238 decides how SAT's CH=0 reaches the boiler in OT-Direct gateway mode (MsgID 0, see ADR-179 Open Questions); until then the cutoff's CH=0 is not reliably honoured there. — **Answered 2026-10-24 by User: Robert van den Breemen:** Deferred to TASK-1238: this ADR decides when SAT wants CH=0, not how the bit reaches the boiler in OT-Direct gateway mode (ADR-179 Open Questions).
 - [x] Whether a user-forced PWM mode (`bForcePWM`) stays PWM through a cold cutoff: resolved by Sergeant D entry 13 (2026-10-23), who removed the Force PWM option completely (TASK-1332). PWM is switched off on the cutoff unconditionally, as thermo-nova does (`heating_control.py:230`).
 
 ## Related Decisions

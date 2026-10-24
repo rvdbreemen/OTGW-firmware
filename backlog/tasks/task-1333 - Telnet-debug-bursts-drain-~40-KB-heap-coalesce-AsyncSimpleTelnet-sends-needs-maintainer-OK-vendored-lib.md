@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-23T21:30:00Z'
+updated_date: '2026-10-24T01:08:00Z'
 labels:
   - heap
   - telnet
@@ -28,3 +29,9 @@ Found in TASK-1328. A burst of telnet debug output (the capture script turns on 
 - [ ] #2 A fix chosen by the maintainer lowers the watermark in the same bench scenario (all toggles on, q+D, emulator, MQTT): before 776 B, after measured
 - [ ] #3 Whether the device can wedge under this burst is settled (Sergeant D's answer or a bench run of 10+ minutes)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-24 maintainer decision (Robert, in session): option A, coalesce sends inside the vendored AsyncSimpleTelnet (src/libraries/SimpleTelnet, submodule) - send only when a full segment is ready or after a short timer; this is explicit approval to change that vendored library. Note: SimpleTelnet is a git submodule; the change has to land in its own repo and the pointer bumped (feedback: submodule pointer must be pushed, ask before pushing the submodule repo).
+<!-- SECTION:NOTES:END -->

@@ -4732,8 +4732,8 @@
       "title": "SAT Per-Heating-System COLD_SETPOINT (Active Boiler-Off Cutoff on Low Demand)",
       "path": "ADR-150-sat-per-heating-system-cold-setpoint-boiler-off-cutoff.md",
       "format": "canonical",
-      "status": "Accepted",
-      "date": "2026-06-24",
+      "status": "Superseded",
+      "date": "2026-10-24",
       "decision_summary": "When SAT is the active controller and the requested setpoint falls below a per-heating-system COLDSETPOINT, SAT comma...",
       "topics": [],
       "aliases": [],
@@ -4755,7 +4755,7 @@
         "documents_shipped": false,
         "verified_in": [],
         "supersedes": [],
-        "superseded_by": null
+        "superseded_by": "ADR-195"
       }
     },
     {
@@ -6804,8 +6804,8 @@
       "title": "SAT cold state and CH-enable rule (proposed successor to ADR-150)",
       "path": "ADR-195-sat-cold-state-and-ch-enable-rule-supersedes-adr-150.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-10-23",
+      "status": "Accepted",
+      "date": "2026-10-24",
       "decision_summary": "While SAT is the active controller, one per-heating-system cold setpoint stands in for thermo-nova's COLDSETPOINT 22...",
       "topics": [
         "ch-enable",
@@ -6867,7 +6867,9 @@
         "gate": null,
         "documents_shipped": false,
         "verified_in": [],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-150"
+        ],
         "superseded_by": null
       }
     },
@@ -6876,8 +6878,8 @@
       "title": "SAT behaviour ground truth: Sergeant D's recorded decisions, then pinned thermo-nova, then specs, then firmware",
       "path": "ADR-196-sat-behaviour-ground-truth-sergeant-d-s-recorded-decisions-then-pinned-thermo-nova-then-specs-then-firmware.md",
       "format": "canonical",
-      "status": "Proposed",
-      "date": "2026-10-23",
+      "status": "Accepted",
+      "date": "2026-10-24",
       "decision_summary": "For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low...",
       "topics": [
         "documentation-process",
@@ -11221,6 +11223,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-150",
+      "target": "ADR-195",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-151",
       "target": "ADR-080",
       "type": "related",
@@ -12310,6 +12318,12 @@
       "source": "ADR-195",
       "target": "ADR-150",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-195",
+      "target": "ADR-150",
+      "type": "supersedes",
       "resolved": true
     },
     {

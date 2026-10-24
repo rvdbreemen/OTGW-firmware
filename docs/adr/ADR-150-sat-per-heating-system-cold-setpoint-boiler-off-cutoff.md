@@ -1,20 +1,20 @@
 ---
 id: "ADR-150"
 title: "SAT Per-Heating-System COLD_SETPOINT (Active Boiler-Off Cutoff on Low Demand)"
-status: "Accepted"
-date: "2026-06-24"
+status: "Superseded"
+date: "2026-10-24"
 binding: false
 gate: null
 documents_shipped: false
 verified_in: []
 supersedes: []
-superseded_by: null
+superseded_by: "ADR-195"
 ---
 # ADR-150: SAT Per-Heating-System COLD_SETPOINT (Active Boiler-Off Cutoff on Low Demand)
 
 ## Status
 
-Accepted. Date: 2026-06-24 (maintainer approval; landed: satGetColdSetpoint()). Originally Proposed 2026-06-21.
+Superseded by ADR-195, 2026-10-24.
 
 ## Status History
 
@@ -30,6 +30,11 @@ status_history:
     changed_by: User
     reason: Accepted by the maintainer; landed satGetColdSetpoint()
     changed_via: adr-kit
+  - date: 2026-10-24
+    status: Superseded
+    changed_by: "User: Robert van den Breemen"
+    reason: Superseded by ADR-195
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context
