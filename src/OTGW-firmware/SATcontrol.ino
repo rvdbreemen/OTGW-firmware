@@ -2588,7 +2588,7 @@ void satSendStatusJSON()
     je.field(F("overshoot_margin"),     settings.sat.fOvershootMargin);
     je.field(F("cycle_count"),          snap->st.sat.iCycleCount);
     je.field(F("cycles_this_hour"),     (int32_t)snap->cyclesThisHour);
-    je.field(F("last_cycle_class"),     (int32_t)snap->st.sat.eLastCycleClass);
+    je.field(F("last_cycle_class"),     (int32_t)satReportedLastCycleClass(snap->st.sat, millis()));
     je.field(F("cycle_max_flow"),       snap->st.sat.fCycleMaxFlow);
     je.field(F("cycle_overshoot_sec"),  snap->st.sat.fCycleOvershootSec);
     je.field(F("duty_ratio"),           snap->st.sat.fDutyRatio);
@@ -2986,7 +2986,7 @@ void satPublishMQTT()
       "none", "good", "overshoot", "underheat", "short", "uncertain",
       "underheat_pwm", "insufficient"
     };
-    int ccIdx = (int)state.sat.eLastCycleClass;
+    int ccIdx = (int)satReportedLastCycleClass(state.sat, millis());
     if (ccIdx < 0 || ccIdx > 7) ccIdx = 0;
     publishIfChangedS(F("sat/cycle_class"), ccNames[ccIdx], s_cycle_class, false);
   }
@@ -3224,10 +3224,11 @@ void satPublishMQTT()
                        (state.sat.eBoilerStatus == SAT_BS_OFF),
                        s_device_health, "ON", "OFF", true);
   {
-    bool cycleProb = (state.sat.eLastCycleClass == SAT_CYCLE_OVERSHOOT ||
-                      state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT ||
-                      state.sat.eLastCycleClass == SAT_CYCLE_UNDERHEAT_PWM ||
-                      state.sat.eLastCycleClass == SAT_CYCLE_SHORT);
+    const SATCycleClass lcc = satReportedLastCycleClass(state.sat, millis());
+    bool cycleProb = (lcc == SAT_CYCLE_OVERSHOOT ||
+                      lcc == SAT_CYCLE_UNDERHEAT ||
+                      lcc == SAT_CYCLE_UNDERHEAT_PWM ||
+                      lcc == SAT_CYCLE_SHORT);
     publishIfChangedBStr(F("sat/cycle_health"), cycleProb, s_cycle_health, "ON", "OFF", true);
   }
 
@@ -3867,7 +3868,7 @@ static void satUpdateFlameStatus()
   }
 
   // Short cycling detection from last completed cycle
-  if (state.sat.eLastCycleClass == SAT_CYCLE_SHORT) {
+  if (satReportedLastCycleClass(state.sat, millis()) == SAT_CYCLE_SHORT) {
     state.sat.eFlameStatus = SAT_FS_SHORT_CYCLING;
     return;
   }

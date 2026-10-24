@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.496
+**  Version  : v2.0.0-alpha.497
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -568,7 +568,7 @@ static void sendTelnetBanner(const char* ip)
     (unsigned)state.sat.iCurrentModulation);
   _debugPrintf_P(PSTR("         status %s   lastCycle %s   fallback %s   wx %s\r\n"),
     satBoilerStatusStr(state.sat.eBoilerStatus),
-    satCycleClassStr(state.sat.eLastCycleClass),
+    satCycleClassStr(satReportedLastCycleClass(state.sat, millis())),
     state.sat.bFallbackActive ? "ON" : "off",
     state.sat.weather.bValid ? "ok" : "stale");
 #if HAS_SAT_BLE

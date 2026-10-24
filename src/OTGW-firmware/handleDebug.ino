@@ -229,7 +229,7 @@ static void dumpDebugInfo() {
     Debugf(PSTR("pid_i: %.2f\r\n"), state.sat.fPidI);
     Debugf(PSTR("pid_d: %.2f\r\n"), state.sat.fPidD);
     Debugf(PSTR("cycle_count: %u\r\n"), (unsigned)state.sat.iCycleCount);
-    Debugf(PSTR("last_cycle_class: %d\r\n"), (int)state.sat.eLastCycleClass);
+    Debugf(PSTR("last_cycle_class: %d\r\n"), (int)satReportedLastCycleClass(state.sat, millis()));
     Debugf(PSTR("duty_ratio: %.3f\r\n"), state.sat.fDutyRatio);
     Debugf(PSTR("pwm_duty: %.2f\r\n"), state.sat.fPwmDutyCycle);
     Debugf(PSTR("active_preset: %d\r\n"), (int)state.sat.eActivePreset);

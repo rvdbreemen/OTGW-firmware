@@ -571,6 +571,7 @@ static void _cycleRecord(SATCycleClass cls, float durationSec, float maxFlow, fl
 
   state.sat.iCycleCount++;
   state.sat.eLastCycleClass = cls;
+  state.sat.iLastCycleEndMs = millis();
   state.sat.fCycleMaxFlow = maxFlow;
   state.sat.fCycleOvershootSec = overshootSec;
   state.sat.fLastCycleDuration = durationSec;

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.496
+**  Version  : v2.0.0-alpha.497
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -999,17 +999,18 @@ static void satSendHealthJSON()
   bool flameHealth     = !state.sat.bSafetyTripped;
   bool deviceHealth    = (state.sat.eBoilerStatus != SAT_BS_OFF)
                       && (state.sat.eBoilerStatus != SAT_BS_STALLED_IGNITION);
-  bool cycleHealth     = (state.sat.eLastCycleClass != SAT_CYCLE_OVERSHOOT)
-                      && (state.sat.eLastCycleClass != SAT_CYCLE_UNDERHEAT)
-                      && (state.sat.eLastCycleClass != SAT_CYCLE_UNDERHEAT_PWM)
-                      && (state.sat.eLastCycleClass != SAT_CYCLE_SHORT);
+  const SATCycleClass lcc = satReportedLastCycleClass(state.sat, millis());
+  bool cycleHealth     = (lcc != SAT_CYCLE_OVERSHOOT)
+                      && (lcc != SAT_CYCLE_UNDERHEAT)
+                      && (lcc != SAT_CYCLE_UNDERHEAT_PWM)
+                      && (lcc != SAT_CYCLE_SHORT);
 
   // --- Cycle class / kind names (kept in PROGMEM via static const) ---
   static const char* const ccNames[] = {
     "none", "good", "overshoot", "underheat", "short", "uncertain",
     "underheat_pwm", "insufficient"
   };
-  int ccIdx = (int)state.sat.eLastCycleClass;
+  int ccIdx = (int)satReportedLastCycleClass(state.sat, millis());
   if (ccIdx < 0 || ccIdx > 7) ccIdx = 0;
 
   static const char* const ckNames[] = {
@@ -2384,7 +2385,7 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("state.sat.pid_i"), snap->st.sat.fPidI);
     je.field(F("state.sat.pid_d"), snap->st.sat.fPidD);
     je.field(F("state.sat.cycle_count"), (uint32_t)snap->st.sat.iCycleCount);
-    je.field(F("state.sat.last_cycle_class"), (int32_t)snap->st.sat.eLastCycleClass);
+    je.field(F("state.sat.last_cycle_class"), (int32_t)satReportedLastCycleClass(snap->st.sat, millis()));
     je.field(F("state.sat.duty_ratio"), snap->st.sat.fDutyRatio);
     je.field(F("state.sat.pwm_duty"), snap->st.sat.fPwmDutyCycle);
     je.field(F("state.sat.active_preset"), (int32_t)snap->st.sat.eActivePreset);

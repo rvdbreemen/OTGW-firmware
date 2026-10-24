@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.496
+**  Version  : v2.0.0-alpha.497
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -164,6 +164,7 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   float fRawDerivative           = 0.0f;  // filtered derivative (for diagnostics)
   // Cycle tracking
   SATCycleClass eLastCycleClass  = SAT_CYCLE_NONE;
+  uint32_t iLastCycleEndMs       = 0;      // millis() when eLastCycleClass was recorded (TASK-1352)
   uint32_t iCycleCount           = 0;
   uint8_t  iCyclesThisHour       = 0;      // Flame-on events in the rolling 60-min window
   float    fCycleMaxFlow         = 0.0f;
@@ -421,6 +422,25 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint8_t  iBleBattery            = 0;      // Battery level of primary BLE sensor
   int8_t   iBleRssi               = 0;      // RSSI of primary BLE sensor
 };
+
+// thermo-nova drops the last cycle 6 h after it ended (cycles/history.py:48-57,
+// LAST_CYCLE_MAX_AGE_SECONDS = 6*3600 in cycles/const.py:14). The firmware keeps
+// state.sat.eLastCycleClass for the control paths; the reporting paths ask here.
+// --- satLastCycleExpired begin
+static const uint32_t SAT_LAST_CYCLE_MAX_AGE_MS = 6UL * 3600UL * 1000UL;
+static inline bool satLastCycleExpired(uint32_t nowMs, uint32_t endMs, bool haveCycle)
+{
+  if (!haveCycle) return true;
+  return (uint32_t)(nowMs - endMs) > SAT_LAST_CYCLE_MAX_AGE_MS;
+}
+// --- satLastCycleExpired end
+
+// Last cycle class as the reporting paths (MQTT, REST, WS, debug, flame status) show it.
+static inline SATCycleClass satReportedLastCycleClass(const SATRuntimeSection& s, uint32_t nowMs)
+{
+  return satLastCycleExpired(nowMs, s.iLastCycleEndMs, s.eLastCycleClass != SAT_CYCLE_NONE)
+           ? SAT_CYCLE_NONE : s.eLastCycleClass;
+}
 
 //====================================================================
 //=== settings.sat — persisted SAT configuration ===
