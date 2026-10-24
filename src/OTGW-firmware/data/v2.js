@@ -1073,7 +1073,11 @@
     var ovrSet = ovrRows.some(function (o) { return ovrMark(o.id) === 'aRoomSet'; });
     setMark('aOut', fmt(model.outside, 1, '°'), model.outside !== null && ovrOut);
     txt('aRoom', fmt(model.room, 1, '°'));
-    var setBase = model.roomSet === null ? '' : 'set ' + fmt(model.roomSet, 1, '°');
+    // TASK-1342: while SAT controls the boiler its target is the setpoint that counts; the
+    // thermostat's own setpoint (MsgID 16) is shown second, as the thermostat may refuse a push.
+    var satSet = sat.active && sat.target !== null && !isNaN(sat.target);
+    var setBase = satSet ? 'set ' + fmt(sat.target, 1, '°') + (model.roomSet === null ? '' : ' (thermostat ' + fmt(model.roomSet, 1, '°') + ')')
+                         : (model.roomSet === null ? '' : 'set ' + fmt(model.roomSet, 1, '°'));
     setMark('aRoomSet', setBase, !!setBase && ovrSet);
     // injected-override badge — count from the same polled overrides model.
     var aob = document.getElementById('aOvrBadge');
@@ -2961,7 +2965,7 @@
   // P9: heat-source control, REST seed, target steppers, conn detail,
   // support hover, graph window/export, settings enum options.
   // ============================================================
-  var sat = { source: 0, detected: 1, target: null };  // source: 0=auto,1=gas,2=hp,3=hybrid
+  var sat = { source: 0, detected: 1, target: null, active: false };  // source: 0=auto,1=gas,2=hp,3=hybrid
   function effectiveSource() { return sat.source === 0 ? sat.detected : sat.source; }
   var statsSort = { col: 'id', asc: true };
   function sortStatsCmp(a, b) {
@@ -3324,6 +3328,7 @@
       if (st.heating_source !== undefined) sat.source = st.heating_source | 0;
       if (st.heating_source_detected !== undefined) sat.detected = st.heating_source_detected | 0;
       if (st.target_temp !== undefined) sat.target = parseFloat(st.target_temp);
+      sat.active = !!st.active;   // TASK-1342: room tile shows SAT's target while SAT controls
       applyApplianceToggle();
       if (activeDesign() === 'a') renderA();
     }).catch(function () { });
