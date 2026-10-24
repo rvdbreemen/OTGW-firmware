@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : networkStuff.ino
-**  Version  : v2.0.0-alpha.485
+**  Version  : v2.0.0-alpha.486
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -622,6 +622,11 @@ void startTelnet()
 {
   debugTelnet.onConnect(sendTelnetBanner);
   debugTelnet.setLineMode(false);
+  // TASK-1333: Nagle on for the debug console only, so the TCP stack merges the
+  // small fragments of each log line. With every fragment sent at once, a debug
+  // burst held ~40 KB of heap in send buffers (minimum free heap 1064 B on the
+  // bench). Port 25238 (OTGWstream) keeps NoDelay for the PIC request/response.
+  debugTelnet.setNoDelay(false);
   debugTelnet.onInputReceived(onTelnetInput);
   debugTelnet.begin(false);        // port was fixed in the constructor (23)
   DebugT(F("\r\nTelnet debug server started on "));
