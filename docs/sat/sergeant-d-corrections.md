@@ -647,3 +647,27 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156346866721
 **Open:** whether the "PWM auto switch" setting should remain at all (it still gates the existing
 60 s sustained-overshoot switch, `SATcycles.ino` `satCycleCheckAutoSwitch`; thermo-nova has no such
 setting). Asked as a follow-up; it does not block TASK-1331.
+
+## 19. Remove the "PWM auto switch" setting (2026-10-24)
+
+**Source:** #alpha-testing, 2026-10-24 08:47 UTC, reply to our follow-up of 08:45 UTC (message
+1563473408203694150: should our "PWM auto switch" setting stay at all? It only blocks the 60-second
+overshoot switch, and thermo-nova has no such setting):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563474015409012747
+
+**Quoted:**
+
+> @BlueFlame Bot remove it
+
+**Settled by this statement:** the firmware setting "PWM auto switch" (`settings.sat.bPwmAutoSwitch`,
+default true, `SATtypes.h`) is removed, as Force PWM was (entry 13). SAT always picks the mode
+itself, as thermo-nova: the sustained-overshoot switch (`heating_control.py:280-304`) and the
+end-of-cycle switch (`pwm.py:219-227`, entries 15 and 18) are never blocked by a user setting.
+thermo-nova has no such setting (a grep of `custom_components/sat` for auto_switch/autoswitch finds
+nothing).
+
+**Task:** TASK-1341 (removal: setting, REST field, MQTT command/HA entity if any, UI field, docs;
+old settings files keep loading).
+
+**Open:** none. (Question Q1 in `docs/sat/open-questions.md`; re-asked at 09:18 UTC before we saw
+this answer.)

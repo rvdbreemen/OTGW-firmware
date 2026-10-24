@@ -14,8 +14,8 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 
 | # | Status | Topic | Blocks |
 |---|---|---|---|
-| Q1 | asked (2026-10-24, re-asked with answers and advice) | Keep the firmware's "PWM auto switch" setting at all? | nothing |
-| Q2 | queued | End-of-cycle switch: compare the tail flow with the control setpoint per sample, as thermo-nova | TASK-1331 |
+| Q1 | answered (entry 19: remove it) -> TASK-1341 | Keep the firmware's "PWM auto switch" setting at all? | nothing |
+| Q2 | asked (2026-10-24) | End-of-cycle switch: compare the tail flow with the control setpoint per sample, as thermo-nova | TASK-1331 |
 | Q3 | queued | Overshoot margin 2.0 equals the flow offset 2.0 | TASK-1331 |
 | Q4 | queued | Classifier steps the firmware keeps that classifier.py does not have | TASK-1331 |
 

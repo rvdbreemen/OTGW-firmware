@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T09:19:00Z'
-updated_date: '2026-10-24T09:19:00Z'
+updated_date: '2026-10-24T09:25:00Z'
 labels:
   - sat
   - spec
@@ -33,4 +33,6 @@ Maintainer directive 2026-10-24: unclear SAT behaviour is resolved interactively
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-24: Q1 (PWM auto switch) asked in the chat with answers A/B and advice A (msg 1563481923404169270).
+
+2026-10-24: Q1 answered by Sergeant D 08:47 UTC ('remove it') -> entry 19, TASK-1341. Q2 (per-sample control setpoint for the end-of-cycle switch) asked.
 <!-- SECTION:NOTES:END -->
