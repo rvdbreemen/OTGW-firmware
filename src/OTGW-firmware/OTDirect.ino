@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : OTDirect.ino
-**  Version  : v2.0.0-alpha.488
+**  Version  : v2.0.0-alpha.489
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -60,6 +60,9 @@ static constexpr uint32_t OT_WRITE_INTERVAL_MS    = 15000;  // Periodic writes e
 
 // Status flags to send in MsgID 0 (master status byte)
 static uint8_t otMasterStatusFlags = 0x01;  // bit0=CH enable (default on)
+// CH= state, mirrors the PIC's CHModeOff: set by CH=0, cleared by CH=1, persists until the next CH=.
+// It only reaches bit0 of MsgID 0 while a CS override is active (otdEffectiveMasterFlags).
+static bool otChModeOff = false;
 
 // Current operating mode (gateway/monitor/bypass/master)
 static OTDirectMode otCurrentMode = OTD_MODE_GATEWAY;
@@ -753,13 +756,32 @@ static void bridgeFrameToParser(char prefix, unsigned long frame) {
 // ---------------------------------------------------------------------------
 // buildStatusRequest — construct MsgID 0 master request with current flags
 // ---------------------------------------------------------------------------
+// TASK-1346: true while the CS= override for MsgID 1 is in force. CS=0, the TASK-442
+// heartbeat expiry and satDisable() all clear it through clearWriteOverride(1).
+static bool otdCsOverrideActive() {
+  for (uint8_t i = 0; i < OT_OVERRIDE_COUNT; i++) {
+    if (otOverrides[i].msgId == 1) return otOverrides[i].active;
+  }
+  return false;
+}
+
+// TASK-1346: bit0 of the MsgID 0 master status the boiler sees. PIC semantics
+// (gateway.asm:53 "CH=1 Override the CH enable bit when CS != 0"; pyotgw/pyotgw.py:602-603):
+// CH= takes effect only while a CS override is active; otherwise the board's own bit0 stands.
+// --- otdEffectiveMasterFlags begin
+static uint8_t otdEffectiveMasterFlags(uint8_t boardFlags, bool chModeOff, bool csOverrideActive) {
+  if (!csOverrideActive) return boardFlags;
+  return chModeOff ? (uint8_t)(boardFlags & ~0x01) : (uint8_t)(boardFlags | 0x01);
+}
+// --- otdEffectiveMasterFlags end
+
 static unsigned long buildStatusRequest() {
   // Build a complete READ_DATA request so message type, data-id and parity are correct.
   // MsgID 0: Master status flags in data-value HB (bits 15-8), LB = 0 (slave fills it)
   return OpenTherm::buildRequest(
     OpenThermMessageType::READ_DATA,
     OpenThermMessageID::Status,
-    ((unsigned int)otMasterStatusFlags << 8)
+    ((unsigned int)otdEffectiveMasterFlags(otMasterStatusFlags, otChModeOff, otdCsOverrideActive()) << 8)
   );
 }
 
@@ -2447,6 +2469,7 @@ static void resetTransientState() {
   otDHWBlocking = false;
   otCoolingEnable = false;
   otMasterStatusFlags = 0x01;  // CH enable only; summer mode re-applied below if persisted
+  otChModeOff = false;         // PIC boots with CHModeOff clear
   if (settings.otd.bSummerMode) otMasterStatusFlags |= 0x20;
   // DHW override
   otDHWOverride = 0xFF;  // auto
@@ -2753,9 +2776,10 @@ void handleOTDirectCommand(const char* buf, int len) {
     float temp = atof(value);
     bool enqueued = true;
     if (temp == 0.0f) {
-      // CS=0 clears the flow setpoint override only. It does NOT touch bit0 (CH enable)
-      // of MsgID 0. gateway.asm SetCtrlSetpoint sets SysCtrlSetpoint on CS=0 but never
-      // modifies bit0. CH= is the sole owner of that bit.
+      // CS=0 clears the flow setpoint override only and does not write bit0 (CH enable)
+      // of MsgID 0. CH= overrides bit0 only while a CS override is active (gateway.asm:53;
+      // pyotgw/pyotgw.py:602-603), so clearing the override hands bit0 back to the board's
+      // own value (otdEffectiveMasterFlags).
       clearWriteOverride(1);
       otCSLastCommandMs = 0;  // TASK-442: explicit clear, no expiry
     } else {
@@ -2992,14 +3016,10 @@ void handleOTDirectCommand(const char* buf, int len) {
     rspBuf[0] = v; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }
-  // CH=0/1 — CH enable (bit0 of master status)
+  // CH=0/1 — CH enable override of bit0, applied only while a CS override is active (PIC CHModeOff)
   else if (cmd0 == 'C' && cmd1 == 'H') {
     if (!checkBoolean(value)) { otDirectBridgeProcessStatus("BV"); return; }
-    if (value[0] == '1') {
-      otMasterStatusFlags |= 0x01;
-    } else {
-      otMasterStatusFlags &= ~0x01;
-    }
+    otChModeOff = (value[0] == '0');
     rspBuf[0] = value[0]; rspBuf[1] = '\0';
     synthesizeResponse(buf, rspBuf);
   }

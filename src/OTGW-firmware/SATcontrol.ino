@@ -2357,6 +2357,11 @@ void satDisable()
   // (This is the disabled-handover only; while SAT is ENABLED it implements a per-heating-system
   // COLD_SETPOINT cold-cutoff that commands the boiler off on low demand -- see ADR-150 / TASK-891.2.)
   satEnqueueOwnCS("CS=0");
+  // TASK-1346: also hand back the CH override. CH= only counts while a CS override is
+  // active (gateway.asm:53, pyotgw.py:602-603), but the flag itself stays: when the
+  // OTDirect heating curve or a later CS= sets a new override, SAT's last CH=0 would
+  // switch central heating off again. CH=1 restores the default state of that flag.
+  addCommandToQueue("CH=1", 4, false, 0);
   // TASK-565: clear the write-on-change cache so the next satControlLoop
   // (re-enable, fallback, or recommissioning) re-emits all four SAT commands.
   satResetCmdCache();

@@ -212,7 +212,7 @@ The OTDirect module operates as a cooperative OpenTherm stack layered on the pro
 
 **Category 2: Status Flag Commands** (immediate effect on MsgID 0 master status byte)
 - `HW=0/1/A/P` - DHW enable + DHW push state machine
-- `CH=0/1` - CH enable (bit 0)
+- `CH=0/1` - CH enable override of bit 0, PIC `CHModeOff` semantics (TASK-1346): the command sets `otChModeOff`, which persists until the next `CH=` and is cleared at init. It reaches MsgID 0 only while a `CS=` override is active (gateway.asm:53; pyotgw/pyotgw.py:602-603): `otdEffectiveMasterFlags(otMasterStatusFlags, otChModeOff, otdCsOverrideActive())` in `buildStatusRequest()`. Without a CS override bit 0 is the board's own value (boot 1, hysteresis suspend, setback), so `CS=0`, the 60 s CS expiry and `satDisable()` hand bit 0 back. Gateway mode with a real thermostat (TASK-1238) is not covered.
 - `H2=0/1` - CH2 enable (bit 4)
 - `SM=0/1` - Summer mode (bit 5, persisted)
 - `BW=0/1` - DHW blocking (bit 6)
