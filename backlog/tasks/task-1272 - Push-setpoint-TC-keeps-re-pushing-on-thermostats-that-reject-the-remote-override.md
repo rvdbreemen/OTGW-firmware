@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:17
-updated_date: '2026-10-24T03:30:00Z'
+updated_date: '2026-10-24T07:45:00Z'
 labels:
   - sat
   - ux
@@ -45,4 +45,8 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 2026-10-24 plan posted to Sergeant D for his OK (#alpha-testing): hybrid push with thermo-nova citations climate.py:641-657, :765, coordinator/mqtt/opentherm.py:206-209. Waiting for his answer; record it as entry 14 in docs/sat/sergeant-d-corrections.md before implementing.
 
 2026-10-24 Sergeant D OK (03:18 UTC, 'yes it is ok') recorded as entry 14 in docs/sat/sergeant-d-corrections.md. Implementing the hybrid.
+
+2026-10-24 review (opus) of the transition-based hybrid: BLOCKED. F1 HIGH: on PIC the MsgID 9 override comes back as a rewritten A frame after the boiler's B (gateway.asm:2932-2953); OTGW-Core.ino:5313-5334 marks it bAnswerOverride, print_f88 does not write TrOverride for it (validForMaster, :1888, :2759-2781) while setMsgLastUpdated does (:5466) -> 'seen' rarely trips (boiler-dependent). F2 HIGH: a refusing thermostat -> PIC cancels after 3 mismatches and clears the override (gateway.asm:3022-3036) -> MsgID 9 reads 0 -> re-push every cycle: harness 11 TC= in 10 min vs 3 on HEAD (scratchpad round.py). F3 MED-HIGH: adopt does not move fLastSentTC, so dial 20->21.5->20 is treated as an echo and SAT stays at 21.5 (conflicts with entry 2; scratchpad dialback.py). F4: code treats any far value as 'gone' (entry 14 said reads 0); F4b: pushes on boot/enable/online edge/toggle are firmware-only, not in entry 14. OT-Direct: re-push never fires (harmless), but after an adopt the stale TC override keeps replacing MsgID 16. Conclusion: with the PIC's signals the firmware cannot tell a gateway reset from a refusing thermostat reliably; a re-push on 'override gone' brings back the flapping. Decision needed from Robert (and possibly Sergeant D).
+
+2026-10-24 Robert decided option D (exactly thermo-nova) after the BLOCKED review; Sergeant D informed 07:27 UTC (msg 1563453986630008849) and asked for an explicit OK in the consolidated question list (question 2). This drops entry 14's MsgID 9 re-push bullet; when he answers, record entry 15 naming entry 14 before committing. Re-review (opus) of option D: no correctness bug; R1 process (this note + entry 15 + AC1 rewrite), R2 a cache reset after an adopt sends the adopted value once (harmless, firmware-only), R3 docs drift (sat-comparison rows, manuals wording, spec citations), R4 fTCAccounted == fLastSentTC and iLastSentTCMs now write-only, R5 test docstring + else-branch coverage. Implementation is uncommitted in the dev tree, waiting.
 <!-- SECTION:NOTES:END -->

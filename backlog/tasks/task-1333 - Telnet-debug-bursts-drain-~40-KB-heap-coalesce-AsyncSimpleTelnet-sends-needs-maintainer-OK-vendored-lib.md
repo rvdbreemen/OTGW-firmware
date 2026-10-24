@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T21:30:00Z'
-updated_date: '2026-10-24T01:48:00Z'
+updated_date: '2026-10-24T07:45:00Z'
 labels:
   - heap
   - telnet
@@ -45,4 +45,8 @@ Option A (maintainer 2026-10-24): coalesce telnet sends inside AsyncSimpleTelnet
 2026-10-24 maintainer decision (in session): SimpleTelnet change goes on a branch in rvdbreemen/SimpleTelnet with a PR; the OTGW submodule pointer points at that branch commit; Robert merges the PR.
 
 2026-10-24 evidence: cause narrowed to the send path: AsyncSimpleTelnet set TCP_NODELAY (Nagle off) on server and clients, so every add()+send() left as its own segment, each holding a heap pbuf and a WiFi dynamic TX buffer until ACKed (which of the two dominates was not split; turning Nagle on removes the effect, which pins it on per-segment send buffering). Fix (option A): SimpleTelnet gets setNoDelay(bool) (default true, unchanged), OTGW calls debugTelnet.setNoDelay(false) in startTelnet(); port 25238 (OTGWstream) keeps NoDelay for the PIC request/response. SimpleTelnet branch perf/coalesce-telnet-tx commit a1067d4, PR https://github.com/rvdbreemen/SimpleTelnet/pull/8 (Robert merges); OTGW submodule pointer -> a1067d4. Bench (OTGW32, fresh reboot per run, temp broker, sat_boiler_emulator on 25238, telnet all toggles on + q + D, 60 s): old alpha.485: min_free_heap 1064 B, trace heap min 13452 B, q output 31127 B; Nagle on (first unconditional, then the configurable version): min_free_heap 23752 / 24348 B (unchanged by the session), trace heap min 64036 / 70252 B, q output 57911 / 58597 B (more of the burst delivered). Console key latency with Nagle: 36-197 ms (8 samples). Port 25238 bridge kept working (emulator connected and sent). Build SUCCESS. OPEN AC3: whether Sergeant D's unit wedged (asked 2026-10-23, no answer yet).
+
+2026-10-24 field evidence (Sergeant D capture on alpha.486, 06:41 UTC, transcript-20261024-093559): during his telnet session with all toggles on and the settings dump, the lowest heap in the trace was 59792 B (before TASK-1333 his dump dropped it to 50276 and our bench to 13-32 KB), so the telnet fix holds in the field. His low watermark (banner minFree 1524 at uptime 0 min) happened before the telnet session: a separate boot-time dip, filed as its own task.
+
+2026-10-24 consolidated open questions re-posted to Sergeant D in #alpha-testing (Robert asked to make the wait explicit); waiting for his answer.
 <!-- SECTION:NOTES:END -->

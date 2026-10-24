@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T10:32:00Z'
-updated_date: '2026-10-23T16:06:00Z'
+updated_date: '2026-10-24T07:45:00Z'
 labels:
   - sat
   - pwm
@@ -57,6 +57,8 @@ Parked in git stash on dev: 'TASK-1316 CH threshold (waiting for Sergeant D)' (t
 2026-10-23 15:08Z Sergeant D (msg 1563207530275152037), reply to the 4-point CH proposal: 'great understanding! As you understand the continuous and pwm buttons should never be present in the SAT dashboard. Because the software decides when every mode will be in charge.' Read as YES to the proposal (interpretation recorded): PWM ON -> CH=1; PWM OFF -> CS=10 + CH=0; continuous -> CH from the setpoint vs the cold setpoint; CH decided on the setpoint before the solar offset. The buttons remark is filed separately.
 
 2026-10-23 18:05 implementation of the confirmed rule: SATchEnable.h satChEnableDecide(preSolar, cold, pwmDrivesSetpoint, pwmOn, coldCutoff) + satChEnableFor; SATcontrol.ino main block: satPwmDrivesSetpoint() mirrors satApplyPWM's early returns (flow<=0, protection off, DHW, pid<=cold), preSolarSetpoint captured before the solar offset, pwmOn captured right after satApplyPWM (opus review HIGH: reading bPwmFlameRequested after satCycleCheckAutoSwitch would send CH=0 mid-burn on a PWM->continuous switch tick, because satPwmReset clears it). Evidence: test_sat_ch_enable.cpp 0 failures, 22 PASS, per case old rule vs new (continuous 25 rad old 1 new 0; underfloor 20.9 old 1 new 0; cold cutoff with pwmOn old 1 new 0; PWM not driving CS + pre 25 old 1 new 0); test_sat_pwm_override.py fix 'Ran 39 OK', HEAD 'FAILED (failures=1)' (source check incl. the pwmOn-before-auto-switch order guard); evaluate 0 fail; build.bat combo SUCCESS 18:02; bench app flash: boots, SAT active, no panic in 120 s (no CS/CH traffic because the bench has no room temperature, so the CH path itself is host-tested only). Follow-ups: TASK-1323 (sticky prevCS + solar during ignition, needs Sergeant D), TASK-1324 (write-on-change resend gap, pre-existing). AC3 open: Sergeant D on his setup.
+
+2026-10-24 consolidated open questions re-posted to Sergeant D in #alpha-testing (Robert asked to make the wait explicit); waiting for his answer.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
