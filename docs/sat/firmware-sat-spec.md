@@ -976,7 +976,7 @@ When `pidOutput` is at or below the cold setpoint (28.2 radiators, 21.0 underflo
 | `sat/setpoint` | `fFinalSetpoint` | SATcontrol.ino:2731 |
 | REST/status JSON `heating_curve`, `pid_output` | Same state values | SATcontrol.ino:2354-2355, restAPI.ino:2393-2394 |
 
-Computed from the code: when zones are active, each zone step calls `satCalcHeatingCurve`, which overwrites `state.sat.fHeatingCurveValue` (SATcontrol.ino:498, SATcontrol.ino:1828). The published `sat/heating_curve` is then the last zone's curve, not the main curve.
+Computed from the code: `satCalcHeatingCurve` returns the curve and writes no state (SATcontrol.ino:591). The control loop stores the main curve, from the main effective target, in `state.sat.fHeatingCurveValue` (SATcontrol.ino:5069). The zone steps compute their own curves from the zone targets without touching it (SATcontrol.ino:2026), so `sat/heating_curve` is the main curve also with zones on (TASK-1353; before that it was the last zone's curve). Thermo-nova does the same: the climate publishes its own curve (climate.py:249, :697; sensor.py:291) and each area keeps a separate one (area.py:49, :262).
 
 <a id="s2-edge-cases"></a>
 

@@ -601,7 +601,8 @@ static float satCalcHeatingCurve(float targetTemp, float outsideTemp)
 
   float setpoint = baseOffset + (coeff / 4.0f) * curveValue;
 
-  state.sat.fHeatingCurveValue = setpoint;
+  // No state write here: the zone steps call this too, and the published curve is the
+  // main curve, stored by the control loop (TASK-1353).
   return setpoint;
 }
 
@@ -5065,6 +5066,7 @@ static void satControlLoopRun()
 
   // --- Calculate heating curve ---
   float curveValue = satCalcHeatingCurve(effectiveTarget, outsideTemp);
+  state.sat.fHeatingCurveValue = curveValue;   // published curve = the main curve, also with zones on (TASK-1353)
 
   // --- Calculate PID output (includes heating curve value) ---
   float pidOutput = satPidUpdate(roomTemp, effectiveTarget, curveValue, satGetFlowTemp());
