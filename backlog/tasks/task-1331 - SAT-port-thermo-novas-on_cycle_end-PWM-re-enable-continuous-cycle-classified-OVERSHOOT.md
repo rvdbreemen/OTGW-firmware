@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-10-24T08:44:00Z'
+updated_date: '2026-10-24T09:06:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -38,4 +38,6 @@ From the TASK-1327 review: thermo-nova re-enables PWM in two ways after a disabl
 2026-10-24 Sergeant D answered (https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840), entry 15: 1a follow thermo-nova (port both on_cycle_end branches, interpretation recorded), 1b margin 2.0, 1d align the classifier first in the same change; 1c (PWM auto switch gate) he asked to expand - explained and asked again. Implementation waits for 1c.
 
 2026-10-24 08:26 UTC Sergeant D on 1c: 'It should follow the thermo-nova solution' -> entry 18: the end-of-cycle switch is NOT gated on bPwmAutoSwitch (option B, interpretation recorded). All decisions for TASK-1331 are in (entries 15 and 18): port both on_cycle_end branches, margin 2.0, align the classifier first, ungated. Implementing.
+
+2026-10-24 implementation (agent) in the working tree, NOT committed. Host test tests/test_sat_cycle_end_switch.py 12/12 OK, HEAD 7 fails; build SUCCESS. Review (opus) BLOCKS: HIGH 1: the classifier compares tail flow with _cycle_setpointAtStart (fFinalSetpoint frozen at flame-on, SATcycles.ino:744/821/701), thermo-nova uses the per-sample control_setpoint (cycles/tracker.py:255, :267-271); now that the class switches the mode this causes (a) firmware-only ping-pong: every mid-burn PWM->continuous exit is reverted to PWM at flame-off, (b) boot/enable with flame on: controlSp=0 -> OVERSHOOT -> PWM, (c) long continuous cycles while the PID ramps the CS, (d) DHW-started burns at CS=10. HEAD's own sat-comparison row 40 required row 26 (per-sample setpoint) first; the diff deferred it silently. MEDIUM 2: sampleCount<3 floor never fires (counted outside the 1 Hz gate) and no warm-up exclusion (tracker.py:98-100, :113-116): a short flicker with one spike can switch to PWM. MEDIUM 3: margin 2.0 equals the flow offset 2.0 (thermo-nova 3.0 vs 2.0): with per-sample CS every clamped sample would be OVERSHOOT -> question for Sergeant D. MEDIUM 4: no PWM IDLE pre-check (classifier.py:28-29). MEDIUM 5: kept continuous SHORT, <120 s UNCERTAIN, PWM SHORT not gated on ON, no kind-UNKNOWN checks: name to Sergeant D. LOW 6-10: wrong citation (guards are not reset by pwm.enable/disable), stale spec caller list, simulation DHW gap, test d not red on HEAD, readers of the class change. Next: port the per-sample setpoint (row 26) first, fix the sample floor and warm-up, and put margin 2.0 vs flow offset 2.0 plus the classifier deviations to Sergeant D. Waiting also for the SAT audit (workflow wf_75e80b42-84f).
 <!-- SECTION:NOTES:END -->
