@@ -289,7 +289,9 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   /* TASK-999 — sub-header bars as 1a underlined text tabs (the second tier). Sits
      on the content surface (not the nav), so muted text + an accent underline reads
      in both themes. The 1px baseline is the tab-row rule the active 2px sits on. */
-  .subtabs{display:flex;gap:2px;margin:2px 0 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  /* overflow-y:hidden: overflow-x:auto alone makes overflow-y auto, and the tabs' -1px bottom
+     margin then draws a vertical scrollbar (TASK-1350). */
+  .subtabs{display:flex;gap:2px;margin:2px 0 14px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
     border-bottom:1px solid var(--border)}
   .subtab{flex:0 0 auto;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);
     padding:9px 14px 8px;margin-bottom:-1px;font-size:.84rem;cursor:pointer;white-space:nowrap;
@@ -716,7 +718,7 @@ html[data-theme="dark"]{--accent:var(--brand-cyan);--nav:#383838;--tile-off:#545
   .sat-pill.idle{background:var(--tile-off)} .sat-pill.off{background:var(--tile-off)}
   /* TASK-999: SAT depth-level nav (Thermostat/Control/Technical) as 1a underlined
      text tabs — the same second-tier pattern as .subtabs, keeping the small hint. */
-  .sat-views{display:flex;gap:2px;margin-bottom:16px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  .sat-views{display:flex;gap:2px;margin-bottom:16px;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;
     border-bottom:1px solid var(--border)}
   .satview-btn{flex:0 0 auto;border:0;border-bottom:2px solid transparent;background:none;color:var(--muted);
     cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:1px;padding:9px 16px 8px;
