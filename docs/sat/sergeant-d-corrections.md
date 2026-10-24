@@ -517,3 +517,38 @@ always leaves PWM mode, as thermo-nova does.
 **Open:** none from him. On our side: a settings file that still holds `SATforcepwm` must load
 without error (removed keys are ignored, ADR-192), and the retained Home Assistant discovery
 config of the entity must be removed so it does not linger.
+
+## 14. Push setpoint: push on a target change, re-push only when the override is gone (2026-10-24)
+
+**Source:** #alpha-testing, 2026-10-24 03:18 UTC, reply to our question of 01:56 UTC
+(message 1563370497188560928: thermo-nova pushes TC= once on a user or preset target change, the
+firmware re-pushes every 5 minutes and the override flaps on a Honeywell Round; Robert's choice
+for his OK):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563391276022366249
+
+**Quoted:**
+
+> @BlueFlame Bot yes it is ok
+
+**Settled by this statement:**
+
+- SAT pushes the room setpoint to the thermostat (TC=) when the target changes, as thermo-nova
+  does: `async_set_target_temperature(temperature, cascade=True)` calls
+  `async_set_control_thermostat_setpoint()` when `push_setpoint_to_thermostat` is set
+  (`climate.py:641-657`), which sends `TC={value}` (`coordinator/mqtt/opentherm.py:206-209`). A
+  change that came from the thermostat itself is not pushed back (`climate.py:765`,
+  `cascade=False`).
+- The firmware's unconditional 5-minute re-push (`satEnqueueIfChangedTC`, `SAT_CMD_REFRESH_MS`
+  in `SATcontrol.ino`) goes. thermo-nova has no periodic re-push (not found in the code).
+- Firmware addition, the maintainer's choice (Robert, 2026-10-24) that Sergeant D approved here:
+  re-push only when the gateway reports the override gone (MsgID 9 TrOverride reads 0) while
+  SAT's push should still be active. This covers a gateway (PIC) reset, which clears the override.
+
+**Changes an earlier entry:** entry 2 called push-setpoint a firmware-only feature. The push
+itself exists in thermo-nova (above); only the periodic re-push was firmware-only. Entry 2's
+follow-thermostat adopt rule is unchanged.
+
+**Task:** TASK-1272.
+
+**Open:** none from him. On our side: OT-Direct boards never cancel a TC= override by themselves
+(OTDirect.ino), so the MsgID 9 re-push condition matters mainly on PIC boards.

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:17
-updated_date: '2026-10-24T01:07:00Z'
+updated_date: '2026-10-24T03:30:00Z'
 labels:
   - sat
   - ux
@@ -41,4 +41,8 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 2026-10-24 research (read-only agent; thermo-nova citations re-opened by the main session as second reader): thermo-nova DOES push a setpoint to the thermostat, once: async_set_target_temperature(temperature, cascade=True) (climate.py:641) calls coordinator.async_set_control_thermostat_setpoint() when push_setpoint_to_thermostat is set (climate.py:656-657, option const.py:60 default False :138); MQTT/serial send 'TC={value}' (coordinator/mqtt/opentherm.py:206-209). It runs on user/preset target changes (climate.py:568, 616, 624) and NOT when the thermostat itself changed the target (climate.py:765 cascade=False). No periodic re-push and no adoption check found (grep only). So the firmware's 5-min TC= refresh (SATcontrol.ino satEnqueueIfChangedTC, SAT_CMD_REFRESH_MS) is firmware-only and is what makes the override flap ~3 min on / ~2 min off on a Honeywell Round (PIC cancels after its attempts, gateway.asm ~3004-3029; capture cap-1138: MsgID 9 20.5 then 0 while TrSet stays 19.0). Entry 2 calls push 'firmware-only'; the push itself exists in thermo-nova, only the refresh does not. OT-Direct never cancels TC by itself (OTDirect.ino ~2774-2784). Options for the maintainer: (A) detect 'not adopted' (MsgID 9 back to 0 while TrSet != push, N=2) and stop re-pushing until the target changes or reboot, status field + narration + v2 note; (B) stop until toggled; (C) slow re-push; (D, likely simplest and thermo-nova aligned) drop the 5-min refresh: push only when the target changes, as thermo-nova; hybrid: re-push only when MsgID 9 reads 0 while a push is active (covers a PIC reset). A push-behaviour change also goes to Sergeant D (thermo-nova trace above). Waiting for a decision.
 
 2026-10-24 maintainer decision (Robert, in session): HYBRID. Push TC= when the user target changes (as thermo-nova climate.py:641-657), and re-push only when MsgID 9 (TrOverride) reads 0 while a push is active (covers a PIC reset); drop the unconditional 5-min refresh. Next: plan with thermo-nova citations to Sergeant D for his OK (push-behaviour change), then implement.
+
+2026-10-24 plan posted to Sergeant D for his OK (#alpha-testing): hybrid push with thermo-nova citations climate.py:641-657, :765, coordinator/mqtt/opentherm.py:206-209. Waiting for his answer; record it as entry 14 in docs/sat/sergeant-d-corrections.md before implementing.
+
+2026-10-24 Sergeant D OK (03:18 UTC, 'yes it is ok') recorded as entry 14 in docs/sat/sergeant-d-corrections.md. Implementing the hybrid.
 <!-- SECTION:NOTES:END -->
