@@ -4602,6 +4602,7 @@
     else if (heating) big = 'Heating to ' + satFmt(d.target_temp, 1, '°');
     else big = 'At target · idle';
     txt('satStatusBig', big);
+    var pr = document.getElementById('satPushRefused'); if (pr) pr.hidden = !(enabled && d.push_refused);
     satRenderPresets(d);
 
     // L2 — history + tiles + dhw + burner cycle + curve + control status

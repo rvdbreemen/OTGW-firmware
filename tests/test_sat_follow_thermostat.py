@@ -43,10 +43,11 @@ STUBS = r"""
 enum SATPreset { SAT_PRESET_NONE = 0, SAT_PRESET_AWAY = 1, SAT_PRESET_ECO = 2 };
 struct SatSettings { bool bEnabled=true, bFollowThermostat=true, bPushSetpoint=false; float fTargetTemp=21.0f; };
 struct Settings { SatSettings sat; };
-struct SatState { float fLastSentTC=0.0f, fThermostatTrSet=0.0f, fThermostatTrSetCand=0.0f, fPreCustomTemp=0.0f; bool bThermostatTrSetValid=false, bThermostatTrSetCandValid=false;
+struct SatState { float fLastSentTC=0.0f, fThermostatTrSet=0.0f, fThermostatTrSetCand=0.0f, fPreCustomTemp=0.0f; uint32_t iTCPushMs=0; bool bPushRefused=false, bTCAccountedValid=false; bool bThermostatTrSetValid=false, bThermostatTrSetCandValid=false;
                   SATPreset eActivePreset=SAT_PRESET_NONE; };
 struct State { SatState sat; };
 static Settings settings; static State state;
+static uint32_t millis() { return 0; }
 static bool satIsEnabled() { return settings.sat.bEnabled; }   // TASK-1345: the real one adds the MQTT-loss takeover flag
 static int g_syncCalls = 0, g_adopt = 0;
 static void dtostrf(float v, int, int prec, char* out) { snprintf(out, 12, "%.*f", prec, v); }
@@ -83,6 +84,7 @@ int main(int argc, char** argv) {
 """
 
 FUNCS = (
+    ("satPushRefusedDecide", r"^static bool satPushRefusedDecide\(.*?^\}\s*$"),
     ("satFollowThermostatDecide", r"^static bool satFollowThermostatDecide\(.*?^\}\s*$"),
     ("satAdoptThermostatSetpoint", r"^static void satAdoptThermostatSetpoint\(.*?^\}\s*$"),
     ("satOnThermostatSetpoint", r"^void satOnThermostatSetpoint\(.*?^\}\s*$"),
@@ -95,6 +97,8 @@ def extract(src: str) -> str:
         m = re.search(rx, src, re.S | re.M)
         if m:
             out.append(m.group(0))
+        elif name == "satPushRefusedDecide":
+            continue   # HEAD: not there yet
         elif name == "satOnThermostatSetpoint":
             out.append("void satOnThermostatSetpoint(float) { }   // HEAD: no follow-thermostat code")
     return "\n\n".join(out)

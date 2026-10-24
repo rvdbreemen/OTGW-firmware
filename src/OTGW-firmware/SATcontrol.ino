@@ -534,6 +534,8 @@ static bool satEnqueueIfChangedCH(uint8_t ch) {
 static void satTCNoteAdopted(float target) {
   state.sat.fLastSentTC       = target;
   state.sat.bTCAccountedValid = true;
+  state.sat.iTCPushMs         = 0;       // adopted, not pushed: nothing to be refused (TASK-1343)
+  state.sat.bPushRefused      = false;
 }
 
 static bool satEnqueueIfChangedTC(float tc) {
@@ -545,12 +547,16 @@ static bool satEnqueueIfChangedTC(float tc) {
   addCommandToQueue(buf, strlen(buf), false, 0);
   state.sat.fLastSentTC       = (float)newQ / 10.0f;
   state.sat.bTCAccountedValid = true;
+  state.sat.iTCPushMs         = millis() ? millis() : 1;   // 0 means "no push"
+  state.sat.bPushRefused      = false;                     // a new push gets a fresh 5 minutes
   return true;
 }
 
 // Push setpoint switched off: forget the push, so switching it on again sends the current target.
 static void satTCPushOff() {
   state.sat.bTCAccountedValid = false;
+  state.sat.iTCPushMs         = 0;
+  state.sat.bPushRefused      = false;
 }
 
 // --- Thermal Drop Learning State (Task #21) ---
@@ -1246,6 +1252,25 @@ static bool satFollowThermostatDecide(float seen, bool active, bool pushOn, floa
   return pushed && !echo;
 }
 
+// --- satPushRefusedDecide begin
+// Does the thermostat refuse the pushed setpoint (TASK-1343)? Pure: every input is an argument, so
+// tests/test_sat_push_refused.py compiles this function as it is. Status only, SAT never re-pushes.
+//  - push setpoint off, or no TC= pushed since boot/off/adoption: not refused.
+//  - the thermostat's own setpoint (MsgID 16 T frame) is within 0.25 C of the push (also when it
+//    rounds to its 0.5 C step): it follows, not refused.
+//  - it still differs 300 s or more after the push: refused (gruijter's Honeywell Round keeps
+//    its own 15.0 after TC=19.5 and the PIC cancels the override after about 3 minutes).
+//  - otherwise (inside the 300 s window): keep the previous verdict.
+static bool satPushRefusedDecide(bool pushOn, bool pushed, uint32_t sincePushMs, float thermostatTr,
+                                 float pushedTC, bool prevRefused)
+{
+  if (!pushOn || !pushed) return false;
+  if (fabsf(thermostatTr - pushedTC) <= 0.25f) return false;
+  if (sincePushMs >= 300000UL) return true;
+  return prevRefused;
+}
+// --- satPushRefusedDecide end
+
 // Called from processOT() for every MsgID 16 Write-Data frame the thermostat sent (T frame), also when
 // the gateway replaced it on the way to the boiler. OTcurrentSystemState.TrSet is not used: with a TC=
 // override active it holds the R frame, i.e. SAT's own pushed value, so a thermostat change would
@@ -1258,6 +1283,10 @@ void satOnThermostatSetpoint(float tr)
                                 state.sat.fThermostatTrSetCand, state.sat.bThermostatTrSetCandValid)) {
     satAdoptThermostatSetpoint(tr);
   }
+  // processOT() holds the OT lock: only a state flag is set here, no MQTT publish and no enqueue.
+  state.sat.bPushRefused = satPushRefusedDecide(settings.sat.bPushSetpoint,
+      state.sat.bTCAccountedValid && state.sat.iTCPushMs != 0 && state.sat.fLastSentTC > 0.0f,
+      millis() - state.sat.iTCPushMs, tr, state.sat.fLastSentTC, state.sat.bPushRefused);
 }
 
 //=====================================================================
@@ -2340,6 +2369,8 @@ void satDisable()
 {
   SATDebugTf(PSTR("SAT: satDisable called (safety=%d fallback=%d)\r\n"),
              (int)state.sat.bSafetyTripped, (int)state.sat.bFallbackActive);
+  state.sat.iTCPushMs    = 0;
+  state.sat.bPushRefused = false;
   satSetControlMode(SAT_MODE_OFF);
   satPwmReset();                       // also when the mode was not PWM: a safety trip must leave no stale PWM state
   _sat_lastControlCS = 0.0f;
@@ -2593,6 +2624,7 @@ void satSendStatusJSON()
     je.field(F("dhw_enable"),           settings.sat.bDhwEnable);
     je.field(F("control_interval_sec"), (int32_t)settings.sat.iControlInterval);
     je.field(F("fallback_active"),      snap->st.sat.bFallbackActive);
+    je.field(F("push_refused"),         snap->st.sat.bPushRefused);
     je.field(F("fallback_reason"),      (int32_t)snap->st.sat.eFallbackReason);
     je.field(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
     je.field(F("current_modulation"),   (int32_t)snap->st.sat.iCurrentModulation);
@@ -2793,7 +2825,7 @@ static const char* satSimmerPerception(float indexC) {
 // the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
 // reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
 // can reset them.
-static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_external_temp_enable;
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_external_temp_enable;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
 
 static void satPublishCoreState()
@@ -2804,6 +2836,7 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/active"),           state.sat.bActive,           s_core_active,           true);
   publishIfChangedB(F("sat/safety_tripped"),   state.sat.bSafetyTripped,    s_core_safety_tripped,   true);
   publishIfChangedB(F("sat/fallback_active"),  state.sat.bFallbackActive,   s_core_fallback_active,  true);
+  publishIfChangedB(F("sat/push_refused"),     state.sat.bPushRefused,      s_core_push_refused,     true);
   publishIfChangedB(F("sat/external_temp_enable"), settings.sat.bUseExternalTemp, s_core_external_temp_enable, true);
 
   // sat/mode is the ACTUAL control mode; sat/control_mode is the one the control_mode command
@@ -2827,6 +2860,7 @@ void satRepublishCoreState()
   memset(&s_core_active, 0, sizeof(s_core_active));
   memset(&s_core_safety_tripped, 0, sizeof(s_core_safety_tripped));
   memset(&s_core_fallback_active, 0, sizeof(s_core_fallback_active));
+  memset(&s_core_push_refused, 0, sizeof(s_core_push_refused));
   memset(&s_core_external_temp_enable, 0, sizeof(s_core_external_temp_enable));
   memset(&s_core_mode, 0, sizeof(s_core_mode));
   memset(&s_core_control_mode, 0, sizeof(s_core_control_mode));

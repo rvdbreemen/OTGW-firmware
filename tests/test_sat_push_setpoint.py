@@ -34,7 +34,7 @@ STUBS = r"""
 #define PSTR(x) x
 #define snprintf_P snprintf
 struct SatState { bool bLastSentValid=false; float fLastSentCS=0; uint8_t iLastSentMM=0, iLastSentCH=0; float fLastSentTC=0;
-                  bool bTCAccountedValid=false;
+                  bool bTCAccountedValid=false; uint32_t iTCPushMs=0; bool bPushRefused=false;
                   uint32_t iLastSentCSMs=0, iLastSentMMMs=0, iLastSentCHMs=0, iLastSentTCMs=0; };  // iLastSentTCMs: only HEAD still has it
 struct State { SatState sat; };
 static State state;

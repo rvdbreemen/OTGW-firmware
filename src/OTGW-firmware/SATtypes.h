@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.495
+**  Version  : v2.0.0-alpha.496
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -398,6 +398,8 @@ struct SATRuntimeSection {         // state.sat — SAT thermostat controller st
   uint8_t  iLastSentMM            = 0;      // MM=<uint> last emitted
   uint8_t  iLastSentCH            = 0;      // CH=<0|1> last emitted
   float    fLastSentTC            = 0.0f;   // TC=<float> last emitted (rounded to .1), or the thermostat value SAT adopted (TASK-1272)
+  uint32_t iTCPushMs              = 0;      // millis() of the last TC= push (0 = none since boot/off/adopt), TASK-1343
+  bool     bPushRefused           = false;  // the thermostat keeps its own setpoint >= 5 min after a TC= push (status only, TASK-1343)
   bool     bTCAccountedValid      = false;  // fLastSentTC is the value the thermostat push has dealt with; false after boot, a cache reset or push off: the next tick sends TC= (TASK-1272)
   float    fThermostatTrSet       = 0.0f;   // last thermostat room setpoint seen for follow-thermostat (TASK-1259)
   float    fThermostatTrSetCand   = 0.0f;   // debounce: new thermostat setpoint seen once, waiting for its second frame
