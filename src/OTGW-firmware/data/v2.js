@@ -5434,6 +5434,9 @@
 
     // Written at Finish: satsystem + satmanufacturer + satcoefficient (Manual only) +
     // satautogains + satenabled + sat_onboarded. Heat pump also writes satsource=2.
+    // satautogains is still written (stored value on Manual, 1.0 on Automatic) but the
+    // PID does not read it (SATpid.ino _pidCalculateGains), so the wizard no longer
+    // offers it as a choice (TASK-1354).
     function commit(then) {
       var m = SAT_SYS[st.system] || SAT_SYS.radiators;
       // Land the settings ONE AT A TIME (never a concurrent burst). The REST
@@ -5535,19 +5538,17 @@
           '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-system" style="' + GHOST + '">Back</button><button data-sa="to-tuning" style="' + PRIM + '">Continue</button></div></div>';
       } else if (st.screen === 'tuning') {
         h += '<div style="' + CARD + ';padding:26px 26px 22px"><h1 style="font-weight:700;font-size:21px;color:var(--text);margin:0 0 5px">How should SAT tune itself?</h1>' +
-          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">SAT has no raw P/I/D, pick automatic learning, or set the curve slope yourself.</p>' +
+          '<p style="font:400 12.5px/1.55 inherit;color:var(--muted);margin:0 0 18px">SAT computes its PID gains from the heating curve. Keep the current curve slope, or set it yourself.</p>' +
           '<div style="display:flex;flex-direction:column;gap:10px">' +
-          '<button data-sa="tune-auto" style="' + optCard(st.tuning === 'auto') + '"><span style="' + dot(st.tuning === 'auto') + '"></span><div style="text-align:left;flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Automatic</span>' + recBadge() + '</div><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">SAT learns your home\'s response over ~2 weeks and adjusts gains. <span style="' + MONO + '">satautogains = 1.0</span></p></div></button>' +
-          '<button data-sa="tune-manual" style="' + optCard(st.tuning === 'manual') + '"><span style="' + dot(st.tuning === 'manual') + '"></span><div style="text-align:left;flex:1"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Manual</span><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">Set the heating-curve slope yourself; auto-gains off. For experienced users.</p></div></button></div>';
+          '<button data-sa="tune-auto" style="' + optCard(st.tuning === 'auto') + '"><span style="' + dot(st.tuning === 'auto') + '"></span><div style="text-align:left;flex:1"><div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Automatic</span>' + recBadge() + '</div><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">SAT computes the PID gains from the heating curve. The stored curve slope is kept. <span style="' + MONO + '">satcoefficient</span></p></div></button>' +
+          '<button data-sa="tune-manual" style="' + optCard(st.tuning === 'manual') + '"><span style="' + dot(st.tuning === 'manual') + '"></span><div style="text-align:left;flex:1"><span style="font-weight:700;font-size:14.5px;color:var(--text)">Manual</span><p style="font:400 11.5px/1.45 inherit;color:var(--muted);margin:4px 0 0">Set the heating-curve slope yourself. SAT still computes the PID gains from that curve. For experienced users.</p></div></button></div>';
         if (st.tuning === 'manual') {
           var pct = slopePct(st.slope);
           h += '<div style="margin-top:16px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px">' +
             '<div style="display:flex;align-items:baseline;margin-bottom:12px"><div><span style="font-weight:600;font-size:13px;color:var(--text)">Heating curve slope</span><p style="font:400 11px inherit;color:var(--muted);margin:2px 0 0">Flow temp rise per °C of outdoor drop · <span style="' + MONO + '">satcoefficient</span></p></div>' +
             '<span id="satOnbSlopeVal" style="margin-left:auto;font-weight:600;font-size:17px;' + MONO + ';color:var(--accent)">' + st.slope.toFixed(1) + '</span></div>' +
             '<input id="satOnbSlope" type="range" class="satonb-slope" min="0.2" max="2.4" step="0.1" value="' + st.slope + '" style="width:100%;background-image:linear-gradient(90deg,var(--accent) ' + pct + '%,var(--tile-off,#54565a) ' + pct + '%)">' +
-            '<div style="display:flex;justify-content:space-between;margin-top:7px;font-weight:500;font-size:10px;color:var(--muted)"><span>Gentle · underfloor</span><span>Steep · radiators</span></div>' +
-            '<div style="display:flex;align-items:center;gap:12px;margin-top:16px;padding-top:14px;border-top:1px solid var(--border)"><div style="flex:1"><span style="font-weight:600;font-size:13px;color:var(--text)">Auto-gains multiplier</span><p style="font:400 11px inherit;color:var(--muted);margin:2px 0 0">Scales learned corrections · <span style="' + MONO + '">satautogains</span></p></div>' +
-            '<input id="satOnbGains" value="' + esc(st.gains) + '" inputmode="decimal" style="width:74px;min-height:44px;text-align:center;border:1px solid var(--border);background:var(--panel);color:var(--text);border-radius:8px;padding:9px 8px;font-weight:600;font-size:13.5px;' + MONO + '"></div></div>';
+            '<div style="display:flex;justify-content:space-between;margin-top:7px;font-weight:500;font-size:10px;color:var(--muted)"><span>Gentle · underfloor</span><span>Steep · radiators</span></div></div>';
         }
         h += '<div style="display:flex;align-items:center;gap:12px;margin-top:22px"><button data-sa="back-mfr" style="' + GHOST + '">Back</button><button data-sa="to-sources" style="' + PRIM + '">Continue</button></div></div>';
       } else if (st.screen === 'sources') {
@@ -5571,7 +5572,7 @@
       } else if (st.screen === 'done') {
         var sysL = { radiators: 'Radiators', underfloor: 'Underfloor heating', hp: 'Heat pump' }[st.system];
         var mfrL = (typeof ENUM_OPTS !== 'undefined' && ENUM_OPTS.satmanufacturer ? (ENUM_OPTS.satmanufacturer.filter(function (o) { return ('' + o[0]) === ('' + st.mfr); })[0] || [0, 'Auto'])[1] : 'Auto');
-        var tuneL = st.tuning === 'auto' ? 'Automatic (auto-gains)' : ('Manual · slope ' + st.slope.toFixed(1));
+        var tuneL = st.tuning === 'auto' ? 'Automatic (stored slope)' : ('Manual · slope ' + st.slope.toFixed(1));
         h += '<div style="' + CARD + ';padding:30px 28px;text-align:center"><div style="width:54px;height:54px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-weight:700;font-size:24px;color:#04222c">✓</div>' +
           '<h1 style="font-weight:700;font-size:24px;color:var(--text);margin:0 0 6px">SAT is now controlling your boiler</h1>' +
           '<p style="font:400 13px/1.6 inherit;color:var(--muted);margin:0 auto 20px;max-width:420px">Room-driven control is live. It may take a heating cycle or two to settle.</p>' +
