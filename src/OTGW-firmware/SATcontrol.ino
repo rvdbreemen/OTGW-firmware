@@ -2362,6 +2362,11 @@ void satDisable()
   // OTDirect heating curve or a later CS= sets a new override, SAT's last CH=0 would
   // switch central heating off again. CH=1 restores the default state of that flag.
   addCommandToQueue("CH=1", 4, false, 0);
+  // TASK-1344: release SAT's MM override (MM=0 in PWM). A non-numeric value clears it on
+  // the PIC (gateway.asm:4752 SetMaxModLevel -> ClrMaxModLevel; pyotgw.py:542-543) and on
+  // OT-Direct (MM= handler, clearWriteOverride(14)); otherwise the thermostat gets the
+  // boiler back with maximum modulation 0 %.
+  addCommandToQueue("MM=T", 4, false, 0);
   // TASK-565: clear the write-on-change cache so the next satControlLoop
   // (re-enable, fallback, or recommissioning) re-emits all four SAT commands.
   satResetCmdCache();
