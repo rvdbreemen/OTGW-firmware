@@ -5367,8 +5367,10 @@
   // system, Manufacturer, Tuning, Sources-health (read-only), Done. Writes only
   // existing keys + sat_onboarded. Second instance of the startOnboarding engine.
   var _satOnbShown = false;
-  // System choice → satsystem value + starting heating-curve slope (satcoefficient).
-  var SAT_SYS = { radiators: { sys: '1', slope: 1.4 }, underfloor: { sys: '2', slope: 0.6 }, hp: { sys: '0', slope: 0.8 } };
+  // System choice -> satsystem value. The wizard never presets the heating-curve slope:
+  // a stored satcoefficient stays, a fresh unit has the firmware default 2.0 (Sergeant D,
+  // entry 24; TASK-1347). Only the Manual tuning choice writes the slope the user set.
+  var SAT_SYS = { radiators: { sys: '1' }, underfloor: { sys: '2' }, hp: { sys: '0' } };
   function satOnbNeeded() {
     var ob = setData.sat_onboarded;
     return !(ob && ('' + ob.value) === 'true');   // falsy / absent (old firmware) => needed
@@ -5390,11 +5392,10 @@
       system: curSys === '1' ? 'radiators' : curSys === '2' ? 'underfloor' : (curSrc === '2' ? 'hp' : 'radiators'),
       mfr: setData.satmanufacturer ? ('' + setData.satmanufacturer.value) : '0',
       tuning: 'auto',
-      slope: null,   // lazily defaulted from system
+      slope: (setData.satcoefficient && setData.satcoefficient.value != null && !isNaN(parseFloat(setData.satcoefficient.value))) ? parseFloat(setData.satcoefficient.value) : 2.0,   // current stored slope (TASK-1347)
       gains: (setData.satautogains && setData.satautogains.value != null) ? ('' + setData.satautogains.value) : '1.0',
       finishing: false
     };
-    if (st.slope == null) st.slope = SAT_SYS[st.system].slope;
 
     var back = document.createElement('div'); back.id = 'satOnbBack';
     back.setAttribute('style', 'position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;overflow:auto');
@@ -5426,11 +5427,10 @@
     function dot(sel) { return 'width:18px;height:18px;border-radius:50%;box-sizing:border-box;flex:0 0 auto;' + (sel ? 'border:5px solid var(--accent)' : 'border:1.5px solid var(--muted)'); }
     function recBadge() { return '<span style="font-weight:600;font-size:9.5px;letter-spacing:.05em;color:var(--accent);border:1px solid var(--accent);border-radius:20px;padding:2px 8px">RECOMMENDED</span>'; }
 
-    // Written at Finish: satsystem + satmanufacturer + satcoefficient (effective slope) +
+    // Written at Finish: satsystem + satmanufacturer + satcoefficient (Manual only) +
     // satautogains + satenabled + sat_onboarded. Heat pump also writes satsource=2.
     function commit(then) {
       var m = SAT_SYS[st.system] || SAT_SYS.radiators;
-      var eff = (st.tuning === 'manual') ? st.slope : m.slope;
       // Land the settings ONE AT A TIME (never a concurrent burst). The REST
       // backpressure gate (restAPI.ino, TASK-884) caps concurrent /api requests
       // at 4 and tightens toward 1 under heap pressure, so firing all 6-7 writes
@@ -5438,7 +5438,8 @@
       // enabled") -- often dropping satenabled itself, leaving a partial write.
       // Sequential keeps exactly one POST in flight, so the gate is never tripped
       // and the write order is guaranteed.
-      var kv = [['satsystem', m.sys], ['satmanufacturer', st.mfr], ['satcoefficient', '' + eff]];
+      var kv = [['satsystem', m.sys], ['satmanufacturer', st.mfr]];
+      if (st.tuning === 'manual') kv.push(['satcoefficient', '' + st.slope]);   // Automatic keeps the stored slope (TASK-1347)
       if (st.system === 'hp') kv.push(['satsource', 2]);
       kv.push(['satautogains', st.tuning === 'manual' ? ('' + st.gains) : '1.0']);
       kv.push(['satenabled', true]);       // SAT enabled ONLY here, after the tuning writes land
@@ -5595,7 +5596,7 @@
       var a = t.getAttribute('data-sa');
       if (a === 'begin') { st.screen = 'system'; render(); }
       else if (a === 'notnow') { dismiss(); }
-      else if (a === 'sys-radiators' || a === 'sys-underfloor' || a === 'sys-hp') { st.system = a.slice(4); st.slope = SAT_SYS[st.system].slope; render(); }
+      else if (a === 'sys-radiators' || a === 'sys-underfloor' || a === 'sys-hp') { st.system = a.slice(4); render(); }
       else if (a === 'back-welcome') { st.screen = 'welcome'; render(); }
       else if (a === 'to-mfr') { st.screen = 'mfr'; render(); }
       else if (a === 'pick-auto') { st.mfr = '0'; render(); }
@@ -5610,7 +5611,7 @@
         if (st.finishing) return; st.finishing = true; st.finishErr = false; render();
         commit(function (ok) { st.finishing = false; if (ok) { st.screen = 'done'; } else { st.finishErr = true; } render(); });
       }
-      else if (a === 'restart') { st.screen = 'welcome'; st.system = 'radiators'; st.mfr = '0'; st.tuning = 'auto'; st.slope = SAT_SYS.radiators.slope; st.gains = '1.0'; render(); }
+      else if (a === 'restart') { st.screen = 'welcome'; st.system = 'radiators'; st.mfr = '0'; st.tuning = 'auto'; st.gains = '1.0'; render(); }
       // TASK-1318: the keys this wizard just saved win over older unsaved edits of them.
       else if (a === 'go') { ['satsystem', 'satmanufacturer', 'satcoefficient', 'satsource', 'satautogains', 'satenabled', 'sat_onboarded'].forEach(function (k) { delete setDirty[k]; }); close(); fetchSettings(); showPage('sat'); }
     });

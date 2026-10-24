@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.489
+**  Version  : v2.0.0-alpha.490
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -440,7 +440,7 @@ struct SATSection {
   uint8_t  iHeatingSource     = SAT_SRC_AUTO;  // SATHeatingSource: auto/gas_boiler/heat_pump/hybrid (TASK-891.8)
   uint16_t iHpCycleSeconds    = 1800;          // Heat-pump min-on / cycle rate: 1800s=2/hr (default) or 2400s=1.5/hr (TASK-891.8)
   float    fTargetTemp        = 20.0f;  // Default room target °C
-  float    fHeatingCurveCoeff = 1.5f;   // Heating curve coefficient
+  float    fHeatingCurveCoeff = 2.0f;   // Heating curve coefficient; 2.0 as thermo-nova const.py:182 (Sergeant D entry 24, TASK-1347). A stored value is kept
   float    fDeadband          = 0.1f;   // PID deadband °C (matches Python DEADBAND=0.1)
   uint16_t iControlInterval   = 30;     // Control loop interval (seconds)
   bool     bUseExternalTemp   = false;  // Prefer MQTT-pushed indoor temp over OT msg 24

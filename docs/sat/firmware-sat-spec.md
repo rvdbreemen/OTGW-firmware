@@ -504,7 +504,7 @@ else: control = max(pidOutput, Tboiler - fFlowOffset)        (fFlowOffset defaul
 | Cold setpoint radiators / underfloor | 28.2 / 21.0 | °C | `SATcontrol.ino:55-56` |
 | Heating curve base offset underfloor / other | 20.0 / 27.2 | °C | `SATcontrol.ino:49-50` |
 | Heating curve reference temperature | 20.0 | °C | `SATcontrol.ino:51` |
-| `fHeatingCurveCoeff` default | 1.5 | - | `SATtypes.h:442` |
+| `fHeatingCurveCoeff` default | 2.0 (TASK-1347, entry 24) | - | `SATtypes.h:443` |
 | `fTargetTemp` default | 20.0 | °C | `SATtypes.h:441` |
 | `bEnabled` default | false | - | `SATtypes.h:437` |
 | `bAutoGains` default | true | - | `SATtypes.h:518` |
@@ -866,7 +866,7 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | `bAutoGains` default | true | bool | SATtypes.h:518 |
 | `fKpManual` / `fKiManual` / `fKdManual` defaults | 5.0 / 0.0005 / 0.0 | none | SATtypes.h:519-521 |
 | `fAutoGainsValue` default (not read by the PID) | 2.0 | none | SATtypes.h:517 |
-| `fHeatingCurveCoeff` default | 1.5 | none | SATtypes.h:442 |
+| `fHeatingCurveCoeff` default | 2.0 (TASK-1347, entry 24) | none | SATtypes.h:443 |
 | Heating curve coefficient setting range | 0.1 to 5.0 | none | settingStuff.ino:998 |
 | Auto-tune coefficient range | 0.3 to 5.0 | none | SATcontrol.ino:4475-4476 |
 | Heating system default | AUTO, treated as radiators | enum | SATtypes.h:438, SATcontrol.ino:198-199 |
@@ -1009,7 +1009,7 @@ Computed from the code: when zones are active, each zone step calls `satCalcHeat
 6. **Preset change "integral reset" is display only.** The comments say the integral is reset (SATcontrol.ino:997, SATcontrol.ino:1006), but only `state.sat.fPidI` is written. The controller value `_pid_integral` is a file-level static in SATpid.ino (SATpid.ino:34). Outside SATpid.ino, no firmware source writes it: the `_pid_` search found only the comment at SATcontrol.ino:2040 and the generated `OTGW-firmware.ino.cpp`. The code does not show whether a real reset was intended.
 7. **Late NTP restore.** The one-time restore at the first NTP-synced pass can overwrite a live integral and raw derivative (SATcontrol.ino:4515-4519, SATpid.ino:77-78). This needs NTP to arrive before this boot's first PID state save (section B, step 5). What `time(nullptr)` returns before NTP sync was not checked for this section. The code does not state whether the overwrite is intended.
 8. **Default differences versus thermo-nova, stated without judgement:**
-   - Heating curve coefficient default 1.5 (SATtypes.h:442); thermo-nova uses 2.0.
+   - Heating curve coefficient default 2.0 since TASK-1347 (entry 24), as thermo-nova; stored values are kept and the setup wizard no longer writes a per-system slope.
    - Coefficient range 0.1 to 5.0 (settingStuff.ino:998); thermo-nova uses 0.1 to 12.
    - System maximum 62 radiators / 45 underfloor (SATcontrol.ino:231). The code comment explains the 62 (SATcontrol.ino:218-227).
    - Cold setpoint 28.2 / 21.0 (SATcontrol.ino:55-56); thermo-nova uses 22.
@@ -1054,7 +1054,7 @@ This section covers layers 1 and 2 and the continuous-mode part of layer 3. The 
 | Outside temperature | `satGetOutsideTemp()`: simulation, external MQTT value (sub-command `outdoor_temp`), weather API when `Toutside` is exactly 0.0, otherwise OpenTherm MsgID 27 `Toutside` | SATcontrol.ino:1283-1303, MQTTstuff.ino:614, MQTTstuff.ino:659 |
 | Heating system | `settings.sat.iHeatingSystem`: 0 auto, 1 radiators, 2 underfloor. Auto is treated as radiators | SATtypes.h:41-43, SATtypes.h:438, settingStuff.ino:994, SATcontrol.ino:194-201 |
 | Heating source | `settings.sat.iHeatingSource`: auto, gas boiler, heat pump, hybrid. Auto is treated as gas boiler. It changes the maximum setpoint, not the curve | SATtypes.h:48-51, SATtypes.h:439, SATcontrol.ino:209-214, SATcontrol.ino:233 |
-| Heating curve coefficient | `settings.sat.fHeatingCurveCoeff`, default 1.5, accepted range 0.1 to 5.0. Read on every curve calculation. Auto-tune can change it | SATtypes.h:442, settingStuff.ino:998, SATcontrol.ino:488, SATcontrol.ino:4444-4485 |
+| Heating curve coefficient | `settings.sat.fHeatingCurveCoeff`, default 2.0 (TASK-1347; 1.5 before), accepted range 0.1 to 5.0. Read on every curve calculation. Auto-tune can change it | SATtypes.h:442, settingStuff.ino:998, SATcontrol.ino:488, SATcontrol.ino:4444-4485 |
 | PID terms (P, I, D) | `satPidUpdate()` fed with the smoothed room temperature and the effective target | SATcontrol.ino:4839, SATpid.ino:251-320 |
 | Zones (secondary rooms) | Up to 4 zones, each with a room temperature and a setpoint pushed over MQTT. Used only when `iZoneCount` > 1 (default 1, range 1 to 4) | SATcontrol.ino:1726-1729, SATcontrol.ino:1753-1784, MQTTstuff.ino:895, SATtypes.h:531, settingStuff.ino:1112, SATcontrol.ino:4846 |
 | Heating mode | `settings.sat.iHeatingMode` (0 comfort, 1 eco). Stored and published, but not read by the control path (see "Not found") | SATtypes.h:524, settingStuff.ino:1104, SATcontrol.ino:2211-2221 |
@@ -1297,7 +1297,7 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 | Curve rounding | none | | SATcontrol.ino:496-499 |
 | `SAT_HC_BASE_OFFSET_FLOOR` | 20.0 | °C | SATcontrol.ino:49 |
 | `SAT_HC_BASE_OFFSET_RAD` (radiators, auto) | 27.2 | °C | SATcontrol.ino:50 |
-| `fHeatingCurveCoeff` default | 1.5 | | SATtypes.h:442 |
+| `fHeatingCurveCoeff` default | 2.0 (TASK-1347) | | SATtypes.h:443 |
 | `fHeatingCurveCoeff` accepted range | 0.1 to 5.0 | | settingStuff.ino:998 |
 | Auto-tune coefficient clamp | 0.3 to 5.0 | | SATcontrol.ino:4475-4476 |
 | `bAutoTune` default | off | | SATtypes.h:511 |
@@ -2708,7 +2708,7 @@ curve = 4*(target - 20) + 0.03*diff^2 - 0.4*diff
 value = base_offset + (coefficient / 4) * curve        # not rounded
 ```
 
-`base_offset` is 20.0 for underfloor and 27.2 otherwise (SATcontrol.ino:49-50, SATcontrol.ino:254-260). The coefficient default is 1.5 (SATtypes.h:442).
+`base_offset` is 20.0 for underfloor and 27.2 otherwise (SATcontrol.ino:49-50, SATcontrol.ino:254-260). The coefficient default is 2.0 (SATtypes.h:443, TASK-1347; it was 1.5 before).
 
 Multi-area weighted room temperature (SATcontrol.ino:1696-1719):
 

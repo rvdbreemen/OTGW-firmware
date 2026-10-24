@@ -70,7 +70,7 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satsource":"Heat source: auto (gas boiler), gas boiler, heat pump or hybrid. Sets cycle timing; heat pumps keep full modulation.",
 "sattargettemp":"Wanted room temperature, 5 to 30 °C. Default 20.",
 "sattempstep":"Step for target temperature changes, 0.1 to 1 °C. Default 0.5.",
-"satcoefficient":"Heating curve slope, 0.1 to 5. Default 1.5. Raise it if rooms stay cold, lower it if they overshoot.",
+"satcoefficient":"Heating curve slope, 0.1 to 5. Default 2.0. Raise it if rooms stay cold, lower it if they overshoot.",
 "satdeadband":"PID deadband in °C (0.05 to 2, default 0.1). The integral term only builds up while the error is inside it.",
 "satheatingmode":"Comfort or Eco. Stored and published, but the control loop does not use it today.",
 "satmanufacturer":"Boiler brand, for known quirks. Auto detects it; set it only if detection is wrong.",
