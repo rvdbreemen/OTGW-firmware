@@ -178,7 +178,7 @@ Two deliberate departures from thermo-nova `heating_control.py:238`, kept from A
 ## Open Questions
 
 - [ ] Sergeant D: is a requested setpoint exactly equal to the cold setpoint (28.2 / 21.0) cold (`<=`, thermo-nova `heating_control.py:72`, `:385`) or not (`<`, his wording in entries 7 and 11)? Queued as Q20 in `docs/sat/open-questions.md` (TASK-1355). The answer is recorded in `docs/sat/sergeant-d-corrections.md` before any code change, in a new entry that also names entry 12 and corrects its "Settled" bullet.
-- [ ] Maintainer: port the thermo-nova `COLD_SETPOINT` sites in `area.py:175`, `:322`, `:331` and `device/status.py:121`, or record them as not applicable.
+- [x] Maintainer: port the thermo-nova `COLD_SETPOINT` sites in `area.py:175`, `:322`, `:331` and `device/status.py:121`, or record them as not applicable. — **Answered 2026-10-24 by Robert van den Breemen:** Robert 2026-10-24: port them with the per-system cold setpoint (28.2 / 21, entries 7 and 11). device/status.py:121 now (TASK-1361); area.py:175, :322 and :331 together with the zone port, which waits for Sergeant D (Q18).
 - [x] Maintainer: should the summer simmer path also call `satPwmDisableOnHeaterOff()`, as the cutoff and valves-closed paths do? Firmware-only path; not a Sergeant D question unless the maintainer wants it to be. — **Answered 2026-10-24 by Robert van den Breemen:** Robert 2026-10-24: yes, the summer simmer cutoff calls satPwmDisableOnHeaterOff() like the cold cutoff and the valves-closed path (TASK-1362).
 - [ ] Sergeant D: CS/MM/CH refresh cadence, every control step as thermo-nova or on change plus 300 s (Q13).
 - [ ] TASK-1238: how SAT's CH=0 reaches the boiler in OT-Direct gateway mode (MsgID 0).
