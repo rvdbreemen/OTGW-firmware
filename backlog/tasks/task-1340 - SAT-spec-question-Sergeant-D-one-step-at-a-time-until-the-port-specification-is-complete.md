@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T09:19:00Z'
-updated_date: '2026-10-24T09:52:00Z'
+updated_date: '2026-10-24T10:05:00Z'
 labels:
   - sat
   - spec
@@ -39,4 +39,6 @@ Maintainer directive 2026-10-24: unclear SAT behaviour is resolved interactively
 2026-10-24: cadence per Robert: check every 4 h; after 12 h unanswered with 10+ other messages since, repeat once with a link. Loop cron moved to every 4 h.
 
 2026-10-24: cadence tightened by Robert: check hourly (silent), repeat after 12 h when 3+ other messages since. Cloud routine feasibility checked: see session.
+
+2026-10-24: cloud routine declined by Robert (bot token would have to live in the cloud environment). Loop stays local: hourly session cron.
 <!-- SECTION:NOTES:END -->
