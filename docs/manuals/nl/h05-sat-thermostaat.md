@@ -61,7 +61,7 @@ Onderwerp: OTGW/set/otgw-AABBCCDDEEFF/sat/enabled
 Waarde:    true
 ```
 
-Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `overshoot_protection`, `pwm_auto_switch`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
+Elke configureerbare SAT-parameter heeft een MQTT-commandotopic van de vorm `%mqtt_sub_topic%/sat/<naam>`. De volledige set wordt gedeclareerd in `MQTTstuff.ino` (`handleMQTTcallback`) en omvat onder andere: `enabled`, `target`, `control_mode`, `heating_system`, `manufacturer`, `max_modulation`, `interval`, `preset`, `heating_curve`, `deadband`, `overshoot_margin`, `flow_offset`, `flame_off_offset`, `mod_sup_delay`, `mod_sup_offset`, `cycles_per_hour`, `valve_offset`, `boiler_capacity`, `target_temp_step`, `sensor_max_age`, `error_monitoring`, `auto_gains_value`, `heating_mode`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `reset_integral`, `flush`, `flush_threshold_h`, `simulation`, `solar_gain`, `solar_freeze_integral`, `solar_min_elevation`, `sun_elevation`, `summer_simmer`, `summer_threshold`, `summer_min_hours`, `comfort_adjust`, `comfort_humidity`, `comfort_max_offset`, `thermal_comfort`, `humidity`, `humidity_timeout_s`, `window`, `window_detection`, `multi_area`, `multi_area_count`, `area/<0..3>`, `auto_tune`, `auto_tune_rate`, `zone_count`, `zone_timeout_s`, `zone/<n>/room_temp`, `zone/<n>/setpoint`, `valves_open`, `preset_sync`, `preset_sync_topic`, `preset_<comfort|eco|away|sleep|activity|home>`, `min_pressure`, `max_pressure`, `max_pressure_drop`, `dhw_enabled`, `dhw_setpoint`, `indoor_temp`, `outdoor_temp`, `ble_enable`, `ble_mac`, `ble_interval`.
 
 Voor booleaanse topics werken `ON` / `OFF` / `true` / `false` / `1` / `0`. Numerieke topics accepteren de gebruikelijke decimale notatie.
 
@@ -88,7 +88,6 @@ curl -X POST -d '{"name":"satenabled","value":"true"}' \
 | `satdeadband` | `0.1` | 0.05-2.0 C | PID-deadband breedte |
 | `satinterval` | `30` | 10-300 s | Regelinterval |
 | `satexternaltemp` | `false` | bool | Externe ruimtetemperatuurbron gebruiken |
-| `satpwmautoswitch` | `true` | bool | Automatisch wisselen tussen PWM en continu |
 | `satovershootprotection` | `true` | bool | PWM-start en modulatie-onderdrukking (zie 5.6). Geldt voor elke warmtebron |
 | `satmaxrelmod` | `100` | 0-100 % | Maximale relatieve modulatie naar ketel (MM= commando) |
 | `satmanufacturer` | `0` | 0-18 | Ketelmerkt (0 = auto-detect) |
@@ -212,7 +211,7 @@ Bij ketels met een hoge minimale modulatie (bijv. 30-40% minimum) kan de continu
 
 #### Automatisch wisselen
 
-Met `satpwmautoswitch = true` (standaard) bewaakt SAT de ketelprestaties via cyclusclassificatie (zie paragraaf 5.11) en wisselt automatisch:
+SAT bewaakt altijd de ketelprestaties via cyclusclassificatie (zie paragraaf 5.11) en wisselt automatisch:
 
 - **Continu naar PWM:** als de aanvoertemperatuur langer dan 60 seconden boven het setpoint + overshoot-marge blijft (ketel kan niet voldoende moduleren).
 - **PWM naar continu:** als de aanvoertemperatuur langer dan 180 seconden meer dan 2 C onder het setpoint blijft (onvoldoende vermogen) of na 300 seconden verzadiging.
@@ -223,7 +222,7 @@ Met `satpwmautoswitch = true` (standaard) bewaakt SAT de ketelprestaties via cyc
 | Ketel met hoge minimale modulatie (>30%) | PWM |
 | Vloerverwarming (trage respons) | Continu |
 | Oversized ketel met radiatoren | PWM |
-| Niet zeker | Begin met Continu, automatisch wisselen aan |
+| Niet zeker | Begin met Continu, SAT wisselt zelf |
 
 ---
 
@@ -642,7 +641,7 @@ Sinds 2.0.0 worden alle bestuurbare SAT-parameters als aparte HA-entiteiten gepu
 | HA-component | Aantal | Voorbeelden |
 |---|---|---|
 | `number` | ~25 | verwarmingscurve-coefficient, deadband, overshoot-marge, regelinterval, max modulatie, flame-off offset, flow offset, mod-sup delay/offset, ketelcapaciteit, comfort-vochtigheid, zomerdrempel, auto-tune rate, preset-temperaturen (comfort/eco/away/sleep/activity/home), min/max druk, max drukval, target temp step |
-| `switch` | 15 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable`, `pwm_auto_switch` |
+| `switch` | 14 | `solar_gain`, `summer_simmer`, `comfort_adjust`, `multi_area`, `auto_tune`, `simulation`, `window_detection`, `overshoot_protection`, `push_setpoint`, `follow_thermostat`, `external_temp`, `preset_sync`, `dhw_enabled`, `dhw_enable` |
 | `select` | 1 | `sat_heating_system` met opties `0` (auto), `1` (radiatoren), `2` (warmtepomp), `3` (vloerverwarming) |
 
 Elke entiteit schrijft naar het bijbehorende `%mqtt_sub_topic%/sat/<parameter>` commandotopic en leest uit het bijbehorende state-topic. Alle wijzigingen lopen via `updateSetting()` en worden dus naar flash gepersisteerd en binnen veilige grenzen geklemd.

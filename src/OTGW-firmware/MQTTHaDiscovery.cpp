@@ -3257,7 +3257,7 @@ bool streamOverrideSensorDiscovery(HaDiscoveryContext &ctx,
 // SAT switch (boolean) and select discovery (TASK-284).
 // Matches the switch/select entries at the bottom of the archived 2.0.0
 // mqttha.cfg. Hardcoded per index (like climate/number) to avoid PROGMEM
-// arrays for a small fixed set. The 15 switches share the same JSON shape,
+// arrays for a small fixed set. The 14 switches share the same JSON shape,
 // so they route through a single streamSatBoolSwitch() helper.
 // ---------------------------------------------------------------------------
 
@@ -3422,12 +3422,6 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("mdi:water-boiler"));
       break;
     case 10:
-      published = streamSatBoolSwitch(ctx,
-        PSTR("-sat-pwm-auto-switch-enable"),  PSTR("_SAT_PWM_Auto_Switch"),
-        PSTR("/sat/pwm_auto_switch"),         PSTR("/sat/pwm_auto_switch_enable"),
-        PSTR("mdi:swap-horizontal"));
-      break;
-    case 11:
       // TASK-516: master DHW enable (HW= command). Only emitted by the caller
       // when MsgID 3 HB3=1 (storage tank); combi boilers get no inert entity.
       published = streamSatBoolSwitch(ctx,
@@ -3435,19 +3429,19 @@ bool streamSatSwitchDiscovery(uint8_t switchIdx,
         PSTR("/sat/dhw_enable"),              PSTR("/sat/dhw_enable"),
         PSTR("mdi:water-boiler"));
       break;
-    case 12:
+    case 11:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-overshoot-protection-enable"), PSTR("_SAT_Overshoot_Protection"),
         PSTR("/sat/overshoot_protection"),    PSTR("/sat/overshoot_protection_enable"),
         PSTR("mdi:shield-check"));
       break;
-    case 13:
+    case 12:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-follow-thermostat-enable"), PSTR("_SAT_Follow_Thermostat"),
         PSTR("/sat/follow_thermostat"),       PSTR("/sat/follow_thermostat_enable"),
         PSTR("mdi:thermostat"));
       break;
-    case 14:
+    case 13:
       published = streamSatBoolSwitch(ctx,
         PSTR("-sat-external-temp-enable"),    PSTR("_SAT_External_Temp"),
         PSTR("/sat/external_temp"),           PSTR("/sat/external_temp_enable"),
@@ -3740,6 +3734,7 @@ struct RetiredSatEntity {
 };
 static const RetiredSatEntity kRetiredSatEntities[] PROGMEM = {
   { "switch", "sat_force_pwm_enable", "/sat/force_pwm_enable" },   // RETIRED-SAT-ENTITY TASK-1332
+  { "switch", "sat_pwm_auto_switch_enable", "/sat/pwm_auto_switch_enable" },   // RETIRED-SAT-ENTITY TASK-1341
 };
 
 void clearRetiredSatEntities(const HaDiscoveryContext &ctx) {

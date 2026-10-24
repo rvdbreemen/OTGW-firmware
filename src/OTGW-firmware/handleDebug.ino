@@ -94,7 +94,6 @@ static void dumpDebugInfo() {
     Debugf(PSTR("deadband: %.2f\r\n"), settings.sat.fDeadband);
     Debugf(PSTR("control_interval: %u\r\n"), (unsigned)settings.sat.iControlInterval);
     Debugf(PSTR("use_external_temp: %s\r\n"), settings.sat.bUseExternalTemp ? "true" : "false");
-    Debugf(PSTR("pwm_auto_switch: %s\r\n"), settings.sat.bPwmAutoSwitch ? "true" : "false");
     Debugf(PSTR("max_rel_mod: %u\r\n"), (unsigned)settings.sat.iMaxRelModulation);
     Debugf(PSTR("overshoot_margin: %.1f\r\n"), settings.sat.fOvershootMargin);
     Debugf(PSTR("dhw_setpoint: %.1f\r\n"), settings.sat.fDhwSetpoint);

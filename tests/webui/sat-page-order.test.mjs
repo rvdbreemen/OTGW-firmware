@@ -196,6 +196,8 @@ check(/PWM/.test(f.cycleSub || '') && /chooses the mode itself/.test(f.cycleSub 
 // TASK-1332: the Force PWM option is gone, so the hint no longer points at a setting and v2.js has no such field
 check(!/setting/i.test(f.cycleSub || ''), `the hint no longer mentions a Force PWM setting (sub=${JSON.stringify(f.cycleSub)})`);
 check(!/satforcepwm|force_pwm|Force PWM/.test(fs.readFileSync(path.join(DATA, 'v2.js'), 'utf8')), 'v2.js has no satforcepwm / Force PWM field');
+// TASK-1341: the PWM auto switch setting is gone too
+check(!/satpwmautoswitch|pwm_auto_switch|Auto PWM switch/.test(fs.readFileSync(path.join(DATA, 'v2.js'), 'utf8')), 'v2.js has no satpwmautoswitch / Auto PWM switch field');
 STATUS.control_mode = 1;
 
 // ------------------------------------------------ (c) same REST calls

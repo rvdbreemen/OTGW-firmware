@@ -362,7 +362,6 @@ Switches:
 | `SAT_OVP_Enabled` | Overshoot prevention-kalibratie inschakelen |
 | `SAT_Preset_Sync` | Climate-preset synchroniseren naar secondaire entiteiten |
 | `SAT_DHW_Enabled` | DHW-regeling binnen SAT inschakelen |
-| `SAT_PWM_Auto_Switch` | Automatisch wisselen tussen continuous- en PWM-modus |
 
 Select:
 

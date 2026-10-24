@@ -483,7 +483,7 @@ Settings echo topics are retained. More settings echo topics exist; the full lis
 
 #### SAT Switch State Topics (TASK-284)
 
-State topics for the 15 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
+State topics for the 14 SAT boolean switches. Payloads are `"true"` / `"false"`. All retained.
 
 | Topic | Description |
 | ----- | ----------- |
@@ -501,7 +501,6 @@ State topics for the 15 SAT boolean switches. Payloads are `"true"` / `"false"`.
 | `sat/ovp_enabled` | OPV (overshoot-protection value) enabled state |
 | `sat/preset_sync_enable` | Preset-sync enable state |
 | `sat/dhw_enabled` | DHW heating enable state |
-| `sat/pwm_auto_switch_enable` | Auto-switch between PWM and continuous mode |
 
 #### Climate Entity Attributes
 
@@ -932,7 +931,7 @@ SAT-specific commands are nested under the `sat/` sub-topic. All commands are su
 
 **Feature Switches (TASK-284, bound to HA switch entities):**
 
-Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 15 auto-discovered SAT switches.
+Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 14 auto-discovered SAT switches.
 
 | Topic Suffix | Bound SAT setting | Description |
 | ------------ | ----------------- | ----------- |
@@ -950,7 +949,6 @@ Payloads: `"true"` / `"false"`. Each of these corresponds to one of the 15 auto-
 | `sat/ovp_enabled` | `SATovpenabled` | Enable OPV (overshoot-protection value) |
 | `sat/preset_sync` | `SATpresetsync` | Enable HA preset-sync subscription |
 | `sat/dhw_enabled` | `SATdhwenabled` | Enable DHW heating |
-| `sat/pwm_auto_switch` | `SATpwmautoswitch` | Auto-switch between PWM and continuous |
 
 `sat/mqtt_fallback` (key `SATmqttfallback`) is a settings command, not an auto-discovered switch, and has no Home Assistant entity. "Take over when MQTT is lost": after more than 5 minutes without MQTT, SAT controls the boiler until MQTT is back; off (default): the thermostat keeps control. It only starts after MQTT was connected at least once since boot, so a simultaneous power cut of broker and OTGW does not trigger it. Switching SAT off yourself during the outage ends the takeover and it does not restart until MQTT has been back. Also settable through `POST /api/v2/settings` (`satmqttfallback`).
 
@@ -1238,7 +1236,7 @@ When SAT is enabled, the following HA entities are auto-discovered. Entities mar
 |-------------|-----------|------|-------------|
 | `number` | `sat_dhw_setpoint` | °C | DHW setpoint slider (30-60 °C, 0.5 step) |
 
-**Switch Entities (TASK-284, 15 switches):**
+**Switch Entities (TASK-284, 14 switches):**
 
 Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and takes commands on `%mqtt_sub_topic%/sat/<command>`. Payloads are literal `"true"` / `"false"` (`pl_on` / `pl_off`).
 
@@ -1258,7 +1256,6 @@ Each switch publishes its state to `%mqtt_pub_topic%/sat/<name>_enable` and take
 | `sat_ovp_enabled` | `sat/ovp_enabled` | `sat/ovp_enabled` | `mdi:shield-check` |
 | `sat_preset_sync_enable` | `sat/preset_sync` | `sat/preset_sync_enable` | `mdi:sync` |
 | `sat_dhw_enabled` | `sat/dhw_enabled` | `sat/dhw_enabled` | `mdi:water-boiler` |
-| `sat_pwm_auto_switch_enable` | `sat/pwm_auto_switch` | `sat/pwm_auto_switch_enable` | `mdi:swap-horizontal` |
 
 **Select Entity (TASK-284):**
 

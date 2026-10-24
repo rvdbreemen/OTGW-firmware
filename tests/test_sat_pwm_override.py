@@ -53,7 +53,7 @@ STUBS = r"""
 #define SAT_QUIRK_IMMERGAS_TP 0x02
 enum { SAT_MODE_OFF = 0, SAT_MODE_CONTINUOUS = 1, SAT_MODE_PWM = 2 };
 typedef int SATControlMode;
-struct SatSettings { @FORCEFIELD@ bool bPwmAutoSwitch=true; float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false;
+struct SatSettings { @FORCEFIELD@ @AUTOFIELD@ float fOvershootMargin=2.0f; bool bEnabled=true, bOvershootProtection=true, bSolarGainEnable=false, bSummerSimmer=false;
                      int iMaxRelModulation=80; float fModSupDelay=20, fModSupOffset=1, fFlameOffOffset=18, fSolarSetpointOffset=2; };
 struct Settings { SatSettings sat; };
 struct SatState { int iCurrentModulation=0; float fFinalSetpoint=0, fPwmDutyCycle=0, fPidOutput=0; bool bPwmFlameRequested=false, bDhwActive=false,
@@ -119,6 +119,21 @@ int main(int argc, char** argv) {
   const float pid = 35.0f;                 // duty (35-27.2)/20 = 0.39: range 3, on 351 s, off 549 s
   state.sat.fPidOutput = pid; SETREQ(pid);
   setPrev(28.0f);                          // previous CS (what the old +18 path produced)
+  if (!strcmp(sc, "sw")) {                 // TASK-1341: sustained switches. argv[3]=PWM auto switch setting (HEAD only) argv[4]=os|uh|sat
+#ifdef HAS_AUTOSWITCH
+    settings.sat.bPwmAutoSwitch = atoi(argv[3]) != 0;
+#endif
+    const bool os = !strcmp(argv[4], "os");
+    const bool sat = !strcmp(argv[4], "sat");
+    state.sat.eControlMode = os ? SAT_MODE_CONTINUOUS : SAT_MODE_PWM;
+    state.sat.bPwmFlameRequested = !os; state.sat.fFinalSetpoint = pid; _sustain_lastCheckMs = g_ms;
+    g_flow = os ? 45.0f : (sat ? 35.0f : 20.0f);     // overshoot: flow above request + margin; underheat: far below; saturation: on target
+    _pwm_lastOffTimeMs = sat ? 0 : 1;                // saturation: the PWM off time stays 0
+    int calls = 0;
+    for (int i = 0; i < 400 && state.sat.eControlMode == (os ? SAT_MODE_CONTINUOUS : SAT_MODE_PWM); i++) { g_ms += 1000; CALL_AUTOSWITCH(pid); calls++; }
+    printf("mode=%d calls=%d\n", state.sat.eControlMode, calls);
+    return 0;
+  }
   if (!strcmp(sc, "uh")) {                 // uh protection pwmFlameRequested: 200 s of low flow, 1 s calls
     state.sat.eControlMode = SAT_MODE_PWM; state.sat.bPwmFlameRequested = atoi(argv[3]) != 0;
     state.sat.fFinalSetpoint = pid; g_flow = 20.0f; _sustain_lastCheckMs = g_ms;
@@ -358,8 +373,12 @@ def build(workdir: Path):
     has_force = "bForcePWM" in body
     if has_force:
         flag += "#define HAS_FORCE_PWM 1\n"
+    # HEAD still gates satCycleCheckAutoSwitch() on settings.sat.bPwmAutoSwitch (TASK-1341): the stub carries the field so HEAD compiles
+    has_auto = "bPwmAutoSwitch" in cycles
+    if has_auto:
+        flag += "#define HAS_AUTOSWITCH 1\n"
     chenable = (REPO / "src" / "OTGW-firmware" / "SATchEnable.h").as_posix()
-    cpp.write_text(flag + STUBS.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "").replace("@CHENABLE@", chenable) + pre + body + cycles + MAIN, encoding="utf-8")
+    cpp.write_text(flag + STUBS.replace("@FORCEFIELD@", "bool bForcePWM=false;" if has_force else "").replace("@AUTOFIELD@", "bool bPwmAutoSwitch=true;" if has_auto else "").replace("@CHENABLE@", chenable) + pre + body + cycles + MAIN, encoding="utf-8")
     return compile_cpp(cpp, workdir / "t.exe")
 
 
@@ -416,6 +435,22 @@ class SatPwmOverride(unittest.TestCase):
         out = subprocess.run([str(self.exe), *map(str, args)], capture_output=True, text=True, check=True).stdout
         return dict(kv.split("=") for kv in out.split())
 
+    # --- TASK-1341: the PWM auto switch setting is gone, the three sustained switches always run (Sergeant D entries 18, 19) ---
+    # thermo-nova heating_control.py:206/217: no setting guards the overshoot / underheat / saturation switches.
+    # On HEAD the stub still carries bPwmAutoSwitch and the scenario sets it to argv[3] (0 = off), which blocks all three.
+    def test_sustained_overshoot_switches_to_pwm_even_with_the_old_setting_off(self):
+        r = self.run_sc("sw", 1, 0, "os")
+        self.assertEqual(r["mode"], "2")                  # CONTINUOUS -> PWM after SAT_OVERSHOOT_SUSTAIN_SEC
+        self.assertLessEqual(int(r["calls"]), 61)
+
+    def test_sustained_underheat_switches_to_continuous_even_with_the_old_setting_off(self):
+        self.assertEqual(self.run_sc("sw", 1, 0, "uh")["mode"], "1")
+
+    def test_sustained_saturation_switches_to_continuous_even_with_the_old_setting_off(self):
+        self.assertEqual(self.run_sc("sw", 1, 0, "sat")["mode"], "1")
+
+    def test_overshoot_switch_with_the_old_setting_on_is_unchanged(self):
+        self.assertEqual(self.run_sc("sw", 1, 1, "os")["mode"], "2")
 
     # --- TASK-1273: duty-cycle BT (Sergeant D 2026-10-22, docs/sat/sergeant-d-corrections.md entry 1) ---
     def test_duty_uses_the_live_flow_at_the_first_flame_not_a_placeholder(self):
@@ -713,6 +748,31 @@ class ColdCutoffSource(unittest.TestCase):
         self.assertIn("satPwmDisableOnHeaterOff();", block)
 
 
+class PwmAutoSwitchRemoved(unittest.TestCase):
+    """TASK-1341: the PWM auto switch setting is gone from the firmware sources (Sergeant D 2026-10-24, entry 19)."""
+    NAMES = re.compile(r"bPwmAutoSwitch|satpwmautoswitch|pwm_auto_switch", re.I)
+
+    def test_no_pwm_auto_switch_name_left_in_firmware_sources(self):
+        left = []
+        for f in (REPO / "src" / "OTGW-firmware").rglob("*"):
+            if f.suffix not in (".ino", ".cpp", ".h", ".js", ".html", ".css", ".ini") or not f.is_file():
+                continue
+            for n, line in enumerate(f.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                if self.NAMES.search(line) and "RETIRED-SAT-ENTITY" not in line:
+                    left.append(f"{f.relative_to(REPO).as_posix()}:{n}")
+        self.assertEqual(left, [])
+
+    def test_retired_entity_table_clears_the_old_discovery_and_state_topic(self):
+        src = (REPO / "src" / "OTGW-firmware" / "MQTTHaDiscovery.cpp").read_text(encoding="utf-8")
+        self.assertIn('"switch", "sat_pwm_auto_switch_enable", "/sat/pwm_auto_switch_enable"', src)
+
+    def test_old_settings_key_is_ignored_silently(self):
+        src = (REPO / "src" / "OTGW-firmware" / "settingStuff.ino").read_text(encoding="utf-8")
+        body = src[src.index("void updateSetting("):src.index("} // updateSetting()")]
+        self.assertNotIn("SATpwmautoswitch", body)
+        self.assertNotRegex(body, r"(?i)unknown (setting|key|field)")
+
+
 class ForcePwmRemoved(unittest.TestCase):
     """TASK-1332: the Force PWM option is gone from the firmware sources (Sergeant D 2026-10-23, entry 13)."""
     NAMES = re.compile(r"bForcePWM|satforcepwm|force_pwm", re.I)
@@ -731,7 +791,7 @@ class ForcePwmRemoved(unittest.TestCase):
     def test_retired_entity_table_clears_the_old_discovery_and_state_topic(self):
         src = (REPO / "src" / "OTGW-firmware" / "MQTTHaDiscovery.cpp").read_text(encoding="utf-8")
         rows = [l for l in src.splitlines() if "RETIRED-SAT-ENTITY" in l and "{" in l]
-        self.assertEqual(len(rows), 1)
+        self.assertEqual(len(rows), 2)
         self.assertIn('"switch", "sat_force_pwm_enable", "/sat/force_pwm_enable"', rows[0])
         self.assertIn("clearRetiredSatEntities(ctx);", (REPO / "src" / "OTGW-firmware" / "MQTTstuff.ino").read_text(encoding="utf-8"))
 

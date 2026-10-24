@@ -1040,7 +1040,6 @@ mosquitto_pub -h your-broker -t "OTGW/set/otgw-AABBCCDDEEFF/sat/target" -m "21.0
 | `satdeadband` | 0.25 | 0.05-2.0 °C | PID deadband width |
 | `satinterval` | 30 | 10-300 s | Control loop interval |
 | `satexternaltemp` | false | bool | Use external indoor sensor via MQTT |
-| `satpwmautoswitch` | true | bool | Automatically switch between continuous and PWM modes |
 
 #### Choosing the heating curve coefficient
 
@@ -1084,7 +1083,7 @@ Worked examples for a radiator system, coefficient 1.5:
 
 **PWM mode**: For boilers that cannot modulate below 30-40%, SAT cycles the flame on and off at a calculated duty cycle. Within each control interval, the boiler runs at full setpoint for `duty * interval` seconds, then idles.
 
-**Auto-switch**: When `satpwmautoswitch` is enabled (default), SAT monitors boiler behavior and switches modes automatically.
+**Auto-switch**: SAT monitors boiler behavior and switches modes automatically. There is no setting for it (removed, Sergeant D 2026-10-24).
 
 ---
 
@@ -1188,7 +1187,7 @@ External temperature values expire automatically (5 minutes for indoor, 10 minut
 |---|---|---|
 | Room never reaches target temperature | Coefficient too low | Increase by 0.2-0.3 |
 | Room consistently overshoots target | Coefficient too high | Decrease by 0.2-0.3 |
-| Frequent short boiler cycles | Boiler minimum modulation too high | Enable PWM auto-switch |
+| Frequent short boiler cycles | Boiler minimum modulation too high | Check the overshoot margin and `satcyclesperhour` |
 | Safety tripped on startup | PIC not ready at SAT init | Normal behavior. Re-enable SAT. |
 | "External temp stale" in logs | MQTT push stopped | Check HA automation and broker connectivity |
 ## Chapter 6: Network Configuration
@@ -3241,7 +3240,6 @@ The commands below pass the payload unchanged to the named setting, the same set
 | `sat/preset_home` | `SATpresethome` |
 | `sat/solar_gain` | `SATsolargain` |
 | `sat/window_detection` | `SATwindowdetect` |
-| `sat/pwm_auto_switch` | `SATpwmautoswitch` |
 | `sat/sensor_max_age` | `SATsensormaxage` |
 | `sat/error_monitoring` | `SATerrormon` |
 | `sat/auto_gains_value` | `SATautogains` |

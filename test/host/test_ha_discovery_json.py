@@ -283,7 +283,8 @@ def component(topic, ctx):
     return topic[len(ctx["prefix"]) + 1:].split("/")[0]
 
 
-RETIRED_SAT_TOPIC_TAILS = ("/sat_force_pwm_enable/config", "/sat/force_pwm_enable")
+RETIRED_SAT_TOPIC_TAILS = ("/sat_force_pwm_enable/config", "/sat/force_pwm_enable",
+                           "/sat_pwm_auto_switch_enable/config", "/sat/pwm_auto_switch_enable")
 
 
 def gate(p, ctx):
@@ -572,6 +573,11 @@ def main():
     emitted = {p["topic"] for p in fix[2] if p["raw"] == b"" and p["retain"]}
     checks.append((f"TASK-1332 FIX: the run emits the empty retained publish to {cfg_topic} and {state_topic}",
                    cfg_topic in emitted and state_topic in emitted))
+    # TASK-1341: same for the removed PWM auto switch
+    cfg_topic2 = f"{fix[0]['prefix']}/switch/{fix[0]['node']}/sat_pwm_auto_switch_enable/config"
+    state_topic2 = f"{fix[0]['pub']}/sat/pwm_auto_switch_enable"
+    checks.append((f"TASK-1341 FIX: the run emits the empty retained publish to {cfg_topic2} and {state_topic2}",
+                   cfg_topic2 in emitted and state_topic2 in emitted))
     # TASK-1201: one config topic per uniq_id, and the one-time clear never empties a live config.
     fix_dups = dup_uniq_ids(fix)
     checks.append((f"TASK-1201 FIX: no uniq_id on two config topics in any permutation (got {fix_dups})",

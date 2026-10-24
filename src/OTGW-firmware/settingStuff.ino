@@ -1,7 +1,7 @@
 /*
 ***************************************************************************  
 **  Program  : settingsStuff
-**  Version  : v2.0.0-alpha.490
+**  Version  : v2.0.0-alpha.491
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -330,7 +330,6 @@ void writeSettings(bool show)
   writeJsonFloatKV(file, F("SATpresetsleep"), settings.sat.fPresetSleep);
   writeJsonFloatKV(file, F("SATpresetactivity"), settings.sat.fPresetActivity);
   writeJsonFloatKV(file, F("SATpresethome"), settings.sat.fPresetHome);
-  writeJsonBoolKV(file, F("SATpwmautoswitch"), settings.sat.bPwmAutoSwitch);
   writeJsonIntKV(file, F("SATmaxmodulation"), settings.sat.iMaxRelModulation);
   writeJsonFloatKV(file, F("SATovershootmargin"), settings.sat.fOvershootMargin);
   writeJsonFloatKV(file, F("SATmodsupdelay"), settings.sat.fModSupDelay);
@@ -1012,7 +1011,6 @@ void updateSetting(const char *field, const char *newValue)
   else if (strcasecmp_P(field, PSTR("SATpresetsleep")) == 0)     settings.sat.fPresetSleep = clampSettingFloat(newValue, settings.sat.fPresetSleep, 5.0f, 25.0f);
   else if (strcasecmp_P(field, PSTR("SATpresetactivity")) == 0)  settings.sat.fPresetActivity = clampSettingFloat(newValue, settings.sat.fPresetActivity, 5.0f, 20.0f);
   else if (strcasecmp_P(field, PSTR("SATpresethome")) == 0)      settings.sat.fPresetHome = clampSettingFloat(newValue, settings.sat.fPresetHome, 10.0f, 25.0f);
-  else if (strcasecmp_P(field, PSTR("SATpwmautoswitch")) == 0)   settings.sat.bPwmAutoSwitch = EVALBOOLEAN(newValue);
   else if (strcasecmp_P(field, PSTR("SATmaxmodulation")) == 0)   settings.sat.iMaxRelModulation = constrain(atoi(newValue), 0, 100);
   else if (strcasecmp_P(field, PSTR("SATovershootmargin")) == 0) settings.sat.fOvershootMargin = clampSettingFloat(newValue, settings.sat.fOvershootMargin, 0.5f, 5.0f);
   else if (strcasecmp_P(field, PSTR("SATmodsupdelay")) == 0)    settings.sat.fModSupDelay = clampSettingFloat(newValue, settings.sat.fModSupDelay, 0.0f, 120.0f);

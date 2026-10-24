@@ -950,8 +950,6 @@ void satCycleSample()
 // Called from the control loop. Returns true if mode was switched.
 bool satCycleCheckAutoSwitch(float requestedSetpoint)
 {
-  if (!settings.sat.bPwmAutoSwitch) return false;
-
   uint32_t now = millis();
   float dt = (float)(now - _sustain_lastCheckMs) / 1000.0f;
   _sustain_lastCheckMs = now;

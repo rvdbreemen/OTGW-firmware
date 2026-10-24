@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : restAPI
-**  Version  : v2.0.0-alpha.490
+**  Version  : v2.0.0-alpha.491
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **     based on Framework ESP8266 from Willem Aandewiel
@@ -1727,8 +1727,6 @@ static void handleSAT(const char words[][API_WORD_LEN], uint8_t wc, HTTPMethod m
       updateSetting("SATsolargain", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("window_detection")) == 0) {
       updateSetting("SATwindowdetect", val); handled = true;
-    } else if (strcasecmp_P(settingName, PSTR("pwm_auto_switch")) == 0) {
-      updateSetting("SATpwmautoswitch", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("sensor_max_age")) == 0) {
       updateSetting("SATsensormaxage", val); handled = true;
     } else if (strcasecmp_P(settingName, PSTR("error_monitoring")) == 0) {
@@ -2276,7 +2274,6 @@ static void handleDebugDump(const char words[][API_WORD_LEN], uint8_t wc, HTTPMe
     je.field(F("settings.sat.deadband"), settings.sat.fDeadband);
     je.field(F("settings.sat.control_interval"), (uint32_t)settings.sat.iControlInterval);
     je.field(F("settings.sat.use_external_temp"), settings.sat.bUseExternalTemp);
-    je.field(F("settings.sat.pwm_auto_switch"), settings.sat.bPwmAutoSwitch);
     je.field(F("settings.sat.max_rel_mod"), (uint32_t)settings.sat.iMaxRelModulation);
     je.field(F("settings.sat.overshoot_margin"), settings.sat.fOvershootMargin);
     je.field(F("settings.sat.overshoot_protection"), settings.sat.bOvershootProtection);
@@ -3902,7 +3899,6 @@ void sendDeviceSettings()
     dtostrf(settings.sat.fPresetAway, 1, 1, tmpBuf);
     addNum(F("satpresetaway"), tmpBuf, "f", 5, 18);
   }
-  addBool(F("satpwmautoswitch"), settings.sat.bPwmAutoSwitch, "b");
   {
     char tmpBuf[8];
     dtostrf(settings.sat.fPresetSleep, 1, 1, tmpBuf);
@@ -4205,7 +4201,7 @@ static const char* const PROGMEM knownSettings[] = {
   // TASK-640: PV-surplus setpoint boost settings
   "satpvboostdeltac", "satpvboostenabled", "satpvboostholds",
   "satpvboostmaxdurationmin", "satpvboostmaxindoorc", "satpvboostthresholdw",
-  "satpwmautoswitch", "satsensorarea0", "satsensorarea1", "satsensorarea2", "satsensorarea3",
+  "satsensorarea0", "satsensorarea1", "satsensorarea2", "satsensorarea3",
   "satsimcoolrate", "satsimheatrate", "satsimulation",
   "satsolargain", "satsolarminelev", "satsolarminrise", "satsolaroffset", "satsource",
   "satsummerminhours", "satsummersimmer", "satsummerthreshold",

@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATtypes.h
-**  Version  : v2.0.0-alpha.490
+**  Version  : v2.0.0-alpha.491
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -450,7 +450,6 @@ struct SATSection {
   float    fPresetSleep       = 16.0f;  // Preset: Sleep
   float    fPresetActivity    = 10.0f;  // Preset: Activity (used by window detection)
   float    fPresetHome        = 18.0f;  // Preset: Home (standard at-home temperature)
-  bool     bPwmAutoSwitch     = true;   // Auto-switch between PWM and continuous mode
   uint8_t  iMaxRelModulation  = 100;    // Max relative modulation 0-100% (MM= command)
   float    fOvershootMargin   = 2.0f;   // Overshoot margin °C (cycle classification + continuous->PWM auto-switch; TASK-1268 lowered it from Python's 3.0)
   float    fModSupDelay       = 20.0f;  // Modulation suppression delay (seconds)

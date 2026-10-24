@@ -141,7 +141,6 @@ static const char SETTINGS_HELP_JSON[] PROGMEM = R"json({
 "satmaxmodulation":"Highest relative modulation SAT sends to the boiler (MM=), 0 to 100 %. Default 100.",
 "satexternaltemp":"Use an indoor temperature you send to SAT. MQTT: publish e.g. 20.8 to <prefix>/set/<node>/sat/indoor_temp. REST: POST /api/v2/sat/externaltemp. Expires after Sensor max age.",
 "satovershootmargin":"Flow above the PID setpoint plus this margin for 60 s switches to PWM. 0.5 to 5 °C, default 2.",
-"satpwmautoswitch":"Switch between continuous and PWM mode automatically, based on boiler behaviour. Default on.",
 "satboilercapacity":"Boiler heat output in kW, 1 to 100. Default 24. SAT power = modulation x this.",
 "satdhwcapacity":"Heat output in kW used while hot water runs. 0 uses the boiler capacity.",
 "satthermalcoeff":"Thermal drop coefficient (0.005 to 0.3). Learned by SAT; normally leave it alone.",

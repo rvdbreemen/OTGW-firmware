@@ -308,7 +308,7 @@ Update a single device setting.
 - `401` - Authentication required
 - `403` - CSRF protection: invalid origin
 
-**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttonchangepublishing`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `ui_onboarded`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satpwmautoswitch`, `satbleriskack`
+**Known setting names**: `hostname`, `mqttenable`, `mqttbroker`, `mqttbrokerport`, `mqttuser`, `mqttpasswd`, `mqtttoptopic`, `mqtthaprefix`, `mqttharebootdetection`, `mqttuniqueid`, `mqttotmessage`, `mqttonchangepublishing`, `mqttinterval`, `mqttseparatesources`, `ntpenable`, `ntptimezone`, `ntphostname`, `ntpsendtime`, `ledblink`, `darktheme`, `nightlyrestart`, `nightlyrestarthour`, `ui_onboarded`, `gpiosensorsenabled`, `gpiosensorslegacyformat`, `gpiosensorspin`, `gpiosensorsinterval`, `s0counterenabled`, `s0counterpin`, `s0counterdebouncetime`, `s0counterpulsekw`, `s0counterinterval`, `gpiooutputsenabled`, `gpiooutputspin`, `gpiooutputstriggerbit`, `otgwcommandenable`, `otgwcommands`, `webhookenable`, `webhookurlon`, `webhookurloff`, `webhooktriggerbit`, `webhookpayload`, `webhookcontenttype`, `httppasswd`, `satenabled`, `satsystem`, `sattargettemp`, `satcoefficient`, `satdeadband`, `satinterval`, `satexternaltemp`, `satpresetcomfort`, `satpreseteco`, `satpresetaway`, `satbleriskack`
 
 **Nightly restart settings**:
 
@@ -331,7 +331,6 @@ Update a single device setting.
 | `satpresetcomfort` | float | 15-28 | `21.0` | Comfort preset temperature (°C) |
 | `satpreseteco` | float | 10-22 | `18.0` | Eco preset temperature (°C) |
 | `satpresetaway` | float | 5-18 | `15.0` | Away preset temperature (°C) |
-| `satpwmautoswitch` | bool | - | `true` | Auto-switch between PWM/continuous mode |
 
 ---
 
@@ -481,7 +480,7 @@ Produced entity categories:
 - `binary_sensor`: 53 entries (PROGMEM table)
 - `climate`: 2 (Thermostat + DHW Control)
 - `number`: 1 (`Toutside_override`)
-- `switch` (SAT, TASK-284): 15 (solar gain, summer simmer, comfort adjust, multi-area, auto-tune, simulation, window detection, push setpoint, preset sync, DHW enabled, PWM auto-switch, DHW enable, overshoot protection, follow thermostat, external temp)
+- `switch` (SAT, TASK-284): 14 (solar gain, summer simmer, comfort adjust, multi-area, auto-tune, simulation, window detection, push setpoint, preset sync, DHW enabled, DHW enable, overshoot protection, follow thermostat, external temp)
 - `select` (SAT, TASK-284): 1 (`sat_heating_system`, options `"0"`..`"3"`)
 - `sensor` (Dallas): runtime, one per detected 1-Wire address
 

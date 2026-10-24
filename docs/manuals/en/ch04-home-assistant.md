@@ -348,7 +348,6 @@ Switches:
 | `SAT_OVP_Enabled` | Enable overshoot prevention calibration |
 | `SAT_Preset_Sync` | Sync climate preset to secondary entities |
 | `SAT_DHW_Enabled` | Enable DHW control interaction with SAT |
-| `SAT_PWM_Auto_Switch` | Auto-switch between continuous and PWM mode |
 
 Select:
 

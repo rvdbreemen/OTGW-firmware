@@ -364,7 +364,7 @@ Some boilers cannot modulate well at low output levels — they have a minimum m
 | Boiler with high minimum modulation (>30%) | PWM |
 | Underfloor heating (slow response) | Continuous |
 | Radiators with oversized boiler | PWM |
-| Not sure | Start with Continuous, enable auto-switch |
+| Not sure | Start with Continuous, SAT switches by itself |
 
 ---
 
@@ -405,7 +405,7 @@ Each completed cycle is classified into one of five categories:
 
 ### Auto-switch logic
 
-When `bPwmAutoSwitch` is enabled (default), SAT monitors sustained conditions and switches modes automatically:
+SAT always monitors sustained conditions (there is no setting for it) and switches modes automatically:
 
 ```
   ┌─────────────┐    sustained overshoot    ┌───────────┐
@@ -551,7 +551,6 @@ SAT is configured through the standard OTGW settings system. Settings persist to
 | `satpresetcomfort` | `21.0` | 15-28 °C | Comfort preset |
 | `satpreseteco` | `18.0` | 10-22 °C | Eco preset |
 | `satpresetaway` | `15.0` | 5-18 °C | Away preset |
-| `satpwmautoswitch` | `true` | bool | Auto-switch PWM/continuous |
 
 Settings can be changed via the Web UI settings page, the REST API (`POST /api/v2/settings`), or MQTT.
 
@@ -696,7 +695,7 @@ Remember to enable `satexternaltemp` in settings for indoor readings, and to pus
 |---------|-------------|-----|
 | Room never reaches target | Coefficient too low | Increase by 0.2-0.3 |
 | Room overshoots target | Coefficient too high | Decrease by 0.2-0.3 |
-| Frequent boiler cycling | Boiler can't modulate low enough | Enable PWM auto-switch |
+| Frequent boiler cycling | Boiler can't modulate low enough | Check the overshoot margin |
 | Safety trips on startup | PIC not ready when SAT initializes | Normal — deferred CS=0 handles this, re-enable SAT |
 | "External temp stale" in logs | Sensor push stopped | Check HA automation / MQTT connectivity |
 | High I term (>5°C) | Sustained offset, possible sensor issue | Check room temp accuracy, verify coefficient |

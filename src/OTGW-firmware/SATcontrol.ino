@@ -2896,7 +2896,7 @@ void satPublishMQTT()
   static SATShadowB s_thermal_comfort, s_multi_area_enable, s_auto_tune_enable;
   static SATShadowB s_simulation_enable, s_window_detection_enable, s_overshoot_protection_enable, s_follow_thermostat_enable;
   static SATShadowB s_push_setpoint_enable, s_preset_sync_enable;
-  static SATShadowB s_dhw_enabled, s_dhw_enable, s_pwm_auto_switch_enable;
+  static SATShadowB s_dhw_enabled, s_dhw_enable;
   // JSON-blob heartbeat counters (BSS zero-init == first-seen sentinel).
   static uint32_t s_pid_attrs_hb        = 0;
   static uint32_t s_cycle_attrs_hb      = 0;
@@ -3350,7 +3350,6 @@ void satPublishMQTT()
   publishIfChangedB(F("sat/preset_sync_enable"),      settings.sat.bPresetSync,       s_preset_sync_enable,      true);
   publishIfChangedB(F("sat/dhw_enabled"),             settings.sat.bDhwEnabled,       s_dhw_enabled,             true);
   publishIfChangedB(F("sat/dhw_enable"),              settings.sat.bDhwEnable,        s_dhw_enable,              true);
-  publishIfChangedB(F("sat/pwm_auto_switch_enable"),  settings.sat.bPwmAutoSwitch,    s_pwm_auto_switch_enable,  true);
 
   // ---------------------------------------------------------------------------
   // Climate entity extra_state_attributes JSON blob (Task #72). Aggregates 13

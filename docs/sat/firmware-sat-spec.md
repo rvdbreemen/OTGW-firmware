@@ -275,7 +275,7 @@ At the first computed update, the restored values are used as follows:
 11. Auto-tune, curve recommendation, modulation reliability, setpoint sync, flame status, boiler status, comfort and PV boost (`SATcontrol.ino:4793-4829`).
 12. Heating curve and PID (`SATcontrol.ino:4836-4839`); multi-zone override when more than one zone is configured (`SATcontrol.ino:4846-4899`).
 13. Subtract `fSolarSetpointOffset` from the PID output when solar gain is active and enabled (TASK-1323; thermo-nova `climate.py:391-392`), then clamp it to 10 °C .. effective maximum (`SATcontrol.ino:4908-4912`). The result is the requested setpoint (thermo-nova `climate.py:394`); it is kept in `_sat_requestedSetpoint` for the 3 s refresh and the `sat/requested_setpoint` topic, while `state.sat.fPidOutput` stays the raw PID output.
-14. Switch PWM to continuous when the output reaches the system maximum; force PWM when configured (`SATcontrol.ino:4917-4925`). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
+14. Switch PWM to continuous when the output reaches the system maximum; force PWM when configured (`SATcontrol.ino:4917-4925`). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists. Removed in TASK-1341, 2026-10-24: the PWM auto switch setting no longer exists, entry 19.)
 15. Compute the control setpoint for the active mode (`SATcontrol.ino:4928-4933`), clamp it again (`SATcontrol.ino:4936-4937`) and remember it as the last control setpoint (`SATcontrol.ino:4939`). There is no solar subtraction on the control setpoint any more (moved to step 13, TASK-1323).
 16. Auto-switch check between continuous and PWM, only when the PID output is above the cold setpoint and the source is not a heat pump (`SATcontrol.ino:4951-4953`).
 17. Compute the modulation value (`SATcontrol.ino:4960-4967`).
@@ -1497,7 +1497,7 @@ Per tick, the PWM code reads:
 
 Timestamps from the cycle tracker that the PWM code uses: the last real flame-on time `_cycle_flameOnStartMs` and the last real flame-off time `_cycle_flameOffStartMs` (SATcycles.ino:107-108, SATcycles.ino:1039-1040). They are updated on every pass of `satControlLoopRun()` (not only on ticks) through flame-edge detection (SATcontrol.ino:4591-4596, SATcycles.ino:697-714, SATcycles.ino:757-760). The flame-on time is written only at init (to 0) and at a flame-on edge; a flame-off edge does not clear it (SATcycles.ino:191, SATcycles.ino:714, SATcycles.ino:757-843).
 
-Configuration inputs (defaults in the constants table below): `bOvershootProtection`, `fFlameOffOffset`, `fModSupDelay`, `fModSupOffset`, `bPwmAutoSwitch`, `fOvershootMargin`, `iMaxRelModulation`, `fFlowOffset`, `iControlInterval`, `iHpCycleSeconds` (SATtypes.h:440-466); `iCyclesPerHour` and `fMaxSetpoint` (SATtypes.h:514, SATtypes.h:525); heating system (radiators or underfloor; AUTO means radiators) and heating source (gas boiler, heat pump, hybrid; AUTO means gas boiler) (SATcontrol.ino:194-214); manufacturer quirks (SATcontrol.ino:114-170). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
+Configuration inputs (defaults in the constants table below): `bOvershootProtection`, `fFlameOffOffset`, `fModSupDelay`, `fModSupOffset`, `fOvershootMargin`, `iMaxRelModulation`, `fFlowOffset`, `iControlInterval`, `iHpCycleSeconds` (SATtypes.h:440-466); `iCyclesPerHour` and `fMaxSetpoint` (SATtypes.h:514, SATtypes.h:525); heating system (radiators or underfloor; AUTO means radiators) and heating source (gas boiler, heat pump, hybrid; AUTO means gas boiler) (SATcontrol.ino:194-214); manufacturer quirks (SATcontrol.ino:114-170). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
 
 <a id="s4-behaviour-step-by-step-in-time-order"></a>
 
@@ -1553,7 +1553,7 @@ PWM is **entered** by exactly these code paths (a search for `satSetControlMode`
 
 | Trigger | Conditions (all must hold) | Citation |
 |---|---|---|
-| Sustained overshoot (per tick) | `bPwmAutoSwitch` on; source not heat pump; `pidOutput > cold setpoint`; mode CONTINUOUS; the time since the previous call `dt` is > 0 and <= 60 s; not DHW and not within 300 s after DHW; `flow > pidOutput + fOvershootMargin` (strict); the accumulated time reaches 60 s | SATcontrol.ino:4951-4952, SATcycles.ino:944-984, SATcycles.ino:29, SATcycles.ino:33 |
+| Sustained overshoot (per tick) | source not heat pump; `pidOutput > cold setpoint`; mode CONTINUOUS; the time since the previous call `dt` is > 0 and <= 60 s; not DHW and not within 300 s after DHW; `flow > pidOutput + fOvershootMargin` (strict); the accumulated time reaches 60 s | SATcontrol.ino:4951-4952, SATcycles.ino:944-984, SATcycles.ino:29, SATcycles.ino:33 |
 | (removed in TASK-1332) Force PWM | `bForcePWM` set and the mode is not PWM, checked every tick | SATcontrol.ino:4923-4925 |
 | Manual command | `control_mode` value "pwm" or 2, while SAT is enabled and not tripped | SATcontrol.ino:2238, SATcontrol.ino:2242-2244 |
 
@@ -1562,7 +1562,7 @@ PWM is **left** by exactly these code paths. Each one calls `satPwmReset()` thro
 | Trigger | Conditions | Citation |
 |---|---|---|
 | Requested at system maximum | Mode PWM and `pidOutput >= satGetMaxSetpoint()` (system cap: 62 °C radiators, 45 °C underfloor, 40 °C heat pump) | SATcontrol.ino:4917-4920, SATcontrol.ino:228-235 |
-| Sustained underheat (per tick) | `bPwmAutoSwitch`; not heat pump; `pidOutput > cold setpoint`; dt in (0, 60] s; mode PWM and ON phase; `flow < pidOutput - 3.0` (strict); accumulated >= 180 s | SATcontrol.ino:4951-4952, SATcycles.ino:986-1004, SATcycles.ino:30-31 |
+| Sustained underheat (per tick) | not heat pump; `pidOutput > cold setpoint`; dt in (0, 60] s; mode PWM and ON phase; `flow < pidOutput - 3.0` (strict); accumulated >= 180 s | SATcontrol.ino:4951-4952, SATcycles.ino:986-1004, SATcycles.ino:30-31 |
 | Sustained saturation (per tick) | Same gate as underheat; last computed off-time is 0 ms; accumulated >= 300 s | SATcycles.ino:1006-1020, SATcycles.ino:32 |
 | Manual command | `control_mode` "continuous"/1 or "auto"/0 (both set CONTINUOUS), while enabled and not tripped | SATcontrol.ino:2239-2241, SATcontrol.ino:2245-2247 |
 | SAT disabled or safety trip | `satDisable()` sets mode OFF | SATcontrol.ino:2160-2165 (call sites in the note below) |
@@ -1809,7 +1809,6 @@ CH command (SATcontrol.ino:4982-4983): `CH = 1 if finalSetpoint > 10 else 0`.
 | Geminox MM floor / Immergas MM cap | 10 / 80 | % | SATcontrol.ino:311-312 |
 | MM in the cold cutoff | 100 | % | SATcontrol.ino:4973 |
 | (removed in TASK-1332) `bForcePWM` default | false | - | SATtypes.h:465 |
-| `bPwmAutoSwitch` default | true | - | SATtypes.h:452 |
 | `bOvershootProtection` default | true | - | SATtypes.h:466 |
 | `fFlameOffOffset` default / allowed | 18.0 / 0 to 30 | °C | SATtypes.h:462, settingStuff.ino:1034 (search result) |
 | `fModSupDelay` default / allowed | 20 / 0 to 120 | s | SATtypes.h:455, settingStuff.ino:1014 (search result) |
@@ -2169,7 +2168,7 @@ This was not checked on a running device.
 #### 9. How cycle data feeds control decisions
 
 - **No PWM switch from the cycle verdict.** No code path reads `eLastCycleClass` to change the control mode. The callers of `satSetControlMode` are SATcycles.ino:980, SATcycles.ino:1001, SATcycles.ino:1017, SATcontrol.ino:2164, SATcontrol.ino:2241-2247, SATcontrol.ino:4918 and SATcontrol.ino:4924. The readers of `eLastCycleClass` are the auto-tune counters (SATcontrol.ino:4398-4413), the flame status rule `SHORT_CYCLING` (SATcontrol.ino:3649), and the MQTT, REST and debug outputs (SATcontrol.ino:2766-2768, SATcontrol.ino:3004-3008, restAPI.ino:1028-1039, networkStuff.ino:571, handleDebug.ino:233).
-- **Sustained-condition mode switch (`satCycleCheckAutoSwitch`, SATcycles.ino:944-1024).** Called on the control tick only when `satAlwaysMaxModulation()` is false and `pidOutput` > cold setpoint (SATcontrol.ino:4951-4953). It does nothing unless `bPwmAutoSwitch` (default true, SATtypes.h:452) and returns when the time since its previous call is <= 0 or > 60 s (SATcycles.ino:946-951). It compares flow with `requestedSetpoint` (SATcycles.ino:953-957):
+- **Sustained-condition mode switch (`satCycleCheckAutoSwitch`, SATcycles.ino:944-1024).** Called on the control tick only when `satAlwaysMaxModulation()` is false and `pidOutput` > cold setpoint (SATcontrol.ino:4951-4953). It always runs (no setting, removed in TASK-1341, Sergeant D entry 19) and returns when the time since its previous call is <= 0 or > 60 s (SATcycles.ino:946-951). It compares flow with `requestedSetpoint` (SATcycles.ino:953-957):
   - continuous: flow > requested + `fOvershootMargin`, outside the hot water guard, for 60 s in a row -> PWM (SATcycles.ino:969-984);
   - PWM OFF phase: underheat and saturation timers reset (SATcycles.ino:989-992);
   - PWM ON phase: flow < requested - 3 for 180 s -> continuous (SATcycles.ino:993-1004); PWM off-time 0 for 300 s -> continuous (SATcycles.ino:1010-1020).
@@ -3730,7 +3729,6 @@ Variable names are as in the code.
 | `fTargetTemp` (`SATtargettemp`) | 20.0 | °C | 5-30 | `SATtypes.h:441` | `settingStuff.ino:997` | `target` (handler) |
 | `iMaxRelModulation` (`SATmaxmodulation`) | 100 | % | 0-100 | `SATtypes.h:453` | `settingStuff.ino:1012` | `max_modulation` |
 | (removed in TASK-1332) `bForcePWM` (`SATforcepwm`) | false | - | bool | `SATtypes.h:465` | `settingStuff.ino:1038` | `force_pwm` |
-| `bPwmAutoSwitch` (`SATpwmautoswitch`) | true | - | bool | `SATtypes.h:452` | `settingStuff.ino:1011` | `pwm_auto_switch` |
 | `bOvershootProtection` (`SATovershootprotection`) | **true** | - | bool | `SATtypes.h:466` | `settingStuff.ino:1039` | `overshoot_protection` |
 | `fFlameOffOffset` (`SATflameoffset`) | 18.0 | °C | 0-30 | `SATtypes.h:462` | `settingStuff.ino:1034` | `flame_off_offset` |
 | `fModSupDelay` (`SATmodsupdelay`) | 20.0 | s | 0-120 | `SATtypes.h:455` | `settingStuff.ino:1014` | `mod_sup_delay` |

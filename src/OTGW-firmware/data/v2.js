@@ -2085,7 +2085,6 @@
     // TASK-1281: the explanation of this setting (formerly an inline 'help' block) lives in settings-help.json.
     satexternaltemp:     { cat: 'sat', label: 'Use MQTT/REST as indoor temp source' },
     satovershootmargin:  { cat: 'sat', label: 'Overshoot margin', hint: '°C' },
-    satpwmautoswitch:    { cat: 'sat', label: 'Auto PWM switch' },
     satboilercapacity:   { cat: 'sat', label: 'Boiler capacity', hint: 'kW' },
     satdhwcapacity:      { cat: 'sat', label: 'DHW capacity', hint: 'kW (0 = boiler capacity)' },
     satthermalcoeff:     { cat: 'sat', label: 'Thermal-drop coefficient' },
@@ -2157,7 +2156,7 @@
   ];
   var SAT_L3 = [
     ['Curve', ['satcoefficient', 'satdeadband', 'sattempstep', 'satovershootmargin']],
-    ['PID / PWM', ['satovershootprotection', 'satpwmautoswitch', 'satcyclesperhour', 'satautogains', 'satmaxmodulation',
+    ['PID / PWM', ['satovershootprotection', 'satcyclesperhour', 'satautogains', 'satmaxmodulation',
                    'satinterval', 'sathpcycle', 'satautotune', 'satautotunerate', 'satsolarfreezeint']],
     ['Offsets', ['satflameoffset', 'satflowoffset', 'satvalveoffset', 'satmodsupdelay', 'satmodsupoffset', 'satflushtreshold']],
     ['Boiler', ['satmanufacturer', 'satboilerratedkw', 'satboilerefficiency', 'satboilercapacity', 'satdhwcapacity',

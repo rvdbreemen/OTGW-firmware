@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.490
+**  Version  : v2.0.0-alpha.491
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -725,7 +725,6 @@ static const SatMqttCmdEntry kSatMqttCmds[] PROGMEM = {
   { "preset_home",            "SATpresethome",        nullptr },
   { "solar_gain",             "SATsolargain",         nullptr },
   { "window_detection",       "SATwindowdetect",      nullptr },
-  { "pwm_auto_switch",        "SATpwmautoswitch",     nullptr },
   { "sensor_max_age",         "SATsensormaxage",      nullptr },
   { "error_monitoring",       "SATerrormon",          nullptr },
   { "auto_gains_value",       "SATautogains",         nullptr },
@@ -2729,11 +2728,11 @@ bool doAutoConfigureMsgid(byte OTid, bool isFirst)
     if (streamClimateDiscovery(0, ctx)) result = true;
     if (streamClimateDiscovery(1, ctx)) result = true;
     ctx.device = HaDevice::Sat;
-    // TASK-516: idx 11 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
+    // TASK-516: idx 10 (dhw_enable) gated on MsgID 3 HB3=1 (storage tank).
     const bool dhwEnableSwitchAllowed =
         (OTcurrentSystemState.SlaveConfigMemberIDcode & 0x0800) != 0;
     for (uint8_t swIdx = 0; swIdx < SAT_HA_SWITCH_COUNT; swIdx++) {
-      if (swIdx == 11 && !dhwEnableSwitchAllowed) continue;
+      if (swIdx == 10 && !dhwEnableSwitchAllowed) continue;
       feedWatchDog();
       if (streamSatSwitchDiscovery(swIdx, ctx)) result = true;
     }
