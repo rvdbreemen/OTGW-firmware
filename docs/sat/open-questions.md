@@ -13,6 +13,11 @@ We check for an answer every hour and stay quiet while there is none. When a que
 has waited 12 hours and 3 or more other messages have pushed it out of view, we repeat
 it once, with a link to the original.
 
+On 2026-10-24 at 20:58 UTC Sergeant D got the full list Q2-Q28 as an overview
+([part 1](https://discord.com/channels/812969634638725140/1514720723980259460/1563656700118958262),
+[part 2](https://discord.com/channels/812969634638725140/1514720723980259460/1563656702086221987));
+he may answer any of them out of order ("Q12: ..."). The detailed questions still come one at a time.
+
 Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 **answered** (recorded as an entry), **dropped** (no longer needed, with the reason).
 
