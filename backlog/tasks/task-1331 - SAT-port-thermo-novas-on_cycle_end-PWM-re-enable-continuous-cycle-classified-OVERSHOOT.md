@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-23T19:43:00Z'
-updated_date: '2026-10-24T11:17:00Z'
+updated_date: '2026-10-24T21:45:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -44,4 +44,6 @@ From the TASK-1327 review: thermo-nova re-enables PWM in two ways after a disabl
 2026-10-24: working-tree change parked in git stash 'TASK-1331 blocked by review: per-sample setpoint needed (Q2-Q4)' (SATcycles.ino, SATcontrol.ino, tests/test_sat_cycle_end_switch.py, firmware-sat-spec.md, sat-comparison.md). Resume after Sergeant D answers Q2-Q4 (docs/sat/open-questions.md).
 
 2026-10-24: the parked stash predates TASK-1345 (and later 1341/1344): expect conflicts in SATcontrol.ino/SATcycles.ino on stash pop.
+
+2026-10-24 Sergeant D answered Q2 (entry 36: per-sample control setpoint first, option A) and Q3 (entry 37: margin 2.0, a cycle at exactly 2.0 counts as overshoot; the firmware's strict '>' in the overshoot timer SATcycles.ino:896 must become '>='). Q4 (classifier steps) asked again with detail. Resume after Q4.
 <!-- SECTION:NOTES:END -->

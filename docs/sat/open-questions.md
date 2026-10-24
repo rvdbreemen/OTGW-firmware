@@ -24,18 +24,18 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | # | Status | Topic | Blocks |
 |---|---|---|---|
 | Q1 | answered (entry 19: remove it) -> TASK-1341 | Keep the firmware's "PWM auto switch" setting at all? | nothing |
-| Q2 | asked 2026-10-24 09:25 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563483620444999771)) | End-of-cycle switch: compare the tail flow with the control setpoint per sample, as thermo-nova | TASK-1331 |
-| Q3 | queued | Overshoot margin 2.0 equals the flow offset 2.0 | TASK-1331 |
-| Q4 | queued | Classifier steps the firmware keeps that classifier.py does not have | TASK-1331 |
+| Q2 | answered (entry 36: yes, option A) -> TASK-1331 | End-of-cycle switch: compare the tail flow with the control setpoint per sample, as thermo-nova | TASK-1331 |
+| Q3 | answered (entry 37: 2.0, count >= 2.0) -> TASK-1331 | Overshoot margin 2.0 equals the flow offset 2.0 | TASK-1331 |
+| Q4 | asked again with more detail 2026-10-24 21:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563666347832119430)) | Classifier steps the firmware keeps that classifier.py does not have | TASK-1331 |
 | Q5 | dropped: decided by the maintainer 2026-10-24 (opt-in setting, default off; the fallback lives in state only) -> TASK-1345 | Fallback after an MQTT outage: which units may SAT take over? (audit #2) | - |
-| Q6 | queued | Room temperature lost or missing: stop SAT, or keep heating on curve + P as thermo-nova? Which stale time? (audit #4, entry 27, conflict C8) | - |
-| Q7 | queued | Outside temperature missing or old: what should SAT use? (audit #5) | - |
-| Q8 | queued | Heat pumps in PWM: minimum on-time and cycles per hour (audit #9, conflicts C3/C4) | - |
-| Q9 | queued | Continuous to PWM: 60 s or 3 minutes of overshoot? (audit #12, conflict C1) | - |
-| Q10 | queued | PID update rate: fixed 60 s as thermo-nova, or the control tick? (audit #14) | ADR-197 |
-| Q11 | queued | First PWM phase after PWM starts: ON at once (thermo-nova) or OFF? (audit #17) | - |
-| Q12 | queued | Hourly start cap: count hot-water ignitions or not? (audit #18) | - |
-| Q13 | queued | CS/MM/CH refresh: every 5 s as thermo-nova, or on change + 300 s? (audit #24) | ADR-199 |
+| Q6 | answered (entry 38: curve only, no P) -> TASK-1364 | Room temperature lost or missing: stop SAT, or keep heating on curve + P as thermo-nova? Which stale time? (audit #4, entry 27, conflict C8) | - |
+| Q7 | clarification asked 2026-10-24 21:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563666350818463826)); his OT-loss rule is entry 39 -> TASK-1365 | Outside temperature missing or old: what should SAT use? (audit #5) | - |
+| Q8 | answered (entry 40: min ON 180 s, cycle 1800/2400 s) -> TASK-1366 | Heat pumps in PWM: minimum on-time and cycles per hour (audit #9, conflicts C3/C4) | - |
+| Q9 | answered (entry 41: 60 s) -> TASK-1367 | Continuous to PWM: 60 s or 3 minutes of overshoot? (audit #12, conflict C1) | - |
+| Q10 | answered (entry 42: fixed 60 s) -> TASK-1368 | PID update rate: fixed 60 s as thermo-nova, or the control tick? (audit #14) | ADR-197 |
+| Q11 | answered (entry 43: ON first) -> TASK-1369 | First PWM phase after PWM starts: ON at once (thermo-nova) or OFF? (audit #17) | - |
+| Q12 | asked again with more detail 2026-10-24 21:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563666349450985620)) | Hourly start cap: count hot-water ignitions or not? (audit #18) | - |
+| Q13 | answered (entry 44: every update) -> TASK-1370 | CS/MM/CH refresh: every 5 s as thermo-nova, or on change + 300 s? (audit #24) | ADR-199 |
 | Q14 | queued | PWM ignition hold without a return temperature sensor (audit #27) | - |
 | Q15 | queued | Maximum flow setpoint: a user setting, and which defaults? (audit #29) | - |
 | Q16 | queued | Cycles per hour default and range (audit #30) | - |
