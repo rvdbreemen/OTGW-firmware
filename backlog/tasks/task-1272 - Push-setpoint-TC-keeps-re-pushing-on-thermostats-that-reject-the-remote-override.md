@@ -7,7 +7,7 @@ status: Done
 assignee:
   - '@claude'
 created_date: 2026-10-20 18:17
-updated_date: '2026-10-24T08:34:00Z'
+updated_date: '2026-10-24T09:27:00Z'
 labels:
   - sat
   - ux
@@ -53,6 +53,8 @@ First real SAT field run (gruijter, Intergas HReco 30 + Honeywell Round + PIC Cl
 2026-10-24 Sergeant D answered 'Yes' to option D (https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840), entry 16 names entry 14. Implementation in git stash 'TASK-1272 option D' can be committed.
 
 2026-10-24 evidence: tests/test_sat_push_setpoint.py (real helpers + satFollowThermostatDecide cut from SATcontrol.ino): HEAD 'FAILED (failures=7)' - a/g: TC= at 100, 400, 700 s with an unchanged target; d/h: adopted value pushed back (110:TC=21.5); x: dial-back case; e: no resend after push off/on; fix 9/9 OK (one TC= per target change, no push back, dial-back adopted). test_sat_follow_thermostat 35 OK, test_sat_cmd_cache 4 OK, test_sat_pwm_override 63 OK, hosttest_ch 0 failures, evaluate 0 fail; build.bat combo SUCCESS; bench OTA app: SAT active, no crashlog (no thermostat on the bench, so TC= behaviour is host-tested only). Review rounds: hybrid blocked (F1-F3), option D re-review no correctness bug; R1 (records) via entries 14/16 + this AC rewrite, R3 docs fixed (sat-comparison rows, manuals EN/NL, spec), R4 iLastSentTCMs removed and fTCAccounted merged into fLastSentTC, R5 test docstring + else-branch wiring + scenario x. AC1 docs: manuals and spec say TC= push works only on thermostats that accept a remote override and SAT does not re-push.
+
+2026-10-24 field check (gruijter, alpha.487, Honeywell Round, capture 20261024-110022): TC=19.5 pushed once at 11:01:17 after the target change, PIC TrOverride 19.50 from 11:01:39, thermostat keeps TrSet 15.00, PIC cancels -> TrOverride 0 at 11:04:29, no re-push afterwards (as designed, entry 16). The override flapping is gone; the Round simply refuses remote overrides. UI follow-up: TASK-1342.
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
