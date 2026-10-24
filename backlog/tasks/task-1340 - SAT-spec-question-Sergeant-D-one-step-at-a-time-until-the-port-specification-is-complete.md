@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T09:19:00Z'
-updated_date: '2026-10-24T10:05:00Z'
+updated_date: '2026-10-24T10:12:00Z'
 labels:
   - sat
   - spec
@@ -41,4 +41,6 @@ Maintainer directive 2026-10-24: unclear SAT behaviour is resolved interactively
 2026-10-24: cadence tightened by Robert: check hourly (silent), repeat after 12 h when 3+ other messages since. Cloud routine feasibility checked: see session.
 
 2026-10-24: cloud routine declined by Robert (bot token would have to live in the cloud environment). Loop stays local: hourly session cron.
+
+2026-10-24: SAT port audit done (docs/sat/sat-port-audit-2026-10-24.md, 69 findings: 9 high, 27 medium, 33 low, none critical). 16 of his statements recorded as entries 20-35 (quotes verified by script, 115/116 exact, 1 elided). Queue extended with Q5-Q18. High findings without a question: TASK-1344 (MM release), TASK-1345 (fallback), TASK-1346 (OT-Direct CH), TASK-1347 (wizard coefficient).
 <!-- SECTION:NOTES:END -->

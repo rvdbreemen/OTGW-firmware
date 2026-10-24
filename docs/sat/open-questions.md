@@ -22,9 +22,28 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q2 | asked 2026-10-24 09:25 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563483620444999771)) | End-of-cycle switch: compare the tail flow with the control setpoint per sample, as thermo-nova | TASK-1331 |
 | Q3 | queued | Overshoot margin 2.0 equals the flow offset 2.0 | TASK-1331 |
 | Q4 | queued | Classifier steps the firmware keeps that classifier.py does not have | TASK-1331 |
+| Q5 | queued | Fallback after an MQTT outage: which units may SAT take over, and for how long? (audit #2) | TASK-1345 |
+| Q6 | queued | Room temperature lost or missing: stop SAT, or keep heating on curve + P as thermo-nova? Which stale time? (audit #4, entry 27, conflict C8) | - |
+| Q7 | queued | Outside temperature missing or old: what should SAT use? (audit #5) | - |
+| Q8 | queued | Heat pumps in PWM: minimum on-time and cycles per hour (audit #9, conflicts C3/C4) | - |
+| Q9 | queued | Continuous to PWM: 60 s or 3 minutes of overshoot? (audit #12, conflict C1) | - |
+| Q10 | queued | PID update rate: fixed 60 s as thermo-nova, or the control tick? (audit #14) | - |
+| Q11 | queued | First PWM phase after PWM starts: ON at once (thermo-nova) or OFF? (audit #17) | - |
+| Q12 | queued | Hourly start cap: count hot-water ignitions or not? (audit #18) | - |
+| Q13 | queued | CS/MM/CH refresh: every 5 s as thermo-nova, or on change + 300 s? (audit #24) | - |
+| Q14 | queued | PWM ignition hold without a return temperature sensor (audit #27) | - |
+| Q15 | queued | Maximum flow setpoint: a user setting, and which defaults? (audit #29) | - |
+| Q16 | queued | Cycles per hour default and range (audit #30) | - |
+| Q17 | queued | DHW setpoint: SW= on change, slider bounded by MsgID 48 (audit #31, entry 33) | - |
+| Q18 | queued | Zones: follow area.py (max, no headroom, cap overshoot)? (audit #32, entry 35) | - |
 
-More questions follow from the SAT port audit of 2026-10-24
-([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)).
+Questions Q5 onwards come from the SAT port audit of 2026-10-24
+([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its
+finding numbers.
+
+Order: by audit priority. Q2-Q4 come first because TASK-1331 waits on them. The low-priority audit
+findings marked "SD?" are asked after these. Each question gets its full text, possible answers and
+our advice (with the thermo-nova citations opened again) only when it is asked.
 
 ## Q1. Keep the "PWM auto switch" setting?
 
