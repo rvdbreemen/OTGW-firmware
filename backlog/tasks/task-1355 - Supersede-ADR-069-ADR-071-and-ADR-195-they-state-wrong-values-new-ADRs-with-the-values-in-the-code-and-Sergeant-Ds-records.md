@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T16:44:00Z'
-updated_date: '2026-10-24T16:45:00Z'
+updated_date: '2026-10-24T17:03:00Z'
 labels:
   - adr
   - sat
@@ -28,5 +28,11 @@ Maintainer 2026-10-24: ADRs with wrong values are retired (superseded) and repla
 <!-- AC:BEGIN -->
 - [ ] #1 Three Proposed ADRs exist that supersede ADR-069, ADR-071 and ADR-195, each value cited and checked by a second reader against the code
 - [ ] #2 adr lint passes; the superseded links are recorded both ways after acceptance (acceptance needs Robert's explicit OK)
-- [ ] #3 The '<=' boundary question is queued in docs/sat/open-questions.md
+- [x] #3 The '<=' boundary question is queued in docs/sat/open-questions.md
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-24 workflow wf_615e59e8-3bf: ADR-197 (supersedes ADR-069), ADR-198 (ADR-071), ADR-199 (ADR-195) drafted by adr-kit generator, status Proposed, supersedes: [] until acceptance (adr supersede writes both sides at once). Second readers opened every citation: no core value refuted; omissions/citation slips found (ADR-197: 11 items) and fixed by the fix agents. ADR index regenerated (199 ADRs). bin/adr-lint: the 3 new ADRs complete; the only FAIL is pre-existing ADR-164 (missing sections). Q20 (cold boundary) queued. Acceptance needs Robert's explicit OK and the Open Questions resolved (several go to Sergeant D).
+<!-- SECTION:NOTES:END -->

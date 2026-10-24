@@ -6941,6 +6941,220 @@
         "supersedes": [],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-197",
+      "title": "SAT PID v3 controller (proposed successor to ADR-069)",
+      "path": "ADR-197-sat-pid-v3-controller-supersedes-adr-069.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-24",
+      "decision_summary": "The SAT PID follows thermo-nova pid.py at 7beaaf5 term by term (entry 28), implemented in src/OTGW-firmware/SATpid.in...",
+      "topics": [
+        "deadband",
+        "derivative",
+        "integral",
+        "pid",
+        "sat",
+        "thermo-nova"
+      ],
+      "aliases": [
+        "integral clamp",
+        "PID cadence",
+        "PID deadband",
+        "PID v3",
+        "pid.py",
+        "SAT PID"
+      ],
+      "components": [
+        "SAT PID controller"
+      ],
+      "symbols": [
+        "_pidCalculateGains",
+        "_pidUpdateDerivative",
+        "_pidUpdateIntegral",
+        "satPidError",
+        "satPidReset",
+        "satPidUpdate",
+        "satResetIntegral"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Keep the deadband at 0.1 °C by default, matching const.py:16.",
+          "Clamp the integral symmetrically to ± the heating curve value, as pid.py:192.",
+          "Set the integral to 0 outside the deadband, and freeze the derivative inside it.",
+          "Add Ki error 60 per integral update, as pid.py:191.",
+          "Derive the gains from the coefficient and the curve value on every update when bAutoGains is on.",
+          "Skip the whole integral update during solar gain when the freeze option is on.",
+          "Cite pid.py and the entry number for any change to the PID; follow ADR-196 for conflicts."
+        ],
+        "must_not": [
+          "Clamp the integral to [0, curve].",
+          "Accumulate the integral outside the deadband (reverted TASK-8, entry 28).",
+          "Change the PID to fight sensor noise; filter the sensor instead (entry 28).",
+          "Claim that the PID is independent of the control interval while it runs on the control tick."
+        ],
+        "exceptions": [
+          "The firmware-only differences listed under Open Questions stay in the code until Sergeant D decides them. They are recorded, not decided, by this ADR."
+        ],
+        "verification": [
+          "python tests/testsatpwmoverride.py compiles the real pidUpdateIntegral() from SATpid.ino and checks the solar freeze path (TASK-1323). No host test exercises the rest of satPidUpdate() (gains, clamp, derivative, cadence).",
+          "The test is not run in CI. This ADR claims no gate.",
+          "Every value in this ADR was read from the code at 2d01d3297 and from thermo-nova pid.py, const.py, climate.py, helpers.py and temperature/state.py in this session. A second reader checked them on 2026-10-24 and refuted no core value; the..."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-198",
+      "title": "SAT heating curve (proposed successor to ADR-071)",
+      "path": "ADR-198-sat-heating-curve-supersedes-adr-071.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-24",
+      "decision_summary": "SAT keeps thermo-nova's convex heating curve with one user coefficient, default 2.0, and a base offset chosen by the...",
+      "topics": [
+        "heating-curve",
+        "sat",
+        "thermo-nova",
+        "weather-compensation"
+      ],
+      "aliases": [
+        "base offset",
+        "curve coefficient",
+        "heating curve",
+        "heating curve coefficient",
+        "heating curve slope",
+        "satcoefficient"
+      ],
+      "components": [
+        "SAT heating curve"
+      ],
+      "symbols": [
+        "fHeatingCurveCoeff",
+        "fHeatingCurveValue",
+        "satCalcHeatingCurve",
+        "satGetBaseOffset",
+        "satGetEffectiveHeatingSystem"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Compute the curve with thermo-nova's formula and its fixed constants 4, 0.03, 0.4 and reference 20 (heatingcurve.py:28-39).",
+          "Take the base offset from the heating system alone: 27.2 radiators (and AUTO), 20.0 underfloor (entries 3 and 30).",
+          "Default the coefficient to 2.0 and keep a stored coefficient across upgrades (entry 24).",
+          "Cite thermo-nova heatingcurve.py, not OT-Thing, as the origin of the formula."
+        ],
+        "must_not": [
+          "Turn the polynomial constants or the base offsets into user settings (entry 3).",
+          "Let the device type (heat pump) change the base offset (entry 30).",
+          "Migrate a stored coefficient to the new default (entry 24).",
+          "Describe the port as exact while the differences in point 5 remain."
+        ],
+        "exceptions": [],
+        "verification": [
+          "python tests/testsatwizardcoefficient.py checks the 2.0 default in SATtypes.h and that the wizard keeps a stored coefficient. It is a source check and does not run the wizard. Run on 2026-10-24: 4 tests, OK.",
+          "No test calls satCalcHeatingCurve(). No file under tests/ contains satCalcHeatingCurve. A case-sensitive grep of tests/ for satCalcHeatingCurve or HeatingCurve finds only tests/testsatwizardcoefficient.py; a case-insensitive grep also fi...",
+          "No CI gate. This ADR claims none."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
+    },
+    {
+      "id": "ADR-199",
+      "title": "SAT cold state and CH-enable rule (supersedes ADR-195)",
+      "path": "ADR-199-sat-cold-state-and-ch-enable-rule-supersedes-adr-195.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-24",
+      "decision_summary": "While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev...",
+      "topics": [
+        "ch-enable",
+        "cold-setpoint",
+        "opentherm",
+        "pwm",
+        "sat"
+      ],
+      "aliases": [
+        "CH enable bit",
+        "CH rule during PWM",
+        "cold boundary",
+        "cold cutoff",
+        "COLD_SETPOINT",
+        "per-system cold setpoint"
+      ],
+      "components": [
+        "SAT CH enable rule",
+        "SAT cold cutoff"
+      ],
+      "symbols": [
+        "satChEnableDecide",
+        "satColdCutoff",
+        "satControlLoopRun",
+        "satCycleResetSustainGuards",
+        "satDisable",
+        "satEnqueueIfChangedCH",
+        "satGetColdSetpoint",
+        "satPwmDisableOnHeaterOff",
+        "satPwmFlameOffHold"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Use satGetColdSetpoint() (28.2 radiators, 21.0 underfloor) at every ported site where thermo-nova's heatingcontrol.py or cycles/classifier.py uses COLDSETPOINT (Decision point 1), and at any area.py or device/status.py site that is porte...",
+          "Compare through satColdCutoff only, so the boundary changes in one place when Q20 is answered.",
+          "On the cutoff and on all valves closed: CS=10, CH=0, MM at the configured maximum, and satPwmDisableOnHeaterOff().",
+          "Queue the CH bit only from the paths in the table of Decision point 2.",
+          "Send SAT's CS through satEnqueueOwnCS (ADR-179)."
+        ],
+        "must_not": [
+          "Turn the cold setpoints into user settings, or reintroduce the global 22 at a COLDSETPOINT site. Not covered: the literal satGetFlowTemp() < 22.0f that labels the published sat/modulationstate \"COLD\" (SATcontrol.ino:3255). It is not a CO...",
+          "Clear CH during the PWM ON phase because the flame-keeping CS is low.",
+          "Derive CH from the sent CS in the main control block.",
+          "Record the <= boundary as decided by Sergeant D before he answers Q20.",
+          "Change the CH part of the SAT-disabled release (CS=0, then CH=1; TASK-1346). The MM=T release belongs to TASK-1344 (In Progress) and is not fixed by this ADR."
+        ],
+        "exceptions": [
+          "None."
+        ],
+        "verification": [
+          "python tests/testsatpwmoverride.py: ran 2026-10-24 in this session, 70 tests, OK. It compiles the real PWM block of SATcontrol.ino (including satPwmReset() and satPwmDisableOnHeaterOff()) and checks the cutoff and closed-valves resets. I...",
+          "tests/testsatchenable.cpp compiles the real SATchEnable.h and checks the boundary at exactly 28.2 and 21.0, the PWM phases and continuous mode. Not run for this ADR: no g++ on this host.",
+          "Neither test runs in CI. No test checks that CH is queued only from the listed paths; that list was built by reading satControlLoopRun() and satDisable() and by a grep of src/OTGW-firmware/.ino for CH= (2026-10-24)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": false,
+        "verified_in": [],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -12383,6 +12597,138 @@
     {
       "source": "ADR-196",
       "target": "ADR-195",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-197",
+      "target": "ADR-069",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-197",
+      "target": "ADR-071",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-197",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-197",
+      "target": "ADR-085",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-197",
+      "target": "ADR-195",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-197",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-069",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-071",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-085",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-110",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-195",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-196",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-197",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-198",
+      "target": "ADR-199",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-199",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-199",
+      "target": "ADR-085",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-199",
+      "target": "ADR-110",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-199",
+      "target": "ADR-150",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-199",
+      "target": "ADR-179",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-199",
+      "target": "ADR-195",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-199",
+      "target": "ADR-196",
       "type": "related",
       "resolved": true
     }

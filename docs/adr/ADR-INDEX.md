@@ -202,3 +202,6 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-194 | Accepted | - | Static text assets that users never need to upload may be compiled into the firmware image and served or read from PR... |
 | ADR-195 | Accepted | - | While SAT is the active controller, one per-heating-system cold setpoint stands in for thermo-nova's COLDSETPOINT 22... |
 | ADR-196 | Accepted | - | For every statement or change about SAT behaviour the sources rank in this order, and a higher source wins over a low... |
+| ADR-197 | Proposed | - | The SAT PID follows thermo-nova pid.py at 7beaaf5 term by term (entry 28), implemented in src/OTGW-firmware/SATpid.in... |
+| ADR-198 | Proposed | - | SAT keeps thermo-nova's convex heating curve with one user coefficient, default 2.0, and a base offset chosen by the... |
+| ADR-199 | Proposed | - | While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev... |
