@@ -3,9 +3,11 @@ id: TASK-1331
 title: >-
   SAT: port thermo-nova's on_cycle_end PWM re-enable (continuous cycle
   classified OVERSHOOT)
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@claude'
 created_date: '2026-10-23T19:43:00Z'
+updated_date: '2026-10-23T23:43:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -22,6 +24,12 @@ From the TASK-1327 review: thermo-nova re-enables PWM in two ways after a disabl
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 thermo-nova on_cycle_end path traced with citations and the difference with the firmware recorded
+- [x] #1 thermo-nova on_cycle_end path traced with citations and the difference with the firmware recorded
 - [ ] #2 Sergeant D's decision recorded in docs/sat/sergeant-d-corrections.md; implemented with a host test (red/green) if he agrees
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-24 research (read-only opus agent, every thermo-nova location opened at the pinned commit): on_cycle_end trace: heating_control.py:167 subscribes EVENT_SAT_CYCLE_ENDED -> pwm.on_cycle_end; tracker.py:74-81 builds the cycle at flame off, control_mode = PWM if pwm enabled else CONTINUOUS (:129), tail = last 180 s from start+min(60 s,25%) (:113-119); classifier.py:69-90 continuous: tail p90 of (flow - per-sample control setpoint) >= 3.0 (cycles/const.py:10) -> OVERSHOOT; pwm.py:219-223 CONTINUOUS+OVERSHOOT -> enable(); pwm.py:225-227 PWM+UNDERHEAT -> disable() (also unported). No min length, cooldown or cold check in on_cycle_end. Firmware: no cycle-end mode switch (satSetControlMode callers SATcycles.ino:987/1008/1024, SATcontrol.ino:1076/2310/2388-2394/5074); classifier differs (margin 2.0 vs 3.0, SHORT before OVERSHOOT, overshootSec>10 gate, one setpoint per cycle, no DHW-in-tail UNCERTAIN, OVERSHOOT in both modes). Blockers before porting: the tail-sort out-of-bounds bug (new task) and the hook must test SAT_MODE_CONTINUOUS explicitly (OFF exists in the firmware). Entries 8/10/11/12/13: no conflict. Discord question to Sergeant D drafted (4 questions: port which branches, margin 2.0 vs 3.0, gate on PWM auto switch, align classifier first).
+<!-- SECTION:NOTES:END -->

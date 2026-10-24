@@ -523,15 +523,15 @@ static float _tailPercentile(uint8_t pct)
   if (_tail_sampleCount == 0) return 0.0f;
 
   float sorted[SAT_TAIL_SAMPLE_SIZE];
-  uint8_t n = _tail_sampleCount;
-  for (uint8_t i = 0; i < n; i++) {
-    uint8_t src = (_tail_sampleHead + SAT_TAIL_SAMPLE_SIZE - n + i) % SAT_TAIL_SAMPLE_SIZE;
+  uint16_t n = _tail_sampleCount;
+  for (uint16_t i = 0; i < n; i++) {
+    uint16_t src = (_tail_sampleHead + SAT_TAIL_SAMPLE_SIZE - n + i) % SAT_TAIL_SAMPLE_SIZE;
     sorted[i] = _tail_samples[src];
   }
 
-  for (uint8_t i = 1; i < n; i++) {
+  for (uint16_t i = 1; i < n; i++) {
     float key = sorted[i];
-    int8_t j = (int8_t)i - 1;
+    int16_t j = (int16_t)i - 1;
     while (j >= 0 && sorted[j] > key) {
       sorted[j + 1] = sorted[j];
       j--;
@@ -539,7 +539,7 @@ static float _tailPercentile(uint8_t pct)
     sorted[j + 1] = key;
   }
 
-  uint8_t idx = (uint8_t)((uint16_t)pct * (n - 1) / 100);
+  uint16_t idx = (uint16_t)((uint32_t)pct * (n - 1) / 100);
   if (idx >= n) idx = n - 1;
   return sorted[idx];
 }
