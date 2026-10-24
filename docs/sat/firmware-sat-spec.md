@@ -263,7 +263,7 @@ At the first computed update, the restored values are used as follows:
 **E3. First control tick.** The first tick comes one interval after `initSAT()` restarted the timer (default 30 s, `SATcontrol.ino:3719`, `SATtypes.h:444`), provided the pass reaches the timer check at that time. In order (`SATcontrol.ino:4616-5018`):
 
 1. Set SAT active; if the mode is OFF, set it to CONTINUOUS (`SATcontrol.ino:4616-4619`).
-2. **DHW check.** DHW is active when slave status bit 2 is set (or a simulated DHW draw runs) (`SATcontrol.ino:4625-4629`). Power and energy are updated first (`SATcontrol.ino:4632-4633`). While DHW is active the tick sends `SW=` once on DHW entry (only with DHW control enabled and a valid DHW setpoint), publishes, and stops. CS, MM and CH are not touched and the PID does not run (`SATcontrol.ino:4635-4652`).
+2. **DHW check.** DHW is active when slave status bit 2 is set (or a simulated DHW draw runs) (`SATcontrol.ino:4625-4629`). Power and energy are updated first (`SATcontrol.ino:4632-4633`). While DHW is active the tick sends `SW=` once on DHW entry (only with DHW control enabled and a valid DHW setpoint), publishes, and stops. CS, MM and CH are not touched and the PID does not run (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`).
 3. Read room, outside and target temperature (`SATcontrol.ino:4656-4658`).
 4. **Room temperature check.** If it is NAN or outside -10 to 50 °C, count a skip and stop. After 10 consecutive skips, set the safety trip and call `satDisable()` (`SATcontrol.ino:4669-4683`, `SATcontrol.ino:68`). A valid reading resets the count (`SATcontrol.ino:4684`).
 5. **Room low-pass filter** with time constant 45 s. The first valid reading seeds the filter; later ticks move toward the raw value (`SATcontrol.ino:4694-4713`).
@@ -279,7 +279,7 @@ At the first computed update, the restored values are used as follows:
 15. Compute the control setpoint for the active mode (`SATcontrol.ino:4928-4933`), clamp it again (`SATcontrol.ino:4936-4937`) and remember it as the last control setpoint (`SATcontrol.ino:4939`). There is no solar subtraction on the control setpoint any more (moved to step 13, TASK-1323).
 16. Auto-switch check between continuous and PWM, only when the PID output is above the cold setpoint and the source is not a heat pump (`SATcontrol.ino:4951-4953`).
 17. Compute the modulation value (`SATcontrol.ino:4960-4967`).
-18. **Cold cutoff:** if the requested setpoint is at or below the cold setpoint (`satColdCutoff()`, `<=` like the PWM gate in `satApplyPWM()` and thermo-nova `heating_control.py:72` / `:385`; TASK-1323) (28.2 °C radiators, 21 °C underfloor), the setpoint becomes 10 °C and the modulation 100 (`SATcontrol.ino:4971-4975`, `SATcontrol.ino:55-56`, `SATcontrol.ino:264-268`). The cutoff also disables PWM, as thermo-nova's heater-OFF branch does (`pwm.disable()`, `heating_control.py:230`, `pwm.py:106-109`; control setpoint reset to `MINIMUM_SETPOINT`, `heating_control.py:233`): `satPwmDisableOnHeaterOff()` (also called in the valves-closed early return, thermo-nova `heating_control.py:69-70`) always leaves PWM mode (TASK-1332, Sergeant D entry 13) (thermo-nova's `control_mode` is CONTINUOUS while PWM is not enabled, `heating_control.py:148-152`; PWM returns through the overshoot paths, `heating_control.py:304`, mirrored by `satCycleCheckAutoSwitch()`; the `on_cycle_end()` re-enable of `pwm.py:219-223` is not ported; summer simmer does not call the helper), resets the PWM phase, ignition wait and hold (`satPwmReset()`), clears the sustained overshoot/underheat/saturation timers (`_reset_pwm_disable_guards`, `heating_control.py:231`, `:525-528`; `satCycleResetSustainGuards()`), sets the modulation to the maximum relative modulation (`heating_control.py:234`) and sets the held "previous CS" to 10, so a later PWM tick without an override cannot return the pre-cutoff value (TASK-1327; Sergeant D 2026-10-23, `docs/sat/sergeant-d-corrections.md` entry 12). thermo-nova never reads its `force_pulse_width_modulation` option (`entry_data.py:223` is its only use), so the firmware option had no counterpart there and was removed.
+18. **Cold cutoff:** if the requested setpoint is at or below the cold setpoint (`satColdCutoff()`, `<=` like the PWM gate in `satApplyPWM()` and thermo-nova `heating_control.py:72` / `:385`; TASK-1323) (28.2 °C radiators, 21 °C underfloor), the setpoint becomes 10 °C and the modulation the configured maximum (corrected 2026-10-24, TASK-1351) (`SATcontrol.ino:5206-5214`, `SATcontrol.ino:130-131`, `SATcontrol.ino:339-343`). The cutoff also disables PWM, as thermo-nova's heater-OFF branch does (`pwm.disable()`, `heating_control.py:230`, `pwm.py:106-109`; control setpoint reset to `MINIMUM_SETPOINT`, `heating_control.py:233`): `satPwmDisableOnHeaterOff()` (also called in the valves-closed early return, thermo-nova `heating_control.py:69-70`) always leaves PWM mode (TASK-1332, Sergeant D entry 13) (thermo-nova's `control_mode` is CONTINUOUS while PWM is not enabled, `heating_control.py:148-152`; PWM returns through the overshoot paths, `heating_control.py:304`, mirrored by `satCycleCheckAutoSwitch()`; the `on_cycle_end()` re-enable of `pwm.py:219-223` is not ported; summer simmer does not call the helper), resets the PWM phase, ignition wait and hold (`satPwmReset()`), clears the sustained overshoot/underheat/saturation timers (`_reset_pwm_disable_guards`, `heating_control.py:231`, `:525-528`; `satCycleResetSustainGuards()`), sets the modulation to the maximum relative modulation (`heating_control.py:234`) and sets the held "previous CS" to 10, so a later PWM tick without an override cannot return the pre-cutoff value (TASK-1327; Sergeant D 2026-10-23, `docs/sat/sergeant-d-corrections.md` entry 12). thermo-nova never reads its `force_pulse_width_modulation` option (`entry_data.py:223` is its only use), so the firmware option had no counterpart there and was removed.
 19. **Send** CS, MM and CH through the write-on-change helpers; CH follows `satChEnableDecide()` (`SATchEnable.h`, TASK-1323; Sergeant D 2026-10-23: "If the requested setpoint is lower than the thresholds then we send CH=0 CS=10"; thermo-nova uses COLD_SETPOINT 22): `CH=0` when the requested setpoint is at or below the cold setpoint (the cold cutoff, CS=10) or when PWM drives the CS and the PWM phase is OFF (CS=10); otherwise `CH=1`. That includes the PWM ON phase whatever low CS is sent, continuous mode, and a PWM tick that keeps the previous CS (overshoot protection off, DHW active, no flow temperature) while the requested setpoint is above the cold setpoint, for example a held CS of 24 on radiators with a requested 30 gives `CH=1`. The CH bit does not depend on the sent CS value. Immergas also gets `TP=11:12=<setpoint>` on every tick (`SATcontrol.ino:4986-4990`). With "push setpoint" on, `TC=<target>` is sent (`SATcontrol.ino:4992-4994`). Without a command interface, count a PIC failure; after 5, set the safety trip and disable (`SATcontrol.ino:4996-5004`, `SATcontrol.ino:69`).
 20. Record the tick time; save the PID state when 300 s passed since the last save (`SATcontrol.ino:5007-5012`). The last-save time starts at 0 (`SATcontrol.ino:1989`), so the first save happens on the first full tick after 300 s of uptime.
 21. Publish the SAT MQTT topics (`SATcontrol.ino:5018`).
@@ -429,8 +429,9 @@ bAutoGains off:           kp, ki, kd = fKpManual, fKiManual, fKdManual (defaults
 **PID terms** (`SATpid.ino:149-246`, `SATpid.ino:297-309`):
 
 ```
-I: if |error| > fDeadband: integral = 0
-   else if ki >= 1e-9 and solar gain not active:
+I: if solar gain active and bSolarFreezeIntegral: no change (no reset, no accumulation)   SATpid.ino:157, (corrected 2026-10-24, TASK-1351)
+   else if |error| > fDeadband: integral = 0
+   else if ki >= 1e-9:
         integral += ki * error * 60
         integral = clamp(integral, -curveValue, +curveValue), then clamp(integral, -20, +20)
 D: dt = (time the current room value first appeared) - (time of the derivative reference)
@@ -450,7 +451,7 @@ output = curveValue + P + I + D        (not rounded)
 pidOutput = clamp(pidOutput, 10, maxSetpoint)
 pidOutput = pidOutput - fSolarSetpointOffset (solar gain active and enabled), before the clamp above (TASK-1323)
 finalSetpoint = clamp(mode result, 10, maxSetpoint)
-if pidOutput <= coldSetpoint (28.2 radiators, 21 underfloor): finalSetpoint = 10, MM = 100
+if pidOutput <= coldSetpoint (28.2 radiators, 21 underfloor): finalSetpoint = 10, MM = iMaxRelModulation, PWM left   (corrected 2026-10-24, TASK-1351)
 CH = 0 if the cold cutoff fired or PWM drives the CS in its OFF phase, else 1   (satChEnableDecide, SATchEnable.h)
 ```
 
@@ -585,7 +586,7 @@ else: control = max(pidOutput, Tboiler - fFlowOffset)        (fFlowOffset defaul
 7. **No room temperature source.** `Tr` starts as NAN (`OTGW-Core.h:79`). Without BLE, external, multi-area or a thermostat `Tr`, every tick counts a skip and the 10th sets the safety trip, sends `CS=0` and stops SAT until it is re-enabled (`SATcontrol.ino:4669-4683`, `SATcontrol.ino:2179`). At 30 s that is 300 s after the first tick.
 8. **No outside temperature source.** The OT value starts as 0.0 and is used as 0 °C (`OTGW-Core.h:82`, `SATcontrol.ino:1302`). The weather value is used instead only when it is valid and the OT value is exactly 0.0 (`SATcontrol.ino:1299-1300`).
 9. **Flame already burning when SAT starts.** The first enabled pass that sees the flame bit starts a new cycle there, and the PWM suppression hold counts from that moment (`SATcontrol.ino:4592-4596`, `SATcycles.ino:701-714`, `SATcontrol.ino:720-723`).
-10. **DHW active.** The tick stops before reading inputs, so the PID and the room filter are not updated and CS, MM, CH are not sent (`SATcontrol.ino:4635-4652`). The PIC keepalive keeps running on every pass (`SATcontrol.ino:4608`).
+10. **DHW active.** The tick stops before reading inputs, so the PID and the room filter are not updated and CS, MM, CH are not sent (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`). The PIC keepalive keeps running on every pass (`SATcontrol.ino:4608`).
 11. **Boiler fault flag.** The tick stops after the room filter update and before the PID (`SATcontrol.ino:4694-4719`).
 12. **Firmware or PIC flash running.** The main loop does not call `satControlLoop()` at all (`OTGW-firmware.ino:1132`, `OTGW-firmware.ino:1157`).
 13. **Runtime enable after a long disable.** No `PM=` commands; the first tick comes at once or one interval later, depending on how old the timer's due time is (`safeTimers.h:181-189`).
@@ -640,7 +641,7 @@ There is one main PID with its own internal state held in file-level static vari
 | Heating system type | `satGetEffectiveHeatingSystem()`: the setting, with AUTO mapped to radiators | SATcontrol.ino:194-201, SATtypes.h:438 |
 | Gains config | `settings.sat.bAutoGains`, `fKpManual`, `fKiManual`, `fKdManual`, `fHeatingCurveCoeff` | SATpid.ino:120-142, SATtypes.h:442, SATtypes.h:518-521 |
 | Deadband | `settings.sat.fDeadband`, a setting (not a constant) | SATpid.ino:151, SATpid.ino:189, SATtypes.h:443 |
-| Freeze flag | `state.sat.bSolarGainActive` | SATpid.ino:163 |
+| Freeze flag | `state.sat.bSolarGainActive` and `settings.sat.bSolarFreezeIntegral` (corrected 2026-10-24, TASK-1351) | SATpid.ino:157 |
 | `boilerTemp` argument | `satGetFlowTemp()` is passed in, but `satPidUpdate` never reads it (see "Not found / unclear") | SATcontrol.ino:4839, SATpid.ino:251-320 |
 
 Differs from thermo-nova: the room temperature passes an extra EMA filter before the PID (SATcontrol.ino:4686-4693 states the reason in a comment). Thermal comfort (Summer Simmer index) only applies when the room temperature comes from the OT Tr path, because the BLE, multi-area and external sources return earlier (SATcontrol.ino:1208-1231, SATcontrol.ino:1264-1270).
@@ -678,7 +679,7 @@ The PID is not called on every tick. The control tick returns before `satPidUpda
 1. SAT disabled or a flash update running (SATcontrol.ino:4568-4573).
 2. Safety trip latched (SATcontrol.ino:4581).
 3. Timer not due (SATcontrol.ino:4614).
-4. DHW active (SATcontrol.ino:4635-4652).
+4. DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]).
 5. Room temperature invalid (`NaN`, below -10 or above 50); after 10 consecutive invalid ticks SAT trips and disables (SATcontrol.ino:4669-4683, SATcontrol.ino:68).
 6. Boiler fault flag (OT status bit 0) set (SATcontrol.ino:4716-4719).
 7. Thermal estimation fallback longer than 2 h: a fixed 45 C setpoint is sent instead (SATcontrol.ino:4730-4746, SATcontrol.ino:82-83).
@@ -774,7 +775,7 @@ Differs from thermo-nova: there the output is recomputed on each read. Here noth
 5. `satApplyPWM(pidOutput)` or `satApplyContinuous(pidOutput)` produces `finalSetpoint` (SATcontrol.ino:4927-4933). These belong to the PWM and heating control sections.
 6. `finalSetpoint` is clamped again to [10.0, max] (SATcontrol.ino:4935-4937).
 7. Solar gain active and enabled: `fSolarSetpointOffset` (default 2.0, SATtypes.h:496) is subtracted from the requested setpoint BEFORE the clamp in step 3 and the control mode step, as thermo-nova does (`climate.py:391-392`; TASK-1323). It is no longer subtracted from `finalSetpoint` afterwards, so the PWM hold and the suppression CS carry no solar term.
-8. Cold setpoint cut-off: if `pidOutput <= satGetColdSetpoint()` (28.2 radiators, 21.0 underfloor), `finalSetpoint = 10.0` and modulation 100 (SATcontrol.ino:4969-4975, SATcontrol.ino:55-56).
+8. Cold setpoint cut-off: if `pidOutput <= satGetColdSetpoint()` (28.2 radiators, 21.0 underfloor), `finalSetpoint = 10.0`, modulation `iMaxRelModulation` and PWM left (SATcontrol.ino:5206-5214, SATcontrol.ino:1100-1109, SATcontrol.ino:130-131) (corrected 2026-10-24, TASK-1351).
 
 There is no ECO / COMFORT branch in this path. The setting `iHeatingMode` exists (SATtypes.h:524, settingStuff.ino:1104), but in the SAT files it is only read for publishing (SATcontrol.ino:2533, SATcontrol.ino:2978). See "Not found / unclear".
 
@@ -807,8 +808,9 @@ Variable names as in the code.
 **Proportional term** (SATpid.ino:297): `P = fKp * error`, no rounding.
 
 **Integral term** (SATpid.ino:154-178, SATpid.ino:298):
-- if `fabsf(error) > deadband`: `_pid_integral = 0.0`
-- else, if `fKi >= 1e-9` and solar gain is not active: `_pid_integral = clamp(clamp(_pid_integral + fKi * error * 60, -curveValue, +curveValue), -20, +20)`
+- if `state.sat.bSolarGainActive && settings.sat.bSolarFreezeIntegral`: return, nothing changes (SATpid.ino:157) (corrected 2026-10-24, TASK-1351); TASK-1323
+- else if `fabsf(error) > deadband`: `_pid_integral = 0.0`
+- else, if `fKi >= 1e-9`: `_pid_integral = clamp(clamp(_pid_integral + fKi * error * 60, -curveValue, +curveValue), -20, +20)`
 - `I = _pid_integral`
 
 **Derivative term** (SATpid.ino:208-246, SATpid.ino:299):
@@ -983,7 +985,7 @@ Computed from the code: when zones are active, each zone step calls `satCalcHeat
 1. **No heating curve value.** The firmware always computes a curve value; there is no "no value" branch (SATcontrol.ino:485-500). An outside temperature outside -40 to 50 is replaced by 10.0 before the curve (SATcontrol.ino:4721-4723).
 2. **Error exactly 0.1.** The error is rounded to 3 decimals so that 0.1 stays inside the band (SATpid.ino:58-66). The integral uses `>` to reset and the derivative uses `<=` to hold (SATpid.ino:154, SATpid.ino:199).
 3. **Error leaves the band.** The integral drops to 0 on the next real update (SATpid.ino:154-157). There is no gradual decay.
-4. **Frozen integral with a large error.** The zeroing runs before the freeze check, so the integral is set to 0 even while frozen (SATpid.ino:154-163). This differs from thermo-nova.
+4. **Frozen integral with a large error.** The freeze check runs before the deadband test, so while solar gain is active and `bSolarFreezeIntegral` is on the integral keeps its value even outside the deadband, as thermo-nova does (SATpid.ino:157-163; pid.py:167-168, pid.py:187-189) (corrected 2026-10-24, TASK-1351); TASK-1323, entry 11 answer 3.
 5. **Integral clamp moves with the curve.** The ±curveValue limit is applied only during an in-band accumulation (SATpid.ino:166-173).
 6. **Derivative inside the band.** `_pid_rawDerivative` is held, so D keeps its last value while the error is within the deadband (SATpid.ino:199-204, SATpid.ino:299).
 7. **Room temperature unchanged.** A change below 0.001 moves the timestamp and reference and keeps `_pid_rawDerivative` (SATpid.ino:208-213).
@@ -1038,7 +1040,7 @@ The firmware works out a boiler flow temperature in the same three layers, but a
 2. **Requested setpoint.** There is no separate function for it. It is the local variable `pidOutput`: the curve plus the PID correction (SATcontrol.ino:4839, SATpid.ino:309), optionally replaced by a multi-zone aggregate (SATcontrol.ino:4846-4899), then clamped to [10, effective maximum] (SATcontrol.ino:4908-4912).
 3. **Control setpoint.** What is sent to the boiler as `CS=`. It is derived from `pidOutput` by the continuous rule or the PWM override (SATcontrol.ino:4928-4933), clamped again (SATcontrol.ino:4936-4937) and forced to 10 °C by the cold-setpoint cutoff; solar gain lowers `pidOutput` before this (TASK-1323), not the control setpoint (SATcontrol.ino:4971-4975).
 
-The order inside one tick is: curve, PID, zone override, clamp, mode (continuous or PWM), final clamp, solar reduction, cold cutoff, send (SATcontrol.ino:4836, 4839, 4846-4899, 4908-4912, 4929-4933, 4936-4937, 4942-4945, 4971-4975, 4978-4994). Note that the solar reduction is applied to the control setpoint after the mode, not to the requested setpoint (SATcontrol.ino:4939-4945).
+The order inside one tick is: curve, PID, zone override, solar reduction, clamp, mode (continuous or PWM), final clamp, auto-switch, modulation, cold cutoff, send (SATcontrol.ino:5137-5143, 5145-5152, 5162-5176, 5178-5183, 5188-5190, 5196-5204, 5206-5214, 5216-5223). The solar reduction is applied to the requested setpoint before the clamp, as in thermo-nova (climate.py:391-394) (corrected 2026-10-24, TASK-1351); TASK-1323.
 
 This section covers layers 1 and 2 and the continuous-mode part of layer 3. The PWM override is only summarised (see "Cross-reference: PWM override").
 
@@ -1103,7 +1105,7 @@ The curve is recalculated on every control tick that passes the early-exit gates
 
 The curve is **not** recalculated, and `state.sat.fHeatingCurveValue` keeps its old value, on ticks that return early:
 
-- DHW active (SATcontrol.ino:4635-4652);
+- DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]);
 - room temperature invalid (SATcontrol.ino:4669-4683);
 - boiler fault flag set (SATcontrol.ino:4716-4719);
 - thermal safe fallback active (SATcontrol.ino:4730-4746);
@@ -1129,7 +1131,7 @@ The PID is called on every tick that reaches it (SATcontrol.ino:4839). There is 
 3. If less than 10 s passed since the last update, the previous output is returned (SATpid.ino:21, SATpid.ino:276-280).
 4. If the error changed by less than 0.001 and less than 60 s passed, the previous output is returned (SATpid.ino:282-285). That previous output contains the previous curve value (SATpid.ino:309-310). So a new curve value is only picked up when the error changes, or at least 60 s after the last update.
 5. Gains are recomputed from the current curve value (SATpid.ino:288, SATpid.ino:120-142).
-6. The integral and the derivative are updated (SATpid.ino:291-294). The integral is frozen while solar gain is active (SATpid.ino:163).
+6. The integral and the derivative are updated (SATpid.ino:291-294). The integral update is skipped entirely, reset included, while solar gain is active and `bSolarFreezeIntegral` is on (SATpid.ino:157) (corrected 2026-10-24, TASK-1351); TASK-1323.
 7. Output = curve + P + I + D, not rounded (SATpid.ino:297-310).
 
 PID internals belong to the PID section. In short: with automatic gains (default on, SATtypes.h:518), `kp = fHeatingCurveCoeff * curveValue / 4` for underfloor and `/ 3` otherwise (SATpid.ino:130-135), `ki = kp / 8400` (SATpid.ino:136), `kd = 0.07 * 8400 * kp` (SATpid.ino:137). The integral is reset to 0 whenever |error| > `fDeadband` (default 0.1, SATtypes.h:443, SATpid.ino:154-156). Inside the deadband it adds `ki * error * 60` per update (SATpid.ino:166), clamped to plus or minus the curve value and to plus or minus 20 (SATpid.ino:172-178).
@@ -1141,7 +1143,7 @@ PID internals belong to the PID section. In short: with automatic gains (default
 Before the timer check, every loop pass handles the fallback enable, the disabled and safety-tripped exits, the deferred boot `CS=0`, the PIC keepalive and the PWM refresh (SATcontrol.ino:4537-4611). Then (SATcontrol.ino:4614):
 
 1. **Mark active.** If the mode is OFF it becomes continuous (SATcontrol.ino:4616-4619).
-2. **DHW.** If DHW is active, `SW=` is sent on entry when configured, and the tick ends. No CS, MM or CH is sent (SATcontrol.ino:4625-4652).
+2. **DHW.** If DHW is active, `SW=` is sent on entry when configured, and the tick ends. No CS, MM or CH is sent (SATcontrol.ino:4851-4883 [lines refreshed 2026-10-24, TASK-1351]).
 3. **Read inputs** (SATcontrol.ino:4656-4658). If the room temperature is NaN or outside -10 to 50 °C, the tick ends; after 10 such ticks in a row SAT trips safety and sends `CS=0` (SATcontrol.ino:68, SATcontrol.ino:4669-4683, SATcontrol.ino:2179).
 4. **Smooth the room temperature** (EMA, tau 45 s) (SATcontrol.ino:4694-4713).
 5. **Boiler fault flag** set: the tick ends (SATcontrol.ino:4716-4719).
@@ -1160,15 +1162,15 @@ Before the timer check, every loop pass handles the fallback enable, the disable
 18. **PWM disable:** if `pidOutput` ≥ the system cap `satGetMaxSetpoint()` and the mode is PWM, the mode becomes continuous (SATcontrol.ino:4909, SATcontrol.ino:4917-4920). If `bForcePWM` is on, the mode becomes PWM (SATcontrol.ino:4923-4925). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
 19. **Mode rule:** PWM override or continuous rule (SATcontrol.ino:4928-4933).
 20. **Final clamp** to [10, effective maximum] (SATcontrol.ino:4936-4937). The result is stored as the "previous control setpoint" (SATcontrol.ino:4939).
-21. **Solar gain:** if solar gain is active and enabled, `fSolarSetpointOffset` is subtracted, floor 10 °C (SATcontrol.ino:4942-4945).
+21. **Solar gain:** no longer applied here. Since TASK-1323 the offset is subtracted from `pidOutput` before the clamp of item 17 (SATcontrol.ino:5137-5143) (corrected 2026-10-24, TASK-1351).
 22. **Auto-switch** between continuous and PWM, skipped for a heat pump or when `pidOutput` ≤ the cold setpoint (SATcontrol.ino:4951-4953).
 23. **Modulation value** (SATcontrol.ino:4960-4967, SATcontrol.ino:304-314).
-24. **Cold cutoff:** if `pidOutput` < the cold setpoint (28.2 °C radiators, 21 °C underfloor), the control setpoint becomes 10 °C and the modulation value 100 (SATcontrol.ino:4971-4975, SATcontrol.ino:264-268).
-25. **Send to the boiler** (SATcontrol.ino:4978-4994): `CS=`, `MM=`, `CH=1` if the final setpoint > 10 °C else `CH=0` (SATcontrol.ino:4982-4983), `TP=11:12=` for Immergas, `TC=` when push-setpoint is on.
+24. **Cold cutoff:** if `pidOutput` is at or below the cold setpoint (28.2 °C radiators, 21 °C underfloor), the control setpoint becomes 10 °C, the modulation value `iMaxRelModulation`, and `satPwmDisableOnHeaterOff()` leaves PWM (SATchEnable.h:26-29, SATcontrol.ino:5206-5214, SATcontrol.ino:1100-1109, SATcontrol.ino:339-343) (corrected 2026-10-24, TASK-1351); entries 7, 11, 12.
+25. **Send to the boiler** (SATcontrol.ino:5216-5236 [lines refreshed 2026-10-24, TASK-1351]): `CS=`, `MM=`, `CH=` from `satChEnableDecide` (SATchEnable.h:46-52, SATcontrol.ino:5223) (corrected 2026-10-24, TASK-1351), `TP=11:12=` for Immergas, `TC=` when push-setpoint is on.
 26. Without a command interface a failure counter counts up; at 5 SAT trips safety (SATcontrol.ino:69, SATcontrol.ino:4996-5004).
 27. PID state is saved every 5 min (SATcontrol.ino:5010-5012), then MQTT is published (SATcontrol.ino:5018).
 
-The "heater off" decisions are made in three places: summer simmer (SATcontrol.ino:4766), valves closed (SATcontrol.ino:4779) and the cold cutoff (SATcontrol.ino:4971). The CH bit follows the final setpoint (SATcontrol.ino:4982). No single heating-demand decision object was found in SATcontrol.ino.
+The "heater off" decisions are made in three places: summer simmer (SATcontrol.ino:4995-5005), valves closed (SATcontrol.ino:5008-5021) and the cold cutoff (SATcontrol.ino:5209-5214) [lines refreshed 2026-10-24, TASK-1351]. The CH bit follows `satChEnableDecide`: the requested setpoint against the cold setpoint and the PWM phase, not the final setpoint (SATchEnable.h:46-52, SATcontrol.ino:5223) (corrected 2026-10-24, TASK-1351). No single heating-demand decision object was found in SATcontrol.ino.
 
 **Modulation value (heater on).** `satComputeMM()`: 0 in PWM mode, the configured maximum `iMaxRelModulation` (default 100) otherwise; a heat pump gets 100 outside PWM; heat pump and hybrid never get 0; Geminox floor 10, Immergas cap 80 (SATcontrol.ino:299-314, SATtypes.h:453). The cold cutoff overwrites it with 100 after these quirks were applied (SATcontrol.ino:4973).
 
@@ -1385,7 +1387,7 @@ Derived from the curve formula and the cold setpoints (computed, not stated in t
 |---|---|---|---|
 | Control setpoint | `finalSetpoint` | `CS=%.1f`. Sent only when the value rounded to 0.1 changed, or 5 min after the last send | SATcontrol.ino:4980, SATcontrol.ino:383-396, SATcontrol.ino:351 |
 | Max relative modulation | `state.sat.iCurrentModulation` | `MM=<n>`, same write-on-change rule | SATcontrol.ino:4981, SATcontrol.ino:416-427 |
-| CH enable | 1 if `finalSetpoint` > 10 °C, else 0 | `CH=1` / `CH=0`, same rule | SATcontrol.ino:4982-4983, SATcontrol.ino:430-439 |
+| CH enable | `satChEnableDecide`: 0 when the requested setpoint is at or below the cold setpoint or in the PWM OFF phase, else 1 (corrected 2026-10-24, TASK-1351) | `CH=1` / `CH=0`, same rule | SATchEnable.h:46-52, SATcontrol.ino:5223 |
 | Immergas extra | the final setpoint, no decimals | `TP=11:12=<value>`, every tick | SATcontrol.ino:4986-4990 |
 | Thermostat display | `settings.sat.fTargetTemp` when `bPushSetpoint` is on | `TC=%.1f`, on target change; no 5-min refresh (TASK-1272) | SATcontrol.ino:5172-5176, SATcontrol.ino:540-553 |
 
@@ -1419,11 +1421,11 @@ Neither mechanism writes the coefficient. Only auto-tune does (SATcontrol.ino:44
 - **Outside value out of range** (below -40 or above 50 °C): 10 °C is used (SATcontrol.ino:4721-4723).
 - **SAT disabled.** The tick does not run. On the enabled-to-disabled transition `CS=0` is sent once (SATcontrol.ino:4568-4573, SATcontrol.ino:2179).
 - **Curve not yet computed.** There is no "None" state. Before the first tick the value is 0.0 (SATtypes.h:154); from the first tick on it is always computed.
-- **Requested setpoint below the cold setpoint** (28.2 radiators, 21 underfloor): control setpoint 10 °C, modulation 100, and `CH=0` because the final setpoint is not above 10 (SATcontrol.ino:4971-4975, SATcontrol.ino:4982).
-- **CH threshold.** There is no separate CH threshold: any final setpoint above 10 °C gives `CH=1` (SATcontrol.ino:4982).
-- **Solar gain pulls the setpoint to 10.** If solar reduction brings the final setpoint to the 10 °C floor, `CH=0` is sent (SATcontrol.ino:4942-4945, SATcontrol.ino:4982).
+- **Requested setpoint at or below the cold setpoint** (28.2 radiators, 21 underfloor): control setpoint 10 °C, modulation `iMaxRelModulation`, `CH=0`, PWM left (SATchEnable.h:26-29, SATcontrol.ino:5206-5214, SATcontrol.ino:5223, SATcontrol.ino:1100-1109) (corrected 2026-10-24, TASK-1351); entries 7, 11, 12.
+- **CH rule.** `satChEnableDecide`: CH=0 when the requested setpoint is at or below the cold setpoint or the PWM OFF phase drives the CS; otherwise CH=1, also in the PWM ON phase whatever CS keeps the flame on (SATchEnable.h:46-52, SATcontrol.ino:5223) (corrected 2026-10-24, TASK-1351): was "any final setpoint above 10 °C gives CH=1"; entries 5, 7, 9, 11, 17.
+- **Solar gain and the cutoff.** The solar offset lowers the requested setpoint before the clamp and the cold cutoff, so solar switches the heater off when it brings the request to or below the cold setpoint (SATcontrol.ino:5137-5152, SATcontrol.ino:5209) (corrected 2026-10-24, TASK-1351); TASK-1323, entry 11.
 - **No valve information.** `bValvesOpen` stays true (SATtypes.h:243).
-- **Valves reported closed.** `CS=10`, `CH=0`, and the PID and curve are not run that tick (SATcontrol.ino:4779-4790).
+- **Valves reported closed.** `CS=10`, `CH=0`, MM `iMaxRelModulation`, PWM left and reset by `satPwmDisableOnHeaterOff()`, and the PID and curve are not run that tick (SATcontrol.ino:5008-5021, SATcontrol.ino:1100-1109) (corrected 2026-10-24, TASK-1351); TASK-1327.
 - **Thermal comfort on.** The Summer Simmer index replaces the room temperature only when the room temperature comes from OpenTherm `Tr` and humidity is fresh (SATcontrol.ino:1264-1270). BLE, multi-area and external sources return earlier (SATcontrol.ino:1208-1231). The curve uses the effective target and the outside temperature only (SATcontrol.ino:4836).
 - **Comfort offset needs summer simmer on.** The offset is 0 unless `bComfortAdjust` and `bSummerSimmer` are both on (SATcontrol.ino:3224-3227).
 - **Requested setpoint at or above the system cap.** PWM is switched to continuous (SATcontrol.ino:4917-4920). Derived from lines 4908-4912 and 4917: the clamp uses the effective maximum, which can be below the system cap (for example when the boiler's MaxTSet is lower), and then `pidOutput` can never reach the system cap, so this switch cannot trigger.
@@ -1444,7 +1446,7 @@ Neither mechanism writes the coefficient. Only auto-tune does (SATcontrol.ino:44
 3. **No "no outside temperature" state.** The code has no path that stops control when no outside source exists (SATcontrol.ino:1283-1303, SATcontrol.ino:4721-4723). Whether 0.0 °C as a silent default is intended is not stated.
 4. **Weather data never expires.** `state.sat.weather.bValid` is set true after a successful fetch (SATweather.ino:376); a grep found no code that sets it false.
 5. **PID reset on target change.** No reset was found on a plain target change (SATcontrol.ino:1903-1934, settingStuff.ino:997). Presets only zero the display copy `fPidI` (SATcontrol.ino:998, SATcontrol.ino:1006). Whether that is intended is not stated; the code comment at SATcontrol.ino:997 says "Reset PID integral to prevent overshoot on large temp jumps".
-6. **`bSolarFreezeIntegral` is not read.** The setting exists, default on (SATtypes.h:527, settingStuff.ino:1109), but the PID freezes the integral on solar gain unconditionally (SATpid.ino:163). A grep found no other read of the setting.
+6. **`bSolarFreezeIntegral`.** Resolved: the PID now reads it, `if (state.sat.bSolarGainActive && settings.sat.bSolarFreezeIntegral) return;` (SATpid.ino:157), default on (SATtypes.h:549) (corrected 2026-10-24, TASK-1351); TASK-1323, entry 11 answer 3.
 7. **`bAutoGains` and the manual gains have no settings key.** `bAutoGains` is read by the PID (SATpid.ino:122), but a grep found no settings-file key or handler that writes it. A grep for `fKpManual`, `fKiManual` and `fKdManual` found only their defaults (SATtypes.h:519-521), the PID read (SATpid.ino:124-126) and a JSON status output (SATcontrol.ino:2528-2530), no writer. The settings key `SATautogains` writes `fAutoGainsValue` instead (settingStuff.ino:1103), and a grep found no read of `fAutoGainsValue` in the control path (only restAPI.ino:4018 and settingStuff.ino:386).
 8. **`fMaxSetpoint` has no settings key.** It is used by the effective maximum (SATcontrol.ino:248) but a grep found no code that writes it, so it stays at 65 °C (SATtypes.h:514).
 9. **`SAT_FLOW_OFFSET_CONTINUOUS` = 5.0** (SATcontrol.ino:58) is defined, but a grep found no use.
@@ -1453,7 +1455,7 @@ Neither mechanism writes the coefficient. Only auto-tune does (SATcontrol.ino:44
 12. **Zone integral step size.** The zone integral adds `ki * error * 60` per tick (SATcontrol.ino:1846) while the tick runs every 30 s by default (SATtypes.h:444); the main PID has a 60 s "unchanged error" rule (SATpid.ino:283), the zone PID has none. The intent is not stated.
 13. **Daily-median sample rate.** The code comment says "~every 15 min" (SATcycles.ino:1199) but the function is called every control tick (SATcontrol.ino:4799). Derived from the defaults: at a 30 s tick a day has 2880 samples and the 1440-slot ring (boards.h:124) keeps only the last 12 h of each day.
 14. **Two recommendation sign conventions.** Mechanism 1 uses `target - room` (SATcontrol.ino:3507), mechanism 2 uses `room - target` (SATcycles.ino:1205). Both map "room too cold" to increase. Which one the user interface treats as leading is outside this section and was not checked.
-15. **Cold cutoff and modulation quirks.** The cutoff sets modulation 100 after the Geminox and Immergas quirks were applied (SATcontrol.ino:4966, SATcontrol.ino:4973), so the Immergas 80 % cap does not apply in that case. Whether that is intended is not stated.
+15. **Cold cutoff and modulation quirks.** The cutoff sets modulation to `iMaxRelModulation` after `satComputeMM()` applied the Geminox and Immergas quirks (SATcontrol.ino:1108, SATcontrol.ino:5196-5214), so neither quirk applies in that case. thermo-nova's heater-off branch does the same (heating_control.py:234) (corrected 2026-10-24, TASK-1351); TASK-1327. The cutoff, summer simmer and valves closed also skip `satComputeMM()`'s heat-pump/hybrid zero guard and the Geminox floor (SATcontrol.ino:385-386). With `SATmaxmodulation` = 0 (allowed, settingStuff.ino:1014) a heat pump receives MM=0, and a Geminox boiler with a maximum below 10 receives less than 10. This conflicts with entry 21 ("never 0 for heat pumps and hybrids, Geminox at least 10") and is open, to put to Sergeant D (corrected 2026-10-24, TASK-1351).
 16. **Why the cold setpoints are 28.2 and 21.** Only the values and a code comment naming a person and task are present (SATcontrol.ino:55-56, SATcontrol.ino:262-263).
 17. **Why the radiator system cap is 62 °C.** Only a code comment gives a reason (SATcontrol.ino:216-227); it is not checked here.
 
@@ -1534,12 +1536,12 @@ On a tick, in this fixed order:
 11. If `bForcePWM` and the mode is not PWM, switch to PWM (SATcontrol.ino:4923-4925). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
 12. PWM mode: `finalSetpoint = satApplyPWM(pidOutput)` (step 4 and 5 below); otherwise `satApplyContinuous(pidOutput)` (SATcontrol.ino:4928-4933).
 13. Clamp `finalSetpoint` to [10, effective maximum] and store it as `_sat_lastControlCS` (SATcontrol.ino:4935-4939).
-14. Solar gain: subtract `fSolarSetpointOffset`, floor 10 (SATcontrol.ino:4941-4946).
+14. Solar gain: no longer here. The offset is subtracted from `pidOutput` before the clamp of item 9 (SATcontrol.ino:5137-5143) (corrected 2026-10-24, TASK-1351); TASK-1323.
 15. Auto-switch check, only if the source is not a heat pump and `pidOutput > cold setpoint` (SATcontrol.ino:4948-4953, details in step 3).
 16. `bModSuppressed = false` (SATcontrol.ino:4955-4957).
 17. Compute MM with `satComputeMM()`, using the mode **after** the auto-switch of item 15 (SATcontrol.ino:4959-4967, details in step 6).
-18. Cold cutoff: if `pidOutput < cold setpoint`, `finalSetpoint = 10` and MM = 100 (SATcontrol.ino:4969-4975).
-19. Send, in this order: CS, MM, CH = 1 if `finalSetpoint > 10` else 0; for Immergas also `TP=11:12=<finalSetpoint>`; optionally `TC=` (SATcontrol.ino:4977-4994). Each of CS, MM, CH is only queued when it changed (CS at 0.1 °C resolution) or when 300 s passed since the last send (SATcontrol.ino:351, SATcontrol.ino:383-439).
+18. Cold cutoff: if `pidOutput <= cold setpoint`, `finalSetpoint = 10`, MM = `iMaxRelModulation`, and `satPwmDisableOnHeaterOff()` leaves PWM (SATcontrol.ino:5206-5214, SATcontrol.ino:1100-1109) (corrected 2026-10-24, TASK-1351).
+19. Send, in this order: CS, MM, CH from `satChEnableDecide` (SATchEnable.h:46-52, SATcontrol.ino:5223) (corrected 2026-10-24, TASK-1351); for Immergas also `TP=11:12=<finalSetpoint>`; optionally `TC=` (SATcontrol.ino:5216-5236). Each of CS, MM, CH is only queued when it changed (CS at 0.1 °C resolution) or when 300 s passed since the last send (`SAT_CMD_REFRESH_MS`, SATcontrol.ino:427, and the `satEnqueueIfChanged*` helpers) [lines refreshed 2026-10-24, TASK-1351].
 
 Consequence of the order in items 15 and 17: on the tick where the auto-switch moves CONTINUOUS to PWM, CS is still the continuous value but MM is already the PWM value (0 for a gas boiler); on the tick where it moves PWM to CONTINUOUS, CS is still the PWM value and MM is already the non-PWM value (SATcontrol.ino:4929-4933, SATcontrol.ino:4951-4967).
 
@@ -1563,13 +1565,13 @@ PWM is **left** by exactly these code paths. Each one calls `satPwmReset()` thro
 |---|---|---|
 | Requested at system maximum | Mode PWM and `pidOutput >= satGetMaxSetpoint()` (system cap: 62 °C radiators, 45 °C underfloor, 40 °C heat pump) | SATcontrol.ino:4917-4920, SATcontrol.ino:228-235 |
 | Sustained underheat (per tick) | not heat pump; `pidOutput > cold setpoint`; dt in (0, 60] s; mode PWM and ON phase; `flow < pidOutput - 3.0` (strict); accumulated >= 180 s | SATcontrol.ino:4951-4952, SATcycles.ino:986-1004, SATcycles.ino:30-31 |
-| Sustained saturation (per tick) | Same gate as underheat; last computed off-time is 0 ms; accumulated >= 300 s | SATcycles.ino:1006-1020, SATcycles.ino:32 |
+| Sustained saturation (per tick) | Same gate as underheat; last computed off-time is 0 ms; accumulated >= 300 s | SATcycles.ino:1012-1024, SATcycles.ino:32 [lines refreshed 2026-10-24, TASK-1351] |
 | Manual command | `control_mode` "continuous"/1 or "auto"/0 (both set CONTINUOUS), while enabled and not tripped | SATcontrol.ino:2239-2241, SATcontrol.ino:2245-2247 |
 | SAT disabled or safety trip | `satDisable()` sets mode OFF | SATcontrol.ino:2160-2165 (call sites in the note below) |
 
 Note: the disable call sites are SATcontrol.ino:4561 (fallback lifted), SATcontrol.ino:4568-4571 (SAT disabled or flashing), SATcontrol.ino:4680 (room temperature lost) and SATcontrol.ino:5002 (no command interface for 5 ticks).
 
-Not a leave path: valves closed and summer simmer send CS = 10, MM = max, CH = 0 but leave the mode at PWM and do not reset PWM (SATcontrol.ino:4764-4790). DHW leaves the mode and PWM state untouched (the tick returns at SATcontrol.ino:4651). `pidOutput` at or below the cold setpoint does not change the mode either; it only skips the auto-switch (SATcontrol.ino:4951) and commands CS = 10 (SATcontrol.ino:4971-4975).
+Leave paths since TASK-1327 (entry 12): valves closed and `pidOutput` at or below the cold setpoint call `satPwmDisableOnHeaterOff()`, which sets CONTINUOUS and resets PWM, the sustain guards and the previous CS (SATcontrol.ino:1100-1109, SATcontrol.ino:5008-5021, SATcontrol.ino:5206-5214). Not a leave path: summer simmer sends CS = 10, MM = max, CH = 0 but leaves the mode at PWM and does not reset PWM (SATcontrol.ino:4994-5006). DHW leaves the mode and PWM state untouched (the tick returns at SATcontrol.ino:4881) (corrected 2026-10-24, TASK-1351).
 
 The requested mode "pwm" is not re-applied on later ticks: `iRequestedControlMode` is only written at SATcontrol.ino:2240-2246 and only read for publishing at SATcontrol.ino:2628 (search for `iRequestedControlMode`). So after a manual "pwm", the auto-switch can still move the mode back to CONTINUOUS. With `bForcePWM` set, by contrast, PWM is re-entered on the next tick (SATcontrol.ino:4923-4925), and when `pidOutput >= system cap` the same tick switches to CONTINUOUS at item 10 and back to PWM at item 11, so PWM is reset twice in that tick (SATcontrol.ino:4917-4925, SATcontrol.ino:936). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
 
@@ -1624,7 +1626,7 @@ The on-time and the off-time are recomputed on every tick, so the phase ends at 
 
 #### 5. The CS override in PWM mode: flame-off setpoint and modulation suppression
 
-This runs on a tick in PWM mode, right after `satPwmSchedule()` (SATcontrol.ino:868-889). First the "previous CS" is fixed: `prevCS = _sat_lastControlCS` if that is above 10 °C, else `pidOutput` (SATcontrol.ino:870). `_sat_lastControlCS` is the CS of the last tick or refresh before the solar adjustment (SATcontrol.ino:693, SATcontrol.ino:910, SATcontrol.ino:4939), and is set to 0 by `satDisable()` (SATcontrol.ino:2166). Before branch 0: if the flow temperature is unknown (`satGetFlowTemp() <= 0`), `satPwmSchedule()` has reset the PWM state and `satApplyPWM()` returns the continuous setpoint `satApplyContinuous(pidOutput)` instead of any branch below (SATcontrol.ino:741-748, SATcontrol.ino:905-907, working tree numbering; pwm.py:122-128, heating_control.py:148-152). Branches, in this order:
+This runs on a tick in PWM mode, right after `satPwmSchedule()` (SATcontrol.ino:868-889). First the "previous CS" is fixed: `prevCS = _sat_lastControlCS` if that is above 10 °C, else `pidOutput` (SATcontrol.ino:870). `_sat_lastControlCS` is the CS of the last tick or refresh; the CS has no solar adjustment any more (SATcontrol.ino:1061, SATcontrol.ino:5182) (corrected 2026-10-24, TASK-1351), and is set to 0 by `satDisable()` (SATcontrol.ino:2166). Before branch 0: if the flow temperature is unknown (`satGetFlowTemp() <= 0`), `satPwmSchedule()` has reset the PWM state and `satApplyPWM()` returns the continuous setpoint `satApplyContinuous(pidOutput)` instead of any branch below (SATcontrol.ino:741-748, SATcontrol.ino:905-907, working tree numbering; pwm.py:122-128, heating_control.py:148-152). Branches, in this order:
 
 | # | Condition | CS result | Citation |
 |---|---|---|---|
@@ -1634,11 +1636,11 @@ This runs on a tick in PWM mode, right after `satPwmSchedule()` (SATcontrol.ino:
 | 3 | ON phase, flame on, less than `fModSupDelay` since the last real flame-on | **Hold**: the stored hold if it is > 0, else `prevCS` ("pending") | SATcontrol.ino:884-886, SATcontrol.ino:720-723 |
 | 4 | ON phase, flame on, delay passed | **Suppression**: stored hold cleared; CS = clamp(flow - `fModSupOffset`, 10, `satGetMaxSetpoint()`) | SATcontrol.ino:887-888, SATcontrol.ino:711-717 |
 
-The DHW part of branch 0 is never true on a tick: a tick with DHW active returns before `satApplyPWM()` (SATcontrol.ino:4635-4652). The schedule (step 4) runs before branch 0, so the phases advance even with overshoot protection off (SATcontrol.ino:871-874). Range 5 counts as ON phase here, because it sets `bPwmFlameRequested = true` (SATcontrol.ino:778). The return temperature is used without a validity check (SATcontrol.ino:703); the flow temperature likewise (SATcontrol.ino:713).
+The DHW part of branch 0 is never true on a tick: a tick with DHW active returns before `satApplyPWM()` (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]). The schedule (step 4) runs before branch 0, so the phases advance even with overshoot protection off (SATcontrol.ino:871-874). Range 5 counts as ON phase here, because it sets `bPwmFlameRequested = true` (SATcontrol.ino:778). The return temperature is used without a validity check (SATcontrol.ino:703); the flow temperature likewise (SATcontrol.ino:713).
 
-After `satApplyPWM()` the tick clamps the result to [10, effective maximum], subtracts the solar offset when active, then applies the cold cutoff (SATcontrol.ino:4935-4946, SATcontrol.ino:4971-4975). The CS sent is that final value (SATcontrol.ino:4980).
+After `satApplyPWM()` the tick clamps the result to [10, effective maximum] and applies the cold cutoff; the solar offset was already subtracted from `pidOutput` before (SATcontrol.ino:5178-5183, SATcontrol.ino:5206-5214, SATcontrol.ino:5137-5143) (corrected 2026-10-24, TASK-1351). The CS sent is that final value (SATcontrol.ino:5219).
 
-**The 3 s refresh.** Between ticks, `satPwmSuppressionRefresh()` re-sends the suppression CS every 3 s. It does nothing unless all of these hold (SATcontrol.ino:894-905): the 3 s timer is due; SAT enabled, active and not tripped; the thermal safe fallback is not active; mode PWM and ON phase; overshoot protection on and `bDhwActive` false (value from the last tick); `SlaveStatus` bits 0 and 2 clear (live fault and DHW bits); valves open and summer simmer not active; flame on and `fModSupDelay` passed since the last real flame-on; `fPidOutput > cold setpoint`; `fFinalSetpoint > 10`. Then CS = the same suppression formula, clamped to the effective maximum, stored as `_sat_lastControlCS`, solar offset applied, written to `fFinalSetpoint` and queued with the same write-on-change helper (SATcontrol.ino:907-917). The refresh sends **only CS**; it does not send MM or CH and it does not change the phase (SATcontrol.ino:894-918). It runs before the tick gate in the same loop pass (SATcontrol.ino:4610-4614).
+**The 3 s refresh.** Between ticks, `satPwmSuppressionRefresh()` re-sends the suppression CS every 3 s. It does nothing unless all of these hold (SATcontrol.ino:1045-1056 [lines refreshed 2026-10-24, TASK-1351]): the 3 s timer is due; SAT enabled, active and not tripped; the thermal safe fallback is not active; mode PWM and ON phase; overshoot protection on and `bDhwActive` false (value from the last tick); `SlaveStatus` bits 0 and 2 clear (live fault and DHW bits); valves open and summer simmer not active; flame on and `fModSupDelay` passed since the last real flame-on; the requested setpoint of the last tick `_sat_requestedSetpoint` (PID output after the solar offset, clamped) above the cold setpoint; `fFinalSetpoint > 10` (SATcontrol.ino:1055-1056). Then CS = the same suppression formula, clamped to the effective maximum, stored as `_sat_lastControlCS`, written to `fFinalSetpoint` and queued with the same write-on-change helper; there is no solar term (SATcontrol.ino:1058-1064) (corrected 2026-10-24, TASK-1351): was "`fPidOutput > cold setpoint`" and "solar offset applied"; TASK-1323. The refresh sends **only CS**; it does not send MM or CH and it does not change the phase (SATcontrol.ino:1045-1065). It runs before the tick gate in the same loop pass (SATcontrol.ino:4610-4614).
 
 What triggers suppression: PWM mode, ON phase, flame on, overshoot protection on, and `fModSupDelay` passed since the cycle tracker's last real flame-on edge (SATcontrol.ino:720-723, SATcontrol.ino:884-888, SATcontrol.ino:899-903). The delay uses the same flame-on time as the ON-phase timing (SATcontrol.ino:722, SATcontrol.ino:813).
 
@@ -1664,11 +1666,11 @@ Computed every tick that reaches SATcontrol.ino:4960 by `satComputeMM(pwmMode, h
 4. Heat pump or hybrid with a result of 0: 100.
 5. Geminox quirk (`SAT_QUIRK_MIN_MOD_10`): at least 10. Immergas quirk: at most 80 (SATcontrol.ino:311-312, SATcontrol.ino:127-129).
 
-Then the cold cutoff overrides MM to 100 when `pidOutput < cold setpoint`, after the quirks (SATcontrol.ino:4971-4974), so an Immergas boiler receives MM = 100 in that case. The "no relative modulation" quirk does not change MM; it only marks modulation as unreliable (SATcontrol.ino:4801-4805).
+Then the cold cutoff overrides MM to `iMaxRelModulation` when `pidOutput <= cold setpoint`, after the quirks (SATcontrol.ino:1108, SATcontrol.ino:5206-5214), so an Immergas boiler receives the configured maximum, uncapped, in that case, as in thermo-nova (heating_control.py:234) (corrected 2026-10-24, TASK-1351). The "no relative modulation" quirk does not change MM; it only marks modulation as unreliable (SATcontrol.ino:4801-4805).
 
 MM is sent only through `satEnqueueIfChangedMM()` (SATcontrol.ino:416-427; a search for `MM=` finds only the format string at SATcontrol.ino:421). Its callers are the thermal safe fallback, summer simmer and valves closed (all `iMaxRelModulation`) and the normal tick end (SATcontrol.ino:4741, SATcontrol.ino:4771, SATcontrol.ino:4784, SATcontrol.ino:4981). So during DHW, a fault-flag tick or an invalid room temperature no MM is sent, and the boiler keeps the last MM, for example 0 if PWM was active (SATcontrol.ino:4635-4719).
 
-So for a gas boiler MM = 0 on every PWM tick that reaches the tick end with `pidOutput >= cold setpoint` (SATcontrol.ino:308, SATcontrol.ino:4971).
+So for a gas boiler MM = 0 on every PWM tick that reaches the tick end with `pidOutput > cold setpoint`; at or below it the cold cutoff sets `iMaxRelModulation` and leaves PWM (SATcontrol.ino:379-389, SATcontrol.ino:5206-5214) (corrected 2026-10-24, TASK-1351).
 
 #### 7. Continuous mode CS (for comparison)
 
@@ -1785,7 +1787,7 @@ saturation: last offTimeMs == 0                      accumulated dt >= 300 s  (m
 dt = time since the previous call; a call with dt <= 0 or dt > 60 s does nothing
 ```
 
-CH command (SATcontrol.ino:4982-4983): `CH = 1 if finalSetpoint > 10 else 0`.
+CH command (SATcontrol.ino:5223): `CH = satChEnableDecide(pidOutput, coldSetpoint, pwmDrivesSetpoint, pwmOn)`: 0 at or below the cold setpoint or in the PWM OFF phase, else 1 (SATchEnable.h:46-52) (corrected 2026-10-24, TASK-1351).
 
 <a id="s4-constants-and-defaults"></a>
 
@@ -1855,7 +1857,7 @@ PWM state (SATcontrol.ino:685-696, SATtypes.h:201-203):
 | `_pwm_waitingForFlame`, `_pwm_waitForFlameStartMs` | Ignition wait and its 180 s timer | SATcontrol.ino:688-689, SATcontrol.ino:757-765, SATcontrol.ino:852-853 |
 | `_pwm_flameOffHoldSetpoint` | Stored flame-off hold | SATcontrol.ino:690, SATcontrol.ino:881 |
 | `_pwm_lastOffTimeMs`, `_pwm_lastOnTimeMs` | Last computed off-time and on-time (saturation check, classifier) | SATcontrol.ino:691-692, SATcontrol.ino:809-810 |
-| `_sat_lastControlCS` | Previous CS before the solar adjustment | SATcontrol.ino:693, SATcontrol.ino:910, SATcontrol.ino:4939 |
+| `_sat_lastControlCS` | Previous CS (no solar adjustment of the CS since TASK-1323); set to 10 by `satPwmDisableOnHeaterOff()` (corrected 2026-10-24, TASK-1351) | SATcontrol.ino:1061, SATcontrol.ino:1107, SATcontrol.ino:5182 |
 | `_sat_thermalSafeActive` | Thermal safe fallback owns CS; blocks the refresh | SATcontrol.ino:694, SATcontrol.ino:898, SATcontrol.ino:4729-4733 |
 
 Cycle tracker state used by PWM: `_cycle_flameOnStartMs`, `_cycle_flameOffStartMs` (SATcycles.ino:107-108), the rolling-hour ring `_hourCycleTs` (SATcycles.ino:38-40), the sustain timers `_sustain_overshootSec`, `_sustain_underheatSec`, `_sustain_saturationSec`, `_sustain_lastCheckMs`, `_sustain_dhwEndMs` (SATcycles.ino:129-136).
@@ -1886,17 +1888,17 @@ To entities (MQTT, published only when changed): `sat/mode` (actual mode, "off" 
 ### Edge cases
 
 - **`bOvershootProtection` off**: in PWM mode CS = `prevCS` on every tick (the last control CS if above 10 °C, else `pidOutput`) (SATcontrol.ino:870-874). The schedule still runs (SATcontrol.ino:871) and MM is still 0 for a gas boiler (SATcontrol.ino:308). The refresh does nothing (SATcontrol.ino:900).
-- **DHW active during PWM**: the tick returns before PWM, CS, MM and CH (SATcontrol.ino:4635-4652). The mode stays PWM, the schedule is frozen, MM keeps its last sent value (0 in PWM), CS keeps its last sent value. The ignition of a DHW burn is a real flame-on edge, so it moves the ON-phase reference and counts in the rolling-hour limit (SATcycles.ino:714, SATcycles.ino:722-724).
+- **DHW active during PWM**: the tick returns before PWM, CS, MM and CH (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]). The mode stays PWM, the schedule is frozen, MM keeps its last sent value (0 in PWM), CS keeps its last sent value. The ignition of a DHW burn is a real flame-on edge, so it moves the ON-phase reference and counts in the rolling-hour limit (SATcycles.ino:714, SATcycles.ino:722-724).
 - **No ignition after the ON phase starts**: see step 4. The ON phase may end at the next tick through the expiry test, or after 180 s through the ignition timeout, depending on how long ago the previous ignition was (SATcontrol.ino:813-832).
 - **Duty below minimum without flame**: on-time 0, off-time `maxMs` (SATcontrol.ino:788-792). The OFF to ON start has no minimum on-time condition, so after `maxMs` since the last flame-off an ON phase still starts, with CS = flame-off hold (SATcontrol.ino:836-853, SATcontrol.ino:879-883).
-- **Duty at or above maximum (range 5)**: phase ON is forced, no expiry, no ignition timeout, last off-time = 0 (SATcontrol.ino:776-781). After 300 s of accumulated ON-phase ticks in this state the auto-switch leaves PWM, if `bPwmAutoSwitch` is on and the source is not a heat pump (SATcycles.ino:1006-1020, SATcontrol.ino:4951).
-- **Requested setpoint equal to the cold setpoint**: `satApplyPWM()` skips the override (`<=`, SATcontrol.ino:872) but the cold cutoff does not fire (`<`, SATcontrol.ino:4971), so CS = `prevCS` and MM = the PWM value.
-- **Requested setpoint below the cold setpoint**: CS = 10, MM = 100, CH = 0; the mode stays PWM and the schedule keeps running (SATcontrol.ino:4971-4975, SATcontrol.ino:871). No auto-switch call that tick (SATcontrol.ino:4951).
-- **Flame-off hold clamp**: the lower clamp is the cold setpoint (28.2 °C radiators), above 10 °C, so the hold always gives CH = 1 (SATcontrol.ino:704, SATcontrol.ino:4982).
-- **Suppressed setpoint low**: it is floored at 10 °C; at exactly 10 °C CH = 0 (SATcontrol.ino:714, SATcontrol.ino:4982).
-- **Valves closed or summer simmer while in PWM**: CS = 10, MM = max, CH = 0, mode and PWM state unchanged; the refresh is blocked (SATcontrol.ino:4764-4790, SATcontrol.ino:902).
-- **Heat pump**: never enters PWM through the auto-switch (SATcontrol.ino:4951, SATcontrol.ino:293-297); only force or the manual command. In PWM MM stays at `iMaxRelModulation`, or 100 when that is 0 (SATcontrol.ino:308-310).
-- **Forced PWM**: an auto-switch to CONTINUOUS lasts one tick; the next tick re-enters PWM with a reset (SATcontrol.ino:4923-4925, SATcontrol.ino:936).
+- **Duty at or above maximum (range 5)**: phase ON is forced, no expiry, no ignition timeout, last off-time = 0 (SATcontrol.ino:904-909). After 300 s of accumulated ON-phase ticks in this state the auto-switch leaves PWM if the source is not a heat pump (SATcycles.ino:1012-1024, SATcycles.ino:32, SATcontrol.ino:5188) [lines refreshed 2026-10-24, TASK-1351]; the `bPwmAutoSwitch` setting was removed in TASK-1341 (entry 19) (corrected 2026-10-24, TASK-1351).
+- **Requested setpoint equal to the cold setpoint**: `satApplyPWM()` (`<=`, SATcontrol.ino:1023) and the cold cutoff (`satColdCutoff`, `<=`, SATchEnable.h:26-29) both treat it as no demand, so CS = 10, CH = 0 and PWM is left, as thermo-nova (`heating_control.py:72`, `:385`) (corrected 2026-10-24, TASK-1351); TASK-1323. Open: Sergeant D wrote "below" (entry 7).
+- **Requested setpoint at or below the cold setpoint**: CS = 10, MM = `iMaxRelModulation`, CH = 0; `satPwmDisableOnHeaterOff()` leaves PWM and resets the PWM state and the sustain guards; the schedule still ran once that tick inside `satApplyPWM()` before the reset (SATcontrol.ino:5168, SATcontrol.ino:5206-5214, SATcontrol.ino:1100-1109). No auto-switch call that tick (SATcontrol.ino:5188) (corrected 2026-10-24, TASK-1351): was "the mode stays PWM"; TASK-1327, entry 12.
+- **Flame-off hold clamp**: the lower clamp is the cold setpoint (28.2 °C radiators) (SATcontrol.ino:811 [lines refreshed 2026-10-24, TASK-1351]). CH = 1 in the PWM ON phase whatever the CS (`satChEnableDecide`, SATchEnable.h:46-52, SATcontrol.ino:5223) (corrected 2026-10-24, TASK-1351).
+- **Suppressed setpoint low**: it is floored at 10 °C (SATcontrol.ino:821 [lines refreshed 2026-10-24, TASK-1351]); CH stays 1, because in the PWM ON phase CH no longer depends on the sent CS (`satChEnableDecide`, SATchEnable.h:46-52) (corrected 2026-10-24, TASK-1351): was "at exactly 10 °C CH = 0"; entries 9 and 17.
+- **Valves closed while in PWM**: CS = 10, MM = max, CH = 0, and `satPwmDisableOnHeaterOff()` leaves PWM and resets the PWM state (SATcontrol.ino:5008-5021, SATcontrol.ino:1100-1109), as thermo-nova (`heating_control.py:69-70`, `heating_control.py:229-234`). **Summer simmer while in PWM**: CS = 10, MM = max, CH = 0, mode and PWM state unchanged (SATcontrol.ino:4994-5006). The refresh is blocked in both (SATcontrol.ino:1053) (corrected 2026-10-24, TASK-1351): valves closed changed in TASK-1327.
+- **Heat pump**: never enters PWM through the auto-switch (`satAlwaysMaxModulation()`, SATcontrol.ino:368-372, SATcontrol.ino:5188); only through the manual `control_mode pwm` command (SATcontrol.ino:2463-2465), since Force PWM is gone (entry 13) (corrected 2026-10-24, TASK-1351). Hybrids are not excluded. A heat-pump exclusion from the PWM switch is not found in thermo-nova (a grep of heating_control.py for `HEAT_PUMP`, `heating_system`, `HeatingSystem` finds only the PWM constructor at :86), and entry 21 says the heat-pump choice should affect only the max modulation: open, to put to Sergeant D. In PWM MM stays at `iMaxRelModulation`, or 100 when that is 0 (SATcontrol.ino:379-389).
+- **Forced PWM**: removed in TASK-1332 (entry 13); the code has no such path any more (corrected 2026-10-24, TASK-1351).
 - **Control interval above 60 s**: no auto-switch at all (SATcycles.ino:951, settingStuff.ino:1001 search result).
 
 <a id="s4-not-found-in-the-code-unclear"></a>
@@ -1985,7 +1987,7 @@ There is no stored record of outside temperature or commanded maximum modulation
 | every 60 s (`timerSAT4hStats`) | 4 h and 24 h window statistics | SATcontrol.ino:478, SATcontrol.ino:4602-4605 |
 | control tick, `settings.sat.iControlInterval` (default 30 s) | modulation reliability, flame status, boiler status, auto-switch | SATtypes.h:444, SATcontrol.ino:476, SATcontrol.ino:3719, SATcontrol.ino:4614, SATcontrol.ino:4802-4814, SATcontrol.ino:4951-4953 |
 
-- On the control tick, the status functions run only if the tick gets past several early returns: DHW active (SATcontrol.ino:4635-4652), invalid room temperature (SATcontrol.ino:4669-4683), boiler fault bit (SATcontrol.ino:4716-4719), the thermal safe fallback (SATcontrol.ino:4730-4746), summer simmer (SATcontrol.ino:4766-4776) and closed valves (SATcontrol.ino:4779-4790). On those ticks the boiler status, flame status and modulation reliability keep their previous values.
+- On the control tick, the status functions run only if the tick gets past several early returns: DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]), invalid room temperature (SATcontrol.ino:4669-4683), boiler fault bit (SATcontrol.ino:4716-4719), the thermal safe fallback (SATcontrol.ino:4730-4746), summer simmer (SATcontrol.ino:4766-4776) and closed valves (SATcontrol.ino:4779-4790). On those ticks the boiler status, flame status and modulation reliability keep their previous values.
 - `satUpdateFlameStatus` has its own 10 s rate limit (SATcontrol.ino:3626), but its only caller is the control tick (SATcontrol.ino:4811), so it runs once per tick.
 - The cycle tracker and the boiler status evaluator each detect flame edges on their own: the cycle tracker on every `loop()` pass through `_sat_prevFlameState` (SATcontrol.ino:4592-4596), the evaluator only on control ticks through `_bs_prevFlame` (SATcontrol.ino:526-531, SATcontrol.ino:644). The evaluator's flame timestamps can therefore lag the real edge by up to one control interval (derived from the order of the code).
 - In simulation, `satUpdateSimulation()` calls `satCycleOnFlameChange()` itself at its own flame transitions (SATcontrol.ino:3825-3839), and the edge detection a few lines later calls it again (SATcontrol.ino:4576, SATcontrol.ino:4592-4596). The second call does nothing because the handler only acts on a change of `_cycle_flameOn` (SATcycles.ino:701, SATcycles.ino:757).
@@ -2063,7 +2065,7 @@ The branches are tested in this order:
 Notes on the status rules:
 
 - **`OFF` is never assigned by the evaluator.** Every branch above assigns another value (SATcontrol.ino:546-637), and the only other writer of `eBoilerStatus` is its initial default (SATtypes.h:152; search for `eBoilerStatus\s*=` found only SATcontrol.ino:643). So `OFF` holds only until the first evaluation (derived from the order of the code). There is no rule on the central-heating bit.
-- **`HEATING_HOT_WATER` is unreachable through the control tick.** The only caller is SATcontrol.ino:4814. It runs after the DHW early return at SATcontrol.ino:4635-4652, so `bDhwActive` is always false when the evaluator runs (derived from the order of the code; the only writers of `bDhwActive` are SATcontrol.ino:4626 and SATcontrol.ino:4628).
+- **`HEATING_HOT_WATER` is unreachable through the control tick.** The only caller is SATcontrol.ino:4814. It runs after the DHW early return at SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], so `bDhwActive` is always false when the evaluator runs (derived from the order of the code; the only writers of `bDhwActive` are SATcontrol.ino:4626 and SATcontrol.ino:4628).
 - **"Setpoint" is SAT's own command** (`fFinalSetpoint`, SATcontrol.ino:521) from the previous tick, because the current tick only writes it later (SATcontrol.ino:4946). In the PWM OFF phase with overshoot protection that value is 10 °C (SATcontrol.ino:875-878), so `hasDemand` is false then (derived from the order of the code).
 - **Overshoot cooling** uses the live margin test only; there is no "last flame-off was an overshoot" memory and no cold-setpoint guard (SATcontrol.ino:556-558).
 - **Timing is per tick.** `_bs_flameOffMs` and `_bs_flameOnMs` are the times of the tick that first saw the change (SATcontrol.ino:526-531). With a 30 s tick, rule 3 can hold on the tick after `COOLING` (about 30 s since the observed flame-off) and no longer one tick later (derived from the order of the code).
@@ -2173,7 +2175,7 @@ This was not checked on a running device.
   - PWM OFF phase: underheat and saturation timers reset (SATcycles.ino:989-992);
   - PWM ON phase: flow < requested - 3 for 180 s -> continuous (SATcycles.ino:993-1004); PWM off-time 0 for 300 s -> continuous (SATcycles.ino:1010-1020).
   The full mode logic belongs to the PWM section of this spec.
-- **Hot water guard, as built.** The guard refreshes `_sustain_dhwEndMs` only while `bDhwActive` (SATcycles.ino:964-966). This function runs after the DHW early return (SATcontrol.ino:4635-4652, SATcontrol.ino:4952), so `bDhwActive` is false whenever it runs, and `_sustain_dhwEndMs` keeps its boot value `0 - 300000` (SATcycles.ino:136). The 300 s guard (SATcycles.ino:971-972) is then never active (derived from the order of the code).
+- **Hot water guard, as built.** The guard refreshes `_sustain_dhwEndMs` only while `bDhwActive` (SATcycles.ino:964-966). This function runs after the DHW early return (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], SATcontrol.ino:4952), so `bDhwActive` is false whenever it runs, and `_sustain_dhwEndMs` keeps its boot value `0 - 300000` (SATcycles.ino:136). The 300 s guard (SATcycles.ino:971-972) is then never active (derived from the order of the code).
 - **Flame-on time for the PWM schedule.** The PWM hold ends `fModSupDelay` (default 20 s, SATtypes.h:455) after the cycle tracker's flame-on time (SATcontrol.ino:720-723, SATcontrol.ino:884-888). The PWM ON phase ends when the time since that flame-on is >= on-time and >= minimum on-time (SATcontrol.ino:813-820). That test does not check whether the flame is on, and it runs before the 180 s ignition timeout (SATcontrol.ino:824-832). While a new ON phase waits for ignition, the cycle tracker's flame-on time still belongs to the previous cycle, so the ON phase can end on the next control tick before the flame lights (derived from the order of the code; see Edge cases). The PWM controller also keeps its own `_pwm_flameOnMs` for the effective temperature EMA (SATcontrol.ino:764-782).
 - **Flame-off time and per-hour count for the PWM schedule.** The OFF phase ends when the time since the cycle tracker's flame-off is >= off-time, unless the rolling-hour count of flame-on events has reached `satGetMaxCyclesPerHour()` (SATcontrol.ino:836-854, SATcycles.ino:286-292). The maximum is 2 for a heat pump, the configured value when it is 2 to 6, else 3 (underfloor) or 4 (SATcontrol.ino:271-281).
 - **PWM on-time into the classifier**: the short threshold (SATcycles.ino:660-666, SATcycles.ino:791).
@@ -2571,7 +2573,7 @@ Contrast with the main PID: an invalid main room temperature skips the tick, and
 
 #### 4. Per control loop tick: combining main and rooms into one requested setpoint
 
-The control tick returns early, before any of the steps below, when SAT is disabled, safety is tripped, DHW is active, the room temperature is invalid, the boiler reports a fault, or the room temperature has been estimated for too long and the thermal safe fallback setpoint is sent instead (SATcontrol.ino:4568-4573, SATcontrol.ino:4581, SATcontrol.ino:4635-4652, SATcontrol.ino:4669-4683, SATcontrol.ino:4716-4719, SATcontrol.ino:4730-4746). Later, it also returns early on summer mode or on `valves_open == false`, in both cases after sending `CS=10`, the max modulation and `CH=0` (SATcontrol.ino:4766-4790).
+The control tick returns early, before any of the steps below, when SAT is disabled, safety is tripped, DHW is active, the room temperature is invalid, the boiler reports a fault, or the room temperature has been estimated for too long and the thermal safe fallback setpoint is sent instead (SATcontrol.ino:4568-4573, SATcontrol.ino:4581, SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], SATcontrol.ino:4669-4683, SATcontrol.ino:4716-4719, SATcontrol.ino:4730-4746). Later, it also returns early on summer mode or on `valves_open == false`, in both cases after sending `CS=10`, the max modulation and `CH=0` (SATcontrol.ino:4994-5021 [lines refreshed 2026-10-24, TASK-1351]).
 
 The requested setpoint is formed as follows (SATcontrol.ino:4831-4912):
 
@@ -2647,15 +2649,15 @@ There is no HVAC mode setter with heat and off and no sync of modes to other cli
 5. Debounce: a new value must be seen in two consecutive frames, within 0.051 °C of each other. The first sighting only becomes the candidate (SATcontrol.ino:1071).
 6. Confirmed: the value becomes the new last value (SATcontrol.ino:1072-1074).
 7. Push-setpoint off: adopt (SATcontrol.ino:1075).
-8. Push-setpoint on: adopt only if a `TC=` was sent since boot, the previous thermostat value was within 0.25 °C of the last sent `TC=`, and the new value is more than 0.25 °C away from it (SATcontrol.ino:1076-1078).
+8. Push-setpoint on: adopt once SAT has a `TC=` reference (`fLastSentTC > 0`, i.e. a `TC=` was sent or a value was adopted since boot) and the new value is more than 0.25 °C away from that reference; a value within 0.25 °C is SAT's own echo and is recorded, not adopted (`satFollowThermostatDecide`, SATcontrol.ino:1239-1253, rule comment SATcontrol.ino:1230-1237). The reference is the last sent `TC=`, or the thermostat value SAT last adopted, because an adoption sets `fLastSentTC` to that value without sending `TC=` (`satTCNoteAdopted`, SATcontrol.ino:534-539, SATtypes.h:401). TASK-1298 dropped the earlier condition that the previous thermostat value had to be within 0.25 °C of the last `TC=` (maintainer decision, entry 2) (corrected 2026-10-24, TASK-1351).
 
-Adopting (`satAdoptThermostatSetpoint`) (SATcontrol.ino:1034-1045):
+Adopting (`satAdoptThermostatSetpoint`) (SATcontrol.ino:1205-1217 [lines refreshed 2026-10-24, TASK-1351]):
 
 - set the active preset to `none` and clear the saved pre-custom temperature, without restoring it;
 - store the value through `updateSetting("SATtargettemp")`, so it is clamped to 5 to 30 °C and saved;
 - publish `none` to the preset sync topic if a preset was active.
 
-No PID is reset (SATcontrol.ino:1034-1045). The value is not pushed back to the thermostat on this path; the normal `TC=` at the next control tick sends the new target if push-setpoint is on (SATcontrol.ino:4991-4994).
+No PID is reset (SATcontrol.ino:1205-1217). The value is not pushed back to the thermostat: `satTCNoteAdopted` sets `fLastSentTC` to the adopted target and marks it accounted, so the write-on-change `TC=` of the next tick has nothing to send (SATcontrol.ino:1213, SATcontrol.ino:534-539, SATcontrol.ino:541-544, SATcontrol.ino:5231-5235; TASK-1272) (corrected 2026-10-24, TASK-1351): was "the normal `TC=` at the next control tick sends the new target".
 
 #### 10. Event: a window sensor changes (window open detection)
 
@@ -2849,7 +2851,7 @@ To the boiler, through the command queue, on each control tick that reaches the 
 Thermostat setpoint push (only when `bPushSetpoint` is true and an OT command interface exists) (SATcontrol.ino:4991-4994, SATcontrol.ino:439-453):
 
 - `TC=<fTargetTemp>` with one decimal, sent when the target rounded to 0.1 changed (TASK-1272, Sergeant D entries 14 and 16; as thermo-nova, `climate.py:641-657`). There is no periodic refresh. A target adopted from the thermostat (follow thermostat) is not sent back (`climate.py:765`, `cascade=False`). There is no re-push, no MsgID 9 check and no 5-minute refresh (maintainer decision 2026-10-24, option D: exactly thermo-nova). A thermostat that refuses the remote override keeps its own setpoint and SAT does not keep asking. A cache reset (OT bus back online) and switching push off and on again also send the current target once. `TC=` push works only on thermostats that accept a remote override; SAT pushes on a target change. An adopted thermostat value also becomes `fLastSentTC`, so the echo guard compares against it and a later dial-back is adopted too. Code: `SATcontrol.ino:529-559` (`satTCNoteAdopted`, `satEnqueueIfChangedTC`, `satTCPushOff`), call site `SATcontrol.ino:5172-5176`.
-- It is skipped on every tick that returns before line 4977: DHW active, invalid room temperature, boiler fault, thermal safe fallback, summer mode, valves closed (SATcontrol.ino:4635-4652, SATcontrol.ino:4669-4683, SATcontrol.ino:4716-4719, SATcontrol.ino:4730-4746, SATcontrol.ino:4766-4790).
+- It is skipped on every tick that returns before line 4977: DHW active, invalid room temperature, boiler fault, thermal safe fallback, summer mode, valves closed (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], SATcontrol.ino:4669-4683, SATcontrol.ino:4716-4719, SATcontrol.ino:4730-4746, SATcontrol.ino:4766-4790).
 - It is sent on the same path for PIC and OT-Direct boards; the code does not branch on the board here (SATcontrol.ino:4978-4994).
 
 To MQTT (under the device's own namespace; `sendMQTTData` prefixes every topic with `MQTTPubNamespace`, MQTTstuff.ino:1427-1429):
@@ -2929,7 +2931,7 @@ This section covers these firmware features:
 
 ### Purpose
 
-**Solar gain compensation.** Detects that the room is warming while the boiler modulates low, and then lowers the control setpoint sent to the boiler by a fixed offset and stops the PID integral from accumulating. The code comment names it "Solar Gain Compensation (Task #23)" (SATcontrol.ino:4206-4207). It is off by default (SATtypes.h:494).
+**Solar gain compensation.** Detects that the room is warming while the boiler modulates low, and then lowers the requested setpoint by a fixed offset before the clamp, the mode step and the cold cutoff, and, with `bSolarFreezeIntegral` on, skips the PID integral update (corrected 2026-10-24, TASK-1351); TASK-1323. The code comment names it "Solar Gain Compensation (Task #23)" (SATcontrol.ino:4206-4207). It is off by default (SATtypes.h:494).
 
 **Summer Simmer index and thermal comfort.** The index function carries the comment "Matches SAT Python summer_simmer.py formula exactly" (SATcontrol.ino:2576-2577). It is published as MQTT topics whenever a humidity value is valid (SATcontrol.ino:3012-3019). When `bThermalComfort` is on, the index replaces the room temperature used by the controller (SATcontrol.ino:1258-1270). That option is off by default (SATtypes.h:522).
 
@@ -3002,7 +3004,7 @@ The firmware has one control loop, not a separate 60 s PID tick and 5 s heating 
 
 Order inside one tick (SATcontrol.ino:4614-5018):
 
-1. Early exits that skip everything in this section: SAT disabled or flashing (SATcontrol.ino:4568-4573), safety tripped (SATcontrol.ino:4581), DHW active (SATcontrol.ino:4635-4652), invalid room temperature (SATcontrol.ino:4669-4683), boiler fault bit set (SATcontrol.ino:4716-4719), thermal-estimation safe setpoint (SATcontrol.ino:4730-4746).
+1. Early exits that skip everything in this section: SAT disabled or flashing (SATcontrol.ino:4568-4573), safety tripped (SATcontrol.ino:4581), DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]), invalid room temperature (SATcontrol.ino:4669-4683), boiler fault bit set (SATcontrol.ino:4716-4719), thermal-estimation safe setpoint (SATcontrol.ino:4730-4746).
 2. Window timer check (SATcontrol.ino:4755). See "Window" below.
 3. Pressure update, then pressure status text (SATcontrol.ino:4758-4759).
 4. Solar gain update, `satUpdateSolarGain()` (SATcontrol.ino:4762, SATcontrol.ino:4215-4299):
@@ -3026,19 +3028,19 @@ Order inside one tick (SATcontrol.ino:4614-5018):
 10. Boiler status update (feeds device health) (SATcontrol.ino:4814).
 11. Humidity weather fallback: if humidity is not valid and weather data is valid, copy the weather humidity, mark it valid and give it the weather update time (SATcontrol.ino:4816-4822).
 12. Comfort offset `satUpdateComfort()` (SATcontrol.ino:4823, SATcontrol.ino:3222-3246). The effective target is `fTargetTemp + fComfortOffset`, plus a PV boost when active (SATcontrol.ino:4831-4833). This effective target drives both the heating curve and the PID (SATcontrol.ino:4836-4839).
-13. PID update with the filtered room temperature (SATcontrol.ino:4839). Integral freeze while solar gain is active: inside the integral update, after the deadband test, `if (state.sat.bSolarGainActive) return;` (SATpid.ino:162-163). Order inside `_pidUpdateIntegral`:
-    - if |error| > deadband: integral set to 0 and return (SATpid.ino:153-157);
-    - if Ki is near zero: return (SATpid.ino:160);
-    - if solar gain is active: return without accumulating (SATpid.ino:163).
-    So during solar gain the firmware still resets the integral to 0 when |error| > deadband (default 0.1 °C, SATtypes.h:443). Only accumulation inside the band is frozen. The setting `bSolarFreezeIntegral` is not read here: a search of the firmware for it found only settings storage, REST, MQTT publish and debug output (settingStuff.ino:392, settingStuff.ino:1109, restAPI.ino:2318, restAPI.ino:4028, SATcontrol.ino:2536, SATcontrol.ino:2981, handleDebug.ino:122). The freeze therefore applies whenever solar gain is active, regardless of that setting. The derivative is still updated (SATpid.ino:294). The multi-zone PID has no solar freeze (SATcontrol.ino:1842-1853).
-14. PWM or continuous mode produces `finalSetpoint` (SATcontrol.ino:4928-4937). The value before the solar offset is stored as `_sat_lastControlCS` (SATcontrol.ino:4939).
-15. Solar offset: if solar gain is active and enabled, `finalSetpoint -= fSolarSetpointOffset`, then clamp to at least 10 °C (SATcontrol.ino:4941-4946). There is no ECO-mode exception: a search for `iHeatingMode` found it only in settings, publish, REST and debug code (SATcontrol.ino:2533, SATcontrol.ino:2978, restAPI.ino:2315, settingStuff.ino:1104, handleDebug.ino:119).
-16. The continuous/PWM auto-switch and the cold-setpoint cutoff use `pidOutput`, not the offset value (SATcontrol.ino:4917, SATcontrol.ino:4951-4953, SATcontrol.ino:4971-4975). Commands sent: CS = `finalSetpoint`, MM = computed modulation, CH = 1 when `finalSetpoint > 10`, else 0 (SATcontrol.ino:4978-4983).
+13. PID update with the filtered room temperature (SATcontrol.ino:4839). Integral freeze (corrected 2026-10-24, TASK-1351); TASK-1323: at the start of the integral update, before the deadband test, `if (state.sat.bSolarGainActive && settings.sat.bSolarFreezeIntegral) return;` (SATpid.ino:157). Order inside `_pidUpdateIntegral`:
+    - if solar gain is active and the freeze setting is on: return, nothing changes (SATpid.ino:157);
+    - if |error| > deadband: integral set to 0 and return (SATpid.ino:160-163);
+    - if Ki is near zero: return (SATpid.ino:166).
+    So during a freeze the reset to 0 outside the deadband is skipped too, as thermo-nova (pid.py:167-168, pid.py:187-189). With the setting off, solar gain does not touch the integral. The derivative is still updated (SATpid.ino:294). The multi-zone PID has no solar freeze (SATcontrol.ino:1842-1853).
+14. PWM or continuous mode produces `finalSetpoint` from `pidOutput`, which already carries the solar offset (SATcontrol.ino:5162-5183); it is stored as `_sat_lastControlCS` (SATcontrol.ino:5182) (corrected 2026-10-24, TASK-1351).
+15. Solar offset: if solar gain is active and enabled, `pidOutput -= fSolarSetpointOffset` before the clamp to [10, effective maximum] (SATcontrol.ino:5137-5152); this happens before step 14 in the code (corrected 2026-10-24, TASK-1351); TASK-1323. There is no ECO-mode exception: a search for `iHeatingMode` found it only in settings, publish, REST and debug code (SATcontrol.ino:2533, SATcontrol.ino:2978, restAPI.ino:2315, settingStuff.ino:1104, handleDebug.ino:119).
+16. The continuous/PWM auto-switch and the cold-setpoint cutoff use `pidOutput` after the offset (SATcontrol.ino:5188-5190, SATcontrol.ino:5206-5214). Commands sent: CS = `finalSetpoint`, MM = computed modulation, CH from `satChEnableDecide` (SATcontrol.ino:5216-5223, SATchEnable.h:46-52) (corrected 2026-10-24, TASK-1351).
 17. Publish (SATcontrol.ino:5018). The sync debouncers and other health outputs are evaluated inside `satPublishMQTT()` (SATcontrol.ino:3083-3118).
 
 #### Per heating control loop (firmware: the 3 s suppression refresh)
 
-The firmware has no 5 s heating loop. The closest equivalent that touches this section is `satPwmSuppressionRefresh()`, timer every 3 s (SATcontrol.ino:480, SATcontrol.ino:894-918). It runs only in PWM mode during the flame-on phase after the hold, and not while valves are closed or summer mode is active (SATcontrol.ino:899-905). It applies the same solar offset to its refreshed setpoint, with the same clamp to 10 °C, and stores the pre-offset value as `_sat_lastControlCS` (SATcontrol.ino:907-917). It uses the solar flag from the latest control tick (derived: the flag is written only in `satUpdateSolarGain`, SATcontrol.ino:4215-4299).
+The firmware has no 5 s heating loop. The closest equivalent that touches this section is `satPwmSuppressionRefresh()`, timer every 3 s (SATcontrol.ino:480, SATcontrol.ino:894-918). It runs only in PWM mode during the flame-on phase after the hold, and not while valves are closed or summer mode is active (SATcontrol.ino:899-905). It applies no solar offset; it stores the refreshed CS as `_sat_lastControlCS` (`satPwmSuppressionRefresh`, SATcontrol.ino:1045-1065) (corrected 2026-10-24, TASK-1351); TASK-1323.
 
 #### Health sensor evaluation
 
@@ -3106,13 +3108,15 @@ else:
 sun gate (only with fresh sun data): elevation < fSolarMinElevation -> inactive at once
 ```
 
-**Setpoint with solar gain** (SATcontrol.ino:4941-4945, SATcontrol.ino:911-914):
+**Setpoint with solar gain** (SATcontrol.ino:5137-5152, SATchEnable.h:46-52) (corrected 2026-10-24, TASK-1351); TASK-1323:
 
 ```
-finalSetpoint = PWM or continuous result, clamped to [10, maxSetpoint]
 if bSolarGainActive and bSolarGainEnable:
-    finalSetpoint = max(finalSetpoint - fSolarSetpointOffset, 10)
-CH = 1 if finalSetpoint > 10 else 0
+    pidOutput = pidOutput - fSolarSetpointOffset
+pidOutput = clamp(pidOutput, 10, effectiveMax)          # the requested setpoint
+finalSetpoint = PWM or continuous result from pidOutput, clamped to [10, effectiveMax]
+if pidOutput <= coldSetpoint: finalSetpoint = 10, PWM left
+CH = satChEnableDecide(pidOutput, coldSetpoint, pwmDrivesSetpoint, pwmOn)
 ```
 
 **Summer Simmer index** (SATcontrol.ino:2577-2583):
@@ -3240,7 +3244,7 @@ The ring holds 20 samples taken at least 30 s apart (SATcontrol.ino:3326, SATcon
 | `fSolarSetpointOffset` range | 0.5 to 10.0 | °C | settingStuff.ino:1084 |
 | `fSolarMinElevation` default | 12.0 | degrees | SATtypes.h:497 |
 | `fSolarMinElevation` range | -10 to 45 | degrees | settingStuff.ino:1085 |
-| `bSolarFreezeIntegral` default (not read by control code) | true | bool | SATtypes.h:527 |
+| `bSolarFreezeIntegral` default (read by the PID since TASK-1323, corrected 2026-10-24, TASK-1351) | true | bool | SATtypes.h:549 |
 | Solar rise-rate minimum sample gap | > 30 | s | SATcontrol.ino:4235 |
 | Solar rise-rate EMA weights | 0.3 new, 0.7 old | - | SATcontrol.ino:4238 |
 | Solar modulation limit | < 20 | % | SATcontrol.ino:4269 |
@@ -3325,8 +3329,8 @@ The "No" entries mean that no save code for them was found; the persistence entr
 
 **To the boiler.**
 
-- Solar gain lowers the control setpoint (CS) by `fSolarSetpointOffset` after PWM or continuous control, with a floor of 10 °C, on every control tick and on every 3 s suppression refresh (SATcontrol.ino:4941-4945, SATcontrol.ino:911-914, SATcontrol.ino:4980). When that drops the CS to 10 °C, CH is commanded 0 (SATcontrol.ino:4982-4983). The cold-setpoint cutoff and the mode switches are not affected by the offset, because they compare `pidOutput` (SATcontrol.ino:4917, SATcontrol.ino:4951, SATcontrol.ino:4971).
-- Solar gain also blocks integral accumulation inside the deadband, whatever `bSolarFreezeIntegral` says, but does not block the reset to 0 outside the deadband (SATpid.ino:153-163).
+- Solar gain lowers the requested setpoint (`pidOutput`) by `fSolarSetpointOffset` before the clamp, on every control tick; the 3 s suppression refresh has no solar term (SATcontrol.ino:5137-5152, SATcontrol.ino:1045-1065). The cold-setpoint cutoff, the CH rule and the mode switches see the lowered value, so solar can switch the heater off (SATcontrol.ino:5188-5223) (corrected 2026-10-24, TASK-1351); TASK-1323.
+- With `bSolarFreezeIntegral` on, solar gain skips the whole integral update, the reset to 0 outside the deadband included (SATpid.ino:157) (corrected 2026-10-24, TASK-1351); TASK-1323.
 - Summer mode (`bSummerSimmer`) sends CS=10, MM=`iMaxRelModulation`, CH=0 and skips the PID while active (SATcontrol.ino:4766-4776).
 - Thermal comfort replaces the OT room temperature with the index, which then drives the room filter, the PID, the error and both history mechanisms (SATcontrol.ino:1264-1270, SATcontrol.ino:4656, SATcontrol.ino:4839). It also feeds the solar rise rate (SATcontrol.ino:4225).
 - The comfort offset changes the target used by the heating curve and the PID (SATcontrol.ino:4831-4839).
@@ -3365,15 +3369,15 @@ The "No" entries mean that no save code for them was found; the persistence entr
 
 ### Edge cases
 
-- **Solar gain in ECO mode.** No ECO exception exists; the offset is applied in both modes (SATcontrol.ino:4941-4945; `iHeatingMode` search result under "Behaviour" step 15).
+- **Solar gain in ECO mode.** No ECO exception exists; the offset is applied in both modes (SATcontrol.ino:5141-5142 [lines refreshed 2026-10-24, TASK-1351]; `iHeatingMode` search result under "Behaviour" step 15).
 - **No valve data.** `bValvesOpen` defaults to true (SATtypes.h:243), so the valve term is met unless an MQTT `valves_open` command says otherwise (MQTTstuff.ino:634-639).
 - **No sun elevation.** Solar gain still works on rise rate and modulation alone (SATcontrol.ino:4262). Thermo-nova instead keeps solar gain off without sun data (a7-features-thermonova.md:343). Sun data older than 1 h is dropped and the same rule applies (SATcontrol.ino:4251-4253).
 - **Flame off.** The solar code does not look at the flame. It uses the boiler's reported relative modulation; before any report this is 0.0, which counts as low (SATcontrol.ino:4267-4269, OTGW-Core.h:72).
 - **Slow activation and slow release.** Activation needs more than 10 min of continuous qualifying ticks, and release needs more than 10 min of continuous not-fast ticks (SATcontrol.ino:4276, SATcontrol.ino:4289). A single tick that is not "rising fast" during the activation phase restarts the 10 min (SATcontrol.ino:4282-4284).
 - **Disable and re-enable.** Disabling solar gain does not clear the stored sample or the average (SATcontrol.ino:4217-4223). After a long disabled period the first new rise rate spans the whole gap (derived from SATcontrol.ino:4235-4238).
-- **Solar setpoint floor.** After the offset the CS is clamped to at least 10 °C. A CS of exactly 10 °C commands CH=0 (SATcontrol.ino:4944, SATcontrol.ino:4982-4983). Example (arithmetic): a PWM or continuous result of 12 °C minus the default 2 °C gives 10 °C, so CH=0.
-- **Continuous mode floor.** The continuous-mode lower limit (boiler temperature minus `fFlowOffset`) is applied before the solar offset, so the offset can take the CS below that limit (derived from SATcontrol.ino:1179-1186, SATcontrol.ino:4932, SATcontrol.ino:4941-4944).
-- **Integral during solar gain.** If the room rises more than the deadband above target, the integral is reset to 0 even while solar gain is active (SATpid.ino:153-157). Inside the deadband it stays frozen (SATpid.ino:163).
+- **Solar setpoint floor.** After the offset the requested setpoint is clamped to at least 10 °C (SATcontrol.ino:5150). CH follows `satChEnableDecide`, not the CS value: a lowered request at or below the cold setpoint gives CH=0 and CS=10 (SATchEnable.h:46-52) (corrected 2026-10-24, TASK-1351).
+- **Continuous mode floor.** The continuous-mode lower limit (boiler temperature minus `fFlowOffset`) is applied after the solar offset, so the offset can no longer take the CS below that limit (SATcontrol.ino:5137-5176) (corrected 2026-10-24, TASK-1351); TASK-1323.
+- **Integral during solar gain.** With `bSolarFreezeIntegral` on (default) the integral is neither accumulated nor reset while solar gain is active; with it off, the normal deadband rules apply (SATpid.ino:157-163) (corrected 2026-10-24, TASK-1351); TASK-1323.
 - **Thermal comfort with a BLE, multi-area or external room sensor.** No index is used, because those sources return before the thermal comfort code (SATcontrol.ino:1208-1231, SATcontrol.ino:1264).
 - **Thermal comfort without fresh humidity.** The PID keeps running on the raw OT room temperature and a debug line is written (SATcontrol.ino:1271). Thermo-nova instead skips the PID tick (a7-features-thermonova.md:349-350).
 - **Thermal comfort with only weather data.** When no direct humidity is valid and weather data is valid, the outdoor humidity is copied in and used for the index, as long as the weather update is not older than `iHumidityTimeoutS` (SATcontrol.ino:4816-4822, SATcontrol.ino:1265).
@@ -3383,7 +3387,7 @@ The "No" entries mean that no save code for them was found; the persistence entr
 - **Summer mode release time.** Any check with outside at or above threshold - 2 °C refills the counter, so release needs `iSummerMinHours` of continuous checks below threshold - 2 °C (derived from SATcontrol.ino:4344-4356).
 - **Simmer index below 58 °F (about 14.4 °C).** The index returns the input temperature unchanged and unrounded (SATcontrol.ino:2580).
 - **Simmer index topic with thermal comfort on.** The published index is computed from `satGetRoomTemp()`, which already returns the index when thermal comfort is active, so the topic shows the index of the index (derived from SATcontrol.ino:3015 and SATcontrol.ino:1264-1270). Thermo-nova has the same effect (a7-features-thermonova.md:337).
-- **History while not heating.** Both mechanisms are skipped on ticks that exit early for DHW, summer mode or closed valves (SATcontrol.ino:4635-4652, SATcontrol.ino:4766-4799).
+- **History while not heating.** Both mechanisms are skipped on ticks that exit early for DHW, summer mode or closed valves (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], SATcontrol.ino:4766-4799).
 - **History sample is one tick old.** Both history functions run before this tick's PID update and read `fError` from the previous update (SATcontrol.ino:4796-4799, SATcontrol.ino:4839, SATpid.ino:305) (derived).
 - **Daily recommendation after restart.** The text is "insufficient" until the next UTC day boundary recomputes it, even when 3 or more days were restored (SATcycles.ino:254-257, SATcycles.ino:1224-1242) (derived).
 - **Daily recommendation after a SAT disable.** `satDisable()` clears the daily ring in RAM (SATcontrol.ino:2174, SATcycles.ino:1189-1197). The file is overwritten at the next save (SATcycles.ino:1097-1133) (derived).
@@ -3404,7 +3408,7 @@ The "No" entries mean that no save code for them was found; the persistence entr
 ### Not found in the code / unclear
 
 1. **Home Assistant discovery for the health topics, the index and the recommendations.** A tree-wide search of `src/OTGW-firmware` for `pressure_health`, `device_health`, `cycle_health`, `setpoint_sync`, `modulation_sync`, `ch_sync`, `curve_recommendation`, `heating_curve_recommendation`, `summer_simmer_index`, `sat/ssi` and `indoor_rise_rate` found no discovery code. The SAT discovery list (MQTTHaDiscovery.cpp:300-357) includes `sat/flame_health` but none of these. This conflicts with a code comment that calls `sat/device_health`, `sat/cycle_health`, the three sync topics and `sat/pressure_health` "HA binary_sensor entities" (SATmqttPublish.h:171-176). The two sources disagree; this section does not pick one. If no discovery exists, the device class and how Home Assistant shows them are not defined in the firmware. For `sat/pressure_health` the ON = healthy polarity matters if some external configuration declares it a PROBLEM sensor.
-2. **`bSolarFreezeIntegral` is stored and published but never read by control code** (search result in "Behaviour" step 13). Whether that is intended is not stated.
+2. **`bSolarFreezeIntegral`.** Resolved: read by the PID since TASK-1323 (SATpid.ino:157; entry 11 answer 3) (corrected 2026-10-24, TASK-1351).
 3. **Boiler modulation with the flame off.** The solar rule uses the reported relative modulation without a flame check (SATcontrol.ino:4267-4269). What a given boiler reports while the flame is off is not in the firmware.
 4. **Exact solar sampling cadence at a 30 s tick.** The "more than 30 s" test (SATcontrol.ino:4235) against a 30 s timer (SATcontrol.ino:476) makes the cadence depend on loop timing, which the code does not fix.
 5. **NaN index publish.** If `satGetRoomTemp()` returns NaN while humidity is valid, the index is computed from NaN and passed to `publishIfChangedF` (SATcontrol.ino:3014-3017). How that helper handles NaN was not read.
@@ -3493,8 +3497,8 @@ The PID, heating curve, PWM schedule and cycle classification are only reference
    - Control mode becomes CONTINUOUS (`SATcontrol.ino:3721-3722`).
    - If a command interface exists: `PM=3`, `PM=15`, `PM=48`, and `MI=500` when the manufacturer has the `SAT_QUIRK_MI_500_BOOT` flag (`SATcontrol.ino:3725-3733`). That flag is set for Ideal, Intergas and Nefit (`SATcontrol.ino:128`, `SATcontrol.ino:130`, `SATcontrol.ino:132`).
    - The manufacturer is the configured one, or the detected one when the setting is AUTO (`SATcontrol.ino:144-149`). The detected value starts as OTHER (`SATtypes.h:240`) and changes only when a MsgID 3 frame arrives (`OTGW-Core.ino:3076`). So at boot, with the default AUTO setting (`SATtypes.h:472`), `MI=500` is sent only if MsgID 3 was already seen.
-   - **PIC path: only `PM=48` survives.** `addCommandToQueue()` with `forceQueue` false overwrites a queued command that has the same two letters (`OTGW-Core.ino:3663-3675`, `OTGW-Core.ino:3698-3705`). The queue is sent only from `handleCommandQueue()` in the 1 s task (`OTGW-firmware.ino:756-758`, `OTGW-Core.ino:3737-3745`). The three `PM=` calls run back to back (`SATcontrol.ino:3726-3728`), so `PM=15` replaces `PM=3` and `PM=48` replaces `PM=15` before anything is sent. This follows from reading the code. It was not checked on hardware.
-   - **OT-Direct path:** each command goes straight to `handleOTDirectCommand()` (`OTGW-Core.ino:3618-3624`). `PM=<id>` marks that MsgID for an immediate poll, or queues a one-shot READ if it is not in the schedule (`OTDirect.ino:3369-3392`). So all three are handled. `MI=` sets the OT-Direct message interval (100 to 1275 ms) and stores it in settings (`OTDirect.ino:3572-3582`).
+   - **PIC path: one `PM=` at a time** (corrected 2026-10-24, TASK-1351); TASK-1315. `initSAT()` calls `pmChainStart()` (`SATcontrol.ino:3946-3948`). The PIC keeps one pending priority message, so the chain queues `PM=3` first; the next `PM=` is queued when the boiler answered the pending ID (`pmChainOnBoilerResponse`, called from `processOT()`) or after 60 s, the chain removes only its own previous `PM=` from the queue, and an ID that timed out is asked once more after the last one (`OTGW-Core.ino:3895-3982`). Before TASK-1315 the three calls ran back to back and only `PM=48` survived the queue. This follows from reading the code; it was not checked on hardware in this correction.
+   - **OT-Direct path:** `pmChainStart()` queues all three at once (`OTGW-Core.ino:3950-3958`) (corrected 2026-10-24, TASK-1351); each command goes straight to `handleOTDirectCommand()` (`OTGW-Core.ino:3618-3624`). `PM=<id>` marks that MsgID for an immediate poll, or queues a one-shot READ if it is not in the schedule (`OTDirect.ino:3369-3392`). So all three are handled. `MI=` sets the OT-Direct message interval (100 to 1275 ms) and stores it in settings (`OTDirect.ino:3572-3582`).
    - Enabling SAT later (MQTT `enabled`, REST, settings page) does not send `PM=` or `MI=`: those paths only set the flag and clear a safety trip (`SATcontrol.ino:1950-1958`, `settingStuff.ino:981-992`).
    - Compare: thermo-nova sends `PM=3`, `PM=15`, `PM=48` (and `MI=500`) on the OTGW-MQTT path on every coordinator start, twice per start.
 6. **No setpoint is computed before the first control tick.** All CS, MM, CH, TP and TC writes of the regulation come from the timer-guarded part of the control pass (`SATcontrol.ino:4614`, `SATcontrol.ino:4978-4994`), plus the special paths in Behaviour C.
@@ -3525,9 +3529,9 @@ Steps 1 to 9 run on every pass. Steps 10 onward run only when the control timer 
 8. Flame edge detection, cycle sampling, window statistics (`SATcontrol.ino:4592-4605`).
 9. **Between-tick writes.**
    - PIC CS keepalive (`SATcontrol.ino:4608`): on a PIC board, if a CS of 8 or more was sent, it is re-sent unchanged when 30 s have passed since the last CS (`SATcontrol.ino:405-414`). The comment says the PIC drops a CS of 8 or more about 63 to 126 s after the last one (`SATcontrol.ino:398-402`).
-   - PWM suppression refresh (`SATcontrol.ino:4611`): every 3 s, only in PWM ON phase with the flame on, after the hold delay, with overshoot protection on, no DHW and no fault flag (`SATcontrol.ino:894-905`). It sends `CS = flow - fModSupOffset`, clamped to [10, system cap] and then to the effective maximum, minus the solar offset if active (`SATcontrol.ino:907-917`, `SATcontrol.ino:711-717`). This belongs to the PWM section.
+   - PWM suppression refresh (`SATcontrol.ino:4611`): every 3 s, only in PWM ON phase with the flame on, after the hold delay, with overshoot protection on, no DHW and no fault flag (`SATcontrol.ino:894-905`). It sends `CS = flow - fModSupOffset`, clamped to [10, system cap] and then to the effective maximum; no solar offset (`SATcontrol.ino:1045-1065`) (corrected 2026-10-24, TASK-1351). This belongs to the PWM section.
 10. **Control tick gate.** If the timer is not due, the pass ends (`SATcontrol.ino:4614`). Otherwise `bActive` = true, and control mode OFF becomes CONTINUOUS (`SATcontrol.ino:4616-4619`).
-11. **DHW check.** `bDhwActive` is set from slave status bit 2, or forced true during a simulated draw (`SATcontrol.ino:4625-4629`). Power and energy are updated (`SATcontrol.ino:4632-4633`). If DHW is active, SAT sends `SW=` on the transition only (see Behaviour F) and returns (`SATcontrol.ino:4635-4652`). **No CS, MM or CH is written during DHW.**
+11. **DHW check.** `bDhwActive` is set from slave status bit 2, or forced true during a simulated draw (`SATcontrol.ino:4625-4629`). Power and energy are updated (`SATcontrol.ino:4632-4633`). If DHW is active, SAT sends `SW=` on the transition only (see Behaviour F) and returns (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`). **No CS, MM or CH is written during DHW.**
 12. **Room temperature check.** If the room temperature is NaN or outside [-10, 50] °C, the skip counter grows and the tick returns without writing. At 10 consecutive skips the safety trips (`SATcontrol.ino:4669-4684`, `SATcontrol.ino:68`). See Behaviour G.
 13. Room temperature EMA filter, tau 45 s (`SATcontrol.ino:4694-4713`). PID section.
 14. **Boiler fault flag.** If slave status bit 0 is set, the tick returns without writing (`SATcontrol.ino:4716-4719`).
@@ -3548,7 +3552,7 @@ Steps 1 to 9 run on every pass. Steps 10 onward run only when the control timer 
     - PWM ON, flame on, after the delay: `flow - fModSupOffset`, clamped to [10, system cap] (`SATcontrol.ino:887-888`, `SATcontrol.ino:711-717`).
     - Continuous: `pidOutput` when the flame is off, the flow is 0 or less or above 100, or the flow is at or below `pidOutput`; otherwise `max(pidOutput, flow - fFlowOffset)` (`SATcontrol.ino:1161-1186`). There is no rising/falling distinction.
     - Compare: thermo-nova's continuous branch holds a falling request at the previous setpoint; the firmware does not compare with the previous setpoint.
-25. **Final clamp** of the setpoint to [10, effective maximum] (`SATcontrol.ino:4936-4937`), then minus the solar offset if active, floored at 10 (`SATcontrol.ino:4942-4945`).
+25. **Final clamp** of the setpoint to [10, effective maximum] (`SATcontrol.ino:5178-5183`). The solar offset is no longer applied here; it lowers `pidOutput` before step 22 (`SATcontrol.ino:5137-5143`) (corrected 2026-10-24, TASK-1351); TASK-1323.
 26. Auto-switch check, only when not a heat pump and `pidOutput` is above the cold setpoint (`SATcontrol.ino:4951-4953`). PWM section.
 27. **Modulation value** `iCurrentModulation = satComputeMM(...)` (`SATcontrol.ino:4960-4967`):
     - heat pump outside PWM: 100;
@@ -3556,14 +3560,14 @@ Steps 1 to 9 run on every pass. Steps 10 onward run only when the control timer 
     - otherwise the configured maximum `iMaxRelModulation`;
     - heat pump or hybrid never get 0 (it becomes 100);
     - Geminox (`SAT_QUIRK_MIN_MOD_10`): at least 10; Immergas (`SAT_QUIRK_IMMERGAS_TP`): at most 80 (`SATcontrol.ino:304-314`).
-28. **Cold-setpoint cutoff.** If `pidOutput` is below the cold setpoint (28.2 °C radiators, 21 °C underfloor), the setpoint becomes 10 and the modulation becomes 100 (`SATcontrol.ino:4971-4975`, `SATcontrol.ino:55-56`, `SATcontrol.ino:264-268`).
+28. **Cold-setpoint cutoff.** If `pidOutput` is at or below the cold setpoint (28.2 °C radiators, 21 °C underfloor), the setpoint becomes 10, the modulation `iMaxRelModulation`, and `satPwmDisableOnHeaterOff()` leaves PWM (`SATcontrol.ino:5206-5214`, `SATcontrol.ino:1100-1109`, `SATcontrol.ino:130-131`) (corrected 2026-10-24, TASK-1351); TASK-1327.
 29. **Writes, in this order, when a command interface exists** (`SATcontrol.ino:4978-4994`):
     1. `CS=<setpoint>` via `satEnqueueIfChangedCS()` (`SATcontrol.ino:4980`);
     2. `MM=<value>` via `satEnqueueIfChangedMM()` (`SATcontrol.ino:4981`);
-    3. `CH=1` if the setpoint is above 10, else `CH=0`, via `satEnqueueIfChangedCH()` (`SATcontrol.ino:4982-4983`);
+    3. `CH=` from `satChEnableDecide()` via `satEnqueueIfChangedCH()` (`SATcontrol.ino:5223`, `SATchEnable.h:46-52`) (corrected 2026-10-24, TASK-1351);
     4. Immergas only: `TP=11:12=<setpoint, 0 decimals>`, sent on every tick, not write-on-change (`SATcontrol.ino:4986-4990`);
     5. `TC=<fTargetTemp>` via `satEnqueueIfChangedTC()` when `bPushSetpoint` is on (`SATcontrol.ino:4992-4994`).
-    - Compare: thermo-nova sets CH from `control_setpoint > 22`; the firmware sets CH from `setpoint > 10`. Thermo-nova sends `TP=11:12=min(MM, 80)` for Immergas; the firmware sends the control setpoint in `TP=11:12`. Thermo-nova sends `PM=25` after every CS on the OTGW-MQTT path; no `PM=25` was found in the firmware (search of all `.ino`, `.h` and `.cpp` files).
+    - Compare: thermo-nova sets CH from `control_setpoint > 22`; the firmware sets CH from the requested setpoint against 28.2 / 21 and the PWM phase (entries 7, 9, 11, 17) (corrected 2026-10-24, TASK-1351). Thermo-nova sends `TP=11:12=min(MM, 80)` for Immergas; the firmware sends the control setpoint in `TP=11:12`. Thermo-nova sends `PM=25` after every CS on the OTGW-MQTT path; no `PM=25` was found in the firmware (search of all `.ino`, `.h` and `.cpp` files).
 30. **No command interface.** The PIC-failure counter grows. At 5 the safety trips (`SATcontrol.ino:4996-5005`, `SATcontrol.ino:69`). See G.
 31. PID state save every 300 s, MQTT publish (`SATcontrol.ino:5007-5018`).
 
@@ -3614,7 +3618,7 @@ When `settings.sat.bSimulation` is on:
   - The `dhw_enable` option (`bDhwEnable`, default true, `SATtypes.h:459`) sends `HW=1` or `HW=0` when its value changes, but only if the boiler reported MsgID 3 bit HB3 (storage tank) (`settingStuff.ino:1018-1031`). It is not tied to the control loop.
   - Compare: thermo-nova never writes a DHW setpoint from the control loop; it writes `SW` only from the user number entity.
 - **Effect of DHW active on control.**
-  - The control tick returns right after the DHW check (`SATcontrol.ino:4635-4652`). No CS, MM or CH is written, no PID update runs, and the 300 s write-on-change refresh does not happen.
+  - The control tick returns right after the DHW check (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`). No CS, MM or CH is written, no PID update runs, and the 300 s write-on-change refresh does not happen.
   - The last sent values stay in effect as far as the firmware is concerned. On a PIC board the CS keepalive keeps re-sending the last CS during DHW, because it runs before the timer gate (`SATcontrol.ino:4608`, `SATcontrol.ino:405-414`).
   - The comment says "DHW has priority, don't adjust CH setpoint, boiler manages itself" (`SATcontrol.ino:4636`).
   - Compare: thermo-nova keeps writing during DHW and sets MM to the configured maximum (HOT_WATER modulation state); the firmware writes nothing.
@@ -3671,8 +3675,8 @@ Variable names are as in the code.
 
 - Effective maximum: `m = MaxTSet; if m < 30: m = 75; m = min(m, sysCap, hardMax, globalMax)` with `sysCap` = 45 underfloor or 62, then 40 for heat pump; `hardMax` = 50 underfloor or 80; `globalMax` = `fMaxSetpoint`, or 65 when outside [30, 80] (`SATcontrol.ino:228-252`).
 - Cold setpoint: 21.0 underfloor, 28.2 otherwise (`SATcontrol.ino:264-268`).
-- Written setpoint: `clamp(branch(pidOutput), 10, effectiveMax)`, minus `fSolarSetpointOffset` floored at 10 when solar gain is active, and 10 when `pidOutput < coldSetpoint` (`SATcontrol.ino:4936-4945`, `SATcontrol.ino:4971-4975`).
-- Written CH: `1 if finalSetpoint > 10 else 0` (`SATcontrol.ino:4982-4983`).
+- Written setpoint: `clamp(branch(pidOutput), 10, effectiveMax)`, where `pidOutput` already carries the solar offset, and 10 when `pidOutput <= coldSetpoint` (`SATcontrol.ino:5137-5183`, `SATcontrol.ino:5206-5214`) (corrected 2026-10-24, TASK-1351).
+- Written CH: `satChEnableDecide(pidOutput, coldSetpoint, pwmDrivesSetpoint, pwmOn)`: 0 at or below the cold setpoint or in the PWM OFF phase, else 1 (`SATchEnable.h:46-52`, `SATcontrol.ino:5223`) (corrected 2026-10-24, TASK-1351).
 - Written MM: `satComputeMM(pwmMode, heatPump, heatPumpOrHybrid, iMaxRelModulation, quirks)`, or 100 under the cold-setpoint cutoff (`SATcontrol.ino:304-314`, `SATcontrol.ino:4973`).
 - PWM hold: `clamp(return + fFlameOffOffset, coldSetpoint, sysCap)` (`SATcontrol.ino:701-707`).
 - PWM suppression: `clamp(flow - fModSupOffset, 10, sysCap)` (`SATcontrol.ino:711-717`).
@@ -3797,10 +3801,10 @@ Compare (defaults that differ from thermo-nova): overshoot protection true here,
 
 ### Edge cases
 
-- **Only `PM=48` reaches a PIC at boot.** See A.5 (`OTGW-Core.ino:3663-3675`, `SATcontrol.ino:3726-3728`).
+- **`PM=3`, `PM=15`, `PM=48` reach a PIC one at a time at boot** (TASK-1315). See A.5 (`OTGW-Core.ino:3895-3982`, `SATcontrol.ino:3946-3948`) (corrected 2026-10-24, TASK-1351): before TASK-1315 only `PM=48` reached a PIC.
 - **First MM=0 or CH=0 within 300 s of boot can be skipped.** `satResetCmdCache()` sets the send times to 0 but keeps the last values (`SATcontrol.ino:356-362`), and those start at 0 (`SATtypes.h:397-398`). The first CS send sets `bLastSentValid` true (`SATcontrol.ino:394`). The MM and CH checks then see "valid, same value, not stale" while `millis()` is below 300000, and return without sending (`SATcontrol.ino:418-419`, `SATcontrol.ino:432-433`). So a first commanded `MM=0` or `CH=0` in the first 5 minutes of uptime is not sent until the refresh. From reading the code; not checked on hardware.
-- **CH follows `setpoint > 10`.** Any written setpoint above 10 gives `CH=1`, including the PWM hold at 28.2 °C (`SATcontrol.ino:4982`). Compare: thermo-nova gives CH=0 for setpoints of 22 or less.
-- **Cold cutoff sets MM=100, the other off paths set MM=max.** Cold cutoff: 100 (`SATcontrol.ino:4973`). Summer simmer and valves closed: `iMaxRelModulation` (`SATcontrol.ino:4771`, `SATcontrol.ino:4784`). With the default 100 both are the same.
+- **CH follows `satChEnableDecide`.** CH=0 when the requested setpoint is at or below 28.2 / 21 or in the PWM OFF phase, otherwise CH=1, the PWM ON phase included whatever CS keeps the flame on (`SATchEnable.h:46-52`, `SATcontrol.ino:5223`). Compare: thermo-nova gives CH=0 for a control setpoint of 22 or less (entries 7, 9, 11, 17) (corrected 2026-10-24, TASK-1351).
+- **All off paths set MM=max.** Cold cutoff: `iMaxRelModulation` (`SATcontrol.ino:1108`). Summer simmer and valves closed: `iMaxRelModulation` (`SATcontrol.ino:5001`, `SATcontrol.ino:5015`) (corrected 2026-10-24, TASK-1351); TASK-1327. Raw value: the entry-21 guards (heat pump/hybrid never 0, Geminox at least 10) do not apply on these paths. Open, see not-found item 15.
 - **PWM with overshoot protection off** keeps the previous setpoint while MM is still 0 in PWM (`SATcontrol.ino:872-874`, `SATcontrol.ino:308`). The firmware default is on (`SATtypes.h:466`).
 - **Immergas `TP` is sent every tick**, outside the write-on-change cache (`SATcontrol.ino:4984-4990`).
 - **Fallback re-enable does not send the boot `PM=` commands** (`SATcontrol.ino:4549-4552`; `PM=` only in `SATcontrol.ino:3725-3733`).
