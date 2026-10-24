@@ -36,6 +36,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q16 | queued | Cycles per hour default and range (audit #30) | - |
 | Q17 | queued | DHW setpoint: SW= on change, slider bounded by MsgID 48 (audit #31, entry 33) | - |
 | Q18 | queued | Zones: follow area.py (max, no headroom, cap overshoot)? (audit #32, entry 35) | - |
+| Q19 | queued | Units whose coefficient was set by the old wizard (1.4 / 0.6 / 0.8, not chosen by the user): leave them (entry 24) or reset them once to 2.0? (TASK-1347) | - |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its
