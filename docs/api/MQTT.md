@@ -57,7 +57,7 @@ Published at startup, on MQTT (re)connect, and every 5 minutes.
 
 | Topic | Value | Description |
 | ----- | ----- | ----------- |
-| `otgw-firmware/version` | `"1.3.0"` | Firmware version string |
+| `otgw-firmware/version` | `"2.0.0-alpha.492+abc1234"` | Firmware version string. Retained, so a client that subscribes later (for example Homey at pairing) gets it at once |
 | `otgw-firmware/reboot_count` | `"42"` | Number of reboots since first boot |
 | `otgw-firmware/reboot_reason` | `"Software/System restart"` | Last reboot reason |
 | `otgw-firmware/uptime` | `"12345"` | Uptime in seconds (not retained) |

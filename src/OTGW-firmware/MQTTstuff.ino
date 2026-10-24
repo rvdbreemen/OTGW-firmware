@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.491
+**  Version  : v2.0.0-alpha.492
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1669,7 +1669,7 @@ void sendMQTTversioninfo(){
   char rebootCountBuf[12];
   snprintf_P(rebootCountBuf, sizeof(rebootCountBuf), PSTR("%lu"), static_cast<unsigned long>(state.uptime.iRebootCount));
   sendMQTTData(F("otgw-firmware/hostname"), CSTR(settings.sHostname), true);  // retained: human-readable mapping of <uniqueid> to device name
-  sendMQTTData("otgw-firmware/version", _SEMVER_FULL);
+  sendMQTTData("otgw-firmware/version", _SEMVER_FULL, true);  // retained: integrations (Homey) read it at pairing; it only changes with a flash (TASK-1348)
   sendMQTTData("otgw-firmware/reboot_count", rebootCountBuf);
   sendMQTTData("otgw-firmware/reboot_reason", lastReset);
   // ADR-113: static, machine-readable hardware-type slug (board class). Retained so
