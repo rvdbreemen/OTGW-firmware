@@ -9,13 +9,17 @@ and then becomes a backlog task.
 George: if a question below is unclear or wrongly put, just say so. A correction of
 the question is as useful as an answer.
 
+We check for an answer every 4 hours. When a question has waited 12 hours and the chat
+has moved on (10 or more other messages since), we repeat it once, with a link to the
+original.
+
 Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 **answered** (recorded as an entry), **dropped** (no longer needed, with the reason).
 
 | # | Status | Topic | Blocks |
 |---|---|---|---|
 | Q1 | answered (entry 19: remove it) -> TASK-1341 | Keep the firmware's "PWM auto switch" setting at all? | nothing |
-| Q2 | asked (2026-10-24) | End-of-cycle switch: compare the tail flow with the control setpoint per sample, as thermo-nova | TASK-1331 |
+| Q2 | asked 2026-10-24 09:25 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563483620444999771)) | End-of-cycle switch: compare the tail flow with the control setpoint per sample, as thermo-nova | TASK-1331 |
 | Q3 | queued | Overshoot margin 2.0 equals the flow offset 2.0 | TASK-1331 |
 | Q4 | queued | Classifier steps the firmware keeps that classifier.py does not have | TASK-1331 |
 
