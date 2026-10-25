@@ -113,6 +113,27 @@ void satPidReset()
   state.sat.fRawDerivative = 0.0f;
 }
 
+//=== PID without a room temperature (TASK-1364, entries 38 and 46) ===
+// Lost or missing room temperature: no error, so P, I and D are 0 and the output is the
+// heating curve. Integral and raw derivative are reset (thermo-nova pid.reset(),
+// pid.py:134-137), not frozen. _pid_initialized stays set, so the first update after the
+// loss is a normal one (satPidReset() would hand back 0 there). _pid_lastError = NAN keeps the
+// unchanged-error gate in satPidUpdate() from returning this curve-only output after recovery.
+// state.sat.fError reads 0 meanwhile: no NaN reaches the publishers, the persisted state or the statistics.
+float satPidCurveOnly(float heatingCurveValue)
+{
+  _pid_integral      = 0.0f;
+  _pid_rawDerivative = 0.0f;
+  _pid_lastError     = NAN;
+  state.sat.fPidP = 0.0f;
+  state.sat.fPidI = 0.0f;
+  state.sat.fPidD = 0.0f;
+  state.sat.fRawDerivative = 0.0f;
+  state.sat.fError = 0.0f;
+  state.sat.fPidOutput = heatingCurveValue;
+  return heatingCurveValue;
+}
+
 //=== Auto-Gain Calculation (Version 3) ===
 // When settings.sat.bAutoGains is true (default): automatic formula from heating curve.
 // When settings.sat.bAutoGains is false: pass through manual fKpManual/fKiManual/fKdManual

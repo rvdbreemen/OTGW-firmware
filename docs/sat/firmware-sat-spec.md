@@ -265,7 +265,7 @@ At the first computed update, the restored values are used as follows:
 1. Set SAT active; if the mode is OFF, set it to CONTINUOUS (`SATcontrol.ino:4616-4619`).
 2. **DHW check.** DHW is active when slave status bit 2 is set (or a simulated DHW draw runs) (`SATcontrol.ino:4625-4629`). Power and energy are updated first (`SATcontrol.ino:4632-4633`). While DHW is active the tick sends `SW=` once on DHW entry (only with DHW control enabled and a valid DHW setpoint), publishes, and stops. CS, MM and CH are not touched and the PID does not run (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`).
 3. Read room, outside and target temperature (`SATcontrol.ino:4656-4658`).
-4. **Room temperature check.** If it is NAN or outside -10 to 50 °C, count a skip and stop. After 10 consecutive skips, set the safety trip and call `satDisable()` (`SATcontrol.ino:4669-4683`, `SATcontrol.ino:68`). A valid reading resets the count (`SATcontrol.ino:4684`).
+4. **Room temperature check (TASK-1364, entries 38 and 46).** `satRoomTempValid()` is false when the room temperature is NAN or outside -10 to 50 °C. There is no trip and no skip: the tick goes on with the room temperature treated as lost. The room low-pass filter, the MQTT-takeover thermal block, auto-tune, the curve recommendation and the daily median sample are skipped, and PV boost does not start. The PID step is replaced by `satPidCurveOnly()` (P, I, D and the raw derivative are 0, `state.sat.fError` reads 0, the requested setpoint is the heating curve value). The solar offset, clamps, cold cutoff, PWM, MM, CS and CH then run as on any tick. The PIC-fail trip (5 ticks without a command interface) is unchanged. When a valid reading returns, `satPidUpdate()` runs again on that tick. The integral restarts from 0. The first D after recovery is computed over the whole gap, from the last pre-loss temperature to the new one, as thermo-nova does (`pid.py:134-137` keeps `_last_temperature`, `pid.py:209-232`), so D need not start at 0. The status field `room_temp_lost` (REST `sat/status`, MQTT `sat/room_temp_lost`) is true while the loss lasts.
 5. **Room low-pass filter** with time constant 45 s. The first valid reading seeds the filter; later ticks move toward the raw value (`SATcontrol.ino:4694-4713`).
 6. **Boiler fault flag** (slave status bit 0): stop this tick (`SATcontrol.ino:4716-4719`).
 7. Outside temperature outside -40 to 50 °C is replaced by 10 °C (`SATcontrol.ino:4721-4723`).
@@ -350,7 +350,7 @@ All SAT commands go through the shared command queue (`addCommandToQueue`). SAT'
 #### Phase H: shutdown, disable and resume
 
 - **Disable** sends `CS=0` and saves zeroed PID state (Phase F). The next boot then starts the PID from zero, because the restored values are zeros (`SATcontrol.ino:2170-2171`).
-- **Safety trip** (10 invalid room readings or 5 ticks without a command interface) sets the trip flag and calls `satDisable()` (`SATcontrol.ino:4676-4681`, `SATcontrol.ino:4998-5003`). Each later pass stops at the trip check (`SATcontrol.ino:4581`). Re-enabling clears it (`SATcontrol.ino:1941-1948`). The trip is not persisted: `initSAT()` clears it (`SATcontrol.ino:3692`).
+- **Safety trip** (5 ticks without a command interface; a lost room temperature no longer trips, TASK-1364) sets the trip flag and calls `satDisable()`. Each later pass stops at the trip check (`SATcontrol.ino:4581`). Re-enabling clears it (`SATcontrol.ino:1941-1948`). The trip is not persisted: `initSAT()` clears it (`SATcontrol.ino:3692`).
 - **Filesystem update:** the update server writes the PID state, energy and curve recommendation from RAM after the new filesystem image is mounted (`SATcontrol.ino:2118-2136`, `OTGW-ModUpdateServer-esp32.h:465`).
 - **Reboot or power loss:** a grep for the callers of `satSavePidState()` finds only `satPersistAllToFs()`, `satDisable()`, `satFlushShortLivedData()` and the 5-minute save in the tick (`SATcontrol.ino:2131`, `SATcontrol.ino:2171`, `SATcontrol.ino:2197`, `SATcontrol.ino:5011`). There is no save on a planned restart in that list, so after a reboot the PID file holds the state of the last 5-minute save.
 - **Kept only in memory** (lost on every restart), with the line where each is initialised: control mode (`SATcontrol.ino:3691`); PWM phase and hold (`SATcontrol.ino:923-931`); cycle history and per-hour counter (`SATcycles.ino:200-207`); command cache (`SATcontrol.ino:356-362`); room filter (`SATcontrol.ino:4696-4698`); skip and PIC-fail counters (`SATcontrol.ino:3693-3694`); previous flame state (`SATcontrol.ino:473`); last control setpoint (`SATcontrol.ino:693`).
@@ -496,7 +496,7 @@ else: control = max(pidOutput, Tboiler - fFlowOffset)        (fFlowOffset defaul
 | PWM suppression refresh | 3 | s | `SATcontrol.ino:480` |
 | Window statistics timer | 60 | s | `SATcontrol.ino:478` |
 | MQTT loss before fallback | 300 | s | `SATcontrol.ino:4547` |
-| `SAT_MAX_SKIP_COUNT` | 10 | ticks | `SATcontrol.ino:68` |
+| `SAT_MAX_SKIP_COUNT` | removed (TASK-1364) | | a lost room temperature no longer trips the safety; SAT heats on the curve only |
 | `SAT_MAX_PIC_FAILS` | 5 | ticks | `SATcontrol.ino:69` |
 | Room filter time constant | 45 | s | `SATcontrol.ino:4695` |
 | Valid room temperature range | -10 to 50 | °C | `SATcontrol.ino:4669` |
@@ -583,7 +583,7 @@ else: control = max(pidOutput, Tboiler - fFlowOffset)        (fFlowOffset defaul
 4. **PID file older than 30 minutes.** It is discarded and the PID starts from zero (`SATcontrol.ino:2033-2037`).
 5. **Restored integral.** It survives the first computed update only when |error| ≤ deadband (`SATpid.ino:154-157`).
 6. **First ticks after any start.** Until the PID computes, the tick sends `CS=10.0`, `MM=100`, `CH=0`, which commands heating off (E2, E3). With the default interval and a steady room, that lasts two ticks (about 60 s). On PIC boards the `CS=10.0` is then kept alive every 30 s (`SATcontrol.ino:405-414`).
-7. **No room temperature source.** `Tr` starts as NAN (`OTGW-Core.h:79`). Without BLE, external, multi-area or a thermostat `Tr`, every tick counts a skip and the 10th sets the safety trip, sends `CS=0` and stops SAT until it is re-enabled (`SATcontrol.ino:4669-4683`, `SATcontrol.ino:2179`). At 30 s that is 300 s after the first tick.
+7. **No room temperature source.** `Tr` starts as NAN (`OTGW-Core.h:79`). Without BLE, external, multi-area or a thermostat `Tr`, SAT heats on the heating curve only (TASK-1364): P, I and D are 0, no trip, no time limit. Before TASK-1364 the 10th invalid tick (about 300 s at 30 s) tripped the safety and sent `CS=0`.
 8. **No outside temperature source.** The OT value starts as 0.0 and is used as 0 °C (`OTGW-Core.h:82`, `SATcontrol.ino:1302`). The weather value is used instead only when it is valid and the OT value is exactly 0.0 (`SATcontrol.ino:1299-1300`).
 9. **Flame already burning when SAT starts.** The first enabled pass that sees the flame bit starts a new cycle there, and the PWM suppression hold counts from that moment (`SATcontrol.ino:4592-4596`, `SATcycles.ino:701-714`, `SATcontrol.ino:720-723`).
 10. **DHW active.** The tick stops before reading inputs, so the PID and the room filter are not updated and CS, MM, CH are not sent (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`). The PIC keepalive keeps running on every pass (`SATcontrol.ino:4608`).
@@ -680,7 +680,7 @@ The PID is not called on every tick. The control tick returns before `satPidUpda
 2. Safety trip latched (SATcontrol.ino:4581).
 3. Timer not due (SATcontrol.ino:4614).
 4. DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]).
-5. Room temperature invalid (`NaN`, below -10 or above 50); after 10 consecutive invalid ticks SAT trips and disables (SATcontrol.ino:4669-4683, SATcontrol.ino:68).
+5. Room temperature invalid (`NaN`, below -10 or above 50): not a stop since TASK-1364. The tick goes on with the heating curve only (P, I, D = 0).
 6. Boiler fault flag (OT status bit 0) set (SATcontrol.ino:4716-4719).
 7. Thermal estimation fallback longer than 2 h: a fixed 45 C setpoint is sent instead (SATcontrol.ino:4730-4746, SATcontrol.ino:82-83).
 8. Summer simmer active (SATcontrol.ino:4766-4776).
@@ -890,7 +890,7 @@ With the firmware default coefficient of 1.5 (SATtypes.h:442) and the same input
 | Solar gain on / off hold | 600 | s | SATcontrol.ino:4276, SATcontrol.ino:4289 |
 | `iSensorMaxAgeS` default (MQTT external room sensor only) | 21600 | s | SATtypes.h:515, SATcontrol.ino:1225 |
 | BLE / Tr room temperature stale limit | 300 | s | SATcontrol.ino:65-66 |
-| Invalid room temperature ticks before safety trip | 10 | ticks | SATcontrol.ino:68 |
+| Invalid room temperature ticks before safety trip | none (TASK-1364: curve only, no trip) | | |
 | PID state file | `/sat_pid_state.json` | none | SATcontrol.ino:1988 |
 | PID state maximum age on restore | 1800 | s | SATcontrol.ino:1993 |
 | PID state periodic save | 300 | s | SATcontrol.ino:5010 |
@@ -933,7 +933,7 @@ The saved integral is `state.sat.fPidI`, the published copy, not `_pid_integral`
 | Trigger | Effect | Citation |
 |---|---|---|
 | Boot (`initSAT`) | Full `satPidReset()`, then restore from file if fresh | SATcontrol.ino:3683-3684 |
-| `satDisable()`: SAT switched off, fallback lifted, safety trip, too many invalid room readings or OT command failures | Full `satPidReset()`, then zeros saved | SATcontrol.ino:2170-2171, SATcontrol.ino:4561, SATcontrol.ino:4569-4571, SATcontrol.ino:4680, SATcontrol.ino:5002 |
+| `satDisable()`: SAT switched off, fallback lifted, safety trip or OT command failures | Full `satPidReset()`, then zeros saved | SATcontrol.ino:2170-2171, SATcontrol.ino:4561, SATcontrol.ino:4569-4571, SATcontrol.ino:4680, SATcontrol.ino:5002 |
 | Flush command (MQTT `sat/flush` or REST `POST /api/v2/sat/flush`) | Full `satPidReset()`, then zeros saved | SATcontrol.ino:2189-2197, restAPI.ino:1377-1380 |
 | `reset_integral` command (MQTT, REST `/api/v2/sat/reset_integral`, and the settings-style REST path) | Integral only: `_pid_integral = 0`; the raw derivative is kept | SATpid.ino:86-91, MQTTstuff.ino:620, MQTTstuff.ino:672, restAPI.ino:1372-1375, restAPI.ino:1624-1626 |
 | Window open longer than `iWindowMinOpenSec` (target switches to the Activity preset) | Integral only | SATcontrol.ino:1126-1142 |
@@ -942,7 +942,7 @@ The saved integral is `state.sat.fPidI`, the published copy, not `_pid_integral`
 | Target temperature changed (MQTT/REST `target`, settings) | None | SATcontrol.ino:1903-1934, settingStuff.ino:997 |
 | Target adopted from the thermostat (follow thermostat) | None | SATcontrol.ino:1034-1045 |
 | Heating mode (ECO/COMFORT) changed | None | SATcontrol.ino:2211-2221 |
-| Stale room sensor | No reset. A stale source is skipped and the next source is used; if none is valid the tick is skipped, and after 10 skips SAT is disabled (which resets) | SATcontrol.ino:1208-1231, SATcontrol.ino:1242-1245, SATcontrol.ino:4669-4683 |
+| Stale room sensor | A stale source is skipped and the next source is used; if none is valid the room temperature counts as lost (TASK-1364): `satPidCurveOnly()` zeroes the integral and the raw derivative each tick, no trip | SATcontrol.ino:1208-1231, SATcontrol.ino:1242-1245 |
 | Zone excluded (zone OFF, stale, invalid input) | That zone's integral and last error cleared | SATcontrol.ino:1790-1796, SATcontrol.ino:1814-1825 |
 
 Window detection only acts when `bWindowDetection` is on (SATcontrol.ino:1100), default false (SATtypes.h:463).
@@ -990,7 +990,7 @@ Computed from the code: `satCalcHeatingCurve` returns the curve and writes no st
 6. **Derivative inside the band.** `_pid_rawDerivative` is held, so D keeps its last value while the error is within the deadband (SATpid.ino:199-204, SATpid.ino:299).
 7. **Room temperature unchanged.** A change below 0.001 moves the timestamp and reference and keeps `_pid_rawDerivative` (SATpid.ino:208-213).
 8. **Large slope.** At `|rawDeriv| >= 5.0` the filter is bypassed and the value is clamped to ±5.0 (SATpid.ino:226-233).
-9. **Stale or missing room temperature.** There is no PID reset on staleness. The tick ends before the PID; after 10 such ticks SAT is disabled, which resets the PID (SATcontrol.ino:4669-4683, SATcontrol.ino:2170).
+9. **Stale or missing room temperature.** (TASK-1364) The tick calls `satPidCurveOnly()` instead of `satPidUpdate()`: integral, raw derivative, P, I, D and the published error are 0 and the output is the heating curve. No trip. After recovery the integral restarts from 0; the first D is computed over the whole gap from the last pre-loss temperature (as pid.py:209-232).
 10. **Integral time step is fixed.** The integral always adds `ki * error * 60`, whatever the control interval (10 to 300 s) or the actual time since the last update (SATpid.ino:166, settingStuff.ino:1001).
 11. **Manual gains.** No setting, REST or MQTT path that writes `bAutoGains` or the manual gains was found, so the manual branch is not reachable at run time (see "Not found / unclear").
 12. **Thermal comfort on.** The error is computed against the Summer Simmer index only when the room temperature comes from OT Tr and the humidity is fresh (SATcontrol.ino:1264-1270).
@@ -1106,7 +1106,6 @@ The curve is recalculated on every control tick that passes the early-exit gates
 The curve is **not** recalculated, and `state.sat.fHeatingCurveValue` keeps its old value, on ticks that return early:
 
 - DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]);
-- room temperature invalid (SATcontrol.ino:4669-4683);
 - boiler fault flag set (SATcontrol.ino:4716-4719);
 - thermal safe fallback active (SATcontrol.ino:4730-4746);
 - summer simmer active (SATcontrol.ino:4766-4776);
@@ -1124,7 +1123,7 @@ When zones are used, every active zone also calls `satCalcHeatingCurve()` with i
 
 #### PID update pass (inside the control tick, not on a separate 60 s timer)
 
-The PID is called on every tick that reaches it (SATcontrol.ino:4839). There is no stale-sensor reset step inside the PID. Invalid room temperatures are handled before it by the skip counter (SATcontrol.ino:4669-4683).
+The PID is called on every tick that reaches it with a valid room temperature. There is no stale-sensor reset step inside `satPidUpdate()`. A lost room temperature is handled before it: the control tick calls `satPidCurveOnly()` instead (TASK-1364), which sets the integral, the raw derivative, P, I, D and the published error to 0 and returns the heating curve value. `_pid_lastError` is set to NAN so the first update after the loss is never swallowed by the unchanged-error gate.
 
 1. The error is `target - room`, rounded to 3 decimals (SATpid.ino:63-66, SATpid.ino:253).
 2. On the first call the tracking variables are initialised (SATpid.ino:264-273).
@@ -1144,7 +1143,7 @@ Before the timer check, every loop pass handles the fallback enable, the disable
 
 1. **Mark active.** If the mode is OFF it becomes continuous (SATcontrol.ino:4616-4619).
 2. **DHW.** If DHW is active, `SW=` is sent on entry when configured, and the tick ends. No CS, MM or CH is sent (SATcontrol.ino:4851-4883 [lines refreshed 2026-10-24, TASK-1351]).
-3. **Read inputs** (SATcontrol.ino:4656-4658). If the room temperature is NaN or outside -10 to 50 °C, the tick ends; after 10 such ticks in a row SAT trips safety and sends `CS=0` (SATcontrol.ino:68, SATcontrol.ino:4669-4683, SATcontrol.ino:2179).
+3. **Read inputs**. If the room temperature is NaN or outside -10 to 50 °C the tick does not end any more (TASK-1364): it runs on the heating curve alone (see step 4 in the Phase E list). No skip count, no trip.
 4. **Smooth the room temperature** (EMA, tau 45 s) (SATcontrol.ino:4694-4713).
 5. **Boiler fault flag** set: the tick ends (SATcontrol.ino:4716-4719).
 6. **Outside temperature** out of range becomes 10 °C (SATcontrol.ino:4721-4723).
@@ -1525,7 +1524,7 @@ On a tick, in this fixed order:
 
 1. `bActive = true`; OFF becomes CONTINUOUS (SATcontrol.ino:4616-4619).
 2. DHW is read. **If DHW is active the tick returns here** (after an optional `SW=`), before any PWM, CS, MM or CH code (SATcontrol.ino:4621-4652).
-3. Invalid room temperature: the tick returns (and after 10 in a row SAT trips) (SATcontrol.ino:4669-4683, SATcontrol.ino:68).
+3. Invalid room temperature: the tick goes on, curve only (TASK-1364); it does not return and does not trip.
 4. Boiler fault flag: the tick returns (SATcontrol.ino:4716-4719).
 5. Thermal safe fallback (after 2 h without a real room temperature): CS = 45 °C capped, MM = `iMaxRelModulation`, CH = 1, return (SATcontrol.ino:4729-4746, SATcontrol.ino:82-83).
 6. Summer simmer active: CS = 10, MM = `iMaxRelModulation`, CH = 0, return (SATcontrol.ino:4764-4776).
@@ -1668,7 +1667,7 @@ Computed every tick that reaches SATcontrol.ino:4960 by `satComputeMM(pwmMode, h
 
 Then the cold cutoff overrides MM to `iMaxRelModulation` when `pidOutput <= cold setpoint`, after the quirks (SATcontrol.ino:1108, SATcontrol.ino:5206-5214), so an Immergas boiler receives the configured maximum, uncapped, in that case, as in thermo-nova (heating_control.py:234) (corrected 2026-10-24, TASK-1351). The "no relative modulation" quirk does not change MM; it only marks modulation as unreliable (SATcontrol.ino:4801-4805).
 
-MM is sent only through `satEnqueueIfChangedMM()` (SATcontrol.ino:416-427; a search for `MM=` finds only the format string at SATcontrol.ino:421). Its callers are the thermal safe fallback, summer simmer and valves closed (all `iMaxRelModulation`) and the normal tick end (SATcontrol.ino:4741, SATcontrol.ino:4771, SATcontrol.ino:4784, SATcontrol.ino:4981). So during DHW, a fault-flag tick or an invalid room temperature no MM is sent, and the boiler keeps the last MM, for example 0 if PWM was active (SATcontrol.ino:4635-4719).
+MM is sent only through `satEnqueueIfChangedMM()` (SATcontrol.ino:416-427; a search for `MM=` finds only the format string at SATcontrol.ino:421). Its callers are the thermal safe fallback, summer simmer and valves closed (all `iMaxRelModulation`) and the normal tick end (SATcontrol.ino:4741, SATcontrol.ino:4771, SATcontrol.ino:4784, SATcontrol.ino:4981). So during DHW or a fault-flag tick no MM is sent, and the boiler keeps the last MM, for example 0 if PWM was active (SATcontrol.ino:4635-4719).
 
 So for a gas boiler MM = 0 on every PWM tick that reaches the tick end with `pidOutput > cold setpoint`; at or below it the cold cutoff sets `iMaxRelModulation` and leaves PWM (SATcontrol.ino:379-389, SATcontrol.ino:5206-5214) (corrected 2026-10-24, TASK-1351).
 
@@ -1987,7 +1986,7 @@ There is no stored record of outside temperature or commanded maximum modulation
 | every 60 s (`timerSAT4hStats`) | 4 h and 24 h window statistics | SATcontrol.ino:478, SATcontrol.ino:4602-4605 |
 | control tick, `settings.sat.iControlInterval` (default 30 s) | modulation reliability, flame status, boiler status, auto-switch | SATtypes.h:444, SATcontrol.ino:476, SATcontrol.ino:3719, SATcontrol.ino:4614, SATcontrol.ino:4802-4814, SATcontrol.ino:4951-4953 |
 
-- On the control tick, the status functions run only if the tick gets past several early returns: DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]), invalid room temperature (SATcontrol.ino:4669-4683), boiler fault bit (SATcontrol.ino:4716-4719), the thermal safe fallback (SATcontrol.ino:4730-4746), summer simmer (SATcontrol.ino:4766-4776) and closed valves (SATcontrol.ino:4779-4790). On those ticks the boiler status, flame status and modulation reliability keep their previous values.
+- On the control tick, the status functions run only if the tick gets past several early returns: DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]), boiler fault bit (SATcontrol.ino:4716-4719), the thermal safe fallback (SATcontrol.ino:4730-4746), summer simmer (SATcontrol.ino:4766-4776) and closed valves (SATcontrol.ino:4779-4790). On those ticks the boiler status, flame status and modulation reliability keep their previous values.
 - `satUpdateFlameStatus` has its own 10 s rate limit (SATcontrol.ino:3626), but its only caller is the control tick (SATcontrol.ino:4811), so it runs once per tick.
 - The cycle tracker and the boiler status evaluator each detect flame edges on their own: the cycle tracker on every `loop()` pass through `_sat_prevFlameState` (SATcontrol.ino:4592-4596), the evaluator only on control ticks through `_bs_prevFlame` (SATcontrol.ino:526-531, SATcontrol.ino:644). The evaluator's flame timestamps can therefore lag the real edge by up to one control interval (derived from the order of the code).
 - In simulation, `satUpdateSimulation()` calls `satCycleOnFlameChange()` itself at its own flame transitions (SATcontrol.ino:3825-3839), and the edge detection a few lines later calls it again (SATcontrol.ino:4576, SATcontrol.ino:4592-4596). The second call does nothing because the handler only acts on a change of `_cycle_flameOn` (SATcycles.ino:701, SATcycles.ino:757).
@@ -2569,11 +2568,11 @@ The closest counterpart is the per-zone PID step `satZonePidStep()`, run for eac
 
 Zone PID state is kept only in RAM (SATcontrol.ino:1726). It is not saved after each update.
 
-Contrast with the main PID: an invalid main room temperature skips the tick, and after 10 consecutive skips trips safety and releases the boiler (SATcontrol.ino:4669-4683, SATcontrol.ino:68). An inactive zone is only excluded and its PID memory cleared (SATcontrol.ino:1790-1796).
+Contrast with the main PID: a lost main room temperature no longer skips the tick or trips safety (TASK-1364): the main output is the heating curve, and a zone with its own valid temperature still uses its own PID. An inactive zone is only excluded and its PID memory cleared (SATcontrol.ino:1790-1796).
 
 #### 4. Per control loop tick: combining main and rooms into one requested setpoint
 
-The control tick returns early, before any of the steps below, when SAT is disabled, safety is tripped, DHW is active, the room temperature is invalid, the boiler reports a fault, or the room temperature has been estimated for too long and the thermal safe fallback setpoint is sent instead (SATcontrol.ino:4568-4573, SATcontrol.ino:4581, SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], SATcontrol.ino:4669-4683, SATcontrol.ino:4716-4719, SATcontrol.ino:4730-4746). Later, it also returns early on summer mode or on `valves_open == false`, in both cases after sending `CS=10`, the max modulation and `CH=0` (SATcontrol.ino:4994-5021 [lines refreshed 2026-10-24, TASK-1351]).
+The control tick returns early, before any of the steps below, when SAT is disabled, safety is tripped, DHW is active, the boiler reports a fault, or the room temperature has been estimated for too long and the thermal safe fallback setpoint is sent instead (SATcontrol.ino:4568-4573, SATcontrol.ino:4581, SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], SATcontrol.ino:4716-4719, SATcontrol.ino:4730-4746). A lost room temperature no longer returns early (TASK-1364). Later, it also returns early on summer mode or on `valves_open == false`, in both cases after sending `CS=10`, the max modulation and `CH=0` (SATcontrol.ino:4994-5021 [lines refreshed 2026-10-24, TASK-1351]).
 
 The requested setpoint is formed as follows (SATcontrol.ino:4831-4912):
 
@@ -2851,7 +2850,7 @@ To the boiler, through the command queue, on each control tick that reaches the 
 Thermostat setpoint push (only when `bPushSetpoint` is true and an OT command interface exists) (SATcontrol.ino:4991-4994, SATcontrol.ino:439-453):
 
 - `TC=<fTargetTemp>` with one decimal, sent when the target rounded to 0.1 changed (TASK-1272, Sergeant D entries 14 and 16; as thermo-nova, `climate.py:641-657`). There is no periodic refresh. A target adopted from the thermostat (follow thermostat) is not sent back (`climate.py:765`, `cascade=False`). There is no re-push, no MsgID 9 check and no 5-minute refresh (maintainer decision 2026-10-24, option D: exactly thermo-nova). A thermostat that refuses the remote override keeps its own setpoint and SAT does not keep asking. A cache reset (OT bus back online) and switching push off and on again also send the current target once. `TC=` push works only on thermostats that accept a remote override; SAT pushes on a target change. An adopted thermostat value also becomes `fLastSentTC`, so the echo guard compares against it and a later dial-back is adopted too. Code: `SATcontrol.ino:529-559` (`satTCNoteAdopted`, `satEnqueueIfChangedTC`, `satTCPushOff`), call site `SATcontrol.ino:5172-5176`.
-- It is skipped on every tick that returns before line 4977: DHW active, invalid room temperature, boiler fault, thermal safe fallback, summer mode, valves closed (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], SATcontrol.ino:4669-4683, SATcontrol.ino:4716-4719, SATcontrol.ino:4730-4746, SATcontrol.ino:4766-4790).
+- It is skipped on every tick that returns before line 4977: DHW active, boiler fault, thermal safe fallback, summer mode, valves closed (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351], SATcontrol.ino:4716-4719, SATcontrol.ino:4730-4746, SATcontrol.ino:4766-4790).
 - It is sent on the same path for PIC and OT-Direct boards; the code does not branch on the board here (SATcontrol.ino:4978-4994).
 
 To MQTT (under the device's own namespace; `sendMQTTData` prefixes every topic with `MQTTPubNamespace`, MQTTstuff.ino:1427-1429):
@@ -3004,7 +3003,7 @@ The firmware has one control loop, not a separate 60 s PID tick and 5 s heating 
 
 Order inside one tick (SATcontrol.ino:4614-5018):
 
-1. Early exits that skip everything in this section: SAT disabled or flashing (SATcontrol.ino:4568-4573), safety tripped (SATcontrol.ino:4581), DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]), invalid room temperature (SATcontrol.ino:4669-4683), boiler fault bit set (SATcontrol.ino:4716-4719), thermal-estimation safe setpoint (SATcontrol.ino:4730-4746).
+1. Early exits that skip everything in this section: SAT disabled or flashing (SATcontrol.ino:4568-4573), safety tripped (SATcontrol.ino:4581), DHW active (SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]), boiler fault bit set (SATcontrol.ino:4716-4719), thermal-estimation safe setpoint (SATcontrol.ino:4730-4746).
 2. Window timer check (SATcontrol.ino:4755). See "Window" below.
 3. Pressure update, then pressure status text (SATcontrol.ino:4758-4759).
 4. Solar gain update, `satUpdateSolarGain()` (SATcontrol.ino:4762, SATcontrol.ino:4215-4299):
@@ -3532,7 +3531,7 @@ Steps 1 to 9 run on every pass. Steps 10 onward run only when the control timer 
    - PWM suppression refresh (`SATcontrol.ino:4611`): every 3 s, only in PWM ON phase with the flame on, after the hold delay, with overshoot protection on, no DHW and no fault flag (`SATcontrol.ino:894-905`). It sends `CS = flow - fModSupOffset`, clamped to [10, system cap] and then to the effective maximum; no solar offset (`SATcontrol.ino:1045-1065`) (corrected 2026-10-24, TASK-1351). This belongs to the PWM section.
 10. **Control tick gate.** If the timer is not due, the pass ends (`SATcontrol.ino:4614`). Otherwise `bActive` = true, and control mode OFF becomes CONTINUOUS (`SATcontrol.ino:4616-4619`).
 11. **DHW check.** `bDhwActive` is set from slave status bit 2, or forced true during a simulated draw (`SATcontrol.ino:4625-4629`). Power and energy are updated (`SATcontrol.ino:4632-4633`). If DHW is active, SAT sends `SW=` on the transition only (see Behaviour F) and returns (`SATcontrol.ino:4865-4882 [lines refreshed 2026-10-24, TASK-1351]`). **No CS, MM or CH is written during DHW.**
-12. **Room temperature check.** If the room temperature is NaN or outside [-10, 50] °C, the skip counter grows and the tick returns without writing. At 10 consecutive skips the safety trips (`SATcontrol.ino:4669-4684`, `SATcontrol.ino:68`). See Behaviour G.
+12. **Room temperature check.** If the room temperature is NaN or outside [-10, 50] °C the tick goes on as room-temperature-lost (TASK-1364): curve only, no trip. See Behaviour G.
 13. Room temperature EMA filter, tau 45 s (`SATcontrol.ino:4694-4713`). PID section.
 14. **Boiler fault flag.** If slave status bit 0 is set, the tick returns without writing (`SATcontrol.ino:4716-4719`).
 15. **Outside temperature sanity.** Outside [-40, 50] °C it is replaced by 10 °C (`SATcontrol.ino:4721-4723`). There is no "outside temperature missing" gate: with no source it is `Toutside`, which starts at 0.0 (`OTGW-Core.h:82`, `SATcontrol.ino:1302`).
@@ -3642,7 +3641,8 @@ When `settings.sat.bSimulation` is on:
   - The 3 s refresh clamps to the effective maximum (`SATcontrol.ino:907-909`).
   - Lower bound everywhere is `SAT_MIN_SETPOINT` = 10 (`SATcontrol.ino:54`).
 - **Maximum setpoint versus PWM.** `pidOutput >= sysMax` (the system cap, not the effective maximum) leaves PWM for CONTINUOUS (`SATcontrol.ino:4909`, `SATcontrol.ino:4917-4920`), unless `bForcePWM` is on (`SATcontrol.ino:4923-4925`). (Removed in TASK-1332, 2026-10-23: the Force PWM option no longer exists.)
-- **Room temperature lost.** NaN or out of range for 10 consecutive control ticks trips the safety (`SATcontrol.ino:4669-4683`). With the default 30 s interval that is about 300 s (my arithmetic, not a constant in the code). The sources mark themselves stale as listed in Inputs.
+- **Open point (TASK-1364): solar gain during a loss.** `satUpdateSolarGain()` keeps its last state while the room temperature is NaN (it returns and publishes the held rise rate). Before TASK-1364 a non-NaN out-of-range value (a sensor fault such as 85 or -127) reached its rise-rate EMA; it is now skipped like NaN through `satRoomTempValid()`, so it cannot switch solar gain on. Whether solar gain should switch off during a loss is not decided.
+- **Room temperature lost.** NaN or out of range: SAT keeps heating on the heating curve alone, P, I and D are 0, no trip and no time limit (TASK-1364, entries 38 and 46). The room low-pass filter, the MQTT-takeover thermal block (and its 2 h safe 45 °C setpoint), auto-tune, the curve recommendation, the daily median sample and a new PV boost are skipped while it lasts. When a valid reading returns, `satPidUpdate()` runs again on that tick. The integral restarts from 0. The first D after recovery is computed over the whole gap, from the last pre-loss temperature to the new one, as thermo-nova does (`pid.py:134-137` keeps `_last_temperature`, `pid.py:209-232`), so D need not start at 0. The status field `room_temp_lost` (REST `sat/status`, MQTT `sat/room_temp_lost`) is true while the loss lasts. The sources mark themselves stale as listed in Inputs; the stale time per source (entry 27) is still open.
 - **Safety trip.** Sets `bSafetyTripped`, narrates "SAFETY TRIPPED", and calls `satDisable()` (`SATcontrol.ino:4678-4680`, `SATcontrol.ino:5000-5002`). `satDisable()` (`SATcontrol.ino:2160-2187`):
   - mode OFF, PWM reset, `bActive` false, final setpoint 0;
   - PID reset and saved as zeros; energy saved; daily recommendation reset;
@@ -3699,7 +3699,7 @@ Variable names are as in the code.
 | `SAT_GLOBAL_MAX_SETPOINT` | 65 | °C | `SATcontrol.ino:64` | fallback for `fMaxSetpoint` |
 | `SAT_STALE_TEMP_BLE_MS`, `SAT_STALE_TEMP_MS` | 300000 | ms | `SATcontrol.ino:65-66` | BLE and thermostat `Tr` staleness |
 | `SAT_STALE_OUTDOOR_MS` | 600000 | ms | `SATcontrol.ino:67` | external outdoor staleness |
-| `SAT_MAX_SKIP_COUNT` | 10 | ticks | `SATcontrol.ino:68` | room-temperature safety trip |
+| `SAT_MAX_SKIP_COUNT` | removed (TASK-1364) | | |
 | `SAT_MAX_PIC_FAILS` | 5 | ticks | `SATcontrol.ino:69` | command-interface safety trip |
 | `SAT_THERMAL_SAFE_FLOW` | 45.0 | °C | `SATcontrol.ino:82` | thermal safe fallback CS |
 | `SAT_THERMAL_MAX_EST_MS` | 7200000 | ms | `SATcontrol.ino:83` | time before the safe CS |
@@ -3708,7 +3708,7 @@ Variable names are as in the code.
 | Keepalive threshold | 8.0 | °C | `SATcontrol.ino:407` | CS below this is not kept alive |
 | Suppression refresh | 3 | s | `SATcontrol.ino:480` | PWM CS refresh |
 | MQTT loss before fallback | 300000 | ms | `SATcontrol.ino:4547` | auto-enable |
-| Room temperature valid range | -10 to 50 | °C | `SATcontrol.ino:4669` | skip counter |
+| Room temperature valid range | -10 to 50 | °C | `SATcontrol.ino:4669` | room temperature lost (curve only) |
 | Outside temperature valid range, fallback | -40 to 50, 10 | °C | `SATcontrol.ino:4721-4723` | outside sanity |
 | `SAT_DHW_SETPOINT_MIN` / `_MAX` | 30 / 60 | °C | `SATtypes.h:433-434` | `SW=` window, setting clamp |
 | `SAT_DHW_OVERSHOOT_GUARD_MS` | 300000 | ms | `SATcycles.ino:33` | DHW guard in auto-switch (never arms, see F) |
@@ -3771,7 +3771,7 @@ Compare (defaults that differ from thermo-nova): overshoot protection true here,
 ### State kept between passes
 
 - Write-on-change cache: `bLastSentValid`, last CS, MM, CH, TC and their send times (`SATtypes.h:390-405`, `SATcontrol.ino:356-362`). In RAM only.
-- Safety: `bSafetyTripped`, `_sat_consecutiveSkips`, `_sat_picFailCount`, `_sat_bootCS0sent` (`SATtypes.h:233`, `SATcontrol.ino:340-342`). In RAM only; reset at boot (`SATcontrol.ino:3692-3695`).
+- Safety: `bSafetyTripped`, `_sat_roomLostActive` (narration only), `_sat_picFailCount`, `_sat_bootCS0sent` (`SATtypes.h:233`, `SATcontrol.ino:340-342`). In RAM only; reset at boot (`SATcontrol.ino:3692-3695`).
 - DHW transition: `_sat_prevDhwActive` (`SATcontrol.ino:343`).
 - OT-bus online edge: `_sat_prevOTOnline` (`SATcontrol.ino:344`).
 - Fallback: `bFallbackActive`, `eFallbackReason` (`SATtypes.h:235-236`). The fallback sets `bEnabled` in RAM without saving (`SATcontrol.ino:4551`).

@@ -79,8 +79,9 @@ class DisabledStateIsPublished(unittest.TestCase):
                 self.assertRegex(core, r'publishIfChanged[BS]\(F\("sat/%s"\),[^;]*,\s*true\);' % topic)
 
     def test_both_trip_paths_set_the_flag_then_disable(self):
+        # TASK-1364: the lost-room-temperature trip is gone (curve only); the PIC-fail trip is the one left.
         sites = [m.start() for m in re.finditer(r"state\.sat\.bSafetyTripped = true;", self.sat)]
-        self.assertEqual(len(sites), 2)
+        self.assertEqual(len(sites), 1)
         for s in sites:
             with self.subTest(offset=s):
                 self.assertIn("satDisable();", self.sat[s:s + 200])

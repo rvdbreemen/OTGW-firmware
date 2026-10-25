@@ -62,6 +62,8 @@ static float satGetMaxSetpoint() { return 62.0f; }
 static float satGetFlowTemp() { return 40.0f; }
 static float satPidError(float t, float r) { return roundf((t - r) * 100.0f) / 100.0f; }
 static float satPidUpdate(float, float, float curve, float) { return curve; }
+static const bool roomValid = true;                       // TASK-1364: room temperature valid in these scenarios
+static float satPidCurveOnly(float curve) { return curve; }
 static void satPublishZoneDiagnostics() { }
 """
 

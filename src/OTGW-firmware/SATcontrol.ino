@@ -140,7 +140,6 @@ static const float    SAT_GLOBAL_MAX_SETPOINT = 65.0f;  // Python MAXIMUM_SETPOI
 static const uint32_t SAT_STALE_TEMP_BLE_MS  = 300000UL; // 5 min: BLE indoor temp considered stale
 static const uint32_t SAT_STALE_TEMP_MS      = 300000UL; // 5 min: thermostat-sourced Tr older than this is stale for SAT (TASK-1157)
 static const uint32_t SAT_STALE_OUTDOOR_MS   = 600000UL; // 10 min: external outdoor temp considered stale
-static const uint8_t  SAT_MAX_SKIP_COUNT     = 10;       // Consecutive invalid-input skips before disable
 static const uint8_t  SAT_MAX_PIC_FAILS      = 5;        // Consecutive PIC comm failures before disable
 
 // --- Thermal Drop Learning Constants (Task #21) ---
@@ -412,7 +411,7 @@ static const char* satGetHeatingSourceName()
   }
 }
 
-static uint8_t _sat_consecutiveSkips  = 0;
+static bool    _sat_roomLostActive     = false;   // room temperature lost: heating on the curve only (TASK-1364)
 static uint8_t _sat_picFailCount      = 0;
 static bool    _sat_bootCS0sent       = false;  // One-shot: ensure CS=0 is sent once PIC is available
 static bool    _sat_prevDhwActive     = false;  // Track DHW transition to send SW= on entry (TASK-437)
@@ -1387,6 +1386,13 @@ static float satApplyContinuous(float pidOutput)
 //=====================================================================
 //=== Get Room Temperature (OT bus or external) ===
 //=====================================================================
+// A room temperature the control loop can use: a number inside -10..50 C.
+// Plain types on purpose: the 60 s PID timer (entry 42) can call it later.
+static bool satRoomTempValid(float roomTemp)
+{
+  return !isnan(roomTemp) && roomTemp >= -10.0f && roomTemp <= 50.0f;
+}
+
 static float satGetRoomTemp()
 {
   // Simulation mode overrides all other sources
@@ -1435,7 +1441,7 @@ static float satGetRoomTemp()
   // TASK-1157: Tr never expires on its own, so a thermostat that went quiet left SAT
   // regulating on its last reading indefinitely. Once the thermostat has reported Tr,
   // a reading it has not refreshed within SAT_STALE_TEMP_MS counts as never observed,
-  // which hands the loop to the existing skip -> safety-trip chain. A Tr that never
+  // which makes the room temperature count as lost (curve only, TASK-1364). A Tr that never
   // came from a thermostat (e.g. a TR= feed) keeps its previous behaviour.
   if (state.otBus.iTrThermostatMs != 0 &&
       (millis() - state.otBus.iTrThermostatMs) > SAT_STALE_TEMP_MS) {
@@ -1470,8 +1476,8 @@ static float satGetRoomTemp()
   }
 
   // TASK-521: ghost-Tr final guard. If no other source returned, and Tr has never been
-  // observed as non-zero, return NAN so the control loop disengages safely instead of
-  // driving the PID against a bogus 0.0 reading.
+  // observed as non-zero, return NAN so the control loop treats the room temperature as lost
+  // (curve only) instead of driving the PID against a bogus 0.0 reading.
   if (trGhost) return NAN;
 
   return otRoom;
@@ -1777,10 +1783,11 @@ static void satUpdatePvBoost()
   float threshold = (float)settings.sat.iPvBoostThresholdW;
   float roomTemp = satGetRoomTemp();
   bool atCeiling = (!isnan(roomTemp) && roomTemp >= settings.sat.fPvBoostMaxIndoorC);
+  bool roomLost  = !satRoomTempValid(roomTemp);   // no new boost without a room temperature (TASK-1364)
 
   if (!state.sat.bPvBoostActive) {
     // Deactivated: check if conditions are met to start the hold-time
-    if (surplus >= threshold && !atCeiling) {
+    if (surplus >= threshold && !atCeiling && !roomLost) {
       if (state.sat.iPvBoostStartedMs == 0)
         state.sat.iPvBoostStartedMs = now;
       if ((now - state.sat.iPvBoostStartedMs) >= ((uint32_t)settings.sat.iPvBoostHoldS * 1000UL)) {
@@ -2141,7 +2148,8 @@ void satClearSafetyTrip()
   if (!state.sat.bSafetyTripped) return;
   state.sat.bSafetyTripped = false;
   satNarrate_P(PSTR("Safety cleared: SAT may resume"));
-  _sat_consecutiveSkips = 0;
+  state.sat.bRoomTempLost = false;
+  _sat_roomLostActive = false;
   _sat_picFailCount = 0;
 }
 
@@ -2372,6 +2380,8 @@ void satDisable()
              (int)state.sat.bSafetyTripped, (int)state.sat.bFallbackActive);
   state.sat.iTCPushMs    = 0;
   state.sat.bPushRefused = false;
+  state.sat.bRoomTempLost = false;     // narration and status start clean after a re-enable (TASK-1364)
+  _sat_roomLostActive = false;
   satSetControlMode(SAT_MODE_OFF);
   satPwmReset();                       // also when the mode was not PWM: a safety trip must leave no stale PWM state
   _sat_lastControlCS = 0.0f;
@@ -2626,6 +2636,7 @@ void satSendStatusJSON()
     je.field(F("control_interval_sec"), (int32_t)settings.sat.iControlInterval);
     je.field(F("fallback_active"),      snap->st.sat.bFallbackActive);
     je.field(F("push_refused"),         snap->st.sat.bPushRefused);
+    je.field(F("room_temp_lost"),       snap->st.sat.bRoomTempLost);
     je.field(F("fallback_reason"),      (int32_t)snap->st.sat.eFallbackReason);
     je.field(F("max_rel_modulation"),   (int32_t)settings.sat.iMaxRelModulation);
     je.field(F("current_modulation"),   (int32_t)snap->st.sat.iCurrentModulation);
@@ -2826,7 +2837,7 @@ static const char* satSimmerPerception(float indexC) {
 // the ADR-111 heartbeat keeps the retained values fresh. A REST or settings disable therefore
 // reaches the broker on the next loop pass. Shadows are file-scope so satRepublishCoreState()
 // can reset them.
-static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_external_temp_enable;
+static SATShadowB s_core_enabled, s_core_active, s_core_safety_tripped, s_core_fallback_active, s_core_push_refused, s_core_room_temp_lost, s_core_external_temp_enable;
 static SATShadowS s_core_mode, s_core_preset, s_core_control_mode;
 
 static void satPublishCoreState()
@@ -2838,6 +2849,7 @@ static void satPublishCoreState()
   publishIfChangedB(F("sat/safety_tripped"),   state.sat.bSafetyTripped,    s_core_safety_tripped,   true);
   publishIfChangedB(F("sat/fallback_active"),  state.sat.bFallbackActive,   s_core_fallback_active,  true);
   publishIfChangedB(F("sat/push_refused"),     state.sat.bPushRefused,      s_core_push_refused,     true);
+  publishIfChangedB(F("sat/room_temp_lost"),   state.sat.bRoomTempLost,     s_core_room_temp_lost,   true);
   publishIfChangedB(F("sat/external_temp_enable"), settings.sat.bUseExternalTemp, s_core_external_temp_enable, true);
 
   // sat/mode is the ACTUAL control mode; sat/control_mode is the one the control_mode command
@@ -2862,6 +2874,7 @@ void satRepublishCoreState()
   memset(&s_core_safety_tripped, 0, sizeof(s_core_safety_tripped));
   memset(&s_core_fallback_active, 0, sizeof(s_core_fallback_active));
   memset(&s_core_push_refused, 0, sizeof(s_core_push_refused));
+  memset(&s_core_room_temp_lost, 0, sizeof(s_core_room_temp_lost));
   memset(&s_core_external_temp_enable, 0, sizeof(s_core_external_temp_enable));
   memset(&s_core_mode, 0, sizeof(s_core_mode));
   memset(&s_core_control_mode, 0, sizeof(s_core_control_mode));
@@ -3913,7 +3926,7 @@ void initSAT()
   state.sat.bActive = false;
   state.sat.eControlMode = SAT_MODE_OFF;
   state.sat.bSafetyTripped = false;
-  _sat_consecutiveSkips = 0;
+  _sat_roomLostActive = false;
   _sat_picFailCount = 0;
   _sat_bootCS0sent = false;
   _sat_prevOTOnline = false;
@@ -4447,7 +4460,8 @@ static void satUpdateSolarGain()
   uint32_t now = millis();
 
   // TASK-521: NaN room temp means no valid source -- skip rate calc to avoid corrupting EMA.
-  if (isnan(roomTemp)) {
+  // TASK-1364: an out-of-range reading (a sensor fault such as 85 or -127) is skipped the same way.
+  if (!satRoomTempValid(roomTemp)) {
     state.sat.fIndoorRiseRate = _solar_riseRateEma;
     return;
   }
@@ -4891,28 +4905,18 @@ static void satControlLoopRun()
   SATDebugTf(PSTR("SAT loop: room=%.1f target=%.1f mode=%d enabled=%d\r\n"),
              roomTemp, targetTemp, (int)state.sat.eControlMode, (int)satIsEnabled());
 
-  // Validate room temp — count consecutive failures.
-  // TASK-521: NaN means satGetRoomTemp() found no valid source (no BLE, no MQTT external,
-  // no MultiArea, no MsgID 24 from a thermostat -- only a boot-time 0.0 ghost). Treat as
-  // invalid and let the existing skip-count machinery hold last-good for SAT_MAX_SKIP_COUNT
-  // cycles, then trip safety (CS=0 via satDisable -> boiler returns to thermostat control).
-  // Log once on entry to the skip window so the operator understands the disengagement.
-  if (isnan(roomTemp) || roomTemp < -10.0f || roomTemp > 50.0f) {
-    if (_sat_consecutiveSkips == 0) {
-      if (isnan(roomTemp)) {
-        DebugTln(F("SAT: all room-temp sources lost (no BLE/external/MultiArea/Tr) -- holding last-good, will disengage if not restored"));
-      }
-    }
-    _sat_consecutiveSkips++;
-    if (_sat_consecutiveSkips >= SAT_MAX_SKIP_COUNT) {
-      DebugTln(F("SAT SAFETY: too many invalid room temp readings, disabling"));
-      state.sat.bSafetyTripped = true;
-      satNarrate_P(PSTR("SAFETY TRIPPED: SAT regulation halted"));
-      satDisable();
-    }
-    return;
+  // TASK-1364 (entries 38, 46): a lost or missing room temperature (NaN or outside -10..50 C)
+  // is no fault. SAT keeps heating on the heating curve alone: P, I and D are 0 and the
+  // normal pipeline (solar offset, clamps, cold cutoff, PWM, MM, CS/CH) runs as usual.
+  const bool roomValid = satRoomTempValid(roomTemp);
+  state.sat.bRoomTempLost = !roomValid;
+  if (!roomValid && !_sat_roomLostActive) {
+    _sat_roomLostActive = true;
+    satNarrate_P(PSTR("Room temperature lost: heating on the heating curve only"));
+  } else if (roomValid && _sat_roomLostActive) {
+    _sat_roomLostActive = false;
+    satNarrate_P(PSTR("Room temperature back: regulation resumes"));
   }
-  _sat_consecutiveSkips = 0;  // Valid reading -- reset counter
 
   // TASK-894 (George): EMA low-pass on the RAW room sensor before it drives control.
   // Tames sensor jitter (e.g. BLE +-0.05 C) at the SOURCE so the controller sees a
@@ -4922,7 +4926,7 @@ static void satControlLoopRun()
   // HA sensor entity. Time-based EMA (tau ~45 s) so it is robust to variable control
   // cadence and self-heals after a source gap (large dt -> alpha ~1 -> snaps to raw).
   // sat/room_temp MQTT still publishes the raw satGetRoomTemp() reading.
-  {
+  if (roomValid) {
     static const float SAT_ROOM_FILTER_TAU_S = 45.0f;   // room temp is slow; ~45 s constant
     static float    _roomFiltered     = 0.0f;
     static uint32_t _roomFilterLastMs = 0;
@@ -4958,7 +4962,8 @@ static void satControlLoopRun()
   float savedDeadband = settings.sat.fDeadband;
   bool thermalDeadbandWidened = false;
   _sat_thermalSafeActive = false;
-  if (state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0) {
+  // Not while the room temperature is lost: entries 38/46 (curve only) outrank this takeover safeguard.
+  if (roomValid && state.sat.bFallbackActive && state.sat.iLastKnownRoomMs > 0) {
     uint32_t estElapsed = millis() - state.sat.iLastKnownRoomMs;
     if (estElapsed >= SAT_THERMAL_MAX_EST_MS) {
       _sat_thermalSafeActive = true;     // the 3 s PWM refresh must not overwrite this safe CS
@@ -5021,14 +5026,13 @@ static void satControlLoopRun()
     return;
   }
 
-  // --- PID auto-tuning (Task #27) ---
-  satAutoTuneUpdate();
-
-  // --- Heating curve recommendation ---
-  satUpdateCurveRecommendation();
-
-  // --- Daily median recommendation (Task #228): collect intra-day sample ---
-  satHCRAddSample();
+  // --- PID auto-tuning (Task #27), curve recommendation, daily median sample ---
+  // They learn from the room error, so they stand still while the room temperature is lost.
+  if (roomValid) {
+    satAutoTuneUpdate();
+    satUpdateCurveRecommendation();   // Heating curve recommendation
+    satHCRAddSample();                // Task #228: collect intra-day sample
+  }
 
   // --- Modulation reliability (skip if manufacturer doesn't support relative modulation) ---
   if (!(satGetManufacturerQuirks() & SAT_QUIRK_NO_REL_MOD))
@@ -5069,7 +5073,9 @@ static void satControlLoopRun()
   state.sat.fHeatingCurveValue = curveValue;   // published curve = the main curve, also with zones on (TASK-1353)
 
   // --- Calculate PID output (includes heating curve value) ---
-  float pidOutput = satPidUpdate(roomTemp, effectiveTarget, curveValue, satGetFlowTemp());
+  // Without a room temperature there is no error: P, I and D are 0, the setpoint is the curve (entries 38, 46).
+  float pidOutput = roomValid ? satPidUpdate(roomTemp, effectiveTarget, curveValue, satGetFlowTemp())
+                              : satPidCurveOnly(curveValue);
 
   // --- Multi-zone PID override (Task #233) ---
   // When sat_zone_count > 1: run each zone's PID and use the most-demanding setpoint.

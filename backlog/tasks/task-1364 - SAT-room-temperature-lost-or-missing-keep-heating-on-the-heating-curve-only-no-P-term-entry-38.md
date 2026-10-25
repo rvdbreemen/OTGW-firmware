@@ -3,11 +3,11 @@ id: TASK-1364
 title: >-
   SAT: room temperature lost or missing - keep heating on the heating curve
   only, no P term (entry 38)
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-25T04:31:00Z'
+updated_date: '2026-10-25T05:13:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,7 +24,7 @@ Sergeant D 2026-10-24 (Q6, entry 38): keep heating on the heating curve; no prop
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 With no valid room temperature SAT keeps heating on the curve without P (host test red on HEAD: trips; green: curve only); stale-time rule documented
+- [x] #1 With no valid room temperature SAT keeps heating on the curve without P (host test red on HEAD: trips; green: curve only); stale-time rule documented
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -199,4 +199,12 @@ Not verifiable here: real BLE or thermostat loss on a live boiler (the bench use
 2026-10-25: plan (second-read) stored; waiting for Sergeant D's OK on the open question (open-questions Q29/Q30/Q31) before implementation, per CLAUDE.md SAT rules.
 
 2026-10-25 03:56 UTC Sergeant D answered Q29 (entry 46): reset P, I and D to 0 while the room temperature is missing; curve only. Plan open point settled; ready to implement.
+
+2026-10-25 evidence. Host: tests/test_sat_room_loss.py (real SATpid.ino + SATcontrol.ino code cut) 12/12 OK on fix; HEAD FAILED (failures=9, errors=1): trip after 10 invalid ticks, no curve-only output, I not restarting from 0. Other SAT tests OK (published_curve, mqtt_state, pwm_override 70, push_refused, mqtt_fallback, follow_thermostat, cmd_cache, otd_ch_override); evaluate 0 failed; build SUCCESS 05:57. Bench OTGW32 (OT-Direct, no room sensor): old alpha.495 was latched safety_tripped=true; fix alpha.499+ffff5b8, satsimulation on, sensor_dropout 420 s from 05:05:21 UTC: every poll 05:06-05:12 active=true, safety_tripped=false, room_temp_lost=true, pid_output == heating_curve (22.52 -> 20.80), P=I=D=0; recovery 05:13:01 room_temp_lost=false, P 1.84, I 0, D 1.78 (gap derivative, documented as thermo-nova). Opus review: no blocker; M1-M3/L3/L4/L6 fixed (room_temp_lost state REST/MQTT/UI, flag cleared on disable, solar guard for out-of-range, docs). Stale-time per source stays open (entry 27). Bench note: the filesystem OTA from alpha.495 left the unit in safeboot (main app did not return); recovered by uploading the app in safeboot - filed separately.
 <!-- SECTION:NOTES:END -->
+
+## Final Summary
+
+<!-- SECTION:FINAL_SUMMARY:BEGIN -->
+SAT no longer switches itself off when the room temperature is lost or missing (Sergeant D entries 38 and 46): it heats on the heating curve only, with P, I and D reset to 0, and the PID resumes when a valid room temperature returns (I from 0, first D over the gap as thermo-nova). New state room_temp_lost (REST sat/status, MQTT sat/room_temp_lost, SAT page hint). Skipped during the loss: room EMA, auto-tune, curve recommendation, PV boost start, error statistics, and the MQTT-takeover 2 h safe setpoint (entries 38/46 outrank it). Evidence: host test 12/12, red on HEAD; bench 7 min sensor dropout without trip, output = curve, P/I/D 0, clean recovery. Open: stale time per source (entry 27), solar gain state during a loss.
+<!-- SECTION:FINAL_SUMMARY:END -->
