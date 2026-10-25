@@ -2683,3 +2683,65 @@ https://discord.com/channels/812969634638725140/1514720723980259460/156380340826
 **Task:** TASK-1366.
 
 **Open:** whether hybrids get the heat pump cycle lengths (the TASK-1366 plan lists it).
+
+## 51. SAT caps the CS it sends at the user's MaxTSet from the SAT settings (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 05:49 UTC, his reply to gruijter's report (05:35 UTC, message
+1563788093775941692: CS shows 50.2 at start-up while his Intergas caps the flow at 48 and does not
+report MsgID 57):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563791707135287388
+
+**Quoted:**
+
+> @BlueFlame Bot SAT clamps the higher CS value that sends to the boiler with the MaxTset that is defined by the user in the SAT settings.
+
+**Settled by this statement:**
+
+- The ceiling of every CS= that SAT sends is the maximum setpoint the user sets in the SAT settings.
+- Read together with entry 48 (seven minutes later): that user value is the MaxTSet slider, bounded
+  by MsgID 57 or 20..80 °C, and it is also written to the boiler. A boiler without MsgID 57 support
+  (gruijter's Intergas) is still capped, because SAT itself clamps CS.
+
+**Compared with thermo-nova and the firmware:** thermo-nova clamps the setpoint at the user's
+`maximum_setpoint` (config option, range 10..100, `config_flow.py:612-613`). Firmware at HEAD:
+`satEffectiveMaxSetpoint()` (`SATcontrol.ino:314-327`) takes the boiler's MsgID 57 value (or
+`SAT_MAX_SETPOINT_DEFAULT` below 30 °C), then the per-system cap (62 / 45 / 40,
+`SATcontrol.ino:302-309`), the hard ceiling and `settings.sat.fMaxSetpoint` (default 65,
+`SATtypes.h:537`). `fMaxSetpoint` has no settings key in `settingStuff.ino` (grep), so the user
+cannot set it today.
+
+**Changes an earlier entry:** none; it adds the clamp rule to entry 48.
+
+**Task:** TASK-1373.
+
+**Open:** none beyond entry 48.
+
+## 52. PWM cycles per hour default: 3 for gas boilers, 2 for heat pumps (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 07:10 UTC, answer to Q16 (07:08 UTC, message
+1563811397534613505: A) default 4, choices 3 or 4 (thermo-nova); B) default 3, choices 3 or 4;
+C) keep default 3 and the 2..6 range; our advice A):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563811907708649533
+
+**Quoted:**
+
+> Keep  3x hour for gas boilers and 2x hour for heat pumps as default values
+
+**Settled by this statement:**
+
+- Gas boilers: default 3 cycles per hour (a 1200 s cycle). With entry 30 the choices are 3 or 4.
+  This is option B, not our advice A.
+- Heat pumps: default 2 per hour (1800 s), which confirms entry 50.
+
+**Compared with thermo-nova and the firmware:** thermo-nova's default is 4 (`const.py:119`), with
+3 or 4 for radiators and 2 or 3 for heat pumps (`config_flow.py:686-701`). Firmware at HEAD: default 3
+(`SATtypes.h:548`), accepted range 2..6 (`settingStuff.ino:1107`).
+
+**Changes an earlier entry:** none; it completes entry 30 (choices) with the default.
+
+**Task:** TASK-1366 (heat pump default) and a new task for the gas boiler range (3 or 4 only).
+
+**Interpretation (ours):** he did not say whether the 2..6 range must shrink to 3 or 4. Entry 30
+says gas boilers use 3 or 4, so we read the range as 3 or 4 for gas boilers.
+
+**Open:** what hybrids default to.

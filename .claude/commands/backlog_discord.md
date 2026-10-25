@@ -19,13 +19,24 @@ Monitor `#dev-sat-mqtt` for backlog-related requests, execute them via the Backl
 
 ## Workflow
 
+### Phase 0: Unanswered-message sweep (ALWAYS, maintainer directive 2026-10-25)
+
+Every run, before Phase 1 and regardless of the timestamp file (B4 does not skip this phase), find every message that still needs an answer. The timestamp filter alone misses messages that arrived while a previous run was busy, or that a run read but did not answer.
+
+1. Read the newest 40 messages of `#alpha-testing` (`1514720723980259460`) and the newest 25 of `#dev-sat-mqtt` (`1105556725714649128`).
+2. A message **needs an answer** when it comes from Sergeant D, gruijter, maarten_41762, another person addressing `@BlueFlame Bot`, **or the maintainer (`384411356616720384`, number3nl) addressing the bot** (for example "take a close look at this feedback and respond"), and no later BlueFlame Bot message answers it. "Answers it" means: it mentions that author's `<@ID>` and addresses the content, or it records/acknowledges that exact answer ("Thank you, recorded: ..."). A bare follow-up question to someone else does not count.
+3. For Sergeant D also check, per message, that his answer or decision is recorded in `docs/sat/sergeant-d-corrections.md` (grep the message ID). An unrecorded one is recorded first (CLAUDE.md SAT rules), then acknowledged in the channel.
+4. Answer every message that needs one in this run, oldest first. Verify technical claims in the code (cite `file:line`) before answering; file a task where the report asks for a change. If an answer needs work that cannot finish in this run, post a short holding answer that names the task, so nothing stays silent.
+5. Messages older than 7 days without an answer: report them to the maintainer in the session summary instead of answering out of the blue.
+6. End the run with a one-line count: `unanswered found N, answered N, held N`.
+
 ### Phase 1: Early-exit + read new messages (B4)
 
 1. Read `.claude/discord_backlog_last_checked.txt`. If absent, default to 1 hour ago.
-2. **Early-exit (B4)**: if timestamp is < 5 minutes old → print "Nothing new (checked < 5 min ago)" and stop.
+2. **Early-exit (B4)**: if timestamp is < 5 minutes old → skip the rest of Phase 1 (Phase 0 still ran).
 3. Fetch messages: `mcp__discord-mcp__read_messages` with `channelId="1105556725714649128"` and `count="25"`.
 4. Filter to messages after the last-checked timestamp. Discard the rest immediately.
-5. Ignore messages from bots and maintainer (user ID `384411356616720384`).
+5. Ignore messages from bots. Ignore the maintainer (user ID `384411356616720384`) for backlog commands, but not when he addresses the bot with a request (Phase 0).
 6. Write current UTC timestamp to `.claude/discord_backlog_last_checked.txt`.
 
 **Tool namespace**: `mcp__discord-mcp__*`. No login step — `DISCORD_TOKEN` is injected via MCP config.
