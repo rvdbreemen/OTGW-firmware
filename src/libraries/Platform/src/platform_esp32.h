@@ -251,11 +251,68 @@ inline uint8_t platformHeapFragmentation() {
   return (uint8_t)(100U - ((maxBlk * 100U) / freeHeap));
 }
 
+// Windowed heap low-water mark (TASK-1339 diagnostics). The IDF heap can track
+// minimum_free_bytes from a chosen moment instead of from boot
+// (heap_caps_monitor_local_minimum_free_size_start/_stop, esp_heap_caps.h:258).
+// That monitor is process-wide: while it runs, heap_caps_get_minimum_free_size()
+// returns the minimum since the window started, for every caller. So the shim
+// keeps the since-boot minimum from before the window in platformHeapWinBootMin(),
+// and platformMinFreeHeap() returns min(that, window minimum) while a window is
+// open. That sum-of-region-minima can sit slightly above IDF's per-region merge
+// at stop; after stop the native value is exact again.
+// The state lives in function-local statics of inline functions, so every
+// translation unit that includes this header shares one copy.
+inline uint32_t& platformHeapWinBootMin() { static uint32_t v = 0xFFFFFFFFu; return v; }
+inline volatile bool& platformHeapWinActiveRef() { static volatile bool a = false; return a; }
+inline bool platformHeapWindowActive() { return platformHeapWinActiveRef(); }
+
+// Minimum free internal heap since the window started (0 when no window is open).
+inline uint32_t platformHeapWindowMin() {
+  if (!platformHeapWindowActive()) return 0;
+  return (uint32_t)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+}
+
+// Close the window. The IDF merges the window minimum into the since-boot
+// minimum per region, so platformMinFreeHeap() stays a true low-water mark.
+inline void platformHeapWindowStop() {
+  if (!platformHeapWindowActive()) return;
+  heap_caps_monitor_local_minimum_free_size_stop();
+  platformHeapWinActiveRef() = false;
+}
+
+// Open a window, or restart it when one is open (stop, then start: a start
+// while monitoring runs is not documented in esp_heap_caps.h; the IDF 5.5.1
+// code then keeps the older saved minimum and returns ESP_OK, but we do not
+// rely on that and pay one extra free + malloc per restart). The start does one small
+// malloc (one size_t per heap region) and asserts on failure, so it is skipped
+// when the largest free block is under 256 B. Returns true when a window is open.
+inline bool platformHeapWindowStart() {
+  const bool wasActive = platformHeapWindowActive();
+  uint32_t m = (uint32_t)heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+  uint32_t& bootMin = platformHeapWinBootMin();
+  if (m < bootMin) bootMin = m;
+  // Mark active before the start, clear it after the stop: a reader on another
+  // task then always sees min(bootMin, native), which is never too high.
+  platformHeapWinActiveRef() = true;
+  if (wasActive) heap_caps_monitor_local_minimum_free_size_stop();
+  if (heap_caps_get_largest_free_block(MALLOC_CAP_INTERNAL) < 256 ||
+      heap_caps_monitor_local_minimum_free_size_start() != ESP_OK) {
+    platformHeapWinActiveRef() = false;
+    return false;
+  }
+  return true;
+}
+
 // Minimum observed free heap since boot. ESP32 tracks this natively in the
 // heap allocator via heap_caps_get_minimum_free_size — no user-space
-// watermark needed.
+// watermark needed, except while a diagnostic window is open (see above).
 inline uint32_t platformMinFreeHeap() {
-  return ESP.getMinFreeHeap();
+  uint32_t m = ESP.getMinFreeHeap();
+  if (platformHeapWindowActive()) {
+    uint32_t b = platformHeapWinBootMin();
+    if (b < m) m = b;
+  }
+  return m;
 }
 
 // One block from PSRAM for a buffer that is allocated once at boot and never freed

@@ -3308,6 +3308,17 @@ Example output:
 [HEAP] Free: 19234 bytes (healthy)
 ```
 
+MQTT connect heap trace (always on, TASK-1339 diagnostics). On every MQTT connect the firmware opens a windowed heap low-water mark (the IDF `heap_caps_monitor_local_minimum_free_size_start` monitor) and logs at most one line per second until the outbox has been empty for 3 s, 60 s have passed, or MQTT disconnects:
+
+```
+[HEAP] burst start window=on free=68164 maxblk=31732
+[HEAP] burst t=1003 free=23400 minWin=13496 maxblk=9204 outbox=37
+[HEAP] drip id=252 ok=1 topics=35 free=30112 maxblk=11252 outbox=35 minWin=27980
+[HEAP] burst end t=5012 reason=drained minWin=13496 lines=4 free=61020 maxblk=27636
+```
+
+`free` and `maxblk` are the current free internal heap and largest free block, `minWin` the lowest free internal heap since the window opened (per-region minima summed, a worst-case bound), `outbox` the number of MQTT packets still queued in the client. A `drip` line follows every discovery drip tick that publishes: `topics` is the number of topics that tick queued and `minWin` covers only that tick (the queueing; the send shows up in the burst lines). The numbers in the example are illustrative.
+
 The verbosity of each category is controlled by boolean flags in `state.debug`:
 
 | Flag | Category | Default |

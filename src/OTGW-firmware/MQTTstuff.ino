@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.504
+**  Version  : v2.0.0-alpha.505
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1081,9 +1081,112 @@ static void onMqttMessage(const espMqttClientTypes::MessageProperties& propertie
 void sendMQTT(const char* topic, const char *json);
 void publishBirthOnline();  // F3 (TASK-874): gate-bypassing retained availability birth
 
+// ---------------------------------------------------------------------
+// TASK-1339 diagnostics: windowed heap low-water mark around the MQTT
+// connect burst and around each discovery drip tick that publishes.
+// Telnet lines only, no behaviour change. Always on (no heap toggle exists,
+// and the boot burst happens before anyone can press a debug key); the burst
+// trace logs at most one line per second and skips a second in which a drip
+// line was printed. One IDF monitor window is shared (platformHeapWindow*):
+// a drip tick restarts it, so the burst first folds the running window
+// minimum into its own accumulator. Runs on the loop task only.
+// ---------------------------------------------------------------------
+static bool     sHeapBurstOpen       = false;
+static uint32_t sHeapBurstStartMs    = 0;
+static uint32_t sHeapBurstLastLineMs = 0;  // last [HEAP] burst/drip line (shared 1 s limiter)
+static uint32_t sHeapBurstNonEmptyMs = 0;  // last time the outbox held a packet
+static uint32_t sHeapBurstMin        = 0xFFFFFFFFu;
+static uint16_t sHeapBurstLines      = 0;
+
+static void heapBurstFold() {
+  uint32_t w = platformHeapWindowMin();
+  if (w != 0 && w < sHeapBurstMin) sHeapBurstMin = w;
+}
+
+static void heapBurstClose(const char *reason) {
+  if (!sHeapBurstOpen) return;
+  heapBurstFold();
+  sHeapBurstOpen = false;
+  platformHeapWindowStop();
+  DebugTf(PSTR("[HEAP] burst end t=%lu reason=%s minWin=%lu lines=%u free=%u maxblk=%u\r\n"),
+          (unsigned long)(millis() - sHeapBurstStartMs), reason,
+          (unsigned long)sHeapBurstMin, (unsigned)sHeapBurstLines,
+          (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
+}
+
+// Called at the top of onMqttConnect, before anything is queued.
+static void heapBurstOpen() {
+  heapBurstClose(PSTR("reconnect"));
+  const uint32_t now = millis();
+  sHeapBurstStartMs    = now;
+  sHeapBurstLastLineMs = now;
+  sHeapBurstNonEmptyMs = now;
+  sHeapBurstMin        = 0xFFFFFFFFu;
+  sHeapBurstLines      = 0;
+  sHeapBurstOpen       = platformHeapWindowStart();
+  DebugTf(PSTR("[HEAP] burst start window=%s free=%u maxblk=%u\r\n"),
+          sHeapBurstOpen ? PSTR("on") : PSTR("off"), (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock());
+}
+
+// Called every handleMQTT() pass, after MQTTclient.loop(). Closes the window
+// once the outbox has been empty for 3 s, after 60 s, or on disconnect.
+static void heapBurstTick() {
+  if (!sHeapBurstOpen) return;
+  if (!state.mqtt.bConnected) { heapBurstClose(PSTR("disconnect")); return; }
+  const uint32_t now = millis();
+  if (now - sHeapBurstLastLineMs < 1000) return;
+  const uint32_t q = (uint32_t)MQTTclient.queueSize();  // packet count, O(n) list walk
+  if (q > 0) sHeapBurstNonEmptyMs = now;
+  heapBurstFold();
+  sHeapBurstLastLineMs = now;
+  sHeapBurstLines++;
+  DebugTf(PSTR("[HEAP] burst t=%lu free=%u minWin=%lu maxblk=%u outbox=%lu\r\n"),
+          (unsigned long)(now - sHeapBurstStartMs), (unsigned)platformFreeHeap(),
+          (unsigned long)sHeapBurstMin, (unsigned)platformMaxFreeBlock(), (unsigned long)q);
+  if (now - sHeapBurstNonEmptyMs >= 3000) heapBurstClose(PSTR("drained"));
+  else if (now - sHeapBurstStartMs >= 60000) heapBurstClose(PSTR("timeout"));
+}
+
+// Discovery drip tick: open (or restart) the window before the publish and
+// return the published-topic count at that moment.
+static uint32_t heapDripTickBegin() {
+  heapBurstFold();
+  platformHeapWindowStart();
+  return state.discovery.iPublishedTopicCount;
+}
+
+// After the tick: one line with the topics queued, the heap now and the window
+// minimum over the tick (the outbox mallocs at queue time; the send happens in
+// later MQTTclient.loop() calls and shows up in the burst trace).
+static void heapDripTickEnd(int msgId, bool ok, uint32_t topicsBefore) {
+  const uint32_t tickMin = platformHeapWindowMin();
+  if (sHeapBurstOpen) {
+    if (tickMin != 0 && tickMin < sHeapBurstMin) sHeapBurstMin = tickMin;  // the burst keeps the window running
+  } else {
+    platformHeapWindowStop();
+  }
+  // A message ID whose discovery keeps failing is retried every tick without
+  // end; outside a burst window only its first failure is logged, so this
+  // always-on line cannot repeat forever.
+  static int sLastFailedDripId = -1;
+  if (ok) {
+    sLastFailedDripId = -1;
+  } else {
+    const bool repeat = (msgId == sLastFailedDripId);
+    sLastFailedDripId = msgId;
+    if (repeat && !sHeapBurstOpen) return;
+  }
+  sHeapBurstLastLineMs = millis();
+  DebugTf(PSTR("[HEAP] drip id=%d ok=%d topics=%lu free=%u maxblk=%u outbox=%lu minWin=%lu\r\n"),
+          msgId, ok ? 1 : 0,
+          (unsigned long)(state.discovery.iPublishedTopicCount - topicsBefore),
+          (unsigned)platformFreeHeap(), (unsigned)platformMaxFreeBlock(),
+          (unsigned long)MQTTclient.queueSize(), (unsigned long)tickMin);
+}
+
 void handleMQTT()
 {
-  if (!settings.mqtt.bEnable) return;
+  if (!settings.mqtt.bEnable) { heapBurstClose(PSTR("disabled")); return; }  // TASK-1339: no-op unless a burst window is open
   DECLARE_TIMER_SEC(timerMQTTwaitforconnect, 42, CATCH_UP_MISSED_TICKS);   // wait before trying to connect again
   DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // wait for retry
 
@@ -1104,6 +1207,7 @@ void handleMQTT()
   // stall the handshake forever — connected() never becomes true because the
   // thing that makes it true is loop() itself. It is a safe no-op when idle.
   MQTTclient.loop();
+  heapBurstTick();  // TASK-1339 diagnostics: [HEAP] burst trace, no behaviour change
 
   // Poll the discovery-verify window closer (ADR-062). Handles timeout,
   // MQTT-disconnect fast-close, and heap-abort.
@@ -1325,6 +1429,7 @@ void PrintMQTTError(){
 // unused (we always setCleanSession(true)).
 static void onMqttConnect(bool sessionPresent) {
   (void)sessionPresent;
+  heapBurstOpen();  // TASK-1339 diagnostics: windowed heap minimum over the connect burst
   reconnectAttempts = 0;
   state.mqtt.bConnected = true;
   stateMQTT = MQTT_STATE_IS_CONNECTED;
@@ -2251,13 +2356,17 @@ void loopMQTTDiscovery()
       // Dallas sensors use a separate path (configSensors)
       if (msgId == OTGWdallasdataid) {
         MQTTDebugTln(F("[drip] publishing Dallas sensor discovery"));
+        const uint32_t heapTopics0 = heapDripTickBegin();  // TASK-1339 diagnostics
         configSensors();
+        heapDripTickEnd(msgId, true, heapTopics0);
         bitClear(MQTTautoCfgPendingMap[group], bit);
         return;  // one per tick
       }
 
       MQTTDebugTf(PSTR("[drip] publishing discovery for OT ID %d\r\n"), msgId);
+      const uint32_t heapTopics0 = heapDripTickBegin();  // TASK-1339 diagnostics
       bool success = doAutoConfigureMsgid(msgId, dripDeviceInfoPending);
+      heapDripTickEnd(msgId, success, heapTopics0);
       if (success) {
         dripDeviceInfoPending = false;
         setMQTTConfigDone(msgId);
