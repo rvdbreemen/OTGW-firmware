@@ -4,9 +4,9 @@ title: 'v2 Home view: heat-pump wording for DHW charging and space heating (cosm
 status: To Do
 assignee: []
 created_date: '2026-10-25T14:34:00Z'
+updated_date: '2026-10-25T15:10:00Z'
 labels:
-  - webui
-  - heatpump
+  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 priority: low
@@ -24,3 +24,9 @@ maarten_41762 2026-10-25 (#alpha-testing 1563922208718463147, heat pump, screens
 - [ ] #1 With heating source heat pump (or a storage tank) the DHW state and the flow label use the tank-charging wording; gas boilers keep today's text (screenshot both)
 - [ ] #2 'Radiators' label replaced by a neutral 'space heating' where it names the CH circuit
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-25 tester feedback: needs Robert's OK before implementation (testers have no admin control).
+<!-- SECTION:NOTES:END -->

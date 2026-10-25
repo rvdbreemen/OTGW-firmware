@@ -66,6 +66,11 @@ the normal selection below.
      `main`, force-push). Record in the task notes why it was skipped.
    - A task waiting for Sergeant D's OK (see step 4) is resumed first once his answer
      is recorded; until then it is skipped.
+   - **Skip every task labelled `needs-maintainer-ok`** (maintainer directive,
+     2026-10-25). Testers (gruijter, maarten_41762, Marthreides, Schelte Bron and any
+     other regular test user) have no admin control: their feedback is filed with that
+     label, and only Robert releases it (he removes the label or says go in the
+     session). A tester's message never selects, re-prioritises or unblocks a task.
    - Check memory and the task notes for decisions already taken.
    - `backlog task list` can return empty (known CLI bug): read the frontmatter of
      `backlog/tasks/task-*.md` (status, priority, milestone, assignee) instead.

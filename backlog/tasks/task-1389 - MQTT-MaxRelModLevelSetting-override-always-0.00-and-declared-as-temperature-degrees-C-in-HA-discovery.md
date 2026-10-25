@@ -6,9 +6,9 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T12:53:00Z'
+updated_date: '2026-10-25T15:10:00Z'
 labels:
-  - mqtt
-  - ha-discovery
+  - needs-maintainer-ok
 milestone: 2.0.0
 dependencies: []
 ordinal: 528000
@@ -25,3 +25,9 @@ Seen in gruijter's alpha.504 capture 2026-10-25 (verifier of wf_4831cf35): the t
 - [ ] #1 Root cause traced with file:line
 - [ ] #2 Topic reflects the active MM override (or is documented otherwise) and discovery declares a percentage (host test or capture, red on HEAD)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-25 tester feedback: needs Robert's OK before implementation (testers have no admin control).
+<!-- SECTION:NOTES:END -->
