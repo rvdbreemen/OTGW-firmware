@@ -3637,6 +3637,12 @@
         ['PIC Firmware Version', d.picfwversion], ['PIC Firmware Type', d.picfwtype],
         ['PIC Device ID', d.picdeviceid], ['Board Type', d.board]
       ]],
+      // TASK-1379: static credits, not device data. SAT's concept is George Ntellas's.
+      ['Credits', [
+        ['SAT concept by', 'George Ntellas'],
+        ['Original SAT Python version', 'Authors Alex Wijnholds - George Ntellas'],
+        ['C/C++ version', 'Robert + Claude']
+      ]],
       ['Network', [
         ['Hostname (.local)', d.hostname], ['IP Address', d.ipaddress], ['MAC Address', d.macaddress],
         ['Wi-Fi Network (SSID)', d.ssid], ['Wi-Fi Signal Strength (dBm)', d.wifirssi], ['Wi-Fi Quality', wifiQ]
