@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T07:29:00Z'
-updated_date: '2026-10-25T12:53:00Z'
+updated_date: '2026-10-25T17:23:00Z'
 labels:
   - heap
   - mqtt
@@ -48,4 +48,6 @@ Sergeant D capture 2026-10-24 06:41 UTC (alpha.486, transcript-20261024-093559-.
 2026-10-25 Sergeant D (https://discord.com/channels/812969634638725140/1514720723980259460/1563883193801908265): PSRAM None, WiFi -59 dBm. So on his unit the library's 16 KB outbox guard applies (no PSRAM) and the link is decent: the weak-link part of the bench correlation does not carry over; the connect burst stays the main suspect. Asked for a telnet capture of one boot once the [HEAP] trace build (alpha.505) is out.
 
 2026-10-25 first [HEAP] trace on alpha.505 (bench OTGW32, broker .32, 2 boots, telnet from boot): boot 1 hd_min_free_heap 2032 B (block 13812), burst window minimum 5700 B within the first second after onMqttConnect while the outbox was already empty at the 1 s sample (outbox drains fast; the dip is the queueing moment), burst end 'drained' at ~5 s; boot 2 hd_min 9032, burst window minimum 24504. Drip ticks: OT ID 0 queues 35 topics (free 50252/48672), OT ID 252 35 topics (free ~54.8 KB), and at the ID 254 tick the outbox held 126 packets (free 46364 boot 1) while the tick itself queued 5: other publishers (status first-seen) fill the outbox at that moment. Boot 1's 2032 B is lower than any window minimum, so it happened outside the windows (before connect, between ticks, or the region-sum effect). Logs: scratchpad boot505-1.txt / boot505-2.txt. Next: same trace from Sergeant D's unit (asked, msg 1563898246894714940).
+
+2026-10-25 Sergeant D transcript alpha.505 (msg 1563963515209908374): capture started at uptime ~1 min, banner minFree 1640, stats min_free_heap 1300; no [HEAP] burst/drip lines (they ran before telnet attached). RSSI -56. Reboot log shows paired software resets ~1 min apart on each update (OTA app + fs). Asked him to start the capture first and reboot from the UI (the script reconnects telnet within 500 ms, capture-mqtt-debug.bat:72/:1347).
 <!-- SECTION:NOTES:END -->
