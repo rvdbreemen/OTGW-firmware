@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T07:29:00Z'
-updated_date: '2026-10-25T21:47:00Z'
+updated_date: '2026-10-25T22:14:00Z'
 labels:
   - heap
   - mqtt
@@ -26,7 +26,7 @@ Sergeant D capture 2026-10-24 06:41 UTC (alpha.486, transcript-20261024-093559-.
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 The allocation that drives the boot-time dip is named with a bench reproduction (e.g. throttled or remote broker via the MikroTik router, mDNS broker name) or recorded as not reproducible with what was tried
+- [x] #1 The allocation that drives the boot-time dip is named with a bench reproduction (e.g. throttled or remote broker via the MikroTik router, mDNS broker name) or recorded as not reproducible with what was tried
 - [ ] #2 If a fix follows: min_free_heap after boot before/after on the same reproduction
 <!-- AC:END -->
 
@@ -58,4 +58,6 @@ Sergeant D capture 2026-10-24 06:41 UTC (alpha.486, transcript-20261024-093559-.
 2026-10-25 correction 2: Robert confirmed the .88.61 unit (MAC 10:20:BA:21:B4:F8) is an S3 WITH a PIC; it ran in OT-Direct mode because the PIC was not detected at boot (TASK-1399). So the evidence is 'combo image in OT-Direct mode on a board whose PIC was not detected', not PIC-gateway behaviour.
 
 2026-10-25 Robert approved widening the diagnostics. Boot-path heap windows added (diagnostic only): consecutive IDF windows setup-early / setup-net / setup-services / setup-late / wait-mqtt / connect / drip from setup() until the boot discovery drip drains (or mqtt-off, or 10-min timeout); one line per phase '[HEAP] boot win=.. minWin=.. free=.. maxblk=.. outbox=.. sburst connburst drip' and a summary '[HEAP] boot done ... allWinMin=.. nativeMin=.. outside=0|1' (outside=1 = a dip fell outside every window). setup() phase lines are stored and printed at end of setup() and again at boot done.
+
+2026-10-25 23:09-23:12 bench, OTGW32 .61 alpha.509+eba2781, MQTT to 192.168.88.32, 3 reboots with telnet from 13 s (scratchpad task1339-509/boot1..3.log). Every boot the deepest window is the drip window that follows the first SAT control tick: minWin 9760 / 8752 / 14060 B (boot done: allWinMin 9760/8752/14060, nativeMin 9760/8596/13456; outside=1 on boots 2-3 by only 156/604 B = window-restart granularity, the dip itself is inside the windows). Setup phases stay >= 69 KB, connect burst >= 24 KB. Cause, named: the first satPublishMQTT() after boot (SATcontrol.ino:2991, 'publishing MQTT state (ADR-111 on-change + heartbeat)') publishes every sat/* topic at once because all values are 'changed' on the first pass: 102-132 sendMQTTData lines in one loop pass (telnet may drop some), outbox depth 126 right after (heapDripTick id=254 line, free 58.7 KB), each queued packet is its own malloc in espMqttClient (Packet.cpp, EMC_USE_MEMPOOL 0), and the heap minimum (8.7-14 KB) follows while the outbox drains and the next drip tick publishes. A unit with less free heap at that moment (Sergeant D's) lands at ~1.5 KB. Fix direction (AC#2): pace the first full SAT publish so the outbox stays bounded (e.g. cap topics per pass / wait while MQTTclient.queueSize() is high), then repeat the same 3-boot capture.
 <!-- SECTION:NOTES:END -->
