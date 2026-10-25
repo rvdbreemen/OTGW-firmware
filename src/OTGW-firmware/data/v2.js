@@ -3640,8 +3640,8 @@
       // TASK-1379: static credits, not device data. SAT's concept is George Ntellas's.
       ['Credits', [
         ['SAT concept by', 'George Ntellas'],
-        ['Original SAT Python version', 'Authors Alex Wijnholds - George Ntellas'],
-        ['C/C++ version', 'Robert + Claude']
+        ['Original SAT Python version', 'Alex Wijnholds - George Ntellas'],
+        ['C/C++ version', 'Robert van den Breemen + Claude + George Ntellas']
       ]],
       ['Network', [
         ['Hostname (.local)', d.hostname], ['IP Address', d.ipaddress], ['MAC Address', d.macaddress],

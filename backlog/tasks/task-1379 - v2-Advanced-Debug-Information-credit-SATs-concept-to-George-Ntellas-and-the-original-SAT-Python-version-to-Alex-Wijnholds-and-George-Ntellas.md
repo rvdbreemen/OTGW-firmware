@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T09:31:00Z'
-updated_date: '2026-10-25T09:33:00Z'
+updated_date: '2026-10-25T10:06:00Z'
 labels:
   - webui
   - sat
@@ -34,3 +34,9 @@ Robert 2026-10-25: add two fields to Advanced tab -> Debug Information: 'SAT con
 <!-- SECTION:PLAN:BEGIN -->
 Static UI only (KISS): in v2.js renderDebugGroups() (~3634) add a group 'Credits' right after 'Firmware' with three rows: 'SAT concept by' = George Ntellas; 'Original SAT Python version' = Authors Alex Wijnholds - George Ntellas; 'C/C++ version' = Robert + Claude. No firmware/REST change: the rows are not device data. Sequencing: TASK-1366's workflow is the single writer in the dev tree right now and may touch v2.js; apply this edit after TASK-1366 is committed, then its own prerelease bump, one build for both, OTA to bench, screenshot of Advanced > Debug Information.
 <!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-25 Robert's follow-ups: drop 'Authors' from the Python field; C/C++ version = Robert van den Breemen + Claude + George Ntellas. Final: SAT concept by = George Ntellas; Original SAT Python version = Alex Wijnholds - George Ntellas; C/C++ version = Robert van den Breemen + Claude + George Ntellas.
+<!-- SECTION:NOTES:END -->
