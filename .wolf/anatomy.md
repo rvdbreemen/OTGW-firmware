@@ -1,7 +1,7 @@
 # anatomy.md
 
-> Auto-maintained by OpenWolf. Last scanned: 2026-10-03T10:48:49.952Z
-> Files: 626 tracked | Anatomy hits: 0 | Misses: 0
+> Auto-maintained by OpenWolf. Last scanned: 2026-10-25T09:05:57.509Z
+> Files: 627 tracked | Anatomy hits: 0 | Misses: 0
 
 ## ./
 
@@ -819,6 +819,7 @@
 ## docs/research/
 
 - `2026-07-03-ble-memory-implementation-proposal.md` — BLE / web-stack memory — implementation proposal (TASK-994) (~1772 tok)
+- `2026-10-25-home-assistant-ui-integration.md` — Home Assistant UI integration: Marketplace, custom integration or ingress (~2798 tok)
 
 ## scripts/
 

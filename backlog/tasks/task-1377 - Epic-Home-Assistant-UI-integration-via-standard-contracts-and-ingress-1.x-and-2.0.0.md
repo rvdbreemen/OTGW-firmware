@@ -6,12 +6,17 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T09:01:00Z'
+updated_date: '2026-10-25T09:06:00Z'
 labels:
   - epic
   - home-assistant
   - mqtt
   - webui
 dependencies: []
+references:
+  - docs/research/2026-10-25-home-assistant-ui-integration.md
+  - https://github.com/lovelylain/hass_ingress
+  - https://next.home-assistant.io/integrations/marketplace
 priority: medium
 ordinal: 511000
 ---
@@ -45,3 +50,9 @@ Ordering: A is independent. C depends on B per line. D depends on C per line.
 - [ ] #3 On both lines, the OTGW UI opens from the HA sidebar through the chosen ingress component with HA over HTTPS, read and admin actions work, shown by a bench transcript or screenshots
 - [ ] #4 MQTT discovery and REST contracts are unchanged apart from the added cu field, shown by a discovery payload diff
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Research 2026-10-25 recorded in docs/research/2026-10-25-home-assistant-ui-integration.md (identical copy on dev and otgw-1.x.x). Key facts: the HA 2026.11 Marketplace is HACS in core (same hacs/default catalog and hacs.json, months of review, nothing audited by HA); options B (card) and D (custom integration) rejected for maintenance and contract duplication; hass_ingress (Apache-2.0) proxies at /api/ingress/{name}/, sends X-Ingress-Path, supports body/header rewrite rules, extra headers (incl. host and authorization) and require_admin. New since the epic was written: rewrite rules may fix absolute UI paths without firmware changes, so the spikes test rewrite-only first and items C shrink to what rewrite cannot fix.
+<!-- SECTION:NOTES:END -->
