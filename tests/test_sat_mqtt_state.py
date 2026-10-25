@@ -190,5 +190,209 @@ class DocsMatchTheCommandTable(unittest.TestCase):
         self.assertEqual(doc - code, set(), "in MANUAL.md, missing in code")
 
 
+# --- TASK-1339: outbox gate in the ADR-111 helpers ---------------------------------------------
+# Behaviour test of the REAL SATmqttPublish.h + SATmqttPublish.cpp (include lines stripped),
+# compiled with a host C++ compiler next to stubs for millis(), dtostrf(), sendMQTTData() and the
+# outbox depth. OTGW_SRC_REV=HEAD runs the same scenarios against the code before the gate: the
+# publish-count and shadow assertions go red there (the deferred flag does not exist on HEAD and
+# is reported as -1, so only the flag assertions read it).
+
+GATE_PRELUDE = r"""
+#include <cstdint>
+#include <cstddef>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
+class __FlashStringHelper;
+#define F(s) (reinterpret_cast<const __FlashStringHelper*>(s))
+#define PSTR(s) (s)
+#define snprintf_P snprintf
+static uint32_t g_now = 1000;
+static uint32_t millis() { return g_now; }
+static char* dtostrf(double v, signed char w, unsigned char p, char* b) { sprintf(b, "%*.*f", w, p, v); return b; }
+static size_t test_strlcpy(char* d, const char* s, size_t n) {
+  size_t l = strlen(s); if (n) { size_t c = l < n - 1 ? l : n - 1; memcpy(d, s, c); d[c] = 0; } return l; }
+#define strlcpy test_strlcpy
+static uint32_t platformHardwareRandom() { return 12345u; }
+static uint32_t g_outbox = 0;
+static int g_sent = 0;
+static char g_lastPayload[64];
+uint32_t mqttOutboxDepth() { return g_outbox; }
+bool sendMQTTData(const char* topic, const char* json, const bool retain) {
+  (void)topic; (void)retain; ++g_sent; ++g_outbox; test_strlcpy(g_lastPayload, json, sizeof(g_lastPayload)); return true; }
+bool sendMQTTData(const __FlashStringHelper* topic, const char* json, const bool retain) {
+  return sendMQTTData(reinterpret_cast<const char*>(topic), json, retain); }
+"""
+
+GATE_MAIN = r"""
+#include <string>
+int main() {
+  // 1. float, first-seen, outbox above the limit, then drained
+  SATShadowF f{};
+  g_outbox = 1000; g_sent = 0; DEFERRED_CLEAR();
+  bool r = publishIfChangedF(F("sat/setpoint"), 21.5f, f, 0.05f, 1, true);
+  printf("f_full r=%d sent=%d valid=%d next=%u deferred=%d\n", (int)r, g_sent, (int)f.valid, (unsigned)f.nextRepublishMs, DEFERRED());
+  g_outbox = 0; g_sent = 0; DEFERRED_CLEAR();
+  r = publishIfChangedF(F("sat/setpoint"), 21.5f, f, 0.05f, 1, true);
+  printf("f_free r=%d sent=%d valid=%d payload=%s deferred=%d\n", (int)r, g_sent, (int)f.valid, g_lastPayload, DEFERRED());
+  // 2. a quiet call (nothing due) with a full outbox does not set the flag
+  g_outbox = 1000; g_sent = 0; DEFERRED_CLEAR();
+  r = publishIfChangedF(F("sat/setpoint"), 21.5f, f, 0.05f, 1, true);
+  printf("f_quiet r=%d sent=%d deferred=%d\n", (int)r, g_sent, DEFERRED());
+  // 3. float changed while full: shadow keeps the old value
+  r = publishIfChangedF(F("sat/setpoint"), 23.0f, f, 0.05f, 1, true);
+  printf("f_changed_full r=%d sent=%d last=%.1f deferred=%d\n", (int)r, g_sent, f.last, DEFERRED());
+  // 4. bool first-seen while full: nextRepublishMs stays 0 (still first-seen)
+  SATShadowB b{};
+  g_outbox = 1000; g_sent = 0; DEFERRED_CLEAR();
+  r = publishIfChangedB(F("sat/active"), true, b, true);
+  printf("b_full r=%d sent=%d next=%u\n", (int)r, g_sent, (unsigned)b.nextRepublishMs);
+  g_outbox = 0;
+  r = publishIfChangedB(F("sat/active"), true, b, true);
+  printf("b_free r=%d sent=%d payload=%s\n", (int)r, g_sent, g_lastPayload);
+  // 5. string, char* topic, first-seen while full
+  SATShadowS s{};
+  g_outbox = 1000; g_sent = 0;
+  r = publishIfChangedS("sat/ble/aabb/x", "HEALTHY", s, false);
+  printf("s_full r=%d sent=%d valid=%d last=[%s]\n", (int)r, g_sent, (int)s.valid, s.last);
+  // 6. boundary: exactly at the limit still publishes
+  SATShadowI i{};
+  g_outbox = 24; g_sent = 0;
+  r = publishIfChangedI(F("sat/max_modulation"), 100, i, true);
+  printf("i_at24 r=%d sent=%d\n", (int)r, g_sent);
+  // 7. JSON blob: change signal while full is kept as "due now"
+  uint32_t hb = 0;
+  g_outbox = 0; g_sent = 0;
+  publishJsonAttrIfChanged(F("sat/pid_attributes"), "{}", hb, false, false);   // first publish
+  g_now += 5000;
+  g_outbox = 1000; g_sent = 0;
+  r = publishJsonAttrIfChanged(F("sat/pid_attributes"), "{\"a\":1}", hb, true, false);
+  printf("blob_full r=%d sent=%d due=%d\n", (int)r, g_sent, (int)((int32_t)(millis() - hb) >= 0));
+  g_now += 500; g_outbox = 0; g_sent = 0;
+  r = publishJsonAttrIfChanged(F("sat/pid_attributes"), "{\"a\":1}", hb, false, false);   // source shadows already updated
+  printf("blob_next r=%d sent=%d\n", (int)r, g_sent);
+  return 0;
+}
+"""
+
+
+def strip_includes(text):
+    return re.sub(r'^\s*#include\s*[<"][^>"]+[>"][^\n]*$', "", text, flags=re.M)
+
+
+class OutboxGate(unittest.TestCase):
+    """TASK-1339: a due publish is skipped (shadow untouched, flag set) while the outbox is full."""
+
+    @classmethod
+    def setUpClass(cls):
+        import sys
+        import tempfile
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_sat_published_curve import compile_cpp
+        h, cpp = read("SATmqttPublish.h"), read("SATmqttPublish.cpp")
+        has_flag = "satPublishDeferred" in h
+        flag = ("#define DEFERRED() ((int)satPublishDeferred())\n#define DEFERRED_CLEAR() satPublishDeferredClear()\n"
+                if has_flag else "#define DEFERRED() (-1)\n#define DEFERRED_CLEAR() ((void)0)\n")
+        cls.tmp = tempfile.TemporaryDirectory()
+        src = Path(cls.tmp.name) / "gate.cpp"
+        src.write_text(GATE_PRELUDE + strip_includes(h) + "\n" + strip_includes(cpp) + "\n" + flag + GATE_MAIN,
+                       encoding="utf-8")
+        cls.exe = compile_cpp(src, Path(cls.tmp.name) / "gate.exe")
+        cls.out = {}
+        if cls.exe:
+            text = subprocess.run([str(cls.exe)], capture_output=True, text=True, check=True).stdout
+            print("\n" + text)
+            for line in text.splitlines():
+                name, *kv = line.split()
+                cls.out[name] = dict(p.split("=", 1) for p in kv)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tmp.cleanup()
+
+    def r(self, name):
+        if not self.exe:
+            self.skipTest("no host C++ compiler")
+        return self.out[name]
+
+    def test_full_outbox_skips_and_keeps_shadow_first_seen(self):
+        o = self.r("f_full")
+        self.assertEqual((o["r"], o["sent"], o["valid"], o["next"]), ("0", "0", "0", "0"))
+        self.assertEqual(o["deferred"], "1")
+
+    def test_drained_outbox_publishes_the_skipped_topic(self):
+        o = self.r("f_free")
+        self.assertEqual((o["r"], o["sent"], o["valid"], o["payload"]), ("1", "1", "1", "21.5"))
+        self.assertEqual(o["deferred"], "0")
+
+    def test_quiet_call_does_not_set_the_flag(self):
+        o = self.r("f_quiet")
+        self.assertEqual((o["r"], o["sent"], o["deferred"]), ("0", "0", "0"))
+
+    def test_changed_value_is_not_written_to_the_shadow_while_full(self):
+        o = self.r("f_changed_full")
+        self.assertEqual((o["r"], o["sent"], o["last"]), ("0", "0", "21.5"))
+        self.assertEqual(o["deferred"], "1")
+
+    def test_bool_stays_first_seen_while_full(self):
+        self.assertEqual(self.r("b_full"), {"r": "0", "sent": "0", "next": "0"})
+        self.assertEqual(self.r("b_free"), {"r": "1", "sent": "1", "payload": "true"})
+
+    def test_char_topic_overload_is_gated(self):
+        self.assertEqual(self.r("s_full"), {"r": "0", "sent": "0", "valid": "0", "last": "[]"})
+
+    def test_at_the_limit_still_publishes(self):
+        self.assertEqual(self.r("i_at24"), {"r": "1", "sent": "1"})
+
+    def test_blob_change_signal_survives_a_skip(self):
+        self.assertEqual(self.r("blob_full"), {"r": "0", "sent": "0", "due": "1"})
+        self.assertEqual(self.r("blob_next"), {"r": "1", "sent": "1"})
+
+    # --- source wiring -----------------------------------------------------------------------
+    def test_every_helper_is_gated_before_its_shadow_write(self):
+        cpp = read("SATmqttPublish.cpp")
+        defs = re.findall(r"^bool publish\w+\([^)]*\)\s*\{", cpp, re.M)
+        self.assertEqual(len(defs), 10)
+        for d in defs:
+            with self.subTest(d.split("(")[0]):
+                fn = body(cpp, d[:-1].rstrip())
+                self.assertIn("satOutboxFull()", fn)
+                self.assertLess(fn.index("satOutboxFull()"), fn.index("sendMQTTData("))
+                write = re.search(r"shadow\.\w+\s*=[^=]|strlcpy\(shadow|nextRepublishMs = satNextDeadline", fn)
+                self.assertIsNotNone(write)
+                self.assertLess(fn.index("satOutboxFull()"), write.start())
+
+    def test_limit_is_a_named_constant(self):
+        self.assertRegex(read("SATmqttPublish.h"),
+                         r"static constexpr uint32_t SAT_MQTT_OUTBOX_LIMIT = 24;\s*// TASK-1339")
+
+    def test_publish_pass_clears_the_flag_before_its_gates(self):
+        pub = body(read("SATcontrol.ino"), "void satPublishMQTT()")
+        gate = pub.index("if (!settings.mqtt.bEnable")
+        self.assertLess(pub.index("satPublishDeferredClear();"), gate)
+        self.assertLess(pub.index("_sat_publishRetryPending = false;"), gate)
+
+    def test_retry_follows_only_a_sat_pass_that_skipped(self):
+        # The retry reads a per-pass flag set after the last publish of satPublishMQTT(), not the
+        # shared helper flag: a core-state skip must not start a SAT publish before a control tick.
+        pub = body(read("SATcontrol.ino"), "void satPublishMQTT()")
+        last = pub.index("_sat_publishRetryPending = satPublishDeferred();")
+        self.assertLess(pub.rindex("satBLEPublishMQTT();"), last)
+        tail = pub[pub.index(";", last) + 1:]
+        self.assertIsNone(re.search(r"[Pp]ublish\w*\(", tail), "a publish after the flag is read escapes the retry")
+        run = body(read("SATcontrol.ino"), "static void satControlLoopRun()")
+        self.assertNotIn("satPublishDeferred()", run)
+
+    def test_retry_runs_between_ticks_after_the_safety_returns(self):
+        run = body(read("SATcontrol.ino"), "static void satControlLoopRun()")
+        retry = run.index("if (_sat_publishRetryPending && DUE(timerSATPublishRetry)) satPublishMQTT();")
+        for guard in ("if (satMqttFallbackStep()) return;", "if (state.sat.bSafetyTripped) return;",
+                      "if (satOtLinkStep()) return;"):
+            self.assertLess(run.index(guard), retry)
+        self.assertLess(retry, run.index("if (!DUE(timerSATControl)) return;"))
+        self.assertIn("DECLARE_TIMER_MS(timerSATPublishRetry, 500, SKIP_MISSED_TICKS);", read("SATcontrol.ino"))
+
+
 if __name__ == "__main__":
     unittest.main()

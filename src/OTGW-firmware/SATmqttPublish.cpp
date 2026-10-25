@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.cpp
-**  Version  : v2.0.0-alpha.510
+**  Version  : v2.0.0-alpha.511
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -37,6 +37,19 @@ bool sendMQTTData(const char* topic, const char* json, const bool retain);
 static inline bool     satHeartbeatDue(uint32_t nextRepublishMs);
 static inline uint32_t satNextDeadline(bool wasFirstSeen);
 
+// TASK-1339 outbox gate (see SATmqttPublish.h). Only reached when a helper has a
+// publish due, so the outbox walk in mqttOutboxDepth() is not paid on quiet passes.
+static bool s_satPublishDeferred = false;
+
+bool satPublishDeferred()      { return s_satPublishDeferred; }
+void satPublishDeferredClear() { s_satPublishDeferred = false; }
+
+static inline bool satOutboxFull() {
+  if (mqttOutboxDepth() <= SAT_MQTT_OUTBOX_LIMIT) return false;
+  s_satPublishDeferred = true;
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // const char* topic overloads — body is identical to the F() overloads. We
 // duplicate (rather than template) because PROGMEM topic strings should stay
@@ -52,6 +65,7 @@ bool publishIfChangedF(const char* topic, float current,
   const bool valueDiff    = !firstSeen && (fabsf(current - shadow.last) >= tolerance);
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
   if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   shadow.last            = current;
   shadow.valid           = true;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
@@ -68,6 +82,7 @@ bool publishIfChangedI(const char* topic, int32_t current,
   const bool valueDiff    = !firstSeen && (current != shadow.last);
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
   if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   shadow.last            = current;
   shadow.valid           = true;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
@@ -84,6 +99,7 @@ bool publishIfChangedB(const char* topic, bool current,
   const bool valueDiff    = !firstSeen && (shadow.last != (int8_t)(current ? 1 : 0));
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
   if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   shadow.last            = (int8_t)(current ? 1 : 0);
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
   sendMQTTData(topic, current ? "true" : "false", retained);
@@ -97,6 +113,7 @@ bool publishIfChangedS(const char* topic, const char* current,
   const bool valueDiff    = !firstSeen && (strncmp(current, shadow.last, sizeof(shadow.last)) != 0);
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
   if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   strlcpy(shadow.last, current, sizeof(shadow.last));
   shadow.valid           = true;
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
@@ -135,6 +152,7 @@ bool publishIfChangedF(const __FlashStringHelper* topic, float current,
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
 
   if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
 
   // Update shadow FIRST (re-entrancy safety — sendMQTTData may feedWatchDog/yield).
   shadow.last            = current;
@@ -160,6 +178,7 @@ bool publishIfChangedI(const __FlashStringHelper* topic, int32_t current,
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
 
   if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
 
   shadow.last            = current;
   shadow.valid           = true;
@@ -195,6 +214,7 @@ bool publishIfChangedB(const __FlashStringHelper* topic, bool current,
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
 
   if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
 
   shadow.last            = (int8_t)(current ? 1 : 0);
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
@@ -215,6 +235,7 @@ bool publishIfChangedS(const __FlashStringHelper* topic, const char* current,
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
 
   if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
 
   strlcpy(shadow.last, current, sizeof(shadow.last));
   shadow.valid           = true;
@@ -238,6 +259,7 @@ bool publishIfChangedBStr(const __FlashStringHelper* topic, bool current,
   const bool valueDiff    = !firstSeen && (shadow.last != (int8_t)(current ? 1 : 0));
   const bool heartbeatDue = !firstSeen && !valueDiff && satHeartbeatDue(shadow.nextRepublishMs);
   if (!firstSeen && !valueDiff && !heartbeatDue) return false;
+  if (satOutboxFull()) return false;   // TASK-1339: shadow untouched, retried next pass
   shadow.last            = (int8_t)(current ? 1 : 0);
   shadow.nextRepublishMs = satNextDeadline(firstSeen);
   sendMQTTData(topic, current ? onLabel : offLabel, retained);
@@ -260,6 +282,12 @@ bool publishJsonAttrIfChanged(const __FlashStringHelper* topic, const char* json
   const bool heartbeatDue = !firstSeen && satHeartbeatDue(nextRepublishMs);
 
   if (!firstSeen && !anyChanged && !heartbeatDue) return false;
+  if (satOutboxFull()) {
+    // TASK-1339: the caller's change signal is gone next pass (its source shadows are
+    // already updated), so mark the blob due now; a first-seen blob stays first-seen.
+    if (anyChanged && nextRepublishMs != 0) nextRepublishMs = millis();
+    return false;
+  }
 
   nextRepublishMs = satNextDeadline(firstSeen);
   sendMQTTData(topic, json, retained);

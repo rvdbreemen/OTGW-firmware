@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.510
+**  Version  : v2.0.0-alpha.511
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1607,6 +1607,10 @@ static void onMqttDisconnect(espMqttClientTypes::DisconnectReason reason) {
 // callers capture pre/post values to determine whether any send landed during
 // their frame and commit the matching mqttPendingSlot accordingly.
 uint32_t mqttSendSuccessCount = 0;
+
+// TASK-1339: packets queued in the outbox, for the SAT publish gate (SATmqttPublish.cpp,
+// declared in SATmqttPublish.h). O(n) list walk under the client mutex.
+uint32_t mqttOutboxDepth() { return (uint32_t)MQTTclient.queueSize(); }
 
 /*
   topic:  <string> , sensor topic, will be automatically prefixed with <mqtt topic>/value/<node_id>

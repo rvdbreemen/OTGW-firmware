@@ -592,6 +592,11 @@ DECLARE_TIMER_SEC(timerSATControl, settings.sat.iControlInterval, CATCH_UP_MISSE
 DECLARE_TIMER_SEC(timerSAT4hStats, 60, SKIP_MISSED_TICKS);
 // --- Timer for the PWM suppression CS refresh (TASK-1268): every 3 s, between control ticks ---
 DECLARE_TIMER_SEC(timerSATSuppress, 3, SKIP_MISSED_TICKS);
+// --- Timer for the deferred SAT MQTT publish (TASK-1339): retry while the outbox gate skipped topics ---
+DECLARE_TIMER_MS(timerSATPublishRetry, 500, SKIP_MISSED_TICKS);
+// Set at the end of a satPublishMQTT() pass that skipped a topic; only such a pass starts a retry,
+// so every SAT publish still follows a control tick (a core-state skip does not start one).
+static bool _sat_publishRetryPending = false;
 
 //=====================================================================
 //=== Heating Curve Calculation ===
@@ -3003,6 +3008,11 @@ void satRepublishCoreState()
 
 void satPublishMQTT()
 {
+  // TASK-1339: each pass starts clean; a helper that meets a full outbox sets the flag again,
+  // and satControlLoopRun() then repeats this publish every 500 ms. Cleared before the gates
+  // below so a disabled SAT or a lost broker ends the retries (the shadows stay unpublished).
+  _sat_publishRetryPending = false;
+  satPublishDeferredClear();
   if (!settings.mqtt.bEnable || !state.mqtt.bConnected) return;
   if (!satIsEnabled()) return;
 
@@ -3570,6 +3580,8 @@ void satPublishMQTT()
   // BLE sensor data (Task #20) — uses its own helpers internally.
   // TASK-742: satBLEPublishMQTT() is a no-op stub on ESP8266.
   satBLEPublishMQTT();
+
+  _sat_publishRetryPending = satPublishDeferred();   // TASK-1339: a topic of this pass was skipped
 }
 
 //=====================================================================
@@ -4981,6 +4993,10 @@ static void satControlLoopRun()
 
   // Refresh the PWM suppression CS between control ticks (TASK-1268)
   satPwmSuppressionRefresh();
+
+  // TASK-1339: topics the outbox gate skipped go out between control ticks, publish only
+  // (satPublishMQTT() computes nothing for control). Bounds the first full publish after boot.
+  if (_sat_publishRetryPending && DUE(timerSATPublishRetry)) satPublishMQTT();
 
   // Main control loop on timer
   if (!DUE(timerSATControl)) return;

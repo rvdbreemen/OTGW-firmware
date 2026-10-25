@@ -82,7 +82,9 @@ static bool _sat_thermalSafeActive = false, _sat_roomLostActive = false;
 static void satPidReset() {} static void satSavePidState() {} static void satSaveEnergyState() {}
 static void satSaveEstimatedEnergy() {} static void satHCRReset() {}
 struct Timer { uint32_t next; uint32_t iv; };
-static Timer timerSATControl = {0, 60000}, timerSAT4hStats = {0, 60000};
+static Timer timerSATControl = {0, 60000}, timerSAT4hStats = {0, 60000}, timerSATPublishRetry = {0, 500};
+static bool _sat_publishRetryPending = false;   // TASK-1339 retry: MQTT publish is not under test here
+static void satPublishMQTT() {}
 static bool due(Timer& t) { if ((int32_t)(g_ms - t.next) >= 0) { t.next = g_ms + t.iv; return true; } return false; }
 #define DUE(t) due(t)
 @SENDERS@

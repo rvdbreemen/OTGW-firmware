@@ -1,7 +1,7 @@
 /*
 ***************************************************************************
 **  Program  : SATmqttPublish.h
-**  Version  : v2.0.0-alpha.510
+**  Version  : v2.0.0-alpha.511
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -78,6 +78,21 @@ static inline uint32_t satRandomBootScatterMs() {
 }
 
 // ---------------------------------------------------------------------------
+// Outbox gate (TASK-1339). A helper that has something to publish skips it while
+// the espMqttClient outbox holds more than SAT_MQTT_OUTBOX_LIMIT packets: the shadow
+// stays as it was (the topic stays first-seen / changed / due) and the deferred flag
+// is set, so satControlLoopRun() calls satPublishMQTT() again every 500 ms until a pass
+// skips nothing. Bounds the first full SAT publish after boot, which queued 126
+// packets (one malloc each) and took free heap from ~82 KB to 8.7-14 KB on the bench.
+// ---------------------------------------------------------------------------
+
+static constexpr uint32_t SAT_MQTT_OUTBOX_LIMIT = 24;   // TASK-1339: steady-state outbox on the bench is 0-35 packets
+
+uint32_t mqttOutboxDepth();         // MQTTstuff.ino: packets queued in the MQTT client outbox
+bool     satPublishDeferred();      // true when a helper skipped a publish since the last clear
+void     satPublishDeferredClear(); // satPublishMQTT() clears it at the start of every pass
+
+// ---------------------------------------------------------------------------
 // Per-field float tolerances (per ADR-111 sub-rule 4, guideline-level).
 // Tune these from field observation; off-by-one in either direction is not
 // an ADR violation as long as the helper pattern itself is used.
@@ -146,6 +161,8 @@ static_assert(sizeof(SATShadowS::last) >= 20,
 //       * calls sendMQTTData(topic, buf, retained),
 //       * returns true.
 //   - otherwise returns false without touching the broker.
+//   - while the outbox is above SAT_MQTT_OUTBOX_LIMIT a due publish is skipped:
+//     shadow untouched, deferred flag set, returns false (TASK-1339).
 //
 // The return value lets a caller publish a dependent JSON-attributes blob
 // (e.g. sat/pid_attributes) when any of its source fields changed — HA's
