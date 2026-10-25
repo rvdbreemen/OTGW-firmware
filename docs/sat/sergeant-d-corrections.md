@@ -2889,3 +2889,37 @@ temperature is None (`climate.py:544-545`), without an age rule. Firmware: see e
 **Task:** TASK-1390.
 
 **Open:** none.
+
+## 58. thermo-nova "pauses PWM counting" while hot water runs (statement, 2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 18:46 UTC, unprompted, in the Q12 thread (hot-water starts and the
+hourly start limit; Q12 asked again 17:23 UTC, message 1563966057784418397):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563987251912904705
+
+**Quoted:**
+
+> @BlueFlame Bot thermo-nova pauses  PWM counting when the DHW is enabled. When DHW enable is off resumes PWM counting. Check thoroughly the thermo-nova branch about how it works
+
+**What the thermo-nova code shows (opened this session, pin 7beaaf5):**
+
+- The hourly counter counts only PWM's own ON-phase starts: `_current_cycle += 1` when an ON phase
+  starts (`pwm.py:159-160`); boiler flame starts are never counted, so hot-water ignitions never count.
+- There is no explicit pause: `pwm.update()` keeps running while hot water is active
+  (`heating_control.py:211`; no hot-water gate in `pwm.py:117-140`). What hot water stops is the PWM
+  setpoint override (`heating_control.py:385`) and the PWM disable guards (`:313-315`).
+- The limit check compares the counter with `duty_cycle_seconds` (`pwm.py:156`), so in practice it
+  never blocks.
+
+**Interpretation (ours, confirmation asked):** his intent matches Q12 option A: hot-water starts must
+not count against the hourly limit, only PWM's own ON phases do. The literal "pause" is not in the
+code; the effect (hot water never counts) is. Reported to him with the citations.
+
+**Compared with the firmware:** the firmware counts every flame-on edge in the rolling hour, hot water
+included, and blocks a new PWM ON phase at the cycles-per-hour limit (SATcycles.ino:279-299; gruijter's
+field data in Q12).
+
+**Changes an earlier entry:** none.
+
+**Task:** after his confirmation of Q12 (a task for "count only PWM ON phases").
+
+**Open:** his confirmation that Q12 = A.
