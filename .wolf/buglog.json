@@ -3550,5 +3550,76 @@
     "related_bugs": [],
     "occurrences": 1,
     "last_seen": "2026-10-22T06:00:00Z"
+  },
+  {
+    "id": "bug-905",
+    "timestamp": "2026-10-22T22:58:00",
+    "error_message": "v2 settings: trigger bit 'Flame' made the GPIO output/webhook follow the fault bit (and 'Fault' the flame bit)",
+    "file": "src/OTGW-firmware/data/v2.js",
+    "root_cause": "ENUM_OPTS labelled stored bit 0 as Flame and 3 as Fault; firmware tests Statusflags & (1<<n) with slave byte bit 0 = fault, 3 = flame (OT MsgID 0 LB)",
+    "fix": "Labels 0=Fault..3=Flame, help texts with bit numbers, REST max 16->15; stored values unchanged (TASK-1295, 298c6608c)",
+    "tags": [
+      "webui",
+      "gpio",
+      "webhook",
+      "statusflags",
+      "opentherm"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-22T22:58:00"
+  },
+  {
+    "id": "bug-906",
+    "timestamp": "2026-10-23T09:55:00",
+    "error_message": "capture-mqtt-debug: telnet log stops at the device reboot and never reconnects (47 s of telnet in a 1 h 44 capture)",
+    "file": "scripts/capture-mqtt-debug.sh, scripts/capture-mqtt-debug.bat",
+    "root_cause": "A rebooting ESP sends no FIN; the telnet socket stays half-open and both workers only reconnected on FIN/exception/restart marker",
+    "fix": "TCP keepalive (10/5/3), health-probe-gated silence watchdog (503/429 = alive), gap lines in summary.txt and telnet.log; unittest tests/test_capture_telnet_worker.py (TASK-1299, 38d6625e9)",
+    "tags": [
+      "capture",
+      "telnet",
+      "keepalive",
+      "half-open",
+      "safeboot"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-23T09:55:00"
+  },
+  {
+    "id": "bug-907",
+    "timestamp": "2026-10-23T15:35:31",
+    "error_message": "gruijter alpha.465: Tret 'polled frequently for a few minutes, then back to every 5 minutes' in the web UI graph",
+    "file": "src/OTGW-firmware/data/v2.js",
+    "root_cause": "TASK-1314 feeds PR: E= into state/MQTT/history without an OT frame; v2.js set model.ret only from WS OT frames MsgID 28, so the live graph and Home readouts followed only the thermostat's ~290 s frames. The device history ring was right, which is why the first minutes of the CSV looked fine. My replay evidence checked firmware state, not the browser.",
+    "fix": "v2.js applyPicReply(): reads the '<' PIC reply events PR: D=<fn> and PR: E=<v> already on the WebSocket; sets model.ret only when fn is R and -40..130. Verified: webui test red on HEAD, bench browser follows 41.2/41.7/42.3.",
+    "tags": [
+      "tret",
+      "webui",
+      "websocket",
+      "task-1314",
+      "evidence-gap"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-23T15:35:31"
+  },
+  {
+    "id": "bug-908",
+    "timestamp": "2026-10-23T17:42:16",
+    "error_message": "WebSocket connection to ws://<dev>/ws failed: Could not decode a text frame as UTF-8",
+    "file": "src/OTGW-firmware/webSocketStuff.ino",
+    "root_cause": "WS text frames carried raw PIC bytes 0x80-0xFF (decoded log/event paths) or a log line truncated at 511 bytes inside a multi-byte char; Chrome closes the socket on invalid UTF-8.",
+    "fix": "sendLogToWebSocket validates (strict WHATWG ranges, WsUtf8.h) and sends a sanitised copy only when invalid; named global buffer (ADR-053) + in-use flag (ADR-090); raw paths untouched (ADR-177).",
+    "tags": [
+      "websocket",
+      "utf-8",
+      "chrome",
+      "task-1300"
+    ],
+    "related_bugs": [],
+    "occurrences": 1,
+    "last_seen": "2026-10-23T17:42:16"
   }
 ]
