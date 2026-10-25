@@ -2513,3 +2513,43 @@ finding #45 asked for.
   flood is done there is our design choice, to be shown to him in the plan.
 - Whether the flood also applies to boilers that do report a return temperature: his text ties it
   to the case without one.
+
+## 46. Room temperature lost or missing: reset P, I and D to 0 (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 03:56 UTC, answer to Q29 (2026-10-24 22:01 UTC, message
+1563673817824628837: "while the room temperature is missing, what happens to I and D? A. Reset I and
+D to 0 [...] B. Freeze I and D and leave them out of the setpoint [...]"):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563763199051038791
+
+**Quoted:**
+
+> @BlueFlame Bot yes reset P, I and D terms to 0
+
+**Interpretation (ours):** option A, and P is named too: while the room temperature is lost or
+missing, the P, I and D terms are 0, so the control setpoint is the heating curve only (entry 38).
+"Reset" means the stored integral and derivative are set to 0, not frozen and brought back after
+recovery. After recovery the PID starts from 0 and builds up again from the new error.
+
+**Settled by this statement:**
+
+- During a lost or missing room temperature: P = 0, I = 0, D = 0; requested setpoint = heating curve
+  (plus the solar offset and the usual clamps, as in the TASK-1364 plan).
+- The integral and the derivative are reset, not frozen.
+
+**Compared with thermo-nova and the firmware:**
+
+- thermo-nova on a stale inside sensor: `pid.reset()` (`climate.py:470-478`), which zeroes only
+  `_integral` and `_raw_derivative` (`pid.py:134-137`); P keeps `kp * _last_error`
+  (`pid.py:96-101`), so its output is curve + frozen P. On an unavailable sensor it returns without a
+  reset (`climate.py:480-482`). His answer goes further than thermo-nova on P (entry 38 already
+  said "not proportional"), and follows thermo-nova's stale path for I and D.
+- Firmware today: no curve-only path; after about 10 invalid control ticks SAT trips and
+  `satDisable()` resets the PID (`SATcontrol.ino:4900-4914`, `:2373-2386`).
+
+**Changes an earlier entry:** completes entry 38 (it named only P) and answers its open point on I
+and D.
+
+**Task:** TASK-1364 (plan already stored; this answer is his OK on the open point).
+
+**Open:** the stale time per source (entry 27, conflict C8) and whether the error statistics and the
+published error should read 0 or "unknown" during the loss.

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-24T22:01:00Z'
+updated_date: '2026-10-25T04:31:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -197,4 +197,6 @@ Not verifiable here: real BLE or thermostat loss on a live boiler (the bench use
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-25: plan (second-read) stored; waiting for Sergeant D's OK on the open question (open-questions Q29/Q30/Q31) before implementation, per CLAUDE.md SAT rules.
+
+2026-10-25 03:56 UTC Sergeant D answered Q29 (entry 46): reset P, I and D to 0 while the room temperature is missing; curve only. Plan open point settled; ready to implement.
 <!-- SECTION:NOTES:END -->
