@@ -224,7 +224,7 @@ Op het MQTT-publicatiepad activeert de firmware bovendien WiFiClient sync-mode (
 | Poort | Protocol | Functie | Opmerkingen |
 |---|---|---|---|
 | 80 | TCP / HTTP | Web UI, REST API en OTA-update | Alle webroutes, bestandsbediening, firmware-update |
-| 81 | TCP / WebSocket | Live OpenTherm-logstream | Gebruikt door de Web UI voor realtime data |
+| 80 | TCP / WebSocket (`/ws`) | Live OpenTherm-logstream | Zelfde poort als de Web UI, pad `/ws` (poort 81 was de 1.x-lijn) |
 | 23 | TCP / Telnet | Debugconsole | Tekstuele debuglog; bediend door SimpleTelnet-bibliotheek |
 | 25238 | TCP | Seriele bridge (ser2net) | Ruwe OTGW PIC-serieel over TCP; bediend door SimpleTelnet-bibliotheek; OTmonitor-compatibel |
 | 123 | UDP (uitgaand) | NTP (SNTP) | Alleen uitgaand |
@@ -244,6 +244,6 @@ mDNS (`otgw2.local`) werkt alleen binnen een enkel Layer 2 broadcast-domein. Als
 
 ### 6.10 Gebruik achter een reverse proxy
 
-De REST API en Web UI werken correct achter een HTTPS-terminating reverse proxy (Nginx, Caddy, etc.). De WebSocket live log (poort 81) vereist een plain `ws://`-verbinding en ondersteunt geen `wss://`. Een reverse proxy die WebSocket-verbindingen opwaardeert naar WSS zal de live log in de webinterface breken.
+De webinterface, de REST API en de live log werken achter een reverse proxy, ook op een pad (bijvoorbeeld `https://example.lan/otgw/` of Home Assistant ingress) en via HTTPS: de interface bouwt elke URL op ten opzichte van de pagina waar hij vandaan komt, en de live log is een WebSocket op `ws` onder dat pad (`wss://` op een HTTPS-pagina). De proxy moet de Host-header van de browser doorgeven (anders wordt met een gateway-wachtwoord elke wijziging met 403 geweigerd) en WebSocket doorgeven. Zie [docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](../../guides/REVERSE_PROXY_AND_HA_INGRESS.md) voor een getest nginx-voorbeeld en het hoofdstuk Home Assistant-integratie voor het HA-paneel.
 
 ---

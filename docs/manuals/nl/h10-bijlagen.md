@@ -364,7 +364,7 @@ Wanneer het vrije heap-geheugen onder drempelwaarden zakt, weigert de firmware n
 
 #### Geen HTTPS of WSS
 
-De firmware ondersteunt opzettelijk geen HTTPS of WSS (ADR-003). Dit is een bewuste keuze voor het lokale thuisnetwerk. Gebruik een reverse proxy (zoals Nginx of Caddy) voor HTTPS als externe toegang gewenst is. WebSocket over zo'n proxy werkt voor de REST API; de live OT-logstroom via WebSocket (poort 81) vereist echter directe toegang.
+De firmware ondersteunt opzettelijk geen HTTPS of WSS (ADR-003). Dit is een bewuste keuze voor het lokale thuisnetwerk. Gebruik een reverse proxy (zoals Nginx of Caddy) voor HTTPS als externe toegang gewenst is. Via zo'n proxy werkt de hele webinterface, ook de live OT-logstroom (WebSocket op `/ws`, poort 80), mits de proxy WebSocket doorgeeft; zie paragraaf 6.10.
 
 #### PIC-firmware en OTmonitor
 

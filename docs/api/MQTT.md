@@ -1336,6 +1336,7 @@ Runtime values interpolated into configs (instead of template placeholders) come
 | `mqttPubTopic` | Publish/state topic base |
 | `mqttSubTopic` | Subscribe/command topic base |
 | `version` | `device.sw_version` and `origin.sw` |
+| `configUrl` | `device.cu` (`configuration_url`): `http://<IP of the active transport>/`, shown by HA as **Visit** on the device page. The IP, not `<hostname>.local`, because mDNS does not resolve on every client; it changes with the next discovery run after an IP change, so give the gateway a DHCP reservation. See [`docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md`](../guides/REVERSE_PROXY_AND_HA_INGRESS.md). |
 
 Source-separated discovery (when `settings.mqtt.bSeparateSources = true`) is handled at stream time by `expandAndStreamSensorSources()`, which emits two variants (`_thermostat`, `_boiler`) for sensors marked with `MQTT_HA_FLAG_ANY_SOURCE`. The canonical entity is emitted by the SEPARATE non-`ANY_SOURCE` base entry in `mqttHaSensors[]` and is always advertised regardless of `bSeparateSources` (ADR-097 dropped ADR-095's mutual-exclusion rule). Per ADR-096 the routing of values to those variants is decided at publish time by `publishToSourceTopic()` using the worldview model: `_thermostat` carries what the thermostat sees, `_boiler` carries what the boiler sees, and canonical mirrors `_boiler`. Per ADR-097 the topic separator between the label and the source segment is an underscore (sibling-suffix shape), not a slash (the earlier nested-children shape). There is no `_gateway` variant.
 

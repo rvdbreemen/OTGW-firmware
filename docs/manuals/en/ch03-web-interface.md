@@ -346,7 +346,7 @@ A **Test** button sends a test webhook immediately so you can verify your endpoi
 
 The OpenTherm log on the Home tab is powered by a plain WebSocket connection to the device (`ws://<device>/ws` on port 80). The firmware streams every decoded OpenTherm frame as it arrives. The browser maintains a circular buffer of recent messages and persists it to `localStorage`.
 
-> **HTTP/WS only**: The firmware does not support HTTPS or WSS. This is a deliberate design decision for a trusted-LAN device with limited ESP8266 resources. The REST API can be exposed through an HTTPS reverse proxy, but the live OpenTherm log assumes a direct plain WebSocket to the device and will not work through an HTTPS proxy that does not also bridge `ws://` to `wss://`. For remote access, use a VPN.
+> **HTTP/WS only**: The firmware does not do HTTPS or WSS itself. Behind an HTTPS reverse proxy (or Home Assistant ingress) the whole interface works, the live log included: the page opens the WebSocket on its own path, as `wss://` when it was loaded over HTTPS, and the proxy forwards it to the device as plain `ws://`. See section 6.10. For remote access without such a proxy, use a VPN.
 
 **Heap backpressure**: On the ESP8266, available RAM is limited. The firmware monitors free heap and automatically reduces WebSocket streaming frequency when memory is low:
 

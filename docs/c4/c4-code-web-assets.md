@@ -212,7 +212,7 @@ Formatted display (example):
 ### Internal Dependencies (ESP32-S3 Firmware)
 
 - **REST API v2**: `/api/v2/` endpoints (see below)
-- **WebSocket endpoint**: `/ws` (plain HTTP, port 80)
+- **WebSocket endpoint**: `/ws` (plain HTTP, port 80; the UI opens it relative to its own directory, so it also passes a reverse proxy that carries WebSocket)
 - **LittleFS served files**: All static assets (HTML, CSS, JS, firmware bins)
 
 ### External Dependencies
@@ -360,7 +360,7 @@ The LittleFS image is built from a minified staging copy of `data/` (ADR-190). I
 
 ### CORS & Same-Origin
 
-- All API calls made to same origin (`window.location.protocol + '//' + window.location.host`)
+- All API calls made to same origin, under the page's own directory: `BASE` = `location.pathname` up to the last `/` (`/` on direct access, the proxy prefix such as `/api/ingress/otgw/` behind a reverse proxy). `APIGW` = origin + `BASE` + `api/`, the WebSocket is `BASE` + `ws` (`wss` on https), and `isApi()` (ADR-165 single-flight gate) matches `BASE` + `api/` (TASK-1377.5).
 - No cross-domain requests
 
 ---

@@ -1,0 +1,16 @@
+{
+  "image": "one-action",
+  "result": "ok",
+  "warn_notes": "This page was opened through a reverse proxy. The update works only if the proxy reaches the unit by IP address (192.168.88.61): the updater has no network name.",
+  "last_status": "Done. The unit runs 2.0.0-alpha.507+f3ebc29 with matching web files.",
+  "seconds": 148.0,
+  "before": "2.0.0-alpha.506+aa04056",
+  "after": "2.0.0-alpha.507+f3ebc29",
+  "uptime_min_before": 0,
+  "uptime_min_after": 0,
+  "console_tail": [
+    "An SSL certificate error occurred when fetching the script.",
+    "Failed to load resource: the server responded with a status of 404 ()",
+    "Failed to load resource: the server responded with a status of 502 ()"
+  ]
+}

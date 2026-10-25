@@ -92,7 +92,7 @@ Naast de tabbladen toont de header rechts de Wi-Fi-signaalbalkjes (of Ethernet-i
 
 Het centrale element van de startpagina is de live OpenTherm-log. Elk bericht dat via de OpenTherm-bus wordt uitgewisseld tussen thermostaat en ketel, wordt in realtime weergegeven. De log wordt via een gewone WebSocket-verbinding gestreamd (`ws://<apparaat>/ws` op poort 80); er is geen herladen van de pagina nodig.
 
-> **Alleen HTTP/WS**: De firmware ondersteunt geen HTTPS of WSS. Dit is een bewuste keuze voor een apparaat dat op een vertrouwd thuisnetwerk draait met beperkte ESP8266-resources. De REST API kan achter een HTTPS-reverse proxy gezet worden, maar de live OpenTherm-log gaat uit van een directe `ws://`-verbinding en werkt niet via een HTTPS-proxy die `ws://` niet naar `wss://` overbrugt. Gebruik een VPN voor toegang van buitenaf.
+> **Alleen HTTP/WS**: De firmware doet zelf geen HTTPS of WSS. Achter een HTTPS-reverse proxy (of Home Assistant ingress) werkt de hele interface, ook de live log: de pagina opent de WebSocket op haar eigen pad, als `wss://` wanneer ze via HTTPS is geladen, en de proxy stuurt die als gewone `ws://` door naar het apparaat. Zie paragraaf 6.10. Gebruik voor toegang van buitenaf zonder zo'n proxy een VPN.
 
 #### Berichtstructuur
 
@@ -357,7 +357,7 @@ Live monitoring, sensorwaarden en de WebSocket-stream blijven zonder authenticat
 
 De 2.0.0-firmware vraagt de HTTP Basic Auth-challenge direct op de root (`/`) op, zodat de browser de credentials in de cache heeft voordat de geladen UI zelf een REST-call doet. Dit voorkomt dat halverwege een sessie alsnog een loginpopup verschijnt. De server verzamelt ook de `Origin`- en `Referer`-headers van elk verzoek, zodat de REST-laag een same-origin CSRF-controle kan afdwingen (ADR-056).
 
-**Opmerking:** De firmware ondersteunt uitsluitend HTTP en WS (geen HTTPS, geen WSS). Stel HTTP Basic Auth alleen in op een vertrouwd thuisnetwerk. Voor externe toegang wordt een VPN aangeraden; een HTTPS-reverse proxy werkt wel voor de REST API, maar de live OpenTherm-log via WebSocket vereist een plain `ws://`-verbinding.
+**Opmerking:** De firmware ondersteunt uitsluitend HTTP en WS (geen HTTPS, geen WSS). Stel HTTP Basic Auth alleen in op een vertrouwd thuisnetwerk. Voor externe toegang wordt een VPN aangeraden; achter een HTTPS-reverse proxy die WebSocket doorgeeft werkt de hele interface, ook de live log (zie paragraaf 6.10).
 
 #### Webhook sectie
 

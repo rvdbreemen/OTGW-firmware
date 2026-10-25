@@ -1,0 +1,25 @@
+== BEFORE: alpha.505 (origin/dev 613c286e6, app only), admin password set
+flash 200
+"fwversion":"2.0.0-alpha.505+613c286"
+set pw 200
+settings POST Origin=[none] with auth: 200
+settings POST Origin=[http://192.168.88.61] with auth: 200
+settings POST Origin=[http://evil.example] with auth: 403
+settings POST no auth: 401
+upload Origin=evil with auth: 403
+upload same Origin with auth: 303
+files: "okprobe.txt" 
+clear pw 200
+
+== AFTER: alpha.507 (this change), admin password set
+flash 200
+"fwversion":"2.0.0-alpha.507+f3ebc29"
+set pw 200
+settings POST Origin=[none] with auth: 200
+settings POST Origin=[http://192.168.88.61] with auth: 200
+settings POST Origin=[http://evil.example] with auth: 403
+settings POST no auth: 401
+upload Origin=evil with auth: 403
+upload same Origin with auth: 303
+files: "okprobe.txt" 
+clear pw 200

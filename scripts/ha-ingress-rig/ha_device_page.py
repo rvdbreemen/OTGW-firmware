@@ -57,10 +57,11 @@ def main():
                 with ctx.expect_page() as new_tab:
                     link.first.click()
                 tab = new_tab.value
-                tab.wait_for_function(
-                    "() => { const e = document.getElementById('devVersion'); return e && e.textContent.indexOf('[') < 0; }",
-                    timeout=30000)
-                d_rep["visit_opened"] = {"url": tab.url, "devVersion": tab.evaluate("document.getElementById('devVersion').textContent")}
+                # v2 UI header (hdrHost) or classic UI (devVersion): the version shows once REST answered.
+                ident = ("() => { const e = document.getElementById('hdrHost') || document.getElementById('devVersion');"
+                         " return e && /(^| )v?[0-9]+[.][0-9]/.test(e.textContent) ? e.textContent : null; }")
+                tab.wait_for_function(ident, timeout=30000)
+                d_rep["visit_opened"] = {"url": tab.url, "ui_identity": tab.evaluate(ident)}
                 tab.screenshot(path=str(out / f"ha_visit_{d['id'][:8]}.png"))
                 tab.close()
         browser.close()

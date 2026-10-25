@@ -203,7 +203,7 @@ On the MQTT publish path the firmware also enables WiFiClient sync mode (`setSyn
 | Port | Protocol | Service | Notes |
 |---|---|---|---|
 | 80 | TCP / HTTP | Web interface and REST API | All web UI routes, file serving, OTA update |
-| 81 | TCP / WebSocket | Live OpenTherm log stream | Used by the web UI for real-time data |
+| 80 | TCP / WebSocket (`/ws`) | Live OpenTherm log stream | Same port as the web UI, path `/ws` (port 81 was the 1.x line) |
 | 23 | TCP / Telnet | Debug console | Plain-text debug log; served by SimpleTelnet library |
 | 25238 | TCP | Serial bridge (ser2net) | Raw OTGW PIC serial over TCP; served by SimpleTelnet library; OTmonitor compatible |
 | 123 | UDP (outbound) | NTP (SNTP) | Outbound only |
@@ -223,6 +223,6 @@ mDNS (`otgw2.local`) only works within a single Layer 2 broadcast domain. If Hom
 
 ### 6.10 Using Behind a Reverse Proxy
 
-The REST API works correctly behind an HTTPS-terminating reverse proxy (Nginx, Caddy, etc.). The WebSocket live log (port 81) requires a plain `ws://` connection and does not support `wss://`. A reverse proxy that upgrades WebSocket connections to WSS will break the live log in the web interface.
+The web interface, the REST API and the live log work behind a reverse proxy, also on a path (for example `https://example.lan/otgw/` or Home Assistant ingress) and over HTTPS: the interface builds every URL relative to the page it was loaded from, and the live log is a WebSocket at `ws` under that path (`wss://` on an HTTPS page). The proxy must pass the browser's Host header (otherwise every change is refused with 403 once a gateway password is set) and carry WebSocket. See [docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](../../guides/REVERSE_PROXY_AND_HA_INGRESS.md) for a tested nginx example and section 4.12 for Home Assistant.
 
 ---

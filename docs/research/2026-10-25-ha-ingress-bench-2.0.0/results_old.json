@@ -1,0 +1,1121 @@
+[
+  {
+    "scenario": "direct",
+    "url": "http://192.168.88.61/",
+    "loaded": true,
+    "header": "OTGW2.local \u00b7 v2.0.0-alpha.505",
+    "write": {
+      "status": 200,
+      "api": "http://192.168.88.61/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://192.168.88.61/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [
+      "503 http://192.168.88.61/api/v2/filesystem/hash-check"
+    ],
+    "console_errors": [],
+    "websockets": [
+      {
+        "url": "ws://192.168.88.61/ws",
+        "frames": 2,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 70756,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 0,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_http_otgw",
+    "url": "http://localhost:18123/otgw",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "write": {
+      "status": 200,
+      "api": "http://localhost:18123/api/ingress/otgw/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://localhost:18123/api/ingress/otgw/upload"
+    },
+    "fsx_forms_escaped": [
+      "http://localhost:18123/upload?path=%2F",
+      "http://localhost:18123/update",
+      "http://localhost:18123/ReBoot",
+      "http://localhost:18123/ResetWireless",
+      "http://localhost:18123/"
+    ],
+    "escaped": [
+      "http://localhost:18123/api/v2/device/info",
+      "http://localhost:18123/api/v2/device/time",
+      "http://localhost:18123/api/v2/filesystem/hash-check",
+      "http://localhost:18123/api/v2/health",
+      "http://localhost:18123/api/v2/otgw/otmonitor",
+      "http://localhost:18123/api/v2/sat/ble/discovery",
+      "http://localhost:18123/api/v2/sat/status",
+      "http://localhost:18123/api/v2/sat/weather",
+      "http://localhost:18123/api/v2/sensors",
+      "http://localhost:18123/api/v2/settings",
+      "http://localhost:18123/fonts/inter-400.woff2",
+      "http://localhost:18123/fonts/inter-700.woff2",
+      "http://localhost:18123/fonts/jetbrains-mono-400.woff2"
+    ],
+    "api_bad": [
+      "404 http://localhost:18123/api/v2/device/info",
+      "404 http://localhost:18123/api/v2/device/time",
+      "404 http://localhost:18123/api/v2/filesystem/hash-check",
+      "404 http://localhost:18123/api/v2/health",
+      "404 http://localhost:18123/api/v2/otgw/otmonitor",
+      "404 http://localhost:18123/api/v2/sat/ble/discovery",
+      "404 http://localhost:18123/api/v2/sat/status",
+      "404 http://localhost:18123/api/v2/sat/weather",
+      "404 http://localhost:18123/api/v2/sensors",
+      "404 http://localhost:18123/api/v2/settings"
+    ],
+    "console_errors": [
+      "WebSocket connection to 'ws://localhost:18123/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:18123/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:18123/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:18123/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:18123/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:18123/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:18123/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:18123/ws' failed: Error during WebSocket handshake: Unexpected response code: 404"
+    ],
+    "websockets": [
+      {
+        "url": "ws://localhost:18123/api/websocket",
+        "frames": 14,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/api/websocket",
+        "frames": 11,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:18123/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      }
+    ],
+    "ws_escaped": [
+      "ws://localhost:18123/api/websocket",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/api/websocket",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/ws",
+      "ws://localhost:18123/ws"
+    ],
+    "device_heap_after": {
+      "freeheap": 67652,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 0,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_otgw",
+    "url": "https://localhost:18443/otgw",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:18443/api/ingress/otgw/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:18443/upload?path=%2F",
+      "https://localhost:18443/update",
+      "https://localhost:18443/ReBoot",
+      "https://localhost:18443/ResetWireless",
+      "https://localhost:18443/"
+    ],
+    "escaped": [
+      "https://localhost:18443/api/v2/device/info",
+      "https://localhost:18443/api/v2/device/time",
+      "https://localhost:18443/api/v2/filesystem/hash-check",
+      "https://localhost:18443/api/v2/health",
+      "https://localhost:18443/api/v2/otgw/otmonitor",
+      "https://localhost:18443/api/v2/sat/ble/discovery",
+      "https://localhost:18443/api/v2/sat/status",
+      "https://localhost:18443/api/v2/sat/weather",
+      "https://localhost:18443/api/v2/sensors",
+      "https://localhost:18443/api/v2/settings",
+      "https://localhost:18443/fonts/inter-400.woff2",
+      "https://localhost:18443/fonts/inter-700.woff2",
+      "https://localhost:18443/fonts/jetbrains-mono-400.woff2"
+    ],
+    "api_bad": [
+      "404 https://localhost:18443/api/v2/device/info",
+      "404 https://localhost:18443/api/v2/device/time",
+      "404 https://localhost:18443/api/v2/filesystem/hash-check",
+      "404 https://localhost:18443/api/v2/health",
+      "404 https://localhost:18443/api/v2/otgw/otmonitor",
+      "404 https://localhost:18443/api/v2/sat/ble/discovery",
+      "404 https://localhost:18443/api/v2/sat/status",
+      "404 https://localhost:18443/api/v2/sat/weather",
+      "404 https://localhost:18443/api/v2/sensors",
+      "404 https://localhost:18443/api/v2/settings"
+    ],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script.",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404"
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 13,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      }
+    ],
+    "ws_escaped": [
+      "wss://localhost:18443/api/websocket",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws"
+    ],
+    "device_heap_after": {
+      "freeheap": 70196,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 0,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_otgw_hostdev",
+    "url": "https://localhost:18443/otgw_hostdev",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:18443/api/ingress/otgw_hostdev/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw_hostdev/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:18443/upload?path=%2F",
+      "https://localhost:18443/update",
+      "https://localhost:18443/ReBoot",
+      "https://localhost:18443/ResetWireless",
+      "https://localhost:18443/"
+    ],
+    "escaped": [
+      "https://localhost:18443/api/v2/device/info",
+      "https://localhost:18443/api/v2/device/time",
+      "https://localhost:18443/api/v2/filesystem/hash-check",
+      "https://localhost:18443/api/v2/health",
+      "https://localhost:18443/api/v2/otgw/otmonitor",
+      "https://localhost:18443/api/v2/sat/ble/discovery",
+      "https://localhost:18443/api/v2/sat/status",
+      "https://localhost:18443/api/v2/sat/weather",
+      "https://localhost:18443/api/v2/sensors",
+      "https://localhost:18443/api/v2/settings",
+      "https://localhost:18443/fonts/inter-400.woff2",
+      "https://localhost:18443/fonts/inter-700.woff2",
+      "https://localhost:18443/fonts/jetbrains-mono-400.woff2"
+    ],
+    "api_bad": [
+      "404 https://localhost:18443/api/v2/device/info",
+      "404 https://localhost:18443/api/v2/device/time",
+      "404 https://localhost:18443/api/v2/filesystem/hash-check",
+      "404 https://localhost:18443/api/v2/health",
+      "404 https://localhost:18443/api/v2/otgw/otmonitor",
+      "404 https://localhost:18443/api/v2/sat/ble/discovery",
+      "404 https://localhost:18443/api/v2/sat/status",
+      "404 https://localhost:18443/api/v2/sat/weather",
+      "404 https://localhost:18443/api/v2/sensors",
+      "404 https://localhost:18443/api/v2/settings"
+    ],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script.",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404"
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 14,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      }
+    ],
+    "ws_escaped": [
+      "wss://localhost:18443/api/websocket",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws"
+    ],
+    "device_heap_after": {
+      "freeheap": 70068,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 0,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_otgw_rw",
+    "url": "https://localhost:18443/otgw_rw",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:18443/api/ingress/otgw_rw/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw_rw/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:18443/upload?path=%2F",
+      "https://localhost:18443/update",
+      "https://localhost:18443/ReBoot",
+      "https://localhost:18443/ResetWireless",
+      "https://localhost:18443/"
+    ],
+    "escaped": [
+      "https://localhost:18443/api/v2/device/info",
+      "https://localhost:18443/api/v2/device/time",
+      "https://localhost:18443/api/v2/filesystem/hash-check",
+      "https://localhost:18443/api/v2/health",
+      "https://localhost:18443/api/v2/otgw/otmonitor",
+      "https://localhost:18443/api/v2/sat/ble/discovery",
+      "https://localhost:18443/api/v2/sat/status",
+      "https://localhost:18443/api/v2/sat/weather",
+      "https://localhost:18443/api/v2/sensors",
+      "https://localhost:18443/api/v2/settings",
+      "https://localhost:18443/fonts/inter-400.woff2",
+      "https://localhost:18443/fonts/inter-700.woff2",
+      "https://localhost:18443/fonts/jetbrains-mono-400.woff2"
+    ],
+    "api_bad": [
+      "404 https://localhost:18443/api/v2/device/info",
+      "404 https://localhost:18443/api/v2/device/time",
+      "404 https://localhost:18443/api/v2/filesystem/hash-check",
+      "404 https://localhost:18443/api/v2/health",
+      "404 https://localhost:18443/api/v2/otgw/otmonitor",
+      "404 https://localhost:18443/api/v2/sat/ble/discovery",
+      "404 https://localhost:18443/api/v2/sat/status",
+      "404 https://localhost:18443/api/v2/sat/weather",
+      "404 https://localhost:18443/api/v2/sensors",
+      "404 https://localhost:18443/api/v2/settings"
+    ],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script.",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:18443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404"
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 14,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:18443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      }
+    ],
+    "ws_escaped": [
+      "wss://localhost:18443/api/websocket",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws",
+      "wss://localhost:18443/ws"
+    ],
+    "device_heap_after": {
+      "freeheap": 65140,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 2,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "nginx_https_keephost",
+    "url": "https://localhost:19443/otgw-keephost/",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:19443/otgw-keephost/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:19443/otgw-keephost/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:19443/upload?path=%2F",
+      "https://localhost:19443/update",
+      "https://localhost:19443/ReBoot",
+      "https://localhost:19443/ResetWireless",
+      "https://localhost:19443/"
+    ],
+    "escaped": [
+      "https://localhost:19443/api/v2/device/info",
+      "https://localhost:19443/api/v2/device/time",
+      "https://localhost:19443/api/v2/filesystem/hash-check",
+      "https://localhost:19443/api/v2/health",
+      "https://localhost:19443/api/v2/otgw/otmonitor",
+      "https://localhost:19443/api/v2/sat/ble/discovery",
+      "https://localhost:19443/api/v2/sat/status",
+      "https://localhost:19443/api/v2/sat/weather",
+      "https://localhost:19443/api/v2/sensors",
+      "https://localhost:19443/api/v2/settings",
+      "https://localhost:19443/fonts/inter-400.woff2",
+      "https://localhost:19443/fonts/inter-700.woff2",
+      "https://localhost:19443/fonts/jetbrains-mono-400.woff2"
+    ],
+    "api_bad": [
+      "404 https://localhost:19443/api/v2/device/info",
+      "404 https://localhost:19443/api/v2/device/time",
+      "404 https://localhost:19443/api/v2/filesystem/hash-check",
+      "404 https://localhost:19443/api/v2/health",
+      "404 https://localhost:19443/api/v2/otgw/otmonitor",
+      "404 https://localhost:19443/api/v2/sat/ble/discovery",
+      "404 https://localhost:19443/api/v2/sat/status",
+      "404 https://localhost:19443/api/v2/sat/weather",
+      "404 https://localhost:19443/api/v2/sensors",
+      "404 https://localhost:19443/api/v2/settings"
+    ],
+    "console_errors": [
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404"
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      }
+    ],
+    "ws_escaped": [
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws"
+    ],
+    "device_heap_after": {
+      "freeheap": 70592,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 2,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "nginx_https_default",
+    "url": "https://localhost:19443/otgw/",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:19443/otgw/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:19443/otgw/upload"
+    },
+    "fsx_forms_escaped": [
+      "https://localhost:19443/upload?path=%2F",
+      "https://localhost:19443/update",
+      "https://localhost:19443/ReBoot",
+      "https://localhost:19443/ResetWireless",
+      "https://localhost:19443/"
+    ],
+    "escaped": [
+      "https://localhost:19443/api/v2/device/info",
+      "https://localhost:19443/api/v2/device/time",
+      "https://localhost:19443/api/v2/filesystem/hash-check",
+      "https://localhost:19443/api/v2/health",
+      "https://localhost:19443/api/v2/otgw/otmonitor",
+      "https://localhost:19443/api/v2/sat/ble/discovery",
+      "https://localhost:19443/api/v2/sat/status",
+      "https://localhost:19443/api/v2/sat/weather",
+      "https://localhost:19443/api/v2/sensors",
+      "https://localhost:19443/api/v2/settings",
+      "https://localhost:19443/fonts/inter-400.woff2",
+      "https://localhost:19443/fonts/inter-700.woff2",
+      "https://localhost:19443/fonts/jetbrains-mono-400.woff2"
+    ],
+    "api_bad": [
+      "404 https://localhost:19443/api/v2/device/info",
+      "404 https://localhost:19443/api/v2/device/time",
+      "404 https://localhost:19443/api/v2/filesystem/hash-check",
+      "404 https://localhost:19443/api/v2/health",
+      "404 https://localhost:19443/api/v2/otgw/otmonitor",
+      "404 https://localhost:19443/api/v2/sat/ble/discovery",
+      "404 https://localhost:19443/api/v2/sat/status",
+      "404 https://localhost:19443/api/v2/sat/weather",
+      "404 https://localhost:19443/api/v2/sensors",
+      "404 https://localhost:19443/api/v2/settings"
+    ],
+    "console_errors": [
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'wss://localhost:19443/ws' failed: Error during WebSocket handshake: Unexpected response code: 404"
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "wss://localhost:19443/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      }
+    ],
+    "ws_escaped": [
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws",
+      "wss://localhost:19443/ws"
+    ],
+    "device_heap_after": {
+      "freeheap": 64552,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 2,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "nginx_http_keephost",
+    "url": "http://localhost:19080/otgw-keephost/",
+    "loaded": false,
+    "load_error": "Frame.wait_for_function: Timeout 30000ms exceeded.",
+    "write": {
+      "status": 200,
+      "api": "http://localhost:19080/otgw-keephost/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://localhost:19080/otgw-keephost/upload"
+    },
+    "fsx_forms_escaped": [
+      "http://localhost:19080/upload?path=%2F",
+      "http://localhost:19080/update",
+      "http://localhost:19080/ReBoot",
+      "http://localhost:19080/ResetWireless",
+      "http://localhost:19080/"
+    ],
+    "escaped": [
+      "http://localhost:19080/api/v2/device/info",
+      "http://localhost:19080/api/v2/device/time",
+      "http://localhost:19080/api/v2/filesystem/hash-check",
+      "http://localhost:19080/api/v2/health",
+      "http://localhost:19080/api/v2/otgw/otmonitor",
+      "http://localhost:19080/api/v2/sat/ble/discovery",
+      "http://localhost:19080/api/v2/sat/status",
+      "http://localhost:19080/api/v2/sat/weather",
+      "http://localhost:19080/api/v2/sensors",
+      "http://localhost:19080/api/v2/settings",
+      "http://localhost:19080/fonts/inter-400.woff2",
+      "http://localhost:19080/fonts/inter-700.woff2",
+      "http://localhost:19080/fonts/jetbrains-mono-400.woff2"
+    ],
+    "api_bad": [
+      "404 http://localhost:19080/api/v2/device/info",
+      "404 http://localhost:19080/api/v2/device/time",
+      "404 http://localhost:19080/api/v2/filesystem/hash-check",
+      "404 http://localhost:19080/api/v2/health",
+      "404 http://localhost:19080/api/v2/otgw/otmonitor",
+      "404 http://localhost:19080/api/v2/sat/ble/discovery",
+      "404 http://localhost:19080/api/v2/sat/status",
+      "404 http://localhost:19080/api/v2/sat/weather",
+      "404 http://localhost:19080/api/v2/sensors",
+      "404 http://localhost:19080/api/v2/settings"
+    ],
+    "console_errors": [
+      "WebSocket connection to 'ws://localhost:19080/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:19080/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:19080/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:19080/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:19080/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:19080/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:19080/ws' failed: Error during WebSocket handshake: Unexpected response code: 404",
+      "WebSocket connection to 'ws://localhost:19080/ws' failed: Error during WebSocket handshake: Unexpected response code: 404"
+    ],
+    "websockets": [
+      {
+        "url": "ws://localhost:19080/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:19080/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:19080/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:19080/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:19080/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:19080/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:19080/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      },
+      {
+        "url": "ws://localhost:19080/ws",
+        "frames": 0,
+        "closed": true,
+        "error": "Error during WebSocket handshake: Unexpected response code: 404"
+      }
+    ],
+    "ws_escaped": [
+      "ws://localhost:19080/ws",
+      "ws://localhost:19080/ws",
+      "ws://localhost:19080/ws",
+      "ws://localhost:19080/ws",
+      "ws://localhost:19080/ws",
+      "ws://localhost:19080/ws",
+      "ws://localhost:19080/ws",
+      "ws://localhost:19080/ws"
+    ],
+    "device_heap_after": {
+      "freeheap": 67804,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 2,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_echo",
+    "url": "https://localhost:18443/echo",
+    "seen_by_backend": {
+      "method": "POST",
+      "path": "/probe",
+      "headers": {
+        "Host": "localhost:18443",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Content-Type": "application/json",
+        "Origin": "https://localhost:18443",
+        "Priority": "u=1, i",
+        "Referer": "https://localhost:18443/api/ingress/echo/",
+        "Sec-CH-UA": "\"Not=A?Brand\";v=\"99\", \"HeadlessChrome\";v=\"151\", \"Chromium\";v=\"151\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"Windows\"",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-Forwarded-For": "172.19.0.1, 172.19.0.5",
+        "X-Forwarded-Host": "localhost:18443",
+        "X-Forwarded-Proto": "https",
+        "X-Ingress-Path": "/api/ingress/echo",
+        "X-Ingress-Subpath": "",
+        "Content-Length": "2"
+      }
+    },
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 14,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [
+      "wss://localhost:18443/api/websocket"
+    ],
+    "device_heap_after": {
+      "freeheap": 70636,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 2,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_echo_hostdev",
+    "url": "https://localhost:18443/echo_hostdev",
+    "seen_by_backend": {
+      "method": "POST",
+      "path": "/probe",
+      "headers": {
+        "Host": "192.168.88.61",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Content-Type": "application/json",
+        "Origin": "https://localhost:18443",
+        "Priority": "u=1, i",
+        "Referer": "https://localhost:18443/api/ingress/echo_hostdev/",
+        "Sec-CH-UA": "\"Not=A?Brand\";v=\"99\", \"HeadlessChrome\";v=\"151\", \"Chromium\";v=\"151\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"Windows\"",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-Forwarded-For": "172.19.0.1, 172.19.0.5",
+        "X-Forwarded-Host": "localhost:18443",
+        "X-Forwarded-Proto": "https",
+        "X-Ingress-Path": "/api/ingress/echo_hostdev",
+        "X-Ingress-Subpath": "",
+        "Content-Length": "2"
+      }
+    },
+    "escaped": [],
+    "api_bad": [],
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 13,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [
+      "wss://localhost:18443/api/websocket"
+    ],
+    "device_heap_after": {
+      "freeheap": 70896,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 2,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 2,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  }
+]

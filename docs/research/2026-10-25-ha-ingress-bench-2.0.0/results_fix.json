@@ -1,0 +1,474 @@
+[
+  {
+    "scenario": "direct",
+    "url": "http://192.168.88.61/",
+    "loaded": true,
+    "header": "OTGW2.local \u00b7 v2.0.0-alpha.507",
+    "write": {
+      "status": 200,
+      "api": "http://192.168.88.61/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://192.168.88.61/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 0,
+    "console_errors": [],
+    "websockets": [
+      {
+        "url": "ws://192.168.88.61/ws",
+        "frames": 4,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 70684,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 1,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 0,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_http_otgw",
+    "url": "http://localhost:18123/otgw",
+    "loaded": true,
+    "header": "OTGW2.local \u00b7 v2.0.0-alpha.507",
+    "write": {
+      "status": 200,
+      "api": "http://localhost:18123/api/ingress/otgw/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://localhost:18123/api/ingress/otgw/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 1,
+    "console_errors": [],
+    "websockets": [
+      {
+        "url": "ws://localhost:18123/api/websocket",
+        "frames": 11,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "ws://localhost:18123/api/ingress/otgw/ws",
+        "frames": 0,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "ws://localhost:18123/api/websocket",
+        "frames": 13,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "ws://localhost:18123/api/ingress/otgw/ws",
+        "frames": 3,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 73028,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 2,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 2,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_otgw",
+    "url": "https://localhost:18443/otgw",
+    "loaded": true,
+    "header": "OTGW2.local \u00b7 v2.0.0-alpha.507",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:18443/api/ingress/otgw/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 2,
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 13,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "wss://localhost:18443/api/ingress/otgw/ws",
+        "frames": 4,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 70292,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 2,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 4,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_otgw_hostdev",
+    "url": "https://localhost:18443/otgw_hostdev",
+    "loaded": true,
+    "header": "OTGW2.local \u00b7 v2.0.0-alpha.507",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:18443/api/ingress/otgw_hostdev/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw_hostdev/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 2,
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 16,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "wss://localhost:18443/api/ingress/otgw_hostdev/ws",
+        "frames": 4,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 70812,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 2,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 6,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_otgw_rw",
+    "url": "https://localhost:18443/otgw_rw",
+    "loaded": true,
+    "header": "OTGW2.local \u00b7 v2.0.0-alpha.507",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:18443/api/ingress/otgw_rw/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:18443/api/ingress/otgw_rw/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 4,
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 14,
+        "closed": false,
+        "error": null
+      },
+      {
+        "url": "wss://localhost:18443/api/ingress/otgw_rw/ws",
+        "frames": 3,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 71012,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 3,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 12,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "nginx_https_keephost",
+    "url": "https://localhost:19443/otgw-keephost/",
+    "loaded": true,
+    "header": "OTGW2.local \u00b7 v2.0.0-alpha.507",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:19443/otgw-keephost/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:19443/otgw-keephost/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 5,
+    "console_errors": [],
+    "websockets": [
+      {
+        "url": "wss://localhost:19443/otgw-keephost/ws",
+        "frames": 3,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 66928,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 3,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 19,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "nginx_https_default",
+    "url": "https://localhost:19443/otgw/",
+    "loaded": true,
+    "header": "OTGW2.local \u00b7 v2.0.0-alpha.507",
+    "write": {
+      "status": 200,
+      "api": "https://localhost:19443/otgw/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "https://localhost:19443/otgw/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 2,
+    "console_errors": [],
+    "websockets": [
+      {
+        "url": "wss://localhost:19443/otgw/ws",
+        "frames": 2,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 71516,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 3,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 21,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "nginx_http_keephost",
+    "url": "http://localhost:19080/otgw-keephost/",
+    "loaded": true,
+    "header": "OTGW2.local \u00b7 v2.0.0-alpha.507",
+    "write": {
+      "status": 200,
+      "api": "http://localhost:19080/otgw-keephost/api/v2/settings"
+    },
+    "upload": {
+      "status": 0,
+      "type": "opaqueredirect",
+      "delete_status": 200,
+      "url": "http://localhost:19080/otgw-keephost/upload"
+    },
+    "fsx_forms_escaped": [],
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 2,
+    "console_errors": [],
+    "websockets": [
+      {
+        "url": "ws://localhost:19080/otgw-keephost/ws",
+        "frames": 2,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 71288,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 3,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 25,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_echo",
+    "url": "https://localhost:18443/echo",
+    "seen_by_backend": {
+      "method": "POST",
+      "path": "/probe",
+      "headers": {
+        "Host": "localhost:18443",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Content-Type": "application/json",
+        "Origin": "https://localhost:18443",
+        "Priority": "u=1, i",
+        "Referer": "https://localhost:18443/api/ingress/echo/",
+        "Sec-CH-UA": "\"Not=A?Brand\";v=\"99\", \"HeadlessChrome\";v=\"151\", \"Chromium\";v=\"151\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"Windows\"",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-Forwarded-For": "172.19.0.1, 172.19.0.5",
+        "X-Forwarded-Host": "localhost:18443",
+        "X-Forwarded-Proto": "https",
+        "X-Ingress-Path": "/api/ingress/echo",
+        "X-Ingress-Subpath": "",
+        "Content-Length": "2"
+      }
+    },
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 0,
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 14,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 64980,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 3,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 25,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  },
+  {
+    "scenario": "ha_https_echo_hostdev",
+    "url": "https://localhost:18443/echo_hostdev",
+    "seen_by_backend": {
+      "method": "POST",
+      "path": "/probe",
+      "headers": {
+        "Host": "192.168.88.61",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/151.0.7922.34 Safari/537.36",
+        "Accept": "*/*",
+        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Content-Type": "application/json",
+        "Origin": "https://localhost:18443",
+        "Priority": "u=1, i",
+        "Referer": "https://localhost:18443/api/ingress/echo_hostdev/",
+        "Sec-CH-UA": "\"Not=A?Brand\";v=\"99\", \"HeadlessChrome\";v=\"151\", \"Chromium\";v=\"151\"",
+        "Sec-CH-UA-Mobile": "?0",
+        "Sec-CH-UA-Platform": "\"Windows\"",
+        "Sec-Fetch-Dest": "empty",
+        "Sec-Fetch-Mode": "cors",
+        "Sec-Fetch-Site": "same-origin",
+        "X-Forwarded-For": "172.19.0.1, 172.19.0.5",
+        "X-Forwarded-Host": "localhost:18443",
+        "X-Forwarded-Proto": "https",
+        "X-Ingress-Path": "/api/ingress/echo_hostdev",
+        "X-Ingress-Subpath": "",
+        "Content-Length": "2"
+      }
+    },
+    "escaped": [],
+    "api_bad": [],
+    "api_503": 0,
+    "console_errors": [
+      "An SSL certificate error occurred when fetching the script."
+    ],
+    "websockets": [
+      {
+        "url": "wss://localhost:18443/api/websocket",
+        "frames": 15,
+        "closed": false,
+        "error": null
+      }
+    ],
+    "ws_escaped": [],
+    "device_heap_after": {
+      "freeheap": 68080,
+      "maxfreeblock": 31732,
+      "hd_rest_503": 3,
+      "hd_webfile_503": 0,
+      "hd_webconn_503": 25,
+      "hd_rest_inflight_hwm": 2,
+      "hd_webfile_inflight_hwm": 2,
+      "hd_ws_drops": 0
+    }
+  }
+]

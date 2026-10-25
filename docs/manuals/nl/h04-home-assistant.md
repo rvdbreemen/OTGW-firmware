@@ -609,3 +609,46 @@ De firmware ondersteunt een optionele geplande nachtelijke herstart om heap-gehe
 | Nightly Restart Hour | 4 | Uur (0-23) waarop de herstart plaatsvindt. Alleen actief als NTP ingeschakeld en gesynchroniseerd is. |
 
 Deze instellingen zijn beschikbaar in de Web UI (instellingenpagina), via de REST API (`/api/v2/settings`) en via het MQTT settings-topic. De herstart veroorzaakt een korte onderbreking van ongeveer 30 seconden.
+
+### De webinterface openen vanuit Home Assistant
+
+Twee manieren, beide getest met Home Assistant 2026.10.4; de volledige handleiding
+met alle regels en een algemeen nginx-voorbeeld staat (in het Engels) in
+[docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](../../guides/REVERSE_PROXY_AND_HA_INGRESS.md).
+
+**Link "Bezoeken".** MQTT-discovery stuurt `configuration_url` =
+`http://<IP van de gateway>/` mee. HA toont die als **Bezoeken** (Visit) op de
+apparaatpagina van de gateway; de link opent de webinterface in een nieuw
+tabblad, vanuit een browser op uw thuisnetwerk. Geef de gateway een vast adres via
+een DHCP-reservering: de link volgt een IP-wijziging pas bij de volgende
+discovery-ronde.
+
+**Paneel in de zijbalk (ingress).** De custom integration
+[hass_ingress](https://github.com/lovelylain/hass_ingress) (Apache-2.0, HACS)
+zet de webinterface in de zijbalk van HA, achter de HA-login, ook via HTTPS en
+van buitenaf. Voorbeeld van de testopstelling:
+
+```yaml
+ingress:
+  otgw:
+    title: OTGW
+    icon: mdi:water-boiler
+    url: http://192.168.1.50      # het IP-adres van de gateway, niet <hostnaam>.local
+    require_admin: true
+```
+
+Alles werkt via het paneel, ook de live OpenTherm-log.
+
+> **Beveiliging.** Laat `require_admin: true` staan: via het paneel zijn de
+> beheerfuncties van de gateway (instellingen, firmware-update, herstart) bereikbaar
+> overal waar HA bereikbaar is, ook via Nabu Casa. Gebruik nooit `static_token`
+> (een link die de HA-login overslaat), zet geen `host`-header (met een
+> gateway-wachtwoord wordt dan elke wijziging met 403 geweigerd) en zet het
+> gateway-wachtwoord niet in een `headers: authorization`-regel (dan wordt elke
+> HA-beheerder ook beheerder van de gateway). De gateway zelf blijft gewoon HTTP op
+> uw thuisnetwerk; HA zorgt voor de HTTPS.
+
+> **Firmware bijwerken via het paneel** lukte op de testopstelling 2 van de 3
+> keer; één keer antwoordde de proxy met 502 op de firmware-upload en wachtte de
+> gateway in zijn updater tot de firmware opnieuw via het IP-adres werd verstuurd.
+> Werk de firmware waar mogelijk bij via het IP-adres op uw thuisnetwerk.

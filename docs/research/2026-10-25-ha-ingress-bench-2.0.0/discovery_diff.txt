@@ -1,0 +1,6 @@
+alpha.505 topics 402, alpha.507 topics 402, common 402, only-505 0, only-507 0
+common topics differing beyond dev.sw_version / dev.cu / origin.sw: 0 []
+507 configs with dev.cu: 35 (505: 0); cu values: {'http://192.168.88.61/'}
+all 507 payloads valid JSON: yes; longest 507 payload 1049 bytes, longest 505 1020
+example device block 505: {'identifiers': 'otgw-XXXXXXXXXXXX', 'manufacturer': 'NodoShop', 'model': 'OTGW', 'name': 'OpenTherm Gateway (OTGW2)', 'sw_version': '2.0.0-alpha.505+613c286 (25-10-2026)'}
+example device block 507: {'identifiers': 'otgw-XXXXXXXXXXXX', 'manufacturer': 'NodoShop', 'model': 'OTGW', 'name': 'OpenTherm Gateway (OTGW2)', 'sw_version': '2.0.0-alpha.507+f3ebc29 (25-10-2026)', 'cu': 'http://192.168.88.61/'}

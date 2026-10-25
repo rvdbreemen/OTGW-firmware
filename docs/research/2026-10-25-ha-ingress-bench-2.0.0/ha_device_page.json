@@ -1,0 +1,13 @@
+[
+  {
+    "id": "9b440d584d4cd1f01c90c7e62d85c6ab",
+    "name": "OpenTherm Gateway (OTGW2)",
+    "sw_version": "2.0.0-alpha.507+f3ebc29 (25-10-2026)",
+    "configuration_url": "http://192.168.88.61/",
+    "visit_link": "http://192.168.88.61/",
+    "visit_opened": {
+      "url": "http://192.168.88.61/",
+      "ui_identity": "OTGW2.local \u00b7 v2.0.0-alpha.507"
+    }
+  }
+]

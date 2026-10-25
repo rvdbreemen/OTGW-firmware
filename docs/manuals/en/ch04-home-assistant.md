@@ -542,5 +542,45 @@ The firmware supports an optional scheduled nightly restart to recover heap memo
 
 These settings are available in the Web UI (Settings page), via the REST API (`/api/v2/settings`), and via the MQTT settings topic. The restart causes a brief interruption of approximately 30 seconds.
 
+### 4.12 Opening the Web Interface from Home Assistant
+
+Two ways, both tested with Home Assistant 2026.10.4; the full guide with all
+rules and a generic nginx example is
+[docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md](../../guides/REVERSE_PROXY_AND_HA_INGRESS.md).
+
+**Visit link.** MQTT discovery sends `configuration_url` = `http://<gateway IP>/`.
+HA shows it as **Visit** on the gateway's device page; it opens the web interface
+in a new tab, from a browser on your LAN. Give the gateway a DHCP reservation: the
+link follows an IP change only at the next discovery run.
+
+**Sidebar panel (ingress).** The custom integration
+[hass_ingress](https://github.com/lovelylain/hass_ingress) (Apache-2.0, HACS)
+puts the web interface in the HA sidebar, behind the HA login, also over HTTPS and
+remotely. Example from the test bench:
+
+```yaml
+ingress:
+  otgw:
+    title: OTGW
+    icon: mdi:water-boiler
+    url: http://192.168.1.50      # the gateway's IP, not <hostname>.local
+    require_admin: true
+```
+
+Everything works through the panel, the live OpenTherm log included.
+
+> **Security.** Keep `require_admin: true`: the panel makes the gateway's admin
+> functions (settings, firmware update, reboot) reachable wherever HA is reachable,
+> Nabu Casa included. Never use `static_token` (a link that skips the HA login),
+> do not set a `host` header (with a gateway password set every change is then
+> refused with 403), and do not put the gateway password in a `headers:
+> authorization` line (every HA admin would become gateway admin). The gateway
+> itself stays plain HTTP on your LAN; HA provides the HTTPS.
+
+> **Firmware updates through the panel** worked in 2 of 3 bench runs; once the
+> proxy answered 502 to the firmware upload and the gateway waited in its updater
+> until the firmware was sent again by IP. Update the firmware by IP on your LAN
+> when you can.
+
 ---
 

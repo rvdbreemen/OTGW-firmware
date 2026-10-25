@@ -38,6 +38,8 @@ def main():
     image = ap.add_mutually_exclusive_group(required=True)
     image.add_argument("--firmware", help="<name>.ino.bin")
     image.add_argument("--filesystem", help="<name>.littlefs.bin")
+    image.add_argument("--one-action", nargs=2, metavar=("APP_BIN", "FS_BIN"),
+                       help="2.0.0: the one-action update (firmware through safeboot, then the web files)")
     ap.add_argument("--panel", default="otgw")
     args = ap.parse_args()
     state = json.loads((RUNTIME / "rig.json").read_text())
@@ -56,7 +58,14 @@ def main():
         page.goto(f"{HA_HTTPS}/{args.panel}", wait_until="domcontentloaded", timeout=60000)
         frame = find_ui_frame(page, f"/api/ingress/{args.panel}/")
         frame.goto(frame.url.split("#")[0].rsplit("/", 1)[0] + "/update", wait_until="domcontentloaded")
-        if args.firmware:
+        if args.one_action:
+            frame.wait_for_function("() => { const i = document.getElementById('unitInfo'); return i && /runs/.test(i.textContent); }",
+                                    timeout=30000)
+            frame.set_input_files("#oneFiles", list(args.one_action))
+            frame.wait_for_function("() => !document.getElementById('oneStart').disabled", timeout=60000)
+            notes = frame.evaluate("document.getElementById('oneWarn').innerText")
+            submit = "#oneStart"
+        elif args.firmware:
             frame.set_input_files("#fwForm input[name='firmware']", args.firmware)
             submit = "#fwSubmit"
         else:
@@ -66,7 +75,24 @@ def main():
         frame.click(submit)
         result = "timeout"
         seen_offline = False
-        for _ in range(240):
+        if args.one_action:
+            # The page drives handover, firmware, settle and web files itself; done when it
+            # shows "Open web UI" (or an error).
+            for _ in range(300):
+                page.wait_for_timeout(2000)
+                try:
+                    st = frame.evaluate("""() => ({open: getComputedStyle(document.getElementById('oneOpen')).display !== 'none',
+                        err: document.getElementById('oneErr').innerText, status: document.getElementById('oneStatus').innerText})""")
+                except Exception:  # noqa: BLE001
+                    continue
+                if st["open"]:
+                    result = "ok"
+                    break
+                if st["err"].strip():
+                    result = "failed: " + st["err"][:300]
+                    break
+            rep_extra = {"warn_notes": notes, "last_status": st.get("status")}
+        for _ in range(0 if args.one_action else 240):
             page.wait_for_timeout(2000)
             try:
                 text = frame.evaluate("document.body.innerText")
@@ -85,7 +111,7 @@ def main():
             if on_update_page and "failed" in text.lower():
                 result = "failed: " + text[-300:]
                 break
-        kind = "firmware" if args.firmware else "filesystem"
+        kind = "one-action" if args.one_action else ("firmware" if args.firmware else "filesystem")
         page.screenshot(path=str(out / f"ota_via_ingress_{kind}.png"))
         browser.close()
     after, up_after = None, None
@@ -94,7 +120,7 @@ def main():
         if after:
             break
         time.sleep(3)
-    rep = {"image": kind, "result": result, "seconds": round(time.time() - t0, 1), "before": before, "after": after,
+    rep = {"image": kind, "result": result, **(rep_extra if args.one_action else {}), "seconds": round(time.time() - t0, 1), "before": before, "after": after,
            "uptime_min_before": up_before, "uptime_min_after": up_after,
            "console_tail": log[-15:]}
     (out / f"ota_via_ingress_{kind}.json").write_text(json.dumps(rep, indent=2))
