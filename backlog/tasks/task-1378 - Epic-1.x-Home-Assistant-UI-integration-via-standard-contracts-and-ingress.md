@@ -5,7 +5,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-25T09:10:00Z'
-updated_date: '2026-10-25T09:29:00Z'
+updated_date: '2026-10-25T11:21:00Z'
 labels:
   - epic
   - home-assistant
@@ -35,7 +35,15 @@ Cross-branch coordination: the 2.0.0 siblings are TASK-1377.1 (A), .3 (B), .5 (C
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [ ] #1 All child tasks are Done, or explicitly dropped with a reason
-- [ ] #2 HA shows a working 'Visit device' link for a 1.x OTGW, shown by a screenshot
-- [ ] #3 The classic UI opens from the HA sidebar through the chosen ingress component with HA over HTTPS; reads and admin actions work, live log shows its degraded state, shown by screenshots or a bench transcript
-- [ ] #4 MQTT discovery and REST contracts unchanged apart from the added cu field, shown by a discovery payload diff
+- [x] #2 HA shows a working 'Visit device' link for a 1.x OTGW, shown by a screenshot
+- [x] #3 The classic UI opens from the HA sidebar through the chosen ingress component with HA over HTTPS; reads and admin actions work, live log shows its degraded state, shown by screenshots or a bench transcript
+- [x] #4 MQTT discovery and REST contracts unchanged apart from the added cu field, shown by a discovery payload diff
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+- 1378.1, .2, .4 Done. 1378.3: all ACs but #4 (ADR) met; #4 waits for the maintainer (no ADR-054 change was needed).
+- Work in worktree wt-1378 from origin/otgw-1.x.x, not in wt-otgw-1.x.x: that tree holds 35 unpushed local commits and an uncommitted TEMP DIAG build (TASK-1262/1302); left untouched.
+- Bench .88.68 now runs 1.7.8-beta.6+54cbe02 (fw + LittleFS); it ran the TASK-1302 no-GARP diag build before. MQTT broker setting restored to homeassistant.local, no HTTP password.
+<!-- SECTION:NOTES:END -->
