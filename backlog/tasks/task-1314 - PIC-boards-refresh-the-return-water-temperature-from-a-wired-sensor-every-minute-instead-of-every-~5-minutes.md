@@ -3,11 +3,11 @@ id: TASK-1314
 title: >-
   PIC boards: refresh the return water temperature from a wired sensor every
   minute instead of every ~5 minutes
-status: In Progress
+status: Done
 assignee:
   - '@claude'
 created_date: '2026-10-23T09:26:00Z'
-updated_date: '2026-10-23T13:35:00Z'
+updated_date: '2026-10-25T11:38:00Z'
 labels:
   - pic
   - opentherm
@@ -27,7 +27,7 @@ Maintainer directive (number3nl, #alpha-testing 2026-10-23 08:46): 'do as gruijt
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
 - [x] #1 Root cause of the ~5 min cadence documented from the PIC reference (other-projects/otgw-6.6 source/docs, cited) and from gruijter's capture (frame types and intervals of MsgID 28)
-- [ ] #2 On PIC boards with the sensor configured as return water, the firmware gets a fresh Tret about every 60 s (mechanism chosen from the evidence, e.g. PM=28 once a minute), without adding PIC commands when the board has no such sensor
+- [x] #2 On PIC boards with the sensor configured as return water, the firmware gets a fresh Tret about every 60 s (mechanism chosen from the evidence, e.g. PM=28 once a minute), without adding PIC commands when the board has no such sensor
 - [x] #3 Bench or replay evidence old vs fix of the MsgID 28 interval; no regression in the PIC command queue (no extra traffic on boards without the sensor)
 <!-- AC:END -->
 
@@ -74,10 +74,12 @@ Open: the live loop on a PIC board with the sensor (PR=E sent and answered every
 2026-10-23 13:30 fix plan (UI follow-up, AC2 field failure): v2.js reads the PIC reply events that already reach the WebSocket ('<' prefix, reportOTGWEvent(buf,'<') in processOT, OTGW-Core.ino:5484): '< PR: D=<x>' stores the sensor function, '< PR: E=<v>' sets model.ret (live graph, Home readouts) only when the last D was 'R' and -40<=v<=130; 'E=-' keeps the value. No new requests, no firmware change, PIC lines consumed verbatim (ADR-177). Test: tests/webui (fake WS feeds D=R then E lines; red on HEAD: ret unchanged). Bench: OTGW32 replay tests/webui/fixtures/tret-pr-e-replay.txt with the real v2 page open: the Home return readout follows 41.20/41.70/hold/42.30.
 
 2026-10-23 15:35 UI fix evidence: v2.js applyPicReply() (16 lines). tests/webui/tret-pr-events.test.mjs: fix 0 failures of 7; HEAD v2.js 5 failures of 7 (readout stays '—' on E lines; frame path passes on both). Regression: sat-status-pill 14, v2-navigation 50, evaluate --quick 0 fail. build.bat combo SUCCESS (littlefs 15:28), bench fs flash with settings round trip 178/178 differing 0; real browser on the device (headless Chrome, #aRet) during the tret-pr-e-replay fixture: '—' -> 35.0 (frame) -> 41.2 -> 41.7 -> holds over E=- -> 42.3, matching the firmware state (35 -> 41.20 -> 41.70 -> 42.30). Old v2.js not re-run on the device (old-vs-fix is the webui test). /otgw_simulation.log deleted from the bench. AC2 still needs the reporter: the graph/Home readout changing about every minute.
+
+2026-10-25 field confirmation: gruijter (PIC Classic, Intergas, alpha.493+) 'yes' to 'does the return-water value now change about once a minute' (https://discord.com/channels/812969634638725140/1514720723980259460/1563865628014678028). He would also welcome 30 s updates (not in scope; note for a later task if asked).
 <!-- SECTION:NOTES:END -->
 
 ## Final Summary
 
 <!-- SECTION:FINAL_SUMMARY:BEGIN -->
-On a PIC gateway (firmware 6.6+) with the wired sensor set to return water (PR: D=R) the firmware now asks for the sensor every 60 s with PR=D then PR=E (serial only, no OpenTherm traffic) and feeds 'PR: E=<v>' as MsgID 28 through the PS=1 summary's frame-less state+publish route; 'E=-' keeps the last value; boards without the sensor or without a PIC send nothing. A PIC found after boot and settings commands from port 25238 now trigger the settings readout, so the sensor function is known. Root cause (AC1): the ~290 s cadence was the Honeywell Round's own polling of ID 28 (capture: T/A pairs 289-295 s); PM=28/AA=28 cannot help (PIC source research, cited). Evidence: AC3 replay old (Tret stuck at the frame value) vs new (follows every E line, holds on '-'), no PR=D/PR=E on the OT-Direct unit; PR=E reply format confirmed on a real PIC 6.8 (1.x bench unit, read-only); host test 33/33; builds x3 SUCCESS; evaluate 0 fail. Open (AC2): the live loop on a PIC board with the sensor needs the reporter's confirmation (Tret changing about every 60 s).
+PIC boards with the sensor as return water get a fresh Tret about every 60 s (PM=28 once a minute, f4c016830 alpha.465; UI 7ff92e58e alpha.467), no extra PIC commands without such a sensor. Evidence: AC1 root cause from otgw-6.6 + gruijter capture; AC3 bench/replay old vs fix; AC2 field confirmation by gruijter 2026-10-25 (Discord 1563865628014678028).
 <!-- SECTION:FINAL_SUMMARY:END -->

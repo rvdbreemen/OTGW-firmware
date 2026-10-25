@@ -2797,3 +2797,32 @@ HEAD: no user setting (entry 51); the ignition hold is clamped with the system c
 **Task:** TASK-1373 (the clamp must also cover the ignition hold).
 
 **Open:** none.
+
+## 55. End-of-cycle classifier: match thermo-nova's classifier.py exactly (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 10:39 UTC, answer to Q4 (asked again 10:35 UTC, message
+1563863552094240852; detail 2026-10-24 21:31 UTC, message 1563666347832119430: A) match classifier.py
+exactly, B) keep "short" only as a display label, C) keep ours; our advice A):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563864684971696211
+
+**Quoted:**
+
+> @BlueFlame Bot Q4: Choose A
+
+**Settled by this statement:**
+
+- The firmware classifier follows `cycles/classifier.py` exactly: no SHORT label for a continuous
+  cycle, no rule that a cycle under 120 s is always UNCERTAIN.
+- Add classifier.py's UNCERTAIN results: kind UNKNOWN (`classifier.py:22-23`), missing PWM tail
+  setpoint-error percentiles (`:42-43`), missing continuous tail control-setpoint-error percentiles
+  (`:71-72`).
+
+**Compared with the firmware:** the extra SHORT and under-120-s rules and the missing UNCERTAIN cases
+are listed in the Q4 detail message; the label now switches PWM/continuous at cycle end (Q2 answer),
+so it must follow classifier.py.
+
+**Changes an earlier entry:** none.
+
+**Task:** TASK-1387 (prerequisite for TASK-1331).
+
+**Open:** none.
