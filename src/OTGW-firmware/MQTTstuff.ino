@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : MQTTstuff
-**  Version  : v2.0.0-alpha.508
+**  Version  : v2.0.0-alpha.509
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **      Modified version from (c) 2020 Willem Aandewiel
@@ -1098,16 +1098,106 @@ static uint32_t sHeapBurstNonEmptyMs = 0;  // last time the outbox held a packet
 static uint32_t sHeapBurstMin        = 0xFFFFFFFFu;
 static uint16_t sHeapBurstLines      = 0;
 
+enum : uint8_t { BOOTHEAP_IDLE = 0, BOOTHEAP_RUN = 1, BOOTHEAP_DONE = 2 };
+static uint8_t     sBootHeapState   = BOOTHEAP_IDLE;
+static uint32_t    sBootHeapMin     = 0xFFFFFFFFu;   // running boot-phase minimum (boot windows below)
 static void heapBurstFold() {
   uint32_t w = platformHeapWindowMin();
   if (w != 0 && w < sHeapBurstMin) sHeapBurstMin = w;
+  if (sBootHeapState == BOOTHEAP_RUN && w != 0 && w < sBootHeapMin) sBootHeapMin = w;  // TASK-1339: boot phase shares the window
+}
+
+// ---------------------------------------------------------------------
+// TASK-1339 diagnostics, part 2: consecutive boot windows. The burst/drip
+// windows below missed the deepest boot dip (hd_min 2032 B on bench boot 1,
+// every burst/drip window minimum was >= 5700 B). From early setup() until the
+// boot discovery drip has finished, one IDF window is always running, split
+// into phases (bootHeapPhase() closes the running phase with one [HEAP] boot
+// line and opens the next). Only one IDF window exists, so every restart by the
+// burst/drip code folds the running minimum into the boot phase first
+// (heapBurstFold) and every stop becomes a restart while boot runs
+// (heapWinRelease). Lines closed before the telnet server is up are kept in a
+// small static table and printed when setup() ends. Diagnostic only.
+// Not covered: global constructors and anything before setup().
+// ---------------------------------------------------------------------
+static const char *sBootHeapName    = nullptr;       // PSTR of the running phase
+static uint32_t    sBootHeapT0Ms    = 0;             // phase start
+static uint32_t    sBootHeapAllMin  = 0xFFFFFFFFu;   // minimum over all closed phases
+static uint16_t    sBootHeapPhases  = 0;
+static int         sBootHeapDripId  = -1;            // last drip id published in this phase
+static bool        sBootHeapShow    = false;         // telnet is up: print at once
+
+static BootHeapRec sBootHeapRec[8];  // struct in OTGW-firmware.h: the .ino prototype pass needs it early
+static uint8_t     sBootHeapRecN = 0;
+
+static void bootHeapPrint(const BootHeapRec &r) {
+  DebugTf(PSTR("[HEAP] boot win=%s dur=%lu minWin=%lu free=%u maxblk=%u outbox=%lu sburst=%u connburst=%u drip=%d\r\n"),
+          r.name, (unsigned long)r.ms, (unsigned long)r.min, (unsigned)r.free, (unsigned)r.maxblk,
+          (unsigned long)r.outbox, (unsigned)r.sburst, (unsigned)r.cburst, (int)r.drip);
+}
+
+// The stored setup() lines are kept: bootHeapFinish() prints them again, for a
+// telnet client that connected after setup() ended.
+static void bootHeapFlushStored() {
+  sBootHeapShow = true;
+  for (uint8_t i = 0; i < sBootHeapRecN; i++) bootHeapPrint(sBootHeapRec[i]);
+}
+
+// Close the running phase: fold, then log (or store) one line.
+static void bootHeapCloseLine() {
+  heapBurstFold();
+  const uint32_t m = (sBootHeapMin == 0xFFFFFFFFu) ? 0 : sBootHeapMin;  // 0 = no window could be opened
+  if (m != 0 && m < sBootHeapAllMin) sBootHeapAllMin = m;
+  sBootHeapPhases++;
+  BootHeapRec r = { sBootHeapName, millis() - sBootHeapT0Ms, m, platformFreeHeap(), platformMaxFreeBlock(),
+                    (uint32_t)MQTTclient.queueSize(), (uint8_t)isStatusBurstActive(), (uint8_t)sHeapBurstOpen,
+                    (int16_t)sBootHeapDripId };
+  if (sBootHeapShow) bootHeapPrint(r);
+  else if (sBootHeapRecN < (sizeof(sBootHeapRec) / sizeof(sBootHeapRec[0]))) sBootHeapRec[sBootHeapRecN++] = r;
+  sBootHeapDripId = -1;
+}
+
+// Stop the shared window, or restart it while the boot phases still need it.
+static void heapWinRelease() {
+  if (sBootHeapState == BOOTHEAP_RUN) platformHeapWindowStart();
+  else platformHeapWindowStop();
+}
+
+void bootHeapPhase(const char *pstrName) {
+  if (sBootHeapState == BOOTHEAP_DONE) return;
+  if (sBootHeapState == BOOTHEAP_RUN) bootHeapCloseLine();
+  // setup() is over (telnet is up): print the stored lines before the first live one.
+  if (!sBootHeapShow && strcmp_P(pstrName, PSTR("wait-mqtt")) == 0) bootHeapFlushStored();
+  sBootHeapState = BOOTHEAP_RUN;
+  sBootHeapName  = pstrName;
+  sBootHeapT0Ms  = millis();
+  sBootHeapMin   = 0xFFFFFFFFu;
+  platformHeapWindowStart();  // false (heap nearly exhausted) shows up as minWin=0
+}
+
+// End of the boot watch: close the last phase, then the overall comparison.
+static void bootHeapFinish(const char *pstrReason) {
+  if (sBootHeapState != BOOTHEAP_RUN) return;
+  bootHeapCloseLine();
+  sBootHeapState = BOOTHEAP_DONE;
+  bootHeapFlushStored();  // the setup() phases again, next to the summary below
+  if (!sHeapBurstOpen) platformHeapWindowStop();  // the IDF merges the window minimum: native value is exact again
+  const uint32_t nativeMin = platformMinFreeHeap();
+  DebugTf(PSTR("[HEAP] boot done reason=%s phases=%u allWinMin=%lu nativeMin=%lu outside=%d\r\n"),
+          pstrReason, (unsigned)sBootHeapPhases, (unsigned long)sBootHeapAllMin, (unsigned long)nativeMin,
+          (nativeMin < sBootHeapAllMin) ? 1 : 0);  // 1 = a dip outside every window
+}
+
+// Failsafe: a boot that never reaches the end of the discovery drip stops watching after 10 min.
+static void bootHeapTick() {
+  if (sBootHeapState == BOOTHEAP_RUN && millis() > 600000UL) bootHeapFinish(PSTR("timeout"));
 }
 
 static void heapBurstClose(const char *reason) {
   if (!sHeapBurstOpen) return;
   heapBurstFold();
   sHeapBurstOpen = false;
-  platformHeapWindowStop();
+  heapWinRelease();
   DebugTf(PSTR("[HEAP] burst end t=%lu reason=%s minWin=%lu lines=%u free=%u maxblk=%u\r\n"),
           (unsigned long)(millis() - sHeapBurstStartMs), reason,
           (unsigned long)sHeapBurstMin, (unsigned)sHeapBurstLines,
@@ -1117,6 +1207,7 @@ static void heapBurstClose(const char *reason) {
 // Called at the top of onMqttConnect, before anything is queued.
 static void heapBurstOpen() {
   heapBurstClose(PSTR("reconnect"));
+  heapBurstFold();  // TASK-1339: the start below restarts the shared window
   const uint32_t now = millis();
   sHeapBurstStartMs    = now;
   sHeapBurstLastLineMs = now;
@@ -1162,8 +1253,13 @@ static void heapDripTickEnd(int msgId, bool ok, uint32_t topicsBefore) {
   const uint32_t tickMin = platformHeapWindowMin();
   if (sHeapBurstOpen) {
     if (tickMin != 0 && tickMin < sHeapBurstMin) sHeapBurstMin = tickMin;  // the burst keeps the window running
-  } else {
+  } else if (sBootHeapState != BOOTHEAP_RUN) {
     platformHeapWindowStop();
+  }
+  if (sBootHeapState == BOOTHEAP_RUN) {
+    if (tickMin != 0 && tickMin < sBootHeapMin) sBootHeapMin = tickMin;
+    sBootHeapDripId = msgId;
+    bootHeapPhase(PSTR("drip"));  // window = previous tick end .. this tick end (gap plus tick)
   }
   // A message ID whose discovery keeps failing is retried every tick without
   // end; outside a burst window only its first failure is logged, so this
@@ -1186,7 +1282,8 @@ static void heapDripTickEnd(int msgId, bool ok, uint32_t topicsBefore) {
 
 void handleMQTT()
 {
-  if (!settings.mqtt.bEnable) { heapBurstClose(PSTR("disabled")); return; }  // TASK-1339: no-op unless a burst window is open
+  bootHeapTick();
+  if (!settings.mqtt.bEnable) { heapBurstClose(PSTR("disabled")); bootHeapFinish(PSTR("mqtt-off")); return; }  // TASK-1339: no-op unless a burst window is open
   DECLARE_TIMER_SEC(timerMQTTwaitforconnect, 42, CATCH_UP_MISSED_TICKS);   // wait before trying to connect again
   DECLARE_TIMER_SEC(timerMQTTwaitforretry, 3, CATCH_UP_MISSED_TICKS);     // wait for retry
 
@@ -1429,6 +1526,7 @@ void PrintMQTTError(){
 // unused (we always setCleanSession(true)).
 static void onMqttConnect(bool sessionPresent) {
   (void)sessionPresent;
+  if (sBootHeapState == BOOTHEAP_RUN) bootHeapPhase(PSTR("connect"));  // TASK-1339: closes wait-mqtt
   heapBurstOpen();  // TASK-1339 diagnostics: windowed heap minimum over the connect burst
   reconnectAttempts = 0;
   state.mqtt.bConnected = true;
@@ -2383,6 +2481,8 @@ void loopMQTTDiscovery()
       return;  // one attempt per tick regardless of success
     }
   }
+
+  bootHeapFinish(PSTR("drip-done"));  // TASK-1339 diagnostics: no discovery pending, boot is over
 
   // No discovery publish pending on this tick: spend it on the one-time clear of
   // the duplicate thermostat_ configs while that still has work (TASK-1201).

@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.h
-**  Version  : v2.0.0-alpha.508
+**  Version  : v2.0.0-alpha.509
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -270,6 +270,8 @@ bool     startDiscoveryVerification();
 bool     isDiscoveryVerificationActive();
 uint16_t countPendingDiscoveryIds();
 bool     discoveryDripHeapHealthy();   // ADR-170: drip's own restore predicate, reused by the daily auto-heal
+void     bootHeapPhase(const char *pstrName);  // TASK-1339 diagnostics: close the running boot heap window (log line), open the next
+struct BootHeapRec { const char *name; uint32_t ms, min, free, maxblk, outbox; uint8_t sburst, cburst; int16_t drip; };  // TASK-1339: one closed boot heap phase
 void     incPublishedTopicCount();    // called by streaming helpers in MQTTHaDiscovery.cpp (ADR-044 shim)
 void sendLogToWebSocket(const char* logMessage);
 

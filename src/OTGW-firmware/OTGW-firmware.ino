@@ -1,7 +1,7 @@
 /* 
 ***************************************************************************  
 **  Program  : OTGW-firmware.ino
-**  Version  : v2.0.0-alpha.508
+**  Version  : v2.0.0-alpha.509
 **
 **  Copyright (c) 2021-2026 Robert van den Breemen
 **
@@ -254,6 +254,7 @@ static void applyResolvedComboPins()
 
 //=====================================================================
 void setup() {
+  bootHeapPhase(PSTR("setup-early"));  // TASK-1339 diagnostics: windowed heap minimum over the boot path
 
   // Serial is initialized by OTGWSerial. It resets the pic and opens serialdevice.
   // OTGWSerial.begin();//OTGW Serial device that knows about OTGW PIC
@@ -315,6 +316,7 @@ void setup() {
   if (!LittleFSmounted) SetupDebugln(F("*** ERROR: LittleFS mount FAILED - running on compile-time defaults ***"));
   cacheBootFlashInfo();   // A: cache static flash/FS values once; used by /api/v2/device/info
   readSettings(true);
+  bootHeapPhase(PSTR("setup-net"));
   checklittlefshash();
   loadOtSupportFiles();  // TASK-693 port: warm the in-RAM support bitmaps from prior-boot knowledge
   loadDHWWaterMeter();   // TASK-1123: restore the DHW water total before any OT frame is decoded
@@ -355,6 +357,7 @@ void setup() {
 
   bool forceWifiPortal = shouldForceWifiConfigPortal();
   startWiFi(CSTR(settings.sHostname), 240, forceWifiPortal);  // timeout 240 seconds
+  bootHeapPhase(PSTR("setup-services"));
 
 #if defined(_VERSION_PRERELEASE)
   if (state.net.bAPFallback) {
@@ -502,6 +505,7 @@ void setup() {
   if (!state.net.bAPFallback)
 #endif
   startMQTT();               // start the MQTT after webserver, always.
+  bootHeapPhase(PSTR("setup-late"));
 
 #if defined(HAS_ETH_CAPABLE) && HAS_ETH_CAPABLE
   // [TASK-751] Probe the W5500; if a wired link with an IP is present, switch to
@@ -570,6 +574,7 @@ void setup() {
   // This prevents USB flash resets or stale RTC data from triggering the portal on next boot.
   clearWifiPortalResetState();
   triggerPICsettingsReadout();  // Start initial PIC settings discovery cycle
+  bootHeapPhase(PSTR("wait-mqtt"));  // setup() done; runs until onMqttConnect
   state.bSetupComplete = true; // ADR-036: allow doBackgroundTasks() to run service handlers
 }
 //=====================================================================

@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T07:29:00Z'
-updated_date: '2026-10-25T20:11:00Z'
+updated_date: '2026-10-25T21:47:00Z'
 labels:
   - heap
   - mqtt
@@ -56,4 +56,6 @@ Sergeant D capture 2026-10-24 06:41 UTC (alpha.486, transcript-20261024-093559-.
 2026-10-25 correction: the bench unit at 192.168.88.61 (MAC 10:20:BA:21:B4:F8) used for this task's evidence was NOT the OTGW32 (Robert: OTGW32 not connected in the 48 h before 2026-10-25 evening). It was an ESP32-S3 without PIC and without boiler running the combo image in OT-Direct mode (ADR-160 bench default). The evidence stands as 'combo image, OT-Direct mode, no boiler'; any 'OTGW32' wording in earlier notes is wrong.
 
 2026-10-25 correction 2: Robert confirmed the .88.61 unit (MAC 10:20:BA:21:B4:F8) is an S3 WITH a PIC; it ran in OT-Direct mode because the PIC was not detected at boot (TASK-1399). So the evidence is 'combo image in OT-Direct mode on a board whose PIC was not detected', not PIC-gateway behaviour.
+
+2026-10-25 Robert approved widening the diagnostics. Boot-path heap windows added (diagnostic only): consecutive IDF windows setup-early / setup-net / setup-services / setup-late / wait-mqtt / connect / drip from setup() until the boot discovery drip drains (or mqtt-off, or 10-min timeout); one line per phase '[HEAP] boot win=.. minWin=.. free=.. maxblk=.. outbox=.. sburst connburst drip' and a summary '[HEAP] boot done ... allWinMin=.. nativeMin=.. outside=0|1' (outside=1 = a dip fell outside every window). setup() phase lines are stored and printed at end of setup() and again at boot done.
 <!-- SECTION:NOTES:END -->
