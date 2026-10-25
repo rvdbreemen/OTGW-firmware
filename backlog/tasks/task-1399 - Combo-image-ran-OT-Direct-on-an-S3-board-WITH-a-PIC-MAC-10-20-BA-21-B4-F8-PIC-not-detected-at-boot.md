@@ -6,6 +6,7 @@ title: >-
 status: To Do
 assignee: []
 created_date: '2026-10-25T20:10:00Z'
+updated_date: '2026-10-25T20:32:00Z'
 labels:
   - combo
   - pic
@@ -26,3 +27,9 @@ ordinal: 538000
 - [ ] #1 Cause named with evidence: telnet [combo] detect line and PR=A/PIC banner on that board, carrier/power checked
 - [ ] #2 If detection bug: fix with old-vs-fix on that board (combo detect line + otcommandinterface PIC)
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-25 (ADR-201 drafting): 'all 3 probes failed every boot' holds only if that unit was in auto (iBoardMode 0); in forced mode 2 it is one probe per boot. Check iBoardMode on that unit first.
+<!-- SECTION:NOTES:END -->

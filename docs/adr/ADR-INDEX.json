@@ -7222,6 +7222,76 @@
         ],
         "superseded_by": null
       }
+    },
+    {
+      "id": "ADR-201",
+      "title": "Combo board detection persists only a positive PIC verdict and re-probes every boot (supersedes ADR-164)",
+      "path": "ADR-201-combo-board-detection-persists-only-a-positive-pic-verdict-and-re-probes-every-boot-supersedes-adr-164.md",
+      "format": "canonical",
+      "status": "Proposed",
+      "date": "2026-10-25",
+      "decision_summary": "On the combo board, boot detection persists only a positive PIC verdict, and every boot that is not already a persist...",
+      "topics": [
+        "board-detection",
+        "board-mode",
+        "boot",
+        "combo",
+        "otdirect",
+        "pic"
+      ],
+      "aliases": [
+        "asymmetric persist",
+        "board mode persistence",
+        "combo board detection",
+        "iBoardMode auto detection",
+        "PIC probe at boot"
+      ],
+      "components": [
+        "Combo hardware-mode resolution"
+      ],
+      "symbols": [
+        "activePicRst",
+        "applyResolvedComboPins",
+        "comboActivePinMap",
+        "detectPIC",
+        "iBoardMode",
+        "initOTDirect",
+        "isPICEnabled"
+      ],
+      "context_scope": "selective",
+      "decision_contract": {
+        "must": [
+          "Persist a detection verdict into settings.iBoardMode only when a PIC was found, and then only as 1 or 3 (OTGW-firmware.ino:431,450, :392-393, OTGW-Core.ino:5647-5650).",
+          "Run the PIC probe on every boot in auto mode and in forced OT-Direct mode.",
+          "Close the PIC UART (OTGWSerial.end()) before initOTDirect() whenever no PIC was found (OTGW-firmware.ino:397,444)."
+        ],
+        "must_not": [
+          "Must not write iBoardMode = 2 from any detection path.",
+          "Must not skip the PIC probe on a board whose iBoardMode is 2."
+        ],
+        "exceptions": [
+          "None. A user can still set any mode by hand; this ADR governs only what the firmware writes on its own."
+        ],
+        "verification": [
+          "Code review of the #if HASRUNTIMEHWDETECT block at OTGW-firmware.ino:375-466 and of OTGW-Core.ino:5647-5650 against the Must and Must Not lists.",
+          "On device: the [combo] detect: eMode=... picEnabled=... boardMode=... line on the USB console (OTGW-firmware.ino:461-463) and the same record in /bootdetect.log (:466). Expected: a Classic board shows boardMode 1 or 3 after its first PIC...",
+          "Bench, 2026-07-09 (TASK-1031 notes, alpha.341, the maintainer's S3 Mini Pro combo): boardmode=2 forced on a board with a live PIC corrected itself to boardmode=3, PIC mode, on the next boot. That exercised the forced OT-Direct recovery p...",
+          "No automated gate exists (guideline-level per ADR-080)."
+        ]
+      },
+      "scope": {
+        "path_globs": []
+      },
+      "metadata": {
+        "binding": false,
+        "gate": null,
+        "documents_shipped": true,
+        "verified_in": [
+          "commit:2a820ac11"
+        ],
+        "supersedes": [],
+        "superseded_by": null
+      }
     }
   ],
   "relationships": [
@@ -12826,6 +12896,42 @@
     {
       "source": "ADR-200",
       "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-201",
+      "target": "ADR-080",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-201",
+      "target": "ADR-125",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-201",
+      "target": "ADR-127",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-201",
+      "target": "ADR-158",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-201",
+      "target": "ADR-160",
+      "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-201",
+      "target": "ADR-164",
       "type": "related",
       "resolved": true
     }

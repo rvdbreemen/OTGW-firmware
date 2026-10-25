@@ -206,3 +206,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-198 | Proposed | - | SAT keeps thermo-nova's convex heating curve with one user coefficient, default 2.0, and a base offset chosen by the... |
 | ADR-199 | Proposed | - | While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev... |
 | ADR-200 | Accepted | - | The GPIO output follows one bit of the 16-bit MsgID 0 status word Statusflags = (MasterStatus << 8) \| SlaveStatus (OT... |
+| ADR-201 | Proposed | - | On the combo board, boot detection persists only a positive PIC verdict, and every boot that is not already a persist... |
