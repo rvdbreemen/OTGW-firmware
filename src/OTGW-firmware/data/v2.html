@@ -83,9 +83,9 @@
     function loadFontsSequentially(){
       if (!window.FontFace) return;   // very old browser: page still works, system-font fallback
       var fonts = [
-        { family: 'Inter',          url: '/fonts/inter-400.woff2',          weight: '400' },
-        { family: 'Inter',          url: '/fonts/inter-700.woff2',          weight: '700' },
-        { family: 'JetBrains Mono', url: '/fonts/jetbrains-mono-400.woff2', weight: '400' }
+        { family: 'Inter',          url: 'fonts/inter-400.woff2',          weight: '400' },
+        { family: 'Inter',          url: 'fonts/inter-700.woff2',          weight: '700' },
+        { family: 'JetBrains Mono', url: 'fonts/jetbrains-mono-400.woff2', weight: '400' }
       ];
       function loadOne(i){
         if (i >= fonts.length) return;
