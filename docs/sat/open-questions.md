@@ -35,7 +35,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q9 | answered (entry 41: 60 s) -> TASK-1367 | Continuous to PWM: 60 s or 3 minutes of overshoot? (audit #12, conflict C1) | - |
 | Q10 | answered (entry 42: fixed 60 s) -> TASK-1368 | PID update rate: fixed 60 s as thermo-nova, or the control tick? (audit #14) | ADR-197 |
 | Q11 | answered (entry 43: ON first) -> TASK-1369 | First PWM phase after PWM starts: ON at once (thermo-nova) or OFF? (audit #17) | - |
-| Q12 | asked again with more detail 2026-10-24 21:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563666349450985620)) | Hourly start cap: count hot-water ignitions or not? (audit #18) | - |
+| Q12 | asked again with more detail 2026-10-24 21:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563666349450985620)) | Hourly start cap: count hot-water ignitions or not? (audit #18) Field evidence 2026-10-25 (gruijter alpha.500, Intergas): telnet 'cycles/hr=3' at 06:53:08; the ON at ~07:35 coincides with the boot start ageing out; the ON at ~08:35 comes one hour after the ~07:35 hot-water ignition (about 20 min of heating lost); BurnerStarts +15 against 6 visible ignitions. | - |
 | Q13 | answered (entry 44: every update) -> TASK-1370 | CS/MM/CH refresh: every 5 s as thermo-nova, or on change + 300 s? (audit #24) | ADR-199 |
 | Q14 | answered (entry 45: flow-based start, CS/PM=25 flood, MI=500) -> TASK-1371 | PWM ignition hold without a return temperature sensor (audit #27) | - |
 | Q15 | answered (entry 48: a MaxTSet slider bounded by MsgID 57, sent to the boiler) -> TASK-1373 | Maximum flow setpoint: a user setting, and which defaults? (audit #29) | - |
