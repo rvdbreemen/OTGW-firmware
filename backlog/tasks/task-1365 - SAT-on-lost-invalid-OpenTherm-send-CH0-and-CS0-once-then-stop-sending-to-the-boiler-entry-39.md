@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-25T08:23:00Z'
+updated_date: '2026-10-25T09:02:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -24,9 +24,9 @@ Sergeant D 2026-10-24 (entry 39): if the software has no valid OT, SAT stops: CH
 
 ## Acceptance Criteria
 <!-- AC:BEGIN -->
-- [ ] #1 On OT loss SAT sends CS=0, CH=1, MM=T exactly once (entry 47), then nothing to the boiler while the loss lasts (host test red on old, green on fix)
+- [x] #1 On OT loss SAT sends CS=0, CH=1, MM=T exactly once (entry 47), then nothing to the boiler while the loss lasts (host test red on old, green on fix)
 - [ ] #2 What counts as lost (30 s, Data-Invalid) and whether SAT resumes by itself are answered by Sergeant D (Q33, Q34) and recorded before commit
-- [ ] #3 No false hand-back on PIC PS=1 enter/leave, a late first loop pass, or millis wrap (host tests)
+- [x] #3 No false hand-back on PIC PS=1 enter/leave, a late first loop pass, or millis wrap (host tests)
 <!-- AC:END -->
 
 ## Implementation Plan
@@ -194,4 +194,6 @@ Sergeant D entries:
 2026-10-25: two workflows ran on this task (orphaned wf_73ecbf70 from before /clear wrote the code; wf_4c6959ba reviewed it). Review findings A (PS=1 exemption PIC-only, hold not resume), D (boot baseline seed), F (wrap-proof stamp resume) are in the tree; E documented; G (MsgID 1 ownership while lost) and H (satDisable wipes PID/HCR) go into Q34. Blocking: Q33/Q34 to Sergeant D; test_sat_ot_loss.py needs the psleave/pslost/otdps/late/wrap cases.
 
 2026-10-25 Robert decided (interactive): commit provisionally now, mark the behaviour provisional in docs/task, keep the task In Progress until Q33/Q34 are answered; a different answer from Sergeant D becomes a follow-up change. Verification this session: test_sat_ot_loss 21/21 OK on fix, HEAD FAILED (failures=10, errors=2); all tests/test_sat_*.py + test_otd_ch_override OK; evaluate --quick exit 0, 0 failed.
+
+2026-10-25 bench alpha.501+6948ad5 on OTGW32 (OT-Direct, no boiler, SAT on, simulation off), app then fs over OTA, 177 settings kept. (1) Boot without boiler: ot_link_lost true ~30 s after SAT's first pass (09:55:11), 'OpenTherm lost: boiler handed back', OT-Direct write overrides empty afterwards (CS and MM released), 0 OTD commands for the next 2 min. (2) OT replay start (POST /api/v2/simulate/start): 09:59:01 'OpenTherm back: SAT resumes', CS=23.0/MM=100/CH=1 re-sent. (3) Replay stop ~09:59:48: 10:00:18 (30 s later) CS=0, CH=1, MM=T once, then 0 OTD commands until capture end 10:01:48. Logs in the session scratchpad (telnet501.txt, telnet501b.txt). AC#2 open: Q33 asked, Q34 queued.
 <!-- SECTION:NOTES:END -->
