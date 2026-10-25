@@ -89,7 +89,7 @@ server {{
   listen 19443 ssl;
   ssl_certificate     /certs/rig.crt;
   ssl_certificate_key /certs/rig.key;
-  client_max_body_size 2m;
+  client_max_body_size 4m;
 
   location /otgw/ {{
     proxy_pass http://{device}/;
@@ -165,8 +165,11 @@ def wait_ha():
     """Wait until HA answers its auth endpoint; return the onboarding steps."""
     for _ in range(180):
         try:
-            with urllib.request.urlopen(HA_URL + "/auth/providers", timeout=5):
-                pass
+            try:
+                with urllib.request.urlopen(HA_URL + "/auth/providers", timeout=5):
+                    pass
+            except urllib.error.HTTPError:
+                pass  # any HTTP answer means up; before onboarding this one is 400
             try:
                 with urllib.request.urlopen(HA_URL + "/api/onboarding", timeout=5) as r:
                     return json.loads(r.read().decode())

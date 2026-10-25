@@ -84,6 +84,39 @@ flashed: ok in 43.8 s, uptime 4 to 0 min, reboot log `[OTA] Rebooting...`, the p
 returned to the UI inside the panel. LittleFS OTA and PIC flashing through a proxy
 were not tested.
 
+## LittleFS OTA through a proxy (added 2026-10-25, build 1.7.8-beta.6+fda6b09)
+
+Firmware fda6b09 flashed directly first, so firmware and image match.
+- HA ingress (HTTPS), the update page's own form: ok, 47.8 s
+  (`ota_via_ingress_filesystem.json`: upload 2072817/2072817, "Flash complete
+  (backend confirmed)", uptime 8 to 0 min). A first run before it also wrote the
+  image: `version.hash` changed 54cbe02 to fda6b09; its success detector missed the
+  reboot because the uptime was already 0 min (fixed: the script now also counts
+  "device went away and came back").
+- `settings.ini` identical before and after (diff of the downloaded files).
+- nginx sub-path (HTTPS), curl mimicking the page's XHR: HTTP 200 in 38.2 s,
+  2072833 bytes sent, device rebooted (uptime 0, reboot log `[OTA] Rebooting...`).
+  The guide's nginx example now uses `client_max_body_size 4m`: 2m left 24 KB of
+  margin.
+
+## PIC flash through a proxy: dry run (no PIC write)
+
+`pic_flash_dryrun.json`, `pic_dryrun_*.png`. The PIC page was opened through HA
+ingress (HTTPS) and through nginx, and the real flash icon was clicked. A
+context-wide browser route answered every request containing `action=upgrade`
+locally, so the request never reached the network; a canary request
+(`favicon.ico?action=upgrade`) had to come back from that route before the click.
+Both proxies: file list `diagnose.hex`, `gateway.hex`, `interface.hex` via
+`/api/v2/firmware/files` 200; icons and the flash request on the proxy path
+(`.../api/ingress/otgw/pic?action=upgrade&name=diagnose.hex`,
+`.../otgw-keephost/pic?action=upgrade&name=diagnose.hex`); progress polling
+`/api/v2/flash/status` 200 through the proxy; 0 requests outside the proxy path.
+Afterwards the device still reported PIC gateway 6.8 and `flashing: false`.
+Progress during a flash rides on that HTTP poll (ADR-025); the live-log WebSocket
+the page also tries is caught (`try` around `new WebSocket`) and is not needed.
+A real PIC flash through a proxy was not run (needs the maintainer's explicit go
+per flash).
+
 ## Free heap during the proxied session
 
 After each scenario (`device_heap_after` in `results_fix.json`): free heap
@@ -104,7 +137,8 @@ and the link opens the classic UI (`fix_ha_visit_opened.png`).
 
 ## Not verified
 
-- LittleFS OTA and PIC flashing through a proxy.
+- A real PIC flash through a proxy (dry run only, see above).
+- LittleFS OTA through nginx from the browser page (only curl mimicking it).
 - Caddy or Traefik in front of the gateway (only nginx).
 - Nabu Casa remote access (same ingress path, not run).
 - A real browser's basic-auth prompt inside the HA panel (the test browser answered

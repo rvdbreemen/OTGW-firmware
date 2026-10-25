@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Flash firmware through the HA ingress panel, using the device's own update
-page, to see whether OTA survives the proxy (TASK-1378). Needs the rig from
-setup_rig.py. Writes a screenshot and the page log to out/ota/.
+"""Flash firmware or the LittleFS image through the HA ingress panel, using the
+device's own update page, to see whether OTA survives the proxy (TASK-1378).
+Needs the rig from setup_rig.py. Writes a screenshot and the page log to out/ota/.
 
     python scripts/ha-ingress-rig/ota_via_ingress.py --firmware build/<name>.ino.bin
+    python scripts/ha-ingress-rig/ota_via_ingress.py --filesystem build/<name>.littlefs.bin
 
 Recovery if the upload drops: see docs/guides/REVERSE_PROXY_AND_HA_INGRESS.md.
 """
@@ -34,7 +35,9 @@ def device_info(dev):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--firmware", required=True)
+    image = ap.add_mutually_exclusive_group(required=True)
+    image.add_argument("--firmware", help="<name>.ino.bin")
+    image.add_argument("--filesystem", help="<name>.littlefs.bin")
     ap.add_argument("--panel", default="otgw")
     args = ap.parse_args()
     state = json.loads((RUNTIME / "rig.json").read_text())
@@ -53,27 +56,37 @@ def main():
         page.goto(f"{HA_HTTPS}/{args.panel}", wait_until="domcontentloaded", timeout=60000)
         frame = find_ui_frame(page, f"/api/ingress/{args.panel}/")
         frame.goto(frame.url.split("#")[0].rsplit("/", 1)[0] + "/update", wait_until="domcontentloaded")
-        frame.set_input_files("#fwForm input[name='firmware']", args.firmware)
+        if args.firmware:
+            frame.set_input_files("#fwForm input[name='firmware']", args.firmware)
+            submit = "#fwSubmit"
+        else:
+            frame.set_input_files("#fsForm input[name='filesystem']", args.filesystem)
+            submit = "#fsSubmit"
         t0 = time.time()
-        frame.click("#fwSubmit")
+        frame.click(submit)
         result = "timeout"
-        for _ in range(120):
+        seen_offline = False
+        for _ in range(240):
             page.wait_for_timeout(2000)
             try:
                 text = frame.evaluate("document.body.innerText")
             except Exception:  # noqa: BLE001  frame navigated (redirect to the UI)
                 text = ""
             v, up = device_info(dev)
-            # Flashing the same build keeps the version, so a reboot (uptime back
-            # to near zero) after the upload is the success signal.
-            if "back online" in text.lower() or (v and (v != before or up < up_before) and time.time() - t0 > 20):
+            seen_offline = seen_offline or v is None
+            # Flashing the same build keeps the version, so the reboot after the
+            # upload is the success signal: the device went away and came back,
+            # or its uptime dropped.
+            if "back online" in text.lower() or (v and (seen_offline or v != before or up < up_before)
+                                                 and time.time() - t0 > 20):
                 result = "ok"
                 break
             on_update_page = "/update" in frame.url if not frame.is_detached() else False
             if on_update_page and "failed" in text.lower():
                 result = "failed: " + text[-300:]
                 break
-        page.screenshot(path=str(out / "ota_via_ingress.png"))
+        kind = "firmware" if args.firmware else "filesystem"
+        page.screenshot(path=str(out / f"ota_via_ingress_{kind}.png"))
         browser.close()
     after, up_after = None, None
     for _ in range(30):
@@ -81,10 +94,10 @@ def main():
         if after:
             break
         time.sleep(3)
-    rep = {"result": result, "seconds": round(time.time() - t0, 1), "before": before, "after": after,
+    rep = {"image": kind, "result": result, "seconds": round(time.time() - t0, 1), "before": before, "after": after,
            "uptime_min_before": up_before, "uptime_min_after": up_after,
            "console_tail": log[-15:]}
-    (out / "ota_via_ingress.json").write_text(json.dumps(rep, indent=2))
+    (out / f"ota_via_ingress_{kind}.json").write_text(json.dumps(rep, indent=2))
     print(json.dumps(rep, indent=1))
 
 

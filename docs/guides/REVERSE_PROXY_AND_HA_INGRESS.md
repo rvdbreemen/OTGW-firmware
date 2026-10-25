@@ -129,7 +129,7 @@ location /otgw/ {
     proxy_set_header X-Forwarded-Proto $scheme;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     proxy_request_buffering off;               # stream firmware uploads
-    client_max_body_size 2m;                   # firmware ~0.8 MB, LittleFS image ~2 MB
+    client_max_body_size 4m;                   # firmware ~0.8 MB, LittleFS image ~2 MB
 }
 ```
 
@@ -143,12 +143,19 @@ location /otgw/ {
 
 ## Firmware updates and PIC flashing through a proxy
 
-- **Firmware update** through the HA ingress panel (HTTPS) was tested and works
-  (upload, flash and reboot in about 45 s; the page returns to the UI inside
-  the panel).
-- **LittleFS (filesystem) update** through a proxy was not tested. Use direct
-  access (`http://<gateway-ip>/update`) for it.
-- **PIC firmware flashing** through a proxy was not tested. Use direct access.
+- **Firmware update** through the HA ingress panel (HTTPS) works: upload, flash
+  and reboot in about 45 s; the page returns to the UI inside the panel.
+- **LittleFS (filesystem) update** works through the HA ingress panel (about
+  48 s) and through nginx (about 38 s). Your settings are kept, as with direct
+  access. The image is about 2 MB, so the proxy must accept a body of that size
+  (nginx: `client_max_body_size 4m`).
+- **PIC firmware flashing**: the PIC page, the file list and the flash progress
+  work through the proxy, and the flash request goes to the gateway on the proxy
+  path. The flash itself runs on the gateway (ESP to PIC over serial), not
+  through the proxy. A real PIC flash through a proxy has not been done on the
+  bench, only a dry run in which the browser held back the final flash request.
+  Until it has, flash the PIC over direct access: an interrupted PIC flash can
+  brick the PIC.
 - If an update through a proxy stops halfway, open the gateway directly and run it
   again from `http://<gateway-ip>/update`.
 
@@ -172,6 +179,8 @@ classic UI against a real gateway in headless Chromium:
 python scripts/ha-ingress-rig/setup_rig.py --device <gateway-ip> --broker <broker-ip>:1883
 python scripts/ha-ingress-rig/validate_ingress.py --label check [--password <gateway admin pw>]
 python scripts/ha-ingress-rig/ota_via_ingress.py --firmware build/<name>.ino.bin
+python scripts/ha-ingress-rig/ota_via_ingress.py --filesystem build/<name>.littlefs.bin
+python scripts/ha-ingress-rig/pic_flash_dryrun.py --label check   # never writes the PIC
 python scripts/ha-ingress-rig/ha_device_page.py --label check
 python scripts/ha-ingress-rig/setup_rig.py --down
 ```

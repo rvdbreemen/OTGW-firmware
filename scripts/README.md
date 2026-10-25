@@ -117,6 +117,8 @@ headless Chromium (TASK-1378). Needs Docker and Playwright for Python.
 python scripts/ha-ingress-rig/setup_rig.py --device <gateway-ip> --broker <broker-ip>:1883
 python scripts/ha-ingress-rig/validate_ingress.py --label check [--password <gateway admin pw>]
 python scripts/ha-ingress-rig/ota_via_ingress.py --firmware build/<name>.ino.bin
+python scripts/ha-ingress-rig/ota_via_ingress.py --filesystem build/<name>.littlefs.bin
+python scripts/ha-ingress-rig/pic_flash_dryrun.py --label check   # never writes the PIC
 python scripts/ha-ingress-rig/ha_device_page.py --label check
 python scripts/ha-ingress-rig/setup_rig.py --down
 ```

@@ -1,0 +1,26 @@
+{
+  "image": "filesystem",
+  "result": "ok",
+  "seconds": 47.8,
+  "before": "1.7.8-beta.6+fda6b09",
+  "after": "1.7.8-beta.6+fda6b09",
+  "uptime_min_before": 8,
+  "uptime_min_after": 0,
+  "console_tail": [
+    "[OTA] State: Sending FormData via XHR",
+    "[OTA] Progress: 100% (2072817/2072817)",
+    "[OTA] State: Flash complete (backend confirmed), device rebooting",
+    "[OTA] State: Waiting for device reboot",
+    "[OTA] Health check: GET /api/v2/health?t=1792929752205",
+    "[OTA] Health check: GET /api/v2/health?t=1792929753207",
+    "[OTA] Health check: GET /api/v2/health?t=1792929754216",
+    "[OTA] Health check: GET /api/v2/health?t=1792929755205",
+    "[OTA] Health check: GET /api/v2/health?t=1792929756203",
+    "[OTA] Health check: GET /api/v2/health?t=1792929757203",
+    "[OTA] Health check: GET /api/v2/health?t=1792929758206",
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy",
+    "[OTA] State: Device is healthy"
+  ]
+}
