@@ -30,7 +30,7 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q4 | answered (entry 55: option A) -> TASK-1387 | Classifier steps the firmware keeps that classifier.py does not have | TASK-1331 |
 | Q5 | dropped: decided by the maintainer 2026-10-24 (opt-in setting, default off; the fallback lives in state only) -> TASK-1345 | Fallback after an MQTT outage: which units may SAT take over? (audit #2) | - |
 | Q6 | answered (entry 38: curve only, no P) -> TASK-1364 | Room temperature lost or missing: stop SAT, or keep heating on curve + P as thermo-nova? Which stale time? (audit #4, entry 27, conflict C8) | - |
-| Q7 | clarification asked 2026-10-24 21:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563666350818463826)); his OT-loss rule is entry 39 -> TASK-1365 | Outside temperature missing or old: what should SAT use? (audit #5) | - |
+| Q7 | clarification asked 2026-10-24 21:31 UTC, asked again 2026-10-25 12:20 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563666350818463826)); his OT-loss rule is entry 39 -> TASK-1365 | Outside temperature missing or old: what should SAT use? (audit #5) | - |
 | Q8 | answered (entry 40: min ON 180 s, cycle 1800/2400 s) -> TASK-1366 | Heat pumps in PWM: minimum on-time and cycles per hour (audit #9, conflicts C3/C4) | - |
 | Q9 | answered (entry 41: 60 s) -> TASK-1367 | Continuous to PWM: 60 s or 3 minutes of overshoot? (audit #12, conflict C1) | - |
 | Q10 | answered (entry 42: fixed 60 s) -> TASK-1368 | PID update rate: fixed 60 s as thermo-nova, or the control tick? (audit #14) | ADR-197 |
