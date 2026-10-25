@@ -2826,3 +2826,36 @@ so it must follow classifier.py.
 **Task:** TASK-1387 (prerequisite for TASK-1331).
 
 **Open:** none.
+
+## 56. Outside temperature missing or old: stop SAT at once (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 12:37 UTC, answer to Q7 (asked again 12:34 UTC, message
+1563893593339338803: A) keep the last value for a few hours, then stop SAT as for lost OT; B) stop
+SAT at once; C) something else; our advice A):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563894284694982677
+
+**Quoted:**
+
+> Q7: I prefer option B.
+
+**Settled by this statement:**
+
+- When the outside temperature is missing or old, SAT stops at once; it does not keep the last
+  value. This also closes the Q7 clarification of 2026-10-24 (his entry 39 rule was about lost
+  OpenTherm; this is the outside-temperature rule).
+
+**Interpretation (ours, asked as Q7b):** "stop" = the same hand-back as lost OpenTherm (entry 47:
+CS=0, CH=1, MM=T once, then silent) and SAT resumes when a fresh value returns. What counts as "old"
+is not settled.
+
+**Compared with thermo-nova and the firmware:** thermo-nova returns early from the control loop when
+the outside temperature is None (climate.py:544-545), so it stops sending, without a hand-back.
+Firmware: `satGetOutsideTemp()` (`SATcontrol.ino:1495-1515`) falls back external (10 min stale,
+`:142`, `:1503`) -> weather (`bValid` is never reset, so a failed fetch keeps an old value) -> OT
+MsgID 27 (0.0 without a sensor): with no source SAT silently heats on a curve for 0 °C.
+
+**Changes an earlier entry:** none.
+
+**Task:** TASK-1390.
+
+**Open:** the age threshold and the hand-back form (Q7b).
