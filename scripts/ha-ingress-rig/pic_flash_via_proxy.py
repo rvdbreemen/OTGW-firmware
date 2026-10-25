@@ -78,8 +78,12 @@ def main():
         t0 = time.time()
         frame.evaluate("(a) => a[0].click()", icons)
         done = None
+        texts = []
         for _ in range(120):  # up to ~6 min
             page.wait_for_timeout(3000)
+            t = frame.evaluate("(document.getElementById('flashPercentageText') || {}).textContent || null")
+            if not texts or texts[-1] != t:
+                texts.append(t)
             fs = device(dev, "/api/v2/flash/status").get("flashstatus", {})
             if refused:
                 done = "refused"
@@ -89,6 +93,13 @@ def main():
                         "pic_filename": fs.get("pic_filename")}
                 break
         rep["seconds"] = round(time.time() - t0, 1)
+        for _ in range(10):  # let the page finish its own completion handling
+            page.wait_for_timeout(1000)
+            t = frame.evaluate("(document.getElementById('flashPercentageText') || {}).textContent || null")
+            if texts[-1] != t:
+                texts.append(t)
+        rep["progress_texts_seen"] = texts
+        rep["page_disabled_after"] = frame.evaluate("document.body.classList.contains('disable-interaction')")
         rep["progress_text"] = frame.evaluate(
             "(document.getElementById('flashPercentageText') || {}).textContent || null")
         page.screenshot(path=str(out / "pic_flash_via_ingress.png"))

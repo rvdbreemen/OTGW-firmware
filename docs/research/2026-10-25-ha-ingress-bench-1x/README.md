@@ -145,7 +145,12 @@ scripted in the browser (`pic_flash_ui_sim.py`; first poll: an earlier flash's
 - fix flashed to the gateway (d54a3c4 firmware + LittleFS) and run against the
   served page: same result (`pic_flash_ui_sim_device.json`). Regression matrix
   `validate_ingress.py` on that build: 5/5 PASS.
-A second real PIC flash with the fixed page was not run.
+Second real flash, fixed page (d54a3c4), maintainer's go, `gateway.hex` 6.8 through
+HA ingress (HTTPS), `pic_flash_via_ingress_fix.json`, `pic_real_flash_ha_https_fix.png`:
+flash OK in 34.1 s, PIC gateway 6.8 before and after; the page showed "started...",
+15 %, 33 %, 51 %, 69 %, 87 %, "Successfully flashed to Gateway 6.8", "Ready to flash"
+(7 status polls, all 200) and was usable afterwards. First real flash with the old
+page: same flash result, page stuck on "started..." after 1 poll.
 
 ## Free heap during the proxied session
 
