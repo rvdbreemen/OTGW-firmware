@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T21:41:00Z'
-updated_date: '2026-10-24T22:01:00Z'
+updated_date: '2026-10-25T05:31:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -186,4 +186,6 @@ Sergeant D entries:
 
 <!-- SECTION:NOTES:BEGIN -->
 2026-10-25: plan (second-read) stored; waiting for Sergeant D's OK on the open question (open-questions Q29/Q30/Q31) before implementation, per CLAUDE.md SAT rules.
+
+2026-10-25 04:33 UTC Sergeant D answered Q30 (entry 47): option B, final message CS=0, CH=1, MM=T (same as satDisable), then nothing. Remaining plan points (no-valid-OT = no boiler reply for 30 s; automatic resume) are our design, stated in the plan; ready to implement.
 <!-- SECTION:NOTES:END -->

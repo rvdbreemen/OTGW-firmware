@@ -2553,3 +2553,36 @@ and D.
 
 **Open:** the stale time per source (entry 27, conflict C8) and whether the error statistics and the
 published error should read 0 or "unknown" during the loss.
+
+## 47. Lost OpenTherm: hand the boiler back like a user switch-off (CS=0, CH=1, MM=T), then send nothing (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 04:33 UTC, answer to Q30 (04:31 UTC, message
+1563771986558193705: which final message should SAT send when OpenTherm is lost? A) CH=0 then CS=0;
+B) CS=0, CH=1, MM=T (the same hand-back as a user switch-off); C) CH=0, CS=0, MM=T; our advice B):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563772498586378281
+
+**Quoted:**
+
+> @BlueFlame Bot I agree option B is better
+
+**Settled by this statement:**
+
+- When SAT finds no valid OpenTherm, it stops and sends, once, the same hand-back as a user
+  switch-off: `CS=0`, `CH=1`, `MM=T` (`satDisable()`, TASK-1346 and TASK-1344), and then sends
+  nothing more to the boiler.
+- This replaces the literal `CH=0, CS=0` of entry 39 for the final message, because the gateway
+  applies `CH=` only while a CS override is active and a stored `CH=0` would block an on/off
+  thermostat on a PIC gateway (`gateway.asm:2719-2723`); the thermostat stays the backup (entry 26).
+
+**Compared with thermo-nova and the firmware:** thermo-nova has no stop on a lost link; on shutdown it
+sends `CS=0` and clears MM without CH (`coordinator/serial/__init__.py:228-231`). Firmware today: see
+the TASK-1365 plan (no dedicated OT-loss stop).
+
+**Changes an earlier entry:** entry 39 (the final message only; "SAT stops and then sends nothing"
+stays).
+
+**Task:** TASK-1365.
+
+**Open:** what counts as "no valid OpenTherm" (the plan proposes no boiler reply for 30 s) and
+whether SAT resumes by itself when OpenTherm returns (the plan recommends automatic resume); both
+are in the TASK-1365 plan and not yet confirmed by him.

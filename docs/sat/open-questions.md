@@ -52,8 +52,8 @@ Status values: **queued** (not asked yet), **asked** (waiting for the answer),
 | Q27 | queued | Derivative details: 'no change' threshold 0.001 vs exactly 0, and the reference temperature that moves only with the derivative time (thermo-nova pid.py:171, :211): match thermo-nova? (ADR-197, audit #38/#40) | ADR-197 |
 | Q28 | queued | Integral with Ki near 0 skips the clamp (SATpid.ino:166) and no rounding of gains/terms/output (pid.py:71-132): match thermo-nova? (ADR-197, audit #38) | ADR-197 |
 | Q29 | answered (entry 46: reset P, I and D to 0) -> TASK-1364 | TASK-1364 (entry 38): while the room temperature is missing, reset I and D to 0 (thermo-nova on a stale sensor) or freeze them? | TASK-1364 |
-| Q30 | asked 2026-10-25 04:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563771986558193705)) | TASK-1365 (entry 39): final message on lost OpenTherm: A) CH=0, CS=0 (literal), B) CS=0, CH=1, MM=T (same hand-back as switching SAT off), C) CH=0, CS=0, MM=T? | TASK-1365 |
-| Q31 | queued | TASK-1366 (entry 40): heat pump PWM: min ON 180 s with cycle length 1800/2400 s (his answer) or 2/3 cycles per hour as thermo-nova config_flow.py:686-693? | TASK-1366 |
+| Q30 | answered (entry 47: option B) -> TASK-1365 | TASK-1365 (entry 39): final message on lost OpenTherm: A) CH=0, CS=0 (literal), B) CS=0, CH=1, MM=T (same hand-back as switching SAT off), C) CH=0, CS=0, MM=T? | TASK-1365 |
+| Q31 | asked 2026-10-25 05:31 UTC ([msg](https://discord.com/channels/812969634638725140/1514720723980259460/1563787079249297559)) | TASK-1366 (entry 40): heat pump PWM: min ON 180 s with cycle length 1800/2400 s (his answer) or 2/3 cycles per hour as thermo-nova config_flow.py:686-693? | TASK-1366 |
 
 Questions Q5 onwards come from the SAT port audit of 2026-10-24
 ([`sat-port-audit-2026-10-24.md`](sat-port-audit-2026-10-24.md)); the numbers in brackets are its
