@@ -7,7 +7,7 @@ status: In Progress
 assignee:
   - '@claude'
 created_date: '2026-10-24T07:29:00Z'
-updated_date: '2026-10-24T08:21:00Z'
+updated_date: '2026-10-25T11:08:00Z'
 labels:
   - heap
   - mqtt
@@ -38,4 +38,6 @@ Sergeant D capture 2026-10-24 06:41 UTC (alpha.486, transcript-20261024-093559-.
 2026-10-24 bench (OTGW32 alpha.486, OT-Direct, no boiler, SAT on, BLE off, local mosquitto; reboot, read hd_min_free_heap after ~90 s, no telnet): broker by IP: 23036, 26036, 21280 B; broker by IP with the router throttling the unit to 64 kbit/s: 24572 B (slow-broker hypothesis not supported); broker by mDNS name Laptop-Robert.local: 14188, 25732, 12772 B. mDNS runs are lower in 2 of 3, so name resolution may add a ~9-11 KB transient, but the spread is too large to call it; none reached his 1.5 KB. Asked Sergeant D (question 5) for entity count, broker location and one capture with the broker set by IP.
 
 2026-10-24 Sergeant D (https://discord.com/channels/812969634638725140/1514720723980259460/1563464620956450840, answers 5a-5c): 405 entities in the MQTT integration; broker is the Mosquitto add-on on the HA machine; he will send a capture with the broker set by IP. 405 entities is far more than the bench publishes: the discovery burst size is the next suspect to reproduce.
+
+2026-10-25 bench (wf_41c083ef, refuted by a second reader; OTGW32 alpha.504+51c1290, OT-Direct, SAT on, no boiler, broker 192.168.88.32 by IP, reboot via /ReBoot, read after ~90 s, no telnet): boot hd_min_free_heap 14788, 3360 (max block 1076, enter low/warn 3/1), 12504, 8448, 4596 B (n=5, median 8448). So a near-repro of Sergeant D's 1524 B is possible on the bench, with a wide spread. Foreign HA discovery tree ruled out by code AND broker: the unit subscribes only to OTGW/set/<node>/#, homeassistant/status and 6 v1 topics for 5 s (MQTTstuff.ino:1364-1374, :1577-1620); discovery-verify filter is <prefix>/+/<node>/# and starts only at uptime >= 3600 s with NTP (mqtt_discovery_verify.cpp:109-117); receive path uses fixed buffers (MqttClient.h:132 RX 1440, Parser.h:32, MQTTstuff.ino:795/:1076); outbound publishes are malloc'd per packet (Packet.cpp:323-324, EMC_USE_MEMPOOL 0). Broker .32 delivers 0 retained messages to the unit at boot (checked read-only). The 400-config preload was not run (blocked by the auto-mode classifier; the code says it cannot matter). Not an A/B with the 2026-10-24 local-mosquitto runs (other firmware, session, weather on, RSSI -74). Side finding (code): getHeapHealth() counts tier entries only when polled (helperStuff.ino:922-931), so short dips below 5120/3072 leave enter_warning/critical at 0 (seen: 4596 B with enter_warning 0); hd_min_max_block is a 1 Hz sample (helperStuff.ino:422-424). Next: telnet [HEAP] trace across the connect steps (MQTTstuff.ino:1340-1385) over a few boots, to name the step that holds the dip.
 <!-- SECTION:NOTES:END -->
