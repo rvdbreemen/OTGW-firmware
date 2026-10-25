@@ -2859,3 +2859,33 @@ MsgID 27 (0.0 without a sensor): with no source SAT silently heats on a curve fo
 **Task:** TASK-1390.
 
 **Open:** the age threshold and the hand-back form (Q7b).
+
+## 57. Outside temperature counts as old after one hour (2026-10-25)
+
+**Source:** #alpha-testing, 2026-10-25 13:19 UTC, answer to Q7b (13:18 UTC, message 1563904467403800678:
+A) old = no fresh value from any source for 1 hour, then the lost-OpenTherm hand-back (CS=0, CH=1, MM=T
+once) and resume by itself when a fresh value arrives; B) the same with 3 hours; C) something else;
+our advice A):
+https://discord.com/channels/812969634638725140/1514720723980259460/1563904963237642251
+
+**Quoted:**
+
+> Q7b: one hour is fine
+
+**Settled by this statement:**
+
+- The outside temperature is "old" when no source (external sensor, weather service, boiler MsgID 27)
+  has delivered a fresh value for one hour.
+
+**Interpretation (ours):** he chose the 1-hour option A, so the rest of option A applies too: on
+expiry SAT does the lost-OpenTherm hand-back once (entry 47) and resumes by itself when a fresh value
+arrives. He did not comment on the hand-back form separately.
+
+**Compared with thermo-nova and the firmware:** thermo-nova stops sending when the outside
+temperature is None (`climate.py:544-545`), without an age rule. Firmware: see entry 56.
+
+**Changes an earlier entry:** completes entry 56.
+
+**Task:** TASK-1390.
+
+**Open:** none.

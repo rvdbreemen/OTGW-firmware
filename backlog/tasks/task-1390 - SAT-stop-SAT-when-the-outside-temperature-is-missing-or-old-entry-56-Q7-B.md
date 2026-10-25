@@ -4,6 +4,7 @@ title: 'SAT: stop SAT when the outside temperature is missing or old (entry 56, 
 status: To Do
 assignee: []
 created_date: '2026-10-25T13:17:00Z'
+updated_date: '2026-10-25T13:34:00Z'
 labels:
   - sat
 milestone: 2.0.0
@@ -23,3 +24,9 @@ Sergeant D 2026-10-25 (Q7: B, entry 56): when the outside temperature is missing
 - [ ] #2 Weather value expires after the agreed age (Q7b)
 - [ ] #3 Status shown (REST/MQTT/UI), docs updated
 <!-- AC:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+2026-10-25 Q7b answered (entry 57): old = no fresh value from any source for 1 hour; on expiry the entry-47 hand-back once, resume when a fresh value arrives.
+<!-- SECTION:NOTES:END -->
