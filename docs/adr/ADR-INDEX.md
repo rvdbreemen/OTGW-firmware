@@ -169,7 +169,7 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-161 | Accepted | - | Expose the BLE roster over REST v2 as a dedicated endpoint /api/v2/sat/ble/roster (GET / PUT / DELETE), not as ~27 fl... |
 | ADR-162 | Accepted | - | Add a deliberate, transient, auth-gated test hook: a REST (Representational State Transfer) endpoint POST /api/v2/sat... |
 | ADR-163 | Accepted | - | Serve Web UI static assets with Cache-Control: no-cache (the browser may store but MUST revalidate via If-None-Match... |
-| ADR-164 | Accepted | - | On the combo board, AUTO board detection (iBoardMode == 0) detects once on first boot and persists its verdict once i... |
+| ADR-164 | Superseded | - | On the combo board, AUTO board detection (iBoardMode == 0) detects once on first boot and persists its verdict once i... |
 | ADR-165 | Accepted | - | Adopt N=2 as the confirmed safe-and-robust parallelism ceiling for RESTMAXINFLIGHT and WEBFILEMAXINFLIGHT on the ESP3... |
 | ADR-166 | Superseded | - | Firmware/app OTA is rejected outright on any board whose partition table has no spare app slot (single otaX == the ru... |
 | ADR-167 | Accepted | - | On the dev branch, retire the ADR-089 heap tier machine and the ADR-121 per-consumer gating in a separate Phase-3 imp... |
@@ -206,4 +206,4 @@ One row per Architecture Decision Record. Scope is the Enforcement `path_glob` s
 | ADR-198 | Proposed | - | SAT keeps thermo-nova's convex heating curve with one user coefficient, default 2.0, and a base offset chosen by the... |
 | ADR-199 | Proposed | - | While SAT is the active controller, one per-heating-system cold setpoint replaces thermo-nova's COLDSETPOINT 22 at ev... |
 | ADR-200 | Accepted | - | The GPIO output follows one bit of the 16-bit MsgID 0 status word Statusflags = (MasterStatus << 8) \| SlaveStatus (OT... |
-| ADR-201 | Proposed | - | On the combo board, boot detection persists only a positive PIC verdict, and every boot that is not already a persist... |
+| ADR-201 | Accepted | - | On the combo board, boot detection persists only a positive PIC verdict, and every boot that is not already a persist... |

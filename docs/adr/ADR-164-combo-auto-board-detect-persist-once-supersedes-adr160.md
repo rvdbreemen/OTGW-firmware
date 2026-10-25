@@ -1,25 +1,8 @@
 ---
-id: ADR-164
+id: "ADR-164"
 title: "Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)"
-status: "Accepted"
-date: 2026-07-04
-tags:
-  - "board-detection"
-  - "combo"
-  - "otgw32"
-  - "esp32s3"
-  - "pic"
-  - "boot"
-  - "reliability"
-  - "i2c"
-superseded_by: null
-related:
-  - "ADR-126"
-  - "ADR-127"
-  - "ADR-158"
-  - "ADR-160"
-deciders:
-  - "Robert van den Breemen"
+status: "Superseded"
+date: "2026-10-25"
 binding: false
 gate: null
 documents_shipped: true
@@ -31,13 +14,30 @@ verified_in:
   - "commit:d7a34f4ad"
 supersedes:
   - "ADR-160"
+superseded_by: "ADR-201"
+related:
+  - "ADR-126"
+  - "ADR-127"
+  - "ADR-158"
+  - "ADR-160"
+deciders:
+  - "Robert van den Breemen"
+tags:
+  - "board-detection"
+  - "combo"
+  - "otgw32"
+  - "esp32s3"
+  - "pic"
+  - "boot"
+  - "reliability"
+  - "i2c"
 ---
 
 # ADR-164: Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)
 
 ## Status
 
-Accepted, 2026-07-04 (authored and accepted the same day by the maintainer Robert van den
+Superseded by ADR-201, 2026-10-25.
 Breemen, who directed the reversal). This ADR documents the board-detection behaviour that
 is already shipped and on-device-verified on the 2.0.0 `dev` line; it reverses the
 never-persist rule that ADR-160 recorded.
@@ -64,6 +64,11 @@ status_history:
     changed_by: maintainer (Robert van den Breemen)
     reason: Accepted after code-implementation verification (persist-once + 3x retry live at OTGW-firmware.ino:341-405) on maintainer instruction in-session, choosing a superseding ADR over an in-place amendment for a genuine decision reversal.
     changed_via: manual
+  - date: 2026-10-25
+    status: Superseded
+    changed_by: Robert van den Breemen
+    reason: Superseded by ADR-201 (asymmetric persist), accepted 2026-10-25
+    changed_via: adr-kit lifecycle
 ```
 
 ## Context

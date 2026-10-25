@@ -5166,8 +5166,8 @@
       "title": "Combo AUTO board detection persists its PIC verdict once (supersedes ADR-160)",
       "path": "ADR-164-combo-auto-board-detect-persist-once-supersedes-adr160.md",
       "format": "nygard",
-      "status": "Accepted",
-      "date": "2026-07-04",
+      "status": "Superseded",
+      "date": "2026-10-25",
       "decision_summary": "On the combo board, AUTO board detection (iBoardMode == 0) detects once on first boot and persists its verdict once i...",
       "topics": [],
       "aliases": [],
@@ -5197,7 +5197,7 @@
         "supersedes": [
           "ADR-160"
         ],
-        "superseded_by": null
+        "superseded_by": "ADR-201"
       }
     },
     {
@@ -7228,7 +7228,7 @@
       "title": "Combo board detection persists only a positive PIC verdict and re-probes every boot (supersedes ADR-164)",
       "path": "ADR-201-combo-board-detection-persists-only-a-positive-pic-verdict-and-re-probes-every-boot-supersedes-adr-164.md",
       "format": "canonical",
-      "status": "Proposed",
+      "status": "Accepted",
       "date": "2026-10-25",
       "decision_summary": "On the combo board, boot detection persists only a positive PIC verdict, and every boot that is not already a persist...",
       "topics": [
@@ -7289,7 +7289,9 @@
         "verified_in": [
           "commit:2a820ac11"
         ],
-        "supersedes": [],
+        "supersedes": [
+          "ADR-164"
+        ],
         "superseded_by": null
       }
     }
@@ -11946,6 +11948,12 @@
       "resolved": true
     },
     {
+      "source": "ADR-164",
+      "target": "ADR-201",
+      "type": "superseded-by",
+      "resolved": true
+    },
+    {
       "source": "ADR-165",
       "target": "ADR-089",
       "type": "related",
@@ -12933,6 +12941,12 @@
       "source": "ADR-201",
       "target": "ADR-164",
       "type": "related",
+      "resolved": true
+    },
+    {
+      "source": "ADR-201",
+      "target": "ADR-164",
+      "type": "supersedes",
       "resolved": true
     }
   ]
