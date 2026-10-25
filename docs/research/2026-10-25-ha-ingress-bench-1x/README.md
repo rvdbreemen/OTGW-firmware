@@ -32,9 +32,13 @@ Root causes found on the old build:
    `'/update'`, `"/FSexplorer"`), `FSexplorer.html` and the update page used `/upload`,
    `/update`, `/ReBoot`, `/`, `/api/v2/...`. Behind a proxy those hit the proxy, not the device.
 2. The upload/delete response (`FSexplorer.ino` `Header[]`) ended without the blank
-   line that closes the header block, and without Content-Length. Chromium tolerates
-   that; curl, nginx and aiohttp (hass_ingress) do not. curl direct to the device:
-   old `000` (no response), fix `303`. Through every proxy: old `502`, fix `303`.
+   line that closes the header block, and without Content-Length. Chromium and curl
+   accept that when the connection closes; nginx and aiohttp (hass_ingress) do not
+   (nginx: "upstream prematurely closed connection while reading response header").
+   Through every proxy: old `502`, fix `303`; through nginx with the released
+   1.7.8-beta.5 3/3 `502`, with the fix 3/3 `303` (`csrf_curl_before_after.txt`).
+   One early direct curl on the old build returned `000`; repeated runs on beta.5
+   returned `303`, so direct curl is not evidence either way.
 3. The live log only showed a notice for PS=1 mode; behind a proxy it stayed
    "Disconnected" without explanation, and over plain-HTTP ingress it tried
    `ws://<ha-host>:81`.
@@ -65,12 +69,12 @@ hass_ingress copies the browser's request headers except its own token cookie
 | nginx, Host kept | 200 | 303 |
 | nginx default (Host = upstream) | 403 | 403 |
 
-curl straight to the device, password set: no Origin 200, same Origin 200,
-`Origin: http://evil.example` 403, no credentials 401; upload with the foreign
-Origin 403 and the file was not written, upload with the same Origin 303.
-`isSameOriginRequest()` is unchanged by this change (no diff in `restAPI.ino`), so
-the CSRF behaviour is the same as before; the old build was not re-run with a
-password. Outcome: no firmware change to the CSRF check. The recommended proxy
+curl straight to the device, password set, run on the released 1.7.8-beta.5
+(before) and on the fix (after), `csrf_curl_before_after.txt`: identical on both:
+no Origin 200, same Origin 200, `Origin: http://evil.example` 403, no credentials
+401; upload with the foreign Origin 403 and the file was not written, upload with
+the same Origin 303. `isSameOriginRequest()` is byte-identical in beta.5 and the
+fix. Outcome: no firmware change to the CSRF check. The recommended proxy
 setups keep the browser's Host, and the guide says so.
 
 ## Firmware OTA through HA ingress (HTTPS)
